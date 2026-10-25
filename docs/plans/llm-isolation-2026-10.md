@@ -1,7 +1,7 @@
 # Plan: the pipeline is the only controller, and each LLM agent runs in an isolated cell
 
-- **Status:** proposed, 2026-10-25. The operator reviews this design set before any code.
-- **Design:** [llm-isolation](../architecture/llm-isolation.md). **Decisions:** [ADR-0154](../architecture/adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md) and, for §11, [ADR-0155](../architecture/adr/0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md). **Research:** [llm-isolation-2026-10](../research/llm-isolation-2026-10.md).
+- **Status:** proposed, 2026-10-25. The operator approved §1 to §11 on 2026-10-25, and X1 is merged (§6.1). §12 is new, and the operator reviews it before its code.
+- **Design:** [llm-isolation](../architecture/llm-isolation.md). **Decisions:** [ADR-0154](../architecture/adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md), for §11 [ADR-0155](../architecture/adr/0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md), and for §12 [ADR-0156](../architecture/adr/0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md). **CLI contract:** [cli-contract](../architecture/cli-contract.md). **Research:** [llm-isolation-2026-10](../research/llm-isolation-2026-10.md).
 
 ## Table of contents
 
@@ -16,6 +16,7 @@
 9. [Risks](#9-risks)
 10. [Open questions](#10-open-questions)
 11. [Part II: self-healing within boundaries](#11-part-ii-self-healing-within-boundaries)
+12. [Part III: the CLI service contract and no ambient control flags](#12-part-iii-the-cli-service-contract-and-no-ambient-control-flags)
 
 ## 1. Request
 
@@ -155,6 +156,32 @@ Each component is one PR, with a red test first. The spec section is the accepta
 | X10 | Neutral instruction source | G9 | I-6, I-7 | A generated `GEMINI.md` differs from the checked-in file. | X1 | `enforce` (a generator check) |
 | X11 | Console through the bridge | G10 | I-1, I-9 | A console review runs with no bridge launch record. | X3, X6, X10 | `enforce` for the console briefs |
 
+### 6.1 Component state
+
+The state on 2026-10-25. Each component re-reads this table before it starts.
+
+| Id | State | PR | Note |
+|---|---|---|---|
+| X1 | merged | #1121 | The matrix is `isolation.Rows` (`go/internal/isolation/matrix.go`). Rows M1 and N9 are green, and each other row is an expected failure with its owner. |
+| X2 | merged, stage `shadow` | #1122 | The stage key is `isolation.i2.stage`, and the flip to `enforce` is an operator decision. X2 closed review finding H2 in the bridge with the explicit list `pipelineEnvMarkers`. X18b makes one list the source for the whole pipeline. |
+| X1b | not started | none | Follow-up of X1, item `isolation-matrix-tmux-repl-fake`: a tmux REPL fake, so the rows M2 to M4 can run a full cycle. |
+| X6 | merged | #1123 | `cli_routing.floors` holds the Claude floor, and its compiled default is `go/internal/policy/routing_defaults.json`. The flow seat defaults are routing data. |
+| X6b | not started | none | Follow-up of X6, item `isolation-floor-profiles-allowed-clis-as-routing-data`. 7 profiles still set `allowed_clis` to Claude families, so an agy-only table cannot compile yet (§6.2). |
+| X3 to X5, X7 to X19 | not started | none | |
+
+### 6.2 The X6 follow-up (X6b)
+
+X6 moves the Claude floor into routing data, but 7 tracked profiles keep their own pin in `allowed_clis`:
+
+| Profile | `allowed_clis` |
+|---|---|
+| `auditor`, `adversarial-review`, `tdd-engineer`, `spec-verifier`, `spec-verify`, `code-reviewer` | `["claude"]` |
+| `router` | `["agy-claude", "claude"]` |
+
+A policy that routes every seat to `agy` and sets `floors` to `{}` still cannot compile, because these profiles refuse the family. So the matrix rows M2 to M5 stay red after X6. X6b (item `isolation-floor-profiles-allowed-clis-as-routing-data`, filed by #1123) moves each pin into the `floors` data or the `agents` chain of `cli_routing`, with the same values. Its red test is the matrix row M2 with `floors: {}`. It depends on X6.
+
+The operator refinement of 2026-10-25 (the lineage index) is in D6 and D6b, in the spec §8 and in ADR-0154 rules 10 to 15. No change is needed for it.
+
 ## 7. Order
 
 1. **X1** first. The matrix shows each gap as a red row. Each later PR turns its rows green, so progress is measured, not claimed.
@@ -288,3 +315,129 @@ X12 to X16 start after X1 to X5, because isolation comes first. X13 also needs X
 
 1. Q5. Which family holds the orchestrator seat? The proposal: the deep chain of today's advisor, as routing data.
 2. Q6. The flip thresholds of the spec §20.2 have no baseline. The operator confirms them after two `shadow` windows.
+
+## 12. Part III: the CLI service contract and no ambient control flags
+
+### 12.1 Request
+
+The operator, 2026-10-25:
+
+> "Make sure evo loop cli can be invoked for most of the core functions all the time. It's the interfaces for other services to use it's functions anytime."
+
+> "this refactory is also the good timing to remove the global flag that should be removed and replaced with dynamic configuration long time ago"
+
+Later the same day the operator added a third point, which became X19 and the invariant I-17 of ADR-0154:
+
+> "The Pipeline itself must be agnostic for the assignment and configurations, LLM specification can only be appended under the driver layer."
+
+The research is in [§6 of the dossier](../research/llm-isolation-2026-10.md#6-the-cli-service-contract-and-the-control-flags). The decision is [ADR-0156](../architecture/adr/0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md). The design is [Part III of the spec](../architecture/llm-isolation.md#26-the-cli-service-contract-x17) and [cli-contract.md](../architecture/cli-contract.md).
+
+### 12.2 Facts
+
+| Fact | Research id |
+|---|---|
+| 112 verbs, with no contract document | F4.1 |
+| No JSON output has a schema version, and many core verbs print prose only | F4.2 |
+| No shared exit-code table: a usage error is 1 in some verbs and 10 in others | F4.3 |
+| `evolve loop status foo` starts a real loop | F4.4 |
+| Five inbox verbs and the `cli-routing` writers refuse during a wave | F4.5 |
+| `gc` takes no lease | F4.7 |
+| Some verbs read the root only from the environment or the current directory | F4.8 |
+| `inbox claim`, a dossier read, `cycle resume`, a wave stop and `events` are absent | F4.10 |
+| `policy.Parse` ignores an unknown key | F5.4 |
+| Each knob and bypass in the environment reaches the LLM children | F5.5 |
+| The readers fall into five classes: 32 markers, 18 knobs, 10 bypasses, 6 dead, 8 test seams | F5.6 |
+
+### 12.3 Candidate designs
+
+The criteria are C1 to C7 of §4. C2 is read as "closes F4.1 to F5.6". The maximum total is 70.
+
+| Design | C1 | C2 ×3 | C3 ×2 | C4 ×3 | C5 ×2 | C6 ×2 | C7 ×2 | Total |
+|---|---|---|---|---|---|---|---|---|
+| K1 A contract for the CLI, and the control flags into policy, parameters or deletion | pass | 5 | 4 | 5 | 3 | 5 | 5 | **64** |
+| K2 A local daemon with an RPC API; the flags stay | pass | 2 | 2 | 4 | 1 | 4 | 5 | 42 |
+| K3 Document the CLI as it is; strip the flags only at the bridge | pass | 2 | 3 | 5 | 5 | 5 | 5 | 57 |
+
+- **K1** closes each fact. The flag move removes the knobs and bypasses from each cell, so C3 is 4. It touches many verbs, so C5 is 3.
+- **K2** adds a server, authentication and a lifecycle. It does not fix the exit codes of the CLI or the flags, so C2 is 2 and C5 is 1.
+- **K3** is cheap. It leaves the prose outputs, the refusals during a wave and the knobs in the environment. A deny list at the bridge misses each new name, so C3 is 3.
+
+X19 has no scored designs. It is an operator directive of 2026-10-25, and §12.4 records it as D29 to D31.
+
+**Why K1 wins.** K1 leads K3 by 7 points, and K3 wins only on delivery size. K1 is the only design that gives a caller a typed result at any time and removes the ambient control. **What changes our mind:** a service that needs more calls a second than a process start allows. Then K2 becomes a separate decision on top of K1.
+
+### 12.4 Decisions
+
+| Id | Decision | Because |
+|---|---|---|
+| D21 | One CLI contract file lists the core verbs, the envelope, the exit table and the classes. | F4.1 to F4.3, P4.1, P4.2 |
+| D22 | Fix `loop status <word>` before any other X17 work. | F4.4 |
+| D23 | The inbox and `cli-routing` writers queue during a wave. `gc` takes a lease. The boundary verbs keep their refusal. | F4.5 to F4.7 |
+| D24 | Add `inbox claim`, `dossier show`, `cycle resume`, `wave stop` and `quality show`. The `events` verbs are E9. | F4.10 |
+| D25 | Make `policy.Parse` strict before any knob moves in. | F5.4, P4.5 |
+| D26 | One named marker list is the only source of `EVOLVE_*` and `BRIDGE_*` names in a cell. | F5.5, X2 review H2 |
+| D27 | Knobs go into the policy file, bypasses become audited parameters, dead names go, test seams are injected. | F5.6, P4.3, P4.6 |
+| D28 | A guard test refuses a new environment read outside the marker list. | F5.3 |
+| D29 | The task assignment holds only neutral fields: role, input index, output contract, tier, effort, budgets, sandbox intents and persona text. | F6.1, F6.2 |
+| D30 | Model names, CLI flags, tool syntax, prompt delivery, environment, dialogs and parsers live only in the drivers and manifests. | F6.3, F6.5 |
+| D31 | The pipeline asks for capabilities. A seat with no capable driver gets a routing refusal. | F6.1, P4.7, spec §11 |
+
+### 12.5 Invariants
+
+| Id | Invariant | Guard | Signal |
+|---|---|---|---|
+| I-15 | The CLI is the service contract. | `TestCLIContract_DocMatchesTheRegistry`, the envelope table test | none (a test guard) |
+| I-17 | The assignment is CLI-neutral (ADR-0154 rules 20 to 24). | `TestNoCLISpecificsAboveTheDriver` | none (a test guard) |
+| I-16 | No ambient control. | `TestNoControlFlagReadOutsideTheMarkerList`, `TestPolicyParse_RefusesAnUnknownKey` | `CONTROL_BYPASS_USED` |
+
+### 12.6 Components
+
+| Id | Component | Invariant | Red test first | Depends on | Stage when it lands |
+|---|---|---|---|---|---|
+| X17a | `loop status <word>` never starts a loop | I-15 | `evolve loop status foo` records a launch on a fake runner | none | `enforce` |
+| X17b | The envelope, the exit table, `--json` and `--project-root` on each core verb, and the contract guard | I-15 | `TestCLIContract_DocMatchesTheRegistry` fails on `inbox list` with no `--project-root` | X17a | `enforce` |
+| X17c | The queue for the inbox and `cli-routing` writers, and the `gc` lease | I-15 | `inbox edit` during a live lease exits 1 | X17b | `shadow` one wave, then `enforce` |
+| X17d | The new verbs: `inbox claim`, `dossier show`, `cycle resume`, `wave stop`, `quality show` | I-15 | the contract guard lists the five verbs as absent | X17b | `enforce` |
+| E9 | The `events` verbs (the events plan) on the X17b envelope | I-15 | the E9 tests of the events plan | X17b | as the events plan says |
+| X18a | Strict `policy.Parse` | I-16 | a policy with `fleet.cuont` parses with no error | none | `enforce` |
+| X18b | The named marker list, the `buildCycleEnv` fix and the AST guard | I-16, I-2 | `EVOLVE_BYPASS_SHIP_GATE` on the parent reaches the cycle env | X2 | `enforce` |
+| X18c | The 18 knobs move into the policy file | I-16 | `EVOLVE_ROUTING_MODE=static` changes the routing with no policy key | X18a, X18b | one wave `shadow` (WARN on a differing env value), then `enforce` |
+| X18d | The 10 bypasses become audited parameters or go | I-16, I-10 | `EVOLVE_SANDBOX=off` turns the sandbox off with no record | X18b | `enforce` |
+| X18e | Delete the 6 dead names; inject the 8 test seams | I-16 | the flag registry lists `EVOLVE_WORKTREE_PATH` with no reader | X18b | `enforce` |
+| X19a | The neutral `TaskAssignment`; no CLI in `PhaseRequest` or in the advisor plan; the guard with a shrinking allowlist | I-17 | `TestNoCLISpecificsAboveTheDriver` lists `ModelRoutingCLI` and the advisor `"cli"` field | X6 | `enforce` |
+| X19b | Neutral sandbox intents in the profiles; `extra_flags_by_cli` into the manifests; neutral personas | I-17 | the guard lists `Bash(evolve phase verify:*)` in 93 profiles | X19a, X6b | `enforce` |
+| X19c | Capability negotiation in the router | I-17 | a seat that needs `edit` routes to a driver with no `edit` capability | X9, X19a, X6b | `enforce` |
+
+### 12.7 Order
+
+1. X17a first. A wrong read can start a batch today.
+2. X18a and X17b in parallel. They touch different packages (`policy`, `cmd/evolve`).
+3. X18b after X2, which is merged. X18b grows the bridge list `pipelineEnvMarkers` of X2 into the one list of the pipeline.
+4. X17c and X17d after X17b, because they use its envelope and exit table.
+5. X18c, X18d and X18e after X18b. The guard of X18b then stops a new reader while the knobs move.
+6. X19a after X6, because X6 removes the family literals of the flow seats first. X19b follows X19a and X6b, because they edit the same profiles. X19c waits for X6b and for the manifest `capabilities` field of X9. The spec §28 has the map of what X19 leaves to X6, X6b, X7, X9, X10 and X18.
+
+### 12.8 Verification
+
+| Goal | Measure | Before (2026-10-25) | After |
+|---|---|---|---|
+| A read never starts work | read forms that start a loop | 1 | 0 |
+| Typed results | core verbs with a versioned envelope | 0 | each verb of cli-contract.md §5 |
+| One exit table | core verbs whose usage error is 10 | some (F4.3) | each core verb |
+| Work during a wave | core writers that refuse only because a lease is live | 9 (5 inbox, 4 `cli-routing`) | 0 |
+| No ambient control | environment reads outside the marker list, by AST guard | 42 names in classes b to e (F5.6) | 0 |
+| No knob in a cell | matrix row N1 with `EVOLVE_SANDBOX` and `EVOLVE_BYPASS_SHIP_GATE` on the parent | they reach the child | they do not |
+
+### 12.9 Risks
+
+| Risk | Control |
+|---|---|
+| A script that sets a knob in the environment breaks. | One wave of `shadow`: the pipeline warns when an environment value differs from the policy value. The CHANGELOG lists each moved knob. |
+| The strict decode refuses the tracked policy file. | X18a lists the unknown keys of the tracked file and the fixtures first, and removes them in the same PR. |
+| A queued change applies in the wrong order. | One file for each request, applied in time order at the boundary, with one signal each. |
+| A new exit code breaks a caller that checks `1`. | A verb keeps its old code for one release with a WARN line. |
+
+### 12.10 Open questions
+
+1. Q7. Which verbs outside cli-contract.md §5 are core? The proposal is the table of §5. The operator confirms it at X17b.
+2. Q8. Does `loop-stop` stay a verb, or does `wave stop` replace it? The proposal keeps both for one release.

@@ -1,0 +1,30 @@
+{
+  "id": "control-flags-bypasses-audited",
+  "kind": "hardening",
+  "priority_class": "security",
+  "weight": 0.6,
+  "route": "console-manual",
+  "title": "Control flags X18d: the 10 bypass flags become explicit CLI parameters that write an audit record, or they are removed",
+  "summary": "10 bypasses are read from the environment: EVOLVE_SANDBOX, EVOLVE_USE_PHASE_REGISTRY, EVOLVE_OPERATOR_CONFIRM, EVOLVE_SHIP_AUTO_CONFIRM, EVOLVE_PHASE_<X>_BIN, BRIDGE_ALLOW_BYPASS, BRIDGE_DRY_RUN, BRIDGE_ALLOW_ANTHROPIC_BASE_URL, BRIDGE_ALLOW_OPENAI_API_KEY and BRIDGE_HUMAN_SIMULATION. They leave no record and reach the LLM children. List with readers: docs/architecture/control-flags.md class (c). Spec: docs/architecture/llm-isolation.md §27 step 4; ADR-0156 rule 13.",
+  "fix": "For each bypass, either add an explicit CLI parameter that writes a ledger record and a CONTROL_BYPASS_USED signal (INFO), or remove it. EVOLVE_OPERATOR_CONFIRM keeps -operator as the only surface. EVOLVE_SANDBOX=off is refused inside a phase (spec §7). Register CONTROL_BYPASS_USED in the Signal Center.",
+  "acceptance": [
+    "RED first: EVOLVE_SANDBOX=off turns the sandbox off with no ledger record and no signal today",
+    "Each class (c) name has no environment read after the change",
+    "Each bypass parameter writes one ledger record and one CONTROL_BYPASS_USED signal",
+    "Each removed bypass is listed in the CHANGELOG",
+    "Changed functions at 100% coverage; control-flags.md, signal-codes.md and runtime-reference.md updated"
+  ],
+  "deps": [
+    "control-flags-marker-list-and-guard"
+  ],
+  "files": [
+    "go/internal/config/",
+    "go/internal/looppreflight/",
+    "go/internal/continuation/",
+    "go/internal/phases/ship/verify.go",
+    "go/internal/adapters/runner/runner.go",
+    "go/internal/bridge/"
+  ],
+  "created_at": "2026-10-25T12:00:28Z",
+  "source": "console, 2026-10-25, plan llm-isolation-2026-10 component X18d (ADR-0156)"
+}

@@ -1,0 +1,27 @@
+{
+  "id": "cli-neutral-task-assignment-and-guard",
+  "kind": "refactor",
+  "priority_class": "stability",
+  "weight": 0.6,
+  "route": "console-manual",
+  "title": "LLM isolation X19a: a CLI-neutral TaskAssignment; no CLI in PhaseRequest or in the advisor plan; a guard on CLI specifics",
+  "summary": "The pipeline carries CLI specifics above the driver layer: core.PhaseRequest has ModelRoutingCLI, ModelRoutingTier and ModelRoutingEffort (go/internal/core/phase.go:101-105), the runner uses ModelRoutingCLI as an overlay (go/internal/phases/runner/routing.go:94, :113), and the advisor plan asks the LLM for a cli (go/internal/core/advisor/prompt.go:90). ADR-0154 I-17 (rules 20 to 24). Spec: docs/architecture/llm-isolation.md §28.",
+  "fix": "Define the neutral TaskAssignment of spec §28: role, input index, output contract, capability tier, effort intent, budgets, sandbox intents and persona text. Drop ModelRoutingCLI from PhaseRequest; the driver identity from cli_routing passes through opaque. The advisor proposes a tier, not a cli. Add TestNoCLISpecificsAboveTheDriver with an allowlist of today's sites that can only shrink; reuse the allowlist mechanism of X6's TestFlowCodeNamesNoFamily so there is one mechanism.",
+  "acceptance": [
+    "RED first: TestNoCLISpecificsAboveTheDriver lists ModelRoutingCLI and the advisor \"cli\" field outside internal/bridge and the routing-data loader",
+    "PhaseRequest has no CLI field; the guard's AST rule fails on a == or switch over a driver identity string in any package outside internal/bridge and the routing-data loader",
+    "The advisor plan schema has no cli field",
+    "Changed functions at 100% coverage; spec §28 and the core, runner and advisor package notes updated"
+  ],
+  "deps": [
+    "isolation-floors-and-defaults-as-routing-data"
+  ],
+  "files": [
+    "go/internal/core/phase.go",
+    "go/internal/phases/runner/routing.go",
+    "go/internal/core/advisor/",
+    "go/internal/llmroute/"
+  ],
+  "created_at": "2026-10-25T12:00:31Z",
+  "source": "console, 2026-10-25, operator design point, plan llm-isolation-2026-10 component X19 (ADR-0154 I-17)"
+}

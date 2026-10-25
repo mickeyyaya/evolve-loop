@@ -132,7 +132,7 @@ The raise reaches the dispatch through its own field, not the advisor overlay:
 
 - `PhaseRequest` carries the ladder rung beside `ModelRoutingCLI` and `ModelRoutingTier`. L3 added its effort part, `ModelRoutingEffort`. The runner puts it into `llmroute.Overlay.Effort`, and the bridge sends it as `--effort` over the tier default. On agy-tmux, a ladder effort above the variant of the model name is capped, and the launch writes the requested and the granted effort ([internal-bridge](packages/internal-bridge.md)).
 - A new `cliroute` step runs after `overlayTier`. It applies the ladder tier and effort, ignores `modelFixed`, and clamps them to `max_tier` and `max_effort`.
-- The allowed set and the family floor (`profiles/family_floor.go`) still apply. A floor seat never goes below its floor.
+- The allowed set and the family floor (`cli_routing.floors`, since X6) still apply. A floor seat never goes below its floor.
 - `evolve cli-routing set` validates `max_tier` and `max_effort` when it compiles the table.
 - L4 built these four rules in `cliroute` (`applyLadder`, `clampLadder`) and in `evolve cli-routing set` (`--max-tier`, `--max-effort`). The rung reaches the router as `llmroute.Overlay.LadderTier` and `Overlay.Effort`. L5 sets them from the decider ([internal-cliroute](packages/internal-cliroute.md)).
 

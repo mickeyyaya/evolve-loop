@@ -1,0 +1,25 @@
+{
+  "id": "cli-contract-envelope-exit-codes-guard",
+  "kind": "feature",
+  "priority_class": "stability",
+  "weight": 0.6,
+  "route": "console-manual",
+  "title": "CLI contract X17b: one versioned envelope, one exit-code table, --json and --project-root on each core verb, and a registry guard",
+  "summary": "112 verbs and no contract document (research F4.1). Many core verbs print prose only and no JSON has a schema version (F4.2). Usage errors exit 1 in loop-stop and inbox-mover and 10 in gc, loop status and quality (F4.3). inbox list|show|rank|add|edit|withdraw|consume and signals tail have no --project-root (F4.8). Spec: docs/architecture/cli-contract.md §2, §3, §5, §7.",
+  "fix": "Add one envelope writer (schema, ok, data, error, warnings) and one exit-code table (0 ok, 1 failed, 2 io, 3 refused, 4 queued, 10 usage, 11 input) in cmd/evolve. Give each core verb of cli-contract.md §5 --json and --project-root. inbox add needs --file - for stdin. A verb that changes a code keeps the old code for one release with a WARN line. Add TestCLIContract_DocMatchesTheRegistry, TestCLIContract_EachCoreVerbPrintsOneEnvelope and TestCLIContract_AlwaysVerbsWriteNothing.",
+  "acceptance": [
+    "RED first: TestCLIContract_DocMatchesTheRegistry parses cli-contract.md §5 and §6 and fails on inbox list with no --project-root",
+    "Each core verb of §5 prints exactly one envelope with a schema field on each exit and exits with a code of §3; the table test has one success, one usage and one refusal case for each verb",
+    "Each always verb leaves the tree hash of a temp root unchanged",
+    "Changed functions at 100% coverage; cli-contract.md 'today' columns and runtime-reference.md updated; CHANGELOG lists each changed exit code"
+  ],
+  "deps": [
+    "cli-contract-loop-status-extra-word"
+  ],
+  "files": [
+    "go/cmd/evolve/",
+    "docs/architecture/cli-contract.md"
+  ],
+  "created_at": "2026-10-25T12:00:21Z",
+  "source": "console, 2026-10-25, plan llm-isolation-2026-10 component X17b (ADR-0156)"
+}

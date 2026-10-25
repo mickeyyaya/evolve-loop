@@ -41,7 +41,8 @@ Bypass = "don't ask the user", NOT "skip integrity checks". These rules are mand
 1. Continue all cycles without a pause. Never ask "should I continue?".
 2. Run the FULL pipeline every cycle: real `scout-report.md` / `build-report.md` / `audit-report.md`.
 3. The Go orchestrator state machine (`go/internal/core`) enforces the phase order at every transition.
-   `evolve guard phase` is a live PreToolUse deny of in-process `Agent`/`Task` dispatch while a cycle is active.
+   `evolve guard phase` is a live PreToolUse deny of in-process `Agent` dispatch while a cycle is active.
+   The hook matcher is `Agent|Task`, but the Go guard checks only `Agent` (`go/internal/guards/phase.go:22`), so a `Task` call passes today. Component X7 of [ADR-0154](docs/architecture/adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md) fixes it (matrix row N11).
    ADR-0075 rewired `evolve guard phase` (`go/internal/guards/phase.go`).
 4. Never fabricate cycle numbers (CRITICAL violation).
 5. Phase agents go through the native bridge (`evolve subagent run` / `evolve loop`). The in-process `Agent` is denied.
@@ -111,7 +112,7 @@ Task priority is the computed inbox rank ([ADR-0121](docs/architecture/adr/0121-
   - Every non-deep, non-top phase runs agy first (Gemini 3.8 Flash High at balanced). No tracked profile defaults to fast, and no tracked profile lets an envelope fall to fast.
   - Since 2026-10-17 deep seats run agy's Gemini 4 Argon (Medium) first, then agy-owned Claude (`agy-claude-tmux`, Claude Opus 5.5), then Claude Code. The operator asked to share the deep build with Argon. Since cycle 1911 an Argon quota wall benches only the Argon model group, not all of agy. Top seats stay agy-owned Claude, then Claude Code.
   - `agy-claude-tmux` waits up to 10 s for a claude-family footer label before the prompt. If no label shows, it exits 87. Exit 87 is a walk trigger, so the seat falls through. The usage query that follows can bench an exhausted Claude group, and preflight only warns on it.
-  - The Claude floor seats (auditor, adversarial-review, tdd-engineer, code-reviewer and the spec verifiers) run Claude Code only. The floor is routing data, not code: `cli_routing.floors.claude` in `.evolve/policy.json`. With no `floors` key, the compiled default is the same list in `go/internal/policy/routing_defaults.json` (ADR-0154 I-6).
+  - The Claude floor seats (auditor, adversarial-review, tdd-engineer, code-reviewer and the spec verifiers) run Claude Code only. The floor is routing data, not code: `cli_routing.floors.claude` in `.evolve/policy.json`. With no `floors` key, the compiled default is the same list in `go/internal/policy/routing_defaults.json` (ADR-0154 I-6, X6 #1123). Seven profiles still pin `allowed_clis`; item `isolation-floor-profiles-allowed-clis-as-routing-data` moves the pins.
   - codex is reachable only under `--bypass-policy`.
   - `evolve cli-routing explain <agent>` prints the chain of any agent.
 - Documents: load `docs-write` before you write any document that a person reads. Each decision cites its evidence and its rejected options ([ADR-0132](docs/architecture/adr/0132-documents-are-written-through-one-skill.md), AGENTS.md invariant 11).
@@ -149,9 +150,19 @@ Task priority is the computed inbox rank ([ADR-0121](docs/architecture/adr/0121-
   - `evolve wave next|status|watch|note` (2026-10-08) runs and watches waves. `wave next` runs the boundary, composes the goal from facts and records the wave. Its `--json` prints one envelope on every exit ([wave-operations.md](docs/operations/wave-operations.md)). `boundary run` stays the low-level primitive.
   - `evolve convergence decide` gives the next step of a console lane's review chain (ADR-0126). The pipeline loops do not call it yet.
   - `workflow.convergence` is a compiled default at stage shadow.
+  - `evolve agent run <profile>` runs one read-only phase agent with no cycle and prints its report; `evolve agent list` names the profiles ([ADR-0152](docs/architecture/adr/0152-one-phase-agent-runs-from-the-command-line-with-no-cycle-through-the-phase-runner.md)).
+  - `evolve quality report --scope wave|tree|judges|replay` and `evolve quality compare` compute the quality indexes and publish them through the Signal Center ([ADR-0153](docs/architecture/adr/0153-quality-is-a-panel-of-separate-indexes-with-intervals-that-the-signal-center-publishes.md)). The scope `wave` reads PQ1, PQ4, CQ2 and CQ1, and `tree` reads CQ3, CQ4 and CQ5. `judges` and `replay` have no readers yet. The boundary runs `quality report --scope wave` after `sync-main`. The stage of each index is `quality.indexes.<id>.stage` (strict), and the checked-in policy does not set it.
+  - `evolve signals tail --channel NAME` reads one event channel under `.evolve/events/ch/`, for example `quality.reading`.
 - When only the deterministic audit gates force a FAIL over a PASS narrative, the cycle gets a bounded Build repair round (ADR-0093).
 - Waves: the console starts each wave with `<plane>/go/bin/evolve wave next` and follows it with `evolve wave watch`. These read cycle state and signals, never the text log. Do not write goal scripts. The standing goal is the tracked `.evolve/wave-goal.md`; queue facts with `evolve wave note add`.
 - Run `/clear` before a new evolve-loop batch. This isolates the session cost.
+- LLM isolation ([ADR-0154](docs/architecture/adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md), [ADR-0155](docs/architecture/adr/0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md), [ADR-0156](docs/architecture/adr/0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md)): the pipeline is the only controller, and each LLM runs in an isolated cell. The state on 2026-10-25:
+  - X1 is merged (#1121): the conformance matrix `isolation.Rows` and the `isolation.violation` channel. Each open gap is an expected-failure row.
+  - X6 is merged (#1123): the Claude floor and the flow seat defaults are routing data.
+  - X2 is merged (#1122): at `enforce` each LLM child gets an allowlisted environment. At the default `shadow` the child keeps today's environment, and the bridge only logs each name that `enforce` drops. The policy key `isolation.i2.stage` defaults to `shadow`, and the checked-in policy does not set it. The flip to `enforce` is an operator decision.
+  - The CLI is the service interface for other services: [cli-contract.md](docs/architecture/cli-contract.md). `evolve loop status <word>` starts a loop today; X17a fixes it.
+  - The pipeline must read no control flag from the environment (X18). [control-flags.md](docs/architecture/control-flags.md) lists each reader by class.
+- Events ([event-notification-protocol-2026-10](docs/plans/event-notification-protocol-2026-10.md)): the channels, the filter, the wake, the reader, the publisher and the root wiring (E10) are on `main`. The `events` CLI verbs (E9) are not started, so `evolve wave watch` still polls every 5 s.
 
 ## References
 
