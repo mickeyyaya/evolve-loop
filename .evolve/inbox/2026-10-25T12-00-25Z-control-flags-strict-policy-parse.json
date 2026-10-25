@@ -1,0 +1,24 @@
+{
+  "id": "control-flags-strict-policy-parse",
+  "kind": "hardening",
+  "priority_class": "correctness",
+  "weight": 0.6,
+  "route": "console-manual",
+  "title": "Control flags X18a: policy.Parse decodes strictly, so a misspelled policy key fails the load",
+  "summary": "policy.Parse uses plain json.Unmarshal (go/internal/policy/patch.go:9-21). Only cli_routing and quality use decodeStrict with DisallowUnknownFields (go/internal/policy/cli_routing.go:124-126, go/internal/policy/quality.go:23). A typo such as fleet.cuont is silently ignored. The knobs of X18c cannot move into the policy until the decode is strict. Spec: docs/architecture/llm-isolation.md §27 step 1; ADR-0156 rule 12.",
+  "fix": "First list each unknown key of the tracked .evolve/policy.json and of the policy test fixtures, and remove or declare each. Then decode Policy with DisallowUnknownFields at every level. The error names the key path.",
+  "acceptance": [
+    "RED first: TestPolicyParse_RefusesAnUnknownKey parses a policy with fleet.cuont, which passes today",
+    "The tracked .evolve/policy.json and every policy fixture parse with no error after the change",
+    "The error message names the full key path of the unknown key",
+    "Changed functions at 100% coverage; the policy package note and spec §27 updated"
+  ],
+  "deps": [],
+  "files": [
+    "go/internal/policy/patch.go",
+    "go/internal/policy/core.go",
+    ".evolve/policy.json"
+  ],
+  "created_at": "2026-10-25T12:00:25Z",
+  "source": "console, 2026-10-25, plan llm-isolation-2026-10 component X18a (ADR-0156)"
+}

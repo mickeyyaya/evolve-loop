@@ -1,6 +1,6 @@
 # Control Flags Reference — `EVOLVE_*`
 
-> The authoritative flag inventory is the **[Generated Flag Index](#generated-flag-index)** below — projected from `go/internal/flagregistry` (the SSOT) and regenerated via `evolve flags generate`. As of **v20.2.0** the operator registry is **35 rows** (flag-campaign-8 banked 48→35; trust the generated table below over any hand-written count).
+> The **[Generated Flag Index](#generated-flag-index)** below is projected from `go/internal/flagregistry` and regenerated with `evolve flags generate`. On 2026-10-25 the registry has **26 rows**. An earlier header said 35, and that count was stale. The registry is not the full inventory: [Classes of the readers outside the registry](#classes-of-the-readers-outside-the-registry) lists each name that production code reads. [ADR-0156](adr/0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md) (I-16, component X18) removes the control flags. After X18, only the pipeline markers stay in the environment.
 >
 > The historical hand-maintained cluster tables were removed in the flag-consolidation campaign: they duplicated the registry and drifted stale (a `never_duplicate` violation). The campaign retires the scattered `os.Getenv` override surface — capabilities move into typed `.evolve/policy.json` config, profile SSOT, DI, or documented subprocess protocol. Background: `docs/research/flag-consolidation-campaign-2026-06-19.md`.
 
@@ -31,6 +31,71 @@ This section documents the closed-vocabulary fields those blocks use.
 - `gates.scan_cache_max_mb` and `gates.scan_cache_budget_seconds` (`.evolve/policy.json:gates.*`) — positive integers that bound the tree hash of the scan shadow. The compiled defaults are 2048 MB and 60 seconds, and a non-positive value takes the default. A tree over either bound makes the shadow degrade for that scan, with the reason in its summary. The ship scan never waits longer than the budget.
 - `gc.testcache_ttl_days` and `gc.testcache_max_mb` (`.evolve/policy.json:gc.*`) — positive integers that bound the store of the scan shadow. The compiled defaults are 14 days and 256 MB, and a non-positive value takes the default. `evolve gc` removes the files past the age, then the oldest files until the store fits the cap. `evolve gc --dry-run` previews it. The ship path never trims the store.
 - `boot.binary_refresh` (`.evolve/policy.json:boot.binary_refresh`) — closed vocabulary: `auto` (the default; empty/absent maps here) or `off`; any other value resolves to `auto` — the self-heal is integrity posture, so a typo must not silently disable it. Runtime meaning: the boot-time binary staleness self-heal for the binary-lag class (fixes land on main but the loop keeps executing the binary it booted with — cycles 1302–1309 ran a sentinel parser the repo had already fixed at cycle-1301). At boot, BEFORE recovery and the readiness gate: when the running binary's embedded build commit is behind plane HEAD by a delta touching `go/`, rebuild via the canonical make target and re-exec the fresh binary in place. Every step is fail-open (any failure WARNs and boots the old binary — a stale batch is yesterday's status quo, a bricked loop is worse); a consume-once marker file (`.evolve/boot-refresh-marker`) caps the heal at one attempt per target HEAD so a rebuild that does not change the stamp can never re-exec forever; `--resume` never refreshes (minimal-perturbation single-cycle protocol — the heal lands at the next fresh boot). `off` is for deliberate old-binary pins (incident bisects). Implementation: `go/cmd/evolve/cmd_loop_boot_refresh.go`; resolution: `Policy.BootBinaryRefresh` (`go/internal/policy/policy.go`). Background: `docs/chronicle/2026-08-binary-lag.md`.
+
+## Classes of the readers outside the registry
+
+> Source: the audit of 2026-10-25 on `origin/main` at `603389ebd` ([research F5.1 to F5.6](../research/llm-isolation-2026-10.md#62-local-evidence-the-control-flags)). The fix of each class is component X18 ([ADR-0156](adr/0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md) I-16, [spec §27](llm-isolation.md#27-no-ambient-control-flags-x18)). Until X18 lands, this list is the full inventory, and the generated index below is not.
+
+The registry has 26 rows. The production code reads more names than that. Many names are built as `"EVOLVE_" + "X"`, so a literal grep misses them. Each reader is in one of five classes.
+
+**(a) Pipeline markers.** The pipeline sets them for its own child processes. They stay, as one named Go list (X18b). Only these names reach a cell.
+
+| Group | Names | Reader |
+|---|---|---|
+| Roots | `EVOLVE_PROJECT_ROOT`, `EVOLVE_PLUGIN_ROOT` | many |
+| Dispatch | `EVOLVE_DISPATCH_ID`, `EVOLVE_DISPATCH_DEPTH`, `EVOLVE_MSG_TOKEN` | `events/rootwire`, `subagent/recursion.go`, `agentmsg/boot` |
+| Fleet and cycle (`ipcenv`) | `EVOLVE_FLEET`, `EVOLVE_FLEET_SCOPE`, `EVOLVE_FLEET_WIDTH`, `EVOLVE_FLEET_REACH_HOLDER`, `EVOLVE_WORKTREE_ROOT`, `EVOLVE_CYCLE_STATE_FILE`, `EVOLVE_TMUX_SOCKET` | `go/internal/ipcenv/ipcenv.go:5-18` |
+| Fan-out worker | `EVOLVE_FANOUT_WORKER_TOKEN`, `EVOLVE_FANOUT_WORKER_NAME`, `EVOLVE_FANOUT_CYCLE`, `EVOLVE_FANOUT_WORKSPACE`, `EVOLVE_FANOUT_PARENT_AGENT`, `EVOLVE_FANOUT_WORKER_ARTIFACT`, `EVOLVE_FANOUT_CACHE_PREFIX_FILE` | `subagent/dispatchparallel.go:176-178`, `fanoutdispatch` |
+| Protocol | `EVOLVE_BRIDGE_PIDFILE`, `EVOLVE_PHASE_RECOVERY_STAGE`, `EVOLVE_SHIP_RELEASE_NOTES`, `EVOLVE_CLI` | `bridge/engine.go:33`, `cli/phasecmd/phase_observer.go:155`, `ship/gitops.go:372`, `codeindex/usagelog/usagelog.go:28` |
+| Bridge launch | `BRIDGE_CLI`, `BRIDGE_RUN_ID`, `BRIDGE_COMPLETION`, `BRIDGE_PERMISSION_MODE`, `BRIDGE_SESSION_NAME`, `BRIDGE_STREAM_OUTPUT`, `BRIDGE_REQUIRE_FULL`, `BRIDGE_REQUIRE_SANDBOX`, `BRIDGE_HUMAN_INPUT_FLAG` | `bridge/launch.go:275-297` |
+
+**(b) Operator knobs.** They change the flow. They move into `.evolve/policy.json`, strict-decoded, and the pipeline reads them at each cycle or boundary (X18c).
+
+| Names | Reader | Note |
+|---|---|---|
+| `EVOLVE_DYNAMIC_ROUTING`, `EVOLVE_ROUTING_MODE`, `EVOLVE_MANDATORY_PHASES`, `EVOLVE_CONDITIONAL_MANDATORY`, `EVOLVE_MAX_OPTIONAL_INSERTIONS` | `config/env.go:15-16`, `:20-22` | duplicates of `phase-registry.json` keys and of `mandatory_phases` |
+| `EVOLVE_COMMIT_EVIDENCE`, `EVOLVE_PHASE_IO` | `config/env.go:17-18` | no policy key yet |
+| `EVOLVE_CLI_HEALTH` | `cmd/evolve/cli_health_canary.go:34`, `bridgechain/bridgechain.go:131` | partly duplicates `cli_health` |
+| `EVOLVE_CLI_MAX_CONCURRENT_<FAM>` | `bridge/driver_tmux_boot.go:29` | |
+| `EVOLVE_LANE` | `runscope/runscope.go:33` | duplicates `--lane` |
+| `EVOLVE_INTENT_DELTA` | `phases/intent/intent.go:67` | |
+| `EVOLVE_<AGENT>_CLI`, `_MODEL`, `_SYSTEM_PROMPT`, `_PERMISSION_MODE` | `llmroute/llmroute.go:105`, `:136`; `systemprompt/systemprompt.go:17`; `phases/runner/routing.go:40` | duplicates of `cli_routing` and the phase pins |
+| `EVOLVE_PROFILE_DIR`, `EVOLVE_PERSONA_OVERRIDE` | `phases/ship/commitgate.go:107`, `:123` | |
+| `EVOLVE_GO_BIN` | `consensusdispatch/resolve.go:23`, `releasepipeline/releasepipeline.go:405`, `rollback/rollback.go:373` | |
+
+**(c) Bypasses.** Each becomes an explicit CLI parameter that writes an audit record, or it goes (X18d).
+
+| Names | Reader | Note |
+|---|---|---|
+| `EVOLVE_SANDBOX` | `config/env.go:19`, `looppreflight/looppreflight.go:240` | partly duplicates `sandbox.nested_fallback`; spec §7 refuses it in a phase |
+| `EVOLVE_USE_PHASE_REGISTRY` | `config/config.go:47` | |
+| `EVOLVE_OPERATOR_CONFIRM` | `continuation/authority.go:12` | the env form of `-operator` |
+| `EVOLVE_SHIP_AUTO_CONFIRM` | `phases/ship/verify.go:183` | set for children by `releasepipeline` and `rollback` |
+| `EVOLVE_PHASE_<X>_BIN` | `adapters/runner/runner.go:63-64` | |
+| `BRIDGE_ALLOW_BYPASS`, `BRIDGE_DRY_RUN` | `bridge/launch.go:294-295` | |
+| `BRIDGE_ALLOW_ANTHROPIC_BASE_URL` | `bridge/driver_claudetmux.go:28` | |
+| `BRIDGE_ALLOW_OPENAI_API_KEY` | `bridge/driver_codextmux.go:26` | |
+| `BRIDGE_HUMAN_SIMULATION` | `bridge/launch.go:48` | |
+
+**(d) Dead names.** Delete them (X18e).
+
+| Names | Why dead |
+|---|---|
+| `EVOLVE_WORKTREE_PATH`, `EVOLVE_REFLECTION_JOURNAL` | registry rows with no production reader; the unprefixed `WORKTREE_PATH` is a different, live subagent variable |
+| `EVOLVE_RESUME`, `EVOLVE_RESUME_MODE` | written (`cmd/evolve/cmd_loop_args.go:357`, `core/resume_bootstrap.go:128`) and never read |
+| `EVOLVE_SANDBOX_FALLBACK_ON_EPERM` | a JSON tag only (`preflight/preflight.go:69`) |
+| `EVOLVE_RELEASE_STRICT_PASS` | replaced by `--strict-pass`; the name is left in messages only (`releasepreflight/releasepreflight.go:404`) |
+
+**(e) Test seams.** They move behind an injected field that a test sets (X18e).
+
+| Names | Reader |
+|---|---|
+| `EVOLVE_PROFILES_DIR_OVERRIDE`, `EVOLVE_ADAPTERS_DIR_OVERRIDE`, `EVOLVE_LEDGER_OVERRIDE` | `paths/paths.go:52-62` |
+| `EVOLVE_PROMPTS_DIR` | `prompts/prompts.go:36` |
+| `BRIDGE_TESTING`, `BRIDGE_<X>_BINARY` | `bridge/driver_common.go:13-17` |
+| `CG_TEST_INSTALL`, `CG_TEST_FORCE_MISSING` | `cli/guardcmd/commitgate.go:58-59` |
+
+The paths in the tables are under `go/internal/` unless they start with `cmd/`. The names `EVOLVE_BYPASS_SHIP_GATE`, `EVOLVE_BYPASS_ROLE_GATE`, `EVOLVE_BYPASS_SHIP_VERIFY` and `EVOLVE_BYPASS_PREFIX_GATE` appear only in tests and in the CHANGELOG on `603389ebd`. They have no production reader, so they are not in a class.
 
 <!-- GENERATED:flag-index BEGIN — do not edit by hand; run `evolve flags generate` -->
 

@@ -1,6 +1,6 @@
 # ADR-0154: The pipeline is the only controller, and each agent is an isolated, replaceable worker
 
-- **Status:** Proposed (2026-10-25).
+- **Status:** Proposed (2026-10-25). Amended by [ADR-0156](0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md) (2026-10-25): the "pipeline markers" of I-2 are one named list (I-16). Amended on 2026-10-25 by the operator: rules 20 to 24 add I-17 (component X19).
 - **Plan:** [llm-isolation-2026-10](../../plans/llm-isolation-2026-10.md). **Research:** [llm-isolation-2026-10](../../research/llm-isolation-2026-10.md). **Design:** [llm-isolation](../llm-isolation.md).
 - **Relates to:**
   - [ADR-0064](0064-pipeline-integrity-boundary.md): the protected control plane. This ADR adds the agent side of the same boundary.
@@ -10,6 +10,7 @@
   - [ADR-0152](0152-one-phase-agent-runs-from-the-command-line-with-no-cycle-through-the-phase-runner.md): `evolve agent run` is the bridge path for the reviewers and the console seat.
   - [ADR-0155](0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md): the companion decision. The orchestrator agent of self-healing is a worker under these invariants.
   - [ADR-0153](0153-quality-is-a-panel-of-separate-indexes-with-intervals-that-the-signal-center-publishes.md): the module, kind and code pattern for the isolation signals.
+  - [ADR-0156](0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md): the companion decision on the control surface. Its marker list (I-16) is the only source of `EVOLVE_*` and `BRIDGE_*` names in the I-2 allowlist.
 - **Evidence:**
   - Every LLM child inherits the full environment of the launcher, and a test pins this (research F1.1).
   - Seven launch paths start an LLM binary outside the bridge launch path, and no test forbids it (F1.2).
@@ -46,6 +47,13 @@ The operator then set the limit of read isolation: "phase agent can read the out
 17. Each invariant has one guard test and one Signal Center code, `ISOLATION_I<n>_VIOLATION`.
 18. Today's Claude floor stays in force. It moves from Go code to the `floors` key of `cli_routing`.
 19. The phase order, the transitions, the phase contracts and the gates do not change.
+20. **I-17 The assignment is CLI-neutral.** The driver layer is the only home of CLI specifics.
+21. A task assignment holds only neutral fields. Spec §28 lists them.
+22. Model names, CLI flags, tool syntax, prompt delivery, environment, dialogs and parsers live only in the drivers and manifests.
+23. The pipeline asks for capabilities. A seat that no routed driver can serve gets a routing refusal, never a silent downgrade.
+24. Routing data names a driver identity. Only the bridge interprets it.
+
+The operator said on 2026-10-25: "The Pipeline itself must be agnostic for the assignment and configurations, LLM specification can only be appended under the driver layer." I-17 is numbered after I-16 of ADR-0156, because ADR-0156 took I-15 and I-16 first.
 
 ## Consequences
 
