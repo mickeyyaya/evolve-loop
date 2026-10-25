@@ -1,0 +1,30 @@
+{
+  "id": "control-flags-knobs-into-policy",
+  "kind": "refactor",
+  "priority_class": "maintainability",
+  "weight": 0.5,
+  "route": "console-manual",
+  "title": "Control flags X18c: the 18 operator knobs move from environment variables into strict-decoded .evolve/policy.json, read at each cycle or boundary",
+  "summary": "18 knobs are read from the environment: EVOLVE_DYNAMIC_ROUTING, ROUTING_MODE, MANDATORY_PHASES, CONDITIONAL_MANDATORY, MAX_OPTIONAL_INSERTIONS (go/internal/config/env.go:15-16, :20-22; EVOLVE_SANDBOX at :19 is a bypass of X18d), COMMIT_EVIDENCE, PHASE_IO, CLI_HEALTH, CLI_MAX_CONCURRENT_<FAM>, LANE, INTENT_DELTA, the per-agent <AGENT>_CLI/_MODEL/_SYSTEM_PROMPT/_PERMISSION_MODE, PROFILE_DIR, PERSONA_OVERRIDE and GO_BIN. Several duplicate a policy key. List with readers: docs/architecture/control-flags.md class (b). Spec: docs/architecture/llm-isolation.md §27 step 3.",
+  "fix": "Give each knob a strict policy key, or reuse the existing key it duplicates (mandatory_phases, cli_health, cli_routing, phase pins, --lane). Read it at each cycle or boundary. For one wave, an environment value that differs from the policy value prints a WARN and loses. Then delete the environment read and shrink the X18b allowlist. CHANGELOG lists each moved knob.",
+  "acceptance": [
+    "RED first: EVOLVE_ROUTING_MODE=static changes the routing with no policy key today",
+    "Each knob of class (b) has a policy key and no environment read; TestNoControlFlagReadOutsideTheMarkerList passes with the not-yet-moved list removed from its allowlist",
+    "In the shadow wave, a differing environment value emits one WARN and the policy value wins",
+    "Changed functions at 100% coverage; control-flags.md, runtime-reference.md and the CHANGELOG updated"
+  ],
+  "deps": [
+    "control-flags-strict-policy-parse",
+    "control-flags-marker-list-and-guard"
+  ],
+  "files": [
+    "go/internal/config/",
+    "go/internal/policy/",
+    "go/internal/llmroute/",
+    "go/internal/bridge/driver_tmux_boot.go",
+    "go/internal/runscope/",
+    "go/internal/phases/"
+  ],
+  "created_at": "2026-10-25T12:00:27Z",
+  "source": "console, 2026-10-25, plan llm-isolation-2026-10 component X18c (ADR-0156)"
+}

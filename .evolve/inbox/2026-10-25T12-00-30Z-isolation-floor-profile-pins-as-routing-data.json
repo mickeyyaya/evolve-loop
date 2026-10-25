@@ -1,0 +1,27 @@
+{
+  "id": "isolation-floor-profile-pins-as-routing-data",
+  "kind": "refactor",
+  "priority_class": "stability",
+  "weight": 0.5,
+  "route": "console-manual",
+  "title": "LLM isolation X6b: the allowed_clis pins of 7 profiles move into routing data, so an agy-only table can compile",
+  "summary": "After X6 (#1123) the Claude floor is routing data, but 7 tracked profiles still pin allowed_clis to Claude families: auditor, adversarial-review, tdd-engineer, spec-verifier, spec-verify and code-reviewer set [\"claude\"], and router sets [\"agy-claude\", \"claude\"] (.evolve/profiles/*.json). A policy that routes every seat to agy with floors {} still cannot compile, so matrix rows M2 to M5 stay red. Spec: docs/architecture/llm-isolation.md §10; plan §6.2.",
+  "fix": "Move each profile pin into cli_routing (the floors data or the agent chain) with the same values, and drop allowed_clis from the 7 profiles. evolve cli-routing explain prints the same chain for each agent before and after; record both outputs in the PR.",
+  "acceptance": [
+    "RED first: matrix row M2 (agy is the only route, floors {}) fails on the profile allowed_clis pins after X6",
+    "evolve cli-routing explain is byte-identical for every profile before and after",
+    "Matrix rows M2 and M3 pass with floors {} in the test policy",
+    "Changed functions at 100% coverage; spec §10 and the profiles and cliroute package notes updated"
+  ],
+  "deps": [
+    "isolation-floors-and-defaults-as-routing-data"
+  ],
+  "files": [
+    ".evolve/profiles/",
+    ".evolve/policy.json",
+    "go/internal/cliroute/",
+    "go/internal/profiles/"
+  ],
+  "created_at": "2026-10-25T12:00:30Z",
+  "source": "console, 2026-10-25, plan llm-isolation-2026-10 component X6b (ADR-0154)"
+}

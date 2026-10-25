@@ -1,0 +1,31 @@
+{
+  "id": "cli-contract-queue-during-wave-and-gc-lease",
+  "kind": "feature",
+  "priority_class": "stability",
+  "weight": 0.5,
+  "route": "console-manual",
+  "title": "CLI contract X17c: inbox curation and cli-routing writers queue during a wave instead of refusing; gc takes a lease and skips live runs",
+  "summary": "inbox edit, withdraw, verify, route-console and route-lane refuse while any run lease is live (refusedMidWaveAt, go/cmd/evolve/cmd_inbox_curate.go:25-35). cli-routing set|unset|init|migrate refuse too (go/cmd/evolve/boundary_write.go:13-27). gc has no top-level lease check (go/cmd/evolve/cmd_gc.go:23-50). Spec: docs/architecture/cli-contract.md §4 rules 2 to 4.",
+  "fix": "During a live lease, a queued verb writes one request file under .evolve/queue/<verb>-<utc>.json and exits 4. The boundary applies the files in time order before sync-main and emits one cli.queue.applied signal each. Inside a phase pane the verbs still refuse with exit 3. gc takes the gc lease and skips each resource that a live run owns. Stage shadow for one wave, then enforce.",
+  "acceptance": [
+    "RED first: TestInboxEdit_DuringAWaveQueuesAndExitsFour fails today (exit 1, refused)",
+    "The boundary step applies queued requests in time order and emits cli.queue.applied for each",
+    "In the shadow wave a queued verb still refuses as today and logs the request file that it would write; at enforce it writes the file and exits 4",
+    "A queued verb inside a phase pane (EVOLVE_DISPATCH_DEPTH>=1) still refuses with exit 3",
+    "TestGC_TakesItsLeaseAndSkipsLiveRuns proves gc leaves a live run's worktree and session alone",
+    "Changed functions at 100% coverage; cli-contract.md §4 and §5 and runtime-reference.md updated"
+  ],
+  "deps": [
+    "cli-contract-envelope-exit-codes-guard"
+  ],
+  "files": [
+    "go/cmd/evolve/cmd_inbox_curate.go",
+    "go/cmd/evolve/cmd_inbox_route_lane.go",
+    "go/cmd/evolve/cmd_inbox_route_console.go",
+    "go/cmd/evolve/boundary_write.go",
+    "go/cmd/evolve/cmd_gc.go",
+    "go/cmd/evolve/cmd_boundary.go"
+  ],
+  "created_at": "2026-10-25T12:00:22Z",
+  "source": "console, 2026-10-25, plan llm-isolation-2026-10 component X17c (ADR-0156)"
+}

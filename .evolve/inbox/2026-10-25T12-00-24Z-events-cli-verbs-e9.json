@@ -1,0 +1,24 @@
+{
+  "id": "events-cli-verbs-e9",
+  "kind": "feature",
+  "priority_class": "feature",
+  "weight": 0.4,
+  "route": "console-manual",
+  "title": "Events E9: the events channels, kinds, watch and subscribe verbs, on the CLI contract envelope",
+  "summary": "The events plan component E9 is not started (docs/plans/event-notification-protocol-2026-10.md §16). The channels, filter, reader, wake, publisher and root wiring are on main, and signals tail --channel reads one channel, but no verb lets a service wait on an event, so wave watch still polls every 5 s (go/cmd/evolve/cmd_wave.go:27). Spec: the events plan E9 and docs/architecture/cli-contract.md §6.",
+  "fix": "Build E9 as the events plan specifies, with the X17b envelope (one JSON line per event with a schema field) and the cli-contract.md §3 exit table. events subscribe is leased; the others are always.",
+  "acceptance": [
+    "RED first: the E9 tests of the events plan §11 (TestEventsCLI_ExitCodesMatchTheTable and the TestEventsWatch_* set) fail before the change",
+    "Each events verb is listed in cli-contract.md §5 and passes the X17b contract tests",
+    "Changed functions at 100% coverage; the events plan §16 row E9 and cli-contract.md updated"
+  ],
+  "deps": [
+    "cli-contract-envelope-exit-codes-guard"
+  ],
+  "files": [
+    "go/cmd/evolve/",
+    "go/internal/events/"
+  ],
+  "created_at": "2026-10-25T12:00:24Z",
+  "source": "console, 2026-10-25, plan event-notification-protocol-2026-10 component E9 and llm-isolation-2026-10 §12 (ADR-0127, ADR-0156)"
+}

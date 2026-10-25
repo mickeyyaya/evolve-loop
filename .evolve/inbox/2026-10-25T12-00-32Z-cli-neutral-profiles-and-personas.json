@@ -1,0 +1,30 @@
+{
+  "id": "cli-neutral-profiles-and-personas",
+  "kind": "refactor",
+  "priority_class": "maintainability",
+  "weight": 0.5,
+  "route": "console-manual",
+  "title": "LLM isolation X19b: profiles hold neutral sandbox intents, the drivers translate them, and personas name no Claude-only tool",
+  "summary": "All 93 agent profiles hold Claude tool syntax such as Bash(evolve phase verify:*) in allowed_tools, and disallowed_tools uses Edit(...) and Bash(git push:*) (.evolve/profiles/*.json). 27 profiles have extra_flags_by_cli with Claude Code flags (--strict-mcp-config, --plugin-dir). 14 of 106 persona files under agents/ name a Claude Code tool. Spec: docs/architecture/llm-isolation.md §28.",
+  "fix": "Replace allowed_tools and disallowed_tools with neutral sandbox intents (read inputs, write worktree, run command class X, network) that each driver translates into its own syntax. Move extra_flags_by_cli into the manifests. Rewrite the 14 personas in neutral words. Shrink the X19a guard allowlist to drop each moved site. The instruction files (CLAUDE.md, GEMINI.md, .claude/agents) stay with X10; this item changes only the personas under agents/.",
+  "acceptance": [
+    "RED first: TestNoCLISpecificsAboveTheDriver lists Bash(evolve phase verify:*) in 93 profiles",
+    "The claude drivers produce the same --allowedTools and --disallowedTools argv as today for each profile (golden test before and after)",
+    "No profile has extra_flags_by_cli, and the claude-tmux argv is unchanged",
+    "No persona under agents/ matches the guard denylist (Bash(, Edit(, Write(, Agent tool, Task tool, TodoWrite, Claude Code); the guard allowlist has no profile or persona entry",
+    "Changed functions at 100% coverage; spec §28 and the profiles and bridge package notes updated"
+  ],
+  "deps": [
+    "cli-neutral-task-assignment-and-guard",
+    "isolation-floor-profile-pins-as-routing-data"
+  ],
+  "files": [
+    ".evolve/profiles/",
+    "agents/",
+    "go/internal/profiles/",
+    "go/internal/phaseconfig/",
+    "go/internal/bridge/"
+  ],
+  "created_at": "2026-10-25T12:00:32Z",
+  "source": "console, 2026-10-25, operator design point, plan llm-isolation-2026-10 component X19 (ADR-0154 I-17)"
+}

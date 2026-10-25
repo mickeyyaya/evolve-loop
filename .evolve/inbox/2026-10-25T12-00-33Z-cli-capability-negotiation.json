@@ -1,0 +1,28 @@
+{
+  "id": "cli-capability-negotiation",
+  "kind": "feature",
+  "priority_class": "stability",
+  "weight": 0.4,
+  "route": "console-manual",
+  "title": "LLM isolation X19c: profiles name the capabilities a seat needs, and the router refuses a seat that no routed driver can serve",
+  "summary": "The router picks a driver by family and tier only. A seat that needs a tool, such as edit or shell, can route to a driver that lacks it, and nothing refuses the route. X9 adds the manifest capabilities field. Spec: docs/architecture/llm-isolation.md §28 (capability negotiation); ADR-0154 rule 23.",
+  "fix": "Each profile names its needed capabilities. The router keeps only the drivers whose manifest capabilities hold each one. When no driver in the chain qualifies, it returns a routing refusal with the missing capability. It never downgrades in silence.",
+  "acceptance": [
+    "RED first: a fixture profile with needs [\"edit\"] routes to a fake manifest without the edit capability, and no refusal happens",
+    "The router refuses the seat with a routing error that names the missing capability",
+    "Today's routing is unchanged for each tracked profile: evolve cli-routing explain is byte-identical before and after",
+    "Changed functions at 100% coverage; spec §28 and the cliroute package note updated"
+  ],
+  "deps": [
+    "isolation-manifest-parsers-and-collectors",
+    "cli-neutral-task-assignment-and-guard",
+    "isolation-floor-profile-pins-as-routing-data"
+  ],
+  "files": [
+    "go/internal/cliroute/",
+    ".evolve/profiles/",
+    "go/internal/bridge/manifests/"
+  ],
+  "created_at": "2026-10-25T12:00:33Z",
+  "source": "console, 2026-10-25, operator design point, plan llm-isolation-2026-10 component X19 (ADR-0154 I-17)"
+}

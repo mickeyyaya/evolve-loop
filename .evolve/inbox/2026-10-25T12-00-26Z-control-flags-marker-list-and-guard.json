@@ -1,0 +1,27 @@
+{
+  "id": "control-flags-marker-list-and-guard",
+  "kind": "hardening",
+  "priority_class": "security",
+  "weight": 0.7,
+  "route": "console-manual",
+  "title": "Control flags X18b: one named marker list is the only EVOLVE_/BRIDGE_ source in a cell, plus an AST guard on env reads",
+  "summary": "buildCycleEnv copies every EVOLVE_* of the operator shell into the cycle env (go/cmd/evolve/cmd_loop_args.go:341-352). The X2 review (#1122, H2) found that the enforce allowlist still passes each EVOLVE_* and BRIDGE_* name. So every knob and bypass reaches the LLM children (research F5.5). The 32 markers are listed in docs/architecture/control-flags.md class (a). Spec: docs/architecture/llm-isolation.md §27 step 2; ADR-0156 rules 11 and 15.",
+  "fix": "Add the marker list as Go data (for example ipcenv.Markers()). buildCycleEnv and the bridge cell env copy only these names. Add TestNoControlFlagReadOutsideTheMarkerList: walk each non-test Go file, find os.Getenv, os.LookupEnv and envchain reads, resolve constant concatenations, and allow only the marker list, the shrinking list of knobs not yet moved and the outside list (HOME, PATH, TMUX, CI, CLAUDE_CODE_*). Extend matrix row N1 with EVOLVE_SANDBOX and EVOLVE_BYPASS_SHIP_GATE.",
+  "acceptance": [
+    "RED first: EVOLVE_BYPASS_SHIP_GATE set on the parent reaches the cycle env of buildCycleEnv today",
+    "Matrix row N1 with EVOLVE_SANDBOX and EVOLVE_BYPASS_SHIP_GATE on the parent passes at enforce",
+    "TestNoControlFlagReadOutsideTheMarkerList fails on a new os.Getenv(\"EVOLVE_\"+\"X\") read in a fixture file",
+    "Changed functions at 100% coverage; control-flags.md class (a), spec §6 and §27 updated"
+  ],
+  "deps": [
+    "isolation-hermetic-driver-env"
+  ],
+  "files": [
+    "go/internal/ipcenv/",
+    "go/cmd/evolve/cmd_loop_args.go",
+    "go/internal/bridge/",
+    "go/internal/isolation/"
+  ],
+  "created_at": "2026-10-25T12:00:26Z",
+  "source": "console, 2026-10-25, plan llm-isolation-2026-10 component X18b (ADR-0156)"
+}

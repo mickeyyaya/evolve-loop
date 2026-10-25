@@ -1,0 +1,29 @@
+{
+  "id": "cli-contract-new-verbs",
+  "kind": "feature",
+  "priority_class": "feature",
+  "weight": 0.4,
+  "route": "console-manual",
+  "title": "CLI contract X17d: add inbox claim, dossier show, cycle resume, wave stop and quality show as core verbs",
+  "summary": "inbox claim exists only as inbox-mover claim (go/cmd/evolve/cmd_inbox_mover.go:29). dossier has only verify, retro-mislabel, publish and sweep (go/cmd/evolve/cmd_dossier.go:19-32). cycle resume exists only as loop --resume, and a wave stop only as loop-stop --wait. quality report publishes signals, so there is no pure read of the readings. Spec: docs/architecture/cli-contract.md §6.",
+  "fix": "Add the five verbs with the X17b envelope and exit table: inbox claim <id> --cycle N (leased), dossier show <cycle> (always), cycle resume [--cycle N] (boundary), wave stop [--wait D] (leased), quality show --scope S (always, no publish).",
+  "acceptance": [
+    "RED first: TestCLIContract_DocMatchesTheRegistry lists the five verbs of cli-contract.md §6 as absent",
+    "Each new verb prints one envelope and passes the X17b table test",
+    "quality show writes nothing: the tree hash and the signal streams are unchanged",
+    "Changed functions at 100% coverage; cli-contract.md §5 and §6 and runtime-reference.md updated"
+  ],
+  "deps": [
+    "cli-contract-envelope-exit-codes-guard"
+  ],
+  "files": [
+    "go/cmd/evolve/registry.go",
+    "go/cmd/evolve/cmd_inbox.go",
+    "go/cmd/evolve/cmd_dossier.go",
+    "go/cmd/evolve/cmd_cycle.go",
+    "go/cmd/evolve/cmd_wave.go",
+    "go/cmd/evolve/cmd_quality.go"
+  ],
+  "created_at": "2026-10-25T12:00:23Z",
+  "source": "console, 2026-10-25, plan llm-isolation-2026-10 component X17d (ADR-0156)"
+}

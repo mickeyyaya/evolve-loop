@@ -1,0 +1,29 @@
+{
+  "id": "control-flags-dead-names-and-test-seams",
+  "kind": "techdebt",
+  "priority_class": "hygiene",
+  "weight": 0.3,
+  "route": "console-manual",
+  "title": "Control flags X18e: delete the 6 dead flag names and move the 8 environment test seams behind injected fields",
+  "summary": "Dead: EVOLVE_WORKTREE_PATH and EVOLVE_REFLECTION_JOURNAL (registry rows, no reader), EVOLVE_RESUME and EVOLVE_RESUME_MODE (written, never read: go/cmd/evolve/cmd_loop_args.go:357, go/internal/core/resume_bootstrap.go:128), EVOLVE_SANDBOX_FALLBACK_ON_EPERM (a JSON tag only), EVOLVE_RELEASE_STRICT_PASS (messages only). Test seams: EVOLVE_PROFILES_DIR_OVERRIDE, ADAPTERS_DIR_OVERRIDE, LEDGER_OVERRIDE (go/internal/paths/paths.go:52-62), EVOLVE_PROMPTS_DIR, BRIDGE_TESTING, BRIDGE_<X>_BINARY, CG_TEST_INSTALL, CG_TEST_FORCE_MISSING. Lists: docs/architecture/control-flags.md classes (d) and (e).",
+  "fix": "Delete each dead name, its registry row and its writer. Move each test seam into an injected field of the package Deps or Options struct that tests set. Regenerate control-flags.md with evolve flags generate.",
+  "acceptance": [
+    "RED first: the flag registry lists EVOLVE_WORKTREE_PATH with no production reader; a registry test that requires a reader for each row fails today",
+    "No class (d) or (e) name has a production environment read after the change",
+    "The tests that used a seam set the injected field instead and still pass",
+    "Changed functions at 100% coverage; control-flags.md regenerated and its class tables updated"
+  ],
+  "deps": [
+    "control-flags-marker-list-and-guard"
+  ],
+  "files": [
+    "go/internal/flagregistry/",
+    "go/internal/paths/paths.go",
+    "go/internal/prompts/prompts.go",
+    "go/internal/bridge/driver_common.go",
+    "go/internal/cli/guardcmd/commitgate.go",
+    "go/cmd/evolve/cmd_loop_args.go"
+  ],
+  "created_at": "2026-10-25T12:00:29Z",
+  "source": "console, 2026-10-25, plan llm-isolation-2026-10 component X18e (ADR-0156)"
+}
