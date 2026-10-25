@@ -193,6 +193,7 @@ var treeReadingSelections = []TestSelection{
 	}},
 	{Package: "./internal/sysexec", Tests: []string{
 		"TestIsolationMatrix_N2_NoLLMSpawnOutsideTheBridgeLaunchAPI",
+		"TestOnlyTheBridgeStartsAnLLMBinary",
 		"TestPipelineCode_StartsEveryProcessThroughCommand",
 	}},
 	{Package: "./test/structure", Tests: []string{

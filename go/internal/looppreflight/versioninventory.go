@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"strings"
@@ -11,7 +12,6 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
-	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 var versionCaptureTimeout = 5 * time.Second
@@ -19,13 +19,15 @@ var versionCaptureTimeout = 5 * time.Second
 var execVersion = func(bin string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), versionCaptureTimeout)
 	defer cancel()
-	cmd := sysexec.Command(ctx, bin, "--version")
-	cmd.Env = bridge.ProcessEnv(bin)
-	out, err := cmd.Output()
+	var out strings.Builder
+	code, err := bridge.LaunchLLM(ctx, bridge.Deps{}, bridge.LLMExec{Purpose: bridge.PurposeInventory, Binary: bin, Args: []string{"--version"}, Stdout: &out, Stderr: io.Discard})
+	if err == nil && code != 0 {
+		err = fmt.Errorf("exit %d", code)
+	}
 	if err != nil {
 		return "", err
 	}
-	return strings.TrimSpace(string(out)), nil
+	return strings.TrimSpace(out.String()), nil
 }
 
 var versionTokenRE = regexp.MustCompile(`\d+\.\d+(?:\.\d+)?`)

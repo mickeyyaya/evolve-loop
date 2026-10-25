@@ -33,7 +33,6 @@ func TestCellEnv_EveryEntryWithNoStageReadsThePolicy(t *testing.T) {
 		"dispatchEnv": dispatchEnv(Deps{}, cfg),
 		"paneEnv":     Deps{}.paneEnv(cfg),
 		"probeEnv":    probeEnv(Deps{}, "claude"),
-		"ProcessEnv":  ProcessEnv("claude"),
 	}
 	for entry, env := range entries {
 		if env == nil || slices.Contains(envNames(env), "FOO_LEAK") {
@@ -60,8 +59,8 @@ func TestProcessEnv_FollowsTheStage(t *testing.T) {
 		t.Setenv(k, v)
 	}
 	enforcePolicyRoot(t, "off")
-	if !slices.Contains(ProcessEnv("codex"), "FOO_LEAK=secret-value-1") {
-		t.Fatal("ProcessEnv at off must keep today's env")
+	if !slices.Contains(probeEnv(Deps{}, "codex"), "FOO_LEAK=secret-value-1") {
+		t.Fatal("probeEnv at off must keep today's env")
 	}
 }
 

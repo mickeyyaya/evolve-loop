@@ -2,6 +2,7 @@
   "schema_version": 1,
   "cli": "ollama-tmux",
   "binary": "ollama",
+  "probe_unsandboxed_reason": "A version or model probe of ollama talks to the local ollama server and reads its model store under $HOME. The phase sandbox grants neither, so the probe runs outside it.",
   "env_passthrough": ["OLLAMA_HOST", "OLLAMA_API_KEY", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "ALL_PROXY", "https_proxy", "http_proxy", "no_proxy", "all_proxy"],
   "model_family": "local",
   "binary_min_version": "0.1.0",

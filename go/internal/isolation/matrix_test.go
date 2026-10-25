@@ -28,11 +28,11 @@ func TestRows_AreTheNineteenRowsOfSpec14InOrder(t *testing.T) {
 
 func TestRows_OnlyTheRowsOfLandedComponentsAreGreenAndEveryOpenRowNamesItsComponent(t *testing.T) {
 	t.Parallel()
-	greenBy := map[string]string{"M1": "X1", "N9": "X1", "N13": "X6", "N1": "X2"}
+	greenBy := map[string]string{"M1": "X1", "N9": "X1", "N13": "X6", "N1": "X2", "N2": "X3"}
 	for _, r := range Rows() {
 		closer, green := greenBy[r.ID]
 		if r.Open == green {
-			t.Errorf("row %s Open = %v; only %v are green after X1, X2 and X6", r.ID, r.Open, greenBy)
+			t.Errorf("row %s Open = %v; only %v are green after X1, X2, X3 and X6", r.ID, r.Open, greenBy)
 		}
 		if !strings.HasPrefix(r.ClosedBy, "X") || r.Check == "" || r.Owner == "" {
 			t.Errorf("row %s must name its check, its owner test file and the component that turns it green: %+v", r.ID, r)

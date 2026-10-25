@@ -4,11 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"slices"
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
@@ -25,7 +24,9 @@ func Exec(run sysexec.RunFunc) func(ctx context.Context, f Family) error {
 		uctx, cancel := context.WithTimeout(ctx, updaterTimeout)
 		defer cancel()
 		var stdout, stderr strings.Builder
-		code, err := run(uctx, argv[0], "", argv[1:], updaterEnv(f.AutoUpdateOffEnv), nil, &stdout, &stderr)
+		code, err := bridge.LaunchLLM(uctx, bridge.Deps{Runner: bridge.CmdRunner(run)}, bridge.LLMExec{
+			Purpose: bridge.PurposeUpdate, Binary: argv[0], Args: argv[1:], Drop: []string{f.AutoUpdateOffEnv}, Stdout: &stdout, Stderr: &stderr,
+		})
 		if err != nil {
 			return fmt.Errorf("%s: %w", strings.Join(argv, " "), err)
 		}
@@ -34,13 +35,6 @@ func Exec(run sysexec.RunFunc) func(ctx context.Context, f Family) error {
 		}
 		return nil
 	}
-}
-
-func updaterEnv(offSwitch string) []string {
-	if offSwitch == "" {
-		return nil
-	}
-	return slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, offSwitch+"=") })
 }
 
 func tail(output string) string {

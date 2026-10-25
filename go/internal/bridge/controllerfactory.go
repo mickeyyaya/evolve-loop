@@ -27,7 +27,7 @@ func (f *ControllerFactory) For(family string) clicontrol.Controller {
 		ProjectRoot: f.projectRoot,
 		Workspace:   filepath.Join(f.baseWorkspace, family),
 		Agent:       f.agent,
-		AllowBypass: true,
 	}
+	launchPurposeConfig(PurposeProbe, cfg)
 	return NewController(cfg, f.deps)
 }

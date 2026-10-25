@@ -12,7 +12,8 @@
 > - X1: merged in #1121. The conformance matrix of §14 and the module, kind, codes and channel of §15 are on `main`. The follow-up X1b (item `isolation-matrix-tmux-repl-fake`) adds a tmux REPL fake, so the rows M2 to M4 can run a full cycle.
 > - X2: merged in #1122 at stage `shadow` (the policy key `isolation.i2.stage`). The flip to `enforce` is an operator decision.
 > - X6: merged in #1123. The routing data of §10 is on `main`: `cli_routing.floors`, with the compiled default in `go/internal/policy/routing_defaults.json`. The follow-up X6b (item `isolation-floor-profiles-allowed-clis-as-routing-data`) moves the `allowed_clis` pins of 7 profiles.
-> - X3 to X5, X7 to X19: not started.
+> - X3: built in this change. The single launch API of §5.1 and its AST guard `TestOnlyTheBridgeStartsAnLLMBinary` are on the branch, and matrix row N2 is green.
+> - X4, X5, X7 to X19: not started.
 
 ## Table of contents
 
@@ -183,11 +184,63 @@ The `sysexec` guard (`go/internal/sysexec/command_guard_test.go:19`) checks only
 
 ### Solution
 
-- The bridge exports one launch API (proposed name `bridge.LaunchLLM`). It takes a purpose (`phase`, `probe`, `update`, `smoke`, `inventory`, `modelquery`) and returns the process. Each purpose uses the same environment builder (§6), the same `unset TMUX` step and the same sandbox decision.
+- The bridge exports one launch API (`bridge.LaunchLLM`). It takes a purpose (`phase`, `probe`, `update`, `smoke`, `inventory`, `modelquery`) and returns the process. Each purpose uses the same environment builder (§6), the same `unset TMUX` step and the same sandbox decision.
 - A probe purpose can run without the sandbox only when the manifest says that the probe cannot run inside it. The launcher logs the reason.
-- A new AST guard (proposed `TestOnlyTheBridgeStartsAnLLMBinary`) walks each non-test Go file. It has two rules:
+- A new AST guard (`TestOnlyTheBridgeStartsAnLLMBinary`) walks each non-test Go file. It has two rules:
   - Outside `internal/bridge`, no call to `sysexec.Command` or `exec.Command` takes a name from the manifest `binary` set. Today three paths break this rule: cli update, the version inventory and the model queries.
   - Inside `internal/bridge`, only the launch API starts an LLM. Today four paths break this rule: doctor, the usage controller (it sets `AllowBypass: true`), the recipe sessions and the smoke tests.
+
+### 5.1 As built (X3)
+
+The launch API is in `go/internal/bridge/launch_llm.go`. It has more than one entry, because an LLM child is a bare process or a tmux pane.
+
+| Entry | Purposes | Callers |
+|---|---|---|
+| `LaunchLLM(ctx, deps, LLMExec)` | `probe`, `update`, `inventory`, `modelquery` | the doctor (`doctor.go`), the CLI updater (`cliupdate.Exec`), the version inventory (`looppreflight.CLIVersion`), the model queries (`ModelQueryRunner`, which `cmd/evolve` injects into `modelquery`) |
+| `launchPane(ctx, purpose, driver, cfg, deps)` | `smoke` | `BootSmokeTest`, `LiveSmokeTest` |
+| `Engine.LaunchArgs` and `launchSwept` | `phase` | each phase dispatch |
+| `newRecipeDriver` | `probe` | the usage controller, the `/help` and `/model` captures, `RunRecipe` |
+
+Each entry applies the same three steps:
+
+1. The environment comes from `Deps.cellEnv` (§6). `LaunchLLM` uses `probeEnv`, and a pane uses `paneEnv`. At `enforce`, `CLAUDECODE` does not reach a child.
+2. The child has no `TMUX` and no `TMUX_PANE`. `LaunchLLM` removes the two names from the environment at each stage. A pane shell sends `unset TMUX TMUX_PANE` (`paneTmuxDetachLine`) before the launch command. The recipe pane sends it too.
+3. The sandbox decision follows the purpose. A `phase` or `smoke` pane uses the sandbox wrap of its driver. Each other purpose runs outside the sandbox and logs `[bridge] <purpose> <binary> runs unsandboxed: <reason>`. The reason is the manifest field `probe_unsandboxed_reason`. Each manifest has one (`TestEveryManifestGivesTheReasonItsProbeRunsUnsandboxed`). A binary with no manifest logs `no family manifest names this binary`.
+
+The launch API decides the bypass grant (`launchPurposeConfig`). Only the `probe` and `smoke` purposes get `AllowBypass`. The usage controller does not set it.
+
+The `probe` purpose must keep the grant. The control capture boots the same REPL as a phase pane. The prompt markers and the auto-responder patterns of each manifest are proven only for the bypass boot. A boot in another permission mode shows other dialogs, for example the plan approval of claude. A live control capture in plan mode must prove that boot before the grant goes.
+
+`LLMExec.Drop` removes names after the manifest defaults. The updater drops the auto-update off switch of its family, so `agy update` does not see `AGY_CLI_DISABLE_AUTO_UPDATE=1`.
+
+The guard `TestOnlyTheBridgeStartsAnLLMBinary` (`go/internal/sysexec/llm_launch_guard_test.go`) parses each non-test file under `cmd`, `internal` and `pkg`. The LLM binaries are `claude`, `agy`, `codex`, `gemini`, `ollama` and each `binary` of the manifests. The guard reports these spawns:
+
+| Rule | Where | Spawn |
+|---|---|---|
+| Literal | each file | a call of `sysexec.Command`, `sysexec.DefaultRunner`, `exec.Command`, `exec.CommandContext`, a `Runner` or a `sysexec.RunFunc` parameter, with an LLM name literal as the program |
+| Research sites | the three files of F1.2 outside the bridge | each process start, with any program |
+| Bridge | `internal/bridge`, outside the launch API | a `Runner` call with a program that is not a literal, a `Driver.Launch` call, a `launchCmdLine` call, and each `AllowBypass` grant of `true` |
+
+For the guard, the launch API is the functions `LaunchLLM`, `launchSwept`, `launchPane`, `launchPurposeConfig` and `newRecipeDriver`, and each function in a `driver_*.go` file. The drivers are inside the API, because only the API calls `Driver.Launch`.
+
+Before the change, the guard found 9 spawns on 7 paths:
+
+| Path | Spawns |
+|---|---|
+| doctor | `doctorDeep`, `doctorVersion` (2 `Runner` calls) |
+| usage controller | `ControllerFactory.For` (`AllowBypass: true`) |
+| smoke tests | `BootSmokeTest`, `LiveSmokeTest` (`Driver.Launch`), `smokeLaunchConfig` (`AllowBypass = true`) |
+| cli update | `cliupdate.Exec` (a `sysexec.RunFunc` call) |
+| version inventory | `execVersion` (`sysexec.Command`) |
+| model queries | `modelquery.defaultRunner` (`sysexec.Command`) |
+
+After the change, the guard finds 0, and row N2 is green.
+
+Limits:
+
+- The guard cannot follow a program name through a variable. Outside the research sites, a process start with a dynamic LLM name passes the guard. The literal rule and the review find the other cases.
+- The recipe sessions do not use the sandbox. The probe reason of the manifest covers them.
+- `modelquery` cannot import the bridge, because the bridge imports `modelquery`. Thus `cmd/evolve` injects `bridge.ModelQueryRunner` through `modelquery.UseLauncher`. With no launcher, a model query starts nothing and returns an error.
 
 ## 6. Hermetic environment
 
@@ -233,7 +286,7 @@ The builder is `Deps.cellEnv` in `go/internal/bridge/hermetic_env.go`. Each LLM 
 | Excluded always | `EVOLVE_DISPATCH_ID` (the dispatch adds its own tag), and each name that is not a shell identifier |
 | Filter | `ipcenv.Keep`, the allowlist twin of the `ipcenv.Scrub` deny list |
 | Report once | `Deps.EnvDrops` (`EnvDropLog`) keeps the family and name pairs that it reported. The in-process adapter shares one log for its process. An engine with no log gets its own. |
-| Bare execs | `ProcessEnv(bin)` (the version inventory and the model queries) follows the stage of the policy, with no signal |
+| Bare execs | `LaunchLLM` (§5.1) gives `probeEnv(bin)` to the doctor, the updater, the version inventory and the model queries. It follows the stage of the policy, with no signal. |
 
 The manifest field `env_passthrough` is built (§11). The parser refuses a name that is not a shell identifier, and it refuses each loop, bridge and credential name, as for `default_env`. So `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL` and `OPENAI_API_KEY` cannot pass through.
 
@@ -580,7 +633,7 @@ The stub for each family declares the same capabilities as the real manifest. Th
 | Row | Check | Invariant | Turned green by | Owner test | State at X1 |
 |---|---|---|---|---|---|
 | N1 | `CLAUDECODE=1` on the parent does not reach any seat | I-2 | X2 | the matrix (M1 run, policy `isolation.i2.stage=enforce`) | green (X2) |
-| N2 | the AST guard finds no LLM spawn outside the bridge launch API | I-1 | X3 | `internal/sysexec` | open |
+| N2 | the AST guard finds no LLM spawn outside the bridge launch API | I-1 | X3 | `internal/sysexec` | green (X3) |
 | N3 | a phase pane cannot exec `claude --version` | I-3 | X4 | sandbox contract | open |
 | N4 | `evolve agent run` inside a phase pane is refused | I-3 | X4 | the matrix (M1 run) | open |
 | N5 | a cell cannot read `<ws>/.bridge/scout-stdout.log` | I-4 | X5 | sandbox contract | open |
@@ -598,7 +651,7 @@ Rows N3, N5 and N7 to N10 extend `TestAgentSandboxContract` (`go/internal/bridge
 
 The network row connects to a loopback listener of the test, so it needs no outside host. N8 reads a fixture `.ssh` file in a test `HOME`, so the row does not depend on the host. A plain allow row reads the predecessor's retrospective through a fixture index. It keeps the lineage read open when X5 adds its denies. [agent-sandbox-contract.md](agent-sandbox-contract.md) lists the rows.
 
-The static rows read source, not a run. N2 parses the three launch sites outside the bridge of research F1.2 and counts each use of `sysexec`. N13 parses the non-test files of `internal/core` and counts each string literal that names a family or a driver. The component that closes the row replaces the probe with its own guard if it needs to.
+The static rows read source, not a run. N2 runs the scan of `TestOnlyTheBridgeStartsAnLLMBinary` (§5.1) over the tree and counts each LLM spawn outside the launch API. N13 parses the non-test files of `internal/core` and counts each string literal that names a family or a driver. The component that closes the row replaces the probe with its own guard if it needs to.
 
 ## 15. The Signal Center contract
 

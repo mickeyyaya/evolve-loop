@@ -6,5 +6,5 @@ import (
 )
 
 func init() {
-	modelquery.UseProcessEnv(bridge.ProcessEnv)
+	modelquery.UseLauncher(bridge.ModelQueryRunner)
 }

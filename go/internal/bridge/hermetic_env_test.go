@@ -201,16 +201,16 @@ func TestProcessEnv_IsTheAllowlistPlusTheManifest(t *testing.T) {
 	}
 	enforcePolicyRoot(t, "enforce")
 	t.Setenv("CLAUDE_CONFIG_DIR", "/Users/cell/.claude-alt")
-	agy := ProcessEnv("agy")
+	agy := probeEnv(Deps{}, "agy")
 	if !slices.Contains(agy, agyAutoUpdateOffEnv+"=1") {
 		t.Errorf("a bare agy exec must carry %s=1 from the agy-tmux manifest", agyAutoUpdateOffEnv)
 	}
-	claude := ProcessEnv("claude")
+	claude := probeEnv(Deps{}, "claude")
 	if !slices.Contains(claude, "CLAUDE_CONFIG_DIR=/Users/cell/.claude-alt") {
 		t.Error("claude lists CLAUDE_CONFIG_DIR in env_passthrough, so a bare claude exec keeps it")
 	}
 	for _, family := range []string{"agy", "claude", "codex", "no-such-family"} {
-		env := ProcessEnv(family)
+		env := probeEnv(Deps{}, family)
 		names := envNames(env)
 		for leak := range launcherLeaks {
 			if slices.Contains(names, leak) {
@@ -221,7 +221,7 @@ func TestProcessEnv_IsTheAllowlistPlusTheManifest(t *testing.T) {
 			t.Errorf("%s: a bare exec lost PATH or HOME", family)
 		}
 	}
-	if slices.Contains(ProcessEnv("codex"), "CLAUDE_CONFIG_DIR=/Users/cell/.claude-alt") {
+	if slices.Contains(probeEnv(Deps{}, "codex"), "CLAUDE_CONFIG_DIR=/Users/cell/.claude-alt") {
 		t.Error("codex does not list CLAUDE_CONFIG_DIR, so it must not get it")
 	}
 }
