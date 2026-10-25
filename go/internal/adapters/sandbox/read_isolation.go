@@ -10,11 +10,13 @@ import (
 )
 
 const (
-	RuleRunsUnrelated = "read.runs.unrelated"
-	RuleHomeSecret    = "read.home.secret"
-	RuleRawOutput     = "read.raw.output"
-	RuleInputsWrite   = "write.inputs"
-	CellMessagePrefix = "evolve-cell="
+	RuleRunsUnrelated     = "read.runs.unrelated"
+	RuleHomeSecret        = "read.home.secret"
+	RuleRawOutput         = "read.raw.output"
+	RuleRawOutputWrite    = "write.raw.output"
+	RuleInputsWrite       = "write.inputs"
+	RulePipelineFileWrite = "write.pipeline.file"
+	CellMessagePrefix     = "evolve-cell="
 )
 
 type ReadIsolation struct {
@@ -28,6 +30,7 @@ type ReadIsolation struct {
 	RawDirs     []string
 	SecretDirs  []string
 	SecretFiles []string
+	PinnedFiles []string
 }
 
 func (ri ReadIsolation) inputsDir() string {
@@ -62,13 +65,23 @@ func writeReadIsolation(b *strings.Builder, ri ReadIsolation) {
 			fmt.Fprintf(b, "(allow file-read* file-read-data (literal %q))\n", g)
 		}
 	}
+	ri.writeRawGuards(b, "file-read-data", RuleRawOutput)
+	ri.writeRawGuards(b, "file-write*", RuleRawOutputWrite)
+	ri.guard(b, "file-write*", fmt.Sprintf("(subpath %q)", ri.inputsDir()), RuleInputsWrite, "I4")
+	for _, f := range ri.PinnedFiles {
+		if f != "" {
+			ri.guard(b, "file-write*", fmt.Sprintf("(literal %q)", f), RulePipelineFileWrite, "I5")
+		}
+	}
+}
+
+func (ri ReadIsolation) writeRawGuards(b *strings.Builder, op, rule string) {
 	for _, d := range ri.RawDirs {
-		ri.guard(b, "file-read-data", fmt.Sprintf("(subpath %q)", d), RuleRawOutput, "I4")
+		ri.guard(b, op, fmt.Sprintf("(subpath %q)", d), rule, "I4")
 	}
 	if ri.RunsDir != "" && len(ri.RawSuffixes) > 0 {
-		ri.guard(b, "file-read-data", fmt.Sprintf(`(require-all (subpath %q) (regex #"%s"))`, ri.RunsDir, rawSuffixPattern(ri.RawSuffixes)), RuleRawOutput, "I4")
+		ri.guard(b, op, fmt.Sprintf(`(require-all (subpath %q) (regex #"%s"))`, ri.RunsDir, rawSuffixPattern(ri.RawSuffixes)), rule, "I4")
 	}
-	ri.guard(b, "file-write*", fmt.Sprintf("(subpath %q)", ri.inputsDir()), RuleInputsWrite, "I4")
 }
 
 func rawSuffixPattern(suffixes []string) string {
@@ -98,5 +111,10 @@ func bwrapReadIsolation(ri ReadIsolation) []string {
 	for _, d := range slices.Concat(ri.RawDirs, ri.SecretDirs) {
 		out = append(out, "--tmpfs", d)
 	}
-	return append(out, "--ro-bind-try", ri.inputsDir(), ri.inputsDir())
+	for _, f := range append([]string{ri.inputsDir()}, ri.PinnedFiles...) {
+		if f != "" {
+			out = append(out, "--ro-bind-try", f, f)
+		}
+	}
+	return out
 }

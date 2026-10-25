@@ -66,6 +66,10 @@ After each row, the host must still reach the run server with its sessions `agen
 | Isolation N8: read `~/.ssh/id_fixture` in the test `HOME` | deny (green, X5) | The read gets `Operation not permitted`. The file is a fixture, not a host secret. |
 | The Claude OAuth login reads its Keychain item through the security service | allow | `security find-generic-password` returns the item `Claude Code-credentials` of a fixture keychain in the test `HOME`. |
 | Write the pipeline-written `inputs/index.json` | deny | The write gets `Operation not permitted`. |
+| Rename a raw log of the own workspace to a name that no rule matches | deny | The rename gets `Operation not permitted`. |
+| Hard-link a raw log of the own workspace under another name | deny | The link gets `Operation not permitted`. |
+| Rewrite the `lane-scope.json` of the own workspace | deny | The write gets `Operation not permitted`. |
+| Write a pipeline lineage record in `.evolve/lineage/` | deny | The repo is read-only for the cell. |
 | Isolation N9: open a TCP connection to a loopback listener of the host | allow (green) | `nc -z` connects. The row records that the network stays open. |
 | Isolation N10: an agy pane writes the protected path `go/internal/guards/role.go` in its worktree | deny (open until X7) | The write succeeds today. |
 

@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/sandbox"
+	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inputindex"
 	"github.com/mickeyyaya/evolve-loop/go/internal/isolation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -55,6 +56,7 @@ func (deps Deps) readIsolation(req SandboxWrapRequest, home string) sandbox.Read
 	ri.Grants = deps.indexGrants(req, ri.RunsDir)
 	ri.RawFiles = rawFilesOf(ri.Workspace)
 	ri.SecretDirs, ri.SecretFiles = secretsOf(home)
+	ri.PinnedFiles = []string{filepath.Join(ri.Workspace, committedset.LanePinFile)}
 	return ri
 }
 

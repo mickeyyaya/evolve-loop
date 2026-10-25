@@ -10,7 +10,13 @@
 
 ## Design
 
-- **Each phase dispatch writes the input index of the cell first** (`input_index.go`, X5 of [ADR-0154](../adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md), spec [llm-isolation.md](../llm-isolation.md) §8.5). `cycleRun.dispatch` calls `writeInputIndex` before the loop of tries. It reads `isolation.lineage_max` from the policy, builds the index with `inputindex.Build` and writes `<ws>/inputs/index.json`. A failure removes the index of the earlier phase and prints `WARN input index for <phase>`, so the cell gets no index grants. The phase request carries no index entry: the agent opens what it needs (`TestDispatch_TheIndexIsTheOnlyLineageInputAndNoEntryIsPreloadedIntoTheRequest`). The handoff correction of `enforcedHandoffRejection` sends the agent to the `handoff-asks` entry of the index (`TestHandoffAsksTravelInTheIndex`).
+- **Each phase dispatch writes the input index of the cell first** (`input_index.go`, X5 of [ADR-0154](../adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md), spec [llm-isolation.md](../llm-isolation.md) §8.5).
+  - `cycleRun.dispatch` calls `writeInputIndex` before the loop of tries.
+  - The item ids come from the `fleet_scope` of the cycle context. When the run already has a record in `.evolve/lineage/`, the record wins. The first dispatch writes the record before the index, so a failed index does not lose it.
+  - It reads `isolation.lineage_max` from the policy. Then it builds the index, writes the record and writes `<ws>/inputs/index.json`.
+  - A failure removes the index of the earlier phase and prints `WARN input index for <phase>`, so the cell gets no index grants.
+  - The phase request carries no index entry: the agent opens what it needs (`TestDispatch_TheIndexIsTheOnlyLineageInputAndNoEntryIsPreloadedIntoTheRequest`).
+  - The handoff correction of `enforcedHandoffRejection` sends the agent to the `handoff-asks` entry of the index (`TestHandoffAsksTravelInTheIndex`).
 - **A resume pends a carrier that a crash left at HEAD** (`resume_carrier_heal.go`, ADR-0105 B1). The unwind and the debugger re-entry each commit a carrier with the trailer `Evolve-Carrier: cycle-<N>/<run>`, rebase it, then pend it. After a crash between the rebase and the pend, a resumed ship re-audits an empty `git diff HEAD`.
   - `loadResumeBootstrap` calls `healCarrierAtHead` before a phase runs. It pends the change on its fork point only when the trailer names this cycle and run. It never acts in an in-place worktree, outside a git checkout or during a rebase. In a git checkout, a git failure fails the resume.
   - The heal does not move `WorktreeBaseSHA`. The resumed cycle sees a pending change on the new base. The tree-binding check of ship then decides the next phase, as for the W0 split of the design review.

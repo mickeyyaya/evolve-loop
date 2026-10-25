@@ -627,12 +627,13 @@ The cell opens the retrospective of cycle 6. Cycle 9 built `item-b`. A read of t
 |---|---|
 | Builder | package `inputindex` ([internal-inputindex](packages/internal-inputindex.md)). `Build` reads only pipeline records. |
 | Writer | `writeInputIndex` (`go/internal/core/input_index.go`). `cycleRun.dispatch` calls it before the first try of each phase. A failure prints `WARN input index for <phase>`, and the cell gets no index grants. |
-| Item id | the `todo_ids` of the `lane-scope.json` of the workspace (`committedset.LanePin`). This is the record that §8.2 asked X5 to confirm. With no record, the index has no lineage and a note. |
-| Lineage | each cycle whose `lane-scope.json` holds an item id of the cycle, and the cycle of the continuation registry entry of each item id (`continuation.ReadRegistryEntry`). The cap is the last `isolation.lineage_max` cycles, default 5. |
+| Item id | the fleet scope of the orchestrator (`fleet_scope` of the cycle context). The first dispatch of a run writes it to `.evolve/lineage/cycle-N.json` before the index (`inputindex.WriteRecord`). Each later dispatch of the same run id reads that record (`inputindex.ReadRecord`), and a new run of the cycle number replaces it. No cell can write `.evolve/lineage/`, because the repo is read-only for a cell. With no item id, the index has no lineage and a note. |
+| Lineage | each cycle whose record in `.evolve/lineage/` holds an item id of the cycle. Also the cycle of the continuation registry entry of each item id (`continuation.ReadRegistryEntry`). The cap is the last `isolation.lineage_max` cycles, default 5. The `lane-scope.json` of a workspace is never read, because a cell can write its workspace (review of #1133, HIGH-1). |
 | Format | as §8.3, with two changes. `item_ids` is a list, because a lane scope can hold more than one id. `attempt` is the number of lineage cycles before the cap, plus 1. |
 | Lineage entries | For each lineage cycle: `retrospective-report.md`, `failure-digest.json`, `carryover-todos.json`, `audit-report.md`, `retrospectives/*.md` (ADR-0151) and `failure-lesson*.yaml`. Also each lesson under `.evolve/instincts/lessons/` that names an item id or the `cycle-N` of a lineage cycle. |
 | Raw output | `inputindex.IsRawOutput`: a path under `.bridge/`, or a name that ends in `-stdout.log`, `-stderr.log`, `-stdout.clean.txt`, `-final-pane.txt`, `-final-scrollback.txt` or `-pane-watch.json`. The index lists none. |
-| Raw logs | stay in the workspace. The sandbox denies them by name (§9), so no reader of the logs changes. A deny of `<ws>/.bridge/` is in place for a later move of the logs. |
+| Raw logs | stay in the workspace. The sandbox denies the reads and the writes of them by name (§9), so no reader of the logs changes. The write deny stops a rename or a hard link to a name that no rule matches. The same two denies cover `<ws>/.bridge/`. |
+| Pinned files | `<ws>/lane-scope.json` gets a write deny (`write.pipeline.file`), as a second guard after the record. |
 | Read grants | `Deps.readIsolation` (`go/internal/bridge/read_isolation.go`) gives the sandbox the real path of each indexed path and of the index. |
 | Stage source | the policy key `isolation.i5.stage`, read by `policy.IsolationReadStage`. An explicit `Deps.ReadStage` wins. The default is `shadow`. One stage covers the I-4 and the I-5 rules. |
 | Shadow signal | each guarded rule carries `(with message "evolve-cell=<dispatch id> rule=<rule> inv=<I4\|I5>")`. After the launch, `Deps.reportReadViolations` reads the reports of the dispatch id with `/usr/bin/log show`. It emits one `ISOLATION_I4_VIOLATION` or `ISOLATION_I5_VIOLATION` for each rule and target, at most 20 for each cell. `action` is `logged` for a reported allow and `refused` for a deny. |
@@ -647,7 +648,12 @@ Three facts set the form of the rules. Each was measured on macOS on 2026-10-26 
 
 The guards are these tests:
 
-- rows N5, N7 and N8 (`TestAgentSandboxContract`, darwin), the allow row "a retry opens its predecessor's retrospective through inputs/index.json", the deny rows "read a raw log that the bridge left in the own workspace" and "write the pipeline-written inputs/index.json", and the allow row "the Claude OAuth login reads its Keychain item through the security service"
+- rows N5, N7 and N8 (`TestAgentSandboxContract`, darwin), and the allow row "a retry opens its predecessor's retrospective through inputs/index.json"
+- the deny rows for a raw log of the own workspace: a read, a rename and a hard link
+- the deny rows for a write of `inputs/index.json`, of `lane-scope.json` and of a record in `.evolve/lineage/`
+- the allow row "the Claude OAuth login reads its Keychain item through the security service"
+- `TestAgentSandboxContract_AForgedLaneScopeGainsNoGrantAtTheNextDispatch`: a shadow cell forges its `lane-scope.json`, and the next enforce cell still cannot read the unrelated cycle
+- `TestDispatch_ALaneScopeThatACellRewroteNeitherNamesTheItemNorJoinsTheLineage` and `TestWriteInputIndex_TheFirstRecordOfTheCycleWinsOverALaterScope`
 - `TestAgentSandboxContract_ShadowReportsTheExecAndLetsItRun`: at `shadow` each guarded read goes through
 - row N6 (the matrix, M1 run at `isolation.i5.stage=enforce`): a phase index lists the scout report and no raw output
 - `TestLineageComesOnlyFromPipelineRecords`, `TestHandoffAsksTravelInTheIndex` and `TestDispatch_TheIndexIsTheOnlyLineageInputAndNoEntryIsPreloadedIntoTheRequest`
@@ -657,10 +663,13 @@ The guards are these tests:
 Known differences from the design:
 
 - The rest of `$HOME` stays readable. The deny of §9 needs the `home_reads` field of each manifest (X9). X5 denies the listed secrets only.
+- The CLI transcripts stay readable: `~/.claude/projects/*/*.jsonl` and `~/.gemini`. So a claude cell can read the raw transcript of another cell. Item `isolation-home-transcripts-before-i4-enforce` closes this gap, and I-4 must not go to `enforce` before it.
+- A cycle that ran before X5 has no record in `.evolve/lineage/`, so it is in no lineage.
+- A source under a symlinked directory, or a file with a second hard link, is not an entry.
 - The secret rules cover the secrets that exist at the launch. A secret that the cell makes later has no rule.
 - The secret list does not hold the directories of the other families yet.
 - Linux has no report. At `shadow` the `bwrap` prefix adds nothing, and no signal comes.
-- On Linux, `bwrap` masks the raw files that exist at the launch. A raw log that the bridge makes later is not masked. The SBPL rule matches by name, so macOS has no such gap.
+- On Linux, `bwrap` masks the raw files that exist at the launch. A raw log that the bridge makes later is not masked. The SBPL rule matches by name, so macOS has no such gap. The item `isolation-home-transcripts-before-i4-enforce` tracks the Linux gap too.
 - A grant is kept only when its real path is inside `.evolve/runs/` and is not raw output. A lesson under `.evolve/instincts/lessons/` gets no grant, because the repo grant already covers it.
 - The report reader is best effort. The kernel can merge repeated reports, and `log show` can miss a report that arrives after it runs. A failed read prints `WARN isolation read reports`.
 - Only the phases of a cycle get an index. A flow seat (advisor, judge, router) and an `evolve agent run` launch get no index, so at `enforce` they read only their own workspace inside `.evolve/runs/`.
@@ -680,7 +689,7 @@ The sandbox today generates SBPL for `sandbox-exec` and an argv for `bwrap` from
 | Read of the own workspace (`.evolve/runs/cycle-N/`), except `<ws>/.bridge/` | allow | `(allow file-read* file-read-data (subpath "<ws>"))` after the runs deny | `--bind <ws> <ws>` after the `tmpfs` | I-5 | built (X5, §8.5) |
 | Read of `inputs/index.json` and each indexed path | allow | `(allow file-read* file-read-data (literal "<path>"))` for each entry | `--ro-bind-try <path> <path>` | I-4 | built (X5) |
 | Read of other files under `.evolve/runs/` | deny | `(deny file-read-data (subpath ".evolve/runs"))` before the literal grants | `--tmpfs .evolve/runs` | I-5 | built at `shadow` (X5) |
-| Read of raw output (`*-stdout.log`, `*-final-pane.txt`, transcripts) | deny | `(deny file-read-data (require-all (subpath ".evolve/runs") (regex #"(-stdout\.log\|...)$")))` and a deny of `<ws>/.bridge/`, after the grants | `--ro-bind /dev/null <file>` for each raw file of the workspace, `--tmpfs <ws>/.bridge` | I-4 | built at `shadow` (X5); the logs stay in the workspace |
+| Read of raw output (`*-stdout.log`, `*-final-pane.txt`; the CLI transcripts in `$HOME` are open until X9, §8.5) | deny | `(deny file-read-data (require-all (subpath ".evolve/runs") (regex #"(-stdout\.log\|...)$")))` and a deny of `<ws>/.bridge/`, after the grants | `--ro-bind /dev/null <file>` for each raw file of the workspace, `--tmpfs <ws>/.bridge` | I-4 | built at `shadow` (X5); the logs stay in the workspace |
 | Read of the CLI's own config in `$HOME` | allow | `(allow file-read* (subpath "~/.<cli dir>"))` from manifest `home_reads` | `--ro-bind` | I-5 | allowed (all of `$HOME`) |
 | Read of secrets in `$HOME` | deny | `(deny file-read-data ...)` for `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.netrc`, `~/.config/gh`, `~/.docker/config.json`, `~/.kube`, and the dirs of the other families | `--tmpfs <dir>`, `--ro-bind /dev/null <file>` | I-5 | built at `shadow` for the listed secrets (X5); not the dirs of the other families |
 | Read of the rest of `$HOME` | deny at `enforce` | no grant | not bound | I-5 | allowed |

@@ -16,13 +16,18 @@ import (
 )
 
 type fixture struct {
-	t    *testing.T
-	root string
+	t     *testing.T
+	root  string
+	items map[int][]string
 }
 
 func newFixture(t *testing.T) fixture {
 	t.Helper()
-	return fixture{t: t, root: t.TempDir()}
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return fixture{t: t, root: root, items: map[int][]string{}}
 }
 
 func (f fixture) ws(cycle int) string {
@@ -44,7 +49,13 @@ func (f fixture) write(rel, body string) string {
 func (f fixture) cycle(n int, item string, files map[string]string) {
 	f.t.Helper()
 	if item != "" {
-		f.write(filepath.Join(".evolve", "runs", "cycle-"+strconv.Itoa(n), "lane-scope.json"), `{"todo_ids":["`+item+`"]}`)
+		f.items[n] = []string{item}
+		if err := WriteRecord(f.root, Record{Cycle: n, ItemIDs: f.items[n]}); err != nil {
+			f.t.Fatal(err)
+		}
+	}
+	if err := os.MkdirAll(f.ws(n), 0o755); err != nil {
+		f.t.Fatal(err)
 	}
 	for name, body := range files {
 		f.write(filepath.Join(".evolve", "runs", "cycle-"+strconv.Itoa(n), name), body)
@@ -53,7 +64,7 @@ func (f fixture) cycle(n int, item string, files map[string]string) {
 
 func (f fixture) build(cycle int, phase string) Index {
 	f.t.Helper()
-	idx, err := Build(Request{ProjectRoot: f.root, Workspace: f.ws(cycle), Cycle: cycle, Phase: phase})
+	idx, err := Build(Request{ProjectRoot: f.root, Workspace: f.ws(cycle), Cycle: cycle, Phase: phase, ItemIDs: f.items[cycle]})
 	if err != nil {
 		f.t.Fatal(err)
 	}
@@ -144,15 +155,16 @@ func TestBuild_ARetryListsTheLineageOfItsItemAndNoUnrelatedCycle(t *testing.T) {
 
 func TestLineageComesOnlyFromPipelineRecords(t *testing.T) {
 	f := newFixture(t)
-	f.cycle(5, "item-z", map[string]string{"retrospective-report.md": "# this text names item-a but the records do not\n"})
-	f.cycle(7, "item-a", map[string]string{"scout-report.md": "# lineage: 5\n", "inputs/lineage.json": `[5]`})
+	f.cycle(5, "item-z", map[string]string{"retrospective-report.md": "# this text names item-a but the records do not\n", "lane-scope.json": `{"todo_ids":["item-a"]}`})
+	f.cycle(9, "", map[string]string{"audit-report.md": "# a cell planted a lane scope here\n", "lane-scope.json": `{"todo_ids":["item-a"]}`})
+	f.cycle(7, "item-a", map[string]string{"scout-report.md": "# lineage: 5\n", "inputs/lineage.json": `[5]`, "lane-scope.json": `{"todo_ids":["item-z"]}`})
 	if err := continuation.WriteRegistryEntry(f.root, "item-a", continuation.Continuation{SnapshotSHA: "abc", Cycle: 4}); err != nil {
 		t.Fatal(err)
 	}
 	f.cycle(4, "", map[string]string{"retrospective-report.md": "# ancestor of the continuation chain\n"})
 	idx := f.build(7, "build")
 	if !slices.Equal(idx.Lineage, []int{4}) {
-		t.Fatalf("lineage = %v, want [4]: only lane-scope todo_ids and the continuation registry name a lineage cycle", idx.Lineage)
+		t.Fatalf("lineage = %v, want [4]: only the pipeline lineage records and the continuation registry name a lineage cycle; a lane-scope.json that a cell can write never does", idx.Lineage)
 	}
 	if _, ok := entryOf(idx, "retrospective", 4); !ok {
 		t.Fatal("the continuation ancestor's retrospective must be listed")
@@ -165,7 +177,7 @@ func TestLineage_KeepsTheLastLineageMaxCycles(t *testing.T) {
 		f.cycle(n, "item-a", nil)
 	}
 	f.cycle(8, "item-a", nil)
-	idx, err := Build(Request{ProjectRoot: f.root, Workspace: f.ws(8), Cycle: 8, Phase: "build", LineageMax: 3})
+	idx, err := Build(Request{ProjectRoot: f.root, Workspace: f.ws(8), Cycle: 8, Phase: "build", LineageMax: 3, ItemIDs: f.items[8]})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -197,13 +209,13 @@ func TestBuild_ListsTheLessonsThatNameTheItemOrALineageCycle(t *testing.T) {
 	}
 }
 
-func TestBuild_NotesACycleWithNoLaneScope(t *testing.T) {
+func TestBuild_NotesACycleWithNoItemID(t *testing.T) {
 	f := newFixture(t)
 	f.cycle(6, "item-a", nil)
 	f.cycle(7, "", map[string]string{"scout-report.md": "# s\n"})
 	idx := f.build(7, "build")
-	if len(idx.Lineage) != 0 || idx.Attempt != 1 || len(idx.Notes) != 1 || !strings.Contains(idx.Notes[0], "lane-scope.json") {
-		t.Fatalf("index = %+v, want no lineage and a note that names lane-scope.json", idx)
+	if len(idx.Lineage) != 0 || idx.Attempt != 1 || len(idx.Notes) != 1 || !strings.Contains(idx.Notes[0], "no item id") {
+		t.Fatalf("index = %+v, want no lineage and a note that the cycle has no item id", idx)
 	}
 }
 
@@ -342,5 +354,67 @@ func TestBuild_SkipsADeliverableThatIsASymlinkSoNoTargetLeaksIntoTheIndex(t *tes
 		if e.Kind == "scout-report" || strings.Contains(e.Summary, "PRIVATE") {
 			t.Fatalf("a planted symlink must not become an entry: %+v", e)
 		}
+	}
+}
+
+func TestWriteRecord_KeepsTheItemIDsOfACycleWhereNoCellCanWrite(t *testing.T) {
+	f := newFixture(t)
+	if err := WriteRecord(f.root, Record{Cycle: 3, ItemIDs: []string{"item-a"}}); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(f.root, ".evolve", "lineage", "cycle-3.json"))
+	if err != nil || !strings.Contains(string(raw), "item-a") {
+		t.Fatalf("record = %q err = %v", raw, err)
+	}
+	f.write("file", "x")
+	if err := WriteRecord(filepath.Join(f.root, "file"), Record{Cycle: 3}); err == nil {
+		t.Fatal("WriteRecord must fail when its directory cannot be made")
+	}
+}
+
+func TestLineage_NotesAMalformedRecordAndSkipsIt(t *testing.T) {
+	f := newFixture(t)
+	f.cycle(6, "item-a", nil)
+	f.write(".evolve/lineage/cycle-5.json", "{")
+	f.write(".evolve/lineage/other.json", `{"cycle":4,"item_ids":["item-a"]}`)
+	got, notes := Lineage(f.root, 7, []string{"item-a"})
+	if !slices.Equal(got, []int{6}) || len(notes) != 1 || !strings.Contains(notes[0], "cycle-5.json") {
+		t.Fatalf("lineage = %v notes = %v, want [6] and a note on the malformed record", got, notes)
+	}
+}
+
+func TestBuild_SkipsAnEntryUnderASymlinkedDirectoryOrWithASecondHardLink(t *testing.T) {
+	f := newFixture(t)
+	f.cycle(6, "item-a", nil)
+	f.cycle(7, "item-a", nil)
+	outside := f.write("home/docs/notes.md", "# HOME-DOC-LINE\n")
+	if err := os.Symlink(filepath.Dir(outside), filepath.Join(f.ws(6), "retrospectives")); err != nil {
+		t.Fatal(err)
+	}
+	linked := f.write(".evolve/runs/cycle-6/audit-report.md", "# hard linked\n")
+	if err := os.Link(linked, filepath.Join(f.root, "home", "copy.md")); err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range f.build(7, "build").Entries {
+		if e.Kind == "recovery-retrospective" || e.Kind == "audit-report" {
+			t.Fatalf("an entry through a symlinked directory or with a second hard link must be skipped: %+v", e)
+		}
+	}
+}
+
+func TestReadRecord_ReturnsTheItemIDsThatThePipelineRecorded(t *testing.T) {
+	f := newFixture(t)
+	if _, ok := ReadRecord(f.root, 3); ok {
+		t.Fatal("no record yet")
+	}
+	if err := WriteRecord(f.root, Record{Cycle: 3, ItemIDs: []string{"item-a"}}); err != nil {
+		t.Fatal(err)
+	}
+	if r, ok := ReadRecord(f.root, 3); !ok || !slices.Equal(r.ItemIDs, []string{"item-a"}) || r.Cycle != 3 {
+		t.Fatalf("ReadRecord = %+v %v", r, ok)
+	}
+	f.write(".evolve/lineage/cycle-4.json", "{")
+	if _, ok := ReadRecord(f.root, 4); ok {
+		t.Fatal("a malformed record is no record")
 	}
 }

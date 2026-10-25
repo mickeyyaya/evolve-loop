@@ -12,7 +12,9 @@ The operator set the rule on 2026-10-25: earlier deliverables and the retry and 
 
 - **`Build(Request)`** reads only pipeline records. It returns an `Index` with the schema `evolve.inputs.index/1`, the cycle, the phase, the item ids, the `attempt` number, the lineage, the entries and the notes. The root and the workspace must be absolute.
 - **Deliverables.** For each phase contract of `phasecontract.Contracts` that writes to the workspace, the artifact of each other phase is an entry when the file exists. `triage-decision.json`, `acs-verdict.json` and each `handoff-*.json` are entries too. A `handoff-*.json` has the kind `handoff-asks`.
-- **Lineage.** `Lineage(root, cycle, itemIDs)` gives each cycle under `.evolve/runs/` whose `lane-scope.json` `todo_ids` holds an item id of this cycle. It adds the cycle of the continuation registry entry of each item id. `Build` keeps the last `Request.LineageMax` cycles (default `DefaultLineageMax`, 5). For each lineage cycle the entries are `retrospective-report.md`, `failure-digest.json`, `carryover-todos.json`, `audit-report.md`, `retrospectives/*.md` (the ADR-0151 documents) and `failure-lesson*.yaml`. A lesson under `.evolve/instincts/lessons/` is an entry when its text names an item id or `cycle-N` of a lineage cycle as a whole token.
+- **Records.** `WriteRecord(root, Record)` writes `.evolve/lineage/cycle-N.json` with the cycle, the run id and the item ids. `ReadRecord` reads it back. The caller gives the ids from the fleet scope of the orchestrator (`Request.ItemIDs`). No cell can write the directory.
+- **Lineage.** `Lineage(root, cycle, itemIDs)` gives each cycle whose record holds an item id of this cycle. A malformed record adds a note. It adds the cycle of the continuation registry entry of each item id. `Build` keeps the last `Request.LineageMax` cycles (default `DefaultLineageMax`, 5).
+- **Lineage entries.** For each lineage cycle the entries are `retrospective-report.md`, `failure-digest.json`, `carryover-todos.json`, `audit-report.md`, `retrospectives/*.md` (the ADR-0151 documents) and `failure-lesson*.yaml`. A lesson under `.evolve/instincts/lessons/` is an entry when its text names an item id or `cycle-N` of a lineage cycle as a whole token.
 - **The `attempt` field.** The `attempt` of the cycle is the number of lineage cycles before the cap, plus 1. Each lineage entry carries the `attempt` of its cycle.
 - **Entries.** An entry has `id`, `class`, `kind`, `path` (relative to the project root), `cycle`, `phase`, `attempt`, `summary`, `bytes` and `sha256`. The summary is one line of at most 160 characters. It comes from the first line of a Markdown file that is not a comment, or the `summary` key of a JSON object. For a YAML file it comes from the `summary:` or `title:` line. No LLM writes it.
 - **Raw output.** `IsRawOutput` refuses each path under a `.bridge/` directory and each name that ends in one of `RawOutputSuffixes`: `-stdout.log`, `-stderr.log`, `-stdout.clean.txt`, `-final-pane.txt`, `-final-scrollback.txt`, `-pane-watch.json`. No entry is raw output, because no source names it.
@@ -20,9 +22,9 @@ The operator set the rule on 2026-10-25: earlier deliverables and the retry and 
 
 ## Invariants
 
-- Lineage comes only from `lane-scope.json` and the continuation registry. The text of an artifact never adds a cycle (`TestLineageComesOnlyFromPipelineRecords`).
-- A missing `lane-scope.json` gives no item id and no lineage, and a note in `notes` says so. An unreadable continuation registry adds a note and no cycle.
-- A source that is a symlink is not an entry. So a cell of an earlier phase cannot plant a link that puts the text of another file into a summary.
+- Lineage comes only from the records and the continuation registry. A `lane-scope.json` in a workspace and the text of an artifact never add a cycle (`TestLineageComesOnlyFromPipelineRecords`).
+- No item id gives no lineage, and a note in `notes` says so. An unreadable continuation registry adds a note and no cycle.
+- A source that is a symlink, that is under a symlinked directory, or that has a second hard link is not an entry. So a cell of an earlier phase cannot plant a link that puts the text of another file into a summary.
 - A deliverable that exists but cannot be read fails `Build`. The caller warns and the cell gets no index.
 
 ## Findings

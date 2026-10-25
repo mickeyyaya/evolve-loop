@@ -184,6 +184,20 @@ var agentContract = []contractRow{
 		script: func(h contractHost) string { return "cat " + h.run + "/.bridge/scout-stdout.log" }},
 	{action: "read a raw log that the bridge left in the own workspace", want: contractDeny,
 		script: func(h contractHost) string { return "cat " + h.run + "/build-stdout.log" }},
+	{action: "rename a raw log of the own workspace to a name that no rule matches", want: contractDeny,
+		script: func(h contractHost) string {
+			return "mv " + h.run + "/build-stdout.log " + h.run + "/b.txt && cat " + h.run + "/b.txt"
+		}},
+	{action: "hard-link a raw log of the own workspace under another name", want: contractDeny,
+		script: func(h contractHost) string {
+			return "ln " + h.run + "/build-stdout.log " + h.run + "/b.txt && cat " + h.run + "/b.txt"
+		}},
+	{action: "write a pipeline lineage record in .evolve/lineage/", want: contractDeny,
+		script: func(h contractHost) string {
+			return `echo '{"cycle":9,"item_ids":["item-a"]}' > ` + h.root + "/.evolve/lineage/cycle-9.json"
+		}},
+	{action: "rewrite the lane-scope.json of the own workspace", want: contractDeny,
+		script: func(h contractHost) string { return `echo '{"todo_ids":["item-b"]}' > ` + h.run + "/lane-scope.json" }},
 	{action: "a retry opens its predecessor's retrospective through inputs/index.json", want: contractAllow,
 		script: func(h contractHost) string {
 			return `p=$(sed -n 's/.*"path": *"\([^"]*retrospective-report\.md\)".*/\1/p' ` + h.run + `/inputs/index.json) && test -n "$p" && cat "` + h.root + `/$p"`
@@ -402,7 +416,6 @@ func (h *contractHost) withIsolationFixtures(t *testing.T) {
 		filepath.Join(runs, "cycle-6", "retrospective-report.md"): "lesson of cycle 6\n",
 		filepath.Join(runs, "cycle-9", "audit-report.md"):         "audit of an unrelated item\n",
 		filepath.Join(h.run, "build-stdout.log"):                  "raw output of the build\n",
-		filepath.Join(runs, "cycle-6", "lane-scope.json"):         `{"todo_ids":["item-a"]}`,
 		filepath.Join(runs, "cycle-9", "lane-scope.json"):         `{"todo_ids":["item-b"]}`,
 		filepath.Join(h.run, "lane-scope.json"):                   `{"todo_ids":["item-a"]}`,
 		filepath.Join(h.home, ".ssh", "id_fixture"):               "fixture secret of the cell home\n",
@@ -414,13 +427,12 @@ func (h *contractHost) withIsolationFixtures(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	idx, err := inputindex.Build(inputindex.Request{ProjectRoot: h.root, Workspace: h.run, Cycle: 7, Phase: "build"})
-	if err != nil {
-		t.Fatal(err)
+	for cycle, item := range map[int]string{6: "item-a", 7: "item-a", 9: "item-b"} {
+		if err := inputindex.WriteRecord(h.root, inputindex.Record{Cycle: cycle, ItemIDs: []string{item}}); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if err := inputindex.Write(h.run, idx); err != nil {
-		t.Fatal(err)
-	}
+	h.reindex(t)
 	h.withKeychain(t)
 	h.stubBin = contractTempDir(t, "", "sbc-bin")
 	fakeclitest.Install(t, filepath.Join(h.stubBin, "claude"), "#!/bin/sh\necho stub-claude 0.0.0\n")
@@ -522,4 +534,33 @@ func contractTempDir(t *testing.T, parent, pattern string) string {
 		t.Fatal(err)
 	}
 	return real
+}
+
+func (h contractHost) reindex(t *testing.T) {
+	t.Helper()
+	record, _ := inputindex.ReadRecord(h.root, 7)
+	idx, err := inputindex.Build(inputindex.Request{ProjectRoot: h.root, Workspace: h.run, Cycle: 7, Phase: "build", ItemIDs: record.ItemIDs})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := inputindex.Write(h.run, idx); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAgentSandboxContract_AForgedLaneScopeGainsNoGrantAtTheNextDispatch(t *testing.T) {
+	h := newContractHost(t)
+	h.prefix = builderPrefix(t, requireNativeSandbox(t), h, "shadow")
+	if out, err := h.agent(t, contractRow{script: func(h contractHost) string {
+		return `echo '{"todo_ids":["item-b"]}' > ` + h.run + "/lane-scope.json && cat " + h.run + "/lane-scope.json"
+	}}); err != nil || !strings.Contains(out, "item-b") {
+		t.Fatalf("inconclusive: the shadow cell must be able to forge its lane scope: err=%v out=%q", err, out)
+	}
+	h.reindex(t)
+	h.prefix = builderPrefix(t, requireNativeSandbox(t), h, "enforce")
+	unrelated := filepath.Join(filepath.Dir(h.otherCycle), "cycle-9", "audit-report.md")
+	out, err := h.agent(t, contractRow{script: func(contractHost) string { return "cat " + unrelated }})
+	if failure := contractFailure(contractDeny, out, err); failure != nil {
+		t.Fatalf("a forged lane scope must not pull an unrelated cycle into the next index: %v", failure)
+	}
 }

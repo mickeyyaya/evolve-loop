@@ -17,6 +17,7 @@ func readIsolationConfig(enforce bool) Config {
 		RawDirs:     []string{"/repo/.evolve/runs/cycle-7/.bridge"},
 		SecretDirs:  []string{"/home/u/.ssh"},
 		SecretFiles: []string{"/home/u/.netrc"},
+		PinnedFiles: []string{"", "/repo/.evolve/runs/cycle-7/lane-scope.json"},
 	}
 	return cfg
 }
@@ -44,7 +45,10 @@ func TestGenerateSBPL_EnforceDeniesOtherRunsSecretsAndRawOutputAndGrantsTheIndex
 		`(allow file-read* file-read-data (literal "/repo/.evolve/runs/cycle-6/retrospective-report.md"))`,
 		`(deny file-read-data (subpath "/repo/.evolve/runs/cycle-7/.bridge") (with message "evolve-cell=d42 rule=read.raw.output inv=I4"))`,
 		`(deny file-read-data (require-all (subpath "/repo/.evolve/runs") (regex #"(-stdout\.log|-final-pane\.txt)$")) (with message "evolve-cell=d42 rule=read.raw.output inv=I4"))`,
+		`(deny file-write* (subpath "/repo/.evolve/runs/cycle-7/.bridge") (with message "evolve-cell=d42 rule=write.raw.output inv=I4"))`,
+		`(deny file-write* (require-all (subpath "/repo/.evolve/runs") (regex #"(-stdout\.log|-final-pane\.txt)$")) (with message "evolve-cell=d42 rule=write.raw.output inv=I4"))`,
 		`(deny file-write* (subpath "/repo/.evolve/runs/cycle-7/inputs") (with message "evolve-cell=d42 rule=write.inputs inv=I4"))`,
+		`(deny file-write* (literal "/repo/.evolve/runs/cycle-7/lane-scope.json") (with message "evolve-cell=d42 rule=write.pipeline.file inv=I5"))`,
 		`(deny file-read* (subpath "/repo/.evolve/runs/cycle-7/private"))`,
 	)
 	if strings.Contains(sbpl, `(literal "")`) {
@@ -95,6 +99,7 @@ func TestBwrapPrefix_EnforceHidesOtherRunsAndRebindsTheOwnWorkspaceAndTheIndex(t
 		"--ro-bind-try /repo/.evolve/runs/cycle-7/inputs /repo/.evolve/runs/cycle-7/inputs",
 		"--tmpfs /home/u/.ssh",
 		"--ro-bind /dev/null /home/u/.netrc",
+		"--ro-bind-try /repo/.evolve/runs/cycle-7/lane-scope.json /repo/.evolve/runs/cycle-7/lane-scope.json",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("enforce must emit %q:\n%s", want, joined)
@@ -124,8 +129,8 @@ func TestBwrapPrefix_ShadowOrNoWorkspaceBindsNothingForReadIsolation(t *testing.
 }
 
 func TestReadIsolation_RuleIDsAreTheSignalRulesOfTheSpec(t *testing.T) {
-	got := []string{RuleRunsUnrelated, RuleHomeSecret, RuleRawOutput, RuleInputsWrite, CellMessagePrefix}
-	want := []string{"read.runs.unrelated", "read.home.secret", "read.raw.output", "write.inputs", "evolve-cell="}
+	got := []string{RuleRunsUnrelated, RuleHomeSecret, RuleRawOutput, RuleRawOutputWrite, RuleInputsWrite, RulePipelineFileWrite, CellMessagePrefix}
+	want := []string{"read.runs.unrelated", "read.home.secret", "read.raw.output", "write.raw.output", "write.inputs", "write.pipeline.file", "evolve-cell="}
 	if !slices.Equal(got, want) {
 		t.Fatalf("rule ids = %v, want %v (llm-isolation.md §15.2)", got, want)
 	}

@@ -17,7 +17,7 @@
 - `Config.ReadIsolation` holds the read rules of I-4 and I-5 ([llm-isolation.md](../llm-isolation.md) §8.5). `writeReadIsolation` writes them after the write denials and before `DenyReadPaths`, in this order:
   1. the guard of `RunsDir` and the guards of the home secrets;
   2. the grant of the own workspace and of each indexed path;
-  3. the guards of the raw output and the write guard of `<ws>/inputs`.
+  3. the read and write guards of the raw output, and the write guards of `<ws>/inputs` and `PinnedFiles`.
 
    Each guard carries the message `evolve-cell=<tag> rule=<rule> inv=<I4|I5>`. At `enforce` a guard is a `deny`, and otherwise an `allow` with a report. A read guard uses the operation `file-read-data`, and each grant names `file-read*` and `file-read-data`. A grant of `file-read*` alone does not reopen a path that a `file-read-data` deny closed (measured on macOS, 2026-10-26).
 - At `enforce`, `bwrapReadIsolation` mounts a `tmpfs` on `RunsDir` and binds the own workspace again. It binds each grant read-only (`--ro-bind-try`) and masks each raw file and secret file with `/dev/null`. It mounts a `tmpfs` on each raw and secret directory, and binds `<ws>/inputs` read-only. At `shadow` it adds nothing, because `bwrap` has no report.

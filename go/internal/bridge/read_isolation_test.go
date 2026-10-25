@@ -63,7 +63,10 @@ func writeFixtureFile(t *testing.T, path, body string) {
 
 func (c readCell) index(t *testing.T) {
 	t.Helper()
-	idx, err := inputindex.Build(inputindex.Request{ProjectRoot: c.root, Workspace: c.ws, Cycle: 7, Phase: "build"})
+	if err := inputindex.WriteRecord(c.root, inputindex.Record{Cycle: 6, ItemIDs: []string{"item-a"}}); err != nil {
+		t.Fatal(err)
+	}
+	idx, err := inputindex.Build(inputindex.Request{ProjectRoot: c.root, Workspace: c.ws, Cycle: 7, Phase: "build", ItemIDs: []string{"item-a"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,6 +92,7 @@ func TestReadIsolation_GrantsTheIndexedPathsAndGuardsTheRunsTheRawOutputAndTheSe
 		RawDirs:     []string{filepath.Join(c.ws, ".bridge")},
 		SecretDirs:  []string{filepath.Join(c.home, ".ssh")},
 		SecretFiles: []string{filepath.Join(c.home, ".netrc")},
+		PinnedFiles: []string{filepath.Join(c.ws, "lane-scope.json")},
 	}
 	if !readIsolationEqual(ri, want) {
 		t.Fatalf("readIsolation =\n%+v\nwant\n%+v", ri, want)
@@ -98,7 +102,8 @@ func TestReadIsolation_GrantsTheIndexedPathsAndGuardsTheRunsTheRawOutputAndTheSe
 func readIsolationEqual(a, b sandbox.ReadIsolation) bool {
 	return a.Enforce == b.Enforce && a.Tag == b.Tag && a.RunsDir == b.RunsDir && a.Workspace == b.Workspace &&
 		slices.Equal(a.Grants, b.Grants) && slices.Equal(a.RawSuffixes, b.RawSuffixes) && slices.Equal(a.RawFiles, b.RawFiles) &&
-		slices.Equal(a.RawDirs, b.RawDirs) && slices.Equal(a.SecretDirs, b.SecretDirs) && slices.Equal(a.SecretFiles, b.SecretFiles)
+		slices.Equal(a.RawDirs, b.RawDirs) && slices.Equal(a.SecretDirs, b.SecretDirs) && slices.Equal(a.SecretFiles, b.SecretFiles) &&
+		slices.Equal(a.PinnedFiles, b.PinnedFiles)
 }
 
 func TestReadIsolation_OffOrNoWorkspaceGivesNoRulesAndShadowDeniesNothing(t *testing.T) {

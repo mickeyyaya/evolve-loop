@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 )
 
@@ -30,15 +29,15 @@ func runsDir(root string) string {
 
 func Lineage(projectRoot string, cycle int, itemIDs []string) ([]int, []string) {
 	found := []int{}
-	dirs, _ := filepath.Glob(filepath.Join(runsDir(projectRoot), "cycle-*"))
-	for _, dir := range dirs {
-		n, err := strconv.Atoi(strings.TrimPrefix(filepath.Base(dir), "cycle-"))
-		if err == nil && n != cycle && slices.ContainsFunc(committedset.LanePin(dir), func(id string) bool { return slices.Contains(itemIDs, id) }) {
-			found = append(found, n)
+	records, notes := readRecords(projectRoot)
+	for _, r := range records {
+		if r.Cycle > 0 && r.Cycle != cycle && slices.ContainsFunc(r.ItemIDs, func(id string) bool { return slices.Contains(itemIDs, id) }) {
+			found = append(found, r.Cycle)
 		}
 	}
-	chain, notes := continuationCycles(projectRoot, cycle, itemIDs)
+	chain, chainNotes := continuationCycles(projectRoot, cycle, itemIDs)
 	found = append(found, chain...)
+	notes = append(notes, chainNotes...)
 	slices.Sort(found)
 	return slices.Compact(found), notes
 }

@@ -16,7 +16,7 @@ func TestHandoffAsksTravelInTheIndex(t *testing.T) {
 	ws := filepath.Join(root, ".evolve", "runs", "cycle-3")
 	writeIndexFixture(t, filepath.Join(ws, "handoff-"+request.PairTDDBuild+".json"), `{"summary":"two asks for the build","asks":[{"id":"a1"}]}`)
 	var warn strings.Builder
-	writeInputIndex(root, ws, 3, PhaseBuild, &warn)
+	writeInputIndex(indexTarget{projectRoot: root, workspace: ws, cycle: 3}, PhaseBuild, nil, &warn)
 	idx, err := inputindex.Read(ws)
 	if err != nil {
 		t.Fatal(err)

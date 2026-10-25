@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
@@ -19,6 +20,7 @@ type Request struct {
 	Cycle       int
 	Phase       string
 	LineageMax  int
+	ItemIDs     []string
 }
 
 type source struct {
@@ -35,10 +37,10 @@ func Build(req Request) (Index, error) {
 	if !filepath.IsAbs(req.ProjectRoot) || !filepath.IsAbs(req.Workspace) {
 		return Index{}, fmt.Errorf("inputindex: the project root %q and the workspace %q must be absolute", req.ProjectRoot, req.Workspace)
 	}
-	ids := committedset.LanePin(req.Workspace)
+	ids := slices.Clone(req.ItemIDs)
 	idx := Index{Schema: Schema, Cycle: req.Cycle, Phase: req.Phase, ItemIDs: ids, Entries: []Entry{}, Notes: []string{}}
 	if len(ids) == 0 {
-		idx.Notes = append(idx.Notes, "no lane-scope.json todo_ids in the workspace, so the cycle has no item id and no lineage")
+		idx.Notes = append(idx.Notes, "the fleet scope of the cycle names no item id, so the cycle has no lineage")
 	}
 	all, notes := Lineage(req.ProjectRoot, req.Cycle, ids)
 	idx.Notes = append(idx.Notes, notes...)
@@ -90,7 +92,12 @@ func kindOf(name string) string {
 
 func newEntry(root string, s source) (Entry, bool, error) {
 	info, err := os.Lstat(s.path)
-	if errors.Is(err, fs.ErrNotExist) || err == nil && info.Mode().Type() == fs.ModeSymlink {
+	switch {
+	case errors.Is(err, fs.ErrNotExist), err == nil && info.Mode().Type() == fs.ModeSymlink:
+		return Entry{}, false, nil
+	case err == nil && !info.Mode().IsRegular():
+		err = errors.New("not a regular file")
+	case err == nil && !plainFile(root, s.path, info):
 		return Entry{}, false, nil
 	}
 	var body []byte
@@ -103,4 +110,19 @@ func newEntry(root string, s source) (Entry, bool, error) {
 	rel, _ := filepath.Rel(root, s.path)
 	return Entry{Class: s.class, Kind: s.kind, Path: filepath.ToSlash(rel), Cycle: s.cycle, Phase: s.phase, Attempt: s.attempt,
 		Summary: summaryOf(s.path, body), Bytes: int64(len(body)), SHA256: digest(body)}, true, nil
+}
+
+func plainFile(root, path string, info fs.FileInfo) bool {
+	if hardLinked(info) {
+		return false
+	}
+	canonicalRoot, rootErr := filepath.EvalSymlinks(root)
+	real, err := filepath.EvalSymlinks(path)
+	rel, _ := filepath.Rel(root, path)
+	return rootErr == nil && err == nil && real == filepath.Join(canonicalRoot, rel)
+}
+
+func hardLinked(info fs.FileInfo) bool {
+	st, ok := info.Sys().(*syscall.Stat_t)
+	return ok && st.Nlink > 1
 }
