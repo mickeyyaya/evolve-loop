@@ -57,6 +57,7 @@ After each row, the host must still reach the run server with its sessions `agen
 | Incident cycle 1853: the exact probe with `TMUX` unset | allow | The probe prints `rc=0` and `own-server`. The run server survives. |
 | Incident cycle 1853: the exact probe with `TMUX` set to the run server | allow | The probe reaches no server. The run server survives. |
 | Isolation N3: exec an LLM binary (a `claude` stub) with `--version` | deny (green, X4) | The shell gets `Operation not permitted`. The profile is built at `isolation.i3.stage=enforce`. |
+| Exec an older installed version of the `claude` stub under the install root (`$HOME/.local/share/claude/versions/2.1.304`) | deny | The exec gets `Operation not permitted`. The `install_roots` entry of the claude manifests covers each version. |
 | Re-enter the profile through `sandbox-exec` to exec the `claude` stub | deny | The exec of `sandbox-exec` gets `Operation not permitted`. |
 | Isolation N5: read the raw output `<ws>/.bridge/scout-stdout.log` | deny (open until X5) | The read succeeds today. |
 | A retry opens the retrospective of its predecessor through a fixture `inputs/index.json` | allow | The read returns the lesson. The row keeps the lineage read of [llm-isolation.md](llm-isolation.md) row N6 open. |

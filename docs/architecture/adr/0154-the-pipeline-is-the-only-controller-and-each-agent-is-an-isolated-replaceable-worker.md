@@ -32,6 +32,8 @@ The operator then set the limit of read isolation: "phase agent can read the out
 2. **I-2 Hermetic environment.** A child gets an allowlist plus manifest variables. No other launcher variable reaches it.
 3. **I-3 No nested agency.** An agent cannot start a new LLM CLI process of any family, its own family too. It cannot run an `evolve` dispatch verb.
    - *Amended 2026-10-26:* a subagent of the own harness, of any type and any model of the same family, is allowed. The harness chooses it, and it runs inside the boundary of the cell.
+   - The pipeline enforces the cell boundary: the sandbox scope, the input index, the exec denies, the network, the budget and the telemetry. The usage of each in-harness subagent counts against the budget of the cell.
+   - The latest-model rule governs only the model that the pipeline assigns to a seat. It does not govern the subagent choices of a harness.
    - To get another phase agent, the agent writes a dispatch request. The pipeline validates it, the orchestrator judges it, and only the pipeline dispatches.
 4. **I-4 Pipeline-mediated communication.** Agents communicate only through declared artifacts that the pipeline records and indexes.
 5. **I-5 Read isolation.** An agent reads its own cycle, its item lineage and its own CLI files, and nothing else.

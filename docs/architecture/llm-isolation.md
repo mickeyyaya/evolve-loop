@@ -407,7 +407,8 @@ Known differences from the design:
 - A root covers each version that the installer keeps. A CLI without a declared root has one literal. A version that is installed during the run gets its rule at the next launch.
 - A copy of `/usr/bin/sandbox-exec` does not run. On Darwin 27 the kernel kills a copied Apple platform binary with `Killed: 9` (exit 137), in the cell and outside it (review of #1126, 2026-10-26).
 - Two gaps stay open, because a rule for them also blocks the `go test` binaries in `/tmp`. A CLI that an interpreter runs, for example `node gemini.js`, is not an exec of the CLI file. A binary that the agent copies into the worktree or `/tmp` has no rule.
-- Before the flip to `enforce`: the deny of `/usr/bin/sandbox-exec` breaks a CLI that uses its own Seatbelt for its tool calls. Examples are Claude Code with its sandbox setting on, and codex without `--yolo`. Only the `claude-tmux` and `codex-tmux` manifests pass `--dangerously-skip-permissions` and `--yolo`. The headless `claude-p` and `codex` drivers do not, so the deny puts them at risk at `enforce`. A CLI can also exec its own binary for a helper. The `shadow` reports must show no such exec before the flip.
+- Before the flip to `enforce`: the deny of `/usr/bin/sandbox-exec` breaks a CLI that uses its own Seatbelt for its tool calls. Examples are Claude Code with its sandbox setting on, and codex without `--yolo`. Of the claude and codex manifests, only `claude-tmux` and `codex-tmux` pass `--dangerously-skip-permissions` and `--yolo`. The agy drivers pass `--dangerously-skip-permissions` too. The headless `claude-p` and `codex` drivers do not, so the deny puts them at risk at `enforce`.
+- A CLI can also exec its own binary for a helper. The `shadow` reports must show no such exec before the flip.
 - The Go refusals depend on the environment. An agent that unsets the markers avoids them. The exec deny is the guard that does not depend on the agent.
 - The refusal of `evolve agent run` emits no signal yet (§15.1).
 
@@ -552,7 +553,7 @@ The sandbox today generates SBPL for `sandbox-exec` and an argv for `bwrap` from
 
 | Rule | Effect | SBPL form | `bwrap` form | Invariant | Today |
 |---|---|---|---|---|---|
-| Exec of LLM binaries | deny | `(deny process-exec (literal "<resolved binary>"))` for each manifest `binary` | `--ro-bind /dev/null <binary path>` | I-3 | built at `shadow` (X4, §7.1) |
+| Exec of LLM binaries | deny | `(deny process-exec (require-all (literal "<real path>") (require-not (signing-identifier "com.apple.sandbox-exec"))))` for each manifest `binary` and `/usr/bin/sandbox-exec`, and the same rule with `subpath` for each `install_roots` entry (§7.1) | `--ro-bind /dev/null <real path>` for each binary and `--tmpfs <root>` for each root, other families only (§7.1) | I-3 | built at `shadow` (X4, §7.1) |
 | Exec of other tools | allow | the current `(allow process-exec)` | as today | none | allowed |
 | `EVOLVE_SANDBOX=off` in a phase | refuse the launch | Go check | Go check | I-3, I-7 | refused (X4, §7.1) |
 | Read of the worktree and the repo source | allow | `(allow file-read* (subpath "<worktree>"))` | `--ro-bind` | none | allowed |
@@ -782,7 +783,7 @@ The contract reuses the shape of [llm-quality-indexes.md](llm-quality-indexes.md
 |---|---|---|
 | `ISOLATION_I1_VIOLATION` | I-1 | the launch API, when a caller outside the bridge registers a launch; the AST guard covers the static case |
 | `ISOLATION_I2_VIOLATION` | I-2 | the environment builder, for each dropped name |
-| `ISOLATION_I3_VIOLATION` | I-3 | the sandbox report of a denied exec; the refusal in `evolve agent run` |
+| `ISOLATION_I3_VIOLATION` | I-3 | built: the refusal of `EVOLVE_SANDBOX=off` in a phase (`rule=sandbox.off.phase`). Proposed: the sandbox report of a denied exec, and the refusal in `evolve agent run` (§7.1). |
 | `ISOLATION_I4_VIOLATION` | I-4 | the sandbox report of a read of raw output or a write of `inputs/` |
 | `ISOLATION_I5_VIOLATION` | I-5 | the sandbox report of a read outside the index, the worktree and `home_reads` |
 | `ISOLATION_I6_VIOLATION` | I-6 | the router, when a launch resolves through a compiled family default and not through routing data |
@@ -1303,7 +1304,7 @@ X19 lands in three items:
 |---|---|---|---|---|
 | I-1 Single launcher | `TestOnlyTheBridgeStartsAnLLMBinary` (AST) | X3 | `enforce` | `ISOLATION_I1_VIOLATION` |
 | I-2 Hermetic environment | `TestProcessEnv_IsTheAllowlistPlusTheManifest`; matrix row N1 | X2 | `shadow`, then `enforce` | `ISOLATION_I2_VIOLATION` |
-| I-3 No nested agency | sandbox contract rows N3, N4 | X4 | `shadow`, then `enforce` | `ISOLATION_I3_VIOLATION` |
+| I-3 No nested agency | sandbox contract row N3 and matrix row N4 | X4 | `shadow`, then `enforce` | `ISOLATION_I3_VIOLATION` |
 | I-4 Pipeline-mediated communication | rows N5, N6; `TestHandoffAsksTravelInTheIndex` | X5 | `shadow`, then `enforce` | `ISOLATION_I4_VIOLATION` |
 | I-5 Read isolation | rows N6, N7, N8; `TestLineageComesOnlyFromPipelineRecords` | X5 | `shadow`, then `enforce` | `ISOLATION_I5_VIOLATION` |
 | I-6 Family-agnostic flow | `TestFlowCodeNamesNoFamily`; rows N13, N14 | X6, X9, X10 | `enforce` | `ISOLATION_I6_VIOLATION` |

@@ -1,0 +1,27 @@
+{
+  "id": "isolation-env-file-left-on-early-kill",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.45,
+  "route": "console-manual",
+  "title": "LLM isolation X2 follow-up: a session killed right after a successful start leaves its 0600 secret env file behind",
+  "summary": "At enforce, writeCellEnvFile (go/internal/bridge/tmux.go:157) writes the cell environment to a 0600 script in a 0700 dir under TMPDIR, and the pane shell removes the dir when it runs the script. A session that is killed after a successful start and before its pane shell runs the rm leaves the file, with the passthrough secrets, and nothing bounds its lifetime. Reproduced 50/50 in the round-2 review of #1126 (MEDIUM-J). The flaky TestRealTmux_AFailedStartLeavesNoEnvFile shows the same path: on a failed start NewSessionEnv runs kill-session -t =<name>: (tmux.go:146), so a start that fails on a duplicate name kills the existing live session of that name, a session it did not create, often before its pane shell removes its file. The \u00a76.1 limit 'the script file exists only until the pane shell starts' is false on a kill path today.",
+  "fix": "Never kill a session that the failed start did not create (check the duplicate name before the kill, or kill only by the id that the start returned). Remove the env dir on each kill and reap path (the bridge knows the path), add an evolve gc sweep of stale evolve-cellenv-* dirs, or make the pane unlink the file before it execs the shell (or read the env from a pipe or FD). Do not fix the flaky test by waiting for the first pane: that hides the kill.",
+  "acceptance": [
+    "RED first: TestRealTmux_AKilledSessionLeavesNoEnvFile (kill the session right after NewSessionEnv returns) fails before",
+    "RED first: TestRealTmux_AFailedStartNeverKillsASessionItDidNotCreate fails before",
+    "No env file survives any kill, reap or exit path of a session",
+    "TestRealTmux_AFailedStartLeavesNoEnvFile passes 50/50 under load",
+    "Changed functions at 100% coverage on every CI OS; the \u00a76.1 limits of docs/architecture/llm-isolation.md are corrected"
+  ],
+  "deps": [
+    "isolation-hermetic-driver-env"
+  ],
+  "files": [
+    "go/internal/bridge/tmux.go",
+    "go/internal/bridge/tmux_hermetic_env_integration_test.go",
+    "docs/architecture/llm-isolation.md"
+  ],
+  "created_at": "2026-10-26T12:00:03Z",
+  "source": "console, 2026-10-26, round-2 review of #1126 (MEDIUM-I, MEDIUM-J)"
+}
