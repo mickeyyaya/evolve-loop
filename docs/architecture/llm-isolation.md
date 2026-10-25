@@ -1037,7 +1037,7 @@ Part I isolates the agents. It says nothing about the callers of the pipeline. A
 
 The isolation link: inside a phase pane, each writing verb refuses with exit 3. A phase agent then cannot use the service interface to act outside its cell (I-3).
 
-X17 lands in four ordered items, because the first defect can start a loop:
+X17 lands in five ordered items, because the first defect can start a loop:
 
 | Item | Scope | Red test first |
 |---|---|---|
@@ -1045,6 +1045,7 @@ X17 lands in four ordered items, because the first defect can start a loop:
 | X17b | the envelope, the exit table, `--json` and `--project-root` on each core verb; the guard against the registry | `TestCLIContract_DocMatchesTheRegistry` fails on a missing verb |
 | X17c | the inbox and `cli-routing` writers queue during a wave; `gc` takes a lease | `TestInboxEdit_DuringAWaveQueuesAndExitsFour` |
 | X17d | `inbox claim`, `dossier show`, `cycle resume`, `wave stop`, `quality show` | one envelope test for each new verb |
+| X17e (amended 2026-10-26) | the agent class of each verb, `agent capabilities --json`, the request kinds and the credential check ([cli-contract.md](cli-contract.md) §4.1 to §4.5, §28 of this file) | `TestAgentClasses_MatchTheContract` fails, because `agent capabilities` does not exist |
 
 The `events` verbs are E9 of the [events plan](../plans/event-notification-protocol-2026-10.md). X17b sets the envelope that E9 uses. X17 does not build them a second time.
 
@@ -1128,6 +1129,7 @@ I-6 says that flow logic names no family. It does not say what the assignment ho
 | budgets and timeouts | turns, tokens, wall time | `max_turns`, `max_budget_usd` |
 | sandbox intents | read inputs, write worktree, run command class X, network yes or no | `allowed_tools`, `disallowed_tools`, `sandbox` |
 | persona text | the CLI-neutral persona | `agents/<name>.md` |
+| tool surface (amended 2026-10-26) | `evolve agent capabilities --json` | none: Claude tool syntax in the profiles, for example `Bash(evolve phase verify:*)` |
 
 **The driver binding is opaque.** `cli_routing` picks a driver identity, for example `agy-tmux`. The pipeline passes the identity through and never branches on it. Only the bridge reads it.
 
@@ -1146,6 +1148,27 @@ I-6 says that flow logic names no family. It does not say what the assignment ho
 **Capability negotiation.** Each driver declares its capabilities in the manifest `capabilities` field (proposed, X9): tools, structured output, sandbox support and context size. A profile names the capabilities that its seat needs, for example `["edit", "shell"]`. The router keeps only the drivers that have each needed capability. When no driver in the chain has them, the router refuses the seat with a routing error. It never downgrades in silence.
 
 **What stays in a profile.** A family preference list is routing data, so it stays, or moves into `cli_routing` (X6b). The profile keeps the role, the output, the tier, the budgets, the needed capabilities and the sandbox intents.
+
+**The pipeline tool surface (amended 2026-10-26, X17e).** The operator said on 2026-10-26: "make sure that LLM cli is able to justify how to interact with the evo loop pipeline as it can decide how to leverage evo loop cli to help it to complete its tasks."
+
+A neutral assignment must also tell the agent which `evolve` verbs it can use. Today only the Claude tool syntax of the profiles does this. The spec of record is [cli-contract.md](cli-contract.md) §4.1 to §4.5:
+
+- Each verb has an agent class: `A` runs in the cell, `R` goes through a request, and `D` is denied. Each verb outside the allowlist is `D`.
+- `evolve agent capabilities --json` (proposed) lists the classes, the schemas and the request paths of the current cell. The assignment field "tool surface" points to it.
+- An `R` request uses the path of the dispatch request of §7.2 on the branch of #1126. Go validates it, the orchestrator agent judges it, and the pipeline runs it.
+- `R` and `D` verbs need the dispatch credential of item `isolation-dispatch-capability-token`, so the class is a rule and not advice.
+
+A worked example: the build agent of cycle 2101 finds a defect outside its item. It runs `evolve agent capabilities --json` and sees that `inbox add` is `R`. It writes `requests/inbox-add-1.json` with the reason and `build-report.md` as the input. At the handoff the pipeline validates the request, the orchestrator approves it, and the pipeline files the item. The item id goes to the lineage index of the build. If the agent runs `evolve inbox add` directly, the verb exits 3 and names the request path.
+
+**The persona text (proposed, X19b).** The shared persona of each phase gets this CLI-neutral text. It names no tool syntax of a family:
+
+> You can use the `evolve` command to check and to understand your work. Run `evolve agent capabilities --json` first. It lists each verb and its class. Run an `A` verb when it helps your task.
+>
+> For an `R` verb, write a request file at the path that the output gives. In `why`, give the fact from your inputs that makes the request necessary. Say why your own task cannot do the work. Do not ask for work outside the scope of your item. Do not run a `D` verb.
+>
+> The pipeline and the orchestrator decide each request. The result comes back in your input index.
+
+This text replaces no part of X19b. X19b puts it in the personas when it makes them neutral.
 
 ### Guard
 
@@ -1168,6 +1191,8 @@ The guard starts with an allowlist of today's sites, and the allowlist can only 
 | X10 | the instruction files `CLAUDE.md`, `GEMINI.md` and the `.claude/agents` reviewers | render instruction files; X19b neutralizes only the personas under `agents/` |
 | X18 | the per-agent `EVOLVE_<AGENT>_*` flags | touch the environment |
 | X7 | the Claude Code hooks | change the hooks |
+| X17e | the agent classes, `agent capabilities` and the request kinds ([cli-contract.md](cli-contract.md) §4.1 to §4.5) | define the classes; X19a adds only the field "tool surface", and X19b adds the persona text |
+| X4 (#1126) | the I-3 wording of 2026-10-26, the dispatch request and the dispatch credential | define the credential or the dispatch request a second time |
 
 X19 lands in three items:
 
@@ -1195,7 +1220,7 @@ X19 lands in three items:
 | I-12 Orchestrator proposes, pipeline disposes | `TestValidator_RefusesAnActionOutsideTheCatalog`; `TestRepairDispatch_NeedsAnAcceptedProposal`; the orchestrator profile has no dispatch tool | X13, X14 | `shadow`, then `enforce` for each tier | `HEALING_I12_VIOLATION` |
 | I-13 Bounded autonomy | `TestBudget_RefusesTheFourthT1RepairInAWindow`; `TestBreaker_OpensAfterTwoFailedRepairs` | X14 | `enforce` | `HEALING_I13_VIOLATION` |
 | I-14 Evidence closes an incident | `TestIncident_ClosesOnlyWithTheFourConditions` | X12, X16 | `enforce` | `HEALING_I14_VIOLATION` |
-| I-15 The CLI is the service contract | `TestLoopStatus_AnExtraWordNeverStartsALoop`; `TestCLIContract_DocMatchesTheRegistry`; `TestCLIContract_EachCoreVerbPrintsOneEnvelope` | X17 | `enforce` | none (a test guard) |
+| I-15 The CLI is the service contract | `TestLoopStatus_AnExtraWordNeverStartsALoop`; `TestCLIContract_DocMatchesTheRegistry`; `TestCLIContract_EachCoreVerbPrintsOneEnvelope`; `TestAgentClasses_MatchTheContract` (X17e) | X17 | `enforce` | none (a test guard); X17e: `ISOLATION_I3_VIOLATION` with `rule=verb.class.r` or `verb.class.d` |
 | I-16 No ambient control | `TestNoControlFlagReadOutsideTheMarkerList` (AST); `TestPolicyParse_RefusesAnUnknownKey`; matrix row N1 extended with `EVOLVE_SANDBOX` and `EVOLVE_BYPASS_SHIP_GATE` | X18 | `enforce` | `CONTROL_BYPASS_USED` (INFO, for each audited bypass) |
 | I-17 The assignment is CLI-neutral | `TestNoCLISpecificsAboveTheDriver` (a shrinking allowlist); a routing test that refuses a seat with no capable driver | X19a to X19c | `enforce` | none (a test guard); a routing refusal is a normal routing error |
 

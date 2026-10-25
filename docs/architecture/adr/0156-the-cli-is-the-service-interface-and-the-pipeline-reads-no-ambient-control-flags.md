@@ -1,12 +1,13 @@
 # ADR-0156: The CLI is the service interface, and the pipeline reads no ambient control flags
 
-- **Status:** Proposed (2026-10-25).
+- **Status:** Proposed (2026-10-25). Amended on 2026-10-26 by the operator: I-15 gives each verb an agent class (rules 17 to 22). A cell reads its classes from one verb. The component is X17e, and the spec is [cli-contract.md](../cli-contract.md) §4.1 to §4.5.
 - **Plan:** [llm-isolation-2026-10](../../plans/llm-isolation-2026-10.md) §12. **Research:** [llm-isolation-2026-10](../../research/llm-isolation-2026-10.md) §6. **Design:** [cli-contract](../cli-contract.md) and [llm-isolation](../llm-isolation.md) Part III.
 - **Relates to:**
   - [ADR-0154](0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md): the agent cell. I-16 closes the `EVOLVE_*` and `BRIDGE_*` hole in the I-2 allowlist.
   - [ADR-0155](0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md): a bypass flag is a way around the constitution. I-16 makes each bypass a visible parameter.
   - [ADR-0127](0127-push-only-event-channels.md): the event channels. The `events` verbs of plan E9 are verbs of this contract.
   - [ADR-0152](0152-one-phase-agent-runs-from-the-command-line-with-no-cycle-through-the-phase-runner.md): `evolve agent run` already has `--json`, `--project-root` and an exit-code list. Only its exit codes move to the shared table.
+  - ADR-0154 I-3, as #1126 amends it on 2026-10-26 (X4, not merged). An agent can run the subagents of its own harness. It asks for another phase agent through a dispatch request. Rules 17 to 22 give the same request path to each verb that changes shared state.
 - **Evidence:**
   - 112 verbs, with no contract document and no shared exit-code table (research F4.1, F4.3).
   - `evolve loop status foo` starts a real loop (F4.4).
@@ -43,6 +44,18 @@ ADR-0154 is about the agent cell: what an LLM worker gets. This decision is abou
 15. A guard test refuses a new environment read of a name outside the marker list.
 16. `loop status <word>` is fixed first, because it starts a loop.
 
+*Amended 2026-10-26 (X17e).* The operator said: "make sure that LLM cli is able to justify how to interact with the evo loop pipeline as it can decide how to leverage evo loop cli to help it to complete its tasks."
+
+17. **I-15, agent class.** Each verb also has one agent class: `A` (allowed in a cell), `R` (request only) or `D` (denied).
+    - The availability class and the agent class are independent.
+18. The `A` and `R` verbs are an allowlist in `cli-contract.md`. Each other verb is `D`. A guard test compares the classes in the file with the classes in the code.
+19. `evolve agent capabilities --json` gives a cell the class and the schemas of each verb.
+    - For an `R` verb it also gives the request schema and the request path.
+    - The neutral TaskAssignment (I-17) points to it.
+20. An agent asks for an `R` verb with a typed request file: what, why, inputs and expected output. The pipeline validates it in Go, the orchestrator agent judges it (ADR-0155), and the pipeline runs it. The result goes to the lineage index of the requester.
+21. An `R` or `D` verb needs the dispatch credential, which no cell can read. Without it the verb exits 3 and names the request path. The sandbox write rules stay as the last layer.
+22. Each request and each decision is a Signal Center signal. The quality panel gets three readings: request rate, approval rate and refusal outcomes.
+
 ## Consequences
 
 Good:
@@ -51,6 +64,8 @@ Good:
 - An operator change is a reviewed file edit, not a hidden shell variable.
 - No knob and no bypass reaches an LLM child, so I-2 holds at `enforce` with no exception.
 - A typo in the policy file fails loudly.
+- Any family learns from one JSON output what it can run, what it must request and why. No persona needs a list in the syntax of one CLI.
+- A justified request reaches the pipeline as data, so the orchestrator can judge it and the panel can count it.
 
 Bad:
 
@@ -58,6 +73,9 @@ Bad:
 - Scripts that set a knob in the environment break. Each moved knob keeps a one-wave shadow read that warns.
 - A queued inbox change lands at the next boundary, not at once. The caller must read the queue state.
 - The strict decode refuses a policy file that has stale keys today. X18a lists them before it turns strict.
+- An agent does not get the result of a request in the same turn. The pipeline reads requests at the handoff, so a later phase or a retry reads the result.
+- Each new verb starts as `D`. Its author must add a class to `cli-contract.md` to make it usable from a cell.
+- The class check depends on the dispatch credential of X4. Until that item lands, the markers are the only check, and `env -u` passes them.
 
 What changes our mind: a service can need a push channel, or a call faster than a process start. Then a local daemon becomes a separate decision. If a knob must change inside a cycle, it gets a policy key that the pipeline reads at each phase, not an environment variable.
 
@@ -70,3 +88,6 @@ What changes our mind: a service can need a push channel, or a call faster than 
 | A deny list of bad environment names | A new name leaks until someone adds it (research §3, the same reason as I-2). |
 | Every verb available to mutate at all times | `pr merge`, `sync-main` and `cycle reset` refuse during a wave for a correct reason (F4.6). |
 | Amend ADR-0154 | It mixes the agent cell with the callers and settings of the pipeline. |
+| Two agent classes, allow and deny (X17e) | An agent then has no way to ask for a justified change, and the operator asked for that way. |
+| A verb list in each persona or profile (X17e) | It is CLI text above the driver, which I-17 forbids, and it does not say why a verb is absent. |
+| A tool server for each family (X17e) | The house rule is CLI only ([cli-only-no-mcp.md](../../conventions/cli-only-no-mcp.md)). |

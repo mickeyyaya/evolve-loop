@@ -1,0 +1,37 @@
+{
+  "id": "cli-agent-tool-surface",
+  "kind": "feature",
+  "priority_class": "stability",
+  "weight": 0.5,
+  "route": "console-manual",
+  "title": "CLI contract X17e: agent classes, the capabilities verb and the credential check",
+  "summary": "An agent cannot learn which evolve verbs it can run. Only Claude tool syntax in 93 profiles (Bash(evolve phase verify:*)) says so, and the X4 refusals read env markers that env -u removes. agent capabilities is not a verb (go/cmd/evolve/registry.go:43). Spec: docs/architecture/cli-contract.md §4.1 to §4.5 and the column agent of §5.",
+  "fix": "Put the agent classes of cli-contract.md §4.1 and §5 in Go data in cmd/evolve. Each verb that the data does not name is D. Add evolve agent capabilities --json (schema evolve.agent.capabilities/1, §4.2). Make each R and D verb read the dispatch credential of isolation-dispatch-capability-token first. Without it, an R verb exits 3 with the §4.4 line that names the request path. A D verb exits 3 and names no path. Extend the request channel of isolation-dispatch-request-channel to the kinds inbox-add, routing-proposal and quality-reading (§4.3). Emit the signals of §4.5 and register ISOLATION_REQUEST_REFUSED in signal-codes.md. The refusal check runs at shadow for one wave, then at enforce.",
+  "acceptance": [
+    "RED first: TestAgentClasses_MatchTheContract fails before",
+    "TestAgentClasses_MatchTheContract parses the table of cli-contract.md §4.1 and the column agent of §5. It fails on each verb whose Go class differs.",
+    "evolve agent capabilities --json prints one evolve.agent.capabilities/1 envelope. It lists each verb that the table names, with its class, and sets default_class to D.",
+    "An A verb (evolve phase verify build) in a cell with no credential exits with the same code and output as outside a cell",
+    "TestAgentClass_RefusesWithoutTheCredentialAndNamesTheRequestPath: an R verb (evolve inbox add) with no credential exits 3, and its stderr names <ws>/requests/inbox-add-<n>.json",
+    "A D verb (evolve wave next) with no credential exits 3, and its stderr names no request path",
+    "TestAgentRequest_AnApprovedRequestIsRunByThePipeline: the pipeline runs an inbox-add request that the orchestrator approves, and the item id appears in the lineage index of the requester",
+    "An approved routing-proposal request writes one queue file, and an approved quality-reading request publishes one reading",
+    "A refused request records its reason, and the pipeline emits isolation.request.decision with ISOLATION_REQUEST_REFUSED",
+    "A class refusal emits ISOLATION_I3_VIOLATION with rule verb.class.r or verb.class.d",
+    "Changed functions at 100% coverage on every CI OS; cli-contract.md, llm-isolation.md §28 and runtime-reference.md updated"
+  ],
+  "deps": [
+    "isolation-dispatch-capability-token",
+    "isolation-dispatch-request-channel"
+  ],
+  "files": [
+    "go/cmd/evolve/",
+    "go/internal/cli/agentcmd/",
+    "go/internal/isolation/",
+    "docs/architecture/cli-contract.md",
+    "docs/architecture/llm-isolation.md",
+    "docs/operations/runtime-reference.md"
+  ],
+  "created_at": "2026-10-26T14:00:00Z",
+  "source": "console, 2026-10-26, operator: \"make sure that LLM cli is able to justify how to interact with the evo loop pipeline as it can decide how to leverage evo loop cli to help it to complete its tasks.\" ADR-0156 rules 17 to 22; docs/architecture/llm-isolation.md §28; plan llm-isolation-2026-10 component X17e. The deps are on #1126 (not merged); isolation-dispatch-request-channel also depends on selfheal-action-catalog-validator-budgets."
+}
