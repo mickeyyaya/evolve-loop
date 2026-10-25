@@ -322,7 +322,13 @@ At `enforce`, a tmux pane starts through `execTmux.NewSessionEnv`. No value of t
 1. The bridge writes the cell environment to a 0600 script in a new 0700 directory under `TMPDIR` (`writeCellEnvFile`). The script first removes its own directory, then exports each pair and runs `exec /bin/sh`. The open script stays readable to the shell after the removal.
 2. The tmux client runs with the base allowlist names and `TMUX_TMPDIR` only, so no passthrough value is in its environment. A server that this client starts has a clean global environment.
 3. The pane command is `/bin/sh -c 'exec /usr/bin/env -i TERM="$TERM" /bin/sh <script>'`. tmux runs it with no `default-shell`, so no shell startup file runs. `env -i` clears each variable of the server and the client. `TERM` stays, because tmux sets it from `default-terminal`.
-4. The same tmux command sets the session option `@evolve_env` to a fingerprint of the cell environment (`envFingerprint`).
+4. The same tmux command sets the session option `@evolve_env` to a fingerprint of the cell environment (`envFingerprint`). It also prints the id of the new session (`-P -F '#{session_id}'`).
+5. `NewSessionEnv` returns only after the pane shell has removed the directory (`awaitCellEnvConsumed`). The wait is at most `cellEnvConsumeTimeout` (30 s, the bound of one tmux command). So a kill or a reap after the start finds no file.
+6. A failed start removes the directory. It kills a session only by the id that its own `new-session` printed (`createdSessionID`). A start that fails on a duplicate name prints no id, so it kills nothing. It never kills a session that it did not create.
+7. Each start first sweeps the stale directories in `TMPDIR` (`sweepStaleCellEnv`). Such a directory is left only when the bridge process dies during a start, for example on a host restart. The sweep removes a directory only when all of these are true:
+   - its name starts with `evolve-cellenv-`, and it is a real directory, not a link;
+   - it is older than `cellEnvStaleAfter` (10 minutes), which is much longer than a start can take;
+   - it holds one regular file, `env`, and that file starts with the line `/bin/rm -rf <the directory>`, which only `writeCellEnvFile` writes. A name match alone never removes a directory.
 
 At `enforce`, a named session that exists before the launch is used again only when its `@evolve_env` matches the fingerprint of this cell (`checkReusedSessionEnv`). Otherwise the launch stops at the safety gate with "env fingerprint mismatch". A session of another cell or another cycle has another environment, so the gate refuses it too. That is the intent.
 
@@ -336,13 +342,15 @@ The guards are these tests:
 - `TestProcessEnv_IsTheAllowlistPlusTheManifest`
 - `TestTmuxBoot_AtEnforceThePaneIsBornWithTheCellEnvOnly`
 - the integration tests `TestRealTmux_APollutedServerGivesThePaneOnlyItsEnvPairs` and `TestRealTmux_ASecretValueIsInNoArgvAndNoLeftoverFile`
+- the integration tests `TestRealTmux_AKilledSessionLeavesNoEnvFile`, `TestRealTmux_AFailedStartNeverKillsASessionItDidNotCreate` and `TestRealTmux_AFailedStartLeavesNoEnvFile`
+- `TestNewSessionEnv_APaneThatNeverReadsItsFileFailsTheStartRemovesTheFileAndKillsOnlyItsOwnSessionID` and `TestSweepStaleCellEnv_RemovesOnlyOldDirsThatCarryTheirOwnBridgeHeader`
 
 Known differences from the design:
 
 - tmux sets `SHELL` in a pane to its `default-shell` option. The name is in the base allowlist, but the value can come from the server option and not from `-e`.
 - The pane shell is `/bin/sh`, not the login shell of the operator. A user startup file does not change the cell environment.
 - The report is once for each family and name in a process, not once for each wave.
-- The values are in the environment of the pane processes, as the CLI needs them. The script file exists only until the pane shell starts.
+- The values are in the environment of the pane processes, as the CLI needs them. The script file exists only until the pane shell reads it, and `NewSessionEnv` returns only after that. If the bridge process dies during a start, the file stays until the next start sweeps it (step 7).
 - Only the in-process adapter wires `Deps.Signals`. The other bridge entries follow the stage but emit no shadow signal.
 - With no explicit `Deps.EnvStage`, each child reads `policy.json` once. The project root comes from `Deps.Env`, then the process. A policy that cannot be read or parsed gives a `WARN isolation stage` line, and the stage stays `shadow`.
 - `envMap` in `go/cmd/evolve/cmd_bridge.go` feeds only the flag fallback of `parseLaunchArgs`. It does not reach a child, so X2 does not change it.
