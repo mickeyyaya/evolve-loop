@@ -25,7 +25,7 @@ func Compile(p policy.Policy, cat Catalog, profs ProfileSource, opts ...CompileO
 	for _, opt := range opts {
 		opt(c)
 	}
-	t := Table{pol: p, catalog: cat}
+	t := Table{pol: p, catalog: cat, floors: p.Floors()}
 	t.profiles = c.snapshotProfiles(profs)
 	if p.CLIRouting != nil {
 		c.block = *p.CLIRouting
@@ -48,6 +48,7 @@ type compiler struct {
 func (c *compiler) compileDeclared(t Table) Table {
 	t.declared = true
 	t.clis = c.compileCLIs()
+	c.checkFloors(t.floors, t.clis)
 	t.chains = c.compileSharedChains()
 	agentChains, models := c.compileAgents()
 	maps.Copy(t.chains, agentChains)
@@ -123,10 +124,28 @@ func (c *compiler) compileCLIs() []string {
 			out = append(out, llmroute.Family(d))
 		}
 	}
-	if !slices.Contains(out, claudeFamily) {
-		c.add(SeverityError, "cli_routing.clis", "claude must be listed: the Claude-family floor agents run only on claude")
-	}
 	return out
+}
+
+func (c *compiler) checkFloors(floors policy.Floors, clis []string) {
+	seen := map[string]string{}
+	for _, family := range floors.Families() {
+		key := "cli_routing.floors." + family
+		if !llmroute.KnownDriver(llmroute.DefaultDriverForFamily(family)) {
+			c.add(SeverityError, key, "unknown family %q (families: claude, codex, agy, agy-claude, ollama)", family)
+			continue
+		}
+		if !slices.Contains(clis, family) {
+			c.add(SeverityError, "cli_routing.clis", "%s must be listed: the floor agents %v run only on %s", family, floors[family], family)
+		}
+		for _, agent := range floors[family] {
+			if prev, taken := seen[agent]; taken {
+				c.add(SeverityError, key, "names agent %s, which the %s floor already holds", agent, prev)
+				continue
+			}
+			seen[agent] = family
+		}
+	}
 }
 
 func (c *compiler) compileChain(key string, entries []string) ([]string, bool) {

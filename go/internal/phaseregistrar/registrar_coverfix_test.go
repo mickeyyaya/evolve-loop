@@ -54,3 +54,12 @@ func TestCoverfixRegisterStampsMintWithInjectedClock(t *testing.T) {
 		t.Errorf("mint stamped in 2001 must have expired once the TTL has passed (wall clock was used instead of NowFn); got %v", farLater)
 	}
 }
+
+func TestRegisterRejectsTheRetiredBareNameGemini(t *testing.T) {
+	r := newRegistrar(t)
+	cfg := validCfg()
+	cfg.Dispatch.CLI = "gemini"
+	cfg.Dispatch.AllowedCLIs = []string{"gemini"}
+	_, err := r.Register(cfg)
+	fixtures.RequireErrContains(t, err, "agy-tmux")
+}

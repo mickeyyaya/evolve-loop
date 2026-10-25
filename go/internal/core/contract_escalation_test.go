@@ -204,8 +204,8 @@ func TestContractCorrection_NoDeclaredFallbackEscalatesToUniversalClaude(t *test
 	if len(probe.dispatched) != 3 {
 		t.Fatalf("build dispatched %d times (%v), want 3", len(probe.dispatched), probe.dispatched)
 	}
-	if probe.dispatched[2] != universalContractFallbackCLI {
-		t.Errorf("correction 2 dispatched on ModelRoutingCLI=%q, want %q — a profile with no declared cli_fallback must escalate to the universal claude fallback", probe.dispatched[2], universalContractFallbackCLI)
+	if probe.dispatched[2] != "claude-tmux" {
+		t.Errorf("correction 2 dispatched on ModelRoutingCLI=%q, want %q — a profile with no declared cli_fallback must escalate to the universal claude fallback", probe.dispatched[2], "claude-tmux")
 	}
 }
 
@@ -213,7 +213,7 @@ func TestContractCorrection_SameFamilyFallbackIsNotAnEscalation(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
-	writeCLIProfile(t, root, "builder", universalContractFallbackCLI, nil)
+	writeCLIProfile(t, root, "builder", "claude-tmux", nil)
 	probe := &escalationProbe{phase: "build", threshold: neverDemotingThreshold}
 
 	if _, err := runEscalationCycle(t, root, probe); err == nil {
@@ -376,8 +376,8 @@ func TestUniversalContractFallbackMatchesLLMRouteDefault(t *testing.T) {
 	if len(plan.Candidates) == 0 {
 		t.Fatal("llmroute.Resolve returned no candidates")
 	}
-	if plan.Candidates[0] != universalContractFallbackCLI {
-		t.Errorf("universalContractFallbackCLI=%q but llmroute's no-profile default is %q — the escalation target must be the same universal fallback the dispatch resolver uses", universalContractFallbackCLI, plan.Candidates[0])
+	if plan.Candidates[0] != "claude-tmux" {
+		t.Errorf("the contract-escalation seat %q differs from llmroute's no-profile default %q — the escalation target must be the same universal fallback the dispatch resolver uses", "claude-tmux", plan.Candidates[0])
 	}
 }
 

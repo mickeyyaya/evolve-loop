@@ -77,6 +77,7 @@ type Deps struct {
 	Signals               *signalcenter.Center
 	TokenResolver         func(tokenusage.Window) (tokenusage.Result, error)
 	ModelChain            func(cli, model string) []string
+	Floors                policy.Floors
 	ListProcesses         proctree.Lister
 	ListCwds              proctree.CwdLister
 	SignalProcess         proctree.Signaler

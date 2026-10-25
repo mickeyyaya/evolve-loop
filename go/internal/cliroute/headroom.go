@@ -18,8 +18,6 @@ const (
 	maxHeadroomPct     = 100
 )
 
-var unmeasuredOrder = []string{claudeFamily, "agy", "agy-claude"}
-
 var (
 	errNoUsageReader = errors.New("the host has no usage reader")
 	errNoWeekWindow  = errors.New("no week window is recorded for a family of the chain")
@@ -141,10 +139,11 @@ func compareMeasure(a, b time.Duration) int {
 }
 
 func unmeasuredRank(family string) int {
-	if i := slices.Index(unmeasuredOrder, family); i >= 0 {
+	order := policy.UnmeasuredOrder()
+	if i := slices.Index(order, family); i >= 0 {
 		return i
 	}
-	return len(unmeasuredOrder)
+	return len(order)
 }
 
 func weekNote(fams []string, used map[string]float64, pct int) string {
@@ -171,7 +170,7 @@ func laneNote(fams []string, lanes []lanetime.FamilyLane) string {
 		}
 	}
 	if len(byFamily) == 0 {
-		return fmt.Sprintf("no family has a measure, so the order is %s", strings.Join(unmeasuredOrder, ", "))
+		return fmt.Sprintf("no family has a measure, so the order is %s", strings.Join(policy.UnmeasuredOrder(), ", "))
 	}
 	parts := make([]string, 0, len(fams))
 	for _, fam := range fams {

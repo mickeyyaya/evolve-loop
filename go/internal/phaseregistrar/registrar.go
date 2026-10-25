@@ -69,7 +69,10 @@ func (r Registrar) Register(cfg phaseconfig.PhaseConfig) (Result, error) {
 	}
 
 	if cfg.Dispatch.CLI != "" {
-		resolved := bridge.DriverFor(cfg.Dispatch.CLI)
+		resolved, err := bridge.DriverFor(cfg.Dispatch.CLI)
+		if err != nil {
+			return Result{}, fmt.Errorf("phaseregistrar: phase %q dispatch.cli: %w", spec.Name, err)
+		}
 		if _, ok := bridge.LookupDriver(resolved); !ok {
 			return Result{}, fmt.Errorf("phaseregistrar: phase %q dispatch.cli %q does not resolve to a registered driver (resolved %q); refusing to mint an unresolvable profile", spec.Name, cfg.Dispatch.CLI, resolved)
 		}

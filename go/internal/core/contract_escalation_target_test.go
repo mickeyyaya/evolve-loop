@@ -39,8 +39,8 @@ func TestContractEscalation_MintedPhaseResolvesItsOwnProfile(t *testing.T) {
 	if !ok {
 		t.Fatal("no escalation target for a minted phase on agy-tmux — the phase in this fix's own live evidence would still be unescalatable")
 	}
-	if esc != universalContractFallbackCLI {
-		t.Errorf("escalation target = %q, want %q", esc, universalContractFallbackCLI)
+	if esc != "claude-tmux" {
+		t.Errorf("escalation target = %q, want %q", esc, "claude-tmux")
 	}
 }
 
@@ -75,8 +75,8 @@ func TestContractEscalation_DispatchOverrideDecidesTheFailedFamily(t *testing.T)
 	if esc == "agy-tmux" {
 		t.Error("escalated onto the overlay CLI that just failed the contract — the dispatch override must define the failed family")
 	}
-	if esc != universalContractFallbackCLI {
-		t.Errorf("escalation target = %q, want %q (the only other family available)", esc, universalContractFallbackCLI)
+	if esc != "claude-tmux" {
+		t.Errorf("escalation target = %q, want %q (the only other family available)", esc, "claude-tmux")
 	}
 }
 
@@ -98,7 +98,7 @@ func TestContractEscalation_RespectsAllowedCLIs(t *testing.T) {
 func TestContractEscalation_NoTargetWhenChainIsOneFamily(t *testing.T) {
 	t.Setenv("EVOLVE_CLI", "")
 	root := t.TempDir()
-	writeCLIProfile(t, root, "triage", universalContractFallbackCLI, []string{"claude-p"})
+	writeCLIProfile(t, root, "triage", "claude-tmux", []string{"claude-p"})
 	cr := contractEscalationRun(root, nil)
 
 	if esc, ok := cr.contractEscalationCLI(PhaseTriage, ""); ok {
@@ -111,8 +111,8 @@ func TestContractEscalation_AbsentProfileIsNilSafe(t *testing.T) {
 	root := t.TempDir()
 	cr := contractEscalationRun(root, nil)
 
-	if got := cr.contractDispatchCLI(PhaseBuild, ""); got != universalContractFallbackCLI {
-		t.Errorf("contractDispatchCLI = %q, want %q (the resolver's own no-profile default)", got, universalContractFallbackCLI)
+	if got := cr.contractDispatchCLI(PhaseBuild, ""); got != "claude-tmux" {
+		t.Errorf("contractDispatchCLI = %q, want %q (the resolver's own no-profile default)", got, "claude-tmux")
 	}
 	if esc, ok := cr.contractEscalationCLI(PhaseBuild, ""); ok {
 		t.Errorf("escalation target = %q, want none for a profile-less phase already on the default family", esc)

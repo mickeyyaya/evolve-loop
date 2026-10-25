@@ -41,7 +41,7 @@ func (p *Phase) AgentPromptName() string { return "evolve-swarm-planner" }
 
 func (p *Phase) ArtifactFilename(_ core.PhaseRequest) string { return "swarm-plan.md" }
 
-func (p *Phase) DefaultModel() string { return "opus" }
+func (p *Phase) DefaultModel() string { return "deep" }
 
 func (p *Phase) ComposePrompt(body string, req core.PhaseRequest) string {
 	prompt := runner.BaseCycleContext(body, req)

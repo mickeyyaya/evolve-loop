@@ -8,6 +8,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute/cliroutetest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
@@ -61,7 +62,7 @@ func TestResolve_TheOperatorTableRoutesNoLaunchToCodex(t *testing.T) {
 
 func TestResolve_TheOperatorTableKeepsTheFloorAgentsOnClaude(t *testing.T) {
 	f := newOperatorFixture(t)
-	for agent := range profiles.ClaudeFamilyFloor() {
+	for _, agent := range policy.DefaultFloors()["claude"] {
 		for _, req := range f.requests(agent) {
 			d := mustResolve(t, f.router, req)
 			for _, attempt := range walkEveryAttemptWalled(d.Plan) {

@@ -150,7 +150,7 @@ func resolvePrimary(agent string, env map[string]string, prof *profiles.Profile)
 	if prof != nil && prof.CLI != "" {
 		return prof.CLI, "profile." + agent + ".cli"
 	}
-	return "claude-tmux", "default"
+	return policy.SeatDefault(policy.SeatNoProfile).CLI, "default"
 }
 
 func resolveTriggers(prof *profiles.Profile) []int {

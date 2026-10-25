@@ -106,7 +106,7 @@ func TestContractEscalation_ARefusedRouteIsLoudOnBothPaths(t *testing.T) {
 	cr := &cycleRun{o: routedOrchestrator(r), req: CycleRequest{ProjectRoot: root}, envSnap: map[string]string{"EVOLVE_BUILDER_CLI": "codex-tmux"}}
 	var got string
 	dispatch := captureStderr(t, func() { got = cr.contractDispatchCLI(PhaseBuild, "") })
-	if got != universalContractFallbackCLI || !strings.Contains(dispatch, "phase build: contract escalation has no route") || !strings.Contains(dispatch, "outside the allowed set") {
+	if got != "claude-tmux" || !strings.Contains(dispatch, "phase build: contract escalation has no route") || !strings.Contains(dispatch, "outside the allowed set") {
 		t.Fatalf("the dispatch-CLI lookup names its refusal instead of silently falling back: cli=%q stderr=%q", got, dispatch)
 	}
 	escalate := captureStderr(t, func() { _, _ = cr.contractEscalationCLI(PhaseBuild, "agy-tmux") })

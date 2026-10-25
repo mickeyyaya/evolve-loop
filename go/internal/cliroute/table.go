@@ -14,7 +14,6 @@ import (
 )
 
 const (
-	claudeFamily  = "claude"
 	ruleDefault   = "default"
 	ruleProfile   = "profile"
 	agentsPrefix  = "agents:"
@@ -41,6 +40,7 @@ type Table struct {
 	roles     map[string][]phasespec.Role
 	agentKeys map[string]string
 	findings  []Finding
+	floors    policy.Floors
 }
 
 type loadedProfile struct {
@@ -85,10 +85,10 @@ func (t Table) legacyProfile(agent string) *profiles.Profile {
 }
 
 func (t Table) allowed(agent string, prof *profiles.Profile) []string {
-	floored := profiles.IsClaudeFamilyFloor(agent)
+	floor := t.floors.FamilyOf(agent)
 	out := []string{}
 	for _, fam := range t.clis {
-		if (!floored || fam == claudeFamily) && prof.AllowsFamily(fam) {
+		if (floor == "" || fam == floor) && prof.AllowsFamily(fam) {
 			out = append(out, fam)
 		}
 	}
@@ -208,6 +208,10 @@ func cloneCeiling(in map[string][]string) map[string][]string {
 		out[tier] = slices.Clone(families)
 	}
 	return out
+}
+
+func (r *Router) FloorFamily(agent string) string {
+	return r.tables.Load().declared.floors.FamilyOf(agent)
 }
 
 func (r *Router) Effort(agent, tier string) (effort, source string) {

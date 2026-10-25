@@ -17,6 +17,7 @@ func cloneRouting(block policy.CLIRouting) policy.CLIRouting {
 	block.Work = maps.Clone(block.Work)
 	block.Tiers = maps.Clone(block.Tiers)
 	block.Agents = maps.Clone(block.Agents)
+	block.Floors = maps.Clone(block.Floors)
 	return block
 }
 
@@ -64,8 +65,10 @@ func setRoutingKey(block policy.CLIRouting, set routingSet) (policy.CLIRouting, 
 		block.Work = withEntry(block.Work, name, values)
 	case scoped && group == "agents":
 		block.Agents = withEntry(block.Agents, name, agentRuleWith(block.Agents[name], set))
+	case scoped && group == "floors":
+		block.Floors = withEntry(block.Floors, name, values)
 	default:
-		return block, fmt.Errorf("unknown key %q (clis, default, after_chain, tiers.<tier>, work.<role>, agents.<agent>)", key)
+		return block, fmt.Errorf("unknown key %q (clis, default, after_chain, tiers.<tier>, work.<role>, agents.<agent>, floors.<family>)", key)
 	}
 	return block, nil
 }
@@ -153,9 +156,21 @@ func unsetRoutingKey(block policy.CLIRouting, key string) (policy.CLIRouting, er
 		delete(block.Work, name)
 	case scoped && group == "agents":
 		delete(block.Agents, name)
+	case key == "floors":
+		block.Floors = nil
+	case scoped && group == "floors":
+		return unsetFloor(block, name)
 	default:
 		return block, fmt.Errorf("unknown key %q", key)
 	}
+	return block, nil
+}
+
+func unsetFloor(block policy.CLIRouting, family string) (policy.CLIRouting, error) {
+	if _, ok := block.Floors[family]; !ok {
+		return block, fmt.Errorf("floors.%s is not set", family)
+	}
+	delete(block.Floors, family)
 	return block, nil
 }
 

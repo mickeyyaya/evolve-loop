@@ -2,39 +2,9 @@ package profiles
 
 import (
 	"reflect"
-	"sort"
 	"testing"
 	"testing/fstest"
 )
-
-func TestClaudeFamilyFloor_NamesTheGraderAgents(t *testing.T) {
-	floor := ClaudeFamilyFloor()
-	names := make([]string, 0, len(floor))
-	for name, why := range floor {
-		if why == "" {
-			t.Errorf("floor entry %s has no reason", name)
-		}
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	want := []string{"adversarial-review", "auditor", "code-reviewer", "spec-verifier", "spec-verify", "tdd-engineer"}
-	if !reflect.DeepEqual(names, want) {
-		t.Fatalf("ClaudeFamilyFloor() = %v, want %v", names, want)
-	}
-}
-
-func TestClaudeFamilyFloor_IsACopyACallerCannotWiden(t *testing.T) {
-	first := ClaudeFamilyFloor()
-	first["builder"] = "widened by a caller"
-	delete(first, "auditor")
-	second := ClaudeFamilyFloor()
-	if _, widened := second["builder"]; widened {
-		t.Fatal("a caller's write leaked into the floor")
-	}
-	if _, kept := second["auditor"]; !kept {
-		t.Fatal("a caller's delete leaked into the floor")
-	}
-}
 
 func TestProfile_CrossFamilyWithDecodes(t *testing.T) {
 	fsys := fstest.MapFS{
@@ -55,19 +25,6 @@ func TestProfile_CrossFamilyWithDecodes(t *testing.T) {
 	}
 	if scout.CrossFamilyWith != "" {
 		t.Fatalf("scout.CrossFamilyWith = %q, want empty", scout.CrossFamilyWith)
-	}
-}
-
-func TestIsClaudeFamilyFloor_AnswersWithoutCopyingTheList(t *testing.T) {
-	for name := range ClaudeFamilyFloor() {
-		if !IsClaudeFamilyFloor(name) {
-			t.Errorf("%s is on the floor", name)
-		}
-	}
-	for _, name := range []string{"builder", "scout", ""} {
-		if IsClaudeFamilyFloor(name) {
-			t.Errorf("%s is not on the floor", name)
-		}
 	}
 }
 

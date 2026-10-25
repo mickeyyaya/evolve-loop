@@ -13,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -70,7 +71,7 @@ func WithAdvisorSignals(c *signalcenter.Center) PhaseAdvisorOption {
 func NewPhaseAdvisor(bridge Bridge, opts ...PhaseAdvisorOption) *PhaseAdvisor {
 	p := &PhaseAdvisor{
 		bridge:   bridge,
-		identity: AgentIdentity{CLI: "claude-tmux", Model: "opus", AgentLabel: routerAgentLabel},
+		identity: seatIdentity(policy.SeatPhaseAdvisor, routerAgentLabel),
 	}
 	for _, o := range opts {
 		o(p)

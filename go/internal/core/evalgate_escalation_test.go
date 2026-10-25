@@ -63,7 +63,7 @@ func TestEvalGateEscalation_SecondIdenticalRejectionEscalatesAndRecovers(t *test
 
 	p := runEvalGateCycle(t, &evalGateProbe{
 		phase:        string(PhaseBuild),
-		compliantCLI: universalContractFallbackCLI,
+		compliantCLI: "claude-tmux",
 		remediation:  "Create the missing eval file(s) at <workspace>/.evolve/evals/<slug>.md",
 	})
 	if len(p.dispatched) < 3 {
@@ -72,7 +72,7 @@ func TestEvalGateEscalation_SecondIdenticalRejectionEscalatesAndRecovers(t *test
 	if p.dispatched[1] != p.dispatched[0] {
 		t.Fatalf("correction 1 must retry the SAME CLI (one bad turn is not a CLI verdict); got %v", p.dispatched)
 	}
-	if p.dispatched[2] != universalContractFallbackCLI {
+	if p.dispatched[2] != "claude-tmux" {
 		t.Fatalf("correction 2 must escalate to the fallback family; got %v", p.dispatched)
 	}
 }
@@ -89,7 +89,7 @@ func TestEvalGateEscalation_DifferentReasonsDoNotEscalate(t *testing.T) {
 		remediation: "Create the missing eval file(s)",
 	})
 	for i, cli := range p.dispatched {
-		if cli == universalContractFallbackCLI && i > 0 {
+		if cli == "claude-tmux" && i > 0 {
 			t.Fatalf("different defects must not escalate; dispatch %d went to %q (%v)", i, cli, p.dispatched)
 		}
 	}
@@ -115,7 +115,7 @@ func TestEvalGateEscalation_EscalatedDirectiveKeepsTheRemediation(t *testing.T) 
 	seen := []string{}
 	p := &evalGateProbe{
 		phase:        string(PhaseBuild),
-		compliantCLI: universalContractFallbackCLI,
+		compliantCLI: "claude-tmux",
 		remediation:  "Create the missing eval file(s) at exactly these paths",
 	}
 	probeRun := p.Run

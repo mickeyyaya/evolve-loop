@@ -64,8 +64,8 @@ func TestRouteQualityJudge_ScoresPlanAgainstGoal(t *testing.T) {
 	if fb.gotReq.CLI != "claude-tmux" {
 		t.Errorf("CLI=%q, want claude-tmux", fb.gotReq.CLI)
 	}
-	if fb.gotReq.Model != "haiku" {
-		t.Errorf("Model=%q, want haiku (D2: judge is fast/cheap, never deep)", fb.gotReq.Model)
+	if fb.gotReq.Model != "fast" {
+		t.Errorf("Model=%q, want fast (D2: judge is fast/cheap, never deep)", fb.gotReq.Model)
 	}
 	if !strings.HasSuffix(fb.gotReq.ArtifactPath, "routing-judge.json") {
 		t.Errorf("ArtifactPath=%q, want .../routing-judge.json", fb.gotReq.ArtifactPath)

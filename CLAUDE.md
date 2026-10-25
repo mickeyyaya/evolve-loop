@@ -111,7 +111,7 @@ Task priority is the computed inbox rank ([ADR-0121](docs/architecture/adr/0121-
   - Every non-deep, non-top phase runs agy first (Gemini 3.8 Flash High at balanced). No tracked profile defaults to fast, and no tracked profile lets an envelope fall to fast.
   - Since 2026-10-17 deep seats run agy's Gemini 4 Argon (Medium) first, then agy-owned Claude (`agy-claude-tmux`, Claude Opus 5.5), then Claude Code. The operator asked to share the deep build with Argon. Since cycle 1911 an Argon quota wall benches only the Argon model group, not all of agy. Top seats stay agy-owned Claude, then Claude Code.
   - `agy-claude-tmux` waits up to 10 s for a claude-family footer label before the prompt. If no label shows, it exits 87. Exit 87 is a walk trigger, so the seat falls through. The usage query that follows can bench an exhausted Claude group, and preflight only warns on it.
-  - The claudeFamilyFloor seats (auditor, adversarial-review, tdd-engineer, code-reviewer and the spec verifiers) run Claude Code only.
+  - The Claude floor seats (auditor, adversarial-review, tdd-engineer, code-reviewer and the spec verifiers) run Claude Code only. The floor is routing data, not code: `cli_routing.floors.claude` in `.evolve/policy.json`. With no `floors` key, the compiled default is the same list in `go/internal/policy/routing_defaults.json` (ADR-0154 I-6).
   - codex is reachable only under `--bypass-policy`.
   - `evolve cli-routing explain <agent>` prints the chain of any agent.
 - Documents: load `docs-write` before you write any document that a person reads. Each decision cites its evidence and its rejected options ([ADR-0132](docs/architecture/adr/0132-documents-are-written-through-one-skill.md), AGENTS.md invariant 11).
@@ -132,7 +132,7 @@ Task priority is the computed inbox rank ([ADR-0121](docs/architecture/adr/0121-
 - Routing:
   - `EVOLVE_DYNAMIC_ROUTING=advisory` is the default since 2026-06-06, when retro steps 1-3 landed. `=off` is the static escape hatch.
   - The integrity floor is `ship ⇒ build ∧ audit ∧ (tdd unless trivial or deliverable_kind=document — ADR-0099)`.
-  - CLI routing is in `.evolve/policy.json` `cli_routing` (one table: `clis`, `default`, `work`, `tiers`, `agents`).
+  - CLI routing is in `.evolve/policy.json` `cli_routing` (one table: `clis`, `default`, `work`, `tiers`, `agents`, `floors`).
   - `pins` beside a table refuse every launch. Thus `evolve cli-routing init|set|unset|migrate` is the only writer of the table. It compiles before it writes. It refuses to write inside a phase or while a cycle holds a live lease.
   - `evolve setup recommend|apply` refuse on a declared project.
   - The policy bypass (`--bypass-policy`) is off by default.

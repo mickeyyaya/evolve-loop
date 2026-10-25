@@ -23,7 +23,7 @@ type WaveConfig struct {
 	FactsMaxCycles int
 }
 
-func DefaultWaveHealthDrivers() []string { return []string{"claude-tmux"} }
+func DefaultWaveHealthDrivers() []string { return []string{SeatDefault(SeatWaveHealth).CLI} }
 
 func (p Policy) WaveSettings() WaveConfig {
 	c := WaveConfig{
