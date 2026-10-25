@@ -44,8 +44,7 @@ func projectPolicy(env map[string]string) policy.Policy {
 	if root == "" {
 		return policy.Policy{}
 	}
-	pol, _ := policy.Load(filepath.Join(root, ".evolve", "policy.json"))
-	return pol
+	return policy.LoadOrDefaults(filepath.Join(root, ".evolve", "policy.json"), os.Stderr)
 }
 
 func execAdapterDepsWith(env map[string]string, signals *signalcenter.Center) gobridge.Deps {

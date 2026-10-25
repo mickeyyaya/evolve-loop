@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## Changed — `.evolve/policy.json` refuses an unknown key (X18a, 2026-10-26)
+
+- **The change.** An unknown key at any level of `.evolve/policy.json` now fails the load. Before, the loader ignored it, so a typo such as `fleet.cuont` had no effect and gave no message.
+- **The message.** The error names the file, the key path and the fix: `policy: parse .evolve/policy.json: unknown policy key "fleet.cuont": remove it or check its spelling; docs/architecture/policy-config.md lists the keys`.
+- **What to do.** Correct the spelling of the key against the schema in [policy-config](docs/architecture/policy-config.md), or remove the key. The key had no effect before, so a removal changes no behavior. A key in another case (`"Fleet"`) is refused too.
+- **Allowed metadata.** The top-level keys `$schema`, `description` and `version` stay allowed and have no effect.
+- **Where it stops.** The loop refuses to start, because the `cli-routing` preflight check halts and names the key. A best-effort reader that runs during a wave prints one `[policy] WARN` line and uses the compiled defaults. Each safety floor then fails closed to `enforce`: `docs_floor`, `comment_floor` and `cover_changed`.
+- **Upgrade step.** At the wave boundary, rebuild the plane binary (`make -C <plane>/go build`) before `evolve wave next`. A strict binary refuses a key that a newer change adds, and `wave next` prints this remedy.
+- Docs: [policy-config](docs/architecture/policy-config.md), [internal-policy](docs/architecture/packages/internal-policy.md), [llm-isolation §27](docs/architecture/llm-isolation.md).
+
 ## Fixed — a predicate that names a test that no longer exists fails (A1, 2026-10-18)
 
 - **The defect.** `go test -run` exits 0 when a name matches no test. A predicate that ran a test by name and judged the exit code passed after a rename or a delete removed the test. A scan found 20 stale names in 16 predicate packages.

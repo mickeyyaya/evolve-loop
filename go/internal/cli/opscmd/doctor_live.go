@@ -28,10 +28,7 @@ func productionDoctorUsageEvidence(projectRoot string, deps bridge.Deps) (usagee
 			return usageprobe.Evidence{Family: driver, Verdict: usageprobe.VerdictUnavailable, Detail: "usage workspace: " + err.Error()}
 		}, func() {}
 	}
-	pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
-	if err != nil {
-		pol = policy.Policy{}
-	}
+	pol := policy.LoadOrDefaults(filepath.Join(projectRoot, ".evolve", "policy.json"), deps.Stderr)
 	factory := bridge.NewControllerFactory(projectRoot, ws, "doctor-usage", deps)
 	explain := usageevidence.New(usageevidence.Options{ProjectRoot: projectRoot, Config: pol.CLIHealthConfig(), Probe: usageevidence.UsagePane(factory), Log: deps.Stderr})
 	return explain, func() { _ = os.RemoveAll(ws) }

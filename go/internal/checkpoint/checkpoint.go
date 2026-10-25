@@ -197,10 +197,7 @@ var computeQuotaReset = quotareset.Compute
 var UsageReset func(projectRoot string, families []string, now time.Time) (time.Time, bool)
 
 func withQuotaReset(cp Checkpoint, cs core.CycleState, projectRoot string, now time.Time) Checkpoint {
-	qr := policy.Policy{}.QuotaResetConfig()
-	if pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json")); err == nil {
-		qr = pol.QuotaResetConfig()
-	}
+	qr := policy.LoadOrDefaults(filepath.Join(projectRoot, ".evolve", "policy.json"), os.Stderr).QuotaResetConfig()
 	families := walkedFamilies(cs.QuotaWalkCLIs)
 	res, err := computeQuotaReset(cs.WorkspacePath, quotareset.Options{
 		Now:          func() time.Time { return now },

@@ -28,13 +28,14 @@ func TestCLIRoutingTiers_TakeTheListAndTheObjectForm(t *testing.T) {
 }
 
 func TestCLIRoutingTiers_RefuseAnUnknownFieldAndNull(t *testing.T) {
-	for _, body := range []string{
-		`{"cli_routing": {"clis": ["claude"], "tiers": {"deep": {"clis": ["claude"], "efort": "high"}}}}`,
-		`{"cli_routing": {"clis": ["claude"], "tiers": {"deep": null}}}`,
-	} {
+	cases := map[string]string{
+		`{"cli_routing": {"clis": ["claude"], "tiers": {"deep": {"clis": ["claude"], "efort": "high"}}}}`: `"cli_routing.tiers.deep.efort"`,
+		`{"cli_routing": {"clis": ["claude"], "tiers": {"deep": null}}}`:                                  "tier rule",
+	}
+	for body, want := range cases {
 		_, err := loadPolicyText(t, body)
-		if err == nil || !strings.Contains(err.Error(), "tier rule") {
-			t.Errorf("load(%s) err = %v, want a tier rule error", body, err)
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("load(%s) err = %v, want an error naming %s", body, err, want)
 		}
 	}
 }

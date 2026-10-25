@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -160,10 +161,7 @@ type goalStallConfig struct {
 }
 
 func loadGoalStallConfig(evolveDir string) goalStallConfig {
-	pol, err := policy.Load(filepath.Join(evolveDir, "policy.json"))
-	if err != nil {
-		pol = policy.Policy{}
-	}
+	pol := policy.LoadOrDefaults(filepath.Join(evolveDir, "policy.json"), os.Stderr)
 	return goalStallConfig{
 		threshold:            pol.GoalStallThreshold(),
 		nonprogressThreshold: pol.GoalStallNonprogressThreshold(),

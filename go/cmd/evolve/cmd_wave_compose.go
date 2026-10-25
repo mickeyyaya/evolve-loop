@@ -144,7 +144,7 @@ func waveLaunchDesc(s boundaryStep, goal string) string {
 }
 
 func withRebuildRemedy(err error, root string, raw []string) error {
-	if !strings.Contains(err.Error(), "unknown field") {
+	if !errors.Is(err, policy.ErrUnknownKey) {
 		return err
 	}
 	return fmt.Errorf("%w; this binary is older than the policy: run make -C %s build, then run %s wave next again with the arguments %q", err, filepath.Join(root, "go"), filepath.Join(root, "go", "bin", "evolve"), raw)

@@ -16,10 +16,12 @@ type qualityPanelIndex struct {
 	Stage string `json:"stage"`
 }
 
+type qualityPanelJSON struct {
+	Indexes map[string]qualityPanelIndex `json:"indexes"`
+}
+
 func (q *QualityPanelPolicy) UnmarshalJSON(raw []byte) error {
-	var decoded struct {
-		Indexes map[string]qualityPanelIndex `json:"indexes"`
-	}
+	var decoded qualityPanelJSON
 	if err := decodeStrict(raw, &decoded); err != nil {
 		return fmt.Errorf("quality: %w", err)
 	}
