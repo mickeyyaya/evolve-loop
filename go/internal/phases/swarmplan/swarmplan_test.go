@@ -18,8 +18,8 @@ func TestPhase_Identity(t *testing.T) {
 	if got := p.ArtifactFilename(core.PhaseRequest{}); got != "swarm-plan.md" {
 		t.Errorf("ArtifactFilename = %q, want swarm-plan.md", got)
 	}
-	if got := p.DefaultModel(); got != "opus" {
-		t.Errorf("DefaultModel = %q, want opus", got)
+	if got := p.DefaultModel(); got != "deep" {
+		t.Errorf("DefaultModel = %q, want deep", got)
 	}
 }
 

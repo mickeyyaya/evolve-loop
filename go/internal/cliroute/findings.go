@@ -150,13 +150,14 @@ func (c *compiler) checkCeiling(t Table, a agentView, picked selection) {
 }
 
 func (c *compiler) checkFloorTiers(t Table, agent string, prof profiles.Profile) {
-	if !profiles.IsClaudeFamilyFloor(agent) {
+	floor := t.floors.FamilyOf(agent)
+	if floor == "" {
 		return
 	}
 	for _, tier := range reachableTiers(prof, t.models[agent]) {
 		tier = policy.TierName(policy.TierRank(tier))
-		if ceiling, capped := t.tiers[tier]; capped && !slices.Contains(ceiling, claudeFamily) {
-			c.add(SeverityError, "cli_routing.tiers."+tier, "excludes claude, but the floor agent %s runs at %s", agent, tier)
+		if ceiling, capped := t.tiers[tier]; capped && !slices.Contains(ceiling, floor) {
+			c.add(SeverityError, "cli_routing.tiers."+tier, "excludes %s, but the floor agent %s runs at %s", floor, agent, tier)
 		}
 	}
 }

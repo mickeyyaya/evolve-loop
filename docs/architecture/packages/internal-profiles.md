@@ -18,7 +18,12 @@
 - **`cross_family_with`.** `Profile.CrossFamilyWith` names the agent whose CLI family this one must not share (`builder` ↔ `auditor`, `tdd-engineer` → `builder`). The key was in the JSON long before the struct modeled it (only `internal/setup` decoded it); `cliroute.Compile` now reads it to report a pair whose resolved primaries collapse into one family.
 - **Provenance.** `generated_from` records where a profile came from: `hand-authored` today, a generated projection such as `phasespec:<name>@<sha>` later. The vocabulary is free-form here. `evolve phases validate` owns its validation and treats an absent key as unstamped. The field is `omitempty`, so an unstamped profile marshals unchanged.
 - **One funnel for real-tree scans.** Every test that iterates the live `.evolve/profiles` goes through `RealTreeProfiles` (root-parameterised as `treeProfiles`). The helpers live in `tracked_realtree_test.go` but are exported, because the external `profiles_test` package calls them too.
-- **Rules projected from one home.** `ClaudeFamilyFloor()` (`family_floor.go`) is the only list of the agents kept off the builder's CLI family, each with its reason ([ADR-0104](../adr/0104-fallback-is-a-property-of-the-bridge-handle.md)). It is production code since 2026-10-05, so the routing resolver (`cliroute`, which clamps these agents to Claude) and the guards here read one list; it returns a copy, so no caller can widen or shrink the floor. `IsClaudeFamilyFloor(name)` answers for one agent without the copy, for hot paths. `TestClaudeFamilyFloor` reads it through the export, and the deep-tier arrangement guard takes its grader exceptions from it and pins only the router (the advisor) itself.
+- **The floor is routing data (X6, ADR-0154 I-6).** Since 2026-10-25 this package has no floor list. The floor is `cli_routing.floors` in `.evolve/policy.json`. With no key, the floor is the compiled default in `go/internal/policy/routing_defaults.json` ([internal-policy.md](internal-policy.md)). The reasons stay here ([ADR-0104](../adr/0104-fallback-is-a-property-of-the-bridge-handle.md), ADR-0124):
+  - `auditor` and `adversarial-review` grade the build content adversarially;
+  - `tdd-engineer` writes the tests in a family apart from the builder;
+  - `spec-verifier` and `spec-verify` verify the build output on the audit side;
+  - `code-reviewer` reviews the build content in a family apart from the builder.
+  - `TestClaudeFamilyFloor` and the deep-tier arrangement guard are external tests (`package profiles_test`). They read `policy.DefaultFloors()`.
 
 ## Invariants
 

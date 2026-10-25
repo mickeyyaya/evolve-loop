@@ -142,6 +142,9 @@ func Run(in Inputs, stdout, stderr io.Writer) int {
 	}
 	tsv, workerCount := BuildCommandsTSV(eligible, in.ProfilePath, in.PromptFile,
 		in.Cycle, workersDir, evolveBin, prof.ModelTierDefault)
+	if skipped := driverlessVoters(eligible); len(skipped) > 0 {
+		logf("WARN: skipped %d eligible voter(s) with no registered driver: %s", len(skipped), strings.Join(skipped, " "))
+	}
 	if workerCount < 2 {
 		logf("FAIL: after filter, only %d workers ready (need ≥2)", workerCount)
 		return ExitRuntimeErr
@@ -285,8 +288,8 @@ func BuildCommandsTSV(eligible []string, profilePath, promptFile, cycle, workers
 	copy(sorted, eligible)
 	sort.Strings(sorted)
 	for _, cli := range sorted {
-		driver := bridge.DriverFor(cli)
-		if _, ok := bridge.LookupDriver(driver); !ok {
+		driver, ok := voterDriver(cli)
+		if !ok {
 			continue
 		}
 		artifact := filepath.Join(workersDir, cli+"-audit.md")
@@ -300,6 +303,25 @@ func BuildCommandsTSV(eligible []string, profilePath, promptFile, cycle, workers
 		count++
 	}
 	return sb.String(), count
+}
+
+func voterDriver(cli string) (string, bool) {
+	driver, err := bridge.DriverFor(cli)
+	if err != nil {
+		return "", false
+	}
+	_, ok := bridge.LookupDriver(driver)
+	return driver, ok
+}
+
+func driverlessVoters(eligible []string) []string {
+	var out []string
+	for _, cli := range eligible {
+		if _, ok := voterDriver(cli); !ok {
+			out = append(out, cli)
+		}
+	}
+	return out
 }
 
 func exitCodeFromErr(ps *os.ProcessState) int {

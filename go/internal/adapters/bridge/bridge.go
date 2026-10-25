@@ -53,6 +53,7 @@ type Adapter struct {
 	fatalPaneStage      string
 	bridgeConfig        policy.BridgePolicy
 	efforts             policy.EffortTable
+	floors              policy.Floors
 	contextFillWarnPct  int
 	paneCaptureMaxBytes int
 	bootTimeoutStore    *clihealth.Store
@@ -74,6 +75,7 @@ func NewDefault(projectRoot string, signals *signalcenter.Center) *Adapter {
 	if err == nil {
 		a.bridgeConfig = pol.BridgeConfig()
 		a.efforts = pol.Efforts()
+		a.floors = pol.Floors()
 		a.contextFillWarnPct = pol.ContextFillConfig().WarnThresholdPct
 	}
 	a.recoveryStage, a.fatalPaneStage = pol.BridgeRecoveryStages()
@@ -103,6 +105,7 @@ func (a *Adapter) productionEngineDeps(env map[string]string) gobridge.Deps {
 		Signals:               a.signals,
 		CorroborateWall:       gobridge.DefaultWallCorroborator(nil, os.Stderr),
 		ModelChain:            gobridge.ModelChainFor(a.bridgeConfig.ModelFailoverOn()),
+		Floors:                a.floors,
 	}
 }
 

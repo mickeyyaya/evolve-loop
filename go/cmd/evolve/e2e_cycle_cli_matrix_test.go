@@ -103,6 +103,7 @@ func runMatrixCycle(t *testing.T, row matrixRow, evolveBin, fakeBin, repoRoot st
 		fakeclitest.Install(t, path, stubScript(bin, fakeBin))
 		env = append(env, "BRIDGE_"+strings.ToUpper(bin)+"_BINARY="+path)
 	}
+	fakeclitest.Install(t, filepath.Join(binDir, "tmux"), tmuxRefusal)
 	env = append(env, isolatedHome(t)...)
 	env = append(withoutEnv(env, "PATH"), "PATH="+stubFirstPath(t, binDir))
 	cmd := exec.Command(evolveBin, "cycle", "run",
@@ -136,6 +137,8 @@ func stubFirstPath(t *testing.T, binDir string) string {
 	return strings.Join(append(dirs, "/usr/bin", "/bin", "/usr/sbin", "/sbin"), string(os.PathListSeparator))
 }
 
+const tmuxRefusal = "#!/bin/sh\necho 'the matrix harness has no tmux REPL fake' >&2\nexit 1\n"
+
 func stubScript(bin, fakeBin string) string {
 	return "#!/bin/sh\n" +
 		`printf '%s CLAUDECODE=%s EVOLVE_DISPATCH_DEPTH=%s\n' ` + bin + ` "${CLAUDECODE-unset}" "${EVOLVE_DISPATCH_DEPTH-unset}" >> "$MATRIX_CALL_LOG"` + "\n" +
@@ -155,7 +158,7 @@ func withoutEnv(env []string, key string) []string {
 func writeMatrixProject(t *testing.T, projRoot, driver string) {
 	t.Helper()
 	writeProjectPolicy(t, projRoot, map[string]any{
-		"cli_routing": map[string]any{"clis": []string{driver}, "default": []string{driver}},
+		"cli_routing": map[string]any{"clis": []string{driver}, "default": []string{driver}, "floors": map[string]any{}},
 	})
 	profilesDir := filepath.Join(projRoot, ".evolve", "profiles")
 	for _, name := range []string{"intent", "scout", "triage", "tdd-engineer", "builder", "auditor", "retrospective"} {

@@ -1,8 +1,12 @@
-package profiles
+package profiles_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
 func family(cli string) string {
@@ -13,13 +17,13 @@ func family(cli string) string {
 }
 
 func TestClaudeFamilyFloor(t *testing.T) {
-	loader, names := RealTreeProfiles(t)
+	loader, names := profiles.RealTreeProfiles(t)
 	builder, err := loader.Get("builder")
 	if err != nil {
 		t.Fatalf("Get(builder): %v", err)
 	}
 	builderFam := family(builder.CLI)
-	floor := ClaudeFamilyFloor()
+	floor := policy.DefaultFloors()["claude"]
 
 	claudeCount := 0
 	for _, name := range names {
@@ -32,15 +36,16 @@ func TestClaudeFamilyFloor(t *testing.T) {
 			continue
 		}
 		claudeCount++
-		if _, ok := floor[name]; !ok {
-			t.Errorf("profile %s: claude family without a floor justification — claude is the quota-constrained family (2026-09-02 directive); either add it to profiles.ClaudeFamilyFloor WITH its load-bearing reason, or route it to codex", name)
+		if !slices.Contains(floor, name) {
+			t.Errorf("profile %s: claude family without a floor justification — claude is the quota-constrained family (2026-09-02 directive); either add it to the claude floor of policy routing_defaults.json WITH its load-bearing reason in the profiles package note, or route it to codex", name)
 		}
 	}
 	if claudeCount == 0 {
 		t.Fatal("matched NO claude-family profiles — the selector is broken and this guard is vacuous")
 	}
 
-	for name, why := range floor {
+	for _, name := range floor {
+		why := "the claude floor"
 		p, err := loader.Get(name)
 		if err != nil {
 			t.Errorf("floor entry %s (%s) does not resolve in the TRACKED tree: %v — a floor pinned on a missing/untracked profile is vacuous", name, why, err)

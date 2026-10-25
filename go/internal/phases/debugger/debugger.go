@@ -104,7 +104,7 @@ type hooks struct{}
 func (hooks) PhaseName() string                           { return string(core.PhaseDebugger) }
 func (hooks) AgentPromptName() string                     { return "evolve-debugger" }
 func (hooks) ArtifactFilename(_ core.PhaseRequest) string { return decisionFilename }
-func (hooks) DefaultModel() string                        { return "opus" }
+func (hooks) DefaultModel() string                        { return "deep" }
 
 func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	var b strings.Builder

@@ -284,8 +284,8 @@ Auditor = Gemini  (independent audit perspective; hybrid mode if claude on PATH)
 **Step 2**: Edit the relevant profiles in `<project-root>/.evolve/profiles/`.
 
 ```bash
-# Example: assign scout to gemini
-jq '.cli = "gemini"' .evolve/profiles/scout.json > .evolve/profiles/scout.json.tmp
+# Example: assign scout to agy (the Gemini models of Antigravity)
+jq '.cli = "agy-tmux"' .evolve/profiles/scout.json > .evolve/profiles/scout.json.tmp
 mv .evolve/profiles/scout.json.tmp .evolve/profiles/scout.json
 ```
 
@@ -312,7 +312,7 @@ bash legacy/scripts/cli_adapters/_capability-compose.sh hybrid full hybrid
 # Output: hybrid
 ```
 
-> **HYBRID Mode Warning**: Setting `"cli": "gemini"` (or `"cli": "codex"`) in a profile when `claude` is on PATH does NOT invoke Gemini's intelligence — `gemini.sh` delegates to `claude.sh`, which runs `claude -p` under the hood. You are running Claude, not Gemini. The "gemini" tier name refers to the adapter shim, not to the Gemini LLM. To get actual Gemini intelligence in audit cycles, use API-based adapters (v8.52.0+ roadmap); they are not yet available in this release.
+> **The bare name `gemini` is retired** (X6, ADR-0154). It ran `claude-tmux`, so a profile that named it ran Claude, not Gemini. Now `bridge.DriverFor("gemini")` is an error that names the agy drivers. Name `agy`, `agy-tmux` or `agy-claude-tmux` instead.
 
 **Caveats**:
 - `.evolve/profiles/` is writable even in plugin-install mode (it lives in PROJECT_ROOT, not PLUGIN_ROOT).
@@ -360,7 +360,7 @@ The Auditor profile (`.evolve/profiles/auditor.json`) declares its consensus con
   "model_tier_default": "opus",
   "consensus": {
     "enabled": false,                    // opt-in default; set via env or flag
-    "cli_voters": ["claude", "gemini", "codex"],
+    "cli_voters": ["claude", "codex"],
     "quorum": 2,                         // ceil(N/2) by default
     "require_min_tier": "hybrid"         // exclude voters below this capability tier
   },

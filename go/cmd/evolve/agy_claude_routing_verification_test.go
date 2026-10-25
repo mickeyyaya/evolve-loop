@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -78,7 +77,7 @@ func realTreeAgyClaudeRoutes(t *testing.T) (floorSeats, otherSeats []string) {
 	t.Helper()
 	root := checkedInRoot(t)
 	loader := profiles.NewFromDir(filepath.Join(root, ".evolve", "profiles"))
-	for name := range profiles.ClaudeFamilyFloor() {
+	for _, name := range policy.DefaultFloors()["claude"] {
 		p, err := loader.Get(name)
 		if err != nil {
 			t.Fatalf("floor profile %s: %v", name, err)
@@ -103,7 +102,7 @@ func routesAFloorSeat(route string) bool {
 	for _, prefix := range []string{"pin ", "cli_routing agents "} {
 		if rest, ok := strings.CutPrefix(route, prefix); ok {
 			agent, _, _ := strings.Cut(rest, " ")
-			return profiles.IsClaudeFamilyFloor(agent)
+			return policy.DefaultFloors().FamilyOf(agent) == "claude"
 		}
 	}
 	return false
@@ -227,7 +226,7 @@ func TestAgyClaudeRouting_TheFloorStillAdmitsOnlyClaudeCode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("the checked-in table: %v", err)
 	}
-	leaks, err := floorChainLeaks(r, root, slices.Collect(maps.Keys(profiles.ClaudeFamilyFloor())))
+	leaks, err := floorChainLeaks(r, root, policy.DefaultFloors()["claude"])
 	if err != nil {
 		t.Fatal(err)
 	}

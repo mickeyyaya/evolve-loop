@@ -14,6 +14,7 @@ type CLIRouting struct {
 	Agents     map[string]AgentRule `json:"agents,omitempty"`
 	Tiers      map[string]TierRule  `json:"tiers,omitempty"`
 	AfterChain string               `json:"after_chain,omitempty"`
+	Floors     Floors               `json:"floors,omitempty"`
 }
 
 type AgentRule struct {
@@ -145,4 +146,16 @@ func refuseNullCLIRouting(raw []byte) error {
 		return nil
 	}
 	return fmt.Errorf("cli_routing: %w", errNullRoutingValue)
+}
+
+func (c CLIRouting) MarshalJSON() ([]byte, error) {
+	type block CLIRouting
+	out := struct {
+		block
+		Floors *Floors `json:"floors,omitempty"`
+	}{block: block(c)}
+	if c.Floors != nil {
+		out.Floors = &c.Floors
+	}
+	return json.Marshal(out)
 }

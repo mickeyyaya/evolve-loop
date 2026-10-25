@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
@@ -38,7 +38,7 @@ func TestLaunch_AFlooredSeatSkipsAFallbackModelOutsideTheClaudeFamily(t *testing
 		{"code-review", "/repo/.evolve/profiles/code-reviewer.json"},
 		{"", "/repo/.evolve/profiles/adversarial-review.json"},
 	}
-	for seat := range profiles.ClaudeFamilyFloor() {
+	for _, seat := range policy.DefaultFloors()["claude"] {
 		seats = append(seats, seatCase{"", ".evolve/profiles/" + seat + ".json"})
 	}
 	for _, seat := range seats {
@@ -46,7 +46,7 @@ func TestLaunch_AFlooredSeatSkipsAFallbackModelOutsideTheClaudeFamily(t *testing
 		if !slices.Equal(s.models, []string{"Claude Opus 5.5 (High)", "Claude Sonnet 5.5 (High)"}) {
 			t.Errorf("agent %q profile %s ran %v: a floored seat must never fail over to a Gemini model", seat.agent, seat.profile, s.models)
 		}
-		if !strings.Contains(log, "WARN model failover: "+seatName(seat.profile)+" holds the Claude family floor; skipping fallback Gemini 3.1 Pro (High)") {
+		if !strings.Contains(log, "WARN model failover: "+seatName(seat.profile)+" holds the claude family floor; skipping fallback Gemini 3.1 Pro (High), which is outside the claude family") {
 			t.Errorf("profile %s: the skip is not logged: %q", seat.profile, log)
 		}
 	}
@@ -68,12 +68,12 @@ func TestLaunch_WithoutAProfileTheAgentNamesTheSeat(t *testing.T) {
 	}
 }
 
-func TestIsClaudeFamilyModel_ReadsCatalogNames(t *testing.T) {
+func TestIsFamilyModel_ReadsCatalogNames(t *testing.T) {
 	t.Parallel()
 	for name, want := range map[string]bool{"opus": true, "sonnet": true, "haiku": true, "Claude Opus 5.5 (High)": true,
 		"claude-sonnet-5-5": true, "Gemini 3.1 Pro (High)": false, "gpt-5.6-sol": false, "gemma4:31b-cloud": false, "": false} {
-		if got := isClaudeFamilyModel(name); got != want {
-			t.Errorf("isClaudeFamilyModel(%q) = %v, want %v", name, got, want)
+		if got := isFamilyModel("claude", name); got != want {
+			t.Errorf("isFamilyModel(claude, %q) = %v, want %v", name, got, want)
 		}
 	}
 }
@@ -90,5 +90,31 @@ func TestLaunch_AFlooredSeatKeepsItsRoutedFirstModel(t *testing.T) {
 	}
 	if !slices.Equal(s.models, []string{"Gemini 3.1 Pro (High)"}) {
 		t.Errorf("ran %v: the routed first model is routing's decision, the walk only filters the fallbacks", s.models)
+	}
+}
+
+func runChainUnderFloors(t *testing.T, floors policy.Floors, wantExit int) (*scriptedModels, string) {
+	t.Helper()
+	s := &scriptedModels{outcome: map[string]core.BridgeResponse{"Claude Opus 5.5 (High)": wall, "Gemini 3.1 Pro (High)": ok, "Claude Sonnet 5.5 (High)": ok},
+		artifact: t.TempDir() + "/artifact.md"}
+	var stderr strings.Builder
+	eng := NewEngine(Deps{Stderr: &stderr, ModelChain: geminiInAgyClaude, launchModel: s.launch, Floors: floors,
+		TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) { return tokenusage.Result{}, nil }})
+	resp, _ := eng.Launch(context.Background(), core.BridgeRequest{CLI: "agy-claude-tmux", Model: "deep", Agent: "audit", Profile: "/repo/.evolve/profiles/auditor.json", ArtifactPath: s.artifact})
+	if resp.ExitCode != wantExit {
+		t.Fatalf("launch exit %d, want %d", resp.ExitCode, wantExit)
+	}
+	return s, stderr.String()
+}
+
+func TestLaunch_TheDeclaredFloorsDecideWhichFallbackModelsASeatKeeps(t *testing.T) {
+	t.Parallel()
+	s, log := runChainUnderFloors(t, policy.Floors{}, 0)
+	if !slices.Equal(s.models, []string{"Claude Opus 5.5 (High)", "Gemini 3.1 Pro (High)"}) || strings.Contains(log, "skipping fallback") {
+		t.Errorf("with no floor the auditor keeps every fallback: ran %v (log %q)", s.models, log)
+	}
+	s, log = runChainUnderFloors(t, policy.Floors{"agy": {"auditor"}}, ExitUnknownPrompt)
+	if !slices.Equal(s.models, []string{"Claude Opus 5.5 (High)"}) || !strings.Contains(log, "holds the agy family floor; skipping fallback Claude Sonnet 5.5 (High), which is outside the agy family") {
+		t.Errorf("a family with no model words keeps no fallback: ran %v (log %q)", s.models, log)
 	}
 }

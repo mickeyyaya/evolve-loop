@@ -1,14 +1,18 @@
-package profiles
+package profiles_test
 
 import (
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
 func TestDeepTierFamilyArrangement(t *testing.T) {
 	exceptions := map[string]string{
 		"router": "agy-claude-tmux",
 	}
-	loader, names := RealTreeProfiles(t)
+	loader, names := profiles.RealTreeProfiles(t)
+	floors := policy.DefaultFloors()
 	checked := 0
 	for _, name := range names {
 		p, gerr := loader.Get(name)
@@ -25,7 +29,7 @@ func TestDeepTierFamilyArrangement(t *testing.T) {
 			}
 			continue
 		}
-		if _, floored := claudeFamilyFloor[name]; floored {
+		if floors.FamilyOf(name) != "" {
 			continue
 		}
 		if p.CLI != "codex-tmux" {

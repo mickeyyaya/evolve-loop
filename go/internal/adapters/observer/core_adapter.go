@@ -175,5 +175,5 @@ func (a *CoreAdapter) phaseCLI(req core.PhaseRequest, phase string) string {
 	if v := look("EVOLVE_CLI"); v != "" {
 		return v
 	}
-	return "claude-tmux"
+	return policy.SeatDefault(policy.SeatObserver).CLI
 }

@@ -22,15 +22,12 @@ const (
 	decisionJudge
 )
 
-const (
-	routerAgent        = "router"
-	routerDefaultModel = "opus"
-)
+const routerAgent = "router"
 
 func routerDecision(r *cliroute.Router, projectRoot string) (cliroute.Decision, error) {
 	return r.Resolve(cliroute.Request{
 		Agent: routerAgent, Launch: cliroute.LaunchAdvisor, ProjectRoot: projectRoot,
-		DefaultModel: routerDefaultModel, Env: filterEvolveEnv(os.Environ()),
+		DefaultModel: policy.SeatDefault(policy.SeatRouter).Model, Env: filterEvolveEnv(os.Environ()),
 	})
 }
 

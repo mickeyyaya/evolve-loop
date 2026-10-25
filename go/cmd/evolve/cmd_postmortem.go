@@ -18,9 +18,8 @@ import (
 )
 
 const (
-	postmortemPrefix     = "evolve postmortem: "
-	postmortemDefaultCLI = "claude-tmux"
-	postmortemUsage      = `usage: evolve postmortem collect --cycle N --phase P --attempt K (--session UUID | --transcript PATH) --cause CODE [--exit-code E] [--cli C] [--started RFC3339 --ended RFC3339] [--force] [--project-root P]
+	postmortemPrefix = "evolve postmortem: "
+	postmortemUsage  = `usage: evolve postmortem collect --cycle N --phase P --attempt K (--session UUID | --transcript PATH) --cause CODE [--exit-code E] [--cli C] [--started RFC3339 --ended RFC3339] [--force] [--project-root P]
        evolve postmortem show --cycle N --phase P [--project-root P]`
 )
 
@@ -210,7 +209,7 @@ func optionalInt(name, value string) (int, error) {
 
 func orDefaultCLI(cli string) string {
 	if cli == "" {
-		return postmortemDefaultCLI
+		return policy.SeatDefault(policy.SeatPostmortem).CLI
 	}
 	return cli
 }

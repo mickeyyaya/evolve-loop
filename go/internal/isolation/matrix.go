@@ -23,10 +23,10 @@ const (
 
 var rows = []Row{
 	{ID: "M1", Check: "a full simulated cycle with claude as the only route", Invariant: "I-9", ClosedBy: "X1", Owner: ownerMatrix},
-	{ID: "M2", Check: "a full simulated cycle with agy as the only route", Invariant: "I-9", ClosedBy: "X6", Open: true, Owner: ownerMatrix, Cause: "claude must be listed"},
-	{ID: "M3", Check: "a full simulated cycle with agy-claude as the only route", Invariant: "I-9", ClosedBy: "X6", Open: true, Owner: ownerMatrix, Cause: "claude must be listed"},
-	{ID: "M4", Check: "a full simulated cycle with codex as the only route", Invariant: "I-9", ClosedBy: "X6, X9", Open: true, Owner: ownerMatrix, Cause: "claude must be listed"},
-	{ID: "M5", Check: "a full simulated cycle with ollama as the only route", Invariant: "I-9", ClosedBy: "X6, X9", Open: true, Owner: ownerMatrix, Cause: "claude must be listed"},
+	{ID: "M2", Check: "a full simulated cycle with agy as the only route", Invariant: "I-9", ClosedBy: "X1b", Open: true, Owner: ownerMatrix, Cause: "new-session: exit status 1"},
+	{ID: "M3", Check: "a full simulated cycle with agy-claude as the only route", Invariant: "I-9", ClosedBy: "X1b", Open: true, Owner: ownerMatrix, Cause: "new-session: exit status 1"},
+	{ID: "M4", Check: "a full simulated cycle with codex as the only route", Invariant: "I-9", ClosedBy: "X1b, X9", Open: true, Owner: ownerMatrix, Cause: "new-session: exit status 1"},
+	{ID: "M5", Check: "a full simulated cycle with ollama as the only route", Invariant: "I-9", ClosedBy: "X9", Open: true, Owner: ownerMatrix, Cause: "ollama-tmux cannot use tools"},
 	{ID: "N1", Check: "CLAUDECODE=1 on the parent does not reach any seat", Invariant: "I-2", ClosedBy: "X2", Open: true, Owner: ownerMatrix, Cause: "CLAUDECODE=1 of the parent reached"},
 	{ID: "N2", Check: "no LLM spawn outside the bridge launch API", Invariant: "I-1", ClosedBy: "X3", Open: true, Owner: "internal/sysexec/isolation_matrix_test.go", Cause: "outside internal/bridge"},
 	{ID: "N3", Check: "a phase pane cannot exec claude --version", Invariant: "I-3", ClosedBy: "X4", Open: true, Owner: ownerContract, Cause: "stub-claude"},
@@ -39,7 +39,7 @@ var rows = []Row{
 	{ID: "N10", Check: "an agy pane cannot write a protected path", Invariant: "I-7", ClosedBy: "X7", Open: true, Owner: ownerContract, Cause: "err=<nil> out=\"\""},
 	{ID: "N11", Check: "guard phase denies Task", Invariant: "I-7", ClosedBy: "X7", Open: true, Owner: "internal/guards/isolation_matrix_test.go", Cause: "guard phase allowed Task"},
 	{ID: "N12", Check: "a judge verdict in prose with no file fails the contract", Invariant: "I-8", ClosedBy: "X8", Open: true, Owner: "internal/core/isolation_matrix_test.go", Cause: "from a JSON span in its stdout prose"},
-	{ID: "N13", Check: "no family string in flow code", Invariant: "I-6", ClosedBy: "X6", Open: true, Owner: "internal/core/isolation_matrix_test.go", Cause: "names a family in"},
+	{ID: "N13", Check: "no family string in flow code", Invariant: "I-6", ClosedBy: "X6", Owner: "internal/core/isolation_matrix_test.go"},
 	{ID: "N14", Check: "a new manifest with known format ids needs no Go change", Invariant: "I-6", ClosedBy: "X9", Open: true, Owner: "internal/bridge/isolation_matrix_test.go", Cause: "unknown field \"parsers\""},
 }
 

@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"sync"
@@ -47,19 +48,23 @@ func LookupDriver(cli string) (Driver, bool) {
 
 var bareDriverMap = map[string]string{
 	"claude": "claude-tmux",
-	"gemini": "claude-tmux",
 	"codex":  "codex-tmux",
 	"agy":    "agy-tmux",
 }
 
-func DriverFor(cli string) string {
+var errRetiredGemini = errors.New("the bare driver name gemini is retired: name an agy driver (agy, agy-tmux or agy-claude-tmux)")
+
+func DriverFor(cli string) (string, error) {
+	if cli == "gemini" {
+		return "", errRetiredGemini
+	}
 	if _, ok := LookupDriver(cli); ok {
-		return cli
+		return cli, nil
 	}
 	if mapped, ok := bareDriverMap[cli]; ok {
-		return mapped
+		return mapped, nil
 	}
-	return cli
+	return cli, nil
 }
 
 func DriverNames() []string {

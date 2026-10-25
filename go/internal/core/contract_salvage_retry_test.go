@@ -39,7 +39,7 @@ func TestContractEscalation_SalvageRetry_WhenNoOtherFamily(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
-	writeCLIProfile(t, root, "builder", universalContractFallbackCLI, nil)
+	writeCLIProfile(t, root, "builder", "claude-tmux", nil)
 	probe := newSalvageProbe(neverDemotingThreshold)
 
 	if _, err := runSalvageCycle(t, root, probe); err == nil {
@@ -89,7 +89,7 @@ func TestContractEscalation_SalvageRetry_NotOnFirstBlock(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
-	writeCLIProfile(t, root, "builder", universalContractFallbackCLI, nil)
+	writeCLIProfile(t, root, "builder", "claude-tmux", nil)
 	probe := newSalvageProbe(neverDemotingThreshold)
 	probe.approveAfter = 1
 
@@ -108,7 +108,7 @@ func TestContractEscalation_SalvageRetry_NotOnNonContractRejection(t *testing.T)
 	t.Parallel()
 
 	root := t.TempDir()
-	writeCLIProfile(t, root, "builder", universalContractFallbackCLI, nil)
+	writeCLIProfile(t, root, "builder", "claude-tmux", nil)
 	probe := newSalvageProbe(neverDemotingThreshold)
 	rev := &recordingReviewer{
 		default_: ReviewResult{Approve: true},
@@ -134,7 +134,7 @@ func TestContractEscalation_SalvageRetry_LedgerRecordsSalvageAttempted(t *testin
 	t.Parallel()
 
 	root := t.TempDir()
-	writeCLIProfile(t, root, "builder", universalContractFallbackCLI, nil)
+	writeCLIProfile(t, root, "builder", "claude-tmux", nil)
 	probe := newSalvageProbe(3)
 
 	led, err := runSalvageCycle(t, root, probe)
@@ -166,20 +166,20 @@ func TestContractEscalation_SalvageRetry_WarnDistinguishesAttemptFromNoRemedy(t 
 	t.Parallel()
 	reason := "triage deliverable failed contract: [missing_failure_block] schema_version 2 required"
 
-	tried := formatContractGateDemotionWarn("triage", universalContractFallbackCLI, contractDispatch{salvageRetried: true}, reason)
+	tried := formatContractGateDemotionWarn("triage", "claude-tmux", contractDispatch{salvageRetried: true}, reason)
 	if !strings.Contains(tried, "salvage retry attempted") {
 		t.Errorf("salvageRetried=true WARN must SAY the salvage retry was attempted and failed: %s", tried)
 	}
 	if strings.Contains(tried, "did NOT run") {
 		t.Errorf("salvageRetried=true WARN still claims no remedy ran — that is the misleading line this task removes: %s", tried)
 	}
-	for _, want := range []string{"WARN", "CONTRACT GATE DEMOTED", "triage", universalContractFallbackCLI, "advisory", "missing_failure_block"} {
+	for _, want := range []string{"WARN", "CONTRACT GATE DEMOTED", "triage", "claude-tmux", "advisory", "missing_failure_block"} {
 		if !strings.Contains(tried, want) {
 			t.Errorf("demotion WARN missing %q: %s", want, tried)
 		}
 	}
 
-	noRemedy := formatContractGateDemotionWarn("triage", universalContractFallbackCLI, contractDispatch{}, reason)
+	noRemedy := formatContractGateDemotionWarn("triage", "claude-tmux", contractDispatch{}, reason)
 	if !strings.Contains(noRemedy, "did NOT run") {
 		t.Errorf("with neither escalation nor salvage retry, the WARN must still report that no remedy ran: %s", noRemedy)
 	}

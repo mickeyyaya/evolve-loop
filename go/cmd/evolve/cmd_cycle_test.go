@@ -75,8 +75,8 @@ func TestResolveRouterDispatch_Precedence(t *testing.T) {
 	t.Run("fallback when no profile and no rc", func(t *testing.T) {
 		t.Parallel()
 		cli, model := mustRouterDispatch(t, t.TempDir(), policy.RouterPolicy{})
-		if cli != "claude-tmux" || model != "opus" {
-			t.Errorf("fallback = (%q,%q), want (claude-tmux,opus)", cli, model)
+		if cli != "claude-tmux" || model != "deep" {
+			t.Errorf("fallback = (%q,%q), want (claude-tmux,deep)", cli, model)
 		}
 	})
 
@@ -113,8 +113,8 @@ func TestResolveRouterDispatch_Precedence(t *testing.T) {
 		dir := t.TempDir()
 		writeRouterProfile(t, dir, "codex-tmux", "")
 		cli, model := mustRouterDispatch(t, dir, policy.RouterPolicy{})
-		if cli != "codex-tmux" || model != "opus" {
-			t.Errorf("partial = (%q,%q), want (codex-tmux,opus) — model falls back", cli, model)
+		if cli != "codex-tmux" || model != "deep" {
+			t.Errorf("partial = (%q,%q), want (codex-tmux,deep) — model falls back", cli, model)
 		}
 	})
 }

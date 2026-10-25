@@ -66,7 +66,7 @@ func (hooks) SecondaryArtifacts(req core.PhaseRequest) []string {
 func (hooks) ArtifactFilename(_ core.PhaseRequest) string {
 	return phasecontract.ArtifactFilename(string(core.PhaseAudit))
 }
-func (hooks) DefaultModel() string { return "opus" }
+func (hooks) DefaultModel() string { return "deep" }
 
 func (h hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	var b strings.Builder

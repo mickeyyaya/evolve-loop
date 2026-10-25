@@ -30,12 +30,12 @@ func TestAdvisorDispatch_CircuitBreakerAfterRepeatedFailure(t *testing.T) {
 
 func TestResolveRouterDispatch_PerDecisionType(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir() // no profile file ⇒ base = claude-tmux/opus
+	dir := t.TempDir()
 	rc := policy.RouterPolicy{}
 
 	for _, dt := range []routerDecisionType{decisionPlan, decisionRePlan, decisionPropose, decisionJudge} {
-		if rd, _ := resolveRouterDispatchHealthy(advisorRouter(t, dir, rc), "", dt, nil); rd.cli != "claude-tmux" || rd.model != "opus" {
-			t.Errorf("decision %d default = (%s,%s), want (claude-tmux,opus) — must be no-op", dt, rd.cli, rd.model)
+		if rd, _ := resolveRouterDispatchHealthy(advisorRouter(t, dir, rc), "", dt, nil); rd.cli != "claude-tmux" || rd.model != "deep" {
+			t.Errorf("decision %d default = (%s,%s), want (claude-tmux,deep) — must be no-op", dt, rd.cli, rd.model)
 		}
 	}
 
@@ -46,8 +46,8 @@ func TestResolveRouterDispatch_PerDecisionType(t *testing.T) {
 	if m := modelFor(t, advisorRouter(t, dir, rc), decisionRePlan); m != "opus-deep" {
 		t.Errorf("replan model = %q, want opus-deep (a deep decision)", m)
 	}
-	if m := modelFor(t, advisorRouter(t, dir, rc), decisionPropose); m != "opus" {
-		t.Errorf("propose model = %q, want base opus (PLAN_MODEL must not affect propose)", m)
+	if m := modelFor(t, advisorRouter(t, dir, rc), decisionPropose); m != "deep" {
+		t.Errorf("propose model = %q, want base deep (PLAN_MODEL must not affect propose)", m)
 	}
 
 	rc.ProposeModel = "haiku"

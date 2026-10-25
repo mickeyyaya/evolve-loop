@@ -19,8 +19,6 @@ import (
 
 const contractEscalateAtBlock = 2
 
-const universalContractFallbackCLI = "claude-tmux"
-
 const contractSalvageRetryDirectiveHeading = "## Contract Salvage Retry — verbatim validator output"
 
 func composeContractSalvageRetry(round int, reason, remediation string) string {
@@ -72,7 +70,7 @@ func (cr *cycleRun) contractDispatchCLI(phase Phase, override string) string {
 	}
 	_, walk, routed := cr.routingWalk(phase)
 	if !routed {
-		return universalContractFallbackCLI
+		return policy.SeatDefault(policy.SeatContractEscalation).CLI
 	}
 	return walk.Candidates[0]
 }
@@ -85,7 +83,7 @@ func (cr *cycleRun) contractEscalationCLI(phase Phase, dispatchedCLI string) (st
 	failed := llmroute.Family(cmp.Or(dispatchedCLI, walk.Candidates[0]))
 	candidates := slices.Clone(walk.Candidates)
 	if d.Legacy() {
-		candidates = append(candidates, universalContractFallbackCLI)
+		candidates = append(candidates, policy.SeatDefault(policy.SeatContractEscalation).CLI)
 	}
 	for _, c := range candidates {
 		if c != "" && llmroute.Family(c) != failed && escalationAllowed(phase, c, d) {

@@ -304,7 +304,7 @@ func TestPhaseAdvisorOptions(t *testing.T) {
 		t.Errorf("model = %q, want opus", p.identity.Model)
 	}
 	d := NewPhaseAdvisor(nil, WithProposerCLI(""), WithProposerModel(""))
-	if d.identity.CLI != "claude-tmux" || d.identity.Model != "opus" {
+	if d.identity.CLI != "claude-tmux" || d.identity.Model != "deep" {
 		t.Errorf("empty opts overrode defaults: cli=%q model=%q", d.identity.CLI, d.identity.Model)
 	}
 }

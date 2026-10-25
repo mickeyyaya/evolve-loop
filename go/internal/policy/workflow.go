@@ -69,7 +69,7 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 		ConsensusAuditEnabled:    true,
 		CompactPrompts:           true,
 		UniversalFallback:        true,
-		UniversalFallbackExclude: []string{"agy"},
+		UniversalFallbackExclude: defaultUniversalFallbackExclude(),
 		RemediationRounds:        1,
 		RemediablePhases:         []string{"coverage-gate"},
 		BuildFloorEnforced:       true,

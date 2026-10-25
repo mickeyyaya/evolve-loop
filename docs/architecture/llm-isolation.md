@@ -5,7 +5,7 @@
 >
 > The plan holds the components X1 to X16 and their order. The ADR holds the decision. The Signal Center contract reuses the shape of [llm-quality-indexes.md](llm-quality-indexes.md) §5.
 >
-> Status: proposed (ADR-0154, ADR-0155), 2026-10-25. X1 is built: the conformance matrix of §14 and the module, kind, codes and channel of §15. No other component is built. Each name in this file that does not exist on `main` is marked "proposed".
+> Status: proposed (ADR-0154, ADR-0155), 2026-10-25. X1 is built: the conformance matrix of §14 and the module, kind, codes and channel of §15. X6 is built: the routing data of §10. No other component is built. Each name in this file that does not exist on `main` is marked "proposed".
 
 ## Table of contents
 
@@ -389,6 +389,27 @@ The floor becomes the `floors` key of `cli_routing` (proposed). Its value today 
 - A grep guard (proposed `TestFlowCodeNamesNoFamily`) checks each non-test Go file. It fails when flow code names a family as a string. The manifests, the bridge drivers and the routing data are exempt.
 - `evolve cli-routing explain <agent>` prints the same chain for each agent before and after X6. X6 records both outputs in its PR.
 
+### Status of X6
+
+X6 is built. These parts landed:
+
+| Part | Where it is now | Proof |
+|---|---|---|
+| The floor | `cli_routing.floors` in `.evolve/policy.json`, written with `evolve cli-routing set floors.claude ...`; the compiled default is `go/internal/policy/routing_defaults.json` | `TestCheckedInPolicy_StrictDecodesWithTheFloorsKey`, `TestCompile_AnEmptyFloorsKeyLetsATableWithoutClaudeRoute` |
+| The five floor checks | `cliroute` (`table.go`, `compile.go`, `findings.go`), `routing_run.go` and `bridge/model_failover.go` read `Policy.Floors()` | `TestCompile_EachFloorFamilyMustBeListedAndKnown`, `TestLaunch_TheDeclaredFloorsDecideWhichFallbackModelsASeatKeeps` |
+| The flow defaults | the `seats` of `routing_defaults.json`, read by `policy.SeatDefault`; the phase default models are the tier word `deep` | `TestSeatDefault_EverySeatHoldsTodaysValue` |
+| The alias | `bridge.DriverFor("gemini")` is an error that names the agy drivers | `TestDriverFor_TheBareNameGeminiIsAnErrorThatNamesTheAgyDrivers` |
+| The grep guard | `TestFlowCodeNamesNoFamily` (`internal/guards`), with an exempt list of the drivers, the routing data and the CLI install and probe code | the guard itself |
+| No route changed | `TestCLIRoutingShow_EveryShippedProfileKeepsItsResolvedRoute`; `cli-routing explain` printed the same text for every tracked profile before and after | the golden file |
+
+These parts stay open:
+
+- The seat defaults are compiled data, not policy keys. A policy cannot move the advisor seat yet. The router and the failure advisor already resolve through `cliroute` with their profiles; the seat default applies only when that route fails.
+- Row N13 is green. Rows M2 to M4 stay open on the next gap, the tmux REPL fake of the harness (X1b, inbox item `isolation-matrix-tmux-repl-fake`). Row M5 stays open on its tool capability (X9).
+- The tracked profiles of the floor agents and the router set `allowed_clis` to Claude families. Thus an agy-only table over the tracked profiles still refuses seven agents, even with `floors: {}`. The matrix uses its own profiles, so this limit does not show there. Inbox item `isolation-floor-profiles-allowed-clis-as-routing-data` owns it.
+- A `--bypass-policy` run ignores the declared table, `floors` included, so it keeps the compiled Claude floor. This is fail-closed (`TestBuild_ABypassRunKeepsTheCompiledFloorEvenWhenThePolicyDeclaresNone`).
+- `TestFlowCodeNamesNoFamily` matches exact string literals only. A built string (`"claude-" + x`), a prefix test, a name outside its list and a file in an exempt home pass it. Non-Go data is not scanned.
+
 ## 11. Manifest fields
 
 The manifests are `go/internal/bridge/manifests/*.json` (eight files). They have `binary`, `default_env`, `controls`, `transient_regex`, `token_line_regex`, `model_tier_map` and more (research F1.8). The new fields are proposed:
@@ -466,17 +487,17 @@ The guard `TestRows_EachOwnerTestJudgesItsRowSoNoRowIsSilentlyDropped` parses ea
 
 A row passes when the cycle ships, the ledger holds each phase, and only the stub of the row family ran. X6 adds `floors: {}` to the row policy when the key exists.
 
-Today rows M2 to M5 fail on the Claude floor: the compiler refuses the table with "claude must be listed: the Claude-family floor agents run only on claude". The M1 run also judges rows N1 and N4 from the records of its stubs. It judges row N6 from its cycle workspace: today the pipeline writes no `inputs/index.json`.
+Since X6 the row policy sets `floors: {}`, so the floor no longer refuses rows M2 to M5. Each bare family routes to its tmux driver, and the harness has no tmux REPL fake. A stub `tmux` on the row `PATH` refuses, so rows M2 to M4 fail with `new-session: exit status 1` on each host. Row M5 fails because `ollama-tmux cannot use tools`. The M1 run also judges rows N1 and N4 from the records of its stubs. It judges row N6 from its cycle workspace: today the pipeline writes no `inputs/index.json`.
 
 The subagent conformance tests (`go/internal/subagent/conformance_test.go`) take the CLI from the row too. `TestConformance_AllRoles_HappyDispatchIsolated` dispatches each role on each of the five families and checks that the role ran on that family.
 
-| Row | Only route (driver) | Seats | Turned green by | State at X1 |
+| Row | Only route (driver) | Seats | Turned green by | State at X6 |
 |---|---|---|---|---|
 | M1 | `claude` (`claude-p`) | all | X1 | green |
-| M2 | `agy` (`agy`) | all | X6 (the floors and defaults move to data) | open |
-| M3 | `agy-claude` (`agy-claude-tmux`) | all | X6 | open |
-| M4 | `codex` (`codex`) | all | X6, X9 | open |
-| M5 | `ollama` (`ollama-tmux`) | the seats that its `capabilities` allow | X6, X9 | open |
+| M2 | `agy` (`agy`) | all | X1b (a tmux REPL fake; X6 removed the floor) | open |
+| M3 | `agy-claude` (`agy-claude-tmux`) | all | X1b | open |
+| M4 | `codex` (`codex`) | all | X1b, X9 | open |
+| M5 | `ollama` (`ollama-tmux`) | the seats that its `capabilities` allow | X9 | open |
 
 The stub for each family declares the same capabilities as the real manifest. The matrix proves that the pipeline has no family dependency. It does not prove that a real model can do the work.
 
@@ -496,7 +517,7 @@ The stub for each family declares the same capabilities as the real manifest. Th
 | N10 | an agy pane cannot write a protected path | I-7 | X7 | sandbox contract | open |
 | N11 | `guard phase` denies `Task` | I-7 | X7 | `internal/guards` | open |
 | N12 | a judge verdict in prose with no file fails the contract | I-8 | X8 | `internal/core` | open |
-| N13 | the grep guard finds no family string in flow code | I-6 | X6 | `internal/core` | open |
+| N13 | the grep guard finds no family string in flow code | I-6 | X6 | `internal/core` | green |
 | N14 | a new manifest with known format ids needs no Go change | I-6 | X9 | `internal/bridge` | open |
 
 Rows N3, N5 and N7 to N10 extend `TestAgentSandboxContract` (`go/internal/bridge/sandbox_contract_integration_test.go`, build tags `integration` and `darwin`). Before X1 it had 22 rows and none for exec, network or a cross-cycle read. The exec row runs a `fakeclitest` stub named `claude`, never a real CLI.

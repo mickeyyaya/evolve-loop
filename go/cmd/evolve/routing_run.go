@@ -48,7 +48,7 @@ func overrideRefusals(r *cliroute.Router, projectRoot string, env map[string]str
 		if err != nil {
 			return nil, err
 		}
-		if !overrideAllowed(agent, value, d) {
+		if !overrideAllowed(r.FloorFamily(agent), value, d) {
 			refusals = append(refusals, fmt.Sprintf("%s: %s=%s is outside its allowed set %v: %s", agent, strings.TrimSuffix(strings.TrimPrefix(source, "env("), ")"), value, d.Allowed, overrideRemedy(agent, source)))
 		}
 	}
@@ -63,8 +63,8 @@ func overrideRemedy(agent, source string) string {
 	return "unset " + key + ", or drop --cli " + agent
 }
 
-func overrideAllowed(agent, value string, d cliroute.Decision) bool {
-	if profiles.IsClaudeFamilyFloor(agent) && llmroute.Family(llmroute.DefaultDriverForFamily(value)) != "claude" {
+func overrideAllowed(floor, value string, d cliroute.Decision) bool {
+	if floor != "" && llmroute.Family(llmroute.DefaultDriverForFamily(value)) != floor {
 		return false
 	}
 	return d.Allows(value)

@@ -139,7 +139,7 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 		cli = prof.CLI
 	}
 	if cli == "" {
-		cli = "claude-tmux"
+		cli = policy.SeatDefault(policy.SeatSubagent).CLI
 	}
 	model := req.Model
 	if model == "" {
