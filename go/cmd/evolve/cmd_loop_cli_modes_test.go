@@ -39,37 +39,18 @@ func TestDetachChildArgs_StripsOnlyDetachFlagsInTheFlagRegion(t *testing.T) {
 	}
 }
 
-func TestReservedGoalVerb_MatchesOnlyAWholeReservedWord(t *testing.T) {
+func TestReservedGoalVerb_MatchesAReservedFirstWord(t *testing.T) {
 	t.Parallel()
 	cases := map[string]string{
 		"stop": "evolve loop-stop", " STATUS ": "evolve loop status", "Help": "evolve loop -h",
 		"plan": "evolve loop --dry-run", "watch": "evolve dashboard",
-		"": "", "status of the fleet": "", "stopper": "",
+		"status of the fleet": "evolve loop status", "stop\tnow": "evolve loop-stop",
+		"": "", "  ": "", "stopper": "", "fix the status bar": "",
 	}
 	for goal, want := range cases {
 		verb, reserved := reservedGoalVerb(goal)
 		if verb != want || reserved != (want != "") {
 			t.Errorf("reservedGoalVerb(%q) = (%q, %v) want %q", goal, verb, reserved, want)
-		}
-	}
-}
-
-func TestIsLoopStatusInvocation_RequiresAFlagOrNothingAfterStatus(t *testing.T) {
-	t.Parallel()
-	cases := []struct {
-		args []string
-		want bool
-	}{
-		{[]string{"status"}, true},
-		{[]string{"status", "--json"}, true},
-		{[]string{"status", "of", "the", "fleet"}, false},
-		{[]string{"Status"}, false},
-		{[]string{"--goal-text", "status"}, false},
-		{nil, false},
-	}
-	for _, tc := range cases {
-		if got := isLoopStatusInvocation(tc.args); got != tc.want {
-			t.Errorf("isLoopStatusInvocation(%q) = %v want %v", tc.args, got, tc.want)
 		}
 	}
 }

@@ -36,16 +36,20 @@ func blockSpan(lines []string, line int) (int, int) {
 	if line < 1 || line > len(lines) || blockEdge(lines[line-1]) {
 		return from, to
 	}
-	for from > 1 && !addedListItem.MatchString(lines[from-1]) && !blockEdge(lines[from-2]) {
+	for from > 1 && !itemStart(lines[from-1]) && !blockEdge(lines[from-2]) {
 		from--
 	}
-	for to < len(lines) && !addedListItem.MatchString(lines[to]) && !blockEdge(lines[to]) {
+	for to < len(lines) && !itemStart(lines[to]) && !blockEdge(lines[to]) {
 		to++
 	}
 	return from, to
 }
 
+func itemStart(line string) bool {
+	return addedListItem.MatchString(quoteContent(strings.TrimSpace(line)))
+}
+
 func blockEdge(line string) bool {
-	t := strings.TrimSpace(line)
+	t := quoteContent(strings.TrimSpace(line))
 	return t == "" || strings.HasPrefix(t, "|") || strings.HasPrefix(t, "#")
 }

@@ -176,7 +176,7 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 	}
 
 	if verb, reserved := reservedGoalVerb(posGoal); reserved {
-		fmt.Fprintf(stderr, "evolve loop: %q is a reserved word, not a goal — did you mean: %s? (to use it as goal text pass --goal-text)\n", posGoal, verb)
+		fmt.Fprintf(stderr, "evolve loop: the goal %q starts with a reserved word — did you mean: %s? (to use it as goal text pass --goal-text)\n", posGoal, verb)
 		return loopConfig{}, 10
 	}
 
@@ -244,7 +244,11 @@ var loopReservedGoalWords = map[string]string{
 }
 
 func reservedGoalVerb(goal string) (verb string, reserved bool) {
-	verb, reserved = loopReservedGoalWords[strings.ToLower(strings.TrimSpace(goal))]
+	words := strings.Fields(strings.ToLower(goal))
+	if len(words) == 0 {
+		return "", false
+	}
+	verb, reserved = loopReservedGoalWords[words[0]]
 	return verb, reserved
 }
 
