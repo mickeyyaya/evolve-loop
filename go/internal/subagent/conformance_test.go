@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
 )
 
 type bridgeOutcome int
@@ -18,14 +20,21 @@ const (
 	bridgeWritesNoToken
 )
 
-func conformanceOpts(t *testing.T, role string, tokenSeed byte, b bridgeOutcome) RunOptions {
+var conformanceFamilies = []string{"claude", "agy", "agy-claude", "codex", "ollama"}
+
+func familyOf(i int) string { return conformanceFamilies[i%len(conformanceFamilies)] }
+
+func conformanceOpts(t *testing.T, role, cli string, tokenSeed byte, b bridgeOutcome) RunOptions {
 	t.Helper()
 	opts := runHappyOpts(t)
 	clock := opts.Now
 	opts.ReadProfile = func(string) (string, error) {
 		return fmt.Sprintf(
-			`{"role":%q,"cli":"claude","model_tier_default":"sonnet","output_artifact":".evolve/runs/cycle-{cycle}/%s.md"}`,
-			role, role), nil
+			`{"role":%q,"cli":%q,"model_tier_default":"sonnet","output_artifact":".evolve/runs/cycle-{cycle}/%s.md"}`,
+			role, cli, role), nil
+	}
+	opts.ResolveLLM = func(string) (resolvellm.Result, error) {
+		return resolvellm.Result{CLI: cli, ModelTier: "sonnet", Source: "profile"}, nil
 	}
 	opts.Rand = func(buf []byte) (int, error) {
 		for i := range buf {
@@ -83,7 +92,7 @@ func TestConformance_AllRoles_BridgeOnly(t *testing.T) {
 			t.Parallel()
 			req := conformanceReq(t, role)
 			req.LegacyAgentDispatch = true
-			_, err := Run(context.Background(), req, conformanceOpts(t, role, byte(i+1), bridgeWritesValid))
+			_, err := Run(context.Background(), req, conformanceOpts(t, role, familyOf(i), byte(i+1), bridgeWritesValid))
 			if err == nil || !strings.Contains(err.Error(), "in-process dispatch") {
 				t.Fatalf("role %s: want ErrInProcessDispatchBanned, got %v", role, err)
 			}
@@ -93,32 +102,37 @@ func TestConformance_AllRoles_BridgeOnly(t *testing.T) {
 
 func TestConformance_AllRoles_HappyDispatchIsolated(t *testing.T) {
 	t.Parallel()
-	for i, role := range agentRoles {
-		role := role
-		t.Run(role, func(t *testing.T) {
-			t.Parallel()
-			req := conformanceReq(t, role)
-			res, err := Run(context.Background(), req, conformanceOpts(t, role, byte(i+1), bridgeWritesValid))
-			if err != nil {
-				t.Fatalf("role %s: unexpected error %v", role, err)
-			}
-			if res.Verdict != VerdictPASS {
-				t.Fatalf("role %s: verdict=%s, want PASS", role, res.Verdict)
-			}
-			if res.ChallengeToken == "" {
-				t.Fatalf("role %s: empty challenge token", role)
-			}
-			if !strings.HasPrefix(res.ArtifactPath, req.ProjectRoot) {
-				t.Fatalf("role %s: artifact %s not under project root %s", role, res.ArtifactPath, req.ProjectRoot)
-			}
-			body, err := os.ReadFile(res.ArtifactPath)
-			if err != nil {
-				t.Fatalf("role %s: read artifact: %v", role, err)
-			}
-			if !strings.Contains(string(body), res.ChallengeToken) {
-				t.Fatalf("role %s: artifact does not bear its challenge token", role)
-			}
-		})
+	for _, cli := range conformanceFamilies {
+		for i, role := range agentRoles {
+			cli, role := cli, role
+			t.Run(cli+"/"+role, func(t *testing.T) {
+				t.Parallel()
+				req := conformanceReq(t, role)
+				res, err := Run(context.Background(), req, conformanceOpts(t, role, cli, byte(i+1), bridgeWritesValid))
+				if err != nil {
+					t.Fatalf("role %s on %s: unexpected error %v", role, cli, err)
+				}
+				if res.Verdict != VerdictPASS {
+					t.Fatalf("role %s on %s: verdict=%s, want PASS", role, cli, res.Verdict)
+				}
+				if res.CLI != cli {
+					t.Fatalf("role %s: the profile routes it to %s, but it ran on %s", role, cli, res.CLI)
+				}
+				if res.ChallengeToken == "" {
+					t.Fatalf("role %s: empty challenge token", role)
+				}
+				if !strings.HasPrefix(res.ArtifactPath, req.ProjectRoot) {
+					t.Fatalf("role %s: artifact %s not under project root %s", role, res.ArtifactPath, req.ProjectRoot)
+				}
+				body, err := os.ReadFile(res.ArtifactPath)
+				if err != nil {
+					t.Fatalf("role %s: read artifact: %v", role, err)
+				}
+				if !strings.Contains(string(body), res.ChallengeToken) {
+					t.Fatalf("role %s: artifact does not bear its challenge token", role)
+				}
+			})
+		}
 	}
 }
 
@@ -137,7 +151,7 @@ func TestConformance_AllRoles_ContractGuards(t *testing.T) {
 			t.Run(role+"/"+tc.name, func(t *testing.T) {
 				t.Parallel()
 				req := conformanceReq(t, role)
-				res, _ := Run(context.Background(), req, conformanceOpts(t, role, byte(i+1), tc.bridge))
+				res, _ := Run(context.Background(), req, conformanceOpts(t, role, familyOf(i), byte(i+1), tc.bridge))
 				if res.Verdict != VerdictIntegrityFail {
 					t.Fatalf("role %s (%s): verdict=%s, want INTEGRITY_FAIL", role, tc.name, res.Verdict)
 				}
@@ -174,7 +188,7 @@ func TestConformance_AllRoles_DepthCapEnforced(t *testing.T) {
 			t.Parallel()
 			req := conformanceReq(t, role)
 			req.DispatchDepth = maxDispatchDepth + 1
-			_, err := Run(context.Background(), req, conformanceOpts(t, role, byte(i+1), bridgeWritesValid))
+			_, err := Run(context.Background(), req, conformanceOpts(t, role, familyOf(i), byte(i+1), bridgeWritesValid))
 			if err == nil || !strings.Contains(err.Error(), "recursion depth cap") {
 				t.Fatalf("role %s: want ErrRecursionDepthExceeded, got %v", role, err)
 			}
@@ -191,7 +205,7 @@ func TestConformance_NoCrossAgentTokenLeakage(t *testing.T) {
 	results := make(map[string]out, len(agentRoles))
 	for i, role := range agentRoles {
 		req := conformanceReq(t, role)
-		res, err := Run(context.Background(), req, conformanceOpts(t, role, byte(i+1), bridgeWritesValid))
+		res, err := Run(context.Background(), req, conformanceOpts(t, role, familyOf(i), byte(i+1), bridgeWritesValid))
 		if err != nil {
 			t.Fatalf("role %s: %v", role, err)
 		}
@@ -232,7 +246,7 @@ func TestConformance_ConcurrentDispatch_NoRace(t *testing.T) {
 		go func(i int, role string) {
 			defer wg.Done()
 			req := conformanceReq(t, role)
-			res, err := Run(context.Background(), req, conformanceOpts(t, role, byte(i+1), bridgeWritesValid))
+			res, err := Run(context.Background(), req, conformanceOpts(t, role, familyOf(i), byte(i+1), bridgeWritesValid))
 			errs[i] = err
 			verdicts[i] = res.Verdict
 		}(i, role)

@@ -28,6 +28,7 @@ Each row runs one shell command in the profile. A row has one of three verdicts:
 - **allow:** the command must exit 0.
 - **deny:** the command must fail, and its output must contain `Operation not permitted`. The text is the evidence that the sandbox refused the command. A failure for another reason does not pass the row.
 - **gap:** the command succeeds today, but the contract says deny. The row fails when the gap closes, so that the author changes the row to deny.
+- **isolation row:** a row that names a row id of the conformance matrix of [llm-isolation.md](llm-isolation.md) §14. The test gives the result of the allow or deny check to `isolation.Judge`. An open row must fail its check, and the test fails when the check passes. The component that closes the gap then marks the row green in `go/internal/isolation/matrix.go`.
 
 After each row, the host must still reach the run server with its sessions `agent` and `victim`.
 
@@ -55,6 +56,13 @@ After each row, the host must still reach the run server with its sessions `agen
 | Open its own pane tty for read and write | allow | Both opens succeed. |
 | Incident cycle 1853: the exact probe with `TMUX` unset | allow | The probe prints `rc=0` and `own-server`. The run server survives. |
 | Incident cycle 1853: the exact probe with `TMUX` set to the run server | allow | The probe reaches no server. The run server survives. |
+| Isolation N3: exec an LLM binary (a `claude` stub) with `--version` | deny (open until X4) | The stub prints its version today. |
+| Isolation N5: read the raw output `<ws>/.bridge/scout-stdout.log` | deny (open until X5) | The read succeeds today. |
+| Isolation N6: a retry opens the retrospective of its predecessor through `inputs/index.json` | allow (open until X5) | No index exists today, so the lookup fails. |
+| Isolation N7: a retry reads the `audit-report.md` of an unrelated cycle | deny (open until X5) | The read succeeds today. |
+| Isolation N8: read `~/.ssh` | deny (open until X5) | The listing succeeds today. The row prints no file name. |
+| Isolation N9: open a TCP connection to a loopback listener of the host | allow (green) | `nc -z` connects. The row records that the network stays open. |
+| Isolation N10: an agy pane writes the protected path `go/internal/guards/role.go` in its worktree | deny (open until X7) | The write succeeds today. |
 
 ## The threat model
 
@@ -67,7 +75,7 @@ The agent is a model that runs commands in a pane. The agent is not hostile by i
 
 The contract does not cover these items:
 
-- the network: a source-writing phase gets the network, because the model API needs it;
+- a deny of the network: a source-writing phase gets the network, because the model API needs it. Row N9 records this allow;
 - Linux: `bwrap` has a separate model (a new `/tmp` and a new PID namespace);
 - a launch without the sandbox (see "Residual risks" in the incident).
 

@@ -5,15 +5,19 @@ package bridge
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/sandbox"
+	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/isolation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
@@ -33,14 +37,17 @@ type contractHost struct {
 	runSocket, defaultSocket    string
 	runName, runPID             string
 	ownTTY, peerTTY, scratch    string
+	stubBin, netPort            string
 }
 
 type contractRow struct {
-	action string
-	want   contractVerdict
-	script func(h contractHost) string
-	env    []string
-	check  func(t *testing.T, h contractHost, out string)
+	action    string
+	want      contractVerdict
+	script    func(h contractHost) string
+	env       []string
+	check     func(t *testing.T, h contractHost, out string)
+	isolation string
+	needs     func() string
 }
 
 const cycle1853ProbeLines = `d=$(mktemp -d /tmp/swxprobe.XXXX)
@@ -123,26 +130,70 @@ var agentContract = []contractRow{
 			}
 			runServerSurvives(t, h)
 		}},
+	{action: "isolation N3: exec an LLM binary (a claude stub) with --version", want: contractDeny, isolation: "N3",
+		script: func(h contractHost) string { return "PATH=" + h.stubBin + ":$PATH claude --version" }},
+	{action: "isolation N5: read the raw output <ws>/.bridge/scout-stdout.log", want: contractDeny, isolation: "N5",
+		script: func(h contractHost) string { return "cat " + h.run + "/.bridge/scout-stdout.log" }},
+	{action: "isolation N6: a retry opens its predecessor's retrospective through inputs/index.json", want: contractAllow, isolation: "N6",
+		script: func(h contractHost) string {
+			return `p=$(sed -n 's/.*"path": *"\([^"]*retrospective-report\.md\)".*/\1/p' ` + h.run + `/inputs/index.json) && test -n "$p" && cat "` + h.root + `/$p"`
+		}},
+	{action: "isolation N7: a retry reads an unrelated cycle's audit-report.md", want: contractDeny, isolation: "N7",
+		script: func(h contractHost) string {
+			return "cat " + filepath.Join(filepath.Dir(h.otherCycle), "cycle-9", "audit-report.md")
+		}},
+	{action: "isolation N8: read ~/.ssh", want: contractDeny, isolation: "N8",
+		script: func(contractHost) string { return `ls "$HOME/.ssh" > /dev/null && echo ok` },
+		needs: func() string {
+			if home, err := os.UserHomeDir(); err != nil || !isDir(filepath.Join(home, ".ssh")) {
+				return "the host has no ~/.ssh, so a refused read cannot be told from an absent one"
+			}
+			return ""
+		}},
+	{action: "isolation N9: open a TCP connection (loopback listener of the host)", want: contractAllow, isolation: "N9",
+		script: func(h contractHost) string { return "nc -z -w 2 127.0.0.1 " + h.netPort + " && echo ok" }},
+	{action: "isolation N10: an agy pane writes the protected path go/internal/guards/role.go", want: contractDeny, isolation: "N10",
+		script: func(h contractHost) string {
+			return "mkdir -p " + h.worktree + "/go/internal/guards && echo x > " + h.worktree + "/go/internal/guards/role.go"
+		}},
+}
+
+func isDir(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
+}
+
+func contractFailure(want contractVerdict, out string, err error) error {
+	switch {
+	case want == contractAllow && err != nil:
+		return fmt.Errorf("contract: allow; the profile refused it: %v: %q", err, out)
+	case want == contractDeny && (err == nil || !strings.Contains(out, "Operation not permitted")):
+		return fmt.Errorf("contract: deny with EPERM; got err=%v out=%q", err, out)
+	case want == contractGap && err != nil:
+		return fmt.Errorf("the known gap is closed (%v: %q); change this row to deny and update docs/architecture/agent-sandbox-contract.md", err, out)
+	}
+	return nil
 }
 
 func TestAgentSandboxContract(t *testing.T) {
 	h := newContractHost(t)
 	for _, row := range agentContract {
 		t.Run(row.action, func(t *testing.T) {
+			if row.needs != nil {
+				if why := row.needs(); why != "" {
+					t.Skipf("inconclusive on this host: %s", why)
+				}
+			}
 			out, err := h.agent(t, row)
-			switch row.want {
-			case contractAllow:
-				if err != nil {
-					t.Fatalf("contract: allow; the profile refused it: %v: %q", err, out)
+			failure := contractFailure(row.want, out, err)
+			if row.isolation != "" {
+				note, jerr := isolation.Judge(row.isolation, failure)
+				if jerr != nil {
+					t.Fatal(jerr)
 				}
-			case contractDeny:
-				if err == nil || !strings.Contains(out, "Operation not permitted") {
-					t.Fatalf("contract: deny with EPERM; got err=%v out=%q", err, out)
-				}
-			case contractGap:
-				if err != nil {
-					t.Fatalf("the known gap is closed (%v: %q); change this row to deny and update docs/architecture/agent-sandbox-contract.md", err, out)
-				}
+				t.Log(note)
+			} else if failure != nil {
+				t.Fatal(failure)
 			}
 			runServerSurvives(t, h)
 			if row.check != nil {
@@ -218,6 +269,41 @@ func (h *contractHost) withProject(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	h.withIsolationFixtures(t)
+}
+
+func (h *contractHost) withIsolationFixtures(t *testing.T) {
+	t.Helper()
+	runs := filepath.Dir(h.run)
+	for rel, body := range map[string]string{
+		filepath.Join(h.run, ".bridge", "scout-stdout.log"):       "raw output of the scout\n",
+		filepath.Join(runs, "cycle-6", "retrospective-report.md"): "lesson of cycle 6\n",
+		filepath.Join(runs, "cycle-9", "audit-report.md"):         "audit of an unrelated item\n",
+	} {
+		if err := os.MkdirAll(filepath.Dir(rel), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(rel, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	h.stubBin = contractTempDir(t, "", "sbc-bin")
+	fakeclitest.Install(t, filepath.Join(h.stubBin, "claude"), "#!/bin/sh\necho stub-claude 0.0.0\n")
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			_ = conn.Close()
+		}
+	}()
+	h.netPort = strconv.Itoa(ln.Addr().(*net.TCPAddr).Port)
 }
 
 func builderPrefix(t *testing.T, probe sandbox.ProbeResult, h contractHost) []string {

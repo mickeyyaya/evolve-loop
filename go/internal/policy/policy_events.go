@@ -27,6 +27,7 @@ func EventsDefaults() EventsPolicy {
 			{Name: "ledger", Route: "kind=ledger.appended", QoS: "best_effort"},
 			{Name: "quality.breach", Route: "kind=quality.breach,quality.warning", QoS: "lossless"},
 			{Name: "quality.reading", Route: "kind=quality.reading", QoS: "best_effort"},
+			{Name: "isolation.violation", Route: "kind=isolation.violation", QoS: "lossless"},
 			{Name: "signals", Route: "", QoS: "best_effort"},
 		},
 		SegmentMB:         16,

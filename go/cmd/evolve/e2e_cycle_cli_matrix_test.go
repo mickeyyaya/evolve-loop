@@ -16,149 +16,217 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gotooltest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/isolation"
+	"github.com/mickeyyaya/evolve-loop/go/internal/subagent"
 )
 
 var expectedPhasesHappyPath = []string{"scout", "triage", "tdd", "build", "audit", "ship"}
 
-var allCLIs = []string{"claude-p", "codex", "agy"}
+type matrixRow struct {
+	id, family, driver string
+}
+
+var substitutionRows = []matrixRow{
+	{id: "M1", family: "claude", driver: "claude-p"},
+	{id: "M2", family: "agy", driver: "agy"},
+	{id: "M3", family: "agy-claude", driver: "agy-claude-tmux"},
+	{id: "M4", family: "codex", driver: "codex"},
+	{id: "M5", family: "ollama", driver: "ollama-tmux"},
+}
+
+var stubBinaries = []string{"claude", "agy", "codex", "ollama", "gemini"}
 
 func TestE2ECycleCLIMatrix(t *testing.T) {
 	t.Parallel()
-	t.Skip("legacy ship-script hatch removed (Stage 5.1); native CLI-matrix e2e pending port to go/test/e2e/ — see PORTING-LEDGER.md")
-	if testing.Short() {
-		t.Skip("E2E test; skipped in -short mode")
-	}
-	for _, bin := range []string{"git", "jq", "bash"} {
-		if _, err := exec.LookPath(bin); err != nil {
-			t.Skipf("required tool %q not on PATH; skipping E2E", bin)
-		}
-	}
-
-	repoRoot := mustRepoRoot(t)
-	binDir := t.TempDir()
-	evolveBin := buildBinary(t, binDir, "evolve", "./cmd/evolve", repoRoot)
-	fakeBin := buildBinary(t, binDir, "evolve-fake-cli", "./cmd/evolve-fake-cli", repoRoot)
-
-	for _, cli := range allCLIs {
-		cli := cli
-		t.Run("offline_"+cli, func(t *testing.T) {
+	evolveBin, fakeBin, repoRoot := mustBuildPipelineBins(t)
+	for _, row := range substitutionRows {
+		t.Run(row.id+"_"+row.family, func(t *testing.T) {
 			t.Parallel()
-			runOneCycle(t, cycleRunConfig{
-				CLI:       cli,
-				EvolveBin: evolveBin,
-				FakeBin:   fakeBin,
-				RepoRoot:  repoRoot,
-				Live:      false,
-			})
+			run := runMatrixCycle(t, row, evolveBin, fakeBin, repoRoot)
+			failure := run.substitutionFailure(row)
+			judgeMatrixRow(t, row.id, failure)
+			if row.id != "M1" {
+				return
+			}
+			if failure != nil || len(run.calls) == 0 {
+				t.Fatalf("rows N1 and N4 read the stub records of a green M1 run; M1 failed or ran no seat: %v", failure)
+			}
+			judgeMatrixRow(t, "N1", run.envLeak())
+			judgeMatrixRow(t, "N4", run.agentRunNotRefused())
 		})
 	}
+}
 
-	if os.Getenv("EVOLVE_E2E_LIVE") != "1" {
-		t.Logf("EVOLVE_E2E_LIVE not set; skipping live sub-tests. Set EVOLVE_E2E_LIVE=1 to run.")
+func judgeMatrixRow(t *testing.T, id string, failure error) {
+	t.Helper()
+	note, err := isolation.Judge(id, failure)
+	if err != nil {
+		t.Error(err)
 		return
 	}
-	for _, cli := range allCLIs {
-		cli := cli
-		t.Run("live_"+cli, func(t *testing.T) {
-			runOneCycle(t, cycleRunConfig{
-				CLI:       cli,
-				EvolveBin: evolveBin,
-				FakeBin:   fakeBin,
-				RepoRoot:  repoRoot,
-				Live:      true,
-			})
-		})
-	}
+	t.Log(note)
 }
 
-type cycleRunConfig struct {
-	CLI       string
-	EvolveBin string
-	FakeBin   string
-	RepoRoot  string
-	Live      bool
+type matrixRun struct {
+	err     error
+	out     string
+	entries []ledgerEntry
+	calls   []stubCall
 }
 
-func runOneCycle(t *testing.T, cfg cycleRunConfig) {
+type stubCall struct {
+	binary     string
+	claudeCode string
+	depth      string
+}
+
+func runMatrixCycle(t *testing.T, row matrixRow, evolveBin, fakeBin, repoRoot string) matrixRun {
 	t.Helper()
-	projRoot := setupTempProject(t, cfg.RepoRoot)
-	shipScript := writeFakeShipScript(t, projRoot)
-
+	projRoot := setupTempProject(t, repoRoot)
+	writeMatrixProject(t, projRoot, row.driver)
+	binDir := t.TempDir()
+	callLog := filepath.Join(t.TempDir(), "calls.log")
 	env := append(os.Environ(),
-		"EVOLVE_SANDBOX=off",
-		"EVOLVE_CLI="+cfg.CLI,
-		"EVOLVE_PROMPTS_DIR="+cfg.RepoRoot,
-		"EVOLVE_SHIP_SCRIPT="+shipScript,
-		"EVOLVE_NATIVE_SHIP=0",
+		"CLAUDECODE=1",
+		"EVOLVE_PROMPTS_DIR="+repoRoot,
 		"EVOLVE_RESEARCH_HOOK_DISABLED=1",
+		"EVOLVE_SANDBOX=off",
+		"BRIDGE_TESTING=1",
+		"MATRIX_CALL_LOG="+callLog,
 	)
-	if !cfg.Live {
-		env = append(env,
-			"BRIDGE_TESTING=1",
-			"BRIDGE_CLAUDE_BINARY="+cfg.FakeBin,
-			"BRIDGE_CODEX_BINARY="+cfg.FakeBin,
-			"BRIDGE_AGY_BINARY="+cfg.FakeBin,
-		)
-		env = append(env, isolatedHome(t)...)
-	} else {
-		if _, err := exec.LookPath(liveBinaryName(cfg.CLI)); err != nil {
-			t.Skipf("live mode: %s binary not on PATH (%v); skipping", cfg.CLI, err)
-		}
+	for _, bin := range stubBinaries {
+		path := filepath.Join(binDir, bin)
+		fakeclitest.Install(t, path, stubScript(bin, fakeBin))
+		env = append(env, "BRIDGE_"+strings.ToUpper(bin)+"_BINARY="+path)
 	}
-
-	args := []string{"cycle", "run",
+	env = append(env, isolatedHome(t)...)
+	env = append(withoutEnv(env, "PATH"), "PATH="+stubFirstPath(t, binDir))
+	cmd := exec.Command(evolveBin, "cycle", "run",
 		"--project-root", projRoot,
-		"--goal-hash", "e2etest" + cfg.CLI,
+		"--goal-hash", "e2ematrix"+strings.ToLower(row.id),
 		"--evolve-dir", filepath.Join(projRoot, ".evolve"),
-	}
-	if cfg.Live {
-		args = append(args, "--budget-usd", "0.50")
-	}
-
-	cmd := exec.Command(cfg.EvolveBin, args...)
-	cmd.Env = env
+	)
+	cmd.Env = withoutEnv(env, "EVOLVE_CLI")
 	cmd.Dir = projRoot
+	out, err := runWithTimeout(cmd, 300*time.Second)
+	if err != nil && strings.HasPrefix(err.Error(), "timed out") {
+		t.Fatalf("inconclusive: the %s cycle timed out, which is not the routing gap of the row", row.family)
+	}
+	run := matrixRun{err: err, out: out, calls: readStubCalls(t, callLog)}
+	if _, statErr := os.Stat(filepath.Join(projRoot, ".evolve", "ledger.jsonl")); statErr == nil {
+		run.entries = readLedger(t, projRoot)
+	}
+	return run
+}
 
-	timeout := 60 * time.Second
-	if cfg.Live {
-		timeout = 5 * time.Minute
+func stubFirstPath(t *testing.T, binDir string) string {
+	t.Helper()
+	dirs := []string{binDir}
+	for _, tool := range []string{"go", "git", "bash"} {
+		path, err := exec.LookPath(tool)
+		if err != nil {
+			t.Fatalf("the matrix cycle needs %s: %v", tool, err)
+		}
+		dirs = append(dirs, filepath.Dir(path))
 	}
-	out, err := runWithTimeout(cmd, timeout)
-	if err != nil {
-		t.Logf("--- combined output ---\n%s", out)
-		dumpWorkspaceLogs(t, projRoot)
-		t.Fatalf("evolve cycle run failed: %v", err)
-	}
+	return strings.Join(append(dirs, "/usr/bin", "/bin", "/usr/sbin", "/sbin"), string(os.PathListSeparator))
+}
 
-	entries := readLedger(t, projRoot)
-	if len(entries) == 0 {
-		dumpWorkspaceLogs(t, projRoot)
-		t.Fatalf("ledger is empty; cycle output:\n%s", out)
-	}
-	missingRole := false
-	for _, want := range expectedPhasesHappyPath {
-		if !ledgerHasRole(entries, want) {
-			missingRole = true
-			t.Errorf("ledger missing role=%q\nfull ledger roles: %v\ncycle output:\n%s",
-				want, ledgerRoles(entries), out)
+func stubScript(bin, fakeBin string) string {
+	return "#!/bin/sh\n" +
+		`printf '%s CLAUDECODE=%s EVOLVE_DISPATCH_DEPTH=%s\n' ` + bin + ` "${CLAUDECODE-unset}" "${EVOLVE_DISPATCH_DEPTH-unset}" >> "$MATRIX_CALL_LOG"` + "\n" +
+		`exec "` + fakeBin + `" "$@"` + "\n"
+}
+
+func withoutEnv(env []string, key string) []string {
+	out := make([]string, 0, len(env))
+	for _, kv := range env {
+		if !strings.HasPrefix(kv, key+"=") {
+			out = append(out, kv)
 		}
 	}
-	if missingRole {
-		dumpWorkspaceLogs(t, projRoot)
-	}
+	return out
+}
 
-	state := readState(t, projRoot)
-	if state.LastCycleNumber < 1 {
-		t.Errorf("state.json:lastCycleNumber=%d, want >=1", state.LastCycleNumber)
+func writeMatrixProject(t *testing.T, projRoot, driver string) {
+	t.Helper()
+	writeProjectPolicy(t, projRoot, map[string]any{
+		"cli_routing": map[string]any{"clis": []string{driver}, "default": []string{driver}},
+	})
+	profilesDir := filepath.Join(projRoot, ".evolve", "profiles")
+	for _, name := range []string{"intent", "scout", "triage", "tdd-engineer", "builder", "auditor", "retrospective"} {
+		body := fmt.Sprintf(`{"name":%q,"role":%q,"cli":%q,"model_tier_default":"sonnet","allowed_tools":["Read","Write","Bash"]}`, name, name, driver)
+		if err := os.WriteFile(filepath.Join(profilesDir, name+".json"), []byte(body), 0o644); err != nil {
+			t.Fatalf("write profile %s: %v", name, err)
+		}
 	}
+}
 
-	logOut, err := exec.Command("git", "-C", projRoot, "log", "--format=%s", "-1").Output()
+func readStubCalls(t *testing.T, path string) []stubCall {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return nil
+	}
 	if err != nil {
-		t.Fatalf("git log: %v", err)
+		t.Fatalf("read the stub call log: %v", err)
 	}
-	if !strings.Contains(string(logOut), "e2etest") {
-		t.Errorf("git log does not contain e2etest commit message; got %q", string(logOut))
+	var calls []stubCall
+	for _, line := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+		f := strings.Fields(line)
+		if len(f) != 3 {
+			t.Fatalf("stub call log line %q", line)
+		}
+		calls = append(calls, stubCall{binary: f[0], claudeCode: strings.TrimPrefix(f[1], "CLAUDECODE="), depth: strings.TrimPrefix(f[2], "EVOLVE_DISPATCH_DEPTH=")})
 	}
+	return calls
+}
+
+func (r matrixRun) substitutionFailure(row matrixRow) error {
+	if r.err != nil {
+		return fmt.Errorf("evolve cycle run with %s as the only route: %v\n%s", row.family, r.err, lastN(r.out, 1500))
+	}
+	var missing []string
+	for _, role := range expectedPhasesHappyPath {
+		if !ledgerHasRole(r.entries, role) {
+			missing = append(missing, role)
+		}
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("the ledger misses roles %v; roles %v", missing, ledgerRoles(r.entries))
+	}
+	want := strings.Split(row.driver, "-")[0]
+	if len(r.calls) == 0 {
+		return fmt.Errorf("no stub CLI ran, so no seat ran on %s", row.family)
+	}
+	for _, c := range r.calls {
+		if c.binary != want {
+			return fmt.Errorf("a seat ran the %s binary; %s is the only route", c.binary, row.family)
+		}
+	}
+	return nil
+}
+
+func (r matrixRun) envLeak() error {
+	for _, c := range r.calls {
+		if c.claudeCode != "unset" {
+			return fmt.Errorf("CLAUDECODE=%s of the parent reached the %s seat", c.claudeCode, c.binary)
+		}
+	}
+	return nil
+}
+
+func (r matrixRun) agentRunNotRefused() error {
+	for _, c := range r.calls {
+		env := map[string]string{"EVOLVE_DISPATCH_DEPTH": c.depth}
+		if c.depth == "unset" {
+			env = map[string]string{}
+		}
+		if subagent.ReadDispatchDepth(func(k string) string { return env[k] }) == 0 {
+			return fmt.Errorf("a %s phase pane has dispatch depth 0 (EVOLVE_DISPATCH_DEPTH=%s), so the depth refusal of evolve agent run (subagent.ReadDispatchDepth) does not fire inside it", c.binary, c.depth)
+		}
+	}
+	return nil
 }
 
 func liveBinaryName(cli string) string {
