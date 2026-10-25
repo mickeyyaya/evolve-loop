@@ -28,11 +28,11 @@ func TestRows_AreTheNineteenRowsOfSpec14InOrder(t *testing.T) {
 
 func TestRows_OnlyTheRowsOfLandedComponentsAreGreenAndEveryOpenRowNamesItsComponent(t *testing.T) {
 	t.Parallel()
-	greenBy := map[string]string{"M1": "X1", "N9": "X1", "N13": "X6", "N1": "X2", "N2": "X3", "N3": "X4", "N4": "X4"}
+	greenBy := map[string]string{"M1": "X1", "N9": "X1", "N13": "X6", "N1": "X2", "N2": "X3", "N3": "X4", "N4": "X4", "M2": "X1b", "M3": "X1b", "M4": "X1b"}
 	for _, r := range Rows() {
 		closer, green := greenBy[r.ID]
 		if r.Open == green {
-			t.Errorf("row %s Open = %v; only %v are green after X1, X2, X3, X4 and X6", r.ID, r.Open, greenBy)
+			t.Errorf("row %s Open = %v; only %v are green after X1, X1b, X2, X3, X4 and X6", r.ID, r.Open, greenBy)
 		}
 		if !strings.HasPrefix(r.ClosedBy, "X") || r.Check == "" || r.Owner == "" {
 			t.Errorf("row %s must name its check, its owner test file and the component that turns it green: %+v", r.ID, r)
@@ -53,8 +53,8 @@ func TestRows_ReturnsACopy(t *testing.T) {
 
 func TestLookup_FindsARowAndRefusesAnUnknownID(t *testing.T) {
 	t.Parallel()
-	if r, ok := Lookup("M2"); !ok || r.ClosedBy != "X1b" || !r.Open {
-		t.Fatalf("Lookup(M2) = %+v, %v; want the open row closed by X1b", r, ok)
+	if r, ok := Lookup("M5"); !ok || r.ClosedBy != "X9" || !r.Open {
+		t.Fatalf("Lookup(M5) = %+v, %v; want the open row closed by X9", r, ok)
 	}
 	if _, ok := Lookup("N99"); ok {
 		t.Fatal("Lookup found a row that the matrix does not hold")
@@ -63,11 +63,11 @@ func TestLookup_FindsARowAndRefusesAnUnknownID(t *testing.T) {
 
 func TestJudge_AnOpenRowThatFailsIsTheExpectedFailureAndNamesItsComponent(t *testing.T) {
 	t.Parallel()
-	note, err := Judge("M2", errors.New("bridge: launch exit=10: [bridge] [agy-tmux] new-session: exit status 1"))
+	note, err := Judge("M5", errors.New("cliroute: cli_routing.clis: ollama-tmux cannot use tools, so it cannot run a phase"))
 	if err != nil {
 		t.Fatalf("an open row that fails is expected, got %v", err)
 	}
-	for _, want := range []string{"M2", "expected failure", "X1b", "new-session: exit status 1"} {
+	for _, want := range []string{"M5", "expected failure", "X9", "ollama-tmux cannot use tools"} {
 		if !strings.Contains(note, want) {
 			t.Errorf("the note %q must name %q", note, want)
 		}
@@ -76,11 +76,11 @@ func TestJudge_AnOpenRowThatFailsIsTheExpectedFailureAndNamesItsComponent(t *tes
 
 func TestJudge_AnOpenRowThatFailsForAnotherReasonIsInconclusive(t *testing.T) {
 	t.Parallel()
-	_, err := Judge("M2", errors.New("evolve cycle run: timed out"))
+	_, err := Judge("M5", errors.New("evolve cycle run: timed out"))
 	if err == nil {
 		t.Fatal("an open row that fails for a reason other than its gap must fail the test")
 	}
-	for _, want := range []string{"M2", "inconclusive", "new-session: exit status 1", "timed out"} {
+	for _, want := range []string{"M5", "inconclusive", "ollama-tmux cannot use tools", "timed out"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("the error %q must name %q", err, want)
 		}

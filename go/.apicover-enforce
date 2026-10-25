@@ -822,3 +822,5 @@
 ./internal/codeshape
 # isolation - the conformance matrix and the ISOLATION_ codes of the agent cell (ADR-0154).
 ./internal/isolation
+# faketmux - the fake tmux of the hermetic e2e matrix: each pane is a detached process that reads a FIFO and writes a screen file, so a tmux driver runs with no tmux server.
+./internal/faketmux

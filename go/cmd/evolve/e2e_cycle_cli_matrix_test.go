@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/faketmux"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gotooltest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/isolation"
 )
@@ -103,7 +104,7 @@ func runMatrixCycle(t *testing.T, row matrixRow, evolveBin, fakeBin, repoRoot st
 		fakeclitest.Install(t, path, stubScript(bin, fakeBin, callLog, evolveBin, probeDir))
 		env = append(env, "BRIDGE_"+strings.ToUpper(bin)+"_BINARY="+path)
 	}
-	fakeclitest.Install(t, filepath.Join(binDir, "tmux"), tmuxRefusal)
+	env = append(env, installFakeTmux(t, binDir, fakeBin)...)
 	env = append(env, isolatedHome(t)...)
 	env = append(withoutEnv(env, "PATH"), "PATH="+stubFirstPath(t, binDir))
 	cmd := exec.Command(evolveBin, "cycle", "run",
@@ -137,7 +138,27 @@ func stubFirstPath(t *testing.T, binDir string) string {
 	return strings.Join(append(dirs, "/usr/bin", "/bin", "/usr/sbin", "/sbin"), string(os.PathListSeparator))
 }
 
-const tmuxRefusal = "#!/bin/sh\necho 'the matrix harness has no tmux REPL fake' >&2\nexit 1\n"
+func installFakeTmux(t *testing.T, binDir, fakeBin string) []string {
+	t.Helper()
+	root := t.TempDir()
+	fakeclitest.Install(t, filepath.Join(binDir, "tmux"), "#!/bin/sh\n"+`exec "`+fakeBin+`" `+faketmux.Flag+` "`+root+`" "$@"`+"\n")
+	t.Cleanup(func() { stopFakeTmux(t, fakeBin, root) })
+	return []string{"TMUX_TMPDIR=" + t.TempDir()}
+}
+
+func stopFakeTmux(t *testing.T, fakeBin, root string) {
+	t.Helper()
+	sockets, err := os.ReadDir(root)
+	if err != nil {
+		t.Errorf("list the fake tmux servers: %v", err)
+		return
+	}
+	for _, socket := range sockets {
+		if out, err := exec.Command(fakeBin, faketmux.Flag, root, "-L", socket.Name(), "kill-server").CombinedOutput(); err != nil {
+			t.Errorf("stop the fake tmux server %s: %v: %s", socket.Name(), err, out)
+		}
+	}
+}
 
 func stubScript(bin, fakeBin, callLog, evolveBin, probeDir string) string {
 	return "#!/bin/sh\n" +

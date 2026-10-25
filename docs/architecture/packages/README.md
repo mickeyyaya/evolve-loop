@@ -53,6 +53,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/tmuxtest` | gives a test binary that runs real tmux a tmux server only its own process owns | [internal-tmuxtest.md](internal-tmuxtest.md) |
 | `internal/testhost` | a missing host tool skips a local test and fails a macOS CI test | [internal-testhost.md](internal-testhost.md) |
 | `internal/fakeclitest` | stands in for a command-line tool in tests without writing a new executable file | [internal-fakeclitest.md](internal-fakeclitest.md) |
+| `internal/faketmux` | stands in for the `tmux` binary in hermetic e2e tests, so a tmux driver runs a full cycle with no tmux server | [internal-faketmux.md](internal-faketmux.md) |
 | `pkg/acsassert` | the assertion DSL that ACS Go predicates write against | [pkg-acsassert.md](pkg-acsassert.md) |
 | `internal/phaseintegrity` | the production digest source of the per-phase integrity chain and the sanctioned ship-sha re-pin | [internal-phaseintegrity.md](internal-phaseintegrity.md) |
 | `internal/preflight` | probes the host once and emits the capability profile the dispatcher configures itself from | [internal-preflight.md](internal-preflight.md) |

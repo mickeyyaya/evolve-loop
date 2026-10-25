@@ -9,7 +9,7 @@
 > Status: proposed (ADR-0154, ADR-0155, ADR-0156), 2026-10-25. Each name in this file that does not exist on `main` is marked "proposed".
 >
 > Component state on 2026-10-25 (the plan §6.1 has the full table):
-> - X1: merged in #1121. The conformance matrix of §14 and the module, kind, codes and channel of §15 are on `main`. The follow-up X1b (item `isolation-matrix-tmux-repl-fake`) adds a tmux REPL fake, so the rows M2 to M4 can run a full cycle.
+> - X1: merged in #1121. The conformance matrix of §14 and the module, kind, codes and channel of §15 are on `main`. The follow-up X1b (item `isolation-matrix-tmux-repl-fake`) adds a fake `tmux` (`go/internal/faketmux`), so the rows M2 to M4 run a full cycle and are green.
 > - X2: merged in #1122 at stage `shadow` (the policy key `isolation.i2.stage`). The flip to `enforce` is an operator decision.
 > - X6: merged in #1123. The routing data of §10 is on `main`: `cli_routing.floors`, with the compiled default in `go/internal/policy/routing_defaults.json`. The follow-up X6b (item `isolation-floor-profiles-allowed-clis-as-routing-data`) moves the `allowed_clis` pins of 7 profiles.
 > - X3: built in this change. The single launch API of §5.1 and its AST guard `TestOnlyTheBridgeStartsAnLLMBinary` are on the branch, and matrix row N2 is green.
@@ -642,7 +642,7 @@ X6 is built. These parts landed:
 These parts stay open:
 
 - The seat defaults are compiled data, not policy keys. A policy cannot move the advisor seat yet. The router and the failure advisor already resolve through `cliroute` with their profiles; the seat default applies only when that route fails.
-- Row N13 is green. Rows M2 to M4 stay open on the next gap, the tmux REPL fake of the harness (X1b, inbox item `isolation-matrix-tmux-repl-fake`). Row M5 stays open on its tool capability (X9).
+- Row N13 is green. Rows M2 to M4 stayed open on the next gap, the tmux REPL fake of the harness. X1b (inbox item `isolation-matrix-tmux-repl-fake`) closes that gap, and the rows are green. Row M5 stays open on its tool capability (X9).
 - The tracked profiles of the floor agents and the router set `allowed_clis` to Claude families. Thus an agy-only table over the tracked profiles still refuses seven agents, even with `floors: {}`. The matrix uses its own profiles, so this limit does not show there. Inbox item `isolation-floor-profiles-allowed-clis-as-routing-data` owns it.
 - A `--bypass-policy` run ignores the declared table, `floors` included, so it keeps the compiled Claude floor. This is fail-closed (`TestBuild_ABypassRunKeepsTheCompiledFloorEvenWhenThePolicyDeclaresNone`).
 - `TestFlowCodeNamesNoFamily` matches exact string literals only. A built string (`"claude-" + x`), a prefix test, a name outside its list and a file in an exempt home pass it. Non-Go data is not scanned.
@@ -706,7 +706,7 @@ The console runs builds and reviews as in-process Claude Code subagents (F1.10).
 
 X1 builds the matrix first. Each row is a test. A row for an open gap starts as an expected failure, so each later component turns its rows green, and the progress is measured.
 
-The catalog of the rows is `isolation.Rows` in `go/internal/isolation/matrix.go`. Package note: [internal-isolation](packages/internal-isolation.md). Each row has an id, its check, its invariant, the component that turns it green, its state and its owner test file. An open row also has its cause: a text that its failure must contain, for example `claude must be listed` for M2. Each owner test gives the result of its check to `isolation.Judge`:
+The catalog of the rows is `isolation.Rows` in `go/internal/isolation/matrix.go`. Package note: [internal-isolation](packages/internal-isolation.md). Each row has an id, its check, its invariant, the component that turns it green, its state and its owner test file. An open row also has its cause: a text that its failure must contain, for example `ollama-tmux cannot use tools` for M5. Each owner test gives the result of its check to `isolation.Judge`:
 
 | Row state | Check result | `Judge` result |
 |---|---|---|
@@ -725,18 +725,22 @@ The guard `TestRows_EachOwnerTestJudgesItsRowSoNoRowIsSilentlyDropped` parses ea
 
 A row passes when the cycle ships, the ledger holds each phase, and only the stub of the row family ran. X6 adds `floors: {}` to the row policy when the key exists.
 
-Since X6 the row policy sets `floors: {}`, so the floor no longer refuses rows M2 to M5. Each bare family routes to its tmux driver, and the harness has no tmux REPL fake. A stub `tmux` on the row `PATH` refuses, so rows M2 to M4 fail with `new-session: exit status 1` on each host. Row M5 fails because `ollama-tmux cannot use tools`.
+Since X6 the row policy sets `floors: {}`, so the floor no longer refuses rows M2 to M5. Each bare family routes to its tmux driver. Row M5 fails because `ollama-tmux cannot use tools`.
+
+Before X1b, a stub `tmux` on the row `PATH` refused, so rows M2 to M4 failed with `new-session: exit status 1` on each host. X1b puts a fake `tmux` there ([internal-faketmux](packages/internal-faketmux.md)). Each pane of the fake is a detached process that reads a FIFO and writes a screen file, so no tmux server starts. The pane runs the stub of the row family, and the stub runs `evolve-fake-cli` as a REPL. Thus each tmux driver boots, pastes the prompt and waits for the artifact, as with a real CLI.
+
+The `agy` REPL of the fake draws the footer label of its `--model` value, so the launch model check of `agy-claude-tmux` reads a Claude label. Each row keeps its real check: the cycle ships, the ledger holds each phase, and only the stub of the row family ran.
 
 The row policy also sets `isolation.i2.stage` to `enforce`, so the stubs see the cell environment. Each stub writes its record to a log path in its script, not in an environment variable. The M1 run also judges rows N1 and N4 from the records of its stubs. It judges row N6 from its cycle workspace: today the pipeline writes no `inputs/index.json`.
 
 The subagent conformance tests (`go/internal/subagent/conformance_test.go`) take the CLI from the row too. `TestConformance_AllRoles_HappyDispatchIsolated` dispatches each role on each of the five families and checks that the role ran on that family.
 
-| Row | Only route (driver) | Seats | Turned green by | State at X6 |
+| Row | Only route (driver) | Seats | Turned green by | State at X1b |
 |---|---|---|---|---|
 | M1 | `claude` (`claude-p`) | all | X1 | green |
-| M2 | `agy` (`agy`) | all | X1b (a tmux REPL fake; X6 removed the floor) | open |
-| M3 | `agy-claude` (`agy-claude-tmux`) | all | X1b | open |
-| M4 | `codex` (`codex`) | all | X1b, X9 | open |
+| M2 | `agy` (`agy`) | all | X1b (a fake `tmux`; X6 removed the floor) | green |
+| M3 | `agy-claude` (`agy-claude-tmux`) | all | X1b | green |
+| M4 | `codex` (`codex`) | all | X1b | green |
 | M5 | `ollama` (`ollama-tmux`) | the seats that its `capabilities` allow | X9 | open |
 
 The stub for each family declares the same capabilities as the real manifest. The matrix proves that the pipeline has no family dependency. It does not prove that a real model can do the work.

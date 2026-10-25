@@ -11,6 +11,14 @@ import (
 
 const replBootMarkers = "❯ › ? for shortcuts >>> evolve-fake-repl-ready"
 
+const agyFooterPrefix = "? for shortcuts  "
+
+func printAgyFooter(stdout io.Writer, inv Invocation) {
+	if inv.Style == "agy" && inv.Model != "" {
+		fmt.Fprintln(stdout, agyFooterPrefix+inv.Model)
+	}
+}
+
 const maxPastedPromptLineBytes = 1 << 20
 
 var replResolveArtifactPath = resolveArtifactPath
