@@ -57,7 +57,7 @@ func runBoundary(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 
 func dispatchBoundaryVerb(verb string, args []string, stdout, stderr io.Writer) int {
 	handlers := map[string]func([]string, io.Reader, io.Writer, io.Writer) int{
-		"loop-stop": runLoopStop, "pr": runPR, "sync-main": runSyncMain, "quality": runQuality, "gc": runGC, "loop": runLoop,
+		"loop-stop": runLoopStop, "pr": runPR, "sync-main": runSyncMain, "quality": runQuality, "gc": runGC, "loop": gatedLoop(defaultDispatchGate),
 		boundaryLogVerb: runBoundaryLog, boundaryRatchetVerb: runBoundaryRatchetTighten,
 	}
 	run, ok := handlers[verb]
@@ -66,6 +66,15 @@ func dispatchBoundaryVerb(verb string, args []string, stdout, stderr io.Writer) 
 		return exitIO
 	}
 	return run(args, strings.NewReader(""), stdout, stderr)
+}
+
+func gatedLoop(g dispatchGate) func([]string, io.Reader, io.Writer, io.Writer) int {
+	return func(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+		if g.refuse(append([]string{"loop"}, args...), stderr) {
+			return exitDispatchRefused
+		}
+		return runLoop(args, stdin, stdout, stderr)
+	}
 }
 
 func runBoundaryWith(dispatch boundaryDispatch, args []string, stdout, stderr io.Writer) int {

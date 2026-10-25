@@ -42,6 +42,9 @@ func LaunchLLM(ctx context.Context, deps Deps, x LLMExec) (int, error) {
 	if deps.Stderr == nil {
 		deps.Stderr = os.Stderr
 	}
+	if err := deps.requireDispatchCredential(x.Purpose, x.Binary); err != nil {
+		return ExitSafetyGate, err
+	}
 	deps.logUnsandboxed(x.Purpose, x.Binary)
 	env := slices.DeleteFunc(probeEnv(deps, x.Binary), func(kv string) bool {
 		name, _, _ := strings.Cut(kv, "=")
@@ -64,6 +67,9 @@ func ModelQueryRunner(ctx context.Context, name string, args []string, stdin str
 }
 
 func launchPane(ctx context.Context, purpose LaunchPurpose, driver Driver, cfg *Config, deps Deps) (int, error) {
+	if err := deps.requireDispatchCredential(purpose, cfg.CLI); err != nil {
+		return ExitSafetyGate, err
+	}
 	launchPurposeConfig(purpose, cfg)
 	return driver.Launch(ctx, cfg, deps)
 }

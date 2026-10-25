@@ -40,6 +40,17 @@ var dispatchVerbCalls = []struct {
 	{[]string{"subagent", "dispatch-parallel"}, "subagent dispatch-parallel", "class D"},
 	{[]string{"loop", "--bogus"}, "loop", "class D"},
 	{[]string{"wave", "next", "--bogus"}, "wave next", "class D"},
+	{[]string{"cycle", "run", "--bogus"}, "cycle run", "class D"},
+	{[]string{"boundary", "run", "--bogus"}, "boundary run", "class D"},
+	{[]string{"bridge", "launch", "--bogus"}, "bridge launch", "class D"},
+	{[]string{"routing", "plan", "--bogus"}, "routing plan", "class D"},
+	{[]string{"campaign", "run", "--bogus"}, "campaign", "class D"},
+	{[]string{"compose", "--bogus"}, "compose", "class D"},
+	{[]string{"plan-and-execute", "--bogus"}, "plan-and-execute", "class D"},
+	{[]string{"serve-phase", "--bogus"}, "serve-phase", "class D"},
+	{[]string{"fleet", "--bogus"}, "fleet", "class D"},
+	{[]string{"consensus-dispatch", "--bogus"}, "consensus-dispatch", "class D"},
+	{[]string{"fanout-dispatch", "--bogus"}, "fanout-dispatch", "class D"},
 }
 
 func TestDispatchVerbs_RefuseWithoutTheDispatchCredential(t *testing.T) {
@@ -114,6 +125,7 @@ func TestDispatchVerbs_ReadVerbsNeedNoCredential(t *testing.T) {
 	for _, args := range [][]string{
 		{"phase", "verify"}, {"phase", "lint"}, {"phase"}, {"loop", "status"}, {"wave", "status"}, {"wave"},
 		{"subagent", "resolve-tier"}, {"subagent"}, {"agent", "list"}, {"agent"}, {"version"},
+		{"cycle", "reset"}, {"boundary"}, {"bridge", "probe"}, {"routing", "explain"}, {"campaign", "status"},
 	} {
 		if verb, gated := dispatchVerbOf(args); gated {
 			t.Errorf("evolve %v is gated as %q; only the dispatch verbs need the credential", args, verb.name)
@@ -150,6 +162,88 @@ func TestDispatchWith_AVerbOutsideTheGateAndABadCallNeedNoCredential(t *testing.
 		code := dispatchWith(gate, c.args, strings.NewReader(""), &stdout, &stderr)
 		if code != c.code || !strings.Contains(stderr.String(), c.out) || strings.Contains(stderr.String(), "dispatch credential") {
 			t.Errorf("evolve %v = exit %d %q, want exit %d with %q and no credential check", c.args, code, stderr.String(), c.code, c.out)
+		}
+	}
+}
+
+func TestBoundaryLoopStep_TheInProcessLoopPassesTheGate(t *testing.T) {
+	t.Parallel()
+	var refused, held bytes.Buffer
+	if code := gatedLoop(dispatchGate{open: unheldStore(t, "enforce")})([]string{"--bogus"}, strings.NewReader(""), &bytes.Buffer{}, &refused); code != exitDispatchRefused || !strings.Contains(refused.String(), "loop is class D") {
+		t.Fatalf("the loop step of boundary run must check the credential, got exit %d %q", code, refused.String())
+	}
+	if code := gatedLoop(dispatchGate{open: heldStore(t)})([]string{"--bogus"}, strings.NewReader(""), &bytes.Buffer{}, &held); code == exitDispatchRefused || strings.Contains(held.String(), "dispatch credential") {
+		t.Fatalf("a host that holds the credential runs the loop step, got exit %d %q", code, held.String())
+	}
+}
+
+var commandsWithNoDispatch = map[string]string{
+	"version": "prints", "help": "prints", "rebuild": "builds the plane binary", "console-lease": "a lease file",
+	"install": "copies files", "uninstall": "removes files", "guard": "a hook check of the cell", "ledger": "reads",
+	"dossier": "reads", "audit": "reads", "salvage": "reads", "soak-report": "reads", "dashboard": "serves reads",
+	"names": "scans files", "acs": "runs predicates", "apicover": "measures", "inbox": "inbox files",
+	"phases": "the phase catalog", "worktree": "git worktrees", "land": "applies a patch", "branches": "git refs",
+	"continuation": "state files", "carryover": "state files", "swarm": "tmux sessions of workers", "checkpoint": "git refs",
+	"treewalk": "scans files", "kb": "reads", "gc": "removes leftovers", "verdicts": "a verdict store",
+	"failures": "state files", "loop-stop": "a brake file", "pr": "gh merges", "postmortem": "reads transcripts",
+	"handoff": "reads", "ci": "gh reads", "comments": "scans files", "status": "reads", "ship": "git commit and push",
+	"reset-sha": "a pin file", "sync-main": "git merge", "quality": "readings", "commit-gate": "lint and tests",
+	"scan": "scans a diff", "detect-cli": "reads the env", "detect-nested-claude": "reads the env", "phase-order": "reads",
+	"convergence": "a pure decision", "estimate-quota-reset": "a pure estimate", "build-invocation-context": "prints a prefix",
+	"resolve-llm": "a routing decision", "cycle-simulator": "no LLM", "phase-watchdog": "watches files",
+	"aggregator": "merges files", "preflight-environment": "probes the host", "phase-observer": "tails a stream",
+	"changelog-gen": "git log", "version-bump": "edits files", "marketplace-poll": "gh reads", "release-preflight": "checks",
+	"rollback": "git revert", "release": "the release pipeline", "prune-ephemeral": "removes files",
+	"postedit-validate": "a hook check of the cell", "inbox-mover": "inbox files", "commit-prefix-gate": "a check",
+	"release-consistency": "reads", "release-verify-binaries": "gh reads", "release-promote": "gh edits", "backups": "reads",
+	"skill-inventory": "a cache", "skills": "generates files", "flags": "generates files", "signals": "generates files",
+	"phase-inventory": "a cache", "eval": "checks", "docs": "lint", "solution": "checks", "cycle-health": "reads",
+	"selfcheck": "the build probe of the cell", "tokens": "reads", "lessons": "reads", "reachability": "go list",
+	"ratchet": "checks", "floor": "go test tiers", "cover": "coverage", "code": "the code index", "ladder": "reads",
+	"context-fill":        "reads",
+	"doctor":              launchAPIOnly,
+	"setup":               launchAPIOnly,
+	"cli-routing":         launchAPIOnly,
+	"release-verify-clis": launchAPIOnly,
+	"models":              launchAPIOnly,
+	"clihealth":           launchAPIOnly,
+	"cli":                 launchAPIOnly,
+	"practice":            launchAPIOnly,
+}
+
+const launchAPIOnly = "its LLM execs go through the bridge launch API, which checks the credential (requireDispatchCredential)"
+
+func TestDispatchGate_EveryRegistryCommandIsGatedOrNamedWithNoDispatch(t *testing.T) {
+	t.Parallel()
+	seen := map[string]bool{}
+	for _, c := range commands {
+		seen[c.Name] = true
+		_, gated := dispatchRules[c.Name]
+		reason, named := commandsWithNoDispatch[c.Name]
+		switch {
+		case gated && named:
+			t.Errorf("evolve %s is gated and also named with no dispatch (%q)", c.Name, reason)
+		case !gated && !named:
+			t.Errorf("evolve %s is a new command: add it to dispatchRules if it can reach an LLM launch, else to commandsWithNoDispatch with the reason", c.Name)
+		}
+	}
+	for name := range dispatchRules {
+		if !seen[name] {
+			t.Errorf("dispatchRules names %q, which the registry does not list", name)
+		}
+	}
+	for name := range commandsWithNoDispatch {
+		if !seen[name] {
+			t.Errorf("commandsWithNoDispatch names %q, which the registry does not list", name)
+		}
+	}
+	called := map[string]bool{}
+	for _, c := range dispatchVerbCalls {
+		called[c.args[0]] = true
+	}
+	for name := range dispatchRules {
+		if !called[name] {
+			t.Errorf("the gated command %s has no refusal case in dispatchVerbCalls", name)
 		}
 	}
 }

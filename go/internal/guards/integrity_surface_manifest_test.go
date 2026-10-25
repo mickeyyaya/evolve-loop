@@ -261,6 +261,7 @@ func TestProtectedSurfaceManifest_CoversTheDispatchCredential(t *testing.T) {
 		"go/internal/dispatchcred/dispatchcred.go",
 		"/wt/go/internal/dispatchcred/dispatchcred.go",
 		"go/cmd/evolve/dispatch_gate.go",
+		"go/cmd/evolve/dispatch_gate_test.go",
 	} {
 		if !IsProtectedSurface(path) {
 			t.Errorf("%q holds the dispatch credential or its check; a cycle must not be able to let its own cell dispatch an agent", path)

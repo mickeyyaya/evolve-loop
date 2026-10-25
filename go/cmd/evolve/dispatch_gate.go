@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchcred"
@@ -28,26 +29,66 @@ type dispatchGate struct {
 
 var defaultDispatchGate = dispatchGate{open: dispatchcred.Default}
 
+type dispatchRule struct {
+	class   string
+	withSub bool
+	gates   func(sub string, rest []string) bool
+}
+
+func anySub(string, []string) bool { return true }
+
+func onlySubs(subs ...string) func(string, []string) bool {
+	return func(sub string, _ []string) bool { return slices.Contains(subs, sub) }
+}
+
+func phaseDispatch(sub string, _ []string) bool {
+	lower := strings.ToLower(sub)
+	return sub != "" && lower != "verify" && lower != "lint"
+}
+
+func loopDispatch(_ string, rest []string) bool {
+	_, status := loopStatusArgs(rest)
+	return !status
+}
+
+func campaignDispatch(sub string, _ []string) bool { return sub != "status" }
+
+var dispatchRules = map[string]dispatchRule{
+	"agent":              {classRequest, true, onlySubs("run")},
+	"phase":              {classRequest, true, phaseDispatch},
+	"subagent":           {classDenied, true, onlySubs("run", "dispatch-parallel")},
+	"loop":               {classDenied, false, loopDispatch},
+	"wave":               {classDenied, true, onlySubs("next")},
+	"cycle":              {classDenied, true, onlySubs("run")},
+	"boundary":           {classDenied, true, onlySubs("run")},
+	"bridge":             {classDenied, true, onlySubs("launch")},
+	"routing":            {classDenied, true, onlySubs("plan")},
+	"campaign":           {classDenied, false, campaignDispatch},
+	"compose":            {classDenied, false, anySub},
+	"plan-and-execute":   {classDenied, false, anySub},
+	"serve-phase":        {classDenied, false, anySub},
+	"fleet":              {classDenied, false, anySub},
+	"consensus-dispatch": {classDenied, false, anySub},
+	"fanout-dispatch":    {classDenied, false, anySub},
+}
+
 func dispatchVerbOf(args []string) (gatedVerb, bool) {
+	rule, ok := dispatchRules[args[0]]
+	if !ok {
+		return gatedVerb{}, false
+	}
 	sub := ""
 	if len(args) > 1 {
 		sub = args[1]
 	}
-	switch args[0] {
-	case "agent":
-		return gatedVerb{"agent run", classRequest}, sub == "run"
-	case "phase":
-		lower := strings.ToLower(sub)
-		return gatedVerb{"phase " + sub, classRequest}, sub != "" && lower != "verify" && lower != "lint"
-	case "subagent":
-		return gatedVerb{"subagent " + sub, classDenied}, sub == "run" || sub == "dispatch-parallel"
-	case "loop":
-		_, status := loopStatusArgs(args[1:])
-		return gatedVerb{"loop", classDenied}, !status
-	case "wave":
-		return gatedVerb{"wave next", classDenied}, sub == "next"
+	if !rule.gates(sub, args[1:]) {
+		return gatedVerb{}, false
 	}
-	return gatedVerb{}, false
+	name := args[0]
+	if rule.withSub {
+		name += " " + sub
+	}
+	return gatedVerb{name, rule.class}, true
 }
 
 func (g dispatchGate) refuse(args []string, stderr io.Writer) bool {

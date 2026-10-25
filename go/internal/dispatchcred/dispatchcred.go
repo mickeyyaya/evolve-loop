@@ -96,6 +96,14 @@ func (s Store) Stage() string {
 	return word
 }
 
+func (s Store) stageOfAMissedHold(cause error) string {
+	_, err := os.Lstat(filepath.Join(s.Dir, stageFile))
+	if errors.Is(err, fs.ErrNotExist) && errors.Is(cause, fs.ErrPermission) {
+		return stageEnforce
+	}
+	return s.Stage()
+}
+
 func (s Store) read() error {
 	path := s.credentialPath()
 	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
@@ -165,7 +173,7 @@ func Admit(open func() (Store, error)) Verdict {
 		return Verdict{Stage: channel.ResolveStage(""), Cause: err}
 	}
 	if err := s.Hold(); err != nil {
-		return Verdict{Stage: s.Stage(), Cause: err}
+		return Verdict{Stage: s.stageOfAMissedHold(err), Cause: err}
 	}
 	return Verdict{Held: true}
 }

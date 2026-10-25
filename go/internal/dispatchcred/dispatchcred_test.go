@@ -294,3 +294,32 @@ func TestStore_ConcurrentHoldsAllSeeOneWholeCredential(t *testing.T) {
 		t.Fatalf("held/ must keep the credential only, no temporary file: %v %v", entries, err)
 	}
 }
+
+func TestAdmit_AMaskedCredentialWithNoStageFileIsEnforce(t *testing.T) {
+	t.Parallel()
+	if os.Getuid() == 0 {
+		t.Skip("root reads a 0000 directory")
+	}
+	s := newStore(t)
+	if err := os.MkdirAll(s.HeldDir(), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(s.HeldDir(), 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(s.HeldDir(), 0o700) })
+	v := Admit(func() (Store, error) { return s, nil })
+	if v.Held || v.Stage != "enforce" || !v.Refused() {
+		t.Fatalf("a cell that removed the stage and cannot read the credential must be refused: %+v", v)
+	}
+	fresh := newStore(t)
+	if err := os.MkdirAll(fresh.Dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(fresh.Dir, heldDir), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if v := Admit(func() (Store, error) { return fresh, nil }); v.Held || v.Stage != "shadow" {
+		t.Fatalf("a credential that cannot be made, with no stage file, stays shadow: %+v", v)
+	}
+}

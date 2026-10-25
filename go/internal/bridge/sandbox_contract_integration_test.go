@@ -160,6 +160,20 @@ var agentContract = []contractRow{
 		script: func(h contractHost) string {
 			return strippedMarkers + h.evolveBin + " wave next --refused-before-parse"
 		}},
+	{action: "rename an ancestor of the dispatch store under a writable home, then run evolve agent run", want: contractCredentialRefusal,
+		script: func(h contractHost) string {
+			ancestor := filepath.Dir(h.dispatch.Dir)
+			return "mv " + ancestor + " " + ancestor + "-moved && " + strippedMarkers + h.evolveBin + " agent run --refused-before-parse"
+		},
+		check: func(t *testing.T, h contractHost, _ string) {
+			ancestor := filepath.Dir(h.dispatch.Dir)
+			if err := os.RemoveAll(ancestor); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Rename(ancestor+"-moved", ancestor); err != nil {
+				t.Fatalf("the host puts the store back for the next rows: %v", err)
+			}
+		}},
 	{action: "turn the dispatch stage off", want: contractDeny,
 		script: func(h contractHost) string { return "echo off > " + filepath.Join(h.dispatch.Dir, "stage") }},
 	{action: "plant a dispatch credential", want: contractDeny,

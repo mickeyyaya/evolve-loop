@@ -265,7 +265,7 @@ The class is a rule, not advice. Three layers enforce it:
 
 The markers of X4 stay as a fast first check with a clear message. They are not the guard (F2).
 
-As built (item `isolation-dispatch-capability-token`): layers 1 and 2 cover the dispatch verbs `agent run`, `phase <name>`, `subagent run`, `subagent dispatch-parallel`, `loop` and `wave next` ([llm-isolation.md](llm-isolation.md) §7.1.1). The refusal exits 3 with the texts above. X17e adds the other `R` and `D` verbs when it builds the class table.
+As built (item `isolation-dispatch-capability-token`): layers 1 and 2 cover each command that starts a dispatch ([llm-isolation.md](llm-isolation.md) §7.1.1). Examples are `agent run`, `phase <name>`, `loop`, `wave next`, `cycle run` and `boundary run`. Each LLM launch through the bridge launch API checks the credential too. The refusal exits 3 with the texts above. X17e adds the other `R` and `D` verbs when it builds the class table.
 
 ### 4.5 Signals and quality readings
 

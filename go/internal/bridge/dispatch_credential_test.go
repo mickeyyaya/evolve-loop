@@ -2,13 +2,20 @@ package bridge
 
 import (
 	"bytes"
+	"context"
 	"errors"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchcred"
+	"github.com/mickeyyaya/evolve-loop/go/internal/proctree"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 func init() {
@@ -95,5 +102,116 @@ func TestDispatchCredentialDeny_TheDefaultStoreIsTheProcessStore(t *testing.T) {
 	want, err := filepath.EvalSymlinks(s.HeldDir())
 	if err != nil || len(held) != 1 || held[0] != want {
 		t.Fatalf("a Deps with no store uses the default store: %v, want [%s] (%v)", held, want, err)
+	}
+}
+
+func unheldDispatchStore(t *testing.T, stage string) func() (dispatchcred.Store, error) {
+	t.Helper()
+	s, open := testDispatchStore(t)
+	if err := s.Ensure(stage); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(filepath.Join(s.HeldDir(), "credential"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return open
+}
+
+type countingLaunchDriver struct{ launches *int }
+
+func (countingLaunchDriver) Name() string { return "counting" }
+
+func (d countingLaunchDriver) Launch(context.Context, *Config, Deps) (int, error) {
+	*d.launches++
+	return 0, nil
+}
+
+func eachLaunchEntry(deps Deps, launches *int) map[string]func() error {
+	driver := countingLaunchDriver{launches: launches}
+	return map[string]func() error{
+		"LaunchLLM": func() error {
+			deps := deps
+			deps.Runner = func(context.Context, string, string, []string, []string, io.Reader, io.Writer, io.Writer) (int, error) {
+				*launches++
+				return 0, nil
+			}
+			_, err := LaunchLLM(context.Background(), deps, LLMExec{Purpose: PurposeProbe, Binary: "claude", Args: []string{"--version"}})
+			return err
+		},
+		"launchPane": func() error {
+			_, err := launchPane(context.Background(), PurposeSmoke, driver, &Config{CLI: "claude-tmux"}, deps)
+			return err
+		},
+		"launchSwept": func() error {
+			deps := deps
+			deps.ListProcesses = func(context.Context) ([]proctree.Process, error) { return nil, nil }
+			deps.ListCwds = func(context.Context) ([]proctree.Cwd, error) { return nil, nil }
+			deps.SignalProcess = func(pid int, _ syscall.Signal) error {
+				return fmt.Errorf("the test signals no process, got pid %d", pid)
+			}
+			_, err := launchSwept(context.Background(), driver, &Config{CLI: "claude-tmux", Agent: "scout"}, deps)
+			return err
+		},
+		"newRecipeDriver": func() error {
+			_, _, err := newRecipeDriver(&Config{Workspace: os.TempDir(), Worktree: os.TempDir(), Agent: "recipe"}, deps, "claude-tmux")
+			if err == nil {
+				*launches++
+			}
+			return err
+		},
+	}
+}
+
+func TestLaunchAPI_EachEntryRefusesALaunchWithNoDispatchCredentialAtEnforce(t *testing.T) {
+	t.Parallel()
+	signals := signalcenter.New()
+	deps := Deps{DispatchStore: unheldDispatchStore(t, "enforce"), Signals: signals, Stderr: io.Discard, Env: map[string]string{}, LookupEnv: mapLookup(nil), Now: time.Now}
+	var launches int
+	for name, launch := range eachLaunchEntry(deps, &launches) {
+		if err := launch(); !errors.Is(err, ErrNoDispatchCredential) {
+			t.Errorf("%s with no credential at enforce = %v, want ErrNoDispatchCredential", name, err)
+		}
+	}
+	if launches != 0 {
+		t.Fatalf("a refused entry must start nothing, got %d launches", launches)
+	}
+	got := 0
+	for _, e := range signals.Recent() {
+		if e.Code == "ISOLATION_I3_VIOLATION" && e.Fields["rule"] == "launch.credential" && e.Fields["action"] == "refused" {
+			got++
+		}
+	}
+	if got != 4 {
+		t.Fatalf("each refusal must emit ISOLATION_I3_VIOLATION rule=launch.credential, got %d", got)
+	}
+}
+
+func TestLaunchAPI_ShadowReportsAndLaunchesAndAHeldCredentialIsSilent(t *testing.T) {
+	t.Parallel()
+	for stage, wantSignals := range map[string]int{"shadow": 4, "held": 0} {
+		open := unheldDispatchStore(t, "shadow")
+		if stage == "held" {
+			_, open = testDispatchStore(t)
+		}
+		signals := signalcenter.New()
+		deps := Deps{DispatchStore: open, Signals: signals, Stderr: io.Discard, Env: map[string]string{}, LookupEnv: mapLookup(nil), Now: time.Now}
+		var launches int
+		for name, launch := range eachLaunchEntry(deps, &launches) {
+			if err := launch(); errors.Is(err, ErrNoDispatchCredential) {
+				t.Errorf("%s/%s must not refuse: %v", stage, name, err)
+			}
+		}
+		credential, logged := 0, 0
+		for _, e := range signals.Recent() {
+			if e.Fields["rule"] == "launch.credential" {
+				credential++
+				if e.Fields["action"] == "logged" {
+					logged++
+				}
+			}
+		}
+		if launches != 4 || (stage == "held" && credential != 0) || logged != credential || logged < wantSignals {
+			t.Errorf("%s: launches = %d (want 4), credential signals = %d, logged = %d (want at least %d logged, none when held)", stage, launches, credential, logged, wantSignals)
+		}
 	}
 }
