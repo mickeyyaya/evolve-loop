@@ -132,7 +132,7 @@ func TestPolicyParse_AValueOfTheWrongShapeFailsInItsOwnDecoderNotAsAnUnknownKey(
 		"a quality index list":      {`{"quality": {"indexes": ["PQ1"]}}`, "quality"},
 		"a handoff pair that is 5":  {`{"handoff": {"build-audit": 5}}`, "handoff"},
 		"an agent rule cli of 5":    {`{"cli_routing": {"agents": {"scout": {"cli": 5}}}}`, "agent rule"},
-		"a retry field of the text": {`{"retry": {"phase_max_attempts": "x"}}`, "phase_max_attempts"},
+		"a retry field of the text": {`{"retry": {"phase_max_attempts": "x"}}`, "retry"},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
