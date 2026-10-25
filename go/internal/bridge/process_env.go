@@ -1,9 +1,5 @@
 package bridge
 
-func ProcessEnv(bin string) []string {
-	return probeEnv(Deps{}, bin)
-}
-
 func probeEnv(deps Deps, bin string) []string {
 	env, _ := deps.cellEnv(&Config{CLI: bin, Agent: "probe", Realization: familyRealization(bin)})
 	return env

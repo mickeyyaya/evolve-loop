@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
@@ -37,9 +39,35 @@ func TestExec_RunsTheUpdaterArgvUnderADeadlineWithoutStdin(t *testing.T) {
 	if err := run(context.Background(), claude()); err != nil {
 		t.Fatalf("exit 0 is success, got %v", err)
 	}
-	want := recordedRun{name: "claude", args: []string{"update"}, hasDeadline: true}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("ran %+v, want %+v (a family with no off switch inherits the environment)", got, want)
+	if got.name != "claude" || !reflect.DeepEqual(got.args, []string{"update"}) || !got.hasDeadline || got.hasStdin {
+		t.Errorf("ran %s %v deadline=%v stdin=%v, want claude [update] under a deadline with no stdin", got.name, got.args, got.hasDeadline, got.hasStdin)
+	}
+}
+
+func TestExec_AtEnforceTheUpdaterGetsTheCellEnvWithoutCLAUDECODE(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".evolve", "policy.json"), []byte(`{"isolation":{"i2":{"stage":"enforce"}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("EVOLVE_PROJECT_ROOT", root)
+	t.Setenv("CLAUDECODE", "1")
+	t.Setenv("TMUX", "/tmp/tmux-501/run,1,0")
+	var got recordedRun
+
+	if err := cliupdate.Exec(fakeRunner(0, "", "", nil, &got))(context.Background(), claude()); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+
+	for _, kv := range got.env {
+		if strings.HasPrefix(kv, "CLAUDECODE=") || strings.HasPrefix(kv, "TMUX=") {
+			t.Fatalf("the updater goes through the bridge launch API, so %q must not reach it", kv)
+		}
+	}
+	if !slices.ContainsFunc(got.env, func(kv string) bool { return strings.HasPrefix(kv, "PATH=") }) {
+		t.Fatalf("the cell env keeps PATH; env names %d", len(got.env))
 	}
 }
 

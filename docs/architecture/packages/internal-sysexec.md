@@ -23,6 +23,7 @@
 - A non-zero exit is `(code, nil)`. Pinned by `sysexec_test.go`.
 - The shared-writer path has no data race. Pinned by `TestCombinedOutput_RealRunner_NoRace` under `-race`.
 - No package outside `sysexec` and its allowed list runs raw `os/exec`. Pinned by the guard test.
+- Only the bridge launch API starts an LLM binary. `TestOnlyTheBridgeStartsAnLLMBinary` (`llm_launch_guard_test.go`) parses the tree and reports each LLM spawn outside it. Row N2 of the isolation matrix runs the same scan. The rules are in [llm-isolation.md](../llm-isolation.md) §5.1.
 
 ## Findings
 

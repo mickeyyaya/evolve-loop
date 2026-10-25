@@ -2,29 +2,24 @@ package modelquery
 
 import (
 	"context"
-	"strings"
-
-	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
+	"errors"
 )
 
 type Runner func(ctx context.Context, name string, args []string, stdin string) (string, error)
 
-var processEnv func(bin string) []string
+var errNoLauncher = errors.New("modelquery: no LLM launcher is wired; the composition root calls UseLauncher(bridge.ModelQueryRunner)")
 
-func UseProcessEnv(env func(bin string) []string) {
-	processEnv = env
+var launcher Runner
+
+func UseLauncher(launch Runner) {
+	launcher = launch
 }
 
 func defaultRunner(ctx context.Context, name string, args []string, stdin string) (string, error) {
-	cmd := sysexec.Command(ctx, name, args...)
-	if processEnv != nil {
-		cmd.Env = processEnv(name)
+	if launcher == nil {
+		return "", errNoLauncher
 	}
-	if stdin != "" {
-		cmd.Stdin = strings.NewReader(stdin)
-	}
-	out, err := cmd.CombinedOutput()
-	return string(out), err
+	return launcher(ctx, name, args, stdin)
 }
 
 func DefaultRouter(capturer ModelCapturer) Router {
