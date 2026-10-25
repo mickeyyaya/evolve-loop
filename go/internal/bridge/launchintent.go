@@ -17,6 +17,7 @@ type Realization struct {
 	LaunchFlags         []string
 	REPLInput           []string
 	Env                 map[string]string
+	EnvPassthrough      []string
 	Ephemeral           bool
 	SessionName         string
 	ModelOmitted        string

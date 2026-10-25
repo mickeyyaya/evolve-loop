@@ -2,6 +2,7 @@
   "schema_version": 1,
   "cli": "agy-tmux",
   "binary": "agy",
+  "env_passthrough": ["XDG_CONFIG_HOME", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY"],
   "model_family": "gemini",
   "binary_min_version": "1.0.0",
   "update_argv": ["agy", "update"],

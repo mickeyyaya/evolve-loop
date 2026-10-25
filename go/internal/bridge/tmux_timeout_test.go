@@ -10,7 +10,7 @@ import (
 func TestRunCmdBounded_KillsHungSubprocess(t *testing.T) {
 	t.Parallel()
 	start := time.Now()
-	_, err := runCmdBounded(context.Background(), 150*time.Millisecond, "sleep", "30")
+	_, err := runCmdBounded(context.Background(), 150*time.Millisecond, nil, "sleep", "30")
 	elapsed := time.Since(start)
 
 	if err == nil {
@@ -23,7 +23,7 @@ func TestRunCmdBounded_KillsHungSubprocess(t *testing.T) {
 
 func TestRunCmdBounded_ReturnsOutputWhenFast(t *testing.T) {
 	t.Parallel()
-	out, err := runCmdBounded(context.Background(), 5*time.Second, "echo", "hello-bounded")
+	out, err := runCmdBounded(context.Background(), 5*time.Second, nil, "echo", "hello-bounded")
 	if err != nil {
 		t.Fatalf("unexpected error on a fast command: %v", err)
 	}
@@ -38,11 +38,22 @@ func TestRunCmdBounded_HonorsParentCancellation(t *testing.T) {
 	go func() { time.Sleep(100 * time.Millisecond); cancel() }()
 
 	start := time.Now()
-	_, err := runCmdBounded(ctx, 30*time.Second, "sleep", "30")
+	_, err := runCmdBounded(ctx, 30*time.Second, nil, "sleep", "30")
 	if err == nil {
 		t.Fatal("expected error when parent ctx cancelled, got nil")
 	}
 	if elapsed := time.Since(start); elapsed > 3*time.Second {
 		t.Fatalf("parent cancellation took %v to unblock — not honored", elapsed)
+	}
+}
+
+func TestRunCmdBounded_AGivenEnvIsTheWholeChildEnv(t *testing.T) {
+	t.Parallel()
+	out, err := runCmdBounded(context.Background(), 5*time.Second, []string{"ONLY_ME=1"}, "/usr/bin/env")
+	if err != nil {
+		t.Fatalf("env: %v", err)
+	}
+	if strings.TrimSpace(out) != "ONLY_ME=1" {
+		t.Fatalf("the child env must be exactly the given env; got %q", out)
 	}
 }

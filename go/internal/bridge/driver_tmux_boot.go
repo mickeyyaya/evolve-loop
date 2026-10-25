@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -12,6 +13,8 @@ import (
 )
 
 const paneTmuxDetachLine = "unset TMUX TMUX_PANE"
+
+var errNoEnvSessionStart = errors.New("the tmux controller cannot start a session with an allowlisted environment")
 
 func bootTmuxREPL(
 	ctx context.Context,
@@ -38,7 +41,7 @@ func bootTmuxREPL(
 		}
 	}()
 
-	if err := deps.startSession(ctx, lp.session, prep.workingDir); err != nil {
+	if err := deps.startSession(ctx, lp.session, prep.workingDir, deps.paneEnv(cfg)); err != nil {
 		return nil, ExitBadFlags, fmt.Errorf("%s new-session: %w", prep.prefix, err)
 	}
 
@@ -139,7 +142,14 @@ func primePaneShell(ctx context.Context, deps Deps, cfg *Config, session, workin
 	return nil
 }
 
-func (deps Deps) startSession(ctx context.Context, session, workingDir string) error {
+func (deps Deps) startSession(ctx context.Context, session, workingDir string, env []string) error {
+	if env != nil {
+		starter, ok := deps.Tmux.(envSessionStarter)
+		if !ok {
+			return errNoEnvSessionStart
+		}
+		return starter.NewSessionEnv(ctx, session, tmuxPaneWidth, tmuxPaneHeight, workingDir, env)
+	}
 	if starter, ok := deps.Tmux.(workdirSessionStarter); ok {
 		return starter.NewSessionIn(ctx, session, tmuxPaneWidth, tmuxPaneHeight, workingDir)
 	}

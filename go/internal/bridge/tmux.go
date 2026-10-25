@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -37,10 +38,13 @@ type execTmux struct{}
 
 const tmuxCmdTimeout = 30 * time.Second
 
-func runCmdBounded(ctx context.Context, timeout time.Duration, name string, args ...string) (string, error) {
+func runCmdBounded(ctx context.Context, timeout time.Duration, env []string, name string, args ...string) (string, error) {
 	cctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	cmd := boundedCommand(cctx, name, args...)
+	if env != nil {
+		cmd.Env = env
+	}
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &out
@@ -99,7 +103,7 @@ func TmuxSocketArgs(args ...string) []string {
 }
 
 func (execTmux) run(ctx context.Context, args ...string) (string, error) {
-	return runCmdBounded(ctx, tmuxCmdTimeout, "tmux", TmuxSocketArgs(args...)...)
+	return runCmdBounded(ctx, tmuxCmdTimeout, nil, "tmux", TmuxSocketArgs(args...)...)
 }
 
 func (t execTmux) HasSession(ctx context.Context, name string) bool {
@@ -119,6 +123,40 @@ type workdirSessionStarter interface {
 func (t execTmux) NewSessionIn(ctx context.Context, name string, width, height int, workdir string) error {
 	_, err := t.run(ctx, "new-session", "-d", "-s", name, "-x", fmt.Sprint(width), "-y", fmt.Sprint(height), "-c", workdir)
 	return err
+}
+
+type envSessionStarter interface {
+	NewSessionEnv(ctx context.Context, name string, width, height int, workdir string, env []string) error
+}
+
+func (t execTmux) NewSessionEnv(ctx context.Context, name string, width, height int, workdir string, env []string) error {
+	_, err := runCmdBounded(ctx, tmuxCmdTimeout, tmuxClientEnv(env), "tmux", TmuxSocketArgs(newSessionEnvArgs(name, width, height, workdir, env)...)...)
+	return err
+}
+
+func tmuxClientEnv(env []string) []string {
+	client := slices.Clone(env)
+	if dir, ok := os.LookupEnv("TMUX_TMPDIR"); ok {
+		client = append(client, "TMUX_TMPDIR="+dir)
+	}
+	return client
+}
+
+func newSessionEnvArgs(name string, width, height int, workdir string, env []string) []string {
+	args := []string{"new-session", "-d", "-s", name, "-x", fmt.Sprint(width), "-y", fmt.Sprint(height)}
+	if workdir != "" {
+		args = append(args, "-c", workdir)
+	}
+	keep := make([]string, 0, len(env)+1)
+	env = ipcenv.Keep(env, isShellIdentifier)
+	for _, kv := range env {
+		args = append(args, "-e", kv)
+	}
+	for _, n := range sortedEnvNames(env) {
+		keep = append(keep, n+`="$`+n+`"`)
+	}
+	keep = append(keep, "/bin/sh")
+	return append(args, "/bin/sh", "-c", "exec env -i "+strings.Join(keep, " "))
 }
 
 func (t execTmux) SendKeys(ctx context.Context, session, keys string, enter bool) error {
@@ -217,6 +255,10 @@ func (f *FakeTmuxController) NewSession(_ context.Context, name string, _, _ int
 	f.Existing[name] = true
 	f.Events = append(f.Events, "new-session:"+name)
 	return nil
+}
+
+func (f *FakeTmuxController) NewSessionEnv(ctx context.Context, name string, width, height int, _ string, _ []string) error {
+	return f.NewSession(ctx, name, width, height)
 }
 
 func (f *FakeTmuxController) SendKeys(_ context.Context, _ string, keys string, enter bool) error {

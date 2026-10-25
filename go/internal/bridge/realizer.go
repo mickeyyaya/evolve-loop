@@ -49,6 +49,7 @@ func Realize(m Manifest, intent LaunchIntent) Realization {
 		r.LaunchFlags = append(r.LaunchFlags, m.DefaultArgs...)
 	}
 	r.Env = maps.Clone(m.DefaultEnv)
+	r.EnvPassthrough = slices.Clone(m.EnvPassthrough)
 
 	realizeScalar(&r, m, "model_tier", intent.ModelTier)
 	realizeScalar(&r, m, "permission", intent.Permission)

@@ -5,7 +5,7 @@
 >
 > The plan holds the components X1 to X16 and their order. The ADR holds the decision. The Signal Center contract reuses the shape of [llm-quality-indexes.md](llm-quality-indexes.md) §5.
 >
-> Status: proposed (ADR-0154, ADR-0155), 2026-10-25. X1 is built: the conformance matrix of §14 and the module, kind, codes and channel of §15. X6 is built: the routing data of §10. No other component is built. Each name in this file that does not exist on `main` is marked "proposed".
+> Status: proposed (ADR-0154, ADR-0155), 2026-10-25. X1 is built: the conformance matrix of §14 and the module, kind, codes and channel of §15. X2 (§6, I-2) is built at stage `shadow`. X6 is built: the routing data of §10. No other component is built. Each name in this file that does not exist on `main` is marked "proposed".
 
 ## Table of contents
 
@@ -203,7 +203,51 @@ The environment of a child is the union of three closed sets, and nothing else:
 - A tmux session starts on a clean server with an explicit `-e NAME=VALUE` for each variable. The tmux server does not supply a variable.
 - In `shadow`, the builder computes both environments. It logs each dropped name once for each wave and emits `ISOLATION_I2_VIOLATION` with the name, not the value. The child still gets today's environment.
 - In `enforce`, the child gets only the union.
-- `process_env_test.go` flips to assert the allowlist (proposed `TestProcessEnv_IsTheAllowlistPlusTheManifest`).
+- `process_env_test.go` flips to assert the allowlist (`TestProcessEnv_IsTheAllowlistPlusTheManifest`).
+
+#### 6.1 As built (X2)
+
+The builder is `Deps.cellEnv` in `go/internal/bridge/hermetic_env.go`. Each LLM child of the bridge gets its environment from it. The headless drivers call it through `dispatchEnv`. The tmux and recipe panes call it through `paneEnv`, and the doctor probes through `probeEnv`.
+
+| Item | As built |
+|---|---|
+| Stage source | the policy key `isolation.i2.stage` (`{"isolation":{"i2":{"stage":"enforce"}}}`), read by `policy.IsolationEnvStage`, carried by `Deps.EnvStage` |
+| Stage default | `shadow` (an empty value), resolved by `channel.ResolveStage`. An unknown word is `off`. |
+| `off` | today's environment, no signal |
+| `shadow` | today's environment, one `ISOLATION_I2_VIOLATION` for each dropped name, `action=logged` |
+| `enforce` | the union only, one `ISOLATION_I2_VIOLATION` for each dropped name, `action=refused` |
+| Base allowlist | the names of the table above, each `LC_*` name, and each `EVOLVE_*` name of the launcher (the pipeline markers) |
+| Excluded always | `EVOLVE_DISPATCH_ID` (the dispatch adds its own tag), and each name that is not a shell identifier |
+| Filter | `ipcenv.Keep`, the allowlist twin of the `ipcenv.Scrub` deny list |
+| Report once | `Deps.EnvDrops` (`EnvDropLog`) keeps the family and name pairs that it reported. The in-process adapter shares one log for its process. An engine with no log gets its own. |
+| Bare execs | `ProcessEnv(bin)` (the version inventory and the model queries) always returns the union, with no stage and no signal |
+
+The manifest field `env_passthrough` is built (§11). The parser refuses a name that is not a shell identifier, and it refuses each loop, bridge and credential name, as for `default_env`. So `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL` and `OPENAI_API_KEY` cannot pass through.
+
+| Manifest | `env_passthrough` |
+|---|---|
+| `claude-tmux`, `claude-p` | `CLAUDE_CONFIG_DIR`, `HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY`, `NODE_EXTRA_CA_CERTS` |
+| `codex`, `codex-tmux` | `CODEX_HOME`, `HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY`, `SSL_CERT_FILE` |
+| `agy`, `agy-tmux`, `agy-claude-tmux` (from its base) | `XDG_CONFIG_HOME`, `HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY` |
+| `ollama-tmux` | `OLLAMA_HOST`, `OLLAMA_API_KEY`, `HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY` |
+
+At `enforce`, a tmux pane starts through `execTmux.NewSessionEnv`, in three steps:
+
+1. The tmux client process runs with the cell environment and `TMUX_TMPDIR` only. tmux 3.8 takes `PATH` for a new pane from the client, not from `-e`. A server that this client starts has a clean global environment.
+2. `new-session` gets one `-e NAME=VALUE` for each variable.
+3. The pane command is `/bin/sh -c 'exec env -i NAME="$NAME" ... /bin/sh'`. tmux runs it with no `default-shell`, so no shell startup file runs. `env -i` keeps only the `-e` names, so a variable of a polluted server cannot reach the pane.
+
+A controller that cannot start a session in this way refuses the launch. The bridge never falls back to a polluted pane.
+
+The guards are `TestN1_LauncherClaudeVariablesReachNoSeatAtEnforce` (the bridge-level form of row N1, for all eight manifests), `TestCellEnv_ShadowKeepsTodaysEnvAndReportsEachDroppedNameWithoutItsValue`, `TestProcessEnv_IsTheAllowlistPlusTheManifest`, `TestTmuxBoot_AtEnforceThePaneIsBornWithTheCellEnvOnly` and the integration test `TestRealTmux_APollutedServerGivesThePaneOnlyItsEnvPairs`.
+
+Known differences from the design:
+
+- tmux sets `SHELL` in a pane to its `default-shell` option. The name is in the base allowlist, but the value can come from the server option and not from `-e`.
+- The pane shell is `/bin/sh`, not the login shell of the operator. A user startup file does not change the cell environment.
+- The report is once for each family and name in a process, not once for each wave.
+- An operator opt-in that depends on a refused name stops at `enforce`. Examples are `BRIDGE_ALLOW_ANTHROPIC_BASE_URL` with `ANTHROPIC_BASE_URL`, and `BRIDGE_ALLOW_OPENAI_API_KEY` with `OPENAI_API_KEY`. The `shadow` signals show if a run uses them.
+- `envMap` in `go/cmd/evolve/cmd_bridge.go` feeds only the flag fallback of `parseLaunchArgs`. It does not reach a child, so X2 does not change it.
 
 ## 7. No nested agency
 
@@ -412,11 +456,11 @@ These parts stay open:
 
 ## 11. Manifest fields
 
-The manifests are `go/internal/bridge/manifests/*.json` (eight files). They have `binary`, `default_env`, `controls`, `transient_regex`, `token_line_regex`, `model_tier_map` and more (research F1.8). The new fields are proposed:
+The manifests are `go/internal/bridge/manifests/*.json` (eight files). They have `binary`, `default_env`, `controls`, `transient_regex`, `token_line_regex`, `model_tier_map` and more (research F1.8). `env_passthrough` is built (X2). The other new fields are proposed:
 
 | Field | Type | Example (`claude-tmux.json`) | Replaces |
 |---|---|---|---|
-| `env_passthrough` | list of names | `["ANTHROPIC_BASE_URL", "HTTPS_PROXY"]` | the inherited environment (§6) |
+| `env_passthrough` (built, X2) | list of names | `["CLAUDE_CONFIG_DIR", "HTTPS_PROXY"]` | the inherited environment (§6) |
 | `home_reads` | list of `$HOME` paths | `["~/.claude", "~/.claude.json"]` | the read of all of `$HOME` (§9) |
 | `parsers` | map of output kind to format id | `{"usage": "claude-usage-v1", "pane": "claude-repl-v1"}` | `usageParsers` (`clicontrol/usage.go:41`), `Profiles` (`panestream/panedelta.go:31`), `DetectorFor` (`liveness.go:195`) |
 | `collectors` | map of metric to format id | `{"tokens": "claude-jsonl-v1"}` | `collectorFamilies` (`tokenusage/defaultresolver.go:35`) |
