@@ -1,0 +1,28 @@
+{
+  "id": "isolation-single-launcher",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.58,
+  "route": "console-manual",
+  "title": "LLM isolation X3: one bridge launch API starts every LLM binary, and an AST guard pins it",
+  "summary": "Seven paths start an LLM binary outside Engine.LaunchArgs (go/internal/bridge/launch.go:17). Three are outside internal/bridge: go/internal/cliupdate/exec.go:28, go/internal/looppreflight/versioninventory.go:22 and go/internal/modelquery/exec.go:19. Four are inside it: doctor.go:157,188, the usage controller (controllerfactory.go:23-33, AllowBypass: true), recipe_adapter.go:40-61, and the smoke tests bootsmoke.go:30 and livesmoke.go:54. They skip the env builder, unset TMUX or the sandbox. Spec: docs/architecture/llm-isolation.md §5.",
+  "fix": "Add one bridge launch API with a purpose word (phase, probe, update, smoke, inventory, modelquery). Route the seven paths through it so they share the X2 environment, the unset TMUX step and the sandbox decision. Add TestOnlyTheBridgeStartsAnLLMBinary in the style of the sysexec guard.",
+  "acceptance": [
+    "RED first: the AST guard lists each spawn of a manifest binary outside the bridge launch API: the three paths outside internal/bridge and the bridge paths that bypass the API; the PR records the count",
+    "After the change the guard finds 0 and matrix row N2 passes; the usage controller no longer sets AllowBypass for an LLM launch, or the spec records why it must",
+    "Each purpose uses the same environment builder; a test per purpose shows CLAUDECODE does not reach the child",
+    "A probe that runs unsandboxed logs the manifest reason",
+    "Changed functions at 100% coverage; spec §5 and the bridge package note updated"
+  ],
+  "deps": [
+    "isolation-hermetic-driver-env"
+  ],
+  "files": [
+    "go/internal/bridge/",
+    "go/internal/cliupdate/exec.go",
+    "go/internal/looppreflight/versioninventory.go",
+    "go/internal/modelquery/exec.go"
+  ],
+  "created_at": "2026-10-25T12:00:03Z",
+  "source": "console, 2026-10-25, plan llm-isolation-2026-10 component X3 (ADR-0154)"
+}

@@ -1,0 +1,28 @@
+{
+  "id": "isolation-no-nested-agency",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.58,
+  "route": "console-manual",
+  "title": "LLM isolation X4: a phase agent cannot start an LLM, an evolve dispatch or another agent",
+  "summary": "A phase pane has dispatch depth 0, so the refusal in evolve agent run (go/internal/cli/agentcmd/run.go:93-94) does not fire. The SBPL preamble allows every exec (go/internal/adapters/sandbox/sandbox.go:149-152). EVOLVE_SANDBOX=off turns the sandbox off inside a phase. Spec: docs/architecture/llm-isolation.md §7, §9 and §23.",
+  "fix": "Set EVOLVE_DISPATCH_DEPTH=1 and EVOLVE_PHASE on each phase pane. Add a process-exec deny for each manifest binary (SBPL literal, bwrap /dev/null bind). Refuse EVOLVE_SANDBOX=off inside a phase. Keep the private tmux server rows and add a row for kill(-1) (blast radius, spec §23).",
+  "acceptance": [
+    "RED first: matrix row N3 (a phase pane runs claude --version with exit 0) fails before and passes after",
+    "Row N4: evolve agent run inside a phase pane is refused",
+    "A launch with EVOLVE_SANDBOX=off inside a phase is refused with a named error",
+    "In shadow the exec deny reports and emits ISOLATION_I3_VIOLATION; in enforce it denies",
+    "Changed functions at 100% coverage; spec §7 and §9 and the sandbox package note updated"
+  ],
+  "deps": [
+    "isolation-hermetic-driver-env"
+  ],
+  "files": [
+    "go/internal/bridge/",
+    "go/internal/adapters/sandbox/sandbox.go",
+    "go/internal/bridge/sandbox_wrap.go",
+    "go/internal/subagent/recursion.go"
+  ],
+  "created_at": "2026-10-25T12:00:04Z",
+  "source": "console, 2026-10-25, plan llm-isolation-2026-10 component X4 (ADR-0154)"
+}

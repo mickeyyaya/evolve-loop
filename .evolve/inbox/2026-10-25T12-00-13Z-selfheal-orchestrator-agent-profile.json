@@ -1,0 +1,30 @@
+{
+  "id": "selfheal-orchestrator-agent-profile",
+  "kind": "feature",
+  "priority_class": "stability",
+  "weight": 0.34,
+  "route": "console-manual",
+  "title": "Self-healing X13: the orchestrator agent diagnoses from an evidence index and writes a typed diagnosis.json; it dispatches nothing",
+  "summary": "The orchestrator agent is an isolated worker (ADR-0154). It reads an evidence index lazily and writes one declared artifact with one action from the closed catalog. Spec: docs/architecture/llm-isolation.md §17.1, §18.3 and §18.4.",
+  "fix": "Add the orchestrator-agent persona and profile with no dispatch tool, the evidence index (classes incident, signal, digest, retrospective, lesson, ci-log, diff) in the X5 format, and the evolve.diagnosis/1 schema in phasecontract. Route the seat through cliroute as a named agent.",
+  "acceptance": [
+    "RED first: a diagnosis with an action outside the catalog passes the parse today; after the change the schema refuses it",
+    "Each evidence id in a diagnosis must exist in the index",
+    "The profile has no tool that starts an agent or an evolve dispatch; matrix row N3 and N4 hold for this seat",
+    "A low-confidence diagnosis maps to halt-and-escalate",
+    "Changed functions at 100% coverage"
+  ],
+  "deps": [
+    "isolation-artifact-index-read-isolation",
+    "isolation-typed-flow-outputs",
+    "selfheal-incident-detector"
+  ],
+  "files": [
+    "agents/",
+    "go/internal/phasecontract/",
+    ".evolve/profiles/",
+    "go/internal/cliroute/"
+  ],
+  "created_at": "2026-10-25T12:00:13Z",
+  "source": "console, 2026-10-25, plan llm-isolation-2026-10 component X13 (ADR-0155)"
+}

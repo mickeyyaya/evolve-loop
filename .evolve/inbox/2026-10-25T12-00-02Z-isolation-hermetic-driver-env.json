@@ -1,0 +1,30 @@
+{
+  "id": "isolation-hermetic-driver-env",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.6,
+  "route": "console-manual",
+  "title": "LLM isolation X2: each LLM child gets an allowlisted environment plus its manifest variables, nothing else",
+  "summary": "driverEnv starts from os.Environ() (go/internal/bridge/driver_common.go:23-32), envMap too (go/cmd/evolve/cmd_bridge.go:631-640), and tmux new-session has no -e (go/internal/bridge/tmux.go:111,120). CLAUDECODE and CLAUDE_CODE_* of the launcher reach each child. Spec: docs/architecture/llm-isolation.md §6.",
+  "fix": "Build the child environment from the base allowlist, the manifest env_passthrough (new field) and default_env, plus the pipeline EVOLVE_ markers. Start tmux sessions with explicit -e pairs. Stage shadow: compute both, emit ISOLATION_I2_VIOLATION for each dropped name (never the value), keep today's env. Stage enforce: only the union. Flip process_env_test.go to assert the allowlist.",
+  "acceptance": [
+    "RED first: matrix row N1 (CLAUDECODE=1 on the parent reaches a seat) fails before the change and passes after it at enforce",
+    "In shadow, each dropped name emits ISOLATION_I2_VIOLATION with the name and no value",
+    "A tmux session gets its environment only from -e pairs; a test with a polluted tmux server proves it",
+    "TestProcessEnv asserts the allowlist plus the manifest, not os.Environ()",
+    "Changed functions at 100% coverage; spec §6 and the bridge package note updated"
+  ],
+  "deps": [
+    "isolation-substitution-matrix"
+  ],
+  "files": [
+    "go/internal/bridge/driver_common.go",
+    "go/internal/bridge/dispatch_reap.go",
+    "go/internal/bridge/tmux.go",
+    "go/cmd/evolve/cmd_bridge.go",
+    "go/internal/bridge/manifests/",
+    "go/internal/bridge/process_env_test.go"
+  ],
+  "created_at": "2026-10-25T12:00:02Z",
+  "source": "console, 2026-10-25, plan llm-isolation-2026-10 component X2 (ADR-0154)"
+}

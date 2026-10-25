@@ -1,0 +1,28 @@
+{
+  "id": "selfheal-action-catalog-validator-budgets",
+  "kind": "feature",
+  "priority_class": "stability",
+  "weight": 0.34,
+  "route": "console-manual",
+  "title": "Self-healing X14: a closed action catalog, a validator, repair budgets and circuit breakers in Go",
+  "summary": "failure-decision.json already has closed enums (go/internal/policy/policy_failure.go:5-15, go/internal/core/failure_decision.go:26-52). The catalog extends them to retry-with-variation, reroute-family, quarantine-item, revert-last-landing, open-repair-item and halt-and-escalate. Spec: docs/architecture/llm-isolation.md §19.",
+  "fix": "Implement the catalog with preconditions and tier limits, the validator that accepts or refuses a diagnosis, the repair budgets for each tier and window, the breaker for each incident class with half-open, and converge-or-escalate after two failed repairs (ADR-0126). Budgets are T0 policy data. Stage shadow: record decisions, the console acts.",
+  "acceptance": [
+    "RED first: TestBudget_RefusesTheFourthT1RepairInAWindow and TestBreaker_OpensAfterTwoFailedRepairs fail before",
+    "TestValidator_RefusesAnActionOutsideTheCatalog and a test for each precondition",
+    "TestRepairDispatch_NeedsAnAcceptedProposal",
+    "Each refusal emits HEALING_PROPOSAL_REFUSED with the failed precondition",
+    "Changed functions at 100% coverage"
+  ],
+  "deps": [
+    "selfheal-incident-detector",
+    "selfheal-orchestrator-agent-profile"
+  ],
+  "files": [
+    "go/internal/policy/policy_failure.go",
+    "go/internal/core/failure_decision.go",
+    "go/internal/core/"
+  ],
+  "created_at": "2026-10-25T12:00:14Z",
+  "source": "console, 2026-10-25, plan llm-isolation-2026-10 component X14 (ADR-0155)"
+}
