@@ -13,7 +13,8 @@
 > - X2: merged in #1122 at stage `shadow` (the policy key `isolation.i2.stage`). The flip to `enforce` is an operator decision.
 > - X6: merged in #1123. The routing data of §10 is on `main`: `cli_routing.floors`, with the compiled default in `go/internal/policy/routing_defaults.json`. The follow-up X6b (item `isolation-floor-profiles-allowed-clis-as-routing-data`) moves the `allowed_clis` pins of 7 profiles.
 > - X3: built in this change. The single launch API of §5.1 and its AST guard `TestOnlyTheBridgeStartsAnLLMBinary` are on the branch, and matrix row N2 is green.
-> - X4, X5, X7 to X19: not started.
+> - X10: built in this change. `AGENTS.md` is the one source, and `evolve skills generate` renders `CLAUDE.md` and `GEMINI.md` from it, and the four `.claude/agents` reviewers from their neutral personas (§13).
+> - X4, X5, X7 to X9, X11 to X19: not started.
 
 ## Table of contents
 
@@ -737,11 +738,25 @@ The flip to `enforce` is an operator decision after one clean wave at `legacy`. 
 
 ### Instruction files
 
-`CLAUDE.md` holds facts that only Claude Code loads. `GEMINI.md` described a delegation to `claude` that does not exist. This PR corrects it. The `.claude/agents/` reviewers run only in Claude Code (F1.9).
+Before X10, `CLAUDE.md` held facts that only Claude Code loaded. `GEMINI.md` described a delegation to `claude` that does not exist. This PR corrects it. The `.claude/agents/` reviewers run only in Claude Code (F1.9).
 
 - `AGENTS.md` and the policy docs are the one neutral source. `evolve skills generate` renders `CLAUDE.md`, `GEMINI.md` and each other CLI file from it (X10).
 - A generator check fails when a checked-in file differs from its render.
 - Each `.claude/agents` reviewer becomes a profile that `evolve agent run` can launch on any family (ADR-0152).
+
+**As built (X10).** The renders are a table in `go/internal/skillcheck/instructions.go`. Each render replaces the `GENERATED:instructions` region of its target, and the text outside the region stays hand-written:
+
+| Target | Source | Hand-written part of the target |
+|---|---|---|
+| `CLAUDE.md`, `GEMINI.md` | `AGENTS.md`, from its first level-2 heading | the overlay of the CLI |
+| `.claude/agents/<name>.md` | `agents/evolve-diff-<name>.md`, without its frontmatter | the Claude Code frontmatter (tool list, model) |
+
+- The facts that only `CLAUDE.md` had moved to the `AGENTS.md` section "Operating rules and runtime facts". Thus Codex and agy, which read `AGENTS.md`, get the same policy as Claude Code.
+- The four reviewers are the phases `architecture-reviewer`, `code-reviewer`, `code-simplifier` and `go-reviewer` (`catalog: on-demand`, so the advisor never selects them). Their profiles are `.evolve/profiles/diff-<name>.json`. `evolve agent run <name>` routes them through `cli_routing` like any seat. `TestAgentRun_EachDiffReviewerRunsOnANonClaudeFamily` runs each one with an agy-first table and a fake bridge, and asserts a driver of a non-Claude family.
+- The personas name no tool of one family. They say "read the 40 lines around a hunk", not the tool syntax of a family (I-17).
+- Each reviewer verdict uses the words of the pipeline (`PASS`, `WARN`, `FAIL`), so the deliverable contract can parse it. The code simplifier has the `plan` archetype, because it gives patches and no verdict. A read-only seat gives each edit as a patch.
+- The guard is the drift check of `evolve skills check` (`TestCheck_CleanRepoNoDrift` and `TestInstructionDiffs_TheCheckedInGeminiFileMatchesItsRender`).
+- Rejected: an `@AGENTS.md` import line in each file. Claude Code and Gemini CLI read such a line, but other CLIs do not, and no check can compare an import with its source. Rejected: one rendered file per CLI with no hand-written part. The Claude Code frontmatter and the tool names of each CLI are data of that CLI, so they stay in its file.
 
 ### The console seat
 
