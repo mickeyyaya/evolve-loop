@@ -37,11 +37,21 @@ type recipeSessionDriver struct {
 	ar         *autoResponder
 }
 
+func (d *recipeSessionDriver) attachExisting(ctx context.Context) (bool, error) {
+	if !d.deps.Tmux.HasSession(ctx, d.session) {
+		return false, nil
+	}
+	if err := d.deps.checkReusedSessionEnv(ctx, d.cfg, d.session); err != nil {
+		return false, err
+	}
+	fmt.Fprintf(d.deps.Stderr, "[recipe] attaching to existing session %s\n", d.session)
+	d.ar.endBoot()
+	return true, nil
+}
+
 func (d *recipeSessionDriver) EnsureSession(ctx context.Context) error {
-	if d.deps.Tmux.HasSession(ctx, d.session) {
-		fmt.Fprintf(d.deps.Stderr, "[recipe] attaching to existing session %s\n", d.session)
-		d.ar.endBoot()
-		return nil
+	if attached, err := d.attachExisting(ctx); attached || err != nil {
+		return err
 	}
 	if err := d.deps.startSession(ctx, d.session, d.workingDir, d.deps.paneEnv(d.cfg)); err != nil {
 		return fmt.Errorf("new-session: %w", err)

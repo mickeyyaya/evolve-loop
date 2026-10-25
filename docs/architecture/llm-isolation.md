@@ -235,24 +235,32 @@ Each manifest also lists the proxy names `HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY`
 | `agy`, `agy-tmux`, `agy-claude-tmux` (from its base) | `XDG_CONFIG_HOME`, `GEMINI_API_KEY`, `GOOGLE_API_KEY`, `GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, `GOOGLE_GENAI_USE_VERTEXAI` |
 | `ollama-tmux` | `OLLAMA_HOST`, `OLLAMA_API_KEY` |
 
-At `enforce`, a tmux pane starts through `execTmux.NewSessionEnv`, in three steps:
+At `enforce`, a tmux pane starts through `execTmux.NewSessionEnv`. No value of the cell environment is in an argv:
 
-1. The tmux client process runs with the cell environment and `TMUX_TMPDIR` only. tmux 3.8 takes `PATH` for a new pane from the client, not from `-e`. A server that this client starts has a clean global environment.
-2. `new-session` gets one `-e NAME=VALUE` for each variable.
-3. The pane command is `/bin/sh -c 'exec env -i NAME="$NAME" ... /bin/sh'`. tmux runs it with no `default-shell`, so no shell startup file runs. `env -i` keeps only the `-e` names, so a variable of a polluted server cannot reach the pane. The keep list always holds `TERM`, because tmux sets it from `default-terminal`.
-4. A pair that ends in `;` gets the escape `\;`. tmux reads a final `;` as a command separator.
+1. The bridge writes the cell environment to a 0600 script in a new 0700 directory under `TMPDIR` (`writeCellEnvFile`). The script first removes its own directory, then exports each pair and runs `exec /bin/sh`. The open script stays readable to the shell after the removal.
+2. The tmux client runs with the base allowlist names and `TMUX_TMPDIR` only, so no passthrough value is in its environment. A server that this client starts has a clean global environment.
+3. The pane command is `/bin/sh -c 'exec /usr/bin/env -i TERM="$TERM" /bin/sh <script>'`. tmux runs it with no `default-shell`, so no shell startup file runs. `env -i` clears each variable of the server and the client. `TERM` stays, because tmux sets it from `default-terminal`.
+4. The same tmux command sets the session option `@evolve_env` to a fingerprint of the cell environment (`envFingerprint`).
+
+At `enforce`, a named session that exists before the launch is used again only when its `@evolve_env` matches the fingerprint of this cell (`checkReusedSessionEnv`). Otherwise the launch stops at the safety gate with "env fingerprint mismatch". A session of another cell or another cycle has another environment, so the gate refuses it too. That is the intent.
 
 A controller that cannot start a session in this way refuses the launch. The bridge never falls back to a polluted pane.
 
-The guards are `TestN1_LauncherClaudeVariablesReachNoSeatAtEnforce` (the bridge-level form of row N1, for all eight manifests), `TestCellEnv_ShadowKeepsTodaysEnvAndReportsEachDroppedNameWithoutItsValue`, `TestProcessEnv_IsTheAllowlistPlusTheManifest`, `TestTmuxBoot_AtEnforceThePaneIsBornWithTheCellEnvOnly` and the integration test `TestRealTmux_APollutedServerGivesThePaneOnlyItsEnvPairs`.
+The guards are these tests:
+
+- row N1 of the matrix (green, §14.2)
+- `TestN1_LauncherClaudeVariablesReachNoSeatAtEnforce`, the bridge-level form of row N1, for all eight manifests
+- `TestCellEnv_ShadowKeepsTodaysEnvAndReportsEachDroppedNameWithoutItsValue`
+- `TestProcessEnv_IsTheAllowlistPlusTheManifest`
+- `TestTmuxBoot_AtEnforceThePaneIsBornWithTheCellEnvOnly`
+- the integration tests `TestRealTmux_APollutedServerGivesThePaneOnlyItsEnvPairs` and `TestRealTmux_ASecretValueIsInNoArgvAndNoLeftoverFile`
 
 Known differences from the design:
 
 - tmux sets `SHELL` in a pane to its `default-shell` option. The name is in the base allowlist, but the value can come from the server option and not from `-e`.
 - The pane shell is `/bin/sh`, not the login shell of the operator. A user startup file does not change the cell environment.
 - The report is once for each family and name in a process, not once for each wave.
-- A `-e NAME=VALUE` pair is in the argv of the tmux client and in the session environment. Only the same user can read them.
-- A named session that exists before the launch is used again with no check of its environment.
+- The values are in the environment of the pane processes, as the CLI needs them. The script file exists only until the pane shell starts.
 - Only the in-process adapter wires `Deps.Signals`. The other bridge entries follow the stage but emit no shadow signal.
 - With no explicit `Deps.EnvStage`, each child reads `policy.json` once. The project root comes from `Deps.Env`, then the process. A policy that cannot be read or parsed gives a `WARN isolation stage` line, and the stage stays `shadow`.
 - `envMap` in `go/cmd/evolve/cmd_bridge.go` feeds only the flag fallback of `parseLaunchArgs`. It does not reach a child, so X2 does not change it.
@@ -539,7 +547,7 @@ The guard `TestRows_EachOwnerTestJudgesItsRowSoNoRowIsSilentlyDropped` parses ea
 
 A row passes when the cycle ships, the ledger holds each phase, and only the stub of the row family ran. X6 adds `floors: {}` to the row policy when the key exists.
 
-Since X6 the row policy sets `floors: {}`, so the floor no longer refuses rows M2 to M5. Each bare family routes to its tmux driver, and the harness has no tmux REPL fake. A stub `tmux` on the row `PATH` refuses, so rows M2 to M4 fail with `new-session: exit status 1` on each host. Row M5 fails because `ollama-tmux cannot use tools`. The M1 run also judges rows N1 and N4 from the records of its stubs. It judges row N6 from its cycle workspace: today the pipeline writes no `inputs/index.json`.
+Since X6 the row policy sets `floors: {}`, so the floor no longer refuses rows M2 to M5. Each bare family routes to its tmux driver, and the harness has no tmux REPL fake. A stub `tmux` on the row `PATH` refuses, so rows M2 to M4 fail with `new-session: exit status 1` on each host. Row M5 fails because `ollama-tmux cannot use tools`. The row policy also sets `isolation.i2.stage` to `enforce`, so the stubs see the cell environment. Each stub writes its record to a log path in its script, not in an environment variable. The M1 run also judges rows N1 and N4 from the records of its stubs. It judges row N6 from its cycle workspace: today the pipeline writes no `inputs/index.json`.
 
 The subagent conformance tests (`go/internal/subagent/conformance_test.go`) take the CLI from the row too. `TestConformance_AllRoles_HappyDispatchIsolated` dispatches each role on each of the five families and checks that the role ran on that family.
 
@@ -557,7 +565,7 @@ The stub for each family declares the same capabilities as the real manifest. Th
 
 | Row | Check | Invariant | Turned green by | Owner test | State at X1 |
 |---|---|---|---|---|---|
-| N1 | `CLAUDECODE=1` on the parent does not reach any seat | I-2 | X2 | the matrix (M1 run) | open |
+| N1 | `CLAUDECODE=1` on the parent does not reach any seat | I-2 | X2 | the matrix (M1 run, policy `isolation.i2.stage=enforce`) | green (X2) |
 | N2 | the AST guard finds no LLM spawn outside the bridge launch API | I-1 | X3 | `internal/sysexec` | open |
 | N3 | a phase pane cannot exec `claude --version` | I-3 | X4 | sandbox contract | open |
 | N4 | `evolve agent run` inside a phase pane is refused | I-3 | X4 | the matrix (M1 run) | open |

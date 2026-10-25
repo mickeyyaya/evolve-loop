@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"context"
 	"fmt"
 	"maps"
 	"os"
@@ -11,14 +12,13 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/channel"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/isolation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 const (
-	CodeIsolationI2Violation signalcenter.Code = "ISOLATION_I2_VIOLATION"
-
 	cellEnvOrigin   = "Deps.cellEnv"
 	envStageEnforce = "enforce"
 	envStageOff     = "off"
@@ -34,10 +34,6 @@ var pipelineEnvMarkers = []string{
 var envOptIns = map[string]string{
 	"BRIDGE_ALLOW_ANTHROPIC_BASE_URL": "ANTHROPIC_BASE_URL",
 	"BRIDGE_ALLOW_OPENAI_API_KEY":     "OPENAI_API_KEY",
-}
-
-func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleIsolation, CodeIsolationI2Violation, "a variable of the launcher is outside the environment allowlist of an LLM child (I-2); in shadow the child still got it, in enforce the child did not; fields invariant, stage, action, cell, family, target (the name, never the value), rule, source")
 }
 
 type EnvDropLog struct {
@@ -161,7 +157,7 @@ func (deps Deps) reportDroppedEnv(cfg *Config, stage string, names []string) {
 	for _, name := range deps.EnvDrops.firstSeen(cfg.CLI, names) {
 		deps.Signals.Emit(signalcenter.Event{
 			Cycle: id.cycle, RunID: id.runID, Phase: id.phase, Module: signalcenter.ModuleIsolation, Origin: cellEnvOrigin,
-			Kind: signalcenter.KindIsolationViolation, Severity: signalcenter.SeverityWarn, Code: CodeIsolationI2Violation,
+			Kind: signalcenter.KindIsolationViolation, Severity: signalcenter.SeverityWarn, Code: isolation.ViolationCode(2),
 			Reason: "launcher variable " + name + " is outside the environment allowlist of " + cfg.CLI,
 			Fields: map[string]string{
 				"invariant": "I2", "stage": stage, "action": action, "cell": cfg.Agent, "family": cfg.CLI,
@@ -177,4 +173,23 @@ func (deps Deps) paneEnv(cfg *Config) []string {
 		return nil
 	}
 	return env
+}
+
+func (deps Deps) checkReusedSessionEnv(ctx context.Context, cfg *Config, session string) error {
+	env := deps.paneEnv(cfg)
+	if env == nil {
+		return nil
+	}
+	starter, ok := deps.Tmux.(envSessionStarter)
+	if !ok {
+		return errNoEnvSessionStart
+	}
+	got, err := starter.SessionEnvFingerprint(ctx, session)
+	if err != nil {
+		return fmt.Errorf("read the env fingerprint of session %s: %w", session, err)
+	}
+	if got != envFingerprint(ipcenv.Keep(env, isShellIdentifier)) {
+		return fmt.Errorf("existing session %s was not born with this cell environment (env fingerprint mismatch); launch a new session", session)
+	}
+	return nil
 }

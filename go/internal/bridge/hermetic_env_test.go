@@ -2,11 +2,14 @@ package bridge
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/isolation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -93,7 +96,7 @@ func TestCellEnv_ShadowKeepsTodaysEnvAndReportsEachDroppedNameWithoutItsValue(t 
 	for leak := range launcherLeaks {
 		e, ok := got[leak]
 		if !ok {
-			t.Errorf("no %s for the dropped name %s", CodeIsolationI2Violation, leak)
+			t.Errorf("no %s for the dropped name %s", isolation.ViolationCode(2), leak)
 			continue
 		}
 		if e.Fields["stage"] != "shadow" || e.Fields["action"] != "logged" || e.Fields["family"] != "claude-tmux" || e.Fields["cell"] != "build" || e.Cycle != 7 {
@@ -148,7 +151,7 @@ func TestEnvDropLog_ReportsEachNameOnceForEachFamily(t *testing.T) {
 	dispatchEnv(deps, seatConfig("agy"))
 	count := 0
 	for _, e := range center.Recent() {
-		if e.Code == CodeIsolationI2Violation && e.Fields["target"] == "FOO_LEAK" {
+		if e.Code == isolation.ViolationCode(2) && e.Fields["target"] == "FOO_LEAK" {
 			count++
 		}
 	}
@@ -164,7 +167,7 @@ func TestEnvDropLog_ReportsEachNameOnceForEachFamily(t *testing.T) {
 func isolationEvents(c *signalcenter.Center) map[string]signalcenter.Event {
 	out := map[string]signalcenter.Event{}
 	for _, e := range c.Recent() {
-		if e.Code == CodeIsolationI2Violation {
+		if e.Code == isolation.ViolationCode(2) {
 			out[e.Fields["target"]] = e
 		}
 	}
@@ -261,8 +264,12 @@ func TestHermeticEnv_EachNameOnceAndOnlyShellIdentifiers(t *testing.T) {
 	if !slices.Equal(got, want) {
 		t.Fatalf("hermeticEnv =\n  %q\nwant\n  %q", got, want)
 	}
-	args := newSessionEnvArgs("s", 1, 1, "", []string{"OK=1", "X;rm -rf ~=1"})
-	if strings.Contains(args[len(args)-1], "rm -rf") || slices.Contains(args, "X;rm -rf ~=1") {
-		t.Fatalf("a non-identifier name must never reach the pane command: %q", args)
+	file, err := writeCellEnvFile([]string{"OK=1", "X;rm -rf ~=1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(filepath.Dir(file))
+	if body, _ := os.ReadFile(file); strings.Contains(string(body), "rm -rf ~") {
+		t.Fatalf("a non-identifier name must never reach the pane script: %q", body)
 	}
 }

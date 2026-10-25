@@ -27,7 +27,7 @@ var rows = []Row{
 	{ID: "M3", Check: "a full simulated cycle with agy-claude as the only route", Invariant: "I-9", ClosedBy: "X1b", Open: true, Owner: ownerMatrix, Cause: "new-session: exit status 1"},
 	{ID: "M4", Check: "a full simulated cycle with codex as the only route", Invariant: "I-9", ClosedBy: "X1b, X9", Open: true, Owner: ownerMatrix, Cause: "new-session: exit status 1"},
 	{ID: "M5", Check: "a full simulated cycle with ollama as the only route", Invariant: "I-9", ClosedBy: "X9", Open: true, Owner: ownerMatrix, Cause: "ollama-tmux cannot use tools"},
-	{ID: "N1", Check: "CLAUDECODE=1 on the parent does not reach any seat", Invariant: "I-2", ClosedBy: "X2", Open: true, Owner: ownerMatrix, Cause: "CLAUDECODE=1 of the parent reached"},
+	{ID: "N1", Check: "CLAUDECODE=1 on the parent does not reach any seat", Invariant: "I-2", ClosedBy: "X2", Owner: ownerMatrix},
 	{ID: "N2", Check: "no LLM spawn outside the bridge launch API", Invariant: "I-1", ClosedBy: "X3", Open: true, Owner: "internal/sysexec/isolation_matrix_test.go", Cause: "outside internal/bridge"},
 	{ID: "N3", Check: "a phase pane cannot exec claude --version", Invariant: "I-3", ClosedBy: "X4", Open: true, Owner: ownerContract, Cause: "stub-claude"},
 	{ID: "N4", Check: "evolve agent run inside a phase pane is refused", Invariant: "I-3", ClosedBy: "X4", Open: true, Owner: ownerMatrix, Cause: "dispatch depth 0"},

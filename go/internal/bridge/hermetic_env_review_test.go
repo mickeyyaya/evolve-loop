@@ -112,17 +112,9 @@ func TestCellEnv_AnOptInPassesItsTargetAtEnforce(t *testing.T) {
 
 func TestNewSessionEnvArgs_AlwaysKeepsTheTermThatTmuxSets(t *testing.T) {
 	t.Parallel()
-	args := newSessionEnvArgs("s", 1, 1, "", []string{"PATH=/bin"})
-	if cmd := args[len(args)-1]; !strings.Contains(cmd, `TERM="$TERM"`) {
-		t.Fatalf("the pane must keep the TERM that tmux sets, even when the launcher has none: %q", cmd)
-	}
-}
-
-func TestNewSessionEnvArgs_EscapesATrailingSemicolonForTmux(t *testing.T) {
-	t.Parallel()
-	args := newSessionEnvArgs("s", 1, 1, "", []string{"A=x;"})
-	if !slices.Contains(args, `A=x\;`) {
-		t.Fatalf("a value that ends in ; must be escaped, or tmux reads it as a command separator: %q", args)
+	args := newSessionEnvArgs("s", 1, 1, "", "/e/env", "fp")
+	if !slices.ContainsFunc(args, func(a string) bool { return strings.Contains(a, `TERM="$TERM"`) }) {
+		t.Fatalf("the pane must keep the TERM that tmux sets, even when the launcher has none: %q", args)
 	}
 }
 
