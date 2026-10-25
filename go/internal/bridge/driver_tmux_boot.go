@@ -136,7 +136,9 @@ func primePaneShell(ctx context.Context, deps Deps, cfg *Config, session, workin
 	if err := deps.Tmux.SendKeys(ctx, session, paneTmuxDetachLine, true); err != nil {
 		return fmt.Errorf("detach the pane shell from the run tmux server: %w", err)
 	}
-	for _, line := range append([]string{dispatchTagLine(cfg.DispatchID)}, exportLines(cfg.Realization.Env)...) {
+	lines := append([]string{dispatchTagLine(cfg.DispatchID)}, exportLines(cfg.Realization.Env)...)
+	lines = append(lines, exportLines(deps.cellMarkers(cfg))...)
+	for _, line := range lines {
 		_ = deps.Tmux.SendKeys(ctx, session, line, true)
 	}
 	return nil

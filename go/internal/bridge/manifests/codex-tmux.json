@@ -3,6 +3,7 @@
   "cli": "codex-tmux",
   "binary": "codex",
   "probe_unsandboxed_reason": "A version or doctor probe of codex reads its sign-in and writes its state under CODEX_HOME (~/.codex by default). The phase sandbox grants no write outside the cell, so the probe runs outside it.",
+  "install_roots": ["/opt/homebrew/Caskroom/codex"],
   "env_passthrough": ["CODEX_HOME", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "ALL_PROXY", "https_proxy", "http_proxy", "no_proxy", "all_proxy", "SSL_CERT_FILE"],
   "model_family": "gpt",
   "binary_min_version": "0.13.0",

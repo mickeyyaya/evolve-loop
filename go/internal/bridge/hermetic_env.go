@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -29,6 +30,7 @@ var baseEnvNames = []string{"PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", 
 var pipelineEnvMarkers = []string{
 	"EVOLVE_PROJECT_ROOT", ipcenv.WorktreeRootKey, ipcenv.CycleStateFileKey, ipcenv.TmuxSocketKey,
 	ipcenv.FleetKey, ipcenv.FleetScopeKey, ipcenv.FleetWidthKey, ipcenv.FleetReachHolderKey,
+	ipcenv.DispatchDepthKey, ipcenv.PhaseKey,
 }
 
 var envOptIns = map[string]string{
@@ -98,8 +100,16 @@ func droppedEnvNames(parent, passthrough []string) []string {
 }
 
 func (deps Deps) envStage() string {
-	if deps.EnvStage != "" {
-		return channel.ResolveStage(deps.EnvStage)
+	return deps.isolationStage(deps.EnvStage, policy.Policy.IsolationEnvStage)
+}
+
+func (deps Deps) execStage() string {
+	return deps.isolationStage(deps.ExecStage, policy.Policy.IsolationExecStage)
+}
+
+func (deps Deps) isolationStage(explicit string, read func(policy.Policy) string) string {
+	if explicit != "" {
+		return channel.ResolveStage(explicit)
 	}
 	cwd, _ := os.Getwd()
 	layout := paths.Resolve(func(key string) string { v, _ := lookupEnv(deps, key); return v }, cwd)
@@ -109,9 +119,9 @@ func (deps Deps) envStage() string {
 		if w == nil {
 			w = os.Stderr
 		}
-		fmt.Fprintf(w, "[bridge] WARN isolation stage: %v (the child environment stays at shadow)\n", err)
+		fmt.Fprintf(w, "[bridge] WARN isolation stage: %v (the isolation stage stays at shadow)\n", err)
 	}
-	return channel.ResolveStage(pol.IsolationEnvStage())
+	return channel.ResolveStage(read(pol))
 }
 
 func (deps Deps) envPassthrough(cfg *Config) []string {
@@ -135,6 +145,7 @@ func sortedEnvNames(env []string) []string {
 }
 
 func (deps Deps) cellEnv(cfg *Config) ([]string, bool) {
+	deps = deps.withCellMarkers(cfg)
 	stage := deps.envStage()
 	if stage == envStageOff {
 		return driverEnv(deps, cfg.Realization.Env), false
@@ -192,4 +203,23 @@ func (deps Deps) checkReusedSessionEnv(ctx context.Context, cfg *Config, session
 		return fmt.Errorf("existing session %s was not born with this cell environment (env fingerprint mismatch); launch a new session", session)
 	}
 	return nil
+}
+
+func (deps Deps) cellMarkers(cfg *Config) map[string]string {
+	depth := ipcenv.DispatchDepth(func(key string) string { v, _ := lookupEnv(deps, key); return v })
+	markers := map[string]string{ipcenv.DispatchDepthKey: strconv.Itoa(depth + 1)}
+	if cfg.Agent != "" {
+		markers[ipcenv.PhaseKey] = cfg.Agent
+	}
+	return markers
+}
+
+func (deps Deps) withCellMarkers(cfg *Config) Deps {
+	env := maps.Clone(deps.Env)
+	if env == nil {
+		env = map[string]string{}
+	}
+	maps.Copy(env, deps.cellMarkers(cfg))
+	deps.Env = env
+	return deps
 }

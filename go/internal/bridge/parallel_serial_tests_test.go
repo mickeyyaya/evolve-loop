@@ -7,6 +7,8 @@ var serialTests = map[string]string{
 	"bridge.TestAddRule_ErrorPaths":                                                       "swaps seam bridgeManifestDirFn, marshalIndent",
 	"bridge.TestAddRule_RoundTrip":                                                        "swaps seam bridgeManifestDirFn",
 	"bridge.TestAgentSandboxContract":                                                     "sets env through a helper",
+	"bridge.TestAgentSandboxContract_ShadowReportsTheExecAndLetsItRun":                    "sets env through a helper",
+	"bridge.TestAgentSandboxContract_TheLauncherStillStartsTheCLIThatTheCellCannotExec":   "sets env through a helper",
 	"bridge.TestAgyClaudeEffortSelectsTheModelVariant":                                    "swaps seam modelCatalogDirFn",
 	"bridge.TestAgyClaudeExplicitAgentEffortWinsOverAPinnedVariant":                       "swaps seam modelCatalogDirFn",
 	"bridge.TestAgyClaudeLaunchLogsOneLineWhenTheEffortIsCapped":                          "swaps seam modelCatalogDirFn",

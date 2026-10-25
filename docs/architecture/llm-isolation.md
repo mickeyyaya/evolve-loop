@@ -168,7 +168,7 @@ The cell has five parts. Each part has its own section and its own invariant.
 |---|---|---|---|
 | Launch | Only the bridge starts the CLI. | I-1 | §5 |
 | Environment | An allowlist plus the manifest variables. | I-2 | §6 |
-| Exec | No LLM binary and no `evolve` dispatch verb. | I-3 | §7 |
+| Exec | No new LLM CLI process and no `evolve` dispatch verb. The subagents of the own harness stay allowed. | I-3 | §7 |
 | Reads | The own workspace, the index, the indexed paths, the worktree and the CLI's own files. | I-4, I-5 | §8, §9 |
 | Outputs | Declared artifacts that a schema checks. | I-4, I-8 | §12 |
 
@@ -360,9 +360,103 @@ A Go refusal only works when the marker reaches the pane. A sandbox rule only wo
 ### Solution
 
 1. The launcher sets `EVOLVE_DISPATCH_DEPTH=1` and `EVOLVE_PHASE=<phase>` (proposed) on each phase pane.
-2. The existing refusals then fire: `evolve agent run`, the boundary writes and each `evolve` dispatch verb.
-3. The sandbox denies the exec of each manifest `binary` (§9). The rule covers `claude`, `agy`, `codex`, `gemini` and `ollama`.
+2. The existing refusals then fire: `evolve agent run` and the boundary writes. The other dispatch verbs do not read the markers yet (§7.1).
+3. The sandbox denies the exec of each manifest `binary` (§9). The rule covers `claude`, `agy`, `codex` and `ollama`. `gemini` has no manifest, so it has no rule (§7.1).
 4. Inside a phase, `EVOLVE_SANDBOX=off` is refused. The host opt-out stays for operator commands outside a phase.
+
+#### 7.1 As built (X4)
+
+A worked example: the scout pane of cycle 7 runs `claude --version` from its Bash tool. The pane carries `EVOLVE_DISPATCH_DEPTH=1` and `EVOLVE_PHASE=scout`. At `enforce` the macOS profile denies the exec, and the shell prints `Operation not permitted`. The agent then runs `evolve agent run scout`, and the command stops with "refused inside a phase".
+
+| Item | As built |
+|---|---|
+| Markers | `ipcenv.DispatchDepthKey` (`EVOLVE_DISPATCH_DEPTH`) and `ipcenv.PhaseKey` (`EVOLVE_PHASE`). `Deps.cellMarkers` sets the depth of the launcher plus 1, and the phase to `cfg.Agent`. |
+| Path of the markers | `Deps.cellEnv` adds them to `Deps.Env`, and both names are in `pipelineEnvMarkers`. So each stage of §6.1 gives them to the child. A tmux pane and a recipe pane also get them as `export` lines before the launch line. At `shadow` such a pane inherits the environment of the server. |
+| Refusals that now fire | `evolve agent run` (`go/internal/cli/agentcmd/run.go:93`) and the boundary writes (`go/cmd/evolve/boundary_write.go:14`). Both read the depth through `subagent.ReadDispatchDepth`, which calls `ipcenv.DispatchDepth`. `subagent run` only checks its depth cap of 3, and `phase`, `loop` and `wave` read no marker. |
+| Strength of the markers | advisory. `env -u EVOLVE_DISPATCH_DEPTH -u EVOLVE_PHASE evolve agent run` passes the refusal. Row N4 proves this advisory layer only. A dispatch credential that no cell receives is the layer that does not depend on the agent (item `isolation-dispatch-capability-token`). |
+| `EVOLVE_SANDBOX=off` in a phase | `launchSwept` refuses the launch when the launcher carries `EVOLVE_PHASE` and the mode is `off`. The error is `bridge.ErrSandboxOffInPhase`, the exit code is `ExitSafetyGate`, and the bridge emits `ISOLATION_I3_VIOLATION` with `action=refused` and `rule=sandbox.off.phase`. |
+| Why the phase marker and not the depth | A fan-out worker has depth 1 or more, but the pipeline starts it, not an agent. It carries no `EVOLVE_PHASE`, so a host opt-out still works for it. |
+| Exec deny set | `Deps.execDenyTargets`. The files: the `binary` of each registered manifest, found on `PATH` (`Deps.LookPath`) and resolved to its real path. The roots: each `install_roots` entry of a manifest (`~/` is the home directory), resolved to its real path when it exists. `claude-p` and `claude-tmux` declare `~/.local/share/claude/versions`, because the native installer keeps each earlier version there. `codex` and `codex-tmux` declare `/opt/homebrew/Caskroom/codex`. `gemini` has no manifest, so it has no rule. |
+| Stage source | the policy key `isolation.i3.stage`, read by `policy.IsolationExecStage`. An explicit `Deps.ExecStage` wins. The default is `shadow`. `Deps.envStage` and `Deps.execStage` share `Deps.isolationStage`. |
+| SBPL, `enforce` | `(deny process-exec (require-all (literal "<real path>") (require-not (signing-identifier "com.apple.sandbox-exec"))))` for each file and for `/usr/bin/sandbox-exec`, and the same rule with `subpath` for each root |
+| SBPL, `shadow` | the same match as `(allow process-exec ... (with report))`. The sandbox writes a report to the system log, and the exec goes through. |
+| `bwrap`, `enforce` | `--ro-bind /dev/null <real path>` for each file and `--tmpfs <root>` for each root, after every other bind |
+| `bwrap`, `shadow` | no bind. The launcher only resolves the paths. |
+| `off` | no exec rule |
+
+Three facts set the form of the SBPL rule. Each was measured on macOS on 2026-10-26 with a stub script:
+
+- A `literal` matches the real path of the file, not the path of a symlink. A deny of `~/.local/bin/claude` does not stop the exec, because that file is a symlink to `~/.local/share/claude/versions/<v>`. So the generator writes the real path.
+- `sandbox-exec` applies the profile before it starts the CLI. A plain deny of the real path also stops the launch of the cell. The `signing-identifier` filter matches the process that does the exec. So the first exec, by `sandbox-exec`, goes through, and each later exec, by a shell or by the CLI, is denied.
+- A process in the cell can run `sandbox-exec` again with the same profile, and that exec of the CLI then comes from `sandbox-exec`. The deny of `/usr/bin/sandbox-exec` closes this path. A contract row pins it.
+
+The guards are these tests:
+
+- row N3 (`TestAgentSandboxContract`, green on darwin only), the row "exec an older installed version of the claude stub under the install root" and the row "re-enter the profile through sandbox-exec to exec the claude stub"
+- `TestAgentSandboxContract_TheLauncherStillStartsTheCLIThatTheCellCannotExec` and `TestAgentSandboxContract_ShadowReportsTheExecAndLetsItRun`
+- row N4 (the matrix, M1 run, green): a stub in the phase pane runs the real `evolve agent run`. It records the exit code 2 and the text "refused inside a phase".
+- `TestCellEnv_EachStageGivesTheChildTheDepthAndPhaseMarkers`, `TestLaunchSwept_RefusesSandboxOffInsideAPhaseWithANamedErrorAndASignal`
+- `TestSandboxWrap_EnforceDeniesTheRealPathOfEachManifestBinaryOnMacOS`, `TestSandboxWrap_EnforceMasksEachOtherFamilyBinaryOnLinux` and `TestSandboxWrap_EnforceDeniesEveryInstalledVersionUnderTheManifestInstallRoot`
+
+Known differences from the design:
+
+- At `shadow` no Go code emits `ISOLATION_I3_VIOLATION` for an exec. The report stays in the system log of macOS, and Linux has no report. A reader of the sandbox reports does not exist yet. X5 needs the same reader for I4 and I5.
+- On Linux the bind of `/dev/null` also hides the file from the launch of the cell. So `bwrap` masks the binaries and roots of the other families only, and a cell can still exec its own CLI. This gap is accepted at `shadow`. Item `isolation-linux-own-family-exec` proposes the fix: an exec rule of Landlock or seccomp that the launcher applies after the exec of the CLI. A bind of the CLI to a private path does not close the gap, because the private path stays reachable.
+- The deny is best effort. The launcher finds each binary on its own `PATH`. A copy of a CLI at another path in the cell has no rule.
+- The macOS form depends on a measured behavior of `signing-identifier`: the filter matches the process that does the exec. A macOS update can change it. `TestAgentSandboxContract_TheLauncherStillStartsTheCLIThatTheCellCannotExec` fails first in that case.
+- A root covers each version that the installer keeps. A CLI without a declared root has one literal. A version that is installed during the run gets its rule at the next launch.
+- A copy of `/usr/bin/sandbox-exec` does not run. On Darwin 27 the kernel kills a copied Apple platform binary with `Killed: 9` (exit 137), in the cell and outside it (review of #1126, 2026-10-26).
+- Two gaps stay open, because a rule for them also blocks the `go test` binaries in `/tmp`. A CLI that an interpreter runs, for example `node gemini.js`, is not an exec of the CLI file. A binary that the agent copies into the worktree or `/tmp` has no rule.
+- Before the flip to `enforce`: the deny of `/usr/bin/sandbox-exec` breaks a CLI that uses its own Seatbelt for its tool calls. Examples are Claude Code with its sandbox setting on, and codex without `--yolo`. Of the claude and codex manifests, only `claude-tmux` and `codex-tmux` pass `--dangerously-skip-permissions` and `--yolo`. The agy drivers pass `--dangerously-skip-permissions` too. The headless `claude-p` and `codex` drivers do not, so the deny puts them at risk at `enforce`.
+- A CLI can also exec its own binary for a helper. The `shadow` reports must show no such exec before the flip.
+- The Go refusals depend on the environment. An agent that unsets the markers avoids them. The exec deny is the guard that does not depend on the agent.
+- The refusal of `evolve agent run` emits no signal yet (§15.1).
+
+#### 7.2 The boundary of I-3 (operator, 2026-10-26)
+
+The operator refined I-3 two times on 2026-10-26:
+
+> "agent can spawn its own subagent inside it's LLM cli within it's phase but if it was to spawn other phase agent, it must send the request back to the evo loop for orchestrator to justify if it is the reasonable request."
+
+> "the same phase agent is allowed to spawn any type of subagent based on its needs within it's family (e.g. opus can decide if it want to spawn haiku for research or simple tasks), it depends on its harness design, the evo loop just need to set the right boundary for it's execution."
+
+The boundary is the cell around the CLI process that the bridge starts. The harness of the CLI decides what runs inside the process. The pipeline decides the limits of the cell.
+
+| Action of the agent | Rule | Why |
+|---|---|---|
+| Start a subagent of its own harness, of any type and any model of the same family. It runs in the own CLI process, with no new exec of an LLM binary. Examples: an Opus seat starts a Haiku Task subagent of Claude Code for research, or another CLI uses its own feature. | allow | The harness chooses the subagent and its model. The subagent runs inside the cell, so the limits of the cell apply to it. |
+| Start a new LLM CLI process of any family, its own family too | deny | A new CLI is a new agent outside the control of the pipeline. The exec deny of §7.1 stops it at `enforce` on macOS. On Linux the own family stays open (§7.1), and at `shadow` the exec is only reported. |
+| Run `evolve agent run` | deny | The phase markers make it refuse (advisory, §7.1). |
+| Run another `evolve` dispatch verb: `phase`, `subagent run`, `loop`, `wave next` | deny (proposed) | These verbs do not read the markers yet. Item `isolation-dispatch-capability-token` makes each verb need a dispatch credential that no cell receives. |
+| Ask for another phase agent | request | The agent writes a dispatch request. The pipeline checks it, and the orchestrator judges it. |
+
+The pipeline does not choose or limit the model of an in-harness subagent. The "always the latest model" routing rule ([model-discovery-and-catalog.md](model-discovery-and-catalog.md)) governs the model that the pipeline assigns to a seat. It does not govern the internal choices of a harness.
+
+The pipeline enforces the boundary of the cell, and each in-harness subagent runs inside it:
+
+- the read and write scope of the sandbox (§9);
+- the input index (§8);
+- the exec denies: no new LLM CLI process and no `evolve` dispatch (§7.1);
+- the network policy (§9);
+- the time budget of the seat, and a token budget (the token cap is proposed);
+- the telemetry of the dispatch.
+
+How an in-harness subagent counts:
+
+- **Budget.** The usage of the subagent is usage of the CLI process, so it counts against the budget of the cell. The artifact timeout of the dispatch covers its time. A token cap for each seat is proposed.
+- **Telemetry.** The bridge records one dispatch for the CLI. A subagent gets no own dispatch record.
+- **Usage collector.** Each manifest usage collector must count the token usage of the subagents of the harness, or flag it as not counted. This is a requirement on the `collectors` field of X9 (§11, proposed).
+- **Manifest.** Each family manifest declares the capability `inprocess_subagents` (proposed) when its harness can run subagents in its own process. A profile cannot ask for subagents on a family without the capability.
+
+The dispatch request (proposed, item `isolation-dispatch-request-channel`):
+
+1. The agent writes a typed request, a declared output such as `requests/dispatch-<n>.json`. It names the target role, the reason, the inputs and the expected output.
+2. The pipeline validates the request in Go: the schema, the allowed roles and two caps.
+   - The caps are the number of requests for each cycle and the depth of a chain of requests.
+   - The proposed policy key `isolation.dispatch_requests` holds them.
+3. The orchestrator agent of [ADR-0155](adr/0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md) judges if the request is reasonable. The catalog of §19 gets a new action, "dispatch phase agent" (ADR-0155, amended 2026-10-26).
+4. If the request is approved, the pipeline dispatches the agent. The result goes into the lineage index of the requester (§8).
+5. A refused request gets a recorded reason. The requesting agent never dispatches an agent itself.
 
 ## 8. The artifact index
 
@@ -459,9 +553,9 @@ The sandbox today generates SBPL for `sandbox-exec` and an argv for `bwrap` from
 
 | Rule | Effect | SBPL form | `bwrap` form | Invariant | Today |
 |---|---|---|---|---|---|
-| Exec of LLM binaries | deny | `(deny process-exec (literal "<resolved binary>"))` for each manifest `binary` | `--ro-bind /dev/null <binary path>` | I-3 | allowed |
+| Exec of LLM binaries | deny | `(deny process-exec (require-all (literal "<real path>") (require-not (signing-identifier "com.apple.sandbox-exec"))))` for each manifest `binary` and `/usr/bin/sandbox-exec`, and the same rule with `subpath` for each `install_roots` entry (§7.1) | `--ro-bind /dev/null <real path>` for each binary and `--tmpfs <root>` for each root, other families only (§7.1) | I-3 | built at `shadow` (X4, §7.1) |
 | Exec of other tools | allow | the current `(allow process-exec)` | as today | none | allowed |
-| `EVOLVE_SANDBOX=off` in a phase | refuse the launch | Go check | Go check | I-3, I-7 | allowed |
+| `EVOLVE_SANDBOX=off` in a phase | refuse the launch | Go check | Go check | I-3, I-7 | refused (X4, §7.1) |
 | Read of the worktree and the repo source | allow | `(allow file-read* (subpath "<worktree>"))` | `--ro-bind` | none | allowed |
 | Read of the own workspace (`.evolve/runs/cycle-N/`), except `<ws>/.bridge/` | allow | `(allow file-read* (subpath "<ws>"))` after the runs deny | `--ro-bind <ws> <ws>` | I-5 | allowed |
 | Read of `inputs/index.json` and each indexed path | allow | `(allow file-read* (literal "<path>"))` for each entry | `--ro-bind <path> <path>` | I-4 | allowed |
@@ -555,19 +649,20 @@ These parts stay open:
 
 ## 11. Manifest fields
 
-The manifests are `go/internal/bridge/manifests/*.json` (eight files). They have `binary`, `default_env`, `controls`, `transient_regex`, `token_line_regex`, `model_tier_map` and more (research F1.8). `env_passthrough` is built (X2). The other new fields are proposed:
+The manifests are `go/internal/bridge/manifests/*.json` (eight files). They have `binary`, `default_env`, `controls`, `transient_regex`, `token_line_regex`, `model_tier_map` and more (research F1.8). `env_passthrough` is built (X2), and `install_roots` is built (X4). The other new fields are proposed:
 
 | Field | Type | Example (`claude-tmux.json`) | Replaces |
 |---|---|---|---|
 | `env_passthrough` (built, X2) | list of names | `["CLAUDE_CONFIG_DIR", "HTTPS_PROXY"]` | the inherited environment (§6) |
+| `install_roots` (built, X4) | list of paths that start with `/` or `~/` | `["~/.local/share/claude/versions"]` | the one-file exec deny (§7.1) |
 | `home_reads` | list of `$HOME` paths | `["~/.claude", "~/.claude.json"]` | the read of all of `$HOME` (§9) |
 | `parsers` | map of output kind to format id | `{"usage": "claude-usage-v1", "pane": "claude-repl-v1"}` | `usageParsers` (`clicontrol/usage.go:41`), `Profiles` (`panestream/panedelta.go:31`), `DetectorFor` (`liveness.go:195`) |
 | `collectors` | map of metric to format id | `{"tokens": "claude-jsonl-v1"}` | `collectorFamilies` (`tokenusage/defaultresolver.go:35`) |
 | `transcript` | object: `path_glob`, `format` | `{"path_glob": "~/.claude/projects/*/*.jsonl", "format": "claude-jsonl-v1"}` | `WritesTranscript` (`attemptpostmortem/transcript.go:35`) |
-| `capabilities` | list of words | `["tools", "edit", "structured_output"]` | `toolless` and the `adapters/*.capabilities.json` files |
+| `capabilities` | list of words | `["tools", "edit", "structured_output", "inprocess_subagents"]` | `toolless` and the `adapters/*.capabilities.json` files |
 
 - Go keeps one implementation for each format id. A manifest picks it by id. A new family with a known format needs no Go change.
-- A family with no collector shows the state `no_collector`, not a zero.
+- A family with no collector shows the state `no_collector`, not a zero. A collector counts the tokens of the in-harness subagents too, or it flags them as not counted (§7.2).
 - The tables in `go/internal/llmroute/llmroute.go:21`, `:120` and `go/internal/modelquery/*` read the manifest.
 - A manifest schema test fails on an unknown field or an unknown format id. It also refuses a `home_reads` entry that overlaps a secret path of §9, because the grants come after the denies.
 
@@ -652,8 +747,8 @@ The stub for each family declares the same capabilities as the real manifest. Th
 |---|---|---|---|---|---|
 | N1 | `CLAUDECODE=1` on the parent does not reach any seat | I-2 | X2 | the matrix (M1 run, policy `isolation.i2.stage=enforce`) | green (X2) |
 | N2 | the AST guard finds no LLM spawn outside the bridge launch API | I-1 | X3 | `internal/sysexec` | green (X3) |
-| N3 | a phase pane cannot exec `claude --version` | I-3 | X4 | sandbox contract | open |
-| N4 | `evolve agent run` inside a phase pane is refused | I-3 | X4 | the matrix (M1 run) | open |
+| N3 | a phase pane cannot exec `claude --version` | I-3 | X4 | sandbox contract | green (X4) |
+| N4 | `evolve agent run` inside a phase pane is refused | I-3 | X4 | the matrix (M1 run) | green (X4) |
 | N5 | a cell cannot read `<ws>/.bridge/scout-stdout.log` | I-4 | X5 | sandbox contract | open |
 | N6 | a retry opens its predecessor's `retrospective-report.md` through the index that the pipeline writes | I-4, I-5 | X5 | the matrix (M1 run) | open |
 | N7 | a retry cannot open an unrelated cycle's `audit-report.md` | I-5 | X5 | sandbox contract | open |
@@ -688,7 +783,7 @@ The contract reuses the shape of [llm-quality-indexes.md](llm-quality-indexes.md
 |---|---|---|
 | `ISOLATION_I1_VIOLATION` | I-1 | the launch API, when a caller outside the bridge registers a launch; the AST guard covers the static case |
 | `ISOLATION_I2_VIOLATION` | I-2 | the environment builder, for each dropped name |
-| `ISOLATION_I3_VIOLATION` | I-3 | the sandbox report of a denied exec; the refusal in `evolve agent run` |
+| `ISOLATION_I3_VIOLATION` | I-3 | built: the refusal of `EVOLVE_SANDBOX=off` in a phase (`rule=sandbox.off.phase`). Proposed: the sandbox report of a denied exec, and the refusal in `evolve agent run` (§7.1). |
 | `ISOLATION_I4_VIOLATION` | I-4 | the sandbox report of a read of raw output or a write of `inputs/` |
 | `ISOLATION_I5_VIOLATION` | I-5 | the sandbox report of a read outside the index, the worktree and `home_reads` |
 | `ISOLATION_I6_VIOLATION` | I-6 | the router, when a launch resolves through a compiled family default and not through routing data |
@@ -884,6 +979,7 @@ The catalog is closed and typed Go (X14). It extends the enums of `failure-decis
 | `revert-last-landing` | none | `main` is red; the incident names a landing of the loop in the window; the revert applies clean | T2, T1 | a revert PR through `evolve ship` |
 | `open-repair-item` | `fix_type: pipeline-repair` | a reproduction statement; the suspect files; the tier from the classifier (§20) | T1 to the loop, T0 to the operator | the inbox write |
 | `halt-and-escalate` | `halt-and-diagnose` | none | all | the loop halt and an operator item |
+| `dispatch-phase-agent` (proposed, amended 2026-10-26, §7.2) | none | a dispatch request that the pipeline validated; under the cap for each cycle and the depth cap; the target role is allowed | T2 | the pipeline dispatch |
 
 A proposal that fails a precondition does not run. The pipeline emits `HEALING_PROPOSAL_REFUSED` with the failed precondition, and the incident goes to `halt-and-escalate` after the second refusal.
 
@@ -1208,7 +1304,7 @@ X19 lands in three items:
 |---|---|---|---|---|
 | I-1 Single launcher | `TestOnlyTheBridgeStartsAnLLMBinary` (AST) | X3 | `enforce` | `ISOLATION_I1_VIOLATION` |
 | I-2 Hermetic environment | `TestProcessEnv_IsTheAllowlistPlusTheManifest`; matrix row N1 | X2 | `shadow`, then `enforce` | `ISOLATION_I2_VIOLATION` |
-| I-3 No nested agency | sandbox contract rows N3, N4 | X4 | `shadow`, then `enforce` | `ISOLATION_I3_VIOLATION` |
+| I-3 No nested agency | sandbox contract row N3 and matrix row N4 | X4 | `shadow`, then `enforce` | `ISOLATION_I3_VIOLATION` |
 | I-4 Pipeline-mediated communication | rows N5, N6; `TestHandoffAsksTravelInTheIndex` | X5 | `shadow`, then `enforce` | `ISOLATION_I4_VIOLATION` |
 | I-5 Read isolation | rows N6, N7, N8; `TestLineageComesOnlyFromPipelineRecords` | X5 | `shadow`, then `enforce` | `ISOLATION_I5_VIOLATION` |
 | I-6 Family-agnostic flow | `TestFlowCodeNamesNoFamily`; rows N13, N14 | X6, X9, X10 | `enforce` | `ISOLATION_I6_VIOLATION` |

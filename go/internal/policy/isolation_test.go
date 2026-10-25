@@ -35,3 +35,24 @@ func TestIsolationPolicy_TheTypedBlockCarriesTheI2Stage(t *testing.T) {
 		t.Fatalf("IsolationEnvStage = %q, want shadow", got)
 	}
 }
+
+func TestIsolationExecStage_ReadsIsolationI3StageApartFromI2(t *testing.T) {
+	t.Parallel()
+	cases := map[string]string{
+		``:                 "",
+		`{"isolation":{}}`: "",
+		`{"isolation":{"i2":{"stage":"enforce"}}}`: "",
+		`{"isolation":{"i3":{"stage":"enforce"}}}`: "enforce",
+	}
+	for body, want := range cases {
+		var p policy.Policy
+		if body != "" {
+			if err := json.Unmarshal([]byte(body), &p); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if got := p.IsolationExecStage(); got != want {
+			t.Errorf("%s: IsolationExecStage = %q, want %q", body, got, want)
+		}
+	}
+}

@@ -17,7 +17,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gotooltest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/isolation"
-	"github.com/mickeyyaya/evolve-loop/go/internal/subagent"
 )
 
 var expectedPhasesHappyPath = []string{"scout", "triage", "tdd", "build", "audit", "ship"}
@@ -82,6 +81,7 @@ type stubCall struct {
 	binary     string
 	claudeCode string
 	depth      string
+	agentRun   string
 }
 
 func runMatrixCycle(t *testing.T, row matrixRow, evolveBin, fakeBin, repoRoot string) matrixRun {
@@ -90,6 +90,7 @@ func runMatrixCycle(t *testing.T, row matrixRow, evolveBin, fakeBin, repoRoot st
 	writeMatrixProject(t, projRoot, row.driver)
 	binDir := t.TempDir()
 	callLog := filepath.Join(t.TempDir(), "calls.log")
+	probeDir := filepath.Join(t.TempDir(), "n4-probe")
 	env := append(os.Environ(),
 		"CLAUDECODE=1",
 		"EVOLVE_PROMPTS_DIR="+repoRoot,
@@ -99,7 +100,7 @@ func runMatrixCycle(t *testing.T, row matrixRow, evolveBin, fakeBin, repoRoot st
 	)
 	for _, bin := range stubBinaries {
 		path := filepath.Join(binDir, bin)
-		fakeclitest.Install(t, path, stubScript(bin, fakeBin, callLog))
+		fakeclitest.Install(t, path, stubScript(bin, fakeBin, callLog, evolveBin, probeDir))
 		env = append(env, "BRIDGE_"+strings.ToUpper(bin)+"_BINARY="+path)
 	}
 	fakeclitest.Install(t, filepath.Join(binDir, "tmux"), tmuxRefusal)
@@ -138,11 +139,21 @@ func stubFirstPath(t *testing.T, binDir string) string {
 
 const tmuxRefusal = "#!/bin/sh\necho 'the matrix harness has no tmux REPL fake' >&2\nexit 1\n"
 
-func stubScript(bin, fakeBin, callLog string) string {
+func stubScript(bin, fakeBin, callLog, evolveBin, probeDir string) string {
 	return "#!/bin/sh\n" +
-		`printf '%s CLAUDECODE=%s EVOLVE_DISPATCH_DEPTH=%s\n' ` + bin + ` "${CLAUDECODE-unset}" "${EVOLVE_DISPATCH_DEPTH-unset}" >> "` + callLog + `"` + "\n" +
+		"probe=skip\n" +
+		`if mkdir "` + probeDir + `" 2>/dev/null; then` + "\n" +
+		`  "` + evolveBin + `" agent run ` + nestedProbeProfile + ` </dev/null >/dev/null 2>"` + probeDir + `/stderr"` + "\n" +
+		`  rc=$?; named=no; grep -q '` + agentRunRefusal + `' "` + probeDir + `/stderr" && named=yes; probe=$rc:$named` + "\n" +
+		"fi\n" +
+		`printf '%s CLAUDECODE=%s EVOLVE_DISPATCH_DEPTH=%s AGENTRUN=%s\n' ` + bin + ` "${CLAUDECODE-unset}" "${EVOLVE_DISPATCH_DEPTH-unset}" "$probe" >> "` + callLog + `"` + "\n" +
 		`exec "` + fakeBin + `" "$@"` + "\n"
 }
+
+const (
+	nestedProbeProfile = "x4-nested-probe-no-such-profile"
+	agentRunRefusal    = "refused inside a phase"
+)
 
 func withoutEnv(env []string, key string) []string {
 	out := make([]string, 0, len(env))
@@ -181,10 +192,10 @@ func readStubCalls(t *testing.T, path string) []stubCall {
 	var calls []stubCall
 	for _, line := range strings.Split(strings.TrimSpace(string(b)), "\n") {
 		f := strings.Fields(line)
-		if len(f) != 3 {
+		if len(f) != 4 {
 			t.Fatalf("stub call log line %q", line)
 		}
-		calls = append(calls, stubCall{binary: f[0], claudeCode: strings.TrimPrefix(f[1], "CLAUDECODE="), depth: strings.TrimPrefix(f[2], "EVOLVE_DISPATCH_DEPTH=")})
+		calls = append(calls, stubCall{binary: f[0], claudeCode: strings.TrimPrefix(f[1], "CLAUDECODE="), depth: strings.TrimPrefix(f[2], "EVOLVE_DISPATCH_DEPTH="), agentRun: strings.TrimPrefix(f[3], "AGENTRUN=")})
 	}
 	return calls
 }
@@ -247,15 +258,15 @@ func (r matrixRun) envLeak() error {
 
 func (r matrixRun) agentRunNotRefused() error {
 	for _, c := range r.calls {
-		env := map[string]string{"EVOLVE_DISPATCH_DEPTH": c.depth}
-		if c.depth == "unset" {
-			env = map[string]string{}
+		if c.agentRun == "skip" {
+			continue
 		}
-		if subagent.ReadDispatchDepth(func(k string) string { return env[k] }) == 0 {
-			return fmt.Errorf("a %s phase pane has dispatch depth 0 (EVOLVE_DISPATCH_DEPTH=%s), so the depth refusal of evolve agent run (subagent.ReadDispatchDepth) does not fire inside it", c.binary, c.depth)
+		if c.agentRun != "2:yes" {
+			return fmt.Errorf("evolve agent run inside a %s phase pane (EVOLVE_DISPATCH_DEPTH=%s) was not refused: exit:named-refusal = %s, want 2:yes (%q)", c.binary, c.depth, c.agentRun, agentRunRefusal)
 		}
+		return nil
 	}
-	return nil
+	return fmt.Errorf("inconclusive: no stub of the M1 run probed evolve agent run")
 }
 
 func liveBinaryName(cli string) string {

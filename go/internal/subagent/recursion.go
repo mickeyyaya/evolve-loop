@@ -3,15 +3,13 @@ package subagent
 import (
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
 const (
-	// SSOT IPC-protocol-allowed: parent→child recursion-depth handoff
-	// Split form keeps it out of the flagreaders guard's standalone-literal
-	// scan (SSOT §IPC-protocol-allowed) — same pattern as FanoutWorkerTokenEnv.
-	dispatchDepthEnv = "EVOLVE_" + "DISPATCH_DEPTH"
+	dispatchDepthEnv = ipcenv.DispatchDepthKey
 	// Split form keeps it out of the flagreaders guard's standalone-literal
 	// scan (SSOT §IPC-protocol-allowed).
 	FanoutWorkerTokenEnv = "EVOLVE_" + "FANOUT_WORKER_TOKEN"
@@ -23,11 +21,7 @@ var ErrRecursionDepthExceeded = errors.New(
 )
 
 func ReadDispatchDepth(getenv func(string) string) int {
-	n, err := strconv.Atoi(strings.TrimSpace(getenv(dispatchDepthEnv)))
-	if err != nil || n < 0 {
-		return 0
-	}
-	return n
+	return ipcenv.DispatchDepth(getenv)
 }
 
 func enforceDispatchDepth(depth int) error {
