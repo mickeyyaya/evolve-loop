@@ -152,7 +152,9 @@ Three rules now prevent a repeat:
 | In the generated profile, the last rule that covers the workspace, the artifact or the worktree allows the write. | the profile that `defaultSandboxWrapWithProbe` makes | `TestSandboxProfile_NoCredentialDenyOrMaskCoversTheCellOfATestLayout`, `TestSandboxProfile_TheCellCheckSeesTheIncidentDeny` |
 | The test store has the shape of `~/.evolve/dispatch`: `$TMPDIR/evolve-bridge-test-home/.evolve/dispatch`. | the `init` of `dispatch_credential_test.go` | `TestDispatchCredentialDeny_ThePackageStoreDeniesNoWriteOverTheTestWorkspaces` |
 
-The profile test reads the rules in order, because the last rule that matches a path decides in both systems. A deny before a later allow is correct: the read-only repository deny comes before the grant of the worktree. The test checks two layouts. The first is the `itConfig` layout with the package default store. The second is the layout of this contract test, with `contractTempDir` and a store in the cell home.
+The profile test reads the rules in order, because the last rule that matches a path decides in both systems. A deny before a later allow is correct: the read-only repository deny comes before the grant of the worktree.
+
+The test checks two layouts. The first is the `itConfig` layout with the package default store. The second is the layout of this contract test, with `contractTempDir` and a store in the cell home. The profile is built at `isolation.i5.stage=enforce` and `isolation.i7.stage=enforce`. Thus the read isolation of X5 and the protected write rules of X7 are in the checked profile, with their `prefix`, `require-all` and `with message` forms.
 
 The rejected option was to refuse the launch when the deny covers the cell. The deny protects the credential, and a refusal makes the deny optional for each layout that has the fault. The cell must stay without the write, and the report must make the cause visible at once.
 

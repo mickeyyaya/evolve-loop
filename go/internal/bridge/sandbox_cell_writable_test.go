@@ -56,7 +56,7 @@ func contractCellLayout(t *testing.T) cellLayout {
 	l.artifact = filepath.Join(l.workspace, "build-report.md")
 	s := dispatchcred.Store{Dir: filepath.Join(home, ".evolve", "dispatch")}
 	l.store = func() (dispatchcred.Store, error) { return s, nil }
-	mkdirs(t, l.workspace)
+	mkdirs(t, l.workspace, filepath.Join(l.workspace, ".bridge"))
 	return l
 }
 
@@ -75,6 +75,7 @@ func incidentCellLayout(t *testing.T) cellLayout {
 func wrapCellProfile(t *testing.T, deps Deps, goos string, l cellLayout) string {
 	t.Helper()
 	deps.Env, deps.ExecStage, deps.DispatchStore = map[string]string{"EVOLVE_SANDBOX": "on"}, "enforce", l.store
+	deps.ReadStage, deps.GuaranteeStage = "enforce", "enforce"
 	prefix, ok := defaultSandboxWrapWithProbe(deps, fakeProbe(goos, true))(SandboxWrapRequest{
 		Phase: "itest", CLI: "claude-tmux", Worktree: l.worktree, Workspace: l.workspace, RepoRoot: l.root,
 	})
@@ -91,14 +92,48 @@ func wrapCellProfile(t *testing.T, deps Deps, goos string, l cellLayout) string 
 	return string(sbpl)
 }
 
-var sbplWriteRule = regexp.MustCompile(`^\((allow|deny) file-write\* \((subpath|literal) "([^"]*)"\)\)$`)
+var (
+	sbplWriteRule   = regexp.MustCompile(`^\((allow|deny) file-write\* \((subpath|literal|prefix) "([^"]*)"\)(?: \(with .*\))?\)$`)
+	sbplWriteRegexp = regexp.MustCompile(`^\((allow|deny) file-write\* \(require-all \(subpath "([^"]*)"\) \(regex #"([^"]*)"\)\)(?: \(with .*\))?\)$`)
+)
+
+func sbplRuleCovers(line, path string) (allow, covers bool) {
+	if m := sbplWriteRule.FindStringSubmatch(line); m != nil {
+		switch m[2] {
+		case "subpath":
+			covers = withinDir(m[3], path)
+		case "prefix":
+			covers = strings.HasPrefix(path, m[3])
+		default:
+			covers = m[3] == path
+		}
+		return m[1] == "allow", covers
+	}
+	if m := sbplWriteRegexp.FindStringSubmatch(line); m != nil {
+		return m[1] == "allow", withinDir(m[2], path) && regexp.MustCompile(m[3]).MatchString(path)
+	}
+	return false, false
+}
+
+func sbplUnparsedWriteRules(profile string) []string {
+	var out []string
+	for _, line := range strings.Split(profile, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.Contains(line, "file-write") || strings.Contains(line, `"/dev/`) || strings.Contains(line, `#"^/dev/`) {
+			continue
+		}
+		if !sbplWriteRule.MatchString(line) && !sbplWriteRegexp.MatchString(line) {
+			out = append(out, line)
+		}
+	}
+	return out
+}
 
 func sbplCellWritable(profile, path string) bool {
 	writable := false
 	for _, line := range strings.Split(profile, "\n") {
-		m := sbplWriteRule.FindStringSubmatch(strings.TrimSpace(line))
-		if m != nil && (m[2] == "subpath" && withinDir(m[3], path) || m[3] == path) {
-			writable = m[1] == "allow"
+		if allow, covers := sbplRuleCovers(strings.TrimSpace(line), path); covers {
+			writable = allow
 		}
 	}
 	return writable
@@ -134,6 +169,11 @@ func TestSandboxProfile_NoCredentialDenyOrMaskCoversTheCellOfATestLayout(t *test
 		for _, layout := range []func(*testing.T) cellLayout{integrationCellLayout, contractCellLayout} {
 			l := layout(t)
 			profile := wrapCellProfile(t, Deps{}, goos, l)
+			if goos == "darwin" {
+				if unparsed := sbplUnparsedWriteRules(profile); len(unparsed) > 0 {
+					t.Fatalf("%s: the check cannot read these write rules, so it cannot judge the cell; teach it each form:\n%s", l.name, strings.Join(unparsed, "\n"))
+				}
+			}
 			for _, path := range []string{l.workspace, l.artifact, l.worktree} {
 				if !cellWritable(goos, profile, path) {
 					t.Errorf("%s on %s: the generated profile denies the write of %s, so the sandboxed agent cannot write its artifact:\n%s", l.name, goos, path, profile)
@@ -167,11 +207,20 @@ func TestCellWritable_TheLastRuleThatCoversThePathDecides(t *testing.T) {
 		{"sbpl literal deny of the path", "darwin", "(allow file-write* (subpath \"/r\"))\n(deny file-write* (literal \"/r/a\"))", "/r/a", false},
 		{"sbpl literal deny of an ancestor", "darwin", "(allow file-write* (subpath \"/r\"))\n(deny file-write* (literal \"/r\"))", "/r/a", true},
 		{"sbpl no rule", "darwin", "(allow file-write* (subpath \"/other\"))", "/r/a", false},
+		{"sbpl deny with a message", "darwin", "(allow file-write* (subpath \"/r\"))\n(deny file-write* (subpath \"/r/w\") (with message \"cell rule=x inv=I4\"))", "/r/w/a", false},
+		{"sbpl prefix deny", "darwin", "(allow file-write* (subpath \"/r\"))\n(deny file-write* (prefix \"/r/go/x\"))", "/r/go/x_test.go", false},
+		{"sbpl prefix deny of another path", "darwin", "(allow file-write* (subpath \"/r\"))\n(deny file-write* (prefix \"/r/go/x\"))", "/r/a", true},
+		{"sbpl regex deny that matches", "darwin", "(allow file-write* (subpath \"/r\"))\n(deny file-write* (require-all (subpath \"/r\") (regex #\"(stdout\\.log)$\")) (with message \"m\"))", "/r/c/stdout.log", false},
+		{"sbpl regex deny that does not match", "darwin", "(allow file-write* (subpath \"/r\"))\n(deny file-write* (require-all (subpath \"/r\") (regex #\"(stdout\\.log)$\")) (with message \"m\"))", "/r/c/artifact", true},
+		{"sbpl reported allow", "darwin", "(allow file-write* (subpath \"/r\") (with report))", "/r/a", true},
 		{"bwrap bind after ro-bind", "linux", "--ro-bind\x00/r\x00/r\x00--bind\x00/r/w\x00/r/w", "/r/w/a", true},
 		{"bwrap ro-bind after bind", "linux", "--bind\x00/r/w\x00/r/w\x00--ro-bind\x00/r\x00/r", "/r/w/a", false},
 		{"bwrap tmpfs over the path", "linux", "--bind\x00/r\x00/r\x00--tmpfs\x00/r/w", "/r/w/a", false},
 		{"bwrap ro-bind of /dev/null on another path", "linux", "--bind\x00/r\x00/r\x00--ro-bind\x00/dev/null\x00/r/b", "/r/a", true},
 		{"bwrap truncated mount", "linux", "--bind\x00/r\x00/r\x00--ro-bind\x00/r", "/r/a", true},
+	}
+	if got := sbplUnparsedWriteRules("(allow file-write* (subpath \"/r\"))\n(deny file-write* (require-not (subpath \"/r\")))\n(allow file-read* file-write* (literal \"/dev/ptmx\"))"); len(got) != 1 || !strings.Contains(got[0], "require-not") {
+		t.Errorf("an unknown write rule form must be reported, and a device rule skipped: %v", got)
 	}
 	for _, tc := range cases {
 		if got := cellWritable(tc.goos, tc.profile, tc.path); got != tc.want {
