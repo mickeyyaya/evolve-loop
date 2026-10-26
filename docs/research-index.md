@@ -511,4 +511,10 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [research/agensh-2026-10.md](research/agensh-2026-10.md) | Research: the Agensh paper (arXiv:2609.26781) and repository, its worker loop, board, router and results, and the limits of its evidence. We reject the self-claim and the direct messages (I-1, I-3, I-4). Five options are adopted as proposals (R1 to R5), and the integrator seat is deferred. |
 
+## 2026-10-26 — eight tests flaked in 14 days of CI, and each cause has a test-design rule
+
+| Document | What it records |
+|---|---|
+| [research/flaky-tests-2026-10.md](research/flaky-tests-2026-10.md) | Research: the ranked flakes with their runs, rates and costs, and the reds that are real defects. It also gives the classes and the rules that prevent them. |
+
 <!-- GENERATED:research-index END -->
