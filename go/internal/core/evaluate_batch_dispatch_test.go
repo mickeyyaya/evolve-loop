@@ -29,6 +29,7 @@ func TestMergeVerdict(t *testing.T) {
 type concurrentRunner struct {
 	name              string
 	active, maxActive *int32
+	peers             int32
 	verdict           string
 	err               error
 }
@@ -42,7 +43,7 @@ func (r *concurrentRunner) Run(_ context.Context, req PhaseRequest) (PhaseRespon
 			break
 		}
 	}
-	time.Sleep(20 * time.Millisecond)
+	r.hold()
 	atomic.AddInt32(r.active, -1)
 	if r.err != nil {
 		return PhaseResponse{}, r.err
@@ -52,6 +53,17 @@ func (r *concurrentRunner) Run(_ context.Context, req PhaseRequest) (PhaseRespon
 		v = VerdictPASS
 	}
 	return PhaseResponse{Phase: r.name, Verdict: v, ArtifactsDir: req.Workspace}, nil
+}
+
+func (r *concurrentRunner) hold() {
+	if r.peers == 0 {
+		time.Sleep(20 * time.Millisecond)
+		return
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for atomic.LoadInt32(r.maxActive) < r.peers && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
 }
 
 func newBatchCycleRun(t *testing.T, runners map[Phase]PhaseRunner, conc int) *cycleRun {
@@ -88,8 +100,8 @@ func TestDispatchEvaluateBatch_Concurrent(t *testing.T) {
 	t.Parallel()
 	var active, maxActive int32
 	runners := buildRunners(nil)
-	runners[Phase("tester")] = &concurrentRunner{name: "tester", active: &active, maxActive: &maxActive}
-	runners[Phase("evaluator")] = &concurrentRunner{name: "evaluator", active: &active, maxActive: &maxActive}
+	runners[Phase("tester")] = &concurrentRunner{name: "tester", active: &active, maxActive: &maxActive, peers: 2}
+	runners[Phase("evaluator")] = &concurrentRunner{name: "evaluator", active: &active, maxActive: &maxActive, peers: 2}
 	cr := newBatchCycleRun(t, runners, 2)
 
 	act, err := cr.dispatchEvaluateBatch([]Phase{"tester", "evaluator"})
