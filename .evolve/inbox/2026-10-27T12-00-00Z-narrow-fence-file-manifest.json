@@ -1,0 +1,26 @@
+{
+  "source": "console, 2026-10-27, operator decision \"1 + 2 + 3\" (ADR-0157). Plan: docs/plans/narrow-fence-2026-10.md",
+  "injected_by": "console-operator-session",
+  "created_at": "2026-10-27T12:00:00Z",
+  "priority_class": "pipeline",
+  "priority": "P1",
+  "id": "narrow-fence-file-manifest",
+  "kind": "feature",
+  "title": "Narrow the protected fence to the files and symbols that enforce a guarantee (ADR-0157 PR 2)",
+  "summary": "Give each guards.ProtectedSurfaceManifest entry a guarantee class, remove the 25 entries that hold no gate, add the ledger, the policy parser, the state machine and the manifest file, and pin the bridge sandbox calls under go/acs/regression/gatepins.",
+  "acceptance": [
+    "Each manifest entry names one of the ten classes of ADR-0157; a guard test names each protected file and its class and fails when one loses its entry.",
+    "TestEveryGateShapedFileIsProtectedSurface stays green, so no gate-shaped file is outside the fence.",
+    "A census test with fixture items shows that items on non-gate files of bridge, core and inboxmover/lifecycle are admissible and items on gate files are console_protected.",
+    "evolve wave supply on a copy of the inbox reports fewer console_protected items than before."
+  ],
+  "files": [
+    "go/internal/guards/integrity_surface.go",
+    "go/acs/regression/gatepins/predicates_test.go",
+    "go/internal/orchestrator/supply_narrow_fence_test.go"
+  ],
+  "deps": [],
+  "route": "console-manual",
+  "weight": 0.9,
+  "notes": "Route console-manual: the change edits the manifest and go/acs/regression, which are on the fence. The console ships it with --class manual."
+}
