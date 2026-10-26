@@ -89,9 +89,14 @@ At most four agents work at the same time. A generated file changes at its gener
 
 | # | Status |
 |---|---|
-| S0 | ◐ the lint and the build-floor WARN passed review (J_0, then a verify-only check: MERGE); the landing is next |
-| S1 | ◐ 21 files are rewritten and checked; the docs pull request is next |
-| S2–S11 | ☐ not started |
+| S0 | ☑ merged in commit `45b18a8b2`: the standard, this plan, `evolve docs ste-lint` (with `--go`) and the build-floor WARN |
+| S1 | ☑ merged in commit `70cb0c3d6`: the 21 pilot files |
+| S2 | ☐ the inbox item `ste-rewrite-campaign-remaining` tracks it |
+| S3 | ◐ PRs 1142 to 1145 rewrote the top-level `docs/architecture` specs on 2026-10-26. The inbox item `ste-rewrite-campaign-remaining` tracks the busy files that stay. |
+| S4–S8 | ☐ the inbox item `ste-rewrite-campaign-remaining` tracks them, in three tiers |
+| S9 | ☐ inbox item `ste100-docs-rewrite-s9-phase-output-overlay` (2026-10-27) |
+| S10 | ◐ the check `ste-lint --go` is on `main` (S0). The rewrite by package is open: inbox item `ste100-docs-rewrite-s10-go-log-text-rewrite` (2026-10-27). |
+| S11 | ☐ inbox item `ste100-docs-rewrite-s11-generator-templates` (2026-10-27) |
 | S12 | ☑ in effect from 2026-10-07 |
 
 ## 8. The S1 pilot data

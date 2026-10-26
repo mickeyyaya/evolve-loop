@@ -99,7 +99,7 @@ C2 ties C1 on the total. It is the only design with both a gain and a risk score
 | W0 | `evolve wave latency` (D7) | `cmd/evolve`, `internal/lanetime` | lane |
 | W1 | Optimistic admission at shadow (D1, D2) | `internal/admission` | lane |
 | W1b | The ship record of a composed-gate failure between two lanes that only D1 admitted (D2) | `internal/phases/ship`, `internal/orchestrator` | console, before W2 |
-| W2 | The move of W1 to enforce (D3): `fleet.orchestrator.admission` | `.evolve/policy.json` | operator, after one wave and W1b |
+| W2 | The move of W1 to enforce (D3): `fleet.orchestrator.admission`. Inbox item `wave-latency-w2-admission-enforce`, an operator decision (2026-10-27). | `.evolve/policy.json` | operator, after one wave and W1b |
 | W3 | Claude first for the builder now (D5) | `.evolve/policy.json` through `evolve cli-routing set` | console, at the next boundary |
 | W4 | The headroom-aware family order (D4) | `internal/cliroute`, `internal/usageprobe` | console |
 | W5 | One verdict store for the floor and the ship (D6). The audit does not write the store, because its test runs are tagged `acs` or `integration`, and these runs are never cacheable. | `internal/testverdict`, `internal/core`, `internal/phases/ship` | console |

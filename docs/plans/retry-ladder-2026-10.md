@@ -120,7 +120,7 @@ Each criterion scores 1 (poor) to 5 (good).
 | L5 | The wiring at shadow: the correction ladder, the repair round, remediation and the next-item start rung | `internal/core` | console |
 | L6 | The fresh session and the digest on a raised rung (ADR-0130 postmortem plus the verbatim failure) | `internal/core`, `internal/bridge` | console |
 | L7 | `evolve ladder report` | `cmd/evolve` | lane |
-| L8 | The move to `enforce`, after one wave of shadow data | `.evolve/policy.json` | operator |
+| L8 | The move to `enforce`, after one wave of shadow data. Inbox item `retry-ladder-l8-enforce`, an operator decision (2026-10-27). | `.evolve/policy.json` | operator |
 
 L1, L2 and L7 can run in lanes, because the new package is not protected. L0 comes first, so the shadow wave of L5 has data.
 

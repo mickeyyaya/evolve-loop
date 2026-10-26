@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "The prompt-regression eval passes on the three changed personas",
+    "evolve code usage shows more than 0 calls for each of the scout, build and debug phases (goal G2)",
+    "Over 3 waves before and 3 waves after K4a, the build tokens fall and the audit pass rate does not fall (goal G3)",
+    "The plan records the before and after table and the decision: keep or revert"
+  ],
+  "created_at": "2026-10-26T19:26:11Z",
+  "deps": [
+    "code-index-cli-k4a-persona-commands"
+  ],
+  "files": [
+    "docs/plans/code-index-cli-2026-10.md"
+  ],
+  "fix": "After K4a merges, run the prompt-regression eval on the three changed personas. Then compare 3 waves before and 3 waves after K4a with evolve code usage and the cycle dossiers. Record the table in the plan. If the measures show a loss, revert K4a.",
+  "id": "code-index-cli-k4b-gate-persona-change",
+  "kind": "decision",
+  "notes": "An operator decision with measured input, so kind decision and route console-manual.",
+  "priority_class": "performance",
+  "route": "console-manual",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Plan docs/plans/code-index-cli-2026-10.md, component K4b (decision D7, goals G2 and G3 of section 8). Spec docs/architecture/code-index-cli.md, the verification section. K4b is the gate for K4a: the operator keeps the persona text only if the measures show no loss.",
+  "title": "Keep or revert the code index persona text after the prompt-regression eval and three waves each side (code index K4b)",
+  "weight": 0.4
+}
