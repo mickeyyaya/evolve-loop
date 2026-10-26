@@ -108,7 +108,18 @@ func TmuxSocketArgs(args ...string) []string {
 }
 
 func (execTmux) run(ctx context.Context, args ...string) (string, error) {
-	return runCmdBounded(ctx, tmuxCmdTimeout, nil, "tmux", TmuxSocketArgs(args...)...)
+	out, err := runCmdBounded(ctx, tmuxCmdTimeout, nil, "tmux", TmuxSocketArgs(args...)...)
+	return out, withTmuxOutput(err, args, out)
+}
+
+func withTmuxOutput(err error, args []string, out string) error {
+	if err == nil {
+		return nil
+	}
+	if out = strings.TrimSpace(out); out == "" {
+		return fmt.Errorf("tmux %s: %w", args[0], err)
+	}
+	return fmt.Errorf("tmux %s: %w: %s", args[0], err, out)
 }
 
 func (t execTmux) HasSession(ctx context.Context, name string) bool {
@@ -147,6 +158,7 @@ func (t execTmux) NewSessionEnv(ctx context.Context, name string, width, height 
 	dir := filepath.Dir(file)
 	args := newSessionEnvArgs(name, width, height, workdir, file, envFingerprint(env))
 	out, err := runCmdBounded(ctx, tmuxCmdTimeout, tmuxClientEnv(env), "tmux", TmuxSocketArgs(args...)...)
+	err = withTmuxOutput(err, args, out)
 	if err == nil {
 		err = awaitCellEnvConsumed(ctx, dir, cellEnvConsumeTimeout)
 	}

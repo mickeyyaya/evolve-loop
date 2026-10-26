@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "RED first: TestBoard_AFailOfLaneAIsListedInTheIndexOfLaneBOnTheSameCell fails before the change.",
+    "An entry with an unknown type, an oversize summary or no item id is refused with a non-zero exit, and the store does not change.",
+    "Only the pipeline writes the board store; an agent write to the store path is denied by the sandbox (I-5 test). Board entries are untrusted L3 data, never required, and grant nothing.",
+    "Before enforce, a shadow wave counts the retries of a hypothesis that an earlier FAIL entry recorded; the count is in the PR body.",
+    "Lands at shadow; changed functions at 100% coverage on every CI OS.",
+    "The package note and the research doc status are updated, and docs/architecture/cell-context-index.md gets the board kind."
+  ],
+  "created_at": "2026-10-26T04:35:17Z",
+  "deps": [],
+  "files": [
+    "go/internal/inputindex/",
+    "go/cmd/evolve/",
+    "docs/architecture/cell-context-index.md"
+  ],
+  "fix": "Add an evolve verb (proposed: evolve board add, agent class A) that writes a declared cycle artifact with a type of FACT, FAIL, OBSERVED or PATCH_SUMMARY, a summary of 100 characters or fewer (300 for PATCH_SUMMARY), an optional detail, the item id, the cycle and the package cells. The pipeline validates each entry against a schema and appends it to a board store under .evolve/ that only the pipeline writes. The context index builder lists the recent entries of the cells of the item as L3 entries of kind board, and the FAIL entries of the item lineage as L2 entries on a retry. The pipeline copies the entries into the inputs of the cell, as it does for recalled-lessons, and a read verb searches that copy. CLAIM is out of scope (research \u00a74).",
+  "id": "agensh-knowledge-board",
+  "kind": "feature",
+  "priority_class": "feature",
+  "route": "console-manual",
+  "source": "console, 2026-10-26. Research: docs/research/agensh-2026-10.md \u00a76 R1 (option A1).",
+  "summary": "A lane can retry a hypothesis that another lane falsified, because no path carries findings across lanes (I-5 and ADR-0129 block a direct read). Agensh uses a typed board that only grows. Research \u00a72.3 P2.6, \u00a73 F3.3 and F3.4, \u00a75 A1.",
+  "title": "A pipeline-carried knowledge board: lanes append FACT, FAIL, OBSERVED and PATCH_SUMMARY entries, and cells read them through the context index.",
+  "weight": 0.5
+}

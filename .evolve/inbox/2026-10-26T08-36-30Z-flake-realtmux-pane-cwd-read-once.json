@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "The assertion polls with a deadline and still fails with the current message when the value stays empty",
+    "The test passes -race -count=100 with -tags integration"
+  ],
+  "created_at": "2026-10-26T13:00:06Z",
+  "deps": [],
+  "files": [
+    "go/internal/bridge/tmux_repl_integration_test.go"
+  ],
+  "fix": "Poll display-message for #{pane_current_path} until it is non-empty or a deadline of a few seconds passes, then compare it with the canonical work directory.",
+  "id": "flake-realtmux-pane-cwd-read-once",
+  "kind": "bug",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "source": "console, 2026-10-26, flaky-test census (docs/research/flaky-tests-2026-10.md)",
+  "summary": "Rank 7 of the flaky-test census (docs/research/flaky-tests-2026-10.md F4.7): 1 red on main (run 38919986816, ubuntu Go 1.23), about 52 runner minutes. Message: tmux_repl_integration_test.go:357: pane_current_path=\"\". The test reads the value once right after new-session; on Linux tmux reads it from the pane process, which can be absent for some milliseconds.",
+  "title": "TestRealTmux_NewSessionInBindsPaneCwd flakes on ubuntu: it reads pane_current_path once",
+  "weight": 0.42
+}

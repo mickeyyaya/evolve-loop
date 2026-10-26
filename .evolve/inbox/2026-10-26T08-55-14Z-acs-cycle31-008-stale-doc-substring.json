@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "`go test -tags acs -count=1 ./acs/cycle31/` passes on main",
+    "The check still fails when a removed name returns as a row of the generated index (mutation checked)"
+  ],
+  "created_at": "2026-10-26T09:30:01Z",
+  "deps": [],
+  "files": [
+    "go/acs/cycle31/predicates_test.go",
+    "docs/architecture/control-flags.md"
+  ],
+  "fix": "Scope the check to the GENERATED:flag-index region of control-flags.md (or to flagregistry.Lookup returning false), so prose that names a removed flag does not fail it.",
+  "id": "acs-cycle31-008-stale-doc-substring",
+  "kind": "techdebt",
+  "priority_class": "hygiene",
+  "route": "console-manual",
+  "source": "console builder, 2026-10-26, main-reds investigation (PR #1153)",
+  "summary": "On main 1db031993 (2026-10-26) `go test -tags acs -count=1 ./acs/cycle31/` fails: TestC31_008_ControlFlagsMdHasNoRemovedRows reports that docs/architecture/control-flags.md contains EVOLVE_BYPASS_PREFIX_GATE, EVOLVE_BYPASS_ROLE_GATE and EVOLVE_BYPASS_SHIP_GATE. The rows are gone from the registry; the names appear only in the prose at control-flags.md:99, which says they have no production reader. The predicate checks a substring of the whole file, not the generated index. No CI job runs acs/cycle*.",
+  "title": "Archived predicate acs/cycle31 TestC31_008 is red on main: it forbids flag names that control-flags.md now cites in prose",
+  "weight": 0.2
+}

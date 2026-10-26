@@ -21,9 +21,10 @@ import (
 )
 
 var (
-	syncMainFetchSleep   = time.Sleep
-	syncMainGetwd        = os.Getwd
-	syncMainAbsoluteRoot = paths.AbsoluteRoot
+	syncMainFetchSleep    = time.Sleep
+	syncMainGetwd         = os.Getwd
+	syncMainAbsoluteRoot  = paths.AbsoluteRoot
+	syncMainCodeIndexHost = defaultCodeIndexHost
 )
 
 func runSyncMain(args []string, _ io.Reader, stdout, stderr io.Writer) int {
@@ -86,8 +87,34 @@ func runSyncMain(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return code
 	}
 
+	return finishSyncMain(absRoot, branch, stdout, stderr)
+}
+
+func finishSyncMain(root, branch string, stdout, stderr io.Writer) int {
 	fmt.Fprintf(stdout, "sync-main: reconciled local %s with origin/%s (merge only; nothing pushed).\n", branch, branch)
-	return 0
+	if branch != codeIndexMainBranch {
+		return 0
+	}
+	return syncMainCodeIndex(root, syncMainCodeIndexHost(), codeIndexRefreshTimeout, stdout, stderr)
+}
+
+func syncMainCodeIndex(root string, host codeIndexHost, timeout time.Duration, stdout, stderr io.Writer) int {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	moved, err := host.refresh(ctx, root)
+	rc, _ := codeRefreshExit(err)
+	switch rc {
+	case 0:
+		fmt.Fprintf(stdout, "sync-main: moved the code index %s to %s %s, %d commit(s) after %s\n", moved.IndexDir, codeIndexMainRef, shortSHA(moved.To), moved.Behind, shortSHA(moved.From))
+		return 0
+	case codeExitAbsent:
+		fmt.Fprintf(stdout, "sync-main: no code index to refresh: %v\n", err)
+		return 0
+	case codeExitFailed:
+		rc = 1
+	}
+	fmt.Fprintf(stderr, "evolve sync-main: the merge is done, but the code index is not refreshed: %v\n", err)
+	return rc
 }
 
 func fetchSyncBranch(root, branch string, stderr io.Writer) error {

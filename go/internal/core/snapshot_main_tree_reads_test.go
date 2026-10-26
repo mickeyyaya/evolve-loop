@@ -128,3 +128,21 @@ func TestSnapshotMainTree_AGuardReadsTheStatusAgainAfterAWrite(t *testing.T) {
 		})
 	}
 }
+
+func TestDispatch_AFailedPrePhaseSnapshotOfACheckoutAbortsBeforeTheLaunch(t *testing.T) {
+	t.Parallel()
+	ran := false
+	runner := &dispatchScriptRunnerE4{name: "build", steps: []func() (PhaseResponse, error){
+		func() (PhaseResponse, error) {
+			ran = true
+			return PhaseResponse{Phase: "build", Verdict: VerdictPASS}, nil
+		},
+	}}
+	reader := &scriptedDirtyReader{err: errors.New("index.lock exists")}
+	cr := dispatchRunE4(t, &fakeLedger{}, runner, PhaseBuild, 1, WithGitDirtyPaths(reader.read))
+	cr.req.ProjectRoot = checkoutRoot(t)
+	_, action, err := cr.dispatch(PhaseBuild)
+	if !errors.Is(err, errPrePhaseSnapshot) || action != loopAbort || ran {
+		t.Fatalf("dispatch = action %v err %v ran %v; a checkout whose status cannot be read aborts the loop before the phase runs", action, err, ran)
+	}
+}

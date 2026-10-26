@@ -27,7 +27,7 @@ A shell command reaches every agent of every CLI. It is also an `evolve` verb, a
 7. The layer reads the index worktree only, and the boundary refreshes it.
 8. Each call appends one record to a usage log.
 9. The scout, builder and debugger prompts name the commands and say when each one helps. The persona edit is a loop change. It is justified because without it the agents made 0 calls (C3, P3.4).
-10. A failed index refresh at the boundary is a warning, never a halt.
+10. A failed index refresh at the boundary is a warning, never a halt. **Amended on 2026-10-26** by D5.2 of [code-index-cli.md](../code-index-cli.md) §4: an absent index is still no halt. Each other refresh failure makes `sync-main` fail after the merge, because a WARN hid a stale index for 5 days.
 11. The MCP registrations go after one wave with the CLI live. **Done on 2026-10-17:** the console removed them. The [cli-only-no-mcp](../../conventions/cli-only-no-mcp.md) convention now forbids MCP in the repository.
 
 ## Consequences
