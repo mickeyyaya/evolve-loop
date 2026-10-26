@@ -17,8 +17,8 @@ The package runs no check. Each row has an owner test in the package that owns t
 
 | Owner test | Rows |
 |---|---|
-| `go/cmd/evolve/e2e_cycle_cli_matrix_test.go` (tags `e2e evolve_test_phases`) | M1 to M5, N1, N4, N6 |
-| `go/internal/bridge/sandbox_contract_integration_test.go` (tags `integration`, `darwin`) | N3, N5, N7 to N10 |
+| `go/cmd/evolve/e2e_cycle_cli_matrix_test.go` (tags `e2e evolve_test_phases`) | M1 to M5, N1, N6 |
+| `go/internal/bridge/sandbox_contract_integration_test.go` (tags `integration`, `darwin`) | N3 to N5, N7 to N10 |
 | `go/internal/sysexec/isolation_matrix_test.go` | N2 |
 | `go/internal/guards/isolation_matrix_test.go` | N11 |
 | `go/internal/core/isolation_matrix_test.go` | N12, N13 |

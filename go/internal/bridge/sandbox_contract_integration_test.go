@@ -4,6 +4,7 @@ package bridge
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -16,6 +17,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/sandbox"
+	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchcred"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/isolation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
@@ -24,9 +26,10 @@ import (
 type contractVerdict string
 
 const (
-	contractAllow contractVerdict = "allow"
-	contractDeny  contractVerdict = "deny"
-	contractGap   contractVerdict = "gap"
+	contractAllow             contractVerdict = "allow"
+	contractDeny              contractVerdict = "deny"
+	contractGap               contractVerdict = "gap"
+	contractCredentialRefusal contractVerdict = "credential refusal"
 )
 
 type contractHost struct {
@@ -38,6 +41,8 @@ type contractHost struct {
 	runName, runPID             string
 	ownTTY, peerTTY, scratch    string
 	stubBin, netPort, home      string
+	evolveBin                   string
+	dispatch                    dispatchcred.Store
 }
 
 type contractRow struct {
@@ -137,6 +142,42 @@ var agentContract = []contractRow{
 		script: func(h contractHost) string {
 			return "sandbox-exec -f " + h.prefix[2] + " " + h.stubBin + "/claude --version"
 		}},
+	{action: "isolation N4: evolve agent run with the env markers stripped is refused at enforce", want: contractCredentialRefusal, isolation: "N4",
+		script: func(h contractHost) string {
+			return strippedMarkers + h.evolveBin + " agent run --refused-before-parse"
+		}},
+	{action: "evolve phase scout with the env markers stripped is refused at enforce", want: contractCredentialRefusal,
+		script: func(h contractHost) string {
+			return strippedMarkers + h.evolveBin + " phase scout --refused-before-parse"
+		}},
+	{action: "evolve subagent run with the env markers stripped is refused at enforce", want: contractCredentialRefusal,
+		script: func(h contractHost) string {
+			return strippedMarkers + h.evolveBin + " subagent run --refused-before-parse"
+		}},
+	{action: "evolve loop with the env markers stripped is refused at enforce", want: contractCredentialRefusal,
+		script: func(h contractHost) string { return strippedMarkers + h.evolveBin + " loop --refused-before-parse" }},
+	{action: "evolve wave next with the env markers stripped is refused at enforce", want: contractCredentialRefusal,
+		script: func(h contractHost) string {
+			return strippedMarkers + h.evolveBin + " wave next --refused-before-parse"
+		}},
+	{action: "rename an ancestor of the dispatch store under a writable home, then run evolve agent run", want: contractCredentialRefusal,
+		script: func(h contractHost) string {
+			ancestor := filepath.Dir(h.dispatch.Dir)
+			return "mv " + ancestor + " " + ancestor + "-moved; " + strippedMarkers + h.evolveBin + " agent run --refused-before-parse"
+		},
+		check: restoreDispatchStore},
+	{action: "swap a symlink to a store of its own in for an ancestor of the dispatch store", want: contractDeny,
+		script: func(h contractHost) string {
+			ancestor := filepath.Dir(h.dispatch.Dir)
+			return "mv " + ancestor + " " + ancestor + "-moved && mkdir " + ancestor + "-evil && ln -s " + ancestor + "-evil " + ancestor + " && " + strippedMarkers + h.evolveBin + " agent run --refused-before-parse"
+		},
+		check: restoreDispatchStore},
+	{action: "turn the dispatch stage off", want: contractDeny,
+		script: func(h contractHost) string { return "echo off > " + filepath.Join(h.dispatch.Dir, "stage") }},
+	{action: "plant a dispatch credential", want: contractDeny,
+		script: func(h contractHost) string { return "echo x > " + filepath.Join(h.dispatch.HeldDir(), "planted") }},
+	{action: "read the dispatch credential", want: contractDeny,
+		script: func(h contractHost) string { return "cat " + filepath.Join(h.dispatch.HeldDir(), "credential") }},
 	{action: "isolation N5: read the raw output <ws>/.bridge/scout-stdout.log", want: contractDeny, isolation: "N5",
 		script: func(h contractHost) string { return "cat " + h.run + "/.bridge/scout-stdout.log" }},
 	{action: "a retry opens its predecessor's retrospective through inputs/index.json", want: contractAllow,
@@ -162,8 +203,29 @@ var agentContract = []contractRow{
 		}},
 }
 
+func restoreDispatchStore(t *testing.T, h contractHost, _ string) {
+	t.Helper()
+	ancestor := filepath.Dir(h.dispatch.Dir)
+	if _, err := os.Lstat(ancestor + "-moved"); err != nil {
+		return
+	}
+	for _, leftover := range []string{ancestor, ancestor + "-evil"} {
+		if err := os.RemoveAll(leftover); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Rename(ancestor+"-moved", ancestor); err != nil {
+		t.Fatalf("the host puts the store back for the next rows: %v", err)
+	}
+}
+
+const strippedMarkers = "env -u EVOLVE_DISPATCH_DEPTH -u EVOLVE_PHASE "
+
 func contractFailure(want contractVerdict, out string, err error) error {
+	var exit *exec.ExitError
 	switch {
+	case want == contractCredentialRefusal && (!errors.As(err, &exit) || exit.ExitCode() != 3 || !strings.Contains(out, "dispatch credential") || !strings.Contains(out, "operation not permitted")):
+		return fmt.Errorf("contract: the verb refuses with exit 3 because the cell cannot read the dispatch credential; got err=%v out=%q", err, out)
 	case want == contractAllow && err != nil:
 		return fmt.Errorf("contract: allow; the profile refused it: %v: %q", err, out)
 	case want == contractDeny && (err == nil || !strings.Contains(out, "Operation not permitted")):
@@ -176,6 +238,7 @@ func contractFailure(want contractVerdict, out string, err error) error {
 
 func TestAgentSandboxContract(t *testing.T) {
 	h := newContractHost(t)
+	h.withEvolveBinary(t)
 	for _, row := range agentContract {
 		t.Run(row.action, func(t *testing.T) {
 			out, err := h.agent(t, row)
@@ -212,6 +275,15 @@ func TestAgentSandboxContract_ShadowReportsTheExecAndLetsItRun(t *testing.T) {
 	out, err := h.agent(t, contractRow{script: func(h contractHost) string { return "PATH=" + h.stubBin + ":$PATH claude --version" }})
 	if err != nil || out != "stub-claude 0.0.0" {
 		t.Fatalf("shadow must let the exec run: err=%v out=%q", err, out)
+	}
+}
+
+func TestAgentSandboxContract_TheHostHoldsTheCredentialThatTheCellCannotRead(t *testing.T) {
+	h := newContractHost(t)
+	h.withEvolveBinary(t)
+	out, err := exec.Command(h.evolveBin, "subagent", "run").CombinedOutput()
+	if strings.Contains(string(out), "dispatch credential") || !strings.Contains(string(out), "expected <agent> <cycle> <workspace>") {
+		t.Fatalf("outside the cell the pipeline holds the credential and the verb runs: err=%v out=%q", err, out)
 	}
 }
 
@@ -287,6 +359,7 @@ func (h *contractHost) withProject(t *testing.T) {
 func (h *contractHost) withIsolationFixtures(t *testing.T) {
 	t.Helper()
 	h.home = contractTempDir(t, "", "sbc-home")
+	h.dispatch = dispatchcred.Store{Dir: filepath.Join(h.home, ".evolve", "dispatch")}
 	t.Setenv("HOME", h.home)
 	runs := filepath.Dir(h.run)
 	for rel, body := range map[string]string{
@@ -327,6 +400,17 @@ func (h *contractHost) withIsolationFixtures(t *testing.T) {
 	h.netPort = strconv.Itoa(ln.Addr().(*net.TCPAddr).Port)
 }
 
+func (h *contractHost) withEvolveBinary(t *testing.T) {
+	t.Helper()
+	h.evolveBin = filepath.Join(contractTempDir(t, "", "sbc-evolve"), "evolve")
+	flags := "-X github.com/mickeyyaya/evolve-loop/go/internal/dispatchcred.root=" + h.dispatch.Dir
+	build := exec.Command("go", "build", "-ldflags", flags, "-o", h.evolveBin, "./cmd/evolve")
+	build.Dir = filepath.Join("..", "..")
+	if out, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("build the evolve binary with the dispatch store of the cell home: %v\n%s", err, out)
+	}
+}
+
 func builderPrefix(t *testing.T, probe sandbox.ProbeResult, h contractHost, execStage string) []string {
 	t.Helper()
 	profilesDir, err := filepath.Abs(filepath.Join("..", "..", "..", ".evolve", "profiles"))
@@ -342,7 +426,8 @@ func builderPrefix(t *testing.T, probe sandbox.ProbeResult, h contractHost, exec
 	if cfg.DenyPaths, err = resolveSandboxDenials(prof.Sandbox.DenySubpaths, h.root, h.worktree, true); err != nil {
 		t.Fatal(err)
 	}
-	deps := Deps{Env: map[string]string{}, LookupEnv: mapLookup(nil), ExecStage: execStage, LookPath: stubOnlyLookPath(h.stubBin)}
+	deps := Deps{Env: map[string]string{}, LookupEnv: mapLookup(nil), ExecStage: execStage, LookPath: stubOnlyLookPath(h.stubBin),
+		DispatchStore: func() (dispatchcred.Store, error) { return h.dispatch, nil }}
 	deps.SandboxWrap = defaultSandboxWrapWithProbe(deps, func() sandbox.ProbeResult { return probe })
 	prefix, ok := sandboxPrefixForLaunch(deps, cfg, h.ownTTY)
 	if !ok {

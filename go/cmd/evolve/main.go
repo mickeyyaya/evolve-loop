@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"io"
 	"os"
 )
@@ -222,15 +221,7 @@ v12.1 utilities + composition:
 `
 
 func dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	if len(args) < 1 {
-		fmt.Fprint(stderr, usage)
-		return 2
-	}
-	if cmd := lookupCommand(args[0]); cmd != nil {
-		return cmd.Run(args[1:], stdin, stdout, stderr)
-	}
-	fmt.Fprintf(stderr, "evolve: unknown command %q\n\n%s", args[0], usage)
-	return 2
+	return dispatchWith(defaultDispatchGate, args, stdin, stdout, stderr)
 }
 
 func main() {

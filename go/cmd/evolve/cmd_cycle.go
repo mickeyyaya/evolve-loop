@@ -324,6 +324,7 @@ const (
 	roleShip      = "ship"
 	roleSubagent  = "subagent"
 	roleSimulate  = "simulate"
+	roleDispatch  = "dispatch"
 )
 
 type orchDeps struct {
