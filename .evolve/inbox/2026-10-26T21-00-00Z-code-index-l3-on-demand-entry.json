@@ -1,0 +1,25 @@
+{
+  "id": "code-index-l3-on-demand-entry",
+  "kind": "feature",
+  "title": "The context-index builder lists the code index as an on-demand L3 knowledge entry with its freshness.",
+  "source": "console, 2026-10-26. In the 7 days to 2026-10-26, evolve code usage counted 2 calls, both from the console, and no call from a phase agent. Design: docs/architecture/code-index-cli.md section 4 (F4.4, D5.4, D5.5).",
+  "summary": "The consumer is the L3 knowledge layer of the context-index builder (CX7b, item context-index-knowledge-layer, PR #1139). The builder must give each phase cell the evolve code verbs as one on-demand L3 entry. The entry carries the stale and behind fields that evolve code --json now reports, so a phase agent sees when the index is behind origin/main.",
+  "fix": "In the L3 entry of kind code-index, name the verbs callers, api, find and map with --json. Copy stale and behind from one evolve code map --json read at cell build. When stale is true, name evolve code refresh as a request (agent class R), never as a command that the cell runs.",
+  "acceptance": [
+    "RED first: TestBuild_TheCodeIndexEntryCarriesTheFreshnessOfTheIndex fails before the change.",
+    "The entry is L3, class knowledge, never required, and adds no grant.",
+    "An absent index gives no entry and no error.",
+    "Changed functions at 100% coverage on every CI OS; the package note and the spec are updated."
+  ],
+  "deps": [
+    "context-index-knowledge-layer"
+  ],
+  "files": [
+    "go/internal/inputindex/",
+    "go/cmd/evolve/"
+  ],
+  "priority_class": "stability",
+  "weight": 0.4,
+  "route": "console-manual",
+  "created_at": "2026-10-26T21:00:00Z"
+}
