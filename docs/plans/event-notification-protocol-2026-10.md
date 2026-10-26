@@ -1,6 +1,6 @@
 # Plan: event channels, a push-only publish/subscribe protocol for `evolve events`
 
-- **Status:** design, opened 2026-10-09 in the docs lane `cl-events` (branch `docs/events-subscriptions`, base `9b47ca6ae`). The operator approved the console plan on 2026-10-09. This file is its mirror in `docs/`, with its research amendments, the operator decisions of fix round 1 and the review fixes.
+- **Status:** in build. E0 to E6 and E10 merged; E7 and E11 are in part (section 16). The design opened on 2026-10-09 in the docs lane `cl-events` (branch `docs/events-subscriptions`, base `9b47ca6ae`). The operator approved the console plan on 2026-10-09. This file is its mirror in `docs/`, with its research amendments, the operator decisions of fix round 1 and the review fixes.
 - **Spec of record:** [event-channels.md](../architecture/event-channels.md). It holds the protocol, the command surface, the exit codes and the limits. This plan holds the decisions, the components and the tests.
 - **Decision record:** [ADR-0127](../architecture/adr/0127-push-only-event-channels.md).
 - **Research:** [event-notification-protocol-2026-10.md](../research/event-notification-protocol-2026-10.md) (findings F1.1 to F7.3, refinements R1 to R24).
@@ -389,9 +389,13 @@ None. The operator decided Q1 to Q10 on 2026-10-09 (§4, O10 to O19).
 | E5 | ☑ `internal/events/reader` and `proctree.StartOf`. The reader arms, catches up and waits over channels. It has the cursor gaps, the duplicate window, the `--since` starts and the last will, with the two notes of the design review. Coverage is 100% on darwin and Linux, and each mutant is killed. It is unwired. Spec findings: [internal-events-reader.md](../architecture/packages/internal-events-reader.md) §Findings Merged in the wave 89 train (#834). |
 | E6 | ☑ `internal/events/publisher`: the routes, the lossless path, the best-effort queue, the gap records, the dispatch stamp and `Close(deadline)`, built, unwired, at 100% coverage. Findings: [internal-events-publisher.md](../architecture/packages/internal-events-publisher.md) §Findings Merged in #828. |
 | E10 | ☑ `internal/events/rootwire` subscribes one Publisher to the Center of each root and returns the closer that the root defers. The roots are `cycle`, `loop`, `loop-chain`, `ship`, `subagent`, `simulate` and `phase-observer`. Guard tests derive the roots from the call sites and require a top-level defer of the closer before the first `return`. Built in the lane `cl-events-e10`. Merged in #967. Findings: [internal-events-rootwire.md](../architecture/packages/internal-events-rootwire.md) §Findings |
-| E11 (part) | ☑ `phase.dispatched`, `ship.landed`, `loop.started` and `loop.exit` have a producer. The kind `loop.lost` and the code `LOOP_LOST` are registered. ☐ `wave.started`, `wave.ended`, `inbox.claimed`, `inbox.released` and `ci.completed` are not started. |
-| E9 | ☐ not started. The `events` verbs take the envelope and the exit table of [cli-contract.md](../architecture/cli-contract.md) (ADR-0156, component X17b). |
-| E1 to E14, except the rows above | ☐ not started |
+| E7 (part) | ◐ PR #967 added the compiled defaults `policy.EventsDefaults()`, and `internal/events/rootwire` reads them. ☐ No `EventsConfig()` reads `policy.json`, and `gcpolicy` has no channel categories and no `Protect`. Inbox item: `event-notification-protocol-e7-events-config-load`. |
+| E11 (part) | ☑ `phase.dispatched`, `ship.landed`, `loop.started` and `loop.exit` have a producer. The kind `loop.lost` and the code `LOOP_LOST` are registered. ☐ `wave.started`, `wave.ended`, `inbox.claimed`, `inbox.released` and `ci.completed` are not started. Inbox item: `event-notification-protocol-e11-remaining-producers`. |
+| E9 | ☐ not started. The `events` verbs take the envelope and the exit table of [cli-contract.md](../architecture/cli-contract.md) (ADR-0156, component X17b). Inbox item: `events-cli-verbs-e9`. |
+| E8 | ☐ not started. Inbox item: `event-notification-protocol-e8-subscriptions-runner`. |
+| E12 | ☐ not started. Inbox item: `event-notification-protocol-e12-poller-migrations`. |
+| E13 | ☐ not started. Inbox item: `event-notification-protocol-e13-consumer-groups`. |
+| E14 | ☐ not started. Inbox item: `event-notification-protocol-e14-push-for-other-pollers`. |
 
 The lane `cl-events-e10` made these choices for E10 and for the part of E11:
 

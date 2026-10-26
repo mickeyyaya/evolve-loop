@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "the item records if the C2 darwin set holds core or the other git-heavy packages",
+    "if the set holds them, the C13 counter shows fewer spawns for each scenario, with the same assertions",
+    "each scenario still runs the real git path once for each distinct shape"
+  ],
+  "created_at": "2026-10-26T19:23:03Z",
+  "deps": [
+    "ci-wall-time-c13-macos-cpu-and-spawn-counts"
+  ],
+  "files": [
+    "go/internal/core/",
+    "go/internal/gc/",
+    "go/internal/explanationdocs/",
+    "go/internal/inboxstamps/"
+  ],
+  "fix": "First check the darwin package set of C2. If core, gc, explanationdocs and inboxstamps are not in the set, close the item with that evidence. If they are in the set, cut the git spawns in each scenario, and use the C13 counts to prove it.",
+  "id": "ci-wall-time-c14-fewer-git-spawns-on-macos",
+  "kind": "test",
+  "notes": "Plan: docs/plans/ci-wall-time-2026-10.md section 6a, C14 and D23. The plan owner is a Sonnet lane. The surface is test files in go/internal/core. Admission decides; the narrowed protected fence lands soon. The intended route is lane. On 2026-10-27, evolve inbox route-lane refused it, because go/internal/explanationdocs/ is in the protected fence today. The item has no route field, so admission decides when the narrowed fence lands.",
+  "priority_class": "performance",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Plan docs/plans/ci-wall-time-2026-10.md, component C14 (decision D23). Spec: docs/architecture/ci-telemetry-and-critical-path.md. C14 starts only if C2 keeps core or the other git-heavy packages on macOS, and only with the spawn counts of C13. C2 landed in PR #1002.",
+  "title": "CI wall time C14: fewer git processes in the macOS-heavy tests, only under decision D23",
+  "weight": 0.2
+}

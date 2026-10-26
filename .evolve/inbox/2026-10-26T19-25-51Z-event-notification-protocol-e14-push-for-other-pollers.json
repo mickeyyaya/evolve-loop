@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "the E14 tests of plan section 11 pass, from TestLoopStopWait_EndsOnLoopExitWithoutAPoll to TestPhaseObserver_WakesOnWritesAndKeepsOneDeadline",
+    "the no-poll guard includes the migrated files and passes",
+    "each new and changed function has 100% coverage"
+  ],
+  "created_at": "2026-10-26T19:23:03Z",
+  "deps": [],
+  "files": [
+    "go/cmd/evolve/cmd_loop_stop.go",
+    "go/cmd/evolve/cmd_loop_detach.go",
+    "go/internal/dashboard/",
+    "go/internal/bridge/channel/",
+    "go/internal/adapters/observer/"
+  ],
+  "fix": "Replace each poll timer with a wait on internal/events/wake and internal/events/reader. loop-stop --wait ends on loop.exit. loop --detach confirms the boot on loop.started. The dashboard, the bridge producer, the bridge supervisor and the phase observer wake on writes and keep one deadline.",
+  "id": "event-notification-protocol-e14-push-for-other-pollers",
+  "kind": "feature",
+  "notes": "Plan: docs/plans/event-notification-protocol-2026-10.md section 11, E14. The surface includes go/internal/bridge/channel, not a gate file. Admission decides; the narrowed protected fence lands soon. The intended route is lane. On 2026-10-27, evolve inbox route-lane refused it, because go/internal/bridge/channel/ is in the protected fence today. The item has no route field, so admission decides when the narrowed fence lands.",
+  "priority_class": "performance",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Plan docs/plans/event-notification-protocol-2026-10.md, component E14. Spec: docs/architecture/event-channels.md. Section 2 of the plan lists these poll timers. They are loop-stop --wait (200 ms), loop --detach (200 ms) and the dashboard (2 s). They are also the bridge channel producer (2 s), the bridge supervisor (500 ms) and the phase observer.",
+  "title": "Event channels E14: loop-stop --wait, the detach boot wait, the dashboard, the bridge producer and supervisor, and the phase observer wake on events",
+  "weight": 0.3
+}

@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "TestRunner_PutsTheMessagesAfterTheCycleContextBoundary passes",
+    "TestHookPostToolUse_PrintsAdditionalContext and TestHookRewake_ExitsTwoWithTheFrame pass",
+    "TestAgyNudge_IsFixedTextWithTheCount passes",
+    "TestAuditRunner_AttachesEvidenceToTheBuildRecord passes",
+    "each new and changed function has 100% coverage"
+  ],
+  "created_at": "2026-10-26T19:23:03Z",
+  "deps": [],
+  "files": [
+    "go/internal/phases/runner/runner.go",
+    "go/internal/agentmsg/delivery/",
+    "go/internal/bridge/inbox/"
+  ],
+  "fix": "Render the messages section after cycleContextBoundary in go/internal/phases/runner/runner.go. Add the PostToolUse hook output and the rewake hook with exit 2 and the frame. Add the fixed-text agy nudge through bridge/inbox. Attach the audit evidence to the build record.",
+  "id": "agent-messaging-m5-deliverers",
+  "kind": "feature",
+  "notes": "Plan: docs/plans/agent-messaging-2026-10.md section 11, M5. The surface includes go/internal/bridge/inbox, not a gate file. Admission decides; the narrowed protected fence lands soon. M5 ships unwired. The intended route is lane. On 2026-10-27, evolve inbox route-lane refused it, because go/internal/phases/runner/runner.go is in the protected fence today. The item has no route field, so admission decides when the narrowed fence lands.",
+  "priority_class": "feature",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Plan docs/plans/agent-messaging-2026-10.md, component M5. Spec: docs/architecture/agent-messaging.md. The runner renders the messages after the cycle context boundary. The Claude hooks print the frame. agy gets a fixed-text nudge with the count.",
+  "title": "Agent messaging M5: the deliverers (the prompt section, the Claude hooks and the agy nudge)",
+  "weight": 0.4
+}
