@@ -69,3 +69,36 @@ func TestUnmarshal_ReturnsTheLibraryErrorUnchanged(t *testing.T) {
 		t.Fatalf("Unmarshal error = %v, want %v", err, wantErr)
 	}
 }
+
+func TestUnmarshalStrict_RefusesAnUnknownField(t *testing.T) {
+	t.Parallel()
+	var got doc
+
+	err := yamlcodec.UnmarshalStrict([]byte("name: a\ncolour: red\n"), &got)
+
+	if err == nil || !strings.Contains(err.Error(), "colour") {
+		t.Fatalf("UnmarshalStrict error = %v, want a refusal that names the field colour", err)
+	}
+}
+
+func TestUnmarshalStrict_DecodesAKnownDocument(t *testing.T) {
+	t.Parallel()
+	var got doc
+
+	err := yamlcodec.UnmarshalStrict([]byte("name: a\ncount: 2\ntags: [x]\n"), &got)
+
+	if err != nil || got.Name != "a" || got.Count != 2 || len(got.Tags) != 1 {
+		t.Fatalf("UnmarshalStrict = %+v, %v; want the decoded doc", got, err)
+	}
+}
+
+func TestUnmarshalStrict_RefusesAnEmptyDocument(t *testing.T) {
+	t.Parallel()
+	var got doc
+
+	err := yamlcodec.UnmarshalStrict([]byte(""), &got)
+
+	if err == nil {
+		t.Fatal("UnmarshalStrict of an empty document = nil error, want a refusal")
+	}
+}
