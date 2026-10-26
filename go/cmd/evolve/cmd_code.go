@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	codeUsage = "usage: evolve code callers <symbol> [--direction in|out] | api <file> | find <query> | map [dir]  [--project-root P] | usage [--since D] [--json]"
+	codeUsage = "usage: evolve code callers <symbol> [--direction in|out] | api <file> | find <query> | map [dir]  [--project-root P] [--json] | refresh [--project-root P] [--json] | usage [--since D] [--json]"
 
 	codeExitNotFound    = 1
 	codeExitAbsent      = 2
@@ -36,11 +36,33 @@ const (
 	codeQueryTimeout = 30 * time.Second
 )
 
-type codeBackendsBuilder func(projectRoot string) (codeindex.Backends, error)
+type codeIndexHandle struct {
+	backends    codeindex.Backends
+	freshness   func(context.Context) (codeIndexFreshness, error)
+	refuseStale bool
+}
+
+type codeBackendsBuilder func(projectRoot string) (codeIndexHandle, error)
 
 type codeInvocation struct {
 	request     codeindex.Request
 	projectRoot string
+	json        bool
+}
+
+type codeHitJSON struct {
+	File   string `json:"file"`
+	Line   int    `json:"line"`
+	Symbol string `json:"symbol"`
+	Text   string `json:"text"`
+}
+
+type codeQueryData struct {
+	Hits      []codeHitJSON `json:"hits"`
+	Stale     *bool         `json:"stale,omitempty"`
+	Behind    *int          `json:"behind,omitempty"`
+	IndexHead string        `json:"index_head,omitempty"`
+	MainHead  string        `json:"main_head,omitempty"`
 }
 
 var codeUsageCacheDir = os.UserCacheDir
@@ -49,36 +71,62 @@ func runCodeCommand(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) > 0 && args[0] == codeUsageVerbName {
 		return codeUsageVerb(args[1:], stdout, stderr, codeUsageCacheDir, codeProjectRoot(""))
 	}
+	if len(args) > 0 && args[0] == codeRefreshVerbName {
+		return codeRefreshVerb(args[1:], stdout, stderr, defaultCodeIndexHost(), os.Getenv, codeIndexRefreshTimeout)
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	sink := codeUsageSink{env: os.Getenv, cacheDir: codeUsageCacheDir, rootOf: func() string { return codeProjectRoot("") }}
-	return codeVerbLogged(ctx, args, stdout, stderr, func(root string) (codeindex.Backends, error) {
-		return buildCodeBackends(root, sysexec.DefaultRunner, os.Environ())
+	return codeVerbLogged(ctx, args, stdout, stderr, func(root string) (codeIndexHandle, error) {
+		return buildCodeIndex(root, defaultCodeIndexHost())
 	}, sink)
 }
 
 func codeVerb(ctx context.Context, args []string, stdout, stderr io.Writer, build codeBackendsBuilder) (int, codeCall) {
 	inv, err := parseCodeArgs(args, stderr)
 	call := codeCall{verb: codeVerbName(args), root: inv.projectRoot}
+	out := codeEnvelopeWriter{schema: "evolve.code." + cmp.Or(call.verb, "query") + "/1", json: slices.Contains(args, "--json"), stdout: stdout, stderr: stderr}
 	if err != nil {
-		fmt.Fprintf(stderr, "evolve code: %v\n%s\n", err, codeUsage)
-		return codeExitUsage, call
+		return out.fail(codeExitUsage, "usage", fmt.Sprintf("evolve code: %v\n%s", err, codeUsage)), call
 	}
+	out.json = inv.json
 	call.argLen = len(inv.request.Arg)
-	backends, err := build(inv.projectRoot)
+	idx, err := build(inv.projectRoot)
 	if err != nil {
-		fmt.Fprintf(stderr, "evolve code: %v\n", err)
-		return codeExitFailed, call
+		return out.fail(codeExitFailed, "failed", fmt.Sprintf("evolve code: %v", err)), call
 	}
 	ctx, cancel := context.WithTimeout(ctx, codeQueryTimeout)
 	defer cancel()
-	hits, err := backends.Search(ctx, inv.request)
+	check := checkCodeFreshness(ctx, idx, string(inv.request.Query))
+	out.warnings = check.warnings
+	for _, w := range check.warnings {
+		fmt.Fprintln(stderr, w)
+	}
+	if check.refused != "" {
+		return out.fail(codeExitStale, "stale", check.refused), call
+	}
+	hits, err := idx.backends.Search(ctx, inv.request)
 	if err != nil {
-		return reportCodeError(inv.request, err, stderr), call
+		rc, kind, message := codeErrorOutcome(inv.request, err)
+		return out.fail(rc, kind, message), call
 	}
 	call.hits = len(hits)
-	printCodeHits(hits, stdout)
-	return 0, call
+	if !out.json {
+		printCodeHits(hits, stdout)
+	}
+	return out.ok(codeQueryResult(hits, check.fresh)), call
+}
+
+func codeQueryResult(hits []codeindex.Hit, fresh *codeIndexFreshness) codeQueryData {
+	data := codeQueryData{Hits: make([]codeHitJSON, 0, len(hits))}
+	for _, h := range hits {
+		data.Hits = append(data.Hits, codeHitJSON{File: h.File, Line: h.Line, Symbol: h.Symbol, Text: h.Text})
+	}
+	if fresh != nil {
+		stale, behind := fresh.stale(), fresh.Behind
+		data.Stale, data.Behind, data.IndexHead, data.MainHead = &stale, &behind, fresh.Head, fresh.Main
+	}
+	return data
 }
 
 func codeVerbName(args []string) string {
@@ -88,20 +136,16 @@ func codeVerbName(args []string) string {
 	return ""
 }
 
-func reportCodeError(req codeindex.Request, err error, stderr io.Writer) int {
+func codeErrorOutcome(req codeindex.Request, err error) (int, string, string) {
 	switch {
 	case errors.Is(err, codeindex.ErrNotFound):
-		fmt.Fprintf(stderr, "evolve code %s: no result for %s\n", req.Query, codeSubject(req.Arg))
-		return codeExitNotFound
+		return codeExitNotFound, "not_found", fmt.Sprintf("evolve code %s: no result for %s", req.Query, codeSubject(req.Arg))
 	case errors.Is(err, codeindex.ErrAbsent):
-		fmt.Fprintf(stderr, "evolve code %s: %v (see docs/architecture/code-index-cli.md, section 4)\n", req.Query, err)
-		return codeExitAbsent
+		return codeExitAbsent, "absent", fmt.Sprintf("evolve code %s: %v (see docs/architecture/code-index-cli.md, section 4)", req.Query, err)
 	case errors.Is(err, codeindex.ErrUnsupported):
-		fmt.Fprintf(stderr, "evolve code %s: %v\n", req.Query, err)
-		return codeExitUnsupported
+		return codeExitUnsupported, "unsupported", fmt.Sprintf("evolve code %s: %v", req.Query, err)
 	}
-	fmt.Fprintf(stderr, "evolve code %s: %v\n", req.Query, err)
-	return codeExitFailed
+	return codeExitFailed, "failed", fmt.Sprintf("evolve code %s: %v", req.Query, err)
 }
 
 func codeSubject(arg string) string {
@@ -131,6 +175,7 @@ func parseCodeArgs(args []string, stderr io.Writer) (codeInvocation, error) {
 	fs.SetOutput(stderr)
 	direction := fs.String("direction", string(codeindex.DirectionIn), "callers: in (who calls it) or out (what it calls)")
 	root := fs.String("project-root", "", "project root (default: $EVOLVE_PROJECT_ROOT or cwd)")
+	asJSON := fs.Bool("json", false, "print one evolve.code.<verb>/1 envelope on stdout with the hits and the index freshness")
 	positional, err := parseInterleaved(fs, args[1:])
 	if err != nil {
 		return codeInvocation{}, err
@@ -141,7 +186,7 @@ func parseCodeArgs(args []string, stderr io.Writer) (codeInvocation, error) {
 	if err != nil {
 		return codeInvocation{}, err
 	}
-	return codeInvocation{request: req, projectRoot: codeProjectRoot(*root)}, nil
+	return codeInvocation{request: req, projectRoot: codeProjectRoot(*root), json: *asJSON}, nil
 }
 
 func parseInterleaved(fs *flag.FlagSet, args []string) ([]string, error) {
@@ -214,17 +259,23 @@ func checkoutRoot(dir string) string {
 	}
 }
 
-func buildCodeBackends(projectRoot string, run sysexec.RunFunc, env []string) (codeindex.Backends, error) {
+func buildCodeIndex(projectRoot string, host codeIndexHost) (codeIndexHandle, error) {
 	loc, err := loadCodeIndexLocation(projectRoot)
 	if err != nil {
-		return codeindex.Backends{}, err
+		return codeIndexHandle{}, err
 	}
-	return newCodeBackends(loc, run, env)
+	backends, err := newCodeBackends(loc, host.run, host.env)
+	if err != nil {
+		return codeIndexHandle{}, err
+	}
+	fresh := func(ctx context.Context) (codeIndexFreshness, error) { return host.freshness(ctx, loc.indexDir) }
+	return codeIndexHandle{backends: backends, freshness: fresh, refuseStale: loc.stale == policy.CodeIndexStaleRefuse}, nil
 }
 
 type codeIndexLocation struct {
 	backends           []string
 	indexDir, trailBin string
+	stale              string
 }
 
 func loadCodeIndexLocation(projectRoot string) (codeIndexLocation, error) {
@@ -240,7 +291,7 @@ func loadCodeIndexLocation(projectRoot string) (codeIndexLocation, error) {
 	if err != nil {
 		return codeIndexLocation{}, err
 	}
-	return codeIndexLocation{backends: cfg.Backends, indexDir: indexDir, trailBin: trailBin}, nil
+	return codeIndexLocation{backends: cfg.Backends, indexDir: indexDir, trailBin: trailBin, stale: cfg.Stale}, nil
 }
 
 func newCodeBackends(loc codeIndexLocation, run sysexec.RunFunc, env []string) (codeindex.Backends, error) {
@@ -261,8 +312,8 @@ func resolveCodeIndexPaths(projectRoot string, cfg policy.CodeIndexSettings) (in
 	}
 	hub, err := plane.ResolveHub(projectRoot)
 	if err != nil {
-		return "", "", fmt.Errorf("code_index.index_dir %q and code_index.trail_bin %q are relative to the hub root, but %s is not a hub worktree: %w",
-			cfg.IndexDir, cfg.TrailBin, projectRoot, err)
+		return "", "", fmt.Errorf("%w: code_index.index_dir %q and code_index.trail_bin %q are relative to the hub root, but %s is not a hub worktree: %w",
+			errCodeIndexAbsent, cfg.IndexDir, cfg.TrailBin, projectRoot, err)
 	}
 	return underHub(hub.Root, cfg.IndexDir), underHub(hub.Root, cfg.TrailBin), nil
 }

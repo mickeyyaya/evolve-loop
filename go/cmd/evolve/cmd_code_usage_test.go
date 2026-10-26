@@ -123,7 +123,7 @@ func TestCodeVerbLogged_ANotFoundExitIsLoggedWithItsExitCode(t *testing.T) {
 func TestCodeVerbLogged_ABackendBuildFailureIsLogged(t *testing.T) {
 	t.Parallel()
 	sink, path := userSink(t, nil)
-	build := func(string) (codeindex.Backends, error) { return codeindex.Backends{}, errors.New("no policy") }
+	build := func(string) (codeIndexHandle, error) { return codeIndexHandle{}, errors.New("no policy") }
 
 	rc, _, _ := runLogged(t, sink, build, "map")
 

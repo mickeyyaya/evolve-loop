@@ -228,7 +228,7 @@ func waveStepVerbs(e waveEnvelope) []string {
 	return out
 }
 
-var waveFullSteps = []string{"checkpoint", "loop-stop", "pr", boundaryRatchetVerb, "sync-main", "quality", "gc", waveBuildVerb, "reset-sha", "doctor", waveCodeRefreshVerb, "loop-stop", boundaryLogVerb, "loop"}
+var waveFullSteps = []string{"checkpoint", "loop-stop", "pr", boundaryRatchetVerb, "sync-main", "quality", "gc", waveBuildVerb, "reset-sha", "doctor", "loop-stop", boundaryLogVerb, "loop"}
 
 func TestWaveNext_DryRunComposesTheGoalAndWritesNothing(t *testing.T) {
 	t.Parallel()
@@ -477,7 +477,7 @@ func TestWaveNext_TextOutputEndsWithTheLaunchedWave(t *testing.T) {
 	rc := h.run("next", "--project-root", p.root)
 
 	out := h.stdout.String()
-	if rc != 0 || !strings.Contains(out, "boundary: step 1/13: evolve checkpoint save --all") ||
+	if rc != 0 || !strings.Contains(out, "boundary: step 1/12: evolve checkpoint save --all") ||
 		!strings.HasSuffix(out, fmt.Sprintf("wave: launched wave 1: run %s, pid %d, goal %d bytes\n", gcpolicy.LogRunID(waveTestClock), waveTestPID, len(waveFirstGoal()))) {
 		t.Errorf("rc = %d stdout:\n%s", rc, out)
 	}

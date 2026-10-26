@@ -10,22 +10,27 @@ const (
 	defaultCodeIndexBackend = "trail"
 	defaultCodeIndexDir     = "dev/code-index"
 	defaultCodeIndexTrail   = "dev/.tools/trail/node_modules/.bin/trail"
+
+	CodeIndexStaleWarn   = "warn"
+	CodeIndexStaleRefuse = "refuse"
 )
 
 type CodeIndexPolicy struct {
 	Backends []string `json:"backends,omitempty"`
 	IndexDir *string  `json:"index_dir,omitempty"`
 	TrailBin *string  `json:"trail_bin,omitempty"`
+	Stale    *string  `json:"stale,omitempty"`
 }
 
 type CodeIndexSettings struct {
 	Backends []string
 	IndexDir string
 	TrailBin string
+	Stale    string
 }
 
 func (p Policy) CodeIndexConfig() (CodeIndexSettings, error) {
-	out := CodeIndexSettings{Backends: []string{defaultCodeIndexBackend}, IndexDir: defaultCodeIndexDir, TrailBin: defaultCodeIndexTrail}
+	out := CodeIndexSettings{Backends: []string{defaultCodeIndexBackend}, IndexDir: defaultCodeIndexDir, TrailBin: defaultCodeIndexTrail, Stale: CodeIndexStaleWarn}
 	c := p.CodeIndex
 	if c == nil {
 		return out, nil
@@ -43,7 +48,20 @@ func (p Policy) CodeIndexConfig() (CodeIndexSettings, error) {
 	if out.TrailBin, err = codeIndexPath("trail_bin", c.TrailBin, out.TrailBin); err != nil {
 		return CodeIndexSettings{}, err
 	}
+	if out.Stale, err = codeIndexStale(c.Stale); err != nil {
+		return CodeIndexSettings{}, err
+	}
 	return out, nil
+}
+
+func codeIndexStale(set *string) (string, error) {
+	if set == nil {
+		return CodeIndexStaleWarn, nil
+	}
+	if *set != CodeIndexStaleWarn && *set != CodeIndexStaleRefuse {
+		return "", fmt.Errorf("policy: code_index.stale %q: want %s|%s", *set, CodeIndexStaleWarn, CodeIndexStaleRefuse)
+	}
+	return *set, nil
 }
 
 func validateCodeIndexBackends(names []string) error {
