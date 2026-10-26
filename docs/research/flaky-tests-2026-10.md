@@ -7,7 +7,7 @@
   - `gh api .../runs/<id>/jobs?filter=all` for each of the 914 runs, and `gh run view <id> --attempt <n> --log-failed` for each of the 161 red attempts.
   - The `go test -json` streams (`test-integration.json`) of 473 coverage artifacts of the red runs. The streams exist from C0 on (2026-10-17).
   - `evolve ci classify <run> --json` on three runs, with `--project-root` set to a worktree, so that no item reached the live inbox.
-  - Code reads at `origin/main` 6ded88874 with `path:line`, and local repeats of two tests. A quoted CI message keeps the line number of the head of its run.
+  - Code reads at `origin/main` 6ded88874 with `path:line`, and local repeats of two tests. A quoted CI message keeps the line number of the head of its run. The line numbers hold at 6ded88874, before #1150 and #1151.
   - The open and consumed inbox items that name a flake, the console review notes, and `docs/incidents/`.
   - Live web searches on 2026-10-26 (section 8).
 - Each local claim names its command or file. "Synthesis" marks our own inference.
@@ -44,10 +44,10 @@ The operator asked on 2026-10-26: "Please investigate flaky tests which wastes o
 The answer in short:
 
 - Eight tests flaked in 14 days, in 21 occurrences. They cost about 1,135 runner minutes of 34,050 Go job minutes (3.3%).
-- Two of the eight are already fixed on `main` (#1006 and #1134). Six are open, and each has one inbox item.
+- Four of the eight are fixed: #1006, #1134 and #1150 are on `main`, and #1151 is open. Four are open, and section 11 lists their items.
 - They made `main` red seven times and held 14 pull requests for a retry.
 - Each flake has a cause in the test design, and a rule of this repository can prevent each cause. Section 7 gives the rules and the guards.
-- The request named seven candidates. Two are flakes (ranks 4 and 6). Four are real defects: `acs/cycle10` on `main`, the predicates of cycle 1946, the predicates of cycle 1950, and the #1132 hang. The #1132 hang class is also a test-design fault. The `internal/guards` failure has no record. Section 5 gives the detail.
+- The request named seven candidates. Two are flakes (ranks 4 and 6), and #1151 and #1150 fix them. Four are real defects: `acs/cycle10` on `main`, the predicates of cycle 1946, the predicates of cycle 1950, and the #1132 hang. The #1132 hang class is also a test-design fault. The `internal/guards` failure has no record. Section 5 gives the detail.
 
 ## 2. How the census tells a flake from a fixture
 
@@ -81,15 +81,15 @@ The rate is the count divided by the jobs on that platform while the test existe
 | 1 | `TestChannel_EndToEnd` | `internal/bridge/channel` | ubuntu 4, macOS 1 | 5 of 1,544 jobs, 0.32% | 271 | poll order across two files | fixed by #1006: 0 of 971 jobs after it |
 | 2 | `TestRealTmux_AFailedStartLeavesNoEnvFile` | `internal/bridge` | macOS | 4 of 41 jobs, 9.8% | 210 | async teardown of a pane | fixed by #1134: 0 of 35 jobs after it |
 | 3 | `TestCancelKillsTheProcessGroup_CancelReapsTheGrandchildToo` | `internal/phases/ship` | macOS | 3 of 830 jobs, 0.36% | 175 | process and signal timing under load | open, cause not proven |
-| 4 | `TestDispatchEvaluateBatch_Concurrent` | `internal/core` | macOS | 3 of 830 jobs, 0.36% | 167 | a sleep that must create an overlap | open |
+| 4 | `TestDispatchEvaluateBatch_Concurrent` | `internal/core` | macOS | 3 of 830 jobs, 0.36% | 167 | a sleep that must create an overlap | fixed by #1151 (open on 2026-10-26): a barrier replaces the sleep |
 | 5 | `TestE2ECLIFallbackChain` (cleanup) | `cmd/evolve` | macOS | 2 of 830 jobs, 0.24% | 113 | git maintenance child against `t.TempDir()` | open |
-| 6 | `TestRealTmux_AKilledSessionLeavesNoEnvFile` | `internal/bridge` | ubuntu | 2 of 81 jobs, 2.5% | 98 | tmux server lifecycle | open |
+| 6 | `TestRealTmux_AKilledSessionLeavesNoEnvFile` | `internal/bridge` | ubuntu | 2 of 81 jobs, 2.5% | 98 | tmux server lifecycle | fixed by #1150 (fab29d408): the server starts with `exit-empty off` |
 | 7 | `TestRealTmux_NewSessionInBindsPaneCwd` | `internal/bridge` | ubuntu 1.23 | 1 of 843 jobs, 0.12% | 52 | one read of an async state | open |
 | 8 | `TestWatch_AnOversizedBodyIsRecordedWithATruncationNote` | `internal/practicewatch` | ubuntu 1.27 | 1 of 842 jobs, 0.12% | 49 | a wall-clock deadline under load | open |
 
 The run ids of each row are in section 4. Two costs are upper bounds. Run 39041577057 (rank 1) and run 39262811729 (rank 3) also had other red tests, so a retry was necessary for those reasons too.
 
-Rank 6 has the highest rate of the open flakes. It entered `main` on 2026-10-25 and failed twice in its first day. The ubuntu jobs average 120 for each day (1,685 in 14 days). At 2.5% and 49 minutes for each occurrence, rank 6 costs about 147 minutes for each day. So it becomes the costliest flake in one to two days (synthesis, an estimate).
+Rank 6 had the highest rate: 2.5% in its first day on `main`. At that rate it costs about 147 minutes for each day (120 ubuntu jobs for each day, 49 minutes for each occurrence). #1150 fixed it on its second day (synthesis, an estimate).
 
 The #1132 hang is not in the table, because its first cause is a defect of that pull request (section 5, F5.3). It cost the most runner time of any single red: 280 macOS minutes.
 
@@ -101,7 +101,7 @@ The #1132 hang is not in the table, because its first cause is a defect of that 
 - Message: `e2e_test.go:76: answer text = "", want substring "3 bullets"` (line 112 at an older head).
 - Cause: the writer goroutine appends the text to `build-stdout.log` and then the marker `idle_reached` to `build-stderr.log` (`go/internal/bridge/channel/e2e_test.go:67-68`). Before #1006, `Normalizer.classifyNewLines` (called by `Poll`) read stdout and then stderr. If both lines arrived between the two reads, the classifier saw `idle_reached` first. The span of the answer then closed before the text got its sequence number.
 - Fix: #1006 (commit 1541b16bf, merged 2026-10-20T04:20Z) reads stderr first and then stdout, and still classifies the stdout lines first (`go/internal/phasestream/normalizer.go:102-117`). `go/internal/phasestream/normalizer_order_test.go` pins the order. The test failed in 5 of 1,544 jobs before #1006 and in 0 of 971 jobs after it.
-- Two items name this test. The consumed item `channel-e2e-timing-flake` (2026-09-14) fixed an earlier symptom. The open item `three-tests-flake-under-full-suite-load` (2026-10-17) still lists it, but #1006 removed that part.
+- Two items name this test. The consumed item `channel-e2e-timing-flake` (2026-09-14) fixed an earlier symptom. The open item `three-tests-flake-under-full-suite-load` (2026-10-17) listed it too. The console removed it from that item on 2026-10-26.
 
 *Implication:* no item. The product had the same window, and #1006 fixed it in the product, not in the test.
 
@@ -123,13 +123,15 @@ The #1132 hang is not in the table, because its first cause is a defect of that 
 
 *Implication:* the first step is a diagnosis, not a fix. On a failure, the test must log the exit status and the time from `cancel()` to the exit. It must also log the state of the grandchild.
 
-### F4.4 `TestDispatchEvaluateBatch_Concurrent`: a sleep must create the overlap
+### F4.4 `TestDispatchEvaluateBatch_Concurrent`: fixed by #1151
 
 - Runs: 38846276793 (`main`), 39462372493 (#1056), 40268371666 (#1138, which does not touch `internal/core`). All on macOS.
 - Message: `evaluate_batch_dispatch_test.go:100: phases did not overlap (maxActive=1, want ≥2) — they ran serially`.
 - Cause: each fake runner counts itself active, sleeps 20 ms and leaves (`go/internal/core/evaluate_batch_dispatch_test.go:37-46`). The test proves the overlap only if the second goroutine starts in those 20 ms. On a loaded runner, the scheduler can start it later.
 
-*Implication:* replace the sleep with a barrier. Each runner signals its arrival and waits until both runners arrive, with a deadline of some seconds. A serial dispatch then fails on the deadline with a clear message, and a concurrent dispatch always passes.
+- Fix: #1151 (open on 2026-10-26, CI running) replaces the sleep with a rendezvous barrier. Each batch member waits until all members arrive. A serial dispatch misses the barrier and fails after 30 s with a record of the miss. The review of #1151 found no defect in `dispatchEvaluateBatch`.
+
+*Implication:* no item. Rule R2 records the lesson: a barrier proves an overlap, and a sleep never does.
 
 ### F4.5 `TestE2ECLIFallbackChain`: the git maintenance child against `t.TempDir()`
 
@@ -139,15 +141,18 @@ The #1132 hang is not in the table, because its first cause is a defect of that 
 
 *Implication:* move the e2e fixture to `gittest`, or give the repository the same two config values. The ratchet entry then goes away. Run 39489674181 (#1084) has a different red of the same test on two platforms. That red is a real defect of #1084, not this flake.
 
-### F4.6 `TestRealTmux_AKilledSessionLeavesNoEnvFile`: the tmux server exits between two starts
+### F4.6 `TestRealTmux_AKilledSessionLeavesNoEnvFile`: fixed by #1150
 
 - Runs: 40268053917 (#1147, a docs-only change), 40269836920 `attempt` 1 (#1139, a docs-only change, a rerun passed). Both on ubuntu.
 - Message: `tmux_hermetic_env_integration_test.go:160: start early-18: exit status 1` and `start early-1: exit status 1`.
-- Cause (synthesis): the test starts and kills 20 sessions on a private socket (`tmux_hermetic_env_integration_test.go:157-165`). No `tmuxtest.StartServer` starts that server, so it has the default `exit-empty on`. Each kill removes the last session, and the server exits. The next start can reach a server that is still in its exit. Two facts support this cause: the first start (`early-0`) never failed, and a failure needs a server that existed before.
-- Local repeats: `-count=30` on darwin passed 30 of 30. 300 start and kill cycles on a private socket with tmux on darwin had no failure. No Linux host was available, so the cause stays a hypothesis.
-- A gap: `NewSessionEnv` returns `exit status 1` without the output of tmux (`go/internal/bridge/tmux.go:148-158`). The red log thus cannot show the cause.
+- Cause, as the census first wrote it: the test starts and kills 20 sessions on a private socket (`tmux_hermetic_env_integration_test.go:157-165`). No `tmuxtest.StartServer` starts that server, so it has the default `exit-empty on`. Each kill removes the last session, and the server exits. The next start can reach a server that is still in its exit. Two facts support this cause: the first start (`early-0`) never failed, and a failure needs a server that existed before.
+- Local repeats: `-count=30` on darwin passed 30 of 30. 300 start and kill cycles on a private socket with tmux on darwin had no failure. No Linux host was available, so the census left the cause as a hypothesis.
+- A gap, fixed by #1150: `NewSessionEnv` returned `exit status 1` without the output of tmux (`go/internal/bridge/tmux.go:148-158`). So the red log did not show the cause.
 
-*Implication:* start the private server with `tmuxtest.StartServer(socket)`, which sets `exit-empty off`, and stop it in the cleanup. Also add the tmux output to the start error.
+- Fix: #1150 (merged as fab29d408) proved the cause. Six hermetic tests start their own socket with the default `exit-empty on`. A kill of the only session stops the server, and tmux 3.4 leaves the socket file. The next `new-session` then connects to a server in its exit.
+- #1150 starts each of those servers with `exit-empty off` and puts the tmux output in each start error. The guard `TestIntegrationTests_EveryOwnSocketStartsItsOwnServer` (`go/internal/bridge/tmux_own_server_guard_test.go`) fails a test that uses its own socket and does not start its own server.
+
+*Implication:* no item. Rule R5 records the lesson, and the guard of #1150 enforces it in `internal/bridge`.
 
 ### F4.7 `TestRealTmux_NewSessionInBindsPaneCwd`: one read of an async state
 
@@ -203,10 +208,10 @@ The #1132 hang is not in the table, because its first cause is a defect of that 
 | Class | Flakes | How it fails | Rule (section 7) |
 |---|---|---|---|
 | Async state read once | F4.2 (fixed), F4.7 | the test reads a state that another process sets later | R1 |
-| A sleep that must create an order or an overlap | F4.4 | the scheduler does not keep the expected order under load | R2 |
+| A sleep that must create an order or an overlap | F4.4 (fixed) | the scheduler does not keep the expected order under load | R2 |
 | A wall-clock deadline in a test that is not about time | F4.8 | a loaded runner passes the deadline | R3 |
 | Poll order across two sources | F4.1 (fixed) | one poll sees the later event first | R4 |
-| A shared server lifecycle | F4.6 | the server of the test exits or changes between two steps | R5 |
+| A shared server lifecycle | F4.6 (fixed) | the server of the test exits or changes between two steps | R5 |
 | A git child against the temporary directory | F4.5 | a detached child writes while the cleanup removes the directory | R6 |
 | Process and signal timing under load | F4.3 | not proven | R7 |
 | An unbounded wait | F5.3 | a red becomes a hang of hours | R8 |
@@ -221,10 +226,10 @@ Each rule says what a test must do, what already enforces it, and where a guard 
 | Id | Rule | Findings | Exists today | Where a guard can enforce it |
 |---|---|---|---|---|
 | R1 | A test that reads a state that another process sets must poll it until a deadline. It must not read it once. | F4.2, F4.7 | No shared helper. `waitForFeed` in `internal/bridge/channel/e2e_test.go:12` and `gone` in the busy-loop test are local copies. | A shared helper `testhost.Eventually` (or one in `internal/tmuxtest` for tmux reads). An AST guard over integration-tagged files can flag a `display-message` or a `Glob` result that a test checks without the helper. |
-| R2 | A test of concurrency must prove the overlap with a barrier and a deadline. It must not sleep. | F4.4 | Nothing. 113 `time.Sleep` calls are in 76 test files. | A ratchet of `time.Sleep` calls in tests, like `internal/rawgitratchet`: a list of allowances that can only shrink. |
+| R2 | A test of concurrency must prove the overlap with a barrier and a deadline. A sleep never proves an overlap. | F4.4 | #1151 (open) does this for `TestDispatchEvaluateBatch_Concurrent`. No guard. 113 `time.Sleep` calls are in 76 test files at 6ded88874. | A ratchet of `time.Sleep` calls in tests, like `internal/rawgitratchet`: a list of allowances that can only shrink. |
 | R3 | A test that is not about a deadline must not depend on a short wall-clock deadline. Inject the clock or the deadline. | F4.8 | Some packages inject `Now` (`practicewatch` does it for timestamps but not for the fetch deadline). | Review only. `testing/synctest` (Go 1.25) gives a fake clock, but the CI still runs Go 1.23, so it cannot be used yet. |
 | R4 | When the product reads two sources, the test must script the order of the reads, not race them. | F4.1 | `go/internal/phasestream/normalizer_order_test.go` (#1006) pins the read order of the normalizer. | Review only. |
-| R5 | A test that runs real tmux must run on a private socket. A test that needs its own server must start it with `tmuxtest.StartServer` (`exit-empty off`) and stop it in its cleanup. | F4.6 | `tmuxtest.Main` gives each binary a private socket in `internal/bridge` and `internal/looppreflight`. `cmd/evolve` and `internal/swarm` set `TMUX_TMPDIR`. Each package that runs real tmux has one of the two. | A guard in `internal/bridge` can fail a test that sets `TmuxSocketEnv` to a new socket and does not call `tmuxtest.StartServer` for it. |
+| R5 | A test that runs real tmux must run on a private socket. A test on its own socket must start its own server with `exit-empty off` and stop it in its cleanup. | F4.6 | `tmuxtest.Main` gives each binary a private socket in `internal/bridge` and `internal/looppreflight`. `cmd/evolve` and `internal/swarm` set `TMUX_TMPDIR`. #1150 adds `TestIntegrationTests_EveryOwnSocketStartsItsOwnServer` in `internal/bridge`. | The guard of #1150 covers `internal/bridge`. Extend it to each other package that starts its own tmux socket. |
 | R6 | A git fixture must come from `internal/gittest`. | F4.5 | `internal/rawgitratchet` fails a new raw fixture. 117 files still have allowances in `baseline.json`. | The ratchet exists. Migrate the files that flaked first, starting with `cmd/evolve/e2e_cycle_cli_matrix_test.go`. |
 | R7 | A test of process signals must report the exit status and the times on failure, so that the next red names its cause. | F4.3 | Nothing. | Review only. |
 | R8 | An integration test must bound each wait with a context deadline of the test. A test binary must not leave a process that holds its output pipe. | F5.3 | PR #1141 (open) adds `integration_wait_guard_test.go` for the bridge, and `tmuxtest.Main` stops an orphan server. | After #1141 merges, extend the AST guard from `internal/bridge` to every integration-tagged package. |
@@ -254,17 +259,15 @@ Each rule says what a test must do, what already enforces it, and where a guard 
 - A rerun replaces the stream of `attempt` 1. For those runs, the census read the log only.
 - The rate uses all jobs of a platform as the denominator. Some jobs did not run the package of the test, so a real rate can be higher.
 - The costs of a retry without a record are estimates (section 3).
-- The causes of F4.3 and F4.6 are not proven. No Linux host was available for a local repeat.
+- The cause of F4.3 is not proven. #1150 proved the cause of F4.6 after the census.
 
 ## 11. Inbox items
 
-The console filed one `console-manual` item for each open flake, in the order of section 3. F4.1 and F4.2 have no item, because #1006 and #1134 fixed them.
+The console filed one `console-manual` item for each open flake, in the order of section 3. F4.1, F4.2, F4.4 and F4.6 have no item, because #1006, #1134, #1151 and #1150 fix them. The console withdrew the two items of ranks 4 and 6 after #1150 and #1151. It also removed `TestChannel_EndToEnd` from the open item `three-tests-flake-under-full-suite-load`.
 
 | Rank | Item |
 |---|---|
 | 3 | `flake-ship-cancel-wait-reports-a-clean-exit` |
-| 4 | `flake-evaluate-batch-overlap-by-sleep` |
 | 5 | `flake-e2e-fallback-raw-git-tempdir-cleanup` |
-| 6 | `flake-realtmux-killed-session-server-exits` |
 | 7 | `flake-realtmux-pane-cwd-read-once` |
 | 8 | `flake-practicewatch-oversized-body-deadline` |
