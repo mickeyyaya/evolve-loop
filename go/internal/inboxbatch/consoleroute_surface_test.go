@@ -51,15 +51,15 @@ func TestConsoleRouted_ReplaysTheFourteenRefusalsThatNameAProtectedFile(t *testi
 
 func TestConsoleRouted_UndeclaredSurfaceIsTheFilesTheTextNames(t *testing.T) {
 	for _, field := range []string{"title", "summary", "fix", "notes", "root_cause", "problem", "details"} {
-		rec := `{"id":"x","kind":"bug","` + field + `":"see go/internal/bridge/autorespond.go for the stall"}`
-		if ok, reason := routed(t, rec); !ok || !strings.Contains(reason, "go/internal/bridge/autorespond.go") {
+		rec := `{"id":"x","kind":"bug","` + field + `":"see go/internal/bridge/sandbox_wrap.go for the stall"}`
+		if ok, reason := routed(t, rec); !ok || !strings.Contains(reason, "go/internal/bridge/sandbox_wrap.go") {
 			t.Errorf("%s: ConsoleRouted = %v %q, want console naming the mentioned file", field, ok, reason)
 		}
 	}
 	if ok, reason := routed(t, `{"id":"y","kind":"bug","fix":"tighten go/internal/inboxbatch/item.go and docs/architecture/x.md"}`); ok {
 		t.Errorf("unprotected file mentions routed console: %q", reason)
 	}
-	if ok, _ := routed(t, `{"id":"z","kind":"bug","fix":"see go\/internal\/bridge\/autorespond.go"}`); !ok {
+	if ok, _ := routed(t, `{"id":"z","kind":"bug","fix":"see go\/internal\/bridge\/sandbox_wrap.go"}`); !ok {
 		t.Error(`an escaped "\/" path must still be read as a mention`)
 	}
 }
@@ -79,7 +79,7 @@ func TestConsoleRouted_MachineFieldsAreNotTheItemsText(t *testing.T) {
 }
 
 func TestConsoleRouted_DeclaredSurfaceWinsOverMentions(t *testing.T) {
-	rec := `{"id":"w","kind":"bug","files":["go/internal/inboxbatch/item.go"],"summary":"the stall shows in go/internal/bridge/autorespond.go"}`
+	rec := `{"id":"w","kind":"bug","files":["go/internal/inboxbatch/item.go"],"summary":"the stall shows in go/internal/bridge/sandbox_wrap.go"}`
 	if ok, reason := routed(t, rec); ok {
 		t.Errorf("declared unprotected surface routed console by a prose mention: %q", reason)
 	}
@@ -110,7 +110,7 @@ func TestItem_DeclaredSurface(t *testing.T) {
 }
 
 func TestConsoleRouted_MentionDerivationKeepsTheClamp(t *testing.T) {
-	const text = `"fix":"edit go/internal/bridge/autorespond.go"`
+	const text = `"fix":"edit go/internal/bridge/sandbox_wrap.go"`
 	if ok, _ := routed(t, `{"id":"a","kind":"bug","route":"lane",`+text+`}`); ok {
 		t.Error("operator-authored route:lane override was not honored")
 	}
@@ -145,7 +145,7 @@ func TestConsoleRouted_ADirectoryThatOnlyContainsProtectedFilesIsLaneWork(t *tes
 
 func TestItem_UnmarshalJSON_DerivesTheMentionedSurface(t *testing.T) {
 	var it inboxbatch.Item
-	if err := it.UnmarshalJSON([]byte(`{"id":"u","kind":"bug","fix":"see go/internal/bridge/autorespond.go"}`)); err != nil {
+	if err := it.UnmarshalJSON([]byte(`{"id":"u","kind":"bug","fix":"see go/internal/bridge/sandbox_wrap.go"}`)); err != nil {
 		t.Fatalf("UnmarshalJSON: %v", err)
 	}
 	if it.ID != "u" || it.Kind != "bug" {

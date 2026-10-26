@@ -80,8 +80,8 @@ func TestIsProtectedScope_JudgesTheDirectorySpellingOfACleanPath(t *testing.T) {
 	if IsProtectedScope("go/internal/core/../../internal/") {
 		t.Error("a directory spelling that cleans to go/internal/ only contains protected surface and must stay out of scope")
 	}
-	if !IsProtectedScope("go/internal/core/../bridge/sub/") {
-		t.Error("a directory spelling that cleans to go/internal/bridge/sub/ lies inside a fragment and must stay in scope")
+	if !IsProtectedScope("go/internal/core/../commitgate/sub/") {
+		t.Error("a directory spelling that cleans to go/internal/commitgate/sub/ lies inside a fragment and must stay in scope")
 	}
 }
 

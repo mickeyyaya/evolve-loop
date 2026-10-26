@@ -30,9 +30,9 @@ func TestTouchesProtectedSurface_ADirectoryThatContainsAFragmentIsProtected(t *t
 
 func TestTouchesProtectedSurface_APathInsideAFragmentOrEqualToOneIsProtected(t *testing.T) {
 	inside := []string{
-		"go/internal/bridge",
-		"go/internal/bridge/",
-		"go/internal/bridge/sub/",
+		"go/internal/commitgate",
+		"go/internal/commitgate/",
+		"go/internal/commitgate/sub/",
 		"/wt/go/internal/phases/runner/verdict/settle",
 		"Skills/Audit/references/",
 		"go/internal/core/build_handoff_floor.go",
@@ -48,12 +48,12 @@ func TestTouchesProtectedSurface_APathInsideAFragmentOrEqualToOneIsProtected(t *
 
 func TestTouchesProtectedSurface_APathThatMeetsNoFragmentIsFree(t *testing.T) {
 	free := []string{
-		"go/internal/inboxbatch/",
+		"go/internal/inboxstamps/",
 		"go/internal/inboxsplit",
 		"go/internal/core/observer.go",
 		"go/internal/core/observer.go/",
 		"go/internal/core/build_handoff",
-		"go/internal/bridgex",
+		"go/internal/commitgatex",
 		"go/internal/phases/runner/runner_x.go",
 		"go/Makefile",
 		"docs",
