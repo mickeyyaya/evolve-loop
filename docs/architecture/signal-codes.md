@@ -379,6 +379,9 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `SHIP_GIT_PUSH_POLICY_REFUSED` | atomic-ship: origin refused the push by policy (a protected branch, a hook, a rule, a token scope or an access refusal); ship does not retry it, unwinds the lane to the audited shape, and the router ends the cycle with no re-audit (precondition) |
 | `SHIP_GIT_PUSH_REJECTED` | atomic-ship: the remote rejected the push |
 | `SHIP_GIT_STAGE_FAILED` | atomic-ship: staging failed (transient) |
+| `SHIP_HELD_FOR_OPERATOR` | atomic-ship: at held_proposals.stage enforce, a lane change that touches the fence or works a pipeline-kind item waits for evolve landing approve of its tree; main did not move (ADR-0157) |
+| `SHIP_HELD_PROPOSAL_REJECTED` | atomic-ship: the operator rejected this tree of a held proposal with evolve landing reject; main did not move (ADR-0157) |
+| `SHIP_HOLD_SHADOW` | at held_proposals.stage shadow, a lane landing that touches the fence or works a pipeline-kind item lands, and the ship records that enforce would hold it for the operator (ADR-0157); fields.cycle, tree, reasons |
 | `SHIP_INTEGRITY_TREE_DRIFT` | post-ship: the shipped tree drifted from the verified one (integrity) |
 | `SHIP_INVALID_CLASS` | verify-class: unknown ship class |
 | `SHIP_LANDING_BINARY_RESET_FAILED` | git checkout HEAD -- <binary> before the ff-merge exited non-zero or failed to spawn; the merge still runs and may fail if the tracked binary is dirty; fields.step=integrate, path, git_rc, git_err |

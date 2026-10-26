@@ -100,3 +100,4 @@
 ./internal/inputindex 100
 ./internal/cli/contextcmd 100
 ./internal/guidance 100
+./internal/heldproposal 100

@@ -833,3 +833,4 @@
 ./internal/cli/contextcmd
 # guidance - the rule registry reader, the build of guidance/index.md, guidance/index.json and the L0 region of AGENTS.md, and the check of the registry.
 ./internal/guidance
+./internal/heldproposal

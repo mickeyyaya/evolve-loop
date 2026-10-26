@@ -50,6 +50,7 @@ func TestWorktreeShipLand_PushesTheLaneCommitBeforeMainMoves(t *testing.T) {
 		"merge-base --is-ancestor main " + pinHead + " [discard]",
 		"diff --name-status -z -M -l0 --diff-filter=DR main " + pinHead + " [capture]",
 		"diff --name-only -z --no-renames --diff-filter=A main " + pinHead + " -- go/acs/ [capture]",
+		"diff --name-only -z --no-renames main " + pinHead + " [capture]",
 		"rev-parse " + pinHead + "^{tree} [capture]",
 		"rev-parse main [capture]",
 		"read-tree " + pinHead + " [other]",

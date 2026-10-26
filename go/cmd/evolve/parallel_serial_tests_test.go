@@ -1,6 +1,12 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestLanding_ABrokenRecordAndAFailedWriteAreErrors":                                                "swaps seam landingCredential",
+	"main.TestLanding_AProcessWithoutTheDispatchCredentialCannotDecide":                                     "swaps seam landingCredential",
+	"main.TestLanding_EachRefusalWritesNoApproval":                                                          "swaps seam landingCredential",
+	"main.TestLanding_ListShowsEachHeldCycle":                                                               "swaps seam landingCredential",
+	"main.TestLanding_TheOperatorApprovesTheHeldTree":                                                       "swaps seam landingCredential",
+	"main.TestLanding_TheOperatorRejectsTheHeldTree":                                                        "swaps seam landingCredential",
 	"main.TestRunGuidance_ARepoRootFailureExitsTwo":                                                         "swaps seam guidanceRepoRoot",
 	"main.TestGuidanceFamilies_NamesEachModelFamilyOnceAndFailsOnABadManifest":                              "swaps seams guidanceManifestNames and guidanceLoadManifest",
 	"main.TestPRRefresh_AConflictOutsideTheGeneratedRegionIsNeverStaged":                                    "swaps seam prRefreshWorktree",
