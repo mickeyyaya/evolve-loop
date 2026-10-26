@@ -66,18 +66,18 @@ This section documents the closed-vocabulary fields those blocks use.
 
 The registry has 25 rows. The production code reads more names than that. Many names are built as `"EVOLVE_" + "X"`, so a literal grep misses them. Each reader is in one of five classes.
 
-**(a) Pipeline markers.** The pipeline sets them for its own child processes. They stay, as one named Go list (X18b). Only these names reach a cell.
+**(a) Pipeline markers.** The pipeline sets them for its own child processes. They stay, as one named Go list: `ipcenv.Markers()` in `go/internal/ipcenv/markers.go` (X18b). The list has 24 `EVOLVE_*` names and 9 `BRIDGE_*` names. Only its part `ipcenv.CellMarkers()` reaches an LLM cell.
 
 | Group | Names | Reader |
 |---|---|---|
 | Roots | `EVOLVE_PROJECT_ROOT`, `EVOLVE_PLUGIN_ROOT` | many |
-| Dispatch | `EVOLVE_DISPATCH_ID`, `EVOLVE_DISPATCH_DEPTH`, `EVOLVE_MSG_TOKEN` | `events/rootwire`, `subagent/recursion.go`, `agentmsg/boot` |
+| Dispatch | `EVOLVE_DISPATCH_ID`, `EVOLVE_DISPATCH_DEPTH`, `EVOLVE_MSG_TOKEN`, `EVOLVE_PHASE` | `events/rootwire`, `subagent/recursion.go`, `agentmsg/boot`, `guards/phase.go` |
 | Fleet and cycle (`ipcenv`) | `EVOLVE_FLEET`, `EVOLVE_FLEET_SCOPE`, `EVOLVE_FLEET_WIDTH`, `EVOLVE_FLEET_REACH_HOLDER`, `EVOLVE_WORKTREE_ROOT`, `EVOLVE_CYCLE_STATE_FILE`, `EVOLVE_TMUX_SOCKET` | `go/internal/ipcenv/ipcenv.go:5-18` |
 | Fan-out worker | `EVOLVE_FANOUT_WORKER_TOKEN`, `EVOLVE_FANOUT_WORKER_NAME`, `EVOLVE_FANOUT_CYCLE`, `EVOLVE_FANOUT_WORKSPACE`, `EVOLVE_FANOUT_PARENT_AGENT`, `EVOLVE_FANOUT_WORKER_ARTIFACT`, `EVOLVE_FANOUT_CACHE_PREFIX_FILE` | `subagent/dispatchparallel.go:176-178`, `fanoutdispatch` |
 | Protocol | `EVOLVE_BRIDGE_PIDFILE`, `EVOLVE_PHASE_RECOVERY_STAGE`, `EVOLVE_SHIP_RELEASE_NOTES`, `EVOLVE_CLI` | `bridge/engine.go:33`, `cli/phasecmd/phase_observer.go:155`, `ship/gitops.go:372`, `codeindex/usagelog/usagelog.go:28` |
 | Bridge launch | `BRIDGE_CLI`, `BRIDGE_RUN_ID`, `BRIDGE_COMPLETION`, `BRIDGE_PERMISSION_MODE`, `BRIDGE_SESSION_NAME`, `BRIDGE_STREAM_OUTPUT`, `BRIDGE_REQUIRE_FULL`, `BRIDGE_REQUIRE_SANDBOX`, `BRIDGE_HUMAN_INPUT_FLAG` | `bridge/launch.go:275-297` |
 
-**(b) Operator knobs.** They change the flow. They move into `.evolve/policy.json`, strict-decoded, and the pipeline reads them at each cycle or boundary (X18c).
+**(b) Operator knobs.** They change the flow. They move into `.evolve/policy.json`, strict-decoded, and the pipeline reads them at each cycle or boundary (X18c). Until then, `ipcenv.UnmovedControls()` lists them with the class (c) names, so a cycle still gets them.
 
 | Names | Reader | Note |
 |---|---|---|
@@ -123,6 +123,19 @@ The registry has 25 rows. The production code reads more names than that. Many n
 | `EVOLVE_PROMPTS_DIR` | `prompts/prompts.go:36` |
 | `BRIDGE_TESTING`, `BRIDGE_<X>_BINARY` | `bridge/driver_common.go:13-17` |
 | `CG_TEST_INSTALL`, `CG_TEST_FORCE_MISSING` | `cli/guardcmd/commitgate.go:58-59` |
+
+The guard `TestNoControlFlagReadOutsideTheMarkerList` (`go/internal/guards/control_flags_test.go`) keeps this inventory true:
+
+- It reads each non-test Go file and finds each read of an environment name. A read is a call of `os.Getenv`, `os.LookupEnv` or an `envchain` reader, or an index of a map whose variable or field name contains `env`. A function that passes its parameter to a read is a reader too.
+- It folds a constant concatenation such as `"EVOLVE_" + "X"`, also through a constant of another package and a local variable. A part that is not constant becomes `*`, so `"EVOLVE_" + agent + "_CLI"` is `EVOLVE_*_CLI`.
+- It fails on each `EVOLVE_*` or `BRIDGE_*` name that is not a marker, a control not yet moved or a declared test seam (class (e)). It also fails on a declared control or seam that no code reads.
+- `TestControlFlagLists_OnlyShrink` holds the ceilings: 29 controls not yet moved and 6 test seams.
+- Limits: the guard finds a read by its form, not by its type.
+  - A table entry counts as a read only when its field is `key`, as in `envDials` of `config/env.go`.
+  - A read whose name has no constant prefix is not judged.
+  - An index of a map with another name, for example `vars["EVOLVE_X"]`, is not seen.
+  - A scan of `os.Environ()` with `strings.HasPrefix` is not seen.
+- The flag registry (`go/internal/flagregistry`) is the documented index of this file. `ipcenv` holds the classes that the code applies at run time. X18e adds the test that ties the two.
 
 The paths in the tables are under `go/internal/` unless they start with `cmd/`. The names `EVOLVE_BYPASS_SHIP_GATE`, `EVOLVE_BYPASS_ROLE_GATE`, `EVOLVE_BYPASS_SHIP_VERIFY` and `EVOLVE_BYPASS_PREFIX_GATE` appear only in tests and in the CHANGELOG on `603389ebd`. They have no production reader, so they are not in a class.
 

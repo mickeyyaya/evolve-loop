@@ -291,7 +291,7 @@ The environment of a child is the union of three closed sets, and nothing else:
 - In `shadow`, the builder computes both environments. It logs each dropped name once for each wave and emits `ISOLATION_I2_VIOLATION` with the name, not the value. The child still gets today's environment.
 - In `enforce`, the child gets only the union.
 - `process_env_test.go` flips to assert the allowlist (`TestProcessEnv_IsTheAllowlistPlusTheManifest`).
-- The pipeline markers are one named list (I-16, §27). X2 closed review finding H2 inside the bridge with the explicit list `pipelineEnvMarkers` (§6.1). X18b makes one list the only source for the whole pipeline: `buildCycleEnv` still copies each `EVOLVE_*` name into the cycle.
+- The pipeline markers are one named list, `ipcenv.Markers()` (I-16, §27). X2 closed review finding H2 inside the bridge with a list of its own. X18b moved that list into `ipcenv`, so the bridge and the cycle read the same data. `buildCycleEnv` now copies only the `EVOLVE_*` names that `ipcenv.Carried` accepts.
 
 #### 6.1 As built (X2)
 
@@ -305,7 +305,7 @@ The builder is `Deps.cellEnv` in `go/internal/bridge/hermetic_env.go`. Each LLM 
 | `shadow` | today's environment, one `ISOLATION_I2_VIOLATION` for each dropped name, `action=logged` |
 | `enforce` | the union only, one `ISOLATION_I2_VIOLATION` for each dropped name, `action=refused` |
 | Base allowlist | the names of the table above and each `LC_*` name |
-| Pipeline markers | an explicit list, `pipelineEnvMarkers`: `EVOLVE_PROJECT_ROOT`, `EVOLVE_WORKTREE_ROOT`, `EVOLVE_CYCLE_STATE_FILE`, `EVOLVE_TMUX_SOCKET` and the four `EVOLVE_FLEET*` keys. It applies to the launcher and to `Deps.Env`. A gate or bypass name (`EVOLVE_BYPASS_*`, `EVOLVE_SANDBOX*`, `EVOLVE_MSG_TOKEN`, `BRIDGE_*`) never reaches a child at `enforce`. |
+| Pipeline markers | the cell part of the marker list, `ipcenv.CellMarkers()` (X18b): `EVOLVE_PROJECT_ROOT`, `EVOLVE_WORKTREE_ROOT`, `EVOLVE_CYCLE_STATE_FILE`, `EVOLVE_TMUX_SOCKET`, the four `EVOLVE_FLEET*` keys, `EVOLVE_DISPATCH_DEPTH` and `EVOLVE_PHASE`. It applies to the launcher and to `Deps.Env`. A gate or bypass name (`EVOLVE_BYPASS_*`, `EVOLVE_SANDBOX*`, `EVOLVE_MSG_TOKEN`, `BRIDGE_*`) never reaches a child at `enforce`. |
 | Operator opt-ins | `BRIDGE_ALLOW_ANTHROPIC_BASE_URL=1` passes `ANTHROPIC_BASE_URL`, and `BRIDGE_ALLOW_OPENAI_API_KEY=1` passes `OPENAI_API_KEY`. So the route that the operator opted into stays the route of the child. |
 | Excluded always | `EVOLVE_DISPATCH_ID` (the dispatch adds its own tag), and each name that is not a shell identifier |
 | Filter | `ipcenv.Keep`, the allowlist twin of the `ipcenv.Scrub` deny list |
@@ -385,7 +385,7 @@ A worked example: the scout pane of cycle 7 runs `claude --version` from its Bas
 | Item | As built |
 |---|---|
 | Markers | `ipcenv.DispatchDepthKey` (`EVOLVE_DISPATCH_DEPTH`) and `ipcenv.PhaseKey` (`EVOLVE_PHASE`). `Deps.cellMarkers` sets the depth of the launcher plus 1, and the phase to `cfg.Agent`. |
-| Path of the markers | `Deps.cellEnv` adds them to `Deps.Env`, and both names are in `pipelineEnvMarkers`. So each stage of §6.1 gives them to the child. A tmux pane and a recipe pane also get them as `export` lines before the launch line. At `shadow` such a pane inherits the environment of the server. |
+| Path of the markers | `Deps.cellEnv` adds them to `Deps.Env`, and both names are in `ipcenv.CellMarkers()`. So each stage of §6.1 gives them to the child. A tmux pane and a recipe pane also get them as `export` lines before the launch line. At `shadow` such a pane inherits the environment of the server. |
 | Refusals that now fire | `evolve agent run` (`go/internal/cli/agentcmd/run.go:93`) and the boundary writes (`go/cmd/evolve/boundary_write.go:14`). Both read the depth through `subagent.ReadDispatchDepth`, which calls `ipcenv.DispatchDepth`. `subagent run` only checks its depth cap of 3, and `phase`, `loop` and `wave` read no marker. |
 | Strength of the markers | advisory. `env -u EVOLVE_DISPATCH_DEPTH -u EVOLVE_PHASE evolve agent run` passes the marker refusal. The dispatch credential (§7.1.1) is the layer that does not depend on the agent. Row N4 now proves that layer. |
 | `EVOLVE_SANDBOX=off` in a phase | `launchSwept` refuses the launch when the launcher carries `EVOLVE_PHASE` and the mode is `off`. The error is `bridge.ErrSandboxOffInPhase`, the exit code is `ExitSafetyGate`, and the bridge emits `ISOLATION_I3_VIOLATION` with `action=refused` and `rule=sandbox.off.phase`. |
@@ -1055,7 +1055,7 @@ The stub for each family declares the same capabilities as the real manifest. Th
 
 | Row | Check | Invariant | Turned green by | Owner test | State at X1 |
 |---|---|---|---|---|---|
-| N1 | `CLAUDECODE=1` on the parent does not reach any seat | I-2 | X2 | the matrix (M1 run, policy `isolation.i2.stage=enforce`) | green (X2) |
+| N1 | `CLAUDECODE=1`, `EVOLVE_SANDBOX` and `EVOLVE_BYPASS_SHIP_GATE` on the parent do not reach any seat | I-2 | X2 | the matrix (M1 run, policy `isolation.i2.stage=enforce`) | green (X2) |
 | N2 | the AST guard finds no LLM spawn outside the bridge launch API | I-1 | X3 | `internal/sysexec` | green (X3) |
 | N3 | a phase pane cannot exec `claude --version` | I-3 | X4 | sandbox contract | green (X4) |
 | N4 | `evolve agent run` in a cell with the env markers stripped is refused at `enforce` (darwin only) | I-3 | X4 | the sandbox contract | green (X4) |
@@ -1466,8 +1466,8 @@ The operator said on 2026-10-25: "this refactory is also the good timing to remo
 
 ### Issue
 
-- `buildCycleEnv` copies each `EVOLVE_*` variable of the operator shell into the cycle (`go/cmd/evolve/cmd_loop_args.go:341-352`).
-- The review of #1122 (H2) found that the first X2 build passed each `EVOLVE_*` and `BRIDGE_*` name. At `enforce` the merged X2 passes only `pipelineEnvMarkers` (§6.1). At the default `shadow` each name still reaches the child, and `buildCycleEnv` still copies each `EVOLVE_*` name into the cycle.
+- Before X18b, `buildCycleEnv` copied each `EVOLVE_*` variable of the operator shell into the cycle (`go/cmd/evolve/cmd_loop_args.go:341-352` on `603389ebd`).
+- The review of #1122 (H2) found that the first X2 build passed each `EVOLVE_*` and `BRIDGE_*` name. At `enforce` the merged X2 passed only its own marker list (§6.1). Before X18b, at the default `shadow` each name reached the child, and `buildCycleEnv` copied each `EVOLVE_*` name into the cycle.
 - So each knob and each bypass reaches each LLM child (F5.5). `EVOLVE_SANDBOX`, which §7 refuses in a phase, is one of them.
 - `policy.Parse` ignores an unknown key (`go/internal/policy/patch.go:9-21`), so a knob that moves into the policy file needs a strict decode first (F5.4).
 - The registry has 26 rows, but the header of control-flags.md says 35, and many readers are not in the registry (F5.1, F5.3).
@@ -1482,7 +1482,7 @@ A deny list in the bridge cannot keep up with new names, which is the same reaso
 
 | Class | Count | Fix | Item |
 |---|---|---|---|
-| (a) pipeline markers | 23 `EVOLVE_*`, 9 `BRIDGE_*` | one named Go list, for example `ipcenv.Markers()`. It is the only source of `EVOLVE_*` and `BRIDGE_*` names in a cell. It grows from `pipelineEnvMarkers` of X2. `buildCycleEnv` copies only these names. | X18b |
+| (a) pipeline markers | 24 `EVOLVE_*`, 9 `BRIDGE_*` | one named Go list, `ipcenv.Markers()` (built). It is the only source of `EVOLVE_*` and `BRIDGE_*` names in a cell. It grew from the bridge list of X2. | X18b |
 | (b) operator knobs | 18 | move into `.evolve/policy.json`, strict-decoded. The pipeline reads them at each cycle or boundary. One wave of shadow: an environment value that differs from the policy value prints a WARN and loses. | X18c |
 | (c) bypasses | 10 | an explicit CLI parameter that writes a ledger record and a `CONTROL_BYPASS_USED` signal, or removal | X18d |
 | (d) dead names | 6 | delete, with the registry rows | X18e |
@@ -1497,11 +1497,16 @@ X18a and X18b go first, in either order. X18c to X18e follow X18b, and X18c also
    - The loop refuses to start on a refused policy: the `cli-routing` preflight check halts and names the key (`TestLoopPreflight_AnUnknownPolicyKeyRefusesTheLoopStart`). The loop keeps no last-known-good copy. A boundary rebuild and a preflight run before each batch, and the plane policy changes only at a boundary.
    - A best-effort reader that runs mid-wave calls `policy.LoadOrDefaults`. It prints one `[policy] WARN` line and uses the compiled defaults, but each safety floor fails closed to `enforce`. 20 former silent readers use it, and the docs floor of the build handoff uses it too. The five readers under `internal/bridge` and `internal/adapters/bridge` still drop the error, because builders X3 and X4 change that code now; item `control-flags-bridge-policy-readers` moves them.
    - Rollout: a strict binary refuses a key that a newer PR adds, as the `floors` key of X6 did. At the boundary, rebuild the plane binary (`make -C <plane>/go build`) before the next `wave next`. `wave next` names that remedy when it meets `ErrUnknownKey`. Each PR that adds a policy key must add the schema field in the same PR.
-2. **X18b** adds the marker list and closes the `buildCycleEnv` leak. It adds the AST guard `TestNoControlFlagReadOutsideTheMarkerList`:
-   - It walks each non-test Go file and finds each `os.Getenv`, `os.LookupEnv` and `envchain` read.
-   - It resolves constant concatenations such as `"EVOLVE_"+"RESUME"`.
-   - It allows a name in the marker list, a knob that is not yet moved, or an outside name (`HOME`, `PATH`, `TMUX`, `CI`, `CLAUDE_CODE_*`).
-   - It fails on each other name. The list of knobs not yet moved can only shrink.
+2. **X18b** (built) adds the marker list and closes the `buildCycleEnv` leak.
+   - `ipcenv.Markers()` (`go/internal/ipcenv/markers.go`) has the 33 markers. `ipcenv.CellMarkers()` is the part that reaches an LLM cell, and the bridge reads it.
+   - `ipcenv.UnmovedControls()` has the 29 names and patterns of classes (b) and (c) that X18c and X18d have not moved. `ipcenv.Carried` accepts a marker or one of these.
+   - `buildCycleEnv` of `evolve loop` and the request of `evolve cycle run` copy only the `EVOLVE_*` names that `Carried` accepts (`carriedEnv`). No `BRIDGE_*` name of the shell reaches the cycle. `EVOLVE_BYPASS_SHIP_GATE` and each dead name stay out (`TestBuildCycleEnv_CarriesOnlyTheMarkersAndTheControlsNotYetMoved`). The class (b) knobs still reach the cycle, so X18b changes no knob.
+   - Row N1 of the matrix sets `EVOLVE_SANDBOX` and `EVOLVE_BYPASS_SHIP_GATE` on the parent. At `enforce` no seat gets them, and at `shadow` the row fails.
+   - It adds the AST guard `TestNoControlFlagReadOutsideTheMarkerList` (`go/internal/guards/control_flags_test.go`):
+     - It walks each non-test Go file and finds each `os.Getenv`, `os.LookupEnv` and `envchain` read. A function that passes its parameter to such a read is a reader too. An index of a map whose name contains `env` is a read.
+     - It resolves constant concatenations such as `"EVOLVE_"+"RESUME"`, also through a constant of another package.
+     - It judges only the `EVOLVE_*` and `BRIDGE_*` names, so an outside name (`HOME`, `PATH`, `TMUX`, `CI`, `CLAUDE_CODE_*`) needs no list. It allows a marker, a control that is not yet moved, and a declared test seam of class (e).
+     - It fails on each other name, and on a declared control or seam that no code reads. `TestControlFlagLists_OnlyShrink` holds the ceilings, so the lists can only shrink.
 3. **X18c** moves the 18 knobs. Each knob that duplicates a policy key (for example, `EVOLVE_MANDATORY_PHASES` and `mandatory_phases`) keeps the policy key.
 4. **X18d** turns each bypass into a parameter or removes it. `EVOLVE_OPERATOR_CONFIRM` already has the `-operator` flag as its primary surface.
 5. **X18e** deletes the dead names and moves the test seams.

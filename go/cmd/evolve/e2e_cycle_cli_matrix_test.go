@@ -85,6 +85,8 @@ type matrixRun struct {
 type stubCall struct {
 	binary     string
 	claudeCode string
+	sandbox    string
+	bypass     string
 	depth      string
 	agentRun   string
 	context    string
@@ -102,6 +104,7 @@ func runMatrixCycle(t *testing.T, row matrixRow, evolveBin, fakeBin, repoRoot st
 		"EVOLVE_PROMPTS_DIR="+repoRoot,
 		"EVOLVE_RESEARCH_HOOK_DISABLED=1",
 		"EVOLVE_SANDBOX=off",
+		"EVOLVE_BYPASS_SHIP_GATE=1",
 		"BRIDGE_TESTING=1",
 	)
 	for _, bin := range stubBinaries {
@@ -166,7 +169,7 @@ func stubScript(bin, fakeBin, callLog, evolveBin, probeDir, projRoot string) str
 		`  rc=$?; named=no; grep -q '` + agentRunRefusal + `' "` + probeDir + `/stderr" && named=yes; probe=$rc:$named` + "\n" +
 		"fi\n" +
 		contextProbe(evolveBin, projRoot) +
-		`printf '%s CLAUDECODE=%s EVOLVE_DISPATCH_DEPTH=%s AGENTRUN=%s CONTEXT=%s\n' ` + bin + ` "${CLAUDECODE-unset}" "${EVOLVE_DISPATCH_DEPTH-unset}" "$probe" "$ctx" >> "` + callLog + `"` + "\n" +
+		`printf '%s CLAUDECODE=%s EVOLVE_SANDBOX=%s EVOLVE_BYPASS_SHIP_GATE=%s EVOLVE_DISPATCH_DEPTH=%s AGENTRUN=%s CONTEXT=%s\n' ` + bin + ` "${CLAUDECODE-unset}" "${EVOLVE_SANDBOX-unset}" "${EVOLVE_BYPASS_SHIP_GATE-unset}" "${EVOLVE_DISPATCH_DEPTH-unset}" "$probe" "$ctx" >> "` + callLog + `"` + "\n" +
 		`exec "` + fakeBin + `" "$@"` + "\n"
 }
 
@@ -212,10 +215,14 @@ func readStubCalls(t *testing.T, path string) []stubCall {
 	var calls []stubCall
 	for _, line := range strings.Split(strings.TrimSpace(string(b)), "\n") {
 		f := strings.Fields(line)
-		if len(f) != 5 {
+		if len(f) != 7 {
 			t.Fatalf("stub call log line %q", line)
 		}
-		calls = append(calls, stubCall{binary: f[0], claudeCode: strings.TrimPrefix(f[1], "CLAUDECODE="), depth: strings.TrimPrefix(f[2], "EVOLVE_DISPATCH_DEPTH="), agentRun: strings.TrimPrefix(f[3], "AGENTRUN="), context: strings.TrimPrefix(f[4], "CONTEXT=")})
+		calls = append(calls, stubCall{
+			binary: f[0], claudeCode: strings.TrimPrefix(f[1], "CLAUDECODE="),
+			sandbox: strings.TrimPrefix(f[2], "EVOLVE_SANDBOX="), bypass: strings.TrimPrefix(f[3], "EVOLVE_BYPASS_SHIP_GATE="),
+			depth: strings.TrimPrefix(f[4], "EVOLVE_DISPATCH_DEPTH="), agentRun: strings.TrimPrefix(f[5], "AGENTRUN="), context: strings.TrimPrefix(f[6], "CONTEXT="),
+		})
 	}
 	return calls
 }
@@ -311,8 +318,10 @@ func (r matrixRun) contextNotOpened() error {
 
 func (r matrixRun) envLeak() error {
 	for _, c := range r.calls {
-		if c.claudeCode != "unset" {
-			return fmt.Errorf("CLAUDECODE=%s of the parent reached the %s seat", c.claudeCode, c.binary)
+		for _, v := range []struct{ name, value string }{{"CLAUDECODE", c.claudeCode}, {"EVOLVE_SANDBOX", c.sandbox}, {"EVOLVE_BYPASS_SHIP_GATE", c.bypass}} {
+			if v.value != "unset" {
+				return fmt.Errorf("%s=%s of the parent reached the %s seat", v.name, v.value, c.binary)
+			}
 		}
 	}
 	return nil

@@ -189,7 +189,7 @@ func (f cycleRunFlags) request(projectRoot string, environ []string) core.CycleR
 	return core.CycleRequest{
 		ProjectRoot:           projectRoot,
 		GoalHash:              f.goalHash,
-		Env:                   filterEvolveEnv(environ),
+		Env:                   carriedEnv(environ),
 		Context:               cycleContext(f.goalHash, f.goalText),
 		DisableWorkspaceGuard: disableWorkspaceGuardForTest,
 		BypassPolicy:          f.bypassPolicy,

@@ -163,7 +163,7 @@ The state on 2026-10-27. Each component re-reads this table before it starts.
 | Id | State | PR | Note |
 |---|---|---|---|
 | X1 | merged | #1121 | The matrix is `isolation.Rows` (`go/internal/isolation/matrix.go`). Rows M1 and N9 are green, and each other row is an expected failure with its owner. |
-| X2 | merged, stage `enforce` | #1122, #1159 | The stage key is `isolation.i2.stage`. PR #1159 set it to `enforce` on 2026-10-26. X2 closed review finding H2 in the bridge with the explicit list `pipelineEnvMarkers`. X18b makes one list the source for the whole pipeline. |
+| X2 | merged, stage `enforce` | #1122, #1159 | The stage key is `isolation.i2.stage`. PR #1159 set it to `enforce` on 2026-10-26. X2 closed review finding H2 in the bridge with the explicit list `pipelineEnvMarkers`. X18b moved that list into `ipcenv`. |
 | X1b | merged | #1128 | Follow-up of X1: a fake `tmux` (`go/internal/faketmux`), so the rows M2 to M4 run a full cycle and are green. |
 | X6 | merged | #1123 | `cli_routing.floors` holds the Claude floor, and its compiled default is `go/internal/policy/routing_defaults.json`. The flow seat defaults are routing data. |
 | X6b | not started | none | Follow-up of X6, item `isolation-floor-profiles-allowed-clis-as-routing-data`. 7 profiles still set `allowed_clis` to Claude families, so an agy-only table cannot compile yet (§6.2). |
@@ -177,7 +177,8 @@ The state on 2026-10-27. Each component re-reads this table before it starts.
 | X17a | merged | #1125 | `evolve loop status` with any extra word never starts a loop. |
 | X17e | merged | #1130 | Each `evolve` verb has an agent class (docs). |
 | X9 | built | this change | The manifest fields `parsers`, `collectors`, `transcript`, `capabilities`, `context_window` and `home_reads` pick one Go implementation for each format id (spec §11.1). Row N14 is green. Row M5 moves to X19c. Item `isolation-x9b-route-and-model-tables-from-manifests` owns the `llmroute` and `modelquery` tables. |
-| X11 to X16, X17b to X17d, X18b to X19 | not started | none | |
+| X18b | built | this change | `ipcenv.Markers()` is the one marker list, and the bridge reads its cell part. A cycle gets only a marker or a control not yet moved. The guard `TestNoControlFlagReadOutsideTheMarkerList` fails on any other `EVOLVE_*` or `BRIDGE_*` read. Row N1 also covers `EVOLVE_SANDBOX` and `EVOLVE_BYPASS_SHIP_GATE`. |
+| X11 to X16, X17b to X17d, X18c to X19 | not started | none | |
 
 ### 6.2 The X6 follow-up (X6b)
 
@@ -423,7 +424,7 @@ X19 has no scored designs. It is an operator directive of 2026-10-25, and §12.4
 
 1. X17a first. A wrong read can start a batch today.
 2. X18a and X17b in parallel. They touch different packages (`policy`, `cmd/evolve`).
-3. X18b after X2, which is merged. X18b grows the bridge list `pipelineEnvMarkers` of X2 into the one list of the pipeline.
+3. X18b after X2, which is merged. X18b grows the bridge list of X2 into the one list of the pipeline, `ipcenv.Markers()`.
 4. X17c and X17d after X17b, because they use its envelope and exit table.
 5. X18c, X18d and X18e after X18b. The guard of X18b then stops a new reader while the knobs move.
 6. X19a after X6, because X6 removes the family literals of the flow seats first. X19b follows X19a and X6b, because they edit the same profiles. X19c waits for X6b and for the manifest `capabilities` field of X9. The spec §28 has the map of what X19 leaves to X6, X6b, X7, X9, X10 and X18.
