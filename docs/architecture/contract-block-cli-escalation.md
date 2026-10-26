@@ -162,7 +162,7 @@ escalation. The two let recurrence analytics separate the three distinct diagnos
 can carry:
 
 - A different CLI family was tried and also failed (`escalated=true`).
-- A structured re-prompt was tried and the CLI still did not comply (`salvage_attempted=true`).
+- A structured re-prompt was tried and the CLI was still unable to comply (`salvage_attempted=true`).
 - No remedy was possible at all (both false).
 
 `formatContractGateDemotionWarn` reports the same three cases in prose. For that reason it takes the

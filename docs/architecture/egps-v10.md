@@ -10,7 +10,7 @@
 
 ## One sentence
 
-**Do not let any model — Builder, Auditor, or judge — report if the work is done. Let the exit code of the sandbox show if the work is done.**
+**Do not let any model — Builder, Auditor, or judge — report if the work is done. Let the exit code of the sandbox be the answer to the question: is the work done?**
 
 ## Verdict contract change (BREAKING)
 

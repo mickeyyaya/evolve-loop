@@ -82,8 +82,8 @@ The observer writes the report atomically (`.tmp` + rename) just before it exits
 (`internal/observerengine`, ADR-0103 unit 12) actually writes these keys: a flat object, 18 keys.
 The original bash design never produced the
 `observer` / `summary` / `tool_call_histogram` blocks and the `verdict` / `suggested_action` /
-`cache_hit_rate` fields (operator question 3 of
-the unit-12 doc):
+`cache_hit_rate` fields. This is operator question 3 of
+the unit-12 doc:
 
 ```json
 {

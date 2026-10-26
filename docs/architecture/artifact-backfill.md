@@ -31,8 +31,8 @@ After `ErrArtifactTimeout` exhaustion (`phaseMaxAttempts` reached):
 4. On success, the orchestrator synthesizes a `PhaseResponse{Verdict: VerdictWARN}`
    and allows the cycle to continue. Downstream phases (auditor, EGPS) see a WARN
    verdict, which is shippable but flagged.
-5. On failure (no header, too short, unknown phase, I/O error), the orchestrator
-   writes `<phase>-failure-diag.json` and aborts as before.
+5. Failure cases: no header, too short, unknown phase, I/O error. The orchestrator
+   then falls through to write `<phase>-failure-diag.json` and aborts as before.
 
 ---
 
@@ -67,11 +67,11 @@ wiring; adjust by modifying the `backfill.TryExtract` call site in
 ADR-0026 Stage 1 routes all stop conditions through `StopReviewer`. Backfill is a
 complementary **recovery path** at the retry-exhaustion seam:
 
-- **StopReviewer** decides *if* it must retry or abort, given a stop condition.
+- **StopReviewer** decides *if* to retry or abort, given a stop condition.
 - **Backfill** provides an artifact *reconstruction* path when retry-exhaustion is
   specifically due to a write-timeout (the phase completed, but the file write timed out).
 
-A future cycle can extend StopReviewer to distinguish "spinner-stuck" from
+Possible future work: StopReviewer distinguishes "spinner-stuck" from
 "completing-slowly" before it decides to try backfill or extend the retry budget.
 
 ---

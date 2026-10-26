@@ -66,7 +66,7 @@ The implementation keeps those responsibilities in one package while separating 
 
 The coordinator owns the mutable cross-iteration state. Extracted stages return a typed `batchDecision`; they do not stop the process or introduce a second result object.
 
-An interrupted batch is resumable. It can intentionally retain its worktree and checkpoint. A clean terminal batch destroys only resources it owns; inherited/operator tmux sockets and named REPL sessions have separate preservation rules.
+An interrupted batch is resumable. It is allowed to intentionally retain its worktree and checkpoint. A clean terminal batch destroys only resources it owns; inherited/operator tmux sockets and named REPL sessions have separate preservation rules.
 
 ## Cycle state machine
 
@@ -81,8 +81,8 @@ start → [intent] → scout → [triage] → [tdd] → [build-planner] → buil
 Square brackets show policy- or content-selected phases. This compact line is not the complete transition graph:
 
 - Scout and Triage are allowed to end early only when the deterministic early-exit floor says no shippable work exists. An explicit `triage-decision.json` with an empty array `top_n: []` supplies the commitment evidence. `null`, a missing field, a malformed decision, or any other shape is unknown and cannot authorize this path.
-- Audit FAIL can re-enter TDD or Build for a bounded repair, or route to Retrospective.
-- Ship failures can route through Debugger and retry stages allowed by the legal-successor graph.
+- Audit FAIL is allowed to re-enter TDD or Build for a bounded repair, or to route to Retrospective.
+- Ship failures are allowed to route through Debugger and retry stages allowed by the legal-successor graph.
 - Retrospective and post-Ship observer phases can be inserted by the router while the mandatory spine remains satisfied.
 
 Intent is optional by default. It runs when the workflow phase enable or cycle context requires it. `CycleState.IntentRequired` persists that choice so resume and fleet execution cannot silently choose a different start edge.
@@ -135,7 +135,7 @@ The registry contains mandatory spine phases and optional phases selected by pol
 | Retrospective | extract failure/success lessons | LLM | Routed | `retrospective-report.md` |
 | Memo | compact carryover context | LLM | Routed | `memo.md`, `carryover-todos.json` |
 
-The registry can contain more optional or user-defined phases. Their presence does not make them mandatory. The router proposes a plan; Core validates the plan against legal successors, phase availability, mandatory anchors, phase contracts, and the Ship floor. Built-in runtime contracts in `go/internal/phasecontract` are authoritative for artifact validation. The registry's TDD output is pinned to the same `test-report.md` name so planning documentation and runtime polling do not drift.
+The registry is allowed to contain more optional or user-defined phases. Their presence does not make them mandatory. The router proposes a plan; Core validates the plan against legal successors, phase availability, mandatory anchors, phase contracts, and the Ship floor. Built-in runtime contracts in `go/internal/phasecontract` are authoritative for artifact validation. The registry's TDD output is pinned to the same `test-report.md` name so planning documentation and runtime polling do not drift.
 
 ## Shared phase runner
 
@@ -147,7 +147,7 @@ The runner performs one ordered execution pipeline:
 2. load the persona, body, profile, and deliverable contract;
 3. resolve policy pins, CLI/model tiers, capability and health ordering, and universal fallback;
 4. create one worktree fence around the entire fallback chain;
-5. dispatch candidates through `llmroute.DispatchTiered` with try-local overlays;
+5. dispatch candidates through `llmroute.DispatchTiered` with `attempt`-local overlays;
 6. restore the fence before any reconciliation or classification;
 7. reconcile a valid deliverable after an infrastructure teardown without trusting a stale artifact;
 8. classify verified artifact bytes once, apply deterministic floors, and write the cleaned output companion.
@@ -170,7 +170,7 @@ The shared tmux REPL path has five conceptual stages:
 
 Those stages are implemented in `driver_tmux_prepare.go`, `driver_tmux_boot.go`, `driver_tmux_dispatch.go`, `driver_tmux_wait.go`, and `driver_tmux_channel.go`, with `driver_tmux_repl.go` retaining the ordered facade and final capture/disposition. The live-injection cursor establishes its EOF cutover before live-channel files are opened, so an envelope arriving during channel initialization remains observable.
 
-The completion wait remains an effectful state machine rather than a pure reducer. Its decisions depend on ordered pane captures, inbox drains, persistence gates, liveness aggregation, reviewer callbacks, prompt injection, clocks, and cancellation-detached final polling. If the machine converts to a pure transition table, then it requires a new event model, and the conversion can change fixture consumption and timing. The current boundary isolates the state machine for focused follow-up without claiming that design change as part of this behavior-preserving extraction.
+The completion wait remains an effectful state machine rather than a pure reducer. Its decisions depend on ordered pane captures, inbox drains, persistence gates, liveness aggregation, reviewer callbacks, prompt injection, clocks, and cancellation-detached final polling. A hypothetical conversion to a pure transition table needs a new event model. Such a conversion can change fixture consumption and timing. The current boundary isolates the state machine for focused follow-up without claiming that design change as part of this behavior-preserving extraction.
 
 Artifact completion, provider exhaustion, a dead/fatal pane, cancellation, transient upstream failure, and timeout are distinct terminal outcomes. Named sessions intentionally survive a launch so an allowed caller can resume them; ephemeral sessions are destroyed. Cleanup uses a detached bounded context because the request context is often already cancelled on the path that most needs cleanup.
 
@@ -186,7 +186,7 @@ Since slice 2 the gate also judges every declared **effect** (`phases[].effects`
 recover escaped writes → host normalization → review → optional correction → recover/normalize again → re-review
 ```
 
-A correction uses `interaction.NextCorrection` to choose a bounded rung. The rungs are salvage, live fix when supported, recover (the recovery agent, when the violation is repairable; ADR-0106), and redispatch. A redispatch can use a different CLI family only for the configured repeated-identical contract block. Temporary correction directives and routing overrides are restored before leaving the ladder.
+A correction uses `interaction.NextCorrection` to choose a bounded rung. The rungs are salvage, live fix when supported, recover (the recovery agent, when the violation is repairable; ADR-0106), and redispatch. A redispatch is allowed to use a different CLI family only for the configured repeated-identical contract block. Temporary correction directives and routing overrides are restored before leaving the ladder.
 
 Only after approval does Core refresh explanation evidence when required, latch Ship success, and run the final tree-diff guard. Registered minted paths and sanctioned generated binary churn have explicit handling; an unregistered source leak aborts rather than being converted to a warning.
 
@@ -257,7 +257,7 @@ The verifier then requires successful Scout and Triage ledger entries, plus Inte
 Configuration is not uniformly immutable. Preserve each setting's current lifetime:
 
 - Routing registry and most workflow/retry settings are resolved into the orchestrator or cycle snapshot.
-- Per-phase policy pins and model routing are resolved for the phase/try scope.
+- Per-phase policy pins and model routing are resolved for the phase/`attempt` scope.
 - `policy.StrictAuditFor` deliberately reloads project policy at its call site.
 - Cycle context and environment maps carry state across phases and are intentionally mutable at defined Core boundaries.
 - Provider token and cost fields are observations. Cost can be absent or cost-blind and is not a universal enforcement budget.

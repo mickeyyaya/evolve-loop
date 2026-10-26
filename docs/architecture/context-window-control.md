@@ -127,16 +127,16 @@ The two systems integrate at the threshold layer:
 3. **Implicit checkpoint** — when context is in the danger zone, the
    same `EVOLVE_CHECKPOINT_REQUEST=1` signal is set as for cost.
 
-An operator can run `/evo:loop --budget-usd 5 "<goal>"`. If the run
+This applies to a run such as `/evo:loop --budget-usd 5 "<goal>"`. If the run
 hits the context wall before the cost wall, the operator sees the same graceful pause
-behavior as if cost had hit first.
+as if cost had hit first.
 
 ## What v9.1.0 Cycle 6 does NOT do
 
 - **Mid-phase trim.** The autotrim runs at prompt-assembly time, not
   during an in-flight subagent's reasoning. The subagent's own context
   is its concern (the kernel can't see it).
-- **Selective phase exemption.** A future v9.2+ change can allow
+- **Selective phase exemption.** A possible future v9.2+ change is to allow
   `EVOLVE_CONTEXT_AUTOTRIM_EXCLUDE=retrospective` to skip autotrim for
   the synthesizer phase. Not yet implemented.
 - **Token-accurate measurement.** The 1-token≈4-bytes heuristic is an
@@ -237,7 +237,7 @@ Two invariants keep the evidence honest, both ACS-pinned:
 
 - **Conservation.** `CyclesJoined + len(NoData)` equals the number of dossiers on
   disk. A cycle with no usable ratio or no verdict is reported in `NoData`. It is
-  never bucketed as a fabricated `0.0`. In that case, it manufactures the very
+  never bucketed as a fabricated `0.0`. The risk is a fabricated `0.0` that manufactures the very
   correlation under measurement. Bucket counts sum to `CyclesJoined`.
 - **An empty corpus is an error, not a zero.** A project root with no dossiers
   exits non-zero rather than printing an all-zero report.

@@ -137,7 +137,7 @@ After v11.8.3 routes `.claude/settings.json` directly to `go/bin/evolve guard`, 
 - (b) Remove the rollback hatch entirely and rely on `git checkout v11.7.5` for emergencies.
 - Recommend (a) until v12.0.0 confidence is high, then drop in v12.
 
-## What the next session does first
+## Recommended first step for the next session
 
 1. Read this doc top-to-bottom.
 2. Verify the "active runtime references" table is still accurate with `grep -rln "legacy/scripts/" go/internal go/cmd .claude/settings.json` (filter out comments/provenance).

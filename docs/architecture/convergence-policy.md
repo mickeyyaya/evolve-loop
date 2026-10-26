@@ -155,7 +155,7 @@ type Decision struct {
 | after *N* | 3, **change the scope** | the exits in §3.1. **No round *N*+1.** | HIGH; CRITICAL never deferred |
 
 **Triggers:**
-- **Marginal gain ≤ 0 (CR2).** Take two cases: the repair damage of round *r* is at least its repairs, or there is no progress at the current bar. In either case, the next round goes **straight to the strategy change of rung 2**. If round *r* is already the final round, the loop goes to rung 3.
+- **Marginal gain ≤ 0 (CR2).** The condition is one of two. The repair damage of round *r* is at least its repairs, or there is no progress at the current bar. When it holds, the next round goes **straight to the strategy change of rung 2**. If round *r* is already the final round, the loop goes to rung 3.
 - **Concentration (CR5).** `C` ≥ `concentration_threshold` (default 0.6) on **two consecutive** windows, each with at least 5 findings, escalates **the hot component only**.
   - That component takes a rung-3 exit of its own: **split** if it is separable, or **accept with limits** if it is certified fail-safe.
   - The rest of the loop continues on the ladder.
@@ -246,14 +246,14 @@ Operator directive (2026-10-07): *"Convergence rule should also apply to evo loo
   - ship recovery: `maxRecoveryDepth` 2, or fleet width + 1;
   - the fleet-rebase replay: 100 steps;
   - correction ladders: per phase.
-- **Everything else** is caught only by `defaultMaxPhaseIterations = 32` (`core/cyclerun.go`). That is a crash guard, not a convergence rule, so a cycle can legally bounce through 32 dispatches.
+- **Everything else** is caught only by `defaultMaxPhaseIterations = 32` (`core/cyclerun.go`). That is a crash guard, not a convergence rule, so a cycle is allowed to bounce legally through 32 dispatches.
 - **Across cycles,** an inbox item is retried until `TaskRetryCeiling` (2) and then quarantined. `RepeatCeiling` (2) and the identical-fingerprint halt watch the batch. The response is binary: the same approach again, then quarantine. Nothing changes between attempts.
 
 **The policy covers three more scopes, all calling the same `Decide`:**
 
 | Scope | Loop name | Round | What the ladder changes | Final exit |
 |---|---|---|---|---|
-| **Within a cycle:** every backward edge combined | `cycle` | one round per backward edge taken (any of the edges above) | rung 1 at the 2nd backward edge: the next re-entry carries the accumulated findings and raises the effort of the fixer. Rung 2 at the 3rd: a fresh context (or a re-plan). The bar stays at the base (MEDIUM). A cycle defers nothing, so a raised bar can land past its open MEDIUM findings without a record of them. **Cross-loop oscillation:** the same failure fingerprint behind two different backward edges jumps to rung 3. | **`max_backward_edges`** (default 3) ends the cycle with a **Stop**: an ADR-0076 continuation, with the work preserved and the best round recorded. The cycle never crawls to the 32-iteration crash guard, which stays as a guard. |
+| **Within a cycle:** every backward edge combined | `cycle` | one round per backward edge taken (any of the edges above) | rung 1 at the 2nd backward edge: the next re-entry carries the accumulated findings and raises the effort of the fixer. Rung 2 at the 3rd: a fresh context (or a re-plan). The bar stays at the base (MEDIUM). A cycle defers nothing, so a raised bar, if used, lands past its open MEDIUM findings without a record of them. **Cross-loop oscillation:** the same failure fingerprint behind two different backward edges jumps to rung 3. | **`max_backward_edges`** (default 3) ends the cycle with a **Stop**: an ADR-0076 continuation, with the work preserved and the best round recorded. The cycle never crawls to the 32-iteration crash guard, which stays as a guard. |
 | **Across cycles:** one inbox item | `inbox-item` | one round per cycle try on the item, counted by its `failure_count` | try 2 (rung 1): the continuation brief carries the findings of the earlier try and the effort is raised. Try 3 (rung 2, the final try): a strategy change. It is a fresh plan at triage at the deep tier, a narrowed scope, or a split of the item. | after the final try, **rung 3**: split the item (file the hot part), or **route it to the console**, or quarantine it, as today. A third try is never the same approach. `TaskRetryCeiling` becomes the ladder's *N*. |
 | **Fleet ship recovery** (ship ↔ rebase ↔ re-audit) | `ship-recovery` | one round per recovery depth | it keeps its bound (`maxRecoveryDepth` or width + 1). With the carry composing (#796), a byte-identical rebase does not need a re-audit round. | a Stop, with the work preserved |
 
@@ -274,7 +274,7 @@ Today's tier tables have **no** deep→top headroom in any family:
 - **The operator's directive** (2026-10-07): top is **Opus 5.5 at xhigh effort**. The claude CLI accepts `--effort` low, medium, high, xhigh and max (model catalog `efforts`).
 - **Component V3b** gave Claude's top tier the xhigh effort through the one tier table. On 2026-10-08 the operator directive "Based on the opus 5.5, the effort should be configured starting with medium effort" set every tier at `medium`, except fast. Thus deep and top have no effort headroom by default. `evolve cli-routing set tiers.top --effort <level>` makes headroom after a measured gain.
 - **Raises stay within the judge's own family.** "One tier above" is never computed across families.
-- **The raise is compared with what actually ran.** The input can name the own model and effort of the fixer or judge. In that case, a target equal to that pair is no headroom, even if the entry of the tier table for the current tier differs.
+- **The raise is compared with what actually ran.** When the input names the own model and effort of the fixer or judge, a target equal to that pair is no headroom. This holds even if the entry of the tier table for the current tier differs.
 - **What the headroom is good for (CR7).** Effort helps only **reasoning-class** failures. It does not help format, docs or hygiene findings, or a capability gap (research F7). Until V3b lands, rung 1(b) and §3.2 are **dormant** and signal `CONVERGENCE_NO_HEADROOM`. They never fake a raise.
 
 ### 8. Configuration

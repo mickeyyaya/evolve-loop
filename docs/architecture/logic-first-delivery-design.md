@@ -113,7 +113,7 @@ A passed audit meets a moved `main` at ship for reasons that touch none of its f
 
 ### 5.3 What speaks for itself
 
-The change is the code, its tests and its explanation document (ADR-0102). Everything a phase writes about the change is a projection. Recovery can regenerate a projection; it never touches the change itself, which lives in the fenced worktree.
+The change is the code, its tests and its explanation document (ADR-0102). Everything a phase writes about the change is a projection. Recovery is allowed to regenerate a projection; it never touches the change itself, which lives in the fenced worktree.
 
 ### 5.4 The agent's identity and its pane (P3)
 
@@ -122,14 +122,14 @@ An agent that inspects its environment must recognise its own traces. The tdd ag
 - **Finished by the driver, appended.** The engine composes the prompt before a session exists. Only the tmux driver knows the session name, so `prepareTmuxREPL` appends `phaseidentity.Block` to the bytes that it pastes. The block goes after the composed prompt for two reasons.
   - The bytes of the engine stay a byte-identical prefix (the cached skill and policy blocks hold across dispatches).
   - The deliverable path stays the last thing that the agent reads.
-  - `resolved-prompt.txt` is the exact pasted bytes, so the block is auditable per phase.
+  - Separately, `resolved-prompt.txt` is the exact pasted bytes, so the block is auditable per phase.
 - **In the prompt, not the system prompt** (revised 2026-09-28, §5.11 T3). `--append-system-prompt` exists for claude only. The block is for every tmux CLI and lands in the same bytes for each. Cycle 1734 showed the cost. Claude declined the whole paste, the block included, as "untrusted pasted text, not something you asked me to do". It declined the typed nudge of the bridge in the same way.
   - The fix splits what varies from what does not.
   - The facts (phase, cycle, session, prompt files, sole writer) still end every paste for every CLI. So the placement rule of this section and its byte-identical prefix hold.
   - A standing authority block (`phaseidentity.Authority()`) states three points. The operator launched this unattended pipeline. The pasted prompt is the instruction of the operator. The interactive conventions of the console are not the conventions of this pane.
   - That block is the system prompt of claude-tmux. There its bytes are the same on every spawn, and the system-prompt cache of the provider holds (`--exclude-dynamic-system-prompt-sections` of ADR-0071).
   - A CLI without the channel pastes the block before the facts.
-- **Null object, and only true claims.** No agent name or no pane gives no block. A phase whose answer the bridge reads from the pane (`completion: stdout`) gets no sole-writer claim. A statement that must stop an agent from doubting its own facts must never contain a false one.
+- **Null object, and only true claims.** No agent name or no pane gives no block. A phase whose answer the bridge reads from the pane (`completion: stdout`) gets no sole-writer claim. The reason: a statement meant to stop an agent from doubting its own facts must never contain a false one.
 - **Suggestions off through the environment.** The prompt suggestion of claude is a background model request per turn. It also shows dim text under the input box that reads like agent output. `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false` takes precedence over the setting. Unlike a `--settings` flag, it is honoured under the `--setting-sources project` of the profiles.
   - The channel is the `default_env` of the manifest, realized once (`Realization.Env`). The tmux boot exports it in the pane. The headless drivers pass it to the process.
   - The parser validates keys as shell identifiers. It refuses the variables of the loop, of the bridge and the credential variables.
@@ -209,7 +209,7 @@ The design keeps one source of truth. The two doors where such an id is finished
 
 | Door | When | Record | Reason |
 |---|---|---|---|
-| the PASS seam (`ApplyCycleOutcome`, through the post-commit closeout of ship) | a committed id that `Promote` cannot move and no inbox item backs | `processed/cycle-N/<sha8>-<id>.json` | `ship-promote-processed: no inbox item backs the id` |
+| the PASS seam (`ApplyCycleOutcome`, through the post-commit closeout of ship) | a committed id that `Promote` was unable to move and no inbox item backs | `processed/cycle-N/<sha8>-<id>.json` | `ship-promote-processed: no inbox item backs the id` |
 | the planned no-work closeout (`ApplyNoWork`) | every scoped id that no inbox item backs, answered or not | `rejected/cycle-N/<id>.json` | the own answer of the lane (`lane triage (cycle N) dropped: already-shipped: 51edfb7f`) or `the lane's triage answered for nothing` |
 
 `inboxmover.RetireUnbacked` is the one door. It writes only for an id whose `ResolveDispatchState` is unknown. So an inbox-backed item keeps its own lifecycle. A no-work lane routes it to the console in place and never retires it: the anti-laundering rule stands. An already retired id is never written twice.
@@ -237,7 +237,7 @@ Only a review that names the code blocks. X1 removes the manufactured case. X2 r
 
 Wave 16's first cycle on the W1/H1b/X1 main was pinned to `file-size-decomposition-backlog`, an inbox item with no declared files. Its triage named `go/internal/core/orchestrator.go` in the card. The classify hook refused the report with `TRIAGE_PROTECTED_SURFACE`. The cycle sealed FAIL after two phases, and the per-item breaker of the closeout (F30) routed the item console-manual. The item did go where it belongs, but the verdict did not. Three facts made it a class, not an accident:
 
-- **The planner cannot judge it.** The protected predicate of the wave planner and the prompt partition judge the declared files of an item. An item with none is disjoint with everything and always pickable. The surface is known only once triage names files.
+- **Before the fix, the planner had no way to judge it.** The protected predicate of the wave planner and the prompt partition judge the declared files of an item. An item with none is disjoint with everything and always pickable. The surface is known only once triage names files.
 - **The agent was never told.** The triage persona did not mention protected surfaces. The prompt listed only the console-routed items excluded from its menu. The only way for the agent to learn the rule was the refusal.
 - **The refusal was a verdict.** A deterministic, operator-owned routing fact (the same card refuses every time, and the console decides) ended the cycle as the FAIL of the task. No logic was judged, the streak broke, and the route of the item came from the failure path.
 
@@ -293,7 +293,7 @@ The design keeps everything that F30 built and moves the decision one step earli
   - Rejected: reading the seal of the cycle from `signals.ndjson`. The architecture review blocked it, for three reasons:
     - The rule of the Signal Center is that listeners observe and never decide (its §3, review 10).
     - The stream can drop or delay events by design.
-    - The deciding code needs the field names of the seal. A copy of them has nothing that pins producer to reader.
+    - The risk was that the field names of the seal are copied into the deciding code with nothing that pins producer to reader.
 
 - **R2: the agent is told.** The inbox section of the triage prompt names the protected surfaces (`guards.ProtectedSurfaceManifest`, the one list) and the drop reason `protected-surface: <path>`. The drop rule of the persona carries the same sentence. An agent that follows it never produces a card that the host has to move. An agent that does not follow it is corrected without a verdict.
 
@@ -366,7 +366,7 @@ The plane-HEAD comparison stays for the resume detection.
 
 - `runComposedGates` ran `make -C go <target>` with the full environment of the lane and discarded the output. The CI-parity gate of the audit scrubs exactly that state.
 - `test` went red 14 times in waves 27–41 (18 carries). Each decline cost a deep re-audit that passed. The log said only which gates.
-- Reproduced on a clean main: `make test` under lane state exits 2, deterministically per test, whenever `EVOLVE_WORKTREE_ROOT` reaches the run. `TestFlags*` resolve their root through `sourceRoot()`, which prefers it, so `generate` can also write into the lane worktree. `TestPredicateEnv_AllBranches` inherits it from `os.Environ()`. Why 18 carries passed is unverified.
+- Reproduced on a clean main: `make test` under lane state exits 2, deterministically per test, whenever `EVOLVE_WORKTREE_ROOT` reaches the run. `TestFlags*` resolve their root through `sourceRoot()`, which prefers it, so `generate` was able to write into the lane worktree too. `TestPredicateEnv_AllBranches` inherits it from `os.Environ()`. Why 18 carries passed is unverified.
 - Now one allowlist serves both: `ciparity.CIEnvAllowlist` with the pure `CIEnv(environ)`, moved out of `ciparitygate`.
 - A failing composed gate prints its name, target, worktree and a bounded output tail (`composedGatesTo(log)`, `tailWriter`).
 - Follow-ups: a coded decline event, hermetic flags/predicate tests.
@@ -400,7 +400,7 @@ The plane-HEAD comparison stays for the resume detection.
 
 What it does not change: a rebase that the proof declines still returns to Audit (or Build when the change is not identical). The audit-bound tree of a cycle that never rebased is checked exactly as today.
 
-One scoping, stated: ship re-proves the ancestry and the bytes itself and verifies the ledger chain that holds the record. It does not re-run the composed gates (build, test, acs, apicover) a second time. The writer refuses a record whose gates are not green, and the chain proves that the record came through the writer. So a ship-side gate check is dead code.
+One scoping, stated: ship re-proves the ancestry and the bytes itself and verifies the ledger chain that holds the record. It does not re-run the composed gates (build, test, acs, apicover) a second time. The writer refuses a record whose gates are not green, and the chain proves that the record came through the writer. So a ship-side gate check, if added, is dead code.
 
 The orchestrator also declines a carry when the audited worktree stood on another base than the base on which the change was authored. The `git_head` of the row is the HEAD of main when the audit was bound, not that base. Cycles 1724 and 1727 paid a second audit to show this. Re-running the gates in ship (C4b) is a follow-up, if a forged, re-chained ledger is ever a credible threat.
 
@@ -461,7 +461,7 @@ The other lane of the wave, 1719 (`docs-consistency-sweep`, a document deliverab
 
 The first is staleness that the pipeline itself produced. The repair round re-runs TDD before the build, so the eval that the builder described is not the eval that the auditor ran. It lives only in the explanation document of a change that the auditor called correct and complete. Under X2 that is a documentation correction, never the FAIL of the round. The second is the broken traceability claim of the deliverable, by one number. It is the call of the auditor to make.
 
-The recommended action for a round whose only residual defects are of the first kind is the rung of X2 (designed). A round with both kinds is a repair round, as it was.
+The recommended action for a round whose only residual defects are of the first kind is the rung of X2. A round with both kinds is a repair round, as it was.
 
 The ship of the same cycle then met the other landing of the wave (the closeout dossier of 1718). Its fleet rebase hit a genuine conflict. Both lanes had edited `docs/operations/rescue-branch-disposition-2026-06-07.md`. The builder of 1718 edited it outside the declared files of its test-hygiene item. The partition separates declared files, not touched ones.
 
@@ -532,14 +532,14 @@ Cycles 1710 and 1711 were minted inside wave 14's window and stopped after scout
    Both lane items waited on a console-owned dependency (`egps-regression-tia-selection`, `chronicle-s7a-historian-shadow`). The widen planned the two blocked items, the gate refused both, and the backlog of the refill had nothing else.
 
    The dispatch then reported the empty launch as a wave: `wave N: 0/0 lanes ok` printed six times, and the batch ended on `max_cycles`. Wave 19 lost its second lane the same way.
-2. **The acceptance ledger decays silently (A1).** 249 predicate files run tests by name through `go test -run`, which exits 0 when a name matches nothing. At review time, 26 exact test names referenced by predicates no longer existed. The tests were renamed or deleted after their predicates were written, so those checks pass vacuously. Two more were in the same case in this landing, but the cycle-1182 predicates were repointed with the renames.
+2. **The acceptance ledger decays silently (A1).** 249 predicate files run tests by name through `go test -run`, which exits 0 when a name matches nothing. At review time, 26 exact test names referenced by predicates no longer existed. The tests were renamed or deleted after their predicates were written, so those checks pass vacuously. The risk was that two more names join the 26 in this landing. The repointing of the cycle-1182 predicates with the renames removed that risk.
 3. **Item identity is replicated (W5).** The canonical reader, `inboxbatch.LoadFile`, gives an item without an `id` its filename stem. The reader of the lifecycle (`lifecycle.readID`) and the backlog read of the planner use the JSON field alone. The five id-less items are visible to triage, invisible to the planner, and unclaimable by the lifecycle.
 4. **Any quota shrink switches off the starvation detector (W4).** `WaveObservation.Starved` excuses a wave whenever the bench shrank it. Waves 19 and 20 realized 1 and 0 of 2 sized lanes. They counted as not starved, because the bench of codex had shrunk the width from 3 to 2.
 5. **A deterministic failure is retried at every dispatch (Q5).** The codex deep pin (`gpt-5.6-sol`) fails `model_unsupported` on the entitlement of the account at every deep or top dispatch. That is about eight bounces per wave, and each pays a boot before the claude fallback. The pin decision of the operator is pending, but the bench need not wait for it. The same class explains the six identical empty waves of wave 20.
 
 **Order of fixes.** W3 lands first: it cost a whole batch, and every later wave depends on an honest plan. A1 follows, because an acceptance ledger that passes vacuously undermines every gate built on it. Then come Q5, W6 (the work-supply census, so an empty plan names why), G1, A2, W4, W5, G2 and G3. Each is one component with its own tests.
 
-The census also matters beyond the loop. 162 of 164 pending items are console-owned, so the lane supply of the loop is structurally tiny. If that is the intended division of work is the call of the operator, not of the loop.
+The census also matters beyond the loop. 162 of 164 pending items are console-owned, so the lane supply of the loop is structurally tiny. The operator decides if that is the intended division of work, not the loop.
 
 ### 5.11 Wave 24: an incapable last rung sealed two capacity failures as FAIL (cycles 1733, 1734)
 
@@ -549,7 +549,7 @@ Wave 24 went 0/2 after five consecutive ships. Both cycles failed the same way, 
 - codex-tmux was walled ("usage limit … try again at Oct 14th, 2026", exit 85).
 - The last rung of the universal-fallback tail, ollama-tmux, refused the phase at launch (exit 10, `source-writing phase rejected`).
 
-The runner surfaces the error of the last rung. So the structural refusal of a driver that can never run a lane phase decided the verdict. The verdict was FAIL. The walk had met a capacity wall, so the deferral of Q1 applies. Three facts made it a class:
+The runner surfaces the error of the last rung. So the structural refusal of a driver that can never run a lane phase decided the verdict. The verdict was FAIL, where the walk had met a capacity wall and the deferral of Q1 applies. Three facts made it a class:
 
 - The tail appended every discovered family, capable or not. ADR-0104 made the tail unconditional and banned only agy by operator judgment.
 - The launch guard of ollama reads `cfg.Worktree != ""` as "a writer phase", a belief that CB.1 retired (every phase runs cwd=worktree). So it refuses every lane phase, not only writers. Its real limit is that it has no tool use.
@@ -560,7 +560,7 @@ The runner surfaces the error of the last rung. So the structural refusal of a d
 | T1 | the tail holds only drivers that can run the phase: manifest `toolless`, `bridge.HasToolUse`, `universalFallbackTail` (ADR-0104 §4) | built (this landing) |
 | T2 | an exhausted walk that met a quota wall is a capacity outcome, whatever the rung order. A claude stall after the wall of codex also defers. The parts are `DispatchTiered.Walled` and `bridgechain.WallKeeper`, in the walk of the runner and of the bridge handle alike. The pause names every rung. Refined 2026-10-09: a pause needs an 85. Each other started rung is proven exhausted or neutral ([cycle 1853](../incidents/cycle-1853-secondary-defects.md)) | built (this landing) |
 | T3 | the authority of the pane is stated where the CLI treats it as authoritative. See the T3 details below the table | built (this landing) |
-| T4 | the plan of the advisor is clamped to the `insert_when` of the phase registry. So a refactor lane never runs bug-reproduction or fault-localization (1733 failed in one). See the T4 details below the table | built (the plan clamp); the rest of F42 built 2026-10-01 (ADR-0099 amendment). See the T4 details below the table |
+| T4 | the plan of the advisor is clamped to the `insert_when` of the phase registry. So a refactor lane never runs bug-reproduction or fault-localization (1733 failed in one). See the T4 details below the table | built (the plan clamp); the rest of F42 built 2026-10-01 (ADR-0099 amendment) |
 
 **T3 details.**
 
@@ -571,7 +571,7 @@ The runner surfaces the error of the last rung. So the structural refusal of a d
 - It is the system prompt of claude-tmux (`--append-system-prompt-file <workspace>/pane-authority.md`, manifest param `system_prompt_file`).
 - Every CLI without that channel pastes it.
 - The block of per-dispatch facts stays at the end of every paste.
-- A typed line was the filed fix. The pane of 1734 refused the typed nudge of the bridge in the same way, so a typed line did not help.
+- A typed line was the filed fix. The pane of 1734 refused the typed nudge of the bridge in the same way. The typed line was not applied, and the evidence of 1734 shows that it does not help.
 
 **T4 details.**
 
@@ -588,7 +588,7 @@ The runner surfaces the error of the last rung. So the structural refusal of a d
 
 Eight cycles (1626, 1647, 1674, 1684, 1685, 1694, 1705, 1735) failed their audit on "predicate execution tree includes undeclared inputs absent from the ship tree". The inputs were the own deliverables of the cycles: the explanation document in five, the TDD predicate and its eval in two. The audit modelled the ship tree as the index plus `add -u`, tracked files only. Ship commits something else: every path that the build and TDD reports declare, untracked or not, plus the changes that a declared directory covers (`shipmanifest.Stageable`).
 
-The build report of 1735 named its document, and the test report of 1694 named its predicate and eval. So Ship committed exactly what the audit refused. The two disagree the other way too: an unnamed tracked edit passes the audit and is left out of the commit.
+The build report of 1735 named its document, and the test report of 1694 named its predicate and eval. Suppose that Ship ran on these cycles. In that case Ship commits exactly what the audit refused. The two disagree the other way too: an unnamed tracked edit passes the audit and is left out of the commit.
 
 A first design staged the declared outputs of each phase through a new registry field. The design review rejected it as a second declared-outputs list beside the list of Ship (a duplicated belief). It moved the fix to its source: the audit asks the own selection of Ship which tree it will commit.
 
@@ -604,7 +604,7 @@ A first design staged the declared outputs of each phase through a new registry 
 
 - After the declared paths it adds every tracked edit (`add -u`), because the audit binding stages them for Ship.
 - `TakeTracked` (which `TakeStaged(nil)` now equals) was deleted.
-- The declared add runs first. A declared file removed with plain `rm` is still in the seed, so `add -A --` stages its deletion. If `add -u` ran first, it dropped the file from the index, and the declared add failed rc=128.
+- The declared add runs first. A declared file removed with plain `rm` is still in the seed, so `add -A --` stages its deletion. With `add -u` first, `add -u` drops the file from the index, and the declared add fails rc=128.
 
 **Component 4 details.**
 
@@ -617,20 +617,23 @@ A first design staged the declared outputs of each phase through a new registry 
 - With a workspace the selection is declared-only (no fallback to the changed set).
 - The empty pathspec of Ship stages nothing.
 
-**Component 4, as built.** The first version moved only the audit onto the selection of Ship. Its architecture review blocked it. The audit binding (`core.worktreeContentSHA`) recorded a third ship tree, `git add -u` then `write-tree`. Ship checks both the predicate receipt and its staged tree against it. If the audit alone had moved, the eight cycles pass the audit and then fail at Ship as an integrity breach.
+**Component 4, as built.** The first version moved only the audit onto the selection of Ship. Its architecture review blocked it. The audit binding (`core.worktreeContentSHA`) recorded a third ship tree, `git add -u` then `write-tree`. Ship checks both the predicate receipt and its staged tree against it.
+
+Suppose the first version shipped. In that case the eight cycles pass the audit and then fail at Ship as an integrity breach.
+
 
 The review also corrected the premise that Ship left undeclared tracked edits out of the commit. The real-index `add -u` of the binding stages every tracked edit, so Ship commits them, and the audit must not refuse them.
 
 The design review of the redesign settled four more points:
 
-- `Select` had two fallbacks to the whole changed set: no manifest, and a manifest that covers nothing. They carried untracked residue into the binding, which the cycle-1594 pins forbid. So with a workspace the selection is declared-only. Only a workspace-less manual ship stages every changed path.
+- `Select` falls back to the whole changed set in two cases: no manifest, and a manifest that covers nothing. Left as they are, those fallbacks carry untracked residue into the binding, which the cycle-1594 pins forbid. So with a workspace the selection is declared-only. Only a workspace-less manual ship stages every changed path.
 - `TakeTracked` became dead and was deleted.
 - `shipmanifest` imports `cyclestate` and not `core`, so `core` can call it.
 - The empty-set guard lives in `StageRetrying`, so no stager can run `git add -A --` with no pathspec.
 
 The delta review proved that the first order of the two adds (`add -u` first) broke every cycle that deletes a declared file with plain `rm`. The declared add now runs first (`TestTakeStaged_ADeclaredFileDeletedButNotStagedIsADeletion`, `TestTakeShipTree_ADeclaredFileRemovedWithPlainRmShipsItsDeletion`).
 
-Ship runs `add -u` itself only on the worktree path (`worktreeShip.stageTrackedEdits`). This is the first staging step, where the `add -u` of the binding sits in production. So it is idempotent after the binding, and production is unchanged. The direct path serves the operator plane, where `add -u` sweeps every tracked plane edit into a manual commit. So the direct path stays without it.
+Ship runs `add -u` itself only on the worktree path (`worktreeShip.stageTrackedEdits`). This is the first staging step, where the `add -u` of the binding sits in production. So it is idempotent after the binding, and production is unchanged. The direct path serves the operator plane, where `add -u` is not wanted. If the direct path ran it, it sweeps every tracked plane edit into a manual commit. So the direct path stays without it.
 
 The code review asked for that after the first redesign relied on the step of the binding. The hand-spliced parity test became an end-to-end one (`TestShipFromWorktree_CommitsTheOneShipTree`).
 
@@ -687,7 +690,9 @@ X2a keeps the judgment and makes its repair the cheapest rung that can satisfy i
   - The report rewrite is required because the bridge completes a Build only on the rewrite of its primary artifact (§12, "Completion after a correction").
 - **The defects are read from the failure block.** The first landing recorded them. `recordExplanationCorrection` copied them into `audit-fail-reason.json`, each prefixed with the class, so that the repair brief and a continuation read them there. Since X2a.5 the brief reads the failure block itself for every agent-graded FAIL. The copy was a second record of the defect list, and it is retired: `retry@explanation` writes nothing.
   - The one reader is `auditRejectionReasons` (`core/repair_brief.go`).
-  - When a runner gate diagnosed the FAIL, it returns the reasons of the runner, with today's rendering and precedence. It reads them from `CycleState.AuditFailReasons` (`runnerDiagnosedAudit`, the one predicate that the X2a classifier, this slot and the findings header share). This is the carrier that the coherence floor also asks. It never reads `audit-fail-reason.json`, the forensic twin of the carrier. That file is written best-effort. `resetFloorFailReason` deliberately keeps the record of another phase across an audit dispatch, so a leftover record hides the failure block.
+  - When a runner gate diagnosed the FAIL, it returns the reasons of the runner, with today's rendering and precedence. It reads them from `CycleState.AuditFailReasons`. `runnerDiagnosedAudit` is the one shared predicate of the X2a classifier, this slot and the findings header. This is the carrier that the coherence floor also asks. It never reads `audit-fail-reason.json`, the forensic twin of the carrier.
+
+    That file is written best-effort. `resetFloorFailReason` deliberately keeps the record of another phase across an audit dispatch. The risk was that a leftover record hides the failure block.
   - Otherwise it returns `phasecontract.ReadFailureBlock(workspace, audit).Defects`, less any defect that restates a finding that the brief lists. The comparison uses the title, the id and title, or the id, severity and title, on letters and digits. The brief lists the first eight actionable findings (`briefedFindings`).
   - The brief no longer reads the file, so nothing there WARNs.
   - The findings header says "the gate reasons above are their symptoms" only when the reasons of the runner lead. Above the defects of the failure block, and in the standing-findings brief, it reads "fix THESE".
@@ -695,15 +700,15 @@ X2a keeps the judgment and makes its repair the cheapest rung that can satisfy i
   - The prompt of the retry adjudicator reads through the same function (the adjudicator is not wired in production).
 - **A phase that dies inside a repair round is digested from its own failure, unless a runner gate diagnosed the FAIL.** `ensureFailureDigest` writes its fallback (the dying phase and its error) only when `audit-fail-reason.json` is absent. An agent-graded FAIL writes no record. So a TDD or Build that dies in its repair round is fingerprinted as that phase. This now includes the X2a re-author, whose Build the retired record had digested as the document defects of the audit.
   - A runner-downgraded FAIL keeps its gate record through the round (the next audit dispatch retires it). So a death inside that round is digested from the gate reasons.
-  - That precedence is kept on purpose. The record is the untruncated, deterministic diagnosis of the runner. The dossier, the gate-reasons panel of the dashboard and audit calibration read it by name. An overwrite with the error of the dying phase erases that evidence.
-  - A digest assembled from anything but the file disagrees with the reason file that the dossier shows beside it.
+  - That precedence is kept on purpose. The record is the untruncated, deterministic diagnosis of the runner. The dossier, the gate-reasons panel of the dashboard and audit calibration read it by name. The risk of an overwrite with the error of the dying phase is that it erases that evidence.
+  - The risk of a digest assembled from anything but the file is that it disagrees with the reason file that the dossier shows beside it.
   - The round exists to repair those reasons, so the recurrence ledger counts the death against them.
   - The error of the dying phase is not lost. The phase-error path hands it to the retro as `failure_error`, and an abnormal exit seals it as the termination reason of the cycle.
 
 Limits. The classifier reads the text of the auditor.
 
 - A defect that names the document without its path ("explanation doc :97 …") keeps the full round. So the auditor reference now asks for the path-first form and says what the host does with it.
-- A defect that begins with the document, but whose real remedy is in code, gets a document-only round. The re-audit judges the result. So the cost is one Build dispatch and one retry try from the `code-audit-fail` budget. At a cap of two, it is possibly the round that can fix the code. The cost is never a wrong ship.
+- A defect that begins with the document, but whose real remedy is in code, gets a document-only round. The re-audit judges the result. So the cost is one Build dispatch and one retry try from the `code-audit-fail` budget. At a cap of two, this is possibly the round that can fix the code. The cost is never a wrong ship.
 - The defence is a rule of the auditor reference, pinned in its persona test. Each code defect is its own entry, and it begins with its own path.
 
 | Id | Component | Status |
@@ -891,7 +896,7 @@ Status: **shipped** (commit on a branch, PR open or merged) · **built** (green 
 **W1 details.**
 
 - `lifecycle.(*Mover).RetireUnbacked` writes the record. `inboxmover.RetireUnbacked` is the one door (unknown dispatch state only).
-- The PASS seam retires what `Promote` cannot move (`OutcomeResult.RetiredUnbacked`, processed).
+- The PASS seam retires what `Promote` was unable to move (`OutcomeResult.RetiredUnbacked`, processed).
 - The no-work closeout retires every such scoped id (`NoWorkResult.Retired`, rejected, the answer of the lane as the reason).
 - The prune of the planner and the freshness probe read the record.
 
@@ -1216,7 +1221,7 @@ Each entry gives the date, the review, the verdict and what changed.
   - The digest assertion is made non-vacuous.
 - **2026-09-27: code-simplifier, go-reviewer, code-reviewer, security-reviewer (P3).** Verdicts: no edits; APPROVE; WARNING → fixed; APPROVE-WITH-MINOR → hardened. What changed:
   - The sole-writer line was false for stdout-completion phases (fixed).
-  - A manifest `default_env` can set credential or loop variables that the guards never see (refused at parse).
+  - A manifest `default_env` was able to set credential or loop variables that the guards never see (now refused at parse).
   - Facts that the block renders are sanitized.
   - No manifest pattern is allowed to match the block (pinned).
 - **2026-09-26: consistency audit (every doc against the design and the shipped code).** Verdict: INCONSISTENCIES-FOUND → fixed. What changed: three stale package pages, one stale sentence in phase-architecture.md, and one imprecise ADR sentence are fixed. Two new package pages are added.
@@ -1227,7 +1232,7 @@ Each entry gives the date, the review, the verdict and what changed.
 - **2026-09-27: F7 (§5.9, §7.3), reviewed twice.**
   - First pass:
     - code-simplifier merged two dedupe-and-sort copies.
-    - go-reviewer: FAIL. The per-package merge dropped the names of an unproven package and allowed a wrong blame on a proven-green one. It was untested. The still-red test cannot tell first from second.
+    - go-reviewer: FAIL. The per-package merge dropped the names of an unproven package and allowed a wrong blame on a proven-green one. It was untested. The still-red test was unable to tell first from second.
     - code-reviewer: WARNING. Re-running one test alone hides a same-package order dependency. The line overclaimed proof. The WARN never reached the Signal Center. Cleared packages were not logged.
   - Reworked:
     - The whole package re-runs by itself.
@@ -1242,7 +1247,7 @@ Each entry gives the date, the review, the verdict and what changed.
 - **2026-09-27: C5 (= ADR-0105 B5; §5.8, §5.9), reviewed twice.**
   - First pass:
     - code-simplifier: no edit.
-    - go-reviewer: BLOCK. There was no `inPlaceWorktree` guard before the first git mutation. A repo-wide `git add -A` can carry untracked debris.
+    - go-reviewer: BLOCK. There was no `inPlaceWorktree` guard before the first git mutation. A repo-wide `git add -A` was able to carry untracked debris.
     - code-reviewer: WARNING. The RERUN target of the debugger was discarded. The re-entry bypassed the recovery budget and backoff. The git sequence has no checkpoint for resume.
   - Reworked:
     - The guard checks the in-place worktree.
@@ -1271,10 +1276,10 @@ Each entry gives the date, the review, the verdict and what changed.
       - The menus hide a waiting item, but the claim floor does not refuse one (W7).
       - The repair width was a bare 1 in two places. It is now `loopwave.RepairWidth`.
       - `dispatchFleetIteration` exceeded 50 lines. It is split into `dispatchPool`, `waveRequest`, `completeWave` and `repairMinWidth`.
-    - An inbox review then found the sixth copy of the rule. The sequential no-work check counted protected-surface and waiting items as claimable. If W3 had shipped like this, the empty-backlog path of W3 seals a misattributed FAIL. The check now reads the same lane menu (`core.WithLaneMenu`).
+    - An inbox review then found the sixth copy of the rule. The sequential no-work check counted protected-surface and waiting items as claimable. With that check, the empty-backlog path of W3 was at risk of a sealed, misattributed FAIL. The check now reads the same lane menu (`core.WithLaneMenu`).
   - Third pass (architecture and one combined code and Go review, on the last delta):
     - The extraction and the default are preserved.
-    - A MAJOR regression is fixed red-first. The no-work check had run the claims of this cycle through the dependency rule. If this had shipped, a claimed waiting item ends as silent no-work and strands in processing. Claims now keep the routing-only rule.
+    - A MAJOR regression is fixed red-first. The no-work check had run the claims of this cycle through the dependency rule. With that code, a claimed waiting item was at risk of ending as silent no-work and stranding in processing. Claims now keep the routing-only rule.
     - The lane-menu rule composed in two places (HIGH). It became one per-item Specification, `PlaceOnLaneMenu`, with an agreement test that pins the backlog of the planner to the menu.
     - The lane path and `laneMenuOf` gained tests.
     - The routing backstop of the pool reads the configured `EvolveDir`.
@@ -1381,7 +1386,7 @@ Each entry gives the date and the change.
   - Ship re-proves the carry inside its one binding rule.
 
   The P1 row and §8 are updated. The gate re-run in ship is scoped out as C4b.
-- **2026-09-27.** Q3 is verified and closed. Both breakers read only failure digests or FAIL verdicts, which a deferral never produces. The one gap was the sequential dispatcher. It recorded a failed approach and ran the failure closeout before its quota pause. That order is now after the check.
+- **2026-09-27.** Q3 is verified and closed. Both breakers read only failure digests or FAIL verdicts, which a deferral never produces. The one gap was the sequential dispatcher. It recorded a failed approach and ran the failure closeout before its quota pause. Those two steps now run after the quota check.
 - **2026-09-27.** §5.9: the test-only build of cycle 1718 explained itself, and the floor refused its own record as immutable history.
   - X3 makes foreign-only immutability the one rule in every branch.
   - X3 verifies a declared explanation of a non-material diff with an empty material set.
@@ -1432,7 +1437,7 @@ Each entry gives the date and the change.
   - T1 and T2 are built. The tail holds only drivers that can run the phase. An exhausted walk that met a wall surfaces the wall and defers.
   - T3 and T4 are designed.
   - The loop halted for the P0.
-- **2026-09-28.** §5.11 T4 built. The plan path evaluates a trigger that is the whole admission rule of a phase (`insert_when` with no `rubric_hint`) at the turn of the phase. It skips a planned phase whose trigger does not fire (`insert-when-gates-plan`). Two floor-activation scenarios that pinned the old contract (a plan inserts tester, and its trigger skips it) are rewritten. ADR-0052 is amended.
+- **2026-09-28.** §5.11 T4 built. The plan path evaluates a trigger that is the whole admission rule of a phase (`insert_when` with no `rubric_hint`) at the turn of the phase. It skips a planned phase whose trigger does not fire (`insert-when-gates-plan`). Two floor-activation scenarios that pinned the old contract (a plan inserts tester; its trigger skips it) are rewritten. ADR-0052 is amended.
 - **2026-09-28.** §5.11 T3 built and §5.4 revised.
   - A standing authority block (`phaseidentity.Authority()`) is the system prompt of claude-tmux (`--append-system-prompt-file`, manifest param `system_prompt_file`, `LaunchIntent`/`Realization.SystemPromptFile`). CLIs without the channel paste it.
   - The block of per-dispatch facts still ends every paste.

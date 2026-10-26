@@ -18,7 +18,7 @@ The rejection names the missing authority and recommends shadow or fleet lanes. 
 
 The merge helper supports acceptance and conflict callbacks, but those are not supplied by the production decorator. Its separate integration worktree also does not become the cycle's authoritative worktree, and provisioning can omit pending TDD work. Helper-level tests do not establish end-to-end shipping semantics.
 
-Activation requires a dedicated change. The change must prove that pending TDD work plus worker changes reach the exact tree that Audit and Ship validate. The change must also cover cancellation, conflicts, invalid acceptance, resume, and cleanup. It is better to keep the existing authoritative cycle worktree. Automatic conflict redispatch is optional scope, not a guarantee to invent from this historical design.
+Activation requires a dedicated change. The change must prove that pending TDD work plus worker changes reach the exact tree that Audit and Ship validate. The change must also cover cancellation, conflicts, invalid acceptance, resume, and cleanup. It is recommended to keep the existing authoritative cycle worktree. Automatic conflict redispatch is optional scope, not a guarantee to invent from this historical design.
 
 Fleet parallelism uses independent complete cycles and its own landing coordination; it is distinct from splitting one phase into writer workers.
 

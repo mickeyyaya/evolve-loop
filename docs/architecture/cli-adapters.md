@@ -5,12 +5,11 @@
 > `cli_adapters/*.sh`, with an **external, operator-installed** `bridge` CLI
 > (`tools/agent-bridge`). That bash bridge and its separate-install model were
 > **removed** in v12. The bridge is now an in-process Go implementation at
-> `go/internal/bridge/` (adapter `go/internal/adapters/bridge/`). It has no separate
+> `go/internal/bridge/` (adapter `go/internal/adapters/bridge/`), with no separate
 > install and no `bash tools/agent-bridge/install.sh` step.
->
-> The `EVOLVE_BRIDGE_GO`
-> toggle is gone (Go is the only path). See ADR-0021 (Go port) and ADR-0022
-> (LaunchIntent realizer). The contract table below remains accurate background.
+> - The `EVOLVE_BRIDGE_GO` toggle is gone (Go is the only path).
+> - See ADR-0021 (Go port) and ADR-0022 (LaunchIntent realizer).
+> - The contract table below remains accurate background.
 
 > **Audience**: operators considering enabling bridge for evolve-loop, contributors editing `legacy/scripts/cli_adapters/*.sh`, anyone debugging why a subagent didn't behave as expected.
 
@@ -89,7 +88,7 @@ export EVOLVE_USE_BRIDGE=0
 
 ### Why default-on?
 
-The integration was opt-in for the first iteration. This validated that it works without breaking native users. After end-to-end verification (bridge installed + EVOLVE_USE_BRIDGE=1 + Haiku probe → subscription-billed cycle ran cleanly), the default flipped to ON. Any user who has bothered to install bridge wants the integration to take effect. Operators who specifically prefer the native prototype set `EVOLVE_USE_BRIDGE=0`.
+The integration was opt-in for the first iteration, to validate that it works without breaking native users. After end-to-end verification (bridge installed + EVOLVE_USE_BRIDGE=1 + Haiku probe → subscription-billed cycle ran cleanly), the default flipped to ON. Any user who has bothered to install bridge wants the integration to take effect. Operators who specifically prefer the native prototype set `EVOLVE_USE_BRIDGE=0`.
 
 ### Installing bridge
 

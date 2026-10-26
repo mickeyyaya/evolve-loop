@@ -24,7 +24,7 @@ The phase catalog covers software-development goal types only (bugfix/feature/re
 
 ## 3. The catalog — 15 phases, 5 domains
 
-Each phase has **4 files**. This matches every shipped user phase. Do NOT use `evolve phases add`. Its scaffold writes only 3 files and puts `profile.json` inside the phase dir instead of `.evolve/profiles/`. The 4 files are:
+Each phase has **4 files**. This matches every shipped user phase. Do NOT rely on `evolve phases add`. Its scaffold writes only 3 files and puts `profile.json` inside the phase dir instead of `.evolve/profiles/`. The 4 files are:
 
 - `.evolve/phases/<name>/phase.json`
 - `.evolve/phases/<name>/agent.md`
