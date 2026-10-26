@@ -76,7 +76,7 @@ func TestSandboxWrap_AStoreFailureWarnsAndKeepsTheWrap(t *testing.T) {
 	t.Parallel()
 	var stderr bytes.Buffer
 	open := func() (dispatchcred.Store, error) { return dispatchcred.Store{}, errors.New("no passwd") }
-	sbpl := wrapForExecDeny(t, Deps{ExecStage: "enforce", DispatchStore: open, Stderr: &stderr}, "darwin", "claude-tmux")
+	sbpl := wrapForExecDeny(t, Deps{ExecStage: "enforce", GuaranteeStage: "off", DispatchStore: open, Stderr: &stderr}, "darwin", "claude-tmux")
 	if !strings.Contains(stderr.String(), "WARN dispatch credential: no passwd") || strings.Contains(sbpl, "dispatch") {
 		t.Fatalf("a store failure must warn and add no deny: %q\n%s", stderr.String(), sbpl)
 	}
