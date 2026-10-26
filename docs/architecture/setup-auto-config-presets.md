@@ -11,19 +11,40 @@
 
 A setup flow already existed (`/setup` skill + `evolve setup detect|complete`), but:
 
-1. **The per-phase model proposal was manual LLM work** in the skill (12 per-phase `AskUserQuestion` decisions) — not "auto-config", not testable, and prone to drift.
-2. **Detection looked shallow.** The skill carried a caveat that Claude's macOS Keychain OAuth might misdetect. (On inspection this was *stale* — `bridge.NewEngine` already wires `defaultKeychainProbe`; `bridge/doctor_test.go` already locks it. The fix was deleting the caveat, not code.)
+1. **The per-phase model proposal was manual LLM work** in the skill (12 per-phase `AskUserQuestion` decisions). It was not "auto-config", not testable and prone to drift.
+2. **Detection looked shallow.** The skill carried a caveat that Claude's macOS Keychain OAuth can misdetect. (On inspection this was *stale* — `bridge.NewEngine` already wires `defaultKeychainProbe`; `bridge/doctor_test.go` already locks it. The fix was deleting the caveat, not code.)
 3. **Twelve decisions** is not "simple choices".
 
 ## Approaches considered
 
-**Subscription detection depth** — (A) *capability-based*: detect auth posture (subscription-OAuth vs API-key vs none) + each CLI's tier→model map, and rely on `verdict` for availability; no fragile plan-name scraping. (B) additionally scrape Pro/Max/Free from each CLI's `/status` pane — richer labels but brittle. **Chosen: A.** Plan tier is not reliably exposed locally; capability + availability is what the recommender actually needs.
+**Subscription detection depth**
 
-**Config UX** — (A) *pick one preset*: the binary computes 3 ready bundles, the user picks one; (B) two dials (CLI arrangement × cost); (C) keep per-phase with smart defaults. **Chosen: A.** One decision instead of twelve, with an optional per-phase tweak after.
+- (A) *capability-based*: detect auth posture (subscription-OAuth vs API-key vs none) + each CLI's tier→model map, and rely on `verdict` for availability. There is no fragile plan-name scraping.
+- (B) also scrape Pro/Max/Free from each CLI's `/status` pane. The labels are richer but brittle.
 
-**Where the logic lives** — (A) *Go writes it* (`recommend` + `apply` subcommands); (B) the skill writes the JSON. **Chosen: A.** Deterministic work belongs in code, not a prompt (Karpathy rule 5); it makes strict TDD possible.
+**Chosen: A.** The CLI does not reliably expose the plan tier locally. The recommender needs capability + availability.
 
-**Where the preset DEFINITIONS live** — (A) *public config file* (Go is a generic interpreter); (B) derive-from-profiles with a thin Go transform. **Chosen: A**, per the directive "configure only public/exposed config files, nothing at the code level." Presets are data in `presets.json` (shipped default) overridable by `.evolve/setup-presets.json`; the Go knows only generic tier-bias strategies.
+**Config UX**
+
+- (A) *pick one preset*: the binary computes 3 ready bundles and the user picks one.
+- (B) two dials (CLI arrangement × cost).
+- (C) keep per-phase with smart defaults.
+
+**Chosen: A.** One decision instead of twelve, with an optional per-phase tweak after.
+
+**Where the logic lives**
+
+- (A) *Go writes it* (`recommend` + `apply` subcommands).
+- (B) the skill writes the JSON.
+
+**Chosen: A.** Deterministic work belongs in code, not a prompt (Karpathy rule 5). This makes strict TDD possible.
+
+**Where the preset DEFINITIONS live**
+
+- (A) *public config file* (Go is a generic interpreter).
+- (B) derive-from-profiles with a thin Go transform.
+
+**Chosen: A**, per the directive "configure only public/exposed config files, nothing at the code level." Presets are data in `presets.json` (shipped default). `.evolve/setup-presets.json` can override them. The Go knows only generic tier-bias strategies.
 
 ## Chosen design
 
@@ -38,7 +59,12 @@ presets.json (config)  ─┘            pure, deterministic                    
 
 - **`Recommend` is pure** over `(DetectReport, PresetConfig)` — no clock/env/disk/rand, no map-iteration order leaks (families/CLIs sorted before any "first" pick). The baseline tier/CLI come from each phase's profile (`default_tier`/`default_cli`, threaded into `PhaseStatus` by `Detect`). The only preset behavior in code is a generic `tier_bias` interpreter (`default`/`down`/`up`/`min`/`max`); the preset *set*, descriptions, and bias selection are config.
 - **Clamping + cross-family.** Every tier is clamped into `[envelope.min..envelope.max]`; every CLI must be in `allowed_clis` (or `all`) AND authed. Builder/auditor split across families when ≥2 are authed, preferring each profile's default family; single-family is a legitimate fallback (not a warning). No allowed family available → `warning` + `degraded`.
-- **`Apply` is the write + gate.** Lossless raw-map merge (preserves `floor`/`cli_health`/foreign pins); a pin emitted ONLY where `differs_from_default`; the **abstract tier** stored in `pin.model` (a native id ranks 0 in `policy.TierRank` and would silently skip the envelope floor — the one load-bearing correctness trap); every emitted pin re-validated with `policy.ValidatePin`; degraded presets and malformed existing policy are refused (no bytes written).
+- **`Apply` is the write + gate.** It has these properties:
+  - Lossless raw-map merge (preserves `floor`/`cli_health`/foreign pins).
+  - A pin is emitted ONLY where `differs_from_default`.
+  - The **abstract tier** is stored in `pin.model`. A native id ranks 0 in `policy.TierRank` and silently skips the envelope floor. This is the one load-bearing correctness trap.
+  - Every emitted pin is re-validated with `policy.ValidatePin`.
+  - Degraded presets and malformed existing policy are refused (no bytes written).
 - **The skill is a thin presenter.** It teaches the pipeline and relays one preset choice; it never re-derives routing or hand-authors `policy.json`.
 
 ## "Config not code"
@@ -47,13 +73,38 @@ The setup's only write target is the public `.evolve/policy.json`. Everything it
 
 ## Test coverage (strict TDD, all RED-first)
 
-- `recommend_test.go` (18): preset shape; baseline=profile default; envelope clamp; no-envelope passthrough; economy down + min==max stays; max-quality up + default==max stays; zero-families degraded; one-family single-family; two-family cross-family; forced-same-family; preferred-unavailable fallback; allowed-restricted-to-unavailable warns; model from tier_models; determinism (byte-identical JSON); differs-from-default.
-- `apply_test.go` (10): unknown preset; only-differing pinned; lossless merge; foreign pins survive; re-apply clears upgrade; malformed refuses; emitted pins pass ValidatePin; degraded refuses; **tier-not-native-model**; cross-family legal.
+- `recommend_test.go` (18):
+  - preset shape
+  - baseline=profile default
+  - envelope clamp
+  - no-envelope passthrough
+  - economy down + min==max stays
+  - max-quality up + default==max stays
+  - zero-families degraded
+  - one-family single-family
+  - two-family cross-family
+  - forced-same-family
+  - preferred-unavailable fallback
+  - allowed-restricted-to-unavailable warns
+  - model from tier_models
+  - determinism (byte-identical JSON)
+  - differs-from-default
+- `apply_test.go` (10):
+  - unknown preset
+  - only-differing pinned
+  - lossless merge
+  - foreign pins survive
+  - re-apply clears upgrade
+  - malformed refuses
+  - emitted pins pass ValidatePin
+  - degraded refuses
+  - **tier-not-native-model**
+  - cross-family legal
 - `presets_test.go` (6): embedded default; override wins; malformed/invalid-default/empty refused; shipped-default valid.
 - `cmd_setup_test.go`: recommend JSON/human; apply missing-preset (10); apply unknown-preset (1); apply host-robust write (foreign keys survive; pins on rc 0; no-clobber on rc 1).
 - `setup_test.go`: `Detect` populates `default_cli`/`default_tier` from the profile, independent of pin overlay.
 
 ## Deferred
 
-- **Live per-model availability** (`modelquery.Refresh`) — would shell to each CLI (tmux) and risk hanging the wizard; manifest tier maps + `verdict` are used instead.
+- **Live per-model availability** (`modelquery.Refresh`) — deferred, because a live query, if added, shells to each CLI (tmux) and risks a hang of the wizard. The design uses manifest tier maps + `verdict` instead.
 - **Plan-tier (Pro/Max/Free) detection** — no reliable local signal.

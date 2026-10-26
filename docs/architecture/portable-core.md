@@ -1,6 +1,6 @@
 # Portable Core: Vendoring Evolve-Loop into Another Project
 
-> **Status:** Authoritative file list for vendoring evolve-loop's runtime kernel into any project using `claude -p`. Lists required vs optional files, the trust-kernel invariants the core preserves, and a bootstrap outline. The full distribution is plugin-installable via marketplace; this doc is for operators who need to vendor a subset directly into their own repository.
+> **Status:** Authoritative file list for vendoring evolve-loop's runtime kernel into any project that uses `claude -p`. Lists required vs optional files, the trust-kernel invariants that the core preserves, and a bootstrap outline. The full distribution is plugin-installable through the marketplace. This doc is for operators who need to vendor a subset directly into their own repository.
 
 ## Contents
 
@@ -135,7 +135,19 @@ Per-project tunables and scope manifests.
 | `.evolve/llm_config.json` | Tier-to-model mapping (consumed by `resolve-llm.sh`) |
 | `AGENTS.md` (project root) | Cross-CLI invariants + 12 Core Agent Rules every persona reads |
 
-**Total: 36 files** (4 guards + 5 lifecycle + 7 dispatch + 3 verification + 2 observability + 6 profiles + 12 personas/refs - the 4 reference files being counted separately + AGENTS.md + 2 .evolve configs). Plus the runtime artifacts created per cycle (`.evolve/runs/cycle-N/*.{md,json}`, `.evolve/cycle-state.json`, `.evolve/instincts/lessons/*.yaml`, the audit ledger).
+**Total: 36 files**. The count has these parts:
+
+- 4 guards
+- 5 lifecycle
+- 7 dispatch
+- 3 verification
+- 2 observability
+- 6 profiles
+- 12 personas/refs (the 4 reference files are counted separately)
+- AGENTS.md
+- 2 .evolve configs
+
+The runtime artifacts that each cycle creates come in addition: `.evolve/runs/cycle-N/*.{md,json}`, `.evolve/cycle-state.json`, `.evolve/instincts/lessons/*.yaml` and the audit ledger.
 
 ## Optional extensions
 
@@ -143,7 +155,7 @@ Layers that compose on top of the core but are not load-bearing for the basic Sc
 
 | Extension | Files | When to add |
 |---|---|---|
-| Plan review | `agents/plan-reviewer.md`, `.evolve/profiles/plan-reviewer.json` | When Scout misallocates effort and a CEO/Eng/Design/Security cross-check would catch it earlier |
+| Plan review | `agents/plan-reviewer.md`, `.evolve/profiles/plan-reviewer.json` | When Scout misallocates effort and a CEO/Eng/Design/Security cross-check can catch it earlier |
 | TDD-first | `agents/evolve-tdd-engineer.md`, `.evolve/profiles/tdd-engineer.json` | When the project's test discipline benefits from RED-phase test-first (failing tests encode acceptance) |
 | EGPS Tester | `agents/evolve-tester.md`, `.evolve/profiles/tester.json` | When you need an independent predicate-author separate from Builder (anti-gaming) |
 | Inspirer | `agents/evolve-inspirer.md`, `.evolve/profiles/inspirer.json` | When you want a "diff-aware reflection" persona between Scout and Builder |
@@ -154,7 +166,7 @@ Layers that compose on top of the core but are not load-bearing for the basic Sc
 
 ## Trust kernel invariants
 
-These hold whether you vendor the core or install the full plugin. They are enforced by the kernel hooks listed above and operate BELOW the persona layer.
+These hold if you vendor the core and if you install the full plugin. The kernel hooks listed above enforce them. They operate BELOW the persona layer.
 
 | # | Invariant | Failure mode if dropped |
 |---|---|---|
@@ -173,7 +185,7 @@ Each invariant maps to a script in the minimal core. Removing the script removes
 
 To wire the minimal core into a new project:
 
-1. **Copy the 36 files** preserving the relative directory layout (`legacy/scripts/guards/`, `legacy/scripts/lifecycle/`, `legacy/scripts/dispatch/`, `legacy/scripts/verification/`, `legacy/scripts/observability/`, `.evolve/profiles/`, `agents/`, plus the 3 config files).
+1. **Copy the 36 files.** Keep the relative directory layout (`legacy/scripts/guards/`, `legacy/scripts/lifecycle/`, `legacy/scripts/dispatch/`, `legacy/scripts/verification/`, `legacy/scripts/observability/`, `.evolve/profiles/`, `agents/`, plus the 3 config files).
 
 2. **Add `AGENTS.md` to the project root** with the cross-CLI invariants + 12 Core Agent Rules.
 
@@ -212,7 +224,7 @@ To wire the minimal core into a new project:
 
    Expect: `scout-report.md` → `build-report.md` → `audit-report.md` → `orchestrator-report.md` in `.evolve/runs/cycle-1/`, plus one commit on `main`.
 
-6. **Verify the trust kernel** by attempting to bypass it (these should all fail):
+6. **Verify the trust kernel** when you try to bypass it (all of these are expected to fail):
 
    ```bash
    # Should be denied by ship-gate (no cycle commit):
@@ -234,13 +246,13 @@ If all three deny correctly, the kernel is wired. If any allow, the invariant is
 | `CHANGELOG.md`, `release-pipeline.sh`, `version-bump.sh` | Release tooling; vendor consumers ship their own releases |
 | `docs/operations/*` incident reports | Historical record specific to evolve-loop the project |
 | `skills/`, `plugins/`, `marketplace.json` | Plugin-distribution layer; vendoring bypasses this |
-| 19 of the 27 phase-agent files | inspirer / evaluator / plan-reviewer / tdd-engineer / tester / operator / diagnose etc. are extensions |
+| 19 of the 27 phase-agent files | inspirer / evaluator / plan-reviewer / tdd-engineer / tester / operator / diagnose and the other phase agents are extensions |
 | `docs/architecture/*` (except this file + `audit-constitution.md` + `posthoc-schema.md` + `control-flags.md`) | Internal design docs; vendor consumers don't need v8.61 archaeology |
 | `acs/regression-suite/*` | Project-specific regression tests; vendor consumers write their own |
 
 ## Version coupling
 
-The core is internally consistent at the level of a single release. If you vendor at version X.Y.Z, **do not mix files across versions** — kernel scripts and personas evolve together (e.g., `audit-constitution-check.sh` added in v10.9.0 requires v10.9+ `auditor.md`).
+The core is internally consistent at the level of a single release. If you vendor at version X.Y.Z, **do not mix files across versions**. Kernel scripts and personas evolve together (for example, `audit-constitution-check.sh` added in v10.9.0 requires v10.9+ `auditor.md`).
 
 Verify alignment after vendoring:
 
@@ -248,7 +260,7 @@ Verify alignment after vendoring:
 grep -h '^# Version:' legacy/scripts/{guards,lifecycle,dispatch,verification,observability}/*.sh | sort -u
 ```
 
-All scripts in the same vendored snapshot should report the same version line. Mismatches indicate partial vendor.
+All scripts in the same vendored snapshot are expected to report the same version line. Mismatches show a partial vendor.
 
 ## References
 

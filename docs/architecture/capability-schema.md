@@ -55,7 +55,7 @@ Each of the five capability fields can be either:
 "subprocess_isolation": "full"
 ```
 
-Use when the adapter always provides this capability at the same tier (e.g., Claude Code always has `subprocess_isolation: full`).
+Use when the adapter always provides this capability at the same tier (for example, Claude Code always has `subprocess_isolation: full`).
 
 ### Form 2: an object with modes + default + warning
 
@@ -73,12 +73,12 @@ Use when the adapter's tier depends on runtime probes. The resolver picks among 
 
 | Tier | Meaning |
 |---|---|
-| `full` | Adapter natively provides this capability with no compromise (e.g., `claude -p --max-budget-usd`). |
-| `hybrid` | Adapter delegates to a more-capable runtime (e.g., Gemini → Claude binary) and inherits its caps. |
+| `full` | Adapter natively provides this capability with no compromise (for example, `claude -p --max-budget-usd`). |
+| `hybrid` | Adapter delegates to a more-capable runtime (for example, Gemini → Claude binary) and inherits its caps. |
 | `degraded` | Adapter runs in same-session mode; this capability is not available, but pipeline-level structural defenses still apply. |
 | `none` | Adapter cannot provide the capability at all. Pipeline relies entirely on its own kernel hooks and forgery defenses. |
 
-Resolved `quality_tier` per cycle is the **lowest mode across all five capabilities** — i.e., one degraded capability degrades the whole entry.
+Resolved `quality_tier` per cycle is the **lowest mode across all five capabilities** — that is, one degraded capability degrades the whole entry.
 
 ## Probe registry
 

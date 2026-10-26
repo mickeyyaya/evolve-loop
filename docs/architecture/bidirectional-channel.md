@@ -1,20 +1,20 @@
 # Bidirectional channel — full design & implementation guide
 
 > Companion to the decision record [ADR-0037](adr/0037-bidirectional-channel.md). The ADR
-> records *what was decided*; this guide records the *request, the requirements, every
+> records *what was decided*. This guide records the *request, the requirements, every
 > approach considered (including the two that were tried and reverted), and the shipped
-> solution end-to-end* — so a future reader can follow the whole arc, not just the verdict.
+> solution end-to-end*. A future reader can follow the whole arc, not just the verdict.
 >
 > Status: shipped on `feat/bidirectional-channel-design` (RT0–RT6 + a post-review hardening
-> commit), opt-in via `EVOLVE_CHANNEL=1`, not yet merged to `main`.
+> commit), opt-in with `EVOLVE_CHANNEL=1`, not yet merged to `main`.
 >
-> **Update (ADR-0045 I6, 2026-06-10): `EVOLVE_CHANNEL` is DEPRECATED.** The channel now rides the
-> `EVOLVE_PHASE_RECOVERY` stage — `enforce` implies it; `off`/`shadow` leave it off (byte-identical).
-> An explicit `EVOLVE_CHANNEL` is honored for one more release with a one-time WARN, then removed.
-> The single source for "is the channel on" is `internal/bridge/channel.Enabled` +
-> `channel.ResolveStage` (shared by the bridge driver and the observer adapter). The
-> `EVOLVE_CHANNEL=1` references throughout this guide describe the *pre-I6* opt-in mechanism; the
-> wiring is unchanged, only the gate that turns it on moved to the recovery dial. See
+> **Update (ADR-0045 I6, 2026-06-10): `EVOLVE_CHANNEL` is DEPRECATED.**
+> - The channel now rides the `EVOLVE_PHASE_RECOVERY` stage — `enforce` implies it; `off`/`shadow` leave it off (byte-identical).
+> - An explicit `EVOLVE_CHANNEL` is honored for one more release with a one-time WARN, then removed.
+> - The single source for "is the channel on" is `internal/bridge/channel.Enabled` +
+> `channel.ResolveStage`. The bridge driver and the observer adapter share them.
+> - The `EVOLVE_CHANNEL=1` references throughout this guide describe the *pre-I6* opt-in mechanism. The wiring is unchanged. Only the gate that turns it on moved to the recovery dial.
+> - See
 > [control-flags.md](control-flags.md) and [interaction-protocol.md](interaction-protocol.md) §I6.
 
 ---
@@ -29,10 +29,10 @@
 Concretely, two unmet needs for phases that run for minutes under a tmux-REPL driver
 (`claude-tmux`, `codex-tmux`, `agy-tmux`, `ollama-tmux`):
 
-1. **Continuous, filtered monitoring** — a live, noise-filtered view of what the agent is
-   producing *while the phase is still running* (not just the post-phase `events.ndjson`).
+1. **Continuous, filtered monitoring** — a live, noise-filtered view of agent output
+   *while the phase still runs* (not just the post-phase `events.ndjson`).
 2. **Correlated mid-task asks** — the host can inject a question into a running REPL
-   (`evolve bridge send` already existed) but had no way to know *which* agent output is the
+   (`evolve bridge send` already existed). It had no way to know *which* agent output is the
    *answer* to *which* injected question. We need request→response bracketing.
 
 ### Requirements / invariants
@@ -53,7 +53,7 @@ Concretely, two unmet needs for phases that run for minutes under a tmux-REPL dr
 ## 2. Approaches considered (including the dead ends)
 
 The headline lesson: **two plausible designs were disproven by capturing real terminal
-output**, and the real fixtures caught bugs a fabricated test never would. The captures are
+output**, and the real fixtures caught bugs that a fabricated test never catches. The captures are
 committed at `docs/research/tmux-live-capture-2026-06-04/` (and mirrored as test
 fixtures under `go/internal/bridge/panestream/testdata/<cli>/{thinking,answer,final}.txt`).
 
@@ -62,7 +62,7 @@ fixtures under `go/internal/bridge/panestream/testdata/<cli>/{thinking,answer,fi
 | Approach | Verdict | Why |
 |---|---|---|
 | **Tail `<phase>-stdout.log`** (the original ADR assumption) | ✗ rejected | A tmux driver streams to the tmux *pane*; its `stdout.log` is **empty until the at-exit dump**. Tailing it yields nothing live. |
-| **`tmux pipe-pane`** (first fix attempt, FT1) | ✗ tried & reverted (RT0) | A real capture proved `pipe-pane`'s raw stream is 2D cursor motion (`\e[2C\e[3A…`, absolute column moves, CRs, non-UTF8). Only a full terminal emulator can linearize it; a `stripANSI`+CR-collapse filter jams lines into garbage (`Accessing\e[12Gworkspace:` → `Accessingworkspace:`). |
+| **`tmux pipe-pane`** (first fix try, FT1) | ✗ tried & reverted (RT0) | A real capture proved `pipe-pane`'s raw stream is 2D cursor motion (`\e[2C\e[3A…`, absolute column moves, CRs, non-UTF8). Only a full terminal emulator can linearize it; a `stripANSI`+CR-collapse filter jams lines into garbage (`Accessing\e[12Gworkspace:` → `Accessingworkspace:`). |
 | **Poll `tmux capture-pane` + emit stabilized deltas** | ✓ **chosen** | `capture-pane -p` renders the pane to **clean text** (tmux *is* the emulator). The driver already polls it every tick. We diff successive rendered snapshots and emit only newly-stable content above the volatile bottom UI. No emulator, no raw-ANSI filter, reuses tmux's rendering. |
 
 ### 2.2 Delta extraction — the two bugs real frames exposed
@@ -70,10 +70,10 @@ fixtures under `go/internal/bridge/panestream/testdata/<cli>/{thinking,answer,fi
 A naive "emit lines below a fixed cursor index" extractor fails on real frames:
 
 - **Volatile-zone-same-height bug:** between the echoed prompt and the empty input box sits a
-  volatile zone (spinner + separators) whose height is identical in the thinking and answer
-  frames, so an index cursor primed on the thinking frame lands on the spinner and **skips the
-  answer**. → Fix: trim a trailing run of volatile rows (`isVolatileTailRow`) so the stable
-  region ends at the last real content line in *both* frames.
+  volatile zone (spinner + separators). Its height is identical in the thinking and answer
+  frames. So an index cursor primed on the thinking frame lands on the spinner and **skips the
+  answer**. → Fix: trim a trailing run of volatile rows (`isVolatileTailRow`). The stable
+  region then ends at the last real content line in *both* frames.
 - **Top-of-buffer-shift bug:** when older scrollback/preludes prepend, every content line
   keeps its text but moves index — a positional cursor re-emits the last bullet. → Fix: a
   **content-anchored** cursor that re-locates the last-emitted line by text each frame.
@@ -85,13 +85,13 @@ Both are encoded in `panestream.PaneDelta` and table-tested against all four CLI
 The original correlation bracketed the answer span on a **busy→idle transition**, detecting
 "busy" as **the prompt marker being absent**. The real frames disproved this:
 
-- The input-box marker (`❯`, `›`, `>`) **persists during generation** for claude/agy (and
-  ollama echoes `>>>` on the prompt line), so "idle = marker present" is *always* idle →
+- The input-box marker (`❯`, `›`, `>`) **persists during generation** for claude/agy. Ollama
+  echoes `>>>` on the prompt line. So "idle = marker present" is *always* idle →
   `idle_reached` **never fired** → correlation never functioned.
 - The actual busy signal is **per-CLI and bimodal**:
   - claude/agy: the interrupt/cancel affordance (`esc to interrupt` / `esc to cancel`) shown
     for the whole interruptible turn. (The spinner words `Inferring`/`Generating` were
-    considered but rejected — redundant with the affordance, and as bare words they could
+    considered but rejected. They are redundant with the affordance, and as bare words they can
     false-match answer prose.)
   - ollama: no affordance; its `Thinking…` header *persists into the answer*, so that is not a
     signal either. The real distinction is the idle input **placeholder** `Send a message`,
@@ -112,8 +112,8 @@ Producer never read**, so correlation was dead on arrival. → Breadcrumbs are a
 
 ### 2.5 Producer source selection — transport-aware
 
-Because tmux content lives in `pane.live` (stdout.log empty until exit) but headless content
-lives in `stdout.log` (no pane.live exists), pointing the Producer at the wrong source
+Tmux content lives in `pane.live` (stdout.log empty until exit). Headless content
+lives in `stdout.log` (no pane.live exists). So a Producer that points at the wrong source
 *silently* empties the feed. → `CoreAdapter.channelSourcePaths` resolves the per-phase CLI
 family and selects the `.live` pair (tmux) or the legacy logs (headless). Empty paths on
 `ProducerConfig` fall back to the legacy defaults, keeping headless byte-identical.
@@ -161,12 +161,11 @@ Off (`EVOLVE_CHANNEL` unset): none of these exist; no producer goroutine; no ext
 ### Resilience
 
 - **RT4 — large-answer recovery:** `collectSpan`'s `bufio.Scanner` uses a 1 MB/10 MB buffer
-  (project convention) so a >64 KB answer line is not silently dropped; `scanner.Err()` is
+  (project convention), so the scanner does not silently drop a >64 KB answer line. `scanner.Err()` is
   surfaced as a WARN.
-- **Silent-empty-feed guard (post-review):** if the content source file never appears after
-  `sourceMissThreshold` (20) polls (~40 s at the 2 s prod poll), the Producer emits a one-time
-  WARN — converting the two "silent empty feed" failure modes (agent≠phase name, mis-resolved
-  CLI family) into a loud signal.
+- **Silent-empty-feed guard (post-review):** if the content source file never appears, the Producer emits one
+  WARN. The trigger is `sourceMissThreshold` (20) polls (~40 s at the 2 s prod poll). This converts the two "silent empty feed" failure modes into a loud signal. The modes are
+  agent≠phase name and mis-resolved CLI family.
 
 ---
 
@@ -174,7 +173,7 @@ Off (`EVOLVE_CHANNEL` unset): none of these exist; no producer goroutine; no ext
 
 | Env var | Default | Effect |
 |---|---|---|
-| `EVOLVE_CHANNEL` | `0` | **DEPRECATED (ADR-0045 I6)** — the channel is now implied by the phase-recovery stage (`enforce` ⇒ on) — then `EVOLVE_PHASE_RECOVERY`, now the policy key `recovery.phase_recovery` (the env var is retired, see ADR-0044). `1` still enables the producer + live feed + `.live` files for one more release (with a WARN); then removed. Resolution lives in `bridge/channel.Enabled`. |
+| `EVOLVE_CHANNEL` | `0` | **DEPRECATED (ADR-0045 I6)** — the channel is now implied by the phase-recovery stage (`enforce` ⇒ on). The stage comes from `EVOLVE_PHASE_RECOVERY`, now the policy key `recovery.phase_recovery` (the env var is retired, see ADR-0044). `1` still enables the producer + live feed + `.live` files for one more release (with a WARN). After that, the variable is removed. Resolution lives in `bridge/channel.Enabled`. |
 | `EVOLVE_CHANNEL_SUPERVISOR` | `0` | Reserved: auto-attach a `Supervisor` on phase launch (manual wiring only today). **Not** affected by the I6 fold — only the feed flag (`EVOLVE_CHANNEL`) is deprecated. |
 | `EVOLVE_<AGENT>_CLI` / `EVOLVE_CLI` | unset → `claude-tmux` | Resolves the per-phase CLI family for transport-aware source selection. |
 
@@ -203,11 +202,11 @@ Off (`EVOLVE_CHANNEL` unset): none of these exist; no producer goroutine; no ext
    pins it, and codex now reads busy through the same affordance as claude.
 2. **profile.cli-pin family mis-read:** `phaseCLI` resolves family from env only; a CLI pinned
    in `profile.json` (not env) is mis-read as tmux. Now *loud* (silent-feed WARN fires) but not
-   *correct* — full fix is to surface the resolved CLI to the observer spawn site.
+   *correct*. The proposed full fix is to surface the resolved CLI to the observer spawn site.
 3. **double `capture-pane`/tick** when a correlation span is open (delta capture + idle-bracket
    capture). Channel-on only; reuse the delta `rendered` for the idle check to save one IPC.
 4. **e2e boot-sync** uses a fixed 20 ms sleep before the supervisor injects; a `driver_ready`
-   breadcrumb would remove the timing assumption.
+   breadcrumb (proposed) removes the timing assumption.
 5. **`sourceMissThreshold`** is a constant (20 polls); expose on `ProducerConfig` if a phase
    has an unusually slow boot.
 

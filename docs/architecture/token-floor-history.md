@@ -27,7 +27,7 @@ Per-phase context bytes loaded into the user prompt by role-context-builder:
 | **Sum** | **176,495** | **~44,124 tokens** |
 
 The orchestrator's own prompt (orchestrator-prompt.md = persona + cycle
-context block) was an additional ~21,106 bytes (~5,277 tokens), loaded once
+context block) was another ~21,106 bytes (~5,277 tokens), loaded once
 per cycle.
 
 ## Post-v9.0.0 (with EVOLVE_CONTEXT_DIGEST=1, cycle-10 fixture)
@@ -42,8 +42,8 @@ per cycle.
 | retrospective | 44,060 | 0% (synthesizer; full files preserved) |
 | **Sum** | **130,492** | **−26% (−46,003 bytes / ~−11,500 tokens per cycle)** |
 
-The auditor and retrospective stay at 0% reduction in Campaign B because
-they legitimately need the full intent.md for deep acceptance-criteria
+The auditor and retrospective stay at 0% reduction in Campaign B. They
+legitimately need the full intent.md for deep acceptance-criteria
 checks and full prior-artifact synthesis. Campaign C's anchor extraction
 addresses the auditor case (with anchored future artifacts).
 
@@ -55,7 +55,7 @@ further:
 
 - Auditor: ~35 KB → projected ~10 KB (~−70%) once cycles use anchored
   scout-report and build-report templates. Pre-v9.0.0 cycles (no anchor
-  markers) fall back gracefully to full-file emission via
+  markers) fall back gracefully to full-file emission through
   `emit_artifact_with_anchors`'s once-per-file fallback.
 - Triage: drops from ~16 KB to ~5 KB on anchored scout-reports
   (proposed_tasks-only extraction).
@@ -63,10 +63,10 @@ further:
 ## Persona size changes (Campaign D)
 
 Personas are loaded as the orchestrator's user prompt. The Layer 1 / Layer 3
-split keeps common-path content in the registered file and moves rare-
-trigger content (deep failure procedures, conditional E2E workflows,
-streak-table rationales) to per-persona reference files loaded on demand
-via `Read`.
+split keeps common-path content in the registered file. The split moves rare-
+trigger content to per-persona reference files. The agent loads these files on demand
+with `Read`. Rare-trigger content includes deep failure procedures, conditional E2E workflows,
+and streak-table rationales.
 
 | File | Pre-v9.0.0 | Post-v9.0.0 | Layer 3 file (on-demand) |
 |---|---|---|---|
@@ -79,8 +79,8 @@ via `Read`.
 ## Campaign E — Per-phase clean-boot (2026-07-17)
 
 Cut the **per-turn boot base** (claude system prompt + tool schemas + MCP + skills +
-CLAUDE.md, re-read on *every* turn as `cache_read`) via config-injected launch flags in
-each phase's `extra_flags_by_cli.claude-tmux` — no Go changes. Full record:
+CLAUDE.md, re-read on *every* turn as `cache_read`). The cut used config-injected launch flags in
+each phase's `extra_flags_by_cli.claude-tmux`. It needed no Go changes. Full record:
 [part5-campaign-implementation-2026-07-17.md](../research/token-optimization-2026/part5-campaign-implementation-2026-07-17.md);
 design: [part4](../research/token-optimization-2026/part4-per-phase-boot-context.md).
 
@@ -122,7 +122,7 @@ All Campaign A–D opt-in flags follow the v8.55/v8.59 ladder:
 | `EVOLVE_CONTEXT_DIGEST` | 0 | v9.0.x verify cycle | v9.1 | v9.2+ |
 | `EVOLVE_ANCHOR_EXTRACT` | 0 | v9.0.x verify cycle | v9.1 | v9.2+ |
 
-Operators set them via env when running `/evo:loop`:
+Operators set them with env when they run `/evo:loop`:
 
 ```bash
 EVOLVE_CACHE_PREFIX_V2=1 EVOLVE_CONTEXT_DIGEST=1 EVOLVE_ANCHOR_EXTRACT=1 /evo:loop --cycles 3 balanced "<goal>"

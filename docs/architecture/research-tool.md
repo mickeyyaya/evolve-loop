@@ -31,7 +31,7 @@ Implementation dossier: [`docs/research/research-as-tool-implementation-cycles-8
 
 ## KB-First Directive
 
-> **Research quota rule (canonical text — single source, referenced from persona files):**
+> **Research quota rule (canonical text; single source, referenced from persona files).**
 > Try `legacy/scripts/research/kb-search.sh` first; escalate to WebSearch only if KB hits are sparse (< 3 results) or evidently outdated. When escalating, log the query and the KB hit count that triggered the escalation. Combine KB results with web results rather than discarding KB findings.
 
 All 6 non-Scout persona files (`evolve-intent.md`, `evolve-triage.md`, `evolve-tdd-engineer.md`, `evolve-builder.md`, `evolve-auditor.md`, `evolve-retrospective.md`) carry a one-line pointer here. Verification: `grep -rl "kb-search.sh first" agents/` must return ≥ 6 paths.
