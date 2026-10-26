@@ -12,6 +12,7 @@ func readIsolationConfig(enforce bool) Config {
 	cfg.ReadIsolation = ReadIsolation{
 		Enforce: enforce, Tag: "d42", RunsDir: "/repo/.evolve/runs", Workspace: "/repo/.evolve/runs/cycle-7",
 		Grants:      []string{"", "/repo/.evolve/runs/cycle-6/retrospective-report.md"},
+		ReportOnly:  []string{"", "/repo/.evolve/instincts/lessons/by-item.yaml"},
 		RawSuffixes: []string{"-stdout.log", "-final-pane.txt"},
 		RawFiles:    []string{"/repo/.evolve/runs/cycle-7/scout-stdout.log"},
 		RawDirs:     []string{"/repo/.evolve/runs/cycle-7/.bridge"},
@@ -38,11 +39,12 @@ func TestGenerateSBPL_EnforceDeniesOtherRunsSecretsAndRawOutputAndGrantsTheIndex
 	sbpl := GenerateSBPL(readIsolationConfig(true))
 	ruleOrder(t, sbpl,
 		`(allow file-read* (subpath "/repo"))`,
+		`(allow file-read* file-read-data (literal "/repo/.evolve/instincts/lessons/by-item.yaml") (with report) (with message "evolve-cell=d42 rule=grant.index"))`,
 		`(deny file-read-data (subpath "/repo/.evolve/runs") (with message "evolve-cell=d42 rule=read.runs.unrelated inv=I5"))`,
 		`(deny file-read-data (subpath "/home/u/.ssh") (with message "evolve-cell=d42 rule=read.home.secret inv=I5"))`,
 		`(deny file-read-data (literal "/home/u/.netrc") (with message "evolve-cell=d42 rule=read.home.secret inv=I5"))`,
 		`(allow file-read* file-read-data (subpath "/repo/.evolve/runs/cycle-7"))`,
-		`(allow file-read* file-read-data (literal "/repo/.evolve/runs/cycle-6/retrospective-report.md"))`,
+		`(allow file-read* file-read-data (literal "/repo/.evolve/runs/cycle-6/retrospective-report.md") (with report) (with message "evolve-cell=d42 rule=grant.index"))`,
 		`(deny file-read-data (subpath "/repo/.evolve/runs/cycle-7/.bridge") (with message "evolve-cell=d42 rule=read.raw.output inv=I4"))`,
 		`(deny file-read-data (require-all (subpath "/repo/.evolve/runs") (regex #"(-stdout\.log|-final-pane\.txt)$")) (with message "evolve-cell=d42 rule=read.raw.output inv=I4"))`,
 		`(deny file-write* (subpath "/repo/.evolve/runs/cycle-7/.bridge") (with message "evolve-cell=d42 rule=write.raw.output inv=I4"))`,
@@ -51,6 +53,9 @@ func TestGenerateSBPL_EnforceDeniesOtherRunsSecretsAndRawOutputAndGrantsTheIndex
 		`(deny file-write* (literal "/repo/.evolve/runs/cycle-7/lane-scope.json") (with message "evolve-cell=d42 rule=write.pipeline.file inv=I5"))`,
 		`(deny file-read* (subpath "/repo/.evolve/runs/cycle-7/private"))`,
 	)
+	if !strings.Contains(sbpl, "rule="+RuleGrantIndex+`"))`) {
+		t.Fatalf("each grant names the rule %s:\n%s", RuleGrantIndex, sbpl)
+	}
 	if strings.Contains(sbpl, `(literal "")`) {
 		t.Fatalf("an empty grant must emit no rule:\n%s", sbpl)
 	}

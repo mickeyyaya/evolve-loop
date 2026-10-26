@@ -56,6 +56,7 @@ func TestE2ECycleCLIMatrix(t *testing.T) {
 				t.Error(err)
 			}
 			reportRow(t)(isolation.Judge("N6", run.indexMissing()))
+			reportRow(t)(isolation.Judge("N15", run.contextNotOpened()))
 		})
 	}
 }
@@ -85,6 +86,7 @@ type stubCall struct {
 	claudeCode string
 	depth      string
 	agentRun   string
+	context    string
 }
 
 func runMatrixCycle(t *testing.T, row matrixRow, evolveBin, fakeBin, repoRoot string) matrixRun {
@@ -103,7 +105,7 @@ func runMatrixCycle(t *testing.T, row matrixRow, evolveBin, fakeBin, repoRoot st
 	)
 	for _, bin := range stubBinaries {
 		path := filepath.Join(binDir, bin)
-		fakeclitest.Install(t, path, stubScript(bin, fakeBin, callLog, evolveBin, probeDir))
+		fakeclitest.Install(t, path, stubScript(bin, fakeBin, callLog, evolveBin, probeDir, projRoot))
 		env = append(env, "BRIDGE_"+strings.ToUpper(bin)+"_BINARY="+path)
 	}
 	env = append(env, installFakeTmux(t, binDir, fakeBin)...)
@@ -155,14 +157,15 @@ func installFakeTmux(t *testing.T, binDir, fakeBin string) []string {
 	return []string{"TMUX_TMPDIR=" + t.TempDir()}
 }
 
-func stubScript(bin, fakeBin, callLog, evolveBin, probeDir string) string {
+func stubScript(bin, fakeBin, callLog, evolveBin, probeDir, projRoot string) string {
 	return "#!/bin/sh\n" +
 		"probe=skip\n" +
 		`if mkdir "` + probeDir + `" 2>/dev/null; then` + "\n" +
 		`  "` + evolveBin + `" agent run ` + nestedProbeProfile + ` </dev/null >/dev/null 2>"` + probeDir + `/stderr"` + "\n" +
 		`  rc=$?; named=no; grep -q '` + agentRunRefusal + `' "` + probeDir + `/stderr" && named=yes; probe=$rc:$named` + "\n" +
 		"fi\n" +
-		`printf '%s CLAUDECODE=%s EVOLVE_DISPATCH_DEPTH=%s AGENTRUN=%s\n' ` + bin + ` "${CLAUDECODE-unset}" "${EVOLVE_DISPATCH_DEPTH-unset}" "$probe" >> "` + callLog + `"` + "\n" +
+		contextProbe(evolveBin, projRoot) +
+		`printf '%s CLAUDECODE=%s EVOLVE_DISPATCH_DEPTH=%s AGENTRUN=%s CONTEXT=%s\n' ` + bin + ` "${CLAUDECODE-unset}" "${EVOLVE_DISPATCH_DEPTH-unset}" "$probe" "$ctx" >> "` + callLog + `"` + "\n" +
 		`exec "` + fakeBin + `" "$@"` + "\n"
 }
 
@@ -208,10 +211,10 @@ func readStubCalls(t *testing.T, path string) []stubCall {
 	var calls []stubCall
 	for _, line := range strings.Split(strings.TrimSpace(string(b)), "\n") {
 		f := strings.Fields(line)
-		if len(f) != 4 {
+		if len(f) != 5 {
 			t.Fatalf("stub call log line %q", line)
 		}
-		calls = append(calls, stubCall{binary: f[0], claudeCode: strings.TrimPrefix(f[1], "CLAUDECODE="), depth: strings.TrimPrefix(f[2], "EVOLVE_DISPATCH_DEPTH="), agentRun: strings.TrimPrefix(f[3], "AGENTRUN=")})
+		calls = append(calls, stubCall{binary: f[0], claudeCode: strings.TrimPrefix(f[1], "CLAUDECODE="), depth: strings.TrimPrefix(f[2], "EVOLVE_DISPATCH_DEPTH="), agentRun: strings.TrimPrefix(f[3], "AGENTRUN="), context: strings.TrimPrefix(f[4], "CONTEXT=")})
 	}
 	return calls
 }
@@ -281,6 +284,28 @@ func (r matrixRun) indexMissing() error {
 		}
 	}
 	return fmt.Errorf("no inputs/index.json in the %d cycle workspace(s) of the M1 run lists the scout report, so a later phase has no index to open its inputs through", len(workspaces))
+}
+
+func contextProbe(evolveBin, projRoot string) string {
+	return "ctx=skip\n" +
+		`if [ -n "${EVOLVE_DISPATCH_ID-}" ]; then` + "\n" +
+		`  ws="` + projRoot + `/.evolve/runs/cycle-$(printf '%s' "$EVOLVE_DISPATCH_ID" | cut -d/ -f2)"` + "\n" +
+		`  j=$("` + evolveBin + `" context index --required --json --workspace "$ws" 2>/dev/null); rc=$?` + "\n" +
+		`  id=$(printf '%s' "$j" | sed -n 's/.*"entries":\[{"id":"\([^"]*\)".*/\1/p')` + "\n" +
+		`  orc=none; if [ -n "$id" ]; then "` + evolveBin + `" context open "$id" --workspace "$ws" >/dev/null 2>&1; orc=$?; fi` + "\n" +
+		`  ctx="$rc:${id:-none}:$orc"` + "\n" +
+		"fi\n"
+}
+
+func (r matrixRun) contextNotOpened() error {
+	var seen []string
+	for _, c := range r.calls {
+		if parts := strings.Split(c.context, ":"); len(parts) == 3 && parts[0] == "0" && parts[1] != "none" && parts[2] == "0" {
+			return nil
+		}
+		seen = append(seen, c.binary+"="+c.context)
+	}
+	return fmt.Errorf("no seat of the M1 run listed its index and opened a required entry through evolve context; exit:id:open-exit per seat = %v", seen)
 }
 
 func (r matrixRun) envLeak() error {

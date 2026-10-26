@@ -150,6 +150,8 @@ The column "Agent" of §5 gives the class of each core verb. These verbs are out
 | `code callers`, `api`, `find`, `map` | A | one usage record in the own workspace (F4) |
 | `code refresh` | R (`code-refresh`, proposed) | It moves the shared index worktree to `origin/main` and rebuilds it ([code-index-cli.md](code-index-cli.md) §4, D5.5). In a cell it refuses with exit 3. |
 | `agent capabilities` (proposed, §4.2) | A | It reads the class table. |
+| `context index`, `context open` | A | They read the cell index and its bodies, and they write nothing ([cell-context-index.md](cell-context-index.md) §7). |
+| `context stats` | D | It reads the access log of other cycles, which I-5 denies to a cell. |
 | `phase <name>` | R (`dispatch`) | It starts a phase agent. |
 | `subagent run` | D | The pipeline starts fan-out workers. A cell uses the subagents of its own harness. |
 | `reset-sha`, `release` | D | operator verbs |

@@ -21,11 +21,12 @@ type Request struct {
 	Phase       string
 	LineageMax  int
 	ItemIDs     []string
+	Context     ContextPolicy
 }
 
 type source struct {
-	path, class, kind, phase string
-	cycle, attempt           int
+	path, class, kind, phase, why string
+	cycle, attempt                int
 }
 
 var extraDeliverables = []source{
@@ -50,7 +51,7 @@ func Build(req Request) (Index, error) {
 	}
 	dropped := max(0, len(all)-limit)
 	idx.Lineage, idx.Attempt = all[dropped:], len(all)+1
-	sources := slices.Concat(deliverables(req, idx.Attempt), lineageSources(req.ProjectRoot, idx.Lineage, dropped+1), lessonSources(req.ProjectRoot, ids, idx.Lineage))
+	sources := slices.Concat(deliverables(req, idx.Attempt), lineageSources(req.ProjectRoot, ids, idx.Lineage, dropped+1), lessonSources(req.ProjectRoot, ids, idx.Lineage))
 	for _, s := range sources {
 		e, ok, err := newEntry(req.ProjectRoot, s)
 		if err != nil {
@@ -61,7 +62,7 @@ func Build(req Request) (Index, error) {
 			idx.Entries = append(idx.Entries, e)
 		}
 	}
-	return idx, nil
+	return annotate(idx, req), nil
 }
 
 func deliverables(req Request, attempt int) []source {
@@ -74,9 +75,12 @@ func deliverables(req Request, attempt int) []source {
 		out = append(out, source{path: c.ArtifactName, kind: kindOf(c.ArtifactName), phase: c.Phase})
 	}
 	out = append(out, extraDeliverables...)
+	for i := range out {
+		out[i].why = "upstream deliverable of " + out[i].phase
+	}
 	handoffs, _ := filepath.Glob(filepath.Join(req.Workspace, "handoff-*.json"))
 	for _, h := range handoffs {
-		out = append(out, source{path: filepath.Base(h), kind: "handoff-asks"})
+		out = append(out, source{path: filepath.Base(h), kind: kindHandoffAsks, why: handoffWhy(filepath.Base(h), req.Phase)})
 	}
 	for i := range out {
 		out[i].path = filepath.Join(req.Workspace, out[i].path)
@@ -109,7 +113,7 @@ func newEntry(root string, s source) (Entry, bool, error) {
 	}
 	rel, _ := filepath.Rel(root, s.path)
 	return Entry{Class: s.class, Kind: s.kind, Path: filepath.ToSlash(rel), Cycle: s.cycle, Phase: s.phase, Attempt: s.attempt,
-		Summary: summaryOf(s.path, body), Bytes: int64(len(body)), SHA256: digest(body)}, true, nil
+		Summary: summaryOf(s.path, body), Bytes: int64(len(body)), SHA256: digest(body), Why: s.why}, true, nil
 }
 
 func plainFile(root, path string, info fs.FileInfo) bool {
