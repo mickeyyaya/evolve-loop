@@ -200,6 +200,7 @@ var commandsWithNoDispatch = map[string]string{
 	"phase-inventory": "a cache", "eval": "checks", "docs": "lint", "solution": "checks", "cycle-health": "reads",
 	"selfcheck": "the build probe of the cell", "tokens": "reads", "lessons": "reads", "reachability": "go list",
 	"ratchet": "checks", "floor": "go test tiers", "cover": "coverage", "code": "the code index", "ladder": "reads",
+	"context":             "reads",
 	"context-fill":        "reads",
 	"doctor":              launchAPIOnly,
 	"setup":               launchAPIOnly,

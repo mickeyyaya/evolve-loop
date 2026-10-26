@@ -37,20 +37,24 @@ All agents receive a JSON context block with these common fields:
 
 | `budgetRemaining` | object | Token/cycle budget awareness — see Budget-Aware Behavior below |
 
-Agent-specific additions (e.g., `task`, `buildReport`, `mode`, `projectContext`) are documented in each agent file.
+Agent-specific additions (for example, `task`, `buildReport`, `mode`, `projectContext`) are documented in each agent file.
 
 ### The input index
 
-The pipeline writes `inputs/index.json` in the workspace before each phase. Consult the index first, and open only the entries that you need. Each entry has a `path`, a `kind`, a `class`, a `cycle` and a one-line `summary`:
+Your assignment is in the prompt. Your inputs are listed in `inputs/index.json` in your workspace. The pipeline writes the index before each phase. Each row has a `path`, a `kind`, a `class`, a `layer` and a one-line `summary`. It also has a size in `bytes`, a `tokens` estimate and the reason for the row (`why`).
 
-- `deliverable`: the reports, verdicts and `handoff-asks` of the earlier phases of this cycle;
-- `lineage`: on a retry or a recovery, the retrospectives, failure digests, carryover notes, audit reports and lessons of the earlier attempts of the same item.
+- `L1` rows (class `deliverable`): the reports, verdicts and `handoff-asks` of the earlier phases of this cycle.
+- `L2` rows (class `lineage`): present only on a retry or a recovery. They hold the retrospectives, failure digests, carryover notes, audit reports and lessons of the earlier attempts of the same item.
+
+Open each row with `required: true` before you write your deliverable. The header field `required` lists their ids. Open another row only when your task needs it.
+
+To read a row, read its path, or run `evolve context open <id> --workspace <workspace>`. The `workspace` line of the cycle context gives the value. `evolve context index --workspace <workspace> --json` lists the rows, and `--required` keeps only the required rows. `evolve context open` checks the `sha256` of the body against the index.
 
 The cell can read the indexed paths and its own workspace. It cannot read the raw output of other agents (`*-stdout.log`, `*-final-pane.txt`), the run directories of unrelated cycles, or the secrets in the home directory. Do not write in `inputs/`.
 
 ## Budget-Aware Behavior
 
-Every agent receives a `budgetRemaining` object in context. Agents should adapt their behavior based on remaining resources — this is **not** a hard limit, but a signal for self-regulation. (Research basis: BATS framework [arXiv:2511.17006] — budget-aware agents self-regulate without additional training.)
+Every agent receives a `budgetRemaining` object in context. Adapt your behavior to the remaining resources — this is **not** a hard limit, but a signal for self-regulation. (Research basis: BATS framework [arXiv:2511.17006] — budget-aware agents self-regulate without more training.)
 
 ```json
 {
@@ -73,7 +77,7 @@ The orchestrator computes `budgetPressure` at cycle start:
 - `medium`: `cyclesLeft / totalCycles` between 0.3 and 0.6
 - `high`: `cyclesLeft / totalCycles < 0.3`
 
-Agents should **not** refuse to work under high pressure — they should work more efficiently. For example, Scout under high pressure selects 1-2 tasks instead of 3-4. Builder under high pressure skips alternative analysis in the design step.
+Do **not** refuse to work under high pressure — work more efficiently. For example, Scout under high pressure selects 1-2 tasks instead of 3-4. Builder under high pressure skips alternative analysis in the design step.
 
 ## Strategy Handling
 
@@ -93,7 +97,7 @@ Each agent applies strategy to its own domain:
 
 ## Skill Awareness
 
-Agents may receive `recommendedSkills` in their task context — a compact list of external skills (from installed plugins) that the orchestrator or Scout matched to the current task.
+Agents can receive `recommendedSkills` in their task context. It is a compact list of external skills (from installed plugins) that the orchestrator or Scout matched to the current task.
 
 **Schema:**
 
@@ -106,18 +110,18 @@ Agents may receive `recommendedSkills` in their task context — a compact list 
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `name` | string | Skill name as registered (e.g., `"everything-claude-code:security-review"`) |
+| `name` | string | Skill name as registered (for example, `"everything-claude-code:security-review"`) |
 | `priority` | string | `"primary"` (strongly relevant — invoke before design) or `"supplementary"` (nice to have — invoke only if needed) |
 | `rationale` | string | Why this skill is recommended (under 50 chars) |
 
 **Rules:**
 - 0-3 skills per task (compact — adds ~200 tokens to context)
-- Agents invoke via the `Skill` tool — invocation is **optional**, based on agent judgment
+- Agents invoke through the `Skill` tool — invocation is **optional**, based on agent judgment
 - Under budget pressure (medium/high): invoke at most 1 primary skill
 - Skip supplementary skills if an applied instinct already covers the pattern
 - Each invocation costs ~2-5K tokens
 
-**Cross-platform & Fallbacks:** Use your platform's native skill invocation method (e.g., the `Skill` tool on Claude Code). On Gemini CLI / generic platforms, read the skill's `SKILL.md` file directly if available at the path in the skill inventory. If a specific recommended skill (e.g., `everything-claude-code:security-review`) is not found in the inventory, search the inventory for the closest available alternative in the same category.
+**Cross-platform & Fallbacks:** Use your platform's native skill invocation method (for example, the `Skill` tool on Claude Code). On Gemini CLI or another platform, read the `SKILL.md` file of the skill at the path in the skill inventory, when it exists. If a recommended skill (for example, `everything-claude-code:security-review`) is not in the inventory, search the inventory for the closest alternative in the same category.
 
 ## Shared Output Conventions
 
@@ -137,7 +141,9 @@ The auditor matches **case-sensitively** against the hyphenated lowercase form `
 
 1. `inputs.challengeToken` from the agent context block (the canonical path; passed at phase launch).
 2. `$WORKSPACE/challenge-token.txt` — read if context input is empty or absent.
-3. **STOP and report `FAIL: challenge-token unavailable`.** Do NOT invent, placeholder, or substitute. Cycle 134's CRITICAL `C1` was scout using `no-token-manual-run-cycle-134` as a placeholder — the auditor treats placeholder values as forgery indicators (CRITICAL FAIL).
+3. **STOP and report `FAIL: challenge-token unavailable`.** Do NOT invent, placeholder, or substitute.
+
+Cycle 134's CRITICAL `C1` was scout using `no-token-manual-run-cycle-134` as a placeholder. The auditor treats placeholder values as forgery indicators (CRITICAL FAIL).
 
 **Also include the token in your ledger entry** under `data.challenge` (same value, no comment syntax). Cross-references the report's header for hash-chain integrity.
 
@@ -174,20 +180,20 @@ Agent-specific `data` fields are defined in each agent file's Ledger Entry secti
 ### Mailbox Protocol
 
 - **On start:** Read `workspace/agent-mailbox.md` for messages addressed to you (by role name) or `to: "all"`. Apply any hints, flags, or persistent warnings from prior agents.
-- **On completion:** Post messages for other agents if you identified concerns worth carrying forward (e.g., fragile files, recurring smells, follow-up suggestions).
+- **On completion:** Post messages for other agents if you identified concerns worth carrying forward (for example, fragile files, recurring smells, follow-up suggestions).
 - Use `persistent: true` only for concerns spanning multiple cycles.
 
 ---
 
 ## Reflection Journal Schema
 
-Every phase agent (Intent, Scout, Triage, Plan-Review, Build-Planner, TDD-Engineer, Tester, Builder, Auditor) appends a bounded `## Reflection` section to its report **and** writes a machine-readable `<phase>-reflection.yaml` sidecar. The learn phase consumes both surfaces: humans read the markdown, the reflector persona aggregates the YAML.
+Each phase agent appends a bounded `## Reflection` section to its report **and** writes a machine-readable `<phase>-reflection.yaml` sidecar. The phase agents are Intent, Scout, Triage, Plan-Review, Build-Planner, TDD-Engineer, Tester, Builder and Auditor. The learn phase consumes both surfaces: humans read the markdown, the reflector persona aggregates the YAML.
 
-Gated on `EVOLVE_REFLECTION_JOURNAL` (default `1` at v10.20.0, opt-out via `0`). See [docs/architecture/reflection-journal.md](../docs/architecture/reflection-journal.md) for design rationale and rollout ladder.
+Gated on `EVOLVE_REFLECTION_JOURNAL` (default `1` at v10.20.0, opt-out with `0`). See [docs/architecture/reflection-journal.md](../docs/architecture/reflection-journal.md) for design rationale and rollout ladder.
 
 ### When to emit
 
-Append the reflection **after** the phase's primary deliverable is complete (after `build-report.md`, `audit-report.md`, etc. have been written) but **before** posting the completion ledger entry. Use the same Write call sequence as the rest of the report — never delegate to a parallel sub-agent (single-writer invariant).
+Append the reflection **after** the primary deliverable of the phase is complete, for example `build-report.md` or `audit-report.md`. Append it **before** you post the completion ledger entry. Use the same Write call sequence as the rest of the report — never delegate to a parallel sub-agent (single-writer invariant).
 
 ### Markdown section (operator-facing, ≤ 350 tokens)
 
@@ -258,7 +264,7 @@ phase_tracker_refs:                        # MUST come from .ephemeral/metrics/<
 | `tool-error` | A tool returned an error that required a workaround |
 | `context-saturation` | Approaching token/turn cap forced abbreviated output |
 | `ambiguous-input` | Upstream artifact was ambiguous and required interpretation |
-| `tool-batching` | Too many serial tool calls that could have been parallelized |
+| `tool-batching` | Too many serial tool calls that can run in parallel |
 | `profile-restriction` | Permission profile blocked an action that turned out necessary |
 | `other` | None of the above — REQUIRES a free-form note in `evidence` |
 
@@ -305,7 +311,7 @@ The full evolve-loop pipeline and the agent responsible for each phase. **Note (
 
 **TDD Engineer contract:** Runs after Scout selects a task and before Builder implements. Writes failing tests that encode acceptance criteria (RED phase). Builder must make those tests pass without modifying them. See [evolve-tdd-engineer.md](evolve-tdd-engineer.md) for the full workflow.
 
-**Phase sequence enforcement:** `phase-gate-precondition.sh` blocks out-of-order agent invocations. The TDD engineer phase (`tdd`) must be advanced via `cycle-state.sh advance tdd tdd-engineer` before Builder can be invoked.
+**Phase sequence enforcement:** `phase-gate-precondition.sh` blocks out-of-order agent invocations. The TDD engineer phase (`tdd`) must be advanced with `cycle-state.sh advance tdd tdd-engineer` before Builder can be invoked.
 
 **Learn phase invocation:** `legacy/scripts/lifecycle/run-cycle.sh` invokes the reflector after Ship completes, then dispatches retrospective (FAIL/WARN) or memo (PASS) based on the audit verdict. The reflector runs on every cycle regardless of verdict.
 
@@ -328,7 +334,7 @@ A human-readable shared narrative document at `.evolve/runs/cycle-N/team-context
 ### Protocol
 
 - **On start:** Read `.evolve/runs/cycle-<N>/team-context.md` in its entirety. Other agents' sections are your context — do not duplicate their work.
-- **On completion:** Append your section via `bash legacy/scripts/utility/team-context.sh append <cycle> <workspace> <role> <body-file>`. Idempotent — re-running replaces your section's body without duplicating.
+- **On completion:** Append your section with `bash legacy/scripts/utility/team-context.sh append <cycle> <workspace> <role> <body-file>`. Idempotent — re-running replaces your section's body without duplicating.
 - **Verification:** `bash legacy/scripts/utility/team-context.sh verify <cycle> <workspace> --require scout,tdd-engineer,builder,auditor` exits non-zero if any required section is empty (still `_pending_`).
 
 ### Phase-gate hook (opt-in)

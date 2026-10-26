@@ -5,11 +5,11 @@
 > test, so by CI) exits 2 when this file drifts from the registry. Design:
 > [signal-center-design.md](signal-center-design.md) §5.4 · [ADR-0101](adr/0101-signal-center.md).
 
-Every WARN or INCIDENT signal carries one of these codes; INFO signals carry none. A code names the
+Every WARN or INCIDENT signal carries one of these codes; an INFO signal can carry one too. A code names the
 **rule** that fired (`MODULE_SNAKE_CASE`, prefix = the owning module); `kind` names the event and
 `origin` the function. Triage kind-first (design §9): the kind says what happened, the code says
-which rule decided it, `fields` name the artifact to open. A code that reaches the Center without
-being registered here is not dropped — it is stamped `SIGNALCENTER_UNREGISTERED_CODE` with the raw
+which rule decided it, `fields` name the artifact to open. The Center does not drop a code that
+is not registered here. It stamps the event `SIGNALCENTER_UNREGISTERED_CODE` and keeps the raw
 value in `fields.raw_code`, so the drift is visible in the same file.
 
 Ship codes are the `shiperr` vocabulary projected verbatim (`SHIP_` + code, `shiperr.SignalCode`);
@@ -172,6 +172,8 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 
 | Code | Meaning |
 |---|---|
+| `ISOLATION_CONTEXT_BUDGET_OVER` | the cell context index: required entries of a layer passed its token budget and lost the flag; fields layer, limit_tokens, over (cell-context-index.md §6) |
+| `ISOLATION_CONTEXT_REQUIRED_UNOPENED` | the cell context index: a cell closed without a read of a required entry; fields.unopened lists the ids, and fields.source is sandbox (cell-context-index.md §8) |
 | `ISOLATION_I1_VIOLATION` | I-1 single launcher: a code path started an LLM binary outside the bridge launch API; fields.target names the binary (ADR-0154) |
 | `ISOLATION_I2_VIOLATION` | I-2 hermetic environment: the allowlist dropped a variable of the launcher; in shadow the child still got it (action=logged), in enforce it did not (action=refused); fields invariant, stage, action, cell, family, target (the name, never its value), rule, source (ADR-0154) |
 | `ISOLATION_I3_VIOLATION` | I-3 no nested agency: a cell tried to start an LLM binary or an evolve dispatch; fields.target names it (ADR-0154) |

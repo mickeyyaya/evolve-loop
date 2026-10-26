@@ -41,6 +41,9 @@ var rows = []Row{
 	{ID: "N12", Check: "a judge verdict in prose with no file fails the contract", Invariant: "I-8", ClosedBy: "X8", Owner: "internal/core/isolation_matrix_test.go"},
 	{ID: "N13", Check: "no family string in flow code", Invariant: "I-6", ClosedBy: "X6", Owner: "internal/core/isolation_matrix_test.go"},
 	{ID: "N14", Check: "a new manifest with known format ids needs no Go change", Invariant: "I-6", ClosedBy: "X9", Open: true, Owner: "internal/bridge/isolation_matrix_test.go", Cause: "unknown field \"parsers\""},
+	{ID: "N15", Check: "a cell lists its inputs/index.json and opens a required entry through evolve context index and evolve context open", Invariant: "I-4", ClosedBy: "X5-CX2", Owner: ownerMatrix},
+	{ID: "N16", Check: "an open of an indexed path writes one access record that names its entry (darwin only)", Invariant: "I-4", ClosedBy: "X5-CX3", Owner: ownerContract},
+	{ID: "N17", Check: "a cell cannot write the access log .evolve/context-access/", Invariant: "I-4", ClosedBy: "X5-CX3", Owner: ownerContract},
 }
 
 func Rows() []Row { return slices.Clone(rows) }
