@@ -86,7 +86,7 @@ C wins. It scores 4 for reach, not 5. A non-claude CLI reads only `AGENTS.md`. O
 | G5 | The migration of §5, in batches by theme | `guidance/rules/`, the memory | console |
 | G6 | The trigger evals of the task skills | `skills/*/evals` | lane |
 | G7 | The with-and-without eval of L0, run once before the switch | `skills/` evals | console |
-| G8 | The pipeline writes the filtered index into the inputs of each cell (§9.4) | `go/internal/isolation`, the cell inputs of X5 | console, after X5 (#1133) |
+| G8 | The context index of a cell reads `guidance/index.json` as its knowledge layer (§9.4) | the context-index design, after X5 (#1133) | the context-index builder |
 | G9 | The instruction loader of each CLI in the driver layer, and the injection for a CLI with no file (§9.4) | `go/internal/bridge/manifests`, `go/internal/adapters/bridge` | console |
 | G10 | A byte budget for `AGENTS.md`, under the Codex cap, after the G5 batches (§9.4) | `go/internal/guidance` | console |
 
@@ -221,7 +221,7 @@ B scores 3 for change size: it needs a reader, a generator, a check and a verb, 
 | D14 | `evolve guidance index [--audience X] [--phase P] [--cli F] [--json]` prints the filtered index. It is an `always` verb of agent class `A`: it reads only, works while a wave runs, and prints one envelope with `--json` (ADR-0156 I-15). | ADR-0154 I-4, ADR-0156 I-15 | Only a file: a cell cannot filter it by its own audience. |
 | D15 | A rule names no family fact. The optional field `families` selects the model families that need a rule. It matches the `model_family` of a manifest, a wider unit than the CLI name that `OverlayRule.CLIs` matches today. The tool names, file names and flags of a family stay in the driver layer. That layer is the CLI overlay of its file and its bridge manifest. | operator rule, F9 inventory | Family sections in `AGENTS.md`: Codex and Ollama read the facts of another family. |
 | D16 | A family with no instruction file gets L0 and the pointer through the `## Rules` prefix of the bridge (`injectRulesPrefix`). Each manifest names its file or `inject` (G9). | S16, F5.3 | A Modelfile `SYSTEM` for each model: it is a second home, and each new model needs a new file. |
-| D17 | The pipeline writes the filtered index into the inputs of each cell when X5 builds the cell inputs (G8). Until then, a phase agent reads `guidance/index.md` or runs the verb. | ADR-0154 I-4 | Wire it now: the cell inputs of X5 (#1133) do not exist on `main`. |
+| D17 | Each entry of `guidance/index.json` has the shared fields `id`, `layer`, `kind`, `summary`, `bytes`, `path` and `audience`. Thus one schema of the context index holds a rule and a data artifact. The context-index design owns the wiring into the cell (G8). Until then, a phase agent reads `guidance/index.md` or runs the verb. | ADR-0154 I-4; the operator, 2026-10-26: data access is indexed and layered too | Wire the rules into the cell here: a second index beside the context index splits one need into two loaders. |
 | D18 | The check fails on a bad registry file, a stale output, a repeated statement or L0 over budget. It also fails on two active rules in conflict and on an absent `enforced_by` path. The build and the verb fail closed on a bad registry file. | design §7 | Skip a bad file: a missing safety rule is silent. |
 | D19 | The first batch migrates the L0 set of §9.5. Batches 2 and 3 follow §5. | §5 | Migrate all 143 at once: one review cannot judge the layer of each rule. |
 
@@ -234,7 +234,7 @@ B scores 3 for change size: it needs a reader, a generator, a check and a verb, 
 G1 and G2 of §4 build the index, the L0 region and the verb. The new components:
 
 - **G1b:** the path rules, the action files and the skill blocks of design §4, when the first L2 rule exists.
-- **G8:** the pipeline writes `inputs/guidance-index.json`, filtered by the audience and the phase of the cell. It depends on X5 (#1133).
+- **G8:** the context index of a cell extends `inputs/index.json` of X5 (#1133). It reads `guidance/index.json` as its knowledge layer, filtered by the audience, the phase and the family of the seat. The context-index builder owns this component (design §10.6).
 - **G9:** each bridge manifest names its instruction file (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`) or `inject`. The bridge injects L0 and the pointer for `inject`. The family facts of `AGENTS.md` ("Per-CLI runtime details", "Tool Hygiene") and the 8 family-specific memory rules move to the CLI overlays and the manifests.
 - **G10:** after the G5 batches move the full rules into the registry, `AGENTS.md` gets a byte budget under 32,768 bytes, and the check enforces it.
 

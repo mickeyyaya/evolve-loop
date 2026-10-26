@@ -212,7 +212,7 @@ The order of the generators is fixed: `evolve guidance build`, then `evolve skil
 | `CLAUDE.md`, `GEMINI.md` | Claude Code; Gemini CLI and legacy agy | a copy of the digest, so the same region | `evolve skills generate` (X10) |
 | the `## Rules` prefix of the prompt | a family with no file, such as Ollama | the same region (G9) | the bridge |
 | `guidance/index.md` | each family, on demand | one row for each active rule | `evolve guidance build` |
-| `guidance/index.json` | each tool and the pipeline | the same rows as data | `evolve guidance build` |
+| `guidance/index.json` | each tool, and the context index of a cell (§10.6) | the same rows as data | `evolve guidance build` |
 | `guidance/rules/<id>.md` | each family, on demand | the body: the why, the evidence | a person, through a reviewed PR |
 
 The pointer line is: "The full rule set is in `guidance/index.md`; run `evolve guidance index --audience <you>` to list the rules of your case."
@@ -224,7 +224,7 @@ The pointer line is: "The full rule set is in `guidance/index.md`; run `evolve g
 | Column | Content |
 |---|---|
 | id | the rule id, a link to its body |
-| statement | the statement of 25 words or fewer |
+| summary | the statement of 25 words or fewer |
 | audience | the audience list, or `all` |
 | families | the family list, or `all` |
 | triggers | the paths, actions, tasks and failures, or `—` |
@@ -232,22 +232,36 @@ The pointer line is: "The full rule set is in `guidance/index.md`; run `evolve g
 
 The rows of a layer are in the order of the registry. The order of an L0 rule is its field `order` (a number, lowest first), so the costliest rule comes first. A rule with no `order` comes after, by id.
 
-`guidance/index.json` holds the same rows:
+`guidance/index.json` holds the same rows as entries. The first seven fields are the shared entry fields of the context index of a cell (§10.6). Thus one schema covers a rule and a data artifact:
+
+| Field | Content |
+|---|---|
+| `id` | the rule id |
+| `layer` | `L0` to `L4` |
+| `kind` | `rule` for each entry of this file |
+| `summary` | the `statement` field of the rule file, 25 words or fewer |
+| `bytes` | the size of the body file, so a reader knows the cost before it opens the body |
+| `path` | the body file, relative to the repository root |
+| `audience` | the audience list (who the entry applies to) |
+| `families`, `phases` | the selectors of §4; an empty list means each |
+| `triggers`, `enforced_by` | the fields of §4 that only a rule has |
 
 ```json
 {
   "schema": "evolve.guidance.index-file/1",
-  "rules": [
+  "entries": [
     {
       "id": "kill-guard-never-mutated",
-      "statement": "Never mutate or run a live kill guard ...",
       "layer": "L0",
+      "kind": "rule",
+      "summary": "Never mutate or run a live kill guard ...",
+      "bytes": 612,
+      "path": "guidance/rules/kill-guard-never-mutated.md",
       "audience": ["all"],
       "families": [],
       "phases": [],
       "triggers": {"paths": [], "actions": [], "tasks": [], "failures": []},
-      "enforced_by": [],
-      "body": "guidance/rules/kill-guard-never-mutated.md"
+      "enforced_by": []
     }
   ]
 }
@@ -269,7 +283,7 @@ Both files are byte-stable: a second build changes nothing.
 - `evolve guidance build` writes tracked files, so it is not an `always` verb. It is a tool of the operator outside the core verbs, as `evolve skills generate` is, and its agent class is `D`. A cell gets the rules from the index, never from a build.
 - With `--json`, the verb prints the envelope on each exit, also on a usage error.
 - Without `--json` it prints the rows as a Markdown table, grouped by layer.
-- With `--json` it prints one envelope with the schema `evolve.guidance.index/1`. Its `data` has the field `filter` (the flag values and the resolved family) and the field `rules` (the rows of §10.2).
+- With `--json` it prints one envelope with the schema `evolve.guidance.index/1`. Its `data` has the field `filter` (the flag values and the resolved family) and the field `entries` (the entries of §10.2).
 
 | Exit | Name | When |
 |---|---|---|
@@ -298,3 +312,7 @@ The check of §7 also fails on these:
 - an L0 rule with a non-empty `families` list;
 - a `families` value that no bridge manifest names;
 - an unknown field in a registry file, or a required field that is absent.
+
+### 10.6 The consumer: the context index of a cell
+
+The rule index is the knowledge layer of the context index of each cell. A separate design extends the `inputs/index.json` of X5 (#1133) into a layered context index for the data that a phase agent reads. That index reads `guidance/index.json` as its knowledge layer. That design owns the wiring into the cell. This design only keeps the entry fields of §10.2 stable.
