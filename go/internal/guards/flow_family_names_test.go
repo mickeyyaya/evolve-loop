@@ -27,12 +27,10 @@ var familyNameHomes = []string{
 	"internal/modelquery/",
 	"internal/detectcli/",
 	"internal/setup/",
-	"internal/tokenusage/",
 	"internal/practicewatch/",
 	"internal/preflight/",
 	"internal/looppreflight/",
 	"internal/capability/",
-	"internal/attemptpostmortem/",
 	"internal/cli/opscmd/doctor_versions.go",
 	"internal/cliroute/cliroutetest/",
 	"cmd/evolve-fake-cli/",
@@ -108,6 +106,11 @@ func flowFamilyNames(t *testing.T, module string) ([]string, int) {
 
 func familyLiterals(t *testing.T, path, rel string) []string {
 	t.Helper()
+	return literalsMatching(t, path, rel, func(value string) bool { return slices.Contains(familyNames, value) })
+}
+
+func literalsMatching(t *testing.T, path, rel string, matches func(string) bool) []string {
+	t.Helper()
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, path, nil, 0)
 	if err != nil {
@@ -119,10 +122,89 @@ func familyLiterals(t *testing.T, path, rel string) []string {
 		if !ok || lit.Kind != token.STRING {
 			return true
 		}
-		if value, err := strconv.Unquote(lit.Value); err == nil && slices.Contains(familyNames, value) {
+		if value, err := strconv.Unquote(lit.Value); err == nil && matches(value) {
 			out = append(out, rel+":"+strconv.Itoa(fset.Position(lit.Pos()).Line)+" "+lit.Value)
 		}
 		return true
 	})
 	return out
+}
+
+var parserPackages = []string{
+	"internal/bridge/panestream",
+	"internal/bridge/clicontrol",
+	"internal/tokenusage",
+	"internal/attemptpostmortem",
+}
+
+func TestParserPackagesNameNoFamily(t *testing.T) {
+	module, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	names, scanned := parserFamilyNames(t, module)
+	if scanned < 20 {
+		t.Fatalf("scanned only %d parser files under %s — the guard lost its corpus", scanned, module)
+	}
+	for _, n := range names {
+		t.Errorf("%s names a CLI family in a parser or collector package: key the implementation by a format id and let the manifest field parsers, collectors or transcript pick it (I-6, X9)", n)
+	}
+}
+
+func TestParserFamilyNames_FindsASwitchCaseAMapKeyAndAPrefixOfAFamily(t *testing.T) {
+	module := t.TempDir()
+	writeGoFile(t, module, filepath.Join("internal", "tokenusage", "pick.go"), `package tokenusage
+
+import "strings"
+
+var byFamily = map[string]int{"codex": 1}
+
+func pick(d string) bool {
+	switch d {
+	case "ollama-tmux":
+		return true
+	}
+	return strings.HasPrefix(d, "claude-")
+}
+
+const format = "claude-jsonl-v1"
+`)
+	writeGoFile(t, module, filepath.Join("internal", "tokenusage", "pick_test.go"), `package tokenusage
+
+const fixture = "agy"
+`)
+	names, scanned := parserFamilyNames(t, module)
+	if scanned != 1 || len(names) != 3 {
+		t.Fatalf("a map key, a case and a prefix; format ids and tests exempt: scanned=%d %v", scanned, names)
+	}
+	for i, want := range []string{`:5 "codex"`, `:9 "ollama-tmux"`, `:12 "claude-"`} {
+		if !strings.HasSuffix(names[i], want) {
+			t.Errorf("finding %d = %q, want the suffix %q", i, names[i], want)
+		}
+	}
+}
+
+func parserFamilyNames(t *testing.T, module string) ([]string, int) {
+	t.Helper()
+	var names []string
+	scanned := 0
+	for _, pkg := range parserPackages {
+		files, err := filepath.Glob(filepath.Join(module, filepath.FromSlash(pkg), "*.go"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, path := range files {
+			if strings.HasSuffix(path, "_test.go") {
+				continue
+			}
+			rel, _ := filepath.Rel(module, path)
+			scanned++
+			names = append(names, literalsMatching(t, path, rel, isFamilyOrPrefix)...)
+		}
+	}
+	return names, scanned
+}
+
+func isFamilyOrPrefix(value string) bool {
+	return slices.Contains(familyNames, value) || slices.Contains(familyNames, strings.TrimSuffix(value, "-")) && strings.HasSuffix(value, "-")
 }

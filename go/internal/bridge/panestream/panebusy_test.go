@@ -12,7 +12,7 @@ func TestPaneBusy_RealFrames(t *testing.T) {
 		{"codex", "generating.txt"},
 	}
 	for _, tc := range cases {
-		p := Profiles[tc.cli]
+		p := Profiles[tc.cli+"-repl-v1"]
 		if got := PaneBusy(readFrame(t, tc.cli+"/"+tc.genFrame), p); !got {
 			t.Errorf("%s %s: PaneBusy=false, want true (generating frame must read busy)", tc.cli, tc.genFrame)
 		}
@@ -23,21 +23,21 @@ func TestPaneBusy_RealFrames(t *testing.T) {
 			t.Errorf("%s final: PaneBusy=true, want false (idle)", tc.cli)
 		}
 	}
-	if PaneBusy(readFrame(t, "codex/thinking.txt"), Profiles["codex"]) {
+	if PaneBusy(readFrame(t, "codex/thinking.txt"), Profiles["codex-repl-v1"]) {
 		t.Error("codex/thinking.txt (idle boot frame) must read NOT busy")
 	}
 }
 
 func TestPaneBusy_Codex0_139_Working(t *testing.T) {
 	frame := readFrame(t, "codex/generating.txt")
-	if !PaneBusy(frame, Profiles["codex"]) {
+	if !PaneBusy(frame, Profiles["codex-repl-v1"]) {
 		t.Fatal("codex 0.139 generating frame (Working … esc to interrupt) must read busy")
 	}
 }
 
 func TestPaneBusy_Claude2_1_173_SpinnerOnly(t *testing.T) {
 	frame := readFrame(t, "claude/thinking-v2.1.173.txt")
-	if !PaneBusy(frame, Profiles["claude"]) {
+	if !PaneBusy(frame, Profiles["claude-repl-v1"]) {
 		t.Fatal("claude 2.1.173 generating frame (spinner stats line, no esc affordance) must read busy")
 	}
 }
@@ -52,7 +52,7 @@ func TestPaneBusy_SpinnerStatsVariants(t *testing.T) {
 		"✻ Persevering… (1h 5m · ↑ 100k tokens)",
 	}
 	for _, line := range busyLines {
-		if !PaneBusy(line+"\n❯ \n", Profiles["claude"]) {
+		if !PaneBusy(line+"\n❯ \n", Profiles["claude-repl-v1"]) {
 			t.Errorf("spinner variant must read busy: %q", line)
 		}
 	}
@@ -61,7 +61,7 @@ func TestPaneBusy_SpinnerStatsVariants(t *testing.T) {
 		"The cost line said it used 3.1k tokens overall.",
 	}
 	for _, line := range idleLines {
-		if PaneBusy(line, Profiles["claude"]) {
+		if PaneBusy(line, Profiles["claude-repl-v1"]) {
 			t.Errorf("idle frame must NOT read busy: %q", line)
 		}
 	}

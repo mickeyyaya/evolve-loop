@@ -27,7 +27,7 @@ func TestReviewCheckpoint_BuildsAndPublishesEvidence(t *testing.T) {
 			callback = stopReviewRec{phase: phase, action: action, reason: reason}
 		},
 	}.withDefaults()
-	profile := panestream.Profiles["claude"]
+	profile := panestream.Profiles["claude-repl-v1"]
 	waiter := replWaiter{
 		ctx: context.Background(),
 		cfg: &Config{

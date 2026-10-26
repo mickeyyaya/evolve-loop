@@ -17,25 +17,25 @@ func TestSignalCenter_BusyOf_AllProfilesMatrix(t *testing.T) {
 	}{
 		{
 			name:         "claude",
-			profile:      Profiles["claude"],
+			profile:      Profiles["claude-repl-v1"],
 			busyRendered: "⏺ thinking\nesc to interrupt\n❯ \n",
 			idleRendered: "⏺ done\n❯ \n",
 		},
 		{
 			name:         "codex",
-			profile:      Profiles["codex"],
+			profile:      Profiles["codex-repl-v1"],
 			busyRendered: "some output\nesc to interrupt\n› \n",
 			idleRendered: "some output\n› \n",
 		},
 		{
 			name:         "agy",
-			profile:      Profiles["agy"],
+			profile:      Profiles["agy-repl-v1"],
 			busyRendered: "working\nesc to cancel\n> \n",
 			idleRendered: "done\n> \n",
 		},
 		{
 			name:         "ollama",
-			profile:      Profiles["ollama"],
+			profile:      Profiles["ollama-repl-v1"],
 			busyRendered: "thinking\nesc to interrupt\n>>> Send a message\n",
 			idleRendered: ">>> Send a message\n",
 		},
@@ -79,7 +79,7 @@ func TestSignalCenter_BusyOf_ZeroValueProfileWithAffordanceLine(t *testing.T) {
 
 func TestSignalCenter_BusyOf_ANSIWrappedAffordanceLine(t *testing.T) {
 	sc := NewLivenessCenter()
-	p := Profiles["claude"]
+	p := Profiles["claude-repl-v1"]
 	rendered := "⏺ thinking\n\x1b[31mesc to interrupt\x1b[0m\n❯ \n"
 
 	want := PaneBusy(rendered, p)
@@ -93,7 +93,7 @@ func TestSignalCenter_BusyOf_ANSIWrappedAffordanceLine(t *testing.T) {
 
 func TestSignalCenter_BusyOf_OllamaEmptyPaneReadsBusy(t *testing.T) {
 	sc := NewLivenessCenter()
-	p := Profiles["ollama"]
+	p := Profiles["ollama-repl-v1"]
 
 	want := PaneBusy("", p)
 	if !want {
@@ -106,7 +106,7 @@ func TestSignalCenter_BusyOf_OllamaEmptyPaneReadsBusy(t *testing.T) {
 
 func TestSignalCenter_BusyOf_OllamaIdlePlaceholderBoundary(t *testing.T) {
 	sc := NewLivenessCenter()
-	p := Profiles["ollama"]
+	p := Profiles["ollama-repl-v1"]
 
 	cases := []struct {
 		name     string
@@ -130,7 +130,7 @@ func TestSignalCenter_BusyOf_OllamaIdlePlaceholderBoundary(t *testing.T) {
 
 func TestSignalCenter_BusyOf_LargeRenderedPaneBuried(t *testing.T) {
 	sc := NewLivenessCenter()
-	p := Profiles["claude"]
+	p := Profiles["claude-repl-v1"]
 
 	const numFillerLines = 5000
 	buildPane := func(affordanceAtLine int) string {
@@ -165,7 +165,7 @@ func TestSignalCenter_BusyOf_LargeRenderedPaneBuried(t *testing.T) {
 func TestSignalCenter_BusyOf_NilReceiverMatchesNonNilForBusyInput(t *testing.T) {
 	var nilCenter *LivenessCenter
 	freshCenter := NewLivenessCenter()
-	p := Profiles["claude"]
+	p := Profiles["claude-repl-v1"]
 	rendered := "⏺ thinking\nesc to interrupt\n❯ \n"
 
 	oracle := PaneBusy(rendered, p)
@@ -189,7 +189,7 @@ func TestSignalCenter_BusyOf_NilReceiverMatchesNonNilForBusyInput(t *testing.T) 
 
 func TestSignalCenter_BusyOf_RepeatedCallsIdempotentNoStateLeak(t *testing.T) {
 	sc := NewLivenessCenter()
-	p := Profiles["claude"]
+	p := Profiles["claude-repl-v1"]
 	busy := "⏺ thinking\nesc to interrupt\n❯ \n"
 	idle := "⏺ done\n❯ \n"
 
@@ -217,7 +217,7 @@ func TestSignalCenter_BusyOf_ConcurrentWithObserveAggregateRegisterHandler(t *te
 	const busyOfIterations = 300
 
 	sc := NewLivenessCenter()
-	claudeProfile := Profiles["claude"]
+	claudeProfile := Profiles["claude-repl-v1"]
 	busyRendered := "⏺ thinking\nesc to interrupt\n❯ \n"
 	idleRendered := "⏺ done\n❯ \n"
 

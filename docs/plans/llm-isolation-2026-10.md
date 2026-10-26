@@ -176,7 +176,8 @@ The state on 2026-10-26. Each component re-reads this table before it starts.
 | X10 | built | this change | `AGENTS.md` is the one source. `evolve skills generate` renders its digest into `CLAUDE.md` and `GEMINI.md`, and the four review-fleet personas into `.claude/agents`. |
 | X17a | merged | #1125 | `evolve loop status` with any extra word never starts a loop. |
 | X17e | merged | #1130 | Each `evolve` verb has an agent class (docs). |
-| X9, X11 to X16, X17b to X17d, X18b to X19 | not started | none | |
+| X9 | built | this change | The manifest fields `parsers`, `collectors`, `transcript`, `capabilities`, `context_window` and `home_reads` pick one Go implementation for each format id (spec §11.1). Row N14 is green. Row M5 moves to X19c. Item `isolation-x9b-route-and-model-tables-from-manifests` owns the `llmroute` and `modelquery` tables. |
+| X11 to X16, X17b to X17d, X18b to X19 | not started | none | |
 
 ### 6.2 The X6 follow-up (X6b)
 
@@ -416,7 +417,7 @@ X19 has no scored designs. It is an operator directive of 2026-10-25, and §12.4
 | X18e | Delete the 6 dead names; inject the 8 test seams | I-16 | the flag registry lists `EVOLVE_REFLECTION_JOURNAL` with no reader (the row of `EVOLVE_WORKTREE_PATH` went on 2026-10-26) | X18b | `enforce` |
 | X19a | The neutral `TaskAssignment`; no CLI in `PhaseRequest` or in the advisor plan; the guard with a shrinking allowlist | I-17 | `TestNoCLISpecificsAboveTheDriver` lists `ModelRoutingCLI` and the advisor `"cli"` field | X6 | `enforce` |
 | X19b | Neutral sandbox intents in the profiles; `extra_flags_by_cli` into the manifests; neutral personas | I-17 | the guard lists `Bash(evolve phase verify:*)` in 93 profiles | X19a, X6b | `enforce` |
-| X19c | Capability negotiation in the router | I-17 | a seat that needs `edit` routes to a driver with no `edit` capability | X9, X19a, X6b | `enforce` |
+| X19c | Capability negotiation in the router | I-17 | a seat that needs `edit` routes to a driver with no `edit` capability; matrix row M5 | X9, X19a, X6b | `enforce` |
 
 ### 12.7 Order
 

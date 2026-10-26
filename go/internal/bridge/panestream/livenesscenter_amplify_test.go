@@ -145,7 +145,7 @@ func TestAmp_SignalCenter_SessionIsolation(t *testing.T) {
 
 func TestAmp_SignalCenter_EmptySessionKey(t *testing.T) {
 	sc := NewLivenessCenter()
-	p := Profiles["claude"]
+	p := Profiles["claude-repl-v1"]
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -160,7 +160,7 @@ func TestAmp_SignalCenter_EmptySessionKey(t *testing.T) {
 
 func TestAmp_SignalCenter_EmptyRendered(t *testing.T) {
 	sc := NewLivenessCenter()
-	p := Profiles["claude"]
+	p := Profiles["claude-repl-v1"]
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -175,7 +175,7 @@ func TestAmp_SignalCenter_EmptyRendered(t *testing.T) {
 
 func TestAmp_SignalCenter_LargeNumSessions(t *testing.T) {
 	sc := NewLivenessCenter()
-	p := Profiles["claude"]
+	p := Profiles["claude-repl-v1"]
 
 	for i := 0; i < 200; i++ {
 		key := fmt.Sprintf("sess-%04d", i)
@@ -197,7 +197,7 @@ func TestAmp_SignalCenter_LargeNumSessions(t *testing.T) {
 
 func TestAmp_SignalCenter_MultipleReadersConcurrent(t *testing.T) {
 	sc := NewLivenessCenter()
-	p := Profiles["claude"]
+	p := Profiles["claude-repl-v1"]
 
 	for i := 0; i < 4; i++ {
 		sc.Observe(fmt.Sprintf("seed-%d", i), "seed content\n❯ \n", p)
@@ -234,7 +234,7 @@ func TestAmp_SignalCenter_MultipleReadersConcurrent(t *testing.T) {
 
 func TestAmp_SignalCenter_SingleObservationPerSession(t *testing.T) {
 	sc := NewLivenessCenter()
-	p := Profiles["claude"]
+	p := Profiles["claude-repl-v1"]
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -250,14 +250,14 @@ func TestAmp_SignalCenter_RegisteredHandlerOverridesBuiltin(t *testing.T) {
 	sc := NewLivenessCenter()
 	overrideCalled := false
 
-	sc.RegisterHandler("claude", func() LivenessProbe {
+	sc.RegisterHandler(FormatClaudeREPL, func() LivenessProbe {
 		overrideCalled = true
 		return &fixedProbe{state: LivenessConverging, conf: 0.99}
 	})
 
-	sc.Observe("sess-override", "content\n❯ \n", Profiles["claude"])
+	sc.Observe("sess-override", "content\n❯ \n", Profiles["claude-repl-v1"])
 	if !overrideCalled {
-		t.Errorf("RegisterHandler(\"claude\", ...) was not called when Observe used Profiles[\"claude\"]; registry must take priority over DetectorFor (OCP seam)")
+		t.Errorf("RegisterHandler(FormatClaudeREPL, ...) was not called when Observe used Profiles[FormatClaudeREPL]; registry must take priority over DetectorFor (OCP seam)")
 	}
 }
 

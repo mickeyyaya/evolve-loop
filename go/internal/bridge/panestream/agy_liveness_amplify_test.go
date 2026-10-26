@@ -23,7 +23,7 @@ func agyFrame(contentLines ...string) string {
 }
 
 func TestAmp_AgyDetector_PrimeCallReturnsBaseBehavior(t *testing.T) {
-	p := Profiles["agy"]
+	p := Profiles["agy-repl-v1"]
 	generating := testdataFrame(t, "agy/thinking.txt")
 
 	det := NewAgyDetector(3)
@@ -43,7 +43,7 @@ func TestAmp_AgyDetector_PrimeCallReturnsBaseBehavior(t *testing.T) {
 }
 
 func TestAmp_AgyDetector_PartialSpinnerNotConverging(t *testing.T) {
-	p := Profiles["agy"]
+	p := Profiles["agy-repl-v1"]
 	const partialSpinner = "⣯ Generat"
 	primeFrame := agyFrame("> what is tmux?")
 	partialFrame := agyFrame("> what is tmux?", partialSpinner)
@@ -63,7 +63,7 @@ func TestAmp_AgyDetector_PartialSpinnerNotConverging(t *testing.T) {
 }
 
 func TestAmp_AgyDetector_SpinnerEmbeddedMidLineNotDetected(t *testing.T) {
-	p := Profiles["agy"]
+	p := Profiles["agy-repl-v1"]
 	primeFrame := agyFrame("> what is tmux?")
 	embeddedFrame := agyFrame("> what is tmux?", "prefix text "+agySpinnerText+" suffix text")
 
@@ -87,7 +87,7 @@ func TestAmp_AgyDetector_SpinnerEmbeddedMidLineNotDetected(t *testing.T) {
 }
 
 func TestAmp_AgyDetector_EscToCancelAloneNotConverging(t *testing.T) {
-	p := Profiles["agy"]
+	p := Profiles["agy-repl-v1"]
 	primeFrame := agyFrame("> what is tmux?")
 	escOnlyFrame := agyFrame("> what is tmux?", agyEscText)
 
@@ -111,7 +111,7 @@ func TestAmp_AgyDetector_EscToCancelAloneNotConverging(t *testing.T) {
 }
 
 func TestAmp_AgyDetector_OscillationSpinnerAnswerSpinner(t *testing.T) {
-	p := Profiles["agy"]
+	p := Profiles["agy-repl-v1"]
 	det := NewAgyDetector(3)
 	base := NewDefaultDetector(3)
 	thinkingFrame := testdataFrame(t, "agy/thinking.txt")
@@ -128,7 +128,7 @@ func TestAmp_AgyDetector_OscillationSpinnerAnswerSpinner(t *testing.T) {
 }
 
 func TestAmp_AgyDetector_RepeatedFrozenSpinnerFramesWalkToHung(t *testing.T) {
-	p := Profiles["agy"]
+	p := Profiles["agy-repl-v1"]
 	det := NewAgyDetector(3)
 	thinkingFrame := testdataFrame(t, "agy/thinking.txt")
 
@@ -147,7 +147,7 @@ func TestAmp_AgyDetector_RepeatedFrozenSpinnerFramesWalkToHung(t *testing.T) {
 }
 
 func TestAmp_AgyDetector_MalformedEdgeCasesNoPanic(t *testing.T) {
-	p := Profiles["agy"]
+	p := Profiles["agy-repl-v1"]
 	cases := []struct {
 		name  string
 		frame string
@@ -190,7 +190,7 @@ func TestAmp_AgyDetector_MalformedEdgeCasesNoPanic(t *testing.T) {
 }
 
 func TestAmp_AgyDetector_WithNonAgyProfile(t *testing.T) {
-	codexProfile := Profiles["codex"]
+	codexProfile := Profiles["codex-repl-v1"]
 	det := NewAgyDetector(3)
 	base := NewDefaultDetector(3)
 
@@ -216,7 +216,7 @@ func TestAmp_AgyDetector_WithNonAgyProfile(t *testing.T) {
 }
 
 func TestAmp_AgyDetector_FrozenSpinnerHonoursTheStallThreshold(t *testing.T) {
-	p := Profiles["agy"]
+	p := Profiles["agy-repl-v1"]
 	det := NewAgyDetector(100)
 	thinkingFrame := testdataFrame(t, "agy/thinking.txt")
 
@@ -229,7 +229,7 @@ func TestAmp_AgyDetector_FrozenSpinnerHonoursTheStallThreshold(t *testing.T) {
 }
 
 func TestAmp_AgyDetector_GeneratingConfidenceEqualsDefault(t *testing.T) {
-	p := Profiles["agy"]
+	p := Profiles["agy-repl-v1"]
 	thinkingFrame := testdataFrame(t, "agy/thinking.txt")
 
 	det := NewAgyDetector(3)
@@ -247,7 +247,7 @@ func TestAmp_AgyDetector_GeneratingConfidenceEqualsDefault(t *testing.T) {
 }
 
 func TestAmp_AgyDetector_ExtendedAnswerFrameParityManyIterations(t *testing.T) {
-	p := Profiles["agy"]
+	p := Profiles["agy-repl-v1"]
 	answerFrame := testdataFrame(t, "agy/answer.txt")
 
 	det := NewAgyDetector(3)

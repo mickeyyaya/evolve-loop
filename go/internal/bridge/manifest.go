@@ -84,7 +84,6 @@ type Manifest struct {
 	TokenLineRegex          string                   `json:"token_line_regex,omitempty"`
 	ModelLabelRegex         string                   `json:"model_label_regex,omitempty"`
 	Stub                    bool                     `json:"stub"`
-	Toolless                bool                     `json:"toolless,omitempty"`
 	ModelTierMap            map[string]string        `json:"model_tier_map,omitempty"`
 	ModelTierMapFrom        string                   `json:"model_tier_map_from,omitempty"`
 	ChatGPTSafeModels       []string                 `json:"chatgpt_safe_models,omitempty"`
@@ -94,6 +93,15 @@ type Manifest struct {
 	Params                  map[string]ParamSpec     `json:"params,omitempty"`
 	Controls                map[string]ControlSpec   `json:"controls,omitempty"`
 	LaunchModelVerification *LaunchModelVerification `json:"launch_model_verification,omitempty"`
+	SchemaVersion           int                      `json:"schema_version,omitempty"`
+	Note                    string                   `json:"note,omitempty"`
+	NotesOnRemovedPatterns  map[string]string        `json:"_notes_on_removed_patterns,omitempty"`
+	Parsers                 map[string]string        `json:"parsers,omitempty"`
+	Collectors              map[string]string        `json:"collectors,omitempty"`
+	Transcript              *TranscriptSpec          `json:"transcript,omitempty"`
+	Capabilities            []string                 `json:"capabilities,omitempty"`
+	HomeReads               []string                 `json:"home_reads,omitempty"`
+	ContextWindow           int                      `json:"context_window,omitempty"`
 }
 
 type ControlSpec struct {
@@ -180,6 +188,9 @@ func parseManifestWithStderr(cli string, data []byte, stderr io.Writer) (Manifes
 		return Manifest{}, err
 	}
 	if err := errors.Join(validateMCPConfigFiles(cli, m.MCPConfigFiles), validateInstallRoots(cli, m.InstallRoots)); err != nil {
+		return Manifest{}, err
+	}
+	if err := checkFormats(cli, m, stderr); err != nil {
 		return Manifest{}, err
 	}
 	if err := validatePaneVocabulary(cli, m); err != nil {
