@@ -12,7 +12,7 @@
   "files": [
     "skills/"
   ],
-  "fix": "Add 8 queries that must load each task skill and 8 that must not, and make evolve guidance check refuse a task skill with no eval.",
+  "fix": "Add 8 queries that must load each task skill and 8 queries that must not load it. Make evolve guidance check refuse a task skill with no eval.",
   "id": "guidance-skill-trigger-evals",
   "kind": "feature",
   "priority_class": "stability",

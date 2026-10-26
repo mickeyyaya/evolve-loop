@@ -15,7 +15,7 @@
     ".evolve/guidance/actions/",
     "skills/"
   ],
-  "fix": "Extend evolve guidance build to render each L2 output of guidance-layers.md \u00a74 from the triggers of the registry, and extend the check to each output and to each paths: glob (design \u00a77).",
+  "fix": "Extend evolve guidance build to render each L2 output of guidance-layers.md \u00a74 from the triggers of the registry. Extend the check to each output and to each paths: glob (design \u00a77).",
   "id": "guidance-build-l2-outputs",
   "kind": "feature",
   "priority_class": "stability",

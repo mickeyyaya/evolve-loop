@@ -3,7 +3,7 @@
     "Each batch-3 memory rule is a registry file, a merge, a retirement with its reason, or a driver-layer fact",
     "evolve guidance check passes",
     "Each of the 3 routing-data rules is in cli_routing or has an inbox item, and its memory file is retired",
-    "The outcome list of plan \u00a79.1 covers all 143 memory feedback files, with no file unassigned, and batch 3 resolves its 50 rules and 13 retirements"
+    "The outcome list of plan \u00a79.1 covers all 143 memory feedback files, with no file unassigned. Batch 3 resolves its 50 rules and 13 retirements"
   ],
   "created_at": "2026-10-26T18:06:00Z",
   "deps": [

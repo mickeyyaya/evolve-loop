@@ -13,7 +13,7 @@
     "go/internal/isolation/",
     "go/internal/guidance/"
   ],
-  "fix": "In the context-index component, read guidance/index.json as the knowledge layer, filter its entries by the audience phase, by the phase name and by the family of the seat, and merge them into the layered context index of the cell. Use the shared entry fields id, layer, kind, summary, bytes, path and audience.",
+  "fix": "In the context-index component, read guidance/index.json as the knowledge layer. Filter its entries by the audience phase, by the phase name and by the family of the seat. Merge them into the layered context index of the cell. Use the shared entry fields id, layer, kind, summary, bytes, path and audience.",
   "id": "guidance-cell-index-input",
   "kind": "feature",
   "priority_class": "stability",

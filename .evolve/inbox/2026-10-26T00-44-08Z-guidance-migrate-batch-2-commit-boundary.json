@@ -13,7 +13,7 @@
     "guidance/rules/",
     "AGENTS.md"
   ],
-  "fix": "Move the rules of the batch-2 rows of plan \u00a79.1 into guidance/rules/ with layer, audience and triggers; merge the duplicates of F9.2; replace each memory file with a pointer; remove the hand-written copies from AGENTS.md.",
+  "fix": "Move the rules of the batch-2 rows of plan \u00a79.1 into guidance/rules/ with layer, audience and triggers. Merge the duplicates of F9.2. Replace each memory file with a pointer. Remove the hand-written copies from AGENTS.md.",
   "id": "guidance-migrate-batch-2-commit-boundary",
   "kind": "feature",
   "priority_class": "stability",

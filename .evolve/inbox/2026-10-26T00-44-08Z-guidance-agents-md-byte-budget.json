@@ -12,13 +12,13 @@
     "go/internal/guidance/",
     "AGENTS.md"
   ],
-  "fix": "After the G5 batches move the full rules into the registry, add a byte budget for AGENTS.md below 32,768 bytes to evolve guidance check.",
+  "fix": "Start after the G5 batches move the full rules into the registry. Then add a byte budget for AGENTS.md below 32,768 bytes to evolve guidance check.",
   "id": "guidance-agents-md-byte-budget",
   "kind": "feature",
   "priority_class": "stability",
   "route": "console-manual",
   "source": "console, 2026-10-26, operator: \"Extract the common rules, policies from claude / gemini / codex / ollama / etc... and build a structured system level indexes MD file to be loaded dynamically in the run time.\" Design: docs/architecture/guidance-layers.md \u00a710; plan docs/plans/guidance-layers-2026-10.md \u00a74 and \u00a79 (ADR-0145).",
-  "summary": "The X10 AGENTS.md is 50,571 bytes, and Codex reads only the first 32,768 bytes, so its runtime facts do not reach a Codex agent (research F5.2).",
+  "summary": "The X10 AGENTS.md is 50,571 bytes, and Codex reads only the first 32,768 bytes. Thus its runtime facts do not reach a Codex agent (research F5.2).",
   "title": "Guidance G10: AGENTS.md stays under the 32 KiB cap of Codex",
   "weight": 0.35
 }

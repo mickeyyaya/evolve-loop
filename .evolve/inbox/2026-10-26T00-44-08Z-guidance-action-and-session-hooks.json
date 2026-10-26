@@ -14,7 +14,7 @@
     "go/internal/guards/",
     ".claude/settings.json"
   ],
-  "fix": "Add an evolve guard verb that emits the checklist of .evolve/guidance/actions/<action>.md as additionalContext on a matching command, and a SessionStart hook that loads the console role. Both exit 0 and print nothing when EVOLVE_PHASE_AGENT is set. First confirm that the installed Claude Code passes PreToolUse additionalContext to the model.",
+  "fix": "Add an evolve guard verb that emits the checklist of .evolve/guidance/actions/<action>.md as additionalContext on a matching command. Add a SessionStart hook that loads the console role. Both exit 0 and print nothing when EVOLVE_PHASE_AGENT is set. First confirm that the installed Claude Code passes PreToolUse additionalContext to the model.",
   "id": "guidance-action-and-session-hooks",
   "kind": "feature",
   "priority_class": "stability",
