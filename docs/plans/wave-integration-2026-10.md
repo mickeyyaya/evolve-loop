@@ -1,6 +1,6 @@
 # Plan: the wave orchestrator owns the integration of its deliverables
 
-- **Status:** proposed, 2026-10-20. The operator decides the open questions of §7.
+- **Status:** proposed, 2026-10-20. The operator decided the questions of §7 on 2026-10-27. Each component of §6 has an inbox item since 2026-10-27.
 - **Research:** [wave-integration-2026-10](../research/wave-integration-2026-10.md). **Decision:** [ADR-0147](../architecture/adr/0147-the-wave-orchestrator-owns-integration-and-decides-when-the-wave-reaches-main.md). **Design:** [wave-orchestrator §15](../architecture/wave-orchestrator.md#15-integration).
 - **Amends:** [ADR-0139](../architecture/adr/0139-a-wave-orchestrator-supplies-admits-and-backfills-every-lane.md) (the orchestrator now owns landing), [ADR-0128](../architecture/adr/0128-landing-queue-tiered-reverification.md) and [ADR-0134](../architecture/adr/0134-fleet-landings-scale-through-content-keyed-verification-and-group-commit.md) (their composition, proof, tiers and conflict-graph order become parts of the integration engine).
 
@@ -127,32 +127,39 @@ Each lane passed its own tests on its own base. The integration branch holds a t
 
 ## 6. Components and order
 
-| # | Component | Home | Route |
-|---|---|---|---|
-| I0 | The deliverable record of D2. The kind `ship.delivered` and the codes `SHIP_INTEGRATION_*` in the Signal Center registry. At `enforce`, a fleet lane's ship stops before `main`. | `go/internal/phases/ship`, `go/internal/core` | console |
-| I1 | The order score of D3, as a pure function | `go/internal/integration` (new) | lane |
-| I2 | The compose engine: one commit for each deliverable, the overlap proof and the tier, reusing the ADR-0128 code (`planlanding.go`, `landprefixes.go`) | `go/internal/integration`, `go/internal/phases/ship` | console |
-| I3 | The prefix check, the ejection and the ejection brief to the lane | `go/internal/integration`, `go/internal/orchestrator` | console |
-| I3b | The batch test L2 of D16 and D17. It finds the affected set and runs each deliverable's predicates on the combined tree. It uses the prefix order for a red and records each verdict. | `go/internal/integration`, `go/internal/phases/ship` | console |
-| I4 | The flush policy of D7 to D9, with the adaptive cap, as a pure function | `go/internal/integration` | lane |
-| I5 | The batch PR: push and open it, and wake on CI through the `gh run watch` child of D22. Fast-forward `main` to the tested tip (D11). Re-run and split on red. | `go/internal/integration`, `go/cmd/evolve` | console |
-| I6 | The bookkeeping batch of D12 | `go/internal/core`, `go/internal/inboxmover` | console |
-| I7 | The compose again after a console merge into `main` | `go/internal/integration` | lane |
-| I8 | `evolve wave integration status` and the signals | `go/cmd/evolve`, `go/internal/signalcenter` | lane |
-| I10 | The integration record of D19, with the lease epoch, the adoption on resume and `--force-with-lease` | `go/internal/integration`, `go/internal/core` | console |
-| I11 | The fast-forward of the plane's `main` after each merge, and the feeds of D21 | `go/internal/core`, `go/internal/orchestrator` | console |
-| I9 | The move to `enforce` | `.evolve/policy.json` | operator |
+| # | Component | Home | Route | Inbox item |
+|---|---|---|---|---|
+| I0 | The deliverable record of D2. The kind `ship.delivered` and the codes `SHIP_INTEGRATION_*` in the Signal Center registry. At `enforce`, a fleet lane's ship stops before `main`. | `go/internal/phases/ship`, `go/internal/core` | console | `wave-integration-i0-deliverable-record` |
+| I1 | The order score of D3, as a pure function | `go/internal/integration` (new) | lane | `wave-integration-i1-order-score` |
+| I2 | The compose engine: one commit for each deliverable, the overlap proof and the tier, reusing the ADR-0128 code (`planlanding.go`, `landprefixes.go`) | `go/internal/integration`, `go/internal/phases/ship` | console | `wave-integration-i2-compose-engine` |
+| I3 | The prefix check, the ejection and the ejection brief to the lane | `go/internal/integration`, `go/internal/orchestrator` | console | `wave-integration-i3-prefix-check-ejection` |
+| I3b | The batch test L2 of D16 and D17. It finds the affected set and runs each deliverable's predicates on the combined tree. It uses the prefix order for a red and records each verdict. | `go/internal/integration`, `go/internal/phases/ship` | console | `wave-integration-i3b-batch-test` |
+| I4 | The flush policy of D7 to D9, with the adaptive cap, as a pure function | `go/internal/integration` | lane | `wave-integration-i4-flush-policy` |
+| I5 | The batch PR: push and open it, and wake on CI through the `gh run watch` child of D22. Fast-forward `main` to the tested tip (D11). Re-run and split on red. | `go/internal/integration`, `go/cmd/evolve` | console | `wave-integration-i5-batch-pr` |
+| I6 | The bookkeeping batch of D12 | `go/internal/core`, `go/internal/inboxmover` | console | `wave-integration-i6-bookkeeping-batch` |
+| I7 | The compose again after a console merge into `main` | `go/internal/integration` | lane | `wave-integration-i7-recompose-after-console-merge` |
+| I8 | `evolve wave integration status` and the signals | `go/cmd/evolve`, `go/internal/signalcenter` | lane | `wave-integration-i8-status-verb` |
+| I10 | The integration record of D19, with the lease epoch, the adoption on resume and `--force-with-lease` | `go/internal/integration`, `go/internal/core` | console | `wave-integration-i10-integration-record` |
+| I11 | The fast-forward of the plane's `main` after each merge, and the feeds of D21 | `go/internal/core`, `go/internal/orchestrator` | console | `wave-integration-i11-plane-main-feeds` |
+| I9 | The move to `enforce` | `.evolve/policy.json` | operator | `wave-integration-i9-enforce-flip` |
 
 The ids name the components; the order is below. I1 and I4 are pure and come first. I0 to I3 make shadow possible. I5, I6, I10 and I11 are needed only for enforce.
 
+The plan audit of 2026-10-27 filed one inbox item for each component. The Route column gives the owner from this plan. The inbox route can differ:
+- An item that touches a gate file is `console-manual` until held proposals exist: I0, I2 and I3b (the ship phase).
+- A console item outside the gate files is `lane`, and admission decides: I3, I5, I6, I10 and I11.
+- I9 is a `decision` item for the operator.
+
 ## 7. Open questions for the operator
 
-| Id | Question | Proposed answer |
+The operator accepted each proposed answer on 2026-10-27. Nothing in §6 waits on these questions now.
+
+| Id | Question | Decision (2026-10-27) |
 |---|---|---|
-| Q1 | The cap and `max_age_minutes` of a batch | cap 4 (adaptive, D8); 45 minutes |
-| Q2 | The merge method of a batch | a fast-forward of `main` to the tested tip, one commit for each cycle (D11). The console PRs keep their squash merge. |
-| Q3 | The base of a new lane | `main`. A base on the integration tip lets later lanes build on earlier wave work, but an ejection then strands each lane on that base. That option waits for shadow data, and then needs the cascade rule: an ejection also ejects each deliverable whose `base_sha` holds the ejected patch-id. |
-| Q4 | May the orchestrator fast-forward `main` during a wave at enforce? This amends the standing rule that code PRs merge only at a boundary. | yes, at enforce only: no lane writes `main` then, and I11 moves the plane's `main` after each merge. Console PRs keep the boundary rule. |
+| Q1 | The cap and `max_age_minutes` of a batch | Decided: cap 4 (adaptive, D8); 45 minutes. |
+| Q2 | The merge method of a batch | Decided: a fast-forward of `main` to the tested tip, one commit for each cycle (D11). The console PRs keep their squash merge. |
+| Q3 | The base of a new lane | Decided: `main`, until shadow data shows otherwise. A base on the integration tip lets later lanes build on earlier wave work, but an ejection then strands each lane on that base. That option waits for shadow data, and then needs the cascade rule: an ejection also ejects each deliverable whose `base_sha` holds the ejected patch-id. |
+| Q4 | Is the orchestrator allowed to fast-forward `main` during a wave at enforce? This amends the standing rule that code PRs merge only at a boundary. | Decided: yes, at enforce only. No lane writes `main` then, and I11 moves the plane's `main` after each merge. Console PRs keep the boundary rule. |
 
 ## 8. Verification
 
