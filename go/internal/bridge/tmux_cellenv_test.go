@@ -2,7 +2,9 @@ package bridge
 
 import (
 	"context"
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -62,6 +64,33 @@ func TestNewSessionEnv_AStartThatPrintsNoSessionIDKillsNothing(t *testing.T) {
 	}
 	if calls, _ := os.ReadFile(log); strings.Contains(string(calls), "kill-session") {
 		t.Fatalf("a start that created no session must kill nothing; calls:\n%s", calls)
+	}
+}
+
+func TestNewSessionEnv_AFailedStartNamesTheOutputOfTmux(t *testing.T) {
+	fakeTmuxOnPath(t, "server exited unexpectedly\n", 1, false)
+	err := (execTmux{}).NewSessionEnv(context.Background(), "early-1", 80, 24, "", []string{"PATH=/bin"})
+	var exit *exec.ExitError
+	if !errors.As(err, &exit) || exit.ExitCode() != 1 {
+		t.Fatalf("the start must keep the exit error of tmux; got %v", err)
+	}
+	if got := err.Error(); !strings.HasPrefix(got, "tmux new-session: exit status 1: ") || !strings.HasSuffix(got, "server exited unexpectedly") {
+		t.Fatalf("the start error must name the command and the output of tmux; got %q", got)
+	}
+}
+
+func TestWithTmuxOutput_WrapsOnlyAFailure(t *testing.T) {
+	t.Parallel()
+	if err := withTmuxOutput(nil, []string{"kill-session"}, "noise\n"); err != nil {
+		t.Fatalf("a success must stay nil; got %v", err)
+	}
+	cause := errors.New("exit status 1")
+	err := withTmuxOutput(cause, []string{"kill-session", "-t", "=x:"}, "can't find session: x\n")
+	if !errors.Is(err, cause) || err.Error() != "tmux kill-session: exit status 1: can't find session: x" {
+		t.Fatalf("a failure must keep its cause and add the output of tmux; got %v", err)
+	}
+	if err := withTmuxOutput(cause, []string{"has-session"}, " \n"); !errors.Is(err, cause) || err.Error() != "tmux has-session: exit status 1" {
+		t.Fatalf("a failure with no output must end at its cause; got %v", err)
 	}
 }
 

@@ -14,16 +14,14 @@ import (
 )
 
 func TestRealTmux_APollutedServerGivesThePaneOnlyItsEnvPairs(t *testing.T) {
-	requireTmux(t)
-	socket := DeriveTestSocket(os.Getpid()) + "-hermetic"
-	t.Setenv(TmuxSocketEnv, socket)
 	t.Setenv("FOO_LEAK_CLIENT", "1")
-	seed := exec.Command("tmux", TmuxSocketArgs("-f", os.DevNull, "new-session", "-d", "-s", "seed", ";", "set-environment", "-g", "FOO_LEAK_GLOBAL", "1")...)
-	seed.Env = append(os.Environ(), "FOO_LEAK=1", "CLAUDECODE=1")
+	polluted := append(os.Environ(), "FOO_LEAK=1", "CLAUDECODE=1")
+	ownTmuxServer(t, "-hermetic", polluted)
+	seed := exec.Command("tmux", TmuxSocketArgs("new-session", "-d", "-s", "seed", ";", "set-environment", "-g", "FOO_LEAK_GLOBAL", "1")...)
+	seed.Env = polluted
 	if out, err := seed.CombinedOutput(); err != nil {
-		t.Fatalf("start the polluted server: %v: %s", err, out)
+		t.Fatalf("seed the polluted server: %v: %s", err, out)
 	}
-	t.Cleanup(func() { _ = exec.Command("tmux", TmuxSocketArgs("kill-server")...).Run() })
 
 	got := dumpPaneEnv(t, "cell", []string{"PATH=/usr/bin:/bin", "HOME=" + t.TempDir(), "SHELL=/bin/zsh", "KEEP_ME=1"})
 	if !hasLine(got, "KEEP_ME=1") || !hasLine(got, "PATH=/usr/bin:/bin") {
@@ -37,12 +35,9 @@ func TestRealTmux_APollutedServerGivesThePaneOnlyItsEnvPairs(t *testing.T) {
 }
 
 func TestRealTmux_ASecretValueIsInNoArgvAndNoLeftoverFile(t *testing.T) {
-	requireTmux(t)
-	socket := DeriveTestSocket(os.Getpid()) + "-secret"
-	t.Setenv(TmuxSocketEnv, socket)
+	ownTmuxServer(t, "-secret", os.Environ())
 	tmp := t.TempDir()
 	t.Setenv("TMPDIR", tmp)
-	t.Cleanup(func() { _ = exec.Command("tmux", TmuxSocketArgs("kill-server")...).Run() })
 	const sentinel = "sk-ant-oat-SENTINEL-7f3a"
 
 	got := dumpPaneEnv(t, "secret-cell", []string{"PATH=/usr/bin:/bin", "HOME=" + tmp, "CLAUDE_CODE_OAUTH_TOKEN=" + sentinel})
@@ -102,12 +97,9 @@ func hasLine(env, prefix string) bool {
 }
 
 func TestRealTmux_AFailedStartLeavesNoEnvFile(t *testing.T) {
-	requireTmux(t)
-	socket := DeriveTestSocket(os.Getpid()) + "-failstart"
-	t.Setenv(TmuxSocketEnv, socket)
+	ownTmuxServer(t, "-failstart", os.Environ())
 	tmp := t.TempDir()
 	t.Setenv("TMPDIR", tmp)
-	t.Cleanup(func() { _ = exec.Command("tmux", TmuxSocketArgs("kill-server")...).Run() })
 	ctx := context.Background()
 	env := []string{"PATH=/usr/bin:/bin", "HOME=" + tmp, "SECRET_ENV=1"}
 	if err := (execTmux{}).NewSessionEnv(ctx, "dup", 80, 24, "", env); err != nil {
@@ -126,10 +118,7 @@ func TestRealTmux_AFailedStartLeavesNoEnvFile(t *testing.T) {
 }
 
 func TestRealTmux_EachSessionOfASharedServerCarriesItsOwnFingerprint(t *testing.T) {
-	requireTmux(t)
-	socket := DeriveTestSocket(os.Getpid()) + "-twofp"
-	t.Setenv(TmuxSocketEnv, socket)
-	t.Cleanup(func() { _ = exec.Command("tmux", TmuxSocketArgs("kill-server")...).Run() })
+	ownTmuxServer(t, "-twofp", os.Environ())
 	ctx := context.Background()
 	a := []string{"PATH=/usr/bin:/bin", "CELL=a"}
 	b := []string{"PATH=/usr/bin:/bin", "CELL=b"}
@@ -146,12 +135,9 @@ func TestRealTmux_EachSessionOfASharedServerCarriesItsOwnFingerprint(t *testing.
 }
 
 func TestRealTmux_AKilledSessionLeavesNoEnvFile(t *testing.T) {
-	requireTmux(t)
-	socket := DeriveTestSocket(os.Getpid()) + "-earlykill"
-	t.Setenv(TmuxSocketEnv, socket)
+	ownTmuxServer(t, "-earlykill", os.Environ())
 	tmp := t.TempDir()
 	t.Setenv("TMPDIR", tmp)
-	t.Cleanup(func() { _ = exec.Command("tmux", TmuxSocketArgs("kill-server")...).Run() })
 	ctx := context.Background()
 	env := []string{"PATH=/usr/bin:/bin", "HOME=" + tmp, "CLAUDE_CODE_OAUTH_TOKEN=fake-secret-for-test"}
 	for i := range 20 {
@@ -169,11 +155,8 @@ func TestRealTmux_AKilledSessionLeavesNoEnvFile(t *testing.T) {
 }
 
 func TestRealTmux_AFailedStartNeverKillsASessionItDidNotCreate(t *testing.T) {
-	requireTmux(t)
-	socket := DeriveTestSocket(os.Getpid()) + "-notmine"
-	t.Setenv(TmuxSocketEnv, socket)
+	ownTmuxServer(t, "-notmine", os.Environ())
 	t.Setenv("TMPDIR", t.TempDir())
-	t.Cleanup(func() { _ = exec.Command("tmux", TmuxSocketArgs("kill-server")...).Run() })
 	if out, err := exec.Command("tmux", TmuxSocketArgs("-f", os.DevNull, "new-session", "-d", "-s", "theirs")...).CombinedOutput(); err != nil {
 		t.Fatalf("start the session of another owner: %v: %s", err, out)
 	}
