@@ -97,7 +97,8 @@ func TestBuild_ListsTheDeliverablesOfTheEarlierPhasesAndNotTheOwnOutput(t *testi
 	}
 	sum := sha256.Sum256([]byte(scout))
 	want := Entry{ID: got.ID, Class: ClassDeliverable, Kind: "scout-report", Path: ".evolve/runs/cycle-7/scout-report.md", Cycle: 7, Phase: "scout", Attempt: 1,
-		Summary: "Scout: replay harness for pass^k", Bytes: int64(len(scout)), SHA256: hex.EncodeToString(sum[:])}
+		Summary: "Scout: replay harness for pass^k", Bytes: int64(len(scout)), Tokens: tokensOf(int64(len(scout))), SHA256: hex.EncodeToString(sum[:]),
+		Layer: LayerUpstream, Required: true, Why: "upstream deliverable of scout; required by the build inputs"}
 	if got != want {
 		t.Fatalf("scout entry = %+v, want %+v", got, want)
 	}

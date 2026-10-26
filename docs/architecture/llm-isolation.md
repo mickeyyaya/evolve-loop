@@ -622,7 +622,7 @@ If X5 builds it, it emits kind `isolation.access` (INFO) with the entry ids. It 
 
 X5 did not build the usage reading. The report reader of §8.5 reads only the guarded rules, not the grants. The grants carry no report, so the reading stays proposed.
 
-The design of the usage reading is now in [cell-context-index.md](cell-context-index.md) §8. A report on each grant names the path that the cell read. The pipeline maps the path to its entry and writes the access log. The same file adds the context layers L0 to L3, the token estimates, the required flag and the budgets (proposed, components CX1 to CX7).
+The usage reading is built in [cell-context-index.md](cell-context-index.md) §8 (CX3, §13 there). A report on each grant names the path that the cell read. The pipeline maps the path to its entry and writes the access log. The same file adds the context layers L0 to L3, the token estimates, the required flag and the budgets. CX1 to CX3 are built, and CX4 to CX7b are proposed.
 
 #### 8.5 As built (X5)
 
@@ -1005,6 +1005,9 @@ The stub for each family declares the same capabilities as the real manifest. Th
 | N12 | a judge verdict in prose with no file fails the contract | I-8 | X8 | `internal/core` | green (X8, at `enforce`) |
 | N13 | the grep guard finds no family string in flow code | I-6 | X6 | `internal/core` | green |
 | N14 | a new manifest with known format ids needs no Go change | I-6 | X9 | `internal/bridge` | open |
+| N15 | a cell lists its `inputs/index.json` and opens a required entry through `evolve context index` and `evolve context open` | I-4 | CX2 ([cell-context-index.md](cell-context-index.md)) | the matrix (M1 run) | green (CX2) |
+| N16 | an open of an indexed path writes one access record that names its entry | I-4 | CX3 | sandbox contract | green (CX3) |
+| N17 | a cell cannot write the access log `.evolve/context-access/` | I-4 | CX3 | sandbox contract | green (CX3) |
 
 Rows N3, N5 and N7 to N10 extend `TestAgentSandboxContract` (`go/internal/bridge/sandbox_contract_integration_test.go`, build tags `integration` and `darwin`). Before X1 it had 22 rows and none for exec, network or a cross-cycle read. The exec row runs a `fakeclitest` stub named `claude`, never a real CLI.
 
@@ -1036,6 +1039,8 @@ The contract reuses the shape of [llm-quality-indexes.md](llm-quality-indexes.md
 | `ISOLATION_I7_VIOLATION` | I-7 | a gate or the fence that stops a write that a hook did not stop |
 | `ISOLATION_I8_VIOLATION` | I-8 | a flow parser that falls back to stdout or prose |
 | `ISOLATION_I9_VIOLATION` | I-9 | none at run time; the matrix test is its guard |
+| `ISOLATION_CONTEXT_REQUIRED_UNOPENED` | I-4 | built (CX3): the bridge, when a cell closes without a read of a required entry of its index; kind `isolation.context`, INFO ([cell-context-index.md](cell-context-index.md) §8) |
+| `ISOLATION_CONTEXT_BUDGET_OVER` | I-4 | built (CX3): the bridge, when required entries of a layer passed its token budget; kind `isolation.context`, WARN ([cell-context-index.md](cell-context-index.md) §6) |
 
 ### 15.2 Fields of a violation
 
