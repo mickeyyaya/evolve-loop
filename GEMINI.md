@@ -17,22 +17,35 @@
 
 This digest has the facts that each agent must have when it starts. The full rules, the reasons and the evidence are in [AGENTS.md](AGENTS.md) and in the linked docs. Read them when your task touches their subject.
 
+<!-- GENERATED:guidance-l0 BEGIN from guidance/rules by `evolve guidance build`; edit the registry, not this region -->
 ### Hard rules
 
-- **The pipeline is the only controller** (ADR-0154, proposed; X1 to X8 are on `main`). No LLM starts or directs another LLM. A phase agent starts through the native bridge (`evolve subagent run`, `evolve loop`). Inside its cell, a phase agent can start subagents of its own harness. Outside a cell during a cycle, `evolve guard phase` denies the start of a phase persona (`evolve-*`).
-- **Phase order.** Scout → Build → Audit → Ship, in that order. The Go state machine (`go/internal/core`) enforces it. Never skip a phase, and never ignore a kernel-gate failure.
-- **Commits go through `evolve ship`.** The ship gate denies a bare `git commit` or `git push`. An interactive commit runs `/commit`, then the attestation, then `evolve ship --class manual`. A routine `--bypass-commit-gate` is a violation. A release is `evolve release X.Y.Z`; "publish" is not "push".
-- **Builder writes only inside its worktree.** The runtime provisions worktrees. An agent never runs `git worktree`.
-- **Ship needs the EGPS verdict.** `acs-verdict.json:red_count == 0`. The ledger is hash-chained; `evolve ledger verify` checks it.
-- **Never fabricate cycle numbers.** This is a CRITICAL violation.
-- **Code has no comments.** Names, types and tests say what the code does. A design reason goes to `docs/architecture/packages/` ([code-comments](docs/conventions/code-comments.md)).
-- **Documents go through `docs-write`.** Load `skills/docs-write/SKILL.md` before you write a document. The new text passes `evolve docs ste-lint --strict`.
-- **No MCP.** Reach each outside service through a CLI ([cli-only-no-mcp](docs/conventions/cli-only-no-mcp.md)).
-- **Document what you find.** Research, lessons and failed approaches go to `docs/`. Never delete a doc; archive it under `docs/private/research/archived-YYYY-MM-DD/`.
+- Never mutate or run a live kill guard. Inject the signal sender, so that a test cannot kill a real process.
+- Never kill processes by a command pattern on the shared host. Kill only the process ids that you started.
+- No LLM starts or directs another LLM. A phase agent starts only through the native bridge of the pipeline. (enforced by `go/internal/guards/phase.go`)
+- Run the phases in the order Scout, Build, Audit, Ship. Never skip a phase, and never ignore a kernel-gate failure. (enforced by `go/internal/core/statemachine.go`)
+- Commit and push only through evolve ship. The ship gate denies a bare git commit and a bare git push. (enforced by `go/internal/guards/ship.go`)
+- The builder writes only inside the worktree that the runtime provisions. An agent never runs git worktree. (enforced by `go/internal/guards/role.go`)
+- Ship only when the EGPS verdict has a red count of zero. Never edit the hash-chained ledger by hand.
+- Never fabricate a cycle number, a test count or a verdict. Report only what a command printed.
+- Do all development on a branch in a worktree, never on main. Main is the integration branch only.
+- Code has no comments. Names, types and tests explain the code, and a design reason goes to the package note. (enforced by `go/internal/commitgate/comments_added.go`)
+- Write each document through the docs-write skill. The new text passes evolve docs ste-lint --strict. (enforced by `go/internal/stelint`)
+- Reach each outside service through a CLI, never through MCP. Build a CLI when a service has none.
+- Put research, lessons and failed approaches under docs/. Never delete a document; archive it.
+- Read no control value from the environment. An operator setting lives in policy.json, and a bypass is a CLI parameter.
+- Add no feature flag. Select each behavior through configuration data and a design pattern.
+- Stop after two consecutive cycles that ship nothing, and find the root cause in the pipeline.
+- Before you claim done, run the check and read its output. Report test counts as N/N PASS.
+- Read a module and list its real exports before you call or import it. Never invent an API.
+- Fix the root cause through a redesign. Never apply a workaround that hides a failure.
+- Never duplicate logic, settings or prose. Keep each in one home, and generate each copy from it.
+
+The full rule set is in [guidance/index.md](guidance/index.md). Run `evolve guidance index --audience <you>` to list the rules of your case.
+<!-- GENERATED:guidance-l0 END -->
 
 ### Operating rules
 
-- **Zero-ship halt.** Evaluate the output after every cycle. If 2 consecutive cycles ship nothing, STOP and find the root cause in the pipeline ([operating-policy §4.1](docs/operations/operating-policy.md)).
 - **Status reports** give the cycles that ran, the ships (for example 2/2) and the open PR numbers. They also give the failed CI jobs with their class, and the next action.
 - **Bypass mode** means "do not ask the user". It does not mean "skip integrity checks". Run the full pipeline every cycle, and follow the failure-adapter verdicts verbatim.
 - **Pre-commit review fleet:** code-simplifier, then architecture-reviewer and code-reviewer in parallel, then fix the findings, then commit. `evolve agent run <name>` runs each reviewer on any family. Fix each CRITICAL finding of architecture-reviewer before the commit. A diff of only `.md` files gets the `docs-review` skill and `--reviewers docs-review`; the code reviewers do not satisfy the gate. Only a proven comment removal needs no reviewer.

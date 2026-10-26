@@ -196,7 +196,7 @@ var commandsWithNoDispatch = map[string]string{
 	"rollback": "git revert", "release": "the release pipeline", "prune-ephemeral": "removes files",
 	"postedit-validate": "a hook check of the cell", "inbox-mover": "inbox files", "commit-prefix-gate": "a check",
 	"release-consistency": "reads", "release-verify-binaries": "gh reads", "release-promote": "gh edits", "backups": "reads",
-	"skill-inventory": "a cache", "skills": "generates files", "flags": "generates files", "signals": "generates files",
+	"skill-inventory": "a cache", "skills": "generates files", "guidance": "reads and generates the rule index", "flags": "generates files", "signals": "generates files",
 	"phase-inventory": "a cache", "eval": "checks", "docs": "lint", "solution": "checks", "cycle-health": "reads",
 	"selfcheck": "the build probe of the cell", "tokens": "reads", "lessons": "reads", "reachability": "go list",
 	"ratchet": "checks", "floor": "go test tiers", "cover": "coverage", "code": "the code index", "ladder": "reads",

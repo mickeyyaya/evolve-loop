@@ -33,6 +33,8 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/.claude/settings.json", Rationale: "PreToolUse hook wiring (repo + global ~/.claude)"},
 	{Fragment: "/.evolve/policy.json", Rationale: "gate-default overrides (eval/contract/swarm gates)"},
 
+	{Fragment: "/go/internal/guidance/", Rationale: "the rule registry check of CI and the generator of the L0 region that every agent of every family loads (ADR-0145)"},
+	{Fragment: "/guidance/rules/", Rationale: "the rule registry: its L0 rules render into AGENTS.md, CLAUDE.md and GEMINI.md, so a tampered rule rewrites the invariants of every agent (ADR-0145)"},
 	{Fragment: "/go/internal/commitgate/", Rationale: "the pre-commit quality gate (attestation writer the manual-ship reader trusts)"},
 	{Fragment: "/go/internal/commentaudit/", Rationale: "the comment rules the commit gate trusts: the comment-only proof behind its review waiver, the added-comment and removed-history refusals, the history archive's append-only check, and the build comment floor (ADR-0115)"},
 	{Fragment: "/go/internal/phaseintegrity/", Rationale: "the per-phase integrity chain's DigestSource (ADR-0065)"},

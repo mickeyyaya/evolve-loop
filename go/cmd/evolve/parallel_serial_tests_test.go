@@ -1,6 +1,8 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestRunGuidance_ARepoRootFailureExitsTwo":                                                         "swaps seam guidanceRepoRoot",
+	"main.TestGuidanceFamilies_NamesEachModelFamilyOnceAndFailsOnABadManifest":                              "swaps seams guidanceManifestNames and guidanceLoadManifest",
 	"main.TestPRRefresh_AConflictOutsideTheGeneratedRegionIsNeverStaged":                                    "swaps seam prRefreshWorktree",
 	"main.TestPRRefresh_AnEntryTheCatalogLacksFailsLoudly":                                                  "swaps seam prRefreshWorktree",
 	"main.TestPRRefresh_EachFailedGitStepFailsTheRefresh":                                                   "swaps seam prRefreshWorktree",
