@@ -1,0 +1,25 @@
+{
+  "source": "console, 2026-10-27, operator decision \"1 + 2 + 3\" (ADR-0157). Plan: docs/plans/narrow-fence-2026-10.md",
+  "injected_by": "console-operator-session",
+  "created_at": "2026-10-27T12:00:00Z",
+  "priority_class": "pipeline",
+  "priority": "P1",
+  "id": "held-proposal-inbox-show-line",
+  "kind": "feature",
+  "title": "evolve inbox show names the held-for-operator state of an item whose cycle is held",
+  "summary": "When the claimed item of cycle N has a record .evolve/landing/held/cycle-N.json with the status held-for-operator, evolve inbox show prints the state and the cycle, and evolve inbox list marks it.",
+  "acceptance": [
+    "evolve inbox show of a held item prints held-for-operator and the cycle; an item of a cycle that is not held prints its old status.",
+    "A test with a fixture hold record covers both branches."
+  ],
+  "files": [
+    "go/cmd/evolve/cmd_inbox_show.go",
+    "go/cmd/evolve/cmd_inbox_list.go"
+  ],
+  "deps": [
+    "held-proposal-gate"
+  ],
+  "route": "lane",
+  "weight": 0.4,
+  "notes": "Route lane: the files are read-only views and are not on the fence. The item reads the hold record and writes nothing."
+}
