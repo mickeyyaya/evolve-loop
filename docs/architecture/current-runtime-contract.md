@@ -6,7 +6,7 @@ This is the current capability index. Historical ADRs explain decisions; an Acce
 |---|---|---|---|
 | Predicate evidence | Host execution and bound modern evidence required at Audit/Ship; legacy shipping requires re-audit | `phases/audit`, `phases/ship`, `acssuite` | [Evidence recovery](recovery-predicate-authority.md) |
 | Isolation | Enforced supported profile read/write restrictions; required but unverified confinement refuses | `bridge`, `adapters/sandbox`, `looppreflight` | [Isolation recovery](recovery-isolation-policy.md) |
-| Continuation adoption | Clean snapshot advances to a pinned main base before archive staging; the ancestor's explanation records and own predicate package are archived under one retention rule (A2); failures stop dispatch | `core/continuation_stamp.go`, `core/continuation_baseadvance.go`, `core/continuation_ancestor_predicates.go` | [Adoption boundary](continuation-adoption-boundary.md) |
+| Continuation adoption | Clean snapshot advances to a pinned main base before archive staging. One retention rule (A2) archives the ancestor's explanation records and own predicate package. Failures stop dispatch | `core/continuation_stamp.go`, `core/continuation_baseadvance.go`, `core/continuation_ancestor_predicates.go` | [Adoption boundary](continuation-adoption-boundary.md) |
 | Resume | Shared terminal lifecycle, policy and checkpoint advancement | `core/resume.go`, fresh cycle lifecycle | [Resume recovery](recovery-resume-lifecycle.md) |
 | Prompt delivery | Multiline bytes preserved through application-aware paste; transport failures stop before verification | `bridge/tmux.go`, shared REPL delivery | [Prompt transport](tmux-prompt-delivery.md) |
 | Task contract | Selected acceptance/predicate inventory delivered to TDD, Build and Audit; sanitized previews name their original authority | `core/task_contract.go` | `TestDispatch_TaskContractReachesTDDBuildAndAudit`, `TestComposeTaskContract_SanitizedCriteriaAreNotClaimedVerbatim` |
@@ -30,11 +30,13 @@ Current guides: [trust](../concepts/trust-architecture.md), [learning](../concep
 
 ## Issue / gap / solution — September recovery
 
-**Issue:** helper-level completeness was repeatedly mistaken for complete production behavior. The dashboard saw one live cycle; the memory contract named a nonexistent summary; writer swarm reported integration without transferring the authoritative tree; a sanitized acceptance preview was called verbatim.
+**Issue:** helper-level completeness was repeatedly mistaken for complete production behavior. The dashboard saw one live cycle. The memory contract named a nonexistent summary. The writer swarm reported integration without transfer of the authoritative tree. A sanitized acceptance preview was called verbatim.
 
 **Gap:** tests exercised individual helpers, declared metadata, or a singleton cycle. They did not establish cross-entrypoint lifecycle/evidence parity or multi-lane liveness. Current-facing documentation retained shell-era guarantees despite a prior reconciliation.
 
-**Solution:** enforce evidence and filesystem controls at launch/ship boundaries; share resumed closeout and policy; retrieve lessons through existing task-context dispatch; derive lane liveness separately; make incomplete writer modes refuse. Preserve task-contract work already landed in PR #534 and label transformed previews accurately. Archive five superseded guides and use this compact index as the current entrypoint.
+**Solution:** enforce evidence and filesystem controls at launch/ship boundaries. Share resumed closeout and policy. Retrieve lessons through existing task-context dispatch. Derive lane liveness separately. Make incomplete writer modes refuse.
+
+Preserve task-contract work already landed in PR #534 and label transformed previews accurately. Archive five superseded guides and use this compact index as the current entrypoint.
 
 ## Outcome verification
 

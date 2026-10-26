@@ -2,11 +2,11 @@
 
 ## Issue
 
-The documentation review on 2026-09-09 found that `RunCycleFromPhase` could
-return a successful result without the terminal lifecycle used by `RunCycle`.
+The documentation review on 2026-09-09 found that `RunCycleFromPhase` was able to return
+a successful result without the terminal lifecycle used by `RunCycle`.
 Resumed cycles skipped the verdict-coherence and lost-landing checks, durable
 cycle dossiers, continuation snapshots, and carryover accounting. Its separate
-32-iteration loop could exhaust its bound and still report success.
+32-iteration loop was able to exhaust its bound and still report success.
 
 Resume also lost difficulty-based build timeouts and recurrence-based model
 escalation. After a second interruption the existing quota checkpoint still
@@ -21,14 +21,14 @@ outcomes or durable checkpoint advancement across the fresh and resumed
 entrypoints. High-level success assertions accepted a cycle without its dossier.
 
 The ordinary phase-boundary checkpoint writer deliberately yields to an existing
-escalation checkpoint. Calling it during resume would therefore leave the old
-quota pause intact. The test suite also lacked the real sequence of consuming
+escalation checkpoint. If the system calls it during resume, the old
+quota pause stays intact. The test suite also lacked the real sequence of consuming
 a quota checkpoint, completing Build, interrupting Audit, and resuming again.
 
 The host cycle number has two meanings: the last completed cycle and the latest
 allocated cycle. A quota pause does not complete a cycle. Singleton resume must
-validate against the host allocation cursor as well as the completed cursor;
-fleet checkpoints continue to derive their authoritative identity from the
+validate against the host allocation cursor as well as the completed cursor.
+Fleet checkpoints continue to derive their authoritative identity from the
 per-run path. A rewritten checkpoint cannot select an arbitrary cycle.
 
 ## Solution
@@ -91,23 +91,34 @@ The CLI shares its quota-pause reporting path and returns 5 on either entrypoint
 
 Quota classification is an explicit retry hook for fresh and resumed serial
 dispatch, whose callers own the durable pause. Parallel evaluation retains its
-existing optional-warning and mandatory-error behavior; it cannot advertise a
-quota pause without a partial-batch recovery checkpoint. Legacy singleton goal
-resolution also checks its persisted batch hash before accepting caller input,
-so a known original task cannot be replaced through a missing checkpoint field.
+existing optional-warning and mandatory-error behavior. It cannot advertise a
+quota pause without a partial-batch recovery checkpoint.
+
+Legacy singleton goal
+resolution also checks its persisted batch hash before it accepts caller input.
+A known original task therefore cannot be replaced through a missing checkpoint field.
 
 ## Verification
 
-`go/internal/core/resume_lifecycle_test.go` exercises durable closeout, original
-identity and goal preservation, goal conflict rejection, explicit iteration
-failure, lost landing, failed-work continuation, carryover and throughput
-idempotency, host cursor monotonicity, persisted lane scope, request budgets,
-audit-round propagation, and the nonterminal quota path.
+`go/internal/core/resume_lifecycle_test.go` exercises these cases:
+
+- durable closeout
+- original identity and goal preservation
+- goal conflict rejection
+- explicit iteration failure
+- lost landing
+- failed-work continuation
+- carryover and throughput idempotency
+- host cursor monotonicity
+- persisted lane scope
+- request budgets
+- audit-round propagation
+- the nonterminal quota path
 
 `go/internal/checkpoint/resume_progress_test.go` uses the real filesystem storage
-and checkpoint producer. It pauses at Build, completes Build, interrupts Audit,
-loads the new Audit checkpoint, resumes successfully without repeating Build,
-and verifies that the completed checkpoint cannot be resurrected.
+and checkpoint producer. It pauses at Build, completes Build, and interrupts Audit.
+It loads the new Audit checkpoint and resumes successfully without repeating Build.
+Then it verifies that the completed checkpoint cannot be resurrected.
 
 `go/cmd/evolve/cmd_loop_resume_quota_test.go` runs the actual CLI orchestration
 with real state/checkpoint storage and external-agent substitutes. It verifies
@@ -115,7 +126,7 @@ exit code 5, the quota-pause result, checkpoint retention, and absence of a fals
 terminal dossier. The tmux process boundary is stubbed to isolate the host.
 
 The existing rebase recovery test now materializes its memory storage's
-checkpoint file, as the production caller already does; its original Build and
+checkpoint file, as the production caller already does. Its original Build and
 base-identity assertions remain unchanged.
 
 Run the recovery and preservation suite from `go/`:
