@@ -3,7 +3,6 @@
 package bridge
 
 import (
-	"context"
 	"errors"
 	"os"
 	"os/exec"
@@ -21,7 +20,7 @@ func TestExecRunner_ACleanExitWhoseOutputCannotBeDeliveredIsAnUnrecoverableError
 	pidFile := filepath.Join(t.TempDir(), "agent.pid")
 	env := append(os.Environ(), bridgePidfileEnv+"="+pidFile)
 
-	code, err := execRunner(context.Background(), "sh", "", []string{"-c", "echo agent-output"}, env, nil, refusingWriter{sink}, refusingWriter{sink})
+	code, err := execRunner(itBoundedContext(t, itLaunchDeadline), "sh", "", []string{"-c", "echo agent-output"}, env, nil, refusingWriter{sink}, refusingWriter{sink})
 
 	if code != -1 || !errors.Is(err, sink) {
 		t.Fatalf("execRunner = (%d, %v), want (-1, the sink error)", code, err)
@@ -39,7 +38,7 @@ func TestExecRunner_ANonZeroExitStillWinsOverAnUndeliverableOutput(t *testing.T)
 	t.Parallel()
 	sink := errors.New("stdout sink closed")
 
-	code, err := execRunner(context.Background(), "sh", "", []string{"-c", "echo agent-output; exit 5"}, nil, nil, refusingWriter{sink}, refusingWriter{sink})
+	code, err := execRunner(itBoundedContext(t, itLaunchDeadline), "sh", "", []string{"-c", "echo agent-output; exit 5"}, nil, nil, refusingWriter{sink}, refusingWriter{sink})
 
 	if code != 5 || err != nil {
 		t.Fatalf("execRunner = (%d, %v), want the process exit (5, nil)", code, err)
