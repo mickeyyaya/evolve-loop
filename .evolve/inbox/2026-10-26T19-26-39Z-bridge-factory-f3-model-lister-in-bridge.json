@@ -1,0 +1,28 @@
+{
+  "acceptance": [
+    "A fixture of the real agy models output gives the model list through the bridge adapter",
+    "go/internal/modelquery does not import go/internal/bridge",
+    "No package outside go/internal/bridge starts claude, agy, codex or ollama through sysexec or exec, and an AST guard test fails on a fixture that does"
+  ],
+  "created_at": "2026-10-26T19:30:00Z",
+  "deps": [
+    "bridge-factory-f2-probe-through-driver"
+  ],
+  "files": [
+    "go/internal/bridge/",
+    "go/internal/bridge/manifests/agy.json",
+    "go/internal/bridge/manifests/agy-tmux.json",
+    "go/internal/bridge/manifests/ollama-tmux.json",
+    "go/internal/modelquery/",
+    "go/cmd/evolve/"
+  ],
+  "fix": "Add controls.models to the manifest schema and to the agy and ollama manifests. Add a bridge adapter that reads controls.models and implements the Lister interface that modelquery defines; modelquery does not import bridge. Move agy first, then ollama. Keep the Go parser until a fixture of the real agy models output passes, then remove it. Add a guard test that bans a sysexec of an LLM binary outside the bridge.",
+  "id": "bridge-factory-f3-model-lister-in-bridge",
+  "kind": "refactor",
+  "notes": "Plan link: docs/plans/bridge-factory-2026-10.md (component F3, verification G2). Spec link: docs/architecture/agent-bridge-factory.md and ADR-0137. The plan order is F1 to F6, and F3 follows F2. The fix surface is go/internal/bridge and not a gate file, so the route is lane: admission decides; the narrowed protected fence lands soon.",
+  "priority_class": "correctness",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Component F3 (decisions D2 and D3) of the plan docs/plans/bridge-factory-2026-10.md. The spec is docs/architecture/agent-bridge-factory.md and ADR-0137. go/internal/modelquery/agy.go has an AgyLister that starts the agy binary outside the bridge. The manifest has no controls.models section.",
+  "title": "A bridge adapter reads controls.models from the manifest and lists the models (bridge-factory plan F3)",
+  "weight": 0.45
+}
