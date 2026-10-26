@@ -148,6 +148,7 @@ The column "Agent" of §5 gives the class of each core verb. These verbs are out
 | `phase verify <phase>` | A | It reads the deliverables. For `build` it runs the handoff probe (F5). |
 | `selfcheck build` | A | the same probe as `phase verify build` (F5) |
 | `code callers`, `api`, `find`, `map` | A | one usage record in the own workspace (F4) |
+| `code refresh` | R (`code-refresh`, proposed) | It moves the shared index worktree to `origin/main` and rebuilds it ([code-index-cli.md](code-index-cli.md) §4, D5.5). In a cell it refuses with exit 3. |
 | `agent capabilities` (proposed, §4.2) | A | It reads the class table. |
 | `phase <name>` | R (`dispatch`) | It starts a phase agent. |
 | `subagent run` | D | The pipeline starts fan-out workers. A cell uses the subagents of its own harness. |
@@ -240,6 +241,7 @@ An agent asks for an `R` verb through a request file. It writes one file for eac
 | `inbox-add` | `inbox add` | It files the item with `source` set to the request id. |
 | `routing-proposal` | `cli-routing set`, `cli-routing unset` | It writes the change to the queue of §4 rule 3. The boundary applies it after `cli-routing check` passes. |
 | `quality-reading` | `quality report`, `quality compare` | It runs the verb and publishes the reading. |
+| `code-refresh` (proposed) | `code refresh` | It runs `evolve code refresh` ([code-index-cli.md](code-index-cli.md) §4, D5.5). |
 
 The path from a request to a result:
 
