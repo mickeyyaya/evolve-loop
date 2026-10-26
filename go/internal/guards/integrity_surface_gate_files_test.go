@@ -147,6 +147,9 @@ var protectedGateFiles = []struct {
 	{"go/internal/inboxmover/lifecycle/claim.go", GuardGuarantee},
 	{"go/internal/inboxmover/lifecycle/route.go", GuardGuarantee},
 	{"go/internal/inboxmover/lifecycle/edit.go", GuardGuarantee},
+	{"go/internal/phases/ship/held_proposal_gate.go", GateGuarantee},
+	{"go/cmd/evolve/cmd_landing.go", GateGuarantee},
+	{"go/internal/policy/held_proposals.go", PolicyGuarantee},
 }
 
 var freedByTheNarrowFence = []string{

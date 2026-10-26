@@ -1,12 +1,12 @@
 # Package design notes
 
-One page per Go package directory, holding what the package's code cannot say: its purpose, why it is shaped the way it is, its invariants with their reasons, and what it taught. Each page is named by the directory under `go/` with `/` replaced by `-`. The rule and its reasons are in [code-comments](../../conventions/code-comments.md). The comment-reduction workstream fills these pages as it removes knowledge from comments ([plan](../../plans/comment-reduction-2026-09.md)).
+Each Go package directory has one page. The page holds what the code cannot say: the purpose, the reason for the shape, the invariants with their reasons, and the lessons. Each page is named by the directory under `go/` with `/` replaced by `-`. The rule and its reasons are in [code-comments](../../conventions/code-comments.md). The comment-reduction workstream fills these pages as it removes knowledge from comments ([plan](../../plans/comment-reduction-2026-09.md)).
 
 | Package | What it is | Notes |
 |---|---|---|
 | `internal/bridge/panestream` | reads tmux pane snapshots of an interactive LLM REPL | [internal-bridge-panestream.md](internal-bridge-panestream.md) |
 | `internal/bridge/phaseidentity` | the identity statement a tmux driver appends to the pasted prompt | [internal-bridge-phaseidentity.md](internal-bridge-phaseidentity.md) |
-| `internal/agentmsg` | the skeleton of cycle agent messaging: the envelope, the address grammar, the identity and the token, the policy engine, the broker of one cycle, the in-memory store and the frame (ADR-0129, M1) | [internal-agentmsg.md](internal-agentmsg.md) |
+| `internal/agentmsg` | the skeleton of cycle agent messaging (ADR-0129, M1). It has the envelope, the address grammar, the identity, the token, the policy engine, the broker, the store and the frame | [internal-agentmsg.md](internal-agentmsg.md) |
 | `internal/agentmsg/channelstore` | the `Store` port of the broker on the ADR-0127 channel log: the channel `msg.<cycle>`, the channel `msg.dead.<cycle>` and the `message` record variant (ADR-0129, M2) | [internal-agentmsg-channelstore.md](internal-agentmsg-channelstore.md) |
 | `internal/admission` | admission by package cell: the conflict rule, the module graph and the hub cell of capacity 1 (ADR-0139 O3, ADR-0134 S14) | [internal-admission.md](internal-admission.md) |
 | `internal/orchestrator` | the pool, the lane lease, the oversight loop and the supply census (ADR-0139 O4, O5, O6) | [internal-orchestrator.md](internal-orchestrator.md) |
@@ -17,6 +17,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/events/reader` | follows event channels: arm, catch up and wait; the cursor rules, the duplicate window and the last will of a loop (ADR-0127, E5) | [internal-events-reader.md](internal-events-reader.md) |
 | `internal/fleet` | plans and runs concurrent, file-disjoint cycle lanes | [internal-fleet.md](internal-fleet.md) |
 | `internal/guards` | the in-process trust kernel: the six guards `evolve guard` runs | [internal-guards.md](internal-guards.md) |
+| `internal/heldproposal` | the rule, the record and the operator approval of a held proposal (ADR-0157) | [internal-heldproposal.md](internal-heldproposal.md) |
 | `internal/inboxbatch` | the inbox item model and the deterministic half of task selection | [internal-inboxbatch.md](internal-inboxbatch.md) |
 | `internal/inboxrank` | the one computed inbox priority: a policy-weighted, explainable score and a total order over pending items (ADR-0121) | [internal-inboxrank.md](internal-inboxrank.md) |
 | `internal/inboxrank/rankinputs` | the one loader of the rank's inputs for an evolve dir: the policy's `inbox_priority` block and the recurrence ledger's item counts (ADR-0121, P2) | [internal-inboxrank-rankinputs.md](internal-inboxrank-rankinputs.md) |
@@ -27,7 +28,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/looppreflight` | the readiness gate `evolve loop` runs before the first wave | [internal-looppreflight.md](internal-looppreflight.md) |
 | `internal/cliupdate` | updates each subscribed CLI family at a loop boundary, smoke-tests a changed version and records the change for the drift check | [internal-cliupdate.md](internal-cliupdate.md) |
 | `internal/practicewatch` | reads the practice sources of each CLI at a loop boundary and files one inbox research item for each source that changed | [internal-practicewatch.md](internal-practicewatch.md) |
-| `internal/usageprobe` | reads each CLI's usage screen into typed windows through its manifest, benches every family already at a cap before a wave's first phase, and records the windows | [internal-usageprobe.md](internal-usageprobe.md) |
+| `internal/usageprobe` | reads the usage screen of each CLI into typed windows through its manifest. It benches each family at a cap before the first phase of a wave, and records the windows | [internal-usageprobe.md](internal-usageprobe.md) |
 | `internal/usageevidence` | queries a failing CLI's usage on every failure path, records the verdict in the workspace and as a signal, and decorates the bridge with it | [internal-usageevidence.md](internal-usageevidence.md) |
 | `internal/overlap` | the overlap proof of the landing queue: the zones, the closure, the evidence and the tier, with the `go list` adapter (ADR-0128, Q3) | [internal-overlap.md](internal-overlap.md) |
 | `internal/phasecoherence` | drift reports between the hand-edited surfaces that define a phase | [internal-phasecoherence.md](internal-phasecoherence.md) |
@@ -61,7 +62,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/panetrust` | the single trust boundary for text captured from a tmux pane | [internal-panetrust.md](internal-panetrust.md) |
 | `internal/adapters/ledger` | the hash-chained append-only ledger, its seals and anchors | [internal-adapters-ledger.md](internal-adapters-ledger.md) |
 | `internal/ledgerartifacts` | the ledger's write-once, content-addressed evidence store (`.evolve/ledger-artifacts/sha256/<2>/<62>`) | [internal-ledgerartifacts.md](internal-ledgerartifacts.md) |
-| `internal/attemptpostmortem` | records how a phase dispatch ended (the cause, the last commands, the suspect command, the pane tail) and renders it into the next prompt (ADR-0130, R2) | [internal-attemptpostmortem.md](internal-attemptpostmortem.md) |
+| `internal/attemptpostmortem` | records how a phase dispatch ended: the cause, the last commands, the suspect command and the pane tail. It renders the record into the next prompt (ADR-0130, R2) | [internal-attemptpostmortem.md](internal-attemptpostmortem.md) |
 | `internal/atomicwrite` | the one crash-safe write-then-rename implementation: plain `Bytes`/`JSON` and the fsyncing `Durable` | [internal-atomicwrite.md](internal-atomicwrite.md) |
 | `internal/changedpkgs` | maps a change to its packages, covering tests and importers | [internal-changedpkgs.md](internal-changedpkgs.md) |
 | `internal/cyclestate` | the per-cycle state, verdicts and outcome record every phase shares | [internal-cyclestate.md](internal-cyclestate.md) |
@@ -94,7 +95,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/deliverable` | the ADR-0100 declared-deliverables gate: verify, salvage and host effects | [internal-deliverable.md](internal-deliverable.md) |
 | `internal/core/advisor` | the routing advisor that plans and re-plans a cycle's phases | [internal-core-advisor.md](internal-core-advisor.md) |
 | `internal/core/defectledger` | the audit phase's anti-laundering defect ledger and the continuation disposition gate (unit 09, ADR-0103) | [internal-core-defectledger.md](internal-core-defectledger.md) |
-| `internal/phases/runner/verdict` | the judge: classifies a phase attempt from its artifact, pane and snapshots | [internal-phases-runner-verdict.md](internal-phases-runner-verdict.md) |
+| `internal/phases/runner/verdict` | the judge: classifies one try of a phase from its artifact, pane and snapshots | [internal-phases-runner-verdict.md](internal-phases-runner-verdict.md) |
 | `internal/core` | the cycle orchestrator: phase sequencing, gates, recovery and ship (filled by file group) | [internal-core.md](internal-core.md) |
 | `cmd/evolve` | the composition root and CLI of the `evolve` binary (filled by file group) | [cmd-evolve.md](cmd-evolve.md) |
 | `internal/bridge` | the native agent bridge: drives tmux and headless LLM CLIs for every phase (filled by file group) | [internal-bridge.md](internal-bridge.md) |
@@ -116,7 +117,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/events/channel` | one event channel as an append-only log of segments: the locked append with torn-tail repair and rotation, and the read with the cursor rules (ADR-0127) | [internal-events-channel.md](internal-events-channel.md) |
 | `internal/events/publisher` | the Signal Center listener of the event channels: routes, the lossless path, the best-effort queue and gap records (ADR-0127, E6) | [internal-events-publisher.md](internal-events-publisher.md) |
 | `internal/events/rootwire` | subscribes one Publisher to the Signal Center of a root process and returns the closer that the root defers (ADR-0127, E10) | [internal-events-rootwire.md](internal-events-rootwire.md) |
-| `internal/landed` | whether a worktree's changes since a merge-base are already in `origin/main`, judged per path by a three-way merge | [internal-landed.md](internal-landed.md) |
+| `internal/landed` | decides if the changes of a worktree since a merge-base are already in `origin/main`, judged per path by a three-way merge | [internal-landed.md](internal-landed.md) |
 | `internal/modelquery` | live model-catalog acquisition: each CLI's model list, classified into the canonical tiers | [internal-modelquery.md](internal-modelquery.md) |
 | `internal/phases/audit/ciparitygate` | the audit phase's five CI-parity gates | [internal-phases-audit-ciparitygate.md](internal-phases-audit-ciparitygate.md) |
 | `internal/phases/retro` | the retrospective phase that runs after a FAIL or WARN verdict | [internal-phases-retro.md](internal-phases-retro.md) |

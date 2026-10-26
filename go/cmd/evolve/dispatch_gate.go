@@ -59,6 +59,7 @@ var dispatchRules = map[string]dispatchRule{
 	"subagent":           {classDenied, true, onlySubs("run", "dispatch-parallel")},
 	"loop":               {classDenied, false, loopDispatch},
 	"wave":               {classDenied, true, onlySubs("next")},
+	"landing":            {classDenied, true, onlySubs("approve", "reject")},
 	"cycle":              {classDenied, true, onlySubs("run")},
 	"boundary":           {classDenied, true, onlySubs("run")},
 	"bridge":             {classDenied, true, onlySubs("launch")},
