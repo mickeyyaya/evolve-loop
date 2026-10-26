@@ -60,7 +60,9 @@ Date: 2026-10-26. Method: I read the X5 branch `feat/x5-artifact-index` at `5d6a
 **F1.7** `phaseio` declares the upstream phases of each phase: build reads scout and triage, and tdd reads scout and triage (`go/internal/phaseio/digest.go:12-22`).
 *Implication:* the pipeline already knows which upstream deliverables a phase needs most. That set is the natural default of `required`.
 
-**F1.8** `phasespec.PhaseSpec` has an `inputs` field and a `prompt_context` field (`go/internal/phasespec/phasespec.go:56-59`). A phase is configuration data, and the project rule is that phase settings come from configuration, not from code. 65 of the 73 files `.evolve/phases/*/phase.json` have an `inputs.files` list that is not empty (`jq`, 2026-10-26). Each item is a path template such as `.evolve/runs/cycle-{cycle}/scout-report.md`. The core phases (scout, triage, tdd, build, audit) have no `phase.json`.
+**F1.8** `phasespec.PhaseSpec` has an `inputs` field and a `prompt_context` field (`go/internal/phasespec/phasespec.go:56-59`). A phase is configuration data, and the project rule is that phase settings come from configuration, not from code. 65 of the 73 files `.evolve/phases/*/phase.json` have an `inputs.files` list that is not empty (`jq`, 2026-10-26). Each item is a path template such as `.evolve/runs/cycle-{cycle}/scout-report.md`.
+
+The core phases (scout, triage, tdd, build, audit) have no `phase.json`. Their specifications are in `docs/architecture/phase-registry.json`, which declares `inputs.files` too: build reads `scout-report.md` and `triage-report.md`.
 *Implication:* the `required` list of a phase belongs in the phase specification or the policy, not in a Go table.
 
 **F1.9** X5 grants a read of each indexed path inside `.evolve/runs/`. A lesson under `.evolve/instincts/lessons/` gets no grant, because the repo grant already covers it (§8.5 of the spec).

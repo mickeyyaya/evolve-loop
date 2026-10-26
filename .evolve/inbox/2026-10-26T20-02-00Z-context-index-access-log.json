@@ -4,7 +4,7 @@
   "title": "Cell context index CX3: the access log from the sandbox report of each index grant.",
   "source": "console, 2026-10-26. The operator request is in docs/plans/cell-context-index-2026-10.md §1. Design: docs/architecture/cell-context-index.md. Plan: §6 of the same plan.",
   "summary": "The pipeline does not know which entries a cell opened, because the X5 grants carry no report (research F1.10). Spec §8.",
-  "fix": "Add (with report) and the message rule=grant.index to each literal index grant, and a report-only rule for each L3 repo path. After the cell, a parser separate from the violation parser reads the grant.index reports. It maps each path to its entry. It writes one record for each opened entry, plus one summary for each cell, to .evolve/context-access/cycle-N.jsonl. Add evolve context stats (class D) and the signals CONTEXT_REQUIRED_UNOPENED, CONTEXT_BUDGET_OVER and CONTEXT_PRELOAD_BYTES.",
+  "fix": "Add (with report) and the message rule=grant.index to each literal index grant, and a report-only rule for each L3 repo path. After the cell, a parser separate from the violation parser reads the grant.index reports. It maps each path to its entry. It writes one record for each opened entry, plus one summary for each cell, to .evolve/context-access/cycle-N.jsonl. Add evolve context stats (class D) and the signals ISOLATION_CONTEXT_REQUIRED_UNOPENED and ISOLATION_CONTEXT_BUDGET_OVER of kind isolation.context.",
   "acceptance": [
     "RED first: TestReportReads_WritesOneAccessRecordForEachOpenedEntry fails before the change.",
     "Sandbox row N16 (darwin): an open of an indexed path writes one record with the entry id.",

@@ -36,7 +36,7 @@ The console brief of the same day named four layers: L0 assignment, L1 upstream 
 | The tail preloads the recalled lessons, the task contract and the repair findings. | F1.5 |
 | A deliverable is 0.4 to 22 KB, and a row is about 300 bytes. | F1.6 |
 | `phaseio` declares the upstream phases of each core phase. | F1.7 |
-| 65 of 73 phase specifications have a list `inputs.files` that is not empty. The core phases have no specification. | F1.8 |
+| 65 of 73 phase specifications have a list `inputs.files` that is not empty. The core phases have no `phase.json`; `docs/architecture/phase-registry.json` declares their inputs. | F1.8 |
 | A repo path needs no new grant. | F1.9 |
 | A sandbox message on a grant names the rule in the kernel report. | F1.10 |
 | A reading must not use data that the measured agent can write. | F1.11 |
@@ -139,7 +139,7 @@ The reason for the order: each later component reads a fact that an earlier one 
 
 | Goal | Before | After | How to measure |
 |---|---|---|---|
-| G1 | build tail 7,169 bytes (median, research F1.4) | at `enforce`, at most the L0 budget | `CONTEXT_PRELOAD_BYTES` at `shadow`, then the tail bytes |
+| G1 | build tail 7,169 bytes (median, research F1.4) | at `enforce`, at most the L0 budget | `ISOLATION_CONTEXT_PRELOAD_BYTES` of CX5, then the tail bytes |
 | G2 | 0 of the entries have `layer`, `tokens`, `required` or `why` | each entry has them | `TestBuild_EachEntryCarriesItsTokenEstimateAndItsReason` |
 | G3 | no access record | one record for each opened entry on macOS | sandbox row N16; the count of records in one wave |
 | G4 | no tune action | each change through the Go check | `TestContextTune_NoChangeGrantsAPathOutsideTheFixedSources` |
@@ -149,7 +149,7 @@ The reason for the order: each later component reads a fact that an earlier one 
 
 | Risk | Control |
 |---|---|
-| An agent skips a required entry. | `CONTEXT_REQUIRED_UNOPENED`, and the persona text. No FAIL, because the reports are best effort. |
+| An agent skips a required entry. | `ISOLATION_CONTEXT_REQUIRED_UNOPENED`, and the persona text. No FAIL, because the reports are best effort. |
 | The kernel merges or drops a report, so a rate is low. | `exclude` has the strictest threshold (0.05) and a minimum of 20 cells. |
 | A wrong exclude hides a needed body. | No L2 exclude; `include` reverses an exclude; the change waits for a boundary. |
 | The estimate is far from the real count for one family. | The budget is a warning and a flag change, never a refusal. |

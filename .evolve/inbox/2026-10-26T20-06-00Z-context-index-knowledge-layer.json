@@ -4,7 +4,7 @@
   "title": "Cell context index CX7b: the docs index and the code verbs as L3 knowledge entries.",
   "source": "console, 2026-10-26. The operator request is in docs/plans/cell-context-index-2026-10.md §1. Design: docs/architecture/cell-context-index.md. Plan: §6 of the same plan.",
   "summary": "The docs index and the code index reach a cell only through the persona text. The rule rows are item guidance-cell-index-input (CX7a). Spec §3 and plan D11.",
-  "fix": "List docs/index.md as kind docs, and the evolve code verbs as a verb entry with no path. At enforce, list inputs/recalled-lessons.json as kind recalled-lessons. Each is an L3 entry of class knowledge.",
+  "fix": "List docs/index.md as kind docs, and the evolve code verbs as a verb entry with no path. At enforce, list inputs/recalled-lessons.json as kind recalled-lessons. Each is an L3 entry of class knowledge. Add the key budget.l3_entries.",
   "acceptance": [
     "RED first: TestBuild_ListsTheDocsIndexAndTheCodeVerbsAsKnowledgeEntries fails before the change.",
     "An L3 entry is never required and adds no grant.",

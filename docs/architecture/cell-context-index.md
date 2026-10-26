@@ -46,7 +46,7 @@ The goals are in the order of the build. G2 comes first, because G3 and G4 need 
 
 ## 2. A worked example
 
-Cycle 2028 builds the item `cli-ship-manual-paths-lane`. Its build prompt has 51,171 bytes, and the tail holds the recalled lessons as one JSON line of 2,411 bytes. The example index below uses the medians of research F1.4 and F1.6 for the sizes, not the files of cycle 2028.
+Cycle 2028 builds the item `cli-ship-manual-paths-lane`. Its build prompt has 51,171 bytes, and the tail holds the recalled lessons as one JSON line of 2,411 bytes. The example index below uses the medians of research F1.4 and F1.6 for the sizes. Only the triage report has the size of its file in cycle 2028.
 
 With this design, the pipeline writes this index before the build dispatch:
 
@@ -60,9 +60,9 @@ With this design, the pipeline writes this index before the build dispatch:
   "lineage": [],
   "stage": "shadow",
   "estimate": "ceil(bytes/3)",
-  "required": ["d1", "d3"],
+  "required": ["d1", "d4"],
   "budgets": {
-    "L1": {"limit_tokens": 8000, "required_tokens": 941},
+    "L1": {"limit_tokens": 8000, "required_tokens": 1180},
     "L2": {"limit_tokens": 6000, "required_tokens": 0},
     "L3": {"limit_entries": 40, "entries": 1, "rule_rows": 1}
   },
@@ -75,7 +75,10 @@ With this design, the pipeline writes this index before the build dispatch:
      "bytes": 8001, "tokens": 2667, "sha256": "…", "required": false, "why": "upstream deliverable of tdd"},
     {"id": "d3", "layer": "L1", "class": "deliverable", "kind": "triage-decision", "path": ".evolve/runs/cycle-2028/triage-decision.json",
      "cycle": 2028, "phase": "triage", "attempt": 1, "summary": "",
-     "bytes": 402, "tokens": 134, "sha256": "…", "required": true, "why": "upstream deliverable of triage; required by the build inputs"},
+     "bytes": 402, "tokens": 134, "sha256": "…", "required": false, "why": "upstream deliverable of triage"},
+    {"id": "d4", "layer": "L1", "class": "deliverable", "kind": "triage-report", "path": ".evolve/runs/cycle-2028/triage-report.md",
+     "cycle": 2028, "phase": "triage", "attempt": 1, "summary": "Triage Decision — Cycle 2028",
+     "bytes": 1117, "tokens": 373, "sha256": "…", "required": true, "why": "upstream deliverable of triage; required by the build inputs"},
     {"id": "k4", "layer": "L3", "class": "knowledge", "kind": "rule", "rule_layer": "L1", "audience": ["phase"],
      "path": "guidance/rules/kill-guard-never-mutated.md", "summary": "Never mutate or run a live kill guard",
      "bytes": 1210, "tokens": 404, "sha256": "…", "required": false, "why": "rule of the registry (ADR-0145) for audience phase, phase build"},
@@ -86,7 +89,7 @@ With this design, the pipeline writes this index before the build dispatch:
 }
 ```
 
-The prompt tail at `enforce` is the L0 block of §5. It names the item, the acceptance, the output `build-report.md` and one pointer line: "Your inputs are in `inputs/index.json`. Open `d1` and `d3` first." The agent runs `evolve context open d1`, and the sandbox reports the read of the path of `d1`. The pipeline maps the path to `d1` and writes one access record.
+The prompt tail at `enforce` is the L0 block of §5. It names the item, the acceptance, the output `build-report.md` and one pointer line: "Your inputs are in `inputs/index.json`. Open `d1` and `d4` first." The agent runs `evolve context open d1`, and the sandbox reports the read of the path of `d1`. The pipeline maps the path to `d1` and writes one access record.
 
 The agent does not open `d2`. After 40 build cells, the open rate of `test-report` in the build is 0.9, so the orchestrator proposes to make it required. A Go check accepts the proposal, and the policy changes at the next boundary (§9).
 
@@ -181,8 +184,10 @@ Each moved body has a class, so its layer follows §3. The cell cannot write `<w
 A phase marks a few kinds as required. The agent must open them before it writes its deliverable. The builder takes the list from the first source that has one:
 
 1. the policy key `isolation.context.required.<phase>`, a list of kinds. Only the tune action of §9 and the operator write it;
-2. the `inputs.files` list of the phase specification (`.evolve/phases/<phase>/phase.json`). 65 of 73 specifications have a list that is not empty (research F1.8). Each item is a path template, and its kind is the base name without the extension. The core phases have no specification;
+2. the `inputs.files` list of the phase specification in the merged phase catalog. A core phase has its specification in `docs/architecture/phase-registry.json`, and an optional phase in `.evolve/phases/<phase>/phase.json`. 65 of 73 `phase.json` files have a list that is not empty (research F1.8). Each item is a path template, and its kind is the base name without the extension;
 3. the upstream edges of `phaseio` (research F1.7): each upstream deliverable, and each `handoff-asks` entry for this phase.
+
+A required kind with no file in the workspace has no row, so it adds nothing to the index.
 
 On a retry, the retrospective and the failure digest of the newest lineage cycle are required, and the older lineage rows are not. An L3 entry is never required.
 
@@ -196,7 +201,7 @@ The budgets are in strict policy:
     "context": {
       "stage": "shadow",
       "budget": {"l0_tokens": 2000, "l1_tokens": 8000, "l2_tokens": 6000, "l3_entries": 40},
-      "required": {"build": ["scout-report", "triage-decision", "handoff-asks"]},
+      "required": {},
       "exclude": {},
       "tune": {"min_cells": 20, "promote_at": 0.8, "demote_at": 0.2, "exclude_at": 0.05, "per_phase_per_day": 1}
     }
@@ -206,6 +211,17 @@ The budgets are in strict policy:
 
 The compiled defaults are the values above, with `required` and `exclude` empty. `policy.Parse` refuses an unknown key, a negative number and a rate outside 0 to 1.
 
+Each key lands with the component that reads it, so no key is dead:
+
+| Keys | Component |
+|---|---|
+| `stage`, `budget.l1_tokens`, `budget.l2_tokens`, `required` | CX1 |
+| `budget.l0_tokens` | CX5 |
+| `budget.l3_entries` | CX7b |
+| `exclude`, `tune` | CX6 |
+
+Until its component lands, a key is an unknown key, and `policy.Parse` refuses it.
+
 | Budget | What it bounds | On an overflow |
 |---|---|---|
 | `l0_tokens` | the estimate of the L0 block | the task contract moves to an L1 entry (§5) |
@@ -213,7 +229,7 @@ The compiled defaults are the values above, with `required` and `exclude` empty.
 | `l2_tokens` | the same, for L2 | the same |
 | `l3_entries` | the count of L3 entries that are not rule rows. Each filtered rule row is listed, as the item `guidance-cell-index-input` requires. | the builder keeps the entries in the fixed source order: the verbs, the docs, then the recalled lessons. The note names the rows that it drops. |
 
-An overflow never removes an L1 or an L2 entry, so it never removes a grant. An L3 row has no grant of its own (§10), so its drop changes no scope. It adds a note and emits `CONTEXT_BUDGET_OVER` (WARN) with the layer, the limit and the sum. The metadata of a row is about 300 bytes, 1 to 10 percent of its body (research F1.6), so the budget counts bodies, not rows.
+An overflow never removes an L1 or an L2 entry, so it never removes a grant. An L3 row has no grant of its own (§10), so its drop changes no scope. It adds a note and emits `ISOLATION_CONTEXT_BUDGET_OVER` (WARN) with the layer, the limit and the sum. The metadata of a row is about 300 bytes, 1 to 10 percent of its body (research F1.6), so the budget counts bodies, not rows.
 
 ## 7. The read path
 
@@ -224,7 +240,7 @@ The index is a plain file, so a family that can read a file can use it. Two verb
 | `evolve context index [--layer L] [--required] [--json]` | the rows of the cell index, filtered | 0 ok; 2 the index cannot be read; 10 usage; 11 the index does not decode |
 | `evolve context open <id> [--json]` | the body of the entry; for a verb entry, the verb text | 0 ok; 1 the sha256 of the body differs from the index; 10 usage; 11 an unknown id or a path outside the project root |
 
-- The verbs find the cell from the workspace of the pipeline markers (llm-isolation.md §27, class (a)), or from `--workspace <ws>`. They read no other environment value.
+- The verbs find the cell from `--workspace <ws>`. The prompt names the workspace in its `workspace` line, so an agent can always pass it. With no flag, the verbs use the marker `EVOLVE_PROJECT_ROOT` (llm-isolation.md §27, class (a)) and the cycle of the dispatch tag `EVOLVE_DISPATCH_ID`, when both are set. The bridge sets the tag for each dispatch, and `codeindex/usagelog` parses it the same way. The marker list of X18b must keep both names. The verbs read no other environment value.
 - With `--json`, each verb prints the envelope of cli-contract.md §2 on each exit. The schemas are `evolve.context.index/1` and `evolve.context.open/1`. The `data` of `open` holds the entry and the body.
 - `open` reads only a path that the index lists. It refuses a path outside the project root, as `inputindex.ReadablePaths` does.
 - `open` writes nothing. The access record comes from the sandbox (§8), so the verb has no log of its own.
@@ -261,7 +277,7 @@ It also writes one summary record for each cell. The record holds the listed ids
 - On Linux, `bwrap` has no report. The summary has `source: none`, and no reading counts the cell.
 - The kernel can merge repeated reports, so a record means "opened at least once", never a count.
 - A verb entry has no path, so it gets no record. The `evolve code` usage log is in the workspace, which the cell can write, so it is not a source.
-- A required entry that the cell did not open emits `CONTEXT_REQUIRED_UNOPENED` (INFO) with the ids. It never fails the phase, because the report reader is best effort.
+- A required entry that the cell did not open emits `ISOLATION_CONTEXT_REQUIRED_UNOPENED` (INFO) with the ids. It never fails the phase, because the report reader is best effort.
 - `evolve context stats [--phase P] [--window N] --json` prints, for each phase and kind, the cells that listed the kind and the cells that opened it. It is agent class `D`: a cell has no task that needs other cycles, and I-5 denies the reads.
 
 ## 9. Prune and promote
@@ -317,8 +333,8 @@ The stage key is `isolation.context.stage`. The compiled default is `shadow`. Th
 
 | Stage | The builder | The prompt | Signals |
 |---|---|---|---|
-| `shadow` | writes `/2` with the layers, the budgets and the required flags; the grants report; the moved bodies of §5 are not listed | unchanged: the tail keeps its bodies | `CONTEXT_BUDGET_OVER`, `CONTEXT_REQUIRED_UNOPENED`, and `CONTEXT_PRELOAD_BYTES` with the bytes that `enforce` moves |
-| `enforce` | the same, plus the moved bodies of §5 | the persona and the L0 block only | the same |
+| `shadow` | writes `/2` with the layers, the budgets and the required flags; the grants report; the moved bodies of §5 are not listed | unchanged: the tail keeps its bodies | `ISOLATION_CONTEXT_BUDGET_OVER` and `ISOLATION_CONTEXT_REQUIRED_UNOPENED` (kind `isolation.context`) |
+| `enforce` | the same, plus the moved bodies of §5 | the persona and the L0 block only | the same, and `ISOLATION_CONTEXT_PRELOAD_BYTES` with the bytes that the move saves (CX5) |
 
 The flip to `enforce` is an operator decision. It needs one clean wave at `shadow`, and the rows N15 to N17 of the guards green. The persona text of §11 is true at both stages, so it lands with CX2. The open rates of a `shadow` wave cover the listed kinds only. `enforce` lands with component CX5. Until then, `policy.Parse` refuses `enforce` and names CX5.
 
