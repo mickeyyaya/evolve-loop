@@ -32,6 +32,11 @@ const (
 	logShowPath    = "/usr/bin/log"
 	readReportCap  = 20
 	logShowTimeout = 10 * time.Second
+
+	sandboxExecPath     = "/usr/bin/sandbox-exec"
+	ruleCellFence       = "cell.fence"
+	reportFenceDeadline = 60 * time.Second
+	reportPollInterval  = time.Second
 )
 
 func (deps Deps) readStage() string {
@@ -170,18 +175,77 @@ func (deps Deps) reportReadViolations(ctx context.Context, cfg *Config, since ti
 		deps.recordContextAccess(cfg, nil, inputindex.AccessSourceNone)
 		return
 	}
-	raw, err := deps.SandboxReports(context.WithoutCancel(ctx), cfg.DispatchID, since)
+	raw, complete, err := deps.cellReports(ctx, cfg.DispatchID, since)
 	if err != nil {
-		if deps.Stderr != nil {
-			fmt.Fprintf(deps.Stderr, "[bridge] WARN isolation read reports: %v\n", err)
-		}
+		deps.warnReports("%v", err)
 		deps.recordContextAccess(cfg, nil, inputindex.AccessSourceNone)
 		return
 	}
 	for _, r := range parseReadReports(raw) {
 		deps.emitReadViolation(cfg, stage, r)
 	}
-	deps.recordContextAccess(cfg, parseGrantReports(raw), inputindex.AccessSourceSandbox)
+	source := inputindex.AccessSourceNone
+	if complete {
+		source = inputindex.AccessSourceSandbox
+	}
+	deps.recordContextAccess(cfg, parseGrantReports(raw), source)
+}
+
+func (deps Deps) warnReports(format string, args ...any) {
+	if deps.Stderr != nil {
+		fmt.Fprintf(deps.Stderr, "[bridge] WARN isolation read reports: "+format+"\n", args...)
+	}
+}
+
+func (deps Deps) cellReports(parent context.Context, tag string, since time.Time) ([]byte, bool, error) {
+	ctx := context.WithoutCancel(parent)
+	if deps.SandboxFence == nil {
+		raw, err := deps.SandboxReports(ctx, tag, since)
+		return raw, true, err
+	}
+	if err := deps.SandboxFence(ctx, tag); err != nil {
+		deps.warnReports("write the fence: %v", err)
+		raw, err := deps.SandboxReports(ctx, tag, since)
+		return raw, false, err
+	}
+	start, deadline := deps.Now(), cmp.Or(deps.ReportFenceDeadline, reportFenceDeadline)
+	for {
+		raw, err := deps.SandboxReports(ctx, tag, since)
+		if err != nil || fenced(raw, tag) {
+			return raw, true, err
+		}
+		if elapsed := deps.Now().Sub(start); elapsed >= deadline || parent.Err() != nil {
+			deps.warnReports("no fence of the cell after %s; its reads count as unmeasured", elapsed.Round(time.Second))
+			return raw, false, nil
+		}
+		deps.Sleep(reportPollInterval)
+	}
+}
+
+func fenced(raw []byte, tag string) bool {
+	want := fenceMessage(tag)
+	for _, line := range bytes.Split(raw, []byte("\n")) {
+		var event struct {
+			EventMessage string `json:"eventMessage"`
+		}
+		if json.Unmarshal(line, &event) == nil && strings.Contains(event.EventMessage, want) {
+			return true
+		}
+	}
+	return false
+}
+
+func fenceMessage(tag string) string {
+	return sandbox.CellMessagePrefix + tag + " rule=" + ruleCellFence
+}
+
+func sandboxFence(binary string) func(context.Context, string) error {
+	return func(ctx context.Context, tag string) error {
+		ctx, cancel := context.WithTimeout(ctx, logShowTimeout)
+		defer cancel()
+		profile := fmt.Sprintf(`(version 1)(allow default)(allow file-read-data (literal "/dev/null") (with report) (with message %q))`, fenceMessage(tag))
+		return sysexec.Command(ctx, binary, "-p", profile, "/bin/cat", "/dev/null").Run()
+	}
 }
 
 func (deps Deps) readReportsApply(cfg *Config) bool {

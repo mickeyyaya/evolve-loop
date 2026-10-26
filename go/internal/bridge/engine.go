@@ -67,6 +67,8 @@ type Deps struct {
 	Reviewer              StopReviewer
 	SandboxWrap           SandboxWrapper
 	SandboxReports        func(ctx context.Context, tag string, since time.Time) ([]byte, error)
+	SandboxFence          func(ctx context.Context, tag string) error
+	ReportFenceDeadline   time.Duration
 	BootTimeoutStore      *clihealth.Store
 	OnStopReview          func(phase, action, reason string)
 	OnBoot                func(bootMS int64)
@@ -213,6 +215,9 @@ func NewEngine(deps Deps) *Engine {
 	d := deps.withDefaults()
 	if d.SandboxReports == nil {
 		d.SandboxReports = logShowReports(logShowPath)
+	}
+	if d.SandboxFence == nil {
+		d.SandboxFence = sandboxFence(sandboxExecPath)
 	}
 	if d.TokenResolver == nil {
 		d.Signals.Emit(signalcenter.Event{

@@ -29,7 +29,6 @@
   "cmd/evolve/cmd_syncmain_test.go": 2,
   "cmd/evolve/cmd_worktree_test.go": 1,
   "cmd/evolve/e2e_advisor_cli_matrix_test.go": 1,
-  "cmd/evolve/e2e_cycle_cli_matrix_test.go": 1,
   "internal/bridge/isolation_policy_integration_test.go": 1,
   "internal/changedpkgs/changedpkgs_derivability_test.go": 1,
   "internal/changedpkgs/fromgit_test.go": 1,

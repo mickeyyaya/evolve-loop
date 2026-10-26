@@ -100,7 +100,7 @@ func TestRealTmux_Interactive_ClaudeSingleSelect_AutoEnter(t *testing.T) {
 	sess := itSession("isingle")
 	defer itTmuxCtl.KillSession(context.Background(), sess)
 
-	code, _ := runTmuxREPL(context.Background(), cfg, itDeps(250*time.Millisecond),
+	code, _ := runTmuxREPL(itBoundedContext(t, itLaunchDeadline), cfg, itDeps(250*time.Millisecond),
 		interactiveLaunch("claude-tmux", sess, launch+" x", itMarker, false))
 	if code != ExitOK {
 		t.Fatalf("exit = %d, want ExitOK (auto-Enter should select the first option and continue)", code)
@@ -119,7 +119,7 @@ func TestRealTmux_Interactive_ClaudeMultiSelect_AutoSubmit(t *testing.T) {
 	sess := itSession("imulti")
 	defer itTmuxCtl.KillSession(context.Background(), sess)
 
-	code, _ := runTmuxREPL(context.Background(), cfg, itDeps(250*time.Millisecond),
+	code, _ := runTmuxREPL(itBoundedContext(t, itLaunchDeadline), cfg, itDeps(250*time.Millisecond),
 		interactiveLaunch("claude-tmux", sess, launch+" x", itMarker, false))
 	if code != ExitOK {
 		t.Fatalf("exit = %d, want ExitOK (Enter,Right,Enter should toggle→navigate→submit and continue)", code)
@@ -138,7 +138,7 @@ func TestRealTmux_Interactive_CodexTrust_AutoRespondAtBoot(t *testing.T) {
 	sess := itSession("itrust")
 	defer itTmuxCtl.KillSession(context.Background(), sess)
 
-	code, _ := runTmuxREPL(context.Background(), cfg, itDeps(250*time.Millisecond),
+	code, _ := runTmuxREPL(itBoundedContext(t, itLaunchDeadline), cfg, itDeps(250*time.Millisecond),
 		interactiveLaunch("codex-tmux", sess, launch+" x", itMarker, true))
 	if code != ExitOK {
 		t.Fatalf("exit = %d, want ExitOK (trust dialog should be auto-dismissed at boot)", code)
@@ -157,7 +157,7 @@ func TestRealTmux_Interactive_AgyPermission_AutoYes(t *testing.T) {
 	sess := itSession("iperm")
 	defer itTmuxCtl.KillSession(context.Background(), sess)
 
-	code, _ := runTmuxREPL(context.Background(), cfg, itDeps(250*time.Millisecond),
+	code, _ := runTmuxREPL(itBoundedContext(t, itLaunchDeadline), cfg, itDeps(250*time.Millisecond),
 		interactiveLaunch("agy-tmux", sess, launch+" x", itMarker, false))
 	if code != ExitOK {
 		t.Fatalf("exit = %d, want ExitOK (permission prompt should be auto-approved)", code)
@@ -176,7 +176,7 @@ func TestRealTmux_Interactive_Escalate_FailsFastWithReport(t *testing.T) {
 	sess := itSession("iesc")
 	defer itTmuxCtl.KillSession(context.Background(), sess)
 
-	code, _ := runTmuxREPL(context.Background(), cfg, itDeps(120*time.Millisecond),
+	code, _ := runTmuxREPL(itBoundedContext(t, itLaunchDeadline), cfg, itDeps(120*time.Millisecond),
 		interactiveLaunch("claude-tmux", sess, launch+" x", itMarker, false))
 	if code != ExitUnknownPrompt {
 		t.Fatalf("exit = %d, want %d (ExitUnknownPrompt — escalate must fail fast)", code, ExitUnknownPrompt)
@@ -195,7 +195,7 @@ func TestRealTmux_Interactive_ArtifactTimeoutOverride(t *testing.T) {
 	sess := itSession("ovrto")
 	defer itTmuxCtl.KillSession(context.Background(), sess)
 
-	code, _ := runTmuxREPL(context.Background(), cfg, itDeps(100*time.Millisecond),
+	code, _ := runTmuxREPL(itBoundedContext(t, itLaunchDeadline), cfg, itDeps(100*time.Millisecond),
 		itLaunch(sess, launchCmd, "OVR-READY", 0, false))
 	if code != ExitArtifactTimeout {
 		t.Fatalf("exit = %d, want %d (ExitArtifactTimeout under the 2s override)", code, ExitArtifactTimeout)
@@ -211,7 +211,7 @@ func TestRealTmux_Interactive_StuckAutoRespond_TripsLoopGuard(t *testing.T) {
 	sess := itSession("iloop")
 	defer itTmuxCtl.KillSession(context.Background(), sess)
 
-	code, _ := runTmuxREPL(context.Background(), cfg, itDeps(120*time.Millisecond),
+	code, _ := runTmuxREPL(itBoundedContext(t, itLaunchDeadline), cfg, itDeps(120*time.Millisecond),
 		interactiveLaunch("claude-tmux", sess, launch+" x", itMarker, false))
 	if code != ExitRespondLoopGuard {
 		t.Fatalf("exit = %d, want %d (ExitRespondLoopGuard — a stuck prompt must not loop forever)", code, ExitRespondLoopGuard)
