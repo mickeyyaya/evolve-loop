@@ -18,6 +18,7 @@ type InboxItem struct {
 	Kind          string   `json:"kind"`
 	Priority      string   `json:"priority"`
 	PriorityClass string   `json:"priority_class"`
+	Origin        string   `json:"origin"`
 	Files         []string `json:"files"`
 	InjectedBy    string   `json:"injected_by"`
 }

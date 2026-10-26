@@ -160,6 +160,7 @@ type escalationItem struct {
 	Kind          string  `json:"kind"`
 	Priority      string  `json:"priority"`
 	PriorityClass string  `json:"priority_class"`
+	Origin        string  `json:"origin"`
 	Title         string  `json:"title"`
 	Summary       string  `json:"summary"`
 	Evidence      string  `json:"evidence,omitempty"`
@@ -183,6 +184,7 @@ func fileEscalation(opts Options, st RunStatus, now time.Time) error {
 		Kind:          "fix",
 		Priority:      "critical",
 		PriorityClass: inboxbatch.ClassCorrectness,
+		Origin:        inboxbatch.OriginCycle,
 		Title:         fmt.Sprintf("CI %s on pushed commit %s — %s", st.Conclusion, short, failing),
 		Summary: fmt.Sprintf(
 			"Post-push CI watch (cycle %d): the GitHub run for %s completed with conclusion=%q. Failing: %s. Fix forward before shipping on top.\n\nLog excerpt:\n%s",

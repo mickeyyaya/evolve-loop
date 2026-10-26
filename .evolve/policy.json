@@ -136,6 +136,14 @@
       "salvage_after_hours": 24
     }
   },
+  "inbox": {
+    "curator": {
+      "stage": "shadow",
+      "overlap_refuse": 0.5,
+      "overlap_warn": 0.3,
+      "consume_min_share": 0.5
+    }
+  },
   "inbox_priority": {
     "class_order": [
       "correctness",

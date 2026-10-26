@@ -26,6 +26,7 @@ type Item struct {
 	Class           string                     `json:"class"`
 	Priority        string                     `json:"priority"`
 	PriorityClass   string                     `json:"priority_class"`
+	Origin          string                     `json:"origin"`
 	Campaign        string                     `json:"campaign"`
 	Files           []string                   `json:"files"`
 	ProtectedFiles  []string                   `json:"protected_files"`

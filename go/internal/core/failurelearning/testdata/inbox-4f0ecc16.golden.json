@@ -5,6 +5,7 @@
   "kind": "bug",
   "priority": "H",
   "priority_class": "correctness",
+  "origin": "retro",
   "files": null,
   "injected_by": "faillearn-failure-floor"
 }

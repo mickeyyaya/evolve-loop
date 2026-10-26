@@ -101,6 +101,7 @@ func (h haltRecord) inboxItem(story haltNarrative) (string, map[string]any) {
 		"kind":           inboxbatch.KindPipelineRepair,
 		"priority":       "P0",
 		"priority_class": inboxbatch.ClassStability,
+		"origin":         inboxbatch.OriginCycle,
 		"injected_by":    escalationInjectedBy,
 		"summary":        story.summary,
 		"root_cause":     story.rootCause,
