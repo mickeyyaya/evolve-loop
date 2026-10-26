@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "RED first: with dispatch forced serial (concurrency 1), the barrier test fails on its deadline",
+    "With concurrency 2 the test passes -race -count=500 on macOS",
+    "No time.Sleep remains in concurrentRunner"
+  ],
+  "created_at": "2026-10-26T13:00:03Z",
+  "deps": [],
+  "files": [
+    "go/internal/core/evaluate_batch_dispatch_test.go"
+  ],
+  "fix": "Replace the sleep with a barrier: each runner signals its arrival and waits until both have arrived, bounded by a deadline of a few seconds. A serial dispatch then fails on the deadline with a clear message.",
+  "id": "flake-evaluate-batch-overlap-by-sleep",
+  "kind": "bug",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "source": "console, 2026-10-26, flaky-test census (docs/research/flaky-tests-2026-10.md)",
+  "summary": "Rank 4 of the flaky-test census (docs/research/flaky-tests-2026-10.md F4.4): 3 reds on macOS (0.36%), about 167 runner minutes. Runs 38846276793 (main), 39462372493 (#1056), 40268371666 (#1138; does not touch internal/core). Message: evaluate_batch_dispatch_test.go:100: phases did not overlap (maxActive=1, want ≥2). concurrentRunner (evaluate_batch_dispatch_test.go:37-46) counts itself active, sleeps 20 ms and leaves. On a loaded runner the second goroutine starts after the first has ended.",
+  "title": "TestDispatchEvaluateBatch_Concurrent flakes on macOS: a 20 ms sleep must create the overlap",
+  "weight": 0.54
+}

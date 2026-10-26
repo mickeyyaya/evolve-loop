@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "The test starts its private server with tmuxtest.StartServer and stops it with tmuxtest.StopServer",
+    "A NewSessionEnv start failure includes the tmux output; a test with a failing fake tmux pins it",
+    "The test passes -count=100 on ubuntu CI (a workflow_dispatch run or the PR run records it)"
+  ],
+  "created_at": "2026-10-26T13:00:05Z",
+  "deps": [],
+  "files": [
+    "go/internal/bridge/tmux_hermetic_env_integration_test.go",
+    "go/internal/bridge/tmux.go"
+  ],
+  "fix": "Start the private server with tmuxtest.StartServer(socket) (exit-empty off) and stop it in t.Cleanup. Also wrap the NewSessionEnv start error with the tmux output.",
+  "id": "flake-realtmux-killed-session-server-exits",
+  "kind": "bug",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "source": "console, 2026-10-26, flaky-test census (docs/research/flaky-tests-2026-10.md)",
+  "summary": "Rank 6 of the flaky-test census (docs/research/flaky-tests-2026-10.md F4.6): 2 reds in its first day on main (2 of 81 ubuntu jobs, 2.5%, the highest open rate), about 98 runner minutes. Runs 40268053917 (#1147, docs only), 40269836920 a1 (#1139, docs only, rerun green). Message: tmux_hermetic_env_integration_test.go:160: start early-18: exit status 1 (also early-1). The test starts and kills 20 sessions on a private socket that no tmuxtest.StartServer started. So exit-empty is on, and each kill ends the server. early-0 never failed. This is a hypothesis; there is no Linux repro. NewSessionEnv drops the tmux output, so the red cannot show the cause.",
+  "title": "TestRealTmux_AKilledSessionLeavesNoEnvFile flakes on ubuntu: the private tmux server can exit between two starts",
+  "weight": 0.48
+}
