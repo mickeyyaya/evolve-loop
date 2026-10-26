@@ -11,6 +11,8 @@ import (
 
 const consumedDirName = "consumed"
 
+const ConsumedDirName = consumedDirName
+
 const unknownConsumedField = "unknown"
 
 type ConsumedRecord struct {

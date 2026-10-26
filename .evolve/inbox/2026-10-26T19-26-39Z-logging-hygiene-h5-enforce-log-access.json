@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "The operator records a decision: enforce now, or keep shadow with a reason",
+    "The decision cites the shadow signals of at least one wave",
+    "If the decision is enforce, a follow-up item names the change of mode and its red test"
+  ],
+  "created_at": "2026-10-26T19:30:00Z",
+  "deps": [
+    "logging-hygiene-h4-logs-reader"
+  ],
+  "files": [
+    "go/internal/phasespec/"
+  ],
+  "fix": "After H4 has run in shadow for at least one wave, read the shadow signals. If no phase reads outside its declared access for a legitimate reason, the operator approves enforce. Then a lane changes the mode, and a read outside the access fails the phase with a named signal.",
+  "id": "logging-hygiene-h5-enforce-log-access",
+  "kind": "decision",
+  "notes": "Plan link: docs/plans/logging-and-process-hygiene-2026-10.md (component H5). Spec link: docs/architecture/event-channels.md. Operator flip: kind decision, route console-manual.",
+  "priority_class": "debuggability",
+  "route": "console-manual",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Component H5 of the plan docs/plans/logging-and-process-hygiene-2026-10.md, section 6.4 and section 8. H4 adds log_access in shadow. H5 is the operator flip to enforce. The STE work for Go strings in H5 is row S10 of docs/plans/ste100-docs-rewrite-2026-10.md, and that plan tracks it.",
+  "title": "Decide when log_access moves from shadow to enforce (logging plan H5)",
+  "weight": 0.4
+}

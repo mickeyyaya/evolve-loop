@@ -3,6 +3,7 @@ package core
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -34,6 +35,9 @@ func inboxFiles(t *testing.T, root string) []string {
 	}
 	var names []string
 	for _, e := range ents {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
 		names = append(names, e.Name())
 	}
 	return names

@@ -26,12 +26,14 @@ type Item struct {
 	Class           string                     `json:"class"`
 	Priority        string                     `json:"priority"`
 	PriorityClass   string                     `json:"priority_class"`
+	Origin          string                     `json:"origin"`
 	Campaign        string                     `json:"campaign"`
 	Files           []string                   `json:"files"`
 	ProtectedFiles  []string                   `json:"protected_files"`
 	ConnectsTo      []string                   `json:"connects_to"`
 	Deps            []string                   `json:"deps"`
 	Route           string                     `json:"route"`
+	RoutedReason    json.RawMessage            `json:"routed_reason,omitempty"`
 	InjectedBy      string                     `json:"injected_by"`
 	Continuation    *continuation.Continuation `json:"continuation,omitempty"`
 	Acceptance      []string                   `json:"acceptance,omitempty"`
@@ -247,6 +249,16 @@ func LoadDir(dir string) (items []Item, warnings []string, err error) {
 const maxFieldLen = 160
 
 const maxAcceptanceLen = 600
+
+const (
+	MaxFieldLen      = maxFieldLen
+	MaxAcceptanceLen = maxAcceptanceLen
+)
+
+func Fit(s string, max int) string {
+	var r fieldRewrites
+	return r.clean("", s, max)
+}
 
 func LoadFile(path string) (Item, []string, error) {
 	raw, err := os.ReadFile(path)

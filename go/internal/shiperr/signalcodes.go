@@ -45,6 +45,8 @@ var codeDocs = map[ShipErrorCode]string{
 	CodeRepoContractInfra:           "atomic-ship: the repo-contract scanner toolchain died twice without a test-level failure (re-dispatchable)",
 	CodeCommittedDocDeleted:         "atomic-ship: the landing deletes a path under docs/ or knowledge-base/ that the target branch holds; a rename into docs/, or within knowledge-base/, ships",
 	CodeForeignPredicatePackage:     "atomic-ship: a cycle landing adds a file under go/acs/cycle<M>/ of a cycle other than the shipping one; archive the superseded package with its explanation record",
+	CodeHeldForOperator:             "atomic-ship: at held_proposals.stage enforce, a lane change that touches the fence or works a pipeline-kind item waits for evolve landing approve of its tree; main did not move (ADR-0157)",
+	CodeHeldProposalRejected:        "atomic-ship: the operator rejected this tree of a held proposal with evolve landing reject; main did not move (ADR-0157)",
 	CodeWorktreeResolve:             "atomic-ship: the cycle worktree could not be resolved",
 	CodeIntegrityTreeDrift:          "post-ship: the shipped tree drifted from the verified one (integrity)",
 	CodeGitLaneNotOnOrigin:          "atomic-ship: nothing to commit, but the lane holds commits that origin does not hold, and no landing intent proves them; ship refuses a PASS with no push (integrity)",

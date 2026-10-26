@@ -25,7 +25,7 @@ func TestPaneProfileFor_AgyClaudeTmuxReadsTheAgyBinarysPaneWithTheAgyDetector(t 
 	if target != agy {
 		t.Errorf("agy-claude-tmux pane profile = %+v, want agy-tmux's %+v: the target overrides no pane field, one binary renders one pane", target, agy)
 	}
-	if target.Name != "agy" || target.BoundaryMarker != ">" || !target.BoundaryExact {
+	if target.Name != panestream.FormatAgyREPL || target.BoundaryMarker != ">" || !target.BoundaryExact {
 		t.Errorf("agy-claude-tmux pane profile = %+v, want agy's exact \">\" input boundary, not the %q footer", target, agyMarker)
 	}
 	if _, isAgy := detectorFor(tmuxLaunch{name: "agy-claude-tmux", promptMarker: agyMarker}).(*panestream.AgyDetector); !isAgy {

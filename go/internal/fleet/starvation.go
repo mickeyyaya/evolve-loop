@@ -59,6 +59,7 @@ type StarvationItem struct {
 	Weight        float64  `json:"weight"`
 	Kind          string   `json:"kind"`
 	PriorityClass string   `json:"priority_class"`
+	Origin        string   `json:"origin"`
 	Description   string   `json:"description"`
 	Files         []string `json:"files"`
 	Source        string   `json:"source"`
@@ -75,6 +76,7 @@ func BuildStarvationItem(o WaveObservation, k int, weight float64, cycle int, no
 		Weight:        weight,
 		Kind:          "feature",
 		PriorityClass: inboxbatch.ClassStability,
+		Origin:        inboxbatch.OriginCycle,
 		Description: fmt.Sprintf(
 			"The fleet ran %d consecutive waves realizing only %d of %d sized lanes "+
 				"(the width left after any quota/capacity shrink) — work-supply starvation, "+

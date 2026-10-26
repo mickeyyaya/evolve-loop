@@ -20,8 +20,7 @@ func newCoherenceProject(t *testing.T) string {
 		}
 	}
 	t.Setenv("EVOLVE_PROJECT_ROOT", root)
-	for _, v := range []string{"EVOLVE_PLUGIN_ROOT", "EVOLVE_PROFILES_DIR_OVERRIDE",
-		"EVOLVE_PROFILE_DIR", "EVOLVE_PERSONA_OVERRIDE", "EVOLVE_PROMPTS_DIR"} {
+	for _, v := range []string{"EVOLVE_PLUGIN_ROOT", "EVOLVE_PROFILE_DIR", "EVOLVE_PERSONA_OVERRIDE"} {
 		t.Setenv(v, "")
 	}
 	return root

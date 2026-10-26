@@ -41,12 +41,12 @@ func TestIsProtectedScope_ADirectoryThatOnlyContainsAFragmentIsNotProtected(t *t
 
 func TestIsProtectedScope_ADirectoryInsideAFragmentIsProtected(t *testing.T) {
 	inside := []string{
-		"go/internal/bridge/sub/",
-		"go/internal/bridge/",
-		"go/internal/bridge",
+		"go/internal/commitgate/sub/",
+		"go/internal/commitgate/",
+		"go/internal/commitgate",
 		"/wt/go/internal/phases/runner/verdict/settle",
 		"Skills/Audit/references/",
-		"go/internal/core/../bridge/sub/",
+		"go/internal/core/../commitgate/sub/",
 	}
 	for _, p := range inside {
 		if !IsProtectedScope(p) {
@@ -71,9 +71,9 @@ func TestIsProtectedScope_AProtectedFileSpellingIsProtected(t *testing.T) {
 
 func TestIsProtectedSurface_MembershipStaysMembership(t *testing.T) {
 	members := []string{
-		"go/internal/bridge",
-		"github.com/mickeyyaya/evolve-loop/go/internal/bridge",
-		"go/internal/bridge/driver_codex.go",
+		"go/internal/commitgate",
+		"github.com/mickeyyaya/evolve-loop/go/internal/commitgate",
+		"go/internal/commitgate/attestation.go",
 		"go/internal/core/orchestrator.go",
 	}
 	for _, p := range members {
@@ -85,7 +85,7 @@ func TestIsProtectedSurface_MembershipStaysMembership(t *testing.T) {
 		"go/internal/core/",
 		"go/internal/phases/runner/",
 		"go/cmd/evolve",
-		"go/internal/bridgex",
+		"go/internal/commitgatex",
 	}
 	for _, p := range notMembers {
 		if IsProtectedSurface(p) {
@@ -100,7 +100,7 @@ func TestIsProtectedScope_ImpliedByMembership(t *testing.T) {
 		rel := strings.TrimPrefix(e.Fragment, "/")
 		paths = append(paths, rel, "/wt"+e.Fragment, strings.TrimSuffix(rel, "/"))
 	}
-	paths = append(paths, "go/internal/bridge", "go/internal/core/", "docs/x.md", "go/Makefile")
+	paths = append(paths, "go/internal/commitgate", "go/internal/core/", "docs/x.md", "go/Makefile")
 	for _, p := range paths {
 		if IsProtectedSurface(p) && !IsProtectedScope(p) {
 			t.Errorf("IsProtectedSurface(%q) but not IsProtectedScope — the seed would admit what the breaker refuses", p)

@@ -83,4 +83,4 @@ Keep it under 400 lines — decide the approach, don't restate the spec or pre-w
 
 ## Reflection Authoring (v10.20.0+)
 
-Before posting your completion ledger entry, execute the Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `architecture-design.md`'s `## Reflection` section and `architecture-design-reflection.yaml` sidecar. Architecture-design friction commonly maps to `ambiguous-input` (scout AC underspecified for a design decision) or `context` (codebase seam not discoverable). Skip only if `EVOLVE_REFLECTION_JOURNAL=0`.
+Before posting your completion ledger entry, execute the Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `architecture-design.md`'s `## Reflection` section and `architecture-design-reflection.yaml` sidecar. Architecture-design friction commonly maps to `ambiguous-input` (scout AC underspecified for a design decision) or `context` (codebase seam not discoverable).

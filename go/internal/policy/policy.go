@@ -21,6 +21,7 @@ type Policy struct {
 	Pins                map[string]Pin       `json:"pins,omitempty"`
 	CLIRouting          *CLIRouting          `json:"cli_routing,omitempty"`
 	InboxPriority       *InboxPriorityPolicy `json:"inbox_priority,omitempty"`
+	Inbox               *InboxPolicy         `json:"inbox,omitempty"`
 	ShipFloor           []string             `json:"ship_floor,omitempty"`
 	Floor               []FloorGate          `json:"floor,omitempty"`
 	FailureFloor        *FailureFloor        `json:"failure_floor,omitempty"`
@@ -58,7 +59,9 @@ type Policy struct {
 	Recovery           *RecoveryPolicy           `json:"recovery,omitempty"`
 	DocsFloor          *DocsFloorPolicy          `json:"docs_floor,omitempty"`
 	CommentFloor       *CommentFloorPolicy       `json:"comment_floor,omitempty"`
+	HeldProposals      *HeldProposalsPolicy      `json:"held_proposals,omitempty"`
 	CoverChanged       *CoverChangedPolicy       `json:"cover_changed,omitempty"`
+	Retrospectives     *RetrospectivesPolicy     `json:"retrospectives,omitempty"`
 	ACS                *ACSConfig                `json:"acs,omitempty"`
 	Paths              *PathsConfig              `json:"paths,omitempty"`
 	Worktree           *WorktreePolicy           `json:"worktree,omitempty"`

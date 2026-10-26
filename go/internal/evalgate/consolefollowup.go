@@ -12,6 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
@@ -91,6 +92,7 @@ func (t acMaterialization) companion(src followupSource, cycle int, row []string
 		"id":             id,
 		"kind":           src.Kind,
 		"priority_class": src.PriorityClass,
+		"origin":         inboxbatch.OriginCycle,
 		"weight":         src.Weight,
 		"route":          inboxmover.RouteConsoleValue,
 		"title":          fmt.Sprintf("Console part of %s: AC %s, which needs a protected path changed", src.ID, row[0]),

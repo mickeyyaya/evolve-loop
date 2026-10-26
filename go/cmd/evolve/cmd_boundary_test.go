@@ -92,9 +92,10 @@ func TestBoundaryRun_StopsAtFirstFailedStepWithItsExitCode(t *testing.T) {
 		{"pr merge refused", 2, exitRefused, []string{"loop-stop", "pr"}},
 		{"pr merge I/O failure", 2, exitIO, []string{"loop-stop", "pr"}},
 		{"sync-main refused", 4, exitRefused, []string{"loop-stop", "pr", boundaryRatchetVerb, "sync-main"}},
-		{"gc I/O failure", 6, exitIO, []string{"loop-stop", "pr", boundaryRatchetVerb, "sync-main", "quality", "gc"}},
-		{"brake release fails", 7, exitRefused, []string{"loop-stop", "pr", boundaryRatchetVerb, "sync-main", "quality", "gc", "loop-stop"}},
-		{"log dir switch fails", 8, exitIO, []string{"loop-stop", "pr", boundaryRatchetVerb, "sync-main", "quality", "gc", "loop-stop", boundaryLogVerb}},
+		{"inbox curate I/O failure", 5, exitIO, []string{"loop-stop", "pr", boundaryRatchetVerb, "sync-main", "inbox"}},
+		{"gc I/O failure", 7, exitIO, []string{"loop-stop", "pr", boundaryRatchetVerb, "sync-main", "inbox", "quality", "gc"}},
+		{"brake release fails", 8, exitRefused, []string{"loop-stop", "pr", boundaryRatchetVerb, "sync-main", "inbox", "quality", "gc", "loop-stop"}},
+		{"log dir switch fails", 9, exitIO, []string{"loop-stop", "pr", boundaryRatchetVerb, "sync-main", "inbox", "quality", "gc", "loop-stop", boundaryLogVerb}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -123,11 +124,14 @@ func TestBoundaryRun_FullFakeRunEndsWithDetachedPidAndBootVerdict(t *testing.T) 
 	if rc != 0 {
 		t.Fatalf("rc = %d, want 0 for a run whose every step succeeds\n%s%s", rc, stdout.String(), stderr.String())
 	}
-	want := []string{"loop-stop", "pr", boundaryRatchetVerb, "sync-main", "quality", "gc", "loop-stop", boundaryLogVerb, "loop"}
+	want := []string{"loop-stop", "pr", boundaryRatchetVerb, "sync-main", "inbox", "quality", "gc", "loop-stop", boundaryLogVerb, "loop"}
 	if got := fake.verbs(); !slices.Equal(got, want) {
-		t.Fatalf("dispatched %v, want the nine steps %v in order", got, want)
+		t.Fatalf("dispatched %v, want the ten steps %v in order", got, want)
 	}
-	stop, merge, release, logStep, launch := fake.calls[0].args, fake.calls[1].args, fake.calls[6].args, fake.calls[7].args, fake.calls[8].args
+	if curate := fake.calls[4].args; !slices.Equal(curate[:2], []string{"curate", "--apply"}) || !slices.Contains(curate, "--project-root") {
+		t.Errorf("the inbox step = %v, want curate --apply with the project root", curate)
+	}
+	stop, merge, release, logStep, launch := fake.calls[0].args, fake.calls[1].args, fake.calls[7].args, fake.calls[8].args, fake.calls[9].args
 	if !slices.Contains(stop, "--wait") || slices.Contains(stop, "--release") {
 		t.Errorf("first loop-stop args %v: want --wait and no --release", stop)
 	}

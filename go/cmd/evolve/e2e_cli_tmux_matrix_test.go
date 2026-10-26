@@ -79,7 +79,6 @@ func runOneTmuxCycle(t *testing.T, cfg tmuxCycleConfig) {
 
 	env := append(os.Environ(),
 		"EVOLVE_CLI="+cfg.CLI,
-		"EVOLVE_PROMPTS_DIR="+cfg.RepoRoot,
 		"EVOLVE_SHIP_SCRIPT="+shipScript,
 		"EVOLVE_NATIVE_SHIP=0",
 		"EVOLVE_RESEARCH_HOOK_DISABLED=1",
@@ -87,12 +86,7 @@ func runOneTmuxCycle(t *testing.T, cfg tmuxCycleConfig) {
 		"HOME="+fakeHome,
 	)
 	if !cfg.Live {
-		env = append(env,
-			"BRIDGE_TESTING=1",
-			"BRIDGE_CLAUDE_BINARY="+cfg.FakeBin,
-			"BRIDGE_CODEX_BINARY="+cfg.FakeBin,
-			"BRIDGE_AGY_BINARY="+cfg.FakeBin,
-		)
+		env = append(env, fakeCLIsFirstOnPath(t, cfg.FakeBin, "claude", "codex", "agy"))
 	} else if _, err := exec.LookPath(liveBinaryName(cfg.CLI)); err != nil {
 		t.Skipf("live mode: %s binary not on PATH (%v); skipping", cfg.CLI, err)
 	}

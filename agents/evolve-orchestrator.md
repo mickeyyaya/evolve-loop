@@ -146,7 +146,7 @@ If role-context prompt exceeds soft token cap, helper emits stderr WARN — *tri
 
 ## Layer-R Reflector Phase Contract (v10.20.0+)
 
-Layer-R runs on EVERY cycle (PASS, WARN, or FAIL) immediately after `ship.sh` returns — regardless of audit verdict. Precedes Layer-P (memo, PASS) and retrospective (FAIL/WARN). Gated on `EVOLVE_REFLECTION_JOURNAL` (default `1`; `0` to opt out).
+Layer-R runs on EVERY cycle (PASS, WARN, or FAIL) immediately after `ship.sh` returns — regardless of audit verdict. Precedes Layer-P (memo, PASS) and retrospective (FAIL/WARN).
 
 Reflector reads `<phase>-reflection.yaml` per phase + aggregates cross-cycle rollup in-process (window 5), then writes:
 
@@ -154,7 +154,7 @@ Reflector reads `<phase>-reflection.yaml` per phase + aggregates cross-cycle rol
 
 Both learn-phase agents consume this synthesis (retrospective Step 1.7, memo Step 2.5). Learn phase: Reflector (always) + Retrospective (FAIL/WARN) + Memo (PASS). See [docs/architecture/learn-phase.md](../docs/architecture/learn-phase.md) and [docs/architecture/reflection-journal.md](../docs/architecture/reflection-journal.md).
 
-**Orchestrator change:** invoke `subagent-run.sh reflector $CYCLE $WORKSPACE` after `ship.sh` exits 0, BEFORE memo (PASS) or retrospective (FAIL/WARN). Skip only if `EVOLVE_REFLECTION_JOURNAL=0`.
+**Orchestrator change:** invoke `subagent-run.sh reflector $CYCLE $WORKSPACE` after `ship.sh` exits 0, BEFORE memo (PASS) or retrospective (FAIL/WARN).
 
 ## Layer-P Memo Phase Contract
 

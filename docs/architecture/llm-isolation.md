@@ -18,7 +18,8 @@
 > - X7: merged in #1135 at stage `shadow` (the policy key `isolation.i7.stage`). The sandbox holds the protected write rule for each family, `guard phase` follows §7.2 for `Agent` and `Task`, and rows N10 and N11 are green (§9.1).
 > - X8: merged in #1131.
 > - X10: built in this change. `AGENTS.md` is the one source. `evolve skills generate` renders its digest into `CLAUDE.md` and `GEMINI.md`, and the four `.claude/agents` reviewers from their neutral personas (§13).
-> - X9 and X11 to X19: not started, except the parts that the plan §6.1 lists as merged.
+> - X9: built in this change. The manifest fields of §11 pick the parsers, the collectors and the transcript format, and row N14 is green (§11.1).
+> - X11 to X19: not started, except the parts that the plan §6.1 lists as merged.
 
 ## Table of contents
 
@@ -290,7 +291,7 @@ The environment of a child is the union of three closed sets, and nothing else:
 - In `shadow`, the builder computes both environments. It logs each dropped name once for each wave and emits `ISOLATION_I2_VIOLATION` with the name, not the value. The child still gets today's environment.
 - In `enforce`, the child gets only the union.
 - `process_env_test.go` flips to assert the allowlist (`TestProcessEnv_IsTheAllowlistPlusTheManifest`).
-- The pipeline markers are one named list (I-16, §27). X2 closed review finding H2 inside the bridge with the explicit list `pipelineEnvMarkers` (§6.1). X18b makes one list the only source for the whole pipeline: `buildCycleEnv` still copies each `EVOLVE_*` name into the cycle.
+- The pipeline markers are one named list, `ipcenv.Markers()` (I-16, §27). X2 closed review finding H2 inside the bridge with a list of its own. X18b moved that list into `ipcenv`, so the bridge and the cycle read the same data. `buildCycleEnv` now copies only the `EVOLVE_*` names that `ipcenv.Carried` accepts.
 
 #### 6.1 As built (X2)
 
@@ -304,7 +305,7 @@ The builder is `Deps.cellEnv` in `go/internal/bridge/hermetic_env.go`. Each LLM 
 | `shadow` | today's environment, one `ISOLATION_I2_VIOLATION` for each dropped name, `action=logged` |
 | `enforce` | the union only, one `ISOLATION_I2_VIOLATION` for each dropped name, `action=refused` |
 | Base allowlist | the names of the table above and each `LC_*` name |
-| Pipeline markers | an explicit list, `pipelineEnvMarkers`: `EVOLVE_PROJECT_ROOT`, `EVOLVE_WORKTREE_ROOT`, `EVOLVE_CYCLE_STATE_FILE`, `EVOLVE_TMUX_SOCKET` and the four `EVOLVE_FLEET*` keys. It applies to the launcher and to `Deps.Env`. A gate or bypass name (`EVOLVE_BYPASS_*`, `EVOLVE_SANDBOX*`, `EVOLVE_MSG_TOKEN`, `BRIDGE_*`) never reaches a child at `enforce`. |
+| Pipeline markers | the cell part of the marker list, `ipcenv.CellMarkers()` (X18b): `EVOLVE_PROJECT_ROOT`, `EVOLVE_WORKTREE_ROOT`, `EVOLVE_CYCLE_STATE_FILE`, `EVOLVE_TMUX_SOCKET`, the four `EVOLVE_FLEET*` keys, `EVOLVE_DISPATCH_DEPTH` and `EVOLVE_PHASE`. It applies to the launcher and to `Deps.Env`. A gate or bypass name (`EVOLVE_BYPASS_*`, `EVOLVE_SANDBOX*`, `EVOLVE_MSG_TOKEN`, `BRIDGE_*`) never reaches a child at `enforce`. |
 | Operator opt-ins | `BRIDGE_ALLOW_ANTHROPIC_BASE_URL=1` passes `ANTHROPIC_BASE_URL`, and `BRIDGE_ALLOW_OPENAI_API_KEY=1` passes `OPENAI_API_KEY`. So the route that the operator opted into stays the route of the child. |
 | Excluded always | `EVOLVE_DISPATCH_ID` (the dispatch adds its own tag), and each name that is not a shell identifier |
 | Filter | `ipcenv.Keep`, the allowlist twin of the `ipcenv.Scrub` deny list |
@@ -384,7 +385,7 @@ A worked example: the scout pane of cycle 7 runs `claude --version` from its Bas
 | Item | As built |
 |---|---|
 | Markers | `ipcenv.DispatchDepthKey` (`EVOLVE_DISPATCH_DEPTH`) and `ipcenv.PhaseKey` (`EVOLVE_PHASE`). `Deps.cellMarkers` sets the depth of the launcher plus 1, and the phase to `cfg.Agent`. |
-| Path of the markers | `Deps.cellEnv` adds them to `Deps.Env`, and both names are in `pipelineEnvMarkers`. So each stage of §6.1 gives them to the child. A tmux pane and a recipe pane also get them as `export` lines before the launch line. At `shadow` such a pane inherits the environment of the server. |
+| Path of the markers | `Deps.cellEnv` adds them to `Deps.Env`, and both names are in `ipcenv.CellMarkers()`. So each stage of §6.1 gives them to the child. A tmux pane and a recipe pane also get them as `export` lines before the launch line. At `shadow` such a pane inherits the environment of the server. |
 | Refusals that now fire | `evolve agent run` (`go/internal/cli/agentcmd/run.go:93`) and the boundary writes (`go/cmd/evolve/boundary_write.go:14`). Both read the depth through `subagent.ReadDispatchDepth`, which calls `ipcenv.DispatchDepth`. `subagent run` only checks its depth cap of 3, and `phase`, `loop` and `wave` read no marker. |
 | Strength of the markers | advisory. `env -u EVOLVE_DISPATCH_DEPTH -u EVOLVE_PHASE evolve agent run` passes the marker refusal. The dispatch credential (§7.1.1) is the layer that does not depend on the agent. Row N4 now proves that layer. |
 | `EVOLVE_SANDBOX=off` in a phase | `launchSwept` refuses the launch when the launcher carries `EVOLVE_PHASE` and the mode is `off`. The error is `bridge.ErrSandboxOffInPhase`, the exit code is `ExitSafetyGate`, and the bridge emits `ISOLATION_I3_VIOLATION` with `action=refused` and `rule=sandbox.off.phase`. |
@@ -669,7 +670,7 @@ The guards are these tests:
 
 Known differences from the design:
 
-- The rest of `$HOME` stays readable. The deny of §9 needs the `home_reads` field of each manifest (X9). X5 denies the listed secrets only.
+- The rest of `$HOME` stays readable. The deny of §9 needs the `home_reads` field of each manifest. X9 adds the field, but the sandbox does not read it yet. X5 denies the listed secrets only.
 - The CLI transcripts stay readable: `~/.claude/projects/*/*.jsonl` and `~/.gemini`. So a claude cell can read the raw transcript of another cell. Item `isolation-home-transcripts-before-i4-enforce` closes this gap, and I-4 must not go to `enforce` before it.
 - A cycle that ran before X5 has no record in `.evolve/lineage/`, so it is in no lineage.
 - A source under a symlinked directory, or a file with a second hard link, is not an entry.
@@ -696,7 +697,7 @@ The sandbox today generates SBPL for `sandbox-exec` and an argv for `bwrap` from
 | Read of the own workspace (`.evolve/runs/cycle-N/`), except `<ws>/.bridge/` | allow | `(allow file-read* file-read-data (subpath "<ws>"))` after the runs deny | `--bind <ws> <ws>` after the `tmpfs` | I-5 | built (X5, §8.5) |
 | Read of `inputs/index.json` and each indexed path | allow | `(allow file-read* file-read-data (literal "<path>"))` for each entry | `--ro-bind-try <path> <path>` | I-4 | built (X5) |
 | Read of other files under `.evolve/runs/` | deny | `(deny file-read-data (subpath ".evolve/runs"))` before the literal grants | `--tmpfs .evolve/runs` | I-5 | built at `shadow` (X5) |
-| Read of raw output (`*-stdout.log`, `*-final-pane.txt`; the CLI transcripts in `$HOME` are open until X9, §8.5) | deny | `(deny file-read-data (require-all (subpath ".evolve/runs") (regex #"(-stdout\.log\|...)$")))` and a deny of `<ws>/.bridge/`, after the grants | `--ro-bind /dev/null <file>` for each raw file of the workspace, `--tmpfs <ws>/.bridge` | I-4 | built at `shadow` (X5); the logs stay in the workspace |
+| Read of raw output (`*-stdout.log`, `*-final-pane.txt`; the CLI transcripts in `$HOME` stay open, §8.5 and §11.1) | deny | `(deny file-read-data (require-all (subpath ".evolve/runs") (regex #"(-stdout\.log\|...)$")))` and a deny of `<ws>/.bridge/`, after the grants | `--ro-bind /dev/null <file>` for each raw file of the workspace, `--tmpfs <ws>/.bridge` | I-4 | built at `shadow` (X5); the logs stay in the workspace |
 | Read of the CLI's own config in `$HOME` | allow | `(allow file-read* (subpath "~/.<cli dir>"))` from manifest `home_reads` | `--ro-bind` | I-5 | allowed (all of `$HOME`) |
 | Read of secrets in `$HOME` | deny | `(deny file-read-data ...)` for `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.netrc`, `~/.config/gh`, `~/.docker/config.json`, `~/.kube`, and the dirs of the other families | `--tmpfs <dir>`, `--ro-bind /dev/null <file>` | I-5 | built at `shadow` for the listed secrets (X5); not the dirs of the other families |
 | Read of the rest of `$HOME` | deny at `enforce` | no grant | not bound | I-5 | allowed |
@@ -828,29 +829,92 @@ X6 is built. These parts landed:
 These parts stay open:
 
 - The seat defaults are compiled data, not policy keys. A policy cannot move the advisor seat yet. The router and the failure advisor already resolve through `cliroute` with their profiles; the seat default applies only when that route fails.
-- Row N13 is green. Rows M2 to M4 stayed open on the next gap, the tmux REPL fake of the harness. X1b (inbox item `isolation-matrix-tmux-repl-fake`) closes that gap, and the rows are green. Row M5 stays open on its tool capability (X9).
+- Row N13 is green. Rows M2 to M4 stayed open on the next gap, the tmux REPL fake of the harness. X1b (inbox item `isolation-matrix-tmux-repl-fake`) closes that gap, and the rows are green. Row M5 stays open on its tool capability (X19c, §11.1).
 - The tracked profiles of the floor agents and the router set `allowed_clis` to Claude families. Thus an agy-only table over the tracked profiles still refuses seven agents, even with `floors: {}`. The matrix uses its own profiles, so this limit does not show there. Inbox item `isolation-floor-profiles-allowed-clis-as-routing-data` owns it.
 - A `--bypass-policy` run ignores the declared table, `floors` included, so it keeps the compiled Claude floor. This is fail-closed (`TestBuild_ABypassRunKeepsTheCompiledFloorEvenWhenThePolicyDeclaresNone`).
 - `TestFlowCodeNamesNoFamily` matches exact string literals only. A built string (`"claude-" + x`), a prefix test, a name outside its list and a file in an exempt home pass it. Non-Go data is not scanned.
 
 ## 11. Manifest fields
 
-The manifests are `go/internal/bridge/manifests/*.json` (eight files). They have `binary`, `default_env`, `controls`, `transient_regex`, `token_line_regex`, `model_tier_map` and more (research F1.8). `env_passthrough` is built (X2), and `install_roots` is built (X4). The other new fields are proposed:
+The manifests are `go/internal/bridge/manifests/*.json` (eight files). They have `binary`, `default_env`, `controls`, `transient_regex`, `token_line_regex`, `model_tier_map` and more (research F1.8). `env_passthrough` is built (X2), and `install_roots` is built (X4). X9 builds the fields of the table below:
 
-| Field | Type | Example (`claude-tmux.json`) | Replaces |
-|---|---|---|---|
-| `env_passthrough` (built, X2) | list of names | `["CLAUDE_CONFIG_DIR", "HTTPS_PROXY"]` | the inherited environment (§6) |
-| `install_roots` (built, X4) | list of paths that start with `/` or `~/` | `["~/.local/share/claude/versions"]` | the one-file exec deny (§7.1) |
-| `home_reads` | list of `$HOME` paths | `["~/.claude", "~/.claude.json"]` | the read of all of `$HOME` (§9) |
-| `parsers` | map of output kind to format id | `{"usage": "claude-usage-v1", "pane": "claude-repl-v1"}` | `usageParsers` (`clicontrol/usage.go:41`), `Profiles` (`panestream/panedelta.go:31`), `DetectorFor` (`liveness.go:195`) |
-| `collectors` | map of metric to format id | `{"tokens": "claude-jsonl-v1"}` | `collectorFamilies` (`tokenusage/defaultresolver.go:35`) |
-| `transcript` | object: `path_glob`, `format` | `{"path_glob": "~/.claude/projects/*/*.jsonl", "format": "claude-jsonl-v1"}` | `WritesTranscript` (`attemptpostmortem/transcript.go:35`) |
-| `capabilities` | list of words | `["tools", "edit", "structured_output", "inprocess_subagents"]` | `toolless` and the `adapters/*.capabilities.json` files |
+| Field | Type | Example (`claude-tmux.json`) | Replaces | State |
+|---|---|---|---|---|
+| `env_passthrough` | list of names | `["CLAUDE_CONFIG_DIR", "HTTPS_PROXY"]` | the inherited environment (§6) | built (X2) |
+| `install_roots` | list of paths that start with `/` or `~/` | `["~/.local/share/claude/versions"]` | the one-file exec deny (§7.1) | built (X4) |
+| `parsers` | map of output kind to format id; the kind is `pane` | `{"pane": "claude-repl-v1"}` | the family keys of `panestream.Profiles` and the `switch` of `panestream.DetectorFor` | built (X9); the usage read is `controls.usage.windows` |
+| `collectors` | map of metric to format id; the metric is `tokens` | `{"tokens": "claude-jsonl-v1"}` | `collectorFamilies`, `isClaudeDriver` and `isAgyDriver` (`tokenusage/defaultresolver.go`) | built (X9) |
+| `transcript` | object: `format` | `{"format": "claude-jsonl-v1"}` | the name test of `KnownTranscriptFormat` (`attemptpostmortem/transcript.go`) | built (X9); `path_glob` stays proposed |
+| `capabilities` | list of words: `tools`, `edit` | `["tools", "edit"]` | `toolless` | built (X9); the `adapters/*.capabilities.json` files stay |
+| `context_window` | a number of tokens | `200000` | the family `switch` of `tokenusage.EffectiveWindow` | built (X9) |
+| `home_reads` | list of `~/` paths | `["~/.claude", "~/.claude.json"]` | the read of all of `$HOME` (§9) | the data is built (X9); the sandbox does not read it yet |
+
+The rules of the fields:
 
 - Go keeps one implementation for each format id. A manifest picks it by id. A new family with a known format needs no Go change.
 - A family with no collector shows the state `no_collector`, not a zero. A collector counts the tokens of the in-harness subagents too, or it flags them as not counted (§7.2).
-- The tables in `go/internal/llmroute/llmroute.go:21`, `:120` and `go/internal/modelquery/*` read the manifest.
+- The tables in `go/internal/llmroute/llmroute.go:21`, `:120` and `go/internal/modelquery/*` read the manifest (proposed; §11.1 lists them as open).
 - A manifest schema test fails on an unknown field or an unknown format id. It also refuses a `home_reads` entry that overlaps a secret path of §9, because the grants come after the denies.
+
+### 11.1 As built (X9)
+
+Each format id has one implementation in Go. The manifest names the id, and the pipeline passes the id to the implementation:
+
+| Format id | Field | Implementation |
+|---|---|---|
+| `claude-repl-v1`, `codex-repl-v1`, `agy-repl-v1`, `ollama-repl-v1` | `parsers.pane` | `panestream.Profiles` and the detector table of `panestream.DetectorFor` |
+| `claude-jsonl-v1` | `collectors.tokens`, `transcript.format` | the transcript chain of `tokenusage.Resolver` and `attemptpostmortem.ClaudeTranscript` |
+| `agy-conversation-v1` | `collectors.tokens` | `tokenusage.AgyConversationCollector` |
+
+The usage read needs no format id. Since #1158 it is the manifest data `controls.usage.windows`, which `quotastate.ReadWindows` reads. The legacy parsers of `clicontrol.ParseUsage` are keyed by the ids `claude-usage-v1` and `codex-usage-v1` now, and no production code calls them.
+
+The pipeline reads the manifest in three places:
+
+1. `paneProfileFor` (`bridge/tmux_pane_checks.go`) picks the pane profile from `parsers.pane`.
+2. `manifestTokenWindow` (`bridge/attempt_telemetry.go`) puts `collectors.tokens` and `context_window` into `tokenusage.Window`.
+3. `transcriptFormatOf` (`phases/runner/postmortem.go`) gives `transcript.format` to `attemptpostmortem.TranscriptFor`.
+
+Worked example: matrix row N14 (`TestIsolationMatrix_N14_ANewManifestWithKnownFormatIDsNeedsNoGoChange`) writes a manifest for the family `newfam-tmux` into the manifest directory. The manifest names `claude-repl-v1` and `claude-jsonl-v1`, and it declares one usage window. With no Go change, the bridge loads it, picks the Claude pane profile and reads the usage window. It also reads the token collector, the window and the tool capability from it.
+
+The state `no_collector`:
+
+- If the manifest names no token collector and no other source has usage, `tokenusage.Resolver` returns the source `no_collector` and the fill `-1`. The LLM call record keeps that source.
+- `clicontrol.ParseUsage` returns the state `no_collector` for a format id with no parser.
+- `evolve clihealth usage` prints `no_collector` for a family whose manifest has no usage command or no `controls.usage.windows`.
+- A manifest with no `capabilities` key loads, but the bridge prints a line on stderr: the driver has no tool use. A manifest written before X9, for example a full copy that `evolve bridge add-rule` wrote, thus shows its missing fields.
+
+The checks:
+
+- `parseManifest` refuses an unknown kind, an unknown format id and an unknown capability. It also refuses a `home_reads` entry outside `~/`, the entry `~/.`, an entry over a secret path in any case, and a negative `context_window`.
+- `TestEmbeddedManifests_DecodeStrictlyAndNameOnlyKnownFormatIDs` decodes each embedded manifest and refuses an unknown field. It found the key `_note` in `codex-tmux.json`, so that key is now `note` in `ParamSpec`.
+- The guard `TestParserPackagesNameNoFamily` (`internal/guards`) reads the string literals of `panestream`, `clicontrol`, `tokenusage` and `attemptpostmortem`. It fails on a family name, or a family prefix such as `"claude-"`. On `origin/main` at `b7d54a934` (2026-10-27), `TestFlowCodeNamesNoFamily` and `TestParserPackagesNameNoFamily` together reported 28 literals. `TestFlowCodeNamesNoFamily` no longer exempts `tokenusage` and `attemptpostmortem`.
+
+The decisions:
+
+| Id | Decision | Because | Rejected options and why |
+|---|---|---|---|
+| X9-D1 | The runtime decode keeps unknown fields legal; the schema test refuses them for the embedded manifests. | An operator overlay in `.evolve/bridge-manifests` with an old key must still load. | A strict runtime decode: one stale key stops each launch of that driver. |
+| X9-D2 | The bridge, not `tokenusage`, maps a driver to its collector. | `tokenusage` cannot import `bridge`, and an overlay manifest must count. | A second embedded copy of the manifests in a leaf package: an overlay is then not seen. |
+| X9-D3 | The context window is the manifest field `context_window`. | `tokenusage.EffectiveWindow` was a family `switch`; the window is data of the driver. | Keep the switch: the guard of X9 fails on it. |
+
+Behavior changes:
+
+- A driver name must match a manifest exactly. A name in mixed case, such as `CLAUDE-TMUX`, has no manifest, so it has no collector and no tripwire. The router never makes such a name.
+- An empty CLI was the Claude default in `tokenusage` and `attemptpostmortem`. `ValidateRequest` refuses an empty CLI before a launch, so that default was unused.
+
+The transcripts in `$HOME`:
+
+- The pipeline reads the CLI transcripts, and the cell does not need them. `tokenusage` reads `~/.claude/projects` in the bridge process, and `attemptpostmortem` reads the transcript in the runner.
+- The cell can still read the transcripts, because the sandbox grants all of `$HOME` except the secrets of §9. X9 adds the `home_reads` data for that deny. Item `isolation-home-transcripts-before-i4-enforce` builds the deny, and I-4 and I-5 must not go to `enforce` before it.
+
+Open parts:
+
+- The tables `cliBinaryFor` and `interactiveDriverFor` (`llmroute/llmroute.go`) and the family keys of `modelquery` still copy manifest data. Item `isolation-x9b-route-and-model-tables-from-manifests` owns them.
+- No collector counts the tokens of the in-harness subagents or flags them as not counted (the rule of §11).
+- No code reads the capability `edit` yet; X19c reads it. The `adapters/*.capabilities.json` files are a second source of capabilities.
+- `home_reads` does not refuse the directory of another family yet. The deny item adds that check before it uses the field.
+- `evolve bridge add-rule` writes a full copy of the manifest, not a merge patch.
+- Row M5 stays open. An `ollama-tmux` cell has no `tools` capability, so it cannot run the edit seats of a cycle. Only the capability routing of X19c can give those seats to another driver, so X19c closes M5.
 
 ## 12. Typed flow decisions
 
@@ -983,7 +1047,7 @@ The subagent conformance tests (`go/internal/subagent/conformance_test.go`) take
 | M2 | `agy` (`agy`) | all | X1b (a fake `tmux`; X6 removed the floor) | green |
 | M3 | `agy-claude` (`agy-claude-tmux`) | all | X1b | green |
 | M4 | `codex` (`codex`) | all | X1b | green |
-| M5 | `ollama` (`ollama-tmux`) | the seats that its `capabilities` allow | X9 | open |
+| M5 | `ollama` (`ollama-tmux`) | the seats that its `capabilities` allow | X19c | open |
 
 The stub for each family declares the same capabilities as the real manifest. The matrix proves that the pipeline has no family dependency. It does not prove that a real model can do the work.
 
@@ -991,7 +1055,7 @@ The stub for each family declares the same capabilities as the real manifest. Th
 
 | Row | Check | Invariant | Turned green by | Owner test | State at X1 |
 |---|---|---|---|---|---|
-| N1 | `CLAUDECODE=1` on the parent does not reach any seat | I-2 | X2 | the matrix (M1 run, policy `isolation.i2.stage=enforce`) | green (X2) |
+| N1 | `CLAUDECODE=1`, `EVOLVE_SANDBOX` and `EVOLVE_BYPASS_SHIP_GATE` on the parent do not reach any seat | I-2 | X2 | the matrix (M1 run, policy `isolation.i2.stage=enforce`) | green (X2) |
 | N2 | the AST guard finds no LLM spawn outside the bridge launch API | I-1 | X3 | `internal/sysexec` | green (X3) |
 | N3 | a phase pane cannot exec `claude --version` | I-3 | X4 | sandbox contract | green (X4) |
 | N4 | `evolve agent run` in a cell with the env markers stripped is refused at `enforce` (darwin only) | I-3 | X4 | the sandbox contract | green (X4) |
@@ -1004,7 +1068,7 @@ The stub for each family declares the same capabilities as the real manifest. Th
 | N11 | `guard phase` allows an in-cell `Task` and denies an out-of-cell phase-persona `Task` during a cycle | I-7 | X7 | `internal/guards` | green (X7) |
 | N12 | a judge verdict in prose with no file fails the contract | I-8 | X8 | `internal/core` | green (X8, at `enforce`) |
 | N13 | the grep guard finds no family string in flow code | I-6 | X6 | `internal/core` | green |
-| N14 | a new manifest with known format ids needs no Go change | I-6 | X9 | `internal/bridge` | open |
+| N14 | a new manifest with known format ids needs no Go change | I-6 | X9 | `internal/bridge` | green (X9) |
 | N15 | a cell lists its `inputs/index.json` and opens a required entry through `evolve context index` and `evolve context open` | I-4 | CX2 ([cell-context-index.md](cell-context-index.md)) | the matrix (M1 run) | green (CX2) |
 | N16 | an open of an indexed path writes one access record that names its entry | I-4 | CX3 | sandbox contract | green (CX3) |
 | N17 | a cell cannot write the access log `.evolve/context-access/` | I-4 | CX3 | sandbox contract | green (CX3) |
@@ -1402,8 +1466,8 @@ The operator said on 2026-10-25: "this refactory is also the good timing to remo
 
 ### Issue
 
-- `buildCycleEnv` copies each `EVOLVE_*` variable of the operator shell into the cycle (`go/cmd/evolve/cmd_loop_args.go:341-352`).
-- The review of #1122 (H2) found that the first X2 build passed each `EVOLVE_*` and `BRIDGE_*` name. At `enforce` the merged X2 passes only `pipelineEnvMarkers` (§6.1). At the default `shadow` each name still reaches the child, and `buildCycleEnv` still copies each `EVOLVE_*` name into the cycle.
+- Before X18b, `buildCycleEnv` copied each `EVOLVE_*` variable of the operator shell into the cycle (`go/cmd/evolve/cmd_loop_args.go:341-352` on `603389ebd`).
+- The review of #1122 (H2) found that the first X2 build passed each `EVOLVE_*` and `BRIDGE_*` name. At `enforce` the merged X2 passed only its own marker list (§6.1). Before X18b, at the default `shadow` each name reached the child, and `buildCycleEnv` copied each `EVOLVE_*` name into the cycle.
 - So each knob and each bypass reaches each LLM child (F5.5). `EVOLVE_SANDBOX`, which §7 refuses in a phase, is one of them.
 - `policy.Parse` ignores an unknown key (`go/internal/policy/patch.go:9-21`), so a knob that moves into the policy file needs a strict decode first (F5.4).
 - The registry has 26 rows, but the header of control-flags.md says 35, and many readers are not in the registry (F5.1, F5.3).
@@ -1418,7 +1482,7 @@ A deny list in the bridge cannot keep up with new names, which is the same reaso
 
 | Class | Count | Fix | Item |
 |---|---|---|---|
-| (a) pipeline markers | 23 `EVOLVE_*`, 9 `BRIDGE_*` | one named Go list, for example `ipcenv.Markers()`. It is the only source of `EVOLVE_*` and `BRIDGE_*` names in a cell. It grows from `pipelineEnvMarkers` of X2. `buildCycleEnv` copies only these names. | X18b |
+| (a) pipeline markers | 24 `EVOLVE_*`, 9 `BRIDGE_*` | one named Go list, `ipcenv.Markers()` (built). It is the only source of `EVOLVE_*` and `BRIDGE_*` names in a cell. It grew from the bridge list of X2. | X18b |
 | (b) operator knobs | 18 | move into `.evolve/policy.json`, strict-decoded. The pipeline reads them at each cycle or boundary. One wave of shadow: an environment value that differs from the policy value prints a WARN and loses. | X18c |
 | (c) bypasses | 10 | an explicit CLI parameter that writes a ledger record and a `CONTROL_BYPASS_USED` signal, or removal | X18d |
 | (d) dead names | 6 | delete, with the registry rows | X18e |
@@ -1433,14 +1497,22 @@ X18a and X18b go first, in either order. X18c to X18e follow X18b, and X18c also
    - The loop refuses to start on a refused policy: the `cli-routing` preflight check halts and names the key (`TestLoopPreflight_AnUnknownPolicyKeyRefusesTheLoopStart`). The loop keeps no last-known-good copy. A boundary rebuild and a preflight run before each batch, and the plane policy changes only at a boundary.
    - A best-effort reader that runs mid-wave calls `policy.LoadOrDefaults`. It prints one `[policy] WARN` line and uses the compiled defaults, but each safety floor fails closed to `enforce`. 20 former silent readers use it, and the docs floor of the build handoff uses it too. The five readers under `internal/bridge` and `internal/adapters/bridge` still drop the error, because builders X3 and X4 change that code now; item `control-flags-bridge-policy-readers` moves them.
    - Rollout: a strict binary refuses a key that a newer PR adds, as the `floors` key of X6 did. At the boundary, rebuild the plane binary (`make -C <plane>/go build`) before the next `wave next`. `wave next` names that remedy when it meets `ErrUnknownKey`. Each PR that adds a policy key must add the schema field in the same PR.
-2. **X18b** adds the marker list and closes the `buildCycleEnv` leak. It adds the AST guard `TestNoControlFlagReadOutsideTheMarkerList`:
-   - It walks each non-test Go file and finds each `os.Getenv`, `os.LookupEnv` and `envchain` read.
-   - It resolves constant concatenations such as `"EVOLVE_"+"RESUME"`.
-   - It allows a name in the marker list, a knob that is not yet moved, or an outside name (`HOME`, `PATH`, `TMUX`, `CI`, `CLAUDE_CODE_*`).
-   - It fails on each other name. The list of knobs not yet moved can only shrink.
+2. **X18b** (built) adds the marker list and closes the `buildCycleEnv` leak.
+   - `ipcenv.Markers()` (`go/internal/ipcenv/markers.go`) has the 33 markers. `ipcenv.CellMarkers()` is the part that reaches an LLM cell, and the bridge reads it.
+   - `ipcenv.UnmovedControls()` has the 29 names and patterns of classes (b) and (c) that X18c and X18d have not moved. `ipcenv.Carried` accepts a marker or one of these.
+   - `buildCycleEnv` of `evolve loop` and the request of `evolve cycle run` copy only the `EVOLVE_*` names that `Carried` accepts (`carriedEnv`). No `BRIDGE_*` name of the shell reaches the cycle. `EVOLVE_BYPASS_SHIP_GATE` and each dead name stay out (`TestBuildCycleEnv_CarriesOnlyTheMarkersAndTheControlsNotYetMoved`). The class (b) knobs still reach the cycle, so X18b changes no knob.
+   - Row N1 of the matrix sets `EVOLVE_SANDBOX` and `EVOLVE_BYPASS_SHIP_GATE` on the parent. At `enforce` no seat gets them, and at `shadow` the row fails.
+   - It adds the AST guard `TestNoControlFlagReadOutsideTheMarkerList` (`go/internal/guards/control_flags_test.go`):
+     - It walks each non-test Go file and finds each `os.Getenv`, `os.LookupEnv` and `envchain` read. A function that passes its parameter to such a read is a reader too. An index of a map whose name contains `env` is a read.
+     - It resolves constant concatenations such as `"EVOLVE_"+"RESUME"`, also through a constant of another package.
+     - It judges only the `EVOLVE_*` and `BRIDGE_*` names, so an outside name (`HOME`, `PATH`, `TMUX`, `CI`, `CLAUDE_CODE_*`) needs no list. It allows a marker and a control that is not yet moved. X18b also allowed the test seams of class (e), and X18e removed that allowance.
+     - It fails on each other name, and on a declared control that no code reads. `TestControlFlagLists_OnlyShrink` holds the ceiling, so the list can only shrink.
 3. **X18c** moves the 18 knobs. Each knob that duplicates a policy key (for example, `EVOLVE_MANDATORY_PHASES` and `mandatory_phases`) keeps the policy key.
 4. **X18d** turns each bypass into a parameter or removes it. `EVOLVE_OPERATOR_CONFIRM` already has the `-operator` flag as its primary surface.
-5. **X18e** deletes the dead names and moves the test seams.
+5. **X18e** (built) deletes the dead names and moves the test seams.
+   - The dead names, their 5 registry rows, their writers and the persona text that named them are gone.
+   - A test of the bridge sets `Deps.Binaries`. An E2E test puts the fake CLI first on `PATH`, and its project holds the `agents/` personas. The layout takes each directory from the project and plugin roots, and `evolve commit-gate run` reads no test switch.
+   - `TestRemovedControlNames_HaveNoProductionRead` and `TestFlagRegistryRows_EachHasAProductionReader` (`go/internal/guards/control_flags_test.go`) keep both classes empty.
 
 When X18 is done, `evolve flags generate` prints only the marker list and the outside list. control-flags.md then describes the markers, and the knobs are in [runtime-reference.md](../operations/runtime-reference.md) as policy keys.
 
@@ -1496,9 +1568,9 @@ I-6 says that flow logic names no family. It does not say what the assignment ho
 | system-prompt delivery | the driver |
 | environment passthrough | the manifest `env_passthrough` (proposed, X2) |
 | dialog auto-responses | the manifest `interactive_prompts` |
-| output, transcript and usage parsing | the manifest `parsers`, `collectors`, `transcript` (proposed, X9) |
+| output, transcript and usage parsing | the manifest `parsers`, `collectors`, `transcript` (built, X9) |
 
-**Capability negotiation.** Each driver declares its capabilities in the manifest `capabilities` field (proposed, X9): tools, structured output, sandbox support and context size. A profile names the capabilities that its seat needs, for example `["edit", "shell"]`. The router keeps only the drivers that have each needed capability. When no driver in the chain has them, the router refuses the seat with a routing error. It never downgrades in silence.
+**Capability negotiation.** Each driver declares its capabilities in the manifest `capabilities` field (X9 built `tools` and `edit`): tools, structured output, sandbox support and context size. A profile names the capabilities that its seat needs, for example `["edit", "shell"]`. The router keeps only the drivers that have each needed capability. When no driver in the chain has them, the router refuses the seat with a routing error. It never downgrades in silence.
 
 **What stays in a profile.** A family preference list is routing data, so it stays, or moves into `cli_routing` (X6b). The profile keeps the role, the output, the tier, the budgets, the needed capabilities and the sandbox intents.
 

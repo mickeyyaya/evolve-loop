@@ -1,6 +1,6 @@
 # Plan: tests and gates that keep the latency fixes in place
 
-- **Status:** proposed, 2026-10-20.
+- **Status:** proposed, 2026-10-20. Each component of §6 has an inbox item since 2026-10-27.
 - **Research:** [latency-gates-2026-10](../research/latency-gates-2026-10.md). **Decision:** [ADR-0144](../architecture/adr/0144-latency-is-gated-by-invariants-at-merge-and-by-trends-on-main.md).
 - **Related:** [wave-latency-2026-10](wave-latency-2026-10.md), [ci-wall-time-2026-10](ci-wall-time-2026-10.md).
 
@@ -118,17 +118,19 @@ These gates watch a trend and file an item. They never block a merge (G4, G12).
 
 ## 6. Components and order
 
-| # | Component | Home | Route |
-|---|---|---|---|
-| T1 | The workflow tests of #988 | `go/internal/repocontract` or a new `ciworkflow` test | lane |
-| T2 | The wave simulation of §3.1 | `go/internal/fleet`, `go/internal/orchestrator` tests | lane |
-| T3 | The W1 property test, the W5 count test, the W4 fixtures | with each PR's package | the PR owner |
-| T4 | The duration ratchet: `go/.test-latency.json`, the class and `tighten` on the existing flags, and the CI step | `go/cmd/testlatency`, `.github/workflows/go.yml` | console |
-| T5 | `evolve ci latency check`: the CI trend gate of §4.1, run at each boundary, files items | `go/cmd/evolve`, a new `internal/citrend` | lane |
-| T6 | `evolve wave latency --check` and `LATENCY_BUDGET_EXCEEDED` (§4.3), after W0 | `go/internal/wavemeasure`, `go/internal/lanetime`, `go/cmd/evolve` | console |
-| T7 | The boundary runs T5 and T6 | `evolve wave next` steps | console |
+| # | Component | Home | Route | Inbox item |
+|---|---|---|---|---|
+| T1 | The workflow tests of #988 | `go/internal/repocontract` or a new `ciworkflow` test | lane | `latency-gates-t1-ci-concurrency-tests` |
+| T2 | The wave simulation of §3.1 | `go/internal/fleet`, `go/internal/orchestrator` tests | lane | `latency-gates-t2-wave-simulation` |
+| T3 | The W1 property test, the W5 count test, the W4 fixtures | with each PR's package | the PR owner | `latency-gates-t3-wave-fix-proofs` |
+| T4 | The duration ratchet: `go/.test-latency.json`, the class and `tighten` on the existing flags, and the CI step | `go/cmd/testlatency`, `.github/workflows/go.yml` | console | `latency-gates-t4-duration-ratchet` |
+| T5 | `evolve ci latency check`: the CI trend gate of §4.1, run at each boundary, files items | `go/cmd/evolve`, a new `internal/citrend` | lane | `latency-gates-t5-ci-trend-gate` |
+| T6 | `evolve wave latency --check` and `LATENCY_BUDGET_EXCEEDED` (§4.3), after W0 | `go/internal/wavemeasure`, `go/internal/lanetime`, `go/cmd/evolve` | console | `latency-gates-t6-wave-latency-check` |
+| T7 | The boundary runs T5 and T6 | `evolve wave next` steps | console | `latency-gates-t7-boundary-runs-checks` |
 
 T1, T2 and T3 come first, because they protect the fixes that are already live. T5 and T6 both change `go/cmd/evolve`, so T6 starts after T5 merges.
+
+The plan audit of 2026-10-27 filed one inbox item for each component, and each item is `lane`. T4, T6 and T7 touch no gate file, so admission decides. The test of T1 extends `go/internal/ciparity`, which holds the workflow tests now. The W1 property test of T3 is on `main` (`go/internal/admission/optimistic_test.go`). The T3 item checks the W5 and W4 proofs.
 
 ## 7. Limits
 

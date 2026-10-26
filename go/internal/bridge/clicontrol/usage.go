@@ -14,17 +14,25 @@ type Window struct {
 	ResetHint   string
 }
 
+type UsageState string
+
+const (
+	UsageParsed      UsageState = "parsed"
+	UsageUnparsed    UsageState = "unparsed"
+	UsageNoCollector UsageState = "no_collector"
+)
+
 type Usage struct {
 	Family  string
 	Windows []Window
-	Parsed  bool
+	State   UsageState
 	Raw     string
 }
 
 const unknownPercentLeft = -1
 
 func (u Usage) MinPercentLeft() int {
-	if !u.Parsed || len(u.Windows) == 0 {
+	if u.State != UsageParsed || len(u.Windows) == 0 {
 		return unknownPercentLeft
 	}
 	min := u.Windows[0].PercentLeft
@@ -38,9 +46,14 @@ func (u Usage) MinPercentLeft() int {
 
 type UsageParser func(pane string) (windows []Window, ok bool)
 
+const (
+	FormatClaudeUsage = "claude-usage-v1"
+	FormatCodexUsage  = "codex-usage-v1"
+)
+
 var usageParsers = map[string]UsageParser{
-	"codex":  parseCodexUsage,
-	"claude": parseClaudeUsage,
+	FormatCodexUsage:  parseCodexUsage,
+	FormatClaudeUsage: parseClaudeUsage,
 }
 
 var codexUsageLine = regexp.MustCompile(`([A-Za-z0-9.\- ]*?limit):\s*(?:\[[^\]]*\]\s*)?(\d{1,3})%\s*left\s*(\([^)]*\))?`)
@@ -79,21 +92,22 @@ func parseClaudeUsage(pane string) ([]Window, bool) {
 	}}, true
 }
 
-func ParseUsage(family, pane string) (Usage, bool) {
-	u := Usage{Family: family, Raw: pane}
-	parse, ok := usageParsers[family]
+func ParseUsage(format, pane string) (Usage, bool) {
+	u := Usage{Raw: pane, State: UsageNoCollector}
+	parse, ok := usageParsers[format]
 	if !ok {
 		return u, false
 	}
 	windows, ok := parse(pane)
 	if !ok {
+		u.State = UsageUnparsed
 		return u, false
 	}
-	u.Windows, u.Parsed = windows, true
+	u.Windows, u.State = windows, UsageParsed
 	return u, true
 }
 
-func QueryUsage(ctx context.Context, ctrl Controller, family string) (Usage, error) {
+func QueryUsage(ctx context.Context, ctrl Controller, family, format string) (Usage, error) {
 	if ctrl == nil {
 		return Usage{Family: family}, fmt.Errorf("clicontrol: QueryUsage requires a Controller")
 	}
@@ -101,6 +115,7 @@ func QueryUsage(ctx context.Context, ctrl Controller, family string) (Usage, err
 	if err != nil {
 		return Usage{Family: family}, err
 	}
-	u, _ := ParseUsage(family, resp.Pane)
+	u, _ := ParseUsage(format, resp.Pane)
+	u.Family = family
 	return u, nil
 }

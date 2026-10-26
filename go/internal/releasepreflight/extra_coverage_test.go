@@ -328,7 +328,7 @@ func TestCheckRecentAudit_NoVerdictStrict(t *testing.T) {
 	}
 	ledger := writeLedger(t, auditEntry(art, time.Now().UTC().Format(time.RFC3339)))
 	_, err := checkRecentAudit(ledger, "", true, time.Now())
-	fixtures.RequireErrContains(t, err, "STRICT_PASS")
+	fixtures.RequireErrContains(t, err, "--strict-pass")
 }
 
 func TestCheckRecentAudit_UnparseableTS(t *testing.T) {

@@ -18,8 +18,9 @@ import (
 type Source string
 
 const (
-	SourceNone       Source = "none"
-	SourceTranscript Source = "transcript"
+	SourceNone        Source = "none"
+	SourceTranscript  Source = "transcript"
+	SourceNoCollector Source = "no_collector"
 )
 
 type Window struct {
@@ -28,6 +29,8 @@ type Window struct {
 	EventsLogPath  string
 	Scrollback     string
 	Driver         string
+	Collector      string
+	ContextWindow  int
 	TokenLineRegex string
 	Start          time.Time
 	End            time.Time

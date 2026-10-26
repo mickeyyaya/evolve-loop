@@ -27,12 +27,6 @@ const (
 
 var baseEnvNames = []string{"PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "TERM", "TMPDIR", "TMP", "TEMP", "TZ"}
 
-var pipelineEnvMarkers = []string{
-	"EVOLVE_PROJECT_ROOT", ipcenv.WorktreeRootKey, ipcenv.CycleStateFileKey, ipcenv.TmuxSocketKey,
-	ipcenv.FleetKey, ipcenv.FleetScopeKey, ipcenv.FleetWidthKey, ipcenv.FleetReachHolderKey,
-	ipcenv.DispatchDepthKey, ipcenv.PhaseKey,
-}
-
 var envOptIns = map[string]string{
 	"BRIDGE_ALLOW_ANTHROPIC_BASE_URL": "ANTHROPIC_BASE_URL",
 	"BRIDGE_ALLOW_OPENAI_API_KEY":     "OPENAI_API_KEY",
@@ -63,11 +57,12 @@ func (l *EnvDropLog) firstSeen(family string, names []string) []string {
 }
 
 func allowedEnvName(passthrough []string) func(string) bool {
+	cellMarkers := ipcenv.CellMarkers()
 	return func(name string) bool {
 		if !isShellIdentifier(name) {
 			return false
 		}
-		return slices.Contains(baseEnvNames, name) || strings.HasPrefix(name, "LC_") || slices.Contains(pipelineEnvMarkers, name) || slices.Contains(passthrough, name)
+		return slices.Contains(baseEnvNames, name) || strings.HasPrefix(name, "LC_") || slices.Contains(cellMarkers, name) || slices.Contains(passthrough, name)
 	}
 }
 
@@ -76,8 +71,9 @@ func hermeticEnv(parent, passthrough []string, cliEnv, pipeline map[string]strin
 	if set == nil {
 		set = map[string]string{}
 	}
+	cellMarkers := ipcenv.CellMarkers()
 	for k, v := range pipeline {
-		if slices.Contains(pipelineEnvMarkers, k) {
+		if slices.Contains(cellMarkers, k) {
 			set[k] = v
 		}
 	}

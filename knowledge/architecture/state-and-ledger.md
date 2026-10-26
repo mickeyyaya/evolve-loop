@@ -180,8 +180,7 @@ before the budget is exhausted). Resume is `core/resume.go`:
   **worktree still exists**, then returns a `ResumePoint`.
 - `RunCycleFromPhase` replays from `resumeFromPhase` onward. Critically, it does
   **not** increment `LastCycleNumber` (it operates on the cycle already in flight)
-  and does **not** re-acquire the lock (the checkpoint was written under lock). It
-  sets `EVOLVE_RESUME_MODE=1` in the env overlay.
+  and does **not** re-acquire the lock (the checkpoint was written under lock).
 
 **Why HEAD validation:** resuming a cycle whose audit was bound to an older tree
 would let stale work ship. The checkpoint pins the tree it paused on; if `main`

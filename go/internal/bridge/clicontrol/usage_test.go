@@ -22,12 +22,12 @@ const realClaudeUsagePane = `▝▜██████▀  Opus 5 (1M context) wi
 You've used 97% of your weekly limit · resets Aug 30 at 9pm (Asia/Taipei)`
 
 func TestParseUsage_Codex_ReadsRemainingNotConsumed(t *testing.T) {
-	u, ok := ParseUsage("codex", realCodexStatusPane)
+	u, ok := ParseUsage(FormatCodexUsage, realCodexStatusPane)
 	if !ok {
 		t.Fatalf("codex pane did not parse: %+v", u)
 	}
-	if u.Family != "codex" {
-		t.Errorf("Family = %q, want codex", u.Family)
+	if u.State != UsageParsed {
+		t.Errorf("State = %q, want %q", u.State, UsageParsed)
 	}
 	if len(u.Windows) != 3 {
 		t.Fatalf("got %d windows %+v, want 3 (weekly, 5h, weekly)", len(u.Windows), u.Windows)
@@ -52,7 +52,7 @@ func TestParseUsage_Codex_ReadsRemainingNotConsumed(t *testing.T) {
 }
 
 func TestParseUsage_Claude_InvertsConsumedToRemaining(t *testing.T) {
-	u, ok := ParseUsage("claude", realClaudeUsagePane)
+	u, ok := ParseUsage(FormatClaudeUsage, realClaudeUsagePane)
 	if !ok {
 		t.Fatalf("claude pane did not parse: %+v", u)
 	}
@@ -69,11 +69,13 @@ func TestParseUsage_Claude_InvertsConsumedToRemaining(t *testing.T) {
 
 func TestParseUsage_UnrecognisedPaneIsHonestlyUnparsed(t *testing.T) {
 	for _, tc := range []struct{ family, pane string }{
-		{"codex", "some future redesign with no percentages at all"},
-		{"claude", "Welcome back!"},
-		{"agy", "Antigravity CLI 1.1.22"},
+		{FormatCodexUsage, "some future redesign with no percentages at all"},
+		{FormatClaudeUsage, "Welcome back!"},
 	} {
 		u, ok := ParseUsage(tc.family, tc.pane)
+		if u.State != UsageUnparsed {
+			t.Errorf("%s: State = %q, want %q", tc.family, u.State, UsageUnparsed)
+		}
 		if ok {
 			t.Errorf("%s: unrecognised pane reported as parsed: %+v", tc.family, u)
 		}
@@ -86,13 +88,16 @@ func TestParseUsage_UnrecognisedPaneIsHonestlyUnparsed(t *testing.T) {
 	}
 }
 
-func TestParseUsage_UnknownFamilyIsUnparsedNotZero(t *testing.T) {
-	u, ok := ParseUsage("ollama", "NAME  ID  SIZE")
-	if ok {
-		t.Errorf("ollama has no usage surface; want not-parsed, got %+v", u)
-	}
-	if u.MinPercentLeft() != -1 {
-		t.Errorf("MinPercentLeft on an unparsed Usage = %d, want -1 (unknown), never 0 (exhausted)", u.MinPercentLeft())
+func TestParseUsage_AFamilyWithNoUsageParserIsNoCollectorNotZero(t *testing.T) {
+	var want UsageState = UsageNoCollector
+	for _, format := range []string{"", "newfam-usage-v9"} {
+		u, ok := ParseUsage(format, "You've used 40% of your weekly limit")
+		if ok || u.State != want {
+			t.Errorf("format %q has no parser; want state %q and not parsed, got %+v", format, UsageNoCollector, u)
+		}
+		if u.MinPercentLeft() != -1 {
+			t.Errorf("MinPercentLeft with no collector = %d, want -1 (unknown), never 0 (exhausted)", u.MinPercentLeft())
+		}
 	}
 }
 
@@ -113,7 +118,7 @@ func (f *fakeController) Do(_ context.Context, family string, ev Event) (Respons
 
 func TestQueryUsage_AsksTheAbstractEventNotACommand(t *testing.T) {
 	ctrl := &fakeController{pane: realCodexStatusPane}
-	u, err := QueryUsage(context.Background(), ctrl, "codex")
+	u, err := QueryUsage(context.Background(), ctrl, "codex", FormatCodexUsage)
 	if err != nil {
 		t.Fatalf("QueryUsage: %v", err)
 	}
@@ -130,7 +135,7 @@ func TestQueryUsage_AsksTheAbstractEventNotACommand(t *testing.T) {
 
 func TestQueryUsage_PropagatesUnsupportedForFamiliesWithoutTheControl(t *testing.T) {
 	ctrl := &fakeController{err: ErrUnsupported}
-	_, err := QueryUsage(context.Background(), ctrl, "ollama")
+	_, err := QueryUsage(context.Background(), ctrl, "ollama", "")
 	if !errors.Is(err, ErrUnsupported) {
 		t.Fatalf("err = %v, want ErrUnsupported so callers can branch on it", err)
 	}
@@ -138,12 +143,12 @@ func TestQueryUsage_PropagatesUnsupportedForFamiliesWithoutTheControl(t *testing
 
 func TestQueryUsage_UnreadablePaneIsNotAnError(t *testing.T) {
 	ctrl := &fakeController{pane: "totally unfamiliar output"}
-	u, err := QueryUsage(context.Background(), ctrl, "codex")
+	u, err := QueryUsage(context.Background(), ctrl, "codex", FormatCodexUsage)
 	if err != nil {
 		t.Fatalf("an unreadable pane must not be an error: %v", err)
 	}
-	if u.Parsed {
-		t.Error("Parsed = true on unfamiliar output")
+	if u.State != UsageUnparsed || u.Family != "codex" {
+		t.Errorf("unfamiliar output: State = %q, Family = %q; want %q for codex", u.State, u.Family, UsageUnparsed)
 	}
 	if u.Raw == "" {
 		t.Error("Raw pane dropped — the operator loses the only evidence of what was actually shown")
@@ -170,12 +175,12 @@ func TestUsage_MinPercentLeftPicksTheTightestWindow(t *testing.T) {
 		in   Usage
 		want int
 	}{
-		{"tightest is last", Usage{Parsed: true, Windows: []Window{{Name: "weekly", PercentLeft: 80}, {Name: "5h", PercentLeft: 12}}}, 12},
-		{"tightest is first", Usage{Parsed: true, Windows: []Window{{Name: "5h", PercentLeft: 4}, {Name: "weekly", PercentLeft: 91}}}, 4},
-		{"single window", Usage{Parsed: true, Windows: []Window{{Name: "weekly", PercentLeft: 55}}}, 55},
-		{"genuinely exhausted is 0, not unknown", Usage{Parsed: true, Windows: []Window{{Name: "weekly", PercentLeft: 0}}}, 0},
-		{"unparsed is unknown", Usage{Parsed: false}, -1},
-		{"parsed but windowless is unknown", Usage{Parsed: true}, -1},
+		{"tightest is last", Usage{State: UsageParsed, Windows: []Window{{Name: "weekly", PercentLeft: 80}, {Name: "5h", PercentLeft: 12}}}, 12},
+		{"tightest is first", Usage{State: UsageParsed, Windows: []Window{{Name: "5h", PercentLeft: 4}, {Name: "weekly", PercentLeft: 91}}}, 4},
+		{"single window", Usage{State: UsageParsed, Windows: []Window{{Name: "weekly", PercentLeft: 55}}}, 55},
+		{"genuinely exhausted is 0, not unknown", Usage{State: UsageParsed, Windows: []Window{{Name: "weekly", PercentLeft: 0}}}, 0},
+		{"unparsed is unknown", Usage{State: UsageUnparsed}, -1},
+		{"parsed but windowless is unknown", Usage{State: UsageParsed}, -1},
 	} {
 		if got := tc.in.MinPercentLeft(); got != tc.want {
 			t.Errorf("%s: MinPercentLeft = %d, want %d", tc.name, got, tc.want)
@@ -197,9 +202,16 @@ func TestUsageParser_RegistryShapeIsStable(t *testing.T) {
 	if _, ok := p(""); ok {
 		t.Error("a parser returning no windows must report ok=false")
 	}
-	for family, parser := range usageParsers {
+	for format, parser := range usageParsers {
 		if parser == nil {
-			t.Errorf("family %q has a nil parser registered", family)
+			t.Errorf("format %q has a nil parser registered", format)
 		}
+	}
+}
+
+func TestQueryUsage_ANilControllerIsAnErrorThatKeepsTheFamily(t *testing.T) {
+	u, err := QueryUsage(context.Background(), nil, "codex", FormatCodexUsage)
+	if err == nil || !strings.Contains(err.Error(), "requires a Controller") || u.Family != "codex" {
+		t.Fatalf("QueryUsage(nil) = %+v, %v; want the Controller error with the family kept", u, err)
 	}
 }

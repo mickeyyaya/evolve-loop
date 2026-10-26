@@ -3,6 +3,8 @@
 **Status:** live · **Code:** `go/internal/core/contract_escalation.go`, `go/internal/core/cyclerun_review.go`
 · **Tests:** `go/internal/core/contract_escalation_test.go`, `go/acs/cycle1291/predicates_test.go`
 
+**Retry ladder:** at `workflow.retry_ladder.stage` `enforce`, the retry ladder replaces this escalation and the same-CLI salvage retry ([retry-ladder §5](retry-ladder.md#5-where-the-ladder-runs)). At `shadow`, this escalation runs as before. The escalation step is `escalateContractCLI` in `go/internal/core/cyclerun_correction.go`.
+
 ## The defect this closes
 
 The correction ladder in `reviewAndGuard` re-dispatched the **same** profile CLI after a

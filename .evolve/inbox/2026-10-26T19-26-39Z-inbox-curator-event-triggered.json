@@ -1,0 +1,30 @@
+{
+  "acceptance": [
+    "Each of the four triggers has a test that starts it with a fixture event",
+    "A duplicate item at add is refused or flagged",
+    "An item whose acceptance merged is proposed for consume within the same boundary",
+    "After one wave, evolve inbox rank lists zero open items for built work",
+    "A re-scope, split or merge case becomes a typed proposal for the X13 orchestrator, and the pipeline validates it before any change"
+  ],
+  "created_at": "2026-10-26T19:30:00Z",
+  "deps": [
+    "inbox-prioritization-p3-add-time-intake",
+    "agensh-ship-landed-outbox"
+  ],
+  "files": [
+    "go/internal/inboxmover/",
+    "go/internal/inboxrank/",
+    "go/internal/loopwave/",
+    "go/cmd/evolve/cmd_inbox_add.go"
+  ],
+  "fix": "Add four triggers. (1) On add, in the P3 intake: validate origin, kind, fix surface and route against the protected fence, run the overlap pre-check against open items, and rank on write. (2) On landing (the ship.landed event and the console merge): compare the merged change and the acceptance of the closed items with the open items, and propose consume for each item whose acceptance is now met. (3) On a change of the policy or of the protected manifest: check each route again. (4) At the boundary: one sweep that catches missed events, plus the P4 preemption. Send each judgment case (re-scope, split, merge) to the X13 orchestrator (item selfheal-orchestrator-agent-profile) as a typed proposal that the pipeline validates.",
+  "id": "inbox-curator-event-triggered",
+  "kind": "feature",
+  "notes": "Plan link: docs/plans/inbox-prioritization-2026-10.md (components P3 to P5). Spec link: docs/architecture/adr/0121-inbox-priority-is-a-computed-rank.md and docs/architecture/packages/internal-inboxrank.md. Source: operator design, 2026-10-27, through the console. The X13 orchestrator item is selfheal-orchestrator-agent-profile; this item does not depend on it, because the deterministic triggers work without it. Being built by the console, 2026-10-27, so no lane claims it.",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Operator design of 2026-10-27 for the plan docs/plans/inbox-prioritization-2026-10.md, components P3 to P5. The spec is docs/architecture/adr/0121-inbox-priority-is-a-computed-rank.md and docs/architecture/packages/internal-inboxrank.md. Today no code reviews open items when a change lands, so items for built work stay open (the plan audit of 2026-10-27 found four). Each check is deterministic code. Judgment cases go to the X13 orchestrator as typed proposals.",
+  "title": "Events, not a poll, start each review of the inbox: on add, on landing, on a policy change and at the boundary",
+  "weight": 0.5
+}

@@ -8,7 +8,7 @@ import (
 
 func BenchmarkSignalCenter_ParallelObserve(b *testing.B) {
 	sc := NewLivenessCenter()
-	profile := Profiles["claude"]
+	profile := Profiles["claude-repl-v1"]
 	var keySeq int64
 
 	b.ResetTimer()

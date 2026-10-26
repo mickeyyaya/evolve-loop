@@ -10,6 +10,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+	"github.com/mickeyyaya/evolve-loop/go/internal/retryladder"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
@@ -35,12 +36,16 @@ func (cr *cycleRun) escalatedBuildTier(currentTier string) (string, bool) {
 		return "", false
 	}
 	maxCount := 0
-	for _, id := range cr.escalationScopeIDs() {
+	ids := cr.escalationScopeIDs()
+	for _, id := range ids {
 		if n := cr.o.failureCountFor(id); n > maxCount {
 			maxCount = n
 		}
 	}
 	if maxCount < threshold {
+		return "", false
+	}
+	if cr.nextItemStartRung(ids) == retryladder.R0 && cr.o.workflowConfig.RetryLadder.Enforced() {
 		return "", false
 	}
 	tier, raised := cr.o.clampedRaise(cr.req.ProjectRoot, PhaseBuild, currentTier, retryEscalationTier)

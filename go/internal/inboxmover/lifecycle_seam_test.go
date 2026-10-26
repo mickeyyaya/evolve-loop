@@ -159,6 +159,7 @@ func TestFacades_KeepEverySpelling(t *testing.T) {
 		_ func(Options, int) (RecoverResult, error)                            = ReleaseCycleProcessing
 		_ func(Options, int, string) (RecoverResult, error)                    = ReleaseCycleProcessingWithReason
 		_ func(Options, string) (int, bool)                                    = ReadFailureCount
+		_ func(Options, string) string                                         = ReadLastFailureClass
 		_ func(string, string) (string, error)                                 = FindFileByTaskID
 		_ func(int, int, bool) bool                                            = ShouldQuarantine
 		_ func([]byte) []string                                                = SupersededInboxIDs

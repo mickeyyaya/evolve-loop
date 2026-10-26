@@ -88,6 +88,8 @@ const (
 	CodeGitLandingUnwindDeclined ShipErrorCode = "GIT_LANDING_UNWIND_DECLINED"
 	CodeGitPushPolicyRefused     ShipErrorCode = "GIT_PUSH_POLICY_REFUSED"
 	CodeForeignPredicatePackage  ShipErrorCode = "FOREIGN_PREDICATE_PACKAGE"
+	CodeHeldForOperator          ShipErrorCode = "HELD_FOR_OPERATOR"
+	CodeHeldProposalRejected     ShipErrorCode = "HELD_PROPOSAL_REJECTED"
 
 	CodeArgs    ShipErrorCode = "ARGS"
 	CodeGitIO   ShipErrorCode = "GIT_IO"

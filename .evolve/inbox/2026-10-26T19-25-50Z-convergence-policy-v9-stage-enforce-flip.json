@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "two shadow waves of CONVERGENCE_RUNG data exist for each loop that calls Decide",
+    "the operator gives a recorded decision",
+    "if the operator approves, .evolve/policy.json has workflow.convergence.stage = enforce, changed at a wave boundary"
+  ],
+  "created_at": "2026-10-26T19:23:03Z",
+  "deps": [
+    "convergence-policy-v5-audit-repair-decide",
+    "convergence-policy-v8-signals-and-metrics"
+  ],
+  "files": [
+    ".evolve/policy.json"
+  ],
+  "fix": "Read two waves of shadow CONVERGENCE_RUNG data for each loop. Show the operator the rounds to land, the deferred-then-closed share and the falsification drop rate. If the operator approves, set workflow.convergence.stage to enforce at a boundary.",
+  "id": "convergence-policy-v9-stage-enforce-flip",
+  "kind": "decision",
+  "notes": "Plan: docs/plans/convergence-policy-2026-10.md section 8, step 5. Operator flip: kind decision, route console-manual.",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Plan docs/plans/convergence-policy-2026-10.md, component V9. Spec: docs/architecture/convergence-policy.md. The plan gives this flip to the operator. It occurs at a wave boundary after two waves of CONVERGENCE_RUNG data for each loop.",
+  "title": "Convergence V9 (operator flip): set workflow.convergence.stage to enforce after two shadow waves",
+  "weight": 0.4
+}

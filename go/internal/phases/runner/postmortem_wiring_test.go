@@ -426,7 +426,7 @@ func TestLocateTranscript_WithNoHomeReadsNoRelativeClaudeDirectory(t *testing.T)
 	w := launchWindow{cli: "claude-tmux", start: mustStamp(t, "2026-10-09T09:59:00Z"), end: mustStamp(t, "2026-10-09T10:01:00Z")}
 	s := postmortemScope{req: core.PhaseRequest{Worktree: "/wt", Env: map[string]string{}}}
 
-	if got := r.locateTranscript(s, w); got != "" {
+	if got := r.locateTranscript(s, w, attemptpostmortem.FormatClaudeJSONL); got != "" {
 		t.Fatalf("locateTranscript with no HOME = %q, want none", got)
 	}
 	s.req.Env["HOME"] = cwd
@@ -439,7 +439,7 @@ func TestLocateTranscript_WithNoHomeReadsNoRelativeClaudeDirectory(t *testing.T)
 	if err := os.Rename(filepath.Join(cwd, "moved", "projects"), filepath.Join(cwd, ".claude", "projects")); err != nil {
 		t.Fatal(err)
 	}
-	if got := r.locateTranscript(s, w); got != filepath.Join(cwd, ".claude", "projects", "p", "s.jsonl") {
+	if got := r.locateTranscript(s, w, attemptpostmortem.FormatClaudeJSONL); got != filepath.Join(cwd, ".claude", "projects", "p", "s.jsonl") {
 		t.Fatalf("control: locateTranscript with HOME = %q, want the session", got)
 	}
 }
@@ -616,5 +616,13 @@ func TestDispatch_AnUnlistableRunDirectoryIsAReadWarnWithNoPathAndThePlainPrompt
 	}
 	if len(run.warnings) != 1 || run.warnings[0].Fields["step"] != "read" || run.warnings[0].Fields["path"] != "" || !strings.Contains(run.warnings[0].Reason, "list the records") {
 		t.Fatalf("warnings = %+v, want one read WARN with no path", run.warnings)
+	}
+}
+
+func TestTranscriptFormatOf_TheManifestNamesTheFormatAndAnUnknownCLIHasNone(t *testing.T) {
+	for cli, want := range map[string]string{"claude-tmux": attemptpostmortem.FormatClaudeJSONL, "codex-tmux": "", "no-such-cli": ""} {
+		if got := transcriptFormatOf(cli); got != want {
+			t.Errorf("transcriptFormatOf(%q) = %q, want %q", cli, got, want)
+		}
 	}
 }

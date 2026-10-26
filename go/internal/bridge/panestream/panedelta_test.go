@@ -16,7 +16,7 @@ func readFrame(t *testing.T, name string) string {
 	return string(b)
 }
 
-var claudeProfile = Profiles["claude"]
+var claudeProfile = Profiles["claude-repl-v1"]
 
 func TestPaneDelta_RealCaptureSequence(t *testing.T) {
 	d := &PaneDelta{}
@@ -60,25 +60,25 @@ func TestPaneDelta_AllCLIs(t *testing.T) {
 	}{
 		{
 			cli:         "claude",
-			profile:     Profiles["claude"],
+			profile:     Profiles["claude-repl-v1"],
 			wantAnswer:  []string{"Terminal multiplexer", "Session persistence", "Split panes"},
 			mustNotLeak: []string{"esc to interrupt", "bypass permissions", "❯"},
 		},
 		{
 			cli:         "codex",
-			profile:     Profiles["codex"],
+			profile:     Profiles["codex-repl-v1"],
 			wantAnswer:  []string{"terminal multiplexer"},
 			mustNotLeak: []string{"gpt-5.5 medium", "›  ", "Summarize recent"},
 		},
 		{
 			cli:         "agy",
-			profile:     Profiles["agy"],
+			profile:     Profiles["agy-repl-v1"],
 			wantAnswer:  []string{"Terminal Multiplexer", "Session Persistence"},
 			mustNotLeak: []string{"? for shortcuts", "────"},
 		},
 		{
 			cli:         "ollama",
-			profile:     Profiles["ollama"],
+			profile:     Profiles["ollama-repl-v1"],
 			wantAnswer:  []string{"terminal multiplexer"},
 			mustNotLeak: []string{">>> Send a message"},
 		},
@@ -239,7 +239,7 @@ func TestIsVolatileTailRow_ContentRowKept(t *testing.T) {
 }
 
 func TestStableLines_NoMarkerFewerThanFallbackRows(t *testing.T) {
-	got := stableLines("Send a message\n? for shortcuts\n", Profiles["claude"])
+	got := stableLines("Send a message\n? for shortcuts\n", Profiles["claude-repl-v1"])
 	if len(got) != 0 {
 		t.Fatalf("stableLines = %v, want empty (cut clamped to 0)", got)
 	}
@@ -264,8 +264,8 @@ func TestPaneDelta_Agy_BlockquoteNotBoundary(t *testing.T) {
 	}, "\n")
 
 	d := &PaneDelta{}
-	_ = d.Next("> what is tmux?\n▸ Thinking...", Profiles["agy"])
-	got := strings.Join(d.Next(frame, Profiles["agy"]), "\n")
+	_ = d.Next("> what is tmux?\n▸ Thinking...", Profiles["agy-repl-v1"])
+	got := strings.Join(d.Next(frame, Profiles["agy-repl-v1"]), "\n")
 
 	if !strings.Contains(got, "quoted wisdom") {
 		t.Fatalf("blockquote line was truncated from content:\n%s", got)
@@ -284,10 +284,10 @@ func TestProfiles_BoundaryMarkers(t *testing.T) {
 		exact  bool
 	}
 	want := map[string]wantProfile{
-		"claude": {"❯", false},
-		"codex":  {"›", false},
-		"agy":    {">", true},
-		"ollama": {">>>", false},
+		FormatClaudeREPL: {"❯", false},
+		FormatCodexREPL:  {"›", false},
+		FormatAgyREPL:    {">", true},
+		FormatOllamaREPL: {">>>", false},
 	}
 	for cli, wp := range want {
 		p, ok := Profiles[cli]
@@ -301,7 +301,7 @@ func TestProfiles_BoundaryMarkers(t *testing.T) {
 			t.Fatalf("[%s] BoundaryExact = %v, want %v", cli, p.BoundaryExact, wp.exact)
 		}
 		if p.Name != cli {
-			t.Fatalf("[%s] Name = %q, want %q", cli, p.Name, cli)
+			t.Fatalf("[%s] Name = %q, want the format id %q", cli, p.Name, cli)
 		}
 	}
 }

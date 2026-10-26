@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "TestEventsConfig_CompiledDefaultsMatchTheChannelTable, TestEventsConfig_AnUnknownKeyFails and TestEventsConfig_ARouteMustParse pass",
+    "TestLogCatalog_HasOneCategoryForEachChannel passes",
+    "TestPlan_ProtectKeepsTheCursorSegmentAndEveryLaterOne, TestPlan_ProtectUsesTheOldestPELCursorOfAGroup and TestPlan_NeverDeletesTheTailSegment pass",
+    "rootwire reads EventsConfig() in place of EventsDefaults()",
+    "each new and changed function has 100% coverage"
+  ],
+  "created_at": "2026-10-26T19:23:03Z",
+  "deps": [],
+  "files": [
+    "go/internal/policy/policy_events.go",
+    "go/internal/gcpolicy/",
+    "go/internal/events/rootwire/"
+  ],
+  "fix": "Add EventsConfig() to go/internal/policy/policy_events.go with a strict key decode. Show the filter.Parse warnings of each route at policy load. Map the segment_mb of a channel to publisher.Channel.SegmentBytes. Add one gcpolicy log category for each channel and a Protect that keeps the cursor segments.",
+  "id": "event-notification-protocol-e7-events-config-load",
+  "kind": "feature",
+  "notes": "Plan: docs/plans/event-notification-protocol-2026-10.md sections 10 and 11, E7. The surface includes the policy parser, a gate file. held_proposal_candidate: true.",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Plan docs/plans/event-notification-protocol-2026-10.md, component E7. Spec: docs/architecture/event-channels.md (ADR-0127). PR #967 added the compiled defaults policy.EventsDefaults, and internal/events/rootwire uses them. No EventsConfig() reads policy.json, and gcpolicy has no channel categories and no Protect.",
+  "title": "Event channels E7 (remainder): load the events policy block, warn on route parse, and add the gc channel categories and Protect",
+  "weight": 0.4
+}

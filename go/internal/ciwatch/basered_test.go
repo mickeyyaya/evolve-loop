@@ -2,6 +2,7 @@ package ciwatch
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -181,5 +182,79 @@ func TestFileBaseRedItems_AnUnreadableProcessingDirIsAnError(t *testing.T) {
 	t.Cleanup(func() { _ = os.Chmod(claimed, 0o755) })
 	if _, err := FileBaseRedItems(inbox, baseRedReport(), time.Now()); err == nil || !strings.Contains(err.Error(), "ciwatch: base-red dedup") {
 		t.Errorf("err = %v, want the dedup scan error of the claimed dir", err)
+	}
+}
+
+func TestFileBaseRedItems_MarshalFailureReturnsError(t *testing.T) {
+	orig := marshalIndent
+	marshalIndent = func(any, string, string) ([]byte, error) { return nil, errors.New("encode boom") }
+	t.Cleanup(func() { marshalIndent = orig })
+
+	inbox := t.TempDir()
+	_, err := FileBaseRedItems(inbox, baseRedReport(), time.Now())
+	if err == nil || !strings.Contains(err.Error(), "ciwatch: marshal base-red item: encode boom") {
+		t.Fatalf("err = %v, want marshal error", err)
+	}
+}
+
+func TestFileBaseRedItems_ALongOddTestNameIsStillFiled(t *testing.T) {
+	inbox := t.TempDir()
+	rep := baseRedReport()
+	rep.Failures = []ClassifiedFailure{{
+		FailingTest: FailingTest{Package: "example.com/m/internal/old", Test: "TestX_" + strings.Repeat("a_very_long_descriptive_name_", 8) + "/case\twith\ttabs"},
+		Evidence:    Evidence{BaseRed: FactYes, RerunGreen: FactNo},
+	}}
+
+	filed, err := FileBaseRedItems(inbox, rep, time.Now())
+
+	if err != nil || len(filed) != 1 {
+		t.Fatalf("filed=%v err=%v; a long or odd test name must still file the fix-first item", filed, err)
+	}
+	items := readInboxItems(t, inbox)
+	if len(items) != 1 || len(items[0].Title) > inboxbatch.MaxFieldLen || strings.ContainsAny(items[0].Title, "\t\n") {
+		t.Errorf("items = %+v, want one item with a bounded, control-free title", items)
+	}
+}
+
+func TestFileBaseRedItems_ARefusedItemDoesNotStopTheOthers(t *testing.T) {
+	orig := marshalIndent
+	calls := 0
+	marshalIndent = func(v any, prefix, indent string) ([]byte, error) {
+		calls++
+		if calls == 1 {
+			return nil, errors.New("encode boom")
+		}
+		return orig(v, prefix, indent)
+	}
+	t.Cleanup(func() { marshalIndent = orig })
+	inbox := t.TempDir()
+	rep := baseRedReport()
+	rep.Failures = append(rep.Failures, ClassifiedFailure{
+		FailingTest: FailingTest{Package: "example.com/m/internal/second", Test: "TestSecond_IsRedOnMain"},
+		Evidence:    Evidence{BaseRed: FactYes, RerunGreen: FactNo},
+	})
+
+	filed, err := FileBaseRedItems(inbox, rep, time.Now())
+
+	if err == nil || !strings.Contains(err.Error(), "encode boom") {
+		t.Fatalf("err = %v, want the refusal of the first item reported", err)
+	}
+	if len(filed) < 2 {
+		t.Errorf("filed = %v, want every other red still filed", filed)
+	}
+}
+
+func TestFileBaseRedItems_AFailureWithNoNameStillFilesAKebabID(t *testing.T) {
+	inbox := t.TempDir()
+	rep := baseRedReport()
+	rep.Failures = []ClassifiedFailure{{
+		FailingTest: FailingTest{Jobs: []string{}},
+		Evidence:    Evidence{BaseRed: FactYes, RerunGreen: FactNo},
+	}}
+
+	filed, err := FileBaseRedItems(inbox, rep, time.Now())
+
+	if err != nil || len(filed) != 1 || strings.Contains(filed[0], "--") {
+		t.Fatalf("filed=%v err=%v; a nameless red must still file a kebab id", filed, err)
 	}
 }

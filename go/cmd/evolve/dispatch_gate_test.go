@@ -40,6 +40,8 @@ var dispatchVerbCalls = []struct {
 	{[]string{"subagent", "dispatch-parallel"}, "subagent dispatch-parallel", "class D"},
 	{[]string{"loop", "--bogus"}, "loop", "class D"},
 	{[]string{"wave", "next", "--bogus"}, "wave next", "class D"},
+	{[]string{"landing", "approve", "--bogus"}, "landing approve", "class D"},
+	{[]string{"landing", "reject", "--bogus"}, "landing reject", "class D"},
 	{[]string{"cycle", "run", "--bogus"}, "cycle run", "class D"},
 	{[]string{"boundary", "run", "--bogus"}, "boundary run", "class D"},
 	{[]string{"bridge", "launch", "--bogus"}, "bridge launch", "class D"},
@@ -123,7 +125,7 @@ func TestDispatchVerbs_AnUnresolvableStoreIsShadow(t *testing.T) {
 func TestDispatchVerbs_ReadVerbsNeedNoCredential(t *testing.T) {
 	t.Parallel()
 	for _, args := range [][]string{
-		{"phase", "verify"}, {"phase", "lint"}, {"phase"}, {"loop", "status"}, {"wave", "status"}, {"wave"},
+		{"phase", "verify"}, {"phase", "lint"}, {"phase"}, {"loop", "status"}, {"wave", "status"}, {"wave"}, {"landing", "list"},
 		{"subagent", "resolve-tier"}, {"subagent"}, {"agent", "list"}, {"agent"}, {"version"},
 		{"cycle", "reset"}, {"boundary"}, {"bridge", "probe"}, {"routing", "explain"}, {"campaign", "status"},
 	} {

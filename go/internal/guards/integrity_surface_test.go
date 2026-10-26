@@ -21,7 +21,6 @@ func TestIsProtectedSurface(t *testing.T) {
 		"/wt/go/internal/core/cyclerun.go",
 		"/wt/go/internal/core/cyclerun_dispatch.go",
 		"/wt/go/internal/core/cyclerun_review.go",
-		"/wt/go/internal/core/resume.go",
 		"/wt/go/internal/phases/runner/runner.go",
 		"/wt/go/internal/phases/audit/audit.go",
 		"/wt/go/internal/phases/retro/retro.go",

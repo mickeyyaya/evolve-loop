@@ -50,7 +50,7 @@ func TestNativeRetrospectiveLessonBoundary(t *testing.T) {
 			stub := filepath.Join(root, "fixture-cli")
 			fakeclitest.Install(t, stub, script)
 			var log strings.Builder
-			deps := Deps{Env: map[string]string{"BRIDGE_TESTING": "1", "BRIDGE_CLAUDE_BINARY": stub}, Stderr: &log, LookupEnv: mapLookup(nil)}
+			deps := Deps{Binaries: map[string]string{"claude": stub}, Stderr: &log, LookupEnv: mapLookup(nil)}
 			deps.SandboxWrap = defaultSandboxWrapWithProbe(deps, func() sandbox.ProbeResult { return probe })
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
@@ -96,7 +96,7 @@ func TestNativeDecisionProfileOwnedCWD(t *testing.T) {
 				script := "#!/bin/sh\nset -eu\nif (printf changed > " + shellQuotePOSIX(protected) + ") 2>/dev/null; then exit 41; fi\nprintf done > " + shellQuotePOSIX(fx.artifact) + "\n"
 				fakeclitest.Install(t, stub, script)
 				var log strings.Builder
-				deps := Deps{Env: map[string]string{"BRIDGE_TESTING": "1", "BRIDGE_CLAUDE_BINARY": stub}, Stderr: &log, LookupEnv: mapLookup(nil)}
+				deps := Deps{Binaries: map[string]string{"claude": stub}, Stderr: &log, LookupEnv: mapLookup(nil)}
 				deps.SandboxWrap = defaultSandboxWrapWithProbe(deps, func() sandbox.ProbeResult { return probe })
 				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 				defer cancel()

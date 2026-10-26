@@ -17,6 +17,7 @@ type ParamSpec struct {
 	Template string              `json:"template,omitempty"`
 	Values   map[string][]string `json:"values,omitempty"`
 	Default  string              `json:"default,omitempty"`
+	Note     string              `json:"note,omitempty"`
 }
 
 var unresolvedModelTokens = append([]string{"auto", "high"}, modelcatalog.CanonicalTiers...)

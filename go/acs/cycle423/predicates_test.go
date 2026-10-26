@@ -5,6 +5,7 @@ package cycle423
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
@@ -47,7 +48,7 @@ func TestC423_002_DefaultDetectorConvergingAllCLIs(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.cli, func(t *testing.T) {
-			profile := panestream.Profiles[c.cli]
+			profile := panestream.Profiles[c.cli+"-repl-v1"]
 			det := panestream.NewDefaultDetector(3)
 			think := readTestdataFrame(t, root, c.thinkFrame)
 			answer := readTestdataFrame(t, root, c.answerFrame)
@@ -61,7 +62,7 @@ func TestC423_002_DefaultDetectorConvergingAllCLIs(t *testing.T) {
 }
 
 func TestC423_003_BusyNoContentIsBusyButStagnant(t *testing.T) {
-	profile := panestream.Profiles["claude"]
+	profile := panestream.Profiles["claude-repl-v1"]
 	det := panestream.NewDefaultDetector(3)
 	det.Assess("⏺ agent output here\n❯ \n", profile)
 	spinnerFrame := "⏺ agent output here\n✽ Inferring… (5s · ↓ 10 tokens)\n❯ \n"
@@ -75,7 +76,7 @@ func TestC423_003_BusyNoContentIsBusyButStagnant(t *testing.T) {
 }
 
 func TestC423_004_QuietFrameIsIdleNotHung(t *testing.T) {
-	profile := panestream.Profiles["claude"]
+	profile := panestream.Profiles["claude-repl-v1"]
 	det := panestream.NewDefaultDetector(3)
 
 	det.Assess("⏺ some output\n❯ \n", profile)
@@ -96,7 +97,7 @@ func TestC423_004_QuietFrameIsIdleNotHung(t *testing.T) {
 }
 
 func TestC423_005_HungAfterStallThreshold(t *testing.T) {
-	profile := panestream.Profiles["claude"]
+	profile := panestream.Profiles["claude-repl-v1"]
 	const stall = 2
 	det := panestream.NewDefaultDetector(stall)
 	det.Assess("⏺ initial content\n❯ \n", profile)
@@ -126,8 +127,9 @@ func TestC423_006_DetectorForRegistryAllCLIs(t *testing.T) {
 			if probe == nil {
 				t.Fatalf("DetectorFor(%q) = nil, want non-nil LivenessProbe", cli)
 			}
-			think := readTestdataFrame(t, root, cli+"/thinking.txt")
-			answer := readTestdataFrame(t, root, cli+"/answer.txt")
+			dir := strings.TrimSuffix(cli, "-repl-v1")
+			think := readTestdataFrame(t, root, dir+"/thinking.txt")
+			answer := readTestdataFrame(t, root, dir+"/answer.txt")
 			probe.Assess(think, profile)
 			state, conf := probe.Assess(answer, profile)
 			if !validStates[state] {
@@ -178,7 +180,7 @@ func TestC423_010_HungFastFailsUnderMaxExtends(t *testing.T) {
 }
 
 func TestC423_011_IncreasingTokensHigherConfConverging(t *testing.T) {
-	profile := panestream.Profiles["claude"]
+	profile := panestream.Profiles["claude-repl-v1"]
 	det := panestream.NewClaudeDetector(3)
 	base := panestream.NewDefaultDetector(3)
 
@@ -204,7 +206,7 @@ func TestC423_011_IncreasingTokensHigherConfConverging(t *testing.T) {
 }
 
 func TestC423_012_StaticTokenFallsBackToDefault(t *testing.T) {
-	profile := panestream.Profiles["claude"]
+	profile := panestream.Profiles["claude-repl-v1"]
 	det := panestream.NewClaudeDetector(3)
 	base := panestream.NewDefaultDetector(3)
 
@@ -225,7 +227,7 @@ func TestC423_012_StaticTokenFallsBackToDefault(t *testing.T) {
 }
 
 func TestC423_013_MalformedTokenNoPanic(t *testing.T) {
-	profile := panestream.Profiles["claude"]
+	profile := panestream.Profiles["claude-repl-v1"]
 	malformedFrames := []string{
 		"✽ Generating… (↓ tokens)\n❯ \n",
 		"✽ Generating… (5s · ↓ k tokens)\n❯ \n",
@@ -257,11 +259,12 @@ func TestC423_014_NonClaudeDetectorUnaffectedByClaudeLayer(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	for _, cli := range []string{"codex", "agy", "ollama"} {
 		t.Run(cli, func(t *testing.T) {
-			profile := panestream.Profiles[cli]
+			profile := panestream.Profiles[cli+"-repl-v1"]
 			det := panestream.DetectorFor(profile)
 			base := panestream.NewDefaultDetector(3)
-			think := readTestdataFrame(t, root, cli+"/thinking.txt")
-			answer := readTestdataFrame(t, root, cli+"/answer.txt")
+			dir := strings.TrimSuffix(cli, "-repl-v1")
+			think := readTestdataFrame(t, root, dir+"/thinking.txt")
+			answer := readTestdataFrame(t, root, dir+"/answer.txt")
 			base.Assess(think, profile)
 			det.Assess(think, profile)
 			baseState, baseConf := base.Assess(answer, profile)

@@ -18,6 +18,8 @@
   - the in-project location as the last resort. Isolation is degraded if a parent sandbox blocks at exec time.
 - **An operator base that is not writable falls through.** The bash port does the same. The reason string of the chosen base tells the operator why.
 - **`Options.WorktreeBase` replaced the `EVOLVE_WORKTREE_BASE` env read.** This was flag reduction ([ADR-0064](../adr/0064-pipeline-integrity-boundary.md)).
+- **The profile names no dead flag.** X18e deleted the `auto_config` key `EVOLVE_SANDBOX_FALLBACK_ON_EPERM`, because no code read it. A reader of `preflight-environment --json` gets no value for that key now. The schema version stays 3, because no reader in the repository used the key.
+- **`hostOSType` folds `runtime.GOOS`.** It keeps `darwin` and `linux` and gives `other` for the rest. A test checks each branch on any host.
 - **Seams.** `Options` exposes `Env`, `IsNested`, `OSType`, `SandboxCapable` and `WorktreeBase`, so tests control the host.
 
 ## Invariants

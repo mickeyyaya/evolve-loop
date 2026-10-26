@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "incremental verify and verify --deep both pass on a sealed ledger",
+    "a one-byte change in a segment fails incremental verify",
+    "verify for each ship takes about 25 ms on the plane ledger",
+    "each new and changed function has 100% coverage"
+  ],
+  "created_at": "2026-10-26T19:23:03Z",
+  "deps": [
+    "ledger-restructure-c11-seal-manifest"
+  ],
+  "files": [
+    "go/internal/adapters/ledger/ledger.go"
+  ],
+  "fix": "For each ship, walk the live tail strictly, check the manifest chain and hash the bytes of each segment. Keep the full walk and the patch-id re-derivation in verify --deep, and recompute the manifest there.",
+  "id": "ledger-restructure-c12-incremental-verify",
+  "kind": "feature",
+  "notes": "Plan: docs/plans/ledger-restructure-2026-10.md sections 4 and 7, C12. The surface is the ledger Verify and hash chain, a gate file. held_proposal_candidate: true.",
+  "priority_class": "performance",
+  "route": "console-manual",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Plan docs/plans/ledger-restructure-2026-10.md, component C12 (decision D5). Decision record: docs/architecture/adr/0123-ledger-durable-evidence-segments-incremental-verify.md. The hard prerequisite seal-breaks-live-only-verify-and-carry is in .evolve/inbox/consumed. Today each ship re-hashes the whole history in about 0.3 s.",
+  "title": "Ledger C12: incremental Verify for each ship, and verify --deep keeps the full walk",
+  "weight": 0.4
+}

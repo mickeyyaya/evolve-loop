@@ -19,8 +19,8 @@
     ]
   },
   "catalog": {
-    "auto_refresh": false,
-    "refresh_stage": "shadow",
+    "auto_refresh": true,
+    "refresh_stage": "enforce",
     "allowed_families": {
       "agy": [
         "gemini"
@@ -101,6 +101,9 @@
       ]
     }
   },
+  "comment_floor": {
+    "stage": "enforce"
+  },
   "docs_floor": {
     "ste_stage": "enforce"
   },
@@ -131,6 +134,14 @@
     "temp_ttl_hours": 24,
     "worktrees": {
       "salvage_after_hours": 24
+    }
+  },
+  "inbox": {
+    "curator": {
+      "stage": "shadow",
+      "overlap_refuse": 0.5,
+      "overlap_warn": 0.3,
+      "consume_min_share": 0.5
     }
   },
   "inbox_priority": {
@@ -168,9 +179,20 @@
   "regression_tia": {
     "stage": "shadow"
   },
+  "retrospectives": {
+    "stage": "enforce"
+  },
   "isolation": {
     "i2": {
       "stage": "enforce"
+    }
+  },
+  "retry": {
+    "contract_correction_retries": 1
+  },
+  "workflow": {
+    "retry_ladder": {
+      "stage": "shadow"
     }
   }
 }

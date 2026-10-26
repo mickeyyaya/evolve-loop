@@ -71,7 +71,7 @@ func TestC425_003_WrongExitCodeNotBootTimeout(t *testing.T) {
 
 func TestC425_004_AgyDetectorGeneratingFrameConverging(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	p := panestream.Profiles["agy"]
+	p := panestream.Profiles["agy-repl-v1"]
 	det := panestream.NewAgyDetector(3)
 
 	thinkingFrame := readTestdataFrame(t, root, "agy/thinking.txt")
@@ -90,7 +90,7 @@ func TestC425_004_AgyDetectorGeneratingFrameConverging(t *testing.T) {
 
 func TestC425_005_AgyDetectorAnswerFrameDefaultParity(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	p := panestream.Profiles["agy"]
+	p := panestream.Profiles["agy-repl-v1"]
 	base := panestream.NewDefaultDetector(3)
 	det := panestream.NewAgyDetector(3)
 
@@ -114,7 +114,7 @@ func TestC425_005_AgyDetectorAnswerFrameDefaultParity(t *testing.T) {
 
 func TestC425_006_DetectorForAgyRoutesToAgyDetector(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	p := panestream.Profiles["agy"]
+	p := panestream.Profiles["agy-repl-v1"]
 	probe := panestream.DetectorFor(p)
 	if probe == nil {
 		t.Fatal("DetectorFor(agy) = nil")

@@ -134,7 +134,7 @@ func TestC424_005_BootBenchIsDriverScoped(t *testing.T) {
 }
 
 func TestC424_006_OllamaDetectorThinkingConverging(t *testing.T) {
-	p := panestream.Profiles["ollama"]
+	p := panestream.Profiles["ollama-repl-v1"]
 	base := panestream.NewDefaultDetector(3)
 	det := panestream.NewOllamaDetector(3)
 
@@ -157,7 +157,7 @@ func TestC424_006_OllamaDetectorThinkingConverging(t *testing.T) {
 }
 
 func TestC424_007_OllamaDetectorNoThinkingFallsBack(t *testing.T) {
-	p := panestream.Profiles["ollama"]
+	p := panestream.Profiles["ollama-repl-v1"]
 	base := panestream.NewDefaultDetector(3)
 	det := panestream.NewOllamaDetector(3)
 
@@ -179,7 +179,7 @@ func TestC424_007_OllamaDetectorNoThinkingFallsBack(t *testing.T) {
 }
 
 func TestC424_008_OllamaDetectorNoPanicEdgeCases(t *testing.T) {
-	p := panestream.Profiles["ollama"]
+	p := panestream.Profiles["ollama-repl-v1"]
 	edgeCases := []struct {
 		name  string
 		frame string
@@ -219,7 +219,7 @@ func TestC424_008_OllamaDetectorNoPanicEdgeCases(t *testing.T) {
 }
 
 func TestC424_009_DetectorForOllamaRoutesOllama(t *testing.T) {
-	p := panestream.Profiles["ollama"]
+	p := panestream.Profiles["ollama-repl-v1"]
 	probe := panestream.DetectorFor(p)
 	if probe == nil {
 		t.Fatal("DetectorFor(ollama) = nil")

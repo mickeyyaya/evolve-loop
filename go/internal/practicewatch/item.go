@@ -51,6 +51,7 @@ type researchItem struct {
 	Title         string   `json:"title"`
 	Kind          string   `json:"kind"`
 	PriorityClass string   `json:"priority_class"`
+	Origin        string   `json:"origin"`
 	Weight        float64  `json:"weight"`
 	InjectedBy    string   `json:"injected_by"`
 	Summary       string   `json:"summary"`
@@ -70,6 +71,7 @@ func practiceItem(src Source, hash string, previous snapshot, added string, at t
 		Title:         fmt.Sprintf("Practice change in %s: %s", src.Family, src.ID),
 		Kind:          "research",
 		PriorityClass: inboxbatch.ClassHygiene,
+		Origin:        inboxbatch.OriginCycle,
 		Weight:        itemWeight,
 		InjectedBy:    injectedByPrefix + src.ID,
 		Summary: fmt.Sprintf("The practice watch found that the source %q of the %s CLI changed since the snapshot of %s.\n\nSource: %s\n\n%s\n%s\n%s\n%s",

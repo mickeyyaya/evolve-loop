@@ -1,6 +1,6 @@
 # Plan: the loop watches the practice of each CLI and trims its scaffolding by measure
 
-- **Status:** accepted, 2026-10-12. M0 (these documents) is in review. M1 (the practice watch) and M4 (the host self-heal) are the first lanes.
+- **Status:** accepted, 2026-10-12. M0 merged in PR 857, and M1 merged in PR 864 on 2026-10-12. M2 to M5 are open, and each has an inbox item (section 7).
 - **Decision:** [ADR-0133](../architecture/adr/0133-the-loop-watches-cli-practice-and-trims-its-scaffolding.md). **Research:** [model-capability-practice-2026-10.md](../research/model-capability-practice-2026-10.md).
 
 ## Table of contents
@@ -106,11 +106,11 @@ Each criterion has a score from 1 (bad) to 5 (good).
 | Id | Component | Red test first | Owner |
 |---|---|---|---|
 | M0 | These documents and the index entry | `evolve docs ste-lint --strict`; the link check | console |
-| M1 | `evolve practice watch` and the boundary call (D1 to D6) | A changed `httptest` source files one item; an unchanged source and a first run file none. A fetch error warns, and the boundary exit code stays 0. A command source (`agy changelog`) runs through a fake CLI. | Sonnet lane. **Status (2026-10-12): built, in review.** `internal/practicewatch`, `go/cmd/evolve/cmd_practice.go`, the boundary call in `cmd_loop_cliupdate.go`; see [runtime-reference](../operations/runtime-reference.md). |
-| M2 | `evolve prompt stats`: the bytes and emphatic words of each persona and of each phase prompt of a run | Counts on a fixture tree | Sonnet lane |
-| M3 | The first diet change: the builder persona (17 emphatic words), with the D8 measures | The persona tests stay green; the measures of D8 are recorded | loop task |
-| M4 | The host self-heal (D10) | The cache trim runs at a cycle start; the guard warns and pauses at the thresholds | Sonnet lane |
-| M5 | Model notes for each family (D11) | An overlay loads only the notes of the family of the dispatch | Sonnet lane |
+| M1 | `evolve practice watch` and the boundary call (D1 to D6) | A changed `httptest` source files one item; an unchanged source and a first run file none. A fetch error warns, and the boundary exit code stays 0. A command source (`agy changelog`) runs through a fake CLI. | Sonnet lane. **Status: built, merged in PR 864 on 2026-10-12.** `internal/practicewatch`, `go/cmd/evolve/cmd_practice.go`, the boundary call in `cmd_loop_cliupdate.go`; see [runtime-reference](../operations/runtime-reference.md). |
+| M2 | `evolve prompt stats`: the bytes and emphatic words of each persona and of each phase prompt of a run | Counts on a fixture tree | Sonnet lane. Open: inbox item `model-capability-practice-m2-prompt-stats` (2026-10-27). |
+| M3 | The first diet change: the builder persona (17 emphatic words), with the D8 measures | The persona tests stay green; the measures of D8 are recorded | loop task. Open: inbox item `model-capability-practice-m3-builder-persona-diet` (2026-10-27). |
+| M4 | The host self-heal (D10) | The cache trim runs at a cycle start; the guard warns and pauses at the thresholds | Sonnet lane. Open: inbox item `model-capability-practice-m4-host-self-heal` (2026-10-27). |
+| M5 | Model notes for each family (D11) | An overlay loads only the notes of the family of the dispatch | Sonnet lane. Open: inbox item `model-capability-practice-m5-family-model-notes` (2026-10-27). |
 
 ## 8. Order
 

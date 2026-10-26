@@ -35,9 +35,23 @@ func inboxFiles(t *testing.T, root string) []string {
 	}
 	var names []string
 	for _, e := range ents {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
 		names = append(names, e.Name())
 	}
 	return names
+}
+
+func inboxItemPath(t *testing.T, root, id string) string {
+	t.Helper()
+	for _, name := range inboxFiles(t, root) {
+		if strings.HasSuffix(name, id+".json") {
+			return filepath.Join(root, ".evolve", "inbox", name)
+		}
+	}
+	t.Fatalf("no inbox item ends with %s.json: %v", id, inboxFiles(t, root))
+	return ""
 }
 
 func readGolden(t *testing.T, name, ws string) string {
@@ -100,7 +114,7 @@ func TestWriteFloor_WritesLessonAndReportByteIdenticalToTheGolden(t *testing.T) 
 		t.Fatalf("the lesson drifted:\n%s\n--- want\n%s", got, want)
 	}
 	for _, item := range []string{"retro-1279-the-ledger-row-lacks-evidence-915304b4", "retro-1279-the-manifest-row-lacks-a-path-4f0ecc16"} {
-		if got, want := readFile(t, filepath.Join(root, ".evolve", "inbox", item+".json")), readGolden(t, "inbox-"+item[len(item)-8:]+".golden.json", ws); got != want {
+		if got, want := readFile(t, inboxItemPath(t, root, item)), readGolden(t, "inbox-"+item[len(item)-8:]+".golden.json", ws); got != want {
 			t.Fatalf("inbox item %s drifted:\n%s", item, got)
 		}
 	}

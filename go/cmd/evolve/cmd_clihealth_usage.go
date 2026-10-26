@@ -20,7 +20,8 @@ import (
 
 type usageReadout struct {
 	usageprobe.Observation
-	Note string `json:"note,omitempty"`
+	State clicontrol.UsageState `json:"state,omitempty"`
+	Note  string                `json:"note,omitempty"`
 }
 
 type usageView struct {
@@ -70,23 +71,23 @@ func readUsage(ctx context.Context, probe func(context.Context, string) (string,
 	pane, err := probe(ctx, family)
 	switch {
 	case errors.Is(err, clicontrol.ErrUnsupported):
-		r.Note = "its manifest maps no usage command"
+		r.State, r.Note = clicontrol.UsageNoCollector, "its manifest maps no usage command"
 	case err != nil:
 		r.Error = err.Error()
 	default:
 		r.Windows = bridge.UsageWindows(family, pane, now)
 		if len(r.Windows) == 0 {
-			r.Error, r.Note = missingWindows(family)
+			r.State, r.Error, r.Note = missingWindows(family)
 		}
 	}
 	return r
 }
 
-func missingWindows(family string) (errText, note string) {
+func missingWindows(family string) (state clicontrol.UsageState, errText, note string) {
 	if bridge.UsageWindowsDeclared(family) {
-		return "no usage window read: the manifest declares controls.usage.windows, but the screen matched none", ""
+		return clicontrol.UsageUnparsed, "no usage window read: the manifest declares controls.usage.windows, but the screen matched none", ""
 	}
-	return "", "its manifest declares no controls.usage.windows"
+	return clicontrol.UsageNoCollector, "", "its manifest declares no controls.usage.windows"
 }
 
 func printUsageReadouts(readouts []usageReadout, asJSON bool, stdout io.Writer) {
@@ -102,10 +103,17 @@ func printUsageReadouts(readouts []usageReadout, asJSON bool, stdout io.Writer) 
 			fmt.Fprintf(tw, "%s\t%s\t%s\t%g%%\t%s\t%s\t%t\t%t\n", r.CLI, w.Scope, w.Kind, w.PercentUsed, w.ResetsText, windowTarget(w), w.Exhausted, w.ExhaustsFamily())
 		}
 		if r.Note != "" {
-			fmt.Fprintf(tw, "%s\t(%s)\n", r.CLI, r.Note)
+			fmt.Fprintf(tw, "%s\t%s(%s)\n", r.CLI, statePrefix(r.State), r.Note)
 		}
 	}
 	_ = tw.Flush()
+}
+
+func statePrefix(state clicontrol.UsageState) string {
+	if state == "" {
+		return ""
+	}
+	return string(state) + " "
 }
 
 func windowTarget(w quotastate.UsageWindow) string {

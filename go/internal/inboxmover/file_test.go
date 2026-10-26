@@ -12,7 +12,7 @@ func TestFile_FilesAnItemTheClaimFloorCanHandToALane(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, ".evolve", "inbox"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	opts := Options{ProjectRoot: root, Stderr: os.Stderr, PriorityClasses: []string{"stability", "feature"}}
+	opts := Options{ProjectRoot: root, Stderr: os.Stderr, PriorityClasses: []string{"stability", "feature"}, Origin: "console"}
 	item := `{"id":"cli-x","kind":"feature","priority_class":"feature","weight":0.4,"title":"t","summary":"s","fix":"f","acceptance":["a"]}`
 
 	res, err := File(opts, []byte(item))

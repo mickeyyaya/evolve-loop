@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "A machine-origin overlap is judged by a fake judge, and the decision is applied with the reasoning recorded in overlap_review",
+    "A human-origin overlap exits 3 and writes .evolve/inbox/pending-intake/<id>.json with the justification and the options",
+    "evolve inbox resolve applies each option: supersedes, merge-into, relates, distinct and withdraw",
+    "When no overlap is above the threshold, no judge call occurs",
+    "Each add prints where the item lands in the rank and the top movers"
+  ],
+  "created_at": "2026-10-26T19:30:00Z",
+  "deps": [],
+  "files": [
+    "go/cmd/evolve/cmd_inbox_add.go",
+    "go/cmd/evolve/cmd_inbox.go",
+    "go/internal/inboxmover/",
+    "go/internal/inboxbatch/item.go",
+    "go/internal/policy/inbox_priority.go",
+    "docs/architecture/packages/internal-inboxbatch.md"
+  ],
+  "fix": "Add a validated origin field (operator, console, cycle or retro); autofilers set it, and evolve inbox add --origin defaults to console. Add a deterministic overlap pre-check: a Jaccard score of shared files and dirs, connects_to, and title-token similarity. Above a policy threshold, call the new deep-tier inbox-overlap-judge profile through the bridge, with a JSON contract (verdict, rationale, related ids, confidence). For machine origin, apply the verdict through the lifecycle writer and store the reasoning in overlap_review. For human origin, exit 3 and write .evolve/inbox/pending-intake/<id>.json; add evolve inbox resolve <id> with --supersedes, --merge-into, --relates, --distinct and --withdraw. Each add prints where the item lands and the top movers. Use a fake judge in every test.",
+  "id": "inbox-prioritization-p3-add-time-intake",
+  "kind": "feature",
+  "notes": "Plan link: docs/plans/inbox-prioritization-2026-10.md (component P3, section Components and section Verification). Spec link: docs/architecture/adr/0121-inbox-priority-is-a-computed-rank.md and docs/architecture/packages/internal-inboxrank.md. Route console-manual by operator decision, 2026-10-27: being built by the console, 2026-10-27, so no lane claims it. The judge runs only through the bridge factory.",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Component P3 of the plan docs/plans/inbox-prioritization-2026-10.md. The spec is docs/architecture/adr/0121-inbox-priority-is-a-computed-rank.md and docs/architecture/packages/internal-inboxrank.md. Today evolve inbox add files each item with no overlap check. The item has no origin field, no inbox-overlap-judge profile exists, and no pending-intake path or evolve inbox resolve verb exists.",
+  "title": "evolve inbox add checks each new item for overlap and sends a human-origin overlap to the operator (inbox plan P3)",
+  "weight": 0.5
+}

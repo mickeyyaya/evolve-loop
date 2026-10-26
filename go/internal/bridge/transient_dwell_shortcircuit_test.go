@@ -247,7 +247,7 @@ func TestRunTmuxREPL_TransientDwell_BusyPaneIsNeverPreempted(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	busy := livePane529(t) + "\nesc to interrupt\n"
-	if !panestream.PaneBusy(busy, panestream.Profiles["claude"]) {
+	if !panestream.PaneBusy(busy, panestream.Profiles["claude-repl-v1"]) {
 		t.Fatal("fixture premise gone: the busy affordance no longer reads as busy")
 	}
 	run := runTransientDwell(t, fx, []string{busy}, "enforce", 300)

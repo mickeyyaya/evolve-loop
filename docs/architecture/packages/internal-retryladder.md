@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`internal/retryladder` classifies a failed phase try into one class: `infra`, `quota`, `halt`, `spec`, `capability` or `unknown` (component L1). It then picks the next rung (component L2). See [ADR-0142](../adr/0142-a-capability-failure-climbs-one-bounded-retry-ladder.md), [spec §3](../retry-ladder.md#3-the-classifier) and [spec §4](../retry-ladder.md#4-the-rungs).
+`internal/retryladder` classifies a failed phase try into one class: `infra`, `quota`, `halt`, `spec`, `capability` or `unknown` (component L1). It then picks the next rung (component L2). It also gives the try record and the digest of a raised try (components L5 and L6). See [ADR-0142](../adr/0142-a-capability-failure-climbs-one-bounded-retry-ladder.md), [spec §3](../retry-ladder.md#3-the-classifier) and [spec §4](../retry-ladder.md#4-the-rungs).
 
 ## Design
 
@@ -17,7 +17,12 @@
 - With no headroom at R2, the decision carries `LADDER_NO_HEADROOM`. R0 goes to R1 and R1 stops. A bound that blocks the step records no signal.
 - A capability failure at R2 stops. It becomes `spec` with `LADDER_STOP_SPEC` when its fingerprint is an earlier one.
 - Unset bounds are `max_tier` deep and `max_effort` high.
-- `Context` and `Stage` name the try-record values of [spec §6](../retry-ladder.md#6-the-try-record). Until L5 wires the decider, the bridge writes `ContextNew` and `StageShadow` on each try.
+- `Context` and `Stage` name the try-record values of [spec §6](../retry-ladder.md#6-the-try-record).
+- `Try` is the ladder decision that one dispatch carries. `Try.Mark` writes it into an `llmcalls.Record`. A nil `Try` writes `R0`, `new` and `shadow`. `Try.LadderTier` gives the tier for `llmroute.Overlay.LadderTier`.
+- `Climbs` is true only for the seats that produce a deliverable: build, tdd, scout, triage, fault localization and bug reproduction. A judge seat never climbs.
+- `Facts.ContractRejected` marks a deliverable that the contract review rejected. It classifies as `capability`, unless a spec signal comes first.
+- `ChooseAuditFix` picks the `audit_fix` rung after an audit FAIL, by the ordered rules of [spec §5](../retry-ladder.md#the-audit_fix-rung-decision-only). It returns the rule and its input, so a signal can record both. `EstimateAuditFix` estimates the files, the lines, the production code lines and the tokens from the cited paths. `AllPrescribed` checks that each defect has a prescription.
+- `Digest.Render` writes the prompt part of a raised try: the failed checks verbatim, the audit findings, the changed files and the tries before. It cuts the text at a rune boundary to the token budget, with 4 bytes for each token.
 - `Input.Critic` is the rung of the shadow critic arm. `Decision.CriticRung` copies it and nothing reads it.
 
 ## Invariants
@@ -25,6 +30,7 @@
 - The package does not import `internal/core`. Predicate `TestC1973_003` checks this.
 - The normalizer copies the rules of `core/failure_digest.go`. A rule change must change both until a later cycle moves the shared rules into one package.
 - A raise moves the rung up, so a chain has at most two raised tries. No target has a tier above `max_tier` or an effort above `max_effort`.
-- `Next` has no production caller yet. A later ladder component wires it into the loop.
+- `Next` has one production caller, `core.cycleRun.askLadder` ([spec §5](../retry-ladder.md#5-where-the-ladder-runs)). The contract correction, the resumed correction and the audit repair round ask it.
+- At a budget of `policy.MinRetryLadderDigestTokens` (64) or more, a digest is never longer than its budget. The first failed check comes first. The policy refuses a smaller budget other than 0.
 - `BuildReport` groups try records by rung and class (component L7). A fix is a try above R0 with exit code 0. It sorts the rows by rung, then class, and skips a record without a rung.
 - `LoadRuns` reads `llm-calls.ndjson` of each run dir in name order. It skips a dir without a ledger and fails on an absent runs dir. `evolve ladder report` prints the result and writes nothing.

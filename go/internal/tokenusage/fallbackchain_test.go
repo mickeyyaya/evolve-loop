@@ -39,6 +39,7 @@ func TestDefaultResolver_EventsLogTier_WinsWhenNoTranscript(t *testing.T) {
 
 	resolver := DefaultResolver(root)
 	res, err := resolver(Window{
+		Collector: FormatClaudeJSONL, ContextWindow: 200_000,
 		Worktree:      "/repo/worktrees/cycle-754",
 		EventsLogPath: log,
 		Start:         mustParse(t, launchWindowStart),
@@ -62,6 +63,7 @@ func TestDefaultResolver_ScrollbackTier_OutputOnlyFloor(t *testing.T) {
 
 	resolver := DefaultResolver(root)
 	res, err := resolver(Window{
+		Collector: FormatClaudeJSONL, ContextWindow: 200_000,
 		Worktree:   "/repo/worktrees/cycle-754",
 		Scrollback: "boot output\nsome REPL noise\n↓ 7k tokens\n",
 		Start:      mustParse(t, launchWindowStart),
@@ -90,6 +92,7 @@ func TestDefaultResolver_TranscriptTier_StillWinsOverLowerTiers(t *testing.T) {
 
 	resolver := DefaultResolver(root)
 	res, err := resolver(Window{
+		Collector: FormatClaudeJSONL, ContextWindow: 200_000,
 		Worktree:      worktree,
 		EventsLogPath: log,
 		Scrollback:    "↓ 99k tokens\n",
@@ -113,6 +116,7 @@ func TestDefaultResolver_AllTiersEmpty_SourceNoneNilError(t *testing.T) {
 
 	resolver := DefaultResolver(root)
 	res, err := resolver(Window{
+		Collector: FormatClaudeJSONL, ContextWindow: 200_000,
 		Worktree:      "/repo/worktrees/cycle-754",
 		EventsLogPath: filepath.Join(t.TempDir(), "does-not-exist-events.ndjson"),
 		Scrollback:    "",
@@ -138,6 +142,7 @@ func TestDefaultResolver_MalformedEventsLog_FallsThroughCleanly(t *testing.T) {
 	t.Run("falls through to scrollback", func(t *testing.T) {
 		resolver := DefaultResolver(t.TempDir())
 		res, err := resolver(Window{
+			Collector: FormatClaudeJSONL, ContextWindow: 200_000,
 			Worktree:      "/repo/worktrees/cycle-754",
 			EventsLogPath: garbage,
 			Scrollback:    "↓ 3k tokens\n",
@@ -158,6 +163,7 @@ func TestDefaultResolver_MalformedEventsLog_FallsThroughCleanly(t *testing.T) {
 	t.Run("falls through to none", func(t *testing.T) {
 		resolver := DefaultResolver(t.TempDir())
 		res, err := resolver(Window{
+			Collector: FormatClaudeJSONL, ContextWindow: 200_000,
 			Worktree:      "/repo/worktrees/cycle-754",
 			EventsLogPath: garbage,
 			Start:         mustParse(t, launchWindowStart),
