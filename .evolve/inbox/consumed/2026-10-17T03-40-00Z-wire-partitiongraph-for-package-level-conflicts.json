@@ -1,0 +1,30 @@
+{
+  "acceptance": [
+    "`TestAdmit_ATodoInABusyCellWaits`, `TestAdmit_TheGlobalCellAdmitsOne` and `TestAdmit_ATodoWithNoFilesTakesItsPackageCell` pass.",
+    "In shadow, 3 runs show an admission width cost of at most 10%."
+  ],
+  "campaign": "wave-orchestrator",
+  "consumed": {
+    "at": "2026-10-26T19:22:03Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Built and merged: O3 admission by package cell in PR 925, with the follow-ups in PR 1007. The three TestAdmit tests pass. The shadow width cost over 3 runs is not recorded. Item wave-orchestrator-measure-goals-g1-g3 carries it."
+  },
+  "created_at": "2026-10-17T03:40:00Z",
+  "deps": [
+    "wave-orchestrator-design-set"
+  ],
+  "files": [
+    "go/internal/fleet/packagegraph.go",
+    "go/internal/loopwave/plan.go"
+  ],
+  "fix": "Plan component O3 (D6, D7), spec section 6. This is ADR-0134 S14, built under ADR-0139: admission by package cell through fleet.PartitionGraph, with the hub cell at capacity 1, in shadow first. A todo with no files takes the cell of its named package, or the hub cell. Design: docs/plans/wave-orchestrator-2026-10.md and docs/architecture/wave-orchestrator.md (ADR-0139).",
+  "id": "wire-partitiongraph-for-package-level-conflicts",
+  "kind": "feature",
+  "priority_class": "performance",
+  "route": "console-manual",
+  "source": "operator, 2026-10-16 ('Set the max cycle per wave to 4', 'have we designed a wave orchestrator...') and 2026-10-17 ('Why the wave cycle number has not configured to 4 parallel running cycle? And did we have the orchestrator oversee all parallel running cycles in the same wave'; 'prioritize them with high prioritization')",
+  "summary": "fleet.PartitionGraph partitions by the module-internal import graph, but it is not wired into dispatch (docs/architecture/packages/internal-fleet.md, status 2026-10-09). File-disjoint lanes can still conflict through a shared package. Current research partitions by cohesion of the dependency graph (arXiv 2606.00953).",
+  "title": "Lanes stay package-disjoint: wire fleet.PartitionGraph into dispatch",
+  "weight": 1.0
+}
