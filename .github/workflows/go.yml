@@ -17,6 +17,7 @@ jobs:
       result: ${{ job.status }}
     name: build + test (Go 1.23, ubuntu, every package and every gate)
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: go
@@ -141,6 +142,7 @@ jobs:
   build-test-darwin:
     name: build + test (Go 1.23, macOS, the darwin package set)
     runs-on: macos-latest
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: go
@@ -165,6 +167,7 @@ jobs:
             echo "::warning::hostsampler build failed; the run has no runner samples"
           fi
       - name: test the darwin set (go/.darwin-set; race + cover, incl. integration tier)
+        timeout-minutes: 30
         env:
           TEST_JSON: test-integration.json
           TEST_RUSAGE: '1'
@@ -210,6 +213,7 @@ jobs:
   build-test-current:
     name: build + test (Go 1.27, ubuntu, every package, no gates)
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: go
@@ -250,6 +254,7 @@ jobs:
   lint:
     name: vet + gofmt (Go 1.23)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: go
@@ -276,6 +281,7 @@ jobs:
   vet-current:
     name: vet (Go 1.27)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: go
@@ -291,6 +297,7 @@ jobs:
   vulncheck:
     name: govulncheck (Go)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: go
