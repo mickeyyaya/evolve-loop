@@ -46,6 +46,8 @@ func TestRealTmux_E2E_LiveInjection_UnblocksAgent(t *testing.T) {
 	cfg.ArtifactTimeoutS = 60
 
 	launchCmd := writeAwaitInjectFake(t, cfg.Worktree)
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
 	sess := itSession("einject")
 	defer itTmuxCtl.KillSession(context.Background(), sess)
 
@@ -65,7 +67,7 @@ func TestRealTmux_E2E_LiveInjection_UnblocksAgent(t *testing.T) {
 		}
 	}()
 
-	code, err := runTmuxREPL(context.Background(), cfg, itDeps(120*time.Millisecond),
+	code, err := runTmuxREPL(ctx, cfg, itDeps(120*time.Millisecond),
 		itLaunch(sess, launchCmd, marker, 0, false))
 	close(runEnded)
 	<-senderStopped

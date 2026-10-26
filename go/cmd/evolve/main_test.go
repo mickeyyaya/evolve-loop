@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchcred"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gotooltest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
@@ -69,6 +71,9 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	codeUsageCacheDir = func() (string, error) { return usageDir, nil }
+	defaultDispatchGate = dispatchGate{open: func() (dispatchcred.Store, error) {
+		return dispatchcred.Store{Dir: filepath.Join(usageDir, "dispatch")}, nil
+	}}
 	code := m.Run()
 	if err := os.RemoveAll(codexHome); err != nil {
 		fmt.Fprintf(os.Stderr, "TestMain: remove %s: %v\n", codexHome, err)

@@ -381,7 +381,7 @@ A worked example: the scout pane of cycle 7 runs `claude --version` from its Bas
 | Markers | `ipcenv.DispatchDepthKey` (`EVOLVE_DISPATCH_DEPTH`) and `ipcenv.PhaseKey` (`EVOLVE_PHASE`). `Deps.cellMarkers` sets the depth of the launcher plus 1, and the phase to `cfg.Agent`. |
 | Path of the markers | `Deps.cellEnv` adds them to `Deps.Env`, and both names are in `pipelineEnvMarkers`. So each stage of §6.1 gives them to the child. A tmux pane and a recipe pane also get them as `export` lines before the launch line. At `shadow` such a pane inherits the environment of the server. |
 | Refusals that now fire | `evolve agent run` (`go/internal/cli/agentcmd/run.go:93`) and the boundary writes (`go/cmd/evolve/boundary_write.go:14`). Both read the depth through `subagent.ReadDispatchDepth`, which calls `ipcenv.DispatchDepth`. `subagent run` only checks its depth cap of 3, and `phase`, `loop` and `wave` read no marker. |
-| Strength of the markers | advisory. `env -u EVOLVE_DISPATCH_DEPTH -u EVOLVE_PHASE evolve agent run` passes the refusal. Row N4 proves this advisory layer only. A dispatch credential that no cell receives is the layer that does not depend on the agent (item `isolation-dispatch-capability-token`). |
+| Strength of the markers | advisory. `env -u EVOLVE_DISPATCH_DEPTH -u EVOLVE_PHASE evolve agent run` passes the marker refusal. The dispatch credential (§7.1.1) is the layer that does not depend on the agent. Row N4 now proves that layer. |
 | `EVOLVE_SANDBOX=off` in a phase | `launchSwept` refuses the launch when the launcher carries `EVOLVE_PHASE` and the mode is `off`. The error is `bridge.ErrSandboxOffInPhase`, the exit code is `ExitSafetyGate`, and the bridge emits `ISOLATION_I3_VIOLATION` with `action=refused` and `rule=sandbox.off.phase`. |
 | Why the phase marker and not the depth | A fan-out worker has depth 1 or more, but the pipeline starts it, not an agent. It carries no `EVOLVE_PHASE`, so a host opt-out still works for it. |
 | Exec deny set | `Deps.execDenyTargets`. The files: the `binary` of each registered manifest, found on `PATH` (`Deps.LookPath`) and resolved to its real path. The roots: each `install_roots` entry of a manifest (`~/` is the home directory), resolved to its real path when it exists. `claude-p` and `claude-tmux` declare `~/.local/share/claude/versions`, because the native installer keeps each earlier version there. `codex` and `codex-tmux` declare `/opt/homebrew/Caskroom/codex`. `gemini` has no manifest, so it has no rule. |
@@ -402,7 +402,8 @@ The guards are these tests:
 
 - row N3 (`TestAgentSandboxContract`, green on darwin only), the row "exec an older installed version of the claude stub under the install root" and the row "re-enter the profile through sandbox-exec to exec the claude stub"
 - `TestAgentSandboxContract_TheLauncherStillStartsTheCLIThatTheCellCannotExec` and `TestAgentSandboxContract_ShadowReportsTheExecAndLetsItRun`
-- row N4 (the matrix, M1 run, green): a stub in the phase pane runs the real `evolve agent run`. It records the exit code 2 and the text "refused inside a phase".
+- row N4 (`TestAgentSandboxContract`, green on darwin only): the real `evolve` binary in the cell runs `env -u EVOLVE_DISPATCH_DEPTH -u EVOLVE_PHASE evolve agent run` at `enforce`. It exits 3, and the text names the dispatch credential (§7.1.1).
+- the marker check of the M1 run of the matrix: a stub in the phase pane runs the real `evolve agent run`. It records the exit code 2 and the text "refused inside a phase".
 - `TestCellEnv_EachStageGivesTheChildTheDepthAndPhaseMarkers`, `TestLaunchSwept_RefusesSandboxOffInsideAPhaseWithANamedErrorAndASignal`
 - `TestSandboxWrap_EnforceDeniesTheRealPathOfEachManifestBinaryOnMacOS`, `TestSandboxWrap_EnforceMasksEachOtherFamilyBinaryOnLinux` and `TestSandboxWrap_EnforceDeniesEveryInstalledVersionUnderTheManifestInstallRoot`
 
@@ -417,8 +418,67 @@ Known differences from the design:
 - Two gaps stay open, because a rule for them also blocks the `go test` binaries in `/tmp`. A CLI that an interpreter runs, for example `node gemini.js`, is not an exec of the CLI file. A binary that the agent copies into the worktree or `/tmp` has no rule.
 - Before the flip to `enforce`: the deny of `/usr/bin/sandbox-exec` breaks a CLI that uses its own Seatbelt for its tool calls. Examples are Claude Code with its sandbox setting on, and codex without `--yolo`. Of the claude and codex manifests, only `claude-tmux` and `codex-tmux` pass `--dangerously-skip-permissions` and `--yolo`. The agy drivers pass `--dangerously-skip-permissions` too. The headless `claude-p` and `codex` drivers do not, so the deny puts them at risk at `enforce`.
 - A CLI can also exec its own binary for a helper. The `shadow` reports must show no such exec before the flip.
-- The Go refusals depend on the environment. An agent that unsets the markers avoids them. The exec deny is the guard that does not depend on the agent.
-- The refusal of `evolve agent run` emits no signal yet (§15.1).
+- The marker refusals depend on the environment. An agent that unsets the markers avoids them. The exec deny and the dispatch credential (§7.1.1) are the guards that do not depend on the agent.
+- The marker refusal of `evolve agent run` emits no signal. The credential refusal emits `ISOLATION_I3_VIOLATION` (§7.1.1).
+
+#### 7.1.1 The dispatch credential (as built)
+
+The markers are advice. An agent can unset them, and then `evolve agent run` dispatches (review of #1126, 2026-10-26). The sandbox cannot deny the `evolve` binary, because the profiles run `evolve phase verify`. So a dispatch verb now needs a capability that a cell never holds: the dispatch credential.
+
+A worked example: the scout pane of cycle 7 runs `env -u EVOLVE_DISPATCH_DEPTH -u EVOLVE_PHASE evolve wave next`. The verb opens `~/.evolve/dispatch/held/credential`. At `enforce` the macOS profile denies the read, so the verb exits 3:
+
+```
+evolve wave next: refused: this process does not hold the pipeline dispatch credential (dispatch credential: open /Users/op/.evolve/dispatch/held/credential: operation not permitted). A phase cell never holds it: wave next is class D; it is an operator or boundary verb
+```
+
+| Item | As built |
+|---|---|
+| The credential | `go/internal/dispatchcred`. A 0600 file `held/credential` with 32 random bytes in hex, in a 0700 directory. The writer makes a temporary file and links it to the name, so a reader never sees a part of a token. `Store.Hold` opens it with `O_NOFOLLOW` and accepts only a regular 0600 file with a token of this form. The check is a read: the token value is not compared. |
+| The location | `~/.evolve/dispatch`, where `~` is the home directory of the passwd entry of the uid (`user.LookupId`). It never comes from `HOME`, `EVOLVE_PROJECT_ROOT` or the current directory. A test binary can set the root at link time (`-ldflags -X .../dispatchcred.root=DIR`). |
+| The gated verbs | `agent run` and `phase <name>` (class R). `subagent run`, `subagent dispatch-parallel`, `loop`, `wave next`, `cycle run`, `boundary run`, `bridge launch`, `routing plan`, `campaign` (not `status`), `compose`, `plan-and-execute`, `serve-phase`, `fleet`, `consensus-dispatch` and `fanout-dispatch` (class D). `phase verify`, `phase lint` and `loop status` are not gated. `dispatchRules` in `go/cmd/evolve/dispatch_gate.go` holds them, and `dispatch` checks them before the verb runs. The loop step of `boundary run` checks again, because it calls the loop in the process (`gatedLoop`). |
+| The launch API | `Deps.requireDispatchCredential` (`go/internal/bridge/dispatch_credential.go`) runs in each entry of the X3 launch API (§5.1). The entries are `LaunchLLM`, `launchPane`, `launchSwept` and `newRecipeDriver`. Each LLM launch of the binary passes one of them. So a launch with no credential is refused at `enforce`, from any caller. The refusal is `ErrNoDispatchCredential` with `ExitSafetyGate` and `rule=launch.credential`. The verb gate is the early refusal with the clear message. |
+| The denies | `Deps.dispatchCredentialDeny` in `go/internal/bridge/dispatch_credential.go`. At each sandboxed launch at `shadow` or `enforce`, the launcher writes the credential and the stage. It denies the read of `held/`: SBPL `deny file-read*`, and `bwrap` `--tmpfs`, `--chmod 000` and `--remount-ro`. |
+| The write denies | The parent of the store (`~/.evolve`) goes to `DenyPaths`, and each higher ancestor goes to `DenyLiterals`. So a cell cannot write the stage or a credential. It also cannot rename an ancestor or swap in a symlink for it (review of #1132, round 2). If `Ensure` fails, the launcher keeps each deny and writes a WARN line. |
+| The stage | the policy key `isolation.i3.stage`, the same stage as the exec deny, read from a file that the cell cannot change. The launcher writes it to `~/.evolve/dispatch/stage`, outside `held/`. A missing file is `shadow`. When the credential read is denied (`EPERM` or `EACCES`), a missing file is `enforce`. Only a launch makes a cell, and the launch writes the stage. A file that cannot be read, or a word that is not `off`, `shadow` or `enforce`, is `enforce`. |
+| `off` | no deny, no store write and no check |
+| `shadow` | The cell cannot read the credential. The verb emits `ISOLATION_I3_VIOLATION` with `action=logged` and runs. |
+| `enforce` | The verb emits `ISOLATION_I3_VIOLATION` with `action=refused` and exits 3. A class R refusal names the request path `.evolve/runs/cycle-<N>/requests/dispatch-<n>.json`. Item `isolation-dispatch-request-channel` builds that channel. |
+| The signal | `rule=verb.class.r` or `verb.class.d`, `target` is the verb, `source=dispatch-credential` (cli-contract.md §4.5). The verb publishes it under the events role `dispatch`, and it goes to the stderr of the verb, which the pane captures. |
+| The hermetic env | No environment name carries the credential or its path. So X2 cannot pass it to a child (§6.1). |
+
+How the operator and the pipeline hold the credential:
+
+- **The operator.** The shell of the operator runs outside a cell, so it can read the file. If the file does not exist, the first gated verb writes it. The operator does no setup.
+- **The pipeline.** `evolve loop`, `wave next` and the fan-out of `subagent dispatch-parallel` run outside a cell. The bridge writes the file before it wraps a cell, so each cell finds it and cannot read it.
+
+| Id | Decision | Because | Rejected options and why |
+|---|---|---|---|
+| D1 | A file in a fixed per-user directory, found through the passwd entry | A cell can set `HOME`, `EVOLVE_PROJECT_ROOT` and its current directory. A path from any of them points the check at a file that the cell writes. | A path under the project `.evolve`: the project root comes from the environment. A token in the environment: X2 is an allowlist, but the cell can set any variable for its own child. A unix socket of the plane: a separate daemon for one check, and the same path question. |
+| D2 | The first gated verb of the operator writes a missing file | The operator experience stays the same. A cell cannot write the file: the profile gives no write grant under `~/.evolve`, and `bwrap` mounts `held/` read-only. | `evolve loop` writes it only: the first `evolve agent run` on a new host then refuses. |
+| D3 | The launcher writes the stage next to the credential | The cell reads the stage from a file that it cannot change. | The policy of the project root: a cell can point the root at a policy with no stage, which is `shadow`. |
+| D4 | The verb gate covers each command that starts a dispatch, and the launch API checks each LLM launch | A verb gate alone misses an in-process caller (`boundary run` called the loop directly, review of #1132). The launch API is the one place where each LLM launch passes (X3). `TestDispatchGate_EveryRegistryCommandIsGatedOrNamedWithNoDispatch` pins each command of the registry to a rule or a reason. | Each verb outside an allowlist (X17e): it breaks the hooks of the cell (`guard`, `postedit-validate`) at `enforce` before X17e lists the A verbs. |
+
+Known differences from the design:
+
+- The verb gate and the launch check are checks of the shipped binary. A cell that runs its own `evolve` binary, built from the source or an older one, has neither. The exec deny of §7.1 and the write scope of §9 are then the backstops. For each in-process path of the shipped binary, the launch check is the backstop of the verb gate.
+- A cell outside a sandbox can read the credential, so the gate passes. This is the same limit as each sandbox rule: `EVOLVE_SANDBOX=off` for a host run, and an unsupported host.
+- In a cell the violation signal reaches stderr only. A cell cannot write `.evolve/events` (§9), and the verb does not know its cycle.
+- A credential with the wrong mode or content refuses each gated verb of the operator at `enforce`. The operator removes `~/.evolve/dispatch/held/credential`, and the next verb writes a new one.
+- A launch with no `Deps.Signals`, for example `ModelQueryRunner`, the CLI updater and the version inventory, emits no shadow signal. At `enforce` it is still refused.
+- A host where the passwd lookup fails has no store. The launcher then adds no deny, and each gated verb reports the cause as at `shadow` and never refuses.
+- Each process of the uid outside a cell holds the credential. The boundary is the cell, not the user.
+- On a host with several projects, the stage file holds the stage of the last sandboxed launch.
+- The row N4 runs on darwin only. The `bwrap` mask has a unit test (`TestSandboxWrap_TheCellCannotReadTheDispatchCredentialOnLinux`), not a contract row.
+- X17e adds the other R and D verbs to the same verb gate (cli-contract.md §4.4). A command that execs an LLM only through the launch API (`doctor`, `cli`, `clihealth`, `cli-routing`, `models`, `setup`, `practice`, `release-verify-clis`) is refused by the launch check.
+
+The guards are these tests:
+
+- row N4 and the rows "evolve phase scout", "evolve subagent run", "evolve loop" and "evolve wave next with the env markers stripped is refused at enforce", and the rows "read the dispatch credential", "turn the dispatch stage off", "plant a dispatch credential" "rename an ancestor of the dispatch store under a writable home" and "swap a symlink to a store of its own in for an ancestor of the dispatch store" (`TestAgentSandboxContract`)
+- `TestLaunchAPI_EachEntryRefusesALaunchWithNoDispatchCredentialAtEnforce` and `TestDispatchGate_EveryRegistryCommandIsGatedOrNamedWithNoDispatch`
+- `TestAgentSandboxContract_TheHostHoldsTheCredentialThatTheCellCannotRead`
+- `TestDispatchVerbs_RefuseWithoutTheDispatchCredential`, `TestDispatchVerbs_ShadowReportsAndRuns` and `TestDispatchVerbs_ReadVerbsNeedNoCredential`
+- `TestSandboxWrap_TheCellCannotReadTheDispatchCredentialOnMacOS` and `TestSandboxWrap_TheCellCannotReadTheDispatchCredentialOnLinux`
+- `TestDefault_IsUnderThePasswdHomeAndIgnoresHOME` and `TestStore_HoldRefusesAForgedOrMaskedCredential`
 
 #### 7.2 The boundary of I-3 (operator, 2026-10-26)
 
@@ -434,8 +494,8 @@ The boundary is the cell around the CLI process that the bridge starts. The harn
 |---|---|---|
 | Start a subagent of its own harness, of any type and any model of the same family. It runs in the own CLI process, with no new exec of an LLM binary. Examples: an Opus seat starts a Haiku Task subagent of Claude Code for research, or another CLI uses its own feature. | allow | The harness chooses the subagent and its model. The subagent runs inside the cell, so the limits of the cell apply to it. |
 | Start a new LLM CLI process of any family, its own family too | deny | A new CLI is a new agent outside the control of the pipeline. The exec deny of §7.1 stops it at `enforce` on macOS. On Linux the own family stays open (§7.1), and at `shadow` the exec is only reported. |
-| Run `evolve agent run` | deny | The phase markers make it refuse (advisory, §7.1). |
-| Run another `evolve` dispatch verb: `phase`, `subagent run`, `loop`, `wave next` | deny (proposed) | These verbs do not read the markers yet. Item `isolation-dispatch-capability-token` makes each verb need a dispatch credential that no cell receives. |
+| Run `evolve agent run` | deny | The phase markers make it refuse, and the dispatch credential makes the refusal hold when the agent unsets them (§7.1.1). |
+| Run another `evolve` dispatch verb: `phase <name>`, `subagent run`, `loop`, `wave next`, `cycle run`, `boundary run`, `bridge launch`, `compose` and the others of §7.1.1 | deny | The cell cannot read the dispatch credential, so the verb refuses at `enforce`. Each LLM launch of the binary checks the credential too (§7.1.1). |
 | Ask for another phase agent | request | The agent writes a dispatch request. The pipeline checks it, and the orchestrator judges it. |
 
 The pipeline does not choose or limit the model of an in-harness subagent. The "always the latest model" routing rule ([model-discovery-and-catalog.md](model-discovery-and-catalog.md)) governs the model that the pipeline assigns to a seat. It does not govern the internal choices of a harness.
@@ -780,7 +840,7 @@ Before X1b, a stub `tmux` on the row `PATH` refused, so rows M2 to M4 failed wit
 
 The `agy` REPL of the fake draws the footer label of its `--model` value, so the launch model check of `agy-claude-tmux` reads a Claude label. The row thus proves that the driver sends a Claude model and reads the footer label. It does not prove that agy serves the model that it was asked for; the bridge real-tmux tests own that. Each row keeps its real check: the cycle ships, the ledger holds each phase, and only the stub of the row family ran.
 
-The row policy also sets `isolation.i2.stage` to `enforce`, so the stubs see the cell environment. Each stub writes its record to a log path in its script, not in an environment variable. The M1 run also judges rows N1 and N4 from the records of its stubs. It judges row N6 from its cycle workspace: today the pipeline writes no `inputs/index.json`.
+The row policy also sets `isolation.i2.stage` to `enforce`, so the stubs see the cell environment. Each stub writes its record to a log path in its script, not in an environment variable. The M1 run also judges row N1 from the records of its stubs, and it checks the marker refusal of `evolve agent run`. It judges row N6 from its cycle workspace: today the pipeline writes no `inputs/index.json`.
 
 The subagent conformance tests (`go/internal/subagent/conformance_test.go`) take the CLI from the row too. `TestConformance_AllRoles_HappyDispatchIsolated` dispatches each role on each of the five families and checks that the role ran on that family.
 
@@ -801,7 +861,7 @@ The stub for each family declares the same capabilities as the real manifest. Th
 | N1 | `CLAUDECODE=1` on the parent does not reach any seat | I-2 | X2 | the matrix (M1 run, policy `isolation.i2.stage=enforce`) | green (X2) |
 | N2 | the AST guard finds no LLM spawn outside the bridge launch API | I-1 | X3 | `internal/sysexec` | green (X3) |
 | N3 | a phase pane cannot exec `claude --version` | I-3 | X4 | sandbox contract | green (X4) |
-| N4 | `evolve agent run` inside a phase pane is refused | I-3 | X4 | the matrix (M1 run) | green (X4) |
+| N4 | `evolve agent run` in a cell with the env markers stripped is refused at `enforce` (darwin only) | I-3 | X4 | the sandbox contract | green (X4) |
 | N5 | a cell cannot read `<ws>/.bridge/scout-stdout.log` | I-4 | X5 | sandbox contract | open |
 | N6 | a retry opens its predecessor's `retrospective-report.md` through the index that the pipeline writes | I-4, I-5 | X5 | the matrix (M1 run) | open |
 | N7 | a retry cannot open an unrelated cycle's `audit-report.md` | I-5 | X5 | sandbox contract | open |
@@ -1363,7 +1423,7 @@ X19 lands in three items:
 |---|---|---|---|---|
 | I-1 Single launcher | `TestOnlyTheBridgeStartsAnLLMBinary` (AST) | X3 | `enforce` | `ISOLATION_I1_VIOLATION` |
 | I-2 Hermetic environment | `TestProcessEnv_IsTheAllowlistPlusTheManifest`; matrix row N1 | X2 | `shadow`, then `enforce` | `ISOLATION_I2_VIOLATION` |
-| I-3 No nested agency | sandbox contract row N3 and matrix row N4 | X4 | `shadow`, then `enforce` | `ISOLATION_I3_VIOLATION` |
+| I-3 No nested agency | sandbox contract rows N3 and N4 | X4 | `shadow`, then `enforce` | `ISOLATION_I3_VIOLATION` |
 | I-4 Pipeline-mediated communication | rows N5, N6; `TestHandoffAsksTravelInTheIndex` | X5 | `shadow`, then `enforce` | `ISOLATION_I4_VIOLATION` |
 | I-5 Read isolation | rows N6, N7, N8; `TestLineageComesOnlyFromPipelineRecords` | X5 | `shadow`, then `enforce` | `ISOLATION_I5_VIOLATION` |
 | I-6 Family-agnostic flow | `TestFlowCodeNamesNoFamily`; rows N13, N14 | X6, X9, X10 | `enforce` | `ISOLATION_I6_VIOLATION` |

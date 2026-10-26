@@ -19,6 +19,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchcred"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmcalls"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -43,6 +44,7 @@ type Deps struct {
 	Env                   map[string]string
 	EnvStage              string
 	ExecStage             string
+	DispatchStore         func() (dispatchcred.Store, error)
 	EnvDrops              *EnvDropLog
 	RecoveryStage         string
 	FatalPaneStage        string

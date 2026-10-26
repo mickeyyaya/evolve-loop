@@ -49,10 +49,12 @@ func TestE2ECycleCLIMatrix(t *testing.T) {
 				return
 			}
 			if failure != nil || len(run.calls) == 0 {
-				t.Fatalf("rows N1 and N4 read the stub records of a green M1 run; M1 failed or ran no seat: %v", failure)
+				t.Fatalf("row N1 and the phase marker check read the stub records of a green M1 run; M1 failed or ran no seat: %v", failure)
 			}
 			reportRow(t)(isolation.Judge("N1", run.envLeak()))
-			reportRow(t)(isolation.Judge("N4", run.agentRunNotRefused()))
+			if err := run.agentRunNotRefused(); err != nil {
+				t.Error(err)
+			}
 			reportRow(t)(isolation.Judge("N6", run.indexMissing()))
 		})
 	}

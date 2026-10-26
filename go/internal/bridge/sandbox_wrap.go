@@ -62,6 +62,9 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 			DenyPaths:     req.DenyPaths,
 			DenyReadPaths: req.DenyReadPaths,
 		}
+		cred := deps.dispatchCredentialDeny(deps.execStage())
+		cfg.DenyReadPaths = append(slices.Clone(cfg.DenyReadPaths), cred.read...)
+		cfg.DenyPaths = append(slices.Clone(cfg.DenyPaths), cred.write...)
 		cfg.ExecDenyPaths, cfg.ExecDenyRoots, cfg.ExecDenyEnforce = deps.execDeny(req.CLI, probe.OS)
 		gitWrites, gitDenies, err := sandboxGitWritePaths(req.Worktree, probe.OS)
 		if err == nil {
@@ -105,7 +108,7 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 			}
 			return nil, false
 		}
-		cfg.DenySockets, cfg.DenyLiterals = sockets, append([]string{socketDir}, sockets...)
+		cfg.DenySockets, cfg.DenyLiterals = sockets, append(append([]string{socketDir}, sockets...), cred.literals...)
 
 		return osSandboxPrefix(probe.OS, deps, req, cfg)
 	}

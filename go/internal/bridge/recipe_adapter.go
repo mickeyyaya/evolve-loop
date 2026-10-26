@@ -127,6 +127,9 @@ func newRecipeDriver(cfg *Config, deps Deps, cli string) (*recipeSessionDriver, 
 	if err != nil {
 		return nil, "", fmt.Errorf("recipe: %w", err)
 	}
+	if err := deps.requireDispatchCredential(PurposeProbe, cli); err != nil {
+		return nil, "", fmt.Errorf("recipe: %w", err)
+	}
 	if strings.HasPrefix(cli, "codex") {
 		if err := pretrustCodexProjects(cfg); err != nil {
 			fmt.Fprintf(deps.Stderr, "[recipe] WARN codex pretrust: %v (continuing — best-effort)\n", err)
