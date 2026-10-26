@@ -103,7 +103,7 @@ func readIsolationEqual(a, b sandbox.ReadIsolation) bool {
 	return a.Enforce == b.Enforce && a.Tag == b.Tag && a.RunsDir == b.RunsDir && a.Workspace == b.Workspace &&
 		slices.Equal(a.Grants, b.Grants) && slices.Equal(a.RawSuffixes, b.RawSuffixes) && slices.Equal(a.RawFiles, b.RawFiles) &&
 		slices.Equal(a.RawDirs, b.RawDirs) && slices.Equal(a.SecretDirs, b.SecretDirs) && slices.Equal(a.SecretFiles, b.SecretFiles) &&
-		slices.Equal(a.PinnedFiles, b.PinnedFiles)
+		slices.Equal(a.PinnedFiles, b.PinnedFiles) && slices.Equal(a.ReportOnly, b.ReportOnly)
 }
 
 func TestReadIsolation_OffOrNoWorkspaceGivesNoRulesAndShadowDeniesNothing(t *testing.T) {
@@ -162,7 +162,7 @@ func TestSandboxWrap_TheProfileCarriesTheReadIsolationOfTheCellAndItsTag(t *test
 	}
 	for _, want := range []string{
 		`(deny file-read-data (subpath "` + c.runs + `") (with message "evolve-cell=d42 rule=read.runs.unrelated inv=I5"))`,
-		`(allow file-read* file-read-data (literal "` + filepath.Join(c.runs, "cycle-6", "retrospective-report.md") + `"))`,
+		`(allow file-read* file-read-data (literal "` + filepath.Join(c.runs, "cycle-6", "retrospective-report.md") + `") (with report) (with message "evolve-cell=d42 rule=grant.index"))`,
 	} {
 		if !strings.Contains(string(sbpl), want) {
 			t.Fatalf("the profile must carry %s:\n%s", want, sbpl)

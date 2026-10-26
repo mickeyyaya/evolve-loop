@@ -14,14 +14,16 @@ import (
 type indexTarget struct {
 	projectRoot, workspace, runID string
 	cycle                         int
+	specInputs                    []string
 }
 
 func writeInputIndex(at indexTarget, phase Phase, itemIDs []string, warn io.Writer) {
 	record, err := cycleRecord(at, itemIDs)
 	var idx inputindex.Index
 	if err == nil {
-		limit := policy.LoadOrDefaults(filepath.Join(at.projectRoot, ".evolve", "policy.json"), warn).IsolationLineageMax()
-		idx, err = inputindex.Build(inputindex.Request{ProjectRoot: at.projectRoot, Workspace: at.workspace, Cycle: at.cycle, Phase: string(phase), LineageMax: limit, ItemIDs: record.ItemIDs})
+		pol := policy.LoadOrDefaults(filepath.Join(at.projectRoot, ".evolve", "policy.json"), warn)
+		idx, err = inputindex.Build(inputindex.Request{ProjectRoot: at.projectRoot, Workspace: at.workspace, Cycle: at.cycle, Phase: string(phase),
+			LineageMax: pol.IsolationLineageMax(), ItemIDs: record.ItemIDs, Context: contextPolicy(pol.IsolationContext(), phase, at.specInputs)})
 	}
 	if err == nil {
 		err = inputindex.Write(at.workspace, idx)
@@ -31,6 +33,11 @@ func writeInputIndex(at indexTarget, phase Phase, itemIDs []string, warn io.Writ
 		_ = os.Remove(inputindex.Path(workspace))
 		fmt.Fprintf(warn, "[orchestrator] WARN input index for %s: %v (the cell gets no index and no lineage grants)\n", phase, err)
 	}
+}
+
+func contextPolicy(c policy.IsolationContextPolicy, phase Phase, inputs []string) inputindex.ContextPolicy {
+	return inputindex.ContextPolicy{Stage: c.Stage, Budget: inputindex.Budget{L1Tokens: c.Budget.L1Tokens, L2Tokens: c.Budget.L2Tokens},
+		Required: c.Required[string(phase)], Inputs: inputs}
 }
 
 func fleetScopeIDs(scope string) []string {
