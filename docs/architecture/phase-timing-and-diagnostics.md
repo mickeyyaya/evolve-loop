@@ -8,20 +8,26 @@ At the conclusion of each cycle run, a central timing trace is recorded at `<wor
 
 ### Format and Schema
 
-The schema's home is the unit design [02-failure-diagnostics.md](decomposition/02-failure-diagnostics.md) (`failurediag.Sidecar`, unit 02 of ADR-0103): the struct's field order is the wire order, and the byte-identity test there pins this example.
+The schema's home is the unit design [02-failure-diagnostics.md](decomposition/02-failure-diagnostics.md) (`failurediag.Sidecar`, unit 02 of ADR-0103). The field order of the struct is the wire order. The byte-identity test there pins this example.
 
 The JSON payload is an array of objects, where each object contains the following load-bearing fields:
 
-- `phase` (string): The identifier of the phase (e.g. `"scout"`, `"build"`, `"audit"`, `"ship"`).
+- `phase` (string): The identifier of the phase (for example, `"scout"`, `"build"`, `"audit"`, `"ship"`).
 - `duration_ms` (integer): The elapsed execution time of the phase in milliseconds.
-- `verdict` (string): The canonical verdict resolved for the phase (e.g. `"PASS"`, `"WARN"`, `"FAIL"`, `"SKIPPED"`).
+- `verdict` (string): The canonical verdict resolved for the phase (for example, `"PASS"`, `"WARN"`, `"FAIL"`, `"SKIPPED"`).
 - `cost_usd` (number): The financial cost accrued by LLM calls during this phase.
 - `attempt_count` (integer): The number of attempts executed during this phase.
-- `context_fill_ratio` (number, optional): How full the model's context window got on the terminal attempt — `contextfill.FillRatio` over `contextfill.WindowSizeForTier(resolved_model)`. **Omitted** when the tier was not resolvable, so an absent key means "unknown", never a genuine `0.0`. Not clamped at `1.0`: a phase that overran its window stays distinguishable from one that just fit.
+- `context_fill_ratio` (number, optional): How full the model's context window got on the terminal try — `contextfill.FillRatio` over `contextfill.WindowSizeForTier(resolved_model)`. **Omitted** when the tier was not resolvable, so an absent key means "unknown", never a genuine `0.0`. Not clamped at `1.0`: a phase that overran its window stays distinguishable from one that just fit.
 - `context_window_hot` (boolean, optional): `true` when `context_fill_ratio` reached the inclusive `contextfill.HotThreshold` (0.85). Omitted when false or unknown.
-- `diagnostics` (array of `{severity, message}`, optional; since 2026-09-13, cycles 1634/1636): the phase's OWN structured notes exactly as its `PhaseResponse` reported them — relayed unfiltered by `phaseOutcomeFrom` and written at the `recordPhaseOutcome` chokepoint on both dispatch roots. The error-severity entries are the phase's reason for a FAIL verdict: the seal (`backfillFailReasons`), the chokepoint log line (`[orchestrator] phase <p> verdict=FAIL: …`) and `cyclehealth.ClassifyOutcome` (reading the record through `phasetiming.Entry`) all read them from this one field through the one projection `cyclestate.ErrorMessages`, so a reasoned FAIL (triage's protected-surface admission rejection) no longer seals as "phase-infra class" — that marker is reserved for a FAIL that recorded nothing. Warnings ride along as a durable trail (reconciliation, ACS-floor overrides) and are never treated as reasons. Omitted when the phase reported none.
+- `diagnostics` (array of `{severity, message}`, optional; since 2026-09-13, cycles 1634/1636): the phase's OWN structured notes exactly as its `PhaseResponse` reported them. `phaseOutcomeFrom` relays them unfiltered. The `recordPhaseOutcome` chokepoint writes them on both dispatch roots.
+  - The error-severity entries are the phase's reason for a FAIL verdict. Three readers use them: the seal (`backfillFailReasons`), the chokepoint log line (`[orchestrator] phase <p> verdict=FAIL: …`) and `cyclehealth.ClassifyOutcome` (which reads the record through `phasetiming.Entry`).
+  - All three read them from this one field through the one projection `cyclestate.ErrorMessages`. A reasoned FAIL (triage's protected-surface admission rejection) therefore no longer seals as "phase-infra class". That marker is reserved for a FAIL that recorded nothing.
+  - Warnings ride along as a durable trail (reconciliation, ACS-floor overrides). The system never treats them as reasons.
+  - Omitted when the phase reported none.
 
-Legacy logs written before a field existed parse to its zero value rather than erroring — every addition to this schema is additive and degrades to "absent". `Rollup()` summarises the hot phases at cycle level as `hot_phase_count` / `hot_phases`. Design detail: `docs/architecture/context-window-control.md` § Telemetry wiring.
+Legacy logs written before a field existed parse to its zero value rather than erroring. Every addition to this schema is additive and degrades to "absent".
+
+`Rollup()` summarises the hot phases at cycle level as `hot_phase_count` / `hot_phases`. Design detail: `docs/architecture/context-window-control.md` § Telemetry wiring.
 
 ### Example Payload
 
@@ -51,9 +57,9 @@ By collecting the `duration_ms` field for every phase, operator scripts or dashb
 
 ---
 
-## Per-Attempt Model Telemetry (`llm-calls.ndjson`)
+## Per-Try Model Telemetry (`llm-calls.ndjson`)
 
-Every completed orchestration-owned `Engine.Launch` writes one canonical attempt
+Every completed orchestration-owned `Engine.Launch` writes one canonical try
 record to `<workspace>/llm-calls.ndjson`, including failed launches and launches
 whose token collector is absent or errors. This ledger answers retry-level model,
 outcome, latency, and input/output questions that a terminal phase summary cannot.
@@ -63,12 +69,15 @@ The two timing artifacts have deliberately different scopes:
 | Artifact | Unit | Duration includes | Main use |
 |---|---|---|---|
 | `phase-timing.json` | Completed orchestrator phase occurrence | The phase lifecycle around one or more dispatches | Cycle timing, verdicts, phase retries, cost rollups |
-| `llm-calls.ndjson` | One `Engine.Launch` attempt | The shared Bridge `LaunchArgs` pipeline through driver return | Per-CLI/model latency, failed-attempt cost, dispatch provenance |
+| `llm-calls.ndjson` | One `Engine.Launch` try | The shared Bridge `LaunchArgs` pipeline through driver return | Per-CLI/model latency, failed-try cost, dispatch provenance |
 
-Attempt timing stops before optional token resolution and ledger I/O. The record
-distinguishes missing duration from a measured zero, missing token usage from
-measured zero tokens, an abstract requested tier from a selector that reached a
-dispatch boundary, and a resumed session from a newly launched process.
+Try timing stops before optional token resolution and ledger I/O. The record
+distinguishes these pairs:
+
+- missing duration from a measured zero
+- missing token usage from measured zero tokens
+- an abstract requested tier from a selector that reached a dispatch boundary
+- a resumed session from a newly launched process
 
 Use `evolve models performance --evolve-dir <project>/.evolve` for the derived
 index. It reports latency coverage, input/output/cache totals, usage coverage,
@@ -87,12 +96,11 @@ Immediately after each phase successfully records its timing entry in the orches
 
 The JSON object contains the following fields:
 
-- `phase` (string): The identifier of the phase (e.g. `"scout"`, `"build"`, `"audit"`, `"ship"`).
+- `phase` (string): The identifier of the phase (for example, `"scout"`, `"build"`, `"audit"`, `"ship"`).
 - `cost_usd` (number): The financial cost accrued by LLM calls during this phase.
 - `duration_ms` (integer): The execution duration of the phase in milliseconds.
 - `attempt_count` (integer): The number of attempts executed before the phase finished.
-- `verdict` (string): The canonical verdict resolved for the phase (e.g. `"PASS"`, `"WARN"`, `"FAIL"`, `"SKIPPED"`).
-
+- `verdict` (string): The canonical verdict resolved for the phase (for example, `"PASS"`, `"WARN"`, `"FAIL"`, `"SKIPPED"`).
 ### Example Payload (`build-usage.json`)
 
 ```json
@@ -109,7 +117,7 @@ The JSON object contains the following fields:
 
 ## Phase Failure Diagnostics (`<phase>-failure-diag.json`)
 
-When a mandatory phase exhausts its retries or encounters a non-recoverable error, the orchestrator writes a failure diagnostic file before returning the error and aborting the cycle. This file is saved to `<workspace>/<phase>-failure-diag.json`.
+When a mandatory phase exhausts its retries or encounters a non-recoverable error, the orchestrator writes a failure diagnostic file. It writes the file before it returns the error and aborts the cycle. The file is at `<workspace>/<phase>-failure-diag.json`.
 
 ### Format and Schema
 
@@ -119,7 +127,7 @@ The diagnostic file contains key context fields to enable immediate automated pa
 - `cycle` (integer): The cycle ID in which the failure occurred.
 - `error_message` (string): The non-empty error message returned from the runner.
 - `delivery_failure` (string): The classified submission failure (for example, `prompt submit_wedged (resends=3)`); empty for generic artifact timeouts and non-timeout failures.
-- `exit_code` (integer): `81` for an artifact timeout (`ErrArtifactTimeout`, wrapped or bare); a subprocess's own exit code when the error is an `*exec.ExitError`; otherwise `1` — a wrapped transient bridge failure (quota exhaustion, exit 80/85/86 at the bridge) records `1` here, its bridge code is in the ledger entry.
+- `exit_code` (integer): `81` for an artifact timeout (`ErrArtifactTimeout`, wrapped or bare). It is the own exit code of a subprocess when the error is an `*exec.ExitError`. Otherwise it is `1`. A wrapped transient bridge failure (quota exhaustion, exit 80/85/86 at the bridge) records `1` here. Its bridge code is in the ledger entry.
 - `attempt_count` (integer): The number of attempts executed before the phase aborted.
 - `timestamp` (string): The UTC timestamp when the failure occurred.
 
@@ -168,9 +176,9 @@ the free-form evidence:
 
 `reason` and `detector_error` are independently bounded and escaped. Long
 evidence preserves both its operation prefix and leaf error suffix. Phase,
-driver, cycle, and artifact identify the failed attempt without exposing full
+driver, cycle, and artifact identify the failed try without exposing full
 workspace paths. A detector error from an earlier poll remains as secondary
-evidence, while `cause=completion_detector_error` is used only when the final
+evidence. The system uses `cause=completion_detector_error` only when the final
 detector observation itself failed. A completion confirmed after an earlier
 fault emits no timeout marker.
 
@@ -186,7 +194,7 @@ bridge errors retain their existing shorter bound. Exit code 81 and
 
 ### Verified Submission Delivery Failures — Issue / Gap / Solution
 
-- **Issue:** A tmux prompt or nudge could remain parked after all three bounded Enter re-sends. Submit verification classified the pane as `submit_wedged`, but the driver still consumed the normal artifact-wait budget before returning exit 81.
+- **Issue:** Before the fix, a tmux prompt or nudge remained parked after all three bounded Enter re-sends. Submit verification classified the pane as `submit_wedged`, but the driver still consumed the normal artifact-wait budget before returning exit 81.
 - **Gap:** Both tmux consumer sites recorded the classification without acting on it, and the terminal failure diagnostic exposed only a flat `error_message`. Generic silence and a verified delivery failure therefore looked identical to automation.
 - **Solution:** The prompt site now short-circuits through the existing `ExitArtifactTimeout` marker, while the nudge site carries its classified reason into that same marker. A typed, host-owned `cause=submit_wedged` field authorizes extraction of the escaped reason into `delivery_failure`; reviewer prose cannot forge that classification. Historical markers without `cause` retain the legacy reason fallback. Generic silence and unrelated failures leave the field empty. The existing resend cap and one-relaunch dispatcher contract are unchanged.
 
@@ -194,7 +202,7 @@ bridge errors retain their existing shorter bound. Exit code 81 and
 
 ## Pause Escalation Report (`<phase>-escalation-report.json`)
 
-When the stop-reviewer issues a `ReviewPause` verdict (e.g., an agent artifact timeout), a detailed investigation report is written to `<workspace>/<phase>-escalation-report.json`. This preserves investigation evidence (such as the recent pane tail, elapsed time, intervals, and attempt count) before the runner returns a hard timeout exit code.
+When the stop-reviewer issues a `ReviewPause` verdict (for example, an agent artifact timeout), the system writes a detailed investigation report to `<workspace>/<phase>-escalation-report.json`. This preserves investigation evidence (such as the recent pane tail, elapsed time, intervals, and try count) before the runner returns a hard timeout exit code.
 
 ### Format and Schema
 
@@ -204,9 +212,9 @@ The JSON object contains the following fields:
 - `cycle` (integer): The cycle ID in which the pause occurred.
 - `elapsed_s` (integer): The total seconds waited so far.
 - `interval_s` (integer): The review interval duration.
-- `attempt` (integer): The review attempt index when the pause was triggered.
-- `stop_kind` (string): The classification of the stop condition (e.g., `"artifact_timeout"`).
-- `action` (string): The reviewer's verdict action (e.g., `"pause"`).
+- `attempt` (integer): The review try index (field `attempt`) when the pause was triggered.
+- `stop_kind` (string): The classification of the stop condition (for example, `"artifact_timeout"`).
+- `action` (string): The reviewer's verdict action (for example, `"pause"`).
 - `reason` (string): The human-readable justification produced by the reviewer.
 - `final_pane` (string): The last 40 lines of pane scrollback/stdout tail.
 
@@ -234,15 +242,15 @@ To preserve the structured audit trail of the cycle's execution, the orchestrato
 
 ### Relaunch Signal (`kind=phase_retry`)
 
-When a transient bridge failure (exit code 80, 85, or 86) or an artifact timeout (exit code 81) triggers a self-heal retry, a `kind=phase_retry` entry is appended to the ledger. This signals that the phase encountered a recoverable issue and was relaunched.
+When a self-heal retry starts, the system appends a `kind=phase_retry` entry to the ledger. A transient bridge failure (exit code 80, 85, or 86) or an artifact timeout (exit code 81) triggers the retry. The entry signals that the phase encountered a recoverable issue and was relaunched.
 
-- **ExitCode**: Records the precise bridge exit code (e.g. `80`, `81`, `85`, `86`) returned by the failing attempt.
+- **ExitCode**: Records the precise bridge exit code (for example, `80`, `81`, `85`, `86`) returned by the failing try.
 
 ### Recovery Signal (`kind=backfill`)
 
-If a mandatory phase exhausts its retry budget due to `ErrArtifactTimeout` but successfully reconstructs the missing report/artifact from the terminal scrollback (via `backfill.TryExtract` with `workflow.backfill_enabled=true`), the orchestrator writes a `kind=backfill` entry to the ledger.
+Assume that a mandatory phase exhausts its retry budget due to `ErrArtifactTimeout`. If it successfully reconstructs the missing report/artifact from the terminal scrollback (with `backfill.TryExtract` and `workflow.backfill_enabled=true`), the orchestrator writes a `kind=backfill` entry to the ledger.
 
-- **Role** (string): Set to the name of the backfilled phase (e.g. `"scout"`).
+- **Role** (string): Set to the name of the backfilled phase (for example, `"scout"`).
 - **ExitCode** (integer): Set to `81`, the original timeout exit code that initiated the backfill.
 
 ---
@@ -251,7 +259,7 @@ If a mandatory phase exhausts its retry budget due to `ErrArtifactTimeout` but s
 
 When the tmux driver's stop-review checkpoint fires (the artifact wait interval elapsed), the reviewer adjudicates the evidence and either extends or pauses the phase. Both decisions are now appended to the ledger as `kind=stop_review` entries:
 
-- **Role** (string): The phase agent name (e.g. `"build"`).
+- **Role** (string): The phase agent name (for example, `"build"`).
 - **Action** (string): The reviewer's decision — `"extend"` (continue waiting) or `"pause"` (stop for investigation).
 - **Message** (string): The human-readable justification the reviewer produced.
 
@@ -280,7 +288,7 @@ When a per-phase override is absent or invalid (non-numeric, ≤ 0), the global 
 
 To track recovery events during a cycle, the integrity checker (`evolve cycle-health`) includes the `self_heal_events` signal (signal 13).
 
-This signal automatically scans `ledger.jsonl` for any entries with `kind=phase_retry`, `kind=backfill`, or `kind=stop_review` (with `action=pause`) for the current cycle. For each event found, it generates a `SeverityWarn` anomaly containing the name of the retried/backfilled/paused phase, alerting operators that a self-heal recovery occurred during the cycle.
+This signal automatically scans `ledger.jsonl` for any entries with `kind=phase_retry`, `kind=backfill`, or `kind=stop_review` (with `action=pause`) for the current cycle. For each event found, it generates a `SeverityWarn` anomaly that contains the name of the retried/backfilled/paused phase. The anomaly alerts operators that a self-heal recovery occurred during the cycle.
 
 ---
 

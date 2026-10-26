@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Prevent the cycle pipeline from burning cost retrying structurally-dead phase-agent launches. Before P1, the orchestrator could spawn the same phase-agent up to 3 times even when each launch exited at duration_s < 5 (sandbox-EPERM, nested-Claude restriction, profile schema violation, etc.). Cycle 93's retrospective burned ~$1.20 retrying a dead launch 3 times. After P1, two consecutive sub-5-second exits abort the cycle with a structured ledger entry.
+Prevent the cycle pipeline from burning cost retrying structurally-dead phase-agent launches. Before P1, the orchestrator was able to spawn the same phase-agent up to 3 times even when each launch exited at duration_s < 5. The causes included sandbox-EPERM, nested-Claude restriction and profile schema violation. Cycle 93's retrospective burned ~$1.20 retrying a dead launch 3 times. After P1, two consecutive sub-5-second exits abort the cycle with a structured ledger entry.
 
 ## Mechanics
 
@@ -32,13 +32,13 @@ At each `subagent-run.sh` invocation:
 4. If `duration_s >= 5`:
    - Reset `retryCounters[<role>]` to 0.
 
-The counter is **per-agent**, not per-workspace. Each role (tdd-engineer, builder, auditor, etc.) gets its own counter. A 0-second exit from tdd-engineer doesn't increment the counter for builder.
+The counter is **per-agent**, not per-workspace. Each role (tdd-engineer, builder, auditor and the others) gets its own counter. A 0-second exit from tdd-engineer doesn't increment the counter for builder.
 
 ## Why per-agent, not per-workspace?
 
 Two structural reasons:
 
-1. **Different failure modes per role.** Sandbox-EPERM affects tdd-engineer (writes test files) differently than auditor (mostly reads). A per-workspace counter would conflate unrelated failures.
+1. **Different failure modes per role.** Sandbox-EPERM affects tdd-engineer (writes test files) differently than auditor (mostly reads). The risk of a per-workspace counter is that it conflates unrelated failures.
 2. **Recovery semantics.** When one agent fails, retrying it makes sense; retrying ALL agents (per-workspace counter) doesn't.
 
 Per memory `feedback_parallelization_discipline.md`: "Parallel only for read-only/summarizing tasks; writes are sequential single-writer (codified as `parallel_eligible: bool` in agent profiles)." The counter follows the same single-writer logic — each writing agent has its own counter.
