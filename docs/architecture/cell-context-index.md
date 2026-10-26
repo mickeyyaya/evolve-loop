@@ -27,6 +27,7 @@
 - [10. Read grants](#10-read-grants)
 - [11. CLI neutrality](#11-cli-neutrality)
 - [12. Stage and rollout](#12-stage-and-rollout)
+- [13. As built (CX1 to CX3)](#13-as-built-cx1-to-cx3)
 - [Guards](#guards)
 - [Limits](#limits)
 
@@ -336,21 +337,43 @@ The stage key is `isolation.context.stage`. The compiled default is `shadow`. Th
 | `shadow` | writes `/2` with the layers, the budgets and the required flags; the grants report; the moved bodies of §5 are not listed | unchanged: the tail keeps its bodies | `ISOLATION_CONTEXT_BUDGET_OVER` and `ISOLATION_CONTEXT_REQUIRED_UNOPENED` (kind `isolation.context`) |
 | `enforce` | the same, plus the moved bodies of §5 | the persona and the L0 block only | the same, and `ISOLATION_CONTEXT_PRELOAD_BYTES` with the bytes that the move saves (CX5) |
 
-The flip to `enforce` is an operator decision. It needs one clean wave at `shadow`, and the rows N15 to N17 of the guards green. The persona text of §11 is true at both stages, so it lands with CX2. The open rates of a `shadow` wave cover the listed kinds only. `enforce` lands with component CX5. Until then, `policy.Parse` refuses `enforce` and names CX5.
+The flip to `enforce` is an operator decision. It needs one clean wave at `shadow`, and the rows N15 to N17 of the guards green. The persona text of §11 is true at both stages, so it lands with CX2. The open rates of a `shadow` wave cover the listed kinds only. `enforce` lands with component CX5. Until then, `policy.Parse` refuses `enforce` and names the inbox item of CX5, `context-index-l0-prompt-enforce`.
+
+## 13. As built (CX1 to CX3)
+
+CX1 to CX3 landed in one change at `shadow`. This table names each part and its home.
+
+| Part | As built |
+|---|---|
+| Fields and layers | `inputindex.annotate` sets `layer`, `tokens`, `required` and `why`, and the header fields `stage`, `estimate`, `required` and `budgets` ([internal-inputindex](packages/internal-inputindex.md)). |
+| Required list | `ContextPolicy.Required`, then `ContextPolicy.Inputs`, then `phaseio.EdgeUpstreams`. `cycleRun.dispatch` passes the `inputs.files` of the phase from the merged catalog. |
+| Policy | `isolation.context.stage`, `budget.l1_tokens`, `budget.l2_tokens` and `required` (`policy.IsolationContext`). `policy.Parse` refuses each stage other than `shadow` and a negative budget. It also refuses a required kind that is not shaped like an artifact kind (lowercase words with hyphens). Its message for `enforce` names the inbox item `context-index-l0-prompt-enforce`. |
+| Verbs | `evolve context index`, `open` and `stats` ([internal-cli-contextcmd](packages/internal-cli-contextcmd.md)). |
+| Grant reports | each indexed grant, and each indexed path in the repo (`ReportOnly`), is an `allow` with a report and the message `rule=grant.index` ([internal-adapters-sandbox](packages/internal-adapters-sandbox.md)). |
+| Access log | after the cell, `Deps.reportReadViolations` reads the reports once. It emits the violations and calls `recordContextAccess`, which maps each reported path to its entry and calls `inputindex.RecordAccess`. A cell with no report source writes a cell record with `source: none`. A dispatch whose agent is not the phase of the index writes no record. |
+| Write refusal | `refuseRunDirsReach` also refuses a write grant that covers `.evolve/context-access/`. |
+| Signals | `ISOLATION_CONTEXT_REQUIRED_UNOPENED` (INFO) and `ISOLATION_CONTEXT_BUDGET_OVER` (WARN), kind `isolation.context` ([internal-isolation](packages/internal-isolation.md)). |
+| Persona | `agents/agent-templates.md` §"The input index". |
+
+Differences from the design:
+
+- The X5 report reader never ran for a real cell. `cellTag` refused the `/` of each minted dispatch id, so `readReportsApply` was false. CX3 allows `/` in the tag (`TestCellTag_AcceptsAMintedDispatchIDAndRefusesAQuote`). So the X5 violation signals also start to flow at `shadow`.
+- The pipeline does not set `EVOLVE_PROJECT_ROOT` in a cell today (row N15 shows exit 10 without `--workspace`). So the persona tells the agent to pass the `workspace` line of the prompt.
+- The package notes of `internal/bridge`, `internal/core` and `internal/policy` do not name the change yet. Each has many old ASD-STE100 findings, and the house rule says that a touched file must lint clean. This section and the notes above hold the detail until those notes are rewritten.
 
 ## Guards
 
 | Rule | Guard | Component | State |
 |---|---|---|---|
-| Each entry has a layer that its class sets | `TestBuild_EachEntryHasTheLayerOfItsClass` | CX1 | proposed |
-| `tokens` is `ceil(bytes / 3)` and `why` uses a template | `TestBuild_EachEntryCarriesItsTokenEstimateAndItsReason` | CX1 | proposed |
-| The required list comes from the policy, then the spec, then the edges | `TestRequired_PolicyThenSpecThenEdges` | CX1 | proposed |
-| An overflow clears `required` in list order and keeps each row | `TestBudget_AnOverflowClearsRequiredAndKeepsTheRow` | CX1 | proposed |
-| `open` refuses an unknown id, a path outside the root and a changed body | `TestContextOpen_RefusesAnUnknownIDAForeignPathAndAChangedBody` | CX2 | proposed |
-| Both verbs are class `A` | `TestAgentClasses_MatchTheContract` (X17e) | CX2 | proposed |
-| N15 (matrix): a cell lists its index and opens a required entry through the verb | the matrix, M1 run | CX2 | proposed |
-| N16 (sandbox contract, darwin): an open of an indexed path writes one access record, which names the entry that the index maps the path to | `TestAgentSandboxContract` | CX3 | proposed |
-| N17 (sandbox contract, darwin): a write of `.evolve/context-access/` from a cell is denied, and a write grant that covers it is refused | `TestAgentSandboxContract` | CX3 | proposed |
+| Each entry has a layer that its class sets | `TestBuild_EachEntryHasTheLayerOfItsClass` | CX1 | built |
+| `tokens` is `ceil(bytes / 3)` and `why` uses a template | `TestBuild_EachEntryCarriesItsTokenEstimateAndItsReason` | CX1 | built |
+| The required list comes from the policy, then the spec, then the edges | `TestRequired_PolicyThenSpecThenEdges` | CX1 | built |
+| An overflow clears `required` in entry order and keeps each row | `TestBudget_AnOverflowClearsRequiredAndKeepsTheRow` | CX1 | built |
+| `open` refuses an unknown id, a path outside the root and a changed body | `TestContextOpen_RefusesAnUnknownIDAForeignPathAndAChangedBody` | CX2 | built |
+| Both verbs are class `A` | the table of cli-contract.md §4.1; `TestAgentClasses_MatchTheContract` when X17e lands | CX2 | built (the table) |
+| N15 (matrix): a cell lists its index and opens a required entry through the verb | the matrix, M1 run | CX2 | green |
+| N16 (sandbox contract, darwin): an open of an indexed path writes one access record, which names the entry that the index maps the path to | `TestAgentSandboxContract_AnOpenOfAnIndexedPathWritesOneAccessRecord` | CX3 | green |
+| N17 (sandbox contract, darwin): a write of `.evolve/context-access/` from a cell is denied, and a write grant that covers it is refused | `TestAgentSandboxContract`, `TestResolveSandboxWriteGrants` | CX3 | green |
 | `context-tune` grants no path outside the fixed sources | `TestContextTune_NoChangeGrantsAPathOutsideTheFixedSources` | CX6 | proposed |
 
 ## Limits

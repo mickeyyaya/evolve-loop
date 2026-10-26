@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/inputindex"
 	"github.com/mickeyyaya/evolve-loop/go/internal/plane"
 	"github.com/mickeyyaya/evolve-loop/go/internal/verifylock"
 )
@@ -192,12 +193,18 @@ func refuseRunDirsReach(declared, grant, root string, ownRunDir bool) error {
 	}
 	runs := strings.ToLower(filepath.Join(canonicalRoot, ".evolve", "runs"))
 	folded := strings.ToLower(grant)
-	covers := folded == runs || strings.HasPrefix(runs, folded+string(filepath.Separator))
-	inside := strings.HasPrefix(folded, runs+string(filepath.Separator))
+	covers, inside := reaches(folded, runs)
 	if covers || (inside && !ownRunDir) {
 		return fmt.Errorf("write grant %q covers the run directories of other cycles (%s); declare %s for the own run directory", declared, grant, runDirGlob)
 	}
+	if covers, inside := reaches(folded, strings.ToLower(inputindex.AccessDir(canonicalRoot))); covers || inside {
+		return fmt.Errorf("write grant %q covers the access log of the cell context index (%s); the pipeline alone writes it", declared, grant)
+	}
 	return nil
+}
+
+func reaches(grant, dir string) (covers, inside bool) {
+	return grant == dir || strings.HasPrefix(dir, grant+string(filepath.Separator)), strings.HasPrefix(grant, dir+string(filepath.Separator))
 }
 
 func globFreeAncestor(rel string) string {
