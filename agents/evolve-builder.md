@@ -92,7 +92,7 @@ not fleet mode) is the same defect — name the paths you covered.
 - Read source YAML when more evidence is needed or task recall is absent.
 - Note applied instincts and genes in output.
 ### Step 2: Read Task & Eval
-- **`triage-report.md`'s `## top_n` is your SOLE, authoritative task source.** Read `workspace/triage-report.md` and bind to the slug(s) committed under its `## top_n` section — these are the ONLY tasks this cycle authorized. `scout-report.md` is background context only, NEVER task selection: use it for design detail (targetFiles, eval graders, research backing) *after* you have fixed your task identity from `## top_n`. When the two disagree, `## top_n` wins exclusively; the two-source divergence is the exact root cause of the recurring wrong-task build (a BLOCKING build→audit gate now enforces this — a `## Task:` slug outside `## top_n` aborts before audit).
+- **`triage-report.md`'s `## top_n` is your SOLE, authoritative task source.** Open the `triage-report` entry of `inputs/index.json` and bind to the slug(s) committed under its `## top_n` section — these are the ONLY tasks this cycle authorized. `scout-report.md` is background context only, NEVER task selection: use it for design detail (targetFiles, eval graders, research backing) *after* you have fixed your task identity from `## top_n`. When the two disagree, `## top_n` wins exclusively; the two-source divergence is the exact root cause of the recurring wrong-task build (a BLOCKING build→audit gate now enforces this — a `## Task:` slug outside `## top_n` aborts before audit).
 - The `## Task: <slug>` line in your `build-report.md` MUST be the exact slug you implement, copied verbatim from `triage-report.md`'s `## top_n`. NEVER invent a goal-level/umbrella slug — the auditor's eval-existence check and the eval graders key off it, so a mismatch spuriously fails the cycle (`eval-missing`). If `## top_n` commits multiple slugs, use the highest-priority (first-listed) one.
 - Read inline `Eval Graders` from task object
 - Only read separate eval file if inline graders missing
@@ -130,8 +130,8 @@ Three rules: summarize after Read, prune expired results from your trajectory, a
 
 Record `## Skills Invoked` table and `"skillsInvoked"` ledger field in build-report.md; format spec: reference `tool-hygiene-rules`.
 ### Step 2.8: Advisory Build-Plan Read (if build-planner phase enabled)
-If `workspace/build-plan.md` exists (produced by the build-planner phase when `workflow.phase_enables.build-planner=on`):
-- Read `workspace/build-plan.md` before starting Step 3.
+If `inputs/index.json` has a `build-plan` entry (produced by the build-planner phase when `workflow.phase_enables.build-planner=on`):
+- Open the `build-plan` entry before starting Step 3.
 - In `build-report.md`, cite at least one directive from build-plan.md:
   either as "adhered: <directive>" or "diverged: <directive> — reason: <why>".
 - This is advisory only. Step 3 Design remains the authoritative driver.

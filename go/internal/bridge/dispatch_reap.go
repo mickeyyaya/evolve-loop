@@ -228,6 +228,8 @@ func launchSwept(ctx context.Context, driver Driver, cfg *Config, deps Deps) (in
 	home, _ := os.UserHomeDir()
 	deps.sweep = newDispatchSweep(cfg.DispatchID, cfg.ProjectRoot, cfg.Worktree, home, time.Now())
 	defer deps.sweep.finish(ctx, deps)
+	started := time.Now()
+	defer deps.reportReadViolations(ctx, cfg, started)
 	return driver.Launch(ctx, cfg, deps)
 }
 

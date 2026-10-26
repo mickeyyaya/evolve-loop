@@ -32,6 +32,8 @@ type Config struct {
 	ExecDenyPaths   []string
 	ExecDenyRoots   []string
 	ExecDenyEnforce bool
+
+	ReadIsolation ReadIsolation
 }
 
 func homeStateWriteDirs(home string) []string {
@@ -143,6 +145,7 @@ func GenerateSBPL(cfg Config) string {
 			fmt.Fprintf(&b, "(deny file-write* (subpath %q))\n", dp)
 		}
 	}
+	writeReadIsolation(&b, cfg.ReadIsolation)
 	for _, dp := range cfg.DenyReadPaths {
 		if dp != "" {
 			fmt.Fprintf(&b, "(deny file-read* (subpath %q))\n", dp)
@@ -315,6 +318,7 @@ func BwrapPrefix(cfg Config) []string {
 			out = append(out, "--ro-bind", dp, dp)
 		}
 	}
+	out = append(out, bwrapReadIsolation(cfg.ReadIsolation)...)
 	for _, dp := range cfg.DenyReadPaths {
 		if dp != "" {
 			out = append(out, "--tmpfs", dp, "--chmod", "000", dp, "--remount-ro", dp)

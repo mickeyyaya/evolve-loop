@@ -137,6 +137,7 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/dispatchcred/", Rationale: "the dispatch credential that no agent cell can read (ADR-0154 I-3): a cycle that could edit it could let a cell dispatch an agent"},
 	{Fragment: "/go/cmd/evolve/dispatch_gate.go", Rationale: "the check that each dispatch verb holds the dispatch credential (ADR-0154 I-3, llm-isolation.md §7.1.1)"},
 	{Fragment: "/go/cmd/evolve/dispatch_gate_test.go", Rationale: "the guard that pins each registry command to a dispatch rule or a reason (llm-isolation.md §7.1.1)"},
+	{Fragment: "/go/internal/inputindex/", Rationale: "the artifact index and lineage of each phase cell (ADR-0154 I-4, I-5, X5): the sandbox grants reads of exactly the indexed paths, so a cycle that widened the lineage or listed raw output could let a cell read unrelated cycles or the raw logs of other agents"},
 	{Fragment: "/go/internal/looppreflight/checks.go", Rationale: "pre-spend required-sandbox readiness HALT"},
 	{Fragment: "/go/internal/looppreflight/drivers.go", Rationale: "sandbox-enabled profile discovery used by readiness HALT"},
 	{Fragment: "/go/internal/preflight/preflight.go", Rationale: "measured host sandbox capability used by readiness HALT"},

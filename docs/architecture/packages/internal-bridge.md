@@ -241,6 +241,16 @@ The spec is [llm-isolation.md](../llm-isolation.md) §7.1.
 - `Deps.dispatchCredentialDeny(stage)` (`dispatch_credential.go`) runs at each sandboxed launch at `shadow` or `enforce`. It writes the dispatch credential and the stage through `dispatchcred.Store.Ensure`. It gives the real path of `held/` to `DenyReadPaths`, the parent of the store to `DenyPaths` and each higher ancestor to `DenyLiterals` (`ancestorsOf`). An `Ensure` failure writes one `[bridge] WARN dispatch credential` line and keeps both denies. A store that does not resolve adds no deny.
 - `Deps.requireDispatchCredential(purpose, target)` runs first in `LaunchLLM`, `launchPane`, `launchSwept` and `newRecipeDriver`. A process that does not hold the credential gets `ISOLATION_I3_VIOLATION` (`rule=launch.credential`), and at `enforce` the launch returns `ErrNoDispatchCredential`. `Deps.DispatchStore` is the seam; the default is `dispatchcred.Default` ([internal-dispatchcred.md](internal-dispatchcred.md), spec §7.1.1).
 
+### Read isolation (`read_isolation.go`, X5 of ADR-0154)
+
+The spec is [llm-isolation.md](../llm-isolation.md) §8.5 and §9.
+
+- `Deps.readIsolation(req, home)` gives the sandbox its `ReadIsolation`. The stage is `Deps.readStage` (policy `isolation.i5.stage`, default `shadow`; `off` gives no rule). It reads the grants from `inputindex.ReadablePaths`, and resolves each path to its real path. It keeps a grant only when the real path is inside the runs directory and is not raw output. So a grant cannot reopen a home secret or a raw log. A missing index gives no grant, and a malformed index gives no grant and a WARN.
+- The guarded paths are `.evolve/runs` of the repo when it exists, and the raw-output files and the `.bridge` directory of the own workspace. The home secrets that exist are guarded too: `.ssh`, `.aws`, `.gnupg`, `.netrc`, `.config/gh`, `.docker/config.json` and `.kube`.
+- `ReadIsolation.PinnedFiles` holds `<ws>/lane-scope.json`, so the cell cannot rewrite it.
+- `SandboxWrapRequest.Tag` carries `Config.DispatchID`. The profile puts it in the message of each guarded rule.
+- `launchSwept` calls `Deps.reportReadViolations` after the launch. On macOS it reads the sandbox reports of the tag through `Deps.SandboxReports` (`NewEngine` sets `logShowReports`, which runs `/usr/bin/log show --style ndjson`). `parseReadReports` keeps one report for each rule and target, at most 20. `emitReadViolation` emits `ISOLATION_I4_VIOLATION` or `ISOLATION_I5_VIOLATION` with `action=logged` for an allowed read and `action=refused` for a denied read, and `source=sbpl-report`.
+
 ### The driver factory (`resolve.go`)
 
 *Added 2026-10-17 by component F1 of [bridge-factory-2026-10](../../plans/bridge-factory-2026-10.md) ([ADR-0137](../adr/0137-one-bridge-factory-resolves-every-llm-cli-and-the-manifest-holds-its-facts.md)). The spec of record is [agent-bridge-factory](../agent-bridge-factory.md) §2 and §3.*

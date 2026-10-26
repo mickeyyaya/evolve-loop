@@ -63,7 +63,7 @@ func enforcedHandoffRejection(phase, pair string, check handoff.Check) ReviewRes
 	}
 	reason := fmt.Sprintf("handoff %s: %s; unmet asks: %s", pair, check.Outcome, strings.Join(check.Unmet, ", "))
 	var remedy strings.Builder
-	fmt.Fprintf(&remedy, "Meet each unmet ask of the %s request, by its ask id, in handoff-%s.json, with evidence that resolves: %s.", pair, pair, strings.Join(check.Unmet, ", "))
+	fmt.Fprintf(&remedy, "Open the handoff-asks entry of inputs/index.json. Meet each unmet ask of the %s request, by its ask id, in handoff-%s.json, with evidence that resolves: %s.", pair, pair, strings.Join(check.Unmet, ", "))
 	for _, line := range slices.Concat(check.FailedEvidence, check.Errors) {
 		fmt.Fprintf(&remedy, "\n- %s", line)
 	}

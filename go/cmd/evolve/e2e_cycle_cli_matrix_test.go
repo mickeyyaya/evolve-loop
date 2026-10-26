@@ -185,7 +185,7 @@ func writeMatrixProject(t *testing.T, projRoot, driver string) {
 	t.Helper()
 	writeProjectPolicy(t, projRoot, map[string]any{
 		"cli_routing": map[string]any{"clis": []string{driver}, "default": []string{driver}, "floors": map[string]any{}},
-		"isolation":   map[string]any{"i2": map[string]any{"stage": "enforce"}},
+		"isolation":   map[string]any{"i2": map[string]any{"stage": "enforce"}, "i5": map[string]any{"stage": "enforce"}},
 	})
 	profilesDir := filepath.Join(projRoot, ".evolve", "profiles")
 	for _, name := range []string{"intent", "scout", "triage", "tdd-engineer", "builder", "auditor", "retrospective"} {
@@ -256,11 +256,31 @@ func (r matrixRun) indexMissing() error {
 	if err != nil || len(workspaces) == 0 {
 		return fmt.Errorf("inconclusive: the M1 run left no cycle workspace (%v)", err)
 	}
-	indexes, err := filepath.Glob(filepath.Join(r.projRoot, ".evolve", "runs", "cycle-*", "inputs", "index.json"))
-	if err != nil || len(indexes) == 0 {
-		return fmt.Errorf("no inputs/index.json in the %d cycle workspace(s) of the M1 run, so a retry has no index to open its lineage through (%v)", len(workspaces), err)
+	for _, ws := range workspaces {
+		raw, err := os.ReadFile(filepath.Join(ws, "inputs", "index.json"))
+		if err != nil {
+			continue
+		}
+		var idx struct {
+			Phase   string `json:"phase"`
+			Entries []struct {
+				Kind string `json:"kind"`
+				Path string `json:"path"`
+			} `json:"entries"`
+		}
+		if err := json.Unmarshal(raw, &idx); err != nil {
+			return fmt.Errorf("the inputs/index.json of %s is not JSON: %v", ws, err)
+		}
+		for _, e := range idx.Entries {
+			if strings.HasSuffix(e.Path, "-stdout.log") || strings.HasSuffix(e.Path, "-final-pane.txt") {
+				return fmt.Errorf("the index of the %s phase lists raw output %s", idx.Phase, e.Path)
+			}
+			if e.Kind == "scout-report" {
+				return nil
+			}
+		}
 	}
-	return nil
+	return fmt.Errorf("no inputs/index.json in the %d cycle workspace(s) of the M1 run lists the scout report, so a later phase has no index to open its inputs through", len(workspaces))
 }
 
 func (r matrixRun) envLeak() error {

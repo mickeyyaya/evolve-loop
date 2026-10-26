@@ -97,3 +97,4 @@
 ./internal/isolation 100
 ./internal/faketmux 100
 ./internal/dispatchcred 100
+./internal/inputindex 100
