@@ -12,7 +12,7 @@ run is not a completed improvement wave.
 The shared tmux transport used an unbracketed paste. Tmux's default newline
 conversion turns LF into CR. A terminal UI can treat CR as Enter, not as
 message content. The short shell-line fixture did not model terminal UI input.
-It can produce an artifact after it received only part of a prompt.
+With that fixture, a run was able to produce an artifact after it received only part of a prompt.
 
 `execTmux.PasteBuffer` now preserves LF with `-r` and requests bracketed paste
 with `-p`. Tmux sends paste delimiters only when the receiving application has
@@ -39,7 +39,7 @@ one LF that the existing resolved-prompt materialization adds. Before the repair
 the first submitted message contained only 30 bytes.
 
 A shell-line compatibility
-test remains alongside it. 
+test remains alongside it.
 This native fixture replaces only the provider UI.
 It makes no network request and does not read private documents.
 

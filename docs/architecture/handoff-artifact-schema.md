@@ -22,7 +22,7 @@ evolve-loop relies on three markdown handoff artifacts per cycle:
 | `build-report.md` | Builder | Auditor |
 | `audit-report.md` | Auditor | Orchestrator, ship.sh |
 
-Before C2, there was no structural contract for these files. A phase agent can produce a malformed artifact (missing challenge token, missing verdict, missing task sections). Downstream phases then silently mis-parse or hallucinate content. C2 defines machine-readable schemas and a bash lint script that validates artifacts against them.
+Before C2, there was no structural contract for these files. A phase agent was able to produce a malformed artifact (missing challenge token, missing verdict, missing task sections). In that case, downstream phases silently mis-parsed or hallucinated content. C2 defines machine-readable schemas and a bash lint script that validates artifacts against them.
 
 **Design constraint**: bash-native, jq-readable JSON — no external validators (no Python/Node/ajv). This matches the project's existing tooling pattern and ensures zero new dependencies.
 
@@ -109,7 +109,7 @@ Added as soft WARNs (not FAILs) in three gates — C4/C5 promote to FAIL:
 
 Each integration is guarded with `[ -x "legacy/scripts/tests/validate-handoff-artifact.sh" ]` for backward compatibility: if the script is absent, the gate continues without error.
 
-**Why soft WARN in C2**: Immediate promotion to FAIL blocks cycles on the first rollout cycle. The reason: agents are not yet updated to produce the new required sections. The WARN→FAIL promotion ladder (v8.55 pattern) lets one verification cycle confirm correctness before enforcement.
+**Why soft WARN in C2**: An immediate promotion to FAIL blocks cycles on the first rollout cycle. This happens if agents are not yet updated to produce the new required sections. The WARN→FAIL promotion ladder (v8.55 pattern) lets one verification cycle confirm correctness before enforcement.
 
 ---
 

@@ -59,7 +59,7 @@ what does it do about it."*
 | `stage` | `pre-build` or `post-build`. A `pre-build` phase must sit before `build`. The routing floor refuses it, with a routing-defect signal, when its `after` anchor (or the default pre-audit slot) falls after `build`. An unknown word is refused. Empty is unconstrained | — |
 | `agent` | agent doc name | `evolve-<name>` |
 | `model` | model tier or `auto` | `auto` |
-| `writes_source` | `true` ⇒ can edit code in the worktree. `false` ⇒ the phase is FENCED (ADR-0097). The runner snapshots the worktree before dispatch and restores it after. The runner undoes any write the agent made and reports it as a diagnostic on the phase response. Declare `true` for any phase that must write source. | `false` |
+| `writes_source` | `true` ⇒ is allowed to edit code in the worktree. `false` ⇒ the phase is FENCED (ADR-0097). The runner snapshots the worktree before dispatch and restores it after. The runner undoes any write the agent made and reports it as a diagnostic on the phase response. Declare `true` for any phase that must write source. | `false` |
 | `inputs/outputs.files` | artifact files consumed/produced | — |
 | `inputs/outputs.signals` | namespaced signals consumed/emitted (`<phase>.<key>`) | — |
 | `prompt_context` | `req.Context` keys appended to the prompt | — |
@@ -80,7 +80,7 @@ Set `classify.verdict_from_sentinel` to have the verdict your agent already emit
 | value | behavior |
 | --- | --- |
 | absent / `""` | off — structure decides, the stated verdict is discarded (legacy) |
-| `"shadow"` | routes exactly as off, and writes `judgment-verdict-shadow-<phase>.json` recording the result that the stated verdict gives, if the verdict was in force |
+| `"shadow"` | routes exactly as off, and writes `judgment-verdict-shadow-<phase>.json` recording the result that the stated verdict gives if the stage is `enforce` |
 | `"enforce"` | the stated verdict is authoritative |
 
 Rules worth knowing before you set it:

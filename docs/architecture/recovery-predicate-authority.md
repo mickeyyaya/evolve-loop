@@ -4,7 +4,7 @@ Status: implementation recovery for F1, 2026-09-09.
 
 ## Issue and gap
 
-The Go pipeline already ran predicates, checked audit report hashes, enforced audit repair and bound worktree commits. The missing contract was the relationship between those controls. A prewritten `acs-verdict.json` can suppress the host generator. Ship treated an absent or malformed verdict as no other restriction. A report hash proved which report the host recorded. It did not prove which predicate execution the host accepted.
+The Go pipeline already ran predicates, checked audit report hashes, enforced audit repair and bound worktree commits. The missing contract was the relationship between those controls. Before this change, a prewritten `acs-verdict.json` was able to suppress the host generator. Ship treated an absent or malformed verdict as no other restriction. A report hash proved which report the host recorded. It did not prove which predicate execution the host accepted.
 
 A second failure path mattered: host classification can reject a prose PASS. Recording that rejection as the same exit value used for a permissible WARN lets a later Ship reinterpret the prose. Core now records a host FAIL as exit 2; WARN retains its existing exit 1 policy. Both normal Ship and report-only completion reject the host failure.
 
@@ -55,7 +55,7 @@ Normal Ship compares its current full snapshot to the sealed host tree. Normal S
 
 Binary normalization must happen before Audit. Normalization or source changes after Audit require fresh execution.
 
-Until 2026-09-28 the ship tree was the tracked tree (`treefence.TakeTracked`, the real index plus `add -u`, which the binding also recorded). Ship commits the report-declared paths if they are tracked and if they are not. So eight cycles (1626, 1647, 1674, 1684, 1685, 1694, 1705, 1735) failed their audit on their own declared deliverables. A move of the audit alone did not ship them. The binding still recorded the tracked tree, and Ship refused the receipt. F43 part 2 made the audit, the binding and Ship read one definition ([logic-first-delivery-design.md](logic-first-delivery-design.md) §5.12, component 4).
+Until 2026-09-28 the ship tree was the tracked tree (`treefence.TakeTracked`, the real index plus `add -u`, which the binding also recorded). Ship commits the report-declared paths if they are tracked and if they are not. So eight cycles (1626, 1647, 1674, 1684, 1685, 1694, 1705, 1735) failed their audit on their own declared deliverables. The audit move alone leaves the binding on the tracked tree. Without more changes, Ship refuses the receipt, so the move does not ship them. F43 part 2 made the audit, the binding and Ship read one definition ([logic-first-delivery-design.md](logic-first-delivery-design.md) §5.12, component 4).
 
 A composition entry may preserve review context across a trivial rebase, but cannot carry predicate execution onto a different tree. The existing fleet rebase path returns to Build when the explanation contract requires rebinding, then Audit. Otherwise the typed predicate precondition requests Audit on the composed tree. Existing exact-tree push recovery remains available.
 

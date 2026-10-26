@@ -75,7 +75,7 @@ is keyed on exact prefix bytes, 5-min TTL.) That is a measurement, not a code ch
 becomes moot under A2, because a warm pooled session keeps the CLI's own conversation cache hot anyway.
 
 ### Lever C — swarm read-parallelism  (high ceiling, high cost — defer)
-Read-only phases (scout, audit) can fan out / overlap instead of a strictly serial run. The
+The lever proposes that read-only phases (scout, audit) fan out / overlap instead of a strictly serial run. The
 swarm harness already runs workers under a bounded semaphore (`EVOLVE_SWARM_CONCURRENCY`, default 2)
 but is stage-gated **off** (`EVOLVE_SWARM_STAGE=shadow`). Real ceiling on read-heavy cycles, but it
 needs advisor+orchestrator coordination and careful gate semantics — larger and riskier than A.

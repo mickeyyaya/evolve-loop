@@ -120,7 +120,7 @@ material change, because the host derives the path set from Git.
 
 The host does not refuse a builder that explains a non-material diff anyway. Two cases apply:
 
-- A `REQUIRED` declaration that names the cycle's own record is verified like any explanation. The material set is empty, so `Changed Areas` can cite only Build content: exact diff paths or patterns that cover them.
+- A `REQUIRED` declaration that names the cycle's own record is verified like any explanation. The material set is empty, so `Changed Areas` is allowed to cite only Build content: exact diff paths or patterns that cover them.
 - A `NOT_APPLICABLE` declaration beside an undeclared own record passes, and the record stays as documentation. Nothing validates its content: no section or path check reads it, and no review is owed to it. Once landed, it is a published record like any other, immutable to every later cycle.
 
 Only foreign cycle records are immutable. That
@@ -145,7 +145,7 @@ paths, more than 64 MiB of changed content, special files, symlink-parent
 escapes, and files that change identity while being read.
 
 Audit and Retro are asked to cite the document and every material path with concrete
-`path:line` evidence. The line must exist in the current file or, for deletions,
+`path:line` evidence. The cited line exists in the current file or, for deletions,
 the sealed base blob. Symlink targets, gitlink commit IDs, and empty files each
 have one citable identity line.
 
@@ -188,7 +188,7 @@ change the retry verdict. A resumed landing never verifies again; its intent car
   mandatory Build floor passes again; downstream requests receive the refreshed
   handoff.
 - Host normalization runs before Build validation and sealing.
-  - A later write-capable phase such as test amplification can refresh only the
+  - A later write-capable phase such as test amplification is allowed to refresh only the
     whole-diff digest. This holds when material paths and Builder-owned documentation remain
     unchanged. Material drift routes back to Build.
   - A refresh failure in the content of the explanation also routes back to Build, for the owner to

@@ -1,7 +1,7 @@
 # User Policy Configuration (`.evolve/policy.json`)
 
 The **policy** layer is the user-controlled rule set that bounds the autonomous
-pipeline. It is the *top authority*. It constrains what the routing advisor can
+pipeline. It is the *top authority*. It constrains what the routing advisor is allowed to
 do and pins how individual phases dispatch. It ranks above the per-agent profile defaults
 and even above operator env overrides.
 
@@ -104,9 +104,9 @@ Two knobs over the lessons corpus (`.evolve/instincts/lessons`), both resolved b
 | `recall_k` | 1–50 | **5** | How many lessons one KB lookup returns — the top-k **prefix** of the existing deterministic ranking, not a resample. Resolved at the composition root (`go/cmd/evolve/cmd_cycle.go`, `kbRecallK` → `research.NewFileKBWithRecall`) and consumed by the advisor's recall memory (`Orchestrator.recallForPlan`). |
 | `novelty_threshold` | (0, 1] | **0.9** | Similarity at or above which an incoming deterministic failure lesson counts as a near-duplicate of one already on disk and is skipped (`faillearn.WithNoveltyThreshold` → `go/internal/faillearn/novelty.go`). |
 
-Out-of-range values fall back to the built-in, so they never take effect.
-If `recall_k: 0` took effect, it silently disabled advisor recall memory. If `novelty_threshold: 0` took effect, it suppressed
-every lesson write. An operator cannot express either intent by accident.
+Out-of-range values fall back to the built-in.
+`recall_k: 0` silently disables advisor recall memory if the loader accepts it. `novelty_threshold: 0` suppresses
+every lesson write if the loader accepts it. An operator cannot express either intent by accident.
 
 **The recall default is held at 5 on purpose.** It is the value that the compiled
 `research.maxResults` has always carried, so the new knob changes no
@@ -213,7 +213,7 @@ output does not sit in the prompt.
 The 200 000 claude window is deliberately conservative, below any advertised
 maximum. The operationally useful signal is proximity to *degradation*,
 not to the hard ceiling. Windows for unmeasured families are left at 0 on purpose.
-A guess of one publishes a fabricated fill reading.
+A guess of one is not published, because it is a fabricated fill reading.
 
 ## Pin semantics (dispatch)
 
@@ -290,7 +290,7 @@ for emergencies.
 |---|---|---|
 | `mandatory_phases` | routing advisor | merged into the orchestrator mandatory set; `ClampPlanToFloor` keeps them in every cycle plan |
 | `pins[phase]` | dispatch resolver (`internal/llmroute`) | absolute CLI/model override, validated with `policy.ValidatePin` |
-| `acs.predicate_env` | ACS suite (`internal/acssuite`: `forwardableKeys`, then `predicateEnv`) | each named key set in the suite's environment is copied into the environment of every predicate. Every other `EVOLVE_` key is stripped. Bounded in one place: a lane protocol key or one of the suite's own exports is refused and named in the `warnings` of the verdict. The refusal happens at projection, not at `policy.Load`, so one bad entry does not fail every policy consumer or drop the rest of the list. The suite reads the policy of the state root only, so a cycle worktree cannot widen it. The checked-in list can name only keys that a curated predicate reads |
+| `acs.predicate_env` | ACS suite (`internal/acssuite`: `forwardableKeys`, then `predicateEnv`) | each named key set in the suite's environment is copied into the environment of every predicate. Every other `EVOLVE_` key is stripped. Bounded in one place: a lane protocol key or one of the suite's own exports is refused and named in the `warnings` of the verdict. The refusal happens at projection, not at `policy.Load`, so one bad entry does not fail every policy consumer or drop the rest of the list. The suite reads the policy of the state root only, so a cycle worktree cannot widen it. The checked-in list is allowed to name only keys that a curated predicate reads |
 
 Implementation: `go/internal/policy` (load + validate), consulted by
 `go/internal/llmroute` (pin) and `go/internal/phases/runner` (load + bypass +

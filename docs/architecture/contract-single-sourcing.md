@@ -49,7 +49,7 @@ When you add or change a machine-graded artifact:
   accepted shape gets its own negative-boundary test.
 - Cost note: a literal example adds ~200–400 prompt tokens per dispatch of the
   authoring phase. One cycle that fails on a guessed schema costs ~2M tokens.
-- Flag a new contract without a three-legged test at review. The
+- It is recommended to flag a new contract without a three-legged test at review. The
   diff-review skill and the auditor persona both carry this lens.
 
 ## Known untied contracts (queued)

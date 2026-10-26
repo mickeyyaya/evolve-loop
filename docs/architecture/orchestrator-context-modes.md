@@ -22,7 +22,7 @@ Before cycle 97 (v10.10.0), every phase agent received the same kitchen-sink con
 Cycle 97 shipped two structural changes:
 
 1. **`context_mode` field on agent profiles.** Declarative per-role. Default unchanged (`full`) so existing agents preserve behavior. Orchestrator was flipped to `digest` because its role is sequencing, not synthesis.
-2. **FAIL-path promotion.** When the previous cycle failed, the orchestrator silently flips back to `full` for the recovering cycle. Remediation then has complete defect context. This removes a footgun: a digest-mode orchestrator can under-feed a Builder fix run.
+2. **FAIL-path promotion.** When the previous cycle failed, the orchestrator silently flips back to `full` for the recovering cycle. Remediation then has complete defect context. This removed a footgun: a digest-mode orchestrator was able to under-feed a Builder fix try.
 
 ## Implementation contract
 

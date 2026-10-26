@@ -73,7 +73,7 @@ There are four parts:
 - **The standard (§2).** It is published in one home, the quality-index skill and the `qualityindex` package. It holds the ten dimensions (RL §2) and the gate criteria, each with a verifier, a certificate kind, a dimension and anchors.
 - **The `audit-plan` phase (§3).** The audit role, once per cycle and immediately before build, reads every pre-build deliverable and writes this cycle's expectations. The kernel pre-renders the deterministic parts.
 - **Delivery (§4).** The expectations reach build, code-review and the final audit as capped digests plus the document's path. Each rejection is recorded in a kernel-owned file, keyed by criterion.
-- **The final audit (§5).** It is held to its plan. It evaluates every published criterion with a certificate. It can FAIL on an unpublished criterion only when it declares the criterion NEW. It keeps its probe instances private.
+- **The final audit (§5).** It is held to its plan. It evaluates every published criterion with a certificate. It is allowed to FAIL on an unpublished criterion only when it declares the criterion NEW. It keeps its probe instances private.
 
   The kernel cross-checks it. The kernel never lowers a verdict.
 
@@ -134,9 +134,9 @@ The design chose Approach C (a published standard, an `audit-plan` before build,
 | `diff` | a hunk in the cycle's diff | `<file>:<from>-<to>` | the audit reads it; the kernel checks that the hunk is in the cycle diff |
 | `kernel` | a fact the kernel computed | `kernel` | nobody; it is read from `kernel-facts.json` |
 
-A certificate form can combine two kinds, such as `kernel` + `artifact` for `G-EVAL`. §3.5 check 6 compares the form of the planner with the form that §2.1 gives. The form of `G-COMMENT` is resolved by stage: `kernel` when `comment_floor.stage=enforce`, else `diff`. Check 6 reads the stage from the persisted policy.
+A certificate form is allowed to combine two kinds, such as `kernel` + `artifact` for `G-EVAL`. §3.5 check 6 compares the form of the planner with the form that §2.1 gives. The form of `G-COMMENT` is resolved by stage: `kernel` when `comment_floor.stage=enforce`, else `diff`. Check 6 reads the stage from the persisted policy.
 
-A claim with no certificate is not evidence. Prose such as "tested manually" or "follows the pattern" satisfies nothing. A certificate states *what a claim can cover and how to check it*. The idea comes from the research (dossier F3), not a measurement taken from it.
+A claim with no certificate is not evidence. Prose such as "tested manually" or "follows the pattern" satisfies nothing. A certificate states *what a claim is allowed to cover and how to check it*. The idea comes from the research (dossier F3), not a measurement taken from it.
 
 #### 2.3 Version
 

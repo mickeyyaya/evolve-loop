@@ -8,14 +8,13 @@
 > Status: shipped on `feat/bidirectional-channel-design` (RT0–RT6 + a post-review hardening
 > commit), opt-in with `EVOLVE_CHANNEL=1`, not yet merged to `main`.
 >
-> **Update (ADR-0045 I6, 2026-06-10): `EVOLVE_CHANNEL` is DEPRECATED.** The channel now rides the
-> `EVOLVE_PHASE_RECOVERY` stage — `enforce` implies it; `off`/`shadow` leave it off (byte-identical).
-> An explicit `EVOLVE_CHANNEL` is honored for one more release with a one-time WARN, then removed.
->
-> The single source for "is the channel on" is `internal/bridge/channel.Enabled` +
+> **Update (ADR-0045 I6, 2026-06-10): `EVOLVE_CHANNEL` is DEPRECATED.**
+> - The channel now rides the `EVOLVE_PHASE_RECOVERY` stage — `enforce` implies it; `off`/`shadow` leave it off (byte-identical).
+> - An explicit `EVOLVE_CHANNEL` is honored for one more release with a one-time WARN, then removed.
+> - The single source for "is the channel on" is `internal/bridge/channel.Enabled` +
 > `channel.ResolveStage`. The bridge driver and the observer adapter share them.
-> The `EVOLVE_CHANNEL=1` references throughout this guide describe the *pre-I6* opt-in mechanism.
-> The wiring is unchanged. Only the gate that turns it on moved to the recovery dial. See
+> - The `EVOLVE_CHANNEL=1` references throughout this guide describe the *pre-I6* opt-in mechanism. The wiring is unchanged. Only the gate that turns it on moved to the recovery dial.
+> - See
 > [control-flags.md](control-flags.md) and [interaction-protocol.md](interaction-protocol.md) §I6.
 
 ---
@@ -33,7 +32,7 @@ Concretely, two unmet needs for phases that run for minutes under a tmux-REPL dr
 1. **Continuous, filtered monitoring** — a live, noise-filtered view of agent output
    *while the phase still runs* (not just the post-phase `events.ndjson`).
 2. **Correlated mid-task asks** — the host can inject a question into a running REPL
-   (`evolve bridge send` already existed). It cannot know *which* agent output is the
+   (`evolve bridge send` already existed). It had no way to know *which* agent output is the
    *answer* to *which* injected question. We need request→response bracketing.
 
 ### Requirements / invariants
@@ -203,7 +202,7 @@ Off (`EVOLVE_CHANNEL` unset): none of these exist; no producer goroutine; no ext
    pins it, and codex now reads busy through the same affordance as claude.
 2. **profile.cli-pin family mis-read:** `phaseCLI` resolves family from env only; a CLI pinned
    in `profile.json` (not env) is mis-read as tmux. Now *loud* (silent-feed WARN fires) but not
-   *correct*. The full fix surfaces the resolved CLI to the observer spawn site.
+   *correct*. The proposed full fix is to surface the resolved CLI to the observer spawn site.
 3. **double `capture-pane`/tick** when a correlation span is open (delta capture + idle-bracket
    capture). Channel-on only; reuse the delta `rendered` for the idle check to save one IPC.
 4. **e2e boot-sync** uses a fixed 20 ms sleep before the supervisor injects; a `driver_ready`

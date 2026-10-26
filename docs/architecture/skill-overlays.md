@@ -132,12 +132,12 @@ dispatch is `balanced`, which no compiled tier rule names.
 
 ## Configuration (`.evolve/policy.json` → `overlays`)
 
-> **`when` (ADR-0099 slice 3):** a rule can also key on the objective signals of the cycle: `{"when": [{"field": "deliverable_kind", "op": "eq", "value": "document"}]}`. The resolver evaluates it against `OverlayDispatch.Signals`. Core projects these at dispatch (`PhaseRequest.Signals`, ONE kernel digest per dispatch; the runner copies and never re-reads the workspace). The signals are:
->
+> **`when` (ADR-0099 slice 3):** a rule is allowed to also key on the objective signals of the cycle: `{"when": [{"field": "deliverable_kind", "op": "eq", "value": "document"}]}`. The resolver evaluates it against `OverlayDispatch.Signals`. Core projects these at dispatch (`PhaseRequest.Signals`, ONE kernel digest per dispatch; the runner copies and never re-reads the workspace). The signals are:
 > - `deliverable_kind` (declared by triage/scout, else the project default from `.evolve/domain.json`, else `code`; always present);
 > - `scout.goal_type` (only when the scout declared one).
->
-> The keys are the routable field names of the kernel (`config.SignalDeliverableKind` / `config.SignalGoalType`, the same words that a `conditional_mandatory` clause uses). An absent signal never matches (fail-closed; see Caveats). The compiled default preloads `solution-scout` / `solution-build` / `solution-audit` onto the scout / build / audit dispatches of a document cycle, each followed by `docs-write`.
+> - The keys are the routable field names of the kernel (`config.SignalDeliverableKind` / `config.SignalGoalType`, the same words that a `conditional_mandatory` clause uses).
+> - An absent signal never matches (fail-closed; see Caveats).
+> - The compiled default preloads `solution-scout` / `solution-build` / `solution-audit` onto the scout / build / audit dispatches of a document cycle, each followed by `docs-write`.
 
 > **`writes_source` (2026-10-07):** `{"writes_source": true}` selects only a dispatch that can write source into the cycle worktree. An omitted or `false` value is a wildcard, like an empty list. The value is `OverlayDispatch.WritesSource`, which the runner reads from `PhaseRequest.WritesSource()`: `!WorktreeReadOnly || len(WorktreeWritablePaths) > 0`. Only the orchestrator's `withWorktreeFence` sets the two fields. It uses the one write predicate and the debugger's fleet-rebase carve-out (its `conflicted_paths`).
 >

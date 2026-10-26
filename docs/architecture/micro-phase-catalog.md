@@ -1,11 +1,8 @@
 # Micro-Phase Catalog — Atomic, Advisor-Composable Development Phases
 
-**Date:** 2026-06-05
-
-**Status:** Approved design; implementation queued as evolve-loop cycle goals (3 waves)
-
-**Research basis:** [docs/research/micro-phase-catalog-research-2026-06-05.md](../research/micro-phase-catalog-research-2026-06-05.md) (2-round web research: 106-agent adversarially-verified deep-research + 3 targeted gap-fill agents)
-
+**Date:** 2026-06-05.
+**Status:** Approved design; implementation queued as evolve-loop cycle goals (3 waves).
+**Research basis:** [docs/research/micro-phase-catalog-research-2026-06-05.md](../research/micro-phase-catalog-research-2026-06-05.md) (2-round web research: 106-agent adversarially-verified deep-research + 3 targeted gap-fill agents).
 **Builds on:** ADR-0024 (phase advisor), ADR-0028 (user-defined phases), ADR-0035 (spec-derived contracts), [user-defined-phases.md](user-defined-phases.md), [missing-development-phases-2026-06-03](../research/missing-development-phases-2026-06-03.md)
 
 ---
@@ -42,9 +39,9 @@ Two tiers — **the shape of a name encodes the phase's tier**:
    - This set is CLOSED: no new single-word phase names, ever.
    - The trust kernel, 53 ACS predicates and the ledger wire them in. A rename is a migration, not a cleanup.
 2. **Every optional / advisor-selectable / user / minted phase is `<object>-<action>`**: the thing examined, then the operation on it.
-   - Examples: `smell-scan`, `mutation-gate`, `dependency-audit`, `bug-reproduction`.
-   - `bug-reproduction` was renamed from `reproduce-bug` on 2026-06-06 to fit the rule. The signal namespace `repro.*` is kept, because signals are namespaces, not phase names.
-   - The action can be a nominal (`-localization`, `-amplification`, `-reproduction`) when the short verb is ambiguous.
+   - Examples: `smell-scan`, `mutation-gate`, `dependency-audit` and `bug-reproduction` (renamed from `reproduce-bug` on 2026-06-06 to fit the rule).
+   - The signal namespace `repro.*` is kept, because signals are namespaces, not phase names.
+   - The action is allowed to be a nominal (`-localization`, `-amplification`, `-reproduction`) when the short verb is ambiguous.
    - A name must answer "what does this phase look at, and what does it do about it" without a read of the spec.
 3. **Grandfathered Go-wired exceptions** (they violate the shape of tier 2, but a Go migration to fix them has a cost):
    - `tester` (single-word but optional; the proposed name is `integration-test`);
@@ -106,7 +103,7 @@ Two tiers — **the shape of a name encodes the phase's tier**:
 - **Reverse-import widening + operator-visible cap (cycle-1267).**
   - The cycle-1255 corpus walked only the *own* directories of the changed packages. A package whose `_test.go` imports the changed package is the literal definition of a covering test. It stayed invisible, and the agent fell back to the whole-repo `Grep` that the corpus exists to remove.
   - `changedpkgs.DirectImporters(worktree, changedPackages)` (`go/internal/changedpkgs/direct_importers.go`) closes that half. It parses the import graph of the module (imports-only, `_test.go` files included). It returns the packages that **directly** import any changed package. `writeCoveringTests` unions them into the pattern set before `CoveringTests` walks it.
-  - DIRECT is one hop by design: an unbounded closure re-inflates the context that this artifact shrinks. Matching is on the exact import path, never a prefix, so nobody can pull in a same-suffix package from another module.
+  - DIRECT is one hop by design: an unbounded closure, if used, re-inflates the context that this artifact shrinks. Matching is on the exact import path, never a prefix, so nobody can pull in a same-suffix package from another module.
   - Fail-open throughout (no `go.mod`, the module-wide `./...` sweep, an escaping pattern, or a leaf that nothing imports all yield `nil`). So the corpus degrades to the cycle-1255 changed-packages-only set.
   - Separately, the byte cap is no longer silent from the seat of the **operator**. `renderCoveringTests` now *returns* the omitted count. That count is the single source for both the in-artifact `TRUNCATED:` note and a `[orchestrator] WARN covering-tests: corpus TRUNCATED — N of M …` line on stderr. The line appears only when something was actually dropped. So a clean cycle stays quiet and the before/after token measurement of the item stays interpretable.
 - **Corpus is untrusted input (cycle-1268).**
@@ -191,7 +188,7 @@ The advisor classifies the cycle goal (classify-then-route — Anthropic/LangGra
 | release | rollback-plan → changelog-sync → [ship] → post-ship-monitor |
 | docs / trivial | spine only (no insertions) |
 
-Recipes are guidance, not law. The advisor can mix rows (for example, a security-relevant refactor takes threat-model + behavior-lock), and `ClampPlanToFloor` clamps everything.
+Recipes are guidance, not law. The advisor is allowed to mix rows (for example, a security-relevant refactor takes threat-model + behavior-lock), and `ClampPlanToFloor` clamps everything.
 
 Since 2026-09-28 the router enforces the drop. A planned phase whose `insert_when` is its whole rule (no `rubric_hint`) runs only when the trigger fires at its turn in the walk. See [dynamic-phase-routing.md](dynamic-phase-routing.md), the phase registry section. Mixing rows still works wherever a row's triggers fire, such as fault-localization on a refactor whose audit fails with `code-audit-fail`. Each trigger field needs a producer. `phasespec.UnproducedTriggerFields` names each field that has none.
 
@@ -211,7 +208,7 @@ Each wave = one or more autonomous cycles. Per phase: `.evolve/phases/<name>/pha
 
 A later ADR may decompose built-in monoliths, requiring Go/registry/floor changes:
 
-- **scout** → `codebase-scan` + `web-research` + `eval-design` (already sub-agents inside the scout skill). Promotion makes them advisor-routable individually. For example, skip web-research on carryover cycles.
+- **scout** → `codebase-scan` + `web-research` + `eval-design` (already sub-agents inside the scout skill). Promotion, if done, makes them advisor-routable individually. For example, skip web-research on carryover cycles.
 - **audit** → `correctness-audit` (floor evaluate) + advisor-selectable lenses (style, safety, docs) — partially superseded by the user evaluate phases above, which already act as audit lenses.
 - **build** → optional `patch-candidates`/`patch-rank` sampling stages (Agentless model) — likely better as builder-internal strategy than as phases.
 - **risk-gate** (OpenHands per-action SecurityAnalyzer) — a per-tool-call kernel hook, not a phase; belongs in the sandbox/trust-kernel layer if pursued.
@@ -226,7 +223,7 @@ Floor implications (≥1 evaluate before ship; build∧audit ordering) must be r
 
 ## 8. Wave 4 — adversarial-pipeline phases (2026-06-14, skills-derived)
 
-Source: a research pass over the most-starred community agent-skill catalogs (agentskills.media → `alirezarezvani/claude-skills`, `VoltAgent/awesome-agent-skills`, `anthropics/skills`, the openaitoolshub "349 ranked" list) cross-referenced against existing coverage. The pass translates the highest-value, currently-uncovered skill classes into **15 new optional `evaluate` gates**. So the loop hardens *any* request type. All are `optional:true` user phases (4-file scaffold, zero spine change). Each is an independent skeptic. It can BLOCK on CRITICAL, but it is advisory + clamped to the integrity floor.
+Source: a research pass over the most-starred community agent-skill catalogs (agentskills.media → `alirezarezvani/claude-skills`, `VoltAgent/awesome-agent-skills`, `anthropics/skills`, the openaitoolshub "349 ranked" list) cross-referenced against existing coverage. The pass translates the highest-value, currently-uncovered skill classes into **15 new optional `evaluate` gates**. So the loop hardens *any* request type. All are `optional:true` user phases (4-file scaffold, zero spine change). Each is an independent skeptic. It is allowed to BLOCK on CRITICAL, but it is advisory + clamped to the integrity floor.
 
 **The live recipes + per-phase core values are the SSOT in [`agents/evolve-router.md`](../../agents/evolve-router.md)** (Goal-Type Recipes table + Phase Catalog — Core Values). This section is the design record (what + why + which skill it derives from); it does not restate the recipes.
 

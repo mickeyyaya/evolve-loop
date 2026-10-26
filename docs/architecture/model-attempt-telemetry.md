@@ -86,7 +86,7 @@ the historical fields used by older readers.
 `first_output_ms` and `first_output_source` remain optional and are not emitted
 today. Headless stdout bytes, a changing tmux pane, and a provider's first token
 do not identify the same event. If the ledger recorded one as universal time to first token,
-the comparison misleads.
+then the comparison misleads.
 
 ## Dispatch identity rules
 
@@ -200,8 +200,8 @@ that corrupt collector values cannot enter totals or throughput calculations.
 
 Input throughput is unavailable because the Bridge has no provider-independent
 boundary separating prompt prefill from queue and transport time. Time to first
-token is unavailable for the same reason. Add these fields only
-with a new source-specific timing contract, and group them by that source.
+token is unavailable for the same reason. It is recommended to add these fields only
+with a new source-specific timing contract. They must be grouped by that source.
 
 ## Consumers and correlation
 

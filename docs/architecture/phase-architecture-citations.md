@@ -153,7 +153,7 @@ Bibliography at the bottom — alphabetical with full author lists, year, venue,
 
 ### Fluent-by-default failure adaptation (v8.28.0+)
 - **Citation**: Anderson 2008 *Security Engineering* §"fail-safe vs fail-secure" [Anderson-2008]
-- **Why**: Anderson distinguishes systems where the recommended failure behavior is default-allow (fail-safe — door unlocks if power fails) vs default-deny (fail-secure — door locks if power fails). Pre-v8.28.0 evolve-loop was fail-secure on every WARN/recurring-failure (block ship). v8.28.0 made code-side failures fail-safe (proceed with awareness) while keeping integrity-side failures fail-secure. The split lets the pipeline keep moving on quality issues while blocking only on structural breaches.
+- **Why**: Anderson distinguishes systems where failure defaults to allow (fail-safe — door unlocks if power fails) vs default-deny (fail-secure — door locks if power fails). Pre-v8.28.0 evolve-loop was fail-secure on every WARN/recurring-failure (block ship). v8.28.0 made code-side failures fail-safe (proceed with awareness) while keeping integrity-side failures fail-secure. The split lets the pipeline keep moving on quality issues while blocking only on structural breaches.
 
 ---
 
@@ -188,7 +188,7 @@ Bibliography at the bottom — alphabetical with full author lists, year, venue,
 - **Why**: Both papers show self-improving systems need frequency gates to avoid runaway adaptation (over-correction on noise). Every-5-cycle gives enough signal accumulation between meta-changes.
 
 ### Pattern detection across cycles
-- **Citation**: Fernando and others 2023 "Promptbreeder: Self-Referential Self-Improvement Via Prompt Evolution" [Fernando-2023]
+- **Citation**: Fernando and others 2023 *"Promptbreeder: Self-Referential Self-Improvement Via Prompt Evolution"* [Fernando-2023]
 - **Why**: Promptbreeder's evolutionary prompt-improvement loop inspires evolve-loop's pattern-detection-then-propose pattern. The proposals[] field is the "candidate gene pool" the operator selects from.
 
 ### Operator approval gate (no auto-modification of kernel)

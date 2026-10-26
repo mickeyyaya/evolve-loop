@@ -107,7 +107,7 @@ Both properties are load-bearing, not stylistic:
   With error severity, a size diagnostic turns a merely verbose report into a dossier-visible failure.
 - **No on-disk mutation.** The ship phase re-reads this artifact and SHA-binds
   those exact bytes (`go/internal/phases/ship/audit.go`).
-  A truncating cap breaks the integrity check that it was meant to protect.
+  A truncating cap, if used, breaks the integrity check that it was meant to protect.
 
 The idiom is the one `defect_ledger.go` already uses for the defect ledger
 (`defectLedgerMaxEntries` / `defectTextMaxRunes`, cycle-1282 DEF-6): bound it,

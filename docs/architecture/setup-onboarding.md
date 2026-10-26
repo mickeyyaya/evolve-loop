@@ -1,14 +1,12 @@
 # Setup Onboarding (`evolve setup` + `/evo:setup`)
 
-> **Status:** Shipped 2026-05-27.
->
-> - Step-9b migration (2026-06-02): the durable per-phase override moved to `.evolve/policy.json` `pins`.
-> - Auto-config update (2026-06-24): the per-phase model **recommendation is now deterministic Go** (`evolve setup recommend`/`apply`), driven by a public preset config. The skill is a thin presenter. It offers ONE preset choice instead of twelve per-phase prompts. Design: [setup-auto-config-presets.md](setup-auto-config-presets.md).
-> - Routing-table amendment (2026-10-07, L2 of the CLI routing plan): when `.evolve/policy.json` declares a `cli_routing` table, the table owns every route and presets do not apply. `detect` reports `routing_table_declared: true`. `recommend` and `apply` refuse (exit 1, nothing written) and point at `evolve cli-routing show` and `evolve cli-routing set agents.<role> <clis> [--model <tier>]`.
->
-> Pins beside a table make every launch refuse.
-> **Audience:** Operators onboarding a new checkout; anyone changing per-phase model routing.
-> **Source:** `go/internal/setup/{setup,recommend,apply,presets}.go`, `go/cmd/evolve/cmd_setup.go`, `skills/setup/SKILL.md`, `go/internal/setup/presets.json`. Design: [adr/0051-setup-onboarding.md](adr/0051-setup-onboarding.md), [setup-auto-config-presets.md](setup-auto-config-presets.md).
+> - **Status:** Shipped 2026-05-27.
+>   - Step-9b migration (2026-06-02): the durable per-phase override moved to `.evolve/policy.json` `pins`.
+>   - Auto-config update (2026-06-24): the per-phase model **recommendation is now deterministic Go** (`evolve setup recommend`/`apply`), driven by a public preset config. The skill is a thin presenter. It offers ONE preset choice instead of twelve per-phase prompts. Design: [setup-auto-config-presets.md](setup-auto-config-presets.md).
+>   - Routing-table amendment (2026-10-07, L2 of the CLI routing plan): when `.evolve/policy.json` declares a `cli_routing` table, the table owns every route and presets do not apply. `detect` reports `routing_table_declared: true`. `recommend` and `apply` refuse (exit 1, nothing written) and point at `evolve cli-routing show` and `evolve cli-routing set agents.<role> <clis> [--model <tier>]`.
+>   - If pins sit beside a table, every launch refuses.
+> - **Audience:** Operators onboarding a new checkout; anyone changing per-phase model routing.
+> - **Source:** `go/internal/setup/{setup,recommend,apply,presets}.go`, `go/cmd/evolve/cmd_setup.go`, `skills/setup/SKILL.md`, `go/internal/setup/presets.json`. Design: [adr/0051-setup-onboarding.md](adr/0051-setup-onboarding.md), [setup-auto-config-presets.md](setup-auto-config-presets.md).
 
 ## TL;DR
 
@@ -74,9 +72,7 @@ Project root resolves `--project-root` > `EVOLVE_PROJECT_ROOT` > cwd; `--evolve-
 - **capability_tier**: `full` (budget + permission native), `delegated` (delegates to claude / kernel hooks), `n/a` (no binary). The precise 5-dimension quality tier is available with `./bin/check-caps`.
 - **tier_models**: each abstract tier → the NATIVE model of that CLI. The source is the `model_tier_map` of the family bridge manifest (single source of truth — `<family>-tmux.json`, for example `codex-tmux.json`). A headless manifest points at it with `model_tier_map_from`. This doc never restates the ids: read the manifest. `/setup` writes the chosen native model into `.evolve/policy.json` `pins[<phase>].model`.
 
-> **Resolution nuance.** Without a pin, `resolvellm` resolves a phase from its profile (`cli` + `model_tier_default`, default `balanced`). Step 9 removed the `llm_config.json` layer, so the profile is the only default source. A `.evolve/policy.json` `pin` then overrides: `pin.cli` sets the CLI and `pin.model` sets the exact model that the realizer dispatches.
->
-> `policy.TierRank` classifies the tier of the pin (for the envelope check) from `pin.model`. Claude models classify by substring. Gemini/gpt models are rank 0, so the envelope check is skipped, and `allowed_clis` still applies.
+> **Resolution nuance.** Without a pin, `resolvellm` resolves a phase from its profile (`cli` + `model_tier_default`, default `balanced`). Step 9 removed the `llm_config.json` layer, so the profile is the only default source. A `.evolve/policy.json` `pin` then overrides: `pin.cli` sets the CLI and `pin.model` sets the exact model that the realizer dispatches. `policy.TierRank` classifies the tier of the pin (for the envelope check) from `pin.model`; Claude models classify by substring. Gemini/gpt models are rank 0, so the envelope check is skipped and `allowed_clis` still applies.
 - **phases** cover the 12 configurable roles, each resolved from its profile by `resolvellm.Resolve`, then the matching `.evolve/policy.json` pin overlaid (`source` becomes `policy-pin`). A malformed `policy.json` sets the top-level `policy_error` and disables overlay (the floor still applies at dispatch).
 - **default_cli / default_tier** carry the PROFILE default (profile `cli` + `model_tier_default`) independently of any pin overlay, so `Recommend` can compute "differs from default" without re-loading the profile. Unpinned phases have these equal to `current_*`; pinned phases keep the profile default here while `current_*` shows the pin.
 
@@ -97,7 +93,7 @@ Project root resolves `--project-root` > `EVOLVE_PROJECT_ROOT` > cwd; `--evolve-
   - It refuses outright when the policy JSON that it patches has a `cli_routing` key, in any letter case as the policy loader reads it (`setup.ErrRoutingTableDeclared`). `detect` reports the same raw key as `routing_table_declared`, so a table policy that otherwise fails to load is still refused. The reasons:
     - The `cli-routing` verbs are the only writer of the table.
     - A preset assigns one CLI per phase. The table routes ordered chains through tier ceilings, the Claude floor and the tail.
-    - The "max" bias picks agy at deep, and the deep ceiling refuses agy.
+    - The "max" bias, if applied, picks agy at deep, and the deep ceiling refuses agy.
   - It writes a pin ONLY where `differs_from_default`.
   - It lossless-merges into `policy.json` (preserving `floor`/`cli_health`/foreign pins).
   - It stores the **abstract tier**, never the native model id. A native id ranks 0 in `TierRank` and skips the envelope check.
@@ -136,5 +132,5 @@ With `routing_table_declared: true` the skill skips the presets (steps 4 to 7). 
 ## Limitations
 
 - **No plan/quota detection:** subscription plan tier (Pro/Max/Free) and remaining quota are out of scope — no reliable local signal. The recommender keys off what's robustly detectable: auth posture (`auth_mode`), availability (`verdict`), and each CLI's tier→model map.
-- **Live per-model availability deferred:** the recommender uses the manifest tier→model maps, not a live `models list` query per CLI. A live query shells to each CLI (tmux) and risks a hang of the wizard. So it is a best-effort follow-up. `verdict`-based availability already prevents a recommendation of a blocked CLI.
+- **Live per-model availability deferred:** the recommender uses the manifest tier→model maps, not a live `models list` query per CLI. A live query, if added, shells to each CLI (tmux) and risks a hang of the wizard. So it is a best-effort follow-up. `verdict`-based availability already prevents a recommendation of a blocked CLI.
 - **Profile-less phases:** a phase with no `<role>.json` profile has no default to recommend against. `recommend` shows a best-effort assignment, but `apply` **skips** it (never pins what it cannot validate). A complete repo ships all 12 profiles.

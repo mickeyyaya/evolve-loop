@@ -5,12 +5,10 @@
 > (classify a dead/stuck phase → kill/fallback/advise). This document owns the layer ABOVE death:
 > **repairing a live or just-completed phase through bounded, validated interaction**, so fewer
 > states ever become terminal.
->
-> The author wrote it on 2026-06-10 from the ADR-0044 validation-batch forensics
-> (cycles 263–269). The team implemented it the same day across five slices + two security-hardening fixes
-> (all merged to main). The sections below are the original design + threat model + rationale.
-> The **As-built deltas** immediately below record where the shipped code intentionally diverged
-> from this sketch. Read them first if you read this doc to understand the running system.
+> - The author wrote it on 2026-06-10 from the ADR-0044 validation-batch forensics (cycles 263–269).
+> - The team implemented it the same day across five slices + two security-hardening fixes (all merged to main).
+> - The sections below are the original design + threat model + rationale.
+> - The **As-built deltas** immediately below record where the shipped code intentionally diverged from this sketch. Read them first if you read this doc to understand the running system.
 
 ## As-built deltas (2026-06-10)
 
@@ -36,7 +34,7 @@ lists the canonical symbols):
   is the one named follow-up — NOT shipped.** What shipped is the **deterministic** half: the
   `KernelAnswerer` (I3) and the full validation/promotion/consumption substrate (I4:
   `internal/interaction/rulepromote.go` + `internal/bridge/interaction_rules.go`). The in-bridge
-  mid-launch second-LLM dispatch that feeds them is future work.
+  mid-launch second-LLM dispatch that is to feed them is future work.
 - **§8's TDD list is the original RED plan; several names were consolidated or renamed in delivery**,
   and the advisor-tail tests track the deferred follow-up above. The shipped suites live in
   `internal/{interaction,panetrust}/*_test.go`, `internal/core/correction_ladder_test.go`,
@@ -70,7 +68,7 @@ resilience against adversarial/degenerate scenarios.
 | 265 | ship's report misplaced → contract-correction re-dispatched the WHOLE phase ×2 → circuit breaker opened | The correction ladder has exactly one rung (full re-dispatch). A misplaced-but-valid artifact is a `mv`, not a re-run. |
 | 265 | correction directive carried only the violation text | Try 2 retried blind — no evidence of what try 1 actually did (which file it DID write, where). |
 | 267 | codex usage-quota pane → `rate_limit` pattern escalated exit 85 → (pre-fix) no fallback | Unknown/blocked prompts had no automated path; the escalation report's `next_steps` instruct a HUMAN to add a rule. |
-| 268 | tdd wrote its eval to the main tree → unrecoverable → guard killed a healthy cycle | Repair actions (salvage/relocate) were missing where interaction can fix the problem cheaply. |
+| 268 | tdd wrote its eval to the main tree → unrecoverable → guard killed a healthy cycle | Repair actions (salvage/relocate) were missing where interaction was able to repair the problem cheaply. |
 | 263–269 | `nudgeSent=true` and nothing measures if any nudge ever worked | Interactions are fired and forgotten — no outcome record, so no tuning signal and no learning. |
 | 262 (archaeology) | the bridge's own nudge echoed into a dead pane and read as "progress" | Injection without correlation/recording is self-interference. |
 
@@ -256,7 +254,7 @@ deferred-debt-then-unify move that ADR-0044 used for outcome recording (C1 → C
 **already triggers the cross-family CLI fallback chain** (`llmroute` default triggers
 `{80, 81, 85, 87, 124, 127}`). That is the right floor. But it is wasteful when the kernel *knows the
 answer* (the deliverable path, the goal, the cycle number). The fallback CLI re-does the whole
-phase to get past a question that one injected line can clear.
+phase to get past a question that one injected line clears.
 
 **Seam (corrected by review — this is load-bearing).** The orchestrator NEVER sees a "blocked
 question". By the time control returns to core, the chain has already advanced. The only place with
@@ -265,7 +263,7 @@ branch BEFORE `return ExitUnknownPrompt`**. The location is `bridge/autorespond.
 surgery as the fatal-pane check of ADR-0044. I3 is therefore a **new pre-85 rung in the bridge**, with
 explicit precedence:
 
-- It can delay the 85 by exactly one bounded answer-window.
+- It is allowed to delay the 85 by exactly one bounded answer-window.
 - On any miss it **falls through to today's 85 → fallback chain unchanged**.
 - I3 must never suppress the chain.
 
@@ -299,7 +297,7 @@ then chain.
 ### I4 — Interaction-rule promotion (Reflexion for the auto-respond registry)
 
 **Problem.** The escalation report tells a *human* to run `evolve bridge add-rule`. The fatal-pane
-registry already self-expands (ADR-0044 Slice 5). The recommended action is that the interaction registry self-expands too — more
+registry already self-expands (ADR-0044 Slice 5). It is recommended that the interaction registry self-expands too — more
 carefully, because a bad auto-respond rule *acts* (keystrokes) rather than just classifies.
 
 **Design — a thin payload-specialization of the promotion path of I3, NOT a parallel stack.** The following are reused **wholesale**:
@@ -309,7 +307,7 @@ carefully, because a bad auto-respond rule *acts* (keystrokes) rather than just 
 
 I4 adds only a second payload Strategy (`{regex, response_keys, note}` instead of `{cause, substr}`) and a second target
 registry. One promotion mechanism, two payloads. A second promote/validate/shadow stack
-violates the single-source command outright.
+violates the single-source command outright, if built.
 
 - **Validation (deterministic, at the trust boundary):**
   - The regex compiles under Go's RE2 (no catastrophic backtracking by construction).
@@ -324,7 +322,7 @@ violates the single-source command outright.
   `.evolve/instincts/interaction-rules/`, replayed at boot beside fatal-signatures (corrupt files
   skipped — boot never bricks). The boot replay **re-runs corpus validation** on every promoted
   rule. So a corpus update (new CLI version's healthy banner) demotes any rule that now matches.
-  The one-time validation of a promotion against a corpus that can rot never happens (§6 S3).
+  A promotion is not validated only once. The boot replay validates it again against a corpus that can rot (§6 S3).
 
 ### I5 — `panetrust`: the pane-content trust boundary (cross-cutting)
 

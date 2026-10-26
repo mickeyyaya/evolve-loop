@@ -106,5 +106,5 @@ The setup's only write target is the public `.evolve/policy.json`. Everything it
 
 ## Deferred
 
-- **Live per-model availability** (`modelquery.Refresh`) — deferred, because a live query shells to each CLI (tmux) and risks a hang of the wizard. The design uses manifest tier maps + `verdict` instead.
+- **Live per-model availability** (`modelquery.Refresh`) — deferred, because a live query, if added, shells to each CLI (tmux) and risks a hang of the wizard. The design uses manifest tier maps + `verdict` instead.
 - **Plan-tier (Pro/Max/Free) detection** — no reliable local signal.

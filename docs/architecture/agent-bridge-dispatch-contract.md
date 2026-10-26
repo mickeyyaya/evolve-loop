@@ -27,7 +27,7 @@ banned.
 
 **Alternatives considered.**
 - *Silently ignore the flag (always bridge).* Rejected — a silent change (Rule 3); a caller that sets
-  the flag, if any, gets surprising behavior with no signal.
+  the flag gets surprising behavior with no signal under this option.
 - *Loud, default-off deprecation with a removal date.* Reasonable, but leaves the banned path
   reachable during the deprecation window.
 - *Hard error (chosen).* Setting the flag fails loudly at the single `Run()` chokepoint. No dispatch
@@ -79,7 +79,7 @@ Two single-source-of-truth fixes: one for the *verdict* a dispatched artifact ea
 ### B3a — Artifact verification SSOT
 
 **Problem.** The "is this artifact valid?" ladder existed in **three** Go copies that
-can drift. The ladder is: stat → freshness < 5 min → readable/non-empty →
+can drift apart. The ladder is: stat → freshness < 5 min → readable/non-empty →
 token-bearing → exec status ⇒ `PASS` / `FAIL` / `INTEGRITY_FAIL`. The copies are:
 
 - `classifyArtifact` (`run.go`, single dispatch, bare verdict);
@@ -152,7 +152,7 @@ override reaches the recorded `StopEvent.IntervalS` end-to-end, and `cfg.Artifac
 ## B4 — Subagent conformance suite
 
 **Problem.** A bespoke test enforced each invariant above. Nothing guaranteed that they held
-*uniformly for every role*, so a new agent can silently miss one.
+*uniformly for every role*, so a new agent was able to silently miss one.
 
 **Design.** `subagent/conformance_test.go` is a single suite driven by a **fake-bridge seam** (the
 `RunOptions.ExecAdapter`, standing in for `evolve subagent run` with no LLM cost). It is **table-driven
@@ -235,9 +235,9 @@ partial-failure were only exercised at N=4.
 
 ## H1 — Fan-out per-worker provenance verification
 
-**Problem.** A capstone `evolve loop` cycle implemented parent-side per-worker artifact verification. It ran the B3 `Verify` with an **empty token**: `bytes.Contains(body, []byte("")) == true` for any
-non-empty body. So a compromised/buggy worker runner can write arbitrary content to the expected
-artifact path and pass (presence, not provenance). The adversarial audit of the pipeline caught this as a
+**Problem.** A capstone `evolve loop` cycle implemented parent-side per-worker artifact verification, but it ran the B3 `Verify` with an **empty token**: `bytes.Contains(body, []byte("")) == true` for any
+non-empty body. So before the fix, a compromised or buggy worker runner was able to write arbitrary content to the expected
+artifact path. The check passed it (presence, not provenance). The adversarial audit of the pipeline caught this as a
 HIGH finding. This change closes it (the deferred token-threading).
 
 **Design (provenance by a parent-dictated token).** The fan-out parent already derives a per-worker
@@ -255,10 +255,10 @@ A wrong-token or tokenless worker artifact now fails verification, which skips a
 ## B6 — Allow-list ↔ profile single-sourcing (+ reaping)
 
 **Problem.** B1 made the allow-list one source (`agentRoles` → `agentRolePattern`). But the allow-list
-and the on-disk profiles can still drift.
+and the on-disk profiles still had no guard against drift.
 
-A role added to `agentRoles` without a `<role>.json`
-profile (or a profile removed out from under a role) fails only at dispatch time.
+Before B6, a role added to `agentRoles` without a `<role>.json`
+profile (or a profile removed out from under a role) failed only at dispatch time.
 `run.go:179` loads `ProfilesDir/<role>.json`.
 
 **Design (test; no production change).** `conformance_registry_test.go`:
