@@ -316,3 +316,9 @@ The check of §7 also fails on these:
 ### 10.6 The consumer: the context index of a cell
 
 The rule index is the knowledge layer of the context index of each cell. A separate design extends the `inputs/index.json` of X5 (#1133) into a layered context index for the data that a phase agent reads. That index reads `guidance/index.json` as its knowledge layer. That design owns the wiring into the cell. This design only keeps the entry fields of §10.2 stable.
+
+The spec of that design is `docs/architecture/cell-context-index.md` (PR #1139). It uses two kinds of layer, and the words differ:
+
+- The `layer` of an entry of `guidance/index.json` is the rule layer of §2 (L0 to L4).
+- The cell index puts each kept rule row into its context layer `L3` (knowledge, reference only). It moves the rule layer to the field `rule_layer`, and it sets `layer` to `L3`.
+- The cell index copies `rule_layer` and `audience` from the row and never changes them. It keeps the rows for the audience `phase`, the phase name and the family of the seat.
