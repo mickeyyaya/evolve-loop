@@ -604,22 +604,19 @@ func TestAgentSandboxContract_AnOpenOfAnIndexedPathWritesOneAccessRecord(t *test
 	}
 	cfg := &Config{CLI: "claude-tmux", Agent: idx.Phase, Cycle: 7, ProjectRoot: h.root, Worktree: h.worktree, Workspace: h.run,
 		RequireSandbox: true, DispatchID: "sbc-" + strconv.Itoa(os.Getpid())}
-	deps := Deps{hostOS: "darwin", ReadStage: "enforce", Env: map[string]string{}, SandboxReports: logShowReports(logShowPath)}
-	failure := fmt.Errorf("no access record names the retrospective of cycle 6")
-	for try := 0; try < 5 && failure != nil; try++ {
-		_ = os.Remove(filepath.Join(inputindex.AccessDir(h.root), "cycle-7.jsonl"))
-		deps.reportReadViolations(context.Background(), cfg, since)
-		records, err := inputindex.ReadAccess(h.root)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, r := range records {
-			if r.Type == inputindex.AccessOpen && r.Kind == "retrospective" && r.Cycle == 7 && r.Source == inputindex.AccessSourceSandbox {
-				failure = nil
-			}
-		}
-		if failure != nil {
-			time.Sleep(time.Second)
+	var stderr strings.Builder
+	deps := Deps{hostOS: "darwin", ReadStage: "enforce", Env: map[string]string{}, Stderr: &stderr, Now: time.Now, Sleep: time.Sleep,
+		SandboxReports: logShowReports(logShowPath), SandboxFence: sandboxFence(sandboxExecPath)}
+	started := time.Now()
+	deps.reportReadViolations(context.Background(), cfg, since)
+	records, err := inputindex.ReadAccess(h.root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	failure := fmt.Errorf("no access record names the retrospective of cycle 6 after %s of polling for the fence (stderr %q)", time.Since(started).Round(time.Millisecond), stderr.String())
+	for _, r := range records {
+		if r.Type == inputindex.AccessOpen && r.Kind == "retrospective" && r.Cycle == 7 && r.Source == inputindex.AccessSourceSandbox {
+			failure = nil
 		}
 	}
 	note, jerr := isolation.Judge("N16", failure)
