@@ -110,6 +110,13 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `CARRYOVER_WORKSPACE_MALFORMED` | a cycle-workspace carryover document is not its documented JSON shape; the file is skipped whole, never aborting the cycle — a persona defect for the memo or audit owner; the reason carries the decode error |
 | `CARRYOVER_WORKSPACE_READ_FAILED` | a cycle-workspace carryover document (carryover-todos.json or defect-ledger.json) exists but could not be read (not absence: permissions, a directory at the path); nothing is merged, the closeout proceeds; fields name the document and path |
 
+### cli
+
+| Code | Meaning |
+|---|---|
+| `CLI_QUEUE_FAILED` | the boundary could not apply a queued CLI request (cli-contract.md §4 rule 3); the request moved to .evolve/queue/failed/; fields verb, request, rc, shelf |
+| `CLI_QUEUE_UNLANDED` | the applied queue left tracked changes beyond the loop stamps; the next sync-main refuses them until an operator lands them (cli-contract.md §4.6); fields paths |
+
 ### config
 
 | Code | Meaning |

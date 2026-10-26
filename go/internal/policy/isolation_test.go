@@ -181,3 +181,32 @@ func TestParse_RefusesAContextBlockThatNoReaderCanApply(t *testing.T) {
 		}
 	}
 }
+
+func TestIsolationQueueStage_ReadsIsolationI15StageAndDefaultsToEmpty(t *testing.T) {
+	t.Parallel()
+	cases := map[string]string{
+		``:                 "",
+		`{"isolation":{}}`: "",
+		`{"isolation":{"i7":{"stage":"enforce"}}}`:  "",
+		`{"isolation":{"i15":{"stage":"enforce"}}}`: "enforce",
+	}
+	for body, want := range cases {
+		var p policy.Policy
+		if body != "" {
+			if err := json.Unmarshal([]byte(body), &p); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if got := p.IsolationQueueStage(); got != want {
+			t.Errorf("%s: IsolationQueueStage = %q, want %q", body, got, want)
+		}
+	}
+}
+
+func TestPolicyParse_AcceptsTheIsolationI15Stage(t *testing.T) {
+	t.Parallel()
+	p, err := policy.Parse([]byte(`{"isolation":{"i15":{"stage":"enforce"}}}`))
+	if err != nil || p.IsolationQueueStage() != "enforce" {
+		t.Fatalf("Parse = %v, stage %q; want the i15 stage accepted", err, p.IsolationQueueStage())
+	}
+}

@@ -23,8 +23,8 @@ func runInboxRouteConsole(root string, args []string, stdout, stderr io.Writer) 
 		fmt.Fprintf(stderr, "inbox route-console: cycle %q is not a cycle number\n%s\n", args[2], inboxUsage("route-console"))
 		return 10
 	}
-	if refusedMidWaveAt(root, "route-console", stderr) {
-		return cliExitRefused
+	if rc, queued := inboxQueueGate(root, "route-console", args, asJSON, stdout, stderr); queued {
+		return rc
 	}
 	opts := inboxmover.Options{ProjectRoot: root, Stderr: stderr}
 	loc, err := inboxmover.Locate(filepath.Join(opts.ProjectRoot, ".evolve", "inbox"), id)

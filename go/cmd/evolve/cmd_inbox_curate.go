@@ -51,8 +51,8 @@ func runInboxEdit(root string, args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, inboxUsage("edit"))
 		return 10
 	}
-	if refusedMidWaveAt(root, "edit", stderr) {
-		return cliExitRefused
+	if rc, queued := inboxQueueGate(root, "edit", args, asJSON, stdout, stderr); queued {
+		return rc
 	}
 	path, err := inboxmover.Edit(curationOptions(root, stderr), target, edits)
 	if rc := curationExitCode("edit", err, stderr); rc != 0 {
@@ -96,8 +96,8 @@ func runInboxWithdraw(root string, args []string, stdout, stderr io.Writer) int 
 		fmt.Fprintln(stderr, inboxUsage("withdraw"))
 		return 10
 	}
-	if refusedMidWaveAt(root, "withdraw", stderr) {
-		return cliExitRefused
+	if rc, queued := inboxQueueGate(root, "withdraw", args, asJSON, stdout, stderr); queued {
+		return rc
 	}
 	id := strings.TrimSpace(args[0])
 	path, err := inboxmover.Withdraw(curationOptions(root, stderr), id, args[1])
@@ -118,8 +118,8 @@ func runInboxVerify(root string, args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, inboxUsage("verify"))
 		return 10
 	}
-	if refusedMidWaveAt(root, "verify", stderr) {
-		return cliExitRefused
+	if rc, queued := inboxQueueGate(root, "verify", args, asJSON, stdout, stderr); queued {
+		return rc
 	}
 	path, err := inboxmover.VerifyPremise(curationOptions(root, stderr), id, *evidence)
 	if rc := curationExitCode("verify", err, stderr); rc != 0 {

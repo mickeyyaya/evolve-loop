@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
@@ -55,9 +54,11 @@ func runCLIRoutingWrite(verb string, args []string, stdout, stderr io.Writer) in
 		fmt.Fprintf(stderr, "evolve cli-routing %s: %v (%s)\n", verb, err, cliRoutingUsage)
 		return exitRoutingUsage
 	}
-	if err := refuseBoundaryWrite(f.root, os.Getenv, time.Now(), "the routing table"); err != nil {
-		fmt.Fprintf(stderr, "evolve cli-routing %s: %v\n", verb, err)
-		return cliExitRefused
+	if !f.dryRun {
+		call := midWaveCall{root: f.root, verb: "cli-routing " + verb, prefix: "evolve cli-routing " + verb, args: routingQueuedArgs(args), asJSON: f.json, stdout: stdout, stderr: stderr}
+		if rc, queued := call.queueOrRefuse(); queued {
+			return rc
+		}
 	}
 	w := routingWrite{verb: "cli-routing " + verb, flags: f, rewrites: rewrites, stdout: stdout, stderr: stderr}
 	if !f.json {
@@ -68,6 +69,11 @@ func runCLIRoutingWrite(verb string, args []string, stdout, stderr io.Writer) in
 		return rc
 	}
 	return printVerbJSON(w.verb, routingWriteResult{Policy: filepath.Join(f.root, ".evolve", "policy.json"), DryRun: f.dryRun, ProfileRewrites: append([]string{}, slices.Sorted(maps.Keys(rewrites))...)}, stdout, stderr)
+}
+
+func routingQueuedArgs(args []string) []string {
+	_, rest, _, _ := takeFlagValue(args, "--project-root")
+	return slices.DeleteFunc(slices.Clone(rest), func(a string) bool { return a == "--json" })
 }
 
 type routingWriteResult struct {

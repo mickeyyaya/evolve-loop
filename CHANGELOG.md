@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## Changed — the inbox and routing writers queue during a wave, and `gc` takes a lease (X17c, 2026-10-27)
+
+- **The queue.** `inbox edit`, `withdraw`, `verify`, `route-console`, `route-lane` and `cli-routing set`, `unset`, `init`, `migrate` can run while a loop lane is live. With the policy key `isolation.i15.stage` at `enforce`, each one writes one request to `.evolve/queue/` and exits 4. The compiled stage is `shadow`: the verb refuses with exit 3 and names the file that `enforce` writes.
+- **The boundary step.** `boundary run` and `wave next` run the new step `queue-apply` right after `sync-main`. It applies the requests in time order and emits one `cli.queue.applied` signal for each. A failed request moves to `.evolve/queue/failed/` with the WARN code `CLI_QUEUE_FAILED`.
+- **Inside a phase pane** each of these verbs refuses with exit 3, also with no live lease. This is new for the five inbox verbs; the `cli-routing` writers refused before. `cli-routing ... --dry-run` runs at once, also during a wave.
+- **Land the applied changes.** `queue-apply` names each tracked change that it leaves (WARN `CLI_QUEUE_UNLANDED`). Land them, for example with `evolve ship --class manual`, before the next `wave next`, or the next `sync-main` refuses them.
+- **`gc`** takes the lease `.evolve/gc.lock`, and a second `gc` exits 3. `--lease-wait D` waits for the lease; the boundary step waits 2 minutes. While a run lease is live, `gc` skips the sweeps that stop processes and names the live runs.
+- **Upgrade step.** Leave the stage at `shadow` for one wave, then set `{"isolation": {"i15": {"stage": "enforce"}}}` in `.evolve/policy.json`.
+- Docs: [cli-contract §4.6](docs/architecture/cli-contract.md), [runtime-reference](docs/operations/runtime-reference.md), [signal-codes](docs/architecture/signal-codes.md), [cmd-evolve](docs/architecture/packages/cmd-evolve.md).
+
 ## Changed — one envelope and one exit table for the core verbs (X17b, 2026-10-27)
 
 - **The envelope.** With `--json`, each core verb prints one envelope on each exit, also on a usage error. Its fields are `schema`, `ok`, `data`, `error` and `warnings`. §5 of [cli-contract.md](docs/architecture/cli-contract.md) lists the core verbs.
