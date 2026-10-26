@@ -1,45 +1,65 @@
 # Loop Binary Self-Deploy — Design (ADR-0046 Layer 3)
 
-- **Status:** Design pass (ADR-0046 L3 was "designed only"; this is the slice-level design it asked for). No code until this plan is approved.
+- **Status:** Design pass (ADR-0046 L3 was "designed only"; this is the slice-level design that it asked for). No code until the plan is approved.
 - **Date:** 2026-06-13
-- **Relates to:** [ADR-0046](adr/0046-gate-epistemics-and-self-deploy.md) (the parent; L0–L2 implemented, L3 designed-only), the ship repair ladder (`repairSelfSHAPin`, the TOFU re-pin this automates), `evolve doctor boot` (boot-smoke), checkpoint/resume (`evolve loop --resume`), [runtime-reference.md](../operations/runtime-reference.md) §"Rebuilding the tracked `go/evolve` binary" (the manual dance this removes).
+- **Relates to:**
+  - [ADR-0046](adr/0046-gate-epistemics-and-self-deploy.md) (the parent; L0–L2 implemented, L3 designed-only);
+  - the ship repair ladder (`repairSelfSHAPin`, the TOFU re-pin this automates);
+  - `evolve doctor boot` (boot-smoke);
+  - checkpoint/resume (`evolve loop --resume`);
+  - [runtime-reference.md](../operations/runtime-reference.md) §"Rebuilding the tracked `go/evolve` binary" (the manual dance this removes).
 
 ## Problem — the manual dance is the missing self-heal step
 
-A cycle that changes loop behavior ships its source, then a HUMAN must: rebuild the tracked `go/evolve` (2× reproducible), `cp` to `bin/`, clear `expected_ship_sha` (the SELF_SHA dance), and ship a `chore(build)` commit — and even then the **running** batch keeps executing the OLD binary until a human restarts it. So a fix to a gate/phase/router does not affect the batch that shipped it; it lands one human-restart later.
+A cycle that changes loop behavior ships its source. Then a HUMAN must do four things:
 
-ADR-0046's end-to-end self-heal vision (301 fails → instinct demotes gate → 302 ships the fix → **boundary re-exec** → 303 runs the fixed gate) is blocked entirely on that re-exec. Layers 0–2 are in; L3 is the last link.
+1. Rebuild the tracked `go/evolve` (2× reproducible).
+2. Run `cp` to `bin/`.
+3. Clear `expected_ship_sha` (the SELF_SHA dance).
+4. Ship a `chore(build)` commit.
 
-> This design was written immediately after performing the manual dance **four times in one session** (ADR-0048 C1, Slice B, ledger-anchor + a docs commit). The steps below are that exact procedure, made deterministic and moved into the loop.
+Even then, the **running** batch keeps executing the OLD binary until a human restarts it. So a fix to a gate/phase/router does not affect the batch that shipped it. The fix lands one human-restart later.
+
+The end-to-end self-heal vision of ADR-0046 is this: 301 fails → instinct demotes gate → 302 ships the fix → **boundary re-exec** → 303 runs the fixed gate. That vision is blocked entirely on the re-exec.
+
+Layers 0–2 are in. L3 is the last link.
+
+> This design was written immediately after the manual dance ran **four times in one session** (ADR-0048 C1, Slice B, ledger-anchor + a docs commit). The steps below are that exact procedure, made deterministic and moved into the loop.
 
 ## Decision — re-exec into the freshly-shipped binary at the cycle boundary
 
-At each cycle boundary (after ship, before the next `RunCycle`), the loop compares the **tracked** `go/evolve`'s committed identity to the **running** binary's baked-in `version.commit`. On a mismatch (the batch just shipped a newer binary than the one executing), boot-smoke the new binary and `exec` into it, resuming the batch. The running process is replaced; the batch continues on the fixed binary.
+At each cycle boundary (after ship, before the next `RunCycle`), the loop compares the **tracked** `go/evolve`'s committed identity to the **running** binary's baked-in `version.commit`. On a mismatch, the batch just shipped a newer binary than the one that executes. Then the loop boot-smokes the new binary, runs `exec` into it and resumes the batch. The new process replaces the running process. The batch continues on the fixed binary.
 
-Gated `EVOLVE_SELF_DEPLOY = off | shadow | enforce` (ADR-0046 discipline), default **shadow** (logs "would re-exec cycle=N old=<commit> new=<commit>"; changes nothing) until a soak validates it.
+Gated `EVOLVE_SELF_DEPLOY = off | shadow | enforce` (ADR-0046 discipline), default **shadow** (logs "would re-exec cycle=N old=<commit> new=<commit>" and changes nothing) until a soak validates it.
 
 ### Trigger (the identity check)
 
-- `running := version.commit` (baked in at build via `-ldflags`).
-- `tracked := git rev-parse --short=12 HEAD:go/evolve`-committed identity. Two sound sources, pick one in the build slice: (a) the `version.commit` baked into the tracked blob — requires reading it out of the committed binary (awkward); (b) simpler & sufficient — the **commit that last touched `go/evolve`** (`git log -1 --format=%h -- go/evolve`) vs `running`. (b) is a deterministic proxy: the binary-chore commit stamps `version.commit = HEAD` at rebuild, so "go/evolve was rebuilt at a commit newer than the one I'm running" is exactly the trigger. **Decision: use (b)** — no binary introspection, pure git.
+- `running := version.commit` (baked in at build with `-ldflags`).
+- `tracked := git rev-parse --short=12 HEAD:go/evolve`-committed identity. There are two sound sources. Pick one in the build slice:
+  - (a) the `version.commit` baked into the tracked blob. This requires you to read it out of the committed binary (awkward).
+  - (b) simpler and enough: the **commit that last touched `go/evolve`** (`git log -1 --format=%h -- go/evolve`) compared with `running`.
+
+  (b) is a deterministic proxy. The binary-chore commit stamps `version.commit = HEAD` at rebuild. So "go/evolve was rebuilt at a commit newer than the one I'm running" is exactly the trigger. **Decision: use (b)** — no binary introspection, pure git.
 - Mismatch AND `tracked` is an ancestor-or-equal of `HEAD` (never re-exec into an unrelated/older binary) ⇒ candidate for re-exec.
 
 ### Boot-smoke before exec (never exec into a broken binary)
 
-Run the new binary through the existing `evolve doctor boot` path (the `looppreflight` boot-smoke — `Config.BootOnly` + `bridge.BootSmokeTest`). On **success**, proceed to exec. On **failure**: keep the current binary, file a defect to the inbox (`self-deploy-boot-smoke-failed`, with both commits + the smoke output), and continue the batch on the running binary. A bad rebuild can never brick the batch — it just doesn't get adopted.
+Run the new binary through the existing `evolve doctor boot` path (the `looppreflight` boot-smoke — `Config.BootOnly` + `bridge.BootSmokeTest`). On **success**, proceed to exec. On **failure**: keep the current binary. File a defect to the inbox (`self-deploy-boot-smoke-failed`, with both commits + the smoke output). Continue the batch on the running binary.
+
+A bad rebuild can never brick the batch. The loop just does not adopt it.
 
 ### The re-exec
 
-- Checkpoint the batch state first (the existing per-cycle checkpoint — `--resume` infra). The re-exec is equivalent to `evolve loop --resume` but in-process via `syscall.Exec` into the new `go/evolve` with the resume args + the same env.
-- **SELF_SHA re-pin on exec:** before exec, perform the dance deterministically — `expected_ship_sha` is cleared so the new binary TOFU-re-pins itself on its first ship (this is exactly `repairSelfSHAPin`'s verified-rebuild path; self-deploy reuses that trust boundary: re-pin ONLY when the running binary's SHA equals `HEAD:go/evolve`'s blob SHA — never a divergent binary).
-- **One generation per cycle (no exec loops):** a re-exec sets a sentinel (`.evolve/self-deploy-generation` = the adopted commit). On boot, if the running `version.commit` already equals that sentinel, do NOT re-exec again this cycle. Bounds the chain to one hop per cycle boundary; a genuinely newer binary next cycle re-exec's again.
+- Checkpoint the batch state first (the existing per-cycle checkpoint — `--resume` infra). The re-exec is equivalent to `evolve loop --resume`, but it runs in-process with `syscall.Exec` into the new `go/evolve`, with the resume args + the same env.
+- **SELF_SHA re-pin on exec:** before exec, perform the dance deterministically. `expected_ship_sha` is cleared so that the new binary TOFU-re-pins itself on its first ship. This is exactly the verified-rebuild path of `repairSelfSHAPin`. Self-deploy reuses that trust boundary: re-pin ONLY when the SHA of the running binary equals the blob SHA of `HEAD:go/evolve` — never a divergent binary.
+- **One generation per cycle (no exec loops):** a re-exec sets a sentinel (`.evolve/self-deploy-generation` = the adopted commit). On boot, if the running `version.commit` already equals that sentinel, do NOT re-exec again this cycle. This bounds the chain to one hop per cycle boundary. A genuinely newer binary in the next cycle causes a re-exec again.
 
 ### Failure / safety matrix
 
 | Condition | Action |
 |---|---|
 | `EVOLVE_SELF_DEPLOY=off` | never check; current behavior |
-| `=shadow` | log would-re-exec; change nothing (soak evidence) |
+| `=shadow` | log `would-re-exec`; change nothing (soak evidence) |
 | boot-smoke fails | keep running binary; file `self-deploy-boot-smoke-failed` defect; continue |
 | running SHA ≠ `HEAD:go/evolve` blob SHA (divergent, not a verified rebuild) | refuse re-exec (same trust floor as `repairSelfSHAPin`); file defect |
 | `tracked` not an ancestor of HEAD | refuse (don't adopt an unrelated binary) |
@@ -48,9 +68,9 @@ Run the new binary through the existing `evolve doctor boot` path (the `looppref
 
 ## Build order (slices, each TDD + dual-review + ship + soak)
 
-1. **Identity probe (pure, no exec):** `selfdeploy.ShouldRedeploy(running, trackedCommitForGoEvolve, headAncestry) → (bool, reason)`. Unit-testable, zero side effects. Wire a **shadow** log at the cycle boundary. Ship; soak collects would-re-exec frequency.
+1. **Identity probe (pure, no exec):** `selfdeploy.ShouldRedeploy(running, trackedCommitForGoEvolve, headAncestry) → (bool, reason)`. Unit-testable, zero side effects. Wire a **shadow** log at the cycle boundary. Ship. The soak collects the frequency of `would-re-exec` logs.
 2. **Boot-smoke gate:** reuse `looppreflight`/`evolve doctor boot` against the candidate binary; the decision stays advisory (shadow still logs). Ship.
-3. **Re-exec + re-pin (enforce path, still shadow-default):** `syscall.Exec` resume + the SELF_SHA re-pin + the one-generation sentinel. Behind `=enforce`. Soak in a dedicated run (ADR-0046 says the natural home is the **CE fleet-supervisor wave**, where worker-restart-on-new-binary is native — sequence it there).
+3. **Re-exec + re-pin (enforce path, still shadow-default):** `syscall.Exec` resume + the SELF_SHA re-pin + the one-generation sentinel. Behind `=enforce`. Soak in a dedicated run. ADR-0046 says the natural home is the **CE fleet-supervisor wave**, where worker-restart-on-new-binary is native. Sequence it there.
 
 ## Open questions / risks
 
@@ -62,5 +82,5 @@ Run the new binary through the existing `evolve doctor boot` path (the `looppref
 ## Non-goals
 
 - A dedicated "hotfix phase" (ADR-0046 rejected it — hotfix capability is emergent from blocker-solo + demotion + self-deploy).
-- Re-exec mid-cycle (only at the boundary — gates run in-process; mid-cycle adoption would change the binary under a running phase).
+- Re-exec mid-cycle (only at the boundary — gates run in-process). The risk is that mid-cycle adoption changes the binary under a running phase.
 - Cross-version self-deploy (a major-version bump is a release, `evolve release`, not a loop self-deploy).

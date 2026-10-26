@@ -1,6 +1,6 @@
 # Observer Severity Vocabulary
 
-> System-wide severity definitions for every component that emits a verdict. The phase-observer was the first consumer, but the same vocabulary applies to future health checks, ledger integrity reports, eval rigor verdicts, and any other observability surface. Defined once, referenced everywhere.
+> System-wide severity definitions for every component that emits a verdict. The phase-observer was the first consumer. The same vocabulary applies to future health checks, ledger integrity reports, eval rigor verdicts and any other observability surface. Defined once, referenced everywhere.
 
 ## Levels
 
@@ -10,7 +10,7 @@
 | WARN | 20 | `"WARN"` | Note in phase report; phase continues; flag for operator review |
 | INCIDENT | 30 | `"INCIDENT"` | Read `suggested_action.machine_readable`; act |
 
-Numeric values are spaced by 10 to allow future intermediate tiers (e.g., `NOTICE=15`) without breaking existing comparisons. Do not change these values without bumping every consumer.
+Numeric values are spaced by 10 to allow future intermediate tiers (for example, `NOTICE=15`) without breaking existing comparisons. Do not change these values without bumping every consumer.
 
 ## When to use each
 
@@ -36,9 +36,9 @@ Default consumer behavior: include in phase report's `summary.warns` array; verd
 
 ### INCIDENT
 
-Confirmed accident requiring action. The orchestrator should read `suggested_action.machine_readable` and follow the recommended action_type.
+Confirmed accident requiring action. The recommended action for the orchestrator is to read `suggested_action.machine_readable` and follow the recommended action_type.
 
-**v9.5.0 update:** `INCIDENT`-severity observations are **kill-eligible** when the observer is running with `--enforce` (`EVOLVE_OBSERVER_ENFORCE=1`). Specifically `stuck_no_output` and `infinite_loop` rules — both INCIDENT severity — trigger the SIGTERM/grace/SIGKILL sequence inherited from `phase-watchdog.sh`. `WARN`-severity rules never trigger kill, even in `--enforce` mode. This preserves the principle that *observer informs; orchestrator/kernel acts* — but when the operator has explicitly authorized the observer to act on the most-confident rules, it does so atomically. Examples:
+**v9.5.0 update:** `INCIDENT`-severity observations are **kill-eligible** when the observer runs with `--enforce` (`EVOLVE_OBSERVER_ENFORCE=1`). Specifically, the `stuck_no_output` and `infinite_loop` rules (both INCIDENT severity) trigger the SIGTERM/grace/SIGKILL sequence inherited from `phase-watchdog.sh`. `WARN`-severity rules never trigger a kill, even in `--enforce` mode. This keeps the principle that *observer informs; orchestrator/kernel acts*. When the operator explicitly authorizes the observer to act on the most-confident rules, it acts atomically. Examples:
 - Phase stuck — no events for >= threshold seconds (`stuck`)
 - Infinite loop detected — same tool call N+ times in window (`infinite_loop`)
 - Integrity breach detected (`ledger_chain_broken`, future)
@@ -76,4 +76,4 @@ fi
 
 The names (`INFO`, `WARN`, `INCIDENT`), numeric values, and verdict tiers (`NORMAL` / `DEGRADED` / `INCIDENT`) are part of the schema-version-1.0 contract. Breaking changes bump the schema_version field in every envelope.
 
-Adding new severity-emitting components (future health checks, etc.): use this vocabulary; do not invent new tiers without a SCHEMA RFC.
+Adding new severity-emitting components (for example, future health checks): use this vocabulary. Do not invent new tiers without a SCHEMA RFC.

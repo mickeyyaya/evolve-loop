@@ -6,9 +6,9 @@
 ## Why this exists
 
 Cycle 13 (commit `35b31c4`, 2026-05-11) deleted 42 substantive `docs/research/`
-files (140-280 LOC each, 7,737 LOC total, 498 KB plugin install reduction) on
-the empirically-correct grounds that they were unreferenced by any runtime
-agent, skill, or script — and contributed to `Glob` / `Grep` context noise per
+files (140-280 LOC each, 7,737 LOC total, 498 KB plugin install reduction).
+The grounds were empirically correct. No runtime
+agent, skill, or script referenced the files. The files also contributed to `Glob` / `Grep` context noise per
 [Liu et al. 2023 — Lost in the Middle (arXiv:2307.03172)](https://arxiv.org/abs/2307.03172).
 Audit verdict was PASS (0.86 confidence).
 
@@ -46,7 +46,7 @@ For new entries, the test is:
 - **No**  → `docs/private/research/` (developer-only)
 
 Cross-references count even if the cite isn't actually loaded into every
-cycle's context — what matters is whether any runtime artifact *could* read it.
+cycle's context — what matters is if any runtime artifact *can* read it.
 
 ## Architecture of runtime exclusion
 
@@ -74,7 +74,7 @@ structurally invisible regardless of deny_subpaths.
 ### L2 — Adapter permission-mode passthrough (Claude Code primary)
 
 Claude Code's permission system honors the same `deny_subpaths` even when the
-OS sandbox is disabled (e.g., nested-sandbox EPERM on macOS Darwin 25.4+). The
+OS sandbox is disabled (for example, nested-sandbox EPERM on macOS Darwin 25.4+). The
 deny rule fires at the CLI's permission gate before any tool invocation.
 
 ### L3 — Layer-B context-builder filter (cross-CLI safety net)
@@ -117,7 +117,7 @@ This is the standard Git mechanism for "track in repo, exclude from
 `~/.claude/plugins/cache/` and applies a separate hardcoded filter
 (documented at `docs/architecture/platform-compatibility.md`).
 
-As of v9.1.x, `docs/private/` may still ship in `/plugin install` for users.
+As of v9.1.x, it is possible that `docs/private/` still ships in `/plugin install` for users.
 The user impact is bounded:
 
 - Runtime exclusion (L1 + L3) holds even on user installs — agents in
@@ -151,10 +151,9 @@ The restoration is byte-identical — verified by `diff` against `35b31c4^` in
 - **Install-size sealing**: if Claude Code adds a `.pluginignore` convention or
   honors `.gitattributes export-ignore`, this folder auto-disappears from user
   installs. Track in a future cycle's retrospective.
-- **Per-role exemptions**: a future change may want to allow ONE role (e.g.,
-  retrospective synthesizer) to read `docs/private/`. The Layer-B filter would
-  gain a role-aware allowlist; profile deny_subpaths would be lifted for that
-  role only. Until justified, default is no exemption.
+- **Per-role exemptions**: a future change possibly wants to allow ONE role (for example,
+  retrospective synthesizer) to read `docs/private/`. In that case (a proposal) the Layer-B filter gains a role-aware allowlist.
+  Profile deny_subpaths are lifted for that role only. Until justified, default is no exemption.
 
 ## Related documents
 
