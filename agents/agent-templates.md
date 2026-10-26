@@ -39,6 +39,15 @@ All agents receive a JSON context block with these common fields:
 
 Agent-specific additions (e.g., `task`, `buildReport`, `mode`, `projectContext`) are documented in each agent file.
 
+### The input index
+
+The pipeline writes `inputs/index.json` in the workspace before each phase. Consult the index first, and open only the entries that you need. Each entry has a `path`, a `kind`, a `class`, a `cycle` and a one-line `summary`:
+
+- `deliverable`: the reports, verdicts and `handoff-asks` of the earlier phases of this cycle;
+- `lineage`: on a retry or a recovery, the retrospectives, failure digests, carryover notes, audit reports and lessons of the earlier attempts of the same item.
+
+The cell can read the indexed paths and its own workspace. It cannot read the raw output of other agents (`*-stdout.log`, `*-final-pane.txt`), the run directories of unrelated cycles, or the secrets in the home directory. Do not write in `inputs/`.
+
 ## Budget-Aware Behavior
 
 Every agent receives a `budgetRemaining` object in context. Agents should adapt their behavior based on remaining resources — this is **not** a hard limit, but a signal for self-regulation. (Research basis: BATS framework [arXiv:2511.17006] — budget-aware agents self-regulate without additional training.)

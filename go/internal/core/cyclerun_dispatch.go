@@ -92,6 +92,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 	if cr.o.cfg.PhaseIO >= config.StageShadow {
 		phaseReq.Input = cr.assemblePhaseIO(next, phaseWorktree, phaseCtx)
 	}
+	writeInputIndex(indexTarget{projectRoot: cr.req.ProjectRoot, workspace: cr.cs.WorkspacePath, runID: cr.cs.RunID, cycle: cr.cycle}, next, fleetScopeIDs(cr.ctxSnap["fleet_scope"]), cr.o.errOut())
 	var resp PhaseResponse
 	var err error
 	shipRecovered := false
