@@ -61,6 +61,7 @@ type Deps struct {
 	Stdout                io.Writer
 	Stderr                io.Writer
 	LookupEnv             func(key string) (string, bool)
+	Binaries              map[string]string
 	Tmux                  TmuxController
 	Sleep                 func(time.Duration)
 	LookPath              func(file string) (string, error)

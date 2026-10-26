@@ -52,8 +52,7 @@ func writeAgent(t *testing.T, dir, name string) {
 	}
 }
 
-func TestNewPromptsLoader_RootsAtProjectRoot_WhenEnvUnset(t *testing.T) {
-	t.Setenv("EVOLVE_PROMPTS_DIR", "")
+func TestNewPromptsLoader_RootsAtProjectRoot(t *testing.T) {
 	root := t.TempDir()
 	writeAgent(t, root, "evolve-test")
 
@@ -67,18 +66,18 @@ func TestNewPromptsLoader_RootsAtProjectRoot_WhenEnvUnset(t *testing.T) {
 	}
 }
 
-func TestNewPromptsLoader_HonorsEnvOverride(t *testing.T) {
+func TestNewPromptsLoader_TheEnvironmentNamesNoPromptDir(t *testing.T) {
 	root := t.TempDir()
 	override := t.TempDir()
 	writeAgent(t, override, "evolve-override")
 	t.Setenv("EVOLVE_PROMPTS_DIR", override)
 
 	l := NewPromptsLoader(root)
-	if _, err := l.Agent("evolve-override"); err != nil {
-		t.Fatalf("Agent(evolve-override) via EVOLVE_PROMPTS_DIR override: %v", err)
+	if _, err := l.Agent("evolve-override"); err == nil {
+		t.Fatal("NewPromptsLoader read EVOLVE_PROMPTS_DIR; the personas come from the project root only (I-16, X18e)")
 	}
 	writeAgent(t, root, "evolve-project-only")
-	if _, err := l.Agent("evolve-project-only"); err == nil {
-		t.Error("Agent(evolve-project-only) unexpectedly found — NewPromptsLoader must prefer EVOLVE_PROMPTS_DIR over projectRoot")
+	if _, err := l.Agent("evolve-project-only"); err != nil {
+		t.Errorf("Agent(evolve-project-only) from the project root: %v", err)
 	}
 }

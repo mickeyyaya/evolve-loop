@@ -101,16 +101,13 @@ func runMatrixCycle(t *testing.T, row matrixRow, evolveBin, fakeBin, repoRoot st
 	probeDir := filepath.Join(t.TempDir(), "n4-probe")
 	env := append(os.Environ(),
 		"CLAUDECODE=1",
-		"EVOLVE_PROMPTS_DIR="+repoRoot,
 		"EVOLVE_RESEARCH_HOOK_DISABLED=1",
 		"EVOLVE_SANDBOX=off",
 		"EVOLVE_BYPASS_SHIP_GATE=1",
-		"BRIDGE_TESTING=1",
 	)
 	for _, bin := range stubBinaries {
 		path := filepath.Join(binDir, bin)
 		fakeclitest.Install(t, path, stubScript(bin, fakeBin, callLog, evolveBin, probeDir, projRoot))
-		env = append(env, "BRIDGE_"+strings.ToUpper(bin)+"_BINARY="+path)
 	}
 	env = append(env, installFakeTmux(t, binDir, fakeBin)...)
 	env = append(env, isolatedHome(t)...)
@@ -381,9 +378,9 @@ func mustRepoRoot(t *testing.T) string {
 
 func setupTempProject(t *testing.T, repoRoot string) string {
 	t.Helper()
-	_ = repoRoot
 	repo := gittest.Fixture(t)
 	root := repo.Dir
+	seedProjectAgents(t, root, repoRoot)
 
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
 		t.Fatalf("mkdir .evolve: %v", err)
@@ -457,6 +454,51 @@ func writeProjectPolicy(t *testing.T, root string, extra map[string]any) {
 	if err := os.WriteFile(filepath.Join(root, ".evolve", "policy.json"), append(body, '\n'), 0o644); err != nil {
 		t.Fatalf("write policy.json: %v", err)
 	}
+}
+
+func seedProjectAgents(t *testing.T, root, repoRoot string) {
+	t.Helper()
+	if repoRoot == "" {
+		return
+	}
+	personas, err := filepath.Glob(filepath.Join(repoRoot, "agents", "*.md"))
+	if err != nil || len(personas) == 0 {
+		t.Fatalf("the project needs the personas of %s/agents: %v", repoRoot, err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "agents"), 0o755); err != nil {
+		t.Fatalf("mkdir agents: %v", err)
+	}
+	for _, src := range personas {
+		body, err := os.ReadFile(src)
+		if err != nil {
+			t.Fatalf("read persona %s: %v", src, err)
+		}
+		if err := os.WriteFile(filepath.Join(root, "agents", filepath.Base(src)), withoutToolsLine(body), 0o644); err != nil {
+			t.Fatalf("write persona %s: %v", src, err)
+		}
+	}
+}
+
+func withoutToolsLine(persona []byte) []byte {
+	lines := strings.Split(string(persona), "\n")
+	kept := lines[:0]
+	for _, line := range lines {
+		if !strings.HasPrefix(line, "tools:") {
+			kept = append(kept, line)
+		}
+	}
+	return []byte(strings.Join(kept, "\n"))
+}
+
+func fakeCLIsFirstOnPath(t *testing.T, fakeBin string, clis ...string) string {
+	t.Helper()
+	binDir := t.TempDir()
+	for _, cli := range clis {
+		if err := os.Symlink(fakeBin, filepath.Join(binDir, cli)); err != nil {
+			t.Fatalf("link the fake %s: %v", cli, err)
+		}
+	}
+	return "PATH=" + binDir + string(os.PathListSeparator) + os.Getenv("PATH")
 }
 
 func commitProjectSeed(t *testing.T, repo *gittest.Repo) {

@@ -59,9 +59,6 @@ func FilterEvolveEnv(environ []string) map[string]string {
 }
 
 func NewPromptsLoader(projectRoot string) *prompts.Loader {
-	if d := os.Getenv("EVOLVE_PROMPTS_DIR"); d != "" {
-		return prompts.NewFromDir(d)
-	}
 	return prompts.NewFromDir(projectRoot)
 }
 

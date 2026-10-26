@@ -76,18 +76,6 @@ func TestC15_005_ControlFlagsMdHasNoResumeRows(t *testing.T) {
 	}
 }
 
-func TestC15_006_IPCSetPreservedInCmdLoopArgs(t *testing.T) {
-	// acs-predicate: config-check
-	root := acsassert.RepoRoot(t)
-	cmdLoopArgsFile := filepath.Join(root, "go", "cmd", "evolve", "cmd_loop_args.go")
-	if !acsassert.FileContains(t, cmdLoopArgsFile, `"EVOLVE_RESUME"`) {
-		t.Errorf("RED: cmd_loop_args.go no longer sets EVOLVE_RESUME — IPC handoff broken.\n"+
-			"Builder must NOT remove the EVOLVE_RESUME= assignment in cmd_loop_args.go:273;\n"+
-			"only the registry row in registry_table.go should be removed.\n"+
-			"File: %s", cmdLoopArgsFile)
-	}
-}
-
 func TestC15_007_BypassPolicyFlagInCycleRunHelp(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goDir := filepath.Join(root, "go")

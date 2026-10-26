@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/flagregistry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
@@ -82,13 +83,19 @@ func importNames(file *ast.File) map[string]string {
 }
 
 func (s envReadScan) reads() []envRead {
+	return s.readsOf(func(name string) bool {
+		return strings.HasPrefix(name, "EVOLVE_") || strings.HasPrefix(name, "BRIDGE_")
+	})
+}
+
+func (s envReadScan) readsOf(keep func(string) bool) []envRead {
 	readers := s.readerFuncs()
 	var out []envRead
 	for _, src := range s.files {
 		writes := assignedIndexes(src.file)
 		ast.Inspect(src.file, func(n ast.Node) bool {
 			for _, name := range s.readNames(src, n, writes, readers) {
-				if strings.HasPrefix(name, "EVOLVE_") || strings.HasPrefix(name, "BRIDGE_") {
+				if keep(name) {
 					out = append(out, envRead{at: src.rel + ":" + strconv.Itoa(s.fset.Position(n.Pos()).Line), name: name})
 				}
 			}
@@ -332,18 +339,10 @@ func joinWildcards(name string) string {
 	return name
 }
 
-var controlFlagTestSeams = []string{
-	"EVOLVE_PROFILES_DIR_OVERRIDE", "EVOLVE_ADAPTERS_DIR_OVERRIDE", "EVOLVE_LEDGER_OVERRIDE", "EVOLVE_PROMPTS_DIR",
-	"BRIDGE_TESTING", "BRIDGE_*_BINARY",
-}
-
-const (
-	unmovedControlCeiling = 29
-	testSeamCeiling       = 6
-)
+const unmovedControlCeiling = 29
 
 func declaredControlNames() []string {
-	return slices.Concat(ipcenv.Markers(), ipcenv.UnmovedControls(), controlFlagTestSeams)
+	return slices.Concat(ipcenv.Markers(), ipcenv.UnmovedControls())
 }
 
 func undeclaredReads(reads []envRead, declared []string) []envRead {
@@ -372,11 +371,11 @@ func TestNoControlFlagReadOutsideTheMarkerList(t *testing.T) {
 	}
 	reads := scan.reads()
 	for _, r := range undeclaredReads(reads, declaredControlNames()) {
-		t.Errorf("%s reads %s from the environment, and the name is not a pipeline marker (ipcenv.Markers), a control not yet moved (ipcenv.UnmovedControls) or a declared test seam. Read no control value from the environment: put a setting in policy.json and a bypass behind a CLI parameter (I-16, ADR-0156)", r.at, r.name)
+		t.Errorf("%s reads %s from the environment, and the name is not a pipeline marker (ipcenv.Markers), a control not yet moved (ipcenv.UnmovedControls). A test seam is an injected field, never an environment read. Read no control value from the environment: put a setting in policy.json and a bypass behind a CLI parameter (I-16, ADR-0156)", r.at, r.name)
 	}
-	for _, name := range slices.Concat(ipcenv.UnmovedControls(), controlFlagTestSeams) {
+	for _, name := range ipcenv.UnmovedControls() {
 		if !slices.ContainsFunc(reads, func(r envRead) bool { return controlNameMatches(name, r.name) }) {
-			t.Errorf("%s is declared as a control not yet moved or a test seam, but no production code reads it: remove it from the list", name)
+			t.Errorf("%s is declared as a control not yet moved, but no production code reads it: remove it from the list", name)
 		}
 	}
 }
@@ -384,9 +383,6 @@ func TestNoControlFlagReadOutsideTheMarkerList(t *testing.T) {
 func TestControlFlagLists_OnlyShrink(t *testing.T) {
 	if n := len(ipcenv.UnmovedControls()); n > unmovedControlCeiling {
 		t.Errorf("ipcenv.UnmovedControls has %d names, ceiling %d: a new control goes into policy.json or a CLI parameter, never into the environment", n, unmovedControlCeiling)
-	}
-	if n := len(controlFlagTestSeams); n > testSeamCeiling {
-		t.Errorf("controlFlagTestSeams has %d names, ceiling %d: a new test seam is an injected field, not an environment read", n, testSeamCeiling)
 	}
 }
 
@@ -424,5 +420,40 @@ var _ = os.Getenv("EVOLVE_" + "Z")
 	}
 	if !slices.Equal(names, []string{"EVOLVE_X", "EVOLVE_Y"}) {
 		t.Fatalf("undeclared reads = %v, want [EVOLVE_X EVOLVE_Y]: a name built from a constant of another package and read through a helper, and a concatenated literal, both count; a marker and a test file do not", got)
+	}
+}
+
+func TestFlagRegistryRows_EachHasAProductionReader(t *testing.T) {
+	module, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	reads := scanEnvModule(t, module).reads()
+	for _, row := range flagregistry.All {
+		if !slices.ContainsFunc(reads, func(r envRead) bool { return controlNameMatches(r.name, row.Name) }) {
+			t.Errorf("flag registry row %s has no production reader: delete the row and each place that names the flag (I-16, X18e)", row.Name)
+		}
+	}
+}
+
+var removedControlNames = []string{
+	"EVOLVE_REFLECTION_JOURNAL", "EVOLVE_RESUME", "EVOLVE_RESUME_MODE", "EVOLVE_SANDBOX_FALLBACK_ON_EPERM", "EVOLVE_RELEASE_STRICT_PASS",
+	"EVOLVE_PROFILES_DIR_OVERRIDE", "EVOLVE_ADAPTERS_DIR_OVERRIDE", "EVOLVE_LEDGER_OVERRIDE", "EVOLVE_PROMPTS_DIR",
+	"BRIDGE_TESTING", "BRIDGE_*_BINARY", "CG_TEST_INSTALL", "CG_TEST_FORCE_MISSING",
+}
+
+func TestRemovedControlNames_HaveNoProductionRead(t *testing.T) {
+	if len(removedControlNames) < 13 {
+		t.Fatalf("removedControlNames has %d names, want at least 13: a deleted name stays on the list so no reader comes back", len(removedControlNames))
+	}
+	module, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	reads := scanEnvModule(t, module).readsOf(func(name string) bool {
+		return slices.ContainsFunc(removedControlNames, func(removed string) bool { return controlNameMatches(removed, name) })
+	})
+	for _, r := range reads {
+		t.Errorf("%s reads %s, a dead name or a test seam of control-flags.md classes (d) and (e): a test sets an injected field instead (X18e)", r.at, r.name)
 	}
 }

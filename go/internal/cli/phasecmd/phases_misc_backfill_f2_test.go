@@ -51,7 +51,13 @@ func TestCollectProvenance_AnArtifactThatCannotBeReadIsAnErrorNamingItF2(t *test
 func TestCollectProvenance_ALedgerThatCannotBeScannedFailsTheCheckF2(t *testing.T) {
 	provenanceFixture(t, provenanceHeaderF2)
 	project := os.Getenv("EVOLVE_PROJECT_ROOT")
-	t.Setenv("EVOLVE_LEDGER_OVERRIDE", t.TempDir())
+	ledger := filepath.Join(project, ".evolve", "ledger.jsonl")
+	if err := os.RemoveAll(ledger); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(ledger, 0o755); err != nil {
+		t.Fatal(err)
+	}
 
 	report, err := collectProvenance(project, 5, &bytes.Buffer{})
 

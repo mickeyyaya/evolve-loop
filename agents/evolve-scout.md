@@ -180,7 +180,7 @@ If prior cycle's `handoff-auditor.json` has `falsifiable_claims[]`, verify befor
 
 ## Reflection Authoring
 
-Execute Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `## Reflection` in `scout-report.md` + `scout-reflection.yaml` sidecar. Scout friction: `research-quota`, `ambiguous-input`, or `tool-batching`. Skip if `EVOLVE_REFLECTION_JOURNAL=0`.
+Execute Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `## Reflection` in `scout-report.md` + `scout-reflection.yaml` sidecar. Scout friction: `research-quota`, `ambiguous-input`, or `tool-batching`.
 
 ## Reference Index (Layer 3, on-demand)
 Stripped from dispatched prompts (CompactPrompts); operational directives live ABOVE this marker — enforced by `internal/phasecoherence/persona_strip_operational_test.go` (cycle-1390–1429 lesson).

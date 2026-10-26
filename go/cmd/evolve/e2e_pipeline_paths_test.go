@@ -19,10 +19,8 @@ func pipelineCycle(t *testing.T, evolveBin, fakeBin, repoRoot, goalHash string, 
 
 	env := append(os.Environ(),
 		"EVOLVE_CLI=claude-p",
-		"EVOLVE_PROMPTS_DIR="+repoRoot,
 		"EVOLVE_RESEARCH_HOOK_DISABLED=1",
-		"BRIDGE_TESTING=1",
-		"BRIDGE_CLAUDE_BINARY="+fakeBin,
+		fakeCLIsFirstOnPath(t, fakeBin, "claude"),
 		"EVOLVE_SANDBOX=off",
 	)
 	env = append(env, isolatedHome(t)...)

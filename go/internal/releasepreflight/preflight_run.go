@@ -215,7 +215,7 @@ func (p *preflightRun) stepRecentAudit() error {
 			p.logf("WARN: skipped %d phantom auditor entry/entries (artifact missing on disk). Using most-recent VALID entry.", auditRes.phantomCount)
 		}
 		if auditRes.verdict == "WARN" {
-			p.logf("INFO: most recent audit is WARN (fluent posture; ships by default). Set EVOLVE_RELEASE_STRICT_PASS=1 for strict-PASS gate.")
+			p.logf("INFO: most recent audit is WARN (fluent posture; ships by default). Pass --strict-pass for the strict-PASS gate.")
 		}
 		p.logf("OK: latest audit %s, artifact=%s", auditRes.verdict, auditRes.artifact)
 	}

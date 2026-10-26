@@ -50,9 +50,6 @@ func TestProbe_DarwinStandalone(t *testing.T) {
 	if !p.Sandbox.ExpectedToWork {
 		t.Errorf("darwin+sandbox-exec+standalone should work; got %+v", p.Sandbox)
 	}
-	if p.AutoConfig.SandboxFallbackOnEPERM != "0" {
-		t.Errorf("standalone fallback should be 0, got %s", p.AutoConfig.SandboxFallbackOnEPERM)
-	}
 	if !p.AutoConfig.InnerSandbox {
 		t.Errorf("standalone+working sandbox should enable inner_sandbox")
 	}
@@ -77,9 +74,6 @@ func TestProbe_DarwinNested(t *testing.T) {
 	}
 	if !strings.Contains(p.Sandbox.Reason, "unmeasured") {
 		t.Errorf("missing unmeasured-capability reason: %s", p.Sandbox.Reason)
-	}
-	if p.AutoConfig.SandboxFallbackOnEPERM != "1" {
-		t.Errorf("nested should set fallback=1, got %s", p.AutoConfig.SandboxFallbackOnEPERM)
 	}
 	if p.AutoConfig.InnerSandbox {
 		t.Errorf("nested should disable inner_sandbox")

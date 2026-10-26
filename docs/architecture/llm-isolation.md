@@ -1441,11 +1441,14 @@ X18a and X18b go first, in either order. X18c to X18e follow X18b, and X18c also
    - It adds the AST guard `TestNoControlFlagReadOutsideTheMarkerList` (`go/internal/guards/control_flags_test.go`):
      - It walks each non-test Go file and finds each `os.Getenv`, `os.LookupEnv` and `envchain` read. A function that passes its parameter to such a read is a reader too. An index of a map whose name contains `env` is a read.
      - It resolves constant concatenations such as `"EVOLVE_"+"RESUME"`, also through a constant of another package.
-     - It judges only the `EVOLVE_*` and `BRIDGE_*` names, so an outside name (`HOME`, `PATH`, `TMUX`, `CI`, `CLAUDE_CODE_*`) needs no list. It allows a marker, a control that is not yet moved, and a declared test seam of class (e).
-     - It fails on each other name, and on a declared control or seam that no code reads. `TestControlFlagLists_OnlyShrink` holds the ceilings, so the lists can only shrink.
+     - It judges only the `EVOLVE_*` and `BRIDGE_*` names, so an outside name (`HOME`, `PATH`, `TMUX`, `CI`, `CLAUDE_CODE_*`) needs no list. It allows a marker and a control that is not yet moved. X18b also allowed the test seams of class (e), and X18e removed that allowance.
+     - It fails on each other name, and on a declared control that no code reads. `TestControlFlagLists_OnlyShrink` holds the ceiling, so the list can only shrink.
 3. **X18c** moves the 18 knobs. Each knob that duplicates a policy key (for example, `EVOLVE_MANDATORY_PHASES` and `mandatory_phases`) keeps the policy key.
 4. **X18d** turns each bypass into a parameter or removes it. `EVOLVE_OPERATOR_CONFIRM` already has the `-operator` flag as its primary surface.
-5. **X18e** deletes the dead names and moves the test seams.
+5. **X18e** (built) deletes the dead names and moves the test seams.
+   - The dead names, their 5 registry rows, their writers and the persona text that named them are gone.
+   - A test of the bridge sets `Deps.Binaries`. An E2E test puts the fake CLI first on `PATH`, and its project holds the `agents/` personas. The layout takes each directory from the project and plugin roots, and `evolve commit-gate run` reads no test switch.
+   - `TestRemovedControlNames_HaveNoProductionRead` and `TestFlagRegistryRows_EachHasAProductionReader` (`go/internal/guards/control_flags_test.go`) keep both classes empty.
 
 When X18 is done, `evolve flags generate` prints only the marker list and the outside list. control-flags.md then describes the markers, and the knobs are in [runtime-reference.md](../operations/runtime-reference.md) as policy keys.
 

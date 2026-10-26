@@ -22,7 +22,6 @@ func hermeticEnv(t *testing.T) string {
 	t.Helper()
 	tmpDir := t.TempDir()
 	t.Setenv("EVOLVE_PROJECT_ROOT", tmpDir)
-	t.Setenv("EVOLVE_LEDGER_OVERRIDE", "")
 	return tmpDir
 }
 
