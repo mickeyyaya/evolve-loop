@@ -80,3 +80,13 @@ func TestClihealthUsage_TheTableNamesEveryWindowAndAFailedProbeExitsOne(t *testi
 		}
 	}
 }
+
+func TestClihealthUsage_AScreenThatHidesTheDeclaredWindowsExitsOne(t *testing.T) {
+	installUsagePanes(t, map[string]string{"claude": "❯ "}, nil)
+
+	_, errOut, code := runDispatch("clihealth", "usage", "--project-root", t.TempDir(), "claude")
+
+	if code != 1 || !strings.Contains(errOut, "claude: no usage window read") {
+		t.Fatalf("exit %d, stderr %q; a CLI that declares windows and reads none fails loudly", code, errOut)
+	}
+}
