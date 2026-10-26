@@ -3,7 +3,7 @@
 > **Purpose.** This is the living plan for the audit evaluation contract.
 > - **What it adds:**
 >   - The audit's full standard (the quality-index dimensions plus gate criteria with stable IDs) is published in one home.
->   - An `audit-plan` phase, run by the audit role once per cycle immediately before build, reads every pre-build deliverable and writes this cycle's expectations: criteria, dimensions, rejection triggers, and need-to-know for build and for review.
+>   - An `audit-plan` phase runs in the audit role once per cycle, immediately before build. It reads every pre-build deliverable. It writes the expectations of this cycle: criteria, dimensions, rejection triggers, and need-to-know for build and for review.
 >   - The final audit is held to that plan, and every rejection is keyed to a criterion, so the next round knows exactly what to fix.
 > - **Approved by the operator on 2026-10-07** in plan mode (decisions E-D1 to E-D4).
 >   - After the operator asked for research before implementation, the plan was revised with refinements AR1–AR9 and decision E-D5, and approved again.
@@ -37,8 +37,8 @@
 
 ## 1. Why
 
-- **The audit's bar is private.** Its verdict rules, per-criterion evidence rule, predicate-quality classes, goal integrity, gate lenses, checklist and explanation review live in the auditor persona and its reference (36,659 bytes together). Build sees only the acceptance and one line about ground truth. Code-review sees only the quality index.
-- **Rejections arrive as prose.** Nothing ties a rejection to a published rule, so a builder cannot tell a missed requirement from a moved goalpost, and the repair converges slowly (the ADR-0096 study).
+- **The audit's bar is private.** Its verdict rules, per-criterion evidence rule, predicate-quality classes and goal integrity live in the auditor persona and its reference. The gate lenses, the checklist and the explanation review live there too (36,659 bytes together). Build sees only the acceptance and one line about ground truth. Code-review sees only the quality index.
+- **Rejections arrive as prose.** Nothing ties a rejection to a published rule. So a builder cannot tell a missed requirement from a moved goalpost, and the repair converges slowly (the ADR-0096 study).
 - **The review loop needs the same bar.** The code-review redesign gave review and audit one shared quality index. This plan finishes that work: the gate's binary criteria join the index, and the audit states its expectations for the change before anyone writes code.
 
 ## 2. Strategies considered
@@ -71,10 +71,10 @@ The research (§4) confirmed C's shape: "contract before code" is how Anthropic'
 | E-D3 | Where the standard lives | **Extend `quality-index`** (skill and package) into the full standard: the dimensions plus the gate criteria. One home. | operator |
 | E-D4 | Rollout | **Follow code-review:** shadow for 2 waves, then enforce, flipped at the same boundary as the review loop. | operator |
 | E-D5 | What is published | **Criteria public, instruments private.** Every criterion, its evidence kind, the condition-class triggers and the need-to-know are published. The final audit's probe *instances* are not, and producers cannot write the fenced instruments. Consistent with E-D1: nothing is judged on an unpublished criterion. | console, from the research; approved with the revised plan |
-| E-D6 | Persona | **`audit-plan` gets its own small persona,** `agents/evolve-audit-planner.md`, rather than a mode of the auditor persona. A mode would be a flag (no flags, by policy), and the auditor persona is already over budget. | console |
+| E-D6 | Persona | **`audit-plan` gets its own small persona,** `agents/evolve-audit-planner.md`, rather than a mode of the auditor persona. A mode is a flag (no flags, by policy), and the auditor persona is already over budget. | console |
 | E-D7 | Plan location | **This plan is its own document** rather than a section of the code-review plan. It is a separate operator request with its own decisions; the code-review plan links it from landing 2. | console |
-| E-D8 | A FAIL finding without a certificate | **It is malformed and goes to the correction rung. The kernel never lowers a verdict.** On exhaustion the finding stands as FAIL and is listed as Advisory. This supersedes the revised plan's "advisory, downgrades a sole FAIL to WARN". That rule would have let a CRITICAL finding with a missing field ship (WARN ships), against the auditor's verdict rule and ADR-0124 D8 (the kernel flips only toward FAIL). The operator may override with an explicit decision. | console, from the doc review (D1); the operator may override |
-| E-D9 | Kernel facts from WARN-only or shadow floors | **A kernel fact counts only at the stage its own gate runs at.** `docsfloor` (WARN-only) and `comment_floor` (shadow by default) are evidence the audit weighs, never overriding facts, so this contract never makes them blocking by a side door. Promoting either floor is that floor's own operator decision. | console, from the doc review (D5); the operator may override |
+| E-D8 | A FAIL finding without a certificate | **It is malformed and goes to the correction rung, and the kernel never lowers a verdict.** On exhaustion the finding stands as FAIL and is listed as Advisory. This supersedes the revised plan's "advisory, downgrades a sole FAIL to WARN". The risk of that rule was that a CRITICAL finding with an absent field ships (WARN ships). That is against the verdict rule of the auditor and ADR-0124 D8 (the kernel flips only toward FAIL). The operator can override with an explicit decision. | console, from the doc review (D1); the operator can override |
+| E-D9 | Kernel facts from WARN-only or shadow floors | **A kernel fact counts only at the stage its own gate runs at.** `docsfloor` (WARN-only) and `comment_floor` (shadow by default) are evidence that the audit weighs. They never override, so this contract never makes them block by a side door. Promoting either floor is that floor's own operator decision. | console, from the doc review (D5); the operator can override |
 | E-D10 | Gate criteria set | **`G-REVIEW` is removed and `G-ACCEPT.<task>.eval` is added.** RL's qualification owns review resolution, so a `G-REVIEW` criterion raised one defect twice. A bound task with no `acceptance[]` needs a criterion of its own, so the `.eval` ID is added. | console, from the doc review; the operator may override |
 
 ## 4. Refinements from the research (AR-numbered; cited in the design)
@@ -88,7 +88,7 @@ The research (§4) confirmed C's shape: "contract before code" is how Anthropic'
 | AR5 | The expectations name outcomes and evidence, never implementation | F1: Anthropic's planner; Agentic Rubrics' over-specification mode |
 | AR6 | The standard's version (SKILL plus COMPACT) is pinned per cycle | F5: PReMISE |
 | AR7 | Calibration anchors per criterion and dimension; `AUDIT_SAME_FAMILY` | F5: Anthropic, the self-preference-bias study |
-| AR8 | Delivery is a byte-capped digest plus the document's path | F7: OpenAI, ETH Zurich (via marmelab) |
+| AR8 | Delivery is a byte-capped digest plus the document's path | F7: OpenAI, ETH Zurich (through marmelab) |
 | AR9 | The phase must earn its place: trivial cycles skip it, the shadow exit criteria, the escape rate | F7: Anthropic's harness removal, marmelab |
 
 Repo principles that apply, from [factory-pipeline-findings-2026-09.md](../research/factory-pipeline-findings-2026-09.md) §2:
@@ -130,7 +130,11 @@ The full design is in [audit-evaluation-contract.md](../architecture/audit-evalu
   - `## Criteria` opens with a `Standard:` line, then gives one line per published criterion, with a certificate.
   - Private probe instances; NEW criteria.
   - `kernel-facts.json`.
-  - The cross-check only moves verdicts toward FAIL: a red enforce-stage fact wins; a shippable verdict with a failed criterion becomes FAIL; an unresolved PASS certificate means FAIL; an uncertified FAIL finding goes to correction; a version mismatch or an unknown criterion is malformed. Each flip declares `code-audit-fail` through `audit-qualification.json`. In shadow, everything only signals.
+  - The cross-check only moves verdicts toward FAIL:
+    - A red enforce-stage fact wins, and a shippable verdict with a failed criterion becomes FAIL.
+    - An unresolved PASS certificate means FAIL, and an uncertified FAIL finding goes to correction.
+    - A version mismatch or an unknown criterion is malformed.
+    - Each flip declares `code-audit-fail` through `audit-qualification.json`. In shadow, everything only signals.
 - **Feedback (design §6).**
   - The repair brief gets a criterion section first, in enforce only, so the shadow golden is unchanged.
   - Code-review's Review Plan covers the expectations' dimensions and each failed criterion's dimension.
@@ -145,14 +149,53 @@ These land **inside the code-review plan's landing 2** (with Q3–Q6), in shadow
 
 | # | Component | Where | Status |
 |---|---|---|---|
-| E0 | The docs:<br>• this plan, the design doc, ADR-0125, and the research dossier with its `research-index.md` entry;<br>• ADR-0124's "Amended by" line;<br>• the code-review plan's landing-2 link;<br>• the `factory-pipeline-findings` P4/P7 evidence pointers and §5.1 rows (its §6 procedure);<br>• the audit-constitution cross-reference;<br>• the doc review (38 findings), applied in revision 2. | `docs/` | ◐ (revision 2 written 2026-10-07; lands as PR-C after code-review PR-B) |
-| E1 | The standard:<br>• Part 2 of `skills/quality-index/SKILL.md` and `COMPACT.md`: criteria, verifiers, certificate kinds and syntax, dimensions, N/A rules, anchors; dimension bars cite their criteria; 3-versus-4 dimension anchors;<br>• `qualityindex`: `CriterionIDs`, `CriterionVerifier`, `CriterionDimension`, `CriterionNeverNA`, `CertificateKinds`, `StandardVersion`;<br>• the Scores grammar caps a dimension at 3 when its criterion FAILed;<br>• the criterion drift test, and the skill's examples pinned against the parsers (ADR-0084 I2);<br>• protected-manifest rows. | `skills/quality-index/`, `qualityindex/`, `guards/integrity_surface.go` | ☐ |
-| E2 | `audit-plan`:<br>• `.evolve/phases/audit-plan/phase.json` (`after: "build-planner"`, `agent: evolve-audit-planner`, `prompt_context: ["goal","task_contract"]`, `classify.require_sections`, `classify.grammars: ["audit-expectations"]`);<br>• the `agents/evolve-audit-planner.md` persona;<br>• the `.evolve/profiles/audit-planner.json` profile, which joins `ClaudeFamilyFloor`;<br>• the `conditional_mandatory` pin and the protected `router/audit_plan_pin_test.go`;<br>• the overlay rule `{audit-plan, code} → [quality-index, engineering-craft]`;<br>• `audit_plan_inputs` and `standard_version` in cycle state;<br>• the kernel-rendered skeleton;<br>• `qualityindex.ParseExpectations` and `ValidateExpectations` with `ExpectationsInput`, through an input-bearing grammar variant;<br>• once-per-cycle scheduling;<br>• the pre-floor optional-phase degrade (exhaustion, failed dispatch) and Q6's quota-wall skip extended to `audit-plan`;<br>• manifest rows for the persona, spec, profile, overlay and pin test. | phases, agents, profiles, registry, `router/`, `core/`, `qualityindex/`, `deliverable/`, `policy/overlays.go`, `guards/integrity_surface.go` | ☐ |
-| E3 | Delivery:<br>• `CtxKeyAuditExpectations`, `auditExpectationsPhase`, and the render under `## Audit Expectations` in `phases/build` and `phases/audit`;<br>• code-review's `prompt_context` gains `audit_expectations`;<br>• recipient digests and `workflow.audit_contract` (stage, `digest_max_bytes`, validation);<br>• the hash-and-restore fence over the expectations, tdd's test files, `go/acs/cycle<N>/**` and the eval file (`audit-snapshots/`, `AUDIT_EXPECTATIONS_TAMPERED`);<br>• `audit-rejections.md`;<br>• `composeRepairBrief`'s criterion section, at enforce only, with the enforce golden re-recorded;<br>• criterion IDs and remediation at the floor's failure sites (`build_floor_reviewer.go`, `comment_floor.go`, `repo_contract_floor.go`). | `core/`, `phases/build/`, `phases/audit/`, `.evolve/phases/code-review/phase.json`, `policy/` | ☐ |
-| E4 | The final audit, kernel side:<br>• the `## Criteria` grammar (`qualityindex.ParseCriteria`) with its `Standard:` line;<br>• the `Criterion:` and `Certificate:` finding fields;<br>• `kernel-facts.json`;<br>• the cross-check rules (design §5.2), extending Q5's;<br>• `AUDIT_QUALIFICATION_GAP` with causes `criterion` and `criterion_kernel` and the `criterion` field;<br>• `audit-qualification.json` defect lines;<br>• `AUDIT_UNPUBLISHED_CRITERION`, `AUDIT_FINDING_UNCERTIFIED`, `AUDIT_SAME_FAMILY`, `AUDIT_PLAN_DIVERGENCE`;<br>• the auditor persona writes `## Criteria` (verdict rules unchanged in shadow). | `core/`, `phases/audit/`, `agents/evolve-auditor.md` | ☐ (with Q5) |
-| E5 | The ledger's additive `criterion` field; `codereview.ValidateReport` checks the Review Plan against the expectations (required dimensions, depth, failed criteria's dimensions); the delta round reads `audit-rejections.md` first | `core/defectledger/`, `codereview/`, `agents/evolve-code-reviewer.md` | ☐ (with Q3/Q4) |
-| E6 | Learning:<br>• `AUDIT_CRITERION_RESULT`, `AUDIT_CRITERION_ESCAPE` (from the retrospective's P7 attribution), `AUDIT_PLAN_CONTRACT_GAP`, `AUDIT_PLAN_SKIPPED`, all registered, with `signal-codes.md` regenerated;<br>• divergence excludes review rounds after an audit-repair re-entry;<br>• the readout verb (`evolve audit contract-metrics [--cycles N] [--json]`, or folded into Q6's `evolve review metrics`; decided in E6). | `core/`, `signalcenter/`, `cmd/evolve`, `docs/architecture/signal-codes.md` | ☐ |
-| E7 | The flip:<br>• `workflow.audit_contract.stage = enforce`, in the same commit as code-review's R8b, after the exit test;<br>• the auditor persona's NEW-declaration duty, uncertified handling and checklist removal into the standard (merged with RL's slimming);<br>• correcting the persona's false constitution-check claim. | operator, at a boundary; `agents/evolve-auditor*.md` | ☐ |
+| E0 | The docs: <br>• this plan, the design doc, ADR-0125, and the research dossier with its `research-index.md` entry. <br>• ADR-0124's "Amended by" line. <br>• the code-review plan's landing-2 link. <br>• the `factory-pipeline-findings` P4/P7 evidence pointers and §5.1 rows (its §6 procedure). <br>• the audit-constitution cross-reference. <br>• the doc review (38 findings), applied in revision 2. | `docs/` | ◐ (revision 2 written 2026-10-07; lands as PR-C after code-review PR-B) |
+| E1 | The standard. The parts are in [§6.1](#61-the-parts-of-e1-to-e4). | `skills/quality-index/`, `qualityindex/`, `guards/integrity_surface.go` | ☐; inbox item `audit-evaluation-contract-e1-standard` |
+| E2 | `audit-plan`. The parts are in [§6.1](#61-the-parts-of-e1-to-e4). | phases, agents, profiles, registry, `router/`, `core/`, `qualityindex/`, `deliverable/`, `policy/overlays.go`, `guards/integrity_surface.go` | ☐; inbox item `audit-evaluation-contract-e2-audit-plan-phase` |
+| E3 | Delivery. The parts are in [§6.1](#61-the-parts-of-e1-to-e4). | `core/`, `phases/build/`, `phases/audit/`, `.evolve/phases/code-review/phase.json`, `policy/` | ☐; inbox item `audit-evaluation-contract-e3-expectations-delivery` |
+| E4 | The final audit, kernel side. The parts are in [§6.1](#61-the-parts-of-e1-to-e4). | `core/`, `phases/audit/`, `agents/evolve-auditor.md` | ☐ (with Q5); inbox item `audit-evaluation-contract-e4-final-audit-criteria` |
+| E5 | The ledger's additive `criterion` field; `codereview.ValidateReport` checks the Review Plan against the expectations (required dimensions, depth, failed criteria's dimensions); the delta round reads `audit-rejections.md` first | `core/defectledger/`, `codereview/`, `agents/evolve-code-reviewer.md` | ☐ (with Q3/Q4); inbox item `audit-evaluation-contract-e5-ledger-criterion-review-plan` |
+| E6 | Learning: <br>• `AUDIT_CRITERION_RESULT`, `AUDIT_CRITERION_ESCAPE` (from the retrospective's P7 attribution), `AUDIT_PLAN_CONTRACT_GAP`, `AUDIT_PLAN_SKIPPED`, all registered, with `signal-codes.md` regenerated. <br>• divergence excludes review rounds after an audit-repair re-entry. <br>• the readout verb (`evolve audit contract-metrics [--cycles N] [--json]`, or folded into Q6's `evolve review metrics`; decided in E6). | `core/`, `signalcenter/`, `cmd/evolve`, `docs/architecture/signal-codes.md` | ☐; inbox item `audit-evaluation-contract-e6-learning-signals` |
+| E7 | The flip: <br>• `workflow.audit_contract.stage = enforce`, in the same commit as code-review's R8b, after the exit test. <br>• the auditor persona's NEW-declaration duty, uncertified handling and checklist removal into the standard (merged with RL's slimming). <br>• correcting the persona's false constitution-check claim. | operator, at a boundary; `agents/evolve-auditor*.md` | ☐; inbox item `audit-evaluation-contract-e7-enforce-flip` |
+
+### 6.1 The parts of E1 to E4
+
+- **E1, the standard:**
+  - Part 2 of `skills/quality-index/SKILL.md` and `COMPACT.md`: criteria, verifiers, certificate kinds and syntax, dimensions, N/A rules and anchors.
+  - The dimension bars cite their criteria, with 3-versus-4 dimension anchors.
+  - `qualityindex`: `CriterionIDs`, `CriterionVerifier`, `CriterionDimension`, `CriterionNeverNA`, `CertificateKinds`, `StandardVersion`.
+  - The Scores grammar caps a dimension at 3 when its criterion FAILed.
+  - The criterion drift test, and the skill's examples pinned against the parsers (ADR-0084 I2).
+  - Protected-manifest rows.
+- **E2, `audit-plan`:**
+  - `.evolve/phases/audit-plan/phase.json`: `after: "build-planner"`, `agent: evolve-audit-planner`, `prompt_context: ["goal","task_contract"]`, `classify.require_sections`, `classify.grammars: ["audit-expectations"]`.
+  - The `agents/evolve-audit-planner.md` persona.
+  - The `.evolve/profiles/audit-planner.json` profile, which joins `ClaudeFamilyFloor`.
+  - The `conditional_mandatory` pin and the protected `router/audit_plan_pin_test.go`.
+  - The overlay rule `{audit-plan, code} → [quality-index, engineering-craft]`.
+  - `audit_plan_inputs` and `standard_version` in cycle state.
+  - The kernel-rendered skeleton.
+  - `qualityindex.ParseExpectations` and `ValidateExpectations` with `ExpectationsInput`, through an input-bearing grammar variant.
+  - A schedule of once per cycle.
+  - The pre-floor optional-phase degrade (exhaustion, failed dispatch), and the quota-wall skip of Q6 extended to `audit-plan`.
+  - Manifest rows for the persona, spec, profile, overlay and pin test.
+- **E3, delivery:**
+  - `CtxKeyAuditExpectations`, `auditExpectationsPhase`, and the render under `## Audit Expectations` in `phases/build` and `phases/audit`.
+  - The `prompt_context` of code-review gains `audit_expectations`.
+  - Recipient digests and `workflow.audit_contract` (stage, `digest_max_bytes`, validation).
+  - The hash-and-restore fence over the expectations, the test files of tdd, `go/acs/cycle<N>/**` and the eval file (`audit-snapshots/`, `AUDIT_EXPECTATIONS_TAMPERED`).
+  - `audit-rejections.md`.
+  - The criterion section of `composeRepairBrief`, at enforce only, with the enforce golden re-recorded.
+  - Criterion IDs and remediation at the failure sites of the floor (`build_floor_reviewer.go`, `comment_floor.go`, `repo_contract_floor.go`).
+- **E4, the final audit, kernel side:**
+  - The `## Criteria` grammar (`qualityindex.ParseCriteria`) with its `Standard:` line.
+  - The `Criterion:` and `Certificate:` finding fields.
+  - `kernel-facts.json`.
+  - The cross-check rules (design §5.2), which extend the rules of Q5.
+  - `AUDIT_QUALIFICATION_GAP` with causes `criterion` and `criterion_kernel` and the `criterion` field.
+  - `audit-qualification.json` defect lines.
+  - `AUDIT_UNPUBLISHED_CRITERION`, `AUDIT_FINDING_UNCERTIFIED`, `AUDIT_SAME_FAMILY`, `AUDIT_PLAN_DIVERGENCE`.
+  - The auditor persona writes `## Criteria`. The verdict rules stay unchanged in shadow.
 
 ## 7. Expected results
 
@@ -196,34 +239,68 @@ E1–E7 are **not** in the v22.27.0 cutoff unless landing 2 lands in time. Landi
   - `audit-rejections.md` appends; repair-brief seeding by criterion at enforce, with the shadow golden byte-identical;
   - the Criteria grammar with the `Standard:` line; a FAIL on a plan-N/A criterion requires `Justification:` and signals divergence;
   - NEW handling and its signal;
-  - **every cross-check rule** in enforce and in shadow, including: a red enforce-stage fact beats an audit PASS; a red shadow-stage or WARN-only fact does not; an unavailable fact leaves the criterion to the audit; an unresolved PASS certificate means FAIL; an uncertified FAIL finding goes to correction and never becomes WARN;
+  - **every cross-check rule** in enforce and in shadow. A red enforce-stage fact beats an audit PASS. A red shadow-stage or WARN-only fact does not. An unavailable fact leaves the criterion to the audit. An unresolved PASS certificate means FAIL. An uncertified FAIL finding goes to correction and never becomes WARN;
   - `audit-qualification.json` lines for criterion flips;
   - a failed criterion caps its dimension at 3;
   - ledger `criterion` rows;
   - `AUDIT_SAME_FAMILY`.
 - **Mutation:** at least 10 overlay mutants each over the coverage check, the cross-check, the once-per-cycle rule and the NEW handling. 0 surviving non-equivalent mutants.
 - **End to end with fakes:**
-  - triage → tdd → build-planner → audit-plan → build sees the digest → code-review covers it → audit FAILs `G-ACCEPT.<task>.2` with a certificate → rejections appended → the build brief carries it → the delta review addresses it → audit PASS;
+  - triage → tdd → build-planner → audit-plan → build sees the digest → code-review covers it. Then the audit FAILs `G-ACCEPT.<task>.2` with a certificate → rejections appended → the build brief carries it → the delta review addresses it → audit PASS;
   - an audit FAIL on an unpublished criterion without NEW → correction; with NEW → signal plus lesson;
   - an uncertified sole FAIL → correction in enforce, signal in shadow, and the verdict stays FAIL.
 - **Live, in shadow:** over 2 waves, expectations coverage, plan-versus-audit agreement, contract-gap and NEW counts, the exit-test metrics, and added time and tokens.
-- **Every landing:** the full floor one target at a time (test, integration, e2e, acs, apicover, cover-strict) with `-count=1`; simplifier → architecture + Go review → fix → delta; the landing-patch audit.
+- **Every landing:** the full floor one target at a time (test, integration, e2e, acs, apicover, cover-strict) with `-count=1`. Then simplifier → architecture + Go review → fix → delta. Then the landing-patch audit.
 
 ## 10. Landing notes
 
 | Landing | Date, lane | What landed | Evidence | Notes |
 |---|---|---|---|---|
 | E0 docs, revision 1 | 2026-10-07, `dev/cl-codereview` (console) | this plan, the design doc, ADR-0125, the research dossier and the cross-references | — | Written before any code, per the operator's "all research, plan, decision, and architecture docs must be properly written under the docs". |
-| E0 docs, revision 2 | 2026-10-07, `dev/cl-codereview` (console) | the doc review's 38 findings (1 CRITICAL, 9 HIGH, 16 MEDIUM, 12 LOW), applied | the review file (verified claims, plus 12 research sources re-checked) | Changes:<br>• E-D8 (no verdict lowering) and E-D9 (stage-respecting kernel facts);<br>• `G-REVIEW` dropped (RL's qualification owns it);<br>• `G-ACCEPT.<task>.<n>`;<br>• a dimension per criterion, and a failed criterion caps its dimension;<br>• `after: build-planner`;<br>• once per cycle;<br>• the pre-floor degrade rule;<br>• corrected kernel sources (`ProtectedSurfaceFloorChecks`, `Ledger.Reconcile`, no Go constitution check);<br>• the instrument fence is new in E3;<br>• `audit-rejections.md` as its own file;<br>• `kernel-facts.json`;<br>• the input-bearing grammar, 8 checks, the kernel skeleton;<br>• certificate syntax;<br>• `G-EVAL` uses `LevelHalt`;<br>• refinements renamed AR1–AR9;<br>• the research wording fixed (Agentic Rubrics is verifier-side; the ImpossibleRubrics certificate and 36%; the manifesto quoted verbatim). |
-| E0 verify follow-ups | 2026-10-18, cycle 1945 (`audit-contract-e0-review-followups`) | the 11 findings of the ADR-0126 verify-only check of these docs, applied: V1 `docs/architecture/audit-evaluation-contract.md:301`; V2 `docs/architecture/audit-evaluation-contract.md:265`; V3 `docs/architecture/audit-evaluation-contract.md:363`; V5 `docs/architecture/audit-evaluation-contract.md:131`; V6 `docs/architecture/audit-evaluation-contract.md:231`; V7 `docs/plans/audit-evaluation-contract-2026-10.md:78`; V8 `docs/research/audit-evaluation-contract-prior-art-2026-10.md:102`; V9 `docs/architecture/audit-evaluation-contract.md:494`; V11 `docs/architecture/audit-evaluation-contract.md:234`; V13 `docs/architecture/audit-evaluation-contract.md:387`; V14 `docs/architecture/audit-evaluation-contract.md:389` | `go test -tags acs -count=1 ./acs/cycle1945` | The index links ADR-0126 at `docs/architecture/review-loop-and-quality-index.md:257`. Every relative link in the four docs resolves. |
+| E0 docs, revision 2 | 2026-10-07, `dev/cl-codereview` (console) | the doc review's 38 findings (1 CRITICAL, 9 HIGH, 16 MEDIUM, 12 LOW), applied | the review file (verified claims, plus 12 research sources re-checked) | The changes are in the list after this table. |
+| E0 verify follow-ups | 2026-10-18, cycle 1945 (`audit-contract-e0-review-followups`) | the 11 findings of the ADR-0126 verify-only check of these docs, applied (the list after this table) | `go test -tags acs -count=1 ./acs/cycle1945` | The index links ADR-0126 at `docs/architecture/review-loop-and-quality-index.md:257`. Every relative link in the four docs resolves. |
+
+The changes of revision 2:
+- E-D8 (no verdict lowering) and E-D9 (stage-respecting kernel facts).
+- `G-REVIEW` dropped (the qualification of RL owns it).
+- `G-ACCEPT.<task>.<n>`.
+- A dimension for each criterion, and a failed criterion caps its dimension.
+- `after: build-planner`.
+- Once per cycle.
+- The pre-floor degrade rule.
+- Corrected kernel sources: `ProtectedSurfaceFloorChecks`, `Ledger.Reconcile`, and no Go constitution check.
+- The instrument fence is new in E3.
+- `audit-rejections.md` as its own file.
+- `kernel-facts.json`.
+- The input-bearing grammar, 8 checks, the kernel skeleton.
+- Certificate syntax.
+- `G-EVAL` uses `LevelHalt`.
+- Refinements renamed AR1–AR9.
+- The research wording fixed: Agentic Rubrics is verifier-side; the ImpossibleRubrics certificate and 36%; the manifesto quoted verbatim.
+
+The 11 findings of the E0 verify follow-ups (cycle 1945), with the line that each fix changed:
+
+| Finding | Location |
+|---|---|
+| V1 | `docs/architecture/audit-evaluation-contract.md:301` |
+| V2 | `docs/architecture/audit-evaluation-contract.md:265` |
+| V3 | `docs/architecture/audit-evaluation-contract.md:363` |
+| V5 | `docs/architecture/audit-evaluation-contract.md:131` |
+| V6 | `docs/architecture/audit-evaluation-contract.md:231` |
+| V7 | `docs/plans/audit-evaluation-contract-2026-10.md:78` |
+| V8 | `docs/research/audit-evaluation-contract-prior-art-2026-10.md:102` |
+| V9 | `docs/architecture/audit-evaluation-contract.md:494` |
+| V11 | `docs/architecture/audit-evaluation-contract.md:234` |
+| V13 | `docs/architecture/audit-evaluation-contract.md:387` |
+| V14 | `docs/architecture/audit-evaluation-contract.md:389` |
 
 ## 11. Open questions
 
 | # | Question | Recommendation |
 |---|---|---|
-| EOQ1 | Any user phase anchored `after: build-planner` would splice ahead of `audit-plan` (`spliceAfter` inserts directly after the anchor). | Pin the placement with a test (audit-plan is the last phase before build), and resolve the order with Q6's explicit registry order if a second phase claims that anchor. |
-| EOQ2 | Should `G-PRED`'s grep-only classification move from the audit to the kernel (AR3)? | Yes, later. The persona's classification rule is mechanical. Propose it after the shadow data, as a separate item. |
+| EOQ1 | A user phase anchored `after: build-planner` splices ahead of `audit-plan` (`spliceAfter` inserts directly after the anchor). | Pin the placement with a test (audit-plan is the last phase before build). If a second phase claims that anchor, resolve the order with the explicit registry order of Q6. |
+| EOQ2 | Does the grep-only classification of `G-PRED` move from the audit to the kernel (AR3)? | Yes, later. The persona's classification rule is mechanical. Propose it after the shadow data, as a separate item. |
 | EOQ3 | Is 2,048 bytes the right digest cap? | Start there. Read prompt-byte and first-pass metrics in shadow, and tune through config. |
-| EOQ4 | Should `audit-plan` run at a cheaper tier? | No. It sets the bar the final audit is held to, and a weaker planner gives a weaker contract. Revisit only if the exit test shows cost without benefit. |
-| EOQ5 | The manifesto recommends rotating holdout scenarios between cycles. | It is a future refinement for the probe instances (not the criteria). Consider it after the shadow data shows whether builders converge on the probes. |
-| EOQ6 | Should `docsfloor` or `comment_floor` become blocking? | Out of scope (E-D9). Each is its own floor's decision. |
+| EOQ4 | Does `audit-plan` run at a cheaper tier? | No. It sets the bar the final audit is held to, and a weaker planner gives a weaker contract. Revisit only if the exit test shows cost without benefit. |
+| EOQ5 | The manifesto recommends rotating holdout scenarios between cycles. | It is a future refinement for the probe instances (not the criteria). Consider it after the shadow data shows if builders converge on the probes. |
+| EOQ6 | Do `docsfloor` or `comment_floor` become blocking? | Out of scope (E-D9). Each is its own floor's decision. |
