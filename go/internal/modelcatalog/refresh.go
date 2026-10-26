@@ -1,6 +1,9 @@
 package modelcatalog
 
-import "time"
+import (
+	"slices"
+	"time"
+)
 
 var CanonicalTiers = []string{"fast", "balanced", "deep", "top"}
 
@@ -58,4 +61,19 @@ func MergeFallbacks(prior, next Catalog) Catalog {
 		merged.CLIs[name] = entry
 	}
 	return merged
+}
+
+func KeepLivePicks(prior, next Catalog) (Catalog, []string) {
+	merged := next
+	merged.CLIs = make(map[string]CLIEntry, len(next.CLIs))
+	var kept []string
+	for name, entry := range next.CLIs {
+		if old, ok := prior.CLIs[name]; ok && entry.Source != SourceLive && old.Source == SourceLive {
+			entry = old
+			kept = append(kept, name)
+		}
+		merged.CLIs[name] = entry
+	}
+	slices.Sort(kept)
+	return merged, kept
 }

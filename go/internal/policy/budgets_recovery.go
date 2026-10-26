@@ -214,3 +214,15 @@ func (p Policy) CoverChangedConfig() CoverChangedPolicy {
 	}
 	return c
 }
+
+type RetrospectivesPolicy struct {
+	Stage string `json:"stage,omitempty"`
+}
+
+func (p Policy) RetrospectivesConfig() RetrospectivesPolicy {
+	c := RetrospectivesPolicy{Stage: "shadow"}
+	if p.Retrospectives != nil && p.Retrospectives.Stage != "" {
+		c.Stage = p.Retrospectives.Stage
+	}
+	return c
+}

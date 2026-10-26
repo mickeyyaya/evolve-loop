@@ -72,13 +72,25 @@ func runStagedCatalogRefresh(ctx context.Context, evolveDir, stage string, refre
 	if err != nil {
 		return err
 	}
+	if fresh.LiveCount() == 0 {
+		fmt.Fprintf(log, "[models] WARN no ready CLI was classified live; the %s catalog and its fetched_at stay as they were, so the next cycle start retries\n", stage)
+		return nil
+	}
 	if stage == "shadow" {
 		for _, line := range shadowDiffLines(live, fresh) {
 			fmt.Fprintf(log, "[models] shadow %s\n", line)
 		}
 		return modelcatalog.WriteShadow(evolveDir, fresh)
 	}
-	_, cerr := modelcatalog.Commit(evolveDir, fresh, log)
+	return commitKeepingLivePicks(evolveDir, live, fresh, log)
+}
+
+func commitKeepingLivePicks(evolveDir string, live, fresh modelcatalog.Catalog, log io.Writer) error {
+	merged, kept := modelcatalog.KeepLivePicks(live, fresh)
+	for _, cli := range kept {
+		fmt.Fprintf(log, "[models] WARN catalog_refresh_degraded %s: the live list failed (%s); the prior live pick stays\n", cli, fresh.CLIs[cli].FallbackReason)
+	}
+	_, cerr := modelcatalog.Commit(evolveDir, merged, log)
 	return cerr
 }
 

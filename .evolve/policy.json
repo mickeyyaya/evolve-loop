@@ -19,8 +19,8 @@
     ]
   },
   "catalog": {
-    "auto_refresh": false,
-    "refresh_stage": "shadow",
+    "auto_refresh": true,
+    "refresh_stage": "enforce",
     "allowed_families": {
       "agy": [
         "gemini"
@@ -101,6 +101,9 @@
       ]
     }
   },
+  "comment_floor": {
+    "stage": "enforce"
+  },
   "docs_floor": {
     "ste_stage": "enforce"
   },
@@ -167,6 +170,9 @@
   },
   "regression_tia": {
     "stage": "shadow"
+  },
+  "retrospectives": {
+    "stage": "enforce"
   },
   "isolation": {
     "i2": {

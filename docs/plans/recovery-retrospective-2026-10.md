@@ -1,6 +1,6 @@
 # Plan: the host writes a retrospective document for each recovery and each judgment lesson
 
-- **Status:** proposed, 2026-10-21. Components C1 to C3 are in the first PR at stage `shadow`. C4 to C6 wait for the operator to move the stage to `enforce`.
+- **Status:** proposed, 2026-10-21. Components C1 to C3 are in the first PR at stage `shadow`. On 2026-10-27 the operator moved the stage to `enforce`. The policy key of C4 is built, and the checked-in policy sets `enforce`. The rest of C4 (the pending dir and the publish), C5 and C6 are not built. Thus the closeout still writes into the workspace only.
 - **Design:** [recovery-retrospective.md](../architecture/recovery-retrospective.md). **Decision:** [ADR-0151](../architecture/adr/0151-the-host-writes-a-retrospective-document-for-each-recovery-and-each-judgment-lesson.md). **Research:** [recovery-retrospective-2026-10.md](../research/recovery-retrospective-2026-10.md).
 - **Package note:** [internal-recoveryretro.md](../architecture/packages/internal-recoveryretro.md).
 
@@ -128,7 +128,7 @@ Each criterion has a weight. The score is 1 (poor) to 5 (good).
 | C1 | `internal/recoveryretro`: `Recoveries` and `RenderRecovery`. It reads the dossiers and renders the try rows, the infrastructure marks and the difference section. | A history with three FAILs and one PASS renders three FAIL rows, one PASS row and one mark. One FAIL gives no recovery. | shadow (this PR) |
 | C2 | `internal/recoveryretro`: `JudgmentLessons` and `RenderJudgmentLesson`, plus `LessonYAML` for both kinds. | Only `cycle-<N>-judgment-<phase>` todos are selected. The YAML parses in `internal/research` and its keywords match. | shadow (this PR) |
 | C3 | `WriteShadow`, called at the closeout of each cycle. It writes into `<workspace>/retrospectives/` only. | A PASS closeout after two FAILs writes one recovery pair. A FAIL closeout writes only the judgment pairs. Nothing is written outside the workspace. | shadow (this PR) |
-| C4 | The stage key `retrospectives.stage` and the pending dir. The boundary publish commits the pairs into `docs/retrospectives/`. | At `enforce`, a pair goes to the pending dir, and the publish commits it with the dossiers. | enforce (next PR) |
+| C4 | The stage key `retrospectives.stage` and the pending dir. The boundary publish commits the pairs into `docs/retrospectives/`. | At `enforce`, a pair goes to the pending dir, and the publish commits it with the dossiers. | the key is built (2026-10-27); the pending dir and the publish come in the next PR |
 | C5 | The judgment-todo retirement after the publish, through `carryover.Retire`. | A todo without its document on `main` stays. A todo with its document leaves. The second run changes nothing. | enforce (next PR) |
 | C6 | `docs/retrospectives/` joins the default recall roots. | A lesson YAML there is recalled for a matching goal. | enforce (next PR) |
 
