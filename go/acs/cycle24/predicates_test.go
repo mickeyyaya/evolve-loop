@@ -70,17 +70,6 @@ func TestC24_005_ControlFlagsMdHasNoRemovedRows(t *testing.T) {
 	}
 }
 
-func TestC24_006_WorktreePathStillInRegistry(t *testing.T) {
-	const worktreePath = "EVOLVE_WORKTREE_PATH"
-	if _, ok := flagregistry.Lookup(worktreePath); !ok {
-		t.Errorf("RED: flagregistry.Lookup(%q) returned ok=false — WORKTREE_PATH removed.\n"+
-			"Builder MUST NOT remove EVOLVE_WORKTREE_PATH from registry_table.go.\n"+
-			"It is a live IPC handoff (agents/evolve-tester.md) pinned by C50_009.\n"+
-			"This is the same mistake that killed cycles 17 and 18.",
-			worktreePath)
-	}
-}
-
 func TestC24_008_LlmrouteSkipsEnvForPerAgentCLI(t *testing.T) {
 	const (
 		sentinelCLI   = "sentinel-cli-c24-008-should-not-be-used"

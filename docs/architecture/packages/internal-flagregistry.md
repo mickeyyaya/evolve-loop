@@ -47,3 +47,4 @@
 ## Findings
 
 - A grep-based "no reader anywhere" classification once misclassified four flags as dead while they were still read by the bash adapters (`adapters/claude.sh`); they stayed correctly `StatusDeprecated` until the script-to-Go migration deleted that reader, and only then were the rows removed. A registry classification must check every reader surface (Go and bash), not just Go's AST scan.
+- `EVOLVE_WORKTREE_PATH` left the registry on 2026-10-26. No Go code reads or writes it. The 14 archived predicates that kept the row (`acs/cycle22` to `acs/cycle39`) said that `agents/evolve-tester.md` reads it as a live handoff. No process sets the name, so that read always falls back to the unprefixed `WORKTREE_PATH`. The `flagreaders` guard keeps the tester read as a retired name. `acs/cycle10` pins the removal.
