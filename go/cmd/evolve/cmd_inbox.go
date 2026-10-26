@@ -31,7 +31,7 @@ func inboxVerbs() []inboxVerb {
 		{"list", "list [--status " + strings.Join(menuStatusNames[:], "|") + "] [--kind K] [--route R] [--json]", withoutStdin(runInboxList)},
 		{"show", "show <id> [--json]", withoutStdin(runInboxShow)},
 		{"rank", "rank [--list " + strings.Join(rankListNames, "|") + "] [--top N] [--explain <id>] [--json]", withoutStdin(runInboxRank)},
-		{"add", "add [--file <item.json>]   (without --file, the item JSON is read from stdin)", runInboxAdd},
+		{"add", "add [--file <item.json>] [--origin O] [--allow-overlap --reason R]   (without --file, the item JSON is read from stdin)", runInboxAdd},
 		{"edit", "edit <id|item-path> (--set F=V | --add F=V | --remove F=V)...   (--set on a list field takes a JSON array)", withoutStdin(runInboxEdit)},
 		{"verify", "verify <id> --evidence <text>", withoutStdin(runInboxVerify)},
 		{"withdraw", "withdraw <id> <reason>", withoutStdin(runInboxWithdraw)},
@@ -41,6 +41,7 @@ func inboxVerbs() []inboxVerb {
 		{"route-console", "route-console <id> <reason> <cycle>", withoutStdin(runInboxRouteConsole)},
 		{"route-lane", "route-lane <id> <reason>", withoutStdin(runInboxRouteLane)},
 		{"consume", "consume <item-path> [--resolution <text>] [--cycle <n>|console]", withoutStdin(runInboxConsume)},
+		{"curate", "curate [--json] [--apply | --event] [--project-root P]   (--event reads one ship.landed wire record from stdin)", runInboxCurate},
 		{"quarantine", "quarantine list [--json] | quarantine release <id>", runInboxQuarantine},
 		{"ack-fingerprint", "ack-fingerprint <item-path>", withoutStdin(runInboxAckFingerprint)},
 	}

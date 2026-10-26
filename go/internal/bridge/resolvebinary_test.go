@@ -2,54 +2,24 @@ package bridge
 
 import "testing"
 
-func TestResolveBinary(t *testing.T) {
+func TestResolveBinary_TakesTheInjectedBinaryOfTheCLIOrItsDefaultName(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name        string
+		binaries    map[string]string
 		env         map[string]string
 		defaultName string
 		want        string
 	}{
-		{
-			name:        "testing off: override ignored",
-			env:         map[string]string{"BRIDGE_CLAUDE_BINARY": "/fake/claude"},
-			defaultName: "claude",
-			want:        "claude",
-		},
-		{
-			name:        "testing on: override applied",
-			env:         map[string]string{"BRIDGE_TESTING": "1", "BRIDGE_CLAUDE_BINARY": "/fake/claude"},
-			defaultName: "claude",
-			want:        "/fake/claude",
-		},
-		{
-			name:        "testing on: codex maps to BRIDGE_CODEX_BINARY",
-			env:         map[string]string{"BRIDGE_TESTING": "1", "BRIDGE_CODEX_BINARY": "/fake/codex"},
-			defaultName: "codex",
-			want:        "/fake/codex",
-		},
-		{
-			name:        "testing on: agy maps to BRIDGE_AGY_BINARY",
-			env:         map[string]string{"BRIDGE_TESTING": "1", "BRIDGE_AGY_BINARY": "/fake/agy"},
-			defaultName: "agy",
-			want:        "/fake/agy",
-		},
-		{
-			name:        "testing on, no override: default",
-			env:         map[string]string{"BRIDGE_TESTING": "1"},
-			defaultName: "claude",
-			want:        "claude",
-		},
-		{
-			name:        "testing on, empty override: default",
-			env:         map[string]string{"BRIDGE_TESTING": "1", "BRIDGE_CLAUDE_BINARY": ""},
-			defaultName: "claude",
-			want:        "claude",
-		},
+		{name: "no injected binary: default", defaultName: "claude", want: "claude"},
+		{name: "injected binary of the CLI", binaries: map[string]string{"claude": "/fake/claude"}, defaultName: "claude", want: "/fake/claude"},
+		{name: "another CLI keeps its default", binaries: map[string]string{"claude": "/fake/claude"}, defaultName: "codex", want: "codex"},
+		{name: "empty injected binary: default", binaries: map[string]string{"agy": ""}, defaultName: "agy", want: "agy"},
+		{name: "the environment never names a binary", env: map[string]string{"BRIDGE_TESTING": "1", "BRIDGE_CLAUDE_BINARY": "/env/claude"}, defaultName: "claude", want: "claude"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := resolveBinary(Deps{LookupEnv: mapLookup(tc.env)}, tc.defaultName)
+			got := resolveBinary(Deps{Binaries: tc.binaries, Env: tc.env, LookupEnv: mapLookup(tc.env)}, tc.defaultName)
 			if got != tc.want {
 				t.Errorf("resolveBinary(%q) = %q, want %q", tc.defaultName, got, tc.want)
 			}

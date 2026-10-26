@@ -318,6 +318,7 @@ Three proposed readings of the quality panel ([llm-quality-indexes.md](llm-quali
 | `quality compare` | leased | R (`quality-reading`) | no | yes | `evolve.quality.compare/1` | it publishes one PQ3 reading |
 | `agent run` | leased | R (`dispatch`) | yes | yes | `evolve.agent.run/1` | read-only agent; it writes a ledger entry with cycle 0 |
 | `inbox add`, `consume` | leased | `add` R (`inbox-add`), `consume` D | no | no | `evolve.inbox.<verb>/1` | no lease check today |
+| `inbox curate` (proposed) | always; `--event` leased; `--apply` boundary | R (`inbox-curate`, proposed) | yes (proposed) | yes (proposed) | `evolve.inbox.curate/1` | read-only without a flag; `--event` publishes signals; `--apply` refuses with exit 1 while a run lease is live ([inbox-curator.md](inbox-curator.md)) |
 | `inbox edit`, `withdraw`, `verify`, `route-console`, `route-lane` | queued | D | no | no | `evolve.inbox.<verb>/1` | refuse during a wave today (F4.5) |
 | `cli-routing set`, `unset`, `init`, `migrate` | queued | D (`set` and `unset` through `routing-proposal`) | no | yes | `evolve.cli-routing.<verb>/1` | refuse during a wave today (`c/boundary_write.go:13-27`) |
 | `wave note` | leased | D | yes | yes | `evolve.wave.note/1` | |

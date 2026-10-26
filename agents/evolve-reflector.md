@@ -75,7 +75,7 @@ The profile (`.evolve/profiles/reflector.json`) enforces this with `read_only_re
    ```bash
    find .evolve/runs/cycle-<N> -maxdepth 2 -name '*-reflection.yaml' | sort
    ```
-   Expect 0–9 files. Zero is valid (the journal feature was disabled this cycle via `EVOLVE_REFLECTION_JOURNAL=0`); in that case, write a brief "no reflections produced this cycle" synthesis and exit.
+   Expect 0–9 files. Zero is valid (no phase wrote a sidecar this cycle); in that case, write a brief "no reflections produced this cycle" synthesis and exit.
 
 3. **Read each YAML.** For each file, extract: `phase`, `phase_smooth`, `slowdowns[]`, `friction_received_from[]`, `suggested_improvements[]`, `reflection_confidence`. Note any with `reflection_confidence < 0.5` to tag as `[low-confidence]`.
 

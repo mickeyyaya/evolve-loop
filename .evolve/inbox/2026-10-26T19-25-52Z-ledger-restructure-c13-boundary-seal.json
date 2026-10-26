@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "evolve boundary run seals after sync and gc, and never in a wave",
+    "after the backfill, evolve ledger verify and verify --deep report OK on the plane",
+    "after a seal, a byte-identical carry still ships without a new audit"
+  ],
+  "created_at": "2026-10-26T19:23:03Z",
+  "deps": [
+    "ledger-restructure-c10-segment-aware-scan",
+    "ledger-restructure-c12-incremental-verify"
+  ],
+  "files": [
+    "go/cmd/evolve/cmd_boundary.go"
+  ],
+  "fix": "Add the seal step to evolve boundary run after sync and gc. Never seal in a wave. Add a one-time monthly backfill of history, which runs only after every reader can read segments.",
+  "id": "ledger-restructure-c13-boundary-seal",
+  "kind": "feature",
+  "notes": "Plan: docs/plans/ledger-restructure-2026-10.md sections 4, 6 and 7, C13. The step seals the ledger hash chain on the plane, so it stays with the console. held_proposal_candidate: true.",
+  "priority_class": "performance",
+  "route": "console-manual",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Plan docs/plans/ledger-restructure-2026-10.md, component C13 (decision D4). Decision record: docs/architecture/adr/0123-ledger-durable-evidence-segments-incremental-verify.md. No seal can run on the plane before C10 and C12 land.",
+  "title": "Ledger C13: evolve boundary run seals the ledger after sync and gc, and a one-time monthly backfill seals history",
+  "weight": 0.3
+}

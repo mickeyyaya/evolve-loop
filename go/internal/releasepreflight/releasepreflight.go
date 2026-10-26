@@ -401,7 +401,7 @@ func scopedOutOrFail(res auditResult, candidate auditledger.Entry, releaseHead s
 		return res, nil
 	}
 	if strict {
-		return res, fmt.Errorf("EVOLVE_RELEASE_STRICT_PASS=1 and most recent audit-report.md does not declare 'Verdict: PASS' (%s)",
+		return res, fmt.Errorf("--strict-pass and most recent audit-report.md does not declare 'Verdict: PASS' (%s)",
 			res.artifact)
 	}
 	return res, fmt.Errorf("most recent audit-report.md does not declare 'Verdict: PASS' or 'Verdict: WARN' (%s)",

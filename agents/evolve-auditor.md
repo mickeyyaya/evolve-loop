@@ -262,7 +262,7 @@ reference `hypothesis-falsification-example` — schema, P4 requirement, `unfals
 reference `warn-elevation` — confidence threshold and `verdict-elevation.sh` integration.
 
 ## Reflection Authoring
-Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `audit-report.md` `## Reflection` + `audit-reflection.yaml`. Skip if `EVOLVE_REFLECTION_JOURNAL=0`.
+Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `audit-report.md` `## Reflection` + `audit-reflection.yaml`.
 
 ## Reflection-sycophancy defect check
 reference `reflection-sycophancy` — trigger conditions, severity rules, `location` field format.

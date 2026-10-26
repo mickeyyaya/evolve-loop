@@ -61,9 +61,10 @@ func TestProductionEngineDeps_ResolverAppliesRealFixture(t *testing.T) {
 		t.Fatal("productionEngineDeps(env).TokenResolver is nil")
 	}
 	res, err := d.TokenResolver(tokenusage.Window{
-		Worktree: worktree,
-		Start:    mustParseRFC3339(t, "2026-07-08T10:59:00Z"),
-		End:      mustParseRFC3339(t, "2026-07-08T11:01:00Z"),
+		Collector: tokenusage.FormatClaudeJSONL,
+		Worktree:  worktree,
+		Start:     mustParseRFC3339(t, "2026-07-08T10:59:00Z"),
+		End:       mustParseRFC3339(t, "2026-07-08T11:01:00Z"),
 	})
 	if err != nil {
 		t.Fatalf("wired resolver returned error against a valid fixture: %v", err)
@@ -96,7 +97,7 @@ insert into conversation_summaries values ('`+id+`', '["file://`+worktree+`"]', 
 insert into gen_metadata values (1, x'0a0b220910d012181e28c0c403');`)
 
 	d := NewDefault(t.TempDir(), nil).productionEngineDeps(map[string]string{"HOME": home})
-	got, err := d.TokenResolver(tokenusage.Window{Driver: "agy-tmux", Worktree: worktree,
+	got, err := d.TokenResolver(tokenusage.Window{Driver: "agy-tmux", Collector: tokenusage.FormatAgyConversation, Worktree: worktree,
 		Start: mustParseRFC3339(t, "2026-10-19T07:07:30Z"), End: mustParseRFC3339(t, "2026-10-19T07:23:34Z")})
 
 	if err != nil || got.Source != tokenusage.SourceAgyConversation || got.Usage.Input != 2384 || got.Usage.Output != 30 || got.Usage.CacheRead != 57920 {

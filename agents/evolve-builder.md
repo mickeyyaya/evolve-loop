@@ -266,7 +266,7 @@ Do NOT self-quote 8 truthable metrics (cost, turns, duration, tokens, cache toke
 
 Before posting your completion ledger entry, execute the Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `build-report.md`'s `## Reflection` section and `build-reflection.yaml` sidecar. Builder-specific friction commonly maps to `tool-error`, `profile-restriction`, `cost-guard threshold breach`, or `ambiguous-input` (AC ambiguity from TDD).
 
-**Distinct from Step 5.6's self-review:** that is a code-quality review of your diff; this reflection journal entry covers process retrospection on your phase's execution. Both can run; they emit to different artifacts (`build-report.md ## Self-Review` vs `build-reflection.yaml`). Skip the reflection only if `EVOLVE_REFLECTION_JOURNAL=0`.
+**Distinct from Step 5.6's self-review:** that is a code-quality review of your diff; this reflection journal entry covers process retrospection on your phase's execution. Both can run; they emit to different artifacts (`build-report.md ## Self-Review` vs `build-reflection.yaml`).
 
 ## Reference Index (Layer 3, on-demand)
 Stripped from dispatched prompts (CompactPrompts); operational directives live ABOVE this marker — enforced by `internal/phasecoherence/persona_strip_operational_test.go` (cycle-1390–1429 lesson). Reference: [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md)

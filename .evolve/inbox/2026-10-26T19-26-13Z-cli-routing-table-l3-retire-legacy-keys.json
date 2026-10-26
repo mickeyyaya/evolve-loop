@@ -1,0 +1,30 @@
+{
+  "acceptance": [
+    "A policy with pins, workflow.universal_fallback, router.cli, router.model, router.plan_model or router.propose_model fails to load with a message that names evolve cli-routing migrate",
+    "evolve cli-routing migrate moves each old key into the table",
+    "resolve-llm prints the same JSON as cli-routing show --json",
+    "The cliroute tests and the call-site tests of the plan verification section stay green",
+    "runtime-reference.md has one precedence table in place of the list of 24 mechanisms"
+  ],
+  "created_at": "2026-10-26T19:26:11Z",
+  "deps": [],
+  "files": [
+    "go/internal/policy/",
+    "go/internal/llmroute/",
+    "go/internal/resolvellm/",
+    "go/cmd/evolve/",
+    "docs/operations/runtime-reference.md",
+    "CLAUDE.md",
+    "skills/setup/SKILL.md"
+  ],
+  "fix": "Delete the old keys. Make their presence a load error that points to evolve cli-routing migrate. Retire llmroute.AllowedDiscovered and policy.ValidatePin. Make resolve-llm an alias of cli-routing show --json. Update docs/operations/runtime-reference.md with one precedence table, and update policy-config.md, internal-llmroute.md, internal-policy.md, the CLAUDE.md routing bullets and the evo:setup skill text.",
+  "id": "cli-routing-table-l3-retire-legacy-keys",
+  "kind": "refactor",
+  "notes": "L3 is code, not an operator flip, so kind refactor. The fix surface is the policy parser, a gate file, so route console-manual. held_proposal_candidate: true.",
+  "priority_class": "maintainability",
+  "route": "console-manual",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Plan docs/plans/cli-routing-table-2026-10.md, landing L3 (items 10 to 12). Decision ADR-0119. L1 and L2 are on main. The legacy keys still decode in go/internal/policy (policy.go Pins, workflow.go UniversalFallback, routing_gates.go PlanModel), so two routing truths exist.",
+  "title": "Retire the legacy routing keys: pins, workflow.universal_fallback, router.cli and model, and router.plan_model and propose_model (CLI routing L3)",
+  "weight": 0.4
+}

@@ -17,7 +17,7 @@ var externalEnvAllowlist = map[string]bool{
 	"GITHUB_TOKEN": true,
 	"CYCLE":        true, "SHIP_CLASS": true, "WORKSPACE_PATH": true, "WORKTREE_PATH": true,
 	"PROFILE_PATH": true, "PROMPT_FILE": true, "PROMPT_FILE_OVERRIDE": true, "MODEL_TIER_HINT": true,
-	"CG_ATTEST_DIR": true, "CG_TEST_FORCE_MISSING": true, "CG_TEST_INSTALL": true,
+	"CG_ATTEST_DIR":          true,
 	"FAKE_CLI_AUDIT_VERDICT": true, "TESTRUSAGE_OUT": true,
 }
 

@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "The agy probe argv has the fast model of the agy manifest",
+    "DriverFor and bareDriverMap do not exist, and each former caller uses bridge.Resolve",
+    "The ollama result of the old DriverFor is decided and pinned by a test",
+    "A guard test fails on a fixture with an LLM argv literal in doctor.go and passes on the tree"
+  ],
+  "created_at": "2026-10-26T19:30:00Z",
+  "deps": [],
+  "files": [
+    "go/internal/bridge/doctor.go",
+    "go/internal/bridge/driver.go",
+    "go/internal/bridge/",
+    "go/cmd/evolve/",
+    "docs/architecture/agent-bridge-factory.md"
+  ],
+  "fix": "Add a Probe capability on an optional driver interface, as CLIPreflight does. Run the deep probe through the driver of its family, so that it gets the manifest model and argv. Remove DriverFor and bareDriverMap, move each caller to bridge.Resolve, and decide the ollama result in the same change. Add a guard test that bans an LLM argv literal in doctor.go and that fails on a fixture with one.",
+  "id": "bridge-factory-f2-probe-through-driver",
+  "kind": "refactor",
+  "notes": "Plan link: docs/plans/bridge-factory-2026-10.md (component F2). Spec link: docs/architecture/agent-bridge-factory.md and ADR-0137. The plan has no owner column. The fix surface is go/internal/bridge and not a gate file, so the route is lane: admission decides; the narrowed protected fence lands soon. F2 also delivers the probe part of tier-policy Q4.",
+  "priority_class": "correctness",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Component F2 (decision D4) of the plan docs/plans/bridge-factory-2026-10.md. The spec is docs/architecture/agent-bridge-factory.md and ADR-0137. F1 is built. go/internal/bridge/driver.go still holds DriverFor and bareDriverMap beside the DriverSet, so the map from family to driver exists two times. The deep probe in go/internal/bridge/doctor.go builds its own argv, so an agy probe does not get the manifest model and uses the Argon pool.",
+  "title": "The deep probe runs through the driver of its family, and DriverFor and bareDriverMap go (bridge-factory plan F2)",
+  "weight": 0.5
+}

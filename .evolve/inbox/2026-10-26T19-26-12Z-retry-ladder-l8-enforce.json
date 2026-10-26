@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "One wave of shadow try records exists, with rung, failure_class, fingerprint and ladder_would filled",
+    "At shadow the dispatch requests are byte-identical to the requests before the ladder (the golden test of plan section 7)",
+    "The operator decision and its date are in the plan",
+    "If the decision is enforce, .evolve/policy.json has retry_ladder.stage enforce"
+  ],
+  "created_at": "2026-10-26T19:26:11Z",
+  "deps": [
+    "retry-ladder-l5-wiring-shadow"
+  ],
+  "files": [
+    ".evolve/policy.json",
+    "docs/plans/retry-ladder-2026-10.md"
+  ],
+  "fix": "After L5 wires the ladder at shadow, read one wave of try records with evolve ladder report. If the records show the ladder choices of the plan, set retry_ladder.stage to enforce at a wave boundary.",
+  "id": "retry-ladder-l8-enforce",
+  "kind": "decision",
+  "notes": "An operator flip, so kind decision and route console-manual.",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Plan docs/plans/retry-ladder-2026-10.md, component L8. Design docs/architecture/retry-ladder.md. Decision ADR-0142. The owner is the operator. The key is retry_ladder.stage in .evolve/policy.json, and the value on main is shadow.",
+  "title": "Move the retry ladder to enforce after one wave of shadow data (retry ladder L8)",
+  "weight": 0.4
+}

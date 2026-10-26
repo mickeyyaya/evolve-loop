@@ -54,7 +54,11 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 				RungBudget: rungBudget,
 			})
 			if act.Rung == "" {
-				break
+				var raised bool
+				if dr.phaseReq, raised = cr.askLadder(contractLadderAsk(next, originContractCorrection, rin.Worktree, rr), dr.phaseReq); !raised {
+					break
+				}
+				act.Rung = interaction.RungRedispatch
 			}
 			rungBudget[act.Rung]--
 			if act.Rung == interaction.RungSalvage {
@@ -101,27 +105,11 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 			fmt.Fprintf(cr.o.errOut(), "[orchestrator] phase %s: contract violation (correction %d/%d) — re-dispatching with correction: %s\n",
 				next, corr, maxCorrections, rr.Reason)
 			salvageRetry := false
-			escalEligible := rr.Blocks >= contractEscalateAtBlock ||
-				(rr.Remediation != "" && corr >= contractEscalateAtBlock)
-			if escalEligible && contractBlocksShareIdentity(prevBlockIdentity, rr.Reason) {
-				failedCLI := cr.contractDispatchCLI(next, dr.phaseReq.ModelRoutingCLI)
-				esc, ok := cr.contractEscalationCLI(next, dr.phaseReq.ModelRoutingCLI)
-				switch {
-				case ok && esc != dr.phaseReq.ModelRoutingCLI:
-					blocksForLog := rr.Blocks
-					if blocksForLog == 0 {
-						blocksForLog = corr
-					}
-					fmt.Fprintf(cr.o.errOut(), "[orchestrator] phase %s: CLI ESCALATION — %d consecutive identical block(s) on cli=%s; correction %d re-dispatches on cli=%s (these rejections never trigger cli_fallback, which is how an incapable CLI used to burn every round). The phase's primary routing is unchanged.\n",
-						next, blocksForLog, failedCLI, corr, esc)
-					dr.phaseReq.ModelRoutingCLI = esc
-					escalated = true
-				case !ok:
-					fmt.Fprintf(cr.o.errOut(), "[orchestrator] phase %s: CONTRACT SALVAGE RETRY — %d consecutive contract blocks on cli=%s and no other CLI family is available to escalate to; correction %d re-dispatches on the SAME cli with a structured re-prompt carrying the validator output verbatim. Breaker-neutral: no extra dispatch, no extra correction, no routing change.\n",
-						next, rr.Blocks, failedCLI, corr)
-					salvageRetry = true
-					salvageRetried = true
-				}
+			if !cr.o.workflowConfig.RetryLadder.Enforced() && contractEscalationDue(rr, corr, prevBlockIdentity) {
+				var escalatedNow bool
+				escalatedNow, salvageRetry = cr.escalateContractCLI(next, dr, rr, corr)
+				escalated = escalated || escalatedNow
+				salvageRetried = salvageRetried || salvageRetry
 			}
 			prevBlockIdentity = newContractBlockIdentity(rr.Reason)
 			if lerr := cr.o.ledger.Append(cr.ctx, LedgerEntry{
@@ -161,9 +149,9 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 				}
 				salvagedFromInvalid = ""
 			}
-			dr.phaseReq.CorrectionDirective = directive
+			dr.phaseReq.CorrectionDirective = preferDigest(directive, dr.phaseReq)
 			cr.o.emitGateCorrection(gateCorrection{
-				origin: "cycleRun.reviewWithCorrections", cycle: cr.cycle, phase: next, correction: corr, max: maxCorrections,
+				origin: originContractCorrection, cycle: cr.cycle, phase: next, correction: corr, max: maxCorrections,
 				rung: interaction.RungRedispatch, cli: dr.phaseReq.ModelRoutingCLI, escalated: escalated, salvageRetry: salvageRetry, reason: rr.Reason,
 			})
 			dr.phaseReq = cr.countDispatch(next, dr.phaseReq)
@@ -213,4 +201,27 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 	}
 
 	return loopNext, nil
+}
+
+func contractEscalationDue(rr ReviewResult, corr int, prev contractBlockIdentity) bool {
+	eligible := rr.Blocks >= contractEscalateAtBlock || (rr.Remediation != "" && corr >= contractEscalateAtBlock)
+	return eligible && contractBlocksShareIdentity(prev, rr.Reason)
+}
+
+func (cr *cycleRun) escalateContractCLI(next Phase, dr *dispatchResult, rr ReviewResult, corr int) (bool, bool) {
+	failedCLI := cr.contractDispatchCLI(next, dr.phaseReq.ModelRoutingCLI)
+	esc, ok := cr.contractEscalationCLI(next, dr.phaseReq.ModelRoutingCLI)
+	if !ok {
+		fmt.Fprintf(cr.o.errOut(), "[orchestrator] phase %s: CONTRACT SALVAGE RETRY — %d consecutive contract blocks on cli=%s and no other CLI family is available to escalate to; correction %d re-dispatches on the SAME cli with a structured re-prompt carrying the validator output verbatim. Breaker-neutral: no extra dispatch, no extra correction, no routing change.\n",
+			next, rr.Blocks, failedCLI, corr)
+		return false, true
+	}
+	blocksForLog := rr.Blocks
+	if blocksForLog == 0 {
+		blocksForLog = corr
+	}
+	fmt.Fprintf(cr.o.errOut(), "[orchestrator] phase %s: CLI ESCALATION — %d consecutive identical block(s) on cli=%s; correction %d re-dispatches on cli=%s (these rejections never trigger cli_fallback, which is how an incapable CLI used to burn every round). The phase's primary routing is unchanged.\n",
+		next, blocksForLog, failedCLI, corr, esc)
+	dr.phaseReq.ModelRoutingCLI = esc
+	return true, false
 }

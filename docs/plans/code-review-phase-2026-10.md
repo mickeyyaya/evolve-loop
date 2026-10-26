@@ -4,7 +4,7 @@
 > - **What the phase does:**
 >   - It reviews the build's diff across every quality dimension, justifying each review it runs.
 >   - It returns findings with suggested fixes to build, repeating until every concern is resolved.
->   - It hands the result to the audit. The audit scores the same quality index to decide whether the change qualifies.
+>   - It hands the result to the audit. The audit scores the same quality index to decide if the change qualifies.
 > - **Approved by the operator on 2026-10-07.** The first design was approved in the morning; the review-loop redesign was approved in plan mode in the afternoon. Both sets of decisions are in §3.
 > - **Design (the core logic):** [review-loop-and-quality-index.md](../architecture/review-loop-and-quality-index.md).
 > - **Decision record:** [ADR-0124](../architecture/adr/0124-code-review-phase.md).
@@ -47,7 +47,7 @@
 |---|---|
 | The audit was the only reviewer and also the gate | A builder first hears of a defect from the audit's rejection, as verdict prose (ADR-0093/0096). The ADR-0096 ship-rate study shows repair converges poorly in that form. |
 | One judgment carried every lens | The auditor persona is 23,956 bytes against the 18,102-byte ACS baseline (`go/acs/cycle419`). Performance, concurrency and debuggability got whatever attention was left. |
-| The real review ran outside the pipeline | The console's review chain found defects on every lane reviewed on 2026-10-06/07 that only showed in the diff: a rule with four disagreeing homes (agy reliability), an ownership check at one of two sites (fleet leak), an exemption stated twice, and surviving mutants. Every lane needed 2–3 review rounds to converge. |
+| The real review ran outside the pipeline | The review chain of the console found defects on every lane that it reviewed on 2026-10-06/07. Only the diff showed them. They were a rule with four homes that disagreed (agy reliability) and an ownership check at one of two sites (fleet leak). The others were an exemption stated twice, and mutants that survived. Every lane needed 2–3 review rounds to converge. |
 | Lens phases rarely ran | Ten single-lens evaluate phases exist (perf-profile, race-condition-scan, error-handling-scan, security-scan, …). The advisor inserts them ad hoc, so most code cycles got none. |
 | No shared bar | Review lenses, the audit checklist and the lens phases each used their own vocabulary, so "qualified" had no single definition. |
 
@@ -77,16 +77,16 @@ The operator asked for at least two strategies and a chosen winner.
 | D1 | Coverage | **Every code cycle that touched files.** The registry pins `code-review` with `conditional_mandatory` (`deliverable_kind==code && build.files_touched>0`). Document and no-change cycles skip it. | operator (morning) |
 | D2 | Rollout | **Shadow for 2 waves, then enforce,** through `workflow.findings_repair.code-review.stage`. | operator (morning) |
 | D3 | Strategy | **S3:** a shared quality index, a lead reviewer, and data-driven specialists. | console, at the operator's request |
-| Q-D1 | Loop stop | **At most 4 review rounds plus a no-progress stop:** a round must strictly reduce the unresolved mass, and no still-OPEN id may have been reopened after FIXED twice. Unresolved work goes to the audit with `REVIEW_UNRESOLVED`, and the audit's existing repair or retro path takes over. | operator (afternoon) |
+| Q-D1 | Loop stop | **At most 4 review rounds plus a no-progress stop.** A round must strictly reduce the unresolved mass. A still-OPEN id must not be reopened after FIXED twice. Unresolved work goes to the audit with `REVIEW_UNRESOLVED`, and the audit's existing repair or retro path takes over. | operator (afternoon) |
 | Q-D2 | "Resolved" | **Strict findings (default CRITICAL, HIGH and MEDIUM):** FIXED with evidence, or DEFERRED with a reason the reviewer accepts. **Below the threshold (default LOW):** dispositioned, either fixed or with a stated reason, and never rejected. **Every applicable dimension** meets its threshold. | operator (afternoon) |
 | Q-D3 | Qualification at the audit | **Every applicable dimension ≥ 4/5** in the audit's own scoring. N/A is allowed with a reason, and the audit may contest it. The thresholds are config. | operator (afternoon) |
 | Q-D4 | Specialists | **Phase B, driven by data:** add one for a dimension where the audit keeps scoring lower than the reviewer. | operator (afternoon) |
-| D4 | Review scope | **A justified Review Plan every round.** Each dimension is required (light, standard or deep) or N/A, with evidence from the diff and from the earlier phases' deliverables, which the reviewer reads as needed. | operator (afternoon) |
+| D4 | Review scope | **A justified Review Plan every round.** Each dimension is required (light, standard or deep) or N/A. The evidence comes from the diff and from the deliverables of the earlier phases, which the reviewer reads as needed. | operator (afternoon) |
 | D5 | The simplifier | **It stays inside the build phases** (C0c self-simplify and self-review, scoped to the phase's own files). The review applies no fixes. | operator (afternoon) |
 | D6 | Grant mechanism | **Deterministic** (design §5.4). No LLM envelope for code-review, and `remediationDenied` is unchanged. The loop is a findings-driven repair, never a re-roll of a verdict. | console (anti-gaming) |
 | D7 | Audit independence | **The audit scores blind,** from a review digest that leaves out the review's Scores, and never opens the raw review report. The kernel computes divergence afterwards. | console |
 | D8 | Kernel cross-check | **A shippable audit verdict (PASS or WARN) that does not qualify becomes FAIL** (`AUDIT_QUALIFICATION_GAP`), declaring the failure class `code-audit-fail` so the existing repair is granted. A malformed Scores section goes to the correction rung (enforce only). | console (logic over format) |
-| D9 | Disputes | **A strict deferral the reviewer rejects twice becomes DISPUTED.** It is resolved for the loop and ruled on by the audit: UPHOLD reopens it, OVERTURN accepts the deferral, and any row still DISPUTED at cycle close becomes OPEN. This extends Q-D2's "a reason the reviewer accepts" with an arbiter, so a reviewer–builder disagreement cannot stall the loop. | console |
+| D9 | Disputes | **A strict deferral the reviewer rejects twice becomes DISPUTED.** It is resolved for the loop, and the audit rules on it. UPHOLD reopens it, OVERTURN accepts the deferral, and a row still DISPUTED at cycle close becomes OPEN. This adds an arbiter to the "a reason the reviewer accepts" rule of Q-D2. So a disagreement of the reviewer and the builder cannot stall the loop. | console |
 | — | Superseded (morning) | "One fix round plus a delta re-review" is replaced by Q-D1's loop. "The audit only grades dispositions" is replaced by: the audit grades dispositions AND scores the shared index. "Threshold HIGH" is replaced by MEDIUM (Q-D2). The morning components R4–R7 are replaced by Q3–Q6, and R8 is split into R8a (the stage switch) and R8b (the flip). | operator (afternoon) |
 
 ## 4. Principles
@@ -111,7 +111,7 @@ The full core logic is in [review-loop-and-quality-index.md](../architecture/rev
 | §2 | The ten dimensions with their score-4 bar, N/A rules and review procedure; the Scores grammar; threshold resolution; `Qualifies` |
 | §3 | The Review Plan grammar and rules; the inputs and how they reach the reviewer; the report grammar check and the report's sections |
 | §4 | The finding grammar and the ledger projection |
-| §5 | Per-round state; the resolved predicate; unresolved mass and progress; the decision pseudo-code and routing seams; the fix brief; the disposition protocol, `applyReviewDispositions` and the delta-review duties; the tamper check |
+| §5 | Per-round state; the resolved predicate; unresolved mass and progress; the decision pseudo-code and routing seams. The fix brief; the disposition protocol, `applyReviewDispositions` and the delta-review duties; the tamper check. |
 | §6 | The blind audit and the digest, the qualification cross-check, divergence and DISPUTED adjudication |
 | §7 | Recovery rungs |
 | §8 | Phase B specialists |
@@ -133,12 +133,12 @@ The morning components R4–R7 are replaced by Q3–Q6, and R8 is split into R8a
 |---|---|---|---|
 | R0/Q0 | This plan, the design doc, and ADR-0124 (amended) | `docs/plans/`, `docs/architecture/` | ☑ #799 (train #801) |
 | R1 | `skills/architecture-review/SKILL.md` | `skills/` | ☑ #799 (train #801) |
-| Q1 | The quality index:<br>• `skills/quality-index/` (SKILL plus COMPACT): the dimensions, score-4 bars, N/A rules, review procedure per dimension and the grammars;<br>• the `qualityindex` package: `Keys`, `NeverNA`, `ResolveThresholds`, `ParseScores`, `ParsePlan`, `Agree`, `Qualifies`;<br>• `workflow.quality_index.thresholds` resolved into `WorkflowConfig.QualityIndex`, with a root-based loader for the deliverable gate;<br>• protected-manifest rows for both, and for the code-review phase's own files and pin test (design §13). | `skills/`, `qualityindex/`, `policy/`, `guards/integrity_surface.go` (also edited by C0; appended at the end, apart from C0's hunk) | ☑ #799 (train #801) |
+| Q1 | The quality index: <br>• `skills/quality-index/` (SKILL plus COMPACT): the dimensions, score-4 bars, N/A rules, review procedure per dimension and the grammars. <br>• the `qualityindex` package: `Keys`, `NeverNA`, `ResolveThresholds`, `ParseScores`, `ParsePlan`, `Agree`, `Qualifies`. <br>• `workflow.quality_index.thresholds` resolved into `WorkflowConfig.QualityIndex`, with a root-based loader for the deliverable gate. <br>• protected-manifest rows for both, and for the code-review phase's own files and pin test (design §13). | `skills/`, `qualityindex/`, `policy/`, `guards/integrity_surface.go` (also edited by C0; appended at the end, apart from C0's hunk) | ☑ #799 (train #801) |
 | R2 | The phase: `phase.json`, the persona and profile, the `conditional_mandatory` pin | phases, agents, profiles, registry | ☑ #799 (train #801) |
-| Q2 | Landing-1 amendments to the design:<br>• the report adds `## Review Plan` and `## Scores` and drops `## Scope`; the finding `Category` becomes `Dimension` (`clean-code` → `maintainability`);<br>• the report grammar `code-review-report` (`codereview.ValidateReport`): plan, scores, agreement, gap citations; declared by `classify.grammars` and checked by the deliverable gate (`bad_grammar`), so `evolve phase verify code-review` applies it;<br>• rows gain `dimension`; the cut's stand-in row takes the highest cut severity; inherited rows keep their provenance;<br>• the persona covers every dimension and reads the earlier deliverables: the Task Contract through `prompt_context`, the rest through `inputs.files`;<br>• the default threshold becomes MEDIUM, and `REVIEW_FINDINGS` gains `scores` and `gaps` with the redefined `would_repair`, the severity counts folded into one `findings` field to fit the Signal Center's 12-field cap;<br>• the landing-1 files that still described the morning design. | `codereview/`, `core/defectledger/`, `core/review_findings.go`, `core/task_contract.go`, `deliverable/`, `phasespec/`, `phasecontract/`, `policy/workflow_findings_repair.go`, `.evolve/phases/code-review/phase.json`, `agents/evolve-code-reviewer.md`, `skills/architecture-review/SKILL.md`, `CHANGELOG.md`, `docs/operations/runtime-reference.md`, `docs/architecture/packages/internal-policy.md`, `docs/architecture/packages/internal-codereview.md`, `docs/architecture/continuation-defect-ledger.md`, `docs/architecture/phase-plugin-system.md` | ☑ #799 (train #801) |
+| Q2 | Landing-1 amendments to the design: <br>• the report adds `## Review Plan` and `## Scores` and drops `## Scope`; the finding `Category` becomes `Dimension` (`clean-code` → `maintainability`). <br>• the report grammar `code-review-report` (`codereview.ValidateReport`): plan, scores, agreement, gap citations; declared by `classify.grammars` and checked by the deliverable gate (`bad_grammar`), so `evolve phase verify code-review` applies it. <br>• rows gain `dimension`; the cut's stand-in row takes the highest cut severity; inherited rows keep their provenance. <br>• the persona covers every dimension and reads the earlier deliverables: the Task Contract through `prompt_context`, the rest through `inputs.files`. <br>• the default threshold is MEDIUM; `REVIEW_FINDINGS` gains `scores`, `gaps` and the redefined `would_repair`; one `findings` field holds the severity counts (Signal Center cap: 12 fields). <br>• the landing-1 files that still described the morning design. | `codereview/`, `core/defectledger/`, `core/review_findings.go`, `core/task_contract.go`, `deliverable/`, `phasespec/`, `phasecontract/`, `policy/workflow_findings_repair.go`, `.evolve/phases/code-review/phase.json`, `agents/evolve-code-reviewer.md`, `skills/architecture-review/SKILL.md`, `CHANGELOG.md`, `docs/operations/runtime-reference.md`, `docs/architecture/packages/internal-policy.md`, `docs/architecture/packages/internal-codereview.md`, `docs/architecture/continuation-defect-ledger.md`, `docs/architecture/phase-plugin-system.md` | ☑ #799 (train #801) |
 | R3 | Ledger rows (`source`, `round`, `severity`), the shared `Append`, `codereview` parse and rows, and the completion-boundary hook | `core/defectledger/`, `codereview/`, `core/` | ☑ #799 (train #801) |
 | R8a | The stage switch, held in shadow | `policy/workflow_findings_repair.go` | ☑ #799 (train #801) |
-| — | After C0: the phase overlay rule (`{phases:[code-review], when: code} → [engineering-craft, code-review-simplify, architecture-review, quality-index]`) | `policy/overlays.go` | ☐ after C0 |
+| — | After C0: the phase overlay rule (`{phases:[code-review], when: code} → [engineering-craft, code-review-simplify, architecture-review, quality-index]`) | `policy/overlays.go` | ☑ landed with #799 (train #801): `go/internal/policy/overlays.go:63` |
 
 ### Landing 2 (shadow, then the flip)
 
@@ -146,17 +146,17 @@ Landing 2 also carries the audit evaluation contract, components E1–E6 of [aud
 
 | # | Component | Where | Status |
 |---|---|---|---|
-| Q3 | The generalized findings-driven repair:<br>• the `ReviewRepair` cycle state (`review_repair,omitempty`), persisted on every path, with `PendingFixRound` for resume;<br>• unresolved mass, the progress rule and its re-entry baseline;<br>• the oscillation counter (still-OPEN ids only);<br>• `decideAfterReview`, computed in full in shadow;<br>• the routing seams: `scheduledNext`, `decisionOnlyEdge`, the registry's `legal_successors`, re-entry scheduling;<br>• `applyReviewDispositions` for same-cycle rows;<br>• the fix-round brief (`CtxKeyReviewRepairFindings`, `composeReviewRepairBrief`) and per-round archives;<br>• the tamper check (hash and restore);<br>• `max_rounds` in config.<br>Audit-repair stays byte-identical (golden). | `core/` (protected), `cyclestate/`, `policy/`, `docs/architecture/phase-registry.json` | ☐ |
-| Q4 | Delta re-review mode: the `## Disposition Review` grammar (one line per id, NOTE for non-strict rows), the kernel applying ACCEPT and REJECT, `defectledger.StatusDisputed`, and DISPUTED at 2 | `codereview/`, `core/defectledger/`, persona | ☐ |
-| Q5 | The audit on the index:<br>• the review digest (`code-review-digest.md`, `writeReviewDigest`);<br>• the auditor's own Scores and Adjudication;<br>• the kernel cross-check on PASS and WARN, with the `code-audit-fail` qualification block (`audit-qualification.json`);<br>• divergence (`review-divergence.json`, `quality_index.divergence`);<br>• DISPUTED → OPEN at cycle close;<br>• slimming the auditor persona (at the flip). | `core/`, `phases/audit/`, `agents/evolve-auditor*.md` | ☐ |
-| Q6 | The capacity skip (a branch at the quota-wall seam for a non-gate phase), the full signal set (design §10), ordering `code-review` first after build (OQ1), and the metrics readout verb `evolve review metrics [--cycles N] [--json]`, which prints design §9's shadow metrics per dimension | runner, `core/`, `phasespec`, `cmd/evolve` | ☐ |
-| R8b | The flip to enforce, after 2 shadow waves | operator, at a boundary | ☐ |
+| Q3 | The generalized findings-driven repair: <br>• the `ReviewRepair` cycle state (`review_repair,omitempty`), persisted on every path, with `PendingFixRound` for resume. <br>• unresolved mass, the progress rule and its re-entry baseline; <br>• the oscillation counter (still-OPEN ids only); <br>• `decideAfterReview`, computed in full in shadow. <br>• the routing seams: `scheduledNext`, `decisionOnlyEdge`, the `legal_successors` of the registry, the re-entry schedule; <br>• `applyReviewDispositions` for same-cycle rows. <br>• the fix-round brief (`CtxKeyReviewRepairFindings`, `composeReviewRepairBrief`) and per-round archives; <br>• the tamper check (hash and restore); <br>• `max_rounds` in config. <br>Audit-repair stays byte-identical (golden). | `core/` (protected), `cyclestate/`, `policy/`, `docs/architecture/phase-registry.json` | ☐; inbox item `code-review-phase-q3-findings-driven-repair` |
+| Q4 | Delta re-review mode: the `## Disposition Review` grammar (one line per id, NOTE for non-strict rows), the kernel applying ACCEPT and REJECT, `defectledger.StatusDisputed`, and DISPUTED at 2 | `codereview/`, `core/defectledger/`, persona | ☐; inbox item `code-review-phase-q4-delta-re-review` |
+| Q5 | The audit on the index: <br>• the review digest (`code-review-digest.md`, `writeReviewDigest`). <br>• the auditor's own Scores and Adjudication. <br>• the kernel cross-check on PASS and WARN, with the `code-audit-fail` qualification block (`audit-qualification.json`). <br>• divergence (`review-divergence.json`, `quality_index.divergence`). <br>• DISPUTED → OPEN at cycle close. <br>• slimming the auditor persona (at the flip). | `core/`, `phases/audit/`, `agents/evolve-auditor*.md` | ☐; inbox item `code-review-phase-q5-audit-on-the-index` |
+| Q6 | The capacity skip: a branch at the quota-wall seam for a non-gate phase. The full signal set (design §10). `code-review` runs first after build (OQ1). The metrics readout verb `evolve review metrics [--cycles N] [--json]` prints the shadow metrics of design §9 for each dimension. | runner, `core/`, `phasespec`, `cmd/evolve` | ☐; inbox item `code-review-phase-q6-capacity-skip-metrics` |
+| R8b | The flip to enforce, after 2 shadow waves | operator, at a boundary | ☐; inbox item `code-review-phase-r8b-enforce-flip` |
 
 ### Phase B
 
 | # | Component | Where | Status |
 |---|---|---|---|
-| Q7 | Specialists:<br>• a diff classifier of signals;<br>• `workflow.review.{specialists, specialist_trigger, hot_path_packages}`;<br>• lens personas normalized to the finding grammar;<br>• specialists in the round's evaluate batch;<br>• the advisor stops inserting mapped lenses standalone. | `core/`, `phasespec/`, lens personas | ☐ after ≥2 enforce waves of divergence data, then by the trigger (30% audit-lower over the last 20 cycles that scored the dimension) |
+| Q7 | Specialists: <br>• a diff classifier of signals. <br>• `workflow.review.{specialists, specialist_trigger, hot_path_packages}`. <br>• lens personas normalized to the finding grammar. <br>• specialists in the round's evaluate batch. <br>• the advisor stops inserting mapped lenses standalone. | `core/`, `phasespec/`, lens personas | ☐ after ≥2 enforce waves of divergence data, then by the trigger (30% audit-lower over the last 20 cycles that scored the dimension); inbox item `code-review-phase-q7-specialists` |
 
 ## 7. Expected results
 
@@ -166,7 +166,7 @@ Landing 2 also carries the audit evaluation contract, components E1–E6 of [aud
 | What "qualified" means | the auditor's own checklist | one index vector, every applicable dimension ≥ 4, cross-checked by the kernel |
 | Auditor persona size | 23,956 bytes | below the 18,102-byte baseline (checklists move to the index and reviewer skills) |
 | Review cost per code cycle | none (the console reviews by hand) | at most 4 deep review dispatches and 3 fix builds; 1–2 rounds expected, measured in shadow |
-| Audit FAIL rate on code cycles | the pre-shadow baseline | expected lower; shadow measures the would-repair rate first |
+| Audit FAIL rate on code cycles | the pre-shadow baseline | expected lower; shadow measures the `would_repair` rate first |
 
 ## 8. Rollout
 
@@ -176,10 +176,10 @@ Landing 2 also carries the audit evaluation contract, components E1–E6 of [aud
    - `REVIEW_FINDINGS` carries the scores vector, the gaps and the round-1 `would_repair`.
 2. **Landing 2 (still shadow).**
    - The loop's decision is computed in full and signalled (`REVIEW_ROUND{decision}`, `would_repair`), but no fix round is granted.
-   - The audit's own index scoring, the cross-check (would-fail) and divergence run in shadow, with no correction rung for the audit's index sections.
+   - The audit's own index scoring, the cross-check (an as-if FAIL) and divergence run in shadow, with no correction rung for the audit's index sections.
 3. **Two shadow waves.** Read the metrics at each boundary with `evolve review metrics`:
    - findings per dimension and severity;
-   - the would-repair rate, and the projected rounds to resolve;
+   - the `would_repair` rate, and the projected rounds to resolve;
    - audit-versus-review divergence per dimension;
    - added wall time and tokens;
    - the audit FAIL and ship rates against the pre-shadow waves.
@@ -231,7 +231,7 @@ Landing 2 also carries the audit evaluation contract, components E1–E6 of [aud
 | # | Question | Recommendation |
 |---|---|---|
 | OQ1 | User phases anchored `after: build` splice in reverse-alphabetical order (`phasespec.ApplyUserRouting`), so `code-review` does not run first after build. | Enforce needs it first, so the other evaluate phases see the settled diff. Add an explicit order to the registry in Q6. Shadow does not need it. |
-| OQ2 | Should the delta re-review run at a cheaper tier? | Keep it deep. The fix diff is small, so the cost is small, and a weaker verifier invites laundering. |
+| OQ2 | Does the delta re-review run at a cheaper tier? | Keep it deep. The fix diff is small, so the cost is small, and a weaker verifier invites laundering. |
 | OQ3 | test-amplification also writes source after build. | In enforce, place it before `code-review`, or count its diff as part of the fix round. Decide with OQ1. |
 | OQ4 | Does a digest that omits the Scores fully prevent anchoring? | Not fully: the raw report stays in the workspace. The persona forbids opening it, and divergence makes anchoring visible. Reconsider after the shadow data. |
 | OQ5 | Is the phase-B divergence share configured, and over what window? | Yes: `workflow.review.specialist_trigger`, defaulting to 30% audit-lower over the last 20 code cycles that scored the dimension. Revisit with data. |

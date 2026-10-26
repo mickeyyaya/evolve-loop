@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "the code-review loop never runs a fourth fix round",
+    "the best qualifying round lands, not the last round",
+    "a policy-deferred finding is filed as a follow-up item",
+    "an accept-with-limits row goes to the audit adjudication",
+    "each new and changed function has 100% coverage"
+  ],
+  "created_at": "2026-10-26T19:23:03Z",
+  "deps": [],
+  "files": [
+    "go/internal/codereview/",
+    "go/internal/core/"
+  ],
+  "fix": "Build the code-review fix loop on convergence.Decide. Give U(n) as the mass function. Set max_fix_rounds to 3. Send policy-deferred rows to the follow-up file and accept-with-limits rows to the audit adjudication, as the changed section 6.2 says.",
+  "id": "convergence-policy-v6-code-review-loop-decide",
+  "kind": "feature",
+  "notes": "Plan: docs/plans/convergence-policy-2026-10.md section 6, V6, which amends code-review-phase Q3. Build V6 with the code-review-phase landing 2 item for Q3. Admission decides; the narrowed protected fence lands soon. The intended route is lane. On 2026-10-27, evolve inbox route-lane refused it, because go/internal/codereview/ is in the protected fence today. The item has no route field, so admission decides when the narrowed fence lands.",
+  "priority_class": "stability",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Plan docs/plans/convergence-policy-2026-10.md, component V6. Spec: docs/architecture/convergence-policy.md. V6 changes component Q3 of docs/plans/code-review-phase-2026-10.md. The code-review loop uses U(n) as the mass, max_fix_rounds 3, and the changed section 6.2.",
+  "title": "Convergence V6: the code-review loop of ADR-0124 landing 2 uses convergence.Decide",
+  "weight": 0.4
+}

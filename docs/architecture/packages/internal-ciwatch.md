@@ -14,7 +14,7 @@
 - **Bounded excerpt.** `maxLogExcerpt` bounds the log excerpt in the inbox item. The item stays a pointer plus evidence, not a log archive, so a huge CI log cannot bloat the inbox.
 - **Best-effort failure detail.** `failedLogSummary` extracts the first failing test name and a bounded excerpt from the failed-job logs. A `gh` error gives empty values, and the escalation item still files, pointing at the run URL.
 - **Atomic verdict.** `writeVerdict` writes a temp file and renames it, so a concurrent dossier build never reads a torn file.
-- **Escalation shape.** `escalationItem` mirrors the hand-filed `.evolve/inbox` items that triage already reads.
+- **Escalation shape.** `escalationItem` carries the full filing shape: `summary`, `fix` and `acceptance`. `fileEscalation` hands it to `inboxfile.Mint`, which validates it with the filing writer rules and holds the inbox lock.
 - **Options.** `SHA` and `Fetch` are required. `Cycle` is recorded in the item (0 means unknown). A non-empty `WorkspaceDir` receives the verdict artifact. `ErrWatchTimeout` reports a run that did not complete in time.
 
 ## Failure attribution of `ci classify`
@@ -37,7 +37,7 @@
 - **Why.** Four PRs (#983, #984, #986 and #997) used 33 of their 43 PR-hours on reds that their change did not cause (plan F3). The classify label `pre-existing` told the author to retry, but no item asked anyone to fix `main`. Thus the next PR paid for the same red again.
 - **When.** A failure gets an item only when its `base_red` fact is `yes` and its `rerun_green` fact is `no`. Thus the red is on the base, and it is still red on the head after `--rerun`. A `base_red` of `no` or `unknown` files nothing, because the red can belong to the change. A `rerun_green` of `yes` is flake evidence, and `unknown` (no `--rerun`) proves nothing, so both file nothing.
 - **One item for one red.** The item ID is `ci-base-red-<slug>-<hash>`. The slug is the test name, else the step, else the jobs. The hash is the first 8 hex digits of the SHA-256 of the failure key, so two packages with one test name get two items. Before it writes, the verb reads the IDs of each pending folder: the open inbox, `retry/`, `quarantine/` and each `processing/cycle-N`. A known ID files nothing, so a second run for the same red files no item.
-- **Item shape.** The item is a `critical` fix of class `correctness` from source `ciclassify`. It names the test, the package, the run, the target and the base commit, and its evidence is the run URL. It uses the same atomic write as the fix-forward item of `Watch` (`writeInboxItem`).
+- **Item shape.** The item is a `critical` fix of class `correctness` from source `ciclassify`. It names the test, the package, the run, the target and the base commit, and its evidence is the run URL. It files through the same atomic mint as the fix-forward item of `Watch` (`inboxfile.Mint`).
 - **Output.** The verb prints `filed fix-first item <id>` on stderr for each new item, so the `--json` output stays one JSON document. A failed inbox read or write exits 2 after the report.
 - **Limits.** A consumed item does not stop a new item. If the same test is red on the base after its fix landed, the red is new evidence. `ci watch` does not file these items: a red `--sha` already files its fix-forward item, and a red `--pr` files nothing.
 

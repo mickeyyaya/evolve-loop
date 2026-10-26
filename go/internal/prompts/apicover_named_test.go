@@ -30,27 +30,19 @@ model: tier-2
 Body content.
 `
 
-func TestNewForProject_OverrideBranch(t *testing.T) {
+func TestNewForProject_TheEnvironmentNamesNoPromptDir(t *testing.T) {
 	overrideRoot := seedAgentDir(t, "evolve-scout", namedAgent)
 	emptyProject := t.TempDir()
 
 	t.Setenv("EVOLVE_PROMPTS_DIR", overrideRoot)
 	var l *Loader = NewForProject(emptyProject)
-	if l == nil {
-		t.Fatal("NewForProject returned nil")
-	}
-	p, err := l.Agent("evolve-scout")
-	if err != nil {
-		t.Fatalf("Agent via override dir: %v", err)
-	}
-	if p.Name != "evolve-scout" {
-		t.Errorf("Prompt.Name = %q, want evolve-scout", p.Name)
+	if _, err := l.Agent("evolve-scout"); err == nil {
+		t.Fatal("NewForProject read EVOLVE_PROMPTS_DIR; the personas come from the project root only (I-16, X18e)")
 	}
 }
 
 func TestNewForProject_UnsetBranch(t *testing.T) {
 	root := seedAgentDir(t, "evolve-builder", "---\nname: evolve-builder\ndescription: builder\n---\nBody.")
-	os.Unsetenv("EVOLVE_PROMPTS_DIR")
 
 	l := NewForProject(root)
 	if l == nil {

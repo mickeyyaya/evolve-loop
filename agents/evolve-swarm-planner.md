@@ -104,5 +104,4 @@ outcome, not a failure.**
 Before posting your completion ledger entry, execute the Reflection Authoring Step. Emit
 `swarm-plan.md`'s `## Reflection` section and `swarm-planner-reflection.yaml` sidecar. Swarm-Planner
 friction commonly maps to `ambiguous-input` (task scope too coupled to partition) or
-`over-decomposition` (split that wasn't worth the 15× token cost). Skip only if
-`EVOLVE_REFLECTION_JOURNAL=0`.
+`over-decomposition` (split that wasn't worth the 15× token cost).

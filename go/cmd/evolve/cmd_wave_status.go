@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/heldproposal"
 	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wave"
@@ -23,20 +24,21 @@ type waveSummary struct {
 }
 
 type waveStatusReport struct {
-	Wave          int                  `json:"wave"`
-	RunID         string               `json:"run_id"`
-	PID           int                  `json:"pid"`
-	PIDAlive      bool                 `json:"pid_alive"`
-	LoopLive      bool                 `json:"loop_live"`
-	PoolLive      *int                 `json:"pool_live,omitempty"`
-	Outcome       string               `json:"outcome"`
-	Cycles        []wave.Cycle         `json:"cycles"`
-	CyclesOmitted int                  `json:"cycles_omitted,omitempty"`
-	LastWave      *waveSummary         `json:"last_wave,omitempty"`
-	NotesQueued   int                  `json:"notes_queued"`
-	Measures      wavemeasure.Measures `json:"measures"`
-	Runs          []waveRunMeasures    `json:"runs"`
-	Warnings      []string             `json:"warnings,omitempty"`
+	Wave          int                   `json:"wave"`
+	RunID         string                `json:"run_id"`
+	PID           int                   `json:"pid"`
+	PIDAlive      bool                  `json:"pid_alive"`
+	LoopLive      bool                  `json:"loop_live"`
+	PoolLive      *int                  `json:"pool_live,omitempty"`
+	Outcome       string                `json:"outcome"`
+	Cycles        []wave.Cycle          `json:"cycles"`
+	CyclesOmitted int                   `json:"cycles_omitted,omitempty"`
+	LastWave      *waveSummary          `json:"last_wave,omitempty"`
+	NotesQueued   int                   `json:"notes_queued"`
+	Measures      wavemeasure.Measures  `json:"measures"`
+	Runs          []waveRunMeasures     `json:"runs"`
+	Warnings      []string              `json:"warnings,omitempty"`
+	Held          []heldproposal.Record `json:"held,omitempty"`
 }
 
 func parseWaveReadArgs(args []string) (projectRoot string, asJSON bool, err error) {
@@ -89,12 +91,14 @@ func buildWaveStatus(env waveEnv, plane wavePlaneDirs, records []wave.Record) wa
 	if notes, err := plane.store.Notes(); err == nil {
 		report.NotesQueued = len(notes)
 	}
+	report.Held, report.Warnings = heldForOperator(plane.evolveDir, report.Warnings)
 	if len(records) == 0 {
 		return report
 	}
 	cur := records[len(records)-1]
 	cycles, loop, warnings := wave.ReadRunCycles(plane.root, cur.CycleFloor, 0)
-	report.Wave, report.RunID, report.PID, report.Warnings = cur.Number, cur.RunID, cur.PID, warnings
+	report.Wave, report.RunID, report.PID = cur.Number, cur.RunID, cur.PID
+	report.Warnings = append(report.Warnings, warnings...)
 	var startWarning string
 	report.PIDAlive, startWarning = waveOwnsPID(env, cur)
 	if live, ok := wave.PoolLive(cur, nil, loop); ok && (report.PIDAlive || report.LoopLive) {
@@ -136,9 +140,26 @@ func writeWaveStatusText(w io.Writer, r waveStatusReport) {
 		fmt.Fprintf(w, "last:    wave %d: %s\n", r.LastWave.Wave, r.LastWave.Outcome)
 	}
 	fmt.Fprintf(w, "notes:   %d queued\n", r.NotesQueued)
+	for _, h := range r.Held {
+		fmt.Fprintf(w, "held:    cycle %d held for operator (tree %s): evolve landing approve|reject --cycle %d --tree %s\n", h.Cycle, h.Tree, h.Cycle, h.Tree)
+	}
 	for _, warn := range r.Warnings {
 		fmt.Fprintf(w, "WARN:    %s\n", warn)
 	}
+}
+
+func heldForOperator(evolveDir string, warnings []string) ([]heldproposal.Record, []string) {
+	records, err := heldproposal.ReadRecords(evolveDir)
+	if err != nil {
+		return nil, append(warnings, "held proposals: "+err.Error())
+	}
+	var held []heldproposal.Record
+	for _, r := range records {
+		if r.Status == heldproposal.StatusHeld {
+			held = append(held, r)
+		}
+	}
+	return held, warnings
 }
 
 func waveCycleText(c wave.Cycle) string {

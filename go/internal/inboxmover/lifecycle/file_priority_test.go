@@ -9,7 +9,7 @@ import (
 var filingClassOrder = []string{"correctness", "stability", "performance", "debuggability", "feature", "maintainability", "hygiene", "security"}
 
 func newFiler(inbox string, appender LedgerAppender, opts ...Option) *Mover {
-	return New(inbox, appender, append([]Option{WithNow(filingClock), WithPriorityClasses(filingClassOrder)}, opts...)...)
+	return New(inbox, appender, append([]Option{WithNow(filingClock), WithPriorityClasses(filingClassOrder), WithOrigin("console")}, opts...)...)
 }
 
 func TestMover_File_RefusesAPriorityClassTheOrderDoesNotName(t *testing.T) {

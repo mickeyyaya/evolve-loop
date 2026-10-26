@@ -28,11 +28,11 @@ func TestRows_AreTheRowsOfSpec14InOrder(t *testing.T) {
 
 func TestRows_OnlyTheRowsOfLandedComponentsAreGreenAndEveryOpenRowNamesItsComponent(t *testing.T) {
 	t.Parallel()
-	greenBy := map[string]string{"M1": "X1", "N9": "X1", "N13": "X6", "N1": "X2", "N2": "X3", "N3": "X4", "N4": "X4", "M2": "X1b", "M3": "X1b", "M4": "X1b", "N12": "X8", "N5": "X5", "N6": "X5", "N7": "X5", "N8": "X5", "N10": "X7", "N11": "X7", "N15": "X5-CX2", "N16": "X5-CX3", "N17": "X5-CX3"}
+	greenBy := map[string]string{"M1": "X1", "N9": "X1", "N13": "X6", "N1": "X2", "N2": "X3", "N3": "X4", "N4": "X4", "M2": "X1b", "M3": "X1b", "M4": "X1b", "N12": "X8", "N5": "X5", "N6": "X5", "N7": "X5", "N8": "X5", "N10": "X7", "N11": "X7", "N15": "X5-CX2", "N16": "X5-CX3", "N17": "X5-CX3", "N14": "X9"}
 	for _, r := range Rows() {
 		closer, green := greenBy[r.ID]
 		if r.Open == green {
-			t.Errorf("row %s Open = %v; only %v are green after X1, X1b, X2, X3, X4, X5, X6, X7 and X8", r.ID, r.Open, greenBy)
+			t.Errorf("row %s Open = %v; only %v are green after X1, X1b, X2, X3, X4, X5, X6, X7, X8 and X9", r.ID, r.Open, greenBy)
 		}
 		if !strings.HasPrefix(r.ClosedBy, "X") || r.Check == "" || r.Owner == "" {
 			t.Errorf("row %s must name its check, its owner test file and the component that turns it green: %+v", r.ID, r)
@@ -53,8 +53,8 @@ func TestRows_ReturnsACopy(t *testing.T) {
 
 func TestLookup_FindsARowAndRefusesAnUnknownID(t *testing.T) {
 	t.Parallel()
-	if r, ok := Lookup("M5"); !ok || r.ClosedBy != "X9" || !r.Open {
-		t.Fatalf("Lookup(M5) = %+v, %v; want the open row closed by X9", r, ok)
+	if r, ok := Lookup("M5"); !ok || r.ClosedBy != "X19c" || !r.Open {
+		t.Fatalf("Lookup(M5) = %+v, %v; want the open row closed by X19c", r, ok)
 	}
 	if _, ok := Lookup("N99"); ok {
 		t.Fatal("Lookup found a row that the matrix does not hold")
@@ -67,7 +67,7 @@ func TestJudge_AnOpenRowThatFailsIsTheExpectedFailureAndNamesItsComponent(t *tes
 	if err != nil {
 		t.Fatalf("an open row that fails is expected, got %v", err)
 	}
-	for _, want := range []string{"M5", "expected failure", "X9", "ollama-tmux cannot use tools"} {
+	for _, want := range []string{"M5", "expected failure", "X19c", "ollama-tmux cannot use tools"} {
 		if !strings.Contains(note, want) {
 			t.Errorf("the note %q must name %q", note, want)
 		}
@@ -98,11 +98,11 @@ func TestRows_EveryOpenRowPinsTheCauseOfItsGapAndNoGreenRowDoes(t *testing.T) {
 
 func TestJudge_AnOpenRowThatPassesFailsTheTestSoTheFixIsNeverMissed(t *testing.T) {
 	t.Parallel()
-	_, err := Judge("N14", nil)
+	_, err := Judge("M5", nil)
 	if err == nil {
 		t.Fatal("an open row that passes must fail the test")
 	}
-	for _, want := range []string{"N14", "passed", "X9", "Open"} {
+	for _, want := range []string{"M5", "passed", "X19c", "Open"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("the error %q must name %q", err, want)
 		}

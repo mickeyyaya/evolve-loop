@@ -689,6 +689,8 @@
 ./internal/inboxrank/rankinputs
 # inboxsplit — splits one mixed inbox item into a console part that keeps every protected file and a lane part, and accepts the split through the inbox writers (ADR-0139, plan O2c).
 ./internal/inboxsplit
+# inboxcurator — the deterministic inbox curator: the add-time intake (origin, kind, fix surface, an unexplained console route) and the overlap measure (shared fix surface and token Jaccard of title and acceptance), plan P3.
+./internal/inboxcurator
 # wtcheckpoint — evolve checkpoint: refs/checkpoints snapshots of uncommitted worktree work (save, list, restore, prune, push).
 ./internal/wtcheckpoint
 # tmuxtest — the one owner of a test process's tmux server: its own evolve-bridge-t<pid> socket, a /bin/sh pane shell and no user config, killed at exit.
@@ -833,3 +835,5 @@
 ./internal/cli/contextcmd
 # guidance - the rule registry reader, the build of guidance/index.md, guidance/index.json and the L0 region of AGENTS.md, and the check of the registry.
 ./internal/guidance
+./internal/heldproposal
+./internal/inboxfile

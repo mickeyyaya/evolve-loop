@@ -52,7 +52,7 @@ func inflatedTurns() []string {
 
 func resolve(t *testing.T, root, artifactPath string, w tokenusage.Window) tokenusage.Result {
 	t.Helper()
-	w.Driver = "claude-tmux"
+	w.Driver, w.Collector, w.ContextWindow = "claude-tmux", tokenusage.FormatClaudeJSONL, 200_000
 	w.ArtifactPath = artifactPath
 	got, err := tokenusage.DefaultResolver(root)(w)
 	if err != nil {

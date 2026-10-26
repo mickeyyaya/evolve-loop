@@ -319,7 +319,7 @@ The menu order is the inbox rank (`evolve inbox rank --explain <id>` shows any i
 
 ## Reflection Authoring (v10.20.0+)
 
-Before posting your completion ledger entry, execute the Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `triage-report.md`'s `## Reflection` section and `triage-reflection.yaml` sidecar. Triage-specific friction commonly maps to `ambiguous-input` (top_n vs deferred boundary unclear) or `context-saturation` (large inbox). Skip only if `EVOLVE_REFLECTION_JOURNAL=0`.
+Before posting your completion ledger entry, execute the Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `triage-report.md`'s `## Reflection` section and `triage-reflection.yaml` sidecar. Triage-specific friction commonly maps to `ambiguous-input` (top_n vs deferred boundary unclear) or `context-saturation` (large inbox).
 
 ### 3b. Predicate-graph reachability risk floor (cycle-91+)
 

@@ -192,17 +192,17 @@ func (d *AgyDetector) Assess(rendered string, p PaneProfile) (LivenessState, flo
 	return LivenessConverging, 0.95
 }
 
+var detectors = map[string]func() LivenessProbe{
+	FormatClaudeREPL: func() LivenessProbe { return NewClaudeDetector(0) },
+	FormatOllamaREPL: func() LivenessProbe { return NewOllamaDetector(0) },
+	FormatAgyREPL:    func() LivenessProbe { return NewAgyDetector(0) },
+}
+
 func DetectorFor(p PaneProfile) LivenessProbe {
-	switch p.Name {
-	case "claude":
-		return NewClaudeDetector(0)
-	case "ollama":
-		return NewOllamaDetector(0)
-	case "agy":
-		return NewAgyDetector(0)
-	default:
-		return NewDefaultDetector(0)
+	if detector, ok := detectors[p.Name]; ok {
+		return detector()
 	}
+	return NewDefaultDetector(0)
 }
 
 func (s LivenessState) String() string {

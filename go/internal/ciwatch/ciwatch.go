@@ -14,6 +14,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxfile"
 )
 
 const StatusCompleted = "completed"
@@ -154,16 +155,29 @@ func writeVerdict(dir string, rec dossier.CIWatchRecord) error {
 }
 
 type escalationItem struct {
-	ID            string  `json:"id"`
-	CreatedAt     string  `json:"created_at"`
-	Weight        float64 `json:"weight"`
-	Kind          string  `json:"kind"`
-	Priority      string  `json:"priority"`
-	PriorityClass string  `json:"priority_class"`
-	Title         string  `json:"title"`
-	Summary       string  `json:"summary"`
-	Evidence      string  `json:"evidence,omitempty"`
-	Source        string  `json:"source"`
+	ID            string   `json:"id"`
+	CreatedAt     string   `json:"created_at"`
+	Weight        float64  `json:"weight"`
+	Kind          string   `json:"kind"`
+	Priority      string   `json:"priority"`
+	PriorityClass string   `json:"priority_class"`
+	Origin        string   `json:"origin"`
+	Title         string   `json:"title"`
+	Summary       string   `json:"summary"`
+	Fix           string   `json:"fix"`
+	Acceptance    []string `json:"acceptance"`
+	Evidence      string   `json:"evidence,omitempty"`
+	Source        string   `json:"source"`
+}
+
+func (it escalationItem) fitted() escalationItem {
+	it.Title = inboxbatch.Fit(it.Title, inboxbatch.MaxFieldLen)
+	acceptance := make([]string, len(it.Acceptance))
+	for i, a := range it.Acceptance {
+		acceptance[i] = inboxbatch.Fit(a, inboxbatch.MaxAcceptanceLen)
+	}
+	it.Acceptance = acceptance
+	return it
 }
 
 func fileEscalation(opts Options, st RunStatus, now time.Time) error {
@@ -183,31 +197,25 @@ func fileEscalation(opts Options, st RunStatus, now time.Time) error {
 		Kind:          "fix",
 		Priority:      "critical",
 		PriorityClass: inboxbatch.ClassCorrectness,
+		Origin:        inboxbatch.OriginCycle,
 		Title:         fmt.Sprintf("CI %s on pushed commit %s — %s", st.Conclusion, short, failing),
 		Summary: fmt.Sprintf(
 			"Post-push CI watch (cycle %d): the GitHub run for %s completed with conclusion=%q. Failing: %s. Fix forward before shipping on top.\n\nLog excerpt:\n%s",
 			opts.Cycle, opts.SHA, st.Conclusion, failing, excerpt),
+		Fix: fmt.Sprintf("Open the failing run, reproduce %s locally, fix it at the source on a new commit and push; do not retry the run unclassified.", failing),
+		Acceptance: []string{
+			fmt.Sprintf("The CI run for the fix commit completes with conclusion=success (it replaces the red run for %s)", short),
+			"The failure has a regression test that fails before the fix and passes after it, or the run is classified a flake with evidence",
+		},
 		Evidence: st.RunURL,
 		Source:   "ciwatch",
 	}
-	return writeInboxItem(opts.InboxDir, fmt.Sprintf("%s-ci-red-%s.json", now.Format(inboxbatch.FilenameStampLayout), short), item)
-}
-
-func writeInboxItem(inboxDir, name string, item escalationItem) error {
-	body, err := marshalIndent(item, "", "  ")
+	body, err := marshalIndent(item.fitted(), "", "  ")
 	if err != nil {
 		return fmt.Errorf("ciwatch: marshal escalation: %w", err)
 	}
-	if err := os.MkdirAll(inboxDir, 0o755); err != nil {
-		return fmt.Errorf("ciwatch: inbox dir: %w", err)
-	}
-	path := filepath.Join(inboxDir, name)
-	tmp := fmt.Sprintf("%s.tmp.%d", path, os.Getpid())
-	if err := os.WriteFile(tmp, body, 0o644); err != nil {
-		return fmt.Errorf("ciwatch: write escalation: %w", err)
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		return fmt.Errorf("ciwatch: rename escalation: %w", err)
+	if _, err := inboxfile.Mint(opts.InboxDir, body, func() time.Time { return now }); err != nil {
+		return fmt.Errorf("ciwatch: file escalation: %w", err)
 	}
 	return nil
 }

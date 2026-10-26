@@ -21,6 +21,8 @@
 - `Commit`: a corrupt prior catalog is warned about and treated as empty. A refresh is the repair path for a corrupt cache. Refusing to write will strand the operator.
 - `Commit` returns the catalog as persisted, with the carried chains merged in. Printing the input instead will show a catalog that lacks the chains just preserved.
 - `MergeFallbacks` fills gaps only. A fresh entry that carries its own chain keeps it. A CLI absent from the new catalog is never restored to keep its old chain. The inputs are not mutated.
+- `LiveCount` is the one predicate for a refresh with no live classification. The verb and the cycle-start refresh both use it, and neither writes a catalog when it is zero (model-currency C3).
+- `KeepLivePicks` keeps the prior `live` entry of a CLI whose fresh entry is not `live`. A failed live list thus never moves a family from a live pick to its detect map. It returns the names that it kept, in order. The inputs are not mutated.
 - `CanonicalTiers` drops non-canonical keys from a snapshot. The catalog never holds a tier that dispatch cannot request. `high` is an input alias of `deep` in the bridge, not a tier of its own.
 - `CandidatesHash` fingerprints the decision inputs of the refresh. The next refresh skips the classifier call when the fingerprint matches. An absent hash never matches, so a pre-existing catalog classifies once and then stabilizes.
 

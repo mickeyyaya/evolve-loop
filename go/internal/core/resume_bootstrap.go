@@ -120,12 +120,10 @@ func (o *Orchestrator) snapshotResumeInputs(boot *resumeBootstrap) resumeInputs 
 	req := boot.request
 	cs := &boot.cycleState
 
-	envSnap := make(map[string]string, len(req.Env)+1)
+	envSnap := make(map[string]string, len(req.Env))
 	for key, value := range req.Env {
 		envSnap[key] = value
 	}
-	// SSOT IPC-protocol-allowed: resume bootstrap → resumed cycle handoff.
-	envSnap["EVOLVE_"+"RESUME_MODE"] = "1"
 	ctxSnap := make(map[string]string, len(req.Context))
 	for key, value := range req.Context {
 		ctxSnap[key] = value

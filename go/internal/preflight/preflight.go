@@ -66,12 +66,11 @@ type CLIBins struct {
 }
 
 type AutoConfig struct {
-	SandboxFallbackOnEPERM string `json:"EVOLVE_SANDBOX_FALLBACK_ON_EPERM"`
-	WorktreeBase           string `json:"worktree_base"`
-	WorktreeBaseReason     string `json:"worktree_base_reason"`
-	InnerSandbox           bool   `json:"inner_sandbox"`
-	InnerSandboxReason     string `json:"inner_sandbox_reason"`
-	Reasoning              string `json:"reasoning"`
+	WorktreeBase       string `json:"worktree_base"`
+	WorktreeBaseReason string `json:"worktree_base_reason"`
+	InnerSandbox       bool   `json:"inner_sandbox"`
+	InnerSandboxReason string `json:"inner_sandbox_reason"`
+	Reasoning          string `json:"reasoning"`
 }
 
 type Options struct {
@@ -102,14 +101,7 @@ func Probe(opts Options) Profile {
 	}
 	osType := opts.OSType
 	if osType == "" {
-		switch runtime.GOOS {
-		case "darwin":
-			osType = "darwin"
-		case "linux":
-			osType = "linux"
-		default:
-			osType = "other"
-		}
+		osType = hostOSType(runtime.GOOS)
 	}
 
 	osVersion := unameR()
@@ -179,11 +171,6 @@ func Probe(opts Options) Profile {
 		Git:    lookPathPtr(opts.LookPath, "git"),
 	}
 
-	autoEPERM := "0"
-	if nested && !innerSandbox {
-		autoEPERM = "1"
-	}
-
 	var autoReasoning string
 	if wtBase != "" {
 		autoReasoning = fmt.Sprintf(
@@ -206,13 +193,21 @@ func Probe(opts Options) Profile {
 		Filesystem:  fs,
 		CLIBinaries: bins,
 		AutoConfig: AutoConfig{
-			SandboxFallbackOnEPERM: autoEPERM,
-			WorktreeBase:           wtBase,
-			WorktreeBaseReason:     wtReason,
-			InnerSandbox:           innerSandbox,
-			InnerSandboxReason:     innerReason,
-			Reasoning:              autoReasoning,
+			WorktreeBase:       wtBase,
+			WorktreeBaseReason: wtReason,
+			InnerSandbox:       innerSandbox,
+			InnerSandboxReason: innerReason,
+			Reasoning:          autoReasoning,
 		},
+	}
+}
+
+func hostOSType(goos string) string {
+	switch goos {
+	case "darwin", "linux":
+		return goos
+	default:
+		return "other"
 	}
 }
 
@@ -326,7 +321,6 @@ func (p Profile) Summary() string {
 	fmt.Fprintf(&b, "  Worktree probes:  in-project=%v tmpdir=%v cache=%v\n",
 		p.Filesystem.InProjectWorktreesWritable, p.Filesystem.TmpdirWritable, p.Filesystem.CacheDirWritable)
 	fmt.Fprintf(&b, "  Auto-config:\n")
-	fmt.Fprintf(&b, "    EVOLVE_SANDBOX_FALLBACK_ON_EPERM=%s\n", p.AutoConfig.SandboxFallbackOnEPERM)
 	wt := p.AutoConfig.WorktreeBase
 	if wt == "" {
 		wt = "<NONE>"

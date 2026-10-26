@@ -8,12 +8,12 @@ import (
 )
 
 func paneProfileFor(lp tmuxLaunch) panestream.PaneProfile {
-	binary := driverBinary(lp.name)
-	p, ok := panestream.Profiles[binary]
+	m, err := LoadManifest(lp.name)
+	p, ok := panestream.Profiles[m.Parsers[ParserPane]]
 	if !ok {
-		p = panestream.PaneProfile{Name: binary, BoundaryMarker: lp.promptMarker}
+		p = panestream.PaneProfile{Name: driverBinary(lp.name), BoundaryMarker: lp.promptMarker}
 	}
-	if m, err := LoadManifest(lp.name); err == nil {
+	if err == nil {
 		p.ExhaustedRegex = manifestExhaustedPattern(m)
 		p.BusyLineRegex = m.BusyLineRegex
 		p.TokenLineRegex = m.TokenLineRegex

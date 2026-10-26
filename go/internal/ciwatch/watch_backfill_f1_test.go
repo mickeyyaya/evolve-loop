@@ -81,7 +81,7 @@ func TestWatchBackfillF1_AnEscalationThatCannotBeFiledReturnsTheRecordAndTheErro
 	writeFileF1(t, blocker)
 	opts.InboxDir = blocker
 	rec, err := Watch(context.Background(), opts)
-	if err == nil || !strings.Contains(err.Error(), "ciwatch: inbox dir:") {
+	if err == nil || !strings.Contains(err.Error(), "ciwatch: file escalation:") {
 		t.Fatalf("err = %v, want the inbox failure", err)
 	}
 	if rec.Conclusion != "failure" || rec.RunURL != "https://ci/red" {

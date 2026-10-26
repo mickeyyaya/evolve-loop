@@ -63,11 +63,8 @@ func TestOllamaTmux_AcceptsReasoningPhase_RejectionDoesNotFire(t *testing.T) {
 	t.Parallel()
 	var stderr strings.Builder
 	deps := Deps{
-		Stderr: &stderr,
-		Env: map[string]string{
-			"BRIDGE_TESTING":       "1",
-			"BRIDGE_OLLAMA_BINARY": "/no/such/binary-for-test",
-		},
+		Stderr:   &stderr,
+		Binaries: map[string]string{"ollama": "/no/such/binary-for-test"},
 	}.withDefaults()
 	cfg := &Config{
 		CLI:      "ollama-tmux",

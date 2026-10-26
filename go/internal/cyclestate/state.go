@@ -83,6 +83,17 @@ type CycleState struct {
 	FailedAt                        []FailedRecord `json:"failed_at,omitempty"`
 	BookkeepingRegradeAttempted     bool           `json:"bookkeeping_regrade_attempted,omitempty"`
 	QuotaWalkCLIs                   []string       `json:"quota_walk_clis,omitempty"`
+	Ladder                          *LadderState   `json:"ladder,omitempty"`
+}
+
+type LadderState struct {
+	Rung         string   `json:"rung,omitempty"`
+	Tier         string   `json:"tier,omitempty"`
+	Effort       string   `json:"effort,omitempty"`
+	Fingerprints []string `json:"fingerprints,omitempty"`
+	History      []string `json:"history,omitempty"`
+	RepairRound  int      `json:"repair_round,omitempty"`
+	AuditFix     string   `json:"audit_fix,omitempty"`
 }
 
 func (s State) HighestCycleNumber() int {

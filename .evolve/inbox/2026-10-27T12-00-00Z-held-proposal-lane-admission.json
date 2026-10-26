@@ -1,0 +1,29 @@
+{
+  "source": "console, 2026-10-27, operator decision \"1 + 2 + 3\" (ADR-0157). Plan: docs/plans/narrow-fence-2026-10.md",
+  "injected_by": "console-operator-session",
+  "created_at": "2026-10-27T12:00:00Z",
+  "priority_class": "pipeline",
+  "priority": "P1",
+  "id": "held-proposal-lane-admission",
+  "kind": "pipeline-integrity",
+  "title": "At held_proposals.stage enforce, admit a protected or pipeline-kind item to a lane as a held proposal (ADR-0157 H5)",
+  "summary": "The census and the lane menu admit a console_kind or console_protected item (not a route:console item) as a held proposal at enforce. The role guard and the ship control-plane check allow the protected files that the claimed held item declares, and only those. At shadow the census only counts what it would admit.",
+  "acceptance": [
+    "At shadow no protected item reaches a lane, and evolve wave supply prints the count it would admit.",
+    "At enforce a lane that claimed a held item can change only the protected files that the item declares; any other protected file is still refused.",
+    "Each such ship is held by held-proposal-gate."
+  ],
+  "files": [
+    "go/internal/inboxbatch/consoleroute.go",
+    "go/internal/guards/role.go",
+    "go/internal/phases/ship/integrity.go",
+    "go/internal/orchestrator/supply.go"
+  ],
+  "deps": [
+    "held-proposal-gate",
+    "held-proposal-adversarial-audit-dispatch"
+  ],
+  "route": "console-manual",
+  "weight": 0.6,
+  "notes": "Held proposal: it relaxes the role guard and the ship control-plane check, which are guards. It must land only after the hold and the audit dispatch are proven at shadow."
+}

@@ -85,6 +85,8 @@ type matrixRun struct {
 type stubCall struct {
 	binary     string
 	claudeCode string
+	sandbox    string
+	bypass     string
 	depth      string
 	agentRun   string
 	context    string
@@ -99,15 +101,13 @@ func runMatrixCycle(t *testing.T, row matrixRow, evolveBin, fakeBin, repoRoot st
 	probeDir := filepath.Join(t.TempDir(), "n4-probe")
 	env := append(os.Environ(),
 		"CLAUDECODE=1",
-		"EVOLVE_PROMPTS_DIR="+repoRoot,
 		"EVOLVE_RESEARCH_HOOK_DISABLED=1",
 		"EVOLVE_SANDBOX=off",
-		"BRIDGE_TESTING=1",
+		"EVOLVE_BYPASS_SHIP_GATE=1",
 	)
 	for _, bin := range stubBinaries {
 		path := filepath.Join(binDir, bin)
 		fakeclitest.Install(t, path, stubScript(bin, fakeBin, callLog, evolveBin, probeDir, projRoot))
-		env = append(env, "BRIDGE_"+strings.ToUpper(bin)+"_BINARY="+path)
 	}
 	env = append(env, installFakeTmux(t, binDir, fakeBin)...)
 	env = append(env, isolatedHome(t)...)
@@ -166,7 +166,7 @@ func stubScript(bin, fakeBin, callLog, evolveBin, probeDir, projRoot string) str
 		`  rc=$?; named=no; grep -q '` + agentRunRefusal + `' "` + probeDir + `/stderr" && named=yes; probe=$rc:$named` + "\n" +
 		"fi\n" +
 		contextProbe(evolveBin, projRoot) +
-		`printf '%s CLAUDECODE=%s EVOLVE_DISPATCH_DEPTH=%s AGENTRUN=%s CONTEXT=%s\n' ` + bin + ` "${CLAUDECODE-unset}" "${EVOLVE_DISPATCH_DEPTH-unset}" "$probe" "$ctx" >> "` + callLog + `"` + "\n" +
+		`printf '%s CLAUDECODE=%s EVOLVE_SANDBOX=%s EVOLVE_BYPASS_SHIP_GATE=%s EVOLVE_DISPATCH_DEPTH=%s AGENTRUN=%s CONTEXT=%s\n' ` + bin + ` "${CLAUDECODE-unset}" "${EVOLVE_SANDBOX-unset}" "${EVOLVE_BYPASS_SHIP_GATE-unset}" "${EVOLVE_DISPATCH_DEPTH-unset}" "$probe" "$ctx" >> "` + callLog + `"` + "\n" +
 		`exec "` + fakeBin + `" "$@"` + "\n"
 }
 
@@ -212,10 +212,14 @@ func readStubCalls(t *testing.T, path string) []stubCall {
 	var calls []stubCall
 	for _, line := range strings.Split(strings.TrimSpace(string(b)), "\n") {
 		f := strings.Fields(line)
-		if len(f) != 5 {
+		if len(f) != 7 {
 			t.Fatalf("stub call log line %q", line)
 		}
-		calls = append(calls, stubCall{binary: f[0], claudeCode: strings.TrimPrefix(f[1], "CLAUDECODE="), depth: strings.TrimPrefix(f[2], "EVOLVE_DISPATCH_DEPTH="), agentRun: strings.TrimPrefix(f[3], "AGENTRUN="), context: strings.TrimPrefix(f[4], "CONTEXT=")})
+		calls = append(calls, stubCall{
+			binary: f[0], claudeCode: strings.TrimPrefix(f[1], "CLAUDECODE="),
+			sandbox: strings.TrimPrefix(f[2], "EVOLVE_SANDBOX="), bypass: strings.TrimPrefix(f[3], "EVOLVE_BYPASS_SHIP_GATE="),
+			depth: strings.TrimPrefix(f[4], "EVOLVE_DISPATCH_DEPTH="), agentRun: strings.TrimPrefix(f[5], "AGENTRUN="), context: strings.TrimPrefix(f[6], "CONTEXT="),
+		})
 	}
 	return calls
 }
@@ -311,8 +315,10 @@ func (r matrixRun) contextNotOpened() error {
 
 func (r matrixRun) envLeak() error {
 	for _, c := range r.calls {
-		if c.claudeCode != "unset" {
-			return fmt.Errorf("CLAUDECODE=%s of the parent reached the %s seat", c.claudeCode, c.binary)
+		for _, v := range []struct{ name, value string }{{"CLAUDECODE", c.claudeCode}, {"EVOLVE_SANDBOX", c.sandbox}, {"EVOLVE_BYPASS_SHIP_GATE", c.bypass}} {
+			if v.value != "unset" {
+				return fmt.Errorf("%s=%s of the parent reached the %s seat", v.name, v.value, c.binary)
+			}
 		}
 	}
 	return nil
@@ -372,9 +378,9 @@ func mustRepoRoot(t *testing.T) string {
 
 func setupTempProject(t *testing.T, repoRoot string) string {
 	t.Helper()
-	_ = repoRoot
 	repo := gittest.Fixture(t)
 	root := repo.Dir
+	seedProjectAgents(t, root, repoRoot)
 
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
 		t.Fatalf("mkdir .evolve: %v", err)
@@ -448,6 +454,51 @@ func writeProjectPolicy(t *testing.T, root string, extra map[string]any) {
 	if err := os.WriteFile(filepath.Join(root, ".evolve", "policy.json"), append(body, '\n'), 0o644); err != nil {
 		t.Fatalf("write policy.json: %v", err)
 	}
+}
+
+func seedProjectAgents(t *testing.T, root, repoRoot string) {
+	t.Helper()
+	if repoRoot == "" {
+		return
+	}
+	personas, err := filepath.Glob(filepath.Join(repoRoot, "agents", "*.md"))
+	if err != nil || len(personas) == 0 {
+		t.Fatalf("the project needs the personas of %s/agents: %v", repoRoot, err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "agents"), 0o755); err != nil {
+		t.Fatalf("mkdir agents: %v", err)
+	}
+	for _, src := range personas {
+		body, err := os.ReadFile(src)
+		if err != nil {
+			t.Fatalf("read persona %s: %v", src, err)
+		}
+		if err := os.WriteFile(filepath.Join(root, "agents", filepath.Base(src)), withoutToolsLine(body), 0o644); err != nil {
+			t.Fatalf("write persona %s: %v", src, err)
+		}
+	}
+}
+
+func withoutToolsLine(persona []byte) []byte {
+	lines := strings.Split(string(persona), "\n")
+	kept := lines[:0]
+	for _, line := range lines {
+		if !strings.HasPrefix(line, "tools:") {
+			kept = append(kept, line)
+		}
+	}
+	return []byte(strings.Join(kept, "\n"))
+}
+
+func fakeCLIsFirstOnPath(t *testing.T, fakeBin string, clis ...string) string {
+	t.Helper()
+	binDir := t.TempDir()
+	for _, cli := range clis {
+		if err := os.Symlink(fakeBin, filepath.Join(binDir, cli)); err != nil {
+			t.Fatalf("link the fake %s: %v", cli, err)
+		}
+	}
+	return "PATH=" + binDir + string(os.PathListSeparator) + os.Getenv("PATH")
 }
 
 func commitProjectSeed(t *testing.T, repo *gittest.Repo) {

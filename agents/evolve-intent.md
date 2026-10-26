@@ -200,7 +200,7 @@ This is the Karpathy Rule constraint: incremental mode must never suppress premi
 
 ## Reflection Authoring (v10.20.0+)
 
-Before posting your completion ledger entry, execute the Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `intent.md`'s `## Reflection` section and `intent-reflection.yaml` sidecar. Intent has a tight 2-turn budget — keep reflection minimal (≤1 bullet per required subsection). Skip only if `EVOLVE_REFLECTION_JOURNAL=0`.
+Before posting your completion ledger entry, execute the Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `intent.md`'s `## Reflection` section and `intent-reflection.yaml` sidecar. Intent has a tight 2-turn budget — keep reflection minimal (≤1 bullet per required subsection).
 
 ## Reference Index (Layer 3, on-demand)
 Stripped from dispatched prompts (CompactPrompts); operational directives — incl. the INTENT_MODE output contract and re-run behavior, which this marker previously buried (cycle-1390–1429 lesson; latent-red C416 predicate) — live ABOVE this marker, enforced by `internal/phasecoherence/persona_strip_operational_test.go`.

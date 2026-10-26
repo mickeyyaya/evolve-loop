@@ -75,6 +75,20 @@ defaults, but each safety floor fails closed to `enforce`: `docs_floor.stage`,
     "preempt_margin": 0.05
   },
 
+  // The inbox curator (inbox-curator.md). Decoded STRICTLY. Absent => the
+  // compiled default shown here: the shadow stage and the default kinds.
+  "inbox": {
+    "curator": {
+      "stage": "shadow",
+      "overlap_refuse": 0.5,
+      "overlap_warn": 0.3,
+      "consume_min_share": 0.5,
+      "kinds": ["bug", "docs", "feature", "fix", "hardening", "maintenance",
+                "pipeline-integrity", "pipeline-repair", "refactor", "research",
+                "security", "sweep", "task", "techdebt", "test"]
+    }
+  },
+
   // The convergence policy (ADR-0126). The convergence sub-block decodes
   // STRICTLY: an unknown key or an out-of-range number fails the load; an
   // unknown stage or bar word warns and resolves to its default. Absent ⇒ the
@@ -89,6 +103,14 @@ defaults, but each safety floor fails closed to `enforce`: `docs_floor.stage`,
       "concentration_window": 2,
       "concentration_min_findings": 5,
       "max_backward_edges": 3
+    },
+    // The retry ladder (ADR-0142). An unknown stage, or a budget that is
+    // not 0 and is outside 64 to 16000, fails the load.
+    "retry_ladder": {
+      "stage": "shadow",
+      "digest_tokens": 2000,
+      "audit_fix": { "max_files": 3, "max_lines": 40, "max_code_lines": 10,
+                     "max_tokens": 6000, "no_new_production_logic": true }
     }
   }
 }
@@ -164,6 +186,20 @@ The checked-in file names the class order and the factors explicitly, so the ope
 
 The block also decides what `evolve inbox rank` shows and which classes `evolve inbox add` accepts. A malformed block makes those consumers rank with the compiled default and warn. `evolve inbox rank` and `evolve inbox add` refuse it. (Under P1, from the same morning, the block changed only the output of the verb and the classes that `add` accepts.)
 
+## Inbox curator (`inbox.curator`)
+
+The block configures `internal/inboxcurator`, the deterministic checks of the inbox ([inbox-curator.md](inbox-curator.md); plan P3 in [the inbox prioritization plan](../plans/inbox-prioritization-2026-10.md)). `evolve inbox add` reads the thresholds and the kinds.
+
+| Key | Meaning | Default | Refused |
+|---|---|---|---|
+| `stage` | `shadow` publishes the proposals of the curator only. `enforce` also applies each proposal whose deterministic check passes. The stage does not govern `evolve inbox add`: its intake always refuses. | `shadow` | a value other than `shadow` or `enforce` |
+| `overlap_refuse` | the similarity at or above which `evolve inbox add` refuses an item that shares a fix surface with an open item | 0.5 | 0 or less, or above 1 |
+| `overlap_warn` | the similarity at or above which `evolve inbox add` warns about such an item | 0.3, or `overlap_refuse` when that is lower | below 0, or above `overlap_refuse` |
+| `consume_min_share` | the share of the named tests of an item that must exist before the curator proposes to consume it | 0.5 | 0 or less, or above 1 |
+| `kinds` | the `kind` values that `evolve inbox add` accepts | the 15 kinds above | empty, a blank or padded entry, a duplicate |
+
+The similarity is the token Jaccard of the title and the acceptance of two items. The live inbox of 2026-10-27 had 2,710 pairs of open items with a shared fix surface. The highest similarity was 0.52, and 13 pairs were between 0.3 and 0.5. These numbers set the defaults.
+
 ## Convergence policy (`workflow.convergence`)
 
 The block configures `internal/convergence`, the one rule every repeat-until-accepted loop uses to choose its next rung ([ADR-0126](adr/0126-every-iterative-loop-converges-or-escalates.md), [design](convergence-policy.md) §8; `evolve convergence decide` prints a decision). Absent means the compiled defaults below.
@@ -178,6 +214,20 @@ The block configures `internal/convergence`, the one rule every repeat-until-acc
 | `concentration_window` | the judgments one concentration window spans | 2 | below 1 fails the load |
 | `concentration_min_findings` | the findings (LOW or above) a window needs before its share is defined | 5 | below 1 fails the load |
 | `max_backward_edges` | the cycle loop's *N*: the backward edges (audit → build, retro → tdd, ship → ship, …) one cycle may take before it stops with a continuation (design §6.1) | 3 | below 1 fails the load |
+
+## Retry ladder (`workflow.retry_ladder`)
+
+The block sets the stage of the retry ladder and the size of the digest of a raised try ([ADR-0142](adr/0142-a-capability-failure-climbs-one-bounded-retry-ladder.md), [design](retry-ladder.md) §5 and §7). The loader refuses a bad value, and the load of the whole file fails.
+
+| Key | Meaning | Default |
+|---|---|---|
+| `stage` | `shadow`: each retry path asks the decider, records `LADDER_DECISION` and dispatches as before. `enforce`: the choice of the decider runs. The checked-in policy sets `shadow`. | `shadow` |
+| `digest_tokens` | the token budget of the digest of a raised try, from 64 to 16000. 0 means the default. | 2000 |
+| `audit_fix.max_files` | the most files that an `audit_fix` estimate can touch, from 0 to 50. 0 means the default. | 3 |
+| `audit_fix.max_lines` | the most estimated lines of an `audit_fix`, from 0 to 2000. 0 means the default. | 40 |
+| `audit_fix.max_code_lines` | the most estimated lines of production code, from 0 to 2000. It applies when `no_new_production_logic` is true. | 10 |
+| `audit_fix.max_tokens` | the most estimated tokens of an `audit_fix`, from 0 to 64000. 0 means the default. | 6000 |
+| `audit_fix.no_new_production_logic` | true limits the production code lines of an `audit_fix` to `max_code_lines`. | true |
 
 ## Documentation floors (`docs_floor`)
 
@@ -195,6 +245,14 @@ The block sets the stage of the changed-function coverage check of the build han
 | Key | Meaning | Default |
 |---|---|---|
 | `stage` | `off` skips the check. `shadow` prints the `[build-floor] WARN cover-changed (shadow)` line. `enforce` rejects the handoff. | `enforce` |
+
+## Recovery retrospectives (`retrospectives`)
+
+The block sets the stage of the retrospective documents that the cycle closeout writes ([spec](recovery-retrospective.md), [plan](../plans/recovery-retrospective-2026-10.md)). The loader decodes the block strictly. A word that is not `off`, `shadow` or `enforce` turns the writer off with a WARN. The writer is not a safety floor, so a refused policy does not move it to `enforce`.
+
+| Key | Meaning | Default |
+|---|---|---|
+| `stage` | `off` writes no document. `shadow` writes the documents into the cycle workspace. `enforce` does the same until plan C4 to C6 add the publish and the todo retirement. The checked-in policy sets `enforce` (operator decision of 2026-10-27). | `shadow` |
 
 ## Context-fill telemetry (`context_fill`)
 

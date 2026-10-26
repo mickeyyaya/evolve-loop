@@ -32,7 +32,6 @@ already enforced; an `(opt-in)` var does nothing until set.
 | Env var | Default | Effect | Rollback / notes |
 |---|---|---|---|
 | `EVOLVE_BUILD_PLANNER` | `1` (advisory, v12.3+) | Opt-C build-planner phase (wired v10.19; cycle-103). `0` = shadow (no-op); `1` = advisory (`build-plan.md` produced). | `=0` shadow. 3-cycle rollout shadow→advisory→enforce. See [ADR-0019](../../docs/architecture/adr/0019-build-planner-phase.md). |
-| `EVOLVE_REFLECTION_JOURNAL` | `1` (advisory, v10.20) | Per-phase Reflection Journal: each phase agent appends `## Reflection` + `<phase>-reflection.yaml` sidecar. Reflector (every cycle) + Retrospective/Memo consume YAML. v10.20 advisory (missing YAML → WARN); v10.21 enforce (phase-gate blocks missing YAML). | `=0` disables. See [reflection-journal](../../docs/architecture/reflection-journal.md), [learn-phase](../../docs/architecture/learn-phase.md). |
 | `EVOLVE_DISABLE_AUTO_RETROSPECTIVE` | `0` (on) | FAIL/WARN cycles auto-run retrospective + merge-lesson. Cost ~$0.30–0.50/cycle. | `=1` disables auto-retro. |
 | `EVOLVE_PLAN_REVIEW` | `0` (off) | Four-lens review (CEO/Eng/Design/Security) between discover and build; verdict gates via `gate_plan_review_to_tdd`. | `=1` to enable. |
 | `EVOLVE_INTENT_DELTA` | `0` (opt-in) | `1`: `intent-batch-resolve.sh` runs before intent phase to compute `INTENT_MODE=full\|delta` by comparing `GOAL_HASH` against `state.json:currentBatch.goalHash`. Delta mode emits `intent-delta.md` (patch) or `[intent-unchanged]`; `gate_intent_to_research` accepts both. Requires `EVOLVE_REQUIRE_INTENT=1`. | `=0` reverts to full intent every cycle. See [incremental-intent](../../docs/architecture/incremental-intent.md). |
@@ -106,7 +105,6 @@ already enforced; an `(opt-in)` var does nothing until set.
 | Env var | Default | Effect | Rollback / notes |
 |---|---|---|---|
 | `EVOLVE_SANDBOX` | (see note) | `1`: runner wraps `claude -p` in `sandbox-exec` (macOS) / `bwrap` (Linux). Auditor/Evaluator profiles run `read_only_repo: true`. | — |
-| `EVOLVE_SANDBOX_FALLBACK_ON_EPERM` | (auto for nested) | `1`: REQUIRED for nested-claude; auto-enabled by `evolve-loop-dispatch.sh` via `detect-nested-claude.sh` when the bash rollback hatch fires. | — |
 | `EVOLVE_INNER_SANDBOX` | auto | `false` when nested-Claude detected; force enable/disable with `1`/`0`. | `EVOLVE_FORCE_INNER_SANDBOX` deprecated. |
 | `EVOLVE_WORKTREE_BASE` | auto | Resolved by `preflight-environment.sh`: `.evolve/worktrees/` > `$TMPDIR/evolve-loop/<hash>`. | Never auto-enable `EVOLVE_SKIP_WORKTREE=1` (operator-only emergency hatch). |
 | `EVOLVE_SKIP_WORKTREE` | `0` | Operator-only emergency hatch to skip per-cycle worktree provisioning. | Do not auto-enable. |

@@ -15,9 +15,10 @@
   - `EvolveDir` is `<ProjectRoot>/.evolve`.
   - `StateFile` is `<EvolveDir>/state.json`, the persistent batch-scope state.
   - `CycleStateFile` is `<EvolveDir>/cycle-state.json`, the transient per-cycle state.
-  - `LedgerFile` is `<EvolveDir>/ledger.jsonl`, the hash-chained audit trail (override `EVOLVE_LEDGER_OVERRIDE`).
-  - `ProfilesDir` is `<PluginRoot>/.evolve/profiles` (override `EVOLVE_PROFILES_DIR_OVERRIDE`).
-  - `AdaptersDir` is `<PluginRoot>/adapters` (override `EVOLVE_ADAPTERS_DIR_OVERRIDE`).
+  - `LedgerFile` is `<EvolveDir>/ledger.jsonl`, the hash-chained audit trail.
+  - `ProfilesDir` is `<PluginRoot>/.evolve/profiles`.
+  - `AdaptersDir` and `CapabilityDir` are `<PluginRoot>/adapters`.
+  - No environment variable overrides a directory (X18e, I-16). A test sets the roots `EVOLVE_PROJECT_ROOT` and `EVOLVE_PLUGIN_ROOT` instead.
 - **`Resolve` takes the env lookup and the cwd as parameters.** Production passes `os.Getenv`, or calls `ResolveFromEnv`. `ResolveFromEnv` resolves a failing `os.Getwd` to `""` to keep the signature pure. A caller that must surface a cwd failure calls `Resolve` with an explicit cwd.
 - **Single homes.** `EvolveDirOf` is the intended home of the `<root>/.evolve` join. Other call sites in `cmd/` and `internal/` still spell the join inline. They migrate here when they are touched.
 - **`PolicyPath` and `LoopStopPath`.** `PolicyPath` is the home of the policy file, which the loop wave and chain engines read. `LoopStopPath` is the home of the brake marker that `evolve loop-stop` writes.
@@ -27,9 +28,9 @@
 
 ## Invariants
 
-- **`CapabilityDir` never honors `EVOLVE_ADAPTERS_DIR_OVERRIDE`.** It mirrors the bash `REAL_ADAPTERS_DIR` invariant. Capability manifests thus reflect the real install and not a test sentinel dir. `TestResolve_CapabilityDirAlwaysPluginRoot` pins this.
+- **Each directory comes from the roots.** The former override variables of the profiles, the adapters and the ledger have no effect (`TestResolve_TheEnvironmentOverridesNoDir`).
 - **`Resolve` is total.** It never returns an error and never reads the filesystem. The cycle-state scope check makes a relative evolve dir absolute against the process cwd. The caller checks existence and permissions.
-- **A `Layout` is bound to the cwd at construction.** When the cwd is empty and no override is set, relative fields capture the working directory at that time. A caller must not call `os.Chdir` between `Resolve` and a filesystem write that uses a `Layout` field. If it does, the write lands relative to the new cwd.
+- **A `Layout` is bound to the cwd at construction.** When the cwd is empty and no root variable is set, relative fields capture the working directory at that time. A caller must not call `os.Chdir` between `Resolve` and a filesystem write that uses a `Layout` field. If it does, the write lands relative to the new cwd.
 - **A project root is made absolute at each entrypoint (`AbsoluteRoot`).** A relative root breaks path-crossing contracts. A worktree-phase agent has the worktree as cwd. The in-process bridge has the main repo as cwd. They resolve the same relative artifact path to different absolute locations. That caused an artifact timeout.
 - **`AbsoluteRoot` fails loud.** When `filepath.Abs` fails, it warns through `warn` (when `warn` is not nil) and returns the path unchanged. To carry on silently reproduces the timeout. `label` names the source of the path (for example `--project-root`) in the warning.
 

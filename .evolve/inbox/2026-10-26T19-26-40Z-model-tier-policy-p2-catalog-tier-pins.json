@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "A refresh with a pin returns the pinned model",
+    "A pin to an absent model makes Refresh return an error",
+    "A pin applies when the prior catalog is reusable",
+    "A changed pin changes the catalog fingerprint",
+    "The strict policy decode refuses an unknown key under catalog.tier_pins"
+  ],
+  "created_at": "2026-10-26T19:30:00Z",
+  "deps": [],
+  "files": [
+    "go/internal/policy/",
+    "go/internal/modelquery/",
+    "go/cmd/evolve/cmd_models_live.go",
+    "docs/reference/model-routing.md"
+  ],
+  "fix": "Add catalog.tier_pins to the strict policy schema in go/internal/policy. Add a TierPins field to RefreshDeps and a pin step in modelquery liveTiers. A pin to a model that the CLI does not offer makes Refresh return an error; the catalog does not fall back to the detect map. A changed pin changes the fingerprint. Per plan open question Q3, a reviewed PR edits .evolve/policy.json directly until a verb exists.",
+  "id": "model-tier-policy-p2-catalog-tier-pins",
+  "kind": "feature",
+  "notes": "Plan link: docs/plans/model-tier-policy-2026-10.md (component P2). Spec link: docs/reference/model-routing.md (section The tier policy) and ADR-0136. Route console-manual: the change adds a key to the strict policy parser, a gate file. held_proposal_candidate: true.",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Component P2 (decisions D3 and D8) of the plan docs/plans/model-tier-policy-2026-10.md. The spec is docs/reference/model-routing.md (section The tier policy) and ADR-0136. The strict policy schema has no catalog.tier_pins key, RefreshDeps has no TierPins field, and liveTiers has no pin step. The manifest offline default is not enough, because the live catalog overlays the tier picks.",
+  "title": "A catalog.tier_pins policy key pins the agy model of a tier, and a pin to an absent model fails the refresh (tier-policy plan P2)",
+  "weight": 0.45
+}

@@ -25,16 +25,24 @@ type Trace struct {
 
 type Transcript func() (Trace, error)
 
-func TranscriptFor(cli, path string) Transcript {
-	if path != "" && WritesTranscript(cli) {
-		return ClaudeTranscript(path)
-	}
-	return func() (Trace, error) { return Trace{}, fmt.Errorf("%w (cli %s)", ErrNoTranscript, cli) }
+const FormatClaudeJSONL = "claude-jsonl-v1"
+
+var transcriptFormats = map[string]func(path string) Transcript{
+	FormatClaudeJSONL: ClaudeTranscript,
 }
 
-func WritesTranscript(cli string) bool {
-	c := strings.ToLower(cli)
-	return c == "claude" || strings.HasPrefix(c, "claude-")
+func TranscriptFor(format, path string) Transcript {
+	if read, ok := transcriptFormats[format]; ok && path != "" {
+		return read(path)
+	}
+	return func() (Trace, error) {
+		return Trace{}, fmt.Errorf("%w (transcript format %q)", ErrNoTranscript, format)
+	}
+}
+
+func KnownTranscriptFormat(format string) bool {
+	_, ok := transcriptFormats[format]
+	return ok
 }
 
 func ClaudeTranscript(path string) Transcript {

@@ -21,7 +21,7 @@ func TestLivenessProbe_StrategyConformance(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.cli, func(t *testing.T) {
-			p := Profiles[c.cli]
+			p := Profiles[c.cli+"-repl-v1"]
 			c.probe.Assess(testdataFrame(t, c.cli+"/thinking.txt"), p)
 			state, conf := c.probe.Assess(testdataFrame(t, c.cli+"/answer.txt"), p)
 			if state != LivenessConverging {

@@ -15,7 +15,7 @@ import (
 var loopStampKeys = []string{"consumed", "continuation", "failure_count", "git_sha", "last_failure_class", "last_failure_fingerprint", "last_failure_reason", "protected_files", "released_continuations",
 	"retired_cycle", "retired_reason", "route", "routed_at", "routed_cycle", "routed_reason", "unbacked"}
 
-var operatorStampKeys = []string{"premise_verified_at", "premise_verified_evidence", "premise_verified_sha"}
+var operatorStampKeys = []string{"intake_override", "premise_verified_at", "premise_verified_evidence", "premise_verified_sha"}
 
 func TestRoleOf_EveryItemFieldHasOneOwner(t *testing.T) {
 	for key, want := range map[string]inboxbatch.FieldRole{
@@ -84,7 +84,7 @@ func TestFieldsOwnedBy_ListsEachOwnersExactKeysSorted(t *testing.T) {
 }
 
 func TestConsoleRouted_NoStampIsTheItemsText(t *testing.T) {
-	const protected = "go/internal/bridge/x.go:12 is where it breaks"
+	const protected = "go/internal/bridge/sandbox_wrap.go:12 is where it breaks"
 	for _, key := range append(append([]string{}, loopStampKeys...), operatorStampKeys...) {
 		if key == "route" || key == "protected_files" {
 			continue
@@ -155,6 +155,7 @@ func TestStampFieldConstants_SpellTheKeysTheInboxHolds(t *testing.T) {
 		{inboxbatch.PremiseVerifiedAtField, "premise_verified_at"},
 		{inboxbatch.PremiseVerifiedSHAField, "premise_verified_sha"},
 		{inboxbatch.PremiseVerifiedEvidenceField, "premise_verified_evidence"},
+		{inboxbatch.IntakeOverrideField, "intake_override"},
 	} {
 		if pair[0] != pair[1] {
 			t.Errorf("a stamp constant spells %q, but items on disk carry %q", pair[0], pair[1])

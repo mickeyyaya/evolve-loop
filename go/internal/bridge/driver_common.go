@@ -10,11 +10,7 @@ import (
 )
 
 func resolveBinary(deps Deps, defaultName string) string {
-	if v, _ := lookupEnv(deps, "BRIDGE_TESTING"); v != "1" {
-		return defaultName
-	}
-	key := "BRIDGE_" + strings.ToUpper(defaultName) + "_BINARY"
-	if v, ok := lookupEnv(deps, key); ok && v != "" {
+	if v := deps.Binaries[defaultName]; v != "" {
 		return v
 	}
 	return defaultName

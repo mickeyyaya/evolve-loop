@@ -189,7 +189,7 @@ Agent-specific `data` fields are defined in each agent file's Ledger Entry secti
 
 Each phase agent appends a bounded `## Reflection` section to its report **and** writes a machine-readable `<phase>-reflection.yaml` sidecar. The phase agents are Intent, Scout, Triage, Plan-Review, Build-Planner, TDD-Engineer, Tester, Builder and Auditor. The learn phase consumes both surfaces: humans read the markdown, the reflector persona aggregates the YAML.
 
-Gated on `EVOLVE_REFLECTION_JOURNAL` (default `1` at v10.20.0, opt-out with `0`). See [docs/architecture/reflection-journal.md](../docs/architecture/reflection-journal.md) for design rationale and rollout ladder.
+Each phase agent always writes it. See [docs/architecture/reflection-journal.md](../docs/architecture/reflection-journal.md) for design rationale and rollout ladder.
 
 ### When to emit
 

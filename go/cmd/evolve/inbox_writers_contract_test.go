@@ -27,35 +27,38 @@ import (
 )
 
 type autofiler struct {
-	name  string
-	sites []string
-	class string
-	build func(t *testing.T) inboxbatch.Item
+	name   string
+	sites  []string
+	class  string
+	origin string
+	build  func(t *testing.T) inboxbatch.Item
 }
 
 var autofilers = []autofiler{
-	{"post-push CI watch", []string{"internal/ciwatch.writeInboxItem"}, inboxbatch.ClassCorrectness, ciRedItem},
-	{"ci classify base red", []string{"internal/ciwatch.writeInboxItem"}, inboxbatch.ClassCorrectness, ciBaseRedItem},
-	{"recurrence boundary applier, retro autofile", []string{"internal/retrofile.FileActions"}, inboxbatch.ClassCorrectness, contractGateDemotedItem},
-	{"fleet starvation observer", []string{"internal/fleet.WriteTo"}, inboxbatch.ClassStability, starvationItem},
-	{"fail-learning floor", []string{"internal/faillearn.writeInboxItems", "internal/faillearn.WriteArtifacts"}, inboxbatch.ClassCorrectness, remediationItem},
-	{"triage-cap demotion", []string{"internal/triagecap.autoFileDemotionDefect"}, inboxbatch.ClassCorrectness, demotionItem},
-	{"goal-stall escalation", []string{"cmd/evolve.writeTo"}, inboxbatch.ClassStability, goalStallInboxItem},
-	{"ADR-0072 halt writer", []string{"cmd/evolve.writePipelineEscalation"}, inboxbatch.ClassStability, haltItem},
-	{"unexplained-outcome classifier", []string{"cmd/evolve.fileUnexplainedOutcomeDefect"}, inboxbatch.ClassDebuggability, unexplainedOutcomeItem},
+	{"post-push CI watch", nil, inboxbatch.ClassCorrectness, inboxbatch.OriginCycle, ciRedItem},
+	{"ci classify base red", nil, inboxbatch.ClassCorrectness, inboxbatch.OriginCycle, ciBaseRedItem},
+	{"recurrence boundary applier, retro autofile", []string{"internal/retrofile.FileActions"}, inboxbatch.ClassCorrectness, inboxbatch.OriginRetro, contractGateDemotedItem},
+	{"fleet starvation observer", []string{"internal/fleet.WriteTo"}, inboxbatch.ClassStability, inboxbatch.OriginCycle, starvationItem},
+	{"fail-learning floor", nil, inboxbatch.ClassCorrectness, inboxbatch.OriginRetro, remediationItem},
+	{"triage-cap demotion", []string{"internal/triagecap.autoFileDemotionDefect"}, inboxbatch.ClassCorrectness, inboxbatch.OriginCycle, demotionItem},
+	{"goal-stall escalation", []string{"cmd/evolve.writeTo"}, inboxbatch.ClassStability, inboxbatch.OriginCycle, goalStallInboxItem},
+	{"ADR-0072 halt writer", []string{"cmd/evolve.writePipelineEscalation"}, inboxbatch.ClassStability, inboxbatch.OriginCycle, haltItem},
+	{"unexplained-outcome classifier", []string{"cmd/evolve.fileUnexplainedOutcomeDefect"}, inboxbatch.ClassDebuggability, inboxbatch.OriginCycle, unexplainedOutcomeItem},
 }
 
 const movesOrRewritesAnExistingItem = "moves or rewrites an item that is already filed, so the item keeps the class it was filed with"
 
 var inboxWritersThatFileNothing = map[string]string{
+	"internal/inboxfile":            "the filing writer: File refuses an item without a known class; autofilers mint through inboxfile",
 	"internal/inboxmover/lifecycle": "the lifecycle writer: File refuses an item without a known class (ADR-0121 decision 6); every other write " + movesOrRewritesAnExistingItem,
 	"internal/phases/ship.stage":    movesOrRewritesAnExistingItem + " (the ship's consumption into consumed/)",
-	"cmd/evolve.runInboxConsume":    movesOrRewritesAnExistingItem + " (evolve inbox consume)",
+	"cmd/evolve.consumeInboxItem":   movesOrRewritesAnExistingItem + " (evolve inbox consume and the boundary step of evolve inbox curate)",
 }
 
 func TestInboxWriters_EveryAutofiledItemCarriesAKnownClass(t *testing.T) {
 	t.Parallel()
 	order := checkedInClassOrder(t)
+	kinds := checkedInKinds(t)
 	for _, w := range autofilers {
 		t.Run(w.name, func(t *testing.T) {
 			item := w.build(t)
@@ -64,6 +67,12 @@ func TestInboxWriters_EveryAutofiledItemCarriesAKnownClass(t *testing.T) {
 			}
 			if err := inboxbatch.CheckPriorityClass(item.PriorityClass, order); err != nil {
 				t.Errorf("the checked-in class_order refuses the class: %v", err)
+			}
+			if item.Origin != w.origin || inboxbatch.CheckOrigin(item.Origin) != nil {
+				t.Errorf("origin = %q, want %q", item.Origin, w.origin)
+			}
+			if item.Kind != "" && !slices.Contains(kinds, item.Kind) {
+				t.Errorf("kind %q is not one of the checked-in inbox.curator.kinds %v", item.Kind, kinds)
 			}
 		})
 	}
@@ -136,6 +145,15 @@ func checkedInClassOrder(t *testing.T) []string {
 		t.Fatal(err)
 	}
 	return pol.InboxPriorityConfig().ClassOrder
+}
+
+func checkedInKinds(t *testing.T) []string {
+	t.Helper()
+	pol, err := policy.Load(filepath.Join(findRepoRoot(t), ".evolve", "policy.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return pol.InboxCuratorConfig().Kinds
 }
 
 func onlyItemIn(t *testing.T, dir string) inboxbatch.Item {
@@ -313,7 +331,16 @@ func WritesElsewhere(runDir string) error {
 
 func TestEnrollmentProblems_NameAnUnenrolledWriterAndAStaleEnrollment(t *testing.T) {
 	t.Parallel()
-	stale := autofilers[0].sites[0]
+	var stale string
+	for _, w := range autofilers {
+		if len(w.sites) > 0 {
+			stale = w.sites[0]
+			break
+		}
+	}
+	if stale == "" {
+		t.Fatal("no enrolled autofiler sites")
+	}
 	var sites []string
 	for _, w := range autofilers {
 		if !slices.Contains(w.sites, stale) {

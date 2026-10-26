@@ -27,12 +27,15 @@ func ledgerEntry(role, treeSHA string) string {
 
 func checkAgainstLedger(t *testing.T, ledgerLines []string, artifact, phase string) ([]phasecoherence.Violation, error) {
 	t.Helper()
-	ledger := filepath.Join(t.TempDir(), "ledger.jsonl")
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	ledger := filepath.Join(root, ".evolve", "ledger.jsonl")
 	if err := os.WriteFile(ledger, []byte(strings.Join(ledgerLines, "\n")+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("EVOLVE_PROJECT_ROOT", t.TempDir())
-	t.Setenv("EVOLVE_LEDGER_OVERRIDE", ledger)
+	t.Setenv("EVOLVE_PROJECT_ROOT", root)
 	return phasecoherence.CheckProvenance(artifact, phasecoherence.ProvenanceFields{Phase: phase, Cycle: provenanceCycle})
 }
 
@@ -97,9 +100,11 @@ func TestC1851_003_CleanLedgerReportsNoMalformedLines(t *testing.T) {
 }
 
 func TestC1851_004_UnreadableLedgerIsReportedNotSilent(t *testing.T) {
-	ledgerIsADirectory := t.TempDir()
-	t.Setenv("EVOLVE_PROJECT_ROOT", t.TempDir())
-	t.Setenv("EVOLVE_LEDGER_OVERRIDE", ledgerIsADirectory)
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, ".evolve", "ledger.jsonl"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("EVOLVE_PROJECT_ROOT", root)
 	violations, err := phasecoherence.CheckProvenance(buildArtifactWithTreeSHA(artifactTreeSHA),
 		phasecoherence.ProvenanceFields{Phase: "build", Cycle: provenanceCycle})
 	if err == nil && len(violations) == 0 {

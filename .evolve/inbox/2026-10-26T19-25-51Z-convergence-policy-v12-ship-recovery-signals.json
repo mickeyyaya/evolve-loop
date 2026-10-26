@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "each ship-recovery round emits a convergence signal with the round number and the bound",
+    "the spec documents the bound",
+    "ship recovery stops at the same bound as before",
+    "each new and changed function has 100% coverage"
+  ],
+  "created_at": "2026-10-26T19:23:03Z",
+  "deps": [
+    "convergence-policy-v8-signals-and-metrics"
+  ],
+  "files": [
+    "go/internal/core/ship_recovery.go",
+    "docs/architecture/convergence-policy.md"
+  ],
+  "fix": "Emit the convergence signals for each ship-recovery round. Document the bound maxRecoveryDepth (or width + 1) in the spec. Do not add a new budget.",
+  "id": "convergence-policy-v12-ship-recovery-signals",
+  "kind": "feature",
+  "notes": "Plan: docs/plans/convergence-policy-2026-10.md section 6, V12. The surface is ship recovery, a ship-gate file. held_proposal_candidate: true.",
+  "priority_class": "debuggability",
+  "route": "console-manual",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Plan docs/plans/convergence-policy-2026-10.md, component V12. Spec: docs/architecture/convergence-policy.md. Ship recovery keeps its bound (maxRecoveryDepth or width + 1) and gets no new budget. V12 adds the signals and documents the bound.",
+  "title": "Convergence V12: ship recovery reports its rounds through the convergence signals, with its documented bound",
+  "weight": 0.3
+}
