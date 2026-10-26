@@ -151,11 +151,11 @@ func (e *Engine) resolveAttemptTokens(req core.BridgeRequest, start, end time.Ti
 			scrollback = string(data)
 		}
 	}
-	result, err := e.deps.TokenResolver(tokenusage.Window{
+	result, err := e.deps.TokenResolver(manifestTokenWindow(tokenusage.Window{
 		Worktree: req.Worktree, ArtifactPath: req.ArtifactPath,
 		EventsLogPath: eventsLogPath, Scrollback: scrollback, Driver: req.CLI,
-		TokenLineRegex: manifestTokenLineRegex(req.CLI), Start: start, End: end,
-	})
+		Start: start, End: end,
+	}))
 	if err != nil {
 		(e.attemptContext(req, callID, attempt)).warn(CodeTokenResolverFailed, "token resolver failed: "+err.Error())
 		return tokenusage.Result{Source: tokenusage.SourceNone, FillPct: tokenusage.FillPctUnmeasured}, llmcalls.UsageResolverError
@@ -220,7 +220,7 @@ func (e *Engine) emitTokenWarnings(req core.BridgeRequest, code int, start, end 
 }
 
 func isTelemetryTripwire(cli string, code int, start, end time.Time, source tokenusage.Source) bool {
-	return code == ExitOK && end.Sub(start) > tripwireSuccessThreshold && source == tokenusage.SourceNone && tokenusage.HasCollector(cli)
+	return code == ExitOK && end.Sub(start) > tripwireSuccessThreshold && source == tokenusage.SourceNone && tokenusage.HasCollector(manifestTokenWindow(tokenusage.Window{Driver: cli}).Collector)
 }
 
 func (e *Engine) recordTokenUsage(req core.BridgeRequest, model string, code int, start time.Time, resp *core.BridgeResponse) {
@@ -245,4 +245,13 @@ func observeServedModel(deps Deps, model string) {
 	if deps.onServedModel != nil {
 		deps.onServedModel(model)
 	}
+}
+
+func manifestTokenWindow(w tokenusage.Window) tokenusage.Window {
+	m, err := LoadManifest(w.Driver)
+	if err != nil {
+		return w
+	}
+	w.Collector, w.ContextWindow, w.TokenLineRegex = m.Collectors[CollectorTokens], m.ContextWindow, m.TokenLineRegex
+	return w
 }

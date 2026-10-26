@@ -24,7 +24,7 @@ func TestRunTmuxREPL_SignalCenterStateWins(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	center := panestream.NewLivenessCenter()
 	probe := &fixedStateProbe{state: panestream.LivenessHung}
-	center.RegisterHandler("claude", func() panestream.LivenessProbe { return probe })
+	center.RegisterHandler(panestream.FormatClaudeREPL, func() panestream.LivenessProbe { return probe })
 
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	rev := &scriptedReviewer{}
@@ -46,7 +46,7 @@ func TestRunTmuxREPL_SignalCenterProbeActuallyInvoked(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	center := panestream.NewLivenessCenter()
 	probe := &fixedStateProbe{state: panestream.LivenessBusyButStagnant}
-	center.RegisterHandler("claude", func() panestream.LivenessProbe { return probe })
+	center.RegisterHandler(panestream.FormatClaudeREPL, func() panestream.LivenessProbe { return probe })
 
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	rev := &scriptedReviewer{}

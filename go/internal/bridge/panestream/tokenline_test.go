@@ -49,7 +49,7 @@ func TestLastTokenLine_ReturnsTheNewestMatchTrimmed(t *testing.T) {
 }
 
 func TestAgyDetector_ANewThoughtBlockIsProgressEvenUnderAFrozenTranscript(t *testing.T) {
-	p := Profiles["agy"]
+	p := Profiles["agy-repl-v1"]
 	p.BusyLineRegex, p.TokenLineRegex = testBusyLineRegex, testTokenLineRegex
 	thinking := "> task\n▸ Thought for 2s, 264 tokens\n⣽  Working...\n────\n>\n────\nesc to cancel"
 	nextBlock := "> task\n▸ Thought for 2s, 264 tokens\n▸ Thought for 9s, 88 tokens\n⢿  Working...\n────\n>\n────\nesc to cancel"

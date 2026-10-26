@@ -2,7 +2,8 @@ package tokenusage
 
 import (
 	"fmt"
-	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/attemptpostmortem"
 )
 
 type Roots struct {
@@ -16,34 +17,38 @@ func DefaultResolver(configRoot string) func(Window) (Result, error) {
 
 func Resolver(roots Roots, query SQLiteQuery) func(Window) (Result, error) {
 	return func(w Window) (Result, error) {
-		r := Chain(driverChain(roots, query, w)...)
+		r := Chain(collectorChain(roots, query, w)...)
 		if r.Source == SourceNone {
-			r.Warn = uncoveredWarning(w.Driver)
-			r.FillPct = FillPctUnmeasured
+			r.Warn, r.FillPct = uncoveredWarning(w), FillPctUnmeasured
+			if !HasCollector(w.Collector) {
+				r.Source = SourceNoCollector
+			}
 			return r, nil
 		}
-		r.FillPct = FillPct(windowOccupancy(r), EffectiveWindow(w.Driver))
+		r.FillPct = FillPct(windowOccupancy(r), w.ContextWindow)
 		return r, nil
 	}
 }
 
-type collectorFamily struct {
-	matches func(driver string) bool
-	chain   func(roots Roots, query SQLiteQuery, w Window) []Collector
-}
+const (
+	FormatClaudeJSONL     = attemptpostmortem.FormatClaudeJSONL
+	FormatAgyConversation = "agy-conversation-v1"
+)
 
-var collectorFamilies = []collectorFamily{
-	{matches: isClaudeDriver, chain: func(roots Roots, _ SQLiteQuery, w Window) []Collector {
+type formatChain func(roots Roots, query SQLiteQuery, w Window) []Collector
+
+var collectorFormats = map[string]formatChain{
+	FormatClaudeJSONL: func(roots Roots, _ SQLiteQuery, w Window) []Collector {
 		return []Collector{TranscriptCollector(roots.Claude, w), EventsResultCollector(w.EventsLogPath), ScrollbackPeakCollector(w.Scrollback)}
-	}},
-	{matches: isAgyDriver, chain: func(roots Roots, query SQLiteQuery, w Window) []Collector {
+	},
+	FormatAgyConversation: func(roots Roots, query SQLiteQuery, w Window) []Collector {
 		return append([]Collector{AgyConversationCollector(roots.Agy, w, query)}, genericChain(w)...)
-	}},
+	},
 }
 
-func driverChain(roots Roots, query SQLiteQuery, w Window) []Collector {
-	if f, ok := familyOf(w.Driver); ok {
-		return f.chain(roots, query, w)
+func collectorChain(roots Roots, query SQLiteQuery, w Window) []Collector {
+	if chain, ok := collectorFormats[w.Collector]; ok {
+		return chain(roots, query, w)
 	}
 	return genericChain(w)
 }
@@ -56,42 +61,16 @@ func genericChain(w Window) []Collector {
 	}
 }
 
-func familyOf(driver string) (collectorFamily, bool) {
-	for _, f := range collectorFamilies {
-		if f.matches(driver) {
-			return f, true
-		}
-	}
-	return collectorFamily{}, false
-}
-
 const unmeasuredNote = "(fail-open, recorded as unmeasured not zero-cost)"
 
-func isClaudeDriver(driver string) bool {
-	d := strings.ToLower(driver)
-	return d == "" || d == "claude" || strings.HasPrefix(d, "claude-")
-}
-
-func isAgyDriver(driver string) bool {
-	d := strings.ToLower(driver)
-	return d == "agy" || strings.HasPrefix(d, "agy-")
-}
-
-func HasCollector(driver string) bool {
-	_, ok := familyOf(driver)
+func HasCollector(format string) bool {
+	_, ok := collectorFormats[format]
 	return ok
 }
 
-func uncoveredWarning(driver string) string {
-	if !HasCollector(driver) {
-		return fmt.Sprintf("token usage unavailable: driver %q has no usage collector, and its events and scrollback held no usage %s", driverLabel(driver), unmeasuredNote)
+func uncoveredWarning(w Window) string {
+	if !HasCollector(w.Collector) {
+		return fmt.Sprintf("token usage unavailable: driver %q has no usage collector (state %s), and its events and scrollback held no usage %s", w.Driver, SourceNoCollector, unmeasuredNote)
 	}
-	return fmt.Sprintf("token usage uncovered for driver %q — no transcript/events/scrollback data %s", driverLabel(driver), unmeasuredNote)
-}
-
-func driverLabel(driver string) string {
-	if driver == "" {
-		return "claude"
-	}
-	return driver
+	return fmt.Sprintf("token usage uncovered for driver %q — no transcript/events/scrollback data %s", w.Driver, unmeasuredNote)
 }

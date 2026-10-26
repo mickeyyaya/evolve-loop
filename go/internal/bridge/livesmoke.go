@@ -56,7 +56,7 @@ func LiveSmokeTest(ctx context.Context, driverName string, cfg *Config, deps Dep
 	if b, err := os.ReadFile(filepath.Join(cfg.Workspace, "tmux-final-scrollback.txt")); err == nil {
 		result.Scrollback = string(b)
 	}
-	result.ServedModel = servedModel(deps, tokenusage.Window{Worktree: cfg.Worktree, Driver: driverName, Scrollback: result.Scrollback, Start: start, End: deps.Now()})
+	result.ServedModel = servedModel(deps, manifestTokenWindow(tokenusage.Window{Worktree: cfg.Worktree, Driver: driverName, Scrollback: result.Scrollback, Start: start, End: deps.Now()}))
 	return result
 }
 

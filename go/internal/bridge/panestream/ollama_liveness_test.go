@@ -5,7 +5,7 @@ import (
 )
 
 func TestOllamaDetector_ThinkingConverging(t *testing.T) {
-	p := Profiles["ollama"]
+	p := Profiles["ollama-repl-v1"]
 	base := NewDefaultDetector(3)
 	det := NewOllamaDetector(3)
 
@@ -26,7 +26,7 @@ func TestOllamaDetector_ThinkingConverging(t *testing.T) {
 }
 
 func TestOllamaDetector_StaticFallsBack(t *testing.T) {
-	p := Profiles["ollama"]
+	p := Profiles["ollama-repl-v1"]
 	base := NewDefaultDetector(3)
 	det := NewOllamaDetector(3)
 
@@ -48,7 +48,7 @@ func TestOllamaDetector_StaticFallsBack(t *testing.T) {
 }
 
 func TestOllamaDetector_Malformed(t *testing.T) {
-	p := Profiles["ollama"]
+	p := Profiles["ollama-repl-v1"]
 	edgeCases := []struct {
 		name  string
 		frame string
@@ -82,7 +82,7 @@ func TestOllamaDetector_Malformed(t *testing.T) {
 }
 
 func TestDetectorFor_OllamaRoutesOllama(t *testing.T) {
-	p := Profiles["ollama"]
+	p := Profiles["ollama-repl-v1"]
 	probe := DetectorFor(p)
 	if probe == nil {
 		t.Fatal("DetectorFor(ollama) = nil")
@@ -105,7 +105,7 @@ func TestDetectorFor_CodexAgyUnchanged(t *testing.T) {
 	for _, cli := range []string{"codex", "agy"} {
 		cli := cli
 		t.Run(cli, func(t *testing.T) {
-			p := Profiles[cli]
+			p := Profiles[cli+"-repl-v1"]
 			probe := DetectorFor(p)
 			base := NewDefaultDetector(0)
 			think := testdataFrame(t, cli+"/thinking.txt")

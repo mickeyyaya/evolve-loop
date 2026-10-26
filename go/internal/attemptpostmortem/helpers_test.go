@@ -42,7 +42,7 @@ func collectAttempt1(t *testing.T, cfg Config) Record {
 	t.Helper()
 	rec, err := Collect(Input{
 		Attempt:        cycle1853BuildAttempt1(t),
-		Transcript:     TranscriptFor("claude-tmux", fixtureAttempt1),
+		Transcript:     TranscriptFor(FormatClaudeJSONL, fixtureAttempt1),
 		ScrollbackPath: fixtureFinalPane1,
 		WorktreeDelta:  " go/internal/swarm/dispatcher_test.go | 31 ++++++++++++++++++++++++-------\n 1 file changed, 24 insertions(+), 7 deletions(-)",
 	}, cfg)

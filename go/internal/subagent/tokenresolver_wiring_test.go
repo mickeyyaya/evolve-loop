@@ -36,9 +36,10 @@ func TestExecAdapterDeps_ResolverAppliesRealFixture(t *testing.T) {
 		t.Fatal("execAdapterDeps(env).TokenResolver is nil")
 	}
 	res, err := d.TokenResolver(tokenusage.Window{
-		Worktree: worktree,
-		Start:    mustParseRFC3339Subagent(t, "2026-07-08T11:59:00Z"),
-		End:      mustParseRFC3339Subagent(t, "2026-07-08T12:01:00Z"),
+		Collector: tokenusage.FormatClaudeJSONL,
+		Worktree:  worktree,
+		Start:     mustParseRFC3339Subagent(t, "2026-07-08T11:59:00Z"),
+		End:       mustParseRFC3339Subagent(t, "2026-07-08T12:01:00Z"),
 	})
 	if err != nil {
 		t.Fatalf("wired resolver returned error against a valid fixture: %v", err)

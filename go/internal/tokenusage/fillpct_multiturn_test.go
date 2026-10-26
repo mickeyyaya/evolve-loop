@@ -43,7 +43,7 @@ func TestFillPct_UsesTerminalTurnNotSumOfTurns(t *testing.T) {
 	const artifact = "/ws/cycle-1455/scout-report.md"
 	root := multiTurnFixture(t, artifact, inflatedTurns())
 
-	got, err := DefaultResolver(root)(Window{Driver: "claude-tmux", ArtifactPath: artifact})
+	got, err := DefaultResolver(root)(Window{Driver: "claude-tmux", Collector: FormatClaudeJSONL, ContextWindow: 200_000, ArtifactPath: artifact})
 	if err != nil {
 		t.Fatalf("resolver returned error (telemetry must be best-effort): %v", err)
 	}
@@ -83,7 +83,7 @@ func TestFillWarn_OverHundredPercent_StaysLegible(t *testing.T) {
 		assistantTurn("m2", 5_000, 800, 235_000, 0),
 	})
 
-	got, err := DefaultResolver(root)(Window{Driver: "claude-tmux", ArtifactPath: artifact})
+	got, err := DefaultResolver(root)(Window{Driver: "claude-tmux", Collector: FormatClaudeJSONL, ContextWindow: 200_000, ArtifactPath: artifact})
 	if err != nil {
 		t.Fatalf("resolver returned error: %v", err)
 	}
@@ -110,7 +110,7 @@ func TestFillWarn_CorrectedFixtureDoesNotFalsePositive(t *testing.T) {
 		assistantTurn("m3", 4_000, 300, 90_000, 0),
 	})
 
-	got, err := DefaultResolver(root)(Window{Driver: "claude-tmux", ArtifactPath: artifact})
+	got, err := DefaultResolver(root)(Window{Driver: "claude-tmux", Collector: FormatClaudeJSONL, ContextWindow: 200_000, ArtifactPath: artifact})
 	if err != nil {
 		t.Fatalf("resolver returned error: %v", err)
 	}
@@ -130,6 +130,7 @@ func TestFillPct_ZeroObservedTurns_IsUnmeasured(t *testing.T) {
 	writeTranscript(t, filepath.Join(root, "projects", "-some-worktree"), "sess.jsonl", body)
 
 	got, err := DefaultResolver(root)(Window{
+		Collector: FormatClaudeJSONL, ContextWindow: 200_000,
 		Driver:       "claude-tmux",
 		ArtifactPath: artifact,
 		Start:        mustParse(t, launchWindowStart),

@@ -134,7 +134,7 @@ func TestNewReplWaitState_RegistersThePaneLivenessHandler(t *testing.T) {
 	lc := panestream.NewLivenessCenter()
 	workspace := t.TempDir()
 	deps := Deps{Signals: c, LivenessCenter: lc, Stderr: io.Discard}.withDefaults()
-	profile := panestream.Profiles["claude"]
+	profile := panestream.Profiles["claude-repl-v1"]
 	waiter := replWaiter{
 		ctx: context.Background(),
 		cfg: &Config{Agent: "build", Cycle: 7, RunID: "run-7", ArtifactTimeoutS: 2, Workspace: workspace, ProjectRoot: workspace,

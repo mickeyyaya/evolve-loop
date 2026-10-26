@@ -37,31 +37,31 @@ func TestRecordTokenUsage_Tripwire_NonZeroExitCodeOtherThanQuotaAbort_Silent(t *
 	}
 }
 
-func TestRecordTokenUsage_Tripwire_ACollectorFamilyIsRecognizedInAnyCase(t *testing.T) {
+func TestRecordTokenUsage_Tripwire_EachDriverWhoseManifestNamesACollectorTrips(t *testing.T) {
 	t.Parallel()
-	for _, cli := range []string{"CLAUDE-TMUX", "Claude", "ClAuDe-Headless", "AGY-TMUX"} {
+	for _, cli := range []string{"claude-tmux", "claude-p", "agy-tmux", "agy-claude-tmux"} {
 		stderr, _ := runTripwireCase(t, tripwireCase{
 			cli: cli, agent: "builder", code: 0, durSecs: 90, cycleInDir: true,
 		})
 		if _, ok := tripwireStderrLine(stderr); !ok {
-			t.Errorf("cli %q names a family with a collector in any case, so it must trip; stderr:\n%s", cli, stderr)
+			t.Errorf("the manifest of cli %q names a token collector, so it must trip; stderr:\n%s", cli, stderr)
 		}
 	}
 }
 
 func TestRecordTokenUsage_Tripwire_ANameThatOnlyContainsAFamilyHasNoCollector(t *testing.T) {
 	t.Parallel()
-	for _, cli := range []string{"my-claude-wrapper", "wrapper-claude", "not-agy-at-all"} {
+	for _, cli := range []string{"my-claude-wrapper", "wrapper-claude", "not-agy-at-all", "CLAUDE-TMUX", "codex-tmux"} {
 		stderr, _ := runTripwireCase(t, tripwireCase{
 			cli: cli, agent: "builder", code: 0, durSecs: 90, cycleInDir: true,
 		})
 		if line, ok := tripwireStderrLine(stderr); ok {
-			t.Errorf("cli %q only contains a family name, so it has no collector and must stay silent; got: %s", cli, line)
+			t.Errorf("cli %q has no manifest that names a token collector, so it must stay silent; got: %s", cli, line)
 		}
 	}
 }
 
-func TestRecordTokenUsage_Tripwire_EmptyCLI_NoPanicStillWarns(t *testing.T) {
+func TestRecordTokenUsage_Tripwire_EmptyCLI_NoPanicAndNoCollector(t *testing.T) {
 	t.Parallel()
 	defer func() {
 		if r := recover(); r != nil {
@@ -71,8 +71,8 @@ func TestRecordTokenUsage_Tripwire_EmptyCLI_NoPanicStillWarns(t *testing.T) {
 	stderr, _ := runTripwireCase(t, tripwireCase{
 		cli: "", agent: "builder", code: 0, durSecs: 90, cycleInDir: true,
 	})
-	if _, ok := tripwireStderrLine(stderr); !ok {
-		t.Errorf("an empty CLI is the claude default, which has a collector, so exit-0/long-duration/uncovered must trip; stderr:\n%s", stderr)
+	if line, ok := tripwireStderrLine(stderr); ok {
+		t.Errorf("an empty CLI has no manifest and thus no collector, so it must stay silent; got: %s", line)
 	}
 }
 

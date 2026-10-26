@@ -4,7 +4,7 @@ import "testing"
 
 func TestSignalCenter_BusyOf_MatchesStandalonePaneBusy(t *testing.T) {
 	sc := NewLivenessCenter()
-	p := Profiles["claude"]
+	p := Profiles["claude-repl-v1"]
 	busyPane := "Which absolute path should I write the deliverable to?\n⏵⏵ bypass permissions on (shift+tab to cycle) · esc to interrupt\n"
 	idlePane := "Which absolute path should I write the deliverable to?\n⏺ answer complete\n"
 
@@ -31,7 +31,7 @@ func TestSignalCenter_BusyOf_EmptyPaneUnknownProfileNoPanic(t *testing.T) {
 			t.Fatalf("BusyOf panicked on empty pane / unknown profile: %v", r)
 		}
 	}()
-	if sc.BusyOf("", Profiles["claude"]) {
+	if sc.BusyOf("", Profiles["claude-repl-v1"]) {
 		t.Error("BusyOf(\"\", claude) = true, want false (empty pane has no affordance)")
 	}
 	if sc.BusyOf("some pane content", unknown) {
@@ -44,7 +44,7 @@ func TestSignalCenter_BusyOf_EmptyPaneUnknownProfileNoPanic(t *testing.T) {
 
 func TestSignalCenter_BusyOf_StatelessNoSessionMutation(t *testing.T) {
 	sc := NewLivenessCenter()
-	p := Profiles["claude"]
+	p := Profiles["claude-repl-v1"]
 	busyPane := "⏵⏵ bypass permissions on (shift+tab to cycle) · esc to interrupt\n"
 
 	for i := 0; i < 3; i++ {
@@ -64,7 +64,7 @@ func TestSignalCenter_BusyOf_StatelessNoSessionMutation(t *testing.T) {
 
 func TestSignalCenter_BusyOf_NilReceiverSafe(t *testing.T) {
 	var sc *LivenessCenter
-	p := Profiles["claude"]
+	p := Profiles["claude-repl-v1"]
 	busyPane := "⏵⏵ bypass permissions on (shift+tab to cycle) · esc to interrupt\n"
 	idlePane := "⏺ answer complete\n"
 

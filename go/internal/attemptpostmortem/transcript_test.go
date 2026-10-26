@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -99,16 +100,16 @@ func TestClaudeTranscript_AnUnreadableFileIsAnError(t *testing.T) {
 	}
 }
 
-func TestTranscriptFor_SelectsTheClaudeAdapterOnlyForAClaudeCLIWithAPath(t *testing.T) {
+func TestTranscriptFor_TheManifestFormatPicksTheAdapterAndAPathIsNeeded(t *testing.T) {
 	cases := []struct {
 		cli, path string
 		claude    bool
 	}{
-		{"claude-tmux", fixtureAttempt1, true},
-		{"claude", fixtureAttempt1, true},
-		{"claude-tmux", "", false},
-		{"agy-claude-tmux", fixtureAttempt1, false},
-		{"codex", fixtureAttempt1, false},
+		{FormatClaudeJSONL, fixtureAttempt1, true},
+		{FormatClaudeJSONL, "", false},
+		{"", fixtureAttempt1, false},
+		{"claude-tmux", fixtureAttempt1, false},
+		{"newfam-jsonl-v9", fixtureAttempt1, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.cli+"|"+tc.path, func(t *testing.T) {
@@ -119,8 +120,8 @@ func TestTranscriptFor_SelectsTheClaudeAdapterOnlyForAClaudeCLIWithAPath(t *test
 				}
 				return
 			}
-			if !errors.Is(err, ErrNoTranscript) {
-				t.Fatalf("err = %v, want ErrNoTranscript", err)
+			if !errors.Is(err, ErrNoTranscript) || !strings.Contains(err.Error(), strconv.Quote(tc.cli)) {
+				t.Fatalf("err = %v, want ErrNoTranscript that names the format %q", err, tc.cli)
 			}
 		})
 	}

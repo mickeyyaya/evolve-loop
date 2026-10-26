@@ -21,8 +21,8 @@ func TestScanner_PerDriverCoverageWarnsNotZeros(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolver errored for an uncovered driver: %v (must fail open)", err)
 	}
-	if res.Source != SourceNone {
-		t.Errorf("Source = %q, want %q for a driver with no observable sources", res.Source, SourceNone)
+	if res.Source != SourceNoCollector {
+		t.Errorf("Source = %q, want %q for a driver with no collector and no observable sources", res.Source, SourceNoCollector)
 	}
 	if res.Usage != (cyclestate.TokenUsage{}) {
 		t.Errorf("Usage = %+v, want zero (no fabrication for an uncovered driver)", res.Usage)
@@ -72,8 +72,8 @@ func TestScanner_UnknownDriverFailsOpenNoError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unknown driver returned error %v — telemetry must never fail a launch", err)
 	}
-	if res.Source != SourceNone {
-		t.Errorf("Source = %q, want %q for an unknown driver with no data", res.Source, SourceNone)
+	if res.Source != SourceNoCollector {
+		t.Errorf("Source = %q, want %q for an unknown driver with no data", res.Source, SourceNoCollector)
 	}
 	if res.Usage != (cyclestate.TokenUsage{}) {
 		t.Errorf("Usage = %+v, want zero (no fabrication)", res.Usage)

@@ -5,7 +5,7 @@ import "testing"
 const testBusyLineRegex = `^\s*([⣾⣽⣻⢿⡿⣟⣯⣷])\s+\S`
 
 func busyLineProfile() PaneProfile {
-	p := Profiles["agy"]
+	p := Profiles["agy-repl-v1"]
 	p.BusyLineRegex = testBusyLineRegex
 	return p
 }
@@ -48,7 +48,7 @@ func TestPaneBusy_TheProfileSpinnerLineIsBusyEvidence(t *testing.T) {
 	if !PaneBusy(pane, busyLineProfile()) {
 		t.Error("a spinner line matching the profile's busy line must read busy")
 	}
-	if PaneBusy(pane, Profiles["agy"]) {
+	if PaneBusy(pane, Profiles["agy-repl-v1"]) {
 		t.Error("without a busy-line pattern the same pane has no busy evidence")
 	}
 }
