@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/attemptpostmortem"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
@@ -110,5 +111,30 @@ func TestParseManifest_AManifestWithNoCapabilitiesSaysSoOnStderr(t *testing.T) {
 	stderr.Reset()
 	if _, err := parseManifestWithStderr("none", []byte(`{"cli":"none","binary":"none","capabilities":[]}`), &stderr); err != nil || stderr.Len() != 0 {
 		t.Fatalf("a manifest that declares no capability on purpose: err %v, stderr %q; want silence", err, stderr.String())
+	}
+}
+
+func TestManifest_TheSchemaWordsNameTheKindsAndTheCapabilities(t *testing.T) {
+	t.Parallel()
+	m := Manifest{
+		Parsers:      map[string]string{ParserPane: panestream.FormatClaudeREPL},
+		Collectors:   map[string]string{CollectorTokens: tokenusage.FormatClaudeJSONL},
+		Transcript:   &TranscriptSpec{Format: attemptpostmortem.FormatClaudeJSONL},
+		Capabilities: []string{CapabilityTools, CapabilityEdit},
+	}
+	if err := validateFormats("x", m); err != nil {
+		t.Fatalf("a manifest built from the schema words is refused: %v", err)
+	}
+	data, err := json.Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`"parsers":{"pane":`, `"collectors":{"tokens":`, `"transcript":{"format":"claude-jsonl-v1"}`, `"capabilities":["tools","edit"]`} {
+		if !strings.Contains(string(data), want) {
+			t.Errorf("manifest JSON %s lacks %s", data, want)
+		}
+	}
+	if !m.HasCapability(CapabilityEdit) || m.TranscriptFormat() != attemptpostmortem.FormatClaudeJSONL {
+		t.Errorf("HasCapability(edit) = %v, TranscriptFormat() = %q", m.HasCapability(CapabilityEdit), m.TranscriptFormat())
 	}
 }
