@@ -79,6 +79,8 @@ func TestAuditRepair_AnUnprescribedFindingKeepsTheRepairRung(t *testing.T) {
 
 type stubRungHandler struct{}
 
+var _ RungHandler = stubRungHandler{}
+
 func (stubRungHandler) Handle(context.Context, RungInput) (RungResult, error) {
 	return RungResult{}, nil
 }

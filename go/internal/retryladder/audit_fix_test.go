@@ -16,7 +16,7 @@ func TestChooseAuditFix_PicksASmallFullyPrescribedFix(t *testing.T) {
 		Estimate: retryladder.AuditFixEstimate{Files: 1, Lines: 20, CodeLines: 0, Tokens: 240},
 		Bounds:   smallBounds(),
 	}
-	got := retryladder.ChooseAuditFix(in)
+	var got retryladder.AuditFixChoice = retryladder.ChooseAuditFix(in)
 	if !got.Choose || got.Rule != retryladder.AuditFixRuleSmallPrescribed || got.Input != in {
 		t.Fatalf("ChooseAuditFix = %+v, want audit_fix by the small-prescribed rule with its input", got)
 	}

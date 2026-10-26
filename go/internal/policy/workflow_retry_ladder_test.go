@@ -68,6 +68,13 @@ func TestRetryLadderConfig_TheCheckedInPolicyRecordsInShadow(t *testing.T) {
 }
 
 func TestRetryLadderConfig_AuditFixBoundsHaveDefaultsAndOverrides(t *testing.T) {
+	off := false
+	explicit := policy.Policy{Workflow: &policy.WorkflowPolicy{RetryLadder: &policy.RetryLadderPolicy{
+		DigestTokens: policy.MinRetryLadderDigestTokens, AuditFix: &policy.AuditFixPolicy{MaxFiles: 1, NoNewProductionLogic: &off},
+	}}}.WorkflowConfig().RetryLadder
+	if explicit.DigestTokens != policy.MinRetryLadderDigestTokens || explicit.AuditFix.MaxFiles != 1 || explicit.AuditFix.NoNewProductionLogic || explicit.AuditFix.MaxLines != 40 {
+		t.Fatalf("explicit block = %+v", explicit)
+	}
 	def := policy.Policy{}.WorkflowConfig().RetryLadder.AuditFix
 	want := policy.AuditFixConfig{MaxFiles: 3, MaxLines: 40, MaxCodeLines: 10, MaxTokens: 6000, NoNewProductionLogic: true}
 	if def != want {
