@@ -25,3 +25,4 @@ docs/private/ export-ignore
 go/.apicover-enforce merge=union
 
 docs/history/code-comments/*.md merge=union
+guidance/** text eol=lf

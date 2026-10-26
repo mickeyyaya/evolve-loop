@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cli/agentcmd"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cli/contextcmd"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cli/guardcmd"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cli/opscmd"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cli/phasecmd"
@@ -73,6 +75,7 @@ var commands = []subcommand{
 	{Name: "sync-main", Summary: "Reconcile a locally-diverged main with origin via merge only (never rebase/force-push/push); refuses on live lease or dirty tree", Run: runSyncMain},
 	{Name: "quality", Summary: "Compute the quality index readings of a scope and publish them through the Signal Center (quality report --scope wave|tree|judges|replay --project-root P | quality compare --index PQ1|PQ4 --a W --b W [--paired] --project-root P; ADR-0153; report exits 0 unless usage)", Run: runQuality},
 	{Name: "commit-gate", Summary: "Pre-commit quality gate (lint + targeted tests + attestation)", Run: guardcmd.RunCommitGate},
+	{Name: "guidance", Summary: "The rule registry under guidance/rules: build writes guidance/index.md, guidance/index.json and the L0 region of AGENTS.md; check reports stale output and registry problems; index prints the rules of a case (guidance build|check [--project-root P] | guidance index [--audience X] [--phase P] [--cli F] [--json] [--project-root P]; exit 0 ok, 1 check problems, 2 I/O, 10 usage, 11 bad registry)", Run: runGuidance},
 	{Name: "scan", Summary: "Scan the staged diff or a ref range for secrets, masked; exit 0 clean, 1 finding, 2 git error (scan secrets [--staged | --diff <ref>] [--project-root P])", Run: runScan},
 	{Name: "bridge", Summary: "Native-Go multi-CLI agent bridge (launch|probe)", Run: runBridge},
 
@@ -131,8 +134,9 @@ var commands = []subcommand{
 	{Name: "ratchet", Summary: "Function-size + raw-git-fixture ratchets over a module: check [size|rawgit] [--root DIR]; tighten [--check] [--root DIR] [--project-root P] (the one writer of offenders.json, refused inside a phase or under a live lease)", Run: runRatchet},
 	{Name: "floor", Summary: "Run the local CI floor tier by tier (fmt on CI's pinned Go, vet, integration, e2e, acs-durable, apicover, cover, ratchet): floor run [--tier fmt,vet,...] [--root DIR] [--dry-run]; one PASS/RED/ERROR line per tier, every tier runs, exit 1 on a red tier, 2 when a tier cannot run", Run: runFloor},
 	{Name: "cover", Summary: "Coverage gate over a change: changed --base <ref> [--profile <path>] [--json] [--root DIR] refuses every changed function below 100%; strict [--profile <path>] [--floors <path>] [--json] [--root DIR] refuses every package of go/.cover-strict below its floor", Run: runCover},
-	{Name: "code", Summary: "Read-only code index for phase agents: callers <symbol> [--direction in|out] | api <file> | find <query> | map [dir] [--project-root P]; one hit per line as file:line, symbol, text; exit 1 no result, 2 index absent, 3 unsupported, 10 usage; each call appends one record to the cycle workspace in a phase, else to the user cache (a write failure never changes the exit code); code usage [--since D] [--json] counts the calls by phase and command", Run: runCodeCommand},
+	{Name: "code", Summary: "Read-only code index for phase agents: callers <symbol> [--direction in|out] | api <file> | find <query> | map [dir] [--project-root P]; one hit per line as file:line, symbol, text, or --json for one envelope with the hits and the stale and behind fields; a stale index warns on stderr, or exits 21 when code_index.stale is refuse; exit 1 no result, 2 index absent, 3 unsupported, 10 usage; each call appends one record to the cycle workspace in a phase, else to the user cache (a write failure never changes the exit code); code usage [--since D] [--json] counts the calls by phase and command; code refresh [--json] moves the index worktree to origin/main and rebuilds it (exit 2 absent, 3 inside a phase, 22 foreign changes, 23 fetch failed)", Run: runCodeCommand},
 	{Name: "ladder", Summary: "Retry ladder telemetry: report [--json] [--project-root DIR] prints the tries, fixes and tokens per rung and failure class from each run dir's llm-calls.ndjson; read-only (exit 2 on an absent runs dir, 10 on usage)", Run: runLadderCommand},
+	{Name: "context", Summary: "The cell context index of a phase agent, read-only and agent class A: context index [--layer L1|L2] [--required] [--json] lists the rows of inputs/index.json; context open <id> [--json] prints the body of one row after its sha256 check (both take --workspace W); context stats [--phase P] [--json] [--project-root R] prints the open rate of each kind from the access log (agent class D; exit 0 ok, 1 changed body, 2 no index, 10 usage, 11 unknown id or bad index)", Run: contextcmd.New(contextcmd.Deps{Env: os.Getenv})},
 	{Name: "context-fill", Summary: "Context-window fill telemetry: correlate (peak fill band vs cycle final verdict)", Run: runContextFill},
 }
 

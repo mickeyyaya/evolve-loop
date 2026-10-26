@@ -496,4 +496,25 @@ approaches / decision / results / retro) — lives at
 | [architecture/guidance-layers.md](architecture/guidance-layers.md) §10 | Spec: `guidance/index.md`, `guidance/index.json`, the L0 region of `AGENTS.md` and the verb `evolve guidance index` with its exit codes. Family facts stay in the driver layer. |
 | [architecture/adr/0145-each-rule-has-one-home-and-loads-by-audience-path-action-or-failure.md](architecture/adr/0145-each-rule-has-one-home-and-loads-by-audience-path-action-or-failure.md) | Decision: points 8 to 10 add the runtime index. |
 
+## 2026-10-26 — each phase cell gets a small assignment and a layered index that it opens on demand (ADR-0154 I-4)
+
+| Document | What it records |
+|---|---|
+| [architecture/cell-context-index.md](architecture/cell-context-index.md) | Spec of record: the context layers L0 to L3, the entry fields and the budgets. It also defines the `evolve context` verbs, the access log and the action `context-tune`. |
+| [plans/cell-context-index-2026-10.md](plans/cell-context-index-2026-10.md) | Plan: five scored designs, the decisions D1 to D12 and the components CX1 to CX7. |
+| [research/cell-context-index-2026-10.md](research/cell-context-index-2026-10.md) | Research: the measured prompts and deliverables, and current practice on just-in-time context and progressive disclosure. |
+| [architecture/llm-isolation.md](architecture/llm-isolation.md) §8.4, §8.5 | Spec: the pointers to the new design. |
+
+## 2026-10-26 — Agensh: what a team of 1,024 agents with no orchestrator teaches a loop with one controller
+
+| Document | What it records |
+|---|---|
+| [research/agensh-2026-10.md](research/agensh-2026-10.md) | Research: the Agensh paper (arXiv:2609.26781) and repository, its worker loop, board, router and results, and the limits of its evidence. We reject the self-claim and the direct messages (I-1, I-3, I-4). Five options are adopted as proposals (R1 to R5), and the integrator seat is deferred. |
+
+## 2026-10-26 — eight tests flaked in 14 days of CI, and each cause has a test-design rule
+
+| Document | What it records |
+|---|---|
+| [research/flaky-tests-2026-10.md](research/flaky-tests-2026-10.md) | Research: the ranked flakes with their runs, rates and costs, and the reds that are real defects. It also gives the classes and the rules that prevent them. |
+
 <!-- GENERATED:research-index END -->

@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "RED first: TestObserver_TheNudgeAsksForAFindingWhenThePhaseAddedNoBoardEntry fails before the change.",
+    "A phase that added a board entry gets the current nudge body.",
+    "The stall kill time is the same before and after the change.",
+    "Changed functions at 100% coverage on every CI OS; the observer package note is updated."
+  ],
+  "created_at": "2026-10-26T04:35:17Z",
+  "deps": [
+    "agensh-knowledge-board"
+  ],
+  "files": [
+    "go/internal/observerengine/",
+    "go/internal/phaseobserver/",
+    "go/internal/policy/"
+  ],
+  "fix": "When the phase has added no board entry at the nudge, send a nudge body that also asks for a FACT or FAIL entry. Both bodies are observer policy values, not code. The stall threshold does not change.",
+  "id": "agensh-no-finding-reminder",
+  "kind": "feature",
+  "priority_class": "feature",
+  "route": "console-manual",
+  "source": "console, 2026-10-26. Research: docs/research/agensh-2026-10.md \u00a76 R3 (option A3).",
+  "summary": "The observer already nudges once at 300 s idle and stalls at 600 s (go/internal/policy/dispatch.go:61, go/internal/observerengine/tick.go:87). Agensh adds a reminder when a turn adds no board entry. Research \u00a72.4 P2.8, \u00a73 F3.5.",
+  "title": "The idle nudge also asks for a FACT or FAIL board entry when the phase has added none.",
+  "weight": 0.2
+}

@@ -58,7 +58,7 @@ Phase A tooling consumes these directly. Phase B switches `claude.sh`'s `--outpu
     └── trace.md                                      # human-readable bullet log (tailable)
 ```
 
-The `.ephemeral/` naming serves two purposes: (1) the leading dot hides it from `ls` defaults; (2) it acts as a policy marker — any tool can trivially classify "safe to prune / safe to compress / safe to skip in git" by directory name alone.
+The `.ephemeral/` name has two purposes. (1) The leading dot hides it from `ls` defaults. (2) It acts as a policy marker: any tool can classify "safe to prune / safe to compress / safe to skip in git" by directory name alone.
 
 ## Event schema
 
@@ -175,8 +175,8 @@ Pruner uses `find -mtime +N` for bash 3.2 compat. Idempotent. `--dry-run` flag f
 
 | Phase | Status | Surface | Lives In |
 |---|---|---|---|
-| **A — additive** | shipped v10.4.0 | All new scripts; works on existing data via replay mode | `legacy/scripts/observability/*.sh`, `legacy/scripts/tests/tracker-writer-test.sh`, this doc |
-| **B — wire live** | shipped v10.5.0 (opt-in via `EVOLVE_TRACKER_ENABLED=1`) | `subagent-run.sh` post-phase replays NDJSON through `tracker-writer` + `append-phase-perf`; `run-cycle.sh` calls `rollup-cycle-metrics` at cycle exit; `.claude/settings.json:hooks.Stop` runs `prune-ephemeral` | `legacy/scripts/dispatch/subagent-run.sh`, `archive/legacy/scripts/dispatch/run-cycle.sh`, `.claude/settings.json` |
+| **A — additive** | shipped v10.4.0 | All new scripts; works on existing data through replay mode | `legacy/scripts/observability/*.sh`, `legacy/scripts/tests/tracker-writer-test.sh`, this doc |
+| **B — wire live** | shipped v10.5.0 (opt-in with `EVOLVE_TRACKER_ENABLED=1`) | `subagent-run.sh` post-phase replays NDJSON through `tracker-writer` + `append-phase-perf`; `run-cycle.sh` calls `rollup-cycle-metrics` at cycle exit; `.claude/settings.json:hooks.Stop` runs `prune-ephemeral` | `legacy/scripts/dispatch/subagent-run.sh`, `archive/legacy/scripts/dispatch/run-cycle.sh`, `.claude/settings.json` |
 
 > **Note** — `claude.sh` already emits `--output-format stream-json --verbose` by default (since v9.2.0, gated by `EVOLVE_STREAM_JSON`, default ON). The original Phase-B plan called for flipping that flag; turned out it had already been flipped two minor versions earlier. v10.5.0 just wires the consumer side.
 
@@ -217,4 +217,4 @@ All scripts follow the project's bash 3.2 contract:
 - No GNU-only sed flags — write to `.tmp.$$` and `mv`
 - No GNU-only `date -d` — fallback chain `gdate || date -d || date -j -f`
 
-Atomic writes via `mv-of-temp`. Append-style NDJSON writes use single `>>` (atomic for ≤PIPE_BUF lines on POSIX).
+Atomic writes use `mv-of-temp`. Append-style NDJSON writes use single `>>` (atomic for ≤PIPE_BUF lines on POSIX).

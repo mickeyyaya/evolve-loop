@@ -171,9 +171,20 @@ func newRecipeEngine(cfg *Config, deps Deps, cli string) (*recipe.Engine, error)
 	}, nil
 }
 
-const helpCaptureSettleTicks = 8
+const (
+	helpCaptureSettleTicks  = 8
+	usageCaptureSettleTicks = 30
+)
+
+type paneSettled func(pane, marker string) bool
+
+func markerShown(pane, marker string) bool { return marker != "" && strings.Contains(pane, marker) }
 
 func captureControl(ctx context.Context, cfg *Config, deps Deps, cli, command string, settleTicks int) (string, error) {
+	return captureUntil(ctx, cfg, deps, cli, command, settleTicks, markerShown)
+}
+
+func captureUntil(ctx context.Context, cfg *Config, deps Deps, cli, command string, settleTicks int, settled paneSettled) (string, error) {
 	deps = deps.withDefaults()
 	drv, marker, err := newRecipeDriver(cfg, deps, cli)
 	if err != nil {
@@ -196,7 +207,7 @@ func captureControl(ctx context.Context, cfg *Config, deps Deps, cli, command st
 			drv.ar.tick(ctx, drv.session)
 		}
 		pane, _ = drv.Capture(ctx)
-		if marker != "" && strings.Contains(pane, marker) {
+		if settled(pane, marker) {
 			break
 		}
 	}

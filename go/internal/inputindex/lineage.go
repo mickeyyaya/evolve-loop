@@ -1,6 +1,7 @@
 package inputindex
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -58,7 +59,7 @@ func continuationCycles(projectRoot string, cycle int, itemIDs []string) ([]int,
 	return out, notes
 }
 
-func lineageSources(projectRoot string, lineage []int, firstAttempt int) []source {
+func lineageSources(projectRoot string, itemIDs []string, lineage []int, firstAttempt int) []source {
 	var out []source
 	for i, n := range lineage {
 		dir := filepath.Join(runsDir(projectRoot), "cycle-"+strconv.Itoa(n))
@@ -76,6 +77,7 @@ func lineageSources(projectRoot string, lineage []int, firstAttempt int) []sourc
 		}
 		for _, s := range cycleSources {
 			s.class, s.cycle, s.attempt = ClassLineage, n, firstAttempt+i
+			s.why = fmt.Sprintf("lineage cycle %d of item %s, attempt %d", n, strings.Join(itemIDs, ", "), s.attempt)
 			out = append(out, s)
 		}
 	}
@@ -98,8 +100,9 @@ func lessonSources(projectRoot string, itemIDs []string, lineage []int) []source
 	lessons, _ := filepath.Glob(filepath.Join(projectRoot, ".evolve", "instincts", "lessons", "*.yaml"))
 	var out []source
 	for _, path := range lessons {
-		if body, err := os.ReadFile(path); err == nil && named.Match(body) {
-			out = append(out, source{path: path, class: ClassLineage, kind: "lesson"})
+		body, err := os.ReadFile(path)
+		if m := named.FindSubmatch(body); err == nil && m != nil {
+			out = append(out, source{path: path, class: ClassLineage, kind: "lesson", why: "lesson that names " + string(m[2])})
 		}
 	}
 	return out

@@ -622,6 +622,8 @@ If X5 builds it, it emits kind `isolation.access` (INFO) with the entry ids. It 
 
 X5 did not build the usage reading. The report reader of §8.5 reads only the guarded rules, not the grants. The grants carry no report, so the reading stays proposed.
 
+The usage reading is built in [cell-context-index.md](cell-context-index.md) §8 (CX3, §13 there). A report on each grant names the path that the cell read. The pipeline maps the path to its entry and writes the access log. The same file adds the context layers L0 to L3, the token estimates, the required flag and the budgets. CX1 to CX3 are built, and CX4 to CX7b are proposed.
+
 #### 8.5 As built (X5)
 
 A worked example. Cycle 7 builds the item `item-a`, and cycle 6 failed on the same item. Before the build launch, the pipeline writes `.evolve/runs/cycle-7/inputs/index.json` with `lineage: [6]` and `attempt: 2`. The index lists the scout report of cycle 7 as a `deliverable`, and the retrospective of cycle 6 as a `lineage` entry.
@@ -676,9 +678,9 @@ Known differences from the design:
 - Linux has no report. At `shadow` the `bwrap` prefix adds nothing, and no signal comes.
 - On Linux, `bwrap` masks the raw files that exist at the launch. A raw log that the bridge makes later is not masked. The SBPL rule matches by name, so macOS has no such gap. The item `isolation-home-transcripts-before-i4-enforce` tracks the Linux gap too.
 - A grant is kept only when its real path is inside `.evolve/runs/` and is not raw output. A lesson under `.evolve/instincts/lessons/` gets no grant, because the repo grant already covers it.
-- The report reader is best effort. The kernel can merge repeated reports, and `log show` can miss a report that arrives after it runs. A failed read prints `WARN isolation read reports`.
+- The kernel can merge repeated reports, so the reader sees each rule and target once. The unified log can lag the end of the cell, so the reader waits for a fence report first ([cell-context-index.md](cell-context-index.md) §8). The fence makes a lost report unlikely, but it does not prove its absence. A failed read prints `WARN isolation read reports`.
 - Only the phases of a cycle get an index. A flow seat (advisor, judge, router) and an `evolve agent run` launch get no index, so at `enforce` they read only their own workspace inside `.evolve/runs/`.
-- The `message` class and the `context` class of §8.1 have no entries yet. The inbox item file and `lane-scope.json` stay readable, because the repo grant covers `.evolve/inbox/` and the workspace grant covers `lane-scope.json`.
+- The `message` class and the `context` class of §8.1 have no entries yet. Component CX4 of [cell-context-index.md](cell-context-index.md) adds them. The inbox item file and `lane-scope.json` stay readable, because the repo grant covers `.evolve/inbox/` and the workspace grant covers `lane-scope.json`.
 - An `evolve` verb that the agent runs inside the cell and that reads other run directories is a violation at `shadow`. The `shadow` signals must show none before the flip to `enforce`.
 
 ## 9. Sandbox rules
@@ -1003,6 +1005,9 @@ The stub for each family declares the same capabilities as the real manifest. Th
 | N12 | a judge verdict in prose with no file fails the contract | I-8 | X8 | `internal/core` | green (X8, at `enforce`) |
 | N13 | the grep guard finds no family string in flow code | I-6 | X6 | `internal/core` | green |
 | N14 | a new manifest with known format ids needs no Go change | I-6 | X9 | `internal/bridge` | open |
+| N15 | a cell lists its `inputs/index.json` and opens a required entry through `evolve context index` and `evolve context open` | I-4 | CX2 ([cell-context-index.md](cell-context-index.md)) | the matrix (M1 run) | green (CX2) |
+| N16 | an open of an indexed path writes one access record that names its entry | I-4 | CX3 | sandbox contract | green (CX3) |
+| N17 | a cell cannot write the access log `.evolve/context-access/` | I-4 | CX3 | sandbox contract | green (CX3) |
 
 Rows N3, N5 and N7 to N10 extend `TestAgentSandboxContract` (`go/internal/bridge/sandbox_contract_integration_test.go`, build tags `integration` and `darwin`). Before X1 it had 22 rows and none for exec, network or a cross-cycle read. The exec row runs a `fakeclitest` stub named `claude`, never a real CLI.
 
@@ -1034,6 +1039,8 @@ The contract reuses the shape of [llm-quality-indexes.md](llm-quality-indexes.md
 | `ISOLATION_I7_VIOLATION` | I-7 | a gate or the fence that stops a write that a hook did not stop |
 | `ISOLATION_I8_VIOLATION` | I-8 | a flow parser that falls back to stdout or prose |
 | `ISOLATION_I9_VIOLATION` | I-9 | none at run time; the matrix test is its guard |
+| `ISOLATION_CONTEXT_REQUIRED_UNOPENED` | I-4 | built (CX3): the bridge, when a cell closes without a read of a required entry of its index; kind `isolation.context`, INFO ([cell-context-index.md](cell-context-index.md) §8) |
+| `ISOLATION_CONTEXT_BUDGET_OVER` | I-4 | built (CX3): the bridge, when required entries of a layer passed its token budget; kind `isolation.context`, WARN ([cell-context-index.md](cell-context-index.md) §6) |
 
 ### 15.2 Fields of a violation
 

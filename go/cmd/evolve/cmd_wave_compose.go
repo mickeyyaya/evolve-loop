@@ -128,7 +128,6 @@ func waveSteps(a boundaryArgs, root string, drivers []string) []boundaryStep {
 	for _, d := range drivers {
 		steps = append(steps, boundaryStep{verb: "doctor", args: []string{"live", d}})
 	}
-	steps = append(steps, boundaryStep{verb: waveCodeRefreshVerb, args: at, desc: waveCodeRefreshDesc})
 	launch := boundaryLaunchSteps(a, root)
 	last := &launch[len(launch)-1]
 	last.desc = waveLaunchDesc(*last, a.goalText)

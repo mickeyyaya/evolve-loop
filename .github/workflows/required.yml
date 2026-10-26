@@ -154,6 +154,8 @@ jobs:
         run: go build -o "$RUNNER_TEMP/evolve" ./cmd/evolve
       - name: Check the research index
         run: '"$RUNNER_TEMP/evolve" docs index check --project-root "$GITHUB_WORKSPACE"'
+      - name: Check the rule registry and its generated index
+        run: '"$RUNNER_TEMP/evolve" guidance check --project-root "$GITHUB_WORKSPACE"'
       - id: lint
         name: Lint the added text
         env:

@@ -37,6 +37,9 @@ jobs:
       - name: Validate plugin structure
         run: go/bin/evolve install --ci
 
+      - name: Check the rule registry and its generated index
+        run: go/bin/evolve guidance check --project-root .
+
   # Durable ACS regression gate. The `//go:build acs` predicates enforce flag-
   # registry ceilings/readers/progress, doc-comment coverage, no-orphan-scripts
   # (subsumes the former standalone noorphan step), and per-cycle source

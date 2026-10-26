@@ -1,6 +1,6 @@
 # Control Flags Reference — `EVOLVE_*`
 
-> The **[Generated Flag Index](#generated-flag-index)** below is projected from `go/internal/flagregistry` and regenerated with `evolve flags generate`. On 2026-10-25 the registry has **26 rows**. An earlier header said 35, and that count was stale. The registry is not the full inventory: [Classes of the readers outside the registry](#classes-of-the-readers-outside-the-registry) lists each name that production code reads. [ADR-0156](adr/0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md) (I-16, component X18) removes the control flags. After X18, only the pipeline markers stay in the environment.
+> The **[Generated Flag Index](#generated-flag-index)** below is projected from `go/internal/flagregistry` and regenerated with `evolve flags generate`. On 2026-10-26 the registry has **25 rows**. An earlier header said 35, and that count was stale. The registry is not the full inventory: [Classes of the readers outside the registry](#classes-of-the-readers-outside-the-registry) lists each name that production code reads. [ADR-0156](adr/0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md) (I-16, component X18) removes the control flags. After X18, only the pipeline markers stay in the environment.
 >
 > The historical hand-maintained cluster tables were removed in the flag-consolidation campaign: they duplicated the registry and drifted stale (a `never_duplicate` violation). The campaign retires the scattered `os.Getenv` override surface — capabilities move into typed `.evolve/policy.json` config, profile SSOT, DI, or documented subprocess protocol. Background: `docs/research/flag-consolidation-campaign-2026-06-19.md`.
 
@@ -64,7 +64,7 @@ This section documents the closed-vocabulary fields those blocks use.
 
 > Source: the audit of 2026-10-25 on `origin/main` at `603389ebd` ([research F5.1 to F5.6](../research/llm-isolation-2026-10.md#62-local-evidence-the-control-flags)). The fix of each class is component X18 ([ADR-0156](adr/0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md) I-16, [spec §27](llm-isolation.md#27-no-ambient-control-flags-x18)). Until X18 lands, this list is the full inventory, and the generated index below is not.
 
-The registry has 26 rows. The production code reads more names than that. Many names are built as `"EVOLVE_" + "X"`, so a literal grep misses them. Each reader is in one of five classes.
+The registry has 25 rows. The production code reads more names than that. Many names are built as `"EVOLVE_" + "X"`, so a literal grep misses them. Each reader is in one of five classes.
 
 **(a) Pipeline markers.** The pipeline sets them for its own child processes. They stay, as one named Go list (X18b). Only these names reach a cell.
 
@@ -109,7 +109,8 @@ The registry has 26 rows. The production code reads more names than that. Many n
 
 | Names | Why dead |
 |---|---|
-| `EVOLVE_WORKTREE_PATH`, `EVOLVE_REFLECTION_JOURNAL` | registry rows with no production reader; the unprefixed `WORKTREE_PATH` is a different, live subagent variable |
+| `EVOLVE_REFLECTION_JOURNAL` | a registry row with no production reader |
+| `EVOLVE_WORKTREE_PATH` | deleted 2026-10-26. No Go code reads or writes it. No workflow or script sets it. The unprefixed `WORKTREE_PATH` is a different, live subagent variable (`subagent/subagentrun/env.go:40`). The fallback read in `agents/evolve-tester.md:94` gets no value and uses `WORKTREE_PATH`. |
 | `EVOLVE_RESUME`, `EVOLVE_RESUME_MODE` | written (`cmd/evolve/cmd_loop_args.go:357`, `core/resume_bootstrap.go:128`) and never read |
 | `EVOLVE_SANDBOX_FALLBACK_ON_EPERM` | a JSON tag only (`preflight/preflight.go:69`) |
 | `EVOLVE_RELEASE_STRICT_PASS` | replaced by `--strict-pass`; the name is left in messages only (`releasepreflight/releasepreflight.go:404`) |
@@ -158,6 +159,5 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | `EVOLVE_SANDBOX` | active | — | — | Sandbox Cluster | Enable outer sandbox-exec/bwrap wrapper |
 | `EVOLVE_TMUX_SOCKET` | internal | — | — | Bridge Cluster | IPC channel (F6, not an operator dial): the loop exports the per-run bridge tmux socket name (evolve-bridge-p<looppid>) so its bridge subprocesses, the reaper, and the orphan GC all target the same isolated socket — so an external `tmux kill-server` on one run's socket can't tear down another. Unset ⇒ the shared `evolve-bridge` default. Set by the loop (cmd_loop) and, for a test process that runs real tmux, by `tmuxtest.Main` (`evolve-bridge-t<testpid>`, a server of its own); never by the operator. |
 | `EVOLVE_USE_PHASE_REGISTRY` | active | — | — | Dynamic Phase Routing (Go-native, v13.0.0 / PR #4 — default-off) | Set `0` to skip reading `phase-registry.json` (built-in defaults only) |
-| `EVOLVE_WORKTREE_PATH` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
 
 <!-- GENERATED:flag-index END -->

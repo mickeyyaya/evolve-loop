@@ -163,7 +163,7 @@ Put each fact in the manifest `controls` map, as the `/usage` path already does 
 | Field | Meaning |
 |---|---|
 | `send` | The command to type into the CLI, for example `/usage`. |
-| `await` | The condition to wait for before the capture, for example `prompt_marker`. |
+| `await` | The condition that ends the capture: `prompt_marker` (the default) or `windows` (a stable window readout). |
 | `exhausted_regex` | A pattern that marks an exhausted quota in the pane. |
 | `drift_probe_regex` | A pattern for a pane that looks like a limit message. |
 | `windows` | The parse spec for usage windows. |
@@ -227,10 +227,10 @@ This case follows one command from the shell to the window values. The path is t
 3. `bridgeUsageProbe` wraps `usageevidence.UsagePane(factory)` (`go/cmd/evolve/cli_usage_probe.go:60-62`). That function calls `factory.For(family).Do(ctx, family, clicontrol.EventUsage)` (`go/internal/usageevidence/production.go:56-61`).
 4. `ControllerFactory.For` builds a `Config` with the driver name of the family from `DefaultDriverSet()` and returns `NewController` (`clicontrol_adapter.go:17`). Before F1, this step built the name by hand.
 5. `cliController.Do` calls `Resolve`, which loads the manifest `agy-tmux`. `Do` then reads `Control("usage")` (`clicontrol_adapter.go:38-47`). If the manifest has no such control, `Do` returns `ErrUnsupported`, and the command prints "its manifest maps no usage command" (`cmd_clihealth_usage.go:72-73`).
-6. `Do` calls `captureControl` with `spec.Send`, which is `/usage` (`clicontrol_adapter.go:50`). `captureControl` starts a session, sends the command and polls the pane up to 8 times. It stops early when the pane contains the prompt marker. It then kills the session (`go/internal/bridge/recipe_adapter.go:161-189`).
+6. `Do` calls `captureSpec` with the control spec. The spec of agy has `await: prompt_marker`, so `captureSpec` calls `captureControl` with `/usage`. `captureControl` starts a session, sends the command and reads the pane up to 8 times. It stops early when the pane contains the prompt marker. It then kills the session (`go/internal/bridge/recipe_adapter.go`). For claude, `await: windows` makes the capture wait for stable usage rows ([2026-10-26 incident](../incidents/2026-10-26-claude-usage-capture-stopped-before-the-rows.md)).
 7. `readUsage` passes the pane to `bridge.UsageWindows(family, pane, now)` (`cmd_clihealth_usage.go:77`). That function loads the manifest, takes `controls.usage.windows` and calls `quotastate.ReadWindows` (`usage_window_reader.go:10-20`).
 8. `ReadWindows` reads the pane line by line. A group title sets the scope. A label opens a window. A value and a reset line fill it (`quotastate/windows.go:176-190`).
-9. If no window comes out, the command prints "no usage window read" (`cmd_clihealth_usage.go:78-80`).
+9. If no window comes out, and the manifest declares `controls.usage.windows`, the command prints the error "no usage window read" and exits 1. A manifest without that spec gets a note.
 
 ```mermaid
 sequenceDiagram
@@ -285,6 +285,7 @@ Each step that removes a bypass adds a guard test that bans the shape it removes
 | `modelcapacity` has no `exec`, no tmux and no CLI-name literal | A repo-contract test ([tier plan](../plans/model-tier-policy-2026-10.md), Q5) | planned |
 | `cliroute` imports no bridge | An import check ([tier plan](../plans/model-tier-policy-2026-10.md), Q3) | planned |
 | A `controls.usage.windows` spec compiles at manifest load | `validateUsageWindows` through `validatePaneVocabulary` | built |
+| A control with `await: windows` declares a `windows` spec | `validateControlAwaits` through `validatePaneVocabulary` | built |
 | A guard fails on a fixture with the banned shape | Each guard has a fixture test (G4) | planned |
 
 ## 9. Limits

@@ -97,6 +97,27 @@ A house-list word that is also a code name or a term with a definition here stay
 - **Generated documents.** A generator writes some files (for example, `docs/architecture/signal-codes.md`) and some rows (for example, the README version history that `versionbump` writes). Change the generator's templates, not the output.
 - **Headings that something reads.** A heading that a test, a persona, a predicate or a link reads keeps its text. Before you change a heading, search the repository for its text and its anchor. If the lint finds a house-list word in such a heading, the batch lists the finding as an accepted exception.
 
+## Patterns for a sentence that is not a fact
+
+The lint bans the modal verbs "would", "could", "should", "may" and "might". A rewrite must not turn a sentence that is not a fact into a statement of fact. Use these six patterns.
+
+1. **Counterfactual.** State what happened. Then state the case that did not happen, with "If" or as a risk.
+2. **Proposal or unbuilt design.** State the status. Write "The design proposes that the planner does X" or "(proposed) The planner does X".
+3. **Estimate.** State that it is an estimate. Write "The estimate is a 30-60% reduction".
+4. **Defect that was fixed.** Use the past tense and name the fix. Write "Before the fix, macOS path aliases bypassed the repository write deny."
+5. **Rule.** A permission uses "is allowed to". Advice uses "it is recommended that". A prohibition uses "must not".
+6. **Condition.** A rule that runs on a condition keeps the form "When X, Y".
+
+Pattern 1 example: "The audit refused the change, so Ship did not commit it. The risk was that Ship commits what the audit refused." Do not write "So Ship committed what the audit refused." That sentence is false.
+
+Pattern 3 example: do not write "The change reduces the cost 30-60%".
+
+Pattern 4 rule: do not state a fixed defect as a present possibility. "Can" stays correct for a possibility that exists now.
+
+Pattern 5 rule: "must" stays only where the old text was an obligation. "Can" stays for a possibility, as in the "Verbs and tenses" rules. Use "is allowed to" only for a rule that replaces "may".
+
+A heading follows the same patterns. A heading that gives advice says so, for example "Recommended first step for the next session".
+
 ## House list of words to replace
 
 The lint reads this table, and it does not check the words of this table in this document. The left column is a word or phrase that this repository often uses and that STE does not approve. The right column gives the approved alternatives. The lint matches the left column as whole words, without regard to case, outside code, links and quotations.

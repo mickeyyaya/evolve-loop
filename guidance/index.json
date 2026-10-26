@@ -1,0 +1,417 @@
+{
+  "schema": "evolve.guidance.index-file/1",
+  "entries": [
+    {
+      "id": "kill-guard-never-mutated",
+      "layer": "L0",
+      "kind": "rule",
+      "summary": "Never mutate or run a live kill guard. Inject the signal sender, so that a test cannot kill a real process.",
+      "bytes": 571,
+      "path": "guidance/rules/kill-guard-never-mutated.md",
+      "audience": [
+        "all"
+      ],
+      "families": [],
+      "phases": [],
+      "triggers": {
+        "paths": [],
+        "actions": [],
+        "tasks": [],
+        "failures": []
+      },
+      "enforced_by": []
+    },
+    {
+      "id": "no-broad-pkill",
+      "layer": "L0",
+      "kind": "rule",
+      "summary": "Never kill processes by a command pattern on the shared host. Kill only the process ids that you started.",
+      "bytes": 549,
+      "path": "guidance/rules/no-broad-pkill.md",
+      "audience": [
+        "all"
+      ],
+      "families": [],
+      "phases": [],
+      "triggers": {
+        "paths": [],
+        "actions": [],
+        "tasks": [],
+        "failures": []
+      },
+      "enforced_by": []
+    },
+    {
+      "id": "pipeline-only-controller",
+      "layer": "L0",
+      "kind": "rule",
+      "summary": "No LLM starts or directs another LLM. A phase agent starts only through the native bridge of the pipeline.",
+      "bytes": 778,
+      "path": "guidance/rules/pipeline-only-controller.md",
+      "audience": [
+        "all"
+      ],
+      "families": [],
+      "phases": [],
+      "triggers": {
+        "paths": [],
+        "actions": [],
+        "tasks": [],
+        "failures": []
+      },
+      "enforced_by": [
+        "go/internal/guards/phase.go"
+      ]
+    },
+    {
+      "id": "phase-order",
+      "layer": "L0",
+      "kind": "rule",
+      "summary": "Run the phases in the order Scout, Build, Audit, Ship. Never skip a phase, and never ignore a kernel-gate failure.",
+      "bytes": 483,
+      "path": "guidance/rules/phase-order.md",
+      "audience": [
+        "all"
+      ],
+      "families": [],
+      "phases": [],
+      "triggers": {
+        "paths": [],
+        "actions": [],
+        "tasks": [],
+        "failures": []
+      },
+      "enforced_by": [
+        "go/internal/core/statemachine.go"
+      ]
+    },
+    {
+      "id": "commit-through-ship",
+      "layer": "L0",
+      "kind": "rule",
+      "summary": "Commit and push only through evolve ship. The ship gate denies a bare git commit and a bare git push.",
+      "bytes": 468,
+      "path": "guidance/rules/commit-through-ship.md",
+      "audience": [
+        "all"
+      ],
+      "families": [],
+      "phases": [],
+      "triggers": {
+        "paths": [],
+        "actions": [],
+        "tasks": [],
+        "failures": []
+      },
+      "enforced_by": [
+        "go/internal/guards/ship.go"
+      ]
+    },
+    {
+      "id": "builder-worktree-only",
+      "layer": "L0",
+      "kind": "rule",
+      "summary": "The builder writes only inside the worktree that the runtime provisions. An agent never runs git worktree.",
+      "bytes": 482,
+      "path": "guidance/rules/builder-worktree-only.md",
+      "audience": [
+        "all"
+      ],
+      "families": [],
+      "phases": [],
+      "triggers": {
+        "paths": [],
+        "actions": [],
+        "tasks": [],
+        "failures": []
+      },
+      "enforced_by": [
+        "go/internal/guards/role.go"
+      ]
+    },
+    {
+      "id": "ship-needs-egps-verdict",
+      "layer": "L0",
+      "kind": "rule",
+      "summary": "Ship only when the EGPS verdict has a red count of zero. Never edit the hash-chained ledger by hand.",
+      "bytes": 523,
+      "path": "guidance/rules/ship-needs-egps-verdict.md",
+      "audience": [
+        "all"
+      ],
+      "families": [],
+      "phases": [],
+      "triggers": {
+        "paths": [],
+        "actions": [],
+        "tasks": [],
+        "failures": []
+      },
+      "enforced_by": []
+    },
+    {
+      "id": "never-fabricate-results",
+      "layer": "L0",
+      "kind": "rule",
+      "summary": "Never fabricate a cycle number, a test count or a verdict. Report only what a command printed.",
+      "bytes": 443,
+      "path": "guidance/rules/never-fabricate-results.md",
+      "audience": [
+        "all"
+      ],
+      "families": [],
+      "phases": [],
+      "triggers": {
+        "paths": [],
+        "actions": [],
+        "tasks": [],
+        "failures": []
+      },
+      "enforced_by": []
+    },
+    {
+      "id": "dev-on-branches",
+      "layer": "L0",
+      "kind": "rule",
+      "summary": "Do all development on a branch in a worktree, never on main. Main is the integration branch only.",
+      "bytes": 459,
+      "path": "guidance/rules/dev-on-branches.md",
+      "audience": [
+        "all"
+      ],
+      "families": [],
+      "phases": [],
+      "triggers": {
+        "paths": [],
+        "actions": [],
+        "tasks": [],
+        "failures": []
+      },
+      "enforced_by": []
+    },
+    {
+      "id": "code-zero-comments",
+      "layer": "L0",
+      "kind": "rule",
+      "summary": "Code has no comments. Names, types and tests explain the code, and a design reason goes to the package note.",
+      "bytes": 572,
+      "path": "guidance/rules/code-zero-comments.md",
+      "audience": [
+        "all"
+      ],
+      "families": [],
+      "phases": [],
+      "triggers": {
+        "paths": [],
+        "actions": [],
+        "tasks": [],
+        "failures": []
+      },
+      "enforced_by": [
+        "go/internal/commitgate/comments_added.go"
+      ]
+    },
+    {
+      "id": "docs-through-docs-write",
+      "layer": "L0",
+      "kind": "rule",
+      "summary": "Write each document through the docs-write skill. The new text passes evolve docs ste-lint --strict.",
+      "bytes": 605,
+      "path": "guidance/rules/docs-through-docs-write.md",
+      "audience": [
+        "all"
+      ],
+      "families": [],
+      "phases": [],
+      "triggers": {
+        "paths": [],
+        "actions": [],
+        "tasks": [],
+        "failures": []
+      },
+      "enforced_by": [
+        "go/internal/stelint"
+      ]
+    },
+    {
+      "id": "cli-only-no-mcp",
+      "layer": "L0",
+      "kind": "rule",
+      "summary": "Reach each outside service through a CLI, never through MCP. Build a CLI when a service has none.",
+      "bytes": 435,
+      "path": "guidance/rules/cli-only-no-mcp.md",
+      "audience": [
+        "all"
+      ],
+      "families": [],
+      "phases": [],
+      "triggers": {
+        "paths": [],
+        "actions": [],
+        "tasks": [],
+        "failures": []
+      },
+      "enforced_by": []
+    },
+    {
+      "id": "findings-go-to-docs",
+      "layer": "L0",
+      "kind": "rule",
+      "summary": "Put research, lessons and failed approaches under docs/. Never delete a document; archive it.",
+      "bytes": 508,
+      "path": "guidance/rules/findings-go-to-docs.md",
+      "audience": [
+        "all"
+      ],
+      "families": [],
+      "phases": [],
+      "triggers": {
+        "paths": [],
+        "actions": [],
+        "tasks": [],
+        "failures": []
+      },
+      "enforced_by": []
+    },
+    {
+      "id": "no-ambient-control",
+      "layer": "L0",
+      "kind": "rule",
+      "summary": "Read no control value from the environment. An operator setting lives in policy.json, and a bypass is a CLI parameter.",
+      "bytes": 454,
+      "path": "guidance/rules/no-ambient-control.md",
+      "audience": [
+        "all"
+      ],
+      "families": [],
+      "phases": [],
+      "triggers": {
+        "paths": [],
+        "actions": [],
+        "tasks": [],
+        "failures": []
+      },
+      "enforced_by": []
+    },
+    {
+      "id": "no-feature-flags",
+      "layer": "L0",
+      "kind": "rule",
+      "summary": "Add no feature flag. Select each behavior through configuration data and a design pattern.",
+      "bytes": 519,
+      "path": "guidance/rules/no-feature-flags.md",
+      "audience": [
+        "all"
+      ],
+      "families": [],
+      "phases": [],
+      "triggers": {
+        "paths": [],
+        "actions": [],
+        "tasks": [],
+        "failures": []
+      },
+      "enforced_by": []
+    },
+    {
+      "id": "zero-ship-halt",
+      "layer": "L0",
+      "kind": "rule",
+      "summary": "Stop after two consecutive cycles that ship nothing, and find the root cause in the pipeline.",
+      "bytes": 607,
+      "path": "guidance/rules/zero-ship-halt.md",
+      "audience": [
+        "all"
+      ],
+      "families": [],
+      "phases": [],
+      "triggers": {
+        "paths": [],
+        "actions": [],
+        "tasks": [],
+        "failures": []
+      },
+      "enforced_by": []
+    },
+    {
+      "id": "verify-before-done",
+      "layer": "L0",
+      "kind": "rule",
+      "summary": "Before you claim done, run the check and read its output. Report test counts as N/N PASS.",
+      "bytes": 509,
+      "path": "guidance/rules/verify-before-done.md",
+      "audience": [
+        "all"
+      ],
+      "families": [],
+      "phases": [],
+      "triggers": {
+        "paths": [],
+        "actions": [],
+        "tasks": [],
+        "failures": []
+      },
+      "enforced_by": []
+    },
+    {
+      "id": "read-before-call",
+      "layer": "L0",
+      "kind": "rule",
+      "summary": "Read a module and list its real exports before you call or import it. Never invent an API.",
+      "bytes": 511,
+      "path": "guidance/rules/read-before-call.md",
+      "audience": [
+        "all"
+      ],
+      "families": [],
+      "phases": [],
+      "triggers": {
+        "paths": [],
+        "actions": [],
+        "tasks": [],
+        "failures": []
+      },
+      "enforced_by": []
+    },
+    {
+      "id": "root-cause-no-workaround",
+      "layer": "L0",
+      "kind": "rule",
+      "summary": "Fix the root cause through a redesign. Never apply a workaround that hides a failure.",
+      "bytes": 448,
+      "path": "guidance/rules/root-cause-no-workaround.md",
+      "audience": [
+        "all"
+      ],
+      "families": [],
+      "phases": [],
+      "triggers": {
+        "paths": [],
+        "actions": [],
+        "tasks": [],
+        "failures": []
+      },
+      "enforced_by": []
+    },
+    {
+      "id": "one-home-no-duplicates",
+      "layer": "L0",
+      "kind": "rule",
+      "summary": "Never duplicate logic, settings or prose. Keep each in one home, and generate each copy from it.",
+      "bytes": 464,
+      "path": "guidance/rules/one-home-no-duplicates.md",
+      "audience": [
+        "all"
+      ],
+      "families": [],
+      "phases": [],
+      "triggers": {
+        "paths": [],
+        "actions": [],
+        "tasks": [],
+        "failures": []
+      },
+      "enforced_by": []
+    }
+  ]
+}

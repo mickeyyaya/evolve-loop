@@ -12,7 +12,7 @@ func TestCodeIndexConfig_AbsentBlockResolvesTheCompiledDefaults(t *testing.T) {
 
 	cfg, err := loadCIWatchPolicy(t, `{}`).CodeIndexConfig()
 
-	want := CodeIndexSettings{Backends: []string{"trail"}, IndexDir: "dev/code-index", TrailBin: "dev/.tools/trail/node_modules/.bin/trail"}
+	want := CodeIndexSettings{Backends: []string{"trail"}, IndexDir: "dev/code-index", TrailBin: "dev/.tools/trail/node_modules/.bin/trail", Stale: CodeIndexStaleWarn}
 	if err != nil {
 		t.Fatalf("CodeIndexConfig: %v", err)
 	}
@@ -52,6 +52,7 @@ func TestCodeIndexConfig_RefusesWhatCannotRun(t *testing.T) {
 		"duplicate backend": {`{"code_index":{"backends":["trail","trail"]}}`, `duplicate backend "trail"`},
 		"blank index dir":   {`{"code_index":{"index_dir":" "}}`, "index_dir must not be blank"},
 		"blank trail bin":   {`{"code_index":{"trail_bin":""}}`, "trail_bin must not be blank"},
+		"unknown stale":     {`{"code_index":{"stale":"ignore"}}`, `code_index.stale "ignore": want warn|refuse`},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -86,5 +87,16 @@ func TestCodeIndexPolicy_UnmarshalJSONKeepsEachKnownKey(t *testing.T) {
 	}
 	if !reflect.DeepEqual(block.Backends, []string{"trail"}) || block.IndexDir == nil || *block.IndexDir != "/srv/idx" || block.TrailBin == nil || *block.TrailBin != "/opt/trail" {
 		t.Errorf("block = %+v", block)
+	}
+}
+
+func TestCodeIndexConfig_TheStaleKeyAcceptsWarnAndRefuse(t *testing.T) {
+	t.Parallel()
+	for _, mode := range []string{CodeIndexStaleWarn, CodeIndexStaleRefuse} {
+		cfg, err := loadCIWatchPolicy(t, `{"code_index":{"stale":"`+mode+`"}}`).CodeIndexConfig()
+
+		if err != nil || cfg.Stale != mode {
+			t.Errorf("stale %q: cfg = %+v, err = %v", mode, cfg, err)
+		}
 	}
 }

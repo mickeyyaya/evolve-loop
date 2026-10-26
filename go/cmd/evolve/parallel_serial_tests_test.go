@@ -1,6 +1,8 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestRunGuidance_ARepoRootFailureExitsTwo":                                                         "swaps seam guidanceRepoRoot",
+	"main.TestGuidanceFamilies_NamesEachModelFamilyOnceAndFailsOnABadManifest":                              "swaps seams guidanceManifestNames and guidanceLoadManifest",
 	"main.TestPRRefresh_AConflictOutsideTheGeneratedRegionIsNeverStaged":                                    "swaps seam prRefreshWorktree",
 	"main.TestPRRefresh_AnEntryTheCatalogLacksFailsLoudly":                                                  "swaps seam prRefreshWorktree",
 	"main.TestPRRefresh_EachFailedGitStepFailsTheRefresh":                                                   "swaps seam prRefreshWorktree",
@@ -130,6 +132,7 @@ var serialTests = map[string]string{
 	"main.TestChainStderr_AllTwentyThreeLinesAreByteIdentical":                                              "swaps seam chainBoundaryFleetLaneFn",
 	"main.TestCheckpointUsageReset_IsWiredToTheProductionUsageQuery":                                        "swaps seam usageEvidenceFn",
 	"main.TestClassifyRedRuns_AnUnloadablePolicyClassifiesNothing":                                          "sets env through a helper",
+	"main.TestClihealthUsage_AScreenThatHidesTheDeclaredWindowsExitsOne":                                    "swaps seam clihealthUsagePaneFn",
 	"main.TestClihealthUsage_NoFamilyNamedProbesEveryInstalledOne":                                          "sets env through a helper",
 	"main.TestClihealthUsage_PrintsEachCLIsTypedWindowsAndWritesNothing":                                    "swaps seam clihealthUsagePaneFn",
 	"main.TestClihealthUsage_TheTableNamesEveryWindowAndAFailedProbeExitsOne":                               "swaps seam clihealthUsagePaneFn",

@@ -117,15 +117,16 @@ C and D score 3 for G2, because the per-call latency of `gopls` and the build ti
 | Id | Component | Red test first |
 |---|---|---|
 | K1 | D1–D4: `evolve code` and the trail-code adapter, with a fake backend for tests | a fake backend returns a "tokens saved" line, and `evolve code callers` prints the answer without it |
-| K2 | D5: the index location and the boundary refresh, as a step of `wave next`. The refresh writes only the separate index worktree, never the main tree. A failed refresh is a warning, never a halt. Built 2026-10-17: the step is the verb `code-refresh`, after the merges and the build and before the loop launch. The optional interface `codeindex.Refresher` keeps backends that cannot refresh valid. The spec is [code-index-cli.md](../architecture/code-index-cli.md), section 4. | `wave next --dry-run` lists the refresh step |
+| K2 | D5: the index location and the boundary refresh, as a step of `wave next`. The refresh writes only the separate index worktree, never the main tree. A failed refresh is a warning, never a halt. Built 2026-10-17 and replaced by K6 on 2026-10-26: the step was the verb `code-refresh`, after the merges and the build and before the loop launch. The optional interface `codeindex.Refresher` keeps backends that cannot refresh valid. The spec is [code-index-cli.md](../architecture/code-index-cli.md), section 4. | `wave next --dry-run` lists the refresh step |
 | K3 | D6: the usage log. Built 2026-10-17: `internal/codeindex/usagelog` and `evolve code usage`. The record also holds the argument length (never the argument), the exit code, the hit count, the duration, the cycle and the CLI family. | a call writes one record with its command and phase |
 | K4a | D7: the persona text in `agents/evolve-scout.md`, `agents/evolve-builder.md` and `agents/evolve-debugger.md` | a Go test reads each persona, finds the four commands, and checks that each instruction line has 20 words or fewer |
 | K4b | D7: the gate for K4a | the prompt-regression eval passes, and the G3 waves before and after show no loss |
 | K5 | D8: the removal of the MCP registrations, and a doc note. **Done on 2026-10-17.** The console removed the trail MCP server from the Claude Code user scope and from the agy `mcp_config.json`, with no repo change. The doc note is [cli-only-no-mcp](../conventions/cli-only-no-mcp.md). | `claude mcp list` and `agy mcp list` show no `trail` |
+| K6 | D5.1 to D5.5 of the spec, section 4 (2026-10-26). On 2026-10-26 the index was 5 days and 114 commits behind `main`, because the console refresh was a manual step. `evolve sync-main` now refreshes the index after it merges `main`, with one exit code for each failure, and the K2 step of `wave next` is removed. Each query warns when the index is behind `origin/main`, and the policy key `code_index.stale` can make it refuse. `evolve code refresh` refreshes on demand. The inbox item `code-index-l3-on-demand-entry` names the L3 knowledge layer of the context-index builder as the consumer. | `TestSyncMain_MovesTheCodeIndexWorktreeToTheNewOriginMain` and `TestCodeVerb_AStaleIndexWarnsOnStderrWithTheCountAndStillAnswers` |
 
 ## 7. Order
 
-The order is K1, K3, K2, K4a, K4b, K5.
+The order is K1, K3, K2, K4a, K4b, K5. K6 replaces the K2 step and can land at any point after K2.
 
 1. K1 comes first, because every other component uses the command.
 2. K3 comes next, so the first prompt change has a measure.
