@@ -1,10 +1,10 @@
 # Intent Phase Architecture (v8.19.0)
 
-> The pre-Scout phase that fills Microsoft's User-intent layer in evolve-loop. Opt-in via `EVOLVE_REQUIRE_INTENT=1`. Autonomy-preserving by design.
+> The pre-Scout phase that fills Microsoft's User-intent layer in evolve-loop. Opt-in with `EVOLVE_REQUIRE_INTENT=1`. Autonomy-preserving by design.
 
 ## Why this phase exists
 
-evolve-loop's trust kernel makes cycles correct, audited, and tamper-evident — but doesn't ensure they're pointed at the right thing. The 2026-04 "giant useless circle force-graph" incident burned 25 cycles because the orchestrator inherited a vague goal verbatim. Five 2026 sources (`arxiv 2409.00557`, Karpathy, Microsoft governance, *Prompt Fidelity*, *Intent Architect*) converge on the diagnosis: autonomous agents drift when user intent is left implicit.
+evolve-loop's trust kernel makes cycles correct, audited, and tamper-evident — but does not make sure that they point at the right thing. The 2026-04 "giant useless circle force-graph" incident burned 25 cycles because the orchestrator inherited a vague goal verbatim. Five 2026 sources (`arxiv 2409.00557`, Karpathy, Microsoft governance, *Prompt Fidelity*, *Intent Architect*) converge on the diagnosis: autonomous agents drift when user intent is left implicit.
 
 evolve-loop already encodes 3 of Microsoft's 4 intent layers:
 
@@ -73,7 +73,7 @@ Per the AwN paper, 15.3% of real-world queries are Instructions Beyond Tool Capa
 
 ## ≥1 challenged_premise rule
 
-`gate_intent_to_research` enforces that `challenged_premises` contains at least one entry. This is the kernel-level expression of Karpathy's #1 failure mode prevention: every goal contains assumptions; even "clear" goals need at least one to be surfaced and questioned. Source: arxiv 2303.08769 (Edward Chang on Socratic prompting), Princeton SocraticAI, MARS framework.
+`gate_intent_to_research` enforces that `challenged_premises` contains at least one entry. This is the kernel-level expression of Karpathy's #1 failure mode prevention. Every goal contains assumptions. Even "clear" goals need at least one assumption that the persona surfaces and questions. Source: arxiv 2303.08769 (Edward Chang on Socratic prompting), Princeton SocraticAI, MARS framework.
 
 ## Re-run and ledger-binding
 
