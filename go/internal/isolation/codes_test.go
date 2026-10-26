@@ -31,3 +31,24 @@ func TestInit_RegistersTheNineInvariantCodesInModuleIsolation(t *testing.T) {
 		}
 	}
 }
+
+func TestInit_RegistersTheContextIndexCodesInModuleIsolation(t *testing.T) {
+	t.Parallel()
+	for _, code := range []signalcenter.Code{CodeContextRequiredUnopened, CodeContextBudgetOver} {
+		if m, ok := signalcenter.IsRegistered(code); !ok || m != signalcenter.ModuleIsolation {
+			t.Errorf("%s registered=%v module=%q, want module isolation", code, ok, m)
+		}
+	}
+	if CodeContextRequiredUnopened != "ISOLATION_CONTEXT_REQUIRED_UNOPENED" || CodeContextBudgetOver != "ISOLATION_CONTEXT_BUDGET_OVER" {
+		t.Fatal("each code carries the module prefix ISOLATION_ (cell-context-index.md §6, §8)")
+	}
+}
+
+func TestContextCodes_BelongToModuleIsolation(t *testing.T) {
+	t.Parallel()
+	for _, code := range []signalcenter.Code{CodeContextRequiredUnopened, CodeContextBudgetOver} {
+		if !code.Valid() || !code.BelongsTo(signalcenter.ModuleIsolation) {
+			t.Errorf("%s must be a valid code of module isolation", code)
+		}
+	}
+}

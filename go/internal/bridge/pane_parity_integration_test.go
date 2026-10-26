@@ -88,9 +88,10 @@ func (p parityTarget) goTestArgs() []string {
 }
 
 const (
-	parityDoneMarker  = "PANE-PARITY-DONE"
-	parityDispatchID  = "parity-dispatch"
-	parityManifestKey = "EVOLVE_PARITY_MANIFEST"
+	parityDoneMarker   = "PANE-PARITY-DONE"
+	parityDispatchID   = "parity-dispatch"
+	parityManifestKey  = "EVOLVE_PARITY_MANIFEST"
+	paneParityDeadline = 10 * time.Minute
 )
 
 type testResults map[string]string
@@ -225,7 +226,7 @@ func runInPane(t *testing.T, probe sandbox.ProbeResult, target parityTarget, mut
 	}
 	session := itSession("parity")
 	t.Cleanup(func() { _ = itTmuxCtl.KillSession(context.Background(), session) })
-	_, code, err := bootTmuxREPL(context.Background(), cfg, deps, itLaunch(session, "/bin/sh "+shellQuotePOSIX(file("parity.sh")), parityDoneMarker, 0, false),
+	_, code, err := bootTmuxREPL(itBoundedContext(t, paneParityDeadline), cfg, deps, itLaunch(session, "/bin/sh "+shellQuotePOSIX(file("parity.sh")), parityDoneMarker, 0, false),
 		replPreparation{prefix: "[parity]", workingDir: filepath.Join(cfg.ProjectRoot, "go")}, nil)
 	if err != nil || code != ExitOK {
 		t.Fatalf("the pane run of %s did not finish: code=%d err=%v", target.pkg, code, err)

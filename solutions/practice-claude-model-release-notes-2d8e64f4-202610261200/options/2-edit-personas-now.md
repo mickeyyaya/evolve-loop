@@ -1,0 +1,24 @@
+# Option 2 — edit the affected personas now
+
+All numbers cite `assumptions-and-evidence.md`.
+
+## What changes, for whom
+
+Add a rule on API version 2026-10-21 and on profile enforcement to the builder and auditor personas. The phase agents then state how to behave when a request fails with a restriction or when an SDK upgrade breaks a call.
+
+## Causal chain to the goal metric
+
+New rules steer a phase around a platform change, so fewer failed requests. The chain needs a baseline to show a gain.
+
+## Quantified expected effect
+
+Unknown. No baseline exists (E6: M2 is not recorded), so no gain or loss can be measured (A3). The two edits break the one-persona-per-change rule (E3).
+
+## Cost and time to effect
+
+10 + 10 cycles of D8 measures for each persona (E3, E8). The effect shows after at least 20 cycles.
+
+## Top two risks
+
+1. The rules add prompt bytes for a surface the loop does not use (E4). Detection: the D8 token measure.
+2. Two simultaneous edits hide which one moved a measure. Detection: none after the fact, so the rule forbids it (E3).

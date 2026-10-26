@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "A new test in cmd/evolve (for example TestE2EProject_GitHasNoMaintenance) asserts that the e2e project repo has maintenance.auto=false and gc.auto=0",
+    "cmd/evolve/e2e_cycle_cli_matrix_test.go has no rawgitratchet allowance left",
+    "The e2e tier passes on macOS, and so do the rawgitratchet and repocontract packages"
+  ],
+  "created_at": "2026-10-26T13:00:04Z",
+  "deps": [],
+  "files": [
+    "go/cmd/evolve/e2e_cycle_cli_matrix_test.go",
+    "go/internal/rawgitratchet/baseline.json"
+  ],
+  "fix": "Replace gitInit with an internal/gittest repository, and drop its entry from go/internal/rawgitratchet/baseline.json. If the e2e project cannot use gittest, apply gittest.MaintenanceConfig to it instead.",
+  "id": "flake-e2e-fallback-raw-git-tempdir-cleanup",
+  "kind": "bug",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "source": "console, 2026-10-26, flaky-test census (docs/research/flaky-tests-2026-10.md)",
+  "summary": "Rank 5 of the flaky-test census (docs/research/flaky-tests-2026-10.md F4.5): 2 reds on macOS (0.24%), about 113 runner minutes. Runs 40217469193 (#1128), 40230631208 (main). Message: testing.go:1232: TempDir RemoveAll cleanup: unlinkat .../001/.git: directory not empty. The e2e project is a raw git repository (gitInit at cmd/evolve/e2e_cycle_cli_matrix_test.go:451, one rawgitratchet allowance). internal/gittest prevents this class with maintenance.auto=false and gc.auto=0. The consumed item tempdir-cleanup-vs-git-flake (2026-09-11) is the same class.",
+  "title": "TestE2ECLIFallbackChain flakes on macOS: a git maintenance child writes .git while t.TempDir removes it",
+  "weight": 0.50
+}

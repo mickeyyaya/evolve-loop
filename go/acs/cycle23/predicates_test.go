@@ -71,17 +71,6 @@ func TestC23_005_ControlFlagsMdHasNoDeadRows(t *testing.T) {
 	}
 }
 
-func TestC23_006_WorktreePathStillInRegistry(t *testing.T) {
-	const worktreePath = "EVOLVE_WORKTREE_PATH"
-	if _, ok := flagregistry.Lookup(worktreePath); !ok {
-		t.Errorf("RED: flagregistry.Lookup(%q) returned ok=false — WORKTREE_PATH removed.\n"+
-			"Builder MUST NOT remove EVOLVE_WORKTREE_PATH from registry_table.go.\n"+
-			"It is a live IPC handoff (agents/evolve-tester.md) pinned by C50_009.\n"+
-			"Correct retirement is cluster-10 split-const (explicitly deferred).",
-			worktreePath)
-	}
-}
-
 func TestC23_007_NoRemovedFlagRefsInAgentsOrSkills(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)

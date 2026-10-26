@@ -54,11 +54,21 @@ The heal does not check for a dirty plane tree. The build uses the working tree,
 | 10 | `error: "usage: …"` | A bad argument. | Fix the arguments. |
 | other | `failed_step`, `error` | A step failed with this exit code. The wave is not recorded, and the notes stay. | Fix the cause, then run step 2 again. A failure before the brake release leaves the brake on, which is the safe state. |
 
-### The code index step
+### The code index refresh
 
-`wave next` has one step, "refresh the code index", after the build and the `doctor live` checks and before the loop launch. It moves the index worktree (`code_index.index_dir`, `dev/code-index` by default) to `origin/main` and runs the incremental `trail build`. Lanes then start on a fresh index. The step writes only the index worktree.
+The code index refresh is part of `sync-main`. It is not a separate step, and the console does not run `git` in `dev/code-index` by hand. After `sync-main` merges `main`, it moves the index worktree (`code_index.index_dir`, `dev/code-index` by default) to `origin/main`, detached. Then it runs the incremental `trail build`. Lanes thus start on a fresh index. The refresh writes only the index worktree ([code-index-cli.md](../architecture/code-index-cli.md) §4).
 
-A failed refresh prints `evolve wave: WARN: code index not refreshed: <reason>` on stderr. It never stops the wave. The agents then use `grep`, as they do when no index exists. To repair the index, fix the cause in the message and run `evolve wave next` again at the next boundary.
+| `sync-main` exit | Cause | Next action |
+|---|---|---|
+| 0, with `sync-main: moved the code index …` | The index is at `origin/main`. | none |
+| 0, with `sync-main: no code index to refresh: …` | The host has no index worktree. | none. The agents use `grep`. |
+| 22 | The index worktree has a change that is not `.gitignore` or `.ignore`. Nothing was reset. | Read the named paths. Keep or remove each change by hand, then run `evolve code refresh`. |
+| 23 | `git fetch origin main` failed in the index worktree. | Fix the network or the remote, then run `evolve code refresh`. |
+| 1, after the line `sync-main: reconciled …` | A guard, a policy error, a failed checkout or rebuild, or the deadline of 5 minutes. | Fix the cause in the message, then run `evolve code refresh`. |
+
+When the refresh fails, the merge is already done. The step fails, and the brake stays on. After `evolve code refresh` exits 0, run the boundary again without `--merge`.
+
+`evolve code refresh [--json]` runs the same refresh at any time. Each `evolve code` query prints a WARN on stderr when the index is behind `origin/main`.
 
 ### What the loop reads at the boundary
 
