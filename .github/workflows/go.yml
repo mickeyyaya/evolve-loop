@@ -165,6 +165,7 @@ jobs:
             echo "::warning::hostsampler build failed; the run has no runner samples"
           fi
       - name: test the darwin set (go/.darwin-set; race + cover, incl. integration tier)
+        timeout-minutes: 30
         env:
           TEST_JSON: test-integration.json
           TEST_RUSAGE: '1'
