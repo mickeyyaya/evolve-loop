@@ -220,6 +220,7 @@ var serialTests = map[string]string{
 	"main.TestCmd_InboxWithdraw_RefusesAClaimedRoutedOrConsumedItem":                                        "sets env through a helper",
 	"main.TestCmd_InboxWithdraw_RefusesAMalformedRequest":                                                   "sets env through a helper",
 	"main.TestCmd_InboxWithdraw_RemovesAPendingItemAndAddFilesTheIDAgain":                                   "sets env through a helper",
+	"main.TestAgentRun_EachDiffReviewerRunsOnANonClaudeFamily":                                              "assigns runner.DefaultRouter",
 	"main.TestCompose_CycleFlag_ARefusedDerivationRunsNoPhase":                                              "assigns runner.DefaultRouter",
 	"main.TestCompose_CycleFlag_RunsEveryPhaseWithTheOneDerivedRequest":                                     "assigns runner.DefaultRouter",
 	"main.TestCompose_DryRun_NoExecution":                                                                   "assigns runner.DefaultRouter",

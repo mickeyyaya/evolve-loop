@@ -1,0 +1,19 @@
+{
+  "name": "code-simplifier",
+  "catalog": "on-demand",
+  "archetype": "plan",
+  "optional": true,
+  "agent": "evolve-diff-code-simplifier",
+  "description": "diff-scoped simplification of a change that keeps its behavior; a read-only seat reports each edit as a patch",
+  "when_to_use": "never selected: an operator or the console runs it with `evolve agent run code-simplifier` and the diff as the input",
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/diff-code-simplifier-report.md"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "Simplifications"
+    ]
+  }
+}

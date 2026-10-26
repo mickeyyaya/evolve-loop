@@ -1,0 +1,44 @@
+{
+  "name": "diff-architecture-reviewer",
+  "role": "diff-architecture-reviewer",
+  "cli": "codex-tmux",
+  "cli_fallback": [
+    "claude-tmux"
+  ],
+  "model_tier_default": "deep",
+  "model_tier_envelope": {
+    "min": "deep",
+    "default": "deep",
+    "max": "deep"
+  },
+  "allowed_tools": [
+    "Read",
+    "Grep",
+    "Glob",
+    "Bash"
+  ],
+  "disallowed_tools": [
+    "Edit",
+    "Write"
+  ],
+  "max_budget_usd": 2.0,
+  "max_turns": 30,
+  "output_artifact": "diff-architecture-reviewer-report.md",
+  "challenge_token_required": true,
+  "parallel_eligible": false,
+  "sandbox": {
+    "enabled": true,
+    "write_subpaths": [
+      ".evolve/runs/cycle-*"
+    ],
+    "read_only_repo": true,
+    "deny_subpaths": [
+      ".evolve/state.json",
+      ".evolve/ledger.jsonl",
+      ".evolve/profiles",
+      ".evolve/evals"
+    ],
+    "allow_network": false
+  },
+  "generated_from": "hand-authored"
+}
