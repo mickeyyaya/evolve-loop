@@ -13,7 +13,7 @@ point-fixes, not a designed protocol — and shows precisely where the seams lea
 
 While measuring pipeline latency (ADR-0043 A0 boot_ms), a measured cycle (262) was run with a trivial,
 real goal: register a `chore(build)` entry in `.evolve/commit-prefix-scope.json`. The cycle **failed**.
-The operator asked three questions, each answered by evidence below, and then asked for a solution from an
+The operator asked three questions, and the evidence below answers each one. The operator then asked for a solution from an
 **AI-driven design** and a **clean-code / design-pattern architecture** perspective. This doc is that answer.
 
 ## 2. What actually happened (the cycle-262 incident)
@@ -35,48 +35,61 @@ Three independent failures stacked into one cycle death:
 so on the build-phase launch (14:33:06) codex auto-ran `brew upgrade --cask codex` (`/opt/homebrew/Caskroom/codex/0.138.0/`
 created 14:33), printed `"🎉 Update ran successfully! Please restart Codex"`, and **exited**. The bridge then
 nudged a bare `zsh` shell (`command not found: Please`). This is interactive-TUI-only behavior — the headless
-`codex exec` path (`driver_codex.go`) would not trigger it; the loop's builder uses the `codex-tmux` REPL path.
+`codex exec` path (`driver_codex.go`) does not trigger it; the loop's builder uses the `codex-tmux` REPL path.
 
 ### 2b. retro was dispatched with an invalid model (D3)
 The retro pane captured the fatal state: `"There's an issue with the selected model (auto). It may not exist
-or you may not have access to it. Run /model to pick a different model."` — `Brewed for 0s`. scout/tdd got
-concrete models (`claude --model sonnet`, `claude --model opus`) from per-phase routing and worked; **retro was
-never assigned a concrete model**, so it fell through to the literal `auto`, and the `claude-tmux` driver passed
+or you may not have access to it. Run /model to pick a different model."` — `Brewed for 0s`.
+
+Per-phase routing gave scout/tdd concrete models (`claude --model sonnet`, `claude --model opus`), and they worked.
+**Retro never received a concrete model**, so it fell through to the literal `auto`. The `claude-tmux` driver passed
 `--model auto` verbatim. `auto` is a *settings* concept, **not a valid `claude --model` CLI value**. The codex
-driver guards exactly this (`driver_codex.go:48` — `case resolved=="" || resolved=="auto": omit`); the
+driver guards exactly this (`driver_codex.go:48` — `case resolved=="" || resolved=="auto": omit`). The
 `claude-tmux` driver has **no equivalent guard**.
 
 ### 2c. the successful build was never recorded — so the cycle "failed" (D1, the critical one)
-The codex build attempt hit `exit 81` (artifact timeout); the configured CLI fallback to `claude-tmux`
-**succeeded** (`dispatch chain: codex-tmux=81 -> claude-tmux=0`), wrote a valid `build-report.md` (`**Status:**
-PASS`), and **actually accomplished the goal** (`chore(build)` is present in the manifest). Yet:
+The codex build try hit `exit 81` (artifact timeout). The configured CLI fallback to `claude-tmux`
+**succeeded** (`dispatch chain: codex-tmux=81 -> claude-tmux=0`). It wrote a valid `build-report.md` (`**Status:**
+PASS`) and **actually accomplished the goal** (`chore(build)` is present in the manifest). Yet:
 - there is **no `build-usage.json`**,
 - **no `build` entry in `phase-timing.json`** (only `scout`, `tdd`, `retro`),
 - **no recorded build verdict**.
 
-So the orchestration spine saw `build` as not-completed, **skipped audit** (`ship ⇒ build ∧ audit` could not
-advance), routed to retro as a failed cycle, and the failure-learning logged `cycle-262-failed-build`. **The
+So the orchestration spine saw `build` as not-completed. It **skipped audit** (`ship ⇒ build ∧ audit` cannot
+advance). It routed to retro as a failed cycle. The failure-learning logged `cycle-262-failed-build`. **The
 work was done; only the recording was missing.**
 
-**Mechanism located (2026-06-10, Slice 1 locate-the-fork — supersedes the paragraph above's implicit guess
-that the fallback wasn't reconciled):** the loop log proves the runner's fallback chain worked end-to-end
+**Mechanism located (2026-06-10, Slice 1 locate-the-fork). This supersedes the implicit guess of the paragraph above
+that the fallback was not reconciled.** The loop log proves that the fallback chain of the runner worked end-to-end
 (`dispatch chain: codex-tmux=81 -> claude-tmux=0`; Classify ran; the runner returned PASS with nil error).
+
 What erased the record: the claude fallback builder wrote the tracked config
-`.evolve/commit-prefix-scope.json` into the **main tree** instead of its worktree; `recoverBuildLeak`
-deliberately never relocates `.evolve/` paths (they're normally runtime state, orchestrator.go:622), so the
-post-phase **tree-diff guard correctly aborted the cycle** (`leaked paths: [.evolve/commit-prefix-scope.json]`
-is the cycle's final error) — and that abort path, like *every* abort path between `runner.Run` returning and
-the orchestrator's single happy-path recording site (~9 paths: review-gate reject, correction failures,
-ship-error recovery, leak-recovery failure, tree-guard, ledger/state persistence failures), returned
-**without recording the outcome** — no timing entry, no usage sidecar, no `PhasesRun` membership. The guard
-was right; erasing the evidence was the defect. (Adjacent finding, not D1: the guard system has a blind spot
-for builders whose *legitimate deliverable* is a tracked `.evolve/` config — relocation skips it by design,
-so such a build can only ever abort. Tracked as a C3-era question.)
+`.evolve/commit-prefix-scope.json` into the **main tree** and not into its worktree. `recoverBuildLeak`
+deliberately never relocates `.evolve/` paths (they are normally runtime state, orchestrator.go:622). The
+post-phase **tree-diff guard therefore correctly aborted the cycle** (`leaked paths: [.evolve/commit-prefix-scope.json]`
+is the final error of the cycle).
+
+That abort path returned **without recording the outcome**. So did *every* abort path between the return of `runner.Run` and
+the single happy-path recording site of the orchestrator.
+There was no timing entry, no usage sidecar and no `PhasesRun` membership. About 9 paths are affected:
+
+- review-gate reject;
+- correction failures;
+- ship-error recovery;
+- leak-recovery failure;
+- tree-guard;
+- ledger/state persistence failures.
+
+The guard was right. Erasing the evidence was the defect.
+
+Adjacent finding, not D1: the guard system has a blind spot
+for builders whose *legitimate deliverable* is a tracked `.evolve/` config. Relocation skips it by design,
+so such a build can only ever abort. Tracked as a C3-era question.
 
 ### Cost of the two slow-fails
-codex-dead (2a) burned ~20 min and retro-model-error (2b) burned ~20 min — each ran to the `maxExtends`
-backstop (`tmuxArtifactTimeoutS=300` × ~4) because **nothing recognizes a self-describing fatal pane state**.
-~40 min of a ~52 min cycle was spent waiting on failures that were deterministically detectable on sight.
+codex-dead (2a) burned ~20 min and retro-model-error (2b) burned ~20 min. Each ran to the `maxExtends`
+backstop (`tmuxArtifactTimeoutS=300` × ~4), because **nothing recognizes a self-describing fatal pane state**.
+The cycle spent ~40 min of ~52 min on failures that were deterministically detectable on sight.
 
 ## 3. Defect taxonomy
 
@@ -93,16 +106,16 @@ backstop (`tmuxArtifactTimeoutS=300` × ~4) because **nothing recognizes a self-
 ## 4. Root cause: recovery is an un-owned cross-cutting concern
 
 Every defect above is a symptom of one architectural fact: **recovery logic is smeared across five
-modules with no single owner**, and each assumes another layer will catch the failure:
+modules with no single owner**. Each module assumes that another layer catches the failure:
 
 - `bridge/driver_tmux_repl.go` — artifact-wait + `maxExtends` backstop (but no fatal-state classification)
-- `phases/runner/runner.go` — `cli_fallback` dispatch (but the fallback's success isn't reconciled)
+- `phases/runner/runner.go` — `cli_fallback` dispatch (but the success of the fallback is not reconciled)
 - `core/orchestrator.go` — verdict recording, spine advance, failure-adapter (but only for the primary path)
 - `core/observer.go` + `phaseobserver/` — stall *detection* (but no corrective action)
 - `phases/ship/` repair ladder — typed repairs (but only for ship error codes)
 
-Because no component owns "given a dispatch result, did this phase succeed, and is that success recorded?",
-the answer can diverge from reality. cycle-262 is the proof: **the process succeeded and the record said
+No component owns "given a dispatch result, did this phase succeed, and is that success recorded?".
+The answer can therefore diverge from reality. cycle-262 is the proof: **the process succeeded and the record said
 failure.** A correctly-architected recovery layer makes that divergence structurally impossible.
 
 ## 5. AI-driven design principles (the governing lens)
@@ -115,8 +128,9 @@ failure.** A correctly-architected recovery layer makes that divergence structur
    `claude booted into an inaccessible-model error` is. Untyped terminal states are why D1/D2 leaked.
 3. **Outcome-orientation, not process-orientation.** Recovery reconciles to a **recorded verdict**, never to
    "the process exited 0." D1 is the canonical violation of this.
-4. **Self-learning tail.** When a *novel* pane state appears, the LLM classifies it once; that classification is
-   **promoted into the deterministic signature registry** so next time it is a fast deterministic catch.
+4. **Self-learning tail.** When a *novel* pane state appears, the LLM classifies it once.
+   The system **promotes that classification into the deterministic signature registry**.
+   Next time it is a fast deterministic catch.
    Judgment at the frontier, determinism in the core — and the frontier shrinks over time.
 
 ## 6. Solution architecture
@@ -125,10 +139,10 @@ Introduce **one owner**: a *Phase Recovery Pipeline* whose single responsibility
 produce a reconciled `PhaseOutcome` or a typed terminal failure."* It is assembled from standard patterns.
 
 ### C1 — Single-source outcome recording (DRY chokepoint) → fixes D1 — ✅ SHIPPED 2026-06-10 (as-located)
-The design sketch below predates locate-the-fork; the shipped shape moved the chokepoint to where the fork
-actually is — the **orchestrator**, whose phase iteration had ONE recording site on the happy path and ~9
-abort returns before it (the runner already reconciles every dispatch route correctly, including
-fallback-success and reconcile-on-timeout):
+The design sketch below predates locate-the-fork. The shipped shape moved the chokepoint to where the fork
+actually is: the **orchestrator**. Its phase iteration had ONE recording site on the happy path and ~9
+abort returns before it. The runner already reconciles every dispatch route correctly, including
+fallback-success and reconcile-on-timeout:
 
 ```
 BEFORE (recording is happy-path-only)                AFTER (one chokepoint, every terminal disposition)
@@ -139,19 +153,22 @@ BEFORE (recording is happy-path-only)                AFTER (one chokepoint, ever
   ledger/state fail    ─► (nothing) ──► ✗ LOST        guard/persist abort─┘          + <phase>-usage.json (+abort_reason)
 ```
 
-As built: `go/internal/recovery/` leaf package owns the `PhaseOutcome` envelope;
-`core.phaseOutcomeFrom(phase, resp, attempts, abortReason)` owns the reconciliation rule (canonical agent
-verdict recorded as-is; anything else synthesizes FAIL — **never PASS**); the verdict stays the agent's own on
-abort paths, with the abort recorded as additive `abort_reason` (omitempty) in both artifacts. Since 2026-09-13
-(cycles 1634/1636) the timing record also carries the phase's OWN `diagnostics` (severity + message, as the
-`PhaseResponse` reported them, omitempty): a phase that returns FAIL by its own Classify seals with the reason it
-gave — the seal (`backfillFailReasons`), the chokepoint log line and `cyclehealth` all read that one field —
-instead of the synthesized "phase-infra class" marker, which is now reserved for a FAIL that recorded nothing.
-Aborted-but-dispatched phases now appear in `PhasesRun`. **This makes the 262-class divergence structurally impossible** —
-the faithful 262 replay (test `TestPhaseOutcome_TreeGuardAbort_RecordsBuildOutcome`) still fails the cycle on
-the genuine leak (the guard is right) but records build's PASS + cost + timing, so a salvage needs no forensic
-reconstruction. Deferred to the C3 slice: `resume.go` is a second, simpler recording boundary (writes no
-timings/sidecars at all) to be unified through the same chokepoint.
+As built:
+
+- The `go/internal/recovery/` leaf package owns the `PhaseOutcome` envelope.
+- `core.phaseOutcomeFrom(phase, resp, attempts, abortReason)` owns the reconciliation rule. The rule records a canonical agent verdict as-is. Anything else synthesizes FAIL — **never PASS**.
+- The verdict stays the agent's own on abort paths. The abort is recorded as additive `abort_reason` (omitempty) in both artifacts.
+
+Since 2026-09-13 (cycles 1634/1636) the timing record also carries the OWN `diagnostics` of the phase (severity + message, as the
+`PhaseResponse` reported them, omitempty). A phase that returns FAIL by its own Classify seals with the reason it
+gave. The seal (`backfillFailReasons`), the chokepoint log line and `cyclehealth` all read that one field.
+The synthesized "phase-infra class" marker is now reserved for a FAIL that recorded nothing.
+
+Aborted-but-dispatched phases now appear in `PhasesRun`. **This makes the 262-class divergence structurally impossible.**
+The faithful 262 replay (test `TestPhaseOutcome_TreeGuardAbort_RecordsBuildOutcome`) still fails the cycle on
+the genuine leak (the guard is right). But it records the PASS + cost + timing of build, so a salvage needs no forensic
+reconstruction. Deferred to the C3 slice: `resume.go` is a second, simpler recording boundary (it writes no
+timings/sidecars at all). The slice unifies it through the same chokepoint.
 
 ### C2 — Terminal-state classification (Template Method hook + Strategy) → fixes D2, D3 — ✅ SHIPPED 2026-06-10 (as-built below)
 The tmux driver already *is* a Template Method (`driver_tmux_repl.go`). The design sketch:
@@ -165,17 +182,15 @@ Known-fatal causes → **fast-fail with a typed cause** (no `maxExtends` backsto
 (`auto` → omit or concrete) becomes a per-driver **`ModelFlagPolicy`** (Strategy): codex already has it,
 claude-tmux gets the same. Adding a CLI ⇒ a new policy, zero edits elsewhere (Open/Closed).
 
-**As built:** the typed-cause registry is `recovery.FatalPaneDetector` (`internal/recovery/detector.go` —
-the single recovery owner, not a per-driver hook), seeded with the three cycle-262 signatures and consulted
-by `bridge.fatalPaneVerdict` at the stop-review checkpoint **before** the reviewer — load-bearing ordering,
-because the dead panes counted as "progressed" (the bridge's own nudge echoed into them), so a post-reviewer
-check would never fire. Stage-gated by `EVOLVE_PHASE_RECOVERY` (off | **shadow default** | enforce; typo→off;
-classification always-on above off, only the kill is staged); a Busy pane is never preempted; the one-shot
-nudge is now gated on `ReviewPause` so a fatal `ReviewStop` exits immediately (exit 81 → the runner's
-fallback chain takes over — cycle-262's rescue, ~20 min sooner). `ModelFlagPolicy` landed at the **realizer
-chokepoint** (`realizeScalar`: post-resolution `auto` emits no model param on any channel) — one matrix-wide
-guard instead of N per-driver copies; the headless codex driver keeps its exec-path guard. The per-driver
-`ClassifyTerminal` hook was deliberately NOT added yet — no consumer; it rides with C3 if the chain needs it.
+**As built:**
+
+- The typed-cause registry is `recovery.FatalPaneDetector` (`internal/recovery/detector.go`). It is the single recovery owner, not a per-driver hook. It is seeded with the three cycle-262 signatures.
+- `bridge.fatalPaneVerdict` consults it at the stop-review checkpoint **before** the reviewer. This ordering is load-bearing. The dead panes counted as "progressed" (the nudge of the bridge echoed into them), so a post-reviewer check never fires.
+- `EVOLVE_PHASE_RECOVERY` gates the stage (off | **shadow default** | enforce; typo→off). Classification is always-on above off. Only the kill is staged.
+- The detector never preempts a Busy pane.
+- The one-shot nudge is now gated on `ReviewPause`, so a fatal `ReviewStop` exits immediately (exit 81 → the fallback chain of the runner takes over). This is the rescue of cycle-262, ~20 min sooner.
+- `ModelFlagPolicy` landed at the **realizer chokepoint** (`realizeScalar`: post-resolution `auto` emits no model param on any channel). This is one matrix-wide guard instead of N per-driver copies. The headless codex driver keeps its exec-path guard.
+- The per-driver `ClassifyTerminal` hook was deliberately NOT added yet, because it has no consumer. It rides with C3 if the chain needs it.
 
 ### C3 — Chain of Responsibility for recovery → composes D1–D4 — ✅ SHIPPED 2026-06-10 (as-built below)
 The dispatch result flows through an ordered chain; each handler recovers, passes, or escalates. The design
@@ -185,61 +200,66 @@ sketch named the pre-dispatch guards as links:
 ModelFlagPolicy → FatalPaneDetector → FallbackStrategy(cli/model) → VerdictReconciler → LLMFailureAdvisor (escalate)
 ```
 
-**As built** (`recovery/handler.go`, modeled on `router/recovery.go`): the always-on correctness pieces
-(ModelFlagPolicy at the realizer, VerdictReconciler = the C1 chokepoint, FallbackStrategy = the runner's
-exit-81 chain) stay where the slices put them — they are not runtime *decisions*. The chain owns the
-DECISIONS for a classified terminal state:
+**As built** (`recovery/handler.go`, modeled on `router/recovery.go`): the always-on correctness pieces stay where the slices put them. They are not runtime *decisions*. The pieces are:
+
+- ModelFlagPolicy at the realizer;
+- VerdictReconciler = the C1 chokepoint;
+- FallbackStrategy = the exit-81 chain of the runner.
+
+The chain owns the DECISIONS for a classified terminal state:
 
 ```
 integrity-escalate → busy-extend → known-fatal-kill → stall-budget-extend → unknown-advise (terminal)
 ```
 
 `Recover(RecoverInput) → Decision{Action, Handler, Reason}` — pure, deterministic, every decision justified.
-Consumers: the observer's chain-backed StallPolicy (`NewChainStallPolicy`, injected by the observer
-subprocess ONLY at `EVOLVE_PHASE_RECOVERY=enforce`; advise degrades to escalate there) and the
-orchestrator's escalate→advise→promote hook (`core/failure_hook.go`, `WithFailureAdviser`, enforce-only,
-deterministic-registry-first, best-effort). `config.RolloutStages.PhaseRecovery` is the orchestrator's view
-of the one dial (default shadow); `resume.go` was unified through the C1 chokepoint in the same slice.
-Adding a recovery behavior = adding a handler. The chain *is* the protocol that was missing.
+Consumers:
+
+- The chain-backed StallPolicy of the observer (`NewChainStallPolicy`). The observer subprocess injects it ONLY at `EVOLVE_PHASE_RECOVERY=enforce`. Advise degrades to escalate there.
+- The escalate→advise→promote hook of the orchestrator (`core/failure_hook.go`, `WithFailureAdviser`, enforce-only, deterministic-registry-first, best-effort).
+
+`config.RolloutStages.PhaseRecovery` is the view of the orchestrator on the one dial (default shadow). The same slice unified `resume.go` through the C1 chokepoint.
+To add a recovery behavior, add a handler. The chain *is* the protocol that was missing.
 
 ### C4 — Observer + StallPolicy (Single Responsibility) → fixes D5 — ✅ SHIPPED 2026-06-10 (seam default-nil; real policy wired in C3)
-Keep the Observer as pure detection (it is already a clean Observer pattern emitting `stall_no_output` etc.).
+Keep the Observer as pure detection. It is already a clean Observer pattern that emits `stall_no_output` and other events.
 Inject a **`StallPolicy`** that maps events → actions (`extend | kill+retry | escalate`). Detection and action
-become independently testable; the observer stops being a passive logger.
+become independently testable. The observer stops being a passive logger.
 
 ### C5 — CLI-version-freeze Specification (preflight) → fixes D6 — ✅ SHIPPED 2026-06-10
-Extend `looppreflight` (ADR readiness gate) with a predicate: any `-tmux` CLI reporting `startup update
-check = true` (e.g. via `codex doctor`) must be pinned (converge the state) or the batch Halts with guidance.
-Idempotent and crash-safe — pinning is a steady state, **not** a per-cycle toggle (a pin/unpin-on-exit is
-fragile: a hard kill never runs the unpin, freezing the host's CLI silently; and `brew pin` is global +
-persistent, not session-scoped). See §8 alternatives.
+Extend `looppreflight` (ADR readiness gate) with a predicate. Any `-tmux` CLI that reports `startup update
+check = true` (for example, with `codex doctor`) must be pinned (converge the state), or the batch Halts with guidance.
+The predicate is idempotent and crash-safe. Pinning is a steady state, **not** a per-cycle toggle.
 
-**As built** (`internal/looppreflight/freeze.go`, the gate's 5th check): host-grounding showed `codex doctor`
-does not reliably emit update info, so "risky" is detected via the `SelfUpdateEvidence` seam (default
-registry: codex → `~/.codex/version.json`, the updater-state file from the incident) and "pinned" via
-`PinnedLister` (default `brew list --pinned`). Confirmed risk without a pin → Halt with the exact
-`brew pin codex` guidance; unverifiable pin state → Warn (fail-open on ambiguity); headless-only usage is
-out of scope (the updater fires on the TUI launch path).
+A pin/unpin-on-exit is fragile: a hard kill never runs the unpin, which silently freezes the CLI of the host. Also, `brew pin` is global +
+persistent, not session-scoped. See §8 alternatives.
+
+**As built** (`internal/looppreflight/freeze.go`, the 5th check of the gate): host-grounding showed that `codex doctor`
+does not reliably emit update info. The check therefore detects "risky" with the `SelfUpdateEvidence` seam (default
+registry: codex → `~/.codex/version.json`, the updater-state file from the incident). It detects "pinned" with
+`PinnedLister` (default `brew list --pinned`). The outcomes are:
+
+- Confirmed risk without a pin → Halt with the exact `brew pin codex` guidance.
+- Unverifiable pin state → Warn (fail-open on ambiguity).
+- Headless-only usage is out of scope (the updater fires on the TUI launch path).
 
 ### Where AI genuinely drives (the escalation tail) — ✅ COMPONENTS SHIPPED 2026-06-10 (CoR wiring in C3)
 `LLMFailureAdvisor` is the **last** link, reached only for *unclassified* terminal states. It reasons about a
-never-seen failure and proposes a recovery — and its classification of a novel pane signature is **written back
+never-seen failure and proposes a recovery. The system **writes back its classification of a novel pane signature
 into the deterministic registry** that `FatalPaneDetector` reads. Each failure class gets cheaper and faster to
-handle over time; the LLM is never on the hot path for a known failure.
+handle over time. The LLM is never on the hot path for a known failure.
 
-**As built:** `core.FailureAdvisor` (PhaseAdvisor blueprint: bridge + persona
-`agents/evolve-failure-advisor.md` + profile `failure-advisor.json`, strict-JSON, every failure mode errors →
-caller escalates) returns `recovery.FailureAdvice{cause, pane_substr, justification}`;
-`recovery.PromoteAdvice` is the validating trust boundary (typed-vocabulary cause, ≥12-char substring) that
-promotes in-memory (after seeds — promotions never shadow vetted entries) AND durably
-(`.evolve/instincts/fatal-signatures/<content-hash-id>.yaml`, absent-only, confidence 0.5, zero-dep YAML);
-the tmux driver boots via `SeedDetectorWithPromotions`, so each novel state is paid for exactly once.
+**As built:**
+
+- `core.FailureAdvisor` (PhaseAdvisor blueprint: bridge + persona `agents/evolve-failure-advisor.md` + profile `failure-advisor.json`, strict-JSON, every failure mode errors → caller escalates) returns `recovery.FailureAdvice{cause, pane_substr, justification}`.
+- `recovery.PromoteAdvice` is the validating trust boundary (typed-vocabulary cause, ≥12-char substring). It promotes in-memory (after seeds — promotions never shadow vetted entries) AND durably (`.evolve/instincts/fatal-signatures/<content-hash-id>.yaml`, absent-only, confidence 0.5, zero-dep YAML).
+- The tmux driver boots with `SeedDetectorWithPromotions`, so the system pays for each novel state exactly once.
 
 ## 7. Implementation order (risk-ranked, test-gated)
 
 | Order | Change | Why first | Size |
 |------|--------|-----------|------|
-| 1 | ✅ **C1 outcome-recording chokepoint** (shipped 2026-06-10 as-located in the orchestrator; see §6 C1) | Highest leverage — makes 262-class record divergence impossible | M |
+| 1 | ✅ **C1 outcome-recording chokepoint** (shipped 2026-06-10 as-located in the orchestrator; see §6 C1) | Highest influence — makes 262-class record divergence impossible | M |
 | 2 | ✅ **C2 `ModelFlagPolicy`** (shipped 2026-06-10 at the realizer chokepoint — matrix-wide omit-on-auto) | Tiny; stops the exact retro break | S |
 | 3 | ✅ **C2 `FatalPaneDetector`** (shipped 2026-06-10; seeded with the 3 cycle-262 signatures, `EVOLVE_PHASE_RECOVERY`-staged, shadow default) | Eliminates the ~20-min slow-fails (in enforce) | M |
 | 4 | ✅ **C5 freeze preflight** + **D4 retro fallback** (shipped 2026-06-10: `looppreflight` 5th check — self-update evidence ∧ tmux-driven ⇒ brew-pinned or Halt; `retrospective.json` gains `cli_fallback:["codex-tmux"]`; broader meta-phase coverage rides C3) | Cheap; prevents recurrence | S |
@@ -251,15 +271,15 @@ the tmux driver boots via `SeedDetectorWithPromotions`, so each novel state is p
 composition root) after a soak batch shows clean shadow logs. The cycle-262 replay tests pin every D1–D6
 fix; D7 (typed recovery beyond ship) is the chain itself.
 
-Each step ships behind the project's gates (TDD red→green, adversarial audit, EGPS red_count==0), measured and
-behavior-neutral where possible — never a blind change to the hot dispatch loop.
+Each step ships behind the gates of the project (TDD red→green, adversarial audit, EGPS red_count==0). Each step is measured and
+behavior-neutral where possible. It is never a blind change to the hot dispatch loop.
 
 ## 8. Alternatives considered
 
-- **Per-cycle `brew pin` / `unpin`-on-exit (operator's first instinct).** Rejected as the primary mechanism:
-  the unpin depends on a clean exit, but the loop is kill-prone (SIGKILL/OOM/reboot never run the unpin) →
-  the host's CLI is silently frozen with no signal; `brew pin` is also global + persistent, so concurrent
-  cycles race. Replaced by C5 (pin is a convergent steady state; updates are an explicit operator action).
+- **Per-cycle `brew pin` / `unpin`-on-exit (first instinct of the operator).** Rejected as the primary mechanism.
+  The unpin depends on a clean exit, but the loop is kill-prone (SIGKILL/OOM/reboot never run the unpin).
+  The CLI of the host is then silently frozen with no signal. `brew pin` is also global + persistent, so concurrent
+  cycles race. C5 replaces it (pin is a convergent steady state; updates are an explicit operator action).
 - **Just raise `maxExtends` / lower the artifact timeout.** Rejected: tuning the backstop treats the symptom
   (slow-fail) not the cause (untyped terminal state). C2 classification is the real fix.
 - **Make the LLM failure-adapter handle everything.** Rejected: violates deterministic-first (Rule 5); cycle-262

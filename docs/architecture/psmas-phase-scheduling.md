@@ -1,4 +1,4 @@
-# PSMAS Phase Scheduling (Predictive Skip via Multi-Agent System)
+# PSMAS Phase Scheduling
 
 > **Status:** Foundation shipped v10.17.0 (cycle 98), **opt-in default-off**
 > **Audience:** Operators experimenting with cycle-level token savings; persona authors
@@ -6,7 +6,7 @@
 
 ## TL;DR
 
-When `EVOLVE_PSMAS_SKIP=1` is set, the Triage agent emits a `phase_skip[]` recommendation in its decision artifact, and the Orchestrator honors the recommendation by skipping those phases for the current cycle. Skipped phases get a `kind:phase_skipped` ledger entry so `--resume` and audit-binding both see the skip as deliberate, not as a missing-artifact failure.
+When `EVOLVE_PSMAS_SKIP=1` is set, the Triage agent emits a `phase_skip[]` recommendation in its decision artifact. The Orchestrator honors the recommendation and skips those phases for the current cycle. Skipped phases get a `kind:phase_skipped` ledger entry. With this entry, `--resume` and audit-binding both see the skip as deliberate, not as a missing-artifact failure.
 
 **Behavior contract:**
 
@@ -15,15 +15,17 @@ When `EVOLVE_PSMAS_SKIP=1` is set, the Triage agent emits a `phase_skip[]` recom
 | `trivial` | `["tdd-engineer", "retrospective"]` | always |
 | `small` | `["retrospective"]` | only when previous cycle's audit verdict was PASS |
 | `medium` | `[]` | always |
-| `large` | `[]` | always (would be blocked at gate; should not reach this path) |
+| `large` | `[]` | always (a gate blocks it, and it is recommended that it does not reach this path) |
 
 **Default-off rationale:** the foundation shipped without A/B verification. Until token-savings are measured against five historical cycle reruns (deferred to a future cycle per `docs/research/v10-17-0-release-debrief.md` §2), the feature is operator-flag-gated. Behavior is byte-identical to v10.10 when `EVOLVE_PSMAS_SKIP` is unset.
 
 ## Why this exists
 
-The Reflexion-style retrospective phase (`agents/evolve-retrospective.md`) is expensive: ~$0.30-0.50 per cycle, ~2 K-4 K tokens of output. For cycles whose verdict is PASS and whose scope is `trivial` or `small`, the retrospective rarely produces actionable lessons — the cycle worked, there's nothing to extract. Similarly, the TDD-engineer phase writes failing tests *before* the Builder writes any production code; for a `trivial` cycle (e.g., a one-line config tweak with no behavioral change), the RED-test ritual adds cost without surfacing new failure modes.
+The Reflexion-style retrospective phase (`agents/evolve-retrospective.md`) is expensive: ~$0.30-0.50 per cycle, ~2 K-4 K tokens of output. Consider cycles whose verdict is PASS and whose scope is `trivial` or `small`. The retrospective rarely produces actionable lessons for them. The cycle worked, and there is nothing to extract.
 
-PSMAS — Predictive Skip via Multi-Agent System — gives the Triage agent (which has already classified cycle size and read recent verdict history) the authority to recommend phase skips that the Orchestrator honors at gate level. This is a structural shortcut, not a prompt-level optimization: phases are skipped *at the phase-gate*, leaving a ledger entry that `--resume` and audit-binding both recognize.
+Similarly, the TDD-engineer phase writes failing tests *before* the Builder writes any production code. Consider a `trivial` cycle (for example, a one-line config tweak with no behavioral change). The RED-test ritual adds cost for it and does not surface new failure modes.
+
+PSMAS ("Predictive Skip via Multi-Agent System") gives the Triage agent the authority to recommend phase skips. The Triage agent has already classified the cycle size and read the recent verdict history. The Orchestrator honors the recommended skips at gate level. This is a structural shortcut, not a prompt-level optimization. The phases are skipped *at the phase-gate*, and the skip leaves a ledger entry that `--resume` and audit-binding both recognize.
 
 ## Implementation contract
 
@@ -83,22 +85,22 @@ Applied only when `EVOLVE_PSMAS_SKIP=1`. When the flag is unset or `0`, the orch
 | `triage-to-build` | tdd-engineer | `EVOLVE_PSMAS_SKIP=1` AND ledger contains `kind:phase_skipped, role:tdd-engineer` for this cycle |
 | `audit-to-complete` | retrospective | `EVOLVE_PSMAS_SKIP=1` AND ledger contains `kind:phase_skipped, role:retrospective` for this cycle |
 
-Both gates fail loudly (exit non-zero) when the flag is set without a matching ledger entry — operators can't accidentally skip a phase by setting the env-var alone. The ledger entry IS the skip; the flag merely permits it.
+Both gates fail loudly (exit non-zero) when the flag is set without a matching ledger entry. Operators cannot accidentally skip a phase when they set the env-var alone. The ledger entry IS the skip. The flag only permits it.
 
 ## Resume safety
 
-A `kind:phase_skipped` entry for phase X in cycle N means `--resume` of cycle N MUST treat X as already completed. Without this discipline, a session interruption mid-cycle would re-execute the skipped phase on resume, defeating the savings.
+A `kind:phase_skipped` entry for phase X in cycle N means `--resume` of cycle N MUST treat X as already completed. Without this discipline, a session interruption mid-cycle re-executes the skipped phase on resume, and the savings are lost.
 
 Implementation: `cycle-state.json:completed_phases[]` is populated when the ledger entry is written. The resume path (`legacy/scripts/lifecycle/resume-cycle.sh`) reads `completed_phases[]` before deciding which phase to dispatch next.
 
 ## Audit-binding considerations
 
-The Auditor verifies that all expected phase outputs exist (`scout-report.md`, `build-report.md`, etc.). A skipped phase's output WILL be missing. The auditor reads the ledger BEFORE checking artifact presence and treats `kind:phase_skipped` entries as legitimate output substitutes:
+The Auditor verifies that all expected phase outputs exist (`scout-report.md`, `build-report.md` and the other reports). A skipped phase's output WILL be missing. The auditor reads the ledger BEFORE checking artifact presence and treats `kind:phase_skipped` entries as legitimate output substitutes:
 
 - Skipping `tdd-engineer` → `tdd-report.md` absence is acceptable; ledger entry is the substitute.
 - Skipping `retrospective` → `retrospective-report.md` absence is acceptable; ledger entry is the substitute.
 
-The cycle's `acs-verdict.json:red_count == 0` predicate still gates ship. If the Builder's predicates fail in a trivial-cycle PSMAS path, the cycle FAILs at audit just like a non-PSMAS cycle would.
+The cycle's `acs-verdict.json:red_count == 0` predicate still gates ship. If the Builder's predicates fail in a trivial-cycle PSMAS path, the cycle FAILs at audit, as a non-PSMAS cycle does.
 
 ## Measured impact (foundation cycle)
 
@@ -116,8 +118,8 @@ For a batch with 5 trivial PASS cycles, conservatively 5 × ($0.30 + $0.50) = $4
 | Anti-pattern | Why bad | Guard |
 |---|---|---|
 | Skip `tdd-engineer` on a `medium` or `large` cycle | Real behavioral changes need RED tests | Triage maps `medium`/`large` to `phase_skip[]=[]` always |
-| Skip `retrospective` after a FAIL | Lessons would be lost | Triage maps `small` to `retrospective` only when previous verdict is PASS |
-| Skip a phase via env-var alone (no ledger entry) | Audit can't distinguish skip from missing | Phase-gates require BOTH `EVOLVE_PSMAS_SKIP=1` AND a matching ledger entry |
+| Skip `retrospective` after a FAIL | In that case lessons are lost | Triage maps `small` to `retrospective` only when previous verdict is PASS |
+| Skip a phase with the env-var alone (no ledger entry) | Audit can't distinguish skip from missing | Phase-gates require BOTH `EVOLVE_PSMAS_SKIP=1` AND a matching ledger entry |
 | Replay-skip on `--resume` re-execution | Wasted work | `completed_phases[]` tracks the skip; resume reads this |
 
 ## Operator controls
@@ -137,7 +139,7 @@ For a batch with 5 trivial PASS cycles, conservatively 5 × ($0.30 + $0.50) = $4
 
 Per the cycle-98 lesson's explicit gate criterion: "rerun 5 historical cycles under `EVOLVE_PSMAS_SKIP=1`, assert ≥20% aggregate token reduction." Cycle 99 advances this by analysing the token-economics of five representative PASS cycles (varied sizes) drawn from the batch ledger:
 
-| Cycle | Size estimate | Phases that would be skipped | Phase cost estimate | Total cycle cost |
+| Cycle | Size estimate | Phases that PSMAS skips | Phase cost estimate | Total cycle cost |
 |---|---|---|---|---|
 | cycle-80 | trivial | tdd-engineer + retrospective | ~$0.80 | ~$2.10 |
 | cycle-82 | small (PASS baseline) | retrospective | ~$0.35 | ~$1.80 |
@@ -151,11 +153,14 @@ The ≥20% threshold from the cycle-98 lesson is met on a per-estimate basis.
 
 ### Why DEFER rather than FLIP
 
-1. **Estimates, not measurements.** Phase cost figures above are derived from per-phase average cost rows in `docs/architecture/token-economics-2026.md` and per-agent usage logs. They are not live A/B measurements under `EVOLVE_PSMAS_SKIP=1` — cycle-99's scope is a verification/observability cycle, not a live batch re-run.
+1. **Estimates, not measurements.** The phase cost figures above come from per-phase average cost rows in `docs/architecture/token-economics-2026.md` and per-agent usage logs. They are not live A/B measurements under `EVOLVE_PSMAS_SKIP=1`. The scope of cycle-99 is a verification/observability cycle, not a live batch re-run.
 
-2. **No live ledger evidence yet.** The `kind:phase_skipped` ledger event introduced in cycle-98 has never been written in production (flag has never been enabled). Until at least 3 live cycles produce `phase_skipped` entries, the gate-level behavior (phase-gate accepting the skip, resume treating it as complete, auditor treating the absence of the skipped artifact as legitimate) has not been exercised end-to-end.
+2. **No live ledger evidence yet.** The `kind:phase_skipped` ledger event from cycle-98 has never been written in production (the flag has never been enabled). Until at least 3 live cycles produce `phase_skipped` entries, nobody has exercised the gate-level behavior end-to-end. That behavior has three parts:
+   - the phase-gate accepts the skip;
+   - resume treats the phase as complete;
+   - the auditor treats the absence of the skipped artifact as legitimate.
 
-3. **Mutation testing extension not yet shipped** — the `psmas_safe: bool` field in lesson YAMLs (roadmap item 2) is absent. Without it, PSMAS cannot refuse to skip retrospective on cycles touching lesson-relevant files, which is a correctness gap.
+3. **Mutation testing extension not yet shipped.** The `psmas_safe: bool` field in lesson YAMLs (roadmap item 2) is absent. Without it, PSMAS cannot refuse to skip retrospective on cycles that touch lesson-relevant files. This is a correctness gap.
 
 **DEFER conditions resolved when:**
 - At least 3 live cycles run with `EVOLVE_PSMAS_SKIP=1` and produce `kind:phase_skipped` ledger entries with clean audit (no regression).
@@ -172,8 +177,8 @@ The ≥20% threshold from the cycle-98 lesson is met on a per-estimate basis.
 
 Per `docs/research/v10-17-0-release-debrief.md`:
 
-1. **A/B verification** (cycle 99: DEFER — see section above) — ≥3 live cycles with `EVOLVE_PSMAS_SKIP=1` and observed ≥20% reduction gate the FLIP verdict.
-2. **Mutation testing extension** — add `psmas_safe: bool` field to lesson YAMLs. When a lesson's failure-mode could only be caught by the retrospective phase, mark unsafe; Triage refuses to skip retrospective on cycles that touch lesson-relevant files.
+1. **A/B verification** (cycle 99: DEFER — see section above). ≥3 live cycles with `EVOLVE_PSMAS_SKIP=1` and an observed ≥20% reduction gate the FLIP verdict.
+2. **Mutation testing extension** — add a `psmas_safe: bool` field to lesson YAMLs. Mark a lesson unsafe when only the retrospective phase can catch its failure-mode. Triage refuses to skip retrospective on cycles that touch lesson-relevant files.
 3. **Default-on flip** — after ≥3 live cycles green + mutation extension shipped + operator confirmation, flip default to `EVOLVE_PSMAS_SKIP=1`. Foundation already supports backward-compat: behavior is byte-identical when flag is `0`.
 
 ## See also

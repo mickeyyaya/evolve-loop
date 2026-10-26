@@ -2,7 +2,8 @@
 
 > **Superseded in part (2026-10-07):** the flag-gated builder self-review loop described below (`EVOLVE_BUILDER_SELF_REVIEW`) is gone; the flag has had no reader since cycle 22's dead-flag sweep. Every code-cycle source writer now runs `code-review-simplify`'s required Self-review hook, preloaded by the compiled-default overlay ([skill-overlays](skill-overlays.md)). The cycle 15–20 analysis stands as history.
 
-> **Status:** v9.1.1 baseline — Cycle 15 research deliverable + opt-in audit-advisory hook. Cycles 16+17 originally shipped advisory subagents (`code-simplifier`, `evolve-code-reviewer`) but their reports were orphans — no downstream consumer. Cycle 20 refactor deleted both and replaced them with a Builder self-review skill loop (`EVOLVE_BUILDER_SELF_REVIEW=1`, default OFF) that invokes review skills mid-build via the Skill tool and converges before Auditor handoff. See "Cycle 20 Refactor" section below.
+> **Status:** v9.1.1 baseline — Cycle 15 research deliverable + opt-in audit-advisory hook. Cycles 16+17 originally shipped advisory subagents (`code-simplifier`, `evolve-code-reviewer`), but their reports were orphans with no downstream consumer. The cycle 20 refactor deleted both. It replaced them with a Builder self-review skill loop (`EVOLVE_BUILDER_SELF_REVIEW=1`, default OFF). The loop invokes review skills mid-build through the Skill tool and converges before Auditor handoff. See "Cycle 20 Refactor" section below.
+>
 > For context-floor history see [token-floor-history.md](token-floor-history.md).
 > For Cycle-11 cost forensics see [token-economics-2026.md](token-economics-2026.md).
 
@@ -63,7 +64,7 @@ Near-term target (Cycles 15–18 combined): **−48% = ~$3.20/cycle saved**.
 | **Target cycle** | 16 |
 | **Verification** | `context-monitor.json` triage `input_bytes`; assert <17KB on anchored cycles |
 
-**Source:** ACON NeurIPS-track (OpenReview) — 26–54% peak-token reduction via failure-driven guideline updates; gradient-free, model-agnostic. [[6]](#sources)
+**Source:** ACON NeurIPS-track (OpenReview) — 26–54% peak-token reduction through failure-driven guideline updates; gradient-free, model-agnostic. [[6]](#sources)
 
 ---
 
@@ -75,7 +76,7 @@ Near-term target (Cycles 15–18 combined): **−48% = ~$3.20/cycle saved**.
 | **Expected saving** | ~$0.05/cycle + 7 KB context-floor reduction for Auditor |
 | **LoC delta** | 1 JSON edit (`auditor.json:context_anchors`) |
 | **Risk** | Low |
-| **Target cycle** | 15 (piloted via advisory hook infrastructure) |
+| **Target cycle** | 15 (piloted through advisory hook infrastructure) |
 | **Verification** | `role-context-builder.sh auditor …` output; assert intent section ≤500 chars when anchor active |
 
 **Source:** Anthropic — Effective context engineering for AI agents (2025–2026): static-content-first / dynamic-content-last maximizes prompt-cache hit rate. [[9]](#sources)
@@ -97,7 +98,7 @@ Near-term target (Cycles 15–18 combined): **−48% = ~$3.20/cycle saved**.
 
 ---
 
-## P6 — PSMAS-style phase-skip via triage `cycle_size_estimate`
+## P6 — PSMAS-style phase-skip through triage `cycle_size_estimate`
 
 | Field | Value |
 |-------|-------|
@@ -108,7 +109,7 @@ Near-term target (Cycles 15–18 combined): **−48% = ~$3.20/cycle saved**.
 | **Target cycle** | 19+ |
 | **Verification** | A/B test: 5 cycles with skip-eligible tasks; assert auditor cost=0 on skipped cycles |
 
-**Source:** PSMAS — Phase-Scheduled Multi-Agent Systems for Token-Efficient Coordination (arXiv:2604.17400, April 2026): **27.3%** mean token reduction via phase scheduling (range 21.4–34.8%); beats learned routing. [[2]](#sources)
+**Source:** PSMAS — Phase-Scheduled Multi-Agent Systems for Token-Efficient Coordination (arXiv:2604.17400, April 2026): **27.3%** mean token reduction through phase scheduling (range 21.4–34.8%); beats learned routing. [[2]](#sources)
 
 ---
 
@@ -136,13 +137,13 @@ Near-term target (Cycles 15–18 combined): **−48% = ~$3.20/cycle saved**.
 | **LoC delta** | High (~200 LoC + external dependency) |
 | **Risk** | High |
 | **Target cycle** | 20+ |
-| **Verification** | Isolated test: same cycle prompt through LLMLingua vs. raw; assert PASS verdict unchanged |
+| **Verification** | Isolated test: same cycle prompt through LLMLingua against raw; assert PASS verdict unchanged |
 
 **Source:** LLMLingua 2026 / TokenMix: 20× compression in production deployments ($42K → $2.1K monthly). [[8]](#sources)
 
 ---
 
-## Additional Items Discovered Cycle 15
+## More Items Discovered Cycle 15
 
 ### P-NEW-1 — Flags A–D promotion (EVOLVE_CONTEXT_DIGEST + EVOLVE_ANCHOR_EXTRACT default-on)
 
@@ -164,7 +165,7 @@ Near-term target (Cycles 15–18 combined): **−48% = ~$3.20/cycle saved**.
 | **LoC delta** | ~20 LoC in profile + eligibility check |
 | **Risk** | Medium (requires validation that Sonnet ADVERSARIAL_AUDIT quality matches Opus) |
 | **Target cycle** | 21+ (after Builder self-review loop verified across multiple cycles — Builder's mid-build skill convergence reduces the residual defect rate Auditor faces, increasing Sonnet's adequacy) |
-| **Verification** | Compare audit quality on 5 Sonnet vs. 5 Opus cycles; no CRITICAL miss-rate increase |
+| **Verification** | Compare audit quality on 5 Sonnet against 5 Opus cycles; no CRITICAL miss-rate increase |
 
 ### P-NEW-3 — evolve-scout.md Layer-3 extraction (Campaign D gap)
 
@@ -207,15 +208,18 @@ Near-term target (Cycles 15–18 combined): **−48% = ~$3.20/cycle saved**.
 
 | Field | Value |
 |-------|-------|
-| **Subsystem** | `agents/evolve-builder.md` Step 5 self-review loop spec; pluggable via `EVOLVE_BUILDER_REVIEW_SKILLS` env-var list (default `code-review-simplify`); invocation via `Skill` tool, no separate subagent profile |
+| **Subsystem** | `agents/evolve-builder.md` Step 5 self-review loop spec; pluggable through `EVOLVE_BUILDER_REVIEW_SKILLS` env-var list (default `code-review-simplify`); invocation through `Skill` tool, no separate subagent profile |
 | **What it replaces** | Cycles 16 (`code-simplifier` profile/persona/`builder-simplify-advisory.sh`/`EVOLVE_SIMPLIFY_ENABLED` hook) and 17 (`code-reviewer` profile/persona/`EVOLVE_FANOUT_AUDITOR_CODE_REVIEWER` fan-out hook) — both DELETED in this cycle |
-| **Expected saving** | Net-same or cheaper per-cycle (~$0.30-1.00 opt-in vs. ~$0.50-1.30 combined cycle-16+17 overhead). Primary win: eliminates orphan reports; same-cycle feedback closes the loop. |
+| **Expected saving** | Net-same or cheaper per-cycle (~$0.30-1.00 opt-in against ~$0.50-1.30 combined cycle-16+17 overhead). Primary win: eliminates orphan reports; same-cycle feedback closes the loop. |
 | **LoC delta** | ~436 LoC deleted (5 files) + ~60 LoC added (`evolve-builder.md`) = ~376 net subtraction across ~8 files |
 | **Risk** | Low — `EVOLVE_BUILDER_SELF_REVIEW=0` default preserves byte-equivalence. Sycophancy break primary defense (Builder Sonnet → Auditor Opus) untouched. |
 | **Target cycle** | 20 (SHIPPED — v9.2.0) |
-| **Verification** | Cycle-20 end-to-end verification: `EVOLVE_BUILDER_SELF_REVIEW=1` activated with `code-review-simplify` skill; `## Self-Review` section confirmed in `build-report.md` with convergence verdict + per-skill composite scores. See cycle-20 build-report for cost delta (flag=1 overhead ~$0.10–0.25 per iteration; baseline flag=0 avg $1.07/cycle cycles 17–19). Git ref contract closed: SKILL.md Step 1 now uses adaptive `HEAD`/`HEAD~1` detection (was `HEAD~1` hardcoded — would have reviewed previous cycle's commit, not Builder's in-flight changes). Skill catalog assessed: `code-review-simplify` confirmed as the only compatible built-in skill; `simplify` system skill is action-based (no composite score); `review` is PR-centric; `refactor` spawns parallel worktrees (single-writer violation). See `docs/architecture/review-skill-catalog.md` for full compatibility table. Default-OFF behavior preserved: flag=0 produces no `## Self-Review` section (byte-equivalent to pre-v9.2.0). |
+| **Verification** | Cycle-20 end-to-end verification: `EVOLVE_BUILDER_SELF_REVIEW=1` activated with `code-review-simplify` skill; `## Self-Review` section confirmed in `build-report.md` with convergence verdict + per-skill composite scores. See cycle-20 build-report for cost delta (flag=1 overhead ~$0.10–0.25 per iteration; baseline flag=0 avg $1.07/cycle cycles 17–19). See `docs/architecture/review-skill-catalog.md` for full compatibility table. Git ref contract closed: SKILL.md Step 1 now uses adaptive `HEAD`/`HEAD~1` detection. It was `HEAD~1` hardcoded, which reviewed the previous cycle's commit and not the in-flight changes of Builder. |
+| **Verification (continued)** | Skill catalog assessed: `code-review-simplify` confirmed as the only compatible built-in skill. `simplify` system skill is action-based (no composite score), `review` is PR-centric, and `refactor` spawns parallel worktrees (single-writer violation). Default-OFF behavior preserved: flag=0 produces no `## Self-Review` section (byte-equivalent to pre-v9.2.0). |
 
-**Why this refactor.** Cycles 16+17 template-copied cycle-15's advisory pattern (skill invoked as a separate subagent around the Builder) but cycle 15's pattern advised an *already-bound* audit verdict — useful as observability. Cycles 16+17 instead advised mid-build work that Builder could still revise, but nothing wired their reports back to Builder. The reports (`code-simplifier-report.md`, `workers/code-reviewer.md`) became orphan forensic artifacts. The Skill primitive exists precisely so an agent can invoke a skill mid-task for self-review — moving the reviewers into Builder's own loop closes the feedback gap.
+**Why this refactor.** Cycles 16+17 template-copied the advisory pattern of cycle-15 (skill invoked as a separate subagent around the Builder). But the pattern of cycle 15 advised an *already-bound* audit verdict, which is useful as observability. Cycles 16+17 instead advised mid-build work that Builder can still revise. Nothing wired their reports back to Builder. The reports (`code-simplifier-report.md`, `workers/code-reviewer.md`) became orphan forensic artifacts.
+
+The Skill primitive exists precisely so that an agent can invoke a skill mid-task for self-review. Moving the reviewers into the own loop of Builder closes the feedback gap.
 
 **Pluggability.** `EVOLVE_BUILDER_REVIEW_SKILLS` is a comma-separated skill name list. Operators add review skills (`refactor`, `security-review`, custom) without touching evolve-loop source.
 
@@ -262,7 +266,7 @@ Items P6–P8 and P-NEW-3/4 push further to 60–70% but require new architectur
 9. Anthropic — Effective context engineering for AI agents (2025–2026): https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
 10. Progressive Disclosure (MindStudio 2025): https://www.mindstudio.ai/blog/progressive-disclosure-ai-agents-context-management
 11. TACO — Self-Evolving Terminal Agent Compression (arXiv:2604.19572, Apr 2026): training-free, model-agnostic tool-result compression framework: https://arxiv.org/abs/2604.19572
-12. Token Economics for LLM Agents (arXiv:2605.09104, May 2026): dual-view study — sequential pipelines achieve 20× lower token usage vs. parallel; combined orchestration+caching+routing achieves 70–80% total savings: https://arxiv.org/abs/2605.09104
+12. Token Economics for LLM Agents (arXiv:2605.09104, May 2026): dual-view study. Sequential pipelines achieve 20× lower token usage against parallel. Combined orchestration+caching+routing achieves 70–80% total savings: https://arxiv.org/abs/2605.09104
 
 ---
 
@@ -270,9 +274,19 @@ Items P6–P8 and P-NEW-3/4 push further to 60–70% but require new architectur
 
 > Updated by Builder cycle 47. Previous snapshot: cycle 43 (2026-05-14).
 
-**Cycle-46 cost snapshot (VERIFIED from usage sidecars):** Scout $0.64 (18 turns) / Triage $0.30 (6 turns) / Builder $3.72 (95 turns — **REGRESSION 4×**) / Auditor $0.84 (29 turns) / Orchestrator $2.53 (26 turns) / Memo $0.35 (9 turns) / Retrospective $0.73 (21 turns). **Total: $9.11 (+75% regression vs cycle-41 baseline $5.21).** Root cause: Builder 95 turns — scope overrun (Phase B: 15 ACS predicates + test + doc + abnormal event pipeline). P-NEW-22 schema filter + P-NEW-29 parallel batching shipped cycle 47 to address this pattern.
+**Cycle-46 cost snapshot (VERIFIED from usage sidecars):**
 
-**Cycle-47 shipped items:** P-NEW-22 Phase 2 (dispatch-layer schema filter enforcement in `claude.sh`); P-NEW-29 (parallel tool-call batching guidance in Builder + Scout personas); T2 turn-overrun observability (`subagent-run.sh` abnormal event on `num_turns > max_turns`); P-NEW-30 roadmap entry (TACO arXiv:2604.19572); Sources entries 11–12.
+- Scout $0.64 (18 turns)
+- Triage $0.30 (6 turns)
+- Builder $3.72 (95 turns — **REGRESSION 4×**)
+- Auditor $0.84 (29 turns)
+- Orchestrator $2.53 (26 turns)
+- Memo $0.35 (9 turns)
+- Retrospective $0.73 (21 turns)
+
+**Total: $9.11 (+75% regression vs cycle-41 baseline $5.21).** Root cause: Builder 95 turns — scope overrun (Phase B: 15 ACS predicates + test + doc + abnormal event pipeline). P-NEW-22 schema filter + P-NEW-29 parallel batching shipped cycle 47 to address this pattern.
+
+**Cycle-47 shipped items:** P-NEW-22 Phase 2 (dispatch-layer schema filter enforcement in `claude.sh`). P-NEW-29 (parallel tool-call batching guidance in Builder + Scout personas). T2 turn-overrun observability (`subagent-run.sh` abnormal event on `num_turns > max_turns`). P-NEW-30 roadmap entry (TACO arXiv:2604.19572). Sources entries 11–12.
 
 **Expected cycle-48 baseline (if P-NEW-29 effective):** Builder turns ≤20 (from 95), saving ~$2.00/cycle on builder. Combined P-NEW-22 + P-NEW-29: target $5.00–6.00/cycle (vs $9.11 cycle-46 regression).
 
@@ -282,27 +296,55 @@ Items P6–P8 and P-NEW-3/4 push further to 60–70% but require new architectur
 
 > Updated by Scout/Builder cycle 43. Previous snapshot: cycle 42 (2026-05-14).
 
-**Cycle-42 cost snapshot (VERIFIED):** Scout $1.24 (28 turns) / Triage $0.32 (5 turns) / Builder $1.06 (33 turns) / Auditor $1.55 (49 turns, Sonnet) / Orchestrator $1.15 (32 turns) / Memo $0.48 (14 turns). **Total: $5.80 (+11% regression vs cycle-41 $5.21).** Scout regression: 20→28 turns (+40%, from P-NEW-17 web search cost). Auditor regression: 35→49 turns (+40%, no stop-criterion — target of P-NEW-19). Memo improvement: 23→14 turns (−39%, P-NEW-16 STOP CRITERION working). Running shipped savings vs cycle-11 $6.70 baseline: ~$0.90/cycle.
+**Cycle-42 cost snapshot (VERIFIED):**
 
-**Cycle-41 cost snapshot (VERIFIED):** Scout $0.83 (20 turns) / Triage $0.40 (8 turns) / Builder $0.99 (34 turns) / Auditor $1.12 (35 turns, Sonnet — P-NEW-2 ✓) / Orchestrator $1.08 (42 turns) / Memo $0.79 (23 turns). **Total: $5.21 (−22% from cycle-11 $6.70 baseline, −$0.27 vs cycle-40 $5.48).** P-NEW-2 Auditor Sonnet: $0.98/cycle actual saving. P-NEW-10 Scout: 68→20 turns. P-NEW-9 Orchestrator: 50KB→10KB accumulated context. Running shipped savings: ~$2.15/cycle.
+- Scout $1.24 (28 turns)
+- Triage $0.32 (5 turns)
+- Builder $1.06 (33 turns)
+- Auditor $1.55 (49 turns, Sonnet)
+- Orchestrator $1.15 (32 turns)
+- Memo $0.48 (14 turns)
 
-**Cycle-40 cost snapshot:** Scout $1.57 (40 turns) / Triage $0.37 / Builder $1.09 / Auditor $2.09 (Opus 4.7 — regression) / Retrospective $0.36. **Total: $5.48.** Auditor Opus regression (+$0.96 vs cycle-39 Sonnet $1.13) erased P-NEW-10 gains. Cumulative from cycle-11 $6.70 baseline: **>18% reduction achieved** (29% target not yet reached due to auditor regression).
+**Total: $5.80 (+11% regression vs cycle-41 $5.21).** Scout regression: 20→28 turns (+40%, from P-NEW-17 web search cost). Auditor regression: 35→49 turns (+40%, no stop-criterion — target of P-NEW-19). Memo improvement: 23→14 turns (−39%, P-NEW-16 STOP CRITERION working). Running shipped savings vs cycle-11 $6.70 baseline: ~$0.90/cycle.
 
-**Cycle-41 fixes shipped:** P-NEW-2 (auditor default Sonnet — expected to recover $0.97/cycle); P-NEW-9 (orchestrator 3-bullet summarization, 50KB→10KB accumulated context); `scout-stop-tighten` (emergency exit turn 12 + max-3 WebSearch cap — targets 40→≤20 turns, ~$0.50/cycle). Builder worktree isolation enforcement promoted to default-ON (`EVOLVE_BUILDER_ISOLATION_CHECK=1` + `EVOLVE_BUILDER_ISOLATION_STRICT=1`) — cost-prevention: breach incidents cost ~$5.48/cycle in wasted retries (cycles 6, 40, 41); `git diff --quiet HEAD` replaces narrow evals/instincts directory scan. Tester allowlist added to `subagent-run.sh` — prevents 241s watchdog kills when orchestrator advances to test phase.
+**Cycle-41 cost snapshot (VERIFIED):**
+
+- Scout $0.83 (20 turns)
+- Triage $0.40 (8 turns)
+- Builder $0.99 (34 turns)
+- Auditor $1.12 (35 turns, Sonnet — P-NEW-2 ✓)
+- Orchestrator $1.08 (42 turns)
+- Memo $0.79 (23 turns)
+
+**Total: $5.21 (−22% from cycle-11 $6.70 baseline, −$0.27 vs cycle-40 $5.48).** P-NEW-2 Auditor Sonnet: $0.98/cycle actual saving. P-NEW-10 Scout: 68→20 turns. P-NEW-9 Orchestrator: 50KB→10KB accumulated context. Running shipped savings: ~$2.15/cycle.
+
+**Cycle-40 cost snapshot:**
+
+- Scout $1.57 (40 turns)
+- Triage $0.37
+- Builder $1.09
+- Auditor $2.09 (Opus 4.7 — regression)
+- Retrospective $0.36
+
+**Total: $5.48.** Auditor Opus regression (+$0.96 vs cycle-39 Sonnet $1.13) erased P-NEW-10 gains. Cumulative from cycle-11 $6.70 baseline: **>18% reduction achieved** (29% target not yet reached due to auditor regression).
+
+**Cycle-41 fixes shipped:** P-NEW-2 (auditor default Sonnet — expected to recover $0.97/cycle). P-NEW-9 (orchestrator 3-bullet summarization, 50KB→10KB accumulated context). `scout-stop-tighten` (emergency exit turn 12 + max-3 WebSearch cap — targets 40→≤20 turns, ~$0.50/cycle). Builder worktree isolation enforcement promoted to default-ON (`EVOLVE_BUILDER_ISOLATION_CHECK=1` + `EVOLVE_BUILDER_ISOLATION_STRICT=1`).
+
+This is cost-prevention: breach incidents cost ~$5.48/cycle in wasted retries (cycles 6, 40, 41). `git diff --quiet HEAD` replaces narrow evals/instincts directory scan. Tester allowlist added to `subagent-run.sh` — prevents 241s watchdog kills when orchestrator advances to test phase.
 
 **P-NEW-10 confirmed:** $0.97/cycle actual saving (cycle 39→40 delta). Target ≤20 turns still pending; cycle-41 scout ran 40 turns — further improvement on track.
 
-**Cache-safety validation (arXiv:2601.06007):** "Don't Break the Cache: Agentic Task Evaluation" (2026) confirms static-content-first / dynamic-content-last as a multi-turn cache-safety requirement. evolve-loop's `role-context-builder.sh` already implements this via `EVOLVE_CONTEXT_DIGEST` + `EVOLVE_ANCHOR_EXTRACT` (P4 DONE, P-NEW-1 DONE). No new action item — paper validates existing design.
+**Cache-safety validation (arXiv:2601.06007):** "Don't Break the Cache: Agentic Task Evaluation" (2026) confirms static-content-first / dynamic-content-last as a multi-turn cache-safety requirement. evolve-loop's `role-context-builder.sh` already implements this through `EVOLVE_CONTEXT_DIGEST` + `EVOLVE_ANCHOR_EXTRACT` (P4 DONE, P-NEW-1 DONE). No new action item — paper validates existing design.
 
 **Inbox audit (cycle 41):** c45 (P-NEW-6 Branch B tool-result clearing) and C1 (ship-gate tree-SHA binding) confirmed ALREADY DONE — do NOT re-implement.
 
-**Auditor model discrepancy:** cycle-39 used `claude-sonnet-4-6` despite `auditor.json:model_tier_default=opus`. Whether intentional (`ADVERSARIAL_AUDIT=0` or model-tier override) or accidental needs operator verification. If intentional, P-NEW-2 is effectively shipping $0.97/cycle savings; document it. If accidental, adversarial quality may be degraded.
+**Auditor model discrepancy:** cycle-39 used `claude-sonnet-4-6` despite `auditor.json:model_tier_default=opus`. The operator must verify if it is intentional (`ADVERSARIAL_AUDIT=0` or model-tier override) or accidental. If intentional, P-NEW-2 is effectively shipping $0.97/cycle savings; document it. If accidental, adversarial quality may be degraded.
 
 | Item | State | Evidence anchor |
 |------|-------|----------------|
 | P1 Scout turn cap (≤15) | **REOPENED** (cycle 40) | `max_turns` advisory-only; claude CLI has no `--max-turns`; cycle-39 scout ran 68 turns ($2.54). Cycle-40 fix: `## STOP CRITERION` persona section in `agents/evolve-scout.md`. |
 | P2 Builder turn cap (≤20 → actual 25) | DONE | `builder.json max_turns=25`; v9.0.4; update roadmap target to ≤25 |
-| P3 Triage right-sizing | DONE (cycle 24) | Context savings delivered via EVOLVE_CONTEXT_DIGEST=1 default-on; triage gets compact intent; 123-line persona already lean |
+| P3 Triage right-sizing | DONE (cycle 24) | Context savings delivered through EVOLVE_CONTEXT_DIGEST=1 default-on; triage gets compact intent; 123-line persona already lean |
 | P4 Auditor anchor mode | DONE | `auditor.json:context_anchors` 4 anchors configured; v8.63.0 |
 | P5 Retrospective YAML template | DONE (cycle 24) | `lesson-template.yaml` created at `.agents/skills/loop/`; `evolve-retrospective.md` trimmed −19 lines |
 | P6 PSMAS phase-skip | PENDING | No implementation; benchmark updated to 34.8% (was 27.3%) |
@@ -322,7 +364,7 @@ Items P6–P8 and P-NEW-3/4 push further to 60–70% but require new architectur
 | P-NEW-12 RLM context folding | RESEARCH | Cycle 50+; paradigm-level; no prod deployments |
 | P-NEW-13 Verbatim semantic compaction | **DONE (cycle 42)** | `subagent-run.sh` autotrim: `head -c`/`tail -c` → `head -n`/`tail -n` (line-boundary cut). ~25 LoC. Commit 183406e. |
 | P-NEW-16 Orchestrator stop-criterion | **DONE (cycle 42)** | `## STOP CRITERION` section added to `agents/evolve-orchestrator.md`; 3 named gates; targets 42→25 orchestrator turns (~$0.40/cycle). Commit 183406e. |
-| P-NEW-17 Explicit Cache TTL for cross-phase reuse | **INVESTIGATION-COMPLETE (cycle 43)** | Path A CLOSED: no `--cache-ttl` CLI flag. CRITICAL CORRECTION: Claude CLI uses 1h TTL (not 5m) per cycle-42 `ephemeral_1h_input_tokens` telemetry (`ephemeral_5m_input_tokens=0` for all phases). TTL concern is API SDK-specific, not CLI-specific. `claude -p` invocations already use 1h TTL. $2.00/cycle estimate was overstated for CLI path. True cross-phase reuse opportunity: shared system-prompt prefix via `EVOLVE_CACHE_PREFIX_V2` (addressed by P-NEW-18). |
+| P-NEW-17 Explicit Cache TTL for cross-phase reuse | **INVESTIGATION-COMPLETE (cycle 43)** | Path A CLOSED: no `--cache-ttl` CLI flag. CRITICAL CORRECTION: Claude CLI uses 1h TTL (not 5m) per cycle-42 `ephemeral_1h_input_tokens` telemetry (`ephemeral_5m_input_tokens=0` for all phases). TTL concern is API SDK-specific, not CLI-specific. `claude -p` invocations already use 1h TTL. $2.00/cycle estimate was overstated for CLI path. True cross-phase reuse opportunity: shared system-prompt prefix through `EVOLVE_CACHE_PREFIX_V2` (addressed by P-NEW-18). |
 | P-NEW-18 EVOLVE_CACHE_PREFIX_V2 default-on | **DONE (cycle 43)** | Default changed from `:-0` to `:-1` in `legacy/scripts/dispatch/subagent-run.sh` and `legacy/scripts/cli_adapters/claude.sh`. `docs/architecture/control-flags.md` updated. Overdue since v8.62 target (shipped v10.6). Expected saving: $0.10–0.30/cycle. |
 | P-NEW-19 Auditor stop-criterion | **DONE (cycle 43)** | `## STOP CRITERION` section added to `agents/evolve-auditor.md`; 3 named gates + banned post-report patterns. ~30 LoC. Expected saving: $0.30–0.50/cycle. |
 | P-NEW-20 Builder stop-criterion | **DONE (cycle 43)** | `## STOP CRITERION` section added to `agents/evolve-builder.md`; 4 named gates + banned post-report patterns. ~40 LoC. Expected saving: $0.40–0.60/cycle (cycle-43 builder: 39 turns / $1.22). |
@@ -332,7 +374,7 @@ Items P6–P8 and P-NEW-3/4 push further to 60–70% but require new architectur
 | P-NEW-24 Observational context compression for Builder | **PENDING (cycle 47+)** | Remove expired tool-results from Builder multi-turn trajectory; arXiv:2604.19572 (Apr 2026); 40–60% input reduction on tool-output bloat. Profile-level contract changes required. Deferred pending P-NEW-27 baseline measurement (1-2 cycles). |
 | P-NEW-25 Anthropic native compaction (compact-2026-01-12) | **CLOSED (cycle 46)** | `claude -p --help` (v2.1.140) confirms no `--compact` flag exists. Path A CLOSED. Path B (SDK-level compaction) out of scope for CLI pipeline. P-NEW-21 profile fields removed as dead config. |
 | P-NEW-26 Per-role `--effort` flag dispatch | **DONE (cycle 44)** | `effort_level` field added to 6 profiles (scout/triage/memo/orchestrator=medium, builder/auditor=high); `legacy/scripts/cli_adapters/claude.sh` reads field + appends `--effort` to `claude -p` invocation. Guard: only appended when field non-empty. Expected saving: ~$0.66/cycle (~25% on medium-effort phases). |
-| P-NEW-27 Scout tool-call discipline (Bash→native) | **DONE (cycle 46)** | BANNED patterns table added to `agents/evolve-scout.md` Tool-Result Hygiene section; 5 before/after examples; Bash-only-for-shell-operations rule. Root cause: cycle-45 scout made 36 Bash calls vs. 4 WebSearch ($1.30 actual vs $0.50 target). Expected saving: ≥$0.50/cycle when scout Bash ≤8. |
+| P-NEW-27 Scout tool-call discipline (Bash→native) | **DONE (cycle 46)** | BANNED patterns table added to `agents/evolve-scout.md` Tool-Result Hygiene section; 5 before/after examples; Bash-only-for-shell-operations rule. Root cause: cycle-45 scout made 36 Bash calls against 4 WebSearch ($1.30 actual vs $0.50 target). Expected saving: ≥$0.50/cycle when scout Bash ≤8. |
 | P-NEW-28 RE-TRAC recursive trajectory compression | **PENDING (cycle 47+)** | arXiv:2602.02486 (RE-TRAC, Feb 2026): recursive summarization of oldest M turns at N-turn boundaries. Complementary to P-NEW-24 (removes tail bloat; RE-TRAC compresses head bloat). Expected: 40–60% input reduction on Builder 35-turn sessions. Needs spec before implementation. |
 | P-NEW-29 Parallel tool-call batching (multi-tool-use) | **DONE (cycle 47)** | "Parallel Tool-Call Batching" section with 3 before/after examples added to `agents/evolve-builder.md` (Turn budget section) and `agents/evolve-scout.md` (BANNED patterns section). Rule: emit independent tool calls in a single turn. Expected: 20–40% turn reduction for read-heavy phases. |
 | P-NEW-30 TACO terminal observation compression | **PENDING (cycle 48+)** | arXiv:2604.19572 (TACO, Apr 2026): training-free tool-result compression framework that discovers and refines compression rules from agent trajectories. Zero training cost, model-agnostic. Upgrade path for P-NEW-24; applies compression BEFORE tool results enter the context. Expected: 30–50% terminal observation token reduction. [[11]](#sources) |
@@ -350,9 +392,9 @@ No paradigm shifts found. The field in 2026 has converged on the same layering e
 
 ### Net-new candidate: P-NEW-6 — Tool-result clearing
 
-Anthropic's 2026 production cookbook documents "tool-result clearing": surgically remove old `tool_result` blocks (keeping `tool_use`) at a configurable token threshold. In a baseline research agent example, this freed ~164K tokens (67% reduction) from re-fetchable file reads, keeping peak context at 173K vs 335K — critical for staying under 200K windows.
+Anthropic's 2026 production cookbook documents "tool-result clearing": surgically remove old `tool_result` blocks (keeping `tool_use`) at a configurable token threshold. In a baseline research agent example, this freed ~164K tokens (67% reduction) from re-fetchable file reads. Peak context stayed at 173K vs 335K. This is critical to stay under 200K windows.
 
-**Relevance to evolve-loop:** Builder's multi-file-read phases accumulate large `tool_result` blocks in context. A profile field `context_clear_trigger_tokens: 30000` + `context_clear_keep_recent_tool_results: 4` could be added to `builder.json` (similar to auditor's `context_anchors` pattern). Expected saving: 20–40% Builder context reduction. Risk: Low (surgical, not destructive). Target: cycle 26+ after P-NEW-1 promotion.
+**Relevance to evolve-loop:** Builder's multi-file-read phases accumulate large `tool_result` blocks in context. A profile field `context_clear_trigger_tokens: 30000` + `context_clear_keep_recent_tool_results: 4` is a possible addition to `builder.json` (similar to auditor's `context_anchors` pattern). Expected saving: 20–40% Builder context reduction. Risk: Low (surgical, not destructive). Target: cycle 26+ after P-NEW-1 promotion.
 
 Source: https://platform.claude.com/cookbook/tool-use-context-engineering-context-engineering-tools
 
@@ -397,12 +439,12 @@ Source: https://platform.claude.com/cookbook/tool-use-context-engineering-contex
 | **Subsystem** | `agents/evolve-orchestrator.md` (phase-report reading protocol) |
 | **Expected saving** | $0.10–0.30/cycle: orchestrator reads scout-report (~15KB) + build-report (~20KB) + audit-report (~15KB) = 50KB accumulated. With 3-bullet summarization between phases: 50KB → ~10KB in orchestrator context. Direct saving: 40KB × (1/4 tokens/byte) × $3/MTok = $0.03/cycle plus ~40% fewer orchestrator turns |
 | **LoC delta** | ~40 LoC in orchestrator persona: add "phase-report reading → 3-bullet summary → pass summary to next phase" protocol section |
-| **Risk** | Medium — LLM-generated summaries could miss audit defect IDs needed for SHA verification. Mitigation: summary MUST include verbatim `## Verdict` line + SHA8 from each report |
+| **Risk** | Medium — LLM-generated summaries can miss audit defect IDs needed for SHA verification. Mitigation: summary MUST include verbatim `## Verdict` line + SHA8 from each report |
 | **Target cycle** | 26+ (after P-NEW-7 verified) |
 | **Verification** | `context-monitor.json` `orchestrator.input_bytes` delta: assert reduction ≥ 10KB vs prior cycle; Auditor verifies SHA in orchestrator-report matches audit-report on-disk |
 | **Source** | OpenHands context condensation (arXiv:2511.03690, Nov 2025) — LLMSummarizingCondenser; quadratic→linear context scaling |
 
-**Anti-gaming:** Orchestrator could summarize away its own audit defects. Mitigation: SHA verification preserved in summary (auditor SHA is 8 chars, always fits). Auditor independently cross-checks SHA.
+**Anti-gaming:** Orchestrator can summarize away its own audit defects. Mitigation: SHA verification preserved in summary (auditor SHA is 8 chars, always fits). Auditor independently cross-checks SHA.
 
 ---
 
@@ -434,9 +476,9 @@ Source: https://platform.claude.com/cookbook/tool-use-context-engineering-contex
 | **LoC delta** | High (~100+ LoC + new external API dependency) |
 | **Risk** | Medium-High (new external API dependency; requires architectural evaluation) |
 | **Target cycle** | 45+ |
-| **Verification** | Isolated test: same cross-phase artifacts through MCP Compaction vs. current bash preprocessing; assert output quality preserved |
+| **Verification** | Isolated test: same cross-phase artifacts through MCP Compaction against current bash preprocessing; assert output quality preserved |
 
-**Source:** Anthropic MCP + Compaction (2026 engineering blog) — native compaction API enables memory-efficient cross-agent communication; combined with tool-result clearing, eliminates token waste from execution trace bloat. evolve-loop already does compaction-equivalent via EVOLVE_CONTEXT_DIGEST; MCP Compaction could provide a runtime-native mechanism.
+**Source:** Anthropic MCP + Compaction (2026 engineering blog) — native compaction API enables memory-efficient cross-agent communication; combined with tool-result clearing, eliminates token waste from execution trace bloat. evolve-loop already does compaction-equivalent through EVOLVE_CONTEXT_DIGEST; MCP Compaction can provide a runtime-native mechanism.
 
 ---
 
@@ -466,9 +508,9 @@ Source: https://platform.claude.com/cookbook/tool-use-context-engineering-contex
 | **Target cycle** | **DONE (cycle 42)** — commit 183406e |
 | **Verification** | Enable `EVOLVE_CONTEXT_AUTOTRIM=1`; verify autotrim output has no truncated JSON objects or partial file paths; assert no autotrim-induced re-read events in `subagent-run.sh` log |
 
-**Source:** Production agentic pipeline analysis (2026) — operating on complete semantic units (statements/blocks) rather than partial truncation ensures file paths and critical references remain intact or absent entirely — critical safety property for code agents.
+**Source:** Production agentic pipeline analysis (2026). Operation on complete semantic units (statements/blocks) rather than partial truncation makes sure that file paths and critical references remain intact or absent entirely. This is a critical safety property for code agents.
 
-**Current gap:** `EVOLVE_CONTEXT_AUTOTRIM=1` uses head-60%/tail-35% truncation (byte-boundary cut) that can split file paths, function signatures, and JSON structures mid-token — triggering parse failures in Builder and requiring expensive re-read loops.
+**Current gap:** `EVOLVE_CONTEXT_AUTOTRIM=1` uses head-60%/tail-35% truncation (byte-boundary cut). The cut can split file paths, function signatures and JSON structures mid-token. This triggers parse failures in Builder and causes expensive re-read loops.
 
 **Validation:** arXiv:2601.06007 "Don't Break the Cache: Agentic Task Evaluation" (2026) confirms static-content-first / dynamic-content-last as a cache-safety constraint. Semantic-unit preservation is the complementary compaction-safety constraint — both are required for safe multi-turn agent context management.
 
@@ -485,9 +527,9 @@ Source: https://platform.claude.com/cookbook/tool-use-context-engineering-contex
 | **Target cycle** | 46+ (post P-NEW-2 verification) |
 | **Verification** | Builder cost delta on recurring token-reduction task types; assert plan-reuse accuracy ≥99% (no incorrect ACs shipped) |
 
-**Source:** Agentic Plan Caching (arXiv:2506.14852, 2026) — cache structured plan templates from initial Builder reasoning; reuse across semantically similar task classes via lightweight similarity matching. Benchmark: 76.42% cost reduction on GAIA, 0.61% accuracy drop.
+**Source:** Agentic Plan Caching (arXiv:2506.14852, 2026) — cache structured plan templates from first Builder reasoning; reuse across semantically similar task classes through lightweight similarity matching. Benchmark: 76.42% cost reduction on GAIA, 0.61% accuracy drop.
 
-**Applicability to evolve-loop:** Builder repeatedly solves similar task archetypes (profile edit, persona section add, roadmap update, ACS predicate write). Plan templates for these archetypes could save 5–8 planning turns per cycle on recognized task types.
+**Applicability to evolve-loop:** Builder repeatedly solves similar task archetypes (profile edit, persona section add, roadmap update, ACS predicate write). Plan templates for these archetypes possibly save 5–8 planning turns per cycle on recognized task types.
 
 ---
 
@@ -496,7 +538,7 @@ Source: https://platform.claude.com/cookbook/tool-use-context-engineering-contex
 | Field | Value |
 |-------|-------|
 | **Subsystem** | `legacy/scripts/dispatch/subagent-run.sh` (MCP tool schema caching at dispatcher level) |
-| **Expected saving** | **50.31% cost reduction, 27.28% latency improvement** vs. no caching (MDPI 2026 benchmark) |
+| **Expected saving** | **50.31% cost reduction, 27.28% latency improvement** against no caching (MDPI 2026 benchmark) |
 | **LoC delta** | ~80 LoC in `subagent-run.sh`: workflow-level + tool-level cache with dependency-aware graph invalidation |
 | **Risk** | Medium — MCP spec compliance required; cache invalidation correctness critical |
 | **Target cycle** | 48+ |
@@ -504,7 +546,7 @@ Source: https://platform.claude.com/cookbook/tool-use-context-engineering-contex
 
 **Source:** Hierarchical Caching for Agentic Workflows (MDPI 2026) — multi-level caching (workflow-level + tool-level) with dependency-aware graph invalidation. MCP tool schema re-sending is 30–50% of context waste in ≥40-tool workflows.
 
-**Applicability to evolve-loop:** evolve-loop uses strict MCP config per subagent (`--strict-mcp-config`); tool schemas are re-sent on each `subagent-run.sh` invocation. With ~6 subagents/cycle each receiving the same tool schema set, dispatcher-level caching could eliminate most of that redundancy.
+**Applicability to evolve-loop:** evolve-loop uses strict MCP config per subagent (`--strict-mcp-config`); tool schemas are re-sent on each `subagent-run.sh` invocation. With ~6 subagents/cycle each receiving the same tool schema set, dispatcher-level caching can eliminate most of that redundancy.
 
 ---
 
@@ -526,7 +568,7 @@ Source: https://platform.claude.com/cookbook/tool-use-context-engineering-contex
 - `verdict-written` — `orchestrator-report.md` contains `## Verdict` line
 - `cycle-state-advanced` — cycle-state phase reflects final state (ship/retrospective/blocked)
 
-Once all three gates satisfied: `Write` the report and halt. Banned post-report patterns enumerated (re-reading audit-report, additional ledger reads, "Let me verify one more time…" loops).
+Once all three gates satisfied: `Write` the report and halt. Banned post-report patterns enumerated (re-reading audit-report, more ledger reads, "Let me verify one more time…" loops).
 
 **Source:** Analogous to P-NEW-10 (Scout stop-criterion, DONE cycle 40) which delivered $0.97/cycle actual saving (68→20 turns). Orchestrator exhibits the same post-completion accumulation pattern at lower base cost.
 
@@ -544,7 +586,7 @@ Once all three gates satisfied: `Write` the report and halt. Banned post-report 
 
 **Problem:** Anthropic silently changed prompt cache TTL from 60 min → 5 min on 2026-03-06. For multi-agent pipelines where sequential phases span 10–30+ minutes total, this means every phase re-pays cache-creation costs (~$0.40–0.63/phase × 5 phases ≈ $2/cycle fixed overhead). Cross-phase cache reuse — which was theoretically possible under the 60-min TTL — is now structurally impossible.
 
-Per cycle-11 forensics (`docs/architecture/token-economics-2026.md`): cache-creation is ~30% of per-phase cost. Eliminating cross-phase cache misses (restoring 1-hour TTL) could recover most of this.
+Per cycle-11 forensics (`docs/architecture/token-economics-2026.md`): cache-creation is ~30% of per-phase cost. Eliminating cross-phase cache misses (restoring 1-hour TTL) can recover most of this.
 
 **Three mitigation paths:**
 
@@ -552,12 +594,12 @@ Per cycle-11 forensics (`docs/architecture/token-economics-2026.md`): cache-crea
 |------|-----------|-------------|
 | A — CLI flag | Pass `--cache-ttl=3600` or equivalent to `claude -p` subagent invocation | Requires CLI support; investigate cycle 43 |
 | B — API migration | Document as prerequisite for API-based subagent dispatch (SDK exposes `"ttl": 3600` in `cache_control`) | Long-term; requires API auth + non-CLI dispatch |
-| C — Phase timing | Minimize inter-phase delays (orchestrator turn reduction via P-NEW-16; parallel-eligible phases) | Already in motion via P-NEW-9/P-NEW-10/P-NEW-16 |
+| C — Phase timing | Minimize inter-phase delays (orchestrator turn reduction through P-NEW-16; parallel-eligible phases) | Already in motion through P-NEW-9/P-NEW-10/P-NEW-16 |
 
 **Investigation tasks (cycle 43):**
 1. Run `claude --help | grep -i cache` to confirm if `--cache-ttl` flag exists in installed version
 2. Inspect `~/.claude/config.json` or equivalent for TTL overrides
-3. Test: invoke `claude -p` with explicit cache breakpoint and measure TTL via API metadata
+3. Test: invoke `claude -p` with explicit cache breakpoint and measure TTL through API metadata
 4. Document result in `docs/research/cache-ttl-march-2026-impact.md`
 
 **Source:** Anthropic TTL change 2026-03-06 (GitHub claude-code issue #56307); Anthropic SDK `cache_control.ttl` (SDK docs 2026); arXiv:2601.06007 "Don't Break the Cache: Agentic Task Evaluation" (2026) — cache-safety constraints for multi-turn agents.
@@ -579,7 +621,7 @@ See `docs/research/cache-ttl-march-2026-impact.md` for full research dossier.
 
 **What the promotion does:**
 - (Cycle A1) `subagent-run.sh` emits a compact `## INVOCATION CONTEXT` user prompt instead of the verbose v1 header
-- (Cycle A2) `claude.sh` attaches role-specific bedrock via `--append-system-prompt` (system-prompt slot is cached automatically; byte-stable per role across runs)
+- (Cycle A2) `claude.sh` attaches role-specific bedrock through `--append-system-prompt` (system-prompt slot is cached automatically; byte-stable per role across runs)
 - `--exclude-dynamic-system-prompt-sections` already flows through profiles' `extra_flags` in both v1 and v2
 
 **Promotion ladder satisfied:** default-off (v8.61) → verify (v8.61–v10.5.x, 18+ versions, no known breakage) → **default-on (v10.6, this cycle)**.
@@ -606,7 +648,7 @@ See `docs/research/cache-ttl-march-2026-impact.md` for full research dossier.
 - `verdict-decided` — PASS/FAIL decision made from `acs-verdict.json` + predicate results
 - `report-written` — `audit-report.md` + `acs-verdict.json` written
 
-Banned post-report patterns: re-running predicates after verdict written, additional grep searches after report written, "let me also check…" loops.
+Banned post-report patterns: re-running predicates after verdict written, more grep searches after report written, "let me also check…" loops.
 
 **Source:** Analogous to P-NEW-10 (Scout, $0.97/cycle actual) and P-NEW-16 (Orchestrator, $0.40/cycle expected). Same post-completion accumulation pattern at auditor cost.
 
@@ -667,28 +709,28 @@ Banned post-report patterns: re-running predicates after verdict written, additi
 
 **Phase 1 (DONE cycle 46):** Added `schema_filter_enabled: true` field to `profiles/scout.json`, `profiles/triage.json`, `profiles/memo.json`. This marks these roles as targets for dispatch-layer schema filtering.
 
-**Phase 2 (DONE cycle 47):** `legacy/scripts/cli_adapters/claude.sh` reads `schema_filter_enabled` from the profile. When `true`, adapter checks whether `--strict-mcp-config` is already in `EXTRA_FLAGS_ARR`; if not, auto-injects it. This makes `schema_filter_enabled: true` the declarative source of truth — the adapter enforces it structurally rather than relying on each profile to manually include the flag in `extra_flags`. All three target profiles already had `--strict-mcp-config` in their extra_flags; the adapter now guarantees it for any future profile that sets `schema_filter_enabled: true`.
+**Phase 2 (DONE cycle 47):** `legacy/scripts/cli_adapters/claude.sh` reads `schema_filter_enabled` from the profile. When `true`, the adapter checks if `--strict-mcp-config` is already in `EXTRA_FLAGS_ARR`. If not, it auto-injects it. This makes `schema_filter_enabled: true` the declarative source of truth. The adapter enforces it structurally and does not rely on each profile to include the flag manually in `extra_flags`. All three target profiles already had `--strict-mcp-config` in their extra_flags; the adapter now guarantees it for any future profile that sets `schema_filter_enabled: true`.
 
 **Source:** GitHub Blog (2026-05-13) "Improving token efficiency in agentic workflows"; MindStudio "10 MCP Optimization Techniques"; MCP SEP-1576 "Mitigating Token Bloat". Tool schema compression: 30–60% per-request overhead reduction reported.
 
 ---
 
-## P-NEW-23 — Token-Budget-Aware Turn Hints via role-context-builder.sh
+## P-NEW-23 — Token-Budget-Aware Turn Hints through role-context-builder.sh
 
 **Status: DONE (cycle 44)**
 
 | Field | Value |
 |-------|-------|
 | **Subsystem** | `legacy/scripts/lifecycle/role-context-builder.sh` — `emit_budget_hint()` added to `header_block()` |
-| **Expected saving** | 10–20% additional turn reduction on top of stop-criterion |
+| **Expected saving** | 10–20% more turn reduction on top of stop-criterion |
 | **Actual LoC delta** | 16 LoC in `role-context-builder.sh` + 6 one-line profile edits |
 | **Risk** | Low — prompt-level only; no structural change |
 | **Shipped cycle** | 44 |
 | **Verification** | Compare `turns` in usage sidecars with/without hint across 3 cycles; assert ≥10% reduction |
 
-**Problem:** Stop-criterion sections (P-NEW-10, P-NEW-16, P-NEW-19, P-NEW-20) are gate-based — they tell the agent when to stop *after* work is done. Budget hints are *preemptive*: injecting a turn budget in the context primes the agent to be concise from turn 1, preventing over-elaboration before gates are even reached.
+**Problem:** Stop-criterion sections (P-NEW-10, P-NEW-16, P-NEW-19, P-NEW-20) are gate-based. They tell the agent when to stop *after* work is done. Budget hints are *preemptive*. A turn budget in the context primes the agent to be concise from turn 1. This prevents over-elaboration before the agent reaches the gates.
 
-**Implementation:** `emit_budget_hint()` in `role-context-builder.sh` reads `turn_budget_hint` from the role's profile JSON via `jq`. When set, it appends a `## Budget` block to `header_block()` output. Per-role advisory values: scout:12, builder:20, auditor:30, orchestrator:45, memo:8, triage:12 (all roughly 75–80% of `max_turns` to induce conservative self-regulation per arXiv:2412.18547).
+**Implementation:** `emit_budget_hint()` in `role-context-builder.sh` reads `turn_budget_hint` from the role's profile JSON through `jq`. When set, it appends a `## Budget` block to `header_block()` output. Per-role advisory values: scout:12, builder:20, auditor:30, orchestrator:45, memo:8, triage:12 (all roughly 75–80% of `max_turns` to induce conservative self-regulation per arXiv:2412.18547).
 
 ---
 
@@ -710,7 +752,7 @@ Banned post-report patterns: re-running predicates after verdict written, additi
 
 ---
 
-## P-NEW-25 — Anthropic Native Compaction via compact-2026-01-12 API
+## P-NEW-25 — Anthropic Native Compaction through compact-2026-01-12 API
 
 | Field | Value |
 |-------|-------|
@@ -724,7 +766,7 @@ Banned post-report patterns: re-running predicates after verdict written, additi
 
 **Problem:** Orchestrator (48 turns / $1.68, cycle-43) and Builder (69 turns / $3.12, cycle-43) are the two highest-cost phases. Both run long sessions where context accumulates. Anthropic's compaction API (compact-2026-01-12) provides automatic context compaction for long-running agent sessions with 40–60% cost reduction and zero changes to persona prompts.
 
-**Investigation first (cycle 45):** Determine whether `claude -p` exposes a `--compact` flag (or equivalent env var). If Path A is open: wire `EVOLVE_COMPACTION=1` in dispatcher profiles for orchestrator and builder. If Path A is closed: explore SDK-level compaction as Path B.
+**Investigation first (cycle 45):** Determine if `claude -p` exposes a `--compact` flag (or equivalent env var). If Path A is open: wire `EVOLVE_COMPACTION=1` in dispatcher profiles for orchestrator and builder. If Path A is closed: explore SDK-level compaction as Path B.
 
 ---
 
@@ -750,20 +792,20 @@ Banned post-report patterns: re-running predicates after verdict written, additi
 
 ---
 
-## P-NEW-29 — Parallel Tool-Call Batching via Multi-Tool-Use Pattern
+## P-NEW-29 — Parallel Tool-Call Batching through Multi-Tool-Use Pattern
 
 | Field | Value |
 |-------|-------|
 | **Subsystem** | Agent personas (`agents/evolve-builder.md`, `agents/evolve-scout.md`) — turn-level tool dispatch |
 | **Status** | **DONE (cycle 47)** |
 | **Research source** | Anthropic Multi-Tool-Use Parallel pattern (Claude API Cookbook 2026); MindStudio "10 MCP Optimization Techniques" (2026) |
-| **Expected saving** | 20–40% turn reduction for read-heavy phases; additional ~5–10% per-turn input reduction from reduced schema serialization overhead |
+| **Expected saving** | 20–40% turn reduction for read-heavy phases; more ~5–10% per-turn input reduction from reduced schema serialization overhead |
 | **LoC delta** | ~28 LoC (persona guidance sections in 2 files — Builder 3 before/after examples + rule; Scout compact guidance) |
 | **Risk** | Low — guidance-only change; no pipeline structure change |
 | **Shipped cycle** | 47 |
 | **Verification** | `grep -q "Parallel Tool-Call Batching" agents/evolve-builder.md agents/evolve-scout.md` |
 
-**Problem:** Scout and Builder agents issue sequential single-tool calls when multiple independent reads could be parallelized. In cycle-45, Builder made 58 turns — a significant portion were sequential `Read` + `Read` + `Bash` calls that have no ordering dependency. Each sequential call adds a round-trip schema serialization overhead (~500–2,000 tokens) and costs a full turn.
+**Problem:** Scout and Builder agents issue sequential single-tool calls when multiple independent reads can be parallelized. In cycle-45, Builder made 58 turns — a significant portion were sequential `Read` + `Read` + `Bash` calls that have no ordering dependency. Each sequential call adds a round-trip schema serialization overhead (~500–2,000 tokens) and costs a full turn.
 
 **Fix:** Add a "Parallel Tool Use" guidance section to `agents/evolve-builder.md` and `agents/evolve-scout.md` instructing agents to:
 1. Identify groups of independent tool calls (multiple `Read` for different files, multiple `Grep` for different patterns).
@@ -794,12 +836,12 @@ Read(file_a), Read(file_b)  →  result_a, result_b (parallel)
 | **Status** | **PENDING (cycle 48+)** |
 | **Research source** | arXiv:2604.19572 (TACO — Self-Evolving Terminal Agent Compression, Apr 2026) [[11]](#sources) |
 | **Expected saving** | 30–50% terminal observation token reduction; complements P-NEW-24 (expired tool-result removal) |
-| **LoC delta** | TBD — depends on implementation approach (pre-context filter vs. in-context summarization) |
+| **LoC delta** | TBD — depends on implementation approach (pre-context filter against in-context summarization) |
 | **Risk** | Low (training-free, model-agnostic) → Medium (requires integration point in trajectory) |
 | **Target cycle** | 48+ |
 | **Verification** | Compare Builder `input_tokens` per-turn before/after; assert ≥20% reduction on tool-result-heavy builds |
 
-**Problem:** Builder's multi-turn trajectory accumulates raw tool-result observations (Read, Grep, Bash output) that grow quadratically with turn count. P-NEW-24 addresses *expired* results; TACO addresses *noisy* results — tool outputs with irrelevant content that could be compressed at ingestion time without losing task-critical signals.
+**Problem:** Builder's multi-turn trajectory accumulates raw tool-result observations (Read, Grep, Bash output) that grow quadratically with turn count. P-NEW-24 addresses *expired* results; TACO addresses *noisy* results — tool outputs with irrelevant content that can be compressed at ingestion time without losing task-critical signals.
 
 **TACO framework:** Discovers compression rules from agent trajectories; refines them iteratively. Training-free and plug-and-play — no fine-tuning required. Applies before tool results enter the context window, preventing accumulation rather than retroactively removing it. Directly applicable to evolve-loop Builder's tool-result bloat identified in cycle-46 (95-turn regression).
 

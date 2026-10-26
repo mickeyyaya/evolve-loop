@@ -106,13 +106,13 @@ Coverage: `legacy/scripts/tests/parallelization-discipline-test.sh` (12 tests) h
 
 ## The Concurrency Cap
 
-`legacy/scripts/dispatch/fanout-dispatch.sh:73` resolves the cap via:
+`legacy/scripts/dispatch/fanout-dispatch.sh:73` resolves the cap with:
 
 ```bash
 CONCURRENCY="${EVOLVE_FANOUT_CONCURRENCY:-2}"   # default 2 since v8.55
 ```
 
-The cap is enforced by a bash-3.2-portable FIFO semaphore (FD 9 with N pre-populated tokens; each worker acquires one before spawning, returns it on subshell exit). Workers spawn as soon as a token is free; WAIT-ALL semantics ensure the dispatcher returns only after every worker completes.
+A bash-3.2-portable FIFO semaphore enforces the cap (FD 9 with N pre-populated tokens). Each worker acquires one token before it spawns, and returns it on subshell exit. Workers spawn as soon as a token is free. WAIT-ALL semantics make sure that the dispatcher returns only after every worker completes.
 
 ### Why default 2
 
@@ -122,9 +122,9 @@ The cap is enforced by a bash-3.2-portable FIFO semaphore (FD 9 with N pre-popul
 | Auditor (4) | 1× | 2× (two batches) | identical |
 | Retrospective (3) | 1× | ≈ 1.5× | identical |
 
-**Total tokens are unchanged; peak burn rate is halved.** For continuous `/loop` runs on subscription quota, the slower-but-steadier burn profile is the difference between completing a multi-hour run and hitting a rate limit. Operators on API plans with no rate concerns can opt back to 4 (or higher) via the env var.
+**Total tokens are unchanged; peak burn rate is halved.** For continuous `/loop` runs on subscription quota, the slower-but-steadier burn profile is the difference between completing a multi-hour run and hitting a rate limit. Operators on API plans with no rate concerns can opt back to 4 (or higher) with the env var.
 
-The number `2` (not `1`) preserves the multi-perspective benefit of fan-out — at any given moment ≥ 2 perspectives run in parallel, which is the minimum for MAJORITY-PASS / FAIL-VETO consensus from the v8.53 cross-CLI framework.
+The number `2` (not `1`) keeps the multi-perspective benefit of fan-out. At any given moment ≥ 2 perspectives run in parallel. This is the minimum for MAJORITY-PASS / FAIL-VETO consensus from the v8.53 cross-CLI framework.
 
 ### Override
 
@@ -167,7 +167,7 @@ EVOLVE_FANOUT_PER_WORKER_BUDGET_USD=0.05 /loop  # tighter cap (small verificatio
 EVOLVE_FANOUT_PER_WORKER_BUDGET_USD=1.00 /loop  # looser cap (large complex cycle)
 ```
 
-Phase E does *not* implement mid-flight kill on cumulative cost overflow — that would require IPC + race resolution. The per-worker cap is enforced by the underlying `claude --max-budget-usd` mechanism (deterministic, race-free). Workers that exceed their individual budget abort cleanly; sibling workers continue.
+Phase E does *not* implement mid-flight kill on cumulative cost overflow. That needs IPC + race resolution. The per-worker cap is enforced by the underlying `claude --max-budget-usd` mechanism (deterministic, race-free). Workers that exceed their individual budget abort cleanly; sibling workers continue.
 
 ---
 
@@ -224,7 +224,7 @@ When introducing a new agent profile under `.evolve/profiles/<role>.json`:
 1. **Declare `parallel_eligible` explicitly.** Default-deny means missing field → rejected at dispatch.
 2. **If `true`, add `_parallel_eligible_reason`** explaining how the role satisfies the (a)/(b)/(c) clauses.
 3. **If `true`, add the role to the canonical taxonomy** in `legacy/scripts/tests/parallelization-discipline-test.sh` so the test asserts your declaration is intentional.
-4. **Audit the role's prompt and tools.** If it can `git commit`, write to `state.json`, or modify a Builder-owned file, the answer is `false`.
+4. **Audit the role's prompt and tools.** If it can `git commit`, write to `state.json`, or change a Builder-owned file, the answer is `false`.
 5. **Document the role in this file's [Role Taxonomy](#role-taxonomy) table.**
 
 If unsure, choose `false`. Promoting later is safe; demoting later is a bug surface.
@@ -235,7 +235,7 @@ If unsure, choose `false`. Promoting later is safe; demoting later is a bug surf
 
 | Lens | Statement |
 |---|---|
-| **Builder single-writer invariant (v8.16)** | Was a one-role-specific rule. Now it is *the* rule, generalized via the canonical taxonomy. |
+| **Builder single-writer invariant (v8.16)** | Was a one-role-specific rule. Now it is *the* rule, generalized through the canonical taxonomy. |
 | **Conway's law** | Pipeline architecture mirrors the read-only/parallel + sequential-write organizational principle. |
 | **CAP analog for agent systems** | Sequential-write trades availability (latency) for consistency (correctness compounds over multi-day runs). |
 | **Little's Law (queueing theory)** | Average concurrency × wall-time ≈ total work. Halving concurrency doubles wall-time but holds total token cost constant; what changes is the **burn rate** (tokens/second), which is exactly what subscription rate-limiters measure. |
