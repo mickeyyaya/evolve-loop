@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "`go vet -tags acs ./acs/cycle334/` is clean and `go test -tags acs -count=1 ./acs/cycle334/` passes on main",
+    "The PR states the decision on a compile-only acs step in CI"
+  ],
+  "created_at": "2026-10-26T09:30:02Z",
+  "deps": [],
+  "files": [
+    "go/acs/cycle334/predicates_test.go",
+    "go/internal/quotareset/quotareset.go"
+  ],
+  "fix": "Port the predicate to the current Options (DefaultHours or UsageReset seam) keeping its intent, or retire it if a quotareset unit test pins the same behavior (name that test). Consider a CI step that only builds every acs package (`go vet -tags acs ./acs/...`) so a compile break is caught.",
+  "id": "acs-cycle334-does-not-compile",
+  "kind": "techdebt",
+  "priority_class": "hygiene",
+  "route": "console-manual",
+  "source": "console builder, 2026-10-26, main-reds investigation (PR #1153)",
+  "summary": "On main 1db031993 (2026-10-26) `go vet -tags acs ./acs/cycle334/` fails: predicates_test.go:43:70 unknown field HoursFn in struct literal of type quotareset.Options. go/internal/quotareset/quotareset.go:23 now has Now, ResetAt, DefaultHours, BenchedUntil and UsageReset. Any `go vet -tags acs ./acs/...` or `go test -tags acs ./acs/...` sweep fails to build this package. No CI job builds acs/cycle* with the acs tag, so the break was not seen.",
+  "title": "Archived predicate acs/cycle334 does not compile on main: quotareset.Options has no HoursFn field",
+  "weight": 0.25
+}
