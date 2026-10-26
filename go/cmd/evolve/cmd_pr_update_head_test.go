@@ -171,8 +171,8 @@ func TestPRMerger_UpdateBranchTimeout(t *testing.T) {
 		name, newHead, failAfter string
 		code                     int
 	}{
-		{"head never moves", "old12", "", exitRefused},
-		{"empty head is no new head", "", "", exitRefused},
+		{"head never moves", "old12", "", cliExitRefused},
+		{"empty head is no new head", "", "", cliExitRefused},
 		{"view fails while waiting", "new12", "gh: HTTP 502", exitIO},
 	}
 	for _, c := range cases {
@@ -201,7 +201,7 @@ func TestPRMerger_UpdateBranchTimeout(t *testing.T) {
 			if *slept > m.wait+m.poll {
 				t.Errorf("the head wait must stay inside --wait %s, slept %s", m.wait, *slept)
 			}
-			if c.code == exitRefused && *slept == 0 {
+			if c.code == cliExitRefused && *slept == 0 {
 				t.Errorf("a lagging head must be polled for before the refusal, slept %s", *slept)
 			}
 		})

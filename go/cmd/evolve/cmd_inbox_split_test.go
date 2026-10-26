@@ -36,7 +36,7 @@ func splitRoot(t *testing.T, item string) string {
 	root := emptyInboxRoot(t)
 	t.Setenv("EVOLVE_PROJECT_ROOT", root)
 	var stdout, stderr bytes.Buffer
-	if rc := runInbox([]string{"add"}, strings.NewReader(item), &stdout, &stderr); rc != 0 {
+	if rc := runInbox([]string{"add", "--file", "-"}, strings.NewReader(item), &stdout, &stderr); rc != 0 {
 		t.Fatalf("add: rc = %d stderr = %q", rc, stderr.String())
 	}
 	return root
@@ -237,7 +237,7 @@ func TestCmd_InboxSplit_RefusesWhileAPendingItemDependsOnTheOriginal(t *testing.
 	root := splitRoot(t, splitItem("mixed", splitProtectedFile, splitLaneFile))
 	dependent := strings.Replace(splitItem("waiter", splitLaneFile), `"weight"`, `"deps":["mixed"],"weight"`, 1)
 	var stdout, stderr bytes.Buffer
-	if rc := runInbox([]string{"add"}, strings.NewReader(dependent), &stdout, &stderr); rc != 0 {
+	if rc := runInbox([]string{"add", "--file", "-"}, strings.NewReader(dependent), &stdout, &stderr); rc != 0 {
 		t.Fatalf("add: rc = %d stderr = %q", rc, stderr.String())
 	}
 	before := listInboxTree(t, root)

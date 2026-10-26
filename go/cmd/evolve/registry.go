@@ -42,7 +42,7 @@ var commands = []subcommand{
 	{Name: "apicover", Summary: "Measure public-API coverage (apicover [-cover f] [-require-doc] [-enforce] <pkgdir>...)", Run: runApicover},
 	{Name: "inbox", Summary: "The backlog: batches (the grouping triage consumes) | list | show | add | edit | verify | withdraw | route-console | route-lane | consume | quarantine | ack-fingerprint (evolve inbox --help)", Run: runInbox},
 	{Name: "phase", Summary: "Run a single phase in-process", Run: runPhase},
-	{Name: "agent", Summary: "Run one read-only phase agent with no cycle: agent run <profile> [--input FILE|-] [--file PATH]... [--json] [--keep] [--project-root P] prints the report on stdout (--json: one envelope with the report, verdict, model, cost and tokens); agent list [--json] names the profiles (exit 0 pass, 1 fail, 2 refused, 3 dispatch error, 10 usage, 11 input)", Run: agentcmd.New(agentcmd.Deps{InstallRouter: rootRouterInstaller})},
+	{Name: "agent", Summary: "Run one read-only phase agent with no cycle: agent run <profile> [--input FILE|-] [--file PATH]... [--json] [--keep] [--project-root P] prints the report on stdout (--json: one envelope with the report, verdict, model, cost and tokens); agent list [--json] names the profiles (exit 0 pass, 1 fail, 3 refused, 21 dispatch error, 10 usage, 11 input)", Run: agentcmd.New(agentcmd.Deps{InstallRouter: rootRouterInstaller})},
 	{Name: "phases", Summary: "List/validate/scaffold phase definitions (the phase catalog)", Run: phasecmd.RunPhases},
 	{Name: "serve-phase", Summary: "Envelope-framed phase subprocess", Run: phasecmd.NewRunServePhase(rootRouterInstaller)},
 	{Name: "cycle", Summary: "Run one full cycle", Run: runCycle},

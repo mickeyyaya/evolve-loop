@@ -101,7 +101,7 @@ func TestNew_ZeroDepsUseTheProcessEnvironment(t *testing.T) {
 
 	code := New(Deps{})([]string{"run", "adversarial-review", "--project-root", project(t)}, strings.NewReader(diff), &stdout, &stderr)
 
-	if code != 2 || !strings.Contains(stderr.String(), "inside a phase") {
+	if code != exitRefused || !strings.Contains(stderr.String(), "inside a phase") {
 		t.Errorf("exit %d stderr %q, want the process dispatch depth to refuse the run", code, stderr.String())
 	}
 }

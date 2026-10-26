@@ -108,14 +108,14 @@ func FuzzParseInboxBatchesArgs(f *testing.F) {
 func TestRunInboxBatches_RefusesBadArgsAndAnUnreadableInbox(t *testing.T) {
 	t.Run("bad args", func(t *testing.T) {
 		var stdout, stderr bytes.Buffer
-		if code := runInboxBatches([]string{"--max"}, &stdout, &stderr); code != 10 || stdout.Len() != 0 {
+		if code := runInboxBatches(envOrCwd("EVOLVE_PROJECT_ROOT"), []string{"--max"}, &stdout, &stderr); code != 10 || stdout.Len() != 0 {
 			t.Fatalf("code=%d stdout=%q", code, stdout.String())
 		}
 	})
 	t.Run("an unreadable inbox", func(t *testing.T) {
 		e2InboxDirAsFile(t)
 		var stdout, stderr bytes.Buffer
-		code := runInboxBatches(nil, &stdout, &stderr)
+		code := runInboxBatches(envOrCwd("EVOLVE_PROJECT_ROOT"), nil, &stdout, &stderr)
 		if code != 1 || !strings.HasPrefix(stderr.String(), "inbox batches: inboxbatch: read dir:") || stdout.Len() != 0 {
 			t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 		}
@@ -177,14 +177,16 @@ func TestReadInboxAddItem_SourcesAndFailures(t *testing.T) {
 		wantCode int
 		wantErr  string
 	}{
-		{name: "stdin", stdin: strings.NewReader(`{"id":"from-stdin"}`), want: `{"id":"from-stdin"}`},
-		{name: "empty stdin", stdin: strings.NewReader(""), want: ""},
+		{name: "stdin", args: []string{"--file", "-"}, stdin: strings.NewReader(`{"id":"from-stdin"}`), want: `{"id":"from-stdin"}`},
+		{name: "empty stdin", args: []string{"--file", "-"}, stdin: strings.NewReader(""), want: ""},
+		{name: "stdin without --file -", stdin: strings.NewReader(`{"id":"from-stdin"}`), wantCode: 10, wantErr: inboxUsage("add")},
+		{name: "--file - with no stdin", args: []string{"--file", "-"}, useNil: true, wantCode: 10, wantErr: inboxUsage("add")},
 		{name: "a file", args: []string{"--file", file}, useNil: true, want: `{"id":"from-file"}`},
 		{name: "a missing file", args: []string{"--file", file + ".absent"}, useNil: true, wantCode: 2, wantErr: "inbox add: open "},
 		{name: "no stdin and no file", useNil: true, wantCode: 10, wantErr: inboxUsage("add")},
 		{name: "a bare --file", args: []string{"--file"}, useNil: true, wantCode: 10, wantErr: inboxUsage("add")},
 		{name: "a wrong flag", args: []string{"--path", file}, useNil: true, wantCode: 10, wantErr: inboxUsage("add")},
-		{name: "a torn stdin", failRead: true, wantCode: 2, wantErr: "inbox add: read the item: stdin torn"},
+		{name: "a torn stdin", args: []string{"--file", "-"}, failRead: true, wantCode: 2, wantErr: "inbox add: read the item: stdin torn"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -227,7 +229,7 @@ func TestRunInboxConsume_AFailedConsumedDirLeavesTheItemPending(t *testing.T) {
 	writeE2File(t, filepath.Join(evolveDir, "inbox"), "a file blocks the consumed dir")
 	var stdout, stderr bytes.Buffer
 
-	code := runInboxConsume([]string{item}, &stdout, &stderr)
+	code := runInboxConsume(envOrCwd("EVOLVE_PROJECT_ROOT"), []string{item}, &stdout, &stderr)
 
 	if code != 1 || !strings.HasPrefix(stderr.String(), "inbox consume: "+item+": mkdir ") {
 		t.Fatalf("code=%d stderr=%q", code, stderr.String())
@@ -244,7 +246,7 @@ func TestRunInboxConsume_AFailedMoveLeavesTheItemPending(t *testing.T) {
 	writeE2File(t, filepath.Join(evolveDir, "inbox", "consumed", name, "occupant"), "x")
 	var stdout, stderr bytes.Buffer
 
-	code := runInboxConsume([]string{item}, &stdout, &stderr)
+	code := runInboxConsume(envOrCwd("EVOLVE_PROJECT_ROOT"), []string{item}, &stdout, &stderr)
 
 	if code != 1 || !strings.HasPrefix(stderr.String(), "inbox consume: "+item+": rename ") {
 		t.Fatalf("code=%d stderr=%q", code, stderr.String())
@@ -260,7 +262,7 @@ func TestRunInboxConsume_AFailedStampIsReportedAfterTheMove(t *testing.T) {
 	item := writePendingItem(t, evolveDir, name, `{"id":"long-name"}`)
 	var stdout, stderr bytes.Buffer
 
-	code := runInboxConsume([]string{item}, &stdout, &stderr)
+	code := runInboxConsume(envOrCwd("EVOLVE_PROJECT_ROOT"), []string{item}, &stdout, &stderr)
 
 	dest := filepath.Join(evolveDir, "inbox", "consumed", name)
 	if code != 1 || !strings.HasPrefix(stderr.String(), "inbox consume: "+dest+" consumed, but the consumed stamp write failed: ") {
@@ -278,7 +280,7 @@ func TestRunInboxConsume_AFailedAckIsReportedAfterTheMove(t *testing.T) {
 	item := writePendingItem(t, evolveDir, name, `{"id":"acked","consumed_by":"`+realConsumedByNarrative+`"}`)
 	var stdout, stderr bytes.Buffer
 
-	code := runInboxConsume([]string{item}, &stdout, &stderr)
+	code := runInboxConsume(envOrCwd("EVOLVE_PROJECT_ROOT"), []string{item}, &stdout, &stderr)
 
 	dest := filepath.Join(evolveDir, "inbox", "consumed", name)
 	if code != 1 || !strings.HasPrefix(stderr.String(), "inbox consume: "+dest+" consumed, but the fingerprint ack failed: resolved-fingerprints.json:") {
@@ -302,7 +304,7 @@ func TestRunInboxConsume_ADirectoryItemIsRefusedInPlace(t *testing.T) {
 	}
 	var stdout, stderr bytes.Buffer
 
-	code := runInboxConsume([]string{dir}, &stdout, &stderr)
+	code := runInboxConsume(envOrCwd("EVOLVE_PROJECT_ROOT"), []string{dir}, &stdout, &stderr)
 
 	if code != 1 || !strings.Contains(stderr.String(), "(item left in place)") {
 		t.Fatalf("code=%d stderr=%q", code, stderr.String())
@@ -448,7 +450,7 @@ func TestRunInboxList_AnUnreadableInboxExits2(t *testing.T) {
 	e2InboxDirAsFile(t)
 	var stdout, stderr bytes.Buffer
 
-	code := runInboxList(nil, &stdout, &stderr)
+	code := runInboxList(envOrCwd("EVOLVE_PROJECT_ROOT"), nil, &stdout, &stderr)
 
 	if code != 2 || !strings.HasPrefix(stderr.String(), "inbox list: inboxbatch: read dir:") || stdout.Len() != 0 {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
@@ -534,7 +536,7 @@ func TestRunInboxShow_AnUnreadableInboxExits2(t *testing.T) {
 	e2InboxDirAsFile(t)
 	var stdout, stderr bytes.Buffer
 
-	code := runInboxShow([]string{"any"}, &stdout, &stderr)
+	code := runInboxShow(envOrCwd("EVOLVE_PROJECT_ROOT"), []string{"any"}, &stdout, &stderr)
 
 	if code != 2 || !strings.HasPrefix(stderr.String(), "inbox show: inboxbatch: read dir:") || stdout.Len() != 0 {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())

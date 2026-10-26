@@ -176,7 +176,8 @@ The state on 2026-10-26. Each component re-reads this table before it starts.
 | X10 | built | this change | `AGENTS.md` is the one source. `evolve skills generate` renders its digest into `CLAUDE.md` and `GEMINI.md`, and the four review-fleet personas into `.claude/agents`. |
 | X17a | merged | #1125 | `evolve loop status` with any extra word never starts a loop. |
 | X17e | merged | #1130 | Each `evolve` verb has an agent class (docs). |
-| X9, X11 to X16, X17b to X17d, X18b to X19 | not started | none | |
+| X17b | built | this change | With `--json`, each core verb of [cli-contract.md](../architecture/cli-contract.md) §5 prints one envelope on each exit and exits with a code of the one exit table. Each core verb takes `--project-root`. `TestCLIContract_DocMatchesTheRegistry` and the integration table test guard both. |
+| X9, X11 to X16, X17c, X17d, X18b to X19 | not started | none | |
 
 ### 6.2 The X6 follow-up (X6b)
 

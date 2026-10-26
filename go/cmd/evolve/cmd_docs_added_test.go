@@ -146,7 +146,7 @@ func TestDocsSteLint_AddedKeepsTheSkipNoticeOfAGeneratedFile(t *testing.T) {
 
 	code, stdout, _ := runDocsCLI("ste-lint", "--strict", "--json", "--changed", base, "--added", "--project-root", repo.Dir)
 
-	if code != 0 || !strings.Contains(stdout, `"skipped": [`) || strings.Contains(stdout, `"skipped": []`) {
+	if data := string(oneEnvelope(t, stdout).Data); code != 0 || !strings.Contains(data, `"skipped":[`) || strings.Contains(data, `"skipped":[]`) {
 		t.Fatalf("code %d, stdout:\n%s\nwant the skip notice kept", code, stdout)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -18,12 +19,14 @@ import (
 
 type inboxVerb struct {
 	name, synopsis string
-	run            func(args []string, stdin io.Reader, stdout, stderr io.Writer) int
+	run            func(root string, args []string, stdin io.Reader, stdout, stderr io.Writer) int
 }
 
 func inboxVerbs() []inboxVerb {
-	withoutStdin := func(run func(args []string, stdout, stderr io.Writer) int) func([]string, io.Reader, io.Writer, io.Writer) int {
-		return func(args []string, _ io.Reader, stdout, stderr io.Writer) int { return run(args, stdout, stderr) }
+	withoutStdin := func(run func(root string, args []string, stdout, stderr io.Writer) int) func(string, []string, io.Reader, io.Writer, io.Writer) int {
+		return func(root string, args []string, _ io.Reader, stdout, stderr io.Writer) int {
+			return run(root, args, stdout, stderr)
+		}
 	}
 	return []inboxVerb{
 		{"batches", "batches [--json] [--max N]", withoutStdin(runInboxBatches)},
@@ -31,16 +34,16 @@ func inboxVerbs() []inboxVerb {
 		{"list", "list [--status " + strings.Join(menuStatusNames[:], "|") + "] [--kind K] [--route R] [--json]", withoutStdin(runInboxList)},
 		{"show", "show <id> [--json]", withoutStdin(runInboxShow)},
 		{"rank", "rank [--list " + strings.Join(rankListNames, "|") + "] [--top N] [--explain <id>] [--json]", withoutStdin(runInboxRank)},
-		{"add", "add [--file <item.json>]   (without --file, the item JSON is read from stdin)", runInboxAdd},
-		{"edit", "edit <id|item-path> (--set F=V | --add F=V | --remove F=V)...   (--set on a list field takes a JSON array)", withoutStdin(runInboxEdit)},
-		{"verify", "verify <id> --evidence <text>", withoutStdin(runInboxVerify)},
-		{"withdraw", "withdraw <id> <reason>", withoutStdin(runInboxWithdraw)},
+		{"add", "add --file <item.json|-> [--json]   (--file - reads the item JSON from stdin)", runInboxAdd},
+		{"edit", "edit <id|item-path> (--set F=V | --add F=V | --remove F=V)... [--json]   (--set on a list field takes a JSON array)", withoutStdin(runInboxEdit)},
+		{"verify", "verify <id> --evidence <text> [--json]", withoutStdin(runInboxVerify)},
+		{"withdraw", "withdraw <id> <reason> [--json]", withoutStdin(runInboxWithdraw)},
 		{"claims", "claims [--json] [--project-root P]", withoutStdin(runInboxClaims)},
 		{"release", "release <id> <reason> [--keep root|claim] [--json] | release --stale <reason> [--json] [--project-root P]", withoutStdin(runInboxRelease)},
 		{"split", "split <id> [--lane-after-console] [--json] [--project-root P]", withoutStdin(runInboxSplit)},
-		{"route-console", "route-console <id> <reason> <cycle>", withoutStdin(runInboxRouteConsole)},
-		{"route-lane", "route-lane <id> <reason>", withoutStdin(runInboxRouteLane)},
-		{"consume", "consume <item-path> [--resolution <text>] [--cycle <n>|console]", withoutStdin(runInboxConsume)},
+		{"route-console", "route-console <id> <reason> <cycle> [--json]", withoutStdin(runInboxRouteConsole)},
+		{"route-lane", "route-lane <id> <reason> [--json]", withoutStdin(runInboxRouteLane)},
+		{"consume", "consume <item-path> [--resolution <text>] [--cycle <n>|console] [--json]", withoutStdin(runInboxConsume)},
 		{"quarantine", "quarantine list [--json] | quarantine release <id>", runInboxQuarantine},
 		{"ack-fingerprint", "ack-fingerprint <item-path>", withoutStdin(runInboxAckFingerprint)},
 	}
@@ -57,12 +60,41 @@ func runInbox(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 0
 	}
 	for _, v := range verbs {
-		if args[0] == v.name {
-			return v.run(args[1:], stdin, stdout, stderr)
+		if args[0] != v.name {
+			continue
 		}
+		root, rest, ok := takeProjectRoot(args[1:])
+		if !ok {
+			fmt.Fprintln(stderr, inboxUsage(v.name))
+			return cliExitUsage
+		}
+		return v.run(root, rest, stdin, stdout, stderr)
 	}
 	printInboxUsage(stderr, verbs)
 	return 10
+}
+
+type inboxWriteResult struct {
+	Verb   string `json:"verb"`
+	ID     string `json:"id,omitempty"`
+	Path   string `json:"path"`
+	Detail string `json:"detail,omitempty"`
+}
+
+func takeInboxJSON(args []string) (bool, []string) {
+	i := slices.Index(args, "--json")
+	if i < 0 {
+		return false, args
+	}
+	return true, slices.Concat(args[:i], args[i+1:])
+}
+
+func finishInboxWrite(asJSON bool, r inboxWriteResult, human string, stdout, stderr io.Writer) int {
+	if asJSON {
+		return printVerbJSON("inbox "+r.Verb, r, stdout, stderr)
+	}
+	fmt.Fprintln(stdout, human)
+	return cliExitOK
 }
 
 func inboxUsage(verb string) string {
@@ -75,7 +107,7 @@ func inboxUsage(verb string) string {
 }
 
 func printInboxUsage(w io.Writer, verbs []inboxVerb) {
-	fmt.Fprintln(w, "usage: evolve inbox <verb> ...")
+	fmt.Fprintln(w, "usage: evolve inbox <verb> ...   (each verb takes --project-root P)")
 	for _, v := range verbs {
 		fmt.Fprintf(w, "  evolve inbox %s\n", v.synopsis)
 	}
@@ -87,8 +119,7 @@ type pendingInbox struct {
 	isProtected func(string) bool
 }
 
-func loadPendingInbox(verb string, stderr io.Writer) (pendingInbox, error) {
-	root := envOrCwd("EVOLVE_PROJECT_ROOT")
+func loadPendingInbox(root, verb string, stderr io.Writer) (pendingInbox, error) {
 	inboxDir := filepath.Join(root, ".evolve", "inbox")
 	scan, err := inboxbatch.ScanDir(inboxDir)
 	if err != nil {
@@ -109,12 +140,12 @@ func (p pendingInbox) place(it inboxbatch.Item) (inboxmover.MenuPlace, string) {
 	return inboxmover.PlaceOnLaneMenu(p.opts, it, p.isProtected)
 }
 
-func runInboxBatches(args []string, stdout, stderr io.Writer) int {
+func runInboxBatches(root string, args []string, stdout, stderr io.Writer) int {
 	asJSON, cfg, ok := parseInboxBatchesArgs(args, stderr)
 	if !ok {
 		return 10
 	}
-	inbox, err := loadPendingInbox("batches", stderr)
+	inbox, err := loadPendingInbox(root, "batches", stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "inbox batches: %v\n", err)
 		return 1
@@ -206,7 +237,7 @@ type inboxLintDoc struct {
 	Undeclared []inboxLintEntry `json:"undeclared"`
 }
 
-func runInboxLint(args []string, stdout, stderr io.Writer) int {
+func runInboxLint(root string, args []string, stdout, stderr io.Writer) int {
 	asJSON := false
 	for _, arg := range args {
 		if arg == "--json" {
@@ -216,12 +247,11 @@ func runInboxLint(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "inbox lint: unknown arg %q\n", arg)
 		return 10
 	}
-	inbox, err := loadPendingInbox("lint", stderr)
+	inbox, err := loadPendingInbox(root, "lint", stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "inbox lint: %v\n", err)
 		return 1
 	}
-	root := filepath.Dir(filepath.Dir(inbox.opts.InboxDir))
 	isProtectedBase := protectedBasenameJudge(root, inbox.isProtected, stderr)
 	var undeclared []inboxLintEntry
 	for _, it := range inbox.items {

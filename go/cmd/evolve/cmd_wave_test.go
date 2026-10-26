@@ -372,8 +372,8 @@ func TestWaveNext_RefusesWhileALoopIsLive(t *testing.T) {
 	rc := h.run("next", "--number", "82", "--project-root", p.root)
 	dryRC := h.run("next", "--number", "82", "--dry-run", "--json", "--project-root", p.root)
 
-	if rc != exitRefused || len(h.verbs.calls) != 0 {
-		t.Errorf("rc = %d with %d steps, want %d and no step", rc, len(h.verbs.calls), exitRefused)
+	if rc != cliExitRefused || len(h.verbs.calls) != 0 {
+		t.Errorf("rc = %d with %d steps, want %d and no step", rc, len(h.verbs.calls), cliExitRefused)
 	}
 	e := decodeWaveEnvelope(t, h.stdout.Bytes())
 	if dryRC != 0 || !slices.ContainsFunc(e.Warnings, func(w string) bool { return strings.Contains(w, "r-live") }) {
@@ -393,8 +393,8 @@ func TestWaveNext_NumberSeedAndRefusal(t *testing.T) {
 	if seeded != 0 || e.Wave != 82 || !slices.ContainsFunc(e.Warnings, func(w string) bool { return strings.Contains(w, "no earlier wave") }) {
 		t.Errorf("seeded rc = %d wave %d warnings %q, want 0, wave 82 and a warning about no earlier wave", seeded, e.Wave, e.Warnings)
 	}
-	if again != exitRefused || !strings.Contains(h.stderr.String(), "not more than the last recorded wave") {
-		t.Errorf("repeat rc = %d stderr %q, want %d naming the number rule", again, h.stderr.String(), exitRefused)
+	if again != cliExitRefused || !strings.Contains(h.stderr.String(), "not more than the last recorded wave") {
+		t.Errorf("repeat rc = %d stderr %q, want %d naming the number rule", again, h.stderr.String(), cliExitRefused)
 	}
 }
 

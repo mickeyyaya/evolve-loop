@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	boundaryUsage   = "usage: evolve boundary run [--merge n,...] --goal-text-file F [--max-cycles N] [--dry-run] [--project-root P]"
+	boundaryUsage   = "usage: evolve boundary run [--merge n,...] --goal-text-file F [--max-cycles N] [--dry-run] [--json] [--project-root P]"
 	boundaryPrefix  = "evolve boundary run: "
 	boundaryLoopLog = "boundary-loop.log"
 )
@@ -49,6 +49,7 @@ type boundaryArgs struct {
 	projectRoot         string
 	runID               string
 	dryRun              bool
+	json                bool
 }
 
 func runBoundary(args []string, _ io.Reader, stdout, stderr io.Writer) int {
@@ -94,6 +95,9 @@ func runBoundaryWith(dispatch boundaryDispatch, args []string, stdout, stderr io
 	}
 	a.runID = gcpolicy.LogRunID(time.Now())
 	steps := boundarySteps(a, root)
+	if a.json {
+		return runBoundaryJSON(dispatch, a, steps, stdout, stderr)
+	}
 	if a.dryRun {
 		fmt.Fprintln(stdout, "boundary: dry run; would run, in order:")
 		for i, s := range steps {
@@ -104,11 +108,32 @@ func runBoundaryWith(dispatch boundaryDispatch, args []string, stdout, stderr io
 	return runBoundarySteps(dispatch, steps, stdout, stderr)
 }
 
+type boundaryRunResult struct {
+	RunID  string           `json:"run_id"`
+	DryRun bool             `json:"dry_run"`
+	Plan   []string         `json:"plan"`
+	Steps  []waveStepResult `json:"steps"`
+}
+
+func runBoundaryJSON(dispatch boundaryDispatch, a boundaryArgs, steps []boundaryStep, stdout, stderr io.Writer) int {
+	result := boundaryRunResult{RunID: a.runID, DryRun: a.dryRun, Plan: []string{}, Steps: []waveStepResult{}}
+	for _, s := range steps {
+		result.Plan = append(result.Plan, s.String())
+	}
+	rc := cliExitOK
+	if !a.dryRun {
+		rec := &waveStepRecorder{next: dispatch, steps: steps}
+		rc = runBoundarySteps(rec.dispatch, steps, stderr, stderr)
+		result.Steps = append(result.Steps, rec.results...)
+	}
+	return max(printVerbJSON("boundary run", result, stdout, stderr), rc)
+}
+
 func parseBoundaryArgs(args []string) (boundaryArgs, error) {
 	var a boundaryArgs
 	var merge, goalFile string
 	operands, err := cliFlags{
-		bools: map[string]*bool{"--dry-run": &a.dryRun},
+		bools: map[string]*bool{"--dry-run": &a.dryRun, "--json": &a.json},
 		values: map[string]*string{
 			"--merge": &merge, "--goal-text-file": &goalFile, "--max-cycles": &a.maxCycles, "--project-root": &a.projectRoot,
 		},

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"flag"
@@ -26,6 +27,7 @@ func runGC(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	dryRun := fs.Bool("dry-run", false, "preview only: list what WOULD be released (orphan tmux sessions and sockets, finished-cycle orphan processes, stale dispatch processes and orphan log tails, worktrees and branches, run dirs, logs of the log catalog, go build cache entries, empty claim dirs of stale cycles), mutating nothing")
 	projectRoot := fs.String("project-root", "", "repository root `dir` the workspace (worktree/branch) sweep is aimed at; required: a non-dry run without it is refused, while --dry-run alone falls back to the current directory.\n\tNOTE the deliberate asymmetry: an explicit 'evolve gc' APPLIES the workspace sweep (an operator run is enforce),\n\twhile the in-loop hook's default mode stays 'shadow' (plan + publish only) — policy.json owns the loop's mode,\n\tthe operator owns their own invocation. Use --dry-run to preview.")
 	only := fs.String("only", "", "run one `scope` and no other sweep. The one scope is cache: the go build cache trim and the pipeline temp sweep. It touches no worktree, branch, session or process, so it is safe while lanes run. When gc.cache_trim_free_gb is set, it trims only while disk free is under that value")
+	asJSON := fs.Bool("json", false, "print the result as JSON: the scope and the report lines")
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}
@@ -37,8 +39,23 @@ func runGC(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if !ok {
 		return code
 	}
-	r := newGCRun(context.Background(), *dryRun, stdout, stderr)
-	if *only == gcScopeCache {
+	if !*asJSON {
+		return newGCRun(context.Background(), *dryRun, stdout, stderr).sweep(root, *only)
+	}
+	var report strings.Builder
+	rc := newGCRun(context.Background(), *dryRun, &report, stderr).sweep(root, *only)
+	result := gcResult{DryRun: *dryRun, Scope: cmp.Or(*only, "all"), Report: strings.FieldsFunc(report.String(), func(r rune) bool { return r == '\n' })}
+	return max(printVerbJSON("gc", result, stdout, stderr), rc)
+}
+
+type gcResult struct {
+	DryRun bool     `json:"dry_run"`
+	Scope  string   `json:"scope"`
+	Report []string `json:"report"`
+}
+
+func (r gcRun) sweep(root, only string) int {
+	if only == gcScopeCache {
 		return r.cacheScope(root)
 	}
 	failed := r.step(gcRun.sessions)

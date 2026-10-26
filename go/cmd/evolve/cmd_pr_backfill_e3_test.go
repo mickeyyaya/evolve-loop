@@ -109,7 +109,7 @@ func TestPRMerger_MergeOneFailurePaths(t *testing.T) {
 			script:   map[string][]e3GHReply{"pr view": {{out: openPR(e3Head)}}, "api ": {e3Behind("0"), e3Behind("3")}},
 			fetch:    e3Green,
 			live:     e3Idle,
-			wantCode: exitRefused, wantErr: "#12 refused: base moved during the wait: aaaaaaaaaaaa is behind main by 3",
+			wantCode: cliExitRefused, wantErr: "#12 refused: base moved during the wait: aaaaaaaaaaaa is behind main by 3",
 		},
 		{
 			name:   "a loop started during the wait",
@@ -125,7 +125,7 @@ func TestPRMerger_MergeOneFailurePaths(t *testing.T) {
 					return []runlease.LiveRun{{Dir: "/r/cycle-4", Lease: runlease.Lease{RunID: "cycle-4"}}}, nil
 				}
 			}(),
-			wantCode: exitRefused, wantErr: "#12 refused: a loop is running: run cycle-4 (/r/cycle-4) is live",
+			wantCode: cliExitRefused, wantErr: "#12 refused: a loop is running: run cycle-4 (/r/cycle-4) is live",
 		},
 		{
 			name: "merged-commit lookup fails",

@@ -191,8 +191,8 @@ func TestSyncMain_RefusesOnDirtyIndex(t *testing.T) {
 
 	var out, errb bytes.Buffer
 	code := runSyncMain([]string{"--project-root", repo}, nil, &out, &errb)
-	if code == 0 {
-		t.Fatalf("expected refusal on dirty index, got exit 0\nstdout=%s", out.String())
+	if code != cliExitRefused {
+		t.Fatalf("expected refusal (exit 3) on dirty index, got exit %d\nstdout=%s", code, out.String())
 	}
 	if got := smHead(t, repo); got != headBefore {
 		t.Errorf("HEAD must be unchanged on refusal: before=%s after=%s", headBefore, got)
@@ -216,8 +216,8 @@ func TestSyncMain_RefusesOnLiveLease(t *testing.T) {
 
 	var out, errb bytes.Buffer
 	code := runSyncMain([]string{"--project-root", repo}, nil, &out, &errb)
-	if code == 0 {
-		t.Fatalf("expected refusal while a run lease is live, got exit 0\nstdout=%s", out.String())
+	if code != cliExitRefused {
+		t.Fatalf("expected refusal (exit 3) while a run lease is live, got exit %d\nstdout=%s", code, out.String())
 	}
 	if got := smHead(t, repo); got != headBefore {
 		t.Errorf("HEAD must be unchanged when refused for a live lease: before=%s after=%s", headBefore, got)

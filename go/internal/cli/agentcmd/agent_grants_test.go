@@ -42,8 +42,8 @@ func TestAgentRun_AnUndeclaredWriterOnAWriteGrantingProfileIsRefused(t *testing.
 
 	code := New(depsWith(fb))([]string{"run", "sneaky-writer", "--project-root", root}, strings.NewReader(diff), &stdout, &stderr)
 
-	if code != 2 || !strings.Contains(stderr.String(), "writes source") || len(fb.prompts) != 0 {
-		t.Errorf("exit %d stderr %q prompts %d, want 2, a writes-source refusal and no dispatch", code, stderr.String(), len(fb.prompts))
+	if code != exitRefused || !strings.Contains(stderr.String(), "writes source") || len(fb.prompts) != 0 {
+		t.Errorf("exit %d stderr %q prompts %d, want 3, a writes-source refusal and no dispatch", code, stderr.String(), len(fb.prompts))
 	}
 	if changed := changedPaths(before, snapshot(t, root)); len(changed) != 0 {
 		t.Errorf("a refused run changed %v", changed)
@@ -62,7 +62,7 @@ func TestAgentRun_AProfileWithoutAConfinedSandboxIsRefused(t *testing.T) {
 
 	code := New(depsWith(&fakeBridge{artifact: passReport}))([]string{"run", "no-profile-review", "--project-root", root}, strings.NewReader(diff), &stdout, &stderr)
 
-	if code != 2 || !strings.Contains(stderr.String(), "writes source") {
+	if code != exitRefused || !strings.Contains(stderr.String(), "writes source") {
 		t.Errorf("exit %d stderr %q, want a fail-closed refusal for a missing profile", code, stderr.String())
 	}
 }

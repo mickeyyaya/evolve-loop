@@ -46,7 +46,7 @@ func TestClihealthUsage_PrintsEachCLIsTypedWindowsAndWritesNothing(t *testing.T)
 		t.Errorf("probed %v", *probed)
 	}
 	var readouts []usageReadout
-	if err := json.Unmarshal([]byte(out), &readouts); err != nil || len(readouts) != 3 {
+	if err := json.Unmarshal(oneEnvelope(t, out).Data, &readouts); err != nil || len(readouts) != 3 {
 		t.Fatalf("readouts = %v (err %v) from %s", readouts, err, out)
 	}
 	fable := readouts[0].Windows[2]

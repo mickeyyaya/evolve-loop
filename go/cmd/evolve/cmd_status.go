@@ -91,11 +91,11 @@ func runStatus(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs.StringVar(&projectRoot, "project-root", "", "project root (default: $EVOLVE_PROJECT_ROOT or cwd)")
 	fs.BoolVar(&asJSON, "json", false, "emit one JSON object instead of the human report")
 	if err := fs.Parse(args); err != nil {
-		return 1
+		return cliExitUsage
 	}
 	if fs.NArg() > 0 {
 		fmt.Fprintf(stderr, "evolve status: unexpected argument %q (usage: evolve status [--json] [--project-root P])\n", fs.Arg(0))
-		return 1
+		return cliExitUsage
 	}
 	root, err := loopStopRoot(projectRoot, stderr)
 	if err != nil {

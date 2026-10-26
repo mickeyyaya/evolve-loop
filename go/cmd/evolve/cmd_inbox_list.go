@@ -25,13 +25,13 @@ type listedItem struct {
 	Reason string          `json:"reason,omitempty"`
 }
 
-func runInboxList(args []string, stdout, stderr io.Writer) int {
+func runInboxList(root string, args []string, stdout, stderr io.Writer) int {
 	filter, asJSON, ok := parseInboxListArgs(args, stderr)
 	if !ok {
 		fmt.Fprintln(stderr, inboxUsage("list"))
 		return 10
 	}
-	inbox, err := loadPendingInbox("list", stderr)
+	inbox, err := loadPendingInbox(root, "list", stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "inbox list: %v\n", err)
 		return 2

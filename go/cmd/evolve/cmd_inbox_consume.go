@@ -72,7 +72,8 @@ type inboxConsumedStamp struct {
 	Resolution string `json:"resolution"`
 }
 
-func runInboxConsume(args []string, stdout, stderr io.Writer) int {
+func runInboxConsume(root string, args []string, stdout, stderr io.Writer) int {
+	asJSON, args := takeInboxJSON(args)
 	itemPath, stamp, ok := parseInboxConsumeArgs(args, stderr)
 	if !ok {
 		return 10
@@ -86,7 +87,7 @@ func runInboxConsume(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "inbox consume: %s: %v (item left in place)\n", itemPath, err)
 		return 1
 	}
-	evolveDir := filepath.Join(envOrCwd("EVOLVE_PROJECT_ROOT"), ".evolve")
+	evolveDir := filepath.Join(root, ".evolve")
 	consumedDir := filepath.Join(evolveDir, "inbox", "consumed")
 	if err := os.MkdirAll(consumedDir, 0o755); err != nil {
 		fmt.Fprintf(stderr, "inbox consume: %s: %v\n", itemPath, err)
@@ -102,20 +103,21 @@ func runInboxConsume(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "inbox consume: %s consumed, but the consumed stamp write failed: %v\n", dest, err)
 		return 1
 	}
+	human := humanWriter(stdout, asJSON)
 	if releaseConsumedItemBinding(filepath.Dir(evolveDir), dest, stderr) {
-		fmt.Fprintf(stdout, "inbox consume: released continuation binding for %s (salvage pointer preserved on the item)\n", filepath.Base(itemPath))
+		fmt.Fprintf(human, "inbox consume: released continuation binding for %s (salvage pointer preserved on the item)\n", filepath.Base(itemPath))
 	}
 	fp, found, err := ackItemFingerprint(evolveDir, dest, "inbox-consume")
 	if err != nil {
 		fmt.Fprintf(stderr, "inbox consume: %s consumed, but the fingerprint ack failed: %v\n", dest, err)
 		return 1
 	}
+	result := inboxWriteResult{Verb: "consume", Path: dest, Detail: fp}
+	message := fmt.Sprintf("inbox consume: %s -> inbox/consumed/ and acknowledged %q in resolved-fingerprints.json — blocker-breaker will exclude it going forward", filepath.Base(itemPath), fp)
 	if !found {
-		fmt.Fprintf(stdout, "inbox consume: %s -> inbox/consumed/ (no fingerprint named; nothing to ack)\n", filepath.Base(itemPath))
-		return 0
+		message = fmt.Sprintf("inbox consume: %s -> inbox/consumed/ (no fingerprint named; nothing to ack)", filepath.Base(itemPath))
 	}
-	fmt.Fprintf(stdout, "inbox consume: %s -> inbox/consumed/ and acknowledged %q in resolved-fingerprints.json — blocker-breaker will exclude it going forward\n", filepath.Base(itemPath), fp)
-	return 0
+	return finishInboxWrite(asJSON, result, message, stdout, stderr)
 }
 
 func parseInboxConsumeArgs(args []string, stderr io.Writer) (string, inboxConsumedStamp, bool) {

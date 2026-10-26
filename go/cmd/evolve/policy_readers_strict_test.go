@@ -53,25 +53,25 @@ func TestPolicyAllowedFamilies_ARefusedPolicyAllowsNoFamilyFilter(t *testing.T) 
 }
 
 func TestRunQuotaReset_ARefusedPolicyIsLoudAndTheEstimateUsesTheDefaults(t *testing.T) {
-	root := strictPolicyRoot(t, `{"quota_reset": {"reset_at": "2026-10-27T00:00:00Z"}, "fleet": {"cuont": 3}}`)
+	root := strictPolicyRoot(t, `{"quota_reset": {"reset_at": "2031-01-02T00:00:00Z"}, "fleet": {"cuont": 3}}`)
 	t.Setenv("EVOLVE_PROJECT_ROOT", root)
 	var stdout, stderr bytes.Buffer
 
 	rc := runQuotaReset([]string{t.TempDir()}, nil, &stdout, &stderr)
 
-	if rc != 0 || !strings.Contains(stderr.String(), `"fleet.cuont"`) || strings.Contains(stdout.String(), "2026-10-27") {
+	if rc != 0 || !strings.Contains(stderr.String(), `"fleet.cuont"`) || strings.Contains(stdout.String(), "2031-01-02") {
 		t.Fatalf("rc %d stdout %q stderr %q: want 0, a WARN naming the key, and no policy reset_at", rc, stdout.String(), stderr.String())
 	}
 }
 
 func TestRunQuotaReset_UsesThePolicyResetAt(t *testing.T) {
-	root := strictPolicyRoot(t, `{"quota_reset": {"reset_at": "2026-10-27T00:00:00Z"}}`)
+	root := strictPolicyRoot(t, `{"quota_reset": {"reset_at": "2031-01-02T00:00:00Z"}}`)
 	t.Setenv("EVOLVE_PROJECT_ROOT", root)
 	var stdout, stderr bytes.Buffer
 
 	rc := runQuotaReset([]string{t.TempDir(), "extra"}, nil, &stdout, &stderr)
 
-	if rc != 0 || !strings.Contains(stdout.String(), "2026-10-27") || stderr.Len() != 0 {
+	if rc != 0 || !strings.Contains(stdout.String(), "2031-01-02") || stderr.Len() != 0 {
 		t.Fatalf("rc %d stdout %q stderr %q: want the policy reset_at", rc, stdout.String(), stderr.String())
 	}
 }

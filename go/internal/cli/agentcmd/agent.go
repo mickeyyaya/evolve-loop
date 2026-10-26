@@ -14,8 +14,8 @@ import (
 
 const (
 	exitFail     = 1
-	exitRefused  = 2
-	exitDispatch = 3
+	exitRefused  = 3
+	exitDispatch = 21
 	exitUsage    = 10
 	exitInput    = 11
 )
@@ -26,7 +26,7 @@ const usage = `Usage: evolve agent <subcommand>
       Run one read-only phase agent with no cycle. The input is stdin, or --input FILE.
       Each --file adds one fenced section. stdout carries the report; --json carries
       one envelope (report, verdict, model, cost, tokens).
-      Exit 0 PASS/WARN/SKIPPED, 1 FAIL, 2 refused, 3 dispatch error, 10 usage, 11 input.
+      Exit 0 PASS/WARN/SKIPPED, 1 FAIL, 3 refused, 21 dispatch error, 10 usage, 11 input.
   evolve agent list [--json] [--project-root P]
       Name each profile that evolve agent run accepts.
 `

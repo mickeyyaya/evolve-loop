@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	exitDispatchRefused = 3
+	exitDispatchRefused = cliExitRefused
 	classRequest        = "R"
 	classDenied         = "D"
 	dispatchRequestPath = ".evolve/runs/cycle-<N>/requests/dispatch-<n>.json"
@@ -139,12 +139,21 @@ func dispatchWith(g dispatchGate, args []string, stdin io.Reader, stdout, stderr
 		fmt.Fprint(stderr, usage)
 		return 2
 	}
-	if g.refuse(args, stderr) {
-		return exitDispatchRefused
-	}
-	if cmd := lookupCommand(args[0]); cmd != nil {
+	cmd := lookupCommand(args[0])
+	run := func(stdout, stderr io.Writer) int {
+		if g.refuse(args, stderr) {
+			return exitDispatchRefused
+		}
+		if cmd == nil {
+			fmt.Fprintf(stderr, "evolve: unknown command %q\n\n%s", args[0], usage)
+			return 2
+		}
 		return cmd.Run(args[1:], stdin, stdout, stderr)
 	}
-	fmt.Fprintf(stderr, "evolve: unknown command %q\n\n%s", args[0], usage)
-	return 2
+	if cmd != nil && jsonRequested(args[1:]) {
+		if v, ok := coreVerbOf(cmd.Name, args[1:]); ok {
+			return runEnveloped(v, run, stdout, stderr)
+		}
+	}
+	return run(stdout, stderr)
 }

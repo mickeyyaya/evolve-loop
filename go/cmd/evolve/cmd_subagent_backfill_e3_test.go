@@ -107,7 +107,7 @@ func TestRunSubagentValidateProfile_WithoutWarningsPrintsNoCapabilityLine(t *tes
 	}
 }
 
-func TestRunSubagent_ARefusedRoutingTableExitsTwoBeforeDispatch(t *testing.T) {
+func TestRunSubagent_ARefusedRoutingTableExitsThreeBeforeDispatch(t *testing.T) {
 	root := e3SubagentProject(t, e3ScoutProfile, map[string]string{".evolve/policy.json": e3RefusedTable})
 	ws := filepath.Join(root, "ws")
 	if err := os.MkdirAll(ws, 0o755); err != nil {

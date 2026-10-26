@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	prUsage       = "usage: evolve pr merge <n>... [--update-branch] [--wait D] [--project-root P]"
+	prUsage       = "usage: evolve pr merge <n>... [--update-branch] [--wait D] [--json] [--project-root P]"
 	exitUsage     = 10
 	exitIO        = 2
 	exitRefused   = 1
@@ -77,13 +77,14 @@ type prMergeArgs struct {
 	updateBranch bool
 	wait         time.Duration
 	projectRoot  string
+	json         bool
 }
 
 func parsePRMergeArgs(args []string) (prMergeArgs, error) {
 	var a prMergeArgs
 	var wait string
 	operands, err := cliFlags{
-		bools:  map[string]*bool{"--update-branch": &a.updateBranch},
+		bools:  map[string]*bool{"--update-branch": &a.updateBranch, "--json": &a.json},
 		values: map[string]*string{"--wait": &wait, "--project-root": &a.projectRoot},
 	}.parse(args)
 	if err != nil {
@@ -137,7 +138,27 @@ func runPR(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "%s%v\n", prMergePrefix, err)
 		return exitIO
 	}
-	return m.mergeAll(context.Background(), a.prs)
+	return mergePRs(m, a, stdout, stderr)
+}
+
+func mergePRs(m prMerger, a prMergeArgs, stdout, stderr io.Writer) int {
+	if !a.json {
+		return m.mergeAll(context.Background(), a.prs)
+	}
+	m.stdout = io.Discard
+	result, rc := m.merge(context.Background(), a.prs)
+	return max(printVerbJSON("pr merge", result, stdout, stderr), rc)
+}
+
+type prMerged struct {
+	PR  string `json:"pr"`
+	SHA string `json:"sha"`
+}
+
+type prMergeResult struct {
+	Merged       []prMerged `json:"merged"`
+	Refused      string     `json:"refused,omitempty"`
+	NotAttempted []string   `json:"not_attempted"`
 }
 
 type prMerger struct {
@@ -227,28 +248,37 @@ func (r prRefusal) Error() string { return string(r) }
 func refusef(format string, args ...any) error { return prRefusal(fmt.Sprintf(format, args...)) }
 
 func (m prMerger) mergeAll(ctx context.Context, prs []string) int {
+	_, rc := m.merge(ctx, prs)
+	return rc
+}
+
+func (m prMerger) merge(ctx context.Context, prs []string) (prMergeResult, int) {
+	result := prMergeResult{Merged: []prMerged{}, NotAttempted: []string{}}
 	if err := m.closedWindowIdle(); err != nil {
+		result.Refused, result.NotAttempted = err.Error(), append(result.NotAttempted, prs...)
 		code := m.report("", err)
 		m.notAttempted(prs)
-		return code
+		return result, code
 	}
 	for i, n := range prs {
 		sha, err := m.mergeOne(ctx, n)
 		if err != nil {
+			result.Refused, result.NotAttempted = "#"+n+" "+err.Error(), append(result.NotAttempted, prs[i+1:]...)
 			code := m.report("#"+n+" ", err)
 			m.notAttempted(prs[i+1:])
-			return code
+			return result, code
 		}
+		result.Merged = append(result.Merged, prMerged{PR: n, SHA: sha})
 		fmt.Fprintf(m.stdout, "merged #%s %s\n", n, sha)
 	}
-	return 0
+	return result, cliExitOK
 }
 
 func (m prMerger) report(subject string, err error) int {
 	var refusal prRefusal
 	if errors.As(err, &refusal) {
 		fmt.Fprintf(m.stderr, "%s%srefused: %s\n", prMergePrefix, subject, refusal)
-		return exitRefused
+		return cliExitRefused
 	}
 	fmt.Fprintf(m.stderr, "%s%s%v\n", prMergePrefix, subject, err)
 	return exitIO

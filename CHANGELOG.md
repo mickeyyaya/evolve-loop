@@ -2,6 +2,43 @@
 
 All notable changes to this project will be documented in this file.
 
+## Changed — one envelope and one exit table for the core verbs (X17b, 2026-10-27)
+
+- **The envelope.** With `--json`, each core verb prints one envelope on each exit, also on a usage error. Its fields are `schema`, `ok`, `data`, `error` and `warnings`. §5 of [cli-contract.md](docs/architecture/cli-contract.md) lists the core verbs.
+- **Streams and data.** A stream verb (`wave watch`, `signals tail`) prints one object for each line. The old `--json` document of a verb is now its `data`. Read `.data.verdict` where you read `.verdict` before.
+- **New `--json`.** `ledger verify`, `dossier verify`, `routing explain`, `scan secrets`, `quality report`, `quality compare`, `inbox add|consume|edit|withdraw|verify|route-console|route-lane`, `cli-routing set|unset|init|migrate`, `wave note add|clear`, `gc`, `loop-stop`, `boundary run`, `pr merge`, `sync-main`, `cycle reset` and `loop --detach`. `cli-routing check` and `explain` now honor `--json`.
+- **New `--project-root`.** Each `evolve inbox` verb, `signals tail`, `ledger verify` and `dossier verify`.
+- **`evolve inbox add`** reads stdin only with `--file -`. A call with no `--file` exits 10, so `echo <item> | evolve inbox add` must become `echo <item> | evolve inbox add --file -`.
+- **`wave next --json`** prints the schema `evolve.wave.next/2`. `refused`, `failed_step` and `error` are now under `data`. `wave note --json` prints `{"action", "notes"}` for `add`, `list` and `clear`.
+- **The exit table.** `0` ok, `1` failed, `2` io, `3` refused, `4` queued, `10` usage, `11` input, `130` interrupted, and `21` to `99` for verb codes.
+- **The exit codes that changed:**
+
+| Verb | Case | Before | Now |
+|---|---|---|---|
+| `status` | a bad flag or a stray argument | 1 | 10 |
+| `loop-stop` | a bad flag, a stray argument, a `--timeout` misuse | 1 | 10 |
+| `loop-stop` | the working directory, or the brake file, cannot be read or written | 1 | 2 |
+| `sync-main` | a bad flag or a stray argument | 1 | 10 |
+| `sync-main` | the working directory cannot be read | 1 | 2 |
+| `sync-main` | a live run lease, a dirty tracked tree, a detached HEAD | 1 | 3 |
+| `inbox edit`, `withdraw`, `verify`, `route-console`, `route-lane` | a loop lane is live | 1 | 3 |
+| `cli-routing` (each verb) | a usage error | 2 | 10 |
+| `cli-routing set`, `unset`, `init`, `migrate` | inside a phase, or a live run lease | 1 | 3 |
+| `clihealth` | a usage error | 2 | 10 |
+| `agent run` | refused (inside a phase, a built-in phase, a source-write profile, the root router) | 2 | 3 |
+| `agent run` | a dispatch, workspace or ledger error | 3 | 21 |
+| `pr merge` | refused (a live loop, a closed window, not open, a draft, a conflict, behind, CI not green) | 1 | 3 |
+| `cycle reset` | a live owner holds the cycle | 1 | 3 |
+| `cli update` | a usage error | 2 | 10 |
+| `cli update` | a run holds a live lease | 2 | 3 |
+| `loop --detach` | a run is already live | 1 | 3 |
+| `loop`, `cycle run`, `compose`, `resolve-llm`, `subagent run`, `subagent validate-profile` | the routing table refuses | 2 | 3 |
+| `wave next` | refused (`loop_live`, `number_taken`) | 1 | 3 |
+| `boundary run`, `wave next` | a failed step | the code of the step | the code of the step, so a refused `pr merge` or `sync-main` step now exits 3 |
+
+- **No overlap release.** The design said that a changed code keeps the old value for one release with a WARN line. The operator asked for one usage code everywhere at once. No caller in the repository read the old codes, so each change takes effect now.
+- Docs: [cli-contract](docs/architecture/cli-contract.md), [runtime-reference](docs/operations/runtime-reference.md), [wave-operations](docs/operations/wave-operations.md), [agent-run](docs/architecture/agent-run.md), [cmd-evolve](docs/architecture/packages/cmd-evolve.md).
+
 ## Changed — `.evolve/policy.json` refuses an unknown key (X18a, 2026-10-26)
 
 - **The change.** An unknown key at any level of `.evolve/policy.json` now fails the load. Before, the loader ignored it, so a typo such as `fleet.cuont` had no effect and gave no message.

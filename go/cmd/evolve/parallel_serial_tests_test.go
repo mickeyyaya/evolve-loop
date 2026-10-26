@@ -1,6 +1,9 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestLoopDetach_JSONPrintsThePidTheLogAndRunningAndNoText":                                         "swaps seam loopDetachCommandFn",
+	"main.TestRunCLIRoutingExplain_JSONNamesARefusedRouteOnStderr":                                          "sets env through a helper",
+	"main.TestRunCLIRoutingWrite_JSONKeepsTheExitOfAFailedWrite":                                            "sets env through a helper",
 	"main.TestRunGuidance_ARepoRootFailureExitsTwo":                                                         "swaps seam guidanceRepoRoot",
 	"main.TestGuidanceFamilies_NamesEachModelFamilyOnceAndFailsOnABadManifest":                              "swaps seams guidanceManifestNames and guidanceLoadManifest",
 	"main.TestPRRefresh_AConflictOutsideTheGeneratedRegionIsNeverStaged":                                    "swaps seam prRefreshWorktree",
@@ -118,7 +121,7 @@ var serialTests = map[string]string{
 	"main.TestCLIUpdate_JSONPrintsTheWholeReport":                                                           "swaps seam cliUpdateWiringFn",
 	"main.TestCLIUpdate_PrintsOneRowPerFamilyAndRecordsTheVersionChange":                                    "swaps seam cliUpdateWiringFn",
 	"main.TestCLIUpdate_RefusesWhileARunHoldsALiveLeaseUnlessDryRun":                                        "swaps seam cliUpdateWiringFn",
-	"main.TestCLIUpdate_UsageErrorsExitTwoAndUpdateNothing":                                                 "swaps seam cliUpdateWiringFn",
+	"main.TestCLIUpdate_UsageErrorsExitTenAndUpdateNothing":                                                 "swaps seam cliUpdateWiringFn",
 	"main.TestCampaignLocalizedRetryFails":                                                                  "swaps seam campaignLaunchFactory",
 	"main.TestCampaignLocalizedRetrySucceeds":                                                               "swaps seam campaignLaunchFactory",
 	"main.TestCampaignRun_AcquiresAndReleasesLease":                                                         "swaps seam campaignLaunchFactory",
@@ -495,7 +498,7 @@ var serialTests = map[string]string{
 	"main.TestRunCycleRun_ACompletedCyclePrintsItsResultAndExitsByVerdict":                                                 "sets env through a helper",
 	"main.TestRunCycleRun_AFailedCycleWhoseInboxCannotBeWalkedWarnsAndExits2":                                              "sets env through a helper",
 	"main.TestRunCycleRun_AForgedFailVerdictHaltsWithTheSystemFailureCode":                                                 "sets env through a helper",
-	"main.TestRunCycleRun_ARefusedRoutingTableExitsTwo":                                                                    "swaps seam wireOrchestratorDepsFn",
+	"main.TestRunCycleRun_ARefusedRoutingTableExitsThree":                                                                  "swaps seam wireOrchestratorDepsFn",
 	"main.TestRunCycleRun_HandsTheWiringItsBypass":                                                                         "swaps seam wireOrchestratorDepsFn",
 	"main.TestRunCycleRun_SimulateNeverWiresTheProductionOrchestrator":                                                     "swaps seam wireOrchestratorDepsFn",
 	"main.TestRunDevWorktreeGC_AnUnwritableWorkspaceIsReportedByThePublisher":                                              "sets env through a helper",
@@ -624,7 +627,7 @@ var serialTests = map[string]string{
 	"main.TestRunLoop_TheChainReExecOfTheSameGoalIsNotRefused":                                                             "calls runLoop, whose batch path calls process-global setter SetHangClassifier",
 	"main.TestRunLoop_AHandoffArmedByAnotherProcessIsNotInherited":                                                         "swaps seam chainRunningCommitFn",
 	"main.TestRunLoop_AHandoffThatCannotBeConsumedIsNotHonouredAndSaysSo":                                                  "swaps seam chainRunningCommitFn",
-	"main.TestRunLoop_ARefusedRoutingTableExitsTwo":                                                                        "swaps seam wireOrchestratorDepsFn",
+	"main.TestRunLoop_ARefusedRoutingTableExitsThree":                                                                      "swaps seam wireOrchestratorDepsFn",
 	"main.TestRunLoop_ASmokeFailureAtBootHaltsBeforeAnyCycleNamingTheFamilyAndVersion":                                     "swaps seam loopOrchOverride",
 	"main.TestRunLoop_AStaleHandoffIsNotHonoured":                                                                          "swaps seam chainRunningCommitFn",
 	"main.TestRunLoop_AbortedCycleDigestsFallOutsideBatchWindow":                                                           "swaps seam wireOrchestratorDepsFn",

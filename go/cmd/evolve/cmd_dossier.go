@@ -204,65 +204,90 @@ func runDossierRetroMislabel(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-func runDossierVerify(_ []string, stdout, stderr io.Writer) int {
-	root := "."
-	if r := os.Getenv("EVOLVE_PROJECT_ROOT"); r != "" {
-		root = r
+type dossierVerifyResult struct {
+	Dir      string   `json:"dir"`
+	Enforced bool     `json:"enforced"`
+	Verified []string `json:"verified"`
+	Invalid  []string `json:"invalid"`
+}
+
+func runDossierVerify(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("evolve dossier verify", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	projectRoot := fs.String("project-root", "", "project root (default: $EVOLVE_PROJECT_ROOT or cwd)")
+	asJSON := fs.Bool("json", false, "print the result as JSON")
+	if err := fs.Parse(args); err != nil || fs.NArg() > 0 {
+		fmt.Fprintln(stderr, "usage: evolve dossier verify [--json] [--project-root P]")
+		return cliExitUsage
 	}
+	root, err := loopStopRoot(*projectRoot, stderr)
+	if err != nil {
+		fmt.Fprintf(stderr, "dossier verify: cwd: %v\n", err)
+		return cliExitIO
+	}
+	human := humanWriter(stdout, *asJSON)
+	result, rc := verifyDossiers(root, human, stderr)
+	if *asJSON && rc == cliExitOK {
+		return printVerbJSON("dossier verify", result, stdout, stderr)
+	}
+	return rc
+}
+
+func verifyDossiers(root string, stdout, stderr io.Writer) (dossierVerifyResult, int) {
+	result := dossierVerifyResult{Dir: dossier.CyclesDir(root), Verified: []string{}, Invalid: []string{}}
 	pol, perr := policy.Load(filepath.Join(root, ".evolve", "policy.json"))
 	if perr != nil {
 		fmt.Fprintf(stderr, "dossier verify: load policy: %v\n", perr)
-		return 1
+		return result, cliExitFailed
 	}
-	enforced := pol.FloorEnrolls("dossier-closeout")
-
-	dir := dossier.CyclesDir(root)
-	entries, err := os.ReadDir(dir)
+	result.Enforced = pol.FloorEnrolls("dossier-closeout")
+	entries, err := os.ReadDir(result.Dir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			if enforced {
+			if result.Enforced {
 				fmt.Fprintln(stderr, `dossier verify: FAIL — policy floor enrolls "dossier-closeout" but knowledge-base/cycles/ is absent (no dossiers written)`)
-				return 1
+				return result, cliExitFailed
 			}
 			fmt.Fprintln(stdout, "dossier verify: knowledge-base/cycles/ absent — no dossiers to verify (OK)")
-			return 0
+			return result, cliExitOK
 		}
 		fmt.Fprintf(stderr, "dossier verify: read dir: %v\n", err)
-		return 1
+		return result, cliExitFailed
 	}
-	errs := 0
-	found := 0
 	for _, e := range entries {
 		if e.IsDir() || filepath.Ext(e.Name()) != ".json" {
 			continue
 		}
-		found++
-		path := filepath.Join(dir, e.Name())
-		data, err := os.ReadFile(path)
-		if err != nil {
-			fmt.Fprintf(stderr, "dossier verify: read %s: %v\n", e.Name(), err)
-			errs++
+		if err := verifyDossierFile(filepath.Join(result.Dir, e.Name())); err != nil {
+			fmt.Fprintf(stderr, "dossier verify: %v\n", err)
+			result.Invalid = append(result.Invalid, e.Name())
 			continue
 		}
-		d, err := dossier.ParseJSON(data)
-		if err != nil {
-			fmt.Fprintf(stderr, "dossier verify: parse %s: %v\n", e.Name(), err)
-			errs++
-			continue
-		}
-		if err := d.Validate(); err != nil {
-			fmt.Fprintf(stderr, "dossier verify: invalid %s: %v\n", e.Name(), err)
-			errs++
-			continue
-		}
+		result.Verified = append(result.Verified, e.Name())
 		fmt.Fprintf(stdout, "dossier verify: OK %s\n", e.Name())
 	}
-	if enforced && found == 0 {
+	if result.Enforced && len(result.Verified)+len(result.Invalid) == 0 {
 		fmt.Fprintln(stderr, `dossier verify: FAIL — policy floor enrolls "dossier-closeout" but knowledge-base/cycles/ contains no dossiers`)
-		return 1
+		return result, cliExitFailed
 	}
-	if errs > 0 {
-		return 1
+	if len(result.Invalid) > 0 {
+		return result, cliExitFailed
 	}
-	return 0
+	return result, cliExitOK
+}
+
+func verifyDossierFile(path string) error {
+	name := filepath.Base(path)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read %s: %w", name, err)
+	}
+	d, err := dossier.ParseJSON(data)
+	if err != nil {
+		return fmt.Errorf("parse %s: %w", name, err)
+	}
+	if err := d.Validate(); err != nil {
+		return fmt.Errorf("invalid %s: %w", name, err)
+	}
+	return nil
 }

@@ -20,50 +20,70 @@ const (
 	loopStopUsage       = "usage: evolve loop-stop [--release | --wait [--timeout D]] [--project-root P]"
 )
 
+type loopStopResult struct {
+	Brake  string `json:"brake"`
+	Action string `json:"action"`
+	Idle   bool   `json:"idle,omitempty"`
+}
+
 func runLoopStop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve loop-stop", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	var projectRoot string
-	var release, wait bool
+	var release, wait, asJSON bool
 	var timeout time.Duration
 	fs.StringVar(&projectRoot, "project-root", "", "project root (default: $EVOLVE_PROJECT_ROOT or cwd)")
 	fs.BoolVar(&release, "release", false, "remove the brake so the next evolve loop launch runs")
 	fs.BoolVar(&wait, "wait", false, "after engaging the brake, block until no run lease is live")
+	fs.BoolVar(&asJSON, "json", false, "print the result as JSON and no text")
 	fs.DurationVar(&timeout, "timeout", loopStopDefaultWait, "with --wait: give up after this long (exit 1, brake kept)")
 	if err := fs.Parse(args); err != nil {
-		return 1
+		return cliExitUsage
 	}
 	if fs.NArg() > 0 {
 		fmt.Fprintf(stderr, "evolve loop-stop: unexpected argument %q (%s)\n", fs.Arg(0), loopStopUsage)
-		return 1
+		return cliExitUsage
 	}
 	timeoutSet := false
 	fs.Visit(func(f *flag.Flag) { timeoutSet = timeoutSet || f.Name == "timeout" })
 	switch {
 	case wait && release:
 		fmt.Fprintf(stderr, "evolve loop-stop: --wait and --release are mutually exclusive (%s)\n", loopStopUsage)
-		return 10
+		return cliExitUsage
 	case timeoutSet && !wait:
 		fmt.Fprintf(stderr, "evolve loop-stop: --timeout requires --wait (%s)\n", loopStopUsage)
-		return 1
+		return cliExitUsage
 	case wait && timeout <= 0:
 		fmt.Fprintf(stderr, "evolve loop-stop: --timeout must be positive, got %s\n", timeout)
-		return 1
+		return cliExitUsage
 	}
 	root, err := loopStopRoot(projectRoot, stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve loop-stop: cwd: %v\n", err)
-		return 1
+		return cliExitIO
 	}
-	brake := paths.LoopStopPath(paths.EvolveDirOf(root))
+	human := humanWriter(stdout, asJSON)
+	result := loopStopResult{Brake: paths.LoopStopPath(paths.EvolveDirOf(root))}
+	rc := loopStopAct(&result, root, release, wait, timeout, human, stderr)
+	if asJSON && rc == cliExitOK {
+		return printVerbJSON("loop-stop", result, stdout, stderr)
+	}
+	return rc
+}
+
+func loopStopAct(result *loopStopResult, root string, release, wait bool, timeout time.Duration, stdout, stderr io.Writer) int {
 	if release {
-		return releaseLoopStop(brake, stdout, stderr)
+		result.Action = "released"
+		return releaseLoopStop(result.Brake, stdout, stderr)
 	}
-	if rc := engageLoopStop(brake, time.Now(), stdout, stderr); rc != 0 || !wait {
+	result.Action = "engaged"
+	if rc := engageLoopStop(result.Brake, time.Now(), stdout, stderr); rc != 0 || !wait {
 		return rc
 	}
 	runsDir := filepath.Join(paths.EvolveDirOf(root), "runs")
-	return waitForIdleLoop(runsDir, timeout, loopStopWaitPoll, time.Now, time.Sleep, stdout, stderr)
+	rc := waitForIdleLoop(runsDir, timeout, loopStopWaitPoll, time.Now, time.Sleep, stdout, stderr)
+	result.Idle = rc == cliExitOK
+	return rc
 }
 
 func waitForIdleLoop(runsDir string, timeout, poll time.Duration, now func() time.Time, sleep func(time.Duration), stdout, stderr io.Writer) int {
@@ -142,7 +162,7 @@ func loopStopRoot(projectRoot string, stderr io.Writer) (string, error) {
 func engageLoopStop(brake string, now time.Time, stdout, stderr io.Writer) int {
 	if err := os.WriteFile(brake, []byte(now.UTC().Format(time.RFC3339)+"\n"), 0o644); err != nil {
 		fmt.Fprintf(stderr, "evolve loop-stop: engage the brake: %v\n", err)
-		return 1
+		return cliExitIO
 	}
 	fmt.Fprintf(stdout, "loop-stop: brake engaged at %s\n", brake)
 	fmt.Fprintf(stdout, "loop-stop:   a running evolve loop finishes its current wave, closes it out, and exits at the next wave boundary (stop_reason %s); a chained run also stops at its batch boundary.\n", loopOperatorBrakeStop)
@@ -157,7 +177,7 @@ func releaseLoopStop(brake string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "loop-stop: no brake at %s; nothing to release\n", brake)
 	case err != nil:
 		fmt.Fprintf(stderr, "evolve loop-stop: release the brake: %v\n", err)
-		return 1
+		return cliExitIO
 	default:
 		fmt.Fprintf(stdout, "loop-stop: brake released (%s removed); the next evolve loop launch runs\n", brake)
 	}

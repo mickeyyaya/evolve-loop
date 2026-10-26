@@ -348,19 +348,19 @@ func TestRunResetSHA_ProvenanceOfAnEmptyCommitIsNeverVerified(t *testing.T) {
 	}
 }
 
-func TestRunSyncMain_RootResolutionFailuresExitOne(t *testing.T) {
+func TestRunSyncMain_ABadFlagIsUsageAndAnUnknownCwdIsIO(t *testing.T) {
 	t.Run("bad flag", func(t *testing.T) {
 		var out, errb bytes.Buffer
-		if code := runSyncMain([]string{"--bogus"}, nil, &out, &errb); code != 1 || !strings.Contains(errb.String(), "flag provided but not defined") {
-			t.Fatalf("runSyncMain = %d, %q; want 1 and the flag error", code, errb.String())
+		if code := runSyncMain([]string{"--bogus"}, nil, &out, &errb); code != cliExitUsage || !strings.Contains(errb.String(), "flag provided but not defined") {
+			t.Fatalf("runSyncMain = %d, %q; want 10 and the flag error", code, errb.String())
 		}
 	})
 	t.Run("cwd unknown", func(t *testing.T) {
 		t.Setenv("EVOLVE_PROJECT_ROOT", "")
 		bfSwap(t, &syncMainGetwd, func() (string, error) { return "", errors.New("getwd failed") })
 		var out, errb bytes.Buffer
-		if code := runSyncMain(nil, nil, &out, &errb); code != 1 || errb.String() != "evolve sync-main: cwd: getwd failed\n" {
-			t.Fatalf("runSyncMain = %d, %q; want 1 and the cwd error", code, errb.String())
+		if code := runSyncMain(nil, nil, &out, &errb); code != cliExitIO || errb.String() != "evolve sync-main: cwd: getwd failed\n" {
+			t.Fatalf("runSyncMain = %d, %q; want 2 and the cwd error", code, errb.String())
 		}
 	})
 }

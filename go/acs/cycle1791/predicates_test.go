@@ -500,7 +500,7 @@ func TestC1791_021_LoopStatusJSONCarriesTheLoopObject(t *testing.T) {
 		t.Fatalf("evolve loop status --json must exit 0:\n%s", run)
 	}
 	var doc map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(run.stdout), &doc); err != nil {
+	if err := json.Unmarshal(cliEnvelopeData(t, run.stdout), &doc); err != nil {
 		t.Fatalf("stdout is not one JSON object: %v\n%s", err, run)
 	}
 	var loop struct {
@@ -607,4 +607,16 @@ func TestC1791_025_OperatorCommandsDocumentLoopStatus(t *testing.T) {
 	if run.code != 0 || !strings.HasPrefix(run.stdout, "loop:    running=true") {
 		t.Errorf("the documented evolve loop status must report the running loop:\n%s", run)
 	}
+}
+
+func cliEnvelopeData(t *testing.T, stdout string) []byte {
+	t.Helper()
+	var e struct {
+		Schema string          `json:"schema"`
+		Data   json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &e); err != nil || e.Schema == "" {
+		t.Fatalf("stdout is not one cli-contract envelope: %v\n%s", err, stdout)
+	}
+	return e.Data
 }

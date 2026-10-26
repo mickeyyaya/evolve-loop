@@ -14,12 +14,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-func runInboxAdd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+func runInboxAdd(root string, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	asJSON, args := takeInboxJSON(args)
 	raw, rc := readInboxAddItem(args, stdin, stderr)
 	if rc != 0 {
 		return rc
 	}
-	root := envOrCwd("EVOLVE_PROJECT_ROOT")
 	pol, err := policy.Load(filepath.Join(root, ".evolve", "policy.json"))
 	if err != nil {
 		fmt.Fprintf(stderr, "inbox add: %v\n", err)
@@ -36,9 +36,9 @@ func runInboxAdd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "inbox add: %v\n", err)
 		return 2
 	}
-	fmt.Fprintf(stdout, "inbox add: filed %s (%s)\n", filepath.Base(res.Path), dispatchability(res.ConsoleReason))
 	warnMonotonicBinaryTargets(raw, stderr)
-	return 0
+	result := inboxWriteResult{Verb: "add", Path: res.Path, Detail: dispatchability(res.ConsoleReason)}
+	return finishInboxWrite(asJSON, result, fmt.Sprintf("inbox add: filed %s (%s)", filepath.Base(res.Path), result.Detail), stdout, stderr)
 }
 
 func warnMonotonicBinaryTargets(raw []byte, stderr io.Writer) {
@@ -55,8 +55,8 @@ func warnMonotonicBinaryTargets(raw []byte, stderr io.Writer) {
 func readInboxAddItem(args []string, stdin io.Reader, stderr io.Writer) ([]byte, int) {
 	source := stdin
 	switch {
-	case len(args) == 0 && stdin != nil:
-	case len(args) == 2 && args[0] == "--file":
+	case len(args) == 2 && args[0] == "--file" && args[1] == "-" && stdin != nil:
+	case len(args) == 2 && args[0] == "--file" && args[1] != "-":
 		f, err := os.Open(args[1])
 		if err != nil {
 			fmt.Fprintf(stderr, "inbox add: %v\n", err)
