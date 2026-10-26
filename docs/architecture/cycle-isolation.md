@@ -18,17 +18,17 @@ its own killed attempts' workspace artifacts on each resume.
 
 **The leak in three sentences:**
 
-1. The orchestrator profile already denied **writes** to historical paths,
-   but `deny_subpaths` is a write-deny mechanism — reads through `Read`,
+1. The orchestrator profile already denied **writes** to historical paths.
+   `deny_subpaths` is a write-deny mechanism, so reads through `Read`,
    `Bash(cat:*)`, `Bash(head:*)`, `Bash(tail:*)` were unrestricted.
-2. On `--resume`, attempt-K's prompt re-injected ledger entries from
-   attempts 1..K-1 of the SAME cycle (verified in cycle 79 attempt 3's
-   prompt: `[cycle:79 role:builder exit:0 sha:8a496b24]` from attempt 2).
-3. The workspace dir `.evolve/runs/cycle-79/` retained killed-attempt
-   artifacts (`builder-stdout.log`, `audit-report.md`, etc.) — the resumed
-   orchestrator opened them via Read, processed them as if they were
-   current state, and burned tokens regenerating output that was already
-   on disk.
+2. On `--resume`, the prompt of try K re-injected ledger entries from
+   tries 1..K-1 of the SAME cycle. Verified in the prompt of try 3 of cycle 79:
+   `[cycle:79 role:builder exit:0 sha:8a496b24]` from try 2.
+3. The workspace dir `.evolve/runs/cycle-79/` retained artifacts of killed tries
+   (`builder-stdout.log`, `audit-report.md` and other files).
+   The resumed orchestrator opened them with Read.
+   It processed them as if they were current state.
+   It burned tokens to regenerate output that was already on disk.
 
 This ADR codifies the structural fix.
 
@@ -39,8 +39,8 @@ The orchestrator is a per-cycle subprocess. It MAY:
 | Resource | Access |
 |----------|--------|
 | `.evolve/runs/cycle-<current>/` | full read+write (its workspace) |
-| `.evolve/cycle-state.json` | read via `cycle-state.sh get`; writes via the four allowlisted ops (`advance`, `set-agent`, `checkpoint`, `clear-checkpoint`) |
-| `.evolve/ledger.jsonl` | **write-only** (via the child `subagent-run.sh` appending phase-agent entries) — reads denied |
+| `.evolve/cycle-state.json` | read with `cycle-state.sh get`; writes with the four allowlisted ops (`advance`, `set-agent`, `checkpoint`, `clear-checkpoint`) |
+| `.evolve/ledger.jsonl` | **write-only** (through the child `subagent-run.sh`, which appends phase-agent entries) — reads denied |
 | `legacy/scripts/**`, `agents/**`, `skills/**` | reads allowed (the persona may need to read its own contract); writes denied |
 | Prompt-injected digest fields (`recentLedgerEntries`, `recentFailures`, `instinctSummary`, `adaptiveFailureDecision`) | the **authoritative** source of cross-cycle history |
 
@@ -50,12 +50,12 @@ The orchestrator MAY NOT:
 |----------|--------|
 | `.evolve/ledger.jsonl` (Read or Bash cat/head/tail/grep) | use the pre-digested `recentLedgerEntries` injection instead |
 | `.evolve/runs/cycle-<N>/.attempt-*/` (any access) | resume-quarantine paths — forensics-preserved on disk but invisible to the resumed orchestrator |
-| `.evolve/state.json`, `.evolve/instincts/`, `.evolve/history/`, `.evolve/research/` | already denied via `deny_subpaths`; use `instinctSummary` |
-| `git worktree add`/`remove`, `git commit`/`push`, `cycle-state.sh clear`/`init`/`set-worktree` | denied via `disallowed_tools` — these are kernel-owned operations |
+| `.evolve/state.json`, `.evolve/instincts/`, `.evolve/history/`, `.evolve/research/` | already denied through `deny_subpaths`; use `instinctSummary` |
+| `git worktree add`/`remove`, `git commit`/`push`, `cycle-state.sh clear`/`init`/`set-worktree` | denied through `disallowed_tools` — these are kernel-owned operations |
 
-Reaching for raw cross-cycle history (e.g., listing `.evolve/runs/`) is
-explicitly anti-pattern — the digest is what survives across attempts;
-raw artifacts are noise that costs money.
+Reaching for raw cross-cycle history (for example, listing `.evolve/runs/`) is
+explicitly an anti-pattern. The digest is what survives across tries.
+Raw artifacts are noise that costs money.
 
 ## Enforcement layers
 
@@ -111,15 +111,15 @@ Quarantine paths and write-deny additions:
 }
 ```
 
-**Deferred work:** broad historical-cycle-dir read denial via OS sandbox
-would require extending the adapter to emit `(deny file-read* ...)` rules.
+**Deferred work:** broad historical-cycle-dir read denial with the OS sandbox
+needs an extension of the adapter to emit `(deny file-read* ...)` rules.
 Currently the tool-perm layer (Layer 1) is the only enforcement for reads.
-For most production paths this is sufficient — adapter extension is a
+For most production paths this is enough. The adapter extension is a
 follow-up if a sandbox-disabled environment proves problematic.
 
 ## Resume-quarantine protocol
 
-When a cycle is auto-resumed, prior killed-attempt artifacts are moved
+When a cycle is auto-resumed, the artifacts of prior killed tries are moved
 into `.evolve/runs/cycle-N/.attempt-K/` subdirs before the orchestrator
 re-spawns. The orchestrator profile (Layer 1) denies reads of these
 subdirs, so forensics are preserved but the resumed orchestrator sees a
@@ -158,9 +158,9 @@ the killed attempt's state directly.
 ## Same-cycle ledger entry filter
 
 `archive/legacy/scripts/dispatch/run-cycle.sh:build_context()` constructs the
-`recentLedgerEntries` digest. On resume, attempts 1..K-1 of the SAME
-cycle would otherwise pollute attempt-K's prompt with stale-attempt
-entries. The filter:
+`recentLedgerEntries` digest. On resume, tries 1..K-1 of the SAME
+cycle otherwise pollute the prompt of try K with entries of stale tries.
+The filter:
 
 ```bash
 ledger_tail=$(jq -c --argjson cur "$cycle" \
@@ -220,11 +220,11 @@ pipeline.
 
 ## What this is NOT
 
-- **NOT a budget cap.** The cycle-79 incident burned $78 not because the
-  orchestrator was unbounded but because it was re-processing dead state.
+- **NOT a budget cap.** The cycle-79 incident burned $78. The orchestrator was not unbounded.
+  It was re-processing dead state.
   Budget caps are orthogonal (see `EVOLVE_MAX_BUDGET_USD` in `CLAUDE.md`).
-- **NOT a fix for the orchestrator hanging in the first place.** Cycle 79
-  attempt 1's stall-inactivity was a different bug (watchdog interaction).
+- **NOT a fix for the orchestrator hanging in the first place.** The
+  stall-inactivity of try 1 of cycle 79 was a different bug (watchdog interaction).
   This ADR prevents the *amplification* of cost on each resume.
 - **NOT a compound-improvement break.** The pre-digested `recentFailures`,
   `instinctSummary`, and filtered `recentLedgerEntries` injections

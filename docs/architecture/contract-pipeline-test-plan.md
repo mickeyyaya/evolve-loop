@@ -1,8 +1,8 @@
 # Contract-Pipeline Test Plan (generation / check / verify)
 
-> Produced 2026-06-12 from an architecture review of contract resolution
+> Produced 2026-06-12 from two sources. The first is an architecture review of contract resolution
 > (the unification that made the runner's reconcile-on-timeout default
-> catalog-aware) plus a full coverage analysis of the three pipeline legs.
+> catalog-aware). The second is a full coverage analysis of the three pipeline legs.
 > P0 items are IMPLEMENTED in the same change; P1/P2 are the backlog.
 > Companion design: ADR-0034 (deliverable contract), ADR-0035 (phase
 > descriptor), ADR-0038 (phase plugins), ADR-0045 (correction ladder).
@@ -49,15 +49,15 @@ P1/P2 = backlog (good cycle goals).
 ## Why property loops over examples
 
 Items 1/2/7/14/15 are invariants over a SET (all contracts, all paired
-phases). A loop fails automatically when a new phase violates the invariant;
-a hand-picked example silently goes stale — the same rot class as the
+phases). A loop fails automatically when a new phase violates the invariant.
+A hand-picked example silently goes stale. This is the same rot class as the
 file-wide ACS count assertions (fixed by `acsassert.CountInGoFunc`, same day).
 
 ## Bugs these tests retro-cover
 
 - **Reconcile default builtin-only** (fixed 2026-06-12): caught by
-  `TestNew_DefaultVerifyFnIsCatalogAware` (runner) + plan #2/#3 would have
-  caught it as a class.
+  `TestNew_DefaultVerifyFnIsCatalogAware` (runner). Plan #2/#3 had caught
+  it as a class, if they had existed.
 - **tester profile `output_artifact` = builder's artifact** (fixed
   2026-06-12, persona-lint commit): caught by
   `TestArtifactNameMatchesProfileOutput`; plan #14 generalizes it to every
@@ -69,12 +69,12 @@ file-wide ACS count assertions (fixed by `acsassert.CountInGoFunc`, same day).
   `<projectRoot>/.evolve` (documented in the func comment; every production
   constructor builds that shape).
 - Catalog-load failure on the reconcile path now WARNs to stderr before
-  degrading to builtin-only (was silent — a degrade there can flip a user
-  phase's outcome).
-- Pre-loaded (gate/salvage, loud at composition root) vs lazy (CLI/reconcile,
-  degrade-with-WARN) catalog loading is a justified seam difference, not a
-  policy fork: the what-resolves-to-what answer is identical.
-- Follow-up chore (reviewer MEDIUM): three near-identical seed-project test
-  fixtures (`phasespec/mergedcatalog_test.go`, `deliverable/catalogaware_test.go`,
-  `runner/runner_reconcile_test.go`) → extract a shared internal testfixture
-  builder so the three suites describe the same scenario.
+  it degrades to builtin-only. It was silent. A degrade there can flip the outcome of a user
+  phase.
+- Pre-loaded catalog loading (gate/salvage, loud at composition root) and lazy catalog loading (CLI/reconcile,
+  degrade-with-WARN) are a justified seam difference, not a
+  policy fork. The what-resolves-to-what answer is identical.
+- Follow-up chore (reviewer MEDIUM): three seed-project test
+  fixtures are almost identical (`phasespec/mergedcatalog_test.go`, `deliverable/catalogaware_test.go`,
+  `runner/runner_reconcile_test.go`). Extract a shared internal testfixture
+  builder so that the three suites describe the same scenario.

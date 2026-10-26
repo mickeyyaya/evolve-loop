@@ -1,6 +1,10 @@
 # Dynamic Model Routing (Multi-CLI Adaptive Allocation)
 
-> **⚠️ SUPERSEDED / unbuilt proposal (banner added 2026-06-23, ADR-0062/T2.2).** This 5-layer adaptive-routing design (and its `llm_config.json` premise) was NOT shipped as written — `llm_config.json` was deleted (step9) and live routing is implemented in `go/internal/router` + `go/internal/llmroute` (advisor-driven, ADR-0052). **Crucially, the "cross-family invariant enforcement" / `rc=2` sections below describe a PROPOSED kernel gate that does NOT exist.** Cross-family separation (builder family ≠ auditor family) is an **advisory preference** carried as profile metadata (`cross_family_with` in `internal/setup`), not a kernel gate: `go/internal/router/floor.go` has no family logic. The sole kernel trust boundary is the integrity floor (`ship ⇒ build ∧ audit ∧ (tdd unless trivial)`); the live adversarial-separation mechanism is the model-level default (Opus auditor vs Sonnet builder, `ADVERSARIAL_AUDIT` default-on). Read this doc as historical design intent only.
+> **⚠️ SUPERSEDED / unbuilt proposal (banner added 2026-06-23, ADR-0062/T2.2).** This 5-layer adaptive-routing design (and its `llm_config.json` premise) was NOT shipped as written. `llm_config.json` was deleted (step9). Live routing is implemented in `go/internal/router` + `go/internal/llmroute` (advisor-driven, ADR-0052).
+>
+> **Crucially, the "cross-family invariant enforcement" / `rc=2` sections below describe a PROPOSED kernel gate that does NOT exist.** Cross-family separation (builder family ≠ auditor family) is an **advisory preference**. It is carried as profile metadata (`cross_family_with` in `internal/setup`). It is not a kernel gate: `go/internal/router/floor.go` has no family logic.
+>
+> The sole kernel trust boundary is the integrity floor (`ship ⇒ build ∧ audit ∧ (tdd unless trivial)`). The live adversarial-separation mechanism is the model-level default (Opus auditor vs Sonnet builder, `ADVERSARIAL_AUDIT` default-on). Read this doc as historical design intent only.
 >
 > **Target path:** `docs/architecture/dynamic-model-routing.md` (in evolve-loop repo)
 > **Status:** Phase 0 (static baseline) staged 2026-05-17. Phases 1–5 pending batch boundary.
@@ -8,11 +12,11 @@
 
 ## Problem
 
-The pipeline today picks per-phase models via `.evolve/llm_config.json` — a flat phase→model map. This has three structural defects:
+The pipeline today picks per-phase models with `.evolve/llm_config.json` — a flat phase→model map. This has three structural defects:
 
 1. **Flat allocation can't adapt to task difficulty.** A trivial bug fix pays the same as a security-critical refactor. The Intent persona already classifies `risk_level` and `awn_class` per cycle; those signals are thrown away today.
 2. **Cross-family integrity is documentation-only.** `CLAUDE.md` mandates "Auditor defaults to Opus (different family from Builder's Sonnet) to break same-model-judge sycophancy," but no code enforces it. Both Builder and Auditor can collapse to the same family/model with no kernel-level block.
-3. **Multi-CLI support is one-dimensional.** The current overlay can be "all Claude" or "all Gemini," but cannot mix (e.g. Claude Sonnet for Builder + Gemini-3.1-Pro for Auditor) — which gives cross-family integrity its strongest physical guarantee.
+3. **Multi-CLI support is one-dimensional.** The current overlay can be "all Claude" or "all Gemini". It cannot mix (for example, Claude Sonnet for Builder + Gemini-3.1-Pro for Auditor). A mix gives cross-family integrity its strongest physical guarantee.
 
 ## Goal
 
@@ -29,7 +33,7 @@ Per-cycle adaptive routing that:
 - Replacing `llm_config.json` as a manual operator override hook.
 - Routing decisions based on arbitrary natural-language reasoning (`gpt-pick-the-model`).
 - Auto-purchasing new vendor API quota or switching providers mid-cycle.
-- Cross-cycle model migration (e.g., switching mid-Builder from Sonnet to Opus). Tier is fixed at phase start.
+- Cross-cycle model migration (for example, switching mid-Builder from Sonnet to Opus). Tier is fixed at phase start.
 
 ## Architecture (5 layers)
 
@@ -131,7 +135,7 @@ Bias: **conservative on uncertainty**. Multiple signals → take max. Orchestrat
 | Phase 0 static 3-tier | $2.50 | $2.50 | $2.50 | $2.50 | partial |
 | Phase 3 adaptive (this design) | $1.80 | $2.50 | $3.80 | $2.55 | ✓ (Phase 4) |
 
-The win is in **distribution**, not average. Easy cycles 28% cheaper, hard cycles 50% more expensive — but easy cycles aren't where quality matters, and hard cycles are where the marginal `deep` tier prevents failure cascades.
+The win is in **distribution**, not average. Easy cycles are 28% cheaper, and hard cycles are 50% more expensive. Quality does not matter most in easy cycles. In hard cycles, the marginal `deep` tier prevents failure cascades.
 
 ## Rollout phases
 
@@ -148,7 +152,7 @@ The win is in **distribution**, not average. Easy cycles 28% cheaper, hard cycle
 
 | Invariant | How |
 |---|---|
-| Bash 3.2 portability | No `declare -A`, `mapfile`, GNU-only flags. Atomic writes via `mv` of `.tmp.$$`. |
+| Bash 3.2 portability | No `declare -A`, `mapfile`, GNU-only flags. Atomic writes with `mv` of `.tmp.$$`. |
 | Trust kernel boundary | Envelope enforcement is separate gate, NOT a kernel bypass. |
 | Audit-binding | `cycle-routing.json` SHA-bound in `ledger.jsonl`. |
 | Single source of truth | `tier-map.json` is the only file containing concrete CLI model IDs. |
@@ -162,7 +166,7 @@ The win is in **distribution**, not average. Easy cycles 28% cheaper, hard cycle
 |---|---|
 | Decision function false-negative on difficulty | Conservative bias: any signal pushes UP; multiple → take max. Orchestrator UP-only. Retro reviews FAILs with min-tier routing. |
 | Cross-family enforcement breaks with single-CLI install | Documented degraded mode: different MODEL within same family + WARN. Phase 4 unblocks structurally. |
-| `tier-map.json` IDs go stale | Versioned via `schema_version`. CI smoke test probes models quarterly. |
+| `tier-map.json` IDs go stale | Versioned with `schema_version`. CI smoke test probes models quarterly. |
 | 3P CLIs lack effort/thinkingLevel knobs | Function emits `tier` + `effort` separately; adapters consume what they support. |
 | Orchestrator override becomes sycophancy vector | UP-only, max 1 per cycle, reason required, retro reviews every override. |
 | Phase 0 changes mid-batch | Staged at `.proposed.json`. Atomic rename ONLY at batch boundary. |
