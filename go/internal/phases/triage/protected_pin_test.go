@@ -24,7 +24,7 @@ func escalationsOf(t *testing.T, path string) map[string]string {
 func TestRouteProtectedCards_AnEmptiedSingleItemLaneAnswersForItsPin(t *testing.T) {
 	t.Parallel()
 	path := writeDecision(t, t.TempDir(), `{"top_n":[{"id":"selection-alias"}],"escalate_block":[]}`)
-	cards := []protectedCard{{ID: "selection-alias", Path: "go/internal/loopwave/loopwave.go"}}
+	cards := []protectedCard{{ID: "selection-alias", Path: "go/internal/commitgate/commitgate.go"}}
 
 	if err := routeProtectedCards(path, cards, []string{"pinned-inbox-item"}); err != nil {
 		t.Fatal(err)
@@ -35,7 +35,7 @@ func TestRouteProtectedCards_AnEmptiedSingleItemLaneAnswersForItsPin(t *testing.
 		t.Fatalf("the routed card and the lane's pin are both escalations: %v", esc)
 	}
 	pinReason := esc["pinned-inbox-item"]
-	if !strings.HasPrefix(pinReason, consoleRouteReason("go/internal/loopwave/loopwave.go")) || !strings.Contains(pinReason, `routed card "selection-alias"`) {
+	if !strings.HasPrefix(pinReason, consoleRouteReason("go/internal/commitgate/commitgate.go")) || !strings.Contains(pinReason, `routed card "selection-alias"`) {
 		t.Errorf("the pin carries the route of the card that emptied the lane and names that card: %q", pinReason)
 	}
 }
@@ -90,7 +90,7 @@ func TestTriageClassify_AnAliasCardOnAProtectedSurfaceAnswersTheLanesPin(t *test
 	}
 	writeDecision(t, ws, `{"cycle":1757,"top_n":[{"id":"goal-text-selection-authority"}],"escalate_block":[]}`)
 	artifact := "## top_n\n- goal-text-selection-authority: selection authority in PlanFn — priority=H, " +
-		"files={go/internal/goalselect/goalselect.go;go/internal/loopwave/loopwave.go}, source={scout}\n"
+		"files={go/internal/goalselect/goalselect.go;go/internal/commitgate/commitgate.go}, source={scout}\n"
 	if err := os.WriteFile(filepath.Join(ws, "triage-report.md"), []byte(artifact), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +106,7 @@ func TestTriageClassify_AnAliasCardOnAProtectedSurfaceAnswersTheLanesPin(t *test
 			pinReason = d.Reason
 		}
 	}
-	if !strings.HasPrefix(pinReason, "protected-surface: go/internal/loopwave/loopwave.go") {
+	if !strings.HasPrefix(pinReason, "protected-surface: go/internal/commitgate/commitgate.go") {
 		t.Errorf("the lane's pinned id is answered with the console route (cycle 1757 answered only the alias): %q", pinReason)
 	}
 	signals, err := router.Digest(ws, []string{string(core.PhaseTriage)})
@@ -119,7 +119,7 @@ func TestWithBoundItem_TheItemJoinsOnceWithTheFirstRoutedCard(t *testing.T) {
 	t.Parallel()
 	cards := make([]protectedCard, 2, 4)
 	cards[0] = protectedCard{ID: "guard-part", Path: "go/internal/guards/role.go"}
-	cards[1] = protectedCard{ID: "loop-part", Path: "go/internal/loopwave/loopwave.go"}
+	cards[1] = protectedCard{ID: "loop-part", Path: "go/internal/commitgate/commitgate.go"}
 
 	routed := withBoundItem(cards, []string{"pin"}, []byte(`{"top_n":[]}`))
 

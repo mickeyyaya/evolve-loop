@@ -84,7 +84,7 @@ func TestFieldsOwnedBy_ListsEachOwnersExactKeysSorted(t *testing.T) {
 }
 
 func TestConsoleRouted_NoStampIsTheItemsText(t *testing.T) {
-	const protected = "go/internal/bridge/x.go:12 is where it breaks"
+	const protected = "go/internal/bridge/sandbox_wrap.go:12 is where it breaks"
 	for _, key := range append(append([]string{}, loopStampKeys...), operatorStampKeys...) {
 		if key == "route" || key == "protected_files" {
 			continue
