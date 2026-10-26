@@ -19,7 +19,7 @@ import (
 )
 
 func init() {
-	dir := filepath.Join(os.TempDir(), "evolve-bridge-test-dispatch")
+	dir := filepath.Join(os.TempDir(), "evolve-bridge-test-home", ".evolve", "dispatch")
 	defaultDispatchStore = func() (dispatchcred.Store, error) { return dispatchcred.Store{Dir: dir}, nil }
 }
 
@@ -102,6 +102,19 @@ func TestDispatchCredentialDeny_TheDefaultStoreIsTheProcessStore(t *testing.T) {
 	want, err := filepath.EvalSymlinks(s.HeldDir())
 	if err != nil || len(held) != 1 || held[0] != want {
 		t.Fatalf("a Deps with no store uses the default store: %v, want [%s] (%v)", held, want, err)
+	}
+}
+
+func TestDispatchCredentialDeny_ThePackageStoreDeniesNoWriteOverTheTestWorkspaces(t *testing.T) {
+	t.Parallel()
+	ws, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, denied := range (Deps{}).dispatchCredentialDeny("enforce").write {
+		if ws == denied || strings.HasPrefix(ws, denied+string(filepath.Separator)) {
+			t.Fatalf("the write deny %s covers the test workspace %s, so a sandboxed integration cell cannot write its artifact", denied, ws)
+		}
 	}
 }
 
