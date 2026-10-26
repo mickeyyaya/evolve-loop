@@ -27,7 +27,7 @@ var rows = []Row{
 	{ID: "M3", Check: "a full simulated cycle with agy-claude as the only route", Invariant: "I-9", ClosedBy: "X1b", Owner: ownerMatrix},
 	{ID: "M4", Check: "a full simulated cycle with codex as the only route", Invariant: "I-9", ClosedBy: "X1b", Owner: ownerMatrix},
 	{ID: "M5", Check: "a full simulated cycle with ollama as the only route", Invariant: "I-9", ClosedBy: "X9", Open: true, Owner: ownerMatrix, Cause: "ollama-tmux cannot use tools"},
-	{ID: "N1", Check: "CLAUDECODE=1 on the parent does not reach any seat", Invariant: "I-2", ClosedBy: "X2", Owner: ownerMatrix},
+	{ID: "N1", Check: "CLAUDECODE=1, EVOLVE_SANDBOX and EVOLVE_BYPASS_SHIP_GATE on the parent do not reach any seat", Invariant: "I-2", ClosedBy: "X2", Owner: ownerMatrix},
 	{ID: "N2", Check: "no LLM spawn outside the bridge launch API", Invariant: "I-1", ClosedBy: "X3", Owner: "internal/sysexec/isolation_matrix_test.go"},
 	{ID: "N3", Check: "a phase pane cannot exec claude --version (darwin only; on Linux a cell can still exec its own family, item isolation-linux-own-family-exec)", Invariant: "I-3", ClosedBy: "X4", Owner: ownerContract},
 	{ID: "N4", Check: "evolve agent run in a cell with the env markers stripped is refused at enforce, because the cell cannot read the dispatch credential (darwin only)", Invariant: "I-3", ClosedBy: "X4", Owner: ownerContract},
