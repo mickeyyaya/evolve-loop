@@ -1,6 +1,6 @@
 # Plan: cycle agent messaging, a general protocol with a policy scoped to one cycle
 
-- **Status:** design and skeleton, opened 2026-10-09 in the lane `cl-agentmsg` (branch `feat/agentmsg-skeleton`, base `origin/main` at `99b9c896d`). The operator gave decisions OD1 to OD4 on 2026-10-09. This lane delivers M0 (the documents) and M1 (the skeleton).
+- **Status:** in build. M0 and M1 merged in PR #845, M2 in PR #972 and M3 in PR #974; M4 to M8 are open (section 16). The design opened on 2026-10-09 in the lane `cl-agentmsg` (branch `feat/agentmsg-skeleton`, base `origin/main` at `99b9c896d`). The operator gave decisions OD1 to OD4 on 2026-10-09. The first lane delivered M0 (the documents) and M1 (the skeleton).
 - **Spec of record:** [agent-messaging.md](../architecture/agent-messaging.md). It holds the protocol: the envelope, the addresses, the policy, the identity, the flow and the delivery. It also holds the limits, the exit codes and the threat model. This plan holds the decisions, the components and the tests.
 - **Decision record:** [ADR-0129](../architecture/adr/0129-cycle-scoped-agent-messaging.md).
 - **Research:** [agent-messaging-2026-10.md](../research/agent-messaging-2026-10.md) (findings F1.1 to F7.5, refinements R1 to R24).
@@ -360,6 +360,10 @@ The limits of record are in the spec: [agent-messaging.md](../architecture/agent
 |---|---|
 | M0 | ☑ the research dossier, this plan, the spec and ADR-0129, in this lane. Merged in PR #845 on 2026-10-12. |
 | M1 | ☑ `internal/agentmsg` and its seven subpackages: built, unwired, at 100% coverage, and in both gate files. The no-poll guard scans the tree. Fix rounds 1 and 2 closed the review items. 70 of 71 mutants killed, with 3 controls, and one is equivalent (§12). Package notes: [internal-agentmsg.md](../architecture/packages/internal-agentmsg.md). Merged in PR #845 on 2026-10-12. |
-| M2 | ☑ `internal/agentmsg/channelstore`: the `Store` adapter on the channel log (`msg.<cycle>` and `msg.dead.<cycle>`). The `message` record variant has its own line limit (D7b). The package is built, unwired, at 100% coverage and in both gate files. The four red tests of §11 pass, and the real broker runs over the adapter, and a named test kills each of 43 mutants. Package notes: [internal-agentmsg-channelstore.md](../architecture/packages/internal-agentmsg-channelstore.md). Not merged. |
-| M3 | ☑ `internal/agentmsg/outbox` (the watcher and the location identity) and `internal/agentmsg/boot` (the token mint), with `ipcenv.MsgTokenKey`. Built, unwired, at 100% coverage, and in both gate files. The six red tests of §11 pass. Not merged. |
-| M4 to M8 | ☐ not started |
+| M2 | ☑ `internal/agentmsg/channelstore`: the `Store` adapter on the channel log (`msg.<cycle>` and `msg.dead.<cycle>`). The `message` record variant has its own line limit (D7b). The package is built, unwired, at 100% coverage and in both gate files. The four red tests of §11 pass, and the real broker runs over the adapter, and a named test kills each of 43 mutants. Package notes: [internal-agentmsg-channelstore.md](../architecture/packages/internal-agentmsg-channelstore.md). Merged in PR #972. |
+| M3 | ☑ `internal/agentmsg/outbox` (the watcher and the location identity) and `internal/agentmsg/boot` (the token mint), with `ipcenv.MsgTokenKey`. Built, unwired, at 100% coverage, and in both gate files. The six red tests of §11 pass. Merged in PR #974. |
+| M4 | ☐ not started. Inbox item: `agent-messaging-m4-msg-cli`. |
+| M5 | ☐ not started. Inbox item: `agent-messaging-m5-deliverers`. |
+| M6 | ☐ not started. The fix `sandbox-cross-cycle-run-dir-write` that M6 waits for is consumed. Inbox item: `agent-messaging-m6-sandbox-rules`. |
+| M7 | ☐ not started. M7 waits for M6. Inbox item: `agent-messaging-m7-cycle-wiring`. |
+| M8 | ☐ not started. M8 waits for M7. Inbox item: `agent-messaging-m8-live-wave-check`. |

@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "the parsers read Kind, Blocking, Component and Late from a finding, and a finding without them gets the documented defaults",
+    "a late finding below HIGH is filed",
+    "a late CRITICAL or HIGH finding is filed only when its falsification result is refuted, and an absent result blocks",
+    "a capability finding below CRITICAL is filed, and a CRITICAL finding is never deferred",
+    "each new and changed function has 100% coverage"
+  ],
+  "created_at": "2026-10-26T19:23:03Z",
+  "deps": [],
+  "files": [
+    "go/internal/codereview/",
+    "go/internal/qualityindex/",
+    "agents/"
+  ],
+  "fix": "Add the Kind:, Blocking:, Component: and Late: lines to the code-review finding grammar and to the audit Criteria finding grammar. Update the personas. Run the falsification check before a blocking finding blocks. Record the result as falsification: survived or refuted.",
+  "id": "convergence-policy-v7-finding-grammar-fields",
+  "kind": "feature",
+  "notes": "Plan: docs/plans/convergence-policy-2026-10.md section 9 (unit tests). The intended route is lane. On 2026-10-27, evolve inbox route-lane refused it, because go/internal/codereview/ is in the protected fence today. The item has no route field, so admission decides when the narrowed fence lands.",
+  "priority_class": "correctness",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Plan docs/plans/convergence-policy-2026-10.md, component V7. Spec: docs/architecture/convergence-policy.md (decisions V-D5 and V-D6). The code-review grammar (RL section 4.1) and the audit Criteria findings (ADR-0125) do not have these fields.",
+  "title": "Convergence V7: the finding grammars get Kind, Blocking, Component and Late, and a falsification check runs before a finding blocks",
+  "weight": 0.4
+}

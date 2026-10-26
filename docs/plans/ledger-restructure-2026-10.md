@@ -1,6 +1,6 @@
 # Ledger restructure: durable evidence, one reader, segments, incremental verify (plan, 2026-10)
 
-> **Purpose.** This is the living plan for restructuring the loop's audit ledger, `.evolve/ledger.jsonl`, so that it is structured, durable and cheap to read, and so that no agent ever has to load it whole.
+> **Purpose.** This is the living plan to restructure the audit ledger of the loop, `.evolve/ledger.jsonl`. The goal is a ledger that is structured, durable and cheap to read. No agent must ever load it whole.
 > - **Approved:** by the operator on 2026-10-06, in plan mode.
 > - **Evidence:** [`docs/research/ledger-structure-research-2026-10.md`](../research/ledger-structure-research-2026-10.md).
 > - **Decision record:** [ADR-0123](../architecture/adr/0123-ledger-durable-evidence-segments-incremental-verify.md).
@@ -29,7 +29,7 @@ The ledger is one flat, hash-chained JSONL file: 47 MB and about 160k lines on t
 | Problem | Evidence (design study, 2026-10-06) |
 |---|---|
 | **Half the file is noise** | `phase_skipped` is 52% of bytes: one line per skipped phase per routing decision (about 14 per decision, up to 74). The lines carry no reason. No Go code reads them. |
-| **Evidence decays and breaks verification** | Run-dir retention has already deleted 25–30% of the artifacts the last 20k lines reference. 21% of surviving `agent_subprocess` artifacts no longer match their recorded sha, because they were overwritten in place. Fleet-rebase carry diffs live in cycle worktrees that are deleted, so `evolve ledger verify` is broken at line 154453 and **6 of 6 carries were refused** at ship. |
+| **Evidence decays and breaks verification** | Run-dir retention has already deleted 25–30% of the artifacts that the last 20k lines reference. 21% of the surviving `agent_subprocess` artifacts no longer match their recorded sha, because they were overwritten in place. Fleet-rebase carry diffs live in cycle worktrees that are deleted. So `evolve ledger verify` is broken at line 154453, and **6 of 6 carries were refused** at ship. |
 | **No random access** | No index or manifest exists. A ship runs 3–6 whole-file passes (each about 0.27 s, 130–200 MB RSS) to find one run's newest row. `evolve ledger tail --n 1` loads all 47 MB and drops fields. `skills/loop/phase2-discover.md:41` feeds the raw tail to an LLM, and 56% of the time those lines are all `phase_skipped`. |
 | **Verify is linear and racy** | Every carry check re-hashes the whole history, and it reads `ledger.tip` *after* walking the file, which races concurrent appends. |
 | **Segments exist but cannot be used** | `evolve ledger seal` exists (`go/internal/adapters/ledger/seal.go`) but has never run, because plain Verify and most readers only see the live file. |
@@ -66,34 +66,34 @@ Status values: ☐ not started · ◐ in progress · ☑ landed (with PR).
 
 | # | Component | Where | Status |
 |---|---|---|---|
-| C1 | `internal/ledgerartifacts`: a write-once, content-addressed store at `.evolve/ledger-artifacts/sha256/<2>/<62>`. Put is idempotent, Get re-checks the sha, and gc's hard-protect list includes it. | new leaf package; `gc/gc.go` | ◐ built and reviewed in the carry lane (`dev/cl-carryf5`); lands with C2–C5 |
-| C2 | Composition verdicts store their diffs in C1 and record `{audited,composed}_diff_sha256`. Verify resolves from the store before the path. | `adapters/ledger/composition.go` | ◐ |
-| C3 | `evolve ledger evidence restore [--dry-run]`: regenerate each legacy diff with `treedelta.Args` from the commits and trees its line names, require the recorded `patch_id`, store the diff, and append a chained record mapping the legacy line to the stored sha. Run at a boundary. | `adapters/ledger`; `cmd/evolve/cmd_ledger.go` | ◐ |
-| C4 | Fallback rungs 0 and 2 write through the project ledger, not a worktree path. A worktree path creates a local tip and lock, which is a latent chain break. | `core/composition_carryforward.go` | ◐ |
-| C5 | Verify reads the tip first and the chain under the ledger lock (race fix). Ship's carry check names its reason when it declines, instead of failing silently. | `adapters/ledger/ledger.go`, `phases/ship/carry.go` | ◐ |
+| C1 | `internal/ledgerartifacts`: a write-once, content-addressed store at `.evolve/ledger-artifacts/sha256/<2>/<62>`. Put is idempotent, Get re-checks the sha, and gc's hard-protect list includes it. | new leaf package; `gc/gc.go` | ☑ landed (PR #788, 2026-10-07) |
+| C2 | Composition verdicts store their diffs in C1 and record `{audited,composed}_diff_sha256`. Verify resolves from the store before the path. | `adapters/ledger/composition.go` | ☑ landed (PR #788, 2026-10-07) |
+| C3 | `evolve ledger evidence restore [--dry-run]`: regenerate each legacy diff with `treedelta.Args` from the commits and trees that its line names. Require the recorded `patch_id`, and store the diff. Append a chained record that maps the legacy line to the stored sha. Run at a boundary. | `adapters/ledger`; `cmd/evolve/cmd_ledger.go` | ☑ landed (PR #788, 2026-10-07) |
+| C4 | Fallback rungs 0 and 2 write through the project ledger, not a worktree path. A worktree path creates a local tip and lock, which is a latent chain break. | `core/composition_carryforward.go` | ☑ landed (PR #788, 2026-10-07) |
+| C5 | Verify reads the tip first and the chain under the ledger lock (race fix). Ship's carry check names its reason when it declines, instead of failing silently. | `adapters/ledger/ledger.go`, `phases/ship/carry.go` | ☑ landed (PR #788, 2026-10-07) |
 
 ### Phase 2: record hygiene
 
 | # | Component | Where | Status |
 |---|---|---|---|
-| C6 | Collapse `phase_skipped` (D1): add `skipped_phases` as an additive `omitempty` field. Update every reader of the kind: `docs/architecture/psmas-phase-scheduling.md`, `docs/architecture/packages/internal-core.md`, `knowledge/architecture/routing-and-advisor.md`, `knowledge/architecture/state-and-ledger.md`, the orchestrator persona's resume rule, and the evals `ledger-skip-source*`, `user-phase-pipeline-hardening` (AC-006) and `plan-time-dispatchability-clamp`. | `core/decision_branch.go`, `core/ports.go` | ☐ |
-| C7 | Store integrity artifacts at append time (D2), so later run-dir gc cannot break them. | ledger adapter writers | ☐ |
+| C6 | Collapse `phase_skipped` (D1): add `skipped_phases` as an additive `omitempty` field. Update every reader of the kind: `docs/architecture/psmas-phase-scheduling.md`, `docs/architecture/packages/internal-core.md`, `knowledge/architecture/routing-and-advisor.md`, `knowledge/architecture/state-and-ledger.md`, the orchestrator persona's resume rule, and the evals `ledger-skip-source*`, `user-phase-pipeline-hardening` (AC-006) and `plan-time-dispatchability-clamp`. | `core/decision_branch.go`, `core/ports.go` | ☐ Inbox item: `ledger-restructure-c6-collapse-phase-skipped`. |
+| C7 | Store integrity artifacts at append time (D2), so later run-dir gc cannot break them. | ledger adapter writers | ☐ Inbox item: `ledger-restructure-c7-store-artifacts-at-append`. |
 
 ### Phase 3: one reader, then agent access
 
 | # | Component | Where | Status |
 |---|---|---|---|
-| C8 | `internal/ledgerscan`: forward or reverse chunked streaming, a raw-byte prefilter (kind, run, cycle), and early exit. Readers migrate one per commit, each with an equivalence test (old reader vs new) on fixtures and on a copy of the real ledger. Hard-coded ledger paths are routed through `paths.Layout`. | new leaf package; `auditledger`, `ship/composition.go`, `core/audited_tree.go`, `phasecoherence`, `cyclehealth`, `dossier`, `ledgerverify` | ☐ |
-| C9 | Agent-facing verbs: `evolve ledger query [--cycle --kind --run --since --fields --limit --json]`, `evolve ledger cycle N --summary` (one screen), and a lossless, filtered `tail`. Skills and personas are repointed, and a grep guard stops them naming `ledger.jsonl`. | `cmd/evolve/cmd_ledger.go`; `skills/loop/…`, `agents/…` | ☐ |
+| C8 | `internal/ledgerscan`: forward or reverse chunked streaming, a raw-byte prefilter (kind, run, cycle), and early exit. Readers migrate one per commit, each with an equivalence test (old reader vs new) on fixtures and on a copy of the real ledger. Hard-coded ledger paths are routed through `paths.Layout`. | new leaf package; `auditledger`, `ship/composition.go`, `core/audited_tree.go`, `phasecoherence`, `cyclehealth`, `dossier`, `ledgerverify` | ☐ Inbox item: `ledger-restructure-c8-ledgerscan-one-reader`. |
+| C9 | Agent-facing verbs: `evolve ledger query [--cycle --kind --run --since --fields --limit --json]`, `evolve ledger cycle N --summary` (one screen), and a lossless, filtered `tail`. Skills and personas are repointed, and a grep guard stops them naming `ledger.jsonl`. | `cmd/evolve/cmd_ledger.go`; `skills/loop/…`, `agents/…` | ☐ Inbox item: `ledger-restructure-c9-agent-query-verbs`. |
 
 ### Phase 4: segments and incremental verify
 
 | # | Component | Where | Status |
 |---|---|---|---|
-| C10 | Segment-aware ledgerscan: read the live file, then the segments from newest to oldest. Every seal on the plane depends on this landing first. | `ledgerscan` | ☐ |
-| C11 | Seal manifest: the `segment_seal` line carries a per-segment summary (seq and time ranges, cycles, kind counts, raw and gz sha) plus `manifest_sha256`. `ledger-segments/manifest.jsonl` is a rebuildable projection. | `adapters/ledger/seal.go` | ☐ |
-| C12 | Incremental `Verify` (D5); `--deep` keeps the full walk and recomputes the manifest. **Hard prerequisite:** inbox `seal-breaks-live-only-verify-and-carry`. Live-only `Verify` fails for good on any sealed ledger, and ship's carry check (`carrySatisfied`) runs it, so the first seal would disable every carry; Seal's truncate-then-anchor gap also shows `ErrSealResidue` to a concurrent `VerifyDeep`. | `adapters/ledger/ledger.go` | ☐ |
-| C13 | Boundary seal (D4) in `evolve boundary run`, after sync and gc, plus a one-time monthly backfill of history. **Depends on C12 and on inbox `seal-breaks-live-only-verify-and-carry`:** no seal may run on the plane before both land. | `cmd/evolve/cmd_boundary.go` | ☐ |
+| C10 | Segment-aware ledgerscan: read the live file, then the segments from newest to oldest. Every seal on the plane depends on this landing first. | `ledgerscan` | ☐ Inbox item: `ledger-restructure-c10-segment-aware-scan`. |
+| C11 | Seal manifest: the `segment_seal` line carries a per-segment summary (seq and time ranges, cycles, kind counts, raw and gz sha) plus `manifest_sha256`. `ledger-segments/manifest.jsonl` is a rebuildable projection. | `adapters/ledger/seal.go` | ☐ Inbox item: `ledger-restructure-c11-seal-manifest`. |
+| C12 | Incremental `Verify` (D5); `--deep` keeps the full walk and recomputes the manifest. **Hard prerequisite:** inbox `seal-breaks-live-only-verify-and-carry`. Live-only `Verify` fails for good on any sealed ledger, and the carry check of ship (`carrySatisfied`) runs it. The risk was that the first seal disables every carry. The truncate-then-anchor gap of Seal also shows `ErrSealResidue` to a concurrent `VerifyDeep`. | `adapters/ledger/ledger.go` | ☐ Inbox item: `ledger-restructure-c12-incremental-verify`. |
+| C13 | Boundary seal (D4) in `evolve boundary run`, after sync and gc, plus a one-time monthly backfill of history. **Depends on C12 and on inbox `seal-breaks-live-only-verify-and-carry`:** no seal may run on the plane before both land. | `cmd/evolve/cmd_boundary.go` | ☐ Inbox item: `ledger-restructure-c13-boundary-seal`. |
 
 ## 5. Expected results
 
@@ -138,5 +138,7 @@ Status values: ☐ not started · ◐ in progress · ☑ landed (with PR).
 | Date | Component | PR | Note |
 |---|---|---|---|
 | 2026-10-06 | plan | — | Approved in plan mode. The research record and this plan were written in `dev/cl-ledgerdesign`. Phase 1 was assigned to the in-flight carry lane (`dev/cl-carryf5`), whose first fix (a durable directory for carry diffs) was re-scoped to the content-addressed store. |
-| 2026-10-07 | C1–C5, C12/C13 | — | Phase 1 is built and reviewed in the carry lane (two review rounds: FIX_THEN_MERGE, then its remaining survivors killed); C1–C5 land together. The re-review found that live-only `Verify` fails on any sealed ledger and that ship's carry check uses it (inbox `seal-breaks-live-only-verify-and-carry`), now a hard prerequisite of C12 and C13. |
+| 2026-10-07 | C1–C5, C12/C13 | — | Phase 1 is built and reviewed in the carry lane (two review rounds: FIX_THEN_MERGE, then its remaining survivors killed). C1–C5 land together. The re-review found that live-only `Verify` fails on any sealed ledger, and that the carry check of ship uses it. That is inbox `seal-breaks-live-only-verify-and-carry`, now a hard prerequisite of C12 and C13. |
 | 2026-10-07 | C12/C13 prerequisite | — | Cycle 1827 built `seal-breaks-live-only-verify-and-carry`: plain `Verify` seeds its walk from the newest segment's last line, and `Seal` appends its anchor before releasing the chain lock. With it, `durable-atomic-write-single-implementation` moved the segment writer onto `atomicwrite.Durable`, which also syncs the segment directory. C12 and C13 stay open. |
+| 2026-10-07 | C1–C5 | #788 | Phase 1 merged as `21d76b914` ("a carry's evidence outlives its cycle worktree"). |
+| 2026-10-27 | C6–C13 | — | The plan audit of 2026-10-27 filed one inbox item for each open component. Each row of section 4 names its item. |
