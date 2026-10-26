@@ -395,7 +395,7 @@ The architecture review judged that the rank can starve a class by design (ADR-0
 
 ### What remains
 
-P3 (one intake path, the overlap judge; revised on 2026-10-27, see below) and P4 (boundary preemption) remain. P5 also remains: `--reason` on every priority change, and the deletion of the last weight write outside the lifecycle: the `Reweight` option of `recurrence.ApplyOptions` (`recurrence.setItemWeight` is gone). The writers `ciwatch`, `retrofile`, `dispositionrouter` and `core/failurelearning` have no package page under `docs/architecture/packages/`. Their class is recorded here, in ADR-0121's amendment and in `internal-core.md`, `internal-recurrence.md`, `internal-faillearn.md`, `internal-fleet.md`, `internal-triagecap.md` and `cmd-evolve.md`.
+P3 (one intake path, the overlap judge; revised on 2026-10-27, see below) and P4 (boundary preemption) remain. P5 also remains: `--reason` on every priority change. P5 also deletes the last weight write outside the lifecycle, the `Reweight` option of `recurrence.ApplyOptions`. `recurrence.setItemWeight` is gone. The writers `ciwatch`, `retrofile`, `dispositionrouter` and `core/failurelearning` have no package page under `docs/architecture/packages/`. Their class is recorded here, in ADR-0121's amendment and in `internal-core.md`, `internal-recurrence.md`, `internal-faillearn.md`, `internal-fleet.md`, `internal-triagecap.md` and `cmd-evolve.md`.
 
 ## P3 revision (2026-10-27): a deterministic intake and an event-driven curator
 

@@ -5,7 +5,7 @@
 > - **Decision:** a newer CLI version found at a wave boundary is installed **automatically at that boundary**, smoke-tested, and the catalog is then refreshed.
 > - **Extends:** [model-discovery-and-catalog.md](../architecture/model-discovery-and-catalog.md).
 > - **Decision record:** ADR-0120, which lands with C2.
-> - **C3 status (2026-10-27):** the operator approved the C3 stage flip, and it landed. The checked-in policy sets `catalog.auto_refresh: true` and `catalog.refresh_stage: enforce`. Two C3 guards landed with it. The boot refresh and the `catalog_refresh_degraded` ledger event are open. C2 is not built. Item: `model-currency-c3-adopt-only-live-picks`. See [C3 landing notes](#c3-landing-notes-2026-10-27).
+> - **C3 status (2026-10-27):** the C3 stage flip that the operator approved landed: the checked-in policy sets `catalog.auto_refresh: true` and `catalog.refresh_stage: enforce`. Two C3 guards landed with it. The boot refresh and the `catalog_refresh_degraded` ledger event are open, and C2 is not built. Item: `model-currency-c3-adopt-only-live-picks`. See [C3 landing notes](#c3-landing-notes-2026-10-27).
 
 ## Context: why the loop ran Gemini 3.7 Flash while 3.8 was available
 

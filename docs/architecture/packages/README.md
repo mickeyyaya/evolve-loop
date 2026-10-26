@@ -1,14 +1,12 @@
 # Package design notes
 
 Each Go package directory has one page. The page holds what the code cannot say: the purpose, the reason for the shape, the invariants with their reasons, and the lessons. Each page is named by the directory under `go/` with `/` replaced by `-`. The rule and its reasons are in [code-comments](../../conventions/code-comments.md). The comment-reduction workstream fills these pages as it removes knowledge from comments ([plan](../../plans/comment-reduction-2026-09.md)).
-One page per Go package directory holds what the code of the package cannot say. That is its purpose, the reason for its shape, its invariants with their reasons, and what it taught. Each page is named by the directory under `go/` with `/` replaced by `-`. The rule and its reasons are in [code-comments](../../conventions/code-comments.md). The comment-reduction workstream fills these pages as it removes knowledge from comments ([plan](../../plans/comment-reduction-2026-09.md)).
 
 | Package | What it is | Notes |
 |---|---|---|
 | `internal/bridge/panestream` | reads tmux pane snapshots of an interactive LLM REPL | [internal-bridge-panestream.md](internal-bridge-panestream.md) |
 | `internal/bridge/phaseidentity` | the identity statement a tmux driver appends to the pasted prompt | [internal-bridge-phaseidentity.md](internal-bridge-phaseidentity.md) |
 | `internal/agentmsg` | the skeleton of cycle agent messaging (ADR-0129, M1). It has the envelope, the address grammar, the identity, the token, the policy engine, the broker, the store and the frame | [internal-agentmsg.md](internal-agentmsg.md) |
-| `internal/agentmsg` | the skeleton of cycle agent messaging (ADR-0129, M1). It holds the envelope, the address grammar, the identity, the token, the policy engine, the broker of one cycle, the in-memory store and the frame | [internal-agentmsg.md](internal-agentmsg.md) |
 | `internal/agentmsg/channelstore` | the `Store` port of the broker on the ADR-0127 channel log: the channel `msg.<cycle>`, the channel `msg.dead.<cycle>` and the `message` record variant (ADR-0129, M2) | [internal-agentmsg-channelstore.md](internal-agentmsg-channelstore.md) |
 | `internal/admission` | admission by package cell: the conflict rule, the module graph and the hub cell of capacity 1 (ADR-0139 O3, ADR-0134 S14) | [internal-admission.md](internal-admission.md) |
 | `internal/orchestrator` | the pool, the lane lease, the oversight loop and the supply census (ADR-0139 O4, O5, O6) | [internal-orchestrator.md](internal-orchestrator.md) |
@@ -66,7 +64,6 @@ One page per Go package directory holds what the code of the package cannot say.
 | `internal/adapters/ledger` | the hash-chained append-only ledger, its seals and anchors | [internal-adapters-ledger.md](internal-adapters-ledger.md) |
 | `internal/ledgerartifacts` | the ledger's write-once, content-addressed evidence store (`.evolve/ledger-artifacts/sha256/<2>/<62>`) | [internal-ledgerartifacts.md](internal-ledgerartifacts.md) |
 | `internal/attemptpostmortem` | records how a phase dispatch ended: the cause, the last commands, the suspect command and the pane tail. It renders the record into the next prompt (ADR-0130, R2) | [internal-attemptpostmortem.md](internal-attemptpostmortem.md) |
-| `internal/attemptpostmortem` | records how a phase dispatch ended (ADR-0130, R2): the cause, the last commands, the suspect command and the pane tail. It renders them into the next prompt | [internal-attemptpostmortem.md](internal-attemptpostmortem.md) |
 | `internal/atomicwrite` | the one crash-safe write-then-rename implementation: plain `Bytes`/`JSON` and the fsyncing `Durable` | [internal-atomicwrite.md](internal-atomicwrite.md) |
 | `internal/changedpkgs` | maps a change to its packages, covering tests and importers | [internal-changedpkgs.md](internal-changedpkgs.md) |
 | `internal/cyclestate` | the per-cycle state, verdicts and outcome record every phase shares | [internal-cyclestate.md](internal-cyclestate.md) |
@@ -100,7 +97,6 @@ One page per Go package directory holds what the code of the package cannot say.
 | `internal/core/advisor` | the routing advisor that plans and re-plans a cycle's phases | [internal-core-advisor.md](internal-core-advisor.md) |
 | `internal/core/defectledger` | the audit phase's anti-laundering defect ledger and the continuation disposition gate (unit 09, ADR-0103) | [internal-core-defectledger.md](internal-core-defectledger.md) |
 | `internal/phases/runner/verdict` | the judge: classifies one try of a phase from its artifact, pane and snapshots | [internal-phases-runner-verdict.md](internal-phases-runner-verdict.md) |
-| `internal/phases/runner/verdict` | the judge: classifies a phase try from its artifact, pane and snapshots | [internal-phases-runner-verdict.md](internal-phases-runner-verdict.md) |
 | `internal/core` | the cycle orchestrator: phase sequencing, gates, recovery and ship (filled by file group) | [internal-core.md](internal-core.md) |
 | `cmd/evolve` | the composition root and CLI of the `evolve` binary (filled by file group) | [cmd-evolve.md](cmd-evolve.md) |
 | `internal/bridge` | the native agent bridge: drives tmux and headless LLM CLIs for every phase (filled by file group) | [internal-bridge.md](internal-bridge.md) |
