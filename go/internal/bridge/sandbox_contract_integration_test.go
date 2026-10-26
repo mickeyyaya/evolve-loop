@@ -224,6 +224,10 @@ var agentContract = []contractRow{
 		}},
 	{action: "write the pipeline-written inputs/index.json", want: contractDeny,
 		script: func(h contractHost) string { return "echo '{}' > " + h.run + "/inputs/index.json" }},
+	{action: "isolation N17: a cell writes the access log .evolve/context-access/", want: contractDeny, isolation: "N17",
+		script: func(h contractHost) string {
+			return `echo '{"type":"open","entry":"d1"}' >> ` + filepath.Join(inputindex.AccessDir(h.root), "cycle-7.jsonl")
+		}},
 	{action: "isolation N9: open a TCP connection (loopback listener of the host)", want: contractAllow, isolation: "N9",
 		script: func(h contractHost) string { return "nc -z -w 2 127.0.0.1 " + h.netPort + " && echo ok" }},
 }
@@ -413,7 +417,7 @@ func (h *contractHost) withProject(t *testing.T) {
 	h.otherCycle = filepath.Join(h.root, ".evolve", "runs", "cycle-8")
 	h.events = filepath.Join(h.root, ".evolve", "events")
 	h.resumeWitness = filepath.Join(h.root, ".evolve", "resume-witness")
-	for _, dir := range []string{h.run, h.otherCycle, h.events, h.resumeWitness} {
+	for _, dir := range []string{h.run, h.otherCycle, h.events, h.resumeWitness, inputindex.AccessDir(h.root)} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -584,4 +588,43 @@ func TestAgentSandboxContract_AForgedLaneScopeGainsNoGrantAtTheNextDispatch(t *t
 	if failure := contractFailure(contractDeny, out, err); failure != nil {
 		t.Fatalf("a forged lane scope must not pull an unrelated cycle into the next index: %v", failure)
 	}
+}
+
+func TestAgentSandboxContract_AnOpenOfAnIndexedPathWritesOneAccessRecord(t *testing.T) {
+	h := newContractHost(t)
+	since := time.Now().Add(-2 * time.Second)
+	if out, err := h.agent(t, contractRow{script: func(h contractHost) string {
+		return "cat " + filepath.Join(filepath.Dir(h.run), "cycle-6", "retrospective-report.md")
+	}}); err != nil || out != "lesson of cycle 6" {
+		t.Fatalf("the indexed read must run: err=%v out=%q", err, out)
+	}
+	idx, err := inputindex.Read(h.run)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := &Config{CLI: "claude-tmux", Agent: idx.Phase, Cycle: 7, ProjectRoot: h.root, Worktree: h.worktree, Workspace: h.run,
+		RequireSandbox: true, DispatchID: "sbc-" + strconv.Itoa(os.Getpid())}
+	deps := Deps{hostOS: "darwin", ReadStage: "enforce", Env: map[string]string{}, SandboxReports: logShowReports(logShowPath)}
+	failure := fmt.Errorf("no access record names the retrospective of cycle 6")
+	for try := 0; try < 5 && failure != nil; try++ {
+		_ = os.Remove(filepath.Join(inputindex.AccessDir(h.root), "cycle-7.jsonl"))
+		deps.reportReadViolations(context.Background(), cfg, since)
+		records, err := inputindex.ReadAccess(h.root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, r := range records {
+			if r.Type == inputindex.AccessOpen && r.Kind == "retrospective" && r.Cycle == 7 && r.Source == inputindex.AccessSourceSandbox {
+				failure = nil
+			}
+		}
+		if failure != nil {
+			time.Sleep(time.Second)
+		}
+	}
+	note, jerr := isolation.Judge("N16", failure)
+	if jerr != nil {
+		t.Fatal(jerr)
+	}
+	t.Log(note)
 }

@@ -15,6 +15,7 @@ var serialTests = map[string]string{
 	"bridge.TestAgentSandboxContract_N10_AnAgyPaneCannotWriteAProtectedPath":              "sets env through a helper",
 	"bridge.TestAgentSandboxContract_ShadowReportsTheExecAndLetsItRun":                    "sets env through a helper",
 	"bridge.TestAgentSandboxContract_AForgedLaneScopeGainsNoGrantAtTheNextDispatch":       "sets env through a helper",
+	"bridge.TestAgentSandboxContract_AnOpenOfAnIndexedPathWritesOneAccessRecord":          "sets env through a helper",
 	"bridge.TestAgentSandboxContract_TheLauncherStillStartsTheCLIThatTheCellCannotExec":   "sets env through a helper",
 	"bridge.TestAgyClaudeEffortSelectsTheModelVariant":                                    "swaps seam modelCatalogDirFn",
 	"bridge.TestAgyClaudeExplicitAgentEffortWinsOverAPinnedVariant":                       "swaps seam modelCatalogDirFn",

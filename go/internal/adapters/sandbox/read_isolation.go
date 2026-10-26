@@ -16,6 +16,7 @@ const (
 	RuleRawOutputWrite    = "write.raw.output"
 	RuleInputsWrite       = "write.inputs"
 	RulePipelineFileWrite = "write.pipeline.file"
+	RuleGrantIndex        = "grant.index"
 	CellMessagePrefix     = "evolve-cell="
 )
 
@@ -25,6 +26,7 @@ type ReadIsolation struct {
 	RunsDir     string
 	Workspace   string
 	Grants      []string
+	ReportOnly  []string
 	RawSuffixes []string
 	RawFiles    []string
 	RawDirs     []string
@@ -50,6 +52,8 @@ func writeReadIsolation(b *strings.Builder, ri ReadIsolation) {
 	if ri.Workspace == "" {
 		return
 	}
+	grantMessage := fmt.Sprintf("%s%s rule=%s", CellMessagePrefix, ri.Tag, RuleGrantIndex)
+	writeGrantReports(b, ri.ReportOnly, grantMessage)
 	if ri.RunsDir != "" {
 		ri.guard(b, "file-read-data", fmt.Sprintf("(subpath %q)", ri.RunsDir), RuleRunsUnrelated, "I5")
 	}
@@ -60,17 +64,21 @@ func writeReadIsolation(b *strings.Builder, ri ReadIsolation) {
 		ri.guard(b, "file-read-data", fmt.Sprintf("(literal %q)", f), RuleHomeSecret, "I5")
 	}
 	fmt.Fprintf(b, "(allow file-read* file-read-data (subpath %q))\n", ri.Workspace)
-	for _, g := range ri.Grants {
-		if g != "" {
-			fmt.Fprintf(b, "(allow file-read* file-read-data (literal %q))\n", g)
-		}
-	}
+	writeGrantReports(b, ri.Grants, grantMessage)
 	ri.writeRawGuards(b, "file-read-data", RuleRawOutput)
 	ri.writeRawGuards(b, "file-write*", RuleRawOutputWrite)
 	ri.guard(b, "file-write*", fmt.Sprintf("(subpath %q)", ri.inputsDir()), RuleInputsWrite, "I4")
 	for _, f := range ri.PinnedFiles {
 		if f != "" {
 			ri.guard(b, "file-write*", fmt.Sprintf("(literal %q)", f), RulePipelineFileWrite, "I5")
+		}
+	}
+}
+
+func writeGrantReports(b *strings.Builder, paths []string, message string) {
+	for _, p := range paths {
+		if p != "" {
+			fmt.Fprintf(b, "(allow file-read* file-read-data (literal %q) (with report) (with message %q))\n", p, message)
 		}
 	}
 }
