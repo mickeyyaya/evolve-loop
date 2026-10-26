@@ -116,6 +116,6 @@ When a change alters the design or an invariant of a package, it updates the des
 - Console reviewers flag every comment that a diff adds, if it is not machine-read and not the enforced package doc (`.claude/agents/architecture-reviewer.md`, the three-book audit). The loop auditor reports each one as a LOW, advisory finding (the `## Audit Rules` block that `go/internal/phases/audit/audit_rules.go` renders into the audit prompt).
   - For loop lanes, the build handoff floor counts them at build exit with the same rule (`comment_floor`, batch 0b).
   - In `shadow`, the compiled default, it WARNs on the phase log.
-  - Set `policy.json` `comment_floor.stage` to `enforce`, and a build that adds a comment gets a correction before its audit.
+  - At `enforce`, a build that adds a comment gets a correction before its audit. The checked-in `.evolve/policy.json` sets `comment_floor.stage` to `enforce` since 2026-10-27, by the operator decision.
   - This project turns it on when the TDD phase has its own comment floor. The reason: the floor scans the whole diff, and the builder must not edit the predicate files that TDD writes.
 - The removal of existing comments runs as its own workstream: [comment reduction](../plans/comment-reduction-2026-09.md).

@@ -196,6 +196,14 @@ The block sets the stage of the changed-function coverage check of the build han
 |---|---|---|
 | `stage` | `off` skips the check. `shadow` prints the `[build-floor] WARN cover-changed (shadow)` line. `enforce` rejects the handoff. | `enforce` |
 
+## Recovery retrospectives (`retrospectives`)
+
+The block sets the stage of the retrospective documents that the cycle closeout writes ([spec](recovery-retrospective.md), [plan](../plans/recovery-retrospective-2026-10.md)). The loader decodes the block strictly. A word that is not `off`, `shadow` or `enforce` turns the writer off with a WARN. The writer is not a safety floor, so a refused policy does not move it to `enforce`.
+
+| Key | Meaning | Default |
+|---|---|---|
+| `stage` | `off` writes no document. `shadow` writes the documents into the cycle workspace. `enforce` does the same until plan C4 to C6 add the publish and the todo retirement. The checked-in policy sets `enforce` (operator decision of 2026-10-27). | `shadow` |
+
 ## Context-fill telemetry (`context_fill`)
 
 The token telemetry of every launch carries a derived **fill reading**. It is the prompt-side

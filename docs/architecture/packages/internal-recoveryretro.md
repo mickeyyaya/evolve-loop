@@ -23,7 +23,7 @@
 
 ## Callers
 
-- `core.cycleRun.writeShadowRetrospectives` (`go/internal/core/retrospective_shadow.go`), from `completeCycle` after the dossier write. It prints one WARN line on an error.
+- `core.cycleRun.writeShadowRetrospectives` (`go/internal/core/retrospective_shadow.go`), from `completeCycle` after the dossier write. It reads `retrospectives.stage` from the policy and writes no document at `off`. It prints one WARN line on an error.
 
 ## Tests
 
