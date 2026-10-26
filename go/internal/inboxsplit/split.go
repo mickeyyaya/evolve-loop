@@ -54,7 +54,7 @@ var textFields = []string{"title", "fix", "summary", "description", "source", "c
 
 var laneFields = []string{
 	"kind", "class", "priority", "priority_class", "weight", "campaign", "source", "created_at",
-	"summary", "fix", "description", "connects_to", "injected_by", "deliverable_kind",
+	"summary", "fix", "description", "connects_to", "injected_by", "deliverable_kind", "origin",
 }
 
 var pathToken = regexp.MustCompile(`[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+/?`)

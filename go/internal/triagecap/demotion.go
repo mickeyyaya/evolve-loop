@@ -137,6 +137,7 @@ type DemotionLedgerRecord struct {
 	Action          string       `json:"action"`
 	Priority        string       `json:"priority"`
 	PriorityClass   string       `json:"priority_class"`
+	Origin          string       `json:"origin"`
 	Weight          float64      `json:"weight"`
 	RelievedCycle   int          `json:"relieved_cycle"`
 	RemedyStatus    RemedyStatus `json:"remedy_status"`
@@ -152,6 +153,7 @@ func NewDemotionLedgerRecord(currentCycle, older, newer int, detail string, stat
 			detail, currentCycle),
 		Priority:        "HIGH",
 		PriorityClass:   inboxbatch.ClassCorrectness,
+		Origin:          inboxbatch.OriginCycle,
 		Weight:          0.7,
 		RelievedCycle:   currentCycle,
 		RemedyStatus:    NormalizeRemedyStatus(string(status)),

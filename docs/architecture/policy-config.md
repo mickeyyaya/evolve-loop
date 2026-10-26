@@ -75,6 +75,20 @@ defaults, but each safety floor fails closed to `enforce`: `docs_floor.stage`,
     "preempt_margin": 0.05
   },
 
+  // The inbox curator (inbox-curator.md). Decoded STRICTLY. Absent => the
+  // compiled default shown here: the shadow stage and the default kinds.
+  "inbox": {
+    "curator": {
+      "stage": "shadow",
+      "overlap_refuse": 0.5,
+      "overlap_warn": 0.3,
+      "consume_min_share": 0.5,
+      "kinds": ["bug", "docs", "feature", "fix", "hardening", "maintenance",
+                "pipeline-integrity", "pipeline-repair", "refactor", "research",
+                "security", "sweep", "task", "techdebt", "test"]
+    }
+  },
+
   // The convergence policy (ADR-0126). The convergence sub-block decodes
   // STRICTLY: an unknown key or an out-of-range number fails the load; an
   // unknown stage or bar word warns and resolves to its default. Absent ⇒ the
@@ -163,6 +177,20 @@ The checked-in file names the class order and the factors explicitly, so the ope
 - the queue of the dashboard.
 
 The block also decides what `evolve inbox rank` shows and which classes `evolve inbox add` accepts. A malformed block makes those consumers rank with the compiled default and warn. `evolve inbox rank` and `evolve inbox add` refuse it. (Under P1, from the same morning, the block changed only the output of the verb and the classes that `add` accepts.)
+
+## Inbox curator (`inbox.curator`)
+
+The block configures `internal/inboxcurator`, the deterministic checks of the inbox ([inbox-curator.md](inbox-curator.md); plan P3 in [the inbox prioritization plan](../plans/inbox-prioritization-2026-10.md)). `evolve inbox add` reads the thresholds and the kinds.
+
+| Key | Meaning | Default | Refused |
+|---|---|---|---|
+| `stage` | `shadow` publishes the proposals of the curator only. `enforce` also applies each proposal whose deterministic check passes. The stage does not govern `evolve inbox add`: its intake always refuses. | `shadow` | a value other than `shadow` or `enforce` |
+| `overlap_refuse` | the similarity at or above which `evolve inbox add` refuses an item that shares a fix surface with an open item | 0.5 | 0 or less, or above 1 |
+| `overlap_warn` | the similarity at or above which `evolve inbox add` warns about such an item | 0.3, or `overlap_refuse` when that is lower | below 0, or above `overlap_refuse` |
+| `consume_min_share` | the share of the named tests of an item that must exist before the curator proposes to consume it | 0.5 | 0 or less, or above 1 |
+| `kinds` | the `kind` values that `evolve inbox add` accepts | the 15 kinds above | empty, a blank or padded entry, a duplicate |
+
+The similarity is the token Jaccard of the title and the acceptance of two items. The live inbox of 2026-10-27 had 2,710 pairs of open items with a shared fix surface. The highest similarity was 0.52, and 13 pairs were between 0.3 and 0.5. These numbers set the defaults.
 
 ## Convergence policy (`workflow.convergence`)
 

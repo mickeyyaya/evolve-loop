@@ -21,6 +21,7 @@ type Policy struct {
 	Pins                map[string]Pin       `json:"pins,omitempty"`
 	CLIRouting          *CLIRouting          `json:"cli_routing,omitempty"`
 	InboxPriority       *InboxPriorityPolicy `json:"inbox_priority,omitempty"`
+	Inbox               *InboxPolicy         `json:"inbox,omitempty"`
 	ShipFloor           []string             `json:"ship_floor,omitempty"`
 	Floor               []FloorGate          `json:"floor,omitempty"`
 	FailureFloor        *FailureFloor        `json:"failure_floor,omitempty"`

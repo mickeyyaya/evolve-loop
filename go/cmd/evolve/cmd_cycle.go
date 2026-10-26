@@ -613,7 +613,7 @@ func hostInboxClaimer(ld inboxmover.LedgerAppender, signals *signalcenter.Center
 
 func hostFollowupFiler(ld inboxmover.LedgerAppender, signals *signalcenter.Center, forbidden func(string) bool, classes []string) evalgate.ConsoleFollowupFiler {
 	return func(projectRoot string, raw []byte) error {
-		_, err := inboxmover.File(inboxmover.Options{ProjectRoot: projectRoot, Stderr: os.Stderr, Ledger: ld, Signals: signals, IsProtectedPath: forbidden, PriorityClasses: classes}, raw)
+		_, err := inboxmover.File(inboxmover.Options{ProjectRoot: projectRoot, Stderr: os.Stderr, Ledger: ld, Signals: signals, IsProtectedPath: forbidden, PriorityClasses: classes, Origin: inboxbatch.OriginCycle}, raw)
 		return err
 	}
 }

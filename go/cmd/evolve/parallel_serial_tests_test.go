@@ -1,6 +1,7 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestPrintFiledRank_WarnsWhenTheRankIsNotKnown":                                                    "swaps seam filedRankSource",
 	"main.TestRunGuidance_ARepoRootFailureExitsTwo":                                                         "swaps seam guidanceRepoRoot",
 	"main.TestGuidanceFamilies_NamesEachModelFamilyOnceAndFailsOnABadManifest":                              "swaps seams guidanceManifestNames and guidanceLoadManifest",
 	"main.TestPRRefresh_AConflictOutsideTheGeneratedRegionIsNeverStaged":                                    "swaps seam prRefreshWorktree",

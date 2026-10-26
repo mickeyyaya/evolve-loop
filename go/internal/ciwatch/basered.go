@@ -95,6 +95,7 @@ func baseRedItem(rep ClassifyReport, f FailingTest, now time.Time) escalationIte
 		Kind:          "fix",
 		Priority:      "critical",
 		PriorityClass: inboxbatch.ClassCorrectness,
+		Origin:        inboxbatch.OriginCycle,
 		Title:         fmt.Sprintf("Fix first: %s is red on the base of %s", name, rep.Target),
 		Summary: fmt.Sprintf(
 			"evolve ci classify found %s (%s) red on run %d of %s and also red on its base %s. The change did not cause it, so each PR on this base pays for it until main is fixed. Fix it on main first.",

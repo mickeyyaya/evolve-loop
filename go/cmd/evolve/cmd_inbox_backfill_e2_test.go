@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -169,36 +170,24 @@ func TestReadInboxAddItem_SourcesAndFailures(t *testing.T) {
 	writeE2File(t, file, `{"id":"from-file"}`)
 	cases := []struct {
 		name     string
-		args     []string
-		stdin    *strings.Reader
-		useNil   bool
-		failRead bool
+		file     string
+		stdin    io.Reader
 		want     string
 		wantCode int
 		wantErr  string
 	}{
 		{name: "stdin", stdin: strings.NewReader(`{"id":"from-stdin"}`), want: `{"id":"from-stdin"}`},
 		{name: "empty stdin", stdin: strings.NewReader(""), want: ""},
-		{name: "a file", args: []string{"--file", file}, useNil: true, want: `{"id":"from-file"}`},
-		{name: "a missing file", args: []string{"--file", file + ".absent"}, useNil: true, wantCode: 2, wantErr: "inbox add: open "},
-		{name: "no stdin and no file", useNil: true, wantCode: 10, wantErr: inboxUsage("add")},
-		{name: "a bare --file", args: []string{"--file"}, useNil: true, wantCode: 10, wantErr: inboxUsage("add")},
-		{name: "a wrong flag", args: []string{"--path", file}, useNil: true, wantCode: 10, wantErr: inboxUsage("add")},
-		{name: "a torn stdin", failRead: true, wantCode: 2, wantErr: "inbox add: read the item: stdin torn"},
+		{name: "a file", file: file, want: `{"id":"from-file"}`},
+		{name: "a missing file", file: file + ".absent", wantCode: 2, wantErr: "inbox add: open "},
+		{name: "no stdin and no file", wantCode: 10, wantErr: inboxUsage("add")},
+		{name: "a torn stdin", stdin: errReaderE2{}, wantCode: 2, wantErr: "inbox add: read the item: stdin torn"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			var stderr bytes.Buffer
-			var raw []byte
-			var code int
-			switch {
-			case tc.failRead:
-				raw, code = readInboxAddItem(tc.args, errReaderE2{}, &stderr)
-			case tc.useNil:
-				raw, code = readInboxAddItem(tc.args, nil, &stderr)
-			default:
-				raw, code = readInboxAddItem(tc.args, tc.stdin, &stderr)
-			}
+
+			raw, code := readInboxAddItem(tc.file, tc.stdin, &stderr)
 
 			if code != tc.wantCode || !strings.Contains(stderr.String(), tc.wantErr) {
 				t.Fatalf("code=%d stderr=%q, want %d containing %q", code, stderr.String(), tc.wantCode, tc.wantErr)
@@ -210,6 +199,15 @@ func TestReadInboxAddItem_SourcesAndFailures(t *testing.T) {
 				t.Fatalf("a failure returned bytes %q", raw)
 			}
 		})
+	}
+}
+
+func TestParseInboxAddArgs_RefusesABareFileOrAnUnknownFlag(t *testing.T) {
+	t.Parallel()
+	for name, args := range map[string][]string{"a bare --file": {"--file"}, "a wrong flag": {"--path", "x"}, "an operand": {"x"}} {
+		if _, ok := parseInboxAddArgs(args, io.Discard); ok {
+			t.Errorf("%s: parseInboxAddArgs(%q) accepted it", name, args)
+		}
 	}
 }
 

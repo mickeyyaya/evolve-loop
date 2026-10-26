@@ -5,6 +5,7 @@ package lifecycle
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -85,6 +86,8 @@ type Mover struct {
 	bound        func(taskID string) (bool, error)
 
 	priorityClasses []string
+	origin          string
+	intakeRecord    json.RawMessage
 }
 
 type Option func(*Mover)

@@ -87,6 +87,7 @@ type goalStallItem struct {
 	Kind          string  `json:"kind"`
 	Priority      string  `json:"priority"`
 	PriorityClass string  `json:"priority_class"`
+	Origin        string  `json:"origin"`
 	Campaign      string  `json:"campaign"`
 	Description   string  `json:"description"`
 	Source        string  `json:"source"`
@@ -109,6 +110,7 @@ func buildGoalStallItem(kind stallKind, goalHash string, esc *goalStallEscalatio
 		Kind:          "bug",
 		Priority:      "high",
 		PriorityClass: inboxbatch.ClassStability,
+		Origin:        inboxbatch.OriginCycle,
 		Campaign:      "pipeline-stability",
 		Description: fmt.Sprintf(
 			"The goal (hash %s) produced %d CONSECUTIVE %s cycles landing nothing "+

@@ -39,6 +39,7 @@ func (e *Engine) remediationItems(f Failure, defects []string, weight float64) [
 			Kind:          "bug",
 			Priority:      "H",
 			PriorityClass: inboxbatch.ClassCorrectness,
+			Origin:        inboxbatch.OriginRetro,
 			InjectedBy:    "faillearn-failure-floor",
 		})
 	}
