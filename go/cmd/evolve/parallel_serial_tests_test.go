@@ -130,6 +130,7 @@ var serialTests = map[string]string{
 	"main.TestChainStderr_AllTwentyThreeLinesAreByteIdentical":                                              "swaps seam chainBoundaryFleetLaneFn",
 	"main.TestCheckpointUsageReset_IsWiredToTheProductionUsageQuery":                                        "swaps seam usageEvidenceFn",
 	"main.TestClassifyRedRuns_AnUnloadablePolicyClassifiesNothing":                                          "sets env through a helper",
+	"main.TestClihealthUsage_AScreenThatHidesTheDeclaredWindowsExitsOne":                                    "swaps seam clihealthUsagePaneFn",
 	"main.TestClihealthUsage_NoFamilyNamedProbesEveryInstalledOne":                                          "sets env through a helper",
 	"main.TestClihealthUsage_PrintsEachCLIsTypedWindowsAndWritesNothing":                                    "swaps seam clihealthUsagePaneFn",
 	"main.TestClihealthUsage_TheTableNamesEveryWindowAndAFailedProbeExitsOne":                               "swaps seam clihealthUsagePaneFn",

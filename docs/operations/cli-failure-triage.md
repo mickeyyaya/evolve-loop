@@ -39,7 +39,8 @@ Each window has a scope, a kind (`session`, `week` or `5h`), a percentage used a
    The command is read-only (no bench, no record). It boots each CLI once in a throwaway workspace.
    - A window marked exhausted is your cause.
    - The command prints a family whose query fails on stderr, and exits 1. That failure is itself evidence of an auth, install or network cause.
-2. **See the raw screen** when step 1 printed a note instead of windows:
+   - The error `no usage window read` means that the manifest declares windows and the screen showed none. Do step 2.
+2. **See the raw screen** when step 1 printed a note or the error `no usage window read`:
 
    ```
    evolve bridge control <family> usage

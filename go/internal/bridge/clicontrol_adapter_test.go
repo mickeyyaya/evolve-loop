@@ -20,8 +20,8 @@ func TestController_Do_ResolvesAndCaptures(t *testing.T) {
 				"usage": {Send: "/usage", Await: "prompt_marker"},
 			}}, nil
 		},
-		capture: func(_ context.Context, cli, command, _ string) (string, error) {
-			gotCLI, gotCmd = cli, command
+		capture: func(_ context.Context, cli string, spec ControlSpec) (string, error) {
+			gotCLI, gotCmd = cli, spec.Send
 			return "Usage: 12% of weekly limit", nil
 		},
 	}
@@ -65,7 +65,7 @@ func TestController_Do_UnsupportedEvent(t *testing.T) {
 		resolve: func(cli string) (Manifest, error) {
 			return Manifest{CLI: cli, Binary: "x"}, nil
 		},
-		capture: func(context.Context, string, string, string) (string, error) {
+		capture: func(context.Context, string, ControlSpec) (string, error) {
 			t.Fatal("capture must not run for an unsupported event")
 			return "", nil
 		},
@@ -90,7 +90,7 @@ func TestController_Do_ResolveError(t *testing.T) {
 	wantErr := errors.New("no manifest")
 	c := &cliController{
 		resolve: func(string) (Manifest, error) { return Manifest{}, wantErr },
-		capture: func(context.Context, string, string, string) (string, error) { return "", nil },
+		capture: func(context.Context, string, ControlSpec) (string, error) { return "", nil },
 	}
 	if _, err := c.Do(context.Background(), "nope", clicontrol.EventStatus); err == nil {
 		t.Fatal("want resolve error propagated")
@@ -128,7 +128,7 @@ func TestController_Do_ACaptureFailureNamesTheFamilyAndTheEvent(t *testing.T) {
 		resolve: func(cli string) (Manifest, error) {
 			return Manifest{CLI: cli, Binary: "x", Controls: map[string]ControlSpec{"usage": {Send: "/usage"}}}, nil
 		},
-		capture: func(context.Context, string, string, string) (string, error) { return "", cause },
+		capture: func(context.Context, string, ControlSpec) (string, error) { return "", cause },
 	}
 
 	_, err := c.Do(context.Background(), "agy", clicontrol.EventUsage)

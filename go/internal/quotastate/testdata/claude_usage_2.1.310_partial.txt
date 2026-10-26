@@ -1,0 +1,37 @@
+❯ /usage
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Settings  Status   Config   Usage   Stats
+
+  Session
+
+  Total cost:            $0.0000
+  Total duration (API):  0s
+  Total duration (wall): 2s
+  Total code changes:    0 lines added, 0 lines removed
+  Usage:                 0 input, 0 output, 0 cache read, 0 cache write
+
+
+  Plugin skill-listing footprint
+  What each plugin's skill descriptions add to the system prompt (cached input after the first turn). Agents and MCP tools not yet counted.
+
+  evo                         27 skills · ~2656 tok/turn
+
+  Total                       ~2000 tok/turn (capped at the listing budget; per-plugin figures above are pre-truncation)
+
+  Current session
+  █████████                                          18% used
+  Resets 8:30pm (Asia/Taipei)
+
+  Current week (all models)
+  ██████████████████                                 36% used
+  Resets Nov 1 at 9pm (Asia/Taipei)
+
+  What's contributing to your limits usage?
+  Approximate · sessions on this machine only
+
+  Scanning local sessions…
+
+  Refreshing…
+
+  Esc to cancel
