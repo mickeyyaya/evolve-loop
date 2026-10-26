@@ -15,6 +15,7 @@
 - [6a. Components after the first instrumented run (C6 to C14)](#6a-components-after-the-first-instrumented-run-c6-to-c14)
 - [6b. Components after the queue measurement (C15 and C16)](#6b-components-after-the-queue-measurement-c15-and-c16)
 - [6c. Build status of C2 (2026-10-20)](#6c-build-status-of-c2-2026-10-20)
+- [6d. A hung job holds the main group (C17, 2026-10-26)](#6d-a-hung-job-holds-the-main-group-c17-2026-10-26)
 - [7. Order](#7-order)
 - [8. Verification](#8-verification)
 - [9. Risks](#9-risks)
@@ -390,6 +391,38 @@ The `lint`, `vet-current` and `vulncheck` jobs do not change. `required.yml` doe
 The console boundary (the latency gate T5 of ADR-0144) will later turn these issues into inbox items. This change does not build that step.
 
 The tests read the workflow text. They cannot run the GitHub scheduler, and they cannot prove that the `gh` calls succeed on a real runner. The first scheduled or manual run proves that.
+
+## 6d. A hung job holds the main group (C17, 2026-10-26)
+
+On 2026-10-26 the console asked why main did not catch the reds of PR #1138. The answer has two parts.
+
+**F9.1** The red of PR #1138 (run 40268371666, macOS job) was one package: `FAIL github.com/mickeyyaya/evolve-loop/go/internal/core 568.266s`. The failing test was `TestDispatchEvaluateBatch_Concurrent`: two fake phases had to overlap in a 20 ms sleep window. The `acs/cycle1946`, `acs/cycle1950` and `acs/cycle10` FAIL lines in the same log are fixture text. `go/internal/core/blocker_proof_test.go:21` and `go/internal/handoff/exit/blocker_test.go:28` hold them as strings.
+*Implication:* the run log showed one real red, and that red was a flaky test, not a regression. A full `internal/core` run on main (1db031993) gives 100.0% for `writeBuildSelfCheckArtifact` and for `AppendResolvedFingerprint`.
+
+**F9.2** No CI job runs the archived predicates under `go/acs/cycle*`. `go/Makefile:59` drops each `/acs/` package from the fast set, and the `acs-durable` job runs only `./acs/regression/...` (`.github/workflows/ci.yml:66`). On main, `acs/cycle10`, `acs/cycle25` and `acs/cycle31` fail, and `acs/cycle334` does not compile.
+*Implication:* a red archived predicate on main is not a CI signal. An archived predicate pins the acceptance of one past cycle.
+
+**F9.3** Run 40265789886 of 6cbf1a765 started at 03:47 UTC. Its `build + test (Go 1.27, ubuntu, every package, no gates)` job was still in the test step after 08:00 UTC. Each other job of the run ended by 04:05 UTC. In the next 4 h GitHub cancelled the pending runs of 824d19077, 71e367ac7 and 76c4815fe, because a group keeps one pending run (D24).
+*Implication:* with no `timeout-minutes`, one hung job holds the main group for the runner default of 360 min. Each push in that time replaces the pending run.
+
+**F9.4** The table gives the longest job time in the last five successful main runs before 6cbf1a765.
+
+| Job | Longest time |
+|---|---|
+| macOS | 1255 s |
+| ubuntu Go 1.23 | 884 s |
+| ubuntu Go 1.27 | 713 s |
+| `vet + gofmt` | 151 s |
+| `vet (Go 1.27)` | 80 s |
+| `govulncheck` | 28 s |
+
+| Id | Decision | Because (findings) | Rejected options and why |
+|---|---|---|---|
+| D27 | Each job of `go.yml` declares `timeout-minutes`: 60 for the three test jobs and 15 for `lint`, `vet-current` and `vulncheck`. 60 is about 3 times the longest measured test job (F9.4). | F9.3, F9.4 | No limit: one hang holds main for 6 h (F9.3). A per-SHA group for pushes to main: each commit of a train then holds a macOS slot for about 21 min, which undoes C15. A daily full run on main is useful, but it changes the routing and the concurrency contracts, so it is the inbox item `ci-main-daily-full-run`. |
+
+| Id | Built as | Red test | What the build records |
+|---|---|---|---|
+| C17 | D27 in `.github/workflows/go.yml` | `TestGoWorkflow_EveryJobHasABoundedTimeout` fails when a `go.yml` job has no `timeout-minutes` or a value above 90 | The test pins the range 1 to 90, not the values 60 and 15. It cannot find the cause of the hang in F9.3. The log of that job is not available while the job runs. |
 
 ## 7. Order
 
