@@ -28,11 +28,11 @@ func TestRows_AreTheNineteenRowsOfSpec14InOrder(t *testing.T) {
 
 func TestRows_OnlyTheRowsOfLandedComponentsAreGreenAndEveryOpenRowNamesItsComponent(t *testing.T) {
 	t.Parallel()
-	greenBy := map[string]string{"M1": "X1", "N9": "X1", "N13": "X6", "N1": "X2", "N2": "X3", "N3": "X4", "N4": "X4", "M2": "X1b", "M3": "X1b", "M4": "X1b", "N12": "X8", "N5": "X5", "N6": "X5", "N7": "X5", "N8": "X5"}
+	greenBy := map[string]string{"M1": "X1", "N9": "X1", "N13": "X6", "N1": "X2", "N2": "X3", "N3": "X4", "N4": "X4", "M2": "X1b", "M3": "X1b", "M4": "X1b", "N12": "X8", "N5": "X5", "N6": "X5", "N7": "X5", "N8": "X5", "N10": "X7", "N11": "X7"}
 	for _, r := range Rows() {
 		closer, green := greenBy[r.ID]
 		if r.Open == green {
-			t.Errorf("row %s Open = %v; only %v are green after X1, X1b, X2, X3, X4, X5, X6 and X8", r.ID, r.Open, greenBy)
+			t.Errorf("row %s Open = %v; only %v are green after X1, X1b, X2, X3, X4, X5, X6, X7 and X8", r.ID, r.Open, greenBy)
 		}
 		if !strings.HasPrefix(r.ClosedBy, "X") || r.Check == "" || r.Owner == "" {
 			t.Errorf("row %s must name its check, its owner test file and the component that turns it green: %+v", r.ID, r)

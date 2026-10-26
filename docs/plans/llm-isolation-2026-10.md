@@ -169,7 +169,8 @@ The state on 2026-10-25. Each component re-reads this table before it starts.
 | X6b | not started | none | Follow-up of X6, item `isolation-floor-profiles-allowed-clis-as-routing-data`. 7 profiles still set `allowed_clis` to Claude families, so an agy-only table cannot compile yet (§6.2). |
 | X3 | built | this change | One launch API (`bridge.LaunchLLM`, `launchPane`, `newRecipeDriver`) starts each LLM binary. The guard `TestOnlyTheBridgeStartsAnLLMBinary` found 9 spawns on 7 paths before the change and 0 after it. Row N2 is green. The probe purpose keeps its bypass grant until item `isolation-probe-bypass-plan-mode-proof` proves a plan-mode control capture. |
 | X18a | built | item `control-flags-strict-policy-parse` | `policy.Parse` refuses an unknown key at any level and names its path. The spec §27 has the design and the rollout step. |
-| X4, X5, X7 to X17, X18b to X19 | not started | none | |
+| X7 | built, stage `shadow` | this change | The sandbox denies each write of a protected path of `guards.ProtectedSurfaceManifest` for each family (policy `isolation.i7.stage`). `guard phase` allows an in-cell `Agent` or `Task` and denies an out-of-cell phase persona. Rows N10 and N11 are green. The spec §9.1 has the map of each hook to its CLI-neutral layer. |
+| X4, X5, X8 to X17, X18b to X19 | not started | none | |
 
 ### 6.2 The X6 follow-up (X6b)
 

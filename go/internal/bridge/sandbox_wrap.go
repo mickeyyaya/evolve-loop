@@ -102,6 +102,7 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 			paths[i] = real
 		}
 		cfg.RepoRoot, cfg.WritePaths = paths[0], paths[1:]
+		cfg = deps.withProtectedWrites(cfg, ownWorktree(req, cfg.WritePaths), cfg.RepoRoot)
 		socketDir, sockets, err := tmuxSocketGuard()
 		if err != nil {
 			if deps.Stderr != nil {
