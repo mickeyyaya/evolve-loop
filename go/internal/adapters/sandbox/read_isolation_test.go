@@ -53,6 +53,9 @@ func TestGenerateSBPL_EnforceDeniesOtherRunsSecretsAndRawOutputAndGrantsTheIndex
 		`(deny file-write* (literal "/repo/.evolve/runs/cycle-7/lane-scope.json") (with message "evolve-cell=d42 rule=write.pipeline.file inv=I5"))`,
 		`(deny file-read* (subpath "/repo/.evolve/runs/cycle-7/private"))`,
 	)
+	if !strings.Contains(sbpl, "rule="+RuleGrantIndex+`"))`) {
+		t.Fatalf("each grant names the rule %s:\n%s", RuleGrantIndex, sbpl)
+	}
 	if strings.Contains(sbpl, `(literal "")`) {
 		t.Fatalf("an empty grant must emit no rule:\n%s", sbpl)
 	}

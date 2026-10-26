@@ -154,6 +154,10 @@ func TestIsolationContext_ParsesTheStageTheBudgetsAndTheRequiredLists(t *testing
 	if empty := (policy.Policy{}).IsolationContext(); empty.Stage != "" || empty.Required != nil {
 		t.Fatalf("a policy with no isolation block has no context settings: %+v", empty)
 	}
+	typed := policy.Policy{Isolation: &policy.IsolationPolicy{Context: &policy.IsolationContextPolicy{Budget: policy.IsolationContextBudget{L2Tokens: 7}}}}
+	if got := typed.IsolationContext().Budget.L2Tokens; got != 7 {
+		t.Fatalf("the typed block carries its budget: %d", got)
+	}
 }
 
 func TestParse_RefusesAContextBlockThatNoReaderCanApply(t *testing.T) {
