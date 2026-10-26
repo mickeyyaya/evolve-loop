@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "The eval runs one fixed task set of at least 20 tasks on a Claude seat and a Codex seat, each arm 3 times",
+    "The plan records the success rate of each arm with its method and date",
+    "Decision rule: if the L0 plus index arm scores lower than today's files, L0 keeps more rules within the budget of research S8, and the plan says which"
+  ],
+  "created_at": "2026-10-26T18:08:00Z",
+  "deps": [
+    "guidance-migrate-batch-2-commit-boundary"
+  ],
+  "files": [
+    "skills/",
+    "docs/plans/guidance-layers-2026-10.md"
+  ],
+  "fix": "Run one eval of the same tasks with today's files and with L0 plus the index, through the agent bridge, and record the result in the plan.",
+  "id": "guidance-l0-with-without-eval",
+  "kind": "feature",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "source": "console, 2026-10-26, operator: \"Extract the common rules, policies from claude / gemini / codex / ollama / etc... and build a structured system level indexes MD file to be loaded dynamically in the run time.\" Design: docs/architecture/guidance-layers.md \u00a710; plan docs/plans/guidance-layers-2026-10.md \u00a74 and \u00a79 (ADR-0145).",
+  "summary": "The switch to L0 plus the index needs proof that agents do not get worse (plan \u00a73, What changes our mind).",
+  "title": "Guidance G7: the with-and-without eval of L0 and the index",
+  "weight": 0.35
+}

@@ -1,6 +1,6 @@
 # ADR-0145: each rule has one home and loads by audience, path, action or failure
 
-- **Status:** Proposed (2026-10-20).
+- **Status:** Proposed (2026-10-20). Amended on 2026-10-26: decisions 8 to 10 add the runtime index.
 - **Plan:** [guidance-layers-2026-10](../../plans/guidance-layers-2026-10.md). **Research:** [guidance-layers-2026-10](../../research/guidance-layers-2026-10.md). **Design:** [guidance-layers](../guidance-layers.md).
 - **Relates to:**
   - [ADR-0132](0132-documents-are-written-through-one-skill.md): `docs-write` stays the one skill for documents, and becomes a task skill of L2.
@@ -23,6 +23,9 @@ The rules of the project grew in seven kinds of source. Each source loads in its
 5. A rule that must hold loads through a forced path. The paths are an overlay, a path rule, an action hook and failure text.
 6. A rule that a check enforces keeps one line and names the check.
 7. Memory keeps personal facts and project status. A project rule lives in the registry.
+8. The generator also writes an index of all active rules, `guidance/index.md` and its twin `guidance/index.json`. An agent reads the index and opens a body only when its case needs it ([plan §9](../../plans/guidance-layers-2026-10.md#9-the-runtime-index-2026-10-26)). Because: current practice loads a catalog first and the detail on demand (research S1, S18).
+9. Each always-on carrier holds only L0 and a pointer to the index. A family with no instruction file gets the same text through the bridge. Because: Codex reads only 32 KiB, and Ollama reads no file (research S15, S16, F5.2).
+10. A rule is neutral. The facts of one CLI family stay in its driver layer: its CLI overlay and its bridge manifest. Because: a fact of one family in a neutral file reaches the agents of each other family (plan F9 inventory).
 
 ## Consequences
 

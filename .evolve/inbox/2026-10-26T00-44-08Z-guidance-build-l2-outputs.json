@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "RED first: an L2 rule with a path trigger renders no .claude/rules file before the change",
+    "A broken paths: glob fails the check",
+    "Each output is byte-stable",
+    "Changed functions at 100% coverage on every CI OS; the package note and the spec are updated"
+  ],
+  "created_at": "2026-10-26T18:01:00Z",
+  "deps": [
+    "guidance-registry-index-and-check"
+  ],
+  "files": [
+    "go/internal/guidance/",
+    ".claude/rules/",
+    ".evolve/guidance/actions/",
+    "skills/"
+  ],
+  "fix": "Extend evolve guidance build to render each L2 output of guidance-layers.md \u00a74 from the triggers of the registry, and extend the check to each output and to each paths: glob (design \u00a77).",
+  "id": "guidance-build-l2-outputs",
+  "kind": "feature",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "source": "console, 2026-10-26, operator: \"Extract the common rules, policies from claude / gemini / codex / ollama / etc... and build a structured system level indexes MD file to be loaded dynamically in the run time.\" Design: docs/architecture/guidance-layers.md \u00a710; plan docs/plans/guidance-layers-2026-10.md \u00a74 and \u00a79 (ADR-0145).",
+  "summary": "The build of G1 writes only L0 and the index. Design \u00a74 also names .claude/rules/<name>.md, .evolve/guidance/actions/<action>.md and the Rules block of each skill.",
+  "title": "Guidance G1b: the build writes the path rules, the action files and the skill blocks",
+  "weight": 0.35
+}

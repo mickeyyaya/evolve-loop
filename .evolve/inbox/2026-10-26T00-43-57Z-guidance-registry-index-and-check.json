@@ -1,0 +1,31 @@
+{
+  "acceptance": [
+    "RED first: a registry file with an unknown field fails the reader before the code exists",
+    "evolve guidance build is byte-stable: a second run changes nothing",
+    "evolve guidance check exits 1 on a stale index, a duplicate statement, L0 over 60 lines or 30 rules, two active rules in conflict, and an absent enforced_by path",
+    "evolve guidance index --json prints one evolve.guidance.index/1 envelope; --audience, --phase and --cli filter the rows; an unknown audience or CLI exits 10; a bad registry file exits 11",
+    "The 20 L0 rules of plan \u00a79.5 are in guidance/rules/, and the digest of AGENTS.md carries their generated region and the pointer line",
+    "CI runs evolve guidance check",
+    "The order guidance build, skills generate, then guidance check and skills check is documented, and CI runs both checks; guidance index --json prints the envelope on a usage exit too",
+    "Changed functions at 100% coverage on every CI OS; the package note and the spec are updated"
+  ],
+  "created_at": "2026-10-26T18:00:00Z",
+  "deps": [],
+  "files": [
+    "go/internal/guidance/",
+    "go/cmd/evolve/",
+    "guidance/",
+    "AGENTS.md",
+    ".github/workflows/",
+    "docs/architecture/packages/"
+  ],
+  "fix": "Add go/internal/guidance: a strict frontmatter reader of guidance/rules/<id>.md (fail closed), a build that writes guidance/index.md, guidance/index.json and the GENERATED:guidance-l0 region of the AGENTS.md digest, and a check (stale output, duplicate statement, L0 budget, conflicts_with, absent enforced_by path, L0 with families). Add evolve guidance build|check|index with --json and the exit codes of \u00a710.3, a CI step, and the first L0 batch of plan \u00a79.5.",
+  "id": "guidance-registry-index-and-check",
+  "kind": "feature",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "source": "console, 2026-10-26, operator: \"Extract the common rules, policies from claude / gemini / codex / ollama / etc... and build a structured system level indexes MD file to be loaded dynamically in the run time.\" Design: docs/architecture/guidance-layers.md \u00a710; plan docs/plans/guidance-layers-2026-10.md \u00a74 and \u00a79 (ADR-0145).",
+  "summary": "No code reads guidance/rules/ and no runtime index exists, so each CLI family loads its own copy of the rules (plan \u00a79.1). Spec: guidance-layers.md \u00a74, \u00a77 and \u00a710.",
+  "title": "Guidance G0 to G2: the rule registry reader, the build of the runtime index and the check",
+  "weight": 0.5
+}

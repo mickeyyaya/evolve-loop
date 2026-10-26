@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "All 40 batch-2 memory files of plan \u00a79.1 are resolved: a registry file, a merge into one, or a pointer",
+    "Each batch-2 memory rule is a registry file or a merge into one",
+    "evolve guidance check passes",
+    "A reviewer checks the layer and the audience of each rule"
+  ],
+  "created_at": "2026-10-26T18:05:00Z",
+  "deps": [
+    "guidance-registry-index-and-check"
+  ],
+  "files": [
+    "guidance/rules/",
+    "AGENTS.md"
+  ],
+  "fix": "Move the rules of the batch-2 rows of plan \u00a79.1 into guidance/rules/ with layer, audience and triggers; merge the duplicates of F9.2; replace each memory file with a pointer; remove the hand-written copies from AGENTS.md.",
+  "id": "guidance-migrate-batch-2-commit-boundary",
+  "kind": "feature",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "source": "console, 2026-10-26, operator: \"Extract the common rules, policies from claude / gemini / codex / ollama / etc... and build a structured system level indexes MD file to be loaded dynamically in the run time.\" Design: docs/architecture/guidance-layers.md \u00a710; plan docs/plans/guidance-layers-2026-10.md \u00a74 and \u00a79 (ADR-0145).",
+  "summary": "40 memory rules on commit, ship, the boundary and the waves are readable only by the console (plan \u00a79.1).",
+  "title": "Guidance G5 batch 2: migrate the commit, ship and boundary rules into the registry",
+  "weight": 0.35
+}
