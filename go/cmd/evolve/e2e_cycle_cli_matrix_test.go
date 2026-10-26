@@ -16,6 +16,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/faketmux"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gotooltest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/isolation"
 )
@@ -372,7 +373,8 @@ func mustRepoRoot(t *testing.T) string {
 func setupTempProject(t *testing.T, repoRoot string) string {
 	t.Helper()
 	_ = repoRoot
-	root := t.TempDir()
+	repo := gittest.Fixture(t)
+	root := repo.Dir
 
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
 		t.Fatalf("mkdir .evolve: %v", err)
@@ -425,7 +427,7 @@ func TestAuditFixture(t *testing.T) {
 		}
 	}
 
-	gitInit(t, root)
+	commitProjectSeed(t, repo)
 
 	return root
 }
@@ -448,27 +450,18 @@ func writeProjectPolicy(t *testing.T, root string, extra map[string]any) {
 	}
 }
 
-func gitInit(t *testing.T, root string) {
+func commitProjectSeed(t *testing.T, repo *gittest.Repo) {
 	t.Helper()
-	run := func(args ...string) {
-		cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
-	}
-	run("init", "-q", "-b", "main")
-	run("config", "user.email", "e2e@test.local")
-	run("config", "user.name", "E2E Test")
-	run("config", "commit.gpgsign", "false")
-	if err := os.WriteFile(filepath.Join(root, ".gitignore"),
+	repo.Git("config", "commit.gpgsign", "false")
+	if err := os.WriteFile(filepath.Join(repo.Dir, ".gitignore"),
 		[]byte("tools/\n.evolve/\ngo/bin/\n"), 0o644); err != nil {
 		t.Fatalf("write .gitignore: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(root, "README.md"), []byte("# e2e\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(repo.Dir, "README.md"), []byte("# e2e\n"), 0o644); err != nil {
 		t.Fatalf("write README: %v", err)
 	}
-	run("add", "-A")
-	run("commit", "-q", "-m", "initial")
+	repo.Git("add", "-A")
+	repo.Git("commit", "-q", "-m", "initial")
 }
 
 func writeFakeShipScript(t *testing.T, projRoot string) string {
