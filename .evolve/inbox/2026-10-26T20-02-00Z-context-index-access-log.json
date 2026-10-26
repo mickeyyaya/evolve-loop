@@ -1,0 +1,29 @@
+{
+  "id": "context-index-access-log",
+  "kind": "feature",
+  "title": "Cell context index CX3: the access log from the sandbox report of each index grant.",
+  "source": "console, 2026-10-26. The operator request is in docs/plans/cell-context-index-2026-10.md §1. Design: docs/architecture/cell-context-index.md. Plan: §6 of the same plan.",
+  "summary": "The pipeline does not know which entries a cell opened, because the X5 grants carry no report (research F1.10). Spec §8.",
+  "fix": "Add (with report) and the message rule=grant.index to each literal index grant, and a report-only rule for each L3 repo path. After the cell, a parser separate from the violation parser reads the grant.index reports. It maps each path to its entry. It writes one record for each opened entry, plus one summary for each cell, to .evolve/context-access/cycle-N.jsonl. Add evolve context stats (class D) and the signals CONTEXT_REQUIRED_UNOPENED, CONTEXT_BUDGET_OVER and CONTEXT_PRELOAD_BYTES.",
+  "acceptance": [
+    "RED first: TestReportReads_WritesOneAccessRecordForEachOpenedEntry fails before the change.",
+    "Sandbox row N16 (darwin): an open of an indexed path writes one record with the entry id.",
+    "Sandbox row N17 (darwin): a write of .evolve/context-access/ from a cell is denied, and a write grant that covers it is refused.",
+    "A Linux cell writes a summary with source none.",
+    "Changed functions at 100% coverage on every CI OS; the package note and the spec are updated."
+  ],
+  "deps": [
+    "context-index-layers-and-budgets"
+  ],
+  "files": [
+    "go/internal/bridge/read_isolation.go",
+    "go/internal/bridge/sandbox_paths.go",
+    "go/internal/adapters/sandbox/",
+    "go/internal/inputindex/",
+    "go/cmd/evolve/"
+  ],
+  "priority_class": "stability",
+  "weight": 0.4,
+  "route": "console-manual",
+  "created_at": "2026-10-26T20:02:00Z"
+}

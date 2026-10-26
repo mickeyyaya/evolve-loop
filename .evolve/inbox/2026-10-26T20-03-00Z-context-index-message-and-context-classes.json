@@ -1,0 +1,23 @@
+{
+  "id": "context-index-message-and-context-classes",
+  "kind": "feature",
+  "title": "Cell context index CX4: the message and context classes of L1.",
+  "source": "console, 2026-10-26. The operator request is in docs/plans/cell-context-index-2026-10.md §1. Design: docs/architecture/cell-context-index.md. Plan: §6 of the same plan.",
+  "summary": "The message class and the context class of llm-isolation.md §8.1 have no entries (research F1.2). Spec §3.",
+  "fix": "List the inbox item file of each item id as class context, and each ADR-0129 mailbox frame of the dispatch as class message. Both are L1.",
+  "acceptance": [
+    "RED first: TestBuild_ListsTheInboxItemFileOfEachItemID fails before the change.",
+    "A mailbox frame of the dispatch is a message entry with its summary and size.",
+    "Changed functions at 100% coverage on every CI OS; the package note and the spec are updated."
+  ],
+  "deps": [
+    "context-index-layers-and-budgets"
+  ],
+  "files": [
+    "go/internal/inputindex/"
+  ],
+  "priority_class": "stability",
+  "weight": 0.4,
+  "route": "console-manual",
+  "created_at": "2026-10-26T20:03:00Z"
+}

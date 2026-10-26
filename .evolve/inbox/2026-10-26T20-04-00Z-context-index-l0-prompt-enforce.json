@@ -1,0 +1,28 @@
+{
+  "id": "context-index-l0-prompt-enforce",
+  "kind": "feature",
+  "title": "Cell context index CX5: at enforce the prompt tail is the L0 block only.",
+  "source": "console, 2026-10-26. The operator request is in docs/plans/cell-context-index-2026-10.md §1. Design: docs/architecture/cell-context-index.md. Plan: §6 of the same plan.",
+  "summary": "The build prompt tail preloads the recalled lessons, the task contract and the repair findings, about 7 KB for each cell (research F1.4, F1.5). Spec §5 and §12.",
+  "fix": "At isolation.context.stage=enforce, write the moved bodies of spec §5 under <ws>/inputs/ and index them, and compose the prompt tail as the L0 block. Accept enforce in policy.Parse.",
+  "acceptance": [
+    "RED first: TestComposePrompt_AtEnforceTheTailIsTheL0BlockOnly fails before the change.",
+    "At shadow the prompt is byte-equal to today.",
+    "The compiled default and the checked-in policy stay shadow.",
+    "Changed functions at 100% coverage on every CI OS; the package note and the spec are updated."
+  ],
+  "deps": [
+    "context-index-access-log",
+    "context-index-read-verbs"
+  ],
+  "files": [
+    "go/internal/phases/runner/",
+    "go/internal/phases/build/",
+    "go/internal/inputindex/",
+    "go/internal/policy/"
+  ],
+  "priority_class": "stability",
+  "weight": 0.4,
+  "route": "console-manual",
+  "created_at": "2026-10-26T20:04:00Z"
+}
