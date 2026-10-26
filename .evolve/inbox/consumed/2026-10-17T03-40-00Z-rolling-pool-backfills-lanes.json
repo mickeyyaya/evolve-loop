@@ -1,0 +1,32 @@
+{
+  "acceptance": [
+    "`TestOrchestrator_AFreeSlotTakesTheNextAdmissibleTodoAtOnce` passes: a ship.landed event backfills the slot with no poll.",
+    "`TestLease_ALanePastItsDeadlineStopsAndReleasesItsItem` passes, and the stop uses no name match.",
+    "At width 4, the utilization in `evolve wave status` is at least 0.85 over 3 runs (goal G3)."
+  ],
+  "campaign": "wave-orchestrator",
+  "consumed": {
+    "at": "2026-10-26T19:22:03Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Built and merged: O4 rolling pool and O5 lane lease in PR 941, pool resupply fix in PR 991. TestOrchestrator_AFreeSlotTakesTheNextAdmissibleTodoAtOnce passes. The lease test has the name TestLease_ALanePastItsDeadlineIsReleasedAndNotRelaunchedInTheSameRun. The measured goal G3 (utilization at least 0.85 at 4 lanes over 3 runs) is not proven: wave 142 shows 0.47. Item wave-orchestrator-measure-goals-g1-g3 carries it."
+  },
+  "created_at": "2026-10-17T03:40:00Z",
+  "deps": [
+    "wave-orchestrator-design-set"
+  ],
+  "files": [
+    "go/internal/fleet/pool.go",
+    "go/internal/loopwave/launcher.go",
+    "go/cmd/evolve/cmd_loop_pool.go"
+  ],
+  "fix": "Plan components O4 (D8) and O5 (D9), spec sections 7 and 8. RunPool becomes the scheduler under the orchestrator: it asks admission for the next todo, runs FreshenSpecs before launch, and publishes each transition on the loop channel. Each lane holds a lease with a heartbeat from its own events and a deadline; past the deadline it stops through its own process group and releases its item. Design: docs/plans/wave-orchestrator-2026-10.md and docs/architecture/wave-orchestrator.md (ADR-0139).",
+  "id": "rolling-pool-backfills-lanes",
+  "kind": "feature",
+  "priority_class": "performance",
+  "route": "console-manual",
+  "source": "operator, 2026-10-16 ('Set the max cycle per wave to 4', 'have we designed a wave orchestrator...') and 2026-10-17 ('Why the wave cycle number has not configured to 4 parallel running cycle? And did we have the orchestrator oversee all parallel running cycles in the same wave'; 'prioritize them with high prioritization')",
+  "summary": "fleet.RunPool backfills a lane the moment another one ends, but fleet.scheduling defaults to wave, a barrier, so the slowest lane holds the others (docs/architecture/packages/internal-fleet.md).",
+  "title": "A free lane takes the next ready task at once: turn on the rolling pool",
+  "weight": 1.0
+}

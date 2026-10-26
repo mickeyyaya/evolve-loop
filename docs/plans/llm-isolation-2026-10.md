@@ -158,22 +158,22 @@ Each component is one PR, with a red test first. The spec section is the accepta
 
 ### 6.1 Component state
 
-The state on 2026-10-26. Each component re-reads this table before it starts.
+The state on 2026-10-27. Each component re-reads this table before it starts.
 
 | Id | State | PR | Note |
 |---|---|---|---|
 | X1 | merged | #1121 | The matrix is `isolation.Rows` (`go/internal/isolation/matrix.go`). Rows M1 and N9 are green, and each other row is an expected failure with its owner. |
-| X2 | merged, stage `shadow` | #1122 | The stage key is `isolation.i2.stage`, and the flip to `enforce` is an operator decision. X2 closed review finding H2 in the bridge with the explicit list `pipelineEnvMarkers`. X18b makes one list the source for the whole pipeline. |
+| X2 | merged, stage `enforce` | #1122, #1159 | The stage key is `isolation.i2.stage`. PR #1159 set it to `enforce` on 2026-10-26. X2 closed review finding H2 in the bridge with the explicit list `pipelineEnvMarkers`. X18b makes one list the source for the whole pipeline. |
 | X1b | merged | #1128 | Follow-up of X1: a fake `tmux` (`go/internal/faketmux`), so the rows M2 to M4 run a full cycle and are green. |
 | X6 | merged | #1123 | `cli_routing.floors` holds the Claude floor, and its compiled default is `go/internal/policy/routing_defaults.json`. The flow seat defaults are routing data. |
 | X6b | not started | none | Follow-up of X6, item `isolation-floor-profiles-allowed-clis-as-routing-data`. 7 profiles still set `allowed_clis` to Claude families, so an agy-only table cannot compile yet (§6.2). |
 | X3 | merged | #1127 | One launch API (`bridge.LaunchLLM`, `launchPane`, `newRecipeDriver`) starts each LLM binary. The guard `TestOnlyTheBridgeStartsAnLLMBinary` found 9 spawns on 7 paths before the change and 0 after it. Row N2 is green. The probe purpose keeps its bypass grant until item `isolation-probe-bypass-plan-mode-proof` proves a plan-mode control capture. |
 | X18a | merged | #1129 | `policy.Parse` refuses an unknown key at any level and names its path. The spec §27 has the design and the rollout step. |
 | X7 | merged, stage `shadow` | #1135 | The sandbox denies each write of a protected path of `guards.ProtectedSurfaceManifest` for each family (policy `isolation.i7.stage`). `guard phase` allows an in-cell `Agent` or `Task` and denies an out-of-cell phase persona. Rows N10 and N11 are green. The spec §9.1 has the map of each hook to its CLI-neutral layer. |
-| X4 | merged | #1126 | A phase cell carries the depth and phase markers, and the sandbox denies the exec of an LLM binary. The dispatch credential of I-3 merged in #1132: the dispatch verbs need a credential that no cell can read. |
+| X4 | merged | #1126 | A phase cell carries the depth and phase markers, and the sandbox denies the exec of an LLM binary. The dispatch credential of I-3 merged in #1132: the dispatch verbs need a credential that no cell can read. The item `isolation-no-nested-agency` stays open: at stage `shadow`, an exec deny report does not emit `ISOLATION_I3_VIOLATION` yet. |
 | X5 | merged, stage `shadow` | #1133 | Each phase cell reads `inputs/index.json` with exact read grants (policy `isolation.i5.stage`). |
 | X8 | merged | #1131 | Each flow decision is a declared JSON file that a `phasecontract` schema checks. |
-| X10 | built | this change | `AGENTS.md` is the one source. `evolve skills generate` renders its digest into `CLAUDE.md` and `GEMINI.md`, and the four review-fleet personas into `.claude/agents`. |
+| X10 | merged | #1136 | `AGENTS.md` is the one source. `evolve skills generate` renders its digest into `CLAUDE.md` and `GEMINI.md`, and the four review-fleet personas into `.claude/agents`. |
 | X17a | merged | #1125 | `evolve loop status` with any extra word never starts a loop. |
 | X17e | merged | #1130 | Each `evolve` verb has an agent class (docs). |
 | X9, X11 to X16, X17b to X17d, X18b to X19 | not started | none | |

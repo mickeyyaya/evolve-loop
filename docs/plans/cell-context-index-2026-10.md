@@ -1,6 +1,6 @@
 # Plan: each phase cell gets a small assignment and a layered index that it opens on demand
 
-- **Status:** proposed, 2026-10-26.
+- **Status:** proposed, 2026-10-26. On 2026-10-27, CX1 to CX3 are merged in PR #1146, at stage `shadow`. CX4 to CX7b have inbox items (§6).
 - **Design:** [cell-context-index](../architecture/cell-context-index.md). **Decision:** [ADR-0154](../architecture/adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md) I-4 rule 14 and [ADR-0155](../architecture/adr/0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md) I-12. **Research:** [cell-context-index-2026-10](../research/cell-context-index-2026-10.md).
 - **Builds on:** X5 (PR #1133), the artifact index of [llm-isolation.md](../architecture/llm-isolation.md) §8; the rule registry index of PR #1137 ([guidance-layers.md](../architecture/guidance-layers.md) §10).
 
@@ -115,9 +115,9 @@ What changes our mind: the access log can show that the cells of a phase open ea
 
 | Id | Component | Red test first | PR | Inbox item |
 |---|---|---|---|---|
-| CX1 | The `/2` fields, the layers, the required list and the budgets in `inputindex`; the policy keys `isolation.context.*` with a strict decode | `TestBuild_EachEntryHasTheLayerOfItsClass` | PR 2 | `context-index-layers-and-budgets` |
-| CX2 | The verbs `evolve context index` and `evolve context open`, class `A`, with the envelope; the persona text in `agents/agent-templates.md`; matrix row N15 | `TestContextOpen_RefusesAnUnknownIDAForeignPathAndAChangedBody` | PR 2 | `context-index-read-verbs` |
-| CX3 | The grant reports, the access log `.evolve/context-access/`, `evolve context stats` and the signals; sandbox rows N16 and N17 | `TestReportReads_WritesOneAccessRecordForEachOpenedEntry` | PR 2 | `context-index-access-log` |
+| CX1 | The `/2` fields, the layers, the required list and the budgets in `inputindex`; the policy keys `isolation.context.*` with a strict decode | `TestBuild_EachEntryHasTheLayerOfItsClass` | #1146 (merged) | `context-index-layers-and-budgets` |
+| CX2 | The verbs `evolve context index` and `evolve context open`, class `A`, with the envelope; the persona text in `agents/agent-templates.md`; matrix row N15 | `TestContextOpen_RefusesAnUnknownIDAForeignPathAndAChangedBody` | #1146 (merged) | `context-index-read-verbs` |
+| CX3 | The grant reports, the access log `.evolve/context-access/`, `evolve context stats` and the signals; sandbox rows N16 and N17 | `TestReportReads_WritesOneAccessRecordForEachOpenedEntry` | #1146 (merged) | `context-index-access-log` |
 | CX4 | The `message` and `context` sources of L1 | `TestBuild_ListsTheInboxItemFileOfEachItemID` | later | `context-index-message-and-context-classes` |
 | CX5 | `enforce`: the L0 block and the moved bodies of spec §5 | `TestComposePrompt_AtEnforceTheTailIsTheL0BlockOnly` | later | `context-index-l0-prompt-enforce` |
 | CX6 | The catalog action `context-tune` and its Go check | `TestContextTune_NoChangeGrantsAPathOutsideTheFixedSources` | later | `context-index-tune-action` |

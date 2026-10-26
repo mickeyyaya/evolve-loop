@@ -1,6 +1,17 @@
 # Plan: each rule has one home and loads in the case where it applies
 
-- **Status:** proposed, 2026-10-20. The operator decided the eight conflicts of §6 on 2026-10-20. The design set is in review; the migration (G5) waits for its approval. §9 adds the runtime index on 2026-10-26.
+- **Status:** proposed, 2026-10-20. The operator decided the eight conflicts of §6 on 2026-10-20. §9 adds the runtime index on 2026-10-26. On 2026-10-27, G0, G1 and G2 are merged in PR #1138, with the 20 rules of the first L0 batch (§9.5) in `guidance/rules/`.
+- **Inbox items of the open components (2026-10-27):**
+  - G1b: `guidance-build-l2-outputs`.
+  - G3a: `guidance-phase-marker`.
+  - G3: `guidance-action-and-session-hooks`.
+  - G4: `guidance-overlay-paths-selector`.
+  - G5: `guidance-migrate-batch-2-commit-boundary` and `guidance-migrate-batch-3-rest`.
+  - G6: `guidance-skill-trigger-evals`.
+  - G7: `guidance-l0-with-without-eval`.
+  - G8: `guidance-cell-index-input`.
+  - G9: `guidance-driver-instruction-loader`.
+  - G10: `guidance-agents-md-byte-budget`.
 - **Research:** [guidance-layers-2026-10](../research/guidance-layers-2026-10.md). **Decision:** [ADR-0145](../architecture/adr/0145-each-rule-has-one-home-and-loads-by-audience-path-action-or-failure.md). **Design:** [guidance-layers](../architecture/guidance-layers.md).
 - **Related:** [ADR-0132](../architecture/adr/0132-documents-are-written-through-one-skill.md) (documents through one skill), the skill-naming convention.
 
