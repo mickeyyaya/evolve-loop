@@ -82,8 +82,8 @@
 | `internal/gitexec` | **0** | does not exist yet (Phase 1.1 creates it green, zero callers). |
 
 **Implication for ordering (D1):** `core` (fan-in 33) and `bridge` (fan-in 10) are the hubs —
-touched **last** in each dedup track, only after their leaf dependencies (`gitexec`, `envchain`,
-`paths`, `log`) are adopted by the lower-fan-in packages. This keeps every hub file edited once.
+touched **last** in each dedup track. The lower-fan-in packages first adopt their leaf dependencies (`gitexec`, `envchain`,
+`paths`, `log`). This keeps every hub file edited once.
 
 ---
 

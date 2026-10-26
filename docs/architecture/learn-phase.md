@@ -20,7 +20,7 @@ Treating these as ad-hoc post-cycle agents created two problems:
 
 2. **Bifurcated by verdict.** Retrospective fired on FAIL/WARN; memo fired on PASS. Operators had to look in different files depending on outcome to find "what should we learn from this cycle." There was no "always-on" learning surface.
 
-The Reflection Journal feature added the reflector — and that prompted formalizing all three into a single named **Learn phase** that runs after Ship on every cycle.
+The Reflection Journal feature added the reflector. That prompted a formal grouping of all three into a single named **Learn phase** that runs after Ship on every cycle.
 
 ## Lifecycle
 
@@ -68,9 +68,9 @@ The `carryover-todos.json` ownership is verdict-conditional: retrospective owns 
 
 ## What the Learn phase does NOT do
 
-- **Not a recovery phase.** If a cycle fails to ship (e.g., ship-gate denial), Learn does not auto-retry. Recovery is the operator's responsibility via `--resume` or manual intervention.
-- **Not gated by phase-gate enforcement of write paths.** Each agent has its own profile-level allowlist (`.evolve/profiles/{reflector,retrospective,memo}.json`). `phase-gate.sh` does check for `reflector-synthesis.md` presence in the enforce stage of the Reflection Journal rollout (v10.21.0+), but the learn phase as a whole is not write-path-gated.
-- **Not a replacement for `meta-cycle` analysis.** The longer-horizon meta-cycle (every 5 cycles per existing architecture) still owns instinct graduation and cross-cycle effectiveness review. Learn-phase aggregation is cycle-scoped + 5-cycle-window via the aggregator, not full meta-analysis.
+- **Not a recovery phase.** If a cycle fails to ship (for example, ship-gate denial), Learn does not auto-retry. Recovery is the responsibility of the operator, with `--resume` or manual intervention.
+- **Not gated by phase-gate enforcement of write paths.** Each agent has its own profile-level allowlist (`.evolve/profiles/{reflector,retrospective,memo}.json`). `phase-gate.sh` does check that `reflector-synthesis.md` exists in the enforce stage of the Reflection Journal rollout (v10.21.0+). The learn phase as a whole is not write-path-gated.
+- **Not a replacement for `meta-cycle` analysis.** The longer-horizon meta-cycle (every 5 cycles per existing architecture) still owns instinct graduation and cross-cycle effectiveness review. Learn-phase aggregation is cycle-scoped + 5-cycle-window through the aggregator, not full meta-analysis.
 
 ## Operator surface
 
