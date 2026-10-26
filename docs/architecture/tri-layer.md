@@ -35,7 +35,7 @@ This is not just a convention — Claude Code enforces it at runtime: *"subagent
 | 4 | **Sequential pipeline as user-driven skill invocations** | Lifecycle with dependencies + human checkpoints | `/evo:scout → :plan-review → :tdd → :build → :audit → :ship → :retro` |
 | 5 | **Auto-orchestrated macro** (the `/evo:loop` exception) | Autonomous mode: full lifecycle without human checkpoints | `/evo:loop` runs the entire sequence; trust kernel enforces phase ordering at script layer |
 
-Pattern 5 is **specific to evolve-loop** because the trust kernel (sandbox, ledger SHA, phase-gate) substitutes for the human checkpoints addyosmani's framework relies on. Without our kernel, auto-orchestration would be Anti-pattern C below.
+Pattern 5 is **specific to evolve-loop** because the trust kernel (sandbox, ledger SHA, phase-gate) substitutes for the human checkpoints addyosmani's framework relies on. If our kernel is absent, auto-orchestration is Anti-pattern C below.
 
 ---
 
@@ -45,7 +45,7 @@ Pattern 5 is **specific to evolve-loop** because the trust kernel (sandbox, ledg
 |---|---|---|
 | A | **Router persona** ("decide which persona to call") | Pure routing layer with no domain value; replicates work that slash commands + intent mapping already do |
 | B | **Persona-calls-persona** | Defeats single-perspective design; failure modes multiply; platform-blocked at runtime |
-| C | **Sequential orchestrator that paraphrases** | Loses human checkpoints; accumulated drift via summarization; doubles tokens |
+| C | **Sequential orchestrator that paraphrases** | Loses human checkpoints; accumulated drift through summarization; doubles tokens |
 | D | **Deep persona trees** | Each layer adds latency and tokens with no decision value |
 
 evolve-loop's `/loop` is *not* Anti-pattern C because the trust kernel binds artifacts SHA-by-SHA — there is no paraphrasing at handoff, only deterministic ledger-verified passing.
@@ -77,7 +77,7 @@ The trust kernel operates at **script layer**, *below* skills/personas/commands:
 A new skill, persona, or command **cannot weaken the kernel** because:
 1. Every LLM invocation routes through `subagent-run.sh` (CLAUDE.md rule 5)
 2. `subagent-run.sh` enforces per-profile sandbox + permission allowlist
-3. Each artifact is bound to the cycle via SHA256 + git tree state in the ledger
+3. Each artifact is bound to the cycle with SHA256 + git tree state in the ledger
 4. `phase-gate-precondition.sh` is a PreToolUse hook — no skill or command can bypass it
 
 This means Sprint 3's tri-layer refactor only touches the user-facing API; the kernel is unchanged.
@@ -91,7 +91,7 @@ This means Sprint 3's tri-layer refactor only touches the user-facing API; the k
 - Live at `skills/<skill-name>/SKILL.md`
 - Have YAML frontmatter with `name` and `description`
 - Define a workflow (steps + exit criteria) — not invoke a persona
-- Be invokable via Claude Code's `Skill` tool
+- Be invokable through Claude Code's `Skill` tool
 
 ### A new Persona must:
 
@@ -108,7 +108,7 @@ This means Sprint 3's tri-layer refactor only touches the user-facing API; the k
 
 ### A new Command must:
 
-- Be the skill itself: the CLI exposes every `skills/<name>/` entry as `/evo:<name>` — there is no separate command file layer (removed in ADR-0040; it duplicated skill prose)
+- Be the skill itself: the CLI exposes every `skills/<name>/` entry as `/evo:<name>` . No separate command file layer exists (ADR-0040 removed it; it duplicated skill prose)
 - Compose personas and skills (the orchestration layer) inside the skill's Composition section
 - For Pattern 3 (fan-out): issue multiple `Agent` tool calls in **one** assistant turn (sequential turns serialize)
 

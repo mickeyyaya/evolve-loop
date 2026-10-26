@@ -44,10 +44,12 @@ The audit was the loop's only code reviewer and also its ship gate. As a result:
 
 ## Gap
 
-1. **No independent review between build and audit.** The author (C0c's self-simplify and self-review) and the gate (audit) were the only voices.
+1. **No independent review between build and audit.** Only two voices existed: the author (C0c's self-simplify and self-review) and the gate (audit).
 2. **No loop.** Nothing returned concrete, suggested fixes to the builder and checked them again before the gate.
-3. **No shared definition of "qualified".** The reviewer's lenses, the audit's checklist and the lens phases each scored on their own vocabulary, so the gate could not ask "is every dimension good enough?" and review could not aim at the gate's bar.
-4. **Review scope was never justified.** Nobody recorded which lenses a change needs and why, so coverage could silently drift between "everything, shallowly" and "whatever the advisor thought of".
+3. **No shared definition of "qualified".** The reviewer's lenses, the audit's checklist and the lens phases each scored on their own vocabulary.
+
+   The gate was therefore unable to ask "is every dimension good enough?" Review was unable to aim at the bar of the gate.
+4. **Review scope was never justified.** Nobody recorded which lenses a change needs and why. Coverage was therefore free to drift silently between "everything, shallowly" and "whatever the advisor thought of".
 
 ## Solution
 
@@ -107,12 +109,12 @@ Both are protected surfaces. A drift test pins the skill's and COMPACT's dimensi
 | `robustness` | Error handling, loud failures, recovery rungs, validation at boundaries | No swallowed error; process failures get a recovery rung; inputs are validated at trust boundaries | A swallowed error; a silent degrade; a block on a format-only issue | the diff is pure documentation or data with no code path | the error-handling-scan checklist, folded into quality-index |
 | `concurrency` | Races, leaks, lock ordering, context propagation | `-race` clean on the touched packages; every goroutine has an owner and a stop; the context is honoured | A race; a leaked goroutine; a lock-order hazard; an ignored cancellation | the diff touches no goroutine, channel, mutex, atomic, shared mutable state or context-cancellation path | `-race` on the touched packages plus the race-condition-scan checklist, folded into quality-index |
 | `performance` | Algorithmic cost, allocations, I/O, hot paths, prompt and token cost of agent-facing text | No new superlinear work on a hot path; no I/O in a loop that can be batched; prompt bytes justified | A measurable regression; an unbounded read; repeated whole-file passes | the diff changes no executed path and no agent-facing text | the perf-profile checklist (and a benchmark at deep), folded into quality-index |
-| `debuggability` | Signals, error context, logs, diagnosability | A failure names its cause and inputs; new behaviour emits a registered signal or log where an operator would look | An error with no context; a silent state change; a log with no fields | the diff changes no runtime behaviour | the telemetry-coverage-check checklist, folded into quality-index |
+| `debuggability` | Signals, error context, logs, diagnosability | A failure names its cause and inputs; new behaviour emits a registered signal or log where an operator will look | An error with no context; a silent state change; a log with no fields | the diff changes no runtime behaviour | the telemetry-coverage-check checklist, folded into quality-index |
 | `security` | Input handling, injection, secrets, sandbox and fences, protected surfaces | No new injection path; no secret in code or logs; fences and the protected manifest are respected | A path traversal; command injection; an unvalidated external input; a fence bypass | the diff touches no trust boundary, external input, credential, subprocess or fence | `security-review-scored` and the security-scan checklist |
 | `docs-consistency` | Docs as the primary asset; config, not code; no flags | The package docs, CHANGELOG and plan status are updated; behaviour lives in config where policy says so; no feature flag | A stale doc; a flag; a policy literal in code | never | the docs-floor rules (`docsfloor`), the code-comments convention |
 
 - **Score 5:** exemplary; nothing to improve within scope.
-- **Score 2:** a defect a user would hit.
+- **Score 2:** a defect that a user hits.
 - **Score 1:** harmful or absent (for example, a data-loss path or no tests at all).
 - **Never N/A:** exactly `correctness`, `architecture`, `maintainability`, `test-quality` and `docs-consistency` (`qualityindex.NeverNA`). The parser rejects N/A on them.
 - **Scope of scoring.** The index applies to a code cycle whose build touched files, the same predicate that pins `code-review` (`deliverable_kind==code && build.files_touched>0`). The audit writes `## Scores`, and the kernel cross-checks it, only on such a cycle (§6.2).
@@ -130,11 +132,11 @@ Every review round and every audit writes a `## Scores` section with exactly one
 
 **Parse rules** (`qualityindex.ParseScores`, on the visible lines of `reportdoc.Section`):
 - a scored line is `- <key>: <value> <sep> <rationale>`;
-- the key is one of §2.1's keys;
+- the key is one of the keys in §2.1;
 - the value is an integer from 1 to 5, or `N/A` (any letter case);
-- `<sep>` is an em dash, an en dash or a hyphen with a space on each side (` — `, ` – `, ` - `), split at the first one, as `reportdoc`'s finding headings tolerate;
+- `<sep>` is an em dash, an en dash or a hyphen with a space on each side (` — `, ` – `, ` - `). The parser splits at the first one, as the finding headings of `reportdoc` tolerate;
 - the rationale (or N/A reason) must not be empty;
-- a score below its dimension's threshold cites at least one finding id (`CR<n>`) whose `Dimension` is that dimension, so a gap always reaches the builder as an actionable finding (checked by the report grammar, §3).
+- a score below the threshold of its dimension cites at least one finding id (`CR<n>`) whose `Dimension` is that dimension. A gap therefore always reaches the builder as an actionable finding (checked by the report grammar, §3).
 
 **A malformed section** goes to the correction rung (format, never logic). Malformed means any of:
 - a missing dimension;
@@ -236,11 +238,11 @@ Qualifies(scores, thresholds) -> (ok bool, gaps []Gap)
 
 #### 4.2 Projection to ledger rows
 
-Each finding becomes a row in `defect-ledger.json`, merged by `defectledger.Append`, the one merge rule the audit's Emit also uses. Dedupe, the 64-row cap and the stand-in row for a cut are each kept per source, so a review row never dedupes, cuts or swallows an audit row:
+Each finding becomes a row in `defect-ledger.json`. `defectledger.Append` merges it, and this is the one merge rule that the Emit of the audit also uses. The system keeps dedupe, the 64-row cap and the stand-in row for a cut per source. A review row therefore never dedupes, cuts or swallows an audit row:
 
 | Field | Value |
 |---|---|
-| `id` | `defectledger.ID("code-review" + "\xff" + text)`, the content hash of the source-qualified text; the `\xff` byte cannot appear in a JSON-decoded defect, so an audit row (whose id stays `ID(text)`) never collides with it |
+| `id` | `defectledger.ID("code-review" + "\xff" + text)`, the content hash of the source-qualified text. The `\xff` byte cannot appear in a JSON-decoded defect. An audit row (whose id stays `ID(text)`) therefore never collides with it |
 | `text` | `[SEV] dimension location — title \| scenario: … \| evidence: … \| fix: …` (capped by `TextMaxRunes`; the report's positional `CR<n>` is left out) |
 | `status` | `OPEN` in enforce; `DEFERRED` (reason = `codereview.ShadowReason`) in shadow |
 | `source` | `code-review` (empty means the audit) |
@@ -248,13 +250,13 @@ Each finding becomes a row in `defect-ledger.json`, merged by `defectledger.Appe
 | `severity` | the finding's severity |
 | `dimension` | the finding's dimension (additive, `omitempty`) |
 
-- **The stand-in row for a cut** takes the cut rows' status, reason, source and round, and the highest severity among them, so a cut never hides a CRITICAL, and in shadow never mints an OPEN row. Its text starts with `code-review: `, so it is never the audit's stand-in. The fix brief names how many findings were cut (§5.5).
-- **A shadow row is never a lineage.** The reconcile gate's empty-ancestor check and its vouch count only the rows a continuation owes: audit rows, and OPEN rows of any source. An ancestor holding only DEFERRED shadow rows is the empty ancestor, exactly as if the review had not run.
-- **Provenance survives inheritance.** When a continuation inherits a code-review row, the reconcile gate carries `source`, `round`, `severity` and `dimension` through, whatever the graded status. An inherited row enters the continuation's audit as an inherited defect (the existing gate). It does not enter the continuation's review round 1, which reviews only the continuation's own diff.
+- **The stand-in row for a cut** takes the status, reason, source and round of the cut rows. It also takes the highest severity among them. A cut therefore never hides a CRITICAL. In shadow it never mints an OPEN row. Its text starts with `code-review: `, so it is never the stand-in of the audit. The fix brief names how many findings were cut (§5.5).
+- **A shadow row is never a lineage.** The empty-ancestor check of the reconcile gate and its vouch count only the rows that a continuation owes. These are audit rows, and OPEN rows of any source. An ancestor that holds only DEFERRED shadow rows is the empty ancestor, exactly as if the review had not run.
+- **Provenance survives inheritance.** When a continuation inherits a code-review row, the reconcile gate carries `source`, `round`, `severity` and `dimension` through, whatever the graded status. An inherited row enters the audit of the continuation as an inherited defect (the existing gate). It does not enter review round 1 of the continuation, which reviews only the own diff of the continuation.
 
 ### 5. The loop until resolved
 
-The loop calls the convergence policy ([ADR-0126](adr/0126-every-iterative-loop-converges-or-escalates.md)) at each decision after a round: `max_fix_rounds` is 3 (the budget of `max_rounds` 4 is unchanged), and U(n) (§5.3) is its mass.
+The loop calls the convergence policy ([ADR-0126](adr/0126-every-iterative-loop-converges-or-escalates.md)) at each decision after a round. `max_fix_rounds` is 3 (the budget of `max_rounds` 4 is unchanged). U(n) (§5.3) is its mass.
 
 #### 5.1 Per-round state (cycle state, persisted on every path)
 
@@ -293,8 +295,8 @@ resolved(rows, scores) :=
 - An ACCEPTed FIXED or DEFERRED claim keeps its status.
 - A REJECTed claim on a strict row reverts to OPEN.
 - A claim on a non-strict row is never rejected: any well-formed disposition resolves it.
-- DISPUTED rows are resolved for the loop's purposes; the audit adjudicates them (§6.4).
-- An *unverified* claim (the Disposition Review was exhausted at the correction rung, §5.6) keeps its status for the loop and is listed in the digest for the audit to verify.
+- DISPUTED rows are resolved for the purposes of the loop. The audit adjudicates them (§6.4).
+- An *unverified* claim (the Disposition Review was exhausted at the correction rung, §5.6) keeps its status for the loop. The digest lists it for the audit to verify.
 
 #### 5.3 Unresolved mass and the progress rule (operator Q-D1)
 
@@ -338,20 +340,20 @@ decideAfterReview(cs, rows, report, cfg):
 
 - **"Continue"** means the remaining evaluate phases in the plan, then the audit.
 - **`max_rounds` counts reviews.** With the default of 4 there are at most 4 reviews and 3 fix builds per cycle, across every audit-repair re-entry. `max_rounds = 1` means review-only. The config requires `max_rounds ≥ 1` (an out-of-range value is ignored with a warning).
-- **Shadow computes the full decision** as if enforced, over the rows read as OPEN, and signals it. It grants nothing and leaves `Stop` empty, so the metrics measure exactly what enforce would do.
-- **Progress across a re-entry.** At an audit-repair re-entry the kernel resets the progress baseline (`ProgressBaseline` = the next index), so the first round after it passes the progress test. Without the reset, a round that ended resolved at U = 0 would make every later round fail the strict-decrease test.
+- **Shadow computes the full decision** as if enforced, over the rows read as OPEN, and signals it. It grants nothing and leaves `Stop` empty. The metrics therefore measure exactly what enforce does.
+- **Progress across a re-entry.** At an audit-repair re-entry the kernel resets the progress baseline (`ProgressBaseline` = the next index), so the first round after it passes the progress test. If the reset is missing, a round that ended resolved at U = 0 causes every later round to fail the strict-decrease test.
 - **Oscillation** tests only ids whose status is OPEN now: an id that was reopened twice and later accepted no longer stops the loop.
 - **Routing (the backward edges).**
   - On a grant, `decideAfterReview` sets `cr.scheduledNext = build`. The completed fix build sets `cr.scheduledNext = code-review` (round n+1), which bypasses the `conditional_mandatory` pin.
-  - Both edges, `code-review → build` and `build → code-review`, join `decisionOnlyEdge` (`audit_fail_decision.go`), so the routing advisor never proposes them, and they join the registry's `legal_successors`, so `sm.CanTransition` allows them.
-  - After an audit-repair build re-entry, the kernel (not the pin) schedules `code-review` when `RoundFrom < max_rounds`. Otherwise it emits `REVIEW_BUDGET_SPENT` and schedules the next phase in the plan, and the digest marks the build's new FIXED claims unverified so the audit verifies them.
+  - Both edges, `code-review → build` and `build → code-review`, join `decisionOnlyEdge` (`audit_fail_decision.go`), so the routing advisor never proposes them. They also join the `legal_successors` of the registry, so `sm.CanTransition` allows them.
+  - After an audit-repair build re-entry, the kernel (not the pin) schedules `code-review` when `RoundFrom < max_rounds`. Otherwise it emits `REVIEW_BUDGET_SPENT` and schedules the next phase in the plan. The digest marks the new FIXED claims of the build unverified, so the audit verifies them.
   - The resume path schedules from the persisted state (`PendingFixRound`), never from a re-decision.
 - **One generalized path:** the decision lives beside `decideAfterAuditFail` in the generalized findings repair, keyed by judge.
 - **No new remediation route:** `maybeRemediate` stays deterministic-gates-only (`remediationDenied`). The review loop is a findings-driven repair, never a remediation of a judgment verdict.
 
 #### 5.5 The fix-round brief (build re-dispatch)
 
-`composeReviewRepairBrief(cs)` composes the brief in `composeRepairBrief`'s shape, bounded by its byte budget, and the kernel seeds it into the build dispatch under the context key `CtxKeyReviewRepairFindings` (`review_repair_findings`):
+`composeReviewRepairBrief(cs)` composes the brief in the shape of `composeRepairBrief`, bounded by its byte budget. The kernel seeds it into the build dispatch under the context key `CtxKeyReviewRepairFindings` (`review_repair_findings`):
 
 1. **Unresolved findings,** ordered by severity, then dimension. Each carries:
    - id, severity, dimension and location;
@@ -365,9 +367,9 @@ decideAfterReview(cs, rows, report, cfg):
    - tests that a test-gap finding asks for are the builder's own new tests;
    - TDD-authored tests and `go/acs/**` predicates are read, never edited.
 
-- **Overflow** is summarized with a count, including the findings the ledger's cap cut (§4.2), so a long tail never truncates silently.
-- **Precedence with the audit brief.** During a review fix round that follows an audit-repair re-entry, `AuditRepairActive` is still set, so the build prompt carries both briefs. It renders `audit_repair_findings` first, because the gate's findings outrank the reviewer's, then `review_repair_findings`.
-- **Per-round archives.** Before each fix dispatch the kernel archives `build-report.md` and the build prompt as `<name>.round<N>` (`phasecontract.RoundArchiveFilename`), the same rule as the audit archives, so every round's claims stay readable.
+- **Overflow** is summarized with a count. The count includes the findings that the cap of the ledger cut (§4.2). A long tail therefore never truncates silently.
+- **Precedence with the audit brief.** During a review fix round that follows an audit-repair re-entry, `AuditRepairActive` is still set, so the build prompt carries both briefs. It renders `audit_repair_findings` first, because the findings of the gate outrank those of the reviewer. Then it renders `review_repair_findings`.
+- **Per-round archives.** Before each fix dispatch the kernel archives `build-report.md` and the build prompt as `<name>.round<N>` (`phasecontract.RoundArchiveFilename`). This is the same rule as the audit archives. Every round's claims therefore stay readable.
 
 #### 5.6 Disposition protocol, and the delta re-review's duties
 
@@ -377,7 +379,13 @@ decideAfterReview(cs, rows, report, cfg):
 
 A non-strict (below-threshold) row needs either, with any well-formed content.
 
-**The delta re-review (round n ≥ 2)** reads the digest's history (the previous findings, dispositions and Disposition Reviews), the fix diff (the tree since round n−1's checkpoint, passed as `review_base`) and the full diff. It then:
+**The delta re-review (round n ≥ 2)** reads these inputs:
+
+- the history of the digest (the previous findings, dispositions and Disposition Reviews)
+- the fix diff (the tree since the checkpoint of round n−1, passed as `review_base`)
+- the full diff
+
+It then:
 1. **Verifies each FIXED claim on a strict row.** The evidence must exist, and the test must fail without the fix (run it, or probe it).
 2. **Judges each DEFERRED reason on a strict row.**
 3. **Scans the fix diff** for new defects (new findings, `round = n`; §5.3's late-finding bound).
@@ -393,8 +401,8 @@ Steps 1 and 2 are written in a `## Disposition Review` section:
 - d0b1c2d3e4f5061728394a5b6c7d8e9f: NOTE — LOW row; deferral reason read, no ruling
 ```
 
-- **One line per id** the build dispositioned since the previous round, using the full `d` + 32-hex id. ACCEPT and REJECT are for strict rows; a non-strict row gets at most a NOTE and is never rejected.
-- **A missing or duplicate line is malformed** and goes to the correction rung. It is never read as acceptance. If the rung is exhausted, the claims stand as *unverified*: the loop treats them as dispositioned, and the digest lists them for the audit to verify (§6.1).
+- **One line per id** that the build dispositioned since the previous round. The line uses the full `d` + 32-hex id. ACCEPT and REJECT are for strict rows. A non-strict row gets at most a NOTE and is never rejected.
+- **A missing or duplicate line is malformed** and goes to the correction rung. It is never read as acceptance. If the rung is exhausted, the claims stand as *unverified*. The loop treats them as dispositioned, and the digest lists them for the audit to verify (§6.1).
 
 #### 5.6a Applying dispositions to same-cycle rows (`applyReviewDispositions`)
 
@@ -416,7 +424,7 @@ The existing reconcile gate grades only rows inherited from an ancestor cycle (`
 
 `defect-ledger.json` and `code-review-report.md` are workspace files, and `guards.Role` is a Claude PreToolUse hook (`role.go`). It does not stop a codex or agy builder, or a Bash write. Same-cycle rows have no ancestor to rebuild from. So:
 
-- **After each review round,** the kernel records a sha256 of `defect-ledger.json` and of `code-review-report.md` in `ReviewRepair.Hashes`, and keeps a copy of each under the workspace's `review-snapshots/`.
+- **After each review round,** the kernel records a sha256 of `defect-ledger.json` and of `code-review-report.md` in `ReviewRepair.Hashes`. It keeps a copy of each under `review-snapshots/` in the workspace.
 - **After each build dispatch,** it re-hashes both. On a mismatch it emits `REVIEW_ROW_TAMPERED` (WARN, `fields.artifact`) and restores its copy before `applyReviewDispositions` runs.
 - **The build writes only `defect-dispositions.json`** among the review's artifacts.
 
@@ -429,10 +437,10 @@ The audit receives:
 - **the review digest**, `code-review-digest.md` in the workspace.
 
 **The digest.** The kernel writes it (`writeReviewDigest`) before each audit dispatch, from the ledger, the cycle state and the review report. Its sections:
-- `## Review Plan`: the last round's plan, verbatim;
+- `## Review Plan`: the plan of the last round, verbatim;
 - `## Findings`: every code-review row, with its id, severity, dimension, status and round;
-- `## Dispositions`: the build's claims, with the Disposition Review's ruling on each, and the claims that stand **unverified** (the Disposition Review was exhausted at the correction rung, or no review budget remained after a re-entry);
-- `## Disputed`: the DISPUTED ids, with the reviewer's rejections and the builder's counter-evidence;
+- `## Dispositions`: the claims of the build, with the ruling of the Disposition Review on each, and the claims that stand **unverified**. A claim is unverified when the Disposition Review was exhausted at the correction rung, or when no review budget remained after a re-entry;
+- `## Disputed`: the DISPUTED ids, with the rejections of the reviewer and the counter-evidence of the builder;
 - `## Stop`: the stop reason and the round count.
 
 It deliberately omits the review's Scores.
@@ -459,11 +467,11 @@ if auditor.verdict ∈ {PASS, WARN} and !qualified  →  verdict FAIL; one AUDIT
 if the Scores or Adjudication section is malformed  →  the correction rung (enforce only; §9)
 ```
 
-- **Shippable verdicts.** `recordAndBranch` acquires the ship window on PASS or WARN, so both are cross-checked.
-- **Where it runs.** The cross-check runs in the audit phase's Classify (`phases/audit`), beside the defect-ledger Reconcile gate, so it decides before `recordAndBranch` acquires the ship window.
-- **The flip declares a failure class.** A FAIL with no declared class is declined by `computeRetryEnvelope` ("audit declared no failure class"). So on a flip the kernel writes a qualification block, `audit-qualification.json`, `{class: code-audit-fail, defects: [one line per gap, OPEN strict row, upheld id or unruled id]}`, and `auditFailEnvelope` reads it when the auditor's own sentinel carries no failure block. `decideAfterAuditFail` then grants a repair through the `CategoryCodeAuditFail` policy row, like any auditor-declared FAIL.
-- **The repair.** The FAIL takes the existing audit-repair path: `decideAfterAuditFail`, then a tdd or build re-entry. After a build re-entry, `code-review` runs a delta round if budget remains (§5.4 routing); otherwise `REVIEW_BUDGET_SPENT`, and the audit re-judges.
-- **In shadow** the cross-check computes `would_fail` over the rows read as OPEN (§5.4) and signals it. It never flips the verdict, and a missing or malformed audit Scores or Adjudication section is signalled, never sent to the correction rung, so shadow changes no verdict and adds no dispatch.
+- **Shippable verdicts.** `recordAndBranch` acquires the ship window on PASS or WARN, so the cross-check covers both.
+- **Where it runs.** The cross-check runs in the Classify step of the audit phase (`phases/audit`), beside the defect-ledger Reconcile gate. It therefore decides before `recordAndBranch` acquires the ship window.
+- **The flip declares a failure class.** `computeRetryEnvelope` declines a FAIL with no declared class ("audit declared no failure class"). So on a flip the kernel writes a qualification block, `audit-qualification.json`, `{class: code-audit-fail, defects: [one line per gap, OPEN strict row, upheld id or unruled id]}`. `auditFailEnvelope` reads it when the own sentinel of the auditor carries no failure block. `decideAfterAuditFail` then grants a repair through the `CategoryCodeAuditFail` policy row, like any auditor-declared FAIL.
+- **The repair.** The FAIL takes the existing audit-repair path: `decideAfterAuditFail`, then a tdd or build re-entry. After a build re-entry, `code-review` runs a delta round if budget remains (§5.4 routing). Otherwise the system emits `REVIEW_BUDGET_SPENT`, and the audit re-judges.
+- **In shadow** the cross-check computes `would_fail` over the rows read as OPEN (§5.4) and signals it. It never flips the verdict. The system signals a missing or malformed audit Scores or Adjudication section and never sends it to the correction rung. Shadow therefore changes no verdict and adds no dispatch.
 
 #### 6.3 Divergence: learning from disagreement
 
@@ -477,8 +485,8 @@ for each dimension d:
   → REVIEW_AUDIT_DIVERGENCE{dimension, review, audit, direction}, appended to the workspace's review-divergence.json
 ```
 
-- **`direction = audit_lower`** means the reviewer was too lenient on that dimension. Only `audit_lower` counts toward phase B; `na_mismatch` never does.
-- **The phase-B trigger** (§8) reads `review-divergence.json` across cycles: a dimension whose audit-lower share exceeds `workflow.review.specialist_trigger.audit_lower_share` (0.3) over the last `window_cycles` (20) code cycles that scored it.
+- **`direction = audit_lower`** means that the reviewer was too lenient on that dimension. Only `audit_lower` counts toward phase B. `na_mismatch` never does.
+- **The phase-B trigger** (§8) reads `review-divergence.json` across cycles. It fires for a dimension whose audit-lower share exceeds `workflow.review.specialist_trigger.audit_lower_share` (0.3) over the last `window_cycles` (20) code cycles that scored it.
 - **Lessons:** the retrospective reads the divergence records into lessons.
 
 #### 6.4 Adjudicating DISPUTED findings
@@ -495,8 +503,11 @@ Process failures get a recovery step; only logic blocks.
 
 | Situation | Behaviour |
 |---|---|
-| No deep-tier capacity (every route walled) | Today a quota wall reaches `pauseForQuota`, which pauses the loop. Q6 adds a branch at that seam for a non-gate phase: a code-review quota wall emits `REVIEW_SKIPPED{reason: capacity}` and the walk continues. A skipped round is not a completed dispatch, so it does not count toward `max_rounds`. The audit still scores the index, so qualification is never waived. |
-| Malformed Review Plan, Findings, Scores or Disposition Review | The correction rung (bounded). Once it is exhausted, the phase degrades to SKIPPED+WARN and the walk continues: nothing is recorded, `REVIEW_SKIPPED{reason: malformed}` is emitted at WARN, and the ledger gets a `contract_exhaustion_skip` entry. This is the shape of the existing non-canonical-verdict degrade (`nonFloorExhaustionDegrade`), and it holds for any optional evaluate phase past the ship floor that the routing config does not list as mandatory (`config.mandatory_phases`), on the fresh and the resume ladder alike (`Orchestrator.degradesOnExhaustion`, `degradesRejection`). The same phase's contract blocks never reach the contract gate's persisted breaker (`ReviewInput.BreakerExempt`: no count, no reset, no demotion). A malformed review therefore can never open the circuit and hand the audit a `contract_gate_demoted` waiver. Because the breaker never counts it, the ladder's breaker-count escalation and the salvage re-prompt (which warns of a breaker about to open) do not apply; each correction is the plain directive. A report that is *absent* (missing or empty, `ReviewResult.DeliverableAbsent`) is not malformed: it keeps the abort, because a non-admitted missing deliverable never reaches Ship ([audit-repair isolation](audit-repair-isolation.md), #542). Since the breaker never counts it either, it can no longer be demoted into an approval. |
+| No deep-tier capacity (every route walled) | Today a quota wall reaches `pauseForQuota`, which pauses the loop. Q6 adds a branch at that seam for a non-gate phase. A code-review quota wall emits `REVIEW_SKIPPED{reason: capacity}`, and the walk continues. A skipped round is not a completed dispatch, so it does not count toward `max_rounds`. The audit still scores the index, so qualification is never waived. |
+| Malformed Review Plan, Findings, Scores or Disposition Review | The correction rung (bounded). Once it is exhausted, the phase degrades to SKIPPED+WARN and the walk continues. Nothing is recorded, `REVIEW_SKIPPED{reason: malformed}` is emitted at WARN, and the ledger gets a `contract_exhaustion_skip` entry. |
+| The degrade of a malformed review (shape and scope) | This is the shape of the existing non-canonical-verdict degrade (`nonFloorExhaustionDegrade`). It holds for any optional evaluate phase past the ship floor that the routing config does not list as mandatory (`config.mandatory_phases`). It holds on the fresh and the resume ladder alike (`Orchestrator.degradesOnExhaustion`, `degradesRejection`). |
+| The contract blocks of a malformed review | The contract blocks of the same phase never reach the persisted breaker of the contract gate (`ReviewInput.BreakerExempt`: no count, no reset, no demotion). A malformed review therefore can never open the circuit and hand the audit a `contract_gate_demoted` waiver. The breaker never counts it. The breaker-count escalation of the ladder and the salvage re-prompt (which warns of a breaker about to open) therefore do not apply. Each correction is the plain directive. |
+| A report that is *absent* (missing or empty, `ReviewResult.DeliverableAbsent`) | The report is not malformed. It keeps the abort, because a non-admitted missing deliverable never reaches Ship ([audit-repair isolation](audit-repair-isolation.md), #542). The breaker never counts it either, so it can no longer be demoted into an approval. |
 | A finding with an unknown dimension or no `Fix:` | Recorded as written, and counted. Never dropped. |
 | The ledger write fails | `REVIEW_FINDINGS{recorded: false}` at WARN. In enforce, the loop stops with `REVIEW_SKIPPED{reason: ledger}`, and the digest carries the parsed findings from memory, which the audit treats as OPEN. It never resolves the loop. |
 | The build omits a disposition | The row stays OPEN, and `REVIEW_DISPOSITION_MISSING{ids}` is emitted. |
@@ -521,7 +532,7 @@ Process failures get a recovery step; only logic blocks.
 }}
 ```
 
-- **The trigger** evaluates from the first enforce wave onward, over `review-divergence.json` (§6.3); the plan adds a specialist only after at least two enforce waves of that data.
+- **The trigger** evaluates from the first enforce wave onward, over `review-divergence.json` (§6.3). The plan adds a specialist only after at least two enforce waves of that data.
 - **Triggers** are deterministic diff signals from a small classifier: concurrency primitives, hot-path packages (`hot_path_packages`), error returns, security-sensitive paths and SQL. The lead reviewer may also *request* a specialist in its Review Plan, with justification. A request is granted only when it is configured and allowed.
 - **Placement:** triggered specialists run in the same round as the lead, in parallel through the evaluate batch (`core/evaluate_batch.go`).
 - **Reporting:** their personas are normalized to the §4.1 grammar, and their rows carry `source: code-review/<phase>`.
@@ -540,17 +551,17 @@ Process failures get a recovery step; only logic blocks.
 ```
 
 - **Compiled defaults** are as shown. The block is absent from the checked-in policy until the flip.
-- **`enforce` is held at shadow until Q3–Q5 land.** `stage: "enforce"` is refused. It resolves to `shadow`, and `REVIEW_FINDINGS` carries the config warning at WARN (`policy.resolveJudgeRepair`). Without the loop (Q3) and the audit's cross-check (Q5), an enforced review would write OPEN rows that no fix round repairs.
+- **`enforce` is held at shadow until Q3–Q5 land.** `stage: "enforce"` is refused. It resolves to `shadow`, and `REVIEW_FINDINGS` carries the config warning at WARN (`policy.resolveJudgeRepair`). If the loop (Q3) and the audit's cross-check (Q5) are absent, an enforced review writes OPEN rows that no fix round repairs.
 - **Each key lands with its reader:** `stage` and `threshold` (landing 1), `quality_index.thresholds` (Q1), `max_rounds` (Q3), `divergence` (Q5), `review.*` (Q7).
-- **Validation.** `threshold` is a severity; `max_rounds` is at least 1; a threshold is an integer from 1 to 5, with `"*"` applied first and per-key entries overriding it. A value that fails validation is ignored with a config warning, and the compiled default stands.
+- **Validation.** `threshold` is a severity. `max_rounds` is at least 1. A threshold is an integer from 1 to 5, with `"*"` applied first and per-key entries overriding it. The system ignores a value that fails validation with a config warning, and the compiled default stands.
 - **Shadow:**
   - the review runs, plans and scores every round;
   - rows are DEFERRED (reason: the stage);
   - there is no fix round;
   - the loop's decision is computed as if enforced and signalled (§5.4);
-  - the audit's own index scoring and the cross-check run in shadow: the would-fail is computed and signalled, the verdict is not flipped, and no correction rung runs for the audit's index sections (§6.2);
+  - the audit's own index scoring and the cross-check run in shadow. The system computes and signals `would_fail`, does not flip the verdict, and runs no correction rung for the index sections of the audit (§6.2);
   - divergence is recorded;
-  - the review never touches the audit. The ledger's dedupe, cap and stand-in are kept per source, and the lineage owes no shadow row (§4.2). The review's contract blocks never reach the contract gate's breaker (§7).
+  - the review never touches the audit. The ledger keeps dedupe, cap and stand-in per source, and the lineage owes no shadow row (§4.2). The contract blocks of the review never reach the breaker of the contract gate (§7).
 - **Enforce:**
   - §5's loop runs;
   - the audit's qualification is binding;
@@ -559,11 +570,13 @@ Process failures get a recovery step; only logic blocks.
 
 ### 10. Signals
 
-All codes but the last are in module `review`. `AUDIT_QUALIFICATION_GAP` belongs to module `audit`, which emits it. **Every code's field set fits the Signal Center's cap** (`signalcenter.MaxFields`, 12), optional fields included: the Center drops what does not fit and only counts it in `fields.truncated`, so a field over the cap is a silent metric loss. That is why `REVIEW_FINDINGS` carries the severity counts as one field (pinned by `TestEvent_TheWorstCaseFieldSetPassesTheCenterUntruncated`).
+All codes but the last are in module `review`. `AUDIT_QUALIFICATION_GAP` belongs to module `audit`, which emits it.
+
+**Every code's field set fits the cap of the Signal Center** (`signalcenter.MaxFields`, 12), optional fields included. The Center drops what does not fit and only counts it in `fields.truncated`, so a field over the cap is a silent metric loss. That is why `REVIEW_FINDINGS` carries the severity counts as one field (pinned by `TestEvent_TheWorstCaseFieldSetPassesTheCenterUntruncated`).
 
 | Code | When | Fields | Lands |
 |---|---|---|---|
-| `REVIEW_FINDINGS` | every completed round | `round`, `findings` (counts by severity: `critical=N,high=N,medium=N,low=N`), `verdict`, `would_repair`, `stage`, `threshold`, `recorded`, `scores` (the vector, `key=N` or `key=N/A`), `gaps` (empty when the scores qualify); `overflow`, `config_warning` or `error` when present | landing 1 (Q2 folds the counts into `findings` and adds `scores` and `gaps`) |
+| `REVIEW_FINDINGS` | every completed round | `round`, `findings` (counts by severity: `critical=N,high=N,medium=N,low=N`), `verdict`, `would_repair`, `stage`, `threshold`, `recorded`, `scores` (the vector, `key=N` or `key=N/A`), `gaps` (empty when the scores qualify). It also carries `overflow`, `config_warning` or `error` when present | landing 1 (Q2 folds the counts into `findings` and adds `scores` and `gaps`) |
 | `REVIEW_PLAN` | every completed round | `round`, `required`, `na`, `deep` (comma lists of dimensions) | Q6 |
 | `REVIEW_ROUND` | after the decision | `round`, `decision`, `stage`, `unresolved`, `finding_mass`, `gap_mass`, `progress` | Q3 |
 | `REVIEW_REPAIR_GRANTED` | a fix round is granted | `round`, `findings`, `gaps` | Q3 |
@@ -572,7 +585,7 @@ All codes but the last are in module `review`. `AUDIT_QUALIFICATION_GAP` belongs
 | `REVIEW_FINDING_DISPUTED` | a strict deferral is rejected twice | `id`, `severity`, `dimension` | Q4 |
 | `REVIEW_DISPOSITION_MISSING` | the build left ids undispositioned | `ids` | Q3 |
 | `REVIEW_ROW_TAMPERED` | the ledger or report changed during a build dispatch | `artifact` | Q3 |
-| `REVIEW_SKIPPED` | a round is skipped or the loop stops on a fault | `reason` (capacity, malformed, ledger), `round` | landing 1 for `malformed` (an exhausted correction ladder or a verdict still non-canonical after every retry); Q6 adds `capacity` and `ledger` |
+| `REVIEW_SKIPPED` | a round is skipped or the loop stops on a fault | `reason` (capacity, malformed, ledger), `round` | landing 1 for `malformed` (an exhausted correction ladder, or a verdict that is still non-canonical after every retry). Q6 adds `capacity` and `ledger` |
 | `REVIEW_SAME_FAMILY` | reviewer family = builder family | `builder_family`, `reviewer_family` | Q6 |
 | `REVIEW_BUDGET_SPENT` | an audit-repair re-entry finds no review budget | `rounds` | Q3 |
 | `REVIEW_AUDIT_DIVERGENCE` | §6.3 | `dimension`, `review`, `audit`, `direction` | Q5 |
@@ -605,11 +618,11 @@ All codes but the last are in module `review`. `AUDIT_QUALIFICATION_GAP` belongs
 
 ### 13. Security surface
 
-These are protected (`ProtectedSurfaceManifest`), because a tampered index or reviewer would silently rewrite what "qualified" means for every cycle:
+These are protected (`ProtectedSurfaceManifest`), because a tampered index or reviewer silently rewrites what "qualified" means for every cycle:
 - `skills/quality-index/`, `skills/architecture-review/` and `skills/code-review-simplify/` (the last by C0);
 - `agents/evolve-code-reviewer.md`, `.evolve/phases/code-review/` and `.evolve/profiles/code-reviewer.json`;
 - the `qualityindex` and `codereview` packages;
-- `go/internal/router/code_review_pin_test.go`, which pins the registry's `conditional_mandatory["code-review"]` rule. The manifest protects whole files, and protecting `docs/architecture/phase-registry.json` would freeze every routing edit, so the pin is guarded by its protected test instead: a lane that removes the pin fails a test it cannot edit;
+- `go/internal/router/code_review_pin_test.go`, which pins the `conditional_mandatory["code-review"]` rule of the registry. The manifest protects whole files. If it protected `docs/architecture/phase-registry.json`, every routing edit freezes. The protected test guards the pin instead. A lane that removes the pin fails a test that it cannot edit;
 - the core repair decision (Q3).
 
 Every compiled-default overlay skill also joins the manifest, pinned by `TestProtectedSurface_CompiledDefaultOverlaySkills`.

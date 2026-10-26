@@ -1,7 +1,7 @@
 # Token Economics — Findings, Forensics, Optimization Roadmap
 
-> **Note (token-budget cost gates removed):** evolve no longer computes or gates
-> on a dollar cost — the calculation was unreliable across LLM models
+> **Note (token-budget cost gates removed):** evolve no longer computes a dollar cost
+> and no longer gates on it. The calculation was unreliable across LLM models
 > (tmux/subscription claude reports `$0`, gemini was hardcoded, ollama is free).
 > Cost is now display-only telemetry. The pricing analysis below remains useful
 > *reference* material for reasoning about token economics, but the figures are
@@ -10,8 +10,8 @@
 > Canonical reference for evolve-loop's token-economics analysis as of
 > v9.0.2 (2026-05-11). Pairs with [`token-floor-history.md`](token-floor-history.md)
 > (static context-floor measurements) and [`control-flags.md`](control-flags.md)
-> (flag inventory). This doc covers *runtime* token economics: where per-cycle
-> dollars actually go, the duplication patterns the data exposes, and the
+> (flag inventory). This doc covers *runtime* token economics. It shows where per-cycle
+> dollars actually go, the duplication patterns that the data exposes, and the
 > ROI-ordered optimization roadmap that follows from the evidence.
 
 ## Status
@@ -46,7 +46,7 @@ rates:
   drive cost" is wrong post Opus 4.7. With output at $25/MTok instead
   of the older $75/MTok, output is 12–25% of phase cost. Cache-read
   dominates at 50% cycle-wide.
-- **Cache creation is paid 5× per cycle** — each phase rebuilds its
+- **Cache creation is paid 5× per cycle.** Each phase rebuilds its
   cache from scratch (~95K tokens × 5 phases × ~$5/M blended = **~$2/cycle
   fixed overhead** before any work happens).
 - **Turn count drives cache-read cost.** Scout (49 turns) reads 2.4M
@@ -61,7 +61,7 @@ rates:
 
 | Resource | Pattern | Why it's already optimal |
 |---|---|---|
-| `state.json` | Pre-emitted via `role-context-builder.sh:emit_state_field` and `emit_carryover_todos` | Zero tool-call duplication; v8.62 digest mode collapsed this further |
+| `state.json` | Pre-emitted by `role-context-builder.sh:emit_state_field` and `emit_carryover_todos` | Zero tool-call duplication; v8.62 digest mode collapsed this further |
 | `ledger.jsonl` | Pre-emitted last-5 entries; auditor explicit Read for verification | Intent gets pre-digested; auditor's read is purpose-specific |
 | Persona prose | Zero duplicated paragraphs across 5 personas | Single-source-of-truth discipline + v9.0.0 Layer 1/3 split |
 | `scout-report.md`, `build-report.md` | Pre-emitted whole or anchor-scoped | v8.63 anchor-extract infrastructure handles this |
@@ -100,13 +100,13 @@ to v9.0.0–v9.0.2's per-phase tuning.
 
 Source: [Obvious Works — Token optimization 2026](https://www.obviousworks.ch/en/token-optimization-saves-up-to-80-percent-llm-costs/)
 
-43% step reduction + 70% token cost reduction via tighter orchestrator-
+43% step reduction + 70% token cost reduction through tighter orchestrator-
 side decisions.
 
 **Pattern applied:** the orchestrator persona itself is a SupervisorAgent
-candidate. v9.0.0 already reduced its persona size by ~6% via Layer 3
-extraction. The next gain is in *decision quality* — the orchestrator
-currently runs every phase mechanically; it could skip phases based on
+candidate. v9.0.0 already reduced its persona size by ~6% with Layer 3
+extraction. The next gain is in *decision quality*. The orchestrator
+currently runs every phase mechanically. It can skip phases based on
 the failure-adapter's classification.
 
 ### Prompt compression — LLMLingua 2026
@@ -117,9 +117,9 @@ Source: [TokenMix — LLMLingua 2026: 20x Prompt Compression](https://tokenmix.a
 documented).
 
 **Applicability:** prompt-side; orthogonal to the per-phase work.
-Speculative for evolve-loop — would require integrating LLMLingua's
+Speculative for evolve-loop — it requires integration of LLMLingua's
 prompt-compressor as a pre-processor on the bedrock + persona prompt
-before sending to claude. Defer to v9.1+.
+before the system sends it to claude. Defer to v9.1+.
 
 ### Structured-output compression — TOON format
 
@@ -129,8 +129,8 @@ TOON cuts structured-output tokens 30–60% vs JSON. TSV equivalent
 ~50% reduction.
 
 **Applicability:** audit-report.md's defects table + triage-report.md's
-top_n structures are JSON-shaped today. Converting to TOON or TSV would
-reduce output tokens 30–60% for those sections.
+top_n structures are JSON-shaped today. A conversion to TOON or TSV
+reduces output tokens 30–60% for those sections.
 
 **Cost-benefit:** small ($0.10/cycle saved), needs downstream parser
 updates. Defer until easier wins land.
@@ -168,7 +168,7 @@ an invisible verbosity tax. Mitigations:
 | P3 | Triage bedrock right-sizing (shorter persona + slimmer context) | ~$0.10 (40% of triage) | Low | Identified | D2 above |
 | P4 | Auditor anchor mode for intent.md (`intent.md:acceptance_criteria`) | ~$0.03–$0.06/cycle (7.3 KB × 22 turns × Opus cache-read rate) | **Tiny** (1 JSON edit) | **Shipped cycle 69; INERT** — input delta C68→C70: −6.1% (−58,014 tokens); cost delta: **+17.6% (+$0.1651)** — input savings swamped by 66% output-token increase at 5× price ratio. See `docs/research/anchored-context-injection-2026.md` | D1 above |
 | P5 | Retrospective YAML template externalization | ~$0.05 | Small | Identified | D3 above |
-| P6 | PSMAS-style phase-skip via triage classification | up to $2.10 on skipped cycles | High (new orchestration) | Research-stage | PSMAS research above |
+| P6 | PSMAS-style phase-skip through triage classification | up to $2.10 on skipped cycles | High (new orchestration) | Research-stage | PSMAS research above |
 | P7 | TOON-format structured outputs for audit/triage tables | ~$0.10 | Medium (downstream parser updates) | Speculative | TOON research above |
 | P8 | LLMLingua prompt compression integration | TBD | High | Speculative | LLMLingua research above |
 

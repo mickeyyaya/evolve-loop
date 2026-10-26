@@ -1,5 +1,7 @@
 > **Audience**: Operators configuring `EVOLVE_BUILDER_REVIEW_SKILLS`; Builders invoking the self-review loop.
-> **Status**: Superseded in part (2026-10-07). The flag-gated builder loop is gone: every code-cycle source writer runs `code-review-simplify`'s required Self-review hook, preloaded by the compiled-default overlay ([skill-overlays](skill-overlays.md)), and the `EVOLVE_BUILDER_*` variables below have had no reader since cycle 22's dead-flag sweep. The cycle-20 skill assessments stand as history.
+> **Status**: Superseded in part (2026-10-07). The flag-gated builder loop is gone.
+>
+> Every code-cycle source writer runs `code-review-simplify`'s required Self-review hook. The compiled-default overlay ([skill-overlays](skill-overlays.md)) preloads the hook. The `EVOLVE_BUILDER_*` variables below have had no reader since cycle 22's dead-flag sweep. The cycle-20 skill assessments stand as history.
 
 # Review Skill Catalog
 
@@ -25,9 +27,9 @@ For a skill to be usable in `EVOLVE_BUILDER_REVIEW_SKILLS`, it must satisfy all 
 | **Single-writer safe** | Must not spawn parallel worktrees or subagents — Builder is the only writer per the single-writer invariant (`parallel_eligible: false` in builder profile) |
 
 **Incompatible patterns:**
-- Action-based skills that apply changes directly without emitting a structured score (e.g., `simplify`)
-- PR-centric skills that read GitHub PR diffs rather than local git diff (e.g., `review`)
-- Skills that spawn parallel worktrees per independent group (e.g., `refactor`)
+- Action-based skills that apply changes directly without emitting a structured score (for example, `simplify`)
+- PR-centric skills that read GitHub PR diffs rather than local git diff (for example, `review`)
+- Skills that spawn parallel worktrees per independent group (for example, `refactor`)
 
 ---
 
@@ -47,7 +49,7 @@ For a skill to be usable in `EVOLVE_BUILDER_REVIEW_SKILLS`, it must satisfy all 
 
 ## 3. Primary Skill: code-review-simplify
 
-**Why unified over split:** A single `code-review-simplify` pass covers all 4 review dimensions (correctness, security, performance, maintainability) in one LLM context load. Splitting into two skills (e.g., `code-review` + `code-simplify`) would double the token cost for the same signal:
+**Why unified over split:** A single `code-review-simplify` pass covers all 4 review dimensions (correctness, security, performance, maintainability) in one LLM context load. A split into two skills (for example, `code-review` + `code-simplify`) doubles the token cost for the same signal:
 
 | Approach | Token cost per review | Dimensions | Convergence loops |
 |----------|-----------------------|------------|-------------------|
@@ -96,23 +98,23 @@ The shell script backing layer (`legacy/scripts/utility/code-review-simplify.sh`
 
 **Assessment:** Action-based — applies simplification edits directly to source files without emitting a numeric composite score. The skill-loop requires a parseable score (0.0–1.0) to drive convergence decisions. `simplify` produces natural-language findings and applies fixes, but has no structured score output compatible with the loop's threshold comparison. **Incompatible with current skill-loop mechanism.**
 
-**Could it be made compatible?** Only with a thin wrapper that: (a) invokes `simplify` in a dry-run / report-only mode, and (b) maps its findings to a numeric score. The wrapper would need to be created as a new evolve-loop built-in skill. Deferred to a future cycle.
+**Can it become compatible?** Only with a thin wrapper that: (a) invokes `simplify` in a dry-run / report-only mode, and (b) maps its findings to a numeric score. Someone must create the wrapper as a new evolve-loop built-in skill. Deferred to a future cycle.
 
 ### `review` (system skill)
 
 **Description:** "Review a pull request."
 
-**Assessment:** PR-centric — reads GitHub PR context via `gh pr view`, not local `git diff HEAD`. Requires an open PR, which does not exist during Builder's in-flight worktree phase. **Incompatible — wrong invocation context.**
+**Assessment:** PR-centric — reads GitHub PR context with `gh pr view`, not local `git diff HEAD`. Requires an open PR, which does not exist during Builder's in-flight worktree phase. **Incompatible — wrong invocation context.**
 
 ### `refactor` (evolve-loop built-in)
 
 **Description:** Orchestrates full refactoring pipeline with parallel worktree isolation per independent refactoring group.
 
-**Assessment:** Spawns parallel worktrees via subagents. This directly violates the single-writer invariant (`parallel_eligible: false` in builder profile). **Structurally incompatible.** The `refactor` skill is designed for human-initiated slash command use, not Builder self-review loops.
+**Assessment:** Spawns parallel worktrees through subagents. This directly violates the single-writer invariant (`parallel_eligible: false` in builder profile). **Structurally incompatible.** The `refactor` skill is designed for human-initiated slash command use, not Builder self-review loops.
 
 ### `security-review` (ECC installed)
 
-**Assessment:** Produces a checklist-style security review (findings listed by category) with no numeric composite score. Could be a high-value extension if a thin wrapper maps checklist severity counts to a composite: `composite = 1.0 - (critical×0.5 + high×0.2 + medium×0.05)`. Deferred to a future cycle — wrapper creation is out of scope for cycle-20 per intent.md constraints.
+**Assessment:** Produces a checklist-style security review (findings listed by category) with no numeric composite score. It can be a high-value extension if a thin wrapper maps checklist severity counts to a composite: `composite = 1.0 - (critical×0.5 + high×0.2 + medium×0.05)`. Deferred to a future cycle — wrapper creation is out of scope for cycle-20 per intent.md constraints.
 
 ---
 
@@ -123,7 +125,7 @@ The shell script backing layer (`legacy/scripts/utility/code-review-simplify.sh`
 To add a skill to the Builder self-review loop:
 
 1. **Verify the skill contract:**
-   - Invokes via `Skill("<skill-name>")` from inside a Builder Claude session
+   - Invokes through `Skill("<skill-name>")` from inside a Builder Claude session
    - Reads `git diff HEAD` (or detects context adaptively)
    - Emits a line matching: `Composite Score: 0.XX` (or `"composite": 0.XX` in JSON)
    - Does not spawn worktrees or subagents
