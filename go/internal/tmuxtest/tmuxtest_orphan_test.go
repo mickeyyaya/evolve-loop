@@ -17,7 +17,7 @@ func serverAlive(socket string) bool {
 	return exec.Command("tmux", "-L", socket, "has-session", "-t", bridge.ExactSessionTarget("victim")).Run() == nil
 }
 
-func TestStartOrphanGuard_TheServerStopsSoonAfterItsOwnerDies(t *testing.T) {
+func TestStartOrphanGuard_TheServersOfTheOwnerStopSoonAfterItDies(t *testing.T) {
 	privateSocketDir(t)
 	socket := bridge.DeriveTestSocket(os.Getpid())
 	t.Setenv(bridge.TmuxSocketEnv, socket)
@@ -33,13 +33,17 @@ func TestStartOrphanGuard_TheServerStopsSoonAfterItsOwnerDies(t *testing.T) {
 	if err := startOrphanGuard(socket, owner.Process.Pid); err != nil {
 		t.Fatal(err)
 	}
-	if out, err := tmux("new-session", "-d", "-s", "victim", "sleep 600"); err != nil {
-		t.Fatalf("new-session: %v: %s", err, out)
+	own, lookalike := socket+"-own", socket+"9"
+	for _, s := range []string{socket, own, lookalike} {
+		if out, err := exec.Command("tmux", "-L", s, "-f", os.DevNull, "new-session", "-d", "-s", "victim", "sleep 600").CombinedOutput(); err != nil {
+			t.Fatalf("new-session on %s: %v: %s", s, err, out)
+		}
 	}
+	t.Cleanup(func() { _ = StopServer(own); _ = StopServer(lookalike) })
 
 	time.Sleep(1500 * time.Millisecond)
-	if !serverAlive(socket) {
-		t.Fatal("the guard stopped the server while its owner still runs")
+	if !serverAlive(socket) || !serverAlive(own) {
+		t.Fatal("the guard stopped a server while its owner still runs")
 	}
 	if err := owner.Process.Kill(); err != nil {
 		t.Fatal(err)
@@ -47,11 +51,14 @@ func TestStartOrphanGuard_TheServerStopsSoonAfterItsOwnerDies(t *testing.T) {
 	_, _ = owner.Process.Wait()
 
 	deadline := time.Now().Add(10 * time.Second)
-	for serverAlive(socket) {
+	for serverAlive(socket) || serverAlive(own) {
 		if time.Now().After(deadline) {
-			t.Fatal("the server and its sessions outlived the owner by 10 s; a timeout panic leaves them to hold the CI step open")
+			t.Fatalf("a server of the owner outlived it by 10 s (main %v, own %v); a timeout panic leaves it to hold the CI step open", serverAlive(socket), serverAlive(own))
 		}
 		time.Sleep(100 * time.Millisecond)
+	}
+	if !serverAlive(lookalike) {
+		t.Fatalf("the guard stopped %s, the server of another pid whose name only starts like %s", lookalike, socket)
 	}
 }
 
@@ -154,5 +161,12 @@ func TestMain_AnUnreadableDescriptorListRunsNothingAndFails(t *testing.T) {
 
 	if code != 1 || ran {
 		t.Fatalf("Main = %d, ran = %v; want 1 without running the tests", code, ran)
+	}
+}
+
+func TestShellQuote_KeepsAQuoteInsideOneShellWord(t *testing.T) {
+	out, err := exec.Command("sh", "-c", "printf %s "+shellQuote("a'b c")).Output()
+	if err != nil || string(out) != "a'b c" {
+		t.Fatalf("shellQuote must survive the shell as one word: %q %v", out, err)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -96,7 +97,9 @@ func closeInheritedOnExec() error {
 }
 
 func startOrphanGuard(socket string, owner int) error {
-	watch := fmt.Sprintf("while kill -0 %d 2>/dev/null; do sleep 1; done; exec tmux -L %s kill-server", owner, socket)
+	dir, name := shellQuote(bridge.TmuxSocketDir()), shellQuote(socket)
+	watch := fmt.Sprintf(`while kill -0 %d 2>/dev/null; do sleep 1; done; for s in %s/%s-*; do [ -S "$s" ] && tmux -S "$s" kill-server; done; exec tmux -L %s kill-server`,
+		owner, dir, name, name)
 	out, err := sysexec.Command(context.Background(), "tmux", bridge.TmuxSocketArgs(
 		"new-session", "-d", "-s", guardSession, watch,
 	)...).CombinedOutput()
@@ -104,4 +107,8 @@ func startOrphanGuard(socket string, owner int) error {
 		return fmt.Errorf("start the orphan guard on socket %s: %w: %s", socket, err, out)
 	}
 	return nil
+}
+
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
