@@ -248,6 +248,16 @@ const maxFieldLen = 160
 
 const maxAcceptanceLen = 600
 
+const (
+	MaxFieldLen      = maxFieldLen
+	MaxAcceptanceLen = maxAcceptanceLen
+)
+
+func Fit(s string, max int) string {
+	var r fieldRewrites
+	return r.clean("", s, max)
+}
+
 func LoadFile(path string) (Item, []string, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {

@@ -1,10 +1,16 @@
 {
+  "acceptance": [
+    "The defect \"the ledger row lacks evidence\" no longer appears in the phase's failure block on a re-run",
+    "A regression test fails before the fix and passes after it"
+  ],
+  "created_at": "2025-07-31T22:13:20Z",
+  "fix": "Find where the phase emits this defect (the ledger row lacks evidence), fix it at the source, and re-run the failed phase.",
   "id": "retro-1279-the-ledger-row-lacks-evidence-915304b4",
-  "title": "the ledger row lacks evidence",
-  "weight": 0.75,
+  "injected_by": "faillearn-failure-floor",
   "kind": "bug",
   "priority": "H",
   "priority_class": "correctness",
-  "files": null,
-  "injected_by": "faillearn-failure-floor"
+  "summary": "Floor remediation item for retro-1279-the-ledger-row-lacks-evidence-915304b4: the ledger row lacks evidence",
+  "title": "the ledger row lacks evidence",
+  "weight": 0.75
 }
