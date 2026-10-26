@@ -33,7 +33,7 @@ The workspace's `console` and `runtime` directories are separate worktrees, not 
 | P1 | CI/release selection and coverage claims diverge | Release omits eight package selections covered by CI; landing tests have no test job; ordinary 85% coverage is advisory | Make selection explicit, close missing lanes under tests, preserve strict/API gates and compare exact selected/executed sets |
 | P2 | Live failure classification may quarantine real contract failures | Broad words in merged model/tool output match transient markers (`go/cmd/evolve/e2e_live_harness_test.go:80`) | Offline adversarial classifier/retry tests; distinguish structured provider failures from task text |
 
-These are separate defect fixes or policy improvements, not permission to change their existing logic during test cleanup. Full findings, confidence levels, and additional candidates are retained in the dossier; no lower-priority findings were silently discarded.
+These are separate defect fixes or policy improvements, not permission to change their existing logic during test cleanup. Full findings, confidence levels, and other candidates are retained in the dossier; no lower-priority findings were silently discarded.
 
 ## Retain the existing two-axis organization
 
@@ -52,7 +52,7 @@ Keep [go/docs/testing.md](../../go/docs/testing.md)'s useful separation of cost 
 | Landing module | Existing `landing` packages | Independent module tests; must be enrolled separately in CI |
 | Live provider evaluation | Existing opt-in live tests and manual spike | Capability/drift signal; report unavailable/inconclusive trials separately |
 
-Build tags are additive, not mutually exclusive lanes. `integration` also compiles untagged tests. Retiering requires an old/new selection comparison on every supported OS; moving a file behind a tag without adding an execution lane loses coverage even if the remaining suite is green. Keep test helpers available in every build configuration that imports them.
+Build tags are additive, not mutually exclusive lanes. `integration` also compiles untagged tests. Retiering requires an old/new selection comparison on every supported OS. If you move a file behind a tag without a new execution lane, you lose coverage even if the remaining suite is green. Keep test helpers available in every build configuration that imports them.
 
 ## Clean-code and pattern decisions
 
@@ -75,15 +75,23 @@ Helpers perform setup and mark themselves with `t.Helper()`. Assertions stay clo
 ### For each harness defect or changed behavior
 
 1. State one observable contract and its blast radius. Locate existing cases before writing another.
-2. Identify pass-to-pass preservation cases and write the new fail-to-pass regression **before** changing production, fake, runner, or gate logic.
-3. Run the regression on the baseline. Record an assertion failure for the intended defect. Compilation errors, missing tools, no tests selected, skips, and unrelated flaky failures are not semantic RED evidence.
-4. Keep the test fixed; make the smallest implementation that makes it pass. If the test specification was wrong, correct that explicitly before continuing, not as a way to turn red green.
-5. Refactor only with the affected suite green. Run preservation cases, required race/tag variants, and relevant composed caller tests. Show that the real caller consumes the fixed output.
-6. Bind host-owned evidence to both trees and the executable test inputs: tests, helpers, fixtures, configuration, selected inventory, command, toolchain, OS/tags, relevant environment and output digests. A test-file hash alone cannot detect a changed helper or `GOFLAGS` filtering out the test. Record exact exit/result classifications and review the implementation and oracle independently.
+2. Identify pass-to-pass preservation cases. Write the new fail-to-pass regression **before** you change production, fake, runner, or gate logic.
+3. Run the regression on the baseline. Record an assertion failure for the intended defect.
+
+   Compilation errors, missing tools, no tests selected, skips, and unrelated flaky failures are not semantic RED evidence.
+4. Keep the test fixed. Make the smallest implementation that makes it pass.
+
+   If the test specification was wrong, correct that explicitly before you continue. Do not use the correction to turn red green.
+5. Refactor only with the affected suite green.
+
+   Run preservation cases, required race/tag variants, and relevant composed caller tests. Show that the real caller consumes the fixed output.
+6. Bind host-owned evidence to both trees and the executable test inputs. These inputs are tests, helpers, fixtures, configuration, selected inventory, command, toolchain, OS/tags, relevant environment and output digests.
+
+   A test-file hash alone cannot detect a changed helper or `GOFLAGS` that filters out the test. Record exact exit/result classifications. Review the implementation and oracle independently.
 
 ### For a pure test refactor
 
-Existing green characterization tests are the starting point. Do not introduce a fake production defect merely to claim RED-first. Add characterization only where an actual contract is missing. Demonstrate the replacement rejects the same intentionally broken behaviors using an isolated mutant/overlay; the production baseline remains green. This is the refactor step of TDD, not a behavior change.
+Existing green characterization tests are the starting point. Do not introduce a fake production defect merely to claim RED-first. Add characterization only where an actual contract is missing. Show that the replacement rejects the same intentionally broken behaviors. Use an isolated mutant/overlay for this; the production baseline remains green. This is the refactor step of TDD, not a behavior change.
 
 Every removed or renamed test needs an old-to-new map containing:
 
@@ -99,7 +107,7 @@ Every removed or renamed test needs an old-to-new map containing:
 
 Accept only when every old scenario maps to a replacement with equal or stronger assertions. The pass-to-pass set remains green; no required selected test silently disappears or becomes a skip. For unchanged production, the set of previously covered blocks must remain a subset of replacement coverage **per package and required environment**, not just in aggregate. Compare hit/non-hit blocks rather than execution counts, because valid dedup reduces counts. Per-package percentages, API references and strict floors must not regress. When production moves, map old/new functions explicitly; percentages from different source layouts are not comparable proof.
 
-Coverage is necessary, not sufficient. Two tests can execute the same lines and detect different faults. Mutation checks supplement assertion review; equivalent, invalid and timed-out mutants are recorded separately. If no measured mutation baseline exists, say so and retain the old test until targeted fault sensitivity has been demonstrated. Never present an estimated score as a measured kill rate.
+Coverage is necessary, not enough. Two tests can execute the same lines and detect different faults. Mutation checks supplement assertion review. Record equivalent, invalid and timed-out mutants separately. If no measured mutation baseline exists, say so and keep the old test until you show targeted fault sensitivity. Never present an estimated score as a measured kill rate.
 
 ## First consolidation candidates
 
@@ -134,11 +142,20 @@ flowchart LR
 
 The deterministic host execution floor and AI judgment answer different questions. For behavior acceptance, inspect real outcomes and artifacts. For architectural rules such as phase order, assert order explicitly because it is the contract. Do not constrain incidental tool-call sequences when multiple valid solutions exist. The [research notes](../research/testing-review-2026-09-14/research.md) explain the evidence behind this distinction.
 
-Test the harness in layers: pure parser/classifier tests; fault-injected runner contracts; fake-versus-real conformance; deterministic full composition with scripted model outputs; real subprocess/sandbox conformance; optional live-provider drift trials. Each grader needs a known-good solution, a known-bad solution, and a plausible gaming attempt. A green result must be distinguishable from empty execution, skipped execution, stale evidence and infrastructure error.
+Test the harness in these layers:
+
+- pure parser/classifier tests
+- fault-injected runner contracts
+- fake-versus-real conformance
+- deterministic full composition with scripted model outputs
+- real subprocess/sandbox conformance
+- optional live-provider drift trials
+
+Each grader needs a known-good solution, a known-bad solution, and a plausible gaming try. A green result must be distinguishable from empty execution, skipped execution, stale evidence and infrastructure error.
 
 Do not mistake simulator coverage for product acceptance. The native `evolve cycle run --simulate` wires real orchestration but uses fixed-PASS phase runners. It can verify transitions and ledger plumbing; it cannot prove genuine TDD, audit, transport or authorization. The separate legacy `cycle-simulator` command has the defect described above.
 
-For live evaluations, version the task corpus, model/provider, prompt, harness, tools and judge rubric; isolate trials; record complete result/skip/error denominators. Report first-attempt performance and repeatability separately. Calibrate qualitative judges against reviewed examples and keep a held-out incident set. Promote verified failures to deterministic regressions where possible. Avoid exact model-output goldens for open-ended prose and avoid changing hard gate decisions based on a judge's narrative.
+For live evaluations, version the task corpus, model/provider, prompt, harness, tools and judge rubric; isolate trials; record complete result/skip/error denominators. Report first-try performance and repeatability separately. Calibrate qualitative judges against reviewed examples and keep a held-out incident set. Promote verified failures to deterministic regressions where possible. Avoid exact model-output goldens for open-ended prose and avoid changing hard gate decisions based on a judge's narrative.
 
 ## CI target contract
 
@@ -150,9 +167,9 @@ The [CI audit](../research/testing-review-2026-09-14/ci-review.md) is the source
 | Integration | Existing Linux/macOS process cases plus untagged coverage; retained capability checks and subprocess positive controls |
 | E2E | Existing no-race execution policy with `e2e evolve_test_phases`; no missing test-only phase registration |
 | Durable ACS | Existing `acs/regression/...` scope and full history where predicates need it; expected skips explicit |
-| Landing | Separate module test lane for relevant changes, prior to deploy |
+| Landing | Separate module test lane for relevant changes, before deploy |
 | Coverage | Every child failure propagates; exact profile provenance; existing API and 19 strict package floors preserved; general package-level ratchet distinct from function diagnostics |
-| Release | Same required test/gate contract on the **tagged SHA**; reused CI evidence must match required suites, OS/toolchain/tags, coverage gates and successful terminal status as well as SHA. Keep release artifact verification separate |
+| Release | Same required test/gate contract on the **tagged SHA**; reused CI evidence must match the SHA. It must also match required suites, OS/toolchain/tags, coverage gates and successful terminal status. Keep release artifact verification separate |
 | Fuzz/robustness | Scheduled bounded fuzzing and selected stress/mutation; minimized failing inputs become normal regression seeds |
 | Live drift | Explicit opt-in, isolated resources, raw results including errors/skips; does not impersonate deterministic gate coverage |
 
@@ -177,10 +194,17 @@ These are independent, reviewable changes, not one bulk rewrite. Correctness com
 | S6 — expand by owner | Phase setup/scanner consumers/ACS wrappers, one family at a time | Fake contracts already proven; static refs and executed identities preserved | Full affected tier + required CI; all deletion maps complete |
 | S7 — sustained robustness | Fuzz corpus, fake/real transport conformance, measured mutation, live calibration | Known-good/bad/gaming controls and retained failure corpora | Reproducible telemetry and documented ownership; no guessed coverage claims |
 
-S1 and S2 are prerequisites for relying on shared harness evidence. Independent documentation and landing selection work can proceed concurrently in separate worktrees. Preserve single-writer ownership per file, merge one family at a time, and stop expansion when coverage, case identity, mutation sensitivity, or required skip behavior changes unexpectedly. Use the repository's review/commit-gate/ship process for implementation commits; record each outcome in the linked integration record.
+S1 and S2 are prerequisites for reliance on shared harness evidence. Independent documentation and landing selection work can proceed concurrently in separate worktrees. Preserve single-writer ownership per file. Merge one family at a time. Stop expansion when coverage, case identity, mutation sensitivity, or required skip behavior changes unexpectedly. Use the repository's review/commit-gate/ship process for implementation commits; record each outcome in the linked integration record.
 
 ## Completion standard for the campaign
 
-The campaign is complete only when every removed test has a reviewed semantic replacement, preserved per-environment block/API coverage, no unclassified new skip, and the same or stronger fault detection. New harness behavior must have witnessed RED-to-GREEN evidence. CI and release must execute the declared contract on the exact revision; design text, workflow labels and aggregate percentages cannot substitute for execution proof.
+The campaign is complete only when all of these conditions hold:
+
+- Every removed test has a reviewed semantic replacement.
+- Per-environment block/API coverage is preserved.
+- No unclassified new skip exists.
+- Fault detection is the same or stronger.
+
+New harness behavior must have witnessed RED-to-GREEN evidence. CI and release must execute the declared contract on the exact revision; design text, workflow labels and aggregate percentages cannot substitute for execution proof.
 
 The original S0 step delivered the design and evidence, with existing tests byte-for-byte intact and only the selected local suites executed. Subsequent full-suite results and code changes are recorded in the [integration record](../reports/test-refactoring-integration-2026-09-14.md). Neither the design nor the first implementation slices claim that all tests have been refactored, every gap fixed, or paid-model and repository-wide mutation evaluations completed.

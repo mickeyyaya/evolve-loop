@@ -76,10 +76,17 @@ func readUsage(ctx context.Context, probe func(context.Context, string) (string,
 	default:
 		r.Windows = bridge.UsageWindows(family, pane, now)
 		if len(r.Windows) == 0 {
-			r.Note = "no usage window read: its manifest declares no controls.usage.windows, or the screen did not match them"
+			r.Error, r.Note = missingWindows(family)
 		}
 	}
 	return r
+}
+
+func missingWindows(family string) (errText, note string) {
+	if bridge.UsageWindowsDeclared(family) {
+		return "no usage window read: the manifest declares controls.usage.windows, but the screen matched none", ""
+	}
+	return "", "its manifest declares no controls.usage.windows"
 }
 
 func printUsageReadouts(readouts []usageReadout, asJSON bool, stdout io.Writer) {

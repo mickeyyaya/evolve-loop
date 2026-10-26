@@ -1,6 +1,6 @@
 # Checkpoint and resume — current Go contract
 
-Run `evolve loop --resume` to continue a checkpointed cycle. Resume preserves the original cycle/run identity and the existing worktree; it does not create a new task attempt merely because a process restarted.
+Run `evolve loop --resume` to continue a checkpointed cycle. Resume preserves the original cycle/run identity and the existing worktree; it does not create a new task try merely because a process restarted.
 
 ## Discovery and validation
 
@@ -10,7 +10,14 @@ The host resolves the explicit state override or singleton state, then eligible 
 
 Fresh and resumed dispatch share policy application for difficulty budgets, recurrence tiers, and audit-repair constraints. Routine phase-complete checkpoints record the completed-phase list as a conservative crash-recovery boundary. A graceful `SIGINT` or `SIGTERM` records an `operator-requested` checkpoint for the phase that is still active while leaving that phase out of `completedPhases`. Resume therefore re-enters the interrupted phase instead of repeating the preceding completed phase. The signal path does not launch retrospective failure learning because an operator stop is not evidence that the task or phase failed.
 
-Graceful cancellation is also nonterminal at closeout. The host preserves partial timing and phase-output diagnostics, but it does not write a failure digest, create a terminal cycle dossier, mark the cycle aborted, or make a dossier commit on the integration branch. This keeps the integration HEAD unchanged while the preserved cycle branch remains resumable. Hard phase failures still use the abnormal closeout path and produce terminal evidence.
+Graceful cancellation is also nonterminal at closeout. The host preserves partial timing and phase-output diagnostics. The host does none of these actions:
+
+- write a failure digest;
+- create a terminal cycle dossier;
+- mark the cycle aborted;
+- make a dossier commit on the integration branch.
+
+This keeps the integration HEAD unchanged while the preserved cycle branch remains resumable. Hard phase failures still use the abnormal closeout path and produce terminal evidence.
 
 Resumed dispatch replaces the consumed pause with an active-phase checkpoint before each new model call. A later quota or operator interruption advances that recovery point, so repeated resume never falls back to the original pause. A typed quota pause remains authoritative when cancellation races its write because it carries the reset time and source needed for recovery. If the active-phase checkpoint write fails, the host reports that resume may repeat the previous completed phase; the original interruption remains the primary outcome.
 

@@ -50,9 +50,9 @@ Two functions in `internal/adapters/sandbox` are the single source of truth:
   with `CLAUDECODE_TYPE=host` overriding). Replaces both prior heuristics.
 - `ShouldWrap(nested bool, probe ProbeResult) (bool, string)` — the wrap policy:
   wrap **iff** OS supported ∧ binary available ∧ **not nested**. The nested
-  exclusion is universal (all modes, all OSes): under an outer Claude session
-  the inner sandbox is redundant (outer already confines) and on macOS
-  non-functional. Returns a non-empty reason for callers to surface.
+  exclusion is universal (all modes, all OSes). Under an outer Claude session
+  the inner sandbox is redundant (outer already confines). On macOS
+  it is non-functional. It returns a non-empty reason for callers to surface.
 
 Consumers:
 
@@ -76,8 +76,8 @@ when `nested`, both are false.
 
 ## Tests
 
-- `adapters/sandbox/confinement_test.go`: `DetectNested` (6 cases incl. host
-  override) + `ShouldWrap` (7 cases incl. the darwin/linux nested→skip cells).
+- `adapters/sandbox/confinement_test.go`: `DetectNested` (6 cases with host
+  override) + `ShouldWrap` (7 cases with the darwin/linux nested→skip cells).
 - `bridge/sandbox_wrap_test.go`: `on`-mode + nested → no wrap + WARN (the closed
   footgun); unknown value normalize; existing off/auto/on/darwin cases.
 - All consumers green with `-race`; full `go build ./...`, `looppreflight` green.
@@ -92,12 +92,13 @@ The 2026-06-13 SSOT closed the `on`-mode-under-nested footgun but left two
 coupled defects in how the nested fallback is **decided** and **trusted**:
 
 - **P1 — the wrap decision is an env-var GUESS, not a measurement.** `DetectNested`
-  reads `CLAUDECODE*`; a wrong guess is asymmetric and severe: a *broken/SIP-weird
-  standalone* host is guessed "not nested → wrap" and **hangs the REPL boot
-  (exit 80)**; a stray env var falsely marks nested → silently drops confinement.
+  reads `CLAUDECODE*`. A wrong guess is asymmetric and severe.
+  - A *broken/SIP-weird standalone* host is guessed "not nested → wrap" and **hangs the REPL boot
+    (exit 80)**.
+  - A stray env var falsely marks nested → silently drops confinement.
 - **P2 — the fallback silently ASSUMES the outer session confines us.** When the
   wrap is skipped, the loop proceeds on the unverified belief that the outer
-  Claude session confines phase writes; even `EVOLVE_SANDBOX=on` only WARNed and
+  Claude session confines phase writes. Even `EVOLVE_SANDBOX=on` only WARNed and
   ran unconfined. The preflight message "the bridge degrades gracefully" concealed
   the loss of the inner write-confinement guarantee.
 
@@ -110,24 +111,27 @@ measuring it.**
    `CapabilityChecked`; `Probe()` execs a trivial confined `/usr/bin/true` once
    (bounded 3s, `WaitDelay`-guarded; timeout/error ⇒ not capable), cached. The
    env heuristic degrades to an explanatory reason only.
-2. **Subtractive `ShouldWrap`.** A MEASURED-incapable sandbox is demoted to skip
-   (fixes the broken-standalone hang); capability can only DEMOTE a would-be wrap,
-   never PROMOTE a nested skip — the non-regression invariant is
-   **`new_wrap ⟹ old_wrap`**. An unchecked probe is byte-identical to the legacy
-   path (this supersedes the "Equivalence" section above).
+2. **Subtractive `ShouldWrap`.** A MEASURED-incapable sandbox is demoted to skip (fixes the broken-standalone hang).
+   - Capability can only DEMOTE a wrap that otherwise happens. It never PROMOTES a nested skip.
+   - The non-regression invariant is **`new_wrap ⟹ old_wrap`**.
+   - An unchecked probe is byte-identical to the legacy
+     path. This supersedes the "Equivalence" section above.
 3. **Measured `ExpectedToWork` (preflight).** An opt-in `Options.SandboxCapable`
    seam (nil ⇒ legacy) lets a measured-incapable result subtractively demote
-   `Sandbox.ExpectedToWork`; `innerProbe` carries the measurement so `InnerSandbox`
+   `Sandbox.ExpectedToWork`. `innerProbe` carries the measurement so `InnerSandbox`
    stays consistent. JSON shape (schema_version 3) unchanged.
 4. **Fail-closed halt for required sandboxes (P2).** A missing required Build
    sandbox halts preflight by default unless opted out with `EVOLVE_SANDBOX=off`.
 5. **Verified-fallback canary (P2).** Config dial `sandbox.nested_fallback`
-   (`off` default / `shadow` / `enforce`, via `parseGateStage`) gates a preflight
-   write-canary that VERIFIES the outer environment blocks an out-of-allowlist
-   write: `shadow` WARNs when unverified, `enforce` HALTs. Default `off` ⇒ the
-   canary never runs and a fresh `policy.json` never halts. `enforce` is opt-in
-   for genuinely-confined outer sessions: under bypass-permissions Claude the
-   outer does not confine writes, so the canary reports unverified by design.
+   (`off` default / `shadow` / `enforce`, through `parseGateStage`) gates a preflight
+   write-canary. The canary VERIFIES that the outer environment blocks an out-of-allowlist
+   write.
+   - `shadow` WARNs when unverified. `enforce` HALTs.
+   - Default `off` ⇒ the
+     canary never runs and a fresh `policy.json` never halts.
+   - `enforce` is opt-in
+     for genuinely-confined outer sessions. Under bypass-permissions Claude the
+     outer does not confine writes, so the canary reports unverified by design.
 
 ### Pattern
 

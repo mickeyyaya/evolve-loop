@@ -191,3 +191,27 @@ func TestWriteInputIndex_WarnsWhenTheRecordCannotBeWritten(t *testing.T) {
 		t.Fatalf("warn = %q", warn.String())
 	}
 }
+
+func TestWriteInputIndex_CarriesThePolicyContextAndTheSpecInputs(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	ws := filepath.Join(root, ".evolve", "runs", "cycle-3")
+	writeIndexFixture(t, filepath.Join(ws, "scout-report.md"), "# "+strings.Repeat("x", 40)+"\n")
+	writeIndexFixture(t, filepath.Join(ws, "test-report.md"), "# t\n")
+	writeIndexFixture(t, filepath.Join(root, ".evolve", "policy.json"), `{"isolation":{"context":{"budget":{"l1_tokens":5},"required":{"audit":["test-report"]}}}}`)
+	var warn strings.Builder
+	at := indexTarget{projectRoot: root, workspace: ws, cycle: 3, specInputs: []string{".evolve/runs/cycle-{cycle}/scout-report.md"}}
+	writeInputIndex(at, PhaseBuild, nil, &warn)
+	idx, err := inputindex.Read(ws)
+	if err != nil || warn.Len() != 0 {
+		t.Fatalf("index err = %v warn = %q", err, warn.String())
+	}
+	if b := idx.Budgets[inputindex.LayerUpstream]; b.LimitTokens != 5 || len(idx.Required) != 0 || len(idx.Notes) == 0 {
+		t.Fatalf("the spec input scout-report is over the policy budget of 5 tokens: budgets %+v required %v notes %v", idx.Budgets, idx.Required, idx.Notes)
+	}
+	writeInputIndex(at, PhaseAudit, nil, &warn)
+	idx, err = inputindex.Read(ws)
+	if err != nil || len(idx.Required) != 1 || idx.Entries[slices.IndexFunc(idx.Entries, func(e inputindex.Entry) bool { return e.Required })].Kind != "test-report" {
+		t.Fatalf("the policy list of the audit wins over the spec inputs: %+v err %v", idx.Entries, err)
+	}
+}

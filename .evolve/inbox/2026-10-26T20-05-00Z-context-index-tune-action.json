@@ -1,0 +1,26 @@
+{
+  "id": "context-index-tune-action",
+  "kind": "feature",
+  "title": "Cell context index CX6: the catalog action context-tune.",
+  "source": "console, 2026-10-26. The operator request is in docs/plans/cell-context-index-2026-10.md §1. Design: docs/architecture/cell-context-index.md. Plan: §6 of the same plan.",
+  "summary": "The required list and the listing cannot learn from use. ADR-0155 I-12: the orchestrator proposes, and the pipeline disposes. Spec §9. The action starts only after one wave of access records exists.",
+  "fix": "Add the action context-tune (promote, demote, exclude, include) to the action catalog. A Go check computes the open rate from the access log, and applies the thresholds of isolation.context.tune. It refuses an exclude of an L1 kind, an L2 kind or the kind rule. The rate leaves out a scan: a cell that opened each listed row. Add the action row to docs/architecture/llm-isolation.md §19. The policy writer applies the change at the boundary. Add the strict policy keys isolation.context.exclude and isolation.context.tune, which refuse a value of tune.promote_at, tune.demote_at or tune.exclude_at outside 0 to 1.",
+  "acceptance": [
+    "RED first: TestContextTune_NoChangeGrantsAPathOutsideTheFixedSources fails before the change.",
+    "A proposal with fewer than tune.min_cells sandbox cells is refused with HEALING_PROPOSAL_REFUSED.",
+    "An exclude of an L1 kind, an L2 kind or the kind rule is refused.",
+    "Changed functions at 100% coverage on every CI OS; the package note and the spec are updated."
+  ],
+  "deps": [
+    "context-index-access-log",
+    "selfheal-action-catalog-validator-budgets"
+  ],
+  "files": [
+    "go/internal/core/",
+    "go/internal/policy/"
+  ],
+  "priority_class": "stability",
+  "weight": 0.4,
+  "route": "console-manual",
+  "created_at": "2026-10-26T20:05:00Z"
+}

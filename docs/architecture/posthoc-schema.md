@@ -1,12 +1,12 @@
 # POSTHOC Schema — Generalized Sentinel for Truthable Metrics
 
-> **Status:** Active (cycle 76, manual Layer 3 ship)
-> **Layer:** 3 of 5 in [ADR-0012 Reward-Hacking Defense System](adr/0012-commit-claim-coherence.md)
-> **Generalizes:** cycle 72's cost-data POSTHOC pattern (single metric) to 8 metrics
+> **Status:** Active (cycle 76, manual Layer 3 ship).
+> **Layer:** 3 of 5 in [ADR-0012 Reward-Hacking Defense System](adr/0012-commit-claim-coherence.md).
+> **Generalizes:** cycle 72's cost-data POSTHOC pattern (single metric) to 8 metrics.
 
 ## Why POSTHOC sentinels exist
 
-Cycle 71 retrospective established that **the Builder cannot reliably self-quote metrics about its own run** because the metrics are written by the runner *after* the Builder's session ends. Cycle 71's Builder claimed `cost ≈ $0.65 / +10%`; the ground-truth `build-usage.json` showed `$0.73 / +23%`. The Builder underreported cost by 13 percentage points — not from malice but because the value was an in-session estimate.
+Cycle 71 retrospective established that **the Builder cannot reliably self-quote metrics about its own run**. The runner writes the metrics *after* the Builder's session ends. Cycle 71's Builder claimed `cost ≈ $0.65 / +10%`. The ground-truth `build-usage.json` showed `$0.73 / +23%`. The Builder underreported cost by 13 percentage points. The cause was not malice: the value was an in-session estimate.
 
 Cycle 72 codified the fix as a **POSTHOC sentinel pattern** for cost data only:
 
@@ -50,7 +50,9 @@ The Builder persona (`agents/evolve-builder.md`) must:
 
 1. **Never quote a truthable metric directly.** Use `pending` + POSTHOC sentinel for all 8 metrics above plus all AC-existence claims.
 2. **Include the verification command in the sentinel comment.** Auditor reads this and runs it.
-3. **For INERT markers**, include `re_attempt_by_cycle: N` (max +5) so the deferral has a deadline. INERT without a re-attempt date is treated as permanent abandonment, which is a P5 violation (constitutional audit checklist).
+3. **For INERT markers**, include `re_attempt_by_cycle: N` (max +5) so the deferral has a deadline.
+
+   INERT without a date for a new try is treated as permanent abandonment. This is a P5 violation (constitutional audit checklist).
 
 ## Auditor enforcement
 

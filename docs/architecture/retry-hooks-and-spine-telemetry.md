@@ -11,8 +11,8 @@ in more than one place, so the copies drift._
 the sequential loop grew had to be re-remembered on the batch side — and twice it
 was not. `optionalInfraSkip` and `postShipObserverSkip` shipped sequential-only,
 so an optional evaluate phase that exhausted infra retries aborted the *whole
-batch* instead of degrading to WARN. Patching the two misses would not fix the
-class: the next hook diverges the same way.
+batch* instead of degrading to WARN. Suppose someone patches the two misses. The
+class stays unfixed: the next hook diverges the same way.
 
 **Design** (`go/internal/core/retry_opts.go`). `retryOpts` is a Strategy value
 enumerating every recovery hook a retry loop may run:
@@ -76,11 +76,12 @@ omissions. A hook wired on one path only fails the test.
 had a single-source home (`errors.go:IsInfraTeardownError`) but was still
 hand-spelled at three call sites, one as the De Morgan negation. All three now
 call the helper: `orchestrator.go:optionalInfraSkip`, the sequential retry arm,
-and the batch arm (the latter via the shared core). `isTransientBridgeError`
-stays a **transient-ONLY component** — it must never be aliased to the union;
-`TestIsTransientBridgeError_StaysTransientOnly` is the anti-widen guard, and
-timeout-only sites (`failure_hook.go`, `failure_learning.go`, the backfill
-trigger) are *different predicates* and were deliberately left alone.
+and the batch arm (the batch arm calls it through the shared core).
+`isTransientBridgeError` stays a **transient-ONLY component**. Never alias it to
+the union. `TestIsTransientBridgeError_StaysTransientOnly` is the anti-widen
+guard. Timeout-only sites (`failure_hook.go`, `failure_learning.go`, the
+backfill trigger) are *different predicates*, and the change left them alone on
+purpose.
 
 `TestInfraTeardownUnion_SpelledExactlyOnce` parses every non-test file in
 `internal/core` and counts boolean expressions joining the two sentinels.
@@ -92,11 +93,11 @@ satisfied by adding text — only by removing duplicate spellings.
 **Problem.** A width-3 batch on 2026-07-13 emitted 76 `spine not satisfied …
 proceeding fail-open` WARNs to stderr and nowhere else: an epidemic with no
 dashboard. This change is measurement-first — make it visible, *then* decide
-whether the fix is artifact-retry, driver-bounce recovery, or an enforce flip.
+if the fix is artifact-retry, driver-bounce recovery, or an enforce flip.
 
-**Design.** Follows the `VerdictsNotAdopted` precedent exactly (one record, one
-projection — the field was named `SkippedPhases` until the record split of
-`dossier-retro-skipped-mislabel`) rather than inventing a new shape:
+**Design.** The design follows the `VerdictsNotAdopted` precedent exactly (one
+record, one projection — the field was named `SkippedPhases` until the record
+split of `dossier-retro-skipped-mislabel`). It does not invent a new shape:
 
 ```
 StateMachine.UnsatisfiedSpineAnchor   → names the FIRST unsatisfied predecessor
@@ -107,8 +108,8 @@ dossier.RollupSpineFailOpens          → batch Total / ByPhase / OverThresholdC
 ```
 
 - `SpineSatisfiedUpTo` now **delegates** to `UnsatisfiedSpineAnchor`, so the gate
-  and its reporter cannot disagree — a reporter that inflated the counter would
-  be worse than no telemetry.
+  and its reporter cannot disagree. Suppose a reporter inflated the counter. Then it is
+  worse than no telemetry.
 - The record carries `(phase, missing_artifact, reason)`. Phase alone cannot
   group 76 WARNs by cause; `reason` distinguishes a dialed-down `SpineFloor`
   ("would-block at enforce") from a degraded digest read.

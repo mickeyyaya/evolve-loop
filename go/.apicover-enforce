@@ -829,3 +829,7 @@
 ./internal/dispatchcred
 # inputindex - the artifact index inputs/index.json of each phase cell and its lineage (ADR-0154 I-4, I-5).
 ./internal/inputindex
+# contextcmd - the evolve context verbs that read the cell index of a phase agent (cell-context-index.md §7).
+./internal/cli/contextcmd
+# guidance - the rule registry reader, the build of guidance/index.md, guidance/index.json and the L0 region of AGENTS.md, and the check of the registry.
+./internal/guidance

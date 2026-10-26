@@ -14,13 +14,13 @@ import (
 	"testing"
 )
 
-func TestRows_AreTheNineteenRowsOfSpec14InOrder(t *testing.T) {
+func TestRows_AreTheRowsOfSpec14InOrder(t *testing.T) {
 	t.Parallel()
 	var ids []string
 	for _, r := range Rows() {
 		ids = append(ids, r.ID)
 	}
-	want := []string{"M1", "M2", "M3", "M4", "M5", "N1", "N2", "N3", "N4", "N5", "N6", "N7", "N8", "N9", "N10", "N11", "N12", "N13", "N14"}
+	want := []string{"M1", "M2", "M3", "M4", "M5", "N1", "N2", "N3", "N4", "N5", "N6", "N7", "N8", "N9", "N10", "N11", "N12", "N13", "N14", "N15", "N16", "N17"}
 	if !slices.Equal(ids, want) {
 		t.Fatalf("matrix rows = %v, want %v", ids, want)
 	}
@@ -28,7 +28,7 @@ func TestRows_AreTheNineteenRowsOfSpec14InOrder(t *testing.T) {
 
 func TestRows_OnlyTheRowsOfLandedComponentsAreGreenAndEveryOpenRowNamesItsComponent(t *testing.T) {
 	t.Parallel()
-	greenBy := map[string]string{"M1": "X1", "N9": "X1", "N13": "X6", "N1": "X2", "N2": "X3", "N3": "X4", "N4": "X4", "M2": "X1b", "M3": "X1b", "M4": "X1b", "N12": "X8", "N5": "X5", "N6": "X5", "N7": "X5", "N8": "X5", "N10": "X7", "N11": "X7"}
+	greenBy := map[string]string{"M1": "X1", "N9": "X1", "N13": "X6", "N1": "X2", "N2": "X3", "N3": "X4", "N4": "X4", "M2": "X1b", "M3": "X1b", "M4": "X1b", "N12": "X8", "N5": "X5", "N6": "X5", "N7": "X5", "N8": "X5", "N10": "X7", "N11": "X7", "N15": "X5-CX2", "N16": "X5-CX3", "N17": "X5-CX3"}
 	for _, r := range Rows() {
 		closer, green := greenBy[r.ID]
 		if r.Open == green {

@@ -14,7 +14,7 @@ The source of truth is split by responsibility:
 
 ## Runtime calls and composition
 
-The arrows below are runtime calls, not Go imports. `cmd/evolve` is the composition root: it may import concrete phase packages, while Core depends on ports and must not import those implementations.
+The arrows below are runtime calls, not Go imports. `cmd/evolve` is the composition root: it is allowed to import concrete phase packages, while Core depends on ports and must not import those implementations.
 
 ```mermaid
 flowchart LR
@@ -64,9 +64,9 @@ The implementation keeps those responsibilities in one package while separating 
 | `cmd_loop_window.go` | boundary refresh plus fleet/pool dispatch |
 | `cmd_loop_sequential*.go` | sequential dispatch, observation, ledger verification, and breaker outcomes |
 
-The coordinator owns the mutable cross-iteration state. Extracted stages return a typed `batchDecision`; they do not terminate the process or introduce a second result object.
+The coordinator owns the mutable cross-iteration state. Extracted stages return a typed `batchDecision`; they do not stop the process or introduce a second result object.
 
-An interrupted batch is resumable. It may intentionally retain its worktree and checkpoint. A clean terminal batch destroys only resources it owns; inherited/operator tmux sockets and named REPL sessions have separate preservation rules.
+An interrupted batch is resumable. It is allowed to intentionally retain its worktree and checkpoint. A clean terminal batch destroys only resources it owns; inherited/operator tmux sockets and named REPL sessions have separate preservation rules.
 
 ## Cycle state machine
 
@@ -78,11 +78,11 @@ The built-in spine is:
 start → [intent] → scout → [triage] → [tdd] → [build-planner] → build → audit → ship → end
 ```
 
-Square brackets indicate policy- or content-selected phases. This compact line is not the complete transition graph:
+Square brackets show policy- or content-selected phases. This compact line is not the complete transition graph:
 
-- Scout and Triage may end early only when the deterministic early-exit floor says no shippable work exists. An explicit `triage-decision.json` with an empty array `top_n: []` supplies the commitment evidence; `null`, a missing field, a malformed decision, or any other shape is unknown and cannot authorize this path.
-- Audit FAIL may re-enter TDD or Build for a bounded repair, or route to Retrospective.
-- Ship failures may route through Debugger and retry stages allowed by the legal-successor graph.
+- Scout and Triage are allowed to end early only when the deterministic early-exit floor says no shippable work exists. An explicit `triage-decision.json` with an empty array `top_n: []` supplies the commitment evidence. `null`, a missing field, a malformed decision, or any other shape is unknown and cannot authorize this path.
+- Audit FAIL is allowed to re-enter TDD or Build for a bounded repair, or to route to Retrospective.
+- Ship failures are allowed to route through Debugger and retry stages allowed by the legal-successor graph.
 - Retrospective and post-Ship observer phases can be inserted by the router while the mandatory spine remains satisfied.
 
 Intent is optional by default. It runs when the workflow phase enable or cycle context requires it. `CycleState.IntentRequired` persists that choice so resume and fleet execution cannot silently choose a different start edge.
@@ -91,7 +91,7 @@ Intent is optional by default. It runs when the workflow phase enable or cycle c
 
 `Orchestrator.RunCycle` allocates the cycle/run workspace and constructs a `cycleRun`. The `cycleRun` files separate phase selection, dispatch, review, recording/branching, remediation, and closeout while sharing one cycle state. Dynamic routing may advise a successor, but the state-machine and mandatory-spine floors clamp the result before execution.
 
-At each iteration, Core first checks whether an enforce-stage parallel-evaluation batch begins at the selected phase. When it does, Core dispatches that batch and skips the sequential path. Otherwise the fresh sequential path:
+At each iteration, Core first checks if an enforce-stage parallel-evaluation batch begins at the selected phase. When it does, Core dispatches that batch and skips the sequential path. Otherwise the fresh sequential path:
 
 1. persists the phase start and dispatch context;
 2. dispatches through retry/fallback policy;
@@ -100,7 +100,9 @@ At each iteration, Core first checks whether an enforce-stage parallel-evaluatio
 5. performs remediation where the fresh lifecycle permits it;
 6. records the phase outcome, ledger evidence, and next branch.
 
-Static and dynamic routing both honor Triage's authorization boundary at every rollout stage. A failed Triage contract stops before TDD and remains FAIL, regardless of any decision sidecar. A PASS or WARN Triage with an explicit empty array stops as planned no-work. The host records that disposition in `CycleResult.TerminationReason`, and closeout reclassifies it only when Triage is the terminal phase and no implementation phase or prior floor ran. This separates artifact evidence from host authorization and prevents an empty or forged sidecar from erasing a genuine failure.
+Static and dynamic routing both honor the authorization boundary of Triage at every rollout stage. A failed Triage contract stops before TDD and remains FAIL, regardless of any decision sidecar. A PASS or WARN Triage with an explicit empty array stops as planned no-work. The host records that disposition in `CycleResult.TerminationReason`. Closeout reclassifies it only when Triage is the terminal phase and no implementation phase or prior floor ran.
+
+This separates artifact evidence from host authorization. It prevents an empty or forged sidecar from erasing a genuine failure.
 
 ### Resume execution
 
@@ -133,7 +135,7 @@ The registry contains mandatory spine phases and optional phases selected by pol
 | Retrospective | extract failure/success lessons | LLM | Routed | `retrospective-report.md` |
 | Memo | compact carryover context | LLM | Routed | `memo.md`, `carryover-todos.json` |
 
-The registry may contain additional optional or user-defined phases. Their presence does not make them mandatory. The router proposes a plan; Core validates the plan against legal successors, phase availability, mandatory anchors, phase contracts, and the Ship floor. Built-in runtime contracts in `go/internal/phasecontract` are authoritative for artifact validation. The registry's TDD output is pinned to the same `test-report.md` name so planning documentation and runtime polling do not drift.
+The registry is allowed to contain more optional or user-defined phases. Their presence does not make them mandatory. The router proposes a plan; Core validates the plan against legal successors, phase availability, mandatory anchors, phase contracts, and the Ship floor. Built-in runtime contracts in `go/internal/phasecontract` are authoritative for artifact validation. The registry's TDD output is pinned to the same `test-report.md` name so planning documentation and runtime polling do not drift.
 
 ## Shared phase runner
 
@@ -145,18 +147,18 @@ The runner performs one ordered execution pipeline:
 2. load the persona, body, profile, and deliverable contract;
 3. resolve policy pins, CLI/model tiers, capability and health ordering, and universal fallback;
 4. create one worktree fence around the entire fallback chain;
-5. dispatch candidates through `llmroute.DispatchTiered` with attempt-local overlays;
+5. dispatch candidates through `llmroute.DispatchTiered` with `attempt`-local overlays;
 6. restore the fence before any reconciliation or classification;
 7. reconcile a valid deliverable after an infrastructure teardown without trusting a stale artifact;
 8. classify verified artifact bytes once, apply deterministic floors, and write the cleaned output companion.
 
 `preparation.go`, `routing.go`, `dispatch.go`, `reconciliation.go`, and `classification.go` implement these stages. `BaseRunner.Run` remains the facade. One execution owns the worktree fence across the complete fallback chain, so a candidate transition cannot expose unguarded workspace state to reconciliation.
 
-When verification resolves the dispatched contracted artifact, its verified bytes are the verdict source. The existing verifier-error path keeps pane classification because contract well-formedness is then undetermined; explicit pathless or different-artifact contracts also retain their documented fallback. Bridge success without a valid mandatory artifact is a phase failure when verification completed; a valid fresh artifact may rescue only the explicitly supported infrastructure-teardown path.
+When verification resolves the dispatched contracted artifact, its verified bytes are the verdict source. The existing verifier-error path keeps pane classification, because contract well-formedness is then undetermined. Explicit pathless or different-artifact contracts also retain their documented fallback. Bridge success without a valid mandatory artifact is a phase failure when verification completed. A valid fresh artifact is allowed to rescue only the explicitly supported infrastructure-teardown path.
 
 ## Provider bridge and tmux REPL
 
-`go/internal/bridge.Engine` selects a driver from the configured CLI manifest. Native non-interactive and tmux REPL drivers return a common `BridgeResponse` with exit identity, artifact/log paths, model, token observations, and cost observations when the provider exposes them.
+`go/internal/bridge.Engine` selects a driver from the configured CLI manifest. Native non-interactive and tmux REPL drivers return a common `BridgeResponse`. It holds exit identity, artifact/log paths, model, token observations, and cost observations when the provider exposes them.
 
 The shared tmux REPL path has five conceptual stages:
 
@@ -164,23 +166,27 @@ The shared tmux REPL path has five conceptual stages:
 2. **Boot:** handle known interactive boot prompts until the manifest's readiness marker appears or the boot deadline expires.
 3. **Delivery:** capture the artifact baseline, paste the prompt with the provider-specific transport, and verify submission.
 4. **Wait:** poll completion evidence, pane liveness, quota/fatal/transient signatures, the live channel, and bounded review/nudge policy.
-5. **Capture/disposition:** perform the cancellation-detached final poll, capture raw and clean scrollback, map the terminal exit, release admission, and destroy or preserve the session according to its ownership.
+5. **Capture/disposition:** do the cancellation-detached final poll. Capture raw and clean scrollback. Map the terminal exit and release admission. Destroy or keep the session as its ownership requires.
 
 Those stages are implemented in `driver_tmux_prepare.go`, `driver_tmux_boot.go`, `driver_tmux_dispatch.go`, `driver_tmux_wait.go`, and `driver_tmux_channel.go`, with `driver_tmux_repl.go` retaining the ordered facade and final capture/disposition. The live-injection cursor establishes its EOF cutover before live-channel files are opened, so an envelope arriving during channel initialization remains observable.
 
-The completion wait remains an effectful state machine rather than a pure reducer. Its decisions depend on ordered pane captures, inbox drains, persistence gates, liveness aggregation, reviewer callbacks, prompt injection, clocks, and cancellation-detached final polling. Converting it to a pure transition table would require a new event model and could change fixture consumption and timing. The current boundary isolates the state machine for focused follow-up without claiming that design change as part of this behavior-preserving extraction.
+The completion wait remains an effectful state machine rather than a pure reducer. Its decisions depend on ordered pane captures, inbox drains, persistence gates, liveness aggregation, reviewer callbacks, prompt injection, clocks, and cancellation-detached final polling. A hypothetical conversion to a pure transition table needs a new event model. Such a conversion can change fixture consumption and timing. The current boundary isolates the state machine for focused follow-up without claiming that design change as part of this behavior-preserving extraction.
 
 Artifact completion, provider exhaustion, a dead/fatal pane, cancellation, transient upstream failure, and timeout are distinct terminal outcomes. Named sessions intentionally survive a launch so an allowed caller can resume them; ephemeral sessions are destroyed. Cleanup uses a detached bounded context because the request context is often already cancelled on the path that most needs cleanup.
 
 ## Review, correction, and tree integrity
 
-Core reviews every non-skipped deliverable before recording success — on both loops, and for the remediation re-run of a gate phase (ADR-0100 closed the two paths that bypassed review). The contract gate judges the primary artifact's shape and, since ADR-0100, every **agent-owed** secondary the registry declares (`outputs.agent_owed`: exists, non-empty, parses if JSON/NDJSON); harness-produced secondaries (`outputs.harness_produced`, e.g. `acs-verdict.json`) are never demanded of an agent. Since slice 2 it also judges every declared **effect** (`phases[].effects`): triage's `inbox-claim` is satisfied only when each committed inbox item sits under this cycle's `processing/cycle-N/` (`missing_effect` otherwise; `unbound_effect` for a declared name with no check). Ordering is load-bearing:
+Core reviews every non-skipped deliverable before it records success. This applies on both loops, and to the remediation re-run of a gate phase (ADR-0100 closed the two paths that bypassed review).
+
+The contract gate judges the shape of the primary artifact. Since ADR-0100, it also judges every **agent-owed** secondary that the registry declares (`outputs.agent_owed`: exists, non-empty, parses if JSON/NDJSON). The gate never demands harness-produced secondaries (`outputs.harness_produced`, for example `acs-verdict.json`) of an agent.
+
+Since slice 2 the gate also judges every declared **effect** (`phases[].effects`). The `inbox-claim` of triage is satisfied only when each committed inbox item sits under the `processing/cycle-N/` of this cycle. Otherwise the result is `missing_effect`. A declared name with no check gives `unbound_effect`. Ordering is load-bearing:
 
 ```text
 recover escaped writes → host normalization → review → optional correction → recover/normalize again → re-review
 ```
 
-A correction uses `interaction.NextCorrection` to choose a bounded rung: salvage, live fix when supported, recover (the recovery agent, when the violation is repairable; ADR-0106), or redispatch. A redispatch may use a different CLI family only for the configured repeated-identical contract block. Temporary correction directives and routing overrides are restored before leaving the ladder.
+A correction uses `interaction.NextCorrection` to choose a bounded rung. The rungs are salvage, live fix when supported, recover (the recovery agent, when the violation is repairable; ADR-0106), and redispatch. A redispatch is allowed to use a different CLI family only for the configured repeated-identical contract block. Temporary correction directives and routing overrides are restored before leaving the ladder.
 
 Only after approval does Core refresh explanation evidence when required, latch Ship success, and run the final tree-diff guard. Registered minted paths and sanctioned generated binary churn have explicit handling; an unregistered source leak aborts rather than being converted to a warning.
 
@@ -193,10 +199,10 @@ Audit combines agent judgment with host-owned evidence. Host gates outrank narra
 3. regenerate and read host predicate evidence;
 4. execute supporting repository gates and reconcile continuation and closure evidence;
 5. write verdict-conflict diagnostics, apply strict-audit promotion, then emit defect-ledger records;
-6. invoke the late evidence-seal callback, which may still force the returned verdict to FAIL;
+6. invoke the late evidence-seal callback, which can still force the returned verdict to FAIL;
 7. record shadow chain reasoning.
 
-`classification.go` parses the narrative disposition and prepares evidence, `gates.go` executes repository and CI gates, and `disposition.go` reconciles continuation/closure evidence and applies the final ordered disposition. `hooks.Classify` is the facade. Diagnostic severity and blocking authority remain separate values; a warning label alone never determines whether a gate blocks.
+`classification.go` parses the narrative disposition and prepares evidence, `gates.go` executes repository and CI gates, and `disposition.go` reconciles continuation/closure evidence and applies the final ordered disposition. `hooks.Classify` is the facade. Diagnostic severity and blocking authority remain separate values; a warning label alone never determines if a gate blocks.
 
 Host predicate execution errors fail closed. Some unavailable local checks, including the documented gofmt and solution-check paths, emit a warning without changing the verdict. Code must represent this blocking disposition separately from diagnostic severity; the word `WARN` alone does not define authority.
 
@@ -237,14 +243,21 @@ The following ownership dispositions are intentionally different:
 
 Fleet lanes use run-scoped state and worktrees. Wave boundaries refresh from the integration head; divergence halts rather than merging in the dispatcher. Git integration remains serialized by the Ship lock even when phase work runs concurrently.
 
-The sequential loop verifier recognizes the same planned no-work path only when the returned result carries the host-owned Triage no-work reason, ends at Triage, records no implementation phase, and the decision artifact still parses as an explicit empty array. It then requires successful Scout and Triage ledger entries, plus Intent when the cycle required it. It does not require Builder, Auditor, or Memo for that shortened chain. The ordinary verification floor remains Scout, Builder, and Auditor, with its existing optional Intent and PASS-Memo requirements. This keeps an artifact alone from weakening the ledger floor.
+The sequential loop verifier recognizes the same planned no-work path only under four conditions:
+
+- The returned result carries the host-owned Triage no-work reason.
+- The result ends at Triage.
+- The result records no implementation phase.
+- The decision artifact still parses as an explicit empty array.
+
+The verifier then requires successful Scout and Triage ledger entries, plus Intent when the cycle required it. It does not require Builder, Auditor, or Memo for that shortened chain. The ordinary verification floor remains Scout, Builder, and Auditor, with its existing optional Intent and PASS-Memo requirements. This keeps an artifact alone from weakening the ledger floor.
 
 ## Configuration resolution timing
 
 Configuration is not uniformly immutable. Preserve each setting's current lifetime:
 
 - Routing registry and most workflow/retry settings are resolved into the orchestrator or cycle snapshot.
-- Per-phase policy pins and model routing are resolved for the phase/attempt scope.
+- Per-phase policy pins and model routing are resolved for the phase/`attempt` scope.
 - `policy.StrictAuditFor` deliberately reloads project policy at its call site.
 - Cycle context and environment maps carry state across phases and are intentionally mutable at defined Core boundaries.
 - Provider token and cost fields are observations. Cost can be absent or cost-blind and is not a universal enforcement budget.
@@ -265,7 +278,12 @@ Unit tests use real package logic and fake only process boundaries such as tmux,
 - package race tests for session, fence, lease, and shared-state ownership;
 - repository-wide `go vet`, Go tests, and the native commit gate.
 
-Live model calls are end-to-end validation, not unit-test dependencies. A completed live run is useful only when its artifacts share one run/tree identity, its material change passes the normal gates, its telemetry is honest about unavailable fields, and every resource reaches its documented disposition.
+Live model calls are end-to-end validation, not unit-test dependencies. A completed live run is useful only under four conditions:
+
+- Its artifacts share one run/tree identity.
+- Its material change passes the normal gates.
+- Its telemetry is honest about unavailable fields.
+- Every resource reaches its documented disposition.
 
 ## Reading order
 

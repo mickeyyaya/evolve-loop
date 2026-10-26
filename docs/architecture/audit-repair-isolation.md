@@ -2,8 +2,8 @@
 
 The September 9 live verification batch exposed a conflict between two existing
 Audit mechanisms. The read-only content fence restored the dispatched Builder
-tree, then the legacy probe quarantine used the first Audit's timestamp to
-remove a legitimate test created by a later repair. In cycle 1618, the
+tree. Then the legacy probe quarantine used the timestamp of the first Audit to
+remove a legitimate test that a later repair created. In cycle 1618, the
 quarantined `commitment_example_test.go` exactly matched its staged Builder blob
 `00bc6977c19e64badac03d9d560a65ef7b1189c9`.
 
@@ -40,18 +40,20 @@ confirms a completed Ship.
 
 Ledger skip appends can occur in evaluate workers through the synchronized
 ledger. Cycle state and phase-completion records remain serial. A failed Audit
-still emits its rejected binding but takes no shipping lease; PASS/WARN retain
-the lease across binding and shipping, releasing it at the next completed
-non-Audit phase.
+still emits its rejected binding but takes no shipping lease. PASS/WARN retain
+the lease across binding and shipping. The next completed non-Audit phase
+releases the lease.
 
 A missing persona doc is the deterministic member of that class. Since
-2026-09-10 the orchestrator learns it without a retrospective agent: the failed
-record, the carryover todo, the failure digest and the lesson artifact are
-written exactly as for any failure, and no LLM is dispatched — the sentinel
-already names the cause and the remedy, and cycles 1619 and 1620 had spent
-344 and 311 seconds of a deep-tier agent discovering nothing beyond it. The
-same absence is excluded from selectable plans before dispatch
-(dynamic-phase-routing.md, "Unavailable-phase drop"), so the skip path is the
+2026-09-10 the orchestrator learns it without a retrospective agent. The
+failed record, the carryover todo, the failure digest and the lesson artifact
+are written exactly as for any failure. No LLM is dispatched.
+
+The sentinel
+already names the cause and the remedy. Cycles 1619 and 1620 had spent
+344 and 311 seconds of a deep-tier agent that discovered nothing beyond it.
+The same absence is excluded from selectable plans before dispatch
+(dynamic-phase-routing.md, "Unavailable-phase drop"). Thus the skip path is the
 fallback for a persona that vanishes mid-cycle, not the steady state.
 
 

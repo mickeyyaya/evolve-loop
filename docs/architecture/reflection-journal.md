@@ -7,14 +7,14 @@
 
 ## Why this exists
 
-Before v10.20.0, friction the phase agents felt — research-tool quota hits, profile restrictions, ambiguous upstream artifacts, context saturation — only surfaced *after* it caused an audit FAIL/WARN, when the retrospective agent dug it out post-mortem. PASS cycles dropped the signal entirely. There was no operator-facing surface that said "Builder hit the same tool-error trap 4 cycles in a row" until someone noticed by hand-comparing reports.
+Before v10.20.0, the phase agents felt friction: research-tool quota hits, profile restrictions, ambiguous upstream artifacts, context saturation. This friction surfaced only *after* it caused an audit FAIL/WARN. Then the retrospective agent dug it out post-mortem. PASS cycles dropped the signal entirely. There was no operator-facing surface that said "Builder hit the same tool-error trap 4 cycles in a row" until someone noticed by hand-comparing reports.
 
 The Reflection Journal closes that gap with two complementary surfaces per cycle:
 
-1. **Per-phase markdown** (`## Reflection` section appended to each phase's primary report) — human-readable summary of friction with cited evidence, intended for operator scan.
+1. **Per-phase markdown** (`## Reflection` section in the primary report of each phase). It is a human-readable summary of friction with cited evidence, for operator scan.
 2. **Per-phase YAML sidecar** (`<phase>-reflection.yaml`) — flat, jq-greppable schema consumed by `aggregate-reflections.sh` for cross-cycle pattern detection.
 
-The new every-cycle `evolve-reflector` agent produces a `learn/reflector-synthesis.md` that retrospective (FAIL/WARN) and memo (PASS) both consume — meaning every cycle ends with one operator-visible "what could be improved" rollup independent of verdict.
+The new every-cycle `evolve-reflector` agent produces a `learn/reflector-synthesis.md`. Retrospective (FAIL/WARN) and memo (PASS) both consume it. Thus every cycle ends with one operator-visible "what could be improved" rollup, independent of verdict.
 
 ## Design tenets
 
@@ -76,19 +76,22 @@ Matches the `EVOLVE_BUILD_PLANNER` precedent in [control-flags.md](control-flags
 | Stage | Version | Default | Behavior |
 |-------|---------|---------|----------|
 | **advisory** | v10.20.0 | `EVOLVE_REFLECTION_JOURNAL=1` | All 9 phase agents emit reflections; reflector + retrospective + memo consume YAML. Missing YAML → WARN line in `learn/reflector-synthesis.md`, no FAIL. |
-| **enforce** | v10.21.0 | unchanged default-on; opt-out via `=0` for emergencies | `phase-gate.sh check_reflection_artifact` blocks each `gate_<phase>_to_<next>` on presence of `<phase>-reflection.yaml`. Absent = exit 1, BLOCK. Promotion criterion: 3 consecutive cycles where ≥80% of phases emit valid reflections AND token overhead ≤ 800 tokens/cycle. |
+| **enforce** | v10.21.0 | unchanged default-on; opt-out with `=0` for emergencies | `phase-gate.sh check_reflection_artifact` blocks each `gate_<phase>_to_<next>` on presence of `<phase>-reflection.yaml`. Absent = exit 1, BLOCK. Promotion criterion: 3 consecutive cycles where ≥80% of phases emit valid reflections AND token overhead ≤ 800 tokens/cycle. |
 
 ## Anti-sycophancy rationale
 
 Reflection systems that ask agents "how did it go?" reliably produce noise — "everything went smoothly" said by every agent every cycle, drowning the rare genuine signal. Three guardrails prevent that:
 
-1. **Required positive-evidence framing:** the `## Reflection` instruction text mandates that "phase went smoothly" is only valid when `phase_smooth: true` is asserted AND `phase_tracker_refs` shows cost/turns within budget. Affirmation without evidence is a defect, not a default.
+1. **Required positive-evidence framing:** the `## Reflection` instruction text mandates a rule. "Phase went smoothly" is valid only when `phase_smooth: true` is asserted AND `phase_tracker_refs` shows cost/turns within budget. Affirmation without evidence is a defect, not a default.
 
-2. **Auditor enforcement (MEDIUM, advisory):** the Auditor agent's existing defect-detection pipeline gets a new check: empty `slowdowns[]` + `phase_smooth: false` (or absent) OR `reflection_confidence < 0.3` → emit `reflection-sycophancy` defect at severity MEDIUM. EGPS only blocks ship on `red_count == 0`, so MEDIUM surfaces in the audit report without weaponizing the gate against truly smooth phases.
+2. **Auditor enforcement (MEDIUM, advisory):** the existing defect-detection pipeline of the Auditor agent gets a new check.
+   - The check fires on empty `slowdowns[]` + `phase_smooth: false` (or absent) OR `reflection_confidence < 0.3`.
+   - The check emits a `reflection-sycophancy` defect at severity MEDIUM.
+   - EGPS blocks ship only on `red_count == 0`. Thus MEDIUM shows in the audit report and does not turn the gate against truly smooth phases.
 
 3. **Aggregator confidence filter:** `reflection_confidence < 0.5` reflections silently excluded from `aggregate-reflections.sh` tallies. A confident "I'm not sure what slowed me down" remains visible in the per-cycle synthesis but won't pollute cross-cycle pattern detection.
 
-These three combined are calibrated, not draconian: a phase that genuinely runs smoothly can attest to it (and remain unflagged), but the asymmetry favors surfacing friction over hiding it.
+These three combined are calibrated, not draconian. A phase that genuinely runs smoothly can attest to it (and remain unflagged). The asymmetry favors showing friction over hiding it.
 
 ## What this is NOT
 
