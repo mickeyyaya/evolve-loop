@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "RED first: evolve guidance check passes a task skill with no eval before the change",
+    "Each eval has 8 queries that must load the skill and 8 that must not",
+    "Each task skill of design \u00a76 has its eval file",
+    "The check fails for a task skill with no eval"
+  ],
+  "created_at": "2026-10-26T18:07:00Z",
+  "deps": [
+    "guidance-registry-index-and-check"
+  ],
+  "files": [
+    "skills/"
+  ],
+  "fix": "Add 8 queries that must load each task skill and 8 queries that must not load it. Make evolve guidance check refuse a task skill with no eval.",
+  "id": "guidance-skill-trigger-evals",
+  "kind": "feature",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "source": "console, 2026-10-26, operator: \"Extract the common rules, policies from claude / gemini / codex / ollama / etc... and build a structured system level indexes MD file to be loaded dynamically in the run time.\" Design: docs/architecture/guidance-layers.md \u00a710; plan docs/plans/guidance-layers-2026-10.md \u00a74 and \u00a79 (ADR-0145).",
+  "summary": "A skill that the model must choose was not loaded in 56% of cases in one eval (research S3). Plan D9.",
+  "title": "Guidance G6: a trigger eval for each task skill",
+  "weight": 0.35
+}

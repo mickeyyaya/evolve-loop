@@ -1,6 +1,6 @@
 # Guidance layers
 
-- **Status:** design of record, proposed 2026-10-20.
+- **Status:** design of record, proposed 2026-10-20. §10 (the runtime index) added on 2026-10-26.
 - **Decision:** [ADR-0145](adr/0145-each-rule-has-one-home-and-loads-by-audience-path-action-or-failure.md). **Plan:** [guidance-layers-2026-10](../plans/guidance-layers-2026-10.md). **Research:** [guidance-layers-2026-10](../research/guidance-layers-2026-10.md).
 
 ## Table of contents
@@ -14,6 +14,7 @@
 - [7. The checks](#7-the-checks)
 - [8. The life of a rule](#8-the-life-of-a-rule)
 - [9. A worked example](#9-a-worked-example)
+- [10. The runtime index](#10-the-runtime-index)
 
 ## 1. The model
 
@@ -80,6 +81,9 @@ Why: the reason, in one or two sentences.
 - `enforced_by` names the check. A rule with a check shows one line and the pointer.
 - `status` is `active`, `superseded` or `retired`. Only active rules reach a layer.
 - `conflicts_with` names a rule that must never be active at the same time. The check refuses two such active rules.
+- `phases` (optional) names the phases that need the rule. An empty list means each phase.
+- `order` (optional) is a positive number that sets the place of the rule in its layer, lowest first. L0 uses it to put the costliest rule first.
+- `families` (optional) names the model families that need the rule (`claude`, `gemini`, `gpt`, `local`, as the bridge manifests name them). An empty list means each family. The field selects; it never holds a fact of a family (§10.4).
 
 `evolve guidance build` writes the layers:
 
@@ -179,3 +183,142 @@ On 2026-10-19 two subagents piped the commit gate through `tail`, so a FAIL exit
   - the action hook adds the `commit-ship` checklist to the console when `git commit` starts;
   - the generator puts the rule into the `agent-brief` skill, so each brief restates it;
   - a later check can refuse a piped gate in the commit hook. Then the rule shows one line and `enforced by` that hook.
+
+## 10. The runtime index
+
+The plan decisions are D12 to D19 ([plan §9](../plans/guidance-layers-2026-10.md#9-the-runtime-index-2026-10-26)). The facts are in research §5.
+
+### 10.1 What an agent sees
+
+An agent of any family starts with L0 and one pointer line. When its task needs more, it reads the index, finds the rows of its case, and opens only those bodies.
+
+```mermaid
+flowchart LR
+    R["guidance/rules/*.md<br/>(the registry)"] --> B["evolve guidance build"]
+    B --> I["guidance/index.md<br/>guidance/index.json"]
+    B --> A["AGENTS.md digest:<br/>GENERATED:guidance-l0 region"]
+    A --> S["evolve skills generate (X10)"]
+    S --> C["CLAUDE.md, GEMINI.md"]
+    A --> X["codex, agy read AGENTS.md"]
+    A --> O["the bridge injects it<br/>for a family with no file"]
+    I --> V["evolve guidance index<br/>--audience --phase --cli --json"]
+```
+
+The order of the generators is fixed: `evolve guidance build`, then `evolve skills generate`, then `evolve guidance check` and `evolve skills check`. A change of L0 thus reaches `CLAUDE.md` and `GEMINI.md` in the same commit. The CI runs both checks, so a missed step fails.
+
+| Carrier | Family | What it holds | Who writes it |
+|---|---|---|---|
+| `AGENTS.md`, the `GENERATED:guidance-l0` region inside the digest | codex, agy, and each CLI that reads `AGENTS.md` | the L0 statements and the pointer line | `evolve guidance build` |
+| `CLAUDE.md`, `GEMINI.md` | Claude Code; Gemini CLI and legacy agy | a copy of the digest, so the same region | `evolve skills generate` (X10) |
+| the `## Rules` prefix of the prompt | a family with no file, such as Ollama | the same region (G9) | the bridge |
+| `guidance/index.md` | each family, on demand | one row for each active rule | `evolve guidance build` |
+| `guidance/index.json` | each tool, and the context index of a cell (§10.6) | the same rows as data | `evolve guidance build` |
+| `guidance/rules/<id>.md` | each family, on demand | the body: the why, the evidence | a person, through a reviewed PR |
+
+The pointer line is: "The full rule set is in `guidance/index.md`; run `evolve guidance index --audience <you>` to list the rules of your case."
+
+### 10.2 The index file
+
+`guidance/index.md` is generated. No one edits it by hand. It has one section for each layer, in the order L0 to L4, and one table in each section:
+
+| Column | Content |
+|---|---|
+| id | the rule id, a link to its body |
+| summary | the statement of 25 words or fewer |
+| audience | the audience list, or `all` |
+| families | the family list, or `all` |
+| triggers | the paths, actions, tasks and failures, or `—` |
+| enforced by | the check paths, or `—` |
+
+The rows of a layer are in the order of the registry. The order of an L0 rule is its field `order` (a number, lowest first), so the costliest rule comes first. A rule with no `order` comes after, by id.
+
+`guidance/index.json` holds the same rows as entries. The first seven fields are the shared entry fields of the context index of a cell (§10.6). Thus one schema covers a rule and a data artifact:
+
+| Field | Content |
+|---|---|
+| `id` | the rule id |
+| `layer` | `L0` to `L4` |
+| `kind` | `rule` for each entry of this file |
+| `summary` | the `statement` field of the rule file, 25 words or fewer |
+| `bytes` | the size of the body file, so a reader knows the cost before it opens the body |
+| `path` | the body file, relative to the repository root |
+| `audience` | the audience list (who the entry applies to) |
+| `families`, `phases` | the selectors of §4; an empty list means each |
+| `triggers`, `enforced_by` | the fields of §4 that only a rule has |
+
+```json
+{
+  "schema": "evolve.guidance.index-file/1",
+  "entries": [
+    {
+      "id": "kill-guard-never-mutated",
+      "layer": "L0",
+      "kind": "rule",
+      "summary": "Never mutate or run a live kill guard ...",
+      "bytes": 612,
+      "path": "guidance/rules/kill-guard-never-mutated.md",
+      "audience": ["all"],
+      "families": [],
+      "phases": [],
+      "triggers": {"paths": [], "actions": [], "tasks": [], "failures": []},
+      "enforced_by": []
+    }
+  ]
+}
+```
+
+Both files are byte-stable: a second build changes nothing.
+
+### 10.3 The verb
+
+`evolve guidance index [--audience X] [--phase P] [--cli F] [--json] [--project-root R]` prints the active rules that match each given filter.
+
+| Flag | A rule matches when |
+|---|---|
+| `--audience X` | its audience has `X` or `all`. `X` is one of `all`, `console`, `phase`, `reviewer`, `brief`. |
+| `--phase P` | its `phases` list is empty or has `P` |
+| `--cli F` | its `families` list is empty or has the model family of the CLI `F`, from the bridge manifest of `F` |
+
+- The verb is of class `always` and agent class `A` ([cli-contract.md](cli-contract.md) §4, §4.1). It reads only, and it works while a wave runs. `evolve guidance check` has the same classes.
+- `evolve guidance build` writes tracked files, so it is not an `always` verb. It is a tool of the operator outside the core verbs, as `evolve skills generate` is, and its agent class is `D`. A cell gets the rules from the index, never from a build.
+- With `--json`, the verb prints the envelope on each exit, also on a usage error.
+- Without `--json` it prints the rows as a Markdown table, grouped by layer.
+- With `--json` it prints one envelope with the schema `evolve.guidance.index/1`. Its `data` has the field `filter` (the flag values and the resolved family) and the field `entries` (the entries of §10.2).
+
+| Exit | Name | When |
+|---|---|---|
+| 0 | `ok` | the rows printed; a filter that matches no rule prints an empty list |
+| 2 | `io` | the registry directory cannot be read |
+| 10 | `usage` | an unknown flag, a stray word, an unknown audience, or a CLI with no bridge manifest |
+| 11 | `input` | a registry file does not decode strictly; the verb names the file and the field |
+
+`evolve guidance build` exits 0 after a write or when each output is current. It exits 2 on an I/O error and 11 on a bad registry file. `evolve guidance check` exits 0 when it finds no problem and 2 on an I/O error. It exits 1 when it finds a problem, and it prints one line on stderr for each problem. A registry file that does not decode is a problem of the check.
+
+### 10.4 Family facts stay in the driver layer
+
+A registry rule is neutral. It names no tool of one CLI, no instruction file and no flag of a CLI. These facts live in the driver layer:
+
+- the hand-written CLI overlay of `CLAUDE.md` and `GEMINI.md` (outside the X10 region);
+- the bridge manifest of each CLI (`go/internal/bridge/manifests/`), which names its instruction file or `inject` (G9);
+- the routing data of `cli_routing`, for the model of each seat.
+
+The field `families` selects a rule for some families. It does not hold the fact of a family. An L0 rule has an empty `families` list, because L0 applies to every agent.
+
+### 10.5 The checks of the index
+
+The check of §7 also fails on these:
+
+- `guidance/index.md`, `guidance/index.json` or the L0 region of `AGENTS.md` differs from a fresh build;
+- an L0 rule with a non-empty `families` list;
+- a `families` value that no bridge manifest names;
+- an unknown field in a registry file, or a required field that is absent.
+
+### 10.6 The consumer: the context index of a cell
+
+The rule index is the knowledge layer of the context index of each cell. A separate design extends the `inputs/index.json` of X5 (#1133) into a layered context index for the data that a phase agent reads. That index reads `guidance/index.json` as its knowledge layer. That design owns the wiring into the cell. This design only keeps the entry fields of §10.2 stable.
+
+The spec of that design is `docs/architecture/cell-context-index.md` (PR #1139). It uses two kinds of layer, and the words differ:
+
+- The `layer` of an entry of `guidance/index.json` is the rule layer of §2 (L0 to L4).
+- The cell index puts each kept rule row into its context layer `L3` (knowledge, reference only). It moves the rule layer to the field `rule_layer`, and it sets `layer` to `L3`.
+- The cell index copies `rule_layer` and `audience` from the row and never changes them. It keeps the rows for the audience `phase`, the phase name and the family of the seat.

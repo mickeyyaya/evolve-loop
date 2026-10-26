@@ -1,6 +1,6 @@
 # Research: how the rules reach the agent that needs them
 
-- **Status:** complete, 2026-10-20.
+- **Status:** complete, 2026-10-20. Section 5 adds a refresh of current practice on 2026-10-26, for the runtime index.
 - **Plan:** [guidance-layers-2026-10](../plans/guidance-layers-2026-10.md). **Decision:** [ADR-0145](../architecture/adr/0145-each-rule-has-one-home-and-loads-by-audience-path-action-or-failure.md). **Design:** [guidance-layers](../architecture/guidance-layers.md).
 - **Method:**
   - a read-only inventory of every rule source of the project, the user rules and the memory files, on 2026-10-20;
@@ -13,6 +13,7 @@
 - [2. Local evidence](#2-local-evidence)
 - [3. Current practice](#3-current-practice)
 - [4. Limits](#4-limits)
+- [5. Refresh: the instruction file of each CLI (2026-10-26)](#5-refresh-the-instruction-file-of-each-cli-2026-10-26)
 
 ## Terms used throughout
 
@@ -151,3 +152,70 @@ Source: [skill-creator](https://raw.githubusercontent.com/anthropics/skills/main
 - The phase agents' exact loaded text was inferred from the launch flags and the bridge code, not captured from a run.
 - The Vercel result (S3) is one vendor eval. The Factory result is a vendor report, and the OpenAI page was read only through a summary.
 - It is not confirmed that the installed Claude Code version emits PreToolUse `additionalContext` to the model (plan §3, D4).
+
+## 5. Refresh: the instruction file of each CLI (2026-10-26)
+
+### The request
+
+The operator asked on 2026-10-26: "Extract the common rules, policies from claude / gemini / codex / ollama / etc... and build a structured system level indexes MD file to be loaded dynamically in the run time."
+
+The searches ran live on 2026-10-26. "acc." marks a page with no date of its own. The plan turns these facts into the runtime index ([plan §9](../plans/guidance-layers-2026-10.md#9-the-runtime-index-2026-10-26)).
+
+### How each CLI loads its instructions
+
+**S12** Claude Code reads `CLAUDE.md` at each session start. The guidance is under 200 lines for each file. An `@path` import loads at launch with the file that names it, so an import does not reduce the context cost. The import depth is at most four hops.
+
+A file in `.claude/rules/` without `paths:` loads at launch. A file with `paths:` loads when Claude reads a matching file. Claude Code reads `AGENTS.md` natively only when no `CLAUDE.md` exists in the working directory or above it (v2.1.277 or later).
+
+The option `instructionFiles: claude-md-and-agents-md` loads both files. Claude Code reads that option from the user or managed settings only, not from the project settings ([memory docs](https://code.claude.com/docs/en/memory), acc.).
+*Implication:* the project cannot make Claude Code read `AGENTS.md` beside `CLAUDE.md` from a project setting. A rendered `CLAUDE.md` (X10) stays the carrier for Claude Code.
+
+**S13** Gemini CLI sends three layers with each prompt. They are the global `~/.gemini/GEMINI.md`, the workspace files and their parents, and the just-in-time files of each path that a tool touches. The setting `context.fileName` takes one name or a list, and the list can name `AGENTS.md`. The page says that Antigravity CLI replaced Gemini CLI on 2026-06-18 ([GEMINI.md docs](https://geminicli.com/docs/cli/gemini-md), acc.).
+
+**S14** Antigravity CLI (`agy`) reads `AGENTS.md` and keeps the legacy `GEMINI.md` for backward compatibility. Antigravity rules sit in `.agents/rules/` (the older `.agent/rules/` still loads). The frontmatter of each rule sets one trigger: always on, a glob, a model decision or a manual mention ([Antigravity rules](https://antigravity.google/docs/rules-workflows), acc.). The CLI migration notes are third-party pages ([inventivehq](https://inventivehq.com/blog/gemini-cli-deprecated-antigravity-cli-migration), acc.).
+*Implication:* the four triggers of Antigravity rules are the same four tiers as S7. The neutral source is `AGENTS.md`.
+
+**S15** Codex CLI reads the first non-empty global file in `~/.codex`. Then it walks from the project root to the working directory and reads one file in each directory. The order is `AGENTS.override.md`, `AGENTS.md`, then the names in `project_doc_fallback_filenames`. It concatenates the files from the root down, so the nearest file comes last.
+
+The cap `project_doc_max_bytes` is 32 KiB for all the files together, and Codex stops when it reaches the cap ([Codex AGENTS.md guide](https://developers.openai.com/codex/guides/agents-md), acc.). On 2026-10-26 the OpenAI page redirected with HTTP 308 to `learn.chatgpt.com`.
+*Implication:* Codex reads only the first 32,768 bytes of the instructions of this repository. A rule after that byte does not reach a Codex agent.
+
+**S16** Ollama has no instruction file. The `SYSTEM` instruction of a Modelfile sets the system message of the model template ([Modelfile](https://docs.ollama.com/modelfile), acc.). The `/api/chat` request accepts a message with the role `system` ([chat API](https://docs.ollama.com/api/chat), acc.). Neither page says how a request system message combines with the Modelfile `SYSTEM`.
+*Implication:* for a family with no instruction file, the driver must inject the always-on rules into the prompt.
+
+### The cross-vendor standard
+
+**S17** `AGENTS.md` is plain Markdown with no required fields. The nearest file in the directory tree wins, and an explicit instruction in the chat prompt overrides each file. The Agentic AI Foundation under the Linux Foundation stewards the format ([agents.md](https://agents.md/), acc.; [OpenAI](https://openai.com/index/agentic-ai-foundation/), 2025-12-09). A foundation post says that the file is guidance, not enforcement, so CI and sandboxes stay necessary ([AAIF](https://aaif.io/blog/measuring-agents-md-what-five-runs-show-that-one-doesn-t), acc.).
+*Implication:* `AGENTS.md` is the neutral source that the most CLIs read, and a check in code still holds each rule that must hold (S10).
+
+### Load on demand
+
+**S18** Thoughtworks names "progressive context disclosure" as a technique of context engineering. The agent first reads a light catalog. It loads the detail only when the task needs it. The entry warns that a long list of DO and DO NOT rules lowers performance ([Technology Radar vol. 34](https://www.thoughtworks.com/radar/techniques/progressive-context-disclosure), 2026-04-15).
+
+*Implication:* current practice for many rules is an index of one line for each rule, with a body that loads on demand (S1, S3, S18).
+
+### What this means for the repository
+
+**F5.1** The four CLI families load instructions in three ways:
+
+| Family | Always-on file | Loader in this repository | Cap |
+|---|---|---|---|
+| Claude Code | `CLAUDE.md` (reads `AGENTS.md` only when no `CLAUDE.md` exists) | the rendered `CLAUDE.md` of X10 | under 200 lines (guidance) |
+| Antigravity (`agy`), Gemini CLI | `AGENTS.md`, legacy `GEMINI.md` | `AGENTS.md`, and the rendered `GEMINI.md` of X10 | none found on an official page |
+| Codex | `AGENTS.md` (or `AGENTS.override.md`) | `AGENTS.md` | 32 KiB for all files |
+| Ollama | none | none today (F5.3). The injection point is the `## Rules` prefix of the prompt (`go/internal/adapters/bridge/bridge.go:159`, `injectRulesPrefix`). | the context window of the model |
+
+*Implication:* the common carrier is a short always-on part plus a pointer to an index. Each family gets the same part, by its own loader.
+
+**F5.2** The `AGENTS.md` of #1136 (X10) is 50,571 bytes and 434 lines (measured on `origin/docs/x10-neutral-instructions`, 2026-10-26). Its byte 32,768 falls on line 303, so a Codex agent does not read the sections after "Shared Constraints", such as "Operating rules and runtime facts". The digest region ends at byte 6,033, so Codex reads all of it. X10 sets a byte budget for `CLAUDE.md` and `GEMINI.md` only.
+*Implication:* the full rules cannot stay in `AGENTS.md`. They move to registry bodies that an agent reads through the index, and `AGENTS.md` needs a byte budget of its own.
+
+**F5.3** No bridge manifest names the instruction file of its CLI. Each manifest in `go/internal/bridge/manifests/` has `cli`, `model_family`, `transport` and the controls (`origin/main` at `f6b8a7ab0`). No field names the file that the CLI reads.
+ No profile sets `system_prompt` today (0 of 95 files in `.evolve/profiles/`), so the `## Rules` prefix is empty for each phase.
+*Implication:* a family with no file, such as Ollama, gets no always-on rules today. The driver layer needs one fact for each CLI: the file it reads, or "inject".
+
+### Limits of the refresh
+
+- The Antigravity CLI pages that describe `AGENTS.md` and `GEMINI.md` are third-party. The official rules page covers the IDE rules.
+- The Ollama pages do not say how the request system message and the Modelfile `SYSTEM` combine.
+- S18 is a technique radar entry, not a measurement.

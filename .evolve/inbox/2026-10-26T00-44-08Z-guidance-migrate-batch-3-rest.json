@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "Each batch-3 memory rule is a registry file, a merge, a retirement with its reason, or a driver-layer fact",
+    "evolve guidance check passes",
+    "Each of the 3 routing-data rules is in cli_routing or has an inbox item, and its memory file is retired",
+    "The outcome list of plan \u00a79.1 covers all 143 memory feedback files, with no file unassigned. Batch 3 resolves its 50 rules and 13 retirements"
+  ],
+  "created_at": "2026-10-26T18:06:00Z",
+  "deps": [
+    "guidance-migrate-batch-2-commit-boundary",
+    "guidance-driver-instruction-loader"
+  ],
+  "files": [
+    "guidance/rules/",
+    "AGENTS.md"
+  ],
+  "fix": "Move the batch-3 rows of plan \u00a79.1 into the registry, retire the 13 rules of the Retire row with their reason. The 8 family-specific rules move in guidance-driver-instruction-loader; this item only confirms that no copy of them is left. Confirm that the 3 routing-data rules (test_lanes_on_sonnet, comment_removal_on_haiku, advisor_opus_deep_reasoning) are in cli_routing, then retire them.",
+  "id": "guidance-migrate-batch-3-rest",
+  "kind": "feature",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "source": "console, 2026-10-26, operator: \"Extract the common rules, policies from claude / gemini / codex / ollama / etc... and build a structured system level indexes MD file to be loaded dynamically in the run time.\" Design: docs/architecture/guidance-layers.md \u00a710; plan docs/plans/guidance-layers-2026-10.md \u00a74 and \u00a79 (ADR-0145).",
+  "summary": "50 more memory rules are console-only, and 13 are superseded or in conflict (plan \u00a79.1, F9.1).",
+  "title": "Guidance G5 batch 3: migrate the test, review, design, docs, config and session rules; retire 13",
+  "weight": 0.35
+}
