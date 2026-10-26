@@ -6,6 +6,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/retryladder"
 )
 
 type Phase = cyclestate.Phase
@@ -103,6 +104,8 @@ type PhaseRequest struct {
 	BudgetScale        float64 `json:"budget_scale,omitempty"`
 	Attempt            int     `json:"attempt,omitempty"`
 	ModelRoutingEffort string  `json:"model_routing_effort,omitempty"`
+
+	Ladder *retryladder.Try `json:"-"`
 }
 
 type PhaseResponse struct {

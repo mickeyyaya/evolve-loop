@@ -189,5 +189,10 @@
   },
   "retry": {
     "contract_correction_retries": 1
+  },
+  "workflow": {
+    "retry_ladder": {
+      "stage": "shadow"
+    }
   }
 }

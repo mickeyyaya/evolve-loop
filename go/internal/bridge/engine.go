@@ -329,7 +329,7 @@ func (e *Engine) launchModel(ctx context.Context, req core.BridgeRequest) (core.
 		ExitCode: run.code, Stderr: run.stderr, BootMS: run.bootMS,
 		DispatchID: run.dispatchID, PaneCapture: run.paneCapture, SessionRecoverable: e.freshSessionAllowed(ctx, run),
 	}
-	marks := append(sessionMarks(req.FreshSession, resp.SessionRecoverable), markBootLoss(run), markTry(run))
+	marks := append(sessionMarks(req.FreshSession, resp.SessionRecoverable), markBootLoss(run), markTry(run, req.Ladder))
 	c := e.recordModelAttempt(req, model, run.code, run.start, run.end, run.dispatched, run.stderr, &resp, marks...)
 	e.reportFreshSession(c, req)
 	e.clearBootStrike(c, req.CLI, run.code)

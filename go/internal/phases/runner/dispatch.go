@@ -137,6 +137,7 @@ func (b *BaseRunner) baseRequest(req core.PhaseRequest, prep phasePreparation, r
 		CorrectionDirective: req.CorrectionDirective,
 		OperatorDirectives:  req.OperatorDirectives,
 		ChainAttempt:        true,
+		Ladder:              req.Ladder,
 	}
 }
 

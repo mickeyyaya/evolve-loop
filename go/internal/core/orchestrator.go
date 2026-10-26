@@ -28,6 +28,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/research"
+	"github.com/mickeyyaya/evolve-loop/go/internal/retryladder"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/verdictcache"
@@ -219,6 +220,8 @@ type Orchestrator struct {
 	chronicle policy.ChronicleConfig
 
 	failureCountFor func(id string) int
+	failureClassFor func(id string) string
+	rungHandlers    map[retryladder.Rung]RungHandler
 
 	failurePolicy policy.SystemFailurePolicy
 
@@ -351,6 +354,10 @@ func WithFailureCountReader(fn func(id string) int) Option {
 			o.failureCountFor = fn
 		}
 	}
+}
+
+func WithFailureClassReader(fn func(id string) string) Option {
+	return func(o *Orchestrator) { o.failureClassFor = fn }
 }
 
 func WithFailurePolicy(fp policy.SystemFailurePolicy) Option {

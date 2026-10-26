@@ -8,6 +8,7 @@ import (
 	"math"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/retryladder"
 )
 
 type Storage interface {
@@ -42,6 +43,7 @@ type Guard interface {
 type (
 	State                 = cyclestate.State
 	CycleState            = cyclestate.CycleState
+	LadderState           = cyclestate.LadderState
 	BatchAccrual          = cyclestate.BatchAccrual
 	FailedRecord          = cyclestate.FailedRecord
 	CarryoverTodo         = cyclestate.CarryoverTodo
@@ -210,6 +212,7 @@ type BridgeRequest struct {
 	CorrectionDirective string             `json:"correction_directive,omitempty"`
 	OperatorDirectives  string             `json:"operator_directives,omitempty"`
 	SessionName         string             `json:"session_name,omitempty"`
+	Ladder              *retryladder.Try   `json:"-"`
 }
 
 type BridgeResponse struct {

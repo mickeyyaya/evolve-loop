@@ -185,6 +185,15 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `ISOLATION_I8_VIOLATION` | I-8 typed flow decisions: a flow parser fell back to stdout or prose; fields.cell names the seat (ADR-0154) |
 | `ISOLATION_I9_VIOLATION` | I-9 proven substitution: no run-time emitter; the conformance matrix TestE2ECycleCLIMatrix is its guard (ADR-0154) |
 
+### ladder
+
+| Code | Meaning |
+|---|---|
+| `LADDER_AUDIT_FIX` | the audit_fix rule ran after an audit FAIL; fields.audit_fix is would (shadow), chosen (enforce) or decline, fields.audit_fix_rule names the rule that decided, and the other fields give its data: the findings, the prescriptions, the estimated files, lines, production code lines and tokens, and if a rung handler is registered |
+| `LADDER_DECISION` | the retry ladder chose the rung of the next try of a phase (ADR-0142); fields.stage is shadow (recorded, the dispatch does not change) or enforce, fields.origin the retry path, fields.rung the rung before, fields.next the chosen rung, fields.action raise, retry or stop, fields.class and fields.fingerprint the classified failure, fields.tier and fields.effort the target |
+| `LADDER_NO_HEADROOM` | no family of the chain has headroom at the next tier, so the ladder holds at R1 or stops; fields.rung is the rung before |
+| `LADDER_STOP_SPEC` | two tiers failed on the same check, so the ladder reclassified the failure as spec and stopped; fields.fingerprint names the check |
+
 ### ledger
 
 | Code | Meaning |

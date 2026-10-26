@@ -1,6 +1,6 @@
 # Plan: a capability failure climbs one bounded retry ladder
 
-- **Status:** accepted, 2026-10-19. The operator decided Q1 to Q3 of §6 on 2026-10-19.
+- **Status:** accepted, 2026-10-19. The operator decided Q1 to Q3 of §6 on 2026-10-19. L5 and L6 are built at stage `shadow` (2026-10-27, [§5](#5-components-and-order)).
 - **Research:** [retry-ladder-2026-10](../research/retry-ladder-2026-10.md). **Decision:** [ADR-0142](../architecture/adr/0142-a-capability-failure-climbs-one-bounded-retry-ladder.md). **Design:** [retry-ladder](../architecture/retry-ladder.md).
 - **Related:** [ADR-0096](../architecture/adr/0096-repair-rounds-escalate-and-carry-findings.md) (repair rounds raise the tier), [ADR-0126](../architecture/adr/0126-every-iterative-loop-converges-or-escalates.md) (converge or escalate), [ADR-0130](../architecture/adr/0130-a-retry-carries-the-evidence-of-the-attempt-it-replaces.md) (a retry carries the evidence), [ADR-0141](../architecture/adr/0141-every-phase-handoff-is-a-request-build-check-loop-with-three-exits.md) (the three exits of a handoff).
 
@@ -94,6 +94,8 @@ Each criterion scores 1 (poor) to 5 (good).
 | D12 | The critic rung of design C is a shadow arm. The decider records the rung that a critic arm chooses. A later plan decides it on the data. | F3.9 | Adopt it now: no local measure. |
 | D13 | Each try records its rung: the class, the fingerprint, the effort, the tier, the served model id, fresh or kept context, and the outcome. `evolve ladder report` gives the success and the cost per rung. | F2.12, F3.10 | Measure from the logs later: the fields are not there. |
 | D14 | `workflow.retry_ladder.stage` is `shadow` as a compiled default. At shadow the decider records its rung and the dispatch does not change. The operator moves it to `enforce`. | the stage pattern of ADR-0139 | Enforce at once: the classifier is unproven. |
+| D15 | The same-rung corrections of `fleet.contract_correction_retries` run first. The correction loop asks the decider when that budget is spent. | the operator decision of 2026-10-27, "1 correction, then escalate"; cycle 2035 | Ask the decider on each correction: the first failure then climbs at once, and the one same-rung correction of the operator does not run. |
+| D16 | After an audit FAIL, the decider chooses `audit_fix` when each defect has a prescription and the estimated fix is inside the limits of `workflow.retry_ladder.audit_fix`. A cycle chooses it at most once. | the operator decision of 2026-10-27, "make sure audit will involve fix and trigger another review for its changes; balance cost and output"; cycle 2035 | A builder repair round for each prescribed fix: cycle 2035 spent 65 build minutes on a fix of about 20 lines. |
 
 ### Consequences
 
@@ -123,6 +125,22 @@ Each criterion scores 1 (poor) to 5 (good).
 | L8 | The move to `enforce`, after one wave of shadow data. Inbox item `retry-ladder-l8-enforce`, an operator decision (2026-10-27). | `.evolve/policy.json` | operator |
 
 L1, L2 and L7 can run in lanes, because the new package is not protected. L0 comes first, so the shadow wave of L5 has data.
+
+### Status of L5 and L6 (2026-10-27)
+
+| Component | Status | Evidence |
+|---|---|---|
+| L5 | built. The correction loop, the resumed correction and the audit repair round ask one decider. Gate remediation keeps its rung, and the next-item rule stores the first rung. The checked-in policy sets `workflow.retry_ladder.stage` to `shadow`. | `go/internal/core/retry_ladder.go`, [design §5](../architecture/retry-ladder.md#5-where-the-ladder-runs) |
+| L6 | built. A raised try at `enforce` has `context` `fresh` and a digest inside `workflow.retry_ladder.digest_tokens`. The tier step comes from the routing data of the phase. | `go/internal/retryladder/digest.go`, [design §5](../architecture/retry-ladder.md#the-fresh-session-and-the-digest-l6) |
+| `audit_fix` | the decision is built (D16). The execution is open: the auditor applies the patch, and a fresh seat reviews the fix. | `go/internal/retryladder/audit_fix.go`, [design §5](../architecture/retry-ladder.md#the-audit_fix-rung-decision-only) |
+| L8 | open. The operator moves the stage to `enforce` after one wave of `LADDER_DECISION` data. | the inbox item of L8 |
+
+The operator decided on 2026-10-27: "1 correction, then escalate" (D15). The console sets `fleet.contract_correction_retries` to 1 in a separate policy change.
+
+Two gaps stay open:
+
+- The failure record of an item has no rung. So at `enforce`, the next-item rule starts a `capability` failure at R2 without the check "at R1 or higher" of D10.
+- A resumed run keeps the ladder state of its correction loop only inside that loop. A later phase of the resumed run starts again from the rung in the checkpoint.
 
 ## 6. Open decisions for the operator
 

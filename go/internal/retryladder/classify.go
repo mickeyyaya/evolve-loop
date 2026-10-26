@@ -46,6 +46,7 @@ type Facts struct {
 	LaneScope          []string
 	Floors             []FloorFailure
 	DeliverableMissing bool
+	ContractRejected   bool
 	Reason             string
 }
 
@@ -100,7 +101,7 @@ func isSpecFailure(f Facts) bool {
 }
 
 func isCapabilityFailure(f Facts) bool {
-	return len(f.Floors) > 0 || f.DeliverableMissing || f.AuditClass == "code-build-fail" || f.AuditClass == "code-audit-fail"
+	return len(f.Floors) > 0 || f.DeliverableMissing || f.ContractRejected || f.AuditClass == "code-build-fail" || f.AuditClass == "code-audit-fail"
 }
 
 func inScope(file string, scope []string) bool {

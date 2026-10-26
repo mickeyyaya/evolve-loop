@@ -103,6 +103,14 @@ defaults, but each safety floor fails closed to `enforce`: `docs_floor.stage`,
       "concentration_window": 2,
       "concentration_min_findings": 5,
       "max_backward_edges": 3
+    },
+    // The retry ladder (ADR-0142). An unknown stage, or a budget that is
+    // not 0 and is outside 64 to 16000, fails the load.
+    "retry_ladder": {
+      "stage": "shadow",
+      "digest_tokens": 2000,
+      "audit_fix": { "max_files": 3, "max_lines": 40, "max_code_lines": 10,
+                     "max_tokens": 6000, "no_new_production_logic": true }
     }
   }
 }
@@ -206,6 +214,20 @@ The block configures `internal/convergence`, the one rule every repeat-until-acc
 | `concentration_window` | the judgments one concentration window spans | 2 | below 1 fails the load |
 | `concentration_min_findings` | the findings (LOW or above) a window needs before its share is defined | 5 | below 1 fails the load |
 | `max_backward_edges` | the cycle loop's *N*: the backward edges (audit → build, retro → tdd, ship → ship, …) one cycle may take before it stops with a continuation (design §6.1) | 3 | below 1 fails the load |
+
+## Retry ladder (`workflow.retry_ladder`)
+
+The block sets the stage of the retry ladder and the size of the digest of a raised try ([ADR-0142](adr/0142-a-capability-failure-climbs-one-bounded-retry-ladder.md), [design](retry-ladder.md) §5 and §7). The loader refuses a bad value, and the load of the whole file fails.
+
+| Key | Meaning | Default |
+|---|---|---|
+| `stage` | `shadow`: each retry path asks the decider, records `LADDER_DECISION` and dispatches as before. `enforce`: the choice of the decider runs. The checked-in policy sets `shadow`. | `shadow` |
+| `digest_tokens` | the token budget of the digest of a raised try, from 64 to 16000. 0 means the default. | 2000 |
+| `audit_fix.max_files` | the most files that an `audit_fix` estimate can touch, from 0 to 50. 0 means the default. | 3 |
+| `audit_fix.max_lines` | the most estimated lines of an `audit_fix`, from 0 to 2000. 0 means the default. | 40 |
+| `audit_fix.max_code_lines` | the most estimated lines of production code, from 0 to 2000. It applies when `no_new_production_logic` is true. | 10 |
+| `audit_fix.max_tokens` | the most estimated tokens of an `audit_fix`, from 0 to 64000. 0 means the default. | 6000 |
+| `audit_fix.no_new_production_logic` | true limits the production code lines of an `audit_fix` to `max_code_lines`. | true |
 
 ## Documentation floors (`docs_floor`)
 
