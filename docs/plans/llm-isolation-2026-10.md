@@ -413,7 +413,7 @@ X19 has no scored designs. It is an operator directive of 2026-10-25, and §12.4
 | X18b | The named marker list, the `buildCycleEnv` fix and the AST guard | I-16, I-2 | `EVOLVE_BYPASS_SHIP_GATE` on the parent reaches the cycle env | X2 | `enforce` |
 | X18c | The 18 knobs move into the policy file | I-16 | `EVOLVE_ROUTING_MODE=static` changes the routing with no policy key | X18a, X18b | one wave `shadow` (WARN on a differing env value), then `enforce` |
 | X18d | The 10 bypasses become audited parameters or go | I-16, I-10 | `EVOLVE_SANDBOX=off` turns the sandbox off with no record | X18b | `enforce` |
-| X18e | Delete the 6 dead names; inject the 8 test seams | I-16 | the flag registry lists `EVOLVE_WORKTREE_PATH` with no reader | X18b | `enforce` |
+| X18e | Delete the 6 dead names; inject the 8 test seams | I-16 | the flag registry lists `EVOLVE_REFLECTION_JOURNAL` with no reader (the row of `EVOLVE_WORKTREE_PATH` went on 2026-10-26) | X18b | `enforce` |
 | X19a | The neutral `TaskAssignment`; no CLI in `PhaseRequest` or in the advisor plan; the guard with a shrinking allowlist | I-17 | `TestNoCLISpecificsAboveTheDriver` lists `ModelRoutingCLI` and the advisor `"cli"` field | X6 | `enforce` |
 | X19b | Neutral sandbox intents in the profiles; `extra_flags_by_cli` into the manifests; neutral personas | I-17 | the guard lists `Bash(evolve phase verify:*)` in 93 profiles | X19a, X6b | `enforce` |
 | X19c | Capability negotiation in the router | I-17 | a seat that needs `edit` routes to a driver with no `edit` capability | X9, X19a, X6b | `enforce` |

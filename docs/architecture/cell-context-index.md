@@ -276,6 +276,9 @@ The message has no `inv=` field, so the violation parser of X5 (`readReportLine`
 It also writes one summary record for each cell. The record holds the listed ids, the opened ids, the unopened required ids and `source`. No write grant of a cell can cover `.evolve/context-access/`. The sandbox paths refuse such a grant, as `refuseRunDirsReach` refuses a reach into other run directories (`go/internal/bridge/sandbox_paths.go:185`).
 
 - On Linux, `bwrap` has no report. The summary has `source: none`, and no reading counts the cell.
+- The unified log can lag the end of the cell by many seconds on a loaded host. A read of `log show` at once can then miss a report, and the cell loses an access record. Row N16 failed so after 12.66 s on the macOS runner of the CI of PR #1152 (2026-10-26).
+- So the bridge first writes a fence (`sandboxFence`): one reported read of `/dev/null` under the tag of the cell, with the message `rule=cell.fence`. Then it reads the log each second until the fence appears, or until 60 s pass (`cellReports`). The kernel writes the reports of one host in order, and `log show` returns them in time order. So a fence in the log makes a lost report of the cell unlikely, but it is no proof: `logd` buffers each process. Row N16 guards the path on macOS. A cancelled run reads the log once and does not wait.
+- A fence that does not appear before the deadline prints a WARN with the elapsed time. A fence that cannot be written prints a WARN with the error. The cell record then has `source: none`, so an incomplete read never lowers an open rate.
 - The kernel can merge repeated reports, so a record means "opened at least once", never a count.
 - A verb entry has no path, so it gets no record. The `evolve code` usage log is in the workspace, which the cell can write, so it is not a source.
 - A required entry that the cell did not open emits `ISOLATION_CONTEXT_REQUIRED_UNOPENED` (INFO) with the ids. It never fails the phase, because the report reader is best effort.
@@ -350,7 +353,7 @@ CX1 to CX3 landed in one change at `shadow`. This table names each part and its 
 | Policy | `isolation.context.stage`, `budget.l1_tokens`, `budget.l2_tokens` and `required` (`policy.IsolationContext`). `policy.Parse` refuses each stage other than `shadow` and a negative budget. It also refuses a required kind that is not shaped like an artifact kind (lowercase words with hyphens). Its message for `enforce` names the inbox item `context-index-l0-prompt-enforce`. |
 | Verbs | `evolve context index`, `open` and `stats` ([internal-cli-contextcmd](packages/internal-cli-contextcmd.md)). |
 | Grant reports | each indexed grant, and each indexed path in the repo (`ReportOnly`), is an `allow` with a report and the message `rule=grant.index` ([internal-adapters-sandbox](packages/internal-adapters-sandbox.md)). |
-| Access log | after the cell, `Deps.reportReadViolations` reads the reports once. It emits the violations and calls `recordContextAccess`, which maps each reported path to its entry and calls `inputindex.RecordAccess`. A cell with no report source writes a cell record with `source: none`. A dispatch whose agent is not the phase of the index writes no record. |
+| Access log | after the cell, `Deps.reportReadViolations` writes the fence and polls the log until the fence appears (`Deps.cellReports`). It emits the violations and calls `recordContextAccess`, which maps each reported path to its entry and calls `inputindex.RecordAccess`. A cell with no report source writes a cell record with `source: none`. A dispatch whose agent is not the phase of the index writes no record. |
 | Write refusal | `refuseRunDirsReach` also refuses a write grant that covers `.evolve/context-access/`. |
 | Signals | `ISOLATION_CONTEXT_REQUIRED_UNOPENED` (INFO) and `ISOLATION_CONTEXT_BUDGET_OVER` (WARN), kind `isolation.context` ([internal-isolation](packages/internal-isolation.md)). |
 | Persona | `agents/agent-templates.md` §"The input index". |
@@ -382,6 +385,6 @@ Differences from the design:
 - The access log exists on macOS only. A Linux cell gives no reading.
 - A record proves that the cell read the body. It does not prove that the agent used it.
 - A broad read, for example `grep -r` of the granted paths, logs each row it touches. The rate leaves out a cell that opened each row (§9), but a scan of most rows still counts.
-- The kernel can merge reports, and `log show` can miss a late report. A missed record makes an open rate low, so `exclude` has the strictest threshold.
+- The kernel can merge reports, so a record means one open or more. A fence that never appears marks the cell `source: none`. The strictest threshold stays on `exclude`.
 - The persona stays in the prompt. A smaller persona is the work of the rule layers (ADR-0145) and of X19b, not of this design.
 - The `message` and `context` classes need component CX4. Until then, L1 holds only deliverables and handoff asks.
