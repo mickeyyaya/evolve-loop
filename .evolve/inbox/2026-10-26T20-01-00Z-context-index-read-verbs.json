@@ -1,0 +1,27 @@
+{
+  "id": "context-index-read-verbs",
+  "kind": "feature",
+  "title": "Cell context index CX2: the verbs evolve context index and evolve context open, agent class A.",
+  "source": "console, 2026-10-26. The operator request is in docs/plans/cell-context-index-2026-10.md §1. Design: docs/architecture/cell-context-index.md. Plan: §6 of the same plan.",
+  "summary": "A cell reads the index only as a file, and the read of a body has no hash check. Spec §7 and §11.",
+  "fix": "Add evolve context index [--layer] [--required] [--json] and evolve context open <id> [--json] with the envelope and the exit codes of spec §7. Put the shared persona text of spec §11 into agents/agent-templates.md. Add matrix row N15, and add both verbs to the class table of docs/architecture/cli-contract.md §4.1.",
+  "acceptance": [
+    "RED first: TestContextOpen_RefusesAnUnknownIDAForeignPathAndAChangedBody fails before the change.",
+    "docs/architecture/cli-contract.md §4.1 lists both verbs as class A.",
+    "Matrix row N15: a cell lists its index and opens a required entry through the verb.",
+    "Changed functions at 100% coverage on every CI OS; the package note and the spec are updated."
+  ],
+  "deps": [
+    "context-index-layers-and-budgets"
+  ],
+  "files": [
+    "go/cmd/evolve/",
+    "go/internal/inputindex/",
+    "agents/agent-templates.md",
+    "go/internal/isolation/"
+  ],
+  "priority_class": "stability",
+  "weight": 0.4,
+  "route": "console-manual",
+  "created_at": "2026-10-26T20:01:00Z"
+}

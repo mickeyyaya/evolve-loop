@@ -1,0 +1,26 @@
+{
+  "id": "context-index-layers-and-budgets",
+  "kind": "feature",
+  "title": "Cell context index CX1: layers, token estimates, the required flag and budgets in inputs/index.json.",
+  "source": "console, 2026-10-26. The operator request is in docs/plans/cell-context-index-2026-10.md §1. Design: docs/architecture/cell-context-index.md. Plan: §6 of the same plan.",
+  "summary": "The X5 index entry has no layer, no token estimate, no required flag and no reason, so the agent cannot tell what to open first (research F1.1). Spec §3, §4 and §6.",
+  "fix": "Add the /2 fields layer, tokens, required and why to inputindex.Entry, and stage, estimate, required and budgets to the header. Read accepts /1 and /2. Compute the required list from isolation.context.required, then phase.json inputs.files, then the phaseio edges. Add the strict policy keys isolation.context.stage (shadow), budget.l1_tokens, budget.l2_tokens and required. The other keys land with their readers, and until then Parse refuses them (spec §6).",
+  "acceptance": [
+    "RED first: TestBuild_EachEntryHasTheLayerOfItsClass fails before the change.",
+    "TestBuild_EachEntryCarriesItsTokenEstimateAndItsReason, TestRequired_PolicyThenSpecThenEdges and TestBudget_AnOverflowClearsRequiredAndKeepsTheRow pass.",
+    "policy.Parse refuses an unknown isolation.context key, a negative budget, a kind that is not an artifact kind and the stage enforce.",
+    "Changed functions at 100% coverage on every CI OS; the package note and the spec are updated."
+  ],
+  "deps": [
+    "isolation-artifact-index-read-isolation"
+  ],
+  "files": [
+    "go/internal/inputindex/",
+    "go/internal/policy/isolation.go",
+    "go/internal/core/input_index.go"
+  ],
+  "priority_class": "stability",
+  "weight": 0.4,
+  "route": "console-manual",
+  "created_at": "2026-10-26T20:00:00Z"
+}
