@@ -1331,5 +1331,6 @@ Rules for these seams:
 - A guard is covered through a seam. Do not delete a guard to reach 100.0%. Go 1.23 `rand.Read` can return an error, so the `MintRunID` guard stays.
 - A test that swaps a seam does not call `t.Parallel()`. Register the test in `serialRequiredTests` in `parallel_default_test.go`.
 - A test reaches each error branch through the real entry point, for example `writeBuildSelfCheckArtifact`, and not through the seam alone.
+- A test that proves concurrent dispatch uses a barrier, not a sleep. In `TestDispatchEvaluateBatch_Concurrent`, each runner waits at a `rendezvous` until all batch members arrive. A serial dispatch fails because a runner stops its wait and records a miss. A sleep with a peak counter failed on a slow CI runner when the second runner started late.
 
 For the related rule on test isolation, see [driver tests must be environment-hermetic](../../conventions/hermetic-driver-tests.md).
