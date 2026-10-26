@@ -47,7 +47,7 @@ The operator's design is event-driven: the review runs on events and never polls
 | D2 | `evolve inbox add` refuses an overlap at or above `overlap_refuse` with exit 3 and the ids, unless `--allow-overlap --reason`. Between `overlap_warn` and `overlap_refuse` it warns. Exit 3 is the code that the plan's P3 gave an overlap, and it is the `refused` class of [cli-contract.md](cli-contract.md): a rule stopped the verb. | F1 | A pending intake that waits for the operator: the operator files with the verb, so the refusal is the question. |
 | D3 | `lifecycle.File` enforces the origin. Every writer stamps one. | F4 | A check in the verb only: four other callers bypass the verb. |
 | D4 | The override is an operator stamp, `intake_override`, that only the filer writes. | — | An author field: an author can forge it. |
-| D5 | The landing trigger proposes `consume` when the change touched the fix surface and at least `consume_min_share` of the named tests exist. The proposal is deterministic when every criterion names a test and every named test exists. | F2 | Consume on any surface change: a partial change closes open work. |
+| D5 | The landing trigger proposes `consume` when the change touched the fix surface and at least `consume_min_share` of the named tests exist. The proposal is deterministic when every criterion names a test and every named test exists. A test file of the change must also define one of them, and the change must not be older than the filing of the item. | F2 | Consume on any surface change: a partial change closes open work. |
 | D6 | A policy or protected-manifest change runs the route check. A `route: lane` item with a protected surface gets a deterministic reroute to the console. A console route that no fact explains gets a reroute proposal to a lane for the operator. | — | Apply the lane reroute: an operator chose the console route, and only the operator can undo that choice. |
 | D7 | The boundary step runs every check over every open item, as a backstop. | F3 | A poll timer: the operator forbids it. |
 | D8 | A `merge`, a sweep `consume` and a lane `reroute` are judgment proposals. They are published for the operator and the orchestrator (item X13). The curator never applies them. | — | Apply them: they need judgment, and no LLM edits the inbox. |
@@ -79,13 +79,17 @@ Exit codes: `0` filed, `1` refused, `2` an I/O error, `3` an overlap, `10` usage
 
 ### 2. On landing
 
-An exec subscription delivers each `ship.landed` record to `evolve inbox curate --event`:
+`evolve inbox curate --follow` is the subscriber of the `ship` channel. The console starts it once, for example under its Monitor:
 
 ```
-evolve events subscribe add inbox-curator --channel ship --filter kind=ship.landed --deliver 'exec:evolve inbox curate --event'
+evolve inbox curate --follow --project-root <plane>
 ```
 
-The verb reads the wire record from stdin, reads the commit with `git log -1 --name-only`, and runs the landing match (D5). It publishes each proposal and applies none, because a lane is live during a wave.
+- It reads the `ship` channel through `internal/events/reader`. The kernel wake makes it wait, so it never polls.
+- For each `ship.landed` record it reads the commit with `git log` and runs the landing match (D5).
+- It publishes each proposal and applies none, because a lane is live during a wave.
+- `evolve inbox curate --event` takes one wire record on stdin. It is the entry point for the exec subscriptions of [event-channels.md §10](event-channels.md#10-delivery), which have no `evolve events` verb yet.
+- The loop does not supervise the follower. When no follower runs, the boundary backstop (section 4) sees the landing.
 
 ### 3. On a policy or protected-manifest change
 
@@ -101,19 +105,24 @@ A change that touches `.evolve/policy.json`, `.evolve/profiles/` or `go/internal
 The cursor has these cases:
 
 - **No cursor** (the first run): the step reads no range. It runs the other checks, then writes the cursor.
-- **A cursor that git cannot read**: the step warns, reads no range, and runs the other checks.
-- **A failure after an apply and before the cursor moves**: the next run reads the range again. An item that the step consumed is no longer open, so the repeat changes nothing.
+- **A lost cursor** (a torn file, or a commit that the repository does not hold): the step warns and restarts the cursor at `HEAD`.
+- **A git fault on the range, or a failed apply**: the step warns and keeps the cursor, so the next boundary reads the range again. An item that the step consumed is no longer open, so the repeat changes nothing.
+
+**The landing of an apply.** The step commits the files that it moved or rewrote, with the message `chore(inbox): the inbox curator's applied proposals`. Thus the next `sync-main` finds no dirt beyond the inbox stamps.
 
 **A declined proposal.** A judgment proposal repeats at each boundary until the operator acts. The operator declines a lane reroute with `evolve inbox route-console <id> <reason> 0`. The stamped `routed_reason` explains the route, so the curator stops the proposal. The operator declines a sweep `consume` with an edit of the acceptance, or ends it with `evolve inbox consume`.
 
 ### The verb
 
-`evolve inbox curate [--json] [--apply] [--event] [--project-root P]`
+`evolve inbox curate [--json] [--apply | --event | --follow [--since S]] [--project-root P]`
+
+The verb takes one mode at most. `--since` takes `new` (the default), `all`, `last` or an RFC 3339 time.
 
 | Mode | Reads | Writes |
 |---|---|---|
 | no flag | the open items, the tests, the commits since the cursor | nothing |
 | `--event` | one wire record and its commit | the proposals to the inbox channel |
+| `--follow` | each `ship.landed` record of the `ship` channel and its commit | the proposals to the inbox channel |
 | `--apply` | as the plain mode | the proposals; in `enforce`, the deterministic changes; the cursor |
 
 - `--apply` refuses with exit 1 while a run lease is live, as the other inbox curation verbs do today. A lane thus cannot apply a proposal.
@@ -141,3 +150,5 @@ The block is `inbox.curator` (its `policy-config.md` section lands with the inta
 | A gate-file item cannot be route lane | `TestReroutes_AGateFileItemOnTheLaneRouteIsADeterministicRerouteToTheConsole` |
 | An item whose acceptance merged is proposed for consume in the same boundary | `TestCmd_InboxCurate_TheBoundaryConsumesAnItemWhoseAcceptanceMergedInEnforce` |
 | A lane cannot apply a proposal | `TestCmd_InboxCurate_ApplyIsRefusedWhileALaneIsLive` |
+| A `ship.landed` event is curated with no poll | `TestCuratorRun_FollowCuratesEachLandingAndSkipsOtherRecords`, `TestLandingReader_ReadsTheShipChannelOfTheRoot` |
+| The next `sync-main` is not refused after an apply | `TestCmd_InboxCurate_TheBoundaryCommitsWhatItApplied` |
