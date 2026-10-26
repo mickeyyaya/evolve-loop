@@ -27,6 +27,7 @@
 - A coverage run must use `CoverageTags`. An untagged run under-reports a tag-gated package by a large margin. In `internal/phases/ship`, the measured figure was 47.0% untagged and 90.6% tagged. Gating on the untagged figure lets a wrong number ship. ADR-0069 fixed the same defect class for vet and apicover.
 - A composed-tree gate counts as missing when its key is absent or its status is not `pass`. A nil result means the fast path may stay open.
 - The `IntersectEnforced` input forms are fixed. Changed entries carry a trailing `/...`. The enforce file holds one bare `./internal/foo` per line, with `#` comments and blank lines. Output is deduplicated and sorted, so it is deterministic. Empty changed input returns nil, and the caller then skips the scoped run.
+- Each job of `go.yml` declares `timeout-minutes` from 1 to 90. A hung job then cannot hold the concurrency group of main for the runner default of 360 min ([plan ci-wall-time-2026-10](../../plans/ci-wall-time-2026-10.md) D27). Pinned by `TestGoWorkflow_EveryJobHasABoundedTimeout`.
 
 ## Findings
 
