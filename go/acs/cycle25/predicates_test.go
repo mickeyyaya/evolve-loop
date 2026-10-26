@@ -89,17 +89,6 @@ func TestC25_005_BridgeRequestInteractivePolicyTypedField(t *testing.T) {
 	}
 }
 
-func TestC25_007_WorktreePathStillInRegistry(t *testing.T) {
-	const worktreePath = "EVOLVE_WORKTREE_PATH"
-	if _, ok := flagregistry.Lookup(worktreePath); !ok {
-		t.Errorf("RED: flagregistry.Lookup(%q) returned ok=false — WORKTREE_PATH removed.\n"+
-			"Builder MUST NOT remove EVOLVE_WORKTREE_PATH from registry_table.go.\n"+
-			"It is a live IPC handoff (agents/evolve-tester.md) pinned by TestC50_009.\n"+
-			"This is the same mistake that killed cycles 17, 18, and 19.",
-			worktreePath)
-	}
-}
-
 func TestC25_008_ControlFlagsMdHasNoRemovedRows(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)

@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "`go test -tags acs -count=1 ./acs/cycle25/` passes on main",
+    "The check fails when routing.go stops reading prep.profile.InteractivePolicy (mutation checked), or the PR names the runner unit test that pins it"
+  ],
+  "created_at": "2026-10-26T09:30:00Z",
+  "deps": [],
+  "files": [
+    "go/acs/cycle25/predicates_test.go",
+    "go/internal/phases/runner/routing.go"
+  ],
+  "fix": "Replace the source grep with a behavioral check: a profile with interactive_policy set reaches BridgeRequest.InteractivePolicy through the runner, or retire the predicate if a unit test in internal/phases/runner already pins it (name that test).",
+  "id": "acs-cycle25-neg1-stale-runner-anchor",
+  "kind": "techdebt",
+  "priority_class": "hygiene",
+  "route": "console-manual",
+  "source": "console builder, 2026-10-26, main-reds investigation (PR #1153)",
+  "summary": "On main 1db031993 (2026-10-26) `go test -tags acs -count=1 ./acs/cycle25/` fails: TestC25_NEG1_ProfileInteractivePolicyHonored reports FileContains(go/internal/phases/runner/runner.go) missing \"prof.InteractivePolicy\". The behavior exists: go/internal/phases/runner/routing.go:45 sets resolved.interactivePolicy = prep.profile.InteractivePolicy, and dispatch.go:135 passes it to the bridge request. The predicate pins a source anchor in a file that no longer holds the logic. No CI job runs acs/cycle* (go/Makefile excludes /acs/; acs-durable runs only ./acs/regression/...).",
+  "title": "Archived predicate acs/cycle25 TestC25_NEG1 is red on main: it greps runner.go for a resolution that moved to routing.go",
+  "weight": 0.2
+}

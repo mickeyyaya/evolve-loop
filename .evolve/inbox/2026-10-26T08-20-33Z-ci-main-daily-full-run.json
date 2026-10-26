@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "RED first: a ciparity test that requires a `schedule` trigger on required.yml and a `schedule` group that has the run id fails on main",
+    "The routing integration test runs the real `changes` script for the `schedule` event and gets every suite selected",
+    "The concurrency contract test pins the schedule group and still pins cancel in progress for pull_request only",
+    "go test -count=1 -tags integration ./internal/ciparity/ ./internal/mergewindow/ passes; plan ci-wall-time-2026-10 has D28"
+  ],
+  "created_at": "2026-10-26T08:30:00Z",
+  "deps": [],
+  "files": [
+    ".github/workflows/required.yml",
+    "go/internal/mergewindow/mergewindow.go",
+    "go/internal/ciparity/required_workflow_test.go",
+    "go/internal/ciparity/routing_workflow_integration_test.go",
+    "docs/plans/ci-wall-time-2026-10.md"
+  ],
+  "fix": "Add `schedule: - cron: '23 5 * * *'` to required.yml. Route `schedule` like `workflow_dispatch` (every suite) in the `changes` job, and give it its own concurrency group `<workflow>-schedule-<run id>`, so no push cancels it and it cancels no push. Update the routing literal in go/internal/mergewindow/mergewindow.go and the ciparity contracts (TestRequiredWorkflow_AlwaysReportsAndCannotSkipDependencies, TestRequiredWorkflow_ConcurrencyCancelsOnlySupersededPullRequestRuns, TestRequiredRouting_MissingEvidenceCannotBecomeDocumentationSkip). Record the decision as D28 in docs/plans/ci-wall-time-2026-10.md. Rejected: a per-SHA group for pushes to main, because each commit of a train then holds a macOS slot for about 21 min, which undoes C15.",
+  "id": "ci-main-daily-full-run",
+  "kind": "techdebt",
+  "priority_class": "hygiene",
+  "route": "console-manual",
+  "source": "console builder, 2026-10-26, main-reds investigation (PR #1138 run 40268371666)",
+  "summary": "During a merge train, main rarely gets a finished full run. required.yml puts each push to main in the group `<workflow>-<ref>` (plan ci-wall-time-2026-10 D24). GitHub keeps one run in progress and one pending run per group, and a newer push cancels the pending run. On 2026-10-26 the runs of 824d19077, 71e367ac7 and 76c4815fe were cancelled while pending, because run 40265789886 (6cbf1a765) held the group for more than 4 h with a hung Go 1.27 test step. The go.yml job timeouts (plan §6d, D27) bound the hold to 60 min, but a train still finishes only the run of its newest SHA. Nothing runs the full required graph on main at a fixed time.",
+  "title": "CI: one full required run of main each day, which no push cancels",
+  "weight": 0.4
+}

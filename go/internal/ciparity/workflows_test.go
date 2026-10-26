@@ -38,6 +38,7 @@ type workflowJobContract struct {
 	Env             map[string]string
 	Outputs         map[string]string
 	ContinueOnError string `yaml:"continue-on-error"`
+	TimeoutMinutes  int    `yaml:"timeout-minutes"`
 	Steps           []workflowStepContract
 }
 
