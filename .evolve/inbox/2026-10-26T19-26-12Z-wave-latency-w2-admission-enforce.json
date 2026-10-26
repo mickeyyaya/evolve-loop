@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "The shadow of one wave records the candidates that only the optimistic rule admits (LOOP_ORCH_ADMISSION_SHADOW)",
+    "The operator decision and its date are in the plan",
+    "After the first enforce wave, evolve wave status prints the failures over the optimistic admissions, and the plan records the rate",
+    "If the rate is one in five or more, the stage goes back to shadow"
+  ],
+  "created_at": "2026-10-26T19:26:11Z",
+  "deps": [],
+  "files": [
+    ".evolve/policy.json",
+    "docs/plans/wave-latency-2026-10.md"
+  ],
+  "fix": "Set fleet.orchestrator.admission to enforce at a wave boundary. In the first enforce wave, read the failures over the admissions with evolve wave status (the W1b ship record). If one in five or more new admissions fail the ship gate, set the stage back to shadow.",
+  "id": "wave-latency-w2-admission-enforce",
+  "kind": "decision",
+  "notes": "An operator flip, so kind decision and route console-manual. The shadow gives the count of new admissions only; the failure rate comes from the first enforce wave (decision D3).",
+  "priority_class": "performance",
+  "route": "console-manual",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Plan docs/plans/wave-latency-2026-10.md, component W2 (decision D3). Decision ADR-0143. W0, W1, W1b, W4 and W5 are consumed. The key fleet.orchestrator.admission is not set in .evolve/policy.json, so admission stays at shadow.",
+  "title": "Move optimistic admission to enforce: fleet.orchestrator.admission (wave latency W2)",
+  "weight": 0.4
+}

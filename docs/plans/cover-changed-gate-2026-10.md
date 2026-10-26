@@ -108,6 +108,8 @@ The local floor is now 8 targets: `lint`, `test`, `test-integration`, `test-e2e`
 
 ## 8. Shadow to enforce in the loop floor
 
+**Decided on 2026-10-27.** The operator approved the move of `cover_changed.stage` to `enforce`. The console makes the policy change in a separate PR. The conditions below were the first plan for the move.
+
 Move `cover_changed.stage` to `enforce` only when all of these are true:
 
 - **M4 is fixed.** Today the floor runs the tests of the changed packages twice: the selfcheck run and the coverage run of this check. One run with `-tags integration -coverprofile` must feed the selfcheck, the apicover naming check and `Check`.
