@@ -117,7 +117,7 @@ This is the standard Git mechanism for "track in repo, exclude from
 `~/.claude/plugins/cache/` and applies a separate hardcoded filter
 (documented at `docs/architecture/platform-compatibility.md`).
 
-As of v9.1.x, `docs/private/` can still ship in `/plugin install` for users.
+As of v9.1.x, it is possible that `docs/private/` still ships in `/plugin install` for users.
 The user impact is bounded:
 
 - Runtime exclusion (L1 + L3) holds even on user installs — agents in
@@ -151,7 +151,7 @@ The restoration is byte-identical — verified by `diff` against `35b31c4^` in
 - **Install-size sealing**: if Claude Code adds a `.pluginignore` convention or
   honors `.gitattributes export-ignore`, this folder auto-disappears from user
   installs. Track in a future cycle's retrospective.
-- **Per-role exemptions**: a future change can allow ONE role (for example,
+- **Per-role exemptions**: a future change possibly wants to allow ONE role (for example,
   retrospective synthesizer) to read `docs/private/`. In that case (a proposal) the Layer-B filter gains a role-aware allowlist.
   Profile deny_subpaths are lifted for that role only. Until justified, default is no exemption.
 

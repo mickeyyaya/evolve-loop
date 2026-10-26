@@ -2,14 +2,14 @@
 
 The first two-wave recovery verification try on 2026-09-09 (Taipei)
 halted during readiness, before it allocated any cycle. The host report claimed
-that Darwin nested-Claude `sandbox_apply` returns EPERM because PATH contained
+that Darwin nested-Claude `sandbox_apply` fails with EPERM because PATH contained
 a Codex session marker. In the same environment the native capability probe
 (`sandbox-exec` running `/usr/bin/true`) succeeded. This try is not a
 completed verification wave.
 
 ## Issue and correction
 
-Preflight guessed capability from the session marker. The bridge refused
+Preflight guessed capability from the session marker, while the bridge refused
 all nested hints before it considered the measured result. The session detector
 can identify a managed CLI context. It cannot prove an outer sandbox, and it cannot prove
 that an inner sandbox fails to apply.
@@ -17,7 +17,7 @@ that an inner sandbox fails to apply.
 Both consumers now use `sandbox.ShouldWrap`. The rules are:
 
 - Unsupported platforms and missing binaries are rejected.
-- A completed capability measurement governs if the actual profile wrapper can be tried.
+- A completed capability measurement governs if the actual profile wrapper is allowed to be tried.
 - Measured failure is rejected.
 - A nested hint without a completed measurement remains rejected.
 - Standalone unmeasured availability keeps its existing behavior.

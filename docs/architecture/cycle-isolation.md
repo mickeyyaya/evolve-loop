@@ -18,8 +18,8 @@ its own killed attempts' workspace artifacts on each resume.
 
 **The leak in three sentences:**
 
-1. The orchestrator profile already denied **writes** to historical paths.
-   `deny_subpaths` is a write-deny mechanism, so reads through `Read`,
+1. The orchestrator profile already denied **writes** to historical paths, but `deny_subpaths` is a write-deny mechanism.
+   Reads through `Read`,
    `Bash(cat:*)`, `Bash(head:*)`, `Bash(tail:*)` were unrestricted.
 2. On `--resume`, the prompt of try K re-injected ledger entries from
    tries 1..K-1 of the SAME cycle. Verified in the prompt of try 3 of cycle 79:
@@ -34,7 +34,7 @@ This ADR codifies the structural fix.
 
 ## The isolation contract
 
-The orchestrator is a per-cycle subprocess. It MAY:
+The orchestrator is a per-cycle subprocess. It is allowed to access:
 
 | Resource | Access |
 |----------|--------|
@@ -44,7 +44,7 @@ The orchestrator is a per-cycle subprocess. It MAY:
 | `legacy/scripts/**`, `agents/**`, `skills/**` | reads allowed (the persona may need to read its own contract); writes denied |
 | Prompt-injected digest fields (`recentLedgerEntries`, `recentFailures`, `instinctSummary`, `adaptiveFailureDecision`) | the **authoritative** source of cross-cycle history |
 
-The orchestrator MAY NOT:
+The orchestrator is NOT allowed to access:
 
 | Resource | Reason |
 |----------|--------|
@@ -158,8 +158,9 @@ the killed attempt's state directly.
 ## Same-cycle ledger entry filter
 
 `archive/legacy/scripts/dispatch/run-cycle.sh:build_context()` constructs the
-`recentLedgerEntries` digest. On resume, tries 1..K-1 of the SAME
-cycle otherwise pollute the prompt of try K with entries of stale tries.
+`recentLedgerEntries` digest. The filter removes the entries of the current cycle.
+Without the filter, on resume, tries 1..K-1 of the SAME
+cycle pollute the prompt of try K with entries of stale tries.
 The filter:
 
 ```bash
@@ -220,8 +221,8 @@ pipeline.
 
 ## What this is NOT
 
-- **NOT a budget cap.** The cycle-79 incident burned $78. The orchestrator was not unbounded.
-  It was re-processing dead state.
+- **NOT a budget cap.** The cycle-79 incident burned $78. The cause was not that the orchestrator was unbounded.
+  The cause was that it re-processed dead state.
   Budget caps are orthogonal (see `EVOLVE_MAX_BUDGET_USD` in `CLAUDE.md`).
 - **NOT a fix for the orchestrator hanging in the first place.** The
   stall-inactivity of try 1 of cycle 79 was a different bug (watchdog interaction).

@@ -5,7 +5,7 @@ metadata:
   type: architecture
 ---
 
-> **Incremental intent (v0.1)** — opt-in delta mode (`EVOLVE_INTENT_DELTA=1`). It compares a normalized goal hash against the current batch. The result shows which of two modes applies: the intent persona runs in full, or it emits a lightweight patch. Builds on [[intent-phase.md]] without duplicating its core design.
+> **Incremental intent (v0.1)** — opt-in delta mode (`EVOLVE_INTENT_DELTA=1`). It compares a normalized goal hash against the current batch. The result shows if the intent persona must run in full or is allowed to emit a lightweight patch. Builds on [[intent-phase.md]] without duplicating its core design.
 
 ## TLDR
 

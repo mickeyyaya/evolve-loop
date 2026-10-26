@@ -56,8 +56,8 @@ file-wide ACS count assertions (fixed by `acsassert.CountInGoFunc`, same day).
 ## Bugs these tests retro-cover
 
 - **Reconcile default builtin-only** (fixed 2026-06-12): caught by
-  `TestNew_DefaultVerifyFnIsCatalogAware` (runner). Plan #2/#3 had caught
-  it as a class, if they had existed.
+  `TestNew_DefaultVerifyFnIsCatalogAware` (runner). If plan #2/#3 existed, they catch
+  it as a class.
 - **tester profile `output_artifact` = builder's artifact** (fixed
   2026-06-12, persona-lint commit): caught by
   `TestArtifactNameMatchesProfileOutput`; plan #14 generalizes it to every

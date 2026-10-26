@@ -104,15 +104,15 @@ The ship gate does fail closed — `CodeAuditBindingVerdictFail`, "auditor expli
 rejected this build" — so nothing rejected can actually ship. The backstop holds. But the
 routing is still wrong in two ways that matter:
 
-- in that case the router sends a failed cycle to a ship that must refuse it. This is a hypothetical outcome: it converts a clean
+- if the retro gate passes, the router sends a failed cycle to a ship that must refuse it. This converts a clean
   terminal disposition into a ShipError plus L5 recovery. The result is wasted work and a confusing
   trail;
-- **in that case it bypasses L4 entirely.** The ADR-0092 repair branch lives BELOW this early
+- **if the retro gate passes, the routing bypasses L4 entirely.** The ADR-0092 repair branch lives BELOW this early
   return, so a correctly-PASSing retro skips the floor, the bookkeeping regrade, and
   the audit repair.
 
 **Correction to recommendation 1 below.** This document originally said "fix the retro gate
-first". If you follow it literally, it activates a dormant category error and disables the
+first". Followed literally, that advice activates a dormant category error and disables the
 in-cycle repair loop in the same change. The two defects must be fixed TOGETHER, and the
 routing half is the one to fix first:
 
@@ -171,8 +171,8 @@ different failure classes. They have no shared budget and no shared vocabulary.
 > remediation. **Judgment phases (audit, adversarial-review, premise-challenge) must never
 > be listed** — remediation is for mechanical, prescribed defects only.
 
-That is a real architectural line: *you can fix a mechanical defect and re-run the same gate.
-You cannot re-roll a judgment until it agrees.* A judge that is re-run until it
+That is a real architectural line: *a mechanical defect can be fixed and the same gate re-run.
+A judgment must not be re-rolled until it agrees.* A judge that is re-run until it
 relents makes a gate a rubber stamp.
 
 **ADR-0092 sits on the wrong side of that line and must justify itself.** It retries after
@@ -213,14 +213,14 @@ single bound predicts.
 same *mechanical, prescribed* shape applies to EGPS/ACS red counts, repo-contract scanner
 findings, and type-safety audit output. Wave-3 cycle-1574 died on
 `red_count=1 [record_absent_from_inbox_root_exactly_once]` — a deterministic, prescribed
-defect. If that gate had been listed, then L2 was the right layer for it.
+defect. L2 did not remediate it, because nobody listed that gate. L2 is the right layer for this defect if the gate is listed.
 
 **G4 — retry is invisible in telemetry.** No artifact answers "how much of this cycle was
 retry?" `attempt_count` exists per phase, `AuditRepairAttempts` is new, and remediation rounds
 are logged. But nothing aggregates them.
 
 The economics argument in
-`cyclerun_remediate.go` is ~1–2M tokens to remediate against ~12.5M to discard a cycle.
+`cyclerun_remediate.go` is an estimate: ~1–2M tokens to remediate against ~12.5M to discard a cycle.
 It is better to measure this kind of claim continuously. Nobody measures it now.
 
 **G5 — the layers share no vocabulary.** L2 says "remediation round", L3 "regrade", L4
@@ -234,10 +234,10 @@ failing cycle cannot ask one question and get one answer.
    normal floor → regrade → repair → adapter ladder on a retro PASS.
    Then make `hasFailureLesson` capable of passing.
 2. **Close G1 at the partitioner, not with a new retry layer.** The right fix is
-   goal-aware partitioning plus a loud launch-time failure. The failure happens when a directive names ids that the
-   resolved lane set cannot contain. Both are already filed as
+   goal-aware partitioning plus a loud launch-time failure. The failure fires when a directive names ids that the
+   lane set cannot contain. Both are already filed as
    `goal-text-has-no-selection-authority` and `spine-dispatches-build-after-empty-triage`.
-   In that case a wave-level retry layer is a *compensation* for a scheduling defect. It is better not to
+   In that rejected design, a wave-level retry layer compensates for a scheduling defect. It is better not to
    need it.
 3. **Give the ladder one budget and one vocabulary (G2/G5).** Add a single `retry` block in
    `policy.json` with per-layer caps and one cycle-wide ceiling. Add one

@@ -34,8 +34,8 @@ Three independent failures stacked into one cycle death:
 `dismissed_version = 0.137.0`. Because the available `0.138.0 > 0.137.0`, the dismissal no longer applied,
 so on the build-phase launch (14:33:06) codex auto-ran `brew upgrade --cask codex` (`/opt/homebrew/Caskroom/codex/0.138.0/`
 created 14:33), printed `"🎉 Update ran successfully! Please restart Codex"`, and **exited**. The bridge then
-nudged a bare `zsh` shell (`command not found: Please`). This is interactive-TUI-only behavior — the headless
-`codex exec` path (`driver_codex.go`) does not trigger it; the loop's builder uses the `codex-tmux` REPL path.
+nudged a bare `zsh` shell (`command not found: Please`). This is interactive-TUI-only behavior. The headless
+`codex exec` path (`driver_codex.go`) does not trigger it, and the loop's builder uses the `codex-tmux` REPL path.
 
 ### 2b. retro was dispatched with an invalid model (D3)
 The retro pane captured the fatal state: `"There's an issue with the selected model (auto). It may not exist
@@ -55,7 +55,7 @@ PASS`) and **actually accomplished the goal** (`chore(build)` is present in the 
 - **no `build` entry in `phase-timing.json`** (only `scout`, `tdd`, `retro`),
 - **no recorded build verdict**.
 
-So the orchestration spine saw `build` as not-completed. It **skipped audit** (`ship ⇒ build ∧ audit` cannot
+So the orchestration spine saw `build` as not-completed. It **skipped audit** (`ship ⇒ build ∧ audit` was unable to
 advance). It routed to retro as a failed cycle. The failure-learning logged `cycle-262-failed-build`. **The
 work was done; only the recording was missing.**
 
@@ -89,7 +89,7 @@ so such a build can only ever abort. Tracked as a C3-era question.
 ### Cost of the two slow-fails
 codex-dead (2a) burned ~20 min and retro-model-error (2b) burned ~20 min. Each ran to the `maxExtends`
 backstop (`tmuxArtifactTimeoutS=300` × ~4), because **nothing recognizes a self-describing fatal pane state**.
-The cycle spent ~40 min of ~52 min on failures that were deterministically detectable on sight.
+The cycle spent ~40 min of ~52 min waiting on failures that were deterministically detectable on sight.
 
 ## 3. Defect taxonomy
 
@@ -185,7 +185,7 @@ claude-tmux gets the same. Adding a CLI ⇒ a new policy, zero edits elsewhere (
 **As built:**
 
 - The typed-cause registry is `recovery.FatalPaneDetector` (`internal/recovery/detector.go`). It is the single recovery owner, not a per-driver hook. It is seeded with the three cycle-262 signatures.
-- `bridge.fatalPaneVerdict` consults it at the stop-review checkpoint **before** the reviewer. This ordering is load-bearing. The dead panes counted as "progressed" (the nudge of the bridge echoed into them), so a post-reviewer check never fires.
+- `bridge.fatalPaneVerdict` consults it at the stop-review checkpoint **before** the reviewer. This ordering is load-bearing. The dead panes counted as "progressed" (the nudge of the bridge echoed into them), so a check after the reviewer never fires.
 - `EVOLVE_PHASE_RECOVERY` gates the stage (off | **shadow default** | enforce; typo→off). Classification is always-on above off. Only the kill is staged.
 - The detector never preempts a Busy pane.
 - The one-shot nudge is now gated on `ReviewPause`, so a fatal `ReviewStop` exits immediately (exit 81 → the fallback chain of the runner takes over). This is the rescue of cycle-262, ~20 min sooner.
@@ -259,7 +259,7 @@ handle over time. The LLM is never on the hot path for a known failure.
 
 | Order | Change | Why first | Size |
 |------|--------|-----------|------|
-| 1 | ✅ **C1 outcome-recording chokepoint** (shipped 2026-06-10 as-located in the orchestrator; see §6 C1) | Highest influence — makes 262-class record divergence impossible | M |
+| 1 | ✅ **C1 outcome-recording chokepoint** (shipped 2026-06-10 as-located in the orchestrator; see §6 C1) | Highest impact — makes 262-class record divergence impossible | M |
 | 2 | ✅ **C2 `ModelFlagPolicy`** (shipped 2026-06-10 at the realizer chokepoint — matrix-wide omit-on-auto) | Tiny; stops the exact retro break | S |
 | 3 | ✅ **C2 `FatalPaneDetector`** (shipped 2026-06-10; seeded with the 3 cycle-262 signatures, `EVOLVE_PHASE_RECOVERY`-staged, shadow default) | Eliminates the ~20-min slow-fails (in enforce) | M |
 | 4 | ✅ **C5 freeze preflight** + **D4 retro fallback** (shipped 2026-06-10: `looppreflight` 5th check — self-update evidence ∧ tmux-driven ⇒ brew-pinned or Halt; `retrospective.json` gains `cli_fallback:["codex-tmux"]`; broader meta-phase coverage rides C3) | Cheap; prevents recurrence | S |

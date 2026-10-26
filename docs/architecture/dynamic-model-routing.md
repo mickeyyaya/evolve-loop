@@ -1,9 +1,9 @@
 # Dynamic Model Routing (Multi-CLI Adaptive Allocation)
 
 > **⚠️ SUPERSEDED / unbuilt proposal (banner added 2026-06-23, ADR-0062/T2.2).** This 5-layer adaptive-routing design (and its `llm_config.json` premise) was NOT shipped as written. `llm_config.json` was deleted (step9). Live routing is implemented in `go/internal/router` + `go/internal/llmroute` (advisor-driven, ADR-0052).
->
+
 > **Crucially, the "cross-family invariant enforcement" / `rc=2` sections below describe a PROPOSED kernel gate that does NOT exist.** Cross-family separation (builder family ≠ auditor family) is an **advisory preference**. It is carried as profile metadata (`cross_family_with` in `internal/setup`). It is not a kernel gate: `go/internal/router/floor.go` has no family logic.
->
+
 > The sole kernel trust boundary is the integrity floor (`ship ⇒ build ∧ audit ∧ (tdd unless trivial)`). The live adversarial-separation mechanism is the model-level default (Opus auditor vs Sonnet builder, `ADVERSARIAL_AUDIT` default-on). Read this doc as historical design intent only.
 >
 > **Target path:** `docs/architecture/dynamic-model-routing.md` (in evolve-loop repo)
@@ -135,7 +135,7 @@ Bias: **conservative on uncertainty**. Multiple signals → take max. Orchestrat
 | Phase 0 static 3-tier | $2.50 | $2.50 | $2.50 | $2.50 | partial |
 | Phase 3 adaptive (this design) | $1.80 | $2.50 | $3.80 | $2.55 | ✓ (Phase 4) |
 
-The win is in **distribution**, not average. Easy cycles are 28% cheaper, and hard cycles are 50% more expensive. Quality does not matter most in easy cycles. In hard cycles, the marginal `deep` tier prevents failure cascades.
+The win is in **distribution**, not average. Easy cycles are 28% cheaper, and hard cycles are 50% more expensive. Easy cycles are not where quality matters. Hard cycles are where the marginal `deep` tier prevents failure cascades.
 
 ## Rollout phases
 

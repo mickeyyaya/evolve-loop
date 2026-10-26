@@ -5,11 +5,11 @@
 > rather than proposing a new design.
 >
 > Audience:
->
+
 > - anyone who adds a new `*-tmux` driver;
 > - anyone who debugs why an LLM CLI appears stuck mid-cycle;
 > - anyone who reasons about what the bridge can and cannot do to a running agent.
->
+
 > The operator directive that motivates this synthesis:
 > *"LLM CLIs should complete their assigned tasks. We have full tmux control —
 > can always send query and command to ask LLM CLI continue and correct its job."*
@@ -275,7 +275,7 @@ stuck, the layer model gives a deterministic checklist:
    never launched cleanly; see G3 preflight failures).
 2. **READ**: `tmux capture-pane -p -t <session> -S -200`. What is on the
    pane? A modal, a thinking spinner, a prompt marker?
-3. **DECIDE**: which rule matches the pane content?
+3. **DECIDE**: which rule is expected to match the pane content?
    `decideAutoRespond` test cases in `autorespond_decision_test.go` are
    the truth table. If NO rule matches the modal → the manifest needs a
    new `interactive_prompts[]` entry (the G1b path).
@@ -283,8 +283,8 @@ stuck, the layer model gives a deterministic checklist:
    `evolve bridge send --kind=keystroke --body=<key> --workspace=<ws> --agent=<phase>`.
    This bypasses idle-gating and decides nothing for itself — operator
    in charge.
-5. If steps 1–4 fail, the hard SIGTERM of the observer at
-   `EVOLVE_OBSERVER_STALL_S` is the final safety net.
+5. If steps 1–4 do not make the cycle continue, the final safety net is the
+   hard SIGTERM at `EVOLVE_OBSERVER_STALL_S`.
    The runner classifies the failure per ADR-0029 (cross-CLI fallback chain).
    It then retries the failure or surfaces it.
 
@@ -329,7 +329,6 @@ data, and the death is not reclassified. Rationale and rejected alternatives:
 top-level `transient_regex` key in `go/internal/bridge/manifests/<cli>.json`. It is
 resolved from whichever CLI the launch named. Recognition therefore works identically
 on claude, codex, agy and ollama, and no provider vocabulary is hard-coded in Go.
-
 
 The key sits at the top level and not under `controls.usage`, because the two read
 different surfaces. `controls.usage.exhausted_regex` classifies the output of the

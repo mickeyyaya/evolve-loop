@@ -23,8 +23,8 @@ Decomposed with the user into ten pinned decisions:
    Built-in and plugin phases have identical pipeline framework, rules and policies.
 6. Rich metadata lives in `phase.json` (schema extension), not agent frontmatter.
 7. New phases become visible at the **next cycle start** (no mid-cycle plan mutation).
-8. Scope: infrastructure + one seed phase. The new flow registers it as the end-to-end proof.
-   The two-tier naming rule renamed `reproduce-bug` to `bug-reproduction`.
+8. Scope: infrastructure + one seed phase, `reproduce-bug`
+   (renamed `bug-reproduction` by the two-tier naming rule). The new flow registers it as the end-to-end proof.
 9. Go CLI does the work; the skill is a thin conversational wrapper.
 10. Built directly as feature-dev in an isolated worktree.
 
@@ -194,7 +194,7 @@ A user phase stays optional-only and can never satisfy or displace the floor, bu
 
 Why a pin and not `routing.insert_when`: at the Advisory stage `insert_when` only *gates* the advisor's plan (`router.shouldRunFromPlan`). It removes a planned phase whose trigger does not fire, but never adds an unplanned one. A pinned phase also does not count against `max_optional_insertions`, and PSMAS cannot skip it. Pinned by `TestCodeReviewPin_*` (`internal/router/code_review_pin_test.go`), which loads the real registry and the real `.evolve/phases`.
 
-**Report grammars.** A user phase can declare `classify.grammars`, a list of named report grammars. The deliverable gate runs the check of each registered grammar on the report. A violation (`bad_grammar`) gets the contract-correction rung, like a missing section. The grammar names are the vocabulary of `phasespec` (`phasespec.Grammars()`).
+**Report grammars.** A user phase is allowed to declare `classify.grammars`, a list of named report grammars. The deliverable gate runs the check of each registered grammar on the report. A violation (`bad_grammar`) gets the contract-correction rung, like a missing section. The grammar names are the vocabulary of `phasespec` (`phasespec.Grammars()`).
 
 A user spec that names any other grammar fails `ValidateUserSpec`. The catalog load then skips it with a WARN, the same as any invalid spec. A typo is therefore a load error and never reaches the correction rung of an agent. The `unbound_grammar` code of the gate stays for a spec that bypassed validation. `TestGrammars_TheGateBindsExactlyTheGrammarsASpecMayDeclare` pins the registry of the gate to that vocabulary in both directions.
 

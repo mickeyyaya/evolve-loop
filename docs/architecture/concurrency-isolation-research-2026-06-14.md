@@ -107,10 +107,10 @@ token + sandbox profile. Drivers consume the token + their own per-dispatch TMPD
 ## Part 3 — Cross-cutting isolation principles (apply program-wide)
 
 1. **Run-ID is durable IDENTITY, not a path.** Store it in the ledger/sidecar. Map it to a stable-or-slot-indexed workspace. Never branch logic on it as a location. Never make it the dir name of a resumable workspace. (Temporal/Airflow/GitLab/Jenkins consensus.)
-2. **Immutable shared inputs, per-worker mutable scratch.** Workers can share read-only inputs (Ray per-job `working_dir`). Any path that a unit MUTATES must be per-worker. Copy config/`.env` into each worktree, never symlink.
+2. **Immutable shared inputs, per-worker mutable scratch.** Read-only shared inputs are allowed to be shared (Ray per-job `working_dir`). Any path that a unit MUTATES must be per-worker. Copy config/`.env` into each worktree, never symlink.
 3. **One short-held integrator lock, everything else concurrent.** Serialize ONLY the git `stage→validate→ff-push` critical section (`.evolve/ship.lock`). Never serialize the whole think-heavy cycle (critical-section minimization).
 4. **Test-the-merged-tree, then promote (Not-Rocket-Science).** Merge/rebase produces a NEW tree, so the prior green is stale. On a diverged base, **rebase-and-re-audit**. SHA-pin the attestation to the exact pushed tree, so that what-you-audited == what-you-shipped.
-5. **Single serialized writer for the audit chain; batch (don't multi-write) for throughput.** Shard only when a single batched writer provably cannot keep up. Then use a root-of-roots anchor to restore whole-history verifiability.
+5. **Single serialized writer for the audit chain; batch (don't multi-write) for throughput.** Shard only when a single batched writer provably cannot keep up. Shard only with a root-of-roots anchor, to restore whole-history verifiability.
 6. **Per-child explicit env, never process-global `os.Setenv` on a concurrent launch path.** Build each `exec.Cmd.Env` as an explicit snapshot. This also makes orchestrator tests `t.Parallel`-safe.
 7. **Five-axis per-dispatch namespace for every spawned child.** The five axes are:
    - private TMPDIR (`mktemp -d 0700`);

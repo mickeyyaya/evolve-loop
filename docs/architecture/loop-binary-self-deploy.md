@@ -59,7 +59,7 @@ A bad rebuild can never brick the batch. The loop just does not adopt it.
 | Condition | Action |
 |---|---|
 | `EVOLVE_SELF_DEPLOY=off` | never check; current behavior |
-| `=shadow` | log the planned re-exec; change nothing (soak evidence) |
+| `=shadow` | log `would-re-exec`; change nothing (soak evidence) |
 | boot-smoke fails | keep running binary; file `self-deploy-boot-smoke-failed` defect; continue |
 | running SHA ≠ `HEAD:go/evolve` blob SHA (divergent, not a verified rebuild) | refuse re-exec (same trust floor as `repairSelfSHAPin`); file defect |
 | `tracked` not an ancestor of HEAD | refuse (don't adopt an unrelated binary) |
@@ -68,7 +68,7 @@ A bad rebuild can never brick the batch. The loop just does not adopt it.
 
 ## Build order (slices, each TDD + dual-review + ship + soak)
 
-1. **Identity probe (pure, no exec):** `selfdeploy.ShouldRedeploy(running, trackedCommitForGoEvolve, headAncestry) → (bool, reason)`. Unit-testable, zero side effects. Wire a **shadow** log at the cycle boundary. Ship. The soak collects the frequency of planned re-execs.
+1. **Identity probe (pure, no exec):** `selfdeploy.ShouldRedeploy(running, trackedCommitForGoEvolve, headAncestry) → (bool, reason)`. Unit-testable, zero side effects. Wire a **shadow** log at the cycle boundary. Ship. The soak collects the frequency of `would-re-exec` logs.
 2. **Boot-smoke gate:** reuse `looppreflight`/`evolve doctor boot` against the candidate binary; the decision stays advisory (shadow still logs). Ship.
 3. **Re-exec + re-pin (enforce path, still shadow-default):** `syscall.Exec` resume + the SELF_SHA re-pin + the one-generation sentinel. Behind `=enforce`. Soak in a dedicated run. ADR-0046 says the natural home is the **CE fleet-supervisor wave**, where worker-restart-on-new-binary is native. Sequence it there.
 
@@ -82,5 +82,5 @@ A bad rebuild can never brick the batch. The loop just does not adopt it.
 ## Non-goals
 
 - A dedicated "hotfix phase" (ADR-0046 rejected it — hotfix capability is emergent from blocker-solo + demotion + self-deploy).
-- Re-exec mid-cycle (only at the boundary — gates run in-process, and mid-cycle adoption changes the binary under a running phase).
+- Re-exec mid-cycle (only at the boundary — gates run in-process). The risk is that mid-cycle adoption changes the binary under a running phase.
 - Cross-version self-deploy (a major-version bump is a release, `evolve release`, not a loop self-deploy).

@@ -29,15 +29,15 @@ An entry retires when either:
   that the ID-keyed dedupe never collapsed.
 
 Everything else survives in original order (the router window is ordered). The
-function never mutates the input slice. Callers re-read state under a lock, so a mutated input
-corrupts the merge of a concurrent peer. A blank committed id is malformed input. It is not
+function never mutates the input slice. Callers re-read state under a lock. A mutated input is dangerous:
+it corrupts the merge of a concurrent peer. A blank committed id is malformed input. It is not
 a claim about the equally-malformed blank-ID entry, and it retires nothing.
 
 **Production caller:** `retireCommittedCarryover` in
 `go/internal/phases/ship/postship.go`, invoked from `promoteInbox` inside the landed
 branch. Two properties are load-bearing:
 
-- It rides the **same landing gate** as inbox promotion (cycle-598). Retiring on an
+- It rides the **same landing gate** as inbox promotion (cycle-598). Without that gate, retiring on an
   unlanded ship erases the only record of work that never shipped.
 - It is **bookkeeping only**: a missing `state.json`, an unreadable state map, or a
   failed write is a `WARN` in `res.Logs`, never a ship error.
@@ -50,9 +50,9 @@ same `withStateLock` that every other `state.json` RMW takes (ADR-0049 S2 / G2).
 
 `stageExplicitPaths` (`go/internal/phases/ship/gitops.go`) classified **every**
 refused `git add` as `core.ShipClassTransient`, so the failure floor kept
-re-dispatching refusals that can never succeed in place. Cycle 1365 burned its
+re-dispatching refusals that were never able to succeed in place. Cycle 1365 burned its
 entire retry budget on one `.evolve/evals` pathspec: its worktree base predated the
-`.gitignore` carve-out, so no retry can ever win.
+`.gitignore` carve-out, so no retry was able to win.
 
 **Rule:** the *first* refusal of a given pathspec stays `ShipClassTransient` — a
 genuinely flaky add must keep its retry. A *second consecutive* refusal of the
@@ -61,7 +61,7 @@ router routes to continuation/salvage instead of another doomed try.
 
 - Identity is the **sorted path set** (`stageRefusalKey`), so "same pathspec" is
   order-independent but a different refused path is a different failure and resets
-  to transient. A rule that merely counts refusals wrongly kills the retry for
+  to transient. If a rule merely counted refusals, it wrongly kills the retry for
   an unrelated second failure.
 - Memory is **workspace-scoped** (`<workspace>/ship-stage-refusal.txt`): fleet lanes
   run concurrently, so one lane's strike must never block a peer's first try.
@@ -87,8 +87,8 @@ further tokens now fold:
 | `cycleNumberToken` | `.evolve/runs/cycle-1365/…`, `.evolve/worktrees/cycle-42824668-1440/…`, bare `cycle 1365` | The same abort recorded on two cycles is one defect. The trailing `(?:-\d+)*` is required for the worktree shape, whose name carries both a lane hash and a cycle number. |
 | `attemptDenominatorToken` | `(attempt 1/3)`, `retry 3 of 4` | One unwinnable defect retried N times is one defect — exactly the retry storms the breaker exists to halt. |
 
-**Blast radius is the constraint, not the folding.** Over-normalization that
-collapses two different defects blinds the breaker far worse than the variance
+**Blast radius is the constraint, not the folding.** If over-normalization
+collapses two different defects, it blinds the breaker far worse than the variance
 it fixes. Thus:
 
 - Only the *number* folds — the path around it (which directory, which artifact
@@ -105,7 +105,7 @@ merely counts, satisfies every positive test above.
 ## Acceptance coverage
 
 `go/acs/cycle1440/predicates_test.go` exercises each seam by running the named tests
-in the production packages. It never uses a source grep, which passes on a cosmetic edit
+in the production packages. It never uses a source grep, because a source grep passes on a cosmetic edit
 that normalizes nothing. `TestC1440_002_CarryoverRetirementWiredIntoPassCloseout` is
 the test that actually gates §1. It drives `promoteInbox` end to end and asserts the
 observable `state.json` mutation, because a seam whose only caller is a test is dead

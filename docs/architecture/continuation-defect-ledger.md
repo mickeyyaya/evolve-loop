@@ -17,7 +17,7 @@ accumulation of individually-honest restatements across four cycles.
 The retrospective half had the same shape. The retro of cycle-1255 "filed" two
 remediation items that existed only inside
 `.evolve/runs/cycle-1255/retrospective-report.md`. The own queue of the loop never saw
-them, so nothing downstream can ever work them. Later continuations were
+them, so nothing downstream was able to work them. Later continuations were
 free to treat the defects as gone.
 
 ## Gap
@@ -62,8 +62,8 @@ past the immediate ancestor. The ledger stores defect text **verbatim**. Narrowi
 text is the laundering.
 
 A PASS, or a FAIL with no structured defects, mints
-nothing. An empty ledger on every cycle makes every later cycle look like a
-continuation and makes the gate below vacuous. Re-emission on a retry
+nothing. If every cycle emitted an empty ledger, every later cycle looks like a
+continuation and the gate below is vacuous. Re-emission on a retry
 merges by text and does not replace. Replacement is deletion by another
 name.
 
@@ -111,14 +111,14 @@ This block is that document. The same example is carried in
 the file is rejected as unparseable. There is one schema in three projections.
 `defect_ledger_doc_example_test.go` holds them in sync.
 
-`evidence` can be a single citation string **or an array of citation strings**
+`evidence` is allowed to be a single citation string **or an array of citation strings**
 (`"evidence": ["a.go:12", "b.go:34"]`). The array is joined with `"; "` into the
 written-back ledger, and **every** element must resolve. The tolerance is on the
 SHAPE only. The gate still rejects as unparseable an `evidence` that is neither a string nor an array of strings
 (an object, a number). It does not degrade it to
 empty. An empty array is still an unevidenced closure.
 
-The gate must account for every inherited `OPEN` entry. An entry is unaccounted when it has no
+The dispositions of the cycle must account for every inherited `OPEN` entry, and the gate checks them. An entry is unaccounted when it has no
 disposition, has `FIXED` without evidence, has `DEFERRED` without a reason, or has an
 unrecognized status. An unaccounted entry blocks the PASS and the gate names the offending **ids** in an
 error diagnostic.
@@ -152,8 +152,8 @@ package and cannot import `inboxbatch`. Parity is therefore by tag, and a test a
 the raw JSON keys.
 
 The inbox write goes **first**, and its failure aborts before the retrospective
-is written. The reverse order leaves the exact 1255 state ("filed" in the
-report, absent from the queue) reachable as the outcome of a partial failure.
+is written. With the reverse order, the exact 1255 state ("filed" in the
+report, absent from the queue) is reachable as the outcome of a partial failure.
 The code deliberately does not try rollback of already-written items. `writeIfAbsent`
 makes the retry idempotent, and a real remediation item that stays queued is the safe
 direction to fail in.
@@ -222,9 +222,9 @@ launder. Cycle-1282 is the continuation that closes them.
 
 ### Issue
 
-The ledger was a record in which rows were quietly lost. It minted ids that re-bind to
-different text. It honored a closure claim that nobody can follow. One
-`rm` disarmed it. It skipped the WARN path entirely. The retro half filed the
+Before the fix, the ledger was able to lose rows quietly. It was able to mint ids that re-bound to
+different text. It was able to honor a closure claim that nobody can follow. One
+`rm` was able to disarm it. It skipped the WARN path entirely. The retro half filed the
 synthesized summary echo as a priority-H bug and concatenated an unvalidated id
 into a filesystem path.
 
@@ -233,7 +233,7 @@ into a filesystem path.
 | # | Gap | Fix |
 |---|---|---|
 | **D1** (CRITICAL) | `reconcileContinuationDefects` rebuilt `merged` from `ancestor.Entries` alone and truncate-wrote it. An ordinary second `Classify` therefore erased the entries that `emitDefectLedger` had appended on the first. No adversary was required. Ids were positional (`"d"+len+1`). Any shrink or reorder re-bound an id to different text, and a disposition keyed on it closed something else. | Reconcile now MERGES onto the ledger already in the workspace, indexed by id. It adds ancestor entries and never substitutes them for what is there. Ids come from `defectID(text)` = `"d"+sha256(text)[:4]`, stable across cycles and chains. |
-| **D2** (HIGH) | The ancestor ledger lives outside the workspace. A missing one returned `(nil, false)` with no diagnostic. One `rm` disarmed the gate in silence. | The missing-ancestor path emits a WARN that names the ancestor cycle and the path it looked in. It does not block, on purpose. Ancestors that predate the mechanism are legitimate and common (cycle-1279 itself left no ledger). Blocking breaks every real continuation, and the diagnostic already removes the silence. |
+| **D2** (HIGH) | The ancestor ledger lives outside the workspace. A missing one returned `(nil, false)` with no diagnostic. One `rm` disarmed the gate in silence. | The missing-ancestor path emits a WARN that names the ancestor cycle and the path it looked in. It does not block, on purpose. Ancestors that predate the mechanism are legitimate and common (cycle-1279 itself left no ledger). If the gate blocks here, every real continuation breaks, and the diagnostic already removes the silence. |
 | **D3** (HIGH) | Closure evidence was validated for non-emptiness after trim. `evidence:"x"` therefore transitioned an inherited CRITICAL to FIXED. | `evidenceResolves` requires the citation to name a file that exists under the workspace or the project root. It tolerates the `path:line` and `path:line:col` forms that auditors actually write. The gate reports a rejected closure by id **and** writes it back as `OPEN`. The artifact must not assert a closure that the gate refused. |
 | **D4** (HIGH) | Three of the five disposition arms and the non-OPEN carry-forward had zero executing coverage. They are the headline rule of the acceptance criterion. | `TestClassify_DispositionArms` (6-case table) + `TestClassify_CarriesForwardAlreadyDispositionedAncestorEntry`. |
 | **D5** (MEDIUM) | `failure_learning.go` claimed to file only self-reported defects but implemented that as `structured != nil`. A classed-but-defectless block left `ev.Defects` as the summary echo and filed it as a priority-H inbox bug. | The call site now applies `faillearn.StructuredDefects`. It is the one rule that the lesson writer already uses, exported and not restated. The lesson and the queue therefore cannot disagree about what a real defect is. |
@@ -262,7 +262,7 @@ line was agent-authored prose.
 every report passes `hooks.Classify`. `go/internal/phases/audit/closure_claim.go`
 runs there, line-scoped. A claim that a prior cycle's defect is closed must
 name `defect-dispositions.json` or `defect-ledger.json` on that same line.
-The gate deliberately does not accept a whole-document citation. One incidental mention
+The gate deliberately does not accept a whole-document citation. With whole-document citation, one incidental mention
 vouches for twenty unevidenced claims.
 
 **Matcher posture (cycle-1431, #448).** The original unbounded substring match
@@ -296,8 +296,8 @@ reproducer before this landing. Each is now a tree-resident lock in
 | F1 | HIGH | Two ordinary defect lines that diverged only after rune 60 minted one inbox id. The DEF-4 collision refusal then aborted `WriteArtifacts` before the retrospective. The caller downgraded that to a stderr WARN. The result: no retrospective, no lesson, one item for two defects. | `remediationSlug` is lossy twice (60-rune cap *and* punctuation collapse) yet was used as an identity. | `remediationFingerprint` appends a digest of the FULL title unconditionally, so ids are injective. The ordering that made an inbox failure fatal to the retrospective is left intact. The collision was the cause, not the ordering. |
 | F2 | HIGH | `rm continuation-manifest.json` closed every inherited OPEN defect with verdict PASS and zero diagnostics. The file is a 0644 file in the own workspace of the graded agent. One garbage byte did the same. | Arming depended solely on a workspace file, while every defense sat downstream of arming. | Arming is split out of grading. A corrupt manifest now BLOCKS (the rule that `readDispositions` already applied). A missing one falls back to the root-owned `continuation-registry.json`, keyed by the scope in `lane-scope.json` of this lane. Manifest/registry disagreement blocks. |
 | F3 | MEDIUM | `Defect-Ledger.json` cited the own record of the gate and closed all inherited defects on a case-insensitive volume. | The self-vouching switch compared basenames exactly. `os.Lstat` two lines later did not. | `strings.EqualFold`. The rejection and the resolution now agree on what "the same file" means. |
-| F5 | MEDIUM | A report that *quoted* an inherited defect, whose text contains the phrase, and declared it still OPEN was graded FAIL. | The gate matched the phrase, not the assertion. | `stripQuotedSpans`. Quoting is reporting. An unquoted assertion is claiming. The design rejected negation markers as a signal: appending "not closed" is a bypass cheaper than the citation demanded. |
-| F4 | LOW | `writeIfAbsent` was stat-then-write. Two fleet lanes can both observe "absent". The DEF-4 equality check only observed the race afterwards. | No exclusive create. | Publish by `os.Link` from a fully-written temp file in the same directory. Create-or-EEXIST is one atomic step, and no partial artifact can appear under the real name. |
+| F5 | MEDIUM | A report that *quoted* an inherited defect, whose text contains the phrase, and declared it still OPEN was graded FAIL. | The gate matched the phrase, not the assertion. | `stripQuotedSpans`. Quoting is reporting. An unquoted assertion is claiming. The design rejected negation markers as a signal: with negation markers, appending "not closed" is a bypass cheaper than the citation demanded. |
+| F4 | LOW | `writeIfAbsent` was stat-then-write. Before the fix, two fleet lanes were able to both observe "absent". The DEF-4 equality check only observed the race afterwards. | No exclusive create. | Publish by `os.Link` from a fully-written temp file in the same directory. Create-or-EEXIST is one atomic step, and no partial artifact can appear under the real name. |
 
 **Known ceiling.** The F2 fallback needs the scope of the lane to look the binding up.
 A workspace with BOTH the manifest and `lane-scope.json` destroyed is not
@@ -314,7 +314,7 @@ tree-resident locks in `go/internal/faillearn/writer_mode_test.go` and
 
 | Defect | Sev | Issue | Gap | Solution |
 |---|---|---|---|---|
-| 1287-F1 (defects[0]) | MEDIUM | The failure floor published its own artifacts at 0600. The artifacts are `retrospective-report.md`, `lessons/*.yaml` and `.evolve/inbox/*.json`. Every other runtime artifact publishes 0644. | `os.CreateTemp` creates at 0600, and `os.Link` preserves it. The 1285 stat-then-write → link-publish rewrite dropped the mode silently, because nothing in the tree pinned it. | `tmp.Chmod(publishedFileMode)` on the TEMP before the link, so the published inode carries the documented 0644 of `internal/atomicwrite`. The design rejected a chmod of the destination. It also rewrites the mode of a PRESERVED pre-existing artifact on the skip path. |
+| 1287-F1 (defects[0]) | MEDIUM | The failure floor published its own artifacts at 0600. The artifacts are `retrospective-report.md`, `lessons/*.yaml` and `.evolve/inbox/*.json`. Every other runtime artifact publishes 0644. | `os.CreateTemp` creates at 0600, and `os.Link` preserves it. The 1285 stat-then-write → link-publish rewrite dropped the mode silently, because nothing in the tree pinned it. | `tmp.Chmod(publishedFileMode)` on the TEMP before the link, so the published inode carries the documented 0644 of `internal/atomicwrite`. The design rejected a chmod of the destination. With a chmod of the destination, the code also rewrites the mode of a PRESERVED pre-existing artifact on the skip path. |
 | 1287 residual (UNQUEUED diagnosis) | MEDIUM | A disk-level inbox failure aborted before any artifact was written. The failure ANALYSIS died with the queue write, and the next continuation had to re-derive it. | The abort ordering is correct and load-bearing. The missing piece: "do not claim the remediation was queued" had been implemented as "write nothing at all". | `preserveDiagnosis` publishes the analysis under the distinct name `retrospective-unqueued.md`. The file is marked UNQUEUED and names every item that reached no queue. The ordering is unreversed, and `WriteArtifacts` still returns the error. |
 
 **Disposition.** Both are FIXED, per the records in `defect-dispositions.json` for
@@ -328,7 +328,7 @@ It is a different surface, not this lane's.
 **Why a distinct filename.** `retrospective-report.md` on disk ASSERTS that the
 remediation reached the queue. That is the 1255 invariant, pinned by
 `inbox_transactional_test.go`, which this landing left byte-identical (predicate
-`TestC1290_004`). A reuse of the canonical name for a degraded artifact is a hypothetical alternative. In that case the lock needs a weakening.
+`TestC1290_004`). The design uses a distinct name. If it reused the canonical name for a degraded artifact, that lock then needs a weakening.
 
 That is the signal that the design, not the contract, is
 wrong. No reader or gate that keys on the canonical name can mistake `retrospective-unqueued.md`
@@ -350,8 +350,8 @@ and `go/acs/cycle1292/predicates_test.go`.
 
 | Defect | Sev | Issue | Gap | Solution |
 |---|---|---|---|---|
-| 1290-D1 | MEDIUM | Both governed documents asserted that 1287-F2 was "DEFERRED, queued as `audit-eval-existence-path-convention`". This was false on disk: no such item existed under `.evolve/inbox`. It was an unbacked deferral claim inside the very lane that exists to catch unbacked claims. | The role guard of the audit phase denies writes outside its workspace. The audit that raised the deferral therefore cannot file the queue entry that its own record cited. | The queue entry now exists: `.evolve/inbox/2026-08-04T22-40-00Z-audit-eval-existence-path-convention.json`. The BUILD phase filed it, because that phase holds write authority over the tracked `.evolve/inbox` path. `TestC1292_004` pins it. The test drives the real consumer `inboxbatch.LoadDir` and does not stat a filename. A file that the loader drops backs no deferral claim. |
-| 1290-D2 | MEDIUM | `writeInboxItems` is not atomic across items. It writes one file per item and returns on the FIRST failure, so items before the failing one are already queued. `preserveDiagnosis` nonetheless listed EVERY configured item as "still UNQUEUED". It overclaimed which remediation was lost. | `preserveDiagnosis` held only `c.inboxItems`. It therefore cannot tell queued from unqueued. | `writeConfig.unqueuedItems` READS THE INBOX BACK. It names only the items that are absent, or occupied by different content under our id. A read of the queue is right for the states that a failure index cannot describe. Example: a concurrent fleet lane filed an item under the same deterministic id. That item is queued. An id collision is not. |
+| 1290-D1 | MEDIUM | Both governed documents asserted that 1287-F2 was "DEFERRED, queued as `audit-eval-existence-path-convention`". This was false on disk: no such item existed under `.evolve/inbox`. It was an unbacked deferral claim inside the very lane that exists to catch unbacked claims. | The role guard of the audit phase denies writes outside its workspace. The audit that raised the deferral was therefore unable to file the queue entry that its own record cited. | The queue entry now exists: `.evolve/inbox/2026-08-04T22-40-00Z-audit-eval-existence-path-convention.json`. The BUILD phase filed it, because that phase holds write authority over the tracked `.evolve/inbox` path. `TestC1292_004` pins it. The test drives the real consumer `inboxbatch.LoadDir` and does not stat a filename. A file that the loader drops backs no deferral claim. |
+| 1290-D2 | MEDIUM | `writeInboxItems` is not atomic across items. It writes one file per item and returns on the FIRST failure, so items before the failing one are already queued. `preserveDiagnosis` nonetheless listed EVERY configured item as "still UNQUEUED". It overclaimed which remediation was lost. | `preserveDiagnosis` held only `c.inboxItems`. It was therefore unable to tell queued from unqueued. | `writeConfig.unqueuedItems` READS THE INBOX BACK. It names only the items that are absent, or occupied by different content under our id. A read of the queue is right for the states that a failure index cannot describe. Example: a concurrent fleet lane filed an item under the same deterministic id. That item is queued. An id collision is not. |
 
 **Disposition.** Both are FIXED, per the records in `defect-dispositions.json` for
 this lineage. `1287-F2` itself stays DEFERRED. It is a different surface (the audit
@@ -364,9 +364,9 @@ stays "name work that may already be filed" over "lose work".
 Re-filing an identical item is idempotent by the same-content rule of `writeIfAbsent`.
 An omitted item is work that nobody goes looking for.
 
-**Known ceiling.** The read-back is a point-in-time observation. A concurrent lane
-can file one of our ids in the window between the failed write and the publication of the degraded
-artifact. The code then reports that id as unqueued. The direction is the safe
+**Known ceiling.** The read-back is a point-in-time observation. Suppose a concurrent lane
+files one of our ids in the window between the failed write and the publication of the degraded
+artifact. Then the code reports that id as unqueued. The direction is the safe
 one, and no cross-lane lock is worth taking on a failure path.
 
 `WriteArtifacts`
@@ -393,7 +393,7 @@ ORCHESTRATOR now releases. Full rationale and rejected alternatives:
 
 **Issue.** The audit was the only writer of the ledger, so a defect reached the record only after the gate rejected. The new `code-review` phase ([ADR-0124](adr/0124-code-review-phase.md), [design](review-loop-and-quality-index.md)) reviews the diff of the build before the audit. Its findings need the same addressable home.
 
-**Gap.** A second store gives findings two homes. A text prefix (like `PRESCRIPTION: `) makes every reader that needs the severity, the source or the dimension parse prose.
+**Gap.** With a second store, findings have two homes. With a text prefix (like `PRESCRIPTION: `), every reader that needs the severity, the source or the dimension parses prose.
 
 **Solution.**
 - **Four additive `omitempty` fields on each entry:** `source` (`code-review`; empty is the audit), `round` (the cycle's code-review dispatch count), `severity` and `dimension` (a quality-index dimension). Old ledgers parse and re-serialize byte-identical.

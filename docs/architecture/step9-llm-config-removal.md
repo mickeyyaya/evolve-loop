@@ -9,7 +9,7 @@
 > load-bearing behavior change and was coherent + tested on its own.
 >
 > **9b shipped:** removed these items:
->
+
 > - `setup.Validate`;
 > - the `evolve setup validate` subcommand + `--config`;
 > - `paths.LLMConfigFile` + `EVOLVE_LLM_CONFIG_PATH`;
@@ -18,7 +18,7 @@
 > - the stale `llm_config` comments in `llmroute.go`/`runner.go`;
 > - `setup.PhaseStatus.CurrentModel` + the dead `DetectOptions.ConfigPath`;
 > - the `acs/cycle-52`+`acs/cycle-53` llm_config predicates.
->
+
 > New: `setup.Detect` is policy-pin-aware (`source=policy-pin`,
 > `pin_violation`, `policy_error`); `/setup` SKILL + setup-onboarding.md rewritten.
 >
@@ -31,7 +31,7 @@
 > `TestResolve_IgnoresLLMConfig` proves a present llm_config.json is ignored.
 >
 > **9b (remaining, follow-up):** the residual non-dispatch surfaces. Remove these items:
->
+
 > - `setup.Validate`'s llm_config clamp + the `--config`/default of the `evolve setup validate` subcommand;
 > - `paths.LLMConfigFile`;
 > - the dead `subagent` `LLMConfigPath` plumbing (`run.go`/`validateprofile.go` field + `ResolveLLM(agent, configPath)` seam);
@@ -39,7 +39,7 @@
 > - the stale `llm_config` comments in `llmroute.go`/`runner.go`;
 > - the now-always-empty `setup.PhaseStatus.CurrentModel` report field;
 > - the stale `acs/cycle52`+`acs/cycle53` predicates. They still assert `source=llm_config`. acs/ is excluded from CI, so they do not fail the gate, but they test removed behavior.
->
+
 > None is load-bearing for dispatch.
 
 ## Goal

@@ -3,7 +3,7 @@
 > **Superseded in part (2026-10-07):** the flag-gated builder self-review loop described below (`EVOLVE_BUILDER_SELF_REVIEW`) is gone; the flag has had no reader since cycle 22's dead-flag sweep. Every code-cycle source writer now runs `code-review-simplify`'s required Self-review hook, preloaded by the compiled-default overlay ([skill-overlays](skill-overlays.md)). The cycle 15–20 analysis stands as history.
 
 > **Status:** v9.1.1 baseline — Cycle 15 research deliverable + opt-in audit-advisory hook. Cycles 16+17 originally shipped advisory subagents (`code-simplifier`, `evolve-code-reviewer`), but their reports were orphans with no downstream consumer. The cycle 20 refactor deleted both. It replaced them with a Builder self-review skill loop (`EVOLVE_BUILDER_SELF_REVIEW=1`, default OFF). The loop invokes review skills mid-build through the Skill tool and converges before Auditor handoff. See "Cycle 20 Refactor" section below.
->
+
 > For context-floor history see [token-floor-history.md](token-floor-history.md).
 > For Cycle-11 cost forensics see [token-economics-2026.md](token-economics-2026.md).
 
@@ -214,8 +214,9 @@ Near-term target (Cycles 15–18 combined): **−48% = ~$3.20/cycle saved**.
 | **LoC delta** | ~436 LoC deleted (5 files) + ~60 LoC added (`evolve-builder.md`) = ~376 net subtraction across ~8 files |
 | **Risk** | Low — `EVOLVE_BUILDER_SELF_REVIEW=0` default preserves byte-equivalence. Sycophancy break primary defense (Builder Sonnet → Auditor Opus) untouched. |
 | **Target cycle** | 20 (SHIPPED — v9.2.0) |
-| **Verification** | Cycle-20 end-to-end verification: `EVOLVE_BUILDER_SELF_REVIEW=1` activated with `code-review-simplify` skill; `## Self-Review` section confirmed in `build-report.md` with convergence verdict + per-skill composite scores. See cycle-20 build-report for cost delta (flag=1 overhead ~$0.10–0.25 per iteration; baseline flag=0 avg $1.07/cycle cycles 17–19). See `docs/architecture/review-skill-catalog.md` for full compatibility table. Git ref contract closed: SKILL.md Step 1 now uses adaptive `HEAD`/`HEAD~1` detection. It was `HEAD~1` hardcoded, which reviewed the previous cycle's commit and not the in-flight changes of Builder. |
-| **Verification (continued)** | Skill catalog assessed: `code-review-simplify` confirmed as the only compatible built-in skill. `simplify` system skill is action-based (no composite score), `review` is PR-centric, and `refactor` spawns parallel worktrees (single-writer violation). Default-OFF behavior preserved: flag=0 produces no `## Self-Review` section (byte-equivalent to pre-v9.2.0). |
+| **Verification** | Cycle-20 end-to-end verification: `EVOLVE_BUILDER_SELF_REVIEW=1` activated with `code-review-simplify` skill; `## Self-Review` section confirmed in `build-report.md` with convergence verdict + per-skill composite scores. See cycle-20 build-report for cost delta (flag=1 overhead ~$0.10–0.25 per iteration; baseline flag=0 avg $1.07/cycle cycles 17–19). Git ref contract closed: SKILL.md Step 1 now uses adaptive `HEAD`/`HEAD~1` detection. Without it, the hardcoded `HEAD~1` reviews the previous cycle's commit and not the in-flight changes of Builder. Skill catalog assessed: `code-review-simplify` is the only compatible built-in skill (see the notes under the table). Default-OFF behavior preserved: flag=0 produces no `## Self-Review` section (byte-equivalent to pre-v9.2.0). |
+
+**Skill catalog notes.** The `simplify` system skill is action-based (no composite score). The `review` skill is PR-centric. The `refactor` skill spawns parallel worktrees (single-writer violation). See `docs/architecture/review-skill-catalog.md` for the full compatibility table.
 
 **Why this refactor.** Cycles 16+17 template-copied the advisory pattern of cycle-15 (skill invoked as a separate subagent around the Builder). But the pattern of cycle 15 advised an *already-bound* audit verdict, which is useful as observability. Cycles 16+17 instead advised mid-build work that Builder can still revise. Nothing wired their reports back to Builder. The reports (`code-simplifier-report.md`, `workers/code-reviewer.md`) became orphan forensic artifacts.
 
@@ -338,7 +339,7 @@ This is cost-prevention: breach incidents cost ~$5.48/cycle in wasted retries (c
 
 **Inbox audit (cycle 41):** c45 (P-NEW-6 Branch B tool-result clearing) and C1 (ship-gate tree-SHA binding) confirmed ALREADY DONE — do NOT re-implement.
 
-**Auditor model discrepancy:** cycle-39 used `claude-sonnet-4-6` despite `auditor.json:model_tier_default=opus`. The operator must verify if it is intentional (`ADVERSARIAL_AUDIT=0` or model-tier override) or accidental. If intentional, P-NEW-2 is effectively shipping $0.97/cycle savings; document it. If accidental, adversarial quality may be degraded.
+**Auditor model discrepancy:** cycle-39 used `claude-sonnet-4-6` despite `auditor.json:model_tier_default=opus`. It is recommended that the operator verify the cause: intentional (`ADVERSARIAL_AUDIT=0` or model-tier override) or accidental. If intentional, P-NEW-2 is effectively shipping $0.97/cycle savings; document it. If accidental, adversarial quality may be degraded.
 
 | Item | State | Evidence anchor |
 |------|-------|----------------|
@@ -478,7 +479,7 @@ Source: https://platform.claude.com/cookbook/tool-use-context-engineering-contex
 | **Target cycle** | 45+ |
 | **Verification** | Isolated test: same cross-phase artifacts through MCP Compaction against current bash preprocessing; assert output quality preserved |
 
-**Source:** Anthropic MCP + Compaction (2026 engineering blog) — native compaction API enables memory-efficient cross-agent communication; combined with tool-result clearing, eliminates token waste from execution trace bloat. evolve-loop already does compaction-equivalent through EVOLVE_CONTEXT_DIGEST; MCP Compaction can provide a runtime-native mechanism.
+**Source:** Anthropic MCP + Compaction (2026 engineering blog) — native compaction API enables memory-efficient cross-agent communication; combined with tool-result clearing, eliminates token waste from execution trace bloat. evolve-loop already does compaction-equivalent through EVOLVE_CONTEXT_DIGEST; MCP Compaction is a possible runtime-native mechanism.
 
 ---
 
@@ -529,7 +530,7 @@ Source: https://platform.claude.com/cookbook/tool-use-context-engineering-contex
 
 **Source:** Agentic Plan Caching (arXiv:2506.14852, 2026) — cache structured plan templates from first Builder reasoning; reuse across semantically similar task classes through lightweight similarity matching. Benchmark: 76.42% cost reduction on GAIA, 0.61% accuracy drop.
 
-**Applicability to evolve-loop:** Builder repeatedly solves similar task archetypes (profile edit, persona section add, roadmap update, ACS predicate write). Plan templates for these archetypes possibly save 5–8 planning turns per cycle on recognized task types.
+**Applicability to evolve-loop:** Builder repeatedly solves similar task archetypes (profile edit, persona section add, roadmap update, ACS predicate write). The estimate is that plan templates for these archetypes save 5–8 planning turns per cycle on recognized task types.
 
 ---
 
@@ -546,7 +547,7 @@ Source: https://platform.claude.com/cookbook/tool-use-context-engineering-contex
 
 **Source:** Hierarchical Caching for Agentic Workflows (MDPI 2026) — multi-level caching (workflow-level + tool-level) with dependency-aware graph invalidation. MCP tool schema re-sending is 30–50% of context waste in ≥40-tool workflows.
 
-**Applicability to evolve-loop:** evolve-loop uses strict MCP config per subagent (`--strict-mcp-config`); tool schemas are re-sent on each `subagent-run.sh` invocation. With ~6 subagents/cycle each receiving the same tool schema set, dispatcher-level caching can eliminate most of that redundancy.
+**Applicability to evolve-loop:** evolve-loop uses strict MCP config per subagent (`--strict-mcp-config`); tool schemas are re-sent on each `subagent-run.sh` invocation. With ~6 subagents/cycle each receiving the same tool schema set, the estimate is that dispatcher-level caching eliminates most of that redundancy.
 
 ---
 
@@ -586,7 +587,7 @@ Once all three gates satisfied: `Write` the report and halt. Banned post-report 
 
 **Problem:** Anthropic silently changed prompt cache TTL from 60 min → 5 min on 2026-03-06. For multi-agent pipelines where sequential phases span 10–30+ minutes total, this means every phase re-pays cache-creation costs (~$0.40–0.63/phase × 5 phases ≈ $2/cycle fixed overhead). Cross-phase cache reuse — which was theoretically possible under the 60-min TTL — is now structurally impossible.
 
-Per cycle-11 forensics (`docs/architecture/token-economics-2026.md`): cache-creation is ~30% of per-phase cost. Eliminating cross-phase cache misses (restoring 1-hour TTL) can recover most of this.
+Per cycle-11 forensics (`docs/architecture/token-economics-2026.md`): cache-creation is ~30% of per-phase cost. The estimate is that eliminating cross-phase cache misses (restoring 1-hour TTL) recovers most of this.
 
 **Three mitigation paths:**
 

@@ -40,7 +40,7 @@ narrowly scoped to genuinely transient failures, never a real FAIL of a model.
 ## Principle for fixes
 
 A failure in the **failure-handler** (retro, debugger) must never be fatal (GAP 9).
-A **transient** infra/bridge failure is recommended to retry or reroute, bounded (GAP 1/5). A
+The recommended response to a **transient** infra/bridge failure is a bounded retry or reroute (GAP 1/5). A
 **genuine** model FAIL or correctness-guard breach must still stop. Recovery is for
 transient/infra faults. It does not mask real failures (token-optimization + the
 "imprecise-evaluator" caveat).

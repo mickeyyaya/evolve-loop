@@ -1,6 +1,6 @@
 # Testing Strategy & Coverage Runbook
 
-> Companion to [TEST_PLAN.md](../TEST_PLAN.md) (per-package coverage contracts). This file captures four items. They are the **layer taxonomy** and the **review findings**. The findings motivated the v12.x test-hardening effort. This file also holds the **meaningful-floor coverage policy** and the **runbook** for a package that rises to the floor. Authored during the `feat/test-coverage-hardening` effort.
+> Companion to [TEST_PLAN.md](../TEST_PLAN.md) (per-package coverage contracts). This file captures the **layer taxonomy** and the **review findings**. The findings motivated the v12.x test-hardening effort. It also captures the **meaningful-floor coverage policy** and the **runbook** to raise a package to the floor. Authored during the `feat/test-coverage-hardening` effort.
 
 ## Contents
 
@@ -77,4 +77,4 @@ The repeatable loop, demonstrated raising `phases/ship` 63%→82.5% (`worktree_t
 1. Finish the `phases/ship` dry-run-path cluster (→ ~90%+; the floor minus the exclusion zone).
 2. Apply the runbook to `releasepipeline` and `rollback`, then to the 16 packages at 85–94%. Each package is independent, so each can run in its own worktree.
 3. **Enforce the gate**: change the `.github/workflows/go.yml` coverage step from warning-only (`exit 0`) to failing at the per-package floor. Use the exclusion list above.
-4. **Mutation testing** on critical packages (`ship`, `guards`, `rollback`, `ledger`) catches "The Liar" tests. Reuse the existing `mutate-eval.sh` discipline. A kill-rate < 0.8 flags a tautological test.
+4. Run **mutation testing** on critical packages (`ship`, `guards`, `rollback`, `ledger`) to catch "The Liar" tests. Reuse the existing `mutate-eval.sh` discipline. A kill-rate < 0.8 flags a tautological test.

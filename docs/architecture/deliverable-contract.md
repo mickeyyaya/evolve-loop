@@ -38,8 +38,10 @@ artifact names from the registry.
 `Agent` selects the router profile, model policy, skill overlays and telemetry label.
 
 `Contract` selects the output protocol that the bridge injects into the prompt. An empty `Contract` defaults to `Agent` for
-existing callers. An explicit unknown contract fails before model dispatch. A silent fallback
-makes a typo validate the wrong file. `PhaseAdvisor` explicitly selects `router`,
+existing callers. An explicit unknown contract fails before model dispatch. A silent fallback is not allowed here.
+If the bridge falls back silently, a typo is validated against the wrong file.
+
+`PhaseAdvisor` explicitly selects `router`,
 `router-replan` or `router-proposal` beside the corresponding artifact path. It never infers the
 protocol from a filename.
 
@@ -313,7 +315,7 @@ only on the tick when the window closes.
 
 The exception is the ONE post-cancel final poll of the wait loop (`isFinalPoll`, and the `ctx.Err()` twin
 for a detector whose context died mid-wait). It completes with `stable == 0`. This is deliberate.
-A demand for a fresh window that it can never get launders every finished-at-the-buzzer session into
+Without the concession, a demand for a fresh window that it can never get launders every finished-at-the-buzzer session into
 `ExitArtifactTimeout`. That is strictly worse than the truncated read this closed.
 
 `renameOnlyRelocate` bounds that concession. Rename relinks the inode, so the open fd of an agent keeps appending

@@ -1,4 +1,4 @@
-# PSMAS Phase Scheduling
+# PSMAS Phase Scheduling ("Predictive Skip via Multi-Agent System")
 
 > **Status:** Foundation shipped v10.17.0 (cycle 98), **opt-in default-off**
 > **Audience:** Operators experimenting with cycle-level token savings; persona authors
@@ -15,15 +15,15 @@ When `EVOLVE_PSMAS_SKIP=1` is set, the Triage agent emits a `phase_skip[]` recom
 | `trivial` | `["tdd-engineer", "retrospective"]` | always |
 | `small` | `["retrospective"]` | only when previous cycle's audit verdict was PASS |
 | `medium` | `[]` | always |
-| `large` | `[]` | always (a gate blocks it, and it is recommended that it does not reach this path) |
+| `large` | `[]` | always (a gate blocks it if it arrives; it is recommended that it does not reach this path) |
 
 **Default-off rationale:** the foundation shipped without A/B verification. Until token-savings are measured against five historical cycle reruns (deferred to a future cycle per `docs/research/v10-17-0-release-debrief.md` §2), the feature is operator-flag-gated. Behavior is byte-identical to v10.10 when `EVOLVE_PSMAS_SKIP` is unset.
 
 ## Why this exists
 
-The Reflexion-style retrospective phase (`agents/evolve-retrospective.md`) is expensive: ~$0.30-0.50 per cycle, ~2 K-4 K tokens of output. Consider cycles whose verdict is PASS and whose scope is `trivial` or `small`. The retrospective rarely produces actionable lessons for them. The cycle worked, and there is nothing to extract.
+The Reflexion-style retrospective phase (`agents/evolve-retrospective.md`) is expensive: ~$0.30-0.50 per cycle, ~2 K-4 K tokens of output. For cycles whose verdict is PASS and whose scope is `trivial` or `small`, the retrospective rarely produces actionable lessons. The cycle worked, and there is nothing to extract.
 
-Similarly, the TDD-engineer phase writes failing tests *before* the Builder writes any production code. Consider a `trivial` cycle (for example, a one-line config tweak with no behavioral change). The RED-test ritual adds cost for it and does not surface new failure modes.
+Similarly, the TDD-engineer phase writes failing tests *before* the Builder writes any production code. For a `trivial` cycle (for example, a one-line config tweak with no behavioral change), the RED-test ritual adds cost. It surfaces no new failure modes.
 
 PSMAS ("Predictive Skip via Multi-Agent System") gives the Triage agent the authority to recommend phase skips. The Triage agent has already classified the cycle size and read the recent verdict history. The Orchestrator honors the recommended skips at gate level. This is a structural shortcut, not a prompt-level optimization. The phases are skipped *at the phase-gate*, and the skip leaves a ledger entry that `--resume` and audit-binding both recognize.
 
@@ -89,7 +89,7 @@ Both gates fail loudly (exit non-zero) when the flag is set without a matching l
 
 ## Resume safety
 
-A `kind:phase_skipped` entry for phase X in cycle N means `--resume` of cycle N MUST treat X as already completed. Without this discipline, a session interruption mid-cycle re-executes the skipped phase on resume, and the savings are lost.
+A `kind:phase_skipped` entry for phase X in cycle N means `--resume` of cycle N MUST treat X as already completed. This discipline keeps a session interruption mid-cycle from re-executing the skipped phase on resume. Without it, the resume re-executes the phase and the savings are lost.
 
 Implementation: `cycle-state.json:completed_phases[]` is populated when the ledger entry is written. The resume path (`legacy/scripts/lifecycle/resume-cycle.sh`) reads `completed_phases[]` before deciding which phase to dispatch next.
 
@@ -139,7 +139,7 @@ For a batch with 5 trivial PASS cycles, conservatively 5 × ($0.30 + $0.50) = $4
 
 Per the cycle-98 lesson's explicit gate criterion: "rerun 5 historical cycles under `EVOLVE_PSMAS_SKIP=1`, assert ≥20% aggregate token reduction." Cycle 99 advances this by analysing the token-economics of five representative PASS cycles (varied sizes) drawn from the batch ledger:
 
-| Cycle | Size estimate | Phases that PSMAS skips | Phase cost estimate | Total cycle cost |
+| Cycle | Size estimate | Phases that PSMAS skips (estimate) | Phase cost estimate | Total cycle cost |
 |---|---|---|---|---|
 | cycle-80 | trivial | tdd-engineer + retrospective | ~$0.80 | ~$2.10 |
 | cycle-82 | small (PASS baseline) | retrospective | ~$0.35 | ~$1.80 |
