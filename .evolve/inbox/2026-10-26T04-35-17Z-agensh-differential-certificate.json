@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "RED first: TestDifferentialCertificate_ADifferentOutputFailsAndNamesTheFirstInput fails before the change.",
+    "Equal outputs on each input give PASS.",
+    "A reference path that the cycle diff changes is refused.",
+    "Changed functions at 100% coverage on every CI OS; audit-evaluation-contract.md \u00a72.2 and the package note are updated."
+  ],
+  "created_at": "2026-10-26T04:35:17Z",
+  "deps": [],
+  "files": [
+    "go/internal/qualityindex/",
+    "docs/architecture/audit-evaluation-contract.md"
+  ],
+  "fix": "Add the certificate kind `differential`: a reference command at a pinned path or commit, a candidate command and an input set. The audit runs both on each input and compares the outputs. A difference is a FAIL that names the first input that differs. The builder cannot change the reference (I-11). The certificate kinds exist only in the spec today; first locate or build the parser of the certificate grammar of audit-evaluation-contract.md \u00a72.2.",
+  "id": "agensh-differential-certificate",
+  "kind": "feature",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "source": "console, 2026-10-26. Research: docs/research/agensh-2026-10.md \u00a76 R5 (option A5).",
+  "summary": "The audit certificate kinds are a closed set with no comparison against a reference program (docs/architecture/audit-evaluation-contract.md \u00a72.2). Agensh workers and the ProgramBench grader verify against a reference binary. Research \u00a72.5 P2.11 and P2.12, \u00a73 F3.10.",
+  "title": "A differential certificate kind: the audit runs a pinned reference and the candidate on the same inputs and compares the outputs.",
+  "weight": 0.3
+}
