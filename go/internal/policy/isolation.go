@@ -4,6 +4,7 @@ type IsolationPolicy struct {
 	I2 IsolationInvariantPolicy `json:"i2,omitempty"`
 	I3 IsolationInvariantPolicy `json:"i3,omitempty"`
 	I5 IsolationInvariantPolicy `json:"i5,omitempty"`
+	I7 IsolationInvariantPolicy `json:"i7,omitempty"`
 	I8 IsolationInvariantPolicy `json:"i8,omitempty"`
 
 	LineageMax int `json:"lineage_max,omitempty"`
@@ -46,4 +47,11 @@ func (p Policy) IsolationLineageMax() int {
 		return 0
 	}
 	return p.Isolation.LineageMax
+}
+
+func (p Policy) IsolationGuaranteeStage() string {
+	if p.Isolation == nil {
+		return ""
+	}
+	return p.Isolation.I7.Stage
 }

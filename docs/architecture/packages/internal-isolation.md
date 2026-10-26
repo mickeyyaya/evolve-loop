@@ -27,7 +27,7 @@ The package runs no check. Each row has an owner test in the package that owns t
 ## Invariants
 
 - The package imports only `signalcenter` and the standard library. It reads no file and starts no process.
-- A component that closes a gap sets `Open` to false for its row. The same PR marks the row green in spec §14. X8 closed row N12.
+- A component that closes a gap sets `Open` to false for its row. The same PR marks the row green in spec §14. X8 closed row N12. X7 closed rows N10 and N11.
 - No row launches a real LLM CLI. The matrix and the exec row use `fakeclitest` stubs.
 
 ## Findings

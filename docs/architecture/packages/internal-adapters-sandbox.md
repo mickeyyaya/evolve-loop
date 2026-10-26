@@ -21,6 +21,8 @@
 
    Each guard carries the message `evolve-cell=<tag> rule=<rule> inv=<I4|I5>`. At `enforce` a guard is a `deny`, and otherwise an `allow` with a report. A read guard uses the operation `file-read-data`, and each grant names `file-read*` and `file-read-data`. A grant of `file-read*` alone does not reopen a path that a `file-read-data` deny closed (measured on macOS, 2026-10-26).
 - At `enforce`, `bwrapReadIsolation` mounts a `tmpfs` on `RunsDir` and binds the own workspace again. It binds each grant read-only (`--ro-bind-try`) and masks each raw file and secret file with `/dev/null`. It mounts a `tmpfs` on each raw and secret directory, and binds `<ws>/inputs` read-only. At `shadow` it adds nothing, because `bwrap` has no report.
+- `Config.ProtectedWriteSubpaths`, `Config.ProtectedWritePrefixes` and `Config.ProtectedWriteEnforce` hold the protected write rule of I-7 ([llm-isolation.md](../llm-isolation.md) §9.1). At `enforce`, `writeProtectedWriteRules` denies each write with `subpath` or `prefix`, after every write grant. When `ProtectedWriteEnforce` is false, the same match allows the write and reports it. At `enforce`, `bwrapProtectedWriteMasks` binds each protected path that exists read-only, before the exec masks. A prefix gets a bind for each file in its directory that starts with it.
+- The signal rule `(allow signal (target same-sandbox))` under `(deny default)`, and `--unshare-pid` for `bwrap`, keep a `kill(-1)` of a cell inside the cell. `TestSandboxContract_KillMinusOneFromACellReachesNoHostProcess` pins both and runs no signal.
 - `getenv` is injected. The detection is tested with a map, and it reads the bridge's request-local env chain in production.
 
 ## Invariants

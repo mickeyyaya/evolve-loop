@@ -71,7 +71,8 @@ After each row, the host must still reach the run server with its sessions `agen
 | Rewrite the `lane-scope.json` of the own workspace | deny | The write gets `Operation not permitted`. |
 | Write a pipeline lineage record in `.evolve/lineage/` | deny | The repo is read-only for the cell. |
 | Isolation N9: open a TCP connection to a loopback listener of the host | allow (green) | `nc -z` connects. The row records that the network stays open. |
-| Isolation N10: an agy pane writes the protected path `go/internal/guards/role.go` in its worktree | deny (open until X7) | The write succeeds today. |
+| Isolation N10: an agy pane writes the protected paths `go/internal/guards/role.go`, `.claude/settings.json` and `go/internal/phases/audit/probe_quarantine.go` in its worktree (its own test, `TestAgentSandboxContract_N10_AnAgyPaneCannotWriteAProtectedPath`) | deny (X7) | Each write gets `Operation not permitted`. A write of the sibling `go/internal/guards2/x.go` goes through. |
+| `kill(-1)` from a cell (a static row, `TestSandboxContract_KillMinusOneFromACellReachesNoHostProcess` in `go/internal/adapters/sandbox`, every OS) | deny (X7) | The row reads the generated profiles and runs no signal. The SBPL profile has `(deny default)` and one signal grant, `(allow signal (target same-sandbox))`. The `bwrap` prefix has `--unshare-pid`. Thus the signal reaches only the processes of the cell. |
 
 ## The threat model
 

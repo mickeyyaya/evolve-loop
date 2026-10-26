@@ -12,6 +12,7 @@ var serialTests = map[string]string{
 	"bridge.TestAddRule_RoundTrip":    "swaps seam bridgeManifestDirFn",
 	"bridge.TestAgentSandboxContract": "sets env through a helper",
 	"bridge.TestAgentSandboxContract_TheHostHoldsTheCredentialThatTheCellCannotRead":      "sets env through a helper",
+	"bridge.TestAgentSandboxContract_N10_AnAgyPaneCannotWriteAProtectedPath":              "sets env through a helper",
 	"bridge.TestAgentSandboxContract_ShadowReportsTheExecAndLetsItRun":                    "sets env through a helper",
 	"bridge.TestAgentSandboxContract_AForgedLaneScopeGainsNoGrantAtTheNextDispatch":       "sets env through a helper",
 	"bridge.TestAgentSandboxContract_TheLauncherStillStartsTheCLIThatTheCellCannotExec":   "sets env through a helper",
