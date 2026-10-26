@@ -358,12 +358,6 @@ func carriedName(name string) bool {
 
 func buildCycleEnv(cfg loopConfig, osEnv []string) map[string]string {
 	out := carriedEnv(osEnv)
-	if cfg.Resume {
-		// IPC key "EVOLVE_RESUME" is split so the operator-flag registry guard
-		// does not classify this parent-to-child handoff as a configurable flag.
-		// SSOT IPC-protocol-allowed
-		out["EVOLVE_"+"RESUME"] = "1"
-	}
 	for agent, cli := range cfg.PerAgentCLI {
 		out["EVOLVE_"+phaseEnvAgentKey(agent)+"_CLI"] = cli
 	}

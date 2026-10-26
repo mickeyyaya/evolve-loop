@@ -66,9 +66,6 @@ func TestProbe_DefaultIsNested_FromClaudecodeEnv(t *testing.T) {
 	if p.ClaudeCode.ClaudecodeEnv == nil || *p.ClaudeCode.ClaudecodeEnv != "1" {
 		t.Errorf("claudecode_env pointer should be set to \"1\", got %#v", p.ClaudeCode.ClaudecodeEnv)
 	}
-	if p.AutoConfig.SandboxFallbackOnEPERM != "1" {
-		t.Errorf("nested should set EPERM fallback to 1, got %s", p.AutoConfig.SandboxFallbackOnEPERM)
-	}
 }
 
 func TestProbe_DefaultIsNested_HostTypeNotNested(t *testing.T) {
@@ -216,5 +213,14 @@ func TestProfile_WriteToFile_RenameError(t *testing.T) {
 	p := Profile{SchemaVersion: 3}
 	if err := p.WriteToFile(root); err == nil {
 		t.Fatal("expected a rename error when the destination is a directory")
+	}
+}
+
+func TestHostOSType_KeepsDarwinAndLinuxAndFoldsTheRest(t *testing.T) {
+	t.Parallel()
+	for goos, want := range map[string]string{"darwin": "darwin", "linux": "linux", "windows": "other", "freebsd": "other"} {
+		if got := hostOSType(goos); got != want {
+			t.Errorf("hostOSType(%q) = %q, want %q", goos, got, want)
+		}
 	}
 }

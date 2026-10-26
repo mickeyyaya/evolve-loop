@@ -220,7 +220,6 @@ func runLiveCycleOnce(t *testing.T, cfg liveCycleCfg) liveResult {
 
 	env := append(os.Environ(),
 		"EVOLVE_CLI="+cfg.Driver,
-		"EVOLVE_PROMPTS_DIR="+cfg.RepoRoot,
 		"EVOLVE_RESEARCH_HOOK_DISABLED=1",
 		"EVOLVE_CODEX_CONFIG_PATH="+filepath.Join(fakeHome, ".codex", "config.toml"),
 	)

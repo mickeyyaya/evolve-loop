@@ -8,12 +8,12 @@
 
 ## Goals
 
-1. Lock the **behavior** of every ported subsystem before Phase 2 wires it into the orchestrator — bash-Go drift gets caught in the test suite, not in production.
+1. Lock the **behavior** of every ported subsystem before Phase 2 wires it into the orchestrator. Thus bash-Go drift gets caught in the test suite, not in production.
 2. Run the test suite in <30 seconds on a developer laptop, in <2 minutes under `-race`.
 3. Hold ≥95% per-package statement coverage (operator-mandated mid-session, raised from parent §3's 85%).
 4. Treat coverage as the floor, not the ceiling — the suite exists to verify *intent*, not to game `go test -cover`.
 
-`cmd/evolve/*` is excluded from the 95% gate (parent §8 risk #6): the CLI layer is thin glue over the internal packages, smoke-tested via `dispatch_test.go`.
+`cmd/evolve/*` is excluded from the 95% gate (parent §8 risk #6): the CLI layer is thin glue over the internal packages, smoke-tested through `dispatch_test.go`.
 
 ---
 
@@ -49,9 +49,9 @@
 
 ### `pkg/acsassert`
 - Each helper has a **happy** path and at least one **sad** path that calls `Errorf` on the `TB`.
-- `AllOf` short-circuits on the first false (verified via a counter-incrementing predicate).
+- `AllOf` short-circuits on the first false (verified with a counter-incrementing predicate).
 - `SubprocessOutput` distinguishes "not found on PATH" (`ErrSubprocessNotFound`) from "ran with exit code N".
-- `JSONFieldEquals` survives non-comparable result types (maps) via `reflect.DeepEqual`.
+- `JSONFieldEquals` survives non-comparable result types (maps) through `reflect.DeepEqual`.
 
 ### `internal/log`
 - `EmitAbnormal` writes one JSON line per event; cumulative tail is preserved.
@@ -65,7 +65,7 @@
 ### `internal/core`
 - `Phase` JSON round-trip: every field of `PhaseRequest` / `PhaseResponse` survives marshal+unmarshal.
 - `CanTransition` accepts all valid edges and rejects every other pair (full transition-table table test).
-- `Orchestrator` invokes guard hooks before each phase and appends a ledger entry per phase (verified via fake ports).
+- `Orchestrator` invokes guard hooks before each phase and appends a ledger entry per phase (verified with fake ports).
 
 ### `internal/adapters/storage`
 - `WriteState` is atomic: a partial write (mid-stream `errors.New`) does not corrupt the on-disk file.
@@ -81,7 +81,7 @@
 ### `internal/guards`
 For every guard:
 - The bypass env var (`EVOLVE_BYPASS_*`) returns Allow=true.
-- The "out of scope" tool name (e.g. `Edit` for `ship` guard) returns Allow=true.
+- The "out of scope" tool name (for example, `Edit` for `ship` guard) returns Allow=true.
 - The targeted deny rule fires with the bash-canonical reason text.
 - A test that exercises the env-var bypass to keep that branch covered.
 
@@ -101,7 +101,7 @@ Per-guard specifics:
 - Hooks (`marshal`, `write`, `close`, `rename`) drive marshal+write+rename failure branches deterministically.
 
 ### `internal/doctor`
-- `Probe` finds via `exec.LookPath` first; falls back to the documented 5 explicit paths.
+- `Probe` finds through `exec.LookPath` first; falls back to the documented 5 explicit paths.
 - The `Checked` log enumerates **every** location attempted (operator-readable diagnostic trail).
 - `home-dir error` does not crash — the home-prefixed candidates are skipped, system paths still walked.
 - `EmitJSON` emits `path: null` (not `path: ""`) when `Found=false`; the marshal failure branch is hook-driven.
@@ -115,7 +115,7 @@ Per-guard specifics:
 
 Each `acs/cycleN/predicates_test.go` asserts the same invariants as the corresponding `acs/cycle-N/*.sh` predicate. The test name encodes the AC-ID (`TestC42_003_PNew13Done`, `TestC104_001_OrchestratorDefaultAdvisory`, …) so a verdict mismatch between bash and Go is immediately traceable.
 
-Predicates that need subprocess scaffolding (cycle-53) shell to `legacy/scripts/dispatch/subagent-run.sh --validate-profile` with the same `EVOLVE_TESTING=1` + sentinel-adapter pattern the bash predicates use. Anti-tautology checks (e.g. claude has no `[adapter-cap] WARN`) are preserved in the Go ports.
+Predicates that need subprocess scaffolding (cycle-53) shell to `legacy/scripts/dispatch/subagent-run.sh --validate-profile` with the same `EVOLVE_TESTING=1` + sentinel-adapter pattern the bash predicates use. Anti-tautology checks (for example, claude has no `[adapter-cap] WARN`) are preserved in the Go ports.
 
 ---
 
@@ -137,7 +137,7 @@ Any divergence between the two verdicts is an integrity bug. The retrospective h
 
 Race detector is non-negotiable for `go test ./internal/adapters/storage/...` (concurrent `flock` + mutex) and `go test ./internal/adapters/ledger/...` (concurrent append).
 
-Property testing via `pgregory.net/rapid` is wired for the ledger chain: 10K shrink iterations against the chain-integrity invariant. No counterexample has been found; the test file lives at `internal/adapters/ledger/ledger_test.go` (search for `rapid.T`).
+Property testing with `pgregory.net/rapid` is wired for the ledger chain: 10K shrink iterations against the chain-integrity invariant. No counterexample has been found; the test file lives at `internal/adapters/ledger/ledger_test.go` (search for `rapid.T`).
 
 ---
 
@@ -170,36 +170,36 @@ Steps 1-4 are non-negotiable per CLAUDE.md "Verification before claiming done". 
 
 ## Phase 2 — CLI scenario coverage (added 2026-05-30)
 
-End-to-end coverage of the "any CLI × any phase" invariant and the adversarial
-pipeline paths, layered on the `evolve-fake-cli` seam (`BRIDGE_TESTING=1` +
-`BRIDGE_<CLI>_BINARY`). Offline-deterministic by default; live opt-in via
-`EVOLVE_E2E_LIVE=1`. All E2E tests skip under `-short`.
+These tests cover the "any CLI × any phase" invariant and the adversarial
+pipeline paths from end to end. They use `evolve-fake-cli`, which is first on
+`PATH` under the name of each CLI. By default they run offline and give the same
+result each time. `EVOLVE_E2E_LIVE=1` adds live runs. All E2E tests skip under `-short`.
 
 | Test (`go/cmd/evolve/`) | Scenario | Drivers / mechanism |
 |---|---|---|
 | `e2e_cycle_cli_matrix_test.go` (pre-existing) | Happy-path full cycle scout→ship | headless: claude-p, codex, agy |
-| `e2e_cli_tmux_matrix_test.go` | Happy-path full cycle through a **real tmux server** | interactive: claude-tmux, codex-tmux, agy-tmux. Fake serves a REPL printing every driver's boot marker; `HOME`/`EVOLVE_CODEX_CONFIG_PATH` redirected so preflights never touch the operator's real `~/.codex`. ~45s/CLI; timeout tunable via `EVOLVE_E2E_TMUX_TIMEOUT_S`. |
-| `e2e_cli_degradation_test.go` | CLI fallback chain (ADR-0029) | Primary claude-p fails with each trigger code {80,81,124,127} → runner retries codex → ships. Non-trigger 99 → no fallback → no ship. Per-CLI exit injection via `FAKE_CLI_CLAUDE_EXIT`. |
+| `e2e_cli_tmux_matrix_test.go` | Happy-path full cycle through a **real tmux server** | interactive: claude-tmux, codex-tmux, agy-tmux. Fake serves a REPL printing every driver's boot marker; `HOME`/`EVOLVE_CODEX_CONFIG_PATH` redirected so preflights never touch the operator's real `~/.codex`. ~45s/CLI; timeout tunable through `EVOLVE_E2E_TMUX_TIMEOUT_S`. |
+| `e2e_cli_degradation_test.go` | CLI fallback chain (ADR-0029) | Primary claude-p fails with each trigger code {80,81,124,127} → runner retries codex → ships. Non-trigger 99 → no fallback → no ship. Per-CLI exit injection through `FAKE_CLI_CLAUDE_EXIT`. |
 | `e2e_pipeline_paths_test.go` | Audit FAIL→retro→no-ship; WARN fluent-ships vs strict-blocks; intent phase | headless; `FAKE_CLI_AUDIT_VERDICT`, `.evolve/policy.json` `workflow.strict_audit`, `EVOLVE_REQUIRE_INTENT`. |
 | `e2e_setup_validation_test.go` | `evolve setup detect/validate` floor | in-process `runSetup`: envelope (ERROR), allowed_clis (ERROR), cross-family (WARN / `--strict` ERROR), detect JSON shape. |
 
 `evolve-fake-cli` gained a persistent REPL mode (auto-detected from a tmux launch:
 no `-p`, no `exec`), per-CLI exit injection, and audit-verdict injection — all
 backward-compatible. It also picked up a correctness fix: the tdd artifact is
-`test-report.md`, not the stale `team-context.md` (the headless matrix masked this
-because its completion is process-exit-based; the tmux artifact-poll exposed it).
+`test-report.md`, not the stale `team-context.md`. The headless matrix masked this
+because its completion is process-exit-based; the tmux artifact-poll exposed it.
 
 **Documented gap — bash-adapter graceful degradation.** The bash adapters'
 "missing binary → stub artifact → exit 0" degradation does NOT exist in the v11+
 Go path. The Go path returns a fallback-trigger exit code (127 `ExitMissingBinary`)
-and relies on the fallback chain; the `--require-full` hard-fail (exit 99) is
+and relies on the fallback chain. The `--require-full` hard-fail (exit 99) is
 covered at the bridge level (`internal/bridge/launch_modes_test.go:TestLaunchArgs_RequireFull_Unmet`,
 `coverage_batch2_test.go:TestRequireFull_ManifestMissing`). No E2E asserts the
 bash stub behavior, because it is unreachable through `evolve cycle run`.
 
 **Not yet covered (later pass):** live-injection (ADR-0023 send/nudge/keystroke),
 recipe engine + capability catalog (ADR-0031), and system-prompt/interactive-policy
-injection *content* — all have bridge-level unit coverage; full-cycle E2E is deferred.
+injection *content*. All have bridge-level unit coverage; full-cycle E2E is deferred.
 The `ollama-tmux` driver (local inference) is out of provider-matrix scope.
 
 ---
@@ -212,7 +212,7 @@ The `ollama-tmux` driver (local inference) is out of provider-matrix scope.
 | `internal/phases/*` | Unit isolation still TBD, but every phase is now exercised end-to-end through the CLI-scenario E2E matrix above (headless + tmux + fallback + FAIL/retro). |
 | `internal/adapters/sandbox/` | Phase 2 — `sandbox-exec` (macOS) and `bwrap` (Linux) profiles. Tests need OS-specific build tags. |
 | `evolve loop` / `evolve cycle run` | `evolve cycle run` now covered E2E across all 6 shipped drivers + fallback + adversarial paths (see Phase 2 section). `evolve loop` multi-cycle + state-machine property tests still TBD. |
-| Cross-CLI parity (Gemini / AGY) | agy-tmux now runs a full cycle in the tmux matrix; the cli/model floor (envelope + allowed_clis) is enforced via `policy.ValidatePin` and surfaced by `evolve setup detect` (`pin_violation`). Model-router unit tests under `internal/router/` still Phase 3. |
+| Cross-CLI parity (Gemini / AGY) | agy-tmux now runs a full cycle in the tmux matrix; the cli/model floor (envelope + allowed_clis) is enforced through `policy.ValidatePin` and surfaced by `evolve setup detect` (`pin_violation`). Model-router unit tests under `internal/router/` still Phase 3. |
 | Distribution | Phase 3 — GoReleaser config, brew formula smoke test, `evolve install` idempotency test. |
 | v11.0 cutover | Phase 4 — final coexistence sunset; bash predicates removed after `evolve acs run` consumes their verdict surface for one full release. |
 

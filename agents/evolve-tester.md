@@ -174,4 +174,4 @@ That's your job. Predicates are the verdict-bearing artifact. Write them like th
 
 ## Reflection Authoring (v10.20.0+)
 
-Before posting your completion ledger entry, execute the Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `tester-report.md`'s `## Reflection` section and `tester-reflection.yaml` sidecar. Tester-specific friction commonly maps to `ambiguous-input` (unverifiable AC count) or `tool-error` (predicate validation lint failures). Skip only if `EVOLVE_REFLECTION_JOURNAL=0`.
+Before posting your completion ledger entry, execute the Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `tester-report.md`'s `## Reflection` section and `tester-reflection.yaml` sidecar. Tester-specific friction commonly maps to `ambiguous-input` (unverifiable AC count) or `tool-error` (predicate validation lint failures).

@@ -109,3 +109,42 @@ func TestCheckRecentAudit_ReleaseCommitAuditStillBlocks(t *testing.T) {
 		t.Fatal("an audit of the release commit itself that rejected it must still block")
 	}
 }
+
+func TestStepRecentAudit_AFailedAuditOfAnotherCommitIsAdvisoryAndNamesBothHeads(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 8, 27, 12, 0, 0, 0, time.UTC)
+	ledgerPath := seedLedgerAndArtifact(t, "laneheadsha0000000000000000000000000000", "FAIL", now.Add(-time.Hour), "")
+	var stderr strings.Builder
+	run := newPreflightRun(resolved{
+		ledgerPath: ledgerPath,
+		now:        func() time.Time { return now },
+		headSHA:    func(string) (string, error) { return "releasehead111111111111111111111111111", nil },
+	}, &stderr)
+
+	if err := run.stepRecentAudit(); err != nil {
+		t.Fatalf("a failed audit of another commit must not block the release: %v", err)
+	}
+	if run.res.AuditVerdict != auditVerdictScopedOut || !strings.Contains(stderr.String(), "did not audit this release commit") || !strings.Contains(stderr.String(), "releasehead1") {
+		t.Fatalf("verdict %q, log %q: want the scoped-out advisory naming the release head", run.res.AuditVerdict, stderr.String())
+	}
+}
+
+func TestStepRecentAudit_AWarnVerdictHintNamesTheStrictPassParameter(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 8, 27, 12, 0, 0, 0, time.UTC)
+	const head = "releasehead111111111111111111111111111"
+	ledgerPath := seedLedgerAndArtifact(t, head, "WARN", now.Add(-time.Hour), "")
+	var stderr strings.Builder
+	run := newPreflightRun(resolved{
+		ledgerPath: ledgerPath,
+		now:        func() time.Time { return now },
+		headSHA:    func(string) (string, error) { return head, nil },
+	}, &stderr)
+
+	if err := run.stepRecentAudit(); err != nil {
+		t.Fatalf("a WARN audit ships under the fluent posture: %v", err)
+	}
+	if !strings.Contains(stderr.String(), "--strict-pass") || strings.Contains(stderr.String(), "EVOLVE_") {
+		t.Fatalf("log %q: the WARN hint must name the --strict-pass parameter and no environment variable", stderr.String())
+	}
+}

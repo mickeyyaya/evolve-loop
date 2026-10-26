@@ -47,16 +47,14 @@ func RunCommitGate(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 
 	opts := commitgate.Options{
-		RepoRoot:     root,
-		Reviewers:    *reviewers,
-		Files:        *files,
-		NoInstall:    *noInstall,
-		AttestDir:    os.Getenv("CG_ATTEST_DIR"),
-		Env:          os.Environ(),
-		Runner:       runner,
-		Now:          time.Now,
-		TestInstall:  os.Getenv("CG_TEST_INSTALL"),
-		ForceMissing: os.Getenv("CG_TEST_FORCE_MISSING"),
+		RepoRoot:  root,
+		Reviewers: *reviewers,
+		Files:     *files,
+		NoInstall: *noInstall,
+		AttestDir: os.Getenv("CG_ATTEST_DIR"),
+		Env:       os.Environ(),
+		Runner:    runner,
+		Now:       time.Now,
 	}
 
 	res := opts.Run(context.Background())

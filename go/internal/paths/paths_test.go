@@ -77,62 +77,25 @@ func TestResolve_SplitPluginRoot(t *testing.T) {
 	}
 }
 
-func TestResolve_DirOverrides(t *testing.T) {
-	cases := []struct {
-		name   string
-		envKey string
-		envVal string
-		field  func(Layout) string
-		want   string
-	}{
-		{
-			name:   "profiles_override",
-			envKey: "EVOLVE_PROFILES_DIR_OVERRIDE",
-			envVal: "/custom/profiles",
-			field:  func(l Layout) string { return l.ProfilesDir },
-			want:   "/custom/profiles",
-		},
-		{
-			name:   "adapters_override",
-			envKey: "EVOLVE_ADAPTERS_DIR_OVERRIDE",
-			envVal: "/custom/adapters",
-			field:  func(l Layout) string { return l.AdaptersDir },
-			want:   "/custom/adapters",
-		},
-		{
-			name:   "ledger_override",
-			envKey: "EVOLVE_LEDGER_OVERRIDE",
-			envVal: "/var/log/ledger.jsonl",
-			field:  func(l Layout) string { return l.LedgerFile },
-			want:   "/var/log/ledger.jsonl",
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			env := map[string]string{
-				"EVOLVE_PROJECT_ROOT": "/repo",
-				tc.envKey:             tc.envVal,
-			}
-			got := tc.field(Resolve(envMap(env), ""))
-			if got != tc.want {
-				t.Errorf("%s = %q, want %q", tc.name, got, tc.want)
-			}
-		})
-	}
-}
-
-func TestResolve_CapabilityDirAlwaysPluginRoot(t *testing.T) {
+func TestResolve_TheEnvironmentOverridesNoDir(t *testing.T) {
 	got := Resolve(envMap(map[string]string{
 		"EVOLVE_PROJECT_ROOT":          "/repo",
 		"EVOLVE_PLUGIN_ROOT":           "/opt/plugin",
+		"EVOLVE_PROFILES_DIR_OVERRIDE": "/custom/profiles",
 		"EVOLVE_ADAPTERS_DIR_OVERRIDE": "/tmp/fake-adapters",
+		"EVOLVE_LEDGER_OVERRIDE":       "/var/log/ledger.jsonl",
 	}), "")
 
-	if got.AdaptersDir != "/tmp/fake-adapters" {
-		t.Errorf("AdaptersDir=%q, want override /tmp/fake-adapters", got.AdaptersDir)
+	want := map[string][2]string{
+		"ProfilesDir":   {got.ProfilesDir, "/opt/plugin/.evolve/profiles"},
+		"AdaptersDir":   {got.AdaptersDir, "/opt/plugin/adapters"},
+		"CapabilityDir": {got.CapabilityDir, "/opt/plugin/adapters"},
+		"LedgerFile":    {got.LedgerFile, "/repo/.evolve/ledger.jsonl"},
 	}
-	if got.CapabilityDir != "/opt/plugin/adapters" {
-		t.Errorf("CapabilityDir=%q, want PluginRoot/adapters (NEVER overridden)", got.CapabilityDir)
+	for field, pair := range want {
+		if pair[0] != pair[1] {
+			t.Errorf("%s = %q, want %q: a dir comes from the roots, never from an override variable (I-16, X18e)", field, pair[0], pair[1])
+		}
 	}
 }
 

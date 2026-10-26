@@ -33,9 +33,6 @@ func NewFromDir(dir string) *Loader {
 }
 
 func NewForProject(projectRoot string) *Loader {
-	if d := os.Getenv("EVOLVE_PROMPTS_DIR"); d != "" {
-		return NewFromDir(d)
-	}
 	return NewFromDir(projectRoot)
 }
 

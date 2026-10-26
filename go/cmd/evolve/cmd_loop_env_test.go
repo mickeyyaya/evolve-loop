@@ -31,25 +31,14 @@ func TestBuildCycleEnv_StrategyNotWrittenByDispatcher(t *testing.T) {
 	}
 }
 
-func TestBuildCycleEnv_DispatcherFlagsPropagate(t *testing.T) {
+func TestBuildCycleEnv_ResumeAndResetWriteNoEnvName(t *testing.T) {
 	t.Parallel()
-	t.Run("resume set", func(t *testing.T) {
-		cfg := loopConfig{Strategy: "balanced", Resume: true, Reset: true}
-		got := buildCycleEnv(cfg, nil)
-		if got["EVOLVE_RESUME"] != "1" {
-			t.Errorf("EVOLVE_RESUME not set; got=%v", got)
+	got := buildCycleEnv(loopConfig{Strategy: "balanced", Resume: true, Reset: true}, nil)
+	for _, name := range []string{"EVOLVE_RESUME", "EVOLVE_RESET"} {
+		if _, present := got[name]; present {
+			t.Errorf("%s is a dead name that no code reads; buildCycleEnv must not write it; got=%v", name, got)
 		}
-		if _, present := got["EVOLVE_RESET"]; present {
-			t.Errorf("EVOLVE_RESET must not be written to env (dead env write); got=%q", got["EVOLVE_RESET"])
-		}
-	})
-	t.Run("none set", func(t *testing.T) {
-		cfg := loopConfig{Strategy: "balanced"}
-		got := buildCycleEnv(cfg, nil)
-		if _, present := got["EVOLVE_RESUME"]; present {
-			t.Errorf("EVOLVE_RESUME must not be set when flag false; got=%q", got["EVOLVE_RESUME"])
-		}
-	})
+	}
 }
 
 func TestBuildCycleEnv_MalformedEnvIgnored(t *testing.T) {

@@ -85,11 +85,11 @@ func TestScanLedger_UnopenableLedgerIsAWrappedError(t *testing.T) {
 }
 
 func TestCheckProvenance_UnopenableLedgerFailsTheCheck(t *testing.T) {
-	file := filepath.Join(t.TempDir(), "not-a-dir")
-	if err := os.WriteFile(file, nil, 0o644); err != nil {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, ".evolve"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("EVOLVE_LEDGER_OVERRIDE", filepath.Join(file, "ledger.jsonl"))
+	t.Setenv("EVOLVE_PROJECT_ROOT", root)
 
 	_, err := CheckProvenance("<!-- evolve:provenance phase=build cycle=1 tree_sha=abc -->", ProvenanceFields{Phase: "build", Cycle: 1})
 
