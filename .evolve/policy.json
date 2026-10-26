@@ -172,5 +172,8 @@
     "i2": {
       "stage": "enforce"
     }
+  },
+  "retry": {
+    "contract_correction_retries": 1
   }
 }
