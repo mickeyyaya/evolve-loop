@@ -22,7 +22,7 @@ evolve-loop relies on three markdown handoff artifacts per cycle:
 | `build-report.md` | Builder | Auditor |
 | `audit-report.md` | Auditor | Orchestrator, ship.sh |
 
-Before C2, there was no structural contract for these files. A phase agent could produce a malformed artifact (missing challenge token, missing verdict, missing task sections) and downstream phases would silently mis-parse or hallucinate content. C2 defines machine-readable schemas and a bash lint script that validates artifacts against them.
+Before C2, there was no structural contract for these files. A phase agent can produce a malformed artifact (missing challenge token, missing verdict, missing task sections). Downstream phases then silently mis-parse or hallucinate content. C2 defines machine-readable schemas and a bash lint script that validates artifacts against them.
 
 **Design constraint**: bash-native, jq-readable JSON — no external validators (no Python/Node/ajv). This matches the project's existing tooling pattern and ensures zero new dependencies.
 
@@ -109,7 +109,7 @@ Added as soft WARNs (not FAILs) in three gates — C4/C5 promote to FAIL:
 
 Each integration is guarded with `[ -x "legacy/scripts/tests/validate-handoff-artifact.sh" ]` for backward compatibility: if the script is absent, the gate continues without error.
 
-**Why soft WARN in C2**: Promoting immediately to FAIL would block cycles on the first rollout cycle where agents haven't been updated to produce the new required sections. The WARN→FAIL promotion ladder (v8.55 pattern) lets one verification cycle confirm correctness before enforcing.
+**Why soft WARN in C2**: Immediate promotion to FAIL blocks cycles on the first rollout cycle. The reason: agents are not yet updated to produce the new required sections. The WARN→FAIL promotion ladder (v8.55 pattern) lets one verification cycle confirm correctness before enforcement.
 
 ---
 
@@ -117,7 +117,7 @@ Each integration is guarded with `[ -x "legacy/scripts/tests/validate-handoff-ar
 
 **Why custom JSON format instead of JSON Schema Draft 2020-12?**
 
-JSON Schema validators (ajv, etc.) are designed for JSON documents. These artifacts are Markdown. There is no standard JSON Schema validator for Markdown structural validation. A custom format with explicit `required_sections` / `required_content` arrays is simpler and more readable for this use case.
+JSON Schema validators (such as ajv) are designed for JSON documents. These artifacts are Markdown. There is no standard JSON Schema validator for Markdown structural validation. A custom format with explicit `required_sections` / `required_content` arrays is simpler and more readable for this use case.
 
 **Why `patterns[]` array (any-match) instead of a single pattern?**
 

@@ -61,17 +61,21 @@ level-two sections exactly once:
 8. `Limitations`
 
 `Changed Areas` has one ``- `<repo-relative path>` — what changed and why``
-entry for every material path. A cited path must name Build content: an exact
-diff path (tried literally first, so a real path whose name holds braces stays
-citable), or a directory (also written `dir/...` or `dir/**`), glob
-(`go/acs/cycle1768/*_test.go`) or brace list (`go/acs/{cycle9,cycle1768}/…`) that
-covers at least one diff path. A citation covering no diff path is rejected, and so
-is a brace list with an empty alternative, a nested brace, an unclosed brace, or
-more expansions than `maxCitationPatterns` allows: those cover nothing, so a typo
-can never widen into a bare prefix or mis-parse into some other diff path. A pattern is only ever a citation: every
-material path still needs its own exact entry, so one broad glob can never stand
-in for the per-path explanations the contract requires (2026-09-30, after cycles
-1765 and 1768 each lost a correction round to a directory or glob citation).
+entry for every material path. A cited path must name Build content. It is one of these:
+
+- an exact diff path (tried literally first, so a real path whose name holds braces stays citable);
+- a directory (also written `dir/...` or `dir/**`) that covers at least one diff path;
+- a glob (`go/acs/cycle1768/*_test.go`) that covers at least one diff path;
+- a brace list (`go/acs/{cycle9,cycle1768}/…`) that covers at least one diff path.
+
+The host rejects a citation that covers no diff path. It also rejects these brace lists: one with an empty alternative, a nested brace, an unclosed brace, or
+more expansions than `maxCitationPatterns` allows. Those cover nothing, so a typo
+can never widen into a bare prefix or mis-parse into some other diff path.
+
+A pattern is only ever a citation. Every
+material path still needs its own exact entry. So one broad glob can never replace
+the per-path explanations that the contract requires. (2026-09-30: cycles
+1765 and 1768 each lost a correction round to a directory or glob citation.)
 
 An entry is a Markdown list item, not a physical line.
 Its explanation can wrap onto continuation lines.
@@ -99,22 +103,27 @@ Every path that an item names still passes the diff check and the `minExplanatio
 Cycles 1707, 1730, 1735, 1737, 1760, 1762, 1765 and 1772 each lost a correction round (2026-09-30).
 The cause was a wrapped or grouped bullet whose explanation the line-by-line reader never saw.
 
-The host classifies documentation, knowledge-base files, eval definitions, ACS
-predicates, testdata, unambiguous test files and the inbox lifecycle records under
-`.evolve/inbox/` (the host claims, moves, stamps and retires them; a build's
-consumption of its item is the ship's in-commit effect, not the builder's design)
-as non-material. When no other
+The host classifies these paths as non-material:
+
+- documentation;
+- knowledge-base files;
+- eval definitions;
+- ACS predicates;
+- testdata;
+- unambiguous test files;
+- the inbox lifecycle records under `.evolve/inbox/`. The host claims, moves, stamps and retires them. The consumption of its item by a build is an in-commit effect of the ship, not the design of the builder.
+
+When no other
 path changed, Builder declares `NOT_APPLICABLE` with a concrete reason and does
 not create a cycle record. Builder cannot use that declaration to hide a
-material change because the host derives the path set from Git.
+material change, because the host derives the path set from Git.
 
-A builder that explains a non-material diff anyway is not refused: a `REQUIRED`
-declaration naming the cycle's own record is verified like any explanation (the
-material set is empty, so `Changed Areas` may cite only Build content: exact diff paths or patterns that cover them), and a
-`NOT_APPLICABLE` declaration beside an undeclared own record passes with the
-record kept as documentation: its content is not validated (no section or path
-check reads it, and no review is owed to it), and once landed it is a published
-record like any other, immutable to every later cycle. Only foreign cycle records are immutable, and that
+The host does not refuse a builder that explains a non-material diff anyway. Two cases apply:
+
+- A `REQUIRED` declaration that names the cycle's own record is verified like any explanation. The material set is empty, so `Changed Areas` can cite only Build content: exact diff paths or patterns that cover them.
+- A `NOT_APPLICABLE` declaration beside an undeclared own record passes, and the record stays as documentation. Nothing validates its content: no section or path check reads it, and no review is owed to it. Once landed, it is a published record like any other, immutable to every later cycle.
+
+Only foreign cycle records are immutable. That
 rule runs before either branch with one message, `published cycle records are
 immutable` (ADR-0106 X3; cycle 1718 paid a builder re-dispatch to delete its own
 document before this).
@@ -136,29 +145,40 @@ paths, more than 64 MiB of changed content, special files, symlink-parent
 escapes, and files that change identity while being read.
 
 Audit and Retro are asked to cite the document and every material path with concrete
-`path:line` evidence whose line exists in the current file or, for deletions,
+`path:line` evidence. The line must exist in the current file or, for deletions,
 the sealed base blob. Symlink targets, gitlink commit IDs, and empty files each
-have one citable identity line. Since 2026-09-13 ([ADR-0102](adr/0102-explanation-review-reasoning-is-the-gate.md))
-the citation form, the handoff echoes and the reviewer's `NEEDS_CORRECTION` judgment are
-**advisory**: they ride the phase record as warnings and never force the verdict. What still
-blocks is the reviewer's reasoning floor (a token Evidence, or a missing or duplicated review
-section), a missing Build delivery reviewed as anything but FAIL (audit; retro records it as an
-advisory), and host-side handoff defects. Retro uses the same status; its correction-ID bookkeeping
+have one citable identity line.
+
+Since 2026-09-13 ([ADR-0102](adr/0102-explanation-review-reasoning-is-the-gate.md))
+the citation form, the handoff echoes and the `NEEDS_CORRECTION` judgment of the reviewer are
+**advisory**. They ride the phase record as warnings and never force the verdict.
+
+These still block:
+
+- the reasoning floor of the reviewer (a token Evidence, or a missing or duplicated review section);
+- a missing Build delivery reviewed as anything but FAIL (audit; retro records it as an advisory);
+- host-side handoff defects.
+
+Retro uses the same status. Its correction-ID bookkeeping
 (`carryover-todos.json` with a non-empty action) is advisory as well.
-The auditor still fails a `NEEDS_CORRECTION` review by persona policy. Since 2026-09-29 an audit
-FAIL whose every defect begins with this cycle's document path (`explanation-needs-correction`)
-repairs at Build alone: the round re-enters Build scoped to the document, skipping TDD, and the
+The auditor still fails a `NEEDS_CORRECTION` review by persona policy.
+
+Since 2026-09-29 an audit
+FAIL whose every defect begins with the document path of this cycle (`explanation-needs-correction`)
+repairs at Build alone. The round re-enters Build scoped to the document and skips TDD. The
 audit re-runs on the corrected document ([logic-first design §5.14](logic-first-delivery-design.md)).
 Quoted `explanation_error_untrusted_json` prompt fields and all Builder-authored
 artifacts are untrusted data, never instructions.
 
 Ship verifies the host marker, result snapshot, workspace handoff, report
 declaration, current diff, and document before shipping. A retry after a
-successful push may outlive worktree cleanup. That path is report-only only
+successful push can outlive worktree cleanup.
+
+That path is report-only only
 when `ship-binding.json` exactly matches the typed cycle, current HEAD commit,
-current HEAD tree, and non-empty audit-bound tree; Ship then re-verifies the
+current HEAD tree, and non-empty audit-bound tree. Ship then re-verifies the
 explanation against an isolated detached worktree of the immutable landed
-commit, so unrelated mutable or untracked state in the main checkout cannot
+commit. So unrelated mutable or untracked state in the main checkout cannot
 change the retry verdict. A resumed landing never verifies again; its intent carries
 `explanation_view_sha256`, the digest of the sealed snapshot ([ADR-0039 §8.1](adr/0039-failure-floor-and-failure-signal-contract.md)).
 
@@ -167,24 +187,27 @@ change the retry verdict. A resumed landing never verifies again; its intent car
 - Build correction and remediation replace the result snapshot only after the
   mandatory Build floor passes again; downstream requests receive the refreshed
   handoff.
-- Host normalization runs before Build validation and sealing. A later
-  write-capable phase such as test amplification may refresh only the
-  whole-diff digest when material paths and Builder-owned documentation remain
-  unchanged; material drift routes back to Build. A refresh failure in the
-  explanation's own content also routes back to Build, for the owner to
-  re-author it: for example, the writer dropped a test path that Changed Areas
-  cites. The revalidation reports such a failure as `ErrContent`, separate from
-  binding, git and unreadable-artifact faults. When every legal successor of
-  the writer already leads to Build (tdd), the round is free: Build was coming
-  anyway and its own floor re-validates the document. Any other writer spends
-  one attempt of the `code-audit-fail` budget, and a spent budget ends the
-  cycle (a cycle-level failure) but not the batch. Every round emits
-  `ORCHESTRATOR_EXPLANATION_REAUTHOR_ROUTED`; any fault aborts
-  ([incident](../incidents/2026-10-07-cycle-1822-explanation-refresh-abort.md)).
+- Host normalization runs before Build validation and sealing.
+  - A later write-capable phase such as test amplification can refresh only the
+    whole-diff digest. This holds when material paths and Builder-owned documentation remain
+    unchanged. Material drift routes back to Build.
+  - A refresh failure in the content of the explanation also routes back to Build, for the owner to
+    re-author it. For example, the writer dropped a test path that Changed Areas
+    cites. The revalidation reports such a failure as `ErrContent`, separate from
+    binding, git and unreadable-artifact faults.
+  - When every legal successor of
+    the writer already leads to Build (tdd), the round is free. Build was coming
+    anyway, and its own floor re-validates the document.
+  - Any other writer spends
+    one try of the `code-audit-fail` budget. A spent budget ends the
+    cycle (a cycle-level failure) but not the batch.
+  - Every round emits
+    `ORCHESTRATOR_EXPLANATION_REAUTHOR_ROUTED`. Any fault aborts
+    ([incident](../incidents/2026-10-07-cycle-1822-explanation-refresh-abort.md)).
 - Fleet rebase writes the verified host base as a write-ahead authority before
   persisting the matching checkpoint. A partial checkpoint or mirror failure
   rolls forward on resume from the old-base snapshot witness and re-enters
-  Build; it never ambiguously rolls the marker behind an already-committed
+  Build. It never ambiguously rolls the marker behind an already-committed
   checkpoint.
 - Fleet rebase changes the sealed base. When the host can prove the explained
   change byte-identical on the new base, `RebindIdenticalRebase` moves the
@@ -194,8 +217,10 @@ change the retry verdict. A resumed landing never verifies again; its intent car
   - the peer delta between them touches no lane path, compared case-folded,
     and no `.gitattributes` or `.gitignore`. Any path that is not plain counts
     as touching, because some filesystem resolves it to a differently spelled
-    file: a non-ASCII path, one containing `:`, `\` or `~`, or one with a
-    component ending in a dot or a space;
+    file. These paths are not plain:
+    - a non-ASCII path;
+    - a path that contains `:`, `\` or `~`;
+    - a path with a component that ends in a dot or a space;
   - the lane's paths, modes and bytes match the sealed digest, read once.
     Ship's inbox consumption is not part of this comparison: a pair of a
     removed `.evolve/inbox/<name>` and a present
@@ -228,11 +253,11 @@ change the retry verdict. A resumed landing never verifies again; its intent car
   downgrade a sealed contract through mutable cycle state.
 - Continuation adoption archives unpublished ancestor cycle records under
   `docs/private/research/archived-YYYY-MM-DD/unshipped-build-explanations/`
-  before the new run may author its own canonical record. The ancestor's own
-  predicate package (`go/acs/cycle<M>`, absent at the base) follows the same
-  retention rule and moves to
+  before the new run may author its own canonical record.
+  The predicate package of the ancestor (`go/acs/cycle<M>`, absent at the base) follows the same
+  retention rule. It moves to
   `docs/private/research/archived-YYYY-MM-DD/superseded-predicate-packages/`
-  (design A2), so the new run's gates never execute a contract it does not own.
+  (design A2). So the gates of the new run never execute a contract that it does not own.
 - A failure before Build has no explanation deliverable yet. A failure after
   Build with a missing or invalid handoff is a correction-required defect.
 

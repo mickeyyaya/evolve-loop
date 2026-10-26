@@ -60,7 +60,7 @@ Claims about savings cite the cycle/commit that introduced the mechanism. A cycl
 
 A `feat()` commit must change production code. Doc-only / test-only commits use `docs:` or `chore:` or `test:` per the scope manifest. P8 is the Layer 1 gate's structural correlate.
 
-**Example FAIL:** Cycle 72's `feat(token-opt):` commit had zero production code (just ADR + ACS predicate). Should be `docs:` or `chore:`. Defect: `substance-label-mismatch`.
+**Example FAIL:** Cycle 72's `feat(token-opt):` commit had zero production code (just ADR + ACS predicate). The recommended prefix is `docs:` or `chore:`. Defect: `substance-label-mismatch`.
 
 ## How to cite
 
@@ -78,7 +78,7 @@ The `legacy/scripts/verification/audit-constitution-check.sh` script verifies:
 
 1. Every criterion has at least one principle citation.
 2. Top-level criteria (the PASS-blocking ones) cite at least P1.
-3. Counts citations of P1..P8 to ensure broad coverage.
+3. Counts citations of P1..P8 to make sure that coverage is broad.
 
 ## What this does NOT enforce
 
@@ -103,20 +103,24 @@ size and the cap; it never flips the verdict and never rewrites the file.
 Both properties are load-bearing, not stylistic:
 
 - **Severity is wiring.** `cyclestate.ErrorMessages` keys off
-  `Severity == "error"` to build `AuditFailReasons`, so an error-severity size
-  diagnostic would turn a merely verbose report into a dossier-visible failure.
+  `Severity == "error"` to build `AuditFailReasons`.
+  With error severity, a size diagnostic turns a merely verbose report into a dossier-visible failure.
 - **No on-disk mutation.** The ship phase re-reads this artifact and SHA-binds
-  those exact bytes (`go/internal/phases/ship/audit.go`), so a truncating cap
-  would break the integrity check it was meant to protect.
+  those exact bytes (`go/internal/phases/ship/audit.go`).
+  A truncating cap breaks the integrity check that it was meant to protect.
 
 The idiom is the one `defect_ledger.go` already uses for the defect ledger
 (`defectLedgerMaxEntries` / `defectTextMaxRunes`, cycle-1282 DEF-6): bound it,
-RECORD the overflow, never silently drop. The budget is set ~1.5x above the
-largest report observed across 256 recorded runs (max 22,035 bytes, p90 15,777)
-— high enough that a normal report never trips it, low enough to catch a runaway
-`## Issues` table. The auditor persona carries the same number
+RECORD the overflow, never silently drop.
+
+The budget is set ~1.5x above the
+largest report observed across 256 recorded runs (max 22,035 bytes, p90 15,777).
+It is high enough that a normal report never trips it. It is low enough to catch a runaway
+`## Issues` table.
+
+The auditor persona carries the same number
 ([agents/evolve-auditor-reference.md](../../agents/evolve-auditor-reference.md)
-§ output-template), and `go/acs/cycle1522` fails on drift between the two.
+§ output-template). `go/acs/cycle1522` fails on drift between the two.
 
 ## References
 

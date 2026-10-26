@@ -26,8 +26,8 @@ Agent tool"* instruction plus a `LEGACY_DISPATCH` stdout token. That token was a
 banned.
 
 **Alternatives considered.**
-- *Silently ignore the flag (always bridge).* Rejected — a silent change (Rule 3); a caller setting
-  the flag would get surprising behavior with no signal.
+- *Silently ignore the flag (always bridge).* Rejected — a silent change (Rule 3); a caller that sets
+  the flag, if any, gets surprising behavior with no signal.
 - *Loud, default-off deprecation with a removal date.* Reasonable, but leaves the banned path
   reachable during the deprecation window.
 - *Hard error (chosen).* Setting the flag fails loudly at the single `Run()` chokepoint. No dispatch
@@ -39,16 +39,17 @@ fan-out, recursive) funnels through. `RunResult.LegacyDispatch` and the `cmd_sub
 block/token were deleted. A source-guard test pins that no in-process fallback signal (or
 "honored-env" advertisement of the retired flag) can regress.
 
-The agent allow-list was collapsed to an `agentRoles[]` SSOT; `agentRolePattern` derives from it and
-the all-roles invariant test iterates it, so a new role is added in exactly one place.
+The agent allow-list was collapsed to an `agentRoles[]` SSOT. `agentRolePattern` derives from it, and
+the all-roles invariant test iterates it. So a new role is added in exactly one place.
 
 ## B2 — Recursion through the same bridge
 
 **Problem.** A fan-out worker recurses by running `evolve subagent run <agent>-worker-<subtask>` —
-re-entering the same binary's `Run()` (good: never the in-process tool). But (a) the command was
-built inline and untested, (b) the recursion was unbounded, and (c) a recursive agent is
-*nested-Claude inside nested-Claude*, so the Part A sandbox-confinement SSOT must stay coherent at
-every depth.
+re-entering the same binary's `Run()` (good: never the in-process tool). But three problems existed:
+
+- (a) the command was built inline and untested;
+- (b) the recursion was unbounded;
+- (c) a recursive agent is *nested-Claude inside nested-Claude*, so the Part A sandbox-confinement SSOT must stay coherent at every depth.
 
 **Design.**
 - **Tested recursion command.** Extracted pure `buildWorkerRecursionCommand()` — composes
@@ -59,9 +60,9 @@ every depth.
   (`ReadDispatchDepth` parses it; absent ⇒ 0). `enforceDispatchDepth` rejects past `maxDispatchDepth`
   (3) at both the `Run()` and `DispatchParallel()` entry points (one predicate). A fan-out loop can't
   recurse unboundedly.
-- **Sandbox coherence by construction.** The worker command clears `CLAUDECODE_TYPE` — a recursive
-  child is, by definition, **not** the top-level host. If a stale `CLAUDECODE_TYPE=host` leaked into a
-  child, `sandbox.DetectNested` would return false → `ShouldWrap` would attempt the inner OS sandbox →
+- **Sandbox coherence by construction.** The worker command clears `CLAUDECODE_TYPE`. A recursive
+  child is, by definition, **not** the top-level host. Suppose a stale `CLAUDECODE_TYPE=host` leaked into a
+  child. Then `sandbox.DetectNested` returns false → `ShouldWrap` tries the inner OS sandbox →
   on macOS `sandbox_apply()` EPERMs and hangs the REPL (the Part A failure mode). Since `claude`
   self-sets `CLAUDECODE` in every process, clearing the host marker keeps `DetectNested=true` at any
   depth → no inner wrap.
@@ -77,16 +78,20 @@ Two single-source-of-truth fixes: one for the *verdict* a dispatched artifact ea
 
 ### B3a — Artifact verification SSOT
 
-**Problem.** The "is this artifact valid?" ladder (stat → freshness < 5 min → readable/non-empty →
-token-bearing → exec status ⇒ `PASS` / `FAIL` / `INTEGRITY_FAIL`) existed in **three** Go copies that
-could drift: `classifyArtifact` (`run.go`, single dispatch, bare verdict), `(*Runner).classify`
-(`subagent.go`, same ladder + `[]core.Diagnostic`), and the bash `verify_artifact()` they were ported
-from. A fourth, weaker copy — the fan-out aggregator's per-worker gate — is unified separately in B5
+**Problem.** The "is this artifact valid?" ladder existed in **three** Go copies that
+can drift. The ladder is: stat → freshness < 5 min → readable/non-empty →
+token-bearing → exec status ⇒ `PASS` / `FAIL` / `INTEGRITY_FAIL`. The copies are:
+
+- `classifyArtifact` (`run.go`, single dispatch, bare verdict);
+- `(*Runner).classify` (`subagent.go`, same ladder + `[]core.Diagnostic`);
+- the bash `verify_artifact()` that the Go copies were ported from.
+
+A fourth, weaker copy — the fan-out aggregator's per-worker gate — is unified separately in B5
 (it must skip freshness, see below).
 
 **Alternatives considered.**
-- *Keep the seams-blob signature (`Verify(opts RunOptions, …)`).* Rejected — couples the verdict to
-  the whole dispatch-options struct and to the filesystem, so the ladder can only be tested with temp
+- *Keep the seams-blob signature (`Verify(opts RunOptions, …)`).* Rejected — it couples the verdict to
+  the whole dispatch-options struct and to the filesystem. So the ladder can only be tested with temp
   files + `os.Chtimes` (no `t.Parallel`).
 - *One pure verdict-only function, callers re-emit their own diagnostics.* Rejected — re-introduces the
   per-call-site duplication for the diagnostic wording (the exact drift we're removing).
@@ -101,36 +106,42 @@ from. A fourth, weaker copy — the fan-out aggregator's per-worker gate — is 
 - `VerifyArtifact(stat, read, now, path, token, exitCode, execErr)` — the single I/O-bearing entry
   point. Gathers the stat (and, only on stat success, the body — preserving the "missing artifact is
   judged before any read" short-circuit), then calls `Verify` against `ArtifactMaxAge`.
-- `run.go` step 13 calls `VerifyArtifact(…).Verdict`; `(*Runner).classify` calls it and returns
+- `run.go` step 13 calls `VerifyArtifact(…).Verdict`. `(*Runner).classify` calls it and returns
   `(.Verdict, .Diagnostics)`. `classifyArtifact` is deleted. Verdict and diagnostic bytes are
-  unchanged — the four legacy FS tests retarget onto `VerifyArtifact`, and the new contract table adds
-  the branches they never covered (token mismatch, exit≠0 ⇒ `FAIL`, happy `PASS`, the leading
-  bridge-error diagnostic that does **not** short-circuit integrity).
+  unchanged. The four legacy FS tests retarget onto `VerifyArtifact`. The new contract table adds
+  the branches that they never covered:
+  - token mismatch;
+  - exit≠0 ⇒ `FAIL`;
+  - happy `PASS`;
+  - the leading bridge-error diagnostic that does **not** short-circuit integrity.
 
-The `evolve subagent check-token` CLI probe (`checktoken.go`) is deliberately **not** folded in: it is
-a lighter exists+token check for operators, not a dispatch verdict, and adding freshness would change
-that contract.
+The `evolve subagent check-token` CLI probe (`checktoken.go`) is deliberately **not** folded in. It is
+a lighter exists+token check for operators, not a dispatch verdict. If the probe added a freshness check, that contract changes.
 
 ### B3b — Tunable deadline: env-resolution SSOT
 
-**Problem.** The artifact-wait deadline is already progress-aware — the `deterministicReviewer` extends
-**unbounded** while the pane shows substantive new content (`Progressed`) and up to `maxExtends` while
-it is busy-but-quiet (`Busy`), so a thorough agent is not killed mid-write (the cycle-311/312 and
-254/255 fixes). What was broken is the **tunable** part: the `EVOLVE_ARTIFACT_TIMEOUT_S` override
-silently did nothing. Root cause is a second SSOT split — the *subprocess* env is built by
-`driverEnv = os.Environ() + deps.Env`, but the *in-process* int reads went through
+**Problem.** The artifact-wait deadline is already progress-aware. The `deterministicReviewer` extends
+**unbounded** while the pane shows substantive new content (`Progressed`). It extends up to `maxExtends` while
+the pane is busy-but-quiet (`Busy`). So nobody kills a thorough agent mid-write (the cycle-311/312 and
+254/255 fixes).
+
+What was broken is the **tunable** part: the `EVOLVE_ARTIFACT_TIMEOUT_S` override
+silently did nothing. The root cause is a second SSOT split. The *subprocess* env is built by
+`driverEnv = os.Environ() + deps.Env`. But the *in-process* int reads went through
 `lookupEnv → deps.LookupEnv` **only**, never consulting `deps.Env`. An override carried on the launch
-(in `deps.Env`, the same place all other request env lives) reached the inner CLI but was invisible to
-the deadline. `envInt`'s doc-comment even *claimed* it read "the Deps env overlay" — it didn't.
+(in `deps.Env`, the same place as all other request env) reached the inner CLI. It was invisible to
+the deadline.
+
+`envInt`'s doc-comment even *claimed* it read "the Deps env overlay", but it did not.
 
 **Alternatives considered.**
-- *Fold the `LaunchArgs` `env` arg into `deps.Env`.* Broader blast radius — would export every
-  request env var to the subprocess; not needed to fix the knob.
+- *Fold the `LaunchArgs` `env` arg into `deps.Env`.* Broader blast radius — if folded in, it exports every
+  request env var to the subprocess. The knob fix does not need that.
 - *Make the env override outrank an explicit `cfg.ArtifactTimeoutS`.* Rejected — livesmoke and
   integration tests set `cfg.ArtifactTimeoutS` deliberately (1–120 s); a stray global `=600` must not
   make them hang.
-- *Make `lookupEnv` consult `deps.Env` first (chosen).* The minimal SSOT fix: the in-process env view
-  now matches the subprocess env view, the lying doc-comment becomes true, and the existing precedence
+- *Make `lookupEnv` consult `deps.Env` first (chosen).* This is the minimal SSOT fix. The in-process env view
+  now matches the subprocess env view. The lying doc-comment becomes true. The existing precedence
   (`cfg.ArtifactTimeoutS` > `EVOLVE_ARTIFACT_TIMEOUT_S` > 300 default) is preserved.
 
 **Design.** `lookupEnv(deps, key)` resolves `deps.Env[key]` → `deps.LookupEnv` → `os.LookupEnv`. Every
@@ -140,16 +151,23 @@ override reaches the recorded `StopEvent.IntervalS` end-to-end, and `cfg.Artifac
 
 ## B4 — Subagent conformance suite
 
-**Problem.** The invariants above were each enforced by a bespoke test; nothing guaranteed they held
-*uniformly for every role*, so a new agent could silently miss one.
+**Problem.** A bespoke test enforced each invariant above. Nothing guaranteed that they held
+*uniformly for every role*, so a new agent can silently miss one.
 
 **Design.** `subagent/conformance_test.go` is a single suite driven by a **fake-bridge seam** (the
-`RunOptions.ExecAdapter`, standing in for `evolve subagent run` with no LLM cost) and **table-driven
-over `agentRoles`** — adding a role to the registry auto-subjects it to every invariant. Each role is
-run through: bridge-only rejection (I1), B3 contract verdicts incl. the integrity-guard negatives
-(I6), isolated dispatch (unique token bound into its own artifact under its own project root),
-sandbox-coherent recursion command (I3+I5), depth-cap rejection (I4), no cross-agent token leakage,
-and concurrent dispatch under `-race`. The suite is characterization, not new behavior: a failing row
+`RunOptions.ExecAdapter`, standing in for `evolve subagent run` with no LLM cost). It is **table-driven
+over `agentRoles`**: a role added to the registry is auto-subjected to every invariant. Each role is
+run through these checks:
+
+- bridge-only rejection (I1);
+- B3 contract verdicts with the integrity-guard negatives (I6);
+- isolated dispatch (unique token bound into its own artifact under its own project root);
+- sandbox-coherent recursion command (I3+I5);
+- depth-cap rejection (I4);
+- no cross-agent token leakage;
+- concurrent dispatch under `-race`.
+
+The suite is characterization, not new behavior: a failing row
 is a real conformance gap. All 14 roles pass.
 
 ## Invariants (enforced by tests)
@@ -158,7 +176,7 @@ is a real conformance gap. All 14 roles pass.
 |---|-----------|-------------|
 | I1 | No dispatch reaches the in-process Agent tool | `enforceBridgeOnly` @ `Run()`; source-guard + conformance |
 | I2 | Agent allow-list is single-sourced | `agentRoles[]` → `agentRolePattern`; all-roles test |
-| I3 | Fan-out workers recurse via `subagent run` | `buildWorkerRecursionCommand` + conformance |
+| I3 | Fan-out workers recurse with `subagent run` | `buildWorkerRecursionCommand` + conformance |
 | I4 | Recursion depth is bounded | `EVOLVE_DISPATCH_DEPTH` + `enforceDispatchDepth` (cap 3); conformance |
 | I5 | Recursive children stay nested (no inner wrap) | `CLAUDECODE_TYPE` cleared per worker; conformance |
 | I6 | Artifact verdict is single-sourced | `Verify`/`VerifyArtifact` (`contract.go`); contract table + conformance |
@@ -171,75 +189,77 @@ is a real conformance gap. All 14 roles pass.
 ### I11 — Fleet worktree fail-closed: the PHASE supplies the cwd
 
 Under `EVOLVE_FLEET=1` the tmux and recipe drivers refuse a launch with no explicit worktree
-(`errWorktreeRequired`) rather than fall back to `os.Getwd()` — a process-cwd fallback would run the
-agent over another lane's tree, or over main. That refusal is correct and must stay bit-for-bit
-intact; the failure mode it created is that a phase with no worktree is simply **lost**.
+(`errWorktreeRequired`). They do not fall back to `os.Getwd()`, because a process-cwd fallback, if used, runs the
+agent over the tree of another lane, or over main. That refusal is correct and must stay bit-for-bit
+intact. The failure mode that it created is that a phase with no worktree is simply **lost**.
 
-`retrospective` was the live instance (cycle-1255): a lane whose worktree was torn down, or never
-provisioned after exhausted retries, dispatched retro with `Worktree == ""` and the knowledge-capture
-phase FAILed on every hit of that window — a failure in the failure-handler. The fix is supplied by
-the phase, not by relaxing the guard: `retro.retroWorktree` mints a disposable cwd under the workspace
-it already owns (`bridge.ScratchCwd(workspace, "retro-scratch-cwd")`), which is legitimate because
+`retrospective` was the live instance (cycle-1255). A lane whose worktree was torn down, or never
+provisioned after exhausted retries, dispatched retro with `Worktree == ""`. The knowledge-capture
+phase FAILed on every hit of that window — a failure in the failure-handler.
+
+The phase supplies the fix. The fix does not relax the guard. `retro.retroWorktree` mints a disposable cwd under the workspace
+it already owns (`bridge.ScratchCwd(workspace, "retro-scratch-cwd")`). This is legitimate because
 retro is read-mostly and Evaluate-archetype.
 
-The two shapes deliberately NOT used, both of which would satisfy "non-empty" while reintroducing the
-defect the guard exists to prevent:
+The two shapes deliberately NOT used both satisfy "non-empty", but they reintroduce the
+defect that the guard exists to prevent:
 
 - the shared main tree (`ProjectRoot`) — refuted in PR #400; **worktree is the write-authority predicate**;
 - the dispatching process's cwd — the exact leak the guard closes.
 
-With no owned workspace there is nowhere safe to mint, so retro leaves `Worktree` empty and the bridge
-decides exactly as before — never a fabricated path, and never a hard error (GAP 9: a failure in the
-failure-handler must not abort the batch). `bridge.ScratchCwd` is the single mint implementation,
-shared with the probe-launch policy `applyScratchCwd` (boot-smoke / health canary), so the
-leak-safety properties — owned dir, reaped with the workspace, never main, never process cwd — cannot
-drift between the two consumers.
+With no owned workspace there is nowhere safe to mint. So retro leaves `Worktree` empty. The bridge
+decides exactly as before. There is never a fabricated path and never a hard error (GAP 9: a failure in the
+failure-handler must not abort the batch).
+
+`bridge.ScratchCwd` is the single mint implementation. The probe-launch policy `applyScratchCwd` (boot-smoke / health canary) shares it. So the
+leak-safety properties cannot drift between the two consumers. The properties are: owned dir, reaped with the workspace, never main, never process cwd.
 
 ## B5 — Fan-out concurrency stability
 
 **Problem.** `fanoutdispatch.Run` fans N worker commands across a semaphore-bounded goroutine pool
 (`sema := make(chan struct{}, Concurrency)`), recording results in a mutex-guarded map and per-worker
-`.meta`/`.out` files. The existing `TestRun_BoundedConcurrency` only asserted all workers *complete* —
-it never observed the cap was honored (it would pass with a broken semaphore), and isolation /
+`.meta`/`.out` files. The existing `TestRun_BoundedConcurrency` only asserted all workers *complete*. It never observed that the cap was honored (it passes with a broken semaphore). Isolation /
 partial-failure were only exercised at N=4.
 
 **Design (tests; no production change — the path was already `-race`-clean).**
 - `TestRun_ConcurrencyBoundIsObserved` — each worker drops a marker file for the lifetime of its
   command and snapshots how many markers exist. A marker's lifetime ⊆ its held semaphore slot, so no
-  snapshot can exceed `Concurrency`; with N≫`Concurrency` + an overlap sleep, at least one snapshot
+  snapshot can exceed `Concurrency`. With N≫`Concurrency` + an overlap sleep, at least one snapshot
   must observe real parallelism (guards against a vacuous serial pass). Asserts `2 ≤ max ≤ Concurrency`.
-- `TestRun_HighFanoutIsolationPartialFailure` — 12 workers at concurrency 4, half failing: every
-  worker's recorded exit code matches its intent, each `.out` carries only its own line (no
-  cross-clobbering of the results map / files), and `Run` returns `ExitWorkerFail`. Stable under
-  `-race -count=3`.
+- `TestRun_HighFanoutIsolationPartialFailure` — 12 workers at concurrency 4, half failing:
+  - the recorded exit code of every worker matches its intent;
+  - each `.out` carries only its own line (no cross-clobbering of the results map / files);
+  - `Run` returns `ExitWorkerFail`.
+
+  Stable under `-race -count=3`.
 
 ## H1 — Fan-out per-worker provenance verification
 
-**Problem.** A capstone `evolve loop` cycle implemented parent-side per-worker artifact verification, but
-ran the B3 `Verify` with an **empty token** — `bytes.Contains(body, []byte("")) == true` for any
-non-empty body — so a compromised/buggy worker runner could write arbitrary content to the expected
-artifact path and pass (presence, not provenance). The pipeline's adversarial audit caught this as a
-HIGH finding; this change closes it (the deferred token-threading).
+**Problem.** A capstone `evolve loop` cycle implemented parent-side per-worker artifact verification. It ran the B3 `Verify` with an **empty token**: `bytes.Contains(body, []byte("")) == true` for any
+non-empty body. So a compromised/buggy worker runner can write arbitrary content to the expected
+artifact path and pass (presence, not provenance). The adversarial audit of the pipeline caught this as a
+HIGH finding. This change closes it (the deferred token-threading).
 
 **Design (provenance by a parent-dictated token).** The fan-out parent already derives a per-worker
-token `parentToken+"-"+subtask`. The fix threads it end-to-end: `buildWorkerRecursionCommand` exports
-`EVOLVE_FANOUT_WORKER_TOKEN`; `cmd_subagent` wires it to `RunRequest.ChallengeTokenOverride`; `run.go`
-uses it as the challenge token instead of minting a fresh one (empty ⇒ mint, the normal path), so the
-worker **writes the parent-known token** into its artifact; the parent's `defaultVerifyWorkerArtifact`
-sets `VerifyInput.Token` to the expected value and runs the SSOT `Verify` (freshness skipped via
-`MaxAge=MaxInt64` — the worker's recursive child already verified freshness at write time, and the
-parent re-checks only after all workers finish). A wrong-token or tokenless worker artifact now fails
-verification, which skips aggregation. This also demonstrates the self-correction loop: the audit found
-the defect, and it was completed to PASS rather than shipped with a deferral.
+token `parentToken+"-"+subtask`. The fix threads it end-to-end:
+
+- `buildWorkerRecursionCommand` exports `EVOLVE_FANOUT_WORKER_TOKEN`.
+- `cmd_subagent` wires it to `RunRequest.ChallengeTokenOverride`.
+- `run.go` uses it as the challenge token instead of a fresh minted one (empty ⇒ mint, the normal path). So the worker **writes the parent-known token** into its artifact.
+- The parent's `defaultVerifyWorkerArtifact` sets `VerifyInput.Token` to the expected value and runs the SSOT `Verify`. Freshness is skipped with `MaxAge=MaxInt64`. The recursive child of the worker already verified freshness at write time. The parent re-checks only after all workers finish.
+
+A wrong-token or tokenless worker artifact now fails verification, which skips aggregation. This also demonstrates the self-correction loop: the audit found the defect, and the cycle completed it to PASS rather than ship it with a deferral.
 
 | I11 | Fan-out worker artifacts are provenance-verified | parent-dictated `EVOLVE_FANOUT_WORKER_TOKEN`; `defaultVerifyWorkerArtifact` token check |
 
 ## B6 — Allow-list ↔ profile single-sourcing (+ reaping)
 
-**Problem.** B1 made the allow-list one source (`agentRoles` → `agentRolePattern`), but the allow-list
-and the on-disk profiles could still drift: a role added to `agentRoles` without a `<role>.json`
-profile (or a profile removed out from under a role) would only fail at dispatch time (`run.go:179`
-loads `ProfilesDir/<role>.json`).
+**Problem.** B1 made the allow-list one source (`agentRoles` → `agentRolePattern`). But the allow-list
+and the on-disk profiles can still drift.
+
+A role added to `agentRoles` without a `<role>.json`
+profile (or a profile removed out from under a role) fails only at dispatch time.
+`run.go:179` loads `ProfilesDir/<role>.json`.
 
 **Design (test; no production change).** `conformance_registry_test.go`:
 - `TestAgentRoles_EveryRoleHasProfile` — every canonical role has a tracked `<role>.json` profile, so
@@ -262,24 +282,28 @@ invariants I1–I10, each backed by tests.
 
 Three dispatch entry points share one profile-derived resolution. Their authorities are now single-sourced:
 
-**Alias SSOT.** `detectcli.Canonical(cli)` (`go/internal/detectcli/detectcli.go`) is the only place the
-`antigravity` → `agy` rewrite lives — the CLI is *declared* as `antigravity` but its adapter, capability
-manifest and PATH binary are all named `agy`. It is called from `subagent/subagentrun/resolve.go` (the run path's cli resolution, ADR-0103 unit 16),
-`subagent/validateprofile.go` and `subagent/dispatchparallel.go` (Step 4), replacing three inline copies of
-the same `if cli == "antigravity"` block. Every other name, including `""`, passes through unchanged so the
-callers' `cli unresolved` guards keep firing.
+**Alias SSOT.** `detectcli.Canonical(cli)` (`go/internal/detectcli/detectcli.go`) is the only place that holds the
+`antigravity` → `agy` rewrite. The CLI is *declared* as `antigravity`, but its adapter, capability
+manifest and PATH binary are all named `agy`. These callers use it:
+
+- `subagent/subagentrun/resolve.go` (the cli resolution of the run path, ADR-0103 unit 16);
+- `subagent/validateprofile.go`;
+- `subagent/dispatchparallel.go` (Step 4).
+
+It replaces three inline copies of the same `if cli == "antigravity"` block. Every other name, including `""`, passes through unchanged. So the `cli unresolved` guards of the callers keep firing.
 
 **dispatch-parallel is a passthrough, not a chooser.** Nothing upstream hands it a CLI
-(`cmd/evolve/cmd_subagent.go` builds `DispatchParallelRequest` without one), and it does not decide what its
-workers run: each worker re-enters `evolve subagent run` → `subagent.Run` → `resolvellm.Resolve`, which reads
-the same profile. The CLI it reads is used solely to inspect capability for the quality tier. It therefore
-reads the one authority (the profile's `cli` field), canonicalises it, and **errors** when nothing resolves —
-the previous `cli = "claude"` literal was a second, divergent routing authority that silently tiered an
-unresolvable profile against claude's manifest while `Run`/`ValidateProfile` hard-failed on the same input.
+(`cmd/evolve/cmd_subagent.go` builds `DispatchParallelRequest` without one). It does not decide what its
+workers run. Each worker re-enters `evolve subagent run` → `subagent.Run` → `resolvellm.Resolve`, which reads
+the same profile. It uses the CLI that it reads solely to inspect capability for the quality tier.
+
+It therefore reads the one authority (the profile's `cli` field), canonicalises it, and **errors** when nothing resolves. The previous `cli = "claude"` literal was a second, divergent routing authority. It silently tiered an
+unresolvable profile against the manifest of claude, while `Run`/`ValidateProfile` hard-failed on the same input.
 
 **The `WORKTREE_PATH` fallback is loud.** `subagent.Run` still falls back to `ProjectRoot` when
-`RunRequest.WorktreePath` is empty (non-worktree dispatch must keep working), but the fallback now appends a
-WARN to `RunResult.Warns` naming the env var and the path. A fleet lane whose orchestrator failed to propagate
-its worktree points the agent at the main tree — the exact shape the tree-diff guard kills a lane for — and
-that is now diagnosable from the run record instead of inferred post-mortem. The warn is conditional: a
+`RunRequest.WorktreePath` is empty (non-worktree dispatch must keep working). But the fallback now appends a
+WARN to `RunResult.Warns` that names the env var and the path.
+
+A fleet lane whose orchestrator failed to propagate
+its worktree points the agent at the main tree. That is the exact shape that the tree-diff guard kills a lane for. Now the run record makes it diagnosable, with no post-mortem inference. The warn is conditional: a
 supplied worktree emits nothing.

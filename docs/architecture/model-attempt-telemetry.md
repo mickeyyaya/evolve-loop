@@ -1,9 +1,9 @@
-# Model Attempt Telemetry
+# Model Try Telemetry
 
-Model attempt telemetry answers four separate questions without treating an
+Model try telemetry answers four separate questions without treating an
 unknown value as zero:
 
-1. Which CLI invocation did the orchestrator attempt?
+1. Which CLI invocation did the orchestrator try?
 2. Which model selector reached that invocation boundary, if it is known?
 3. How long did the Bridge dispatch path take?
 4. Which input, output, and cache token counts were actually measured?
@@ -31,7 +31,7 @@ flowchart LR
 ## Ownership and measurement boundary
 
 One completed, orchestration-owned `Engine.Launch` invocation makes exactly one
-ledger append attempt. A nil token resolver, resolver error, driver failure, or
+ledger append try. A nil token resolver, resolver error, driver failure, or
 missing token source does not remove the lifecycle record and does not change
 the launch result.
 
@@ -51,9 +51,9 @@ therefore cannot inflate model latency. Direct calls to public `LaunchArgs` and
 errors that return before the shared invocation begins are outside this ledger
 boundary. Callers must not describe the ledger as covering those paths.
 
-`phase-timing.json` retains a different scope: it measures an orchestrator phase
+`phase-timing.json` retains a different scope. It measures an orchestrator phase
 and can include retries, validation, report handling, and other work around one
-or more Bridge attempts. The two durations are useful together but are not
+or more Bridge tries. The two durations are useful together but are not
 interchangeable.
 
 ## Record schema
@@ -64,12 +64,12 @@ the historical fields used by older readers.
 | Field | Meaning |
 |---|---|
 | `schema_version` | `2` for the canonical lifecycle schema; absent on legacy rows. |
-| `call_id` | Opaque process-unique attempt identity used for import deduplication and correlation. |
+| `call_id` | Opaque process-unique try identity used for import deduplication and correlation. |
 | `ts` | Compatibility terminal timestamp. |
 | `started_at`, `ended_at` | UTC RFC3339Nano bounds for the measured timing scope. |
 | `timing_scope` | Currently `bridge_dispatch`. Missing legacy scope is reported as `legacy_unspecified`. |
-| `agent`, `phase`, `attempt` | Orchestrator role and retry identity. An unset attempt becomes `1`. |
-| `cli` | Driver selected for this attempt. |
+| `agent`, `phase`, `attempt` | Orchestrator role and retry identity. An unset try becomes `1`. |
+| `cli` | Driver selected for this try. |
 | `model` | Historical requested selector retained for compatibility. It is not proof of dispatch. |
 | `requested_model` | Selector requested by orchestration, which may be a tier such as `deep`. |
 | `dispatched_model` | Concrete selector observed at a launch or REPL-send boundary; omitted when unknown. |
@@ -85,8 +85,8 @@ the historical fields used by older readers.
 
 `first_output_ms` and `first_output_source` remain optional and are not emitted
 today. Headless stdout bytes, a changing tmux pane, and a provider's first token
-do not identify the same event. Recording one as universal time to first token
-would produce a misleading comparison.
+do not identify the same event. If the ledger recorded one as universal time to first token,
+the comparison misleads.
 
 ## Dispatch identity rules
 
@@ -94,7 +94,7 @@ Dispatch identity is observed by the driver that owns the final invocation:
 
 - Headless drivers observe the selector after log and sandbox preparation and
   immediately before calling the process runner. A runner start failure still
-  represents an attempted invocation with that selector.
+  represents an invocation that the driver tried with that selector.
 - A new tmux session observes its selector only after the CLI launch command is
   successfully sent. A failed transport remains `not_started`.
 - A `/model ...` seed replaces the launch selector only after that individual
@@ -106,17 +106,20 @@ Dispatch identity is observed by the driver that owns the final invocation:
   and telemetry share one provider-specific grammar for split and inline
   `-m`/`--model` flags plus `-c`/`--config model=...` overrides. Dedicated
   model flags take precedence over config overrides regardless of argv order.
-  Repeated config overrides retain their ordered override semantics, but a
-  second surviving dedicated model flag is a provider argument conflict; its
-  dispatch identity is `unknown` and the clamp does not invent an effective
-  selector. An empty dedicated value is also `unknown`, including before a
+
+  Repeated config overrides retain their ordered override semantics. A
+  second surviving dedicated model flag is a provider argument conflict. Its
+  dispatch identity is `unknown`, and the clamp does not invent an effective
+  selector.
+
+  An empty dedicated value is also `unknown`, including before a
   later repetition. This follows Codex's composition of the dedicated CLI model
   above the generic config model in the pinned
   [CLI override](https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/tui/src/lib.rs#L997-L1011),
   [config resolution](https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/core/src/config/mod.rs#L3628-L3635),
   and scalar [model option](https://github.com/openai/codex/blob/rust-v0.147.0/codex-rs/utils/cli/src/shared_options.rs).
-- Selector evidence is derived from the exact deduplicated launch vector:
-  manifest-generated flags form a trusted prefix, while the surviving raw
+- Selector evidence comes from the exact deduplicated launch vector.
+  Manifest-generated flags form a trusted prefix. The surviving raw
   profile suffix and direct extras use the conservative parser. Codex config
   syntax is not applied to another provider's `-c` flag. Unknown option arity
   makes the selector `unknown` rather than storing model-looking prompt or
@@ -146,7 +149,7 @@ exact writer limit remains readable. If a prior process left a non-newline tail,
 the next append inserts a separator. Readers keep valid records, count malformed
 or unrelated JSON lines as skipped, and require the minimum historical
 invariant `phase != ""`. JSON `null`, empty objects, and unrelated envelopes do
-not become zero-valued attempts.
+not become zero-valued tries.
 
 Import preserves the exact valid source bytes. Version 2 rows deduplicate on
 `call_id`; legacy rows use a SHA-256 identity of their trimmed JSON line. Running
@@ -169,7 +172,7 @@ Groups remain comparable by separating these dimensions:
 - timing scope;
 - outcome (`success`, `failure`, or `unknown`).
 
-Each group reports attempt and outcome counts, latency sample and unavailable
+Each group reports try and outcome counts, latency sample and unavailable
 counts, total/minimum/p50/p95/maximum latency, usage coverage, observed token
 totals, and amortized measured output throughput. Human output prints missing
 latency as `-/-`; a measured zero-duration sample prints `0s/0s` with a non-zero
@@ -197,21 +200,23 @@ that corrupt collector values cannot enter totals or throughput calculations.
 
 Input throughput is unavailable because the Bridge has no provider-independent
 boundary separating prompt prefill from queue and transport time. Time to first
-token is unavailable for the same reason. These fields should be added only
-with a new source-specific timing contract and must be grouped by that source.
+token is unavailable for the same reason. Add these fields only
+with a new source-specific timing contract, and group them by that source.
 
 ## Consumers and correlation
 
 The dashboard, token report, cycle classifier, and probe salvage all use the
 canonical reader or import operation.
 
-Dashboard phase rows select the latest unused attempt whose start and terminal
+Dashboard phase rows select the latest unused try whose start and terminal
 timestamps lie within that phase occurrence. Whole-second legacy phase ends
-include their final fractional second, but a call with a precise start in the
-next repeated phase belongs to the later occurrence. A timestamp-only call in
+include their final fractional second. A call with a precise start in the
+next repeated phase belongs to the later occurrence.
+
+A timestamp-only call in
 the overlap is withheld from both occurrences because its owner is unknowable.
 Repeated phases with indistinguishable timestamp windows likewise receive no
-attempt attribution. One attempt index can be used at most once. When timestamp
+try attribution. A try index can be used at most once. When timestamp
 evidence cannot be associated safely, the dashboard leaves routing blank.
 Ordinal fallback is reserved for wholly legacy, untimestamped data.
 
@@ -221,19 +226,19 @@ classification merely because its token resolver failed.
 
 ## Diagnostics
 
-Attempt warnings carry `call_id`, quoted CLI and agent identity, and attempt
-number. Bridge and command diagnostics share `internal/log.DiagnosticField`,
-which bounds each untrusted field to 512 Unicode code points and emits it with
+Try warnings carry `call_id`, quoted CLI and agent identity, and try
+number. Bridge and command diagnostics share `internal/log.DiagnosticField`.
+It bounds each untrusted field to 512 Unicode code points and emits it with
 ASCII escapes in one quoted field. Newlines, terminal controls, invalid UTF-8,
 and bidi formatting marks cannot inject another log line. Append, resolver,
 ledger-read, and probe-salvage failures name the failed operation and retain
 their bounded paths or detail. Append and resolver failures stay fail-open for
-the model launch while remaining attributable to one attempt.
+the model launch while remaining attributable to one try.
 
-For a failed attempt, inspect in this order:
+For a failed try, inspect in this order:
 
 1. `cause_code` and `exit_code` for the stable host classification;
-2. `dispatch_source` and `dispatched_model` to see whether a selector reached a
+2. `dispatch_source` and `dispatched_model` to see if a selector reached a
    process, a new tmux session, or a REPL command;
 3. `usage_status` and `source` before interpreting zero token fields;
 4. `started_at`, `ended_at`, `duration_ms`, and `timing_scope` for latency;
