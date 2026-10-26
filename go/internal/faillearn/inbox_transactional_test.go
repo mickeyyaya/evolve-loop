@@ -26,7 +26,7 @@ func remediationEvent() FailureEvent {
 }
 
 func remediationItems() []InboxItem {
-	return []InboxItem{
+	return shaped([]InboxItem{
 		{
 			ID:            "retro-1279-stale-active-worktree",
 			Title:         "Reconcile cs.ActiveWorktree on fleet teardown",
@@ -47,7 +47,7 @@ func remediationItems() []InboxItem {
 			Files:         []string{"go/internal/phases/audit/probe_quarantine.go"},
 			InjectedBy:    "retrofile",
 		},
-	}
+	}...)
 }
 
 func TestWriteArtifacts_InboxItemsLandBesideRetrospective(t *testing.T) {
@@ -65,7 +65,7 @@ func TestWriteArtifacts_InboxItemsLandBesideRetrospective(t *testing.T) {
 	}
 
 	for _, want := range remediationItems() {
-		path := filepath.Join(inboxDir, want.ID+".json")
+		path := filedPath(t, inboxDir, want.ID)
 		raw, err := os.ReadFile(path)
 		if err != nil {
 			t.Errorf("remediation item %q must reach the inbox as %s: %v", want.ID, filepath.Base(path), err)

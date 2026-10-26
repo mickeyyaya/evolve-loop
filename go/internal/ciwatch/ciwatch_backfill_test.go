@@ -211,7 +211,7 @@ func TestFileEscalation_FailingDependenciesReturnWrappedErrors(t *testing.T) {
 				t.Fatal(err)
 			}
 			opts.InboxDir = file
-		}, "ciwatch: inbox dir:"},
+		}, "ciwatch: file escalation:"},
 		{"inbox dir read-only", func(t *testing.T, opts *Options) {
 			dir := t.TempDir()
 			if err := os.Chmod(dir, 0o555); err != nil {
@@ -219,13 +219,13 @@ func TestFileEscalation_FailingDependenciesReturnWrappedErrors(t *testing.T) {
 			}
 			t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
 			opts.InboxDir = dir
-		}, "ciwatch: write escalation:"},
+		}, "ciwatch: file escalation:"},
 		{"target is a non-empty directory", func(t *testing.T, opts *Options) {
 			target := filepath.Join(opts.InboxDir, now.Format(inboxbatch.FilenameStampLayout)+"-ci-red-deadbeefcafe.json")
 			if err := os.MkdirAll(filepath.Join(target, "occupied"), 0o755); err != nil {
 				t.Fatal(err)
 			}
-		}, "ciwatch: rename escalation:"},
+		}, "ciwatch: file escalation:"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -238,5 +238,21 @@ func TestFileEscalation_FailingDependenciesReturnWrappedErrors(t *testing.T) {
 				t.Fatalf("err = %v, want it to contain %q", err, tc.want)
 			}
 		})
+	}
+}
+
+func TestFileEscalation_ALongOddFailingTestNameIsStillFiled(t *testing.T) {
+	opts, inbox, _ := watchOpts(t, nil)
+	st := escalationStatus()
+	st.FailingTest = "TestX_" + strings.Repeat("a_very_long_descriptive_name_", 8) + "/case\twith\ttabs"
+
+	if err := fileEscalation(opts, st, opts.Now()); err != nil {
+		t.Fatalf("fileEscalation: %v; a long or odd test name must still file the fix-forward item", err)
+	}
+
+	item := soleEscalation(t, inbox)
+	title := item["title"].(string)
+	if len(title) > inboxbatch.MaxFieldLen || strings.ContainsAny(title, "\t\n") {
+		t.Errorf("title = %q, want bounded and control-free", title)
 	}
 }

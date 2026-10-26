@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxfile"
 )
 
 const (
@@ -39,18 +41,28 @@ func FileBaseRedItems(inboxDir string, rep ClassifyReport, now time.Time) ([]str
 	}
 	now = now.UTC()
 	var filed []string
+	var errs []error
 	for _, f := range reds {
-		item := baseRedItem(rep, f.FailingTest, now)
+		item := baseRedItem(rep, f.FailingTest, now).fitted()
 		if known[item.ID] {
 			continue
 		}
-		if err := writeInboxItem(inboxDir, fmt.Sprintf("%s-%s.json", now.Format(inboxbatch.FilenameStampLayout), item.ID), item); err != nil {
-			return filed, err
+		body, err := marshalIndent(item, "", "  ")
+		if err != nil {
+			errs = append(errs, fmt.Errorf("ciwatch: marshal base-red item: %w", err))
+			continue
 		}
-		known[item.ID] = true
-		filed = append(filed, item.ID)
+		res, err := inboxfile.Mint(inboxDir, body, func() time.Time { return now })
+		if err != nil {
+			errs = append(errs, fmt.Errorf("ciwatch: write escalation: %w", err))
+			continue
+		}
+		if !res.Skipped {
+			known[item.ID] = true
+			filed = append(filed, item.ID)
+		}
 	}
-	return filed, nil
+	return filed, errors.Join(errs...)
 }
 
 func knownItemIDs(inboxDir string) (map[string]bool, error) {
@@ -78,6 +90,9 @@ func baseRedItemID(f FailingTest) string {
 	if len(slug) > baseRedSlugMax {
 		slug = strings.TrimRight(slug[:baseRedSlugMax], "-")
 	}
+	if slug == "" {
+		slug = "unnamed"
+	}
 	return BaseRedItemPrefix + slug + "-" + hex.EncodeToString(sum[:4])
 }
 
@@ -100,6 +115,11 @@ func baseRedItem(rep ClassifyReport, f FailingTest, now time.Time) escalationIte
 		Summary: fmt.Sprintf(
 			"evolve ci classify found %s (%s) red on run %d of %s and also red on its base %s. The change did not cause it, so each PR on this base pays for it until main is fixed. Fix it on main first.",
 			name, where, rep.RunID, rep.Target, shortCommit(rep.BaseSHA)),
+		Fix: fmt.Sprintf("Reproduce %s locally on the base commit %s, fix it at the source on main, and push before merging PRs.", name, shortCommit(rep.BaseSHA)),
+		Acceptance: []string{
+			fmt.Sprintf("The CI run on main passes %s", name),
+			"A regression test fails before the fix and passes after it",
+		},
 		Evidence: rep.RunURL,
 		Source:   BaseRedSource,
 	}

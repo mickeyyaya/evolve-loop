@@ -13,6 +13,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxfile"
 )
 
 type fakeClock struct{ now time.Time }
@@ -46,7 +47,9 @@ func inboxFiles(t *testing.T, dir string) []string {
 	}
 	var names []string
 	for _, e := range entries {
-		names = append(names, e.Name())
+		if e.Name() != inboxfile.LockName {
+			names = append(names, e.Name())
+		}
 	}
 	return names
 }

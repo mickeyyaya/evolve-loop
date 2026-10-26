@@ -1,7 +1,6 @@
 package faillearn
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,7 +8,7 @@ import (
 )
 
 func partialWriteItems() []InboxItem {
-	return []InboxItem{
+	return shaped([]InboxItem{
 		{
 			ID:            "retro-1292-first-item-reaches-disk",
 			Title:         "First remediation item — written before the failure",
@@ -40,7 +39,7 @@ func partialWriteItems() []InboxItem {
 			Files:         []string{"go/internal/faillearn/inbox.go"},
 			InjectedBy:    "retrofile",
 		},
-	}
+	}...)
 }
 
 func unqueuedSection(t *testing.T, body string) string {
@@ -67,45 +66,27 @@ func unqueuedSection(t *testing.T, body string) string {
 	return strings.Join(out, "\n")
 }
 
-func collidingInboxDir(t *testing.T, failIdx int) string {
-	t.Helper()
-	dir := filepath.Join(t.TempDir(), "inbox")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatalf("prepare inbox dir: %v", err)
-	}
-	victim := partialWriteItems()[failIdx]
-	body, err := json.MarshalIndent(InboxItem{
-		ID:         victim.ID,
-		Title:      "a DIFFERENT item already filed under this id by another lane",
-		Weight:     0.5,
-		Kind:       "chore",
-		Priority:   "L",
-		InjectedBy: "other-lane",
-	}, "", "  ")
-	if err != nil {
-		t.Fatalf("encode colliding item: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, victim.ID+".json"), body, 0o644); err != nil {
-		t.Fatalf("write colliding item: %v", err)
-	}
-	return dir
+func refusedAt(failIdx int) []InboxItem {
+	items := partialWriteItems()
+	items[failIdx].Weight = 2
+	return items
 }
 
 func TestWriteArtifacts_PartialWriteNamesOnlyUnqueuedItems(t *testing.T) {
 	runDir, lessonsDir := t.TempDir(), t.TempDir()
-	items := partialWriteItems()
-	inboxDir := collidingInboxDir(t, 1)
+	items := refusedAt(1)
+	inboxDir := filepath.Join(t.TempDir(), "inbox")
 
 	err := WriteArtifacts(remediationEvent(), runDir, lessonsDir, WithInbox(inboxDir, items))
 
 	if err == nil {
-		t.Fatal("an id collision must still abort WriteArtifacts — preserving an accurate item list is an ADDITION to failing loudly")
+		t.Fatal("a writer-refused item must still abort WriteArtifacts — preserving an accurate item list is an ADDITION to failing loudly")
 	}
 	if _, statErr := os.Stat(filepath.Join(runDir, "retrospective-report.md")); statErr == nil {
 		t.Error("retrospective-report.md was written while remediation items reached no queue — the 1255 abort ordering must stay unreversed")
 	}
 	queued := items[0]
-	if _, statErr := os.Stat(filepath.Join(inboxDir, queued.ID+".json")); statErr != nil {
+	if _, statErr := os.Stat(filedPath(t, inboxDir, queued.ID)); statErr != nil {
 		t.Fatalf("fixture premise broken: item %q was expected to reach disk before the failing item: %v", queued.ID, statErr)
 	}
 
@@ -140,7 +121,7 @@ func TestWriteArtifacts_PartialWriteItemRejectionNamesOnlyUnqueuedItems(t *testi
 		t.Fatal("an item with no id must still be rejected loudly")
 	}
 	queued := items[0]
-	if _, statErr := os.Stat(filepath.Join(inboxDir, queued.ID+".json")); statErr != nil {
+	if _, statErr := os.Stat(filedPath(t, inboxDir, queued.ID)); statErr != nil {
 		t.Fatalf("fixture premise broken: item %q was expected to reach disk before the rejected item: %v", queued.ID, statErr)
 	}
 
@@ -180,11 +161,11 @@ func TestWriteArtifacts_PartialWrite_TotalFailureNamesEveryItem(t *testing.T) {
 
 func TestWriteArtifacts_PartialWrite_FirstItemFailsNamesEveryItem(t *testing.T) {
 	runDir, lessonsDir := t.TempDir(), t.TempDir()
-	items := partialWriteItems()
+	items := refusedAt(0)
 
-	err := WriteArtifacts(remediationEvent(), runDir, lessonsDir, WithInbox(collidingInboxDir(t, 0), items))
+	err := WriteArtifacts(remediationEvent(), runDir, lessonsDir, WithInbox(filepath.Join(t.TempDir(), "inbox"), items))
 	if err == nil {
-		t.Fatal("a collision on the first item must still abort")
+		t.Fatal("a refusal on the first item must still abort")
 	}
 	raw, readErr := os.ReadFile(filepath.Join(runDir, unqueuedRetroName))
 	if readErr != nil {

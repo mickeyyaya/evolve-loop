@@ -33,7 +33,7 @@ func TestWriteArtifacts_InboxRejectsPathEscapingID(t *testing.T) {
 			err := WriteArtifacts(
 				FailureEvent{Cycle: 1279, FailedPhase: "audit", Scope: ScopePhase, Classification: "deliverable-rejected", Verdict: "FAIL", Summary: "s"},
 				runDir, lessons,
-				WithInbox(inbox, []InboxItem{{ID: id, Title: "t", Kind: "bug", Priority: "H", PriorityClass: "correctness", InjectedBy: "faillearn-failure-floor"}}),
+				WithInbox(inbox, shaped(InboxItem{ID: id, Title: "t", Weight: 0.5, Kind: "bug", Priority: "H", PriorityClass: "correctness", InjectedBy: "faillearn-failure-floor"})),
 			)
 			if err == nil {
 				t.Fatalf("id %q was accepted — an id that is not a bare filename must be rejected, like the empty-id case already is", id)
@@ -65,11 +65,35 @@ func TestWriteArtifacts_InboxAcceptsOrdinaryID(t *testing.T) {
 	if err := WriteArtifacts(
 		FailureEvent{Cycle: 1279, FailedPhase: "audit", Scope: ScopePhase, Classification: "deliverable-rejected", Verdict: "FAIL", Summary: "s"},
 		runDir, lessons,
-		WithInbox(inbox, []InboxItem{{ID: id, Title: "t", Kind: "bug", Priority: "H", PriorityClass: "correctness", InjectedBy: "faillearn-failure-floor"}}),
+		WithInbox(inbox, shaped(InboxItem{ID: id, Title: "t", Weight: 0.5, Kind: "bug", Priority: "H", PriorityClass: "correctness", InjectedBy: "faillearn-failure-floor"})),
 	); err != nil {
 		t.Fatalf("an ordinary slug id must still be written: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(inbox, id+".json")); err != nil {
+	if _, err := os.Stat(filedPath(t, inbox, id)); err != nil {
+		t.Errorf("item %s did not land in the inbox: %v", id, err)
+	}
+}
+
+func TestWriteArtifacts_InboxDefaultsEmptyTitle(t *testing.T) {
+	root := t.TempDir()
+	inbox := filepath.Join(root, "inbox")
+	runDir := filepath.Join(root, "run")
+	lessons := filepath.Join(root, "lessons")
+	for _, d := range []string{inbox, runDir, lessons} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", d, err)
+		}
+	}
+
+	const id = "retro-1279-untitled"
+	if err := WriteArtifacts(
+		FailureEvent{Cycle: 1279, FailedPhase: "audit", Scope: ScopePhase, Classification: "deliverable-rejected", Verdict: "FAIL", Summary: "s"},
+		runDir, lessons,
+		WithInbox(inbox, shaped(InboxItem{ID: id, Weight: 0.5, Kind: "bug", Priority: "H", PriorityClass: "correctness", InjectedBy: "faillearn-failure-floor"})),
+	); err != nil {
+		t.Fatalf("an untitled item must default its title: %v", err)
+	}
+	if _, err := os.Stat(filedPath(t, inbox, id)); err != nil {
 		t.Errorf("item %s did not land in the inbox: %v", id, err)
 	}
 }
