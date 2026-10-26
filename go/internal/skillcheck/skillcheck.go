@@ -177,15 +177,19 @@ func projectSurfaces(projectRoot string, diffs []factsDiff, write bool, stdout, 
 		return false, cmdErr
 	}
 
-	codexDiffs, codexErr := codexManifestDiffs(projectRoot)
-	if codexErr != nil {
-		return false, codexErr
+	renderDiffs, renderErr := renderedFileDiffs(projectRoot)
+	if renderErr != nil {
+		return false, renderErr
 	}
-	codexDrift, codexErr := projectCommandDiffs(codexDiffs, write, stdout, stderr)
-	if codexErr != nil {
-		return false, codexErr
+	renderDrift, renderErr := projectCommandDiffs(renderDiffs, write, stdout, stderr)
+	if renderErr != nil {
+		return false, renderErr
 	}
-	return drift || cmdDrift || codexDrift, nil
+	overBudget := budgetProblems(renderDiffs, instructionRenders())
+	for _, p := range overBudget {
+		fmt.Fprintln(stderr, p)
+	}
+	return drift || cmdDrift || renderDrift || len(overBudget) > 0, nil
 }
 
 func projectCommandDiffs(diffs []commandDiff, write bool, stdout, stderr io.Writer) (bool, error) {
@@ -236,29 +240,24 @@ func Check(projectRoot string) ([]string, error) {
 			drift = append(drift, d.rel)
 		}
 	}
-	cmdDiffs, cmdErr := commandDiffs(projectRoot)
-	if cmdErr != nil {
-		return nil, cmdErr
-	}
-	for _, d := range cmdDiffs {
-		if d.drifted {
-			drift = append(drift, d.rel)
-		}
-	}
-	codexDiffs, codexErr := codexManifestDiffs(projectRoot)
-	if codexErr != nil {
-		return nil, codexErr
-	}
-	for _, d := range codexDiffs {
-		if d.drifted {
-			drift = append(drift, d.rel)
-		}
-	}
 	manifestProblems, mErr := ManifestProblems(projectRoot)
 	if mErr != nil {
 		return nil, mErr
 	}
-	return append(append(drift, nameErrs...), manifestProblems...), nil
+	cmdDiffs, cmdErr := commandDiffs(projectRoot)
+	if cmdErr != nil {
+		return nil, cmdErr
+	}
+	renderDiffs, renderErr := renderedFileDiffs(projectRoot)
+	if renderErr != nil {
+		return nil, renderErr
+	}
+	for _, d := range append(cmdDiffs, renderDiffs...) {
+		if d.drifted {
+			drift = append(drift, d.rel)
+		}
+	}
+	return append(append(append(drift, nameErrs...), manifestProblems...), budgetProblems(renderDiffs, instructionRenders())...), nil
 }
 
 func sortedPhaseSkillNames() []string {
