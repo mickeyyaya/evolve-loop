@@ -57,7 +57,7 @@ func runBoundary(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 
 func dispatchBoundaryVerb(verb string, args []string, stdout, stderr io.Writer) int {
 	handlers := map[string]func([]string, io.Reader, io.Writer, io.Writer) int{
-		"loop-stop": runLoopStop, "pr": runPR, "sync-main": runSyncMain, "quality": runQuality, "gc": runGC, "loop": gatedLoop(defaultDispatchGate),
+		"loop-stop": runLoopStop, "pr": runPR, "sync-main": runSyncMain, "inbox": runInbox, "quality": runQuality, "gc": runGC, "loop": gatedLoop(defaultDispatchGate),
 		boundaryLogVerb: runBoundaryLog, boundaryRatchetVerb: runBoundaryRatchetTighten,
 	}
 	run, ok := handlers[verb]
@@ -165,7 +165,8 @@ func boundaryHaltSteps(a boundaryArgs, root string) []boundaryStep {
 		steps = append(steps, boundaryStep{verb: "pr", args: append(append([]string{"merge"}, a.prs...), at...)})
 	}
 	return append(steps, boundaryStep{verb: boundaryRatchetVerb, args: at, desc: boundaryRatchetDesc},
-		boundaryStep{verb: "sync-main", args: at}, boundaryStep{verb: "quality", args: append([]string{"report", "--scope", "wave"}, at...)},
+		boundaryStep{verb: "sync-main", args: at}, boundaryStep{verb: "inbox", args: append([]string{"curate", "--apply"}, at...)},
+		boundaryStep{verb: "quality", args: append([]string{"report", "--scope", "wave"}, at...)},
 		boundaryStep{verb: "gc", args: at})
 }
 

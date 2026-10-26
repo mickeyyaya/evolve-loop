@@ -6,11 +6,12 @@
 
 `internal/inboxcurator` judges inbox items with deterministic rules. No LLM edits the inbox through this package. The operator asked for the check on 2026-10-27: "Duplicates and wrong routes enter at add time unchecked."
 
-The package has three parts:
+The package has four parts:
 
 1. **The intake** that `evolve inbox add` runs before it files an item.
 2. **The overlap measure** that the intake and the curator use to find duplicates.
 3. **The open items**: the reader of every item that a lane can still take or holds.
+4. **The curator**: the typed proposals after a landing, after a routing change and at the wave boundary.
 
 ## Design
 
@@ -30,6 +31,48 @@ The package has three parts:
 - **`OpenItems(inboxDir)`** reads the inbox root and every claim directory `processing/cycle-<N>/`. A claimed item is still open work, so a duplicate of it is refused too. It returns every load warning. The verb prints each file that does not load, so a partial check is never silent. A directory that cannot be read is an error.
 - **The verb** maps the verdict to exit codes: `3` for an overlap, `1` for every other refusal, `2` when the open items cannot be read. It prints each warned overlap as a `WARN` line.
 - **The stage does not govern the intake.** `inbox.curator.stage` selects shadow or enforce for the curator after a landing. The intake always refuses, because the operator asked for a check at add time.
+
+## The curator (2026-10-27)
+
+- **`Proposal`** is one typed change to one open item. `Kind` is `consume`, `reroute` or `merge` (`ProposalKind`). `Trigger` is `landing`, `sweep` or `routing`. `Deterministic` is true only when Go verified the fact behind it. `Proposal.Event(stage, applied)` is the `INBOX_CURATOR_PROPOSAL` signal of the module `inbox`.
+- **`NamedTests(item)`** lists the `Test…`, `Benchmark…` and `Fuzz…` names in the acceptance, and says if every criterion names one.
+- **`MatchLanding(change, open, hasTest, minShare)`** proposes `consume` for an item when the `Change` touched its fix surface and at least `minShare` of its named tests exist. The proposal is deterministic only when all of these are true:
+  - every criterion names a test, and every named test exists;
+  - a test file of the change defines at least one of the named tests (`Change.Tests`);
+  - the change is not older than the filing of the item (`Change.When`).
+
+  A change that consumed a file with the same name as the item (`.evolve/inbox/consumed/<file>`) gives a deterministic proposal for the root copy. A change text that names the id gives a judgment proposal.
+- **`Sweep(open, hasTest, minShare)`** proposes `consume` for each item when at least `minShare` of its named tests exist on the tree. It is never deterministic, because a test can predate the item.
+- **`Reroutes(open, isProtected)`** proposes:
+  - a deterministic reroute to the console for an item on `route: lane` whose surface `inboxbatch.ConsoleRouted` sends to the console;
+  - a judgment reroute to a lane for a console route that no fact explains and no `routed_reason` records. `evolve inbox route-console <id> <reason> 0` records a reason, so the operator declines the proposal with it.
+- **`TouchesRouting(paths)`** is true for `.evolve/policy.json`, `.evolve/profiles/` and `go/internal/guards/integrity_surface.go`.
+- **`Duplicates(open, thresholds)`** proposes a judgment `merge` of a newer item into the most similar older open item at or above the refuse threshold.
+- **`Curate(inputs)`** runs the landing match for each change. It adds the route check when a change touches routing, or at the backstop. The backstop also runs the sweep and the duplicate check. One proposal per kind and item is kept, and a deterministic one replaces a judgment one.
+- **`IndexTests(goDir)`** reads every `_test.go` file outside `testdata` and `vendor`. A project with no `go/` tree has no tests, so the boundary step still runs there. **`Landed(git, from, to)`** and **`Commit(git, sha)`** read the paths, the time and the text of commits through `git log --first-parent -m --name-only`, with `core.quotepath=false`. They read the tests that each touched test file defines with `git grep` at the commit. A revision that is not a hex commit id is refused with `ErrBadRevision`, so a wire record or a cursor cannot pass a git option.
+
+**The verb** (`go/cmd/evolve/cmd_inbox_curator*.go`) has four modes:
+
+| Mode | Changes | Applies |
+|---|---|---|
+| no flag | the commits since the cursor, plus the backstop checks | never; it publishes nothing |
+| `--event` | the commit of one `ship.landed` wire record on stdin | never |
+| `--follow [--since S]` | the commit of each `ship.landed` record on the `ship` channel, read with the kernel wake of `internal/events/reader` (no poll) | never |
+| `--apply` (the boundary step) | the commits since the cursor, plus the backstop checks | in the `enforce` stage, the deterministic proposals of root items |
+
+- The curator judges the open items of `OpenItems`, the root and the claims. It applies only to an item at the root.
+- After an apply, the step commits the moved and rewritten inbox files with the message `chore(inbox): the inbox curator's applied proposals`. Thus the next `sync-main` finds no dirt beyond the inbox stamps. The commit names only the paths that exist or that git tracks. Thus the consume of an untracked item commits its new copy, and the old path causes no failure. This follows the commit of the inbox stamps (`internal/inboxstamps`).
+- A cursor is lost when it does not decode, or when the repository does not hold its commit. Then the step warns and restarts the cursor at `HEAD`. A git fault on the range keeps the cursor, and so does a failed apply, so the next boundary tries again.
+- The console starts `--follow` once, for example under its Monitor, as a subscriber of the `ship` channel. The loop does not supervise it. The boundary backstop covers a landing that no follower saw.
+
+**The live inbox (a read-only copy of 2026-10-27, 258 items, shadow stage).** The curator made 57 proposals:
+
+| Proposal | Count |
+|---|---|
+| sweep `consume` (judgment) | 18, including the 4 stale items `rolling-pool-backfills-lanes`, `wave-orchestrator-oversees-every-lane`, `wave-runs-four-parallel-lanes` and `wire-partitiongraph-for-package-level-conflicts` |
+| deterministic reroute to the console | 2: `continuation-findings-prompt-hygiene` and `untrack-goevolve-binary` name `route: lane` on a protected surface |
+| judgment reroute to a lane | 37 console routes that no fact explains and no `routed_reason` records |
+| `merge` | 0: the only pair at or above 0.5 is a declared dependency |
 
 ## Decisions and rejected options
 
@@ -56,3 +99,4 @@ The package has three parts:
 - `TestAdmit_RefusesAnOverlapUnlessAllowedWithAReason`, `TestAdmit_AnUnexplainedConsoleRouteNeedsAReason`, `TestAdmit_AClearItemHasNoRecordAndABadOneIsRefused`.
 - `TestOpenItems_ReadsTheRootAndEveryClaimAndNamesAnUnreadableFile` and the two error tests.
 - The verb: `TestCmd_InboxAdd_ADuplicateIsRefusedNamingTheOverlappingID` and the other tests in `go/cmd/evolve/cmd_inbox_add_intake_test.go`.
+- The curator: `TestMatchLanding_ProposesADeterministicConsumeWhenTheSurfaceChangedAndEveryNamedTestExists`, `TestReroutes_AGateFileItemOnTheLaneRouteIsADeterministicRerouteToTheConsole`, `TestCurate_ALandingRunsTheMatchAndARoutingChangeRunsTheRerouteCheck`, and in `go/cmd/evolve/cmd_inbox_curator_test.go` `TestCmd_InboxCurate_TheBoundaryConsumesAnItemWhoseAcceptanceMergedInEnforce` and `TestCmd_InboxCurate_ApplyIsRefusedWhileALaneIsLive`.

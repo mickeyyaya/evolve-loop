@@ -101,6 +101,7 @@ func TestRootSignalCenter_EveryRootSubscribesThePublisher(t *testing.T) {
 		"newRoleSignalCenter": {
 			"cmd/evolve/cmd_cycle.go:wireOrchestratorDeps",
 			"cmd/evolve/cmd_cycle_simulate.go:wireSimulateOrchestrator",
+			"cmd/evolve/cmd_inbox_curator.go:runInboxCurate",
 			"cmd/evolve/cmd_loop_chain.go:maybeRefreshChainBoundary",
 			"cmd/evolve/cmd_loop_chain.go:runLoopChain",
 			"cmd/evolve/cmd_quality.go:newQualityCenter",

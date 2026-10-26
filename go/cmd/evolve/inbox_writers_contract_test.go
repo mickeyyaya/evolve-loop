@@ -51,7 +51,7 @@ const movesOrRewritesAnExistingItem = "moves or rewrites an item that is already
 var inboxWritersThatFileNothing = map[string]string{
 	"internal/inboxmover/lifecycle": "the lifecycle writer: File refuses an item without a known class (ADR-0121 decision 6); every other write " + movesOrRewritesAnExistingItem,
 	"internal/phases/ship.stage":    movesOrRewritesAnExistingItem + " (the ship's consumption into consumed/)",
-	"cmd/evolve.runInboxConsume":    movesOrRewritesAnExistingItem + " (evolve inbox consume)",
+	"cmd/evolve.consumeInboxItem":   movesOrRewritesAnExistingItem + " (evolve inbox consume and the boundary step of evolve inbox curate)",
 }
 
 func TestInboxWriters_EveryAutofiledItemCarriesAKnownClass(t *testing.T) {
