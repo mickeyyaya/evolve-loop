@@ -1,8 +1,8 @@
 # User Policy Configuration (`.evolve/policy.json`)
 
 The **policy** layer is the user-controlled rule set that bounds the autonomous
-pipeline. It is the *top authority*: it constrains what the routing advisor may
-do and pins how individual phases dispatch, above the per-agent profile defaults
+pipeline. It is the *top authority*. It constrains what the routing advisor can
+do and pins how individual phases dispatch. It ranks above the per-agent profile defaults
 and even above operator env overrides.
 
 It lives in a single user-owned, version-controllable file: `.evolve/policy.json`.
@@ -104,29 +104,31 @@ Two knobs over the lessons corpus (`.evolve/instincts/lessons`), both resolved b
 | `recall_k` | 1–50 | **5** | How many lessons one KB lookup returns — the top-k **prefix** of the existing deterministic ranking, not a resample. Resolved at the composition root (`go/cmd/evolve/cmd_cycle.go`, `kbRecallK` → `research.NewFileKBWithRecall`) and consumed by the advisor's recall memory (`Orchestrator.recallForPlan`). |
 | `novelty_threshold` | (0, 1] | **0.9** | Similarity at or above which an incoming deterministic failure lesson counts as a near-duplicate of one already on disk and is skipped (`faillearn.WithNoveltyThreshold` → `go/internal/faillearn/novelty.go`). |
 
-Out-of-range values fall back to the built-in rather than being honoured: `recall_k: 0`
-would silently disable advisor recall memory and `novelty_threshold: 0` would suppress
-every lesson write, and neither is an intent an operator can express by accident.
+Out-of-range values fall back to the built-in, so they never take effect.
+If `recall_k: 0` took effect, it silently disabled advisor recall memory. If `novelty_threshold: 0` took effect, it suppressed
+every lesson write. An operator cannot express either intent by accident.
 
-**The recall default is held at 5 on purpose.** It is the value the compiled
-`research.maxResults` has always carried, so introducing the knob changes no
-install's behaviour; lowering it narrows the advisor's failure recall, which is a
+**The recall default is held at 5 on purpose.** It is the value that the compiled
+`research.maxResults` has always carried, so the new knob changes no
+install's behaviour. A lower value narrows the failure recall of the advisor. That is a
 phase-integrity regression, not a token optimisation.
 
 ### Why the novelty gate sits in the writer
 
-A lesson id is `cycle-N-<scope>-<slug>`, so the same observation recurring on a later
-cycle lands under a *different* filename — `writeIfAbsent`'s exact-path dedupe cannot
-see it, and a corpus that repeats one failure for twenty cycles crowds recall with
-twenty copies of it. The gate therefore intercepts `faillearn.WriteArtifacts` itself
+A lesson id is `cycle-N-<scope>-<slug>`. So the same observation that recurs on a later
+cycle lands under a *different* filename. The exact-path dedupe of `writeIfAbsent` cannot
+see it. A corpus that repeats one failure for twenty cycles crowds recall with
+twenty copies of it.
+
+The gate therefore intercepts `faillearn.WriteArtifacts` itself
 (the one Go lesson-write seam, reached from `cmd_loop_outcome.go`,
-`core/failure_learning.go` and `core/reset.go`) rather than living in a helper the
+`core/failure_learning.go` and `core/reset.go`). It does not live in a helper that the
 write path never calls.
 
 Similarity is Jaccard overlap over the *observation-bearing* fields only —
 `pattern`, `description`, `defects` and `failureContext`. `id`, `source` and
-`preventiveAction` all embed the cycle number, so including them would make every
-recurrence look novel and the gate would never fire. Pure-digit tokens are dropped for
+`preventiveAction` all embed the cycle number. If the gate included them, every
+recurrence looks novel and the gate never fires. Pure-digit tokens are dropped for
 the same reason. Two hard rules bound the gate, both pinned by tests:
 
 - a materially different failure is **never** suppressed (suppressing evidence is
@@ -149,9 +151,18 @@ The block configures `internal/inboxrank`, the one computed order over pending i
 | `unblocks_cap` | the dependent count at which the unblocks feature saturates at 1 | 3 | below 1 |
 | `recurrence_cap` | the recurrence count at which the recurrence feature saturates at 1 | 5 | below 1 |
 | `active_campaigns` | the `campaign` values whose items get the goal feature | none | a blank, padded or duplicated entry |
-| `preempt_margin` | the score margin by which a new item must beat the lowest uncommitted planned slot to take it at a wave boundary (read from the plan's P4; unused in P1) | 0.05 | negative |
+| `preempt_margin` | the score margin by which a new item must beat the lowest uncommitted planned slot to take it at a wave boundary. (Read from the plan's P4; unused in P1.) | 0.05 | negative |
 
-The checked-in file names the class order and the factors explicitly, so the operator's weights live in config rather than in the compiled default. Since the plan's P2 (2026-10-06) the block orders the loop's work: the wave seed, the widen, the launch refill, the triage prompt's `inbox_batches` menu, `evolve inbox batches` and the dashboard's queue all read the rank it configures (loaded per evolve dir by `internal/inboxrank/rankinputs`), as well as deciding what `evolve inbox rank` shows and which classes `evolve inbox add` accepts. A malformed block makes those consumers rank with the compiled default and warn; `evolve inbox rank` and `evolve inbox add` refuse it. (Under P1, from the same morning, the block changed only the verb's output and the classes `add` accepts.)
+The checked-in file names the class order and the factors explicitly, so the operator's weights live in config rather than in the compiled default. Since the plan's P2 (2026-10-06) the block orders the work of the loop. These consumers all read the rank that the block configures (loaded per evolve dir by `internal/inboxrank/rankinputs`):
+
+- the wave seed;
+- the widen;
+- the launch refill;
+- the `inbox_batches` menu of the triage prompt;
+- `evolve inbox batches`;
+- the queue of the dashboard.
+
+The block also decides what `evolve inbox rank` shows and which classes `evolve inbox add` accepts. A malformed block makes those consumers rank with the compiled default and warn. `evolve inbox rank` and `evolve inbox add` refuse it. (Under P1, from the same morning, the block changed only the output of the verb and the classes that `add` accepts.)
 
 ## Convergence policy (`workflow.convergence`)
 
@@ -187,10 +198,10 @@ The block sets the stage of the changed-function coverage check of the build han
 
 ## Context-fill telemetry (`context_fill`)
 
-Every launch's token telemetry carries a derived **fill reading**: the prompt-side
-tokens the resolver already recovered (`Input + CacheRead + CacheWrite` — generated
-output does not sit in the prompt) divided by the driver family's effective context
-window, on a 0–100 scale.
+The token telemetry of every launch carries a derived **fill reading**. It is the prompt-side
+tokens that the resolver already recovered (`Input + CacheRead + CacheWrite`), divided by the effective context
+window of the driver family, on a 0–100 scale. Generated
+output does not sit in the prompt.
 
 | Aspect | Behaviour |
 |---|---|
@@ -199,10 +210,10 @@ window, on a 0–100 scale.
 | WARN | Emitted at the dispatch seam (`internal/bridge.Engine.recordTokenUsage`) **strictly above** the threshold, carrying the `CONTEXT-FILL` marker and naming the phase. The sentinel never warns. |
 | Persistence | Each `llm-calls.ndjson` record carries `fill_pct`, so the reading is durable rather than only printed. |
 
-The 200 000 claude window is deliberately conservative — below any advertised
-maximum — because the operationally useful signal is proximity to *degradation*,
-not to the hard ceiling. Windows for unmeasured families are left at 0 on purpose:
-guessing one would publish a fabricated fill reading.
+The 200 000 claude window is deliberately conservative, below any advertised
+maximum. The operationally useful signal is proximity to *degradation*,
+not to the hard ceiling. Windows for unmeasured families are left at 0 on purpose.
+A guess of one publishes a fabricated fill reading.
 
 ## Pin semantics (dispatch)
 
@@ -218,14 +229,17 @@ precedence (high → low):
 
 - `pin.cli` replaces the resolved primary CLI (dispatch log shows
   `source=policy.pin`). The profile's `cli_fallback` chain is still appended, so
-  a pinned phase keeps CLI-failure resilience. Since ADR-0104 (2026-09-14) every
-  agent profile that names a `cli` MUST name a non-empty `cli_fallback`
-  (`TestEveryAgentProfileHasAFallbackChain` guards the tracked tree; the five
-  Claude-family-floor agents keep theirs in-family, `["claude-p"]`), and the
-  universal tail (`workflow.universal_fallback`, the remaining available CLIs the
-  profile's `allowed_clis` permits) is appended after it unconditionally — a
-  strict single-CLI phase is `allowed_clis: ["<family>"]` plus a single-driver
-  chain, not an empty one.
+  a pinned phase keeps CLI-failure resilience.
+  - Since ADR-0104 (2026-09-14) every
+    agent profile that names a `cli` MUST name a non-empty `cli_fallback`.
+    `TestEveryAgentProfileHasAFallbackChain` guards the tracked tree. The five
+    Claude-family-floor agents keep theirs in-family, `["claude-p"]`.
+  - The
+    universal tail (`workflow.universal_fallback`, the remaining available CLIs that the
+    `allowed_clis` of the profile permits) is appended after it unconditionally.
+  - A
+    strict single-CLI phase is `allowed_clis: ["<family>"]` plus a single-driver
+    chain, not an empty one.
 - `pin.model` replaces the resolved model verbatim, bypassing the
   env/profile/default chain **and** the `"auto"` → model-catalog expansion (a
   pinned exact model never triggers a catalog lookup).
@@ -234,19 +248,21 @@ precedence (high → low):
 
 The CLI candidate chain behind both dispatch entry points is built by ONE
 function — `buildCandidates(primary, prof, excludeProfileCLI)` in
-`go/internal/llmroute/dispatch.go`. Common behaviour: primary first, then
-`profile.cli_fallback` whitespace-trimmed, empties dropped, first occurrence
-wins, and the result always holds at least the primary (`Dispatch` fails loudly
-on an empty chain).
+`go/internal/llmroute/dispatch.go`. Common behaviour:
 
-`excludeProfileCLI` is the only difference between the two callers, and it is a
-parameter rather than a second copy of the loop (cycle-1265 collapsed the former
+- The primary is first.
+- Then `profile.cli_fallback` follows, whitespace-trimmed, with empties dropped. The first occurrence wins.
+- The result always holds at least the primary (`Dispatch` fails loudly
+  on an empty chain).
+
+`excludeProfileCLI` is the only difference between the two callers. It is a
+parameter, not a second copy of the loop (cycle-1265 collapsed the former
 `candidatesFrom`/`chainCandidates` pair):
 
 | Caller | `excludeProfileCLI` | Why |
 |---|---|---|
 | `llmroute.Resolve` | `false` | a pinned or env-forced primary keeps the profile's chain intact, so the phase retains CLI-failure resilience (see the `pin.cli` bullet above) |
-| `llmroute.ChainFor` | `true` | `prof.CLI` names the CLI the composition root deliberately swapped away from (e.g. the advisor routed around a benched family); re-appending it as a "fallback" would walk straight back into it |
+| `llmroute.ChainFor` | `true` | `prof.CLI` names the CLI the composition root deliberately swapped away from (for example, the advisor routed around a benched family). If the chain re-appends it as a "fallback", the route walks straight back into it |
 
 ### Guardrails
 
@@ -254,7 +270,7 @@ A pin is validated against the phase profile's guardrails at dispatch:
 
 - `pin.cli`'s family must be within the profile's `allowed_clis` (unless
   `allowed_clis` is empty or `["all"]`).
-- `pin.model`'s tier (classified from the model identifier — e.g.
+- `pin.model`'s tier (classified from the model identifier — for example
   `claude-opus-4-8` → deep) must sit within the profile's `model_tier_envelope`.
 
 An out-of-guardrail pin **hard-fails the phase loudly** rather than silently
@@ -273,15 +289,14 @@ for emergencies.
 | Rule | Consulted by | Mechanism |
 |---|---|---|
 | `mandatory_phases` | routing advisor | merged into the orchestrator mandatory set; `ClampPlanToFloor` keeps them in every cycle plan |
-| `pins[phase]` | dispatch resolver (`internal/llmroute`) | absolute CLI/model override, validated via `policy.ValidatePin` |
-| `acs.predicate_env` | ACS suite (`internal/acssuite`: `forwardableKeys`, then `predicateEnv`) | each named key set in the suite's environment is copied into every predicate's; every other `EVOLVE_` key is stripped. Bounded in one place: a lane protocol key or one of the suite's own exports is refused and named in the verdict's `warnings` (at projection, not at `policy.Load`, so one bad entry neither fails every policy consumer nor drops the rest of the list). Read from the state root's policy only, so a cycle worktree cannot widen it; the checked-in list may name only keys a curated predicate reads |
+| `pins[phase]` | dispatch resolver (`internal/llmroute`) | absolute CLI/model override, validated with `policy.ValidatePin` |
+| `acs.predicate_env` | ACS suite (`internal/acssuite`: `forwardableKeys`, then `predicateEnv`) | each named key set in the suite's environment is copied into the environment of every predicate. Every other `EVOLVE_` key is stripped. Bounded in one place: a lane protocol key or one of the suite's own exports is refused and named in the `warnings` of the verdict. The refusal happens at projection, not at `policy.Load`, so one bad entry does not fail every policy consumer or drop the rest of the list. The suite reads the policy of the state root only, so a cycle worktree cannot widen it. The checked-in list can name only keys that a curated predicate reads |
 
 Implementation: `go/internal/policy` (load + validate), consulted by
 `go/internal/llmroute` (pin) and `go/internal/phases/runner` (load + bypass +
 validate before dispatch).
 
-`mandatory_phases` is applied uniformly via the shared `policy.MergeMandatory`
-helper at **both** config-load sites — the loop's composition root
-(`cmd_cycle.go`) and the per-phase `router.PolicyForProject` — so a
-policy-mandatory phase is honored even by the self-skipping phases (triage,
-tdd, build-planner) when they decide whether to run.
+`mandatory_phases` is applied uniformly with the shared `policy.MergeMandatory`
+helper at **both** config-load sites: the composition root of the loop
+(`cmd_cycle.go`) and the per-phase `router.PolicyForProject`. So even the self-skipping phases (triage,
+tdd, build-planner) honor a policy-mandatory phase when they decide if to run.
