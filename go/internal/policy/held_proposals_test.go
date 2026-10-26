@@ -69,3 +69,12 @@ func TestHeldProposalsPolicy_UnmarshalJSONRefusesAnUnknownKeyAndABadStage(t *tes
 		t.Errorf("enforce: %v, %+v", err, h)
 	}
 }
+
+func TestPolicy_HeldProposalsStage_DefaultsToShadowAndReadsTheBlock(t *testing.T) {
+	if got := (Policy{}).HeldProposalsStage(); got != config.StageShadow {
+		t.Errorf("no block = %v, want shadow", got)
+	}
+	if got := (Policy{HeldProposals: &HeldProposalsPolicy{Stage: "off"}}).HeldProposalsStage(); got != config.StageOff {
+		t.Errorf("off block = %v, want off", got)
+	}
+}
