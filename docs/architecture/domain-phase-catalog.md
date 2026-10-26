@@ -1,9 +1,9 @@
 # Domain Phase Catalog — Cross-Domain Checkpoint Phases (PM · Strategy · Accounting · Product · Ops)
 
-**Date:** 2026-06-06
-**Status:** Approved design; implementation queued as evolve-loop cycle goals (5 domain waves + 1 integration cycle) on branch `feat/domain-phase-catalog`
-**Research basis:** [docs/research/domain-phase-catalog-research-2026-06-06.md](../research/domain-phase-catalog-research-2026-06-06.md) (5-domain cited web research)
-**Builds on:** [micro-phase-catalog.md](micro-phase-catalog.md) (the software catalog — same design principles, naming rule, and additive-first decision), ADR-0028 (user-defined phases), ADR-0035 (spec-derived contracts)
+**Date:** 2026-06-06.
+**Status:** Approved design; implementation queued as evolve-loop cycle goals (5 domain waves + 1 integration cycle) on branch `feat/domain-phase-catalog`.
+**Research basis:** [docs/research/domain-phase-catalog-research-2026-06-06.md](../research/domain-phase-catalog-research-2026-06-06.md) (5-domain cited web research).
+**Builds on:** [micro-phase-catalog.md](micro-phase-catalog.md) (the software catalog, with the same design principles, naming rule, and additive-first decision), ADR-0028 (user-defined phases), ADR-0035 (spec-derived contracts)
 
 ---
 
@@ -19,12 +19,19 @@ The phase catalog covers software-development goal types only (bugfix/feature/re
 2. **Artifact-first**: every phase emits a document practitioners already standardize; required sections come from the cited canonical templates, not invention.
 3. **Checkpoint, not process**: the phase reviews/produces the control document; it does not execute the business process.
 4. **Routing by goal classification**: `insert_when: [{field: "scout.goal_type", op: "==", value: "<domain>"}]`, `after: "triage"` — proven string-equality mechanism, advisor classifies.
-5. **Signals are doc-shaped and advisory** (counts, flags); classify gates on `require_sections` + `fail_if_empty` only in v1 (shadow-first; tighten `fail_if_signal` from observed data later, same as mutation-gate's staged rollout).
+5. **Signals are doc-shaped and advisory** (counts, flags). In v1, classify gates on `require_sections` + `fail_if_empty` only. This is shadow-first. Later, tighten `fail_if_signal` from observed data, as in the staged rollout of mutation-gate.
 6. **Naming**: `<object>-<action[-nominal]>` per the two-tier rule. Signal namespaces must not collide with the existing set (`dependency.*` is taken → `dependency-map` uses `depmap.*`).
 
 ## 3. The catalog — 15 phases, 5 domains
 
-Per phase, **4 files** (matching every shipped user phase — do NOT rely on `evolve phases add`, whose scaffold writes only 3 files and puts `profile.json` inside the phase dir instead of `.evolve/profiles/`): `.evolve/phases/<name>/phase.json`, `.evolve/phases/<name>/agent.md`, `agents/evolve-<name>.md` (byte-identical persona mirror of the phase-dir `agent.md`), and `.evolve/profiles/<name>.json`. Artifact = `<name>-report.md` (uniform; simplifies the contract table). All `kind: llm`, `optional: true`, `writes_source: false`, `model: auto`, inputs `scout-report.md`, `prompt_context: ["goal"]`, `after: "triage"` unless noted. Profile template: fault-localization's (read-only repo, write `.evolve/runs/cycle-*`, no network, no git) — **explicit v1 decision**: domain phases judge over cycle inputs only; external data fetch (market data, GL feeds) is out of scope until a vetted network-profile pattern exists.
+Each phase has **4 files**. This matches every shipped user phase. Do NOT use `evolve phases add`. Its scaffold writes only 3 files and puts `profile.json` inside the phase dir instead of `.evolve/profiles/`. The 4 files are:
+
+- `.evolve/phases/<name>/phase.json`
+- `.evolve/phases/<name>/agent.md`
+- `agents/evolve-<name>.md` (byte-identical persona mirror of the phase-dir `agent.md`)
+- `.evolve/profiles/<name>.json`
+
+Artifact = `<name>-report.md` (uniform; this simplifies the contract table). All phases have `kind: llm`, `optional: true`, `writes_source: false`, `model: auto`, inputs `scout-report.md`, `prompt_context: ["goal"]`, and `after: "triage"` unless noted. The profile template is the profile of fault-localization (read-only repo, write `.evolve/runs/cycle-*`, no network, no git). **Explicit v1 decision:** domain phases judge over cycle inputs only. External data fetch (market data, GL feeds) is out of scope until a vetted network-profile pattern exists.
 
 ### Wave PM — `project-management`
 
@@ -84,11 +91,11 @@ Evidence: Google SRE ch. 15 + PagerDuty/Atlassian postmortem convergence; SRE Wo
 "classify": { "require_sections": [...per table...], "fail_if_empty": true, "verdict_on_pass": "PASS" }
 ```
 
-`verdict_on_pass` is set on all 15 for uniformity, but it is **silently inert on the 6 plan and 2 control phases**: contract derivation (`phasecontract.verdictsFromSpec`, ADR-0035) emits a verdict vocabulary only when archetype = `evaluate` — so exactly 7 of 15 emit verdicts (consistent with the shipped `architecture-design` precedent of a non-evaluate phase carrying the field).
+`verdict_on_pass` is set on all 15 for uniformity, but it is **silently inert on the 6 plan and 2 control phases**. Contract derivation (`phasecontract.verdictsFromSpec`, ADR-0035) emits a verdict vocabulary only when archetype = `evaluate`. So exactly 7 of 15 emit verdicts. This is consistent with the shipped `architecture-design` precedent of a non-evaluate phase that carries the field.
 
-Section-count discipline (≤4) forced two documented drops from the researched templates: the postmortem's fifth convergent section *Lessons Learned* folds into **Action Items** (and feeds the existing `memo`/`lesson-extract` path), and the runbook's *Verification* step folds into **Resolution Steps**.
+The section-count limit (≤4) forced two documented drops from the researched templates. The fifth convergent section of the postmortem, *Lessons Learned*, folds into **Action Items** (and feeds the existing `memo`/`lesson-extract` path). The *Verification* step of the runbook folds into **Resolution Steps**.
 
-Naming note: `close-checklist` and `metric-tree` carry artifact-noun second components rather than action verbs — same accepted shape as the shipped `threat-model` and `rollback-plan` (artifact-name fidelity to the practitioner standard beats verb purity).
+Naming note: `close-checklist` and `metric-tree` carry artifact-noun second components, not action verbs. This is the same accepted shape as the shipped `threat-model` and `rollback-plan`. Artifact-name fidelity to the practitioner standard beats verb purity.
 
 ## 4. Advisor integration
 
@@ -106,7 +113,7 @@ Also: add all 15 one-line core values to the "Phase Catalog — Core Values" tab
 
 ### 4.2 New signal namespaces
 
-> **2026-09-09 (ADR-0099):** `scout.goal_type` — the trigger every phase below keys on — is now READ by the kernel: `router.scoutFromReportFallback` lifts a `goal_type:` header line in scout-report.md onto the routing signals (the scout persona line that WRITES it lands with ADR-0099 slice 3) (handoff JSON has been extinct since ~cycle 215, so no trigger here had ever fired). `deliverable_kind` rides the same path.
+> **2026-09-09 (ADR-0099):** the kernel now READS `scout.goal_type`, the trigger that every phase below keys on. `router.scoutFromReportFallback` lifts a `goal_type:` header line in scout-report.md onto the routing signals. The scout persona line that WRITES it lands with ADR-0099 slice 3. Handoff JSON has been extinct since ~cycle 215, so no trigger here had ever fired. `deliverable_kind` rides the same path.
 
 `risk.*`, `scope.*`, `depmap.*`, `forces.*`, `market.*`, `okr.*`, `reconcile.*`, `variance.*`, `close.*`, `prd.*`, `opportunity.*`, `metric.*`, `postmortem.*`, `runbook.*`, `capacity.*`. (Checked against micro-catalog §4.3 — no collisions; `dependency.*` deliberately avoided.)
 
@@ -118,7 +125,7 @@ No `max_optional_insertions` change needed: every domain recipe inserts ≤3 (cu
 
 One wave per autonomous cycle on `feat/domain-phase-catalog` (order: PM → Strategy → Accounting → Product → Ops → integration). Per cycle, TDD-first:
 
-1. **RED**: add the wave's 3 table cases to `go/internal/phasespec/usercatalog_research_test.go` (`TestResearchPhasesAreConfigOnly`) — artifact `<name>-report.md`, sections per §3 tables (canonical `## <section>` form), `hasVerdict` true iff archetype = evaluate. Test fails: phases not in catalog.
+1. **RED**: add the 3 table cases of the wave to `go/internal/phasespec/usercatalog_research_test.go` (`TestResearchPhasesAreConfigOnly`). Use artifact `<name>-report.md` and the sections of the §3 tables (canonical `## <section>` form). `hasVerdict` is true if and only if archetype = evaluate. The test fails: phases not in catalog.
 2. **GREEN**: author the 4 files per phase; `evolve phases validate <name>` exit 0; test passes.
 3. Flip the wave's status in this document.
 

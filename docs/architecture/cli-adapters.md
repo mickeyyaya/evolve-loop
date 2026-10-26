@@ -4,9 +4,11 @@
 > model: bash `legacy/scripts/dispatch/subagent-run.sh` dispatching to bash
 > `cli_adapters/*.sh`, with an **external, operator-installed** `bridge` CLI
 > (`tools/agent-bridge`). That bash bridge and its separate-install model were
-> **removed** in v12 — the bridge is now an in-process Go implementation at
-> `go/internal/bridge/` (adapter `go/internal/adapters/bridge/`), with no separate
-> install and no `bash tools/agent-bridge/install.sh` step. The `EVOLVE_BRIDGE_GO`
+> **removed** in v12. The bridge is now an in-process Go implementation at
+> `go/internal/bridge/` (adapter `go/internal/adapters/bridge/`). It has no separate
+> install and no `bash tools/agent-bridge/install.sh` step.
+>
+> The `EVOLVE_BRIDGE_GO`
 > toggle is gone (Go is the only path). See ADR-0021 (Go port) and ADR-0022
 > (LaunchIntent realizer). The contract table below remains accurate background.
 
@@ -41,7 +43,13 @@ Exit codes: see each adapter file's header.
 
 ### What is bridge?
 
-`bridge` is a multi-CLI tmux-driven AI agent bridge — a separate, user-installable CLI that wraps Claude / Codex / Antigravity CLIs behind a uniform interface. Its **value-add** is a battle-tested implementation: better REPL prompt detection for tmux variants, auto-respond fallback for permission prompts, billing-snapshot verification, stable JSON-over-stdout contract for skill consumers, and a single CLI surface across 3 different vendor CLIs.
+`bridge` is a multi-CLI tmux-driven AI agent bridge. It is a separate, user-installable CLI that wraps Claude / Codex / Antigravity CLIs behind a uniform interface. Its **value-add** is a battle-tested implementation:
+
+- better REPL prompt detection for tmux variants
+- auto-respond fallback for permission prompts
+- billing-snapshot verification
+- stable JSON-over-stdout contract for skill consumers
+- a single CLI surface across 3 different vendor CLIs
 
 Bridge source is **not** distributed in this repository. It is the operator's responsibility to install.
 
@@ -50,14 +58,14 @@ Bridge source is **not** distributed in this repository. It is the operator's re
 | evolve-loop adapter | Bridge CLI | Default-on? |
 |---|---|---|
 | `legacy/scripts/cli_adapters/claude.sh` | `claude-p` (headless `claude -p`) | ✓ |
-| `legacy/scripts/cli_adapters/claude-tmux.sh` | `claude-tmux` (interactive via tmux) | ✓ |
+| `legacy/scripts/cli_adapters/claude-tmux.sh` | `claude-tmux` (interactive through tmux) | ✓ |
 | `legacy/scripts/cli_adapters/codex.sh` | `codex` (`codex exec`) | ✓ |
 | `legacy/scripts/cli_adapters/agy.sh` | `agy` (`agy -p`) | ✓ |
 | `legacy/scripts/cli_adapters/gemini.sh` | *no bridge support* | n/a (always native) |
 
-When the gate fires in any of the 4 supported adapters, control transfers to bridge via `exec`. Bridge picks up the standard env vars (PROFILE_PATH, RESOLVED_MODEL, PROMPT_FILE, WORKSPACE_PATH, STDOUT_LOG, STDERR_LOG, ARTIFACT_PATH, CYCLE, WORKTREE_PATH, AGENT) from its env-var fallback contract.
+When the gate fires in any of the 4 supported adapters, control transfers to bridge with `exec`. Bridge picks up the standard env vars (PROFILE_PATH, RESOLVED_MODEL, PROMPT_FILE, WORKSPACE_PATH, STDOUT_LOG, STDERR_LOG, ARTIFACT_PATH, CYCLE, WORKTREE_PATH, AGENT) from its env-var fallback contract.
 
-**Behavioral note for `codex.sh` and `agy.sh`**: the existing native paths in these two adapters use a HYBRID-delegate-to-claude pattern (i.e., they run claude when claude is installed, not the actual codex/agy binary). With bridge default-on, these adapters now run the *real* codex / agy CLIs. To restore the old HYBRID-to-claude behavior, set `EVOLVE_USE_BRIDGE=0`.
+**Behavioral note for `codex.sh` and `agy.sh`**: the existing native paths in these two adapters use a HYBRID-delegate-to-claude pattern. That is, they run claude when claude is installed, not the actual codex/agy binary. With bridge default-on, these adapters now run the *real* codex / agy CLIs. To restore the old HYBRID-to-claude behavior, set `EVOLVE_USE_BRIDGE=0`.
 
 ### Activation (default-on with per-CLI auto-fallback)
 
@@ -66,14 +74,14 @@ The integration is **default-on** when bridge is installed AND supports the spec
 1. `EVOLVE_USE_BRIDGE` is unset OR set to anything other than `"0"` (default).
 2. `bridge` is on PATH.
 3. `bridge --json version` reports `schema_version=1`.
-4. `bridge --json probe --cli=<NAME>` reports `tier != "none"` (i.e., bridge has a manifest entry for this CLI AND the underlying binary is on PATH).
+4. `bridge --json probe --cli=<NAME>` reports `tier != "none"` (that is, bridge has a manifest entry for this CLI AND the underlying binary is on PATH).
 
 If ANY of those is false, the gate falls back to the **native adapter** quietly — no error to the operator. This means:
 - An evolve-loop installation without bridge → runs native adapters (unchanged behavior)
-- An evolve-loop installation with bridge but missing the underlying CLI binary (e.g., `claude` not installed) → falls back to native, which surfaces a clearer error
+- An evolve-loop installation with bridge but missing the underlying CLI binary (for example, `claude` not installed) → falls back to native, which surfaces a clearer error
 - An evolve-loop installation with bridge for some CLIs but not others → uses bridge for the supported ones, native for the rest
 
-To **force-disable bridge across the board** (e.g., to debug the native path, or for bit-for-bit reproducibility in CI):
+To **force-disable bridge across the board** (for example, to debug the native path, or for bit-for-bit reproducibility in CI):
 
 ```bash
 export EVOLVE_USE_BRIDGE=0
@@ -81,7 +89,7 @@ export EVOLVE_USE_BRIDGE=0
 
 ### Why default-on?
 
-The integration was opt-in for the first iteration to validate it works without breaking native users. After end-to-end verification (bridge installed + EVOLVE_USE_BRIDGE=1 + Haiku probe → subscription-billed cycle ran cleanly), the default flipped to ON: any user who has bothered to install bridge wants the integration to take effect. Operators who specifically prefer the native prototype set `EVOLVE_USE_BRIDGE=0`.
+The integration was opt-in for the first iteration. This validated that it works without breaking native users. After end-to-end verification (bridge installed + EVOLVE_USE_BRIDGE=1 + Haiku probe → subscription-billed cycle ran cleanly), the default flipped to ON. Any user who has bothered to install bridge wants the integration to take effect. Operators who specifically prefer the native prototype set `EVOLVE_USE_BRIDGE=0`.
 
 ### Installing bridge
 
@@ -142,8 +150,8 @@ The gate refuses to delegate if `bridge --json version | jq -r .schema_version` 
 | `bridge --json version` exits non-zero | Gate WARNs and falls through. |
 | Bridge schema mismatch (≠ `"1"`) | Gate WARNs (`schema_version='X' (expected 1)`) and falls through. |
 | Bridge can't handle this CLI (manifest missing) | Gate WARNs (`tier=none (manifest missing or binary not on PATH)`) and falls through. |
-| Underlying CLI binary missing (e.g., `claude` not on PATH) | Gate WARNs (`tier=none`) and falls through. Native adapter would also fail, but its error message is more familiar. |
-| Bridge runs but returns non-zero | The `exec` propagates bridge's exit code. Cycle fails the same way as a native adapter failure would. |
+| Underlying CLI binary missing (for example, `claude` not on PATH) | Gate WARNs (`tier=none`) and falls through. In that case a native adapter also fails, but its error message is more familiar. |
+| Bridge runs but returns non-zero | The `exec` propagates bridge's exit code. The cycle fails in the same way as after a native adapter failure. |
 | `EVOLVE_USE_BRIDGE=0` set | Gate doesn't fire. Native adapter runs as before. |
 
 ### Why these 4 adapters?
@@ -154,7 +162,7 @@ All 4 are CLIs that bridge has a verified driver for (claude-p, claude-tmux, cod
 
 `gemini.sh` is excluded because bridge does not yet support gemini as a backend. The native gemini adapter runs unchanged regardless of `EVOLVE_USE_BRIDGE`.
 
-Operators who want bit-for-bit reproducibility of the historical (native) behavior should set `EVOLVE_USE_BRIDGE=0` once per shell or CI run.
+Operators who want bit-for-bit reproducibility of the historical (native) behavior are advised to set `EVOLVE_USE_BRIDGE=0` once per shell or CI run.
 
 ---
 
@@ -174,9 +182,9 @@ EVOLVE_USE_BRIDGE=0 bash legacy/scripts/cli_adapters/claude-tmux.sh   # expect: 
 EVOLVE_USE_BRIDGE=1 bash legacy/scripts/cli_adapters/claude-tmux.sh   # expect: "[claude-tmux] delegating to bridge ..."
 ```
 
-Both invocations fail rc-nonzero in this contrived example (env vars missing); the point of the smoke is the **stderr log line** which tells you which path ran.
+Both invocations fail rc-nonzero in this contrived example (env vars missing). The point of the smoke is the **stderr log line**. It tells you which path ran.
 
-For a real cycle, set the 8 mandatory env vars and run via `subagent-run.sh` normally with `EVOLVE_USE_BRIDGE=1`.
+For a real cycle, set the 8 mandatory env vars and run `subagent-run.sh` normally with `EVOLVE_USE_BRIDGE=1`.
 
 ---
 

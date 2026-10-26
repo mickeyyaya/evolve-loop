@@ -10,7 +10,7 @@
 
 ## One sentence
 
-**Stop letting any model — Builder, Auditor, or judge — report whether the work is done; let the sandbox's exit code be whether the work is done.**
+**Do not let any model — Builder, Auditor, or judge — report if the work is done. Let the exit code of the sandbox show if the work is done.**
 
 ## Verdict contract change (BREAKING)
 
@@ -82,23 +82,27 @@ Output: `acs-verdict.json` with schema:
 ```
 
 A predicate that exits **77 = SKIP** (TAP/automake convention) is classified
-`result: "skip"` and counted in neither `green_count` nor `red_count` — it
+`result: "skip"`. It is counted in neither `green_count` nor `red_count`. It
 increments `skip_count` (mirrored as `predicate_suite.skipped_count`) and is
-listed in `skip_ids`. Use it for a runtime-only predicate whose evidence (a
-gitignored `.evolve/` artifact) is absent on a fresh clone: the predicate must
-neither block the gate (RED) nor fake a pass (GREEN). `total` includes skips, so
+listed in `skip_ids`. Use it for a runtime-only predicate when its evidence is absent on a fresh clone (a
+gitignored `.evolve/` artifact). The predicate must
+neither block the gate (RED) nor fake a pass (GREEN).
+
+`total` includes skips, so
 the accounting identity is `green_count + red_count + skip_count == total`. The
 gate decision is unchanged: `red_count == 0 ⇒ verdict PASS ⇒ ship_eligible`.
 
 **Provenance stamps (cycle-1434, #449).** Every minted verdict additionally
 carries `"suite_root"` and `"project_root"` — the roots it was minted under.
-They exist because a verdict minted with the WRONG state root (the linked-
-worktree plane resolved to the console checkout) red'd 3 predicates the
-correct-root run showed green, and nothing in the artifact said so. Absence
+They exist because of one failure. A verdict was minted with the WRONG state root (the linked-
+worktree plane resolved to the console checkout). That verdict red'd 3 predicates that the
+correct-root run showed green. Nothing in the artifact said so.
+
+Absence
 means *unstamped* (every pre-stamp verdict; operator/CI pre-stage), never a
-mismatch. The audit phase regenerates a pre-staged verdict whose stamped
-`project_root` differs from its own (symlink-normalized compare), preserving
-the original as `acs-verdict.foreign.json` — its reds are the evidence of what
+mismatch. The audit phase regenerates a pre-staged verdict when its stamped
+`project_root` differs from its own (symlink-normalized compare). The phase keeps
+the original as `acs-verdict.foreign.json`. The reds of that file are the evidence of what
 the wrong root saw.
 
 ## ship-gate integration
