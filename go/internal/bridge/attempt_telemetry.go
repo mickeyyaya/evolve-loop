@@ -227,11 +227,9 @@ func (e *Engine) recordTokenUsage(req core.BridgeRequest, model string, code int
 	e.recordModelAttempt(req, model, code, start, e.deps.Now(), modelDispatch{}, "", resp)
 }
 
-func markTry(run launchRun) func(*llmcalls.Record) {
+func markTry(run launchRun, try *retryladder.Try) func(*llmcalls.Record) {
 	return func(rec *llmcalls.Record) {
-		rec.Rung = string(retryladder.R0)
-		rec.Context = string(retryladder.ContextNew)
-		rec.LadderStage = string(retryladder.StageShadow)
+		try.Mark(rec)
 		rec.Effort = run.effort
 		rec.ServedModel = cmp.Or(rec.ServedModel, run.servedModel)
 	}

@@ -541,6 +541,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	opts = append(opts, core.WithShipFloor(policyShipFloor))
 	opts = append(opts, core.WithRetryConfig(pol.RetryConfig()))
 	opts = append(opts, core.WithFailureCountReader(failureCountReader(projectRoot)))
+	opts = append(opts, core.WithFailureClassReader(failureClassReader(projectRoot)))
 	opts = append(opts, core.WithScopePathResolver(scopePathResolver))
 	opts = append(opts, core.WithContinuationResolver(continuationForScope))
 	opts = append(opts, core.WithWorkflowConfig(wfCfg))
@@ -598,6 +599,12 @@ func failureCountReader(projectRoot string) func(id string) int {
 	return func(id string) int {
 		n, _ := inboxmover.ReadFailureCount(inboxmover.Options{ProjectRoot: projectRoot}, id)
 		return n
+	}
+}
+
+func failureClassReader(projectRoot string) func(id string) string {
+	return func(id string) string {
+		return inboxmover.ReadLastFailureClass(inboxmover.Options{ProjectRoot: projectRoot}, id)
 	}
 }
 

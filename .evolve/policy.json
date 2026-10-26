@@ -172,5 +172,10 @@
     "i2": {
       "stage": "enforce"
     }
+  },
+  "workflow": {
+    "retry_ladder": {
+      "stage": "shadow"
+    }
   }
 }

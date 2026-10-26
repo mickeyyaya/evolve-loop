@@ -222,6 +222,10 @@ func ReadFailureCount(opts Options, taskID string) (int, bool) {
 	return opts.reader().ReadFailureCount(taskID)
 }
 
+func ReadLastFailureClass(opts Options, taskID string) string {
+	return opts.reader().ReadLastFailureClass(taskID)
+}
+
 func FindFileByTaskID(dir, taskID string) (string, error) {
 	return lifecycle.FindFileByTaskID(dir, taskID)
 }
