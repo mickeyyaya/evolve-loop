@@ -29,17 +29,17 @@ After filtering noise, **the actual Phase 5 work surface is ~12 files of runtime
 | Subdir | Count | Role | Phase 5 disposition |
 |---|---|---|---|
 | `tests/` | 95 | bash-on-bash unit tests of legacy scripts | DELETE in v12 (Go has its own tests; bash tests test bash) |
-| `utility/` | 25 | one-off helpers (release.sh, inbox-mover, doctor-subscription-auth, etc.) | AUDIT individually; port the ~5 still referenced |
+| `utility/` | 25 | one-off helpers (release.sh, inbox-mover, doctor-subscription-auth, and others) | AUDIT individually; port the ~5 still referenced |
 | `lifecycle/` | 17 | run-cycle.sh / resume-cycle.sh / ship.sh / others | Most already shelled-out from Go; **ship.sh has native Go sibling at `evolve ship`** |
-| `observability/` | 16 | prune-ephemeral, phase-observer, tracker-writer, etc. | ✅ prune-ephemeral ported v11.8.0; ~3 others actively referenced |
-| `dispatch/` | 14 | evolve-loop-dispatch.sh, subagent-run.sh, etc. | **Already moved to `archive/legacy/scripts/dispatch/`** in v11.5.0; legacy/dispatch/ may be stale symlinks |
+| `observability/` | 16 | prune-ephemeral, phase-observer, tracker-writer, and others | ✅ prune-ephemeral ported v11.8.0; ~3 others actively referenced |
+| `dispatch/` | 14 | evolve-loop-dispatch.sh, subagent-run.sh, and others | **Already moved to `archive/legacy/scripts/dispatch/`** in v11.5.0; legacy/dispatch/ can be stale symlinks |
 | `verification/` | 11 | postedit-validate, mutate-eval, audit-binding | Port postedit-validate (referenced in settings.json) |
 | `release/` | 10 | preflight, changelog-gen, version-bump, marketplace-poll, rollback, release-pipeline + 3 tests + full-dry-run | ✅ 6/6 production scripts ported v11.7.x; full-dry-run.sh remains as opt-in only |
-| `cli_adapters/` | 7 | claude/codex/gemini/agy shell wrappers around external LLM CLIs | **KEEP — these are intentional adapter shims; just move to non-legacy path (e.g. `adapters/`)** |
-| `guards/` | 6 | ship-gate, role-gate, phase-gate-precondition, evolve-guard-dispatch, doc-deletion-guard, commit-prefix-gate | All have Go siblings via `evolve guard`; dispatcher in legacy/ is the fallback path |
-| `failure/` | 6 | failure-adapter, failure-classifier, etc. | AUDIT — likely most are not actively called at runtime |
+| `cli_adapters/` | 7 | claude/codex/gemini/agy shell wrappers around external LLM CLIs | **KEEP — these are intentional adapter shims; just move to non-legacy path (for example `adapters/`)** |
+| `guards/` | 6 | ship-gate, role-gate, phase-gate-precondition, evolve-guard-dispatch, doc-deletion-guard, commit-prefix-gate | All have Go siblings through `evolve guard`; dispatcher in legacy/ is the fallback path |
+| `failure/` | 6 | failure-adapter, failure-classifier, and others | AUDIT — likely most are not actively called at runtime |
 | `routing/` | 4 | model-routing helpers | AUDIT |
-| `lib/` | 3 | shared bash sourcable funcs (resolve-roots.sh, etc.) | Sourced by other bash; deletes with the parents |
+| `lib/` | 3 | shared bash sourcable funcs (resolve-roots.sh, and others) | Sourced by other bash; deletes with the parents |
 | `hooks/` | 2 | research-quota-gate, doc-deletion-guard (already routed through dispatcher) | DELETE after dispatcher port |
 | `research/` | 1 | one helper | AUDIT |
 | (top-level .sh) | 3 | release-pipeline.sh, perf-cycle-comparison.sh, parity-audit.sh | release-pipeline.sh already ported; 2 standalone |
@@ -96,7 +96,7 @@ All five PreToolUse hooks go through `evolve-guard-dispatch.sh`, which **already
 - Port `legacy/scripts/utility/release.sh` consistency-checker (small) → `go/internal/releaseconsistency/` + wire into `evolve release` step 4 (replaces the bash shell-out from releasepipeline)
 
 ### v11.8.3
-- Replace `ship.sh` shell-out in releasepipeline.go + rollback.go with native `evolve ship` calls (the Go ship phase already exists at `go/internal/phases/ship/`; just need to wire it as a callable function not a CLI subprocess)
+- Replace `ship.sh` shell-out in releasepipeline.go + rollback.go with native `evolve ship` calls (the Go ship phase already exists at `go/internal/phases/ship/`). Wire it as a callable function, not a CLI subprocess
 - Update `evolve-guard-dispatch.sh` strategy: make `.claude/settings.json` point directly at `go/bin/evolve guard <name>` (skip the bash dispatcher entirely); keep the bash dispatcher as `EVOLVE_NATIVE_GUARDS=0` fallback only
 - Port the bash heredoc-stripping pre-processor from `legacy/scripts/guards/ship-gate.sh` into `go/internal/guards/ship.go` (so commit message bodies don't trip the verb regex — see `feedback_ship_gate_verb_in_message`)
 
@@ -126,7 +126,7 @@ Documented in `feedback_ship_gate_verb_in_message.md`. The Go-native ship-gate's
 The 95 scripts in `legacy/scripts/tests/` test the BASH scripts themselves. They have no Go equivalents because the Go ports have their own Go test files. When `git rm -rf legacy/` ships, the Go tests are unaffected — the bash tests just disappear with the bash they tested.
 
 ### Active `archive/legacy/scripts/dispatch/`
-The historical bash dispatcher was moved to `archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh` in v11.5.0 as part of the bash→Go cutover. The `legacy/scripts/dispatch/` directory may still contain stale copies. **Verify before deleting** that nothing references the non-archive path at runtime (most should already go through `evolve loop`).
+The historical bash dispatcher was moved to `archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh` in v11.5.0 as part of the bash→Go cutover. The `legacy/scripts/dispatch/` directory can still contain stale copies. **Verify before deleting** that nothing references the non-archive path at runtime. Most references are expected to already go through `evolve loop`.
 
 ### `legacy/scripts/lib/resolve-roots.sh`
 Other bash scripts source this for PLUGIN_ROOT vs PROJECT_ROOT resolution. When the parent scripts are removed, this becomes orphaned. Delete with the parents.
@@ -137,10 +137,10 @@ After v11.8.3 routes `.claude/settings.json` directly to `go/bin/evolve guard`, 
 - (b) Remove the rollback hatch entirely and rely on `git checkout v11.7.5` for emergencies.
 - Recommend (a) until v12.0.0 confidence is high, then drop in v12.
 
-## What the next session should do first
+## What the next session does first
 
 1. Read this doc top-to-bottom.
-2. Verify the "active runtime references" table is still accurate via `grep -rln "legacy/scripts/" go/internal go/cmd .claude/settings.json` (filter out comments/provenance).
+2. Verify the "active runtime references" table is still accurate with `grep -rln "legacy/scripts/" go/internal go/cmd .claude/settings.json` (filter out comments/provenance).
 3. Pick the next slice (v11.8.1) from the sequencing plan above.
 4. Use the canonical port pattern documented in `[[feedback_go_port_pattern]]` — the same template used for v11.7.x ships.
 5. Each slice = one feat commit + version bump + changelog + tag + release + memory update. ~20-30 min per slice.

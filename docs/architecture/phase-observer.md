@@ -1,8 +1,8 @@
 # Per-Phase Observer Service
 
-> The observer is spawned at every phase start, monitors the subagent through its entire phase, and notifies the orchestrator at the end (and during, on incident). Implements layers 1-3 (collect → digest → translate) of the operator-specified observability architecture; layer 4 (execute) is the orchestrator itself. Sibling to `phase-watchdog.sh`; coexists in v1, subsumes in v2.
+> The observer is spawned at every phase start. It monitors the subagent through its entire phase. It notifies the orchestrator at the end (and during, on incident). It implements layers 1-3 (collect → digest → translate) of the operator-specified observability architecture. Layer 4 (execute) is the orchestrator itself. Sibling to `phase-watchdog.sh`; coexists in v1, subsumes in v2.
 >
-> **Default detector since v10.18.0 (cycle 100):** `EVOLVE_OBSERVER_ENFORCE=1` is now the run-cycle.sh default. Phase-watchdog (`phase-watchdog.sh`) is retained for one-release opt-out via `EVOLVE_OBSERVER_ENFORCE=0` (emits deprecation WARN). See [`docs/incidents/cycle-94-98-watchdog-overfiring.md`](../incidents/cycle-94-98-watchdog-overfiring.md) for migration motivation.
+> **Default detector since v10.18.0 (cycle 100):** `EVOLVE_OBSERVER_ENFORCE=1` is now the run-cycle.sh default. Phase-watchdog (`phase-watchdog.sh`) is retained for one-release opt-out with `EVOLVE_OBSERVER_ENFORCE=0` (emits deprecation WARN). See [`docs/incidents/cycle-94-98-watchdog-overfiring.md`](../incidents/cycle-94-98-watchdog-overfiring.md) for migration motivation.
 
 ## Why
 
@@ -68,7 +68,7 @@ See `docs/architecture/observer-severity.md` for severity semantics.
 
 | Rule | Trigger | Severity | Suggested action_type |
 |---|---|---|---|
-| `stuck_no_output` | `now - last_event_ts >= stall threshold` (default 600s; configured via `.evolve/policy.json` `observer.stall_s`, not the retired `EVOLVE_OBSERVER_STALL_S` env var) | INCIDENT | `terminate_phase` (reason `STUCK_NO_OUTPUT`) |
+| `stuck_no_output` | `now - last_event_ts >= stall threshold` (default 600s; configured in `.evolve/policy.json` `observer.stall_s`, not the retired `EVOLVE_OBSERVER_STALL_S` env var) | INCIDENT | `terminate_phase` (reason `STUCK_NO_OUTPUT`) |
 | `infinite_loop` | Same `(tool_name + sha256(args))` repeated >= `EVOLVE_OBSERVER_LOOP_N` (default 6) in `EVOLVE_OBSERVER_LOOP_WINDOW_S` (default 120s) | INCIDENT | `terminate_phase` (reason `INFINITE_LOOP`) |
 | `error_spike` | `is_error=true / total_tool_results > EVOLVE_OBSERVER_ERROR_RATE` (default 0.3); requires >= 5 sample | WARN | `continue` (reason `ERROR_SPIKE`) |
 | `cost_anomaly` | `(current_cost - baseline_mean) / baseline_stddev >= EVOLVE_OBSERVER_COST_SIGMA` (default 2); requires baseline | WARN | `continue` (reason `COST_ANOMALY`) — not wired in v1; needs rollup baselines |
@@ -78,10 +78,11 @@ Future haiku-augmented rule (designed for, not built): `semantic_loop` — agent
 
 ## Phase-end report
 
-Written atomically (`.tmp` + rename) just before the observer exits. The keys the Go port
-(`internal/observerengine`, ADR-0103 unit 12) actually writes — a flat object, 18 keys; the
+The observer writes the report atomically (`.tmp` + rename) just before it exits. The Go port
+(`internal/observerengine`, ADR-0103 unit 12) actually writes these keys: a flat object, 18 keys.
+The original bash design never produced the
 `observer` / `summary` / `tool_call_histogram` blocks and the `verdict` / `suggested_action` /
-`cache_hit_rate` fields of the original bash design were never produced (operator question 3 of
+`cache_hit_rate` fields (operator question 3 of
 the unit-12 doc):
 
 ```json
@@ -125,14 +126,14 @@ kill -USR1 "$OBSERVER_PID" 2>/dev/null
 wait "$OBSERVER_PID" 2>/dev/null
 ```
 
-Auto-shutdown via EOF-grace (default 10s of no log growth + at least one event seen). SIGUSR1 forces immediate shutdown. SIGTERM is allowed; observer exits gracefully without writing the final report.
+Auto-shutdown by EOF-grace (default 10s of no log growth + at least one event seen). SIGUSR1 forces immediate shutdown. SIGTERM is allowed; observer exits gracefully without writing the final report.
 
 ## Watchdog migration ladder (v9.4 → v9.7+)
 
 | Version | phase-watchdog | phase-observer | Operator action |
 |---|---|---|---|
 | v9.4.0 | runs unchanged; SIGTERMs on stall | runs alongside; emits INCIDENT but does NOT kill | None (shipped) |
-| v9.5.0 (this) | runs UNLESS `EVOLVE_OBSERVER_ENFORCE=1` | gains `--enforce` flag; with EVOLVE_OBSERVER_ENFORCE=1 spawned at cycle-scope (replacing watchdog) AND at phase-scope, both with kill authority | Opt in via `EVOLVE_OBSERVER_ENFORCE=1` to test |
+| v9.5.0 (this) | runs UNLESS `EVOLVE_OBSERVER_ENFORCE=1` | gains `--enforce` flag; with EVOLVE_OBSERVER_ENFORCE=1 spawned at cycle-scope (replacing watchdog) AND at phase-scope, both with kill authority | Opt in with `EVOLVE_OBSERVER_ENFORCE=1` to test |
 | v9.6.0 (candidate) | not spawned by run-cycle.sh | default `EVOLVE_OBSERVER_ENFORCE=1`; watchdog kept on disk but unused | None — observer is now default |
 | v9.7.0 (candidate) | DELETED | sole stall-protection mechanism | Remove `EVOLVE_INACTIVITY_*` env vars from any cron / CI configs |
 
@@ -197,12 +198,12 @@ tail -F .evolve/runs/cycle-38/builder-observer-events.ndjson | jq -c '{ts, type,
 jq '{event_count, tool_call_count, error_count, incident_count, incidents: [.incidents[] | {type, action: .data.action}]}' .evolve/runs/cycle-38/builder-observer-report.json
 ```
 
-**Triage the observer's own faults** (ADR-0103 unit 12 — the manual subcommand renders them on its stderr as `[observer] observer.warning …`; the live adapter's land in the cycle's `signals.ndjson`):
+**Triage the observer's own faults** (ADR-0103 unit 12). The manual subcommand renders them on its stderr as `[observer] observer.warning …`. The live adapter writes them to the `signals.ndjson` of the cycle:
 ```bash
 grep '"module":"observer"' .evolve/runs/cycle-38/signals.ndjson | jq -c '{code, origin, fields}'
 ```
 
-**Tune for a noisy phase** (e.g., long Memo phases):
+**Tune for a noisy phase** (for example, long Memo phases):
 ```bash
 EVOLVE_OBSERVER_STALL_S=600 EVOLVE_OBSERVER_ENABLED=1 \
     bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh --resume
@@ -217,7 +218,7 @@ EVOLVE_OBSERVER_ENABLED=0   # observer not spawned; watchdog still active
 
 - Unit tests for rules: `legacy/scripts/tests/phase-observer-test.sh` — 6 fixture scenarios, 20 assertions
 - Live smoke: run any cycle with `EVOLVE_OBSERVER_ENABLED=1`; tail the events file
-- Integration: orchestrator-report.md should reference `observer-report.json` consumption after the v1 rollout
+- Integration: after the v1 rollout, it is recommended that orchestrator-report.md references the consumption of `observer-report.json`
 
 ## Out of scope (v1)
 
