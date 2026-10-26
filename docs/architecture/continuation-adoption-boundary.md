@@ -1,8 +1,8 @@
 # Continuation adoption boundary
 
-Cycles 1607 and 1609 exposed an ordering defect during live recovery verification:
-archiving unpublished explanation records staged changes before the snapshot was
-merged with current main. Git refused that dirty merge; adoption still dispatched
+Cycles 1607 and 1609 exposed an ordering defect during live recovery verification.
+Archiving unpublished explanation records staged changes before the snapshot was
+merged with current main. Git refused that dirty merge. Adoption still dispatched
 later phases on the old base. The pre-adoption clean-merge screen did not protect
 against changes introduced by adoption itself.
 

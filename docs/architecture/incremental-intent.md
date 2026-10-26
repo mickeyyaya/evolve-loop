@@ -5,11 +5,11 @@ metadata:
   type: architecture
 ---
 
-> **Incremental intent (v0.1)** — opt-in delta mode (`EVOLVE_INTENT_DELTA=1`) that compares a normalized goal hash against the current batch to determine whether the intent persona must run in full or can emit a lightweight patch. Builds on [[intent-phase.md]] without duplicating its core design.
+> **Incremental intent (v0.1)** — opt-in delta mode (`EVOLVE_INTENT_DELTA=1`). It compares a normalized goal hash against the current batch. The result shows if the intent persona must run in full or is allowed to emit a lightweight patch. Builds on [[intent-phase.md]] without duplicating its core design.
 
 ## TLDR
 
-**Synopsis:** When `EVOLVE_INTENT_DELTA=1`, the pipeline computes a `GOAL_HASH` before the intent phase; if the hash matches the current batch's stored hash, the intent persona emits `intent-delta.md` (a patch) or `[intent-unchanged]` instead of a full `intent.md`, saving tokens and turn budget.
+**Synopsis:** When `EVOLVE_INTENT_DELTA=1`, the pipeline computes a `GOAL_HASH` before the intent phase. If the hash matches the stored hash of the current batch, the intent persona emits `intent-delta.md` (a patch) or `[intent-unchanged]` instead of a full `intent.md`. This saves tokens and turn budget.
 
 **Key points:**
 - `EVOLVE_INTENT_DELTA=0` (default): existing full-intent flow unchanged
@@ -38,7 +38,7 @@ metadata:
 
 ## Why Incremental Intent
 
-The full intent phase costs ~1–2 turns and $0.10–0.30 per cycle (Opus pricing). For multi-cycle batches pursuing the same goal — e.g., a 5-cycle queue-drain of carryover todos — the intent is structurally identical across cycles. Re-running a full intent persona each time is wasteful.
+The full intent phase costs ~1–2 turns and $0.10–0.30 per cycle (Opus pricing). For multi-cycle batches pursuing the same goal — for example, a 5-cycle queue-drain of carryover todos — the intent is structurally identical across cycles. Re-running a full intent persona each time is wasteful.
 
 At the same time, the intent phase exists to surface wrong assumptions (Karpathy's #1 failure mode). Skipping it entirely risks drift. Delta mode threads the needle: run full intent on first cycle and on trigger conditions; emit a lightweight patch or unchanged marker otherwise.
 
@@ -47,7 +47,7 @@ At the same time, the intent phase exists to surface wrong assumptions (Karpathy
 ## Batch and GoalHash Concepts
 
 A **batch** is a sequence of cycles sharing the same normalized goal. It has:
-- `batchId` — a deterministic prefix + timestamp string (e.g., `batch-20260519T142300Z`)
+- `batchId` — a deterministic prefix + timestamp string (for example, `batch-20260519T142300Z`)
 - `goalHash` — SHA256 of the normalized goal text (whitespace-collapsed, lowercased)
 
 A **GoalHash match** means the current cycle's goal is materially the same as the batch's stored goal. A mismatch forces `INTENT_MODE=full` regardless of `EVOLVE_INTENT_DELTA`.
@@ -80,7 +80,7 @@ newInboxOrCarryover == true  →  INTENT_MODE=full  (scope changed)
 else  →  INTENT_MODE=delta
 ```
 
-The first three conditions ensure correctness. The last two implement the Karpathy Rule: even when the goal hash matches, a FAIL audit or new scope items warrant fresh premise-challenging.
+The first three conditions make sure of correctness. The last two implement the Karpathy Rule: even when the goal hash matches, a FAIL audit or new scope items warrant fresh premise-challenging.
 
 ---
 
@@ -124,7 +124,7 @@ The file `intent-delta.md` contains only the literal text `[intent-unchanged]`. 
     intent-delta-N.md  ← per-cycle delta archives (optional)
 ```
 
-After `intent-merge-patches.sh` runs, the workspace `intent.md` is a symlink to `.evolve/batch/<batchId>/intent.md`. This ensures the intent persona reads the merged canonical file on subsequent delta cycles.
+After `intent-merge-patches.sh` runs, the workspace `intent.md` is a symlink to `.evolve/batch/<batchId>/intent.md`. This makes sure that the intent persona reads the merged canonical file on subsequent delta cycles.
 
 ---
 

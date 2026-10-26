@@ -57,18 +57,19 @@ Cycle-1576 is the one real failure in the set — an empty retrospective. The ot
 the work, wrote the disposition, produced lessons, and were graded FAIL anyway.
 
 The irony worth recording: cycle-1575's lesson is
-`inst-L1575a-fleet-partition-must-bind-goal-eligibility-before-minting-lanes.yaml` — the
-system correctly diagnosed the very partition defect that stranded that lane, and its
-retro was marked FAIL for doing so.
+`inst-L1575a-fleet-partition-must-bind-goal-eligibility-before-minting-lanes.yaml`.
+The system correctly diagnosed the very partition defect that stranded that lane.
+Its retro was marked FAIL for doing so.
 
 ### Why this matters beyond cosmetics
 
 1. **It destroys the signal it was built to provide.** A real retro failure (1576) is
-   indistinguishable from the 92% noise. The one verdict that would tell an operator "the
+   indistinguishable from the 92% noise. The one verdict that tells an operator "the
    failure analysis itself broke" is permanently pinned to FAIL.
-2. **It contaminates routing.** `decideAfterRetro` is driven by the retro verdict. Every
-   downstream decision — failure-adapter action, floor evaluation, and the ADR-0092 repair
-   branch — takes its input from a value that is FAIL almost unconditionally.
+2. **It contaminates routing.** The retro verdict drives `decideAfterRetro`. Every
+   downstream decision takes its input from a value that is FAIL almost unconditionally.
+   The downstream decisions are the failure-adapter action, the floor evaluation and the ADR-0092 repair
+   branch.
 3. **It inflates failure counters.** Retro FAILs feed the failure history the
    consecutive-failure breaker and non-progress dossier read.
 4. **It is the same class as the persona-strip lobotomy (#434).** There, the dispatched
@@ -95,7 +96,7 @@ returns PASS:
    FAIL/WARN (`retro.go`: "previous verdict != FAIL/WARN → SKIPPED"). "Nothing failed" is
    never true on this path — the audit failed, which is why retro ran at all.
 2. **It is a category error.** Retro PASS means *"the post-mortem deliverable is complete"*
-   — a non-empty retrospective plus a lesson file. It says nothing about whether the
+   — a non-empty retrospective plus a lesson file. It says nothing about if the
    underlying defect was fixed. The routing reads it as *"the cycle recovered"* and sends
    it to ship.
 
@@ -103,41 +104,41 @@ The ship gate does fail closed — `CodeAuditBindingVerdictFail`, "auditor expli
 rejected this build" — so nothing rejected can actually ship. The backstop holds. But the
 routing is still wrong in two ways that matter:
 
-- a failed cycle would be routed to a ship that must refuse it, converting a clean
-  terminal disposition into a ShipError plus L5 recovery — wasted work and a confusing
+- if the retro gate passes, the router sends a failed cycle to a ship that must refuse it. This converts a clean
+  terminal disposition into a ShipError plus L5 recovery. The result is wasted work and a confusing
   trail;
-- **it would bypass L4 entirely.** The ADR-0092 repair branch lives BELOW this early
-  return, so a correctly-PASSing retro would skip the floor, the bookkeeping regrade, and
+- **if the retro gate passes, the routing bypasses L4 entirely.** The ADR-0092 repair branch lives BELOW this early
+  return, so a correctly-PASSing retro skips the floor, the bookkeeping regrade, and
   the audit repair.
 
 **Correction to recommendation 1 below.** This document originally said "fix the retro gate
-first". Followed literally, that would activate a dormant category error and disable the
+first". Followed literally, that advice activates a dormant category error and disables the
 in-cycle repair loop in the same change. The two defects must be fixed TOGETHER, and the
 routing half is the one to fix first:
 
 - `decideAfterRetro` must stop treating retro's deliverable-quality verdict as a recovery
-  signal. A retro PASS on a FAIL cycle should fall through to the SAME floor → regrade →
-  repair → adapter ladder as a retro FAIL; the retro verdict should gate only whether the
+  signal. It is recommended that a retro PASS on a FAIL cycle falls through to the SAME floor → regrade →
+  repair → adapter ladder as a retro FAIL. It is recommended that the retro verdict gates only if the
   post-mortem itself needs re-dispatch.
 - Only then is it safe to make the retro gate capable of passing.
 
-This is a textbook masked-defect pair: defect 1 (the gate cannot pass) has been suppressing
-defect 2 (PASS is routed as recovery) for as long as both have existed. Fixing the visible
-one alone would have shipped the hidden one into production.
+This is a textbook masked-defect pair. Defect 1 (the gate cannot pass) has suppressed
+defect 2 (PASS is routed as recovery) for as long as both have existed. Fixing only the visible defect leaves the hidden defect
+to ship to production.
 
 ### Fix shape (not yet implemented)
 
-The gate is the wrong half to keep. The persona's convention (`inst-<id>-<slug>.yaml` in a
-shared, cross-cycle lessons directory) is the one that is actually load-bearing — those 593
-files are read back into future agents' `instinctSummary`. Recommended:
+The gate is the wrong half to keep. The convention of the persona (`inst-<id>-<slug>.yaml` in a
+shared, cross-cycle lessons directory) is the one that is actually load-bearing. Future agents read those 593
+files back into their `instinctSummary`. Recommended:
 
-- `hasFailureLesson` resolves lessons the way the persona writes them: check
-  `.evolve/instincts/lessons/` for a lesson **whose id names this cycle** (`inst-L<cycle>*`),
-  which also makes the check cycle-scoped rather than "any lesson anywhere".
+- `hasFailureLesson` resolves lessons the way the persona writes them. Check
+  `.evolve/instincts/lessons/` for a lesson **whose id names this cycle** (`inst-L<cycle>*`).
+  This also makes the check cycle-scoped and not "any lesson anywhere".
 - Keep accepting the legacy workspace `failure-lesson*.yaml` shape so cycle-1571-era
   artifacts still pass.
-- Add a single-source test that the persona's documented output path and the gate's search
-  path are the same string — the drift class this whole finding is an instance of.
+- Add a single-source test that the documented output path of the persona and the search
+  path of the gate are the same string. This whole finding is an instance of that drift class.
 - Pin cycle-1576's shape (empty retrospective ⇒ genuine FAIL) so the fix cannot turn the
   gate into a rubber stamp.
 
@@ -145,8 +146,8 @@ files are read back into future agents' `instinctSummary`. Recommended:
 
 ## Part 2 — Pipeline retry, as an architecture
 
-Retry is not one mechanism here; it is **nine layers**, built at different times for
-different failure classes, with no shared budget and no shared vocabulary.
+Retry is not one mechanism here. It is **nine layers**. The layers were built at different times for
+different failure classes. They have no shared budget and no shared vocabulary.
 
 ### The layer map (as built)
 
@@ -170,13 +171,13 @@ different failure classes, with no shared budget and no shared vocabulary.
 > remediation. **Judgment phases (audit, adversarial-review, premise-challenge) must never
 > be listed** — remediation is for mechanical, prescribed defects only.
 
-That is a real architectural line: *a mechanical defect may be fixed and the same gate
-re-run; a judgment may not be re-rolled until it agrees.* Re-running a judge until it
-relents is how a gate becomes a rubber stamp.
+That is a real architectural line: *a mechanical defect can be fixed and the same gate re-run.
+A judgment must not be re-rolled until it agrees.* A judge that is re-run until it
+relents makes a gate a rubber stamp.
 
 **ADR-0092 sits on the wrong side of that line and must justify itself.** It retries after
-a *judgment* phase. The distinction it relies on — and which should be stated explicitly in
-the ADR rather than implied — is **re-earn vs. override**:
+a *judgment* phase. The distinction that it relies on is **re-earn against override**.
+It is better to state it explicitly in the ADR than to leave it implied:
 
 - **Override** (forbidden): re-run the same judge on the same artifact until the verdict
   flips. Nothing changed but the dice.
@@ -184,18 +185,22 @@ the ADR rather than implied — is **re-earn vs. override**:
   *different tree*, and the audit is run again on that new tree. The rejection is not
   overturned; it is made obsolete by new work.
 
-L2 is nearer the danger than L4 is, because it re-runs *the same gate* on a builder patch;
-it is safe only because the gate is deterministic. L4 re-runs a judge, but never on the
-same input. Both are defensible; neither is defensible without stating which side of the
+L2 is nearer the danger than L4. It re-runs *the same gate* on a builder patch,
+and it is safe only because the gate is deterministic. L4 re-runs a judge, but never on the
+same input. Both are defensible. Neither is defensible without a statement of which side of the
 line it is on.
 
 ### Gaps, ranked
 
 **G1 — L7 (wave) does not exist.** When a lane is assigned a scope it cannot legally work,
-nothing reassigns it. Cycle-1575 is the proof: `fleet.Partition` handed it exactly one
-item, the goal excluded that item, scout and triage both correctly refused, and the lane
-then burned seven phases and closed retro/FAIL. Every lower layer worked correctly; the
-missing layer is the one that should have said *"this lane has no work, give it different
+nothing reassigns it. Cycle-1575 is the proof.
+
+`fleet.Partition` handed the lane exactly one
+item. The goal excluded that item. Scout and triage both correctly refused. The lane
+then burned seven phases and closed retro/FAIL.
+
+Every lower layer worked correctly. The
+missing layer is the one that was expected to say *"this lane has no work, give it different
 work."* The system's own retro named this
 (`inst-L1575a-fleet-partition-must-bind-goal-eligibility-before-minting-lanes`).
 
@@ -208,13 +213,15 @@ single bound predicts.
 same *mechanical, prescribed* shape applies to EGPS/ACS red counts, repo-contract scanner
 findings, and type-safety audit output. Wave-3 cycle-1574 died on
 `red_count=1 [record_absent_from_inbox_root_exactly_once]` — a deterministic, prescribed
-defect that L2 would have been the right layer for, had that gate been listed.
+defect. L2 did not remediate it, because nobody listed that gate. L2 is the right layer for this defect if the gate is listed.
 
 **G4 — retry is invisible in telemetry.** No artifact answers "how much of this cycle was
-retry?" `attempt_count` exists per phase, `AuditRepairAttempts` is new, remediation rounds
-are logged — but nothing aggregates them. The economics argument in
-`cyclerun_remediate.go` (~1–2M tokens to remediate vs ~12.5M to discard a cycle) is exactly
-the kind of claim that should be measured continuously, and currently is not.
+retry?" `attempt_count` exists per phase, `AuditRepairAttempts` is new, and remediation rounds
+are logged. But nothing aggregates them.
+
+The economics argument in
+`cyclerun_remediate.go` is an estimate: ~1–2M tokens to remediate against ~12.5M to discard a cycle.
+It is better to measure this kind of claim continuously. Nobody measures it now.
 
 **G5 — the layers share no vocabulary.** L2 says "remediation round", L3 "regrade", L4
 "repair attempt", L5 "recovery depth", L6 "continuation", L0 "extend". An operator reading a
@@ -224,27 +231,27 @@ failing cycle cannot ask one question and get one answer.
 
 1. **Fix the retro ROUTING before the retro gate.** See "A masked second defect" above for
    why repairing the gate alone is unsafe. Action: make `decideAfterRetro` fall through the
-   normal floor → regrade → repair → adapter ladder on a retro PASS, then make
-   `hasFailureLesson` capable of passing.
+   normal floor → regrade → repair → adapter ladder on a retro PASS.
+   Then make `hasFailureLesson` capable of passing.
 2. **Close G1 at the partitioner, not with a new retry layer.** The right fix is
-   goal-aware partitioning plus a loud launch-time failure when a directive names ids the
-   resolved lane set cannot contain — already filed as
+   goal-aware partitioning plus a loud launch-time failure. The failure fires when a directive names ids that the
+   lane set cannot contain. Both are already filed as
    `goal-text-has-no-selection-authority` and `spine-dispatches-build-after-empty-triage`.
-   A wave-level retry layer would be *compensating* for a scheduling defect; better not to
+   In that rejected design, a wave-level retry layer compensates for a scheduling defect. It is better not to
    need it.
-3. **Give the ladder one budget and one vocabulary (G2/G5).** A single `retry` block in
-   `policy.json` with per-layer caps and one cycle-wide ceiling, and one
-   `retry-ledger.json` per cycle recording every attempt at every layer with its cost. This
+3. **Give the ladder one budget and one vocabulary (G2/G5).** Add a single `retry` block in
+   `policy.json` with per-layer caps and one cycle-wide ceiling. Add one
+   `retry-ledger.json` per cycle that records every try at every layer with its cost. This
    is the smallest change that makes the economics auditable.
 4. **Widen L2 deliberately (G3)** to the deterministic gates that meet the "mechanical and
-   prescribed" bar — EGPS/ACS and repo-contract — and leave every judgment phase off the
+   prescribed" bar (EGPS/ACS and repo-contract). Leave every judgment phase off the
    list, permanently.
 5. **State the re-earn/override principle in ADR-0092** and make it the explicit test any
    future retry layer must pass.
 
 ### What NOT to do
 
-- Do not make judgment phases remediable. The `policy.go` comment is correct and should
-  become a guard test, not just a comment.
+- Do not make judgment phases remediable. The `policy.go` comment is correct. It is better to make it
+  a guard test and not only a comment.
 - Do not raise any bound before G4 exists. Every current bound was picked without
   measurement; raising one blind trades a known cost for an unknown one.

@@ -1,20 +1,25 @@
 # Step 9 — Remove `llm_config.json` (migration plan)
 
 > **Status:** **9a + 9b DONE (2026-06-02)** — `llm_config.json` is fully removed.
-> 9a removed it from the dispatch resolution path; 9b removed the residual
+> 9a removed it from the dispatch resolution path. 9b removed the residual
 > operator surfaces AND repointed `/setup` onboarding at `.evolve/policy.json`
-> `pins` (the durable per-phase override layer) with `evolve setup detect`
-> overlaying + validating pins via `policy.ValidatePin`. The standalone
-> `evolve setup validate` subcommand is gone. Split because 9a was the
+> `pins` (the durable per-phase override layer). `evolve setup detect`
+> overlays + validates pins with `policy.ValidatePin`. The standalone
+> `evolve setup validate` subcommand is gone. The work is split because 9a was the
 > load-bearing behavior change and was coherent + tested on its own.
 >
-> **9b shipped:** removed `setup.Validate` + the `evolve setup validate`
-> subcommand + `--config`, `paths.LLMConfigFile` + `EVOLVE_LLM_CONFIG_PATH`, the
-> `subagent` `LLMConfigPath` plumbing + the `ResolveLLM(agent, configPath)` seam
-> param, `examples/llm_config.example.json`, the stale `llm_config` comments in
-> `llmroute.go`/`runner.go`, `setup.PhaseStatus.CurrentModel` + the dead
-> `DetectOptions.ConfigPath`, and the `acs/cycle-52`+`acs/cycle-53` llm_config
-> predicates. New: `setup.Detect` is policy-pin-aware (`source=policy-pin`,
+> **9b shipped:** removed these items:
+
+> - `setup.Validate`;
+> - the `evolve setup validate` subcommand + `--config`;
+> - `paths.LLMConfigFile` + `EVOLVE_LLM_CONFIG_PATH`;
+> - the `subagent` `LLMConfigPath` plumbing + the `ResolveLLM(agent, configPath)` seam param;
+> - `examples/llm_config.example.json`;
+> - the stale `llm_config` comments in `llmroute.go`/`runner.go`;
+> - `setup.PhaseStatus.CurrentModel` + the dead `DetectOptions.ConfigPath`;
+> - the `acs/cycle-52`+`acs/cycle-53` llm_config predicates.
+
+> New: `setup.Detect` is policy-pin-aware (`source=policy-pin`,
 > `pin_violation`, `policy_error`); `/setup` SKILL + setup-onboarding.md rewritten.
 >
 > **9a (done):** `resolvellm.Resolve` collapsed to profile-only — the
@@ -25,23 +30,25 @@
 > `subagent.defaultResolveLLM` (ignores the now-dead configPath). New
 > `TestResolve_IgnoresLLMConfig` proves a present llm_config.json is ignored.
 >
-> **9b (remaining, follow-up):** the residual non-dispatch surfaces — remove
-> `setup.Validate`'s llm_config clamp + the `evolve setup validate` subcommand's
-> `--config`/default, `paths.LLMConfigFile`, the dead `subagent` `LLMConfigPath`
-> plumbing (`run.go`/`validateprofile.go` field + `ResolveLLM(agent, configPath)`
-> seam), `examples/llm_config.example.json`, the stale `llm_config` comments in
-> `llmroute.go`/`runner.go`, the now-always-empty `setup.PhaseStatus.CurrentModel`
-> report field, and the stale `acs/cycle52`+`acs/cycle53` predicates (which still
-> assert `source=llm_config`; acs/ is excluded from CI so they don't fail the
-> gate, but they test removed behavior). None is load-bearing for dispatch.
+> **9b (remaining, follow-up):** the residual non-dispatch surfaces. Remove these items:
+
+> - `setup.Validate`'s llm_config clamp + the `--config`/default of the `evolve setup validate` subcommand;
+> - `paths.LLMConfigFile`;
+> - the dead `subagent` `LLMConfigPath` plumbing (`run.go`/`validateprofile.go` field + `ResolveLLM(agent, configPath)` seam);
+> - `examples/llm_config.example.json`;
+> - the stale `llm_config` comments in `llmroute.go`/`runner.go`;
+> - the now-always-empty `setup.PhaseStatus.CurrentModel` report field;
+> - the stale `acs/cycle52`+`acs/cycle53` predicates. They still assert `source=llm_config`. acs/ is excluded from CI, so they do not fail the gate, but they test removed behavior.
+
+> None is load-bearing for dispatch.
 
 ## Goal
 
 Eliminate `.evolve/llm_config.json` as a dispatch-config surface. After the
 refactor, **profiles + `.evolve/policy.json` own the CLI**, and the **live
 model-catalog (Step 10) owns `tier → model`**. This removes a redundant 5th
-dispatch surface (env > policy-pin > profile > llm_config > default) and makes
-the config story: *profile/policy decide CLI + tier; catalog resolves tier to a
+dispatch surface (env > policy-pin > profile > llm_config > default). It makes
+the config story this: *profile/policy decide CLI + tier; catalog resolves tier to a
 concrete model.*
 
 This reverses the *original* Step 9 ("make `llm_config.cli` authoritative") —
@@ -62,7 +69,7 @@ that pointed the wrong way; the target is removal, not promotion.
   `resolvellm`'s CLI result is consulted only for the legacy `cmd_resolve_llm`
   surface and `setup.Validate`. So removing the CLI role is low-risk.
 - **Only the model/tier auto-expansion is load-bearing** — `resolvellm` expands
-  the `"auto"` model sentinel via `llm_config.phases.<role>` (model or tier).
+  the `"auto"` model sentinel through `llm_config.phases.<role>` (model or tier).
 - **No real `.evolve/llm_config.json` is shipped** — only
   `examples/llm_config.example.json`. In the default repo, `resolvellm` always
   falls through to profile (step 3). The `llm_config` branches are dormant
@@ -86,7 +93,7 @@ that pointed the wrong way; the target is removal, not promotion.
 | `internal/resolvellm/resolvellm.go` | the reader — collapses to profile-only (or is deleted) |
 | `internal/resolvellm/resolvellm_test.go` | the oracle — migrate branch tests deliberately |
 | `internal/llmroute/llmroute.go` | AutoModel seam — point auto-expansion at the catalog |
-| `internal/phases/runner/runner.go` | consumes resolvellm via the AutoModel seam |
+| `internal/phases/runner/runner.go` | consumes resolvellm through the AutoModel seam |
 | `internal/setup/setup.go` | `Validate` reads `llm_config.json` — drop or repoint |
 | `internal/paths/paths.go` | `LLMConfigFile` constant — remove |
 | `internal/subagent/run.go` (since ADR-0103 unit 16 the seam over `internal/subagent/subagentrun`), `validateprofile.go` | resolvellm consumers |
@@ -96,10 +103,10 @@ that pointed the wrong way; the target is removal, not promotion.
 ## Migration order (behavior-preserving where possible)
 
 1. **Repoint auto-expansion to the catalog** behind the existing `AutoModel`
-   seam in `llmroute`/`runner`: when model is `"auto"`, resolve via
-   `catalog.DispatchModel` first, fall back to the *current* resolvellm path.
-   Additive — no removal yet. Soak this (the catalog must actually cover the
-   ready CLIs' tiers — see prerequisite).
+   seam in `llmroute`/`runner`. When model is `"auto"`, resolve with
+   `catalog.DispatchModel` first. Fall back to the *current* resolvellm path.
+   This step is additive — no removal yet. Soak this step. The catalog must actually cover the
+   tiers of the ready CLIs (see prerequisite).
 2. **Drop the `llm_config.cli` consult** from `resolvellm` (it is already inert
    for the runner; only `cmd_resolve_llm`/`setup.Validate` observe it). Keep
    profile fallback. Migrate the affected oracle tests.
