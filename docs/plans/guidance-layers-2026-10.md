@@ -1,6 +1,6 @@
 # Plan: each rule has one home and loads in the case where it applies
 
-- **Status:** proposed, 2026-10-20. The operator decided the eight conflicts of §6 on 2026-10-20. The design set is in review; the migration (G5) waits for its approval.
+- **Status:** proposed, 2026-10-20. The operator decided the eight conflicts of §6 on 2026-10-20. The design set is in review; the migration (G5) waits for its approval. §9 adds the runtime index on 2026-10-26.
 - **Research:** [guidance-layers-2026-10](../research/guidance-layers-2026-10.md). **Decision:** [ADR-0145](../architecture/adr/0145-each-rule-has-one-home-and-loads-by-audience-path-action-or-failure.md). **Design:** [guidance-layers](../architecture/guidance-layers.md).
 - **Related:** [ADR-0132](../architecture/adr/0132-documents-are-written-through-one-skill.md) (documents through one skill), the skill-naming convention.
 
@@ -14,6 +14,7 @@
 - [6. Conflicts for the operator](#6-conflicts-for-the-operator)
 - [7. Verification](#7-verification)
 - [8. Limits](#8-limits)
+- [9. The runtime index (2026-10-26)](#9-the-runtime-index-2026-10-26)
 
 ## 1. The problem
 
@@ -77,14 +78,17 @@ C wins. It scores 4 for reach, not 5. A non-claude CLI reads only `AGENTS.md`. O
 | # | Component | Home | Route |
 |---|---|---|---|
 | G0 | The registry format, `guidance/rules/`, and a reader with tests | `go/internal/guidance` (new) | lane |
-| G1 | `evolve guidance build`: the L0 blocks, the path rules, the action files, the skill blocks | `go/internal/guidance`, `go/cmd/evolve` | lane |
-| G2 | `evolve guidance check` and its CI step (§7 of the design) | `go/internal/guidance`, `.github/workflows` | console |
+| G1 | `evolve guidance build`: the L0 block and the runtime index first (§9). The path rules, the action files and the skill blocks follow as G1b. | `go/internal/guidance`, `go/cmd/evolve` | console |
+| G2 | `evolve guidance check` and its CI step (§7 of the design), and the verb `evolve guidance index` (§9) | `go/internal/guidance`, `go/cmd/evolve`, `.github/workflows` | console |
 | G3a | The phase marker of D11, exported in the pane shell, with tests that the export is sent for every phase | `go/internal/bridge` (`driver_tmux_boot.go`, the launch config) | console |
 | G3 | The action hook (new Go code that emits `additionalContext` on PreToolUse) and the console `SessionStart` hook. Both exit silently when the marker is set. | `.claude/settings.json`, `evolve guard` | console |
 | G4 | The `Paths` selector of the overlay rules, and `docs-write` only for a scope with a document | `go/internal/policy/overlays.go` | console |
 | G5 | The migration of §5, in batches by theme | `guidance/rules/`, the memory | console |
 | G6 | The trigger evals of the task skills | `skills/*/evals` | lane |
 | G7 | The with-and-without eval of L0, run once before the switch | `skills/` evals | console |
+| G8 | The context index of a cell reads `guidance/index.json` as its knowledge layer (§9.4) | the context-index design, after X5 (#1133) | the context-index builder |
+| G9 | The instruction loader of each CLI in the driver layer, and the injection for a CLI with no file (§9.4) | `go/internal/bridge/manifests`, `go/internal/adapters/bridge` | console |
+| G10 | A byte budget for `AGENTS.md`, under the Codex cap, after the G5 batches (§9.4) | `go/internal/guidance` | console |
 
 G0 and G1 come first, so the migration has a target. G3a comes before G3. G5 runs after the review of this set.
 
@@ -144,3 +148,121 @@ Each conflict of research F2.4 has one answer. The operator accepted all eight a
 - The registry does not decide what a rule says. A wrong rule is still wrong in one place.
 - On a non-claude CLI (`codex`, `agy`), path rules, hooks and `SessionStart` do not load. L1 and L2 arrive only through the persona and the overlays (F2.12).
 - The registry has one owner: the console operator. Without a reviewed PR for each change, the registry drifts like the files it replaces.
+
+## 9. The runtime index (2026-10-26)
+
+The operator asked on 2026-10-26: "Extract the common rules, policies from claude / gemini / codex / ollama / etc... and build a structured system level indexes MD file to be loaded dynamically in the run time."
+
+This section extends the registry of D7 with one more generated output: an index of all active rules. Research §5 (S12 to S18, F5.1 to F5.3) holds the facts.
+
+### 9.1 The extraction inventory
+
+The inventory read each project rule source on `origin/main` at `f6b8a7ab0` and the X10 branch of #1136, on 2026-10-26. The user files in `~/.claude` are personal and stay outside the generator (design §2).
+
+| Source | Size | Reader | Common to each family | Family-specific, and why | Copies and conflicts |
+|---|---|---|---|---|---|
+| `AGENTS.md` (main) | 224 lines, 23,976 B | each CLI | the 13 invariants, the 12 core rules, the banned patterns | "Per-CLI runtime details" (the skill paths, drivers and tiers of each CLI). "Tool Hygiene" names the Claude tools `Read`, `Bash`, `Glob` and `Grep`. | invariants 1 to 6 are also in `GEMINI.md`, and invariants 1 to 5 in the X10 digest |
+| `AGENTS.md` (X10, #1136) | 434 lines, 50,571 B | each CLI | the digest region (4,914 B, it ends at byte 6,033) and the full rules | the same two sections | over the Codex cap of 32 KiB from line 303 (F5.2); "Shared Constraints §5" allows a one-line comment on an export, against invariant 10 (zero comments) |
+| `CLAUDE.md` (main) | 172 lines, 21,513 B | Claude Code, claude-tmux phase agents | the guardrails, the status format, the CI and Go rules | the kernel hooks of `.claude/settings.json`, `/clear` | X10 moves its rules to `AGENTS.md` and renders the digest; the X10 `CLAUDE.md` is 6,551 B in total |
+| `GEMINI.md` (main) | 61 lines, 3,447 B | Gemini CLI, agy (legacy) | 6 invariants copied from `AGENTS.md` | the tool name table: a fact of one family | it names "9 cross-CLI invariants"; `AGENTS.md` has 13 (stale) |
+| `.claude/agents/*.md` | 4 reviewers | Claude Code | the review rules | the frontmatter (tool list, model) | X10 renders each body from `agents/evolve-diff-<name>.md` |
+| `.claude/rules/` | absent | — | — | — | — |
+| `agents/*.md` personas | 106 files; 78 use MUST or NEVER | phase agents of each family | the phase procedure (L1) | the tool syntax of one family in 2 files (`Bash(`, "Agent tool") | — |
+| `skills/*/SKILL.md` | 34 skills | console; phase agents through overlays | the task procedures (L2) | none found | `minimalism` and `architecture-review` have their own `Rules` blocks |
+| policy overlays | 6 compiled rules (`go/internal/policy/overlays.go:58-63`) and `.evolve/policy.json` | phase agents | the selection by tier, phase, kind | the field `CLIs` selects a family (`overlays.go:33`) | — |
+| `docs/operations/runtime-reference.md` | 743 lines, 318,112 B | on demand | the runtime facts (L3) | the CLI rows of the routing tables | many facts also in `CLAUDE.md` "Critical runtime facts" |
+| `docs/operations/operating-policy.md` | 282 lines | on demand | the process rules with evidence (L3) | none | the digest restates the zero-ship halt |
+| memory `feedback_*.md` | 143 files | the console only | see the next table | see the next table | see the next table |
+
+The 143 memory feedback files sort into these outcomes. The list of each file and its outcome is the first step of each G5 batch. Batch 1 is part of the G0 to G2 item. Batch 3 also confirms that the 3 routing files are in `cli_routing` and then retires them. The 9 personal files need no action.
+
+| Outcome | Files | Examples |
+|---|---|---|
+| L0, batch 1 (this change) | 20 | `never_mutate_live_kill_guards`, `no_broad_pkill_shared_host`, `every_llm_query_through_agent_bridge`, `no_mcp_cli_only` |
+| L2 commit and ship, batch 2 | 20 | `gate_exit_code_through_pipe`, `attest_only_reviewers_that_ran`, `git_add_explicit_paths` |
+| L1 and L2 boundary and waves, batch 2 | 20 | `no_pr_merges_mid_wave`, `merge_only_all_green_and_loop_pid`, `pool_live_from_signals_not_status` |
+| L2 `test-write`, batch 3 | 11 | `coverage_never_by_deleting_guards`, `ci_os_error_text_pins` |
+| L2 `review-converge`, batch 3 | 7 | `review_convergence_rule`, `reviewer_agents_no_git_mutation` |
+| L1 and L2 design, docs, config and session, batch 3 | 30 | `phase_settings_from_config_not_code`, `always_run_online_research` |
+| L2 `agent-brief`, host traps, batch 3 | 2 | `zsh_no_word_split_worktree`, `perl_delimiter_alternation_trap` |
+| Family-specific: the driver layer (G9) | 8 | `parallel_bash_cd_shares_one_shell` and `monitor_pipeline_line_buffering` (Claude Code tools), `skill_tool_system_level` (claude flags), `commit_hook_dash_n_false_positive` (a Claude Code hook) |
+| Routing data, not a rule | 3 | `test_lanes_on_sonnet`, `comment_removal_on_haiku`, `advisor_opus_deep_reasoning`: they belong in `cli_routing` |
+| Personal or status: keep in memory | 9 | `hold_at_93pct_weekly_usage`, `claude_dir_14_day_retention` |
+| Retire | 13 | `no_agy_fallback`, `release_script`, `ship_bypass_var`, `self_explaining_code_minimal_comments`, `skip_reviewers_for_docs` |
+
+**F9.1** The inventory found a ninth conflict. `skip_reviewers_for_docs` says that a docs-only commit bypasses the reviewer requirement. `docs_change_gets_docs_review` says that a docs-only commit gets the `docs-review` skill, and the gate capability `docs-review` exists (#1010). The newer rule wins, so the older one retires.
+
+**F9.2** Duplicates collapse into one rule each. Examples:
+
+- `gate_and_commit_chained` and `gate_exit_code_through_pipe` become `commit-gate-unpiped` (design §9);
+- `subagent_dispatch_via_agent_bridge`, `every_llm_query_through_agent_bridge`, invariant 2 and invariant 13 become `pipeline-only-controller`;
+- `no_feature_flags_use_design_patterns` and `no_feature_flag_sprawl` become `no-feature-flags`;
+- `session_handoff_at_40pct` and `refresh_context_at_40pct` stay in memory as one personal note.
+
+### 9.2 Candidate designs
+
+The criteria score 1 (poor) to 5 (good).
+
+| Design | Every family gets the common rules | Context cost | One home | Reachable at any time by any agent | Change size | Total |
+|---|---|---|---|---|---|---|
+| A. A hand-written `RULES.md` that each CLI file imports | 3: Ollama reads no file; Codex truncates at 32 KiB | 2: an import loads in full (S12) | 2: a person keeps it in step with the registry | 3 | 5 | 15 |
+| B. A generated index of the registry. L0 is always on, and the bodies load on demand. A CLI verb filters the index. The driver layer injects L0 for a family with no file. | 5 | 5 | 5 | 5: a file and a verb | 3 | **23** |
+| C. A per-family copy of all rules, rendered into each CLI file | 4 | 1: about 50 KB for each session (X10 rejected the same copy) | 4 | 3 | 3 | 15 |
+| D. A per-CLI native rules directory (`.claude/rules/`, `.agents/rules/`), rendered from the registry, and no index | 3: no file for Codex or Ollama | 4 | 4 | 2: only the native loader decides | 2 | 15 |
+
+B scores 3 for change size: it needs a reader, a generator, a check and a verb, as C needs a generator and a check. The score hides G1b, the native renders that B adds later. B wins. A and C load the full text each session, and Codex drops all text after 32 KiB (F5.2). D uses the best native loader of each CLI, but two families have none, and an agent cannot list the rules. B keeps the good part of D: G1b can still render the native path rules from the same registry.
+
+### 9.3 Decisions
+
+| Id | Decision | Because | Rejected options and why |
+|---|---|---|---|
+| D12 | `evolve guidance build` writes `guidance/index.md` and its machine twin `guidance/index.json` from the registry. The index has one row for each active rule, grouped by layer. | S1, S3, S18 | A hand-written index: it drifts (F2.3). |
+| D13 | Each always-on file carries only L0 and one pointer line to `guidance/index.md`. The L0 block is a generated region inside the digest of `AGENTS.md`, so `evolve skills generate` (X10) copies it into `CLAUDE.md` and `GEMINI.md`. The region replaces the hand-written "Hard rules" of the digest. The other digest facts stay hand-written beside it until the G5 batches move them to L1 and L2. | S12, S15, F5.2 | A second generator for `CLAUDE.md`: X10 already owns that render. |
+| D14 | `evolve guidance index [--audience X] [--phase P] [--cli F] [--json]` prints the filtered index. It is an `always` verb of agent class `A`: it reads only, works while a wave runs, and prints one envelope with `--json` (ADR-0156 I-15). | ADR-0154 I-4, ADR-0156 I-15 | Only a file: a cell cannot filter it by its own audience. |
+| D15 | A rule names no family fact. The optional field `families` selects the model families that need a rule. It matches the `model_family` of a manifest, a wider unit than the CLI name that `OverlayRule.CLIs` matches today. The tool names, file names and flags of a family stay in the driver layer. That layer is the CLI overlay of its file and its bridge manifest. | operator rule, F9 inventory | Family sections in `AGENTS.md`: Codex and Ollama read the facts of another family. |
+| D16 | A family with no instruction file gets L0 and the pointer through the `## Rules` prefix of the bridge (`injectRulesPrefix`). Each manifest names its file or `inject` (G9). | S16, F5.3 | A Modelfile `SYSTEM` for each model: it is a second home, and each new model needs a new file. |
+| D17 | Each entry of `guidance/index.json` has the shared fields `id`, `layer`, `kind`, `summary`, `bytes`, `path` and `audience`. Thus one schema of the context index holds a rule and a data artifact. The context-index design owns the wiring into the cell (G8). Until then, a phase agent reads `guidance/index.md` or runs the verb. | ADR-0154 I-4; the operator, 2026-10-26: data access is indexed and layered too | Wire the rules into the cell here: a second index beside the context index splits one need into two loaders. |
+| D18 | The check fails on a bad registry file, a stale output, a repeated statement or L0 over budget. It also fails on two active rules in conflict and on an absent `enforced_by` path. The build and the verb fail closed on a bad registry file. | design §7 | Skip a bad file: a missing safety rule is silent. |
+| D19 | The first batch migrates the L0 set of §9.5. Batches 2 and 3 follow §5. | §5 | Migrate all 143 at once: one review cannot judge the layer of each rule. |
+
+**Consequences.** Good: each family gets the same 20 invariants, and any agent can list the rest with one verb. Bad: an agent must choose to open a body, so a rule that must hold still needs a forced loader (D3). Risk: the index row of a rule is its statement only. A statement that is too short can hide its scope, so the reviewer of each batch reads each statement against its body.
+
+**What changes our mind.** The G7 eval shows lower success with L0 and the index than with today's files. Then L0 keeps more rules, within the budget of S8.
+
+### 9.4 Components
+
+G1 and G2 of §4 build the index, the L0 region and the verb. The new components:
+
+- **G1b:** the path rules, the action files and the skill blocks of design §4, when the first L2 rule exists.
+- **G8:** the context index of a cell extends `inputs/index.json` of X5 (#1133). It reads `guidance/index.json` as its knowledge layer, filtered by the audience, the phase and the family of the seat. The context-index builder owns this component (design §10.6).
+- **G9:** each bridge manifest names its instruction file (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`) or `inject`. The bridge injects L0 and the pointer for `inject`. The family facts of `AGENTS.md` ("Per-CLI runtime details", "Tool Hygiene") and the 8 family-specific memory rules move to the CLI overlays and the manifests.
+- **G10:** after the G5 batches move the full rules into the registry, `AGENTS.md` gets a byte budget under 32,768 bytes, and the check enforces it.
+
+### 9.5 The first L0 batch
+
+These 20 rules apply to every agent of every family. They are ordered by the cost of a break.
+
+| Id | Source | Enforced by |
+|---|---|---|
+| `kill-guard-never-mutated` | memory `never_mutate_live_kill_guards` | — |
+| `no-broad-pkill` | memory `no_broad_pkill_shared_host` | — |
+| `pipeline-only-controller` | `AGENTS.md` invariants 2 and 13; two memory files (F9.2) | `go/internal/guards/phase.go` |
+| `phase-order` | `AGENTS.md` invariant 1 | `go/internal/core/statemachine.go` |
+| `commit-through-ship` | `AGENTS.md` invariant 3 | `go/internal/guards/ship.go` |
+| `builder-worktree-only` | `AGENTS.md` invariant 4 | `go/internal/guards/role.go` |
+| `ship-needs-egps-verdict` | `AGENTS.md` invariants 5 and 6 | — |
+| `never-fabricate-results` | the X10 digest | — |
+| `dev-on-branches` | memory `dev_on_branches_never_main` | — |
+| `code-zero-comments` | `AGENTS.md` invariant 10 | `go/internal/commitgate/comments_added.go` |
+| `docs-through-docs-write` | `AGENTS.md` invariant 11; three memory files | `go/internal/stelint` |
+| `cli-only-no-mcp` | `AGENTS.md` invariant 12; memory `no_mcp_cli_only` | — |
+| `findings-go-to-docs` | `AGENTS.md` invariant 9; two memory files | — |
+| `no-ambient-control` | ADR-0156 I-16; memory `cli_params_over_env_flags` | — |
+| `no-feature-flags` | two memory files (F9.2) | — |
+| `zero-ship-halt` | the X10 digest; memory `zero_ship_halt_and_gate_red_protocol` | — |
+| `verify-before-done` | the X10 digest; memory `probe_before_unavailable` | — |
+| `read-before-call` | core rule 8; memory `read_before_implement`, `verify_named_proofs_exist` | — |
+| `root-cause-no-workaround` | memory `no_workaround_root_cause_redesign` | — |
+| `one-home-no-duplicates` | memory `never_duplicate_centralize_via_design_patterns` | — |
+
+The commit rules (`commit-gate-unpiped` and the staging rules) are L2 of `commit-ship` (design §6), so they wait for batch 2.

@@ -341,6 +341,7 @@ Verbs outside this table are tools for the operator or for the pipeline itself. 
 | `events channels`, `kinds`, `watch`, `subscribe` | always (`subscribe` is leased) | absent: plan E9 is not started | a service waits on an event, not on a poll ([event-notification-protocol-2026-10](../plans/event-notification-protocol-2026-10.md) E9) |
 | `quality show --scope S` | always | absent | the readings with no publish. Its agent class is `A` (§4.1 D2). |
 | `agent capabilities [--json]` | always | absent (`c/registry.go:43`) | the agent of a cell reads its classes, schemas and request paths (§4.2). Its agent class is `A`. Component X17e. |
+| `guidance index [--audience X] [--phase P] [--cli F] [--json]`, `guidance check` | always | absent | an agent of any family lists the rules of its case from the rule registry ([guidance-layers.md](guidance-layers.md) §10.3). The agent class of both is `A`. `guidance build` writes tracked files, so it stays an operator tool outside the core verbs. |
 
 `events` is the E9 component of the events plan. X17 does not build a second `events` verb. The X17 item depends on the E9 item, and the E9 item takes the envelope and the exit table of this file.
 
