@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "The failure message names the exit status, the signal and the elapsed time, pinned by a test with a fake process state",
+    "A macOS run of -race -count=200 under parallel load is recorded in the internal-phases-ship package note",
+    "Cancel still kills the whole process group; the package note records the cause"
+  ],
+  "created_at": "2026-10-26T13:00:02Z",
+  "deps": [],
+  "files": [
+    "go/internal/phases/ship/repocontract_cmd_unix_test.go",
+    "go/internal/phases/ship/repocontract_cmd_unix.go"
+  ],
+  "fix": "First make the next red diagnosable. On failure, log the ProcessState (exit code, signal), the time from cancel() to exit, and kill -0 of the grandchild. Then fix the cause. If it is macOS group-kill timing, assert with a bounded poll that the group is gone, not with the shell exit status.",
+  "id": "flake-ship-cancel-wait-reports-a-clean-exit",
+  "kind": "bug",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "source": "console, 2026-10-26, flaky-test census (docs/research/flaky-tests-2026-10.md)",
+  "summary": "Rank 3 of the flaky-test census (docs/research/flaky-tests-2026-10.md F4.3): 3 reds on macOS (0.36% of macOS jobs), about 175 runner minutes. Runs 39069306819 a1 (rerun green), 39262811729 (#997), 39392251222 (#1032); neither PR touches internal/phases/ship. Message: repocontract_cmd_unix_test.go:50: Wait = context canceled, want the shell killed by SIGKILL. exec.Cmd.Wait returns the context error only if the process status is success, so the shell exited 0 after cancel. The cause is not proven, so this item starts with a diagnosis and has no RED-first criterion.",
+  "title": "TestCancelKillsTheProcessGroup_CancelReapsTheGrandchildToo flakes on macOS: Wait reports a clean exit after cancel",
+  "weight": 0.56
+}

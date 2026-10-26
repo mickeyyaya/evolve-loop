@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"sync/atomic"
 	"testing"
@@ -54,6 +55,37 @@ func (r *concurrentRunner) Run(_ context.Context, req PhaseRequest) (PhaseRespon
 	return PhaseResponse{Phase: r.name, Verdict: v, ArtifactsDir: req.Workspace}, nil
 }
 
+const rendezvousPatience = 30 * time.Second
+
+type rendezvous struct {
+	want, arrived int32
+	missed        atomic.Bool
+	all           chan struct{}
+}
+
+func newRendezvous(want int32) *rendezvous {
+	return &rendezvous{want: want, all: make(chan struct{})}
+}
+
+type rendezvousRunner struct {
+	name string
+	meet *rendezvous
+}
+
+func (r *rendezvousRunner) Name() string { return r.name }
+func (r *rendezvousRunner) Run(_ context.Context, req PhaseRequest) (PhaseResponse, error) {
+	if atomic.AddInt32(&r.meet.arrived, 1) == r.meet.want {
+		close(r.meet.all)
+	}
+	select {
+	case <-r.meet.all:
+		return PhaseResponse{Phase: r.name, Verdict: VerdictPASS, ArtifactsDir: req.Workspace}, nil
+	case <-time.After(rendezvousPatience):
+		r.meet.missed.Store(true)
+		return PhaseResponse{}, fmt.Errorf("%s waited %s and its batch peers never arrived: the batch ran serially", r.name, rendezvousPatience)
+	}
+}
+
 func newBatchCycleRun(t *testing.T, runners map[Phase]PhaseRunner, conc int) *cycleRun {
 	t.Helper()
 	root := t.TempDir()
@@ -86,18 +118,18 @@ func batchHas(cr *cycleRun, phase string) bool {
 
 func TestDispatchEvaluateBatch_Concurrent(t *testing.T) {
 	t.Parallel()
-	var active, maxActive int32
+	meet := newRendezvous(2)
 	runners := buildRunners(nil)
-	runners[Phase("tester")] = &concurrentRunner{name: "tester", active: &active, maxActive: &maxActive}
-	runners[Phase("evaluator")] = &concurrentRunner{name: "evaluator", active: &active, maxActive: &maxActive}
+	runners[Phase("tester")] = &rendezvousRunner{name: "tester", meet: meet}
+	runners[Phase("evaluator")] = &rendezvousRunner{name: "evaluator", meet: meet}
 	cr := newBatchCycleRun(t, runners, 2)
 
 	act, err := cr.dispatchEvaluateBatch([]Phase{"tester", "evaluator"})
 	if err != nil || act != loopNext {
-		t.Fatalf("clean batch: act=%v err=%v, want loopNext/nil", act, err)
+		t.Fatalf("both members must be in flight together: act=%v err=%v, want loopNext/nil", act, err)
 	}
-	if maxActive < 2 {
-		t.Errorf("phases did not overlap (maxActive=%d, want ≥2) — they ran serially", maxActive)
+	if meet.missed.Load() {
+		t.Fatal("a member gave up waiting for its batch peer: the batch ran serially")
 	}
 	if !batchHas(cr, "tester") || !batchHas(cr, "evaluator") {
 		t.Errorf("both phases must be in PhasesRun; got %v", cr.result.PhasesRun)

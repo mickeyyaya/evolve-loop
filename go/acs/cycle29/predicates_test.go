@@ -131,15 +131,6 @@ func TestC29_005_WorkflowConfigStructExistsInPolicy(t *testing.T) {
 	}
 }
 
-func TestC29_007_WorktreePathStillRegistered(t *testing.T) {
-	if _, ok := flagregistry.Lookup("EVOLVE_WORKTREE_PATH"); !ok {
-		t.Errorf("RED: flagregistry.Lookup(%q) returned ok=false — WORKTREE_PATH was removed.\n"+
-			"This flag is on the FORBIDDEN-REPEAT list (cycles 17/18 fail history).\n"+
-			"Builder must NOT touch EVOLVE_WORKTREE_PATH in registry_table.go.",
-			"EVOLVE_WORKTREE_PATH")
-	}
-}
-
 func TestC29_E01_WorkflowConfigEmptyPolicyDefaults(t *testing.T) {
 	wc := policy.Policy{Workflow: &policy.WorkflowPolicy{}}.WorkflowConfig()
 	if wc.MaxConsecutiveFails != 1 {

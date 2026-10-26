@@ -1,7 +1,7 @@
 # Code index CLI: `evolve code` gives every phase agent a read-only code graph
 
 > Research: [code-index-cli-2026-10](../research/code-index-cli-2026-10.md). Plan: [code-index-cli-2026-10](../plans/code-index-cli-2026-10.md). Decision: [ADR-0138](adr/0138-phase-agents-query-the-code-index-through-an-evolve-cli-not-mcp.md).
-> Status: K1, K2 and K3 are built (2026-10-17), and K4a, K4b and K5 are planned. A name with no code is marked "planned".
+> Status: K1, K2 and K3 are built (2026-10-17). K6 (2026-10-26) moves the refresh from the K2 step into `sync-main`. K4a, K4b and K5 are planned, and a name with no code is marked "planned".
 >
 > This file is the spec of record for the `evolve code` verb. The research holds the evidence, the plan holds the scored designs and the order of work, and the ADR holds the decision.
 
@@ -13,10 +13,10 @@ On 2026-10-17 the operator asked that the loop agents use trail-code, "separated
 |---|---|
 | code index | A graph of the symbols and the calls of this repository. trail-code builds it with tree-sitter (C1, C7). |
 | trail-code | The outside tool that builds and queries the index. Its binary is `dev/.tools/trail/node_modules/.bin/trail` (C6). |
-| index worktree | A git worktree at `dev/code-index` (the default of `code_index.index_dir`). It holds the checkout that the index describes. The operator makes it. The boundary refreshes it (K2, built). |
+| index worktree | A git worktree at `dev/code-index` (the default of `code_index.index_dir`). It holds the checkout that the index describes. The operator makes it. `evolve sync-main` refreshes it at each boundary (K6, built). |
 | `Backend` | The Go interface `codeindex.Backend` (`go/internal/codeindex`) that the `evolve code` commands call. It has one method for each command. |
 | adapter | The one package, `go/internal/adapters/codeindex/trail`, that runs the trail-code binary. It implements `Backend`. |
-| boundary | The step between two waves where the loop merges and refreshes. `evolve wave next` runs it (`go/cmd/evolve/cmd_wave_next.go:102`). |
+| boundary | The step between two waves where the loop merges and refreshes. `evolve wave next` and `evolve boundary run` run it. |
 | phase agent | The LLM CLI process of one phase: scout, builder, debugger and others. Each has a shell tool (C5). |
 | usage log | The file `code-calls.ndjson` (built, K3). A call inside a phase writes the cycle workspace copy. A call outside a phase writes the per-user cache copy. |
 
@@ -57,7 +57,7 @@ An MCP tool lives in the tool list of one CLI. A shell command is the one surfac
 
 ### Solution
 
-`evolve code` has four commands. Each command is read-only (D1). The code is `go/cmd/evolve/cmd_code.go`.
+`evolve code` has four query commands. Each query command is read-only (D1). The code is `go/cmd/evolve/cmd_code.go`. Two more commands are not queries: `evolve code usage` reads the usage log (section 6), and `evolve code refresh` refreshes the index (section 4).
 
 | Command | Question it answers | Backend call (trail-code) |
 |---|---|---|
@@ -68,7 +68,7 @@ An MCP tool lives in the tool list of one CLI. A shell command is the one surfac
 
 The output is plain text. Each hit is one line of three fields that a tab separates: `file:line`, the symbol and a short text. A hit that has no line, such as a directory of `map`, shows the `file` alone. A tab or a newline inside a field becomes a space. The agent opens the file at the line.
 
-`find` joins its words, so `evolve code find catalog refresh` and `evolve code find "catalog refresh"` are the same query. Every command takes `--project-root P` (default: `$EVOLVE_PROJECT_ROOT`, then the nearest directory at or above the working directory that holds `.git`).
+`find` joins its words, so `evolve code find catalog refresh` and `evolve code find "catalog refresh"` are the same query. With `--json`, a query command prints one `evolve.code.<command>/1` envelope on stdout ([cli-contract.md](cli-contract.md) §2). Its `data` holds `hits`, a list of objects with `file`, `line`, `symbol` and `text`, and the freshness fields of section 4. Every command takes `--project-root P` (default: `$EVOLVE_PROJECT_ROOT`, then the nearest directory at or above the working directory that holds `.git`).
 
 | Exit code | Meaning | Output |
 |---|---|---|
@@ -78,6 +78,7 @@ The output is plain text. Each hit is one line of three fields that a tab separa
 | 3 | No backend in the list serves the command. | one line on stderr: `no backend serves <command>` |
 | 4 | Any other failure: a refused policy, a root that is no hub, an unknown backend name or a failed backend. | one line on stderr |
 | 10 | A usage error: a missing or extra argument, a wrong flag or a wrong direction. | the reason and the usage line on stderr |
+| 21 | The index is stale, and `code_index.stale` is `refuse` (section 4). | one line on stderr that gives the count of commits and names `evolve code refresh` |
 
 The `map [dir]` command lists the directory clusters of the index. With a `dir`, it keeps the clusters at or below that directory. The other commands read the index, whatever the `dir`.
 
@@ -90,8 +91,9 @@ The wiring reads the block `code_index` of `.evolve/policy.json`. The decode is 
 | `backends` | `["trail"]` | the ordered list of backend names. It is a capability route: the first backend that serves a query answers it. There is no failover when that backend is absent. |
 | `index_dir` | `dev/code-index` | the index worktree |
 | `trail_bin` | `dev/.tools/trail/node_modules/.bin/trail` | the trail-code binary |
+| `stale` | `warn` | what a query does when the index is not at `origin/main`: `warn` prints a warning and answers, `refuse` exits 21 (section 4). Another word is a policy error. |
 
-The exit code 2 is the case of a host with no Node, no binary or no index worktree. The command stops with a clear message and does not guess (plan section 9). No command writes to the repository, to the index or to the cycle worktree.
+The exit code 2 is the case of a host with no Node, no binary or no index worktree. The command stops with a clear message and does not guess (plan section 9). No query command writes to the repository, to the index or to the cycle worktree. Only `evolve code refresh` and `evolve sync-main` write the index worktree.
 
 ## 2. The Backend interface
 
@@ -180,28 +182,87 @@ A cycle writes to its own worktree. If the index follows the cycle worktree, eac
 
 ### Solution
 
-The index worktree is separate from every cycle worktree. The boundary refreshes it (D5). A phase never does.
+The index worktree is separate from every cycle worktree. The pipeline refreshes it (D5). A phase never does.
 
-1. The boundary runs `git checkout --detach origin/main` in the index worktree.
-2. The boundary runs an incremental `trail build`. It reads only the changed files and takes about 2 s (C1).
-3. A phase reads the index. A query takes about 0.1 s (C1).
+1. `evolve sync-main` runs `git checkout --detach origin/main` in the index worktree, after it merges `main`.
+2. Then it runs an incremental `trail build`. The build reads only the changed files and takes about 2 s (C1).
+3. A phase reads the index. A query takes about 0.1 s (C1). Each query also compares the index with `origin/main` and warns when the index is stale.
 
-The refresh is a step of `evolve wave next` (built, K2), beside the other boundary steps. `wave next --dry-run` lists it as "refresh the code index".
+#### Findings of 2026-10-26 (K6)
 
-K2 is built as follows:
+**F4.1** On 2026-10-26 the index was 5 days and 114 commits behind `main`. The console refreshed it by hand at each boundary (`git -C dev/code-index fetch` and `checkout --detach origin/main`), and the step was missed (operator report, 2026-10-26).
+*Implication:* a refresh that depends on a person is missed. The pipeline must own it.
 
-1. The step is the verb `code-refresh`. It runs after the merges, the build and the `doctor live` checks, and before `loop-stop --release`. A lane therefore starts on a fresh index.
-2. The step reads `code_index.index_dir` and resolves it against the hub root, as `evolve code` does.
-3. The step cleans `index_dir` and resolves its symbolic links. It then refuses `index_dir` in four cases. The first case is the project root. The second is a path inside the project root. The third is a path under `<project root>/.evolve/worktrees`. The fourth is the runtime plane root of the hub, or a path inside it.
-4. A refusal is a WARN, and no `git` or trail command runs.
-5. The step runs `git rev-parse --show-toplevel` with `index_dir` as the working directory. The output must equal the cleaned `index_dir`. If not, `index_dir` is a plain directory inside another repository. The step then prints a WARN. It runs no `git fetch` and no `git checkout`.
-6. The step runs `git fetch --quiet origin` and then `git checkout --quiet --detach origin/main`. Both commands run with the index worktree as the working directory. No command names the project root, so the step does not write the main tree.
-7. If local changes in the index worktree conflict, the checkout fails. The step then prints a WARN. It does not run `reset` and does not run trail. The operator cleans the index worktree.
-8. The whole step has a deadline of 5 minutes. When the deadline ends, `sysexec` sends SIGTERM to the child process. After `WaitDelay` (5 s), it kills the child process. The step then prints a WARN and exits 0.
-9. The step calls `Backends.Refresh`. It runs `Refresh` on each backend that implements the small interface `codeindex.Refresher`. A backend that cannot refresh stays valid and is skipped. The trail adapter runs `trail build -- <index_dir>`. This is the incremental rebuild.
-10. A failure prints `evolve wave: WARN: code index not refreshed: <reason>` to stderr. The step exits 0 and the boundary goes on.
-11. A WARN has one of these causes: a policy error, a path outside a hub, or a refused `index_dir`.
-12. A WARN can also come from a failed `git` command, a deadline, or a failed rebuild.
+**F4.2** The K2 step `code-refresh` ran only in `evolve wave next`, and it turned each failure into a WARN with exit 0 (`go/cmd/evolve/cmd_wave_codeindex.go:30-34` on `f6b8a7ab0`). `evolve boundary run` had no refresh step (`go/cmd/evolve/cmd_boundary.go:152-160` on `f6b8a7ab0`).
+*Implication:* a boundary through `boundary run` never refreshed, and a failed refresh in `wave next` left only one stderr line.
+
+**F4.3** No `evolve code` command read the commit of the index (`go/cmd/evolve/cmd_code.go:56-75` on `f6b8a7ab0`).
+*Implication:* an agent got answers from old code with no sign that they were old.
+
+**F4.4** In the 7 days to 2026-10-26, `evolve code usage` counted 2 calls, both from the console, and no call from a phase agent.
+*Implication:* the phase agents do not see the index as a tool. An inbox item for the context-index builder covers this gap (K6, last row).
+
+**F4.5** The index worktree is a worktree of the hub store: `git -C dev/code-index rev-parse --git-common-dir` printed `/Users/danleemh/ai/claude/evolve-loop/.repo.git` on 2026-10-26, the same store as the runtime plane.
+*Implication:* the `origin/main` ref in the index worktree is the ref that `sync-main` fetches. A compare of `HEAD` with `origin/main` needs no network.
+
+**F4.6** On 2026-10-26, `git -C dev/code-index status --porcelain` printed ` M .gitignore` and `?? .ignore`. The `.gitignore` edit adds `/graft/`, and `.ignore` puts `graft/` back into the search.
+*Implication:* these two edits are the index tool's own and are expected. Any other change belongs to a person or to a defect.
+
+| Id | Decision | Because | Rejected options and why |
+|---|---|---|---|
+| D5.1 | `sync-main` refreshes the index after it merges `main`. `boundary run` and `wave next` run `sync-main`, so each boundary refreshes the index. The `wave next` step `code-refresh` is removed. | F4.1, F4.2 | A manual console step: F4.1 shows that it is missed. Keep the `wave next` step too: each wave boundary then refreshes twice. A refresh in each query: a query then writes, which breaks G4, and a full build takes 31 s (C1). |
+| D5.2 | After the merge, a failed refresh makes `sync-main` exit non-zero with one code for each cause. An absent index is not a failure. This decision amends decision 10 of ADR-0138. | F4.2 | A WARN with exit 0: F4.2 shows that a WARN hides a stale index for days. A failure for an absent index: a host without an index, such as CI or a new clone, then cannot sync. |
+| D5.3 | Only `.gitignore` and `.ignore` can have changes in the index worktree. Any other change stops the refresh before the fetch, and nothing is reset. | F4.6 | `git reset --hard` or `git clean`: they destroy work that the pipeline did not write. A refusal of every change: F4.6 then stops each refresh. |
+| D5.4 | Each query compares the index `HEAD` with the local `origin/main` ref and warns on stderr when they differ. The policy key `code_index.stale` set to `refuse` makes a stale query exit 21. The default is `warn`. | F4.3, F4.5 | A fetch for each query: it is slow and fails with no network. Refusal by default: an answer about old code is still correct, and the agent can use `grep`. |
+| D5.5 | `evolve code refresh [--json]` refreshes on demand. Its agent class is `R` ([cli-contract.md](cli-contract.md) §4.1): inside a phase it refuses with exit 3. The request kind `code-refresh` of cli-contract §4.3 is proposed, not built. | F4.4, G4 | Class `A`: a phase agent then writes the shared index, which breaks G4. Class `D`: an agent then has no way to ask for a fresh index. |
+
+What changes our mind: a dirty index can stop more than one boundary in a month. Then the refresh can carry the edits of the index tool across the checkout.
+
+#### The refresh
+
+The refresh is `codeIndexHost.refresh` in `go/cmd/evolve/cmd_code_refresh.go`. `sync-main` and `evolve code refresh` call it. Each `git` command runs with the index worktree as its working directory and names no other tree. Thus the refresh never writes the main tree, a cycle worktree or a lane worktree.
+
+1. Read `code_index.index_dir` and resolve it against the hub root, as `evolve code` does. A relative path in a root that is not a hub worktree means "no index".
+2. Clean `index_dir` and resolve its symbolic links. Then refuse it in these cases:
+   - the project root, or a path inside it;
+   - a path under `<project root>/.evolve/worktrees`;
+   - the runtime plane root, or a path inside it.
+3. Check that `index_dir` exists. If it does not exist, the index is absent.
+4. Run `git rev-parse --show-toplevel`. The output must equal `index_dir`. If not, `index_dir` is a plain directory inside another repository.
+5. Run `git status --porcelain --untracked-files=normal`. A path other than `.gitignore` and `.ignore` stops the refresh. The message names each path and says that nothing was reset.
+6. Run `git fetch --quiet origin main`.
+7. Run `git rev-parse HEAD origin/main`. If the two commits differ, run `git rev-list --count HEAD..origin/main`.
+8. Run `git checkout --quiet --detach origin/main`. If a change of `main` conflicts with the edits of the index tool, the checkout fails. The message tells the operator to clean the index worktree.
+9. Call `Backends.Refresh`. It runs `Refresh` on each backend that implements `codeindex.Refresher`, and skips the others. The trail adapter runs `trail build -- <index_dir>`. The refresh never runs `trail init`.
+10. The whole refresh has a deadline of 5 minutes. At the deadline, `sysexec` sends SIGTERM to the child process and kills it after `WaitDelay` (5 s). The refresh then fails.
+
+`sync-main` refreshes only when it synced the branch `main`. The sync of another branch does not move `origin/main`. When the refresh fails, the merge is already done, and the message says so. Fix the cause, run `evolve code refresh`, then run the boundary again without `--merge`.
+
+| Result | `evolve code refresh` exit | `evolve sync-main` exit | Output |
+|---|---|---|---|
+| The index moved, or it was at `origin/main` | 0 | 0 | one line on stdout with the index path, the new commit and the count of commits after the old commit |
+| The index is absent, or the root is not a hub worktree | 2 | 0 | one line on stderr (`refresh`) or on stdout (`sync-main`) that says what is absent |
+| Inside a phase | 3 | not applicable: `sync-main` is class `D` | one line on stderr |
+| A refused `index_dir`, a policy error, a failed `git` command or rebuild, or the deadline | 4 | 1 | one line on stderr |
+| A change in the index worktree that is not the index tool's own | 22 | 22 | one line on stderr that names each path |
+| `git fetch origin main` failed | 23 | 23 | one line on stderr with the first line of the `git` error |
+| A usage error | 10 | 1 | the reason and the usage line on stderr |
+
+With `--json`, `evolve code refresh` prints one `evolve.code.refresh/1` envelope on stdout ([cli-contract.md](cli-contract.md) §2). Its `data` holds `index_dir`, `from`, `to`, `behind` and `rebuilt`, the list of the backends that rebuilt.
+
+#### The freshness of a query
+
+Each query command runs two local reads in the index worktree before it asks the backend: `git rev-parse HEAD origin/main`, and `git rev-list --count HEAD..origin/main` when the commits differ. The code is `checkCodeFreshness` in `go/cmd/evolve/cmd_code_freshness.go`.
+
+| State | stderr | Exit | `--json` fields |
+|---|---|---|---|
+| `HEAD` equals `origin/main` | nothing | the exit of the query | `stale: false`, `behind: 0`, `index_head`, `main_head` |
+| `HEAD` differs, `code_index.stale` is `warn` | `evolve code: WARN: the code index is N commit(s) behind origin/main (index <sha>, origin/main <sha>); an answer can miss newer code; evolve code refresh moves the index` | the exit of the query | `stale: true`, `behind: N`, and the warning in `warnings` |
+| `HEAD` differs, `code_index.stale` is `refuse` | one refusal line | 21, and no query runs | `error.kind: "stale"` |
+| The index is absent | nothing; the backend reports the absence | 2 | none |
+| A read failed | `evolve code: WARN: the freshness of the code index is unknown: <reason>` | the exit of the query | no `stale` and no `behind` |
+
+The count is 0 only when the index is ahead of `origin/main`, so that `origin/main` is an ancestor of the index `HEAD`. The index is then stale, but no commit of `main` is missing. The WARN then says `the code index is not at origin/main but misses none of its commits`.
 
 Why the index at `main` is right for a cycle: a cycle starts from `main`, so the index matches the base of the cycle. The index does not show the edits that the builder made in this cycle. The prompt tells the agent this (section 7). The agent reads a file before it changes it, and the file on disk is always current.
 
@@ -299,7 +360,7 @@ K4a tests each instruction line for 20 words or fewer. K4b runs the prompt-regre
 
 ## Separation from the loop
 
-The feature touches the loop in two places: the persona paragraph (K4a) and the refresh step of `wave next` (K2). It adds no flag and changes no phase order. If the index is absent, `evolve code` exits 2 and the agent uses grep. If the refresh fails, `wave next` prints a warning and goes on. One revert of K4a and K2 removes the feature. The prompt-regression eval and the G3 measure show that the loop does not lose quality.
+The feature touches the loop in two places: the persona paragraph (K4a) and the refresh in `sync-main` (K6). It adds no feature flag and changes no phase order. If the index is absent, `evolve code` exits 2 and the agent uses grep, and `sync-main` goes on. If the refresh fails, `sync-main` exits with the code of the cause, after the merge (section 4). One revert of K4a and K6 removes the feature. The prompt-regression eval and the G3 measure show that the loop does not lose quality.
 
 ## 8. The flow and a worked example
 
@@ -310,10 +371,10 @@ flowchart LR
     C -->|DO_NOT_TRACK=1, refresh off| D[trail binary]
     D --> E[(index at dev/code-index)]
     B -.->|one record per call| F[code-calls.ndjson: cycle workspace or user cache/]
-    G[boundary: wave next] -->|checkout --detach origin/main, trail build| E
+    G[boundary: sync-main or code refresh] -->|checkout --detach origin/main, trail build| E
 ```
 
-The solid arrows are the query path. The agent calls the command. The command calls the `Backend`. The adapter runs the binary against the index. The dotted arrow is the log. The boundary is the only writer of the index.
+The solid arrows are the query path. The agent calls the command. The command calls the `Backend`. The adapter runs the binary against the index. The dotted arrow is the log. The refresh is the only writer of the index.
 
 **Worked example.** A scout reads `runStagedCatalogRefresh` in the source and asks who calls it.
 
@@ -355,7 +416,7 @@ Three parts: a type-checked backend, a benchmark against the type checker, and a
 **The `gotypes` backend.** It lives in `go/internal/adapters/codeindex/gotypes`, because its build runs `go list`. It uses the standard library only (`go/parser`, `go/types`). At the boundary, it type-checks the module with its test variants and keeps the 85,694 static call edges to module functions (F2.20).
 
 - **The index file.** One gob file, `dev/code-index-gotypes/index.gob`, beside the index worktree and outside every git tree, so no ignore rule is needed. `gotypes.IndexPath` gives this path from `code_index.index_dir`. The file holds the definitions, the module call edges, the declarations and the interface links. A definition answers to its bare name, to `Type.Method` and to its package-qualified name. On this repository it is 5.4 MB (G1, 2026-10-17), and the prototype file of F2.20 was 19 MB.
-- **The refresh order.** The K2 refresh runs `git checkout --detach origin/main` and the incremental `trail build` in the index worktree. Then the `gotypes` step type-checks the same checkout and writes the index, in about 5 s (F2.13). A failed step keeps the last good index and prints a warning.
+- **The refresh order.** The refresh of section 4 runs `git checkout --detach origin/main` and the incremental `trail build` in the index worktree. Then the `gotypes` step type-checks the same checkout and writes the index, in about 5 s (F2.13). A failed step keeps the last good index and prints a warning.
 - **The cost of a query.** The query loads the index and prints the three-field lines of section 1. The prototype took 0.044–0.047 s at p50, and `evolve` starts in 0.019 s (F2.20). The G1 backend, measured as one run of `evolve code callers`, took 0.031–0.037 s at p50 for 5 symbols on 2026-10-17. Its `Build` took 3.7–8.2 s, with a peak memory of 434–461 MB.
 
 **Names.** A package-qualified name, such as `router.Digest` or `loopwave.Launcher.Run`, gives an exact answer (decision 4). The prototype scored 1.00 and 1.00 with qualified names, and 0.44 and 1.00 with bare names. A bare name merges the homonyms of every package. So for a bare name with several definitions, each hit's `Text` starts with the qualified name of its definition. The agent can then drop the hits of the other definitions.
@@ -425,10 +486,13 @@ A caller is the pair of its file and its enclosing function, so two call sites i
 | D3: one package runs the trail-code binary | `TestOnlyTheTrailAdapterRunsTheTrailBinary` in `go/test/structure/binary_test.go` fails if another package both runs a process and names the trail binary path. `TestTheCodeIndexAbstractionRunsNoProcessAndNamesNoBackend` keeps `internal/codeindex` free of both. The convention has one row | built (K1) |
 | D4: the output has no instruction line | `TestTrailBackend_NoOutputLineThatInstructsTheAgentReachesAnyHit` and `TestCodeVerb_ThePhaseAgentDoesNotSeeAnInstructionLineOfTheBackendOutput` feed a "tokens saved" header and expect the answer without it | built (K1) |
 | D5: the command is read-only, so a cycle worktree stays clean | `TestCodeVerb_EveryVerbLeavesTheCheckedOutTreeClean` runs the four verbs in a temporary git repository and expects an empty `git status` | built (K1) |
-| D5: the refresh writes only the index worktree and never halts the boundary | `TestWaveCodeRefresh_NeverNamesTheProjectRootTreeInAnyCommand` records every command and its working directory and expects no path under the project root. `TestWaveCodeRefresh_AFailureIsAWarningAndTheStepStillSucceeds` and `TestWaveCodeRefresh_AFailedRefreshDoesNotStopTheBoundarySteps` expect a WARN and a next step that runs. `TestWaveNext_DryRunListsTheRefreshStepBeforeTheLaunch` expects the step in the dry run. `TestTrailBackend_RefreshRunsTheIncrementalBuildWithTheIndexDirAfterTheSeparator` pins the argv | built (K2) |
-| D5a: the refresh refuses an unsafe `index_dir` | `TestWaveCodeRefresh_AnIndexDirInsideTheProjectIsAWarningAndRunsNothing`, `TestWaveCodeRefresh_AnIndexDirThroughASymlinkIntoTheRootIsRefused` and `TestWaveCodeRefresh_AnIndexDirInTheRuntimePlaneIsAWarningAndRunsNothing` expect a WARN and zero runner calls | built (K2) |
-| D5b: the refresh touches only a real, own worktree | `TestWaveCodeRefresh_AnIndexDirThatIsNotItsOwnWorktreeIsAWarningWithNoFetchOrCheckout` expects only the `rev-parse` call. `TestWaveCodeRefresh_ADirtyIndexWorktreeWarnsAndNeverReachesTheRebuild` expects no trail call after a failed checkout | built (K2) |
-| D5c: a hung command ends at the deadline | `TestWaveCodeRefresh_AHungGitCallEndsAtTheDeadlineWithAWarning` expects a return before the test limit and a deadline WARN | built (K2) |
+| D5: the refresh writes only the index worktree | `TestCodeRefresh_NeverNamesTheProjectRootTreeInAnyCommand` records every command and its working directory and expects no path under the project root. `TestCodeRefresh_MovesTheIndexWorktreeToOriginMainDetachedThenRebuilds` pins the order of the commands. `TestTrailBackend_RefreshRunsTheIncrementalBuildWithTheIndexDirAfterTheSeparator` pins the argv of the rebuild | built (K6) |
+| D5: the refresh refuses an unsafe `index_dir` | `TestCodeRefresh_AnIndexDirInsideTheProjectIsRefusedAndRunsNothing`, `TestCodeRefresh_AnIndexDirThroughASymlinkIntoTheRootIsRefused` and `TestCodeRefresh_AnIndexDirInTheRuntimePlaneIsRefused` expect exit 4 and zero runner calls. `TestCodeRefresh_AnIndexDirThatIsNotItsOwnWorktreeExitsFourWithNoFetch` expects only the `rev-parse` call | built (K6) |
+| D5.1: `sync-main` refreshes the index, and `wave next` has no second step | `TestSyncMain_MovesTheCodeIndexWorktreeToTheNewOriginMain` runs `sync-main` on real repositories and expects a detached index at the new `origin/main`. `TestSyncMain_OnABranchOtherThanMainLeavesTheIndexAlone` expects no move. `TestWaveNext_HasNoSeparateRefreshStepBecauseSyncMainOwnsIt` expects no `code-refresh` step | built (K6) |
+| D5.2: each failure has its own exit code | `TestCodeRefresh_AFetchFailureExitsTwentyThreeBeforeTheCheckout`, `TestCodeRefresh_AnotherFailureExitsFourAndStopsAtTheFailedStep`, `TestCodeRefresh_AnAbsentIndexExitsTwoAndRunsNothing`, `TestCodeRefresh_AHungGitCallEndsAtTheDeadline` and `TestSyncMainCodeIndex_EachOutcomeHasItsMessageAndExitCode` | built (K6) |
+| D5.3: a foreign change stops the refresh and nothing is reset | `TestCodeRefresh_AForeignChangeInTheIndexExitsTwentyTwoAndResetsNothing` expects no fetch and no checkout. `TestSyncMain_AForeignEditInTheIndexFailsLoudlyAfterTheMergeAndKeepsTheEdit` expects the edit on disk. `TestCodeRefresh_TheIndexToolsOwnEditsDoNotBlockTheMove` expects the full refresh | built (K6) |
+| D5.4: a stale query warns, or refuses under the policy | `TestCodeVerb_AStaleIndexWarnsOnStderrWithTheCountAndStillAnswers`, `TestCodeVerb_AStaleIndexUnderTheRefusePolicyExitsTwentyOneBeforeTheQuery`, `TestCodeVerb_JSONCarriesTheHitsAndTheFreshness` and `TestCodeIndexHostFreshness_ComparesTheIndexHeadWithTheLocalOriginMainRef` | built (K6) |
+| D5.5: `code refresh` refuses inside a phase | `TestCodeRefresh_InsideAPhaseItRefusesWithExitThreeAndRunsNothing` | built (K6) |
 | D6: one record for each call | `TestCodeVerbLogged_ACallWritesOneRecordWithItsCommandAndPhase` runs one command and reads one new record with the command and the phase. `TestAppend_ConcurrentCallsGiveWholeLines` pins whole lines. `TestCodeUsage_AggregatesCallsByPhaseAndCommand` pins the summary | built (K3) |
 | G5: any backend passes the same tests | `codeindextest.Run` runs on the fake and on the trail adapter (`TestTrailBackend_PassesTheConformanceSuite`); the command tests run on the fake. A backend that implements `Refresher` also gets two checks. A refresh of a present index succeeds. A refresh of an absent index is `ErrAbsent`. The strip and the real process run through the trail adapter | built (K1) |
 
@@ -442,4 +506,6 @@ A caller is the pair of its file and its enclosing function, so two call sites i
 - The gain in tokens is not proven. Independent tests find that a graph helps most on structural questions, not on tokens (P3.3). G3 measures it for this repository.
 - A path from the cycle worktree maps to the index worktree at main, so a file that the cycle edited shows its old API.
 - A relative `code_index` path needs a worktree of the hub store. A checkout outside the hub gets exit 4, and an absolute path in the policy avoids the need. K1 did not test a phase worktree of the runtime plane. It stays open.
+- The refresh takes no lock. Two refreshes at the same time in the index worktree can collide. `git` then refuses the second checkout, but two `trail build` runs are not kept apart. A query during a refresh can read a part-built index. Only the boundary and the operator start a refresh.
+- The trail adapter finds a missing binary only at the rebuild, after the checkout. The refresh then fails loudly, but the checkout stays at the new commit with the old build. A query then reports the index as fresh. Install the binary, then run `evolve code refresh`.
 - The spec does not remove the MCP registrations. K5 does that after one wave with the CLI live (D8).
