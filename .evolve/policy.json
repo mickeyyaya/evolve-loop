@@ -167,5 +167,10 @@
   },
   "regression_tia": {
     "stage": "shadow"
+  },
+  "isolation": {
+    "i2": {
+      "stage": "enforce"
+    }
   }
 }
