@@ -33,6 +33,7 @@ type Item struct {
 	ConnectsTo      []string                   `json:"connects_to"`
 	Deps            []string                   `json:"deps"`
 	Route           string                     `json:"route"`
+	RoutedReason    json.RawMessage            `json:"routed_reason,omitempty"`
 	InjectedBy      string                     `json:"injected_by"`
 	Continuation    *continuation.Continuation `json:"continuation,omitempty"`
 	Acceptance      []string                   `json:"acceptance,omitempty"`

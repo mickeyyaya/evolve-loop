@@ -77,6 +77,10 @@ func runInboxConsume(args []string, stdout, stderr io.Writer) int {
 	if !ok {
 		return 10
 	}
+	return consumeInboxItem(filepath.Join(envOrCwd("EVOLVE_PROJECT_ROOT"), ".evolve"), itemPath, stamp, stdout, stderr)
+}
+
+func consumeInboxItem(evolveDir, itemPath string, stamp inboxConsumedStamp, stdout, stderr io.Writer) int {
 	if _, err := os.Stat(itemPath); err != nil {
 		fmt.Fprintf(stderr, "inbox consume: %v\n", err)
 		return 1
@@ -86,7 +90,6 @@ func runInboxConsume(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "inbox consume: %s: %v (item left in place)\n", itemPath, err)
 		return 1
 	}
-	evolveDir := filepath.Join(envOrCwd("EVOLVE_PROJECT_ROOT"), ".evolve")
 	consumedDir := filepath.Join(evolveDir, "inbox", "consumed")
 	if err := os.MkdirAll(consumedDir, 0o755); err != nil {
 		fmt.Fprintf(stderr, "inbox consume: %s: %v\n", itemPath, err)

@@ -1,6 +1,10 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestCmd_InboxCurate_AFailedCommitOfTheAppliedProposalsExitsIO":                                    "sets PATH through gittest.FaultOn",
+	"main.TestCmd_InboxCurate_AFailedStageOfTheAppliedProposalsExitsIO":                                     "sets PATH through gittest.FaultOn",
+	"main.TestCmd_InboxCurate_AGitFaultOnTheRangeKeepsTheCursor":                                            "sets PATH through gittest.FaultOn",
+	"main.TestCmd_InboxCurate_FollowEndsWhenItsContextEnds":                                                 "swaps seam curateFollowContext",
 	"main.TestPrintFiledRank_WarnsWhenTheRankIsNotKnown":                                                    "swaps seam filedRankSource",
 	"main.TestRunGuidance_ARepoRootFailureExitsTwo":                                                         "swaps seam guidanceRepoRoot",
 	"main.TestGuidanceFamilies_NamesEachModelFamilyOnceAndFailsOnABadManifest":                              "swaps seams guidanceManifestNames and guidanceLoadManifest",
