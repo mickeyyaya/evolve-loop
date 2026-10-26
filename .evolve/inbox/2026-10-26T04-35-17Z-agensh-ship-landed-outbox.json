@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "RED first: TestLanding_AStopBetweenTheIntentAndTheEmitStillEmitsShipLandedOnce fails before the change.",
+    "After the recovery the channel holds exactly one ship.landed with the original event id.",
+    "A recovery of a landing whose event is marked sent emits nothing.",
+    "Changed functions at 100% coverage on every CI OS; event-channels.md \u00a714 and the package note are updated."
+  ],
+  "created_at": "2026-10-26T04:35:17Z",
+  "deps": [],
+  "files": [
+    "go/internal/phases/ship/",
+    "go/internal/events/",
+    "docs/architecture/event-channels.md"
+  ],
+  "fix": "Record in the complete intent that ship.landed is due, with its event id. Mark it sent after the emit. On recovery, emit each due event with no sent mark, with the original event id, so that a consumer drops a duplicate by its idempotency key.",
+  "id": "agensh-ship-landed-outbox",
+  "kind": "hardening",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "source": "console, 2026-10-26. Research: docs/research/agensh-2026-10.md \u00a76 R2 (option A2).",
+  "summary": "docs/architecture/event-channels.md \u00a714 says ship.landed is at most once: a stop between the write of the complete intent and the emit loses the event. The Agensh router puts unfinished events back into its queue after a restart. Research \u00a72.4 P2.7, \u00a73 F3.7.",
+  "title": "ship.landed is at least once: the complete intent records the due event, and recovery emits it when it is unsent.",
+  "weight": 0.4
+}
