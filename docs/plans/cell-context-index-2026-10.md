@@ -159,6 +159,6 @@ The reason for the order: each later component reads a fact that an earlier one 
 ## 10. Open questions
 
 - Q1. The brief named class `R` for the read verbs. This plan uses `A` (D7). The operator confirms or changes it.
-- Q2. The field name `rule_layer` of D11 needs the agreement of the builder of PR #1137.
+- Q2 (closed on 2026-10-26). The field name `rule_layer` of D11 is agreed: [guidance-layers.md](../architecture/guidance-layers.md) §10.6 uses it (PR #1137).
 - Q3. A Linux cell gives no access record. A Linux source, for example an `fanotify` reader, needs root. This plan has none.
 - Q4. The open rate as a quality index of the ADR-0153 panel needs an amendment of ADR-0153. CX6 reads the log directly until then.

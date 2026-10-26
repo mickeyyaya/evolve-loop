@@ -1,7 +1,7 @@
 # Cell context index: each phase cell gets a small assignment and a layered index that it opens on demand
 
 > [ADR-0154](adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md) I-4, I-5 and I-17 · [ADR-0155](adr/0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md) I-12 · [ADR-0156](adr/0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md) I-15, I-16 · plan: [cell-context-index-2026-10](../plans/cell-context-index-2026-10.md) · research: [cell-context-index-2026-10](../research/cell-context-index-2026-10.md).
-> This file is the spec of record for the cell index: its layers, entry fields, budgets, read verbs and access log. [llm-isolation.md](llm-isolation.md) §8 owns the index file, the lineage rule and the read grants that X5 built. [guidance-layers.md](guidance-layers.md) §10 owns the rule registry index (on the branch of PR #1137, not yet merged). [cli-contract.md](cli-contract.md) §4.1 owns the agent classes.
+> This file is the spec of record for the cell index: its layers, entry fields, budgets, read verbs and access log. [llm-isolation.md](llm-isolation.md) §8 owns the index file, the lineage rule and the read grants that X5 built. [guidance-layers.md](guidance-layers.md) §10 owns the rule registry index, and its §10.6 names this file and the `rule_layer` mapping of §3 of this file. [cli-contract.md](cli-contract.md) §4.1 owns the agent classes.
 >
 > **Terms used throughout:**
 >
@@ -125,7 +125,7 @@ flowchart TD
     L3 --> B3["rule body, doc,<br/>or a verb such as evolve code find"]
 ```
 
-The rules are the knowledge layer of the same index (guidance-layers.md §10.6 on PR #1137). The builder reads `guidance/index.json` and keeps the rows for the audience `phase`, the phase name and the family of the seat. Each kept row becomes an L3 entry with the shared fields `id`, `layer`, `kind`, `summary`, `bytes`, `path` and `audience`. In `guidance/index.json`, `layer` is the rule layer. The cell index moves it to `rule_layer` and sets `layer` to `L3`.
+The rules are the knowledge layer of the same index ([guidance-layers.md](guidance-layers.md) §10.6). The builder reads `guidance/index.json` and keeps the rows for the audience `phase`, the phase name and the family of the seat. Each kept row becomes an L3 entry with the shared fields `id`, `layer`, `kind`, `summary`, `bytes`, `path` and `audience`. In `guidance/index.json`, `layer` is the rule layer. The cell index moves it to `rule_layer` and sets `layer` to `L3`.
 
 The `context` class lists the inbox item file of each item id. The `message` class lists the ADR-0129 mailbox frames that the broker holds for this dispatch. Both are new sources of component CX4.
 
