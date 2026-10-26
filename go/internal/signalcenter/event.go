@@ -138,6 +138,7 @@ const (
 	KindQualityBreach          Kind = "quality.breach"
 	KindQualityWarning         Kind = "quality.warning"
 	KindIsolationViolation     Kind = "isolation.violation"
+	KindIsolationContext       Kind = "isolation.context"
 )
 
 var knownKinds = map[Kind]bool{
@@ -146,7 +147,7 @@ var knownKinds = map[Kind]bool{
 	KindQuotaPaused: true, KindBridgeWarning: true, KindBridgeTripwire: true, KindPaneLiveness: true,
 	KindLedgerAppended: true, KindOutcomeWarning: true, KindFailureDiagWarning: true, KindCarryoverWarning: true, KindFailureLearningWarning: true, KindConfigWarning: true, KindAdvisorWarning: true, KindRunnerWarning: true, KindInboxWarning: true, KindAuditWarning: true, KindObserverWarning: true, KindCycleSealed: true, KindLoopWave: true, KindLoopHalt: true, KindLoopWarning: true,
 	KindLoopEscalation: true, KindLoopStarted: true, KindLoopExit: true, KindLoopLost: true, KindListenerPanicked: true, KindRegistryDrift: true, KindSinkDropped: true,
-	KindQualityReading: true, KindQualityBreach: true, KindQualityWarning: true, KindIsolationViolation: true,
+	KindQualityReading: true, KindQualityBreach: true, KindQualityWarning: true, KindIsolationViolation: true, KindIsolationContext: true,
 }
 
 var terminalKinds = map[Kind]bool{

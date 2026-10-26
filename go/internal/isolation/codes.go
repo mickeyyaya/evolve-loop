@@ -18,6 +18,11 @@ var invariantDocs = []string{
 	"I-9 proven substitution: no run-time emitter; the conformance matrix TestE2ECycleCLIMatrix is its guard (ADR-0154)",
 }
 
+const (
+	CodeContextRequiredUnopened signalcenter.Code = "ISOLATION_CONTEXT_REQUIRED_UNOPENED"
+	CodeContextBudgetOver       signalcenter.Code = "ISOLATION_CONTEXT_BUDGET_OVER"
+)
+
 func ViolationCode(invariant int) signalcenter.Code {
 	return signalcenter.Code("ISOLATION_I" + strconv.Itoa(invariant) + "_VIOLATION")
 }
@@ -26,4 +31,6 @@ func init() {
 	for i, doc := range invariantDocs {
 		signalcenter.RegisterCode(signalcenter.ModuleIsolation, ViolationCode(i+1), doc)
 	}
+	signalcenter.RegisterCode(signalcenter.ModuleIsolation, CodeContextRequiredUnopened, "the cell context index: a cell closed without a read of a required entry; fields.unopened lists the ids, and fields.source is sandbox (cell-context-index.md §8)")
+	signalcenter.RegisterCode(signalcenter.ModuleIsolation, CodeContextBudgetOver, "the cell context index: required entries of a layer passed its token budget and lost the flag; fields layer, limit_tokens, over (cell-context-index.md §6)")
 }

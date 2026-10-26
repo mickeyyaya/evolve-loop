@@ -1,7 +1,7 @@
 # Auto-Resume After Quota Hits (v10.6.0+)
 
 > **Status:** ships with v10.6.0. Operator-confirmed scope: Layers 1–3
-> (in-session via `ScheduleWakeup`). Layer 4 (cron-driven fallback for
+> (in-session with `ScheduleWakeup`). Layer 4 (cron-driven fallback for
 > terminal-closed scenarios) deliberately deferred.
 
 ## Why this exists
@@ -62,21 +62,21 @@ Source priority:
 
 > **The Go path since 2026-10-09** ([internal-quotareset](packages/internal-quotareset.md)). The order is: override, hint, the earliest active bench (`source=bench`), the configured `quota_reset.default_hours`, and `source=unknown` at the current time. The built-in 5.4167 h fallback is removed ([cycle 1853](../incidents/cycle-1853-secondary-defects.md)).
 
-The hint-file path is rarely populated in practice because the nested
+The hint-file path is rarely populated in practice. The nested
 `claude -p` subprocess typically dies with empty stderr (the outer Claude
 Code consumes the rate-limit response at the auth layer). The fallback
-is therefore the *common case*; the hint capture is defense-in-depth for
-direct-CLI invocations and future SDK changes that might surface the
+is therefore the *common case*. The hint capture is defense-in-depth for
+direct-CLI invocations and for future SDK changes that can surface the
 message through the subprocess stderr.
 
 ### Layer 2 — Checkpoint schema extension
 
 `legacy/scripts/lifecycle/cycle-state.sh:cycle_state_checkpoint()` writes 4
-additional fields beyond the v9.1.0 baseline:
+more fields beyond the v9.1.0 baseline:
 
 | Field | Type | Source | Notes |
 |---|---|---|---|
-| `quotaResetAt` | ISO 8601 string | `$EVOLVE_CHECKPOINT_QUOTA_RESET_AT` env var | Empty string when env unset (e.g. non-quota checkpoint). |
+| `quotaResetAt` | ISO 8601 string | `$EVOLVE_CHECKPOINT_QUOTA_RESET_AT` env var | Empty string when env unset (for example, non-quota checkpoint). |
 | `quotaResetSource` | `"operator-override" \| "parsed" \| "default"` | `$EVOLVE_CHECKPOINT_QUOTA_RESET_SOURCE` env var | Trail for forensics. |
 | `autoResumeAttempts` | integer | preserved across re-checkpoints (carries old value); 0 on fresh write | Bumped by `resume-cycle.sh`; reset on full-cycle success. |
 | `autoResumeMaxAttempts` | integer | `$EVOLVE_AUTO_RESUME_MAX_ATTEMPTS` env, default `3` | Cap on consecutive auto-resume invocations. |
@@ -107,11 +107,16 @@ QUOTA-PAUSE: cycle=N wake-at=2026-05-15T05:20:00+0800 source=parsed attempts=0/3
 (0/1/2/3/4 were in use; 5 was free).
 
 `.agents/skills/loop/SKILL.md` carries a "Quota Handling &
-Auto-Resume" section that instructs the model: when `DISPATCH_RC=5` appears
-in dispatcher output, parse the `wake-at=ISO8601` value, compute a clamped
-`delaySeconds`, call `ScheduleWakeup` with `prompt="/evo:loop --resume"`,
-and chain wake-ups until the reset time. The clamp is `[60, 3600]` to
-match `ScheduleWakeup`'s own range; for waits longer than 3600s the SKILL
+Auto-Resume" section that instructs the model. When `DISPATCH_RC=5` appears
+in dispatcher output, the model does these steps:
+
+1. Parse the `wake-at=ISO8601` value.
+2. Compute a clamped `delaySeconds`.
+3. Call `ScheduleWakeup` with `prompt="/evo:loop --resume"`.
+4. Chain wake-ups until the reset time.
+
+The clamp is `[60, 3600]` to
+match `ScheduleWakeup`'s own range. For waits longer than 3600s the SKILL
 schedules a fresh wake on each cycle.
 
 `resume-cycle.sh` is the post-wake entry point. It now:
@@ -160,7 +165,7 @@ Default behavior (always-on auto-resume):
 ### Aborting an in-flight auto-resume
 
 The `QUOTA-PAUSE: wake-at=ISO` log line is the intervention surface.
-Operator reads the timestamp, decides whether they want to wait or
+Operator reads the timestamp, decides if they want to wait or
 abort, and Ctrl+Cs the Claude Code session before the wake fires. There
 is no `--no-auto-resume` flag; the loud log is the entire opt-out.
 
@@ -187,10 +192,10 @@ bash legacy/scripts/lifecycle/cycle-state.sh clear-checkpoint
 
 ### Layer 4 — cron daemon for terminal-closed scenarios
 
-We considered a `legacy/scripts/scheduler/auto-resume-daemon.sh` that would poll
-`.evolve/cycle-state.json` from cron every 5 minutes and invoke
-`resume-cycle.sh` when `now >= quotaResetAt`. This would survive the user
-closing Claude Code entirely. The operator decision was to defer it
+We considered a `legacy/scripts/scheduler/auto-resume-daemon.sh` that was a design to poll
+`.evolve/cycle-state.json` from cron every 5 minutes and to invoke
+`resume-cycle.sh` when `now >= quotaResetAt`. In that design, a
+closed Claude Code session does not stop the resume. The operator decision was to defer it
 because:
 
 - It introduces a long-lived process surface (cron job running as the
@@ -201,17 +206,17 @@ because:
   preserved; the user can manually `bash archive/legacy/scripts/dispatch/resume-cycle.sh`
   on the next session without losing work.
 
-Layer 4 can ship later as a purely-additive feature; the Layer 1–3 design
-exposes the right primitives (`bump-auto-resume-attempts`, the
-`quotaResetAt` field, the `resume-cycle.sh` entry point) for a daemon to
-hook into.
+Layer 4 can ship later as a purely-additive feature. The Layer 1–3 design
+exposes the right primitives for a daemon to hook into:
+`bump-auto-resume-attempts`, the
+`quotaResetAt` field and the `resume-cycle.sh` entry point.
 
 ### Reset-time parsing beyond stderr
 
 We do not try to introspect Anthropic's API for rate-limit reset
-headers, nor parse the outer Claude Code TUI. Both would require either
-an `ANTHROPIC_API_KEY` (most evolve-loop users authenticate via
-subscription) or running outside the harness. The default 5h25min
+headers, nor parse the outer Claude Code TUI. Both require either
+an `ANTHROPIC_API_KEY` (most evolve-loop users authenticate with a
+subscription) or a run outside the harness. The default 5h25min
 fallback is calibrated against Anthropic's published Pro/Max 5-hour
 rate-limit window with a 25min jitter buffer.
 
@@ -221,11 +226,11 @@ rate-limit window with a 25min jitter buffer.
 |---|---|
 | Infinite quota-resume-quota loop | `autoResumeMaxAttempts` cap (default 3). The counter is preserved across re-checkpoints so the cap accumulates across the failure chain. |
 | Operator wants to stop, didn't realize auto-resume was on | Loud `QUOTA-PAUSE: wake-at=ISO` log emitted before `ScheduleWakeup` fires. Operator interrupts the Claude Code session before the wake. |
-| HEAD drifted while paused (e.g., hot-fix committed on main) | Existing v9.1.0 guard at `resume-cycle.sh:85-100` refuses to resume unless `EVOLVE_RESUME_ALLOW_HEAD_MOVED=1`. Auto-resume never sets that env var. |
+| HEAD drifted while paused (for example, hot-fix committed on main) | Existing v9.1.0 guard at `resume-cycle.sh:85-100` refuses to resume unless `EVOLVE_RESUME_ALLOW_HEAD_MOVED=1`. Auto-resume never sets that env var. |
 | Cost spiral | `EVOLVE_BATCH_BUDGET_CAP` (default $20) is enforced by the dispatcher regardless of auto-resume. Cumulative spend never exceeds it. |
 | Anthropic changes the "resets HH:MMam" message format | Falls back to default `now + EVOLVE_QUOTA_RESET_HOURS`. `EVOLVE_QUOTA_RESET_AT` lets the operator hard-code the right time. |
 | `ScheduleWakeup` tool not loaded in the session | SKILL.md fallback: log the `QUOTA-PAUSE wake-at=ISO` marker verbatim and require manual `bash archive/legacy/scripts/dispatch/resume-cycle.sh`. Never silently swallow `DISPATCH_RC=5`. |
-| User closes Claude Code mid-wait | Cycle stays preserved on disk. Manual `--resume` from a future session picks it up. (Layer 4 would close this gap but is out of scope.) |
+| User closes Claude Code mid-wait | Cycle stays preserved on disk. Manual `--resume` from a future session picks it up. (A Layer 4 design is out of scope. In that design, the daemon closes this gap.) |
 
 ## Verification
 

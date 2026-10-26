@@ -5,7 +5,9 @@
 
 ## 1. Why this exists
 
-One session surfaced 15 regressions. Fixing each instance is table stakes; this document files every regression into a **root-cause class** and pairs each class with a **general test design** so the *class* can never silently recur. The unifying lesson: the pipeline tested the *work* hard but barely tested its own *referees* — most burned cycles were gate-infrastructure failures (timeout, flake, counter semantics), not work failures.
+One session surfaced 15 regressions. Fixing each instance is table stakes. This document files every regression into a **root-cause class**. It pairs each class with a **general test design**, so the *class* can never silently recur.
+
+The unifying lesson: the pipeline tested the *work* hard but barely tested its own *referees*. Most burned cycles were gate-infrastructure failures (timeout, flake, counter semantics), not work failures.
 
 ## 2. Regression catalog → taxonomy
 
@@ -39,20 +41,29 @@ One session surfaced 15 regressions. Fixing each instance is table stakes; this 
 - Each test double and its real adapter run the **same** behavioral contract suite for every property tests rely on (idempotent `CapturePane`, marker echo, exit-code mapping). A fake that drifts turns one red conformance test, not N mysterious downstream failures.
 
 ### F — anti-misuse pins
-- A test that demonstrates the trap (e.g. `CombinedOutput` err==nil on exit 1) + a static gate banning the trapped API from gate-critical packages. Each pinned with its incident reference.
+- A test that demonstrates the trap (for example, `CombinedOutput` err==nil on exit 1) + a static gate banning the trapped API from gate-critical packages. Each pinned with its incident reference.
 
 ### G/H — gate failure-mode matrices + golden-replay harness (the core of RT)
 - For EVERY gate (EGPS generator, triage-cap, contract gate, eval gate, commit-gate, CI-parity, ship): a table
   `{artifact missing, malformed, TIMEOUT, flaky-red (passes on retry), partial, compliant-but-counter-divergent} × {expected verdict, expected diagnostic substring}`.
-  Non-negotiable properties: **timeout ≠ absence** (distinct diagnostics naming the ceiling + fix knob), **flake ≠ regression** (retry-once semantics), **every reject reason is actionable** (states the counting rule / the fix).
-- **Golden-replay harness**: `go/acs/regression/testdata/regressions/<case>/` with `manifest.json` (`{gate, inputs, expected_verdict, expected_diag_substring}`) + real artifacts from failed cycles. The harness `fs.Glob`s the directory — **adding a regression case = dropping a directory, zero Go changes**. Seed cases (artifacts verified on disk 2026-07-02): cycle-449 triage report (must count 3, not 7), cycle-444 timeout scenario (audit-report present, acs-verdict absent), cycle-447 flake scenario (red_count:1, passes on re-run), failedApproaches[448,449] demotion-hole.
+  Non-negotiable properties:
+
+  - **timeout ≠ absence** (distinct diagnostics naming the ceiling + fix knob)
+  - **flake ≠ regression** (retry-once semantics)
+  - **every reject reason is actionable** (states the counting rule / the fix)
+- **Golden-replay harness**: `go/acs/regression/testdata/regressions/<case>/` with `manifest.json` (`{gate, inputs, expected_verdict, expected_diag_substring}`) + real artifacts from failed cycles. The harness `fs.Glob`s the directory — **adding a regression case = dropping a directory, zero Go changes**. The seed cases (artifacts verified on disk 2026-07-02) are:
+
+  - cycle-449 triage report (must count 3, not 7)
+  - cycle-444 timeout scenario (audit-report present, acs-verdict absent)
+  - cycle-447 flake scenario (red_count:1, passes on re-run)
+  - failedApproaches[448,449] demotion-hole
 
 ### I — determinism + loud-degradation property tests
 - Same input ⇒ same output for every classifier/selector (hash-stability; call-counting fakes prove no re-classification on unchanged input).
 - Every fallback path asserts its **diagnostic is emitted** — silence is the bug class; tests pin the loudness, not just the fallback.
 
 ### J — capability-matrix parity pins
-- Enumerate registry × capability; assert every cell is either effective or **explicitly documented** as an exception (the `model_tier_parity_test` pattern generalized: params channels, sandbox knobs, exhausted_regex presence, prompt markers).
+- Enumerate registry × capability. Assert that every cell is effective or **explicitly documented** as an exception. This generalizes the `model_tier_parity_test` pattern to params channels, sandbox knobs, exhausted_regex presence and prompt markers.
 
 ### K — feature-liveness golden replays
 - For each authority that can be ON-but-dormant: a golden end-to-end replay proving the wire *fires* (advisor response with `{cli,tier}` ⇒ dispatch line carries the clamped overlay). Dormancy becomes a red test, not archaeology.

@@ -39,3 +39,5 @@ A backend is done when it passes `Run`. The trail adapter runs the suite with a 
 ## Wiring
 
 `go/cmd/evolve/cmd_code.go` builds the `Backends` set from the policy block `code_index` (`internal/policy`, `CodeIndexConfig`) and maps the errors to exit codes. It appends one record to the usage log for each call through [`internal/codeindex/usagelog`](internal-codeindex-usagelog.md).
+
+`go/cmd/evolve/cmd_code_freshness.go` compares the index `HEAD` with the local `origin/main` ref before each query. It warns on stderr when they differ, or refuses with exit 21 when `code_index.stale` is `refuse`. `go/cmd/evolve/cmd_code_refresh.go` moves the index worktree to `origin/main` and calls `Backends.Refresh`. `evolve sync-main` and `evolve code refresh` run it. The spec is [code-index-cli.md](../code-index-cli.md), section 4.

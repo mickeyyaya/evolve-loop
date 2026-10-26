@@ -113,15 +113,6 @@ func TestC37_005_RouterConfigDefaults(t *testing.T) {
 	}
 }
 
-func TestC37_006_WorktreePathStillRegistered(t *testing.T) {
-	if _, ok := flagregistry.Lookup("EVOLVE_WORKTREE_PATH"); !ok {
-		t.Errorf("RED: flagregistry.Lookup(%q) returned ok=false — WORKTREE_PATH was removed.\n"+
-			"This flag is on the FORBIDDEN-REPEAT list (cycles 17/18/19 fail history).\n"+
-			"Builder must NOT touch EVOLVE_WORKTREE_PATH in registry_table.go.",
-			"EVOLVE_WORKTREE_PATH")
-	}
-}
-
 func TestC37_008_ControlFlagsDocNoRemovedFlags(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)

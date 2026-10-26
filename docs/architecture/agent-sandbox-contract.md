@@ -70,6 +70,8 @@ After each row, the host must still reach the run server with its sessions `agen
 | Hard-link a raw log of the own workspace under another name | deny | The link gets `Operation not permitted`. |
 | Rewrite the `lane-scope.json` of the own workspace | deny | The write gets `Operation not permitted`. |
 | Write a pipeline lineage record in `.evolve/lineage/` | deny | The repo is read-only for the cell. |
+| Isolation N17: a cell appends a record to the access log `.evolve/context-access/cycle-7.jsonl` | deny (green, CX3) | The write gets `Operation not permitted`. No write grant can cover the log ([cell-context-index.md](cell-context-index.md) §8). |
+| Isolation N16 (its own test): a cell reads the indexed retrospective of cycle 6 | allow (green, CX3) | `log show` returns the report of the grant rule `rule=grant.index`. The pipeline writes one access record of kind `retrospective` with `source: sandbox`. |
 | Isolation N9: open a TCP connection to a loopback listener of the host | allow (green) | `nc -z` connects. The row records that the network stays open. |
 | Isolation N10: an agy pane writes the protected paths `go/internal/guards/role.go`, `.claude/settings.json` and `go/internal/phases/audit/probe_quarantine.go` in its worktree (its own test, `TestAgentSandboxContract_N10_AnAgyPaneCannotWriteAProtectedPath`) | deny (X7) | Each write gets `Operation not permitted`. A write of the sibling `go/internal/guards2/x.go` goes through. |
 | `kill(-1)` from a cell (a static row, `TestSandboxContract_KillMinusOneFromACellReachesNoHostProcess` in `go/internal/adapters/sandbox`, every OS) | deny (X7) | The row reads the generated profiles and runs no signal. The SBPL profile has `(deny default)` and one signal grant, `(allow signal (target same-sandbox))`. The `bwrap` prefix has `--unshare-pid`. Thus the signal reaches only the processes of the cell. |
@@ -136,6 +138,26 @@ The gap verdict stays in the test for the next known gap. No row uses it now.
 The scout profile declares `.evolve/evals/cycle-*`. That glob is not a run directory, so it still widens to `.evolve/evals`. Thus the scout can write the evals of each other cycle. Inbox `sandbox-cross-cycle-evals-write` tracks the fix.
 
 
+## The credential deny and the cell
+
+The bridge denies writes in the parent of the dispatch store. Thus a cell cannot rename the store or put a symlink in its place ([llm-isolation.md](llm-isolation.md) §7.1.1). The deny is a `file-write*` subpath in SBPL and a `--ro-bind` mask in `bwrap`. A store in the wrong place can thus remove the write grant of the cell.
+
+This happened on #1132 (run 40234187614, 2026-10-25). The bridge test store was `$TMPDIR/evolve-bridge-test-dispatch`, so the deny covered `$TMPDIR` and each integration workspace in it. The sandbox refused the artifact write of the fake agent, and the macOS CI step hung for about 4 h. [internal-bridge.md](packages/internal-bridge.md) "Findings" has the full chain.
+
+Three rules now prevent a repeat:
+
+| Rule | Where | Test |
+|---|---|---|
+| The wrapper keeps the deny, but reports a deny that is equal to the worktree or the workspace, or contains it. The report is a WARN line and an `isolation.violation` signal with `rule=launch.credential.covers-cell`. | `Deps.warnCredentialCoversCell` (`dispatch_credential.go`) | `TestSandboxWrap_ACredentialDenyOverTheCellKeepsTheDenyAndIsLoud`, `TestSandboxWrap_ANormalLayoutGetsNoCellWarning` |
+| In the generated profile, the last rule that covers the workspace, the artifact or the worktree allows the write. | the profile that `defaultSandboxWrapWithProbe` makes | `TestSandboxProfile_NoCredentialDenyOrMaskCoversTheCellOfATestLayout`, `TestSandboxProfile_TheCellCheckSeesTheIncidentDeny` |
+| The test store has the shape of `~/.evolve/dispatch`: `$TMPDIR/evolve-bridge-test-home/.evolve/dispatch`. | the `init` of `dispatch_credential_test.go` | `TestDispatchCredentialDeny_ThePackageStoreDeniesNoWriteOverTheTestWorkspaces` |
+
+The profile test reads the rules in order, because the last rule that matches a path decides in both systems. A deny before a later allow is correct: the read-only repository deny comes before the grant of the worktree.
+
+The test checks two layouts. The first is the `itConfig` layout with the package default store. The second is the layout of this contract test, with `contractTempDir` and a store in the cell home. The profile is built at `isolation.i5.stage=enforce` and `isolation.i7.stage=enforce`. Thus the read isolation of X5 and the protected write rules of X7 are in the checked profile, with their `prefix`, `require-all` and `with message` forms.
+
+The rejected option was to refuse the launch when the deny covers the cell. The deny protects the credential, and a refusal makes the deny optional for each layout that has the fault. The cell must stay without the write, and the report must make the cause visible at once.
+
 ## How to add a row
 
 1. Find the command that the agent ran, or the action that you must allow or deny.
@@ -152,4 +174,6 @@ An incident command stays in the table as a row forever. Do not remove a row to 
 - `TestCI_TheRunnerCanApplyTheAgentSandbox` runs first in `internal/bridge`. It applies the generated agent profile to `/usr/bin/true`. If the runner cannot apply a sandbox, the message gives the binary path, the apply error, its output and the SBPL.
 - `TestPaneParity_RealTmuxPackagesPassInTheSandboxedPaneAsOnTheHost` runs `./internal/swarm` and the real-tmux tests of `./internal/bridge` two times: on the host, and in a real pane through `bootTmuxREPL` with the generated profile. A test that passes on the host and fails in the pane fails the gate. It also checks the pane environment: no `TMUX`, no `TMUX_PANE`, and the exports of the boot. Each run must be evidence. The exit status agrees with the test results, and each line is test2json. The host passes each test that the target names.
 - `TestPaneParity_ReportsTheCycle1853TriggerWhenThePtyRulesAreRemoved` removes the pty rules from the profile. The harness must then report `TestExecTmuxKill_NeverKillsASessionWhoseNameExtendsTheTarget` as host=pass and pane=fail.
+- `TestIntegrationTests_EveryLaunchAndWaitHasABoundedContext` fails when an integration test gives `context.Background()` or `context.TODO()` to a launch or wait entry. A sandbox fault then fails one test in minutes, not at the package timeout ([internal-bridge.md](packages/internal-bridge.md), "Invariants").
+- The tmux server of a test binary stops about 1 s after the binary dies, and no child keeps an inherited pipe ([internal-tmuxtest.md](packages/internal-tmuxtest.md)).
 - In CI on macOS, a real-tmux test or a sandbox test fails when `tmux` or `sandbox-exec` is missing ([internal-testhost](packages/internal-testhost.md)).

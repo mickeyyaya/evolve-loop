@@ -86,3 +86,34 @@ func (deps Deps) warnDispatchCredential(err error, outcome string) {
 		fmt.Fprintf(deps.Stderr, "[bridge] WARN dispatch credential: %v (%s)\n", err, outcome)
 	}
 }
+
+func (deps Deps) warnCredentialCoversCell(denies []string, req SandboxWrapRequest) {
+	for _, cell := range []string{req.Worktree, req.Workspace} {
+		if cell == "" {
+			continue
+		}
+		real, err := canonicalSandboxPath(cell)
+		if err != nil {
+			continue
+		}
+		for _, deny := range denies {
+			if withinDir(deny, real) {
+				deps.reportCredentialCoversCell(deny, real)
+			}
+		}
+	}
+}
+
+func (deps Deps) reportCredentialCoversCell(deny, cell string) {
+	err := fmt.Errorf("the write deny %s covers the cell path %s", deny, cell)
+	deps.warnDispatchCredential(err, "the cell keeps the deny and cannot write there")
+	deps.Signals.Emit(signalcenter.Event{
+		Module: signalcenter.ModuleIsolation, Origin: "bridge.warnCredentialCoversCell",
+		Kind: signalcenter.KindIsolationViolation, Severity: signalcenter.SeverityWarn, Code: isolation.ViolationCode(3),
+		Reason: err.Error(),
+		Fields: map[string]string{
+			"invariant": "I3", "action": "logged", "deny": deny, "cell": cell,
+			"rule": "launch.credential.covers-cell", "source": "dispatch-credential",
+		},
+	})
+}

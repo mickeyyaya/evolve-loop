@@ -16,15 +16,15 @@ import (
 func TestExecRunner_Real(t *testing.T) {
 	t.Parallel()
 	var out bytes.Buffer
-	code, err := execRunner(context.Background(), "sh", "", []string{"-c", "exit 0"}, os.Environ(), nil, &out, &out)
+	code, err := execRunner(itBoundedContext(t, itLaunchDeadline), "sh", "", []string{"-c", "exit 0"}, os.Environ(), nil, &out, &out)
 	if err != nil || code != 0 {
 		t.Fatalf("exit 0: code=%d err=%v", code, err)
 	}
-	code, err = execRunner(context.Background(), "sh", "", []string{"-c", "exit 7"}, nil, nil, &out, &out)
+	code, err = execRunner(itBoundedContext(t, itLaunchDeadline), "sh", "", []string{"-c", "exit 7"}, nil, nil, &out, &out)
 	if err != nil || code != 7 {
 		t.Fatalf("exit 7: code=%d err=%v, want (7,nil)", code, err)
 	}
-	code, err = execRunner(context.Background(), "/no/such/binary-cov-xyz", "", nil, nil, nil, &out, &out)
+	code, err = execRunner(itBoundedContext(t, itLaunchDeadline), "/no/such/binary-cov-xyz", "", nil, nil, nil, &out, &out)
 	if err == nil || code != -1 {
 		t.Fatalf("missing binary: code=%d err=%v, want (-1, err)", code, err)
 	}
@@ -39,7 +39,7 @@ func TestExecRunner_Real(t *testing.T) {
 	}
 	dir := t.TempDir()
 	out.Reset()
-	code, err = execRunner(context.Background(), "sh", dir, []string{"-c", "pwd"}, nil, nil, &out, &out)
+	code, err = execRunner(itBoundedContext(t, itLaunchDeadline), "sh", dir, []string{"-c", "pwd"}, nil, nil, &out, &out)
 	if err != nil || code != 0 {
 		t.Fatalf("pwd: code=%d err=%v", code, err)
 	}

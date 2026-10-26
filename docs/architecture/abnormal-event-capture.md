@@ -16,7 +16,7 @@
 
 ## Overview
 
-The abnormal-event capture pipeline provides structured observability for anomalies detected during phase dispatch. When a phase exits abnormally (quota exhaustion, integrity failure, dispatch error, etc.), a structured JSONL record is appended to `$WORKSPACE/abnormal-events.jsonl`. Downstream pipeline stages consume this file to:
+The abnormal-event capture pipeline provides structured observability for anomalies detected during phase dispatch. When a phase exits abnormally (quota exhaustion, integrity failure, dispatch error, and others), a structured JSONL record is appended to `$WORKSPACE/abnormal-events.jsonl`. Downstream pipeline stages consume this file to:
 
 - Trigger the retrospective phase even on PASS verdicts (`gate_audit_to_retrospective`)
 - Promote unresolved anomaly types to `carryoverTodos[]` as HIGH-priority items (`reconcile-carryover-todos.sh`)
@@ -45,7 +45,7 @@ Each line in `abnormal-events.jsonl` is a JSON object:
 
 ## Detector Table
 
-Detectors are implemented in `legacy/scripts/dispatch/subagent-run.sh` via the `_append_abnormal_event()` function.
+Detectors are implemented in `legacy/scripts/dispatch/subagent-run.sh` with the `_append_abnormal_event()` function.
 
 | event_type | Severity | Trigger Condition | Remediation Hint |
 |------------|----------|-------------------|------------------|
@@ -146,22 +146,22 @@ Check: Is `abnormal-events.jsonl` non-empty? (`wc -l $WORKSPACE/abnormal-events.
 
 **Problem:** Abnormal events not promoted to carryoverTodos after cycle.
 
-Check: Did `reconcile-carryover-todos.sh` run? It only fires post-ship/post-retrospective via the orchestrator. Also verify the workspace path passed via `--workspace` matches the workspace that contains `abnormal-events.jsonl`.
+Check: Did `reconcile-carryover-todos.sh` run? It fires only post-ship/post-retrospective through the orchestrator. Also verify that the workspace path passed with `--workspace` matches the workspace that contains `abnormal-events.jsonl`.
 
 **Known pattern: `ship-refused` with tree-drift between two builder sub-rounds.**
 
 Symptom: `audit-bound tree SHA <X> != committed tree SHA <Y>` in ship.sh output. Classification: `abnormal-event: ship-refused`.
 
-Root cause: Builder ran two sub-rounds (e.g., first commit + second patch commit); the second commit changed the tree AFTER auditor already bound to the first commit's tree SHA. The cycle recovers correctly — ship.sh retries against the new HEAD, finds the audit binding acceptable (all same ACS predicates GREEN), and ships on the second attempt.
+Root cause: Builder ran two sub-rounds (for example, first commit + second patch commit). The second commit changed the tree AFTER auditor already bound to the tree SHA of the first commit. The cycle recovers correctly. ship.sh retries against the new HEAD and finds the audit binding acceptable (all same ACS predicates GREEN). It ships on the second try.
 
 Recovery procedure:
 1. Re-run `ship.sh "<commit-msg>"` — it re-reads the current tree SHA and re-evaluates audit binding.
-2. If the second attempt passes `acs-verdict.json` (all predicates still GREEN), ship succeeds.
-3. No structural fix is needed — the abnormal event pipeline captures the first refusal correctly; the carryoverTodo from `reconcile-carryover-todos.sh` is informational only.
-4. If ship.sh continues to refuse: verify the worktree branch matches `evolve/cycle-N` (`git branch` inside worktree) and that no unrelated commits landed between audit and ship.
+2. If the second try passes `acs-verdict.json` (all predicates still GREEN), ship succeeds.
+3. No structural fix is needed. The abnormal event pipeline captures the first refusal correctly. The carryoverTodo from `reconcile-carryover-todos.sh` is informational only.
+4. If ship.sh still refuses, verify two items. The worktree branch matches `evolve/cycle-N` (`git branch` inside worktree). No unrelated commits landed between audit and ship.
 
-Verified: cycle 46 experienced this pattern and recovered successfully on the second ship attempt (commit 3ad9765).
+Verified: cycle 46 experienced this pattern and recovered successfully on the second ship try (commit 3ad9765).
 
 **Problem:** Duplicate carryoverTodos for the same event_type.
 
-The deduplication key is `_inbox_source='abnormal-event:<type>'`. If duplicates appear, check whether the field was stripped by an earlier version of `merge-lesson-into-state.sh` that did not preserve unknown fields.
+The deduplication key is `_inbox_source='abnormal-event:<type>'`. If duplicates appear, check if the field was stripped by an earlier version of `merge-lesson-into-state.sh` that did not preserve unknown fields.

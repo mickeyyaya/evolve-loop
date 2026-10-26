@@ -11,15 +11,23 @@ type cliController struct {
 	cfg     *Config
 	deps    Deps
 	resolve func(cli string) (Manifest, error)
-	capture func(ctx context.Context, cli, command, await string) (string, error)
+	capture func(ctx context.Context, cli string, spec ControlSpec) (string, error)
 }
+
+const controlAwaitWindows = "windows"
 
 func NewController(cfg *Config, deps Deps) clicontrol.Controller {
 	c := &cliController{cfg: cfg, deps: deps.withDefaults(), resolve: LoadManifest}
-	c.capture = func(ctx context.Context, cli, command, _ string) (string, error) {
-		return captureControl(ctx, c.perFamilyConfig(cli), c.deps, cli, command, helpCaptureSettleTicks)
-	}
+	c.capture = c.captureSpec
 	return c
+}
+
+func (c *cliController) captureSpec(ctx context.Context, cli string, spec ControlSpec) (string, error) {
+	cfg := c.perFamilyConfig(cli)
+	if spec.Await == controlAwaitWindows {
+		return captureUntil(ctx, cfg, c.deps, cli, spec.Send, usageCaptureSettleTicks, windowsSettled(*spec.Windows, c.deps.Now()))
+	}
+	return captureControl(ctx, cfg, c.deps, cli, spec.Send, helpCaptureSettleTicks)
 }
 
 func (c *cliController) perFamilyConfig(cli string) *Config {
@@ -47,7 +55,7 @@ func (c *cliController) Do(ctx context.Context, family string, ev clicontrol.Eve
 	if !ok {
 		return resp, fmt.Errorf("%w: family=%s event=%s", clicontrol.ErrUnsupported, family, ev)
 	}
-	pane, err := c.capture(ctx, cli, spec.Send, spec.Await)
+	pane, err := c.capture(ctx, cli, spec)
 	if err != nil {
 		return resp, fmt.Errorf("clicontrol: %s %s: %w", family, ev, err)
 	}

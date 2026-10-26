@@ -11,7 +11,8 @@ import (
 )
 
 const (
-	Schema            = "evolve.inputs.index/1"
+	Schema            = "evolve.inputs.index/2"
+	schemaV1          = "evolve.inputs.index/1"
 	inputsDir         = "inputs"
 	indexFile         = "index.json"
 	DefaultLineageMax = 5
@@ -23,27 +24,35 @@ const (
 )
 
 type Entry struct {
-	ID      string `json:"id"`
-	Class   string `json:"class"`
-	Kind    string `json:"kind"`
-	Path    string `json:"path"`
-	Cycle   int    `json:"cycle"`
-	Phase   string `json:"phase,omitempty"`
-	Attempt int    `json:"attempt"`
-	Summary string `json:"summary"`
-	Bytes   int64  `json:"bytes"`
-	SHA256  string `json:"sha256"`
+	ID       string `json:"id"`
+	Class    string `json:"class"`
+	Kind     string `json:"kind"`
+	Path     string `json:"path"`
+	Cycle    int    `json:"cycle"`
+	Phase    string `json:"phase,omitempty"`
+	Attempt  int    `json:"attempt"`
+	Summary  string `json:"summary"`
+	Bytes    int64  `json:"bytes"`
+	Tokens   int64  `json:"tokens"`
+	SHA256   string `json:"sha256"`
+	Layer    string `json:"layer"`
+	Required bool   `json:"required"`
+	Why      string `json:"why"`
 }
 
 type Index struct {
-	Schema  string   `json:"schema"`
-	Cycle   int      `json:"cycle"`
-	Phase   string   `json:"phase"`
-	ItemIDs []string `json:"item_ids"`
-	Attempt int      `json:"attempt"`
-	Lineage []int    `json:"lineage"`
-	Entries []Entry  `json:"entries"`
-	Notes   []string `json:"notes"`
+	Schema   string                 `json:"schema"`
+	Cycle    int                    `json:"cycle"`
+	Phase    string                 `json:"phase"`
+	ItemIDs  []string               `json:"item_ids"`
+	Attempt  int                    `json:"attempt"`
+	Lineage  []int                  `json:"lineage"`
+	Stage    string                 `json:"stage"`
+	Estimate string                 `json:"estimate"`
+	Required []string               `json:"required"`
+	Budgets  map[string]LayerBudget `json:"budgets"`
+	Entries  []Entry                `json:"entries"`
+	Notes    []string               `json:"notes"`
 }
 
 func Path(workspace string) string {
@@ -67,7 +76,7 @@ func Read(workspace string) (Index, error) {
 	if err := json.Unmarshal(raw, &idx); err != nil {
 		return Index{}, fmt.Errorf("inputindex: %s: %w", Path(workspace), err)
 	}
-	if idx.Schema != Schema {
+	if idx.Schema != Schema && idx.Schema != schemaV1 {
 		return Index{}, fmt.Errorf("inputindex: %s has schema %q, want %q", Path(workspace), idx.Schema, Schema)
 	}
 	return idx, nil

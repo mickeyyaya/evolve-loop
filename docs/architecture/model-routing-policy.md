@@ -6,16 +6,17 @@ phase. Phase profiles in `.evolve/profiles/*.json` carry the executable default
 
 ## Driver-agnostic by construction
 
-Routing is expressed in **capability tiers**, never vendor model names. A profile
+Routing uses **capability tiers**, never vendor model names. A profile
 names an abstract tier — `fast`, `balanced`, or `deep`
-(`modelcatalog.CanonicalTiers`) — and the runtime translates that tier to a
-concrete, CLI-native model id at dispatch via `modelcatalog.Lookup(cli, tier)`.
+(`modelcatalog.CanonicalTiers`). At dispatch, the runtime translates that tier to a
+concrete, CLI-native model id with `modelcatalog.Lookup(cli, tier)`.
 
 **Invariant: Claude must be replaceable by codex, agy, ollama, or any driver,
-using an equal-capability model.** No phase may hard-code a vendor model. A
-vendor name in a profile (e.g. `"sonnet"`) reaches *past* the tier abstraction
+using an equal-capability model.** Phases must not hard-code a vendor model.
+
+A vendor name in a profile (for example, `"sonnet"`) reaches *past* the tier abstraction
 and silently fails to resolve for any non-Claude CLI
-(`Lookup("codex","sonnet")` misses), so it is forbidden in `model_tier_default`,
+(`Lookup("codex","sonnet")` misses). The policy forbids it in `model_tier_default`,
 `model_tier_overrides`, and `model_tier_envelope`.
 
 ### Per-driver model mapping — owned by `modelcatalog` (single source of truth)
@@ -40,10 +41,10 @@ Pick any spine phase, point its profile `cli` at codex/agy/ollama, keep the same
 tier — the pipeline still resolves a model. Enforced by:
 
 - `TestAllProfilesSubstitutabilityAtParity` — the definitive all-profiles parity
-  guard: iterates all profiles via `loader.List()`, checks `model_tier_default`,
+  guard. It iterates all profiles with `loader.List()`. It checks `model_tier_default`,
   every `model_tier_overrides` value, and every non-empty `model_tier_envelope`
-  field (min/default/max) against each swappable bridge manifest using real
-  manifests (not a synthetic fixture). Uses `t.Errorf` so any missing tier is a
+  field (min/default/max) against each swappable bridge manifest. It uses real
+  manifests (not a synthetic fixture). It uses `t.Errorf`, so any missing tier is a
   hard failure, not a silent skip.
 - `TestAllProfileDefaultTiersResolveForSwappableDrivers` — companion check that
   all profiles' default tiers resolve across all swappable driver manifests
@@ -128,9 +129,9 @@ parity across Claude, Codex, agy, and other supported bridges.
 ## Research Basis
 
 The cycle-337 research synthesis mapped current agent practice to this rule:
-LLMs should decide where judgment is needed, while deterministic pipeline code
-should execute fixed validation and state transitions. Agent consistency matters
-most at quality gates, so expensive tiers belong at audit and routing boundaries,
+It is recommended that LLMs decide where judgment is needed. It is also recommended that deterministic pipeline code
+executes fixed validation and state transitions. Agent consistency matters
+most at quality gates. Expensive tiers belong at audit and routing boundaries,
 not routine categorization.
 
 Three concrete findings from the cycle-337 scout report:
@@ -149,5 +150,5 @@ cd go && go test -count=1 ./internal/profiles/... ./internal/resolvellm/... ./in
 ```
 
 `TestSpineProfilesAreDriverAgnostic` fails if any spine profile reintroduces a
-vendor model name. Policy changes should also keep cycle-specific ACS predicates
+vendor model name. It is recommended that policy changes also keep cycle-specific ACS predicates
 green when a cycle pins model routing behavior.
