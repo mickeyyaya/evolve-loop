@@ -5,6 +5,8 @@ var serialTests = map[string]string{
 	"bridge.TestNewSessionEnv_APaneThatNeverReadsItsFileFailsTheStartRemovesTheFileAndKillsOnlyItsOwnSessionID": "sets env through a helper, swaps seam cellEnvConsumeTimeout",
 	"bridge.TestNewSessionEnv_AStartThatPrintsNoSessionIDKillsNothing":                                          "sets env through a helper",
 	"bridge.TestNewSessionEnv_SweepsAStaleEnvDirBeforeItStarts":                                                 "sets env through a helper",
+	"bridge.TestNewSessionEnv_AFailedStartNamesTheOutputOfTmux":                                                 "sets env through a helper",
+	"bridge.TestRealTmux_EachSessionOfASharedServerCarriesItsOwnFingerprint":                                    "sets env through a helper",
 	"bridge.TestLoadShadowObservers_SkipsRuleWhosePatternDoesNotCompile":                                        "swaps seam compileShadowPattern",
 	"bridge.TestPaneParity_ReportsTheCycle1853TriggerWhenThePtyRulesAreRemoved":                                 "starts the fixed dispatch id parity-dispatch session that TestPaneParity_RealTmuxPackagesPassInTheSandboxedPaneAsOnTheHost also starts",
 	"bridge.TestAddRule_BadCLI":       "swaps seam bridgeManifestDirFn",
