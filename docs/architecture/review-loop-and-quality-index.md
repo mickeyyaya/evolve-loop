@@ -114,7 +114,7 @@ Both are protected surfaces. A drift test pins the skill's and COMPACT's dimensi
 | `docs-consistency` | Docs as the primary asset; config, not code; no flags | The package docs, CHANGELOG and plan status are updated; behaviour lives in config where policy says so; no feature flag | A stale doc; a flag; a policy literal in code | never | the docs-floor rules (`docsfloor`), the code-comments convention |
 
 - **Score 5:** exemplary; nothing to improve within scope.
-- **Score 2:** a defect that a user hits.
+- **Score 2:** a defect that a user can hit.
 - **Score 1:** harmful or absent (for example, a data-loss path or no tests at all).
 - **Never N/A:** exactly `correctness`, `architecture`, `maintainability`, `test-quality` and `docs-consistency` (`qualityindex.NeverNA`). The parser rejects N/A on them.
 - **Scope of scoring.** The index applies to a code cycle whose build touched files, the same predicate that pins `code-review` (`deliverable_kind==code && build.files_touched>0`). The audit writes `## Scores`, and the kernel cross-checks it, only on such a cycle (§6.2).
@@ -340,7 +340,7 @@ decideAfterReview(cs, rows, report, cfg):
 
 - **"Continue"** means the remaining evaluate phases in the plan, then the audit.
 - **`max_rounds` counts reviews.** With the default of 4 there are at most 4 reviews and 3 fix builds per cycle, across every audit-repair re-entry. `max_rounds = 1` means review-only. The config requires `max_rounds ≥ 1` (an out-of-range value is ignored with a warning).
-- **Shadow computes the full decision** as if enforced, over the rows read as OPEN, and signals it. It grants nothing and leaves `Stop` empty. The metrics therefore measure exactly what enforce does.
+- **Shadow computes the full decision** as if enforced, over the rows read as OPEN, and signals it. It grants nothing and leaves `Stop` empty. The metrics therefore measure exactly what enforce does if it runs.
 - **Progress across a re-entry.** At an audit-repair re-entry the kernel resets the progress baseline (`ProgressBaseline` = the next index), so the first round after it passes the progress test. If the reset is missing, a round that ended resolved at U = 0 causes every later round to fail the strict-decrease test.
 - **Oscillation** tests only ids whose status is OPEN now: an id that was reopened twice and later accepted no longer stops the loop.
 - **Routing (the backward edges).**
@@ -504,10 +504,7 @@ Process failures get a recovery step; only logic blocks.
 | Situation | Behaviour |
 |---|---|
 | No deep-tier capacity (every route walled) | Today a quota wall reaches `pauseForQuota`, which pauses the loop. Q6 adds a branch at that seam for a non-gate phase. A code-review quota wall emits `REVIEW_SKIPPED{reason: capacity}`, and the walk continues. A skipped round is not a completed dispatch, so it does not count toward `max_rounds`. The audit still scores the index, so qualification is never waived. |
-| Malformed Review Plan, Findings, Scores or Disposition Review | The correction rung (bounded). Once it is exhausted, the phase degrades to SKIPPED+WARN and the walk continues. Nothing is recorded, `REVIEW_SKIPPED{reason: malformed}` is emitted at WARN, and the ledger gets a `contract_exhaustion_skip` entry. |
-| The degrade of a malformed review (shape and scope) | This is the shape of the existing non-canonical-verdict degrade (`nonFloorExhaustionDegrade`). It holds for any optional evaluate phase past the ship floor that the routing config does not list as mandatory (`config.mandatory_phases`). It holds on the fresh and the resume ladder alike (`Orchestrator.degradesOnExhaustion`, `degradesRejection`). |
-| The contract blocks of a malformed review | The contract blocks of the same phase never reach the persisted breaker of the contract gate (`ReviewInput.BreakerExempt`: no count, no reset, no demotion). A malformed review therefore can never open the circuit and hand the audit a `contract_gate_demoted` waiver. The breaker never counts it. The breaker-count escalation of the ladder and the salvage re-prompt (which warns of a breaker about to open) therefore do not apply. Each correction is the plain directive. |
-| A report that is *absent* (missing or empty, `ReviewResult.DeliverableAbsent`) | The report is not malformed. It keeps the abort, because a non-admitted missing deliverable never reaches Ship ([audit-repair isolation](audit-repair-isolation.md), #542). The breaker never counts it either, so it can no longer be demoted into an approval. |
+| Malformed Review Plan, Findings, Scores or Disposition Review | The correction rung (bounded). Once it is exhausted, the phase degrades to SKIPPED+WARN and the walk continues. Nothing is recorded, `REVIEW_SKIPPED{reason: malformed}` is emitted at WARN, and the ledger gets a `contract_exhaustion_skip` entry. See the notes below the table. |
 | A finding with an unknown dimension or no `Fix:` | Recorded as written, and counted. Never dropped. |
 | The ledger write fails | `REVIEW_FINDINGS{recorded: false}` at WARN. In enforce, the loop stops with `REVIEW_SKIPPED{reason: ledger}`, and the digest carries the parsed findings from memory, which the audit treats as OPEN. It never resolves the loop. |
 | The build omits a disposition | The row stays OPEN, and `REVIEW_DISPOSITION_MISSING{ids}` is emitted. |
@@ -515,6 +512,12 @@ Process failures get a recovery step; only logic blocks.
 | The build rewrites the ledger or the report | `REVIEW_ROW_TAMPERED`, and the kernel restores its copy (§5.7). |
 | An unknown stage, threshold or index key in config | The default stands, and `REVIEW_FINDINGS` carries the config warning at WARN. |
 | The reviewer runs on the builder's model family | `REVIEW_SAME_FAMILY` WARN. Never a block. |
+
+Notes on the row for a malformed Review Plan, Findings, Scores or Disposition Review:
+
+- Shape and scope of the degrade. This is the shape of the existing non-canonical-verdict degrade (`nonFloorExhaustionDegrade`). It holds for any optional evaluate phase past the ship floor that the routing config does not list as mandatory (`config.mandatory_phases`). It holds on the fresh and the resume ladder alike (`Orchestrator.degradesOnExhaustion`, `degradesRejection`).
+- Contract blocks of a malformed review. The contract blocks of the same phase never reach the persisted breaker of the contract gate (`ReviewInput.BreakerExempt`: no count, no reset, no demotion). A malformed review therefore can never open the circuit and hand the audit a `contract_gate_demoted` waiver. The breaker never counts it. The breaker-count escalation of the ladder and the salvage re-prompt (which warns of a breaker about to open) therefore do not apply. Each correction is the plain directive.
+- A report that is *absent* (missing or empty, `ReviewResult.DeliverableAbsent`): The report is not malformed. It keeps the abort, because a non-admitted missing deliverable never reaches Ship ([audit-repair isolation](audit-repair-isolation.md), #542). The breaker never counts it either, so it can no longer be demoted into an approval.
 
 ### 8. Specialists (phase B, data-driven; operator Q-D4)
 
@@ -618,7 +621,7 @@ All codes but the last are in module `review`. `AUDIT_QUALIFICATION_GAP` belongs
 
 ### 13. Security surface
 
-These are protected (`ProtectedSurfaceManifest`), because a tampered index or reviewer silently rewrites what "qualified" means for every cycle:
+These are protected (`ProtectedSurfaceManifest`), because a tampered index or reviewer can silently rewrite what "qualified" means for every cycle:
 - `skills/quality-index/`, `skills/architecture-review/` and `skills/code-review-simplify/` (the last by C0);
 - `agents/evolve-code-reviewer.md`, `.evolve/phases/code-review/` and `.evolve/profiles/code-reviewer.json`;
 - the `qualityindex` and `codereview` packages;

@@ -1,6 +1,5 @@
 > **Audience**: Operators configuring `EVOLVE_BUILDER_REVIEW_SKILLS`; Builders invoking the self-review loop.
-> **Status**: Superseded in part (2026-10-07). The flag-gated builder loop is gone.
->
+> **Status**: Superseded in part (2026-10-07); the flag-gated builder loop is gone.
 > Every code-cycle source writer runs `code-review-simplify`'s required Self-review hook. The compiled-default overlay ([skill-overlays](skill-overlays.md)) preloads the hook. The `EVOLVE_BUILDER_*` variables below have had no reader since cycle 22's dead-flag sweep. The cycle-20 skill assessments stand as history.
 
 # Review Skill Catalog
@@ -49,7 +48,7 @@ For a skill to be usable in `EVOLVE_BUILDER_REVIEW_SKILLS`, it must satisfy all 
 
 ## 3. Primary Skill: code-review-simplify
 
-**Why unified over split:** A single `code-review-simplify` pass covers all 4 review dimensions (correctness, security, performance, maintainability) in one LLM context load. A split into two skills (for example, `code-review` + `code-simplify`) doubles the token cost for the same signal:
+**Why unified over split:** A single `code-review-simplify` pass covers all 4 review dimensions (correctness, security, performance, maintainability) in one LLM context load. Suppose a split into two skills (for example, `code-review` + `code-simplify`). Then the token cost doubles for the same signal:
 
 | Approach | Token cost per review | Dimensions | Convergence loops |
 |----------|-----------------------|------------|-------------------|
@@ -98,7 +97,7 @@ The shell script backing layer (`legacy/scripts/utility/code-review-simplify.sh`
 
 **Assessment:** Action-based — applies simplification edits directly to source files without emitting a numeric composite score. The skill-loop requires a parseable score (0.0–1.0) to drive convergence decisions. `simplify` produces natural-language findings and applies fixes, but has no structured score output compatible with the loop's threshold comparison. **Incompatible with current skill-loop mechanism.**
 
-**Can it become compatible?** Only with a thin wrapper that: (a) invokes `simplify` in a dry-run / report-only mode, and (b) maps its findings to a numeric score. Someone must create the wrapper as a new evolve-loop built-in skill. Deferred to a future cycle.
+**Can it become compatible?** Only with a thin wrapper that: (a) invokes `simplify` in a dry-run / report-only mode, and (b) maps its findings to a numeric score. The wrapper needs creation as a new evolve-loop built-in skill. Deferred to a future cycle.
 
 ### `review` (system skill)
 

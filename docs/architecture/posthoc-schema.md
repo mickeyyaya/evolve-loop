@@ -52,7 +52,7 @@ The Builder persona (`agents/evolve-builder.md`) must:
 2. **Include the verification command in the sentinel comment.** Auditor reads this and runs it.
 3. **For INERT markers**, include `re_attempt_by_cycle: N` (max +5) so the deferral has a deadline.
 
-   The audit treats INERT without a date for a new try as permanent abandonment. This is a P5 violation (constitutional audit checklist).
+   INERT without a date for a new try is treated as permanent abandonment. This is a P5 violation (constitutional audit checklist).
 
 ## Auditor enforcement
 

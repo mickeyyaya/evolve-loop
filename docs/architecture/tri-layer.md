@@ -108,7 +108,7 @@ This means Sprint 3's tri-layer refactor only touches the user-facing API; the k
 
 ### A new Command must:
 
-- Be the skill itself: the CLI exposes every `skills/<name>/` entry as `/evo:<name>` . No separate command file layer exists (ADR-0040 removed it; it duplicated skill prose)
+- Be the skill itself: the CLI exposes every `skills/<name>/` entry as `/evo:<name>`. No separate command file layer exists (ADR-0040 removed it; it duplicated skill prose)
 - Compose personas and skills (the orchestration layer) inside the skill's Composition section
 - For Pattern 3 (fan-out): issue multiple `Agent` tool calls in **one** assistant turn (sequential turns serialize)
 

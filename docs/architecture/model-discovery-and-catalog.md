@@ -55,7 +55,7 @@ A second defect hid behind the first. `bridgePromptDispatcher` launches the clas
 
 The request of the dispatcher (`bridgePromptDispatcher.request`) now appends `Write that JSON object, and nothing else, to the file <ArtifactPath>, then reply with the same JSON.` The prompt of the route judge already follows this pattern. The dispatcher also removes the file before each launch. Every link and family shares the file, and a link that writes nothing must not read the reply of the previous link.
 
-codex still overwrites the artifact with its last message, which the prompt asks to be the same JSON. That codex path is unverified live here, because the codex of this operator has no subscription. An inbox follow-up covers the resolution of the classifier CLI through the CLI routing table (`internal/cliroute`, ADR-0119) instead of the `classifierCLIPreference` literal.
+codex still overwrites the artifact with its last message, which the prompt asks to be the same JSON. That codex path is unverified live here, because the codex of this operator has no subscription. The resolution of the classifier CLI through the CLI routing table (`internal/cliroute`, ADR-0119) instead of the `classifierCLIPreference` literal was filed as an inbox follow-up.
 
 **The classifier order comes from the routing table (2026-10-06, L1b of the CLI routing table, [ADR-0119](adr/0119-one-routing-table-one-resolver.md)).** That follow-up is done. `liveRefresh` compiles the table (`classifierPreference` → `loadCLIRouter`). `classifierFamilies` asks the router for `Resolve{Agent: "model-classifier", Launch: LaunchClassifier}` and keeps each candidate's family once, in chain order. `pickClassifierCLI` then takes the ready CLIs in that order.
 
@@ -77,7 +77,7 @@ Pinned by `TestClassifierOrder_TheLegacyProjectionKeepsTodaysOrder`, `TestClassi
 | `shadow` | `model-catalog.shadow.json` | shadow file only, plus per-tier `would-change cli.tier: old -> new` diff lines against the live catalog | **none** — the overlay reads only `model-catalog.json`, byte-identical to `off` |
 | `enforce` | `model-catalog.json` | live catalog through the `Commit` seam | live entries overlay dispatch |
 
-Absent `refresh_stage` derives from `catalog.auto_refresh` (true ⇒ `enforce`, false ⇒ `off`), so existing deployments keep their exact behavior. An unknown value fails safe to `off` (`policy.resolveRefreshStage`): a typo disables the write and never arms one. Shadow gates its TTL on the file *it* writes. A gate on the live file either never runs or drives the expensive live probe every cycle.
+Absent `refresh_stage` derives from `catalog.auto_refresh` (true ⇒ `enforce`, false ⇒ `off`), so existing deployments keep their exact behavior. An unknown value fails safe to `off` (`policy.resolveRefreshStage`): a typo disables the write and never arms one. Shadow gates its TTL on the file *it* writes. If shadow gated on the live file, the gate either never runs or drives the expensive live probe every cycle.
 
 Manual commands: `evolve models refresh [--source live|detect] [--json]` (an explicit operator action that writes the live catalog) and `evolve models list` (prints staleness). Each CLI row prints `source: live`, `source: detect`, or `source: detect fallback, reason="…"`. `--json` carries `fallback_reason` on each fallback entry. A live refresh's header counts both (`source: live /model; 2 live, 2 detect fallback`).
 
@@ -93,7 +93,7 @@ The live probe (tmux `/model` capture + one-shot classifier) runs in a **throwaw
 
 **Issue.** The operator asked the loop to track the latest model per tier per CLI automatically. The centerpiece comparator `NewestInLineage` had zero production call sites. A naive wiring of it was a capability downgrade: `parseVersion("Gemini 3.5 Flash (Medium)")=[3,5]` beats `("Gemini 3.1 Pro (High)")=[3,1]`. "Newest wins" over a whole candidate list therefore replaces Pro with Flash.
 
-Separately, tier assignment was a live LLM call with no stability check. A documented flap: an identical agy list reclassified Sonnet-4.6 → GPT-OSS-120B between refreshes. For claude, the cache of any concrete id *freezes* the version that its alias tracks.
+Separately, tier assignment was a live LLM call with no stability check. A documented flap: an identical agy list reclassified Sonnet-4.6 → GPT-OSS-120B between refreshes. For claude, if the cache holds any concrete id, that id *freezes* the version that its alias tracks.
 
 **Gap.** "Latest" is only well-defined *within a lineage* (same model line, different versions), and nothing grouped ids by lineage. "Freshest" is CLI-relative: claude resolves `opus` to the newest release at launch, while enumerating CLIs need the newest concrete id. Nothing declared that fact per CLI. And an unchanged offering had no way to keep its previous classification.
 

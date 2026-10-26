@@ -53,7 +53,7 @@ This section documents the closed-vocabulary fields those blocks use.
 - `boot.binary_refresh` (`.evolve/policy.json:boot.binary_refresh`) — closed vocabulary: `auto` (the default; empty/absent maps here) or `off`.
   - Any other value resolves to `auto`. The self-heal is integrity posture, so a typo must not silently disable it.
   - Runtime meaning: the boot-time binary staleness self-heal for the binary-lag class. In this class, fixes land on main but the loop keeps executing the binary it booted with. Cycles 1302–1309 ran a sentinel parser that the repo had already fixed at cycle-1301.
-  - At boot, BEFORE recovery and the readiness gate, this check runs. The embedded build commit of the running binary can be behind plane HEAD by a delta that touches `go/`. In that case, the loop rebuilds with the canonical make target. Then it re-execs the fresh binary in place.
+  - At boot, BEFORE recovery and the readiness gate, this check runs. When the running binary is behind plane HEAD by a delta that touches `go/`, the loop rebuilds with the canonical make target. The test uses the embedded build commit of the binary. Then the loop re-execs the fresh binary in place.
   - Every step is fail-open. Any failure WARNs and boots the old binary. A stale batch is yesterday's status quo, and a bricked loop is worse.
   - A consume-once marker file (`.evolve/boot-refresh-marker`) caps the heal at one try per target HEAD. A rebuild that does not change the stamp can therefore never re-exec forever.
   - `--resume` never refreshes (minimal-perturbation single-cycle protocol). The heal lands at the next fresh boot.

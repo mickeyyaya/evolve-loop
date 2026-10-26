@@ -1,11 +1,8 @@
 # Dynamic Phase Routing (Go kernel)
 
-> **Status:** Kernel shipped v13.0.0 (PR #4, `53ed48b`), **default `advisory`** since 2026-06-06. Registry-pinned after retro migration steps 1-3 landed. It was default-off from v13.0.0. `EVOLVE_DYNAMIC_ROUTING=off` remains the static escape hatch.
->
+> **Status:** Kernel shipped v13.0.0 (PR #4, `53ed48b`), **default `advisory`** since 2026-06-06. Registry-pinned after retro migration steps 1-3 landed; it was default-off from v13.0.0. `EVOLVE_DYNAMIC_ROUTING=off` remains the static escape hatch.
 > **Audience:** Operators experimenting with per-cycle phase selection; persona + router authors.
->
 > **Source:** `go/internal/config` (the `Loader` the composition root calls — ADR-0103 unit 08, [decomposition/08-config.md](decomposition/08-config.md)), `go/internal/router/` (clamp + strategy), `go/internal/core/phase_advisor.go` (LLM brain), `go/internal/core/orchestrator.go` (`WithRouting`), `docs/architecture/phase-registry.json` (registry).
->
 > **Successor design:** ADR-0024 (Proposed) replaces the fixed mandatory-spine model with a conditional floor + PhaseAdvisor — read it before extending this kernel.
 
 ## TL;DR
@@ -44,7 +41,7 @@ An unknown value resolves to `Off` and emits an `unknown-value` warning (never a
 **ADR-0024 §1 floor activation (PR-5, live as of this slice).** At `Stage >= Advisory` the orchestrator computes the advisor's whole-cycle plan once at cycle start. It clamps the plan with `router.ClampPlanToFloor`. It threads the clamped plan into every `Route()`, so the plan drives run/skip for non-mandatory phases. Two separate guarantees, deliberately decoupled:
 
 - **Configurable never-skip set** — `EVOLVE_MANDATORY_PHASES` (default `scout,build,audit,ship`). `shouldRun`'s mandatory branch runs first, so the advisor can never skip a mandatory phase.
-- **Non-configurable integrity floor** — `ship ⇒ build ∧ audit ∧ (tdd unless trivial or deliverable_kind=document — ADR-0099)`, forced *into the plan* before the orchestrator threads it. This makes a tiny mandatory set safe. An operator can set `EVOLVE_MANDATORY_PHASES=tdd`, and the advisor still cannot reach ship without a real build+audit, because `ClampPlanToFloor` re-adds them to the plan.
+- **Non-configurable integrity floor** — `ship ⇒ build ∧ audit ∧ (tdd unless trivial or deliverable_kind=document — ADR-0099)`, forced *into the plan* before the orchestrator threads it. This makes a tiny mandatory set safe. An operator is allowed to set `EVOLVE_MANDATORY_PHASES=tdd`, and the advisor still cannot reach ship without a real build+audit, because `ClampPlanToFloor` re-adds them to the plan.
 
 A planner failure (or `routing_mode=static`, which has no advisor) ⇒ nil plan ⇒ the configurable spine drives through the trigger path (**fail-safe to static**). `CanTransition` + the artifact-backed `SpineSatisfiedUpTo` keep re-validating the `enforceNext` override. The audit-binding of the ship phase remains the ultimate gate. These are three layers, and the floor is never the sole one.
 
@@ -76,7 +73,7 @@ The clamp pass in `go/internal/router` enforces the floor regardless of stage or
 
 ### Unknown-phase drop (cycles 1151/1152)
 
-`ValidatePlan` has always flagged an advisor-invented phase as `unknown-phase`. The documentation calls it **PURE and REPORT-ONLY**, so nothing removed the entry. Cycles 1151 and 1152 both hard-failed at dispatch (`phase gate-wiring-proof: profile not found`). The advisor minted that name out of operating-policy prose. The clamp is the sole plan disposer, and it only ever *added* phases.
+`ValidatePlan` has always flagged an advisor-invented phase as `unknown-phase`, but the documentation calls it **PURE and REPORT-ONLY**, so nothing removed the entry. Cycles 1151 and 1152 both hard-failed at dispatch (`phase gate-wiring-proof: profile not found`). The advisor minted that name out of operating-policy prose. The clamp is the sole plan disposer, and it only ever *added* phases.
 
 `ClampPlanToFloorWith` now drops those entries before applying the floor, reusing `knownPhaseSet` so the two layers can never disagree about what "known" means:
 
@@ -194,7 +191,7 @@ A phase that the plan runs records `plan:<phase>` as its reason. `forced-on:<pha
 
 Each decision is recorded as a `routing-decision-N.json` artifact in the cycle workspace (`Orchestrator.recordRoutingDecision`) so the Off→Shadow soak can diff advisor rationale vs the static path.
 
-**Hybrid cadence (ADR-0024 §2).** Once an upfront whole-cycle plan is driving (`Stage >= Advisory`, `in.Plan != nil`), `LLMProposal.Decide` invokes the per-transition `Propose` ONLY at **branch transitions**. These are post-build and post-audit, where new objective signals (`acs_red`, audit verdict) appear. The signal-poor start-of-cycle plan cannot foresee them.
+**Hybrid cadence (ADR-0024 §2).** Once an upfront whole-cycle plan is driving (`Stage >= Advisory`, `in.Plan != nil`), `LLMProposal.Decide` invokes the per-transition `Propose` ONLY at **branch transitions**. These are post-build and post-audit, where new objective signals (`acs_red`, audit verdict) appear. The signal-poor start-of-cycle plan was unable to foresee them.
 
 The cached plan already decides every other transition. A proposal can never change the `NextPhase` of the kernel regardless (`applyProposal` only annotates + clamps). A call to the LLM there was pure cost.
 
@@ -216,7 +213,7 @@ With NO upfront plan (Shadow, static mode, planner failure) the legacy per-trans
 | Reading a routing env var outside `config.Loader.Load` | Splits the composition root; reintroduces `os.Getenv` sprawl | `config` is a leaf package (stdlib + `signalcenter` + `paths`, import-allowlist-tested); orchestrator/phases take `RoutingConfig` by injection |
 | Letting the LLM proposal drive ship directly | Reopens the reward-hacking surface | `router.Route()` clamp re-validates every proposal against the floor before any phase runs |
 | Dropping `audit` or `ship` from `EVOLVE_MANDATORY_PHASES` | Breaks audit-before-ship | `validateSpine` emits `weak-spine`; ship-needs-real-audit still clamps |
-| Hard-failing on an unknown stage/mode value | If a typo broke the value, autonomy breaks | Unknown values resolve to safe defaults (`Off` / `llm`) + a warning |
+| Hard-failing on an unknown stage/mode value | A typo can break autonomy | Unknown values resolve to safe defaults (`Off` / `llm`) + a warning |
 
 ## See also
 

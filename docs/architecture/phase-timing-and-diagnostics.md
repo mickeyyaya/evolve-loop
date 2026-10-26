@@ -194,7 +194,7 @@ bridge errors retain their existing shorter bound. Exit code 81 and
 
 ### Verified Submission Delivery Failures — Issue / Gap / Solution
 
-- **Issue:** A tmux prompt or nudge can remain parked after all three bounded Enter re-sends. Submit verification classified the pane as `submit_wedged`, but the driver still consumed the normal artifact-wait budget before returning exit 81.
+- **Issue:** Before the fix, a tmux prompt or nudge remained parked after all three bounded Enter re-sends. Submit verification classified the pane as `submit_wedged`, but the driver still consumed the normal artifact-wait budget before returning exit 81.
 - **Gap:** Both tmux consumer sites recorded the classification without acting on it, and the terminal failure diagnostic exposed only a flat `error_message`. Generic silence and a verified delivery failure therefore looked identical to automation.
 - **Solution:** The prompt site now short-circuits through the existing `ExitArtifactTimeout` marker, while the nudge site carries its classified reason into that same marker. A typed, host-owned `cause=submit_wedged` field authorizes extraction of the escaped reason into `delivery_failure`; reviewer prose cannot forge that classification. Historical markers without `cause` retain the legacy reason fallback. Generic silence and unrelated failures leave the field empty. The existing resend cap and one-relaunch dispatcher contract are unchanged.
 
@@ -212,7 +212,7 @@ The JSON object contains the following fields:
 - `cycle` (integer): The cycle ID in which the pause occurred.
 - `elapsed_s` (integer): The total seconds waited so far.
 - `interval_s` (integer): The review interval duration.
-- `attempt` (integer): The review try index when the pause was triggered.
+- `attempt` (integer): The review try index (field `attempt`) when the pause was triggered.
 - `stop_kind` (string): The classification of the stop condition (for example, `"artifact_timeout"`).
 - `action` (string): The reviewer's verdict action (for example, `"pause"`).
 - `reason` (string): The human-readable justification produced by the reviewer.
@@ -242,7 +242,7 @@ To preserve the structured audit trail of the cycle's execution, the orchestrato
 
 ### Relaunch Signal (`kind=phase_retry`)
 
-A transient bridge failure (exit code 80, 85, or 86) or an artifact timeout (exit code 81) can trigger a self-heal retry. Then the system appends a `kind=phase_retry` entry to the ledger. This signals a recoverable issue in the phase. The system relaunched it.
+When a self-heal retry starts, the system appends a `kind=phase_retry` entry to the ledger. A transient bridge failure (exit code 80, 85, or 86) or an artifact timeout (exit code 81) triggers the retry. The entry signals that the phase encountered a recoverable issue and was relaunched.
 
 - **ExitCode**: Records the precise bridge exit code (for example, `80`, `81`, `85`, `86`) returned by the failing try.
 

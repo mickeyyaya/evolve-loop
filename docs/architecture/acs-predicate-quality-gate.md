@@ -120,9 +120,9 @@ Layers 1–4 ask *"does this predicate assert real behavior?"*. Layer 5 asks the
 
 **Stage: ADVISORY, structurally.** Gate D returns `block=false` as a constant — a flaky *shape* is a strong smell, not proof the predicate is wrong. It never rejects a deliverable at any stage. In the CLI a finding raises `PASS→WARN` (exit 1) through a **monotonic severity join**, so it can never lower a Level-0 tautology HALT.
 
-Gate D emits **exactly one line per `tdd` phase, on every path** — findings, `CLEAN — linted N file(s), 0 findings`, `no Go ACS predicate package`, or a loud stand-down. If silence meant "clean", a healthy cycle was indistinguishable from a gate that silently no-ops. That is the dead-code failure mode this layer was created to close.
+Gate D emits **exactly one line per `tdd` phase, on every path** — findings, `CLEAN — linted N file(s), 0 findings`, `no Go ACS predicate package`, or a loud stand-down. Silence never means "clean". If it did, a healthy cycle was indistinguishable from a gate that silently no-ops. That is the dead-code failure mode this layer was created to close.
 
-> **Known limit:** that line goes to the phase log (stderr) only. Nothing persists it to an artifact, cycle state, or the Auditor handoff. Findings are therefore operator-visible but **not** agent-consumable. The per-class audit that the promotion path needs cannot get live runs until they are. Wiring an advisory-finding channel is a reviewer-seam change, tracked separately.
+> **Known limit:** that line goes to the phase log (stderr) only. Nothing persists it to an artifact, cycle state, or the Auditor handoff. Findings are therefore operator-visible but **not** agent-consumable. The per-class audit that the promotion path needs cannot get live runs until findings are agent-consumable. Wiring an advisory-finding channel is a reviewer-seam change, tracked separately.
 
 **Promotion gate.** Measured over the live corpus (282 `go/acs/cycle*` dirs, 2026-07-30, shipped binary):
 
@@ -156,7 +156,7 @@ The cuts also *added* true positives previously invisible: the `git`-without-`-C
 
 Layer 5 asks if a predicate asserts reliably. Layer 6 asks if it **can** pass at all. A predicate that is red on every tree burns the whole build and proves nothing. Cycle 1488's `TestC1488_003` used `FileContains` to assert that a string was absent, and three lanes failed on it.
 
-The two cycles that then built this lint each failed on a predicate of their own that no lane can satisfy. Cycle 1788 failed on an exit code that `go run` cannot return. Cycle 1793 failed on output that only a protected path prints.
+The two cycles that then built this lint each failed on a predicate of their own that no lane was able to satisfy. Cycle 1788 failed on an exit code that `go run` cannot return. Cycle 1793 failed on output that only a protected path prints.
 
 **Implementation:** `internal/evalqualitycheck.LintUnsatisfiablePredicates`, a deterministic `go/ast` lint over the same predicate sources as Layer 5. Three kinds:
 

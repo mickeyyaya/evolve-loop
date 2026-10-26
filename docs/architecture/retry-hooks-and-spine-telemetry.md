@@ -11,8 +11,8 @@ in more than one place, so the copies drift._
 the sequential loop grew had to be re-remembered on the batch side — and twice it
 was not. `optionalInfraSkip` and `postShipObserverSkip` shipped sequential-only,
 so an optional evaluate phase that exhausted infra retries aborted the *whole
-batch* instead of degrading to WARN. A patch of the two misses does not fix the
-class: the next hook diverges the same way.
+batch* instead of degrading to WARN. Suppose someone patches the two misses. The
+class stays unfixed: the next hook diverges the same way.
 
 **Design** (`go/internal/core/retry_opts.go`). `retryOpts` is a Strategy value
 enumerating every recovery hook a retry loop may run:
@@ -108,7 +108,7 @@ dossier.RollupSpineFailOpens          → batch Total / ByPhase / OverThresholdC
 ```
 
 - `SpineSatisfiedUpTo` now **delegates** to `UnsatisfiedSpineAnchor`, so the gate
-  and its reporter cannot disagree. A reporter that inflated the counter is
+  and its reporter cannot disagree. Suppose a reporter inflated the counter. Then it is
   worse than no telemetry.
 - The record carries `(phase, missing_artifact, reason)`. Phase alone cannot
   group 76 WARNs by cause; `reason` distinguishes a dialed-down `SpineFloor`

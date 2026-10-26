@@ -12,11 +12,11 @@ not evidence that a child process received that restriction.
 
 Investigation also exposed three connected failures:
 
-- The Linux launch prefix omitted the `bwrap` executable.
-- macOS path aliases can bypass the repository write denial.
-- A broad scratch-directory write grant can reopen a repository located under that scratch directory.
+- Before the fix, the Linux launch prefix omitted the `bwrap` executable.
+- Before the fix, macOS path aliases bypassed the repository write denial.
+- Before the fix, a broad scratch-directory write grant reopened a repository located under that scratch directory.
 
-The launch accepted a nested-session marker as satisfying mandatory sandboxing. The optional preflight
+Before the fix, a nested-session marker was accepted as satisfying mandatory sandboxing. The optional preflight
 canary treated any setup error as verified outer confinement.
 
 ## Supported policy
@@ -85,7 +85,7 @@ alternates), even when broad scratch permissions otherwise cover their parent.
 
 macOS grants the required files and current branch lock paths precisely.
 Bubblewrap needs coarse writable directory mounts to create and rename Git
-lockfiles. Those mounts also expose routing/configuration metadata. Linked-worktree
+lockfiles. Suppose the sandbox grants those mounts. Then they also expose routing/configuration metadata. Linked-worktree
 Git metadata confinement is therefore explicitly unsupported on Linux. A
 mandatory linked-worktree launch fails closed.
 

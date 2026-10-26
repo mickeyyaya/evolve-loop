@@ -129,8 +129,8 @@ TOON cuts structured-output tokens 30–60% vs JSON. TSV equivalent
 ~50% reduction.
 
 **Applicability:** audit-report.md's defects table + triage-report.md's
-top_n structures are JSON-shaped today. A conversion to TOON or TSV
-reduces output tokens 30–60% for those sections.
+top_n structures are JSON-shaped today. The estimate for a conversion to TOON or TSV
+is a 30–60% reduction of output tokens for those sections.
 
 **Cost-benefit:** small ($0.10/cycle saved), needs downstream parser
 updates. Defer until easier wins land.

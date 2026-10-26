@@ -1,8 +1,7 @@
 # Code-Graph & Blast-Radius Context — Design
 
-> **Status:** Design / not yet implemented (authored 2026-07-20). Target: a Go-native code-graph that scopes Scout / Audit / carry-forward context to the *blast radius* of a change. This cuts token cost and raises precision.
->
-> **Prior art / attribution:** This design is directly inspired by **[tirth8205/code-review-graph](https://github.com/tirth8205/code-review-graph)** (MIT). We borrow its central idea — a persistent code knowledge-graph queried for *impact radius* instead of re-reading the whole corpus. We re-implement it natively in Go to satisfy this repo's `go_only_all_tooling` invariant. Where we diverge from the source, this document says so explicitly.
+> **Status:** Design / not yet implemented (authored 2026-07-20). Target: a Go-native code-graph that scopes Scout / Audit / carry-forward context to the *blast radius* of a change, to cut token cost and raise precision.
+> **Prior art / attribution:** This design is directly inspired by **[tirth8205/code-review-graph](https://github.com/tirth8205/code-review-graph)** (MIT). We borrow its central idea: a persistent code knowledge-graph queried for *impact radius* instead of re-reading the whole corpus. We re-implement it natively in Go to satisfy this repo's `go_only_all_tooling` invariant. Where we diverge from the source, this document says so explicitly.
 
 ## Table of Contents
 
@@ -78,7 +77,7 @@ This is expensive (tokens ∝ bytes read) and imprecise (the agent may read 30 f
 ## Approaches considered
 
 **A — Wrap the Python source tool through subprocess/MCP.**
-Fastest to a demo. It violates `go_only_all_tooling` and `subagent_dispatch_via_agent_bridge` (phases shell to Python/MCP). It adds a runtime Python dependency to a Go binary that ships through the marketplace. **Rejected.**
+Fastest to a demo. It violates `go_only_all_tooling` and `subagent_dispatch_via_agent_bridge` (in this rejected option, phases shell to Python/MCP). It adds a runtime Python dependency to a Go binary that ships through the marketplace. **Rejected.**
 
 **B — Embeddings-only semantic retrieval (no graph).**
 Index files/chunks as vectors, retrieve top-k by similarity. Simple, language-agnostic. But it gives *similar* code, not *impacted* code — it cannot answer "who calls this / what test covers this," which is exactly what Audit needs for recall. Also adds an embedding provider dependency on the hot path. **Rejected as the primary mechanism** (kept as an optional hybrid layer in S6).
@@ -181,7 +180,7 @@ impact(changedPaths, maxHops):
 
    It answers exactly the "did this break a caller / is it tested" question, at a fraction of the bytes.
 3. **carry-forward filter (`carryforward_filter.go`).** Adds a cheap dependency signal: does the candidate branch touch symbols with high downstream fan-in? Complements the existing 3-way-merge landability check.
-4. **Token-telemetry.** The system measures every impact-scoped read against the counterfactual (the bytes that the phase reads without the graph).
+4. **Token-telemetry.** The system measures every impact-scoped read against the counterfactual (the hypothetical read size of the phase without the graph).
 
    This way the 82×-style claim is *verified in-repo*, not assumed.
 

@@ -2,11 +2,11 @@
 
 ## Issue
 
-The documentation review on 2026-09-09 found that `RunCycleFromPhase` can
-return a successful result without the terminal lifecycle used by `RunCycle`.
+The documentation review on 2026-09-09 found that `RunCycleFromPhase` was able to return
+a successful result without the terminal lifecycle used by `RunCycle`.
 Resumed cycles skipped the verdict-coherence and lost-landing checks, durable
 cycle dossiers, continuation snapshots, and carryover accounting. Its separate
-32-iteration loop can exhaust its bound and still report success.
+32-iteration loop was able to exhaust its bound and still report success.
 
 Resume also lost difficulty-based build timeouts and recurrence-based model
 escalation. After a second interruption the existing quota checkpoint still

@@ -208,11 +208,11 @@ Bash 3.2 compatible. Mirrors the `mode_rank` / `rank_to_mode` pattern already in
 
 **Severity**: LOW / FUTURE
 
-**Description** (Axis C): Fan-out the Auditor phase to 3 different CLIs (for example, Claude Auditor + Gemini Auditor + Codex Auditor). Then aggregate verdicts with majority vote or consensus threshold. This breaks same-vendor LLM sycophancy. An auditor from the same vendor as the builder can be systematically more lenient.
+**Description** (Axis C): Fan-out the Auditor phase to 3 different CLIs (for example, Claude Auditor + Gemini Auditor + Codex Auditor). Then aggregate verdicts with majority vote or consensus threshold. This is expected to break same-vendor LLM sycophancy. An auditor from the same vendor as the builder can be systematically more lenient.
 
 **Why this matters architecturally**: Axis A (per-phase sequential CLI assignment) gives diverse perspectives across phases but not within a phase. A Builder-Claude + Auditor-Gemini setup is still one-vs-one. Axis C gives N independent auditors from different vendors — much stronger independence signal.
 
-**Why this is deferred**: The fan-out aggregator (`aggregator.sh`) handles `verdict` merge mode (majority vote on PASS/FAIL/WARN strings). But the per-worker quality tier problem (GAP-3) compounds: 3 workers across 3 CLIs, each with different tiers. The design requires GAP-3 to be closed first. It also requires fan-out to be enabled by default (currently `EVOLVE_FANOUT_ENABLED=0`).
+**Why this is deferred**: The fan-out aggregator (`aggregator.sh`) handles `verdict` merge mode (majority vote on PASS/FAIL/WARN strings). But the per-worker quality tier problem (GAP-3) is expected to compound: 3 workers across 3 CLIs, each with different tiers. The design requires GAP-3 to be closed first. It also requires fan-out to be enabled by default (currently `EVOLVE_FANOUT_ENABLED=0`).
 
 **Recommendation**: Dedicate a future cycle to Axis C design after GAP-3 and GAP-4 are closed.
 
@@ -404,8 +404,8 @@ The `quality_tier` per-CLI annotation in fan-out ledger entries (v8.52.0) makes 
 
 This pattern responds to two prior incidents documented elsewhere:
 
-- **Gemini Forgery (2026-03-23)** — same-vendor reasoning produced internally-consistent but fabricated artifacts. A cross-CLI Auditor can surface such a discrepancy. Different vendors trained on different corpora produce divergent outputs on novel content, so agreement signals truth more than within-vendor agreement does.
-- **Cycle 102-111 reward hacking** — the Auditor and Builder were both Sonnet, so the Auditor accepted tautological evals the Builder authored. A cross-CLI consensus gives non-Sonnet voters a chance to spot the tautology.
+- **Gemini Forgery (2026-03-23)** — same-vendor reasoning produced internally-consistent but fabricated artifacts. Suppose a cross-CLI Auditor runs in this incident. Then it surfaces the discrepancy. Different vendors trained on different corpora produce divergent outputs on novel content, so agreement signals truth more than within-vendor agreement does.
+- **Cycle 102-111 reward hacking** — the Auditor and Builder were both Sonnet, so the Auditor accepted tautological evals the Builder authored. In a cross-CLI consensus, non-Sonnet voters get a chance to spot the tautology.
 
 Consensus auditing alone does not fully solve either of these incidents. Kernel hooks, mutation testing, and audit-binding remain the primary defenses. Consensus closes the residual same-vendor-sycophancy gap.
 

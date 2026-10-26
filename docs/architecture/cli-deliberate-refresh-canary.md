@@ -18,13 +18,13 @@ The deliverable has two halves with very different testability:
 
    A unit test cannot do this. It needs a live CLI and belongs behind an integration gate (like the other live-CLI validations).
 
-If you build (1) without a spec and (2) without the live harness, you produce a half-feature on a sensitive path (CLI routing). The honest increment is to spec it first.
+Building (1) without a spec and (2) without the live harness risks a half-feature on a sensitive path (CLI routing). The honest increment is to spec it first.
 
 ## Sketch for the focused increment
 
 - **Seam:** `type CanaryDriver interface { Probe(ctx, cli string) (ok bool, detail string, err error) }`. A real impl drives one bounded generation with the existing `*-tmux` recipe. A fake impl returns scripted results for unit tests.
 - **Decision (pure, unit-testable):** `canary.Plan(expired map[string]clihealth.Entry, now, lastCanary map[string]time.Time) []string` → the families to canary this cycle, with a min-interval back-off so a flapping CLI isn't canaried every cycle.
-- **Wiring:** at the cycle boundary (near the bench snapshot the router already takes), run `Plan`. For each result, call `CanaryDriver.Probe`. On `ok`, call `Store.Clear(family)` (un-bench, so the family is routable again). On failure, re-`Bench` with a fresh window. The flag `EVOLVE_CLI_CANARY=off|shadow|enforce` gates this. In shadow mode, the system logs the canary that it plans to run.
+- **Wiring:** at the cycle boundary (near the bench snapshot the router already takes), run `Plan`. For each result, call `CanaryDriver.Probe`. On `ok`, call `Store.Clear(family)` (un-bench, so the family is routable again). On failure, re-`Bench` with a fresh window. The flag `EVOLVE_CLI_CANARY=off|shadow|enforce` gates this. In shadow mode, the system logs the canary that it does not run.
 - **Tests:** `Plan` unit tests (expiry + back-off); a fake-driver integration test for the clear/re-bench wiring; the live `Probe` behind the integration tag.
 
 ## Deferral rationale

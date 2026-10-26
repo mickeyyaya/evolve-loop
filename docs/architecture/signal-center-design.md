@@ -1,13 +1,8 @@
 # Signal Center — design
 
-> **Status:** design (S0) for [ADR-0101](adr/0101-signal-center.md). The architect's design review (2026-09-13: APPROVE-WITH-FIXES) revised it. The design folds in every blocking and `should-fix` finding below and marks it *(review N)*.
->
+> **Status:** design (S0) for [ADR-0101](adr/0101-signal-center.md), revised after the architect's design review (2026-09-13: APPROVE-WITH-FIXES). The design folds in every blocking and `should-fix` finding below and marks it *(review N)*.
 > Evidence: [signal-center-inventory-2026-09-13.md](../research/signal-center-inventory-2026-09-13.md).
->
-> Severity contract: [observer-severity.md](observer-severity.md) (schema 1.0, adopted unchanged).
->
-> Envelope compatibility: [phase-observer.md](phase-observer.md) § Unified envelope.
->
+> Severity contract: [observer-severity.md](observer-severity.md) (schema 1.0, adopted unchanged); envelope compatibility: [phase-observer.md](phase-observer.md) § Unified envelope.
 > External subscribers (2026-10-09): a `Publisher` listener at each root appends every event to channel logs. Other programs subscribe with `evolve events` ([event-channels.md](event-channels.md), [ADR-0127](adr/0127-push-only-event-channels.md)).
 
 ## Table of contents
@@ -157,7 +152,7 @@ Rules (each is a named test):
 - Compatibility with the observer envelope: `source.{component,cycle,phase}` ↔ `module,cycle,phase`;
   `type` ↔ `kind`; `severity` identical; `run_id` plays `trace_id`.
 
-Examples (the lines that the Center produces for cycles 1636 and 1630, which had no such lines):
+Examples (the lines that the Center produces for cycles 1636 and 1630 if it had run):
 
 ```json
 {"schema_version":"signal/1.0","seq":41,"pid":9055,"ts":"2026-09-13T17:46:02.114Z","cycle":1636,"run_id":"01J…","phase":"triage","attempt":1,
@@ -215,7 +210,7 @@ raises it to WARN — never dropped. *(review 21: `advisor` and `config` added t
 | `phase.dispatched` | a phase starts: one event for each dispatch, not for each retry (ADR-0127 E11) | INFO | |
 | `phase.outcome` | the C1 terminal disposition (verdict recorded). It is also the routing disposition that the orchestrator takes after a phase. Two cases exist: an audit FAIL's repair grant or decline (`ORCHESTRATOR_AUDIT_REPAIR_*`), and a post-Build writer's stale explanation routed back to Build (`ORCHESTRATOR_EXPLANATION_REAUTHOR_ROUTED`, WARN). A routing disposition carries no verdict and is not a phase run. The dashboard counts a `phase.outcome` as a run only when `fields.verdict` is set | INFO on PASS, WARN on WARN/FAIL | ✓ on FAIL |
 | `phase.aborted` | the cycle aborted after a phase (review reject, guard, persistence) | WARN | ✓ |
-| `gate.passed` | the contract gate let the phase advance. Cases: verified, salvaged, or advanced with a WARN that it is better not to hide (`would-block` under a shadow stage, breaker demotion, fail-open) — S2b. For a verified phase (`GATE_CONTRACT_VERIFIED`), the fields name the artifact, its size, the owed files and effects, and where the gate searched | INFO; WARN for `would-block` / demoted / fail-open | |
+| `gate.passed` | the contract gate let the phase advance. Cases: verified, salvaged, or advanced with a WARN that it is recommended not to hide (`would-block` under a shadow stage, breaker demotion, fail-open) — S2b. For a verified phase (`GATE_CONTRACT_VERIFIED`), the fields name the artifact, its size, the owed files and effects, and where the gate searched | INFO; WARN for `would-block` / demoted / fail-open | |
 | `gate.rejected` / `gate.corrected` | `gate.rejected`: the contract gate refused at enforce. The reason IS the correction directive (`fields.codes`, `blocks`). `gate.corrected`: the ladder of the orchestrator re-dispatched a correction (`fields.correction`, `max`, `rung`, `cli`, `escalated`) — S2b, both roots | WARN / INFO | ✓ / |
 | `ship.landed` / `ship.error` | a landing / a `shiperr` code | INFO / WARN (INCIDENT for the `integrity` class) | / ✓ |
 | `ship.warning` | the landing failed to reset the tracked binary before the ff-merge or declined the inline push-race repair. Or it failed to read HEAD after the push, or failed to write ship-binding.json. The commit/push stands. The own error of the ship (if any) is the `ship.error` that follows, and its `fields.step` names the landing step (unit 07) | WARN | |
@@ -426,8 +421,7 @@ Batch-level signals carry no cycle and are durable in `<evolveDir>/signals.ndjso
 cycle. Before S4a the root
 returned no path for cycle 0. This was harmless while no regular producer was cycle-less.
 
-The stub root prevented a drop report after every wave. The wave summary of the loop otherwise raised that report on the durable sink. The
-stub root found the risk first, because it builds the production topology (§15.4).
+Suppose the root still returned no path for cycle 0 when the wave summary of the loop arrived. Then the sink reports a drop after every wave. The stub root caught this danger, because it builds the production topology (§15.4).
 
 **E12 retires this file** ([ADR-0127](adr/0127-push-only-event-channels.md)). The project-level `<evolveDir>/signals.ndjson` retires into the `signals` channel. The root topology then wraps the per-cycle sink in a cycle filter, so cycle 0 events never reach it. The lossless `loop` and `errors` channels keep those events ([event-channels.md](event-channels.md) §2).
 
@@ -542,7 +536,7 @@ Hand-written `[x]` prose disappears one module at a time (§10 S5).
 - `quota.paused` at `cycleRun.pauseForQuota` (the seam both roots reach; its hand-written WARN line deleted).
 - An abnormal exit seals the cycle FAIL from `cycleRun.abnormalEpilogue`.
 - `Center.Flush` deferred at both roots.
-- `evolve signals codes generate\|check` projects the registry into `docs/architecture/signal-codes.md`.
+- `evolve signals codes generate|check` projects the registry into `docs/architecture/signal-codes.md`.
 
 **S2a** acceptance (measured by tests, not prose):
 
@@ -646,7 +640,7 @@ Hand-written `[x]` prose disappears one module at a time (§10 S5).
 - **Coverage** *(review 13)*. `internal/signalcenter` joins `.apicover-enforce` (0 uncovered exports,
   0 false-greens, godoc on every export — the in-test API gate stays as today). The **100 % line
   coverage is enforced in CI/`make`** (`go test -count=1 -coverprofile` + a threshold step beside
-  the apicover gate). A test that reads its own profile never enforces it, because that test skips silently.
+  the apicover gate). The 100 % line coverage is never enforced by a test that reads its own profile. Such a test skips silently.
 - **Race.** `go test -race ./internal/signalcenter/` with concurrent emitters and (un)subscribers. A
   `core` `-race` test with evaluate-batch goroutines emitting into the summary of the orchestrator.
 - **Named tests added on review:**
@@ -819,7 +813,7 @@ Folded from the S1 architecture review (Approve; four MEDIUM):
 - `verdictReason(verdict, diags)` is the one rendering of "verdict=<V>[: reasons]" for the floor error, the seal and the FAIL **and** WARN events.
 - The registry-clean assertion lives in `cmd/evolve` (`TestSignalCenterRegistry_EveryLinkedModuleRegistersCleanly`), the binary that links every producer module. The leaf package's own test cannot see them.
 
-Folded from the S1 Go review (Approve; one MEDIUM): the ≤ 4 KiB line cap only looked at `Fields`. A regex-valid but over-long `Origin` or a hostile `Reason` can break the atomic-append promise. Identifiers are now bounded and `Reason` is cut to fit (§4).
+Folded from the S1 Go review (Approve; one MEDIUM): the ≤ 4 KiB line cap only looked at `Fields`. Before the fix, a regex-valid but over-long `Origin` or a hostile `Reason` broke the atomic-append promise. Identifiers are now bounded and `Reason` is cut to fit (§4).
 
 Proof carried by the S1 PR:
 
@@ -873,7 +867,7 @@ constructor. A test that asserts a rendered INCIDENT line therefore proves the t
 console sink renders into the stderr writer of the command (production passes `os.Stderr`).
 
 Cycle-less signals are durable in `<evolveDir>/signals.ndjson` (see §6). The production topology of the stub root
-prevented the drop report that the wave summary otherwise raised after every wave.
+caught the danger of a drop report from the wave summary after every wave.
 
 Deleted
 1:1: the three-line `[loop] SYSTEM-FAILURE HALT` message, `[loop] PIPELINE-BLOCKER HALT`, the
@@ -963,7 +957,7 @@ Follow-up outside this slice: CI compiles only `acs/regression/...` under `-tags
 
 | Producer | Chokepoint (origin) | Severity / code | Fields |
 |---|---|---|---|
-| `cycle.sealed` | `cycleRun.completeCycle` — the closeout both dispatch roots share, after `finalizeCycle`, so the FINAL verdict is known. It is the last orchestrator event of every completed cycle. An abnormal exit (the cycle died mid-phase) seals from `cycleRun.abnormalEpilogue` instead: FAIL, with the abort reason as `termination_reason`. "How did cycle N end" therefore has one answer on every path | INFO; WARN `ORCHESTRATOR_CYCLE_FAILED` on FAIL | `final_verdict`, `phases_run`, `termination_reason`, `retro_decision` (`shipped` arrives in S2b with `CycleState.Shipped`) |
+| `cycle.sealed` | `cycleRun.completeCycle` — the closeout both dispatch roots share, after `finalizeCycle`, so the FINAL verdict is known. It is the last orchestrator event of every completed cycle. An abnormal exit (the cycle died mid-phase) seals from `cycleRun.abnormalEpilogue` instead: FAIL, with the abort reason as `termination_reason`. "how did cycle N end" therefore has one answer on every path | INFO; WARN `ORCHESTRATOR_CYCLE_FAILED` on FAIL | `final_verdict`, `phases_run`, `termination_reason`, `retro_decision` (`shipped` arrives in S2b with `CycleState.Shipped`) |
 | `system.failure` | `cycleRun.completeCycle`, before the seal, when any floor attached a `SystemFailureSignal` (incoherence, lost landing, audit-fail floor, decision branches) | INCIDENT `ORCHESTRATOR_SYSTEM_FAILURE` when `Halt`, WARN otherwise | `category`, `level`, `halt` |
 | `ship.error` | `Orchestrator.recordShipError` — where core records the phase's typed error (`ship-error.json` + ledger) | WARN `SHIP_<code>` (`shiperr.SignalCode`); INCIDENT for the `integrity` class — `ShipErrorClass.SignalSeverity`, the rule's one home, beside the vocabulary | `class`, `stage`, `path` |
 | `quota.paused` | `cycleRun.pauseForQuota` — the seam BOTH dispatch roots reach. The deferred guard of the resume root never calls the epilogue for a pause, so the epilogue was the wrong seam (S2a architecture review). Its hand-written `[orchestrator] WARN` line deleted | WARN `ORCHESTRATOR_QUOTA_PAUSED`; the reason is the one error text that the ledger and the phase diag carry | `phase` |
@@ -1005,7 +999,7 @@ declared in the closed sets with **zero producers**, and the production streams 
 The prompt carried the contract block (artifact path, required sections or JSON keys, verdict
 sentinel, the `evolve phase verify` self-check). But two ADR-0100 additions that the gate enforces lived only in persona prose:
 the agent-owed secondaries and the declared effects. A registry
-change was therefore a risk: a gate move without a prompt move was possible. This slice closes that risk.
+change was therefore a risk: a gate move without a prompt move was possible.
 
 | Producer | Chokepoint (origin) | Severity / code | Fields |
 |---|---|---|---|

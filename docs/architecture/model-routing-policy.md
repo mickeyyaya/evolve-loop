@@ -12,7 +12,7 @@ names an abstract tier — `fast`, `balanced`, or `deep`
 concrete, CLI-native model id with `modelcatalog.Lookup(cli, tier)`.
 
 **Invariant: Claude must be replaceable by codex, agy, ollama, or any driver,
-using an equal-capability model.** No phase may hard-code a vendor model.
+using an equal-capability model.** Phases must not hard-code a vendor model.
 
 A vendor name in a profile (for example, `"sonnet"`) reaches *past* the tier abstraction
 and silently fails to resolve for any non-Claude CLI
