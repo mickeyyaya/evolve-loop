@@ -547,20 +547,6 @@ func contractTmux(t *testing.T, socket string, args ...string) string {
 	return strings.TrimSpace(string(out))
 }
 
-func contractTempDir(t *testing.T, parent, pattern string) string {
-	t.Helper()
-	dir, err := os.MkdirTemp(parent, pattern)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.RemoveAll(dir) })
-	real, err := filepath.EvalSymlinks(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return real
-}
-
 func (h contractHost) reindex(t *testing.T) {
 	t.Helper()
 	record, _ := inputindex.ReadRecord(h.root, 7)

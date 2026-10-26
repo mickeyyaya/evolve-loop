@@ -132,6 +132,15 @@ func itLaunch(session, launchCmd, marker string, scrollback int, named bool) tmu
 	}
 }
 
+const itLaunchDeadline = 5 * time.Minute
+
+func itBoundedContext(t *testing.T, d time.Duration) context.Context {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), d)
+	t.Cleanup(cancel)
+	return ctx
+}
+
 func itSession(tag string) string {
 	return fmt.Sprintf("evolve-bridge-it-%s-%d", tag, os.Getpid())
 }
@@ -150,7 +159,7 @@ func TestRealTmux_HappyPath(t *testing.T) {
 	deps.Stderr = &stderr
 	defer itTmuxCtl.KillSession(context.Background(), sess)
 
-	code, err := runTmuxREPL(context.Background(), cfg, deps, itLaunch(sess, launchCmd, marker, 0, false))
+	code, err := runTmuxREPL(itBoundedContext(t, itLaunchDeadline), cfg, deps, itLaunch(sess, launchCmd, marker, 0, false))
 	if err != nil {
 		t.Fatalf("runTmuxREPL err: %v", err)
 	}
@@ -179,7 +188,7 @@ func TestRealTmux_BootTimeout(t *testing.T) {
 	sess := itSession("boot")
 	defer itTmuxCtl.KillSession(context.Background(), sess)
 
-	code, _ := runTmuxREPL(context.Background(), cfg, itDeps(10*time.Millisecond),
+	code, _ := runTmuxREPL(itBoundedContext(t, itLaunchDeadline), cfg, itDeps(10*time.Millisecond),
 		itLaunch(sess, launchCmd, "NEVER", 0, false))
 	if code != ExitREPLBootTimeout {
 		t.Fatalf("exit = %d, want %d (ExitREPLBootTimeout)", code, ExitREPLBootTimeout)
@@ -199,7 +208,7 @@ func TestRealTmux_ArtifactTimeout(t *testing.T) {
 	sess := itSession("artto")
 	defer itTmuxCtl.KillSession(context.Background(), sess)
 
-	code, _ := runTmuxREPL(context.Background(), cfg, itDeps(150*time.Millisecond),
+	code, _ := runTmuxREPL(itBoundedContext(t, itLaunchDeadline), cfg, itDeps(150*time.Millisecond),
 		itLaunch(sess, launchCmd, marker, 0, false))
 	if code != ExitArtifactTimeout {
 		t.Fatalf("exit = %d, want %d (ExitArtifactTimeout)", code, ExitArtifactTimeout)
@@ -220,7 +229,7 @@ func TestRealTmux_MultilineSpecialCharPrompt(t *testing.T) {
 	sess := itSession("multiline")
 	defer itTmuxCtl.KillSession(context.Background(), sess)
 
-	code, _ := runTmuxREPL(context.Background(), cfg, itDeps(150*time.Millisecond),
+	code, _ := runTmuxREPL(itBoundedContext(t, itLaunchDeadline), cfg, itDeps(150*time.Millisecond),
 		itLaunch(sess, launchCmd, marker, 0, false))
 	if code != ExitOK {
 		t.Fatalf("exit = %d, want ExitOK", code)
@@ -240,7 +249,7 @@ func TestRealTmux_NamedSessionResume(t *testing.T) {
 	cfg1 := itConfig(t, "x")
 	mustWrite(t, cfg1.PromptFile, "ARTIFACT="+cfg1.Artifact)
 	launchCmd := writeFakeREPL(t, cfg1.Worktree, "happy", marker)
-	code1, _ := runTmuxREPL(context.Background(), cfg1, itDeps(120*time.Millisecond),
+	code1, _ := runTmuxREPL(itBoundedContext(t, itLaunchDeadline), cfg1, itDeps(120*time.Millisecond),
 		itLaunch(sess, launchCmd, marker, 0, true))
 	if code1 != ExitOK {
 		t.Fatalf("run 1 exit = %d, want ExitOK", code1)
@@ -254,7 +263,7 @@ func TestRealTmux_NamedSessionResume(t *testing.T) {
 
 	cfg2 := itConfig(t, "x")
 	mustWrite(t, cfg2.PromptFile, "ARTIFACT="+cfg2.Artifact)
-	code2, _ := runTmuxREPL(context.Background(), cfg2, itDeps(120*time.Millisecond),
+	code2, _ := runTmuxREPL(itBoundedContext(t, itLaunchDeadline), cfg2, itDeps(120*time.Millisecond),
 		itLaunch(sess, "false", marker, 0, true))
 	if code2 != ExitOK {
 		t.Fatalf("run 2 (resume) exit = %d, want ExitOK", code2)
@@ -302,7 +311,7 @@ func TestRealTmux_ConcurrentSessionsIsolated(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			codes[i], _ = runTmuxREPL(context.Background(), runs[i].cfg,
+			codes[i], _ = runTmuxREPL(itBoundedContext(t, itLaunchDeadline), runs[i].cfg,
 				itDeps(150*time.Millisecond), itLaunch(runs[i].sess, runs[i].launchCmd, marker, 0, false))
 		}(i)
 	}

@@ -58,7 +58,7 @@ func assertMenuAutoAnswered(t *testing.T, prompt string) {
 		bootIntervalS: sp.bootIntervalS, tickDuringBoot: sp.tickDuringBoot,
 		exitSeq: sp.exitSeq,
 	}
-	if _, err := runTmuxREPL(context.Background(), cfg, deps, lp); err != nil {
+	if _, err := runTmuxREPL(itBoundedContext(t, itLaunchDeadline), cfg, deps, lp); err != nil {
 		t.Fatalf("runTmuxREPL err: %v", err)
 	}
 
