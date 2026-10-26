@@ -19,7 +19,7 @@ This digest has the facts that each agent must have when it starts. The full rul
 
 ### Hard rules
 
-- **The pipeline is the only controller** (ADR-0154, proposed; X1, X2 and X6 are on `main`). No LLM starts or directs another LLM. A phase agent starts through the native bridge (`evolve subagent run`, `evolve loop`), never through an in-process subagent tool. `evolve guard phase` denies that tool while a cycle is active.
+- **The pipeline is the only controller** (ADR-0154, proposed; X1 to X8 are on `main`). No LLM starts or directs another LLM. A phase agent starts through the native bridge (`evolve subagent run`, `evolve loop`). Inside its cell, a phase agent can start subagents of its own harness. Outside a cell during a cycle, `evolve guard phase` denies the start of a phase persona (`evolve-*`).
 - **Phase order.** Scout → Build → Audit → Ship, in that order. The Go state machine (`go/internal/core`) enforces it. Never skip a phase, and never ignore a kernel-gate failure.
 - **Commits go through `evolve ship`.** The ship gate denies a bare `git commit` or `git push`. An interactive commit runs `/commit`, then the attestation, then `evolve ship --class manual`. A routine `--bypass-commit-gate` is a violation. A release is `evolve release X.Y.Z`; "publish" is not "push".
 - **Builder writes only inside its worktree.** The runtime provisions worktrees. An agent never runs `git worktree`.

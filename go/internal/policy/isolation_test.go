@@ -77,3 +77,59 @@ func TestIsolationFlowStage_ReadsIsolationI8StageAndDefaultsToEmpty(t *testing.T
 		}
 	}
 }
+
+func TestIsolationReadStageAndLineageMax_ReadTheI5BlockApartFromI2AndI3(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct {
+		stage string
+		max   int
+	}{
+		``: {},
+		`{"isolation":{"i3":{"stage":"enforce"}}}`:                 {},
+		`{"isolation":{"i5":{"stage":"enforce"},"lineage_max":3}}`: {stage: "enforce", max: 3},
+		`{"isolation":{"i5":{"stage":"shadow"}}}`:                  {stage: "shadow"},
+	}
+	for body, want := range cases {
+		var p policy.Policy
+		if body != "" {
+			if err := json.Unmarshal([]byte(body), &p); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if got := p.IsolationReadStage(); got != want.stage {
+			t.Errorf("%s: IsolationReadStage = %q, want %q", body, got, want.stage)
+		}
+		if got := p.IsolationLineageMax(); got != want.max {
+			t.Errorf("%s: IsolationLineageMax = %d, want %d", body, got, want.max)
+		}
+	}
+}
+
+func TestIsolationGuaranteeStage_ReadsIsolationI7StageAndDefaultsToEmpty(t *testing.T) {
+	t.Parallel()
+	cases := map[string]string{
+		``:                 "",
+		`{"isolation":{}}`: "",
+		`{"isolation":{"i3":{"stage":"enforce"}}}`: "",
+		`{"isolation":{"i7":{"stage":"enforce"}}}`: "enforce",
+	}
+	for body, want := range cases {
+		var p policy.Policy
+		if body != "" {
+			if err := json.Unmarshal([]byte(body), &p); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if got := p.IsolationGuaranteeStage(); got != want {
+			t.Errorf("%s: IsolationGuaranteeStage = %q, want %q", body, got, want)
+		}
+	}
+}
+
+func TestPolicyParse_AcceptsTheIsolationI7Stage(t *testing.T) {
+	t.Parallel()
+	p, err := policy.Parse([]byte(`{"isolation":{"i7":{"stage":"enforce"}}}`))
+	if err != nil || p.IsolationGuaranteeStage() != "enforce" {
+		t.Fatalf("the strict parse must keep isolation.i7.stage: %v %q", err, p.IsolationGuaranteeStage())
+	}
+}

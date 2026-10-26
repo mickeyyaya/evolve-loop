@@ -8,7 +8,7 @@
 
 ## Claude Code overlay
 
-- The kernel guards fire as PreToolUse hooks, as `.claude/settings.json` specifies. `evolve guard phase` matches `Agent|Task`. The Go guard checks only `Agent` (`go/internal/guards/phase.go`), so a `Task` call passes today (AGENTS.md invariant 1).
+- The kernel guards fire as PreToolUse hooks, as `.claude/settings.json` specifies. `evolve guard phase` matches `Agent|Task`. During a cycle it denies the start of a phase persona (`evolve-*`) outside a phase cell. Inside a cell, each call passes (AGENTS.md invariant 1). The hooks are defence in depth; the sandbox and the gates hold each guarantee for every family.
 - The four reviewers of the pre-commit review fleet are also Claude Code subagents in `.claude/agents/`. `evolve skills generate` renders the body of each subagent from its neutral persona `agents/evolve-diff-<name>.md`. Only the frontmatter (the tool list and the model) is Claude Code data. Change the persona, not the rendered body.
 - The repository documents use the Claude Code tool names (`Read`, `Grep`, `Glob`, `Bash`, `Edit`, `Write`).
 - Run `/clear` before a new evolve-loop batch.
@@ -20,7 +20,7 @@ This digest has the facts that each agent must have when it starts. The full rul
 
 ### Hard rules
 
-- **The pipeline is the only controller** (ADR-0154, proposed; X1, X2 and X6 are on `main`). No LLM starts or directs another LLM. A phase agent starts through the native bridge (`evolve subagent run`, `evolve loop`), never through an in-process subagent tool. `evolve guard phase` denies that tool while a cycle is active.
+- **The pipeline is the only controller** (ADR-0154, proposed; X1 to X8 are on `main`). No LLM starts or directs another LLM. A phase agent starts through the native bridge (`evolve subagent run`, `evolve loop`). Inside its cell, a phase agent can start subagents of its own harness. Outside a cell during a cycle, `evolve guard phase` denies the start of a phase persona (`evolve-*`).
 - **Phase order.** Scout → Build → Audit → Ship, in that order. The Go state machine (`go/internal/core`) enforces it. Never skip a phase, and never ignore a kernel-gate failure.
 - **Commits go through `evolve ship`.** The ship gate denies a bare `git commit` or `git push`. An interactive commit runs `/commit`, then the attestation, then `evolve ship --class manual`. A routine `--bypass-commit-gate` is a violation. A release is `evolve release X.Y.Z`; "publish" is not "push".
 - **Builder writes only inside its worktree.** The runtime provisions worktrees. An agent never runs `git worktree`.

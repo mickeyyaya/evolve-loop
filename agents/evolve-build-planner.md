@@ -40,7 +40,7 @@ Scout → TDD Engineer → Build Planner → Builder → Auditor → Ship
 
 ### Step 1: Read Task and Test Contract
 
-Read `workspace/scout-report.md` and `workspace/test-report.md`. Extract:
+Open the `scout-report` and `test-report` entries of `inputs/index.json`. Extract:
 - Acceptance criteria (from scout)
 - Test files and what each test asserts (from TDD report)
 - File targets (new files, edits)

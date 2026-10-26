@@ -1,0 +1,19 @@
+{
+  "id": "isolation-home-transcripts-before-i4-enforce",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.5,
+  "route": "console-manual",
+  "title": "LLM isolation: close the $HOME transcript gap and the Linux late raw-log gap before isolation.i4/i5 go to enforce",
+  "summary": "X5 (#1133) denies raw output under .evolve/runs, but each CLI keeps its own transcripts in $HOME: ~/.claude/projects/*/*.jsonl (508 directories on the host, 2026-10-26) and ~/.gemini. $HOME is readable and ~/.claude is writable (homeStateWriteDirs), so a claude cell can read the raw transcript of any other cell of any cycle. On Linux, bwrap masks only the raw files that exist at the launch. Review of #1133, MEDIUM-3 and the Linux part of MEDIUM-2. Spec: docs/architecture/llm-isolation.md §8.5 and §9.",
+  "fix": "Add the manifest field home_reads (X9) and grant each cell only the home paths of its own CLI. Deny the transcript directories of the other cells: ~/.claude/projects except the own session, and ~/.gemini. On Linux, mask the raw-output names of the workspace for files that the bridge makes after the launch, or move the bridge logs outside the write path of the cell.",
+  "acceptance": [
+    "A contract row: a claude cell cannot read a fixture ~/.claude/projects/<other>/session.jsonl in the test HOME",
+    "A contract row on Linux (bwrap): a raw log made after the launch is not readable by the cell",
+    "isolation.i4.stage and isolation.i5.stage do not go to enforce before both rows are green"
+  ],
+  "deps": ["isolation-artifact-index-read-isolation", "isolation-manifest-parsers-and-collectors"],
+  "files": ["go/internal/bridge/read_isolation.go", "go/internal/bridge/manifest.go", "go/internal/adapters/sandbox/"],
+  "created_at": "2026-10-26T18:00:00Z",
+  "source": "console, review of PR #1133 (X5), 2026-10-26"
+}

@@ -131,6 +131,8 @@ var treeReadingSelections = []TestSelection{
 		"TestWireBridgeStages_IsTheRootsOnlyStageForwarding",
 	}},
 	{Package: "./internal/bridge", Tests: []string{
+		"TestAgentSandboxContract",
+		"TestAgentSandboxContract_TheHostHoldsTheCredentialThatTheCellCannotRead",
 		"TestCompletionContractVocabulary_EveryRequestNamesItsContractByTheTypedConstant",
 		"TestCompletionContractVocabulary_SpelledOnce",
 		"TestDriverNames_AreBuiltOnlyByResolve",

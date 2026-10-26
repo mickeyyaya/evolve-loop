@@ -220,11 +220,16 @@ func launchSwept(ctx context.Context, driver Driver, cfg *Config, deps Deps) (in
 	if err := deps.refuseSandboxOffInPhase(cfg); err != nil {
 		return ExitSafetyGate, err
 	}
+	if err := deps.requireDispatchCredential("phase", cfg.CLI); err != nil {
+		return ExitSafetyGate, err
+	}
 	cfg.DispatchID = mintDispatchID(cfg, os.Getpid())
 	observeDispatchID(deps, cfg.DispatchID)
 	home, _ := os.UserHomeDir()
 	deps.sweep = newDispatchSweep(cfg.DispatchID, cfg.ProjectRoot, cfg.Worktree, home, time.Now())
 	defer deps.sweep.finish(ctx, deps)
+	started := time.Now()
+	defer deps.reportReadViolations(ctx, cfg, started)
 	return driver.Launch(ctx, cfg, deps)
 }
 

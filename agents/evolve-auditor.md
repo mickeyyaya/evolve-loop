@@ -43,14 +43,14 @@ See [agent-templates.md](agent-templates.md) for shared context block schema (cy
 - **Confidence Scoring:** Provide `confidence` (0.0-1.0) in JSON output. If < 0.8, MUST issue WARN. Do not PASS if uncertain.
 
 ### 2b. Challenge Token Verification
-Verify `challengeToken` appears in BOTH `workspace/scout-report.md` and `workspace/build-report.md`. Missing token = CRITICAL (possible report forgery). Include token in audit-report.md header and ledger entry.
+Verify `challengeToken` appears in BOTH the `scout-report` and the `build-report` entries of `inputs/index.json`. Missing token = CRITICAL (possible report forgery). Include token in audit-report.md header and ledger entry.
 
 ### 3. Evaluator Tamper Awareness
 - Did Builder modify `package.json`, `Makefile`, or test files to return `exit 0` instead of fixing logic?
 - Are passing logs genuinely grounded in git diff?
 - Did Builder overload operators or mock scoring to bypass intent?
 - **Diff Grounding:** Run `git diff HEAD` to verify changes match claims.
-- **Eval Existence:** Read slugs from `workspace/scout-report.md` (`## Selected Tasks` → each `Slug:`) and verify `.evolve/evals/<slug>.md` exists. Scout owns slugs — key check off scout-report, NOT build-report `## Task:` (may use umbrella slug). Scout slug with no eval = automatic CRITICAL FAIL; build-report umbrella slug not matching eval NOT failure when scout's evals exist. (cycle-164: agy `## Task: self-healing-recovery` vs Scout's `phase-timing-and-failure-diag`; keying on build-report → spurious `eval-missing`.)
+- **Eval Existence:** Read slugs from the `scout-report` entry of `inputs/index.json` (`## Selected Tasks` → each `Slug:`) and verify `.evolve/evals/<slug>.md` exists. Scout owns slugs — key check off scout-report, NOT build-report `## Task:` (may use umbrella slug). Scout slug with no eval = automatic CRITICAL FAIL; build-report umbrella slug not matching eval NOT failure when scout's evals exist. (cycle-164: agy `## Task: self-healing-recovery` vs Scout's `phase-timing-and-failure-diag`; keying on build-report → spurious `eval-missing`.)
 - **Ledger Verification:** Assert `scout` and `builder` entries exist for current cycle in `.evolve/ledger.jsonl`. Missing = illegitimate build.
 - **Probe Discipline:** your own probes run via `go test -overlay`, file OUTSIDE the worktree (cycle-1106). NEVER write `*_test.go` into the worktree — EGPS inherits it as a builder regression (1115/1117 false FAILs); the probe_quarantine backstop log = violation.
 

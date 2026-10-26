@@ -21,7 +21,7 @@ This digest has the facts that each agent must have when it starts. The full rul
 
 ### Hard rules
 
-- **The pipeline is the only controller** (ADR-0154, proposed; X1, X2 and X6 are on `main`). No LLM starts or directs another LLM. A phase agent starts through the native bridge (`evolve subagent run`, `evolve loop`), never through an in-process subagent tool. `evolve guard phase` denies that tool while a cycle is active.
+- **The pipeline is the only controller** (ADR-0154, proposed; X1 to X8 are on `main`). No LLM starts or directs another LLM. A phase agent starts through the native bridge (`evolve subagent run`, `evolve loop`). Inside its cell, a phase agent can start subagents of its own harness. Outside a cell during a cycle, `evolve guard phase` denies the start of a phase persona (`evolve-*`).
 - **Phase order.** Scout → Build → Audit → Ship, in that order. The Go state machine (`go/internal/core`) enforces it. Never skip a phase, and never ignore a kernel-gate failure.
 - **Commits go through `evolve ship`.** The ship gate denies a bare `git commit` or `git push`. An interactive commit runs `/commit`, then the attestation, then `evolve ship --class manual`. A routine `--bypass-commit-gate` is a violation. A release is `evolve release X.Y.Z`; "publish" is not "push".
 - **Builder writes only inside its worktree.** The runtime provisions worktrees. An agent never runs `git worktree`.
@@ -68,15 +68,17 @@ evolve-loop is a development pipeline that evolves itself. It orchestrates speci
 
 ## Cross-CLI invariants (the universal rules)
 
-These rules apply on every CLI that you run under. They are STRUCTURAL: kernel hooks enforce them, not prompt instructions.
+These rules apply on every CLI that you run under. They are STRUCTURAL: the OS sandbox, the worktree fence and the ship gates enforce them for every family, not prompt instructions. The Claude Code kernel hooks are defence in depth ([llm-isolation.md §9.1](docs/architecture/llm-isolation.md#91-as-built-x7)). The protected write rule of the sandbox denies only at `isolation.i7.stage` `enforce`; at the default `shadow` it only reports.
 
 ### 1. Pipeline ordering is non-negotiable
-Phases run Scout → Builder → Auditor → Ship/Record, in that exact order. The Go orchestrator state machine (`go/internal/core`) enforces the phase ORDER. The phase-gate kernel hook (`evolve guard phase`) denies in-process subagent dispatch while a cycle is active. Per ADR-0075, this hook was rewired onto the `Agent|Task` matcher. The Go guard denies only `Agent` today (`go/internal/guards/phase.go:22`), so a `Task` call passes. X7 of ADR-0154 fixes it.
+Phases run Scout → Builder → Auditor → Ship/Record, in that exact order. The Go orchestrator state machine (`go/internal/core`) enforces the phase ORDER. The phase-gate kernel hook (`evolve guard phase`, matcher `Agent|Task` since ADR-0075) is defence in depth. During a cycle, it denies an `Agent` or `Task` call outside a phase cell when its `subagent_type` names a phase persona (`evolve-*`). Inside a cell (the phase marker of the launcher is set), each `Agent` and `Task` call passes. A phase agent can start any subagent of its own harness (llm-isolation §7.2).
+
+The cell marker is advisory, and the cell boundary is the real limit (X7 of ADR-0154, matrix row N11).
 
 The emergency operator override is the explicit `evolve guard phase --bypass` CLI flag. With it, the guard allows the call and writes no special log line. Each use is a CRITICAL violation.
 
 ### 2. Subagents start through the native bridge, never through in-process tool calls
-The native runner spawns every phase agent. The runner is `evolve subagent run <agent> <cycle> <workspace>`, or the in-process `go/internal/bridge` launcher that `evolve loop` / `evolve cycle run` drive. The kernel hook enforces this rule. During a cycle, the hook **denies** the in-process `Agent` (Claude Code) / `activate_skill` (Gemini) / equivalent (Codex). Reason: in-process subagents bypass the profile-scoped permissions and the tamper-evident ledger.
+The native runner spawns every phase agent. The runner is `evolve subagent run <agent> <cycle> <workspace>`, or the in-process `go/internal/bridge` launcher that `evolve loop` / `evolve cycle run` drive. During a cycle, the phase-gate hook denies an in-process start of a phase persona (`evolve-*`) outside a phase cell. Reason: a phase persona that starts in-process bypasses the profile-scoped permissions and the tamper-evident ledger. Inside a cell, a phase agent can start subagents of its own harness, and the cell boundary limits them (invariant 1).
 
 ### 3. Commits go through `evolve ship`, never bare `git commit / git push`
 The ship-gate kernel hook (`evolve guard ship`) denies a bare git commit/push/gh release create. The only canonical entry point is the native `evolve ship`. It enforces audit verification, cycle binding (HEAD + tree_state_sha match) and version-aware self-SHA pinning. Operator escape: `--class manual` (interactive) or the explicit `evolve guard ship --bypass` emergency flag.
@@ -124,7 +126,7 @@ No phase, lane or project config uses an MCP server. Reach each outside service 
 
 ### 13. The pipeline is the only controller (2026-10-25, proposed)
 
-No LLM controls another LLM. The `evolve` binary starts each agent in an isolated cell, carries each message and routes each seat by data ([ADR-0154](docs/architecture/adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md), [spec](docs/architecture/llm-isolation.md)). The `evolve` CLI is the interface for other services ([cli-contract.md](docs/architecture/cli-contract.md)). The pipeline must read no control flag from the environment ([ADR-0156](docs/architecture/adr/0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md)). The task assignment is CLI-neutral, and only the bridge drivers hold CLI specifics (ADR-0154 I-17). The components X1 to X19 build these rules, and X1, X2 and X6 are on `main`.
+No LLM controls another LLM. The `evolve` binary starts each agent in an isolated cell, carries each message and routes each seat by data ([ADR-0154](docs/architecture/adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md), [spec](docs/architecture/llm-isolation.md)). The `evolve` CLI is the interface for other services ([cli-contract.md](docs/architecture/cli-contract.md)). The pipeline must read no control flag from the environment ([ADR-0156](docs/architecture/adr/0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md)). The task assignment is CLI-neutral, and only the bridge drivers hold CLI specifics (ADR-0154 I-17). The components X1 to X19 build these rules, and X1 to X8 are on `main`.
 
 ## 12 Core agent rules
 
@@ -297,9 +299,10 @@ Bypass = "don't ask the user", NOT "skip integrity checks". These rules are mand
 1. Continue all cycles without a pause. Never ask "should I continue?".
 2. Run the FULL pipeline every cycle: real `scout-report.md` / `build-report.md` / `audit-report.md`.
 3. The Go orchestrator state machine (`go/internal/core`) enforces the phase order at every transition.
-   `evolve guard phase` denies an in-process subagent dispatch while a cycle is active. Invariant 1 has the open gap, and X7 of [ADR-0154](docs/architecture/adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md) closes it (matrix row N11).
+   `evolve guard phase`: during a cycle, a session outside a phase cell cannot start a phase persona (`evolve-*`). Inside a cell, each `Agent` and `Task` call passes (`go/internal/guards/phase.go`, wired by ADR-0075; matrix row N11, X7 of [ADR-0154](docs/architecture/adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md)).
+   The four `evolve guard` hooks are defence in depth in Claude Code panes only. The OS sandbox write rules, the worktree fence and the ship gates hold each guarantee for every family ([llm-isolation.md §9.1](docs/architecture/llm-isolation.md#91-as-built-x7)). The protected write rule of the sandbox denies only at `isolation.i7.stage` `enforce`; at the default `shadow` it only reports.
 4. Never fabricate cycle numbers (CRITICAL violation).
-5. Phase agents go through the native bridge (`evolve subagent run` / `evolve loop`). The in-process subagent tool is denied.
+5. Phase agents go through the native bridge (`evolve subagent run` / `evolve loop`). A phase agent can start subagents of its own harness inside its cell.
 6. The OS sandbox wraps subprocesses (`EVOLVE_SANDBOX=1`). When the sandbox is nested, the EPERM fallback turns on automatically.
 7. Run the eval-quality pre-flight on every eval (`evolve eval quality-check`).
 8. The Adversarial Auditor is on by default. The auditor runs Claude Opus on Claude Code, and the builder runs agy first. `ADVERSARIAL_AUDIT=0` turns it off.

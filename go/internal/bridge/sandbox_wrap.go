@@ -62,7 +62,11 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 			DenyPaths:     req.DenyPaths,
 			DenyReadPaths: req.DenyReadPaths,
 		}
+		cred := deps.dispatchCredentialDeny(deps.execStage())
+		cfg.DenyReadPaths = append(slices.Clone(cfg.DenyReadPaths), cred.read...)
+		cfg.DenyPaths = append(slices.Clone(cfg.DenyPaths), cred.write...)
 		cfg.ExecDenyPaths, cfg.ExecDenyRoots, cfg.ExecDenyEnforce = deps.execDeny(req.CLI, probe.OS)
+		cfg.ReadIsolation = deps.readIsolation(req, home)
 		gitWrites, gitDenies, err := sandboxGitWritePaths(req.Worktree, probe.OS)
 		if err == nil {
 			gitDenies, err = resolveSandboxDenials(gitDenies, "", "", true)
@@ -98,6 +102,7 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 			paths[i] = real
 		}
 		cfg.RepoRoot, cfg.WritePaths = paths[0], paths[1:]
+		cfg = deps.withProtectedWrites(cfg, ownWorktree(req, cfg.WritePaths), cfg.RepoRoot)
 		socketDir, sockets, err := tmuxSocketGuard()
 		if err != nil {
 			if deps.Stderr != nil {
@@ -105,7 +110,7 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 			}
 			return nil, false
 		}
-		cfg.DenySockets, cfg.DenyLiterals = sockets, append([]string{socketDir}, sockets...)
+		cfg.DenySockets, cfg.DenyLiterals = sockets, append(append([]string{socketDir}, sockets...), cred.literals...)
 
 		return osSandboxPrefix(probe.OS, deps, req, cfg)
 	}
@@ -192,6 +197,7 @@ func sandboxPrefixForLaunch(deps Deps, cfg *Config, terminalPath string) ([]stri
 	}
 	return deps.SandboxWrap(SandboxWrapRequest{
 		CLI:           cfg.CLI,
+		Tag:           cfg.DispatchID,
 		TerminalPath:  terminalPath,
 		Phase:         cfg.Agent,
 		Workspace:     cfg.Workspace,

@@ -19,6 +19,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchcred"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmcalls"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -43,6 +44,9 @@ type Deps struct {
 	Env                   map[string]string
 	EnvStage              string
 	ExecStage             string
+	DispatchStore         func() (dispatchcred.Store, error)
+	ReadStage             string
+	GuaranteeStage        string
 	EnvDrops              *EnvDropLog
 	RecoveryStage         string
 	FatalPaneStage        string
@@ -62,6 +66,7 @@ type Deps struct {
 	LookPath              func(file string) (string, error)
 	Reviewer              StopReviewer
 	SandboxWrap           SandboxWrapper
+	SandboxReports        func(ctx context.Context, tag string, since time.Time) ([]byte, error)
 	BootTimeoutStore      *clihealth.Store
 	OnStopReview          func(phase, action, reason string)
 	OnBoot                func(bootMS int64)
@@ -93,6 +98,7 @@ type SandboxWrapper func(req SandboxWrapRequest) (prefixArgv []string, available
 
 type SandboxWrapRequest struct {
 	CLI           string
+	Tag           string
 	TerminalPath  string
 	DenyPaths     []string
 	DenyReadPaths []string
@@ -205,6 +211,9 @@ type Engine struct {
 
 func NewEngine(deps Deps) *Engine {
 	d := deps.withDefaults()
+	if d.SandboxReports == nil {
+		d.SandboxReports = logShowReports(logShowPath)
+	}
 	if d.TokenResolver == nil {
 		d.Signals.Emit(signalcenter.Event{
 			Module: signalcenter.ModuleBridge, Origin: "NewEngine", Kind: signalcenter.KindBridgeWarning,

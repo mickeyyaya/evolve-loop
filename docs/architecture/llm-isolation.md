@@ -8,13 +8,17 @@
 >
 > Status: proposed (ADR-0154, ADR-0155, ADR-0156), 2026-10-25. Each name in this file that does not exist on `main` is marked "proposed".
 >
-> Component state on 2026-10-25 (the plan §6.1 has the full table):
-> - X1: merged in #1121. The conformance matrix of §14 and the module, kind, codes and channel of §15 are on `main`. The follow-up X1b (item `isolation-matrix-tmux-repl-fake`) adds a fake `tmux` (`go/internal/faketmux`), so the rows M2 to M4 run a full cycle and are green.
+> Component state on 2026-10-26 (the plan §6.1 has the full table):
+> - X1: merged in #1121. The conformance matrix of §14 and the module, kind, codes and channel of §15 are on `main`. The follow-up X1b (#1128) adds a fake `tmux` (`go/internal/faketmux`), so the rows M2 to M4 run a full cycle and are green.
 > - X2: merged in #1122 at stage `shadow` (the policy key `isolation.i2.stage`). The flip to `enforce` is an operator decision.
+> - X3: merged in #1127. The single launch API of §5.1 and its AST guard `TestOnlyTheBridgeStartsAnLLMBinary` are on `main`, and matrix row N2 is green.
+> - X4: merged in #1126, and the dispatch credential of I-3 merged in #1132.
+> - X5: merged in #1133 at stage `shadow` (the policy key `isolation.i5.stage`).
 > - X6: merged in #1123. The routing data of §10 is on `main`: `cli_routing.floors`, with the compiled default in `go/internal/policy/routing_defaults.json`. The follow-up X6b (item `isolation-floor-profiles-allowed-clis-as-routing-data`) moves the `allowed_clis` pins of 7 profiles.
-> - X3: built in this change. The single launch API of §5.1 and its AST guard `TestOnlyTheBridgeStartsAnLLMBinary` are on the branch, and matrix row N2 is green.
+> - X7: merged in #1135 at stage `shadow` (the policy key `isolation.i7.stage`). The sandbox holds the protected write rule for each family, `guard phase` follows §7.2 for `Agent` and `Task`, and rows N10 and N11 are green (§9.1).
+> - X8: merged in #1131.
 > - X10: built in this change. `AGENTS.md` is the one source. `evolve skills generate` renders its digest into `CLAUDE.md` and `GEMINI.md`, and the four `.claude/agents` reviewers from their neutral personas (§13).
-> - X4, X5, X7 to X9, X11 to X19: not started.
+> - X9 and X11 to X19: not started, except the parts that the plan §6.1 lists as merged.
 
 ## Table of contents
 
@@ -96,7 +100,7 @@ Item `pass-k-replay-harness` fails its audit in cycle 2101. The pipeline starts 
 | artifact | a file that a phase contract declares as an output |
 | deliverable | an artifact that a phase writes for later phases: a report, a verdict or a handoff file |
 | raw output | the stdout log, the pane capture or the transcript of an agent; never an artifact |
-| artifact index | the file `inputs/index.json` that lists each artifact that a cell can open (proposed) |
+| artifact index | the file `inputs/index.json` that lists each artifact that a cell can open (built by X5, §8.5) |
 | lineage | the cycles that share the inbox item id of this cycle, and its retry or recovery chain |
 | unrelated cycle | a cycle outside the lineage |
 | floor | a routing rule that holds a seat on one family; today, the Claude floor |
@@ -382,7 +386,7 @@ A worked example: the scout pane of cycle 7 runs `claude --version` from its Bas
 | Markers | `ipcenv.DispatchDepthKey` (`EVOLVE_DISPATCH_DEPTH`) and `ipcenv.PhaseKey` (`EVOLVE_PHASE`). `Deps.cellMarkers` sets the depth of the launcher plus 1, and the phase to `cfg.Agent`. |
 | Path of the markers | `Deps.cellEnv` adds them to `Deps.Env`, and both names are in `pipelineEnvMarkers`. So each stage of §6.1 gives them to the child. A tmux pane and a recipe pane also get them as `export` lines before the launch line. At `shadow` such a pane inherits the environment of the server. |
 | Refusals that now fire | `evolve agent run` (`go/internal/cli/agentcmd/run.go:93`) and the boundary writes (`go/cmd/evolve/boundary_write.go:14`). Both read the depth through `subagent.ReadDispatchDepth`, which calls `ipcenv.DispatchDepth`. `subagent run` only checks its depth cap of 3, and `phase`, `loop` and `wave` read no marker. |
-| Strength of the markers | advisory. `env -u EVOLVE_DISPATCH_DEPTH -u EVOLVE_PHASE evolve agent run` passes the refusal. Row N4 proves this advisory layer only. A dispatch credential that no cell receives is the layer that does not depend on the agent (item `isolation-dispatch-capability-token`). |
+| Strength of the markers | advisory. `env -u EVOLVE_DISPATCH_DEPTH -u EVOLVE_PHASE evolve agent run` passes the marker refusal. The dispatch credential (§7.1.1) is the layer that does not depend on the agent. Row N4 now proves that layer. |
 | `EVOLVE_SANDBOX=off` in a phase | `launchSwept` refuses the launch when the launcher carries `EVOLVE_PHASE` and the mode is `off`. The error is `bridge.ErrSandboxOffInPhase`, the exit code is `ExitSafetyGate`, and the bridge emits `ISOLATION_I3_VIOLATION` with `action=refused` and `rule=sandbox.off.phase`. |
 | Why the phase marker and not the depth | A fan-out worker has depth 1 or more, but the pipeline starts it, not an agent. It carries no `EVOLVE_PHASE`, so a host opt-out still works for it. |
 | Exec deny set | `Deps.execDenyTargets`. The files: the `binary` of each registered manifest, found on `PATH` (`Deps.LookPath`) and resolved to its real path. The roots: each `install_roots` entry of a manifest (`~/` is the home directory), resolved to its real path when it exists. `claude-p` and `claude-tmux` declare `~/.local/share/claude/versions`, because the native installer keeps each earlier version there. `codex` and `codex-tmux` declare `/opt/homebrew/Caskroom/codex`. `gemini` has no manifest, so it has no rule. |
@@ -403,7 +407,8 @@ The guards are these tests:
 
 - row N3 (`TestAgentSandboxContract`, green on darwin only), the row "exec an older installed version of the claude stub under the install root" and the row "re-enter the profile through sandbox-exec to exec the claude stub"
 - `TestAgentSandboxContract_TheLauncherStillStartsTheCLIThatTheCellCannotExec` and `TestAgentSandboxContract_ShadowReportsTheExecAndLetsItRun`
-- row N4 (the matrix, M1 run, green): a stub in the phase pane runs the real `evolve agent run`. It records the exit code 2 and the text "refused inside a phase".
+- row N4 (`TestAgentSandboxContract`, green on darwin only): the real `evolve` binary in the cell runs `env -u EVOLVE_DISPATCH_DEPTH -u EVOLVE_PHASE evolve agent run` at `enforce`. It exits 3, and the text names the dispatch credential (§7.1.1).
+- the marker check of the M1 run of the matrix: a stub in the phase pane runs the real `evolve agent run`. It records the exit code 2 and the text "refused inside a phase".
 - `TestCellEnv_EachStageGivesTheChildTheDepthAndPhaseMarkers`, `TestLaunchSwept_RefusesSandboxOffInsideAPhaseWithANamedErrorAndASignal`
 - `TestSandboxWrap_EnforceDeniesTheRealPathOfEachManifestBinaryOnMacOS`, `TestSandboxWrap_EnforceMasksEachOtherFamilyBinaryOnLinux` and `TestSandboxWrap_EnforceDeniesEveryInstalledVersionUnderTheManifestInstallRoot`
 
@@ -418,8 +423,67 @@ Known differences from the design:
 - Two gaps stay open, because a rule for them also blocks the `go test` binaries in `/tmp`. A CLI that an interpreter runs, for example `node gemini.js`, is not an exec of the CLI file. A binary that the agent copies into the worktree or `/tmp` has no rule.
 - Before the flip to `enforce`: the deny of `/usr/bin/sandbox-exec` breaks a CLI that uses its own Seatbelt for its tool calls. Examples are Claude Code with its sandbox setting on, and codex without `--yolo`. Of the claude and codex manifests, only `claude-tmux` and `codex-tmux` pass `--dangerously-skip-permissions` and `--yolo`. The agy drivers pass `--dangerously-skip-permissions` too. The headless `claude-p` and `codex` drivers do not, so the deny puts them at risk at `enforce`.
 - A CLI can also exec its own binary for a helper. The `shadow` reports must show no such exec before the flip.
-- The Go refusals depend on the environment. An agent that unsets the markers avoids them. The exec deny is the guard that does not depend on the agent.
-- The refusal of `evolve agent run` emits no signal yet (§15.1).
+- The marker refusals depend on the environment. An agent that unsets the markers avoids them. The exec deny and the dispatch credential (§7.1.1) are the guards that do not depend on the agent.
+- The marker refusal of `evolve agent run` emits no signal. The credential refusal emits `ISOLATION_I3_VIOLATION` (§7.1.1).
+
+#### 7.1.1 The dispatch credential (as built)
+
+The markers are advice. An agent can unset them, and then `evolve agent run` dispatches (review of #1126, 2026-10-26). The sandbox cannot deny the `evolve` binary, because the profiles run `evolve phase verify`. So a dispatch verb now needs a capability that a cell never holds: the dispatch credential.
+
+A worked example: the scout pane of cycle 7 runs `env -u EVOLVE_DISPATCH_DEPTH -u EVOLVE_PHASE evolve wave next`. The verb opens `~/.evolve/dispatch/held/credential`. At `enforce` the macOS profile denies the read, so the verb exits 3:
+
+```
+evolve wave next: refused: this process does not hold the pipeline dispatch credential (dispatch credential: open /Users/op/.evolve/dispatch/held/credential: operation not permitted). A phase cell never holds it: wave next is class D; it is an operator or boundary verb
+```
+
+| Item | As built |
+|---|---|
+| The credential | `go/internal/dispatchcred`. A 0600 file `held/credential` with 32 random bytes in hex, in a 0700 directory. The writer makes a temporary file and links it to the name, so a reader never sees a part of a token. `Store.Hold` opens it with `O_NOFOLLOW` and accepts only a regular 0600 file with a token of this form. The check is a read: the token value is not compared. |
+| The location | `~/.evolve/dispatch`, where `~` is the home directory of the passwd entry of the uid (`user.LookupId`). It never comes from `HOME`, `EVOLVE_PROJECT_ROOT` or the current directory. A test binary can set the root at link time (`-ldflags -X .../dispatchcred.root=DIR`). |
+| The gated verbs | `agent run` and `phase <name>` (class R). `subagent run`, `subagent dispatch-parallel`, `loop`, `wave next`, `cycle run`, `boundary run`, `bridge launch`, `routing plan`, `campaign` (not `status`), `compose`, `plan-and-execute`, `serve-phase`, `fleet`, `consensus-dispatch` and `fanout-dispatch` (class D). `phase verify`, `phase lint` and `loop status` are not gated. `dispatchRules` in `go/cmd/evolve/dispatch_gate.go` holds them, and `dispatch` checks them before the verb runs. The loop step of `boundary run` checks again, because it calls the loop in the process (`gatedLoop`). |
+| The launch API | `Deps.requireDispatchCredential` (`go/internal/bridge/dispatch_credential.go`) runs in each entry of the X3 launch API (§5.1). The entries are `LaunchLLM`, `launchPane`, `launchSwept` and `newRecipeDriver`. Each LLM launch of the binary passes one of them. So a launch with no credential is refused at `enforce`, from any caller. The refusal is `ErrNoDispatchCredential` with `ExitSafetyGate` and `rule=launch.credential`. The verb gate is the early refusal with the clear message. |
+| The denies | `Deps.dispatchCredentialDeny` in `go/internal/bridge/dispatch_credential.go`. At each sandboxed launch at `shadow` or `enforce`, the launcher writes the credential and the stage. It denies the read of `held/`: SBPL `deny file-read*`, and `bwrap` `--tmpfs`, `--chmod 000` and `--remount-ro`. |
+| The write denies | The parent of the store (`~/.evolve`) goes to `DenyPaths`, and each higher ancestor goes to `DenyLiterals`. So a cell cannot write the stage or a credential. It also cannot rename an ancestor or swap in a symlink for it (review of #1132, round 2). If `Ensure` fails, the launcher keeps each deny and writes a WARN line. |
+| The stage | the policy key `isolation.i3.stage`, the same stage as the exec deny, read from a file that the cell cannot change. The launcher writes it to `~/.evolve/dispatch/stage`, outside `held/`. A missing file is `shadow`. When the credential read is denied (`EPERM` or `EACCES`), a missing file is `enforce`. Only a launch makes a cell, and the launch writes the stage. A file that cannot be read, or a word that is not `off`, `shadow` or `enforce`, is `enforce`. |
+| `off` | no deny, no store write and no check |
+| `shadow` | The cell cannot read the credential. The verb emits `ISOLATION_I3_VIOLATION` with `action=logged` and runs. |
+| `enforce` | The verb emits `ISOLATION_I3_VIOLATION` with `action=refused` and exits 3. A class R refusal names the request path `.evolve/runs/cycle-<N>/requests/dispatch-<n>.json`. Item `isolation-dispatch-request-channel` builds that channel. |
+| The signal | `rule=verb.class.r` or `verb.class.d`, `target` is the verb, `source=dispatch-credential` (cli-contract.md §4.5). The verb publishes it under the events role `dispatch`, and it goes to the stderr of the verb, which the pane captures. |
+| The hermetic env | No environment name carries the credential or its path. So X2 cannot pass it to a child (§6.1). |
+
+How the operator and the pipeline hold the credential:
+
+- **The operator.** The shell of the operator runs outside a cell, so it can read the file. If the file does not exist, the first gated verb writes it. The operator does no setup.
+- **The pipeline.** `evolve loop`, `wave next` and the fan-out of `subagent dispatch-parallel` run outside a cell. The bridge writes the file before it wraps a cell, so each cell finds it and cannot read it.
+
+| Id | Decision | Because | Rejected options and why |
+|---|---|---|---|
+| D1 | A file in a fixed per-user directory, found through the passwd entry | A cell can set `HOME`, `EVOLVE_PROJECT_ROOT` and its current directory. A path from any of them points the check at a file that the cell writes. | A path under the project `.evolve`: the project root comes from the environment. A token in the environment: X2 is an allowlist, but the cell can set any variable for its own child. A unix socket of the plane: a separate daemon for one check, and the same path question. |
+| D2 | The first gated verb of the operator writes a missing file | The operator experience stays the same. A cell cannot write the file: the profile gives no write grant under `~/.evolve`, and `bwrap` mounts `held/` read-only. | `evolve loop` writes it only: the first `evolve agent run` on a new host then refuses. |
+| D3 | The launcher writes the stage next to the credential | The cell reads the stage from a file that it cannot change. | The policy of the project root: a cell can point the root at a policy with no stage, which is `shadow`. |
+| D4 | The verb gate covers each command that starts a dispatch, and the launch API checks each LLM launch | A verb gate alone misses an in-process caller (`boundary run` called the loop directly, review of #1132). The launch API is the one place where each LLM launch passes (X3). `TestDispatchGate_EveryRegistryCommandIsGatedOrNamedWithNoDispatch` pins each command of the registry to a rule or a reason. | Each verb outside an allowlist (X17e): it breaks the hooks of the cell (`guard`, `postedit-validate`) at `enforce` before X17e lists the A verbs. |
+
+Known differences from the design:
+
+- The verb gate and the launch check are checks of the shipped binary. A cell that runs its own `evolve` binary, built from the source or an older one, has neither. The exec deny of §7.1 and the write scope of §9 are then the backstops. For each in-process path of the shipped binary, the launch check is the backstop of the verb gate.
+- A cell outside a sandbox can read the credential, so the gate passes. This is the same limit as each sandbox rule: `EVOLVE_SANDBOX=off` for a host run, and an unsupported host.
+- In a cell the violation signal reaches stderr only. A cell cannot write `.evolve/events` (§9), and the verb does not know its cycle.
+- A credential with the wrong mode or content refuses each gated verb of the operator at `enforce`. The operator removes `~/.evolve/dispatch/held/credential`, and the next verb writes a new one.
+- A launch with no `Deps.Signals`, for example `ModelQueryRunner`, the CLI updater and the version inventory, emits no shadow signal. At `enforce` it is still refused.
+- A host where the passwd lookup fails has no store. The launcher then adds no deny, and each gated verb reports the cause as at `shadow` and never refuses.
+- Each process of the uid outside a cell holds the credential. The boundary is the cell, not the user.
+- On a host with several projects, the stage file holds the stage of the last sandboxed launch.
+- The row N4 runs on darwin only. The `bwrap` mask has a unit test (`TestSandboxWrap_TheCellCannotReadTheDispatchCredentialOnLinux`), not a contract row.
+- X17e adds the other R and D verbs to the same verb gate (cli-contract.md §4.4). A command that execs an LLM only through the launch API (`doctor`, `cli`, `clihealth`, `cli-routing`, `models`, `setup`, `practice`, `release-verify-clis`) is refused by the launch check.
+
+The guards are these tests:
+
+- row N4 and the rows "evolve phase scout", "evolve subagent run", "evolve loop" and "evolve wave next with the env markers stripped is refused at enforce", and the rows "read the dispatch credential", "turn the dispatch stage off", "plant a dispatch credential" "rename an ancestor of the dispatch store under a writable home" and "swap a symlink to a store of its own in for an ancestor of the dispatch store" (`TestAgentSandboxContract`)
+- `TestLaunchAPI_EachEntryRefusesALaunchWithNoDispatchCredentialAtEnforce` and `TestDispatchGate_EveryRegistryCommandIsGatedOrNamedWithNoDispatch`
+- `TestAgentSandboxContract_TheHostHoldsTheCredentialThatTheCellCannotRead`
+- `TestDispatchVerbs_RefuseWithoutTheDispatchCredential`, `TestDispatchVerbs_ShadowReportsAndRuns` and `TestDispatchVerbs_ReadVerbsNeedNoCredential`
+- `TestSandboxWrap_TheCellCannotReadTheDispatchCredentialOnMacOS` and `TestSandboxWrap_TheCellCannotReadTheDispatchCredentialOnLinux`
+- `TestDefault_IsUnderThePasswdHomeAndIgnoresHOME` and `TestStore_HoldRefusesAForgedOrMaskedCredential`
 
 #### 7.2 The boundary of I-3 (operator, 2026-10-26)
 
@@ -435,8 +499,8 @@ The boundary is the cell around the CLI process that the bridge starts. The harn
 |---|---|---|
 | Start a subagent of its own harness, of any type and any model of the same family. It runs in the own CLI process, with no new exec of an LLM binary. Examples: an Opus seat starts a Haiku Task subagent of Claude Code for research, or another CLI uses its own feature. | allow | The harness chooses the subagent and its model. The subagent runs inside the cell, so the limits of the cell apply to it. |
 | Start a new LLM CLI process of any family, its own family too | deny | A new CLI is a new agent outside the control of the pipeline. The exec deny of §7.1 stops it at `enforce` on macOS. On Linux the own family stays open (§7.1), and at `shadow` the exec is only reported. |
-| Run `evolve agent run` | deny | The phase markers make it refuse (advisory, §7.1). |
-| Run another `evolve` dispatch verb: `phase`, `subagent run`, `loop`, `wave next` | deny (proposed) | These verbs do not read the markers yet. Item `isolation-dispatch-capability-token` makes each verb need a dispatch credential that no cell receives. |
+| Run `evolve agent run` | deny | The phase markers make it refuse, and the dispatch credential makes the refusal hold when the agent unsets them (§7.1.1). |
+| Run another `evolve` dispatch verb: `phase <name>`, `subagent run`, `loop`, `wave next`, `cycle run`, `boundary run`, `bridge launch`, `compose` and the others of §7.1.1 | deny | The cell cannot read the dispatch credential, so the verb refuses at `enforce`. Each LLM launch of the binary checks the credential too (§7.1.1). |
 | Ask for another phase agent | request | The agent writes a dispatch request. The pipeline checks it, and the orchestrator judges it. |
 
 The pipeline does not choose or limit the model of an in-harness subagent. The "always the latest model" routing rule ([model-discovery-and-catalog.md](model-discovery-and-catalog.md)) governs the model that the pipeline assigns to a seat. It does not govern the internal choices of a harness.
@@ -505,7 +569,7 @@ X5 confirms the exact record that holds the item id of a finished cycle. If the 
 
 #### 8.3 Format
 
-The file is `<ws>/inputs/index.json` (proposed). The pipeline writes it before the launch. The sandbox makes it read-only for the cell.
+The file is `<ws>/inputs/index.json` (built by X5, §8.5). The pipeline writes it before the launch. The sandbox makes it read-only for the cell.
 
 ```json
 {
@@ -556,6 +620,67 @@ The pipeline can record which entries a cell opened. The source is the sandbox r
 
 If X5 builds it, it emits kind `isolation.access` (INFO) with the entry ids. It also adds a proposed panel index "index use" in stage `shadow`: the share of indexed entries that a phase opened. An amendment of ADR-0153 adds the index.
 
+X5 did not build the usage reading. The report reader of §8.5 reads only the guarded rules, not the grants. The grants carry no report, so the reading stays proposed.
+
+#### 8.5 As built (X5)
+
+A worked example. Cycle 7 builds the item `item-a`, and cycle 6 failed on the same item. Before the build launch, the pipeline writes `.evolve/runs/cycle-7/inputs/index.json` with `lineage: [6]` and `attempt: 2`. The index lists the scout report of cycle 7 as a `deliverable`, and the retrospective of cycle 6 as a `lineage` entry.
+
+The cell opens the retrospective of cycle 6. Cycle 9 built `item-b`. A read of the audit report of cycle 9 gets `Operation not permitted` at `enforce`.
+
+| Item | As built |
+|---|---|
+| Builder | package `inputindex` ([internal-inputindex](packages/internal-inputindex.md)). `Build` reads only pipeline records. |
+| Writer | `writeInputIndex` (`go/internal/core/input_index.go`). `cycleRun.dispatch` calls it before the first try of each phase. A failure prints `WARN input index for <phase>`, and the cell gets no index grants. |
+| Item id | the fleet scope of the orchestrator (`fleet_scope` of the cycle context). The first dispatch of a run writes it to `.evolve/lineage/cycle-N.json` before the index (`inputindex.WriteRecord`). Each later dispatch of the same run id reads that record (`inputindex.ReadRecord`), and a new run of the cycle number replaces it. No cell can write `.evolve/lineage/`, because the repo is read-only for a cell. With no item id, the index has no lineage and a note. |
+| Lineage | each cycle whose record in `.evolve/lineage/` holds an item id of the cycle. Also the cycle of the continuation registry entry of each item id (`continuation.ReadRegistryEntry`). The cap is the last `isolation.lineage_max` cycles, default 5. The `lane-scope.json` of a workspace is never read, because a cell can write its workspace (review of #1133, HIGH-1). |
+| Format | as §8.3, with two changes. `item_ids` is a list, because a lane scope can hold more than one id. `attempt` is the number of lineage cycles before the cap, plus 1. |
+| Lineage entries | For each lineage cycle: `retrospective-report.md`, `failure-digest.json`, `carryover-todos.json`, `audit-report.md`, `retrospectives/*.md` (ADR-0151) and `failure-lesson*.yaml`. Also each lesson under `.evolve/instincts/lessons/` that names an item id or the `cycle-N` of a lineage cycle. |
+| Raw output | `inputindex.IsRawOutput`: a path under `.bridge/`, or a name that ends in `-stdout.log`, `-stderr.log`, `-stdout.clean.txt`, `-final-pane.txt`, `-final-scrollback.txt` or `-pane-watch.json`. The index lists none. |
+| Raw logs | stay in the workspace. The sandbox denies the reads and the writes of them by name (§9), so no reader of the logs changes. The write deny stops a rename or a hard link to a name that no rule matches. The same two denies cover `<ws>/.bridge/`. |
+| Pinned files | `<ws>/lane-scope.json` gets a write deny (`write.pipeline.file`), as a second guard after the record. |
+| Read grants | `Deps.readIsolation` (`go/internal/bridge/read_isolation.go`) gives the sandbox the real path of each indexed path and of the index. |
+| Stage source | the policy key `isolation.i5.stage`, read by `policy.IsolationReadStage`. An explicit `Deps.ReadStage` wins. The default is `shadow`. One stage covers the I-4 and the I-5 rules. |
+| Shadow signal | each guarded rule carries `(with message "evolve-cell=<dispatch id> rule=<rule> inv=<I4\|I5>")`. After the launch, `Deps.reportReadViolations` reads the reports of the dispatch id with `/usr/bin/log show`. It emits one `ISOLATION_I4_VIOLATION` or `ISOLATION_I5_VIOLATION` for each rule and target, at most 20 for each cell. `action` is `logged` for a reported allow and `refused` for a deny. |
+| Handoff asks | each `handoff-*.json` is a `deliverable` of kind `handoff-asks`. The correction of the handoff reviewer names the `handoff-asks` entry of the index. |
+| Personas | `agents/agent-templates.md` §"The input index", and the builder, auditor, tdd-engineer, build-planner and retrospective personas open index entries, not fixed workspace paths. |
+
+Three facts set the form of the rules. Each was measured on macOS on 2026-10-26 with `sandbox-exec` and a scratch profile:
+
+- A grant of `file-read*` after a deny of `file-read-data` does not reopen the path. The grant must name `file-read-data` too. So the workspace and index grants name both operations.
+- A deny of `file-read-data` keeps the metadata reads. `ls` of the own workspace and a path walk through `.evolve/runs/` still work.
+- `(with message "...")` adds its text to the kernel report of the rule. `log show --predicate 'sender == "Sandbox" AND eventMessage CONTAINS "evolve-cell=<id> "'` returns only the reports of one cell. An allowed read logs `allow file-read-data <path>`, and a denied read logs `deny(1) file-read-data <path>`.
+
+The guards are these tests:
+
+- rows N5, N7 and N8 (`TestAgentSandboxContract`, darwin), and the allow row "a retry opens its predecessor's retrospective through inputs/index.json"
+- the deny rows for a raw log of the own workspace: a read, a rename and a hard link
+- the deny rows for a write of `inputs/index.json`, of `lane-scope.json` and of a record in `.evolve/lineage/`
+- the allow row "the Claude OAuth login reads its Keychain item through the security service"
+- `TestAgentSandboxContract_AForgedLaneScopeGainsNoGrantAtTheNextDispatch`: a shadow cell forges its `lane-scope.json`, and the next enforce cell still cannot read the unrelated cycle
+- `TestDispatch_ALaneScopeThatACellRewroteNeitherNamesTheItemNorJoinsTheLineage` and `TestWriteInputIndex_TheFirstRecordOfTheCycleWinsOverALaterScope`
+- `TestAgentSandboxContract_ShadowReportsTheExecAndLetsItRun`: at `shadow` each guarded read goes through
+- row N6 (the matrix, M1 run at `isolation.i5.stage=enforce`): a phase index lists the scout report and no raw output
+- `TestLineageComesOnlyFromPipelineRecords`, `TestHandoffAsksTravelInTheIndex` and `TestDispatch_TheIndexIsTheOnlyLineageInputAndNoEntryIsPreloadedIntoTheRequest`
+- `TestGenerateSBPL_EnforceDeniesOtherRunsSecretsAndRawOutputAndGrantsTheIndex` and `TestBwrapPrefix_EnforceHidesOtherRunsAndRebindsTheOwnWorkspaceAndTheIndex`
+- `TestReportReadViolations_EmitsOneSignalForEachGuardedReadOfTheCell`
+
+Known differences from the design:
+
+- The rest of `$HOME` stays readable. The deny of §9 needs the `home_reads` field of each manifest (X9). X5 denies the listed secrets only.
+- The CLI transcripts stay readable: `~/.claude/projects/*/*.jsonl` and `~/.gemini`. So a claude cell can read the raw transcript of another cell. Item `isolation-home-transcripts-before-i4-enforce` closes this gap, and I-4 must not go to `enforce` before it.
+- A cycle that ran before X5 has no record in `.evolve/lineage/`, so it is in no lineage.
+- A source under a symlinked directory, or a file with a second hard link, is not an entry.
+- The secret rules cover the secrets that exist at the launch. A secret that the cell makes later has no rule.
+- The secret list does not hold the directories of the other families yet.
+- Linux has no report. At `shadow` the `bwrap` prefix adds nothing, and no signal comes.
+- On Linux, `bwrap` masks the raw files that exist at the launch. A raw log that the bridge makes later is not masked. The SBPL rule matches by name, so macOS has no such gap. The item `isolation-home-transcripts-before-i4-enforce` tracks the Linux gap too.
+- A grant is kept only when its real path is inside `.evolve/runs/` and is not raw output. A lesson under `.evolve/instincts/lessons/` gets no grant, because the repo grant already covers it.
+- The report reader is best effort. The kernel can merge repeated reports, and `log show` can miss a report that arrives after it runs. A failed read prints `WARN isolation read reports`.
+- Only the phases of a cycle get an index. A flow seat (advisor, judge, router) and an `evolve agent run` launch get no index, so at `enforce` they read only their own workspace inside `.evolve/runs/`.
+- The `message` class and the `context` class of §8.1 have no entries yet. The inbox item file and `lane-scope.json` stay readable, because the repo grant covers `.evolve/inbox/` and the workspace grant covers `lane-scope.json`.
+- An `evolve` verb that the agent runs inside the cell and that reads other run directories is a violation at `shadow`. The `shadow` signals must show none before the flip to `enforce`.
+
 ## 9. Sandbox rules
 
 The sandbox today generates SBPL for `sandbox-exec` and an argv for `bwrap` from one `Config` (`go/internal/adapters/sandbox`). Each new rule below is proposed. Each rule starts in `shadow`: on macOS, the rule is an `(allow ... (with report))` that logs, and on Linux the launcher checks the path before the launch.
@@ -566,16 +691,17 @@ The sandbox today generates SBPL for `sandbox-exec` and an argv for `bwrap` from
 | Exec of other tools | allow | the current `(allow process-exec)` | as today | none | allowed |
 | `EVOLVE_SANDBOX=off` in a phase | refuse the launch | Go check | Go check | I-3, I-7 | refused (X4, §7.1) |
 | Read of the worktree and the repo source | allow | `(allow file-read* (subpath "<worktree>"))` | `--ro-bind` | none | allowed |
-| Read of the own workspace (`.evolve/runs/cycle-N/`), except `<ws>/.bridge/` | allow | `(allow file-read* (subpath "<ws>"))` after the runs deny | `--ro-bind <ws> <ws>` | I-5 | allowed |
-| Read of `inputs/index.json` and each indexed path | allow | `(allow file-read* (literal "<path>"))` for each entry | `--ro-bind <path> <path>` | I-4 | allowed |
-| Read of other files under `.evolve/runs/` | deny | `(deny file-read* (subpath ".evolve/runs"))` before the literal grants | not bound | I-5 | allowed |
-| Read of raw output (`*-stdout.log`, `*-final-pane.txt`, transcripts) | deny | the logs move to `<ws>/.bridge/` (proposed), which no grant covers | not bound | I-4 | allowed |
+| Read of the own workspace (`.evolve/runs/cycle-N/`), except `<ws>/.bridge/` | allow | `(allow file-read* file-read-data (subpath "<ws>"))` after the runs deny | `--bind <ws> <ws>` after the `tmpfs` | I-5 | built (X5, §8.5) |
+| Read of `inputs/index.json` and each indexed path | allow | `(allow file-read* file-read-data (literal "<path>"))` for each entry | `--ro-bind-try <path> <path>` | I-4 | built (X5) |
+| Read of other files under `.evolve/runs/` | deny | `(deny file-read-data (subpath ".evolve/runs"))` before the literal grants | `--tmpfs .evolve/runs` | I-5 | built at `shadow` (X5) |
+| Read of raw output (`*-stdout.log`, `*-final-pane.txt`; the CLI transcripts in `$HOME` are open until X9, §8.5) | deny | `(deny file-read-data (require-all (subpath ".evolve/runs") (regex #"(-stdout\.log\|...)$")))` and a deny of `<ws>/.bridge/`, after the grants | `--ro-bind /dev/null <file>` for each raw file of the workspace, `--tmpfs <ws>/.bridge` | I-4 | built at `shadow` (X5); the logs stay in the workspace |
 | Read of the CLI's own config in `$HOME` | allow | `(allow file-read* (subpath "~/.<cli dir>"))` from manifest `home_reads` | `--ro-bind` | I-5 | allowed (all of `$HOME`) |
-| Read of secrets in `$HOME` | deny | `(deny file-read* ...)` for `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.netrc`, `~/.config/gh`, `~/.docker/config.json`, `~/.kube`, and the dirs of the other families | not bound | I-5 | allowed |
+| Read of secrets in `$HOME` | deny | `(deny file-read-data ...)` for `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.netrc`, `~/.config/gh`, `~/.docker/config.json`, `~/.kube`, and the dirs of the other families | `--tmpfs <dir>`, `--ro-bind /dev/null <file>` | I-5 | built at `shadow` for the listed secrets (X5); not the dirs of the other families |
 | Read of the rest of `$HOME` | deny at `enforce` | no grant | not bound | I-5 | allowed |
 | Write of the worktree and the own run dir | allow | as today (`go/internal/bridge/sandbox_paths.go:161-201`) | as today | I-7 | allowed |
 | Write of another cycle, `.evolve/events/`, `.evolve/resume-witness/` | deny | as today | as today | I-7 | denied |
-| Write of `inputs/` | deny | `(deny file-write* (subpath "<ws>/inputs"))` | `--ro-bind` | I-4 | not present |
+| Write of a protected path of the worktree or the repo root | deny | `(deny file-write* (subpath "<base>/<dir>"))` for each directory fragment of `guards.ProtectedSurfaceManifest`, `(deny file-write* (prefix "<base>/<file>"))` for each file fragment, after every write grant (§9.1) | `--ro-bind <path> <path>` for each protected path that exists | I-7 | built at `shadow` (X7, §9.1) |
+| Write of `inputs/` | deny | `(deny file-write* (subpath "<ws>/inputs"))` | `--ro-bind-try` | I-4 | built at `shadow` (X5) |
 | Network | allow | as today | as today | none (a limit) | allowed |
 | Signal of a host process | deny | as today | as today | I-7 | denied |
 
@@ -588,7 +714,56 @@ The SBPL rule order matters: a later rule wins. The generator writes the rules i
 
 A contract row pins the order: a read of an unrelated run after the repo grant is denied. Only secondary sources describe the SBPL syntax (research P2.4), so each rule gets a row in the sandbox contract test that runs on the host.
 
-The macOS Keychain is reached through a system service, not through a file read. The deny of `$HOME` therefore does not stop the Claude OAuth login. X5 proves it with a contract row.
+The macOS Keychain is reached through a system service, not through a file read. The deny of `$HOME` therefore does not stop the Claude OAuth login. X5 proves it with a contract row: the cell reads the item `Claude Code-credentials` of a fixture keychain with `security find-generic-password`.
+
+### 9.1 As built (X7)
+
+Before X7, the four kernel guards were Claude Code PreToolUse hooks only (`.claude/settings.json`, research F1.6). An agy, codex or ollama pane got none of them. X7 puts each guarantee in a layer that does not depend on the CLI. The hooks stay as defence in depth in Claude Code panes.
+
+A worked example: the build pane of an agy cell runs `echo x > go/internal/guards/role.go` in its worktree. At `enforce` the macOS profile denies the write, and the shell prints `Operation not permitted`. A write of `go/internal/feature/x.go` in the same worktree goes through. At `shadow` both writes go through, and the sandbox writes a report of the protected write to the system log.
+
+| Hook guarantee | CLI-neutral layer | Where |
+|---|---|---|
+| `guard role`: a cycle does not change the control plane | the sandbox denies each write of a protected path (new); the ship tripwire refuses a cycle diff that touches a protected path (exists) | `bridge.Deps.withProtectedWrites`, `sandbox.writeProtectedWriteRules`; `ship.verifyNoControlPlaneEdits` (`go/internal/phases/ship/integrity.go:11`) |
+| `guard role`: a phase writes only its workspace and its worktree | the sandbox write grants (exist); the fence of a read-only phase restores each write outside its writable paths (exists) | `go/internal/bridge/sandbox_paths.go`; `go/internal/phases/runner/worktree_fence.go:12` |
+| `guard ship`: only `evolve ship` lands a commit | the sandbox grants the write of the own branch ref only, not of `main` (exists); the ship binds the audit to the tree (exists) | `bridge.sandboxGitWritePaths`; `go/internal/phases/ship/` |
+| `guard docdelete`: no delete of committed docs | the ship refuses the deletion of a file under `docs/` or `knowledge-base/` (exists) | `ship.refuseCommittedDocDeletion` (`go/internal/phases/ship/committed_doc_guard.go:17`) |
+| `guard phase`: a session outside a cell cannot start a phase persona during a cycle | the exec deny of each LLM binary and the cell markers (X4, §7.1); the hook judges `Agent` and `Task` alike (X7, row N11) | `go/internal/guards/phase.go` |
+| no global effect: `kill(-1)` from a cell | the SBPL profile grants `signal` only to `(target same-sandbox)` under `(deny default)`; `bwrap` runs the cell with `--unshare-pid` (exist; a contract row pins both, §23) | `go/internal/adapters/sandbox/sandbox.go` |
+
+| Item | As built |
+|---|---|
+| Protected paths | `bridge.Deps.withProtectedWrites` maps each fragment of `guards.ProtectedSurfaceManifest` onto the real path of the worktree, and at `enforce` also of the repo root. A fragment that ends in `/` is a directory, so it gets `subpath`. Any other fragment is a file prefix, for example `probe_quarantine`, so it gets `prefix`. Thus the role guard and the sandbox read one list. |
+| Rule order | At `enforce`, `GenerateSBPL` writes the deny rules last, because a later SBPL rule wins. At `shadow`, it writes the report rules directly after the write grants, so each later deny still wins. The repo root is read-only, so a `shadow` report rule for it can open the root again. Thus `shadow` covers the worktree only. `BwrapPrefix` writes the binds after the worktree bind and before the exec masks. |
+| Stage source | the policy key `isolation.i7.stage`, read by `policy.IsolationGuaranteeStage`. An explicit `Deps.GuaranteeStage` wins. The default is `shadow`. |
+| SBPL, `enforce` | `(deny file-write* (subpath "<path>"))` and `(deny file-write* (prefix "<path>"))` |
+| SBPL, `shadow` | the same match as `(allow file-write* ... (with report))` |
+| `bwrap`, `enforce` | `--ro-bind <path> <path>` for each protected directory that exists and for each file that starts with a protected prefix |
+| `bwrap`, `shadow` | no bind |
+| `off` | no protected rule |
+
+Three facts set the form of the rule. Each was measured on macOS on 2026-10-26 with `sandbox-exec` and a scratch directory:
+
+- `prefix` is a valid SBPL filter. It denies `probe_quarantine.go` and allows `other.go` in the same directory.
+- A `subpath` deny of a directory also denies a rename of the directory itself.
+- The match is on the resolved path. A write of `GO/internal/guards/role.go` on a case-insensitive volume is denied by the rule for `go/internal/guards`.
+
+The guards are these tests:
+
+- row N10, `TestAgentSandboxContract_N10_AnAgyPaneCannotWriteAProtectedPath` (darwin, build tag `integration`): an `agy-tmux` cell writes three protected paths and gets `Operation not permitted` for each. It still writes `go/internal/guards2/x.go`, a sibling of a protected directory.
+- row N11, `TestIsolationMatrix_N11_GuardPhaseAllowsAnInCellTaskAndDeniesAnOutOfCellPhasePersonaTask`: a `Task` inside a cell passes, and a phase-persona `Task` outside a cell during a cycle is denied. A revert of either branch fails the row.
+- `TestSandboxContract_KillMinusOneFromACellReachesNoHostProcess`: it reads the generated profiles and runs no signal (§23)
+- `TestWithProtectedWrites_EnforceDeniesEachManifestFragmentUnderEachBase`, `TestSandboxWrap_TheProtectedRulesNameTheRealPathsOfASymlinkedWorktreeAndTheRoot`, `TestGenerateSBPL_EnforceDeniesEachProtectedPathAfterTheWorktreeGrant` and `TestBwrapPrefix_EnforceBindsEachProtectedPathReadOnlyBeforeTheExecMasks`
+
+Known differences from the design:
+
+- At `shadow` no Go code emits `ISOLATION_I7_VIOLATION`. The report stays in the system log of macOS. The reader of the sandbox reports that X4 and X5 need is also the reader for I-7.
+- A rename of a parent directory of a protected path, for example `mv go/internal x`, is not denied. The ship tripwire lists each old path of the rename, so the cycle cannot ship it.
+- On Linux a protected path that does not exist at the launch gets no bind, because `bwrap` binds only a path that exists. A new file with a protected prefix also gets no bind. The ship tripwire refuses each such file.
+- `guard phase` follows §7.2:
+  - Inside a cell (`EVOLVE_PHASE` set by the launcher), each `Agent` and `Task` call passes. A phase agent can start any subagent of its own harness.
+  - Outside a cell, during a cycle, the hook denies a call whose `subagent_type` names a phase persona. A phase persona is `evolve-*`, with or without a plugin prefix. Thus the console or an operator session cannot act as a phase. A generic subagent passes.
+  - The marker is advisory, because an agent can set or unset it. That is acceptable, because the hook is defence in depth. The cell boundary (sandbox, exec deny, dispatch credential) is the limit.
 
 ## 10. Routing data
 
@@ -796,7 +971,7 @@ Before X1b, a stub `tmux` on the row `PATH` refused, so rows M2 to M4 failed wit
 
 The `agy` REPL of the fake draws the footer label of its `--model` value, so the launch model check of `agy-claude-tmux` reads a Claude label. The row thus proves that the driver sends a Claude model and reads the footer label. It does not prove that agy serves the model that it was asked for; the bridge real-tmux tests own that. Each row keeps its real check: the cycle ships, the ledger holds each phase, and only the stub of the row family ran.
 
-The row policy also sets `isolation.i2.stage` to `enforce`, so the stubs see the cell environment. Each stub writes its record to a log path in its script, not in an environment variable. The M1 run also judges rows N1 and N4 from the records of its stubs. It judges row N6 from its cycle workspace: today the pipeline writes no `inputs/index.json`.
+The row policy also sets `isolation.i2.stage` to `enforce`, so the stubs see the cell environment. Each stub writes its record to a log path in its script, not in an environment variable. The M1 run also judges row N1 from the records of its stubs, and it checks the marker refusal of `evolve agent run`. It judges row N6 from its cycle workspaces at `isolation.i5.stage=enforce`: a phase index must list the scout report and no raw output.
 
 The subagent conformance tests (`go/internal/subagent/conformance_test.go`) take the CLI from the row too. `TestConformance_AllRoles_HappyDispatchIsolated` dispatches each role on each of the five families and checks that the role ran on that family.
 
@@ -817,21 +992,21 @@ The stub for each family declares the same capabilities as the real manifest. Th
 | N1 | `CLAUDECODE=1` on the parent does not reach any seat | I-2 | X2 | the matrix (M1 run, policy `isolation.i2.stage=enforce`) | green (X2) |
 | N2 | the AST guard finds no LLM spawn outside the bridge launch API | I-1 | X3 | `internal/sysexec` | green (X3) |
 | N3 | a phase pane cannot exec `claude --version` | I-3 | X4 | sandbox contract | green (X4) |
-| N4 | `evolve agent run` inside a phase pane is refused | I-3 | X4 | the matrix (M1 run) | green (X4) |
-| N5 | a cell cannot read `<ws>/.bridge/scout-stdout.log` | I-4 | X5 | sandbox contract | open |
-| N6 | a retry opens its predecessor's `retrospective-report.md` through the index that the pipeline writes | I-4, I-5 | X5 | the matrix (M1 run) | open |
-| N7 | a retry cannot open an unrelated cycle's `audit-report.md` | I-5 | X5 | sandbox contract | open |
-| N8 | a cell cannot read `~/.ssh` | I-5 | X5 | sandbox contract | open |
+| N4 | `evolve agent run` in a cell with the env markers stripped is refused at `enforce` (darwin only) | I-3 | X4 | the sandbox contract | green (X4) |
+| N5 | a cell cannot read `<ws>/.bridge/scout-stdout.log` | I-4 | X5 | sandbox contract | green (X5) |
+| N6 | a retry opens its predecessor's `retrospective-report.md` through the index that the pipeline writes | I-4, I-5 | X5 | the matrix (M1 run) | green (X5) |
+| N7 | a retry cannot open an unrelated cycle's `audit-report.md` | I-5 | X5 | sandbox contract | green (X5) |
+| N8 | a cell cannot read `~/.ssh` | I-5 | X5 | sandbox contract | green (X5) |
 | N9 | the network row records today's behavior (allowed) | none | X1 | sandbox contract | green |
-| N10 | an agy pane cannot write a protected path | I-7 | X7 | sandbox contract | open |
-| N11 | `guard phase` denies `Task` | I-7 | X7 | `internal/guards` | open |
+| N10 | an agy pane cannot write a protected path | I-7 | X7 | sandbox contract | green (X7, at `enforce`) |
+| N11 | `guard phase` allows an in-cell `Task` and denies an out-of-cell phase-persona `Task` during a cycle | I-7 | X7 | `internal/guards` | green (X7) |
 | N12 | a judge verdict in prose with no file fails the contract | I-8 | X8 | `internal/core` | green (X8, at `enforce`) |
 | N13 | the grep guard finds no family string in flow code | I-6 | X6 | `internal/core` | green |
 | N14 | a new manifest with known format ids needs no Go change | I-6 | X9 | `internal/bridge` | open |
 
 Rows N3, N5 and N7 to N10 extend `TestAgentSandboxContract` (`go/internal/bridge/sandbox_contract_integration_test.go`, build tags `integration` and `darwin`). Before X1 it had 22 rows and none for exec, network or a cross-cycle read. The exec row runs a `fakeclitest` stub named `claude`, never a real CLI.
 
-The network row connects to a loopback listener of the test, so it needs no outside host. N8 reads a fixture `.ssh` file in a test `HOME`, so the row does not depend on the host. A plain allow row reads the predecessor's retrospective through a fixture index. It keeps the lineage read open when X5 adds its denies. [agent-sandbox-contract.md](agent-sandbox-contract.md) lists the rows.
+The network row connects to a loopback listener of the test, so it needs no outside host. N8 reads a fixture `.ssh` file in a test `HOME`, so the row does not depend on the host. A plain allow row reads the predecessor's retrospective through an index that `inputindex.Build` writes from fixture records. It keeps the lineage read open when X5 adds its denies. [agent-sandbox-contract.md](agent-sandbox-contract.md) lists the rows.
 
 The static rows read source, not a run. N2 runs the scan of `TestOnlyTheBridgeStartsAnLLMBinary` (§5.1) over the tree and counts each LLM spawn outside the launch API. N13 parses the non-test files of `internal/core` and counts each string literal that names a family or a driver. The component that closes the row replaces the probe with its own guard if it needs to.
 
@@ -853,8 +1028,8 @@ The contract reuses the shape of [llm-quality-indexes.md](llm-quality-indexes.md
 | `ISOLATION_I1_VIOLATION` | I-1 | the launch API, when a caller outside the bridge registers a launch; the AST guard covers the static case |
 | `ISOLATION_I2_VIOLATION` | I-2 | the environment builder, for each dropped name |
 | `ISOLATION_I3_VIOLATION` | I-3 | built: the refusal of `EVOLVE_SANDBOX=off` in a phase (`rule=sandbox.off.phase`). Proposed: the sandbox report of a denied exec, and the refusal in `evolve agent run` (§7.1). |
-| `ISOLATION_I4_VIOLATION` | I-4 | the sandbox report of a read of raw output or a write of `inputs/` |
-| `ISOLATION_I5_VIOLATION` | I-5 | the sandbox report of a read outside the index, the worktree and `home_reads` |
+| `ISOLATION_I4_VIOLATION` | I-4 | built (X5): the sandbox report of a read of raw output or a write of `inputs/`, read by `Deps.reportReadViolations` on macOS |
+| `ISOLATION_I5_VIOLATION` | I-5 | built (X5): the sandbox report of a read of another run directory or a home secret, read by `Deps.reportReadViolations` on macOS |
 | `ISOLATION_I6_VIOLATION` | I-6 | the router, when a launch resolves through a compiled family default and not through routing data |
 | `ISOLATION_I7_VIOLATION` | I-7 | a gate or the fence that stops a write that a hook did not stop |
 | `ISOLATION_I8_VIOLATION` | I-8 | a flow parser that falls back to stdout or prose |
@@ -1134,9 +1309,9 @@ An accident inside a cell must stay inside the cell. Two incidents show the risk
 | Global effect | Guard | Component |
 |---|---|---|
 | kill the shared tmux server | the private `tmux -L` server rows of the sandbox contract (exist) | X4 keeps them; X7 adds a row for each family |
-| signal a host process, `kill(-1)` | the "signal a host process" deny (exists); a contract row for `kill(-1)` | X7 |
+| signal a host process, `kill(-1)` | the "signal a host process" deny (exists); the contract row `TestSandboxContract_KillMinusOneFromACellReachesNoHostProcess` reads the profiles and runs no signal (§9.1) | X7 (built) |
 | start another LLM or a dispatch | the exec deny and the depth marker | X4 |
-| write the shared state of the loop | the write fence and the ADR-0064 deny | X7 |
+| write the shared state of the loop | the write fence, the protected write rule and the ADR-0064 deny | X7 (built, §9.1) |
 | run a mutation on kill code | the mutation gate skips code that signals a process (ADR-0153 rule 17) | X15 for the T1 mutation gate |
 
 ## 24. Self-healing signals
@@ -1280,7 +1455,7 @@ CLI specifics live above the driver layer today (research F6.1 to F6.6):
 | Claude tools in personas | 14 of 106 files under `agents/` | X19b |
 | Family and model literals in flow code | `phase_advisor.go:73`, `failure_advisor.go:54`, `phase_judge.go:28`, `contract_escalation.go:22`; the default model `opus` of four phases | X6, merged in #1123 after this read (not X19) |
 | Per-agent CLI and model flags | `EVOLVE_<AGENT>_CLI`, `_MODEL` (control-flags.md class (b)) | X18c (not X19) |
-| Guards as Claude Code hooks | `.claude/settings.json` | X7 (not X19) |
+| Guards as Claude Code hooks | `.claude/settings.json` | X7 (not X19; built, the hooks are defence in depth, §9.1) |
 
 ### Gap
 
@@ -1379,11 +1554,11 @@ X19 lands in three items:
 |---|---|---|---|---|
 | I-1 Single launcher | `TestOnlyTheBridgeStartsAnLLMBinary` (AST) | X3 | `enforce` | `ISOLATION_I1_VIOLATION` |
 | I-2 Hermetic environment | `TestProcessEnv_IsTheAllowlistPlusTheManifest`; matrix row N1 | X2 | `shadow`, then `enforce` | `ISOLATION_I2_VIOLATION` |
-| I-3 No nested agency | sandbox contract row N3 and matrix row N4 | X4 | `shadow`, then `enforce` | `ISOLATION_I3_VIOLATION` |
-| I-4 Pipeline-mediated communication | rows N5, N6; `TestHandoffAsksTravelInTheIndex` | X5 | `shadow`, then `enforce` | `ISOLATION_I4_VIOLATION` |
-| I-5 Read isolation | rows N6, N7, N8; `TestLineageComesOnlyFromPipelineRecords` | X5 | `shadow`, then `enforce` | `ISOLATION_I5_VIOLATION` |
+| I-3 No nested agency | sandbox contract rows N3 and N4 | X4 | `shadow`, then `enforce` | `ISOLATION_I3_VIOLATION` |
+| I-4 Pipeline-mediated communication | rows N5, N6; `TestHandoffAsksTravelInTheIndex` (built) | X5 | `shadow` (built), then `enforce` | `ISOLATION_I4_VIOLATION` |
+| I-5 Read isolation | rows N6, N7, N8; `TestLineageComesOnlyFromPipelineRecords` (built) | X5 | `shadow` (built), then `enforce` | `ISOLATION_I5_VIOLATION` |
 | I-6 Family-agnostic flow | `TestFlowCodeNamesNoFamily`; rows N13, N14 | X6, X9, X10 | `enforce` | `ISOLATION_I6_VIOLATION` |
-| I-7 CLI-neutral guarantees | rows N10, N11 | X7 | `enforce` | `ISOLATION_I7_VIOLATION` |
+| I-7 CLI-neutral guarantees | rows N10, N11; `TestSandboxContract_KillMinusOneFromACellReachesNoHostProcess` | X7 | `shadow`, then `enforce` | `ISOLATION_I7_VIOLATION` |
 | I-8 Typed flow decisions | row N12; `TestFlowDecision_ValidateRejectsAnUnknownFieldAndAMissingField`; `TestFlowCode_OnlyTheLegacySpanFileNamesLastBalancedSpan` | X8 | `legacy`, then `shadow`, then `enforce` (§12.1) | `ISOLATION_I8_VIOLATION` |
 | I-9 Proven substitution | `TestE2ECycleCLIMatrix` rows M1 to M5 (exists, skipped today) | X1, X11 | `enforce` per row | none (a test guard) |
 | I-10 Constitution | `TestGateClassifier_FlagsEachWeakeningPattern` (one case for each pattern of §20.3); the ADR-0064 P2 check (exists) | X15 | `enforce` | `HEALING_I10_VIOLATION` |

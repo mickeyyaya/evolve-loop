@@ -236,8 +236,21 @@ The spec is [llm-isolation.md](../llm-isolation.md) §7.1.
 
 - `Deps.cellMarkers(cfg)` gives `EVOLVE_DISPATCH_DEPTH` (the depth of the launcher plus 1) and `EVOLVE_PHASE` (`cfg.Agent`). `cellEnv` adds them through `withCellMarkers`, and `primePaneShell` and the recipe boot export them before the launch line.
 - `launchSwept` calls `Deps.refuseSandboxOffInPhase` first. A launcher with `EVOLVE_PHASE` and `EVOLVE_SANDBOX=off` gets `ErrSandboxOffInPhase` and `ExitSafetyGate`, and the bridge emits `ISOLATION_I3_VIOLATION`.
+- `Deps.withProtectedWrites(cfg, realBases...)` gives the sandbox the protected write rule of I-7 ([llm-isolation.md](../llm-isolation.md) §9.1). It maps each fragment of `guards.ProtectedSurfaceManifest` onto the real worktree (`ownWorktree`) and the real repo root. The stage is `Deps.guaranteeStage` (policy `isolation.i7.stage`, default `shadow`). At `off` the config is unchanged.
 - `Deps.execDeny(cli, goos)` gives the sandbox its exec deny paths and stage. The stage is `Deps.execStage` (policy `isolation.i3.stage`, default `shadow`). The targets come from `execDenyTargets`: the real path of each manifest binary on `PATH`, and each manifest `install_roots` entry that exists. On Linux the binary and the roots of the launched family are left out, because the `bwrap` mask also hides them from the launch.
 - `SandboxWrapRequest.CLI` carries the family of the launch to the wrapper.
+- `Deps.dispatchCredentialDeny(stage)` (`dispatch_credential.go`) runs at each sandboxed launch at `shadow` or `enforce`. It writes the dispatch credential and the stage through `dispatchcred.Store.Ensure`. It gives the real path of `held/` to `DenyReadPaths`, the parent of the store to `DenyPaths` and each higher ancestor to `DenyLiterals` (`ancestorsOf`). An `Ensure` failure writes one `[bridge] WARN dispatch credential` line and keeps both denies. A store that does not resolve adds no deny.
+- `Deps.requireDispatchCredential(purpose, target)` runs first in `LaunchLLM`, `launchPane`, `launchSwept` and `newRecipeDriver`. A process that does not hold the credential gets `ISOLATION_I3_VIOLATION` (`rule=launch.credential`), and at `enforce` the launch returns `ErrNoDispatchCredential`. `Deps.DispatchStore` is the seam; the default is `dispatchcred.Default` ([internal-dispatchcred.md](internal-dispatchcred.md), spec §7.1.1).
+
+### Read isolation (`read_isolation.go`, X5 of ADR-0154)
+
+The spec is [llm-isolation.md](../llm-isolation.md) §8.5 and §9.
+
+- `Deps.readIsolation(req, home)` gives the sandbox its `ReadIsolation`. The stage is `Deps.readStage` (policy `isolation.i5.stage`, default `shadow`; `off` gives no rule). It reads the grants from `inputindex.ReadablePaths`, and resolves each path to its real path. It keeps a grant only when the real path is inside the runs directory and is not raw output. So a grant cannot reopen a home secret or a raw log. A missing index gives no grant, and a malformed index gives no grant and a WARN.
+- The guarded paths are `.evolve/runs` of the repo when it exists, and the raw-output files and the `.bridge` directory of the own workspace. The home secrets that exist are guarded too: `.ssh`, `.aws`, `.gnupg`, `.netrc`, `.config/gh`, `.docker/config.json` and `.kube`.
+- `ReadIsolation.PinnedFiles` holds `<ws>/lane-scope.json`, so the cell cannot rewrite it.
+- `SandboxWrapRequest.Tag` carries `Config.DispatchID`. The profile puts it in the message of each guarded rule.
+- `launchSwept` calls `Deps.reportReadViolations` after the launch. On macOS it reads the sandbox reports of the tag through `Deps.SandboxReports` (`NewEngine` sets `logShowReports`, which runs `/usr/bin/log show --style ndjson`). `parseReadReports` keeps one report for each rule and target, at most 20. `emitReadViolation` emits `ISOLATION_I4_VIOLATION` or `ISOLATION_I5_VIOLATION` with `action=logged` for an allowed read and `action=refused` for a denied read, and `source=sbpl-report`.
 
 ### The driver factory (`resolve.go`)
 
