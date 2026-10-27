@@ -75,6 +75,12 @@ the change it exists to catch**.
 (`os`, `os/exec`, `os/user`, `syscall`, `net`, `net/http`) as **underivable**, and underivable means
 always-run.
 
+The closure is **module-local**: the walk follows the imports of module packages only. It does not
+follow the standard library, because every test package reaches `os` through `testing`, and that
+made every package underivable. A package that reaches `os` through a module package (`apicover`
+through `acsassert`) stays underivable. Pinned by `TestCompute_SkipsAPredicateThatReachesOsOnlyThroughTesting`
+and `TestC2053_001_PackageWithNoEscapeHatchInItsModuleLocalGraphIsSkippable` and `TestC2053_002_ReachingOsThroughAModulePackageStaysAnEscapeHatch`.
+
 Measured against this repository (scope `./internal/apicover/...`):
 
 ```

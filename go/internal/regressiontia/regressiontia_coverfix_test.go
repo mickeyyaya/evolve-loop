@@ -86,3 +86,20 @@ func TestListCorpusDepsCoverfix_ListingFailureYieldsNothing(t *testing.T) {
 		t.Fatalf("failed listing must yield nothing, got %v %q", deps, mod)
 	}
 }
+
+func TestCorpus_MissingInputsYieldNil(t *testing.T) {
+	if got := corpus(""); got != nil {
+		t.Fatalf("empty moduleDir must yield nil, got %v", got)
+	}
+	if got := corpus(t.TempDir()); got != nil {
+		t.Fatalf("a module without a regression directory must yield nil, got %v", got)
+	}
+}
+
+func TestSelect_AnEmptyDependencyPatternOverlapsEveryScope(t *testing.T) {
+	deps := map[string][]string{"./acs/regression/a": {"./..."}}
+	selected, wouldSkip := Select([]string{"./acs/regression/a"}, []string{"./internal/x"}, deps)
+	if len(selected) != 1 || len(wouldSkip) != 0 {
+		t.Fatalf("selected=%v wouldSkip=%v: a root-wide dependency must stay selected", selected, wouldSkip)
+	}
+}
