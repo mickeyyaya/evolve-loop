@@ -1,6 +1,8 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestGC_TakesItsLeaseAndSkipsLiveRuns":                                                             "swaps seams gcInjectedReapers and gcInjectedProcessHost",
+	"main.TestGC_WithNoLiveRunRunsTheProcessSweeps":                                                         "swaps seam gcInjectedReapers",
 	"main.TestLoopDetach_JSONPrintsThePidTheLogAndRunningAndNoText":                                         "swaps seam loopDetachCommandFn",
 	"main.TestRunCLIRoutingExplain_JSONNamesARefusedRouteOnStderr":                                          "sets env through a helper",
 	"main.TestRunCLIRoutingWrite_JSONKeepsTheExitOfAFailedWrite":                                            "sets env through a helper",

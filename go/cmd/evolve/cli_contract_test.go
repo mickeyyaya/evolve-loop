@@ -259,7 +259,7 @@ func TestRunEnveloped_TheMessageIsTheFailureOfABoundaryStep(t *testing.T) {
 		return runBoundaryWith(verbs.dispatch, []string{"run", "--json", "--goal-text-file", fakeBoundaryGoalFile(t), "--project-root", t.TempDir()}, o, e)
 	}, &stdout, &stderr)
 	e := oneEnvelope(t, stdout.String())
-	if rc != cliExitRefused || e.Error == nil || !strings.HasPrefix(e.Error.Message, "evolve boundary run: step 3/9 ") || !strings.Contains(e.Error.Message, "failed rc=3") {
+	if rc != cliExitRefused || e.Error == nil || !strings.HasPrefix(e.Error.Message, "evolve boundary run: step 3/10 ") || !strings.Contains(e.Error.Message, "failed rc=3") {
 		t.Fatalf("rc %d error %+v, want the failed step line as the message", rc, e.Error)
 	}
 }

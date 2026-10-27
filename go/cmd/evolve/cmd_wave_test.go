@@ -228,7 +228,7 @@ func waveStepVerbs(e waveEnvelope) []string {
 	return out
 }
 
-var waveFullSteps = []string{"checkpoint", "loop-stop", "pr", boundaryRatchetVerb, "sync-main", "inbox", "quality", "gc", waveBuildVerb, "reset-sha", "doctor", "loop-stop", boundaryLogVerb, "loop"}
+var waveFullSteps = []string{"checkpoint", "loop-stop", "pr", boundaryRatchetVerb, "sync-main", queueApplyVerb, "inbox", "quality", "gc", waveBuildVerb, "reset-sha", "doctor", "loop-stop", boundaryLogVerb, "loop"}
 
 func TestWaveNext_DryRunComposesTheGoalAndWritesNothing(t *testing.T) {
 	t.Parallel()
@@ -251,7 +251,7 @@ func TestWaveNext_DryRunComposesTheGoalAndWritesNothing(t *testing.T) {
 	if launch := e.Steps[len(e.Steps)-1].Name; strings.Contains(launch, waveTestStanding) || !strings.Contains(launch, fmt.Sprintf("--goal-text <goal: %d bytes>", len(strings.TrimSpace(e.Goal)))) {
 		t.Errorf("launch step name = %q, want the goal shown by its size only", launch)
 	}
-	if build := e.Steps[8]; build.Name != "make -C "+filepath.Join(p.root, "go")+" build" || build.OK || build.Detail != "planned" {
+	if build := e.Steps[9]; build.Name != "make -C "+filepath.Join(p.root, "go")+" build" || build.OK || build.Detail != "planned" {
 		t.Errorf("planned build step = %+v, want the make command, not run", build)
 	}
 	for _, want := range []string{"Wave 82.", waveTestStanding, "Wave 81 facts (run 20261008T080000Z): 1 of 2 cycles shipped.",
@@ -477,7 +477,7 @@ func TestWaveNext_TextOutputEndsWithTheLaunchedWave(t *testing.T) {
 	rc := h.run("next", "--project-root", p.root)
 
 	out := h.stdout.String()
-	if rc != 0 || !strings.Contains(out, "boundary: step 1/13: evolve checkpoint save --all") ||
+	if rc != 0 || !strings.Contains(out, "boundary: step 1/14: evolve checkpoint save --all") ||
 		!strings.HasSuffix(out, fmt.Sprintf("wave: launched wave 1: run %s, pid %d, goal %d bytes\n", gcpolicy.LogRunID(waveTestClock), waveTestPID, len(waveFirstGoal()))) {
 		t.Errorf("rc = %d stdout:\n%s", rc, out)
 	}

@@ -16,8 +16,8 @@ func runInboxRouteLane(root string, args []string, stdout, stderr io.Writer) int
 		fmt.Fprintln(stderr, inboxUsage("route-lane"))
 		return 10
 	}
-	if refusedMidWaveAt(root, "route-lane", stderr) {
-		return cliExitRefused
+	if rc, queued := inboxQueueGate(root, "route-lane", args, asJSON, stdout, stderr); queued {
+		return rc
 	}
 	id, reason := strings.TrimSpace(args[0]), strings.TrimSpace(args[1])
 	opts := inboxmover.Options{ProjectRoot: root, Stderr: stderr, IsProtectedPath: laneForbidden(root, stderr)}
