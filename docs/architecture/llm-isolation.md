@@ -1442,12 +1442,24 @@ A deterministic diff classifier (X15) runs at the build floor and at ship, besid
 | touches a protected path | `go/internal/guards/role.go` |
 | removes a test function in a guard package or a contract test | `func TestAgentSandboxContract` deleted |
 | adds `t.Skip` to a test that ran | a skipped matrix row |
-| lowers a threshold or a budget constant | `zero_ship_halt` from 2 to 3 |
+| lowers a threshold or a budget constant (as built: changes one, §20.4) | `zero_ship_halt` from 2 to 3 |
 | moves a stage key from `enforce` to `shadow` or `off` | `docs_floor.ste_stage` |
 | changes a frozen acceptance check | `go/acs/cycle<N>/` after the TDD digest (item `tdd-predicates-frozen-at-handoff`) |
 | changes the catalog, the budgets or the tier table | `healing` policy keys |
 
 A T0 flag in a loop cycle refuses the ship with `HEALING_I10_VIOLATION`. The repair goes to the operator queue as a proposal.
+
+### 20.4 As built (X15)
+
+- `go/internal/gateclass` holds the tier table and the classifier ([internal-gateclass.md](packages/internal-gateclass.md)). It is pure Go: the callers give it the diff, the untracked paths and the cycle.
+- The build floor runs it (`core.GateClassifierFloorChecks`). Each flag is a floor failure, and the builder must restore the change.
+- Ship runs it for `--class cycle` after the P2 check and before the audit binding (`refuseWeakenedGates`). A flag refuses the ship with `GATE_WEAKENED` and emits `HEALING_I10_VIOLATION`.
+- The classifier is at `enforce` and has no stage key. A manual ship does not run it.
+- The classifier flags by pattern at each tier. A T2 path, for example a guard test outside the protected list, gets a flag when a pattern matches. The tiers are data until X16 routes a repair by them.
+- The classifier flags each change of a threshold or budget number, not only a lower one. A raised halt count is also weaker, and a diff does not show the direction of the rule.
+- The `frozen-check` pattern flags a change of a predicate package of another cycle. The digest of item `tdd-predicates-frozen-at-handoff` is not built yet.
+- The T1 judge rule is `cliroute.Decision.IndependentOf`. It removes the builder family from the audit seat, or refuses with `ErrNoIndependentFamily`. X16 calls it for a T1 repair cycle.
+- The classifier package, the ship check and the floor check are on the protected list (`go/internal/guards/integrity_surface.go`). The manifest is the one home of the T0 paths. An entry with `Constitution: true` is also a healing constitution path.
 
 ## 21. No agent writes its own oracle (I-11)
 
@@ -1498,7 +1510,7 @@ The module is `healing` (built by X12, code prefix `HEALING_`), in the same shap
 | `incident.escalated` | INCIDENT | `HEALING_ESCALATED` | two failed repairs, two refused proposals, an open breaker or a `low` diagnosis |
 | `healing.violation` | WARN | `HEALING_I10_VIOLATION` to `HEALING_I14_VIOLATION` | an invariant of Part II breaks |
 
-As built (X12): one kind `selfheal.incident` with a field `transition` replaces `incident.opened` and `incident.closed` ([internal-selfheal.md](packages/internal-selfheal.md) has the codes). The kinds `incident.proposal`, `incident.refused` and `incident.escalated` come with X14. X13 emits no signal: in `shadow` it writes the proposal records only (§18.6).
+As built (X12): one kind `selfheal.incident` with a field `transition` replaces `incident.opened` and `incident.closed` ([internal-selfheal.md](packages/internal-selfheal.md) has the codes). The kinds `incident.proposal`, `incident.refused` and `incident.escalated` come with X14. X13 emits no signal: in `shadow` it writes the proposal records only (§18.6). X15 emits `HEALING_I10_VIOLATION` with the kind `gate.rejected` (§20.4).
 
 The measures for the stage flips of §20.2 are proposed panel readings: repair success rate, false-diagnosis rate and OQ4 time to green. A false diagnosis is a repair whose verify failed and whose next diagnosis named another cause. An amendment of ADR-0153 adds them.
 

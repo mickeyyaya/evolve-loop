@@ -849,3 +849,5 @@
 ./internal/selfheal
 # auditfix - the audit_fix rung handler: the auditor applies a small prescribed patch and a fresh seat reviews it (ADR-0158).
 ./internal/auditfix
+# gateclass - the surface tiers and the gate classifier of I-10: it flags a cycle diff that changes a kernel surface or weakens a gate (ADR-0155 X15).
+./internal/gateclass
