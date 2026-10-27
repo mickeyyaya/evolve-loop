@@ -34,7 +34,7 @@ func TestEveryGoReaderHasRegistryRow(t *testing.T) {
 	if len(skipped) > 0 {
 		t.Logf("envtaint: %d unparseable file(s) skipped: %v", len(skipped), skipped)
 	}
-	if len(r) < 10 {
+	if len(r) < 5 {
 		t.Fatalf("read-set implausibly small (%d keys) — the production scan is likely broken", len(r))
 	}
 	for _, key := range r {

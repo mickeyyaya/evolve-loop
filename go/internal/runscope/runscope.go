@@ -11,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
 )
 
-const EnvLane = "EVOLVE_" + "LANE"
-
 type Lane string
 
 type RunScope struct {
@@ -25,14 +23,9 @@ func New(lane Lane, runID string, cycle int) RunScope {
 	return RunScope{lane: lane, runID: runID, cycle: cycle}
 }
 
-func ResolveLane(explicit, root string, getenv func(string) string) Lane {
+func ResolveLane(explicit, root string) Lane {
 	if s := sanitizeLane(explicit); s != "" {
 		return Lane(s)
-	}
-	if getenv != nil {
-		if s := sanitizeLane(getenv(EnvLane)); s != "" {
-			return Lane(s)
-		}
 	}
 	return LaneFromRoot(root)
 }

@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -17,8 +18,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -34,11 +35,10 @@ type Escalation struct {
 	CLI           string
 	Tier          string
 	DispatchStart time.Time
-	Env           map[string]string
 }
 
 func EscalationFor(req core.BridgeRequest, dispatchStart time.Time) Escalation {
-	return Escalation{ProjectRoot: req.ProjectRoot, Workspace: req.Workspace, CLI: req.CLI, Tier: req.Model, DispatchStart: dispatchStart, Env: req.Env}
+	return Escalation{ProjectRoot: req.ProjectRoot, Workspace: req.Workspace, CLI: req.CLI, Tier: req.Model, DispatchStart: dispatchStart}
 }
 
 type Logf func(format string, args ...any)
@@ -127,12 +127,12 @@ func DefaultPlanResolver(router *cliroute.Router) PlanResolver {
 	}
 }
 
-func CLIHealthEnabled(env map[string]string) bool {
-	return envchain.BoolValue(envchain.Resolve("EVOLVE_CLI_HEALTH", env, "", "1"), true)
+func CLIHealthOn(projectRoot string) bool {
+	return policy.LoadOrDefaults(filepath.Join(projectRoot, ".evolve", "policy.json"), io.Discard).CLIHealthConfig().On()
 }
 
-func ApplyCLIHealthBench(projectRoot, phase string, plan llmroute.Plan, env map[string]string, now func() time.Time, logf Logf) llmroute.Plan {
-	if !CLIHealthEnabled(env) {
+func ApplyCLIHealthBench(projectRoot, phase string, plan llmroute.Plan, now func() time.Time, logf Logf) llmroute.Plan {
+	if !CLIHealthOn(projectRoot) {
 		return plan
 	}
 	if logf == nil {
@@ -248,7 +248,7 @@ type escalationReport struct {
 }
 
 func BenchOnEscalation(e Escalation, now func() time.Time, logf Logf) {
-	if !CLIHealthEnabled(e.Env) {
+	if !CLIHealthOn(e.ProjectRoot) {
 		return
 	}
 	if logf == nil {

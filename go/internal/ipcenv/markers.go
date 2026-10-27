@@ -3,6 +3,7 @@ package ipcenv
 import (
 	"path"
 	"slices"
+	"strings"
 )
 
 type marker struct {
@@ -26,14 +27,33 @@ var markers = []marker{
 }
 
 var unmovedControls = []string{
-	"EVOLVE_DYNAMIC_ROUTING", "EVOLVE_ROUTING_MODE", "EVOLVE_MANDATORY_PHASES", "EVOLVE_CONDITIONAL_MANDATORY",
-	"EVOLVE_MAX_OPTIONAL_INSERTIONS", "EVOLVE_COMMIT_EVIDENCE", "EVOLVE_PHASE_IO", "EVOLVE_CLI_HEALTH",
-	"EVOLVE_CLI_MAX_CONCURRENT_*", "EVOLVE_LANE", "EVOLVE_INTENT_DELTA",
-	"EVOLVE_*_CLI", "EVOLVE_*_MODEL", "EVOLVE_*_SYSTEM_PROMPT", "EVOLVE_SYSTEM_PROMPT", "EVOLVE_*_PERMISSION_MODE",
-	"EVOLVE_PROFILE_DIR", "EVOLVE_PERSONA_OVERRIDE", "EVOLVE_GO_BIN",
 	"EVOLVE_SANDBOX", "EVOLVE_USE_PHASE_REGISTRY", "EVOLVE_OPERATOR_CONFIRM", "EVOLVE_SHIP_AUTO_CONFIRM",
 	"EVOLVE_PHASE_*_BIN", "BRIDGE_ALLOW_BYPASS", "BRIDGE_DRY_RUN", "BRIDGE_ALLOW_ANTHROPIC_BASE_URL",
 	"BRIDGE_ALLOW_OPENAI_API_KEY", "BRIDGE_HUMAN_SIMULATION",
+}
+
+type RetiredControl struct{ Name, Use string }
+
+var retiredControls = []RetiredControl{
+	{"EVOLVE_DYNAMIC_ROUTING", "policy.json router.dynamic_routing"},
+	{"EVOLVE_ROUTING_MODE", "policy.json router.routing_mode"},
+	{"EVOLVE_MANDATORY_PHASES", "policy.json mandatory_phases"},
+	{"EVOLVE_CONDITIONAL_MANDATORY", "policy.json router.conditional_mandatory"},
+	{"EVOLVE_MAX_OPTIONAL_INSERTIONS", "policy.json router.max_optional_insertions"},
+	{"EVOLVE_COMMIT_EVIDENCE", "nothing: no code consumed the commit-evidence stage, so it has no replacement"},
+	{"EVOLVE_PHASE_IO", "policy.json gates.phase_io"},
+	{"EVOLVE_CLI_HEALTH", "policy.json cli_health.enabled"},
+	{"EVOLVE_CLI_MAX_CONCURRENT_*", "policy.json bridge.max_concurrent.<driver>"},
+	{"EVOLVE_LANE", "the --lane parameter"},
+	{"EVOLVE_INTENT_DELTA", "policy.json workflow.intent_delta"},
+	{"EVOLVE_*_CLI", "the --cli <agent>=<driver> parameter or policy.json pins.<phase>.cli"},
+	{"EVOLVE_*_MODEL", "the --model <agent>=<tier> parameter or policy.json pins.<phase>.model"},
+	{"EVOLVE_*_SYSTEM_PROMPT", "the system_prompt of the agent profile"},
+	{"EVOLVE_SYSTEM_PROMPT", "the system_prompt of the agent profile"},
+	{"EVOLVE_*_PERMISSION_MODE", "the permission_mode of the agent profile"},
+	{"EVOLVE_PROFILE_DIR", "the --profile-dir parameter of evolve phases"},
+	{"EVOLVE_PERSONA_OVERRIDE", "the --persona-override parameter of evolve phases"},
+	{"EVOLVE_GO_BIN", "go/bin/evolve or evolve on PATH"},
 }
 
 func Markers() []string {
@@ -56,6 +76,24 @@ func CellMarkers() []string {
 
 func UnmovedControls() []string {
 	return slices.Clone(unmovedControls)
+}
+
+func RetiredControls() []RetiredControl {
+	return slices.Clone(retiredControls)
+}
+
+func RetiredInUse(environ []string) []RetiredControl {
+	out := make([]RetiredControl, 0, len(retiredControls))
+	for _, r := range retiredControls {
+		if slices.ContainsFunc(environ, func(kv string) bool {
+			name, value, _ := strings.Cut(kv, "=")
+			matched, _ := path.Match(r.Name, name)
+			return matched && value != ""
+		}) {
+			out = append(out, r)
+		}
+	}
+	return out
 }
 
 func Carried(name string) bool {

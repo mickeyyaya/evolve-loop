@@ -23,12 +23,12 @@ func headroomRule() policy.AgentRule {
 	return policy.AgentRule{CLI: operatorBuildChain, Model: "balanced", Order: cliroute.OrderHeadroom}
 }
 
-func headroomTable(t *testing.T, rule policy.AgentRule) cliroute.Table {
+func headroomTable(t *testing.T, rule policy.AgentRule, opts ...cliroute.CompileOption) cliroute.Table {
 	t.Helper()
 	pol := operatorTable()
 	pol.CLIRouting.Agents = map[string]policy.AgentRule{"builder": rule}
 	profileDir, _ := cliroutetest.TrackedProfiles(t)
-	return mustCompile(t, pol, realCatalog(t), profiles.NewFromDir(profileDir))
+	return mustCompile(t, pol, realCatalog(t), profiles.NewFromDir(profileDir), opts...)
 }
 
 func weekUsed(t *testing.T, used map[string]float64) func(string) (map[string]float64, error) {
@@ -157,7 +157,7 @@ func TestHeadroom_AFailedLaneTimeReadOrdersWithoutAMeasure(t *testing.T) {
 
 func TestHeadroom_TheCliHealthBenchStillDemotesAFamilyInCooldown(t *testing.T) {
 	var benchSaw []string
-	bench := func(_, _ string, plan llmroute.Plan, _ map[string]string) llmroute.Plan {
+	bench := func(_, _ string, plan llmroute.Plan) llmroute.Plan {
 		benchSaw = families(plan.Candidates)
 		return llmroute.ApplyBench(plan, map[string]time.Time{"claude": time.Now().Add(time.Hour)})
 	}
@@ -256,10 +256,10 @@ func TestHeadroom_AFamilyOutsideTheUnmeasuredOrderKeepsItsPolicyPlaceAfterIt(t *
 }
 
 func TestHeadroom_AnEnvOverrideStillLeadsTheHeadroomOrder(t *testing.T) {
-	r := mustRouter(t, headroomTable(t, headroomRule()), cliroute.Host{LookPath: everyBinary(), WeekUsed: weekUsed(t, map[string]float64{"claude": 14})})
-	d := mustResolve(t, r, cliroute.Request{Agent: "builder", Phase: "build", ProjectRoot: headroomRoot, DefaultModel: "balanced", Env: map[string]string{"EVOLVE_BUILDER_CLI": "agy"}})
+	r := mustRouter(t, headroomTable(t, headroomRule(), override("builder", llmroute.AgentOverride{CLI: "agy"})), cliroute.Host{LookPath: everyBinary(), WeekUsed: weekUsed(t, map[string]float64{"claude": 14})})
+	d := mustResolve(t, r, cliroute.Request{Agent: "builder", Phase: "build", ProjectRoot: headroomRoot, DefaultModel: "balanced"})
 	if got := families(d.Plan.Candidates); got[0] != "agy" {
-		t.Fatalf("an env override must lead after the headroom order, got %v", got)
+		t.Fatalf("a --cli override must lead after the headroom order, got %v", got)
 	}
 }
 

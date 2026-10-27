@@ -207,17 +207,15 @@ func TestShareNotes_NameEachSharedTierAndItsPace(t *testing.T) {
 
 func TestShare_AnOperatorEnvPinKeepsTheSharedFamilyOnTheSeat(t *testing.T) {
 	t.Parallel()
-	r := syntheticRouter(t, shareBlock(1), shareHost(argonWeek(90, 6*24*time.Hour)))
+	r := syntheticRouter(t, shareBlock(1), shareHost(argonWeek(90, 6*24*time.Hour)), override("builder", llmroute.AgentOverride{CLI: "agy"}))
 
 	for cycle := 1; cycle <= 10; cycle++ {
-		req := deepRequest(cycle)
-		req.Env = map[string]string{"EVOLVE_BUILDER_CLI": "agy"}
-		d := mustResolve(t, r, req)
+		d := mustResolve(t, r, deepRequest(cycle))
 
 		if llmroute.Family(d.Plan.Candidates[0]) != "agy" {
 			t.Fatalf("cycle %d: chain %v trace %q; the operator pinned agy, so the share must not demote it", cycle, d.Plan.Candidates, d.Trace)
 		}
-		requireTrace(t, d, "share 1% at deep skipped: env(EVOLVE_BUILDER_CLI) pins agy")
+		requireTrace(t, d, "share 1% at deep skipped: --cli builder pins agy")
 	}
 }
 

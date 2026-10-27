@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/goalhash"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
@@ -356,29 +357,17 @@ func carriedName(name string) bool {
 	return strings.HasPrefix(name, "EVOLVE_") && ipcenv.Carried(name)
 }
 
-func buildCycleEnv(cfg loopConfig, osEnv []string) map[string]string {
-	out := carriedEnv(osEnv)
+func (cfg loopConfig) agentOverrides() cliroute.Overrides {
+	out := cliroute.Overrides{}
 	for agent, cli := range cfg.PerAgentCLI {
-		out["EVOLVE_"+phaseEnvAgentKey(agent)+"_CLI"] = cli
+		ov := out[agent]
+		ov.CLI = cli
+		out[agent] = ov
 	}
 	for agent, model := range cfg.PerAgentModel {
-		out["EVOLVE_"+phaseEnvAgentKey(agent)+"_MODEL"] = model
+		ov := out[agent]
+		ov.Model = model
+		out[agent] = ov
 	}
 	return out
-}
-
-func phaseEnvAgentKey(agent string) string {
-	b := make([]byte, 0, len(agent))
-	for i := 0; i < len(agent); i++ {
-		c := agent[i]
-		switch {
-		case c == '-':
-			b = append(b, '_')
-		case c >= 'a' && c <= 'z':
-			b = append(b, c-32)
-		default:
-			b = append(b, c)
-		}
-	}
-	return string(b)
 }

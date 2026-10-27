@@ -32,6 +32,7 @@ type WorkflowPolicy struct {
 	QualityIndex             *QualityIndexPolicy   `json:"quality_index,omitempty"`
 	Convergence              *ConvergencePolicy    `json:"convergence,omitempty"`
 	RetryLadder              *RetryLadderPolicy    `json:"retry_ladder,omitempty"`
+	IntentDelta              bool                  `json:"intent_delta,omitempty"`
 }
 
 type WorkflowConfig struct {
@@ -59,6 +60,7 @@ type WorkflowConfig struct {
 	CodeReviewRepair         JudgeRepairConfig
 	QualityIndex             QualityIndexConfig
 	RetryLadder              RetryLadderConfig
+	IntentDelta              bool
 }
 
 func (p Policy) WorkflowConfig() WorkflowConfig {
@@ -100,6 +102,7 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 		c.CycleBudget = p.Workflow.CycleBudget
 	}
 	c.AllowDocDelete = p.Workflow.AllowDocDelete
+	c.IntentDelta = p.Workflow.IntentDelta
 	c.DiffComplexityDisable = p.Workflow.DiffComplexityDisable
 	c.AuditorTierOverride = p.Workflow.AuditorTierOverride
 	c.PhaseEnables = maps.Clone(p.Workflow.PhaseEnables)

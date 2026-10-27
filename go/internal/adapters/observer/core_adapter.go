@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -35,6 +34,8 @@ type CoreAdapter struct {
 	Signals func() *signalcenter.Center
 
 	UsageEvidence usageevidence.Explain
+
+	CLIFor func(phase string) string
 }
 
 func NewCoreAdapter(config ...policy.ObserverPolicy) *CoreAdapter {
@@ -168,9 +169,10 @@ func (a *CoreAdapter) phaseCLI(req core.PhaseRequest, phase string) string {
 		}
 		return ""
 	}
-	agentKey := "EVOLVE_" + strings.ToUpper(strings.ReplaceAll(phase, "-", "_")) + "_CLI"
-	if v := look(agentKey); v != "" {
-		return v
+	if a.CLIFor != nil {
+		if v := a.CLIFor(phase); v != "" {
+			return v
+		}
 	}
 	if v := look("EVOLVE_CLI"); v != "" {
 		return v

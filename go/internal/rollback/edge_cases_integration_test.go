@@ -13,7 +13,6 @@ import (
 
 func TestRun_NilStepsGetDefaultsWired(t *testing.T) {
 	jp, repo := makeJournal(t, journalFull)
-	t.Setenv("EVOLVE_GO_BIN", "")
 	t.Setenv("PATH", "/nonexistent-bin-for-nil-steps-test")
 
 	res, err := Run(Options{
@@ -106,7 +105,6 @@ func TestRun_NilDeleteRemoteTag_LsRemoteFails_IsPartial(t *testing.T) {
 
 func TestRun_NilRevertAndShip_DefaultIsWired(t *testing.T) {
 	jp, repo := makeJournal(t, journalFull)
-	t.Setenv("EVOLVE_GO_BIN", "")
 
 	steps := Steps{
 		GhDeleteRelease: func(string) string { return "deleted" },
@@ -229,7 +227,6 @@ func TestDefaultRevertAndShip_RevertSucceeds_NoBin_LocalOnly(t *testing.T) {
 	gitScript := filepath.Join(dir, "git")
 	fakeclitest.Install(t, gitScript, "#!/bin/sh\nexit 0\n")
 	t.Setenv("PATH", dir+":"+os.Getenv("PATH"))
-	t.Setenv("EVOLVE_GO_BIN", "")
 
 	repoRoot := t.TempDir()
 	got := defaultRevertAndShip(repoRoot, "deadbeef", "test reason", "9.9.9")
@@ -241,12 +238,9 @@ func TestDefaultRevertAndShip_RevertSucceeds_NoBin_LocalOnly(t *testing.T) {
 func TestDefaultRevertAndShip_RevertSucceeds_BinPresent_ShipSucceeds(t *testing.T) {
 	dir := t.TempDir()
 	fakeclitest.Install(t, filepath.Join(dir, "git"), "#!/bin/sh\nexit 0\n")
-	evolveBin := filepath.Join(dir, "fake-evolve")
-	fakeclitest.Install(t, evolveBin, "#!/bin/sh\nexit 0\n")
 	t.Setenv("PATH", dir+":"+os.Getenv("PATH"))
-	t.Setenv("EVOLVE_GO_BIN", evolveBin)
-
 	repoRoot := t.TempDir()
+	installRepoEvolve(t, repoRoot, "#!/bin/sh\nexit 0\n")
 	got := defaultRevertAndShip(repoRoot, "deadbeef", "test reason", "9.9.9")
 	if got != "reverted" {
 		t.Errorf("got %q, want 'reverted' when revert+ship both exit 0", got)
@@ -256,12 +250,9 @@ func TestDefaultRevertAndShip_RevertSucceeds_BinPresent_ShipSucceeds(t *testing.
 func TestDefaultRevertAndShip_RevertSucceeds_BinPresent_ShipFails(t *testing.T) {
 	dir := t.TempDir()
 	fakeclitest.Install(t, filepath.Join(dir, "git"), "#!/bin/sh\nexit 0\n")
-	evolveBin := filepath.Join(dir, "fake-evolve-fail")
-	fakeclitest.Install(t, evolveBin, "#!/bin/sh\nexit 1\n")
 	t.Setenv("PATH", dir+":"+os.Getenv("PATH"))
-	t.Setenv("EVOLVE_GO_BIN", evolveBin)
-
 	repoRoot := t.TempDir()
+	installRepoEvolve(t, repoRoot, "#!/bin/sh\nexit 1\n")
 	got := defaultRevertAndShip(repoRoot, "deadbeef", "test reason", "9.9.9")
 	if got != "local-only" {
 		t.Errorf("got %q, want 'local-only' when revert ok but ship exits 1", got)

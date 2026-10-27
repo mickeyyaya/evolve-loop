@@ -8,8 +8,8 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/observer"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
-	"github.com/mickeyyaya/evolve-loop/go/internal/bridgechain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/checkpoint"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -21,9 +21,10 @@ var usageEvidenceFn = productionUsageEvidence
 
 func productionUsageEvidence(projectRoot, evolveDir string, log io.Writer) usageevidence.Explain {
 	factory := bridge.NewControllerFactory(projectRoot, filepath.Join(evolveDir, "usage-evidence"), "usage-evidence", bridge.Deps{})
+	health := loadCLIHealthConfig(evolveDir)
 	return usageevidence.New(usageevidence.Options{
-		ProjectRoot: projectRoot, EvolveDir: evolveDir, Config: loadCLIHealthConfig(evolveDir),
-		Probe: usageevidence.UsagePane(factory), Act: bridgechain.CLIHealthEnabled(nil), Log: log,
+		ProjectRoot: projectRoot, EvolveDir: evolveDir, Config: health,
+		Probe: usageevidence.UsagePane(factory), Act: health.On(), Log: log,
 	})
 }
 
@@ -55,8 +56,9 @@ func evidenceSummary(explain usageevidence.Explain) func(driver string) string {
 }
 
 type observerDeps struct {
-	signals *signalcenter.Center
-	usage   usageevidence.Explain
+	signals   *signalcenter.Center
+	usage     usageevidence.Explain
+	overrides cliroute.Overrides
 }
 
 func phaseObserverOptions(cfg policy.ObserverPolicy, recoveryStage string, deps observerDeps) []core.Option {
@@ -71,6 +73,7 @@ func phaseObserverAdapter(cfg policy.ObserverPolicy, recoveryStage string, deps 
 	ca.RecoveryStage = recoveryStage
 	ca.Signals = func() *signalcenter.Center { return deps.signals }
 	ca.UsageEvidence = deps.usage
+	ca.CLIFor = func(phase string) string { return deps.overrides.For(phase).CLI }
 	return ca
 }
 

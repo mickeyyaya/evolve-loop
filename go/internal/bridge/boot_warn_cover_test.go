@@ -22,7 +22,7 @@ func TestBootTmuxREPL_AnAdmissionOrRegistryFailureWarnsAndTheBootGoesOn(t *testi
 	}
 	tmux := &fakeTmux{paneSeq: []string{"❯"}}
 	deps, stderr := bootSmokeDeps(tmux)
-	deps.LookupEnv = mapLookup(map[string]string{"EVOLVE_CLI_MAX_CONCURRENT_CLAUDE-TMUX": "1"})
+	deps.MaxConcurrent = map[string]int{"claude-tmux": 1}
 
 	rc, _ := BootSmokeTest(context.Background(), "claude-tmux", &Config{Workspace: ws}, deps)
 

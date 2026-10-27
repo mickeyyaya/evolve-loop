@@ -560,6 +560,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/dispatchevents` | 1 | [internal-dispatchevents.md](internal-dispatchevents.md) |
 | `internal/docsfloor` | 5 | [internal-docsfloor.md](internal-docsfloor.md) |
 | `internal/dossier` | 38 | [internal-dossier.md](internal-dossier.md) |
+| `internal/envchain` | 1 | [internal-envchain.md](internal-envchain.md) |
 | `internal/evalgate` | 32 | [internal-evalgate.md](internal-evalgate.md) |
 | `internal/evalqualitycheck` | 15 | [internal-evalqualitycheck.md](internal-evalqualitycheck.md) |
 | `internal/explanationdocs` | 9 | [internal-explanationdocs.md](internal-explanationdocs.md) |

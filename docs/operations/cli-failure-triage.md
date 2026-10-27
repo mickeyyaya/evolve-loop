@@ -92,4 +92,4 @@ Each window has a scope, a kind (`session`, `week` or `5h`), a percentage used a
 - The loop queries a CLI that is down, drained or unreadable at most once per TTL per process. Down means a failed query, drained means an exhausted read before its reset, and unreadable means no window.
 - The loop queries a CLI whose screen reads `healthy` again for each failed try that started after the last read. Each query costs one usage round trip. A healthy read from before a failure cannot rule its cause out.
 - Across processes, the recorded windows are the shared cache. So at most the lane width of queries run at the same time.
-- `EVOLVE_CLI_HEALTH=0` keeps the query, the workspace record and the signal. But the query then does not bench and does not write `.evolve/usage-windows.json`.
+- `cli_health.enabled: false` in `.evolve/policy.json` keeps the query, the workspace record and the signal. But the query then does not bench and does not write `.evolve/usage-windows.json`.

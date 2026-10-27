@@ -11,7 +11,6 @@ func TestResolveEvolveBin_PathLookup(t *testing.T) {
 	binDir := t.TempDir()
 	makeExecutable(t, binDir, "evolve")
 
-	t.Setenv("EVOLVE_GO_BIN", "")
 	t.Setenv("PATH", binDir+":"+os.Getenv("PATH"))
 
 	emptyRoot := t.TempDir()

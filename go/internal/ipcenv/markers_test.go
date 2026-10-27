@@ -57,10 +57,10 @@ func TestCarried_IsAMarkerOrAControlNotYetMoved(t *testing.T) {
 	for name, want := range map[string]bool{
 		"EVOLVE_PROJECT_ROOT":              true,
 		"BRIDGE_RUN_ID":                    true,
-		"EVOLVE_ROUTING_MODE":              true,
-		"EVOLVE_AUDITOR_CLI":               true,
-		"EVOLVE_TDD_ENGINEER_MODEL":        true,
-		"EVOLVE_CLI_MAX_CONCURRENT_CLAUDE": true,
+		"EVOLVE_ROUTING_MODE":              false,
+		"EVOLVE_AUDITOR_CLI":               false,
+		"EVOLVE_TDD_ENGINEER_MODEL":        false,
+		"EVOLVE_CLI_MAX_CONCURRENT_CLAUDE": false,
 		"EVOLVE_SANDBOX":                   true,
 		"BRIDGE_ALLOW_BYPASS":              true,
 		"EVOLVE_BYPASS_SHIP_GATE":          false,
@@ -99,5 +99,45 @@ func TestMarkerLists_ReturnFreshSlices(t *testing.T) {
 		if list()[0] == "MUTATED" {
 			t.Errorf("%s handed out its backing array", name)
 		}
+	}
+}
+
+func TestRetiredInUse_NamesEachRetiredControlThatIsSetOnceWithItsReplacement(t *testing.T) {
+	t.Parallel()
+	got := ipcenv.RetiredInUse([]string{
+		"EVOLVE_ROUTING_MODE=static", "EVOLVE_AUDITOR_CLI=claude-tmux", "EVOLVE_SCOUT_CLI=agy-tmux",
+		"EVOLVE_LANE=", "EVOLVE_PROJECT_ROOT=/r", "EVOLVE_SANDBOX=off", "PATH=/bin", "EVOLVE_GO_BIN",
+	})
+	var names []string
+	for _, r := range got {
+		names = append(names, r.Name)
+		if r.Use == "" {
+			t.Errorf("%s names no replacement", r.Name)
+		}
+	}
+	if want := []string{"EVOLVE_ROUTING_MODE", "EVOLVE_*_CLI"}; !slices.Equal(names, want) {
+		t.Errorf("RetiredInUse = %v, want %v: a set name warns once, an empty or valueless one does not", names, want)
+	}
+}
+
+func TestRetiredControls_AreNoLongerCarriedAndMatchNoMarker(t *testing.T) {
+	t.Parallel()
+	retired := ipcenv.RetiredControls()
+	if len(retired) == 0 {
+		t.Fatal("RetiredControls is empty")
+	}
+	for _, r := range retired {
+		if slices.Contains(ipcenv.UnmovedControls(), r.Name) {
+			t.Errorf("%s is both retired and not yet moved", r.Name)
+		}
+		for _, name := range ipcenv.Markers() {
+			if matched, _ := path.Match(r.Name, name); matched {
+				t.Errorf("the retired %s matches the pipeline marker %s", r.Name, name)
+			}
+		}
+	}
+	retired[0].Name = "MUTATED"
+	if ipcenv.RetiredControls()[0].Name == "MUTATED" {
+		t.Error("RetiredControls handed out its backing array")
 	}
 }

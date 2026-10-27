@@ -1,6 +1,7 @@
 package router
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 
@@ -49,11 +50,21 @@ func (p PhasePolicy) ShouldRunPhase(phase string) bool {
 }
 
 func PolicyForProject(projectRoot string, env map[string]string, opts ...config.Option) PhasePolicy {
-	cfg, _ := config.New(opts...).Load(config.RegistryPath(projectRoot), env)
-	pol := policy.LoadOrDefaults(filepath.Join(projectRoot, ".evolve", "policy.json"), os.Stderr)
+	cfg, _ := ConfigForProject(projectRoot, env, os.Stderr, opts...)
+	return PhasePolicy{Cfg: cfg}
+}
+
+func ConfigForProject(projectRoot string, env map[string]string, warn io.Writer, opts ...config.Option) (config.RoutingConfig, []config.Warning) {
+	loader := config.New(opts...)
+	cfg, ws := loader.Load(config.RegistryPath(projectRoot), env)
+	return ApplyPolicy(loader, cfg, policy.LoadOrDefaults(filepath.Join(projectRoot, ".evolve", "policy.json"), warn)), ws
+}
+
+func ApplyPolicy(loader *config.Loader, cfg config.RoutingConfig, pol policy.Policy) config.RoutingConfig {
+	cfg, _ = loader.ApplyRoutingKnobs(cfg, RoutingKnobsOf(pol.GatesConfig(), pol.RouterConfig()))
 	cfg.Mandatory = pol.MergeMandatory(cfg.Mandatory)
 	cfg.AuditFailRoutesTo = FailureRouteFromPolicy(pol)
-	return PhasePolicy{Cfg: cfg}
+	return cfg
 }
 
 func FailureRouteFromPolicy(pol policy.Policy) string {
@@ -66,4 +77,11 @@ func FailureRouteFromPolicy(pol policy.Policy) string {
 		route = "memo"
 	}
 	return route
+}
+
+func RoutingKnobsOf(g policy.GatesConfig, rt policy.RouterPolicy) config.RoutingKnobs {
+	return config.RoutingKnobs{
+		DynamicRouting: rt.DynamicRouting, RoutingMode: rt.RoutingMode, ConditionalMandatory: rt.ConditionalMandatory,
+		MaxOptionalInsertions: rt.MaxOptionalInsertions, PhaseIO: g.PhaseIO,
+	}
 }

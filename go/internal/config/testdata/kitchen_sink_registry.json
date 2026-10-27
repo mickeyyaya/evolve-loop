@@ -4,7 +4,7 @@
     "dynamic_routing": "bogus",
     "routing_mode": "bogus",
     "model_routing": "bogus",
-    "mandatory_phases": ["scout", "build", "audit", "ship"],
+    "mandatory_phases": ["scout"],
     "conditional_mandatory": {"plan-review": "nonsense"},
     "deliverable_kinds": {"document": {"root": "", "min_options": 0}}
   },

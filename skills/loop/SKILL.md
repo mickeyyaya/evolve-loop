@@ -6,7 +6,7 @@ argument-hint: "(--resume | [--cycles N] [strategy] <goal>)"
 
 # Evolve Loop v22.30
 
-> Self-evolving development pipeline. Orchestrates 4 agents through 6 lean phases per cycle: Discover → Build → Audit → Ship → Learn → Meta-Cycle. This skill performs destructive operations (commits, pushes, version bumps) — only invoke when the user explicitly requests it via `/evo:loop` or asks to run improvement cycles.
+> Self-evolving development pipeline. Orchestrates 4 agents through 6 lean phases per cycle: Discover → Build → Audit → Ship → Learn → Meta-Cycle. This skill performs destructive operations (commits, pushes, version bumps) — only invoke when the user explicitly requests it through `/evo:loop` or asks to run improvement cycles.
 
 ## Platform overlay (v8.15.0+)
 
@@ -14,19 +14,21 @@ Tool and command names in this file use **Claude Code conventions** (for example
 
 > **v12.1 status:** All command examples in this skill use the native `evolve <subcommand>` CLI. The legacy bash dispatcher is archived at `archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh` — not for general use.
 
-> **What this does in one paragraph:** Each `/evo:loop` invocation runs one or more self-contained improvement cycles — Scout finds work, Builder implements it in an isolated worktree, Auditor reviews it, and `evolve ship` commits only what passes. The Go state machine (`go/internal/core`) enforces the phase order for every CLI. The OS sandbox, the worktree fence and the ship gates hold the write rules (the protected write rule denies only at `isolation.i7.stage` `enforce`). The `evolve guard` hooks (`ship`, `phase`, `role`, `docdelete`) are defence in depth in Claude Code panes only. The shell hooks (`phase-gate-precondition.sh`, `role-gate.sh`, `ship-gate.sh`) were removed. Failures become structured lessons via the Retrospective agent; the loop gets smarter with each pass.
+> **What this does in one paragraph:** Each `/evo:loop` invocation runs one or more self-contained improvement cycles. Scout finds work, Builder implements it in an isolated worktree, Auditor reviews it, and `evolve ship` commits only what passes. The Go state machine (`go/internal/core`) enforces the phase order for every CLI. The OS sandbox, the worktree fence and the ship gates hold the write rules (the protected write rule denies only at `isolation.i7.stage` `enforce`).
+>
+> The `evolve guard` hooks (`ship`, `phase`, `role`, `docdelete`) are defence in depth in Claude Code panes only. The shell hooks (`phase-gate-precondition.sh`, `role-gate.sh`, `ship-gate.sh`) were removed. Failures become structured lessons through the Retrospective agent; the loop gets smarter with each pass.
 
 ## STRICT MODE — Read this first (v11.5.0+)
 
-When invoked via `/evo:loop [args]`, you MUST execute exactly one bash command that runs the native Go binary's `evolve loop` subcommand. The binary lives at `$EVOLVE_GO_BIN` (operator override) or `<plugin_root>/go/bin/evolve` (default). **Your cwd is the user's project directory, NOT the plugin install** — let the resolver find the binary:
+When invoked through `/evo:loop [args]`, you MUST execute exactly one bash command that runs the native Go binary's `evolve loop` subcommand. The binary lives at `<plugin_root>/go/bin/evolve`. **Your cwd is the user's project directory, NOT the plugin install** — let the resolver find the binary:
 
 ```bash
-"${EVOLVE_GO_BIN:-$(find $HOME/.claude/plugins \( -path '*/marketplaces/evolve-loop/go/bin/evolve' -o -path '*/marketplaces/evolve-loop/go/evolve' -o -path '*/cache/evolve-loop/evolve-loop/*/go/bin/evolve' -o -path '*/cache/evolve-loop/evolve-loop/*/go/evolve' \) -type f 2>/dev/null | sort | tail -1)}" loop <args>
+"$(find $HOME/.claude/plugins \( -path '*/marketplaces/evolve-loop/go/bin/evolve' -o -path '*/marketplaces/evolve-loop/go/evolve' -o -path '*/cache/evolve-loop/evolve-loop/*/go/bin/evolve' -o -path '*/cache/evolve-loop/evolve-loop/*/go/evolve' \) -type f 2>/dev/null | sort | tail -1)" loop <args>
 ```
 
-The `find` expression locates the Go binary in either install layout (marketplace or cache). `sort | tail -1` prefers the highest-version cache install. The whole `"${EVOLVE_GO_BIN:-$(find ...)}"` expression is **one** shell argument from bash's perspective.
+The `find` expression locates the Go binary in either install layout (marketplace or cache). `sort | tail -1` prefers the highest-version cache install. The whole `"$(find ...)"` expression is **one** shell argument from bash's perspective.
 
-**Quote `<args>` correctly.** When `<args>` contains an apostrophe (e.g., `doesn't`, `won't`, `it's`), the shell tokenizer breaks because `'` opens an unmatched quoted string. Always wrap the goal portion in double quotes:
+**Quote `<args>` correctly.** When `<args>` contains an apostrophe (for example, `doesn't`, `won't`, `it's`), the shell tokenizer breaks because `'` opens an unmatched quoted string. Always wrap the goal portion in double quotes:
 
 ```bash
 # CYCLES STRATEGY then a SINGLE double-quoted goal:
@@ -41,9 +43,15 @@ The `find` expression locates the Go binary in either install layout (marketplac
 
 Single quotes inside the goal are fine when the goal itself is double-quoted. Avoid passing apostrophe-containing goals as bare unquoted args.
 
-**A GOAL IS MANDATORY — prompt-and-wait before dispatch:** Before you run `evolve loop`, inspect `<args>`. If it contains NO goal (no positional goal text, no `--goal-text`/`--goal-hash`) and it is NOT a `--resume` or `--dry-run` invocation, you MUST ask the user to supply a one-line goal (via AskUserQuestion or a direct prompt) and WAIT for their answer BEFORE dispatching. **Never dispatch a goal-less `evolve loop`** — the binary rejects it with `rc=10` (`a goal is required …`), which is a re-prompt-the-user condition, not a terminal error. Only the cycle COUNT is optional (see below), never the goal.
+**A GOAL IS MANDATORY — prompt-and-wait before dispatch:** Before you run `evolve loop`, inspect `<args>`.
 
-**Cycle count is optional:** omit `--cycles` and the advisor decides how many cycles the goal needs — completion-driven, stopping when the backlog drains, bounded by a safety cap. Pass `--cycles N` for a hard bound of exactly N cycles.
+- A goal is missing when `<args>` has no positional goal text, no `--goal-text` and no `--goal-hash`.
+- A `--resume` or `--dry-run` invocation needs no goal.
+- When the goal is missing, you MUST ask the user for a one-line goal (with AskUserQuestion or a direct prompt). WAIT for their answer BEFORE dispatching.
+- **Never dispatch a goal-less `evolve loop`.** The binary rejects it with `rc=10` (`a goal is required …`). This is a re-prompt-the-user condition, not a terminal error.
+- Only the cycle COUNT is optional (see below), never the goal.
+
+**Cycle count is optional:** when you omit `--cycles`, the advisor decides how many cycles the goal needs. The run is completion-driven: it stops when the backlog drains, within a safety cap. Pass `--cycles N` for a hard bound of exactly N cycles.
 
 **Resume after pause:** If a cycle was checkpointed (Claude Code subscription quota wall, batch cap near, or operator-requested), recover with `--resume`:
 ```bash
@@ -57,24 +65,26 @@ The native dispatcher locates the most recent paused cycle, validates state (git
 
 …and then read the binary's summary. Nothing else. The dispatcher loops one cycle per iteration and asserts each cycle produced Intent + Scout + Builder + Auditor ledger entries. Any cycle that bypasses the pipeline (orchestrator shortcut) makes the dispatcher exit with rc=2 and a CRITICAL diagnostic.
 
-**Why intent capture** (v8.19.1+): the intent persona structures the user's goal into an `intent.md` artifact (8 fields + AwN classifier + ≥1 challenged premise) before Scout fires. Enable via `workflow.phase_enables.intent=on` in policy.json. This is the pre-Scout phase that prevents the "vague goal → wrong direction" failure mode the cycle-25 incident exposed. It's autonomy-preserving — no human checkpoint, no pause; the kernel verifies structure and the cycle continues. The user only invokes `/evo:loop` and intent capture happens automatically as the first phase.
+**Why intent capture** (v8.19.1+): the intent persona structures the user's goal into an `intent.md` artifact (8 fields + AwN classifier + ≥1 challenged premise) before Scout fires. Enable it with `workflow.phase_enables.intent=on` in policy.json. This is the pre-Scout phase that prevents the "vague goal → wrong direction" failure mode the cycle-25 incident exposed. It's autonomy-preserving — no human checkpoint, no pause; the kernel verifies structure and the cycle continues. The user only invokes `/evo:loop` and intent capture happens automatically as the first phase.
 
 **Sandbox EPERM fallback** (v8.20.1+, auto-managed since cycle-10): on macOS Darwin 25.4+, `sandbox-exec` cannot be nested. The preflight auto-detects nested-Claude and enables the EPERM fallback automatically — no env flag needed. The adapter retries without sandbox-exec on EPERM, preserving sandbox where the kernel allows it.
 
-**You MUST NOT, when activating this skill** (tool names below are Claude Code conventions; consult `reference/<platform>-tools.md` for your CLI's equivalents — the prohibitions apply to those equivalents too):
-- Use TodoWrite (CC) / `write_todos` (Gemini) / your CLI's task-list tool to decompose the goal into sub-tasks (the goal is for the orchestrator subagent inside each cycle, not for you).
-- Invoke Edit, Write, or Bash (or `replace`/`write_file`/`run_shell_command` on Gemini, etc.) for any task other than the dispatcher itself (and reading its output).
+**You MUST NOT do these things when you activate this skill.** The tool names below are Claude Code conventions. For your CLI's equivalents, consult `reference/<platform>-tools.md`. The prohibitions apply to those equivalents too:
+- Use TodoWrite (CC) / `write_todos` (Gemini) / your CLI's task-list tool to decompose the goal into sub-tasks. The goal is for the orchestrator subagent inside each cycle, not for you.
+- Invoke Edit, Write, or Bash for any task other than the dispatcher itself (and reading its output). On Gemini, the same applies to `replace`/`write_file`/`run_shell_command`; other CLIs have equivalent tools.
 - Invoke the in-process Agent / Task / `activate_skill`-as-subagent dispatch to run Scout/Builder/Auditor. Phase agents are spawned by `evolve subagent run` from inside the native `evolve cycle run` orchestrator. They are profile-restricted; the in-process subagent dispatch is not.
 - "Help out" by editing files between cycles. Builder edits files inside its worktree, held there by the sandbox, the fence and `evolve guard role`. You are not Builder.
 
-**Why this is strict and not advisory:** the 2026-04-29 flow audit (cycles 8201–8213) showed that prompt-driven orchestration routinely shortcuts. Most cycles in that window have an Auditor ledger entry but no Scout/Builder entries — meaning Scout and Builder were either skipped or run via the in-process Agent tool that bypasses the kernel guards. The dispatcher closes that gap structurally. Every cycle goes through `evolve cycle run`, or `evolve loop` for batches. The Go orchestrator (`go/internal/core`) then dispatches Scout, Builder and Auditor through the native bridge, and its state machine enforces the sequence. The bash `subagent-run.sh` path and the shell hooks were removed in v12.0.0.
+**Why this is strict and not advisory:** the 2026-04-29 flow audit (cycles 8201–8213) showed that prompt-driven orchestration routinely shortcuts. Most cycles in that window have an Auditor ledger entry but no Scout/Builder entries. Thus Scout and Builder were skipped, or they ran through the in-process Agent tool that bypasses the kernel guards. The dispatcher closes that gap structurally.
+
+Every cycle goes through `evolve cycle run`, or `evolve loop` for batches. The Go orchestrator (`go/internal/core`) then dispatches Scout, Builder and Auditor through the native bridge, and its state machine enforces the sequence. The bash `subagent-run.sh` path and the shell hooks were removed in v12.0.0.
 
 **Reading the summary correctly:**
 
 | Dispatcher exit | Meaning | Your follow-up |
 |---|---|---|
 | `0` | All cycles ran AND ledger verified clean | Report the summary; that's it |
-| `1` | A cycle invocation failed (e.g., subagent crash, state.json unwritable) | Surface the specific cycle's stderr and stop — do NOT retry inline |
+| `1` | A cycle invocation failed (for example, subagent crash, state.json unwritable) | Surface the specific cycle's stderr and stop — do NOT retry inline |
 | `2` | INTEGRITY BREACH: orchestrator silently skipped Scout/Builder/Auditor (no orchestrator-report.md, or report doesn't disclose the gap) — CRITICAL | Quote the exact ledger counts to the user; recommend inspecting `.evolve/runs/cycle-N/` to investigate; STOP |
 | `3` | Batch completed with one or more recoverable failures (infrastructure / audit-fail / build-fail). Failure modes recorded to `state.json:failedApproaches[]` for the next dispatch's orchestrator to read and adapt | Report which cycles had which classification; surface state.json:failedApproaches summary; offer to re-run with the same goal so subsequent cycles can adapt |
 | `10` | Bad arguments — most often a MISSING GOAL (`a goal is required …`) | Re-prompt the user for a one-line goal (not a terminal error), then re-dispatch with the goal supplied |
@@ -85,13 +95,22 @@ The rest of this file (architecture, model routing, phase docs) is reference mat
 
 ---
 
-> **Trust boundary (v8.13.1, v12.1-updated, re-verified 2026-10-25)**: four PreToolUse hooks in `.claude/settings.json` run the native Go guards. `evolve guard ship` (matcher `Bash`) lets only `evolve ship` commit, push or release. `evolve guard phase` (matcher `Agent|Task`) denies, outside a phase cell during a cycle, an `Agent` or `Task` call that names a phase persona (`evolve-*`), so phase agents go through the native bridge. Inside a cell each subagent of the own harness passes (component X7 of [ADR-0154](../../docs/architecture/adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md)). `evolve guard role` (matcher `Edit|Write`) holds each edit to the path allowlist of the active phase. `evolve guard docdelete` (matcher `Bash`) blocks a delete under `docs/` without an archive move. The hooks fire only in Claude Code panes, so they are defence in depth. The OS sandbox write rules, the worktree fence and the ship gates hold each guarantee for every family ([llm-isolation.md §9.1](../../docs/architecture/llm-isolation.md#91-as-built-x7)). The protected write rule of the sandbox denies only at `isolation.i7.stage` `enforce`; at the default `shadow` it only reports. The Go state machine (`go/internal/core`) enforces the phase order for every CLI. For automated cycles, use `evolve cycle run [--goal-text GOAL]` (or `evolve loop` for batches).
+> **Trust boundary (v8.13.1, v12.1-updated, re-verified 2026-10-25)**: four PreToolUse hooks in `.claude/settings.json` run the native Go guards.
+>
+> - `evolve guard ship` (matcher `Bash`) lets only `evolve ship` commit, push or release.
+> - `evolve guard phase` (matcher `Agent|Task`) acts outside a phase cell during a cycle. It denies an `Agent` or `Task` call that names a phase persona (`evolve-*`), so phase agents go through the native bridge. Inside a cell each subagent of the own harness passes (component X7 of [ADR-0154](../../docs/architecture/adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md)).
+> - `evolve guard role` (matcher `Edit|Write`) holds each edit to the path allowlist of the active phase.
+> - `evolve guard docdelete` (matcher `Bash`) blocks a delete under `docs/` without an archive move.
+>
+> The hooks fire only in Claude Code panes, so they are defence in depth. The OS sandbox write rules, the worktree fence and the ship gates hold each guarantee for every family ([llm-isolation.md §9.1](../../docs/architecture/llm-isolation.md#91-as-built-x7)). The protected write rule of the sandbox denies only at `isolation.i7.stage` `enforce`; at the default `shadow` it only reports. The Go state machine (`go/internal/core`) enforces the phase order for every CLI. For automated cycles, use `evolve cycle run [--goal-text GOAL]` (or `evolve loop` for batches).
 
 > **v8.13.2 / v12.0.0**: the release pipeline heals itself. For a version-bump release, use `evolve release <version>` (native Go). The pipeline runs the pre-flight gates and writes a CHANGELOG entry from conventional commits. It ships atomically through `evolve ship`, polls the marketplace for up to 5 minutes, and rolls back automatically when a step after the push fails. Use `--dry-run` to simulate without changes. See [docs/guides/publishing-releases.md](../../docs/guides/publishing-releases.md) for the vocabulary (push ≠ tag ≠ release ≠ publish ≠ propagate).
 
 ## Code carries no comments (system policy)
 
-Every phase that writes code writes none: the code explains itself through names, types, small functions and test names, and a design reason goes to the package's notes under `docs/architecture/packages/`. Only the comments a tool reads survive; [the code-comments convention](../../docs/conventions/code-comments.md) lists them. The build handoff floor counts the comments a build adds (`comment_floor` in `.evolve/policy.json`: `shadow` WARNs, the default; `enforce` sends the build back for correction before its audit), the auditor reports any that reach it, and the commit gate refuses a console commit that adds one.
+Every phase that writes code writes no comments. The code explains itself through names, types, small functions and test names. A design reason goes to the package's notes under `docs/architecture/packages/`. Only the comments a tool reads survive; [the code-comments convention](../../docs/conventions/code-comments.md) lists them.
+
+The build handoff floor counts the comments a build adds (`comment_floor` in `.evolve/policy.json`). At `shadow`, the default, it WARNs. At `enforce`, it sends the build back for correction before its audit. The auditor reports any comment that reaches it, and the commit gate refuses a console commit that adds one.
 
 ## Shared Agent Values
 
@@ -211,8 +230,8 @@ QUOTA-PAUSE: cycle=N wake-at=ISO8601 source=X attempts=K/M resume-in=Ss
 QUOTA-PAUSE: cycle=N wake-at= source=unknown attempts=K/0 auto-resume=off: <operator action>
 ```
 
-This is the Claude Code subscription quota wall: the cycle ran far enough
-to hit the quota ceiling, then a phase failed with empty stderr (the
+This is the Claude Code subscription quota wall. The cycle ran far enough
+to hit the quota ceiling. Then a phase failed with empty stderr (the
 quota-likely signature). `subagent-run.sh` wrote a checkpoint and
 `cycle-state.json` carries the wake-at timestamp.
 
@@ -248,8 +267,8 @@ ScheduleWakeup before it fires. There is no flag-based opt-out — the loud
 log is the intervention surface.
 
 **Fallback if `ScheduleWakeup` is unavailable.** If you cannot call
-`ScheduleWakeup` (e.g., the tool isn't loaded in this session's surface),
-log the QUOTA-PAUSE marker verbatim so the operator can resume manually:
+`ScheduleWakeup` (for example, the tool isn't loaded in this session's surface),
+log the QUOTA-PAUSE marker verbatim. Then the operator can resume manually:
 `evolve loop --resume`. Never silently swallow the DISPATCH_RC=5 signal.
 
 See `docs/architecture/auto-resume.md` for the full architectural
@@ -277,9 +296,11 @@ Phase 7:   META ────── self-improvement (every 5 cycles) → phase7-
 
 For each cycle:
 1. Claim cycle number (OCC protocol)
-2. **Phase transitions (ORDER) are enforced by the in-process Go orchestrator's state machine** (`go/internal/core`). `evolve guard phase` (a PreToolUse hook in `.claude/settings.json`, matcher `Agent|Task`) is a backstop: outside a phase cell, during a cycle, it denies an `Agent` or `Task` call that names a phase persona (ADR-0154 X7). Operators do not invoke a separate phase-gate command; the state machine enforces order automatically.
+2. **The in-process Go orchestrator's state machine enforces the phase transitions (ORDER)** (`go/internal/core`). `evolve guard phase` is a backstop (a PreToolUse hook in `.claude/settings.json`, matcher `Agent|Task`). It acts outside a phase cell, during a cycle. It denies an `Agent` or `Task` call that names a phase persona (ADR-0154 X7). Operators do not invoke a separate phase-gate command. The state machine enforces order automatically.
 3. Intent (v8.19.1+, always for /evo:loop) → Scout → Builder → Auditor → phase-gate verification → Ship → Learn
-4. **Subagents are dispatched by the Go orchestrator** (`go/internal/core/orchestrator.go`) via the `bridge` adapter, which spawns the CLI that `cli_routing` names (claude, agy, codex or ollama; `gemini` has no driver) and feeds the per-phase agent prompt from `agents/<name>.md`. The kernel still enforces per-agent CLI permission profiles in `.evolve/profiles/` and writes tamper-evident ledger entries. The `evolve subagent run <agent> <cycle> <workspace>` CLI is available for manual single-phase dispatch (used by `evolve serve-phase` and the cross-CLI consensus harness). The bash `subagent-run.sh` path was removed in v12.0.0.
+4. **The Go orchestrator dispatches subagents** (`go/internal/core/orchestrator.go`) through the `bridge` adapter.
+   - The adapter spawns the CLI that `cli_routing` names (claude, agy, codex or ollama; `gemini` has no driver). It feeds the per-phase agent prompt from `agents/<name>.md`. The kernel still enforces per-agent CLI permission profiles in `.evolve/profiles/`. It also writes tamper-evident ledger entries.
+   - The `evolve subagent run <agent> <cycle> <workspace>` CLI is available for manual single-phase dispatch. `evolve serve-phase` and the cross-CLI consensus harness use it. The bash `subagent-run.sh` path was removed in v12.0.0.
 5. Max 3 retries per task; WARN/FAIL blocks shipping
 6. Output Discovery Briefing → continue immediately
 7. **Never stop to ask. Never skip agents. Never fabricate cycles. Complete ALL requested cycles.**
@@ -290,10 +311,10 @@ Instead of running the loop from inside this skill's prompt, the native binary's
 
 1. Picks the next cycle number (or accepts `--cycle N`).
 2. Initializes `.evolve/cycle-state.json` with `phase=calibrate`.
-3. Spawns the orchestrator subagent (via the Go subagent runner under `.evolve/profiles/orchestrator.json`; Edit/Write/git ops still blocked at the kernel hook layer — hooks are unchanged).
+3. Spawns the orchestrator subagent (through the Go subagent runner under `.evolve/profiles/orchestrator.json`). Edit/Write/git ops are still blocked at the kernel hook layer; the hooks are unchanged.
 4. Clears cycle-state on exit.
 
-The orchestrator subagent (`agents/evolve-orchestrator.md`) advances phases through the native state machine, which is the authoritative phase-ORDER enforcer. The `evolve guard phase` PreToolUse hook (matcher `Agent|Task`) reads cycle-state. Outside a phase cell, during a live cycle, it denies an `Agent` or `Task` call that names a phase persona; inside a cell it allows each call (ADR-0154 X7).
+The orchestrator subagent (`agents/evolve-orchestrator.md`) advances phases through the native state machine, which is the authoritative phase-ORDER enforcer. The `evolve guard phase` PreToolUse hook (matcher `Agent|Task`) reads cycle-state. Outside a phase cell, during a live cycle, it denies an `Agent` or `Task` call that names a phase persona. Inside a cell it allows each call (ADR-0154 X7).
 
 Use `evolve loop` (multi-cycle batch) or `evolve cycle run` (single cycle) for autonomous runs.
 
@@ -307,7 +328,7 @@ Use `evolve loop` (multi-cycle batch) or `evolve cycle run` (single cycle) for a
 
 ## Model Routing
 
-Each profile in `.evolve/profiles/` names a default tier and an envelope on the ladder `fast`, `balanced`, `deep` and `top`. The advisor can move a phase inside its envelope (`EVOLVE_DYNAMIC_ROUTING=advisory`, the default).
+Each profile in `.evolve/profiles/` names a default tier and an envelope on the ladder `fast`, `balanced`, `deep` and `top`. The advisor can move a phase inside its envelope (`router.dynamic_routing` in `.evolve/policy.json` is `advisory` by default).
 
 | Phase | Default | Envelope |
 |-------|---------|----------|

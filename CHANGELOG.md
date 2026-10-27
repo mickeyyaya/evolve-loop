@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## Changed — the operator knobs read `.evolve/policy.json`, not the environment (X18c, 2026-10-27)
+
+- **The change.** No code reads the 19 class (b) names of [control-flags](docs/architecture/control-flags.md#classes-of-the-readers-outside-the-registry) from the environment now (ADR-0156 I-16). A set name has no effect.
+- **The warning.** For one release, the cycle start prints one `[policy] WARN <name> is set, but the pipeline does not read it` line for each set name. The line names the replacement.
+- **The moved knobs.** `EVOLVE_DYNAMIC_ROUTING`, `EVOLVE_ROUTING_MODE`, `EVOLVE_CONDITIONAL_MANDATORY` and `EVOLVE_MAX_OPTIONAL_INSERTIONS` became `router.*` keys. `EVOLVE_PHASE_IO` became `gates.phase_io`.
+- **More moved knobs.** `EVOLVE_CLI_HEALTH` became `cli_health.enabled`, `EVOLVE_CLI_MAX_CONCURRENT_<FAM>` became `bridge.max_concurrent.<driver>`, and `EVOLVE_INTENT_DELTA` became `workflow.intent_delta`. `EVOLVE_MANDATORY_PHASES` became `mandatory_phases`, which can add a phase but not remove one.
+- **Parameters and profiles.** `EVOLVE_LANE` became `evolve worktree --lane`. `EVOLVE_<AGENT>_CLI` and `_MODEL` became `evolve loop --cli` and `--model`, or `pins.<phase>`. The profile holds `system_prompt` and `permission_mode`, so `EVOLVE_SYSTEM_PROMPT`, `EVOLVE_<AGENT>_SYSTEM_PROMPT` and `EVOLVE_<AGENT>_PERMISSION_MODE` went.
+- **Removed.** `EVOLVE_COMMIT_EVIDENCE` went with no key, because no code consumed its stage. `EVOLVE_GO_BIN` went: the tools find `<root>/go/bin/evolve`, then `evolve` on `PATH`. `EVOLVE_PROFILE_DIR` and `EVOLVE_PERSONA_OVERRIDE` went from the ship lint, which reads `<root>/.evolve/profiles`.
+- **What to do.** Move each set name to its replacement in the table of [policy-config](docs/architecture/policy-config.md#routing-and-run-knobs-x18c). The flag registry lost 13 rows.
+
 ## Changed — `.evolve/policy.json` refuses an unknown key (X18a, 2026-10-26)
 
 - **The change.** An unknown key at any level of `.evolve/policy.json` now fails the load. Before, the loader ignored it, so a typo such as `fleet.cuont` had no effect and gave no message.

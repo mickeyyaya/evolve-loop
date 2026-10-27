@@ -11,12 +11,8 @@ import (
 
 func kitchenSinkEnv() map[string]string {
 	return map[string]string{
-		"EVOLVE_SANDBOX":                 "bogus",
-		"EVOLVE_MAX_OPTIONAL_INSERTIONS": "x",
-		"EVOLVE_COMMIT_EVIDENCE":         "advisory",
-		"EVOLVE_MANDATORY_PHASES":        "scout",
-		"EVOLVE_DYNAMIC_ROUTING":         "off",
-		"EVOLVE_USE_PHASE_REGISTRY":      "false",
+		"EVOLVE_SANDBOX":            "bogus",
+		"EVOLVE_USE_PHASE_REGISTRY": "false",
 	}
 }
 
@@ -49,15 +45,11 @@ func codesOf(ws []Warning) []string {
 }
 
 func TestLoad_WarningOrderIsRegistryThenEnvThenSpineThenInert(t *testing.T) {
-	reg := writeRegistry(t, `{"config":{"dynamic_routing":"bogus"},"phases":[{"name":"plan-review","enabled":"on"}]}`)
-	_, ws := Load(reg, map[string]string{
-		"EVOLVE_PHASE_IO":         "bogus",
-		"EVOLVE_DYNAMIC_ROUTING":  "off",
-		"EVOLVE_MANDATORY_PHASES": "scout,build",
-	})
+	reg := writeRegistry(t, `{"config":{"dynamic_routing":"bogus","mandatory_phases":["scout","build"]},"phases":[{"name":"plan-review","enabled":"on"}]}`)
+	_, ws := Load(reg, map[string]string{"EVOLVE_SANDBOX": "bogus"})
 	want := []string{
 		`dynamic_routing="bogus" unknown, defaulting to off`,
-		`EVOLVE_PHASE_IO="bogus" unknown, defaulting to off`,
+		`EVOLVE_SANDBOX="bogus" unknown (want auto|on|off), defaulting to "auto"`,
 		`mandatory_phases omits audit+ship — audit-before-ship guarantee weakened`,
 		`phase "plan-review" is force-enabled but the router is off/shadow (dynamic_routing<advisory) and it is not in the static state machine — the enable is inert; set dynamic_routing>=advisory or remove the enable`,
 	}
@@ -75,7 +67,8 @@ func TestLoad_WarningOrderIsRegistryThenEnvThenSpineThenInert(t *testing.T) {
 func TestValidateInertEnables_FiresForForceEnabledNonSpinePhasesInSortedOrder(t *testing.T) {
 	reg := writeRegistry(t, `{"config":{"mandatory_phases":["scout","build","audit","ship","custom-mandatory"]},
 		"phases":[{"name":"zz-custom","enabled":"on"},{"name":"plan-review","enabled":"on"},{"name":"triage","enabled":"on"},{"name":"custom-mandatory","enabled":"on"}]}`)
-	_, ws := Load(reg, map[string]string{"EVOLVE_DYNAMIC_ROUTING": "shadow"})
+	loaded, _ := Load(reg, nil)
+	_, ws := withKnobs(loaded, func(ps *RoutingKnobs) { ps.DynamicRouting = "shadow" })
 	var got []string
 	for _, w := range ws {
 		if w.Code == "inert-phase-enable" {
@@ -89,17 +82,17 @@ func TestValidateInertEnables_FiresForForceEnabledNonSpinePhasesInSortedOrder(t 
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("inert warnings %q, want %q (sorted; the spine phase, the mandatory phase and the Off phases silent)", got, want)
 	}
-	if _, ws := Load(reg, map[string]string{"EVOLVE_DYNAMIC_ROUTING": "advisory"}); hasWarning(ws, "inert-phase-enable") {
+	if _, ws := withKnobs(loaded, func(ps *RoutingKnobs) { ps.DynamicRouting = "advisory" }); hasWarning(ws, "inert-phase-enable") {
 		t.Errorf("at advisory the router consults PhaseEnable — nothing is inert: %+v", ws)
 	}
 }
 
-func TestApplyEnv_ConditionalMandatoryParseErrorWarns(t *testing.T) {
-	cfg, ws := Load("/nonexistent/phase-registry.json", map[string]string{"EVOLVE_CONDITIONAL_MANDATORY": "tdd:nonsense"})
+func TestApplyPolicyKnobs_ConditionalMandatoryParseErrorWarns(t *testing.T) {
+	cfg, ws := withKnobs(defaults(), func(ps *RoutingKnobs) { ps.ConditionalMandatory = map[string]string{"tdd": "nonsense"} })
 	if got := codesOf(ws); !reflect.DeepEqual(got, []string{"unknown-value"}) {
 		t.Fatalf("codes %v, want exactly one unknown-value", got)
 	}
-	if want := `EVOLVE_CONDITIONAL_MANDATORY="tdd:nonsense": no comparison operator in "nonsense"`; ws[0].Message != want {
+	if want := `conditional_mandatory[tdd]="nonsense": no comparison operator in "nonsense"`; ws[0].Message != want {
 		t.Errorf("message %q, want %q", ws[0].Message, want)
 	}
 	if !reflect.DeepEqual(cfg.Conditional["tdd"], DefaultTddRule()) {
@@ -108,7 +101,7 @@ func TestApplyEnv_ConditionalMandatoryParseErrorWarns(t *testing.T) {
 }
 
 func TestParseMode_UnknownWarnsAndDefaultsToLLM(t *testing.T) {
-	cfg, ws := Load("/nonexistent/phase-registry.json", map[string]string{"EVOLVE_ROUTING_MODE": "bogus"})
+	cfg, ws := withKnobs(defaults(), func(ps *RoutingKnobs) { ps.RoutingMode = "bogus" })
 	if cfg.Mode != ModeDynamicLLM {
 		t.Errorf("Mode = %v, want ModeDynamicLLM", cfg.Mode)
 	}
@@ -181,8 +174,8 @@ func TestLoad_KitchenSink_WarningsMatchTheGolden(t *testing.T) {
 	for _, w := range ws {
 		got = append(got, cm{w.Code, w.Message})
 	}
-	if len(got) != 12 {
-		t.Fatalf("the kitchen sink yields twelve warnings, got %d: %+v", len(got), got)
+	if len(got) != 10 {
+		t.Fatalf("the kitchen sink yields ten warnings, got %d: %+v", len(got), got)
 	}
 	if g, want := marshalIndented(t, got), readGolden(t, "kitchen_sink_warnings.golden.json"); string(g) != string(want) {
 		t.Fatalf("the warning sequence drifted from the pre-split golden:\n%s", diffLines(string(want), string(g)))

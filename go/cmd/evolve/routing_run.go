@@ -11,15 +11,15 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
-	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
 type routingRun struct {
-	bypass bool
-	env    map[string]string
-	role   string
+	bypass    bool
+	env       map[string]string
+	role      string
+	overrides cliroute.Overrides
 }
 
 func (r routingRun) centerRole() string {
@@ -29,7 +29,7 @@ func (r routingRun) centerRole() string {
 	return r.role
 }
 
-func overrideRefusals(r *cliroute.Router, projectRoot string, env map[string]string) ([]string, error) {
+func overrideRefusals(r *cliroute.Router, projectRoot string, env map[string]string, overrides cliroute.Overrides) ([]string, error) {
 	agents, err := profiles.NewFromDir(routingProfilesDir(projectRoot)).List()
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
@@ -40,11 +40,18 @@ func overrideRefusals(r *cliroute.Router, projectRoot string, env map[string]str
 	sort.Strings(agents)
 	var refusals []string
 	for _, agent := range agents {
-		value, source := llmroute.EnvPrimary(agent, env)
+		value, source := overrides.For(agent).CLI, llmroute.OverrideSource(agent)
+		if value == "" {
+			value, source = llmroute.EnvPrimary(env)
+		}
 		if value == "" {
 			continue
 		}
 		d, err := r.Resolve(cliroute.Request{Agent: agent, ProjectRoot: projectRoot, DefaultModel: unsetDispatchTier})
+		if errors.Is(err, cliroute.ErrRefused) && overrides.For(agent).CLI != "" {
+			refusals = append(refusals, fmt.Sprintf("%s: %v: %s", agent, err, overrideRemedy(agent, source)))
+			continue
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -56,11 +63,10 @@ func overrideRefusals(r *cliroute.Router, projectRoot string, env map[string]str
 }
 
 func overrideRemedy(agent, source string) string {
-	key := envchain.PhaseEnvKey(agent, "CLI")
 	if source == "env(EVOLVE_CLI)" {
-		return "unset EVOLVE_CLI, or set " + key + " (or --cli " + agent + "=<driver>) for this agent"
+		return "unset EVOLVE_CLI, or set --cli " + agent + "=<driver> for this agent"
 	}
-	return "unset " + key + ", or drop --cli " + agent
+	return "drop --cli " + agent
 }
 
 func overrideAllowed(floor, value string, d cliroute.Decision) bool {
@@ -78,12 +84,13 @@ func wireCLIRouter(site routerSite, run routingRun, console io.Writer) (*clirout
 		return nil, fmt.Errorf("the CLI routing table refuses to route: %w", err)
 	}
 	s.Bypass = run.bypass
+	s.Options = append(s.Options, cliroute.WithOverrides(run.overrides))
 	r, findings, err := cliroute.Build(s)
 	reportRoutingFindings(console, findings)
 	if err != nil {
 		return nil, fmt.Errorf("the CLI routing table refuses to route: %w", err)
 	}
-	refusals, err := routingRunOverrideRefusals(r, site.root, run.env)
+	refusals, err := routingRunOverrideRefusals(r, site.root, run.env, run.overrides)
 	if err != nil {
 		return nil, fmt.Errorf("checking the CLI overrides: %w", err)
 	}

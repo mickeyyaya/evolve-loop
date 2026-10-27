@@ -1,6 +1,12 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestWireOrchestratorDeps_TheIntentRunnerReadsDeltaModeFromThePolicy":                              "sets runner.DefaultRouter through wireOrchestratorDeps",
+	"main.TestRunPlanAndExecute_ABadFlagOrAnUnreadableStdinStops":                                           "resets the phase registry",
+	"main.TestRunPlanAndExecute_AFailedPassStopsWithItsCode":                                                "resets the phase registry",
+	"main.TestRunPlanAndExecute_AMalformedRequestExits1":                                                    "resets the phase registry",
+	"main.TestRunPlanAndExecute_ThePlanPathDefaultsToTheWorkspaceThenTheWorkingDirectory":                   "resets the phase registry and changes the working directory",
+	"main.TestWireOrchestratorDeps_AnAdvisorWithoutARouteRefusesTheWiring":                                  "swaps runner.DefaultRouter",
 	"main.TestLanding_ABrokenRecordAndAFailedWriteAreErrors":                                                "swaps seam landingCredential",
 	"main.TestLanding_AProcessWithoutTheDispatchCredentialCannotDecide":                                     "swaps seam landingCredential",
 	"main.TestLanding_EachRefusalWritesNoApproval":                                                          "swaps seam landingCredential",

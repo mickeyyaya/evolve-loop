@@ -20,7 +20,7 @@ func TestCanary_AnExpiredModelBenchIsNotProbedAsAFamily(t *testing.T) {
 	var probed []string
 	var out bytes.Buffer
 
-	runCLIHealthCanary(context.Background(), root, nil, func(driver string) (int, string, string) {
+	runCLIHealthCanary(context.Background(), root, func(driver string) (int, string, string) {
 		probed = append(probed, driver)
 		return 0, "", ""
 	}, &out)

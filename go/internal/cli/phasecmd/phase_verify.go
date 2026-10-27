@@ -17,6 +17,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/reachabilityprobe"
+	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
 func (c phaseCommand) runPhaseVerify(args []string, stdout, stderr io.Writer) int {
@@ -167,7 +168,7 @@ func withFrozenPinViolations(res deliverable.Result, worktree string) deliverabl
 }
 
 func phaseVerifyPhaseIO() config.Stage {
-	cfg, _ := config.Load(config.RegistryPath(cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT")), cmdutil.FilterEvolveEnv(os.Environ()))
+	cfg, _ := router.ConfigForProject(cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT"), cmdutil.FilterEvolveEnv(os.Environ()), os.Stderr)
 	return cfg.PhaseIO
 }
 

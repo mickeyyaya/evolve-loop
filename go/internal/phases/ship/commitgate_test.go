@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/commitgate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecoherence"
 )
 
 func excludeCommitGate(t *testing.T, repo string) {
@@ -215,6 +216,50 @@ func TestPersonaLint_UndeclaredDriftLogsButPasses(t *testing.T) {
 	}
 	if !containsLog(*res, "persona-lint") {
 		t.Errorf("undeclared drift must be logged loudly (silent WARN is the retro defect class); logs=%v", res.Logs)
+	}
+}
+
+func TestPersonaLint_TheEnvironmentNeitherMovesTheProfilesNorOverridesAPersona(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writePersonaFixture(t, root, "builder", []string{"Read", "Bash"}, []string{"Read"})
+	clean := filepath.Join(t.TempDir(), "clean.md")
+	mustWrite(t, clean, "---\nname: evolve-builder\ntools: [\"Read\"]\n---\n")
+	opts := lintOpts(root)
+	opts.Env = map[string]string{"EVOLVE_PROFILE_DIR": t.TempDir(), "EVOLVE_PERSONA_OVERRIDE": clean + ":evolve-builder"}
+
+	res := &RunResult{}
+	var ie *IntegrityError
+	if err := runPersonaLint(context.Background(), opts, res); !errors.As(err, &ie) {
+		t.Fatalf("the lint reads <root>/.evolve/profiles and the tracked persona, so the contradiction blocks; got %v (logs=%v)", err, res.Logs)
+	}
+}
+
+func TestPersonaLint_AMissingProfilesDirectorySkipsTheLint(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "agents", "evolve-builder.md"), "---\nname: evolve-builder\n---\n")
+	res := &RunResult{}
+	if err := runPersonaLint(context.Background(), lintOpts(root), res); err != nil || !containsLog(*res, "profiles directory missing") {
+		t.Fatalf("err=%v logs=%v, want a logged skip", err, res.Logs)
+	}
+}
+
+func TestPersonaLint_EachCheckErrorFailsTheLint(t *testing.T) {
+	root := t.TempDir()
+	writePersonaFixture(t, root, "builder", []string{"Read"}, []string{"Read"})
+	boom := errors.New("boom")
+	clean := func(phasecoherence.Options) ([]phasecoherence.Violation, error) { return nil, nil }
+	failing := func(phasecoherence.Options) ([]phasecoherence.Violation, error) { return nil, boom }
+	saved := personaChecks
+	t.Cleanup(func() { personaChecks = saved })
+	for name, checks := range map[string][]func(phasecoherence.Options) ([]phasecoherence.Violation, error){
+		"first": {failing, clean}, "second": {clean, failing},
+	} {
+		personaChecks = checks
+		if err := runPersonaLint(context.Background(), lintOpts(root), &RunResult{}); !errors.Is(err, boom) {
+			t.Errorf("%s check error: got %v, want boom", name, err)
+		}
 	}
 }
 

@@ -20,8 +20,8 @@ func routerOver(t *testing.T, dir string, pol policy.Policy) *cliroute.Router {
 	t.Helper()
 	r, _, err := cliroute.Build(cliroute.Setup{
 		Policy: pol, Profiles: profiles.NewFromDir(dir),
-		Host: cliroute.Host{LookPath: findAll, Bench: func(root, label string, plan llmroute.Plan, env map[string]string) llmroute.Plan {
-			return bridgechain.ApplyCLIHealthBench(root, label, plan, env, time.Now, nil)
+		Host: cliroute.Host{LookPath: findAll, Bench: func(root, label string, plan llmroute.Plan) llmroute.Plan {
+			return bridgechain.ApplyCLIHealthBench(root, label, plan, time.Now, nil)
 		}},
 	})
 	if err != nil {
@@ -64,7 +64,7 @@ func TestWalking_ARoutingRefusalFailsTheLaunchInsteadOfFallingBack(t *testing.T)
 	inner := &scripted{}
 	w := bridgechain.New(inner, bridgechain.DefaultPlanResolver(routerOver(t, dir, policy.Policy{CLIRouting: &block})))
 	_, err := w.Launch(context.Background(), core.BridgeRequest{Agent: "retrospective", Model: "deep", ProjectRoot: root,
-		Env: map[string]string{"EVOLVE_RETROSPECTIVE_CLI": "codex-tmux"}})
+		Env: map[string]string{"EVOLVE_CLI": "codex-tmux"}})
 	if err == nil || !strings.Contains(err.Error(), "outside the allowed set") || len(inner.calls) != 0 {
 		t.Fatalf("a bad rule fails the launch loudly and launches nothing: calls=%d err=%v", len(inner.calls), err)
 	}

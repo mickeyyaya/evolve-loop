@@ -56,6 +56,7 @@ type Deps struct {
 	ArtifactTimeoutS      int
 	ArtifactMaxExtends    int
 	PhaseArtifactTimeoutS map[string]int
+	MaxConcurrent         map[string]int
 	Efforts               policy.EffortTable
 	CorroborateWall       WallCorroborator
 	Stdout                io.Writer

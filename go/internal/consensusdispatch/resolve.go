@@ -13,18 +13,13 @@ import (
 func resolveNativeDispatch(dispatchDir, subcmd string, subArgs []string) (*exec.Cmd, error) {
 	binPath := resolveEvolveBin(dispatchDir)
 	if binPath == "" {
-		return nil, fmt.Errorf("consensusdispatch: native evolve binary not found (set EVOLVE_GO_BIN or build go/bin/evolve)")
+		return nil, fmt.Errorf("consensusdispatch: native evolve binary not found (build go/bin/evolve, or put evolve on PATH)")
 	}
 	args := append([]string{subcmd}, subArgs...)
 	return sysexec.Command(context.Background(), binPath, args...), nil
 }
 
 func resolveEvolveBin(hintDir string) string {
-	if p := os.Getenv("EVOLVE_GO_BIN"); p != "" {
-		if info, err := os.Stat(p); err == nil && info.Mode()&0o111 != 0 {
-			return p
-		}
-	}
 	candidate := hintDir
 	for i := 0; i < 8; i++ {
 		gobin := filepath.Join(candidate, "go", "bin", "evolve")

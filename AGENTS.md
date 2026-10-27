@@ -404,7 +404,7 @@ Task priority is the computed inbox rank ([ADR-0121](docs/architecture/adr/0121-
 - Commits: the ship gate denies a bare `git commit` / `git push origin main`. Interactive commits: `/commit` → attestation → `evolve ship --class manual`. A routine use of `--bypass-commit-gate` is a violation. Cycle commits: `--class cycle` (full audit-binding). Releases: `evolve release X.Y.Z`. "publish" ≠ "push".
 - For an unfinished cycle, use `evolve loop --resume` or `evolve cycle reset`. `evolve loop --force-fresh` is the last-resort escape hatch. It does NOT seal the history.
 - Routing:
-  - `EVOLVE_DYNAMIC_ROUTING=advisory` is the default since 2026-06-06, when retro steps 1-3 landed. `=off` is the static escape hatch.
+  - `router.dynamic_routing` in `.evolve/policy.json` is `advisory` by default since 2026-06-06, when retro steps 1-3 landed. `off` is the static escape hatch.
   - The integrity floor is `ship ⇒ build ∧ audit ∧ (tdd unless trivial or deliverable_kind=document — ADR-0099)`.
   - CLI routing is in `.evolve/policy.json` `cli_routing` (one table: `clis`, `default`, `work`, `tiers`, `agents`, `floors`).
   - `pins` beside a table refuse every launch. Thus `evolve cli-routing init|set|unset|migrate` is the only writer of the table. It compiles before it writes. It refuses to write inside a phase or while a cycle holds a live lease.

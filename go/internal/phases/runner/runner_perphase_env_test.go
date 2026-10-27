@@ -7,7 +7,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-func TestRun_PerAgentModelEnvKey_AgentKeyedNotPhaseKeyed(t *testing.T) {
+func TestRun_ThePerAgentModelEnvKeyIsNotRead(t *testing.T) {
 	cases := []struct {
 		name        string
 		phase       string
@@ -16,35 +16,35 @@ func TestRun_PerAgentModelEnvKey_AgentKeyedNotPhaseKeyed(t *testing.T) {
 		want        string
 	}{
 		{
-			name:        "tdd phase / tdd-engineer agent — EVOLVE_TDD_ENGINEER_MODEL beats profile default",
+			name:        "tdd phase / tdd-engineer agent — EVOLVE_TDD_ENGINEER_MODEL is not read",
 			phase:       "tdd",
 			agentPrompt: "evolve-tdd-engineer",
 			envKey:      "EVOLVE_TDD_ENGINEER_MODEL",
 			want:        "marker-tdd",
 		},
 		{
-			name:        "build phase / builder agent — EVOLVE_BUILDER_MODEL beats profile default",
+			name:        "build phase / builder agent — EVOLVE_BUILDER_MODEL is not read",
 			phase:       "build",
 			agentPrompt: "evolve-builder",
 			envKey:      "EVOLVE_BUILDER_MODEL",
 			want:        "marker-build",
 		},
 		{
-			name:        "audit phase / auditor agent — EVOLVE_AUDITOR_MODEL beats profile default",
+			name:        "audit phase / auditor agent — EVOLVE_AUDITOR_MODEL is not read",
 			phase:       "audit",
 			agentPrompt: "evolve-auditor",
 			envKey:      "EVOLVE_AUDITOR_MODEL",
 			want:        "marker-audit",
 		},
 		{
-			name:        "retro phase / retrospective agent — EVOLVE_RETROSPECTIVE_MODEL beats profile default",
+			name:        "retro phase / retrospective agent — EVOLVE_RETROSPECTIVE_MODEL is not read",
 			phase:       "retro",
 			agentPrompt: "evolve-retrospective",
 			envKey:      "EVOLVE_RETROSPECTIVE_MODEL",
 			want:        "marker-retro",
 		},
 		{
-			name:        "scout phase / scout agent (sanity, phase == profileName)",
+			name:        "scout phase / scout agent — EVOLVE_SCOUT_MODEL is not read",
 			phase:       "scout",
 			agentPrompt: "evolve-scout",
 			envKey:      "EVOLVE_SCOUT_MODEL",
@@ -75,8 +75,8 @@ func TestRun_PerAgentModelEnvKey_AgentKeyedNotPhaseKeyed(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Run: %v", err)
 			}
-			if fb.gotReq.Model != tc.want {
-				t.Errorf("Model=%q, want %q — env key %s was either silently dropped or overridden by profile default", fb.gotReq.Model, tc.want, tc.envKey)
+			if fb.gotReq.Model == tc.want {
+				t.Errorf("Model=%q came from the env key %s; a model override is the --model parameter or a policy pin", fb.gotReq.Model, tc.envKey)
 			}
 		})
 	}

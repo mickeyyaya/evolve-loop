@@ -82,18 +82,16 @@ func TestLoad_RegistryConfigBlockParsed(t *testing.T) {
 	}
 }
 
-func TestLoad_EnvOverridesRegistryAndDefault(t *testing.T) {
+func TestApplyPolicyStages_PolicyKnobsOverrideTheRegistry(t *testing.T) {
 	reg := writeRegistry(t, `{"schema_version":3,"config":{"dynamic_routing":"shadow"},"phases":[]}`)
-
-	cfg, ws := Load(reg, map[string]string{
-		"EVOLVE_DYNAMIC_ROUTING":         "enforce",
-		"EVOLVE_ROUTING_MODE":            "static",
-		"EVOLVE_MAX_OPTIONAL_INSERTIONS": "2",
-		"EVOLVE_MANDATORY_PHASES":        "scout,build",
+	loaded, _ := Load(reg, nil)
+	two := 2
+	cfg, ws := withKnobs(loaded, func(ps *RoutingKnobs) {
+		ps.DynamicRouting, ps.RoutingMode, ps.MaxOptionalInsertions = "enforce", "static", &two
 	})
 
 	if cfg.Stage != StageEnforce {
-		t.Errorf("Stage = %v, want StageEnforce (env beats registry)", cfg.Stage)
+		t.Errorf("Stage = %v, want StageEnforce (policy beats registry)", cfg.Stage)
 	}
 	if cfg.Mode != ModeStaticPreset {
 		t.Errorf("Mode = %v, want ModeStaticPreset", cfg.Mode)
@@ -101,11 +99,8 @@ func TestLoad_EnvOverridesRegistryAndDefault(t *testing.T) {
 	if cfg.MaxInsertions != 2 {
 		t.Errorf("MaxInsertions = %d, want 2", cfg.MaxInsertions)
 	}
-	if len(cfg.Mandatory) != 2 {
-		t.Errorf("Mandatory = %v, want [scout build]", cfg.Mandatory)
-	}
-	if !hasWarning(ws, "weak-spine") {
-		t.Errorf("expected weak-spine warning when audit/ship dropped from mandatory")
+	if len(ws) != 0 {
+		t.Errorf("warnings = %+v, want none", ws)
 	}
 }
 
@@ -131,10 +126,8 @@ func TestLoad_GateStagesUseDefaults(t *testing.T) {
 	}
 }
 
-func TestLoad_UnknownStageDefaultsSafe(t *testing.T) {
-	cfg, ws := Load(filepath.Join(t.TempDir(), "absent.json"), map[string]string{
-		"EVOLVE_DYNAMIC_ROUTING": "banana",
-	})
+func TestApplyPolicyKnobs_UnknownStageDefaultsSafe(t *testing.T) {
+	cfg, ws := withKnobs(defaults(), func(ps *RoutingKnobs) { ps.DynamicRouting = "banana" })
 	if cfg.Stage != StageOff {
 		t.Errorf("Stage = %v, want StageOff for unknown value (protect autonomy)", cfg.Stage)
 	}
@@ -261,16 +254,16 @@ func TestPhaseIOStage(t *testing.T) {
 		"off": StageOff, "0": StageOff, "shadow": StageShadow,
 		"advisory": StageAdvisory, "enforce": StageEnforce,
 	} {
-		if cfg, _ := Load(absent, map[string]string{"EVOLVE_PHASE_IO": v}); cfg.PhaseIO != want {
-			t.Errorf("EVOLVE_PHASE_IO=%q → %v, want %v", v, cfg.PhaseIO, want)
+		if cfg, _ := withKnobs(defaults(), func(ps *RoutingKnobs) { ps.PhaseIO = v }); cfg.PhaseIO != want {
+			t.Errorf("gates.phase_io=%q → %v, want %v", v, cfg.PhaseIO, want)
 		}
 	}
-	cfg, ws := Load(absent, map[string]string{"EVOLVE_PHASE_IO": "banana"})
+	cfg, ws := withKnobs(defaults(), func(ps *RoutingKnobs) { ps.PhaseIO = "banana" })
 	if cfg.PhaseIO != StageOff {
-		t.Errorf("typo EVOLVE_PHASE_IO → %v, want StageOff", cfg.PhaseIO)
+		t.Errorf("typo gates.phase_io → %v, want StageOff", cfg.PhaseIO)
 	}
 	if !hasWarning(ws, "unknown-value") {
-		t.Error("typo EVOLVE_PHASE_IO should warn unknown-value")
+		t.Error("typo gates.phase_io should warn unknown-value")
 	}
 }
 

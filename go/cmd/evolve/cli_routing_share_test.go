@@ -116,7 +116,7 @@ func TestRoutingHost_CarriesTheTierWeekReaderTheClockAndABenchThatLogs(t *testin
 	if host.TierWeek == nil || host.Now == nil || !host.Now().Equal(now) {
 		t.Fatalf("the production host must carry the tier week reader and the clock: %+v", host)
 	}
-	host.Bench(root, "build", llmroute.Plan{Candidates: []string{"agy-tmux", "claude-tmux"}}, map[string]string{})
+	host.Bench(root, "build", llmroute.Plan{Candidates: []string{"agy-tmux", "claude-tmux"}})
 	if !strings.Contains(log.String(), "[cliroute] ") {
 		t.Fatalf("a bench move must log through the host, got %q", log.String())
 	}

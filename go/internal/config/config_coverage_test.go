@@ -1,7 +1,6 @@
 package config
 
 import (
-	"path/filepath"
 	"testing"
 )
 
@@ -46,11 +45,10 @@ func TestParseCondRule_AllOpsAndError(t *testing.T) {
 	}
 }
 
-func TestApplyEnv_ConditionalAndBadInts(t *testing.T) {
-	cfg, ws := Load(filepath.Join(t.TempDir(), "absent.json"), map[string]string{
-		"EVOLVE_CONDITIONAL_MANDATORY":   "audit:verdict==PASS",
-		"EVOLVE_MAX_OPTIONAL_INSERTIONS": "notanint",
-		"EVOLVE_ROUTING_MODE":            "preset",
+func TestApplyPolicyKnobs_ConditionalAndModeAlias(t *testing.T) {
+	cfg, ws := withKnobs(defaults(), func(ps *RoutingKnobs) {
+		ps.ConditionalMandatory = map[string]string{"audit": "verdict==PASS"}
+		ps.RoutingMode = "preset"
 	})
 	rule, ok := cfg.Conditional["audit"]
 	if !ok || rule.Field != "verdict" || rule.Op != "==" || rule.Value != "PASS" {
@@ -60,10 +58,10 @@ func TestApplyEnv_ConditionalAndBadInts(t *testing.T) {
 		t.Errorf("Mode = %v, want ModeStaticPreset (alias 'preset')", cfg.Mode)
 	}
 	if cfg.MaxInsertions != 4 {
-		t.Errorf("MaxInsertions = %d, want default 4 (bad int ignored)", cfg.MaxInsertions)
+		t.Errorf("MaxInsertions = %d, want default 4 without a key", cfg.MaxInsertions)
 	}
-	if !hasWarning(ws, "unknown-value") {
-		t.Errorf("expected unknown-value warning for non-int max insertions")
+	if len(ws) != 0 {
+		t.Errorf("warnings = %+v, want none", ws)
 	}
 }
 
