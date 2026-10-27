@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/defectledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/events/channel"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -143,7 +144,7 @@ func loadCycle(dir string, id int) (Cycle, bool, error) {
 	var decision failureDecisionFile
 	err := errors.Join(
 		ignoreFound(readOptionalJSON(filepath.Join(dir, "triage-decision.json"), &triage)),
-		ignoreFound(readOptionalJSON(filepath.Join(dir, "defect-ledger.json"), &defects)),
+		ignoreFound(readOptionalJSON(filepath.Join(dir, defectledger.LedgerFile), &defects)),
 		ignoreFound(readOptionalJSON(filepath.Join(dir, "failure-decision.json"), &decision)),
 	)
 	c.FailureLevel = decision.Level
