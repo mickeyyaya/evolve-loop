@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "Red test first: fixtures with func TestX(t *testing.T) {} and with a body of only a comment both fail the guard and name the file, the line and the function.",
+    "A test body with only t.Skip and a reason passes.",
+    "The baseline holds the offenders on main at the build commit; a new offender fails while a baseline offender passes.",
+    "The guard runs in go test ./acs/regression/... and in the build handoff floor."
+  ],
+  "created_at": "2026-10-26T23:19:23Z",
+  "deps": [],
+  "files": [
+    "go/acs/regression/emptytests/emptytests_test.go",
+    "go/acs/regression/emptytests/baseline.txt"
+  ],
+  "fix": "Add a regression guard under go/acs/regression that parses each _test.go file with go/ast and refuses a Test, Fuzz or Benchmark function whose body has no statement. Start with a baseline file of the offenders on main, so only new offenders fail. The fence fragment /go/acs/regression/ already covers the guard.",
+  "id": "vacuous-test-guard",
+  "injected_by": "console-operator-session",
+  "kind": "feature",
+  "notes": "Route console-manual: go/acs/regression/ is on the fence (integrity_surface.go:37).",
+  "priority": "P1",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "source": "console, 2026-10-27, operator request on cycle 2035 (\"balance to cost and output\"). ADR-0158; plan docs/plans/cost-aware-repair-2026-10.md",
+  "summary": "The cycle 2035 builder satisfied the acsnames guard with func TestSomething(t *testing.T) {}, TestX and TestBaseRed in go/internal/ciwatch/ciwatch_test.go:310-314. No audit flagged them, and no guard in go/ refuses an empty test body. The test-smell catalog calls this the Empty Test.",
+  "title": "A guard refuses a new or changed Go test function with an empty body (ADR-0158 decision 19)",
+  "weight": 0.82
+}

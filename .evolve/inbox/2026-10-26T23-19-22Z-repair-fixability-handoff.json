@@ -1,0 +1,32 @@
+{
+  "acceptance": [
+    "Red test first: the four failure blocks of cycle 2035 as fixtures; round 1 returns stop with the reason handoff_blocker and names M1 and the console item retro-minting-files-through-inbox-add-lane-ac-5-console.",
+    "A failure block with only lane findings (the H1 helper fix alone) returns no stop and lists the lane findings.",
+    "A hand-off finding that does not block (M2, MEDIUM, no gate failure) is in the hand-off list and does not cause a stop.",
+    "The stop decision carries the salvage pointer, the findings and the console item that the seal records.",
+    "workflow.repair.fixability.stage is a strict stage key (off, shadow, enforce; default shadow)."
+  ],
+  "created_at": "2026-10-26T23:19:22Z",
+  "deps": [],
+  "files": [
+    "go/internal/fixability/fixability.go",
+    "go/internal/fixability/fixability_test.go",
+    "go/internal/policy/workflow_findings_repair.go",
+    "go/cmd/evolve/policy_readers_strict_test.go",
+    "docs/architecture/policy-config.md"
+  ],
+  "fix": "Add a pure package fixability that reads the failure block (defects, prescriptions, evidence paths) and the ship and gate failures. A finding is hand-off when it cites a path for which guards.IsProtectedSurface is true or names an open console inbox item. It blocks when a deterministic gate fails on it, the audit proves a red test on it (as the round 1 overlay proof of M1), or its severity is HIGH or above. The result is lane findings, hand-off findings and a stop decision with the salvage fields. Add the stage key.",
+  "id": "repair-fixability-handoff",
+  "injected_by": "console-operator-session",
+  "kind": "feature",
+  "notes": "Rank 2: the largest cost cut for its size (plan candidate C2). The call site in internal/core is on the fence, so the console item wire-cost-aware-repair-call-sites wires it after this item lands.",
+  "priority": "P1",
+  "priority_class": "performance",
+  "route": "lane",
+  "routed_at": "2026-10-26T23:19:32Z",
+  "routed_reason": "ADR-0158 plan section 6: no fence path to change; a fenced call site is a split",
+  "source": "console, 2026-10-27, operator request on cycle 2035 (\"balance to cost and output\"). ADR-0158; plan docs/plans/cost-aware-repair-2026-10.md",
+  "summary": "Cycle 2035 ran two repair rounds of tdd and build after the first audit had named the blocker M1 on the protected go/internal/core/failurelearning tests. The rounds used 104.3 of 160.1 LLM minutes and did not converge. The repair decision reads only the failure class (go/internal/core/retry_envelope.go).",
+  "title": "A pure classifier sorts each audit finding into a lane or a hand-off finding, and finds a blocker that the lane cannot fix (ADR-0158)",
+  "weight": 0.88
+}

@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "The audit prompt of a cycle with a red gate carries the gate result as a facts block, and the rubric says not to judge it again.",
+    "The audit report has a section for the final-diff regression review and a section for the honesty check, and schemas/handoff/audit-report.schema.json refuses a report without them.",
+    "A fixture diff with an empty test body (go/internal/core/testdata/audit-honesty/empty-test.diff) and a fake auditor gives an honesty section that names the empty test."
+  ],
+  "created_at": "2026-10-26T23:19:23Z",
+  "deps": [],
+  "files": [
+    "agents/evolve-auditor.md",
+    "agents/evolve-auditor-reference.md",
+    "skills/audit/SKILL.md",
+    "schemas/handoff/audit-report.schema.json"
+  ],
+  "fix": "Change the audit persona and rubric: the prompt carries the gate and floor results as a fixed facts block; the auditor does not argue them. The rubric adds two mandatory sections: a regression review of the final diff (each changed function of the unprotected code) and an honesty check for each change that makes a guard or a test pass.",
+  "id": "audit-reviews-the-final-diff",
+  "injected_by": "console-operator-session",
+  "kind": "feature",
+  "notes": "Route console-manual: agents/evolve-auditor.md and skills/audit/ are on the fence (integrity_surface.go:44, :159).",
+  "priority": "P2",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "source": "console, 2026-10-27, operator request on cycle 2035 (\"balance to cost and output\"). ADR-0158; plan docs/plans/cost-aware-repair-2026-10.md",
+  "summary": "The four audits of cycle 2035 restated M1 and M2 four times and missed the HIGH regressions F1 and F2 and the three empty tests. One adversarial review of the final diff found F1 and F2. Three of the four stops came from deterministic gates, so the audit judged again what a gate had already decided.",
+  "title": "The audit takes the gate results as facts, reviews the final diff for regressions and asks if each guard fix is honest (ADR-0158 decisions 20 and 21)",
+  "weight": 0.75
+}
