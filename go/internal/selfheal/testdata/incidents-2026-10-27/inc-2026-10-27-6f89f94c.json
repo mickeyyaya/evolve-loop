@@ -1,0 +1,24 @@
+{
+  "schema": "evolve.incident/1",
+  "id": "inc-2026-10-27-6f89f94c",
+  "fingerprint": "flaky-test:rerun-green",
+  "class": "flaky-test",
+  "subject": "rerun-green",
+  "severity": "INCIDENT",
+  "tier": "T2",
+  "state": "open",
+  "sources": [
+    "ci:40217002682",
+    "ci:40269836920",
+    "ci:40295509335",
+    "ci:40390149614"
+  ],
+  "recurrence": 4,
+  "reopened": 0,
+  "attempts": 0,
+  "repro_test": "",
+  "summary": "a CI rerun of the same code turned green",
+  "opened_at": "2026-10-27T10:30:56.21104+08:00",
+  "last_seen_at": "2026-10-26T20:47:14Z",
+  "closed_at": null
+}

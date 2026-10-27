@@ -49,7 +49,7 @@ func TestRetro_ARoutingRefusalIsAFailVerdictWithTheReason(t *testing.T) {
 	resp, err := phase.Run(context.Background(), core.PhaseRequest{
 		Workspace: t.TempDir(), ProjectRoot: root, Cycle: 1,
 		Context: map[string]string{"previous_verdict": core.VerdictFAIL},
-		Env:     map[string]string{"EVOLVE_RETROSPECTIVE_CLI": "codex-tmux"},
+		Env:     map[string]string{"EVOLVE_CLI": "codex-tmux"},
 	})
 	if err != nil || resp.Verdict != core.VerdictFAIL || fb.gotReq.CLI != "" || !strings.Contains(resp.Diagnostics[len(resp.Diagnostics)-1].Message, "outside the allowed set") {
 		t.Fatalf("a refused route fails the retro without launching: %+v %v launched=%q", resp, err, fb.gotReq.CLI)

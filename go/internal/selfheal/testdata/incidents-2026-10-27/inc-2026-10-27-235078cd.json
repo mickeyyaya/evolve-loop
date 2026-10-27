@@ -1,0 +1,22 @@
+{
+  "schema": "evolve.incident/1",
+  "id": "inc-2026-10-27-235078cd",
+  "fingerprint": "ci-hang:main",
+  "class": "ci-hang",
+  "subject": "main",
+  "severity": "WARN",
+  "tier": "T1",
+  "state": "open",
+  "sources": [
+    "ci:40265789886",
+    "ci:40269772364"
+  ],
+  "recurrence": 2,
+  "reopened": 0,
+  "attempts": 0,
+  "repro_test": "",
+  "summary": "a CI run on main ran past the hang limit",
+  "opened_at": "2026-10-27T10:30:56.21104+08:00",
+  "last_seen_at": "2026-10-26T04:34:30Z",
+  "closed_at": null
+}

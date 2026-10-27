@@ -62,7 +62,7 @@ Each row below is a contract item from cli-matrix-and-drivers.md, with where to 
    before the artifact exists and the phase looks like it "produced nothing."
 5. **Credential isolation.** Refuse ambiguous credential paths. `driver_claudep.go`
    returns `ExitCostLeak` when `ANTHROPIC_API_KEY` is set, or `ANTHROPIC_BASE_URL` is
-   set without `BRIDGE_ALLOW_ANTHROPIC_BASE_URL=1` — fail loud, don't silently bill
+   set without the policy key `bridge.allow_anthropic_base_url` — fail loud, don't silently bill
    the wrong account.
 
 ## The checklist (from cli-matrix-and-drivers.md)

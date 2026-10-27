@@ -138,7 +138,7 @@ func TestC1141_003_lanescope_scout_report_name_derived(t *testing.T) {
 }
 
 func TestC1141_004_routing_mandatory_no_regression(t *testing.T) {
-	cfg, _ := config.Load(filepath.Join(t.TempDir(), "absent-registry.json"), map[string]string{})
+	cfg, _ := config.Load(filepath.Join(t.TempDir(), "absent-registry.json"))
 	if len(cfg.Mandatory) == 0 {
 		t.Fatalf("routing config Mandatory is empty — routing completeness floor lost")
 	}
@@ -164,7 +164,7 @@ func TestC1141_004_routing_mandatory_no_regression(t *testing.T) {
 }
 
 func TestC1141_005_mandatory_divergence_derived_or_documented(t *testing.T) {
-	cfg, _ := config.Load(filepath.Join(t.TempDir(), "absent-registry.json"), map[string]string{})
+	cfg, _ := config.Load(filepath.Join(t.TempDir(), "absent-registry.json"))
 	required := map[string]bool{}
 	for _, role := range phasecontract.RequiredRoles() {
 		required[phaseForRole(t, role)] = true

@@ -320,7 +320,7 @@ Bypass = "don't ask the user", NOT "skip integrity checks". These rules are mand
    The four `evolve guard` hooks are defence in depth in Claude Code panes only. The OS sandbox write rules, the worktree fence and the ship gates hold each guarantee for every family ([llm-isolation.md §9.1](docs/architecture/llm-isolation.md#91-as-built-x7)). The protected write rule of the sandbox denies only at `isolation.i7.stage` `enforce`; at the default `shadow` it only reports.
 4. Never fabricate cycle numbers (CRITICAL violation).
 5. Phase agents go through the native bridge (`evolve subagent run` / `evolve loop`). A phase agent can start subagents of its own harness inside its cell.
-6. The OS sandbox wraps subprocesses (`EVOLVE_SANDBOX=1`). When the sandbox is nested, the EPERM fallback turns on automatically.
+6. The OS sandbox wraps subprocesses (policy.json `sandbox.mode`, `auto` by default). When the sandbox is nested, the EPERM fallback turns on automatically. Only the audited `--sandbox-off=<reason>` parameter turns it off.
 7. Run the eval-quality pre-flight on every eval (`evolve eval quality-check`).
 8. The Adversarial Auditor is on by default. The auditor runs Claude Opus on Claude Code, and the builder runs agy first. `ADVERSARIAL_AUDIT=0` turns it off.
 
@@ -408,7 +408,7 @@ Task priority is the computed inbox rank ([ADR-0121](docs/architecture/adr/0121-
 - Commits: the ship gate denies a bare `git commit` / `git push origin main`. Interactive commits: `/commit` → attestation → `evolve ship --class manual`. A routine use of `--bypass-commit-gate` is a violation. Cycle commits: `--class cycle` (full audit-binding). Releases: `evolve release X.Y.Z`. "publish" ≠ "push".
 - For an unfinished cycle, use `evolve loop --resume` or `evolve cycle reset`. `evolve loop --force-fresh` is the last-resort escape hatch. It does NOT seal the history.
 - Routing:
-  - `EVOLVE_DYNAMIC_ROUTING=advisory` is the default since 2026-06-06, when retro steps 1-3 landed. `=off` is the static escape hatch.
+  - `router.dynamic_routing` in `.evolve/policy.json` is `advisory` by default since 2026-06-06, when retro steps 1-3 landed. `off` is the static escape hatch.
   - The integrity floor is `ship ⇒ build ∧ audit ∧ (tdd unless trivial or deliverable_kind=document — ADR-0099)`.
   - CLI routing is in `.evolve/policy.json` `cli_routing` (one table: `clis`, `default`, `work`, `tiers`, `agents`, `floors`).
   - `pins` beside a table refuse every launch. Thus `evolve cli-routing init|set|unset|migrate` is the only writer of the table. It compiles before it writes. It refuses to write inside a phase or while a cycle holds a live lease.

@@ -53,7 +53,7 @@ func TestTmuxPromptTransportErrorStopsDelivery(t *testing.T) {
 				cfg := fixtureConfig(t)
 				cfg.HumanInput = human
 				deps := fixtureDeps(tm)
-				deps.LookupEnv = mapLookup(map[string]string{"BRIDGE_HUMAN_SIMULATION": "1", "EVOLVE_PHASE_RECOVERY": "off"})
+				deps.LookupEnv = mapLookup(map[string]string{"EVOLVE_PHASE_RECOVERY": "off"})
 				var log bytes.Buffer
 				deps.Stderr = &log
 				rc, err := runTmuxREPL(context.Background(), cfg, deps, tmuxLaunch{name: "claude-tmux", session: "delivery-error", launchCmd: "claude", promptMarker: "❯", inputLineMarker: "❯", bootIntervalS: 1})

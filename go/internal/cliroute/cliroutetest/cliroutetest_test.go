@@ -45,14 +45,19 @@ func TestVariants_AreUniqueAndEachHasAHost(t *testing.T) {
 	}
 }
 
-func TestVariant_EnvForAddsThePerAgentKeyWithoutTouchingTheVariant(t *testing.T) {
+func TestVariant_TheAgentCLIIsAnOverrideNotAnEnvironmentKey(t *testing.T) {
 	v := variantNamed(t, "env_agent")
-	env := v.EnvFor("tdd-engineer")
-	if env["EVOLVE_TDD_ENGINEER_CLI"] != "agy-tmux" {
-		t.Fatalf("EnvFor = %v", env)
+	if env := v.EnvFor(); len(env) != 0 {
+		t.Fatalf("EnvFor = %v, want no per-agent key", env)
+	}
+	if got := v.Overrides([]string{"tdd-engineer"})["tdd-engineer"]; got.CLI != "agy-tmux" {
+		t.Fatalf("Overrides = %+v, want the agy-tmux CLI override", got)
+	}
+	if got := variantNamed(t, "none").Overrides([]string{"tdd-engineer"}); got != nil {
+		t.Fatalf("a variant without an agent CLI has overrides %v", got)
 	}
 	cli := variantNamed(t, "env_cli")
-	env = cli.EnvFor("builder")
+	env := cli.EnvFor()
 	env["EVOLVE_CLI"] = "changed"
 	if cli.Env["EVOLVE_CLI"] != "claude-p" {
 		t.Fatal("EnvFor must return a copy")

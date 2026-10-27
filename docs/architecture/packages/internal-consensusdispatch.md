@@ -19,7 +19,7 @@
 - **Quorum.** If fewer voters are eligible than the declared quorum, the effective quorum is `ceil(eligible / 2)`, with a warning. Fewer than two eligible voters is a runtime error.
 - **Workers go through the bridge.** Each TSV line is `<cli>\t<command>`, and the command is `evolve bridge launch ...` with the flags of the bridge launch arguments. The bridge owns the dispatch contract (it renders the prompt, drives the CLI and writes the artifact). `--allow-bypass` mirrors the trusted-path posture of the in-process runner, so a tmux driver does not stop at the safety gate. The model goes in as `--model`.
 - `bridge.DriverFor` projects a bare voter name onto a registered driver (`claude` to `claude-tmux`). A voter with no registered driver is skipped, and so is the retired bare name `gemini`, which `DriverFor` refuses since X6. `Run` names each skipped voter on stderr (`WARN: skipped 1 eligible voter(s) with no registered driver: gemini`). Fewer than two workers is a runtime error. The auditor profile lists `claude` and `codex` as voters; its third voter was `gemini`, which ran `claude-tmux` a second time. The voters are sorted, so the TSV is deterministic.
-- **Finding the binary.** `resolveEvolveBin` uses `EVOLVE_GO_BIN` if it is set and executable. Then it walks up to eight parents from the hint directory for `go/bin/evolve`. Then it uses `evolve` on the `PATH`. It mirrors `releasepipeline.resolveEvolveBin`, but it takes a hint directory, not a repo root.
+- **Finding the binary.** `resolveEvolveBin` reads no environment name (X18c). It walks up to eight parents from the hint directory for `go/bin/evolve`. Then it uses `evolve` on the `PATH`. It mirrors `releasepipeline.resolveEvolveBin`, but it takes a hint directory, not a repo root.
 - `Run` falls back to the bare name `evolve`, which the worker shell resolves. `resolveNativeDispatch` has no shell fallback, because `legacy/scripts/dispatch/` was removed (ADR-0062, T1.7). A missing native binary is a hard error, not a failing call of a script that is gone.
 
 ## Invariants
@@ -29,7 +29,7 @@
 - **A failing aggregator sets the exit code.** `TestRun_AggregatorFailPropagates` pins it. `TestRun_NoArtifactsProducedFails` pins that the aggregator is not reached with no artifacts.
 - **Worker selection by driver.** `TestBuildCommandsTSV` pins that a CLI with no registered driver is skipped and that the order is stable. `TestRun_QuorumReducedThenNoDrivers` pins the quorum reduction and the fewer-than-two-workers error.
 - **`ParseProfile` mapping.** `TestProfile_FullStructFromParse` pins the field mapping.
-- **Serial tests.** A test that uses `t.Setenv` for `EVOLVE_GO_BIN` or `PATH` does not run in parallel, because it changes the process environment.
+- **Serial tests.** A test that uses `t.Setenv` for `PATH` does not run in parallel, because it changes the process environment. A test puts its fake binary at `<dir>/go/bin/evolve`.
 - **`resolveDispatch` is a test seam.** A nil field falls back to `resolveNativeDispatch`, so a zero-valued `Inputs` dispatches as before. Tests set it to reach the fanout and aggregator failure paths. `BuildCommandsTSV` returns no error, because no path through it fails.
 
 ## Findings

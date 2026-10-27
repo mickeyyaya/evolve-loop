@@ -230,10 +230,10 @@ func TestStopReviewRecorder_AppendsOneStopReviewEntry(t *testing.T) {
 func TestCycleDiagfAndBench_WriteToTheProcessStderr(t *testing.T) {
 	stderr := captureProcessStderr(t, func() {
 		cycleDiagf("[diag] %s=%d\n", "x", 3)
-		cycleBenchOnEscalation(bridgechain.Escalation{Env: map[string]string{"EVOLVE_CLI_HEALTH": "0"}})
+		cycleBenchOnEscalation(bridgechain.Escalation{ProjectRoot: t.TempDir(), Workspace: t.TempDir()})
 	})
 	if stderr != "[diag] x=3\n" {
-		t.Errorf("stderr = %q, want only the diag line (a disabled bench is silent)", stderr)
+		t.Errorf("stderr = %q, want only the diag line (a dispatch with no report is silent)", stderr)
 	}
 }
 
@@ -331,9 +331,7 @@ func TestWireOrchestratorDeps_AnAdvisorWithoutARouteRefusesTheWiring(t *testing.
 	orig := runner.DefaultRouter
 	t.Cleanup(func() { runner.DefaultRouter = orig })
 	root, evolveDir := wiringRoot(t, `{"cli_routing":{"clis":["agy","claude"],"default":["agy","claude"]}}`)
-	t.Setenv("EVOLVE_ROUTER_CLI", "codex-tmux")
-
-	d := wireOrchestratorDeps(root, evolveDir, io.Discard, routingRun{})
+	d := wireOrchestratorDeps(root, evolveDir, io.Discard, routingRun{overrides: cliOverrides("router", "codex-tmux")})
 
 	if d.RoutingErr == nil || !strings.HasPrefix(d.RoutingErr.Error(), "the routing advisor has no route: ") || d.Orchestrator != nil || d.Signals == nil {
 		t.Errorf("wiring = (err=%v orch=%v signals=%v), want the advisor refusal with the Center kept", d.RoutingErr, d.Orchestrator, d.Signals)

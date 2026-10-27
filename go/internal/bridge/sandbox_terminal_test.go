@@ -54,7 +54,7 @@ func TestSandboxTerminalOptOutDoesNotQueryPane(t *testing.T) {
 	t.Parallel()
 	for _, mode := range []string{"off", " off "} {
 		mux := &failedTerminalTmux{fakeTmux: &fakeTmux{}, err: errors.New("must not query")}
-		path, err := sandboxTerminalPath(context.Background(), Deps{Tmux: mux, Env: map[string]string{envSandboxMode: mode}}, &Config{RequireSandbox: true}, "fixture")
+		path, err := sandboxTerminalPath(context.Background(), Deps{Tmux: mux, SandboxMode: mode}, &Config{RequireSandbox: true}, "fixture")
 		if path != "" || err != nil || mux.calls != 0 {
 			t.Fatalf("mode %q: path=%q err=%v calls=%d", mode, path, err, mux.calls)
 		}

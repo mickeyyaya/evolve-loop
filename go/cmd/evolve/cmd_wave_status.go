@@ -193,6 +193,7 @@ func runWaveWatch(env waveEnv, args []string, stdout, stderr io.Writer) int {
 		return exitIO
 	}
 	w := &waveWatcher{env: env, plane: plane, cur: records[len(records)-1], prev: wave.Snapshot{LoopLive: true}, seen: map[string]bool{}, asJSON: asJSON, stdout: stdout, stderr: stderr}
+	events := w.openEvents()
 	for {
 		done, err := w.poll()
 		if err != nil {
@@ -202,7 +203,7 @@ func runWaveWatch(env waveEnv, args []string, stdout, stderr io.Writer) int {
 		if done {
 			return 0
 		}
-		env.sleep(waveWatchPoll)
+		events = w.wait(events)
 	}
 }
 
@@ -215,6 +216,7 @@ type waveWatcher struct {
 	asJSON         bool
 	stdout, stderr io.Writer
 	signalOffset   int64
+	eventsFailed   bool
 }
 
 func (w *waveWatcher) poll() (bool, error) {

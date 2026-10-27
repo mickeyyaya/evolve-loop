@@ -22,7 +22,7 @@ const advisorTier = "balanced"
 func realRegistry(t *testing.T) config.RoutingConfig {
 	t.Helper()
 	root := acsassert.RepoRoot(t)
-	cfg, warns := config.Load(filepath.Join(root, "docs", "architecture", "phase-registry.json"), map[string]string{})
+	cfg, warns := config.Load(filepath.Join(root, "docs", "architecture", "phase-registry.json"))
 	for _, w := range warns {
 		t.Logf("registry warning: %+v", w)
 	}

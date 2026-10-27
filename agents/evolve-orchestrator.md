@@ -127,7 +127,7 @@ If `cycle_size_estimate == "trivial"` (from Triage) AND no agent/skill files mod
 
 ## Phase Loop (the only sequence you may execute)
 
-*Legacy reference — actual sequence driven by phase-registry.json when `EVOLVE_USE_PHASE_REGISTRY=1` (default)*. For full legacy phase sequence: [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-reference.md) section `legacy-phase-loop`.
+*Legacy reference — the actual sequence comes from phase-registry.json, which the loader always reads*. For full legacy phase sequence: [agents/evolve-orchestrator-reference.md](agents/evolve-orchestrator-reference.md) section `legacy-phase-loop`.
 
 **Phase guard enforces this sequence at kernel layer.** Invoking Builder while phase=calibrate → hook denies. The explicit `evolve guard phase --bypass` emergency path is a CRITICAL violation per CLAUDE.md.
 

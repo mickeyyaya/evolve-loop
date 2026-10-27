@@ -87,7 +87,7 @@ Every watcher of the pipeline polls, and no program outside one process can subs
 - **State: Built (E10, 2026-10-18).** The function `newRoleSignalCenter` in `go/cmd/evolve/cmd_cycle.go` builds the Center of a root and subscribes one Publisher through `rootwire.Attach`. The phase observer calls `rootwire.Attach` itself. Each root defers the closer. Package note: [internal-events-rootwire.md](packages/internal-events-rootwire.md).
 - **Listeners observe and never decide** ([ADR-0101](adr/0101-signal-center.md) decision 5). The Publisher never emits and never calls `Flush`.
 - **No broker.** A subscriber reads the channel logs. No process forwards an event, so no process needs a supervisor.
-- **Roles.** The `role` names the root: `cycle`, `loop`, `loop-chain`, `ship`, `subagent`, `simulate`, `phase-observer`, `wave`, `inbox`, `ci`, `subscriber`, `quality` (the collector of [ADR-0153](adr/0153-quality-is-a-panel-of-separate-indexes-with-intervals-that-the-signal-center-publishes.md)), `dispatch` or `agent`. The role `dispatch` is the check of the dispatch credential ([llm-isolation.md](llm-isolation.md) §7.1.1). The role `agent` is one `evolve agent run` ([agent-run.md](agent-run.md) §7). A reader marks the records that it makes with `watch`.
+- **Roles.** The `role` names the root: `cycle`, `loop`, `loop-chain`, `ship`, `subagent`, `simulate`, `phase-observer`, `wave`, `inbox`, `ci`, `subscriber`, `quality` (the collector of [ADR-0153](adr/0153-quality-is-a-panel-of-separate-indexes-with-intervals-that-the-signal-center-publishes.md)), `dispatch`, `agent` or `selfheal`. The role `dispatch` is the check of the dispatch credential ([llm-isolation.md](llm-isolation.md) §7.1.1). The role `agent` is one `evolve agent run` ([agent-run.md](agent-run.md) §7). The role `selfheal` is the incident detector ([llm-isolation.md](llm-isolation.md) §18). A reader marks the records that it makes with `watch`.
 
 ### 2. Channels
 
@@ -119,6 +119,7 @@ The default channels:
 | `quality.breach` | `kind=quality.breach,quality.warning` ([ADR-0153](adr/0153-quality-is-a-panel-of-separate-indexes-with-intervals-that-the-signal-center-publishes.md)) | lossless |
 | `quality.reading` | `kind=quality.reading` | best_effort |
 | `isolation.violation` | `kind=isolation.violation` ([ADR-0154](adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md); a violation is rare and must not be lost) | lossless |
+| `selfheal.incident` | `kind=selfheal.incident` ([ADR-0155](adr/0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md); each open, reopen and close of an incident record, [llm-isolation.md](llm-isolation.md) §18.5) | lossless |
 | `signals` | every event (the firehose) | best_effort |
 
 - One event can go to several channels. The Publisher writes it once in each channel.
@@ -461,16 +462,21 @@ evolve events subscribe run NAME                     # the consumer of an exec s
 evolve events subscribe status [NAME]                # lag per channel, dead-letter count, last delivery
 ```
 
+The verbs use the one exit table of [cli-contract.md](cli-contract.md) §3:
+
 | Exit | Meaning |
 |---|---|
-| 0 | ok: `--until` matched, or the user stopped the command (SIGINT or SIGTERM) |
-| 1 | refused: an unsupported filesystem or system; an unknown kind or module; a selector with no channel; a held runner lock; a refused kernel watch |
-| 2 | an I/O error, or the `.evolve` directory is gone |
-| 3 | the reader of stdout is gone: a hangup, or `EPIPE` |
-| 4 | `wave watch` only: a live `loop.lost` record ended the wave; a historical one never does |
-| 10 | a usage error |
+| 0 | `--until` matched, or a SIGINT or SIGTERM stopped the watch |
+| 2 | an I/O error, for example a channel path that is not a directory |
+| 3 | the reader of stdout is gone (a hangup or `EPIPE`); the system has no kernel wake; a held runner lock (E8) |
+| 10 | a usage error: no `--channel`, a bad `--since`, an unknown filter key |
+| 11 | an unknown kind or module, or a selector that matches no channel |
+
+- The exit of `wave watch` on a live `loop.lost` record is the work of E12. It needs a verb code in 21 to 99, because 4 is `queued` in §3 of the contract.
 
 - A deleted channel directory is not an exit. The reader writes a `reset` gap, makes the directory again and arms again (§4).
+- **State: Built for `channels`, `kinds` and `watch --channel` (E9, 2026-10-27).** The verbs are in `go/cmd/evolve/cmd_events.go` and `cmd_events_watch.go`. They are core verbs of [cli-contract.md](cli-contract.md) §5, so they take `--project-root` and print the envelope with `--json`. `watch --sub` and each `subscribe` verb need the subscription store of E8, so they are not built.
+- `channels` prints the compiled catalog with the tail cursor (`end`) of each channel. It has no lag column until E8 adds the subscriptions.
 - The stream output is one JSON line for each record, in the wire form (§3). Without `--json`, a line is `<channel> <cursor> ` and then `signalcenter.FormatLine` of the signal.
 
 ### 14. Kinds, modules and codes
@@ -520,6 +526,7 @@ The module `events` (new) owns `EVENTS_DEAD_LETTERED`. A gap record is not a sig
   - the E13 `ack_wait_s` deadline;
   - the watchdog deadline for "nothing happened".
 - **Forbidden: a poll.** A poll is a loop that sleeps and then reads a file, a status or an API again.
+- **One exception until E12.** `wave watch` reads its state again at a deadline of 5 s. It sleeps 5 s when no kernel wake is available (plan decision O20, 2026-10-27).
 - **The guard.** The AST guard test `TestNoPollTimerInTheEventChannelSources` (`go/test/structure/nopoll_guard_test.go`) bans `time.Sleep`, `time.Tick`, `time.NewTicker`, `time.After` and `time.NewTimer`. Its list of directories is data: `internal/events` today. E2 adds `flock.LockWithin`, and E12 and E14 add the migrated watch files.
 - **The runtime.** An idle Go process wakes about once a minute for runtime work (research F1.6). That wake never reads our state.
 

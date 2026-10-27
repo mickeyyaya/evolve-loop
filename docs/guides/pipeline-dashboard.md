@@ -56,7 +56,7 @@ The stepper itself is the *plan* of the cycle, not only its history:
 - The required set is `config.mandatory_phases` (scout, triage, build, audit, ship — the set that the floor of the router never skips).
   It also contains the `conditional_mandatory` phases (tdd, plan-review, build-planner) that ran.
 - If the registry is malformed, the board falls back to the compiled baseline and says so in the warnings.
-- The overrides of the operator (`EVOLVE_MANDATORY_PHASES`, `EVOLVE_USE_PHASE_REGISTRY`, and the other overrides) change the set exactly as they change the floor of the loop.
+- The operator overrides (`mandatory_phases` and the routing keys of policy.json) change the set exactly as they change the floor of the loop.
 - A conditional-mandatory phase appears only after it runs, because the board does not evaluate the rule.
   Thus `left:` names only the mandatory phases that are still ahead. The required count increases by one when such a phase runs.
 

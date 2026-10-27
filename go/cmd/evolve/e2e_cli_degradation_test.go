@@ -60,7 +60,6 @@ func runFallbackCycle(t *testing.T, cfg fallbackCfg) {
 	writeFallbackProfiles(t, projRoot, "claude-p", []string{"codex"})
 
 	env := append(os.Environ(),
-		"EVOLVE_SANDBOX=off",
 		"EVOLVE_RESEARCH_HOOK_DISABLED=1",
 		fakeCLIsFirstOnPath(t, cfg.FakeBin, "claude", "codex"),
 		fmt.Sprintf("FAKE_CLI_CLAUDE_EXIT=%d", cfg.PrimaryExitCode),
@@ -71,6 +70,7 @@ func runFallbackCycle(t *testing.T, cfg fallbackCfg) {
 		"--project-root", projRoot,
 		"--goal-hash", fmt.Sprintf("e2efb%d", cfg.PrimaryExitCode),
 		"--evolve-dir", filepath.Join(projRoot, ".evolve"),
+		"--sandbox-off=e2e fake CLIs need no confinement",
 	}
 	cmd := exec.Command(cfg.EvolveBin, args...)
 	cmd.Env = env

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -56,5 +57,31 @@ func TestSolutionCheck(t *testing.T) {
 	}
 	if code, _ := run(); code != 2 {
 		t.Fatalf("usage: exit %d, want 2", code)
+	}
+}
+
+func TestSolutionCheck_TheDefaultRootIsTheWorkingDirectoryAndAnUnknownOneRefuses(t *testing.T) {
+	saved := solutionWorkdir
+	t.Cleanup(func() { solutionWorkdir = saved })
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "docs", "architecture"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "docs", "architecture", "phase-registry.json"), []byte(`{`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	solutionWorkdir = func() (string, error) { return root, nil }
+	var out, errb bytes.Buffer
+	if code := runSolution([]string{"check", "x"}, nil, &out, &errb); code != 2 || !strings.Contains(errb.String(), "registry warning") || !strings.Contains(errb.String(), filepath.Join(root, "docs", "architecture", "phase-registry.json")) {
+		t.Errorf("default root: code = %d, stderr = %q, want 2, the registry warning and the registry of the working directory", code, errb.String())
+	}
+	solutionWorkdir = func() (string, error) { return "", errors.New("cwd gone") }
+	errb.Reset()
+	if code := runSolution([]string{"check", "x"}, nil, &out, &errb); code != 2 || !strings.Contains(errb.String(), "cwd gone") {
+		t.Errorf("unknown working directory: code = %d, stderr = %q, want 2 and the error", code, errb.String())
+	}
+	errb.Reset()
+	if code := runSolution([]string{"check", "a", "b"}, nil, &out, &errb); code != 2 || !strings.Contains(errb.String(), "usage") {
+		t.Errorf("two slugs: code = %d, stderr = %q, want the usage", code, errb.String())
 	}
 }

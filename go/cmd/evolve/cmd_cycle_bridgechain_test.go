@@ -30,6 +30,7 @@ func TestWireOrchestratorDeps_EveryConsumerGetsTheChainWalkingBridge(t *testing.
 		regexp.MustCompile(`bridgechain\.New\(withUsageEvidence\(br, explainUsage, signals\),`),
 		regexp.MustCompile(`catalogPublisher\(br, cliRouter\)`),
 		regexp.MustCompile(`wireBridgeStages\(br, `),
+		regexp.MustCompile(`applySandboxOff\(br, `),
 		regexp.MustCompile(`^\s*Bridge:\s{2,}br,\s*$`),
 	}
 	for i, line := range strings.Split(fn, "\n") {

@@ -67,7 +67,7 @@ func TestLaunchSwept_RefusesSandboxOffInsideAPhaseWithANamedErrorAndASignal(t *t
 	t.Parallel()
 	center := signalcenter.New()
 	driver := &launchCountingDriver{}
-	deps := Deps{Signals: center, Env: map[string]string{envSandboxMode: " off "}, LookupEnv: mapLookup(map[string]string{ipcenv.PhaseKey: "build"})}
+	deps := Deps{Signals: center, SandboxMode: " off ", LookupEnv: mapLookup(map[string]string{ipcenv.PhaseKey: "build"})}
 	cfg := &Config{CLI: "claude-tmux", Agent: "scout", Cycle: 4}
 
 	rc, err := launchSwept(context.Background(), driver, cfg, deps)
@@ -81,19 +81,22 @@ func TestLaunchSwept_RefusesSandboxOffInsideAPhaseWithANamedErrorAndASignal(t *t
 			got = append(got, e)
 		}
 	}
-	if len(got) != 1 || got[0].Fields["action"] != "refused" || got[0].Fields["phase"] != "build" || got[0].Fields["cell"] != "scout" || got[0].Fields["target"] != envSandboxMode || got[0].Cycle != 4 {
+	if len(got) != 1 || got[0].Fields["action"] != "refused" || got[0].Fields["phase"] != "build" || got[0].Fields["cell"] != "scout" || got[0].Fields["target"] != "--sandbox-off" || got[0].Cycle != 4 {
 		t.Fatalf("want one %s with action=refused for the cell scout launched from the phase build; got %+v", isolation.ViolationCode(3), got)
 	}
 }
 
 func TestRefuseSandboxOffInPhase_AllowsTheOptOutOutsideAPhaseAndAnyOtherModeInside(t *testing.T) {
 	t.Parallel()
-	for name, env := range map[string]map[string]string{
-		"off outside a phase":  {envSandboxMode: "off"},
-		"auto inside a phase":  {envSandboxMode: "auto", ipcenv.PhaseKey: "build"},
-		"unset inside a phase": {ipcenv.PhaseKey: "build"},
+	for name, tc := range map[string]struct {
+		mode string
+		env  map[string]string
+	}{
+		"off outside a phase":  {"off", nil},
+		"auto inside a phase":  {"auto", map[string]string{ipcenv.PhaseKey: "build"}},
+		"unset inside a phase": {"", map[string]string{ipcenv.PhaseKey: "build"}},
 	} {
-		deps := Deps{Env: env, LookupEnv: mapLookup(nil)}
+		deps := Deps{SandboxMode: tc.mode, Env: tc.env, LookupEnv: mapLookup(nil)}
 		if err := deps.refuseSandboxOffInPhase(&Config{Agent: "scout"}); err != nil {
 			t.Errorf("%s: refused with %v", name, err)
 		}

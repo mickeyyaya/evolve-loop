@@ -200,11 +200,11 @@ func sandboxUnavailableIssue(host preflight.Profile, mode string) (halt, warn st
 	switch {
 	case ok && optOut:
 		return "", fmt.Sprintf(
-			"EVOLVE_SANDBOX=off — host opt-out honoured; source-writing phases run UNCONFINED despite a sandbox-requiring profile (inner sandbox also unavailable: %s)",
+			"--sandbox-off — host opt-out honoured; source-writing phases run UNCONFINED despite a sandbox-requiring profile (inner sandbox also unavailable: %s)",
 			host.Sandbox.Reason)
 	default:
 		return fmt.Sprintf(
-			"required Build sandbox unavailable (%s; %s); run on a supported non-nested host or explicitly opt out with EVOLVE_SANDBOX=off",
+			"required Build sandbox unavailable (%s; %s); run on a supported non-nested host or explicitly opt out with evolve loop --sandbox-off=<reason>",
 			host.Sandbox.Reason, reason), ""
 	}
 }

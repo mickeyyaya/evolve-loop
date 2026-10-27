@@ -3,7 +3,7 @@
 > [ADR-0153](adr/0153-quality-is-a-panel-of-separate-indexes-with-intervals-that-the-signal-center-publishes.md) · plan: [llm-quality-indexes-2026-10](../plans/llm-quality-indexes-2026-10.md) · research: [llm-quality-indexes-2026-10](../research/llm-quality-indexes-2026-10.md) (F2.1 to F2.16, P3.1 to P4.3, R1 to R8).
 > This file is the spec of record for each quality index: its formula, its data source, its interval, its stage and its signal. The plan holds the components and their order. The ADR holds the decision. The Signal Center design is in [signal-center-design.md](signal-center-design.md), and the event channels are in [event-channels.md](event-channels.md).
 >
-> Status: accepted (ADR-0153), 2026-10-21. Component Q1 is built: `internal/qualitypanel`, the `quality` module, `evolve quality report`, the boundary step and the two channels ([internal-qualitypanel](packages/internal-qualitypanel.md)). Component Q2 is built: the PQ1, PQ4 and CQ2 readers of the wave scope and `evolve quality compare` for PQ3 ([internal-pipelinerates](packages/internal-pipelinerates.md)). Component Q3 is built: the CQ1, CQ3, CQ4 and CQ5 readers ([internal-codeshape](packages/internal-codeshape.md)). Q4 to Q10 add the other readers. The baselines below come from one-time Go programs (research §2).
+> Status: accepted (ADR-0153), 2026-10-21. Component Q1 is built: `internal/qualitypanel`, the `quality` module, `evolve quality report`, the boundary step and the two channels ([internal-qualitypanel](packages/internal-qualitypanel.md)). Component Q2 is built: the PQ1, PQ4 and CQ2 readers of the wave scope and `evolve quality compare` for PQ3 ([internal-pipelinerates](packages/internal-pipelinerates.md)). Component Q3 is built: the CQ1, CQ3, CQ4 and CQ5 readers ([internal-codeshape](packages/internal-codeshape.md)). The PQ5 reader of the wave scope is built for [ADR-0158](adr/0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md) ([internal-pipelinerates](packages/internal-pipelinerates.md)), and Q4 to Q10 add the other readers. The baselines below come from one-time Go programs (research §2).
 
 ## Table of contents
 
@@ -32,7 +32,7 @@ An index here is a measured reading with an interval, not a score. The loop has 
 |---|---|---|
 | Code | Is the code easy for an agent to change safely? | CQ1 to CQ5 |
 | Tests | Do the tests catch a wrong change? | TQ1 to TQ4 |
-| Pipeline | Does the loop turn items into ships, and how consistently? | PQ1 to PQ4 |
+| Pipeline | Does the loop turn items into ships, how consistently, and at what cost? | PQ1 to PQ5 |
 | Judges | Do the auditors and reviewers find real defects? | JQ1 to JQ4 |
 | Outcomes | What happened on `main` after the ship? | OQ1 to OQ4 |
 
@@ -55,6 +55,7 @@ An index here is a measured reading with an interval, not a score. The loop has 
 | PQ2 | pass^k per phase | probability | replay | shadow | no valid data (Q9) |
 | PQ3 | Comparison noise floor | percentage points | on request | report | MDE 24 points at 66 cycles per arm |
 | PQ4 | Deadline and system-fail rate | % of cycles | wave | report | deadline 16.7% [12.0, 22.7]; system-fail 4.8% [2.6, 8.9] |
+| PQ5 | Cost for each shipped cycle | LLM minutes for each shipped cycle | wave | report | 101.2 (cycles 2029 to 2036, added 2026-10-27) |
 | JQ1 | Seeded-defect recall | % of seeded defects found | corpus run | shadow | no data (Q8) |
 | JQ2 | False-PASS rate | % of PASS ships | report | shadow | no data (Q7) |
 | JQ3 | Independent-review escalation | % of reviewed PRs | wave | report | 41.8% [32.6, 51.7], n = 98 |
@@ -79,6 +80,7 @@ Each index section names its research ids. The ids resolve in the [research doss
 | TQ2 | the reviews of #1103, #1106 and #1107 | local |
 | TQ4 | ImpossibleBench ([LessWrong](https://www.lesswrong.com/posts/qJYMbrabcQqCZ7iqm/impossiblebench-measuring-reward-hacking-in-llm-coding-1)), EvilGenie ([arXiv 2511.21654](https://arxiv.org/html/2511.21654v2)) | secondary summary, preprint |
 | PQ1, PQ4 | local cycle records; Wilson ([Brown, Cai and DasGupta](https://projecteuclid.org/download/pdf_1/euclid.ss/1009213286)) | local, textbook |
+| PQ5 | local cycle records (`llm-calls.ndjson`); a census with no interval | local |
 | PQ2 | τ-bench ([arXiv 2406.12045](https://arxiv.org/pdf/2406.12045)) | preprint; the estimator form is our synthesis |
 | PQ3 | paired tests ([arXiv 2604.17849](https://arxiv.org/pdf/2604.17849)), noise audit ([arXiv 2608.22331](https://arxiv.org/pdf/2608.22331)), MDE ([arXiv 2305.16459](https://arxiv.org/pdf/2305.16459)) | preprints, textbook |
 | JQ1, JQ4 | judge calibration and self-preference ([Arthur](https://www.arthur.ai/column/can-you-trust-llm-as-judge-calibrating-automated-evals), [LangChain](https://www.langchain.com/resources/llm-as-a-judge)) | vendor, weak |
@@ -150,7 +152,7 @@ The collector computes. The Signal Center carries. The readers show. No reader d
 
 | Goal | Measure | Target |
 |---|---|---|
-| G1 Each quality question has a number with an interval | indexes with a formula, a source and an interval method | 21 of 21 in this spec |
+| G1 Each quality question has a number with an interval | indexes with a formula, a source and an interval method | 22 of 22 in this spec |
 | G2 The numbers live in one monitoring home | indexes that emit through `signalcenter` and no other store | all computed indexes |
 | G3 A number cannot be raised by the agent that it measures | indexes that read a report the measured agent writes about its own work | 0. Tree indexes read `main` after the landing. CQ5 is the one exception: an author can move it, so it stays a trend and never gates. |
 | G4 Noise is not read as change | stage flips without the sample rule of §4.6 | 0 |
@@ -205,7 +207,7 @@ Each index has a direction (`higher_is_better` or `lower_is_better`) and a thres
 | `report` | The collector also emits `quality.breach` (WARN) on a breach. | compiled default for an index with a baseline. The key `quality.indexes.<id>.stage` overrides it. |
 | `gate` | The collector still emits `quality.reading` and `quality.breach` as in `report`. A gate outside the Signal Center reads the index and can refuse a ship. | an ADR amendment, then the gate's own policy key |
 
-Nine indexes have a baseline and a reader in their first component. They start at `report`: CQ1, CQ2, PQ1, PQ3, PQ4, JQ3, JQ4, OQ2 and OQ3. The baseline counts as their first window. They still emit no breach under `n_min`. The other twelve start at `shadow`.
+Ten indexes have a baseline and a reader in their first component. They start at `report`: CQ1, CQ2, PQ1, PQ3, PQ4, PQ5, JQ3, JQ4, OQ2 and OQ3. The baseline counts as their first window. They still emit no breach under `n_min`. The other twelve start at `shadow`.
 
 The Signal Center never moves an index between stages. A listener observes and never decides ([signal-center-design.md](signal-center-design.md) §3, "Listeners observe; they never decide").
 
@@ -288,7 +290,7 @@ The computation is deterministic Go in `internal/qualitypanel`. It runs off the 
 
 | When | Command | Indexes |
 |---|---|---|
-| Each wave boundary, after `sync-main` and before `gc` | `evolve quality report --scope wave` | PQ1, PQ4, JQ3, JQ4, OQ4, CQ1 (tree), and the cycle indexes for each cycle of the closing wave: CQ1 (changed), CQ2, TQ1, TQ2, TQ4 |
+| Each wave boundary, after `sync-main` and before `gc` | `evolve quality report --scope wave` | PQ1, PQ4, PQ5, JQ3, JQ4, OQ4, CQ1 (tree), and the cycle indexes for each cycle of the closing wave: CQ1 (changed), CQ2, TQ1, TQ2, TQ4 |
 | On request, and at a boundary when the last tree reading is older than 24 hours | `evolve quality report --scope tree` | CQ3, CQ4, CQ5, TQ3, OQ1, OQ2, OQ3, JQ2 |
 | A corpus run | `evolve quality report --scope judges` | JQ1 |
 | A replay run | `evolve quality report --scope replay` | PQ2 |
@@ -603,6 +605,32 @@ The Signal Center does not compute an index, choose a threshold, change a stage 
 | Game and counter | A cycle that ends itself early with a planned no-work seal avoids the deadline count. Count planned no-work seals as their own reading next to it. |
 | Relation to gates | The halt rules for system fails in the operating policy. |
 | Evidence | local |
+
+### PQ5 Cost for each shipped cycle
+
+**Why the standard metric is not enough.** PQ1 counts ships and says nothing about the cost of a ship. Cycle 2035 used 160.1 LLM minutes and did not ship, so its cost went to the five ships of waves 141 and 142 ([ADR-0158](adr/0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md)).
+
+**What it measures.** The LLM spend of all cycles of a window, divided by its shipped cycles.
+
+| Field | Value |
+|---|---|
+| Question | How much LLM time and how many tokens does one ship cost? |
+| Formula | the sum of `duration_ms` of each row of `llm-calls.ndjson` of each cycle of the window, in minutes, divided by the shipped cycles. The suffix `/fresh-tokens` divides input, output and cache-write tokens. `/cache-read-tokens` divides the cache-read tokens. `/audit-rounds` divides `audit_dispatches` by the started cycles. `/unmeasured-calls` counts the rows whose `usage_status` is not `measured`. |
+| Unit | LLM minutes for each shipped cycle; tokens; audit rounds for each cycle; calls |
+| Window | one wave; rolling 10 waves |
+| Source | `.evolve/runs/cycle-N/llm-calls.ndjson`, `cycle-state.json` and the ship outcome of PQ1 |
+| Interval | census (the value is exact for the window) |
+| Baseline | 101.2 LLM minutes for each shipped cycle over cycles 2029 to 2036 (506.1 minutes, 5 ships). The reader gives 89.5 over its window `waves:141-142`, because it puts cycle 2028 into wave 141 (see the limit below). |
+| Stage and threshold | `report`. Lower is better. No threshold until one wave at `shadow` of the ADR-0158 stops gives an after number. The plan target is 75 or less. |
+| Good and bad | A fall with no fall of PQ1 is good. A window with no ship has no cost (`no_data`), not a cost of 0. |
+| WARN action | Read the cycles with the most LLM minutes and no ship. Check if a hand-off finding or a spend limit stopped them. |
+| Game and counter | A loop that ships only small items lowers PQ5. Read PQ5 with PQ1 and CQ2. |
+| Relation to gates | The spend limit of ADR-0158 (`workflow.cycle_spend`) stops one cycle. PQ5 measures the window. |
+| Evidence | local; [cost-aware-repair-2026-10](../research/cost-aware-repair-2026-10.md) F1.14 |
+
+The unit of a PQ5 reading depends on its window suffix. The suffix is the contract: a reader must group PQ5 by index and suffix, not by index alone.
+
+**Limit.** `pipelinerates` puts a cycle into the last wave whose `cycle_floor` is at or below its id. `evolve wave status` starts a wave after its floor (`go/internal/wave/facts.go:44`). Thus PQ5 and the `cost:` line of `wave status` can count a different set of cycles. The same rule applies to PQ1 and PQ4, and its own item fixes it with their baselines.
 
 ## 9. Judge indexes
 

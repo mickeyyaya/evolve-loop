@@ -41,6 +41,7 @@ type Table struct {
 	agentKeys map[string]string
 	findings  []Finding
 	floors    policy.Floors
+	overrides Overrides
 }
 
 type loadedProfile struct {

@@ -13,7 +13,7 @@ User: /evo:loop 5 polish improve dispatcher
   ↓ detects platform = codex, reads reference/codex-runtime.md (this file)
 
 Skill activates → STRICT MODE: execute exactly one shell command:
-  "${EVOLVE_GO_BIN:-<plugin_root>/go/bin/evolve}" loop 5 polish "improve dispatcher"
+  "<plugin_root>/go/bin/evolve" loop 5 polish "improve dispatcher"
 
   ↓ (Codex calls its shell-execution tool)
 
@@ -50,7 +50,7 @@ The `evolve guard` hooks are Claude Code PreToolUse hooks (`.claude/settings.jso
 | Variable | Required | Purpose |
 |---|---|---|
 | `codex` binary on PATH | yes | The binary that both codex drivers run |
-| `OPENAI_API_KEY` | no | If it is set, the `codex` driver refuses to start (exit 3) unless `BRIDGE_ALLOW_OPENAI_API_KEY=1`. Codex uses its own login (`codex login`). |
+| `OPENAI_API_KEY` | no | If it is set, the `codex` driver refuses to start (exit 3) unless policy.json sets `bridge.allow_openai_api_key`. Codex uses its own login (`codex login`). |
 
 ## Checks before you run cycles
 

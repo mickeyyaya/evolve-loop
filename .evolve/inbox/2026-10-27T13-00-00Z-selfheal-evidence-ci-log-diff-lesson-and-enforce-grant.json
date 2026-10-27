@@ -1,0 +1,27 @@
+{
+  "id": "selfheal-evidence-ci-log-diff-lesson-and-enforce-grant",
+  "kind": "feature",
+  "priority_class": "stability",
+  "weight": 0.3,
+  "route": "console-manual",
+  "title": "Self-healing X13b: the evidence index cuts a CI log, a diff and the lessons, and the seat reads it at isolation.i5.stage enforce",
+  "summary": "X13 (selfheal-orchestrator-agent-profile) writes the evidence index of an incident with the classes incident, signal, digest and retrospective. The classes ci-log, diff and lesson of llm-isolation.md §18.3 have no cut: the index names them only in notes, so a flaky-test diagnosis cannot name the test. An evolve agent run launch also has no index grant (§8.5), so at isolation.i5.stage=enforce the seat cannot read .evolve/runs/selfheal-<id>/. Spec: llm-isolation.md §18.6 Limits.",
+  "fix": "Add a ci-log cut (the failed lines of gh run view --log-failed for each ci: source, taken by the pipeline, never by the seat), a diff cut for a landing source, and the lesson YAML files that name the subject or a source cycle. Give the agent-run launch of the seat a read grant for its evidence workspace, as the phase cells get for inputs/index.json.",
+  "acceptance": [
+    "RED first: the index of the live ci-hang record has no ci-log entry today; after the change it lists one for each CI run",
+    "A flaky-test diagnosis cites a ci-log entry that names the test",
+    "At isolation.i5.stage=enforce the seat opens i1 of its evidence workspace and cannot open an unrelated run directory (sandbox contract row)",
+    "Changed functions at 100% coverage"
+  ],
+  "deps": [
+    "selfheal-orchestrator-agent-profile"
+  ],
+  "files": [
+    "go/internal/selfheal/evidence.go",
+    "go/cmd/evolve/cmd_selfheal_propose.go",
+    "go/internal/bridge/read_isolation.go"
+  ],
+  "origin": "console",
+  "created_at": "2026-10-27T13:00:00Z",
+  "source": "console, 2026-10-27, the limits of X13 (llm-isolation.md §18.6)"
+}

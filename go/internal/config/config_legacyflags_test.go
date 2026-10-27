@@ -13,7 +13,7 @@ func TestLoad_LegacyPhaseFlags(t *testing.T) {
 		{"default build-planner skipped", "build-planner", EnableOff},
 	}
 	for _, c := range cases {
-		cfg, _ := Load("/nonexistent/phase-registry.json", map[string]string{})
+		cfg, _ := Load("/nonexistent/phase-registry.json")
 		if got := cfg.PhaseEnable[c.phase]; got != c.want {
 			t.Errorf("%s: PhaseEnable[%q]=%v, want %v", c.name, c.phase, got, c.want)
 		}
@@ -21,7 +21,7 @@ func TestLoad_LegacyPhaseFlags(t *testing.T) {
 }
 
 func TestLoad_EVOLVE_TDD_PHASE_NoLongerBound(t *testing.T) {
-	cfg, _ := Load("/nonexistent/phase-registry.json", map[string]string{"EVOLVE_TDD_PHASE": "0"})
+	cfg, _ := Load("/nonexistent/phase-registry.json")
 	if got := cfg.PhaseEnable["tdd"]; got != EnableOn {
 		t.Errorf("tdd enable=%v, want EnableOn (EVOLVE_TDD_PHASE must be inert; only EVOLVE_TEST_PHASE_ENABLED binds)", got)
 	}
@@ -29,7 +29,7 @@ func TestLoad_EVOLVE_TDD_PHASE_NoLongerBound(t *testing.T) {
 
 func TestDisableAutoRetro_RetiredAndIgnored(t *testing.T) {
 	for _, v := range []string{"1", "0", "true"} {
-		cfg, ws := Load("/nonexistent/phase-registry.json", map[string]string{"EVOLVE_DISABLE_AUTO_RETROSPECTIVE": v})
+		cfg, ws := Load("/nonexistent/phase-registry.json")
 		if got, ok := cfg.PhaseEnable["retrospective"]; ok {
 			t.Errorf("=%s: retired flag must not bind retrospective; got %v", v, got)
 		}

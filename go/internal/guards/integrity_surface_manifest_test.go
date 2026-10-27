@@ -255,3 +255,29 @@ func TestProtectedSurfaceManifest_CoversTheDispatchCredential(t *testing.T) {
 		}
 	}
 }
+
+func TestProtectedSurfaceManifest_CoversTheIncidentRecordsTheDetectorAndItsStageKey(t *testing.T) {
+	for _, path := range []string{
+		".evolve/incidents/inc-2026-10-27-0a1b2c3d.json",
+		"/users/x/.evolve/worktrees/cycle-9/.evolve/incidents/inc-x.json",
+		"go/internal/selfheal/incident.go",
+		"go/internal/policy/healing.go",
+		"go/cmd/evolve/cmd_selfheal.go",
+	} {
+		if !IsProtectedSurface(path) {
+			t.Errorf("IsProtectedSurface(%q) = false: the incident records, the detector with its four close conditions and the healing stage key are T0 (llm-isolation.md §18.2, §21); no agent may write them", path)
+		}
+	}
+}
+
+func TestProtectedSurfaceManifest_CoversTheDiagnosisSchemaAndTheProposeVerb(t *testing.T) {
+	for _, path := range []string{
+		"go/internal/phasecontract/diagnosis.go",
+		"go/cmd/evolve/cmd_selfheal_propose.go",
+		".evolve/incidents/proposals/inc-2026-10-27-0a1b2c3d.json",
+	} {
+		if !IsProtectedSurface(path) {
+			t.Errorf("IsProtectedSurface(%q) = false: the diagnosis schema with its closed catalog, the propose verb and the proposal records are T0 (llm-isolation.md §18.6, §20.1)", path)
+		}
+	}
+}

@@ -95,8 +95,8 @@ func TestParseLaunchArgs_Branches(t *testing.T) {
 		t.Fatalf("space form: %+v err=%v", r, err)
 	}
 	r, err = parseLaunchArgs([]string{"--cli=codex", "--validate-only", "--dry-run", "--require-full",
-		"--allow-bypass", "--human-input", "--stream-output", "--", "--bare", "--x"}, nil)
-	if err != nil || !r.validateOnly || !r.dryRun || !r.requireFull || !r.allowBypass || !r.humanInput || r.streamOutput != "true" {
+		"--allow-bypass", "--human-input=demo", "--stream-output", "--", "--bare", "--x"}, nil)
+	if err != nil || !r.validateOnly || !r.dryRun || !r.requireFull || !r.allowBypass || r.humanReason != "demo" || r.streamOutput != "true" {
 		t.Fatalf("bool/passthrough: %+v err=%v", r, err)
 	}
 	if len(r.extra) != 2 {
@@ -114,8 +114,8 @@ func TestParseLaunchArgs_Branches(t *testing.T) {
 		"BRIDGE_CLI": "agy", "PROFILE_PATH": "/p", "RESOLVED_MODEL": "opus",
 		"BRIDGE_REQUIRE_FULL": "1", "BRIDGE_ALLOW_BYPASS": "1", "VALIDATE_ONLY": "1",
 	})
-	if r.cli != "agy" || r.profile != "/p" || r.model != "opus" || !r.requireFull || !r.allowBypass || !r.validateOnly {
-		t.Fatalf("env fallbacks: %+v", r)
+	if r.cli != "agy" || r.profile != "/p" || r.model != "opus" || !r.requireFull || r.allowBypass || !r.validateOnly {
+		t.Fatalf("env fallbacks (BRIDGE_ALLOW_BYPASS is retired; only --allow-bypass sets it): %+v", r)
 	}
 }
 

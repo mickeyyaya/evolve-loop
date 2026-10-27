@@ -39,6 +39,7 @@ func inboxVerbs() []inboxVerb {
 		{"edit", "edit <id|item-path> (--set F=V | --add F=V | --remove F=V)... [--json]   (--set on a list field takes a JSON array)", withoutStdin(runInboxEdit)},
 		{"verify", "verify <id> --evidence <text> [--json]", withoutStdin(runInboxVerify)},
 		{"withdraw", "withdraw <id> <reason> [--json]", withoutStdin(runInboxWithdraw)},
+		{"claim", "claim <id> --cycle N [--json]   (moves a dispatchable item into processing/cycle-N/)", withoutStdin(runInboxClaim)},
 		{"claims", "claims [--json] [--project-root P]", withoutStdin(runInboxClaims)},
 		{"release", "release <id> <reason> [--keep root|claim] [--json] | release --stale <reason> [--json] [--project-root P]", withoutStdin(runInboxRelease)},
 		{"split", "split <id> [--lane-after-console] [--json] [--project-root P]", withoutStdin(runInboxSplit)},

@@ -43,7 +43,7 @@ type ProfileSource interface {
 type Host struct {
 	LookPath  func(string) (string, error)
 	Discover  func() []string
-	Bench     func(projectRoot, phase string, plan llmroute.Plan, env map[string]string) llmroute.Plan
+	Bench     func(projectRoot, phase string, plan llmroute.Plan) llmroute.Plan
 	Toolless  func(driver string) bool
 	Logf      func(format string, args ...any)
 	WeekUsed  func(projectRoot string) (map[string]float64, error)
@@ -156,7 +156,7 @@ func (v resolver) bench(req Request, plan llmroute.Plan) llmroute.Plan {
 	if label == "" {
 		label = req.Agent
 	}
-	return v.host.Bench(req.ProjectRoot, label, plan, req.Env)
+	return v.host.Bench(req.ProjectRoot, label, plan)
 }
 
 func familyOf(cli string) string {

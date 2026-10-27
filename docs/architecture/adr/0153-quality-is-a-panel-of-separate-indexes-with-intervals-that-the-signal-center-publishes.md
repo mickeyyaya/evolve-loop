@@ -1,6 +1,7 @@
 # ADR-0153: Quality is a panel of separate indexes with intervals that the Signal Center publishes
 
 - **Status:** Proposed (2026-10-21).
+- **Amended by:** [ADR-0158](0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md) (Accepted, 2026-10-27). The panel has 22 indexes. PQ5 is the cost for each shipped cycle.
 - **Plan:** [llm-quality-indexes-2026-10](../../plans/llm-quality-indexes-2026-10.md). **Research:** [llm-quality-indexes-2026-10](../../research/llm-quality-indexes-2026-10.md). **Design:** [llm-quality-indexes](../llm-quality-indexes.md).
 - **Relates to:**
   - [ADR-0101](0101-signal-center.md): the Signal Center is the home of every reading; its listeners observe and never decide.

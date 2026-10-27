@@ -31,7 +31,7 @@ func TestBenchOnEscalation_OneReportBenchesItsFamilyOnceAndKeepsALongerBench(t *
 		t.Fatal(err)
 	}
 
-	bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: "agy-claude-tmux", DispatchStart: now.Add(-time.Minute), Env: map[string]string{}}, clock, nil)
+	bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: "agy-claude-tmux", DispatchStart: now.Add(-time.Minute)}, clock, nil)
 
 	e := store.Active()["agy-claude"]
 	if e.Strikes != 1 || e.BenchedUntil.Before(untilReset) {
@@ -54,7 +54,7 @@ func TestBenchOnEscalation_AWallSeenAfterTheLastBenchIsANewStrikeWhetherOrNotTha
 			}
 			writeAgyClaudeWall(t, ws, wallSeen)
 
-			bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: "agy-claude-tmux", DispatchStart: now.Add(-time.Minute), Env: map[string]string{}}, clock, nil)
+			bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: "agy-claude-tmux", DispatchStart: now.Add(-time.Minute)}, clock, nil)
 
 			if e := clihealth.NewStore(root, clock).Active()["agy-claude"]; e.Strikes != 2 || !e.BenchedAt.Equal(now) {
 				t.Fatalf("bench = %+v; a wall captured after the last bench is a new strike", e)

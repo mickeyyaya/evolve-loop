@@ -5,15 +5,19 @@ import (
 	"fmt"
 )
 
+const AuditFixOff = "off"
+
 type AuditFixPolicy struct {
-	MaxFiles             int   `json:"max_files,omitempty"`
-	MaxLines             int   `json:"max_lines,omitempty"`
-	MaxCodeLines         int   `json:"max_code_lines,omitempty"`
-	MaxTokens            int   `json:"max_tokens,omitempty"`
-	NoNewProductionLogic *bool `json:"no_new_production_logic,omitempty"`
+	Stage                string `json:"stage,omitempty"`
+	MaxFiles             int    `json:"max_files,omitempty"`
+	MaxLines             int    `json:"max_lines,omitempty"`
+	MaxCodeLines         int    `json:"max_code_lines,omitempty"`
+	MaxTokens            int    `json:"max_tokens,omitempty"`
+	NoNewProductionLogic *bool  `json:"no_new_production_logic,omitempty"`
 }
 
 type AuditFixConfig struct {
+	Stage                string
 	MaxFiles             int
 	MaxLines             int
 	MaxCodeLines         int
@@ -21,7 +25,7 @@ type AuditFixConfig struct {
 	NoNewProductionLogic bool
 }
 
-var defaultAuditFix = AuditFixConfig{MaxFiles: 3, MaxLines: 40, MaxCodeLines: 10, MaxTokens: 6000, NoNewProductionLogic: true}
+var defaultAuditFix = AuditFixConfig{Stage: RetryLadderShadow, MaxFiles: 3, MaxLines: 40, MaxCodeLines: 10, MaxTokens: 6000, NoNewProductionLogic: true}
 
 var auditFixCaps = AuditFixConfig{MaxFiles: 50, MaxLines: 2000, MaxCodeLines: 2000, MaxTokens: 64000}
 
@@ -30,6 +34,7 @@ func auditFixConfigOf(block *AuditFixPolicy) AuditFixConfig {
 		return defaultAuditFix
 	}
 	c := AuditFixConfig{
+		Stage:                cmp.Or(block.Stage, defaultAuditFix.Stage),
 		MaxFiles:             cmp.Or(block.MaxFiles, defaultAuditFix.MaxFiles),
 		MaxLines:             cmp.Or(block.MaxLines, defaultAuditFix.MaxLines),
 		MaxCodeLines:         cmp.Or(block.MaxCodeLines, defaultAuditFix.MaxCodeLines),
@@ -46,6 +51,11 @@ func (b *AuditFixPolicy) validate() error {
 	if b == nil {
 		return nil
 	}
+	switch b.Stage {
+	case "", AuditFixOff, RetryLadderShadow, RetryLadderEnforce:
+	default:
+		return fmt.Errorf("workflow.retry_ladder.audit_fix.stage must be %s, %s or %s, got %q", AuditFixOff, RetryLadderShadow, RetryLadderEnforce, b.Stage)
+	}
 	for _, f := range []struct {
 		key        string
 		value, cap int
@@ -61,3 +71,5 @@ func (b *AuditFixPolicy) validate() error {
 	}
 	return nil
 }
+
+func (c AuditFixConfig) Enforced() bool { return c.Stage == RetryLadderEnforce }

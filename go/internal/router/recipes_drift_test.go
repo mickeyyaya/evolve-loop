@@ -40,7 +40,7 @@ func TestRouterPersonaRecipeTable_NoDrift(t *testing.T) {
 	}
 	extracted := persona[blockStart : blockStart+end]
 
-	cfg, _ := config.Load(registryPath, map[string]string{})
+	cfg, _ := config.Load(registryPath)
 	if len(cfg.GoalRecipes) == 0 {
 		t.Fatalf("config.goal_recipes is empty in %s — the recipe SSOT must be present", registryPath)
 	}

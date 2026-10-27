@@ -20,12 +20,9 @@ func RunPhaseOrder(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		switch a {
 		case "--help", "-h":
 			fmt.Fprintln(stdout, "Usage: evolve phase-order")
-			fmt.Fprintln(stdout, "Env: EVOLVE_USE_PHASE_REGISTRY=0 forces hardcoded order")
 			return 0
 		}
 	}
-	useRegistry := os.Getenv("EVOLVE_USE_PHASE_REGISTRY") != "0"
-
 	projectRoot := os.Getenv("EVOLVE_PROJECT_ROOT")
 	if projectRoot != "" {
 		projectRoot = absoluteRoot("EVOLVE_PROJECT_ROOT", projectRoot, func(m string) {
@@ -41,7 +38,7 @@ func RunPhaseOrder(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 	registryPath := config.RegistryPath(projectRoot)
 
-	phases, err := phaseorder.List(registryPath, useRegistry)
+	phases, err := phaseorder.List(registryPath)
 	if err != nil {
 		fmt.Fprintf(stderr, "[phase-order] ERROR: %v\n", err)
 		return 1

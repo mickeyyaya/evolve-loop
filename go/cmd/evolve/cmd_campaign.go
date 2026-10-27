@@ -411,6 +411,6 @@ func campaignBeforeWave(simulate bool, projectRoot string, stderr io.Writer) fun
 		return nil
 	}
 	return func(ctx context.Context) error {
-		return runPreWaveProbes(ctx, projectRoot, filepath.Join(projectRoot, ".evolve"), nil, stderr)
+		return runPreWaveProbes(ctx, projectRoot, filepath.Join(projectRoot, ".evolve"), stderr)
 	}
 }

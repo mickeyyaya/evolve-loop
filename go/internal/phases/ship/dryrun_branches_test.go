@@ -138,7 +138,7 @@ func TestRun_DryRun_ClassManual_WritesJournal_NoCommit(t *testing.T) {
 		Class:         ClassManual,
 		CommitMessage: "manual: dry run",
 		DryRun:        true,
-		Env:           map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"},
+		AutoConfirm:   "test",
 	})
 	if err != nil {
 		t.Fatalf("DryRun manual errored: %v", err)

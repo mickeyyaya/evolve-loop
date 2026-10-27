@@ -1,0 +1,14 @@
+{
+  "name": "selfheal-orchestrator",
+  "catalog": "on-demand",
+  "archetype": "evaluate",
+  "optional": true,
+  "agent": "evolve-selfheal-orchestrator",
+  "description": "the orchestrator agent of the self-healing loop: it diagnoses one open incident from its evidence index and proposes one catalog action in diagnosis.json; it acts on nothing",
+  "when_to_use": "never selected: evolve selfheal propose runs it for each open incident at the boundary or on demand",
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/diagnosis.json"
+    ]
+  }
+}

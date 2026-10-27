@@ -31,7 +31,7 @@ func TestLoad_BindsRoutingTypes(t *testing.T) {
 
 	var cfg RoutingConfig
 	var warnings []Warning
-	cfg, warnings = Load(regPath, map[string]string{})
+	cfg, warnings = Load(regPath)
 	if len(warnings) > 0 {
 		t.Logf("Load returned non-fatal warnings on the clean fixture: %v", warnings)
 	}
@@ -81,7 +81,7 @@ func TestModelRouting_ParsesAndStringifies(t *testing.T) {
 		if err := os.WriteFile(regPath, []byte(reg), 0o644); err != nil {
 			t.Fatalf("write registry: %v", err)
 		}
-		cfg, _ := Load(regPath, map[string]string{})
+		cfg, _ := Load(regPath)
 		if cfg.ModelRouting != tc.want {
 			t.Errorf("model_routing=%q => ModelRouting = %v, want %v", tc.value, cfg.ModelRouting, tc.want)
 		}

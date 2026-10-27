@@ -93,7 +93,6 @@ func TestRun_NilReleaseShOverriddenByDefault(t *testing.T) {
 func TestRun_NilShipOverriddenByDefault(t *testing.T) {
 	steps := allOkSteps()
 	steps.Ship = nil
-	t.Setenv("EVOLVE_GO_BIN", "")
 	t.Setenv("PATH", "")
 
 	_, err := Run(Options{

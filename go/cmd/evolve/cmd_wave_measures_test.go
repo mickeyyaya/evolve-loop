@@ -68,10 +68,10 @@ func TestWaveStatus_ReportsTheConflictRate(t *testing.T) {
 		t.Fatalf("rc = %d, decode %v:\n%s", rc, err, h.stdout.String())
 	}
 	want := wavemeasure.Measures{WidthSized: 3, WidthRealized: 1, Utilization: 150.0 / 360.0, ConflictRate: 0.5, Conflicts: 1, Landed: 2, AdmissionWaits: 1}
-	if got.Measures != want {
+	if withoutCost(got.Measures) != want {
 		t.Errorf("measures = %+v\nwant %+v", got.Measures, want)
 	}
-	if len(got.Runs) != waveMeasuredRuns || got.Runs[0].Wave != 80 || got.Runs[2].Wave != 82 || got.Runs[2].Measures != want ||
+	if len(got.Runs) != waveMeasuredRuns || got.Runs[0].Wave != 80 || got.Runs[2].Wave != 82 || withoutCost(got.Runs[2].Measures) != want ||
 		got.Runs[2].WidthSource != wave.WidthFromSignal || got.Runs[0].WidthSource != wave.WidthFromPolicy || got.Runs[0].RunID != "r80" {
 		t.Errorf("runs = %+v, want the last %d runs, oldest first, the newest equal to the current measures", got.Runs, waveMeasuredRuns)
 	}
@@ -188,7 +188,8 @@ func TestWaveStatus_AFinishedRunEndsAtItsLoopLogAndALiveRunAtTheClock(t *testing
 			if err := json.Unmarshal(h.stdout.Bytes(), &got); err != nil {
 				t.Fatal(err)
 			}
-			if got.Measures != tc.want {
+			tc.want.Cost = wavemeasure.Cost{Started: 2, Shipped: 2, LLMMinutesPerShippedCycle: f64(0), FreshTokensPerShippedCycle: f64(0), CacheReadTokensPerShippedCycle: f64(0), AuditRoundsPerCycle: f64(0), ConvergenceRate: f64(1)}
+			if !reflect.DeepEqual(got.Measures, tc.want) {
 				t.Errorf("measures = %+v\nwant %+v", got.Measures, tc.want)
 			}
 		})
@@ -314,7 +315,7 @@ func TestWaveStatus_TextPrintsTheOptimisticFailureCountWhenTheWaveHadOptimisticA
 	writeWaveMeasuresText(&with, wavemeasure.Measures{WidthSized: 3, OptimisticAdmissions: 4, OptimisticFailures: 1, OptimisticFailureRate: 0.25})
 	writeWaveMeasuresText(&without, wavemeasure.Measures{WidthSized: 3})
 
-	if want := " · optimistic 1/4 failed (0.25)\n"; !strings.HasSuffix(with.String(), want) {
+	if want := " · optimistic 1/4 failed (0.25)\n"; !strings.Contains(with.String(), want) {
 		t.Errorf("text = %q, want suffix %q", with.String(), want)
 	}
 	if strings.Contains(without.String(), "optimistic") {

@@ -6,7 +6,7 @@
 
 ## Design
 
-- `List` returns `HardcodedOrder`, the canonical sequence, when the registry is turned off (`useRegistry` false, from `EVOLVE_USE_PHASE_REGISTRY=0`) or when the file does not exist.
+- `List` returns `HardcodedOrder`, the canonical sequence, when the registry file does not exist. X18d removed the switch that turned the registry off.
 - `List` returns an error only when the registry exists and cannot be parsed. This keeps the exit-code-1 contract of the bash original.
 
 ## Invariants

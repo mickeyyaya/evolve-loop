@@ -93,7 +93,7 @@ func (e *Engine) doctorAuth(cli string) AuthInfo {
 		if b, err := os.ReadFile(p); err == nil && json.Valid(b) {
 			return AuthInfo{Configured: true, Source: "file:~/.codex/auth.json", SubscriptionType: "chatgpt-account"}
 		}
-		return AuthInfo{Hint: "Run `codex login` or set OPENAI_API_KEY + BRIDGE_ALLOW_OPENAI_API_KEY=1"}
+		return AuthInfo{Hint: "Run `codex login` or set OPENAI_API_KEY + policy bridge.allow_openai_api_key"}
 	case "agy":
 		for _, d := range []string{filepath.Join(home, ".config", "agy"), filepath.Join(home, ".agy"), filepath.Join(home, "Library", "Application Support", "Antigravity")} {
 			if IsDir(d) {
@@ -126,8 +126,8 @@ func (e *Engine) doctorEnvWarnings(cli string) []string {
 		}
 	case "codex", "codex-tmux":
 		if set("OPENAI_API_KEY") {
-			if v, _ := lookupEnv(e.deps, "BRIDGE_ALLOW_OPENAI_API_KEY"); v != "1" {
-				w = append(w, "OPENAI_API_KEY is set; bridge will refuse without BRIDGE_ALLOW_OPENAI_API_KEY=1")
+			if !e.deps.AllowOpenAIAPIKey {
+				w = append(w, "OPENAI_API_KEY is set; bridge will refuse without policy bridge.allow_openai_api_key")
 			}
 		}
 	}

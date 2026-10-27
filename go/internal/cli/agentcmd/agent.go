@@ -38,6 +38,9 @@ const usage = `Usage: evolve agent <subcommand>
       Exit 0 PASS/WARN/SKIPPED, 1 FAIL, 3 refused, 21 dispatch error, 10 usage, 11 input.
   evolve agent list [--json] [--project-root P]
       Name each profile that evolve agent run accepts.
+  evolve agent capabilities [--json] [--project-root P]
+      Print the agent class of each evolve verb: A runs in a cell, R needs a request, D is denied.
+      Each verb that the list does not name is D.
 `
 
 type Deps struct {
@@ -47,6 +50,7 @@ type Deps struct {
 	TreeState     func(ctx context.Context, dir string) (string, error)
 	Getenv        func(string) string
 	Now           func() time.Time
+	VerbSchema    func(path string) string
 }
 
 func defaultBridge(projectRoot string, _ *signalcenter.Center) core.Bridge {
@@ -80,6 +84,9 @@ func New(d Deps) func(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 	if d.Now == nil {
 		d.Now = time.Now
 	}
+	if d.VerbSchema == nil {
+		d.VerbSchema = func(string) string { return "" }
+	}
 	return command{deps: d}.dispatch
 }
 
@@ -93,6 +100,8 @@ func (c command) dispatch(args []string, stdin io.Reader, stdout, stderr io.Writ
 		return c.run(args[1:], stdin, stdout, stderr)
 	case "list":
 		return runList(args[1:], stdout, stderr)
+	case "capabilities":
+		return c.capabilities(args[1:], stdout, stderr)
 	case "help", "-h", "--help":
 		fmt.Fprint(stdout, usage)
 		return 0

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclespend"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
@@ -27,18 +28,19 @@ var (
 )
 
 type Cycle struct {
-	ID           int       `json:"id"`
-	Todo         string    `json:"todo,omitempty"`
-	Phase        string    `json:"phase,omitempty"`
-	Verdict      string    `json:"verdict,omitempty"`
-	Termination  string    `json:"termination,omitempty"`
-	Shipped      bool      `json:"shipped"`
-	QuotaPauses  int       `json:"quota_pauses"`
-	Conflict     bool      `json:"conflict,omitempty"`
-	HandoffWould int       `json:"handoff_would_stops,omitempty"`
-	HandoffStop  string    `json:"handoff_stop,omitempty"`
-	StartedAt    time.Time `json:"-"`
-	EndedAt      time.Time `json:"-"`
+	ID           int              `json:"id"`
+	Todo         string           `json:"todo,omitempty"`
+	Phase        string           `json:"phase,omitempty"`
+	Verdict      string           `json:"verdict,omitempty"`
+	Termination  string           `json:"termination,omitempty"`
+	Shipped      bool             `json:"shipped"`
+	QuotaPauses  int              `json:"quota_pauses"`
+	Conflict     bool             `json:"conflict,omitempty"`
+	Spend        cyclespend.Spend `json:"spend"`
+	HandoffWould int              `json:"handoff_would_stops,omitempty"`
+	HandoffStop  string           `json:"handoff_stop,omitempty"`
+	StartedAt    time.Time        `json:"-"`
+	EndedAt      time.Time        `json:"-"`
 }
 
 type cycleWindow struct{ floor, ceiling int }
@@ -107,6 +109,7 @@ func readCycle(root string, id int, live cyclestate.CycleState, d *dossier.Dossi
 	if ok {
 		c.Phase, c.Shipped = st.Phase, st.Shipped
 	}
+	c.Spend, warnings = readSpend(ws, id, warnings)
 	warnings = append(warnings, applySignals(&c, filepath.Join(ws, signalcenter.StreamFileName))...)
 	intent, found, err := landing.ReadIntent(landing.IntentPath(paths.EvolveDirOf(root), id))
 	if err != nil {
@@ -121,6 +124,14 @@ func readCycle(root string, id int, live cyclestate.CycleState, d *dossier.Dossi
 		c.StartedAt, c.EndedAt = phaseSpan(c.StartedAt, c.EndedAt, d.Phases)
 	}
 	return c, warnings
+}
+
+func readSpend(ws string, id int, warnings []string) (cyclespend.Spend, []string) {
+	spend, err := cyclespend.Read(ws)
+	if errors.Is(err, cyclespend.ErrLedger) {
+		warnings = append(warnings, fmt.Sprintf("cycle-%d: llm spend: %v", id, err))
+	}
+	return spend, warnings
 }
 
 func workspaceState(ws string, id int, live cyclestate.CycleState) (cyclestate.CycleState, bool, []string) {

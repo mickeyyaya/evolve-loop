@@ -230,7 +230,7 @@ func assignedIndexes(file *ast.File) map[ast.Expr]bool {
 	return out
 }
 
-var envchainReaders = []string{"Resolve", "ResolveNoOS", "Int", "IntMin", "Bool"}
+var envchainReaders = []string{"Resolve", "Int", "IntMin", "Bool"}
 
 func (s envReadScan) isEnvReader(src envSourceFile, fun ast.Expr, readers map[string]bool) bool {
 	switch f := fun.(type) {
@@ -339,12 +339,6 @@ func joinWildcards(name string) string {
 	return name
 }
 
-const unmovedControlCeiling = 29
-
-func declaredControlNames() []string {
-	return slices.Concat(ipcenv.Markers(), ipcenv.UnmovedControls())
-}
-
 func undeclaredReads(reads []envRead, declared []string) []envRead {
 	var out []envRead
 	for _, r := range reads {
@@ -370,19 +364,8 @@ func TestNoControlFlagReadOutsideTheMarkerList(t *testing.T) {
 		t.Fatalf("scanned only %d files under %s; the guard lost its corpus", len(scan.files), module)
 	}
 	reads := scan.reads()
-	for _, r := range undeclaredReads(reads, declaredControlNames()) {
-		t.Errorf("%s reads %s from the environment, and the name is not a pipeline marker (ipcenv.Markers), a control not yet moved (ipcenv.UnmovedControls). A test seam is an injected field, never an environment read. Read no control value from the environment: put a setting in policy.json and a bypass behind a CLI parameter (I-16, ADR-0156)", r.at, r.name)
-	}
-	for _, name := range ipcenv.UnmovedControls() {
-		if !slices.ContainsFunc(reads, func(r envRead) bool { return controlNameMatches(name, r.name) }) {
-			t.Errorf("%s is declared as a control not yet moved, but no production code reads it: remove it from the list", name)
-		}
-	}
-}
-
-func TestControlFlagLists_OnlyShrink(t *testing.T) {
-	if n := len(ipcenv.UnmovedControls()); n > unmovedControlCeiling {
-		t.Errorf("ipcenv.UnmovedControls has %d names, ceiling %d: a new control goes into policy.json or a CLI parameter, never into the environment", n, unmovedControlCeiling)
+	for _, r := range undeclaredReads(reads, ipcenv.Markers()) {
+		t.Errorf("%s reads %s from the environment, and the name is not a pipeline marker (ipcenv.Markers). A test seam is an injected field, never an environment read. Read no control value from the environment: put a setting in policy.json and a bypass behind a CLI parameter (I-16, ADR-0156)", r.at, r.name)
 	}
 }
 
@@ -413,7 +396,7 @@ import "os"
 
 var _ = os.Getenv("EVOLVE_" + "Z")
 `)
-	got := undeclaredReads(scanEnvModule(t, module).reads(), declaredControlNames())
+	got := undeclaredReads(scanEnvModule(t, module).reads(), ipcenv.Markers())
 	var names []string
 	for _, r := range got {
 		names = append(names, r.name)
@@ -455,5 +438,18 @@ func TestRemovedControlNames_HaveNoProductionRead(t *testing.T) {
 	})
 	for _, r := range reads {
 		t.Errorf("%s reads %s, a dead name or a test seam of control-flags.md classes (d) and (e): a test sets an injected field instead (X18e)", r.at, r.name)
+	}
+}
+
+func TestRetiredControls_HaveNoProductionRead(t *testing.T) {
+	module, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	reads := scanEnvModule(t, module).readsOf(func(name string) bool {
+		return slices.ContainsFunc(ipcenv.RetiredControls(), func(r ipcenv.RetiredControl) bool { return controlNameMatches(r.Name, name) })
+	})
+	for _, r := range reads {
+		t.Errorf("%s reads %s, a control that moved to policy.json or a CLI parameter: read the replacement that ipcenv.RetiredControls names (X18c)", r.at, r.name)
 	}
 }

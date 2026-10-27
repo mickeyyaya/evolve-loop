@@ -71,6 +71,7 @@ Bad:
 
 - Each core verb gets a JSON envelope and new tests. The work spans several PRs.
 - Scripts that set a knob in the environment break. Each moved knob keeps a one-wave shadow read that warns.
+  - Amended 2026-10-27 (X18c): no code reads a moved name, so there is no value to compare. A moved name that is set prints one `[policy] WARN` at the cycle start for one release, and the policy value wins.
 - A queued inbox change lands at the next boundary, not at once. The caller must read the queue state.
 - The strict decode refuses a policy file that has stale keys today. X18a lists them before it turns strict.
 - An agent does not get the result of a request in the same turn. The pipeline reads requests at the handoff, so a later phase or a retry reads the result.

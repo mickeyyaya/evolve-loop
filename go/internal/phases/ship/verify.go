@@ -14,9 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// SSOT IPC-protocol-allowed: releasepipeline/rollback→ship subprocess
-const envShipAutoConfirm = "EVOLVE_" + "SHIP_AUTO_CONFIRM"
-
 func sha256File(path string) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -180,9 +177,9 @@ func verifyManualConfirm(ctx context.Context, opts *Options, res *RunResult) err
 		return errEmptyDiff
 	}
 
-	if opts.envBool(envShipAutoConfirm) {
-		res.Logs = append(res.Logs, "[ship] "+envShipAutoConfirm+"=1 — skipping interactive prompt (CI mode)")
-		res.Provenance = "manual (auto-confirmed via env)"
+	if opts.AutoConfirm != "" {
+		res.Logs = append(res.Logs, "[ship] --auto-confirm — skipping interactive prompt: "+opts.AutoConfirm)
+		res.Provenance = "manual (auto-confirmed: " + opts.AutoConfirm + ")"
 		return nil
 	}
 
@@ -209,7 +206,7 @@ func verifyManualConfirm(ctx context.Context, opts *Options, res *RunResult) err
 	stdinCannotAnswerPrompt := !isTerminal(opts.Stdin)
 	if stdinCannotAnswerPrompt {
 		return shipErr(core.CodeManualNotTTY, core.ShipClassConfig, core.StageVerifyClass,
-			fmt.Sprintf("--class manual requires interactive stdin (not a tty). Set %s=1 for non-interactive use (CI), or run from a real terminal.", envShipAutoConfirm))
+			"--class manual requires interactive stdin (not a tty). Pass --auto-confirm=<reason> for non-interactive use (CI), or run from a real terminal.")
 	}
 
 	fmt.Fprint(opts.Stderr, `[ship] Confirm manual commit? Type EXACTLY "yes" to ship, anything else aborts: `)

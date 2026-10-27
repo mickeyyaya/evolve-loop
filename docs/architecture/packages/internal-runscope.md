@@ -12,9 +12,8 @@
 - **The pattern is the pattern of GitLab `CI_CONCURRENT_ID`, Jenkins `@N` and Temporal.** The path is stable, the lane is bounded and the run id is in a sidecar. An id in the path breaks resume and the warm cache.
 - **The per-invocation ULID `RunID` is in no path.** It lives only in the ledger, the `run.json` sidecar and the tmux session names. `RunID` can be empty where only a lane and a cycle exist, such as the stateless `evolve worktree` CLI.
 - **`RunScope` carries three coordinates:** the lane, the `RunID` and the cycle. Every name is a pure projection of them. Two equal values give byte-identical names.
-- **`ResolveLane` has a fixed order.** An explicit value (the `--lane` flag) wins. Then `EVOLVE_LANE` from `getenv`. Then the hash-of-root default (`LaneFromRoot`). A nil `getenv` counts as unset.
-- **`EnvLane` only makes a lane readable.** An example is `EVOLVE_LANE=campaign`. Correctness never depends on it, because the hash default is collision-safe across distinct roots. The `--lane` flag is primary. The variable stays for script compatibility.
-- **The constant is `"EVOLVE_" + "LANE"` on purpose.** The split keeps the name out of the `flagreaders` guard (the bootstrap-locator pattern). `TestC49B_002_EnvLane_IsSplitConst` pins the split form.
+- **`ResolveLane` has a fixed order.** An explicit value (the `--lane` flag) wins. Then the hash-of-root default (`LaneFromRoot`) applies. No code reads `EVOLVE_LANE` since X18c ([ADR-0156](../adr/0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md) I-16), so the package has no `EnvLane` constant.
+- **The `--lane` value only makes a lane readable.** An example is `--lane campaign`. Correctness never depends on it, because the hash default is collision-safe across distinct roots.
 - **Name shapes.** `CycleBranch` is `cycle-<lane>-<N>`. It is both the `-B` branch and the directory leaf, so the in-process provisioner and the `evolve worktree` CLI agree. `WorktreeDir` is `<base>/cycle-<lane>-<N>`. `IntegrationBranch` adds `-integration`. `WorkerBranch` adds `-<workerID>`.
 - **`SessionPrefix` is `RunToken()+"-"` when `RunID` is set, else empty.** For an empty `RunID` it equals the legacy session name.
 

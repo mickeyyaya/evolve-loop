@@ -132,8 +132,10 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/adapters/bridge/", Class: SandboxGuarantee, Rationale: "Bridge request adapter preserving mandatory Build sandbox propagation"},
 	{Fragment: "/go/internal/adapters/sandbox/", Class: SandboxGuarantee, Rationale: "OS-specific confinement policy and generated write boundary"},
 	{Fragment: "/go/internal/dispatchcred/", Class: DispatchCredentialGuarantee, Rationale: "the dispatch credential that no agent cell can read (ADR-0154 I-3): a cycle that could edit it could let a cell dispatch an agent"},
-	{Fragment: "/go/cmd/evolve/dispatch_gate.go", Class: DispatchCredentialGuarantee, Rationale: "the check that each dispatch verb holds the dispatch credential (ADR-0154 I-3, llm-isolation.md §7.1.1)"},
-	{Fragment: "/go/cmd/evolve/dispatch_gate_test.go", Class: DispatchCredentialGuarantee, Rationale: "the guard that pins each registry command to a dispatch rule or a reason (llm-isolation.md §7.1.1)"},
+	{Fragment: "/go/internal/agentclass/", Class: DispatchCredentialGuarantee, Rationale: "the agent class of each evolve verb (ADR-0156, cli-contract.md §4.1): a cycle that could mark a verb class A could let a cell run it without the dispatch credential"},
+	{Fragment: "/go/cmd/evolve/dispatch_gate.go", Class: DispatchCredentialGuarantee, Rationale: "the one gate that checks the dispatch credential for each verb that is not class A (ADR-0154 I-3, cli-contract.md §4.4)"},
+	{Fragment: "/go/cmd/evolve/dispatch_gate_test.go", Class: DispatchCredentialGuarantee, Rationale: "the guard that each registry command has a class and each verb that is not class A refuses without the credential (cli-contract.md §4.4)"},
+	{Fragment: "/go/cmd/evolve/agent_classes_doc_test.go", Class: DispatchCredentialGuarantee, Rationale: "the guard that the class table matches cli-contract.md §4.1 and §5 (TestAgentClasses_MatchTheContract)"},
 	{Fragment: "/go/internal/inputindex/", Class: SandboxGuarantee, Rationale: "the artifact index and lineage of each phase cell (ADR-0154 I-4, I-5, X5): the sandbox grants reads of exactly the indexed paths, so a cycle that widened the lineage or listed raw output could let a cell read unrelated cycles or the raw logs of other agents"},
 	{Fragment: "/go/internal/looppreflight/checks.go", Class: SandboxGuarantee, Rationale: "pre-spend required-sandbox readiness HALT"},
 	{Fragment: "/go/internal/looppreflight/drivers.go", Class: SandboxGuarantee, Rationale: "sandbox-enabled profile discovery used by readiness HALT"},
@@ -196,6 +198,7 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/bridge/launch_llm.go", Class: SandboxGuarantee, Rationale: "the one launch API of an LLM (ADR-0154 I-1, X3)"},
 	{Fragment: "/go/internal/bridge/driver_tmux_boot.go", Class: SandboxGuarantee, Rationale: "the tmux boot that applies sandboxPrefixForLaunch to each tmux family"},
 	{Fragment: "/go/internal/bridge/dispatch_signal_guard_test.go", Class: GuardGuarantee, Rationale: "the kill-guard pin: a test that leaves SignalProcess nil never reaches kill(2)"},
+	{Fragment: "/go/internal/bridge/realtmux_sender_guard_test.go", Class: GuardGuarantee, Rationale: "the sender guard of the real tmux tests: it fails when a test Deps over execTmux{} has no SignalProcess, so the reap at kill-session would reach the default sender (the PR #1190 macOS panic)"},
 	{Fragment: "/go/internal/bridge/resolve_guard_test.go", Class: GuardGuarantee, Rationale: "the one-resolver guard: only bridge.Resolve builds a driver name"},
 	{Fragment: "/go/internal/bridge/selfmatch_guard_test.go", Class: GuardGuarantee, Rationale: "the self-match guard: the text of a tracked file never takes the shape of a live dialog rule"},
 	{Fragment: "/go/internal/bridge/selfmatch_guard_prefilter_test.go", Class: GuardGuarantee, Rationale: "the self-match prefilter gives the exhaustive verdict for each rule"},
@@ -224,6 +227,12 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/policy/core.go", Class: PolicyGuarantee, Rationale: "the policy parser Load (ADR-0157)"},
 	{Fragment: "/go/internal/policy/strict_keys.go", Class: PolicyGuarantee, Rationale: "the strict policy: refuseUnknownKeys refuses a key that the schema does not know (ADR-0157)"},
 	{Fragment: "/go/internal/core/statemachine.go", Class: PhaseOrderGuarantee, Rationale: "the phase-order state machine CanTransition that clamps each plan of the advisor (ADR-0155 F3.2)"},
+	{Fragment: "/.evolve/incidents/", Class: LedgerGuarantee, Rationale: "the incident records of the self-healing loop: only the detector writes them, so no agent can open, close or edit its own incident (ADR-0155, llm-isolation.md §18.2)"},
+	{Fragment: "/go/internal/selfheal/", Class: AuditVerdictGuarantee, Rationale: "the incident detector and the four close conditions of I-14: an agent that could edit them could close its own incident (ADR-0155, llm-isolation.md §21)"},
+	{Fragment: "/go/cmd/evolve/cmd_selfheal.go", Class: AuditVerdictGuarantee, Rationale: "evolve selfheal incidents: it chooses the evidence of the detector, builds the verifier of the four close conditions and writes the records (ADR-0155, llm-isolation.md §18.5)"},
+	{Fragment: "/go/internal/policy/healing.go", Class: PolicyGuarantee, Rationale: "the healing.detector.stage key and its validation (ADR-0155, llm-isolation.md §20.2)"},
+	{Fragment: "/go/internal/phasecontract/diagnosis.go", Class: GateGuarantee, Rationale: "the evolve.diagnosis/1 schema with the closed action catalog and the low-confidence escalation: an agent that could widen it could propose an action outside the catalog (ADR-0155, llm-isolation.md §18.4, §20.1)"},
+	{Fragment: "/go/cmd/evolve/cmd_selfheal_propose.go", Class: AuditVerdictGuarantee, Rationale: "evolve selfheal propose: it builds the evidence index, runs the orchestrator seat, checks each diagnosis.json and writes the proposal records (ADR-0155, llm-isolation.md §18.6)"},
 }
 
 func IsProtectedSurface(path string) bool {

@@ -24,34 +24,18 @@ func makeNonExecutable(t *testing.T, dir, name string) string {
 	return path
 }
 
-func TestResolveEvolveBin_EnvVarExecutable(t *testing.T) {
+func TestResolveEvolveBin_TheEnvironmentNamesNoBinary(t *testing.T) {
 	dir := t.TempDir()
-	bin := makeExecutable(t, dir, "evolve")
-	t.Setenv("EVOLVE_GO_BIN", bin)
-
-	got := resolveEvolveBin(dir)
-	if got != bin {
-		t.Errorf("resolveEvolveBin = %q, want %q (EVOLVE_GO_BIN path)", got, bin)
-	}
-}
-
-func TestResolveEvolveBin_EnvVarNonExecutable(t *testing.T) {
-	dir := t.TempDir()
-	bin := makeNonExecutable(t, dir, "evolve")
-	t.Setenv("EVOLVE_GO_BIN", bin)
-
-	emptyRoot := t.TempDir()
+	t.Setenv("EVOLVE_GO_BIN", makeExecutable(t, dir, "evolve"))
 	t.Setenv("PATH", "")
 
-	got := resolveEvolveBin(emptyRoot)
-	if got != "" {
-		t.Errorf("resolveEvolveBin with non-executable EVOLVE_GO_BIN = %q, want empty", got)
+	if got := resolveEvolveBin(t.TempDir()); got != "" {
+		t.Errorf("resolveEvolveBin = %q, want empty: EVOLVE_GO_BIN is not read", got)
 	}
 }
 
 func TestResolveEvolveBin_EnvVarNotSet_RepoBin(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("EVOLVE_GO_BIN", "")
 
 	binDir := filepath.Join(dir, "go", "bin")
 	if err := os.MkdirAll(binDir, 0o755); err != nil {
@@ -70,7 +54,6 @@ func TestResolveEvolveBin_EnvVarNotSet_RepoBin(t *testing.T) {
 
 func TestResolveEvolveBin_EnvVarNotSet_RepoBinNonExecutable(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("EVOLVE_GO_BIN", "")
 	t.Setenv("PATH", "")
 
 	binDir := filepath.Join(dir, "go", "bin")
@@ -87,7 +70,6 @@ func TestResolveEvolveBin_EnvVarNotSet_RepoBinNonExecutable(t *testing.T) {
 
 func TestResolveEvolveBin_AllMissing(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("EVOLVE_GO_BIN", "")
 	t.Setenv("PATH", "")
 
 	got := resolveEvolveBin(dir)
@@ -98,7 +80,6 @@ func TestResolveEvolveBin_AllMissing(t *testing.T) {
 
 func TestResolveEvolveBin_TrackedGoEvolve(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("EVOLVE_GO_BIN", "")
 	t.Setenv("PATH", "")
 	goDir := filepath.Join(dir, "go")
 	if err := os.MkdirAll(goDir, 0o755); err != nil {
@@ -113,7 +94,6 @@ func TestResolveEvolveBin_TrackedGoEvolve(t *testing.T) {
 
 func TestResolveEvolveBin_RepoBinBeatsTrackedGoEvolve(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("EVOLVE_GO_BIN", "")
 	binDir := filepath.Join(dir, "go", "bin")
 	if err := os.MkdirAll(binDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)

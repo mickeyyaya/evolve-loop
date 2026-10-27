@@ -4,9 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"path/filepath"
 	"slices"
+	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
@@ -20,6 +23,19 @@ type Setup struct {
 	Options  []CompileOption
 	Bypass   bool
 }
+
+type Overrides map[string]llmroute.AgentOverride
+
+func (o Overrides) For(agent string) llmroute.AgentOverride {
+	for _, name := range slices.Sorted(maps.Keys(o)) {
+		if overrideKey(name) == overrideKey(agent) {
+			return o[name]
+		}
+	}
+	return llmroute.AgentOverride{}
+}
+
+func overrideKey(agent string) string { return strings.ToUpper(strings.ReplaceAll(agent, "-", "_")) }
 
 var ErrRefused = errors.New("cliroute: route refused")
 

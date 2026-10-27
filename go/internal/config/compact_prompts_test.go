@@ -10,7 +10,7 @@ func TestCompactPrompts_DefaultTrue_WhenKeyAbsent(t *testing.T) {
 	  "config": {"dynamic_routing": "advisory", "workflow": {}},
 	  "phases": []
 	}`)
-	cfg, warns := Load(reg, map[string]string{})
+	cfg, warns := Load(reg)
 	for _, w := range warns {
 		t.Logf("warn: %s: %s", w.Code, w.Message)
 	}
@@ -28,7 +28,7 @@ func TestCompactPrompts_DefaultTrue_WhenWorkflowBlockAbsent(t *testing.T) {
 	  "config": {"dynamic_routing": "advisory"},
 	  "phases": []
 	}`)
-	cfg, warns := Load(reg, map[string]string{})
+	cfg, warns := Load(reg)
 	for _, w := range warns {
 		t.Logf("warn: %s: %s", w.Code, w.Message)
 	}
@@ -46,7 +46,7 @@ func TestCompactPrompts_ExplicitFalse_Overrides(t *testing.T) {
 	  "config": {"dynamic_routing": "advisory", "workflow": {"compact_prompts": false}},
 	  "phases": []
 	}`)
-	cfg, warns := Load(reg, map[string]string{})
+	cfg, warns := Load(reg)
 	for _, w := range warns {
 		t.Logf("warn: %s: %s", w.Code, w.Message)
 	}
@@ -60,7 +60,7 @@ func TestCompactPrompts_ExplicitFalse_Overrides(t *testing.T) {
 }
 
 func TestCompactPrompts_DefaultTrue_WhenRegistryMissing(t *testing.T) {
-	cfg, warns := Load("nonexistent-path/registry.json", map[string]string{})
+	cfg, warns := Load("nonexistent-path/registry.json")
 	for _, w := range warns {
 		t.Logf("warn: %s: %s", w.Code, w.Message)
 	}
@@ -78,7 +78,7 @@ func TestCompactPrompts_ExplicitTrue_RoundTrips(t *testing.T) {
 	  "config": {"dynamic_routing": "advisory", "workflow": {"compact_prompts": true}},
 	  "phases": []
 	}`)
-	cfg, warns := Load(reg, map[string]string{})
+	cfg, warns := Load(reg)
 	for _, w := range warns {
 		t.Logf("warn: %s: %s", w.Code, w.Message)
 	}

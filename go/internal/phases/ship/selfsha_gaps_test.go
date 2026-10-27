@@ -234,7 +234,7 @@ func TestRun_ManualClass_NoStagedChanges_ExitOK(t *testing.T) {
 	res, err := runShip(t, repo, Options{
 		Class:         ClassManual,
 		CommitMessage: "manual: clean exit",
-		Env:           map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"},
+		AutoConfirm:   "test",
 	})
 	if err != nil {
 		t.Fatalf("clean-exit manual should not error; got %v", err)

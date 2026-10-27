@@ -149,7 +149,7 @@ func TestSandboxWrap_TheProfileCarriesTheReadIsolationOfTheCellAndItsTag(t *test
 	t.Parallel()
 	c := newReadCell(t)
 	c.index(t)
-	deps := Deps{Env: map[string]string{"EVOLVE_SANDBOX": "on"}, ReadStage: "enforce", ExecStage: "off"}
+	deps := Deps{SandboxMode: "on", ReadStage: "enforce", ExecStage: "off"}
 	req := c.request()
 	req.Worktree = realDir(t)
 	prefix, ok := defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))(req)
@@ -235,7 +235,7 @@ func TestReportReadViolations_SkipsACellThatHasNoReadReport(t *testing.T) {
 		"no dispatch id":  {Deps{hostOS: "darwin", ReadStage: "shadow"}, Config{Workspace: "/ws", Worktree: "/wt"}},
 		"no workspace":    {Deps{hostOS: "darwin", ReadStage: "shadow"}, Config{Worktree: "/wt", DispatchID: "d1"}},
 		"no sandbox":      {Deps{hostOS: "darwin", ReadStage: "shadow"}, Config{Workspace: "/ws", DispatchID: "d1"}},
-		"sandbox opt-out": {Deps{hostOS: "darwin", ReadStage: "shadow", Env: map[string]string{envSandboxMode: "off"}}, *cfg},
+		"sandbox opt-out": {Deps{hostOS: "darwin", ReadStage: "shadow", SandboxMode: "off"}, *cfg},
 	} {
 		called := false
 		c.deps.SandboxReports = func(context.Context, string, time.Time) ([]byte, error) { called = true; return nil, nil }

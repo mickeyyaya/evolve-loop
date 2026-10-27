@@ -65,7 +65,7 @@ func TestResolveDispatchPlan_ARouterRefusalIsALoudFail(t *testing.T) {
 	block := policy.CLIRouting{CLIs: []string{"agy", "claude"}, Default: []string{"agy", "claude"}}
 	b := New(Options{Hooks: &fakeHooks{phase: "scout", agent: "evolve-scout"}, Bridge: &fakeBridge{}, Prompts: fakePromptsFS("evolve-scout", "x"),
 		Router: declaredRouter(t, root, block)})
-	req := core.PhaseRequest{ProjectRoot: root, Env: map[string]string{"EVOLVE_SCOUT_CLI": "codex-tmux"}}
+	req := core.PhaseRequest{ProjectRoot: root, Env: map[string]string{"EVOLVE_CLI": "codex-tmux"}}
 	_, resp, err := b.resolveDispatchPlan(req, scoutPreparation(root))
 	if err == nil || resp == nil || resp.Verdict != core.VerdictFAIL || !strings.Contains(resp.Diagnostics[0].Message, "outside the allowed set") {
 		t.Fatalf("an env primary outside the table fails the phase loudly: %v %+v", err, resp)

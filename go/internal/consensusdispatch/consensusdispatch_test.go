@@ -42,7 +42,7 @@ func writeProfile(t *testing.T, path string, consensus map[string]any) {
 
 func installFakeEvolve(t *testing.T, dir, artifactBody string, launchExit, aggExit int) {
 	t.Helper()
-	bin := filepath.Join(dir, "bin", "evolve")
+	bin := filepath.Join(dir, "go", "bin", "evolve")
 	script := fmt.Sprintf(`#!/usr/bin/env bash
 sub="$1"; shift
 case "$sub" in
@@ -79,7 +79,6 @@ case "$sub" in
 esac
 `, artifactBody, launchExit, aggExit)
 	writeExec(t, bin, script)
-	t.Setenv("EVOLVE_GO_BIN", bin)
 }
 
 func TestParseProfile(t *testing.T) {

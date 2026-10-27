@@ -42,6 +42,7 @@ type loopConfig struct {
 	SkipPreflight     bool              `json:"skip_preflight,omitempty"`
 	SkipPreflightBoot bool              `json:"skip_preflight_boot,omitempty"`
 	BypassPolicy      bool              `json:"bypass_policy,omitempty"`
+	SandboxOff        string            `json:"sandbox_off,omitempty"`
 	ChainMode         bool              `json:"chain_mode,omitempty"`
 	PerAgentCLI       map[string]string `json:"per_agent_cli,omitempty"`
 	PerAgentModel     map[string]string `json:"per_agent_model,omitempty"`
@@ -139,7 +140,7 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) (exit i
 
 	gcOrphanSessions("startup", stderr)
 
-	deps := wireOrchestratorDepsFn(cfg.ProjectRoot, cfg.EvolveDir, stderr, routingRun{bypass: cfg.BypassPolicy, env: buildCycleEnv(cfg, os.Environ()), role: roleLoop})
+	deps := wireOrchestratorDepsFn(cfg.ProjectRoot, cfg.EvolveDir, stderr, routingRun{bypass: cfg.BypassPolicy, env: carriedEnv(os.Environ()), role: roleLoop, overrides: cfg.agentOverrides(), sandboxOff: cfg.SandboxOff})
 	defer deps.closeSignals()
 	if deps.RoutingErr != nil {
 		fmt.Fprintf(stderr, "evolve loop: %v\n", deps.RoutingErr)
@@ -157,7 +158,7 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) (exit i
 
 	maintainBatchState(cfg, wc.AutoPrune, stderr)
 
-	cycleEnv := buildCycleEnv(cfg, os.Environ())
+	cycleEnv := carriedEnv(os.Environ())
 	cycleCtx := buildCycleContext(cfg)
 
 	lr := loopResult{StopReason: "max_cycles", classifyRoot: cfg.ProjectRoot}

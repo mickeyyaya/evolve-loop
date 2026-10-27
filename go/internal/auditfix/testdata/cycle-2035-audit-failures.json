@@ -1,0 +1,80 @@
+[
+  {
+    "report": "audit-report.round1.md",
+    "verdict": "WARN",
+    "failure": {
+      "class": "code-audit-warn",
+      "defects": [
+        "M1: go/internal/core/failurelearning floor tests fail (3) with this diff, because faillearn now mints timestamped files under .bump.lock; protected surface, fix is console item retro-minting-files-through-inbox-add-lane-ac-5-console",
+        "M2: go/internal/inboxfile/inboxfile.go duplicates the filing rules of go/internal/inboxmover/lifecycle/file.go (protected); unification queued as retro-minting-files-through-inbox-add-console"
+      ],
+      "evidence_paths": [
+        ".evolve/runs/cycle-2035/acs-verdict.json",
+        ".evolve/runs/cycle-2035/audit-report.md"
+      ],
+      "prescription": [
+        "Land console item retro-minting-files-through-inbox-add-lane-ac-5-console (core/failurelearning floor_test + goldens) in the same PR, or CI goes red on 3 TestWriteFloor_* tests"
+      ]
+    }
+  },
+  {
+    "report": "audit-report.round2.md",
+    "verdict": "WARN",
+    "failure": {
+      "class": "code-audit-warn",
+      "defects": [
+        "M1: go/internal/core/failurelearning floor tests fail (3) with this diff, because faillearn now mints timestamped files under .bump.lock; protected surface, fix is console item retro-minting-files-through-inbox-add-lane-ac-5-console",
+        "M2: go/internal/inboxfile/inboxfile.go duplicates the filing rules of go/internal/inboxmover/lifecycle/file.go (protected); unification queued as retro-minting-files-through-inbox-add-console",
+        "M3: go/cmd/evolve/cmd_wave_pid_integration_test.go:19-26 adds an out-of-scope sandbox skip in a document-only correction round; the root cause is the phase sandbox denying /bin/ps"
+      ],
+      "evidence_paths": [
+        ".evolve/runs/cycle-2035/acs-verdict.json",
+        ".evolve/runs/cycle-2035/audit-report.md"
+      ],
+      "prescription": [
+        "Land console item retro-minting-files-through-inbox-add-lane-ac-5-console (core/failurelearning floor_test + goldens) in the same PR, or CI goes red on 3 TestWriteFloor_* tests",
+        "Drop the ps skip from go/cmd/evolve/cmd_wave_pid_integration_test.go and allow /bin/ps in the phase sandbox profile instead"
+      ]
+    }
+  },
+  {
+    "report": "audit-report.round3.md",
+    "verdict": "FAIL",
+    "failure": {
+      "class": "code-audit-fail",
+      "defects": [
+        "H1: go/internal/core/retro_remediation_filter_test.go:29 inboxFiles counts .bump.lock and every entry, so TestWriteDeterministicLearning_StructuredDefectsAreFiled and TestRepro1285_F1_CollidingRemediationSlugSuppressesRetrospectiveAndLesson fail with this diff; unprotected, lane-fixable; ship REPO_CONTRACT_GATE refused",
+        "M1: go/internal/core/failurelearning floor tests fail (3) with this diff; protected surface, fix is console item retro-minting-files-through-inbox-add-lane-ac-5-console in the same PR",
+        "M2: go/internal/inboxfile/inboxfile.go duplicates the filing rules of go/internal/inboxmover/lifecycle/file.go (protected); unification queued as retro-minting-files-through-inbox-add-console",
+        "M3: go/cmd/evolve/cmd_wave_pid_integration_test.go:19-26 adds an out-of-scope ps sandbox skip"
+      ],
+      "evidence_paths": [
+        ".evolve/runs/cycle-2035/ship-error.json",
+        ".evolve/runs/cycle-2035/audit-report.md"
+      ],
+      "prescription": [
+        "Make inboxFiles in go/internal/core/retro_remediation_filter_test.go count only *.json items (ignore inboxfile.LockName) and rerun go test -count=1 ./internal/core",
+        "Land console item retro-minting-files-through-inbox-add-lane-ac-5-console (core/failurelearning floor_test + goldens) in the same PR, or the importer backstop stays red on 3 TestWriteFloor_* tests",
+        "Drop the ps skip from go/cmd/evolve/cmd_wave_pid_integration_test.go and allow /bin/ps in the phase sandbox profile instead"
+      ]
+    }
+  },
+  {
+    "report": "audit-report.md",
+    "verdict": "WARN",
+    "failure": {
+      "class": "code-audit-warn",
+      "defects": [
+        "M1: go/internal/core/failurelearning floor tests (3) fail with this diff; protected surface, fix is console item retro-minting-files-through-inbox-add-lane-ac-5-console in the same PR",
+        "M2: go/internal/inboxfile/inboxfile.go duplicates the filing rules of protected go/internal/inboxmover/lifecycle/file.go; unification queued as retro-minting-files-through-inbox-add-console"
+      ],
+      "evidence_paths": [
+        ".evolve/runs/cycle-2035/ship-error.json",
+        ".evolve/runs/cycle-2035/acs-verdict.json"
+      ],
+      "prescription": [
+        "Land console item retro-minting-files-through-inbox-add-lane-ac-5-console (core/failurelearning floor_test + goldens) in the same PR, or the importer backstop stays red on 3 TestWriteFloor_* tests"
+      ]
+    }
+  }
+]

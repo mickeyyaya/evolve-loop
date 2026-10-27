@@ -21,7 +21,7 @@ func TestBenchOnEscalation_ACredentialWallBenchesAndNamesTheOperator(t *testing.
 		t.Fatal(err)
 	}
 	var logs []string
-	bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: "claude-tmux", DispatchStart: now().Add(-time.Minute), Env: map[string]string{}}, now, func(f string, a ...any) { logs = append(logs, fmt.Sprintf(f, a...)) })
+	bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: "claude-tmux", DispatchStart: now().Add(-time.Minute)}, now, func(f string, a ...any) { logs = append(logs, fmt.Sprintf(f, a...)) })
 	entry, ok := clihealth.NewStore(root, now).Active()["claude"]
 	if !ok || entry.Reason != clihealth.CredentialPattern {
 		t.Fatalf("claude must be benched for the credential wall; active=%v", clihealth.NewStore(root, now).Active())

@@ -31,12 +31,11 @@ Work resumes and grades do not. A continuation carries no verdict state, and eve
   A package name outside `[A-Za-z0-9_-]` is skipped, so a verdict entry cannot point outside `go/acs/`. An absent verdict is no directive, and an unreadable verdict or predicate file is an error. In cycles 1492 and 1495 two lanes rebuilt green work around one inherited red predicate. The findings described the red, but did not order its repair. That red was in the ancestor's own package, and the adoption archive (f8955a32) now removes that shape. The directive serves the reds that are left: mostly shipped predicates that the prior change breaks.
 - **The release gate lives here.** `RequireOperatorAuthority` is the operator gate for every path that can drop a binding. The defect-ledger gate reads a binding as anti-tamper evidence. The phase guard denies in-process Agent dispatch, but it does not see a Bash call of the evolve binary. Without a gate, any process that can run Bash can erase the lineage of a live scope.
 - **The gate is in the package, not in `cmd/evolve`.** A later in-process caller cannot route around the gate that the CLI honours.
-- **The environment fallback reads the value.** `-operator` is the explicit authorization. Otherwise `OperatorConfirmEnv` is read through `envchain.Bool`, and `0` is a refusal. An empty export never authorizes an erasure. The error that the gate returns is the refusal text of the CLI and names both paths, so the message and the gate cannot drift. `OperatorConfirmEnv` is exported because operators type its name.
+- **Only the parameter authorizes.** `-operator` is the one authorization. X18d removed the environment fallback `EVOLVE_OPERATOR_CONFIRM` (ADR-0156 I-16), so no exported value of the environment can erase a binding. The error that the gate returns is the refusal text of the CLI, so the message and the gate cannot drift.
 
 ## Invariants
 
-- **The spelling of the environment variable is a public contract.** An unrecognised name reads as "not set", which is a silent refusal. `TestOperatorConfirmEnv` pins it.
-- **The gate reads the value, not the presence.** `TestRequireOperatorAuthority` covers all four states. A gate that tests `os.Getenv(...) != ""` reads a set but negative value as consent.
+- **Only `-operator` authorizes.** `TestRequireOperatorAuthority` pins it: the gate passes with the parameter, and it refuses without it, also when `EVOLVE_OPERATOR_CONFIRM=1` is in the environment.
 - **One manifest file name.** `TestManifestName_IsTheFileTheManifestRoundTripsThrough` pins it.
 - **One schema.** The registry stores `Continuation` as it is, with the field names of the manifest. `TestRegistry_StoresTheContinuationSchemaVerbatim` pins it.
 - **A second scope does not overwrite the first, and concurrent lanes keep their bindings.** `TestRegistry_SecondScopeDoesNotClobberFirst` and `TestRegistry_ConcurrentLaneWritesDoNotLoseBindings` pin it.

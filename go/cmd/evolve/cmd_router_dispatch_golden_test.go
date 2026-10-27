@@ -37,7 +37,7 @@ func TestLegacyAdvisorDispatch_MatchesTheGolden(t *testing.T) {
 	profileDir, _ := cliroutetest.TrackedProfiles(t)
 	var records []cliroutetest.Record
 	for _, v := range cliroutetest.Variants() {
-		for key, val := range v.EnvFor("router") {
+		for key, val := range v.EnvFor() {
 			t.Setenv(key, val)
 		}
 		root := v.ProjectRoot(t, nil)
@@ -51,7 +51,7 @@ func TestLegacyAdvisorDispatch_MatchesTheGolden(t *testing.T) {
 				})
 			}
 		}
-		for key := range v.EnvFor("router") {
+		for key := range v.EnvFor() {
 			t.Setenv(key, "")
 		}
 	}

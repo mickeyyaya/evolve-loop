@@ -34,7 +34,7 @@ func TestManualShip_ClosesInboxItemInShipCommit(t *testing.T) {
 	res, err := runShip(t, repo, Options{
 		Class: ClassManual, CommitMessage: "fix: manual widget",
 		WorkspacePath: workspace, Stdout: io.Discard, Stderr: io.Discard,
-		Env: map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"},
+		AutoConfirm: "test",
 	})
 	if err != nil || res.ExitCode != ExitOK {
 		t.Fatalf("manual ship must land: exit=%d err=%v logs=%v", res.ExitCode, err, res.Logs)
