@@ -28,9 +28,10 @@ func GuaranteeClasses() []GuaranteeClass {
 }
 
 type ProtectedSurfaceEntry struct {
-	Fragment  string
-	Class     GuaranteeClass
-	Rationale string
+	Fragment     string
+	Class        GuaranteeClass
+	Rationale    string
+	Constitution bool
 }
 
 var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
@@ -230,19 +231,30 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/.evolve/incidents/", Class: LedgerGuarantee, Rationale: "the incident records of the self-healing loop: only the detector writes them, so no agent can open, close or edit its own incident (ADR-0155, llm-isolation.md §18.2)"},
 	{Fragment: "/go/internal/selfheal/", Class: AuditVerdictGuarantee, Rationale: "the incident detector and the four close conditions of I-14: an agent that could edit them could close its own incident (ADR-0155, llm-isolation.md §21)"},
 	{Fragment: "/go/cmd/evolve/cmd_selfheal.go", Class: AuditVerdictGuarantee, Rationale: "evolve selfheal incidents: it chooses the evidence of the detector, builds the verifier of the four close conditions and writes the records (ADR-0155, llm-isolation.md §18.5)"},
-	{Fragment: "/go/internal/policy/healing.go", Class: PolicyGuarantee, Rationale: "the healing.detector.stage key and its validation (ADR-0155, llm-isolation.md §20.2)"},
-	{Fragment: "/go/internal/phasecontract/diagnosis.go", Class: GateGuarantee, Rationale: "the evolve.diagnosis/1 schema with the closed action catalog and the low-confidence escalation: an agent that could widen it could propose an action outside the catalog (ADR-0155, llm-isolation.md §18.4, §20.1)"},
+	{Fragment: "/go/internal/policy/healing.go", Class: PolicyGuarantee, Rationale: "the healing.detector.stage key and its validation (ADR-0155, llm-isolation.md §20.2)", Constitution: true},
+	{Fragment: "/go/internal/phasecontract/diagnosis.go", Class: GateGuarantee, Rationale: "the evolve.diagnosis/1 schema with the closed action catalog and the low-confidence escalation: an agent that could widen it could propose an action outside the catalog (ADR-0155, llm-isolation.md §18.4, §20.1)", Constitution: true},
 	{Fragment: "/go/cmd/evolve/cmd_selfheal_propose.go", Class: AuditVerdictGuarantee, Rationale: "evolve selfheal propose: it builds the evidence index, runs the orchestrator seat, checks each diagnosis.json and writes the proposal records (ADR-0155, llm-isolation.md §18.6)"},
+	{Fragment: "/go/internal/gateclass/", Class: GateGuarantee, Rationale: "the gate classifier and the surface tiers of I-10: an agent that could edit them could weaken a gate and pass its own check (ADR-0155, llm-isolation.md §20)", Constitution: true},
+	{Fragment: "/go/internal/phases/ship/gate_classifier_gate.go", Class: GateGuarantee, Rationale: "the ship check that refuses a cycle diff the gate classifier flags (ADR-0155, llm-isolation.md §20.3)"},
+	{Fragment: "/go/internal/core/gate_classifier_floor.go", Class: GateGuarantee, Rationale: "the build floor check that fails a build the gate classifier flags (ADR-0155, llm-isolation.md §20.3)"},
 }
 
 func IsProtectedSurface(path string) bool {
+	return matchesManifest(path, func(ProtectedSurfaceEntry) bool { return true })
+}
+
+func IsHealingConstitution(path string) bool {
+	return matchesManifest(path, func(e ProtectedSurfaceEntry) bool { return e.Constitution })
+}
+
+func matchesManifest(path string, keep func(ProtectedSurfaceEntry) bool) bool {
 	p, ok := normalizeSurfacePath(path)
 	if !ok {
 		return false
 	}
 	pd := p + "/"
 	for _, e := range ProtectedSurfaceManifest {
-		if strings.Contains(pd, e.Fragment) {
+		if keep(e) && strings.Contains(pd, e.Fragment) {
 			return true
 		}
 	}

@@ -851,3 +851,5 @@
 ./internal/auditfix
 # citelemetry - the critical-path report that joins the jobs, steps, test JSON, rusage and sampler records of one CI run (ci-wall-time plan C1).
 ./internal/citelemetry
+# gateclass - the surface tiers and the gate classifier of I-10: it flags a cycle diff that changes a kernel surface or weakens a gate (ADR-0155 X15).
+./internal/gateclass

@@ -436,6 +436,7 @@ var serialTests = map[string]string{
 	"main.TestProductionBuildFloorChecks_CorrectsARedRepoContractPackByTheTestsName":                                       "swaps seam repoContractPack",
 	"main.TestProductionBuildFloorChecks_RefusesAProtectedFileThroughTheRealManifest":                                      "swaps seam repoContractPack",
 	"main.TestProductionBuildFloorChecks_ReportsAScopeDeltaThroughTheComposedFloor":                                        "swaps seam repoContractPack",
+	"main.TestProductionBuildFloorChecks_TheComposedFloorRunsTheGateClassifier":                                            "swaps seam repoContractPack",
 	"main.TestPruneWorktrees_NotARepositoryIsExitOne":                                                                      "sets env through a helper",
 	"main.TestPublishAgy_IncludesCommandStubs":                                                                             "swaps seam publishLookPath",
 	"main.TestPublishAgy_InstallFailsLoudlyWithoutBinary":                                                                  "swaps seam publishLookPath",
