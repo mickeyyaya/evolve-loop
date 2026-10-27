@@ -243,17 +243,14 @@ func removeWorkspace(workspace string, stderr io.Writer) {
 }
 
 func (r standaloneRun) request() core.PhaseRequest {
-	req := core.PhaseRequest{
+	return core.PhaseRequest{
 		ProjectRoot: r.root,
 		Workspace:   r.workspace,
 		Worktree:    r.worktree,
+		Fence:       core.FenceFor(r.worktree == "", r.writable),
 		RunID:       r.label,
 		Context:     map[string]string{specrunner.AgentInputKey: r.input},
 	}
-	if r.worktree != "" {
-		req.Fence = &core.WorktreeFence{Writable: r.writable}
-	}
-	return req
 }
 
 func readReport(r standaloneRun) (string, bool) {
