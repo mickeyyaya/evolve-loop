@@ -19,11 +19,18 @@ import (
 var failureDigestMarshal = json.Marshal
 
 type FailureDigest struct {
-	Cycle       int    `json:"cycle"`
-	Fingerprint string `json:"fingerprint"`
-	PreClass    string `json:"pre_class"`
-	Recurrence  int    `json:"recurrence"`
-	Unexplained bool   `json:"unexplained,omitempty"`
+	Cycle            int      `json:"cycle"`
+	Fingerprint      string   `json:"fingerprint"`
+	PreClass         string   `json:"pre_class"`
+	Recurrence       int      `json:"recurrence"`
+	Unexplained      bool     `json:"unexplained,omitempty"`
+	Checks           []string `json:"checks,omitempty"`
+	ClassFingerprint string   `json:"class_fingerprint,omitempty"`
+	ClassLayer       string   `json:"class_layer,omitempty"`
+	ClassRecurrence  int      `json:"class_recurrence,omitempty"`
+	ClassRecordedAt  string   `json:"class_recorded_at,omitempty"`
+	ClassRoute       string   `json:"class_route,omitempty"`
+	ClassRouteReason string   `json:"class_route_reason,omitempty"`
 }
 
 type RecurrenceCounter interface {
@@ -70,22 +77,24 @@ func AssembleFailureDigest(cycle int, workspace string, rc RecurrenceCounter) (F
 		Fingerprint: fingerprint(phase, preClass, reasons),
 		PreClass:    preClass,
 		Unexplained: reasonsAreContentFree(reasons),
+		Checks:      failingChecks(reasons),
 	}
 	if rc != nil {
 		digest.Recurrence = rc.Count(digest.Fingerprint)
 	}
+	digest = withRecordedClass(workspace, digest)
+	return digest, persistFailureDigest(workspace, digest)
+}
 
+func persistFailureDigest(workspace string, digest FailureDigest) error {
 	b, err := failureDigestMarshal(digest)
 	if err != nil {
-		return digest, fmt.Errorf("marshal failure digest: %w", err)
+		return fmt.Errorf("marshal failure digest: %w", err)
 	}
 	if err := writeArtifactAtomically(filepath.Join(workspace, "failure-digest.json"), b); err != nil {
-		return digest, fmt.Errorf("write failure-digest.json: %w", err)
+		return fmt.Errorf("write failure-digest.json: %w", err)
 	}
-	if err := writeFailureDigestRecord(workspace, b); err != nil {
-		return digest, err
-	}
-	return digest, nil
+	return writeFailureDigestRecord(workspace, b)
 }
 
 const failureDigestRecordDir = "failure-digests"

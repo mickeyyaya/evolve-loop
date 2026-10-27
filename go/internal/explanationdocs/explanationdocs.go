@@ -37,6 +37,8 @@ const (
 
 const CurrentContractVersion = contractV1
 
+const FailurePrefix = "Explanation Documentation: "
+
 var fullCommitSHA = regexp.MustCompile(`^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$`)
 var safeRunID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`)
 var cycleRecordPath = regexp.MustCompile(`^docs/explain/builds/cycle-[1-9][0-9]*-[a-z0-9][a-z0-9_-]{0,63}\.md$`)
@@ -328,10 +330,10 @@ func checkRequired(ctx context.Context, binding CycleBinding, declaration report
 	want := cycleDocumentPath(binding.Cycle, binding.RunID)
 	var failures []string
 	if declaration.Status != "REQUIRED" {
-		failures = append(failures, fmt.Sprintf("Explanation Documentation: Status must be REQUIRED for a material Build diff (material: %s)", strings.Join(material, ", ")))
+		failures = append(failures, fmt.Sprintf(FailurePrefix+"Status must be REQUIRED for a material Build diff (material: %s)", strings.Join(material, ", ")))
 	}
 	if declaration.Document != want || declaration.Reason != "" {
-		failures = append(failures, "Explanation Documentation: Document must be the canonical cycle-owned path and Reason must be omitted when required")
+		failures = append(failures, FailurePrefix+"Document must be the canonical cycle-owned path and Reason must be omitted when required")
 	}
 	view := &phaseio.ExplanationView{
 		SchemaVersion:   currentArtifactSchema,
@@ -355,16 +357,16 @@ func validateRequired(ctx context.Context, binding CycleBinding, changed, materi
 	want := cycleDocumentPath(binding.Cycle, binding.RunID)
 	var failures []string
 	if view.DocumentPath != want {
-		return []string{"Explanation Documentation: manifest Document path is not canonical for the cycle"}, nil
+		return []string{FailurePrefix + "manifest Document path is not canonical for the cycle"}, nil
 	}
 	if view.BaseSHA == "" {
-		failures = append(failures, "Explanation Documentation: base_sha is required for downstream verification")
+		failures = append(failures, FailurePrefix+"base_sha is required for downstream verification")
 	}
 	if !samePaths(view.MaterialPaths, material) {
-		failures = append(failures, "Explanation Documentation: manifest material_paths does not match the base-bound diff")
+		failures = append(failures, FailurePrefix+"manifest material_paths does not match the base-bound diff")
 	}
 	if !contains(changed, want) {
-		failures = append(failures, "Explanation Documentation: cycle document is not part of the Build diff")
+		failures = append(failures, FailurePrefix+"cycle document is not part of the Build diff")
 	}
 	if view.BaseSHA != "" {
 		exists, err := existsAtBase(ctx, binding.Worktree, view.BaseSHA, want)
@@ -372,20 +374,20 @@ func validateRequired(ctx context.Context, binding CycleBinding, changed, materi
 			return failures, fmt.Errorf("cannot verify cycle document immutability: %w", err)
 		}
 		if exists {
-			failures = append(failures, "Explanation Documentation: cycle document existed at the cycle base; published Build explanations are immutable")
+			failures = append(failures, FailurePrefix+"cycle document existed at the cycle base; published Build explanations are immutable")
 		}
 	}
 	failures = append(failures, immutableHistoryFailures(changed, want)...)
 	body, sha, err := readRegularWithin(binding.Worktree, want)
 	if errors.Is(err, fs.ErrNotExist) || errors.Is(err, errArtifactTooLarge) {
-		return append(failures, "Explanation Documentation: "+err.Error()), nil
+		return append(failures, FailurePrefix+err.Error()), nil
 	}
 	if err != nil {
 		return failures, err
 	}
 	failures = append(failures, validateDocument(body, binding.Cycle, authoredBase(view), changed, material)...)
 	if view.DocumentSHA256 != "" && view.DocumentSHA256 != sha {
-		failures = append(failures, "Explanation Documentation: document SHA256 mismatch")
+		failures = append(failures, FailurePrefix+"document SHA256 mismatch")
 	}
 	view.DocumentSHA256 = sha
 	return failures, nil
@@ -410,13 +412,13 @@ func validateDocument(body string, cycle int, baseSHA string, changed, material 
 		if err == nil {
 			err = errors.New("missing ## Build Binding")
 		}
-		failures = append(failures, "Explanation Documentation: "+err.Error())
+		failures = append(failures, FailurePrefix+err.Error())
 	} else {
 		fields, fieldErr := reportdoc.Fields(bindingBody, "Cycle", "Base SHA")
 		if fieldErr != nil {
-			failures = append(failures, "Explanation Documentation: "+fieldErr.Error())
+			failures = append(failures, FailurePrefix+fieldErr.Error())
 		} else if fields["cycle"] != strconv.Itoa(cycle) || fields["base sha"] != baseSHA {
-			failures = append(failures, "Explanation Documentation: Build Binding must contain the exact Cycle and Base SHA")
+			failures = append(failures, FailurePrefix+"Build Binding must contain the exact Cycle and Base SHA")
 		}
 	}
 	sections := make(map[string]string, len(required))
@@ -424,11 +426,11 @@ func validateDocument(body string, cycle int, baseSHA string, changed, material 
 		section, present, sectionErr := reportdoc.Section(body, requirement.heading)
 		switch {
 		case sectionErr != nil:
-			failures = append(failures, "Explanation Documentation: "+sectionErr.Error())
+			failures = append(failures, FailurePrefix+sectionErr.Error())
 		case !present:
-			failures = append(failures, "Explanation Documentation: missing ## "+requirement.heading)
+			failures = append(failures, FailurePrefix+"missing ## "+requirement.heading)
 		case len(strings.TrimSpace(section)) < requirement.minBytes:
-			failures = append(failures, fmt.Sprintf("Explanation Documentation: ## %s must contain substantive content", requirement.heading))
+			failures = append(failures, fmt.Sprintf(FailurePrefix+"## %s must contain substantive content", requirement.heading))
 		default:
 			sections[requirement.heading] = section
 		}
@@ -578,7 +580,7 @@ func supportedArtifactSchema(version int) bool {
 }
 
 func explanationFailure(err error) []string {
-	return []string{"Explanation Documentation: " + err.Error()}
+	return []string{FailurePrefix + err.Error()}
 }
 
 func renderFailures(failures []string, fault error) []string {

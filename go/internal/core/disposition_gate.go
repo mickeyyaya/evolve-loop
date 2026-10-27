@@ -125,5 +125,8 @@ func (o *Orchestrator) finalizeRetroCompletion(workspace string) error {
 	if err := VerifyDisposition(workspace); err != nil {
 		return fmt.Errorf("disposition-gate: %w", err)
 	}
+	if _, err := recordFailureClass(workspace, o.now); err != nil {
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN failure class not recorded: %v\n", err)
+	}
 	return nil
 }

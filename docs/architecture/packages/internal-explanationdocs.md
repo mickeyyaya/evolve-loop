@@ -12,6 +12,7 @@
 - `ValidateReviewedHandoff` is the phase-agnostic core of a review section. It is the single home of the contract. Audit and retro each apply their own phase policy to its result.
 - `DocumentPath` is collision-resistant per run. A fresh clone's local cycle counter therefore cannot collide with a document that another installation published.
 - `checkBuildV1` and `verifyResolvedV1` read the base-bound diff one time. The diff hash folds the same path list that the check classified, so each check starts three fewer git processes.
+- `FailurePrefix` (`Explanation Documentation: `) starts each failure that the package returns. The failure class parser of `internal/core` counts the explanation failures of a floor reason with the same constant ([failure-identity-lifecycle.md §4](../failure-identity-lifecycle.md#4-failure-class-fingerprint)).
 
 ## Invariants
 
