@@ -13,6 +13,8 @@
 >
 > Amended on 2026-10-27 by component X17d: `inbox claim`, `dossier show`, `cycle resume`, `wave stop` and `quality show` are core verbs (§5). §6 no longer lists them. Their agent classes are in §5. `cycle resume` starts a loop, so the dispatch gate refuses it in a cell (§4.4). The gate of the other `D` verbs, `inbox claim` and `wave stop` among them, is the class table of X17e.
 >
+> Amended on 2026-10-27 by component E9 of the events plan: `events channels`, `events kinds` and `events watch` are core verbs (§5). `events subscribe` stays in §6 until E8 builds the subscription store. `wave watch` waits on the event channels.
+>
 > **Terms used throughout:**
 > - **core verb**: a verb in the table of §5. A service can depend on it.
 > - **envelope**: the one JSON object that a core verb prints on stdout with `--json`.
@@ -92,6 +94,7 @@ Each core verb with `--json` prints exactly one JSON object on stdout, and nothi
 - The dispatcher reads `--json` as a word before `--`. A text value that is exactly `--json`, for example `wave next --note --json`, also selects the envelope.
 - Exit 4 (`queued`) has `ok: false` and `error.kind: "queued"`, as the rule for `ok` says. Its `data` is the receipt of the queue.
 - A stream verb (`signals tail --follow`, `wave watch`, the `events` verbs) prints one envelope for each line. Each line has the same `schema` field (JSON Lines).
+- `events watch` exits 0 when a SIGINT or SIGTERM stops it, not 130, because the stop is the normal end of a watch. It exits 3 when the reader of its stdout is gone (E9). `wave watch` does not catch a signal yet.
 - The human text without `--json` is not a contract. It can change at any time.
 
 ## 3. Exit codes
@@ -362,9 +365,11 @@ Limits:
 | `loop status` | always | A | yes | yes | `evolve.loop.status/1` | fix §8 first |
 | `wave status` | always | A | yes | yes | `evolve.wave.status/1` | |
 | `wave supply` | always | A | yes | yes | `evolve.wave.supply/1` | |
-| `wave watch` | always | A | yes | yes | `evolve.wave.watch/1` | a stream; it polls every 5 s today (`c/cmd_wave.go:27`) until E13 |
+| `wave watch` | always | A | yes | yes | `evolve.wave.watch/1` | a stream; it waits on the `loop` and `cycle` channels and reads again every 5 s at most (E9) |
 | `inbox list`, `show`, `rank`, `lint`, `batches` | always | A | yes | yes | `evolve.inbox.<verb>/1` | `evolve inbox` takes `--project-root` for each verb (F4.8) |
 | `signals tail` | always | A | yes | yes | `evolve.signals.tail/1` | a stream |
+| `events channels`, `kinds` | always | A | yes | yes | `evolve.events.<verb>/1` | the catalog and the vocabulary of the channels; E9 |
+| `events watch` | always | A | yes | yes | `evolve.events.watch/1` | a stream of wire records (`evolve.event/1` in `data`); the kernel wakes it; E9 |
 | `ledger verify` | always | A | yes | yes | `evolve.ledger.verify/1` | the text form prints on stderr; `--evolve-dir` still wins over the root |
 | `dossier verify` | always | A | yes | yes | `evolve.dossier.verify/1` | |
 | `dossier show` | always | A | yes | yes | `evolve.dossier.show/1` | the dossier of one cycle; X17d |
@@ -405,7 +410,7 @@ Verbs outside this table are tools for the operator or for the pipeline itself. 
 
 | Verb | Class | Today | Why |
 |---|---|---|---|
-| `events channels`, `kinds`, `watch`, `subscribe` | always (`subscribe` is leased) | absent: plan E9 is not started | a service waits on an event, not on a poll ([event-notification-protocol-2026-10](../plans/event-notification-protocol-2026-10.md) E9) |
+| `events subscribe` | leased | absent: the subscription store and runner are component E8 | a service resumes a named cursor ([event-notification-protocol-2026-10](../plans/event-notification-protocol-2026-10.md) E8, E9) |
 | `agent capabilities [--json]` | always | absent (`c/registry.go:43`) | the agent of a cell reads its classes, schemas and request paths (§4.2). Its agent class is `A`. Component X17e. |
 | `guidance index [--audience X] [--phase P] [--cli F] [--json]`, `guidance check` | always | both exist (#1138); `index` prints an envelope and `check` has no `--json` | an agent of any family lists the rules of its case from the rule registry ([guidance-layers.md](guidance-layers.md) §10.3). The agent class of both is `A`. `guidance build` writes tracked files, so it stays an operator tool outside the core verbs. |
 

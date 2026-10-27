@@ -186,7 +186,7 @@ var commandsWithNoDispatch = map[string]string{
 	"version": "prints", "help": "prints", "rebuild": "builds the plane binary", "console-lease": "a lease file",
 	"install": "copies files", "uninstall": "removes files", "guard": "a hook check of the cell", "ledger": "reads",
 	"dossier": "reads", "audit": "reads", "salvage": "reads", "soak-report": "reads", "dashboard": "serves reads",
-	"names": "scans files", "acs": "runs predicates", "apicover": "measures", "inbox": "inbox files",
+	"names": "scans files", "acs": "runs predicates", "apicover": "measures", "events": "reads the event channels", "inbox": "inbox files",
 	"phases": "the phase catalog", "worktree": "git worktrees", "land": "applies a patch", "branches": "git refs",
 	"continuation": "state files", "carryover": "state files", "swarm": "tmux sessions of workers", "checkpoint": "git refs",
 	"treewalk": "scans files", "kb": "reads", "gc": "removes leftovers", "verdicts": "a verdict store",

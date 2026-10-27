@@ -1,6 +1,8 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestEventsWatch_TheDefaultEnvironmentArmsTheKernelAndTheSignals":                                  "installs the process signal handlers of the watch",
+	"main.TestEvents_AnUnreadableWorkingDirectoryIsAnIOError":                                               "swaps seam processGetwd",
 	"main.TestCycleResume_AnUnreadableWorkingDirectoryIsAnIOError":                                          "swaps seams processGetwd and cycleResumeLoad",
 	"main.TestCycleResume_DryRunNamesThePausedCycleAndStartsNothing":                                        "swaps seams cycleResumeLoad and loopLaunchFn",
 	"main.TestCycleResume_EachRefusalHasItsExitCode":                                                        "swaps seams cycleResumeLoad and loopLaunchFn",

@@ -14,6 +14,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 func okCall(prep func(*testing.T) map[string]string, args ...string) contractCall {
@@ -57,6 +59,9 @@ var contractCases = []contractVerbCases{
 	{"inbox lint", []contractCall{okCall(contractInboxItem, "inbox", "lint", prFlag, "{root}"), usageCall(contractPlane, "inbox", "lint", "--bogus", prFlag, "{root}"), failCall(cliExitFailed, contractUndeclaredItem, "inbox", "lint", prFlag, "{root}")}},
 	{"inbox batches", []contractCall{okCall(contractInboxItem, "inbox", "batches", prFlag, "{root}"), usageCall(contractPlane, "inbox", "batches", "--max", "x", prFlag, "{root}"), failCall(cliExitFailed, contractInboxFile, "inbox", "batches", prFlag, "{root}")}},
 	{"signals tail", []contractCall{okCall(contractPlane, "signals", "tail", prFlag, "{root}"), usageCall(contractPlane, "signals", "tail", "--bogus", prFlag, "{root}"), failCall(cliExitFailed, contractPlane, "signals", "tail", "--cycle", "5", prFlag, "{root}")}},
+	{"events channels", []contractCall{okCall(contractPlane, "events", "channels", prFlag, "{root}"), usageCall(contractPlane, "events", "channels", "extra", prFlag, "{root}"), failCall(cliExitIO, contractEvolveFile, "events", "channels", prFlag, "{root}")}},
+	{"events kinds", []contractCall{okCall(contractPlane, "events", "kinds", prFlag, "{root}"), usageCall(contractPlane, "events", "kinds", "extra", prFlag, "{root}")}},
+	{"events watch", []contractCall{okCall(contractLoopChannel, "events", "watch", "--channel", "loop", "--since", "all", "--until", "kind=loop.exit", prFlag, "{root}"), usageCall(contractPlane, "events", "watch", prFlag, "{root}"), failCall(cliExitInput, contractPlane, "events", "watch", "--channel", "nosuch", prFlag, "{root}")}},
 	{"ledger verify", []contractCall{okCall(contractPlane, "ledger", "verify", prFlag, "{root}"), usageCall(contractPlane, "ledger", "verify", "--bogus", prFlag, "{root}"), failCall(cliExitIO, contractBrokenLedger, "ledger", "verify", prFlag, "{root}")}},
 	{"dossier verify", []contractCall{okCall(contractPlane, "dossier", "verify", prFlag, "{root}"), usageCall(contractPlane, "dossier", "verify", "extra", prFlag, "{root}"), failCall(cliExitFailed, contractBadDossier, "dossier", "verify", prFlag, "{root}")}},
 	{"dossier show", []contractCall{okCall(contractDossier, "dossier", "show", "1", prFlag, "{root}"), usageCall(contractPlane, "dossier", "show", prFlag, "{root}"), failCall(cliExitFailed, contractPlane, "dossier", "show", "5", prFlag, "{root}")}},
@@ -122,6 +127,13 @@ func contractCycleResume(t *testing.T, _ map[string]string) func([]string, io.Wr
 	t.Helper()
 	pausedCycle(t, pausedAtBuild, nil)
 	return func(args []string, stdout, stderr io.Writer) int { return runCycle(args[1:], nil, stdout, stderr) }
+}
+
+func contractLoopChannel(t *testing.T) map[string]string {
+	t.Helper()
+	vars := contractPlane(t)
+	appendEvents(t, vars["root"], "loop", loopEvent(1, signalcenter.KindLoopExit))
+	return vars
 }
 
 func contractBadWaves(t *testing.T) map[string]string {

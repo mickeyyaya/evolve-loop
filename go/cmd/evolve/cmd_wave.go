@@ -54,6 +54,7 @@ type waveEnv struct {
 	mergedPRs     func(root, since string) ([]string, error)
 	loadGraph     graphLoader
 	refreshBinary func(loopConfig, io.Writer) bootBinaryRefreshResult
+	openEvents    func(evolveDir string) (eventSource, error)
 }
 
 type wavePlaneDirs struct {
@@ -71,7 +72,7 @@ func defaultWaveEnv() waveEnv {
 		resolveRoot: loopStopRoot, executable: os.Executable, pidStarted: processStartTime,
 		dispatch: dispatchWaveVerb(sysexec.DefaultRunner), now: time.Now, sleep: time.Sleep,
 		pidAlive: runlease.PIDAlive, saveRecord: wave.Store.Save, mainHead: gitMainHead, mergedPRs: gitMergedPRs, loadGraph: loadModuleGraph,
-		refreshBinary: bootBinaryRefresh,
+		refreshBinary: bootBinaryRefresh, openEvents: openWaveEvents,
 	}
 }
 
