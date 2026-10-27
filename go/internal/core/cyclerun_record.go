@@ -59,6 +59,7 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 	if cr.current == PhaseAudit && dr.resp.Verdict == VerdictFAIL {
 		branch, reason, sysFail := cr.o.decideAfterAuditFail(cr.cs)
 		consumeAuditRepairGrant(&cr.cs, reason)
+		cr.sealHandedOff(&cr.result, cr.phaseTimings, reason)
 		if sysFail != nil && cr.result.SystemFailure == nil {
 			cr.result.SystemFailure = sysFail
 		}

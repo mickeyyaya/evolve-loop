@@ -1,0 +1,20 @@
+{
+ "source": ".evolve/runs/cycle-2035/audit-report.round2.md",
+ "failure": {
+  "class": "code-audit-warn",
+  "defects": [
+   "M1: go/internal/core/failurelearning floor tests fail (3) with this diff, because faillearn now mints timestamped files under .bump.lock; protected surface, fix is console item retro-minting-files-through-inbox-add-lane-ac-5-console",
+   "M2: go/internal/inboxfile/inboxfile.go duplicates the filing rules of go/internal/inboxmover/lifecycle/file.go (protected); unification queued as retro-minting-files-through-inbox-add-console",
+   "M3: go/cmd/evolve/cmd_wave_pid_integration_test.go:19-26 adds an out-of-scope sandbox skip in a document-only correction round; the root cause is the phase sandbox denying /bin/ps"
+  ],
+  "evidence_paths": [
+   ".evolve/runs/cycle-2035/acs-verdict.json",
+   ".evolve/runs/cycle-2035/audit-report.md"
+  ],
+  "prescription": [
+   "Land console item retro-minting-files-through-inbox-add-lane-ac-5-console (core/failurelearning floor_test + goldens) in the same PR, or CI goes red on 3 TestWriteFloor_* tests",
+   "Drop the ps skip from go/cmd/evolve/cmd_wave_pid_integration_test.go and allow /bin/ps in the phase sandbox profile instead"
+  ]
+ },
+ "gate_failures": []
+}

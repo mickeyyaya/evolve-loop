@@ -10,7 +10,7 @@ import (
 
 func (b *loopBatchCoordinator) completeSequentialCycle(iteration int, cycle sequentialCycle, state *sequentialBatchState) batchDecision {
 	failed := cycle.result.FinalVerdict == core.VerdictFAIL
-	blocked := core.IsProvenBlockerResult(cycle.result)
+	blocked := core.IsProvenBlockerResult(cycle.result) || core.IsHandedOffResult(cycle.result)
 	var stop bool
 	if blocked {
 		fmt.Fprintf(b.stderr, "[loop] cycle %d blocked: needs console — not a code FAIL, so the consecutive-FAIL count stays %d of max %d\n",

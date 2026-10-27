@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclespend"
+	"github.com/mickeyyaya/evolve-loop/go/internal/fixability"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -25,6 +26,8 @@ type Cycle struct {
 	SystemFail   bool
 	Item, Commit string
 	Spend        cyclespend.Spend
+	HandoffWould int
+	HandedOff    bool
 }
 
 func (c Cycle) DeadlineEnd() bool { return !c.Sealed || c.LaneDeadline }
@@ -161,8 +164,19 @@ func withSignals(c Cycle, path string) (Cycle, error) {
 			c.LaneDeadline = c.LaneDeadline || strings.Contains(e.Fields["termination_reason"], "lane deadline")
 		}
 		c.SystemFail = c.SystemFail || systemFailCode(e.Code)
+		if e.Code == fixability.SignalCode {
+			c.HandoffWould += boolInt(e.Fields[fixability.FieldDecision] == fixability.DecisionWould)
+			c.HandedOff = c.HandedOff || e.Fields[fixability.FieldDecision] == fixability.DecisionStop
+		}
 	}
 	return c, nil
+}
+
+func boolInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 func systemFailCode(code signalcenter.Code) bool {

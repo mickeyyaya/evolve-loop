@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxrank"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxrank/rankinputs"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 func ReadInboxBacklog(evolveDir string, isProtected func(string) bool) []FleetCandidate {
@@ -31,7 +33,7 @@ func readRankedBacklog(evolveDir string, isProtected func(string) bool, now time
 	for _, w := range append(warnings, inboxrank.ClassWarnings(queue, rank.Config)...) {
 		fmt.Fprintf(loopLog, "[triagecap] WARN inbox rank: %s\n", w)
 	}
-	ranked := inboxmover.RankLaneMenu(lifecycle, queue, isProtected, rank).Ranked
+	ranked := inboxmover.RankLaneMenu(lifecycle, queue, isProtected, rank, policy.RepairFixabilityStageFor(filepath.Dir(evolveDir), "triagecap", loopLog)).Ranked
 	candidates := make([]FleetCandidate, len(ranked))
 	for i, r := range ranked {
 		candidates[i] = FleetCandidate{ID: r.Item.ID, Weight: r.Item.Weight, Files: r.Item.Files}

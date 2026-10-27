@@ -615,7 +615,7 @@ The Signal Center does not compute an index, choose a threshold, change a stage 
 | Field | Value |
 |---|---|
 | Question | How much LLM time and how many tokens does one ship cost? |
-| Formula | the sum of `duration_ms` of each row of `llm-calls.ndjson` of each cycle of the window, in minutes, divided by the shipped cycles. The suffix `/fresh-tokens` divides input, output and cache-write tokens. `/cache-read-tokens` divides the cache-read tokens. `/audit-rounds` divides `audit_dispatches` by the started cycles. `/unmeasured-calls` counts the rows whose `usage_status` is not `measured`. |
+| Formula | the sum of `duration_ms` of each row of `llm-calls.ndjson` of each cycle of the window, in minutes, divided by the shipped cycles. The suffix `/fresh-tokens` divides input, output and cache-write tokens. `/cache-read-tokens` divides the cache-read tokens. `/audit-rounds` divides `audit_dispatches` by the started cycles. `/unmeasured-calls` counts the rows whose `usage_status` is not `measured`. `/handoff-would-stops` and `/handoff-stops` count the `REPAIR_HANDOFF` decisions of the window, and `/false-stops` counts the cycles with a `would_stop` that then shipped ([internal-fixability](packages/internal-fixability.md)). |
 | Unit | LLM minutes for each shipped cycle; tokens; audit rounds for each cycle; calls |
 | Window | one wave; rolling 10 waves |
 | Source | `.evolve/runs/cycle-N/llm-calls.ndjson`, `cycle-state.json` and the ship outcome of PQ1 |

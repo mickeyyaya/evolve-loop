@@ -198,6 +198,7 @@ The closed set of modules:
 - `carryover` (the carryover-todo lifecycle, breakdown unit 03)
 - `failurelearning` (the failure-learning engine — the failed-approach recorder, the deterministic floor, the recurrence closure; breakdown unit 03b)
 - `review` (the kernel half of the code-review phase, `internal/codereview`, ADR-0124: `REVIEW_FINDINGS`)
+- `repair` (the fixability check before a repair round, ADR-0158: `REPAIR_HANDOFF`)
 
 A module is added by
 editing the closed set and its test. The Center stamps an unknown module `SIGNALCENTER_UNKNOWN_MODULE` and

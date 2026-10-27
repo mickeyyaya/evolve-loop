@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/quotareset"
 )
 
@@ -90,5 +92,29 @@ func TestRunQuotaReset_HelpAndAComputeFailure(t *testing.T) {
 
 	if rc := runQuotaReset(nil, nil, &stdout, &stderr); rc != 1 || !strings.Contains(stderr.String(), "FATAL: no clock") {
 		t.Fatalf("a compute failure exits 1 with FATAL: rc %d stderr %q", rc, stderr.String())
+	}
+}
+
+func TestRepairFixabilityStage_IsAStrictStageKeyWithTheDefaultShadow(t *testing.T) {
+	t.Parallel()
+	for body, want := range map[string]config.Stage{
+		`{}`: config.StageShadow,
+		`{"workflow": {"repair": {"fixability": {"stage": "enforce"}}}}`: config.StageEnforce,
+		`{"workflow": {"repair": {"fixability": {"stage": "off"}}}}`:     config.StageOff,
+	} {
+		var warn strings.Builder
+		got := policy.RepairFixabilityStageFor(strictPolicyRoot(t, body), "strict", &warn)
+		if warn.Len() != 0 || got != want {
+			t.Errorf("%s: stage = %v (%q); want %v", body, got, warn.String(), want)
+		}
+	}
+	for _, body := range []string{
+		`{"workflow": {"repair": {"fixability": {"stage": "advisory"}}}}`,
+		`{"workflow": {"repair": {"fixability": {"stage": "shadow", "stgae": 1}}}}`,
+	} {
+		var warn strings.Builder
+		if got := policy.RepairFixabilityStageFor(strictPolicyRoot(t, body), "strict", &warn); got != config.StageShadow || !strings.Contains(warn.String(), "workflow.repair.fixability") {
+			t.Errorf("%s: stage %v, warn %q; want shadow and a refusal that names workflow.repair.fixability", body, got, warn.String())
+		}
 	}
 }

@@ -59,6 +59,7 @@ func (w supplyWiring) census() orchestrator.Census {
 	window, _ := engine.QuotaCount(w.fleet, loopwave.LoadRouting(w.evolveDir, w.stderr))
 	inboxDir := filepath.Join(w.evolveDir, "inbox")
 	protected := laneForbidden(w.root, w.stderr)
+	companions := policy.RepairFixabilityStageFor(w.root, "census", w.stderr)
 	return orchestrator.Census{
 		Inbox:      inboxmover.Options{InboxDir: inboxDir, Stderr: io.Discard},
 		Rank:       rank,
@@ -68,6 +69,7 @@ func (w supplyWiring) census() orchestrator.Census {
 		Text:       engine.InboxText(w.iteration),
 		Window:     window,
 		Propose:    splitProposer(inboxDir, splitForbidden(protected), w.stderr),
+		Companions: companions,
 		Path:       waveSupplyPath(w.evolveDir),
 		Now:        w.now,
 	}

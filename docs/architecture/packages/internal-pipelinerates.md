@@ -11,7 +11,7 @@
 - **The outcome of a cycle.** `LoadCycles` reads `.evolve/waves/wave-N.json` (`number`, `cycle_floor`) and each `.evolve/runs/cycle-N/`. A cycle belongs to the last wave whose floor is at or below its id. A cycle ships when `run.json` `shipped` is true or its stream has `ship.landed`. A cycle is sealed when its stream has `cycle.sealed`. The loader never reads `run.json` `final_verdict`: in cycle 2024 it says PASS and the seal says FAIL.
 - **A cycle that still runs.** A cycle whose run lease is live (`runlease.LiveOwner`) has no outcome yet, so `LoadCycles` leaves it out. Without this rule the latest wave reads too high on PQ4.
 - **Deadline and system fail.** A cycle with no seal, or with a seal whose `termination_reason` names a lane deadline, is a deadline end. A cycle whose stream has `ORCHESTRATOR_SYSTEM_FAILURE`, `LOOP_SYSTEM_FAILURE_HALT` or a `BRIDGE_EXIT_*_TIMEOUT` code is a system fail. The system-fail reading is a PQ4 reading with the window suffix `/system-fail` and its own threshold of 0.05.
-- **The cost (PQ5, ADR-0158).** `LoadCycles` also reads the spend of each cycle through `cyclespend.Read`. A spend that cannot be read adds one unmeasured call, so the other indexes still load (`TestLoadCycles_AnUnreadableLLMCallLedgerCountsAsAnUnmeasuredCallAndKeepsTheOtherIndexes`). `CostPerShip` gives five census readings for each window:
+- **The cost (PQ5, ADR-0158).** `LoadCycles` also reads the spend of each cycle through `cyclespend.Read`. A spend that cannot be read adds one unmeasured call, so the other indexes still load (`TestLoadCycles_AnUnreadableLLMCallLedgerCountsAsAnUnmeasuredCallAndKeepsTheOtherIndexes`). `CostPerShip` gives eight census readings for each window:
 
   | Window suffix | Value |
   |---|---|
@@ -19,6 +19,7 @@
   | `/fresh-tokens`, `/cache-read-tokens` | the tokens for each shipped cycle |
   | `/audit-rounds` | the audit rounds for each started cycle |
   | `/unmeasured-calls` | the calls with no measured usage |
+  | `/handoff-would-stops`, `/handoff-stops`, `/false-stops` | the counts of `REPAIR_HANDOFF` in the window: the `would_stop` decisions, the `stop` decisions, and the cycles with a `would_stop` that shipped |
 
   A window with no ship has `n` 0, so the panel publishes `no_data`, not a cost of 0 (`TestCostPerShip_AWaveWithNoShipHasNoDataNotAZeroCost`). PQ1 is the convergence rate of ADR-0158: shipped cycles divided by started cycles.
 - **Windows.** `Windows` gives the latest wave, the last 10 waves, and all waves when they reach past the last 10.
