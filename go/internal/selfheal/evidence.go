@@ -31,6 +31,8 @@ const (
 	ciSourcePrefix       = "ci:"
 )
 
+var evidencePrefixes = map[string]string{EvidenceIncident: "i", EvidenceSignal: "s", EvidenceDigest: "d", EvidenceRetrospective: "r"}
+
 var cycleRecords = []struct{ name, class string }{
 	{"failure-digest.json", EvidenceDigest},
 	{"retrospective-report.md", EvidenceRetrospective},
@@ -77,7 +79,7 @@ func writeEvidenceAt(root, ws string, inc Incident, signals []signalcenter.Event
 			continue
 		}
 		counts[s.class]++
-		e.ID, e.Cycle, e.Required = s.class[:1]+strconv.Itoa(counts[s.class]), s.cycle, s.class == EvidenceIncident
+		e.ID, e.Cycle, e.Required = evidencePrefixes[s.class]+strconv.Itoa(counts[s.class]), s.cycle, s.class == EvidenceIncident
 		if e.Required {
 			idx.Required = append(idx.Required, e.ID)
 		}

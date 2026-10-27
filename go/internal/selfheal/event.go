@@ -12,7 +12,7 @@ const (
 )
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleHealing, CodeIncidentOpened, "the incident detector opened an incident record under .evolve/incidents; fields incident, class, fingerprint, tier, state, transition, recurrence, stage (llm-isolation.md §18, §24)")
+	signalcenter.RegisterCode(signalcenter.ModuleHealing, CodeIncidentOpened, "the incident detector opened an incident record under .evolve/incidents; fields incident, class, fingerprint, tier, state, transition, recurrence, stage, and from the live reaction on a sealed FAIL also reaction: would_brake, braked, brake_already_engaged or brake_failed (llm-isolation.md §18, §24)")
 	signalcenter.RegisterCode(signalcenter.ModuleHealing, CodeIncidentReopened, "the incident detector reopened a closed incident, because its signal fired again after the close; the same fields as HEALING_INCIDENT_OPENED (llm-isolation.md §18, §22)")
 }
 

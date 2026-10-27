@@ -94,6 +94,7 @@ Each Go package directory has one page. The page holds what the code cannot say:
 | `internal/phases/runner` | the shared phase engine: launch, fence, verify, correction ladder and host effects before the judge | [internal-phases-runner.md](internal-phases-runner.md) |
 | `internal/phases/audit` | the audit phase's EGPS gate: classifies audit-report.md and acs-verdict.json into a verdict | [internal-phases-audit.md](internal-phases-audit.md) |
 | `internal/phases/ship` | the native commit-and-push phase: audit-binding, EGPS gate, atomic commit+ff-merge+push | [internal-phases-ship.md](internal-phases-ship.md) |
+| `internal/shipjournal` | the one format of `.evolve/ship-journal.jsonl`: the entry, the file name, the loop landing class and the time stamp | [internal-shipjournal.md](internal-shipjournal.md) |
 | `internal/shipmanifest` | the one selection of which paths Ship commits: declared report manifest, porcelain parsing, the staging pathspec | [internal-shipmanifest.md](internal-shipmanifest.md) |
 | `internal/deliverable` | the ADR-0100 declared-deliverables gate: verify, salvage and host effects | [internal-deliverable.md](internal-deliverable.md) |
 | `internal/core/advisor` | the routing advisor that plans and re-plans a cycle's phases | [internal-core-advisor.md](internal-core-advisor.md) |

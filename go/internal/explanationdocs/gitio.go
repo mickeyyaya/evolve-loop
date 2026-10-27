@@ -354,7 +354,7 @@ func ensureRealSubdirectories(root, rel string) (string, error) {
 func immutableHistoryFailures(changed []string, current string) []string {
 	failures := foreignHistoryFailures(changed, current)
 	if !contains(changed, current) {
-		failures = append(failures, "Explanation Documentation: current cycle change record must be newly added relative to the sealed base")
+		failures = append(failures, FailurePrefix+"current cycle change record must be newly added relative to the sealed base")
 	}
 	return failures
 }
@@ -363,7 +363,7 @@ func foreignHistoryFailures(changed []string, current string) []string {
 	var failures []string
 	for _, path := range changedCycleRecords(changed) {
 		if path != current {
-			failures = append(failures, fmt.Sprintf("Explanation Documentation: historical change record %s is a foreign cycle change record; published cycle records are immutable", path))
+			failures = append(failures, fmt.Sprintf(FailurePrefix+"historical change record %s is a foreign cycle change record; published cycle records are immutable", path))
 		}
 	}
 	return failures
