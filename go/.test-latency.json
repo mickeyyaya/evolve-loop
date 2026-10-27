@@ -1,0 +1,1400 @@
+{
+  "packages": {
+    "acs/regression/gatepins": {
+      "class": "small",
+      "p90": 0.28
+    },
+    "cmd/commentaudit": {
+      "class": "small",
+      "p90": 0.28
+    },
+    "cmd/darwinset": {
+      "class": "small",
+      "p90": 0.29
+    },
+    "cmd/e2elist": {
+      "class": "small",
+      "p90": 0.29
+    },
+    "cmd/evolve": {
+      "class": "medium",
+      "p90": 178.07
+    },
+    "cmd/evolve-fake-cli": {
+      "class": "small",
+      "p90": 0.31
+    },
+    "cmd/evolve/cmdutil": {
+      "class": "small",
+      "p90": 0.28
+    },
+    "cmd/filter-stdout": {
+      "class": "small",
+      "p90": 0.26
+    },
+    "cmd/hostsampler": {
+      "class": "small",
+      "p90": 3.73
+    },
+    "cmd/testlatency": {
+      "class": "small",
+      "p90": 0.26
+    },
+    "cmd/testrusage": {
+      "class": "small",
+      "p90": 1.09
+    },
+    "cmd/vulnfilter": {
+      "class": "small",
+      "p90": 0.62
+    },
+    "internal/acspathscan": {
+      "class": "small",
+      "p90": 0.67
+    },
+    "internal/acsrunner": {
+      "class": "small",
+      "p90": 0.83
+    },
+    "internal/acssuite": {
+      "class": "small",
+      "p90": 5.45
+    },
+    "internal/acsverdict": {
+      "class": "small",
+      "p90": 0.61
+    },
+    "internal/adapters/bridge": {
+      "class": "small",
+      "p90": 0.54
+    },
+    "internal/adapters/codeindex/gotypes": {
+      "class": "small",
+      "p90": 0.88
+    },
+    "internal/adapters/codeindex/trail": {
+      "class": "small",
+      "p90": 0.24
+    },
+    "internal/adapters/flock": {
+      "class": "small",
+      "p90": 0.28
+    },
+    "internal/adapters/ledger": {
+      "class": "small",
+      "p90": 21.87
+    },
+    "internal/adapters/observer": {
+      "class": "small",
+      "p90": 2.75
+    },
+    "internal/adapters/sandbox": {
+      "class": "small",
+      "p90": 0.29
+    },
+    "internal/adapters/statemap": {
+      "class": "small",
+      "p90": 0.8
+    },
+    "internal/adapters/storage": {
+      "class": "small",
+      "p90": 5.38
+    },
+    "internal/adapters/yamlcodec": {
+      "class": "small",
+      "p90": 0.26
+    },
+    "internal/addedtests": {
+      "class": "small",
+      "p90": 0.42
+    },
+    "internal/admission": {
+      "class": "small",
+      "p90": 0.31
+    },
+    "internal/agentclass": {
+      "class": "small",
+      "p90": 0.27
+    },
+    "internal/agentmsg": {
+      "class": "small",
+      "p90": 0.26
+    },
+    "internal/agentmsg/address": {
+      "class": "small",
+      "p90": 0.27
+    },
+    "internal/agentmsg/boot": {
+      "class": "small",
+      "p90": 0.25
+    },
+    "internal/agentmsg/broker": {
+      "class": "small",
+      "p90": 0.26
+    },
+    "internal/agentmsg/channelstore": {
+      "class": "small",
+      "p90": 0.31
+    },
+    "internal/agentmsg/delivery": {
+      "class": "small",
+      "p90": 0.26
+    },
+    "internal/agentmsg/envelope": {
+      "class": "small",
+      "p90": 0.25
+    },
+    "internal/agentmsg/identity": {
+      "class": "small",
+      "p90": 0.25
+    },
+    "internal/agentmsg/memstore": {
+      "class": "small",
+      "p90": 0.25
+    },
+    "internal/agentmsg/outbox": {
+      "class": "small",
+      "p90": 0.69
+    },
+    "internal/agentmsg/policy": {
+      "class": "small",
+      "p90": 0.24
+    },
+    "internal/aggregator": {
+      "class": "small",
+      "p90": 0.43
+    },
+    "internal/apicover": {
+      "class": "small",
+      "p90": 0.61
+    },
+    "internal/atomicwrite": {
+      "class": "small",
+      "p90": 0.6
+    },
+    "internal/attemptpostmortem": {
+      "class": "small",
+      "p90": 0.71
+    },
+    "internal/auditcalibration": {
+      "class": "small",
+      "p90": 0.53
+    },
+    "internal/auditcascade": {
+      "class": "small",
+      "p90": 0.29
+    },
+    "internal/auditchain": {
+      "class": "small",
+      "p90": 0.36
+    },
+    "internal/auditfix": {
+      "class": "small",
+      "p90": 0.4
+    },
+    "internal/auditledger": {
+      "class": "small",
+      "p90": 0.27
+    },
+    "internal/backfill": {
+      "class": "small",
+      "p90": 0.35
+    },
+    "internal/bedrock": {
+      "class": "small",
+      "p90": 0.27
+    },
+    "internal/binaryguard": {
+      "class": "small",
+      "p90": 0.27
+    },
+    "internal/bridge": {
+      "class": "medium",
+      "p90": 64.42
+    },
+    "internal/bridge/capabilities": {
+      "class": "small",
+      "p90": 0.3
+    },
+    "internal/bridge/channel": {
+      "class": "small",
+      "p90": 0.67
+    },
+    "internal/bridge/clicontrol": {
+      "class": "small",
+      "p90": 0.25
+    },
+    "internal/bridge/inbox": {
+      "class": "small",
+      "p90": 0.4
+    },
+    "internal/bridge/keyspec": {
+      "class": "small",
+      "p90": 0.25
+    },
+    "internal/bridge/launchoutcome": {
+      "class": "small",
+      "p90": 0.27
+    },
+    "internal/bridge/panestream": {
+      "class": "small",
+      "p90": 0.39
+    },
+    "internal/bridge/phaseidentity": {
+      "class": "small",
+      "p90": 0.26
+    },
+    "internal/bridge/recipe": {
+      "class": "small",
+      "p90": 0.27
+    },
+    "internal/bridgechain": {
+      "class": "small",
+      "p90": 0.89
+    },
+    "internal/budgethistory": {
+      "class": "small",
+      "p90": 0.47
+    },
+    "internal/builddiff": {
+      "class": "small",
+      "p90": 4.42
+    },
+    "internal/bypass": {
+      "class": "small",
+      "p90": 0.27
+    },
+    "internal/campaign": {
+      "class": "small",
+      "p90": 0.55
+    },
+    "internal/capability": {
+      "class": "small",
+      "p90": 0.29
+    },
+    "internal/changedpkgs": {
+      "class": "small",
+      "p90": 24.01
+    },
+    "internal/changeloggen": {
+      "class": "small",
+      "p90": 2.68
+    },
+    "internal/checkpoint": {
+      "class": "small",
+      "p90": 10.91
+    },
+    "internal/ciparity": {
+      "class": "small",
+      "p90": 2.01
+    },
+    "internal/ciwatch": {
+      "class": "small",
+      "p90": 1.17
+    },
+    "internal/cli/agentcmd": {
+      "class": "small",
+      "p90": 17.14
+    },
+    "internal/cli/contextcmd": {
+      "class": "small",
+      "p90": 0.4
+    },
+    "internal/cli/guardcmd": {
+      "class": "small",
+      "p90": 1.81
+    },
+    "internal/cli/opscmd": {
+      "class": "small",
+      "p90": 7.6
+    },
+    "internal/cli/phasecmd": {
+      "class": "small",
+      "p90": 11.3
+    },
+    "internal/cliadmit": {
+      "class": "small",
+      "p90": 1.6
+    },
+    "internal/clihealth": {
+      "class": "small",
+      "p90": 0.48
+    },
+    "internal/cliroute": {
+      "class": "small",
+      "p90": 3.21
+    },
+    "internal/cliroute/cliroutetest": {
+      "class": "small",
+      "p90": 0.38
+    },
+    "internal/cliupdate": {
+      "class": "small",
+      "p90": 1.62
+    },
+    "internal/codeindex": {
+      "class": "small",
+      "p90": 0.26
+    },
+    "internal/codeindex/codeindextest": {
+      "class": "small",
+      "p90": 0.25
+    },
+    "internal/codeindex/usagelog": {
+      "class": "small",
+      "p90": 0.34
+    },
+    "internal/codequality": {
+      "class": "small",
+      "p90": 0.55
+    },
+    "internal/codereview": {
+      "class": "small",
+      "p90": 0.38
+    },
+    "internal/codeshape": {
+      "class": "small",
+      "p90": 1.45
+    },
+    "internal/coherence": {
+      "class": "small",
+      "p90": 0.62
+    },
+    "internal/commentaudit": {
+      "class": "small",
+      "p90": 2.76
+    },
+    "internal/commitgate": {
+      "class": "small",
+      "p90": 4.33
+    },
+    "internal/commitprefixgate": {
+      "class": "small",
+      "p90": 0.42
+    },
+    "internal/committedset": {
+      "class": "small",
+      "p90": 0.59
+    },
+    "internal/config": {
+      "class": "small",
+      "p90": 0.48
+    },
+    "internal/consensusdispatch": {
+      "class": "small",
+      "p90": 0.72
+    },
+    "internal/contextfill": {
+      "class": "small",
+      "p90": 0.25
+    },
+    "internal/contextfillcorrelate": {
+      "class": "small",
+      "p90": 0.3
+    },
+    "internal/continuation": {
+      "class": "small",
+      "p90": 0.56
+    },
+    "internal/convergence": {
+      "class": "small",
+      "p90": 0.42
+    },
+    "internal/core": {
+      "class": "medium",
+      "p90": 124.39
+    },
+    "internal/core/advisor": {
+      "class": "small",
+      "p90": 0.74
+    },
+    "internal/core/carryover": {
+      "class": "small",
+      "p90": 0.34
+    },
+    "internal/core/defectledger": {
+      "class": "small",
+      "p90": 1.1
+    },
+    "internal/core/evidence": {
+      "class": "small",
+      "p90": 0.24
+    },
+    "internal/core/failurediag": {
+      "class": "small",
+      "p90": 0.34
+    },
+    "internal/core/failurelearning": {
+      "class": "small",
+      "p90": 0.73
+    },
+    "internal/core/outcome": {
+      "class": "small",
+      "p90": 0.33
+    },
+    "internal/covchanged": {
+      "class": "small",
+      "p90": 0.47
+    },
+    "internal/coverstrict": {
+      "class": "small",
+      "p90": 0.76
+    },
+    "internal/cyclebudget": {
+      "class": "small",
+      "p90": 0.25
+    },
+    "internal/cycleclassify": {
+      "class": "small",
+      "p90": 0.92
+    },
+    "internal/cyclecost": {
+      "class": "small",
+      "p90": 0.4
+    },
+    "internal/cyclehealth": {
+      "class": "small",
+      "p90": 0.71
+    },
+    "internal/cycleoutcome": {
+      "class": "small",
+      "p90": 2.42
+    },
+    "internal/cyclesimulator": {
+      "class": "small",
+      "p90": 4.21
+    },
+    "internal/cyclespend": {
+      "class": "small",
+      "p90": 0.28
+    },
+    "internal/cyclestate": {
+      "class": "small",
+      "p90": 0.28
+    },
+    "internal/dag": {
+      "class": "small",
+      "p90": 0.26
+    },
+    "internal/dashboard": {
+      "class": "small",
+      "p90": 0.79
+    },
+    "internal/deliverable": {
+      "class": "small",
+      "p90": 54.35
+    },
+    "internal/deliverable/gatesignal": {
+      "class": "small",
+      "p90": 0.29
+    },
+    "internal/derived": {
+      "class": "small",
+      "p90": 0.3
+    },
+    "internal/detectcli": {
+      "class": "small",
+      "p90": 0.26
+    },
+    "internal/detectnested": {
+      "class": "small",
+      "p90": 0.25
+    },
+    "internal/digest": {
+      "class": "small",
+      "p90": 0.26
+    },
+    "internal/directives": {
+      "class": "small",
+      "p90": 0.27
+    },
+    "internal/dispatchcred": {
+      "class": "small",
+      "p90": 0.28
+    },
+    "internal/dispatchevents": {
+      "class": "small",
+      "p90": 0.3
+    },
+    "internal/dispositionrouter": {
+      "class": "small",
+      "p90": 0.27
+    },
+    "internal/docsfloor": {
+      "class": "small",
+      "p90": 0.24
+    },
+    "internal/doctor": {
+      "class": "small",
+      "p90": 0.27
+    },
+    "internal/dossier": {
+      "class": "small",
+      "p90": 10.18
+    },
+    "internal/envchain": {
+      "class": "small",
+      "p90": 0.25
+    },
+    "internal/envscope": {
+      "class": "small",
+      "p90": 0.25
+    },
+    "internal/evalgate": {
+      "class": "small",
+      "p90": 1.27
+    },
+    "internal/evalqualitycheck": {
+      "class": "small",
+      "p90": 1.53
+    },
+    "internal/events/channel": {
+      "class": "small",
+      "p90": 0.42
+    },
+    "internal/events/filter": {
+      "class": "small",
+      "p90": 0.3
+    },
+    "internal/events/publisher": {
+      "class": "small",
+      "p90": 0.49
+    },
+    "internal/events/reader": {
+      "class": "small",
+      "p90": 0.61
+    },
+    "internal/events/rootwire": {
+      "class": "small",
+      "p90": 0.33
+    },
+    "internal/events/wake": {
+      "class": "small",
+      "p90": 0.39
+    },
+    "internal/explanationdocs": {
+      "class": "medium",
+      "p90": 91.09
+    },
+    "internal/faillearn": {
+      "class": "small",
+      "p90": 0.65
+    },
+    "internal/failureadapter": {
+      "class": "small",
+      "p90": 0.26
+    },
+    "internal/failuregrade": {
+      "class": "small",
+      "p90": 0.25
+    },
+    "internal/failurelog": {
+      "class": "small",
+      "p90": 0.63
+    },
+    "internal/fakeclitest": {
+      "class": "small",
+      "p90": 0.54
+    },
+    "internal/faketmux": {
+      "class": "small",
+      "p90": 10.61
+    },
+    "internal/fanoutdispatch": {
+      "class": "small",
+      "p90": 2.51
+    },
+    "internal/fixability": {
+      "class": "small",
+      "p90": 0.28
+    },
+    "internal/flagregistry": {
+      "class": "small",
+      "p90": 0.25
+    },
+    "internal/fleet": {
+      "class": "small",
+      "p90": 5.16
+    },
+    "internal/fleetbudget": {
+      "class": "small",
+      "p90": 0.25
+    },
+    "internal/gc": {
+      "class": "medium",
+      "p90": 88.21
+    },
+    "internal/gcpolicy": {
+      "class": "small",
+      "p90": 0.25
+    },
+    "internal/gitexec": {
+      "class": "small",
+      "p90": 7.37
+    },
+    "internal/gittest": {
+      "class": "small",
+      "p90": 14.47
+    },
+    "internal/goalhash": {
+      "class": "small",
+      "p90": 0.4
+    },
+    "internal/gopkgpattern": {
+      "class": "small",
+      "p90": 0.27
+    },
+    "internal/gotooltest": {
+      "class": "small",
+      "p90": 0.31
+    },
+    "internal/guards": {
+      "class": "small",
+      "p90": 16.95
+    },
+    "internal/guards/treediff": {
+      "class": "small",
+      "p90": 0.27
+    },
+    "internal/guardslog": {
+      "class": "small",
+      "p90": 0.27
+    },
+    "internal/guidance": {
+      "class": "small",
+      "p90": 0.37
+    },
+    "internal/handoff": {
+      "class": "small",
+      "p90": 0.26
+    },
+    "internal/handoff/evidence": {
+      "class": "small",
+      "p90": 0.29
+    },
+    "internal/handoff/exit": {
+      "class": "small",
+      "p90": 0.32
+    },
+    "internal/handoff/request": {
+      "class": "small",
+      "p90": 0.4
+    },
+    "internal/heldproposal": {
+      "class": "small",
+      "p90": 0.25
+    },
+    "internal/inboxbatch": {
+      "class": "small",
+      "p90": 1.17
+    },
+    "internal/inboxcurator": {
+      "class": "small",
+      "p90": 1.57
+    },
+    "internal/inboxfile": {
+      "class": "small",
+      "p90": 1.05
+    },
+    "internal/inboxmover": {
+      "class": "small",
+      "p90": 2.93
+    },
+    "internal/inboxmover/lifecycle": {
+      "class": "small",
+      "p90": 1.42
+    },
+    "internal/inboxrank": {
+      "class": "small",
+      "p90": 1.28
+    },
+    "internal/inboxrank/rankinputs": {
+      "class": "small",
+      "p90": 0.29
+    },
+    "internal/inboxsplit": {
+      "class": "small",
+      "p90": 0.28
+    },
+    "internal/inboxstamps": {
+      "class": "small",
+      "p90": 28.55
+    },
+    "internal/inputindex": {
+      "class": "small",
+      "p90": 0.48
+    },
+    "internal/installer": {
+      "class": "small",
+      "p90": 0.49
+    },
+    "internal/integration": {
+      "class": "small",
+      "p90": 0.26
+    },
+    "internal/interaction": {
+      "class": "small",
+      "p90": 1.69
+    },
+    "internal/ipcenv": {
+      "class": "small",
+      "p90": 2.51
+    },
+    "internal/isolation": {
+      "class": "small",
+      "p90": 0.25
+    },
+    "internal/kbgraph": {
+      "class": "small",
+      "p90": 0.28
+    },
+    "internal/kerneltest": {
+      "class": "small",
+      "p90": 0.26
+    },
+    "internal/landed": {
+      "class": "small",
+      "p90": 2.04
+    },
+    "internal/lanebudget": {
+      "class": "small",
+      "p90": 0.25
+    },
+    "internal/lanerouting": {
+      "class": "small",
+      "p90": 0.3
+    },
+    "internal/lanetime": {
+      "class": "small",
+      "p90": 0.29
+    },
+    "internal/launchrecord": {
+      "class": "small",
+      "p90": 0.27
+    },
+    "internal/ledgerartifacts": {
+      "class": "small",
+      "p90": 0.64
+    },
+    "internal/ledgertip": {
+      "class": "small",
+      "p90": 0.26
+    },
+    "internal/ledgerverify": {
+      "class": "small",
+      "p90": 0.32
+    },
+    "internal/llmcalls": {
+      "class": "small",
+      "p90": 0.35
+    },
+    "internal/llmroute": {
+      "class": "small",
+      "p90": 0.29
+    },
+    "internal/log": {
+      "class": "small",
+      "p90": 0.3
+    },
+    "internal/logfilter": {
+      "class": "small",
+      "p90": 0.39
+    },
+    "internal/loopchain": {
+      "class": "small",
+      "p90": 2.12
+    },
+    "internal/looppreflight": {
+      "class": "small",
+      "p90": 5.92
+    },
+    "internal/loopwave": {
+      "class": "small",
+      "p90": 0.98
+    },
+    "internal/marketplacepoll": {
+      "class": "small",
+      "p90": 0.31
+    },
+    "internal/mergegate": {
+      "class": "small",
+      "p90": 0.32
+    },
+    "internal/mergewindow": {
+      "class": "small",
+      "p90": 0.26
+    },
+    "internal/mintregistry": {
+      "class": "small",
+      "p90": 0.31
+    },
+    "internal/modelcatalog": {
+      "class": "small",
+      "p90": 0.55
+    },
+    "internal/modelquery": {
+      "class": "small",
+      "p90": 0.3
+    },
+    "internal/observerengine": {
+      "class": "small",
+      "p90": 1.49
+    },
+    "internal/orchestrator": {
+      "class": "small",
+      "p90": 1.29
+    },
+    "internal/overlap": {
+      "class": "small",
+      "p90": 1.47
+    },
+    "internal/panetrust": {
+      "class": "small",
+      "p90": 0.27
+    },
+    "internal/panewatch": {
+      "class": "small",
+      "p90": 0.28
+    },
+    "internal/paralleltest": {
+      "class": "small",
+      "p90": 0.27
+    },
+    "internal/paths": {
+      "class": "small",
+      "p90": 0.24
+    },
+    "internal/phaseblock": {
+      "class": "small",
+      "p90": 0.24
+    },
+    "internal/phasecoherence": {
+      "class": "small",
+      "p90": 1.68
+    },
+    "internal/phaseconfig": {
+      "class": "small",
+      "p90": 0.26
+    },
+    "internal/phasecontract": {
+      "class": "small",
+      "p90": 0.31
+    },
+    "internal/phaseintegrity": {
+      "class": "small",
+      "p90": 0.79
+    },
+    "internal/phaseinventory": {
+      "class": "small",
+      "p90": 0.37
+    },
+    "internal/phaseio": {
+      "class": "small",
+      "p90": 0.29
+    },
+    "internal/phaseobserver": {
+      "class": "small",
+      "p90": 2.52
+    },
+    "internal/phaseorder": {
+      "class": "small",
+      "p90": 0.26
+    },
+    "internal/phaseoutputs": {
+      "class": "small",
+      "p90": 0.27
+    },
+    "internal/phaseregistrar": {
+      "class": "small",
+      "p90": 0.42
+    },
+    "internal/phases/audit": {
+      "class": "small",
+      "p90": 7.79
+    },
+    "internal/phases/audit/ciparitygate": {
+      "class": "small",
+      "p90": 0.37
+    },
+    "internal/phases/build": {
+      "class": "small",
+      "p90": 3.5
+    },
+    "internal/phases/buildplanner": {
+      "class": "small",
+      "p90": 0.28
+    },
+    "internal/phases/debugger": {
+      "class": "small",
+      "p90": 0.3
+    },
+    "internal/phases/flakererunscan": {
+      "class": "small",
+      "p90": 0.24
+    },
+    "internal/phases/intent": {
+      "class": "small",
+      "p90": 6.56
+    },
+    "internal/phases/registry": {
+      "class": "small",
+      "p90": 0.26
+    },
+    "internal/phases/retro": {
+      "class": "small",
+      "p90": 2.9
+    },
+    "internal/phases/runner": {
+      "class": "small",
+      "p90": 27.06
+    },
+    "internal/phases/runner/runnertest": {
+      "class": "small",
+      "p90": 0.27
+    },
+    "internal/phases/runner/verdict": {
+      "class": "small",
+      "p90": 0.45
+    },
+    "internal/phases/scout": {
+      "class": "small",
+      "p90": 3.51
+    },
+    "internal/phases/secretleakscan": {
+      "class": "small",
+      "p90": 0.29
+    },
+    "internal/phases/ship": {
+      "class": "small",
+      "p90": 27.89
+    },
+    "internal/phases/ship/landing": {
+      "class": "small",
+      "p90": 0.36
+    },
+    "internal/phases/specrunner": {
+      "class": "small",
+      "p90": 0.49
+    },
+    "internal/phases/swarmplan": {
+      "class": "small",
+      "p90": 0.28
+    },
+    "internal/phases/swarmrunner": {
+      "class": "small",
+      "p90": 0.5
+    },
+    "internal/phases/tdd": {
+      "class": "small",
+      "p90": 6.56
+    },
+    "internal/phases/triage": {
+      "class": "small",
+      "p90": 25.07
+    },
+    "internal/phasespec": {
+      "class": "small",
+      "p90": 13.53
+    },
+    "internal/phasestream": {
+      "class": "small",
+      "p90": 0.29
+    },
+    "internal/phasetiming": {
+      "class": "small",
+      "p90": 0.26
+    },
+    "internal/phasewatchdog": {
+      "class": "small",
+      "p90": 0.29
+    },
+    "internal/pipelinerates": {
+      "class": "small",
+      "p90": 0.93
+    },
+    "internal/plane": {
+      "class": "small",
+      "p90": 0.32
+    },
+    "internal/policy": {
+      "class": "small",
+      "p90": 0.96
+    },
+    "internal/posteditvalidate": {
+      "class": "small",
+      "p90": 1.02
+    },
+    "internal/practicewatch": {
+      "class": "small",
+      "p90": 11.52
+    },
+    "internal/preflight": {
+      "class": "small",
+      "p90": 0.57
+    },
+    "internal/proctree": {
+      "class": "small",
+      "p90": 0.42
+    },
+    "internal/profiles": {
+      "class": "small",
+      "p90": 2.72
+    },
+    "internal/projecthash": {
+      "class": "small",
+      "p90": 0.46
+    },
+    "internal/prompts": {
+      "class": "small",
+      "p90": 1.71
+    },
+    "internal/pruneephemeral": {
+      "class": "small",
+      "p90": 0.59
+    },
+    "internal/qualityindex": {
+      "class": "small",
+      "p90": 0.34
+    },
+    "internal/qualitypanel": {
+      "class": "small",
+      "p90": 0.26
+    },
+    "internal/quotareset": {
+      "class": "small",
+      "p90": 0.45
+    },
+    "internal/quotastate": {
+      "class": "small",
+      "p90": 0.25
+    },
+    "internal/rawgitratchet": {
+      "class": "small",
+      "p90": 7.56
+    },
+    "internal/reachabilityprobe": {
+      "class": "small",
+      "p90": 1.56
+    },
+    "internal/recovery": {
+      "class": "small",
+      "p90": 1.4
+    },
+    "internal/recoveryguard": {
+      "class": "small",
+      "p90": 1.69
+    },
+    "internal/recoveryretro": {
+      "class": "small",
+      "p90": 0.44
+    },
+    "internal/recurrence": {
+      "class": "small",
+      "p90": 0.58
+    },
+    "internal/redteamcheck": {
+      "class": "small",
+      "p90": 0.42
+    },
+    "internal/reflection": {
+      "class": "small",
+      "p90": 0.27
+    },
+    "internal/regressiontia": {
+      "class": "small",
+      "p90": 9.79
+    },
+    "internal/releaseconsistency": {
+      "class": "small",
+      "p90": 0.41
+    },
+    "internal/releasepipeline": {
+      "class": "small",
+      "p90": 37.06
+    },
+    "internal/releasepreflight": {
+      "class": "small",
+      "p90": 6.1
+    },
+    "internal/releasetargets": {
+      "class": "small",
+      "p90": 0.28
+    },
+    "internal/repocontract": {
+      "class": "small",
+      "p90": 8.09
+    },
+    "internal/reportdoc": {
+      "class": "small",
+      "p90": 1.97
+    },
+    "internal/repostate": {
+      "class": "small",
+      "p90": 1.0
+    },
+    "internal/research": {
+      "class": "small",
+      "p90": 0.29
+    },
+    "internal/researchindex": {
+      "class": "small",
+      "p90": 1.58
+    },
+    "internal/resolvellm": {
+      "class": "small",
+      "p90": 0.33
+    },
+    "internal/retrofile": {
+      "class": "small",
+      "p90": 0.29
+    },
+    "internal/retryladder": {
+      "class": "small",
+      "p90": 0.31
+    },
+    "internal/rollback": {
+      "class": "small",
+      "p90": 1.32
+    },
+    "internal/router": {
+      "class": "small",
+      "p90": 0.72
+    },
+    "internal/routingeval": {
+      "class": "small",
+      "p90": 0.26
+    },
+    "internal/routingtest": {
+      "class": "small",
+      "p90": 14.49
+    },
+    "internal/runlease": {
+      "class": "small",
+      "p90": 0.29
+    },
+    "internal/runscope": {
+      "class": "small",
+      "p90": 0.23
+    },
+    "internal/scopedelta": {
+      "class": "small",
+      "p90": 0.23
+    },
+    "internal/selfheal": {
+      "class": "small",
+      "p90": 0.31
+    },
+    "internal/selfsha": {
+      "class": "small",
+      "p90": 0.26
+    },
+    "internal/semvercheck": {
+      "class": "small",
+      "p90": 0.23
+    },
+    "internal/sessionreaper": {
+      "class": "small",
+      "p90": 0.28
+    },
+    "internal/sessionrecord": {
+      "class": "small",
+      "p90": 0.35
+    },
+    "internal/setup": {
+      "class": "small",
+      "p90": 16.99
+    },
+    "internal/shiperr": {
+      "class": "small",
+      "p90": 0.24
+    },
+    "internal/shipmanifest": {
+      "class": "small",
+      "p90": 2.27
+    },
+    "internal/shipwindow": {
+      "class": "small",
+      "p90": 1.09
+    },
+    "internal/signalcenter": {
+      "class": "small",
+      "p90": 0.3
+    },
+    "internal/sizeratchet": {
+      "class": "small",
+      "p90": 1.38
+    },
+    "internal/skillcheck": {
+      "class": "small",
+      "p90": 9.23
+    },
+    "internal/skillinventory": {
+      "class": "small",
+      "p90": 0.33
+    },
+    "internal/skilloverlay": {
+      "class": "small",
+      "p90": 0.25
+    },
+    "internal/soakreport": {
+      "class": "small",
+      "p90": 0.26
+    },
+    "internal/solutioncheck": {
+      "class": "small",
+      "p90": 0.29
+    },
+    "internal/stelint": {
+      "class": "small",
+      "p90": 0.36
+    },
+    "internal/subagent": {
+      "class": "small",
+      "p90": 2.06
+    },
+    "internal/subagent/subagentrun": {
+      "class": "small",
+      "p90": 0.63
+    },
+    "internal/swarm": {
+      "class": "small",
+      "p90": 13.08
+    },
+    "internal/sysexec": {
+      "class": "small",
+      "p90": 5.33
+    },
+    "internal/systemprompt": {
+      "class": "small",
+      "p90": 0.29
+    },
+    "internal/testhost": {
+      "class": "small",
+      "p90": 0.23
+    },
+    "internal/testkey": {
+      "class": "small",
+      "p90": 0.28
+    },
+    "internal/testmainexit": {
+      "class": "small",
+      "p90": 2.67
+    },
+    "internal/testverdict": {
+      "class": "small",
+      "p90": 0.46
+    },
+    "internal/textcap": {
+      "class": "small",
+      "p90": 0.24
+    },
+    "internal/textutil": {
+      "class": "small",
+      "p90": 0.24
+    },
+    "internal/tmuxtest": {
+      "class": "small",
+      "p90": 2.87
+    },
+    "internal/tokenusage": {
+      "class": "small",
+      "p90": 1.03
+    },
+    "internal/topngate": {
+      "class": "small",
+      "p90": 0.51
+    },
+    "internal/treedelta": {
+      "class": "small",
+      "p90": 1.06
+    },
+    "internal/treefence": {
+      "class": "small",
+      "p90": 14.23
+    },
+    "internal/treestate": {
+      "class": "small",
+      "p90": 0.4
+    },
+    "internal/treewalk": {
+      "class": "small",
+      "p90": 0.26
+    },
+    "internal/triagecap": {
+      "class": "small",
+      "p90": 1.66
+    },
+    "internal/triagedecision": {
+      "class": "small",
+      "p90": 0.25
+    },
+    "internal/usageevidence": {
+      "class": "small",
+      "p90": 0.51
+    },
+    "internal/usageprobe": {
+      "class": "small",
+      "p90": 0.81
+    },
+    "internal/verdictcache": {
+      "class": "small",
+      "p90": 0.33
+    },
+    "internal/verifyeval": {
+      "class": "small",
+      "p90": 0.38
+    },
+    "internal/verifylock": {
+      "class": "small",
+      "p90": 1.49
+    },
+    "internal/versionbump": {
+      "class": "small",
+      "p90": 0.53
+    },
+    "internal/wave": {
+      "class": "small",
+      "p90": 0.47
+    },
+    "internal/wavemeasure": {
+      "class": "small",
+      "p90": 0.27
+    },
+    "internal/wtcheckpoint": {
+      "class": "small",
+      "p90": 9.6
+    },
+    "pkg/acsassert": {
+      "class": "small",
+      "p90": 0.76
+    },
+    "pkg/naminguard": {
+      "class": "small",
+      "p90": 3.72
+    },
+    "pkg/phaseproto": {
+      "class": "small",
+      "p90": 0.81
+    },
+    "pkg/version": {
+      "class": "small",
+      "p90": 0.26
+    },
+    "test/component": {
+      "class": "small",
+      "p90": 0.3
+    },
+    "test/fixtures": {
+      "class": "small",
+      "p90": 0.43
+    },
+    "test/structure": {
+      "class": "small",
+      "p90": 7.66
+    },
+    "test/trustkernel": {
+      "class": "small",
+      "p90": 3.82
+    }
+  }
+}

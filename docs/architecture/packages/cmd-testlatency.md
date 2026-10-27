@@ -18,6 +18,9 @@
 - **Report sections.** Optimization targets (packages over the wall threshold) with the columns Package, Wall, Tests, Σall tests, Serial Σ, Parallel max, Floor, Dominant, Slowest test and Slowest.
 - **Table columns.** The Σall tests column sums every top-level test. The Serial Σ column sums only the tests without `pause`.
 - **Package budget.** `--budget` leads the report with the packages over a wall time. `--fail-over-budget` then exits 1. `-package-budget` sets both from `addedtests.PackageWallBudget`. `make test-budget` runs it on the fast suite.
+- **Duration ratchet.** `-ratchet <file>` reads `go/.test-latency.json`, which records a class (`small` 60 s, `medium` 300 s, `large` 600 s) and a p90 for each package. The command exits 1 when a package runs longer than min(2 x its class ceiling, `-test-timeout`). The default of `-test-timeout` is `20m`, the `TEST_TIMEOUT` of the Makefile. A package with no record has only the timeout as limit. A ratchet file that is missing, malformed or has an unknown class gives exit 2 and names the file.
+- **p90 warning.** With `-ratchet`, the report lists each package whose wall time is above its recorded p90 by 50% and by more than 30 seconds, under `## Packages above their recorded p90`. A warning never changes the exit code.
+- **`tighten`.** `testlatency tighten -ratchet <file>` lowers the p90 of a recorded package that ran faster. It never raises a value and never adds a package. It does not rewrite the file when nothing is lower. Only a reviewed diff of the file raises a value.
 - **Other sections.** The report also has the slowest tests (capped by `Top`). A count of tests over the per-test threshold is the regression watch. `shortPkg` trims the module prefix.
 
 ## Invariants

@@ -212,7 +212,7 @@ func TestGoWorkflow_ReportsPackageWallBudgetWithoutGatingTheJob(t *testing.T) {
 		if strings.Contains(step.Run, "make test-integration") {
 			integration = i
 		}
-		if strings.Contains(step.Run, "cmd/testlatency") {
+		if budget < 0 && strings.Contains(step.Run, "cmd/testlatency") {
 			budget = i
 		}
 	}

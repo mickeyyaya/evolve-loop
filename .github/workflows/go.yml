@@ -65,6 +65,11 @@ jobs:
           if [ -s test-integration.json ]; then
             go run ./cmd/testlatency -budget 180s -title "Package wall time under race and integration" < test-integration.json >> "$GITHUB_STEP_SUMMARY" || echo "::warning::package wall budget report failed"
           fi
+      - name: package wall ratchet (fails above min(2 x class ceiling, TEST_TIMEOUT))
+        run: |
+          if [ -s test-integration.json ]; then
+            go run ./cmd/testlatency -ratchet .test-latency.json -title "Package wall ratchet" < test-integration.json >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: e2e tier (no race; live sub-tier self-skips without live flag)
         # `evolve_test_phases` is added alongside `e2e` so the serve-phase
         # subprocess round-trip test (cmd/evolve/e2e_serve_phase_subprocess_test.go
@@ -190,6 +195,11 @@ jobs:
         run: |
           if [ -s test-integration.json ]; then
             go run ./cmd/testlatency -budget 180s -title "Package wall time of the darwin set under race and integration" < test-integration.json >> "$GITHUB_STEP_SUMMARY" || echo "::warning::package wall budget report failed"
+          fi
+      - name: package wall ratchet (fails above min(2 x class ceiling, TEST_TIMEOUT))
+        run: |
+          if [ -s test-integration.json ]; then
+            go run ./cmd/testlatency -ratchet .test-latency.json -title "Package wall ratchet" < test-integration.json >> "$GITHUB_STEP_SUMMARY"
           fi
       - name: e2e tier (no race; live sub-tier self-skips without live flag)
         env:
