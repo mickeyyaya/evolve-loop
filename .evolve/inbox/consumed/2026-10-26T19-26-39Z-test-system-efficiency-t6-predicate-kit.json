@@ -1,0 +1,32 @@
+{
+  "acceptance": [
+    "Each new helper in go/pkg/acsassert has a table test and a failure case",
+    "Each new exported helper has a test that names it (apicover)",
+    "agents/evolve-tdd-engineer.md and go/acs/README.md name the helpers",
+    "go/pkg/acsassert stays at 100% coverage"
+  ],
+  "consumed": {
+    "at": "2026-10-27T04:49:17Z",
+    "cycle": "",
+    "via": "ship"
+  },
+  "created_at": "2026-10-26T19:30:00Z",
+  "deps": [],
+  "files": [
+    "go/pkg/acsassert/",
+    "agents/evolve-tdd-engineer.md",
+    "go/acs/README.md"
+  ],
+  "fix": "Add to go/pkg/acsassert: the module directory, the tail of an output, the coverage of one function, and a walk of the module. Give each new helper a table test and a failure case. Name the helpers in the persona text of the phases that write predicates (agents/evolve-tdd-engineer.md and go/acs/README.md).",
+  "id": "test-system-efficiency-t6-predicate-kit",
+  "kind": "test",
+  "notes": "Plan link: docs/plans/test-system-efficiency-2026-10.md (component T6). Spec link: docs/architecture/test-system.md section 6.5. Lane model in the plan: Sonnet. GoTests already covers the go test run part of D13.",
+  "priority_class": "maintainability",
+  "route": "lane",
+  "routed_at": "2026-10-26T19:26:39Z",
+  "routed_reason": "plan audit 2026-10-27: the plan owner is a lane, or the surface is not a gate file",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Component T6 (decision D13) of the plan docs/plans/test-system-efficiency-2026-10.md. The spec is docs/architecture/test-system.md, section 6.5. pkg/acsassert has GoTests, a go test run with its JSON result and a check that tests ran. It does not have the module directory, the tail of an output, the coverage of one function or a walk of the module. Cycles wrote 597 copies of these helpers (research F4.2).",
+  "title": "pkg/acsassert gets the remaining predicate helpers, and the predicate personas name them (test-system plan T6)",
+  "weight": 0.4
+}

@@ -153,3 +153,14 @@ in a `go test`, regenerate the expected output from the worktree's source-of-tru
 doc, resolving paths under `acsassert.RepoRoot(t)` (the worktree). Prefer that
 when authoring a new generated-doc predicate; the `flags check` / `skills check`
 subprocess path is the safety net the dual-root pattern keeps correct.
+
+### Predicate kit — use the helper, never write a copy
+
+`go/pkg/acsassert` has four helpers that cycles copied 597 times. Call them.
+
+| Helper | Use |
+|---|---|
+| `ModuleDir` | Returns the nearest directory with a `go.mod` at or above a start path. |
+| `OutputTail` | Returns the last N lines of a command output. |
+| `FuncCoverage` | Returns the coverage percentage of one function from `go tool cover -func` output. |
+| `WalkModule` | Lists the module files, as slash paths relative to the root, that a filter keeps. |
