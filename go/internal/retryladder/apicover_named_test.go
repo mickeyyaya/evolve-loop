@@ -1,6 +1,7 @@
 package retryladder_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/convergence"
@@ -92,5 +93,31 @@ func TestReportExportsAreNamed(t *testing.T) {
 	}
 	if _, err := retryladder.LoadRuns(t.TempDir()); err != nil {
 		t.Fatalf("LoadRuns on an empty dir: %v", err)
+	}
+}
+
+func TestFixSpecExportsAreNamed(t *testing.T) {
+	var spec retryladder.FixSpec
+	var err error
+	spec, err = retryladder.ParseFixSpec("fix-spec: 1\nexpected: ok\nedit: a.go:1-2\n> x\n")
+	if err != nil {
+		t.Fatalf("ParseFixSpec: %v", err)
+	}
+	var edit retryladder.FixEdit = spec.Edits[0]
+	if edit.File != "a.go" || edit.FromLine != 1 || edit.ToLine != 2 || len(edit.Replacement) != 1 {
+		t.Fatalf("edit = %+v", edit)
+	}
+	_, err = retryladder.ParseFixSpec("")
+	if !errors.Is(err, retryladder.ErrMalformedFixSpec) {
+		t.Fatalf("empty spec error = %v", err)
+	}
+	var violations []retryladder.ScopeViolation
+	violations, err = retryladder.FixScopeViolations(spec, "diff --git a/b.go b/b.go\n@@ -1 +1 @@\n")
+	var code retryladder.ScopeCode = retryladder.ScopeFileOutside
+	if err != nil || len(violations) != 1 || violations[0].Code != code || violations[0].Code == retryladder.ScopeLinesOutside {
+		t.Fatalf("violations = %+v, %v", violations, err)
+	}
+	if _, err = retryladder.FixScopeViolations(spec, "@@ -1 +1 @@\n"); !errors.Is(err, retryladder.ErrMalformedFixDiff) {
+		t.Fatalf("headless hunk error = %v", err)
 	}
 }
