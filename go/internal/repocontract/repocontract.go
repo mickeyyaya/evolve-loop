@@ -135,6 +135,7 @@ var treeReadingSelections = []TestSelection{
 	{Package: "./internal/bridge", Tests: []string{
 		"TestAgentSandboxContract",
 		"TestAgentSandboxContract_TheHostHoldsTheCredentialThatTheCellCannotRead",
+		"TestAgentSandboxContract_TheSelfhealOrchestratorSeatHoldsN3AndN4",
 		"TestCompletionContractVocabulary_EveryRequestNamesItsContractByTheTypedConstant",
 		"TestCompletionContractVocabulary_SpelledOnce",
 		"TestDriverNames_AreBuiltOnlyByResolve",

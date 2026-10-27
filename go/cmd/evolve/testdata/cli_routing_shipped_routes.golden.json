@@ -2412,6 +2412,40 @@
       ]
     },
     {
+      "agent": "selfheal-orchestrator",
+      "phase": "selfheal-orchestrator",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "deep",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        },
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share 50%: bucket 31 of 100; no usage reader, so the pace does not apply",
+        "share keeps the seat on agy",
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
       "agent": "smell-scan",
       "phase": "smell-scan",
       "rule": "default",

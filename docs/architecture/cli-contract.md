@@ -166,6 +166,7 @@ The column "Agent" of §5 gives the class of each core verb. These verbs are out
 | `context index`, `context open` | A | They read the cell index and its bodies, and they write nothing ([cell-context-index.md](cell-context-index.md) §7). |
 | `context stats` | D | It reads the access log of other cycles, which I-5 denies to a cell. |
 | `selfheal incidents` | R | It writes the incident records and publishes `selfheal.incident` events, which are shared state ([llm-isolation.md](llm-isolation.md) §18.5). `dispatch_gate.go` refuses it in a cell with no dispatch credential. |
+| `selfheal propose` | R | It starts the orchestrator agent through `evolve agent run` and writes the proposal records, which are shared state ([llm-isolation.md](llm-isolation.md) §18.6). `dispatch_gate.go` refuses it in a cell with no dispatch credential, and `evolve agent run` refuses inside a phase. |
 | `phase <name>` | R (`dispatch`) | It starts a phase agent. |
 | `subagent run` | D | The pipeline starts fan-out workers. A cell uses the subagents of its own harness. |
 | `reset-sha`, `release` | D | operator verbs |

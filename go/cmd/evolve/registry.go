@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/cli/agentcmd"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cli/contextcmd"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cli/guardcmd"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cli/opscmd"
@@ -42,7 +41,7 @@ var commands = []subcommand{
 	{Name: "apicover", Summary: "Measure public-API coverage (apicover [-cover f] [-require-doc] [-enforce] <pkgdir>...)", Run: runApicover},
 	{Name: "inbox", Summary: "The backlog: batches (the grouping triage consumes) | list | show | add | edit | verify | withdraw | route-console | route-lane | consume | quarantine | ack-fingerprint (evolve inbox --help)", Run: runInbox},
 	{Name: "phase", Summary: "Run a single phase in-process", Run: runPhase},
-	{Name: "agent", Summary: "Run one phase agent with no cycle, through the bridge: agent run <profile> [--input FILE|-] [--file PATH]... [--worktree DIR [--writable PATH]...] [--json] [--keep] [--project-root P] prints the report on stdout (--json: one envelope with the report, verdict, driver, family, model, cost, tokens and the launch record); each run writes .evolve/agent-runs/<run label>.json; agent list [--json] names the profiles (exit 0 pass, 1 fail, 3 refused, 21 dispatch error, 10 usage, 11 input)", Run: agentcmd.New(agentcmd.Deps{InstallRouter: rootRouterInstaller, Bridge: agentRunBridge, Signals: agentRunSignals})},
+	{Name: "agent", Summary: "Run one phase agent with no cycle, through the bridge: agent run <profile> [--input FILE|-] [--file PATH]... [--worktree DIR [--writable PATH]...] [--json] [--keep] [--project-root P] prints the report on stdout (--json: one envelope with the report, verdict, driver, family, model, cost, tokens and the launch record); each run writes .evolve/agent-runs/<run label>.json; agent list [--json] names the profiles (exit 0 pass, 1 fail, 3 refused, 21 dispatch error, 10 usage, 11 input)", Run: runAgentCommand},
 	{Name: "phases", Summary: "List/validate/scaffold phase definitions (the phase catalog)", Run: phasecmd.RunPhases},
 	{Name: "serve-phase", Summary: "Envelope-framed phase subprocess", Run: phasecmd.NewRunServePhase(rootRouterInstaller)},
 	{Name: "cycle", Summary: "Run one full cycle", Run: runCycle},
@@ -75,7 +74,7 @@ var commands = []subcommand{
 	{Name: "reset-sha", Summary: "Re-pin the ship-gate binary SHA to the running binary (provenance-gated; --operator to override)", Run: runResetSHA},
 	{Name: "sync-main", Summary: "Reconcile a locally-diverged main with origin via merge only (never rebase/force-push/push); refuses on live lease or dirty tree", Run: runSyncMain},
 	{Name: "quality", Summary: "Compute the quality index readings of a scope and publish them through the Signal Center (quality report --scope wave|tree|judges|replay --project-root P | quality compare --index PQ1|PQ4 --a W --b W [--paired] --project-root P; ADR-0153; report exits 0 unless usage)", Run: runQuality},
-	{Name: "selfheal", Summary: "The incident detector of the self-healing loop (ADR-0155 X12): incidents [--json] [--project-root P] runs one detection pass over the Signal Center channels, the cycle state, the CI runs and the usage readings, writes the records under .evolve/incidents, publishes selfheal.incident events and lists the records; it never acts (policy healing.detector.stage: shadow by default, off lists only; exit 0 ok, 2 io, 10 usage, 11 bad policy)", Run: runSelfheal},
+	{Name: "selfheal", Summary: "The incident detector of the self-healing loop (ADR-0155 X12): incidents [--json] [--project-root P] runs one detection pass over the Signal Center channels, the cycle state, the CI runs and the usage readings, writes the records under .evolve/incidents, publishes selfheal.incident events and lists the records; it never acts (policy healing.detector.stage: shadow by default, off lists only). propose [--json] [--project-root P] runs the orchestrator agent (ADR-0155 X13) through evolve agent run for each open incident that has no current proposal, checks its diagnosis.json against the evolve.diagnosis/1 schema and records one typed proposal under .evolve/incidents/proposals; it acts on nothing (policy healing.orchestrator: stage shadow by default, off runs no agent; max_per_pass 2). Exit 0 ok, 2 io, 10 usage, 11 bad policy", Run: runSelfheal},
 	{Name: "commit-gate", Summary: "Pre-commit quality gate (lint + targeted tests + attestation)", Run: guardcmd.RunCommitGate},
 	{Name: "guidance", Summary: "The rule registry under guidance/rules: build writes guidance/index.md, guidance/index.json and the L0 region of AGENTS.md; check reports stale output and registry problems; index prints the rules of a case (guidance build|check [--project-root P] | guidance index [--audience X] [--phase P] [--cli F] [--json] [--project-root P]; exit 0 ok, 1 check problems, 2 I/O, 10 usage, 11 bad registry)", Run: runGuidance},
 	{Name: "scan", Summary: "Scan the staged diff or a ref range for secrets, masked; exit 0 clean, 1 finding, 2 git error (scan secrets [--staged | --diff <ref>] [--project-root P])", Run: runScan},

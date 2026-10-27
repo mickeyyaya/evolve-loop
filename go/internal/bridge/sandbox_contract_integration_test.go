@@ -496,15 +496,20 @@ func builderPrefix(t *testing.T, probe sandbox.ProbeResult, h contractHost, exec
 
 func cellPrefix(t *testing.T, probe sandbox.ProbeResult, h contractHost, execStage, cli string) []string {
 	t.Helper()
+	return seatPrefix(t, probe, h, execStage, cli, "builder")
+}
+
+func seatPrefix(t *testing.T, probe sandbox.ProbeResult, h contractHost, execStage, cli, seat string) []string {
+	t.Helper()
 	profilesDir, err := filepath.Abs(filepath.Join("..", "..", "..", ".evolve", "profiles"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	prof, err := profiles.NewFromDir(profilesDir).Get("builder")
+	prof, err := profiles.NewFromDir(profilesDir).Get(seat)
 	if err != nil || prof.Sandbox == nil || !prof.Sandbox.Enabled {
-		t.Fatalf("the builder profile must declare an enabled sandbox: %v", err)
+		t.Fatalf("the %s profile must declare an enabled sandbox: %v", seat, err)
 	}
-	cfg := &Config{CLI: cli, Agent: "builder", ProjectRoot: h.root, Worktree: h.worktree, Workspace: h.run,
+	cfg := &Config{CLI: cli, Agent: seat, ProjectRoot: h.root, Worktree: h.worktree, Workspace: h.run,
 		RequireSandbox: true, SandboxWriteSubpaths: prof.Sandbox.WriteSubpaths}
 	if cfg.DenyPaths, err = resolveSandboxDenials(prof.Sandbox.DenySubpaths, h.root, h.worktree, true); err != nil {
 		t.Fatal(err)
@@ -515,7 +520,7 @@ func cellPrefix(t *testing.T, probe sandbox.ProbeResult, h contractHost, execSta
 	deps.SandboxWrap = defaultSandboxWrapWithProbe(deps, func() sandbox.ProbeResult { return probe })
 	prefix, ok := sandboxPrefixForLaunch(deps, cfg, h.ownTTY)
 	if !ok {
-		t.Fatal("the bridge refused to wrap the builder")
+		t.Fatalf("the bridge refused to wrap the %s", seat)
 	}
 	return prefix
 }
@@ -610,4 +615,32 @@ func TestAgentSandboxContract_AnOpenOfAnIndexedPathWritesOneAccessRecord(t *test
 		t.Fatal(jerr)
 	}
 	t.Log(note)
+}
+
+func TestAgentSandboxContract_TheSelfhealOrchestratorSeatHoldsN3AndN4(t *testing.T) {
+	h := newContractHost(t)
+	h.withEvolveBinary(t)
+	h.prefix = seatPrefix(t, requireNativeSandbox(t), h, "enforce", "claude-tmux", "selfheal-orchestrator")
+	rows := []contractRow{
+		{action: "N3 for the orchestrator seat: exec an LLM binary", want: contractDeny,
+			script: func(h contractHost) string { return "PATH=" + h.stubBin + ":$PATH claude --version" }},
+		{action: "N4 for the orchestrator seat: evolve agent run with the env markers stripped", want: contractCredentialRefusal,
+			script: func(h contractHost) string {
+				return strippedMarkers + h.evolveBin + " agent run --refused-before-parse"
+			}},
+		{action: "the orchestrator seat cannot start its own verb: evolve selfheal propose with the env markers stripped", want: contractCredentialRefusal,
+			script: func(h contractHost) string {
+				return strippedMarkers + h.evolveBin + " selfheal propose --refused-before-parse"
+			}},
+		{action: "the orchestrator seat cannot write a file of the repository", want: contractDeny,
+			script: func(h contractHost) string { return "echo x > " + h.root + "/.evolve/forged.json" }},
+	}
+	for _, row := range rows {
+		t.Run(row.action, func(t *testing.T) {
+			out, err := h.agent(t, row)
+			if failure := contractFailure(row.want, out, err); failure != nil {
+				t.Fatal(failure)
+			}
+		})
+	}
 }

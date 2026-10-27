@@ -55,3 +55,46 @@ func TestHealingPolicy_TheTypedBlockCarriesTheDetectorStage(t *testing.T) {
 		t.Fatalf("%+v", got)
 	}
 }
+
+func TestHealingOrchestrator_DefaultsToShadowWithTwoIncidentsAPass(t *testing.T) {
+	t.Parallel()
+	for _, body := range []string{`{}`, `{"healing":{}}`, `{"healing":{"orchestrator":{}}}`} {
+		p, err := policy.Parse([]byte(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := p.HealingOrchestrator(); got.Stage != policy.HealingStageShadow || got.MaxPerPass != 2 {
+			t.Errorf("%s: %+v, want shadow and 2 incidents a pass", body, got)
+		}
+	}
+	p, err := policy.Parse([]byte(`{"healing":{"orchestrator":{"stage":"off","max_per_pass":5}}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := p.HealingOrchestrator(); got.Stage != policy.HealingStageOff || got.MaxPerPass != 5 {
+		t.Fatalf("%+v", got)
+	}
+}
+
+func TestPolicyParse_RefusesABadHealingOrchestratorBlock(t *testing.T) {
+	t.Parallel()
+	cases := map[string]string{
+		`{"healing":{"orchestrator":{"stage":"enforce"}}}`: "selfheal-action-catalog-validator-budgets",
+		`{"healing":{"orchestrator":{"stage":"loud"}}}`:    `orchestrator.stage "loud"`,
+		`{"healing":{"orchestrator":{"max_per_pass":-1}}}`: "max_per_pass",
+		`{"healing":{"orchestrator":{"stgae":"shadow"}}}`:  "healing.orchestrator.stgae",
+	}
+	for body, want := range cases {
+		if _, err := policy.Parse([]byte(body)); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s: err = %v, want it to name %s", body, err, want)
+		}
+	}
+}
+
+func TestHealingPolicy_TheTypedBlockCarriesTheOrchestratorStage(t *testing.T) {
+	t.Parallel()
+	p := policy.Policy{Healing: &policy.HealingPolicy{Orchestrator: &policy.HealingOrchestratorPolicy{Stage: policy.HealingStageOff}}}
+	if got := p.HealingOrchestrator(); got.Stage != policy.HealingStageOff || got.MaxPerPass != 2 {
+		t.Fatalf("%+v", got)
+	}
+}

@@ -1,0 +1,22 @@
+{
+  "schema": "evolve.incident/1",
+  "id": "inc-2026-10-27-a3bf0a7f",
+  "fingerprint": "lane-starvation:supply",
+  "class": "lane-starvation",
+  "subject": "supply",
+  "severity": "WARN",
+  "tier": "T1",
+  "state": "open",
+  "sources": [
+    "signal:92011.3",
+    "signal:35853.3"
+  ],
+  "recurrence": 2,
+  "reopened": 0,
+  "attempts": 0,
+  "repro_test": "",
+  "summary": "the lane supply is short: 2 admissible for a window of 4",
+  "opened_at": "2026-10-27T10:30:56.21104+08:00",
+  "last_seen_at": "2026-10-26T18:29:01.380147Z",
+  "closed_at": null
+}

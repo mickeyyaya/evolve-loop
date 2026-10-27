@@ -1,0 +1,24 @@
+{
+  "schema": "evolve.incident/1",
+  "id": "inc-2026-10-27-cb3817ea",
+  "fingerprint": "claim-churn:core-one-diagnostics-writer-lane",
+  "class": "claim-churn",
+  "subject": "core-one-diagnostics-writer-lane",
+  "severity": "INCIDENT",
+  "tier": "T2",
+  "state": "open",
+  "sources": [
+    "cycle:2003",
+    "cycle:2018",
+    "cycle:2024",
+    "cycle:2034"
+  ],
+  "recurrence": 4,
+  "reopened": 0,
+  "attempts": 0,
+  "repro_test": "",
+  "summary": "cycles claimed item core-one-diagnostics-writer-lane and none shipped it",
+  "opened_at": "2026-10-27T10:30:56.21104+08:00",
+  "last_seen_at": "2026-10-26T13:59:12Z",
+  "closed_at": null
+}

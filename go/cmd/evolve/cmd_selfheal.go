@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -21,8 +22,7 @@ import (
 )
 
 const (
-	selfhealUsage    = "usage: evolve selfheal incidents [--json] [--project-root P]"
-	selfhealSchema   = "evolve.selfheal.incidents/1"
+	selfhealUsage    = "usage: evolve selfheal incidents|propose [--json] [--project-root P]"
 	selfhealExitIn   = 11
 	selfhealCIFields = "databaseId,headBranch,status,conclusion,attempt,createdAt,updatedAt"
 	selfhealCILimit  = "200"
@@ -30,9 +30,17 @@ const (
 	shipJournalFile  = "ship-journal.jsonl"
 )
 
+const (
+	selfhealVerbIncidents = "incidents"
+	selfhealVerbPropose   = "propose"
+)
+
+var selfhealSchemas = map[string]string{selfhealVerbIncidents: "evolve.selfheal.incidents/1", selfhealVerbPropose: "evolve.selfheal.propose/1"}
+
 var selfhealChannels = []string{"errors", "loop"}
 
 type selfhealEnv struct {
+	agent     func(args []string, stdin io.Reader, stdout, stderr io.Writer) int
 	now       func() time.Time
 	gh        func(ctx context.Context, root string, args ...string) (string, error)
 	declared  func(family string) bool
@@ -51,23 +59,31 @@ type selfhealReport struct {
 }
 
 func runSelfheal(args []string, _ io.Reader, stdout, stderr io.Writer) int {
-	return runSelfhealWith(selfhealEnv{now: time.Now, gh: ghOutput, declared: bridge.UsageWindowsDeclared, newCenter: newSelfhealCenter}, args, stdout, stderr)
+	return runSelfhealWith(selfhealEnv{agent: runAgentCommand, now: time.Now, gh: ghOutput, declared: bridge.UsageWindowsDeclared, newCenter: newSelfhealCenter}, args, stdout, stderr)
 }
 
 func newSelfhealCenter(root, evolveDir string, console io.Writer) (*signalcenter.Center, func()) {
 	return newRoleSignalCenter(roleSelfheal, root, evolveDir, console)
 }
 
+type selfhealArgs struct {
+	verb, root string
+	json       bool
+}
+
 func runSelfhealWith(env selfhealEnv, args []string, stdout, stderr io.Writer) int {
-	root, asJSON, err := parseSelfhealArgs(args)
-	w := codeEnvelopeWriter{schema: selfhealSchema, json: asJSON, stdout: stdout, stderr: stderr}
+	a, err := parseSelfhealArgs(args)
+	w := codeEnvelopeWriter{schema: selfhealSchemas[cmp.Or(a.verb, selfhealVerbIncidents)], json: a.json, stdout: stdout, stderr: stderr}
 	if err != nil {
 		return w.fail(exitUsage, "usage", "evolve selfheal: "+err.Error()+"\n"+selfhealUsage)
 	}
-	evolveDir := paths.EvolveDirOf(root)
+	evolveDir := paths.EvolveDirOf(a.root)
 	pol, err := policy.Load(filepath.Join(evolveDir, paths.PolicyFile))
 	if err != nil {
 		return w.fail(selfhealExitIn, "input", "evolve selfheal: "+err.Error())
+	}
+	if a.verb == selfhealVerbPropose {
+		return runSelfhealPropose(env, w, a.root, pol)
 	}
 	cfg := pol.HealingDetector()
 	existing, err := selfheal.LoadIncidents(selfheal.Dir(evolveDir))
@@ -76,29 +92,30 @@ func runSelfhealWith(env selfhealEnv, args []string, stdout, stderr io.Writer) i
 	}
 	report := selfhealReport{Stage: cfg.Stage, Incidents: existing, Transitions: []selfhealTransition{}}
 	if cfg.Stage != policy.HealingStageOff {
-		report, w.warnings, err = detectIncidents(env, root, cfg, existing, stderr)
+		report, w.warnings, err = detectIncidents(env, a.root, cfg, existing, stderr)
 		if err != nil {
 			return w.fail(exitIO, "io", "evolve selfheal: "+err.Error())
 		}
 	}
-	printSelfheal(stdout, asJSON, report)
+	printSelfheal(stdout, a.json, report)
 	return w.ok(report)
 }
 
-func parseSelfhealArgs(args []string) (string, bool, error) {
-	asJSON := slices.Contains(args, "--json")
-	if len(args) == 0 || args[0] != "incidents" {
-		return "", asJSON, errors.New("want the incidents verb")
+func parseSelfhealArgs(args []string) (selfhealArgs, error) {
+	a := selfhealArgs{json: slices.Contains(args, "--json")}
+	if len(args) == 0 || selfhealSchemas[args[0]] == "" {
+		return a, errors.New("want the incidents or the propose verb")
 	}
-	var root string
-	operands, err := (cliFlags{bools: map[string]*bool{"--json": &asJSON}, values: map[string]*string{"--project-root": &root}}).parse(args[1:])
+	a.verb = args[0]
+	operands, err := (cliFlags{bools: map[string]*bool{"--json": &a.json}, values: map[string]*string{"--project-root": &a.root}}).parse(args[1:])
 	switch {
 	case err != nil:
-		return "", asJSON, err
+		return a, err
 	case len(operands) > 0:
-		return "", asJSON, fmt.Errorf("unexpected argument %q", operands[0])
+		return a, fmt.Errorf("unexpected argument %q", operands[0])
 	}
-	return paths.AbsoluteRoot("--project-root", root, nil), asJSON, nil
+	a.root = paths.AbsoluteRoot("--project-root", a.root, nil)
+	return a, nil
 }
 
 func detectIncidents(env selfhealEnv, root string, cfg policy.HealingDetectorPolicy, existing []selfheal.Incident, stderr io.Writer) (selfhealReport, []string, error) {

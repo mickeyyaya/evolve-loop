@@ -14,13 +14,14 @@ import (
 )
 
 var validFlowDecisions = map[string]string{
-	FlowSeatPlan:             `[{"phase":"scout","run":true,"justification":"needed"}]`,
-	FlowSeatRePlan:           `[{"phase":"build","run":false,"justification":"done"}]`,
-	FlowSeatProposal:         `{"next_phase":"build","insert_phases":[],"justification":"next"}`,
-	FlowSeatJudge:            `{"score":0.5,"rationale":"fine","missing_phases":[]}`,
-	FlowSeatRetryAdjudicator: `{"action":"rebuild","reentry_phase":"build","justification":"fixable"}`,
-	FlowSeatFailureAdvisor:   `{"cause":"dead_shell","pane_substr":"zsh: command not found","justification":"plain shell"}`,
-	FlowSeatTriage:           `{"cycle":3,"top_n":[{"id":"a"}],"committed_floors":["./x"]}`,
+	FlowSeatPlan:                 `[{"phase":"scout","run":true,"justification":"needed"}]`,
+	FlowSeatRePlan:               `[{"phase":"build","run":false,"justification":"done"}]`,
+	FlowSeatProposal:             `{"next_phase":"build","insert_phases":[],"justification":"next"}`,
+	FlowSeatJudge:                `{"score":0.5,"rationale":"fine","missing_phases":[]}`,
+	FlowSeatRetryAdjudicator:     `{"action":"rebuild","reentry_phase":"build","justification":"fixable"}`,
+	FlowSeatFailureAdvisor:       `{"cause":"dead_shell","pane_substr":"zsh: command not found","justification":"plain shell"}`,
+	FlowSeatTriage:               `{"cycle":3,"top_n":[{"id":"a"}],"committed_floors":["./x"]}`,
+	FlowSeatSelfhealOrchestrator: validDiagnosis,
 }
 
 func TestFlowDecisions_EachSeatHasADeclaredFileAndASchema(t *testing.T) {
