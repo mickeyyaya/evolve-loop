@@ -104,3 +104,4 @@
 ./internal/heldproposal 100
 ./internal/launchrecord 100
 ./internal/integration 100
+./internal/cyclespend 100
