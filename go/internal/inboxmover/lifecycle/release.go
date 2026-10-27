@@ -118,16 +118,7 @@ func (m *Mover) releaseOne(d drained, reason string, cycle int, stamp *continuat
 			fields: map[string]string{"task_id": d.taskID, "base": d.base, "step": "release_cycle"}})
 		return false
 	}
-	if stamp != nil {
-		if serr := UpdateItemJSON(d.src, func(item map[string]json.RawMessage) {
-			cb, _ := json.Marshal(stamp)
-			item[inboxbatch.ContinuationField] = cb
-		}); serr != nil {
-			m.warn(fault{code: CodeItemRewriteFailed, origin: "Mover.Release", cycle: cycle, legacy: "WARN: ",
-				reason: fmt.Sprintf("release-cycle: continuation stamp failed for %s: %v (releasing unstamped)", d.base, serr),
-				fields: map[string]string{"task_id": d.taskID, "path": d.src, "err": serr.Error(), "step": "continuation_stamp"}})
-		}
-	}
+	m.stampItem(stampTarget{at: Location{Path: d.src, Cycle: cycle}, taskID: d.taskID, origin: "Mover.Release"}, stamp)
 	if mvErr := os.Rename(d.src, d.dest); mvErr != nil {
 		m.warn(fault{code: CodeReleaseMoveFailed, origin: "Mover.Release", cycle: cycle, legacy: "WARN: ",
 			reason: fmt.Sprintf("release-cycle: mv failed for %s (leaving in processing/cycle-%d/): %v", d.base, cycle, mvErr),
@@ -144,4 +135,24 @@ func (m *Mover) releaseOne(d drained, reason string, cycle int, stamp *continuat
 		Reason: reason,
 	})
 	return true
+}
+
+type stampTarget struct {
+	at     Location
+	taskID string
+	origin string
+}
+
+func (m *Mover) stampItem(t stampTarget, stamp *continuation.Continuation) {
+	if stamp == nil {
+		return
+	}
+	if serr := UpdateItemJSON(t.at.Path, func(item map[string]json.RawMessage) {
+		cb, _ := json.Marshal(stamp)
+		item[inboxbatch.ContinuationField] = cb
+	}); serr != nil {
+		m.warn(fault{code: CodeItemRewriteFailed, origin: t.origin, cycle: t.at.Cycle, legacy: "WARN: ",
+			reason: fmt.Sprintf("release-cycle: continuation stamp failed for %s: %v (releasing unstamped)", filepath.Base(t.at.Path), serr),
+			fields: map[string]string{"task_id": t.taskID, "path": t.at.Path, "err": serr.Error(), "step": "continuation_stamp"}})
+	}
 }

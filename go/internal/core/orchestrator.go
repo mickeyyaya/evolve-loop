@@ -187,6 +187,8 @@ type Orchestrator struct {
 
 	stderr io.Writer
 
+	stampBudget time.Duration
+
 	shipWindow *shipWindowHold
 
 	worktree WorktreeProvisioner

@@ -78,6 +78,7 @@ func (m *Mover) ReleaseClaim(taskID string, loc Location, reason string) (ClaimR
 	case !errors.Is(err, ErrNotFound):
 		return ClaimReleaseResult{}, fmt.Errorf("release: scan the inbox root: %w", err)
 	}
+	m.stampItem(stampTarget{at: loc, taskID: taskID, origin: "Mover.ReleaseClaim"}, m.readStamp(loc.Cycle))
 	dest := filepath.Join(m.inboxDir, filepath.Base(loc.Path))
 	if err := moveExclusive(loc.Path, dest); err != nil {
 		return ClaimReleaseResult{}, moveError(taskID, dest, err)

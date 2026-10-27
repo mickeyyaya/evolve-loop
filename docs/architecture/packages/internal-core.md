@@ -250,7 +250,9 @@
 - **The pause carries its walk.** `pauseForQuota` copies `core.WalkError.CLIs` to `CycleState.QuotaWalkCLIs` (`quota_walk_clis`, additive) before the checkpoint hook runs. The checkpoint reads the reset evidence of those families only. Pinned by `TestRunCycle_AWalledPauseHandsTheWalkedCLIsToTheCheckpoint` and `TestRunCycle_ALedgerFaultDoesNotLoseTheQuotaPause`.
 - **The abnormal epilogue** (`abnormalEpilogue`).
   - RunCycle defers it. It acts only when the cycle did not reach the normal closeout.
-  - A quota pause and a graceful cancel have their own checkpoints, so it does nothing for them.
+  - A quota pause has its own checkpoint, so it does nothing for it.
+  - A cancelled cycle context (a lane lease deadline or an operator stop) keeps its phase for resume. Since 2026-10-27 the epilogue then runs only the deadline stamp (`deadlineStamp`). The salvage snapshot and the continuation stamp run on `context.WithoutCancel` with their own budget, `defaultDeadlineStampBudget` (5 s). The budget is half of `LaneLaunchWaitDelay` (10 s), the `WaitDelay` of the lane launch (`execCycleLaunch`), so the stamp cannot hold the lane past its SIGKILL. A log line `deadline stamp after the cycle context ended (<cause>)` records each try.
+  - Why: before 2026-10-27 the epilogue returned on a cancelled context. The deadline stops of cycles 2008, 2010, 2013, 2015 and 2034 thus left no snapshot and lost 326.8 LLM minutes of work. Pinned by `TestAbnormalEpilogue_LaneDeadlineCancelStillSnapshotsAndStamps` and `TestAbnormalEpilogue_DeadlineStampStopsAtItsOwnBudget`.
   - It is best effort and loud, and each step tolerates a failure of the others.
   - The steps are the failure digest, the `closeout` skip, the FAIL seal (ADR-0101), the dossier, the continuation manifest (ADR-0076) and the `aborted` state.
   - The seal reason is the template plus `epilogueCauseSuffix(cause)`. It is `cause=` for a task error and `teardown=` for an infra teardown (ADR-0072), with the tail of `causeHead`.

@@ -64,6 +64,7 @@ var serialRequiredTests = map[string]string{
 	"core.TestReauditCycle_UnresolvableMainIsInfraAndAuditsNothing":                                 swapsReauditRebase,
 	"core.TestReauditCycle_RebasesThroughTheSharedRebaseStep":                                       swapsReauditRebase,
 	"core.TestCheckpointInterruptedPhase_CheckpointFailureWarns":                                    swapsResumeBoundaryCheckpointer,
+	"core.TestAbnormalEpilogue_DeadlineStampStopsAtItsOwnBudget":                                    swapsGitRunner,
 	"core.TestOriginDefaultBranch_GitFailureFallsBackToMain":                                        swapsGitRunner,
 	"core.TestGitWorktree_CreateReusedWorktreeFailures":                                             swapsGitRunner,
 	"core.TestPersonaBudgetFailures_LongOutputIsTruncated":                                          swapsBuildSelfCheckRunner,
