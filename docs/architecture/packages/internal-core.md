@@ -12,6 +12,7 @@
 
 - **Each phase dispatch writes the input index of the cell first** (`input_index.go`, X5 of [ADR-0154](../adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md), spec [llm-isolation.md](../llm-isolation.md) §8.5).
   - `cycleRun.dispatch` calls `writeInputIndex` before the loop of tries.
+  - After a try with a verdict, `cycleRun.handoffRequests` gives the cell (`RequestCell`) to the port of `WithRequestHandoff`. `RequestHandoffWired` is the wiring proof of the composition root. So the next phase finds the result of a request in its index ([llm-isolation.md](../llm-isolation.md) §7.2.1). An error prints `WARN request channel of <phase>`, and the cycle goes on.
   - The item ids come from the `fleet_scope` of the cycle context. When the run already has a record in `.evolve/lineage/`, the record wins. The first dispatch writes the record before the index, so a failed index does not lose it.
   - It reads `isolation.lineage_max` from the policy. Then it builds the index, writes the record and writes `<ws>/inputs/index.json`.
   - A failure removes the index of the earlier phase and prints `WARN input index for <phase>`, so the cell gets no index grants.

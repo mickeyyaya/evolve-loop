@@ -13,6 +13,8 @@
 >
 > Amended on 2026-10-27 by component X17d: `inbox claim`, `dossier show`, `cycle resume`, `wave stop` and `quality show` are core verbs (§5). §6 no longer lists them. Their agent classes are in §5. `cycle resume` starts a loop, so the dispatch gate refuses it in a cell (§4.4). The gate of the other `D` verbs, `inbox claim` and `wave stop` among them, is the class table of X17e.
 >
+> Amended on 2026-10-27 by item `isolation-dispatch-request-channel`: the pipeline reads the requests of the kind `dispatch` (§4.3) and emits the request signals of §4.5. `agent capabilities` prints `caps.dispatch` (§4.2.1). The other request kinds wait for item `cli-agent-tool-surface`.
+>
 > Amended on 2026-10-27 by component E9 of the events plan: `events channels`, `events kinds` and `events watch` are core verbs (§5). `events subscribe` stays in §6 until E8 builds the subscription store. `wave watch` waits on the event channels.
 >
 > **Terms used throughout:**
@@ -157,7 +159,7 @@ Rules:
 3. An `A` verb execs no LLM CLI. A verb form that execs one is `D` in a cell (I-3).
 4. An `R` verb changes shared state or starts an agent. The pipeline runs it, never the cell.
 5. A `D` verb is a verb of the operator or of the boundary. An agent has no reason to run it, so no request kind maps to it.
-6. In the subagents of its own harness, an agent can use each `A` verb. The subagents run in the cell, so the same classes apply to them ([llm-isolation.md](llm-isolation.md) §7.2 on the branch of #1126).
+6. In the subagents of its own harness, an agent can use each `A` verb. The subagents run in the cell, so the same classes apply to them ([llm-isolation.md](llm-isolation.md) §7.2).
 
 The column "Agent" of §5 gives the class of each core verb. These verbs are outside §5, but a cell meets them:
 
@@ -247,7 +249,7 @@ What changes our mind: the orchestrator can approve more than 95% of the request
       {"verb": "wave next", "class": "D"}
     ],
     "default_class": "D",
-    "caps": {"dispatch": {"per_cycle": 2, "chain_depth": 1}, "inbox-add": {"per_cycle": 3}}
+    "caps": {"dispatch": {"stage": "shadow", "roles": ["fault-localization", "premise-challenge", "dependency-map"], "per_cycle": 3, "max_depth": 1}}
   },
   "error": null,
   "warnings": []
@@ -271,7 +273,7 @@ The neutral TaskAssignment (I-17) carries a pointer to this verb ([llm-isolation
 - The table is Go data in `go/internal/agentclass` (`table.go`). The class gate, the capabilities verb and the bridge read it. No other list of classes exists.
 - `agent capabilities` without `--json` prints one line for each verb: the verb, the class and, for an `R` verb, the request kind. The last line is `default D`.
 - The bridge adds one short section to the prompt of each phase cell (`preparePrompt`, `go/internal/bridge/driver_common.go`). The section points to `evolve agent capabilities --json` and gives the request directory of the cell. It names no tool syntax of a family. A pane with no phase agent, for example a probe, gets no section.
-- `caps` is `{}`. The request validator of item `isolation-dispatch-request-channel` sets the caps when it lands.
+- `caps` holds one key, `dispatch`: the block `isolation.dispatch_requests` of the policy of `--project-root`, with its defaults ([llm-isolation.md](llm-isolation.md) §7.2.1). The other request kinds have no caps yet.
 - One class rule is outside the table: `loop` with the word `status` after its flags is `loop status` (`agentClassOf`, `go/cmd/evolve/dispatch_gate.go`). The parse of the loop flags lives in `cmd/evolve`.
 - A flag rule reads the last instance of the flag, as the `flag` package does. For `only_with`, an instance right after another flag with no `=` can be the value of that flag, so it does not count. Thus `cli-routing show --json --static` is `D`, and `cli-routing show --static --json` is `A`. The error is to the safe side.
 - `TestAgentClasses_EachVerbThatAPersonaRunsIsAOrR` reads each `` `evolve <verb>` `` in `agents/*.md`. It reads the forms in backticks, after a path such as `./go/bin/`, and at the start of a line. It fails on a class `D` verb. The test names each exception with its reason: the fan-out of the pipeline (`subagent`, `aggregator`), F11 and F13.
@@ -293,7 +295,7 @@ An agent asks for an `R` verb through a request file. It writes one file for eac
 
 | Kind | Verbs | What the pipeline does after approval |
 |---|---|---|
-| `dispatch` | `agent run`, `phase <name>` | It dispatches the phase agent ([llm-isolation.md](llm-isolation.md) §7.2 on the branch of #1126). |
+| `dispatch` | `agent run`, `phase <name>` | It dispatches the phase agent ([llm-isolation.md](llm-isolation.md) §7.2.1). As built, it runs the role through `agent run` only, so it refuses a built-in phase. |
 | `inbox-add` | `inbox add` | It files the item with `source` set to the request id. |
 | `routing-proposal` | `cli-routing set`, `cli-routing unset` | It writes the change to the queue of §4 rule 3. The boundary applies it after `cli-routing check` passes. |
 | `quality-reading` | `quality report`, `quality compare` | It runs the verb and publishes the reading. |
@@ -308,6 +310,8 @@ The path from a request to a result:
 5. A refusal records its reason in the same index. The agent never runs the verb itself.
 
 The agent does not wait in its turn for the decision. The pipeline reads the requests at the handoff of the phase. A later phase, a retry or the next item of the lineage reads the result through the index.
+
+As built (item `isolation-dispatch-request-channel`): the channel runs the kind `dispatch` only. It refuses each other kind with the precondition `kind`, until item `cli-agent-tool-surface` adds their executors. The steps, the policy and the records are in [llm-isolation.md](llm-isolation.md) §7.2.1.
 
 ### 4.4 Enforcement
 
@@ -337,12 +341,13 @@ Each request and each decision is a signal of the module `isolation` ([llm-isola
 
 | Kind | Severity | Code | When | Fields |
 |---|---|---|---|---|
-| `isolation.request` | INFO | none | the validator reads a request | `request`, `kind`, `verb`, `cell`, `family` |
-| `isolation.request.decision` | INFO | none | the orchestrator approves, or the pipeline runs the verb | `request`, `kind`, `decision`, `result` |
-| `isolation.request.decision` | WARN | `ISOLATION_REQUEST_REFUSED` (proposed) | the validator or the orchestrator refuses | `request`, `kind`, `decision`, `reason`, `stage` |
+| `isolation.request` | INFO | none | the validator reads a request | `request`, `kind`, `verb`, `role`, `cell`, `depth` |
+| `isolation.request.decision` | INFO | none | the orchestrator approves, or the pipeline runs the verb | `request`, `kind`, `role`, `decision`, `result`, `stage` |
+| `isolation.request.decision` | WARN | `ISOLATION_REQUEST_REFUSED` | the validator or the orchestrator refuses | `request`, `kind`, `role`, `decision`, `precondition`, `reason`, `stage` |
+| `isolation.request.decision` | WARN | `ISOLATION_REQUEST_FAILED` | the dispatch of an approved request fails | the fields of the row above |
 | `isolation.violation` | WARN | `ISOLATION_I3_VIOLATION` | an `R` or `D` verb refuses in a cell (§4.4) | `rule` is `verb.class.r` or `verb.class.d`, and `target` is the verb |
 
-The last row closes a gap of X4. As built (X17e), each violation of the class gate emits it: `action=logged` at `shadow`, and `action=refused` at `enforce`. The request signals of the first three rows need item `isolation-dispatch-request-channel`.
+The last row closes a gap of X4. As built (X17e), each violation of the class gate emits it: `action=logged` at `shadow`, and `action=refused` at `enforce`. The request signals of the first four rows are built (item `isolation-dispatch-request-channel`). A signal names no `family`, because the channel reads the request file and not the launch of the cell.
 
 Three proposed readings of the quality panel ([llm-quality-indexes.md](llm-quality-indexes.md), ADR-0153) use these signals. An amendment of ADR-0153 adds them at stage `shadow`:
 
@@ -497,7 +502,7 @@ A third rule closes the other forms: `reservedGoalVerb` refuses a positional goa
 | `gc` skips a resource that a live run owns | `TestGC_TakesItsLeaseAndSkipsLiveRuns` (built) | X17c | enforce |
 | The agent class of each verb in Go matches §4.1 and the column "Agent" of §5, and each core verb has a class | `TestAgentClasses_MatchTheContract` (built) | X17e | enforce |
 | An `R` verb with no credential exits 3 and names the request path. A `D` verb exits 3. | `TestAgentClass_RefusesWithoutTheCredentialAndNamesTheRequestPath` (built); `TestAgentClass_EveryVerbOfTheTableIsGatedByItsClass` (built) | X17e | shadow one wave, then enforce |
-| A valid request is run by the pipeline, and its result reaches the lineage index | `TestAgentRequest_AnApprovedRequestIsRunByThePipeline` (not built: it needs item `isolation-dispatch-request-channel`) | X17e | enforce |
+| A valid request is run by the pipeline, and its result reaches the lineage index | `TestAgentRequest_AnApprovedRequestIsRunByThePipeline` (built, kind `dispatch`) and `TestDispatchRequest_AValidRequestIsDispatchedByThePipeline` (built) | X17e, X4 | shadow, then enforce |
 
 ## Limits
 
@@ -507,7 +512,7 @@ A third rule closes the other forms: `reservedGoalVerb` refuses a positional goa
 - The human text is not a contract. A script that parses it breaks without notice.
 - This file covers the core verbs only. About 80 other verbs keep their own usage text.
 - `agent capabilities` prints `cell` as `null`, also in a cell. The verb has no record of the dispatch, and it does not read the environment. The bridge gives the request directory of the cell in the prompt (§4.2.1).
-- The request channel of §4.3 is not built. An agent can write a request file, but no step of the pipeline reads it until item `isolation-dispatch-request-channel` lands.
+- The request channel of §4.3 runs the kind `dispatch` only. The pipeline refuses a request of another kind with a recorded reason.
 - Each verb that is not `A` reads the credential also for the operator. The first such verb on a new host writes `~/.evolve/dispatch/held/credential` (llm-isolation.md §7.1.1 D2).
 - At `enforce` the full `doctor` and `loop --dry-run` steps of the post-ship monitor refuse (F13). Change the persona before the flip.
 - At `enforce` the triage probe of F11 exits 3 and triage reads it as a console-routed item. Do not set the stage `enforce` of the credential store before the probe and its profile grants are removed.

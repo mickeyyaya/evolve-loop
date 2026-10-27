@@ -855,3 +855,5 @@
 ./internal/citelemetry
 # gateclass - the surface tiers and the gate classifier of I-10: it flags a cycle diff that changes a kernel surface or weakens a gate (ADR-0155 X15).
 ./internal/gateclass
+# agentrequest - the request channel of a cell: the validator, the judgement and the dispatch of a phase agent request (llm-isolation.md §7.2.1).
+./internal/agentrequest

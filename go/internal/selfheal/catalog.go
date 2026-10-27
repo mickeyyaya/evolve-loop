@@ -23,6 +23,7 @@ const (
 	PreBreaker         = "breaker"
 	PreBudget          = "budget"
 	PreDiagnosis       = "diagnosis"
+	PreRequestValid    = "request-validated"
 )
 
 type Landing struct {
@@ -36,6 +37,7 @@ type Inventory struct {
 	Landings   []Landing
 	MainRed    bool
 	FileExists func(path string) bool
+	Requests   map[string]bool
 }
 
 type check struct {
@@ -68,6 +70,7 @@ var (
 	mainRed         = precondition{PreMainRed, refuseGreenMain}
 	landingInWindow = precondition{PreLandingInWindow, refuseUnknownLanding}
 	filesExist      = precondition{PreFilesExist, refuseMissingFile}
+	requestValid    = precondition{PreRequestValid, refuseUnvalidatedRequest}
 )
 
 var catalog = []catalogAction{
@@ -77,6 +80,7 @@ var catalog = []catalogAction{
 	{phasecontract.ActionRevertLastLanding, loopTiers, true, []precondition{mainRed, landingInWindow}},
 	{phasecontract.ActionOpenRepairItem, allTiers, true, []precondition{filesExist}},
 	{phasecontract.ActionHaltAndEscalate, allTiers, false, nil},
+	{phasecontract.ActionDispatchPhaseAgent, []string{TierItem}, false, []precondition{requestValid}},
 }
 
 func CatalogActions() []string {
@@ -161,4 +165,11 @@ func refuseMissingFile(c check) string {
 		}
 	}
 	return ""
+}
+
+func refuseUnvalidatedRequest(c check) string {
+	if c.inv.Requests[c.params.Request] {
+		return ""
+	}
+	return fmt.Sprintf("the request %q is not a request that the pipeline validated", c.params.Request)
 }

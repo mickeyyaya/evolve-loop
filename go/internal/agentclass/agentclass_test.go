@@ -2,6 +2,7 @@ package agentclass
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -173,5 +174,32 @@ func TestRequestPath_IsUnderTheWorkspaceOrTheCellTemplate(t *testing.T) {
 	}
 	if got := RequestPath("", "dispatch"); got != ".evolve/runs/cycle-<N>/requests/dispatch-<n>.json" {
 		t.Errorf("RequestPath(\"\") = %q", got)
+	}
+}
+
+func TestRequestName_TheFileTheChildAndTheNameShareOneGrammar(t *testing.T) {
+	t.Parallel()
+	file := filepath.Base(strings.Replace(RequestPath("ws", "dispatch"), "<n>", "12", 1))
+	kind, n, ok := RequestFile(file)
+	if !ok || kind != "dispatch" || n != 12 {
+		t.Fatalf("RequestFile(%q) = %q %d %v; the refusal path must be a request file", file, kind, n, ok)
+	}
+	if want := filepath.Join("ws", RequestsDir, KindDispatch+"-<n>.json"); RequestPath("ws", KindDispatch) != want {
+		t.Fatalf("RequestPath = %q, want %q", RequestPath("ws", KindDispatch), want)
+	}
+	parent := ChildRequest("", file)
+	child := ChildRequest(parent, "dispatch-1.json")
+	if parent != "dispatch-12" || child != "dispatch-12.dispatch-1" || !ValidRequestName(parent) || !ValidRequestName(child) {
+		t.Fatalf("names %q and %q must be valid request names", parent, child)
+	}
+	for _, bad := range []string{"notes.txt", "dispatch.json", "Dispatch-1.json", "dispatch-1.json.bak", "../dispatch-1.json"} {
+		if _, _, ok := RequestFile(bad); ok {
+			t.Errorf("RequestFile(%q) must refuse", bad)
+		}
+	}
+	for _, bad := range []string{"", "../x", "dispatch-1.", "dispatch-1..dispatch-2", "dispatch"} {
+		if ValidRequestName(bad) {
+			t.Errorf("ValidRequestName(%q) must refuse", bad)
+		}
 	}
 }

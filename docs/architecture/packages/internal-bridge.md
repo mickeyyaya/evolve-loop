@@ -38,7 +38,7 @@ The boot waits (`bootTmuxREPL` for a phase launch or boot smoke, and the recipe 
 
 Rule selection:
 
-- **A manifest declares what its driver can do.** The field `capabilities` lists `tools` and `edit` (X9). `ollama-tmux` lists none, so it has no tool use and cannot write a worktree artifact. `HasToolUse` is the one predicate over the field, and it fails closed: a CLI whose manifest does not load has no proven tool use. The ollama launch guard and the universal-fallback tail use it.
+- **A manifest declares what its driver can do.** The field `capabilities` lists `tools`, `edit` and `inprocess_subagents` (X9, [llm-isolation.md](../llm-isolation.md) §7.2). `claude-p` and `claude-tmux` declare `inprocess_subagents`, because the Claude Code harness runs its subagents in its own process. `ollama-tmux` lists none, so it has no tool use and cannot write a worktree artifact. `HasToolUse` is the one predicate over the field, and it fails closed: a CLI whose manifest does not load has no proven tool use. The ollama launch guard and the universal-fallback tail use it.
 
   Every lane phase runs in its worktree (CB.1). Thus the guard refuses a lane phase because it has no tool use, not because the phase writes source. Pinned by `TestHasToolUse_FollowsTheDriverManifest`.
 - **`LacksToolUse` is the evidence predicate of the routing filter.** `HasToolUse` fails closed, so a manifest that does not load reads as no tool use. A filter that drops on that reading drops a live driver. A corrupt override, a broken `base` or a broken `model_tier_map_from` causes it, and the load error stays hidden. `LacksToolUse` is true only when the manifest loads and has no `tools` capability.
