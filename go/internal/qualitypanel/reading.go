@@ -38,6 +38,7 @@ type Reading struct {
 	Origin    string
 	Threshold *float64
 	Status    Status
+	Extra     map[string]string
 }
 
 func Judge(ix Index, r Reading) Status {
@@ -116,6 +117,9 @@ func readingFields(ix Index, r Reading, stage Stage, status Status) map[string]s
 	}
 	if r.Method != MethodCensus {
 		f["lo"], f["hi"] = num(r.Interval.Lo), num(r.Interval.Hi)
+	}
+	for k, v := range r.Extra {
+		f[k] = v
 	}
 	return f
 }

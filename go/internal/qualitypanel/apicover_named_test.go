@@ -1,6 +1,9 @@
 package qualitypanel
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 func TestDirection_RatesThatMustRiseAndRatesThatMustFall(t *testing.T) {
 	t.Parallel()
@@ -28,5 +31,19 @@ func TestJudge_NoSampleIsStatusNoDataEvenWithoutAThreshold(t *testing.T) {
 	ix, _ := Lookup("JQ4")
 	if got := Judge(ix, Reading{}); got != StatusNoData {
 		t.Errorf("Judge(empty) = %s, want %s", got, StatusNoData)
+	}
+}
+
+func TestMutationResult_ACleanRunWithNothingSkippedEqualsTheEmptySkipLists(t *testing.T) {
+	t.Parallel()
+	fn := ChangedFunction{Package: "go/internal/proctree", File: "go/internal/proctree/a.go", Name: "Add", Source: []byte(addSrc)}
+	res, err := MeasureMutation(inputFor(t, fn), &fakeRunner{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []MutationSkip{{Function: fn, Reason: "the path go/internal/proctree/ is a kill guard"}}
+	wantResult := MutationResult{TQ1: res.TQ1, TQ3: res.TQ3, Excluded: want}
+	if !reflect.DeepEqual(res, wantResult) {
+		t.Errorf("result = %+v, want %+v", res, wantResult)
 	}
 }

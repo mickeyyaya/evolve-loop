@@ -900,7 +900,7 @@ Quality (report stage; [95% interval], n, window)
 | Every index emits through `signalcenter` | `TestQualityReport_IsVisibleInSignalsTailByKind` reads `evolve signals tail --channel signals --kind quality.reading,…` output | built (Q1) |
 | The registry and `signal-codes.md` agree | `evolve signals codes check` (a `cmd/evolve` test) | exists; Q1 adds the codes |
 | No listener changes a stage | stage is read only from policy; the collector has no write path to policy | built (Q1): `TestQualityReport_TheStageComesOnlyFromPolicy` |
-| No mutation of kill paths | the TQ1 exclusion list, with a test that a kill path is refused | planned (Q5) |
+| No mutation of kill paths | the TQ1 exclusion list, with a test that a kill path is refused | built (Q5): `TestMeasureMutation_AKillGuardPathIsExcludedWithItsReason`; the real gremlins runner and its caller are still open |
 | A rule with an empty denominator is loud | `QUALITY_VACUOUS_DENOMINATOR` | built (Q1): `TestEvents_AnEmptySampleWarnsVacuousDenominator` |
 | An outcome never comes from `final_verdict` alone | a collector test on the cycle-2024 shape | planned (Q2) |
 
