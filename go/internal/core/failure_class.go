@@ -22,7 +22,7 @@ import (
 
 const classSegment = "|class-"
 
-var classCountedLayers = map[string]bool{"pipeline-code": true, "harness": true, "infra": true}
+var classCountedLayers = map[string]bool{dispositionrouter.LayerPipelineCode: true, dispositionrouter.LayerHarness: true, dispositionrouter.LayerInfra: true}
 
 var floorFailureCount = regexp.MustCompile(regexp.QuoteMeta(floorReasonHead) + `(\d+)` + regexp.QuoteMeta(floorReasonCount))
 

@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
-	"reflect"
 	"slices"
 	"time"
 
@@ -93,7 +92,7 @@ func runSelfhealWith(env selfhealEnv, args []string, stdout, stderr io.Writer) i
 	}
 	report := selfhealReport{Stage: cfg.Stage, Incidents: existing, Transitions: []selfhealTransition{}}
 	if cfg.Stage != policy.HealingStageOff {
-		report, w.warnings, err = detectIncidents(env, a.root, cfg, existing, stderr)
+		report, w.warnings, err = detectIncidents(env, a.root, cfg, stderr)
 		if err != nil {
 			return w.fail(exitIO, "io", "evolve selfheal: "+err.Error())
 		}
@@ -119,7 +118,7 @@ func parseSelfhealArgs(args []string) (selfhealArgs, error) {
 	return a, nil
 }
 
-func detectIncidents(env selfhealEnv, root string, cfg policy.HealingDetectorPolicy, existing []selfheal.Incident, stderr io.Writer) (selfhealReport, []string, error) {
+func detectIncidents(env selfhealEnv, root string, cfg policy.HealingDetectorPolicy, stderr io.Writer) (selfhealReport, []string, error) {
 	now := env.now()
 	obs, verifier, warnings, err := gatherIncidentEvidence(env, root, cfg, now)
 	if err != nil {
@@ -128,8 +127,13 @@ func detectIncidents(env selfhealEnv, root string, cfg policy.HealingDetectorPol
 	for _, warning := range warnings {
 		fmt.Fprintln(stderr, "evolve selfheal: WARN: "+warning)
 	}
-	next, transitions := selfheal.Detect(existing, obs, verifier, now)
-	if err := writeChangedIncidents(selfheal.Dir(paths.EvolveDirOf(root)), existing, next); err != nil {
+	var next []selfheal.Incident
+	var transitions []selfheal.Transition
+	err = selfheal.UpdateIncidents(selfheal.Dir(paths.EvolveDirOf(root)), func(current []selfheal.Incident) ([]selfheal.Incident, error) {
+		next, transitions = selfheal.Detect(current, obs, verifier, now)
+		return next, nil
+	})
+	if err != nil {
 		return selfhealReport{}, nil, err
 	}
 	report := selfhealReport{Stage: cfg.Stage, Incidents: next, Transitions: []selfhealTransition{}}
@@ -208,22 +212,6 @@ func selfhealCIRuns(env selfhealEnv, root string, since time.Time) ([]selfheal.C
 		}
 	}
 	return runs, nil
-}
-
-func writeChangedIncidents(dir string, before, after []selfheal.Incident) error {
-	old := map[string]selfheal.Incident{}
-	for _, inc := range before {
-		old[inc.ID] = inc
-	}
-	for _, inc := range after {
-		if prev, ok := old[inc.ID]; ok && reflect.DeepEqual(prev, inc) {
-			continue
-		}
-		if err := selfheal.WriteIncident(dir, inc); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func publishTransitions(env selfhealEnv, root, stage string, transitions []selfheal.Transition, stderr io.Writer) {

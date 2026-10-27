@@ -255,6 +255,14 @@ The block configures `internal/inboxcurator`, the deterministic checks of the in
 
 The similarity is the token Jaccard of the title and the acceptance of two items. The live inbox of 2026-10-27 had 2,710 pairs of open items with a shared fix surface. The highest similarity was 0.52, and 13 pairs were between 0.3 and 0.5. These numbers set the defaults.
 
+## Live incident reaction (`healing.live_reaction`)
+
+The block configures the live reaction of the incident detector ([internal-selfheal.md](packages/internal-selfheal.md#the-live-reaction)). Each cycle process runs it on a `cycle.sealed` event with the verdict FAIL. It opens an incident at once when a `pipeline-code` failure class fails for the third time ([failure-identity-lifecycle.md §4](failure-identity-lifecycle.md#4-failure-class-fingerprint)).
+
+| Key | Meaning | Default | Refused |
+|---|---|---|---|
+| `stage` | `off` arms nothing. `shadow` writes the incident record and emits the `selfheal.incident` event with the field `reaction` `would_brake`. `enforce` also engages the loop brake `.evolve/loop-stop` once, so the rolling pool admits no new lane. | `shadow` | a value other than `off`, `shadow` or `enforce` |
+
 ## Convergence policy (`workflow.convergence`)
 
 The block configures `internal/convergence`, the one rule every repeat-until-accepted loop uses to choose its next rung ([ADR-0126](adr/0126-every-iterative-loop-converges-or-escalates.md), [design](convergence-policy.md) §8; `evolve convergence decide` prints a decision). Absent means the compiled defaults below.
