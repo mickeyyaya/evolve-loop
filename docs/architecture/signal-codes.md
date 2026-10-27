@@ -462,6 +462,12 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `SIGNALCENTER_UNKNOWN_SEVERITY` | an event carried a severity outside INFO/WARN/INCIDENT; raw value in fields.raw_severity |
 | `SIGNALCENTER_UNREGISTERED_CODE` | an event carried a code its module never registered; raw value in fields.raw_code |
 
+### tokens
+
+| Code | Meaning |
+|---|---|
+| `TOKENS_ROW_UNATTRIBUTED` | a cycle workspace wrote an llm-calls row whose request carried no cycle number, so the row cannot be attributed to its cycle; emitted at the enforce stage only; fields call_id, cli, agent |
+
 ### triage
 
 | Code | Meaning |

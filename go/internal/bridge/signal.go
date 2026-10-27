@@ -13,6 +13,7 @@ const (
 	CodeContextFillHigh       signalcenter.Code = "BRIDGE_CONTEXT_FILL_HIGH"
 	CodeTelemetryAppendFailed signalcenter.Code = "BRIDGE_TELEMETRY_APPEND_FAILED"
 	CodeTelemetryTripwire     signalcenter.Code = "BRIDGE_TELEMETRY_TRIPWIRE"
+	CodeTokensRowUnattributed signalcenter.Code = "TOKENS_ROW_UNATTRIBUTED"
 
 	CodeBootStrikeClearFailed    signalcenter.Code = "BRIDGE_BOOT_STRIKE_CLEAR_FAILED"
 	CodeBootStrikeRecordFailed   signalcenter.Code = "BRIDGE_BOOT_STRIKE_RECORD_FAILED"
@@ -36,6 +37,7 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeContextFillHigh, "an attempt's context fill crossed the configured warn threshold; the reason names the fill and the threshold")
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeTelemetryAppendFailed, "the per-attempt telemetry record could not be appended to the workspace ledger; fields name the path")
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeTelemetryTripwire, "a successful attempt ran past the tripwire threshold with no measurable token usage — telemetry blind spot, not a phase failure")
+	signalcenter.RegisterCode(signalcenter.ModuleTokens, CodeTokensRowUnattributed, "a cycle workspace wrote an llm-calls row whose request carried no cycle number, so the row cannot be attributed to its cycle; emitted at the enforce stage only; fields call_id, cli, agent")
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeBootStrikeClearFailed, "the boot-strike store could not clear the driver's consecutive boot-timeout strike after a non-80 exit (the REPL booted); the strike count may stay stale and bench the driver early; fields step=clear_boot_strike, call_id, cli, agent")
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeBootStrikeRecordFailed, "the boot-strike store could not record the driver's boot-timeout strike after exit 80; the bench never escalates for this driver; the launch error still wraps the transient sentinel; fields step=record_boot_strike, call_id, cli, agent")
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeLaunchErrorPersistFailed, "the captured launch stderr could not be persisted as <workspace>/<agent>-launch-error.txt after a non-zero exit (the forensic file a validate-gauntlet death leaves); the classified error is unchanged and the BRIDGE_EXIT_* event carries no launch_error field; fields step=persist_launch_error, path, call_id, cli, agent")

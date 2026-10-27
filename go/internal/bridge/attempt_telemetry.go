@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/launchoutcome"
@@ -92,11 +93,6 @@ func (e *Engine) recordModelAttempt(
 	e.emitTokenWarnings(req, code, start, end, callID, attempt, result)
 
 	dispatched.source = cmp.Or(dispatched.source, llmcalls.DispatchNotStarted)
-	duration := end.Sub(start).Milliseconds()
-	var durationMS *int64
-	if duration >= 0 {
-		durationMS = &duration
-	}
 	exitCode := code
 	tripwire := isTelemetryTripwire(req.CLI, code, start, end, result.Source)
 	usage := result.Usage
@@ -121,13 +117,14 @@ func (e *Engine) recordModelAttempt(
 		Tokens:          usage,
 		Source:          string(result.Source),
 		UsageStatus:     usageStatus,
-		DurationMS:      durationMS,
+		DurationMS:      elapsedMillis(start, end),
 		ExitCode:        &exitCode,
 		Tripwire:        tripwire,
 		FillPct:         result.FillPct,
 		CauseCode:       launchoutcome.CauseCode(code, launchStderr),
 		ServedModel:     result.ServedModel,
 	}
+	attributeToRequest(&rec, req, attempt)
 	for _, mark := range marks {
 		mark(&rec)
 	}
@@ -135,7 +132,43 @@ func (e *Engine) recordModelAttempt(
 		logContext.warn(CodeTelemetryAppendFailed,
 			fmt.Sprintf("attempt telemetry append failed: path=%s error=%v", llmcalls.Path(req.Workspace), err))
 	}
+	e.signalUnattributedRow(req, logContext, rec)
 	return logContext
+}
+
+func elapsedMillis(start, end time.Time) (millis *int64) {
+	duration := end.Sub(start).Milliseconds()
+	if duration >= 0 {
+		millis = &duration
+	}
+	return millis
+}
+
+func attributeToRequest(rec *llmcalls.Record, req core.BridgeRequest, attempt int) {
+	rec.Cycle = req.Cycle
+	rec.RunID = req.RunID
+	rec.Profile = req.Profile
+	rec.Purpose = attemptPurpose(req, attempt)
+}
+
+func attemptPurpose(req core.BridgeRequest, attempt int) string {
+	switch {
+	case req.CorrectionDirective != "":
+		return llmcalls.PurposeContractCorrection
+	case attempt > 1:
+		return llmcalls.PurposeRetry
+	}
+	return llmcalls.PurposeFirst
+}
+
+func (e *Engine) signalUnattributedRow(req core.BridgeRequest, logContext attemptLogContext, rec llmcalls.Record) {
+	if e.deps.TokenAttributionStage != "enforce" || rec.Cycle != 0 || !strings.HasPrefix(filepath.Base(req.Workspace), "cycle-") {
+		return
+	}
+	event := logContext.event("Engine.signalUnattributedRow", signalcenter.KindBridgeWarning, CodeTokensRowUnattributed,
+		"llm-calls row written in a cycle workspace without a cycle number: "+req.Workspace)
+	event.Module = signalcenter.ModuleTokens
+	logContext.signals.Emit(event)
 }
 
 func (e *Engine) resolveAttemptTokens(req core.BridgeRequest, start, end time.Time, callID string, attempt int) (tokenusage.Result, llmcalls.UsageStatus) {
