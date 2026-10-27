@@ -39,5 +39,8 @@
 - A cycle with a shadow decision and no verdict is listed in `NoVerdict`. A file that does not parse is listed in `Unreadable`. A runs directory that does not exist is an error.
 - `evolve acs tia-report` prints the rollup, or `--json` prints the `Summary`.
 - Pinned by `TestRollup_CountsTheShadowDecisionsAndNamesEachMiss`, `TestRollup_AMissingRunsDirIsAnError` and `TestRollup_ARealCycleVerdictNamesTheMissOfASkippedRegressionPackage`. The last test reads a verbatim copy of the `acs-verdict.json` of cycle 2027 (`testdata/`).
-- **Known limit (filed).** `resolveDeps` treats a package as an escape hatch when any transitive dependency is `os`. Each test package reaches `os` through `testing`, so the selection never skips a package today and `would_skip` stays 0. The inbox item `regression-tia-escape-hatch-is-transitive` owns the fix.
+- **Module-local walk.** `listCorpusDeps` lists the direct imports of each package (`-deps`, `-test`). It walks only the packages of the module, and it records each module package and each escape-hatch import that it meets.
+- The walk ignores the generated `X.test` main package, because that package imports `os` for every test binary. A stdlib package such as `testing` is not walked.
+- A package that reaches `os` through a module package (for example `apicover` through `acsassert`) stays an escape hatch.
+- Pinned by `TestCompute_SkipsAPredicateThatReachesOsOnlyThroughTesting` and `TestC2053_001_PackageWithNoEscapeHatchInItsModuleLocalGraphIsSkippable` and `TestC2053_002_ReachingOsThroughAModulePackageStaysAnEscapeHatch`.
 

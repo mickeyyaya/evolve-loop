@@ -16,7 +16,16 @@ type BuildFloorCheck struct {
 
 type BuildHandoffFloor []BuildFloorCheck
 
-const explanationFloorCheckName = "explanation-documentation"
+const (
+	explanationFloorCheckName = "explanation-documentation"
+	composedFloorCheckName    = "composed-floor"
+)
+
+const (
+	floorReasonHead       = "build handoff floor: "
+	floorReasonCount      = " deterministic check failure(s)"
+	floorFailureSeparator = "\n  "
+)
 
 func MandatoryBuildHandoffFloor() BuildHandoffFloor {
 	return BuildHandoffFloor{{Name: explanationFloorCheckName, Run: explanationDocumentationFailures}}
@@ -50,8 +59,8 @@ func (f BuildHandoffFloor) Review(ctx context.Context, in ReviewInput) ReviewRes
 	if len(failures) == 0 {
 		return ReviewResult{Approve: true}
 	}
-	reason := fmt.Sprintf("build handoff floor: %d deterministic check failure(s) — fix these exactly before handoff:\n  %s",
-		len(failures), strings.Join(failures, "\n  "))
+	reason := fmt.Sprintf(floorReasonHead+"%d"+floorReasonCount+" — fix these exactly before handoff:"+floorFailureSeparator+"%s",
+		len(failures), strings.Join(failures, floorFailureSeparator))
 	fmt.Fprintf(os.Stderr, "[build-floor] REJECT: %s\n", reason)
 	return ReviewResult{Approve: false, Retry: true, Reason: reason, Failures: failures}
 }

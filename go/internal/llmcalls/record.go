@@ -46,6 +46,12 @@ const (
 	OutcomeUnknown = "unknown"
 )
 
+const (
+	PurposeFirst              = "first"
+	PurposeRetry              = "retry"
+	PurposeContractCorrection = "contract_correction"
+)
+
 type Record struct {
 	SchemaVersion int    `json:"schema_version,omitempty"`
 	CallID        string `json:"call_id,omitempty"`
@@ -62,6 +68,10 @@ type Record struct {
 	DispatchedModel string `json:"dispatched_model,omitempty"`
 	DispatchSource  string `json:"dispatch_source,omitempty"`
 	Attempt         int    `json:"attempt"`
+	Cycle           int    `json:"cycle,omitempty"`
+	RunID           string `json:"run_id,omitempty"`
+	Profile         string `json:"profile,omitempty"`
+	Purpose         string `json:"purpose,omitempty"`
 
 	Tokens             cyclestate.TokenUsage `json:"tokens"`
 	Source             string                `json:"source"`
