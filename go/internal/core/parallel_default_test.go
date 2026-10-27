@@ -73,6 +73,8 @@ var serialRequiredTests = map[string]string{
 	"core.TestWorktreeBaseSHA_SkipsMalformedLogLines":                                               swapsGitRunner,
 	"core.TestEnsureCleanWorktree_QuarantineFailures":                                               swapsGitRunner,
 	"core.TestOriginDefaultBranch_EmptyRemoteHeadFallsBackToMain":                                   swapsGitRunner,
+	"core.TestAdoptContinuationForConsole_AFailedBaseAdvanceIsAnError":                              swapsGitRunner,
+	"core.TestUndoConsoleWorktree_NamesEachStepThatFails":                                           swapsGitRunner,
 	"core.TestDefaultCurrentHead_GitTransportError":                                                 swapsGitRunner,
 	"core.TestDiscardMainLeak_GitFailures":                                                          swapsGitRunner,
 	"core.TestGitStatusNames_Edges":                                                                 swapsGitRunner,

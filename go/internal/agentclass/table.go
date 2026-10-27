@@ -96,5 +96,6 @@ var table = []Verb{
 	{Path: "selfheal propose", Class: Denied},
 	{Path: "subagent run", Class: Denied},
 	{Path: "reset-sha", Class: Denied},
+	{Path: "continuation adopt", Class: Denied},
 	{Path: "release", Class: Denied},
 }

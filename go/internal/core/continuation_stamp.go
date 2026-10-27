@@ -116,6 +116,9 @@ func validateContinuation(ctx context.Context, projectRoot string, c *continuati
 	if err != nil {
 		return fmt.Errorf("continuation: adopt-time re-screen: %w", err)
 	}
+	if verdict == FleetRebaseConflict {
+		return fmt.Errorf("%w: snapshot %s no longer Clean against main (verdict=%d)", ErrContinuationConflict, c.SnapshotSHA[:12], int(verdict))
+	}
 	if verdict != FleetRebaseClean {
 		return fmt.Errorf("continuation: snapshot %s no longer Clean against main (verdict=%d)", c.SnapshotSHA[:12], int(verdict))
 	}

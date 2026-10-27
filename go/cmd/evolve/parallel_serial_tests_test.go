@@ -1,6 +1,8 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestRunContinuationAdopt_ATildePathInTheRegistryIsExpanded":                                       "sets env through a helper",
+	"main.TestRunContinuationAdopt_ATildePathOnTheStampIsExpanded":                                          "sets env through a helper",
 	"main.TestEventsWatch_TheDefaultEnvironmentArmsTheKernelAndTheSignals":                                  "installs the process signal handlers of the watch",
 	"main.TestEvents_AnUnreadableWorkingDirectoryIsAnIOError":                                               "swaps seam processGetwd",
 	"main.TestCycleResume_AnUnreadableWorkingDirectoryIsAnIOError":                                          "swaps seams processGetwd and cycleResumeLoad",

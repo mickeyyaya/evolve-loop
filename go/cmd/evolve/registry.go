@@ -51,7 +51,7 @@ var commands = []subcommand{
 	{Name: "worktree", Summary: "Manage per-cycle worktrees", Run: runWorktree},
 	{Name: "land", Summary: "Land a patch or a salvaged cycle uncommitted on a hub dev worktree at the fetched origin/main; never commits or pushes (land --branch B (--patch F | --salvage <leaf>) [--project-root P])", Run: runLand},
 	{Name: "branches", Summary: "Audit/prune superseded orphan cycle-* branches (branches audit|prune)", Run: runBranches},
-	{Name: "continuation", Summary: "Inspect/release scope-keyed continuation bindings (continuation list | continuation release <scope-id>)", Run: runContinuation},
+	{Name: "continuation", Summary: "Inspect, release or adopt scope-keyed continuation bindings (continuation list | continuation release <scope-id> | continuation adopt <item-id> --worktree <path>)", Run: runContinuation},
 	{Name: "carryover", Summary: "Apply a reviewed keep/drop/cluster decisions file to state.json:carryoverTodos via the sanctioned locked RMW path (carryover apply-decisions)", Run: runCarryover},
 	{Name: "swarm", Summary: "Inspect/reap swarm worker sessions (ADR-0032)", Run: runSwarm},
 	{Name: "checkpoint", Summary: "Protect uncommitted worktree work as refs/checkpoints snapshots, never touching the branch, index or tree: checkpoint save [--worktree DIR | --all] [--label T] [--push] | list [--worktree DIR] | restore <ref> --into DIR | prune [--landed] (each takes --json and --project-root P)", Run: runCheckpoint},
