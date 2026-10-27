@@ -49,25 +49,32 @@ func releaseContinuationOnRetire(opts Options, itemPath, taskID, reason string) 
 var marshalReleasedContinuation = func(v releasedContinuation) ([]byte, error) { return json.Marshal(v) }
 
 func appendReleasedContinuation(path string, c continuation.Continuation, reason, releasedBy string, at time.Time) error {
-	entry, err := marshalReleasedContinuation(releasedContinuation{
-		Continuation: c,
-		ReleasedAt:   at.Format(time.RFC3339),
-		Reason:       reason,
-		ReleasedBy:   releasedBy,
-	})
+	entry, err := marshalReleasedContinuation(releasedContinuation{Continuation: c, ReleasedAt: at.Format(time.RFC3339), Reason: reason, ReleasedBy: releasedBy})
 	if err != nil {
 		return err
 	}
-	return updateItemJSON(path, func(m map[string]json.RawMessage) {
-		var list []json.RawMessage
-		if raw, ok := m[inboxbatch.ReleasedContinuationsField]; ok {
-			_ = json.Unmarshal(raw, &list)
-		}
-		list = append(list, entry)
-		if out, merr := json.Marshal(list); merr == nil {
-			m[inboxbatch.ReleasedContinuationsField] = out
-		}
-	})
+	return updateItemJSON(path, func(m map[string]json.RawMessage) { releasePointer(m, entry, c.SnapshotSHA) })
+}
+
+func releasePointer(m map[string]json.RawMessage, entry []byte, snapshot string) {
+	var live struct {
+		SnapshotSHA string `json:"snapshot_sha"`
+	}
+	if snapshot != "" && json.Unmarshal(m[inboxbatch.ContinuationField], &live) == nil && live.SnapshotSHA == snapshot {
+		delete(m, inboxbatch.ContinuationField)
+	}
+	appendReleasedEntry(m, entry)
+}
+
+func appendReleasedEntry(m map[string]json.RawMessage, entry []byte) {
+	var list []json.RawMessage
+	if raw, ok := m[inboxbatch.ReleasedContinuationsField]; ok {
+		_ = json.Unmarshal(raw, &list)
+	}
+	list = append(list, entry)
+	if out, merr := json.Marshal(list); merr == nil {
+		m[inboxbatch.ReleasedContinuationsField] = out
+	}
 }
 
 func scopeHasLiveItem(opts Options, scopeID string) bool {

@@ -17,6 +17,7 @@ var RealInboxForTest struct {
 	ResolveScope func(root string, cycle int, scopeIDs []string) *continuation.Continuation
 	Release      func(root string, cycle int, reason string) error
 	Claim        func(root, taskID, cycle string) error
+	Shed         func(root string, cycle int, declined continuation.Continuation) ([]string, error)
 }
 
 func stampedContinuation(t *testing.T, root, wt string, oldCycle int) continuation.Continuation {

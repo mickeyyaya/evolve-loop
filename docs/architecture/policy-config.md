@@ -330,6 +330,16 @@ The block sets the stage of the retrospective documents that the cycle closeout 
 |---|---|---|
 | `stage` | `off` writes no document. `shadow` writes the documents into the cycle workspace. `enforce` does the same until plan C4 to C6 add the publish and the todo retirement. The checked-in policy sets `enforce` (operator decision of 2026-10-27). | `shadow` |
 
+## Continuation age (`continuation`)
+
+The block sets how long a continuation binding lives (2026-10-27). `evolve gc` releases each binding older than `max_age_cycles` and removes its worktree ([cmd-evolve.md](packages/cmd-evolve.md)). The loader decodes the block strictly. An unknown key, or a value out of range, fails the load of the whole file, and the error names the key. When the file does not load, `evolve gc` skips the sweep with a WARN and releases nothing, because the age is then unknown.
+
+| Key | Meaning | Default | Refused |
+|---|---|---|---|
+| `max_age_cycles` | the number of cycles after which `evolve gc` releases a binding. The age is `lastCycleNumber` of `state.json` minus the cycle of the binding. | 100 | below 1, above 10000, or not a number |
+
+Why: on 2026-10-27 the registry held 101 bindings, and 89 of them came from cycles before 1900 (the oldest from cycle 1127). Each kept its worktree out of `evolve worktree cleanup --stale`.
+
 ## Context-fill telemetry (`context_fill`)
 
 The token telemetry of every launch carries a derived **fill reading**. It is the prompt-side
