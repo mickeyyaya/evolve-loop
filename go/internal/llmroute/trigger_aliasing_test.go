@@ -18,7 +18,7 @@ func TestResolveTriggers_EveryPlanOwnsItsDefaultTriggers(t *testing.T) {
 	for label, prof := range cases {
 		t.Run(label, func(t *testing.T) {
 			builders := map[string]func() Plan{
-				"Resolve":  func() Plan { return Resolve("scout", "scout", "balanced", nil, prof, nil, nil) },
+				"Resolve":  func() Plan { return Resolve("scout", "scout", "balanced", nil, AgentOverride{}, prof, nil, nil) },
 				"ChainFor": func() Plan { return ChainFor("claude-tmux", prof) },
 			}
 			for name, build := range builders {
@@ -38,7 +38,7 @@ func TestResolveTriggers_EveryPlanOwnsItsDefaultTriggers(t *testing.T) {
 
 func TestResolveTriggers_AProfileListWinsAndIsNeverAliased(t *testing.T) {
 	own := []int{7, 8}
-	plan := Resolve("scout", "scout", "balanced", nil, &profiles.Profile{CLIFallbackOnExit: own}, nil, nil)
+	plan := Resolve("scout", "scout", "balanced", nil, AgentOverride{}, &profiles.Profile{CLIFallbackOnExit: own}, nil, nil)
 	if !slices.Equal(plan.Triggers, []int{7, 8}) {
 		t.Fatalf("Triggers=%v, want the profile's own [7 8]", plan.Triggers)
 	}

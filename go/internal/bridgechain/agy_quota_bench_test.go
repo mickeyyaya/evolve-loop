@@ -20,7 +20,7 @@ func TestBenchOnEscalation_AgyQuotaWallBenchesTheAgyFamily(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(ws, "escalation-report.json"), b, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: "agy-tmux", DispatchStart: now().Add(-time.Minute), Env: map[string]string{}}, now, nil)
+	bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: "agy-tmux", DispatchStart: now().Add(-time.Minute)}, now, nil)
 	if _, ok := clihealth.NewStore(root, now).Active()["agy"]; !ok {
 		t.Fatal("agy's quota_exhausted wall left the family unbenched; every later dispatch pays a dead round-trip")
 	}
@@ -46,7 +46,7 @@ func TestBenchOnEscalation_AgyWallScopeFollowsTheDispatchedTier(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(ws, "escalation-report.json"), b, 0o644); err != nil {
 			t.Fatal(err)
 		}
-		bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: tc.cli, Tier: tc.tier, DispatchStart: now().Add(-time.Minute), Env: map[string]string{}}, now, nil)
+		bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: tc.cli, Tier: tc.tier, DispatchStart: now().Add(-time.Minute)}, now, nil)
 		active := clihealth.NewStore(root, now).Active()
 		if _, ok := active[tc.wantKey]; !ok || len(active) != 1 {
 			t.Errorf("%s wall at tier %q: benches = %v, want the single key %q", tc.cli, tc.tier, active, tc.wantKey)
@@ -62,7 +62,7 @@ func TestEscalationFor_TheTierOfTheTryScopesTheAgyWallToItsModelGroup(t *testing
 	if err := os.WriteFile(filepath.Join(ws, "escalation-report.json"), b, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	req := core.BridgeRequest{CLI: "agy-tmux", Model: "deep", ProjectRoot: root, Workspace: ws, Env: map[string]string{}}
+	req := core.BridgeRequest{CLI: "agy-tmux", Model: "deep", ProjectRoot: root, Workspace: ws}
 
 	bridgechain.BenchOnEscalation(bridgechain.EscalationFor(req, now().Add(-time.Minute)), now, nil)
 

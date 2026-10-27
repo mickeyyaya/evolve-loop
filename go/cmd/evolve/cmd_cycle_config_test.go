@@ -65,11 +65,9 @@ func TestRoutingConfigLoader_ConstructionSitesArePinned(t *testing.T) {
 func TestCenterlessConfigLoadSitesArePinned(t *testing.T) {
 	t.Parallel()
 	want := map[string]bool{
-		"internal/cli/phasecmd/phase_verify.go": true,
-		"cmd/evolve/cmd_solution.go":            true,
-		"internal/kerneltest/fixture.go":        true,
-		"internal/dashboard/plan.go":            true,
-		"cmd/evolve/cmd_cycle_config.go":        true,
+		"cmd/evolve/cmd_solution.go":     true,
+		"internal/kerneltest/fixture.go": true,
+		"cmd/evolve/cmd_cycle_config.go": true,
 	}
 	hits := nonTestSourcesMatching(t, regexp.MustCompile(`\bconfig\.Load\(`))
 	got := map[string]bool{}
@@ -253,5 +251,15 @@ func TestWireBridgeStages_IsTheRootsOnlyStageForwarding(t *testing.T) {
 	want := []string{"cmd/evolve/cmd_cycle.go", "cmd/evolve/cmd_cycle_config.go"}
 	if !reflect.DeepEqual(hits, want) {
 		t.Errorf("wireBridgeStages( must be defined in cmd_cycle_config.go and called by cmd_cycle.go, found in %v", hits)
+	}
+}
+
+func TestWarnRetiredControls_NamesThePolicyKeyForEachSetName(t *testing.T) {
+	t.Parallel()
+	var out strings.Builder
+	warnRetiredControls(&out, []string{"EVOLVE_ROUTING_MODE=static", "EVOLVE_PROJECT_ROOT=/r"})
+	want := "[policy] WARN EVOLVE_ROUTING_MODE is set, but the pipeline does not read it (ADR-0156 I-16): use policy.json router.routing_mode\n"
+	if out.String() != want {
+		t.Errorf("warning = %q, want %q", out.String(), want)
 	}
 }

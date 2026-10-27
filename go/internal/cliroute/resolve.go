@@ -3,9 +3,7 @@ package cliroute
 import (
 	"fmt"
 	"slices"
-	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
@@ -35,7 +33,7 @@ func (v resolver) resolveDeclared(req Request) (Decision, error) {
 	}
 	res := resolution{
 		req: req, prof: prof, allowed: v.table.allowed(req.Agent, prof),
-		base: llmroute.Resolve(req.Agent, req.Phase, req.DefaultModel, req.Env, prof, req.Expand, nil),
+		base: llmroute.Resolve(req.Agent, req.Phase, req.DefaultModel, req.Env, v.table.overrides.For(req.Agent), prof, req.Expand, nil),
 	}
 	for _, next := range declaredStages {
 		out, err := next(v, res)
@@ -69,7 +67,7 @@ func selectRule(v resolver, res resolution) (resolution, error) {
 
 func fixAgentModel(v resolver, res resolution) (resolution, error) {
 	model, set := v.table.models[res.req.Agent]
-	if !set || res.req.Env[envchain.PhaseEnvKey(res.req.Agent, "MODEL")] != "" {
+	if !set || v.table.overrides.For(res.req.Agent).Model != "" {
 		return res, nil
 	}
 	res.plan = llmroute.ApplySoftOverlay(res.plan, llmroute.Overlay{Tier: model}, res.prof)
@@ -79,7 +77,7 @@ func fixAgentModel(v resolver, res resolution) (resolution, error) {
 
 func guardEnv(_ resolver, res resolution) (resolution, error) {
 	source := res.base.PrimarySource
-	if !strings.HasPrefix(source, "env(") {
+	if !llmroute.IsOperatorChoice(source) {
 		return res, nil
 	}
 	primary := res.base.Candidates[0]
@@ -93,7 +91,7 @@ func guardEnv(_ resolver, res resolution) (resolution, error) {
 
 func leadWithCaller(_ resolver, res resolution) (resolution, error) {
 	caller := res.req.CallerCLI
-	if caller == "" || res.rule != ruleProfile || strings.HasPrefix(res.plan.PrimarySource, "env(") {
+	if caller == "" || res.rule != ruleProfile || llmroute.IsOperatorChoice(res.plan.PrimarySource) {
 		return res, nil
 	}
 	if !slices.Contains(res.allowed, familyOf(caller)) {

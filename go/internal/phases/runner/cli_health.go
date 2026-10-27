@@ -10,8 +10,8 @@ import (
 
 func runnerLogf(format string, args ...any) { fmt.Fprintf(os.Stderr, "[runner] "+format, args...) }
 
-func (b *BaseRunner) bench(projectRoot, phase string, plan llmroute.Plan, env map[string]string) llmroute.Plan {
-	return bridgechain.ApplyCLIHealthBench(projectRoot, phase, plan, env, b.nowFn, runnerLogf)
+func (b *BaseRunner) bench(projectRoot, phase string, plan llmroute.Plan) llmroute.Plan {
+	return bridgechain.ApplyCLIHealthBench(projectRoot, phase, plan, b.nowFn, runnerLogf)
 }
 
 func (b *BaseRunner) maybeBenchOnEscalation(e bridgechain.Escalation) {

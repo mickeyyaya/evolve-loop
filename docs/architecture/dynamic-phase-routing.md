@@ -1,6 +1,9 @@
 # Dynamic Phase Routing (Go kernel)
 
 > **Status:** Kernel shipped v13.0.0 (PR #4, `53ed48b`), **default `advisory`** since 2026-06-06. Registry-pinned after retro migration steps 1-3 landed; it was default-off from v13.0.0. `EVOLVE_DYNAMIC_ROUTING=off` remains the static escape hatch.
+
+> **Amended 2026-10-27 (X18c):** the dials of this page are keys of `.evolve/policy.json`: `router.dynamic_routing`, `router.routing_mode`, `router.conditional_mandatory` and `router.max_optional_insertions`. No code reads the `EVOLVE_*` names of this page, except `EVOLVE_USE_PHASE_REGISTRY` ([policy-config.md](policy-config.md#routing-and-run-knobs-x18c)).
+
 > **Audience:** Operators experimenting with per-cycle phase selection; persona + router authors.
 > **Source:** `go/internal/config` (the `Loader` the composition root calls — ADR-0103 unit 08, [decomposition/08-config.md](decomposition/08-config.md)), `go/internal/router/` (clamp + strategy), `go/internal/core/phase_advisor.go` (LLM brain), `go/internal/core/orchestrator.go` (`WithRouting`), `docs/architecture/phase-registry.json` (registry).
 > **Successor design:** ADR-0024 (Proposed) replaces the fixed mandatory-spine model with a conditional floor + PhaseAdvisor — read it before extending this kernel.

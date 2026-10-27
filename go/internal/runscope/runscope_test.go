@@ -13,8 +13,8 @@ import (
 )
 
 func TestResolveLane_DistinctRootsDistinctLanes(t *testing.T) {
-	a := runscope.ResolveLane("", "/Users/x/ai/evolve-loop-campaign", noEnv)
-	b := runscope.ResolveLane("", "/Users/x/ai/evolve-loop-dossier", noEnv)
+	a := runscope.ResolveLane("", "/Users/x/ai/evolve-loop-campaign")
+	b := runscope.ResolveLane("", "/Users/x/ai/evolve-loop-dossier")
 	if a == "" || b == "" {
 		t.Fatalf("lane must be non-empty: a=%q b=%q", a, b)
 	}
@@ -25,36 +25,32 @@ func TestResolveLane_DistinctRootsDistinctLanes(t *testing.T) {
 
 func TestResolveLane_StableAcrossResume(t *testing.T) {
 	root := "/Users/x/ai/evolve-loop-campaign"
-	first := runscope.ResolveLane("", root, noEnv)
-	if again := runscope.ResolveLane("", root, noEnv); again != first {
+	first := runscope.ResolveLane("", root)
+	if again := runscope.ResolveLane("", root); again != first {
 		t.Fatalf("lane not stable: %q then %q", first, again)
 	}
-	if slash := runscope.ResolveLane("", root+"/", noEnv); slash != first {
+	if slash := runscope.ResolveLane("", root+"/"); slash != first {
 		t.Fatalf("trailing-slash variant lane = %q, want %q (same dir)", slash, first)
 	}
 }
 
 func TestResolveLane_OverridePrecedence(t *testing.T) {
-	env := func(k string) string {
-		if k == runscope.EnvLane {
-			return "from-env"
-		}
-		return ""
-	}
-	if got := runscope.ResolveLane("explicit", "/root", env); got != "explicit" {
+	t.Setenv("EVOLVE_LANE", "from-env")
+	if got := runscope.ResolveLane("explicit", "/root"); got != "explicit" {
 		t.Errorf("explicit should win: got %q", got)
 	}
-	if got := runscope.ResolveLane("", "/root", env); got != "from-env" {
-		t.Errorf("env should win over hash: got %q", got)
+	hash := runscope.LaneFromRoot("/root")
+	if got := runscope.ResolveLane("", "/root"); got != hash {
+		t.Errorf("without --lane the lane is the root hash %q, never the environment: got %q", hash, got)
 	}
-	if got := runscope.ResolveLane("///", "/root", env); got != "from-env" {
-		t.Errorf("unsafe explicit must fall through to env: got %q", got)
+	if got := runscope.ResolveLane("///", "/root"); got != hash {
+		t.Errorf("unsafe explicit must fall through to the root hash %q: got %q", hash, got)
 	}
-	if got := runscope.ResolveLane("camp aign:2", "/root", noEnv); strings.ContainsAny(string(got), "/ :~^?*[\\\t") {
+	if got := runscope.ResolveLane("camp aign:2", "/root"); strings.ContainsAny(string(got), "/ :~^?*[\\\t") {
 		t.Errorf("override not sanitized: %q", got)
 	}
 	for _, in := range []string{"a..b", "a.lock", ".hidden", "x...y"} {
-		got := string(runscope.ResolveLane(in, "/root", noEnv))
+		got := string(runscope.ResolveLane(in, "/root"))
 		branch := runscope.New(runscope.Lane(got), "", 1).CycleBranch()
 		if strings.Contains(branch, "..") || strings.HasSuffix(branch, ".lock") {
 			t.Errorf("override %q produced ref-illegal branch %q", in, branch)
@@ -134,5 +130,3 @@ func TestLaneFromRoot_EqualsHotfixToken(t *testing.T) {
 		t.Fatalf("LaneFromRoot = %q, want projecthash %q", got, want)
 	}
 }
-
-func noEnv(string) string { return "" }

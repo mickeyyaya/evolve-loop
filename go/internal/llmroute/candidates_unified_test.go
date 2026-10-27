@@ -118,8 +118,7 @@ func TestUnifiedCandidateBuilder_ChainForDelegates(t *testing.T) {
 func TestUnifiedCandidateBuilder_ResolveDelegates(t *testing.T) {
 	for _, tc := range unifiedCases() {
 		t.Run(tc.name, func(t *testing.T) {
-			env := map[string]string{"EVOLVE_AUDITOR_CLI": tc.primary}
-			got := Resolve("auditor", "audit", "auto", env, tc.prof, nil, nil).Candidates
+			got := Resolve("auditor", "audit", "auto", nil, AgentOverride{CLI: tc.primary}, tc.prof, nil, nil).Candidates
 			want := buildCandidates(tc.primary, tc.prof, false)
 			if !reflect.DeepEqual(got, want) {
 				t.Errorf("Resolve(...).Candidates=%v, want buildCandidates(...,false)=%v", got, want)

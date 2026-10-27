@@ -34,7 +34,6 @@ func TestDefaultReleaseVerify_MissingBinaryOnDisk(t *testing.T) {
 }
 
 func TestDefaultShip_BinaryNotFound(t *testing.T) {
-	t.Setenv("EVOLVE_GO_BIN", "")
 	t.Setenv("PATH", t.TempDir())
 
 	_, err := defaultShip(t.TempDir(), "release: test", "notes")

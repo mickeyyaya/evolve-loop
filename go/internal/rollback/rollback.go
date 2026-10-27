@@ -370,11 +370,6 @@ func revertAndShipWith(g gitexec.Git, repoRoot, commitSHA, reason, version strin
 }
 
 func resolveEvolveBinForRollback(repoRoot string) string {
-	if p := os.Getenv("EVOLVE_GO_BIN"); p != "" {
-		if info, err := os.Stat(p); err == nil && info.Mode()&0o111 != 0 {
-			return p
-		}
-	}
 	candidate := filepath.Join(repoRoot, "go", "bin", "evolve")
 	if info, err := os.Stat(candidate); err == nil && info.Mode()&0o111 != 0 {
 		return candidate

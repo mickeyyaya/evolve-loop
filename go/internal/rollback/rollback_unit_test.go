@@ -13,34 +13,29 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-func TestResolveEvolveBinForRollback_EnvVarSet(t *testing.T) {
+func TestResolveEvolveBinForRollback_TheEnvironmentNamesNoBinary(t *testing.T) {
 	dir := t.TempDir()
 	binPath := filepath.Join(dir, "fake-evolve")
 	if err := os.WriteFile(binPath, []byte("#!/bin/sh\necho fake\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("EVOLVE_GO_BIN", binPath)
-	got := resolveEvolveBinForRollback(t.TempDir())
-	if got != binPath {
-		t.Errorf("got %q, want %q", got, binPath)
+	t.Setenv("PATH", "/nonexistent/path")
+	if got := resolveEvolveBinForRollback(t.TempDir()); got != "" {
+		t.Errorf("got %q, want empty: EVOLVE_GO_BIN is not read", got)
 	}
 }
 
-func TestResolveEvolveBinForRollback_EnvVarNonExecutable_FallsThrough(t *testing.T) {
-	dir := t.TempDir()
-	binPath := filepath.Join(dir, "not-exec")
-	if err := os.WriteFile(binPath, []byte("x"), 0o644); err != nil {
+func installRepoEvolve(t *testing.T, root, script string) {
+	t.Helper()
+	bin := filepath.Join(root, "go", "bin", "evolve")
+	if err := os.MkdirAll(filepath.Dir(bin), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("EVOLVE_GO_BIN", binPath)
-	got := resolveEvolveBinForRollback(t.TempDir())
-	if got == binPath {
-		t.Error("non-executable env var should be skipped")
-	}
+	fakeclitest.Install(t, bin, script)
 }
 
 func TestResolveEvolveBinForRollback_RepoRootCandidate(t *testing.T) {
-	t.Setenv("EVOLVE_GO_BIN", "")
 	repo := t.TempDir()
 	candidate := filepath.Join(repo, "go", "bin", "evolve")
 	if err := os.MkdirAll(filepath.Dir(candidate), 0o755); err != nil {
@@ -55,7 +50,6 @@ func TestResolveEvolveBinForRollback_RepoRootCandidate(t *testing.T) {
 }
 
 func TestResolveEvolveBinForRollback_NotFound_ReturnsEmpty(t *testing.T) {
-	t.Setenv("EVOLVE_GO_BIN", "")
 	t.Setenv("PATH", "/nonexistent/path")
 	if got := resolveEvolveBinForRollback("/no/such/repo/root"); got != "" {
 		t.Errorf("got %q, want empty (no binary anywhere)", got)
@@ -108,12 +102,8 @@ func TestAppendLedger_MkdirFailure_ReturnsError(t *testing.T) {
 }
 
 func TestRevertAndShipWith_RevertOK_BinaryFails_LocalOnly(t *testing.T) {
-	t.Setenv("EVOLVE_GO_BIN", "")
-
 	binDir := t.TempDir()
-	binPath := filepath.Join(binDir, "evolve")
-	fakeclitest.Install(t, binPath, "#!/bin/sh\nexit 1\n")
-	t.Setenv("EVOLVE_GO_BIN", binPath)
+	installRepoEvolve(t, binDir, "#!/bin/sh\nexit 1\n")
 
 	fake := &fixtures.FakeExec{}
 	g := gitexec.Git{Dir: t.TempDir(), Exec: fake.Run}
@@ -125,12 +115,8 @@ func TestRevertAndShipWith_RevertOK_BinaryFails_LocalOnly(t *testing.T) {
 }
 
 func TestRevertAndShipWith_RevertOK_BinarySucceeds_Reverted(t *testing.T) {
-	t.Setenv("EVOLVE_GO_BIN", "")
-
 	binDir := t.TempDir()
-	binPath := filepath.Join(binDir, "evolve")
-	fakeclitest.Install(t, binPath, "#!/bin/sh\nexit 0\n")
-	t.Setenv("EVOLVE_GO_BIN", binPath)
+	installRepoEvolve(t, binDir, "#!/bin/sh\nexit 0\n")
 
 	fake := &fixtures.FakeExec{}
 	g := gitexec.Git{Dir: t.TempDir(), Exec: fake.Run}

@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
@@ -35,12 +36,12 @@ func overrideProject(t *testing.T) string {
 	return root
 }
 
-func overrideRouter(t *testing.T, root string, bypass bool) *cliroute.Router {
+func overrideRouter(t *testing.T, root string, bypass bool, ov cliroute.Overrides) *cliroute.Router {
 	t.Helper()
 	block := policy.CLIRouting{CLIs: []string{"agy", "agy-claude", "claude"}, Default: []string{"agy", "agy-claude", "claude"}}
 	r, _, err := cliroute.Build(cliroute.Setup{
 		Policy: policy.Policy{CLIRouting: &block}, Profiles: profiles.NewFromDir(routingProfilesDir(root)),
-		Host: cliroute.Host{LookPath: everyBinaryPresent}, Bypass: bypass,
+		Host: cliroute.Host{LookPath: everyBinaryPresent}, Bypass: bypass, Options: []cliroute.CompileOption{cliroute.WithOverrides(ov)},
 	})
 	if err != nil {
 		t.Fatalf("Build: %v", err)
@@ -61,9 +62,9 @@ func refusedAgents(t *testing.T, refusals []string) []string {
 func TestOverrideRefusals_AnOverrideOutsideTheAllowedSetIsRefusedAtStart(t *testing.T) {
 	t.Parallel()
 	root := overrideProject(t)
-	env := map[string]string{"EVOLVE_AUDITOR_CLI": "codex-tmux", "EVOLVE_SCOUT_CLI": "agy-tmux", "EVOLVE_ROUTER_CLI": "claude-tmux"}
+	ov := cliOverrides("auditor", "codex-tmux", "scout", "agy-tmux", "router", "claude-tmux")
 
-	refusals, err := overrideRefusals(overrideRouter(t, root, false), root, env)
+	refusals, err := overrideRefusals(overrideRouter(t, root, false, ov), root, nil, ov)
 
 	if err != nil || !reflect.DeepEqual(refusedAgents(t, refusals), []string{"auditor"}) {
 		t.Fatalf("refusals = %q (err %v), want the auditor alone", refusals, err)
@@ -73,9 +74,9 @@ func TestOverrideRefusals_AnOverrideOutsideTheAllowedSetIsRefusedAtStart(t *test
 func TestOverrideRefusals_UnderBypassTheFloorAndTheProfileCeilingStillBind(t *testing.T) {
 	t.Parallel()
 	root := overrideProject(t)
-	env := map[string]string{"EVOLVE_AUDITOR_CLI": "codex-tmux", "EVOLVE_ROUTER_CLI": "agy-tmux", "EVOLVE_SCOUT_CLI": "codex-tmux"}
+	ov := cliOverrides("auditor", "codex-tmux", "router", "agy-tmux", "scout", "codex-tmux")
 
-	refusals, err := overrideRefusals(overrideRouter(t, root, true), root, env)
+	refusals, err := overrideRefusals(overrideRouter(t, root, true, ov), root, nil, ov)
 
 	if err != nil || !reflect.DeepEqual(refusedAgents(t, refusals), []string{"auditor", "router"}) {
 		t.Fatalf("refusals = %q (err %v), want the floor auditor and the router's profile ceiling, never the unconstrained scout", refusals, err)
@@ -86,7 +87,7 @@ func TestOverrideRefusals_TheGlobalCLIOverrideIsCheckedForEveryAgent(t *testing.
 	t.Parallel()
 	root := overrideProject(t)
 
-	refusals, err := overrideRefusals(overrideRouter(t, root, false), root, map[string]string{"EVOLVE_CLI": "agy-tmux"})
+	refusals, err := overrideRefusals(overrideRouter(t, root, false, nil), root, map[string]string{"EVOLVE_CLI": "agy-tmux"}, nil)
 
 	if err != nil || !reflect.DeepEqual(refusedAgents(t, refusals), []string{"auditor", "router"}) {
 		t.Fatalf("refusals = %q (err %v), want every agent whose allowed set excludes agy", refusals, err)
@@ -97,7 +98,7 @@ func TestOverrideRefusals_NoOverrideNoRefusal(t *testing.T) {
 	t.Parallel()
 	root := overrideProject(t)
 
-	refusals, err := overrideRefusals(overrideRouter(t, root, false), root, map[string]string{"EVOLVE_PROJECT_ROOT": root})
+	refusals, err := overrideRefusals(overrideRouter(t, root, false, nil), root, map[string]string{"EVOLVE_PROJECT_ROOT": root, "EVOLVE_AUDITOR_CLI": "codex-tmux"}, nil)
 
 	if err != nil || len(refusals) != 0 {
 		t.Fatalf("refusals = %q (err %v), want none", refusals, err)
@@ -110,9 +111,9 @@ func TestWireOrchestratorDeps_ARefusedOverrideIsARoutingErrorBeforeAnyDispatch(t
 		t.Fatal(err)
 	}
 
-	d := wireOrchestratorDeps(root, evolveDir, io.Discard, routingRun{env: map[string]string{"EVOLVE_AUDITOR_CLI": "codex-tmux"}})
+	d := wireOrchestratorDeps(root, evolveDir, io.Discard, routingRun{overrides: cliOverrides("auditor", "codex-tmux")})
 
-	if d.RoutingErr == nil || !strings.Contains(d.RoutingErr.Error(), "EVOLVE_AUDITOR_CLI") {
+	if d.RoutingErr == nil || !strings.Contains(d.RoutingErr.Error(), "refuses 1 override(s): auditor:") || !strings.Contains(d.RoutingErr.Error(), "codex-tmux") || !strings.Contains(d.RoutingErr.Error(), "drop --cli auditor") {
 		t.Fatalf("RoutingErr = %v, want the refused override named", d.RoutingErr)
 	}
 }
@@ -130,7 +131,7 @@ func TestRunLoop_HandsTheWiringItsBypassAndItsCLIOverrides(t *testing.T) {
 
 	runLoop([]string{"--project-root", root, "--evolve-dir", evolveDir, "--goal-text", "x", "--cycles", "1", "--force-fresh", "--skip-preflight", "--bypass-policy", "--cli", "auditor=claude-tmux"}, nil, &stdout, &stderr)
 
-	if !got.bypass || got.env["EVOLVE_AUDITOR_CLI"] != "claude-tmux" {
+	if !got.bypass || got.overrides.For("auditor").CLI != "claude-tmux" || got.env["EVOLVE_AUDITOR_CLI"] != "" {
 		t.Fatalf("run = %+v, want the loop's --bypass-policy and its --cli override", got)
 	}
 }
@@ -180,19 +181,18 @@ func TestOverrideRefusals_TheFloorBindsAFloorAgentWhoseProfileNamesNoCeiling(t *
 		t.Fatal(err)
 	}
 
-	refusals, err := overrideRefusals(overrideRouter(t, root, true), root, map[string]string{"EVOLVE_TDD_ENGINEER_CLI": "codex-tmux"})
+	refusals, err := overrideRefusals(overrideRouter(t, root, true, cliOverrides("tdd-engineer", "codex-tmux")), root, nil, cliOverrides("tdd-engineer", "codex-tmux"))
 
 	if err != nil || !reflect.DeepEqual(refusedAgents(t, refusals), []string{"tdd-engineer"}) {
 		t.Fatalf("refusals = %q (err %v): the Claude-family floor is code, not profile hygiene", refusals, err)
 	}
 }
 
-func TestOverrideRefusals_TheAgentKeyOutranksTheGlobalOverrideAsTheResolverReadsThem(t *testing.T) {
+func TestOverrideRefusals_TheAgentOverrideOutranksTheGlobalOverrideAsTheResolverReadsThem(t *testing.T) {
 	t.Parallel()
 	root := overrideProject(t)
-	env := map[string]string{"EVOLVE_AUDITOR_CLI": "agy-tmux", "EVOLVE_CLI": "claude-tmux"}
 
-	refusals, err := overrideRefusals(overrideRouter(t, root, true), root, env)
+	refusals, err := overrideRefusals(overrideRouter(t, root, true, cliOverrides("auditor", "agy-tmux")), root, map[string]string{"EVOLVE_CLI": "claude-tmux"}, cliOverrides("auditor", "agy-tmux"))
 
 	if err != nil || !reflect.DeepEqual(refusedAgents(t, refusals), []string{"auditor"}) {
 		t.Fatalf("refusals = %q (err %v), want the auditor (its own key names agy)", refusals, err)
@@ -202,13 +202,25 @@ func TestOverrideRefusals_TheAgentKeyOutranksTheGlobalOverrideAsTheResolverReads
 func TestOverrideRefusals_NamesTheRemedyForTheKeyThatWon(t *testing.T) {
 	t.Parallel()
 	root := overrideProject(t)
-	for env, remedy := range map[string]string{
-		"EVOLVE_AUDITOR_CLI": "unset EVOLVE_AUDITOR_CLI",
-		"EVOLVE_CLI":         "set EVOLVE_AUDITOR_CLI",
+	for _, tc := range []struct {
+		env    map[string]string
+		ov     cliroute.Overrides
+		remedy string
+	}{
+		{nil, cliOverrides("auditor", "codex-tmux"), "drop --cli auditor"},
+		{map[string]string{"EVOLVE_CLI": "codex-tmux"}, nil, "unset EVOLVE_CLI, or set --cli auditor=<driver>"},
 	} {
-		refusals, err := overrideRefusals(overrideRouter(t, root, false), root, map[string]string{env: "codex-tmux"})
-		if err != nil || len(refusals) == 0 || !strings.Contains(refusals[0], remedy) {
-			t.Errorf("%s: refusals = %q (err %v), want the remedy %q", env, refusals, err, remedy)
+		refusals, err := overrideRefusals(overrideRouter(t, root, false, tc.ov), root, tc.env, tc.ov)
+		if err != nil || len(refusals) == 0 || !strings.Contains(refusals[0], tc.remedy) {
+			t.Errorf("refusals = %q (err %v), want the remedy %q", refusals, err, tc.remedy)
 		}
 	}
+}
+
+func cliOverrides(agentCLI ...string) cliroute.Overrides {
+	out := cliroute.Overrides{}
+	for i := 0; i+1 < len(agentCLI); i += 2 {
+		out[agentCLI[i]] = llmroute.AgentOverride{CLI: agentCLI[i+1]}
+	}
+	return out
 }

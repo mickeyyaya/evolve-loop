@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 )
 
 func TestParseLoopArgs_PerAgentCLIFlag(t *testing.T) {
@@ -59,68 +61,23 @@ func TestParseLoopArgs_MalformedCLIFlagRejected(t *testing.T) {
 	}
 }
 
-func TestBuildCycleEnv_PerAgentCLI_TranslatesToEvolveEnvKey(t *testing.T) {
+func TestAgentOverrides_CarryTheCLIAndModelFlagsAsTypedOverrides(t *testing.T) {
 	t.Parallel()
 	cfg := loopConfig{
-		Strategy: "balanced",
-		PerAgentCLI: map[string]string{
-			"auditor":      "claude-tmux",
-			"tdd-engineer": "agy-tmux",
-		},
+		Strategy:      "balanced",
+		PerAgentCLI:   map[string]string{"auditor": "claude-tmux", "tdd-engineer": "agy-tmux"},
+		PerAgentModel: map[string]string{"auditor": "opus", "build-planner": "haiku"},
 	}
-	env := buildCycleEnv(cfg, nil)
-	if got := env["EVOLVE_AUDITOR_CLI"]; got != "claude-tmux" {
-		t.Errorf("EVOLVE_AUDITOR_CLI=%q, want claude-tmux", got)
+	got := cfg.agentOverrides()
+	want := cliroute.Overrides{
+		"auditor":       {CLI: "claude-tmux", Model: "opus"},
+		"tdd-engineer":  {CLI: "agy-tmux"},
+		"build-planner": {Model: "haiku"},
 	}
-	if got := env["EVOLVE_TDD_ENGINEER_CLI"]; got != "agy-tmux" {
-		t.Errorf("EVOLVE_TDD_ENGINEER_CLI=%q, want agy-tmux (dash→underscore in agent name)", got)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("agentOverrides = %+v, want %+v", got, want)
 	}
-}
-
-func TestBuildCycleEnv_PerAgentModel_TranslatesToEvolveEnvKey(t *testing.T) {
-	t.Parallel()
-	cfg := loopConfig{
-		Strategy: "balanced",
-		PerAgentModel: map[string]string{
-			"auditor":       "opus",
-			"build-planner": "haiku",
-		},
-	}
-	env := buildCycleEnv(cfg, nil)
-	if got := env["EVOLVE_AUDITOR_MODEL"]; got != "opus" {
-		t.Errorf("EVOLVE_AUDITOR_MODEL=%q, want opus", got)
-	}
-	if got := env["EVOLVE_BUILD_PLANNER_MODEL"]; got != "haiku" {
-		t.Errorf("EVOLVE_BUILD_PLANNER_MODEL=%q, want haiku", got)
-	}
-}
-
-func TestBuildCycleEnv_FlagOverridesInheritedEnv(t *testing.T) {
-	t.Parallel()
-	cfg := loopConfig{
-		Strategy:    "balanced",
-		PerAgentCLI: map[string]string{"auditor": "claude-tmux"},
-	}
-	env := buildCycleEnv(cfg, []string{"EVOLVE_AUDITOR_CLI=inherited-from-shell"})
-	if env["EVOLVE_AUDITOR_CLI"] != "claude-tmux" {
-		t.Errorf("flag must override inherited env; got %q", env["EVOLVE_AUDITOR_CLI"])
-	}
-}
-
-func TestPhaseEnvAgentKey(t *testing.T) {
-	t.Parallel()
-	cases := []struct {
-		in, want string
-	}{
-		{"auditor", "AUDITOR"},
-		{"tdd-engineer", "TDD_ENGINEER"},
-		{"build-planner", "BUILD_PLANNER"},
-		{"scout", "SCOUT"},
-		{"AlreadyUpper", "ALREADYUPPER"},
-	}
-	for _, c := range cases {
-		if got := phaseEnvAgentKey(c.in); got != c.want {
-			t.Errorf("phaseEnvAgentKey(%q)=%q, want %q", c.in, got, c.want)
-		}
+	if env := carriedEnv(nil); len(env) != 0 {
+		t.Errorf("the overrides must not reach the cycle env: %v", env)
 	}
 }

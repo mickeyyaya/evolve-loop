@@ -2,6 +2,7 @@ package dashboard
 
 import (
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -243,10 +244,10 @@ func TestServer_SnapshotReflectsTheInjectedEnvironment(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	writePlanFixture(t, root, 1682, []phasetiming.Entry{entry("scout", "PASS", "2026-09-14T08:15:00Z", "2026-09-14T08:18:00Z", 1)}, nil, "")
-	env := map[string]string{"EVOLVE_MANDATORY_PHASES": "scout,build,ship"}
+	env := map[string]string{"EVOLVE_USE_PHASE_REGISTRY": "0", "EVOLVE_MANDATORY_PHASES": "scout,build,ship"}
 	set, warns := readMandatory(root, env)
-	if !reflect.DeepEqual(set.mandatory, []string{"scout", "build", "ship"}) {
-		t.Errorf("mandatory = %v (warns %v), want the env override", set.mandatory, warns)
+	if !reflect.DeepEqual(set.mandatory, []string{"scout", "build", "audit", "ship"}) {
+		t.Errorf("mandatory = %v (warns %v), want the compiled spine: the registry is off and EVOLVE_MANDATORY_PHASES is not read", set.mandatory, warns)
 	}
 	now := time.Date(2026, 9, 14, 9, 0, 0, 0, time.UTC)
 	snap := New(root, Options{Env: env}).Snapshot(now)
@@ -262,7 +263,7 @@ func TestServer_SnapshotReflectsTheInjectedEnvironment(t *testing.T) {
 			without = c.Plan
 		}
 	}
-	if withEnv == nil || without == nil || !reflect.DeepEqual(withEnv.Mandatory, []string{"scout", "build", "ship"}) || len(without.Mandatory) != 5 {
+	if withEnv == nil || without == nil || !reflect.DeepEqual(withEnv.Mandatory, []string{"scout", "build", "audit", "ship"}) || len(without.Mandatory) != 5 {
 		t.Errorf("snapshot mandatory = %v, collect mandatory = %v", withEnv, without)
 	}
 }
@@ -280,5 +281,18 @@ func TestScanStream_ARoutingDispositionIsNotAPhaseRun(t *testing.T) {
 	last, rounds, _ := runOrder(outcomes, "build", true)
 	if len(outcomes) != 1 || verdictStatus(last["tdd"].Verdict) != StatePass || rounds["tdd"] != 1 || rounds["audit"] != 0 {
 		t.Fatalf("a phase.outcome with no verdict is a routing disposition, not a run: outcomes=%+v rounds=%v", outcomes, rounds)
+	}
+}
+
+func TestReadMandatory_AddsThePolicyMandatoryPhases(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writePlanFixture(t, root, 1682, []phasetiming.Entry{entry("scout", "PASS", "2026-09-14T08:15:00Z", "2026-09-14T08:18:00Z", 1)}, nil, "")
+	if err := os.WriteFile(filepath.Join(root, ".evolve", "policy.json"), []byte(`{"mandatory_phases":["retro"]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	set, _ := readMandatory(root, nil)
+	if n := len(set.mandatory); n == 0 || set.mandatory[n-1] != "retro" {
+		t.Errorf("mandatory = %v, want the policy phase retro appended", set.mandatory)
 	}
 }

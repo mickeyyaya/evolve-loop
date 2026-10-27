@@ -81,23 +81,19 @@ func TestFilterEligible_MissingManifestExcludedUnderHybrid(t *testing.T) {
 	}
 }
 
-func TestResolveEvolveBin_EnvOverride(t *testing.T) {
+func TestResolveEvolveBin_TheEnvironmentNamesNoBinary(t *testing.T) {
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "evolve")
 	writeExec(t, bin, "#!/bin/sh\nexit 0\n")
 	t.Setenv("EVOLVE_GO_BIN", bin)
-	if got := resolveEvolveBin(dir); got != bin {
-		t.Errorf("env override: got %q, want %q", got, bin)
+	t.Setenv("PATH", "")
+	if got := resolveEvolveBin(dir); got != "" {
+		t.Errorf("got %q, want empty: EVOLVE_GO_BIN is not read", got)
 	}
 }
 
 func TestResolveEvolveBin_WalkFindsGoBin(t *testing.T) {
 	dir := t.TempDir()
-	notExec := filepath.Join(dir, "not-exec")
-	if err := os.WriteFile(notExec, []byte("x"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("EVOLVE_GO_BIN", notExec)
 	gobin := filepath.Join(dir, "go", "bin", "evolve")
 	writeExec(t, gobin, "#!/bin/sh\nexit 0\n")
 	if got := resolveEvolveBin(dir); got != gobin {
@@ -106,7 +102,6 @@ func TestResolveEvolveBin_WalkFindsGoBin(t *testing.T) {
 }
 
 func TestResolveEvolveBin_NotFound(t *testing.T) {
-	t.Setenv("EVOLVE_GO_BIN", "")
 	t.Setenv("PATH", "")
 	if got := resolveEvolveBin(t.TempDir()); got != "" {
 		t.Errorf("not found: got %q, want empty", got)
@@ -115,9 +110,8 @@ func TestResolveEvolveBin_NotFound(t *testing.T) {
 
 func TestResolveNativeDispatch_Native(t *testing.T) {
 	dir := t.TempDir()
-	bin := filepath.Join(dir, "evolve")
+	bin := filepath.Join(dir, "go", "bin", "evolve")
 	writeExec(t, bin, "#!/bin/sh\nexit 0\n")
-	t.Setenv("EVOLVE_GO_BIN", bin)
 	cmd, err := resolveNativeDispatch(dir, "fanout-dispatch", []string{"a.tsv", "b.tsv"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -134,7 +128,6 @@ func TestResolveNativeDispatch_Native(t *testing.T) {
 }
 
 func TestResolveNativeDispatch_RequiresNativeBin(t *testing.T) {
-	t.Setenv("EVOLVE_GO_BIN", "")
 	t.Setenv("PATH", "")
 	if _, err := resolveNativeDispatch(t.TempDir(), "aggregator", []string{"out.md"}); err == nil {
 		t.Error("expected error when no native evolve binary is available (bash fallback removed in v12)")

@@ -1585,7 +1585,7 @@ A deny list in the bridge cannot keep up with new names, which is the same reaso
 | Class | Count | Fix | Item |
 |---|---|---|---|
 | (a) pipeline markers | 24 `EVOLVE_*`, 9 `BRIDGE_*` | one named Go list, `ipcenv.Markers()` (built). It is the only source of `EVOLVE_*` and `BRIDGE_*` names in a cell. It grew from the bridge list of X2. | X18b |
-| (b) operator knobs | 18 | move into `.evolve/policy.json`, strict-decoded. The pipeline reads them at each cycle or boundary. One wave of shadow: an environment value that differs from the policy value prints a WARN and loses. | X18c |
+| (b) operator knobs | 19 | move into `.evolve/policy.json`, strict-decoded, or into a CLI parameter (built). The pipeline reads them at each cycle start. A former name that is set prints one WARN, and the policy value wins. | X18c |
 | (c) bypasses | 10 | an explicit CLI parameter that writes a ledger record and a `CONTROL_BYPASS_USED` signal, or removal | X18d |
 | (d) dead names | 6 | delete, with the registry rows | X18e |
 | (e) test seams | 8 | move behind an injected field of a `Deps` struct; tests set the field | X18e |
@@ -1609,7 +1609,12 @@ X18a and X18b go first, in either order. X18c to X18e follow X18b, and X18c also
      - It resolves constant concatenations such as `"EVOLVE_"+"RESUME"`, also through a constant of another package.
      - It judges only the `EVOLVE_*` and `BRIDGE_*` names, so an outside name (`HOME`, `PATH`, `TMUX`, `CI`, `CLAUDE_CODE_*`) needs no list. It allows a marker and a control that is not yet moved. X18b also allowed the test seams of class (e), and X18e removed that allowance.
      - It fails on each other name, and on a declared control that no code reads. `TestControlFlagLists_OnlyShrink` holds the ceiling, so the list can only shrink.
-3. **X18c** moves the 18 knobs. Each knob that duplicates a policy key (for example, `EVOLVE_MANDATORY_PHASES` and `mandatory_phases`) keeps the policy key.
+3. **X18c** (built) moves the knobs of class (b). No code reads a class (b) name from the environment now.
+   - Each knob that duplicates a key keeps the key, for example `mandatory_phases`, `pins` and the `--lane` parameter. The other knobs get a new strict key: `router.*`, `gates.phase_io`, `cli_health.enabled`, `bridge.max_concurrent` and `workflow.intent_delta` ([policy-config.md](policy-config.md#routing-and-run-knobs-x18c)).
+   - `router.ApplyPolicy` is the one projection of the routing keys, so the cycle, `router.PolicyForProject`, `evolve phase verify` and the dashboard agree. `EVOLVE_COMMIT_EVIDENCE` had no consumer, so it got no key.
+   - `evolve loop --cli` and `--model` reach the router as typed overrides (`cliroute.WithOverrides`), not as cycle environment names. The profile holds the system prompt and the permission mode, and `evolve plan-and-execute` sets `core.PhaseRequest.PermissionMode`.
+   - The design replaces the shadow wave of the plan with a simpler rule. The policy value wins at once, and a former name that is set prints one `[policy] WARN` at the cycle start (`ipcenv.RetiredInUse`). The WARN stays for one release.
+   - `ipcenv.UnmovedControls()` keeps the 10 class (c) names. The ceiling of `TestControlFlagLists_OnlyShrink` went from 29 to 10, and `TestRetiredControls_HaveNoProductionRead` stops a class (b) reader from coming back.
 4. **X18d** turns each bypass into a parameter or removes it. `EVOLVE_OPERATOR_CONFIRM` already has the `-operator` flag as its primary surface.
 5. **X18e** (built) deletes the dead names and moves the test seams.
    - The dead names, their 5 registry rows, their writers and the persona text that named them are gone.

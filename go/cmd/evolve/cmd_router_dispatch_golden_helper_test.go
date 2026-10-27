@@ -76,7 +76,7 @@ func TestRouterDispatch_ARefusedRouteIsAnError(t *testing.T) {
 	evolveDir := t.TempDir()
 	block := policy.CLIRouting{CLIs: []string{"agy", "claude"}, Default: []string{"agy", "claude"}}
 	r := routerOverEvolveDir(t, evolveDir, policy.Policy{CLIRouting: &block})
-	t.Setenv("EVOLVE_ROUTER_CLI", "codex-tmux")
+	t.Setenv("EVOLVE_CLI", "codex-tmux")
 	if _, err := resolveRouterDispatchHealthy(r, "", decisionPlan, nil); err == nil {
 		t.Fatal("an env primary outside the table refuses the advisor's route")
 	}

@@ -168,7 +168,7 @@ func TestWireOrchestratorDeps_TheObserverAndTheBridgeShareOneUsageEvidence(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"explainUsage := usageEvidenceFn(projectRoot, evolveDir, console)", "withUsageEvidence(br, explainUsage, signals)", "observerDeps{signals: signals, usage: explainUsage}"} {
+	for _, want := range []string{"explainUsage := usageEvidenceFn(projectRoot, evolveDir, console)", "withUsageEvidence(br, explainUsage, signals)", "observerDeps{signals: signals, usage: explainUsage, overrides: run.overrides}"} {
 		if strings.Count(string(src), want) != 1 {
 			t.Errorf("cmd_cycle.go must contain %q exactly once", want)
 		}

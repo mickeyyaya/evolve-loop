@@ -48,6 +48,15 @@ All notable changes to this project will be documented in this file.
 
 - **No overlap release.** The design said that a changed code keeps the old value for one release with a WARN line. The operator asked for one usage code everywhere at once. No caller in the repository read the old codes, so each change takes effect now.
 - Docs: [cli-contract](docs/architecture/cli-contract.md), [runtime-reference](docs/operations/runtime-reference.md), [wave-operations](docs/operations/wave-operations.md), [agent-run](docs/architecture/agent-run.md), [cmd-evolve](docs/architecture/packages/cmd-evolve.md).
+## Changed — the operator knobs read `.evolve/policy.json`, not the environment (X18c, 2026-10-27)
+
+- **The change.** No code reads the 19 class (b) names of [control-flags](docs/architecture/control-flags.md#classes-of-the-readers-outside-the-registry) from the environment now (ADR-0156 I-16). A set name has no effect.
+- **The warning.** For one release, the cycle start prints one `[policy] WARN <name> is set, but the pipeline does not read it` line for each set name. The line names the replacement.
+- **The moved knobs.** `EVOLVE_DYNAMIC_ROUTING`, `EVOLVE_ROUTING_MODE`, `EVOLVE_CONDITIONAL_MANDATORY` and `EVOLVE_MAX_OPTIONAL_INSERTIONS` became `router.*` keys. `EVOLVE_PHASE_IO` became `gates.phase_io`.
+- **More moved knobs.** `EVOLVE_CLI_HEALTH` became `cli_health.enabled`, `EVOLVE_CLI_MAX_CONCURRENT_<FAM>` became `bridge.max_concurrent.<driver>`, and `EVOLVE_INTENT_DELTA` became `workflow.intent_delta`. `EVOLVE_MANDATORY_PHASES` became `mandatory_phases`, which can add a phase but not remove one.
+- **Parameters and profiles.** `EVOLVE_LANE` became `evolve worktree --lane`. `EVOLVE_<AGENT>_CLI` and `_MODEL` became `evolve loop --cli` and `--model`, or `pins.<phase>`. The profile holds `system_prompt` and `permission_mode`, so `EVOLVE_SYSTEM_PROMPT`, `EVOLVE_<AGENT>_SYSTEM_PROMPT` and `EVOLVE_<AGENT>_PERMISSION_MODE` went.
+- **Removed.** `EVOLVE_COMMIT_EVIDENCE` went with no key, because no code consumed its stage. `EVOLVE_GO_BIN` went: the tools find `<root>/go/bin/evolve`, then `evolve` on `PATH`. `EVOLVE_PROFILE_DIR` and `EVOLVE_PERSONA_OVERRIDE` went from the ship lint, which reads `<root>/.evolve/profiles`.
+- **What to do.** Move each set name to its replacement in the table of [policy-config](docs/architecture/policy-config.md#routing-and-run-knobs-x18c). The flag registry lost 13 rows.
 
 ## Changed — `.evolve/policy.json` refuses an unknown key (X18a, 2026-10-26)
 

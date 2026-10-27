@@ -372,7 +372,7 @@ func TestChainReviewers_CarriesDemotionThroughLaterRejection(t *testing.T) {
 
 func TestUniversalContractFallbackMatchesLLMRouteDefault(t *testing.T) {
 	t.Parallel()
-	plan := llmroute.Resolve("builder", "build", "balanced", nil, nil, nil, nil)
+	plan := llmroute.Resolve("builder", "build", "balanced", nil, llmroute.AgentOverride{}, nil, nil, nil)
 	if len(plan.Candidates) == 0 {
 		t.Fatal("llmroute.Resolve returned no candidates")
 	}

@@ -13,7 +13,7 @@ User: /evo:loop 5 polish improve dispatcher
   ↓ detects platform = codex, reads reference/codex-runtime.md (this file)
 
 Skill activates → STRICT MODE: execute exactly one shell command:
-  "${EVOLVE_GO_BIN:-<plugin_root>/go/bin/evolve}" loop 5 polish "improve dispatcher"
+  "<plugin_root>/go/bin/evolve" loop 5 polish "improve dispatcher"
 
   ↓ (Codex calls its shell-execution tool)
 

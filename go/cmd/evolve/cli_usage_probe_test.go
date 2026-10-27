@@ -25,23 +25,22 @@ func TestUsageProbeEnabled(t *testing.T) {
 	t.Parallel()
 	on := writeProbePolicy(t, `{"cli_health":{"proactive_probe":true}}`)
 	off := writeProbePolicy(t, `{}`)
+	masterOff := writeProbePolicy(t, `{"cli_health":{"proactive_probe":true,"enabled":false}}`)
 
 	cases := []struct {
 		name      string
-		env       map[string]string
 		evolveDir string
 		want      bool
 	}{
-		{"policy on, env unset", nil, on, true},
-		{"policy on, env=1", map[string]string{"EVOLVE_CLI_HEALTH": "1"}, on, true},
-		{"policy on but master off", map[string]string{"EVOLVE_CLI_HEALTH": "0"}, on, false},
-		{"policy off (default)", nil, off, false},
-		{"no policy dir", nil, t.TempDir(), false},
+		{"policy on", on, true},
+		{"policy on but master off", masterOff, false},
+		{"policy off (default)", off, false},
+		{"no policy dir", t.TempDir(), false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := usageProbeEnabled(tc.env, tc.evolveDir); got != tc.want {
-				t.Errorf("usageProbeEnabled(%v, …) = %v, want %v", tc.env, got, tc.want)
+			if got := usageProbeEnabled(tc.evolveDir); got != tc.want {
+				t.Errorf("usageProbeEnabled(%s) = %v, want %v", tc.name, got, tc.want)
 			}
 		})
 	}

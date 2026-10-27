@@ -29,8 +29,7 @@ func bootTmuxREPL(
 		return func() {}, ExitOK, nil
 	}
 
-	admitMax := envInt(deps, "EVOLVE_CLI_MAX_CONCURRENT_"+strings.ToUpper(lp.name), 0)
-	admitRelease, admitErr := cliadmit.Acquire(ctx, lp.name, admitMax, cliadmit.DefaultTTL)
+	admitRelease, admitErr := cliadmit.Acquire(ctx, lp.name, deps.MaxConcurrent[lp.name], cliadmit.DefaultTTL)
 	if admitErr != nil {
 		fmt.Fprintf(deps.Stderr, "%s WARN cliadmit: %v (proceeding uncapped)\n", prep.prefix, admitErr)
 	}

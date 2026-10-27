@@ -129,15 +129,15 @@ func TestRun_DeltaMode_IntentUnchanged_SKIPPED(t *testing.T) {
 	ws := t.TempDir()
 	fb := &fakeBridge{writeArtifact: "[intent-unchanged] goal_hash=abc12345\n"}
 	phase := New(Config{
-		Bridge:  fb,
-		Prompts: fakePromptsFS("# body"),
+		Bridge:    fb,
+		Prompts:   fakePromptsFS("# body"),
+		DeltaMode: true,
 	})
 	req := core.PhaseRequest{
 		Cycle:       1,
 		ProjectRoot: "/tmp/proj",
 		Workspace:   ws,
 		GoalHash:    "abc12345",
-		Env:         map[string]string{"EVOLVE_INTENT_DELTA": "1"},
 	}
 	resp, err := phase.Run(context.Background(), req)
 	if err != nil {
@@ -274,7 +274,7 @@ func TestRun_AgentLoadFails_ReturnsError(t *testing.T) {
 	}
 }
 
-func TestRun_EnvOverridesCLIAndModel(t *testing.T) {
+func TestRun_TheGlobalCLIMarkerRoutesAndThePerAgentModelEnvIsNotRead(t *testing.T) {
 	ws := t.TempDir()
 	fb := &fakeBridge{writeArtifact: "goal: x\nacceptance_checks: [a]\n"}
 	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
@@ -290,8 +290,8 @@ func TestRun_EnvOverridesCLIAndModel(t *testing.T) {
 	if fb.gotReq.CLI != "codex" {
 		t.Errorf("CLI=%q, want codex", fb.gotReq.CLI)
 	}
-	if fb.gotReq.Model != "gpt-5" {
-		t.Errorf("Model=%q, want gpt-5", fb.gotReq.Model)
+	if fb.gotReq.Model == "gpt-5" {
+		t.Errorf("Model=%q came from EVOLVE_INTENT_MODEL; the environment is not read", fb.gotReq.Model)
 	}
 }
 

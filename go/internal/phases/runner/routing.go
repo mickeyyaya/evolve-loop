@@ -7,7 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/log"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -37,14 +36,14 @@ func (b *BaseRunner) resolveDispatchPlan(req core.PhaseRequest, prep phasePrepar
 	}
 	resolved := phaseDispatchPlan{plan: d.Plan, overlayPolicy: overlayPolicy, modelSource: modelSourceOf(req, d)}
 	b.logDecision(req, prep, d, overlayPolicy)
-	resolved.permissionMode = req.Env[envchain.PhaseEnvKey(prep.profileName, "PERMISSION_MODE")]
+	resolved.permissionMode = req.PermissionMode
 	if resolved.permissionMode == "" && prep.profile != nil {
 		resolved.permissionMode = prep.profile.PermissionMode
 	}
 	if prep.profile != nil {
 		resolved.interactivePolicy = prep.profile.InteractivePolicy
 	}
-	resolved.systemPrompt = systemprompt.Resolve(prep.profileName, prep.profileDir, req.Env)
+	resolved.systemPrompt = systemprompt.Resolve(prep.profileName, prep.profileDir)
 	return resolved, nil, nil
 }
 

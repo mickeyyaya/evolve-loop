@@ -185,7 +185,8 @@ The state on 2026-10-27. Each component re-reads this table before it starts.
 | X12 | built, stage `shadow` | branch `feat/selfheal-x12` | `go/internal/selfheal` turns signals, cycle state, CI runs and usage readings into records under `.evolve/incidents/`. The verb is `evolve selfheal incidents`. A pass over the data of 2026-10-27 opened 8 records. They include the repair loop of cycle 2035 (T0), the ten claims of cycles 1983 to 2035 and the CI hang of run 40265789886. Spec §18.5. |
 | X13 | built, stage `shadow` | branch `feat/selfheal-x13` | The seat `selfheal-orchestrator` reads the evidence index of an open incident and writes `diagnosis.json`. `phasecontract.ParseDiagnosis` refuses an action outside the closed catalog and an evidence id outside the index. The verb `evolve selfheal propose` records one proposal for each incident under `.evolve/incidents/proposals/`. Spec §18.6. |
 | X17d | built | #1190 | `inbox claim`, `dossier show`, `cycle resume`, `wave stop` and `quality show` are core verbs with the envelope, the exit table and `--project-root`. `quality show` publishes nothing. The dispatch gate refuses `cycle resume` in a cell. |
-| X14 to X16, X18c, X18d, X19 | not started | none | |
+| X18c | built | this PR | The class (b) knobs read `.evolve/policy.json` keys or CLI parameters, and no code reads their former names. A former name that is set prints one `[policy] WARN`; the plan shadow wave became this WARN. `ipcenv.UnmovedControls()` went from 29 to 10 names. |
+| X14 to X16, X18d, X19 | not started | none | |
 
 ### 6.2 The X6 follow-up (X6b)
 

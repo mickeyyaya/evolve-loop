@@ -80,7 +80,7 @@ func (b *loopBatchCoordinator) runPreWave(iteration int) (batchDecision, bool) {
 }
 
 func (b *loopBatchCoordinator) probeSyncAndPublish(iteration int) (batchDecision, bool) {
-	if err := runPreWaveProbes(b.ctx, b.cfg.ProjectRoot, b.cfg.EvolveDir, b.cycleEnv, b.stderr); err != nil {
+	if err := runPreWaveProbes(b.ctx, b.cfg.ProjectRoot, b.cfg.EvolveDir, b.stderr); err != nil {
 		return b.interruptReturn(iteration, "during the pre-wave probes "), true
 	}
 	if _, halt := syncMainFromOriginAtWaveBoundary(b.ctx, b.cfg.ProjectRoot, b.stderr); halt != nil {
