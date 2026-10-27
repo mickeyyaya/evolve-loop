@@ -39,7 +39,10 @@ func RecordObservation(evolveDir string, obs Observation) error {
 			return err
 		}
 		all[obs.CLI] = obs
-		return atomicwrite.JSON(path, all)
+		if err := atomicwrite.JSON(path, all); err != nil {
+			return err
+		}
+		return appendHistory(evolveDir, obs)
 	})
 }
 
