@@ -87,6 +87,7 @@ func TestInboxCenterlessRootsArePinned(t *testing.T) {
 		"cmd/evolve/cmd_inbox_add.go":           "operator command `evolve inbox add` — 06-F1",
 		"cmd/evolve/cmd_practice.go":            "operator command `evolve practice watch` and the boundary watch, the one filing of a research item — 06-F1",
 		"cmd/evolve/cmd_continuation.go":        "operator command `evolve continuation` — 06-F1",
+		"cmd/evolve/cmd_continuation_adopt.go":  "operator command `evolve continuation adopt`: the read-only dispatch-state probe of the item — never writes",
 		"cmd/evolve/cmd_inbox_consume.go":       "operator command `evolve inbox consume` (two literals) — 06-F1",
 		"cmd/evolve/cmd_cycle.go":               "read-only probes (failure count, continuation scope, dispatch state) — never write; hostInboxClaimer — WIRED (Signals: signals)",
 		"internal/loopwave/launcher.go":         "the wave engine's one read-only lifecycle, rooted at EvolveDir: the launch gate's probe and the plan-time prune (ADR-0106 W3) — WIRED (Signals: e.center())",

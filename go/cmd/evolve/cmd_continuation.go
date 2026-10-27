@@ -16,7 +16,7 @@ import (
 
 func runContinuation(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "evolve continuation: usage: continuation list | continuation release <scope-id>")
+		fmt.Fprintln(stderr, "evolve continuation: usage: continuation list | continuation release <scope-id> | continuation adopt <item-id> --worktree <path>")
 		return 10
 	}
 	switch args[0] {
@@ -24,8 +24,10 @@ func runContinuation(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return runContinuationList(args[1:], stdout, stderr)
 	case "release":
 		return runContinuationRelease(args[1:], stdout, stderr)
+	case "adopt":
+		return runContinuationAdopt(args[1:], stdout, stderr)
 	default:
-		fmt.Fprintf(stderr, "evolve continuation: unknown subcommand %q (want: list, release)\n", args[0])
+		fmt.Fprintf(stderr, "evolve continuation: unknown subcommand %q (want: list, release, adopt)\n", args[0])
 		return 10
 	}
 }
