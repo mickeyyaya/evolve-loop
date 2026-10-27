@@ -141,6 +141,7 @@ var serialRequiredTests = map[string]string{
 	"core.TestResumeExecution_ARetroBranchTheStateMachineForbidsAbortsTheResume":                    swapsFailureDecide,
 	"core.TestResumeExecution_ARetroDecisionCarriesItsEnvironmentIntoTheRescheduledPhase":           swapsFailureDecide,
 	"core.TestAssembleFailureDigest_EachPersistenceFailureReturnsTheBuiltDigest":                    swapsFailureDigestMarshal,
+	"core.TestFailureClass_AMarshalErrorIsReturned":                                                 swapsFailureDigestMarshal,
 	"core.TestCarryforwardCandidateLandable_CleanMergeIsLandable":                                   swapsGitRunner,
 	"core.TestCarryforwardCandidateLandable_ConflictIsFalseNotError":                                swapsGitRunner,
 	"core.TestCarryforwardCandidateLandable_PatchIdDuplicateSuperseded":                             swapsGitRunner,

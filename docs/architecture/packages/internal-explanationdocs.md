@@ -11,6 +11,7 @@
 - `RebaseBuild`, `RebaseBuildAndPersist` and `RecoverRebaseSplit` handle a moved base. `RebindIdenticalRebase` moves an approved contract to a new base without a new Build. It does so only when the change is provably byte-identical there (ADR-0105).
 - `ValidateReviewedHandoff` is the phase-agnostic core of a review section. It is the single home of the contract. Audit and retro each apply their own phase policy to its result.
 - `DocumentPath` is collision-resistant per run. A fresh clone's local cycle counter therefore cannot collide with a document that another installation published.
+- `FailurePrefix` (`Explanation Documentation: `) starts each failure that the package returns. The failure class parser of `internal/core` counts the explanation failures of a floor reason with the same constant ([failure-identity-lifecycle.md §4](../failure-identity-lifecycle.md#4-failure-class-fingerprint)).
 
 ## Invariants
 
