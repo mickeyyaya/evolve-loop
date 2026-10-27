@@ -21,7 +21,8 @@ import (
 const (
 	ciUsage = "usage: evolve ci classify <run-id|run:N|pr:N|sha:H> [--json] [--rerun] [--project-root P]\n" +
 		"       evolve ci watch (--sha S | --pr N | --tag T) [--workflow W]... [--cycle N] [--project-root P]\n" +
-		"       evolve ci darwin-set <generate|check> [--project-root P]"
+		"       evolve ci darwin-set <generate|check> [--project-root P]\n" +
+		"       evolve ci telemetry --jobs FILE [--job-artifacts \"JOB NAME=DIR\"]... [--json]"
 	ciClassifyPrefix = "evolve ci classify: "
 	ciModuleDir      = "go"
 	ciMainWindow     = 10
@@ -54,11 +55,10 @@ func parseCIClassifyArgs(args []string) (ciClassifyArgs, error) {
 }
 
 func runCI(args []string, _ io.Reader, stdout, stderr io.Writer) int {
-	if len(args) > 0 && args[0] == "watch" {
-		return runCIWatch(args[1:], stdout, stderr)
-	}
-	if len(args) > 0 && args[0] == "darwin-set" {
-		return darwinSetVerb.run(args[1:], stdout, stderr)
+	if len(args) > 0 {
+		if run := ciSubverbRunner(args[0]); run != nil {
+			return run(args[1:], stdout, stderr)
+		}
 	}
 	if len(args) == 0 || args[0] != "classify" {
 		fmt.Fprintln(stderr, ciUsage)
@@ -100,6 +100,18 @@ func runCI(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return 0
 	}
 	return exitRefused
+}
+
+func ciSubverbRunner(name string) func([]string, io.Writer, io.Writer) int {
+	switch name {
+	case "watch":
+		return runCIWatch
+	case "telemetry":
+		return runCITelemetry
+	case "darwin-set":
+		return darwinSetVerb.run
+	}
+	return nil
 }
 
 func fileBaseRedItems(root string, rep ciwatch.ClassifyReport, stderr io.Writer) error {

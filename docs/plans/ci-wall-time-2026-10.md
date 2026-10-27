@@ -228,6 +228,8 @@ Each level keeps the indexes that explain its time. The last column says which d
 
 C0b status: built. `cmd/testrusage` and `cmd/hostsampler` are in `go/.cover-strict` and `go/.apicover-enforce` at 100%. `go.yml` runs both on the Go job and uploads `test-rusage.ndjson` and `runner-samples.ndjson` with the C0 artifacts.
 
+C1 status: built (cycle 2066). `evolve ci telemetry` is in `go/internal/citelemetry` ([page](../architecture/packages/internal-citelemetry.md)). The `contention` limit of D21 stays with C12.
+
 ## 6a. Components after the first instrumented run (C6 to C14)
 
 On 2026-10-17 the operator asked: "Continue investigating the performance, latency, resource usage for ci pipeline and test cases". The C0b run 39031338517 gave the data (research F3.20 to F3.35). This section adds nine components, ranked by the wall time that they save on the critical path, then by CPU-seconds. PR #935 owns D14 and C5b, so the new ids start at D15 and C6.
