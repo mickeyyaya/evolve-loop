@@ -118,3 +118,22 @@ func TestRepairFixabilityStage_IsAStrictStageKeyWithTheDefaultShadow(t *testing.
 		}
 	}
 }
+
+func TestCycleSpend_EachKeyIsStrictInTheLoadedPolicy(t *testing.T) {
+	t.Parallel()
+	for _, body := range []string{
+		`{"workflow": {"cycle_spend": {"max_llm_minutes": 601}}}`,
+		`{"workflow": {"cycle_spend": {"max_audit_rounds": 0}}}`,
+		`{"workflow": {"cycle_spend": {"stage": "advisory"}}}`,
+		`{"workflow": {"cycle_spend": {"max_minutes": 90}}}`,
+	} {
+		root := strictPolicyRoot(t, body)
+		if _, err := policy.Load(filepath.Join(root, ".evolve", "policy.json")); err == nil || !strings.Contains(err.Error(), "cycle_spend") {
+			t.Errorf("%s: err = %v, want a refusal that names workflow.cycle_spend", body, err)
+		}
+	}
+	p, err := policy.Load(filepath.Join(strictPolicyRoot(t, `{"workflow": {"cycle_spend": {"stage": "enforce", "max_llm_minutes": 90}}}`), ".evolve", "policy.json"))
+	if err != nil || p.WorkflowConfig().CycleSpend.Stage != config.StageEnforce || p.WorkflowConfig().CycleSpend.Limits.MaxLLMMinutes != 90 {
+		t.Errorf("load = %+v, %v", p.WorkflowConfig().CycleSpend, err)
+	}
+}

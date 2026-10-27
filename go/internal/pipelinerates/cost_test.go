@@ -40,8 +40,8 @@ func TestCostPerShip_TheSpendOfEveryCycleOfAWaveIsSharedByItsShips(t *testing.T)
 			t.Errorf("%s = %+v (found %t), want PQ5 %v at n %d", window, r, ok, want.value, want.n)
 		}
 	}
-	if len(rs) != 8 {
-		t.Errorf("readings = %d, want 8 for one wave", len(rs))
+	if len(rs) != 10 {
+		t.Errorf("readings = %d, want 10 for one wave", len(rs))
 	}
 }
 
@@ -124,5 +124,35 @@ func TestLoadCycles_TheFixabilitySignalsGiveTheHandoffCounts(t *testing.T) {
 
 	if c := cycleByID(cycles, 2027); err != nil || c.HandoffWould != 1 || !c.HandedOff {
 		t.Errorf("cycle 2027 = %+v, %v; want 1 would stop and a hand-off stop", c, err)
+	}
+}
+
+func TestCostPerShip_CountsTheSpendLimitStopsAndTheirFalseStops(t *testing.T) {
+	t.Parallel()
+	cycles := []Cycle{{ID: 1, Wave: 9, Shipped: true, SpendLimit: "would_stop"}, {ID: 2, Wave: 9, SpendLimit: "stop"}, {ID: 3, Wave: 9, SpendLimit: "would_stop"}}
+
+	rs := CostPerShip(cycles)
+
+	for window, want := range map[string]float64{"wave:9/spend-limit-would-stops": 2, "wave:9/spend-limit-stops": 1, "wave:9/false-stops": 1} {
+		if r, ok := readingFor(rs, window); !ok || r.Interval.Value != want {
+			t.Errorf("%s = %+v, want %v", window, r, want)
+		}
+	}
+}
+
+func TestLoadCycles_TheSpendLimitSignalGivesTheDecision(t *testing.T) {
+	t.Parallel()
+	root := wavesFixture(t)
+	writeCycle(t, root, fixtureCycle{id: 2027, seal: "final verdict FAIL"})
+	stream := filepath.Join(root, ".evolve", "runs", "cycle-2027", "signals.ndjson")
+	line := `{"schema_version":"signal/1.0","seq":1,"ts":"2026-10-21T10:00:00Z","module":"cycle","kind":"phase.outcome","code":"CYCLE_SPEND_LIMIT","severity":"WARN","origin":"F.e","reason":"r","fields":{"decision":"would_stop"}}` + "\n"
+	if err := os.WriteFile(stream, []byte(line), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cycles, err := LoadCycles(root)
+
+	if c := cycleByID(cycles, 2027); err != nil || c.SpendLimit != "would_stop" {
+		t.Errorf("cycle 2027 = %+v, %v; want the would_stop decision", c, err)
 	}
 }

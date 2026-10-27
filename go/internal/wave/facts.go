@@ -40,6 +40,7 @@ type Cycle struct {
 	Spend        cyclespend.Spend `json:"spend"`
 	HandoffWould int              `json:"handoff_would_stops,omitempty"`
 	HandoffStop  string           `json:"handoff_stop,omitempty"`
+	SpendLimit   string           `json:"spend_limit,omitempty"`
 	StartedAt    time.Time        `json:"-"`
 	EndedAt      time.Time        `json:"-"`
 }
@@ -194,6 +195,9 @@ func applySignals(c *Cycle, path string) []string {
 }
 
 func applyHandoff(c *Cycle, e signalcenter.Event) {
+	if e.Code == cyclespend.SignalCode {
+		c.SpendLimit = e.Fields[cyclespend.FieldDecision]
+	}
 	if e.Code != fixability.SignalCode {
 		return
 	}

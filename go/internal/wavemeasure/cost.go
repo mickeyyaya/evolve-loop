@@ -11,6 +11,7 @@ type CycleSpend struct {
 	Spend        cyclespend.Spend
 	HandoffWould int
 	HandedOff    bool
+	SpendLimit   string
 }
 
 type Cost struct {
@@ -25,6 +26,8 @@ type Cost struct {
 	HandoffStops                   int      `json:"handoff_stops"`
 	HandoffWouldStops              int      `json:"handoff_would_stops"`
 	FalseStops                     int      `json:"false_stops"`
+	SpendLimitStops                int      `json:"spend_limit_stops"`
+	SpendLimitWouldStops           int      `json:"spend_limit_would_stops"`
 }
 
 func computeCost(cycles []CycleSpend) Cost {
@@ -54,7 +57,13 @@ func (c Cost) withHandoff(cy CycleSpend) Cost {
 	if cy.HandedOff {
 		c.HandoffStops++
 	}
-	if cy.HandoffWould > 0 && cy.Shipped {
+	switch cy.SpendLimit {
+	case cyclespend.ActionStop:
+		c.SpendLimitStops++
+	case cyclespend.ActionWouldStop:
+		c.SpendLimitWouldStops++
+	}
+	if (cy.HandoffWould > 0 || cy.SpendLimit == cyclespend.ActionWouldStop) && cy.Shipped {
 		c.FalseStops++
 	}
 	return c
