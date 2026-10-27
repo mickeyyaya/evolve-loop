@@ -1,0 +1,32 @@
+{
+  "acceptance": [
+    "Red test first: a reviewer output whose field says PASS and whose body lists one HIGH gives verdict FAIL.",
+    "A disagreement emits one signal that names the run id.",
+    "evolve commit-gate refuses an attestation whose derived verdict is FAIL.",
+    "The doc of evolve agent run states the rule in STE."
+  ],
+  "consumed": {
+    "at": "2026-10-27T08:33:53Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "evolve agent run derives the run verdict of a review from the report body (reportdoc.CountSeverities and the stated verdict); a disagreement is FAIL with REVIEW_AGENT_RUN_VERDICT_MISMATCH naming the run id; the launch record carries the run verdict, so commit-gate refuses it; agent-run.md §4.1 states the rule"
+  },
+  "created_at": "2026-10-27T06:20:13Z",
+  "deps": [],
+  "files": [
+    "go/internal/cli/agentcmd/run.go"
+  ],
+  "fix": "Derive the envelope verdict from the declared report artifact (a schema-checked findings file with severity counts), not from a separate free field. When the field and the body disagree, the envelope verdict is FAIL and the run emits a signal. The commit gate reads the derived verdict.",
+  "id": "agent-run-verdict-matches-report-body",
+  "injected_by": "console-operator-session",
+  "kind": "pipeline-integrity",
+  "notes": "Console route: agent run and the commit gate are the review path of the console itself.",
+  "origin": "console",
+  "priority": "P1",
+  "priority_class": "correctness",
+  "route": "console",
+  "source": "console, 2026-10-27, docs-review run on PR #1197 and the cycle-2035 salvage",
+  "summary": "Reviews through evolve agent run return an envelope whose verdict field can say PASS while the report body says FAIL. This occurred at least twice: the cycle-2035 salvage reviews and the docs-review round 1 of PR #1197 on 2026-10-27 (run agent-docs-review-20261027T060904Z-90c9, body FAIL with 1 HIGH). A gate or a reader that trusts the field passes a failed review.",
+  "title": "The verdict of evolve agent run comes from the report body, so a FAIL report cannot carry a PASS verdict",
+  "weight": 0.8
+}

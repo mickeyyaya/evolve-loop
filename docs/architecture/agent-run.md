@@ -81,7 +81,8 @@ An evaluate phase gets `goal` by default, but a plan phase gets no key. The pers
 |---|---|
 | `profile` | the profile name |
 | `run_label` | the run label |
-| `verdict` | `PASS`, `WARN`, `FAIL` or `SKIPPED` from the phase runner |
+| `verdict` | `PASS`, `WARN`, `FAIL` or `SKIPPED`: the verdict of the phase runner, checked against the report body (§4.1) |
+| `findings` | the counts of the report body by severity: `critical`, `high`, `medium`, `low` (§4.1) |
 | `report` | the report text |
 | `model`, `model_source` | `PhaseResponse.ResolvedModel` and `ModelSource` |
 | `cost_usd`, `tokens`, `duration_ms` | from the phase response |
@@ -102,6 +103,32 @@ An evaluate phase gets `goal` by default, but a plan phase gets no key. The pers
 | 10 | Usage: a missing or unknown profile, a bad flag, a terminal on stdin. |
 | 11 | Input: an unreadable or empty input. |
 | 21 | A dispatch error, a failed ledger append, or a failed write of the launch record. It was 3 before X17b. |
+
+### 4.1 The verdict comes from the report body
+
+**F4.1** The verdict field of a review run said PASS while the report body said FAIL. This occurred twice on 2026-10-27, for example in run `agent-docs-review-20261027T060904Z-90c9` (body FAIL, 1 HIGH).
+*Implication:* the phase runner sets the field from the required sections only. A reader or a gate that trusts the field passes a failed review.
+
+- A profile that requires a `Verdict` section declares a review report. For such a profile, the run reads the report body after the dispatch (`reportVerdict` in `go/internal/cli/agentcmd/verdict.go`).
+- The body gives two values:
+  - the stated verdict: the `evolve-verdict` sentinel, else the `Verdict` line (`reportdoc.Verdict`);
+  - the counts by severity (`reportdoc.CountSeverities`). A finding line starts with `[CRITICAL]`, `[HIGH]`, `[MEDIUM]` or `[LOW]`. `[MAJOR]` counts as HIGH, and `[MINOR]` counts as LOW. A count table row and a counts line (two or more counts on one line) also count. For each severity, the larger of the listed and the declared count is the count.
+- When the field is PASS or WARN, these rules apply in this order:
+
+| The report body | The run verdict | Signal |
+|---|---|---|
+| one or more CRITICAL or HIGH findings | FAIL | `REVIEW_AGENT_RUN_VERDICT_MISMATCH` |
+| the stated verdict is FAIL | FAIL | `REVIEW_AGENT_RUN_VERDICT_MISMATCH` |
+| no stated verdict | FAIL | `REVIEW_AGENT_RUN_VERDICT_MISMATCH` |
+| the stated verdict is WARN | WARN | none |
+| the stated verdict is PASS or SKIPPED | the field | none |
+
+- A field of FAIL or SKIPPED stays as it is. A profile with no `Verdict` section keeps the field, for example `code-simplifier` and the orchestrator seat of the self-healing loop.
+- The signal is WARN in the module `review`. Its `run_id` is the run label, and its reason names the run label too. Its fields give the field verdict, the stated verdict and the CRITICAL and HIGH counts. The envelope gets one error diagnostic with the same reason.
+- The run verdict goes to the envelope, the exit code, the ledger entry and the launch record. Thus `evolve commit-gate run --reviewers run:<run label>` refuses the run, because its record verdict is FAIL (§7).
+- A body WARN with a field PASS gives WARN, not FAIL. The rule takes the stricter verdict of the two. A WARN review that names only MEDIUM findings does not block a commit.
+- A `Verdict` entry with a heading marker (`## Verdict`) also declares a review report.
+- Limit: a cycle phase does not apply this rule yet, because the rule runs after the phase runner. Item `specrunner-classify-owns-the-review-body-verdict` moves it into the classify stage of `specrunner`. Then one function decides the verdict of a report in a cycle and in a standalone run.
 
 ## 5. No cycle
 
@@ -163,7 +190,7 @@ Before X11, a console review ran as an in-process Claude Code subagent. It left 
 | `profile` | the profile name |
 | `cli`, `family` | the driver of the last bridge launch, and its CLI family |
 | `model` | the resolved model, else the model of the launch request |
-| `verdict` | the verdict of the phase runner, empty after a dispatch error |
+| `verdict` | the run verdict of §4.1, empty after a dispatch error |
 | `writes_source` | true for a writer run (§8) |
 | `tree_state_sha_before`, `tree_state_sha_after` | the tree-state SHA (`treestate.SHA`) of the worktree, else of the project root, before and after the dispatch |
 | `artifact_sha256` | the SHA-256 of the report, when there is one |
