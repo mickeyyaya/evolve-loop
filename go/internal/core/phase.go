@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/retryladder"
@@ -101,13 +102,17 @@ type PhaseRequest struct {
 
 	UpstreamSignals map[string]any `json:"upstream_signals,omitempty"`
 
-	ModelRoutingCLI    string  `json:"model_routing_cli,omitempty"`
-	ModelRoutingTier   string  `json:"model_routing_tier,omitempty"`
-	BudgetScale        float64 `json:"budget_scale,omitempty"`
-	Attempt            int     `json:"attempt,omitempty"`
-	ModelRoutingEffort string  `json:"model_routing_effort,omitempty"`
+	Assignment  TaskAssignment   `json:"assignment"`
+	Driver      llmroute.Binding `json:"-"`
+	BudgetScale float64          `json:"budget_scale,omitempty"`
+	Attempt     int              `json:"attempt,omitempty"`
 
 	Ladder *retryladder.Try `json:"-"`
+}
+
+type TaskAssignment struct {
+	Tier   string `json:"tier,omitempty"`
+	Effort string `json:"effort,omitempty"`
 }
 
 type PhaseResponse struct {

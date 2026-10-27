@@ -30,8 +30,6 @@ func WithFailureAdviser(a FailureAdviser) Option {
 
 func (o *Orchestrator) FailureAdviserWired() bool { return o.failureAdviser != nil }
 
-func (o *Orchestrator) ModelCatalogLookupWired() bool { return o.modelCatalogLookup != nil }
-
 func fatalSignaturesDir(projectRoot string) string {
 	return filepath.Join(projectRoot, ".evolve", "instincts", "fatal-signatures")
 }

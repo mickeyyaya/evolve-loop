@@ -35,7 +35,7 @@ func TestRunner_DeepTierDispatch_ResolvesFableOverlay(t *testing.T) {
 
 	_, err := r.Run(context.Background(), core.PhaseRequest{
 		ProjectRoot: root, Workspace: t.TempDir(),
-		ModelRoutingTier: "deep",
+		Assignment: core.TaskAssignment{Tier: "deep"},
 	})
 	if err != nil {
 		t.Fatalf("Run: %v", err)

@@ -9,6 +9,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
@@ -46,7 +47,7 @@ func TestResolveDispatchPlan_AWorktreePhaseDropsACLIWithoutToolUseWhoeverNamedIt
 		{"an EVOLVE_CLI override", "claude-tmux", []string{"agy-tmux"}, policy.Policy{},
 			func(r *core.PhaseRequest) { r.Env = map[string]string{"EVOLVE_CLI": "ollama-tmux"} }, []string{"agy-tmux"}},
 		{"the advisor overlay", "claude-tmux", []string{"agy-tmux"}, policy.Policy{},
-			func(r *core.PhaseRequest) { r.ModelRoutingCLI = "ollama" }, []string{"claude-tmux", "agy-tmux"}},
+			func(r *core.PhaseRequest) { r.Driver = llmroute.Bind("ollama") }, []string{"claude-tmux", "agy-tmux"}},
 		{"a policy pin", "claude-tmux", []string{"agy-tmux"}, policy.Policy{Pins: map[string]policy.Pin{"scout": {CLI: "ollama"}}},
 			func(*core.PhaseRequest) {}, []string{"agy-tmux"}},
 	}

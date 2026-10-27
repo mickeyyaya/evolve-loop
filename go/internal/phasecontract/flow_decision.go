@@ -72,7 +72,7 @@ type FlowDecision struct {
 	Allowed      []string
 }
 
-var planEntryKeys = []string{"phase", "run", "justification", "cli", "tier", "mint", "forced_by"}
+var planEntryKeys = []string{"phase", "run", "justification", "tier", "mint", "forced_by"}
 
 var flowDecisions = []FlowDecision{
 	{Seat: FlowSeatPlan, ArtifactName: "routing-plan.json", Shape: JSONShapeArray,

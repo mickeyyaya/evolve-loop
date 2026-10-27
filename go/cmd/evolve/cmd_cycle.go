@@ -566,8 +566,6 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	opts = append(opts, core.WithCatalogRefresher(makeCatalogRefresher(projectRoot, evolveDir, pol.CatalogConfig().RefreshStage)))
 	opts = append(opts, core.WithCatalogRefreshStage(catalogRefreshStage(pol)))
 
-	opts = append(opts, core.WithModelCatalogLookup(resolveModelTier))
-
 	opts = append(opts, core.WithDirectivesProvider(makeDirectivesProvider(projectRoot)))
 
 	opts = append(opts, core.WithKB(research.NewFileKBWithRecall(kbRootsAbs(projectRoot), kbRecallK(projectRoot))))

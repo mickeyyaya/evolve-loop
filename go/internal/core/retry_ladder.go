@@ -75,7 +75,7 @@ func (cr *cycleRun) askLadder(ask ladderAsk, req PhaseRequest) (PhaseRequest, bo
 	}
 	try.Rung, try.Context, try.Stage, try.Tier = d.Rung, retryladder.ContextFresh, retryladder.StageEnforce, d.Target.Tier
 	req.Ladder = &try
-	req.ModelRoutingEffort = d.Target.Effort
+	req.Assignment.Effort = d.Target.Effort
 	req.CorrectionDirective = retryladder.Digest{
 		Rung: d.Rung, Class: verdict.Class, Failures: ask.failures, Findings: ask.findings,
 		ChangedFiles: gitStatusNames(ask.worktree, evidenceStatusMaxNames), History: prior.History,
@@ -131,7 +131,7 @@ func (cr *cycleRun) keepLadderRung(phase Phase, req PhaseRequest) PhaseRequest {
 		return req
 	}
 	req.Ladder = &retryladder.Try{Rung: retryladder.Rung(st.Rung), Stage: retryladder.StageEnforce, Tier: st.Tier}
-	req.ModelRoutingEffort = st.Effort
+	req.Assignment.Effort = st.Effort
 	return req
 }
 

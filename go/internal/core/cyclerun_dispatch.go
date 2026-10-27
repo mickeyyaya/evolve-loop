@@ -78,8 +78,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 	if cr.o.cfg.ModelRouting == config.ModelRoutingAuto && cr.clampedPlan != nil {
 		for _, e := range cr.clampedPlan.Entries {
 			if e.Phase == string(next) {
-				phaseReq.ModelRoutingCLI = e.CLI
-				phaseReq.ModelRoutingTier = e.Tier
+				phaseReq.Assignment.Tier = e.Tier
 				break
 			}
 		}

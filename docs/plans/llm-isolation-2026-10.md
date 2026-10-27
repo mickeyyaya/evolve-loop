@@ -188,7 +188,8 @@ The state on 2026-10-27. Each component re-reads this table before it starts.
 | X17d | built | #1190 | `inbox claim`, `dossier show`, `cycle resume`, `wave stop` and `quality show` are core verbs with the envelope, the exit table and `--project-root`. `quality show` publishes nothing. The dispatch gate refuses `cycle resume` in a cell. |
 | X18c | built | #1187 | The class (b) knobs read `.evolve/policy.json` keys or CLI parameters, and no code reads their former names. A former name that is set prints one `[policy] WARN`; the plan shadow wave became this WARN. `ipcenv.UnmovedControls()` went from 29 to 10 names. |
 | X18d | built | this PR | Each class (c) bypass is an audited parameter (`--sandbox-off`, `ship --auto-confirm`, `bridge launch --human-input`), a policy key (`sandbox.mode`, `bridge.allow_*`) or removed. The package `adapters/runner` had no production caller, and the batch PR deleted it. Each audited use writes one `control_bypass` ledger entry and one `CONTROL_BYPASS_USED` signal. `ipcenv.UnmovedControls()` went from 10 names to none, and X18d deleted it. |
-| X14 to X16, X19 | not started | none | |
+| X19a | built | this PR | Item `cli-neutral-task-assignment-and-guard`. `PhaseRequest` carries the neutral `TaskAssignment` and an opaque `llmroute.Binding`, with no CLI field. The advisor plan has no `cli` field. `TestNoCLISpecificsAboveTheDriver` went from 10 allowlisted sites to 5 (spec §28). |
+| X14 to X16, X19b, X19c | not started | none | |
 
 ### 6.2 The X6 follow-up (X6b)
 
