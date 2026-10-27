@@ -57,7 +57,7 @@ func TestC413_005_ConfigLoadPopulatesCompactPrompts(t *testing.T) {
 	if err := os.WriteFile(f, []byte(regJSON), 0o644); err != nil {
 		t.Fatalf("write temp registry: %v", err)
 	}
-	cfg, warns := config.Load(f, map[string]string{})
+	cfg, warns := config.Load(f)
 	for _, w := range warns {
 		t.Logf("config warn: %s: %s", w.Code, w.Message)
 	}

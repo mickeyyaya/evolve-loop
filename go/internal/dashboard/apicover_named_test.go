@@ -43,6 +43,9 @@ func TestAPICoverNamedExports(t *testing.T) {
 	if snap.Cycles[0].State != StateRunning || snap.Cycles[2].State != StateFail {
 		t.Fatalf("states: %s %s", snap.Cycles[0].State, snap.Cycles[2].State)
 	}
+	if got := New(root, Options{}).Snapshot(now); len(got.Cycles) != len(snap.Cycles) || got.Cycles[0].State != StateRunning || got.Cycles[2].State != StateFail {
+		t.Fatalf("Server.Snapshot = %d cycles, want the %d of Collect with the same states", len(got.Cycles), len(snap.Cycles))
+	}
 
 	list, err := ListArtifacts(root, 3)
 	if err != nil || len(list) == 0 {

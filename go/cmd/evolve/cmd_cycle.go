@@ -62,7 +62,7 @@ import (
 
 func runCycle(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
-		fmt.Fprintln(stderr, "evolve cycle: missing subcommand (try: run | reset | timing | models)")
+		fmt.Fprintln(stderr, "evolve cycle: missing subcommand (try: run | resume | reset | timing | models)")
 		return 10
 	}
 	switch args[0] {
@@ -70,6 +70,8 @@ func runCycle(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return runCycleRun(args[1:], stdout, stderr)
 	case "reset":
 		return runCycleReset(args[1:], stdout, stderr)
+	case "resume":
+		return runCycleResume(args[1:], stdout, stderr)
 	case "timing":
 		return runCycleTiming(args[1:], stdout, stderr)
 	case "models":
@@ -176,8 +178,8 @@ func cycleResetFailure(res core.SealResult, err error, stderr io.Writer) int {
 var cycleRunAbsoluteRoot = paths.AbsoluteRoot
 
 type cycleRunFlags struct {
-	projectRoot, goalHash, goalText, evolveDir string
-	simulate, bypassPolicy                     bool
+	projectRoot, goalHash, goalText, evolveDir, sandboxOff string
+	simulate, bypassPolicy                                 bool
 }
 
 func parseCycleRunFlags(args []string, stderr io.Writer) (cycleRunFlags, bool) {
@@ -190,6 +192,7 @@ func parseCycleRunFlags(args []string, stderr io.Writer) (cycleRunFlags, bool) {
 	fs.StringVar(&f.evolveDir, "evolve-dir", "", "path to .evolve/ state directory (default <project-root>/.evolve)")
 	fs.BoolVar(&f.simulate, "simulate", false, "no-LLM walk: every phase returns PASS without calling out (for parity-audit harness)")
 	fs.BoolVar(&f.bypassPolicy, "bypass-policy", false, "use --bypass-policy to bypass policy.json pin enforcement for every phase this run (operator escape hatch)")
+	fs.StringVar(&f.sandboxOff, "sandbox-off", "", sandboxOffUsage)
 	args = stripRemovedBudgetFlags(args, func(m string) {
 		fmt.Fprintf(stderr, "evolve cycle run: WARN: %s\n", m)
 	})
@@ -328,7 +331,7 @@ func wireCycleRun(f cycleRunFlags, projectRoot, evolveDir string, stderr io.Writ
 		return wireSimulateOrchestrator(projectRoot, evolveDir, stderr)
 	}
 	gcOrphanSessions("cycle-start", stderr)
-	return wireOrchestratorDepsFn(projectRoot, evolveDir, stderr, routingRun{bypass: f.bypassPolicy, env: filterEvolveEnv(os.Environ())})
+	return wireOrchestratorDepsFn(projectRoot, evolveDir, stderr, routingRun{bypass: f.bypassPolicy, env: filterEvolveEnv(os.Environ()), sandboxOff: f.sandboxOff})
 }
 
 func filterEvolveEnv(environ []string) map[string]string {
@@ -344,6 +347,7 @@ const (
 	roleSimulate  = "simulate"
 	roleDispatch  = "dispatch"
 	roleAgent     = "agent"
+	roleSelfheal  = "selfheal"
 )
 
 func agentRunSignals(projectRoot string, console io.Writer) (*signalcenter.Center, func()) {
@@ -433,16 +437,20 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	}
 	signals, closeSignals := newRoleSignalCenter(run.centerRole(), projectRoot, evolveDir, console)
 	watchOptimisticAdmission(signals, os.Getenv)
+	warnRetiredControls(console, os.Environ())
 	st := storage.New(evolveDir)
 	ld := ledger.New(evolveDir, ledger.WithSignals(signals))
 
 	br := bridge.NewDefault(projectRoot, signals)
+	if err := newBypassAuditor(evolveDir, signals, console).applySandboxOff(br, run.sandboxOff); err != nil {
+		return orchDeps{Signals: signals, CloseSignals: closeSignals, RoutingErr: err}
+	}
 	br.SetOnStopReview(stopReviewRecorder(ld))
 	prm := cmdutil.NewPromptsLoader(projectRoot)
 
 	registryPath := config.RegistryPath(projectRoot)
 	loader := wiredRoutingConfigLoader(signals)
-	cfg, _ := loader.Load(registryPath, filterEvolveEnv(os.Environ()))
+	cfg, _ := loader.Load(registryPath)
 
 	var policyShipFloor []string
 	pol, policyErr := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
@@ -450,11 +458,10 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 		fmt.Fprintf(console, "[policy] WARN %v (mandatory merge skipped; the routing table refuses it before any dispatch)\n", policyErr)
 		pol = policy.Policy{}
 	} else {
-		cfg.Mandatory = pol.MergeMandatory(cfg.Mandatory)
+		cfg = router.ApplyPolicy(loader, cfg, pol)
 		if floor, overridden := pol.FloorPhases(); overridden {
 			policyShipFloor = floor
 		}
-		cfg.AuditFailRoutesTo = router.FailureRouteFromPolicy(pol)
 	}
 	swCfg := swarmrunner.Config{Stage: pol.SwarmConfig().Stage, PortBase: pol.SwarmConfig().PortBase, WorktreeBase: pol.WorktreeBase()}
 	gatesCfg := pol.GatesConfig()
@@ -483,7 +490,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	forbidden := laneForbiddenTo(projectRoot, signals.Emit)
 
 	runners := map[core.Phase]core.PhaseRunner{
-		core.PhaseIntent:       intent.New(intent.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, CompactPrompts: cfg.CompactPrompts}),
+		core.PhaseIntent:       intent.New(intent.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, CompactPrompts: cfg.CompactPrompts, DeltaMode: wfCfg.IntentDelta}),
 		core.PhaseScout:        swarmrunner.New(scout.New(scout.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), walked, swarm.ModeReader, swCfg),
 		core.PhaseTriage:       triage.New(triage.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts, LaneForbidden: forbidden}),
 		core.PhaseTDD:          tdd.New(tdd.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, CompactPrompts: cfg.CompactPrompts}),
@@ -528,7 +535,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 			RegistryPath: mintregistry.Path(projectRoot),
 		}}),
 	}
-	opts = append(opts, phaseObserverOptions(pol.ObserverConfig(), cfg.PhaseRecovery.String(), observerDeps{signals: signals, usage: explainUsage})...)
+	opts = append(opts, phaseObserverOptions(pol.ObserverConfig(), cfg.PhaseRecovery.String(), observerDeps{signals: signals, usage: explainUsage, overrides: run.overrides})...)
 	var reviewers []core.DeliverableReviewer
 	if floor := composedBuildHandoffFloor(pol.WorkflowConfig(), cfg); len(floor) > 0 {
 		reviewers = append(reviewers, floor)

@@ -65,4 +65,23 @@ func writeWaveMeasuresText(w io.Writer, m wavemeasure.Measures) {
 		fmt.Fprintf(w, " · optimistic %d/%d failed (%.2f)", m.OptimisticFailures, m.OptimisticAdmissions, m.OptimisticFailureRate)
 	}
 	fmt.Fprintln(w)
+	writeWaveCostText(w, m.Cost)
+}
+
+func writeWaveCostText(w io.Writer, c wavemeasure.Cost) {
+	switch {
+	case c.Started == 0:
+		fmt.Fprintln(w, "cost:    no cycle")
+		return
+	case c.Shipped == 0:
+		fmt.Fprintf(w, "cost:    not defined (0 of %d cycle(s) shipped)", c.Started)
+	default:
+		fmt.Fprintf(w, "cost:    %.1f LLM min, %.2f M fresh and %.2f M cache-read tokens per shipped cycle (%d of %d shipped)",
+			*c.LLMMinutesPerShippedCycle, *c.FreshTokensPerShippedCycle/1e6, *c.CacheReadTokensPerShippedCycle/1e6, c.Shipped, c.Started)
+	}
+	fmt.Fprintf(w, " · audit rounds %.2f per cycle · convergence %.2f", *c.AuditRoundsPerCycle, *c.ConvergenceRate)
+	if c.UnmeasuredCalls > 0 {
+		fmt.Fprintf(w, " · %d call(s) unmeasured", c.UnmeasuredCalls)
+	}
+	fmt.Fprintln(w)
 }

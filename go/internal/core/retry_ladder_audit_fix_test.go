@@ -20,7 +20,9 @@ func auditFixRun(t *testing.T, stage string, fb *phasecontract.FailureBlock, opt
 		t.Fatal(err)
 	}
 	center, events := captureSignals()
-	opts = append([]Option{WithWorkflowConfig(ladderWorkflow(stage)), WithSignalCenter(center)}, opts...)
+	wf := ladderWorkflow(policy.RetryLadderShadow)
+	wf.RetryLadder.AuditFix.Stage = stage
+	opts = append([]Option{WithWorkflowConfig(wf), WithSignalCenter(center)}, opts...)
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil), opts...)
 	return &cycleRun{o: o, cycle: 2035, req: CycleRequest{ProjectRoot: root}, cs: CycleState{
 		CycleID: 2035, WorkspacePath: ws, AuditRepairActive: true, AuditRepairAttempts: 1, AuditFailReasons: fb.Defects,
@@ -93,10 +95,42 @@ func TestAuditRepair_EnforceNamesTheRegisteredRungHandler(t *testing.T) {
 	if f["audit_fix"] != auditFixChosen || f["audit_fix_handler"] != "registered" {
 		t.Fatalf("fields = %+v, want audit_fix chosen with the registered handler", f)
 	}
+	if cr.cs.Ladder == nil || cr.cs.Ladder.AuditFix != auditFixChosen {
+		t.Fatalf("a chosen audit_fix with a handler did not use the allowance: %+v", cr.cs.Ladder)
+	}
 	if h, ok := cr.o.rungHandler(retryladder.RungAuditFix); !ok || h == nil {
 		t.Fatalf("the audit_fix handler is not registered")
 	}
 	if res, err := (stubRungHandler{}).Handle(context.Background(), RungInput{Rung: retryladder.RungAuditFix}); err != nil || res.Handled {
 		t.Fatalf("stub handler = %+v %v", res, err)
+	}
+}
+
+func TestAuditRepair_AChosenAuditFixWithNoHandlerKeepsTheAllowance(t *testing.T) {
+	t.Parallel()
+	cr, events := auditFixRun(t, policy.RetryLadderEnforce, prescribedSmallFix)
+	cr.applyDispatchPolicy(PhaseBuild, &PhaseRequest{})
+	first := eventsWithCode(*events, CodeLadderAuditFix)[0].Fields
+	if first["audit_fix"] != auditFixChosen || first["audit_fix_handler"] != "absent" || first["stage"] != policy.RetryLadderEnforce {
+		t.Fatalf("fields = %+v, want audit_fix chosen at the audit_fix stage with no handler", first)
+	}
+	if cr.cs.Ladder == nil || cr.cs.Ladder.AuditFix != "" {
+		t.Fatalf("a chosen audit_fix with no handler used the allowance: %+v", cr.cs.Ladder)
+	}
+	cr.cs.AuditRepairAttempts = 2
+	cr.applyDispatchPolicy(PhaseBuild, &PhaseRequest{})
+	second := eventsWithCode(*events, CodeLadderAuditFix)
+	if len(second) != 2 || second[1].Fields["audit_fix"] != auditFixChosen {
+		t.Fatalf("the second repair round did not choose audit_fix again: %+v", second[len(second)-1].Fields)
+	}
+}
+
+func TestAuditRepair_TheAuditFixStageOffDeclines(t *testing.T) {
+	t.Parallel()
+	cr, events := auditFixRun(t, policy.AuditFixOff, prescribedSmallFix, WithRungHandler(retryladder.RungAuditFix, stubRungHandler{}))
+	cr.applyDispatchPolicy(PhaseBuild, &PhaseRequest{})
+	f := eventsWithCode(*events, CodeLadderAuditFix)[0].Fields
+	if f["audit_fix"] != auditFixDecline || f["stage"] != policy.AuditFixOff || cr.cs.Ladder.AuditFix != "" {
+		t.Fatalf("fields = %+v, state %+v, want a decline at stage off", f, cr.cs.Ladder)
 	}
 }

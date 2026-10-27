@@ -10,22 +10,21 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
-	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/quotastate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/usageevidence"
 	"github.com/mickeyyaya/evolve-loop/go/internal/usageprobe"
 )
 
-func runPreWaveProbes(ctx context.Context, projectRoot, evolveDir string, env map[string]string, stderr io.Writer) error {
-	runCLIHealthCanary(ctx, projectRoot, env, defaultLiveProbe(ctx, projectRoot, bridge.Deps{Stderr: stderr}), stderr)
-	runUsageProbe(ctx, projectRoot, evolveDir, env, stderr)
+func runPreWaveProbes(ctx context.Context, projectRoot, evolveDir string, stderr io.Writer) error {
+	runCLIHealthCanary(ctx, projectRoot, defaultLiveProbe(ctx, projectRoot, bridge.Deps{Stderr: stderr}), stderr)
+	runUsageProbe(ctx, projectRoot, evolveDir, stderr)
 	recordLaneTimes(evolveDir, stderr)
 	return ctx.Err()
 }
 
-func runUsageProbe(ctx context.Context, projectRoot, evolveDir string, env map[string]string, stderr io.Writer) {
-	if !usageProbeEnabled(env, evolveDir) {
+func runUsageProbe(ctx context.Context, projectRoot, evolveDir string, stderr io.Writer) {
+	if !usageProbeEnabled(evolveDir) {
 		return
 	}
 	families := bridge.InteractiveFamilies()
@@ -63,11 +62,9 @@ func bridgeUsageProbe(factory *bridge.ControllerFactory) func(ctx context.Contex
 	return usageevidence.UsagePane(factory)
 }
 
-func usageProbeEnabled(env map[string]string, evolveDir string) bool {
-	if !envchain.BoolValue(envchain.Resolve("EVOLVE_CLI_HEALTH", env, "", "1"), true) {
-		return false
-	}
-	return loadCLIHealthConfig(evolveDir).ProactiveProbe
+func usageProbeEnabled(evolveDir string) bool {
+	c := loadCLIHealthConfig(evolveDir)
+	return c.On() && c.ProactiveProbe
 }
 
 func loadCLIHealthConfig(evolveDir string) policy.CLIHealthConfig {

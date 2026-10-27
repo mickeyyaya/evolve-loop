@@ -78,6 +78,7 @@ func TestInboxCenterlessRootsArePinned(t *testing.T) {
 		"cmd/evolve/cmd_inbox_quarantine.go":    "operator command `evolve inbox quarantine release` — 06-F1",
 		"cmd/evolve/cmd_inbox_route_console.go": "operator command `evolve inbox route-console` — 06-F1",
 		"cmd/evolve/cmd_inbox_claims.go":        "operator commands `evolve inbox claims` and `release` (cycle 1838) — a console verb prints its own lines",
+		"cmd/evolve/cmd_inbox_claim.go":         "operator command `evolve inbox claim` (X17d) — a console verb prints its own lines, as `release` does",
 		"cmd/evolve/cmd_syncmain.go":            "operator command `evolve sync-main`, the claim absorb after the merge (cycle 1838) — it prints its own lines",
 		"cmd/evolve/cmd_loop_wavesync.go":       "the loop's wave-boundary sync, the claim absorb after the fast-forward (cycle 1838) — it prints its own [loop] lines",
 		"cmd/evolve/cmd_gc_claims.go":           "operator command `evolve gc`, the empty claim dir sweep (cycle 1838) — read-only survey, no mover warning",

@@ -39,7 +39,7 @@ func (q *QualityPanelPolicy) UnmarshalJSON(raw []byte) error {
 
 func qualityStage(id, stage string) (qualitypanel.Stage, error) {
 	if _, ok := qualitypanel.Lookup(id); !ok {
-		return "", fmt.Errorf("quality: index %q is not one of the 21 ids of docs/architecture/llm-quality-indexes.md", id)
+		return "", fmt.Errorf("quality: index %q is not one of the 22 ids of docs/architecture/llm-quality-indexes.md", id)
 	}
 	st, err := qualitypanel.ParseStage(stage)
 	if err != nil {

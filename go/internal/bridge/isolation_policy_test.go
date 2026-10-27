@@ -124,7 +124,7 @@ func TestMandatorySandboxDoesNotTrustNestedEnvironment(t *testing.T) {
 	if !sandboxRequiredButUnavailable(deps, &Config{RequireSandbox: true}, false) {
 		t.Fatal("nested marker is not proof of required filesystem restrictions")
 	}
-	deps.Env[envSandboxMode] = "off"
+	deps.SandboxMode = "off"
 	if sandboxRequiredButUnavailable(deps, &Config{RequireSandbox: true}, false) {
 		t.Fatal("explicit operator opt-out must remain supported")
 	}

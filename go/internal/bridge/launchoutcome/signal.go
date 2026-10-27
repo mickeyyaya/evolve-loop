@@ -20,7 +20,7 @@ const (
 
 func init() {
 	const common = "; the reason is the classified launch error (the exact string the outcome record and the retry backoff parse), fields exit_code, cause_code, transient, ctx_cancelled, launch_error (the persisted <agent>-launch-error.txt when written), call_id, cli, agent, step=classify"
-	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeExitSafetyGate, "a launch died in a safety gate (exit 2: e.g. --human-input without the host opt-in); plain failure"+common)
+	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeExitSafetyGate, "a launch died in a safety gate (exit 2: e.g. a launch without --allow-bypass, or a --human-input with no audit); plain failure"+common)
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeExitCostLeak, "a launch refused to leak a forbidden credential into the inner CLI's environment (exit 3); plain failure"+common)
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeExitBadFlags, "a launch died in the validate gauntlet — bad flags, a missing profile, an unreadable or empty prompt, no driver for the CLI (exit 10); plain failure"+common)
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeExitREPLBootTimeout, "a tmux REPL never showed its prompt marker within the boot budget (exit 80); transient — the boot strike is recorded before this event"+common)

@@ -1,0 +1,22 @@
+{
+  "schema": "evolve.incident/1",
+  "id": "inc-2026-10-27-9abfa496",
+  "fingerprint": "stall:LIVENESS_PHASE_STALLED:build",
+  "class": "stall",
+  "subject": "LIVENESS_PHASE_STALLED:build",
+  "severity": "WARN",
+  "tier": "T1",
+  "state": "open",
+  "sources": [
+    "signal:41337.638",
+    "signal:41337.642"
+  ],
+  "recurrence": 2,
+  "reopened": 0,
+  "attempts": 0,
+  "repro_test": "",
+  "summary": "a phase pane stalled in phase build",
+  "opened_at": "2026-10-27T10:30:56.21104+08:00",
+  "last_seen_at": "2026-10-26T21:28:09.470634Z",
+  "closed_at": null
+}

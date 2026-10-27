@@ -2,20 +2,13 @@ package bridge
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"os"
 	"strings"
 	"time"
 )
-
-func humanActive(deps Deps, humanInput bool) bool {
-	if !humanInput {
-		return false
-	}
-	v, _ := lookupEnv(deps, "BRIDGE_HUMAN_SIMULATION")
-	return v == "1"
-}
 
 func humanSampleMS(meanMS, sdMS int) time.Duration {
 	v := rand.NormFloat64()*float64(sdMS) + float64(meanMS)
@@ -81,4 +74,13 @@ func humanReadingPause(deps Deps, text string) {
 	ms := 60000 * words / 220
 	fmt.Fprintf(deps.Stderr, "[human-input] reading pause (~%d words)\n", words)
 	deps.Sleep(humanSampleMS(ms, ms/4))
+}
+
+var errBypassNotAudited = errors.New("this launch has no audit sink for a bypass; run it through evolve bridge launch")
+
+func (deps Deps) auditBypass(name, reason string) error {
+	if deps.RecordBypass == nil {
+		return fmt.Errorf("--%s: %w", name, errBypassNotAudited)
+	}
+	return deps.RecordBypass(name, reason)
 }

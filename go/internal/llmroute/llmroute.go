@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
@@ -67,8 +68,18 @@ func (p Plan) TriggersFallback(exitCode int) bool {
 	return false
 }
 
-func Resolve(agent, phase, defaultModel string, env map[string]string, prof *profiles.Profile, autoExpand AutoModel, pin *policy.Pin) Plan {
-	primary, source := resolvePrimary(agent, env, prof)
+type AgentOverride struct{ CLI, Model string }
+
+const overrideSourcePrefix = "--cli "
+
+func OverrideSource(agent string) string { return overrideSourcePrefix + agent }
+
+func IsOperatorChoice(source string) bool {
+	return strings.HasPrefix(source, "env(") || strings.HasPrefix(source, overrideSourcePrefix)
+}
+
+func Resolve(agent, phase, defaultModel string, env map[string]string, ov AgentOverride, prof *profiles.Profile, autoExpand AutoModel, pin *policy.Pin) Plan {
+	primary, source := resolvePrimary(agent, env, ov, prof)
 	if pin != nil && pin.CLI != "" {
 		primary, source = defaultDriverForFamily(pin.CLI), "policy.pin"
 	}
@@ -78,7 +89,7 @@ func Resolve(agent, phase, defaultModel string, env map[string]string, prof *pro
 		model = pin.Model
 		tiers = []string{model}
 	} else {
-		model = resolveModel(agent, phase, defaultModel, env, prof, autoExpand)
+		model = resolveModel(phase, defaultModel, ov.Model, prof, autoExpand)
 		tiers = TierChain(model, envelopeMin(prof))
 	}
 	return Plan{
@@ -97,12 +108,12 @@ func envelopeMin(prof *profiles.Profile) string {
 	return prof.ModelTierEnvelope.Min
 }
 
-func resolveModel(agent, phase, defaultModel string, env map[string]string, prof *profiles.Profile, autoExpand AutoModel) string {
+func resolveModel(phase, defaultModel, override string, prof *profiles.Profile, autoExpand AutoModel) string {
 	profileModelTier := ""
 	if prof != nil {
 		profileModelTier = prof.ModelTierDefault
 	}
-	model := env[envchain.PhaseEnvKey(agent, "MODEL")]
+	model := override
 	if model == "" {
 		model = profileModelTier
 	}
@@ -132,19 +143,18 @@ func defaultDriverForFamily(cli string) string {
 	return cli
 }
 
-func EnvPrimary(agent string, env map[string]string) (cli, source string) {
-	perAgentKey := envchain.PhaseEnvKey(agent, "CLI")
-	if v := env[perAgentKey]; v != "" {
-		return v, "env(" + perAgentKey + ")"
-	}
+func EnvPrimary(env map[string]string) (cli, source string) {
 	if v := envchain.Resolve("EVOLVE_CLI", env, "", ""); v != "" {
 		return v, "env(EVOLVE_CLI)"
 	}
 	return "", ""
 }
 
-func resolvePrimary(agent string, env map[string]string, prof *profiles.Profile) (cli, source string) {
-	if cli, source := EnvPrimary(agent, env); cli != "" {
+func resolvePrimary(agent string, env map[string]string, ov AgentOverride, prof *profiles.Profile) (cli, source string) {
+	if ov.CLI != "" {
+		return ov.CLI, OverrideSource(agent)
+	}
+	if cli, source := EnvPrimary(env); cli != "" {
 		return cli, source
 	}
 	if prof != nil && prof.CLI != "" {

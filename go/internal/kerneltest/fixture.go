@@ -23,12 +23,17 @@ func registryPath() string {
 
 func Load(t testing.TB) *Fixture {
 	t.Helper()
-	path := registryPath()
+	return loadFrom(t, registryPath())
+}
+
+func loadFrom(t testing.TB, path string) *Fixture {
+	t.Helper()
 	cat, err := phasespec.Load(path)
 	if err != nil {
 		t.Fatalf("kerneltest: load registry: %v", err)
+		return nil
 	}
-	cfg, _ := config.Load(path, nil)
+	cfg, _ := config.Load(path)
 	return &Fixture{Catalog: cat, Config: cfg}
 }
 

@@ -24,18 +24,6 @@
     "Message": "enabled=\"maybe\" unknown, defaulting to content"
   },
   {
-    "Code": "unknown-value",
-    "Message": "EVOLVE_COMMIT_EVIDENCE=\"advisory\" unknown (want off|shadow|enforce), defaulting to off"
-  },
-  {
-    "Code": "unknown-value",
-    "Message": "EVOLVE_SANDBOX=\"bogus\" unknown (want auto|on|off), defaulting to \"auto\""
-  },
-  {
-    "Code": "unknown-value",
-    "Message": "EVOLVE_MAX_OPTIONAL_INSERTIONS=\"x\" not an int"
-  },
-  {
     "Code": "weak-spine",
     "Message": "mandatory_phases omits audit+ship — audit-before-ship guarantee weakened"
   },

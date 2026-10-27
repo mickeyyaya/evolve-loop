@@ -29,7 +29,7 @@ func (p *Phase) BaseRunner() *runner.BaseRunner {
 }
 
 func (p *Phase) ShouldSkip(req core.PhaseRequest) (bool, string, string, []core.Diagnostic) {
-	if router.PolicyForProject(req.ProjectRoot, req.Env).ShouldRunPhase(string(core.PhaseSwarmPlan)) {
+	if router.PolicyForProject(req.ProjectRoot).ShouldRunPhase(string(core.PhaseSwarmPlan)) {
 		return false, "", "", nil
 	}
 	return true, core.VerdictSKIPPED, string(core.PhaseBuild), nil

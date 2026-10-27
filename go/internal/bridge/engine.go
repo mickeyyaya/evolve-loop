@@ -56,6 +56,11 @@ type Deps struct {
 	ArtifactTimeoutS      int
 	ArtifactMaxExtends    int
 	PhaseArtifactTimeoutS map[string]int
+	MaxConcurrent         map[string]int
+	SandboxMode           string
+	AllowAnthropicBaseURL bool
+	AllowOpenAIAPIKey     bool
+	RecordBypass          func(name, reason string) error
 	Efforts               policy.EffortTable
 	CorroborateWall       WallCorroborator
 	Stdout                io.Writer

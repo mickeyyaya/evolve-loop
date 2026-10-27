@@ -15,7 +15,7 @@ func TestParseModelRouting_ZeroValueStatic(t *testing.T) {
 	if err := os.WriteFile(regPath, []byte(reg), 0o644); err != nil {
 		t.Fatalf("write registry: %v", err)
 	}
-	cfg, _ := Load(regPath, map[string]string{})
+	cfg, _ := Load(regPath)
 	if cfg.ModelRouting != ModelRoutingStatic {
 		t.Errorf("ModelRouting = %v, want ModelRoutingStatic (absent key ⇒ Go zero value)", cfg.ModelRouting)
 	}
@@ -29,7 +29,7 @@ func TestParseModelRouting_EscapeHatchStaticOff(t *testing.T) {
 		if err := os.WriteFile(regPath, []byte(reg), 0o644); err != nil {
 			t.Fatalf("write registry: %v", err)
 		}
-		cfg, _ := Load(regPath, map[string]string{})
+		cfg, _ := Load(regPath)
 		if cfg.ModelRouting != ModelRoutingStatic {
 			t.Errorf("model_routing=%q => ModelRouting = %v, want ModelRoutingStatic (escape hatch)", value, cfg.ModelRouting)
 		}
@@ -42,7 +42,7 @@ func TestCheckedInPolicyDefaultsModelRoutingAuto(t *testing.T) {
 	if _, err := os.Stat(regPath); err != nil {
 		t.Fatalf("checked-in registry missing at %s: %v", regPath, err)
 	}
-	cfg, _ := Load(regPath, map[string]string{})
+	cfg, _ := Load(regPath)
 	if cfg.ModelRouting != ModelRoutingAuto {
 		t.Errorf("checked-in docs/architecture/phase-registry.json => ModelRouting = %v, want ModelRoutingAuto", cfg.ModelRouting)
 	}

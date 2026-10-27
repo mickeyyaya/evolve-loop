@@ -8,7 +8,6 @@
   "ContractGate": 3,
   "TriageCapGate": 3,
   "TopNGate": 3,
-  "SandboxMode": "auto",
   "PhaseRecovery": 1,
   "SpineFloor": 3,
   "FatalPane": 3,

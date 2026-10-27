@@ -16,23 +16,24 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/specrunner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
-type hooks struct{}
+type hooks struct{ delta bool }
 
 func (hooks) PhaseName() string       { return string(core.PhaseIntent) }
 func (hooks) AgentPromptName() string { return "evolve-intent" }
 func (hooks) DefaultModel() string    { return "auto" }
 
-func (hooks) ArtifactFilename(req core.PhaseRequest) string {
-	if isDeltaMode(req) {
+func (h hooks) ArtifactFilename(core.PhaseRequest) string {
+	if h.delta {
 		return "intent-delta.md"
 	}
 	return "intent.md"
 }
 
-func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
+func (h hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	var b strings.Builder
 	b.WriteString(runner.BaseCycleContext(body, req))
 	goal := req.Context["goal"]
@@ -42,7 +43,7 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	if goal != "" {
 		fmt.Fprintf(&b, "- goal: %s\n", goal)
 	}
-	if isDeltaMode(req) {
+	if h.delta {
 		b.WriteString("- mode: delta (the goal changed since the last batch; emit intent-delta.md describing what is new or changed)\n")
 	} else {
 		b.WriteString("- mode: full\n")
@@ -53,8 +54,8 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	return b.String()
 }
 
-func (hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {
-	if isDeltaMode(req) && strings.Contains(strings.TrimSpace(artifact), "[intent-unchanged]") {
+func (h hooks) Classify(artifact string, _ core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {
+	if h.delta && strings.Contains(strings.TrimSpace(artifact), "[intent-unchanged]") {
 		return core.VerdictSKIPPED, nil, string(core.PhaseScout)
 	}
 	verdict, diags := specrunner.EvaluateClassify(artifact, &phasespec.ClassifyRules{
@@ -64,10 +65,8 @@ func (hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRespo
 	return verdict, diags, string(core.PhaseScout)
 }
 
-func isDeltaMode(req core.PhaseRequest) bool { return req.Env["EVOLVE_INTENT_DELTA"] == "1" }
-
-func (hooks) ShouldSkip(req core.PhaseRequest) (bool, string, string, []core.Diagnostic) {
-	if !isDeltaMode(req) || req.GoalHash == "" {
+func (h hooks) ShouldSkip(req core.PhaseRequest) (bool, string, string, []core.Diagnostic) {
+	if !h.delta || req.GoalHash == "" {
 		return false, "", "", nil
 	}
 	prior := readBatchGoalHash(req.ProjectRoot)
@@ -101,6 +100,7 @@ type Config struct {
 	NowFn            func() time.Time
 	CompactPrompts   bool
 	SleepFn          func(time.Duration)
+	DeltaMode        bool
 }
 
 type Phase struct{ *runner.BaseRunner }
@@ -108,7 +108,7 @@ type Phase struct{ *runner.BaseRunner }
 func New(c Config) *Phase {
 	return &Phase{
 		BaseRunner: runner.New(runner.Options{
-			Hooks:            hooks{},
+			Hooks:            hooks{delta: c.DeltaMode},
 			Bridge:           c.Bridge,
 			ContractVerifier: c.ContractVerifier,
 			HostEffects:      c.HostEffects,
@@ -123,8 +123,9 @@ func New(c Config) *Phase {
 func init() {
 	registry.Register(string(core.PhaseIntent), func(req core.PhaseRequest) core.PhaseRunner {
 		return New(Config{
-			Bridge:  bridge.NewDefault(req.ProjectRoot, nil),
-			Prompts: prompts.NewForProject(req.ProjectRoot),
+			Bridge:    bridge.NewDefault(req.ProjectRoot, nil),
+			Prompts:   prompts.NewForProject(req.ProjectRoot),
+			DeltaMode: policy.LoadOrDefaults(filepath.Join(req.ProjectRoot, ".evolve", "policy.json"), os.Stderr).WorkflowConfig().IntentDelta,
 		})
 	})
 }

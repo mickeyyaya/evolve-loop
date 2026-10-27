@@ -202,7 +202,7 @@ func TestBoundarySteps_ApplyTheQueueRightAfterSyncMain(t *testing.T) {
 		verbs = append(verbs, s.verb)
 	}
 	got := strings.Join(verbs, " ")
-	if !strings.Contains(got, "sync-main "+queueApplyVerb+" inbox quality") {
+	if !strings.Contains(got, "sync-main "+queueApplyVerb+" inbox selfheal selfheal quality") {
 		t.Fatalf("steps = %s, want %s right after sync-main", got, queueApplyVerb)
 	}
 }

@@ -79,7 +79,7 @@ func TestC34_005_GatesConfigDefaults(t *testing.T) {
 }
 
 func TestC34_NEG1_DefaultContractGateIsEnforce(t *testing.T) {
-	cfg, _ := config.Load("", map[string]string{})
+	cfg, _ := config.Load("")
 
 	if cfg.ContractGate != config.StageEnforce {
 		t.Errorf("RED: config.Load(emptyEnv).ContractGate = %v, want StageEnforce (%v).\n"+

@@ -93,9 +93,10 @@ func TestBoundaryRun_StopsAtFirstFailedStepWithItsExitCode(t *testing.T) {
 		{"pr merge I/O failure", 2, exitIO, []string{"loop-stop", "pr"}},
 		{"sync-main refused", 4, exitRefused, []string{"loop-stop", "pr", boundaryRatchetVerb, "sync-main"}},
 		{"inbox curate I/O failure", 6, exitIO, []string{"loop-stop", "pr", boundaryRatchetVerb, "sync-main", queueApplyVerb, "inbox"}},
-		{"gc I/O failure", 8, exitIO, []string{"loop-stop", "pr", boundaryRatchetVerb, "sync-main", queueApplyVerb, "inbox", "quality", "gc"}},
-		{"brake release fails", 9, exitRefused, []string{"loop-stop", "pr", boundaryRatchetVerb, "sync-main", queueApplyVerb, "inbox", "quality", "gc", "loop-stop"}},
-		{"log dir switch fails", 10, exitIO, []string{"loop-stop", "pr", boundaryRatchetVerb, "sync-main", queueApplyVerb, "inbox", "quality", "gc", "loop-stop", boundaryLogVerb}},
+		{"selfheal propose I/O failure", 8, exitIO, []string{"loop-stop", "pr", boundaryRatchetVerb, "sync-main", queueApplyVerb, "inbox", "selfheal", "selfheal"}},
+		{"gc I/O failure", 10, exitIO, []string{"loop-stop", "pr", boundaryRatchetVerb, "sync-main", queueApplyVerb, "inbox", "selfheal", "selfheal", "quality", "gc"}},
+		{"brake release fails", 11, exitRefused, []string{"loop-stop", "pr", boundaryRatchetVerb, "sync-main", queueApplyVerb, "inbox", "selfheal", "selfheal", "quality", "gc", "loop-stop"}},
+		{"log dir switch fails", 12, exitIO, []string{"loop-stop", "pr", boundaryRatchetVerb, "sync-main", queueApplyVerb, "inbox", "selfheal", "selfheal", "quality", "gc", "loop-stop", boundaryLogVerb}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -124,14 +125,17 @@ func TestBoundaryRun_FullFakeRunEndsWithDetachedPidAndBootVerdict(t *testing.T) 
 	if rc != 0 {
 		t.Fatalf("rc = %d, want 0 for a run whose every step succeeds\n%s%s", rc, stdout.String(), stderr.String())
 	}
-	want := []string{"loop-stop", "pr", boundaryRatchetVerb, "sync-main", queueApplyVerb, "inbox", "quality", "gc", "loop-stop", boundaryLogVerb, "loop"}
+	want := []string{"loop-stop", "pr", boundaryRatchetVerb, "sync-main", queueApplyVerb, "inbox", "selfheal", "selfheal", "quality", "gc", "loop-stop", boundaryLogVerb, "loop"}
 	if got := fake.verbs(); !slices.Equal(got, want) {
-		t.Fatalf("dispatched %v, want the eleven steps %v in order", got, want)
+		t.Fatalf("dispatched %v, want the thirteen steps %v in order", got, want)
 	}
 	if curate := fake.calls[5].args; !slices.Equal(curate[:2], []string{"curate", "--apply"}) || !slices.Contains(curate, "--project-root") {
 		t.Errorf("the inbox step = %v, want curate --apply with the project root", curate)
 	}
-	stop, merge, release, logStep, launch := fake.calls[0].args, fake.calls[1].args, fake.calls[8].args, fake.calls[9].args, fake.calls[10].args
+	if detect, propose := fake.calls[6].args, fake.calls[7].args; detect[0] != "incidents" || propose[0] != "propose" || !slices.Contains(propose, "--project-root") {
+		t.Errorf("the selfheal steps = %v and %v, want incidents and then propose with the project root", detect, propose)
+	}
+	stop, merge, release, logStep, launch := fake.calls[0].args, fake.calls[1].args, fake.calls[10].args, fake.calls[11].args, fake.calls[12].args
 	if !slices.Contains(stop, "--wait") || slices.Contains(stop, "--release") {
 		t.Errorf("first loop-stop args %v: want --wait and no --release", stop)
 	}

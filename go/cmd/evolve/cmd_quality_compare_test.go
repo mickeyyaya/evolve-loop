@@ -52,8 +52,8 @@ func TestQualityReport_TheWaveScopeReadsShipRateDeadlineRateAndPackages(t *testi
 
 	rc, stdout := runQualityReport(t, env, root)
 
-	if rc != 0 || !strings.Contains(stdout, "10 reading(s)") || !strings.Contains(stdout, "3 warning(s)") {
-		t.Fatalf("rc %d stdout %q, want 10 readings (PQ1 x2, PQ4 x4, CQ2 x2, CQ1 tree and wave) and three no-data warnings: wave 2 shipped nothing and the fixture tree has no function", rc, stdout)
+	if rc != 0 || !strings.Contains(stdout, "20 reading(s)") || !strings.Contains(stdout, "6 warning(s)") {
+		t.Fatalf("rc %d stdout %q, want 20 readings (PQ1 x2, PQ4 x4, CQ2 x2, CQ1 tree and wave, PQ5 x10) and six no-data warnings: wave 2 shipped nothing (CQ2 and three PQ5 costs) and the fixture tree has no function", rc, stdout)
 	}
 	byWindow := map[string]map[string]string{}
 	for _, e := range channelEvents(t, root, "quality.reading") {
@@ -83,16 +83,16 @@ func TestWaveQualityReaders_AMissingWaveRecordIsASourceAbsentWarning(t *testing.
 
 	rc, stdout := runQualityReport(t, env, root)
 
-	if rc != 0 || !strings.Contains(stdout, "0 reading(s), 0 breach(es), 5 warning(s)") {
-		t.Errorf("rc %d stdout %q, want five warnings and exit 0", rc, stdout)
+	if rc != 0 || !strings.Contains(stdout, "0 reading(s), 0 breach(es), 6 warning(s)") {
+		t.Errorf("rc %d stdout %q, want six warnings and exit 0", rc, stdout)
 	}
 	for _, e := range channelEvents(t, root, "quality.breach") {
 		if e.Code != "QUALITY_SOURCE_ABSENT" || !(strings.HasSuffix(e.Fields["source"], filepath.Join(".evolve", "waves")) || strings.HasSuffix(e.Fields["source"], "go")) {
 			t.Errorf("warning %+v, want QUALITY_SOURCE_ABSENT naming .evolve/waves or the go tree", e)
 		}
 	}
-	if got := len(qualityScopes["wave"]); got != 5 {
-		t.Errorf("the production wave scope has %d readers, want PQ1, PQ4, CQ2 and the two CQ1 readers", got)
+	if got := len(qualityScopes["wave"]); got != 6 {
+		t.Errorf("the production wave scope has %d readers, want PQ1, PQ4, CQ2, the two CQ1 readers and PQ5", got)
 	}
 }
 

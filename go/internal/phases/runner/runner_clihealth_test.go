@@ -172,8 +172,11 @@ func TestRun_NonBenchablePatternDoesNotBench(t *testing.T) {
 	}
 }
 
-func TestRun_EnvDisableSkipsBenchAndDemotion(t *testing.T) {
+func TestRun_PolicyDisableSkipsBenchAndDemotion(t *testing.T) {
 	root := writeFallbackProfile(t, "evolve-auditor", "codex-tmux", []string{"claude-tmux"})
+	if err := os.WriteFile(filepath.Join(root, ".evolve", "policy.json"), []byte(`{"cli_health":{"enabled":false}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	now := time.Now()
 	_ = (clihealth.NewStore(root, nil)).Bench(clihealth.Entry{
 		Family: "codex", Reason: "rate_limit", BenchedAt: now, BenchedUntil: now.Add(time.Hour),
@@ -185,12 +188,11 @@ func TestRun_EnvDisableSkipsBenchAndDemotion(t *testing.T) {
 	if _, err := r.Run(context.Background(), core.PhaseRequest{
 		ProjectRoot: root,
 		Workspace:   t.TempDir(),
-		Env:         map[string]string{"EVOLVE_CLI_HEALTH": "0"},
 	}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	if len(sb.calls) == 0 || sb.calls[0] != "codex-tmux" {
-		t.Fatalf("dispatch order %v — EVOLVE_CLI_HEALTH=0 must disable demotion", sb.calls)
+		t.Fatalf("dispatch order %v — cli_health.enabled false must disable demotion", sb.calls)
 	}
 }
 

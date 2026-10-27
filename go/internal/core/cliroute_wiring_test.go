@@ -103,7 +103,7 @@ func TestContractEscalation_ARefusedRouteIsLoudOnBothPaths(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}
-	cr := &cycleRun{o: routedOrchestrator(r), req: CycleRequest{ProjectRoot: root}, envSnap: map[string]string{"EVOLVE_BUILDER_CLI": "codex-tmux"}}
+	cr := &cycleRun{o: routedOrchestrator(r), req: CycleRequest{ProjectRoot: root}, envSnap: map[string]string{"EVOLVE_CLI": "codex-tmux"}}
 	var got string
 	dispatch := captureStderr(t, func() { got = cr.contractDispatchCLI(PhaseBuild, "") })
 	if got != "claude-tmux" || !strings.Contains(dispatch, "phase build: contract escalation has no route") || !strings.Contains(dispatch, "outside the allowed set") {

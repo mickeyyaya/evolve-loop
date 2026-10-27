@@ -21,7 +21,7 @@ func TestRealTreeRoutingOrder_AnchoredPhasesFollowTheirAnchors(t *testing.T) {
 	if _, err := os.Stat(registryPath); err != nil {
 		t.Skipf("phase registry not present: %v", err)
 	}
-	cfg, _ := config.Load(registryPath, map[string]string{})
+	cfg, _ := config.Load(registryPath)
 	if len(cfg.Order) == 0 {
 		t.Skip("registry produced no order")
 	}

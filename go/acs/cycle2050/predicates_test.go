@@ -74,7 +74,7 @@ func digestAfter(t *testing.T, ws string, completed ...string) router.RoutingSig
 func productionPolicy(t *testing.T, root string) router.PhasePolicy {
 	t.Helper()
 	registry := config.RegistryPath(root)
-	cfg, _ := config.New().Load(registry, nil)
+	cfg, _ := config.New().Load(registry)
 	builtin, err := phasespec.Load(registry)
 	if err != nil {
 		t.Fatalf("load the builtin registry: %v", err)

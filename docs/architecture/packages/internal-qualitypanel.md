@@ -4,13 +4,13 @@
 
 ## Purpose
 
-`internal/qualitypanel` turns one quality index reading into Signal Center events. It holds the registry of the 21 indexes and the statistics: Wilson 95%, a cluster bootstrap of the median and the MDE. It also holds the breach test and the codes of module `quality`. It computes no index from a data source. The readers of components Q2 to Q10 do that and hand it a `Reading`.
+`internal/qualitypanel` turns one quality index reading into Signal Center events. It holds the registry of the 22 indexes and the statistics: Wilson 95%, a cluster bootstrap of the median and the MDE. It also holds the breach test and the codes of module `quality`. It computes no index from a data source. The readers of components Q2 to Q10 do that and hand it a `Reading`.
 
 "Quality index" here is not the review-score grammar of `internal/qualityindex`. That package scores one review. This package measures the loop.
 
 ## Design
 
-- **The registry.** `Indexes` returns a copy of the 21 entries of spec §1: id, name, unit, direction, threshold, `NMin` and baseline. An entry with a baseline has the default stage `report`. The others start at `shadow`. PQ3 and JQ4 have no threshold by design, so they are not `Breachable`.
+- **The registry.** `Indexes` returns a copy of the 22 entries of spec §1: id, name, unit, direction, threshold, `NMin` and baseline. An entry with a baseline has the default stage `report`. The others start at `shadow`. PQ3 and JQ4 have no threshold by design, so they are not `Breachable`.
 - **The stage.** `StageFor` takes the policy overrides and falls back to the registry default. The overrides come only from `.evolve/policy.json` `quality.indexes.<id>.stage`. The policy decode is strict: an unknown key, an unknown id or a stage outside `shadow`, `report` and `gate` refuses the policy.
 - **The breach test.** `Judge` returns `no_data` for n = 0 and `ok` for an index with no threshold. Otherwise it compares the whole interval with the threshold. A breach needs the whole interval on the bad side. An interval across the threshold is `inconclusive`. A breach under `NMin` is also `inconclusive`.
 - **The events.** `Events` returns one `quality.reading` (INFO, no code) with 11 field keys, under the `MaxFields` limit of 12, so `Normalize` drops none. At stage `report` or `gate`, a breach adds one `quality.breach` (WARN, `QUALITY_<ID>_BREACH`). A reading with n = 0 adds a `quality.warning` (`QUALITY_VACUOUS_DENOMINATOR`). `SourceWarning` builds the warning for an absent or unreadable source.

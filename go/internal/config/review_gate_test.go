@@ -3,14 +3,14 @@ package config
 import "testing"
 
 func TestLoad_ReviewGate_DefaultsOff(t *testing.T) {
-	cfg, _ := Load("", map[string]string{})
+	cfg, _ := Load("")
 	if cfg.ReviewGate != StageOff {
 		t.Errorf("default ReviewGate=%v, want StageOff", cfg.ReviewGate)
 	}
 }
 
 func TestLoad_ReviewGate_IgnoresRemovedEnvOverride(t *testing.T) {
-	cfg, ws := Load("", map[string]string{"EVOLVE_REVIEW_GATE": "advisory"})
+	cfg, ws := Load("")
 	if cfg.ReviewGate != StageOff {
 		t.Errorf("removed env override changed ReviewGate; got %v", cfg.ReviewGate)
 	}

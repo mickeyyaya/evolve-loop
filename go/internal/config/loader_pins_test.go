@@ -9,17 +9,6 @@ import (
 	"testing"
 )
 
-func kitchenSinkEnv() map[string]string {
-	return map[string]string{
-		"EVOLVE_SANDBOX":                 "bogus",
-		"EVOLVE_MAX_OPTIONAL_INSERTIONS": "x",
-		"EVOLVE_COMMIT_EVIDENCE":         "advisory",
-		"EVOLVE_MANDATORY_PHASES":        "scout",
-		"EVOLVE_DYNAMIC_ROUTING":         "off",
-		"EVOLVE_USE_PHASE_REGISTRY":      "false",
-	}
-}
-
 func kitchenSinkRegistry() string { return filepath.Join("testdata", "kitchen_sink_registry.json") }
 
 func readGolden(t *testing.T, name string) []byte {
@@ -49,19 +38,14 @@ func codesOf(ws []Warning) []string {
 }
 
 func TestLoad_WarningOrderIsRegistryThenEnvThenSpineThenInert(t *testing.T) {
-	reg := writeRegistry(t, `{"config":{"dynamic_routing":"bogus"},"phases":[{"name":"plan-review","enabled":"on"}]}`)
-	_, ws := Load(reg, map[string]string{
-		"EVOLVE_PHASE_IO":         "bogus",
-		"EVOLVE_DYNAMIC_ROUTING":  "off",
-		"EVOLVE_MANDATORY_PHASES": "scout,build",
-	})
+	reg := writeRegistry(t, `{"config":{"dynamic_routing":"bogus","mandatory_phases":["scout","build"]},"phases":[{"name":"plan-review","enabled":"on"}]}`)
+	_, ws := Load(reg)
 	want := []string{
 		`dynamic_routing="bogus" unknown, defaulting to off`,
-		`EVOLVE_PHASE_IO="bogus" unknown, defaulting to off`,
 		`mandatory_phases omits audit+ship — audit-before-ship guarantee weakened`,
 		`phase "plan-review" is force-enabled but the router is off/shadow (dynamic_routing<advisory) and it is not in the static state machine — the enable is inert; set dynamic_routing>=advisory or remove the enable`,
 	}
-	wantCodes := []string{"unknown-value", "unknown-value", "weak-spine", "inert-phase-enable"}
+	wantCodes := []string{"unknown-value", "weak-spine", "inert-phase-enable"}
 	if got := codesOf(ws); !reflect.DeepEqual(got, wantCodes) {
 		t.Fatalf("codes %v, want %v", got, wantCodes)
 	}
@@ -75,7 +59,8 @@ func TestLoad_WarningOrderIsRegistryThenEnvThenSpineThenInert(t *testing.T) {
 func TestValidateInertEnables_FiresForForceEnabledNonSpinePhasesInSortedOrder(t *testing.T) {
 	reg := writeRegistry(t, `{"config":{"mandatory_phases":["scout","build","audit","ship","custom-mandatory"]},
 		"phases":[{"name":"zz-custom","enabled":"on"},{"name":"plan-review","enabled":"on"},{"name":"triage","enabled":"on"},{"name":"custom-mandatory","enabled":"on"}]}`)
-	_, ws := Load(reg, map[string]string{"EVOLVE_DYNAMIC_ROUTING": "shadow"})
+	loaded, _ := Load(reg)
+	_, ws := withKnobs(loaded, func(ps *RoutingKnobs) { ps.DynamicRouting = "shadow" })
 	var got []string
 	for _, w := range ws {
 		if w.Code == "inert-phase-enable" {
@@ -89,17 +74,17 @@ func TestValidateInertEnables_FiresForForceEnabledNonSpinePhasesInSortedOrder(t 
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("inert warnings %q, want %q (sorted; the spine phase, the mandatory phase and the Off phases silent)", got, want)
 	}
-	if _, ws := Load(reg, map[string]string{"EVOLVE_DYNAMIC_ROUTING": "advisory"}); hasWarning(ws, "inert-phase-enable") {
+	if _, ws := withKnobs(loaded, func(ps *RoutingKnobs) { ps.DynamicRouting = "advisory" }); hasWarning(ws, "inert-phase-enable") {
 		t.Errorf("at advisory the router consults PhaseEnable — nothing is inert: %+v", ws)
 	}
 }
 
-func TestApplyEnv_ConditionalMandatoryParseErrorWarns(t *testing.T) {
-	cfg, ws := Load("/nonexistent/phase-registry.json", map[string]string{"EVOLVE_CONDITIONAL_MANDATORY": "tdd:nonsense"})
+func TestApplyPolicyKnobs_ConditionalMandatoryParseErrorWarns(t *testing.T) {
+	cfg, ws := withKnobs(defaults(), func(ps *RoutingKnobs) { ps.ConditionalMandatory = map[string]string{"tdd": "nonsense"} })
 	if got := codesOf(ws); !reflect.DeepEqual(got, []string{"unknown-value"}) {
 		t.Fatalf("codes %v, want exactly one unknown-value", got)
 	}
-	if want := `EVOLVE_CONDITIONAL_MANDATORY="tdd:nonsense": no comparison operator in "nonsense"`; ws[0].Message != want {
+	if want := `conditional_mandatory[tdd]="nonsense": no comparison operator in "nonsense"`; ws[0].Message != want {
 		t.Errorf("message %q, want %q", ws[0].Message, want)
 	}
 	if !reflect.DeepEqual(cfg.Conditional["tdd"], DefaultTddRule()) {
@@ -108,7 +93,7 @@ func TestApplyEnv_ConditionalMandatoryParseErrorWarns(t *testing.T) {
 }
 
 func TestParseMode_UnknownWarnsAndDefaultsToLLM(t *testing.T) {
-	cfg, ws := Load("/nonexistent/phase-registry.json", map[string]string{"EVOLVE_ROUTING_MODE": "bogus"})
+	cfg, ws := withKnobs(defaults(), func(ps *RoutingKnobs) { ps.RoutingMode = "bogus" })
 	if cfg.Mode != ModeDynamicLLM {
 		t.Errorf("Mode = %v, want ModeDynamicLLM", cfg.Mode)
 	}
@@ -119,7 +104,7 @@ func TestParseMode_UnknownWarnsAndDefaultsToLLM(t *testing.T) {
 
 func TestApplyRegistry_PhaseWithoutNameIsSkipped(t *testing.T) {
 	reg := writeRegistry(t, `{"config":{},"phases":[{"name":"","enabled":"on"},{"name":"scout"}]}`)
-	cfg, _ := Load(reg, map[string]string{})
+	cfg, _ := Load(reg)
 	if !reflect.DeepEqual(cfg.Order, []string{"scout"}) {
 		t.Errorf("Order = %v, want [scout]", cfg.Order)
 	}
@@ -130,7 +115,7 @@ func TestApplyRegistry_PhaseWithoutNameIsSkipped(t *testing.T) {
 
 func TestLoad_RegistryConditionalMergesOverTheTddDefault(t *testing.T) {
 	reg := writeRegistry(t, `{"config":{"conditional_mandatory":{"plan-review":"triage.unified_size!="}},"phases":[]}`)
-	cfg, ws := Load(reg, map[string]string{})
+	cfg, ws := Load(reg)
 	if len(ws) != 0 {
 		t.Fatalf("unexpected warnings: %+v", ws)
 	}
@@ -144,8 +129,8 @@ func TestLoad_RegistryConditionalMergesOverTheTddDefault(t *testing.T) {
 
 func TestLoad_MalformedRegistryFallsBackToTheCompiledBaseline(t *testing.T) {
 	reg := writeRegistry(t, `{`)
-	cfg, _ := Load(reg, map[string]string{})
-	baseline, _ := Load("/nonexistent/phase-registry.json", map[string]string{})
+	cfg, _ := Load(reg)
+	baseline, _ := Load("/nonexistent/phase-registry.json")
 	if !reflect.DeepEqual(cfg, baseline) {
 		t.Errorf("a malformed registry must resolve to the compiled baseline:\n got %+v\nwant %+v", cfg, baseline)
 	}
@@ -155,7 +140,7 @@ func TestLoad_MalformedRegistryFallsBackToTheCompiledBaseline(t *testing.T) {
 }
 
 func TestLoad_RealRegistry_MatchesTheGolden(t *testing.T) {
-	cfg, ws := Load(filepath.Join("testdata", "frozen_registry.json"), map[string]string{})
+	cfg, ws := Load(filepath.Join("testdata", "frozen_registry.json"))
 	if len(ws) != 0 {
 		t.Fatalf("the frozen registry loads clean: %+v", ws)
 	}
@@ -165,7 +150,7 @@ func TestLoad_RealRegistry_MatchesTheGolden(t *testing.T) {
 }
 
 func TestLoad_BuiltinDefaults_MatchTheGoldenThroughTheDefaultReader(t *testing.T) {
-	cfg, ws := Load("/nonexistent/phase-registry.json", nil)
+	cfg, ws := Load("/nonexistent/phase-registry.json")
 	if len(ws) != 0 {
 		t.Fatalf("an absent registry is silent: %+v", ws)
 	}
@@ -175,14 +160,14 @@ func TestLoad_BuiltinDefaults_MatchTheGoldenThroughTheDefaultReader(t *testing.T
 }
 
 func TestLoad_KitchenSink_WarningsMatchTheGolden(t *testing.T) {
-	_, ws := Load(kitchenSinkRegistry(), kitchenSinkEnv())
+	_, ws := Load(kitchenSinkRegistry())
 	type cm struct{ Code, Message string }
 	got := make([]cm, 0, len(ws))
 	for _, w := range ws {
 		got = append(got, cm{w.Code, w.Message})
 	}
-	if len(got) != 12 {
-		t.Fatalf("the kitchen sink yields twelve warnings, got %d: %+v", len(got), got)
+	if len(got) != 9 {
+		t.Fatalf("the kitchen sink yields nine warnings, got %d: %+v", len(got), got)
 	}
 	if g, want := marshalIndented(t, got), readGolden(t, "kitchen_sink_warnings.golden.json"); string(g) != string(want) {
 		t.Fatalf("the warning sequence drifted from the pre-split golden:\n%s", diffLines(string(want), string(g)))
@@ -203,24 +188,12 @@ func TestLoadDomain_ReadErrorOtherThanAbsenceIsReturned(t *testing.T) {
 
 func TestApplyRegistry_DeliverableKindHoleWarnsButKeepsTheSpec(t *testing.T) {
 	reg := writeRegistry(t, `{"config":{"deliverable_kinds":{"document":{"root":"","min_options":0}}},"phases":[]}`)
-	cfg, ws := Load(reg, map[string]string{})
+	cfg, ws := Load(reg)
 	if len(ws) != 1 || ws[0].Message != `deliverable_kinds[document]: root and min_options must be set (root="", min_options=0)` {
 		t.Fatalf("warnings %+v, want the one hole warning", ws)
 	}
 	if _, ok := cfg.DeliverableKinds["document"]; !ok {
 		t.Errorf("the spec is assigned before it is validated: %+v", cfg.DeliverableKinds)
-	}
-}
-
-func TestLoad_UsePhaseRegistry_OnlyTheLiteralZeroDisables(t *testing.T) {
-	reg := writeRegistry(t, `{"config":{},"phases":[{"name":"scout"}]}`)
-	if cfg, _ := Load(reg, map[string]string{"EVOLVE_USE_PHASE_REGISTRY": "0"}); len(cfg.Order) != 0 {
-		t.Errorf(`"0" disables the registry: Order = %v`, cfg.Order)
-	}
-	for _, v := range []string{"false", "off", ""} {
-		if cfg, _ := Load(reg, map[string]string{"EVOLVE_USE_PHASE_REGISTRY": v}); len(cfg.Order) != 1 {
-			t.Errorf("%q keeps the registry on (Q1): Order = %v", v, cfg.Order)
-		}
 	}
 }
 

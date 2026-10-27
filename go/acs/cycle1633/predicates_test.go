@@ -161,7 +161,7 @@ func digestTriage(t *testing.T, ws string) router.RoutingSignals {
 func realRegistryConfig(t *testing.T) config.RoutingConfig {
 	t.Helper()
 	root := acsassert.RepoRoot(t)
-	cfg, _ := config.Load(filepath.Join(root, "docs", "architecture", "phase-registry.json"), map[string]string{})
+	cfg, _ := config.Load(filepath.Join(root, "docs", "architecture", "phase-registry.json"))
 	return cfg
 }
 

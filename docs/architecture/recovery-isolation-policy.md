@@ -23,7 +23,7 @@ canary treated any setup error as verified outer confinement.
 
 The bridge now shares `profiles.SandboxConfig` with the canonical loader.
 `sandbox.enabled=true` requires a successfully constructed OS sandbox wrapper
-for the launch. An explicit `EVOLVE_SANDBOX=off` remains an operator opt-out,
+for the launch. The audited `--sandbox-off=<reason>` parameter remains an operator opt-out,
 reported as UNCONFINED. An absent or disabled profile sandbox does not introduce
 a new mandatory requirement; an explicit launch requirement still applies.
 

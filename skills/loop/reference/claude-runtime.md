@@ -11,7 +11,7 @@ User: /evo:loop 5 polish improve dispatcher
   ↓ via .claude-plugin/plugin.json → skills/loop/SKILL.md
 
 Skill activates → STRICT MODE: execute exactly one Bash command:
-  "${EVOLVE_GO_BIN:-<plugin_root>/go/bin/evolve}" loop 5 polish "improve dispatcher"
+  "<plugin_root>/go/bin/evolve" loop 5 polish "improve dispatcher"
 
   ↓
 
@@ -30,7 +30,7 @@ the CLI; `evolve cli-routing explain <agent>` prints the chain.
 The claude-tmux driver runs Claude Code in a tmux pane, and the claude-p
 driver runs `claude -p`. Both run under the OS sandbox, sandbox-exec (macOS)
 or bwrap (Linux), when it applies — see internal/bridge/sandbox_wrap.go
-(sandbox.ShouldWrap, gated by EVOLVE_SANDBOX) and driver_tmux_boot.go.
+(sandbox.ShouldWrap, gated by policy.json sandbox.mode) and driver_tmux_boot.go.
 The claude-p driver also applies --allowedTools / --disallowedTools / etc.
 (The legacy bash CLI adapters under adapters/*.sh were removed in the
 script→Go migration; the bridge now dispatches natively.)
@@ -53,7 +53,7 @@ Optional but recommended:
 
 | Variable | Purpose |
 |---|---|
-| `EVOLVE_SANDBOX=on` | `EVOLVE_SANDBOX=on` warns when the sandbox-exec or bwrap wrap cannot apply. A profile that requires the sandbox fails closed. `off` is the host opt-out. The values are `auto` (the default), `on` and `off`. |
+| `sandbox.mode` (policy.json) | `on` warns when the sandbox-exec or bwrap wrap cannot apply. A profile that requires the sandbox fails closed. The values are `auto` (the default) and `on`. The host opt-out is the audited `--sandbox-off=<reason>` parameter of `evolve loop` and `evolve cycle run`. |
 
 ## Trust boundary
 

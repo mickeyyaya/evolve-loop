@@ -65,7 +65,7 @@ func runQualityCompare(env qualityEnv, args []string, stdout, stderr io.Writer) 
 	}
 	center, closeCenter := env.newCenter(opts.root, paths.EvolveDirOf(opts.root), stderr)
 	defer closeCenter()
-	t := qualityTally{center: center}
+	t := qualityTally{sink: center.Emit}
 	t.publish([]qualitypanel.Reading{c.Reading(opts.index + " a:" + opts.a.Name + "|b:" + opts.b.Name)}, t.stages(opts.root))
 	if opts.json {
 		return printVerbJSON("quality compare", result, stdout, stderr)

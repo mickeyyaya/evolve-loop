@@ -127,9 +127,9 @@ func TestRun_BypassShipVerify_FlagSilentlyIgnored_NoBridge(t *testing.T) {
 	res, _ := runShip(t, repo, Options{
 		Class:         ClassCycle,
 		CommitMessage: "bypass: flag silently ignored",
+		AutoConfirm:   "test",
 		Env: map[string]string{
 			"EVOLVE_BYPASS_SHIP_VERIFY": "1",
-			"EVOLVE_SHIP_AUTO_CONFIRM":  "1",
 			"EVOLVE_BYPASS_ROLE_GATE":   "1",
 			"EVOLVE_BYPASS_SHIP_GATE":   "1",
 			"EVOLVE_BYPASS_PREFIX_GATE": "1",

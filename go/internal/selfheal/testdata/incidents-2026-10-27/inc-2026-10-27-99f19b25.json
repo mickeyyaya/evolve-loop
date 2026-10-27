@@ -1,0 +1,24 @@
+{
+  "schema": "evolve.incident/1",
+  "id": "inc-2026-10-27-99f19b25",
+  "fingerprint": "repair-loop:retro-minting-files-through-inbox-add-lane",
+  "class": "repair-loop",
+  "subject": "retro-minting-files-through-inbox-add-lane",
+  "severity": "INCIDENT",
+  "tier": "T0",
+  "state": "open",
+  "sources": [
+    "cycle:1983",
+    "cycle:2015",
+    "cycle:2026",
+    "cycle:2035"
+  ],
+  "recurrence": 4,
+  "reopened": 0,
+  "attempts": 0,
+  "repro_test": "",
+  "summary": "repair rounds did not converge to a ship for item retro-minting-files-through-inbox-add-lane",
+  "opened_at": "2026-10-27T10:30:56.21104+08:00",
+  "last_seen_at": "2026-10-26T18:29:01Z",
+  "closed_at": null
+}

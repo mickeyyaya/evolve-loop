@@ -27,7 +27,7 @@ func benchUnsupported(t *testing.T, cli, tier string) (map[string]clihealth.Entr
 		t.Fatal(err)
 	}
 	var logs []string
-	bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: cli, Tier: tier, DispatchStart: unsupportedNow().Add(-time.Minute), Env: map[string]string{}},
+	bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: cli, Tier: tier, DispatchStart: unsupportedNow().Add(-time.Minute)},
 		unsupportedNow, func(f string, a ...any) { logs = append(logs, fmt.Sprintf(f, a...)) })
 	return clihealth.NewStore(root, unsupportedNow).Active(), logs
 }
@@ -71,8 +71,8 @@ func TestApplyCLIHealthBench_AModelBenchClearsWhenTheTierResolvesToAnotherModel(
 		return llmroute.Plan{Candidates: []string{"codex-tmux", "claude-tmux"}, Tiers: []string{tier}}
 	}
 
-	deep := bridgechain.ApplyCLIHealthBench(root, "audit", plan("deep"), map[string]string{}, unsupportedNow, nil)
-	balanced := bridgechain.ApplyCLIHealthBench(root, "audit", plan("balanced"), map[string]string{}, unsupportedNow, nil)
+	deep := bridgechain.ApplyCLIHealthBench(root, "audit", plan("deep"), unsupportedNow, nil)
+	balanced := bridgechain.ApplyCLIHealthBench(root, "audit", plan("balanced"), unsupportedNow, nil)
 
 	if deep.Candidates[0] != "claude-tmux" {
 		t.Errorf("deep chain = %v: codex deep resolves to the benched gpt-5.6-sol, so it goes last", deep.Candidates)

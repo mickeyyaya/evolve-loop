@@ -42,8 +42,8 @@ func TestDefaultPlanResolver_AWorktreeLaunchDropsACLIWithoutToolUseWhoeverNamedI
 	}{
 		{"the profile cli", "ollama-tmux", []string{"claude-tmux"}, func(*core.BridgeRequest) {}, []string{"claude-tmux"}},
 		{"the profile cli_fallback", "claude-tmux", []string{"ollama-tmux", "agy-tmux"}, func(*core.BridgeRequest) {}, []string{"claude-tmux", "agy-tmux"}},
-		{"an EVOLVE_BUILDER_CLI override", "claude-tmux", []string{"agy-tmux"},
-			func(r *core.BridgeRequest) { r.Env = map[string]string{"EVOLVE_BUILDER_CLI": "ollama-tmux"} }, []string{"agy-tmux"}},
+		{"an EVOLVE_CLI override", "claude-tmux", []string{"agy-tmux"},
+			func(r *core.BridgeRequest) { r.Env = map[string]string{"EVOLVE_CLI": "ollama-tmux"} }, []string{"agy-tmux"}},
 		{"the caller cli", "claude-tmux", []string{"agy-tmux"}, func(r *core.BridgeRequest) { r.CLI = "ollama-tmux" }, []string{"claude-tmux", "agy-tmux"}},
 	}
 	for _, tc := range cases {

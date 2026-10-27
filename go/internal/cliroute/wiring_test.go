@@ -294,8 +294,9 @@ func TestBuild_ABypassTableThatCannotListTheProfilesIsRefused(t *testing.T) {
 
 func TestResolve_ADeclaredRefusalIsErrRefusedAndALegacyPinErrorIsNot(t *testing.T) {
 	block := policy.CLIRouting{CLIs: []string{"agy", "claude"}, Default: []string{"agy", "claude"}}
-	r := mustBuild(t, cliroute.Setup{Policy: routingPolicy(block), Catalog: syntheticCatalog(), Profiles: syntheticProfiles(t), Host: cliroute.Host{LookPath: everyBinary()}})
-	if _, err := r.Resolve(cliroute.Request{Agent: "scout", Env: map[string]string{"EVOLVE_SCOUT_CLI": "codex-tmux"}}); !errors.Is(err, cliroute.ErrRefused) {
+	r := mustBuild(t, cliroute.Setup{Policy: routingPolicy(block), Catalog: syntheticCatalog(), Profiles: syntheticProfiles(t), Host: cliroute.Host{LookPath: everyBinary()},
+		Options: []cliroute.CompileOption{override("scout", llmroute.AgentOverride{CLI: "codex-tmux"})}})
+	if _, err := r.Resolve(cliroute.Request{Agent: "scout"}); !errors.Is(err, cliroute.ErrRefused) {
 		t.Fatalf("a declared refusal carries ErrRefused: %v", err)
 	}
 	legacy := mustBuild(t, cliroute.Setup{Policy: policy.Policy{Pins: map[string]policy.Pin{"audit": {CLI: "agy"}}}, Catalog: syntheticCatalog(), Profiles: syntheticProfiles(t)})

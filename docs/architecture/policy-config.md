@@ -116,6 +116,61 @@ defaults, but each safety floor fails closed to `enforce`: `docs_floor.stage`,
 }
 ```
 
+## Routing and run knobs (X18c)
+
+These keys replace the class (b) environment names of [control-flags.md](control-flags.md#classes-of-the-readers-outside-the-registry) (X18c, ADR-0156 I-16). The pipeline reads them at each cycle start. An absent key keeps the value of the phase registry or the compiled default. When a former name is set in the environment, the cycle start prints one `[policy] WARN` that names the key below.
+
+```jsonc
+{
+  "router": {
+    "dynamic_routing": "advisory",
+    "routing_mode": "llm",
+    "conditional_mandatory": { "plan-review": "cycle_size==large" },
+    "max_optional_insertions": 4
+  },
+  "gates": { "phase_io": "enforce" },
+  "cli_health": { "enabled": true },
+  "bridge": { "max_concurrent": { "claude-tmux": 2 } },
+  "workflow": { "intent_delta": false }
+}
+```
+
+| Key | Values | Effect | Former name |
+|---|---|---|---|
+| `router.dynamic_routing` | `off`, `shadow`, `advisory`, `enforce` | The rollout stage of the routing advisor. An unknown word gives `off` and a warning. | `EVOLVE_DYNAMIC_ROUTING` |
+| `router.routing_mode` | `llm`, `static` (and their aliases) | The routing brain. An unknown word gives `llm` and a warning. | `EVOLVE_ROUTING_MODE` |
+| `router.conditional_mandatory` | a map of phase to `field op value`, joined with `&&` | It adds or replaces a conditional spine rule of the phase registry. A rule for `tdd` replaces the whole registry rule. | `EVOLVE_CONDITIONAL_MANDATORY` |
+| `router.max_optional_insertions` | an integer, `0` allowed | The cap on the optional phases that the router inserts. | `EVOLVE_MAX_OPTIONAL_INSERTIONS` |
+| `gates.phase_io` | `off`, `shadow`, `advisory`, `enforce` | The stage of the typed phase I/O (ADR-0050). | `EVOLVE_PHASE_IO` |
+| `cli_health.enabled` | `true`, `false` (absent means `true`) | `false` turns off the bench layer: the bench writer, the demotion, the canary and the usage probe. | `EVOLVE_CLI_HEALTH` |
+| `bridge.max_concurrent` | a map of driver to an integer | The cap on the sessions of one driver at a time. Absent or `0` means no cap. | `EVOLVE_CLI_MAX_CONCURRENT_<FAM>` |
+| `workflow.intent_delta` | `true`, `false` | `true` runs the intent phase in delta mode. | `EVOLVE_INTENT_DELTA` |
+
+`router.ApplyPolicy` is the one projection of these keys. The cycle, `router.PolicyForProject`, `evolve phase verify` and the dashboard all read through it. `EVOLVE_COMMIT_EVIDENCE` got no key, because no code consumed its stage.
+
+The other class (b) names have a home that is not a key here. `mandatory_phases` and `pins` are in the schema above. `evolve loop --cli <agent>=<driver>` and `--model <agent>=<tier>` set a per-run override, and `evolve worktree --lane` sets the lane. The agent profile holds `system_prompt` and `permission_mode`.
+
+## Sandbox mode and credential opt-ins (X18d)
+
+These keys replace class (c) environment names of [control-flags.md](control-flags.md#classes-of-the-readers-outside-the-registry) (X18d, ADR-0156 I-16).
+
+```jsonc
+{
+  "sandbox": { "mode": "on" },
+  "bridge": { "allow_anthropic_base_url": true, "allow_openai_api_key": true }
+}
+```
+
+| Key | Values | Effect | Former name |
+|---|---|---|---|
+| `sandbox.mode` | `auto` (the default), `on` | `on` prints a WARN when the inner sandbox cannot apply. The parse refuses `off` and each other word. | `EVOLVE_SANDBOX` |
+| `bridge.allow_anthropic_base_url` | `true`, `false` | `true` passes `ANTHROPIC_BASE_URL` to each LLM cell. Without the key, the Claude drivers refuse to start when it is set. | `BRIDGE_ALLOW_ANTHROPIC_BASE_URL` |
+| `bridge.allow_openai_api_key` | `true`, `false` | `true` passes `OPENAI_API_KEY` to each LLM cell. Without the key, the codex drivers refuse to start when it is set. | `BRIDGE_ALLOW_OPENAI_API_KEY` |
+
+At each start of the bridge adapter of a cycle, each credential opt-in that is on emits one `CONTROL_BYPASS_USED` signal with the actor `policy.json`. The signal does not depend on the stage `isolation.i2.stage`.
+
+A policy key cannot turn the sandbox off. The operator turns it off for one run with `evolve loop --sandbox-off=<reason>` or `evolve cycle run --sandbox-off=<reason>`. The run writes one `control_bypass` ledger entry and one `CONTROL_BYPASS_USED` signal, and a launch inside an LLM cell refuses the parameter.
+
 ## KB recall and lesson novelty (`research`)
 
 Two knobs over the lessons corpus (`.evolve/instincts/lessons`), both resolved by
@@ -231,6 +286,7 @@ The block sets the stage of the retry ladder and the size of the digest of a rai
 |---|---|---|
 | `stage` | `shadow`: each retry path asks the decider, records `LADDER_DECISION` and dispatches as before. `enforce`: the choice of the decider runs. The checked-in policy sets `shadow`. | `shadow` |
 | `digest_tokens` | the token budget of the digest of a raised try, from 64 to 16000. 0 means the default. | 2000 |
+| `audit_fix.stage` | the stage of the `audit_fix` rung, apart from `stage`. `off` declines the rung. `shadow` records the choice, and the handler writes its record and changes no file. `enforce` runs the handler. Another word fails the load. | `shadow` |
 | `audit_fix.max_files` | the most files that an `audit_fix` estimate can touch, from 0 to 50. 0 means the default. | 3 |
 | `audit_fix.max_lines` | the most estimated lines of an `audit_fix`, from 0 to 2000. 0 means the default. | 40 |
 | `audit_fix.max_code_lines` | the most estimated lines of production code, from 0 to 2000. It applies when `no_new_production_logic` is true. | 10 |

@@ -129,6 +129,10 @@ func TestDoctorEnvWarnings(t *testing.T) {
 		t.Fatalf("agy warnings = %v", w)
 	}
 	e2 := doctorEngine(map[string]string{"OPENAI_API_KEY": "o", "BRIDGE_ALLOW_OPENAI_API_KEY": "1"}, nil, 0, nil)
+	if w := e2.doctorEnvWarnings("codex-tmux"); len(w) != 1 {
+		t.Fatalf("the environment opt-in is retired; warnings = %v", w)
+	}
+	e2.deps.AllowOpenAIAPIKey = true
 	if w := e2.doctorEnvWarnings("codex-tmux"); len(w) != 0 {
 		t.Fatalf("codex allowed warnings = %v", w)
 	}

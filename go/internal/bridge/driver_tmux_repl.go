@@ -73,7 +73,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	resolvedPrompt := prep.resolvedPrompt
 	defer tmuxCleanup(ctx, deps, lp.name, lp.session, paneCapture{shared: prep.scrollbackFile, dispatch: prep.dispatchPaneFile, lines: prep.artifactScrollback}, lp.named)
 
-	human := humanActive(deps, cfg.HumanInput)
+	human := cfg.HumanInput
 	ar := newLaunchAutoResponder(cfg.Workspace, deps, lp, human)
 	ar.injectedPrompt = resolvedPrompt
 

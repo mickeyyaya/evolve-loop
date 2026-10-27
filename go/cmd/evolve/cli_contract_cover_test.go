@@ -38,7 +38,7 @@ func TestRunBoundaryJSON_RecordsEachStepAndKeepsTheFailedStepsCode(t *testing.T)
 		name          string
 		failAt, code  int
 		wantRC, steps int
-	}{{"each step passes", 0, 0, cliExitOK, 10}, {"the sync step fails", 3, 22, 22, 3}} {
+	}{{"each step passes", 0, 0, cliExitOK, 12}, {"the sync step fails", 3, 22, 22, 3}} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 			verbs := &fakeBoundaryVerbs{failAt: c.failAt, code: c.code}
@@ -48,7 +48,7 @@ func TestRunBoundaryJSON_RecordsEachStepAndKeepsTheFailedStepsCode(t *testing.T)
 			if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 				t.Fatalf("stdout %q: %v", stdout.String(), err)
 			}
-			if rc != c.wantRC || result.DryRun || len(result.Steps) != c.steps || len(result.Plan) != 10 || result.Steps[len(result.Steps)-1].OK != (c.failAt == 0) {
+			if rc != c.wantRC || result.DryRun || len(result.Steps) != c.steps || len(result.Plan) != 12 || result.Steps[len(result.Steps)-1].OK != (c.failAt == 0) {
 				t.Fatalf("rc %d result %+v, want rc %d and %d steps", rc, result, c.wantRC, c.steps)
 			}
 			if strings.Contains(stdout.String(), "fake-step") {

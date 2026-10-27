@@ -1,16 +1,12 @@
 package continuation
 
-import (
-	"fmt"
+import "errors"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
-)
-
-const OperatorConfirmEnv = "EVOLVE_OPERATOR_CONFIRM"
+var errNoOperatorAuthority = errors.New("releasing a continuation binding erases the lineage the defect-ledger gate reads as anti-tamper evidence, and needs operator authority: pass -operator")
 
 func RequireOperatorAuthority(operator bool) error {
-	if operator || envchain.Bool(OperatorConfirmEnv, nil, false) {
+	if operator {
 		return nil
 	}
-	return fmt.Errorf("releasing a continuation binding erases the lineage the defect-ledger gate reads as anti-tamper evidence, and needs operator authority: pass -operator, or set %s=1 in the environment", OperatorConfirmEnv)
+	return errNoOperatorAuthority
 }

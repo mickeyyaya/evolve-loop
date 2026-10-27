@@ -4,16 +4,15 @@ import (
 	"testing"
 )
 
-func TestBuildCycleEnv_SkipsNonEvolvePrefix(t *testing.T) {
+func TestCarriedEnv_SkipsNonEvolvePrefix(t *testing.T) {
 	t.Parallel()
-	cfg := loopConfig{Strategy: "balanced"}
 	osEnv := []string{
 		"PATH=/usr/bin",
 		"HOME=/Users/x",
 		"ANTHROPIC_API_KEY=sk-secret",
 		"EVOLVE_PROJECT_ROOT=/repo",
 	}
-	got := buildCycleEnv(cfg, osEnv)
+	got := carriedEnv(osEnv)
 	for k := range got {
 		switch k {
 		case "PATH", "HOME", "ANTHROPIC_API_KEY":
@@ -22,35 +21,15 @@ func TestBuildCycleEnv_SkipsNonEvolvePrefix(t *testing.T) {
 	}
 }
 
-func TestBuildCycleEnv_StrategyNotWrittenByDispatcher(t *testing.T) {
+func TestCarriedEnv_MalformedEnvIgnored(t *testing.T) {
 	t.Parallel()
-	cfg := loopConfig{Strategy: "harden"}
-	got := buildCycleEnv(cfg, nil)
-	if _, present := got["EVOLVE_STRATEGY"]; present {
-		t.Errorf("EVOLVE_STRATEGY must not be written by dispatcher; Strategy flows via Context[\"strategy\"]; got %q", got["EVOLVE_STRATEGY"])
-	}
-}
-
-func TestBuildCycleEnv_ResumeAndResetWriteNoEnvName(t *testing.T) {
-	t.Parallel()
-	got := buildCycleEnv(loopConfig{Strategy: "balanced", Resume: true, Reset: true}, nil)
-	for _, name := range []string{"EVOLVE_RESUME", "EVOLVE_RESET"} {
-		if _, present := got[name]; present {
-			t.Errorf("%s is a dead name that no code reads; buildCycleEnv must not write it; got=%v", name, got)
-		}
-	}
-}
-
-func TestBuildCycleEnv_MalformedEnvIgnored(t *testing.T) {
-	t.Parallel()
-	cfg := loopConfig{Strategy: "balanced"}
 	osEnv := []string{
 		"EVOLVE_NO_EQUALS",
 		"=EVOLVE_NAMELESS",
 		"EVOLVE_PLUGIN_ROOT",
 		"EVOLVE_PROJECT_ROOT=/repo",
 	}
-	got := buildCycleEnv(cfg, osEnv)
+	got := carriedEnv(osEnv)
 	if _, present := got["EVOLVE_PLUGIN_ROOT"]; present {
 		t.Errorf("a marker with no '=' must not reach the cycle env; got=%v", got)
 	}
@@ -83,7 +62,7 @@ func TestBuildCycleContext_EmptyGoalTextOmitsKey(t *testing.T) {
 	}
 }
 
-func TestBuildCycleEnv_CarriesOnlyTheMarkersAndTheControlsNotYetMoved(t *testing.T) {
+func TestCarriedEnv_CarriesOnlyTheMarkers(t *testing.T) {
 	t.Parallel()
 	osEnv := []string{
 		"EVOLVE_BYPASS_SHIP_GATE=1",
@@ -92,18 +71,17 @@ func TestBuildCycleEnv_CarriesOnlyTheMarkersAndTheControlsNotYetMoved(t *testing
 		"EVOLVE_ROUTING_MODE=static",
 		"EVOLVE_SANDBOX=off",
 		"EVOLVE_AUDITOR_CLI=claude-tmux",
+		"EVOLVE_AUDITOR_MODEL=opus",
 		"BRIDGE_ALLOW_BYPASS=1",
 		"BRIDGE_RUN_ID=r1",
 	}
-	got := buildCycleEnv(loopConfig{Strategy: "balanced"}, osEnv)
-	for _, name := range []string{"EVOLVE_BYPASS_SHIP_GATE", "EVOLVE_SANDBOX_FALLBACK_ON_EPERM", "BRIDGE_ALLOW_BYPASS", "BRIDGE_RUN_ID"} {
+	got := carriedEnv(osEnv)
+	for _, name := range []string{"EVOLVE_BYPASS_SHIP_GATE", "EVOLVE_SANDBOX_FALLBACK_ON_EPERM", "EVOLVE_SANDBOX", "BRIDGE_ALLOW_BYPASS", "BRIDGE_RUN_ID", "EVOLVE_ROUTING_MODE", "EVOLVE_AUDITOR_CLI", "EVOLVE_AUDITOR_MODEL"} {
 		if _, present := got[name]; present {
-			t.Errorf("%s of the parent reached the cycle env; only the pipeline markers and the controls not yet moved may", name)
+			t.Errorf("%s of the parent reached the cycle env; only the pipeline markers may", name)
 		}
 	}
-	for name, want := range map[string]string{"EVOLVE_PROJECT_ROOT": "/repo", "EVOLVE_ROUTING_MODE": "static", "EVOLVE_SANDBOX": "off", "EVOLVE_AUDITOR_CLI": "claude-tmux"} {
-		if got[name] != want {
-			t.Errorf("%s = %q, want %q: a marker or a control not yet moved must still reach the cycle", name, got[name], want)
-		}
+	if got["EVOLVE_PROJECT_ROOT"] != "/repo" {
+		t.Errorf("EVOLVE_PROJECT_ROOT = %q, want /repo: a marker must still reach the cycle", got["EVOLVE_PROJECT_ROOT"])
 	}
 }

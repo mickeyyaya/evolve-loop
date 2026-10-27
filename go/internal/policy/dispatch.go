@@ -111,6 +111,9 @@ type BridgePolicy struct {
 	PhaseArtifactTimeoutS map[string]int `json:"phase_artifact_timeout_s,omitempty"`
 	AnthropicBaseURL      string         `json:"anthropic_base_url,omitempty"`
 	ModelFailover         string         `json:"model_failover,omitempty"`
+	MaxConcurrent         map[string]int `json:"max_concurrent,omitempty"`
+	AllowAnthropicBaseURL bool           `json:"allow_anthropic_base_url,omitempty"`
+	AllowOpenAIAPIKey     bool           `json:"allow_openai_api_key,omitempty"`
 }
 
 const ModelFailoverStageOn = "on"
@@ -191,10 +194,13 @@ func (p Policy) QuotaResetConfig() QuotaResetConfig {
 }
 
 type CLIHealthConfig struct {
-	ProactiveProbe        bool `json:"proactive_probe,omitempty"`
-	UsageEvidenceTimeoutS int  `json:"usage_evidence_timeout_s,omitempty"`
-	UsageEvidenceTTLS     int  `json:"usage_evidence_ttl_s,omitempty"`
+	ProactiveProbe        bool  `json:"proactive_probe,omitempty"`
+	UsageEvidenceTimeoutS int   `json:"usage_evidence_timeout_s,omitempty"`
+	UsageEvidenceTTLS     int   `json:"usage_evidence_ttl_s,omitempty"`
+	Enabled               *bool `json:"enabled,omitempty"`
 }
+
+func (c CLIHealthConfig) On() bool { return c.Enabled == nil || *c.Enabled }
 
 const (
 	defaultUsageEvidenceTimeout = 2 * time.Minute

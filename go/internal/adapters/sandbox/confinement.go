@@ -20,7 +20,7 @@ func DetectNested(getenv func(string) string) bool {
 
 func ConfinementSatisfied(nested bool, mode string) (ok, optOut bool, reason string) {
 	if strings.TrimSpace(mode) == "off" {
-		return true, true, "EVOLVE_SANDBOX=off: host opt-out honoured — the phase runs UNCONFINED despite the sandbox requirement"
+		return true, true, "--sandbox-off: host opt-out honoured — the phase runs UNCONFINED despite the sandbox requirement"
 	}
 	if nested {
 		return false, false, "nested LLM-CLI session: inner sandbox unavailable; outer session is UNVERIFIED and does not satisfy mandatory profile restrictions"

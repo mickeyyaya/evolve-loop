@@ -1,6 +1,7 @@
 package policy_test
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -28,7 +29,7 @@ func TestRouterConfig_Resolution(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := tc.pol.RouterConfig(); got != tc.want {
+			if got := tc.pol.RouterConfig(); !reflect.DeepEqual(got, tc.want) {
 				t.Errorf("RouterConfig() = %+v, want %+v", got, tc.want)
 			}
 		})

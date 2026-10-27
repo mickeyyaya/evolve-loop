@@ -98,16 +98,15 @@ func verifyCommitGateAttestation(ctx context.Context, opts *Options, res *RunRes
 	return nil
 }
 
+var personaChecks = []func(phasecoherence.Options) ([]phasecoherence.Violation, error){phasecoherence.Check, phasecoherence.CheckArtifactNames}
+
 func runPersonaLint(ctx context.Context, opts *Options, res *RunResult) error {
 	if opts.BypassCommitGate {
 		res.Logs = append(res.Logs, "[ship] persona-lint: --bypass-commit-gate — persona lint skipped")
 		return nil
 	}
 
-	profileDir := opts.envStr("EVOLVE_PROFILE_DIR")
-	if profileDir == "" {
-		profileDir = filepath.Join(opts.ProjectRoot, ".evolve", "profiles")
-	}
+	profileDir := filepath.Join(opts.ProjectRoot, ".evolve", "profiles")
 
 	agentsDir := filepath.Join(opts.ProjectRoot, "agents")
 	if _, err := os.Stat(agentsDir); os.IsNotExist(err) {
@@ -119,32 +118,19 @@ func runPersonaLint(ctx context.Context, opts *Options, res *RunResult) error {
 		return nil
 	}
 
-	overrides := make(map[string]string)
-	if override := opts.envStr("EVOLVE_PERSONA_OVERRIDE"); override != "" {
-		parts := strings.SplitN(override, ":", 2)
-		if len(parts) == 2 {
-			path := parts[0]
-			name := parts[1]
-			overrides[name] = path
-		}
-	}
-
 	pcOpts := phasecoherence.Options{
 		AgentsFS:   os.DirFS(opts.ProjectRoot),
 		ProfilesFS: os.DirFS(profileDir),
-		Overrides:  overrides,
 	}
 
-	violations1, err := phasecoherence.Check(pcOpts)
-	if err != nil {
-		return err
+	var allViolations []phasecoherence.Violation
+	for _, check := range personaChecks {
+		violations, err := check(pcOpts)
+		if err != nil {
+			return err
+		}
+		allViolations = append(allViolations, violations...)
 	}
-	violations2, err := phasecoherence.CheckArtifactNames(pcOpts)
-	if err != nil {
-		return err
-	}
-
-	allViolations := append(violations1, violations2...)
 
 	var errMsgs []string
 	for _, v := range allViolations {

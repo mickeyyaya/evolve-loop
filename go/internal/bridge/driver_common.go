@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/agentclass"
 )
 
 func resolveBinary(deps Deps, defaultName string) string {
@@ -61,7 +63,10 @@ func preparePrompt(cfg *Config, deps Deps) (string, error) {
 		content = strings.ReplaceAll(content, "$CHALLENGE_TOKEN", tok)
 	}
 	content = strings.ReplaceAll(content, "$ARTIFACT_PATH", cfg.Artifact)
-	return content, nil
+	if cfg.Agent == "" {
+		return content, nil
+	}
+	return strings.TrimRight(content, "\n") + "\n\n" + agentclass.Brief(cfg.Workspace), nil
 }
 
 func ensureDirs(cfg *Config) error {

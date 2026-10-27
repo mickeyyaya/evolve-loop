@@ -43,8 +43,8 @@ func TestResolveDispatchPlan_AWorktreePhaseDropsACLIWithoutToolUseWhoeverNamedIt
 	}{
 		{"the profile cli", "ollama-tmux", []string{"claude-tmux"}, policy.Policy{}, func(*core.PhaseRequest) {}, []string{"claude-tmux"}},
 		{"the profile cli_fallback", "claude-tmux", []string{"ollama-tmux", "agy-tmux"}, policy.Policy{}, func(*core.PhaseRequest) {}, []string{"claude-tmux", "agy-tmux"}},
-		{"an EVOLVE_SCOUT_CLI override", "claude-tmux", []string{"agy-tmux"}, policy.Policy{},
-			func(r *core.PhaseRequest) { r.Env = map[string]string{"EVOLVE_SCOUT_CLI": "ollama-tmux"} }, []string{"agy-tmux"}},
+		{"an EVOLVE_CLI override", "claude-tmux", []string{"agy-tmux"}, policy.Policy{},
+			func(r *core.PhaseRequest) { r.Env = map[string]string{"EVOLVE_CLI": "ollama-tmux"} }, []string{"agy-tmux"}},
 		{"the advisor overlay", "claude-tmux", []string{"agy-tmux"}, policy.Policy{},
 			func(r *core.PhaseRequest) { r.ModelRoutingCLI = "ollama" }, []string{"claude-tmux", "agy-tmux"}},
 		{"a policy pin", "claude-tmux", []string{"agy-tmux"}, policy.Policy{Pins: map[string]policy.Pin{"scout": {CLI: "ollama"}}},

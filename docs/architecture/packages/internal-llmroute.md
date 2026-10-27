@@ -11,10 +11,10 @@
 - **One resolver.** Before this package the runner stitched the decision together from two paths: `runner.resolveCLIChain` picked the chain, and `resolvellm.Resolve` (called only to expand `"auto"`) computed a CLI that the runner then discarded. `Resolve` folds both into one `Plan`. The advisor reuses the same seam when it mints a phase.
 - **Precedence.**
   - A `policy.Pin` overrides everything below it.
-  - CLI primary: `EVOLVE_<AGENT>_CLI` > `EVOLVE_CLI` > `profile.cli` > `claude-tmux`. The env half is one exported rule, `EnvPrimary(agent, env) (cli, source)`, which the cmd/evolve start guard (`overrideRefusals`) reads too, so the guard and the dispatch never disagree on which key won (2026-10-07, the CLI routing table's L2 fix round; `env_primary_test.go`).
+  - CLI primary: the `--cli` override (`AgentOverride.CLI`, source `--cli <agent>`) > `EVOLVE_CLI` > `profile.cli` > `claude-tmux`. `EnvPrimary(env)` reads `EVOLVE_CLI` only, and the start guard `overrideRefusals` of `cmd/evolve` uses the same two sources. So the guard and the dispatch agree on the source that won. `IsOperatorChoice` holds for both sources. No code reads `EVOLVE_<AGENT>_CLI` since X18c.
   - CLI chain: the primary, then `profile.cli_fallback`, trimmed, deduped and in declared order.
   - Triggers: `profile.cli_fallback_on_exit`, else the default set below.
-  - Model: `EVOLVE_<AGENT>_MODEL` > `profile.model_tier_default` > the phase's default model. A result of `"auto"` is expanded through the injected `AutoModel`, and stays `"auto"` when the expander declines.
+  - Model: the `--model` override (`AgentOverride.Model`) > `profile.model_tier_default` > the phase's default model. A result of `"auto"` is expanded through the injected `AutoModel`, and stays `"auto"` when the expander declines.
   - Tiers: `TierChain(model, envelope.Min)`.
 - **Leaf package.** It imports `envchain`, `policy`, `profiles` and the standard library only, never the runner, `resolvellm`, `core` or `bridge`. `resolvellm` stays an independent API that the runner bridges in through the `AutoModel` closure, so `"auto"` expands exactly as it did before this package existed.
 - **`AutoModel` is keyed by phase; env and profile lookups are keyed by agent.** The asymmetry comes from the removed `llm_config.json` layer, which was phase-keyed. `TestAutoModel_NamedSeamExpandsAuto` and `TestResolve_AutoExpandedViaSeam` pin it.

@@ -23,8 +23,8 @@ func (codexTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int,
 		return rc, nil
 	}
 	if v, ok := lookupEnv(deps, "OPENAI_API_KEY"); ok && v != "" {
-		if allow, _ := lookupEnv(deps, "BRIDGE_ALLOW_OPENAI_API_KEY"); allow != "1" {
-			fmt.Fprintln(deps.Stderr, "[codex-tmux] credential-isolation guard: OPENAI_API_KEY set without BRIDGE_ALLOW_OPENAI_API_KEY=1")
+		if !deps.AllowOpenAIAPIKey {
+			fmt.Fprintln(deps.Stderr, "[codex-tmux] credential-isolation guard: OPENAI_API_KEY set without policy bridge.allow_openai_api_key")
 			return ExitCostLeak, nil
 		}
 	}

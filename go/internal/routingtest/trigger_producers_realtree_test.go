@@ -13,7 +13,7 @@ func TestTheCheckedInRegistry_EveryTriggerFieldHasAProducer(t *testing.T) {
 	t.Parallel()
 	root := filepath.Join("..", "..", "..")
 	registry := config.RegistryPath(root)
-	cfg, _ := config.New().Load(registry, nil)
+	cfg, _ := config.New().Load(registry)
 	builtin, err := phasespec.Load(registry)
 	if err != nil {
 		t.Fatalf("load the builtin registry: %v", err)

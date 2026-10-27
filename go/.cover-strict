@@ -3,6 +3,7 @@
 # and the go.yml step "line-coverage strict" read this file, so the two surfaces
 # cannot drift. Packages listed here ship with the coverage they declare; a
 # regression fails the tree. Blank lines and `#` comments are ignored.
+./internal/bypass 100
 ./internal/signalcenter 100
 ./internal/core/outcome 100
 ./internal/deliverable/gatesignal 100
@@ -98,9 +99,13 @@
 ./internal/isolation 100
 ./internal/faketmux 100
 ./internal/dispatchcred 100
+./internal/agentclass 100
 ./internal/inputindex 100
 ./internal/cli/contextcmd 100
 ./internal/guidance 100
+./internal/auditfix 100
 ./internal/heldproposal 100
 ./internal/launchrecord 100
 ./internal/integration 100
+./internal/cyclespend 100
+./internal/selfheal 100
