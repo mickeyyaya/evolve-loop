@@ -323,6 +323,53 @@ func TestDocsSteLint_AnEnvironmentRootWinsOverTheGitRoot(t *testing.T) {
 	if code != 0 || !strings.HasPrefix(stdout, "docs/b.md:1 STE-WORD") {
 		t.Fatalf("code %d, stdout %q; want the EVOLVE_WORKTREE_ROOT tree checked", code, stdout)
 	}
+
+	explicit := steFixtureRoot(t, map[string]string{"docs/c.md": "We utilize it.\n"})
+	code, stdout, _ = runDocsCLI("ste-lint", "--project-root", explicit)
+
+	if code != 0 || !strings.HasPrefix(stdout, "docs/c.md:1 STE-WORD") {
+		t.Fatalf("code %d, stdout %q; want the --project-root tree checked over EVOLVE_WORKTREE_ROOT", code, stdout)
+	}
+}
+
+func TestDocsSteLint_ChangedFromALinkedWorktreeChecksTheWorktreeAndNotTheProjectRoot(t *testing.T) {
+	repo := gittest.Fixture(t)
+	writeSteFiles(t, repo.Dir, map[string]string{stelint.StandardPath: steFixtureStandard, "docs/a.md": "Clean.\n"})
+	repo.Git("add", "-A")
+	repo.Git("commit", "-q", "-m", "base")
+	base := repo.Git("rev-parse", "HEAD")
+	worktree := filepath.Join(t.TempDir(), "cycle")
+	repo.Git("worktree", "add", "-q", "-b", "cycle", worktree, base)
+	writeSteFiles(t, worktree, map[string]string{"docs/a.md": "We utilize it.\n"})
+	chdirForTest(t, filepath.Join(worktree, "docs"))
+	t.Setenv("EVOLVE_PROJECT_ROOT", repo.Dir)
+	t.Setenv("EVOLVE_WORKTREE_ROOT", "")
+
+	code, stdout, stderr := runDocsCLI("ste-lint", "--changed", base)
+
+	want := "docs/a.md:1 STE-WORD replace \"utilize\" with \"use\"\nste-lint: 1 finding(s) in 1 file(s); 1 file(s) checked\n"
+	if code != 0 || stdout != want {
+		t.Fatalf("code %d, stdout %q, stderr %q; want the worktree doc checked: %q", code, stdout, stderr, want)
+	}
+}
+
+func TestDocsSteLint_OutsideAGitTreeTheProjectRootEnvironmentIsTheRoot(t *testing.T) {
+	dir := steFixtureRoot(t, map[string]string{"docs/a.md": "Clean.\n"})
+	project := steFixtureRoot(t, map[string]string{"docs/b.md": "Go via it.\n"})
+	chdirForTest(t, dir)
+	relProject, err := filepath.Rel(dir, project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("EVOLVE_PROJECT_ROOT", relProject)
+	t.Setenv("EVOLVE_WORKTREE_ROOT", "")
+	t.Setenv("GIT_CEILING_DIRECTORIES", filepath.Dir(dir))
+
+	code, stdout, stderr := runDocsCLI("ste-lint")
+
+	if code != 0 || !strings.HasPrefix(stdout, "docs/b.md:1 STE-WORD") {
+		t.Fatalf("code %d, stdout %q, stderr %q; want the EVOLVE_PROJECT_ROOT tree checked", code, stdout, stderr)
+	}
 }
 
 func TestDocsSteLint_OutsideAGitTreeWithoutARootIsAnError(t *testing.T) {

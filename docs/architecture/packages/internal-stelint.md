@@ -47,7 +47,7 @@
 
 | Consumer | What it does |
 |---|---|
-| `evolve docs ste-lint` (`cmd/evolve/cmd_docs.go`, `cmd_docs_report.go`) | checks the scope, the named paths, or the files that changed since a base ref, and prints `path:line RULE message` lines and a summary line, or JSON. It finds the root from `--project-root`, the root variables or the git top level, never from the current directory. |
+| `evolve docs ste-lint` (`cmd/evolve/cmd_docs.go`, `cmd_docs_report.go`) | checks the scope, the named paths, or the files that changed since a base ref, and prints `path:line RULE message` lines and a summary line, or JSON. It finds the root in this order: `--project-root`, `EVOLVE_WORKTREE_ROOT`, the git top level of the current directory, then `EVOLVE_PROJECT_ROOT`. Thus a check in a cycle worktree lints that worktree, not the main checkout. |
 | the build handoff floor (`steLintFloor` in `internal/core/ste_floor.go`, from `docsFloorChecks`) | checks the changed documents in scope. At `shadow` it prints `[ste-lint] WARN: <n> finding(s) in <m> file(s) (first: path:line RULE)`. At `enforce` it returns a floor failure |
 
 `steLintFloorLines` returns the lines and the finding, and `steLintFloor` prints the lines. A changed document that the floor cannot read gets its own `[ste-lint] WARN: <path> was not checked` line. At the stage `shadow`, the floor counts every finding in a changed document, not only the findings that the change adds.
