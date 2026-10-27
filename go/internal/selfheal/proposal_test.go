@@ -25,8 +25,14 @@ func TestProposal_RecordsTheIncidentTheDiagnosisAndTheProposedAction(t *testing.
 	if p.Schema != ProposalSchema || p.IncidentID != inc.ID || p.Class != ClassStall || p.Tier != TierPipeline || p.Stage != "shadow" || p.RunLabel != "agent-selfheal-orchestrator-x" {
 		t.Fatalf("header %+v", p)
 	}
-	if p.State != ProposalProposed || p.Diagnosis == nil || p.Action == nil || p.Action.Kind != phasecontract.ActionHaltAndEscalate {
-		t.Fatalf("a low diagnosis is recorded with the halt-and-escalate action, got %+v", p)
+	if p.State != ProposalProposed || p.Diagnosis == nil || p.Action == nil || p.Action.Kind != phasecontract.ActionHaltAndEscalate ||
+		!strings.Contains(p.Action.Params.Reason, "low") || !strings.Contains(p.Action.Params.Reason, p.Diagnosis.Hypothesis) || p.Diagnosis.Action.Kind != phasecontract.ActionOpenRepairItem {
+		t.Fatalf("a low diagnosis is recorded with the halt-and-escalate action and keeps its own action, got %+v", p)
+	}
+	medium := lowDiagnosis(inc.ID)
+	medium.Confidence = phasecontract.ConfidenceMedium
+	if got := NewProposal(inc, "shadow", "", t0).WithDiagnosis(medium); got.Action.Kind != phasecontract.ActionOpenRepairItem {
+		t.Errorf("a medium diagnosis proposes its own action, got %+v", got.Action)
 	}
 	refused := NewProposal(inc, "shadow", "", t0).Refused(errors.New("schema"))
 	failed := NewProposal(inc, "shadow", "", t0).Failed(errors.New("dispatch"))
@@ -39,31 +45,34 @@ func TestPending_DiagnosesEachOpenIncidentOnceUntilItChangesAndCapsThePass(t *te
 	t.Parallel()
 	incidents := liveRecords(t)
 	done := map[string]Proposal{}
-	first := Pending(incidents, done, 2)
+	first := Pending(incidents, done, PassLimits{Max: 2, RetryAt: t0})
 	if len(first) != 2 || first[0].Severity != "INCIDENT" || first[1].Severity != "INCIDENT" {
 		t.Fatalf("the pass takes the INCIDENT records first, got %v", ids(first))
 	}
 	for _, inc := range first {
 		done[inc.ID] = NewProposal(inc, "shadow", "", t0)
 	}
-	if again := Pending(incidents, done, 8); len(again) != 6 || slices.ContainsFunc(again, func(i Incident) bool { _, ok := done[i.ID]; return ok }) {
+	if again := Pending(incidents, done, PassLimits{Max: 8, RetryAt: t0}); len(again) != 6 || slices.ContainsFunc(again, func(i Incident) bool { _, ok := done[i.ID]; return ok }) {
 		t.Fatalf("a diagnosed incident that did not change waits, got %v", ids(again))
 	}
 	changed := slices.Clone(incidents)
 	i := slices.IndexFunc(changed, func(inc Incident) bool { return inc.ID == first[0].ID })
 	changed[i].Recurrence++
-	if got := Pending(changed, done, 8); !slices.ContainsFunc(got, func(inc Incident) bool { return inc.ID == first[0].ID }) {
+	if got := Pending(changed, done, PassLimits{Max: 8, RetryAt: t0}); !slices.ContainsFunc(got, func(inc Incident) bool { return inc.ID == first[0].ID }) {
 		t.Errorf("an incident that recurred after its diagnosis is diagnosed again, got %v", ids(got))
 	}
 	failed := map[string]Proposal{first[1].ID: NewProposal(first[1], "shadow", "", t0).Failed(errors.New("x"))}
-	if got := Pending(incidents, failed, 8); !slices.ContainsFunc(got, func(inc Incident) bool { return inc.ID == first[1].ID }) {
-		t.Errorf("a failed run is tried again, got %v", ids(got))
+	if got := Pending(incidents, failed, PassLimits{Max: 8, RetryAt: t0}); !slices.ContainsFunc(got, func(inc Incident) bool { return inc.ID == first[1].ID }) {
+		t.Errorf("a failed run is tried again after its backoff, got %v", ids(got))
+	}
+	if got := Pending(incidents, failed, PassLimits{Max: 8, RetryAt: t0.Add(-time.Hour)}); slices.ContainsFunc(got, func(inc Incident) bool { return inc.ID == first[1].ID }) {
+		t.Errorf("a failed run waits for its backoff, got %v", ids(got))
 	}
 	closed := slices.Clone(incidents)
 	for k := range closed {
 		closed[k].State = StateClosed
 	}
-	if got := Pending(closed, map[string]Proposal{}, 8); len(got) != 0 {
+	if got := Pending(closed, map[string]Proposal{}, PassLimits{Max: 8, RetryAt: t0}); len(got) != 0 {
 		t.Errorf("a closed incident needs no diagnosis, got %v", ids(got))
 	}
 }

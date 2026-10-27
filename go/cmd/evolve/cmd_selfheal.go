@@ -17,6 +17,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/selfheal"
+	"github.com/mickeyyaya/evolve-loop/go/internal/shipjournal"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wave"
 )
@@ -27,7 +28,6 @@ const (
 	selfhealCIFields = "databaseId,headBranch,status,conclusion,attempt,createdAt,updatedAt"
 	selfhealCILimit  = "200"
 	selfhealGHWait   = 60 * time.Second
-	shipJournalFile  = "ship-journal.jsonl"
 )
 
 const (
@@ -44,6 +44,7 @@ type selfhealEnv struct {
 	now       func() time.Time
 	gh        func(ctx context.Context, root string, args ...string) (string, error)
 	declared  func(family string) bool
+	families  func() []string
 	newCenter func(root, evolveDir string, console io.Writer) (*signalcenter.Center, func())
 }
 
@@ -59,7 +60,7 @@ type selfhealReport struct {
 }
 
 func runSelfheal(args []string, _ io.Reader, stdout, stderr io.Writer) int {
-	return runSelfhealWith(selfhealEnv{agent: runAgentCommand, now: time.Now, gh: ghOutput, declared: bridge.UsageWindowsDeclared, newCenter: newSelfhealCenter}, args, stdout, stderr)
+	return runSelfhealWith(selfhealEnv{agent: runAgentCommand, now: time.Now, gh: ghOutput, declared: bridge.UsageWindowsDeclared, families: bridge.InteractiveFamilies, newCenter: newSelfhealCenter}, args, stdout, stderr)
 }
 
 func newSelfhealCenter(root, evolveDir string, console io.Writer) (*signalcenter.Center, func()) {
@@ -141,7 +142,7 @@ func detectIncidents(env selfhealEnv, root string, cfg policy.HealingDetectorPol
 
 func gatherIncidentEvidence(env selfhealEnv, root string, cfg policy.HealingDetectorPolicy, now time.Time) ([]selfheal.Observation, selfheal.TreeVerifier, []string, error) {
 	evolveDir := paths.EvolveDirOf(root)
-	since := now.Add(-time.Duration(cfg.WindowHours) * time.Hour)
+	since := now.Add(-hours(cfg.WindowHours))
 	events, err := selfheal.LoadSignals(paths.EventChannelsRoot(evolveDir), selfhealChannels, since)
 	if err != nil {
 		return nil, selfheal.TreeVerifier{}, nil, err
@@ -168,7 +169,7 @@ func gatherIncidentEvidence(env selfhealEnv, root string, cfg policy.HealingDete
 }
 
 func cycleObservations(evolveDir string, limit int) ([]selfheal.Observation, []string) {
-	shipped, err := selfheal.LoadShipped(filepath.Join(evolveDir, shipJournalFile))
+	shipped, err := selfheal.LoadShipped(shipjournal.Path(evolveDir))
 	if err != nil {
 		return nil, []string{"the cycle rules did not run: " + err.Error()}
 	}

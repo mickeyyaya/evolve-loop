@@ -29,14 +29,22 @@ The notes of the index name the evidence that it does not hold. Do not look for 
 
 ## The action catalog
 
-| `kind` | Required params | Optional params | Use it when |
-|---|---|---|---|
-| `retry-with-variation` | `item`, `variation` (`model`, `tier` or `prompt-seed`) | none | one task failed, and a different try can pass |
-| `reroute-family` | `item`, `family` | none | one family fails on the item, and another family can do it |
-| `quarantine-item` | `item` | `reason` | one inbox item causes the incident again and again |
-| `revert-last-landing` | `sha` (hex, 7 to 40 characters) | none | main is red after a landing of the loop |
-| `open-repair-item` | `files` (paths in the repository), `repro` | none | the pipeline code has a defect |
-| `halt-and-escalate` | none | `reason` | no other action is safe |
+| `kind` | Required params | Optional params | Use it when | The pipeline refuses it when |
+|---|---|---|---|---|
+| `retry-with-variation` | `item`, `variation` (`model`, `tier` or `prompt-seed`) | none | one task failed, and a different try can pass | the item is not a pending inbox item, an earlier retry of the incident used the same variation, or the incident is T0 |
+| `reroute-family` | `item`, `family` (an installed CLI family, for example `agy`) | none | one family fails on the item, and another family can do it | the item is not a pending inbox item, the family is not installed, or the incident is T0 |
+| `quarantine-item` | `item` | `reason` | one inbox item causes the incident again and again | the item is not a pending inbox item, or it is not the subject of the incident |
+| `revert-last-landing` | `sha` (hex, 7 to 40 characters) | none | main is red after a landing of the loop | main is not red, the commit is not a landing of the loop in the window, or the incident is T0 |
+| `open-repair-item` | `files` (paths in the repository), `repro` | none | the pipeline code has a defect | a file does not exist |
+| `halt-and-escalate` | none | `reason` | no other action is safe | never |
+
+The pipeline also refuses a repair in these cases:
+
+- The repair budget of the tier is spent.
+- The breaker of the incident class is open.
+- Two repairs of the incident failed.
+
+The second refusal of one incident sends it to the operator.
 
 A command or a free text action is not in the catalog. The pipeline refuses it.
 
