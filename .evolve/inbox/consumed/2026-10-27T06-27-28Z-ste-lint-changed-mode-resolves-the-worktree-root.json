@@ -1,0 +1,31 @@
+{
+  "acceptance": [
+    "A red test runs ste-lint --changed from a linked worktree whose doc differs from the main checkout, with EVOLVE_PROJECT_ROOT set to the main checkout, and gets the worktree finding.",
+    "Outside a git tree EVOLVE_PROJECT_ROOT is still the root.",
+    "100% coverage on steLintRoot; guard bundle green."
+  ],
+  "consumed": {
+    "at": "2026-10-27T09:57:09Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "landed in PR #1199 through the wave-144 boundary batch #1206 (merge fb1280de0)"
+  },
+  "created_at": "2026-10-27T06:27:28Z",
+  "deps": [],
+  "files": [
+    "go/cmd/evolve/cmd_docs.go",
+    "go/cmd/evolve/cmd_docs_test.go",
+    "docs/architecture/packages/internal-stelint.md"
+  ],
+  "fix": "steLintRoot (go/cmd/evolve/cmd_docs.go) resolves --project-root, then EVOLVE_WORKTREE_ROOT, then the git top level of the current directory, and uses EVOLVE_PROJECT_ROOT only outside a git tree.",
+  "id": "ste-lint-changed-mode-resolves-the-worktree-root",
+  "kind": "pipeline-repair",
+  "origin": "console",
+  "priority": "P1",
+  "priority_class": "correctness",
+  "route": "console",
+  "source": "console, 2026-10-27, wave-143 failure triage",
+  "summary": "In a build pane the root of `evolve docs ste-lint --changed` fell back to EVOLVE_PROJECT_ROOT (the main checkout), because the pane has no EVOLVE_WORKTREE_ROOT. The builder self-check linted the wrong tree and passed, and the floor then failed the build (cycles 2049, 2051).",
+  "title": "evolve docs ste-lint resolves the root from the git worktree of the current directory before EVOLVE_PROJECT_ROOT",
+  "weight": 0.8
+}

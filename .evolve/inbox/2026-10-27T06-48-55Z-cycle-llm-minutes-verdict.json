@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "Red test first: a fixture FAIL cycle with a floor rejection at minute 30 and 20 more minutes gives fail point 30, waste 20, ratio 0.6.",
+    "A PASS cycle gives minutes to ship and no fail point.",
+    "evolve wave status (or the quality panel) lists the per-cycle values and the wave median.",
+    "The doc of the measure is updated in STE."
+  ],
+  "created_at": "2026-10-27T06:48:55Z",
+  "deps": [
+    "cost-per-shipped-cycle-measure"
+  ],
+  "files": [
+    "go/internal/cyclespend/cyclespend.go",
+    "go/internal/wavemeasure/cost.go"
+  ],
+  "fix": "From llm-calls.ndjson and the ledger, compute per cycle: LLM minutes to verdict; for a FAIL, the fail point (the first blocking signal: floor rejection, audit FAIL, gate red) and the LLM minutes after it; fail_fast_ratio = minutes up to the fail point / total. Write it into the cycle result and show it per wave next to the L1-L8 baseline.",
+  "id": "cycle-llm-minutes-verdict",
+  "kind": "feature",
+  "notes": "Builds on #1184 (cyclespend Sum, wavemeasure cost) in batch PR #1198.",
+  "origin": "console",
+  "priority": "P1",
+  "priority_class": "performance",
+  "source": "console, 2026-10-27, operator: \"make LLM [minutes] the evaluation on the cycle result; it should fail fast and deliver faster; if not, something is blocking the pipeline; use side indexes\". Extends ADR-0158 item 1 (docs/plans/cost-aware-repair-2026-10.md); baseline dev/console-notes/llm-minutes-baseline-2026-10-27.md",
+  "summary": "The operator evaluates a cycle by LLM minutes: a PASS must deliver fast and a FAIL must fail fast. Today only LLM minutes per shipped cycle exist (ADR-0158 item 1). Wave 143: all 7 FAIL cycles were decided at the build floor but each one spent its correction after that point.",
+  "title": "Each cycle result carries LLM minutes to verdict, the fail point, the waste after it and a fail-fast ratio",
+  "weight": 0.8
+}

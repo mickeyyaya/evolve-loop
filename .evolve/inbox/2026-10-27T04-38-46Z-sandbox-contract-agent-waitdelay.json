@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Red test first: a contract row whose agent leaves a daemon child that holds stdout returns within 15 s, not at the package timeout.",
+    "The tmux -L row passes 5 runs in a row with -count=1 and the integration tag.",
+    "No row leaves a tmux server alive after the test."
+  ],
+  "created_at": "2026-10-27T04:38:46Z",
+  "deps": [],
+  "files": [
+    "go/internal/bridge/sandbox_contract_integration_test.go"
+  ],
+  "fix": "Set cmd.WaitDelay on the command in contractHost.agent so Wait returns after the context ends even when a grandchild holds the pipe. Kill the private tmux -L server of the row in the row cleanup.",
+  "id": "sandbox-contract-agent-waitdelay",
+  "injected_by": "console-operator-session",
+  "kind": "test",
+  "notes": "Test-only change. The tripwire signal sender stays.",
+  "origin": "console",
+  "priority": "P2",
+  "priority_class": "stability",
+  "source": "console, 2026-10-27, CI run on PR #1193 (macOS attempt 1)",
+  "summary": "CI macOS on PR #1193 timed out in TestAgentSandboxContract/start_a_private_tmux_server_(-L). contractHost.agent (go/internal/bridge/sandbox_contract_integration_test.go:369) calls CombinedOutput under a 10 s context with no cmd.WaitDelay. The agent starts a daemon tmux -L server that keeps the output pipe open, so Wait blocks until the 20 minute package timeout. A rerun was green.",
+  "title": "The sandbox contract test agent call has a WaitDelay, so a daemon tmux server in the agent cannot hang the package for 20 minutes",
+  "weight": 0.5
+}
