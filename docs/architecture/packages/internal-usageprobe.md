@@ -21,6 +21,16 @@ The probe is opt-in (`cli_health.proactive_probe`, compiled default off; this pr
 
   The package holds no tmux and no manifests, so the tests run with neither.
 - **One probe per family, concurrently.** `Run` probes every family that has no active bench, in parallel. It returns when all have answered or the context ends. An interrupt wins: no bench and no log line is written after it, and in-flight probes are abandoned.
+- **A bounded round** (since 2026-10-27). `Prober.Timeout` bounds the round. A zero `Timeout` sets no bound. At the bound, `Run` returns and abandons each probe that has not answered. A family whose probe fails or times out gets one `WARN` line, and the probe benches nothing for it:
+  - `[usage-probe] WARN agy: usage probe failed: <cause>; nothing benched`;
+  - `[usage-probe] WARN agy: no usage read within <Timeout>; nothing benched`.
+
+  A `probeRound` holds the families that have not answered, and the interrupt context. Each answer and the bound take the round's lock, and the first one reports the family. A family therefore never gets two `WARN` lines. The answers are judged in parallel, outside the lock. At the bound, `Run` waits only for the started judgements (local reads and writes), so no line or bench is written after `Run` returns. Pinned by these tests in `bounded_test.go`:
+  - `TestProber_Run_AFailedProbeBenchesNothingAndLogsOneWarn` and `TestProber_Run_AFamilyWithoutAUsageControlIsNotAWarn`;
+  - `TestProber_Run_AProbeThatIgnoresItsDeadlineIsOneWarnAndRunReturns`, `TestProber_Run_AProbeThatHonoursItsDeadlineIsAlwaysOneWarn` and `TestProbeOne_AProbeThatAnswersPastTheBoundBeforeTheRoundClosesIsOneWarn`;
+  - `TestProber_Run_WaitsForAJudgementThatStartedBeforeTheBound` and `TestProber_Run_AnAnswerAfterTheBoundWritesNothing`.
+
+  `TestProber_Run_AProbeThatHonoursItsDeadlineIsAlwaysOneWarn` depends on a race. A round that judges with the probe context fails it in 10 of 10 runs with `-race`. Without `-race`, it fails in about 5 of 10 runs (measured 2026-10-27).
 - **One reader for every CLI** (since 2026-10-06). `quotastate.ReadWindows(spec, pane, now)` reads any usage screen whose layout the CLI's manifest declares in `controls.usage.windows`. A spec names:
   - how a window is found: a label line, optionally inside a section such as agy's group header;
   - how its value is read: used or remaining, with remaining normalized to used;

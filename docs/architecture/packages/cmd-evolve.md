@@ -67,6 +67,8 @@ The cycle's production composition root, `wireOrchestratorDeps` in `cmd_cycle.go
     - `Classify` is the whole-family `exhausted_regex` (`bridge.ClassifyExhausted`), the fallback for a screen with no window.
 
     An exhausted family-scoped window benches its own routing family until its reset: `agy` or `agy-claude` from agy's groups, `claude` from claude's session or all-models week. A per-model window is a WARN and a recorded fact. The compiled default of `proactive_probe` stays off; this project's checked-in policy turns it on. Pinned by `TestNewUsageProber_ReadsEachCLIsWindowsThroughItsManifestAndBenchesTheRightFamily`.
+
+    `cli_health.usage_evidence_timeout_s` ([internal-policy.md](internal-policy.md)) bounds the round, so a CLI that does not answer cannot hold the wave boundary. A failed or late probe is one `WARN` and benches nothing. The probe reaches each CLI through the seam `preWaveUsagePaneFn` (production: `bridgeUsageProbe`). Tests replace the seam, so no test boots a CLI. Pinned by `TestRunPreWaveProbes_AFakeProbeThatReadsAgyExhaustedBenchesAgyBeforeTheWaveAdmitsALane`, `TestRunPreWaveProbes_AFailedProbeBenchesNothingAndLogsOneWarn` and `TestRunPreWaveProbes_TheUsageEvidenceTimeoutBoundsAProbeThatNeverAnswers`.
   - **Usage evidence on every failure path** (`usage_evidence_wiring.go`, since 2026-10-06). `usageEvidenceFn` builds the one production `usageevidence.Explain`: a controller factory under `<evolve-dir>/usage-evidence`, the `cli_health` timeout and TTL, and benching under `EVOLVE_CLI_HEALTH`. Four wirings take it:
     - `productionCLIUpdateWiring` gets `Seams.Explain` (`familyEvidence` maps a family to its `-tmux` driver);
     - `loopPreflightOptions` gets `UsageEvidence` (`evidenceSummary`);
