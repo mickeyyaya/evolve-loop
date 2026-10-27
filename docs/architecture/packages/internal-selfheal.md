@@ -51,6 +51,7 @@ A second pass over the same files opens nothing and publishes nothing.
 
   X12 has no repair path, so no record has a `repro_test` yet. So a record stays open until X16 runs a repair. This is the rule of I-14, not a gap.
 - **The record.** `WriteIncident` writes `.evolve/incidents/<id>.json` with `atomicwrite.JSON`. It has the fields of spec §18.2: `id`, `class`, `sources`, `tier`, `state`, `attempts`, `repro_test`, `opened_at` and `closed_at`. It also has `fingerprint`, `subject`, `severity`, `recurrence`, `reopened`, `summary` and `last_seen_at`. `LoadIncidents` fails on a corrupt record and names its path.
+- **The store lock.** `UpdateIncidents` is the one read, change and write of the store. It holds the lock `.evolve/incidents.lock`, loads the records, applies the update and writes only the changed records. The boundary pass and the live reaction both use it, so neither writer loses an update of the other.
 - **The events.** `Transition.Event` gives one event for each open, reopen and close: module `healing`, kind `selfheal.incident`. An open has the code `HEALING_INCIDENT_OPENED`, a reopen has `HEALING_INCIDENT_REOPENED`, and a close is INFO with no code. The lossless channel `selfheal.incident` keeps them ([event-channels.md](../event-channels.md)).
 - **At most once.** The verb writes the records first and publishes the events after. A crash between the two loses the events of that pass. The records are the source of truth.
 - **The loaders.** `LoadSignals`, `LoadShipped`, `LoadCycles` and `LoadUsage` read the files. `LoadCycles` reads the newest `cycles` run directories. A corrupt file of one cycle is a warning, not an error.
@@ -131,10 +132,33 @@ The ledger is the source of the budget. So after a fault before the ledger write
 | `window_hours`, `t1_repairs`, `t2_repairs` | 24, 3, 6 | the budget of each tier in one window |
 | `breaker_failures`, `breaker_open_hours` | 2, 24 | the failures in a row that open the breaker of a class, and its open time |
 
+## The live reaction
+
+The operator asked on 2026-10-27: "Why didn't we find the wave issue immediately, why doesn't wave watch pick up the failed signal and react?" The boundary pass ran only at the wave boundary. Cycles 2043, 2046 and 2055 failed on one pipeline-code defect inside one wave, and no incident opened.
+
+The live reaction runs the detection on each `cycle.sealed` event with `final_verdict` FAIL. It does not wait for the boundary.
+
+| Step | Part | Effect |
+|---|---|---|
+| 1 | `newLiveReaction(...).arm` (`go/cmd/evolve/cmd_selfheal_live.go`) | subscribes to the Signal Center of each cycle process in `wireOrchestratorDeps`, so each wave launch arms it |
+| 2 | `LoadFailureClass` | reads `paths.FailureDigestRecordPath` (`.evolve/failure-digests/cycle-<N>.json`), the harness digest record that `internal/core` writes with the same path function, with the class fields ([failure-identity-lifecycle.md §4](../failure-identity-lifecycle.md#4-failure-class-fingerprint)) |
+| 3 | `FromFailureClass` | gives a `pipeline-defect` observation only for the layer `dispositionrouter.LayerPipelineCode` at a class recurrence of `dispositionrouter.RecurrenceConsoleFloor` (3) or more |
+| 4 | `DetectLive` | opens or reopens one record for the observation and changes no other record |
+| 5 | the reaction | writes the record under the incident lock, then emits the `selfheal.incident` event with the field `reaction` |
+
+| Policy `healing.live_reaction` | Default | Effect |
+|---|---|---|
+| `stage` | `shadow` | `off` arms nothing. `shadow` writes the record and emits the event with `reaction` `would_brake`. `enforce` also writes the loop brake `.evolve/loop-stop` and emits `braked`. |
+
+- **One brake.** Only an open or a reopen reacts. If an operator releases the brake while the record is open, the next seal of the class does not engage it again. A later seal of the same class adds evidence to the open record and emits nothing. The brake file is created with `O_EXCL`: a brake that is already there is `brake_already_engaged`, and a write fault is `brake_failed` with a warning.
+- **The hold.** The rolling pool admits no new lane while the brake is engaged (`poolHalted`), so each pending lane item waits. No item-level hold exists, because a mid-wave write to a tracked inbox item races the claims of the lanes.
+- **A fault is a warning.** A corrupt record or an incident store that does not load is a warning on the console of the cycle. The seal of the cycle does not change.
+- Pinned by `TestLiveIncident_TheThirdSealOfTheFloorClassEmitsOneIncidentAtShadow`, `TestLiveIncident_EnforceWritesTheBrakeOnce`, `TestLiveIncident_ATaskCodeOrPassingSealEmitsNothing` and `TestWireOrchestratorDeps_ArmsTheLiveIncidentReaction`.
+
 ## Invariants
 
 - The package never acts. It writes only its own records, the decision ledger and the evidence workspaces. It changes no inbox item, no policy and no git ref.
-- The incident records, the package, the verb file `cmd_selfheal.go` and the stage key are protected surfaces (`guards.ProtectedSurfaceManifest`). The verb file is protected because it chooses the evidence and builds the verifier. `cmd_selfheal_propose.go` is protected for the same reason, and the proposal records are under the protected directory. `TestNoAgentProfileCanWriteTheIncidentRecords` checks that no agent profile has a write grant over `.evolve/incidents/`.
+- The incident records, the package, the verb file `cmd_selfheal.go` and the stage key are protected surfaces (`guards.ProtectedSurfaceManifest`). The verb file is protected because it chooses the evidence and builds the verifier. `cmd_selfheal_live.go` is protected too, because it opens incidents and engages the loop brake. `cmd_selfheal_propose.go` is protected for the same reason, and the proposal records are under the protected directory. `TestNoAgentProfileCanWriteTheIncidentRecords` checks that no agent profile has a write grant over `.evolve/incidents/`.
 - Each rule is a pure function. Only the loaders read files, and only the verb starts `gh`.
 
 ## Findings

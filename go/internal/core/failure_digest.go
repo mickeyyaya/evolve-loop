@@ -8,10 +8,12 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recurrence"
 )
@@ -97,15 +99,15 @@ func persistFailureDigest(workspace string, digest FailureDigest) error {
 	return writeFailureDigestRecord(workspace, b)
 }
 
-const failureDigestRecordDir = "failure-digests"
-
 func failureDigestRecordPath(workspace string) (string, bool) {
 	ws := filepath.Clean(workspace)
 	runs := filepath.Dir(ws)
-	if !strings.HasPrefix(filepath.Base(ws), "cycle-") || filepath.Base(runs) != "runs" || filepath.Base(filepath.Dir(runs)) != ".evolve" {
+	suffix, isCycle := strings.CutPrefix(filepath.Base(ws), "cycle-")
+	cycle, err := strconv.Atoi(suffix)
+	if err != nil || !isCycle || strconv.Itoa(cycle) != suffix || filepath.Base(runs) != "runs" || filepath.Base(filepath.Dir(runs)) != ".evolve" {
 		return "", false
 	}
-	return filepath.Join(filepath.Dir(runs), failureDigestRecordDir, filepath.Base(ws)+".json"), true
+	return paths.FailureDigestRecordPath(filepath.Dir(runs), cycle), true
 }
 
 func writeFailureDigestRecord(workspace string, b []byte) error {

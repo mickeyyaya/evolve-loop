@@ -6,8 +6,9 @@ import (
 )
 
 const (
-	HealingStageOff    = "off"
-	HealingStageShadow = "shadow"
+	HealingStageOff     = "off"
+	HealingStageShadow  = "shadow"
+	HealingStageEnforce = "enforce"
 
 	healingWindowHours       = 72
 	healingCycles            = 60
@@ -25,6 +26,7 @@ type HealingPolicy struct {
 	Detector     *HealingDetectorPolicy     `json:"detector,omitempty"`
 	Orchestrator *HealingOrchestratorPolicy `json:"orchestrator,omitempty"`
 	Validator    *HealingValidatorPolicy    `json:"validator,omitempty"`
+	LiveReaction *HealingLiveReactionPolicy `json:"live_reaction,omitempty"`
 }
 
 type HealingOrchestratorPolicy struct {
@@ -114,6 +116,9 @@ func (h *HealingPolicy) validate() error {
 	if err := h.Validator.validate(); err != nil {
 		return err
 	}
+	if err := h.LiveReaction.validate(); err != nil {
+		return err
+	}
 	if h.Detector == nil {
 		return nil
 	}
@@ -165,8 +170,34 @@ func (v *HealingValidatorPolicy) validate() error {
 }
 
 func healingStageError(part, stage, why string) error {
-	if stage == "enforce" {
+	if stage == HealingStageEnforce {
 		return errors.New(part + `.stage "enforce" lands with the inbox item ` + healingEnforceItem + ` (X16); ` + why + `, so use "shadow"`)
 	}
 	return fmt.Errorf(`%s.stage %q: the stages are "off" and "shadow"`, part, stage)
+}
+
+type HealingLiveReactionPolicy struct {
+	Stage string `json:"stage,omitempty"`
+}
+
+func (p Policy) HealingLiveReaction() HealingLiveReactionPolicy {
+	out := HealingLiveReactionPolicy{}
+	if p.Healing != nil && p.Healing.LiveReaction != nil {
+		out = *p.Healing.LiveReaction
+	}
+	if out.Stage == "" {
+		out.Stage = HealingStageShadow
+	}
+	return out
+}
+
+func (l *HealingLiveReactionPolicy) validate() error {
+	if l == nil {
+		return nil
+	}
+	switch l.Stage {
+	case "", HealingStageOff, HealingStageShadow, HealingStageEnforce:
+		return nil
+	}
+	return fmt.Errorf(`live_reaction.stage %q: the stages are "off", "shadow" and "enforce"`, l.Stage)
 }

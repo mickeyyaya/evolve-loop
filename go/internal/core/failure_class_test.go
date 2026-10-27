@@ -533,3 +533,16 @@ func TestFailureClass_ARefinalizedCycleDoesNotCountItself(t *testing.T) {
 		t.Fatalf("class recurrence after a second retro completion = %d; want 1", again.ClassRecurrence)
 	}
 }
+
+func TestFailureDigestRecordPath_RefusesANonCanonicalCycleName(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	for _, name := range []string{"cycle-007", "cycle-+5", "cycle-x", "run-7"} {
+		if path, ok := failureDigestRecordPath(filepath.Join(root, ".evolve", "runs", name)); ok {
+			t.Errorf("%s: record path %q; want none", name, path)
+		}
+	}
+	if path, ok := failureDigestRecordPath(filepath.Join(root, ".evolve", "runs", "cycle-7")); !ok || filepath.Base(path) != "cycle-7.json" {
+		t.Errorf("cycle-7: %q %v; want cycle-7.json", path, ok)
+	}
+}

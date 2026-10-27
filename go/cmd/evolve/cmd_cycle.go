@@ -463,6 +463,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 			policyShipFloor = floor
 		}
 	}
+	newLiveReaction(evolveDir, pol.HealingLiveReaction(), console).arm(signals)
 	swCfg := swarmrunner.Config{Stage: pol.SwarmConfig().Stage, PortBase: pol.SwarmConfig().PortBase, WorktreeBase: pol.WorktreeBase()}
 	gatesCfg := pol.GatesConfig()
 	routerCfg := pol.RouterConfig()

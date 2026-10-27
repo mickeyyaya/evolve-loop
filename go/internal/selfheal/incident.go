@@ -23,6 +23,7 @@ const (
 	ClassRepairLoop     Class = "repair-loop"
 	ClassClaimChurn     Class = "claim-churn"
 	ClassUsageBlind     Class = "usage-blind"
+	ClassPipelineDefect Class = "pipeline-defect"
 )
 
 const (
@@ -35,10 +36,11 @@ var classTiers = map[Class]string{
 	ClassMainRed: TierPipeline, ClassCIHang: TierPipeline, ClassFlakyTest: TierItem, ClassQuality: TierPipeline,
 	ClassIsolation: TierPipeline, ClassStall: TierPipeline, ClassSystem: TierPipeline, ClassZeroShip: TierPipeline,
 	ClassLaneStarvation: TierPipeline, ClassRepairLoop: TierPipeline, ClassClaimChurn: TierItem, ClassUsageBlind: TierPipeline,
+	ClassPipelineDefect: TierPipeline,
 }
 
 func Classes() []Class {
-	return []Class{ClassMainRed, ClassCIHang, ClassFlakyTest, ClassQuality, ClassIsolation, ClassStall, ClassSystem, ClassZeroShip, ClassLaneStarvation, ClassRepairLoop, ClassClaimChurn, ClassUsageBlind}
+	return []Class{ClassMainRed, ClassCIHang, ClassFlakyTest, ClassQuality, ClassIsolation, ClassStall, ClassSystem, ClassZeroShip, ClassLaneStarvation, ClassRepairLoop, ClassClaimChurn, ClassUsageBlind, ClassPipelineDefect}
 }
 
 func tierOf(c Class, protected []string) string {
