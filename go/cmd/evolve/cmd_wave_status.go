@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/heldproposal"
 	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
@@ -39,6 +40,7 @@ type waveStatusReport struct {
 	Runs          []waveRunMeasures     `json:"runs"`
 	Warnings      []string              `json:"warnings,omitempty"`
 	Held          []heldproposal.Record `json:"held,omitempty"`
+	Benched       []clihealth.Entry     `json:"benched,omitempty"`
 }
 
 func parseWaveReadArgs(args []string) (projectRoot string, asJSON bool, err error) {
@@ -92,6 +94,7 @@ func buildWaveStatus(env waveEnv, plane wavePlaneDirs, records []wave.Record) wa
 		report.NotesQueued = len(notes)
 	}
 	report.Held, report.Warnings = heldForOperator(plane.evolveDir, report.Warnings)
+	report.Benched = activeBenches(clihealth.NewStore(plane.root, env.now))
 	if len(records) == 0 {
 		return report
 	}
@@ -140,6 +143,9 @@ func writeWaveStatusText(w io.Writer, r waveStatusReport) {
 		fmt.Fprintf(w, "last:    wave %d: %s\n", r.LastWave.Wave, r.LastWave.Outcome)
 	}
 	fmt.Fprintf(w, "notes:   %d queued\n", r.NotesQueued)
+	for _, b := range r.Benched {
+		fmt.Fprintf(w, "benched: %s %s until %s\n", b.Key(), b.Reason, b.BenchedUntil.Format(time.RFC3339))
+	}
 	for _, h := range r.Held {
 		fmt.Fprintf(w, "held:    cycle %d held for operator (tree %s): evolve landing approve|reject --cycle %d --tree %s\n", h.Cycle, h.Tree, h.Cycle, h.Tree)
 	}
