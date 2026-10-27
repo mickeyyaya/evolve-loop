@@ -61,7 +61,7 @@ var dispatchRules = map[string]dispatchRule{
 	"loop":               {classDenied, false, loopDispatch},
 	"wave":               {classDenied, true, onlySubs("next")},
 	"landing":            {classDenied, true, onlySubs("approve", "reject")},
-	"cycle":              {classDenied, true, onlySubs("run")},
+	"cycle":              {classDenied, true, onlySubs("run", "resume")},
 	"boundary":           {classDenied, true, onlySubs("run")},
 	"bridge":             {classDenied, true, onlySubs("launch")},
 	"routing":            {classDenied, true, onlySubs("plan")},

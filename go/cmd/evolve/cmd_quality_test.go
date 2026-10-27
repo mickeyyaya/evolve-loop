@@ -246,7 +246,7 @@ func TestDispatchBoundaryVerb_AnUnknownVerbIsAnIOError(t *testing.T) {
 
 func TestQualityArgs_ARelativeRootBecomesAbsoluteForThePublisher(t *testing.T) {
 	t.Parallel()
-	parsed, err := parseQualityArgs([]string{"report", "--scope", "wave", "--project-root", "."}, qualityScopes)
+	parsed, err := parseQualityArgs("report", []string{"report", "--scope", "wave", "--project-root", "."}, qualityScopes)
 	root := parsed.root
 	c, cerr := parseQualityCompare([]string{"--index", "PQ1", "--a", "wave:1", "--b", "wave:2", "--project-root", "."})
 	if err != nil || cerr != nil || !filepath.IsAbs(root) || !filepath.IsAbs(c.root) {

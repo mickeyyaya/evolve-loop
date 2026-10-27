@@ -1,6 +1,12 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestCycleResume_AnUnreadableWorkingDirectoryIsAnIOError":                                          "swaps seams processGetwd and cycleResumeLoad",
+	"main.TestCycleResume_DryRunNamesThePausedCycleAndStartsNothing":                                        "swaps seams cycleResumeLoad and loopLaunchFn",
+	"main.TestCycleResume_EachRefusalHasItsExitCode":                                                        "swaps seams cycleResumeLoad and loopLaunchFn",
+	"main.TestCycleResume_LaunchesTheLoopOnThePausedCycle":                                                  "swaps seams cycleResumeLoad and loopLaunchFn",
+	"main.TestCycleResume_ReadsTheCheckpointOfTheRoot":                                                      "swaps seam loopLaunchFn",
+	"main.TestDossierShow_AnUnreadableWorkingDirectoryIsAnIOError":                                          "swaps seam processGetwd",
 	"main.TestGC_TakesItsLeaseAndSkipsLiveRuns":                                                             "swaps seams gcInjectedReapers and gcInjectedProcessHost",
 	"main.TestGC_WithNoLiveRunRunsTheProcessSweeps":                                                         "swaps seam gcInjectedReapers",
 	"main.TestLoopDetach_JSONPrintsThePidTheLogAndRunningAndNoText":                                         "swaps seam loopDetachCommandFn",

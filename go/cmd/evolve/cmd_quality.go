@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	qualityUsage      = "usage: evolve quality report --scope wave|tree|judges|replay [--json] --project-root P | evolve quality compare --index PQ1|PQ4 --a WINDOW --b WINDOW [--paired] [--json] --project-root P (WINDOW: wave:N or waves:A-B)"
+	qualityUsage      = "usage: evolve quality report|show --scope wave|tree|judges|replay [--json] --project-root P | evolve quality compare --index PQ1|PQ4 --a WINDOW --b WINDOW [--paired] [--json] --project-root P (WINDOW: wave:N or waves:A-B)"
 	qualityPolicyPath = ".evolve/" + paths.PolicyFile
 )
 
@@ -107,7 +107,10 @@ func runQualityWith(env qualityEnv, args []string, stdout, stderr io.Writer) int
 	if len(args) > 0 && args[0] == "compare" {
 		return runQualityCompare(env, args[1:], stdout, stderr)
 	}
-	a, err := parseQualityArgs(args, env.scopes)
+	if len(args) > 0 && args[0] == "show" {
+		return runQualityShow(env, args, stdout, stderr)
+	}
+	a, err := parseQualityArgs("report", args, env.scopes)
 	if err != nil {
 		fmt.Fprintf(stderr, "quality: %v\n%s\n", err, qualityUsage)
 		return exitUsage
@@ -119,9 +122,9 @@ func runQualityWith(env qualityEnv, args []string, stdout, stderr io.Writer) int
 	}
 	center, closeCenter := env.newCenter(a.root, paths.EvolveDirOf(a.root), stderr)
 	defer closeCenter()
-	t := collectQuality(center, a.root, readers)
+	t := collectQuality(center.Emit, a.root, readers)
 	if a.json {
-		return printVerbJSON("quality report", qualityReportResult{Scope: a.scope, Readings: t.readings, Breaches: t.breaches, Warnings: t.warnings}, stdout, stderr)
+		return printVerbJSON("quality report", t.result(a.scope), stdout, stderr)
 	}
 	fmt.Fprintf(stdout, "quality report: scope %s: %d reading(s), %d breach(es), %d warning(s)\n", a.scope, t.readings, t.breaches, t.warnings)
 	return 0
@@ -139,10 +142,10 @@ type qualityReportResult struct {
 	Warnings int    `json:"warnings"`
 }
 
-func parseQualityArgs(args []string, scopes map[string][]qualityReader) (qualityReportArgs, error) {
+func parseQualityArgs(verb string, args []string, scopes map[string][]qualityReader) (qualityReportArgs, error) {
 	var a qualityReportArgs
-	if len(args) == 0 || args[0] != "report" {
-		return a, errors.New("want the report verb")
+	if len(args) == 0 || args[0] != verb {
+		return a, fmt.Errorf("want the %s verb", verb)
 	}
 	operands, err := (cliFlags{values: map[string]*string{"--scope": &a.scope, "--project-root": &a.root}, bools: map[string]*bool{"--json": &a.json}}).parse(args[1:])
 	switch {
@@ -161,12 +164,12 @@ func parseQualityArgs(args []string, scopes map[string][]qualityReader) (quality
 }
 
 type qualityTally struct {
-	center                       *signalcenter.Center
+	sink                         func(signalcenter.Event)
 	readings, breaches, warnings int
 }
 
-func collectQuality(center *signalcenter.Center, root string, readers []qualityReader) qualityTally {
-	t := qualityTally{center: center}
+func collectQuality(sink func(signalcenter.Event), root string, readers []qualityReader) qualityTally {
+	t := qualityTally{sink: sink}
 	stages := t.stages(root)
 	for _, rd := range readers {
 		readings, err := rd.read(root)
@@ -176,6 +179,10 @@ func collectQuality(center *signalcenter.Center, root string, readers []qualityR
 		t.publish(readings, stages)
 	}
 	return t
+}
+
+func (t qualityTally) result(scope string) qualityReportResult {
+	return qualityReportResult{Scope: scope, Readings: t.readings, Breaches: t.breaches, Warnings: t.warnings}
 }
 
 func (t *qualityTally) stages(root string) map[string]qualitypanel.Stage {
@@ -203,7 +210,7 @@ func (t *qualityTally) emit(e signalcenter.Event) {
 	default:
 		t.warnings++
 	}
-	t.center.Emit(e)
+	t.sink(e)
 }
 
 func readerWarning(index string, err error) signalcenter.Event {
@@ -212,4 +219,28 @@ func readerWarning(index string, err error) signalcenter.Event {
 		return qualitypanel.SourceWarning(index, qualitypanel.CodeSourceAbsent, pathErr.Path, err.Error())
 	}
 	return qualitypanel.SourceWarning(index, qualitypanel.CodeSourceUnreadable, "", err.Error())
+}
+
+type qualityShowResult struct {
+	qualityReportResult
+	Events []signalcenter.Event `json:"events"`
+}
+
+func runQualityShow(env qualityEnv, args []string, stdout, stderr io.Writer) int {
+	a, err := parseQualityArgs("show", args, env.scopes)
+	if err != nil {
+		fmt.Fprintf(stderr, "quality show: %v\n%s\n", err, qualityUsage)
+		return exitUsage
+	}
+	events := []signalcenter.Event{}
+	t := collectQuality(func(e signalcenter.Event) { events = append(events, e) }, a.root, env.scopes[a.scope])
+	result := qualityShowResult{t.result(a.scope), events}
+	if a.json {
+		return printVerbJSON("quality show", result, stdout, stderr)
+	}
+	for _, e := range events {
+		fmt.Fprintln(stdout, signalcenter.FormatLine(e))
+	}
+	fmt.Fprintf(stdout, "quality show: scope %s: %d reading(s), %d breach(es), %d warning(s)\n", a.scope, t.readings, t.breaches, t.warnings)
+	return cliExitOK
 }

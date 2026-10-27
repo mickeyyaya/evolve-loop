@@ -11,6 +11,8 @@
 >
 > Amended on 2026-10-27 by component X17c: the `queued` verbs queue during a wave, and `gc` takes a lease (§4.6). The stage of the queue is the policy key `isolation.i15.stage`, compiled default `shadow`.
 >
+> Amended on 2026-10-27 by component X17d: `inbox claim`, `dossier show`, `cycle resume`, `wave stop` and `quality show` are core verbs (§5). §6 no longer lists them. Their agent classes are in §5. `cycle resume` starts a loop, so the dispatch gate refuses it in a cell (§4.4). The gate of the other `D` verbs, `inbox claim` and `wave stop` among them, is the class table of X17e.
+>
 > **Terms used throughout:**
 > - **core verb**: a verb in the table of §5. A service can depend on it.
 > - **envelope**: the one JSON object that a core verb prints on stdout with `--json`.
@@ -126,7 +128,7 @@ Each core verb has one class. The class says what the verb does while a wave run
 
 Rules:
 
-1. An `always` verb never writes a tracked file, a lease or a signal. `quality report` publishes signals today (`c/cmd_quality.go:116-118`), so it is `leased`, and a read-only form `quality show` is added.
+1. An `always` verb never writes a tracked file, a lease or a signal. `quality report` publishes signals (`c/cmd_quality.go:120-122`), so it is `leased`. The read-only form `quality show` (X17d) publishes nothing.
 2. A `queued` verb never refuses only because a lease is live. Before X17c, five inbox verbs and the `cli-routing` writers refused (F4.5). §4.6 has the design as built.
 3. The queue is `.evolve/queue/<verb>-<utc>.json`, one file for each request. The boundary step `queue-apply` applies the files in time order, right after `sync-main`. Each applied file writes one `cli.queue.applied` signal.
 4. A `leased` verb holds the lease only for its own write. `gc` takes the `gc` lease and skips each resource that a live run owns. Before X17c, `gc` took no lease (F4.7).
@@ -192,7 +194,7 @@ The column "Agent" of §5 gives the class of each core verb. These verbs are out
 | Id | Decision | Because | Rejected options and why |
 |---|---|---|---|
 | D1 | Three classes, and `D` is the default | F1, F2 | Two classes, allow and deny: an agent then has no way to ask for a justified dispatch, and the operator asked for that way. A deny list: a new verb is open until someone adds it. |
-| D2 | `quality report` and `quality compare` are `R`. The read form `quality show` (§6, X17d) is `A`. | F3 | `A`: a cell then publishes readings to the Signal Center, which is a channel to other cells outside I-4. `D`: a PQ3 reading is "on request" by design ([llm-quality-indexes.md](llm-quality-indexes.md) §5.4), so an agent needs a way to ask for it. |
+| D2 | `quality report` and `quality compare` are `R`. The read form `quality show` (§5, X17d) is `A`. | F3 | `A`: a cell then publishes readings to the Signal Center, which is a channel to other cells outside I-4. `D`: a PQ3 reading is "on request" by design ([llm-quality-indexes.md](llm-quality-indexes.md) §5.4), so an agent needs a way to ask for it. |
 | D3 | `code callers`, `api`, `find` and `map` are `A` | F4 | `R`: the usage record is telemetry of the own cell, and a request for each code query costs a judgement for no gain. |
 | D4 | The cell reads its classes from one verb, `agent capabilities --json` (§4.2) | F1, F6 | A list in each persona: it is CLI text above the driver, which I-17 forbids. A tool server for each family: the house rule is CLI only ([cli-only-no-mcp.md](../conventions/cli-only-no-mcp.md)). |
 | D5 | `R` and `D` verbs need the dispatch credential (§4.4) | F2 | The markers only: `env -u` passes them. A sandbox deny of the `evolve` binary: the profiles must run `evolve phase verify`. |
@@ -365,6 +367,7 @@ Limits:
 | `signals tail` | always | A | yes | yes | `evolve.signals.tail/1` | a stream |
 | `ledger verify` | always | A | yes | yes | `evolve.ledger.verify/1` | the text form prints on stderr; `--evolve-dir` still wins over the root |
 | `dossier verify` | always | A | yes | yes | `evolve.dossier.verify/1` | |
+| `dossier show` | always | A | yes | yes | `evolve.dossier.show/1` | the dossier of one cycle; X17d |
 | `cli-routing show`, `check`, `explain` | always | A (`show` and `explain` with `--static` only, F7) | yes | yes | `evolve.cli-routing.<verb>/1` | |
 | `routing explain` | always | A | yes | yes | `evolve.routing.explain/1` | |
 | `clihealth list`, `usage` | always | `list` A, `usage` D (F7) | yes | yes | `evolve.clihealth.<verb>/1` | `usage` starts a usage probe of the CLI, not a model turn |
@@ -374,7 +377,9 @@ Limits:
 | `docs ste-lint` | always | A | yes | yes | `evolve.docs.ste-lint/1` | |
 | `quality report` | leased | R (`quality-reading`) | yes | yes | `evolve.quality.report/1` | it publishes signals |
 | `quality compare` | leased | R (`quality-reading`) | yes | yes | `evolve.quality.compare/1` | it publishes one PQ3 reading |
+| `quality show` | always | A | yes | yes | `evolve.quality.show/1` | the readings of `quality report` with no publish (§4.1 D2); X17d |
 | `agent run` | leased | R (`dispatch`) | yes | yes | `evolve.agent.run/1` | read-only agent; it writes a ledger entry with cycle 0 |
+| `inbox claim` | leased | D | yes | yes | `evolve.inbox.claim/1` | the move into `processing/cycle-N/` under the lock of the inbox mover; X17d |
 | `inbox add`, `consume` | leased | `add` R (`inbox-add`), `consume` D | yes | yes | `evolve.inbox.<verb>/1` | no lease check; `add` reads stdin only with `--file -` |
 | `inbox edit`, `withdraw`, `verify`, `route-console`, `route-lane` | queued | D | yes | yes | `evolve.inbox.<verb>/1` | queue during a wave at stage `enforce`, exit 4 (§4.6) |
 | `cli-routing set`, `unset`, `init`, `migrate` | queued | D (`set` and `unset` through `routing-proposal`) | yes | yes | `evolve.cli-routing.<verb>/1` | queue during a wave at stage `enforce`; `--dry-run` runs at once (§4.6) |
@@ -382,10 +387,12 @@ Limits:
 | `checkpoint save`, `list`, `restore`, `prune` | leased | D | yes | yes | `evolve.checkpoint.<verb>/1` | ADR-0122 |
 | `gc` | leased | D | yes | yes | `evolve.gc/1` | the `gc` lease; a live run stops the process sweeps (§4.6) |
 | `loop-stop` | leased | D | yes | yes | `evolve.loop-stop/1` | it sets the brake; `--wait` blocks |
+| `wave stop` | leased | D | yes | yes | `evolve.wave.stop/1` | the brake of `loop-stop`; `--wait D` blocks for D at most; X17d |
 | `wave next` | boundary | D | yes | yes | `evolve.wave.next/2` | it runs the boundary. X17b moved the old document, which had its own `schema` field, into `data`, so the major is 2. |
 | `boundary run` | boundary | D | yes | yes | `evolve.boundary.run/1` | |
 | `pr merge` | boundary | D | yes | yes | `evolve.pr.merge/1` | refuses while a loop runs (`c/cmd_pr.go:265-276`) |
 | `sync-main` | boundary | D | yes | yes | `evolve.sync-main/1` | (`c/cmd_syncmain.go:58-63`) |
+| `cycle resume` | boundary | D | yes | yes | `evolve.cycle.resume/1` | the paused cycle through `loop --resume`; `--cycle N` names it; X17d |
 | `cycle reset` | boundary | D | yes | yes | `evolve.cycle.reset/1` | `--force` overrides (`c/cmd_cycle.go:109`, refusal at `:131-133`) |
 | `cli update` | boundary | D | yes | yes | `evolve.cli.update/1` | `--dry-run` is `always` (`c/cmd_cli.go:57`) |
 | `loop` | boundary | D | yes | yes | `evolve.loop/1` | one owner only (`c/cmd_loop_detach.go:55`) |
@@ -398,12 +405,7 @@ Verbs outside this table are tools for the operator or for the pipeline itself. 
 
 | Verb | Class | Today | Why |
 |---|---|---|---|
-| `inbox claim <id> --cycle N` | leased | only `inbox-mover claim` (`c/cmd_inbox_mover.go:29`) | a service that runs one item needs a public claim |
-| `dossier show <cycle>` | always | no read of one dossier; `dossier` has 4 other subverbs (`c/cmd_dossier.go:19-32`) | the result of one cycle in one call |
-| `cycle resume [--cycle N]` | boundary | only `loop --resume` | resume one cycle without the loop flags |
-| `wave stop [--wait D]` | leased | only `loop-stop --wait` | the wave verb set is complete |
 | `events channels`, `kinds`, `watch`, `subscribe` | always (`subscribe` is leased) | absent: plan E9 is not started | a service waits on an event, not on a poll ([event-notification-protocol-2026-10](../plans/event-notification-protocol-2026-10.md) E9) |
-| `quality show --scope S` | always | absent | the readings with no publish. Its agent class is `A` (§4.1 D2). |
 | `agent capabilities [--json]` | always | absent (`c/registry.go:43`) | the agent of a cell reads its classes, schemas and request paths (§4.2). Its agent class is `A`. Component X17e. |
 | `guidance index [--audience X] [--phase P] [--cli F] [--json]`, `guidance check` | always | both exist (#1138); `index` prints an envelope and `check` has no `--json` | an agent of any family lists the rules of its case from the rule registry ([guidance-layers.md](guidance-layers.md) §10.3). The agent class of both is `A`. `guidance build` writes tracked files, so it stays an operator tool outside the core verbs. |
 
