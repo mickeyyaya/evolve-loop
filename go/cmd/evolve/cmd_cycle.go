@@ -593,6 +593,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	opts = append(opts, core.WithLaneMenu(laneMenuOf(forbidden)))
 	opts = append(opts, core.WithProtectedSurface(protectedMembership))
 	opts = append(opts, core.WithSignalCenter(signals))
+	opts = append(opts, core.WithRequestHandoff(requestHandoff(pol, runAgentCommand, signals.Emit, console)))
 
 	return orchDeps{
 		Storage:      st,

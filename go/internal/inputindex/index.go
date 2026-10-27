@@ -21,6 +21,8 @@ const (
 const (
 	ClassDeliverable = "deliverable"
 	ClassLineage     = "lineage"
+	KindRequest      = "request"
+	requestsDirName  = "requests"
 )
 
 type Entry struct {

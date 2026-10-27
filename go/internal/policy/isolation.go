@@ -4,6 +4,22 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
+)
+
+const (
+	DispatchRequestStageOff     = "off"
+	DispatchRequestStageShadow  = "shadow"
+	DispatchRequestStageEnforce = "enforce"
+
+	dispatchRequestsPerCycle = 3
+	dispatchRequestsMaxDepth = 1
+)
+
+var (
+	dispatchRequestStages = []string{DispatchRequestStageOff, DispatchRequestStageShadow, DispatchRequestStageEnforce}
+	dispatchRequestRoles  = []string{"fault-localization", "premise-challenge", "dependency-map"}
+	profileName           = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
 )
 
 type IsolationPolicy struct {
@@ -17,6 +33,15 @@ type IsolationPolicy struct {
 	LineageMax int `json:"lineage_max,omitempty"`
 
 	Context *IsolationContextPolicy `json:"context,omitempty"`
+
+	DispatchRequests *DispatchRequestsPolicy `json:"dispatch_requests,omitempty"`
+}
+
+type DispatchRequestsPolicy struct {
+	Stage    string   `json:"stage,omitempty"`
+	Roles    []string `json:"roles,omitempty"`
+	PerCycle int      `json:"per_cycle,omitempty"`
+	MaxDepth int      `json:"max_depth,omitempty"`
 }
 
 type IsolationContextPolicy struct {
@@ -110,6 +135,46 @@ func (c *IsolationContextPolicy) validate() error {
 			if !contextKind.MatchString(k) {
 				return fmt.Errorf("required.%s: kind %q is not an artifact kind such as scout-report", phase, k)
 			}
+		}
+	}
+	return nil
+}
+
+func (p Policy) IsolationDispatchRequests() DispatchRequestsPolicy {
+	out := DispatchRequestsPolicy{}
+	if p.Isolation != nil && p.Isolation.DispatchRequests != nil {
+		out = *p.Isolation.DispatchRequests
+	}
+	if out.Stage == "" {
+		out.Stage = DispatchRequestStageShadow
+	}
+	if len(out.Roles) == 0 {
+		out.Roles = dispatchRequestRoles
+	}
+	if out.PerCycle == 0 {
+		out.PerCycle = dispatchRequestsPerCycle
+	}
+	if out.MaxDepth == 0 {
+		out.MaxDepth = dispatchRequestsMaxDepth
+	}
+	out.Roles = slices.Clone(out.Roles)
+	return out
+}
+
+func (d *DispatchRequestsPolicy) validate() error {
+	switch {
+	case d == nil:
+		return nil
+	case d.Stage != "" && !slices.Contains(dispatchRequestStages, d.Stage):
+		return fmt.Errorf("stage %q: the stages are %v", d.Stage, dispatchRequestStages)
+	case d.PerCycle < 0:
+		return fmt.Errorf("per_cycle %d: a cap cannot be negative", d.PerCycle)
+	case d.MaxDepth < 0:
+		return fmt.Errorf("max_depth %d: a cap cannot be negative", d.MaxDepth)
+	}
+	for _, role := range d.Roles {
+		if !profileName.MatchString(role) {
+			return fmt.Errorf("role %q is not a profile name such as fault-localization", role)
 		}
 	}
 	return nil

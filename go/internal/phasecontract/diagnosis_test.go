@@ -75,6 +75,8 @@ func TestParseDiagnosis_Refusals(t *testing.T) {
 		{"an unknown variation", diagnosisWith(repair, `"kind":"retry-with-variation","params":{"item":"a","variation":"luck"}`), `variation "luck"`},
 		{"a sha that is not hex", diagnosisWith(repair, `"kind":"revert-last-landing","params":{"sha":"HEAD~1"}`), `sha "HEAD~1"`},
 		{"a file outside the repository", diagnosisWith(repair, `"kind":"open-repair-item","params":{"files":["../etc/passwd"],"repro":"r"}`), `file "../etc/passwd"`},
+		{"a dispatch with no request", diagnosisWith(repair, `"kind":"dispatch-phase-agent","params":{}`), `dispatch-phase-agent needs the param "request"`},
+		{"a dispatch of a request that is not a request name", diagnosisWith(repair, `"kind":"dispatch-phase-agent","params":{"request":"../x"}`), `request "../x"`},
 		{"a bad alternative", diagnosisWith(`"kind":"revert-last-landing","params":{"sha":"abc1234"}`, `"kind":"run-shell","params":{}`), `alternative: action kind "run-shell"`},
 	}
 	for _, c := range cases {
@@ -97,6 +99,7 @@ func TestParseDiagnosis_EachCatalogActionWithItsParamsIsAccepted(t *testing.T) {
 		ActionRevertLastLanding:  `"kind":"revert-last-landing","params":{"sha":"0123456789abcdef0123456789abcdef01234567"}`,
 		ActionOpenRepairItem:     repair,
 		ActionHaltAndEscalate:    `"kind":"halt-and-escalate","params":{}`,
+		ActionDispatchPhaseAgent: `"kind":"dispatch-phase-agent","params":{"request":"dispatch-1"}`,
 	}
 	if got := DiagnosisActions(); len(got) != len(actions) {
 		t.Fatalf("DiagnosisActions() = %v, want the %d actions of llm-isolation.md §19", got, len(actions))

@@ -37,6 +37,7 @@ The notes of the index name the evidence that it does not hold. Do not look for 
 | `revert-last-landing` | `sha` (hex, 7 to 40 characters) | none | main is red after a landing of the loop | main is not red, the commit is not a landing of the loop in the window, or the incident is T0 |
 | `open-repair-item` | `files` (paths in the repository), `repro` | none | the pipeline code has a defect | a file does not exist |
 | `halt-and-escalate` | none | `reason` | no other action is safe | never |
+| `dispatch-phase-agent` | `request` (the request name, for example `dispatch-1`) | none | you judge a dispatch request, and the request is reasonable | the pipeline did not validate the request, or the incident is T0 or T1 |
 
 The pipeline also refuses a repair in these cases:
 
@@ -47,6 +48,16 @@ The pipeline also refuses a repair in these cases:
 The second refusal of one incident sends it to the operator.
 
 A command or a free text action is not in the catalog. The pipeline refuses it.
+
+## Judge a dispatch request
+
+The input can name a dispatch request instead of an incident (llm-isolation.md §7.2). A phase agent wrote the request, because it needs another phase agent. The pipeline checked the schema, the role and the caps of the request before it started you. The `incident_id` of your diagnosis is then the request name.
+
+1. Open the required entry `q1`. It is the request: the target role, the reason (`why`), the inputs and the expected output.
+2. Open an input entry only when your judgement needs it.
+3. Judge if the request is reasonable. A reasonable request names a role that can give the expected output, and a reason that the task of the requester needs.
+4. If the request is reasonable, propose `dispatch-phase-agent` with `params.request` set to the request name.
+5. If not, propose `halt-and-escalate` with the reason in `params.reason`. The pipeline refuses the request and records your reason.
 
 ## Output contract
 
@@ -61,4 +72,4 @@ Write one strict JSON object (no prose, no code fence) to the artifact path in y
 - Do not start an agent, a phase, a loop or an evolve dispatch. Do not run an LLM CLI.
 - Do not change the inbox, the policy, a profile, a persona or code. Write only `diagnosis.json`.
 - Cite only the ids of the evidence index in `evidence`.
-- One incident, one diagnosis.
+- One incident or one request, one diagnosis.

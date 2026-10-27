@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -213,16 +211,7 @@ func diagnoseIncident(env selfhealEnv, root string, inc selfheal.Incident, signa
 }
 
 func runOrchestratorAgent(env selfhealEnv, root string, inc selfheal.Incident, stderr io.Writer) (agentcmd.Envelope, error) {
-	var stdout bytes.Buffer
-	rc := env.agent([]string{"run", orchestratorProfile, "--json", "--project-root", root}, strings.NewReader(orchestratorInput(root, inc)), &stdout, stderr)
-	var run agentcmd.Envelope
-	if err := json.Unmarshal(stdout.Bytes(), &run); err != nil {
-		return run, fmt.Errorf("evolve agent run %s: exit %d with no JSON envelope: %w", orchestratorProfile, rc, err)
-	}
-	if rc != 0 {
-		return run, fmt.Errorf("evolve agent run %s: exit %d: %s", orchestratorProfile, rc, run.Error)
-	}
-	return run, nil
+	return runAgentSeat(env.agent, []string{orchestratorProfile, "--json", "--project-root", root}, orchestratorInput(root, inc), stderr)
 }
 
 func orchestratorInput(root string, inc selfheal.Incident) string {

@@ -200,6 +200,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 	if shipRecovered {
 		return dispatchResult{}, loopContinue, nil
 	}
+	cr.handoffRequests(next)
 
 	return dispatchResult{
 		resp:          resp,

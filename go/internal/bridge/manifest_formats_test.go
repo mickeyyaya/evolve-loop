@@ -138,3 +138,17 @@ func TestManifest_TheSchemaWordsNameTheKindsAndTheCapabilities(t *testing.T) {
 		t.Errorf("HasCapability(edit) = %v, TranscriptFormat() = %q", m.HasCapability(CapabilityEdit), m.TranscriptFormat())
 	}
 }
+
+func TestManifests_DeclareInProcessSubagentsOnlyForAHarnessThatRunsThem(t *testing.T) {
+	t.Parallel()
+	subagents := map[string]bool{"claude-p": true, "claude-tmux": true}
+	for _, cli := range ManifestNames() {
+		m, err := LoadManifest(cli)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := m.HasCapability(CapabilityInprocessSubagents); got != subagents[cli] {
+			t.Errorf("%s: HasCapability(inprocess_subagents) = %v, want %v (llm-isolation.md §7.2)", cli, got, subagents[cli])
+		}
+	}
+}

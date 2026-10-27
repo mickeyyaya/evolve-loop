@@ -40,7 +40,7 @@ var selfhealSchemas = map[string]string{selfhealVerbIncidents: "evolve.selfheal.
 var selfhealChannels = []string{"errors", "loop"}
 
 type selfhealEnv struct {
-	agent     func(args []string, stdin io.Reader, stdout, stderr io.Writer) int
+	agent     agentSeat
 	now       func() time.Time
 	gh        func(ctx context.Context, root string, args ...string) (string, error)
 	declared  func(family string) bool
