@@ -44,6 +44,7 @@
    15. [Timers](#15-timers)
    16. [Safety](#16-safety)
    17. [What this does not do](#17-what-this-does-not-do)
+   18. [Selection keys](#18-selection-keys)
 4. [Limits](#limits)
 
 ## Issue
@@ -548,6 +549,27 @@ The module `events` (new) owns `EVENTS_DEAD_LETTERED`. A gap record is not a sig
 - **No order across channels.**
 - **No change to the ledger** or its hash chain. The `ledger` channel only notifies, with `fields.entry_seq` as the pointer.
 - **No change to the per-cycle `signals.ndjson`.** It stays the cycle record, and a test pins it to the `signals` channel filtered to cycle N.
+### 18. Selection keys
+
+Each log record has nine keys. A reader selects records with them. One writer factory, `NewSelectionLogger` in `go/internal/log`, writes the keys for every logger of the loop.
+
+| Key | Meaning |
+|---|---|
+| `ts` | Time of the record, RFC 3339. |
+| `run` | Run id. |
+| `cycle` | Cycle number. |
+| `phase` | Phase name. |
+| `dispatch` | Dispatch id: `run/cycle/phase/attempt`. |
+| `cat` | Category of the record, for example `loop`. |
+| `component` | Package or module that wrote the record. |
+| `level` | Severity: DEBUG, INFO, WARN or ERROR. |
+| `code` | Registered signal code, if the record has one. |
+
+- **One call feeds two handlers.** `NewSelectionLogger` takes `Sinks`: a JSON writer, a text writer and a level. A nil writer skips that handler. Both handlers get the same record.
+- **The context carries the selection.** `WithSelection` puts a `Selection` into a context. The logger adds its non-zero keys to each record. A key set by the caller on the record wins and appears once.
+- **A bare record has no invented keys.** Only `ts`, `level` and `msg` appear.
+- **A writer can keep its line text.** `Sinks.Render` replaces the text handler with a line writer. The signal-center stderr sink uses it, so its line text does not change.
+
 
 ## Limits
 

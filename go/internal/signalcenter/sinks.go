@@ -3,12 +3,15 @@ package signalcenter
 import (
 	"encoding/json"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+
+	evolog "github.com/mickeyyaya/evolve-loop/go/internal/log"
 )
 
 func (c *Center) NDJSONSink(pathFor func(cycle int) string) Listener {
@@ -93,7 +96,8 @@ func (s *ndjsonSink) reportDrops(e Event, n int) {
 }
 
 func StderrSink(w io.Writer) Listener {
-	return func(e Event) { _, _ = io.WriteString(w, FormatLine(e)+"\n") }
+	logger := evolog.NewSelectionLogger(evolog.Sinks{Text: w, Level: "debug", Render: func(r slog.Record) string { return r.Message }})
+	return func(e Event) { logger.Info(FormatLine(e)) }
 }
 
 func FormatLine(e Event) string {
