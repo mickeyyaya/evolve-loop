@@ -116,6 +116,7 @@ func runMatrixCycle(t *testing.T, row matrixRow, evolveBin, fakeBin, repoRoot st
 		"--project-root", projRoot,
 		"--goal-hash", "e2ematrix"+strings.ToLower(row.id),
 		"--evolve-dir", filepath.Join(projRoot, ".evolve"),
+		"--sandbox-off=e2e stub CLIs need no confinement",
 	)
 	cmd.Env = withoutEnv(env, "EVOLVE_CLI")
 	cmd.Dir = projRoot

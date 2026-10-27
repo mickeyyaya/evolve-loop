@@ -279,7 +279,7 @@ Thus pre-flight step 4 checks the most recent audit before any change. In some c
 
 The old `EVOLVE_BYPASS_SHIP_GATE`, `EVOLVE_BYPASS_SHIP_VERIFY`, `EVOLVE_BYPASS_ROLE_GATE` and `EVOLVE_BYPASS_PHASE_GATE` variables are removed. The code ignores them.
 If you use a bypass as a routine, you violate CLAUDE.md. The pipeline never uses one itself.
-`evolve rollback` ships its revert commit with `evolve ship --class manual` and `EVOLVE_SHIP_AUTO_CONFIRM=1`.
+`evolve rollback` ships its revert commit with `evolve ship --class manual --auto-confirm=<reason>`.
 
 ## Common failure modes
 

@@ -27,9 +27,14 @@ const (
 
 var baseEnvNames = []string{"PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "TERM", "TMPDIR", "TMP", "TEMP", "TZ"}
 
-var envOptIns = map[string]string{
-	"BRIDGE_ALLOW_ANTHROPIC_BASE_URL": "ANTHROPIC_BASE_URL",
-	"BRIDGE_ALLOW_OPENAI_API_KEY":     "OPENAI_API_KEY",
+type credentialOptIn struct {
+	key     string
+	allowed func(Deps) bool
+}
+
+var credentialOptIns = []credentialOptIn{
+	{"ANTHROPIC_BASE_URL", func(d Deps) bool { return d.AllowAnthropicBaseURL }},
+	{"OPENAI_API_KEY", func(d Deps) bool { return d.AllowOpenAIAPIKey }},
 }
 
 type EnvDropLog struct {
@@ -122,10 +127,11 @@ func (deps Deps) isolationStage(explicit string, read func(policy.Policy) string
 
 func (deps Deps) envPassthrough(cfg *Config) []string {
 	names := slices.Clone(cfg.Realization.EnvPassthrough)
-	for _, optIn := range slices.Sorted(maps.Keys(envOptIns)) {
-		if v, _ := lookupEnv(deps, optIn); v == "1" {
-			names = append(names, envOptIns[optIn])
+	for _, o := range credentialOptIns {
+		if !o.allowed(deps) {
+			continue
 		}
+		names = append(names, o.key)
 	}
 	return names
 }

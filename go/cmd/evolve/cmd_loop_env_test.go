@@ -62,7 +62,7 @@ func TestBuildCycleContext_EmptyGoalTextOmitsKey(t *testing.T) {
 	}
 }
 
-func TestCarriedEnv_CarriesOnlyTheMarkersAndTheControlsNotYetMoved(t *testing.T) {
+func TestCarriedEnv_CarriesOnlyTheMarkers(t *testing.T) {
 	t.Parallel()
 	osEnv := []string{
 		"EVOLVE_BYPASS_SHIP_GATE=1",
@@ -76,14 +76,12 @@ func TestCarriedEnv_CarriesOnlyTheMarkersAndTheControlsNotYetMoved(t *testing.T)
 		"BRIDGE_RUN_ID=r1",
 	}
 	got := carriedEnv(osEnv)
-	for _, name := range []string{"EVOLVE_BYPASS_SHIP_GATE", "EVOLVE_SANDBOX_FALLBACK_ON_EPERM", "BRIDGE_ALLOW_BYPASS", "BRIDGE_RUN_ID", "EVOLVE_ROUTING_MODE", "EVOLVE_AUDITOR_CLI", "EVOLVE_AUDITOR_MODEL"} {
+	for _, name := range []string{"EVOLVE_BYPASS_SHIP_GATE", "EVOLVE_SANDBOX_FALLBACK_ON_EPERM", "EVOLVE_SANDBOX", "BRIDGE_ALLOW_BYPASS", "BRIDGE_RUN_ID", "EVOLVE_ROUTING_MODE", "EVOLVE_AUDITOR_CLI", "EVOLVE_AUDITOR_MODEL"} {
 		if _, present := got[name]; present {
-			t.Errorf("%s of the parent reached the cycle env; only the pipeline markers and the controls not yet moved may", name)
+			t.Errorf("%s of the parent reached the cycle env; only the pipeline markers may", name)
 		}
 	}
-	for name, want := range map[string]string{"EVOLVE_PROJECT_ROOT": "/repo", "EVOLVE_SANDBOX": "off"} {
-		if got[name] != want {
-			t.Errorf("%s = %q, want %q: a marker or a control not yet moved must still reach the cycle", name, got[name], want)
-		}
+	if got["EVOLVE_PROJECT_ROOT"] != "/repo" {
+		t.Errorf("EVOLVE_PROJECT_ROOT = %q, want /repo: a marker must still reach the cycle", got["EVOLVE_PROJECT_ROOT"])
 	}
 }

@@ -16,10 +16,11 @@ import (
 )
 
 type routingRun struct {
-	bypass    bool
-	env       map[string]string
-	role      string
-	overrides cliroute.Overrides
+	bypass     bool
+	env        map[string]string
+	role       string
+	overrides  cliroute.Overrides
+	sandboxOff string
 }
 
 func (r routingRun) centerRole() string {

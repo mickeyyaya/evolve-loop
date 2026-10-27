@@ -17,7 +17,7 @@ func TestConfinementSatisfied(t *testing.T) {
 		{"nested is unverified and fails closed", true, "", false, false, "UNVERIFIED"},
 		{"nested explicit opt-out", true, "off", true, true, "UNCONFINED"},
 		{"explicit opt-out satisfies loudly", false, "off", true, true, "UNCONFINED"},
-		{"opt-out tolerates whitespace", false, " off ", true, true, "EVOLVE_SANDBOX=off"},
+		{"opt-out tolerates whitespace", false, " off ", true, true, "--sandbox-off"},
 		{"unavailable fails closed", false, "", false, false, "required but unavailable"},
 		{"unknown mode is not an opt-out", false, "auto", false, false, "required but unavailable"},
 	}

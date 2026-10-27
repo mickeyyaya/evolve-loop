@@ -62,7 +62,7 @@ func TestWithProtectedWrites_ShadowKeepsTheRulesAsReportsAndOffDropsThem(t *test
 func TestSandboxWrap_EnforceDeniesTheProtectedPathsOfTheWorktree(t *testing.T) {
 	t.Parallel()
 	wt := realTempDir(t)
-	prefix, ok := defaultSandboxWrapWithProbe(Deps{GuaranteeStage: "enforce", ExecStage: "off", Env: map[string]string{"EVOLVE_SANDBOX": "on"}}, fakeProbe("darwin", true))(SandboxWrapRequest{
+	prefix, ok := defaultSandboxWrapWithProbe(Deps{GuaranteeStage: "enforce", ExecStage: "off", SandboxMode: "on"}, fakeProbe("darwin", true))(SandboxWrapRequest{
 		Phase: "build", CLI: "agy-tmux", Worktree: wt, Workspace: t.TempDir(), RepoRoot: t.TempDir(),
 	})
 	if !ok {
@@ -84,7 +84,7 @@ func TestSandboxWrap_TheProtectedRulesNameTheRealPathsOfASymlinkedWorktreeAndThe
 	if err := os.Symlink(realWT, link); err != nil {
 		t.Fatal(err)
 	}
-	deps := Deps{GuaranteeStage: "enforce", ExecStage: "off", Env: map[string]string{"EVOLVE_SANDBOX": "on"}}
+	deps := Deps{GuaranteeStage: "enforce", ExecStage: "off", SandboxMode: "on"}
 	prefix, ok := defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))(SandboxWrapRequest{
 		Phase: "build", CLI: "agy-tmux", Worktree: link, Workspace: t.TempDir(), RepoRoot: root,
 	})

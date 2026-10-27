@@ -71,7 +71,7 @@ func probeBuildHandoffFloor(projectRoot string) core.BuildHandoffFloor {
 		fmt.Fprintf(os.Stderr, "[policy] WARN %v (the build handoff floor uses the compiled workflow defaults, as the cycle does)\n", err)
 		pol = policy.Policy{}
 	}
-	cfg, _ := config.Load(config.RegistryPath(projectRoot), filterEvolveEnv(os.Environ()))
+	cfg, _ := config.Load(config.RegistryPath(projectRoot))
 	return core.WholeBuildHandoffFloor(composedBuildHandoffFloor(pol.WorkflowConfig(), cfg))
 }
 

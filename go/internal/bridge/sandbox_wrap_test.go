@@ -172,18 +172,17 @@ func TestJoinPrefixForTmux_QuotesSpecialChars(t *testing.T) {
 
 func TestDefaultSandboxWrap_OffMode_NeverWraps(t *testing.T) {
 	t.Parallel()
-	deps := Deps{Env: map[string]string{"EVOLVE_SANDBOX": config.SandboxModeOff}}
+	deps := Deps{SandboxMode: config.SandboxModeOff}
 	wrap := defaultSandboxWrap(deps)
 	prefix, ok := wrap(SandboxWrapRequest{Phase: "build", Worktree: "/wt", Workspace: "/ws", RepoRoot: "/r"})
 	if ok || prefix != nil {
-		t.Errorf("EVOLVE_SANDBOX=off must short-circuit before Probe; got (%v, %v)", prefix, ok)
+		t.Errorf("--sandbox-off must short-circuit before Probe; got (%v, %v)", prefix, ok)
 	}
 }
 
 func TestDefaultSandboxWrap_NestedClaudeAuto_DoesNotWrap(t *testing.T) {
 	t.Parallel()
-	deps := Deps{Env: map[string]string{
-		"EVOLVE_SANDBOX":         config.SandboxModeAuto,
+	deps := Deps{SandboxMode: config.SandboxModeAuto, Env: map[string]string{
 		"CLAUDE_CODE_ENTRYPOINT": "cli",
 	}}
 	wrap := defaultSandboxWrap(deps)
@@ -196,7 +195,7 @@ func TestDefaultSandboxWrap_NestedClaudeAuto_DoesNotWrap(t *testing.T) {
 func TestDefaultSandboxWrap_NestedViaLookupEnv_DoesNotWrap(t *testing.T) {
 	t.Parallel()
 	deps := Deps{
-		Env: map[string]string{"EVOLVE_SANDBOX": config.SandboxModeAuto},
+		SandboxMode: config.SandboxModeAuto,
 		LookupEnv: func(k string) (string, bool) {
 			if k == "CLAUDE_CODE_SESSION_ID" {
 				return "sess-xyz", true
@@ -222,7 +221,7 @@ func fakeProbe(os string, available bool) func() sandbox.ProbeResult {
 func TestDefaultSandboxWrap_Darwin_WritesSBPLAndUsesDashF(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
-	deps := Deps{Env: map[string]string{"EVOLVE_SANDBOX": config.SandboxModeOn}}
+	deps := Deps{SandboxMode: config.SandboxModeOn}
 	wrap := defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))
 	prefix, ok := wrap(SandboxWrapRequest{
 		Phase: "build", Worktree: t.TempDir(), Workspace: ws, RepoRoot: t.TempDir(),
@@ -248,7 +247,7 @@ func TestDefaultSandboxWrap_Darwin_WritesSBPLAndUsesDashF(t *testing.T) {
 func TestDefaultSandboxWrap_Darwin_AllowsHomeReadAndProfileNetwork(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
-	deps := Deps{Env: map[string]string{"EVOLVE_SANDBOX": config.SandboxModeOn}}
+	deps := Deps{SandboxMode: config.SandboxModeOn}
 	wrap := defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))
 	prefix, ok := wrap(SandboxWrapRequest{
 		Phase:        "build",
@@ -277,13 +276,13 @@ func TestDefaultSandboxWrap_Darwin_AllowsHomeReadAndProfileNetwork(t *testing.T)
 func TestDefaultSandboxWrap_OnMode_UnavailableProbe_LogsWarn(t *testing.T) {
 	t.Parallel()
 	var stderr strings.Builder
-	deps := Deps{Env: map[string]string{"EVOLVE_SANDBOX": config.SandboxModeOn}, Stderr: &stderr}
+	deps := Deps{SandboxMode: config.SandboxModeOn, Stderr: &stderr}
 	wrap := defaultSandboxWrapWithProbe(deps, fakeProbe("linux", false))
 	prefix, ok := wrap(SandboxWrapRequest{Phase: "build", Worktree: "/wt", Workspace: "/ws", RepoRoot: "/r"})
 	if ok || prefix != nil {
 		t.Errorf("no host sandbox → must return (nil, false); got (%v, %v)", prefix, ok)
 	}
-	if !strings.Contains(stderr.String(), "EVOLVE_SANDBOX=on") || !strings.Contains(stderr.String(), "UNCONFINED") {
+	if !strings.Contains(stderr.String(), "sandbox.mode=on") || !strings.Contains(stderr.String(), "UNCONFINED") {
 		t.Errorf("expected loud WARN on on-mode + unavailable probe; got: %q", stderr.String())
 	}
 }
@@ -291,7 +290,7 @@ func TestDefaultSandboxWrap_OnMode_UnavailableProbe_LogsWarn(t *testing.T) {
 func TestDefaultSandboxWrap_AutoMode_UnavailableProbe_Silent(t *testing.T) {
 	t.Parallel()
 	var stderr strings.Builder
-	deps := Deps{Env: map[string]string{"EVOLVE_SANDBOX": config.SandboxModeAuto}, Stderr: &stderr}
+	deps := Deps{SandboxMode: config.SandboxModeAuto, Stderr: &stderr}
 	wrap := defaultSandboxWrapWithProbe(deps, fakeProbe("linux", false))
 	_, _ = wrap(SandboxWrapRequest{Phase: "build", Worktree: "/wt", Workspace: "/ws", RepoRoot: "/r"})
 	if strings.Contains(stderr.String(), "WARN") {
@@ -301,8 +300,7 @@ func TestDefaultSandboxWrap_AutoMode_UnavailableProbe_Silent(t *testing.T) {
 
 func TestDefaultSandboxWrap_UnknownMode_NestedClaude_DoesNotWrap(t *testing.T) {
 	t.Parallel()
-	deps := Deps{Env: map[string]string{
-		"EVOLVE_SANDBOX":         "1",
+	deps := Deps{SandboxMode: "1", Env: map[string]string{
 		"CLAUDE_CODE_ENTRYPOINT": "cli",
 	}}
 	wrap := defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))
@@ -310,14 +308,14 @@ func TestDefaultSandboxWrap_UnknownMode_NestedClaude_DoesNotWrap(t *testing.T) {
 		Phase: "scout", Worktree: t.TempDir(), Workspace: t.TempDir(), RepoRoot: t.TempDir(),
 	})
 	if ok || prefix != nil {
-		t.Errorf("unrecognized EVOLVE_SANDBOX value must normalize to auto and skip wrap under nested-claude; got (%v, %v)", prefix, ok)
+		t.Errorf("unrecognized sandbox mode must normalize to auto and skip wrap under nested-claude; got (%v, %v)", prefix, ok)
 	}
 }
 
 func TestDefaultSandboxWrap_UnknownMode_NormalizesToAuto_WarnsAndWrapsWhenNotNested(t *testing.T) {
 	t.Parallel()
 	var stderr strings.Builder
-	deps := Deps{Env: map[string]string{"EVOLVE_SANDBOX": "bogus"}, Stderr: &stderr}
+	deps := Deps{SandboxMode: "bogus", Stderr: &stderr}
 	wrap := defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))
 	prefix, ok := wrap(SandboxWrapRequest{
 		Phase: "build", Worktree: t.TempDir(), Workspace: t.TempDir(), RepoRoot: t.TempDir(),
@@ -325,7 +323,7 @@ func TestDefaultSandboxWrap_UnknownMode_NormalizesToAuto_WarnsAndWrapsWhenNotNes
 	if !ok || len(prefix) == 0 {
 		t.Errorf("unknown value normalizes to auto; not-nested + available probe → should wrap; got (%v, %v)", prefix, ok)
 	}
-	if !strings.Contains(stderr.String(), "EVOLVE_SANDBOX") || !strings.Contains(stderr.String(), "unrecognized") {
+	if !strings.Contains(stderr.String(), "sandbox mode") || !strings.Contains(stderr.String(), "unrecognized") {
 		t.Errorf("expected an unrecognized-value WARN; got %q", stderr.String())
 	}
 }
@@ -333,8 +331,7 @@ func TestDefaultSandboxWrap_UnknownMode_NormalizesToAuto_WarnsAndWrapsWhenNotNes
 func TestDefaultSandboxWrap_OnMode_NestedClaude_DoesNotWrap(t *testing.T) {
 	t.Parallel()
 	var stderr strings.Builder
-	deps := Deps{Env: map[string]string{
-		"EVOLVE_SANDBOX":         config.SandboxModeOn,
+	deps := Deps{SandboxMode: config.SandboxModeOn, Env: map[string]string{
 		"CLAUDE_CODE_ENTRYPOINT": "cli",
 	}, Stderr: &stderr}
 	wrap := defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))
@@ -344,7 +341,7 @@ func TestDefaultSandboxWrap_OnMode_NestedClaude_DoesNotWrap(t *testing.T) {
 	if ok || prefix != nil {
 		t.Errorf("on-mode + nested-claude must NOT wrap (inner sandbox-exec hangs on nested macOS); got (%v, %v)", prefix, ok)
 	}
-	if !strings.Contains(stderr.String(), "EVOLVE_SANDBOX=on") || !strings.Contains(stderr.String(), "UNCONFINED") {
+	if !strings.Contains(stderr.String(), "sandbox.mode=on") || !strings.Contains(stderr.String(), "UNCONFINED") {
 		t.Errorf("on-mode nested skip must emit a loud WARN; got %q", stderr.String())
 	}
 }

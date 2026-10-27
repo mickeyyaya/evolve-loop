@@ -7,12 +7,14 @@ import (
 )
 
 func TestLoad_IgnoresTheMovedRoutingEnvironmentDials(t *testing.T) {
-	env := map[string]string{
+	for k, v := range map[string]string{
 		"EVOLVE_DYNAMIC_ROUTING": "enforce", "EVOLVE_ROUTING_MODE": "static", "EVOLVE_COMMIT_EVIDENCE": "enforce",
 		"EVOLVE_PHASE_IO": "off", "EVOLVE_MANDATORY_PHASES": "scout,build", "EVOLVE_CONDITIONAL_MANDATORY": "tdd:build_size>=9",
-		"EVOLVE_MAX_OPTIONAL_INSERTIONS": "9",
+		"EVOLVE_MAX_OPTIONAL_INSERTIONS": "9", "EVOLVE_SANDBOX": "off", "EVOLVE_USE_PHASE_REGISTRY": "0",
+	} {
+		t.Setenv(k, v)
 	}
-	got, ws := New(WithReadFile(func(string) ([]byte, error) { return nil, fs.ErrNotExist })).Load("absent.json", env)
+	got, ws := New(WithReadFile(func(string) ([]byte, error) { return nil, fs.ErrNotExist })).Load("absent.json")
 	if !reflect.DeepEqual(got, defaults()) {
 		t.Errorf("Load with the moved dials set = %+v, want the compiled defaults: the routing reads policy.json, not the environment", got)
 	}

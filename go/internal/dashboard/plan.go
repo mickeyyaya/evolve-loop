@@ -34,8 +34,8 @@ type mandatorySet struct {
 	order       []string
 }
 
-func readMandatory(root string, env map[string]string) (mandatorySet, []string) {
-	cfg, ws := router.ConfigForProject(root, env, io.Discard)
+func readMandatory(root string) (mandatorySet, []string) {
+	cfg, ws := router.ConfigForProject(root, io.Discard)
 	var warnings []string
 	for _, w := range ws {
 		if config.IsRegistryFault(w) {

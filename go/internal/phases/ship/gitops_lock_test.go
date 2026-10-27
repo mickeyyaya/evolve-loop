@@ -21,7 +21,7 @@ func TestShipDirect_AcquiresAndReleasesShipLock(t *testing.T) {
 		Class:            ClassManual,
 		CommitMessage:    "fix: manual change",
 		BypassCommitGate: true,
-		Env:              map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"},
+		AutoConfirm:      "test",
 		shipLock: func(path string) (func(), error) {
 			acquired++
 			lockedPath = path

@@ -47,10 +47,10 @@ func TestRealTmux_AgentTmuxProbeCannotKillTheRunServer(t *testing.T) {
 	defer itTmuxCtl.KillSession(context.Background(), sess)
 
 	deps := Deps{
-		Tmux:  execTmux{},
-		Sleep: func(time.Duration) { time.Sleep(100 * time.Millisecond) },
-		Now:   time.Now,
-		Env:   map[string]string{envSandboxMode: "off"},
+		Tmux:        execTmux{},
+		Sleep:       func(time.Duration) { time.Sleep(100 * time.Millisecond) },
+		Now:         time.Now,
+		SandboxMode: "off",
 	}.withDefaults()
 	_, code, err := bootTmuxREPL(ctx, cfg, deps, itLaunch(sess, launch, marker, 0, false),
 		replPreparation{prefix: "[it]", workingDir: cfg.Worktree}, nil)

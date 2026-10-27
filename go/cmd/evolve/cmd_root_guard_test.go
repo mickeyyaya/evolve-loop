@@ -100,6 +100,7 @@ func TestRootSignalCenter_EveryRootSubscribesThePublisher(t *testing.T) {
 		"newRootSignalCenter": {"cmd/evolve/cmd_cycle.go:newRoleSignalCenter"},
 		"newRoleSignalCenter": {
 			"cmd/evolve/cli_queue.go:applyQueue",
+			"cmd/evolve/cmd_bridge.go:recordBridgeBypass",
 			"cmd/evolve/cmd_cycle.go:agentRunSignals",
 			"cmd/evolve/cmd_cycle.go:wireOrchestratorDeps",
 			"cmd/evolve/cmd_cycle_simulate.go:wireSimulateOrchestrator",

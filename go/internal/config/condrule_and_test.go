@@ -24,8 +24,8 @@ func TestParseCondRule_AndClauses(t *testing.T) {
 	if _, err := parseCondRule("cycle_size!=trivial && nonsense"); err == nil {
 		t.Errorf("a malformed AND clause must fail the whole rule")
 	}
-	cfg, _ := Load(filepath.Join(t.TempDir(), "absent.json"), map[string]string{
-		"EVOLVE_CONDITIONAL_MANDATORY": "tdd:cycle_size!=trivial&&deliverable_kind!=document",
+	cfg, _ := withKnobs(defaults(), func(k *RoutingKnobs) {
+		k.ConditionalMandatory = map[string]string{"tdd": "cycle_size!=trivial&&deliverable_kind!=document"}
 	})
 	if r := cfg.Conditional["tdd"]; len(r.And) != 1 || r.And[0].Field != "deliverable_kind" {
 		t.Errorf("env form: Conditional[tdd] = %+v, want the AND clause", r)
@@ -33,7 +33,7 @@ func TestParseCondRule_AndClauses(t *testing.T) {
 }
 
 func TestLoad_RegistryTddRule_ReleasesDocumentCycles(t *testing.T) {
-	cfg, ws := Load(filepath.Join("..", "..", "..", "docs", "architecture", "phase-registry.json"), map[string]string{})
+	cfg, ws := Load(filepath.Join("..", "..", "..", "docs", "architecture", "phase-registry.json"))
 	for _, w := range ws {
 		if w.Code == "unknown-value" {
 			t.Errorf("registry warning: %s", w.Message)
@@ -61,7 +61,7 @@ func TestLoad_RegistryTddRule_ReleasesDocumentCycles(t *testing.T) {
 
 func TestDefaults_TddRuleMatchesRegistry(t *testing.T) {
 	want := DefaultTddRule()
-	cfg, _ := Load(filepath.Join("..", "..", "..", "docs", "architecture", "phase-registry.json"), map[string]string{})
+	cfg, _ := Load(filepath.Join("..", "..", "..", "docs", "architecture", "phase-registry.json"))
 	got := cfg.Conditional["tdd"]
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("registry tdd rule %+v != compiled default %+v (DefaultTddRuleExpr=%q)", got, want, DefaultTddRuleExpr)

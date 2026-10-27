@@ -50,7 +50,6 @@ func runPhaseOrder(t *testing.T) (code int, stdout, stderr string) {
 const twoPhaseRegistry = `{"phases":[{"name":"scout"},{"name":""},{"name":"ship"}]}`
 
 func TestRunPhaseOrder_ResolvesTheRegistryRoot(t *testing.T) {
-	t.Setenv("EVOLVE_USE_PHASE_REGISTRY", "")
 	t.Setenv("GIT_CEILING_DIRECTORIES", "")
 	envRoot := t.TempDir()
 	writeRegistry(t, envRoot, twoPhaseRegistry)
@@ -83,40 +82,21 @@ func TestRunPhaseOrder_ResolvesTheRegistryRoot(t *testing.T) {
 	}
 }
 
-func TestRunPhaseOrder_RegistryOffSwitchPrintsTheHardcodedOrder(t *testing.T) {
+func TestRunPhaseOrder_TheEnvironmentDoesNotTurnTheRegistryOff(t *testing.T) {
 	root := t.TempDir()
-	writeRegistry(t, root, `not json`)
+	writeRegistry(t, root, twoPhaseRegistry)
 	t.Setenv("EVOLVE_PROJECT_ROOT", root)
 	t.Setenv("EVOLVE_USE_PHASE_REGISTRY", "0")
 
-	code, stdout, stderr := runPhaseOrder(t)
+	code, stdout, _ := runPhaseOrder(t)
 
-	want := strings.Join(phaseorder.HardcodedOrder, "\n") + "\n"
-	if code != 0 || stdout != want || stderr != "" {
-		t.Fatalf("RunPhaseOrder = %d, %q, %q; want 0 and the hardcoded order", code, stdout, stderr)
-	}
-}
-
-func TestRunPhaseOrder_OnlyTheExactZeroTurnsTheRegistryOff(t *testing.T) {
-	for _, value := range []string{"1", "false", "00", " 0"} {
-		t.Run(value, func(t *testing.T) {
-			root := t.TempDir()
-			writeRegistry(t, root, twoPhaseRegistry)
-			t.Setenv("EVOLVE_PROJECT_ROOT", root)
-			t.Setenv("EVOLVE_USE_PHASE_REGISTRY", value)
-
-			code, stdout, _ := runPhaseOrder(t)
-
-			if code != 0 || stdout != "scout\nship\n" {
-				t.Fatalf("EVOLVE_USE_PHASE_REGISTRY=%q: %d, %q; want the registry order", value, code, stdout)
-			}
-		})
+	if code != 0 || stdout != "scout\nship\n" {
+		t.Fatalf("RunPhaseOrder = %d, %q; want the registry order: EVOLVE_USE_PHASE_REGISTRY is not read", code, stdout)
 	}
 }
 
 func TestRunPhaseOrder_MissingRegistryFallsBackToTheHardcodedOrder(t *testing.T) {
 	t.Setenv("EVOLVE_PROJECT_ROOT", t.TempDir())
-	t.Setenv("EVOLVE_USE_PHASE_REGISTRY", "")
 
 	code, stdout, _ := runPhaseOrder(t)
 
@@ -134,7 +114,6 @@ func TestRunPhaseOrder_UnreadableRegistryIsExitOneWithTheError(t *testing.T) {
 			root := t.TempDir()
 			writeRegistry(t, root, body)
 			t.Setenv("EVOLVE_PROJECT_ROOT", root)
-			t.Setenv("EVOLVE_USE_PHASE_REGISTRY", "")
 
 			code, stdout, stderr := runPhaseOrder(t)
 
@@ -155,7 +134,6 @@ func TestRunPhaseOrder_UnresolvableEnvRootWarnsAndKeepsTheRawRoot(t *testing.T) 
 		return p
 	}
 	t.Setenv("EVOLVE_PROJECT_ROOT", "rel-root")
-	t.Setenv("EVOLVE_USE_PHASE_REGISTRY", "")
 
 	code, stdout, stderr := runPhaseOrder(t)
 
@@ -178,7 +156,7 @@ func TestRunPhaseOrder_HelpPrintsUsageWithoutResolvingARoot(t *testing.T) {
 
 		code := RunPhaseOrder(args, nil, &out, &errOut)
 
-		want := "Usage: evolve phase-order\nEnv: EVOLVE_USE_PHASE_REGISTRY=0 forces hardcoded order\n"
+		want := "Usage: evolve phase-order\n"
 		if code != 0 || out.String() != want || errOut.String() != "" {
 			t.Fatalf("RunPhaseOrder(%q) = %d, %q, %q; want 0 and the usage", args, code, out.String(), errOut.String())
 		}

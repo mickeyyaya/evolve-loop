@@ -69,6 +69,27 @@ func (p Policy) GoalStallWeight() float64 {
 
 type SandboxPolicy struct {
 	NestedFallback string `json:"nested_fallback,omitempty"`
+	Mode           string `json:"mode,omitempty"`
+}
+
+func (s *SandboxPolicy) UnmarshalJSON(raw []byte) error {
+	type block SandboxPolicy
+	var decoded block
+	if err := decodeStrict(raw, &decoded); err != nil {
+		return fmt.Errorf("sandbox: %w", err)
+	}
+	if decoded.Mode != "" && decoded.Mode != config.SandboxModeAuto && decoded.Mode != config.SandboxModeOn {
+		return fmt.Errorf("sandbox: mode %q is not auto or on; the sandbox turns off only through the audited --sandbox-off=<reason> parameter", decoded.Mode)
+	}
+	*s = SandboxPolicy(decoded)
+	return nil
+}
+
+func (s SandboxPolicy) SandboxMode() string {
+	if s.Mode == config.SandboxModeOn {
+		return config.SandboxModeOn
+	}
+	return config.SandboxModeAuto
 }
 
 func (p Policy) SandboxConfig() SandboxPolicy {
@@ -79,6 +100,7 @@ func (p Policy) SandboxConfig() SandboxPolicy {
 	if p.Sandbox.NestedFallback != "" {
 		c.NestedFallback = p.Sandbox.NestedFallback
 	}
+	c.Mode = p.Sandbox.Mode
 	return c
 }
 

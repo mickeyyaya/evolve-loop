@@ -13,6 +13,7 @@
 # This file is the single source of truth: the CI enforce step (and any future
 # acs ship-gate predicate) read it, so the two enforcement surfaces cannot drift.
 
+./internal/bypass
 ./internal/failuregrade
 ./internal/auditchain
 ./internal/auditcalibration

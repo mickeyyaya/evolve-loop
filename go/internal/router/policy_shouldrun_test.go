@@ -43,7 +43,7 @@ func TestShouldRunPhase_StageAware(t *testing.T) {
 }
 
 func TestPolicyForProject_FallsBackToDefaults(t *testing.T) {
-	p := PolicyForProject("/nonexistent", map[string]string{})
+	p := PolicyForProject("/nonexistent")
 	if !p.ShouldRunPhase("triage") {
 		t.Error("triage should default to run with no registry")
 	}

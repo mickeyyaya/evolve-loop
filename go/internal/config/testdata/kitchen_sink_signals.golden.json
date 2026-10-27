@@ -44,13 +44,6 @@
   {
     "Module": "config",
     "Kind": "config.warning",
-    "Code": "CONFIG_UNKNOWN_VALUE",
-    "Origin": "Loader.Load",
-    "Step": "env"
-  },
-  {
-    "Module": "config",
-    "Kind": "config.warning",
     "Code": "CONFIG_WEAK_SPINE",
     "Origin": "Loader.Load",
     "Step": "spine"

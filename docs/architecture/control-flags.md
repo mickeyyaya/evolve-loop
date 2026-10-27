@@ -64,9 +64,9 @@ This section documents the closed-vocabulary fields those blocks use.
 
 > Source: the audit of 2026-10-25 on `origin/main` at `603389ebd` ([research F5.1 to F5.6](../research/llm-isolation-2026-10.md#62-local-evidence-the-control-flags)). The fix of each class is component X18 ([ADR-0156](adr/0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md) I-16, [spec §27](llm-isolation.md#27-no-ambient-control-flags-x18)). Until X18 lands, this list is the full inventory, and the generated index below is not.
 
-The registry has 7 rows. The production code reads more names than that. Many names are built as `"EVOLVE_" + "X"`, so a literal grep misses them. Each reader was in one of five classes. Classes (d) and (e) are empty since X18e.
+The registry has 4 rows. The production code reads more names than that. Many names are built as `"EVOLVE_" + "X"`, so a literal grep misses them. Each reader was in one of five classes. Classes (d) and (e) are empty since X18e, and classes (b) and (c) have no environment reader since X18c and X18d.
 
-**(a) Pipeline markers.** The pipeline sets them for its own child processes. They stay, as one named Go list: `ipcenv.Markers()` in `go/internal/ipcenv/markers.go` (X18b). The list has 24 `EVOLVE_*` names and 9 `BRIDGE_*` names. Only its part `ipcenv.CellMarkers()` reaches an LLM cell.
+**(a) Pipeline markers.** The pipeline sets them for its own child processes. They stay, as one named Go list: `ipcenv.Markers()` in `go/internal/ipcenv/markers.go` (X18b). The list has 24 `EVOLVE_*` names and 8 `BRIDGE_*` names. Only its part `ipcenv.CellMarkers()` reaches an LLM cell.
 
 | Group | Names | Reader |
 |---|---|---|
@@ -75,7 +75,7 @@ The registry has 7 rows. The production code reads more names than that. Many na
 | Fleet and cycle (`ipcenv`) | `EVOLVE_FLEET`, `EVOLVE_FLEET_SCOPE`, `EVOLVE_FLEET_WIDTH`, `EVOLVE_FLEET_REACH_HOLDER`, `EVOLVE_WORKTREE_ROOT`, `EVOLVE_CYCLE_STATE_FILE`, `EVOLVE_TMUX_SOCKET` | `go/internal/ipcenv/ipcenv.go:5-18` |
 | Fan-out worker | `EVOLVE_FANOUT_WORKER_TOKEN`, `EVOLVE_FANOUT_WORKER_NAME`, `EVOLVE_FANOUT_CYCLE`, `EVOLVE_FANOUT_WORKSPACE`, `EVOLVE_FANOUT_PARENT_AGENT`, `EVOLVE_FANOUT_WORKER_ARTIFACT`, `EVOLVE_FANOUT_CACHE_PREFIX_FILE` | `subagent/dispatchparallel.go:176-178`, `fanoutdispatch` |
 | Protocol | `EVOLVE_BRIDGE_PIDFILE`, `EVOLVE_PHASE_RECOVERY_STAGE`, `EVOLVE_SHIP_RELEASE_NOTES`, `EVOLVE_CLI` | `bridge/engine.go:33`, `cli/phasecmd/phase_observer.go:155`, `ship/gitops.go:372`, `codeindex/usagelog/usagelog.go:28` |
-| Bridge launch | `BRIDGE_CLI`, `BRIDGE_RUN_ID`, `BRIDGE_COMPLETION`, `BRIDGE_PERMISSION_MODE`, `BRIDGE_SESSION_NAME`, `BRIDGE_STREAM_OUTPUT`, `BRIDGE_REQUIRE_FULL`, `BRIDGE_REQUIRE_SANDBOX`, `BRIDGE_HUMAN_INPUT_FLAG` | `bridge/launch.go:275-297` |
+| Bridge launch | `BRIDGE_CLI`, `BRIDGE_RUN_ID`, `BRIDGE_COMPLETION`, `BRIDGE_PERMISSION_MODE`, `BRIDGE_SESSION_NAME`, `BRIDGE_STREAM_OUTPUT`, `BRIDGE_REQUIRE_FULL`, `BRIDGE_REQUIRE_SANDBOX` | `bridge/launch.go:275-297` |
 
 **(b) Operator knobs.** They change the flow. X18c moved each one into a strict-decoded key of `.evolve/policy.json` or into a CLI parameter. The pipeline reads the key at each cycle start. No code reads a class (b) name from the environment now.
 
@@ -100,19 +100,22 @@ The registry has 7 rows. The production code reads more names than that. Many na
 | `EVOLVE_PROFILE_DIR`, `EVOLVE_PERSONA_OVERRIDE` | the `--profile-dir` and `--persona-override` parameters of `evolve phases`; the ship lint reads `<root>/.evolve/profiles` | `phases/ship/commitgate.go` |
 | `EVOLVE_GO_BIN` | `<root>/go/bin/evolve`, then `evolve` on `PATH` | `consensusdispatch`, `releasepipeline`, `rollback` |
 
-**(c) Bypasses.** Each becomes an explicit CLI parameter that writes an audit record, or it goes (X18d).
+**(c) Bypasses.** X18d made each bypass an explicit CLI parameter or a policy key, or removed it. No code reads a class (c) name from the environment now. The former names are in `ipcenv.RetiredControls()` too, so a set name prints the same `[policy] WARN` as a class (b) name.
 
-| Names | Reader | Note |
+- An audited bypass parameter takes the reason as its value. An empty value means that the bypass is not in use. A bare `--sandbox-off` or `--auto-confirm` takes the next argument as its reason, so write `--<name>=<reason>`. A bare `--human-input` is refused.
+- `bypass.Check` refuses a use inside an LLM cell: `EVOLVE_PHASE` is set, or the dispatch depth is more than 0.
+- `bypass.Record` (`go/internal/bypass`) first writes one ledger entry of kind `control_bypass`. Then it emits one `CONTROL_BYPASS_USED` signal. When the ledger write fails, the command refuses the bypass and emits no signal. Each record has the bypass name, the operator account, the reason and the time.
+
+| Former name | Replacement | Audit record |
 |---|---|---|
-| `EVOLVE_SANDBOX` | `config/env.go:19`, `looppreflight/looppreflight.go:240` | partly duplicates `sandbox.nested_fallback`; spec §7 refuses it in a phase |
-| `EVOLVE_USE_PHASE_REGISTRY` | `config/config.go:47` | |
-| `EVOLVE_OPERATOR_CONFIRM` | `continuation/authority.go:12` | the env form of `-operator` |
-| `EVOLVE_SHIP_AUTO_CONFIRM` | `phases/ship/verify.go:183` | set for children by `releasepipeline` and `rollback` |
-| `EVOLVE_PHASE_<X>_BIN` | `adapters/runner/runner.go:63-64` | |
-| `BRIDGE_ALLOW_BYPASS`, `BRIDGE_DRY_RUN` | `bridge/launch.go:294-295` | |
-| `BRIDGE_ALLOW_ANTHROPIC_BASE_URL` | `bridge/driver_claudetmux.go:28` | |
-| `BRIDGE_ALLOW_OPENAI_API_KEY` | `bridge/driver_codextmux.go:26` | |
-| `BRIDGE_HUMAN_SIMULATION` | `bridge/launch.go:48` | |
+| `EVOLVE_SANDBOX` | `sandbox.mode` (`auto` or `on`) in policy.json; the `--sandbox-off=<reason>` parameter of `evolve loop` and `evolve cycle run` | a ledger entry and a signal for each `--sandbox-off` |
+| `EVOLVE_USE_PHASE_REGISTRY` | none: the loader always reads the phase registry | — |
+| `EVOLVE_OPERATOR_CONFIRM` | the `-operator` parameter of `evolve continuation` | — (the parameter was the primary surface before X18d) |
+| `EVOLVE_SHIP_AUTO_CONFIRM` | the `--auto-confirm=<reason>` parameter of `evolve ship --class manual`; `rollback` passes it to its ship child | a ledger entry and a signal for each use outside `--dry-run` |
+| `EVOLVE_PHASE_<X>_BIN` | none: the agent bridge runs each phase, and `runner.PerPhase` had no caller | — |
+| `BRIDGE_ALLOW_BYPASS`, `BRIDGE_DRY_RUN` | the `--allow-bypass` and `--dry-run` parameters of `evolve bridge launch` | — (the pipeline sets `--allow-bypass` for each phase launch) |
+| `BRIDGE_ALLOW_ANTHROPIC_BASE_URL`, `BRIDGE_ALLOW_OPENAI_API_KEY` | `bridge.allow_anthropic_base_url` and `bridge.allow_openai_api_key` in policy.json | a signal at each start of the bridge adapter of a cycle (`bypass.Emit`, actor `policy.json`) |
+| `BRIDGE_HUMAN_SIMULATION`, `BRIDGE_HUMAN_INPUT_FLAG` | the `--human-input=<reason>` parameter of `evolve bridge launch` | a ledger entry and a signal for each use outside `--dry-run` and `--validate-only`; a launch with no audit sink is refused |
 
 **(d) Dead names.** X18e deleted them, with their registry rows, their writers and the persona text that named them. No class (d) name is left. The plan row X18e in [llm-isolation-2026-10.md](../plans/llm-isolation-2026-10.md) lists each deleted name.
 
@@ -125,16 +128,15 @@ The registry has 7 rows. The production code reads more names than that. Many na
 | the binary overrides of `bridge.resolveBinary` | the field `bridge.Deps.Binaries` (CLI name to path); an E2E test puts the fake CLI first on `PATH` |
 | the install and missing-tool switches of `evolve commit-gate run` | the fields `commitgate.Options.TestInstall` and `ForceMissing` |
 
-`TestRemovedControlNames_HaveNoProductionRead` (`go/internal/guards/control_flags_test.go`) fails when production code reads one of these names again, however the code builds the name. `TestRetiredControls_HaveNoProductionRead` does the same for the class (b) names. `TestFlagRegistryRows_EachHasAProductionReader` fails on a registry row that no code reads.
+`TestRemovedControlNames_HaveNoProductionRead` (`go/internal/guards/control_flags_test.go`) fails when production code reads one of these names again, however the code builds the name. `TestRetiredControls_HaveNoProductionRead` does the same for the class (b) and class (c) names. `TestFlagRegistryRows_EachHasAProductionReader` fails on a registry row that no code reads.
 
 The guard `TestNoControlFlagReadOutsideTheMarkerList` (`go/internal/guards/control_flags_test.go`) keeps this inventory true:
 
 - It reads each non-test Go file and finds each read of an environment name. A read is a call of `os.Getenv`, `os.LookupEnv` or an `envchain` reader, or an index of a map whose variable or field name contains `env`. A function that passes its parameter to a read is a reader too.
 - It folds a constant concatenation such as `"EVOLVE_" + "X"`, also through a constant of another package and a local variable. A part that is not constant becomes `*`, so `"EVOLVE_" + agent + "_CLI"` is `EVOLVE_*_CLI`.
-- It fails on each `EVOLVE_*` or `BRIDGE_*` name that is not a marker or a control not yet moved. It also fails on a declared control that no code reads.
-- `TestControlFlagLists_OnlyShrink` holds the ceiling of 10 controls not yet moved. X18c lowered it from 29.
+- It fails on each `EVOLVE_*` or `BRIDGE_*` name that is not a marker. X18d removed the list of controls not yet moved (`ipcenv.UnmovedControls`) and its ceiling test, because the list became empty.
 - Limits: the guard finds a read by its form, not by its type.
-  - A table entry counts as a read only when its field is `key`, as in `envDials` of `config/env.go`. The table of `ipcenv.RetiredControls` uses the field `Name`, because it holds no read.
+  - A table entry counts as a read only when its field is `key`. The table of `ipcenv.RetiredControls` uses the field `Name`, because it holds no read.
   - A read whose name has no constant prefix is not judged.
   - An index of a map with another name, for example `vars["EVOLVE_X"]`, is not seen.
   - A scan of `os.Environ()` with `strings.HasPrefix` is not seen.
@@ -151,11 +153,8 @@ Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit t
 | Flag | Status | Kind | Default | Cluster | Purpose |
 |------|--------|------|---------|---------|----------|
 | `EVOLVE_CLI` | internal | — | — | — | Undocumented production reader (inventory 2026-06-11); classify when touched. |
-| `EVOLVE_OPERATOR_CONFIRM` | internal | bool | unset (refuses) | Operator Authority | Non-interactive spelling of the `-operator` authority flag, which is the PRIMARY surface; the env path exists for a script or a session that cannot pass the flag (the EVOLVE_LANE precedent: flag primary, env retained for script compatibility). NOT a feature dial and NOT consolidatable into policy.json — it configures no behavior, it carries per-invocation CONSENT, and a persisted 'the operator agrees' value would permanently disarm the gate it guards, so the flag-reduction campaign metric (LiveFeatureFlags) correctly excludes it. Read by VALUE, never by mere presence (envchain.Bool): `1`/`true`/`yes`/`on` authorize; `0`, an unrecognized word, and an exported-but-empty value are all refusals, so a variable lingering in a lane's environment can never consent on the operator's behalf. Gates `evolve continuation release` (cycle-1684, ADR-0089): releasing a continuation binding erases the lineage the defect-ledger gate reads as anti-tamper evidence, and the phase guard denies in-process Agent/Task dispatch but says nothing about a Bash invocation of the evolve binary. |
 | `EVOLVE_PLUGIN_ROOT` | active | — | — | Core Infrastructure (never consolidate) | Read-only plugin install location |
 | `EVOLVE_PROJECT_ROOT` | active | — | — | Core Infrastructure (never consolidate) | Writable project directory (dual-root pattern) |
-| `EVOLVE_SANDBOX` | active | — | — | Sandbox Cluster | Enable outer sandbox-exec/bwrap wrapper |
 | `EVOLVE_TMUX_SOCKET` | internal | — | — | Bridge Cluster | IPC channel (F6, not an operator dial): the loop exports the per-run bridge tmux socket name (evolve-bridge-p<looppid>) so its bridge subprocesses, the reaper, and the orphan GC all target the same isolated socket — so an external `tmux kill-server` on one run's socket can't tear down another. Unset ⇒ the shared `evolve-bridge` default. Set by the loop (cmd_loop) and, for a test process that runs real tmux, by `tmuxtest.Main` (`evolve-bridge-t<testpid>`, a server of its own); never by the operator. |
-| `EVOLVE_USE_PHASE_REGISTRY` | active | — | — | Dynamic Phase Routing (Go-native, v13.0.0 / PR #4 — default-off) | Set `0` to skip reading `phase-registry.json` (built-in defaults only) |
 
 <!-- GENERATED:flag-index END -->

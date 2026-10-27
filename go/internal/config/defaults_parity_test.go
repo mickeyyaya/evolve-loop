@@ -47,7 +47,7 @@ func TestPolicyStages_KeysMatchPolicyJSONTags(t *testing.T) {
 }
 
 func TestDefaults_GateDialsMatchPolicyCompiledDefaults(t *testing.T) {
-	cfg, ws := config.Load("/nonexistent/phase-registry.json", nil)
+	cfg, ws := config.Load("/nonexistent/phase-registry.json")
 	if len(ws) != 0 {
 		t.Fatalf("unexpected warnings: %+v", ws)
 	}

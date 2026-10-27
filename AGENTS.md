@@ -320,7 +320,7 @@ Bypass = "don't ask the user", NOT "skip integrity checks". These rules are mand
    The four `evolve guard` hooks are defence in depth in Claude Code panes only. The OS sandbox write rules, the worktree fence and the ship gates hold each guarantee for every family ([llm-isolation.md §9.1](docs/architecture/llm-isolation.md#91-as-built-x7)). The protected write rule of the sandbox denies only at `isolation.i7.stage` `enforce`; at the default `shadow` it only reports.
 4. Never fabricate cycle numbers (CRITICAL violation).
 5. Phase agents go through the native bridge (`evolve subagent run` / `evolve loop`). A phase agent can start subagents of its own harness inside its cell.
-6. The OS sandbox wraps subprocesses (`EVOLVE_SANDBOX=1`). When the sandbox is nested, the EPERM fallback turns on automatically.
+6. The OS sandbox wraps subprocesses (policy.json `sandbox.mode`, `auto` by default). When the sandbox is nested, the EPERM fallback turns on automatically. Only the audited `--sandbox-off=<reason>` parameter turns it off.
 7. Run the eval-quality pre-flight on every eval (`evolve eval quality-check`).
 8. The Adversarial Auditor is on by default. The auditor runs Claude Opus on Claude Code, and the builder runs agy first. `ADVERSARIAL_AUDIT=0` turns it off.
 

@@ -24,11 +24,11 @@ func TestTmuxBoot_AFailedDetachSendStopsTheBootBeforeTheLaunch(t *testing.T) {
 	tmux := &fakeTmux{}
 	var stderr bytes.Buffer
 	deps := Deps{
-		Tmux:   detachFailTmux{tmux},
-		Stderr: &stderr,
-		Sleep:  func(time.Duration) {},
-		Now:    time.Now,
-		Env:    map[string]string{envSandboxMode: "off"},
+		Tmux:        detachFailTmux{tmux},
+		Stderr:      &stderr,
+		Sleep:       func(time.Duration) {},
+		Now:         time.Now,
+		SandboxMode: "off",
 	}.withDefaults()
 	cfg := &Config{Workspace: t.TempDir(), Worktree: t.TempDir(), Agent: "build"}
 	lp := tmuxLaunch{name: "itest-tmux", session: "detach-fail", launchCmd: "fake-cli --go", promptMarker: "READY"}

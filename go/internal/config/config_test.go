@@ -26,7 +26,7 @@ func hasWarning(ws []Warning, code string) bool {
 }
 
 func TestLoad_DefaultsWhenRegistryMissing(t *testing.T) {
-	cfg, ws := Load(filepath.Join(t.TempDir(), "absent.json"), map[string]string{})
+	cfg, ws := Load(filepath.Join(t.TempDir(), "absent.json"))
 
 	if cfg.Stage != StageAdvisory {
 		t.Errorf("Stage = %v, want StageAdvisory (default-on since Component #7)", cfg.Stage)
@@ -66,7 +66,7 @@ func TestLoad_RegistryConfigBlockParsed(t *testing.T) {
       "phases": []
     }`)
 
-	cfg, ws := Load(reg, map[string]string{})
+	cfg, ws := Load(reg)
 
 	if cfg.Stage != StageShadow {
 		t.Errorf("Stage = %v, want StageShadow", cfg.Stage)
@@ -84,7 +84,7 @@ func TestLoad_RegistryConfigBlockParsed(t *testing.T) {
 
 func TestApplyPolicyStages_PolicyKnobsOverrideTheRegistry(t *testing.T) {
 	reg := writeRegistry(t, `{"schema_version":3,"config":{"dynamic_routing":"shadow"},"phases":[]}`)
-	loaded, _ := Load(reg, nil)
+	loaded, _ := Load(reg)
 	two := 2
 	cfg, ws := withKnobs(loaded, func(ps *RoutingKnobs) {
 		ps.DynamicRouting, ps.RoutingMode, ps.MaxOptionalInsertions = "enforce", "static", &two
@@ -107,11 +107,7 @@ func TestApplyPolicyStages_PolicyKnobsOverrideTheRegistry(t *testing.T) {
 func TestLoad_GateStagesUseDefaults(t *testing.T) {
 	absent := filepath.Join(t.TempDir(), "absent.json")
 
-	cfg, ws := Load(absent, map[string]string{
-		"EVOLVE_EVAL_GATE":       "off",
-		"EVOLVE_CONTRACT_GATE":   "shadow",
-		"EVOLVE_TRIAGE_CAP_GATE": "off",
-	})
+	cfg, ws := Load(absent)
 	if cfg.EvalGate != StageEnforce {
 		t.Errorf("default EvalGate = %v, want StageEnforce", cfg.EvalGate)
 	}
@@ -136,14 +132,6 @@ func TestApplyPolicyKnobs_UnknownStageDefaultsSafe(t *testing.T) {
 	}
 }
 
-func TestLoad_UseRegistryDisabled(t *testing.T) {
-	reg := writeRegistry(t, `{"schema_version":3,"config":{"max_optional_insertions":99},"phases":[]}`)
-	cfg, _ := Load(reg, map[string]string{"EVOLVE_USE_PHASE_REGISTRY": "0"})
-	if cfg.MaxInsertions != 4 {
-		t.Errorf("MaxInsertions = %d, want default 4 when registry disabled", cfg.MaxInsertions)
-	}
-}
-
 func TestLoad_PerPhaseEnabledAndTriggers(t *testing.T) {
 	reg := writeRegistry(t, `{
       "schema_version": 3,
@@ -155,7 +143,7 @@ func TestLoad_PerPhaseEnabledAndTriggers(t *testing.T) {
       ]
     }`)
 
-	cfg, _ := Load(reg, map[string]string{})
+	cfg, _ := Load(reg)
 
 	if cfg.PhaseEnable["tester"] != EnableContent {
 		t.Errorf("tester enable = %v, want EnableContent", cfg.PhaseEnable["tester"])
@@ -205,11 +193,11 @@ func TestStageAndModeString(t *testing.T) {
 func TestLoad_PhaseRecoveryStage(t *testing.T) {
 	absent := filepath.Join(t.TempDir(), "absent.json")
 
-	if cfg, _ := Load(absent, map[string]string{}); cfg.PhaseRecovery != StageShadow {
+	if cfg, _ := Load(absent); cfg.PhaseRecovery != StageShadow {
 		t.Errorf("default PhaseRecovery = %v, want StageShadow", cfg.PhaseRecovery)
 	}
 	for _, v := range []string{"off", "0", "shadow", "enforce", "banana"} {
-		cfg, _ := Load(absent, map[string]string{"EVOLVE_PHASE_RECOVERY": v})
+		cfg, _ := Load(absent)
 		if cfg.PhaseRecovery != StageShadow {
 			t.Errorf("EVOLVE_PHASE_RECOVERY=%q should be ignored (retired flag); got %v, want StageShadow", v, cfg.PhaseRecovery)
 		}
@@ -218,11 +206,11 @@ func TestLoad_PhaseRecoveryStage(t *testing.T) {
 
 func TestLoad_SpineFloorStage(t *testing.T) {
 	absent := filepath.Join(t.TempDir(), "absent.json")
-	if cfg, _ := Load(absent, map[string]string{}); cfg.SpineFloor != StageEnforce {
+	if cfg, _ := Load(absent); cfg.SpineFloor != StageEnforce {
 		t.Errorf("default SpineFloor = %v, want StageEnforce (R8.5 flip)", cfg.SpineFloor)
 	}
 	for _, v := range []string{"off", "shadow", "banana"} {
-		cfg, _ := Load(absent, map[string]string{"EVOLVE_SPINE_FLOOR": v})
+		cfg, _ := Load(absent)
 		if cfg.SpineFloor != StageEnforce {
 			t.Errorf("EVOLVE_SPINE_FLOOR=%q must be inert (policy-only dial); got %v, want StageEnforce", v, cfg.SpineFloor)
 		}
@@ -231,12 +219,12 @@ func TestLoad_SpineFloorStage(t *testing.T) {
 
 func TestLoad_FatalPaneStage(t *testing.T) {
 	absent := filepath.Join(t.TempDir(), "absent.json")
-	if cfg, _ := Load(absent, map[string]string{}); cfg.FatalPane != StageEnforce {
+	if cfg, _ := Load(absent); cfg.FatalPane != StageEnforce {
 		t.Errorf("default FatalPane = %v, want StageEnforce (F27 flip)", cfg.FatalPane)
 	}
 	for _, key := range []string{"EVOLVE_FATAL_PANE", "EVOLVE_PHASE_RECOVERY"} {
 		for _, v := range []string{"off", "shadow", "banana"} {
-			cfg, _ := Load(absent, map[string]string{key: v})
+			cfg, _ := Load(absent)
 			if cfg.FatalPane != StageEnforce {
 				t.Errorf("%s=%q must be inert for the policy-only fatal-pane dial; got %v, want StageEnforce", key, v, cfg.FatalPane)
 			}
@@ -247,7 +235,7 @@ func TestLoad_FatalPaneStage(t *testing.T) {
 func TestPhaseIOStage(t *testing.T) {
 	absent := filepath.Join(t.TempDir(), "absent.json")
 
-	if cfg, _ := Load(absent, map[string]string{}); cfg.PhaseIO != StageEnforce {
+	if cfg, _ := Load(absent); cfg.PhaseIO != StageEnforce {
 		t.Errorf("default PhaseIO = %v, want StageEnforce", cfg.PhaseIO)
 	}
 	for v, want := range map[string]Stage{

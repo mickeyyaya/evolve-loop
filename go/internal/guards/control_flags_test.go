@@ -339,12 +339,6 @@ func joinWildcards(name string) string {
 	return name
 }
 
-const unmovedControlCeiling = 10
-
-func declaredControlNames() []string {
-	return slices.Concat(ipcenv.Markers(), ipcenv.UnmovedControls())
-}
-
 func undeclaredReads(reads []envRead, declared []string) []envRead {
 	var out []envRead
 	for _, r := range reads {
@@ -370,19 +364,8 @@ func TestNoControlFlagReadOutsideTheMarkerList(t *testing.T) {
 		t.Fatalf("scanned only %d files under %s; the guard lost its corpus", len(scan.files), module)
 	}
 	reads := scan.reads()
-	for _, r := range undeclaredReads(reads, declaredControlNames()) {
-		t.Errorf("%s reads %s from the environment, and the name is not a pipeline marker (ipcenv.Markers), a control not yet moved (ipcenv.UnmovedControls). A test seam is an injected field, never an environment read. Read no control value from the environment: put a setting in policy.json and a bypass behind a CLI parameter (I-16, ADR-0156)", r.at, r.name)
-	}
-	for _, name := range ipcenv.UnmovedControls() {
-		if !slices.ContainsFunc(reads, func(r envRead) bool { return controlNameMatches(name, r.name) }) {
-			t.Errorf("%s is declared as a control not yet moved, but no production code reads it: remove it from the list", name)
-		}
-	}
-}
-
-func TestControlFlagLists_OnlyShrink(t *testing.T) {
-	if n := len(ipcenv.UnmovedControls()); n > unmovedControlCeiling {
-		t.Errorf("ipcenv.UnmovedControls has %d names, ceiling %d: a new control goes into policy.json or a CLI parameter, never into the environment", n, unmovedControlCeiling)
+	for _, r := range undeclaredReads(reads, ipcenv.Markers()) {
+		t.Errorf("%s reads %s from the environment, and the name is not a pipeline marker (ipcenv.Markers). A test seam is an injected field, never an environment read. Read no control value from the environment: put a setting in policy.json and a bypass behind a CLI parameter (I-16, ADR-0156)", r.at, r.name)
 	}
 }
 
@@ -413,7 +396,7 @@ import "os"
 
 var _ = os.Getenv("EVOLVE_" + "Z")
 `)
-	got := undeclaredReads(scanEnvModule(t, module).reads(), declaredControlNames())
+	got := undeclaredReads(scanEnvModule(t, module).reads(), ipcenv.Markers())
 	var names []string
 	for _, r := range got {
 		names = append(names, r.name)

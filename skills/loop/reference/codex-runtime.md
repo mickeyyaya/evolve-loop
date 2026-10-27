@@ -50,7 +50,7 @@ The `evolve guard` hooks are Claude Code PreToolUse hooks (`.claude/settings.jso
 | Variable | Required | Purpose |
 |---|---|---|
 | `codex` binary on PATH | yes | The binary that both codex drivers run |
-| `OPENAI_API_KEY` | no | If it is set, the `codex` driver refuses to start (exit 3) unless `BRIDGE_ALLOW_OPENAI_API_KEY=1`. Codex uses its own login (`codex login`). |
+| `OPENAI_API_KEY` | no | If it is set, the `codex` driver refuses to start (exit 3) unless policy.json sets `bridge.allow_openai_api_key`. Codex uses its own login (`codex login`). |
 
 ## Checks before you run cycles
 

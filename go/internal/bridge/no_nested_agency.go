@@ -15,22 +15,21 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-var ErrSandboxOffInPhase = errors.New("EVOLVE_SANDBOX=off is refused inside a phase: a phase agent must not start an unconfined agent")
+var ErrSandboxOffInPhase = errors.New("--sandbox-off is refused inside a phase: a phase agent must not start an unconfined agent")
 
 func (deps Deps) refuseSandboxOffInPhase(cfg *Config) error {
 	phase, _ := lookupEnv(deps, ipcenv.PhaseKey)
-	mode, _ := lookupEnv(deps, envSandboxMode)
-	if phase == "" || strings.TrimSpace(mode) != config.SandboxModeOff {
+	if phase == "" || strings.TrimSpace(deps.SandboxMode) != config.SandboxModeOff {
 		return nil
 	}
 	id := configIdentity(cfg)
 	deps.Signals.Emit(signalcenter.Event{
 		Cycle: id.cycle, RunID: id.runID, Phase: id.phase, Module: signalcenter.ModuleIsolation, Origin: "bridge.launchSwept",
 		Kind: signalcenter.KindIsolationViolation, Severity: signalcenter.SeverityWarn, Code: isolation.ViolationCode(3),
-		Reason: "the phase " + phase + " launched " + cfg.CLI + " with " + envSandboxMode + "=off",
+		Reason: "the phase " + phase + " launched " + cfg.CLI + " with --sandbox-off",
 		Fields: map[string]string{
 			"invariant": "I3", "stage": envStageEnforce, "action": "refused", "cell": cfg.Agent, "family": cfg.CLI, "phase": phase,
-			"target": envSandboxMode, "rule": "sandbox.off.phase", "source": "launcher",
+			"target": "--sandbox-off", "rule": "sandbox.off.phase", "source": "launcher",
 		},
 	})
 	return fmt.Errorf("%w (phase %s, cell %s)", ErrSandboxOffInPhase, phase, cfg.Agent)

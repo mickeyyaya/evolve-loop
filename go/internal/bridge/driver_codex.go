@@ -25,8 +25,8 @@ func (codexDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, err
 		fmt.Fprintf(deps.Stderr, "[codex] NOTE: --session-name='%s' is no-op for this driver (single-shot process).\n", cfg.SessionName)
 	}
 	if v, ok := lookupEnv(deps, "OPENAI_API_KEY"); ok && v != "" {
-		if allow, _ := lookupEnv(deps, "BRIDGE_ALLOW_OPENAI_API_KEY"); allow != "1" {
-			fmt.Fprintln(deps.Stderr, "[codex] credential-isolation guard: OPENAI_API_KEY set without BRIDGE_ALLOW_OPENAI_API_KEY=1")
+		if !deps.AllowOpenAIAPIKey {
+			fmt.Fprintln(deps.Stderr, "[codex] credential-isolation guard: OPENAI_API_KEY set without policy bridge.allow_openai_api_key")
 			return ExitCostLeak, nil
 		}
 	}

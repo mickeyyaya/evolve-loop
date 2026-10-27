@@ -27,7 +27,7 @@ func (hooks) ArtifactFilename(_ core.PhaseRequest) string {
 func (hooks) DefaultModel() string { return "auto" }
 
 func (hooks) ShouldSkip(req core.PhaseRequest) (bool, string, string, []core.Diagnostic) {
-	if router.PolicyForProject(req.ProjectRoot, req.Env).ShouldRunPhase(string(core.PhaseTDD)) {
+	if router.PolicyForProject(req.ProjectRoot).ShouldRunPhase(string(core.PhaseTDD)) {
 		return false, "", "", nil
 	}
 	return true, core.VerdictSKIPPED, string(core.PhaseBuild), nil

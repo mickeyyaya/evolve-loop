@@ -11,18 +11,19 @@ import (
 func TestCodexAuthMode(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name string
-		env  map[string]string
-		want string
+		name    string
+		env     map[string]string
+		allowed bool
+		want    string
 	}{
-		{"no api key → subscription", map[string]string{}, "chatgpt"},
-		{"api key set + allowed → api-key", map[string]string{"OPENAI_API_KEY": "sk-x", "BRIDGE_ALLOW_OPENAI_API_KEY": "1"}, "api-key"},
-		{"api key set but not allowed → subscription (guard would reject anyway)", map[string]string{"OPENAI_API_KEY": "sk-x"}, "chatgpt"},
-		{"empty api key → subscription", map[string]string{"OPENAI_API_KEY": ""}, "chatgpt"},
+		{"no api key → subscription", map[string]string{}, true, "chatgpt"},
+		{"api key set + policy allowed → api-key", map[string]string{"OPENAI_API_KEY": "sk-x"}, true, "api-key"},
+		{"api key set + retired env opt-in → subscription", map[string]string{"OPENAI_API_KEY": "sk-x", "BRIDGE_ALLOW_OPENAI_API_KEY": "1"}, false, "chatgpt"},
+		{"empty api key → subscription", map[string]string{"OPENAI_API_KEY": ""}, true, "chatgpt"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			deps := Deps{LookupEnv: func(k string) (string, bool) { v, ok := tc.env[k]; return v, ok }}
+			deps := Deps{AllowOpenAIAPIKey: tc.allowed, LookupEnv: func(k string) (string, bool) { v, ok := tc.env[k]; return v, ok }}
 			if got := codexAuthMode(deps); got != tc.want {
 				t.Errorf("codexAuthMode = %q, want %q", got, tc.want)
 			}

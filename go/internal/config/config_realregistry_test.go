@@ -7,7 +7,7 @@ import (
 
 func TestLoad_RealRegistry(t *testing.T) {
 	path := filepath.Join("..", "..", "..", "docs", "architecture", "phase-registry.json")
-	cfg, ws := Load(path, map[string]string{})
+	cfg, ws := Load(path)
 
 	if cfg.Stage != StageAdvisory {
 		t.Errorf("Stage=%v, want StageAdvisory (registry dynamic_routing=advisory)", cfg.Stage)
