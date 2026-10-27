@@ -300,3 +300,29 @@ func TestDecide_Rule10_EveryBarThePolicyAcceptsIsASeverity(t *testing.T) {
 		}
 	}
 }
+
+func TestValidate_RefusesRoundsWithoutHunksOrRolesWhenTheConfigIsUnresolved(t *testing.T) {
+	in := convergence.Input{
+		Loop:   convergence.LoopConsoleLane,
+		Round:  0,
+		Rounds: []convergence.Judgment{{Index: 0, Findings: []convergence.Finding{{ID: "f1", Severity: convergence.SeverityLow, Status: convergence.StatusOpen}}}},
+	}
+
+	err := in.Validate()
+
+	if err == nil || !strings.Contains(err.Error(), "config") {
+		t.Fatalf("Validate = %v, want an error naming the unresolved config", err)
+	}
+}
+
+func TestValidate_AcceptsRoundsWithoutHunksOrRolesWhenTheConfigIsResolved(t *testing.T) {
+	in := convergence.Input{
+		Loop:   convergence.LoopConsoleLane,
+		Round:  0,
+		Rounds: []convergence.Judgment{{Index: 0, Findings: []convergence.Finding{{ID: "f1", Severity: convergence.SeverityLow, Status: convergence.StatusOpen}}}},
+		Config: policy.Policy{}.ConvergenceConfig(),
+	}
+	if err := in.Validate(); err != nil {
+		t.Fatalf("Validate: %v", err)
+	}
+}

@@ -143,6 +143,7 @@ undiagnosable. Its blast radius is every later cycle.
    - A comment removal needs no reviewer. The commit gate accepts a proof instead when
      every changed Go file is proven comment-only and every other file is Markdown under `docs/`.
      The commit then carries `Review-waived: comment-only` ([code comments](../conventions/code-comments.md)).
+   - **Convergence rule for review chains.** After every review check, the console runs `evolve convergence decide --input <rounds.json>` and follows the decision ([convergence policy](../architecture/convergence-policy.md)).
    - *Mechanized: the docs floor (`internal/docsfloor`, ADR-0077) WARNs at the
      build handoff when an architecture-labeled change touches no `docs/` file.
      WARN, not block: "is there a doc at all" is mechanical, and "is this doc
@@ -185,6 +186,23 @@ undiagnosable. Its blast radius is every later cycle.
    *Evidence: the 2026-08-04 batch integrity review. A reproduced CRITICAL
    was laundered to "verified closed" across four locally-honest hops. A
    dormant feature was recorded as a feature in an active soak.*
+
+### Review-brief template
+
+The console uses review briefs for reviewer dispatches. Each brief follows the convergence policy:
+
+```yaml
+Give a full first judgment (J_0). Later judgments are verify-only.
+
+- id: <stable id>
+- severity: CRITICAL | HIGH | MEDIUM | LOW | INFO
+- kind: defect | capability
+- component: <name>
+- location: <file:line>
+- status: OPEN | FIXED | DEFERRED | DISPUTED | FILED
+- blocking: true | false
+- late: true | false
+```
 
 ## 4. Failure handling (the routed-not-fatal contract)
 
