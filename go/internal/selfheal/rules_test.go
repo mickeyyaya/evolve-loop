@@ -229,3 +229,14 @@ func TestFromCycles_ASystemLevelFailureDecisionIsASystemIncident(t *testing.T) {
 		t.Fatalf("observation %+v", o)
 	}
 }
+
+func TestFromSignals_ALauncherDropAtEnforceIsTheControlAndACellAttemptAtEnforceIsAnIncident(t *testing.T) {
+	t.Parallel()
+	drop := signal(1, signalcenter.KindIsolationViolation, "ISOLATION_I2_VIOLATION", t0, map[string]string{"stage": "enforce", "action": "refused", "source": "launcher", "rule": "env.allowlist"})
+	read := signal(2, signalcenter.KindIsolationViolation, "ISOLATION_I5_VIOLATION", t0, map[string]string{"stage": "enforce", "action": "refused", "source": "sbpl-report", "rule": "read.runs.unrelated"})
+	shadowRead := signal(3, signalcenter.KindIsolationViolation, "ISOLATION_I5_VIOLATION", t0, map[string]string{"stage": "shadow", "source": "sbpl-report", "rule": "read.runs.unrelated"})
+	got, _ := Detect(nil, FromSignals([]signalcenter.Event{drop, read, shadowRead}), fakeVerifier{}, t0)
+	if len(got) != 1 || got[0].Fingerprint != "isolation:ISOLATION_I5_VIOLATION:read.runs.unrelated" || got[0].Recurrence != 1 {
+		t.Fatalf("only the read that the cell tried at enforce opens a record: %+v", got)
+	}
+}

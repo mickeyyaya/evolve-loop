@@ -39,8 +39,8 @@ func TestModule_ClosedSet(t *testing.T) {
 	if Module("").Known() || Module("Orchestrator").Known() || Module("core").Known() {
 		t.Error("empty, differently-cased and undeclared modules are unknown")
 	}
-	if got := Modules(); len(got) != 31 || !sortedModules(got) {
-		t.Errorf("Modules() must list the 31 declared modules sorted, got %v", got)
+	if got := Modules(); len(got) != 32 || !sortedModules(got) {
+		t.Errorf("Modules() must list the 32 declared modules sorted, got %v", got)
 	}
 }
 

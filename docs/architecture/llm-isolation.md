@@ -1305,6 +1305,7 @@ X12 builds step 1 (detect) and step 5 (verify) in `go/internal/selfheal` ([packa
 |---|---|
 | Sources | the channels `errors` and `loop`, the run directories (`run.json`, `triage-decision.json`, `defect-ledger.json`, `failure-decision.json`), `ship-journal.jsonl`, the runs of `required.yml` from `gh`, and `usage-windows.json`. The level of `failure-decision.json` and the `gh` runs replace `failure-digest.json` and `evolve ci classify` of §18.1. |
 | Classes | the six of §18.1, and six from the incidents of 2026-10-26: `repair-loop`, `claim-churn`, `ci-hang`, `flaky-test`, `lane-starvation` and `usage-blind` |
+| Isolation | only an action that a cell tried and the pipeline refused at `enforce`. A drop of the launcher (`source=launcher`, I-2) is the control at work and opens no record. |
 | Fingerprint | `<class>:<subject>`, for example `repair-loop:retro-minting-files-through-inbox-add-lane`. The id is `inc-<date>-<8 hex of the fingerprint hash>`. |
 | Severity | the highest severity of the evidence; INCIDENT at 3 occurrences or on a protected surface |
 | Tier | T0 when the evidence names a protected surface, else T1 or T2 by class (§20.1) |

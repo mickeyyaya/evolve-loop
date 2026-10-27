@@ -12,6 +12,7 @@ const (
 	codeStall       signalcenter.Code = "LIVENESS_PHASE_STALLED"
 	codeZeroShip    signalcenter.Code = "LOOP_ZERO_SHIP_HALT"
 	codeSupplyShort signalcenter.Code = "LOOP_ORCH_SUPPLY_SHORT"
+	launcherSource                    = "launcher"
 )
 
 type signalRule func(signalcenter.Event) (Observation, bool)
@@ -42,10 +43,10 @@ func qualityBreach(e signalcenter.Event) (Observation, bool) {
 }
 
 func enforcedViolation(e signalcenter.Event) (Observation, bool) {
-	if e.Kind != signalcenter.KindIsolationViolation || e.Fields["stage"] != "enforce" {
+	if e.Kind != signalcenter.KindIsolationViolation || e.Fields["stage"] != "enforce" || e.Fields["source"] == launcherSource {
 		return Observation{}, false
 	}
-	return Observation{Class: ClassIsolation, Subject: string(e.Code) + ":" + e.Fields["rule"], Severity: signalcenter.SeverityWarn, Summary: "the pipeline refused an isolation violation at enforce: " + string(e.Code)}, true
+	return Observation{Class: ClassIsolation, Subject: string(e.Code) + ":" + e.Fields["rule"], Severity: signalcenter.SeverityWarn, Summary: "a cell tried an action that an invariant forbids, and the pipeline refused it at enforce: " + string(e.Code)}, true
 }
 
 func phaseStall(e signalcenter.Event) (Observation, bool) {

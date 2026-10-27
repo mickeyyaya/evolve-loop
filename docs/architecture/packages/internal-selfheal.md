@@ -25,11 +25,12 @@ A second pass over the same files opens nothing and publishes nothing.
 
   | Function | Input | Classes |
   |---|---|---|
-  | `FromSignals` | Signal Center events of the channels `errors` and `loop` | `quality` (a `QUALITY_*_BREACH`), `isolation` (a violation at `enforce`), `stall` (`LIVENESS_PHASE_STALLED`), `system` (`system.failure`), `zero-ship` (`LOOP_ZERO_SHIP_HALT`), `lane-starvation` (`LOOP_ORCH_SUPPLY_SHORT`) |
+  | `FromSignals` | Signal Center events of the channels `errors` and `loop` | `quality` (a `QUALITY_*_BREACH`), `isolation` (a read, exec or write that a cell tried, refused at `enforce`), `stall` (`LIVENESS_PHASE_STALLED`), `system` (`system.failure`), `zero-ship` (`LOOP_ZERO_SHIP_HALT`), `lane-starvation` (`LOOP_ORCH_SUPPLY_SHORT`) |
   | `FromCIRuns` | the runs of `required.yml` | `main-red`: the newest completed run on `main` failed. `ci-hang`: a run on `main` is open, cancelled or timed out after `HangAfter` (90 minutes). `flaky-test`: a second try of a run turned green. |
   | `FromCycles` | `run.json`, `triage-decision.json`, `defect-ledger.json`, `failure-decision.json` and the ship journal | `repair-loop`: `RepairLoopAfter` repair rounds and no ship. `claim-churn`: `ChurnAfter` claims of one item after its last ship. `system`: a failure decision with the level `system`. |
   | `FromUsage` | `.evolve/usage-windows.json` and the manifest declaration | `usage-blind` (a CLI that declares usage windows, and its last reading has no window, an error or is older than `UsageStaleAfter`) |
 
+- **The control is no incident.** An `ISOLATION_*` event with `source=launcher` is the launcher that drops a variable from the environment of a cell. That is the I-2 control at work, so it opens no record. Only an action that a cell tried opens a record (`source` `sbpl-report`, `gate` or `parser`). A violation at `shadow` opens no record either.
 - **The fingerprint.** `Observation.Fingerprint` is `<class>:<subject>`. It has no time and no cycle number, so one fault keeps one record. The record id is `inc-<date of the open>-<8 hex of sha256(fingerprint)>`.
 - **The pass.** `Detect(existing, observations, verifier, now)` is level-triggered. It reads the whole window each time and does not depend on one event.
   - Evidence that is newer than `last_seen_at` adds to `recurrence` and to `sources` (the newest `MaxSources`, 20).
@@ -74,7 +75,7 @@ A second pass over the same files opens nothing and publishes nothing.
 
 ## Findings
 
-- On 2026-10-27, one pass read a copy of the runtime data. The copy has the signals of 72 hours, cycles 1977 to 2036 and the CI runs of `gh`. The pass opened 9 records. Two fixture classes, `main-red` and `usage-blind`, opened no record, and the data is correct for both. `main` was green. The claude usage reading of 2026-10-26 18:28Z has 3 windows, after the fix of #1158.
+- On 2026-10-27, one pass read a copy of the runtime data. The copy has the signals of 72 hours, cycles 1977 to 2036 and the CI runs of `gh`. The pass opened 8 records. Two fixture classes, `main-red` and `usage-blind`, opened no record, and the data is correct for both. `main` was green. The claude usage reading of 2026-10-26 18:28Z has 3 windows, after the fix of #1158.
 
   | Fingerprint | Recurrence | Evidence |
   |---|---|---|
@@ -85,7 +86,6 @@ A second pass over the same files opens nothing and publishes nothing.
   | `flaky-test:rerun-green` | 4 | runs 40217002682, 40269836920, 40295509335, 40390149614 |
   | `lane-starvation:supply` | 2 | `LOOP_ORCH_SUPPLY_SHORT`: 2 admissible for a window of 4 |
   | `stall:LIVENESS_PHASE_STALLED:build`, `...:audit` | 2 each | the build of cycle 2035, the audit of cycle 2034 |
-  | `isolation:ISOLATION_I2_VIOLATION:env.allowlist` | 208 | the allowlist dropped a variable at `enforce` |
 
 - The flake rule sees a rerun that turned green. It does not name the test. The test name needs the failed log, which X13 reads through a `ci-log` entry of the evidence index.
 - The architecture review of 2026-10-27 named four limits that X16 must close before a record can close for real:
