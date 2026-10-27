@@ -397,7 +397,7 @@ entirely (a Level-0 tautological *eval*), and that one you must rewrite. Always 
 
 ### Template + assertion library (single source)
 
-Canonical predicate template and `acsassert` DSL (`RepoRoot`, `FileExists`, `FileContains`, `FileMatchesRegex`, `JSONFieldEquals`, `SubprocessOutput`, `CountOccurrencesAny`, `LineContainsAll`, `AllOf`, …) in **[go/acs/README.md](../go/acs/README.md)** — author from there. Predicate is `func TestC<N>_<NNN>_<slug>(t *testing.T)`; reports RED via `t.Errorf`/`t.Fatalf`. **No output scraping** — test's pass/fail IS verdict; bash-era footguns (`grep '^--- PASS:'` cycle-131, missing-`-v` cycle-137, sourcing `acs/lib/assert.sh`) all gone.
+Canonical predicate template and `acsassert` DSL (`RepoRoot`, `FileExists`, `FileContains`, `FileMatchesRegex`, `JSONFieldEquals`, `SubprocessOutput`, `CountOccurrencesAny`, `LineContainsAll`, `AllOf`, …) and the predicate kit (`ModuleDir`, `OutputTail`, `FuncCoverage`, `WalkModule`: call each, never write a copy) in **[go/acs/README.md](../go/acs/README.md)** — author from there. Predicate is `func TestC<N>_<NNN>_<slug>(t *testing.T)`; reports RED via `t.Errorf`/`t.Fatalf`. **No output scraping** — test's pass/fail IS verdict; bash-era footguns (`grep '^--- PASS:'` cycle-131, missing-`-v` cycle-137, sourcing `acs/lib/assert.sh`) all gone.
 
 ### Examples
 
