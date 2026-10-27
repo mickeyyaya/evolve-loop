@@ -224,14 +224,17 @@ func (r gcRun) project(projectRoot string) int {
 	if !ok {
 		return code
 	}
-	projectRoot, gcPol, ok := r.loadPolicy(projectRoot)
+	projectRoot, pol, loaded, ok := r.loadFullPolicy(projectRoot)
 	if !ok {
 		return 1
 	}
+	gcPol := gcBlock(pol)
 	evolveDir := filepath.Join(projectRoot, ".evolve")
 	opts := worktreeGCOptions(projectRoot, evolveDir, gcPol.Worktrees, r.stdout)
 	before, freeErr := looppreflight.DiskFreeBytes(projectRoot)
+	ageOf := continuationAge{maxAge: pol.ContinuationConfig().MaxAgeCycles, loaded: loaded}
 	steps := []func(gcRun) bool{
+		func(s gcRun) bool { return s.agedContinuations(projectRoot, ageOf, opts.WorktreeBase) },
 		func(s gcRun) bool { return s.worktrees(opts) },
 		func(s gcRun) bool { return s.devWorktrees(projectRoot, evolveDir, gcPol) },
 		func(s gcRun) bool { return s.runDirs(evolveDir, gcPol) },
@@ -260,19 +263,28 @@ func (r gcRun) project(projectRoot string) int {
 }
 
 func (r gcRun) loadPolicy(projectRoot string) (string, gc.Policy, bool) {
+	projectRoot, pol, _, ok := r.loadFullPolicy(projectRoot)
+	return projectRoot, gcBlock(pol), ok
+}
+
+func (r gcRun) loadFullPolicy(projectRoot string) (string, policy.Policy, bool, bool) {
 	projectRoot, err := r.abs(projectRoot)
 	if err != nil {
 		fmt.Fprintf(r.stderr, "evolve gc: resolve --project-root: %v\n", err)
-		return "", gc.Policy{}, false
+		return "", policy.Policy{}, false, false
 	}
 	pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
 	if err != nil {
 		fmt.Fprintf(r.stderr, "evolve gc: WARN: policy load failed: %v; using zero-value gc policy\n", err)
 	}
+	return projectRoot, pol, err == nil, true
+}
+
+func gcBlock(pol policy.Policy) gc.Policy {
 	if pol.GC == nil {
-		return projectRoot, gc.Policy{}, true
+		return gc.Policy{}
 	}
-	return projectRoot, *pol.GC, true
+	return *pol.GC
 }
 
 func (r gcRun) cycleProcesses(opts gc.WorktreeOptions) bool {

@@ -54,7 +54,7 @@ func TestKeyWalk_EachCustomDecoderIsAReviewedShape(t *testing.T) {
 		}
 	}
 	slices.Sort(got)
-	want := []string{"AgentRule", "AttemptPostmortemPolicy", "CLIRouting", "CheckpointPolicy", "CodeIndexPolicy", "ConvergencePolicy", "DocsFloorPolicy", "FleetOrchestratorPolicy", "HeldProposalsPolicy", "InboxCuratorPolicy", "InboxPriorityFactors", "InboxPriorityPolicy", "PracticeWatchPolicy", "RegressionTIAPolicy", "ResumeConfig", "RetryPolicy", "SandboxPolicy", "TierRule"}
+	want := []string{"AgentRule", "AttemptPostmortemPolicy", "CLIRouting", "CheckpointPolicy", "CodeIndexPolicy", "ContinuationPolicy", "ConvergencePolicy", "DocsFloorPolicy", "FleetOrchestratorPolicy", "HeldProposalsPolicy", "InboxCuratorPolicy", "InboxPriorityFactors", "InboxPriorityPolicy", "PracticeWatchPolicy", "RegressionTIAPolicy", "ResumeConfig", "RetryPolicy", "SandboxPolicy", "TierRule"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("a custom UnmarshalJSON whose wire keys differ from its json tags needs a keyShapes entry; review the new set %v against %v", got, want)
 	}

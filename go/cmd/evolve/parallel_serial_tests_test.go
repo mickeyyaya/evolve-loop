@@ -843,6 +843,7 @@ var serialTests = map[string]string{
 	"main.TestWireOrchestratorDeps_OneRouterReachesEveryLaunchPath":                                                        "assigns runner.DefaultRouter",
 	"main.TestWireOrchestratorDeps_PublishesAsTheRoleOfItsRun":                                                             "calls process-global setter SetModelCatalogDirFn",
 	"main.TestWireOrchestratorDeps_RegistersTheScopePathResolver":                                                          "calls process-global setter SetModelCatalogDirFn",
+	"main.TestWireOrchestratorDeps_RegistersTheContinuationShedder":                                                        "calls process-global setter SetModelCatalogDirFn",
 	"main.TestWireOrchestratorDeps_SignalCenterConsoleSinkIsFilteredAtWarn":                                                "calls process-global setter SetModelCatalogDirFn",
 	"main.TestWireOrchestratorDeps_SignalCenterReachesEveryPhaseRunner":                                                    "calls process-global setter SetModelCatalogDirFn",
 	"main.TestWireOrchestratorDeps_SignalCenterReachesTheBridge":                                                           "calls process-global setter SetModelCatalogDirFn",
