@@ -42,3 +42,11 @@ Each lane of a wave lands its own deliverable on `main`, so the landings race ea
 The plan scores five designs ([plan §3](../../plans/wave-integration-2026-10.md#3-candidate-designs)). The per-lane queue keeps a lane as the writer of `main`. A native merge queue gives each deliverable its own PR and CI.
 
 Parallel trains cost several CI runs for each wave. A rebase merge of the batch PR rewrites each SHA, and after a move of `main` it lands a tree that no CI tested. Avoidance alone leaves each lane to land itself. A fix to the per-lane ship that follows an outside move was drafted on 2026-10-20 and not merged, because of F2.7.
+
+## Notes
+
+- **2026-10-27, the per-lane fallback.** The stage `fleet.integration.stage` is `shadow` (Decision 11), so each lane still lands itself and meets a moved `main`. In wave 145, cycles 2058, 2060, 2062 and 2063 each have three or more auditor rows in `.evolve/ledger.jsonl`. The counts on 2026-10-28 are 4, 6, 3 and 3. Each ship met a `main` that moved over an unchanged lane.
+
+  Now a lane that holds its audited change pending rebases onto the new `main` when ship reports `AUDIT_BINDING_HEAD_MOVED`. The ADR-0105 identity carry then runs the composed-tree gates on the merged tree and re-binds the audit to the new `main` with no audit round. A changed lane diff still gets an audit round. The signal `ORCHESTRATOR_SHIP_RECOVERY_PATH` records the path.
+
+  The Context above rejects a fix to the per-lane ship, because a patch to the per-lane landing cannot remove the race (F2.7). This fix does not try to remove the race, and it does not change when or how a lane lands. It only removes a repeated audit of an unchanged diff, and it reuses the proof that ADR-0105 already enforces. It is a bounded fallback while the stage is `shadow`. Decision 1 removes the per-lane landing at stage `enforce`, and this path then has no caller. Design: [internal-core](../packages/internal-core.md), [internal-phases-ship](../packages/internal-phases-ship.md).

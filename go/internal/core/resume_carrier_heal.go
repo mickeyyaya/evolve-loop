@@ -27,7 +27,7 @@ func (o *Orchestrator) healCarrierAtHead(ctx context.Context, projectRoot string
 	if err != nil || !checkout {
 		return err
 	}
-	label := fmt.Sprintf("cycle-%d/%s", cycle, cs.RunID)
+	label := carrierLabel(cycle, cs.RunID)
 	carried, err := carrierAtHead(ctx, cs.ActiveWorktree, label, git)
 	if err != nil {
 		return fmt.Errorf("read the HEAD of lane %s: %w", cs.ActiveWorktree, err)
@@ -68,7 +68,7 @@ func isGitCheckout(worktree string) (bool, error) {
 }
 
 func carrierAtHead(ctx context.Context, worktree, label string, git gitFn) (bool, error) {
-	trailers, err := gitStdout(ctx, git, worktree, "log", "-1", "--format=%(trailers:key=Evolve-Carrier,valueonly)")
+	trailers, err := gitStdout(ctx, git, worktree, "log", "-1", "--format=%(trailers:key="+carrierTrailerKey+",valueonly)")
 	if err != nil {
 		return false, err
 	}
