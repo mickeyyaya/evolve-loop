@@ -186,6 +186,7 @@ var serialRequiredTests = map[string]string{
 	"core.TestPruneSupersededOrphans_WorktreeListFailureAbortsBeforeAnyDelete":                      swapsGitRunner,
 	"core.TestRecordAuditBinding_AFailedHeadReadStopsBeforeAnyOtherGitOrBinding":                    swapsGitRunner,
 	"core.TestRecoverBuildLeak_UsesInjectedGit":                                                     swapsGitRunner,
+	"core.TestCommitPendingAuditedChange_ANamedGitFailureLeavesTheLaneOnItsBase":                    swapsGitRunner,
 	"core.TestVerdictCacheCollisionRegression":                                                      swapsGitRunner,
 	"core.TestWorktreeReuseBase_UnreadableAncestryRecordsHEADVerbatim":                              swapsGitRunner,
 	"core.TestIdentityCarryForward_AnUnidentifiablePatchIsReauditedAfterTheGates":                   swapsIdentityPatchID,

@@ -1,0 +1,32 @@
+{
+  "acceptance": [
+    "Red test first: a ship with AUDIT_BINDING_HEAD_MOVED and an unchanged lane patch id re-binds without dispatching audit.",
+    "A changed lane diff still gets an LLM audit round.",
+    "The spend reader counts a re-bind as no audit round.",
+    "Docs in STE (ADR-0147 integration notes)."
+  ],
+  "consumed": {
+    "at": "2026-10-27T19:34:14Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "A moved main over a pending, unchanged lane now rebases through the ADR-0105 identity carry and re-binds the audit with no audit round (head_moved_rebind.go, carryReboundHead); a changed lane still gets an audit round; ORCHESTRATOR_SHIP_RECOVERY_PATH records the path"
+  },
+  "created_at": "2026-10-27T12:50:39Z",
+  "deps": [],
+  "files": [
+    "go/internal/phases/ship",
+    "go/internal/core"
+  ],
+  "fix": "When the rebased lane diff is unchanged (same patch id) or the only change is the merge of main with no conflict, re-run the deterministic floor and re-bind the audit to the new HEAD without an LLM audit round. Run an LLM audit only when the lane diff itself changed. Record which path ran.",
+  "id": "ship-head-moved-rechecks-without-full-reaudit",
+  "kind": "pipeline-repair",
+  "notes": "Console route: ship and core are on the fence.",
+  "origin": "console",
+  "priority": "P1",
+  "priority_class": "performance",
+  "route": "console",
+  "source": "console, 2026-10-27, operator \"investigate in watcher issue\"; wave-145 errors channel 10:05Z-12:40Z (1387 WARN signals)",
+  "summary": "In wave 145, cycles 2058, 2060 and 2062 reached 3 audit rounds (CYCLE_SPEND_LIMIT would_stop on max_audit_rounds 3 of 2). Their ships aborted with AUDIT_BINDING_HEAD_MOVED or GIT_FLEET_REBASE_NEEDED and recovered by running audit again (ORCHESTRATOR_PHASE_ABORTED: ship error ... recovering via audit). A main that moved under a clean lane costs a full LLM audit round.",
+  "title": "A ship that finds main moved re-checks the rebased diff deterministically instead of a full audit round",
+  "weight": 0.8
+}
