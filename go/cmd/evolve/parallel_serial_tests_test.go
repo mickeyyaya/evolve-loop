@@ -215,6 +215,7 @@ var serialTests = map[string]string{
 	"main.TestCmd_InboxRouteVerbs_ARefusalNeverMasksUsageErrors":                                            "sets env through a helper",
 	"main.TestCmd_InboxRouteVerbs_AStaleLeaseDoesNotRefuse":                                                 "sets env through a helper",
 	"main.TestCmd_InboxRouteVerbs_RefuseWhileALoopLaneIsLiveAndLeaveTheItemByteIdentical":                   "sets env through a helper",
+	"main.TestCmd_InboxRoute_AQueuedRouteKeepsItsBlocker":                                                   "sets env through a helper",
 	"main.TestCmd_InboxShow_AnIDNotPendingExits1NamingWhereItIs":                                            "sets env through a helper",
 	"main.TestCmd_InboxShow_JSONCarriesTheWholeItemAndItsPlace":                                             "sets env through a helper",
 	"main.TestCmd_InboxShow_PrintsTheItemAndItsLaneMenuPlace":                                               "sets env through a helper",
