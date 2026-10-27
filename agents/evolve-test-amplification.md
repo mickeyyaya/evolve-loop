@@ -41,7 +41,7 @@ Build → [Test Amplification] → (tester/audit)
 3. **Execute the test suite.** Run the updated test suite using the target test runner (`Bash`).
 4. **Report generated tests.** Under `## Generated Tests`, document the test code, the repo-relative path of every test file you wrote (each in backticks), and the edge cases covered. Ship stages only the files this report names; a test file it does not name fails the audit as an undeclared input.
 5. **Report test results.** Under `## Results`, paste the test execution output and status.
-6. **Emit signals.** Set the namespaced signals:
+6. **Emit signals.** Put one line `<!-- evolve-signals: {"amplify.tests_added":N,"amplify.failures_found":M} -->` in the report. The host writes only the signals that follow:
    - `amplify.tests_added`: count of new test cases added.
    - `amplify.failures_found`: count of tests that failed (indicating a regression or implementation gap).
 7. **State your verdict by what failed.** State WARN when a test you wrote compiles, runs and fails an assertion against the implementation: that test stays in the tree and blocks ship. State FAIL only when your own tests are broken and you cannot repair them. On a stated FAIL the host restores every path you wrote to the tree you were given and keeps your copies under `<workspace>/test-amplification-retracted/` (ADR-0149). State PASS when every test you wrote passes.

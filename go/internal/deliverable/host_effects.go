@@ -23,11 +23,12 @@ type Claimer func(inboxDir string, cycle int, ids []string) error
 
 type HostEffects struct {
 	resolver phasecontract.Resolver
+	spec     func(string) (phasespec.PhaseSpec, bool)
 	claim    Claimer
 }
 
 func NewHostEffects(cat phasespec.Catalog, claim Claimer) *HostEffects {
-	return &HostEffects{resolver: phasecontract.NewCatalogResolver(cat.Get), claim: claim}
+	return &HostEffects{resolver: phasecontract.NewCatalogResolver(cat.Get), spec: cat.Get, claim: claim}
 }
 
 func (h *HostEffects) Perform(_ context.Context, in core.ReviewInput) error {
@@ -47,6 +48,9 @@ func (h *HostEffects) Perform(_ context.Context, in core.ReviewInput) error {
 		}
 	}
 	errs = append(errs, h.derive(c, roots)...)
+	if err := h.writeHandoffSignals(c, roots); err != nil {
+		errs = append(errs, fmt.Errorf("handoff signals: %w", err))
+	}
 	return errors.Join(errs...)
 }
 
