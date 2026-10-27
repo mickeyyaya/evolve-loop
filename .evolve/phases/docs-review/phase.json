@@ -1,0 +1,20 @@
+{
+  "name": "docs-review",
+  "catalog": "on-demand",
+  "archetype": "evaluate",
+  "optional": true,
+  "agent": "evolve-diff-docs-review",
+  "description": "review of a change of only documents: the deterministic checks, then the lenses of type, claims, reasoning and consistency",
+  "when_to_use": "never selected: an operator or the console runs it with `evolve agent run docs-review` and the diff as the input",
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/diff-docs-review-report.md"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "Findings",
+      "Verdict"
+    ]
+  }
+}

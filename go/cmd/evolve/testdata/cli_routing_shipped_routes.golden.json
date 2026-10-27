@@ -599,6 +599,32 @@
       ]
     },
     {
+      "agent": "console-builder",
+      "phase": "console-builder",
+      "rule": "agents:console-builder",
+      "chain": [
+        "claude-tmux",
+        "agy-claude-tmux",
+        "agy-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
       "agent": "container-hardening-scan",
       "phase": "container-hardening-scan",
       "rule": "default",
@@ -934,6 +960,31 @@
     },
     {
       "agent": "diff-code-simplifier",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "diff-docs-review",
       "rule": "default",
       "chain": [
         "agy-tmux",

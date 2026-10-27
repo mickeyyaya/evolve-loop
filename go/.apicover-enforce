@@ -837,3 +837,5 @@
 ./internal/guidance
 ./internal/heldproposal
 ./internal/inboxfile
+# launchrecord - the bridge launch record of evolve agent run, which the commit gate reads to attest a review run (ADR-0154 X11).
+./internal/launchrecord

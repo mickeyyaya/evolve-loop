@@ -7,10 +7,14 @@ description: Budget-capped adversarial review + simplification pass over a STAGE
 
 > Why this skill exists: two generic review agents (go-reviewer + code-simplifier)
 > spent 197k + 136k tokens and 97 + 58 tool calls reviewing ONE staged diff
-> (2026-07-27). Measured waste: re-deriving repo context the caller already had,
-> re-running test suites the caller had already run, unbounded whole-tree
-> consumer sweeps, and loading the same diff into two separate contexts. This
-> skill keeps the review QUALITY disciplines (evidence-first, adversarial,
+> (2026-07-27). The measured waste had four parts:
+>
+> - a second derivation of the repo context that the caller already had;
+> - a second run of the test suites that the caller already ran;
+> - unbounded whole-tree consumer sweeps;
+> - two separate contexts that each loaded the same diff.
+>
+> This skill keeps the review QUALITY disciplines (evidence-first, adversarial,
 > file:line findings) and deletes the waste structurally.
 
 ## Scope contract (RIGID)
@@ -34,12 +38,12 @@ If the caller declared nothing, spend ONE tool call asking the diff itself
 - **≤ 15 file reads**, and reads are TARGETED: `Read` with offset/limit around
   the hunk, never whole large files; the diff already shows the change.
 - **One hop of coupling, found by grep.** For each changed/added exported
-  symbol and each changed behavior (e.g. a return-shape change): ONE `grep -rn`
+  symbol and each changed behavior (for example a return-shape change): ONE `grep -rn`
   for its call sites. Read only the call sites the grep surfaces. NEVER sweep
   docs/, .evolve/runs/, or knowledge-base/ unless a hunk edits them.
-- **Run nothing the caller declared green.** You may run at most ONE cheap
-  compile/probe (`go build ./pkg`, a 5-line script) to settle a finding you
-  cannot settle by reading — and only for a finding you will report.
+- **Run nothing the caller declared green.** You can run at most ONE cheap
+  compile/probe (`go build ./pkg`, a 5-line script). Use it only to settle a
+  finding that a read cannot settle, and only for a finding that you report.
 
 ## The pass (both lenses, one sweep over the hunks)
 
@@ -53,26 +57,29 @@ Walk the diff hunk by hunk. For each, ask BOTH lenses before moving on:
 3. Gate-weakening — for pipeline code: can an agent/author exploit this path to
    make a real failure invisible? Fail-open paths need a stated justification.
 4. Wiring — a new seam/option/hook that nothing calls is dead code; say so.
-5. Tests-vs-intent — do the new tests pin the claimed behavior, and would a
-   degenerate implementation pass them? Name the missing negative case.
+5. Tests-vs-intent — do the new tests pin the claimed behavior?
+   Does a degenerate implementation pass them? Name the missing negative case.
 
 ADR-0084 gate-integrity lenses (apply when the diff touches the matching class):
-5a. On-disk scanning — a new/changed test or gate that walks repo dirs must bind
-    only git-TRACKED state (internal/repostate); binding everything on disk is
-    the cd49274beab2 false-RED class.
+
+5a. On-disk scans — a new/changed test or gate that walks repo dirs must bind
+    only git-TRACKED state (internal/repostate).
+    A bind to all files on disk is the cd49274beab2 false-RED class.
+
 5b. Machine-graded artifact — a new/changed LLM-authored contract needs a
     literal example single-sourced against its production reader
     (docs/architecture/contract-single-sourcing.md three-legged test).
+
 5c. Gate evidence — a new/changed gate that runs a subprocess or computes a
-    verdict must persist its underlying output to the run dir and name the
-    offender in its error; a silent fail-open or empty debug field is a finding.
+    verdict must keep its output in the run dir.
+    Its error must name the offender. A silent fail-open or an empty debug field is a finding.
 
 **Simplifier lens** (the change, made smaller/clearer, behavior identical):
-6. Duplication vs one-hop neighbors — an existing helper the diff re-implements
-   (your grep hop already surfaced the candidates; do not go hunting further).
-7. Comment restatement — flag comments that repeat the code or repeat another
-   comment in the SAME diff; keep incident context and constraint-visibility
-   comments (they prevent bad future "simplifications").
+6. Duplication vs one-hop neighbors — an existing helper that the diff re-implements.
+   Your grep hop already found the candidates. Do not search further.
+7. Comment restatement — flag comments that repeat the code or another
+   comment in the SAME diff.
+   Keep incident context and constraint-visibility comments. They prevent bad future "simplifications".
 8. Dead branches, ceremony, mis-signaling names — only within the diff.
 
 ## Output (RIGID)
@@ -83,8 +90,8 @@ replacement. No essays. Then:
 
 - **Clean**: one plain list of what you checked and found sound (so the caller
   knows it was covered, not skipped).
-- **UNVERIFIED**: hypotheses you could not settle within budget — never
-  silently drop them, never burn budget chasing them.
+- **UNVERIFIED**: hypotheses that you did not settle within budget. Never
+  silently drop them, and never spend budget on them.
 - **Budget line**: `tool_calls=N/20 reads=M/15` — the caller uses this to tune
   the skill.
 - Verdict: BLOCK (any BLOCK/HIGH finding) or APPROVE.
@@ -100,6 +107,19 @@ replacement. No essays. Then:
 
 ## Caller template
 
+From the console, run the review seats through the bridge, so that any family can hold each seat.
+Each run writes a launch record, and the commit gate attests it with `--reviewers run:<run label>`
+([agent-run.md](../../docs/architecture/agent-run.md) §7 and §8):
+
+```
+git diff --cached | evolve agent run code-simplifier --json --project-root <repo>
+git diff --cached | evolve agent run go-reviewer --json --project-root <repo>
+```
+
+Only these review profiles exist: `code-simplifier`, `code-reviewer`, `go-reviewer`, `architecture-reviewer` and `docs-review`.
+
+Inside a session with no bridge, run this skill as an in-process subagent. Its review has no launch record:
+
 ```
 Agent(general-purpose or <lang>-reviewer, model per risk tier):
   Follow skills/diff-review/SKILL.md exactly.
@@ -109,6 +129,6 @@ Agent(general-purpose or <lang>-reviewer, model per risk tier):
   Constraints: <protected surfaces, pinned contracts, applied prior findings>.
 ```
 
-Model choice stays a risk decision, not a cost decision: pipeline-integrity
-diffs still get an opus-class reviewer (standing rule) — the budgets, not a
-weaker model, are what cut the cost.
+Model choice stays a risk decision, not a cost decision. Pipeline-integrity
+diffs still get an opus-class reviewer (standing rule).
+The budgets cut the cost, not a weaker model.

@@ -3,6 +3,7 @@
 package agentcmd
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -10,6 +11,9 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cli/phasecmd"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/treestate"
 )
 
 const (
@@ -22,10 +26,15 @@ const (
 
 const usage = `Usage: evolve agent <subcommand>
 
-  evolve agent run <profile> [--input FILE|-] [--file PATH]... [--json] [--keep] [--project-root P]
-      Run one read-only phase agent with no cycle. The input is stdin, or --input FILE.
-      Each --file adds one fenced section. stdout carries the report; --json carries
-      one envelope (report, verdict, model, cost, tokens).
+  evolve agent run <profile> [--input FILE|-] [--file PATH]... [--worktree DIR [--writable PATH]...] [--json] [--keep] [--project-root P]
+      Run one phase agent with no cycle, through the bridge. The input is stdin, or --input FILE.
+      Each --file adds one fenced section. stdout carries the report.
+      --json carries one envelope (report, verdict, driver, family, model, cost, tokens, launch record).
+      Each run writes its launch record to .evolve/agent-runs/<run label>.json.
+      evolve commit-gate run --reviewers run:<run label> attests it.
+      --worktree runs the agent in a linked git worktree.
+      A writer needs --worktree and one --writable PATH for each file that it can change.
+      The pipeline restores each other file of the worktree after the run.
       Exit 0 PASS/WARN/SKIPPED, 1 FAIL, 3 refused, 21 dispatch error, 10 usage, 11 input.
   evolve agent list [--json] [--project-root P]
       Name each profile that evolve agent run accepts.
@@ -33,9 +42,21 @@ const usage = `Usage: evolve agent <subcommand>
 
 type Deps struct {
 	InstallRouter func(projectRoot string) error
-	Bridge        func(projectRoot string) core.Bridge
+	Bridge        func(projectRoot string, signals *signalcenter.Center) core.Bridge
+	Signals       func(projectRoot string, stderr io.Writer) (*signalcenter.Center, func())
+	TreeState     func(ctx context.Context, dir string) (string, error)
 	Getenv        func(string) string
 	Now           func() time.Time
+}
+
+func defaultBridge(projectRoot string, _ *signalcenter.Center) core.Bridge {
+	return phasecmd.DefaultBridge(projectRoot)
+}
+
+func noSignals(string, io.Writer) (*signalcenter.Center, func()) { return nil, func() {} }
+
+func defaultTreeState(ctx context.Context, dir string) (string, error) {
+	return treestate.SHA(ctx, sysexec.DefaultRunner, dir, nil)
 }
 
 type command struct{ deps Deps }
@@ -45,7 +66,13 @@ func New(d Deps) func(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 		d.InstallRouter = func(string) error { return nil }
 	}
 	if d.Bridge == nil {
-		d.Bridge = phasecmd.DefaultBridge
+		d.Bridge = defaultBridge
+	}
+	if d.Signals == nil {
+		d.Signals = noSignals
+	}
+	if d.TreeState == nil {
+		d.TreeState = defaultTreeState
 	}
 	if d.Getenv == nil {
 		d.Getenv = os.Getenv

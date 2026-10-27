@@ -343,7 +343,16 @@ const (
 	roleSubagent  = "subagent"
 	roleSimulate  = "simulate"
 	roleDispatch  = "dispatch"
+	roleAgent     = "agent"
 )
+
+func agentRunSignals(projectRoot string, console io.Writer) (*signalcenter.Center, func()) {
+	return newRoleSignalCenter(roleAgent, projectRoot, filepath.Join(projectRoot, ".evolve"), console)
+}
+
+func agentRunBridge(projectRoot string, signals *signalcenter.Center) core.Bridge {
+	return bridge.NewDefault(projectRoot, signals)
+}
 
 type orchDeps struct {
 	Storage      core.Storage

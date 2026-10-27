@@ -71,7 +71,6 @@ func TestAgentRun_RefusedRunWritesNothing(t *testing.T) {
 }
 
 func TestAgentRun_InputSources(t *testing.T) {
-	root := project(t)
 	dir := t.TempDir()
 	inputFile := filepath.Join(dir, "change.diff")
 	attached := filepath.Join(dir, "notes.txt")
@@ -94,6 +93,7 @@ func TestAgentRun_InputSources(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			root := project(t)
 			fb := &fakeBridge{artifact: passReport}
 			var stdout, stderr bytes.Buffer
 
