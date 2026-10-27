@@ -63,6 +63,7 @@ func TestRefusalDisposition_TableBesideTheVocabulary(t *testing.T) {
 		{DiagCodeTriageProtectedSurface, true, true, false},
 		{DiagCodeProtectedPredicateRoute, true, true, false},
 		{DiagCodeBlockerRoute, true, true, true},
+		{DiagCodeHandoffRoute, true, true, true},
 		{DiagCodeBuildRejected, true, false, false},
 		{DiagCodeTriageTopNEmpty, true, false, false},
 		{DiagCodeTriageCommitmentInvalid, false, false, false},
@@ -93,7 +94,7 @@ func TestCycleTerminationBlockedNeedsConsole_IsTheSealedSpelling(t *testing.T) {
 }
 
 func TestRefusalDisposition_OnlyTheBuildRejectionYieldsToInfrastructure(t *testing.T) {
-	for _, code := range []string{DiagCodeTriageProtectedSurface, DiagCodeProtectedPredicateRoute, DiagCodeBlockerRoute, DiagCodeTriageTopNEmpty, DiagCodeTriageCommitmentInvalid, DiagCodeTriageScopeUnanswered, DiagCodeTriageLanePinMissing, DiagCodeBuildRejected} {
+	for _, code := range []string{DiagCodeTriageProtectedSurface, DiagCodeProtectedPredicateRoute, DiagCodeBlockerRoute, DiagCodeHandoffRoute, DiagCodeTriageTopNEmpty, DiagCodeTriageCommitmentInvalid, DiagCodeTriageScopeUnanswered, DiagCodeTriageLanePinMissing, DiagCodeBuildRejected} {
 		if got, want := RefusalDisposition(code).YieldsToInfra, code == DiagCodeBuildRejected; got != want {
 			t.Errorf("RefusalDisposition(%q).YieldsToInfra = %v, want %v: a build rejection is often an infrastructure symptom, an agent refusal is not", code, got, want)
 		}

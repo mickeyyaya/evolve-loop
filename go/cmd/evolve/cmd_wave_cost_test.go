@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/wave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wavemeasure"
 )
 
@@ -24,6 +25,8 @@ func TestWaveStatus_TextPrintsOneCostLine(t *testing.T) {
 		"no ship": {wavemeasure.Cost{Started: 1, AuditRoundsPerCycle: f64(4), ConvergenceRate: f64(0)},
 			"cost:    not defined (0 of 1 cycle(s) shipped) · audit rounds 4.00 per cycle · convergence 0.00\n"},
 		"no cycle": {wavemeasure.Cost{}, "cost:    no cycle\n"},
+		"hand-offs": {wavemeasure.Cost{Started: 2, AuditRoundsPerCycle: f64(1), ConvergenceRate: f64(0), HandoffStops: 1, HandoffWouldStops: 2, FalseStops: 1},
+			"cost:    not defined (0 of 2 cycle(s) shipped) · audit rounds 1.00 per cycle · convergence 0.00 · hand-off stops 1, would stops 2, false stops 1\n"},
 	} {
 		var b strings.Builder
 		writeWaveMeasuresText(&b, wavemeasure.Measures{Cost: tc.cost})
@@ -83,5 +86,13 @@ func TestQualityReport_TheWaveScopePublishesTheCostPerShippedCycle(t *testing.T)
 	}
 	if rc != 0 || got["PQ5 waves:1-2"]["value"] != "3.000" || got["PQ5 waves:1-2"]["stage"] != "report" || got["PQ5 wave:2"]["status"] != "no_data" {
 		t.Errorf("rc %d readings %v; want PQ5 3 LLM minutes for the one ship of waves 1-2 at stage report, and no_data for wave 2 with no ship", rc, got)
+	}
+}
+
+func TestWaveCycleText_AHandedOffCycleShowsItsReason(t *testing.T) {
+	t.Parallel()
+	got := waveCycleText(wave.Cycle{ID: 2035, Verdict: "FAIL", Termination: "handed-off", HandoffStop: "handoff_blocker: M1"})
+	if got != "cycle 2035: verdict FAIL, not shipped, handed-off (handoff_blocker: M1)" {
+		t.Errorf("text = %q", got)
 	}
 }

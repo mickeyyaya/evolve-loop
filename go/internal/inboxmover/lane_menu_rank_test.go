@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxrank"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -20,7 +21,7 @@ func TestRankLaneMenu_RanksTheReadyListAgainstTheWholeQueue(t *testing.T) {
 		{ID: "waits", Weight: 0.9, PriorityClass: "stability", Deps: []string{"blocker"}},
 	}
 	rank := inboxrank.Inputs{Config: policy.Policy{}.InboxPriorityConfig(), Now: time.Date(2026, 10, 6, 0, 0, 0, 0, time.UTC)}
-	var got RankedLaneMenu = RankLaneMenu(Options{ProjectRoot: root}, queue, nil, rank)
+	var got RankedLaneMenu = RankLaneMenu(Options{ProjectRoot: root}, queue, nil, rank, config.StageShadow)
 	if want := PartitionLaneMenu(Options{ProjectRoot: root}, queue, nil); !reflect.DeepEqual(got.LaneMenu, want) {
 		t.Fatalf("the menu is PartitionLaneMenu's: %+v, want %+v", got.LaneMenu, want)
 	}

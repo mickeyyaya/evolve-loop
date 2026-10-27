@@ -52,8 +52,8 @@ func TestQualityReport_TheWaveScopeReadsShipRateDeadlineRateAndPackages(t *testi
 
 	rc, stdout := runQualityReport(t, env, root)
 
-	if rc != 0 || !strings.Contains(stdout, "20 reading(s)") || !strings.Contains(stdout, "6 warning(s)") {
-		t.Fatalf("rc %d stdout %q, want 20 readings (PQ1 x2, PQ4 x4, CQ2 x2, CQ1 tree and wave, PQ5 x10) and six no-data warnings: wave 2 shipped nothing (CQ2 and three PQ5 costs) and the fixture tree has no function", rc, stdout)
+	if rc != 0 || !strings.Contains(stdout, "26 reading(s)") || !strings.Contains(stdout, "6 warning(s)") {
+		t.Fatalf("rc %d stdout %q, want 26 readings (PQ1 x2, PQ4 x4, CQ2 x2, CQ1 tree and wave, PQ5 x16) and six no-data warnings: wave 2 shipped nothing (CQ2 and three PQ5 costs) and the fixture tree has no function", rc, stdout)
 	}
 	byWindow := map[string]map[string]string{}
 	for _, e := range channelEvents(t, root, "quality.reading") {

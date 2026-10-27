@@ -13,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 	"github.com/mickeyyaya/evolve-loop/go/internal/admission"
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
@@ -75,6 +76,7 @@ type Census struct {
 	Optimistic bool
 	Window     int
 	Propose    Proposer
+	Companions config.Stage
 	Path       string
 	Publish    Publish
 	Now        func() time.Time
@@ -88,13 +90,16 @@ func (c Census) Count() (Supply, error) {
 	if err != nil {
 		return Supply{}, fmt.Errorf("orchestrator: census: %w", err)
 	}
-	menu := inboxmover.RankLaneMenu(c.Inbox, scan.Items, c.Protected, c.Rank)
+	menu := inboxmover.RankLaneMenu(c.Inbox, scan.Items, c.Protected, c.Rank, c.Companions)
 	s := Supply{At: c.Now().UTC(), Window: c.Window, Counts: map[string]int{}}
 	for _, class := range Classes() {
 		s.Counts[class] = 0
 	}
 	for _, w := range scan.Warnings {
 		s.Warnings = append(s.Warnings, w.String())
+	}
+	for _, would := range menu.WouldDefer {
+		s.Warnings = append(s.Warnings, "would defer "+would)
 	}
 	protected := s.refuse(menu.Console, menu.ConsoleReasons, consoleClass)
 	s.refuse(menu.Waiting, menu.WaitingReasons, func(string) string { return ClassWaitingDeps })

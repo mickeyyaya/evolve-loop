@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/admission"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
@@ -329,6 +330,23 @@ func TestSupplyWiring_TheCensusTakesTheAdmissionRuleOfTheKey(t *testing.T) {
 			fleet: policy.FleetConfig{Count: 2, Orchestrator: policy.OrchestratorConfig{Admission: admissionKey}}}
 		if got := w.census().Optimistic; got != want {
 			t.Errorf("admission %s: census Optimistic = %v, want %v", admissionKey, got, want)
+		}
+	}
+}
+
+func TestSupplyWiring_TheCensusTakesTheCompanionStageOfThePolicy(t *testing.T) {
+	t.Parallel()
+	for body, want := range map[string]config.Stage{
+		`{"workflow": {"repair": {"fixability": {"stage": "enforce"}}}}`:  config.StageEnforce,
+		`{"workflow": {"repair": {"fixability": {"stage": "advisory"}}}}`: config.StageShadow,
+	} {
+		root := strictPolicyRoot(t, body)
+		var stderr strings.Builder
+		w := supplyWiring{root: root, evolveDir: filepath.Join(root, ".evolve"), now: func() time.Time { return time.Time{} }, stderr: &stderr}
+		got := w.census().Companions
+		refused := strings.Contains(stderr.String(), "the fixability check holds shadow")
+		if got != want || refused != (want == config.StageShadow) {
+			t.Errorf("%s: census Companions = %v (warned %t), want %v", body, got, refused, want)
 		}
 	}
 }

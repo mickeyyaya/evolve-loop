@@ -229,6 +229,14 @@ The block sets the stage of the retry ladder and the size of the digest of a rai
 | `audit_fix.max_tokens` | the most estimated tokens of an `audit_fix`, from 0 to 64000. 0 means the default. | 6000 |
 | `audit_fix.no_new_production_logic` | true limits the production code lines of an `audit_fix` to `max_code_lines`. | true |
 
+## Repair fixability (`workflow.repair`)
+
+The block sets the stage of the fixability check of [ADR-0158](adr/0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md) decisions 1 to 6 ([internal-fixability](packages/internal-fixability.md)). One stage serves two checks: the check before a repair round, and the console companion check of the lane menu. The lane menu serves triage, the supply census, the wave seed and `evolve inbox batches`. A refused policy holds `shadow` with a WARN. The loader refuses a stage that is not `0`, `off`, `shadow` or `enforce`, and an unknown key, with the key name. `0` is `off`.
+
+| Key | Meaning | Default |
+|---|---|---|
+| `fixability.stage` | `off`: no check. `shadow`: a blocker records `REPAIR_HANDOFF` with `decision: would_stop`, and the repair round runs. A lane item with a console companion stays admissible, and the census records `would defer`. `enforce`: a blocker seals the cycle `handed-off` with no repair round. A lane item with a console companion waits with the reason `console_companion_pending`. The checked-in policy does not set the key. | `shadow` |
+
 ## Documentation floors (`docs_floor`)
 
 The block sets the stages of the two documentation floors of the build handoff. The docs floor only WARNs. The STE floor fails the handoff at `ste_stage: enforce`. The loader decodes the block strictly. An unknown key, or a `stage` or `ste_stage` word that is not `0`, `off`, `shadow` or `enforce`, fails the load of the whole file. Thus a typo key in `docs_floor` stops every consumer of the policy, not only the two floors.

@@ -16,6 +16,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclespend"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
+	"github.com/mickeyyaya/evolve-loop/go/internal/fixability"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/landing"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
@@ -28,17 +29,19 @@ var (
 )
 
 type Cycle struct {
-	ID          int              `json:"id"`
-	Todo        string           `json:"todo,omitempty"`
-	Phase       string           `json:"phase,omitempty"`
-	Verdict     string           `json:"verdict,omitempty"`
-	Termination string           `json:"termination,omitempty"`
-	Shipped     bool             `json:"shipped"`
-	QuotaPauses int              `json:"quota_pauses"`
-	Conflict    bool             `json:"conflict,omitempty"`
-	Spend       cyclespend.Spend `json:"spend"`
-	StartedAt   time.Time        `json:"-"`
-	EndedAt     time.Time        `json:"-"`
+	ID           int              `json:"id"`
+	Todo         string           `json:"todo,omitempty"`
+	Phase        string           `json:"phase,omitempty"`
+	Verdict      string           `json:"verdict,omitempty"`
+	Termination  string           `json:"termination,omitempty"`
+	Shipped      bool             `json:"shipped"`
+	QuotaPauses  int              `json:"quota_pauses"`
+	Conflict     bool             `json:"conflict,omitempty"`
+	Spend        cyclespend.Spend `json:"spend"`
+	HandoffWould int              `json:"handoff_would_stops,omitempty"`
+	HandoffStop  string           `json:"handoff_stop,omitempty"`
+	StartedAt    time.Time        `json:"-"`
+	EndedAt      time.Time        `json:"-"`
 }
 
 type cycleWindow struct{ floor, ceiling int }
@@ -182,11 +185,24 @@ func applySignals(c *Cycle, path string) []string {
 		case signalcenter.KindShipError:
 			c.Conflict = c.Conflict || shiperr.IsLandingConflict(e.Code)
 		}
+		applyHandoff(c, e)
 	}
 	if chunk.Skipped > 0 {
 		return []string{fmt.Sprintf("cycle-%d: skipped %d malformed signal line(s) in %s", c.ID, chunk.Skipped, path)}
 	}
 	return nil
+}
+
+func applyHandoff(c *Cycle, e signalcenter.Event) {
+	if e.Code != fixability.SignalCode {
+		return
+	}
+	switch e.Fields[fixability.FieldDecision] {
+	case fixability.DecisionWould:
+		c.HandoffWould++
+	case fixability.DecisionStop:
+		c.HandoffStop = e.Fields[fixability.FieldReason] + ": " + e.Fields[fixability.FieldBlockers]
+	}
 }
 
 func CycleFloor(evolveDir string) (int, error) {

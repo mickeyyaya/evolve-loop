@@ -19,6 +19,8 @@ const CycleTerminationTddProtectedRoute = "tdd-protected-predicate-route"
 
 const CycleTerminationBlockedNeedsConsole = "blocked-needs-console"
 
+const CycleTerminationHandedOff = "handed-off"
+
 const CycleTerminationTriageClaimFailed = "triage-empty-commitment-claimable-work"
 
 const CycleTerminationLaneWorktreeDeferred = "lane-worktree-deferred"

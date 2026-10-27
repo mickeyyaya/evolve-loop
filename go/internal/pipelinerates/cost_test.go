@@ -40,8 +40,8 @@ func TestCostPerShip_TheSpendOfEveryCycleOfAWaveIsSharedByItsShips(t *testing.T)
 			t.Errorf("%s = %+v (found %t), want PQ5 %v at n %d", window, r, ok, want.value, want.n)
 		}
 	}
-	if len(rs) != 5 {
-		t.Errorf("readings = %d, want 5 for one wave", len(rs))
+	if len(rs) != 8 {
+		t.Errorf("readings = %d, want 8 for one wave", len(rs))
 	}
 }
 
@@ -93,5 +93,36 @@ func TestLoadCycles_AnUnreadableLLMCallLedgerCountsAsAnUnmeasuredCallAndKeepsThe
 
 	if err != nil || cycleByID(cycles, 2026).Spend.UnmeasuredCalls != 1 {
 		t.Errorf("LoadCycles = cycle 2026 spend %+v, %v; want the load to hold and one unmeasured call", cycleByID(cycles, 2026).Spend, err)
+	}
+}
+
+func TestCostPerShip_CountsTheHandoffStopsAndTheFalseStops(t *testing.T) {
+	t.Parallel()
+	cycles := []Cycle{{ID: 1, Wave: 9, Shipped: true, HandoffWould: 1}, {ID: 2, Wave: 9, HandoffWould: 2}, {ID: 3, Wave: 9, HandedOff: true}}
+
+	rs := CostPerShip(cycles)
+
+	for window, want := range map[string]float64{"wave:9/handoff-would-stops": 3, "wave:9/handoff-stops": 1, "wave:9/false-stops": 1} {
+		if r, ok := readingFor(rs, window); !ok || r.Interval.Value != want || r.N != 3 {
+			t.Errorf("%s = %+v, want %v at n 3", window, r, want)
+		}
+	}
+}
+
+func TestLoadCycles_TheFixabilitySignalsGiveTheHandoffCounts(t *testing.T) {
+	t.Parallel()
+	root := wavesFixture(t)
+	writeCycle(t, root, fixtureCycle{id: 2027, seal: "final verdict FAIL", codes: []string{"REPAIR_HANDOFF"}})
+	stream := filepath.Join(root, ".evolve", "runs", "cycle-2027", "signals.ndjson")
+	lines := `{"schema_version":"signal/1.0","seq":1,"ts":"2026-10-21T10:00:00Z","module":"repair","kind":"phase.outcome","code":"REPAIR_HANDOFF","severity":"WARN","origin":"F.e","reason":"r","fields":{"decision":"would_stop"}}` + "\n" +
+		`{"schema_version":"signal/1.0","seq":2,"ts":"2026-10-21T10:00:01Z","module":"repair","kind":"phase.outcome","code":"REPAIR_HANDOFF","severity":"WARN","origin":"F.e","reason":"r","fields":{"decision":"stop"}}` + "\n"
+	if err := os.WriteFile(stream, []byte(lines), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cycles, err := LoadCycles(root)
+
+	if c := cycleByID(cycles, 2027); err != nil || c.HandoffWould != 1 || !c.HandedOff {
+		t.Errorf("cycle 2027 = %+v, %v; want 1 would stop and a hand-off stop", c, err)
 	}
 }

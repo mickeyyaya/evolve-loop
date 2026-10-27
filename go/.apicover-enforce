@@ -842,3 +842,5 @@
 ./internal/integration
 # cyclespend - the LLM spend of one cycle from llm-calls.ndjson (ADR-0158).
 ./internal/cyclespend
+# fixability - lane or hand-off findings and the console companions of a lane item (ADR-0158).
+./internal/fixability

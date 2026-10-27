@@ -4,6 +4,8 @@ import (
 	"maps"
 	"path/filepath"
 	"slices"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
 type WorkflowPolicy struct {
@@ -32,6 +34,7 @@ type WorkflowPolicy struct {
 	QualityIndex             *QualityIndexPolicy   `json:"quality_index,omitempty"`
 	Convergence              *ConvergencePolicy    `json:"convergence,omitempty"`
 	RetryLadder              *RetryLadderPolicy    `json:"retry_ladder,omitempty"`
+	Repair                   *RepairPolicy         `json:"repair,omitempty"`
 }
 
 type WorkflowConfig struct {
@@ -59,6 +62,7 @@ type WorkflowConfig struct {
 	CodeReviewRepair         JudgeRepairConfig
 	QualityIndex             QualityIndexConfig
 	RetryLadder              RetryLadderConfig
+	RepairFixability         config.Stage
 }
 
 func (p Policy) WorkflowConfig() WorkflowConfig {
@@ -80,6 +84,7 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 		CodeReviewRepair:         resolveJudgeRepair("code-review", p.codeReviewRepairPolicy()),
 		QualityIndex:             p.qualityIndexConfig(),
 		RetryLadder:              p.retryLadderConfig(),
+		RepairFixability:         p.RepairFixabilityStage(),
 	}
 	if p.Workflow == nil {
 		return c

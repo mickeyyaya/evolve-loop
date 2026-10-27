@@ -14,6 +14,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxrank"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/repostate"
 )
 
@@ -152,7 +153,7 @@ func runInboxBatches(root string, args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	rank := loadRankInputs("batches", filepath.Dir(inbox.opts.InboxDir), time.Now(), stderr)
-	menu := inboxmover.RankLaneMenu(inbox.opts, inbox.items, inbox.isProtected, rank)
+	menu := inboxmover.RankLaneMenu(inbox.opts, inbox.items, inbox.isProtected, rank, policy.RepairFixabilityStageFor(filepath.Dir(filepath.Dir(inbox.opts.InboxDir)), "inbox batches", stderr))
 	cfg.Order = inboxrank.Sequence(menu.Ranked)
 	batches := inboxbatch.Classify(menu.Ready, cfg)
 	if asJSON {

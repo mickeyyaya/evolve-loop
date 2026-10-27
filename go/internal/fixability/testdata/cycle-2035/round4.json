@@ -1,0 +1,21 @@
+{
+ "source": ".evolve/runs/cycle-2035/audit-report.md",
+ "failure": {
+  "class": "code-audit-warn",
+  "defects": [
+   "M1: go/internal/core/failurelearning floor tests (3) fail with this diff; protected surface, fix is console item retro-minting-files-through-inbox-add-lane-ac-5-console in the same PR",
+   "M2: go/internal/inboxfile/inboxfile.go duplicates the filing rules of protected go/internal/inboxmover/lifecycle/file.go; unification queued as retro-minting-files-through-inbox-add-console"
+  ],
+  "evidence_paths": [
+   ".evolve/runs/cycle-2035/ship-error.json",
+   ".evolve/runs/cycle-2035/acs-verdict.json"
+  ],
+  "prescription": [
+   "Land console item retro-minting-files-through-inbox-add-lane-ac-5-console (core/failurelearning floor_test + goldens) in the same PR, or the importer backstop stays red on 3 TestWriteFloor_* tests"
+  ]
+ },
+ "gate_failures": [
+  "the integration tier (`go test -tags integration`) reported 11 offender(s) locally. NOTE \u2014 host/CI parity gap: this host HAS tmux and CI runners do not, so every test guarded by requireTmux runs here and SKIPs in CI; those offenders may correspond to no CI failure. An exit=80 (REPL boot timeout) offender is usually host contention \u2014 concurrent lanes hold tmux sessions \u2014 not a defect. Confirm against a quiet host before treating it as one. Offenders: --- FAIL: TestWriteFloor_WritesLessonAndReportByteIdenticalToTheGolden (0.01s); floor_test.go:103: /var/folders/11/n1_42bt961s29wjcr9qxj45m0000gn/T/TestWriteFloor_WritesLessonAndReportByteIdenticalToTheGolden3259826907/001/.evolve/inbox/retro-1279-the-ledger-row-lacks-evidence-915304b4.json: open /var/folders/11/n1_42bt961s29wjcr9qxj45m0000gn/T/TestWriteFloor_WritesLessonAndReportByteIdenticalToTheGolden3259826907/001/.evolve/inbox/retro-1279-the-ledger-row-lacks-evidence-915304b4.json: no such file or directory; --- FAIL: TestWriteFloor_FilesOnlyStructuredDefectsAsInbox (0.02s); --- FAIL: TestWriteFloor_FilesOnlyStructuredDefectsAsInbox/self-reported_defects (0.01s); floor_test.go:129: inbox: [.bump.lock 2025-07-31T22-13-20Z-retro-1279-a-real-defect-4474bf62.json], want 1 item(s); --- FAIL: TestWriteFloor_PolicyLoadFailsOnceAndFallsBackToCompiledDefaults (0.01s); floor_test.go:157: the remediation is still filed at the compiled weight: [.bump.lock 2026-07-15T01-02-03Z-retro-1279-a-real-defect-4474bf62.json]; FAIL; FAIL\tgithub.com/mickeyyaya/evolve-loop/go/internal/core/failurelearning\t0.359s; FAIL; full output: /Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2035/integration-tier.log",
+  "verdict-conflict: auditor narrative=WARN but 1 deterministic gate(s) forced FAIL [integration-tier gate] \u2014 the gate outranks the narrative (ship policy unchanged); both readings are recorded so the disagreement is weighable. Gate detail is in the error diagnostics beside this one."
+ ]
+}
