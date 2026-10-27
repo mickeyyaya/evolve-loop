@@ -182,7 +182,7 @@ The state on 2026-10-27. Each component re-reads this table before it starts.
 | X17b | built | #1178 | With `--json`, each core verb of [cli-contract.md](../architecture/cli-contract.md) §5 prints one envelope on each exit and exits with a code of the one exit table. Each core verb takes `--project-root`. `TestCLIContract_DocMatchesTheRegistry` and the integration table test guard both. |
 | X17c | built, stage `shadow` | #1180 | The inbox curation verbs and the `cli-routing` writers queue during a wave (policy `isolation.i15.stage`). The boundary step `queue-apply` applies the queue after `sync-main`. `gc` takes a lease and skips the process sweeps while a run is live. |
 | X11 | built | #1182 | `evolve agent run` writes a launch record for each run, and `commit-gate run --reviewers run:<label>` attests a review from it. `console-builder` is the build seat in a linked worktree, and `docs-review` is a profile. The spec is [agent-run.md](../architecture/agent-run.md) §7 and §8. |
-| X17d | built | the X17d pull request | `inbox claim`, `dossier show`, `cycle resume`, `wave stop` and `quality show` are core verbs with the envelope, the exit table and `--project-root`. `quality show` publishes nothing. The dispatch gate refuses `cycle resume` in a cell. |
+| X17d | built | #1190 | `inbox claim`, `dossier show`, `cycle resume`, `wave stop` and `quality show` are core verbs with the envelope, the exit table and `--project-root`. `quality show` publishes nothing. The dispatch gate refuses `cycle resume` in a cell. |
 | X12 to X16, X18c, X18d, X19 | not started | none | |
 
 ### 6.2 The X6 follow-up (X6b)

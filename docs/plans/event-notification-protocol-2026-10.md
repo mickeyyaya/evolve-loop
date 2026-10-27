@@ -114,6 +114,7 @@ The plan adds one non-goal: no feature flag and no env flag, because the channel
 | O17 | Component E14 moves the other pollers to push after E12. The GitHub API pollers stay as documented limits (was Q8). | operator, 2026-10-09 |
 | O18 | Accept the stall exposure of a channel lock, as for the ledger (was Q9). | operator, 2026-10-09 |
 | O19 | Retention: 30 days; 128 MB for each lossless channel; 512 MB for `ledger` and `signals` (was Q10). | operator, 2026-10-09 |
+| O20 | Until E12, `wave watch` waits on the `loop` and `cycle` channels with a deadline of 5 s. A read every 5 s stays as the fallback. This is an exception to O3 and D12 for `wave watch` only. E12 removes the fallback. | operator, 2026-10-27 ("switch `evolve wave watch` to the events subscription with the 5 s poll as a fallback only") |
 
 ## 5. Candidate designs
 
@@ -391,9 +392,9 @@ None. The operator decided Q1 to Q10 on 2026-10-09 (§4, O10 to O19).
 | E10 | ☑ `internal/events/rootwire` subscribes one Publisher to the Center of each root and returns the closer that the root defers. The roots are `cycle`, `loop`, `loop-chain`, `ship`, `subagent`, `simulate` and `phase-observer`. Guard tests derive the roots from the call sites and require a top-level defer of the closer before the first `return`. Built in the lane `cl-events-e10`. Merged in #967. Findings: [internal-events-rootwire.md](../architecture/packages/internal-events-rootwire.md) §Findings |
 | E7 (part) | ◐ PR #967 added the compiled defaults `policy.EventsDefaults()`, and `internal/events/rootwire` reads them. ☐ No `EventsConfig()` reads `policy.json`, and `gcpolicy` has no channel categories and no `Protect`. Inbox item: `event-notification-protocol-e7-events-config-load`. |
 | E11 (part) | ☑ `phase.dispatched`, `ship.landed`, `loop.started` and `loop.exit` have a producer. The kind `loop.lost` and the code `LOOP_LOST` are registered. ☐ `wave.started`, `wave.ended`, `inbox.claimed`, `inbox.released` and `ci.completed` are not started. Inbox item: `event-notification-protocol-e11-remaining-producers`. |
-| E9 | ☐ not started. The `events` verbs take the envelope and the exit table of [cli-contract.md](../architecture/cli-contract.md) (ADR-0156, component X17b). Inbox item: `events-cli-verbs-e9`. |
+| E9 | ◐ `events channels`, `events kinds` and `events watch --channel` are built, with the envelope and the exit table of [cli-contract.md](../architecture/cli-contract.md) (ADR-0156). Spec: [event-channels.md](../architecture/event-channels.md) §13. `evolve wave watch` waits on the `loop` and `cycle` channels and reads again every 5 s at most. ☐ `events subscribe` and `events watch --sub` need the store of E8, so the tests `TestEventsWatch_SubResumesFromTheStoredCursor` and `TestEventsSubscribe_AddWritesTheConfigOnly` are not written. The inbox item `events-cli-verbs-e9` stays open. |
 | E8 | ☐ not started. Inbox item: `event-notification-protocol-e8-subscriptions-runner`. |
-| E12 | ☐ not started. Inbox item: `event-notification-protocol-e12-poller-migrations`. |
+| E12 | ◐ started by E9 under O20: `wave watch` wakes on the `loop` and `cycle` channels. ☐ Its lines still come from the run directories, a `loop.lost` record does not end it, and the 5 s fallback stays. The `loop.lost` exit needs a verb code in 21 to 99, because 4 is `queued` in [cli-contract.md](../architecture/cli-contract.md) §3. Inbox item: `event-notification-protocol-e12-poller-migrations`. |
 | E13 | ☐ not started. Inbox item: `event-notification-protocol-e13-consumer-groups`. |
 | E14 | ☐ not started. Inbox item: `event-notification-protocol-e14-push-for-other-pollers`. |
 
