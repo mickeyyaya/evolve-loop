@@ -1,12 +1,12 @@
 # internal/selfheal
 
-> Decision: [ADR-0155](../adr/0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md). Spec of record: [llm-isolation.md](../llm-isolation.md) §18, §22 and §24. Plan: [llm-isolation-2026-10](../../plans/llm-isolation-2026-10.md) components X12 and X13. The verbs are `evolve selfheal incidents` (`go/cmd/evolve/cmd_selfheal.go`) and `evolve selfheal propose` (`go/cmd/evolve/cmd_selfheal_propose.go`).
+> Decision: [ADR-0155](../adr/0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md). Spec of record: [llm-isolation.md](../llm-isolation.md) §18, §22 and §24. Plan: [llm-isolation-2026-10](../../plans/llm-isolation-2026-10.md) components X12, X13 and X14. The verbs are `evolve selfheal incidents` (`go/cmd/evolve/cmd_selfheal.go`) and `evolve selfheal propose` (`go/cmd/evolve/cmd_selfheal_propose.go`).
 
 ## Purpose
 
-`internal/selfheal` is step 1 (detect) and step 5 (verify) of the self-healing loop. It turns evidence into typed incident records. It is deterministic Go and calls no LLM. It never acts: an action belongs to X14 and X16.
+`internal/selfheal` is step 1 (detect) and step 5 (verify) of the self-healing loop. It turns evidence into typed incident records. It is deterministic Go and calls no LLM. It never acts: an action belongs to X16.
 
-The package also holds the pipeline half of step 2 (diagnose, X13): the evidence index of an incident and the proposal record. The LLM half is the seat `selfheal-orchestrator` (§18.6 of the spec).
+The package also holds the pipeline half of step 2 (diagnose, X13): the evidence index of an incident and the proposal record. The LLM half is the seat `selfheal-orchestrator` (§18.6 of the spec). Step 3 (decide, X14) is the catalog validator of the section [The validator step (X14)](#the-validator-step-x14).
 
 The operator asked on 2026-10-27 for a detector that "turns signals into typed incidents that X13 can later read as input and X14 can act on".
 
@@ -80,11 +80,11 @@ The operator asked on 2026-10-27 for "the LLM judgment step" that reads the open
 | Selection | `Pending(incidents, proposals, limit)` | the open incidents with no current proposal, INCIDENT first |
 | Record | `NewProposal`, `WithDiagnosis`, `Refused`, `Failed`, `WriteProposal`, `LoadProposals` | `.evolve/incidents/proposals/<incident id>.json` with the schema `evolve.healing.proposal/1` |
 
-- **The classes of the index.** `EvidenceIncident` is the record, `i1`, the one required entry. `EvidenceSignal` is a cut of the signals that the record names, and of the `INBOX_CURATOR_PROPOSAL` signals that name its subject. `EvidenceDigest` and `EvidenceRetrospective` are `failure-digest.json` and `retrospective-report.md` of each source cycle. Each id is the first letter of its class and a number, for example `s1`.
+- **The classes of the index.** `EvidenceIncident` is the record, `i1`, the one required entry. `EvidenceSignal` is a cut of the signals that the record names, and of the `INBOX_CURATOR_PROPOSAL` signals that name its subject. `EvidenceDigest` and `EvidenceRetrospective` are `failure-digest.json` and `retrospective-report.md` of each source cycle. Each id is the prefix of its class in the table `evidencePrefixes` and a number, for example `s1`. The table gives each class its own prefix, so a later class `diff` cannot take the `d` of `digest`.
 - **The notes.** The index names the evidence that it does not hold: the runs of a `ci:` source and the diff. The pipeline has no cut of a CI log or a diff yet.
 - **A fresh index.** Each pass removes the evidence workspace first, so a cut of an earlier pass never stays. Each entry carries the `sha256` of its file, so `evolve context open` refuses a changed file.
-- **A current proposal.** A proposal is current while its incident keeps the `recurrence` and the `last_seen_at` of the diagnosis. A `failed` run is never current, so the next pass tries it again. A `refused` diagnosis is current: the next pass does not pay for the same mistake.
-- **The proposed action.** `WithDiagnosis` keeps the diagnosis of the agent and stores `Diagnosis.Proposed` in `action`. A `low` diagnosis thus records `halt-and-escalate`.
+- **A current proposal.** A proposal is current while its incident keeps the `recurrence` and the `last_seen_at` of the diagnosis. A `failed` run is current for `healing.orchestrator.retry_after_hours` (6). After that the next pass tries it again. So a run that fails at each try does not take a pass slot at each boundary. A `refused` diagnosis is current: the next pass does not pay for the same mistake.
+- **The proposed action.** `WithDiagnosis` keeps the diagnosis of the agent and stores the proposed action in `action`. A `low` diagnosis records `halt-and-escalate`. The rule is in this package, because the pipeline decides the action and `phasecontract` checks only the shape.
 
 The verb `evolve selfheal propose [--json] [--project-root P]` runs one pass. The JSON envelope has the schema `evolve.selfheal.propose/1`.
 
@@ -99,9 +99,41 @@ The verb `evolve selfheal propose [--json] [--project-root P]` runs one pass. Th
 - The boundary runs `selfheal incidents` and then `selfheal propose` after `inbox curate --apply`.
 - The tests use the 8 records of the live pass of 2026-10-27 (`testdata/incidents-2026-10-27/`) and a fake bridge (`TestSelfhealPropose_TheLiveIncidentsEachGetOneCheckedProposalThroughTheBridge`).
 
+## The validator step (X14)
+
+The plan row X14 asks for "a closed action catalog, a validator, repair budgets and circuit breakers in Go". The guard of the plan is "a fourth T1 repair in one window runs". The spec is [llm-isolation.md](../llm-isolation.md) §19.2.
+
+| Part | Function | Output |
+|---|---|---|
+| Catalog | `CatalogActions`, the table `catalog` | the six actions of `phasecontract`, each with its tier limit, its preconditions and a repair mark |
+| Decision | `Validator.Decide(incident, action, now)` | a `Decision`: `accepted`, or `refused` with the first failed precondition and its reason |
+| Schema refusal | `Validator.Refuse(incident, err, now)` | a refusal with the precondition `diagnosis` |
+| History | `Validator.Record`, `LoadHistory`, `AppendDecisions` | `.evolve/incidents/decisions.jsonl`, and the repair outcomes of `.evolve/incidents/repairs.jsonl` |
+| Inventory | `Inventory`, `LoadLandings` | the pending inbox ids, the installed families, the `cycle` landings of the ship journal, `main` red, and a file check that the verb gives |
+| Signals | `Decision.Events` | kind `selfheal.decision`: INFO when accepted, `HEALING_PROPOSAL_REFUSED` (WARN) when refused, `HEALING_ESCALATED` (INCIDENT) when escalated |
+| Dispatch gate | `Proposal.Dispatchable` | the accepted action, or `ErrNoAcceptedProposal` |
+
+- **Pure decisions.** `Decide` reads only its `Validator` value and the clock that the caller gives. The verb gives the file check `Inventory.FileExists`, so `Decide` does no I/O. `Record` returns a new `Validator` with the decision added. So the verb counts each decision of one pass against the budget of the next proposal in the same pass.
+- **Shadow decisions.** In `shadow` an accepted decision is the action that X16 will run. It counts against the budget, so the panel can measure the refusals that `enforce` will make.
+- **The breaker reads outcomes, not decisions.** A failed repair is an outcome that X16 writes. A decision is not an outcome, so a refused proposal never opens a breaker. The half-open state reads the decisions: one accepted repair of the class after the open time uses the slot.
+- **The order of the checks.** The catalog and the tier come first, because a wrong action has no preconditions to check. The repair controls come last. So a refusal names the most specific cause, and an action that cannot run never spends a budget slot.
+- **Inventory loads only on demand.** The verb reads the inbox, the ship journal and the ledger only when a pass has a pending incident. A missing inbox directory is an empty inventory. A corrupt ledger is exit 2, because the ledger is a record of this package. An unreadable ship journal is a warning: the boundary goes on, and each `revert-last-landing` is refused with `landing-in-window`.
+
+The verb `evolve selfheal propose` runs the validator after it parses each diagnosis. It appends the decisions of the pass to the ledger first. Then it writes the proposal records (field `decision`) and publishes the events.
+
+The ledger is the source of the budget. So after a fault before the ledger write, no proposal record has a decision that the ledger lacks. A fault after the ledger write makes the next pass decide the incident again, and the budget counts it twice. That error refuses more repairs, not fewer.
+
+- **The ship journal.** `internal/shipjournal` holds the entry type, the file name, the class `cycle` and the time format of `ship-journal.jsonl`. The ship phase writes through it and this package reads through it, so the two cannot drift.
+
+| Policy `healing.validator` | Default | Effect |
+|---|---|---|
+| `stage` | `shadow` | `shadow` records the decisions and the events. `off` decides nothing. `enforce` is refused until X16. |
+| `window_hours`, `t1_repairs`, `t2_repairs` | 24, 3, 6 | the budget of each tier in one window |
+| `breaker_failures`, `breaker_open_hours` | 2, 24 | the failures in a row that open the breaker of a class, and its open time |
+
 ## Invariants
 
-- The package never acts. It writes only its own records and the evidence workspaces. It changes no inbox item, no policy and no git ref.
+- The package never acts. It writes only its own records, the decision ledger and the evidence workspaces. It changes no inbox item, no policy and no git ref.
 - The incident records, the package, the verb file `cmd_selfheal.go` and the stage key are protected surfaces (`guards.ProtectedSurfaceManifest`). The verb file is protected because it chooses the evidence and builds the verifier. `cmd_selfheal_propose.go` is protected for the same reason, and the proposal records are under the protected directory. `TestNoAgentProfileCanWriteTheIncidentRecords` checks that no agent profile has a write grant over `.evolve/incidents/`.
 - Each rule is a pure function. Only the loaders read files, and only the verb starts `gh`.
 
@@ -123,6 +155,6 @@ The verb `evolve selfheal propose [--json] [--project-root P]` runs one pass. Th
 - The architecture review of 2026-10-27 named four limits that X16 must close before a record can close for real:
   - `ReproGreen` reads the test in the tree at the project root, not at `origin/main`.
   - `RetrospectiveExists` accepts any file under `docs/retrospectives/` that names the id.
-  - The states are `open` and `closed` only. X14 adds the states of spec §18.2 with a new major version of `evolve.incident/1`.
+  - The states are `open` and `closed` only. X16 adds the states of spec §18.2 with a new major version of `evolve.incident/1`. X14 records an escalation as a decision and a signal, not as a state.
   - One record holds each flake and each hang on `main`. A per-test subject needs the `ci-log` digest of X13.
 - The module is `healing`, because spec §24 and the codes `HEALING_*` of X14 and X15 use it. The kind is `selfheal.incident`, because the operator named it on 2026-10-27.

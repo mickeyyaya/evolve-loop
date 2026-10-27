@@ -1316,9 +1316,9 @@ X12 builds step 1 (detect) and step 5 (verify) in `go/internal/selfheal` ([packa
 | Tier | T0 when the evidence names a protected surface, else T1 or T2 by class (§20.1) |
 | Pass | level-triggered: it reads the whole window each time. A closed record whose fingerprint is in the window again reopens, and an observed fingerprint cannot close. |
 | Close | `Incident.Close` with the four conditions of §22. A record with no `repro_test` stays open until X16. |
-| Stage | the policy key `healing.detector.stage`: `shadow` (default) or `off`. `enforce` is refused until X14. |
+| Stage | the policy key `healing.detector.stage`: `shadow` (default) or `off`. `enforce` is refused until X16 (item `selfheal-repair-cycle-path`). |
 
-The record has the fields of §18.2 and some more fields ([internal-selfheal.md](packages/internal-selfheal.md)). `.evolve/incidents/`, `go/internal/selfheal/`, `go/cmd/evolve/cmd_selfheal.go` and `go/internal/policy/healing.go` are in `guards.ProtectedSurfaceManifest`. The states are `open` and `closed`. X14 adds the other states of §18.2 with a new major schema version.
+The record has the fields of §18.2 and some more fields ([internal-selfheal.md](packages/internal-selfheal.md)). `.evolve/incidents/`, `go/internal/selfheal/`, `go/cmd/evolve/cmd_selfheal.go` and `go/internal/policy/healing.go` are in `guards.ProtectedSurfaceManifest`. The states are `open` and `closed`. X16 adds the other states of §18.2 with a new major schema version, because X16 runs the repairs that move a record through them.
 
 ### 18.6 As built (X13)
 
@@ -1339,10 +1339,10 @@ A worked example: the record `inc-2026-10-27-235078cd` (`ci-hang:main`, T1) has 
 | Evidence index | `selfheal.WriteEvidence` writes `.evolve/runs/selfheal-<incident id>/inputs/index.json` in the format `evolve.inputs.index/2` of §8.5. The seat reads it with `evolve context index` and `open --workspace`. |
 | Classes | `incident` is the record (`i1`, the required entry). `signal` is a cut of the source signals, and the `INBOX_CURATOR_PROPOSAL` signals whose `id` or `target` is the subject. `digest` and `retrospective` are `failure-digest.json` and `retrospective-report.md` of each source cycle. `lesson`, `ci-log` and `diff` have no entry yet. The index names the missing CI runs and the diff in `notes`. |
 | Diagnosis | `diagnosis.json`, the flow seat `selfheal-orchestrator` of `phasecontract.FlowDecisions`. `phasecontract.ParseDiagnosis` checks it; the table below has the rules. |
-| Low confidence | `Diagnosis.Proposed` returns `halt-and-escalate` for a `low` diagnosis. The record keeps the action of the agent in `diagnosis` and the proposed action in `action`. |
+| Low confidence | `Proposal.WithDiagnosis` records `halt-and-escalate` for a `low` diagnosis. The record keeps the action of the agent in `diagnosis` and the proposed action in `action`. The rule is in `selfheal`, not in `phasecontract`: the schema checks the shape, and the pipeline decides the action (X14). |
 | Proposal record | `.evolve/incidents/proposals/<incident id>.json`, schema `evolve.healing.proposal/1`. The state is `proposed` (the diagnosis passed), `refused` (it failed the check) or `failed` (the run gave no diagnosis). The directory is under the protected `.evolve/incidents/`. |
-| Pass | `selfheal.Pending` selects each open incident with no current proposal: INCIDENT first, then by id, at most `max_per_pass`. A proposal is current while the incident keeps its `recurrence` and `last_seen_at`. A `failed` run is tried again at the next pass. |
-| Stage | the policy key `healing.orchestrator.stage`: `shadow` (default) records the proposals, and `off` runs no agent. `enforce` is refused until X14. `healing.orchestrator.max_per_pass` is 2 by default. |
+| Pass | `selfheal.Pending` selects each open incident with no current proposal: INCIDENT first, then by id, at most `max_per_pass`. A proposal is current while the incident keeps its `recurrence` and `last_seen_at`. A `failed` run is tried again after `healing.orchestrator.retry_after_hours` (6 by default, X14). Until then, the incident gives its slot to the next incident. |
+| Stage | the policy key `healing.orchestrator.stage`: `shadow` (default) records the proposals, and `off` runs no agent. `enforce` is refused until X16. `healing.orchestrator.max_per_pass` is 2 by default. |
 | Boundary | `evolve boundary run` and `evolve wave next` run `evolve selfheal incidents` and then `evolve selfheal propose` after `evolve inbox curate --apply`. A failed agent run is a `failed` record and exit 0, so it does not stop the boundary. An I/O fault is exit 2 and stops the boundary. |
 
 The rules of `evolve.diagnosis/1`, for the validator of X14:
@@ -1374,7 +1374,7 @@ Two changes from §18.4:
 - The diagnosis has no `tier` key. The tier comes from the incident record, so the agent cannot lower the tier of its own incident.
 - `expected_effect` is required, because the operator asked for the expected effect of each proposal (2026-10-27). X16 can verify it after a repair.
 
-The catalog of §19 also names `dispatch-phase-agent` (proposed). The schema refuses it until X14 adds it.
+The catalog of §19 also names `dispatch-phase-agent` (proposed). The schema and the X14 catalog refuse it. X14 holds the six actions of X13 only; the amendment of §7.2 must add the seventh.
 
 Limits:
 
@@ -1409,6 +1409,68 @@ A proposal that fails a precondition does not run. The pipeline emits `HEALING_P
 | global stop | the existing zero-ship halt and the three-FAIL stop stay in force | unchanged |
 
 The budget values are routing-style policy data in the constitution. Only the operator changes them.
+
+### 19.2 As built (X14)
+
+X14 builds step 3 (decide) in `go/internal/selfheal` ([package note](packages/internal-selfheal.md)). It is deterministic Go. In `shadow` it records a decision for each proposal and applies nothing. The console does the repair.
+
+A worked example. The pass of §18.6 gives the record `inc-2026-10-27-235078cd` (`ci-hang:main`, T1) the action `open-repair-item` with the file `go/internal/gc/devidle.go`.
+
+1. `evolve selfheal propose` parses `diagnosis.json` and builds the proposal, as in §18.6.
+2. `Validator.Decide` finds the action in the catalog. `open-repair-item` runs at each tier, so the tier limit holds.
+3. It checks the precondition `files-exist`: the file is in the repository. The file `go/internal/gc/sweep.go` of §18.6 does not exist, so the same check refuses that diagnosis.
+4. It checks the repair controls of T1. No repair of the incident failed, and the breaker of the class `ci-hang` is closed. The ledger has 0 accepted T1 repairs in the last 24 hours.
+5. The decision is `accepted`. The verb writes it into the proposal record and appends it to `.evolve/incidents/decisions.jsonl`. Then it publishes one INFO `selfheal.decision` event.
+
+Three earlier accepted T1 repairs in the window change step 4. The decision is then `refused` with the precondition `budget`, and the event has the code `HEALING_PROPOSAL_REFUSED`. That is the guard of the plan: "a fourth T1 repair in one window runs" fails (`TestBudget_RefusesTheFourthT1RepairInAWindow`).
+
+The validator checks in this order. The first check that fails names the refusal.
+
+| Order | Check | Precondition name | Holds for |
+|---|---|---|---|
+| 1 | The action is in the catalog. | `catalog` | each action |
+| 2 | The tier of the incident is in the tier limit of §19. | `tier-limit` | each action |
+| 3 | The preconditions of the action (table below). | see below | each action |
+| 4 | The incident has fewer than 2 failed repairs (ADR-0126). | `converge` | a repair at T1 or T2 |
+| 5 | The breaker of the incident class is closed, or half-open with no repair yet. | `breaker` | a repair at T1 or T2 |
+| 6 | The budget of the tier has room in the window. | `budget` | a repair at T1 or T2 |
+
+A repair is `retry-with-variation`, `reroute-family`, `revert-last-landing` or `open-repair-item`. `quarantine-item` is an inbox move and `halt-and-escalate` is a stop, so no budget or breaker holds them. The console repairs a T0 `open-repair-item` outside the loop, so no loop control holds it. Its decision is `accepted` and does not escalate.
+
+| Action | Preconditions | Inventory that the verb reads |
+|---|---|---|
+| `retry-with-variation` | `item-known`, `variation-new` | the pending inbox ids (`inboxfile.PendingIDs`); the accepted retries of the incident in the ledger |
+| `reroute-family` | `item-known`, `family-known` | the pending inbox ids; the installed CLI families (`bridge.InteractiveFamilies`) |
+| `quarantine-item` | `item-known`, `item-of-incident` | the pending inbox ids; the subject of the incident |
+| `revert-last-landing` | `main-red`, `landing-in-window` | an open `main-red` incident; the `cycle` landings of `ship-journal.jsonl` in the detector window |
+| `open-repair-item` | `files-exist` | the files of the repository |
+| `halt-and-escalate` | none | none |
+
+| Part | As built |
+|---|---|
+| Catalog | `selfheal.CatalogActions` is the closed list. `TestCatalog_HasEachKindOfTheDiagnosisSchema` fails when the catalog and `phasecontract.DiagnosisActions` differ. |
+| Budget | the accepted repairs of the tier in the ledger, in the last `window_hours`. A loop tier with no budget value refuses each repair, so a missing value cannot remove the bound. An accepted decision in `shadow` counts too, so `shadow` measures the budget that `enforce` will apply. |
+| Breaker | It reads the repair outcomes of the class in time order. `breaker_failures` failures in a row open it. It stays open for `breaker_open_hours`, then it is half-open. One accepted repair can run in the half-open state. A FAIL opens the breaker again, and a PASS closes it. |
+| Escalation | A decision escalates on a `converge` or `breaker` refusal, on the second refusal of one incident, and on an accepted `halt-and-escalate`. A low diagnosis is an accepted `halt-and-escalate`, so it escalates. |
+| Schema refusal | A diagnosis that fails `ParseDiagnosis` is a refusal with the precondition `diagnosis`. It counts for the second-refusal rule. A `failed` run is no proposal and gets no decision. |
+| Records | one line for each decision in `.evolve/incidents/decisions.jsonl` (schema `evolve.healing.decision/1`), and the field `decision` of the proposal record. The verb writes the ledger first, because the budget reads it. The repair outcomes are `.evolve/incidents/repairs.jsonl`, which X16 writes. The directory is protected. |
+| Dispatch | `Proposal.Dispatchable` returns the action only for an accepted decision, else `ErrNoAcceptedProposal` (`TestRepairDispatch_NeedsAnAcceptedProposal`). X16 calls it. In `shadow` nothing calls it. |
+| Stage | the policy key `healing.validator.stage`: `shadow` (default) records the decisions, and `off` decides nothing. `enforce` is refused until X16. |
+
+| Policy `healing.validator` | Default | Meaning |
+|---|---|---|
+| `window_hours` | 24 | the budget window |
+| `t1_repairs` | 3 | the T1 repairs in one window |
+| `t2_repairs` | 6 | the T2 repairs in one window |
+| `breaker_failures` | 2 | the failed repairs of one class in a row that open its breaker |
+| `breaker_open_hours` | 24 | the time that an open breaker stays open |
+
+Limits:
+
+- No repair runs before X16, so `repairs.jsonl` is empty. The `converge` and `breaker` checks thus refuse nothing on live data until X16 writes outcomes.
+- `family-known` checks that the family is installed. It does not check the health of the family or the routing floors of the seat. The incident names no seat.
+- `revert-last-landing` does not check that the revert applies clean. The executor of X16 must check it, because only a real revert can prove it.
+- The incident record keeps the states `open` and `closed`. An escalation is a decision and a signal, not a new incident state (§18.5).
 
 ## 20. Surface tiers and the gate classifier
 
@@ -1510,7 +1572,11 @@ The module is `healing` (built by X12, code prefix `HEALING_`), in the same shap
 | `incident.escalated` | INCIDENT | `HEALING_ESCALATED` | two failed repairs, two refused proposals, an open breaker or a `low` diagnosis |
 | `healing.violation` | WARN | `HEALING_I10_VIOLATION` to `HEALING_I14_VIOLATION` | an invariant of Part II breaks |
 
-As built (X12): one kind `selfheal.incident` with a field `transition` replaces `incident.opened` and `incident.closed` ([internal-selfheal.md](packages/internal-selfheal.md) has the codes). The kinds `incident.proposal`, `incident.refused` and `incident.escalated` come with X14. X13 emits no signal: in `shadow` it writes the proposal records only (§18.6). X15 emits `HEALING_I10_VIOLATION` with the kind `gate.rejected` (§20.4).
+As built (X12): one kind `selfheal.incident` with a field `transition` replaces `incident.opened` and `incident.closed` ([internal-selfheal.md](packages/internal-selfheal.md) has the codes). X13 emits no signal: in `shadow` it writes the proposal records only (§18.6). X15 emits `HEALING_I10_VIOLATION` with the kind `gate.rejected` (§20.4).
+
+As built (X14): one kind `selfheal.decision` with a field `verdict` replaces `incident.proposal`, `incident.refused` and `incident.escalated`. The lossless channel `selfheal.decision` keeps each one. An accepted decision is INFO with no code. A refusal has the code `HEALING_PROPOSAL_REFUSED` and the field `precondition`. An escalated refusal adds a second event with the code `HEALING_ESCALATED`. An accepted `halt-and-escalate` is one `HEALING_ESCALATED` event.
+
+X14 emits no `HEALING_I12_VIOLATION` or `HEALING_I13_VIOLATION`: in `shadow` no repair runs, so no repair can break I-12 or I-13. X16 emits them at its dispatch.
 
 The measures for the stage flips of §20.2 are proposed panel readings: repair success rate, false-diagnosis rate and OQ4 time to green. A false diagnosis is a repair whose verify failed and whose next diagnosis named another cause. An amendment of ADR-0153 adds them.
 
@@ -1522,7 +1588,8 @@ The measures for the stage flips of §20.2 are proposed panel readings: repair s
 | Why did the pipeline refuse a proposal? | `evolve signals tail --channel errors --code HEALING_PROPOSAL_REFUSED --json` |
 | What did the orchestrator agent see? | `evolve context index --workspace .evolve/runs/selfheal-<incident id> --json` |
 | What did the orchestrator agent propose? | `evolve selfheal propose --json`, or `cat .evolve/incidents/proposals/<incident id>.json` |
-| What stage is each tier at? | the `healing` block of `.evolve/policy.json`: `healing.detector.stage` (X12) and `healing.orchestrator.stage` (X13) are built, and the tier keys are proposed |
+| What stage is each tier at? | the `healing` block of `.evolve/policy.json`: `healing.detector.stage` (X12), `healing.orchestrator.stage` (X13) and `healing.validator.stage` (X14) are built, and the tier keys are proposed |
+| What did the validator decide, and why? | `evolve signals tail --channel selfheal.decision --json`, or `.evolve/incidents/decisions.jsonl` |
 
 | Code | What it means | What to do |
 |---|---|---|
@@ -1767,8 +1834,8 @@ X19 lands in three items:
 | I-9 Proven substitution | `TestE2ECycleCLIMatrix` rows M1 to M5 (exists, skipped today) | X1, X11 | `enforce` per row | none (a test guard) |
 | I-10 Constitution | `TestGateClassifier_FlagsEachWeakeningPattern` (one case for each pattern of §20.3); the ADR-0064 P2 check (exists) | X15 | `enforce` | `HEALING_I10_VIOLATION` |
 | I-11 No agent writes its own oracle | the TDD digest check (item `tdd-predicates-frozen-at-handoff`); `TestT1AuditSeatIsAnotherFamily` | X15, X16 | `enforce` | `HEALING_I11_VIOLATION` |
-| I-12 Orchestrator proposes, pipeline disposes | `TestValidator_RefusesAnActionOutsideTheCatalog`; `TestRepairDispatch_NeedsAnAcceptedProposal`; the orchestrator profile has no dispatch tool | X13, X14 | `shadow`, then `enforce` for each tier | `HEALING_I12_VIOLATION` |
-| I-13 Bounded autonomy | `TestBudget_RefusesTheFourthT1RepairInAWindow`; `TestBreaker_OpensAfterTwoFailedRepairs` | X14 | `enforce` | `HEALING_I13_VIOLATION` |
+| I-12 Orchestrator proposes, pipeline disposes | `TestValidator_RefusesAnActionOutsideTheCatalog` (built); `TestRepairDispatch_NeedsAnAcceptedProposal` (built); the orchestrator profile has no dispatch tool | X13, X14 | `shadow`, then `enforce` for each tier | `HEALING_I12_VIOLATION` |
+| I-13 Bounded autonomy | `TestBudget_RefusesTheFourthT1RepairInAWindow` (built); `TestBreaker_OpensAfterTwoFailedRepairs` (built) | X14 | `shadow` (built), then `enforce` with X16 | `HEALING_I13_VIOLATION` |
 | I-14 Evidence closes an incident | `TestIncident_ClosesOnlyWithTheFourConditions` | X12, X16 | `enforce` | `HEALING_I14_VIOLATION` |
 | I-15 The CLI is the service contract | `TestLoopStatus_AnExtraWordNeverStartsALoop`; `TestCLIContract_DocMatchesTheRegistry`; `TestCLIContract_EachCoreVerbPrintsOneEnvelope`; `TestAgentClasses_MatchTheContract` (X17e) | X17 | `enforce` | none (a test guard); X17e: `ISOLATION_I3_VIOLATION` with `rule=verb.class.r` or `verb.class.d` |
 | I-16 No ambient control | `TestNoControlFlagReadOutsideTheMarkerList` (AST); `TestPolicyParse_RefusesAnUnknownKey`; matrix row N1 extended with `EVOLVE_SANDBOX` and `EVOLVE_BYPASS_SHIP_GATE` | X18 | `enforce` | `CONTROL_BYPASS_USED` (INFO, for each audited bypass) |

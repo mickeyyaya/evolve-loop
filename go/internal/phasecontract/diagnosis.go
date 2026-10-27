@@ -193,10 +193,3 @@ func (p DiagnosisParams) check() error {
 	}
 	return nil
 }
-
-func (d Diagnosis) Proposed() DiagnosisAction {
-	if d.Confidence != ConfidenceLow {
-		return d.Action
-	}
-	return DiagnosisAction{Kind: ActionHaltAndEscalate, Params: DiagnosisParams{Reason: "a low-confidence diagnosis goes to the operator: " + d.Hypothesis}}
-}

@@ -189,7 +189,8 @@ The state on 2026-10-27. Each component re-reads this table before it starts.
 | X17d | built | #1190 | `inbox claim`, `dossier show`, `cycle resume`, `wave stop` and `quality show` are core verbs with the envelope, the exit table and `--project-root`. `quality show` publishes nothing. The dispatch gate refuses `cycle resume` in a cell. |
 | X18c | built | #1187 | The class (b) knobs read `.evolve/policy.json` keys or CLI parameters, and no code reads their former names. A former name that is set prints one `[policy] WARN`; the plan shadow wave became this WARN. `ipcenv.UnmovedControls()` went from 29 to 10 names. |
 | X18d | built | this PR | Each class (c) bypass is an audited parameter (`--sandbox-off`, `ship --auto-confirm`, `bridge launch --human-input`), a policy key (`sandbox.mode`, `bridge.allow_*`) or removed. The package `adapters/runner` had no production caller, and the batch PR deleted it. Each audited use writes one `control_bypass` ledger entry and one `CONTROL_BYPASS_USED` signal. `ipcenv.UnmovedControls()` went from 10 names to none, and X18d deleted it. |
-| X14, X16, X19 | not started | none | |
+| X14 | built, stage `shadow` | #1211 | `selfheal.Validator` checks each proposal against the closed catalog, the pending inbox ids, the installed CLI families, the loop landings, the files and the tier. It applies the T1 and T2 budgets of each window, the breaker of each class with its half-open state, and converge-or-escalate. The policy block is `healing.validator`. Each refusal emits `HEALING_PROPOSAL_REFUSED` with its precondition. In `shadow` the verb records the decisions in `.evolve/incidents/decisions.jsonl` and applies nothing. Spec §19.2. |
+| X16, X19 | not started | none | |
 
 ### 6.2 The X6 follow-up (X6b)
 

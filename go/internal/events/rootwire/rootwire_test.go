@@ -323,8 +323,8 @@ func TestAttach_AnEmptyOrRelativeEvolveDirPublishesNothingAndWarnsOnce(t *testin
 func TestDeadlineOf_IsTheChannelCountTimesTheLockDeadline(t *testing.T) {
 	t.Parallel()
 
-	if got := deadlineOf(policy.EventsDefaults()); got != 11*250*time.Millisecond {
-		t.Errorf("default deadline = %v, want 11 channels x 250ms", got)
+	if got := deadlineOf(policy.EventsDefaults()); got != 12*250*time.Millisecond {
+		t.Errorf("default deadline = %v, want 12 channels x 250ms", got)
 	}
 	custom := policy.EventsPolicy{Channels: make([]policy.EventChannel, 2), LockDeadlineMS: 100}
 	if got := deadlineOf(custom); got != 200*time.Millisecond {

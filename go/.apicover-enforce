@@ -847,6 +847,8 @@
 ./internal/cyclespend
 # selfheal - the incident detector of the self-healing loop: typed incident records from signals, cycle state, CI runs and usage readings (ADR-0155 X12).
 ./internal/selfheal
+# shipjournal - the one format of .evolve/ship-journal.jsonl that the ship phase writes and selfheal reads (ADR-0155 X14).
+./internal/shipjournal
 # auditfix - the audit_fix rung handler: the auditor applies a small prescribed patch and a fresh seat reviews it (ADR-0158).
 ./internal/auditfix
 # citelemetry - the critical-path report that joins the jobs, steps, test JSON, rusage and sampler records of one CI run (ci-wall-time plan C1).

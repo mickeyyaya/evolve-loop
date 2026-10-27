@@ -171,9 +171,11 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 
 | Code | Meaning |
 |---|---|
+| `HEALING_ESCALATED` | the catalog validator sent an incident to the operator: a second refusal, two failed repairs, an open breaker or a halt-and-escalate action; the same fields as HEALING_PROPOSAL_REFUSED (llm-isolation.md §19.1, §19.2, §24) |
 | `HEALING_I10_VIOLATION` | the gate classifier flagged a loop cycle diff that changes a kernel surface or weakens a gate (invariant I-10, llm-isolation.md §20.3); the build floor fails and ship refuses the cycle; fields.patterns names each pattern, fields.paths each flagged path |
 | `HEALING_INCIDENT_OPENED` | the incident detector opened an incident record under .evolve/incidents; fields incident, class, fingerprint, tier, state, transition, recurrence, stage (llm-isolation.md §18, §24) |
 | `HEALING_INCIDENT_REOPENED` | the incident detector reopened a closed incident, because its signal fired again after the close; the same fields as HEALING_INCIDENT_OPENED (llm-isolation.md §18, §22) |
+| `HEALING_PROPOSAL_REFUSED` | the catalog validator refused a proposal of the orchestrator agent; fields incident, class, tier, action, verdict, precondition, reason, stage (llm-isolation.md §19, §19.2, §24) |
 
 ### inbox
 
