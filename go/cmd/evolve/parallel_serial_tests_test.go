@@ -842,6 +842,7 @@ var serialTests = map[string]string{
 	"main.TestWireOrchestratorDeps_SignalCenterConsoleSinkIsFilteredAtWarn":                                                "calls process-global setter SetModelCatalogDirFn",
 	"main.TestWireOrchestratorDeps_SignalCenterReachesEveryPhaseRunner":                                                    "calls process-global setter SetModelCatalogDirFn",
 	"main.TestWireOrchestratorDeps_SignalCenterReachesTheBridge":                                                           "calls process-global setter SetModelCatalogDirFn",
+	"main.TestWireOrchestratorDeps_RequestChannelWired":                                                                    "calls process-global setter SetModelCatalogDirFn",
 	"main.TestWireOrchestratorDeps_SignalCenterWired":                                                                      "calls process-global setter SetModelCatalogDirFn",
 	"main.TestWireOrchestrator_CatalogPublisherWired":                                                                      "calls process-global setter SetModelCatalogDirFn",
 	"main.TestWireOrchestrator_CompositionFastPathWired":                                                                   "calls process-global setter SetModelCatalogDirFn",

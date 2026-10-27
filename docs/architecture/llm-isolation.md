@@ -12,7 +12,7 @@
 > - X1: merged in #1121. The conformance matrix of §14 and the module, kind, codes and channel of §15 are on `main`. The follow-up X1b (#1128) adds a fake `tmux` (`go/internal/faketmux`), so the rows M2 to M4 run a full cycle and are green.
 > - X2: merged in #1122 at stage `shadow` (the policy key `isolation.i2.stage`). The flip to `enforce` is an operator decision.
 > - X3: merged in #1127. The single launch API of §5.1 and its AST guard `TestOnlyTheBridgeStartsAnLLMBinary` are on `main`, and matrix row N2 is green.
-> - X4: merged in #1126, and the dispatch credential of I-3 merged in #1132.
+> - X4: merged in #1126, and the dispatch credential of I-3 merged in #1132. The request channel of §7.2.1 (item `isolation-dispatch-request-channel`) is built at stage `shadow`.
 > - X5: merged in #1133 at stage `shadow` (the policy key `isolation.i5.stage`).
 > - X6: merged in #1123. The routing data of §10 is on `main`: `cli_routing.floors`, with the compiled default in `go/internal/policy/routing_defaults.json`. The follow-up X6b (item `isolation-floor-profiles-allowed-clis-as-routing-data`) moves the `allowed_clis` pins of 7 profiles.
 > - X7: merged in #1135 at stage `shadow` (the policy key `isolation.i7.stage`). The sandbox holds the protected write rule for each family, `guard phase` follows §7.2 for `Agent` and `Task`, and rows N10 and N11 are green (§9.1).
@@ -448,7 +448,7 @@ evolve wave next: refused inside a phase: wave next is class D; it is an operato
 | The stage | the policy key `isolation.i3.stage`, the same stage as the exec deny, read from a file that the cell cannot change. The launcher writes it to `~/.evolve/dispatch/stage`, outside `held/`. A missing file is `shadow`. When the credential read is denied (`EPERM` or `EACCES`), a missing file is `enforce`. Only a launch makes a cell, and the launch writes the stage. A file that cannot be read, or a word that is not `off`, `shadow` or `enforce`, is `enforce`. |
 | `off` | no deny, no store write and no check |
 | `shadow` | The cell cannot read the credential. The verb emits `ISOLATION_I3_VIOLATION` with `action=logged` and runs. |
-| `enforce` | The verb emits `ISOLATION_I3_VIOLATION` with `action=refused` and exits 3. A class R refusal names the request path of its kind, for example `.evolve/runs/cycle-<N>/requests/dispatch-<n>.json`. Item `isolation-dispatch-request-channel` builds that channel. |
+| `enforce` | The verb emits `ISOLATION_I3_VIOLATION` with `action=refused` and exits 3. A class R refusal names the request path of its kind, for example `.evolve/runs/cycle-<N>/requests/dispatch-<n>.json`. The request channel of §7.2.1 reads that file. |
 | The signal | `rule=verb.class.r` or `verb.class.d`, `target` is the verb, `source=dispatch-credential` (cli-contract.md §4.5). The verb publishes it under the events role `dispatch`, and it goes to the stderr of the verb, which the pane captures. |
 | The hermetic env | No environment name carries the credential or its path. So X2 cannot pass it to a child (§6.1). |
 
@@ -521,9 +521,9 @@ How an in-harness subagent counts:
 - **Budget.** The usage of the subagent is usage of the CLI process, so it counts against the budget of the cell. The artifact timeout of the dispatch covers its time. A token cap for each seat is proposed.
 - **Telemetry.** The bridge records one dispatch for the CLI. A subagent gets no own dispatch record.
 - **Usage collector.** Each manifest usage collector must count the token usage of the subagents of the harness, or flag it as not counted. This is a requirement on the `collectors` field of X9 (§11, proposed).
-- **Manifest.** Each family manifest declares the capability `inprocess_subagents` (proposed) when its harness can run subagents in its own process. A profile cannot ask for subagents on a family without the capability.
+- **Manifest.** Each family manifest declares the capability `inprocess_subagents` when its harness can run subagents in its own process. As built, `claude-p` and `claude-tmux` declare it (§7.2.1). The rule "a profile cannot ask for subagents on a family without the capability" is proposed: no check reads the capability yet.
 
-The dispatch request (proposed, item `isolation-dispatch-request-channel`):
+The dispatch request (built by item `isolation-dispatch-request-channel`, §7.2.1):
 
 1. The agent writes a typed request, a declared output such as `requests/dispatch-<n>.json`. It names the target role, the reason, the inputs and the expected output.
 2. The pipeline validates the request in Go: the schema, the allowed roles and two caps.
@@ -532,6 +532,80 @@ The dispatch request (proposed, item `isolation-dispatch-request-channel`):
 3. The orchestrator agent of [ADR-0155](adr/0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md) judges if the request is reasonable. The catalog of §19 gets a new action, "dispatch phase agent" (ADR-0155, amended 2026-10-26).
 4. If the request is approved, the pipeline dispatches the agent. The result goes into the lineage index of the requester (§8).
 5. A refused request gets a recorded reason. The requesting agent never dispatches an agent itself.
+
+#### 7.2.1 The request channel (as built)
+
+A worked example. The build agent of cycle 7 needs the suspect files of a failure. It cannot run `evolve agent run fault-localization`: the verb is class R, and a cell has no dispatch credential (§7.1.1). The refusal names the request path. The agent writes `.evolve/runs/cycle-7/requests/dispatch-1.json`:
+
+```json
+{"schema":"evolve.request/1","kind":"dispatch","what":{"verb":"agent run","args":{"role":"fault-localization"}},
+ "why":"The build fails in a parser that the scout report does not name.","inputs":["build-report.md"],
+ "expected_output":{"artifact":"the suspect files of the failure"}}
+```
+
+1. The build phase ends. Before the dispatch returns, `cycleRun.handoffRequests` gives the cell to the channel (`go/internal/core/request_handoff.go`).
+2. `agentrequest.Channel.Handoff` reads `requests/dispatch-1.json` and emits `isolation.request`.
+3. The validator checks the file in Go, and each check passes:
+   - the strict schema and the kind `dispatch`;
+   - the role, which is in `isolation.dispatch_requests.roles`;
+   - the cycle cap (cycle 7 has fewer than 3 requests) and the depth cap (the depth is 1);
+   - the input `build-report.md`, which is a plain file of the workspace.
+4. The channel writes the evidence workspace `.evolve/runs/request-7-dispatch-1/`. Entry `q1` is a copy of the request, and entry `i1` is the input. A failure of this write refuses the request with the precondition `evidence`.
+5. The seat `selfheal-orchestrator` judges the request through `evolve agent run`. It writes `diagnosis.json` with `incident_id` `dispatch-1` and the action `dispatch-phase-agent`.
+6. `phasecontract.ParseDiagnosis` checks the judgement. `selfheal.Validator.Decide` checks the action against the catalog of §19, at tier T2, with the request as validated.
+7. At `enforce` the pipeline runs `evolve agent run fault-localization --json --keep --file <ws>/build-report.md`. The record `.evolve/lineage/requests/cycle-7/dispatch-1.json` gets the decision `run`, the run label and the report.
+8. The pipeline reads the requests in the kept workspace of that run at depth 2. Then it removes the workspace.
+9. The index of the next phase lists the record as a `deliverable` of kind `request` (§8). A retry of the item lists it as a `lineage` entry.
+
+| Item | As built |
+|---|---|
+| Request file | `requests/<kind>-<n>.json` in the workspace of the cell. The pipeline reads the files in order of the kind and the number. A file with another name is not read. One grammar in `go/internal/agentclass` (`RequestFile`, `ChildRequest`, `ValidRequestName`, `KindDispatch`) gives the file form, the name of a nested request and the name check of the judgement. |
+| Schema | `evolve.request/1` (`agentclass.RequestSchema`), parsed by `agentrequest`. An unknown key, trailing data, an empty `why` or no `expected_output.artifact` is a refusal. |
+| Kinds | `dispatch` only. The kind in the file name and in the file must be the same. The kinds `inbox-add`, `routing-proposal`, `quality-reading` and `code-refresh` of [cli-contract.md](cli-contract.md) §4.3 are refused with precondition `kind`. Item `cli-agent-tool-surface` adds their executors. |
+| Validator | `agentrequest.Channel.check`, in this order: `kind`, `role`, `cycle-cap`, `depth-cap`, `input`. Each input is a clean relative path to a plain file in the workspace of the requester, by the rule of `inputindex.FileEntry`. The same entries go into the evidence index. |
+| Policy | `isolation.dispatch_requests`: `stage` (`off`, `shadow`, `enforce`; default `shadow`), `roles` (default `fault-localization`, `premise-challenge`, `dependency-map`), `per_cycle` (default 3) and `max_depth` (default 1). A value of 0 takes the default. `evolve agent capabilities --json` prints the block as `caps.dispatch`. |
+| Cycle cap | the number of records of the cycle in `.evolve/lineage/requests/cycle-<N>/`. Each request that the channel reads counts, also a refused one. |
+| Depth | A request of a phase agent has depth 1. A request in the workspace of an agent that a request dispatched has the depth of its parent plus 1. Its name is `<parent>.<file>`, for example `dispatch-1.dispatch-1`. |
+| Judge | the seat `selfheal-orchestrator` (ADR-0155). Its persona has the section "Judge a dispatch request". `dispatch-phase-agent` approves. Each other action refuses, with `params.reason` or the hypothesis as the reason (precondition `judged`). |
+| Catalog | `dispatch-phase-agent` is the seventh action of `selfheal.CatalogActions` and of `phasecontract.DiagnosisActions`. Its tier is T2, and its precondition is `request-validated`: an approval of a request that the validator did not pass is refused. A catalog refusal has the precondition `catalog`, and its reason starts with the word of the catalog, for example `request-validated: ...`. |
+| `shadow` | The channel validates, judges and records. The decision is `approved`, and no agent runs. |
+| `enforce` | An approved request runs. A failed run gets the decision `failed`. |
+| Record | `evolve.request.record/1` in `.evolve/lineage/requests/cycle-<N>/<name>.json`, where no cell can write. The record keeps the `sha256` of the request. A file with a record and the same digest is not read again. A file with a record and another digest is a new request under a used name. The channel refuses it once with the precondition `name`. Its record name is `<name>~<12 hex digits>`. |
+| Index | `inputindex.Build` lists each record of the cycle (`deliverable`) and of each lineage cycle (`lineage`), with kind `request`. The summary names the request, the role, the decision and the reason. |
+| Signals | `isolation.request` (INFO) for each request that parses. `isolation.request.decision`: INFO for `run` and `approved`, WARN `ISOLATION_REQUEST_REFUSED` for a refusal, WARN `ISOLATION_REQUEST_FAILED` for a failed run. |
+| Errors | Three faults are errors: an unreadable `requests/` directory, a corrupt record and a record that cannot be written. Core then prints `[orchestrator] WARN request channel of <phase>`. The cycle goes on. A cancelled cycle reads no further request. The channel removes the kept workspace of each run, also after a failed run or a failed record. |
+| Manifest | the capability `inprocess_subagents` (`bridge.CapabilityInprocessSubagents`), declared by `claude-p` and `claude-tmux` |
+
+| Id | Decision | Because | Rejected options and why |
+|---|---|---|---|
+| RC1 | The channel reads the requests at the end of each phase dispatch, before the next phase. | The next phase then finds the result in its index (cli-contract.md §4.3: "The pipeline reads the requests at the handoff of the phase"). | A pass at the boundary: the requester and the next phases of the cycle never see the result. |
+| RC2 | The judge is the seat `selfheal-orchestrator`, and it answers with the diagnosis schema. | ADR-0155 names that seat as the orchestrator agent. The schema, the catalog and the validator of X13 and X14 then check the judgement with no new contract. | A new seat with a new judgement schema: a second profile, persona and routing row for one decision. |
+| RC3 | The validator runs before the judge. | A request that fails a Go check costs no LLM launch. | The judge first: a cap or a schema error then costs a launch. |
+| RC4 | The record lives in `.evolve/lineage/requests/`. | The repo is read-only for a cell, so a cell cannot forge a decision or a result (§8.5). | The workspace of the cell: the next phase of the cycle can write it. |
+| RC5 | A dispatched role runs through `evolve agent run`, which admits only a standalone profile. | `agent run` refuses a built-in phase and a writer with no worktree, so a request cannot start a second build. | A phase runner of the cycle: it reads and writes the cycle state. |
+
+Known differences from the design:
+
+- The kind `dispatch` is the only kind with an executor. The other request kinds of cli-contract.md §4.3 wait for item `cli-agent-tool-surface`.
+- A request with the role of a built-in phase, for example `scout`, is refused by `agent run`. The decision is `failed`.
+- The judge has the same limit as the diagnosis seat: at `isolation.i5.stage=enforce` it cannot read its evidence workspace (§18.6).
+- At `shadow` each valid request costs one launch of the judge.
+- A dispatched agent writes its requests into its own kept workspace. The profiles of the default roles have no `Write` tool grant, so a nested request is rare until a profile grants it.
+- The signals go to the signal stream. No events channel routes the kinds `isolation.request` and `isolation.request.decision` yet.
+- No check reads the capability `inprocess_subagents` yet. Item `isolation-inprocess-subagents-profile-check` adds the reader.
+- The evidence workspace of each request stays under `.evolve/runs/` as the record of the judgement, as the evidence of an incident does (§18.6).
+- The seats run in the process of the loop through `evolve agent run`, which takes no context. A cancel stops the channel between requests, not during a seat.
+
+The guards are these tests:
+
+- `TestDispatchRequest_AValidRequestIsDispatchedByThePipeline` and `TestAgentRequest_AnApprovedRequestIsRunByThePipeline`
+- `TestHandoff_AnUnreasonableRequestIsRefusedWithARecordedReason`
+- `TestHandoff_ARequestOfADispatchedAgentIsRefusedPastTheDepthCap` and `TestHandoff_ARequestPastTheCycleCapIsRefused`
+- `TestAgentRequest_ADirectAgentRunInACellIsRefusedAndNamesTheFileThatThePipelineReads` and the row "agent run" of `TestDispatchVerbs_RefuseWithoutTheDispatchCredential`
+- `TestHandoff_TheValidatorRefusesBeforeTheOrchestratorJudges` and `TestHandoff_TheCatalogDisposesOfTheJudgement`
+- `TestHandoff_ANewRequestUnderADecidedNameIsRefusedOnce`, `TestHandoff_ANestedRequestUnderTheDepthCapIsJudgedAndRun` and `TestRequestName_TheFileTheChildAndTheNameShareOneGrammar`
+- `TestDispatch_HandsTheRequestsOfTheFinishedPhaseToTheChannel`, `TestWireOrchestratorDeps_RequestChannelWired` and `TestBuild_ListsTheRequestRecordsOfTheCycleAndOfItsLineage`
+- `TestManifests_DeclareInProcessSubagentsOnlyForAHarnessThatRunsThem`
 
 ## 8. The artifact index
 
@@ -1121,6 +1195,8 @@ The contract reuses the shape of [llm-quality-indexes.md](llm-quality-indexes.md
 | `ISOLATION_I9_VIOLATION` | I-9 | none at run time; the matrix test is its guard |
 | `ISOLATION_CONTEXT_REQUIRED_UNOPENED` | I-4 | built (CX3): the bridge, when a cell closes without a read of a required entry of its index; kind `isolation.context`, INFO ([cell-context-index.md](cell-context-index.md) §8) |
 | `ISOLATION_CONTEXT_BUDGET_OVER` | I-4 | built (CX3): the bridge, when required entries of a layer passed its token budget; kind `isolation.context`, WARN ([cell-context-index.md](cell-context-index.md) §6) |
+| `ISOLATION_REQUEST_REFUSED` | I-3 | built: the request channel, when the validator or the orchestrator agent refuses a request; kind `isolation.request.decision`, WARN (§7.2.1) |
+| `ISOLATION_REQUEST_FAILED` | I-3 | built: the request channel, when the dispatch of an approved request fails; kind `isolation.request.decision`, WARN (§7.2.1) |
 
 ### 15.2 Fields of a violation
 
@@ -1368,13 +1444,14 @@ An unknown key at any level, a missing key, prose around the JSON or trailing da
 | `revert-last-landing` | `sha` | none | 7 to 40 lowercase hex characters |
 | `open-repair-item` | `files`, `repro` | none | each file is a clean path inside the repository |
 | `halt-and-escalate` | none | `reason` | none |
+| `dispatch-phase-agent` | `request` | none | the name of a request file, such as `dispatch-1` or `dispatch-1.dispatch-1` |
 
 Two changes from §18.4:
 
 - The diagnosis has no `tier` key. The tier comes from the incident record, so the agent cannot lower the tier of its own incident.
 - `expected_effect` is required, because the operator asked for the expected effect of each proposal (2026-10-27). X16 can verify it after a repair.
 
-The catalog of §19 also names `dispatch-phase-agent` (proposed). The schema and the X14 catalog refuse it. X14 holds the six actions of X13 only; the amendment of §7.2 must add the seventh.
+The catalog of §19 also names `dispatch-phase-agent`. Item `isolation-dispatch-request-channel` added it to the schema and to the X14 catalog as the seventh action (§7.2.1). The seat proposes it only when it judges a dispatch request.
 
 Limits:
 
@@ -1394,7 +1471,7 @@ The catalog is closed and typed Go (X14). It extends the enums of `failure-decis
 | `revert-last-landing` | none | `main` is red; the incident names a landing of the loop in the window; the revert applies clean | T2, T1 | a revert PR through `evolve ship` |
 | `open-repair-item` | `fix_type: pipeline-repair` | a reproduction statement; the suspect files; the tier from the classifier (§20) | T1 to the loop, T0 to the operator | the inbox write |
 | `halt-and-escalate` | `halt-and-diagnose` | none | all | the loop halt and an operator item |
-| `dispatch-phase-agent` (proposed, amended 2026-10-26, §7.2) | none | a dispatch request that the pipeline validated; under the cap for each cycle and the depth cap; the target role is allowed | T2 | the pipeline dispatch |
+| `dispatch-phase-agent` (amended 2026-10-26, built by §7.2.1) | none | a dispatch request that the pipeline validated; under the cap for each cycle and the depth cap; the target role is allowed | T2 | the pipeline dispatch |
 
 A proposal that fails a precondition does not run. The pipeline emits `HEALING_PROPOSAL_REFUSED` with the failed precondition, and the incident goes to `halt-and-escalate` after the second refusal.
 
@@ -1435,7 +1512,7 @@ The validator checks in this order. The first check that fails names the refusal
 | 5 | The breaker of the incident class is closed, or half-open with no repair yet. | `breaker` | a repair at T1 or T2 |
 | 6 | The budget of the tier has room in the window. | `budget` | a repair at T1 or T2 |
 
-A repair is `retry-with-variation`, `reroute-family`, `revert-last-landing` or `open-repair-item`. `quarantine-item` is an inbox move and `halt-and-escalate` is a stop, so no budget or breaker holds them. The console repairs a T0 `open-repair-item` outside the loop, so no loop control holds it. Its decision is `accepted` and does not escalate.
+A repair is `retry-with-variation`, `reroute-family`, `revert-last-landing` or `open-repair-item`. `quarantine-item` is an inbox move, and `halt-and-escalate` is a stop. `dispatch-phase-agent` is a dispatch with its own caps (§7.2.1). So no budget or breaker holds these three. The console repairs a T0 `open-repair-item` outside the loop, so no loop control holds it. Its decision is `accepted` and does not escalate.
 
 | Action | Preconditions | Inventory that the verb reads |
 |---|---|---|
@@ -1445,6 +1522,7 @@ A repair is `retry-with-variation`, `reroute-family`, `revert-last-landing` or `
 | `revert-last-landing` | `main-red`, `landing-in-window` | an open `main-red` incident; the `cycle` landings of `ship-journal.jsonl` in the detector window |
 | `open-repair-item` | `files-exist` | the files of the repository |
 | `halt-and-escalate` | none | none |
+| `dispatch-phase-agent` | `request-validated` | the request that the channel validated (§7.2.1). The verb `selfheal propose` gives no request, so it refuses this action for an incident. |
 
 | Part | As built |
 |---|---|

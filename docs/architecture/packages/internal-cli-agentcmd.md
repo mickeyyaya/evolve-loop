@@ -41,7 +41,7 @@
   - A failed write is exit 21. `stageWorkspace` refuses a run label whose record exists, before the dispatch (exit 21).
 - **Output.** stdout carries the report text. With `--json` it carries the `Envelope` struct, which is the `data` of the envelope of [cli-contract.md](../cli-contract.md) §2. The envelope also names the driver, the family, the launch record and the worktree. A dispatch error goes to stderr and into `Envelope.Error`. A ledger error and a launch record error go there too.
 - **Signals.** SIGINT and SIGTERM cancel the dispatch context (`signal.NotifyContext`), so the ledger append and the workspace removal still run.
-- **Capabilities** (`capabilities.go`, X17e, [cli-contract.md](../cli-contract.md) §4.2). The verb prints `agentclass.Surface` with no cell. With `--json` the document is the `data` of the envelope `evolve.agent.capabilities/1`. The text form has one line for each verb and ends with `default D`. A stray word or an unknown flag is exit 10.
+- **Capabilities** (`capabilities.go`, X17e, [cli-contract.md](../cli-contract.md) §4.2). The verb prints `agentclass.Surface` with no cell. With `--json` the document is the `data` of the envelope `evolve.agent.capabilities/1`. The text form has one line for each verb and ends with `default D`. `caps.dispatch` is the block `isolation.dispatch_requests` of the policy of `--project-root`, with its defaults ([llm-isolation.md](../llm-isolation.md) §7.2.1). A stray word or an unknown flag is exit 10.
   - `--project-root` is accepted for the contract of §5, and the table is the same for each root.
   - Pinned by `TestAgentCapabilities_JSONListsEachVerbOfTheTableWithDefaultClassD` and `TestAgentCapabilities_TextNamesEachClassAndAStrayWordIsUsage`.
 

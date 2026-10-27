@@ -105,7 +105,7 @@ The plan row X14 asks for "a closed action catalog, a validator, repair budgets 
 
 | Part | Function | Output |
 |---|---|---|
-| Catalog | `CatalogActions`, the table `catalog` | the six actions of `phasecontract`, each with its tier limit, its preconditions and a repair mark |
+| Catalog | `CatalogActions`, the table `catalog` | the seven actions of `phasecontract`, each with its tier limit, its preconditions and a repair mark. `dispatch-phase-agent` runs at T2 only, and its precondition `request-validated` reads `Inventory.Requests`, which only the request channel ([internal-agentrequest](internal-agentrequest.md)) fills. |
 | Decision | `Validator.Decide(incident, action, now)` | a `Decision`: `accepted`, or `refused` with the first failed precondition and its reason |
 | Schema refusal | `Validator.Refuse(incident, err, now)` | a refusal with the precondition `diagnosis` |
 | History | `Validator.Record`, `LoadHistory`, `AppendDecisions` | `.evolve/incidents/decisions.jsonl`, and the repair outcomes of `.evolve/incidents/repairs.jsonl` |

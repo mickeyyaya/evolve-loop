@@ -30,6 +30,9 @@ func Parse(raw []byte) (Policy, error) {
 		if err := p.Isolation.Context.validate(); err != nil {
 			return Policy{}, fmt.Errorf("isolation.context: %w", err)
 		}
+		if err := p.Isolation.DispatchRequests.validate(); err != nil {
+			return Policy{}, fmt.Errorf("isolation.dispatch_requests: %w", err)
+		}
 	}
 	if err := p.Healing.validate(); err != nil {
 		return Policy{}, fmt.Errorf("healing.%w", err)

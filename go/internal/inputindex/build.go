@@ -51,7 +51,7 @@ func Build(req Request) (Index, error) {
 	}
 	dropped := max(0, len(all)-limit)
 	idx.Lineage, idx.Attempt = all[dropped:], len(all)+1
-	sources := slices.Concat(deliverables(req, idx.Attempt), lineageSources(req.ProjectRoot, ids, idx.Lineage, dropped+1), lessonSources(req.ProjectRoot, ids, idx.Lineage))
+	sources := slices.Concat(deliverables(req, idx.Attempt), lineageSources(req.ProjectRoot, ids, idx.Lineage, dropped+1), lessonSources(req.ProjectRoot, ids, idx.Lineage), requestSources(req.ProjectRoot, req.Cycle, idx.Lineage, idx.Attempt))
 	for _, s := range sources {
 		e, ok, err := newEntry(req.ProjectRoot, s)
 		if err != nil {

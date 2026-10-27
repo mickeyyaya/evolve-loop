@@ -206,6 +206,8 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `ISOLATION_I7_VIOLATION` | I-7 CLI-neutral guarantees: a gate or the fence stopped a write that no hook stopped; fields.target names the path (ADR-0154) |
 | `ISOLATION_I8_VIOLATION` | I-8 typed flow decisions: a flow parser fell back to stdout or prose; fields.cell names the seat (ADR-0154) |
 | `ISOLATION_I9_VIOLATION` | I-9 proven substitution: no run-time emitter; the conformance matrix TestE2ECycleCLIMatrix is its guard (ADR-0154) |
+| `ISOLATION_REQUEST_FAILED` | the request channel approved a request of a cell, and the dispatch of the agent failed; the same fields as ISOLATION_REQUEST_REFUSED (llm-isolation.md §7.2.1) |
+| `ISOLATION_REQUEST_REFUSED` | the request channel refused a request of a cell: the validator (schema, kind, role, input, cap or depth) or the orchestrator agent; fields request, kind, role, decision, precondition, reason, stage (cli-contract.md §4.5, llm-isolation.md §7.2.1) |
 
 ### ladder
 

@@ -26,6 +26,7 @@ func testValidator(t *testing.T) Validator {
 	t.Helper()
 	inv := Inventory{Items: map[string]bool{churnItem: true, "core-one-diagnostics-writer-lane": true}, Families: []string{"agy", "claude"},
 		Landings: []Landing{{SHA: landingSHA, At: t0.Add(-time.Hour)}}, FileExists: func(path string) bool { return path == repairFile }}
+	inv.Requests = map[string]bool{"dispatch-1": true}
 	return Validator{Inventory: inv, Limits: testLimits, Stage: "shadow"}
 }
 
@@ -179,6 +180,9 @@ func TestValidator_RefusesEachFailedPrecondition(t *testing.T) {
 	repairOf := func(files ...string) phasecontract.DiagnosisAction {
 		return phasecontract.DiagnosisAction{Kind: phasecontract.ActionOpenRepairItem, Params: phasecontract.DiagnosisParams{Files: files, Repro: "x"}}
 	}
+	dispatch := func(request string) phasecontract.DiagnosisAction {
+		return phasecontract.DiagnosisAction{Kind: phasecontract.ActionDispatchPhaseAgent, Params: phasecontract.DiagnosisParams{Request: request}}
+	}
 	mainRed := func(v Validator) Validator { v.Inventory.MainRed = true; return v }
 	triedModel := func(v Validator) Validator {
 		return v.Record(Decision{IncidentID: churnIncident, Verdict: VerdictAccepted, Action: &phasecontract.DiagnosisAction{Kind: phasecontract.ActionRetryWithVariation, Params: phasecontract.DiagnosisParams{Item: churnItem, Variation: "model"}}, At: t0.Add(-time.Hour)})
@@ -201,6 +205,8 @@ func TestValidator_RefusesEachFailedPrecondition(t *testing.T) {
 		{"quarantine names an item of another incident", churnIncident, quarantine("core-one-diagnostics-writer-lane"), same, PreItemOfIncident, churnItem},
 		{"revert while main is green", ciHangIncident, revert(landingSHA[:7]), same, PreMainRed, "main"},
 		{"revert of a commit that is no landing of the loop", ciHangIncident, revert("abc1234"), mainRed, PreLandingInWindow, `"abc1234"`},
+		{"a dispatch of a request that the pipeline did not validate", churnIncident, dispatch("dispatch-2"), same, PreRequestValid, `"dispatch-2"`},
+		{"a dispatch runs only at T2", ciHangIncident, dispatch("dispatch-1"), same, PreTierLimit, "T1"},
 		{"a repair item for a file that does not exist", ciHangIncident, repairOf(repairFile, "go/internal/gc/nope.go"), same, PreFilesExist, `"go/internal/gc/nope.go"`},
 	}
 	for _, c := range cases {
@@ -228,6 +234,7 @@ func TestValidator_AcceptsEachActionWhosePreconditionsHold(t *testing.T) {
 		"quarantine": {churnIncident, phasecontract.DiagnosisAction{Kind: phasecontract.ActionQuarantineItem, Params: phasecontract.DiagnosisParams{Item: churnItem}}},
 		"revert":     {ciHangIncident, phasecontract.DiagnosisAction{Kind: phasecontract.ActionRevertLastLanding, Params: phasecontract.DiagnosisParams{SHA: landingSHA[:9]}}},
 		"T0 repair":  {repairLoopInc, openRepair()},
+		"dispatch":   {churnIncident, phasecontract.DiagnosisAction{Kind: phasecontract.ActionDispatchPhaseAgent, Params: phasecontract.DiagnosisParams{Request: "dispatch-1"}}},
 	}
 	for name, c := range cases {
 		inc := liveIncident(t, c.incident)
@@ -522,6 +529,7 @@ func TestValidator_AFirstRefusalAfterAnAcceptedDecisionDoesNotEscalate(t *testin
 var personaRefusalWords = map[string]string{
 	PreItemKnown: "pending inbox item", PreVariationNew: "same variation", PreFamilyKnown: "not installed", PreItemOfIncident: "subject of the incident",
 	PreMainRed: "main is not red", PreLandingInWindow: "landing of the loop", PreFilesExist: "does not exist",
+	PreRequestValid: "did not validate",
 }
 
 func TestCatalog_ThePersonaStatesTheRefusalsOfEachAction(t *testing.T) {

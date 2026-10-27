@@ -851,3 +851,5 @@
 ./internal/shipjournal
 # auditfix - the audit_fix rung handler: the auditor applies a small prescribed patch and a fresh seat reviews it (ADR-0158).
 ./internal/auditfix
+# agentrequest - the request channel of a cell: the validator, the judgement and the dispatch of a phase agent request (llm-isolation.md §7.2.1).
+./internal/agentrequest

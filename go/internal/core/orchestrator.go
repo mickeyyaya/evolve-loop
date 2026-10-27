@@ -240,6 +240,7 @@ type Orchestrator struct {
 	contractVerifier ContractVerifier
 
 	throughputRecorder ThroughputRecorder
+	requestHandoff     RequestHandoff
 
 	signals       *signalcenter.Center
 	signalMu      sync.Mutex
