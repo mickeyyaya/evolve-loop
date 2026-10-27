@@ -66,7 +66,19 @@ type WorkflowConfig struct {
 }
 
 func (p Policy) WorkflowConfig() WorkflowConfig {
-	c := WorkflowConfig{
+	c := p.defaultWorkflowConfig()
+	if p.Workflow == nil {
+		return c
+	}
+	w := *p.Workflow
+	for _, section := range []func(WorkflowConfig) WorkflowConfig{w.withLoopLimits, w.withPhaseSwitches, w.withFallback, w.withRemediation, w.withInteractive} {
+		c = section(c)
+	}
+	return c
+}
+
+func (p Policy) defaultWorkflowConfig() WorkflowConfig {
+	return WorkflowConfig{
 		MaxConsecutiveFails:      1,
 		MaxCyclesCap:             25,
 		CycleBudget:              "enforce",
@@ -86,64 +98,82 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 		RetryLadder:              p.retryLadderConfig(),
 		Repair:                   p.repairConfig(),
 	}
-	if p.Workflow == nil {
-		return c
+}
+
+func (w WorkflowPolicy) withLoopLimits(c WorkflowConfig) WorkflowConfig {
+	if w.MaxConsecutiveFails > 0 {
+		c.MaxConsecutiveFails = w.MaxConsecutiveFails
 	}
-	if p.Workflow.MaxConsecutiveFails > 0 {
-		c.MaxConsecutiveFails = p.Workflow.MaxConsecutiveFails
+	if w.MaxCyclesCap > 0 {
+		c.MaxCyclesCap = w.MaxCyclesCap
 	}
-	if p.Workflow.MaxCyclesCap > 0 {
-		c.MaxCyclesCap = p.Workflow.MaxCyclesCap
+	if w.AutoPrune != nil {
+		c.AutoPrune = *w.AutoPrune
 	}
-	if p.Workflow.AutoPrune != nil {
-		c.AutoPrune = *p.Workflow.AutoPrune
+	if w.BackfillEnabled != nil {
+		c.BackfillEnabled = *w.BackfillEnabled
 	}
-	if p.Workflow.BackfillEnabled != nil {
-		c.BackfillEnabled = *p.Workflow.BackfillEnabled
+	if w.CycleBudget != "" {
+		c.CycleBudget = w.CycleBudget
 	}
-	if p.Workflow.CycleBudget != "" {
-		c.CycleBudget = p.Workflow.CycleBudget
+	return c
+}
+
+func (w WorkflowPolicy) withPhaseSwitches(c WorkflowConfig) WorkflowConfig {
+	c.AllowDocDelete = w.AllowDocDelete
+	c.IntentDelta = w.IntentDelta
+	c.DiffComplexityDisable = w.DiffComplexityDisable
+	c.AuditorTierOverride = w.AuditorTierOverride
+	c.PhaseEnables = maps.Clone(w.PhaseEnables)
+	if w.ConsensusAuditEnabled != nil {
+		c.ConsensusAuditEnabled = *w.ConsensusAuditEnabled
 	}
-	c.AllowDocDelete = p.Workflow.AllowDocDelete
-	c.IntentDelta = p.Workflow.IntentDelta
-	c.DiffComplexityDisable = p.Workflow.DiffComplexityDisable
-	c.AuditorTierOverride = p.Workflow.AuditorTierOverride
-	c.PhaseEnables = maps.Clone(p.Workflow.PhaseEnables)
-	if p.Workflow.ConsensusAuditEnabled != nil {
-		c.ConsensusAuditEnabled = *p.Workflow.ConsensusAuditEnabled
+	if w.PSMASEnabled != nil {
+		c.PSMASEnabled = *w.PSMASEnabled
 	}
-	if p.Workflow.PSMASEnabled != nil {
-		c.PSMASEnabled = *p.Workflow.PSMASEnabled
+	c.StrictAudit = w.StrictAudit
+	if w.CompactPrompts != nil {
+		c.CompactPrompts = *w.CompactPrompts
 	}
-	c.StrictAudit = p.Workflow.StrictAudit
-	if p.Workflow.CompactPrompts != nil {
-		c.CompactPrompts = *p.Workflow.CompactPrompts
+	return c
+}
+
+func (w WorkflowPolicy) withFallback(c WorkflowConfig) WorkflowConfig {
+	if w.UniversalFallback != nil {
+		c.UniversalFallback = *w.UniversalFallback
 	}
-	if p.Workflow.UniversalFallback != nil {
-		c.UniversalFallback = *p.Workflow.UniversalFallback
+	if w.UniversalFallbackExclude != nil {
+		c.UniversalFallbackExclude = append([]string(nil), w.UniversalFallbackExclude...)
 	}
-	if p.Workflow.UniversalFallbackExclude != nil {
-		c.UniversalFallbackExclude = append([]string(nil), p.Workflow.UniversalFallbackExclude...)
-	}
-	for k, v := range p.Workflow.SizeBudgetMultipliers {
+	return c
+}
+
+func (w WorkflowPolicy) withRemediation(c WorkflowConfig) WorkflowConfig {
+	multipliers := maps.Clone(c.SizeBudgetMultipliers)
+	for k, v := range w.SizeBudgetMultipliers {
 		if v > 0 {
-			c.SizeBudgetMultipliers[k] = v
+			multipliers[k] = v
 		}
 	}
-	if p.Workflow.RemediationRounds != nil {
-		c.RemediationRounds = *p.Workflow.RemediationRounds
+	c.SizeBudgetMultipliers = multipliers
+	if w.RemediationRounds != nil {
+		c.RemediationRounds = *w.RemediationRounds
 	}
-	if p.Workflow.RemediablePhases != nil {
-		c.RemediablePhases = slices.Clone(p.Workflow.RemediablePhases)
+	if w.RemediablePhases != nil {
+		c.RemediablePhases = slices.Clone(w.RemediablePhases)
 	}
-	if p.Workflow.BuildFloor != nil {
-		c.BuildFloorEnforced = *p.Workflow.BuildFloor
+	if w.BuildFloor != nil {
+		c.BuildFloorEnforced = *w.BuildFloor
 	}
-	if p.Workflow.InteractivePolicy != "" {
-		c.InteractivePolicy = p.Workflow.InteractivePolicy
+	return c
+}
+
+func (w WorkflowPolicy) withInteractive(c WorkflowConfig) WorkflowConfig {
+	if w.InteractivePolicy != "" {
+		c.InteractivePolicy = w.InteractivePolicy
 	}
-	if p.Workflow.InteractivePolicies != nil {
-		c.InteractivePolicies = maps.Clone(p.Workflow.InteractivePolicies)
+	if w.InteractivePolicies != nil {
+		c.InteractivePolicies = maps.Clone(w.InteractivePolicies)
 	}
 	return c
 }
