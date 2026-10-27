@@ -23,6 +23,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/specrunner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/reportdoc"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/subagent"
 )
@@ -35,22 +36,23 @@ const (
 )
 
 type Envelope struct {
-	Profile      string            `json:"profile"`
-	RunLabel     string            `json:"run_label"`
-	Verdict      string            `json:"verdict"`
-	Report       string            `json:"report"`
-	Model        string            `json:"model"`
-	ModelSource  string            `json:"model_source,omitempty"`
-	CostUSD      float64           `json:"cost_usd"`
-	Tokens       core.TokenUsage   `json:"tokens"`
-	DurationMS   int64             `json:"duration_ms"`
-	Diagnostics  []core.Diagnostic `json:"diagnostics,omitempty"`
-	CLI          string            `json:"cli,omitempty"`
-	Family       string            `json:"family,omitempty"`
-	LaunchRecord string            `json:"launch_record,omitempty"`
-	Worktree     string            `json:"worktree,omitempty"`
-	Workspace    string            `json:"workspace,omitempty"`
-	Error        string            `json:"error,omitempty"`
+	Profile      string                   `json:"profile"`
+	RunLabel     string                   `json:"run_label"`
+	Verdict      string                   `json:"verdict"`
+	Findings     reportdoc.SeverityCounts `json:"findings"`
+	Report       string                   `json:"report"`
+	Model        string                   `json:"model"`
+	ModelSource  string                   `json:"model_source,omitempty"`
+	CostUSD      float64                  `json:"cost_usd"`
+	Tokens       core.TokenUsage          `json:"tokens"`
+	DurationMS   int64                    `json:"duration_ms"`
+	Diagnostics  []core.Diagnostic        `json:"diagnostics,omitempty"`
+	CLI          string                   `json:"cli,omitempty"`
+	Family       string                   `json:"family,omitempty"`
+	LaunchRecord string                   `json:"launch_record,omitempty"`
+	Worktree     string                   `json:"worktree,omitempty"`
+	Workspace    string                   `json:"workspace,omitempty"`
+	Error        string                   `json:"error,omitempty"`
 }
 
 type runOptions struct {
@@ -83,6 +85,7 @@ type launchOutcome struct {
 	family     string
 	model      string
 	verdict    string
+	findings   reportdoc.SeverityCounts
 	writer     bool
 	treeBefore string
 	treeAfter  string
@@ -182,7 +185,7 @@ func (c command) launch(ctx context.Context, r standaloneRun, signals *signalcen
 	out.cli, out.model, out.family = spy.cli, spy.model, llmroute.Family(spy.cli)
 	out.writer = len(r.writable) > 0
 	if out.runErr == nil {
-		out.verdict = out.resp.Verdict
+		out = out.withReportVerdict(r, signals)
 	}
 	return out
 }
@@ -305,7 +308,7 @@ func emit(o runOptions, r standaloneRun, out launchOutcome, recordPath string, f
 	}
 	resp := out.resp
 	env := Envelope{
-		Profile: r.spec.Name, RunLabel: r.label, Verdict: resp.Verdict, Report: out.report,
+		Profile: r.spec.Name, RunLabel: r.label, Verdict: resp.Verdict, Findings: out.findings, Report: out.report,
 		Model: out.launchedModel(), ModelSource: resp.ModelSource, CostUSD: resp.CostUSD, Tokens: resp.Tokens,
 		DurationMS: resp.DurationMS, Diagnostics: resp.Diagnostics,
 		CLI: out.cli, Family: out.family, LaunchRecord: recordPath, Worktree: r.worktree,
