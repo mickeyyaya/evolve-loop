@@ -21,6 +21,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/selfheal"
+	"github.com/mickeyyaya/evolve-loop/go/internal/shipjournal"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -42,6 +43,7 @@ var diagnosisActionOf = map[string]string{
 type diagnosisBridge struct {
 	mu       sync.Mutex
 	requests []core.BridgeRequest
+	actions  map[string]string
 }
 
 func (b *diagnosisBridge) Launch(_ context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
@@ -49,7 +51,10 @@ func (b *diagnosisBridge) Launch(_ context.Context, req core.BridgeRequest) (cor
 	b.requests = append(b.requests, req)
 	b.mu.Unlock()
 	id := incidentIDPattern.FindString(req.Prompt)
-	action, ok := diagnosisActionOf[id]
+	action, ok := b.actions[id]
+	if !ok {
+		action, ok = diagnosisActionOf[id]
+	}
 	if !ok {
 		action = `{"kind":"quarantine-item","params":{"item":"retro-minting-files-through-inbox-add-lane"}}`
 	}
@@ -231,7 +236,7 @@ func scriptedAgent(stdout string, rc int) func([]string, io.Reader, io.Writer, i
 	}
 }
 
-func TestSelfhealPropose_AFailedRunIsRecordedAndTriedAgain(t *testing.T) {
+func TestSelfhealPropose_AFailedRunIsRecorded(t *testing.T) {
 	t.Parallel()
 	cases := map[string]struct {
 		agent func([]string, io.Reader, io.Writer, io.Writer) int
@@ -249,10 +254,6 @@ func TestSelfhealPropose_AFailedRunIsRecordedAndTriedAgain(t *testing.T) {
 			rc, e, _ := runProposeJSON(t, env, root)
 			if rc != 0 || len(e.Data.Proposals) != 1 || e.Data.Proposals[0].State != selfheal.ProposalFailed || !strings.Contains(e.Data.Proposals[0].Error, c.want) {
 				t.Fatalf("rc=%d %+v", rc, e.Data.Proposals)
-			}
-			_, again, _ := runProposeJSON(t, env, root)
-			if len(again.Data.Proposals) != 1 || again.Data.Proposals[0].IncidentID != e.Data.Proposals[0].IncidentID {
-				t.Fatalf("a failed run is tried again at the next pass: %+v", again.Data.Proposals)
 			}
 		})
 	}
@@ -329,5 +330,239 @@ func TestRunAgentCommand_IsTheRegisteredAgentVerb(t *testing.T) {
 	}
 	if cmd := lookupCommand("agent"); cmd == nil {
 		t.Fatal("evolve agent must stay registered")
+	}
+}
+
+func validatedProject(t *testing.T, healing string) string {
+	t.Helper()
+	root := proposeProject(t, healing)
+	selfhealFile(t, filepath.Join(paths.EvolveDirOf(root), "inbox", "2026-10-27T00-00-00Z-retro.json"), `{"id":"retro-minting-files-through-inbox-add-lane"}`)
+	selfhealFile(t, filepath.Join(root, "go", "internal", "gc", "sweep.go"), "package gc\n")
+	return root
+}
+
+func TestSelfhealPropose_TheValidatorDecidesEachProposalAndRecordsWouldApplyDecisions(t *testing.T) {
+	root := validatedProject(t, `{"orchestrator":{"max_per_pass":8}}`)
+	env := selfhealTestEnv(fixtureGH)
+	env.agent = fakeBridgeAgent(t, &diagnosisBridge{})
+
+	rc, e, stderr := runProposeJSON(t, env, root)
+
+	if rc != 0 || len(e.Data.Proposals) != 8 || e.Data.ValidatorStage != "shadow" {
+		t.Fatalf("rc=%d %+v\n%s", rc, e, stderr)
+	}
+	want := map[string]struct{ verdict, precondition string }{
+		incCIHang:                 {selfheal.VerdictAccepted, ""},
+		incAuditStall:             {selfheal.VerdictAccepted, ""},
+		"inc-2026-10-27-99f19b25": {selfheal.VerdictAccepted, ""},
+		incChurn:                  {selfheal.VerdictRefused, selfheal.PreDiagnosis},
+		incBuildStall:             {selfheal.VerdictRefused, selfheal.PreDiagnosis},
+		"inc-2026-10-27-6f89f94c": {selfheal.VerdictRefused, selfheal.PreItemOfIncident},
+		"inc-2026-10-27-cb3817ea": {selfheal.VerdictRefused, selfheal.PreItemOfIncident},
+		"inc-2026-10-27-a3bf0a7f": {selfheal.VerdictRefused, selfheal.PreItemOfIncident},
+	}
+	for id, w := range want {
+		p := proposalOf(t, e.Data.Proposals, id)
+		if p.Decision == nil || p.Decision.Verdict != w.verdict || p.Decision.Precondition != w.precondition || p.Decision.Stage != "shadow" {
+			t.Errorf("%s: want %s %s, got %+v", id, w.verdict, w.precondition, p.Decision)
+		}
+	}
+	if p := proposalOf(t, e.Data.Proposals, incAuditStall); !p.Decision.Escalated {
+		t.Errorf("a low diagnosis is an accepted halt-and-escalate that goes to the operator: %+v", p.Decision)
+	}
+	if _, err := proposalOf(t, e.Data.Proposals, incCIHang).Dispatchable(); err != nil {
+		t.Errorf("the accepted repair is the would-apply action: %v", err)
+	}
+	history, err := selfheal.LoadHistory(paths.EvolveDirOf(root))
+	if err != nil || len(history.Decisions) != 8 {
+		t.Fatalf("the ledger holds one decision for each proposal: %d %v", len(history.Decisions), err)
+	}
+	refused, escalated := 0, 0
+	for _, ev := range channelEvents(t, root, "selfheal.decision") {
+		switch ev.Code {
+		case selfheal.CodeProposalRefused:
+			refused++
+			if ev.Fields["precondition"] == "" {
+				t.Errorf("a refusal names its precondition: %+v", ev)
+			}
+		case selfheal.CodeEscalated:
+			escalated++
+		}
+	}
+	if refused != 5 || escalated != 1 {
+		t.Errorf("want 5 HEALING_PROPOSAL_REFUSED and 1 HEALING_ESCALATED, got %d and %d", refused, escalated)
+	}
+}
+
+func TestSelfhealPropose_TheBudgetRefusesTheFourthT1RepairOfAWindow(t *testing.T) {
+	root := validatedProject(t, `{"orchestrator":{"max_per_pass":1}}`)
+	evolveDir := paths.EvolveDirOf(root)
+	var spent []selfheal.Decision
+	for i := range 3 {
+		action := phasecontract.DiagnosisAction{Kind: phasecontract.ActionOpenRepairItem}
+		spent = append(spent, selfheal.Decision{IncidentID: "inc-earlier", Tier: selfheal.TierPipeline, Verdict: selfheal.VerdictAccepted, Action: &action, At: selfhealNow.Add(-time.Duration(i+1) * time.Hour)})
+	}
+	if err := selfheal.AppendDecisions(selfheal.DecisionsPath(evolveDir), spent); err != nil {
+		t.Fatal(err)
+	}
+	for _, inc := range liveRecordsExcept(t, incCIHang) {
+		if err := selfheal.WriteProposal(selfheal.ProposalsDir(evolveDir), selfheal.NewProposal(inc, "shadow", "", selfhealNow)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	env := selfhealTestEnv(fixtureGH)
+	env.agent = fakeBridgeAgent(t, &diagnosisBridge{})
+
+	rc, e, _ := runProposeJSON(t, env, root)
+
+	if rc != 0 || len(e.Data.Proposals) != 1 {
+		t.Fatalf("rc=%d %+v", rc, e.Data.Proposals)
+	}
+	if d := e.Data.Proposals[0].Decision; d == nil || d.Verdict != selfheal.VerdictRefused || d.Precondition != selfheal.PreBudget {
+		t.Fatalf("a fourth T1 repair in one window must not run: %+v", d)
+	}
+}
+
+func liveRecordsExcept(t *testing.T, id string) []selfheal.Incident {
+	t.Helper()
+	incidents, err := selfheal.LoadIncidents(liveIncidentFixtures)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return slices.DeleteFunc(incidents, func(inc selfheal.Incident) bool { return inc.ID == id })
+}
+
+func TestSelfhealPropose_ValidatorStageOffDecidesNothing(t *testing.T) {
+	root := validatedProject(t, `{"orchestrator":{"max_per_pass":1},"validator":{"stage":"off"}}`)
+	env := selfhealTestEnv(fixtureGH)
+	env.agent = fakeBridgeAgent(t, &diagnosisBridge{})
+	rc, e, _ := runProposeJSON(t, env, root)
+	if rc != 0 || len(e.Data.Proposals) != 1 || e.Data.Proposals[0].Decision != nil || e.Data.ValidatorStage != "off" {
+		t.Fatalf("rc=%d %+v", rc, e.Data)
+	}
+	if _, err := os.Stat(selfheal.DecisionsPath(paths.EvolveDirOf(root))); !os.IsNotExist(err) {
+		t.Errorf("stage off writes no ledger: %v", err)
+	}
+}
+
+func TestSelfhealPropose_AFailedRunWaitsForItsBackoff(t *testing.T) {
+	t.Parallel()
+	root := validatedProject(t, `{"orchestrator":{"max_per_pass":1,"retry_after_hours":2}}`)
+	env := selfhealTestEnv(fixtureGH)
+	env.agent = scriptedAgent("not json", 3)
+	_, first, _ := runProposeJSON(t, env, root)
+	_, again, _ := runProposeJSON(t, env, root)
+	if len(first.Data.Proposals) != 1 || first.Data.Proposals[0].State != selfheal.ProposalFailed || first.Data.Proposals[0].Decision != nil {
+		t.Fatalf("a failed run has no decision: %+v", first.Data.Proposals)
+	}
+	if len(again.Data.Proposals) != 1 || again.Data.Proposals[0].IncidentID == first.Data.Proposals[0].IncidentID {
+		t.Fatalf("within its backoff a failed incident gives its slot to the next one: %+v", again.Data.Proposals)
+	}
+	env.now = func() time.Time { return selfhealNow.Add(3 * time.Hour) }
+	_, later, _ := runProposeJSON(t, env, root)
+	if !slices.ContainsFunc(later.Data.Proposals, func(p selfheal.Proposal) bool { return p.IncidentID == first.Data.Proposals[0].IncidentID }) {
+		t.Fatalf("after its backoff a failed incident is tried again: %+v", later.Data.Proposals)
+	}
+}
+
+func TestSelfhealPropose_ValidatorIOFaultsAreExitTwo(t *testing.T) {
+	cases := map[string]func(t *testing.T, root string){
+		"a corrupt decision ledger": func(t *testing.T, root string) {
+			selfhealFile(t, selfheal.DecisionsPath(paths.EvolveDirOf(root)), "{")
+		},
+		"an unreadable inbox": func(t *testing.T, root string) {
+			if err := os.Chmod(filepath.Join(paths.EvolveDirOf(root), "inbox"), 0o000); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = os.Chmod(filepath.Join(paths.EvolveDirOf(root), "inbox"), 0o755) })
+		},
+		"a ledger that cannot be written": func(t *testing.T, root string) {
+			selfhealFile(t, selfheal.DecisionsPath(paths.EvolveDirOf(root)), "")
+			if err := os.Chmod(selfheal.DecisionsPath(paths.EvolveDirOf(root)), 0o444); err != nil {
+				t.Fatal(err)
+			}
+		},
+	}
+	for name, setup := range cases {
+		t.Run(name, func(t *testing.T) {
+			root := validatedProject(t, `{"orchestrator":{"max_per_pass":1}}`)
+			setup(t, root)
+			env := selfhealTestEnv(fixtureGH)
+			env.agent = fakeBridgeAgent(t, &diagnosisBridge{})
+			rc, e, _ := runProposeJSON(t, env, root)
+			if rc != exitIO || e.OK {
+				t.Fatalf("rc=%d envelope=%+v", rc, e)
+			}
+			stored, err := selfheal.LoadProposals(selfheal.ProposalsDir(paths.EvolveDirOf(root)))
+			if err != nil || len(stored) != 0 {
+				t.Fatalf("a fault before the ledger write leaves no proposal record with a decision that the ledger lacks: %d %v", len(stored), err)
+			}
+		})
+	}
+}
+
+func TestSelfhealPropose_TheVerbGivesTheValidatorTheRealInventory(t *testing.T) {
+	root := proposeProject(t, `{"orchestrator":{"max_per_pass":8},"validator":{"t2_repairs":1}}`)
+	evolveDir := paths.EvolveDirOf(root)
+	selfhealFile(t, filepath.Join(evolveDir, "inbox", "2026-10-27T00-00-00Z-retro.json"), `{"id":"retro-minting-files-through-inbox-add-lane"}`)
+	selfhealFile(t, filepath.Join(root, "go", "internal", "gc", "devidle.go"), "package gc\n")
+	selfhealFile(t, shipjournal.Path(evolveDir), `{"sha":"4fc458846355c8e758bf56dd6c6770295d56b61c","class":"cycle","ts":"2026-10-27T00:00:00Z","cycle":2038}`+"\n")
+	closedRed := selfheal.Incident{Schema: selfheal.RecordSchema, ID: "inc-2026-10-26-00000001", Fingerprint: "main-red:main", Class: selfheal.ClassMainRed, Subject: "main",
+		Severity: signalcenter.SeverityWarn, Tier: selfheal.TierPipeline, State: selfheal.StateClosed}
+	if err := selfheal.WriteIncident(selfheal.Dir(evolveDir), closedRed); err != nil {
+		t.Fatal(err)
+	}
+	b := &diagnosisBridge{actions: map[string]string{
+		"inc-2026-10-27-a3bf0a7f": `{"kind":"revert-last-landing","params":{"sha":"4fc4588"}}`,
+		"inc-2026-10-27-6f89f94c": `{"kind":"reroute-family","params":{"item":"retro-minting-files-through-inbox-add-lane","family":"agy"}}`,
+		"inc-2026-10-27-cb3817ea": `{"kind":"open-repair-item","params":{"files":["go/internal/gc/devidle.go"],"repro":"x"}}`,
+	}}
+	env := selfhealTestEnv(fixtureGH)
+	env.agent = fakeBridgeAgent(t, b)
+
+	rc, e, stderr := runProposeJSON(t, env, root)
+
+	if rc != 0 {
+		t.Fatalf("rc=%d\n%s", rc, stderr)
+	}
+	want := map[string]struct{ verdict, precondition string }{
+		incCIHang:                 {selfheal.VerdictRefused, selfheal.PreFilesExist},
+		"inc-2026-10-27-a3bf0a7f": {selfheal.VerdictRefused, selfheal.PreMainRed},
+		"inc-2026-10-27-6f89f94c": {selfheal.VerdictAccepted, ""},
+		"inc-2026-10-27-cb3817ea": {selfheal.VerdictRefused, selfheal.PreBudget},
+	}
+	for id, w := range want {
+		if d := proposalOf(t, e.Data.Proposals, id).Decision; d == nil || d.Verdict != w.verdict || d.Precondition != w.precondition {
+			t.Errorf("%s: want %s %s, got %+v", id, w.verdict, w.precondition, d)
+		}
+	}
+}
+
+func TestSelfhealPropose_ATornShipJournalIsAWarningAndRefusesOnlyTheRevert(t *testing.T) {
+	root := validatedProject(t, `{"orchestrator":{"max_per_pass":2}}`)
+	evolveDir := paths.EvolveDirOf(root)
+	selfhealFile(t, shipjournal.Path(evolveDir), `{"sha":"4fc458846355c8e758bf56dd6c6770295d56b61c","class":"cycle","ts":"2026-10-27T00:00:00Z","cycle":2038}`+"\n{")
+	openRed := selfheal.Incident{Schema: selfheal.RecordSchema, ID: "inc-2026-10-26-00000001", Fingerprint: "main-red:main", Class: selfheal.ClassMainRed, Subject: "main",
+		Severity: signalcenter.SeverityWarn, Tier: selfheal.TierPipeline, State: selfheal.StateOpen}
+	if err := selfheal.WriteIncident(selfheal.Dir(evolveDir), openRed); err != nil {
+		t.Fatal(err)
+	}
+	b := &diagnosisBridge{actions: map[string]string{
+		incChurn:                  `{"kind":"reroute-family","params":{"item":"retro-minting-files-through-inbox-add-lane","family":"agy"}}`,
+		"inc-2026-10-27-6f89f94c": `{"kind":"revert-last-landing","params":{"sha":"4fc4588"}}`,
+	}}
+	env := selfhealTestEnv(fixtureGH)
+	env.agent = fakeBridgeAgent(t, b)
+
+	rc, e, stderr := runProposeJSON(t, env, root)
+
+	if rc != 0 || !slices.ContainsFunc(e.Warnings, func(w string) bool { return strings.HasPrefix(w, "no landing of the loop is known") }) {
+		t.Fatalf("a torn journal is a warning: rc=%d %v\n%s", rc, e.Warnings, stderr)
+	}
+	if d := proposalOf(t, e.Data.Proposals, incChurn).Decision; d == nil || d.Verdict != selfheal.VerdictAccepted {
+		t.Errorf("an action that needs no landing is still decided on its merits: %+v", d)
+	}
+	if d := proposalOf(t, e.Data.Proposals, "inc-2026-10-27-6f89f94c").Decision; d == nil || d.Verdict != selfheal.VerdictRefused || d.Precondition != selfheal.PreLandingInWindow {
+		t.Errorf("with no known landing the revert is refused: %+v", d)
 	}
 }

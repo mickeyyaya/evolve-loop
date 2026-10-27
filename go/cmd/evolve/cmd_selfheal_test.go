@@ -17,6 +17,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/events/rootwire"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/selfheal"
+	"github.com/mickeyyaya/evolve-loop/go/internal/shipjournal"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -60,14 +61,14 @@ func selfhealProject(t *testing.T, policyJSON string) string {
 		selfhealFile(t, filepath.Join(runs, "cycle-"+id, "triage-decision.json"), `{"top_n":[{"id":"retro-minting-files-through-inbox-add-lane"}]}`)
 	}
 	selfhealFile(t, filepath.Join(runs, "cycle-2035", "defect-ledger.json"), `{"entries":[{"text":"M1: go/internal/core/failurelearning floor tests fail; protected surface","status":"OPEN"}]}`)
-	selfhealFile(t, filepath.Join(evolveDir, shipJournalFile), `{"sha":"b","class":"cycle","cycle":2036}`+"\n")
+	selfhealFile(t, shipjournal.Path(evolveDir), `{"sha":"b","class":"cycle","cycle":2036}`+"\n")
 	selfhealFile(t, filepath.Join(evolveDir, "usage-windows.json"), `{"claude":{"cli":"claude","observed_at":"2026-10-26T18:28:52Z","windows":[]}}`)
 	return root
 }
 
 func selfhealTestEnv(gh func(context.Context, string, ...string) (string, error)) selfhealEnv {
 	return selfhealEnv{
-		now: func() time.Time { return selfhealNow }, gh: gh, declared: func(f string) bool { return f == "claude" },
+		now: func() time.Time { return selfhealNow }, gh: gh, declared: func(f string) bool { return f == "claude" }, families: func() []string { return []string{"agy", "claude"} },
 		newCenter: func(root, evolveDir string, console io.Writer) (*signalcenter.Center, func()) {
 			c := newRootSignalCenter(root, evolveDir, console)
 			return c, rootwire.Attach(c, roleSelfheal, evolveDir, console)
@@ -145,21 +146,7 @@ func TestSelfhealIncidents_APassOpensTheFixtureIncidentsWritesTheRecordsAndPubli
 
 func selfhealChannelEvents(t *testing.T, root string) []signalcenter.Event {
 	t.Helper()
-	log, err := channel.New(paths.EventChannelsRoot(paths.EvolveDirOf(root)), "selfheal.incident", channel.Config{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	batch, err := log.Read(0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var out []signalcenter.Event
-	for _, r := range batch.Records {
-		if r.Signal != nil {
-			out = append(out, *r.Signal)
-		}
-	}
-	return out
+	return channelEvents(t, root, "selfheal.incident")
 }
 
 func TestSelfhealIncidents_StageOffListsTheRecordsAndRunsNoPass(t *testing.T) {
@@ -202,7 +189,7 @@ func TestSelfhealIncidents_AFailedSourceIsAWarningAndThePassStillRuns(t *testing
 func TestSelfhealIncidents_AnUndecodableCIListOrAnUnreadableShipJournalIsAWarning(t *testing.T) {
 	t.Parallel()
 	root := selfhealProject(t, `{}`)
-	selfhealFile(t, filepath.Join(paths.EvolveDirOf(root), shipJournalFile), "{\n")
+	selfhealFile(t, shipjournal.Path(paths.EvolveDirOf(root)), "{\n")
 	gh := func(context.Context, string, ...string) (string, error) { return "not json", nil }
 	rc, e, _ := runSelfhealJSON(t, selfhealTestEnv(gh), root)
 	if rc != 0 || len(e.Warnings) != 2 || !strings.Contains(e.Warnings[0], "decode") || !strings.Contains(e.Warnings[1], "the cycle rules did not run") {
