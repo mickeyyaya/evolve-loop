@@ -15,7 +15,7 @@ import (
 func initPushOnlyRepo(t *testing.T) (string, func(dir string, args ...string) string) {
 	t.Helper()
 	remote := gittest.Bare(t).Dir
-	root := gittest.Fixture(t).Dir
+	root := emptyRepo(t).Dir
 	run := func(dir string, args ...string) string {
 		t.Helper()
 		cmd := exec.Command("git", args...)

@@ -108,11 +108,15 @@ func makeRepo(t *testing.T) string {
 	}).Dir
 }
 
+func emptyRepo(t *testing.T) *gittest.Repo {
+	t.Helper()
+	return gittest.FromTemplate(t, "ship-empty-repo", func(*gittest.Repo) error { return nil })
+}
+
 func addRemote(t *testing.T, repo string) string {
 	t.Helper()
-	bare := gittest.Bare(t).Dir
+	bare := gittest.BareFromTemplate(t).Dir
 	runGit(t, repo, "remote", "add", "origin", bare)
-	runGit(t, repo, "branch", "-M", "main")
 	return bare
 }
 

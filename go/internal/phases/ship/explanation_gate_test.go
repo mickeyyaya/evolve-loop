@@ -12,7 +12,6 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
-	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 func TestPhaseRun_MissingRequiredExplanationBlocksBeforeNativeShip(t *testing.T) {
@@ -154,7 +153,7 @@ func TestVerifyNativeExplanation_FreezesStandaloneHostIdentity(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	workspace := filepath.Join(root, ".evolve", "runs", "cycle-42")
-	worktree := gittest.Fixture(t).Dir
+	worktree := emptyRepo(t).Dir
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
 		t.Fatal(err)
 	}

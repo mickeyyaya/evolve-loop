@@ -71,7 +71,7 @@ func TestConsumeCommittedItems_KeepsTheBindingUntilTheLandingAndAReShipRecordsTh
 
 func landedRepo(t *testing.T, items map[string]string) (*gittest.Repo, *Options) {
 	t.Helper()
-	repo := gittest.Fixture(t)
+	repo := emptyRepo(t)
 	repo.Write("README", "x\n")
 	repo.Git("add", "-A")
 	repo.Git("commit", "-q", "-m", "base")
