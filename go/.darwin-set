@@ -14,7 +14,6 @@
 ./internal/cycleclassify
 ./internal/events/reader
 ./internal/events/wake
-./internal/flagregistry
 ./internal/looppreflight
 ./internal/phases/ship
 ./internal/phasestream
