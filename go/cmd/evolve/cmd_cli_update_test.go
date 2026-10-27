@@ -179,7 +179,7 @@ func TestCLIUpdate_DryRunCallsNothingAndRecordsNothing(t *testing.T) {
 	}
 }
 
-func TestCLIUpdate_UsageErrorsExitTwoAndUpdateNothing(t *testing.T) {
+func TestCLIUpdate_UsageErrorsExitTenAndUpdateNothing(t *testing.T) {
 	h := claudeRaisedHost()
 	h.install(t)
 	for name, args := range map[string][]string{
@@ -190,8 +190,8 @@ func TestCLIUpdate_UsageErrorsExitTwoAndUpdateNothing(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			rc, _, stderr := runCLIUpdateVerb(t, args...)
-			if rc != 2 || !strings.Contains(stderr, "evolve cli update") {
-				t.Errorf("want rc 2 with the usage, got rc=%d stderr=%q", rc, stderr)
+			if rc != cliExitUsage || !strings.Contains(stderr, "evolve cli update") {
+				t.Errorf("want rc 10 with the usage, got rc=%d stderr=%q", rc, stderr)
 			}
 		})
 	}
@@ -392,8 +392,8 @@ func TestCLIUpdate_RefusesWhileARunHoldsALiveLeaseUnlessDryRun(t *testing.T) {
 
 	rc, _, stderr := runCLIUpdateVerb(t, "update", "--project-root", root)
 
-	if rc != 2 || len(h.calls) != 0 || !strings.Contains(stderr, "cycle-9") || !strings.Contains(stderr, "within a wave") {
-		t.Fatalf("a mid-wave update would pass cli-version-drift as expected; it must refuse with exit 2 naming the live run: rc=%d calls=%q stderr=%q", rc, h.calls, stderr)
+	if rc != cliExitRefused || len(h.calls) != 0 || !strings.Contains(stderr, "cycle-9") || !strings.Contains(stderr, "within a wave") {
+		t.Fatalf("a mid-wave update would pass cli-version-drift as expected; it must refuse with exit 3 naming the live run: rc=%d calls=%q stderr=%q", rc, h.calls, stderr)
 	}
 	if rc, _, _ := runCLIUpdateVerb(t, "update", "--dry-run", "--project-root", root); rc != 0 {
 		t.Errorf("a dry run changes nothing, so it runs mid-wave: rc=%d", rc)
@@ -411,7 +411,7 @@ func TestCLIUpdate_AnInterruptExitsOneThirtyNotOne(t *testing.T) {
 
 	rc := cliUpdateVerb(ctx, []string{"update", "--project-root", t.TempDir()}, &out, &errb)
 
-	if rc != 130 || strings.Contains(out.String(), "smoke-failed") {
+	if rc != cliExitInterrupted || strings.Contains(out.String(), "smoke-failed") {
 		t.Fatalf("SIGINT is an interrupt, not a failed update: rc=%d\n%s%s", rc, out.String(), errb.String())
 	}
 }

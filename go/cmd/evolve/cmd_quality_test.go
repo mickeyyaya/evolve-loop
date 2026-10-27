@@ -246,7 +246,8 @@ func TestDispatchBoundaryVerb_AnUnknownVerbIsAnIOError(t *testing.T) {
 
 func TestQualityArgs_ARelativeRootBecomesAbsoluteForThePublisher(t *testing.T) {
 	t.Parallel()
-	_, root, err := parseQualityArgs([]string{"report", "--scope", "wave", "--project-root", "."}, qualityScopes)
+	parsed, err := parseQualityArgs([]string{"report", "--scope", "wave", "--project-root", "."}, qualityScopes)
+	root := parsed.root
 	c, cerr := parseQualityCompare([]string{"--index", "PQ1", "--a", "wave:1", "--b", "wave:2", "--project-root", "."})
 	if err != nil || cerr != nil || !filepath.IsAbs(root) || !filepath.IsAbs(c.root) {
 		t.Errorf("report root %q (%v), compare root %q (%v); want absolute paths, since the publisher refuses a relative evolve directory", root, err, c.root, cerr)

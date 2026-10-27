@@ -18,12 +18,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-func runInboxSplit(args []string, stdout, stderr io.Writer) int {
+func runInboxSplit(root string, args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("inbox split", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	asJSON := fs.Bool("json", false, "print the three ids as one JSON object")
 	afterConsole := fs.Bool("lane-after-console", false, "the lane part waits for the console part (deps)")
-	projectRoot := fs.String("project-root", envOrCwd("EVOLVE_PROJECT_ROOT"), "the project root")
+	projectRoot := &root
 	id, ok := parseOnePositional(fs, args)
 	if !ok {
 		fmt.Fprintln(stderr, inboxUsage("split"))

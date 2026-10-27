@@ -41,8 +41,8 @@ func TestClihealth_ListShowsActiveAndClearRemovesOnlyTheNamedBench(t *testing.T)
 func TestClihealth_RejectsUnknownVerbAndMissingFamily(t *testing.T) {
 	t.Parallel()
 	for _, args := range [][]string{{"clihealth"}, {"clihealth", "frobnicate"}, {"clihealth", "clear"}} {
-		if _, _, code := runDispatch(args...); code != 2 {
-			t.Errorf("%v exit=%d, want 2", args, code)
+		if _, _, code := runDispatch(args...); code != cliExitUsage {
+			t.Errorf("%v exit=%d, want 10", args, code)
 		}
 	}
 }

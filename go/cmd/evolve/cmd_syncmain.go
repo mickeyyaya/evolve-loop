@@ -28,27 +28,10 @@ var (
 )
 
 func runSyncMain(args []string, _ io.Reader, stdout, stderr io.Writer) int {
-	fs := flag.NewFlagSet("evolve sync-main", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	var projectRoot string
-	fs.StringVar(&projectRoot, "project-root", "", "project root (default: $EVOLVE_PROJECT_ROOT or cwd)")
-	if err := fs.Parse(args); err != nil {
-		return 1
+	absRoot, asJSON, rc := parseSyncMainArgs(args, stderr)
+	if rc != 0 {
+		return rc
 	}
-
-	if projectRoot == "" {
-		projectRoot = os.Getenv("EVOLVE_PROJECT_ROOT")
-	}
-	if projectRoot == "" {
-		var err error
-		if projectRoot, err = syncMainGetwd(); err != nil {
-			fmt.Fprintf(stderr, "evolve sync-main: cwd: %v\n", err)
-			return 1
-		}
-	}
-	absRoot := syncMainAbsoluteRoot("--project-root", projectRoot, func(m string) {
-		fmt.Fprintf(stderr, "evolve sync-main: WARN: %s\n", m)
-	})
 
 	git := func(gitArgs ...string) (string, error) {
 		cmd := sysexec.Command(context.Background(), "git", append([]string{"-C", absRoot}, gitArgs...)...)
@@ -60,7 +43,7 @@ func runSyncMain(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		if lease, ok := runlease.LiveOwner(ws, time.Now()); ok {
 			fmt.Fprintf(stderr, "evolve sync-main: refused — a run lease is live (pid %d, heartbeat fresh); another evolve loop owns this tree.\n", lease.OwnerPID)
 			fmt.Fprintln(stderr, "evolve sync-main:   • let it finish, or `evolve loop --resume` to attach, then retry.")
-			return 1
+			return cliExitRefused
 		}
 	}
 
@@ -78,16 +61,55 @@ func runSyncMain(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 
 	if err := fetchSyncBranch(absRoot, branch, stderr); err != nil {
 		fmt.Fprintf(stderr, "evolve sync-main: %v\n", err)
+		if errors.Is(err, errSyncDetachedHead) {
+			return cliExitRefused
+		}
 		return 1
 	}
 
-	landing := stampLanding{root: absRoot, stdout: stdout, stderr: stderr}
+	human := humanWriter(stdout, asJSON)
+	landing := stampLanding{root: absRoot, stdout: human, stderr: stderr}
 	merge := func() int { return mergeOrigin(git, branch, stderr) }
 	if code := landing.aroundMerge("origin/"+branch, stamps, merge); code != 0 {
 		return code
 	}
+	if code := finishSyncMain(absRoot, branch, human, stderr); code != 0 || !asJSON {
+		return code
+	}
+	return printVerbJSON("sync-main", syncMainResult{Root: absRoot, Branch: branch}, stdout, stderr)
+}
 
-	return finishSyncMain(absRoot, branch, stdout, stderr)
+type syncMainResult struct {
+	Root   string `json:"root"`
+	Branch string `json:"branch"`
+}
+
+var errSyncDetachedHead = errors.New("refused — detached HEAD; check out the branch to sync")
+
+func parseSyncMainArgs(args []string, stderr io.Writer) (string, bool, int) {
+	fs := flag.NewFlagSet("evolve sync-main", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	var projectRoot string
+	var asJSON bool
+	fs.StringVar(&projectRoot, "project-root", "", "project root (default: $EVOLVE_PROJECT_ROOT or cwd)")
+	fs.BoolVar(&asJSON, "json", false, "print the result as JSON and no text")
+	if err := fs.Parse(args); err != nil || fs.NArg() > 0 {
+		fmt.Fprintln(stderr, "usage: evolve sync-main [--json] [--project-root P]")
+		return "", false, cliExitUsage
+	}
+	if projectRoot == "" {
+		projectRoot = os.Getenv("EVOLVE_PROJECT_ROOT")
+	}
+	if projectRoot == "" {
+		var err error
+		if projectRoot, err = syncMainGetwd(); err != nil {
+			fmt.Fprintf(stderr, "evolve sync-main: cwd: %v\n", err)
+			return "", false, cliExitIO
+		}
+	}
+	return syncMainAbsoluteRoot("--project-root", projectRoot, func(m string) {
+		fmt.Fprintf(stderr, "evolve sync-main: WARN: %s\n", m)
+	}), asJSON, 0
 }
 
 func finishSyncMain(root, branch string, stdout, stderr io.Writer) int {
@@ -119,7 +141,7 @@ func syncMainCodeIndex(root string, host codeIndexHost, timeout time.Duration, s
 
 func fetchSyncBranch(root, branch string, stderr io.Writer) error {
 	if branch == "HEAD" {
-		return errors.New("refused — detached HEAD; check out the branch to sync")
+		return errSyncDetachedHead
 	}
 	retry := gitexec.FetchRetry{
 		Sleep: func(d time.Duration) { syncMainFetchSleep(d) },
@@ -174,7 +196,7 @@ func refuseDirtBeyondInboxStamps(root string, stderr io.Writer) ([]inboxstamps.S
 	}
 	if len(partition.Other) > 0 {
 		fmt.Fprintf(stderr, "evolve sync-main: refused — tracked files have uncommitted changes beyond the loop's inbox stamps; commit or stash first:\n  %s\n", strings.Join(partition.Other, "\n  "))
-		return nil, 1
+		return nil, cliExitRefused
 	}
 	return partition.Stamps, 0
 }

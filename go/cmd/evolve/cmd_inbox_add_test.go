@@ -27,7 +27,7 @@ func TestCmd_InboxAdd_FilesAnItemFromStdinThatBatchesLists(t *testing.T) {
 	t.Setenv("EVOLVE_PROJECT_ROOT", root)
 	var stdout, stderr bytes.Buffer
 
-	rc := runInbox([]string{"add"}, strings.NewReader(cliInboxItem), &stdout, &stderr)
+	rc := runInbox([]string{"add", "--file", "-"}, strings.NewReader(cliInboxItem), &stdout, &stderr)
 
 	if rc != 0 || !strings.Contains(stdout.String(), "cli-inbox-show.json") || !strings.Contains(stdout.String(), "lane-dispatchable") {
 		t.Fatalf("rc = %d stdout = %q stderr = %q", rc, stdout.String(), stderr.String())
@@ -58,7 +58,7 @@ func TestCmd_InboxAdd_RefusesAnInvalidOrDuplicateItem(t *testing.T) {
 	root := emptyInboxRoot(t)
 	t.Setenv("EVOLVE_PROJECT_ROOT", root)
 	var stdout, stderr bytes.Buffer
-	if rc := runInbox([]string{"add"}, strings.NewReader(cliInboxItem), &stdout, &stderr); rc != 0 {
+	if rc := runInbox([]string{"add", "--file", "-"}, strings.NewReader(cliInboxItem), &stdout, &stderr); rc != 0 {
 		t.Fatalf("first filing: rc = %d stderr = %q", rc, stderr.String())
 	}
 	for name, tc := range map[string]struct{ body, why string }{
@@ -66,7 +66,7 @@ func TestCmd_InboxAdd_RefusesAnInvalidOrDuplicateItem(t *testing.T) {
 		"no summary":     {strings.Replace(cliInboxItem, `"summary":"No verb prints one item.",`, ``, 1), "summary"},
 	} {
 		stderr.Reset()
-		if rc := runInbox([]string{"add"}, strings.NewReader(tc.body), &stdout, &stderr); rc != 1 || !strings.Contains(stderr.String(), tc.why) {
+		if rc := runInbox([]string{"add", "--file", "-"}, strings.NewReader(tc.body), &stdout, &stderr); rc != 1 || !strings.Contains(stderr.String(), tc.why) {
 			t.Errorf("%s: rc = %d stderr = %q, want 1 naming %q", name, rc, stderr.String(), tc.why)
 		}
 	}
@@ -99,7 +99,7 @@ func TestCmd_InboxAdd_AFilingFaultExits2(t *testing.T) {
 	t.Setenv("EVOLVE_PROJECT_ROOT", root)
 	var stdout, stderr bytes.Buffer
 
-	if rc := runInbox([]string{"add"}, strings.NewReader(cliInboxItem), &stdout, &stderr); rc != 2 {
+	if rc := runInbox([]string{"add", "--file", "-"}, strings.NewReader(cliInboxItem), &stdout, &stderr); rc != 2 {
 		t.Errorf("rc = %d, want 2 for an inbox that cannot be written (stderr=%q)", rc, stderr.String())
 	}
 }
@@ -109,7 +109,7 @@ func TestCmd_InboxAdd_JudgesWithTheLaneForbiddenPredicate(t *testing.T) {
 	body := strings.Replace(cliInboxItem, `"files":["go/cmd/evolve/cmd_inbox.go"]`, `"files":["go/internal/guards/phase.go"]`, 1)
 	var stdout, stderr bytes.Buffer
 
-	rc := runInbox([]string{"add"}, strings.NewReader(body), &stdout, &stderr)
+	rc := runInbox([]string{"add", "--file", "-"}, strings.NewReader(body), &stdout, &stderr)
 
 	if rc != 0 || !strings.Contains(stdout.String(), "console-owned: protected fix surface") {
 		t.Errorf("rc = %d stdout = %q, want the lane-forbidden predicate's verdict", rc, stdout.String())
@@ -123,7 +123,7 @@ func TestCmd_InboxAdd_WarnsOnAMonotonicBinaryTargetButStillFiles(t *testing.T) {
 		`"class":"task-contract-design","acceptance":["reduce the backlog to at most 25 items","evolve inbox show <id> prints the item"]`, 1)
 	var stdout, stderr bytes.Buffer
 
-	rc := runInbox([]string{"add"}, strings.NewReader(item), &stdout, &stderr)
+	rc := runInbox([]string{"add", "--file", "-"}, strings.NewReader(item), &stdout, &stderr)
 
 	if rc != 0 || !strings.Contains(stdout.String(), "cli-inbox-show.json") {
 		t.Fatalf("the lint is advisory, the item must still file; rc = %d stdout = %q stderr = %q", rc, stdout.String(), stderr.String())
@@ -143,7 +143,7 @@ func TestCmd_InboxAdd_NoMonotonicWarningForAOneShotClass(t *testing.T) {
 		`"class":"feature","acceptance":["reduce the backlog to at most 25 items"]`, 1)
 	var stdout, stderr bytes.Buffer
 
-	if rc := runInbox([]string{"add"}, strings.NewReader(item), &stdout, &stderr); rc != 0 {
+	if rc := runInbox([]string{"add", "--file", "-"}, strings.NewReader(item), &stdout, &stderr); rc != 0 {
 		t.Fatalf("rc = %d stderr = %q", rc, stderr.String())
 	}
 	if strings.Contains(stderr.String(), "binary absolute target") {
@@ -164,14 +164,14 @@ func TestCmd_InboxAdd_RefusesAPriorityClassThePolicyOrderLacks(t *testing.T) {
 	urgent := strings.Replace(cliInboxItem, `"priority_class":"debuggability"`, `"priority_class":"urgent"`, 1)
 	var stdout, stderr bytes.Buffer
 
-	rc := runInbox([]string{"add"}, strings.NewReader(urgent), &stdout, &stderr)
+	rc := runInbox([]string{"add", "--file", "-"}, strings.NewReader(urgent), &stdout, &stderr)
 
 	if rc != 1 || !strings.Contains(stderr.String(), `priority_class "urgent"`) || !strings.Contains(stderr.String(), "correctness, stability, performance, debuggability, feature, maintainability, hygiene, security") {
 		t.Fatalf("rc = %d stderr = %q, want 1 naming the class and the compiled class order", rc, stderr.String())
 	}
 	writePolicy(t, root, `{"inbox_priority": {"class_order": ["urgent", "security"]}}`)
 	stderr.Reset()
-	if rc := runInbox([]string{"add"}, strings.NewReader(urgent), &stdout, &stderr); rc != 0 {
+	if rc := runInbox([]string{"add", "--file", "-"}, strings.NewReader(urgent), &stdout, &stderr); rc != 0 {
 		t.Errorf("a class the policy's own order names: rc = %d stderr = %q, want it filed", rc, stderr.String())
 	}
 }
@@ -182,7 +182,7 @@ func TestCmd_InboxAdd_AMalformedPolicyIsAFaultAndFilesNothing(t *testing.T) {
 	writePolicy(t, root, `{"inbox_priority": {"class_ordr": ["security"]}}`)
 	var stdout, stderr bytes.Buffer
 
-	rc := runInbox([]string{"add"}, strings.NewReader(cliInboxItem), &stdout, &stderr)
+	rc := runInbox([]string{"add", "--file", "-"}, strings.NewReader(cliInboxItem), &stdout, &stderr)
 
 	if rc != 2 || !strings.Contains(stderr.String(), "class_ordr") {
 		t.Errorf("rc = %d stderr = %q, want 2 naming the bad key", rc, stderr.String())

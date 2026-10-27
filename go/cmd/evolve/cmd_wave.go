@@ -21,7 +21,6 @@ import (
 )
 
 const (
-	waveNextSchema      = "evolve.wave.next/1"
 	wavePrefix          = "evolve wave: "
 	waveBuildVerb       = "wave-build"
 	waveWatchPoll       = 5 * time.Second
@@ -156,17 +155,22 @@ func runWaveNote(env waveEnv, args []string, stdout, stderr io.Writer) int {
 	}
 	switch operands[0] {
 	case "add":
-		return addWaveNote(env, plane.store, strings.Join(operands[1:], " "), stdout, stderr)
+		return addWaveNote(env, plane.store, strings.Join(operands[1:], " "), asJSON, stdout, stderr)
 	case "list":
 		return listWaveNotes(plane.store, asJSON, stdout, stderr)
 	case "clear":
-		return clearWaveNotes(plane.store, stdout, stderr)
+		return clearWaveNotes(plane.store, asJSON, stdout, stderr)
 	default:
 		return waveUsageError(stderr, fmt.Errorf("unknown note sub-verb %q", operands[0]))
 	}
 }
 
-func addWaveNote(env waveEnv, store wave.Store, text string, stdout, stderr io.Writer) int {
+type waveNoteResult struct {
+	Action string      `json:"action"`
+	Notes  []wave.Note `json:"notes"`
+}
+
+func addWaveNote(env waveEnv, store wave.Store, text string, asJSON bool, stdout, stderr io.Writer) int {
 	if strings.TrimSpace(text) == "" {
 		return waveUsageError(stderr, errors.New("note add needs a text"))
 	}
@@ -174,6 +178,9 @@ func addWaveNote(env waveEnv, store wave.Store, text string, stdout, stderr io.W
 	if err != nil {
 		fmt.Fprintf(stderr, "%s%v\n", wavePrefix, err)
 		return exitIO
+	}
+	if asJSON {
+		return writeWaveJSON(waveNoteResult{Action: "add", Notes: []wave.Note{n}}, stdout, stderr)
 	}
 	fmt.Fprintf(stdout, "wave: queued note %s for the next wave\n", n.Name)
 	return 0
@@ -186,7 +193,7 @@ func listWaveNotes(store wave.Store, asJSON bool, stdout, stderr io.Writer) int 
 		return exitIO
 	}
 	if asJSON {
-		return writeWaveJSON(append([]wave.Note{}, notes...), stdout, stderr)
+		return writeWaveJSON(waveNoteResult{Action: "list", Notes: append([]wave.Note{}, notes...)}, stdout, stderr)
 	}
 	for _, n := range notes {
 		fmt.Fprintf(stdout, "%s: %s\n", n.Name, n.Text)
@@ -194,7 +201,7 @@ func listWaveNotes(store wave.Store, asJSON bool, stdout, stderr io.Writer) int 
 	return 0
 }
 
-func clearWaveNotes(store wave.Store, stdout, stderr io.Writer) int {
+func clearWaveNotes(store wave.Store, asJSON bool, stdout, stderr io.Writer) int {
 	notes, err := store.Notes()
 	if err == nil {
 		err = store.RemoveNotes(notes)
@@ -202,6 +209,9 @@ func clearWaveNotes(store wave.Store, stdout, stderr io.Writer) int {
 	if err != nil {
 		fmt.Fprintf(stderr, "%s%v\n", wavePrefix, err)
 		return exitIO
+	}
+	if asJSON {
+		return writeWaveJSON(waveNoteResult{Action: "clear", Notes: append([]wave.Note{}, notes...)}, stdout, stderr)
 	}
 	fmt.Fprintf(stdout, "wave: removed %d note(s)\n", len(notes))
 	return 0

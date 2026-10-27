@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "Red test first: a build handoff with no receipt for its tree gets the floor findings in the same session (fake bridge), and no new dispatch starts.",
+    "A receipt for another tree digest counts as no receipt.",
+    "At shadow the floor records would_return_in_session and the flow of today runs. workflow.builder_selfcheck.stage is a strict stage key (off, shadow, enforce; default shadow)."
+  ],
+  "created_at": "2026-10-26T23:19:23Z",
+  "deps": [],
+  "files": [
+    "go/internal/core/build_floor_reviewer.go",
+    "go/cmd/evolve/cmd_selfcheck.go",
+    "go/internal/policy/workflow.go"
+  ],
+  "fix": "The self-check writes a receipt bound to the tree digest. When the builder hands off with no GREEN receipt for the current tree, the floor findings go back into the same live session once, before the session closes. If the bridge cannot deliver into a live session, the flow of today runs (a new dispatch).",
+  "id": "builder-selfcheck-before-close",
+  "injected_by": "console-operator-session",
+  "kind": "feature",
+  "notes": "Route console-manual: go/internal/core/build_floor_reviewer.go is on the fence (integrity_surface.go:88). Blocked on plan question Q2: first prove that the bridge can deliver a message into a live session (ADR-0129).",
+  "priority": "P2",
+  "priority_class": "performance",
+  "route": "console-manual",
+  "source": "console, 2026-10-27, operator request on cycle 2035 (\"balance to cost and output\"). ADR-0158; plan docs/plans/cost-aware-repair-2026-10.md",
+  "summary": "The handoff floor refused cycle 2035 build try 1 (an STE lint finding and one more) and try 2 (11 of 26 functions below 100% coverage). Each refusal started a new dispatch with the full 49 KB prompt (8.5 and 10.3 LLM minutes). The prompt already makes evolve phase verify build mandatory, but nothing enforces it before the session closes.",
+  "title": "A build session gets the handoff floor findings before it closes, so a floor refusal does not cost a new dispatch (ADR-0158 decision 18)",
+  "weight": 0.7
+}

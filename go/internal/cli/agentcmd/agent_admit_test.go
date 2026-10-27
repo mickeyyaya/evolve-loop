@@ -24,9 +24,9 @@ func TestAgentRun_Refusals(t *testing.T) {
 		code   int
 		reason string
 	}{
-		{"inside a phase", runArgs(root), func(d Deps) Deps { d.Getenv = depth; return d }, 2, "inside a phase"},
-		{"built-in phase", []string{"run", "tdd", "--project-root", root}, nil, 2, "evolve phase tdd --cycle N"},
-		{"source-write profile", []string{"run", "test-amplification", "--project-root", root}, nil, 2, "writes source"},
+		{"inside a phase", runArgs(root), func(d Deps) Deps { d.Getenv = depth; return d }, exitRefused, "inside a phase"},
+		{"built-in phase", []string{"run", "tdd", "--project-root", root}, nil, exitRefused, "evolve phase tdd --cycle N"},
+		{"source-write profile", []string{"run", "test-amplification", "--project-root", root}, nil, exitRefused, "writes source"},
 		{"unknown profile", []string{"run", "no-such-agent", "--project-root", root}, nil, 10, "evolve agent list"},
 		{"missing profile", []string{"run"}, nil, 10, "missing profile"},
 		{"bad flag", runArgs(root, "--bogus"), nil, 10, "bogus"},
@@ -34,7 +34,7 @@ func TestAgentRun_Refusals(t *testing.T) {
 		{"router refused", runArgs(root), func(d Deps) Deps {
 			d.InstallRouter = func(string) error { return errors.New("pins beside a table") }
 			return d
-		}, 2, "pins beside a table"},
+		}, exitRefused, "pins beside a table"},
 		{"no catalog", []string{"run", "adversarial-review", "--project-root", t.TempDir()}, nil, 10, "phase catalog"},
 	}
 	for _, c := range cases {
@@ -71,7 +71,6 @@ func TestAgentRun_RefusedRunWritesNothing(t *testing.T) {
 }
 
 func TestAgentRun_InputSources(t *testing.T) {
-	root := project(t)
 	dir := t.TempDir()
 	inputFile := filepath.Join(dir, "change.diff")
 	attached := filepath.Join(dir, "notes.txt")
@@ -94,6 +93,7 @@ func TestAgentRun_InputSources(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			root := project(t)
 			fb := &fakeBridge{artifact: passReport}
 			var stdout, stderr bytes.Buffer
 
@@ -191,7 +191,7 @@ func TestAgentRun_StdinReadErrorIsAnInputError(t *testing.T) {
 	}
 }
 
-func TestAgentRun_ALabelCollisionExitsThreeAndKeepsTheOtherRun(t *testing.T) {
+func TestAgentRun_ALabelCollisionIsADispatchErrorAndKeepsTheOtherRun(t *testing.T) {
 	root := project(t)
 	other := filepath.Join(root, ".evolve", "ephemeral", "agent-runs", runLabel("adversarial-review", fixedNow()))
 	if err := os.MkdirAll(other, 0o755); err != nil {
@@ -201,8 +201,8 @@ func TestAgentRun_ALabelCollisionExitsThreeAndKeepsTheOtherRun(t *testing.T) {
 
 	code := New(depsWith(&fakeBridge{artifact: passReport}))(runArgs(root), strings.NewReader(diff), &stdout, &stderr)
 
-	if code != 3 || !strings.Contains(stderr.String(), "workspace") {
-		t.Errorf("exit %d stderr %q, want 3 and a workspace error", code, stderr.String())
+	if code != exitDispatch || !strings.Contains(stderr.String(), "workspace") {
+		t.Errorf("exit %d stderr %q, want 21 and a workspace error", code, stderr.String())
 	}
 	if _, err := os.Stat(other); err != nil {
 		t.Errorf("a collision removed the workspace of the other run: %v", err)
@@ -252,7 +252,7 @@ func TestAgentRun_AnInputOverTheLimitIsRefused(t *testing.T) {
 
 func TestRefuse_AnErrorThatIsNotARefusalIsADispatchError(t *testing.T) {
 	var stderr bytes.Buffer
-	if code := refuse(errors.New("unexpected"), &stderr); code != 3 || !strings.Contains(stderr.String(), "unexpected") {
-		t.Errorf("refuse = %d stderr %q, want 3 and the error", code, stderr.String())
+	if code := refuse(errors.New("unexpected"), &stderr); code != exitDispatch || !strings.Contains(stderr.String(), "unexpected") {
+		t.Errorf("refuse = %d stderr %q, want 21 and the error", code, stderr.String())
 	}
 }

@@ -125,13 +125,13 @@ func TestPRMerger_RefusesAndStops(t *testing.T) {
 		live                     []runlease.LiveRun
 		code                     int
 	}{
-		{"live lease", openPR("h12"), `{"behind_by":0}`, "run cycle-9", green, []runlease.LiveRun{{Dir: "/r/cycle-9", Lease: runlease.Lease{RunID: "cycle-9"}}}, exitRefused},
-		{"draft", `{"state":"OPEN","isDraft":true,"headRefOid":"h12"}`, `{"behind_by":0}`, "draft", green, nil, exitRefused},
-		{"closed", `{"state":"CLOSED","headRefOid":"h12"}`, `{"behind_by":0}`, "CLOSED", green, nil, exitRefused},
-		{"conflicting", `{"state":"OPEN","mergeable":"CONFLICTING","headRefOid":"h12","baseRefName":"main"}`, `{"behind_by":0}`, "conflicts", green, nil, exitRefused},
-		{"behind without --update-branch", openPR("h12"), `{"behind_by":2}`, "--update-branch", green, nil, exitRefused},
-		{"red names the job", openPR("h12"), `{"behind_by":0}`, "test (ubuntu)", red, nil, exitRefused},
-		{"pending past the deadline", openPR("h12"), `{"behind_by":0}`, "pending", pending, nil, exitRefused},
+		{"live lease", openPR("h12"), `{"behind_by":0}`, "run cycle-9", green, []runlease.LiveRun{{Dir: "/r/cycle-9", Lease: runlease.Lease{RunID: "cycle-9"}}}, cliExitRefused},
+		{"draft", `{"state":"OPEN","isDraft":true,"headRefOid":"h12"}`, `{"behind_by":0}`, "draft", green, nil, cliExitRefused},
+		{"closed", `{"state":"CLOSED","headRefOid":"h12"}`, `{"behind_by":0}`, "CLOSED", green, nil, cliExitRefused},
+		{"conflicting", `{"state":"OPEN","mergeable":"CONFLICTING","headRefOid":"h12","baseRefName":"main"}`, `{"behind_by":0}`, "conflicts", green, nil, cliExitRefused},
+		{"behind without --update-branch", openPR("h12"), `{"behind_by":2}`, "--update-branch", green, nil, cliExitRefused},
+		{"red names the job", openPR("h12"), `{"behind_by":0}`, "test (ubuntu)", red, nil, cliExitRefused},
+		{"pending past the deadline", openPR("h12"), `{"behind_by":0}`, "pending", pending, nil, cliExitRefused},
 		{"unparsable gh JSON", `not json`, `{"behind_by":0}`, "decode", green, nil, exitIO},
 	}
 	for _, c := range cases {

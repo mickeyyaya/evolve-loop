@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
-	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
@@ -29,6 +30,7 @@ type routingWriteFlags struct {
 	maxEffort string
 	sharePct  int
 	dryRun    bool
+	json      bool
 }
 
 type routingEdit func(existing []byte, pol policy.Policy) (map[string]any, error)
@@ -52,11 +54,32 @@ func runCLIRoutingWrite(verb string, args []string, stdout, stderr io.Writer) in
 		fmt.Fprintf(stderr, "evolve cli-routing %s: %v (%s)\n", verb, err, cliRoutingUsage)
 		return exitRoutingUsage
 	}
-	if err := refuseBoundaryWrite(f.root, os.Getenv, time.Now(), "the routing table"); err != nil {
-		fmt.Fprintf(stderr, "evolve cli-routing %s: %v\n", verb, err)
-		return exitRoutingFinding
+	if !f.dryRun {
+		call := midWaveCall{root: f.root, verb: "cli-routing " + verb, prefix: "evolve cli-routing " + verb, args: routingQueuedArgs(args), asJSON: f.json, stdout: stdout, stderr: stderr}
+		if rc, queued := call.queueOrRefuse(); queued {
+			return rc
+		}
 	}
-	return writeRoutingEdit(routingWrite{verb: "cli-routing " + verb, flags: f, rewrites: rewrites, stdout: stdout, stderr: stderr}, edit)
+	w := routingWrite{verb: "cli-routing " + verb, flags: f, rewrites: rewrites, stdout: stdout, stderr: stderr}
+	if !f.json {
+		return writeRoutingEdit(w, edit)
+	}
+	w.stdout = io.Discard
+	if rc := writeRoutingEdit(w, edit); rc != cliExitOK {
+		return rc
+	}
+	return printVerbJSON(w.verb, routingWriteResult{Policy: filepath.Join(f.root, ".evolve", "policy.json"), DryRun: f.dryRun, ProfileRewrites: append([]string{}, slices.Sorted(maps.Keys(rewrites))...)}, stdout, stderr)
+}
+
+func routingQueuedArgs(args []string) []string {
+	_, rest, _, _ := takeFlagValue(args, "--project-root")
+	return slices.DeleteFunc(slices.Clone(rest), func(a string) bool { return a == "--json" })
+}
+
+type routingWriteResult struct {
+	Policy          string   `json:"policy"`
+	DryRun          bool     `json:"dry_run"`
+	ProfileRewrites []string `json:"profile_rewrites"`
 }
 
 func parseRoutingWriteFlags(verb string, args []string, stderr io.Writer) (routingWriteFlags, []string, bool) {
@@ -71,6 +94,7 @@ func parseRoutingWriteFlags(verb string, args []string, stderr io.Writer) (routi
 	fs.StringVar(&f.maxEffort, "max-effort", "", "set agents.<agent>: the highest effort the retry ladder reaches (default high)")
 	fs.IntVar(&f.sharePct, "share-pct", 0, "set tiers.<tier>: the percent of the seats of the tier that the first family of its clis takes (1 to 99)")
 	fs.BoolVar(&f.dryRun, "dry-run", false, "print the result and write nothing")
+	fs.BoolVar(&f.json, "json", false, "print the result as JSON")
 	rest, err := cmdutil.ParseInterspersed(fs, args)
 	if err != nil {
 		return f, nil, false

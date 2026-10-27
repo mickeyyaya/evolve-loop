@@ -41,14 +41,14 @@ A `wave next` that is not a dry run first heals a stale plane binary. When the b
 The heal does not check for a dirty plane tree. The build uses the working tree, as at the boot of `evolve loop`.
 
 1. Run `<plane>/go/bin/evolve wave next --merge <n,...> --dry-run`. Read the goal and the steps.
-2. Run `<plane>/go/bin/evolve wave next --merge <n,...> --json`. Read the envelope on stdout. The step output goes to stderr.
+2. Run `<plane>/go/bin/evolve wave next --merge <n,...> --json`. Read the envelope `evolve.wave.next/2` on stdout ([cli-contract.md](../architecture/cli-contract.md) §2). Its `data` holds the fields of the table below. The step output goes to stderr.
 3. Use the exit code and the envelope to decide the next action:
 
-| Exit | Envelope | Meaning | Next action |
+| Exit | `data` | Meaning | Next action |
 |---|---|---|---|
 | 0 | `launched: true`, `recorded: true` | The wave runs. | Run `evolve wave watch`. |
-| 1 | `refused: "loop_live"` | A loop is live. | Wait, or stop it with `evolve loop-stop --wait`. |
-| 1 | `refused: "number_taken"` | `--number` is not more than the last wave. | Remove `--number`. |
+| 3 | `refused: "loop_live"` | A loop is live. | Wait, or stop it with `evolve loop-stop --wait`. |
+| 3 | `refused: "number_taken"` | `--number` is not more than the last wave. | Remove `--number`. |
 | 2 | `launched: false`, `error` | A file read or write failed before the steps. | Fix the named file. |
 | 2 | `launched: true`, `recorded: false` | The loop runs, but the record save failed twice. The notes are consumed, and the old wave stays open. | Do not run `wave next` again. Fix `.evolve/waves/`; `wave status` shows no record for this wave. |
 | 10 | `error: "usage: …"` | A bad argument. | Fix the arguments. |

@@ -121,7 +121,7 @@ type lintDoc struct {
 func decodeLint(t *testing.T, r result) lintDoc {
 	t.Helper()
 	var doc lintDoc
-	if err := json.Unmarshal([]byte(r.stdout), &doc); err != nil {
+	if err := json.Unmarshal(cliEnvelopeData(t, r.stdout), &doc); err != nil {
 		t.Fatalf("evolve inbox lint --json printed no JSON document: %v\n%s", err, r)
 	}
 	return doc
@@ -397,4 +397,16 @@ func TestC1929_009_LintFindsATrackedProtectedFileUnderANestedRunsInboxOrWorktree
 			}
 		})
 	}
+}
+
+func cliEnvelopeData(t *testing.T, stdout string) []byte {
+	t.Helper()
+	var e struct {
+		Schema string          `json:"schema"`
+		Data   json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &e); err != nil || e.Schema == "" {
+		t.Fatalf("stdout is not one cli-contract envelope: %v\n%s", err, stdout)
+	}
+	return e.Data
 }

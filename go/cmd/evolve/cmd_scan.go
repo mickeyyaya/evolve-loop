@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	scanUsage         = "usage: evolve scan secrets [--staged | --diff <ref>] [--project-root P]"
+	scanUsage         = "usage: evolve scan secrets [--staged | --diff <ref>] [--json] [--project-root P]"
 	scanSecretsPrefix = "evolve scan secrets: "
 	exitSecretFound   = 1
 	maskKeepRunes     = 4
@@ -20,6 +20,7 @@ const (
 
 type scanSecretsArgs struct {
 	staged, help bool
+	json         bool
 	diffRefs     []string
 	projectRoot  string
 }
@@ -48,7 +49,7 @@ func runScan(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 func parseScanSecretsArgs(args []string) (scanSecretsArgs, error) {
 	var a scanSecretsArgs
 	operands, err := cliFlags{
-		bools:  map[string]*bool{"--staged": &a.staged, "--help": &a.help, "-h": &a.help},
+		bools:  map[string]*bool{"--staged": &a.staged, "--help": &a.help, "-h": &a.help, "--json": &a.json},
 		values: map[string]*string{"--project-root": &a.projectRoot},
 		lists:  map[string]*[]string{"--diff": &a.diffRefs},
 	}.parse(args)
@@ -74,15 +75,35 @@ func scanSecrets(a scanSecretsArgs, stdout, stderr io.Writer) int {
 		return exitIO
 	}
 	findings := secretleakscan.ScanDiff(diff)
+	result := scanSecretsResult{Source: scanSource(a), Verdict: secretleakscan.Verdict(findings), Findings: []maskedFinding{}}
 	for _, f := range findings {
-		fmt.Fprintf(stdout, "%s:%d: %s: %s\n", f.File, f.Line, f.Rule, maskSecret(f.Match))
+		result.Findings = append(result.Findings, maskedFinding{File: f.File, Line: f.Line, Rule: f.Rule, Match: maskSecret(f.Match)})
 	}
-	verdict := secretleakscan.Verdict(findings)
-	fmt.Fprintf(stdout, "scan secrets: %s: %d finding(s) in %s\n", verdict, len(findings), scanSource(a))
-	if verdict == "FAIL" {
-		return exitSecretFound
+	rc := cliExitOK
+	if result.Verdict == "FAIL" {
+		rc = exitSecretFound
 	}
-	return 0
+	if a.json {
+		return max(printVerbJSON("scan secrets", result, stdout, stderr), rc)
+	}
+	for _, f := range result.Findings {
+		fmt.Fprintf(stdout, "%s:%d: %s: %s\n", f.File, f.Line, f.Rule, f.Match)
+	}
+	fmt.Fprintf(stdout, "scan secrets: %s: %d finding(s) in %s\n", result.Verdict, len(findings), result.Source)
+	return rc
+}
+
+type maskedFinding struct {
+	File  string `json:"file"`
+	Line  int    `json:"line"`
+	Rule  string `json:"rule"`
+	Match string `json:"match"`
+}
+
+type scanSecretsResult struct {
+	Source   string          `json:"source"`
+	Verdict  string          `json:"verdict"`
+	Findings []maskedFinding `json:"findings"`
 }
 
 func scanGitDiff(a scanSecretsArgs) (string, error) {

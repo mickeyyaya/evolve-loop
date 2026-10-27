@@ -60,10 +60,10 @@ func TestAgentRun_AdversarialReviewDiffOnStdinPrintsTheReportAndLeavesNoCycleFoo
 	}
 	for _, path := range changedPaths(before, snapshot(t, root)) {
 		switch {
-		case isLedgerFile(path):
+		case isLedgerFile(path), isLaunchRecord(path):
 		case path == filepath.Join(".evolve", "ephemeral")+"/", path == filepath.Join(".evolve", "ephemeral", "agent-runs")+"/":
 		default:
-			t.Errorf("the run changed %s; only the ledger may change", path)
+			t.Errorf("the run changed %s; only the ledger and the launch record may change", path)
 		}
 	}
 	if _, err := os.Stat(filepath.Join(root, ".evolve", "runs")); !errors.Is(err, os.ErrNotExist) {
@@ -161,14 +161,14 @@ func TestAgentRun_NoReportIsAFailVerdictWithAnEmptyStdout(t *testing.T) {
 	}
 }
 
-func TestAgentRun_DispatchErrorExitsThreeAndNamesTheError(t *testing.T) {
+func TestAgentRun_DispatchErrorExitsTwentyOneAndNamesTheError(t *testing.T) {
 	root := project(t)
 	var stdout, stderr bytes.Buffer
 
 	code := New(depsWith(&fakeBridge{err: errBridgeDown}))(runArgs(root, "--json"), strings.NewReader(diff), &stdout, &stderr)
 
-	if code != 3 {
-		t.Fatalf("exit %d, want 3 (stderr=%s)", code, stderr.String())
+	if code != exitDispatch {
+		t.Fatalf("exit %d, want 21 (stderr=%s)", code, stderr.String())
 	}
 	if !strings.Contains(stderr.String(), "bridge down") {
 		t.Errorf("stderr = %q, want the dispatch error", stderr.String())
@@ -179,7 +179,7 @@ func TestAgentRun_DispatchErrorExitsThreeAndNamesTheError(t *testing.T) {
 	}
 }
 
-func TestAgentRun_LedgerFailureExitsThree(t *testing.T) {
+func TestAgentRun_LedgerFailureIsADispatchError(t *testing.T) {
 	root := project(t)
 	if err := os.MkdirAll(filepath.Join(root, ".evolve", "ledger.jsonl"), 0o755); err != nil {
 		t.Fatal(err)
@@ -188,15 +188,15 @@ func TestAgentRun_LedgerFailureExitsThree(t *testing.T) {
 
 	code := New(depsWith(&fakeBridge{artifact: passReport}))(runArgs(root), strings.NewReader(diff), &stdout, &stderr)
 
-	if code != 3 || !strings.Contains(stderr.String(), "ledger") {
-		t.Errorf("exit %d stderr %q, want 3 and a ledger error", code, stderr.String())
+	if code != exitDispatch || !strings.Contains(stderr.String(), "ledger") {
+		t.Errorf("exit %d stderr %q, want 21 and a ledger error", code, stderr.String())
 	}
 	if stdout.String() != passReport {
 		t.Errorf("stdout = %q, want the report even when the ledger fails", stdout.String())
 	}
 }
 
-func TestAgentRun_WorkspaceCreateFailureExitsThree(t *testing.T) {
+func TestAgentRun_WorkspaceCreateFailureIsADispatchError(t *testing.T) {
 	root := project(t)
 	if err := os.WriteFile(filepath.Join(root, ".evolve", "ephemeral"), nil, 0o644); err != nil {
 		t.Fatal(err)
@@ -205,8 +205,8 @@ func TestAgentRun_WorkspaceCreateFailureExitsThree(t *testing.T) {
 
 	code := New(depsWith(&fakeBridge{artifact: passReport}))(runArgs(root), strings.NewReader(diff), &stdout, &stderr)
 
-	if code != 3 || !strings.Contains(stderr.String(), "workspace") {
-		t.Errorf("exit %d stderr %q, want 3 and a workspace error", code, stderr.String())
+	if code != exitDispatch || !strings.Contains(stderr.String(), "workspace") {
+		t.Errorf("exit %d stderr %q, want 21 and a workspace error", code, stderr.String())
 	}
 }
 
@@ -223,8 +223,8 @@ func TestAgentRun_LedgerFailureIsNamedInTheJSONEnvelope(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &env); err != nil {
 		t.Fatal(err)
 	}
-	if code != 3 || env.Error == "" || env.Verdict != core.VerdictPASS {
-		t.Errorf("exit %d envelope error %q verdict %q, want 3, the ledger error and the PASS verdict", code, env.Error, env.Verdict)
+	if code != exitDispatch || env.Error == "" || env.Verdict != core.VerdictPASS {
+		t.Errorf("exit %d envelope error %q verdict %q, want 21, the ledger error and the PASS verdict", code, env.Error, env.Verdict)
 	}
 }
 

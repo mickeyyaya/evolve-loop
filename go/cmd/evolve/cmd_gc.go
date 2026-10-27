@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"flag"
@@ -15,9 +16,12 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
 	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/verifylock"
 )
 
 func runGC(args []string, _ io.Reader, stdout, stderr io.Writer) int {
@@ -26,6 +30,8 @@ func runGC(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	dryRun := fs.Bool("dry-run", false, "preview only: list what WOULD be released (orphan tmux sessions and sockets, finished-cycle orphan processes, stale dispatch processes and orphan log tails, worktrees and branches, run dirs, logs of the log catalog, go build cache entries, empty claim dirs of stale cycles), mutating nothing")
 	projectRoot := fs.String("project-root", "", "repository root `dir` the workspace (worktree/branch) sweep is aimed at; required: a non-dry run without it is refused, while --dry-run alone falls back to the current directory.\n\tNOTE the deliberate asymmetry: an explicit 'evolve gc' APPLIES the workspace sweep (an operator run is enforce),\n\twhile the in-loop hook's default mode stays 'shadow' (plan + publish only) — policy.json owns the loop's mode,\n\tthe operator owns their own invocation. Use --dry-run to preview.")
 	only := fs.String("only", "", "run one `scope` and no other sweep. The one scope is cache: the go build cache trim and the pipeline temp sweep. It touches no worktree, branch, session or process, so it is safe while lanes run. When gc.cache_trim_free_gb is set, it trims only while disk free is under that value")
+	asJSON := fs.Bool("json", false, "print the result as JSON: the scope and the report lines")
+	leaseWait := fs.Duration("lease-wait", 0, "wait up to this long for the gc lease that another gc holds; 0 refuses at once (exit 3)")
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}
@@ -37,12 +43,84 @@ func runGC(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if !ok {
 		return code
 	}
-	r := newGCRun(context.Background(), *dryRun, stdout, stderr)
-	if *only == gcScopeCache {
+	plan := gcPlan{root: root, only: *only, dryRun: *dryRun, asJSON: *asJSON}
+	if *dryRun {
+		return plan.run(stdout, stderr)
+	}
+	release, rc := takeGCLease(root, *leaseWait, stderr)
+	if rc != cliExitOK {
+		return rc
+	}
+	defer release()
+	plan.liveRuns = liveRunDirs(root, stderr)
+	return plan.run(stdout, stderr)
+}
+
+type gcPlan struct {
+	root, only     string
+	liveRuns       []string
+	dryRun, asJSON bool
+}
+
+func (p gcPlan) sweeper(stdout, stderr io.Writer) gcRun {
+	r := newGCRun(context.Background(), p.dryRun, stdout, stderr)
+	r.liveRuns = p.liveRuns
+	return r
+}
+
+func (p gcPlan) run(stdout, stderr io.Writer) int {
+	if !p.asJSON {
+		return p.sweeper(stdout, stderr).sweep(p.root, p.only)
+	}
+	var report strings.Builder
+	rc := p.sweeper(&report, stderr).sweep(p.root, p.only)
+	result := gcResult{DryRun: p.dryRun, Scope: cmp.Or(p.only, "all"), LiveRuns: p.liveRuns, Report: strings.FieldsFunc(report.String(), func(r rune) bool { return r == '\n' })}
+	return max(printVerbJSON("gc", result, stdout, stderr), rc)
+}
+
+func takeGCLease(root string, wait time.Duration, stderr io.Writer) (func(), int) {
+	deadline, cancel := context.WithTimeout(context.Background(), wait)
+	defer cancel()
+	path := filepath.Join(paths.EvolveDirOf(root), gcLeaseFile)
+	release, err := verifylock.AcquireAt(deadline, path, nil)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve gc: refused — another gc holds the gc lease (%s): %v\n", path, err)
+		return nil, cliExitRefused
+	}
+	return release, cliExitOK
+}
+
+func liveRunDirs(root string, stderr io.Writer) []string {
+	live := runlease.LiveRuns(filepath.Join(paths.EvolveDirOf(root), "runs"), time.Now())
+	if len(live) == 0 {
+		return nil
+	}
+	dirs := make([]string, 0, len(live))
+	for _, r := range live {
+		dirs = append(dirs, filepath.Base(r.Dir))
+	}
+	fmt.Fprintf(stderr, "evolve gc: %d run(s) hold a live lease (%s), so the sweeps that stop processes (sessions, sockets, cycle and dispatch processes) wait for a wave boundary\n", len(live), strings.Join(dirs, ", "))
+	return dirs
+}
+
+type gcResult struct {
+	DryRun   bool     `json:"dry_run"`
+	Scope    string   `json:"scope"`
+	LiveRuns []string `json:"live_runs,omitempty"`
+	Report   []string `json:"report"`
+}
+
+const gcLeaseFile = "gc.lock"
+
+func (r gcRun) sweep(root, only string) int {
+	if only == gcScopeCache {
 		return r.cacheScope(root)
 	}
-	failed := r.step(gcRun.sessions)
-	failed = r.step(gcRun.sockets) || failed
+	failed := false
+	if len(r.liveRuns) == 0 {
+		failed = r.step(gcRun.sessions)
+		failed = r.step(gcRun.sockets) || failed
+	}
 	failed = r.project(root) != 0 || failed
 	if failed {
 		return 1
@@ -66,6 +144,7 @@ type gcRun struct {
 	remove         func(string) error
 	removeAll      func(string) error
 	abs            func(string) (string, error)
+	liveRuns       []string
 }
 
 func newGCRun(ctx context.Context, dryRun bool, stdout, stderr io.Writer) gcRun {
@@ -153,8 +232,6 @@ func (r gcRun) project(projectRoot string) int {
 	opts := worktreeGCOptions(projectRoot, evolveDir, gcPol.Worktrees, r.stdout)
 	before, freeErr := looppreflight.DiskFreeBytes(projectRoot)
 	steps := []func(gcRun) bool{
-		func(s gcRun) bool { return s.cycleProcesses(opts) },
-		func(s gcRun) bool { return s.dispatchProcesses(projectRoot, gcPol.TempTTLHours) },
 		func(s gcRun) bool { return s.worktrees(opts) },
 		func(s gcRun) bool { return s.devWorktrees(projectRoot, evolveDir, gcPol) },
 		func(s gcRun) bool { return s.runDirs(evolveDir, gcPol) },
@@ -162,6 +239,12 @@ func (r gcRun) project(projectRoot string) int {
 		func(s gcRun) bool { return s.pipelineTemp(gcPol.TempTTLHours) },
 		func(s gcRun) bool { return s.testCache(evolveDir, gcPol) },
 		func(s gcRun) bool { return s.claimDirs(projectRoot) },
+	}
+	if len(r.liveRuns) == 0 {
+		steps = append([]func(gcRun) bool{
+			func(s gcRun) bool { return s.cycleProcesses(opts) },
+			func(s gcRun) bool { return s.dispatchProcesses(projectRoot, gcPol.TempTTLHours) },
+		}, steps...)
 	}
 	failed := false
 	for _, run := range steps {

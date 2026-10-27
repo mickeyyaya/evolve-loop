@@ -14,7 +14,7 @@ import (
 func runClihealth(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, "usage: evolve clihealth list [--json] | clear <family> | usage [--json] [family...] [--project-root DIR]")
-		return 2
+		return cliExitUsage
 	}
 	fs := flag.NewFlagSet("clihealth "+args[0], flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -22,7 +22,7 @@ func runClihealth(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	asJSON := fs.Bool("json", false, "print JSON")
 	positional, err := parseInterspersed(fs, args[1:])
 	if err != nil {
-		return 2
+		return cliExitUsage
 	}
 	store := clihealth.NewStore(*root, time.Now)
 	switch {
@@ -34,7 +34,7 @@ func runClihealth(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return clihealthUsage(usageView{projectRoot: *root, families: positional, asJSON: *asJSON}, stdout, stderr)
 	}
 	fmt.Fprintf(stderr, "evolve clihealth: bad invocation %q; want list [--json] | clear <family> | usage [--json] [family...]\n", args)
-	return 2
+	return cliExitUsage
 }
 
 func parseInterspersed(fs *flag.FlagSet, args []string) ([]string, error) {

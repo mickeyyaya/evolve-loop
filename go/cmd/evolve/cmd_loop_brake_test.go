@@ -155,7 +155,7 @@ func TestLoopStop_ResolvesTheRootLikeSyncMainAndRefusesStrayArguments(t *testing
 		t.Fatalf("$EVOLVE_PROJECT_ROOT names the root: rc=%d %s", rc, errb.String())
 	}
 	errb.Reset()
-	if rc := runLoopStop([]string{"--project-root", t.TempDir()}, nil, &out, &errb); rc != 1 || !strings.Contains(errb.String(), "evolve loop-stop:") {
+	if rc := runLoopStop([]string{"--project-root", t.TempDir()}, nil, &out, &errb); rc != cliExitIO || !strings.Contains(errb.String(), "evolve loop-stop:") {
 		t.Errorf("a root without .evolve fails loudly: rc=%d %s", rc, errb.String())
 	}
 	if c := lookupCommand("loop-stop"); c == nil {

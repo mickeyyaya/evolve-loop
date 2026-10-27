@@ -1005,8 +1005,23 @@ Before X10, `CLAUDE.md` held facts that only Claude Code loaded. `GEMINI.md` des
 The console runs builds and reviews as in-process Claude Code subagents (F1.10). After X11:
 
 - A console build or review runs through `evolve agent run` and the bridge. It gets a cell like any phase agent.
-- The console briefs say so. The Claude family stays the default console seat, and another family can hold it through routing data.
+- The console briefs say so. Claude stays first for the build seat. Each review seat follows `cli_routing`, and another family can hold each seat through routing data.
 - The console is still an operator session. It does not control a phase agent. It starts a dispatch through the pipeline and reads the declared artifacts.
+
+**As built (X11).** The spec of record is [agent-run.md](agent-run.md) §7 and §8.
+
+| Seat | Profile | Routing data | Record |
+|---|---|---|---|
+| Review | `code-simplifier`, `go-reviewer`, `architecture-reviewer`, `docs-review` | `cli_routing.default` (agy first) | the launch record of each run |
+| Review on the Claude floor | `code-reviewer` | the Claude floor | the launch record |
+| Audit of a diff | `adversarial-review` (no profile is named `auditor`) | the Claude floor | the launch record |
+| Build | `console-builder` with `--worktree` and `--writable` | `cli_routing.agents.console-builder`: Claude first | the launch record and the fenced worktree |
+
+- Each `evolve agent run` writes `.evolve/agent-runs/<run label>.json`. The record names the profile, the driver, the family, the model and the tree state before and after the run.
+- `evolve commit-gate run --reviewers run:<run label>` attests a review from its record. The record must have a driver and no `FAIL` verdict, and both tree states must equal the staged tree. The attestation lists each run under `review_runs`.
+- Each run has a Signal Center with the role `agent`, so a cell violation reaches the `isolation.violation` channel, as in a cycle.
+- `TestConsoleReviewChain_ANonClaudeSeatReviewsAndTheGateAttestsTheBridgeRecords` runs the simplifier and the Go reviewer on an agy-first table and attests both runs. `TestConsoleBuildSeat_RoutingDataMovesTheSeatToAnotherFamily` moves the build seat to agy through routing data.
+- The console briefs and the operating rules of `AGENTS.md` tell the console to use these seats. An in-process Claude Code subagent stays possible, but its review has no launch record.
 
 ## 14. Conformance matrix
 

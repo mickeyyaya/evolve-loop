@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 const passReport = "## Threat Model\nA diff that adds one function.\n## Findings\nNone.\n## Verdict\nPASS\n"
@@ -57,6 +59,9 @@ var fixtureFiles = []string{
 	"agents/evolve-adversarial-review.md",
 	".evolve/phases/test-amplification/phase.json",
 	".evolve/profiles/test-amplification.json",
+	".evolve/phases/console-builder/phase.json",
+	".evolve/profiles/console-builder.json",
+	"agents/evolve-console-builder.md",
 }
 
 func project(t *testing.T) string {
@@ -125,7 +130,12 @@ func fixedNow() time.Time { return time.Date(2026, 10, 21, 9, 30, 0, 0, time.UTC
 func noEnv(string) string { return "" }
 
 func depsWith(b *fakeBridge) Deps {
-	return Deps{Bridge: func(string) core.Bridge { return b }, Getenv: noEnv, Now: fixedNow}
+	return Deps{
+		Bridge:    func(string, *signalcenter.Center) core.Bridge { return b },
+		Signals:   func(string, io.Writer) (*signalcenter.Center, func()) { return signalcenter.New(), func() {} },
+		TreeState: func(context.Context, string) (string, error) { return "tree", nil },
+		Getenv:    noEnv, Now: fixedNow,
+	}
 }
 
 func runArgs(root string, extra ...string) []string {
@@ -134,4 +144,8 @@ func runArgs(root string, extra ...string) []string {
 
 func isLedgerFile(path string) bool {
 	return strings.HasPrefix(path, filepath.Join(".evolve", "ledger"))
+}
+
+func isLaunchRecord(path string) bool {
+	return strings.HasPrefix(path, filepath.Join(".evolve", "agent-runs"))
 }

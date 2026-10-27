@@ -21,11 +21,11 @@ import (
 const exitOverlap = 3
 
 type inboxAddRequest struct {
-	file, origin, reason    string
-	originSet, allowOverlap bool
+	file, origin, reason            string
+	originSet, allowOverlap, asJSON bool
 }
 
-func runInboxAdd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+func runInboxAdd(root string, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	req, ok := parseInboxAddArgs(args, stderr)
 	if !ok {
 		fmt.Fprintln(stderr, inboxUsage("add"))
@@ -35,7 +35,6 @@ func runInboxAdd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if rc != 0 {
 		return rc
 	}
-	root := envOrCwd("EVOLVE_PROJECT_ROOT")
 	pol, err := policy.Load(filepath.Join(root, ".evolve", "policy.json"))
 	if err != nil {
 		fmt.Fprintf(stderr, "inbox add: %v\n", err)
@@ -55,10 +54,10 @@ func runInboxAdd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "inbox add: %v\n", err)
 		return 2
 	}
-	fmt.Fprintf(stdout, "inbox add: filed %s (%s)\n", filepath.Base(res.Path), dispatchability(res.ConsoleReason))
-	printFiledRank(res.Path, stdout, stderr)
+	printFiledRank(root, res.Path, humanWriter(stdout, req.asJSON), stderr)
 	warnMonotonicBinaryTargets(raw, stderr)
-	return 0
+	result := inboxWriteResult{Verb: "add", Path: res.Path, Detail: dispatchability(res.ConsoleReason)}
+	return finishInboxWrite(req.asJSON, result, fmt.Sprintf("inbox add: filed %s (%s)", filepath.Base(res.Path), result.Detail), stdout, stderr)
 }
 
 func warnMonotonicBinaryTargets(raw []byte, stderr io.Writer) {
@@ -83,7 +82,8 @@ func parseInboxAddArgs(args []string, stderr io.Writer) (inboxAddRequest, bool) 
 	req := inboxAddRequest{origin: inboxbatch.OriginConsole}
 	fs := flag.NewFlagSet("inbox add", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	fs.StringVar(&req.file, "file", "", "read the item JSON from this file instead of stdin")
+	fs.StringVar(&req.file, "file", "", "read the item JSON from this file; - reads stdin")
+	fs.BoolVar(&req.asJSON, "json", false, "print the result as JSON")
 	fs.StringVar(&req.origin, "origin", req.origin, strings.Join(inboxbatch.Origins(), " | "))
 	fs.BoolVar(&req.allowOverlap, "allow-overlap", false, "file an item that overlaps an open item (needs --reason)")
 	fs.StringVar(&req.reason, "reason", "", "why an override is right; recorded in the item's intake_override")
@@ -105,11 +105,11 @@ func parseInboxAddArgs(args []string, stderr io.Writer) (inboxAddRequest, bool) 
 
 func readInboxAddItem(file string, stdin io.Reader, stderr io.Writer) ([]byte, int) {
 	source := stdin
-	if file == "" && stdin == nil {
+	if file == "" || (file == "-" && stdin == nil) {
 		fmt.Fprintln(stderr, inboxUsage("add"))
 		return nil, 10
 	}
-	if file != "" {
+	if file != "-" {
 		f, err := os.Open(file)
 		if err != nil {
 			fmt.Fprintf(stderr, "inbox add: %v\n", err)
@@ -189,8 +189,8 @@ func reportOverlaps(id string, overlaps []inboxcurator.Overlap, prefix string, s
 
 var filedRankSource = loadRankedInbox
 
-func printFiledRank(path string, stdout, stderr io.Writer) {
-	ranked, err := filedRankSource(time.Now(), io.Discard)
+func printFiledRank(root, path string, stdout, stderr io.Writer) {
+	ranked, err := filedRankSource(root, time.Now(), io.Discard)
 	if err != nil {
 		fmt.Fprintf(stderr, "inbox add: WARN the rank is not known: %v\n", err)
 		return

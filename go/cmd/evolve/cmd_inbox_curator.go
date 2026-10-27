@@ -50,8 +50,8 @@ type curatorRun struct {
 	landed                    []string
 }
 
-func runInboxCurate(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	req, ok := parseInboxCurateArgs(args, stderr)
+func runInboxCurate(root string, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	req, ok := parseInboxCurateArgs(append([]string{"--project-root", root}, args...), stderr)
 	if !ok {
 		fmt.Fprintln(stderr, inboxUsage("curate"))
 		return 10

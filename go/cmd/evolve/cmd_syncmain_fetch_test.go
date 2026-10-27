@@ -96,7 +96,7 @@ func TestSyncMain_RefusesADetachedHEADBeforeFetching(t *testing.T) {
 	var out, errb bytes.Buffer
 	code := runSyncMain([]string{"--project-root", runtime.Dir}, nil, &out, &errb)
 
-	if code != 1 || !strings.Contains(errb.String(), "detached HEAD; check out the branch to sync") {
+	if code != cliExitRefused || !strings.Contains(errb.String(), "detached HEAD; check out the branch to sync") {
 		t.Fatalf("exit %d, stderr %q: a detached HEAD has no branch to sync and must be refused by name", code, errb.String())
 	}
 	if after := runtime.Git("rev-parse", "origin/main"); after != before {

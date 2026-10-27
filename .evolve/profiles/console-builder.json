@@ -1,0 +1,59 @@
+{
+  "name": "console-builder",
+  "role": "console-builder",
+  "cli": "codex-tmux",
+  "cli_fallback": [
+    "claude-tmux"
+  ],
+  "model_tier_default": "balanced",
+  "model_tier_envelope": {
+    "min": "balanced",
+    "default": "balanced",
+    "max": "deep"
+  },
+  "allowed_tools": [
+    "Read",
+    "Grep",
+    "Glob",
+    "Edit",
+    "Write",
+    "Bash"
+  ],
+  "disallowed_tools": [
+    "Bash(git commit:*)",
+    "Bash(git push:*)",
+    "Bash(git stash:*)",
+    "Bash(git config:*)"
+  ],
+  "add_dir": [
+    "{worktree_path}"
+  ],
+  "max_budget_usd": 3.0,
+  "max_turns": 60,
+  "output_artifact": "console-builder-report.md",
+  "challenge_token_required": true,
+  "isolation": "worktree",
+  "parallel_eligible": false,
+  "sandbox": {
+    "enabled": true,
+    "write_subpaths": [
+      "{worktree_path}",
+      ".evolve/runs/cycle-*"
+    ],
+    "read_only_repo": true,
+    "deny_subpaths": [
+      ".git",
+      ".commit-gate",
+      ".claude-plugin",
+      ".evolve/agent-runs",
+      ".evolve/state.json",
+      ".evolve/ledger.jsonl",
+      ".evolve/policy.json",
+      ".evolve/phases",
+      ".evolve/profiles",
+      ".evolve/evals"
+    ],
+    "allow_network": false
+  },
+  "generated_from": "hand-authored"
+}

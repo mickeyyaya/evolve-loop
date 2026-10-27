@@ -1,0 +1,32 @@
+{
+  "acceptance": [
+    "Red test first: 3 shipped lanes of 40 minutes and 2 failed lanes of 6 hours give a deadline from the shipped lanes only at shipped.",
+    "At all the deadline is as today, and the loop log line prints the deadline of both bases.",
+    "With no shipped lane the deadline is the floor (deadline_floor_minutes).",
+    "fleet.orchestrator.deadline_basis refuses any value other than all or shipped."
+  ],
+  "created_at": "2026-10-26T23:19:23Z",
+  "deps": [],
+  "files": [
+    "go/internal/orchestrator/deadline.go",
+    "go/internal/orchestrator/runs.go",
+    "go/internal/orchestrator/runs_test.go",
+    "go/cmd/evolve/cmd_loop_orchestrator.go",
+    "go/internal/policy/fleet_orchestrator.go",
+    "go/internal/policy/fleet_orchestrator_test.go"
+  ],
+  "fix": "Add fleet.orchestrator.deadline_basis (all or shipped, default all). LaneTimes returns the outcome with each time: a lane is shipped when its signals.ndjson has the ship phase outcome PASS. At shipped, DeadlineOf uses only the shipped lanes. The loop log prints the deadline of both bases, so the operator can compare them before the flip.",
+  "id": "lane-deadline-from-shipped-lanes",
+  "injected_by": "console-operator-session",
+  "kind": "feature",
+  "notes": "Rank 10: the spend limit is the cost stop, so this item only makes the hang guard tighter. go/internal/orchestrator/guard_test.go is on the fence; do not change it.",
+  "priority": "P3",
+  "priority_class": "stability",
+  "route": "lane",
+  "routed_at": "2026-10-26T23:19:32Z",
+  "routed_reason": "ADR-0158 plan section 6: no fence path to change; a fenced call site is a split",
+  "source": "console, 2026-10-27, operator request on cycle 2035 (\"balance to cost and output\"). ADR-0158; plan docs/plans/cost-aware-repair-2026-10.md",
+  "summary": "DeadlineOf takes the 95th percentile of the last 50 lane times without the longest one (go/internal/orchestrator/deadline.go:8-18). Each long failed cycle makes the next deadline longer: it was 6 h 21 m 49 s for wave 142, while the shipped cycles of waves 141 and 142 used 28.9 to 47.0 LLM minutes.",
+  "title": "The lane deadline percentile counts only the times of shipped lanes (ADR-0158 decision 17)",
+  "weight": 0.5
+}
