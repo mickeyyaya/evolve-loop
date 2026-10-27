@@ -59,6 +59,14 @@
         ],
         "model": "balanced"
       },
+      "console-builder": {
+        "cli": [
+          "claude",
+          "agy-claude",
+          "agy"
+        ],
+        "model": "balanced"
+      },
       "reflector": {
         "effort": "low"
       },

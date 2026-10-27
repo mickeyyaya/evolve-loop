@@ -60,10 +60,10 @@ func TestAgentRun_AdversarialReviewDiffOnStdinPrintsTheReportAndLeavesNoCycleFoo
 	}
 	for _, path := range changedPaths(before, snapshot(t, root)) {
 		switch {
-		case isLedgerFile(path):
+		case isLedgerFile(path), isLaunchRecord(path):
 		case path == filepath.Join(".evolve", "ephemeral")+"/", path == filepath.Join(".evolve", "ephemeral", "agent-runs")+"/":
 		default:
-			t.Errorf("the run changed %s; only the ledger may change", path)
+			t.Errorf("the run changed %s; only the ledger and the launch record may change", path)
 		}
 	}
 	if _, err := os.Stat(filepath.Join(root, ".evolve", "runs")); !errors.Is(err, os.ErrNotExist) {

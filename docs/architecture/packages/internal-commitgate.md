@@ -47,6 +47,13 @@
   - One review capability is enough, and `code-review-simplify` satisfies both.
   - Each declared reviewer is normalized by dropping everything through its last `:` (so `ecc:go-reviewer` counts as `go-reviewer`) and all ASCII whitespace. Only the check normalizes: `reviewers_run` records the raw spellings with empties dropped.
   - Pinned by `TestReviewersSatisfied`, `TestSplitReviewers_RawVerbatim`, `TestRun_GeneralReviewerAlone_ExitPass` and `TestRun_EccPrefixedReviewer_ExitPass`.
+- **A review run** is a token `run:<run label>` in `--reviewers` (`resolveReviewRuns`, `review_runs.go`). The design is [agent-run.md](../agent-run.md) §7.
+  - The gate computes the tree-state SHA once and reads the launch record of each run (`launchrecord.Read`).
+  - It refuses the commit (ExitFail, `DENY: review run <label> does not attest this commit`) when the record is absent or unreadable, or holds another run id.
+  - It also refuses a record with no driver, a writer record, a verdict other than `PASS` or `WARN`, no report hash, or another tree (`Record.BoundTo`).
+  - A tree-state error is ExitGitFatal. A gate with no `run:` token reads no record and no extra tree.
+  - Each accepted token becomes the profile name of the run, so the reviewer precondition reads it like a named reviewer.
+  - Pinned by `TestRun_BridgeRunReviewsSatisfyTheGateAndTheAttestationNamesEachRun`, `TestRun_ABridgeRunThatCannotAttestIsDenied` and `TestRun_NamedReviewersAloneReadNoTreeBeforeTheLanes`.
 - **A docs-only change** is a change whose every path ends in `.md` (`isDocsOnly`).
   - The gate lists the change itself with `--no-renames` (`listedChange`), not the `--files` override. So a code file renamed to Markdown still lists its old path and needs the code review (`TestRun_ACodeFileRenamedToMarkdownStillNeedsTheCodeReview`). It needs the capability "docs review" in place of simplify and review (`requiredReviewSatisfied`). The skill [docs-review](../../../skills/docs-review/SKILL.md) satisfies it. The code reviewers do not satisfy it, and `docs-review` does not satisfy the code capabilities of a change with any other path. A denied docs-only change logs `missing required review capability: docs review`.
   - Pinned by `TestRequiredReview_ADocsOnlyChangeNeedsTheDocsReviewCapability`, `TestRun_ADocsOnlyChangeCommitsWithTheDocsReviewAloneAndRecordsIt` and `TestRun_ADocsOnlyChangeWithOnlyCodeReviewersIsDenied`.
@@ -77,12 +84,13 @@
 - **Node lane:** `eslint`, or `npx eslint` when only npx is present, over the changed ts/tsx/js/jsx/mjs/cjs files. Neither present is ExitToolMissing.
 - **Rust lane:** per crate (the nearest `Cargo.toml`), `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test`. A `.rs` file with no `Cargo.toml` above it contributes no crate and is skipped, as the Go lane skips a file outside every module (`TestLaneRust_NoCargoTomlAbove_NoCrateFound`).
 - **Tool presence.** `ensureTool` honours `ForceMissing` (tools treated as absent regardless of PATH) and `TestInstall` (`ok` or `fail` stands in for the install result). Only a test sets these fields; `evolve commit-gate run` reads no environment variable for them (X18e). `NoInstall` makes every missing tool a hard ExitToolMissing. The two seams come from `Options` fields, never from `Env`, so tests stay hermetic; the unexported `lookPath` is the presence probe tests replace. `Env` is the lint and test subprocesses' environment (nil inherits the parent).
-- **The attestation** is `attestation.json` under `AttestDir` (`CG_ATTEST_DIR`; default `<RepoRoot>/.commit-gate`), written atomically. The cmd layer (`internal/cli/guardcmd/commitgate.go`) reads `CG_ATTEST_DIR` into `Options.AttestDir`. Its fields, in order:
+- **The attestation** is `attestation.json` under `AttestDir` (`CG_ATTEST_DIR`; default `<RepoRoot>/.commit-gate`), written atomically. `AttestDirName` is the one home of `.commit-gate`. The cmd layer (`internal/cli/guardcmd/commitgate.go`) reads `CG_ATTEST_DIR` into `Options.AttestDir`. Its fields, in order:
   - `tree_state_sha`: the sha256 of `git diff HEAD` from `internal/treestate.SHA`. That is the function the ship reader uses, so writer and reader agree by construction.
   - `ts`: the UTC write time, informational only.
   - `checks_passed`: in execution order.
   - `reviewers_run`.
   - `review_waiver`: present only when the review waiver applied.
+  - `review_runs`: present only when a `run:` token applied. Each entry has the run id, the profile, the driver, the family and the model.
   - `tool`: `shasum` when present, else `sha256sum` (neither is ExitGitFatal).
 
   The reader (`internal/phases/ship`) decodes into this same `Attestation` type, so the schema has one home. The reader consumes `tree_state_sha`, `reviewers_run` and `review_waiver`. It turns each reviewer into a `Reviewed-by` trailer and the waiver into a `Review-waived` trailer. Ship's tests write their attestations with this package's `Marshal`. `TestAttestation_MarshalWritesValidJSONForAnyReviewerName` round-trips every field, so a writer key that drifts from its struct tag fails a test.

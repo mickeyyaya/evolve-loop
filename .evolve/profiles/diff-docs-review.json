@@ -1,0 +1,44 @@
+{
+  "name": "diff-docs-review",
+  "role": "diff-docs-review",
+  "cli": "codex-tmux",
+  "cli_fallback": [
+    "claude-tmux"
+  ],
+  "model_tier_default": "balanced",
+  "model_tier_envelope": {
+    "min": "balanced",
+    "default": "balanced",
+    "max": "balanced"
+  },
+  "allowed_tools": [
+    "Read",
+    "Grep",
+    "Glob",
+    "Bash"
+  ],
+  "disallowed_tools": [
+    "Edit",
+    "Write"
+  ],
+  "max_budget_usd": 1.0,
+  "max_turns": 15,
+  "output_artifact": "diff-docs-review-report.md",
+  "challenge_token_required": true,
+  "parallel_eligible": false,
+  "sandbox": {
+    "enabled": true,
+    "write_subpaths": [
+      ".evolve/runs/cycle-*"
+    ],
+    "read_only_repo": true,
+    "deny_subpaths": [
+      ".evolve/state.json",
+      ".evolve/ledger.jsonl",
+      ".evolve/profiles",
+      ".evolve/evals"
+    ],
+    "allow_network": false
+  },
+  "generated_from": "hand-authored"
+}
