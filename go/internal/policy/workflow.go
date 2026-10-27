@@ -35,6 +35,7 @@ type WorkflowPolicy struct {
 	Convergence              *ConvergencePolicy    `json:"convergence,omitempty"`
 	RetryLadder              *RetryLadderPolicy    `json:"retry_ladder,omitempty"`
 	Repair                   *RepairPolicy         `json:"repair,omitempty"`
+	CycleSpend               *CycleSpendPolicy     `json:"cycle_spend,omitempty"`
 }
 
 type WorkflowConfig struct {
@@ -63,6 +64,7 @@ type WorkflowConfig struct {
 	QualityIndex             QualityIndexConfig
 	RetryLadder              RetryLadderConfig
 	RepairFixability         config.Stage
+	CycleSpend               CycleSpendConfig
 }
 
 func (p Policy) WorkflowConfig() WorkflowConfig {
@@ -85,6 +87,7 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 		QualityIndex:             p.qualityIndexConfig(),
 		RetryLadder:              p.retryLadderConfig(),
 		RepairFixability:         p.RepairFixabilityStage(),
+		CycleSpend:               p.cycleSpendConfig(),
 	}
 	if p.Workflow == nil {
 		return c

@@ -237,6 +237,18 @@ The block sets the stage of the fixability check of [ADR-0158](adr/0158-a-repair
 |---|---|---|
 | `fixability.stage` | `off`: no check. `shadow`: a blocker records `REPAIR_HANDOFF` with `decision: would_stop`, and the repair round runs. A lane item with a console companion stays admissible, and the census records `would defer`. `enforce`: a blocker seals the cycle `handed-off` with no repair round. A lane item with a console companion waits with the reason `console_companion_pending`. The checked-in policy does not set the key. | `shadow` |
 
+## Cycle spend (`workflow.cycle_spend`)
+
+The block sets the spend limit of one cycle ([ADR-0158](adr/0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md) decisions 14 to 16, [internal-cyclespend](packages/internal-cyclespend.md)). It is not `workflow.cycle_budget`, the stage of the loop end decision. The loader refuses three faults with the key name. They are an unknown stage, an unknown key and a value outside its range. The stages are `0`, `off`, `shadow` and `enforce`. To get the default, leave the key out.
+
+| Key | Range | Meaning | Default |
+|---|---|---|---|
+| `stage` | `0`, `off`, `shadow`, `enforce` | `shadow`: the first passed limit records `CYCLE_SPEND_LIMIT` with `decision: would_stop`, and the flow of today runs. `enforce`: the first boundary over the limit records `over`. The cycle stops at the first failed phase that has a legal edge to retro (a failed audit), records `stop` and seals `handed-off`. A passing audit still ships. | `shadow` |
+| `max_llm_minutes` | 10 to 600 | the LLM minutes of the cycle | 90 |
+| `max_fresh_tokens` | 100000 to 20000000 | input, output and cache-write tokens | 2500000 |
+| `max_cache_read_tokens` | 1000000 to 500000000 | cache-read tokens | 40000000 |
+| `max_audit_rounds` | 1 to 4 | `audit_dispatches` of the cycle | 2 |
+
 ## Documentation floors (`docs_floor`)
 
 The block sets the stages of the two documentation floors of the build handoff. The docs floor only WARNs. The STE floor fails the handoff at `ste_stage: enforce`. The loader decodes the block strictly. An unknown key, or a `stage` or `ste_stage` word that is not `0`, `off`, `shadow` or `enforce`, fails the load of the whole file. Thus a typo key in `docs_floor` stops every consumer of the policy, not only the two floors.

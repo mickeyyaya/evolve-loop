@@ -28,6 +28,7 @@ type Cycle struct {
 	Spend        cyclespend.Spend
 	HandoffWould int
 	HandedOff    bool
+	SpendLimit   string
 }
 
 func (c Cycle) DeadlineEnd() bool { return !c.Sealed || c.LaneDeadline }
@@ -164,6 +165,9 @@ func withSignals(c Cycle, path string) (Cycle, error) {
 			c.LaneDeadline = c.LaneDeadline || strings.Contains(e.Fields["termination_reason"], "lane deadline")
 		}
 		c.SystemFail = c.SystemFail || systemFailCode(e.Code)
+		if e.Code == cyclespend.SignalCode {
+			c.SpendLimit = e.Fields[cyclespend.FieldDecision]
+		}
 		if e.Code == fixability.SignalCode {
 			c.HandoffWould += boolInt(e.Fields[fixability.FieldDecision] == fixability.DecisionWould)
 			c.HandedOff = c.HandedOff || e.Fields[fixability.FieldDecision] == fixability.DecisionStop

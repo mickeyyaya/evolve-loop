@@ -85,9 +85,20 @@ func TestCost_TheJSONFieldNamesAreStable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, key := range []string{"started_cycles", "shipped_cycles", "llm_minutes_per_shipped_cycle", "fresh_tokens_per_shipped_cycle", "cache_read_tokens_per_shipped_cycle", "unmeasured_calls", "audit_rounds_per_cycle", "convergence_rate", "handoff_stops", "handoff_would_stops", "false_stops"} {
+	for _, key := range []string{"started_cycles", "shipped_cycles", "llm_minutes_per_shipped_cycle", "fresh_tokens_per_shipped_cycle", "cache_read_tokens_per_shipped_cycle", "unmeasured_calls", "audit_rounds_per_cycle", "convergence_rate", "handoff_stops", "handoff_would_stops", "false_stops", "spend_limit_stops", "spend_limit_would_stops"} {
 		if !strings.Contains(string(raw), `"`+key+`":`) {
 			t.Errorf("json %s has no key %s", raw, key)
 		}
+	}
+}
+
+func TestCompute_CountsTheSpendLimitStopsAndAWouldStopThatShippedIsAFalseStop(t *testing.T) {
+	t.Parallel()
+	f := wavemeasure.Facts{Cycles: []wavemeasure.CycleSpend{{Shipped: true, SpendLimit: "would_stop"}, {SpendLimit: "stop"}, {SpendLimit: "would_stop"}}}
+
+	c := wavemeasure.Compute(f, at(0)).Cost
+
+	if c.SpendLimitWouldStops != 2 || c.SpendLimitStops != 1 || c.FalseStops != 1 {
+		t.Errorf("cost = %+v, want 2 would stops, 1 stop and 1 false stop", c)
 	}
 }
