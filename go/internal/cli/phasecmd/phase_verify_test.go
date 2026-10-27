@@ -129,7 +129,15 @@ func TestPhaseVerify_FailureContextPhaseIO_RespectsStage(t *testing.T) {
 	failNoBlock := "## Changes\n- x\n" + phasecontract.RenderVerdictSentinel("build", "FAIL") + "\n"
 
 	t.Run("explicit-off-dormant", func(t *testing.T) {
-		t.Setenv("EVOLVE_PHASE_IO", "off")
+		root := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, ".evolve", "policy.json"), []byte(`{"gates":{"phase_io":"off"}}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("EVOLVE_PROJECT_ROOT", root)
+		t.Setenv("EVOLVE_PHASE_IO", "enforce")
 		ws := t.TempDir()
 		if err := os.WriteFile(filepath.Join(ws, "build-report.md"), []byte(failNoBlock), 0o644); err != nil {
 			t.Fatal(err)

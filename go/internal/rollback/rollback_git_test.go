@@ -67,7 +67,6 @@ func TestRevertAndShipWith_RevertFails_ReturnsFailed(t *testing.T) {
 }
 
 func TestRevertAndShipWith_RevertOK_NoBinary_LocalOnly(t *testing.T) {
-	t.Setenv("EVOLVE_GO_BIN", "")
 	t.Setenv("PATH", "")
 	fake := &fixtures.FakeExec{}
 	g := gitexec.Git{Dir: t.TempDir(), Exec: fake.Run}

@@ -15,7 +15,7 @@
   The retro launched on codex. Codex timed out after 1800 s. The retro emitted FAIL with no disposition, and the cycle sealed abnormally.
 - **A Decorator over `core.Bridge`.** `New` wraps the bridge once at the composition root (`wireOrchestratorDeps` in `cmd/evolve`), so every `Launch` gets the walk by construction.
 - **No double walk.** A caller that walks its own chain (the runner, the advisor) marks each try with `BridgeRequest.ChainAttempt`. The decorator passes a marked request to the inner bridge. It does not resolve a plan. Pinned by `TestWalking_ChainAttemptPassesThrough`.
-- **Shared projections.** `CLIHealthEnabled`, `ApplyCLIHealthBench` and `BenchOnEscalation` are the cli-health projections of the runner, moved here so both walks share one implementation.
+- **Shared projections.** `CLIHealthOn`, `ApplyCLIHealthBench` and `BenchOnEscalation` are the cli-health projections of the runner, moved here so both walks share one implementation.
 - **The plan.** For a launch, the plan is the chain of the agent profile (`llmroute.Resolve`: primary, `cli_fallback`, tier chain, triggers). The own CLI of the caller stays the primary when it differs, so wrapping never changes which CLI runs first. It changes only what happens when that CLI fails (`TestDefaultPlanResolver_ProfileChainRunsBehindTheCallersPrimary`). A resolver with nothing to say degrades to exactly the launch that the caller asked for, once.
 - **The log.** `Logf` is the diagnostic sink. The composition root points it at the stderr of the loop, so a fallback is never silent.
 - **Signals pass through.** `Signals` forwards the Signal Center of the inner adapter. The verdict engine of every runner built from the wrapped handle asserts `Signals()` on its bridge. The swarm decorator and the orchestrator ask `SignalsWired()`.
@@ -36,7 +36,7 @@
 
   All others have a family key (`ApplyBench`). When every candidate is benched, the order stays and a WARN says so. Each reorder is one log line.
 
-  `EVOLVE_CLI_HEALTH=0` turns it all off. Log lines are sorted so transcripts diff well.
+  `cli_health.enabled: false` in `<root>/.evolve/policy.json` turns it all off (`CLIHealthOn`, X18c). No code reads `EVOLVE_CLI_HEALTH` now. Log lines are sorted so transcripts diff well.
 - **Staleness guard.** `BenchOnEscalation` benches a family only when the workspace escalation report classifies a benchable wall for this dispatch. The report must name the CLI that just exited 85 and must be captured at or after the start of this dispatch. The workspace is shared across phases, so a leftover report must never bench (`TestBenchOnEscalation_BenchesTheFamilyAFreshReportNames`).
 
   With no report, the 85 is generic and nothing is classified. The `benched_until` value comes from the reset hint of the pane when it parses, else from the strike-scaled cooldown. A wall can need an operator fix, such as a credential wall.

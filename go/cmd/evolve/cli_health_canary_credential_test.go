@@ -14,7 +14,7 @@ func TestCanaryCredentialWallRebenchesAndNamesTheOperator(t *testing.T) {
 	root := t.TempDir()
 	benchExpired(t, root, "claude", 1)
 	var out bytes.Buffer
-	runCLIHealthCanary(context.Background(), root, nil, func(driver string) (int, string, string) {
+	runCLIHealthCanary(context.Background(), root, func(driver string) (int, string, string) {
 		return 85, clihealth.CredentialPattern, "Please log in to continue"
 	}, &out)
 	benches, _ := clihealth.NewStore(root, nil).Load()

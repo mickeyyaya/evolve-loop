@@ -29,7 +29,7 @@ func doctorResultsFor(v cliroutetest.Variant) []gobridge.DoctorResult {
 	return append(results, doctorResult("ollama-tmux", true, "ready"), doctorResult("claude-p", true, "ready"))
 }
 
-func productionRouterFor(t *testing.T, v cliroutetest.Variant, root, profileDir string) *cliroute.Router {
+func productionRouterFor(t *testing.T, v cliroutetest.Variant, root, profileDir string, agents []string) *cliroute.Router {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
 		t.Fatal(err)
@@ -38,7 +38,12 @@ func productionRouterFor(t *testing.T, v cliroutetest.Variant, root, profileDir 
 		t.Fatal(err)
 	}
 	fakeRoutingDoctor(t, doctorResultsFor(v)...)
-	router, _, err := loadCLIRouter(root, routingHost(io.Discard, cliroutetest.Now))
+	s, err := cliRouterSetup(routerSite{root: root, catalog: routingCatalog(root)}, routingHost(io.Discard, cliroutetest.Now))
+	if err != nil {
+		t.Fatalf("variant %s: the production setup refuses: %v", v.Name, err)
+	}
+	s.Options = append(s.Options, cliroute.WithOverrides(v.Overrides(agents)))
+	router, _, err := cliroute.Build(s)
 	if err != nil {
 		t.Fatalf("variant %s: the production composition refuses: %v", v.Name, err)
 	}
@@ -53,17 +58,17 @@ func TestProductionRouter_ReplaysTheLegacyGolden(t *testing.T) {
 	var runnerRecords, chainRecords []cliroutetest.Record
 	for _, v := range cliroutetest.Variants() {
 		root := v.ProjectRoot(t, cliroutetest.PhasesOf(agents))
-		router := productionRouterFor(t, v, root, profileDir)
+		router := productionRouterFor(t, v, root, profileDir, agents)
 		t.Setenv("PATH", v.PathDir(t))
 		for _, agent := range agents {
 			phase := cliroutetest.PhaseOf(agent)
 			d, err := router.Resolve(cliroute.Request{
 				Agent: agent, Phase: phase, ProjectRoot: root, DefaultModel: cliroutetest.DefaultModel,
-				Env: v.EnvFor(agent), Overlay: v.Overlay, Expand: declineAuto, BypassPolicy: v.Bypass,
+				Env: v.EnvFor(), Overlay: v.Overlay, Expand: declineAuto, BypassPolicy: v.Bypass,
 			})
 			runnerRecords = append(runnerRecords, goldenRecord(cliroutetest.ResolverRunner, v.Name, agent, phase, d, err))
 			plan, err := bridgechain.DefaultPlanResolver(router)(core.BridgeRequest{
-				Agent: agent, Model: cliroutetest.DefaultModel, CLI: v.CallerCLI, Env: v.EnvFor(agent), ProjectRoot: root,
+				Agent: agent, Model: cliroutetest.DefaultModel, CLI: v.CallerCLI, Env: v.EnvFor(), ProjectRoot: root,
 			})
 			chainRecords = append(chainRecords, goldenRecord(cliroutetest.ResolverBridgechain, v.Name, agent, "", cliroute.Decision{Plan: plan}, err))
 		}

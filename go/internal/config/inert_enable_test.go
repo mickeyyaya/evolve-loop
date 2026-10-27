@@ -35,9 +35,8 @@ func TestLoad_NoEnables_NoInertWarning(t *testing.T) {
 }
 
 func TestLoad_OtherWarningsStillEmit(t *testing.T) {
-	_, ws := Load("", map[string]string{
-		"EVOLVE_MANDATORY_PHASES": "scout,build",
-	})
+	reg := writeRegistry(t, `{"config":{"mandatory_phases":["scout","build"]},"phases":[]}`)
+	_, ws := Load(reg, nil)
 	var sawWeak bool
 	for _, w := range ws {
 		if w.Code == "weak-spine" {

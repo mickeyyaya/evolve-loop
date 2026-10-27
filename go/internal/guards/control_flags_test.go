@@ -230,7 +230,7 @@ func assignedIndexes(file *ast.File) map[ast.Expr]bool {
 	return out
 }
 
-var envchainReaders = []string{"Resolve", "ResolveNoOS", "Int", "IntMin", "Bool"}
+var envchainReaders = []string{"Resolve", "Int", "IntMin", "Bool"}
 
 func (s envReadScan) isEnvReader(src envSourceFile, fun ast.Expr, readers map[string]bool) bool {
 	switch f := fun.(type) {
@@ -339,7 +339,7 @@ func joinWildcards(name string) string {
 	return name
 }
 
-const unmovedControlCeiling = 29
+const unmovedControlCeiling = 10
 
 func declaredControlNames() []string {
 	return slices.Concat(ipcenv.Markers(), ipcenv.UnmovedControls())
@@ -455,5 +455,18 @@ func TestRemovedControlNames_HaveNoProductionRead(t *testing.T) {
 	})
 	for _, r := range reads {
 		t.Errorf("%s reads %s, a dead name or a test seam of control-flags.md classes (d) and (e): a test sets an injected field instead (X18e)", r.at, r.name)
+	}
+}
+
+func TestRetiredControls_HaveNoProductionRead(t *testing.T) {
+	module, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	reads := scanEnvModule(t, module).readsOf(func(name string) bool {
+		return slices.ContainsFunc(ipcenv.RetiredControls(), func(r ipcenv.RetiredControl) bool { return controlNameMatches(r.Name, name) })
+	})
+	for _, r := range reads {
+		t.Errorf("%s reads %s, a control that moved to policy.json or a CLI parameter: read the replacement that ipcenv.RetiredControls names (X18c)", r.at, r.name)
 	}
 }

@@ -16,7 +16,7 @@
 
 | Dial | Ladder | Default | Source | What it gates |
 |---|---|---|---|---|
-| `CommitEvidence` | gate | off | `EVOLVE_COMMIT_EVIDENCE` | Commit-as-evidence ([ADR-0027](../adr/0027-commit-as-evidence.md)): shadow computes git evidence beside the artifact; enforce makes the git evidence authoritative. |
+| `CommitEvidence` | gate | off | none (no key since X18c, and no reader) | Commit-as-evidence ([ADR-0027](../adr/0027-commit-as-evidence.md)): shadow computes git evidence beside the artifact; enforce makes the git evidence authoritative. |
 | `ReviewGate` | gate | off | `gates.review_gate` | The per-phase review gate. Off keeps the no-op reviewer; at enforce a reject aborts the cycle. |
 | `EvalGate` | gate | enforce | `gates.eval_gate` | `internal/evalgate`: Gate A (scout eval files exist) and Gate B (tdd predicate quality). It fails open on ambiguity. |
 | `ContractGate` | gate | enforce | `gates.contract_gate` | The `internal/deliverable` contract gate ([ADR-0034](../adr/0034-unified-deliverable-contract.md)). A circuit breaker demotes enforce to advisory after N consecutive blocks. |
@@ -26,7 +26,7 @@
 | `PhaseRecovery` | gate | shadow | `recovery.phase_recovery` | The ADR-0044 program: the live channel, the ask-broker, the transient-dwell fast-fail, the chain-backed `StallPolicy`, the failure-adviser promotion and the misplaced-deliverable salvage. |
 | `SpineFloor` | gate | enforce | `recovery.spine_floor` | Only whether a clean-absence handoff gap aborts the cycle. |
 | `FatalPane` | gate | enforce | `recovery.fatal_pane` | Only whether a persisted, non-Busy fatal-pane match ends the stop-review wait. |
-| `PhaseIO` | router | enforce | `EVOLVE_PHASE_IO` | The unified phase-I/O envelope ([ADR-0050](../adr/0050-modularization-and-unified-phase-io.md)); off is the rollback. |
+| `PhaseIO` | router | enforce | `gates.phase_io` | The unified phase-I/O envelope ([ADR-0050](../adr/0050-modularization-and-unified-phase-io.md)); off is the rollback. |
 | `RouterReplan` | router, enforce unused | shadow | `router.router_replan` | The post-scout re-plan ([ADR-0052](../adr/0052-advisor-maximization.md)); at advisory it replaces the clamped plan after the floor re-clamps it. |
 | `MergeGate` | router | shadow | compiled only | Merge-to-main promotion ([ADR-0057](../adr/0057-merge-to-main-gate.md)). No production code reads this field; only enforce is meant to auto-promote. |
 | `ParallelEvaluate` | router | off | `parallel_evaluate.stage` | Concurrent post-build evaluate phases (archetype evaluate, excluding the audit verdict-brancher), merged serially with a weakest-link verdict. |

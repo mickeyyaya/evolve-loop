@@ -27,7 +27,7 @@ func TestCanary_ACancelDuringTheProbeLeavesTheBenchAndStopsTheSweep(t *testing.T
 	probes := 0
 	var out bytes.Buffer
 
-	runCLIHealthCanary(ctx, root, nil, func(string) (int, string, string) {
+	runCLIHealthCanary(ctx, root, func(string) (int, string, string) {
 		probes++
 		cancel()
 		return 0, "", ""
@@ -238,7 +238,7 @@ func TestRunUsageProbe_NoInstalledFamilyProbesNothing(t *testing.T) {
 	evolveDir := writeProbePolicy(t, `{"cli_health":{"proactive_probe":true}}`)
 	var stderr bytes.Buffer
 
-	runUsageProbe(context.Background(), t.TempDir(), evolveDir, nil, &stderr)
+	runUsageProbe(context.Background(), t.TempDir(), evolveDir, &stderr)
 
 	if stderr.Len() != 0 {
 		t.Errorf("stderr = %q, want silence with no CLI on PATH", stderr.String())
@@ -251,7 +251,7 @@ func TestRunUsageProbe_ProbesEveryInstalledFamilyAndBenchesNoneWithoutAUsageCont
 	evolveDir := writeProbePolicy(t, `{"cli_health":{"proactive_probe":true}}`)
 	var stderr bytes.Buffer
 
-	runUsageProbe(context.Background(), root, evolveDir, nil, &stderr)
+	runUsageProbe(context.Background(), root, evolveDir, &stderr)
 
 	if !strings.Contains(stderr.String(), "[loop] usage-probe: checking [ollama] for quota caps before dispatch") {
 		t.Errorf("stderr = %q, want the probe announcement naming ollama", stderr.String())
@@ -265,7 +265,7 @@ func TestRunUsageProbe_DisabledByPolicyDoesNotLookForFamilies(t *testing.T) {
 	usageProbeFakePATH(t, "ollama")
 	var stderr bytes.Buffer
 
-	runUsageProbe(context.Background(), t.TempDir(), writeProbePolicy(t, `{}`), nil, &stderr)
+	runUsageProbe(context.Background(), t.TempDir(), writeProbePolicy(t, `{}`), &stderr)
 
 	if stderr.Len() != 0 {
 		t.Errorf("stderr = %q, want silence when the policy leaves the probe off", stderr.String())

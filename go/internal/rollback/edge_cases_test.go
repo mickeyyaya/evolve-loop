@@ -134,7 +134,6 @@ func TestResolveEvolveBinForRollback_PathLookup_Found(t *testing.T) {
 	if err := os.WriteFile(evolveBin, []byte("#!/bin/sh\necho fake\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("EVOLVE_GO_BIN", "")
 	t.Setenv("PATH", dir)
 
 	repoRoot := t.TempDir()

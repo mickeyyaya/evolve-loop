@@ -382,7 +382,7 @@ func defaultReleaseSh(repoRoot, target string) error {
 func defaultShip(repoRoot, msg, releaseNotes string) (string, error) {
 	binPath := resolveEvolveBin(repoRoot)
 	if binPath == "" {
-		return "", fmt.Errorf("evolve binary not found (set EVOLVE_GO_BIN, or place at %s/go/bin/evolve or %s/go/evolve); v12.0.0+ requires the native binary",
+		return "", fmt.Errorf("evolve binary not found (place it at %s/go/bin/evolve or %s/go/evolve, or put evolve on PATH); v12.0.0+ requires the native binary",
 			repoRoot, repoRoot)
 	}
 	cmd := sysexec.Command(context.Background(), binPath, "ship", "--class", "release", msg)
@@ -402,9 +402,6 @@ func defaultShip(repoRoot, msg, releaseNotes string) (string, error) {
 }
 
 func resolveEvolveBin(repoRoot string) string {
-	if p := os.Getenv("EVOLVE_GO_BIN"); p != "" && isExecutableFile(p) {
-		return p
-	}
 	if c := filepath.Join(repoRoot, "go", "bin", "evolve"); isExecutableFile(c) {
 		return c
 	}

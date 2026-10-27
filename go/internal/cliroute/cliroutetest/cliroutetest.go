@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,7 +15,6 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
-	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -72,15 +72,19 @@ func Variants() []Variant {
 	}
 }
 
-func (v Variant) EnvFor(agent string) map[string]string {
-	env := make(map[string]string, len(v.Env)+1)
-	for k, val := range v.Env {
-		env[k] = val
+func (v Variant) EnvFor() map[string]string {
+	return maps.Clone(v.Env)
+}
+
+func (v Variant) Overrides(agents []string) map[string]llmroute.AgentOverride {
+	if v.AgentCLI == "" {
+		return nil
 	}
-	if v.AgentCLI != "" {
-		env[envchain.PhaseEnvKey(agent, "CLI")] = v.AgentCLI
+	out := map[string]llmroute.AgentOverride{}
+	for _, agent := range agents {
+		out[agent] = llmroute.AgentOverride{CLI: v.AgentCLI}
 	}
-	return env
+	return out
 }
 
 func (v Variant) LookPath(bin string) (string, error) {

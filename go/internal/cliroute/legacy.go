@@ -2,7 +2,6 @@ package cliroute
 
 import (
 	"slices"
-	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -39,7 +38,7 @@ func (v resolver) legacyDispatch(req Request) (Decision, error) {
 	if err != nil {
 		return Decision{}, err
 	}
-	plan := llmroute.Resolve(req.Agent, req.Phase, req.DefaultModel, req.Env, prof, req.Expand, pin)
+	plan := llmroute.Resolve(req.Agent, req.Phase, req.DefaultModel, req.Env, v.table.overrides.For(req.Agent), prof, req.Expand, pin)
 	plan.Candidates = leadWith(req.CallerCLI, plan.Candidates)
 	var clamped []string
 	if pin == nil && req.Overlay != (llmroute.Overlay{}) {
@@ -100,7 +99,7 @@ func legacyRule(req Request, plan llmroute.Plan, pin *policy.Pin) string {
 		return RuleLegacyPin
 	case req.CallerCLI != "":
 		return ruleLegacyCaller
-	case strings.HasPrefix(plan.PrimarySource, "env("):
+	case llmroute.IsOperatorChoice(plan.PrimarySource):
 		return ruleLegacyEnv
 	case plan.PrimarySource == "default":
 		return ruleLegacyDefault

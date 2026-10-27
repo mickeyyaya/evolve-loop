@@ -99,6 +99,7 @@ func (a *Adapter) productionEngineDeps(env map[string]string) gobridge.Deps {
 		ArtifactTimeoutS:      a.bridgeConfig.ArtifactTimeoutS,
 		ArtifactMaxExtends:    a.bridgeConfig.ArtifactMaxExtends,
 		PhaseArtifactTimeoutS: a.bridgeConfig.PhaseArtifactTimeouts(),
+		MaxConcurrent:         a.bridgeConfig.MaxConcurrent,
 		Efforts:               a.efforts,
 		ScrollbackLines:       a.bridgeConfig.ScrollbackLines,
 		TokenResolver:         tokenusage.Resolver(tokenusage.Roots{Claude: tokenusage.ClaudeConfigRoot(env), Agy: tokenusage.AgyDataRoot(env)}, tokenusage.SQLiteCLI),

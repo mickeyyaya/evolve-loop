@@ -105,9 +105,9 @@ func mustRouter(t *testing.T, table cliroute.Table, host cliroute.Host) *clirout
 	return r
 }
 
-func mustCompile(t *testing.T, p policy.Policy, cat cliroute.Catalog, profs cliroute.ProfileSource) cliroute.Table {
+func mustCompile(t *testing.T, p policy.Policy, cat cliroute.Catalog, profs cliroute.ProfileSource, opts ...cliroute.CompileOption) cliroute.Table {
 	t.Helper()
-	table, findings := cliroute.Compile(p, cat, profs)
+	table, findings := cliroute.Compile(p, cat, profs, opts...)
 	if errs := errorFindings(findings); len(errs) > 0 {
 		t.Fatalf("Compile reported errors: %+v", errs)
 	}
@@ -173,8 +173,8 @@ func walkEveryAttemptWalled(plan llmroute.Plan) []string {
 	}, nil).Attempts
 }
 
-func realBench(root, phase string, plan llmroute.Plan, env map[string]string) llmroute.Plan {
-	return bridgechain.ApplyCLIHealthBench(root, phase, plan, env, cliroutetest.Now, nil)
+func realBench(root, phase string, plan llmroute.Plan) llmroute.Plan {
+	return bridgechain.ApplyCLIHealthBench(root, phase, plan, cliroutetest.Now, nil)
 }
 
 func realCatalog(t *testing.T) phasespec.Catalog {
@@ -192,4 +192,8 @@ func operatorTable() policy.Policy {
 		Default: []string{"agy", "agy-claude", "claude"},
 		Tiers:   map[string]policy.TierRule{"deep": {CLIs: []string{"agy-claude", "claude"}}, "top": {CLIs: []string{"agy-claude", "claude"}}},
 	})
+}
+
+func override(agent string, ov llmroute.AgentOverride) cliroute.CompileOption {
+	return cliroute.WithOverrides(cliroute.Overrides{agent: ov})
 }

@@ -36,7 +36,7 @@ func launchAgyDeepIntoTheWall(t *testing.T, usageScreen string) wallAttempt {
 
 func (a wallAttempt) chainAt(tier string) []string {
 	plan := llmroute.Plan{Candidates: slices.Clone(agyFirstChain), Triggers: llmroute.DefaultTriggers(), Model: tier, Tiers: []string{tier}}
-	return bridgechain.ApplyCLIHealthBench(a.root, "build", plan, map[string]string{}, nil, nil).Candidates
+	return bridgechain.ApplyCLIHealthBench(a.root, "build", plan, nil, nil).Candidates
 }
 
 func TestBridge_Cycle1951AnArgonWallAtDeepBenchesOnlyTheArgonGroupAndKeepsTheBalancedAgySeatFirst(t *testing.T) {

@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"maps"
 	"path/filepath"
 	"time"
 )
@@ -28,6 +29,11 @@ type RouterPolicy struct {
 	ProposeModel string `json:"propose_model,omitempty"`
 	CLI          string `json:"cli,omitempty"`
 	Model        string `json:"model,omitempty"`
+
+	DynamicRouting        string            `json:"dynamic_routing,omitempty"`
+	RoutingMode           string            `json:"routing_mode,omitempty"`
+	ConditionalMandatory  map[string]string `json:"conditional_mandatory,omitempty"`
+	MaxOptionalInsertions *int              `json:"max_optional_insertions,omitempty"`
 }
 
 func (p Policy) RouterConfig() RouterPolicy {
@@ -47,6 +53,10 @@ func (p Policy) RouterConfig() RouterPolicy {
 	c.ProposeModel = p.Router.ProposeModel
 	c.CLI = p.Router.CLI
 	c.Model = p.Router.Model
+	c.DynamicRouting = p.Router.DynamicRouting
+	c.RoutingMode = p.Router.RoutingMode
+	c.ConditionalMandatory = maps.Clone(p.Router.ConditionalMandatory)
+	c.MaxOptionalInsertions = p.Router.MaxOptionalInsertions
 	return c
 }
 
@@ -64,6 +74,8 @@ type GatesPolicy struct {
 	ScanCacheGate          string `json:"scan_cache_gate,omitempty"`
 	ScanCacheMaxMB         int    `json:"scan_cache_max_mb,omitempty"`
 	ScanCacheBudgetSeconds int    `json:"scan_cache_budget_seconds,omitempty"`
+
+	PhaseIO string `json:"phase_io,omitempty"`
 }
 
 type GatesConfig struct {
@@ -79,6 +91,8 @@ type GatesConfig struct {
 
 	ScanCacheMaxMB         int
 	ScanCacheBudgetSeconds int
+
+	PhaseIO string
 }
 
 func (p Policy) GatesConfig() GatesConfig {
@@ -124,6 +138,7 @@ func (p Policy) GatesConfig() GatesConfig {
 		c.RepoContractGate = p.Gates.RepoContractGate
 	}
 	c.applyScanCache(p.Gates)
+	c.PhaseIO = p.Gates.PhaseIO
 	return c
 }
 

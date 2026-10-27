@@ -5,6 +5,8 @@ metadata:
   type: architecture
 ---
 
+> **Amended 2026-10-27 (X18c):** the switch is `workflow.intent_delta` in `.evolve/policy.json`. No code reads `EVOLVE_INTENT_DELTA` now.
+
 > **Incremental intent (v0.1)** — opt-in delta mode (`EVOLVE_INTENT_DELTA=1`). It compares a normalized goal hash against the current batch. The result shows if the intent persona must run in full or is allowed to emit a lightweight patch. Builds on [[intent-phase.md]] without duplicating its core design.
 
 ## TLDR

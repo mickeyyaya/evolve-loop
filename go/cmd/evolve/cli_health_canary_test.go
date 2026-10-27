@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -28,7 +30,7 @@ func TestCanaryRecoveryClearsBench(t *testing.T) {
 	benchExpired(t, root, "codex", 1)
 	var probed []string
 	var out bytes.Buffer
-	runCLIHealthCanary(context.Background(), root, nil, func(driver string) (int, string, string) {
+	runCLIHealthCanary(context.Background(), root, func(driver string) (int, string, string) {
 		probed = append(probed, driver)
 		return 0, "", ""
 	}, &out)
@@ -45,7 +47,7 @@ func TestCanaryStillWalledRebenchesWithStrike(t *testing.T) {
 	root := t.TempDir()
 	benchExpired(t, root, "codex", 1)
 	var out bytes.Buffer
-	runCLIHealthCanary(context.Background(), root, nil, func(driver string) (int, string, string) {
+	runCLIHealthCanary(context.Background(), root, func(driver string) (int, string, string) {
 		return 85, "rate_limit", "no reset hint in this pane"
 	}, &out)
 	benches, _ := clihealth.NewStore(root, nil).Load()
@@ -66,7 +68,7 @@ func TestCanaryWallWithResetHintUsesIt(t *testing.T) {
 	root := t.TempDir()
 	benchExpired(t, root, "codex", 1)
 	var out bytes.Buffer
-	runCLIHealthCanary(context.Background(), root, nil, func(driver string) (int, string, string) {
+	runCLIHealthCanary(context.Background(), root, func(driver string) (int, string, string) {
 		return 85, "rate_limit", "You've hit your usage limit. try again in 3 hours."
 	}, &out)
 	benches, _ := clihealth.NewStore(root, nil).Load()
@@ -81,7 +83,7 @@ func TestCanaryNonWallFailureClears(t *testing.T) {
 	root := t.TempDir()
 	benchExpired(t, root, "codex", 1)
 	var out bytes.Buffer
-	runCLIHealthCanary(context.Background(), root, nil, func(driver string) (int, string, string) {
+	runCLIHealthCanary(context.Background(), root, func(driver string) (int, string, string) {
 		return 80, "", "boot timeout"
 	}, &out)
 	if benches, _ := clihealth.NewStore(root, nil).Load(); len(benches) != 0 {
@@ -92,7 +94,7 @@ func TestCanaryNonWallFailureClears(t *testing.T) {
 	}
 }
 
-func TestCanarySkipsActiveBenchesAndDisabledEnv(t *testing.T) {
+func TestCanarySkipsActiveBenchesAndADisabledPolicy(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	now := time.Now()
@@ -101,16 +103,21 @@ func TestCanarySkipsActiveBenchesAndDisabledEnv(t *testing.T) {
 	})
 	probes := 0
 	var out bytes.Buffer
-	runCLIHealthCanary(context.Background(), root, nil, func(string) (int, string, string) { probes++; return 0, "", "" }, &out)
+	runCLIHealthCanary(context.Background(), root, func(string) (int, string, string) { probes++; return 0, "", "" }, &out)
 	if probes != 0 {
 		t.Errorf("ACTIVE bench was probed (%d probes) — only expired benches get the canary", probes)
 	}
 
 	benchExpired(t, root, "agy", 1)
-	runCLIHealthCanary(context.Background(), root, map[string]string{"EVOLVE_CLI_HEALTH": "0"},
-		func(string) (int, string, string) { probes++; return 0, "", "" }, &out)
+	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".evolve", "policy.json"), []byte(`{"cli_health":{"enabled":false}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runCLIHealthCanary(context.Background(), root, func(string) (int, string, string) { probes++; return 0, "", "" }, &out)
 	if probes != 0 {
-		t.Errorf("EVOLVE_CLI_HEALTH=0 still probed (%d)", probes)
+		t.Errorf("cli_health.enabled false still probed (%d)", probes)
 	}
 }
 
@@ -120,7 +127,7 @@ func TestCanary_AnExpiredAgyClaudeBenchProbesTheAgyClaudeTarget(t *testing.T) {
 	benchExpired(t, root, "agy-claude", 1)
 	var probed []string
 	var out bytes.Buffer
-	runCLIHealthCanary(context.Background(), root, nil, func(driver string) (int, string, string) {
+	runCLIHealthCanary(context.Background(), root, func(driver string) (int, string, string) {
 		probed = append(probed, driver)
 		return 0, "", ""
 	}, &out)
@@ -134,7 +141,7 @@ func TestCanaryAModelMismatchKeepsTheBench(t *testing.T) {
 	root := t.TempDir()
 	benchExpired(t, root, "agy-claude", 1)
 	var out bytes.Buffer
-	runCLIHealthCanary(context.Background(), root, nil, func(driver string) (int, string, string) {
+	runCLIHealthCanary(context.Background(), root, func(driver string) (int, string, string) {
 		return bridge.ExitModelMismatch, "", "Gemini 3.8 Flash · low"
 	}, &out)
 	benches, _ := clihealth.NewStore(root, nil).Load()
@@ -148,7 +155,7 @@ func TestCanaryAWallBesideAModelMismatchRebenchesWithAStrike(t *testing.T) {
 	root := t.TempDir()
 	benchExpired(t, root, "agy-claude", 1)
 	var out bytes.Buffer
-	runCLIHealthCanary(context.Background(), root, nil, func(driver string) (int, string, string) {
+	runCLIHealthCanary(context.Background(), root, func(driver string) (int, string, string) {
 		return bridge.ExitModelMismatch, "rate_limit", "Individual quota reached. Resets in 2h15m."
 	}, &out)
 	benches, _ := clihealth.NewStore(root, nil).Load()

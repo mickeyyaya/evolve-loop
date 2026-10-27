@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridgechain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
-	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 )
 
 func defaultLiveProbe(ctx context.Context, projectRoot string, deps bridge.Deps) liveProbe {
@@ -30,8 +30,8 @@ func liveProbeWith(ctx context.Context, projectRoot, model string, deps bridge.D
 
 type liveProbe func(driver string) (rc int, pattern, scrollback string)
 
-func runCLIHealthCanary(ctx context.Context, projectRoot string, env map[string]string, probe liveProbe, stderr io.Writer) {
-	if !envchain.BoolValue(envchain.Resolve("EVOLVE_CLI_HEALTH", env, "", "1"), true) {
+func runCLIHealthCanary(ctx context.Context, projectRoot string, probe liveProbe, stderr io.Writer) {
+	if !bridgechain.CLIHealthOn(projectRoot) {
 		return
 	}
 	if ctx.Err() != nil {

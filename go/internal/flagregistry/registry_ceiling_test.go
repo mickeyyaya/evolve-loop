@@ -2,7 +2,7 @@ package flagregistry
 
 import "testing"
 
-const FlagCeiling = 26
+const FlagCeiling = 7
 
 func TestRegistry_FlagCeiling(t *testing.T) {
 	if got := len(All); got > FlagCeiling {
@@ -11,7 +11,7 @@ func TestRegistry_FlagCeiling(t *testing.T) {
 	}
 }
 
-const LiveFeatureFlagCeiling = 11
+const LiveFeatureFlagCeiling = 2
 
 func TestRegistry_LiveFeatureFlagCeiling(t *testing.T) {
 	if got := len(LiveFeatureFlags()); got > LiveFeatureFlagCeiling {

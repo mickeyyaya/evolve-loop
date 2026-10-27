@@ -19,7 +19,7 @@ evolve phases validate security-scan # check the spec against the safety floor
 evolve phases list                   # see it in the merged catalog as a 'user' phase
 ```
 
-Your phase runs only under dynamic routing: set `EVOLVE_DYNAMIC_ROUTING=advisory` (or `enforce`).
+Your phase runs only under dynamic routing: set `router.dynamic_routing` in `.evolve/policy.json` to `advisory` (or `enforce`).
 
 ## Naming rule (REQUIRED for new phases)
 
@@ -169,7 +169,7 @@ User phases are **optional-only** and kernel-clamped. Enforced at every gate:
 3. The orchestrator's transition check requires forward progress in the order and rejects non-optional user phases.
 4. `SpineSatisfiedUpTo` independently guards the anchors — `ship` still requires a real audit PASS/WARN bound to the build tree.
 
-A user phase therefore cannot skip `build`/`audit`, cannot reach `ship` illegitimately, and cannot run before its declared position. The static pipeline (`EVOLVE_DYNAMIC_ROUTING=off` — the escape hatch; advisory is the default since 2026-06-06) ignores user phases entirely. Under the advisory default, the advisor can route user phases out of the box.
+A user phase therefore cannot skip `build`/`audit`, cannot reach `ship` illegitimately, and cannot run before its declared position. The static pipeline (`router.dynamic_routing: off` in `.evolve/policy.json` — the escape hatch; advisory is the default since 2026-06-06) ignores user phases entirely. Under the advisory default, the advisor can route user phases out of the box.
 
 ## CLI reference
 

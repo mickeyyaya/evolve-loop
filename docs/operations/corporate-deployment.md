@@ -1,12 +1,12 @@
 # Corporate deployment: one approved fingerprint
 
-This guide is for running evolve-loop inside an organization whose security
-policy approves external executables **by fingerprint** (a SHA256 hash acts as
-the executable's UID; each distinct hash needs its own approval request).
+This guide is for an organization whose security policy approves external
+executables **by fingerprint**. A SHA256 hash acts as the UID of the executable,
+and each distinct hash needs its own approval request.
 
-The goal of the "one-binary" work is that running the `/evo:loop` skill needs
-**exactly one security approval per adopted release** — and, with the
-config-release channel, only one approval per *binary-changing* release.
+The goal of the "one-binary" work: the `/evo:loop` skill needs **exactly one
+security approval per adopted release**. With the config-release channel, it
+needs one approval per *binary-changing* release only.
 
 ## Why this is now tractable
 
@@ -18,8 +18,8 @@ evolve-loop presents a single first-party executable, `evolve`:
   first-party executable. A durable guard (`go/acs/regression/norebuild`)
   fails CI/audit if any new runtime `go build -o <exe>` site is introduced.
 - **No runtime rebuilds in deployed mode.** A target-repo cycle never compiles a
-  first-party executable — the only remaining build site is the operator-invoked
-  `evolve release`, which never fires while running the loop on your code.
+  first-party executable. The only remaining build site is `evolve release`,
+  which the operator starts and which never runs while the loop works on your code.
 - **One macOS fingerprint per version.** Releases publish a universal
   `evolve_darwin_all.tar.gz` (a `lipo`-merged x86_64 + arm64 fat binary), so a
   single hash covers both Intel and Apple Silicon. SHA256s for every published
@@ -52,21 +52,19 @@ compiler and without network** using the installer's air-gap mode:
 sh install.sh --binary ./evolve_darwin_all.tar.gz --checksums ./checksums.txt
 ```
 
-`--binary` verifies the artifact against `checksums.txt` (refusing to install on
-a mismatch), extracts the binary + skill payload into `$HOME/.evolve-loop`, and
-prints the installed binary's SHA256 fingerprint for your records. It never
-downloads or compiles. (A raw `evolve` binary is also accepted instead of the
-`.tar.gz`, but the archive is preferred because it bundles the skill payload and
-is the artifact named in `checksums.txt`.)
+`--binary` verifies the artifact against `checksums.txt` and refuses to install
+on a mismatch. It extracts the binary and the skill payload into
+`$HOME/.evolve-loop`, and prints the SHA256 fingerprint of the binary for your
+records. It never downloads or compiles. A raw `evolve` binary is also accepted.
+The `.tar.gz` is better, because it bundles the skill payload and
+`checksums.txt` names it.
 
 ### Point the loop at the approved binary
 
-The `/evo:loop` skill resolves its binary as `${EVOLVE_GO_BIN:-<discovered
-plugin binary>}` — `EVOLVE_GO_BIN` wins. Export it to a stable, approved path so
-every cycle runs the approved executable regardless of plugin layout:
+The `/evo:loop` skill runs the binary that it finds in the plugin install, at `<plugin_root>/go/bin/evolve`. The release, rollback and consensus tools find `<repo_root>/go/bin/evolve`, then `evolve` on `PATH`. No code reads `EVOLVE_GO_BIN` since X18c. Put the approved executable at `<plugin_root>/go/bin/evolve`:
 
 ```sh
-export EVOLVE_GO_BIN="$HOME/.evolve-loop/evolve"   # add to your shell rc
+install -m 0755 "$HOME/.evolve-loop/evolve" "<plugin_root>/go/bin/evolve"
 ```
 
 ## Approving a new release
@@ -79,7 +77,7 @@ Read the release notes' first line — every release is classified:
 - **binary-release** — the compiled binary changed, so it has a **new
   fingerprint** that needs a fresh approval request. Submit the
   `evolve_darwin_all.tar.gz` SHA256 from that release's `checksums.txt`.
-- **unavailable** — classification could not run (a git error at release time).
+- **unavailable** — classification cannot run (a git error at release time).
   Fail closed: treat it as a binary-release (assume a new fingerprint), and
   verify the artifact against `checksums.txt` before adopting it.
 
@@ -96,14 +94,14 @@ pin management — the fingerprint you approve is the only thing you track.
 
 ## Optional: certificate-based approval (one approval, ever)
 
-If your security system can approve by **signing identity** (a stable Developer
-ID / Team ID) rather than by per-build hash, you can codesign + notarize the
-universal binary with a single Apple Developer ID. Every future release signed
+Some security systems approve by **signing identity** (a stable Developer
+ID / Team ID) and not by per-build hash. With such a system, you can codesign and
+notarize the universal binary with a single Apple Developer ID. Every future release signed
 with the same identity is then trusted without a new request — one approval,
 ever, instead of one per binary-release.
 
-This is an operator decision: it requires an Apple Developer account and a
-signing step in the release pipeline, and it only pays off if your security team
+This is an operator decision. It requires an Apple Developer account and a
+signing step in the release pipeline. It pays off only if your security team
 supports certificate-scoped rules. Confirm that before investing in it.
 
 ## Out of scope
@@ -117,6 +115,6 @@ supports certificate-scoped rules. Confirm that before investing in it.
 
 ## See also
 
-- [runtime-reference.md](runtime-reference.md) — env vars (incl. `EVOLVE_GO_BIN`),
+- [runtime-reference.md](runtime-reference.md) — env vars,
   operator commands, ship classes, the publishing pipeline.
 - `install.sh --help` — the `--binary` / `--checksums` air-gap flags.

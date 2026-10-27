@@ -62,7 +62,7 @@ func runWorktreeCreate(args []string, stdout, stderr io.Writer) int {
 	fs.IntVar(&cycle, "cycle", 0, "cycle number (required unless --dev)")
 	fs.StringVar(&projectRoot, "project-root", ".", "absolute path to project root")
 	fs.StringVar(&base, "base", "", "worktree base dir (default .evolve/worktrees)")
-	fs.StringVar(&lane, "lane", "", "lane override for the worktree name (default: hash of project root, or EVOLVE_LANE)")
+	fs.StringVar(&lane, "lane", "", "lane override for the worktree name (default: hash of project root)")
 	fs.StringVar(&devTask, "dev", "", "create the hub dev worktree <hub>/dev/<task> on --branch at the fetched origin/main")
 	fs.StringVar(&devBranch, "branch", "", "new branch for --dev")
 	if err := fs.Parse(args); err != nil {
@@ -83,7 +83,7 @@ func runWorktreeCreate(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "evolve worktree create: mkdir: %v\n", err)
 		return 1
 	}
-	wt := runscope.New(runscope.ResolveLane(lane, projectRoot, os.Getenv), "", cycle).WorktreeDir(base)
+	wt := runscope.New(runscope.ResolveLane(lane, projectRoot), "", cycle).WorktreeDir(base)
 	_, gitErr, code, err := gitexec.Git{Dir: projectRoot, Exec: worktreeGitRunner}.
 		AddWorktreeWithRetry(context.Background(), worktreeAddRetry, "--detach", wt, "HEAD")
 	if err != nil || code != 0 {
@@ -128,7 +128,7 @@ func runWorktreeCleanup(args []string, stdout, stderr io.Writer) int {
 	fs.StringVar(&projectRoot, "project-root", ".", "absolute path to project root")
 	fs.StringVar(&base, "base", "", "worktree base dir (default .evolve/worktrees)")
 	fs.IntVar(&cycle, "cycle", 0, "cycle number to remove (0 = prune all stale)")
-	fs.StringVar(&lane, "lane", "", "lane override; must match the lane used at create (default: hash of project root, or EVOLVE_LANE)")
+	fs.StringVar(&lane, "lane", "", "lane override; must match the lane used at create (default: hash of project root)")
 	fs.StringVar(&dev.task, "dev", "", "remove the hub dev worktree <hub>/dev/<task> and its branch once its head is merged or every change in it is already in origin/main (a named task skips --all's quiet period)")
 	fs.BoolVar(&dev.all, "all", false, "with a bare --dev: clean up every dev/<task> a proof shows landed and unchanged for gc.worktrees.dev_quiet_minutes (default "+gcpolicy.WorktreesPolicy{}.DevQuietPeriod().String()+"), naming the reason each other one is kept")
 	fs.BoolVar(&dev.dryRun, "dry-run", false, "with --dev: print what would be removed and why each tree is kept; removes nothing and does not fetch")
@@ -163,7 +163,7 @@ func runWorktreeCleanup(args []string, stdout, stderr io.Writer) int {
 }
 
 func removeCycleWorktree(projectRoot, base, lane string, cycle int, stdout, stderr io.Writer) int {
-	wt := runscope.New(runscope.ResolveLane(lane, projectRoot, os.Getenv), "", cycle).WorktreeDir(base)
+	wt := runscope.New(runscope.ResolveLane(lane, projectRoot), "", cycle).WorktreeDir(base)
 	cmd := sysexec.Command(context.Background(), "git", "-C", projectRoot, "worktree", "remove", "--force", wt)
 	var ebuf bytes.Buffer
 	cmd.Stderr = &ebuf

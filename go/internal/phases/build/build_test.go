@@ -188,19 +188,19 @@ func TestRun_NoProfile_EmptyExtraFlags(t *testing.T) {
 	}
 }
 
-func TestRun_NoProfile_EnvAloneStillWires(t *testing.T) {
+func TestRun_NoProfile_TheRequestPermissionModeStillWires(t *testing.T) {
 	body := "# Build Report\n## Files Modified\n- a.go\n"
 	fb := &fakeBridge{writeArtifact: body}
 	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
 	_, err := phase.Run(context.Background(), core.PhaseRequest{
-		Cycle: 1, ProjectRoot: t.TempDir(), Workspace: t.TempDir(),
-		Env: map[string]string{"EVOLVE_BUILDER_PERMISSION_MODE": "plan"},
+		Cycle: 1, ProjectRoot: t.TempDir(), Workspace: t.TempDir(), PermissionMode: "plan",
+		Env: map[string]string{"EVOLVE_BUILDER_PERMISSION_MODE": "acceptEdits"},
 	})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	if fb.gotReq.PermissionMode != "plan" {
-		t.Errorf("env-only permission mode not propagated; got %q", fb.gotReq.PermissionMode)
+		t.Errorf("the request permission mode was not propagated; got %q", fb.gotReq.PermissionMode)
 	}
 }
 

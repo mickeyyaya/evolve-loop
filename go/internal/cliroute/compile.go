@@ -20,12 +20,16 @@ func WithToolCapable(fn func(driver string) bool) CompileOption {
 	return func(c *compiler) { c.toolCapable = fn }
 }
 
+func WithOverrides(o Overrides) CompileOption {
+	return func(c *compiler) { c.overrides = o }
+}
+
 func Compile(p policy.Policy, cat Catalog, profs ProfileSource, opts ...CompileOption) (Table, []Finding) {
 	c := &compiler{pol: p, cat: cat, agentKeys: map[string]string{}}
 	for _, opt := range opts {
 		opt(c)
 	}
-	t := Table{pol: p, catalog: cat, floors: p.Floors()}
+	t := Table{pol: p, catalog: cat, floors: p.Floors(), overrides: c.overrides}
 	t.profiles = c.snapshotProfiles(profs)
 	if p.CLIRouting != nil {
 		c.block = *p.CLIRouting
@@ -40,6 +44,7 @@ type compiler struct {
 	pol         policy.Policy
 	cat         Catalog
 	toolCapable func(string) bool
+	overrides   Overrides
 	names       []string
 	agentKeys   map[string]string
 	findings    []Finding

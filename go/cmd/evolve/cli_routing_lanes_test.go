@@ -138,7 +138,7 @@ func TestRunPreWaveProbes_TheWaveBoundaryRecordsTheLaneTimeOnce(t *testing.T) {
 	t.Parallel()
 	dir := laneFixtureEvolveDir(t)
 	var log bytes.Buffer
-	if err := runPreWaveProbes(context.Background(), t.TempDir(), dir, map[string]string{"EVOLVE_CLI_HEALTH": "0"}, &log); err != nil {
+	if err := runPreWaveProbes(context.Background(), t.TempDir(), dir, &log); err != nil {
 		t.Fatalf("runPreWaveProbes: %v", err)
 	}
 	lanes, err := loadLaneTimes(dir)

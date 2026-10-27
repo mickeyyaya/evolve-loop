@@ -433,6 +433,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	}
 	signals, closeSignals := newRoleSignalCenter(run.centerRole(), projectRoot, evolveDir, console)
 	watchOptimisticAdmission(signals, os.Getenv)
+	warnRetiredControls(console, os.Environ())
 	st := storage.New(evolveDir)
 	ld := ledger.New(evolveDir, ledger.WithSignals(signals))
 
@@ -450,11 +451,10 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 		fmt.Fprintf(console, "[policy] WARN %v (mandatory merge skipped; the routing table refuses it before any dispatch)\n", policyErr)
 		pol = policy.Policy{}
 	} else {
-		cfg.Mandatory = pol.MergeMandatory(cfg.Mandatory)
+		cfg = router.ApplyPolicy(loader, cfg, pol)
 		if floor, overridden := pol.FloorPhases(); overridden {
 			policyShipFloor = floor
 		}
-		cfg.AuditFailRoutesTo = router.FailureRouteFromPolicy(pol)
 	}
 	swCfg := swarmrunner.Config{Stage: pol.SwarmConfig().Stage, PortBase: pol.SwarmConfig().PortBase, WorktreeBase: pol.WorktreeBase()}
 	gatesCfg := pol.GatesConfig()
@@ -483,7 +483,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	forbidden := laneForbiddenTo(projectRoot, signals.Emit)
 
 	runners := map[core.Phase]core.PhaseRunner{
-		core.PhaseIntent:       intent.New(intent.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, CompactPrompts: cfg.CompactPrompts}),
+		core.PhaseIntent:       intent.New(intent.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, CompactPrompts: cfg.CompactPrompts, DeltaMode: wfCfg.IntentDelta}),
 		core.PhaseScout:        swarmrunner.New(scout.New(scout.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), walked, swarm.ModeReader, swCfg),
 		core.PhaseTriage:       triage.New(triage.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts, LaneForbidden: forbidden}),
 		core.PhaseTDD:          tdd.New(tdd.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, CompactPrompts: cfg.CompactPrompts}),
@@ -528,7 +528,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 			RegistryPath: mintregistry.Path(projectRoot),
 		}}),
 	}
-	opts = append(opts, phaseObserverOptions(pol.ObserverConfig(), cfg.PhaseRecovery.String(), observerDeps{signals: signals, usage: explainUsage})...)
+	opts = append(opts, phaseObserverOptions(pol.ObserverConfig(), cfg.PhaseRecovery.String(), observerDeps{signals: signals, usage: explainUsage, overrides: run.overrides})...)
 	var reviewers []core.DeliverableReviewer
 	if floor := composedBuildHandoffFloor(pol.WorkflowConfig(), cfg); len(floor) > 0 {
 		reviewers = append(reviewers, floor)

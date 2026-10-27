@@ -90,8 +90,8 @@ func routingHost(logw io.Writer, now func() time.Time) cliroute.Host {
 	logf := func(format string, args ...any) { fmt.Fprintf(logw, format, args...) }
 	return cliroute.Host{
 		Discover: memoized(discoveredTail),
-		Bench: func(projectRoot, label string, plan llmroute.Plan, env map[string]string) llmroute.Plan {
-			return bridgechain.ApplyCLIHealthBench(projectRoot, label, plan, env, now, func(format string, args ...any) {
+		Bench: func(projectRoot, label string, plan llmroute.Plan) llmroute.Plan {
+			return bridgechain.ApplyCLIHealthBench(projectRoot, label, plan, now, func(format string, args ...any) {
 				logf("[cliroute] "+format, args...)
 			})
 		},

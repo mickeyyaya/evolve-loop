@@ -5,7 +5,6 @@ import (
 	"hash/fnv"
 	"math"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
@@ -64,7 +63,7 @@ func shareTier(v resolver, res resolution) (resolution, error) {
 
 func sharePin(res resolution, family string) string {
 	switch {
-	case strings.HasPrefix(res.plan.PrimarySource, "env("):
+	case llmroute.IsOperatorChoice(res.plan.PrimarySource):
 		return res.plan.PrimarySource
 	case res.pinsFamily(res.req.CallerCLI, family):
 		return "the caller cli " + res.req.CallerCLI

@@ -16,12 +16,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-func syntheticRouter(t *testing.T, block policy.CLIRouting, host cliroute.Host) *cliroute.Router {
+func syntheticRouter(t *testing.T, block policy.CLIRouting, host cliroute.Host, opts ...cliroute.CompileOption) *cliroute.Router {
 	t.Helper()
 	if host.LookPath == nil {
 		host.LookPath = everyBinary()
 	}
-	return mustRouter(t, mustCompile(t, routingPolicy(block), syntheticCatalog(), syntheticProfiles(t)), host)
+	return mustRouter(t, mustCompile(t, routingPolicy(block), syntheticCatalog(), syntheticProfiles(t), opts...), host)
 }
 
 func mustResolve(t *testing.T, r *cliroute.Router, req cliroute.Request) cliroute.Decision {
@@ -160,7 +160,7 @@ func TestResolve_AfterChainStopEndsTheWalk(t *testing.T) {
 }
 
 func TestResolve_AnAssignmentKeepsTheProbeAndTheBench(t *testing.T) {
-	benched := func(_, _ string, p llmroute.Plan, _ map[string]string) llmroute.Plan {
+	benched := func(_, _ string, p llmroute.Plan) llmroute.Plan {
 		return llmroute.ApplyBench(p, map[string]time.Time{"agy": time.Unix(0, 0)})
 	}
 	block := policy.CLIRouting{CLIs: agyClaude, Default: agyClaude}
@@ -194,9 +194,16 @@ func TestResolve_AnAgentModelOutranksTheAdvisorTier(t *testing.T) {
 	if d.Plan.Model != "fast" || d.Plan.Tiers[0] != "fast" {
 		t.Fatalf("agents.scout.model fixes the tier: model=%s tiers=%v", d.Plan.Model, d.Plan.Tiers)
 	}
-	d = mustResolve(t, r, cliroute.Request{Agent: "scout", Phase: "scout", Env: map[string]string{"EVOLVE_SCOUT_MODEL": "top"}})
+	if d := mustResolve(t, r, cliroute.Request{Agent: "scout", Phase: "scout", Env: map[string]string{"EVOLVE_SCOUT_MODEL": "top"}}); d.Plan.Model != "fast" {
+		t.Fatalf("the per-agent model env is not read: %s", d.Plan.Model)
+	}
+	r = syntheticRouter(t, policy.CLIRouting{
+		CLIs: agyClaude, Default: agyClaude,
+		Agents: map[string]policy.AgentRule{"scout": {CLI: []string{"agy"}, Model: "fast"}},
+	}, cliroute.Host{}, override("scout", llmroute.AgentOverride{Model: "top"}))
+	d = mustResolve(t, r, cliroute.Request{Agent: "scout", Phase: "scout"})
 	if d.Plan.Model != "top" {
-		t.Fatalf("a per-run model env stays a per-run override: %s", d.Plan.Model)
+		t.Fatalf("a --model override stays a per-run override: %s", d.Plan.Model)
 	}
 }
 
@@ -213,23 +220,27 @@ func TestResolve_TheAdvisorCLIAppliesUnderTheProfileRuleWithinTheAllowedSet(t *t
 }
 
 func TestResolve_EnvOverrideOutsideAllowedFails(t *testing.T) {
-	r := syntheticRouter(t, policy.CLIRouting{CLIs: agyClaude, Default: agyClaude}, cliroute.Host{})
+	block := policy.CLIRouting{CLIs: agyClaude, Default: agyClaude}
 	cases := []struct {
-		agent, phase, key, value string
+		agent, phase, source string
+		env                  map[string]string
+		ov                   llmroute.AgentOverride
 	}{
-		{"auditor", "audit", "EVOLVE_AUDITOR_CLI", "agy-tmux"},
-		{"scout", "scout", "EVOLVE_CLI", "codex-tmux"},
-		{"scout", "scout", "EVOLVE_SCOUT_CLI", "codex"},
+		{"auditor", "audit", "--cli auditor", nil, llmroute.AgentOverride{CLI: "agy-tmux"}},
+		{"scout", "scout", "EVOLVE_CLI", map[string]string{"EVOLVE_CLI": "codex-tmux"}, llmroute.AgentOverride{}},
+		{"scout", "scout", "--cli scout", nil, llmroute.AgentOverride{CLI: "codex"}},
 	}
 	for _, tc := range cases {
-		_, err := r.Resolve(cliroute.Request{Agent: tc.agent, Phase: tc.phase, Env: map[string]string{tc.key: tc.value}})
-		if err == nil || !strings.Contains(err.Error(), tc.key) || !strings.Contains(err.Error(), "allowed") {
-			t.Errorf("%s=%s for %s: err = %v, want a refusal naming the key", tc.key, tc.value, tc.agent, err)
+		r := syntheticRouter(t, block, cliroute.Host{}, override(tc.agent, tc.ov))
+		_, err := r.Resolve(cliroute.Request{Agent: tc.agent, Phase: tc.phase, Env: tc.env})
+		if err == nil || !strings.Contains(err.Error(), tc.source) || !strings.Contains(err.Error(), "allowed") {
+			t.Errorf("%s for %s: err = %v, want a refusal naming the source", tc.source, tc.agent, err)
 		}
 	}
-	d := mustResolve(t, r, cliroute.Request{Agent: "scout", Phase: "scout", Env: map[string]string{"EVOLVE_SCOUT_CLI": "claude-p"}})
-	if d.Plan.Candidates[0] != "claude-p" || d.Plan.PrimarySource != "env(EVOLVE_SCOUT_CLI)" {
-		t.Fatalf("an allowed env primary leads the chain: %v from %s", d.Plan.Candidates, d.Plan.PrimarySource)
+	r := syntheticRouter(t, block, cliroute.Host{}, override("scout", llmroute.AgentOverride{CLI: "claude-p"}))
+	d := mustResolve(t, r, cliroute.Request{Agent: "scout", Phase: "scout", Env: map[string]string{"EVOLVE_SCOUT_CLI": "agy-tmux"}})
+	if d.Plan.Candidates[0] != "claude-p" || d.Plan.PrimarySource != "--cli scout" {
+		t.Fatalf("an allowed --cli primary leads the chain: %v from %s", d.Plan.Candidates, d.Plan.PrimarySource)
 	}
 }
 
@@ -249,13 +260,14 @@ func TestResolve_ACallerCLIAppliesOnlyWhenNoTableRuleCoversTheAgent(t *testing.T
 }
 
 func TestResolve_APerRunTierTheCeilingEmptiesIsATypedCeilingError(t *testing.T) {
-	r := syntheticRouter(t, policy.CLIRouting{
+	block := policy.CLIRouting{
 		CLIs: agyClaude, Default: agyClaude, AfterChain: "stop",
 		Agents: map[string]policy.AgentRule{"memo": {CLI: []string{"agy"}}},
 		Tiers:  map[string]policy.TierRule{"deep": {CLIs: []string{"claude"}}, "balanced": {CLIs: []string{"claude"}}},
-	}, cliroute.Host{})
-	mustResolve(t, r, cliroute.Request{Agent: "memo", Phase: "memo"})
-	_, err := r.Resolve(cliroute.Request{Agent: "memo", Phase: "memo", Env: map[string]string{"EVOLVE_MEMO_MODEL": "deep"}})
+	}
+	mustResolve(t, syntheticRouter(t, block, cliroute.Host{}), cliroute.Request{Agent: "memo", Phase: "memo"})
+	r := syntheticRouter(t, block, cliroute.Host{}, override("memo", llmroute.AgentOverride{Model: "deep"}))
+	_, err := r.Resolve(cliroute.Request{Agent: "memo", Phase: "memo"})
 	var ceilingErr *cliroute.CeilingError
 	if !errors.As(err, &ceilingErr) || !strings.Contains(err.Error(), "tier ceiling") {
 		t.Fatalf("an agy-only chain run at claude-only tiers has nothing to launch: %v", err)
@@ -379,6 +391,28 @@ func TestCeilingError_NamesTheRuleTheTiersTheChainAndTheCeiling(t *testing.T) {
 	for _, want := range []string{"rule default", "tier ceiling", "[agy-tmux]", "[deep]", "deep:[claude]"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("%q lacks %q", err.Error(), want)
+		}
+	}
+}
+
+func TestOverrides_ForMatchesTheAgentAcrossCaseAndTheDashSpelling(t *testing.T) {
+	o := cliroute.Overrides{"TDD_ENGINEER": {CLI: "agy-tmux"}, "auditor": {Model: "deep"}}
+	if got := o.For("tdd-engineer"); got.CLI != "agy-tmux" {
+		t.Errorf("For(tdd-engineer) = %+v, want the TDD_ENGINEER override", got)
+	}
+	if got := o.For("Auditor"); got.Model != "deep" {
+		t.Errorf("For(Auditor) = %+v, want the auditor override", got)
+	}
+	if got := o.For("scout"); got != (llmroute.AgentOverride{}) {
+		t.Errorf("For(scout) = %+v, want no override", got)
+	}
+}
+
+func TestOverrides_ForPicksTheSortedFirstOfTwoSpellingsOfOneAgent(t *testing.T) {
+	o := cliroute.Overrides{"tdd_engineer": {CLI: "claude-tmux"}, "tdd-engineer": {CLI: "agy-tmux"}}
+	for i := 0; i < 20; i++ {
+		if got := o.For("TDD-ENGINEER"); got.CLI != "agy-tmux" {
+			t.Fatalf("For = %+v, want the sorted-first key tdd-engineer every time", got)
 		}
 	}
 }

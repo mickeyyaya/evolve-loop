@@ -105,9 +105,7 @@ func TestDefaultShip_RunsTheReleaseShipAndReturnsTheNewHead(t *testing.T) {
 	record := filepath.Join(t.TempDir(), "ship")
 	script := `printf '%s\n' "$@" "notes=$EVOLVE_SHIP_RELEASE_NOTES" "confirm=$EVOLVE_SHIP_AUTO_CONFIRM" > '` + record + `'
 git -C '` + repo.Dir + `' commit -q --allow-empty -m shipped`
-	bin := filepath.Join(t.TempDir(), "evolve")
-	fakeclitest.Install(t, bin, "#!/bin/sh\n"+script+"\n")
-	t.Setenv("EVOLVE_GO_BIN", bin)
+	installRepoEvolve(t, repo.Dir, "#!/bin/sh\n"+script+"\n")
 
 	head, err := defaultShip(repo.Dir, "release: v1.2.3", "line one\nline two")
 
@@ -123,9 +121,7 @@ git -C '` + repo.Dir + `' commit -q --allow-empty -m shipped`
 func TestDefaultShip_FailuresAreReturnedWithoutAHead(t *testing.T) {
 	t.Run("ship fails", func(t *testing.T) {
 		repo := gittest.Fixture(t)
-		bin := filepath.Join(t.TempDir(), "evolve")
-		fakeclitest.Install(t, bin, "#!/bin/sh\necho 'gate refused'\nexit 3\n")
-		t.Setenv("EVOLVE_GO_BIN", bin)
+		installRepoEvolve(t, repo.Dir, "#!/bin/sh\necho 'gate refused'\nexit 3\n")
 
 		head, err := defaultShip(repo.Dir, "msg", "")
 
@@ -136,9 +132,7 @@ func TestDefaultShip_FailuresAreReturnedWithoutAHead(t *testing.T) {
 	t.Run("head unreadable after ship", func(t *testing.T) {
 		root := t.TempDir()
 		t.Setenv("GIT_CEILING_DIRECTORIES", filepath.Dir(root))
-		bin := filepath.Join(t.TempDir(), "evolve")
-		fakeclitest.Install(t, bin, "#!/bin/sh\nexit 0\n")
-		t.Setenv("EVOLVE_GO_BIN", bin)
+		installRepoEvolve(t, root, "#!/bin/sh\nexit 0\n")
 
 		head, err := defaultShip(root, "msg", "")
 
@@ -161,4 +155,13 @@ func TestDefaultReleaseVerify_ACommitWithoutTheBinaryIsTheV1850Defect(t *testing
 	if err == nil || !strings.Contains(err.Error(), "go/evolve not committed in release "+untracked+" (the v18.5.0 defect)") || !errors.As(err, &exitErr) {
 		t.Fatalf("defaultReleaseVerify = %v, want the not-committed error wrapping git's exit", err)
 	}
+}
+
+func installRepoEvolve(t *testing.T, root, script string) {
+	t.Helper()
+	bin := filepath.Join(root, "go", "bin", "evolve")
+	if err := os.MkdirAll(filepath.Dir(bin), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	fakeclitest.Install(t, bin, script)
 }
