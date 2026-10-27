@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/retryladder"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -25,8 +26,10 @@ type RungInput struct {
 }
 
 type RungResult struct {
-	Handled bool
-	Reason  string
+	Handled  bool
+	Escalate bool
+	Stop     bool
+	Reason   string
 }
 
 type RungHandler interface {
@@ -60,17 +63,18 @@ func (cr *cycleRun) recordAuditFix(phase Phase, fb *phasecontract.FailureBlock) 
 	})
 	mark := auditFixDecline
 	switch {
-	case choice.Choose && cfg.Enforced():
+	case choice.Choose && cfg.AuditFix.Enforced():
 		mark = auditFixChosen
-	case choice.Choose:
+	case choice.Choose && cfg.AuditFix.Stage == policy.RetryLadderShadow:
 		mark = auditFixWould
 	}
+	_, registered := cr.o.rungHandler(retryladder.RungAuditFix)
 	handler := "absent"
-	if _, ok := cr.o.rungHandler(retryladder.RungAuditFix); ok {
+	if registered {
 		handler = "registered"
 	}
 	fields := map[string]string{
-		"stage": cfg.Stage, "audit_fix": mark, "audit_fix_rule": choice.Rule, "audit_fix_handler": handler,
+		"stage": cfg.AuditFix.Stage, "audit_fix": mark, "audit_fix_rule": choice.Rule, "audit_fix_handler": handler,
 		"audit_fix_findings": strconv.Itoa(choice.Input.Findings), "audit_fix_prescriptions": strconv.Itoa(choice.Input.Prescriptions),
 		"audit_fix_files": strconv.Itoa(estimate.Files), "audit_fix_lines": strconv.Itoa(estimate.Lines),
 		"audit_fix_code_lines": strconv.Itoa(estimate.CodeLines), "audit_fix_tokens": strconv.Itoa(estimate.Tokens),
@@ -78,9 +82,9 @@ func (cr *cycleRun) recordAuditFix(phase Phase, fb *phasecontract.FailureBlock) 
 	cr.o.signals.Emit(signalcenter.Event{
 		Cycle: cr.cs.CycleID, RunID: cr.o.signalRunID(), Phase: string(phase), Module: signalcenter.ModuleLadder, Origin: originAuditRepair,
 		Kind: signalcenter.KindLadderDecision, Severity: signalcenter.SeverityInfo, Code: CodeLadderAuditFix, Fields: fields,
-		Reason: "retry ladder (" + cfg.Stage + ") audit_fix " + mark + " by rule " + choice.Rule,
+		Reason: "retry ladder audit_fix (" + cfg.AuditFix.Stage + ") " + mark + " by rule " + choice.Rule,
 	})
-	if mark == auditFixDecline {
+	if mark == auditFixDecline || (mark == auditFixChosen && !registered) {
 		return ""
 	}
 	return mark

@@ -231,6 +231,7 @@ The block sets the stage of the retry ladder and the size of the digest of a rai
 |---|---|---|
 | `stage` | `shadow`: each retry path asks the decider, records `LADDER_DECISION` and dispatches as before. `enforce`: the choice of the decider runs. The checked-in policy sets `shadow`. | `shadow` |
 | `digest_tokens` | the token budget of the digest of a raised try, from 64 to 16000. 0 means the default. | 2000 |
+| `audit_fix.stage` | the stage of the `audit_fix` rung, apart from `stage`. `off` declines the rung. `shadow` records the choice, and the handler writes its record and changes no file. `enforce` runs the handler. Another word fails the load. | `shadow` |
 | `audit_fix.max_files` | the most files that an `audit_fix` estimate can touch, from 0 to 50. 0 means the default. | 3 |
 | `audit_fix.max_lines` | the most estimated lines of an `audit_fix`, from 0 to 2000. 0 means the default. | 40 |
 | `audit_fix.max_code_lines` | the most estimated lines of production code, from 0 to 2000. It applies when `no_new_production_logic` is true. | 10 |
