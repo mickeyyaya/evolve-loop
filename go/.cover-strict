@@ -101,6 +101,7 @@
 ./internal/inputindex 100
 ./internal/cli/contextcmd 100
 ./internal/guidance 100
+./internal/auditfix 100
 ./internal/heldproposal 100
 ./internal/launchrecord 100
 ./internal/integration 100

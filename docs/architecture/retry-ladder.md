@@ -124,7 +124,7 @@ The stage key `workflow.retry_ladder.stage` selects the effect:
 - The cycle state keeps the rung in `ladder` (`cyclestate.LadderState`). At `shadow`, that rung is the rung that the ladder chose but did not apply. At `enforce`, each later dispatch of a climbing seat in the cycle keeps the rung (D10).
 - A stop at `enforce` ends the correction loop. The handoff then takes the rejection exit of today. A stop in a repair round keeps the current rung for that round.
 
-### The audit_fix rung (decision only)
+### The audit_fix rung
 
 The operator decided on 2026-10-27: "make sure audit will involve fix and trigger another review for its changes; balance cost and output". Cycle 2035 spent about 100 LLM minutes and 67 M cache-read tokens on a fix that the audit had already prescribed exactly. The four agy builds used 65 minutes and 50.6 M of those tokens. The fix was about 20 lines of a test helper and 2 goldens.
 
@@ -135,14 +135,28 @@ The operator decided on 2026-10-27: "make sure audit will involve fix and trigge
 | 1 | the cycle already chose `audit_fix` | `used_this_cycle`: no `audit_fix` |
 | 2 | the failure block has no defect | `no_findings`: no `audit_fix` |
 | 3 | a defect has no concrete prescription | `unprescribed`: no `audit_fix` |
-| 4 | the estimate is above `max_files`, `max_lines`, `max_code_lines` (with `no_new_production_logic`) or `max_tokens` | the name of that limit: no `audit_fix` |
-| 5 | none of the above | `small_prescribed`: `audit_fix` |
+| 4 | a defect cites no file path | `uncited`: no `audit_fix` |
+| 5 | the estimate is above `max_files`, `max_lines`, `max_code_lines` (with `no_new_production_logic`) or `max_tokens` | the name of that limit: no `audit_fix` |
+| 6 | none of the above | `small_prescribed`: `audit_fix` |
 
 - Every defect has a prescription when the failure block has at least as many non-blank `prescription` entries as `defects`.
 - `retryladder.EstimateAuditFix` reads the file paths that the defects and the prescriptions cite. A cited span `file:a-b` counts its lines, `file:a` counts 1 line, and a path without a span counts 10 lines. The lines of a non-test `.go` file are production code. The token estimate is 12 tokens for each line. These numbers are an estimate, and the shadow wave measures them.
-- The repair round records one `LADDER_AUDIT_FIX` signal with the rule and its data. `audit_fix` is `would` at `shadow`, `chosen` at `enforce` and `decline` otherwise. The cycle state keeps the choice in `ladder.audit_fix`, so a cycle chooses it at most once.
-- This change builds the decision only. A later builder builds the execution: the auditor applies the patch, then a fresh seat reviews the fix and runs the gates again.
+- A defect that cites no file estimates 0 lines, so it passed each limit before rule 4. Rule 4 declines it (review note of #1173).
+- The rung reads its own stage, `workflow.retry_ladder.audit_fix.stage`. It can run at `enforce` while `workflow.retry_ladder.stage` stays at `shadow` (ADR-0158).
+- The repair round records one `LADDER_AUDIT_FIX` signal with the rule and its data. `audit_fix` is `would` at `shadow`, `chosen` at `enforce` and `decline` at `off` or when a rule declines.
+- The cycle state keeps the choice in `ladder.audit_fix`, so a cycle chooses it at most once. A `chosen` mark with no registered handler does not use this allowance, because nothing ran (review note of #1173).
 - The execution plugs in through `core.RungHandler` and `core.WithRungHandler(retryladder.RungAuditFix, h)`. The signal names the handler as `registered` or `absent`. Until a handler runs, the repair round keeps the rungs of this section.
+
+The handler is `internal/auditfix` ([package note](packages/internal-auditfix.md)). It uses two seats (ADR-0158 decisions 8 to 13):
+
+1. The auditor applies the patch in its loaded session, inside the cycle worktree. The patch changes only the cited files, inside the `audit_fix` bounds.
+2. A fresh seat reviews only the patch and the prescriptions. Its session is never the session of the auditor. The routing picks another family when the chain has one, and a lower tier is allowed.
+3. The handoff floor, cover-changed and ACS run again on the patched tree. The original audit verdict stays the verdict for the rest of the diff.
+4. A pass lets the cycle go on to ship. A refused patch, a failed review or a red gate restores the tree. Then one escalation runs: a raised build with the L6 digest. A second failure stops the cycle with `audit_fix_exhausted`.
+5. A patch on a fence path joins the held proposal at `held_proposals` `enforce` (ADR-0157). At another stage, the handler refuses it.
+6. The handler writes `audit-fix.json` in the run directory. It has the patch, each finding id with its prescription, and the reason for each change.
+
+No production code registers the handler yet. The inbox item `wire-cost-aware-repair-call-sites` wires it, because the call sites are on the fence.
 
 ### Limits of the L5 wiring
 
@@ -175,7 +189,7 @@ Each phase dispatch is a new bridge launch with an ephemeral session, because no
 
 The tier step uses routing data only. `ladderRoute` (`core/retry_ladder.go:100`) reads the chain and the tier ceilings of the routing decision of the phase. It never names a family. The router then picks the first healthy family of the chain at the ladder tier. It clamps the tier and the effort to `max_tier` and `max_effort`.
 
-The auditor seat stays a judge. `retryladder.Climbs` is false for the auditor, the adversarial review, the code reviewer and the spec verifiers, so the decider does not run for them. A repair round goes back to tdd or build. The seat of the auditor never does the fix, and the auditor judges the fixed result.
+The auditor seat does not climb. `retryladder.Climbs` is false for the auditor, the adversarial review, the code reviewer and the spec verifiers, so the decider does not run for them. A repair round goes back to tdd or build. In an `audit_fix` round, the auditor applies the patch and a fresh seat judges it: the two-seat rule of ADR-0158. The auditor never approves its own patch.
 
 ### The failure record of an item
 
@@ -235,13 +249,14 @@ L0 writes these fields, and `retryladder.Try.Mark` fills them from `BridgeReques
 "workflow": {
   "retry_ladder": {
     "stage": "shadow", "digest_tokens": 2000,
-    "audit_fix": {"max_files": 3, "max_lines": 40, "max_code_lines": 10, "max_tokens": 6000, "no_new_production_logic": true}
+    "audit_fix": {"stage": "shadow", "max_files": 3, "max_lines": 40, "max_code_lines": 10, "max_tokens": 6000, "no_new_production_logic": true}
   }
 }
 ```
 
 - `workflow.retry_ladder.stage` is `shadow` or `enforce`. An absent key means `shadow`. Another word fails the load of the policy. The checked-in policy sets `shadow`, so one wave records the decisions before L8 moves the stage.
 - `workflow.retry_ladder.digest_tokens` is the token budget of the digest of a raised try, from 64 to 16000. An absent key or 0 means 2000.
+- `workflow.retry_ladder.audit_fix.stage` is `off`, `shadow` or `enforce`. An absent key means `shadow`. Another word fails the load of the policy.
 - `workflow.retry_ladder.audit_fix` gives the size limits of the `audit_fix` rule. Each number is from 0 to its cap (50 files, 2000 lines, 2000 code lines, 64000 tokens), and 0 means the default. `no_new_production_logic` applies `max_code_lines`. Its default is true.
 
 - `model` is the base rung. Without `max_tier`, the ladder stops at `deep`. Without `max_effort`, it stops at `high`.

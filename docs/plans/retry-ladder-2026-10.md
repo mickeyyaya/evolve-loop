@@ -132,7 +132,7 @@ L1, L2 and L7 can run in lanes, because the new package is not protected. L0 com
 |---|---|---|
 | L5 | built. The correction loop, the resumed correction and the audit repair round ask one decider. Gate remediation keeps its rung, and the next-item rule stores the first rung. The checked-in policy sets `workflow.retry_ladder.stage` to `shadow`. | `go/internal/core/retry_ladder.go`, [design §5](../architecture/retry-ladder.md#5-where-the-ladder-runs) |
 | L6 | built. A raised try at `enforce` has `context` `fresh` and a digest inside `workflow.retry_ladder.digest_tokens`. The tier step comes from the routing data of the phase. | `go/internal/retryladder/digest.go`, [design §5](../architecture/retry-ladder.md#the-fresh-session-and-the-digest-l6) |
-| `audit_fix` | the decision is built (D16). The execution is open: the auditor applies the patch, and a fresh seat reviews the fix. | `go/internal/retryladder/audit_fix.go`, [design §5](../architecture/retry-ladder.md#the-audit_fix-rung-decision-only) |
+| `audit_fix` | the decision is built (D16). The handler is built in `internal/auditfix`: the auditor applies the patch, and a fresh seat reviews the fix. The wiring is open. | `go/internal/retryladder/audit_fix.go`, `go/internal/auditfix/auditfix.go`, [design §5](../architecture/retry-ladder.md#the-audit_fix-rung) |
 | L8 | open. The operator moves the stage to `enforce` after one wave of `LADDER_DECISION` data. | the inbox item of L8 |
 
 The operator decided on 2026-10-27: "1 correction, then escalate" (D15). The console sets `fleet.contract_correction_retries` to 1 in a separate policy change.
