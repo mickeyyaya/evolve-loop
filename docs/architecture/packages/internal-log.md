@@ -21,6 +21,9 @@
 - **`Console` covers prose only.** The structured emitters are unchanged. The zero value is safe, because a nil sink is a no-op. Tests inject `*strings.Builder` sinks.
 - **One bound serves both field renderers.** `boundedUTF8` repairs invalid bytes to the replacement rune. It caps the text at `maxDiagnosticRunes` runes with a trailing ellipsis.
 - **The two renderers differ only in the output form.** `DiagnosticField` quotes the result to ASCII. `SanitizeField` keeps one line without quotes. It serves values inside a JSON string or a single-line record, such as the event fields and reasons of the Signal Center (ADR-0101). The renderers never disagree on the length of a field. `sanitize_test.go` pins this.
+- **`NewSelectionLogger` is the one writer factory.** It builds a JSON handler and a text handler from `Sinks`. Both get the same record. `WithSelection` puts a `Selection` into the context.
+- **The factory adds the selection keys.** The logger adds the non-zero keys `run`, `cycle`, `phase`, `dispatch`, `cat`, `component` and `code`. The handlers write `ts` in place of the slog key `time`, and `level` always. A record attribute with a selection key wins.
+- **`Sinks.Render` swaps the text handler for a line writer.** A moved loop-log writer keeps its text (`signalcenter.StderrSink`).
 
 ## Invariants
 
