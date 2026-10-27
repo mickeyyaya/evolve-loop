@@ -29,7 +29,8 @@
     "Write(.evolve/runs/cycle-*/workers/*)",
     "Edit(.evolve/runs/cycle-*/plan-review.md)",
     "Edit(.evolve/runs/cycle-*/handoff-plan-reviewer.json)",
-    "Edit(.evolve/runs/cycle-*/workers/*)"
+    "Edit(.evolve/runs/cycle-*/workers/*)",
+    "Write(.evolve/ephemeral/agent-runs/*/plan-review-report.md)"
   ],
   "disallowed_tools": [
     "Bash(git commit:*)",

@@ -140,6 +140,12 @@ flowchart LR
 - A built-in phase is refused (exit 3) with a pointer to `evolve phase --cycle N`, because each built-in phase reads or writes cycle state.
 - A source-write spec phase (`bug-reproduction`, `test-amplification`) is refused (exit 3). The one exception is a profile that §8 admits as a build seat.
 - The JSON list marks a build seat with `writes_source: true`.
+- Each runnable profile grants the `Write` tool on its report in the run workspace. The grant is data in the profile:
+  - `allowed_tools` has the rule `Write(.evolve/ephemeral/agent-runs/*/<report>)`, and `*` is the run label;
+  - no rule in `disallowed_tools` covers that path, and `Edit` stays in `disallowed_tools` of each review seat;
+  - the sandbox stays `read_only_repo`, and the launch record still binds the review to an unchanged tree (§7).
+- Before this grant, the five review seats denied `Write`. Then a run passed only when the model wrote its report through `Bash`. One run stopped at the denial and ended with exit 81 after 900 s (2026-10-27, `agent-code-simplifier-20261027T112246Z-7922`).
+- `TestEveryAgentRunProfileGrantsWriteOnItsDeliverable` (`go/internal/cli/agentcmd`) checks each profile that `evolve agent list` names. The test fails when no rule grants `Write` on the report path, or when a rule denies it.
 
 ## 7. The launch record and the signals
 

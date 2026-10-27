@@ -15,11 +15,11 @@
     "Read",
     "Grep",
     "Glob",
-    "Bash"
+    "Bash",
+    "Write(.evolve/ephemeral/agent-runs/*/diff-architecture-reviewer-report.md)"
   ],
   "disallowed_tools": [
-    "Edit",
-    "Write"
+    "Edit"
   ],
   "max_budget_usd": 2.0,
   "max_turns": 30,
