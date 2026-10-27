@@ -115,6 +115,7 @@ var treeReadingSelections = []TestSelection{
 		"TestRootSignalCenter_NoRootDropsItsCloserAndEveryDepsLiteralCarriesIt",
 		"TestRoutingConfigLoader_ConstructionSitesArePinned",
 		"TestRunLoopChain_SetsBoundaryRefreshOnReExecStop",
+		"TestRunPreWaveProbes_AFakeProbeThatReadsAgyExhaustedBenchesAgyBeforeTheWaveAdmitsALane",
 		"TestRunPreWaveProbes_TheWaveBoundaryRecordsTheLaneTimeOnce",
 		"TestUnobservedLedgerRootsArePinned",
 		"TestWaveEngine_OneConstructionSite",
