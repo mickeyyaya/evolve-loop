@@ -85,6 +85,7 @@ func TestFlowDecision_ValidateRejectsProseAndTheWrongShape(t *testing.T) {
 		{"array for an object", judge, `[{"score":0.8,"rationale":"x"}]`, "is not an object"},
 		{"object for an array", plan, `{"phase":"scout","run":true}`, "is not an array"},
 		{"an element that is not an object", plan, `["scout"]`, "is not an object"},
+		{"a plan entry that names a CLI", plan, `[{"phase":"build","run":true,"cli":"codex-tmux","tier":"deep"}]`, `unknown field "cli"`},
 		{"empty file", judge, ``, "EOF"},
 	}
 	for _, c := range cases {

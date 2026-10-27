@@ -480,7 +480,7 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 				profileFor := func(phase string) *profiles.Profile {
 					return o.profileForModelRouting(req.ProjectRoot, phase)
 				}
-				clampedPlan, mrClamps = router.ClampPlanModelRouting(clampedPlan, profileFor, o.modelCatalogLookup)
+				clampedPlan, mrClamps = router.ClampPlanModelRouting(clampedPlan, profileFor)
 				clamps = append(clamps, mrClamps...)
 			}
 			o.recordPhasePlan(ctx, cycle, cs, clampedPlan, clamps)

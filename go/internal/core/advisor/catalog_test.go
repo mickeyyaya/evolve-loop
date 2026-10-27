@@ -66,8 +66,8 @@ func TestWriteCatalog_EnrichesTwelveByStablePriorityAndPointsAtTheRest(t *testin
 func TestWriteCard_WritesSourceCategoriesAndHintCap(t *testing.T) {
 	var b strings.Builder
 	writeCard(&b, router.PhaseCard{Name: "security-sweep", Role: "evaluate", WritesSource: true, Categories: []string{"security", "auth"},
-		WhenToUse: strings.Repeat("w", 141), AllowedCLIs: []string{"claude-tmux", "codex-tmux"}, ModelTierEnvelope: &profiles.ModelTierEnvelope{Min: "balanced", Default: "deep", Max: "top"}})
-	want := "- security-sweep [evaluate, writes-source] (security, auth) — when: " + strings.Repeat("w", 140) + " …[truncated]\n  allowed_clis: claude-tmux, codex-tmux\n  model_tier_envelope: {min: balanced, default: deep, max: top}\n"
+		WhenToUse: strings.Repeat("w", 141), ModelTierEnvelope: &profiles.ModelTierEnvelope{Min: "balanced", Default: "deep", Max: "top"}})
+	want := "- security-sweep [evaluate, writes-source] (security, auth) — when: " + strings.Repeat("w", 140) + " …[truncated]\n  model_tier_envelope: {min: balanced, default: deep, max: top}\n"
 	if b.String() != want {
 		t.Errorf("full card:\n got %q\nwant %q", b.String(), want)
 	}

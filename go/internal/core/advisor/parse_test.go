@@ -63,8 +63,13 @@ func TestParsePhasePlan_SanitizesTiersAndReportsRejectedMintsAsData(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	if parsed.Plan.Entries[0].Tier != "" || parsed.Plan.Entries[0].CLI != "claude" || parsed.Plan.Entries[1].Tier != "top" {
-		t.Errorf("opus dropped, top kept, cli untouched: %+v", parsed.Plan.Entries[:2])
+	if parsed.Plan.Entries[0].Tier != "" || parsed.Plan.Entries[1].Tier != "top" {
+		t.Errorf("opus dropped, top kept: %+v", parsed.Plan.Entries[:2])
+	}
+	for _, m := range parsed.Plan.MintPhases {
+		if m.Dispatch.CLI != "" {
+			t.Errorf("minted phase %s names the CLI %q: the routing data picks the driver", m.Name, m.Dispatch.CLI)
+		}
 	}
 	names := make([]string, 0, len(parsed.Plan.MintPhases))
 	for _, m := range parsed.Plan.MintPhases {
@@ -74,7 +79,7 @@ func TestParsePhasePlan_SanitizesTiersAndReportsRejectedMintsAsData(t *testing.T
 		t.Errorf("minted: %v", names)
 	}
 	sweep, probe, drift := parsed.Plan.MintPhases[0], parsed.Plan.MintPhases[1], parsed.Plan.MintPhases[2]
-	if sweep.WritesSource || !probe.WritesSource || sweep.Dispatch.ModelTierDefault != "deep" || sweep.Dispatch.CLI != "claude" || !strings.Contains(sweep.Prompt, "security reviewer") {
+	if sweep.WritesSource || !probe.WritesSource || sweep.Dispatch.ModelTierDefault != "deep" || !strings.Contains(sweep.Prompt, "security reviewer") {
 		t.Errorf("mint fields: %+v / %+v", sweep, probe)
 	}
 	if drift.Description != "Reports wire-schema drift." || drift.WhenToUse != "Select when router wire structs change." || probe.Description != "" {

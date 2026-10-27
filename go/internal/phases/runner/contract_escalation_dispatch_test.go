@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 )
 
 func TestRunner_ContractEscalation_RedispatchesOnEscalatedCLIWithDirective(t *testing.T) {
@@ -18,7 +19,7 @@ func TestRunner_ContractEscalation_RedispatchesOnEscalatedCLIWithDirective(t *te
 	if _, err := r.Run(context.Background(), core.PhaseRequest{
 		ProjectRoot:         root,
 		Workspace:           t.TempDir(),
-		ModelRoutingCLI:     "claude-tmux",
+		Driver:              llmroute.Bind("claude-tmux"),
 		CorrectionDirective: directive,
 	}); err != nil {
 		t.Fatalf("Run: %v", err)
@@ -45,7 +46,7 @@ func TestRunner_ContractEscalation_KeepsOriginalPrimaryInChain(t *testing.T) {
 	if _, err := r.Run(context.Background(), core.PhaseRequest{
 		ProjectRoot:         root,
 		Workspace:           t.TempDir(),
-		ModelRoutingCLI:     "claude-tmux",
+		Driver:              llmroute.Bind("claude-tmux"),
 		CorrectionDirective: "## Correction\nmissing '## Findings'",
 	}); err != nil {
 		t.Fatalf("Run: %v", err)

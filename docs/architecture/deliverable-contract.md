@@ -218,7 +218,7 @@ check and the harness's post-phase gate can never drift.
     dispatch chain of the phase is one CLI family, there is nowhere to escalate. The same trigger then
     enriches the correction with the output of the contract validator **verbatim** (a structured
     re-prompt, `composeContractSalvageRetry`).
-    - It adds no dispatch and never touches `ModelRoutingCLI`.
+    - It adds no dispatch and never touches `PhaseRequest.Driver`.
     - It leaves `ReviewResult.Blocks`, the own counter of the breaker, untouched. The circuit still
       opens on the third strike as the last resort.
     - It is disjoint from escalation by construction. A phase
@@ -226,7 +226,7 @@ check and the harness's post-phase gate can never drift.
     - Together the two rungs are the block-recovery ladder that runs before the breaker demotes the gate.
   - Candidates are validated with `policy.ValidatePin`, so the `allowed_clis` of a profile bounds the
     escalation exactly as it bounds an operator pin.
-  - The escalation applies to `PhaseRequest.ModelRoutingCLI` on **that re-dispatch only**. It is a soft overlay: the escalated
+  - The escalation applies to `PhaseRequest.Driver`, an opaque `llmroute.Binding` (X19a), on **that re-dispatch only**. It is a soft overlay: the escalated
     CLI becomes chain primary, and the own chain of the profile stays behind it. It reverts when the ladder
     ends. The primary routing of the phase and the profile on disk are untouched, so the common PASS path is
     unchanged. Minted/user phases resolve `.evolve/profiles/<phase>.json`. The built-in

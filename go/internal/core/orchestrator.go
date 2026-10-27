@@ -171,8 +171,6 @@ type Orchestrator struct {
 
 	catalogRefreshStage func() string
 
-	modelCatalogLookup func(cli, tier string) (string, bool)
-
 	directivesProvider func(ctx context.Context, cycle int) directives.Set
 
 	compositionSnapshot      func(ctx context.Context, worktree, runID string) (CompositionAuditSnapshot, error)
@@ -407,10 +405,6 @@ func WithCatalogRefresher(fn func(ctx context.Context) error) Option {
 
 func WithCatalogRefreshStage(fn func() string) Option {
 	return func(o *Orchestrator) { o.catalogRefreshStage = fn }
-}
-
-func WithModelCatalogLookup(fn func(cli, tier string) (string, bool)) Option {
-	return func(o *Orchestrator) { o.modelCatalogLookup = fn }
 }
 
 func WithDirectivesProvider(fn func(ctx context.Context, cycle int) directives.Set) Option {

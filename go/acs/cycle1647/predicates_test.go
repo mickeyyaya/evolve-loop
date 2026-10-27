@@ -15,6 +15,7 @@ import (
 	"testing/fstest"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
@@ -108,9 +109,9 @@ func dispatchThroughRunner(t *testing.T, root, overlayCLI string, trigger map[st
 	})
 	r := runner.New(runner.Options{Hooks: hooks, Bridge: bridge, Prompts: loader})
 	if _, err := r.Run(context.Background(), core.PhaseRequest{
-		ProjectRoot:     root,
-		Workspace:       t.TempDir(),
-		ModelRoutingCLI: overlayCLI,
+		ProjectRoot: root,
+		Workspace:   t.TempDir(),
+		Driver:      llmroute.Bind(overlayCLI),
 	}); err != nil {
 		t.Fatalf("runner.Run(overlay=%q): %v", overlayCLI, err)
 	}
@@ -216,7 +217,7 @@ func TestC1647_004_FocusedRunnerRegressionCoversAdvisorProjectionAndNamesCaller(
 	if !acsassert.FileContains(t, filepath.Join(dir, "internal", "phases", "runner", "routing.go"), "func (b *BaseRunner) resolveDispatchPlan(") {
 		t.Errorf("RED: the production caller resolveDispatchPlan is no longer defined in internal/phases/runner/routing.go")
 	}
-	for _, want := range []string{"ModelRoutingCLI", `"claude-p"`, `"codex"`, `"claude-tmux"`} {
+	for _, want := range []string{"llmroute.Bind(", `"claude-p"`, `"codex"`, `"claude-tmux"`} {
 		if !acsassert.FileContains(t, file, want) {
 			t.Errorf("RED: %s does not mention %q — the focused test must drive the AC's literal inputs", filepath.Base(file), want)
 		}
@@ -225,7 +226,7 @@ func TestC1647_004_FocusedRunnerRegressionCoversAdvisorProjectionAndNamesCaller(
 	if escalationFile == "" {
 		t.Fatalf("RED: no *_test.go under internal/phases/runner defines func %s", contractEscalationTest)
 	}
-	for _, want := range []string{"ModelRoutingCLI", "CorrectionDirective"} {
+	for _, want := range []string{"llmroute.Bind(", "CorrectionDirective"} {
 		if !acsassert.FileContains(t, escalationFile, want) {
 			t.Errorf("RED: %s does not mention %q — the contract-escalation projection must be driven through its own test, distinct from the advisor projection", filepath.Base(escalationFile), want)
 		}
