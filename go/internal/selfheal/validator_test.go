@@ -401,6 +401,20 @@ func TestLoadLandings_ReadsTheLoopLandingsOfTheWindow(t *testing.T) {
 	}
 }
 
+func TestLoadLandings_ALandingAtTheWindowStartIsInTheWindow(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "ship-journal.jsonl")
+	body := `{"sha":"` + landingSHA + `","class":"cycle","ts":"2026-10-27T00:30:00Z","cycle":2038}
+`
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := LoadLandings(path, t0.Add(-30*time.Minute))
+	if err != nil || len(got) != 1 || got[0].SHA != landingSHA {
+		t.Fatalf("a landing at exactly the window start counts: %+v %v", got, err)
+	}
+}
+
 func TestValidator_AnEarlierVariationCountsOnlyWhenItWasAnAcceptedRetryOfThisIncident(t *testing.T) {
 	t.Parallel()
 	retry := phasecontract.DiagnosisAction{Kind: phasecontract.ActionRetryWithVariation, Params: phasecontract.DiagnosisParams{Item: churnItem, Variation: "model"}}
