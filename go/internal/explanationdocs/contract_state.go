@@ -162,7 +162,7 @@ func revalidationFailure(failures []string, fault error) error {
 	if fault == nil {
 		return fmt.Errorf("revalidate builder explanation handoff before sealing: %w", contentFailure(failures))
 	}
-	verdicts := strings.Join(append(slices.Clip(failures), "Explanation Documentation: "), "; ")
+	verdicts := strings.Join(append(slices.Clip(failures), FailurePrefix), "; ")
 	return fmt.Errorf("revalidate builder explanation handoff before sealing: %s%w", verdicts, fault)
 }
 
