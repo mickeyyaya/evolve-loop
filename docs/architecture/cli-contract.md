@@ -175,6 +175,7 @@ The column "Agent" of §5 gives the class of each core verb. These verbs are out
 | `phase <name>` | R (`dispatch`) | It starts a phase agent. |
 | `subagent run` | D | The pipeline starts fan-out workers. A cell uses the subagents of its own harness. |
 | `reset-sha`, `release` | D | operator verbs |
+| `continuation adopt` | D | The console runs it to resume the work of a failed lane. It adds a git worktree and a branch, which are shared state. No persona runs it (2026-10-27). |
 | `guidance index`, `check` | A | They read the rule registry and write nothing ([guidance-layers.md](guidance-layers.md) §10.3). |
 | `guard ship`, `phase`, `role`, `docdelete` | A | The hooks of a Claude Code cell run them before each tool call. A refusal with exit 3 is not a block for the hook, so the guard opens if the class gate refuses it (F10). They write only their own log. |
 | `postedit-validate` | A | The hook of a Claude Code cell runs it after each edit. It checks the syntax of one file and blocks nothing. |
