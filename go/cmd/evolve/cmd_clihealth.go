@@ -52,13 +52,18 @@ func parseInterspersed(fs *flag.FlagSet, args []string) ([]string, error) {
 	}
 }
 
-func clihealthList(store *clihealth.Store, asJSON bool, stdout io.Writer) int {
+func activeBenches(store *clihealth.Store) []clihealth.Entry {
 	active := store.Active()
 	entries := make([]clihealth.Entry, 0, len(active))
 	for _, e := range active {
 		entries = append(entries, e)
 	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].Key() < entries[j].Key() })
+	return entries
+}
+
+func clihealthList(store *clihealth.Store, asJSON bool, stdout io.Writer) int {
+	entries := activeBenches(store)
 	if asJSON {
 		body, _ := json.Marshal(entries)
 		fmt.Fprintln(stdout, string(body))
