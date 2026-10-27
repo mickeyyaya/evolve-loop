@@ -224,6 +224,10 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/policy/core.go", Class: PolicyGuarantee, Rationale: "the policy parser Load (ADR-0157)"},
 	{Fragment: "/go/internal/policy/strict_keys.go", Class: PolicyGuarantee, Rationale: "the strict policy: refuseUnknownKeys refuses a key that the schema does not know (ADR-0157)"},
 	{Fragment: "/go/internal/core/statemachine.go", Class: PhaseOrderGuarantee, Rationale: "the phase-order state machine CanTransition that clamps each plan of the advisor (ADR-0155 F3.2)"},
+	{Fragment: "/.evolve/incidents/", Class: LedgerGuarantee, Rationale: "the incident records of the self-healing loop: only the detector writes them, so no agent can open, close or edit its own incident (ADR-0155, llm-isolation.md §18.2)"},
+	{Fragment: "/go/internal/selfheal/", Class: AuditVerdictGuarantee, Rationale: "the incident detector and the four close conditions of I-14: an agent that could edit them could close its own incident (ADR-0155, llm-isolation.md §21)"},
+	{Fragment: "/go/cmd/evolve/cmd_selfheal.go", Class: AuditVerdictGuarantee, Rationale: "evolve selfheal incidents: it chooses the evidence of the detector, builds the verifier of the four close conditions and writes the records (ADR-0155, llm-isolation.md §18.5)"},
+	{Fragment: "/go/internal/policy/healing.go", Class: PolicyGuarantee, Rationale: "the healing.detector.stage key and its validation (ADR-0155, llm-isolation.md §20.2)"},
 }
 
 func IsProtectedSurface(path string) bool {

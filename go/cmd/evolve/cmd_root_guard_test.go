@@ -107,6 +107,7 @@ func TestRootSignalCenter_EveryRootSubscribesThePublisher(t *testing.T) {
 			"cmd/evolve/cmd_loop_chain.go:maybeRefreshChainBoundary",
 			"cmd/evolve/cmd_loop_chain.go:runLoopChain",
 			"cmd/evolve/cmd_quality.go:newQualityCenter",
+			"cmd/evolve/cmd_selfheal.go:newSelfhealCenter",
 			"cmd/evolve/cmd_ship.go:shipRootSignals",
 			"cmd/evolve/cmd_subagent.go:runSubagentRun",
 			"cmd/evolve/dispatch_gate.go:emitDispatchViolation",

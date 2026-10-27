@@ -839,3 +839,5 @@
 ./internal/inboxfile
 # launchrecord - the bridge launch record of evolve agent run, which the commit gate reads to attest a review run (ADR-0154 X11).
 ./internal/launchrecord
+# selfheal - the incident detector of the self-healing loop: typed incident records from signals, cycle state, CI runs and usage readings (ADR-0155 X12).
+./internal/selfheal
