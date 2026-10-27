@@ -76,6 +76,8 @@ var protectedGateFiles = []struct {
 	{"go/internal/phases/runner/verdict_engine.go", AuditVerdictGuarantee},
 	{"go/cmd/evolve/dispatch_gate.go", DispatchCredentialGuarantee},
 	{"go/cmd/evolve/dispatch_gate_test.go", DispatchCredentialGuarantee},
+	{"go/cmd/evolve/agent_classes_doc_test.go", DispatchCredentialGuarantee},
+	{"go/internal/agentclass/table.go", DispatchCredentialGuarantee},
 	{"go/internal/looppreflight/checks.go", SandboxGuarantee},
 	{"go/internal/looppreflight/drivers.go", SandboxGuarantee},
 	{"go/internal/preflight/preflight.go", SandboxGuarantee},

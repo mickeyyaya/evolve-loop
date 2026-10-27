@@ -28,9 +28,10 @@ const (
 )
 
 var contractNoNegative = map[string]string{
-	"clihealth list": "the list reads the bench file and treats an absent or unreadable file as no bench",
-	"quality report": "the report exits 0 on each reading; only a usage error fails it",
-	"quality show":   "the show exits 0 on each reading, as the report does; only a usage error fails it",
+	"clihealth list":     "the list reads the bench file and treats an absent or unreadable file as no bench",
+	"quality report":     "the report exits 0 on each reading; only a usage error fails it",
+	"quality show":       "the show exits 0 on each reading, as the report does; only a usage error fails it",
+	"agent capabilities": "the verb prints a table compiled into the binary; only a usage error fails it",
 }
 
 type contractCall struct {

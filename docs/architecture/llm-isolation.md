@@ -434,21 +434,21 @@ The markers are advice. An agent can unset them, and then `evolve agent run` dis
 A worked example: the scout pane of cycle 7 runs `env -u EVOLVE_DISPATCH_DEPTH -u EVOLVE_PHASE evolve wave next`. The verb opens `~/.evolve/dispatch/held/credential`. At `enforce` the macOS profile denies the read, so the verb exits 3:
 
 ```
-evolve wave next: refused: this process does not hold the pipeline dispatch credential (dispatch credential: open /Users/op/.evolve/dispatch/held/credential: operation not permitted). A phase cell never holds it: wave next is class D; it is an operator or boundary verb
+evolve wave next: refused inside a phase: wave next is class D; it is an operator or boundary verb. This process does not hold the pipeline dispatch credential (dispatch credential: open /Users/op/.evolve/dispatch/held/credential: operation not permitted), and a phase cell never holds it.
 ```
 
 | Item | As built |
 |---|---|
 | The credential | `go/internal/dispatchcred`. A 0600 file `held/credential` with 32 random bytes in hex, in a 0700 directory. The writer makes a temporary file and links it to the name, so a reader never sees a part of a token. `Store.Hold` opens it with `O_NOFOLLOW` and accepts only a regular 0600 file with a token of this form. The check is a read: the token value is not compared. |
 | The location | `~/.evolve/dispatch`, where `~` is the home directory of the passwd entry of the uid (`user.LookupId`). It never comes from `HOME`, `EVOLVE_PROJECT_ROOT` or the current directory. A test binary can set the root at link time (`-ldflags -X .../dispatchcred.root=DIR`). |
-| The gated verbs | `agent run` and `phase <name>` (class R). `subagent run`, `subagent dispatch-parallel`, `loop`, `wave next`, `cycle run`, `boundary run`, `bridge launch`, `routing plan`, `campaign` (not `status`), `compose`, `plan-and-execute`, `serve-phase`, `fleet`, `consensus-dispatch` and `fanout-dispatch` (class D). `phase verify`, `phase lint` and `loop status` are not gated. `dispatchRules` in `go/cmd/evolve/dispatch_gate.go` holds them, and `dispatch` checks them before the verb runs. The loop step of `boundary run` checks again, because it calls the loop in the process (`gatedLoop`). |
+| The gated verbs | Each verb that is not class A (X17e, [cli-contract.md](cli-contract.md) §4.4). The class table is `go/internal/agentclass`. Each verb that the table does not name is class D, for example `subagent dispatch-parallel`, `compose` and `fanout-dispatch`. `dispatchWith` in `go/cmd/evolve/dispatch_gate.go` checks the class before the verb runs. The loop step of `boundary run` checks again, because it calls the loop in the process (`gatedLoop`). |
 | The launch API | `Deps.requireDispatchCredential` (`go/internal/bridge/dispatch_credential.go`) runs in each entry of the X3 launch API (§5.1). The entries are `LaunchLLM`, `launchPane`, `launchSwept` and `newRecipeDriver`. Each LLM launch of the binary passes one of them. So a launch with no credential is refused at `enforce`, from any caller. The refusal is `ErrNoDispatchCredential` with `ExitSafetyGate` and `rule=launch.credential`. The verb gate is the early refusal with the clear message. |
 | The denies | `Deps.dispatchCredentialDeny` in `go/internal/bridge/dispatch_credential.go`. At each sandboxed launch at `shadow` or `enforce`, the launcher writes the credential and the stage. It denies the read of `held/`: SBPL `deny file-read*`, and `bwrap` `--tmpfs`, `--chmod 000` and `--remount-ro`. |
 | The write denies | The parent of the store (`~/.evolve`) goes to `DenyPaths`, and each higher ancestor goes to `DenyLiterals`. So a cell cannot write the stage or a credential. It also cannot rename an ancestor or swap in a symlink for it (review of #1132, round 2). If `Ensure` fails, the launcher keeps each deny and writes a WARN line. |
 | The stage | the policy key `isolation.i3.stage`, the same stage as the exec deny, read from a file that the cell cannot change. The launcher writes it to `~/.evolve/dispatch/stage`, outside `held/`. A missing file is `shadow`. When the credential read is denied (`EPERM` or `EACCES`), a missing file is `enforce`. Only a launch makes a cell, and the launch writes the stage. A file that cannot be read, or a word that is not `off`, `shadow` or `enforce`, is `enforce`. |
 | `off` | no deny, no store write and no check |
 | `shadow` | The cell cannot read the credential. The verb emits `ISOLATION_I3_VIOLATION` with `action=logged` and runs. |
-| `enforce` | The verb emits `ISOLATION_I3_VIOLATION` with `action=refused` and exits 3. A class R refusal names the request path `.evolve/runs/cycle-<N>/requests/dispatch-<n>.json`. Item `isolation-dispatch-request-channel` builds that channel. |
+| `enforce` | The verb emits `ISOLATION_I3_VIOLATION` with `action=refused` and exits 3. A class R refusal names the request path of its kind, for example `.evolve/runs/cycle-<N>/requests/dispatch-<n>.json`. Item `isolation-dispatch-request-channel` builds that channel. |
 | The signal | `rule=verb.class.r` or `verb.class.d`, `target` is the verb, `source=dispatch-credential` (cli-contract.md §4.5). The verb publishes it under the events role `dispatch`, and it goes to the stderr of the verb, which the pane captures. |
 | The hermetic env | No environment name carries the credential or its path. So X2 cannot pass it to a child (§6.1). |
 
@@ -462,7 +462,7 @@ How the operator and the pipeline hold the credential:
 | D1 | A file in a fixed per-user directory, found through the passwd entry | A cell can set `HOME`, `EVOLVE_PROJECT_ROOT` and its current directory. A path from any of them points the check at a file that the cell writes. | A path under the project `.evolve`: the project root comes from the environment. A token in the environment: X2 is an allowlist, but the cell can set any variable for its own child. A unix socket of the plane: a separate daemon for one check, and the same path question. |
 | D2 | The first gated verb of the operator writes a missing file | The operator experience stays the same. A cell cannot write the file: the profile gives no write grant under `~/.evolve`, and `bwrap` mounts `held/` read-only. | `evolve loop` writes it only: the first `evolve agent run` on a new host then refuses. |
 | D3 | The launcher writes the stage next to the credential | The cell reads the stage from a file that it cannot change. | The policy of the project root: a cell can point the root at a policy with no stage, which is `shadow`. |
-| D4 | The verb gate covers each command that starts a dispatch, and the launch API checks each LLM launch | A verb gate alone misses an in-process caller (`boundary run` called the loop directly, review of #1132). The launch API is the one place where each LLM launch passes (X3). `TestDispatchGate_EveryRegistryCommandIsGatedOrNamedWithNoDispatch` pins each command of the registry to a rule or a reason. | Each verb outside an allowlist (X17e): it breaks the hooks of the cell (`guard`, `postedit-validate`) at `enforce` before X17e lists the A verbs. |
+| D4 | The verb gate covers each command that starts a dispatch, and the launch API checks each LLM launch | A verb gate alone misses an in-process caller (`boundary run` called the loop directly, review of #1132). The launch API is the one place where each LLM launch passes (X3). X17e replaced the list of gated verbs with the class table, so a new command is class D. The table lists the hooks of the cell (`guard`, `postedit-validate`) as class A. | A list of gated verbs (the design of #1132): a new verb that changes shared state is open until someone adds it. |
 
 Known differences from the design:
 
@@ -475,14 +475,15 @@ Known differences from the design:
 - Each process of the uid outside a cell holds the credential. The boundary is the cell, not the user.
 - On a host with several projects, the stage file holds the stage of the last sandboxed launch.
 - The row N4 runs on darwin only. The `bwrap` mask has a unit test (`TestSandboxWrap_TheCellCannotReadTheDispatchCredentialOnLinux`), not a contract row.
-- X17e adds the other R and D verbs to the same verb gate (cli-contract.md §4.4). A command that execs an LLM only through the launch API (`doctor`, `cli`, `clihealth`, `cli-routing`, `models`, `setup`, `practice`, `release-verify-clis`) is refused by the launch check.
+- X17e checks each R and D verb at the same verb gate (cli-contract.md §4.4). A command that execs an LLM only through the launch API (`doctor`, `cli`, `clihealth`, `cli-routing`, `models`, `setup`, `practice`, `release-verify-clis`) is refused by the launch check.
 
 The guards are these tests:
 
 - row N4 and the rows "evolve phase scout", "evolve subagent run", "evolve loop" and "evolve wave next with the env markers stripped is refused at enforce", and the rows "read the dispatch credential", "turn the dispatch stage off", "plant a dispatch credential" "rename an ancestor of the dispatch store under a writable home" and "swap a symlink to a store of its own in for an ancestor of the dispatch store" (`TestAgentSandboxContract`)
-- `TestLaunchAPI_EachEntryRefusesALaunchWithNoDispatchCredentialAtEnforce` and `TestDispatchGate_EveryRegistryCommandIsGatedOrNamedWithNoDispatch`
+- `TestLaunchAPI_EachEntryRefusesALaunchWithNoDispatchCredentialAtEnforce`, `TestAgentClasses_EachVerbThatAPersonaRunsIsAOrR` and `TestAgentClass_EveryVerbOfTheTableIsGatedByItsClass`
 - `TestAgentSandboxContract_TheHostHoldsTheCredentialThatTheCellCannotRead`
-- `TestDispatchVerbs_RefuseWithoutTheDispatchCredential`, `TestDispatchVerbs_ShadowReportsAndRuns` and `TestDispatchVerbs_ReadVerbsNeedNoCredential`
+- `TestDispatchVerbs_RefuseWithoutTheDispatchCredential`, `TestDispatchVerbs_ShadowReportsAndRuns` and `TestAgentClass_AnAVerbInACellRunsAsOutsideACell`
+- the rows "X17e: evolve inbox add (class R) in a cell is refused at enforce" and "X17e: evolve inbox claim (class D) in a cell is refused at enforce" (`TestAgentSandboxContract`)
 - `TestSandboxWrap_TheCellCannotReadTheDispatchCredentialOnMacOS` and `TestSandboxWrap_TheCellCannotReadTheDispatchCredentialOnLinux`
 - `TestDefault_IsUnderThePasswdHomeAndIgnoresHOME` and `TestStore_HoldRefusesAForgedOrMaskedCredential`
 
@@ -1569,7 +1570,7 @@ I-6 says that flow logic names no family. It does not say what the assignment ho
 | budgets and timeouts | turns, tokens, wall time | `max_turns`, `max_budget_usd` |
 | sandbox intents | read inputs, write worktree, run command class X, network yes or no | `allowed_tools`, `disallowed_tools`, `sandbox` |
 | persona text | the CLI-neutral persona | `agents/<name>.md` |
-| tool surface (amended 2026-10-26) | `evolve agent capabilities --json` | none: Claude tool syntax in the profiles, for example `Bash(evolve phase verify:*)` |
+| tool surface (amended 2026-10-26) | `evolve agent capabilities --json` | as built (X17e): a short section that `preparePrompt` adds to the prompt of each phase cell. It points to the verb and names the request directory of the cell. |
 
 **The driver binding is opaque.** `cli_routing` picks a driver identity, for example `agy-tmux`. The pipeline passes the identity through and never branches on it. Only the bridge reads it.
 
@@ -1594,7 +1595,7 @@ I-6 says that flow logic names no family. It does not say what the assignment ho
 A neutral assignment must also tell the agent which `evolve` verbs it can use. Today only the Claude tool syntax of the profiles does this. The spec of record is [cli-contract.md](cli-contract.md) §4.1 to §4.5:
 
 - Each verb has an agent class: `A` runs in the cell, `R` goes through a request, and `D` is denied. Each verb outside the allowlist is `D`.
-- `evolve agent capabilities --json` (proposed) lists the classes, the schemas and the request paths of the current cell. The assignment field "tool surface" points to it.
+- `evolve agent capabilities --json` (built, X17e) lists the classes, the schemas and the request paths of the current cell. The assignment field "tool surface" points to it.
 - An `R` request uses the path of the dispatch request of §7.2 on the branch of #1126. Go validates it, the orchestrator agent judges it, and the pipeline runs it.
 - `R` and `D` verbs need the dispatch credential of item `isolation-dispatch-capability-token`, so the class is a rule and not advice.
 

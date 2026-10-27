@@ -4,11 +4,11 @@
 
 ## Purpose
 
-`internal/cli/agentcmd` holds `evolve agent run <profile>` and `evolve agent list`. A person or a program runs one phase agent with an input on stdin and gets the report on stdout, with no cycle. A review profile is read-only. The build seat `console-builder` writes only the `--writable` files of a linked worktree ([agent-run.md](../agent-run.md) §8).
+`internal/cli/agentcmd` holds `evolve agent run <profile>`, `evolve agent list` and `evolve agent capabilities`. A person or a program runs one phase agent with an input on stdin and gets the report on stdout, with no cycle. A review profile is read-only. The build seat `console-builder` writes only the `--writable` files of a linked worktree ([agent-run.md](../agent-run.md) §8).
 
 ## Design
 
-- **`New(Deps)`** returns the standard subcommand function. `Deps` has six seams:
+- **`New(Deps)`** returns the standard subcommand function. `Deps` has seven seams:
 
 | Seam | Default |
 |---|---|
@@ -18,6 +18,7 @@
 | `TreeState(ctx, dir)` | `defaultTreeState`: `treestate.SHA` through `sysexec.DefaultRunner` |
 | `Getenv` | `os.Getenv` |
 | `Now` | `time.Now` |
+| `VerbSchema(path)` | no schema, so each `A` verb shows `text/1`; cmd/evolve passes `coreVerbSchema`, the envelope schema of each core verb |
 
   Tests inject a fake bridge and a fake tree state, so no test launches a real CLI or reads a real tree.
 - **One dispatch path.** The run builds its runner with `phasecmd.NewSpecRunner`, the constructor that `evolve phase` uses. The routing table, the fallback walk, the sandbox and the verdict all come from the shared phase runner.
@@ -40,6 +41,9 @@
   - A failed write is exit 21. `stageWorkspace` refuses a run label whose record exists, before the dispatch (exit 21).
 - **Output.** stdout carries the report text. With `--json` it carries the `Envelope` struct, which is the `data` of the envelope of [cli-contract.md](../cli-contract.md) §2. The envelope also names the driver, the family, the launch record and the worktree. A dispatch error goes to stderr and into `Envelope.Error`. A ledger error and a launch record error go there too.
 - **Signals.** SIGINT and SIGTERM cancel the dispatch context (`signal.NotifyContext`), so the ledger append and the workspace removal still run.
+- **Capabilities** (`capabilities.go`, X17e, [cli-contract.md](../cli-contract.md) §4.2). The verb prints `agentclass.Surface` with no cell. With `--json` the document is the `data` of the envelope `evolve.agent.capabilities/1`. The text form has one line for each verb and ends with `default D`. A stray word or an unknown flag is exit 10.
+  - `--project-root` is accepted for the contract of §5, and the table is the same for each root.
+  - Pinned by `TestAgentCapabilities_JSONListsEachVerbOfTheTableWithDefaultClassD` and `TestAgentCapabilities_TextNamesEachClassAndAStrayWordIsUsage`.
 
 ## Invariants
 

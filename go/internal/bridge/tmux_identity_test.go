@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/agentclass"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/phaseidentity"
 )
 
@@ -56,8 +57,8 @@ func TestTmuxDispatch_ClaudeStatesItsAuthorityAsItsSystemPrompt(t *testing.T) {
 		t.Fatalf("claude must launch with the authority as its system prompt: %q", line)
 	}
 	body, _ := os.ReadFile(fx.promptFile)
-	if pasted != strings.TrimRight(string(body), "\n")+"\n\n"+strings.TrimRight(want, "\n")+"\n" {
-		t.Fatalf("the paste is the composed prompt and this dispatch's facts, without the authority:\n%s", pasted)
+	if pasted != strings.TrimRight(string(body), "\n")+"\n\n"+strings.TrimRight(agentclass.Brief(fx.ws), "\n")+"\n\n"+strings.TrimRight(want, "\n")+"\n" {
+		t.Fatalf("the paste is the composed prompt, the tool surface of the cell and this dispatch's facts, without the authority:\n%s", pasted)
 	}
 }
 

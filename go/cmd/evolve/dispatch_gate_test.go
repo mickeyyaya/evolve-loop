@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/agentclass"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchcred"
 )
 
@@ -36,23 +37,24 @@ var dispatchVerbCalls = []struct {
 }{
 	{[]string{"agent", "run", "--bogus"}, "agent run", "class R"},
 	{[]string{"phase", "scout", "--bogus"}, "phase scout", "class R"},
+	{[]string{"inbox", "add", "--bogus"}, "inbox add", "class R"},
+	{[]string{"quality", "report", "--bogus"}, "quality report", "class R"},
 	{[]string{"subagent", "run"}, "subagent run", "class D"},
-	{[]string{"subagent", "dispatch-parallel"}, "subagent dispatch-parallel", "class D"},
+	{[]string{"subagent", "dispatch-parallel"}, "subagent", "class D"},
 	{[]string{"loop", "--bogus"}, "loop", "class D"},
 	{[]string{"wave", "next", "--bogus"}, "wave next", "class D"},
-	{[]string{"landing", "approve", "--bogus"}, "landing approve", "class D"},
-	{[]string{"landing", "reject", "--bogus"}, "landing reject", "class D"},
-	{[]string{"cycle", "run", "--bogus"}, "cycle run", "class D"},
+	{[]string{"wave", "stop", "--bogus"}, "wave stop", "class D"},
+	{[]string{"loop-stop", "--bogus"}, "loop-stop", "class D"},
+	{[]string{"inbox", "claim", "--bogus"}, "inbox claim", "class D"},
+	{[]string{"inbox-mover", "claim"}, "inbox-mover", "class D"},
+	{[]string{"landing", "approve", "--bogus"}, "landing", "class D"},
+	{[]string{"cycle", "run", "--bogus"}, "cycle", "class D"},
 	{[]string{"cycle", "resume", "--bogus"}, "cycle resume", "class D"},
 	{[]string{"boundary", "run", "--bogus"}, "boundary run", "class D"},
-	{[]string{"bridge", "launch", "--bogus"}, "bridge launch", "class D"},
-	{[]string{"routing", "plan", "--bogus"}, "routing plan", "class D"},
-	{[]string{"campaign", "run", "--bogus"}, "campaign", "class D"},
+	{[]string{"bridge", "launch", "--bogus"}, "bridge", "class D"},
+	{[]string{"cli-routing", "show", "--bogus"}, "cli-routing show", "class D"},
+	{[]string{"ci", "classify", "--rerun", "--bogus"}, "ci classify", "class D"},
 	{[]string{"compose", "--bogus"}, "compose", "class D"},
-	{[]string{"plan-and-execute", "--bogus"}, "plan-and-execute", "class D"},
-	{[]string{"serve-phase", "--bogus"}, "serve-phase", "class D"},
-	{[]string{"fleet", "--bogus"}, "fleet", "class D"},
-	{[]string{"consensus-dispatch", "--bogus"}, "consensus-dispatch", "class D"},
 	{[]string{"fanout-dispatch", "--bogus"}, "fanout-dispatch", "class D"},
 }
 
@@ -65,27 +67,61 @@ func TestDispatchVerbs_RefuseWithoutTheDispatchCredential(t *testing.T) {
 			var stdout, stderr bytes.Buffer
 			code := dispatchWith(gate, c.args, strings.NewReader(""), &stdout, &stderr)
 			out := stderr.String()
-			if code != exitDispatchRefused || !strings.Contains(out, "dispatch credential") || !strings.Contains(out, c.verb+" is "+c.class) {
+			if code != exitDispatchRefused || !strings.Contains(out, "dispatch credential") || !strings.Contains(out, "refused inside a phase: "+c.verb+" is "+c.class) {
 				t.Fatalf("evolve %v with no credential = exit %d %q, want exit %d naming the credential and %q", c.args, code, out, exitDispatchRefused, c.verb+" is "+c.class)
 			}
 			if !strings.Contains(out, "ISOLATION_I3_VIOLATION") || !strings.Contains(out, "verb.class.") {
 				t.Fatalf("the refusal must emit ISOLATION_I3_VIOLATION with the class rule, got %q", out)
 			}
+			if (c.class == "class R") != strings.Contains(out, "/requests/") {
+				t.Fatalf("only a class R refusal names a request path, got %q", out)
+			}
 		})
 	}
 }
 
-func TestDispatchVerbs_TheRefusalNamesTheRequestPathForClassROnly(t *testing.T) {
+func TestAgentClass_RefusesWithoutTheCredentialAndNamesTheRequestPath(t *testing.T) {
 	t.Parallel()
 	gate := dispatchGate{open: unheldStore(t, "enforce")}
 	var r, d bytes.Buffer
-	dispatchWith(gate, []string{"agent", "run", "--bogus"}, strings.NewReader(""), &bytes.Buffer{}, &r)
-	dispatchWith(gate, []string{"wave", "next", "--bogus"}, strings.NewReader(""), &bytes.Buffer{}, &d)
-	if !strings.Contains(r.String(), dispatchRequestPath) {
-		t.Fatalf("a class R refusal must name the request path %q, got %q", dispatchRequestPath, r.String())
+	rc := dispatchWith(gate, []string{"inbox", "add", "--bogus"}, strings.NewReader(""), &bytes.Buffer{}, &r)
+	if want := agentclass.RequestPath("", "inbox-add"); rc != exitDispatchRefused || !strings.Contains(r.String(), want) {
+		t.Fatalf("inbox add with no credential = exit %d %q, want exit %d naming %q", rc, r.String(), exitDispatchRefused, want)
 	}
-	if strings.Contains(d.String(), dispatchRequestPath) || !strings.Contains(d.String(), "operator or boundary verb") {
-		t.Fatalf("a class D refusal names no request path, got %q", d.String())
+	dc := dispatchWith(gate, []string{"wave", "next", "--bogus"}, strings.NewReader(""), &bytes.Buffer{}, &d)
+	if dc != exitDispatchRefused || strings.Contains(d.String(), "/requests/") || !strings.Contains(d.String(), "operator or boundary verb") {
+		t.Fatalf("wave next with no credential = exit %d %q, want exit %d with no request path", dc, d.String(), exitDispatchRefused)
+	}
+}
+
+func TestAgentClass_EveryVerbOfTheTableIsGatedByItsClass(t *testing.T) {
+	t.Parallel()
+	gate := dispatchGate{open: unheldStore(t, "enforce")}
+	for _, v := range agentclass.Verbs() {
+		args := strings.Fields(strings.ReplaceAll(v.Path, "<name>", "scout"))
+		if v.OnlyWith != "" {
+			args = append(args, v.OnlyWith)
+		}
+		var stderr bytes.Buffer
+		refused := gate.refuse(args, &stderr)
+		if refused != (v.Class != agentclass.Allowed) {
+			t.Errorf("evolve %v (class %s): refused %v, stderr %q", args, v.Class, refused, stderr.String())
+		}
+	}
+}
+
+func TestAgentClass_AnAVerbInACellRunsAsOutsideACell(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	run := func(open func() (dispatchcred.Store, error)) (int, string, string) {
+		var stdout, stderr bytes.Buffer
+		code := dispatchWith(dispatchGate{open: open}, []string{"phase", "verify", "build", "--project-root", root}, strings.NewReader(""), &stdout, &stderr)
+		return code, stdout.String(), stderr.String()
+	}
+	cellCode, cellOut, cellErr := run(unheldStore(t, "enforce"))
+	hostCode, hostOut, hostErr := run(heldStore(t))
+	if cellCode != hostCode || cellOut != hostOut || cellErr != hostErr || strings.Contains(cellErr, "dispatch credential") {
+		t.Fatalf("phase verify build in a cell = %d %q %q, outside = %d %q %q; want the same", cellCode, cellOut, cellErr, hostCode, hostOut, hostErr)
 	}
 }
 
@@ -123,24 +159,6 @@ func TestDispatchVerbs_AnUnresolvableStoreIsShadow(t *testing.T) {
 	}
 }
 
-func TestDispatchVerbs_ReadVerbsNeedNoCredential(t *testing.T) {
-	t.Parallel()
-	for _, args := range [][]string{
-		{"phase", "verify"}, {"phase", "lint"}, {"phase"}, {"loop", "status"}, {"wave", "status"}, {"wave"}, {"landing", "list"},
-		{"subagent", "resolve-tier"}, {"subagent"}, {"agent", "list"}, {"agent"}, {"version"},
-		{"cycle", "reset"}, {"boundary"}, {"bridge", "probe"}, {"routing", "explain"}, {"campaign", "status"},
-	} {
-		if verb, gated := dispatchVerbOf(args); gated {
-			t.Errorf("evolve %v is gated as %q; only the dispatch verbs need the credential", args, verb.name)
-		}
-	}
-	for _, c := range dispatchVerbCalls {
-		if verb, gated := dispatchVerbOf(c.args); !gated || verb.name != c.verb {
-			t.Errorf("evolve %v = %q gated %v, want %q", c.args, verb.name, gated, c.verb)
-		}
-	}
-}
-
 func TestDispatch_TheOperatorShellHoldsTheCredential(t *testing.T) {
 	t.Parallel()
 	var stdout, stderr bytes.Buffer
@@ -159,7 +177,7 @@ func TestDispatchWith_AVerbOutsideTheGateAndABadCallNeedNoCredential(t *testing.
 	}{
 		{nil, 2, "Usage:"},
 		{[]string{"no-such-verb"}, 2, `unknown command "no-such-verb"`},
-		{[]string{"version"}, 0, ""},
+		{[]string{"help"}, 0, ""},
 	} {
 		var stdout, stderr bytes.Buffer
 		code := dispatchWith(gate, c.args, strings.NewReader(""), &stdout, &stderr)
@@ -180,74 +198,13 @@ func TestBoundaryLoopStep_TheInProcessLoopPassesTheGate(t *testing.T) {
 	}
 }
 
-var commandsWithNoDispatch = map[string]string{
-	"version": "prints", "help": "prints", "rebuild": "builds the plane binary", "console-lease": "a lease file",
-	"install": "copies files", "uninstall": "removes files", "guard": "a hook check of the cell", "ledger": "reads",
-	"dossier": "reads", "audit": "reads", "salvage": "reads", "soak-report": "reads", "dashboard": "serves reads",
-	"names": "scans files", "acs": "runs predicates", "apicover": "measures", "inbox": "inbox files",
-	"phases": "the phase catalog", "worktree": "git worktrees", "land": "applies a patch", "branches": "git refs",
-	"continuation": "state files", "carryover": "state files", "swarm": "tmux sessions of workers", "checkpoint": "git refs",
-	"treewalk": "scans files", "kb": "reads", "gc": "removes leftovers", "verdicts": "a verdict store",
-	"failures": "state files", "loop-stop": "a brake file", "pr": "gh merges", "postmortem": "reads transcripts",
-	"handoff": "reads", "ci": "gh reads", "comments": "scans files", "status": "reads", "ship": "git commit and push",
-	"reset-sha": "a pin file", "sync-main": "git merge", "quality": "readings", "commit-gate": "lint and tests",
-	"scan": "scans a diff", "detect-cli": "reads the env", "detect-nested-claude": "reads the env", "phase-order": "reads",
-	"convergence": "a pure decision", "estimate-quota-reset": "a pure estimate", "build-invocation-context": "prints a prefix",
-	"resolve-llm": "a routing decision", "cycle-simulator": "no LLM", "phase-watchdog": "watches files",
-	"aggregator": "merges files", "preflight-environment": "probes the host", "phase-observer": "tails a stream",
-	"changelog-gen": "git log", "version-bump": "edits files", "marketplace-poll": "gh reads", "release-preflight": "checks",
-	"rollback": "git revert", "release": "the release pipeline", "prune-ephemeral": "removes files",
-	"postedit-validate": "a hook check of the cell", "inbox-mover": "inbox files", "commit-prefix-gate": "a check",
-	"release-consistency": "reads", "release-verify-binaries": "gh reads", "release-promote": "gh edits", "backups": "reads",
-	"skill-inventory": "a cache", "skills": "generates files", "guidance": "reads and generates the rule index", "flags": "generates files", "signals": "generates files",
-	"phase-inventory": "a cache", "eval": "checks", "docs": "lint", "solution": "checks", "cycle-health": "reads",
-	"selfcheck": "the build probe of the cell", "tokens": "reads", "lessons": "reads", "reachability": "go list",
-	"ratchet": "checks", "floor": "go test tiers", "cover": "coverage", "code": "the code index", "ladder": "reads",
-	"context":             "reads",
-	"context-fill":        "reads",
-	"doctor":              launchAPIOnly,
-	"setup":               launchAPIOnly,
-	"cli-routing":         launchAPIOnly,
-	"release-verify-clis": launchAPIOnly,
-	"models":              launchAPIOnly,
-	"clihealth":           launchAPIOnly,
-	"cli":                 launchAPIOnly,
-	"practice":            launchAPIOnly,
-}
-
-const launchAPIOnly = "its LLM execs go through the bridge launch API, which checks the credential (requireDispatchCredential)"
-
-func TestDispatchGate_EveryRegistryCommandIsGatedOrNamedWithNoDispatch(t *testing.T) {
+func TestAgentClass_AnAliasAndAFlagFirstLoopStatusTakeTheirClass(t *testing.T) {
 	t.Parallel()
-	seen := map[string]bool{}
-	for _, c := range commands {
-		seen[c.Name] = true
-		_, gated := dispatchRules[c.Name]
-		reason, named := commandsWithNoDispatch[c.Name]
-		switch {
-		case gated && named:
-			t.Errorf("evolve %s is gated and also named with no dispatch (%q)", c.Name, reason)
-		case !gated && !named:
-			t.Errorf("evolve %s is a new command: add it to dispatchRules if it can reach an LLM launch, else to commandsWithNoDispatch with the reason", c.Name)
-		}
+	var stderr bytes.Buffer
+	if code := dispatchWith(dispatchGate{open: unheldStore(t, "enforce")}, []string{"--version"}, strings.NewReader(""), &bytes.Buffer{}, &stderr); code != 0 || stderr.Len() > 0 {
+		t.Errorf("an alias takes the class of its command: evolve --version in a cell = %d %q", code, stderr.String())
 	}
-	for name := range dispatchRules {
-		if !seen[name] {
-			t.Errorf("dispatchRules names %q, which the registry does not list", name)
-		}
-	}
-	for name := range commandsWithNoDispatch {
-		if !seen[name] {
-			t.Errorf("commandsWithNoDispatch names %q, which the registry does not list", name)
-		}
-	}
-	called := map[string]bool{}
-	for _, c := range dispatchVerbCalls {
-		called[c.args[0]] = true
-	}
-	for name := range dispatchRules {
-		if !called[name] {
-			t.Errorf("the gated command %s has no refusal case in dispatchVerbCalls", name)
-		}
+	if m := agentClassOf([]string{"loop", "--project-root", "P", "status"}); m.Class != agentclass.Allowed {
+		t.Errorf("loop status after a flag = %+v, want class A", m)
 	}
 }
