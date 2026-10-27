@@ -315,3 +315,13 @@ func File(opts Options, raw []byte) (FileResult, error) {
 func RouteConsole(opts Options, taskID, reason string, cycle int) (RouteResult, error) {
 	return withMover(opts, func(m *lifecycle.Mover) (RouteResult, error) { return m.RouteConsole(taskID, reason, cycle) })
 }
+
+type RouteRequest = lifecycle.RouteRequest
+
+func RouteConsoleRequest(opts Options, r RouteRequest) (RouteResult, error) {
+	return withMover(opts, func(m *lifecycle.Mover) (RouteResult, error) { return m.RouteConsoleRequest(r) })
+}
+
+func RouteLaneRequest(opts Options, r RouteRequest) (RouteResult, error) {
+	return withMover(opts, func(m *lifecycle.Mover) (RouteResult, error) { return m.RouteLaneRequest(r) })
+}

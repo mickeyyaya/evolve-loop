@@ -40,3 +40,44 @@ func TestRouteConsole_NamesTheFacadeAndRoutesThroughOptions(t *testing.T) {
 		t.Error("a missing id surfaces as an error through the facade")
 	}
 }
+
+func TestRouteRequests_CarryTheBlockerThroughTheFacade(t *testing.T) {
+	root := t.TempDir()
+	inbox := filepath.Join(root, ".evolve", "inbox")
+	if err := os.MkdirAll(inbox, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for id, body := range map[string]string{"blocker": `{"id":"blocker"}`, "a": `{"id":"a"}`, "b": `{"id":"b"}`} {
+		if err := os.WriteFile(filepath.Join(inbox, id+".json"), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	opts := Options{ProjectRoot: root, Stderr: io.Discard}
+
+	_, cerr := RouteConsoleRequest(opts, RouteRequest{TaskID: "a", Reason: "r", Cycle: 7, BlockedBy: "blocker"})
+	_, lerr := RouteLaneRequest(opts, RouteRequest{TaskID: "b", Reason: "r", BlockedBy: "blocker"})
+
+	if cerr != nil || lerr != nil {
+		t.Fatalf("console err = %v, lane err = %v", cerr, lerr)
+	}
+	for _, id := range []string{"a", "b"} {
+		if d := PendingDispatchability(opts, readDeps(t, filepath.Join(inbox, id+".json"))); d.Dispatchable {
+			t.Errorf("%s: dispatchable while its blocker is pending; deps must name the blocker", id)
+		}
+	}
+}
+
+func readDeps(t *testing.T, path string) []string {
+	t.Helper()
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var it struct {
+		Deps []string `json:"deps"`
+	}
+	if err := json.Unmarshal(body, &it); err != nil {
+		t.Fatal(err)
+	}
+	return it.Deps
+}
