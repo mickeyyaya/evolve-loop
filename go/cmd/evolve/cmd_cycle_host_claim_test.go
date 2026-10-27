@@ -15,8 +15,10 @@ func wiredWithRealPhases(t *testing.T) orchDeps {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("EVOLVE_PROMPTS_DIR", repoRoot)
 	root := t.TempDir()
+	if err := os.Symlink(filepath.Join(repoRoot, "agents"), filepath.Join(root, "agents")); err != nil {
+		t.Fatal(err)
+	}
 	registry, err := os.ReadFile(filepath.Join(repoRoot, "docs", "architecture", "phase-registry.json"))
 	if err != nil {
 		t.Fatal(err)

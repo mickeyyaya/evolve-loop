@@ -340,3 +340,22 @@ func TestRunInbox_Consume_ReconsumeReplacesEarlierStamp(t *testing.T) {
 		t.Errorf("re-consume must replace the earlier stamp; got %+v", stamp)
 	}
 }
+
+func TestRunInbox_Consume_JSONNamesTheConsumedPathAndTheAckedFingerprint(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	evolveDir := filepath.Join(root, ".evolve")
+	name := "2026-08-05T08-30-00Z-pipeline-defect-pipeline-blocker.json"
+	itemPath := writePendingItem(t, evolveDir, name,
+		`{"id":"pipeline-blocker","kind":"pipeline-repair","consumed_by":"`+realConsumedByNarrative+`"}`)
+	var stdout, stderr bytes.Buffer
+	rc := runInbox([]string{"consume", "--json", "--project-root", root, itemPath}, nil, &stdout, &stderr)
+	var got inboxWriteResult
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil || rc != cliExitOK {
+		t.Fatalf("rc %d stdout %q (%v) stderr %q, want exit 0 and one JSON result", rc, stdout.String(), err, stderr.String())
+	}
+	want := inboxWriteResult{Verb: "consume", Path: filepath.Join(evolveDir, "inbox", "consumed", name), Detail: incidentFingerprint}
+	if got != want {
+		t.Errorf("result %+v, want %+v", got, want)
+	}
+}

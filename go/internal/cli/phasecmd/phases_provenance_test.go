@@ -28,7 +28,6 @@ func provenanceFixture(t *testing.T, buildReport string) {
 		}
 	}
 	t.Setenv("EVOLVE_PROJECT_ROOT", root)
-	t.Setenv("EVOLVE_LEDGER_OVERRIDE", "")
 }
 
 func TestPhasesCheckProvenance_MissingHeaderWarnsAndPasses(t *testing.T) {

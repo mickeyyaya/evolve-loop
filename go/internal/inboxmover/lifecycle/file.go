@@ -58,6 +58,9 @@ func (m *Mover) File(raw []byte) (FileResult, error) {
 	if err := m.checkPriorityClass(item); err != nil {
 		return FileResult{}, err
 	}
+	if err := m.stampIntake(fields, item); err != nil {
+		return FileResult{}, err
+	}
 	filed, err := filedItemIDs(m.inboxDir)
 	if err != nil {
 		return FileResult{}, fmt.Errorf("file: scan %s: %w", m.inboxDir, err)

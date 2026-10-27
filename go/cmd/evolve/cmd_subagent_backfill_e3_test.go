@@ -62,8 +62,6 @@ func e3SubagentProject(t *testing.T, profile string, extra map[string]string) st
 	}
 	t.Setenv("EVOLVE_PROJECT_ROOT", root)
 	t.Setenv("EVOLVE_PLUGIN_ROOT", root)
-	t.Setenv("EVOLVE_PROFILES_DIR_OVERRIDE", "")
-	t.Setenv("EVOLVE_ADAPTERS_DIR_OVERRIDE", "")
 	t.Setenv("WORKTREE_PATH", "")
 	return root
 }

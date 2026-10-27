@@ -151,7 +151,7 @@ func TestWaveNext_TextDryRunPrintsTheGoalAndTheSteps(t *testing.T) {
 	goal := waveFirstGoal()
 	out := h.stdout.String()
 	want := fmt.Sprintf("wave: dry run for wave 1; the goal is %d bytes:\n%swave: dry run; the steps, in order:\n  1. evolve checkpoint save --all", len(goal), goal)
-	if rc != 0 || !strings.HasPrefix(out, want) || !strings.Contains(out, "\n  13. evolve loop --detach") || !strings.Contains(h.stderr.String(), "WARN: no earlier wave is recorded") {
+	if rc != 0 || !strings.HasPrefix(out, want) || !strings.Contains(out, "\n  14. evolve loop --detach") || !strings.Contains(h.stderr.String(), "WARN: no earlier wave is recorded") {
 		t.Errorf("rc = %d stdout:\n%s\nstderr: %s", rc, out, h.stderr.String())
 	}
 }

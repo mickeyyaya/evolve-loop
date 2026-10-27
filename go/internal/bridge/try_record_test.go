@@ -111,13 +111,13 @@ func TestTryRecord_ServedModelIsTheVerifiedFooterLabel(t *testing.T) {
 func TestTryRecord_ATranscriptModelOutranksTheFooterLabel(t *testing.T) {
 	t.Parallel()
 	rec := llmcalls.Record{ServedModel: "claude-opus-5-5"}
-	markTry(launchRun{effort: "high", servedModel: "Claude Opus 5.5 · high"})(&rec)
+	markTry(launchRun{effort: "high", servedModel: "Claude Opus 5.5 · high"}, nil)(&rec)
 
 	if rec.ServedModel != "claude-opus-5-5" || rec.Effort != "high" {
 		t.Fatalf("record = %+v, want the transcript model kept and the effort high", rec)
 	}
 	rec = llmcalls.Record{}
-	markTry(launchRun{servedModel: "Claude Opus 5.5 · high"})(&rec)
+	markTry(launchRun{servedModel: "Claude Opus 5.5 · high"}, nil)(&rec)
 	if rec.ServedModel != "Claude Opus 5.5 · high" {
 		t.Fatalf("served_model = %q, want the footer label when no transcript reports one", rec.ServedModel)
 	}

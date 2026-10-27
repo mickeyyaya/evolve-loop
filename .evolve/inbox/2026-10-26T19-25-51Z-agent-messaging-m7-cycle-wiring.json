@@ -1,0 +1,32 @@
+{
+  "acceptance": [
+    "the M7 tests of plan section 11 pass, from TestRoster_HoldsAtMostOneEntryThatIsNotPastForEachPhase to TestProtectedSurface_CoversTheMessageTree",
+    "TestSeal_WritesTheArchiveHashToTheLedger passes",
+    "TestPolicyMessaging_DecodesStrictly passes",
+    "each new and changed function has 100% coverage"
+  ],
+  "created_at": "2026-10-26T19:23:03Z",
+  "deps": [
+    "agent-messaging-m4-msg-cli",
+    "agent-messaging-m5-deliverers",
+    "agent-messaging-m6-sandbox-rules"
+  ],
+  "files": [
+    "go/internal/core/cyclerun.go",
+    "go/internal/core/resume.go",
+    "go/internal/bridge/dispatch_reap.go",
+    "go/internal/policy/",
+    "go/internal/guards/integrity_surface.go",
+    "go/internal/adapters/ledger/"
+  ],
+  "fix": "Start the service in newCycleRun and in RunCycleFromPhase. Export EVOLVE_MSG_TOKEN at the bridge boot and add it to ipcenv.ProtocolKeys(). Decode the messaging block of policy.json strictly. Emit msg.sent, msg.denied and msg.dead. At the seal, write the archive hash to the ledger and dead-letter the open queues. Add /.evolve/msg/ to the protected surface.",
+  "id": "agent-messaging-m7-cycle-wiring",
+  "kind": "feature",
+  "notes": "Plan: docs/plans/agent-messaging-2026-10.md sections 9 to 11, M7. The surface includes the policy parser, the ledger and the guards, which are gate files. held_proposal_candidate: true. Open question Q5 (a message to a phase that did not run goes to msg.dead.<cycle>) is confirmed here.",
+  "priority_class": "feature",
+  "route": "console-manual",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Plan docs/plans/agent-messaging-2026-10.md, component M7. Spec: docs/architecture/agent-messaging.md. M7 changes live behavior. Plan section 10 blocks M7 until M6 lands. Section 9 lists the seams.",
+  "title": "Agent messaging M7: wire the service into RunCycle and RunCycleFromPhase, with the roster, the policy block, the signals and the seal",
+  "weight": 0.4
+}

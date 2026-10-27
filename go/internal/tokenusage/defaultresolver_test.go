@@ -25,6 +25,7 @@ func TestDefaultResolver_TranscriptFixture_ReturnsTranscriptSource(t *testing.T)
 		t.Fatal("DefaultResolver returned a nil func — telemetry stays silently off")
 	}
 	res, err := resolver(Window{
+		Collector: FormatClaudeJSONL, ContextWindow: 200_000,
 		Worktree: worktree,
 		Start:    mustParse(t, launchWindowStart),
 		End:      mustParse(t, launchWindowEnd),
@@ -45,6 +46,7 @@ func TestDefaultResolver_EmptyConfigRoot_ReturnsSourceNoneNotError(t *testing.T)
 
 	resolver := DefaultResolver(root)
 	res, err := resolver(Window{
+		Collector: FormatClaudeJSONL, ContextWindow: 200_000,
 		Worktree: "/repo/worktrees/cycle-999",
 		Start:    mustParse(t, launchWindowStart),
 		End:      mustParse(t, launchWindowEnd),

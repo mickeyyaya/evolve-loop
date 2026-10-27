@@ -35,8 +35,8 @@ Subcommands:
   validate-profile   Validate agent profile JSON + adapter capabilities +
                      dispatch plan log; runs adapter with VALIDATE_ONLY=1
                      ( validate-profile [--dispatch-plan-log PATH] <agent> )
-                     Honors EVOLVE_PROFILES_DIR_OVERRIDE,
-                     EVOLVE_ADAPTERS_DIR_OVERRIDE.
+                     Reads the profiles and the adapters of
+                     EVOLVE_PLUGIN_ROOT, else of the project root.
   run                Execute one phase agent end-to-end (v2 cache-prefix
                      prompt + adapter exec + verify + ledger).
                      ( run <agent> <cycle> <workspace_path> )
@@ -259,7 +259,7 @@ func runSubagentCheckCtxAdvisory(args []string, stdout, stderr io.Writer) int {
 func runSubagentValidateProfile(args []string, stdout, stderr io.Writer) int {
 	if cmdutil.HasHelp(args) {
 		fmt.Fprintln(stdout, "Usage: evolve subagent validate-profile [--dispatch-plan-log PATH] <agent>")
-		fmt.Fprintln(stdout, "Env: EVOLVE_PROFILES_DIR_OVERRIDE, EVOLVE_ADAPTERS_DIR_OVERRIDE")
+		fmt.Fprintln(stdout, "Reads <plugin root>/.evolve/profiles and <plugin root>/adapters (EVOLVE_PLUGIN_ROOT, else the project root).")
 		return 0
 	}
 	dispatchPlanLog, args, parsed := parseValidateProfileFlags(args, stderr)

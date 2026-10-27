@@ -19,9 +19,6 @@ const claudeWindow = 200_000
 func goDir(t *testing.T) string { return filepath.Join(acsassert.RepoRoot(t), "go") }
 
 func TestC1444_001_FillPctIsPercentOfEffectiveWindow(t *testing.T) {
-	if got := tokenusage.EffectiveWindow("claude-tmux"); got != claudeWindow {
-		t.Fatalf("EffectiveWindow(\"claude-tmux\") = %d, want %d", got, claudeWindow)
-	}
 	prompt := tokenusage.PromptTokens(cyclestate.TokenUsage{
 		Input: 100_000, Output: 9_999_999, CacheRead: 20_000, CacheWrite: 0,
 	})
@@ -46,9 +43,6 @@ func TestC1444_002_UnmeasurableFillIsSentinelNeverZeroOrInf(t *testing.T) {
 	if tokenusage.FillPctUnmeasured >= 0 {
 		t.Errorf("sentinel %v is non-negative — it can collide with a real 0–100%% reading", tokenusage.FillPctUnmeasured)
 	}
-	if got := tokenusage.EffectiveWindow("no-such-cli-family"); got != 0 {
-		t.Errorf("EffectiveWindow(unknown family) = %d, want 0 (never guess a window)", got)
-	}
 }
 
 func TestC1444_003_ResolverStampsFillFromRecoveredUsage(t *testing.T) {
@@ -60,7 +54,7 @@ func TestC1444_003_ResolverStampsFillFromRecoveredUsage(t *testing.T) {
 	}
 	resolve := tokenusage.DefaultResolver(t.TempDir())
 
-	covered, err := resolve(tokenusage.Window{Driver: "claude-tmux", EventsLogPath: events})
+	covered, err := resolve(tokenusage.Window{Driver: "claude-tmux", Collector: tokenusage.FormatClaudeJSONL, ContextWindow: claudeWindow, EventsLogPath: events})
 	if err != nil {
 		t.Fatalf("resolver errored (telemetry must be best-effort): %v", err)
 	}
@@ -71,7 +65,7 @@ func TestC1444_003_ResolverStampsFillFromRecoveredUsage(t *testing.T) {
 		t.Errorf("Result.FillPct = %v, want 60 — fill%% is not derived from the usage this resolve recovered", covered.FillPct)
 	}
 
-	uncovered, err := resolve(tokenusage.Window{Driver: "claude-tmux"})
+	uncovered, err := resolve(tokenusage.Window{Driver: "claude-tmux", Collector: tokenusage.FormatClaudeJSONL, ContextWindow: claudeWindow})
 	if err != nil {
 		t.Fatalf("resolver errored: %v", err)
 	}

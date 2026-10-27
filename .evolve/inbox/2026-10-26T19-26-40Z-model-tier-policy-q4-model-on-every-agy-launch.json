@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "The argv of a dispatch launch of agy with no tier carries the fast model of the agy manifest",
+    "The argv of a launch whose tier token does not resolve carries the fast model of the agy manifest",
+    "The argv of the agy -p doctor probe carries the fast model (delivered by bridge-factory F2)",
+    "No Go literal names an agy model"
+  ],
+  "created_at": "2026-10-26T19:30:00Z",
+  "deps": [
+    "bridge-factory-f2-probe-through-driver"
+  ],
+  "files": [
+    "go/internal/bridge/",
+    "go/internal/bridge/manifests/agy.json",
+    "go/internal/bridge/manifests/agy-tmux.json"
+  ],
+  "fix": "In go/internal/bridge, give each agy launch the --model value of its tier. If the tier is empty or does not resolve, use the fast model of the agy manifest (today Gemini 3.8 Flash (Low)). Read the model from the manifest model_tier_map, never from a Go literal.",
+  "id": "model-tier-policy-q4-model-on-every-agy-launch",
+  "kind": "bug",
+  "notes": "Plan link: docs/plans/model-tier-policy-2026-10.md (component Q4). Spec link: docs/reference/model-routing.md (section The tier policy) and ADR-0136. The plan has no owner column. The fix surface is go/internal/bridge and not a gate file, so the route is lane: admission decides; the narrowed protected fence lands soon.",
+  "priority_class": "correctness",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Component Q4 (decision D10) of the plan docs/plans/model-tier-policy-2026-10.md. The spec is docs/reference/model-routing.md (section The tier policy) and ADR-0136. A launch of agy without a tier, or with a tier token that does not resolve, starts agy without --model, and agy then uses its default model and the Argon pool (plan fact U2). Bridge-factory F2 delivers the probe part. This item covers the dispatch launch.",
+  "title": "Every agy launch passes a valid --model, also when the tier token does not resolve (tier-policy plan Q4)",
+  "weight": 0.45
+}

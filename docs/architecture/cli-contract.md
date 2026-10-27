@@ -388,6 +388,8 @@ Limits:
 | `cli update` | boundary | D | yes | yes | `evolve.cli.update/1` | `--dry-run` is `always` (`c/cmd_cli.go:57`) |
 | `loop` | boundary | D | yes | yes | `evolve.loop/1` | one owner only (`c/cmd_loop_detach.go:55`) |
 
+`inbox curate` is not a core verb yet. It has no `--json`. Without a flag it is read-only. `--event` publishes signals, and `--apply` refuses with exit 1 while a run lease is live. [inbox-curator.md](inbox-curator.md) is its specification.
+
 Verbs outside this table are tools for the operator or for the pipeline itself. A caller must not depend on them. Examples are `inbox-mover`, `fanout-dispatch`, `serve-phase` and `phase-watchdog`.
 
 ## 6. Verbs to add

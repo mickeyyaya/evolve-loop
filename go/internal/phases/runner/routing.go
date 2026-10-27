@@ -91,7 +91,7 @@ func (b *BaseRunner) routeRequest(req core.PhaseRequest, prep phasePreparation, 
 	}
 	return cliroute.Request{
 		Agent: prep.profileName, Phase: prep.phase, ProjectRoot: req.ProjectRoot, DefaultModel: b.hooks.DefaultModel(),
-		Env: req.Env, Overlay: llmroute.Overlay{CLI: req.ModelRoutingCLI, Tier: req.ModelRoutingTier, Effort: req.ModelRoutingEffort},
+		Env: req.Env, Overlay: llmroute.Overlay{CLI: req.ModelRoutingCLI, Tier: req.ModelRoutingTier, LadderTier: req.Ladder.LadderTier(), Effort: req.ModelRoutingEffort},
 		Expand: autoExpander(resolve), BypassPolicy: req.BypassPolicy, NeedsTools: req.Worktree != "", Cycle: req.Cycle,
 	}
 }

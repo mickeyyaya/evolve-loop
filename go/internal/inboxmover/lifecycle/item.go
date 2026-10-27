@@ -102,31 +102,49 @@ func readTaskIDOrUnknown(path string) string {
 }
 
 func (m *Mover) ReadFailureCount(taskID string) (int, bool) {
+	rec, ok := m.readFailureFields(taskID)
+	return rec.FailureCount, ok
+}
+
+func (m *Mover) ReadLastFailureClass(taskID string) string {
+	rec, _ := m.readFailureFields(taskID)
+	return rec.LastFailureClass
+}
+
+type failureFields struct {
+	FailureCount     int    `json:"failure_count"`
+	LastFailureClass string `json:"last_failure_class"`
+}
+
+func (m *Mover) readFailureFields(taskID string) (failureFields, bool) {
 	dirs := append([]string{m.inboxDir}, inboxbatch.ProcessingCycleDirs(m.inboxDir)...)
 	for _, d := range dirs {
 		path, err := FindFileByTaskID(d, taskID)
 		if err != nil {
 			continue
 		}
-		if n, ok := readFailureCountAt(path); ok {
-			return n, true
+		if rec, ok := readFailureFieldsAt(path); ok {
+			return rec, true
 		}
 	}
-	return 0, false
+	return failureFields{}, false
 }
 
 func readFailureCountAt(path string) (int, bool) {
+	rec, ok := readFailureFieldsAt(path)
+	return rec.FailureCount, ok
+}
+
+func readFailureFieldsAt(path string) (failureFields, bool) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return 0, false
+		return failureFields{}, false
 	}
-	var doc struct {
-		FailureCount int `json:"failure_count"`
+	var rec failureFields
+	if json.Unmarshal(raw, &rec) != nil {
+		return failureFields{}, false
 	}
-	if json.Unmarshal(raw, &doc) != nil {
-		return 0, false
-	}
-	return doc.FailureCount, true
+	return rec, true
 }
 
 type failureRecord struct {

@@ -28,7 +28,7 @@ func TestDefaultDetector_Converging(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.cli, func(t *testing.T) {
 			det := NewDefaultDetector(3)
-			p := Profiles[c.cli]
+			p := Profiles[c.cli+"-repl-v1"]
 			det.Assess(testdataFrame(t, c.think), p)
 			state, _ := det.Assess(testdataFrame(t, c.answer), p)
 			if state != LivenessConverging {
@@ -39,7 +39,7 @@ func TestDefaultDetector_Converging(t *testing.T) {
 }
 
 func TestDefaultDetector_SpinnerOnlyIsNotConverging(t *testing.T) {
-	p := Profiles["claude"]
+	p := Profiles["claude-repl-v1"]
 	det := NewDefaultDetector(3)
 	det.Assess("⏺ real content\n❯ \n", p)
 	spinner := "⏺ real content\n✽ Thinking… (5s · ↓ 50 tokens)\n❯ \n"
@@ -50,7 +50,7 @@ func TestDefaultDetector_SpinnerOnlyIsNotConverging(t *testing.T) {
 }
 
 func TestDefaultDetector_PrimingNotHung(t *testing.T) {
-	p := Profiles["claude"]
+	p := Profiles["claude-repl-v1"]
 	for _, frame := range []string{
 		"❯ \n",
 		"⏺ some content\n❯ \n",
@@ -65,7 +65,7 @@ func TestDefaultDetector_PrimingNotHung(t *testing.T) {
 }
 
 func TestDefaultDetector_HungAfterThreshold(t *testing.T) {
-	p := Profiles["claude"]
+	p := Profiles["claude-repl-v1"]
 	const stall = 2
 	det := NewDefaultDetector(stall)
 	det.Assess("⏺ initial\n❯ \n", p)
@@ -80,7 +80,7 @@ func TestDefaultDetector_HungAfterThreshold(t *testing.T) {
 }
 
 func TestDefaultDetector_IdleResetsStalls(t *testing.T) {
-	p := Profiles["claude"]
+	p := Profiles["claude-repl-v1"]
 	det := NewDefaultDetector(2)
 	det.Assess("⏺ content\n❯ \n", p)
 	det.Assess("⏺ content\n✽ Thinking… (3s · ↓ 5 tokens)\n❯ \n", p)
@@ -92,7 +92,7 @@ func TestDefaultDetector_IdleResetsStalls(t *testing.T) {
 }
 
 func TestClaudeDetector_IncreasingTokensConverging(t *testing.T) {
-	p := Profiles["claude"]
+	p := Profiles["claude-repl-v1"]
 	base := NewDefaultDetector(3)
 	det := NewClaudeDetector(3)
 	frames := []string{
@@ -115,7 +115,7 @@ func TestClaudeDetector_IncreasingTokensConverging(t *testing.T) {
 }
 
 func TestClaudeDetector_StaticTokenFallsBack(t *testing.T) {
-	p := Profiles["claude"]
+	p := Profiles["claude-repl-v1"]
 	base := NewDefaultDetector(3)
 	det := NewClaudeDetector(3)
 	static := "✽ Thinking… (5s · ↓ 100 tokens)\n❯ \n"
@@ -134,7 +134,7 @@ func TestClaudeDetector_StaticTokenFallsBack(t *testing.T) {
 }
 
 func TestClaudeDetector_MalformedTokenNoPanic(t *testing.T) {
-	p := Profiles["claude"]
+	p := Profiles["claude-repl-v1"]
 	malformed := []string{
 		"✽ Thinking… (↓ tokens)\n❯ \n",
 		"✽ Thinking… (5s · ↓ k tokens)\n❯ \n",
@@ -164,7 +164,7 @@ func TestClaudeDetector_MalformedTokenNoPanic(t *testing.T) {
 func TestDetectorFor_NonClaudeIsDefault(t *testing.T) {
 	for _, cli := range []string{"codex", "agy", "ollama"} {
 		t.Run(cli, func(t *testing.T) {
-			p := Profiles[cli]
+			p := Profiles[cli+"-repl-v1"]
 			probe := DetectorFor(p)
 			if probe == nil {
 				t.Fatalf("DetectorFor(%q) = nil", cli)
@@ -184,7 +184,7 @@ func TestDetectorFor_NonClaudeIsDefault(t *testing.T) {
 }
 
 func TestDetectorFor_ClaudeIsClaudeDetector(t *testing.T) {
-	p := Profiles["claude"]
+	p := Profiles["claude-repl-v1"]
 	probe := DetectorFor(p)
 	base := NewDefaultDetector(0)
 	frames := []string{

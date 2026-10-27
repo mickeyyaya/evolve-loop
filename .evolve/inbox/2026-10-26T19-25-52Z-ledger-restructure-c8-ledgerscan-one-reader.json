@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "each migrated reader matches its old self on fixtures and on a copy of the real ledger",
+    "the per-ship RSS and time are measured before and after the migration",
+    "the package is in go/.cover-strict at 100 and in go/.apicover-enforce"
+  ],
+  "created_at": "2026-10-26T19:23:03Z",
+  "deps": [],
+  "files": [
+    "go/internal/ledgerscan/",
+    "go/internal/auditledger/",
+    "go/internal/phases/ship/composition.go",
+    "go/internal/core/audited_tree.go",
+    "go/internal/phasecoherence/",
+    "go/internal/cyclehealth/",
+    "go/internal/dossier/",
+    "go/internal/ledgerverify/"
+  ],
+  "fix": "Build go/internal/ledgerscan: a forward or reverse chunked stream, a raw-byte prefilter on kind, run and cycle, and early exit. Migrate one reader in each commit, each with an equivalence test of the old and new reader. Route the hard-coded ledger paths through paths.Layout.",
+  "id": "ledger-restructure-c8-ledgerscan-one-reader",
+  "kind": "refactor",
+  "notes": "Plan: docs/plans/ledger-restructure-2026-10.md sections 4 and 7, C8. The readers include the ship composition check and ledgerverify, which are gate files. held_proposal_candidate: true. The new package alone can be a lane part.",
+  "priority_class": "performance",
+  "route": "console-manual",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Plan docs/plans/ledger-restructure-2026-10.md, component C8. Decision record: docs/architecture/adr/0123-ledger-durable-evidence-segments-incremental-verify.md. go/internal/ledgerscan does not exist. A ship runs 3 to 6 whole-file passes to find the newest row of one run.",
+  "title": "Ledger C8: internal/ledgerscan, one streaming reader, and each reader migrates with an equivalence test",
+  "weight": 0.4
+}

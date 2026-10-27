@@ -278,15 +278,13 @@ func TestRunSubagent_ValidateProfile_Help(t *testing.T) {
 	if rc != 0 {
 		t.Errorf("rc=%d", rc)
 	}
-	if !strings.Contains(out, "Usage") || !strings.Contains(out, "EVOLVE_PROFILES_DIR_OVERRIDE") {
+	if !strings.Contains(out, "Usage") || !strings.Contains(out, "<plugin root>/.evolve/profiles") || strings.Contains(out, "_OVERRIDE") {
 		t.Errorf("help missing env vars: %q", out)
 	}
 }
 
 func TestRunSubagent_ValidateProfile_MissingProfileFails(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("EVOLVE_PROFILES_DIR_OVERRIDE", tmp)
-	t.Setenv("EVOLVE_ADAPTERS_DIR_OVERRIDE", tmp)
 	t.Setenv("EVOLVE_PROJECT_ROOT", tmp)
 	t.Setenv("EVOLVE_PLUGIN_ROOT", tmp)
 	_, errOut, rc := runCLI("validate-profile", "no-such-agent")

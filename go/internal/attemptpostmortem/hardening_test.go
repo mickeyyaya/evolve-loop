@@ -160,10 +160,10 @@ func TestNextNumber_IsOnePastTheHighestContiguousRecord(t *testing.T) {
 	}
 }
 
-func TestWritesTranscript_IsTrueOnlyForAClaudeCLI(t *testing.T) {
-	for cli, want := range map[string]bool{"claude": true, "claude-tmux": true, "claude-p": true, "Claude-Tmux": true, "CLAUDE": true, "agy-claude-tmux": false, "agy": false, "codex-tmux": false, "": false} {
-		if got := WritesTranscript(cli); got != want {
-			t.Errorf("WritesTranscript(%q) = %v, want %v", cli, got, want)
+func TestKnownTranscriptFormat_IsTrueOnlyForAKnownTranscriptFormat(t *testing.T) {
+	for format, want := range map[string]bool{FormatClaudeJSONL: true, "claude": false, "claude-tmux": false, "agy": false, "newfam-jsonl-v9": false, "": false} {
+		if got := KnownTranscriptFormat(format); got != want {
+			t.Errorf("KnownTranscriptFormat(%q) = %v, want %v", format, got, want)
 		}
 	}
 }

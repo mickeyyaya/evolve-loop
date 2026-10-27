@@ -1,7 +1,7 @@
 # Reflection Journal — Per-Phase Improvement Signal
 
 > Status: **advisory** (v10.20.0+). Promotion to **enforce** target: v10.21.0.
-> Env-var gate: `EVOLVE_REFLECTION_JOURNAL` (default `1`; `0` opts out for emergencies).
+> No gate: each phase agent always writes its reflection. X18e (2026-10-27) deleted the old environment gate, because no code read it.
 > Schema: [agents/agent-templates.md](../../agents/agent-templates.md) → Reflection Journal Schema section.
 > Learn-phase formalization: [learn-phase.md](learn-phase.md).
 
@@ -75,8 +75,8 @@ Matches the `EVOLVE_BUILD_PLANNER` precedent in [control-flags.md](control-flags
 
 | Stage | Version | Default | Behavior |
 |-------|---------|---------|----------|
-| **advisory** | v10.20.0 | `EVOLVE_REFLECTION_JOURNAL=1` | All 9 phase agents emit reflections; reflector + retrospective + memo consume YAML. Missing YAML → WARN line in `learn/reflector-synthesis.md`, no FAIL. |
-| **enforce** | v10.21.0 | unchanged default-on; opt-out with `=0` for emergencies | `phase-gate.sh check_reflection_artifact` blocks each `gate_<phase>_to_<next>` on presence of `<phase>-reflection.yaml`. Absent = exit 1, BLOCK. Promotion criterion: 3 consecutive cycles where ≥80% of phases emit valid reflections AND token overhead ≤ 800 tokens/cycle. |
+| **advisory** | v10.20.0 | on | All 9 phase agents emit reflections; reflector + retrospective + memo consume YAML. Missing YAML → WARN line in `learn/reflector-synthesis.md`, no FAIL. |
+| **enforce** | v10.21.0 | on | `phase-gate.sh check_reflection_artifact` blocks each `gate_<phase>_to_<next>` on presence of `<phase>-reflection.yaml`. Absent = exit 1, BLOCK. Promotion criterion: 3 consecutive cycles where ≥80% of phases emit valid reflections AND token overhead ≤ 800 tokens/cycle. |
 
 ## Anti-sycophancy rationale
 

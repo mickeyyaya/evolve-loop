@@ -207,7 +207,7 @@ func (f cycleRunFlags) request(projectRoot string, environ []string) core.CycleR
 	return core.CycleRequest{
 		ProjectRoot:           projectRoot,
 		GoalHash:              f.goalHash,
-		Env:                   filterEvolveEnv(environ),
+		Env:                   carriedEnv(environ),
 		Context:               cycleContext(f.goalHash, f.goalText),
 		DisableWorkspaceGuard: disableWorkspaceGuardForTest,
 		BypassPolicy:          f.bypassPolicy,
@@ -559,6 +559,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	opts = append(opts, core.WithShipFloor(policyShipFloor))
 	opts = append(opts, core.WithRetryConfig(pol.RetryConfig()))
 	opts = append(opts, core.WithFailureCountReader(failureCountReader(projectRoot)))
+	opts = append(opts, core.WithFailureClassReader(failureClassReader(projectRoot)))
 	opts = append(opts, core.WithScopePathResolver(scopePathResolver))
 	opts = append(opts, core.WithContinuationResolver(continuationForScope))
 	opts = append(opts, core.WithWorkflowConfig(wfCfg))
@@ -619,6 +620,12 @@ func failureCountReader(projectRoot string) func(id string) int {
 	}
 }
 
+func failureClassReader(projectRoot string) func(id string) string {
+	return func(id string) string {
+		return inboxmover.ReadLastFailureClass(inboxmover.Options{ProjectRoot: projectRoot}, id)
+	}
+}
+
 func continuationForScope(root string, cycle int, scopeIDs []string) *continuation.Continuation {
 	return inboxmover.ResolveContinuationForScope(inboxmover.Options{ProjectRoot: root, Stderr: os.Stderr}, cycle, scopeIDs)
 }
@@ -631,7 +638,7 @@ func hostInboxClaimer(ld inboxmover.LedgerAppender, signals *signalcenter.Center
 
 func hostFollowupFiler(ld inboxmover.LedgerAppender, signals *signalcenter.Center, forbidden func(string) bool, classes []string) evalgate.ConsoleFollowupFiler {
 	return func(projectRoot string, raw []byte) error {
-		_, err := inboxmover.File(inboxmover.Options{ProjectRoot: projectRoot, Stderr: os.Stderr, Ledger: ld, Signals: signals, IsProtectedPath: forbidden, PriorityClasses: classes}, raw)
+		_, err := inboxmover.File(inboxmover.Options{ProjectRoot: projectRoot, Stderr: os.Stderr, Ledger: ld, Signals: signals, IsProtectedPath: forbidden, PriorityClasses: classes, Origin: inboxbatch.OriginCycle}, raw)
 		return err
 	}
 }

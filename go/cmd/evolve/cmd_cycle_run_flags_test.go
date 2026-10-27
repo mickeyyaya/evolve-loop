@@ -36,17 +36,17 @@ func TestParseCycleRunFlags(t *testing.T) {
 	}
 }
 
-func TestCycleRunFlags_RequestCarriesTheGoalTheBypassAndTheEvolveEnv(t *testing.T) {
+func TestCycleRunFlags_RequestCarriesTheGoalTheBypassAndTheMarkers(t *testing.T) {
 	t.Parallel()
 	f := cycleRunFlags{goalHash: "abcd1234", goalText: "ship it", bypassPolicy: true}
 
-	req := f.request("/abs/root", []string{"EVOLVE_X=1", "HOME=/h"})
+	req := f.request("/abs/root", []string{"EVOLVE_PROJECT_ROOT=/abs/root", "EVOLVE_BYPASS_SHIP_GATE=1", "HOME=/h"})
 
 	if req.ProjectRoot != "/abs/root" || req.GoalHash != "abcd1234" || req.Context["goal"] != "ship it" || !req.BypassPolicy {
 		t.Errorf("request = %+v, want the absolutized root, the goal hash, the goal text in Context and the bypass", req)
 	}
-	if len(req.Env) != 1 || req.Env["EVOLVE_X"] != "1" {
-		t.Errorf("request Env = %v, want only the EVOLVE_ variable", req.Env)
+	if len(req.Env) != 1 || req.Env["EVOLVE_PROJECT_ROOT"] != "/abs/root" {
+		t.Errorf("request Env = %v, want only the pipeline marker: an unlisted EVOLVE_ name must not reach the cycle", req.Env)
 	}
 }
 

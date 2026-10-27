@@ -93,7 +93,7 @@ func TestClihealthUsage_NoFamilyNamedProbesEveryInstalledOne(t *testing.T) {
 	if code != 0 || len(*probed) != 1 || (*probed)[0] != "ollama" {
 		t.Errorf("code=%d probed=%v stderr=%q, want only the installed ollama probed", code, *probed, errb.String())
 	}
-	if !strings.Contains(out.String(), "ollama  (its manifest maps no usage command)") {
+	if !strings.Contains(out.String(), "ollama  no_collector (its manifest maps no usage command)") {
 		t.Errorf("stdout = %q, want the note row", out.String())
 	}
 }
@@ -102,7 +102,7 @@ func TestReadUsage_ACLIThatDeclaresWindowsAndReadsNoneIsAnError(t *testing.T) {
 	t.Parallel()
 	r := readUsage(context.Background(), func(context.Context, string) (string, error) { return "nothing here", nil }, "claude")
 
-	if r.CLI != "claude" || r.Note != "" || len(r.Windows) != 0 || !strings.HasPrefix(r.Error, "no usage window read") {
+	if r.CLI != "claude" || r.Note != "" || r.State != clicontrol.UsageUnparsed || len(r.Windows) != 0 || !strings.HasPrefix(r.Error, "no usage window read") {
 		t.Errorf("readout = %+v; claude declares controls.usage.windows, so a screen with none is an error", r)
 	}
 }
@@ -111,8 +111,8 @@ func TestReadUsage_ACLIThatDeclaresNoWindowsGetsANote(t *testing.T) {
 	t.Parallel()
 	r := readUsage(context.Background(), func(context.Context, string) (string, error) { return "nothing here", nil }, "codex")
 
-	if r.Error != "" || len(r.Windows) != 0 || !strings.HasPrefix(r.Note, "its manifest declares no controls.usage.windows") {
-		t.Errorf("readout = %+v, want no windows and the no-declaration note", r)
+	if r.Error != "" || len(r.Windows) != 0 || r.State != clicontrol.UsageNoCollector || !strings.HasPrefix(r.Note, "its manifest declares no controls.usage.windows") {
+		t.Errorf("readout = %+v, want no windows, the state no_collector and the no-declaration note", r)
 	}
 }
 

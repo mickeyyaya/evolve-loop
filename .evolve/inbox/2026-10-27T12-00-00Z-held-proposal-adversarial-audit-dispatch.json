@@ -1,0 +1,27 @@
+{
+  "source": "console, 2026-10-27, operator decision \"1 + 2 + 3\" (ADR-0157). Plan: docs/plans/narrow-fence-2026-10.md",
+  "injected_by": "console-operator-session",
+  "created_at": "2026-10-27T12:00:00Z",
+  "priority_class": "pipeline",
+  "priority": "P1",
+  "id": "held-proposal-adversarial-audit-dispatch",
+  "kind": "pipeline-integrity",
+  "title": "Dispatch the extra adversarial audit of a held proposal: a family other than the builder, at the deep tier (ADR-0157 H4)",
+  "summary": "When the ship holds a lane change, the pipeline dispatches one adversarial audit from a family that is not the family of the builder, at the deep tier, and writes the report beside the hold record. evolve landing approve refuses an approval with no PASS report from such a family.",
+  "acceptance": [
+    "An audit from the family of the builder is refused as the extra audit.",
+    "evolve landing approve refuses when the report is absent, is not PASS or names the builder family.",
+    "The dispatch goes through the bridge launch API and the dispatch credential (ADR-0154)."
+  ],
+  "files": [
+    "go/internal/heldproposal/",
+    "go/internal/phases/audit/",
+    "go/cmd/evolve/cmd_landing.go"
+  ],
+  "deps": [
+    "held-proposal-gate"
+  ],
+  "route": "console-manual",
+  "weight": 0.7,
+  "notes": "Held proposal: it changes the audit verdict and a gate, so it lands only through the hold of held-proposal-gate. Until the lane admission (held-proposal-lane-admission) is built, the console routes it."
+}

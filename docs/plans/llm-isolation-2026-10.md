@@ -158,27 +158,30 @@ Each component is one PR, with a red test first. The spec section is the accepta
 
 ### 6.1 Component state
 
-The state on 2026-10-26. Each component re-reads this table before it starts.
+The state on 2026-10-27. Each component re-reads this table before it starts.
 
 | Id | State | PR | Note |
 |---|---|---|---|
 | X1 | merged | #1121 | The matrix is `isolation.Rows` (`go/internal/isolation/matrix.go`). Rows M1 and N9 are green, and each other row is an expected failure with its owner. |
-| X2 | merged, stage `shadow` | #1122 | The stage key is `isolation.i2.stage`, and the flip to `enforce` is an operator decision. X2 closed review finding H2 in the bridge with the explicit list `pipelineEnvMarkers`. X18b makes one list the source for the whole pipeline. |
+| X2 | merged, stage `enforce` | #1122, #1159 | The stage key is `isolation.i2.stage`. PR #1159 set it to `enforce` on 2026-10-26. X2 closed review finding H2 in the bridge with the explicit list `pipelineEnvMarkers`. X18b moved that list into `ipcenv`. |
 | X1b | merged | #1128 | Follow-up of X1: a fake `tmux` (`go/internal/faketmux`), so the rows M2 to M4 run a full cycle and are green. |
 | X6 | merged | #1123 | `cli_routing.floors` holds the Claude floor, and its compiled default is `go/internal/policy/routing_defaults.json`. The flow seat defaults are routing data. |
 | X6b | not started | none | Follow-up of X6, item `isolation-floor-profiles-allowed-clis-as-routing-data`. 7 profiles still set `allowed_clis` to Claude families, so an agy-only table cannot compile yet (§6.2). |
 | X3 | merged | #1127 | One launch API (`bridge.LaunchLLM`, `launchPane`, `newRecipeDriver`) starts each LLM binary. The guard `TestOnlyTheBridgeStartsAnLLMBinary` found 9 spawns on 7 paths before the change and 0 after it. Row N2 is green. The probe purpose keeps its bypass grant until item `isolation-probe-bypass-plan-mode-proof` proves a plan-mode control capture. |
 | X18a | merged | #1129 | `policy.Parse` refuses an unknown key at any level and names its path. The spec §27 has the design and the rollout step. |
 | X7 | merged, stage `shadow` | #1135 | The sandbox denies each write of a protected path of `guards.ProtectedSurfaceManifest` for each family (policy `isolation.i7.stage`). `guard phase` allows an in-cell `Agent` or `Task` and denies an out-of-cell phase persona. Rows N10 and N11 are green. The spec §9.1 has the map of each hook to its CLI-neutral layer. |
-| X4 | merged | #1126 | A phase cell carries the depth and phase markers, and the sandbox denies the exec of an LLM binary. The dispatch credential of I-3 merged in #1132: the dispatch verbs need a credential that no cell can read. |
+| X4 | merged | #1126 | A phase cell carries the depth and phase markers, and the sandbox denies the exec of an LLM binary. The dispatch credential of I-3 merged in #1132: the dispatch verbs need a credential that no cell can read. The item `isolation-no-nested-agency` stays open: at stage `shadow`, an exec deny report does not emit `ISOLATION_I3_VIOLATION` yet. |
 | X5 | merged, stage `shadow` | #1133 | Each phase cell reads `inputs/index.json` with exact read grants (policy `isolation.i5.stage`). |
 | X8 | merged | #1131 | Each flow decision is a declared JSON file that a `phasecontract` schema checks. |
-| X10 | built | this change | `AGENTS.md` is the one source. `evolve skills generate` renders its digest into `CLAUDE.md` and `GEMINI.md`, and the four review-fleet personas into `.claude/agents`. |
+| X10 | merged | #1136 | `AGENTS.md` is the one source. `evolve skills generate` renders its digest into `CLAUDE.md` and `GEMINI.md`, and the four review-fleet personas into `.claude/agents`. |
 | X17a | merged | #1125 | `evolve loop status` with any extra word never starts a loop. |
 | X17e | merged | #1130 | Each `evolve` verb has an agent class (docs). |
-| X17b | built | this change | With `--json`, each core verb of [cli-contract.md](../architecture/cli-contract.md) §5 prints one envelope on each exit and exits with a code of the one exit table. Each core verb takes `--project-root`. `TestCLIContract_DocMatchesTheRegistry` and the integration table test guard both. |
+| X9 | built | #1174 | The manifest fields `parsers`, `collectors`, `transcript`, `capabilities`, `context_window` and `home_reads` pick one Go implementation for each format id (spec §11.1). Row N14 is green. Row M5 moves to X19c. Item `isolation-x9b-route-and-model-tables-from-manifests` owns the `llmroute` and `modelquery` tables. |
+| X18b | built | #1175 | `ipcenv.Markers()` is the one marker list, and the bridge reads its cell part. A cycle gets only a marker or a control not yet moved. The guard `TestNoControlFlagReadOutsideTheMarkerList` fails on any other `EVOLVE_*` or `BRIDGE_*` read. Row N1 also covers `EVOLVE_SANDBOX` and `EVOLVE_BYPASS_SHIP_GATE`. |
+| X18e | built | #1177 | Deleted names: `EVOLVE_REFLECTION_JOURNAL`, `EVOLVE_RESUME`, `EVOLVE_RESUME_MODE`, `EVOLVE_SANDBOX_FALLBACK_ON_EPERM` and `EVOLVE_RELEASE_STRICT_PASS`, with 5 registry rows. The test seams `EVOLVE_PROFILES_DIR_OVERRIDE`, `EVOLVE_ADAPTERS_DIR_OVERRIDE`, `EVOLVE_LEDGER_OVERRIDE`, `EVOLVE_PROMPTS_DIR`, `BRIDGE_TESTING`, `BRIDGE_<X>_BINARY`, `CG_TEST_INSTALL` and `CG_TEST_FORCE_MISSING` have no production read. Tests set `bridge.Deps.Binaries`, the `commitgate.Options` fields, or the real project roots. |
+| X17b | built | #1178 | With `--json`, each core verb of [cli-contract.md](../architecture/cli-contract.md) §5 prints one envelope on each exit and exits with a code of the one exit table. Each core verb takes `--project-root`. `TestCLIContract_DocMatchesTheRegistry` and the integration table test guard both. |
 | X17c | built, stage `shadow` | this change | The inbox curation verbs and the `cli-routing` writers queue during a wave (policy `isolation.i15.stage`). The boundary step `queue-apply` applies the queue after `sync-main`. `gc` takes a lease and skips the process sweeps while a run is live. |
-| X9, X11 to X16, X17d, X18b to X19 | not started | none | |
+| X11 to X16, X17d, X18c, X18d, X19 | not started | none | |
 
 ### 6.2 The X6 follow-up (X6b)
 
@@ -418,13 +421,13 @@ X19 has no scored designs. It is an operator directive of 2026-10-25, and §12.4
 | X18e | Delete the 6 dead names; inject the 8 test seams | I-16 | the flag registry lists `EVOLVE_REFLECTION_JOURNAL` with no reader (the row of `EVOLVE_WORKTREE_PATH` went on 2026-10-26) | X18b | `enforce` |
 | X19a | The neutral `TaskAssignment`; no CLI in `PhaseRequest` or in the advisor plan; the guard with a shrinking allowlist | I-17 | `TestNoCLISpecificsAboveTheDriver` lists `ModelRoutingCLI` and the advisor `"cli"` field | X6 | `enforce` |
 | X19b | Neutral sandbox intents in the profiles; `extra_flags_by_cli` into the manifests; neutral personas | I-17 | the guard lists `Bash(evolve phase verify:*)` in 93 profiles | X19a, X6b | `enforce` |
-| X19c | Capability negotiation in the router | I-17 | a seat that needs `edit` routes to a driver with no `edit` capability | X9, X19a, X6b | `enforce` |
+| X19c | Capability negotiation in the router | I-17 | a seat that needs `edit` routes to a driver with no `edit` capability; matrix row M5 | X9, X19a, X6b | `enforce` |
 
 ### 12.7 Order
 
 1. X17a first. A wrong read can start a batch today.
 2. X18a and X17b in parallel. They touch different packages (`policy`, `cmd/evolve`).
-3. X18b after X2, which is merged. X18b grows the bridge list `pipelineEnvMarkers` of X2 into the one list of the pipeline.
+3. X18b after X2, which is merged. X18b grows the bridge list of X2 into the one list of the pipeline, `ipcenv.Markers()`.
 4. X17c and X17d after X17b, because they use its envelope and exit table.
 5. X18c, X18d and X18e after X18b. The guard of X18b then stops a new reader while the knobs move.
 6. X19a after X6, because X6 removes the family literals of the flow seats first. X19b follows X19a and X6b, because they edit the same profiles. X19c waits for X6b and for the manifest `capabilities` field of X9. The spec §28 has the map of what X19 leaves to X6, X6b, X7, X9, X10 and X18.

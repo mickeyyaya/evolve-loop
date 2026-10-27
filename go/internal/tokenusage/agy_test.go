@@ -36,7 +36,7 @@ func agy14GenRows(t *testing.T) string {
 }
 
 func agy14Window() Window {
-	return Window{Worktree: agy14Worktree, Driver: "agy-tmux",
+	return Window{Worktree: agy14Worktree, Driver: "agy-tmux", Collector: FormatAgyConversation, ContextWindow: 200_000,
 		Start: time.Date(2026, 10, 19, 7, 7, 30, 696469000, time.UTC), End: time.Date(2026, 10, 19, 7, 23, 34, 167863000, time.UTC)}
 }
 
@@ -173,7 +173,7 @@ func TestResolver_AnAgyDriverReadsItsConversationStoreFirst(t *testing.T) {
 
 	var query SQLiteQuery = store.query
 	got, err := Resolver(Roots{Agy: "/agy"}, query)(w)
-	claude, _ := Resolver(Roots{Agy: "/agy"}, store.query)(Window{Driver: "claude-tmux", Worktree: agy14Worktree, Start: w.Start, End: w.End})
+	claude, _ := Resolver(Roots{Agy: "/agy"}, store.query)(Window{Driver: "claude-tmux", Collector: FormatClaudeJSONL, ContextWindow: 200_000, Worktree: agy14Worktree, Start: w.Start, End: w.End})
 
 	if err != nil || got.Source != SourceAgyConversation || got.Usage.Output != 69220 || got.FillPct <= 0 {
 		t.Errorf("Resolver(agy-tmux) = %+v, %v; want the conversation usage with a fill", got, err)

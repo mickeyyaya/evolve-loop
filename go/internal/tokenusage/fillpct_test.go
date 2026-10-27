@@ -60,20 +60,9 @@ func TestFillTelemetry_PromptTokensSumsInputSideOnly(t *testing.T) {
 	}
 }
 
-func TestFillTelemetry_EffectiveWindowClaudeFamily(t *testing.T) {
-	for _, driver := range []string{"", "claude", "claude-tmux"} {
-		if got := EffectiveWindow(driver); got != claudeWindow {
-			t.Errorf("EffectiveWindow(%q) = %d, want %d", driver, got, claudeWindow)
-		}
-	}
-}
-
-func TestFillTelemetry_EffectiveWindowUnconfiguredFamily(t *testing.T) {
-	if got := EffectiveWindow("no-such-cli-family"); got != 0 {
-		t.Errorf("EffectiveWindow(\"no-such-cli-family\") = %d, want 0 (never guess a window for an unknown family)", got)
-	}
-	if got := FillPct(120_000, EffectiveWindow("no-such-cli-family")); got != FillPctUnmeasured {
-		t.Errorf("unknown family fill = %v, want FillPctUnmeasured", got)
+func TestFillTelemetry_AZeroContextWindowIsUnmeasured(t *testing.T) {
+	if got := FillPct(120_000, 0); got != FillPctUnmeasured {
+		t.Errorf("fill with no context window = %v, want FillPctUnmeasured (never guess a window)", got)
 	}
 }
 
@@ -86,6 +75,7 @@ func TestFillTelemetry_ResolverStampsFillPct(t *testing.T) {
 	}
 
 	got, err := DefaultResolver(t.TempDir())(Window{
+		Collector: FormatClaudeJSONL, ContextWindow: 200_000,
 		Driver:        "claude-tmux",
 		EventsLogPath: events,
 	})
@@ -101,7 +91,7 @@ func TestFillTelemetry_ResolverStampsFillPct(t *testing.T) {
 }
 
 func TestFillTelemetry_UnmeasuredResolveCarriesSentinel(t *testing.T) {
-	got, err := DefaultResolver(t.TempDir())(Window{Driver: "claude-tmux"})
+	got, err := DefaultResolver(t.TempDir())(Window{Driver: "claude-tmux", Collector: FormatClaudeJSONL, ContextWindow: 200_000})
 	if err != nil {
 		t.Fatalf("resolver returned error: %v", err)
 	}

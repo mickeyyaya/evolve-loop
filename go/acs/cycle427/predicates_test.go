@@ -129,7 +129,7 @@ func TestC427_012_StopReviewHasNoCLILiterals(t *testing.T) {
 }
 
 func TestC427_013_CodexThinkingToAnswerConverging(t *testing.T) {
-	p := panestream.Profiles["codex"]
+	p := panestream.Profiles["codex-repl-v1"]
 	det := panestream.NewDefaultDetector(3)
 	think := codexTestdataFrame(t, "thinking.txt")
 	answer := codexTestdataFrame(t, "answer.txt")
@@ -141,7 +141,7 @@ func TestC427_013_CodexThinkingToAnswerConverging(t *testing.T) {
 }
 
 func TestC427_014_CodexPrimingNotHung(t *testing.T) {
-	p := panestream.Profiles["codex"]
+	p := panestream.Profiles["codex-repl-v1"]
 	answer := codexTestdataFrame(t, "answer.txt")
 	det := panestream.NewDefaultDetector(1)
 	state, _ := det.Assess(answer, p)
@@ -151,7 +151,7 @@ func TestC427_014_CodexPrimingNotHung(t *testing.T) {
 }
 
 func TestC427_015_CodexStalledIdleNotHung(t *testing.T) {
-	p := panestream.Profiles["codex"]
+	p := panestream.Profiles["codex-repl-v1"]
 	answer := codexTestdataFrame(t, "answer.txt")
 	if panestream.PaneBusy(answer, p) {
 		t.Fatal("C427_015 precondition: codex answer frame must not be busy")
@@ -170,7 +170,7 @@ func TestC427_015_CodexStalledIdleNotHung(t *testing.T) {
 }
 
 func TestC427_016_CodexConfidenceInRange(t *testing.T) {
-	p := panestream.Profiles["codex"]
+	p := panestream.Profiles["codex-repl-v1"]
 	frames := []string{"thinking.txt", "answer.txt", "final.txt"}
 	for _, name := range frames {
 		t.Run(name, func(t *testing.T) {

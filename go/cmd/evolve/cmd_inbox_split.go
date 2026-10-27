@@ -38,7 +38,7 @@ func runInboxSplit(root string, args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	opts := inboxmover.Options{ProjectRoot: *projectRoot, Stderr: stderr, IsProtectedPath: laneForbidden(*projectRoot, stderr),
-		PriorityClasses: pol.InboxPriorityConfig().ClassOrder}
+		PriorityClasses: pol.InboxPriorityConfig().ClassOrder, Origin: inboxbatch.OriginConsole}
 	res, err := inboxsplit.Accept(newSplitInbox(opts), id, splitForbidden(opts.IsProtectedPath), *afterConsole)
 	if err != nil {
 		fmt.Fprintf(stderr, "inbox split: %v\n", err)

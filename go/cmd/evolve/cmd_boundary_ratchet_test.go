@@ -376,7 +376,7 @@ func TestBoundaryHaltSteps_TightenBeforeSyncMainSoThePlaneMergesIt(t *testing.T)
 	for _, s := range steps {
 		verbs = append(verbs, s.verb)
 	}
-	if strings.Join(verbs, " ") != "loop-stop pr "+boundaryRatchetVerb+" sync-main "+queueApplyVerb+" quality gc" {
+	if strings.Join(verbs, " ") != "loop-stop pr "+boundaryRatchetVerb+" sync-main "+queueApplyVerb+" inbox quality gc" {
 		t.Fatalf("halt steps %v, want the tighten after the PR merges and before sync-main", verbs)
 	}
 	if s := steps[2]; s.String() != boundaryRatchetDesc || strings.Join(s.args, " ") != "--project-root /plane" {

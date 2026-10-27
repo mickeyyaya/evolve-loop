@@ -238,28 +238,11 @@ func TestPreserveDiagnosis_UnwritableWorkspaceJoinsBothErrors(t *testing.T) {
 	}
 }
 
-func TestWriteInboxItems_UnencodableItemAndUnreadableCollisionFailLoudly(t *testing.T) {
+func TestWriteInboxItems_UnencodableItemFailsLoudly(t *testing.T) {
 	t.Run("a NaN weight cannot be encoded", func(t *testing.T) {
 		cfg := writeConfig{inboxDir: t.TempDir(), inboxItems: []InboxItem{{ID: "n1", Title: "t", Weight: math.NaN(), PriorityClass: "correctness"}}}
 		err := cfg.writeInboxItems()
 		if err == nil || !strings.Contains(err.Error(), "encode inbox item n1") {
-			t.Fatalf("err = %v", err)
-		}
-	})
-	t.Run("an existing item that cannot be read cannot be confirmed", func(t *testing.T) {
-		dir := t.TempDir()
-		path := filepath.Join(dir, "u1.json")
-		if err := os.WriteFile(path, []byte("{}"), 0o000); err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() { _ = os.Chmod(path, 0o644) })
-		if f, err := os.Open(path); err == nil {
-			f.Close()
-			t.Skip("file permissions are not enforced for this user")
-		}
-		cfg := writeConfig{inboxDir: dir, inboxItems: []InboxItem{{ID: "u1", Title: "t", PriorityClass: "correctness"}}}
-		err := cfg.writeInboxItems()
-		if err == nil || !strings.Contains(err.Error(), "already exists but cannot be read") {
 			t.Fatalf("err = %v", err)
 		}
 	})

@@ -56,7 +56,7 @@ func TestClihealthUsage_PrintsEachCLIsTypedWindowsAndWritesNothing(t *testing.T)
 	if drained := readouts[1].Windows[3]; readouts[1].CLI != "agy" || drained.Family != "agy-claude" || !drained.Exhausted {
 		t.Errorf("agy readout = %+v", readouts[1])
 	}
-	if readouts[2].CLI != "ollama" || readouts[2].Note == "" || readouts[2].Error != "" {
+	if readouts[2].CLI != "ollama" || readouts[2].Note == "" || readouts[2].State != clicontrol.UsageNoCollector || readouts[2].Error != "" {
 		t.Errorf("ollama readout = %+v; a CLI with no usage command is a note, not an error", readouts[2])
 	}
 	if _, err := os.Stat(filepath.Join(root, ".evolve")); !errors.Is(err, os.ErrNotExist) {

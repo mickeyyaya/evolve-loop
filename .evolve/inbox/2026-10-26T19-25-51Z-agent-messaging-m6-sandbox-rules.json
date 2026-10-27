@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "TestSBPL_AllowsOnlyTheOwnOutbox passes",
+    "TestSBPL_DeniesTheStoreAndOtherMailboxes and TestSBPL_DeniesReadsOfOtherMailboxesAndOtherCycles pass",
+    "TestSandbox_ARealProcessCannotWriteAnotherOutboxOfItsCycleOrOfAnotherCycle passes on darwin",
+    "each new and changed function has 100% coverage"
+  ],
+  "created_at": "2026-10-26T19:23:03Z",
+  "deps": [],
+  "files": [
+    "go/internal/adapters/sandbox/",
+    "go/internal/bridge/sandbox_wrap.go"
+  ],
+  "fix": "In the sandbox rule generator, allow writes to the outbox of the dispatch only. Deny writes to the store. Deny file-read* on the .evolve/msg/ tree of other cycles and on the mailboxes of other dispatches.",
+  "id": "agent-messaging-m6-sandbox-rules",
+  "kind": "feature",
+  "notes": "Plan: docs/plans/agent-messaging-2026-10.md sections 9 to 11, M6. The surface is the sandbox rule generator, a gate file. held_proposal_candidate: true.",
+  "priority_class": "security",
+  "route": "console-manual",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Plan docs/plans/agent-messaging-2026-10.md, component M6. Spec: docs/architecture/agent-messaging.md (threat model). The fix sandbox-cross-cycle-run-dir-write is in .evolve/inbox/consumed, so the order rule of plan section 10 is met.",
+  "title": "Agent messaging M6: the sandbox allows writes to the own outbox only and denies the store and other mailboxes",
+  "weight": 0.5
+}

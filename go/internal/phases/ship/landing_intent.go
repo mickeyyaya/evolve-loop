@@ -54,7 +54,10 @@ func (s *worktreeShip) checkLanding(commit string) error {
 	if err := refuseCommittedDocDeletion(s.ctx, s.opts, s.branch, commit); err != nil {
 		return err
 	}
-	return refuseForeignPredicatePackages(s.ctx, s.opts, s.branch, commit)
+	if err := refuseForeignPredicatePackages(s.ctx, s.opts, s.branch, commit); err != nil {
+		return err
+	}
+	return refuseUnapprovedHeldProposal(s.ctx, s.opts, s.logf, s.branch, commit)
 }
 
 func (s *worktreeShip) landingCommit(pending string) (string, error) {

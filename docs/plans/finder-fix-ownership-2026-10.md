@@ -113,17 +113,19 @@ C follows the pattern of Gerrit, Copilot and CodeRabbit (R1 to R3). The reviewer
 
 ## 5. Components and order
 
-| # | Component | Home | Route |
-|---|---|---|---|
-| F0 | The fix spec format and its reader, with the scope guard of D5 | `go/internal/retryladder` | lane |
-| F1 | The auditor writes a fix spec on request (persona and contract) | `agents/evolve-auditor.md`, the audit contract | console |
-| F2 | Rung R3 in the ladder decider: the fresh builder, the family choice, the skip of R2 | `go/internal/retryladder` | lane |
-| F3 | The verifier of R3: the floor, the tdd tests unchanged, and a second auditor instance | `go/internal/core` | console |
-| F4 | The ledger records of D4, and the refusal of the spec author's PASS | `go/internal/core`, the ledger | console |
-| F5 | The fast path of D6 | `go/internal/core` | console |
-| F6 | The rung records of D7 in `evolve ladder report` | `go/cmd/evolve` | lane |
+| # | Component | Home | Route | Inbox item |
+|---|---|---|---|---|
+| F0 | The fix spec format and its reader, with the scope guard of D5 | `go/internal/retryladder` | lane | `finder-fix-ownership-f0-fix-spec-format` |
+| F1 | The auditor writes a fix spec on request (persona and contract) | `agents/evolve-auditor.md`, the audit contract | console | `finder-fix-ownership-f1-auditor-writes-fix-spec` |
+| F2 | Rung R3 in the ladder decider: the fresh builder, the family choice, the skip of R2 | `go/internal/retryladder` | lane | `finder-fix-ownership-f2-rung-r3-decider` |
+| F3 | The verifier of R3: the floor, the tdd tests unchanged, and a second auditor instance | `go/internal/core` | console | `finder-fix-ownership-f3-r3-verifier` |
+| F4 | The ledger records of D4, and the refusal of the spec author's PASS | `go/internal/core`, the ledger | console | `finder-fix-ownership-f4-ledger-authorship` |
+| F5 | The fast path of D6 | `go/internal/core` | console | `finder-fix-ownership-f5-deterministic-fast-path` |
+| F6 | The rung records of D7 in `evolve ladder report` | `go/cmd/evolve` | lane | `finder-fix-ownership-f6-ladder-report-rungs` |
 
 F0 and F2 extend the retry ladder of ADR-0142, so they follow its L1 and L2, which have shipped.
+
+The plan audit of 2026-10-27 filed one inbox item for each component. The inbox route can differ from the Route column. F1, F3 and F4 are `console-manual`, because they touch a protected persona, the audit verdict or the ledger. F5 is `lane`, and admission decides.
 
 ## 6. Verification
 

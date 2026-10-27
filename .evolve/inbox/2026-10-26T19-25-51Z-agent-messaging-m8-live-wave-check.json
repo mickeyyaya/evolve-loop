@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "in a live wave, scout sends a handoff to build, and build sees it in its prompt",
+    "build sends evidence to audit, and audit gets it",
+    "a note from build to audit gets msg.denied",
+    "the message counts and hop counts of the wave are recorded for open question Q1"
+  ],
+  "created_at": "2026-10-26T19:23:03Z",
+  "deps": [
+    "agent-messaging-m7-cycle-wiring"
+  ],
+  "files": [
+    "docs/plans/agent-messaging-2026-10.md"
+  ],
+  "fix": "After M7 lands, run one wave and read the errors and signals channels. Check the three flows of plan section 11. Record the accepted message count and the hop count of each cycle. Give the operator the numbers for Q1.",
+  "id": "agent-messaging-m8-live-wave-check",
+  "kind": "test",
+  "notes": "Plan: docs/plans/agent-messaging-2026-10.md sections 11, 12 and 15, M8. The route is console-manual because the check runs a live wave, and only the console drives a wave. It is not a gate file.",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Plan docs/plans/agent-messaging-2026-10.md, component M8. Spec: docs/architecture/agent-messaging.md. M8 measures the real message use of a wave. Then the operator sets the cycle budget and the hop limit (open question Q1).",
+  "title": "Agent messaging M8: a live check in a wave",
+  "weight": 0.3
+}

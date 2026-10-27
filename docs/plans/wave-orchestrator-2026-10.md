@@ -1,6 +1,11 @@
 # Plan: a wave orchestrator keeps at least four lanes busy, keeps their conflicts low, and scales to a large fleet
 
-- **Status:** proposed, 2026-10-17.
+- **Status:** proposed, 2026-10-17. Built at stage `enforce` (`fleet.orchestrator.stage`), with `fleet.count` 4. The state on 2026-10-27:
+  - Merged: O1 (#922), O2b (#923), O2c (#959) and O3 (#925, #1007).
+  - Merged: O4 and O5 (#941, #991), the O6 library and the census R1 (#963, #966), O7 (#929), O8 (#964) and O9 (#942).
+  - Open: O6 R2, the loop wiring of `orchestrator.Oversight`. No production code constructs it. Item: `wave-orchestrator-o6-wire-oversight-into-the-loop`.
+  - Open: the measured goals G1 and G3 of §8 and the O3 width cost. Wave 142 shows `width_realized` 2 and utilization 0.47. Item: `wave-orchestrator-measure-goals-g1-g3`.
+  - Open: O2a, item `restore-lane-routable-supply`. On 2026-10-27, `evolve wave supply` admits 1 item, not the 20 of its acceptance.
 - **Design:** [wave-orchestrator](../architecture/wave-orchestrator.md). **Decision:** [ADR-0139](../architecture/adr/0139-a-wave-orchestrator-supplies-admits-and-backfills-every-lane.md). **Research:** [wave-orchestrator-2026-10](../research/wave-orchestrator-2026-10.md).
 
 ## Table of contents
@@ -205,15 +210,17 @@ The order is O0, O1, O2a, O2b, O3, O7, O4, O5, O6, O2c, O8.
 
 The inbox holds one item for each group of components, in the campaign `wave-orchestrator`:
 
-| Inbox item | Components |
-|---|---|
-| `wave-orchestrator-design-set` | O0 |
-| `wave-runs-four-parallel-lanes` | O1 |
-| `restore-lane-routable-supply` | O2a, O2b |
-| `wire-partitiongraph-for-package-level-conflicts` | O3 |
-| `wave-orchestrator-oversees-every-lane` | O6, O7 |
-| `rolling-pool-backfills-lanes` | O4, O5 |
-| `triage-commits-disjoint-tasks-for-every-lane` | O6 (the census), O2c |
+| Inbox item | Components | State on 2026-10-27 |
+|---|---|---|
+| `wave-orchestrator-design-set` | O0 | consumed |
+| `wave-runs-four-parallel-lanes` | O1 | consumed; G1 moves to `wave-orchestrator-measure-goals-g1-g3` |
+| `restore-lane-routable-supply` | O2a, O2b | open |
+| `wire-partitiongraph-for-package-level-conflicts` | O3 | consumed; the width cost moves to `wave-orchestrator-measure-goals-g1-g3` |
+| `wave-orchestrator-oversees-every-lane` | O6, O7 | consumed; R2 moves to `wave-orchestrator-o6-wire-oversight-into-the-loop` |
+| `rolling-pool-backfills-lanes` | O4, O5 | consumed; G3 moves to `wave-orchestrator-measure-goals-g1-g3` |
+| `triage-commits-disjoint-tasks-for-every-lane` | O6 (the census), O2c | consumed |
+| `wave-orchestrator-o6-wire-oversight-into-the-loop` | O6 R2 | open |
+| `wave-orchestrator-measure-goals-g1-g3` | G1, G3, the O3 width cost | open |
 
 ## 8. Verification
 
@@ -242,5 +249,7 @@ The inbox holds one item for each group of components, in the campaign `wave-orc
 
 - **Q1:** what is the deadline? We propose the 95th percentile of lane time over the last 50 cycles, with a floor of 60 minutes. O5 measures it in shadow. **Measured, 2026-10-17:** over cycles 1873 to 1928 (44 lane times from `signals.ndjson`), the median lane time is 39.0 minutes and the p95 is 98.9 minutes. The deadline rule removes the longest lane first (spec §8), so the deadline is 95.1 minutes. The exit rule of spec §14 (no deadline stop of a lane that passed later) needs 3 live runs of `LOOP_ORCH_LANE_LATE_EXIT` events.
 - **Q2 (resolved, 2026-10-17):** how many hub packages go into the hub cell? Four: `sysexec` (151 importers), `log` (127), `atomicwrite` (126) and `signalcenter` (122). O3 measured the transitive importer count of each of the 303 module packages. The next package is `ipcenv` with 116, and the median is 5. The default `fleet.orchestrator.hub_min_importers` is 120. The measure is in [internal-admission.md](../architecture/packages/internal-admission.md) §Findings.
-- **Q4 (resolved, 2026-10-19):** how does a lane that edits `go/cmd/evolve` stop holding every Go todo? Approach (b): a leaf package, with no importer in the module graph, adds no reach. Evidence: wave 131 fell to 3 of 4 lanes with 18 items ready, because the reach of `cmd/evolve` held 266 packages. Rejected (a): direct imports only, which shrinks the reach of non-leaf packages and misses transitive importers. Rejected (c): reach by exported API, which needs a type diff before the build exists. A todo with one non-leaf package keeps the full reach. The spec is [wave-orchestrator.md](../architecture/wave-orchestrator.md) §6.
+- **Q4 (resolved, 2026-10-19):** how does a lane that edits `go/cmd/evolve` stop holding every Go todo? Approach (b): a leaf package, with no importer in the module graph, adds no reach. Evidence: wave 131 fell to 3 of 4 lanes with 18 items ready, because the reach of `cmd/evolve` held 266 packages. A todo with one non-leaf package keeps the full reach. The spec is [wave-orchestrator.md](../architecture/wave-orchestrator.md) §6.
+  - Rejected (a): direct imports only, which shrinks the reach of non-leaf packages and misses transitive importers.
+  - Rejected (c): reach by exported API, which needs a type diff before the build exists.
 - **Q3:** does a goal-split planner phase (design D) become a second supply source? We propose not until O2 is live and measured.

@@ -9,7 +9,6 @@ tools: []
 > **v12.0.0 status:** `legacy/scripts/...` paths referenced below were removed in the v12 flag day. Reflection sidecar writes and aggregation are owned by the Go reflection package (`go/internal/reflection/`). Treat bash snippets as contracts; do not invoke them directly.
 >
 > Referenced verbatim by all 9 phase agent personas (Intent, Scout, Triage, Plan-Review, Build-Planner, TDD-Engineer, Tester, Builder, Auditor).
-> Gated on `EVOLVE_REFLECTION_JOURNAL` (default `1` at v10.20.0; `0` opts out).
 > Schema details: [agents/agent-templates.md](agent-templates.md) → Reflection Journal Schema.
 
 ## Purpose
@@ -52,10 +51,6 @@ Concretely:
 
 These are starting points, not an exhaustive list. The `category` field uses the closed enum (`research-quota`, `tool-error`, `context-saturation`, `ambiguous-input`, `tool-batching`, `profile-restriction`, `other`).
 
-## Skip when
-
-If `EVOLVE_REFLECTION_JOURNAL=0` is set in the dispatcher environment, skip this step entirely (do not write the YAML or markdown section). This is the emergency opt-out per CLAUDE.md env-var ladder.
-
 ## Ledger entry adjustment
 
 When you post your completion ledger entry, add one field:
@@ -64,7 +59,7 @@ When you post your completion ledger entry, add one field:
 "reflection_emitted": <true|false>
 ```
 
-`true` if you wrote `<phase>-reflection.yaml`; `false` only if `EVOLVE_REFLECTION_JOURNAL=0` was set.
+`true` if you wrote `<phase>-reflection.yaml`; `false` only if the phase ended before you could write it.
 
 ## Cross-references
 

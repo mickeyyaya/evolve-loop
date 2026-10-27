@@ -13,7 +13,7 @@ import (
 
 func TestSignalCenter_BusyProjection(t *testing.T) {
 	sc := NewLivenessCenter()
-	p := Profiles["claude"]
+	p := Profiles["claude-repl-v1"]
 
 	busyPane := "⏺ working\n⏵⏵ bypass permissions on (shift+tab to cycle) · esc to interrupt\n❯ \n"
 	sc.Observe("sess-1", busyPane, p)
@@ -36,7 +36,7 @@ func TestSignalCenter_BusyProjection(t *testing.T) {
 
 func TestSignalCenter_ChangedProjection(t *testing.T) {
 	sc := NewLivenessCenter()
-	p := Profiles["claude"]
+	p := Profiles["claude-repl-v1"]
 
 	sc.Observe("sess-1", "❯ starting task\n⏺ line one\n❯ \n", p)
 	sc.Observe("sess-1", "❯ starting task\n⏺ line one\n⏺ line two (new content)\n❯ \n", p)
@@ -52,7 +52,7 @@ func TestSignalCenter_ChangedProjection(t *testing.T) {
 
 func TestSignalCenter_ChangedIgnoresChrome(t *testing.T) {
 	sc := NewLivenessCenter()
-	p := Profiles["claude"]
+	p := Profiles["claude-repl-v1"]
 
 	sc.Observe("sess-1", "⏺ working on it\n✻ Schlepping… (4s · ↑ 1.2k tokens)\n❯ \n", p)
 	sc.Observe("sess-1", "⏺ working on it\n✻ Schlepping… (9s · ↑ 4.7k tokens)\n❯ \n", p)
@@ -80,7 +80,7 @@ func TestSignalCenter_UnknownKeyIsQuiet(t *testing.T) {
 func TestSignalCenter_ProjectionsConcurrent(t *testing.T) {
 	const numProducers = 8
 	sc := NewLivenessCenter()
-	p := Profiles["claude"]
+	p := Profiles["claude-repl-v1"]
 	sharedKey := "shared-sess"
 
 	var wg sync.WaitGroup

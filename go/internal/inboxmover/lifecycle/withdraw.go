@@ -85,7 +85,7 @@ func (m *Mover) refuseDependents(taskID string) error {
 	return err
 }
 
-func notLifecycleOwned(key string) bool { return !isLifecycleOwned(key) }
+func notLifecycleOwned(key string) bool { return !isLifecycleOwned(key) || filingStamps[key] }
 
 func (m *Mover) pendingDependents(taskID string) ([]string, error) {
 	var dependents []string

@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "after run-dir gc deletes the run directory, Verify still resolves each integrity artifact from the store",
+    "prompts and responses are not put in the store",
+    "each new and changed function has 100% coverage"
+  ],
+  "created_at": "2026-10-26T19:23:03Z",
+  "deps": [],
+  "files": [
+    "go/internal/adapters/ledger/",
+    "go/internal/ledgerartifacts/"
+  ],
+  "fix": "When a ledger writer appends a record that commits to an integrity artifact, put the artifact in internal/ledgerartifacts and record its sha. The artifacts are audit reports, contracts and verdict artifacts that a gate or Verify reads again. Prompts and responses keep the normal run retention.",
+  "id": "ledger-restructure-c7-store-artifacts-at-append",
+  "kind": "feature",
+  "notes": "Plan: docs/plans/ledger-restructure-2026-10.md section 4, C7. The surface is the ledger writers, a gate file. held_proposal_candidate: true.",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Plan docs/plans/ledger-restructure-2026-10.md, component C7 (decision D2). Decision record: docs/architecture/adr/0123-ledger-durable-evidence-segments-incremental-verify.md. C1 to C5 landed in PR #788, so the store exists. Only composition verdicts use it. Run-dir gc can still delete the audit reports and contracts that Verify reads again.",
+  "title": "Ledger C7: store the integrity artifacts in the content-addressed store at append time",
+  "weight": 0.4
+}

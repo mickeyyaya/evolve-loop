@@ -18,7 +18,7 @@ func TestWriteArtifacts_PublishedArtifactsHaveMode0644(t *testing.T) {
 
 	paths := []string{filepath.Join(runDir, "retrospective-report.md")}
 	for _, it := range remediationItems() {
-		paths = append(paths, filepath.Join(inboxDir, it.ID+".json"))
+		paths = append(paths, filedPath(t, inboxDir, it.ID))
 	}
 	lessons, err := os.ReadDir(lessonsDir)
 	if err != nil {

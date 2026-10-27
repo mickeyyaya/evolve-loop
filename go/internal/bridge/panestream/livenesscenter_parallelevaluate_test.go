@@ -21,7 +21,7 @@ func TestSignalCenter_ParallelEvaluateStress_MixedOpsRaceClean(t *testing.T) {
 	const readerIterations = 200
 
 	sc := NewLivenessCenter()
-	p := Profiles["claude"]
+	p := Profiles["claude-repl-v1"]
 
 	var wg sync.WaitGroup
 
@@ -74,7 +74,7 @@ func TestSignalCenter_ObserveAggregateSameKeyRaceClean(t *testing.T) {
 	const iterations = 500
 
 	sc := NewLivenessCenter()
-	p := Profiles["claude"]
+	p := Profiles["claude-repl-v1"]
 	key := "shared-key"
 	sc.Observe(key, "⏺ priming\n❯ \n", p)
 

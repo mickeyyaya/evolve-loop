@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "the E8 runner tests of plan section 11 pass, from TestRunner_DeliversSeriallyInCursorOrder to TestRunner_TagsTheCommandAndReapsItsDescendants",
+    "the E8 subs tests of plan section 11 pass, with TestProtectedSurface_CoversTheEventsTree",
+    "register an exec subscription on errors, emit one WARN, and the command gets the event JSON exactly once",
+    "the package is in go/.cover-strict at 100 and in go/.apicover-enforce"
+  ],
+  "created_at": "2026-10-26T19:23:03Z",
+  "deps": [
+    "event-notification-protocol-e7-events-config-load"
+  ],
+  "files": [
+    "go/internal/events/subs/",
+    "go/internal/events/filter/",
+    "go/internal/guards/integrity_surface.go"
+  ],
+  "fix": "Build go/internal/events/subs: the config store and the cursor store on atomicwrite and WithPathLock, the exec runner on sysexec.Command and proctree, pull acks and dead letters. Add Filter.Names. Add the events tree to the protected surface. Refuse to start the runner with exit 1 when a stored filter names a removed kind.",
+  "id": "event-notification-protocol-e8-subscriptions-runner",
+  "kind": "feature",
+  "notes": "Plan: docs/plans/event-notification-protocol-2026-10.md sections 11 and 12, E8. The protected surface entry is a guards file. held_proposal_candidate: true. The new package part can move to a lane when held proposals exist.",
+  "priority_class": "feature",
+  "route": "console-manual",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Plan docs/plans/event-notification-protocol-2026-10.md, component E8. Spec: docs/architecture/event-channels.md (ADR-0127). go/internal/events/subs does not exist on origin/main. E8 also adds Filter.Names(key, value) for the module=events skip (D24).",
+  "title": "Event channels E8: the subscription stores, the exec runner, pull acks, dead letters and the protected surface entry",
+  "weight": 0.4
+}

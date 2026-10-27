@@ -132,9 +132,9 @@ At `shadow`, `recoveryretro.WriteShadow` writes the pairs into `<workspace>/retr
 
 ## 6. The enforce stage
 
-The next PR builds this stage (plan C4 to C6). It is a design here, not code.
+Step 1 is built. Steps 2 to 5 are a design here, not code (plan C4 to C6).
 
-1. The key `retrospectives.stage` takes `shadow` or `enforce`. The compiled default stays `shadow`.
+1. The key `retrospectives.stage` takes `off`, `shadow` or `enforce` (`policy.RetrospectivesConfig`). The compiled default stays `shadow`. The checked-in policy sets `enforce` since 2026-10-27, by the operator decision. At `off`, the closeout writes no document. Until steps 2 to 5 are built, `enforce` writes into the workspace, as `shadow` does.
 2. At `enforce`, the closeout writes the pairs into `.evolve/retrospectives-pending/`.
 3. The boundary publish commits the pending pairs into `docs/retrospectives/` with the dossiers. The publish is create-only: it never replaces a document that is on `main`.
 4. After the publish, a judgment todo whose `docs/retrospectives/<id>.md` is in the published tree leaves the carryover log through `carryover.Retire`. The check repeats at each closeout, so a failed publish keeps the todo.
@@ -160,6 +160,7 @@ The next PR builds this stage (plan C4 to C6). It is a design here, not code.
 | Agent text cannot break a code span or a table | `quote` and `cell` replace backticks, line breaks and `\|` | built |
 | The shadow stage writes only into the workspace | `TestWriteShadow_APassAfterFailuresWritesTheRecoveryPairInTheWorkspaceOnly`, `TestRunCycle_TheCloseoutWritesTheShadowRetrospectiveIntoTheWorkspace` | built |
 | A write failure never stops the closeout | `TestWriteShadow_AWriteFailureIsReturned`, `TestWriteShadowRetrospectives_AFailureIsAWarnLineOnly` | built |
+| The stage key is policy data, and `off` writes no document | `TestRetrospectivesConfig_ShadowsUntilThePolicySaysOtherwise`, `TestRunCycle_RetrospectivesStageOffWritesNoRetrospective` | built |
 | A judgment todo leaves the log only with its document on `main` | the C5 tests | planned |
 
 ## 8. Limits

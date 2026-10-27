@@ -96,14 +96,8 @@ func finishLiveRefresh(o modelsOpts, cat modelcatalog.Catalog, stdout, stderr io
 }
 
 func countLiveAndFallback(cat modelcatalog.Catalog) (live, fallback int) {
-	for _, e := range cat.CLIs {
-		if e.Source == modelcatalog.SourceLive {
-			live++
-		} else {
-			fallback++
-		}
-	}
-	return live, fallback
+	live = cat.LiveCount()
+	return live, len(cat.CLIs) - live
 }
 
 func commitAndReport(o modelsOpts, cat modelcatalog.Catalog, srcLbl string, stdout, stderr io.Writer) int {
