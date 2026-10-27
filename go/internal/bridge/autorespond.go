@@ -65,8 +65,28 @@ func strippedForFatalPaneScan(pane, injectedPrompt string, protected []string) s
 	return recovery.StripAgentContent(pane, injectedPrompt, protected)
 }
 
+var manifestDataLine = regexp.MustCompile(`^\s*"[A-Za-z0-9_]+"\s*:`)
+
+const manifestDataMark = "#"
+
+func stripManifestDataLines(pane string) string {
+	lines := strings.Split(pane, "\n")
+	out := make([]string, len(lines))
+	for i, line := range lines {
+		out[i] = line
+		if manifestDataLine.MatchString(line) {
+			out[i] = manifestDataMark
+		}
+	}
+	return strings.Join(out, "\n")
+}
+
+func autoRespondSubject(pane string) string {
+	return stripManifestDataLines(stripAgentDiffLines(pane))
+}
+
 func decideAutoRespond(pane string, prompts []ManifestPrompt, counts map[string]int, paneBusy bool) (string, int) {
-	pane = stripAgentDiffLines(pane)
+	pane = autoRespondSubject(pane)
 	suppressedOnce := ""
 	for _, p := range prompts {
 		if !promptMatches(p, pane) {
@@ -179,6 +199,7 @@ func (ar *autoResponder) firedRuleName(prevCounts map[string]int) string {
 type pendingAutoRespond struct {
 	rule    string
 	re      *regexp.Regexp
+	tail    int
 	keys    string
 	at      time.Time
 	kind    string
@@ -302,13 +323,13 @@ func (ar *autoResponder) tickPane(ctx context.Context, session, pane string, cap
 	}
 	switch rc {
 	case 1:
-		keysCSV := strings.TrimPrefix(action, "send:")
+		keysCSV, rule := strings.TrimPrefix(action, "send:"), ar.firedRuleName(prevCounts)
 		if ar.human {
 			humanReadingPause(ar.deps, pane)
-			humanSendKeysCSV(ctx, ar.deps, session, keysCSV)
+			humanSendKeysCSV(ctx, ar.deps, session, keysCSV, rule)
 		} else {
 			sendKeySequence(ctx, ar.deps, session, keysCSV)
-			fmt.Fprintf(ar.deps.Stderr, "[auto-respond] sent keys: %s (rule=%s)\n", keysCSV, ar.firedRuleName(prevCounts))
+			fmt.Fprintf(ar.deps.Stderr, "[auto-respond] sent keys: %s (rule=%s)\n", keysCSV, rule)
 		}
 		ar.openPending(prevCounts, keysCSV)
 		return "", 1
@@ -349,7 +370,11 @@ func (ar *autoResponder) resolvePending(pane string) {
 	if ar.pending == nil || ar.pending.re == nil {
 		return
 	}
-	if !ar.pending.re.MatchString(pane) {
+	subject := autoRespondSubject(pane)
+	if ar.pending.tail > 0 {
+		subject = lastLines(subject, ar.pending.tail)
+	}
+	if !ar.pending.re.MatchString(subject) {
 		ar.record(ar.pending, interaction.ResultPromptCleared)
 		ar.pending = nil
 	}
@@ -374,13 +399,15 @@ func (ar *autoResponder) openPending(prevCounts map[string]int, keysCSV string) 
 		return
 	}
 	var re *regexp.Regexp
+	tail := 0
 	for _, p := range ar.prompts {
 		if p.Name == name {
 			re, _ = regexp.Compile(p.Regex)
+			tail = p.TailLines
 			break
 		}
 	}
-	ar.pending = &pendingAutoRespond{rule: name, re: re, keys: keysCSV, at: ar.deps.Now()}
+	ar.pending = &pendingAutoRespond{rule: name, re: re, tail: tail, keys: keysCSV, at: ar.deps.Now()}
 }
 
 func (ar *autoResponder) flushPending() {

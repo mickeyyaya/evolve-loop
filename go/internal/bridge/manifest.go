@@ -52,6 +52,7 @@ type ManifestPrompt struct {
 	Note         string `json:"note"`
 	Once         bool   `json:"once"`
 	TailLines    int    `json:"tail_lines"`
+	DriftProbe   string `json:"drift_probe_regex,omitempty"`
 }
 
 type ModelFreshness struct {
