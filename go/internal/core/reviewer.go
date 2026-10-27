@@ -65,8 +65,8 @@ func (r mandatoryExplanationReviewer) Review(ctx context.Context, in ReviewInput
 	if in.Phase != string(PhaseBuild) || in.ExplanationDocumentationVersion == 0 {
 		return r.next.Review(ctx, in)
 	}
-	if floor := r.floor.Review(ctx, in); !floor.Approve {
-		return floor
+	if gaps := r.floor.Failures(ctx, in); len(gaps) > 0 {
+		return floorRejection(append(gaps, floorChecks(r.next).Failures(ctx, in)...), in.Protected)
 	}
 	optional := r.next.Review(ctx, in)
 	if !optional.Approve {

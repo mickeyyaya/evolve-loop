@@ -1,0 +1,30 @@
+{
+  "acceptance": [
+    "Red test first: replaying the cycle.sealed of 2043, 2046, 2055 emits one selfheal.incident at the third seal, not at the boundary.",
+    "At shadow the decision is would_brake and nothing stops; at enforce the brake file is written once.",
+    "A task-code FAIL emits no incident.",
+    "The stage key is strict with a range and is documented in STE.",
+    "Every wave launch arms it (no console step needed)."
+  ],
+  "created_at": "2026-10-27T08:13:34Z",
+  "deps": [
+    "failure-class-fingerprint-recurrence"
+  ],
+  "files": [
+    "go/internal/selfheal/incidents.go",
+    "go/cmd/evolve/cmd_selfheal.go",
+    "go/internal/policy/healing.go"
+  ],
+  "fix": "Subscribe the detector to cycle.sealed with final_verdict FAIL (event-triggered, like inbox curate --event): read the new class recurrence (item failure-class-fingerprint-recurrence) and emit selfheal.incident at once when a pipeline-code class recurs. Add policy healing.live_reaction.stage (off, shadow, enforce; default shadow): at enforce, a T0 or T1 pipeline-code incident with class recurrence >= 2 engages the loop brake and holds the lane items whose files overlap the failing check; at shadow it records would_brake.",
+  "id": "live-incident-on-cycle-sealed",
+  "kind": "pipeline-repair",
+  "notes": "Console route: self-heal chain (X12/X13) and the loop brake.",
+  "origin": "console",
+  "priority": "P1",
+  "priority_class": "stability",
+  "route": "console",
+  "source": "console, 2026-10-27, operator: \"why did we not find the wave issue at once, why does wave watch not pick up the failed signal and react?\" Evidence: cycles 2043, 2046, 2055 (pipeline-code) and 2048 failed on the same build floor defect with 4 different fingerprints and recurrence 0",
+  "summary": "The X12 incident detector runs only at the wave boundary (evolve boundary run). During wave 144 a pipeline-code FAIL of a known class (cycle 2055, 4th time) emitted only cycle.sealed WARN; no incident, no hold, no brake. The loop kept starting cycles that could hit the same defect.",
+  "title": "Each sealed FAIL runs the incident detector at once, and a repeating pipeline-code class emits a live incident",
+  "weight": 0.85
+}

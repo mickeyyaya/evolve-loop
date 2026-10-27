@@ -27,9 +27,13 @@
   | `unmeasured_calls` | the LLM calls whose `usage_status` is not `measured` |
   | `audit_rounds_per_cycle` | the sum of `audit_dispatches`, divided by the started cycles, rounded to 0.01 |
   | `convergence_rate` | the shipped cycles divided by the started cycles |
+  | `handoff_stops` | the cycles that the fixability check sealed `handed-off` (`REPAIR_HANDOFF` with `decision: stop`) |
+  | `handoff_would_stops` | the repair rounds that started with a hand-off finding that blocks (`decision: would_stop`, ADR-0158 metric 5) |
+  | `spend_limit_stops`, `spend_limit_would_stops` | the cycles with a `CYCLE_SPEND_LIMIT` `stop` or `would_stop` decision |
+  | `false_stops` | the cycles with a `would_stop` of either check that then shipped (ADR-0158 decision 26). The target before a flip to `enforce` is 0. |
 
   A failed cycle adds its spend to the numerator, because its spend bought no ship. With no shipped cycle, each figure for each shipped cycle is `null`, not 0. With no cycle, the two rates are `null` too (`TestCompute_AWaveWithNoShipHasNoDefinedCost`, `TestCompute_AWaveWithNoCycleHasNoDefinedRate`). `wave status` prints one `cost:` line under the measures line (`cmd/evolve` `TestWaveStatus_TextPrintsOneCostLine`).
-- **The JSON names are a contract.** `TestMeasures_TheJSONFieldNamesAreStable` pins the eleven keys. The constants `FieldWidthSized` and `CodeAdmitWait` are the names that the writer and the reader share.
+- **The JSON names are a contract.** `TestMeasures_TheJSONFieldNamesAreStable` pins the eleven top-level keys of `Measures`, and `cost` is one of them. `TestCost_TheJSONFieldNamesAreStable` pins the keys of `cost`. When a count is not 0, `wave status` adds the hand-off counts, the spend-limit counts and the false stops to the `cost:` line. It prints `handed-off (<reason>: <blockers>)` on the line of a handed-off cycle (`cmd/evolve` `TestWaveCycleText_AHandedOffCycleShowsItsReason`). The constants `FieldWidthSized` and `CodeAdmitWait` are the names that the writer and the reader share.
 
 ## Where the facts come from
 

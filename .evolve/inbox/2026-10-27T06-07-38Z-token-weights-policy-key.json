@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "A policy with telemetry.token_weights.claude loads.",
+    "An unknown family or a negative weight fails the strict load and names the key.",
+    "No policy key gives the defaults."
+  ],
+  "created_at": "2026-10-27T13:30:00Z",
+  "deps": [],
+  "files": [
+    "go/internal/policy/strict_keys.go",
+    "go/internal/policy (the reader of the key)"
+  ],
+  "fix": "Register telemetry.token_weights.<family> with four weights (input, output, cache_read, cache_write) and the defaults 1, 5, 0.1 and 1.25. The report reads the weights from the policy; no weight is a Go literal outside the default.",
+  "id": "token-weights-policy-key",
+  "kind": "feature",
+  "origin": "console",
+  "priority": "P1",
+  "priority_class": "maintainability",
+  "route": "console",
+  "source": "console, 2026-10-27, operator request: \"identify which phase or agent or steps burning the most tokens\". Plan docs/plans/token-telemetry-2026-10.md; research docs/research/token-telemetry-2026-10.md",
+  "summary": "The policy key telemetry.token_weights holds the CWU weights of each family. Plan docs/plans/token-telemetry-2026-10.md component T8.",
+  "title": "The policy key telemetry.token_weights holds the CWU weights of each family",
+  "weight": 0.6
+}

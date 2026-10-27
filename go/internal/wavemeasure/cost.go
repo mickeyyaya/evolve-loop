@@ -7,8 +7,11 @@ import (
 )
 
 type CycleSpend struct {
-	Shipped bool
-	Spend   cyclespend.Spend
+	Shipped      bool
+	Spend        cyclespend.Spend
+	HandoffWould int
+	HandedOff    bool
+	SpendLimit   string
 }
 
 type Cost struct {
@@ -20,14 +23,21 @@ type Cost struct {
 	UnmeasuredCalls                int      `json:"unmeasured_calls"`
 	AuditRoundsPerCycle            *float64 `json:"audit_rounds_per_cycle"`
 	ConvergenceRate                *float64 `json:"convergence_rate"`
+	HandoffStops                   int      `json:"handoff_stops"`
+	HandoffWouldStops              int      `json:"handoff_would_stops"`
+	FalseStops                     int      `json:"false_stops"`
+	SpendLimitStops                int      `json:"spend_limit_stops"`
+	SpendLimitWouldStops           int      `json:"spend_limit_would_stops"`
 }
 
 func computeCost(cycles []CycleSpend) Cost {
 	var t cyclespend.Totals
+	var c Cost
 	for _, cy := range cycles {
 		t = t.Add(cy.Spend, cy.Shipped)
+		c = c.withHandoff(cy)
 	}
-	c := Cost{Started: t.Started, Shipped: t.Shipped, UnmeasuredCalls: t.Spend.UnmeasuredCalls}
+	c.Started, c.Shipped, c.UnmeasuredCalls = t.Started, t.Shipped, t.Spend.UnmeasuredCalls
 	if per, ok := t.PerShipped(); ok {
 		c.LLMMinutesPerShippedCycle = rounded(per.LLMMinutes, 10)
 		c.FreshTokensPerShippedCycle = rounded(per.FreshTokens, 1)
@@ -38,6 +48,23 @@ func computeCost(cycles []CycleSpend) Cost {
 	}
 	if rate, ok := t.ConvergenceRate(); ok {
 		c.ConvergenceRate = &rate
+	}
+	return c
+}
+
+func (c Cost) withHandoff(cy CycleSpend) Cost {
+	c.HandoffWouldStops += cy.HandoffWould
+	if cy.HandedOff {
+		c.HandoffStops++
+	}
+	switch cy.SpendLimit {
+	case cyclespend.ActionStop:
+		c.SpendLimitStops++
+	case cyclespend.ActionWouldStop:
+		c.SpendLimitWouldStops++
+	}
+	if (cy.HandoffWould > 0 || cy.SpendLimit == cyclespend.ActionWouldStop) && cy.Shipped {
+		c.FalseStops++
 	}
 	return c
 }

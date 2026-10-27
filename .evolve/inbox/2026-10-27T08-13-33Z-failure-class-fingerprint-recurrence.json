@@ -1,0 +1,28 @@
+{
+  "acceptance": [
+    "Red test first: the reasons of 2043, 2046 and 2055 (fixtures from their audit-fail-reason.json) give one class fingerprint and recurrence 1, 2, 3; the third routes to the console with the floor reason.",
+    "2048 (layer task-code) does not count toward that class.",
+    "Two failures with different failing checks give different class fingerprints.",
+    "The doc of the failure digest states both fingerprints in STE."
+  ],
+  "created_at": "2026-10-27T08:13:33Z",
+  "deps": [],
+  "files": [
+    "go/internal/core/failure_digest.go",
+    "go/internal/recurrence/ledger.go",
+    "go/internal/dispositionrouter/dispositionrouter.go",
+    "go/internal/core/blocker_breaker.go"
+  ],
+  "fix": "Add a class fingerprint next to the exact one: phase | pre-class | the sorted names of the failing checks (explanation, ste-lint, coverage, apicover, size, repo-contract, ...) | the disposition layer. Count recurrence on the class fingerprint for pipeline-code, harness and infra layers; keep the exact fingerprint for task-code. Feed the class recurrence to dispositionrouter.Decide and the blocker breaker.",
+  "id": "failure-class-fingerprint-recurrence",
+  "kind": "pipeline-repair",
+  "notes": "Console route: internal/core is on the fence.",
+  "origin": "console",
+  "priority": "P1",
+  "priority_class": "correctness",
+  "route": "console",
+  "source": "console, 2026-10-27, operator: \"why did we not find the wave issue at once, why does wave watch not pick up the failed signal and react?\" Evidence: cycles 2043, 2046, 2055 (pipeline-code) and 2048 failed on the same build floor defect with 4 different fingerprints and recurrence 0",
+  "summary": "fingerprint() in go/internal/core/failure_digest.go:129-136 hashes the whole normalized reason text. The text names files, functions and percentages, so the same floor defect gives a new hash each cycle: 2043 0a48aa5747ca, 2046 c98f5503ae68, 2048 89fb584113df, 2055 6e9e4730e355, recurrence 0 each. RecurrenceConsoleFloor (3, dispositionrouter.go:24) and the IdenticalFingerprintCeiling breaker (blocker_breaker.go:151) never fire.",
+  "title": "Failures with one root cause share a class fingerprint, so recurrence counts them and the console floor trips",
+  "weight": 0.85
+}

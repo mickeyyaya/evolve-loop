@@ -42,6 +42,7 @@ const (
 	CycleTerminationTddProtectedRoute = cyclestate.CycleTerminationTddProtectedRoute
 
 	CycleTerminationBlockedNeedsConsole = cyclestate.CycleTerminationBlockedNeedsConsole
+	CycleTerminationHandedOff           = cyclestate.CycleTerminationHandedOff
 )
 
 func IsVerdict(s string) bool { return cyclestate.IsVerdict(s) }

@@ -140,12 +140,16 @@ func runSteLint(args []string, stdout, stderr io.Writer) int {
 }
 
 func steLintRoot(explicit string) (string, error) {
-	for _, candidate := range []string{explicit, os.Getenv(ipcenv.WorktreeRootKey), os.Getenv("EVOLVE_PROJECT_ROOT")} {
+	for _, candidate := range []string{explicit, os.Getenv(ipcenv.WorktreeRootKey)} {
 		if candidate != "" {
 			return filepath.Abs(candidate)
 		}
 	}
-	return resolveRepoRoot("")
+	root, err := resolveRepoRoot("")
+	if err != nil && os.Getenv("EVOLVE_PROJECT_ROOT") != "" {
+		return filepath.Abs(os.Getenv("EVOLVE_PROJECT_ROOT"))
+	}
+	return root, err
 }
 
 func steLintTargets(a steLintArgs, root string) ([]steTarget, error) {

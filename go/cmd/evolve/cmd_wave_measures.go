@@ -83,5 +83,14 @@ func writeWaveCostText(w io.Writer, c wavemeasure.Cost) {
 	if c.UnmeasuredCalls > 0 {
 		fmt.Fprintf(w, " · %d call(s) unmeasured", c.UnmeasuredCalls)
 	}
+	if c.HandoffStops+c.HandoffWouldStops > 0 {
+		fmt.Fprintf(w, " · hand-off stops %d, would stops %d", c.HandoffStops, c.HandoffWouldStops)
+	}
+	if c.SpendLimitStops+c.SpendLimitWouldStops > 0 {
+		fmt.Fprintf(w, " · spend-limit stops %d, would stops %d", c.SpendLimitStops, c.SpendLimitWouldStops)
+	}
+	if c.FalseStops > 0 {
+		fmt.Fprintf(w, " · false stops %d", c.FalseStops)
+	}
 	fmt.Fprintln(w)
 }

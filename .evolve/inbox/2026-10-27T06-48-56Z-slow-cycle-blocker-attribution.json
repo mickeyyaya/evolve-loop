@@ -1,0 +1,32 @@
+{
+  "acceptance": [
+    "Red test first: wave-143 fixtures 2049 and 2051 name the STE self-check as the shared blocker and give one incident.",
+    "A cycle whose wall time is far above its LLM time names waiting as the blocker.",
+    "The threshold is a strict policy key with a range.",
+    "The doc is updated in STE."
+  ],
+  "created_at": "2026-10-27T06:48:56Z",
+  "deps": [
+    "cycle-llm-minutes-verdict"
+  ],
+  "files": [
+    "go/internal/selfheal/incidents.go",
+    "go/internal/wavemeasure/cost.go"
+  ],
+  "fix": "At the boundary, for each cycle above the wave median of LLM minutes to verdict or with a fail-fast ratio under a policy threshold, score each side index in minutes and name the top blocker with its evidence. Record it in the cycle result and pass a repeating blocker (same fingerprint in 2 or more cycles) to the X12 incident detector.",
+  "id": "slow-cycle-blocker-attribution",
+  "intake_override": {
+    "reason": "feeds the self-heal incident detector X12 that the console builds",
+    "console_route": true
+  },
+  "kind": "feature",
+  "notes": "Console route: it feeds the self-heal incident detector (X12, #1186) that the console builds.",
+  "origin": "console",
+  "priority": "P1",
+  "priority_class": "debuggability",
+  "route": "console",
+  "source": "console, 2026-10-27, operator: \"make LLM [minutes] the evaluation on the cycle result; it should fail fast and deliver faster; if not, something is blocking the pipeline; use side indexes\". Extends ADR-0158 item 1 (docs/plans/cost-aware-repair-2026-10.md); baseline dev/console-notes/llm-minutes-baseline-2026-10-27.md",
+  "summary": "When a cycle does not fail fast or deliver fast, something blocks the pipeline. The side indexes exist but nothing reads them per cycle: wall time against LLM time per phase, corrections and floor rejections, audit rounds, context fill and cache-read growth, continuation stamp and adoption, quota exits (85), ship rebase signals, deadline stops, and a repeating failure fingerprint across cycles.",
+  "title": "A slow or late-failing cycle names its top blocker from the side indexes and feeds the incident detector",
+  "weight": 0.75
+}

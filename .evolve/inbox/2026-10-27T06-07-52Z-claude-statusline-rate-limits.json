@@ -1,0 +1,32 @@
+{
+  "acceptance": [
+    "A statusline JSON with rate_limits.seven_day.used_percentage 41.5 gives one history line with source statusline.",
+    "A JSON without rate_limits writes nothing and exits 0.",
+    "No write outside the cell occurs (sandbox test).",
+    "The stage stays shadow until the operator closes plan Q3."
+  ],
+  "created_at": "2026-10-27T13:30:00Z",
+  "deps": [
+    "usage-observation-history"
+  ],
+  "files": [
+    "go/cmd/evolve (a new evolve usage statusline verb)",
+    "go/internal/bridge/manifests/claude-tmux.json (the statusline setting of the pane)",
+    "go/internal/usageprobe/history.go"
+  ],
+  "fix": "Add a verb that reads the statusline JSON on stdin and appends rate_limits.five_hour and rate_limits.seven_day used_percentage and resets_at to the usage history with source statusline. Close plan Q3 first: the pane sandbox grants no write outside the cell, so the verb writes inside the cell and the bridge copies the line after the launch.",
+  "id": "claude-statusline-rate-limits",
+  "intake_override": {
+    "reason": "the pane setting is driver data on the launch path; the sandbox rule decides the write path (plan Q3)",
+    "console_route": true
+  },
+  "kind": "feature",
+  "origin": "console",
+  "priority": "P3",
+  "priority_class": "debuggability",
+  "route": "console",
+  "source": "console, 2026-10-27, operator request: \"identify which phase or agent or steps burning the most tokens\". Plan docs/plans/token-telemetry-2026-10.md; research docs/research/token-telemetry-2026-10.md",
+  "summary": "The Claude statusline rate_limits percent is a second quota source, at shadow. Plan docs/plans/token-telemetry-2026-10.md component T5.",
+  "title": "The Claude statusline rate_limits percent is a second quota source, at shadow",
+  "weight": 0.45
+}

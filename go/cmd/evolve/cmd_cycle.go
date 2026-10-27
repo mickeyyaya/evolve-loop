@@ -590,8 +590,9 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	opts = append(opts, compositionOptions()...)
 	hostEffects = deliverable.NewHostEffects(catalog, hostInboxClaimer(ld, signals, forbidden))
 	opts = append(opts, core.WithHostEffects(hostEffects))
-	opts = append(opts, core.WithLaneMenu(laneMenuOf(forbidden)))
+	opts = append(opts, core.WithLaneMenu(laneMenuOf(forbidden, wfCfg.Repair.Fixability)))
 	opts = append(opts, core.WithProtectedSurface(protectedMembership))
+	opts = append(opts, core.WithRepairFixability(repairFixability(protectedMembership, os.Stderr)))
 	opts = append(opts, core.WithSignalCenter(signals))
 
 	return orchDeps{
@@ -767,8 +768,8 @@ func documentSpecPtr(cfg config.RoutingConfig) *config.DeliverableKindSpec {
 	return &spec
 }
 
-func laneMenuOf(forbidden func(string) bool) core.LaneMenuFn {
+func laneMenuOf(forbidden func(string) bool, companions policy.FixabilityConfig) core.LaneMenuFn {
 	return func(inboxRoot string, items []inboxbatch.Item) []inboxbatch.Item {
-		return inboxmover.PartitionLaneMenu(inboxmover.Options{InboxDir: inboxRoot, Stderr: io.Discard}, items, forbidden).Ready
+		return inboxmover.PartitionLaneMenu(inboxmover.Options{InboxDir: inboxRoot, Stderr: io.Discard, Companions: companions}, items, forbidden).Ready
 	}
 }

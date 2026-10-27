@@ -135,6 +135,12 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 |---|---|
 | `CONTROL_BYPASS_USED` | an audited bypass is in use (ADR-0156 I-16, X18d): an operator parameter, after its control_bypass ledger entry is written, or a policy opt-in at the bridge adapter start; fields name, actor, reason and at |
 
+### cycle
+
+| Code | Meaning |
+|---|---|
+| `CYCLE_SPEND_LIMIT` | the spend of the cycle passed a limit of workflow.cycle_spend at a phase boundary (ADR-0158 decisions 14 to 16); fields.decision is would_stop (shadow, once for each cycle, the flow of today runs), over (enforce, the first boundary over the limit where no stop is legal) or stop (enforce, at the failed audit where the cycle goes to retro and seals handed-off; a passing audit still ships); fields.stage is shadow or enforce, fields.partial is true when the ledger did not load whole, fields.limit names the limit, fields.value and fields.max give the spend and the limit, and fields.phase the boundary |
+
 ### failurediag
 
 | Code | Meaning |
@@ -349,6 +355,12 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `QUALITY_TQ3_BREACH` | the whole 95% interval of TQ3 (test value) is on the bad side of its threshold at stage report or gate (ADR-0153) |
 | `QUALITY_TQ4_BREACH` | the whole 95% interval of TQ4 (held-out share) is on the bad side of its threshold at stage report or gate (ADR-0153) |
 | `QUALITY_VACUOUS_DENOMINATOR` | a quality reading has n = 0 where the index expects data; a rule that holds on an empty set proves nothing (ADR-0153) |
+
+### repair
+
+| Code | Meaning |
+|---|---|
+| `REPAIR_HANDOFF` | the fixability check found a hand-off finding before a repair round (ADR-0158); fields.stage is shadow or enforce, fields.decision is none, would_stop (shadow) or stop (enforce: the cycle seals handed-off with no repair round), fields.reason is handoff_blocker on a stop or a would_stop, fields.blockers, fields.handoff and fields.lane list the finding ids, fields.console_items the console items the findings name and fields.salvage the worktree of the cycle |
 
 ### review
 

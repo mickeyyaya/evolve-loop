@@ -174,6 +174,9 @@ func waveCycleText(c wave.Cycle) string {
 		}
 		text = fmt.Sprintf("cycle %d: verdict %s, %s", c.ID, c.Verdict, shipped)
 	}
+	if c.HandoffStop != "" {
+		text += ", handed-off (" + c.HandoffStop + ")"
+	}
 	if c.QuotaPauses > 0 {
 		text += fmt.Sprintf(", quota pauses %d", c.QuotaPauses)
 	}

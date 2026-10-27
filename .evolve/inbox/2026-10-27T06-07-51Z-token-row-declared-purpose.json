@@ -1,0 +1,30 @@
+{
+  "acceptance": [
+    "A repair round of tdd writes purpose repair.",
+    "An audit_fix patch dispatch writes purpose audit_fix.",
+    "An advisor plan launch writes agent router with step plan.",
+    "A request without a declared purpose keeps the derived purpose of T1."
+  ],
+  "created_at": "2026-10-27T13:30:00Z",
+  "deps": [
+    "token-row-attribution-from-request"
+  ],
+  "files": [
+    "go/internal/core/ports.go",
+    "go/internal/core/cyclerun_dispatch.go",
+    "go/internal/core/retry_envelope.go",
+    "go/internal/core/phase_advisor.go",
+    "go/internal/bridge/attempt_telemetry.go"
+  ],
+  "fix": "Add a Purpose field (and a Step field for the advisor: plan, proposal, replan) to core.BridgeRequest. Set it at the repair round, the audit_fix rung, the recovery and the advisor launch call sites. The bridge writes the declared purpose when it is set, else the purpose of T1.",
+  "id": "token-row-declared-purpose",
+  "kind": "feature",
+  "origin": "console",
+  "priority": "P2",
+  "priority_class": "debuggability",
+  "route": "console",
+  "source": "console, 2026-10-27, operator request: \"identify which phase or agent or steps burning the most tokens\". Plan docs/plans/token-telemetry-2026-10.md; research docs/research/token-telemetry-2026-10.md",
+  "summary": "The core declares the round purpose of each dispatch: repair, audit fix, recovery and the advisor step. Plan docs/plans/token-telemetry-2026-10.md component T2.",
+  "title": "The core declares the round purpose of each dispatch: repair, audit fix, recovery and the advisor step",
+  "weight": 0.7
+}

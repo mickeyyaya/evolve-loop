@@ -238,7 +238,7 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 		}
 		cursor.advance(next, resp.Verdict)
 
-		if err := o.resumeAfterAudit(&cs, &cursor, &result, resp.Verdict); err != nil {
+		if err := o.resumeAfterAudit(&cs, &cursor, &result, phaseTimings, resp.Verdict); err != nil {
 			return result, err
 		}
 

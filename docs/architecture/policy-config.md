@@ -272,11 +272,11 @@ The block configures `internal/convergence`, the one rule every repeat-until-acc
 
 ## Repair fixability (`workflow.repair.fixability`)
 
-The block sets the stage of lane fixability classification ([ADR-0158](adr/0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md)). The loader refuses a bad stage value with an error.
+The block sets the stage of lane fixability classification ([ADR-0158](adr/0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md), [internal-fixability](packages/internal-fixability.md)). One stage serves two checks: the check before a repair round, and the console companion check of the lane menu. The loader refuses a bad stage value with an error. `policy.FixabilityFor` holds `shadow` with a WARN when the policy file is refused.
 
 | Key | Meaning | Default |
 |---|---|---|
-| `stage` | `off` disables classification. `shadow` records decisions without stopping. `enforce` stops the repair round on a blocking handoff finding. | `shadow` |
+| `stage` | `off` disables classification. `shadow` records `REPAIR_HANDOFF` with `decision: would_stop`, and the repair round runs. A lane item with a console companion stays ready. `enforce` seals the cycle `handed-off` on a blocking handoff finding, with no repair round. A lane item with a console companion waits with the reason `console_companion_pending`. | `shadow` |
 
 ## Retry ladder (`workflow.retry_ladder`)
 
@@ -292,6 +292,18 @@ The block sets the stage of the retry ladder and the size of the digest of a rai
 | `audit_fix.max_code_lines` | the most estimated lines of production code, from 0 to 2000. It applies when `no_new_production_logic` is true. | 10 |
 | `audit_fix.max_tokens` | the most estimated tokens of an `audit_fix`, from 0 to 64000. 0 means the default. | 6000 |
 | `audit_fix.no_new_production_logic` | true limits the production code lines of an `audit_fix` to `max_code_lines`. | true |
+
+## Cycle spend (`workflow.cycle_spend`)
+
+The block sets the spend limit of one cycle ([ADR-0158](adr/0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md) decisions 14 to 16, [internal-cyclespend](packages/internal-cyclespend.md)). It is not `workflow.cycle_budget`, the stage of the loop end decision. The loader refuses three faults with the key name. They are an unknown stage, an unknown key and a value outside its range. The stages are `0`, `off`, `shadow` and `enforce`. To get the default, leave the key out.
+
+| Key | Range | Meaning | Default |
+|---|---|---|---|
+| `stage` | `0`, `off`, `shadow`, `enforce` | `shadow`: the first passed limit records `CYCLE_SPEND_LIMIT` with `decision: would_stop`, and the flow of today runs. `enforce`: the first boundary over the limit records `over`. The cycle stops at the first failed phase that has a legal edge to retro (a failed audit), records `stop` and seals `handed-off`. A passing audit still ships. | `shadow` |
+| `max_llm_minutes` | 10 to 600 | the LLM minutes of the cycle | 90 |
+| `max_fresh_tokens` | 100000 to 20000000 | input, output and cache-write tokens | 2500000 |
+| `max_cache_read_tokens` | 1000000 to 500000000 | cache-read tokens | 40000000 |
+| `max_audit_rounds` | 1 to 4 | `audit_dispatches` of the cycle | 2 |
 
 ## Documentation floors (`docs_floor`)
 

@@ -198,7 +198,6 @@
   "internal/phasestream.Normalizer.Poll": 59,
   "internal/phasewatchdog.Run": 143,
   "internal/policy.Policy.FleetConfig": 77,
-  "internal/policy.Policy.WorkflowConfig": 90,
   "internal/posteditvalidate.Run": 108,
   "internal/preflight.Probe": 139,
   "internal/pruneephemeral.Run": 117,

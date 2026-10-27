@@ -194,3 +194,61 @@ func TestBuildHandoffProbe_Input_BindsThePersistedCycleOrSaysWhyNot(t *testing.T
 		t.Fatalf("no persisted state is reported, and the probe falls back to the unbound input: got %+v err=%v", got, err)
 	}
 }
+
+func TestMandatoryExplanationReviewer_AnExplanationGapCarriesEveryComposedFloorFailureInOneRejection(t *testing.T) {
+	t.Parallel()
+
+	var calls []string
+	contract := &recordingReviewer{default_: ReviewResult{Reason: "contract rejects"}}
+	r := mandatoryExplanationReviewer{
+		floor: BuildHandoffFloor{recordingCheck("explanation", &calls, "Explanation Documentation: the build is not sealed")},
+		next: ChainReviewers(
+			BuildHandoffFloor{recordingCheck("production", &calls, "[size] Policy.WorkflowConfig is 82 lines; the allowance is 81", "[cover] f is at 80.0%")},
+			contract,
+		),
+	}
+	in := ReviewInput{Phase: string(PhaseBuild), ExplanationDocumentationVersion: 1, Worktree: "/wt"}
+
+	got := r.Review(context.Background(), in)
+
+	want := []string{"Explanation Documentation: the build is not sealed", "[size] Policy.WorkflowConfig is 82 lines; the allowance is 81", "[cover] f is at 80.0%"}
+	if got.Approve || !got.Retry || !reflect.DeepEqual(got.Failures, want) || !strings.HasPrefix(got.Reason, "build handoff floor: 3 deterministic check failure(s)") {
+		t.Fatalf("one rejection carries the union of the explanation and the composed floor: got %+v, want failures %q", got, want)
+	}
+	if wantCalls := []string{"explanation@/wt", "production@/wt"}; !reflect.DeepEqual(calls, wantCalls) || len(contract.calls) != 0 {
+		t.Fatalf("each floor check runs once and no other reviewer runs on a floor rejection; calls = %q, contract calls = %d", calls, len(contract.calls))
+	}
+}
+
+func TestMandatoryExplanationReviewer_AnExplanationGapAloneKeepsItsOneFailure(t *testing.T) {
+	t.Parallel()
+
+	var calls []string
+	r := mandatoryExplanationReviewer{
+		floor: BuildHandoffFloor{recordingCheck("explanation", &calls, "Explanation Documentation: the build is not sealed")},
+		next:  ChainReviewers(BuildHandoffFloor{recordingCheck("production", &calls)}),
+	}
+
+	got := r.Review(context.Background(), ReviewInput{Phase: string(PhaseBuild), ExplanationDocumentationVersion: 1, Worktree: "/wt"})
+
+	if got.Approve || !reflect.DeepEqual(got.Failures, []string{"Explanation Documentation: the build is not sealed"}) {
+		t.Fatalf("a green composed floor adds nothing to the explanation rejection; got %+v", got)
+	}
+}
+
+func TestMandatoryExplanationReviewer_AnExplanationGapAnnotatesProtectedFileFailuresFromTheComposedFloor(t *testing.T) {
+	t.Parallel()
+
+	var calls []string
+	r := mandatoryExplanationReviewer{
+		floor: BuildHandoffFloor{recordingCheck("explanation", &calls, "Explanation Documentation: the build is not sealed")},
+		next:  ChainReviewers(BuildHandoffFloor{recordingCheck("acs", &calls, cycle1946PredicateFailure)}),
+	}
+	in := ReviewInput{Phase: string(PhaseBuild), ExplanationDocumentationVersion: 1, Worktree: "/wt", Protected: protectsSelfcheck}
+
+	got := r.Review(context.Background(), in)
+
+	if len(got.Failures) != 2 || !strings.Contains(got.Failures[1], protectedFileNote(selfcheckPath+":138")) {
+		t.Fatalf("composed floor failures under an explanation gap must still carry the protected-file blocker note: got %+v", got.Failures)
+	}
+}

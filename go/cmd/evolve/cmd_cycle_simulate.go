@@ -12,6 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 type simulatePhase struct {
@@ -75,7 +76,7 @@ func wireSimulateOrchestrator(projectRoot, evolveDir string, console io.Writer) 
 		Storage: st, Ledger: ld, Signals: signals, CloseSignals: closeSignals,
 		Orchestrator: core.NewOrchestrator(st, ld, runners, core.WithSignalCenter(signals),
 			core.WithWorktreeProvisioner(simulateWorktrees{}), core.WithDossierDestination(core.DossierFilesOnly),
-			core.WithLaneMenu(laneMenuOf(laneForbiddenTo(projectRoot, signals.Emit)))),
+			core.WithLaneMenu(laneMenuOf(laneForbiddenTo(projectRoot, signals.Emit), policy.FixabilityFor(projectRoot, "simulate", os.Stderr)))),
 	}
 }
 
