@@ -22,7 +22,7 @@ func TestRunClihealth_AnUnknownFlagExits2(t *testing.T) {
 
 	code := runClihealth([]string{"list", "--bogus"}, nil, &out, &errb)
 
-	if code != 2 || out.Len() != 0 || !strings.Contains(errb.String(), "flag provided but not defined: -bogus") {
+	if code != cliExitUsage || out.Len() != 0 || !strings.Contains(errb.String(), "flag provided but not defined: -bogus") {
 		t.Errorf("code=%d stdout=%q stderr=%q, want 2 and the flag error", code, out.String(), errb.String())
 	}
 }

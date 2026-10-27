@@ -14,13 +14,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
-func curationOptions(stderr io.Writer) inboxmover.Options {
-	root := envOrCwd("EVOLVE_PROJECT_ROOT")
+func curationOptions(root string, stderr io.Writer) inboxmover.Options {
 	return inboxmover.Options{ProjectRoot: root, Stderr: stderr, IsProtectedPath: laneForbidden(root, stderr)}
-}
-
-func refusedMidWave(verb string, stderr io.Writer) bool {
-	return refusedMidWaveAt(envOrCwd("EVOLVE_PROJECT_ROOT"), verb, stderr)
 }
 
 func refusedMidWaveAt(root, verb string, stderr io.Writer) bool {
@@ -49,21 +44,21 @@ func curationExitCode(verb string, err error, stderr io.Writer) int {
 	return 2
 }
 
-func runInboxEdit(args []string, stdout, stderr io.Writer) int {
+func runInboxEdit(root string, args []string, stdout, stderr io.Writer) int {
+	asJSON, args := takeInboxJSON(args)
 	target, edits, ok := parseInboxEditArgs(args, stderr)
 	if !ok {
 		fmt.Fprintln(stderr, inboxUsage("edit"))
 		return 10
 	}
-	if refusedMidWave("edit", stderr) {
-		return 1
+	if refusedMidWaveAt(root, "edit", stderr) {
+		return cliExitRefused
 	}
-	path, err := inboxmover.Edit(curationOptions(stderr), target, edits)
+	path, err := inboxmover.Edit(curationOptions(root, stderr), target, edits)
 	if rc := curationExitCode("edit", err, stderr); rc != 0 {
 		return rc
 	}
-	fmt.Fprintf(stdout, "inbox edit: edited %s\n", filepath.Base(path))
-	return 0
+	return finishInboxWrite(asJSON, inboxWriteResult{Verb: "edit", Path: path}, "inbox edit: edited "+filepath.Base(path), stdout, stderr)
 }
 
 func parseInboxEditArgs(args []string, stderr io.Writer) (string, []inboxmover.FieldEdit, bool) {
@@ -95,24 +90,26 @@ func parseOnePositional(fs *flag.FlagSet, args []string) (string, bool) {
 	return positional, positional != ""
 }
 
-func runInboxWithdraw(args []string, stdout, stderr io.Writer) int {
+func runInboxWithdraw(root string, args []string, stdout, stderr io.Writer) int {
+	asJSON, args := takeInboxJSON(args)
 	if len(args) != 2 || strings.TrimSpace(args[0]) == "" || strings.TrimSpace(args[1]) == "" {
 		fmt.Fprintln(stderr, inboxUsage("withdraw"))
 		return 10
 	}
-	if refusedMidWave("withdraw", stderr) {
-		return 1
+	if refusedMidWaveAt(root, "withdraw", stderr) {
+		return cliExitRefused
 	}
 	id := strings.TrimSpace(args[0])
-	path, err := inboxmover.Withdraw(curationOptions(stderr), id, args[1])
+	path, err := inboxmover.Withdraw(curationOptions(root, stderr), id, args[1])
 	if rc := curationExitCode("withdraw", err, stderr); rc != 0 {
 		return rc
 	}
-	fmt.Fprintf(stdout, "inbox withdraw: %s withdrawn (%s removed; the id may be filed again)\n", id, filepath.Base(path))
-	return 0
+	human := fmt.Sprintf("inbox withdraw: %s withdrawn (%s removed; the id may be filed again)", id, filepath.Base(path))
+	return finishInboxWrite(asJSON, inboxWriteResult{Verb: "withdraw", ID: id, Path: path}, human, stdout, stderr)
 }
 
-func runInboxVerify(args []string, stdout, stderr io.Writer) int {
+func runInboxVerify(root string, args []string, stdout, stderr io.Writer) int {
+	asJSON, args := takeInboxJSON(args)
 	fs := flag.NewFlagSet("inbox verify", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	evidence := fs.String("evidence", "", "what the console checked, and what it found")
@@ -121,13 +118,13 @@ func runInboxVerify(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, inboxUsage("verify"))
 		return 10
 	}
-	if refusedMidWave("verify", stderr) {
-		return 1
+	if refusedMidWaveAt(root, "verify", stderr) {
+		return cliExitRefused
 	}
-	path, err := inboxmover.VerifyPremise(curationOptions(stderr), id, *evidence)
+	path, err := inboxmover.VerifyPremise(curationOptions(root, stderr), id, *evidence)
 	if rc := curationExitCode("verify", err, stderr); rc != 0 {
 		return rc
 	}
-	fmt.Fprintf(stdout, "inbox verify: stamped the premise of %s (%s)\n", id, filepath.Base(path))
-	return 0
+	human := fmt.Sprintf("inbox verify: stamped the premise of %s (%s)", id, filepath.Base(path))
+	return finishInboxWrite(asJSON, inboxWriteResult{Verb: "verify", ID: id, Path: path}, human, stdout, stderr)
 }

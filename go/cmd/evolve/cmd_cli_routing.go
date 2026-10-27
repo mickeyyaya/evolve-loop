@@ -23,7 +23,7 @@ import (
 
 const (
 	cliRoutingUsage    = "usage: evolve cli-routing show [--static] [--json] | check | explain <agent> [--phase P] [--static] | init --clis a,b | set <key> [<a,b>] [--model T] [--effort L] [--share-pct N] | unset <key>[.effort|.share_pct] | migrate [--dry-run]  (all take --project-root DIR)"
-	exitRoutingUsage   = 2
+	exitRoutingUsage   = cliExitUsage
 	exitRoutingFinding = 1
 )
 
@@ -105,7 +105,7 @@ func parseCLIRoutingFlags(name string, args []string, stderr io.Writer) (cliRout
 	fs.StringVar(&f.root, "project-root", "", "project root (default: EVOLVE_PROJECT_ROOT or the cwd)")
 	fs.StringVar(&f.phase, "phase", "", "explain: the phase the agent dispatches for (default: its own phase)")
 	fs.BoolVar(&f.static, "static", false, "resolve without the host: no probe, no bench, no discovered tail")
-	fs.BoolVar(&f.json, "json", false, "show: print the report as JSON")
+	fs.BoolVar(&f.json, "json", false, "print the result as JSON")
 	if err := fs.Parse(args); err != nil {
 		return f, nil, false
 	}
@@ -155,6 +155,9 @@ func runCLIRoutingCheck(args []string, stdout, stderr io.Writer) int {
 	}
 	f.static = true
 	view, err := loadRoutingView(f)
+	if f.json {
+		return printRoutingCheckJSON(view, err, stdout, stderr)
+	}
 	reportRoutingFindings(stdout, view.findings)
 	if err != nil {
 		fmt.Fprintf(stdout, "cli-routing check: REFUSED: %v\n", err)
@@ -162,6 +165,25 @@ func runCLIRoutingCheck(args []string, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprintf(stdout, "cli-routing check: OK — the table compiles (%s, %d warning(s))\n", routingMode(view.router), len(view.findings))
 	return 0
+}
+
+type routingCheckResult struct {
+	Compiles bool               `json:"compiles"`
+	Mode     string             `json:"mode,omitempty"`
+	Refusal  string             `json:"refusal,omitempty"`
+	Findings []cliroute.Finding `json:"findings"`
+}
+
+func printRoutingCheckJSON(view routingView, err error, stdout, stderr io.Writer) int {
+	result := routingCheckResult{Compiles: err == nil, Findings: append([]cliroute.Finding{}, view.findings...)}
+	rc := cliExitOK
+	if err != nil {
+		result.Refusal, rc = err.Error(), exitRoutingFinding
+		fmt.Fprintf(stderr, "cli-routing check: REFUSED: %v\n", err)
+	} else {
+		result.Mode = routingMode(view.router)
+	}
+	return max(printVerbJSON("cli-routing check", result, stdout, stderr), rc)
 }
 
 func routingMode(r *cliroute.Router) string {

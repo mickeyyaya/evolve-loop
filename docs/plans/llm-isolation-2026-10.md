@@ -179,7 +179,8 @@ The state on 2026-10-27. Each component re-reads this table before it starts.
 | X9 | built | #1174 | The manifest fields `parsers`, `collectors`, `transcript`, `capabilities`, `context_window` and `home_reads` pick one Go implementation for each format id (spec §11.1). Row N14 is green. Row M5 moves to X19c. Item `isolation-x9b-route-and-model-tables-from-manifests` owns the `llmroute` and `modelquery` tables. |
 | X18b | built | #1175 | `ipcenv.Markers()` is the one marker list, and the bridge reads its cell part. A cycle gets only a marker or a control not yet moved. The guard `TestNoControlFlagReadOutsideTheMarkerList` fails on any other `EVOLVE_*` or `BRIDGE_*` read. Row N1 also covers `EVOLVE_SANDBOX` and `EVOLVE_BYPASS_SHIP_GATE`. |
 | X18e | built | #1177 | Deleted names: `EVOLVE_REFLECTION_JOURNAL`, `EVOLVE_RESUME`, `EVOLVE_RESUME_MODE`, `EVOLVE_SANDBOX_FALLBACK_ON_EPERM` and `EVOLVE_RELEASE_STRICT_PASS`, with 5 registry rows. The test seams `EVOLVE_PROFILES_DIR_OVERRIDE`, `EVOLVE_ADAPTERS_DIR_OVERRIDE`, `EVOLVE_LEDGER_OVERRIDE`, `EVOLVE_PROMPTS_DIR`, `BRIDGE_TESTING`, `BRIDGE_<X>_BINARY`, `CG_TEST_INSTALL` and `CG_TEST_FORCE_MISSING` have no production read. Tests set `bridge.Deps.Binaries`, the `commitgate.Options` fields, or the real project roots. |
-| X11 to X16, X17b to X17d, X18c, X18d, X19 | not started | none | |
+| X17b | built | this change | With `--json`, each core verb of [cli-contract.md](../architecture/cli-contract.md) §5 prints one envelope on each exit and exits with a code of the one exit table. Each core verb takes `--project-root`. `TestCLIContract_DocMatchesTheRegistry` and the integration table test guard both. |
+| X11 to X16, X17c, X17d, X18c, X18d, X19 | not started | none | |
 
 ### 6.2 The X6 follow-up (X6b)
 

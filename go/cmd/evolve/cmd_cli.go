@@ -56,14 +56,14 @@ func cliUpdateVerb(ctx context.Context, args []string, stdout, stderr io.Writer)
 	evolveDir := filepath.Join(opts.projectRoot, ".evolve")
 	if live := runlease.LiveRuns(filepath.Join(evolveDir, "runs"), time.Now()); len(live) > 0 && !opts.dryRun {
 		fmt.Fprintf(stderr, "evolve cli update: refused: %d run(s) hold a live lease (%s); CLIs stay frozen within a wave, so update at a boundary (the loop does it itself) or pass --dry-run\n", len(live), live[0].Dir)
-		return 2
+		return cliExitRefused
 	}
 	rep := updateCLIs(ctx, opts.projectRoot, evolveDir, opts.dryRun, stderr)
 	printCLIUpdateReport(rep, opts.asJSON, stdout)
 	switch {
 	case ctx.Err() != nil:
 		fmt.Fprintf(stderr, "evolve cli update: interrupted (%v); a family not yet reached was skipped\n", ctx.Err())
-		return 130
+		return cliExitInterrupted
 	case len(rep.Failed()) > 0:
 		return 1
 	}
@@ -73,7 +73,7 @@ func cliUpdateVerb(ctx context.Context, args []string, stdout, stderr io.Writer)
 func parseCLIUpdateArgs(args []string, stderr io.Writer) (cliUpdateOptions, int) {
 	if len(args) == 0 || args[0] != "update" {
 		fmt.Fprintf(stderr, "evolve cli update: want the update subcommand (%s)\n", cliUsage)
-		return cliUpdateOptions{}, 2
+		return cliUpdateOptions{}, cliExitUsage
 	}
 	fs := flag.NewFlagSet("evolve cli update", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -82,11 +82,11 @@ func parseCLIUpdateArgs(args []string, stderr io.Writer) (cliUpdateOptions, int)
 	asJSON := fs.Bool("json", false, "print the report as JSON")
 	if err := fs.Parse(args[1:]); err != nil {
 		fmt.Fprintln(stderr, "evolve cli update: "+cliUsage)
-		return cliUpdateOptions{}, 2
+		return cliUpdateOptions{}, cliExitUsage
 	}
 	if fs.NArg() > 0 {
 		fmt.Fprintf(stderr, "evolve cli update: unexpected argument %q (%s)\n", fs.Arg(0), cliUsage)
-		return cliUpdateOptions{}, 2
+		return cliUpdateOptions{}, cliExitUsage
 	}
 	return cliUpdateOptions{projectRoot: cliUpdateRoot(*root, stderr), dryRun: *dryRun, asJSON: *asJSON}, 0
 }

@@ -1107,8 +1107,8 @@ func TestC1792_002_PRMergeRefusesWithExitOneAndMergesNothingFurther(t *testing.T
 				return
 			}
 			calls := fx.calls(t)
-			if r.code != 1 || r.stdout != "" || !strings.Contains(r.stderr, c.names) {
-				t.Errorf("want exit 1, empty stdout and a refusal naming %q:\n%s", c.names, r)
+			if r.code != 3 || r.stdout != "" || !strings.Contains(r.stderr, c.names) {
+				t.Errorf("want the refusal exit 3 of cli-contract.md §3, empty stdout and a refusal naming %q:\n%s", c.names, r)
 			}
 			if merges := callsTo(calls, "pr", "merge"); len(merges) != 0 {
 				t.Errorf("a refusal must merge nothing:\n%s", describe(calls))
@@ -1136,8 +1136,8 @@ func TestC1792_003_PRMergeStopsAtTheFirstRefusalAndKeepsEarlierMerges(t *testing
 		return
 	}
 	calls := fx.calls(t)
-	if r.code != 1 || r.stdout != mergedLine(sc, 12) {
-		t.Errorf("want exit 1 with only #12's merge line on stdout:\n%s", r)
+	if r.code != 3 || r.stdout != mergedLine(sc, 12) {
+		t.Errorf("want the refusal exit 3 with only #12's merge line on stdout:\n%s", r)
 	}
 	requireMergeAt(t, calls, 12, sc.PRs["12"].Head, "--merge")
 	for _, n := range []string{"13", "14"} {
@@ -1248,8 +1248,8 @@ func TestC1792_006_PRMergeRefusesAnUpdatedHeadThatIsNotGreenInTime(t *testing.T)
 				return
 			}
 			calls := fx.calls(t)
-			if r.code != 1 || r.stdout != "" || !strings.Contains(r.stderr, "#12") {
-				t.Errorf("want exit 1 refusing #12 with nothing merged:\n%s", r)
+			if r.code != 3 || r.stdout != "" || !strings.Contains(r.stderr, "#12") {
+				t.Errorf("want the refusal exit 3 refusing #12 with nothing merged:\n%s", r)
 			}
 			if merges := callsTo(calls, "pr", "merge"); len(merges) != 0 {
 				t.Errorf("a head that is not green must not be merged:\n%s", describe(calls))
@@ -1418,8 +1418,8 @@ func TestC1792_010_BoundaryMergeStepRunsAnEvolvePRMerge(t *testing.T) {
 		writeLease(t, filepath.Join(plane.Dir, ".evolve", "runs"), "cycle-45", time.Now())
 		fx := newGHFixture(t, plane.Dir, prScenario(12))
 		r := fx.evolve(t, args...)
-		if r.code != 1 || len(callsTo(fx.calls(t), "pr", "merge")) != 0 {
-			t.Errorf("the documented `evolve %s` must refuse with exit 1 while a run lease is live:\n%s", strings.Join(args, " "), r)
+		if r.code != 3 || len(callsTo(fx.calls(t), "pr", "merge")) != 0 {
+			t.Errorf("the documented `evolve %s` must refuse with exit 3 while a run lease is live:\n%s", strings.Join(args, " "), r)
 		}
 	})
 	t.Run("merges a green PR", func(t *testing.T) {
@@ -1562,7 +1562,7 @@ type classifyReport struct {
 func decodeReport(t *testing.T, r result) classifyReport {
 	t.Helper()
 	var rep classifyReport
-	if err := json.Unmarshal([]byte(r.stdout), &rep); err != nil {
+	if err := json.Unmarshal(cliEnvelopeData(t, r.stdout), &rep); err != nil {
 		t.Fatalf("--json must print exactly one report object: %v\n%s", err, r)
 	}
 	if rep.RetrySafe == nil {
@@ -1779,7 +1779,7 @@ func TestC1792_016_CIClassifyExitCodeFollowsRetrySafety(t *testing.T) {
 			return
 		}
 		var raw map[string]json.RawMessage
-		if err := json.Unmarshal([]byte(r.stdout), &raw); err != nil {
+		if err := json.Unmarshal(cliEnvelopeData(t, r.stdout), &raw); err != nil {
 			t.Fatalf("--json: %v\n%s", err, r)
 		}
 		if r.code != 0 || string(bytes.TrimSpace(raw["failures"])) != "[]" || string(raw["retry_safe"]) != "true" {
@@ -2008,4 +2008,16 @@ func TestC1792_023_CommentConventionDocumentsARunnableEvolveCommentsVerify(t *te
 	if r := run(t, repo.Dir, env, evolveBin(t), args...); r.code != 1 {
 		t.Errorf("the documented `evolve %s` must reject a code edit:\n%s", strings.Join(args, " "), r)
 	}
+}
+
+func cliEnvelopeData(t *testing.T, stdout string) []byte {
+	t.Helper()
+	var e struct {
+		Schema string          `json:"schema"`
+		Data   json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &e); err != nil || e.Schema == "" {
+		t.Fatalf("stdout is not one cli-contract envelope: %v\n%s", err, stdout)
+	}
+	return e.Data
 }

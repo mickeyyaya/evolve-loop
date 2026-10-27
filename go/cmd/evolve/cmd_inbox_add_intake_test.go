@@ -20,7 +20,7 @@ const poolItem = `{"id":"rolling-pool","kind":"feature","priority_class":"perfor
 func addItem(t *testing.T, body string, args ...string) (int, string, string) {
 	t.Helper()
 	var stdout, stderr bytes.Buffer
-	rc := runInbox(append([]string{"add"}, args...), strings.NewReader(body), &stdout, &stderr)
+	rc := runInbox(append([]string{"add", "--file", "-"}, args...), strings.NewReader(body), &stdout, &stderr)
 	return rc, stdout.String(), stderr.String()
 }
 
@@ -231,16 +231,16 @@ func TestPrintFiledRank_WarnsWhenTheRankIsNotKnown(t *testing.T) {
 	saved := filedRankSource
 	t.Cleanup(func() { filedRankSource = saved })
 	for name, tc := range map[string]struct {
-		source func(time.Time, io.Writer) (rankedInbox, error)
+		source func(string, time.Time, io.Writer) (rankedInbox, error)
 		want   string
 	}{
-		"the rank fails":     {func(time.Time, io.Writer) (rankedInbox, error) { return rankedInbox{}, errors.New("no policy") }, "no policy"},
-		"no row is the item": {func(time.Time, io.Writer) (rankedInbox, error) { return rankedInbox{}, nil }, "holds no row"},
+		"the rank fails":     {func(string, time.Time, io.Writer) (rankedInbox, error) { return rankedInbox{}, errors.New("no policy") }, "no policy"},
+		"no row is the item": {func(string, time.Time, io.Writer) (rankedInbox, error) { return rankedInbox{}, nil }, "holds no row"},
 	} {
 		filedRankSource = tc.source
 		var stdout, stderr bytes.Buffer
 
-		printFiledRank("/x/.evolve/inbox/a.json", &stdout, &stderr)
+		printFiledRank("/x", "/x/.evolve/inbox/a.json", &stdout, &stderr)
 
 		if stdout.Len() != 0 || !strings.Contains(stderr.String(), tc.want) {
 			t.Errorf("%s: stdout = %q stderr = %q, want a WARN naming %q", name, stdout.String(), stderr.String(), tc.want)

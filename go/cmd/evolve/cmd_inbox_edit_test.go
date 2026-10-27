@@ -18,7 +18,7 @@ func fileCLIItem(t *testing.T) (root, path string) {
 	root = emptyInboxRoot(t)
 	t.Setenv("EVOLVE_PROJECT_ROOT", root)
 	var stdout, stderr bytes.Buffer
-	if rc := runInbox([]string{"add"}, strings.NewReader(cliInboxItem), &stdout, &stderr); rc != 0 {
+	if rc := runInbox([]string{"add", "--file", "-"}, strings.NewReader(cliInboxItem), &stdout, &stderr); rc != 0 {
 		t.Fatalf("add: rc = %d stderr = %q", rc, stderr.String())
 	}
 	matches, err := filepath.Glob(filepath.Join(root, ".evolve", "inbox", "*-cli-inbox-show.json"))
@@ -186,8 +186,8 @@ func TestCmd_InboxCurationVerbs_RefuseWhileALoopLaneIsLive(t *testing.T) {
 		{"verify", "cli-inbox-show", "--evidence", "checked"},
 	} {
 		var stdout, stderr bytes.Buffer
-		if rc := runInbox(args, nil, &stdout, &stderr); rc != 1 || !strings.Contains(stderr.String(), "a loop lane is live") || !strings.Contains(stderr.String(), "cycle-1790") {
-			t.Errorf("%v: rc = %d stderr = %q, want 1 naming the live lane", args, rc, stderr.String())
+		if rc := runInbox(args, nil, &stdout, &stderr); rc != cliExitRefused || !strings.Contains(stderr.String(), "a loop lane is live") || !strings.Contains(stderr.String(), "cycle-1790") {
+			t.Errorf("%v: rc = %d stderr = %q, want 3 naming the live lane", args, rc, stderr.String())
 		}
 	}
 	if after, _ := os.ReadFile(path); !bytes.Equal(before, after) {

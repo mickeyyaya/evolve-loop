@@ -56,18 +56,29 @@ func runLoopDetached(cfg loopConfig, stdout, stderr io.Writer) int {
 		for _, r := range live {
 			fmt.Fprintf(stderr, "evolve loop: --detach: run %s (%s) is already live (owner pid %d); not launching a second loop — stop it with: evolve loop-stop --wait\n", r.Lease.RunID, r.Dir, r.Lease.OwnerPID)
 		}
-		return 1
+		return cliExitRefused
 	}
+	human := humanWriter(stdout, cfg.JSON)
 	launch, err := startDetachedLoop(cfg, attr)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve loop: --detach: %v\n", err)
 		return 1
 	}
-	fmt.Fprintf(stdout, "loop: detached pid %d, log %s\n", launch.pid, cfg.LogPath)
+	fmt.Fprintf(human, "loop: detached pid %d, log %s\n", launch.pid, cfg.LogPath)
 	if err := recordLogWriter(cfg.LogPath, launch.pid); err != nil {
 		fmt.Fprintf(stderr, "evolve loop: WARN: --detach: %v; gc can delete this log while the loop writes it\n", err)
 	}
-	return awaitDetachedBoot(cfg, launch, detachBootWait(cfg.EvolveDir, stderr), stdout, stderr)
+	rc := awaitDetachedBoot(cfg, launch, detachBootWait(cfg.EvolveDir, stderr), human, stderr)
+	if !cfg.JSON {
+		return rc
+	}
+	return max(printVerbJSON("loop", detachedLoopResult{PID: launch.pid, Log: cfg.LogPath, Running: rc == cliExitOK}, stdout, stderr), rc)
+}
+
+type detachedLoopResult struct {
+	PID     int    `json:"pid"`
+	Log     string `json:"log"`
+	Running bool   `json:"running"`
 }
 
 func startDetachedLoop(cfg loopConfig, attr *syscall.SysProcAttr) (detachedLaunch, error) {

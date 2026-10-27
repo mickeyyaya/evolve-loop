@@ -24,7 +24,7 @@ func TestCmd_InboxWithdraw_RemovesAPendingItemAndAddFilesTheIDAgain(t *testing.T
 	if last := lines[len(lines)-1]; last.Action != "withdraw" || last.TaskID != "cli-inbox-show" || !strings.Contains(last.Message, "filed under the wrong scope") {
 		t.Errorf("ledger tail = %+v, want the withdraw line", last)
 	}
-	if rc := runInbox([]string{"add"}, strings.NewReader(cliInboxItem), &stdout, &stderr); rc != 0 {
+	if rc := runInbox([]string{"add", "--file", "-"}, strings.NewReader(cliInboxItem), &stdout, &stderr); rc != 0 {
 		t.Errorf("filing the withdrawn id again: rc = %d stderr = %q", rc, stderr.String())
 	}
 }

@@ -92,6 +92,15 @@ func cycleResetRootWarner(stderr io.Writer) func(string) {
 	}
 }
 
+type cycleResetResult struct {
+	Cycle     int    `json:"cycle"`
+	Phase     string `json:"phase"`
+	Archive   string `json:"archive"`
+	NextCycle int    `json:"next_cycle"`
+	DryRun    bool   `json:"dry_run"`
+	Forced    bool   `json:"forced"`
+}
+
 func runCycleReset(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve cycle reset", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -101,12 +110,14 @@ func runCycleReset(args []string, stdout, stderr io.Writer) int {
 		reason      string
 		dryRun      bool
 		force       bool
+		asJSON      bool
 	)
 	fs.StringVar(&projectRoot, "project-root", ".", "absolute path to the project root (default cwd)")
 	fs.StringVar(&evolveDir, "evolve-dir", "", "path to .evolve/ state directory (default <project-root>/.evolve)")
 	fs.StringVar(&reason, "reason", "operator-requested reset", "reason recorded in the seal manifest + ledger")
 	fs.BoolVar(&dryRun, "dry-run", false, "print the seal plan without mutating any state")
 	fs.BoolVar(&force, "force", false, "seal even when the cycle's run lease is still fresh (override a live, heartbeating owner — last resort)")
+	fs.BoolVar(&asJSON, "json", false, "print the result as JSON")
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}
@@ -124,28 +135,16 @@ func runCycleReset(args []string, stdout, stderr io.Writer) int {
 		PidAlive:    pidAlive,
 	})
 	if err != nil {
-		switch {
-		case errors.Is(err, core.ErrNothingToReset):
-			fmt.Fprintln(stderr, "evolve cycle reset: no in-progress cycle to seal")
-			return 1
-		case errors.Is(err, core.ErrCycleOwnedLive):
-			fmt.Fprintf(stderr, "evolve cycle reset: cycle %d is owned by a LIVE run (pid %d, lease heartbeat %s ago) — refusing to seal a running loop.\n",
-				res.SealedCycleID, res.LeaseOwnerPID, res.LeaseHeartbeatAge.Round(time.Second))
-			fmt.Fprintln(stderr, "  • continue it:      evolve loop --resume")
-			fmt.Fprintln(stderr, "  • stop it cleanly:  send SIGINT/SIGTERM (Ctrl-C) to that loop — it checkpoints, then `evolve loop --resume`")
-			fmt.Fprintln(stderr, "  • override (only if you KNOW the owner is wedged): evolve cycle reset --force")
-			fmt.Fprintln(stderr, "  Do NOT `pkill evolve` or `tmux kill-server` — that corrupts the run and sibling sessions.")
-			return 1
-		default:
-			fmt.Fprintf(stderr, "evolve cycle reset: %v\n", err)
-			return 1
-		}
+		return cycleResetFailure(res, err, stderr)
 	}
 	if res.ForcedOverLiveOwner {
 		fmt.Fprintf(stderr, "evolve cycle reset: WARN --force sealed cycle %d while its lease was still FRESH (pid %d, heartbeat %s ago) — a live owner was overridden.\n",
 			res.SealedCycleID, res.LeaseOwnerPID, res.LeaseHeartbeatAge.Round(time.Second))
 	}
-
+	if asJSON {
+		return printVerbJSON("cycle reset", cycleResetResult{Cycle: res.SealedCycleID, Phase: res.SealedPhase, Archive: res.ArchiveDir,
+			NextCycle: res.NextCycle, DryRun: res.DryRun, Forced: res.ForcedOverLiveOwner}, stdout, stderr)
+	}
 	verb := "sealed"
 	if res.DryRun {
 		verb = "would seal"
@@ -153,6 +152,25 @@ func runCycleReset(args []string, stdout, stderr io.Writer) int {
 	fmt.Fprintf(stdout, "%s cycle %d (phase=%s) → %s; next cycle %d\n",
 		verb, res.SealedCycleID, res.SealedPhase, res.ArchiveDir, res.NextCycle)
 	return 0
+}
+
+func cycleResetFailure(res core.SealResult, err error, stderr io.Writer) int {
+	switch {
+	case errors.Is(err, core.ErrNothingToReset):
+		fmt.Fprintln(stderr, "evolve cycle reset: no in-progress cycle to seal")
+		return 1
+	case errors.Is(err, core.ErrCycleOwnedLive):
+		fmt.Fprintf(stderr, "evolve cycle reset: cycle %d is owned by a LIVE run (pid %d, lease heartbeat %s ago) — refusing to seal a running loop.\n",
+			res.SealedCycleID, res.LeaseOwnerPID, res.LeaseHeartbeatAge.Round(time.Second))
+		fmt.Fprintln(stderr, "  • continue it:      evolve loop --resume")
+		fmt.Fprintln(stderr, "  • stop it cleanly:  send SIGINT/SIGTERM (Ctrl-C) to that loop — it checkpoints, then `evolve loop --resume`")
+		fmt.Fprintln(stderr, "  • override (only if you KNOW the owner is wedged): evolve cycle reset --force")
+		fmt.Fprintln(stderr, "  Do NOT `pkill evolve` or `tmux kill-server` — that corrupts the run and sibling sessions.")
+		return cliExitRefused
+	default:
+		fmt.Fprintf(stderr, "evolve cycle reset: %v\n", err)
+		return 1
+	}
 }
 
 var cycleRunAbsoluteRoot = paths.AbsoluteRoot

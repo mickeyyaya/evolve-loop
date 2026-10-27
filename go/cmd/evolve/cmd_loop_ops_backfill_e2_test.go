@@ -281,12 +281,12 @@ func TestRunLoopStop_RefusesConflictingOrBadFlags(t *testing.T) {
 		want    int
 		wantErr string
 	}{
-		{"an unknown flag", []string{"--hard"}, 1, "flag provided but not defined: -hard"},
-		{"an operand", []string{"now"}, 1, `evolve loop-stop: unexpected argument "now"`},
+		{"an unknown flag", []string{"--hard"}, 10, "flag provided but not defined: -hard"},
+		{"an operand", []string{"now"}, 10, `evolve loop-stop: unexpected argument "now"`},
 		{"wait and release", []string{"--wait", "--release"}, 10, "--wait and --release are mutually exclusive"},
-		{"a timeout without wait", []string{"--timeout", "5s"}, 1, "--timeout requires --wait"},
-		{"a zero timeout", []string{"--wait", "--timeout", "0s"}, 1, "--timeout must be positive, got 0s"},
-		{"a negative timeout", []string{"--wait", "--timeout", "-1s"}, 1, "--timeout must be positive, got -1s"},
+		{"a timeout without wait", []string{"--timeout", "5s"}, 10, "--timeout requires --wait"},
+		{"a zero timeout", []string{"--wait", "--timeout", "0s"}, 10, "--timeout must be positive, got 0s"},
+		{"a negative timeout", []string{"--wait", "--timeout", "-1s"}, 10, "--timeout must be positive, got -1s"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -305,14 +305,14 @@ func TestRunLoopStop_RefusesConflictingOrBadFlags(t *testing.T) {
 	}
 }
 
-func TestRunLoopStop_AnUnresolvableRootExits1(t *testing.T) {
+func TestRunLoopStop_AnUnresolvableRootIsAnIOFailure(t *testing.T) {
 	t.Setenv("EVOLVE_PROJECT_ROOT", "")
 	e2StubProcessGetwd(t, errors.New("cwd gone"))
 	var stdout, stderr bytes.Buffer
 
 	code := runLoopStop(nil, nil, &stdout, &stderr)
 
-	if code != 1 || stderr.String() != "evolve loop-stop: cwd: cwd gone\n" {
+	if code != cliExitIO || stderr.String() != "evolve loop-stop: cwd: cwd gone\n" {
 		t.Fatalf("code=%d stderr=%q", code, stderr.String())
 	}
 }
@@ -361,7 +361,7 @@ func TestLiveRunPhase_ReadsThePhaseOrNothing(t *testing.T) {
 	}
 }
 
-func TestReleaseLoopStop_AnIrremovableBrakeExits1(t *testing.T) {
+func TestReleaseLoopStop_AnIrremovableBrakeIsAnIOFailure(t *testing.T) {
 	t.Parallel()
 	brake := filepath.Join(t.TempDir(), "loop-stop")
 	writeE2File(t, filepath.Join(brake, "inside"), "x")
@@ -369,7 +369,7 @@ func TestReleaseLoopStop_AnIrremovableBrakeExits1(t *testing.T) {
 
 	code := releaseLoopStop(brake, &stdout, &stderr)
 
-	if code != 1 || !strings.HasPrefix(stderr.String(), "evolve loop-stop: release the brake: ") || stdout.Len() != 0 {
+	if code != cliExitIO || !strings.HasPrefix(stderr.String(), "evolve loop-stop: release the brake: ") || stdout.Len() != 0 {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 }

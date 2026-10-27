@@ -49,7 +49,8 @@ func (r *curatorRun) applyProposal(p inboxcurator.Proposal, isProtected func(str
 	switch {
 	case p.Kind == inboxcurator.ProposeConsume:
 		stamp := inboxConsumedStamp{Via: "inbox curate", Cycle: "console", Resolution: why}
-		ok = consumeInboxItem(filepath.Join(r.req.root, ".evolve"), filepath.Join(r.req.root, item), stamp, r.stderr, r.stderr) == 0
+		_, rc := consumeInboxItem(filepath.Join(r.req.root, ".evolve"), filepath.Join(r.req.root, item), stamp, r.stderr, r.stderr)
+		ok = rc == 0
 		r.recordLanding(ok, item, filepath.Join(".evolve", "inbox", "consumed", p.Path))
 	case p.Kind == inboxcurator.ProposeReroute && p.Target == inboxcurator.RouteConsoleTarget:
 		opts := inboxmover.Options{ProjectRoot: r.req.root, Stderr: r.stderr, IsProtectedPath: isProtected, Signals: r.signals}

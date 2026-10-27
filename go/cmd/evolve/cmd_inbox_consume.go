@@ -72,38 +72,44 @@ type inboxConsumedStamp struct {
 	Resolution string `json:"resolution"`
 }
 
-func runInboxConsume(args []string, stdout, stderr io.Writer) int {
+func runInboxConsume(root string, args []string, stdout, stderr io.Writer) int {
+	asJSON, args := takeInboxJSON(args)
 	itemPath, stamp, ok := parseInboxConsumeArgs(args, stderr)
 	if !ok {
 		return 10
 	}
-	return consumeInboxItem(filepath.Join(envOrCwd("EVOLVE_PROJECT_ROOT"), ".evolve"), itemPath, stamp, stdout, stderr)
+	evolveDir := filepath.Join(root, ".evolve")
+	result, rc := consumeInboxItem(evolveDir, itemPath, stamp, humanWriter(stdout, asJSON), stderr)
+	if rc != cliExitOK || !asJSON {
+		return rc
+	}
+	return printVerbJSON("inbox consume", result, stdout, stderr)
 }
 
-func consumeInboxItem(evolveDir, itemPath string, stamp inboxConsumedStamp, stdout, stderr io.Writer) int {
+func consumeInboxItem(evolveDir, itemPath string, stamp inboxConsumedStamp, stdout, stderr io.Writer) (inboxWriteResult, int) {
 	if _, err := os.Stat(itemPath); err != nil {
 		fmt.Fprintf(stderr, "inbox consume: %v\n", err)
-		return 1
+		return inboxWriteResult{}, 1
 	}
 	doc, err := readInboxItemObject(itemPath)
 	if err != nil {
 		fmt.Fprintf(stderr, "inbox consume: %s: %v (item left in place)\n", itemPath, err)
-		return 1
+		return inboxWriteResult{}, 1
 	}
 	consumedDir := filepath.Join(evolveDir, "inbox", "consumed")
 	if err := os.MkdirAll(consumedDir, 0o755); err != nil {
 		fmt.Fprintf(stderr, "inbox consume: %s: %v\n", itemPath, err)
-		return 1
+		return inboxWriteResult{}, 1
 	}
 	dest := filepath.Join(consumedDir, filepath.Base(itemPath))
 	if err := os.Rename(itemPath, dest); err != nil {
 		fmt.Fprintf(stderr, "inbox consume: %s: %v\n", itemPath, err)
-		return 1
+		return inboxWriteResult{}, 1
 	}
 	stamp.At = time.Now().UTC().Format(time.RFC3339)
 	if err := writeConsumedStamp(dest, doc, stamp); err != nil {
 		fmt.Fprintf(stderr, "inbox consume: %s consumed, but the consumed stamp write failed: %v\n", dest, err)
-		return 1
+		return inboxWriteResult{}, 1
 	}
 	if releaseConsumedItemBinding(filepath.Dir(evolveDir), dest, stderr) {
 		fmt.Fprintf(stdout, "inbox consume: released continuation binding for %s (salvage pointer preserved on the item)\n", filepath.Base(itemPath))
@@ -111,14 +117,14 @@ func consumeInboxItem(evolveDir, itemPath string, stamp inboxConsumedStamp, stdo
 	fp, found, err := ackItemFingerprint(evolveDir, dest, "inbox-consume")
 	if err != nil {
 		fmt.Fprintf(stderr, "inbox consume: %s consumed, but the fingerprint ack failed: %v\n", dest, err)
-		return 1
+		return inboxWriteResult{}, 1
 	}
 	if !found {
 		fmt.Fprintf(stdout, "inbox consume: %s -> inbox/consumed/ (no fingerprint named; nothing to ack)\n", filepath.Base(itemPath))
-		return 0
+		return inboxWriteResult{Verb: "consume", Path: dest}, cliExitOK
 	}
 	fmt.Fprintf(stdout, "inbox consume: %s -> inbox/consumed/ and acknowledged %q in resolved-fingerprints.json — blocker-breaker will exclude it going forward\n", filepath.Base(itemPath), fp)
-	return 0
+	return inboxWriteResult{Verb: "consume", Path: dest, Detail: fp}, cliExitOK
 }
 
 func parseInboxConsumeArgs(args []string, stderr io.Writer) (string, inboxConsumedStamp, bool) {

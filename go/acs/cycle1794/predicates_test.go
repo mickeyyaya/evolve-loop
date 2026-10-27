@@ -503,7 +503,7 @@ func decodeJSONLines(t *testing.T, stdout string) []signalcenter.Event {
 		if line == "" {
 			continue
 		}
-		dec := json.NewDecoder(strings.NewReader(line))
+		dec := json.NewDecoder(strings.NewReader(string(cliEnvelopeData(t, line))))
 		dec.DisallowUnknownFields()
 		var e signalcenter.Event
 		if err := dec.Decode(&e); err != nil {
@@ -974,4 +974,16 @@ func TestC1794_020_SignalsDispatchKeepsCodesAndAdvertisesTail(t *testing.T) {
 	if r.code != usageExit || !strings.Contains(r.stderr, "evolve signals codes <generate|check>") || !strings.Contains(r.stderr, "evolve signals tail") {
 		t.Errorf("bare `signals` must exit %d with a usage line naming both codes and tail:\n%s", usageExit, r)
 	}
+}
+
+func cliEnvelopeData(t *testing.T, stdout string) []byte {
+	t.Helper()
+	var e struct {
+		Schema string          `json:"schema"`
+		Data   json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &e); err != nil || e.Schema == "" {
+		t.Fatalf("stdout is not one cli-contract envelope: %v\n%s", err, stdout)
+	}
+	return e.Data
 }

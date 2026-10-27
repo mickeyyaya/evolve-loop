@@ -39,7 +39,6 @@ type waveStepResult struct {
 }
 
 type waveNextEnvelope struct {
-	Schema     string           `json:"schema"`
 	Wave       int              `json:"wave"`
 	RunID      string           `json:"run_id"`
 	PID        int              `json:"pid"`
@@ -101,7 +100,7 @@ func waveStepDetail(rc int, tail []string) string {
 }
 
 func runWaveNext(env waveEnv, args []string, stdout, stderr io.Writer) int {
-	e := waveNextEnvelope{Schema: waveNextSchema, Steps: []waveStepResult{}, Warnings: []string{}}
+	e := waveNextEnvelope{Steps: []waveStepResult{}, Warnings: []string{}}
 	a, err := parseWaveNextArgs(args)
 	var rc int
 	if err != nil {
@@ -144,7 +143,7 @@ func failWave(e *waveNextEnvelope, err error, stderr io.Writer) int {
 	if errors.As(err, &refusal) {
 		e.Refused = refusal.code
 		fmt.Fprintf(stderr, "%srefused (%s): %v\n", wavePrefix, refusal.code, err)
-		return exitRefused
+		return cliExitRefused
 	}
 	fmt.Fprintf(stderr, "%s%v\n", wavePrefix, err)
 	return exitIO

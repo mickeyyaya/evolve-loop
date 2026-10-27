@@ -10,12 +10,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
-func runInboxQuarantine(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+func runInboxQuarantine(root string, args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprintln(stderr, inboxUsage("quarantine"))
 		return 10
 	}
-	root := envOrCwd("EVOLVE_PROJECT_ROOT")
 	qDir := filepath.Join(root, ".evolve", "inbox", "quarantine")
 
 	switch args[0] {

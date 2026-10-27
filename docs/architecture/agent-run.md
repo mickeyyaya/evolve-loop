@@ -37,7 +37,7 @@ The goals have this order: G3 and G4 are safety, so they win over G1 and G2 when
 ```sh
 git diff origin/main...HEAD | evolve agent run adversarial-review > review.md
 echo $?   # 0 for PASS or WARN, 1 for FAIL
-git diff origin/main...HEAD | evolve agent run adversarial-review --json | jq '.verdict, .cost_usd'
+git diff origin/main...HEAD | evolve agent run adversarial-review --json | jq '.data.verdict, .data.cost_usd'
 ```
 
 The command reads the diff, writes it to `<run workspace>/agent-input.md`, and runs the `adversarial-review` spec phase with cycle 0. The routing table picks the CLI chain of the profile (Claude Code for this claude-family-floor profile). The agent writes `adversarial-review-report.md` in the run workspace. The command prints that file, appends one ledger line, and removes the run workspace.
@@ -71,7 +71,7 @@ An evaluate phase gets `goal` by default, but a plan phase gets no key. The pers
 ### Solution
 
 - stdout carries the report text, unchanged. Nothing else goes to stdout.
-- `--json` replaces the report text with one JSON object:
+- `--json` replaces the report text with one envelope of [cli-contract.md](cli-contract.md) §2 (`evolve.agent.run/1`, since X17b). Its `data` is this object:
 
 | Field | Value |
 |---|---|
@@ -91,10 +91,10 @@ An evaluate phase gets `goal` by default, but a plan phase gets no key. The pers
 |---|---|
 | 0 | The verdict is PASS, WARN or SKIPPED. |
 | 1 | The verdict is FAIL. The report, if any, is still printed. |
-| 2 | Refused: a source-write profile, a built-in phase, a call from inside a phase, or a refused root router. |
-| 3 | A dispatch error, or a failed ledger append. |
+| 3 | Refused: a source-write profile, a built-in phase, a call from inside a phase, or a refused root router. It was 2 before X17b. |
 | 10 | Usage: a missing or unknown profile, a bad flag, a terminal on stdin. |
 | 11 | Input: an unreadable or empty input. |
+| 21 | A dispatch error, or a failed ledger append. It was 3 before X17b. |
 
 ## 5. No cycle
 
