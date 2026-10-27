@@ -41,9 +41,10 @@ func TestCheck_NeedsAReasonAndRefusesInsideACell(t *testing.T) {
 
 func TestRecord_WritesOneLedgerEntryAndOneSignalWithWhoWhenWhy(t *testing.T) {
 	ld := &memLedger{}
+	var appender bypass.Appender = ld
 	center := signalcenter.New()
 	at := time.Date(2026, 10, 27, 9, 0, 0, 0, time.UTC)
-	err := bypass.Record(context.Background(), ld, center, bypass.Use{Name: "sandbox-off", Reason: "debug a pane", Actor: "dan", Origin: "runLoop", Cycle: 7, At: at})
+	err := bypass.Record(context.Background(), appender, center, bypass.Use{Name: "sandbox-off", Reason: "debug a pane", Actor: "dan", Origin: "runLoop", Cycle: 7, At: at})
 	if err != nil {
 		t.Fatalf("Record: %v", err)
 	}

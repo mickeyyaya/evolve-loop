@@ -223,7 +223,6 @@ Each Go package directory has one page. The page holds what the code cannot say:
 | `internal/core/failurediag` | the phase failure sidecar and the delivery-failure classifier | [internal-core-failurediag.md](internal-core-failurediag.md) |
 | `internal/releaseconsistency` | the version-marker consistency check of a release | [internal-releaseconsistency.md](internal-releaseconsistency.md) |
 | `internal/adapters/flock` | the blocking and non-blocking file-lock primitives | [internal-adapters-flock.md](internal-adapters-flock.md) |
-| `internal/adapters/runner` | the in-process and subprocess phase runner adapters | [internal-adapters-runner.md](internal-adapters-runner.md) |
 | `internal/sysexec` | the single seam for running external commands | [internal-sysexec.md](internal-sysexec.md) |
 | `internal/sessionrecord` | the per-run tmux session registry schema | [internal-sessionrecord.md](internal-sessionrecord.md) |
 | `internal/pruneephemeral` | TTL retention for phase-tracker ephemeral data | [internal-pruneephemeral.md](internal-pruneephemeral.md) |

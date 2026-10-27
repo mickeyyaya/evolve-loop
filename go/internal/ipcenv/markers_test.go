@@ -93,15 +93,13 @@ func TestRetiredInUse_NamesEachRetiredControlThatIsSetOnceWithItsReplacement(t *
 		"EVOLVE_ROUTING_MODE=static", "EVOLVE_AUDITOR_CLI=claude-tmux", "EVOLVE_SCOUT_CLI=agy-tmux",
 		"EVOLVE_LANE=", "EVOLVE_PROJECT_ROOT=/r", "EVOLVE_SANDBOX=off", "PATH=/bin", "EVOLVE_GO_BIN",
 	})
-	var names []string
-	for _, r := range got {
-		names = append(names, r.Name)
-		if r.Use == "" {
-			t.Errorf("%s names no replacement", r.Name)
-		}
+	want := []ipcenv.RetiredControl{
+		{Name: "EVOLVE_ROUTING_MODE", Use: "policy.json router.routing_mode"},
+		{Name: "EVOLVE_*_CLI", Use: "the --cli <agent>=<driver> parameter or policy.json pins.<phase>.cli"},
+		{Name: "EVOLVE_SANDBOX", Use: "policy.json sandbox.mode, or the audited --sandbox-off=<reason> parameter of evolve loop and evolve cycle run"},
 	}
-	if want := []string{"EVOLVE_ROUTING_MODE", "EVOLVE_*_CLI", "EVOLVE_SANDBOX"}; !slices.Equal(names, want) {
-		t.Errorf("RetiredInUse = %v, want %v: a set name warns once, an empty or valueless one does not", names, want)
+	if !slices.Equal(got, want) {
+		t.Errorf("RetiredInUse = %v, want %v: a set name warns once with its replacement, an empty or valueless one does not", got, want)
 	}
 }
 

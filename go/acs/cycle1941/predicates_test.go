@@ -19,7 +19,7 @@ var strategyOptionsDocumentPhases = []string{"premise-challenge", "forces-analys
 func realRoutingConfig(t *testing.T, root string) config.RoutingConfig {
 	t.Helper()
 	registry := config.RegistryPath(root)
-	cfg, _ := config.Load(registry, map[string]string{})
+	cfg, _ := config.Load(registry)
 	builtin, err := phasespec.Load(registry)
 	if err != nil {
 		t.Fatalf("load builtin catalog: %v", err)
