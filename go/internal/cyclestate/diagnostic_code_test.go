@@ -87,6 +87,12 @@ func TestCycleTerminationTriageClaimFailed_IsTheSealedSpelling(t *testing.T) {
 	}
 }
 
+func TestCycleTerminationHandedOff_IsTheSealedSpelling(t *testing.T) {
+	if CycleTerminationHandedOff != "handed-off" {
+		t.Errorf("the sealed termination reason is %q", CycleTerminationHandedOff)
+	}
+}
+
 func TestCycleTerminationBlockedNeedsConsole_IsTheSealedSpelling(t *testing.T) {
 	if CycleTerminationBlockedNeedsConsole != "blocked-needs-console" {
 		t.Errorf("the sealed termination reason is %q", CycleTerminationBlockedNeedsConsole)
