@@ -54,11 +54,19 @@ func TestMutators_RefuseACycleWorktreeInboxCopyAndNameThePlane(t *testing.T) {
 		"AbsorbRootCopies":       func() error { _, err := AbsorbRootCopies(opts); return err },
 		"RouteLane":              func() error { _, err := RouteLane(opts, "task-1", "r"); return err },
 		"RouteConsole":           func() error { _, err := RouteConsole(opts, "task-1", "r", 9); return err },
-		"File":                   func() error { _, err := File(opts, []byte(`{"id":"task-3"}`)); return err },
-		"Edit":                   func() error { _, err := Edit(opts, "task-1", nil); return err },
-		"EditHeld":               func() error { _, err := EditHeld(opts, "task-1", 9, nil); return err },
-		"Withdraw":               func() error { _, err := Withdraw(opts, "task-1", "r"); return err },
-		"VerifyPremise":          func() error { _, err := VerifyPremise(opts, "task-1", "e"); return err },
+		"RouteLaneRequest": func() error {
+			_, err := RouteLaneRequest(opts, RouteRequest{TaskID: "task-1", Reason: "r"})
+			return err
+		},
+		"RouteConsoleRequest": func() error {
+			_, err := RouteConsoleRequest(opts, RouteRequest{TaskID: "task-1", Reason: "r", Cycle: 9})
+			return err
+		},
+		"File":          func() error { _, err := File(opts, []byte(`{"id":"task-3"}`)); return err },
+		"Edit":          func() error { _, err := Edit(opts, "task-1", nil); return err },
+		"EditHeld":      func() error { _, err := EditHeld(opts, "task-1", 9, nil); return err },
+		"Withdraw":      func() error { _, err := Withdraw(opts, "task-1", "r"); return err },
+		"VerifyPremise": func() error { _, err := VerifyPremise(opts, "task-1", "e"); return err },
 		"ReleaseContinuationBinding": func() error {
 			_, _, err := ReleaseContinuationBinding(opts, "task-1", "r", "test")
 			return err
