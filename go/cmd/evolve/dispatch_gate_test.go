@@ -36,6 +36,7 @@ var dispatchVerbCalls = []struct {
 }{
 	{[]string{"agent", "run", "--bogus"}, "agent run", "class R"},
 	{[]string{"phase", "scout", "--bogus"}, "phase scout", "class R"},
+	{[]string{"selfheal", "incidents", "--bogus"}, "selfheal incidents", "class R"},
 	{[]string{"subagent", "run"}, "subagent run", "class D"},
 	{[]string{"subagent", "dispatch-parallel"}, "subagent dispatch-parallel", "class D"},
 	{[]string{"loop", "--bogus"}, "loop", "class D"},

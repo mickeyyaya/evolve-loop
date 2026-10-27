@@ -80,4 +80,5 @@ type Policy struct {
 	AuditCascade       *AuditCascadePolicy       `json:"audit_cascade,omitempty"`
 	Quality            *QualityPanelPolicy       `json:"quality,omitempty"`
 	Isolation          *IsolationPolicy          `json:"isolation,omitempty"`
+	Healing            *HealingPolicy            `json:"healing,omitempty"`
 }

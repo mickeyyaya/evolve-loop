@@ -105,3 +105,4 @@
 ./internal/launchrecord 100
 ./internal/integration 100
 ./internal/cyclespend 100
+./internal/selfheal 100

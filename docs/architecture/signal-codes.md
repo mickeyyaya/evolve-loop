@@ -155,6 +155,13 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `GATE_CONTRACT_VERIFIED` | the phase's declared deliverables were found in place (fields name the artifact, its size, the agent-owed files and the effects verified) and the phase advanced |
 | `GATE_CONTRACT_WOULD_BLOCK` | the deliverable violated its contract but the stage (shadow/advisory, or the report-size gate's) lets the phase advance; the reason is what enforce would have refused |
 
+### healing
+
+| Code | Meaning |
+|---|---|
+| `HEALING_INCIDENT_OPENED` | the incident detector opened an incident record under .evolve/incidents; fields incident, class, fingerprint, tier, state, transition, recurrence, stage (llm-isolation.md §18, §24) |
+| `HEALING_INCIDENT_REOPENED` | the incident detector reopened a closed incident, because its signal fired again after the close; the same fields as HEALING_INCIDENT_OPENED (llm-isolation.md §18, §22) |
+
 ### inbox
 
 | Code | Meaning |

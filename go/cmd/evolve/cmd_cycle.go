@@ -344,6 +344,7 @@ const (
 	roleSimulate  = "simulate"
 	roleDispatch  = "dispatch"
 	roleAgent     = "agent"
+	roleSelfheal  = "selfheal"
 )
 
 func agentRunSignals(projectRoot string, console io.Writer) (*signalcenter.Center, func()) {

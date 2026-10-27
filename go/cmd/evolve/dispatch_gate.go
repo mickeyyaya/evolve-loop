@@ -56,6 +56,7 @@ func campaignDispatch(sub string, _ []string) bool { return sub != "status" }
 var dispatchRules = map[string]dispatchRule{
 	"agent":              {classRequest, true, onlySubs("run")},
 	"phase":              {classRequest, true, phaseDispatch},
+	"selfheal":           {classRequest, true, onlySubs("incidents")},
 	"subagent":           {classDenied, true, onlySubs("run", "dispatch-parallel")},
 	"loop":               {classDenied, false, loopDispatch},
 	"wave":               {classDenied, true, onlySubs("next")},

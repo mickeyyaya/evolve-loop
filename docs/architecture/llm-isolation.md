@@ -1259,7 +1259,7 @@ Detection is deterministic Go. No LLM decides that an incident exists.
 | a zero-ship streak | two waves with no ship (`LOOP_ZERO_SHIP_HALT`) | `zero-ship` |
 | a failure digest with level `system` | `failure-digest.json` | `system` |
 
-### 18.2 The incident record (proposed)
+### 18.2 The incident record (built by X12, §18.5)
 
 The pipeline writes `.evolve/incidents/<id>.json`. The path is a protected surface: no agent can write it.
 
@@ -1297,6 +1297,24 @@ The orchestrator agent reads `inputs/index.json` in the same format as §8.3. Th
 - `action.kind` is one word of the catalog (§19). A free command is not a field.
 - `confidence` is `low`, `medium` or `high`. A `low` diagnosis goes to the operator.
 
+### 18.5 As built (X12)
+
+X12 builds step 1 (detect) and step 5 (verify) in `go/internal/selfheal` ([package note](packages/internal-selfheal.md)). It is deterministic Go and never acts. The verb `evolve selfheal incidents [--json]` runs one pass.
+
+| Part | As built |
+|---|---|
+| Sources | the channels `errors` and `loop`, the run directories (`run.json`, `triage-decision.json`, `defect-ledger.json`, `failure-decision.json`), `ship-journal.jsonl`, the runs of `required.yml` from `gh`, and `usage-windows.json`. The level of `failure-decision.json` and the `gh` runs replace `failure-digest.json` and `evolve ci classify` of §18.1. |
+| Classes | the six of §18.1, and six from the incidents of 2026-10-26: `repair-loop`, `claim-churn`, `ci-hang`, `flaky-test`, `lane-starvation` and `usage-blind` |
+| Isolation | only an action that a cell tried and the pipeline refused at `enforce`. A drop of the launcher (`source=launcher`, I-2) is the control at work and opens no record. |
+| Fingerprint | `<class>:<subject>`, for example `repair-loop:retro-minting-files-through-inbox-add-lane`. The id is `inc-<date>-<8 hex of the fingerprint hash>`. |
+| Severity | the highest severity of the evidence; INCIDENT at 3 occurrences or on a protected surface |
+| Tier | T0 when the evidence names a protected surface, else T1 or T2 by class (§20.1) |
+| Pass | level-triggered: it reads the whole window each time. A closed record whose fingerprint is in the window again reopens, and an observed fingerprint cannot close. |
+| Close | `Incident.Close` with the four conditions of §22. A record with no `repro_test` stays open until X16. |
+| Stage | the policy key `healing.detector.stage`: `shadow` (default) or `off`. `enforce` is refused until X14. |
+
+The record has the fields of §18.2 and some more fields ([internal-selfheal.md](packages/internal-selfheal.md)). `.evolve/incidents/`, `go/internal/selfheal/`, `go/cmd/evolve/cmd_selfheal.go` and `go/internal/policy/healing.go` are in `guards.ProtectedSurfaceManifest`. The states are `open` and `closed`. X14 adds the other states of §18.2 with a new major schema version.
+
 ## 19. The action catalog
 
 The catalog is closed and typed Go (X14). It extends the enums of `failure-decision.json`. Each action has preconditions, a tier limit and a budget. The pipeline checks all three before it acts.
@@ -1331,7 +1349,7 @@ The budget values are routing-style policy data in the constitution. Only the op
 
 | Tier | Surface | Who repairs | Review |
 |---|---|---|---|
-| T0 kernel | the ADR-0064 protected surfaces (`guards.IsProtectedSurface`, `go/internal/guards/integrity_surface.go:184`). Also the policy floors and stage keys, the gates and oracles, the ledger, the frozen checks, and this catalog with its budgets. | the operator; the loop only proposes | the operator |
+| T0 kernel | the ADR-0064 protected surfaces (`guards.IsProtectedSurface` in `go/internal/guards/integrity_surface.go`). Also the policy floors and stage keys, the gates and oracles, the ledger, the frozen checks, and this catalog with its budgets. | the operator; the loop only proposes | the operator |
 | T1 pipeline code | the code of the loop outside T0: `go/internal/core`, `bridge`, `cliroute`, `gc` and the personas outside the protected surfaces | the loop, after `enforce` for T1 | an independent-family judge, a mutation gate on changed functions, a `shadow` or canary stage first |
 | T2 item code | the code that an ordinary item changes | the loop | the normal flow |
 
@@ -1402,7 +1420,7 @@ An accident inside a cell must stay inside the cell. Two incidents show the risk
 
 ## 24. Self-healing signals
 
-The module is `healing` (proposed, code prefix `HEALING_`), in the same shape as §15.
+The module is `healing` (built by X12, code prefix `HEALING_`), in the same shape as §15.
 
 | Kind | Severity | Code | When |
 |---|---|---|---|
@@ -1413,16 +1431,18 @@ The module is `healing` (proposed, code prefix `HEALING_`), in the same shape as
 | `incident.escalated` | INCIDENT | `HEALING_ESCALATED` | two failed repairs, two refused proposals, an open breaker or a `low` diagnosis |
 | `healing.violation` | WARN | `HEALING_I10_VIOLATION` to `HEALING_I14_VIOLATION` | an invariant of Part II breaks |
 
+As built (X12): one kind `selfheal.incident` with a field `transition` replaces `incident.opened` and `incident.closed` ([internal-selfheal.md](packages/internal-selfheal.md) has the codes). The kinds `incident.proposal`, `incident.refused` and `incident.escalated` come with X14.
+
 The measures for the stage flips of §20.2 are proposed panel readings: repair success rate, false-diagnosis rate and OQ4 time to green. A false diagnosis is a repair whose verify failed and whose next diagnosis named another cause. An amendment of ADR-0153 adds them.
 
 ## 25. Self-healing runbook
 
 | Question | Command |
 |---|---|
-| Which incidents are open? | `ls .evolve/incidents/` and `evolve signals tail --channel errors --kind incident.opened,incident.escalated` |
+| Which incidents are open? | `evolve selfheal incidents --json`, or `evolve signals tail --channel selfheal.incident` |
 | Why did the pipeline refuse a proposal? | `evolve signals tail --channel errors --code HEALING_PROPOSAL_REFUSED --json` |
 | What did the orchestrator agent see? | `cat .evolve/runs/cycle-N/inputs/index.json` |
-| What stage is each tier at? | the `healing` block of `.evolve/policy.json` (proposed) |
+| What stage is each tier at? | the `healing` block of `.evolve/policy.json`: `healing.detector.stage` is built (X12), and the tier keys are proposed |
 
 | Code | What it means | What to do |
 |---|---|---|

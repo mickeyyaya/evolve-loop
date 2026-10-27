@@ -843,3 +843,5 @@
 ./internal/fixability
 # cyclespend - the LLM spend of one cycle from llm-calls.ndjson (ADR-0158).
 ./internal/cyclespend
+# selfheal - the incident detector of the self-healing loop: typed incident records from signals, cycle state, CI runs and usage readings (ADR-0155 X12).
+./internal/selfheal

@@ -18,6 +18,7 @@ func TestEventsDefaults_AreTheChannelTableOfTheSpec(t *testing.T) {
 		{Name: "quality.breach", Route: "kind=quality.breach,quality.warning", QoS: "lossless"},
 		{Name: "quality.reading", Route: "kind=quality.reading", QoS: "best_effort"},
 		{Name: "isolation.violation", Route: "kind=isolation.violation", QoS: "lossless"},
+		{Name: "selfheal.incident", Route: "kind=selfheal.incident", QoS: "lossless"},
 		{Name: "signals", Route: "", QoS: "best_effort"},
 	}
 
@@ -73,7 +74,7 @@ func TestEventsDefaults_NameEachChannelOnceWithAValidName(t *testing.T) {
 		}
 		seen[name] = true
 	}
-	if len(seen) != 10 {
-		t.Errorf("defaults name %d channels, want the 7 of the spec table without ci plus the two quality channels of ADR-0153 and the isolation channel of ADR-0154", len(seen))
+	if len(seen) != 11 {
+		t.Errorf("defaults name %d channels, want the 7 of the spec table without ci plus the two quality channels of ADR-0153, the isolation channel of ADR-0154 and the incident channel of ADR-0155", len(seen))
 	}
 }
