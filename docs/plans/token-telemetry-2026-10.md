@@ -1,7 +1,7 @@
 # Plan: each subscription token has a phase, a seat, a round purpose and a step, so the operator can find and cut the largest consumer
 
-- **Status:** proposed, 2026-10-27.
-- **Research:** [token-telemetry-2026-10](../research/token-telemetry-2026-10.md). **Decision record:** none yet. If the operator accepts this plan, an ADR records D1 to D10. **Spec of the try record:** [model-attempt-telemetry.md](../architecture/model-attempt-telemetry.md). **Earlier campaign:** [token-telemetry-2026-07](token-telemetry-2026-07.md), [ADR-0071](../architecture/adr/0071-token-telemetry-attribution-and-clean-boot.md). **Related cost policy:** [cost-aware-repair-2026-10](cost-aware-repair-2026-10.md), [ADR-0158](../architecture/adr/0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md).
+- **Status:** approved, 2026-10-27. The operator approved design A, and T1 to T9 are filed in the runtime inbox (§13).
+- **Research:** [token-telemetry-2026-10](../research/token-telemetry-2026-10.md). **Decision record:** none yet. An ADR records D1 to D10 after one `shadow` wave of T1 and T7 data (§13, Q5). **Spec of the try record:** [model-attempt-telemetry.md](../architecture/model-attempt-telemetry.md). **Earlier campaign:** [token-telemetry-2026-07](token-telemetry-2026-07.md), [ADR-0071](../architecture/adr/0071-token-telemetry-attribution-and-clean-boot.md). **Related cost policy:** [cost-aware-repair-2026-10](cost-aware-repair-2026-10.md), [ADR-0158](../architecture/adr/0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md).
 
 ## Table of contents
 
@@ -17,6 +17,7 @@
 - [10. Verification](#10-verification)
 - [11. Risks](#11-risks)
 - [12. Open questions](#12-open-questions)
+- [13. Decision log](#13-decision-log)
 
 ## 1. Request
 
@@ -231,4 +232,12 @@ The data decides each cut. No cut starts before its metric has one wave of data.
 - **Q2.** Which agy field holds the cache write, if any? Today all agy rows report 0 (F1.9).
 - **Q3.** Can the `claude-tmux` pane run a statusline command that writes outside its cell? The sandbox grants no write outside the cell. A file inside the cell that the bridge reads after the launch is the likely answer.
 - **Q4.** Which source gives the agy quota percent? `clicontrol` has no agy parser (F1.11). Without it, M5 covers the Claude family only.
-- **Q5.** Does the operator want an ADR for D1 to D10 before T1 starts, or after the shadow wave?
+- **Q5.** Closed on 2026-10-27. The ADR for D1 to D10 comes after one `shadow` wave of T1 and T7 data (§13).
+
+## 13. Decision log
+
+| Date | Decision | Effect |
+|---|---|---|
+| 2026-10-27 | The operator approved design A (§5). | Status is approved. Design B stays a later stage under the conditions of §5.3. |
+| 2026-10-27 | T1 to T9 are filed in the runtime inbox (`.evolve/inbox/` of the runtime tree, 06:07Z). The inbox id of each item is the id in the §7 table. The routes are those of §7: T2, T5 and T8 go to the console, and the other six go to a lane. | The lane and the console build the items in the order of §8. |
+| 2026-10-27 | Q5: the ADR comes after one `shadow` wave of T1 and T7 data. | The ADR cites the measured data of that wave. |
