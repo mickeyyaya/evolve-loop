@@ -62,8 +62,12 @@ func TestDeciderExportsAreNamed(t *testing.T) {
 	}
 	stopped := in
 	stopped.Rung = retryladder.R2
+	if d := retryladder.Next(stopped); d.Action != retryladder.ActionRaise || d.Rung != retryladder.R3 {
+		t.Fatalf("R2 on a repeated fingerprint = %+v, want a raise to R3", d)
+	}
+	stopped.Rung = retryladder.R3
 	if d := retryladder.Next(stopped); d.Action != retryladder.ActionStop || d.Class != retryladder.Spec || d.Signals[0] != retryladder.SignalStopSpec {
-		t.Fatalf("R2 on a repeated fingerprint = %+v", d)
+		t.Fatalf("R3 on a repeated fingerprint = %+v", d)
 	}
 	stopped.Verdict.Fingerprint, stopped.Headroom = "codes:z", convergence.HeadroomTable{}
 	stopped.Rung = retryladder.R1

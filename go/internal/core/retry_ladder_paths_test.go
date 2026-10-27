@@ -198,7 +198,7 @@ func TestReviewResumedDeliverable_AsksTheLadderWhenItsCorrectionsAreSpent(t *tes
 		dispatches int
 	}{
 		{policy.RetryLadderShadow, 1},
-		{policy.RetryLadderEnforce, 2},
+		{policy.RetryLadderEnforce, 3},
 	} {
 		t.Run(tc.stage, func(t *testing.T) {
 			root := t.TempDir()

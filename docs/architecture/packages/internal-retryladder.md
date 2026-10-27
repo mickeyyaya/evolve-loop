@@ -12,10 +12,10 @@
 - `Fingerprint` is the sorted set of bracketed violation codes. Without codes it is a hash of the normalized text.
 - `Next` reads `Input` and returns a `Decision`. It calls no model and reads no clock.
 - `infra` and `quota` retry on the same rung. `halt` and `spec` stop. `unknown` raises R0 to R1 and stops after that.
-- `capability` goes R0 to R1 on a new fingerprint when the base effort has a step. Otherwise it goes R0 to R2. It goes R1 to R2 on the next fail.
+- `capability` goes R0 to R1 on a new fingerprint when the base effort has a step. Otherwise it goes R0 to R2. R1 goes to R2 on the next fail. R1 skips R2 and goes to R3 when its fingerprint is an earlier one, or when R2 has no tier to climb.
 - R2 is one tier above the base tier. The first family of the chain with headroom at that tier supplies the model. The effort is the larger of the R1 effort and the tier default, at most `max_effort`.
-- With no headroom at R2, the decision carries `LADDER_NO_HEADROOM`. R0 goes to R1 and R1 stops. A bound that blocks the step records no signal.
-- A capability failure at R2 stops. It becomes `spec` with `LADDER_STOP_SPEC` when its fingerprint is an earlier one.
+- With no headroom at R2, the decision carries `LADDER_NO_HEADROOM`. R0 goes to R1 and R1 goes to R3. A bound that blocks the step records no signal.
+- R2 always goes to R3, the last rung. R3 runs a fresh builder at the base tier. The family is the first other family of the chain with headroom at that tier. With none, it is the base family. The effort stays at most `max_effort`, and a capability failure at R3 stops. It becomes `spec` with `LADDER_STOP_SPEC` when its fingerprint is an earlier one.
 - Unset bounds are `max_tier` deep and `max_effort` high.
 - `Context` and `Stage` name the try-record values of [spec §6](../retry-ladder.md#6-the-try-record).
 - `Try` is the ladder decision that one dispatch carries. `Try.Mark` writes it into an `llmcalls.Record`. A nil `Try` writes `R0`, `new` and `shadow`. `Try.LadderTier` gives the tier for `llmroute.Overlay.LadderTier`.
@@ -30,7 +30,7 @@
 
 - The package does not import `internal/core`. Predicate `TestC1973_003` checks this.
 - The normalizer copies the rules of `core/failure_digest.go`. A rule change must change both until a later cycle moves the shared rules into one package.
-- A raise moves the rung up, so a chain has at most two raised tries. No target has a tier above `max_tier` or an effort above `max_effort`.
+- A raise moves the rung up, so a chain has at most three raised tries. No target has a tier above `max_tier` or an effort above `max_effort`.
 - `Next` has one production caller, `core.cycleRun.askLadder` ([spec §5](../retry-ladder.md#5-where-the-ladder-runs)). The contract correction, the resumed correction and the audit repair round ask it.
 - At a budget of `policy.MinRetryLadderDigestTokens` (64) or more, a digest is never longer than its budget. The first failed check comes first. The policy refuses a smaller budget other than 0.
 - `BuildReport` groups try records by rung and class (component L7). A fix is a try above R0 with exit code 0. It sorts the rows by rung, then class, and skips a record without a rung.

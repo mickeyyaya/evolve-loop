@@ -111,15 +111,27 @@ func TestNext_CapabilityLadderTable(t *testing.T) {
 			wantTarget: convergence.TierEffort{Family: "claude", Tier: "deep", Model: "opus", Effort: "high"},
 		},
 		{
-			name:       "R2 to stop-as-spec: the failure repeats an earlier fingerprint",
+			name:       "R2 to R3: the failure repeats an earlier fingerprint",
 			in:         capabilityAt(retryladder.R2, "codes:a", "codes:a", "codes:b"),
-			wantAction: retryladder.ActionStop, wantRung: retryladder.R2, wantClass: retryladder.Spec,
+			wantAction: retryladder.ActionRaise, wantRung: retryladder.R3, wantClass: retryladder.Capability,
+			wantTarget: convergence.TierEffort{Family: "claude", Tier: "balanced", Model: "sonnet", Effort: "high"},
+		},
+		{
+			name:       "R2 to R3: the fingerprint is new",
+			in:         capabilityAt(retryladder.R2, "codes:c", "codes:a", "codes:b"),
+			wantAction: retryladder.ActionRaise, wantRung: retryladder.R3, wantClass: retryladder.Capability,
+			wantTarget: convergence.TierEffort{Family: "claude", Tier: "balanced", Model: "sonnet", Effort: "high"},
+		},
+		{
+			name:       "R3 stops as spec when the failure repeats an earlier fingerprint",
+			in:         capabilityAt(retryladder.R3, "codes:a", "codes:a", "codes:b", "codes:c"),
+			wantAction: retryladder.ActionStop, wantRung: retryladder.R3, wantClass: retryladder.Spec,
 			wantSignals: []string{retryladder.SignalStopSpec},
 		},
 		{
-			name:       "R2 stops as capability when the fingerprint is new",
-			in:         capabilityAt(retryladder.R2, "codes:c", "codes:a", "codes:b"),
-			wantAction: retryladder.ActionStop, wantRung: retryladder.R2, wantClass: retryladder.Capability,
+			name:       "R3 stops as capability when the fingerprint is new",
+			in:         capabilityAt(retryladder.R3, "codes:d", "codes:a", "codes:b", "codes:c"),
+			wantAction: retryladder.ActionStop, wantRung: retryladder.R3, wantClass: retryladder.Capability,
 		},
 		{
 			name:       "R0 to R1 on a new fingerprint needs no headroom check",
@@ -142,9 +154,10 @@ func TestNext_CapabilityLadderTable(t *testing.T) {
 			wantSignals: []string{retryladder.SignalNoHeadroom},
 		},
 		{
-			name:       "no headroom at R1 stops",
+			name:       "no headroom at R1 skips R2 and goes to R3 on the base family",
 			in:         noHeadroomR1,
-			wantAction: retryladder.ActionStop, wantRung: retryladder.R1, wantClass: retryladder.Capability,
+			wantAction: retryladder.ActionRaise, wantRung: retryladder.R3, wantClass: retryladder.Capability,
+			wantTarget:  convergence.TierEffort{Family: "claude", Tier: "balanced", Model: "sonnet", Effort: "high"},
 			wantSignals: []string{retryladder.SignalNoHeadroom},
 		},
 	}
@@ -427,7 +440,7 @@ func TestNext_PropertyNoInputBeatsTheBounds(t *testing.T) {
 				continue
 			}
 			raised++
-			if raised > 2 {
+			if raised > 3 {
 				t.Fatalf("trial %d: %d raised tries from %+v", trial, raised, in)
 			}
 			if got.Rung <= rung {
@@ -444,6 +457,9 @@ func TestNext_PropertyNoInputBeatsTheBounds(t *testing.T) {
 			}
 			if got.Rung == retryladder.R2 && tierIndex(got.Target.Tier) != tierIndex(base.Tier)+1 {
 				t.Fatalf("trial %d: R2 tier %q is not one step above %q", trial, got.Target.Tier, base.Tier)
+			}
+			if got.Rung == retryladder.R3 && got.Target.Tier != base.Tier {
+				t.Fatalf("trial %d: R3 changed the tier to %q", trial, got.Target.Tier)
 			}
 			if got.Rung == retryladder.R1 && got.Target.Tier != base.Tier {
 				t.Fatalf("trial %d: R1 changed the tier to %q", trial, got.Target.Tier)

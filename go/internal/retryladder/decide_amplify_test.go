@@ -53,19 +53,19 @@ func TestAmplify_EmptyAndNilTablesNeverPanicOrExceedTwoRaises(t *testing.T) {
 func TestAmplify_R1CapabilityNeverRaisesToR2(t *testing.T) {
 	for _, earlier := range [][]string{nil, {"codes:a"}, {"codes:z"}} {
 		got := retryladder.Next(capabilityAt(retryladder.R1, "codes:a", earlier...))
-		if got.Action == retryladder.ActionRaise && got.Rung != retryladder.R2 {
-			t.Errorf("earlier %v: raise landed on %s, want R2 or a stop", earlier, got.Rung)
+		if got.Action == retryladder.ActionRaise && got.Rung != retryladder.R2 && got.Rung != retryladder.R3 {
+			t.Errorf("earlier %v: raise landed on %s, want R2 or R3", earlier, got.Rung)
 		}
-		if got.Action == retryladder.ActionRaise && got.Rung == retryladder.R2 && got.Class != retryladder.Capability {
+		if got.Action == retryladder.ActionRaise && got.Class != retryladder.Capability {
 			t.Errorf("earlier %v: raise class = %s, want capability", earlier, got.Class)
 		}
 	}
 }
 
-func TestAmplify_StopAtR2OnEarlierFingerprintCarriesTheSpecSignal(t *testing.T) {
-	got := retryladder.Next(capabilityAt(retryladder.R2, "codes:a", "codes:b", "codes:a"))
+func TestAmplify_StopAtR3OnEarlierFingerprintCarriesTheSpecSignal(t *testing.T) {
+	got := retryladder.Next(capabilityAt(retryladder.R3, "codes:a", "codes:b", "codes:a"))
 	if got.Action != retryladder.ActionStop || got.Class != retryladder.Spec {
-		t.Fatalf("R2 on an earlier fingerprint = {%s %s}, want a stop as spec", got.Action, got.Class)
+		t.Fatalf("R3 on an earlier fingerprint = {%s %s}, want a stop as spec", got.Action, got.Class)
 	}
 	if !slices.Contains(got.Signals, retryladder.SignalStopSpec) {
 		t.Errorf("signals = %v, want %s", got.Signals, retryladder.SignalStopSpec)

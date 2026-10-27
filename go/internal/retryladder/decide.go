@@ -15,6 +15,7 @@ const (
 	R0 Rung = "R0"
 	R1 Rung = "R1"
 	R2 Rung = "R2"
+	R3 Rung = "R3"
 )
 
 type Action string
@@ -116,8 +117,13 @@ func (b bounded) capability(d Decision) Decision {
 		}
 		return b.climbOrStayOnTier(d)
 	case R1:
-		return b.climbOrStop(d)
+		if repeated {
+			return d.raiseTo(R3, b.builderSeat())
+		}
+		return b.climbOrSkipToR3(d)
 	case R2:
+		return d.raiseTo(R3, b.builderSeat())
+	case R3:
 		if repeated {
 			d.Class, d.Signals = Spec, []string{SignalStopSpec}
 		}
@@ -135,7 +141,7 @@ func (b bounded) climbOrStayOnTier(d Decision) Decision {
 	return d.raiseTo(R1, b.sameTierTarget())
 }
 
-func (b bounded) climbOrStop(d Decision) Decision {
+func (b bounded) climbOrSkipToR3(d Decision) Decision {
 	target, found, blockedByHeadroom := b.tierClimb()
 	if found {
 		return d.raiseTo(R2, target)
@@ -143,7 +149,24 @@ func (b bounded) climbOrStop(d Decision) Decision {
 	if blockedByHeadroom {
 		d.Signals = []string{SignalNoHeadroom}
 	}
-	return d
+	return d.raiseTo(R3, b.builderSeat())
+}
+
+func (b bounded) builderSeat() convergence.TierEffort {
+	base := b.in.Base
+	family := base.Family
+	for _, other := range b.in.Chain {
+		if _, ok := b.in.Headroom[other][base.Tier]; ok && other != base.Family {
+			family = other
+			break
+		}
+	}
+	seat, ok := b.in.Headroom[family][base.Tier]
+	model := base.Model
+	if ok {
+		model = seat.Model
+	}
+	return convergence.TierEffort{Family: family, Tier: base.Tier, Model: model, Effort: b.climbEffort(seat.Effort)}
 }
 
 func (b bounded) effortStep() (string, bool) {

@@ -1,17 +1,17 @@
 ---
 score_cap:
-  - criterion: "The rung table: R0 to R1, R0 to R2 on a repeated fingerprint or no effort step, R2 to stop-as-spec on an earlier fingerprint, no headroom at R0 and at R1"
+  - criterion: "The rung table: R0 to R1, R0 to R2 on a repeated fingerprint or no effort step, R2 to R3, R3 stops as spec on an earlier fingerprint, no headroom at R0 and at R1"
     max_if_missing: 7
     evidence: "cd go && go test -count=1 -run 'TestNext_CapabilityLadderTable|TestNext_EffortStepRules|TestNext_TierStepRules|TestNext_R2EffortIsTheLargerOfTheRaisedEffortAndTheTierDefault' ./internal/retryladder/"
-  - criterion: "No input gives more than two raised tries, a tier above max_tier or an effort above max_effort"
+  - criterion: "No input gives more than three raised tries, a tier above max_tier or an effort above max_effort"
     max_if_missing: 8
     evidence: "cd go && go test -count=1 -run TestNext_PropertyNoInputBeatsTheBounds ./internal/retryladder/"
   - criterion: "halt and spec never climb; unknown never passes R1; infra and quota keep the rung"
     max_if_missing: 8
     evidence: "cd go && go test -count=1 -run 'TestNext_HaltAndSpecNeverClimb|TestNext_UnknownNeverPassesR1|TestNext_InfraAndQuotaKeepTheRung' ./internal/retryladder/"
-  - criterion: "With no headroom the decider records LADDER_NO_HEADROOM, goes from R0 to R1, and stops at R1"
+  - criterion: "With no headroom the decider records LADDER_NO_HEADROOM, goes from R0 to R1, and skips R2 from R1 to R3"
     max_if_missing: 7
-    evidence: "cd go && go test -count=1 -tags acs -run TestC1977_004 ./acs/cycle1977/"
+    evidence: "cd go && go test -count=1 -run TestNext_CapabilityLadderTable ./internal/retryladder/"
   - criterion: "Every decision records the shadow critic rung and the critic never changes the decision"
     max_if_missing: 6
     evidence: "cd go && go test -count=1 -run TestNext_RecordsTheShadowCriticRungWithoutFollowingIt ./internal/retryladder/"
@@ -32,9 +32,9 @@ score_cap:
 | Pattern | Criterion | max_if_missing | Evidence |
 |---|---|---|---|
 | rung-table | the flow of spec §2 as a table | 7/10 | `go test -run TestNext_CapabilityLadderTable` |
-| bounds-property | at most two raises, tier and effort inside the bounds | 8/10 | `go test -run TestNext_PropertyNoInputBeatsTheBounds` |
+| bounds-property | at most three raises, tier and effort inside the bounds | 8/10 | `go test -run TestNext_PropertyNoInputBeatsTheBounds` |
 | no-climb-classes | halt, spec and unknown stop the climb | 8/10 | `go test -run TestNext_HaltAndSpecNeverClimb` |
-| no-headroom | the signal, R0 to R1, stop at R1 | 7/10 | `go test -tags acs -run TestC1977_004` |
+| no-headroom | the signal, R0 to R1, R1 to R3 | 7/10 | `go test -run TestNext_CapabilityLadderTable` |
 | shadow-critic | the critic rung is recorded and never followed | 6/10 | `go test -run TestNext_RecordsTheShadowCriticRungWithoutFollowingIt` |
 | default-bounds | deep and high when unset | 6/10 | `go test -run TestBounds_DefaultsAreDeepAndHigh` |
 | one-tier-table | convergence reused, core not imported | 8/10 | `go test -tags acs -run TestC1977_008` |

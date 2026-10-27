@@ -104,8 +104,8 @@ func TestContractCorrection_EnforceEscalatesToAFreshRaisedTryAfterOneCorrection(
 	probe := newLadderProbe(0)
 	events := runLadderCycle(t, policy.RetryLadderEnforce, probe)
 
-	if len(probe.requests) != 3 {
-		t.Fatalf("enforce dispatched %d build tries, want 3 (try, one correction, one raised try, then stop)", len(probe.requests))
+	if len(probe.requests) != 4 {
+		t.Fatalf("enforce dispatched %d build tries, want 4 (try, one correction, R2, R3, then stop)", len(probe.requests))
 	}
 	if probe.requests[1].Ladder != nil {
 		t.Fatalf("the one correction ran at a raised rung: %+v", probe.requests[1].Ladder)
@@ -121,8 +121,16 @@ func TestContractCorrection_EnforceEscalatesToAFreshRaisedTryAfterOneCorrection(
 	if strings.Contains(raised.CorrectionDirective, "Your previous output for this phase was REJECTED") {
 		t.Fatalf("the raised try re-prompts the old correction text:\n%s", raised.CorrectionDirective)
 	}
+	finalTry := probe.requests[3]
+	if finalTry.Ladder == nil || finalTry.Ladder.Rung != retryladder.R3 || finalTry.Ladder.Context != retryladder.ContextFresh ||
+		finalTry.Ladder.Stage != retryladder.StageEnforce {
+		t.Fatalf("the last try = %+v, want a fresh R3 try", finalTry.Ladder)
+	}
+	if !strings.Contains(finalTry.CorrectionDirective, "Retry digest") || !strings.Contains(finalTry.CorrectionDirective, ladderFloorReason) {
+		t.Fatalf("the R3 try lacks the digest with the verbatim check:\n%s", finalTry.CorrectionDirective)
+	}
 	if len(eventsWithCode(events, CodeLadderStopSpec)) != 1 {
-		t.Fatalf("an R2 try that fails on the same check must stop as spec: %+v", events)
+		t.Fatalf("an R3 try that fails on the same check must stop as spec: %+v", events)
 	}
 }
 
