@@ -45,7 +45,7 @@ func installLLMBinaries(t *testing.T) llmBinaries {
 
 func wrapForExecDeny(t *testing.T, deps Deps, goos, cli string) string {
 	t.Helper()
-	deps.Env = map[string]string{"EVOLVE_SANDBOX": "on"}
+	deps.SandboxMode = "on"
 	prefix, ok := defaultSandboxWrapWithProbe(deps, fakeProbe(goos, true))(SandboxWrapRequest{
 		Phase: "build", CLI: cli, Worktree: t.TempDir(), Workspace: t.TempDir(), RepoRoot: t.TempDir(),
 	})

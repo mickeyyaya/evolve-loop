@@ -14,6 +14,7 @@ var registry = []Index{
 	{ID: "PQ2", Name: "pass^k per phase", Unit: "probability", Breachable: true, NMin: 1},
 	{ID: "PQ3", Name: "comparison noise floor", Unit: "percentage points", NMin: 1, Baseline: "MDE 0.24 at 66 per arm"},
 	{ID: "PQ4", Name: "deadline rate", Unit: "ratio", Direction: LowerIsBetter, Threshold: 0.20, HasThreshold: true, Breachable: true, NMin: 40, Baseline: "0.167 of 186 cycles"},
+	{ID: "PQ5", Name: "cost per shipped cycle", Unit: "LLM minutes", Direction: LowerIsBetter, NMin: 1, Baseline: "101.2 LLM minutes of 5 shipped cycles"},
 	{ID: "JQ1", Name: "seeded-defect recall", Unit: "ratio", Direction: HigherIsBetter, Threshold: 0.75, HasThreshold: true, Breachable: true, NMin: 1},
 	{ID: "JQ2", Name: "false-PASS rate", Unit: "ratio", Direction: LowerIsBetter, Threshold: 0.10, HasThreshold: true, Breachable: true, NMin: 1},
 	{ID: "JQ3", Name: "independent-review escalation", Unit: "ratio", Direction: LowerIsBetter, Threshold: 0.40, HasThreshold: true, Breachable: true, NMin: 30, Baseline: "0.418 of 98 reviews"},

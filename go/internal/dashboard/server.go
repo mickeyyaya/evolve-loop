@@ -31,7 +31,6 @@ type Options struct {
 	Now          func() time.Time
 	MaxCycles    int
 	KeepAlive    time.Duration
-	Env          map[string]string
 }
 
 func (o Options) withDefaults() Options {
@@ -75,7 +74,7 @@ type Server struct {
 func New(root string, opts Options) *Server {
 	opts = opts.withDefaults()
 	col := newCollector(root)
-	col.maxCycles, col.operatorEnv = opts.MaxCycles, opts.Env
+	col.maxCycles = opts.MaxCycles
 	s := &Server{root: root, opts: opts, col: col, subs: map[chan uint64]struct{}{}, boundHosts: map[string]bool{}}
 	s.mux = http.NewServeMux()
 	s.routes()
@@ -268,7 +267,7 @@ func (s *Server) handleCycle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cs = assignState(cs, snap.Loop)
-	mandatory, mw := readMandatory(s.root, s.col.operatorEnv)
+	mandatory, mw := readMandatory(s.root)
 	warns = append(warns, mw...)
 	var pw []string
 	cs.Plan, pw = readPlan(mandatory, core.RunWorkspacePath(s.root, id), cs, snap.Loop, s.col.streams)

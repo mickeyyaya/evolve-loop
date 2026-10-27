@@ -20,6 +20,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/recipe"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
 )
@@ -71,6 +73,32 @@ var bridgeReadOnlyViews = map[string]func([]string, io.Writer, io.Writer) int{
 	"sessions": runBridgeSessions,
 }
 
+func bridgeLaunchDeps(getwd func() (string, error), stderr io.Writer) bridge.Deps {
+	deps := bridge.Deps{TokenResolver: tokenusage.DefaultResolver(tokenusage.ClaudeConfigRoot(nil))}
+	root, err := routingProjectRoot("", getwd)
+	if err != nil {
+		fmt.Fprintf(stderr, "[bridge] WARN %v; the policy opt-ins stay off\n", err)
+		return deps
+	}
+	pol := policy.LoadOrDefaults(filepath.Join(root, ".evolve", "policy.json"), stderr)
+	deps.SandboxMode = pol.SandboxConfig().SandboxMode()
+	deps.AllowAnthropicBaseURL = pol.BridgeConfig().AllowAnthropicBaseURL
+	deps.AllowOpenAIAPIKey = pol.BridgeConfig().AllowOpenAIAPIKey
+	deps.RecordBypass = bridgeBypassRecorder(root, stderr)
+	return deps
+}
+
+func bridgeBypassRecorder(root string, stderr io.Writer) func(name, reason string) error {
+	return func(name, reason string) error { return recordBridgeBypass(root, name, reason, stderr) }
+}
+
+func recordBridgeBypass(root, name, reason string, stderr io.Writer) error {
+	evolveDir := paths.EvolveDirOf(root)
+	signals, closeSignals := newRoleSignalCenter(roleDispatch, root, evolveDir, stderr)
+	defer closeSignals()
+	return newBypassAuditor(evolveDir, signals, stderr).record(name, reason, "runBridge")
+}
+
 func runBridge(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprint(stderr, bridgeUsage)
@@ -80,12 +108,12 @@ func runBridge(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if view, ok := bridgeReadOnlyViews[sub]; ok {
 		return view(rest, stdout, stderr)
 	}
+	if sub == "launch" {
+		return bridge.NewEngine(bridgeLaunchDeps(os.Getwd, stderr)).LaunchArgs(context.Background(), rest, envMap(), stdout, stderr)
+	}
 	eng := bridge.NewEngine(bridge.Deps{TokenResolver: tokenusage.DefaultResolver(tokenusage.ClaudeConfigRoot(nil))})
 
 	switch sub {
-	case "launch":
-		return eng.LaunchArgs(context.Background(), rest, envMap(), stdout, stderr)
-
 	case "probe":
 		filter := ""
 		for _, a := range rest {

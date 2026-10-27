@@ -22,7 +22,7 @@ func TestRealTreeRoutingOrder_EveryPreBuildPhaseSitsBeforeBuild(t *testing.T) {
 	if _, err := os.Stat(registryPath); err != nil {
 		t.Skipf("phase registry not present: %v", err)
 	}
-	cfg, _ := config.Load(registryPath, map[string]string{})
+	cfg, _ := config.Load(registryPath)
 	builtinCat, err := phasespec.Load(registryPath)
 	if err != nil {
 		t.Skipf("builtin catalog load failed: %v", err)

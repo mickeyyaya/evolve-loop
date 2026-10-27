@@ -166,7 +166,7 @@ func TestOverrideRefusals_FaultsAreErrorsNotRefusals(t *testing.T) {
 	t.Run("profiles path is a file", func(t *testing.T) {
 		root := t.TempDir()
 		writeFileForPublishTest(t, routingProfilesDir(root), "not a dir")
-		refusals, err := overrideRefusals(e3AgyClaudeRouter(t, nil), root, map[string]string{"EVOLVE_CLI": "agy"})
+		refusals, err := overrideRefusals(e3AgyClaudeRouter(t, nil), root, map[string]string{"EVOLVE_CLI": "agy"}, nil)
 		if err == nil || refusals != nil {
 			t.Fatalf("refusals %v err %v, want the list error", refusals, err)
 		}
@@ -180,7 +180,7 @@ func TestOverrideRefusals_FaultsAreErrorsNotRefusals(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Build: %v", err)
 		}
-		refusals, err := overrideRefusals(r, root, map[string]string{"EVOLVE_CLI": "agy"})
+		refusals, err := overrideRefusals(r, root, map[string]string{"EVOLVE_CLI": "agy"}, nil)
 		if err == nil || refusals != nil {
 			t.Fatalf("refusals %v err %v, want the resolve error", refusals, err)
 		}
@@ -188,7 +188,7 @@ func TestOverrideRefusals_FaultsAreErrorsNotRefusals(t *testing.T) {
 	t.Run("no override set means no resolve", func(t *testing.T) {
 		root := t.TempDir()
 		e3OverrideProfiles(t, root)
-		refusals, err := overrideRefusals(e3AgyClaudeRouter(t, nil), root, map[string]string{})
+		refusals, err := overrideRefusals(e3AgyClaudeRouter(t, nil), root, map[string]string{}, nil)
 		if err != nil || refusals != nil {
 			t.Fatalf("refusals %v err %v", refusals, err)
 		}
@@ -201,7 +201,7 @@ func TestWireCLIRouter_AnOverrideCheckFaultIsReported(t *testing.T) {
 	var gotEnv map[string]string
 	prev := routingRunOverrideRefusals
 	t.Cleanup(func() { routingRunOverrideRefusals = prev })
-	routingRunOverrideRefusals = func(r *cliroute.Router, projectRoot string, env map[string]string) ([]string, error) {
+	routingRunOverrideRefusals = func(r *cliroute.Router, projectRoot string, env map[string]string, _ cliroute.Overrides) ([]string, error) {
 		gotEnv = env
 		if r == nil || projectRoot != root {
 			t.Errorf("the check ran on router %v root %q", r, projectRoot)
@@ -288,7 +288,10 @@ func TestPhaseObserverAdapter_ReadsTheDepsItWasWiredWith(t *testing.T) {
 	}
 	on := true
 
-	built := phaseObserverAdapter(policy.ObserverPolicy{Autospawn: &on}, "enforce", observerDeps{signals: center, usage: explain})
+	built := phaseObserverAdapter(policy.ObserverPolicy{Autospawn: &on}, "enforce", observerDeps{signals: center, usage: explain, overrides: cliOverrides("build", "claude-p")})
+	if got := built.CLIFor("build"); got != "claude-p" {
+		t.Errorf("CLIFor(build) = %q, want the --cli override claude-p", got)
+	}
 
 	if built.Signals() != center || built.RecoveryStage != "enforce" || !*built.Config.Autospawn {
 		t.Errorf("adapter = %+v, want the given center, stage and config", built)

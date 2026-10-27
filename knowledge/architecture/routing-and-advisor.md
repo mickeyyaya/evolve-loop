@@ -191,8 +191,8 @@ The integrity floor is LIVE from Advisory onward (ADR-0024 PR-16 widened
 `EVOLVE_MANDATORY_PHASES` (CSV — omitting `audit`/`ship` emits a `weak-spine` WARN,
 now backstopped by the integrity floor), `EVOLVE_CONDITIONAL_MANDATORY`
 (default `tdd:cycle_size!=trivial&&deliverable_kind!=document`), `EVOLVE_MAX_OPTIONAL_INSERTIONS` (default 4,
-not applied to plan-driven inserts), `EVOLVE_USE_PHASE_REGISTRY`. Precedence:
-env > registry file > built-in default.
+not applied to plan-driven inserts). Precedence:
+the routing keys of `.evolve/policy.json` > registry file > built-in default.
 
 **Reversibility** is the design discipline: `EVOLVE_DYNAMIC_ROUTING=off` reverts to
 byte-identical legacy, and each tier promotes independently via the

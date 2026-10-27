@@ -67,7 +67,7 @@ func TestDefaultSandboxWrap_RefusesAProfileItCannotBuildSafely(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var stderr bytes.Buffer
-			deps := Deps{Env: map[string]string{envSandboxMode: config.SandboxModeOn}, Stderr: &stderr, MkScratchDir: tc.mkdir}
+			deps := Deps{SandboxMode: config.SandboxModeOn, Stderr: &stderr, MkScratchDir: tc.mkdir}
 
 			prefix, ok := defaultSandboxWrapWithProbe(deps, fakeProbe(tc.os, true))(tc.req(t))
 

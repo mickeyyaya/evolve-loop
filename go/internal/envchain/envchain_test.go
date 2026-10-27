@@ -48,32 +48,3 @@ func TestResolve_DistinctKeysDoNotCollide(t *testing.T) {
 		t.Errorf("KEY_C_UNSET=%q, want default", got)
 	}
 }
-
-func TestPhaseEnvKey_CanonicalForm(t *testing.T) {
-	cases := []struct {
-		phase, suffix, want string
-	}{
-		{"build", "PERMISSION_MODE", "EVOLVE_BUILD_PERMISSION_MODE"},
-		{"scout", "MODEL", "EVOLVE_SCOUT_MODEL"},
-		{"intent", "PERMISSION_MODE", "EVOLVE_INTENT_PERMISSION_MODE"},
-		{"triage", "MODEL", "EVOLVE_TRIAGE_MODEL"},
-		{"tdd", "PLAN_INPUT", "EVOLVE_TDD_PLAN_INPUT"},
-		{"audit", "MODEL", "EVOLVE_AUDIT_MODEL"},
-		{"tdd-engineer", "MODEL", "EVOLVE_TDD_ENGINEER_MODEL"},
-		{"plan-reviewer", "PERMISSION_MODE", "EVOLVE_PLAN_REVIEWER_PERMISSION_MODE"},
-	}
-	for _, c := range cases {
-		if got := PhaseEnvKey(c.phase, c.suffix); got != c.want {
-			t.Errorf("PhaseEnvKey(%q,%q)=%q, want %q", c.phase, c.suffix, got, c.want)
-		}
-	}
-}
-
-func TestPhaseEnvKey_EmptyInputs(t *testing.T) {
-	if got := PhaseEnvKey("", "MODEL"); got != "EVOLVE__MODEL" {
-		t.Errorf("empty phase: %q", got)
-	}
-	if got := PhaseEnvKey("build", ""); got != "EVOLVE_BUILD_" {
-		t.Errorf("empty suffix: %q", got)
-	}
-}

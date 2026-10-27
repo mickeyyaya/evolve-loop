@@ -48,40 +48,39 @@ func TestBenchOnEscalation_NoBenchIsWrittenWhenTheReportDoesNotQualify(t *testin
 	cases := []struct {
 		name   string
 		setup  func(t *testing.T, ws string)
-		env    map[string]string
+		off    bool
 		cli    string
 		silent bool
 	}{
-		{"health bench disabled by env", func(t *testing.T, ws string) {
+		{"health bench disabled by policy", func(t *testing.T, ws string) {
 			writeReportF4(t, ws, map[string]any{"captured_at": now, "cli": "claude-tmux", "pattern_name": "exhausted", "pane_tail": "x"})
-		}, map[string]string{"EVOLVE_CLI_HEALTH": "0"}, "claude-tmux", true},
-		{"no report in the workspace", func(*testing.T, string) {}, nil, "claude-tmux", true},
+		}, true, "claude-tmux", true},
+		{"no report in the workspace", func(*testing.T, string) {}, false, "claude-tmux", true},
 		{"report is not JSON", func(t *testing.T, ws string) {
 			if err := os.WriteFile(filepath.Join(ws, "escalation-report.json"), []byte("{broken"), 0o644); err != nil {
 				t.Fatal(err)
 			}
-		}, nil, "claude-tmux", true},
+		}, false, "claude-tmux", true},
 		{"pattern is not benchable", func(t *testing.T, ws string) {
 			writeReportF4(t, ws, map[string]any{"captured_at": now, "cli": "claude-tmux", "pattern_name": "trust_dialog", "pane_tail": "x"})
-		}, nil, "claude-tmux", true},
+		}, false, "claude-tmux", true},
 		{"report names another CLI", func(t *testing.T, ws string) {
 			writeReportF4(t, ws, map[string]any{"captured_at": now, "cli": "codex-tmux", "pattern_name": "exhausted", "pane_tail": "x"})
-		}, nil, "claude-tmux", true},
+		}, false, "claude-tmux", true},
 		{"report predates this dispatch", func(t *testing.T, ws string) {
 			writeReportF4(t, ws, map[string]any{"captured_at": start.Add(-time.Second), "cli": "claude-tmux", "pattern_name": "exhausted", "pane_tail": "x"})
-		}, nil, "claude-tmux", true},
+		}, false, "claude-tmux", true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			root, ws := t.TempDir(), t.TempDir()
 			tc.setup(t, ws)
 			sink := &logSinkF4{}
-			env := tc.env
-			if env == nil {
-				env = map[string]string{}
+			if tc.off {
+				writeCLIHealthOff(t, root)
 			}
 
-			bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: tc.cli, DispatchStart: start, Env: env}, clock, sink.logf)
+			bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: tc.cli, DispatchStart: start}, clock, sink.logf)
 
 			if active := clihealth.NewStore(root, clock).Active(); len(active) != 0 {
 				t.Errorf("no family may be benched: %+v", active)
@@ -104,7 +103,7 @@ func TestBenchOnEscalation_AlreadyBenchedWallIsLoggedAndNotStruckAgain(t *testin
 	writeReportF4(t, ws, map[string]any{"captured_at": wallSeen, "cli": "claude-tmux", "pattern_name": "exhausted", "pane_tail": "limit"})
 	sink := &logSinkF4{}
 
-	bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: "claude-tmux", DispatchStart: now.Add(-time.Minute), Env: map[string]string{}}, clock, sink.logf)
+	bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: "claude-tmux", DispatchStart: now.Add(-time.Minute)}, clock, sink.logf)
 
 	if !strings.Contains(sink.joined(), "already benched for this wall; not benched again") {
 		t.Errorf("log = %q", sink.joined())
@@ -124,7 +123,7 @@ func TestBenchOnEscalation_BenchWriteFailureIsLoggedAsWarnAndDoesNotPanic(t *tes
 	writeReportF4(t, ws, map[string]any{"captured_at": now, "cli": "claude-tmux", "pattern_name": "exhausted", "pane_tail": "limit"})
 	sink := &logSinkF4{}
 
-	bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: "claude-tmux", DispatchStart: now.Add(-time.Minute), Env: map[string]string{}}, clock, sink.logf)
+	bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: "claude-tmux", DispatchStart: now.Add(-time.Minute)}, clock, sink.logf)
 
 	if !strings.Contains(sink.joined(), "WARN cli-health bench write failed") {
 		t.Errorf("log = %q", sink.joined())

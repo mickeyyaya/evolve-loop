@@ -109,15 +109,6 @@ func itConfig(t *testing.T, promptLines ...string) *Config {
 	}
 }
 
-func itDeps(perTick time.Duration) Deps {
-	d := Deps{
-		Tmux:  execTmux{},
-		Sleep: func(time.Duration) { time.Sleep(perTick) },
-		Now:   time.Now,
-	}
-	return d.withDefaults()
-}
-
 func itLaunch(session, launchCmd, marker string, scrollback int, named bool) tmuxLaunch {
 	return tmuxLaunch{
 		name:            "itest-tmux",

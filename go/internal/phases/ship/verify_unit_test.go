@@ -149,13 +149,13 @@ func TestVerifyManualConfirm_AutoConfirm(t *testing.T) {
 	opts := &Options{
 		ProjectRoot: t.TempDir(),
 		Runner:      r.runner(),
-		Env:         map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"},
+		AutoConfirm: "test",
 		Stderr:      devNullFile(t),
 	}
 	if err := verifyManualConfirm(context.Background(), opts, res); err != nil {
 		t.Fatalf("auto-confirm must succeed; got %v", err)
 	}
-	if res.Provenance != "manual (auto-confirmed via env)" {
+	if res.Provenance != "manual (auto-confirmed: test)" {
 		t.Errorf("provenance=%q want auto-confirmed", res.Provenance)
 	}
 }

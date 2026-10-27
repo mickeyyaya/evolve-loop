@@ -51,7 +51,7 @@ func assertMenuAutoAnswered(t *testing.T, prompt string) {
 	sess := fmt.Sprintf("evolve-bridge-liveint-%d", os.Getpid())
 	defer func() { _ = execTmux{}.KillSession(context.Background(), sess) }()
 
-	deps := Deps{Tmux: execTmux{}, Sleep: time.Sleep, Now: time.Now}.withDefaults()
+	deps := Deps{Tmux: execTmux{}, Sleep: time.Sleep, Now: time.Now, SignalProcess: refuseTestSignal}.withDefaults()
 	lp := tmuxLaunch{
 		name: sp.name, session: sess, launchCmd: sp.launchCmd,
 		promptMarker: sp.marker, inputLineMarker: sp.marker, bootScrollback: sp.bootScrollback,

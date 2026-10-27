@@ -40,7 +40,7 @@ already enforced; an `(opt-in)` var does nothing until set.
 | `EVOLVE_MANDATORY_PHASES` | `scout,build,audit,ship` | CSV never-skip set. Omitting `audit`/`ship` emits a `weak-spine` WARN (backstopped by the integrity floor). | Precedence: env > registry file > built-in default. |
 | `EVOLVE_CONDITIONAL_MANDATORY` | `tdd:cycle_size!=trivial&&deliverable_kind!=document` | `phase:expr` conditional-mandatory rule; clauses joined by `&&` are AND-ed (ADR-0099). | — |
 | `EVOLVE_MAX_OPTIONAL_INSERTIONS` | `4` | Cap on optional-phase insertions. NOT applied to plan-driven inserts (the plan is the advisor's clamped whole-cycle selection). | — |
-| `EVOLVE_USE_PHASE_REGISTRY` | (on) | `0` ignores `docs/architecture/phase-registry.json`. | Precedence: env > registry file > built-in default. |
+| `EVOLVE_USE_PHASE_REGISTRY` | removed (X18d) | No effect. The loader always reads `docs/architecture/phase-registry.json` when it exists. | — |
 
 ## Bridge / CLI dispatch & interaction
 
@@ -104,7 +104,7 @@ already enforced; an `(opt-in)` var does nothing until set.
 
 | Env var | Default | Effect | Rollback / notes |
 |---|---|---|---|
-| `EVOLVE_SANDBOX` | (see note) | `1`: runner wraps `claude -p` in `sandbox-exec` (macOS) / `bwrap` (Linux). Auditor/Evaluator profiles run `read_only_repo: true`. | — |
+| `EVOLVE_SANDBOX` | removed (X18d) | No effect. Use policy.json `sandbox.mode` (`auto` or `on`), or the audited `--sandbox-off=<reason>` parameter of `evolve loop` and `evolve cycle run`. | — |
 | `EVOLVE_INNER_SANDBOX` | auto | `false` when nested-Claude detected; force enable/disable with `1`/`0`. | `EVOLVE_FORCE_INNER_SANDBOX` deprecated. |
 | `EVOLVE_WORKTREE_BASE` | auto | Resolved by `preflight-environment.sh`: `.evolve/worktrees/` > `$TMPDIR/evolve-loop/<hash>`. | Never auto-enable `EVOLVE_SKIP_WORKTREE=1` (operator-only emergency hatch). |
 | `EVOLVE_SKIP_WORKTREE` | `0` | Operator-only emergency hatch to skip per-cycle worktree provisioning. | Do not auto-enable. |
@@ -115,7 +115,7 @@ already enforced; an `(opt-in)` var does nothing until set.
 |---|---|---|---|
 | `evolve ship` (native, no flag) | always native | The ship phase runs native Go (`go/internal/phases/ship/`): self-SHA TOFU, audit-binding, EGPS gate, atomic commit+ff-merge+push, gh release. CLI: `evolve ship [--class cycle\|manual\|release\|trivial] [--dry-run] "<msg>"`. | The `EVOLVE_NATIVE_SHIP=0` shell-out to a bash `ship.sh` was removed in the Go-only consolidation; ship is native-only. Parity history: `go/internal/phases/ship/native_test.go` pins commit-message footers, exit codes, and ledger semantics. |
 | `EVOLVE_BYPASS_COMMIT_GATE` | `0` (gate on, v13.0.0+) | `evolve ship --class manual` is the single chokepoint for interactive commits (bare `git commit` ship-gate-denied); requires a fresh commit-gate attestation `.commit-gate/attestation.json` whose `tree_state_sha == sha256(git diff HEAD)`. Produce with `/commit`. Missing/malformed/stale → ship refuses (`IntegrityError`). `--dry-run` exempt. | `=1` skips the check (routine use is a CLAUDE.md violation). Impl: gate `evolve commit-gate run` (`go/internal/commitgate/`); enforcement `go/internal/phases/ship/commitgate.go`. See [commit skill](../../skills/commit/SKILL.md). |
-| `EVOLVE_SHIP_AUTO_CONFIRM` | unset | `1`: CI mode for `--class manual` — skips the interactive y/N confirm. | — |
+| `EVOLVE_SHIP_AUTO_CONFIRM` | removed (X18d) | No effect. Use the audited `--auto-confirm=<reason>` parameter of `evolve ship`. | — |
 | `EVOLVE_BYPASS_SHIP_VERIFY` | `0` | `1`: permanent compatibility bridge that bypasses ship-gate verification (bare `git push origin main` is denied since v8.13.0). | Emits deprecation WARN — prefer `--class manual`. |
 | `EVOLVE_FORCE_FRESH` | `0` (guard on) | A fresh `evolve loop` REFUSES (exit 2, `stop_reason=unfinished_cycle`) when an unfinished cycle is detected (`cycle-state.json` ahead of `lastCycleNumber`, OR unreadable). Prints the resume∥reset fork. Resolve via `evolve loop --resume` or `evolve cycle reset` (seals: archives workspace + snapshot + `reset-manifest.json` to `.evolve/runs/cycle-<N>.reset-<ts>/`, advances `lastCycleNumber`, ledger entry). | `=1` restores prior silent-clobber (history NOT sealed). Impl: `unfinishedCycle` + guard in `go/cmd/evolve/cmd_loop.go`; `core.SealCycle` in `go/internal/core/reset.go`. |
 
@@ -136,7 +136,7 @@ already enforced; an `(opt-in)` var does nothing until set.
 |---|---|---|
 | Runtime location | `go/internal/...` (Go-only) | The runtime is the Go binary; the bash `legacy/scripts/` tree was removed in the Go-only consolidation. A few shell helpers remain only as test fixtures + the commit-gate runner. |
 | Ship class `cycle` (default) | Full audit-binding: recent PASS, SHA match, HEAD/tree bound, `acs-verdict.json` red_count==0 | `/evo:loop` cycle commits. |
-| Ship class `manual` | Skips audit-binding; requires fresh commit-gate attestation (bypass `EVOLVE_BYPASS_COMMIT_GATE=1`); interactive y/N (CI: `EVOLVE_SHIP_AUTO_CONFIRM=1`) | Operator-driven manual commits. |
+| Ship class `manual` | Skips audit-binding; requires fresh commit-gate attestation (bypass `--bypass-commit-gate`); interactive y/N (CI: `--auto-confirm=<reason>`) | Operator-driven manual commits. |
 | Ship class `release` | Skips audit (version-bump mutates files post-audit); logs RELEASE class loudly | `evolve release` pipeline only. |
 
 ### Operator read-only commands

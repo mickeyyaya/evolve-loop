@@ -1,5 +1,4 @@
 // Package systemprompt resolves the launch-time system prompt for an agent.
-// Per-agent and global environment overrides win over the profile.
 package systemprompt
 
 import (
@@ -7,18 +6,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-func Resolve(agent, profileDir string, reqEnv map[string]string) string {
-	def := profileDefault(agent, profileDir)
-	if agent != "" {
-		if v := envchain.Resolve(envchain.PhaseEnvKey(agent, "SYSTEM_PROMPT"), reqEnv, "", ""); v != "" {
-			return v
-		}
-	}
-	return envchain.ResolveNoOS(envchain.SystemPromptReqEnvKey, reqEnv, def, "")
+func Resolve(agent, profileDir string) string {
+	return profileDefault(agent, profileDir)
 }
 
 func profileDefault(agent, profileDir string) string {

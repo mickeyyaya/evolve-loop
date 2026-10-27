@@ -1,5 +1,7 @@
 # Model Try Telemetry
 
+> Proposed extension (2026-10-27): the attribution fields of the row, a record for each turn and a report by phase, seat and step. See the plan [token-telemetry-2026-10](../plans/token-telemetry-2026-10.md) and the [research](../research/token-telemetry-2026-10.md).
+
 Model try telemetry answers four separate questions without treating an
 unknown value as zero:
 

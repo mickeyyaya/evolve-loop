@@ -23,7 +23,7 @@ var bridgeEngineRoots = map[string]struct {
 	calls  int
 	wiring string
 }{
-	"cmd/evolve/cmd_bridge.go":           {1, "center-less: `evolve bridge launch`, Deps{TokenResolver}"},
+	"cmd/evolve/cmd_bridge.go":           {2, "center-less: `evolve bridge launch` through bridgeLaunchDeps (TokenResolver, the policy sandbox mode and credential opt-ins, and the bypass recorder), and the other bridge verbs through Deps{TokenResolver}"},
 	"cmd/evolve/cli_routing_root.go":     {1, "center-less: the routing table's discovered-tail Doctor probe, Deps{TokenResolver}"},
 	"cmd/evolve/cmd_models_live.go":      {1, "center-less: the models-live probe, Deps{TokenResolver}"},
 	"internal/adapters/bridge/bridge.go": {3, "center-bearing: New()'s default factory (Env and TokenResolver), NewDefault's factory and Launch's onStopReview branch through productionEngineDeps (Deps.Signals = the Adapter's Center; nil when NewDefault was given nil)"},
@@ -31,7 +31,7 @@ var bridgeEngineRoots = map[string]struct {
 	"internal/subagent/bridgeadapter.go": {1, "center-bearing: the `evolve subagent run` root (ADR-0103 unit 16) — execAdapterDepsWith(env, signals) hands the Dispatcher's Center to the engine"},
 }
 
-var depsBuildersThatWireTokens = map[string]bool{"productionEngineDeps": true, "execAdapterDepsWith": true, "execAdapterDeps": true}
+var depsBuildersThatWireTokens = map[string]bool{"bridgeLaunchDeps": true, "productionEngineDeps": true, "execAdapterDepsWith": true, "execAdapterDeps": true}
 
 var depsForwarders = map[string]string{
 	"internal/subagent/bridgeadapter.go": "newAdapterBridge forwards the Deps that execAdapterDepsWith builds",

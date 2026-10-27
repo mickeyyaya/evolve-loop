@@ -2,7 +2,7 @@ package bridge
 
 func codexAuthMode(deps Deps) string {
 	if v, ok := lookupEnv(deps, "OPENAI_API_KEY"); ok && v != "" {
-		if allow, _ := lookupEnv(deps, "BRIDGE_ALLOW_OPENAI_API_KEY"); allow == "1" {
+		if deps.AllowOpenAIAPIKey {
 			return "api-key"
 		}
 	}

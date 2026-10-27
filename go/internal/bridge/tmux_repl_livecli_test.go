@@ -70,7 +70,7 @@ func TestLiveCLI_BootMarkerDetected(t *testing.T) {
 			defer func() { _ = tx.KillSession(ctx, sess) }()
 
 			var stderr strings.Builder
-			deps := Deps{Tmux: tx, Now: time.Now, Stderr: &stderr}.withDefaults()
+			deps := Deps{Tmux: tx, Now: time.Now, Stderr: &stderr, SignalProcess: refuseTestSignal}.withDefaults()
 			ar := newAutoResponder(sp.name, t.TempDir(), deps, false, 0)
 
 			if err := tx.NewSession(ctx, sess, tmuxPaneWidth, tmuxPaneHeight); err != nil {
@@ -150,7 +150,7 @@ func TestLiveCLI_FullRoundtrip(t *testing.T) {
 			sess := fmt.Sprintf("evolve-bridge-livert-%s-%d", sp.bin, os.Getpid())
 			defer func() { _ = tx.KillSession(ctx, sess) }()
 
-			deps := Deps{Tmux: tx, Sleep: time.Sleep, Now: time.Now}.withDefaults()
+			deps := Deps{Tmux: tx, Sleep: time.Sleep, Now: time.Now, SignalProcess: refuseTestSignal}.withDefaults()
 			lp := tmuxLaunch{
 				name: sp.name, session: sess, launchCmd: sp.launchCmd,
 				promptMarker: sp.marker, inputLineMarker: sp.marker, bootScrollback: sp.bootScrollback,

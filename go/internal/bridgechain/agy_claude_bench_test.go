@@ -30,13 +30,13 @@ func TestBenchOnEscalation_AQuotaWallOnOneAgyTargetLeavesTheOtherFirst(t *testin
 			t.Fatal(err)
 		}
 
-		bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: tc.walled, DispatchStart: now().Add(-time.Minute), Env: map[string]string{}}, now, nil)
+		bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: tc.walled, DispatchStart: now().Add(-time.Minute)}, now, nil)
 
 		active := clihealth.NewStore(root, now).Active()
 		if _, benched := active[tc.benched]; !benched || len(active) != 1 {
 			t.Errorf("wall on %s: benches = %v, want %s alone: Antigravity pools quota per model group (Gemini; Claude and GPT)", tc.walled, active, tc.benched)
 		}
-		out := bridgechain.ApplyCLIHealthBench(root, "build", plan, map[string]string{}, now, nil)
+		out := bridgechain.ApplyCLIHealthBench(root, "build", plan, now, nil)
 		if !slices.Equal(out.Candidates, tc.want) {
 			t.Errorf("wall on %s: chain = %v, want %v", tc.walled, out.Candidates, tc.want)
 		}

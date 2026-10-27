@@ -19,6 +19,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/sandbox"
 	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inputindex"
 	"github.com/mickeyyaya/evolve-loop/go/internal/isolation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -251,7 +252,7 @@ func sandboxFence(binary string) func(context.Context, string) error {
 func (deps Deps) readReportsApply(cfg *Config) bool {
 	sandboxed := cfg.Worktree != "" || cfg.RequireSandbox
 	return deps.SandboxReports != nil && cmp.Or(deps.hostOS, runtime.GOOS) == "darwin" && cellTag.MatchString(cfg.DispatchID) && cfg.Workspace != "" &&
-		sandboxed && strings.TrimSpace(deps.Env[envSandboxMode]) != "off"
+		sandboxed && strings.TrimSpace(deps.SandboxMode) != config.SandboxModeOff
 }
 
 func relToProject(root, target string) string {

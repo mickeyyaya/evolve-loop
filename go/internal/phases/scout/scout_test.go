@@ -210,7 +210,7 @@ func TestRun_AgentLoadFails_ReturnsError(t *testing.T) {
 	}
 }
 
-func TestRun_EnvOverridesCLIAndModel(t *testing.T) {
+func TestRun_TheGlobalCLIMarkerRoutesAndThePerAgentModelEnvIsNotRead(t *testing.T) {
 	fb := &fakeBridge{writeArtifact: "# Scout\n## Proposed Tasks\n1. x\n"}
 	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("b")})
 	_, _ = phase.Run(context.Background(), core.PhaseRequest{
@@ -220,8 +220,8 @@ func TestRun_EnvOverridesCLIAndModel(t *testing.T) {
 	if fb.gotReq.CLI != "gemini" {
 		t.Errorf("CLI=%q, want gemini", fb.gotReq.CLI)
 	}
-	if fb.gotReq.Model != "gemini-2.5-pro" {
-		t.Errorf("Model=%q, want gemini-2.5-pro", fb.gotReq.Model)
+	if fb.gotReq.Model == "gemini-2.5-pro" {
+		t.Errorf("Model=%q came from EVOLVE_SCOUT_MODEL; the environment is not read", fb.gotReq.Model)
 	}
 }
 

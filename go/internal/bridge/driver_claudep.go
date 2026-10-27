@@ -49,8 +49,8 @@ func (claudePDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, e
 		return ExitCostLeak, nil
 	}
 	if v, ok := lookupEnv(deps, "ANTHROPIC_BASE_URL"); ok && v != "" {
-		if allow, _ := lookupEnv(deps, "BRIDGE_ALLOW_ANTHROPIC_BASE_URL"); allow != "1" {
-			fmt.Fprintln(deps.Stderr, "[claude-p] credential-isolation guard: ANTHROPIC_BASE_URL set without BRIDGE_ALLOW_ANTHROPIC_BASE_URL=1")
+		if !deps.AllowAnthropicBaseURL {
+			fmt.Fprintln(deps.Stderr, "[claude-p] credential-isolation guard: ANTHROPIC_BASE_URL set without policy bridge.allow_anthropic_base_url")
 			return ExitCostLeak, nil
 		}
 	}

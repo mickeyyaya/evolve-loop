@@ -2,13 +2,14 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 )
 
@@ -34,9 +35,14 @@ func runPlanAndExecute(args []string, stdin io.Reader, stdout, stderr io.Writer)
 		return 10
 	}
 
-	envReq, err := io.ReadAll(stdin)
+	raw, err := io.ReadAll(stdin)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve plan-and-execute: read stdin: %v\n", err)
+		return 1
+	}
+	var req core.PhaseRequest
+	if err := json.Unmarshal(raw, &req); err != nil {
+		fmt.Fprintf(stderr, "evolve plan-and-execute: decode the phase request: %v\n", err)
 		return 1
 	}
 
@@ -49,14 +55,8 @@ func runPlanAndExecute(args []string, stdin io.Reader, stdout, stderr io.Writer)
 		}
 	}
 
-	planKey := envchain.PhaseEnvKey(phase, "PERMISSION_MODE")
-	outputKey := envchain.PhaseEnvKey(phase, "PLAN_OUTPUT")
-
 	fmt.Fprintf(stdout, "[plan-and-execute] pass A: %s in plan mode → %s\n", phase, planPath)
-	if code := runPassWithEnv(phase, envReq, map[string]string{
-		planKey:   "plan",
-		outputKey: planPath,
-	}, stdout, stderr); code != 0 {
+	if code := runPassInMode(phase, req, "plan", stdout, stderr); code != 0 {
 		fmt.Fprintf(stderr, "[plan-and-execute] pass A failed (exit=%d); aborting\n", code)
 		return 1
 	}
@@ -72,13 +72,8 @@ func runPlanAndExecute(args []string, stdin io.Reader, stdout, stderr io.Writer)
 		return 11
 	}
 
-	inputKey := envchain.PhaseEnvKey(phase, "PLAN_INPUT")
-
 	fmt.Fprintf(stdout, "[plan-and-execute] pass B: %s in acceptEdits mode (plan ← %s)\n", phase, planPath)
-	if code := runPassWithEnv(phase, envReq, map[string]string{
-		planKey:  "acceptEdits",
-		inputKey: planPath,
-	}, stdout, stderr); code != 0 {
+	if code := runPassInMode(phase, req, "acceptEdits", stdout, stderr); code != 0 {
 		fmt.Fprintf(stderr, "[plan-and-execute] pass B failed (exit=%d)\n", code)
 		return 2
 	}
@@ -86,22 +81,14 @@ func runPlanAndExecute(args []string, stdin io.Reader, stdout, stderr io.Writer)
 	return 0
 }
 
-func runPassWithEnv(phase string, req []byte, env map[string]string, stdout, stderr io.Writer) int {
-	saved := map[string]string{}
-	for k, v := range env {
-		saved[k] = os.Getenv(k)
-		_ = os.Setenv(k, v)
+func runPassInMode(phase string, req core.PhaseRequest, mode string, stdout, stderr io.Writer) int {
+	req.PermissionMode = mode
+	body, err := json.Marshal(req)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve plan-and-execute: encode the phase request: %v\n", err)
+		return 1
 	}
-	defer func() {
-		for k, v := range saved {
-			if v == "" {
-				_ = os.Unsetenv(k)
-			} else {
-				_ = os.Setenv(k, v)
-			}
-		}
-	}()
-	return runPhase([]string{phase}, bytes.NewReader(req), stdout, stderr)
+	return runPhase([]string{phase}, bytes.NewReader(body), stdout, stderr)
 }
 
 func joinNames(names []string) string {

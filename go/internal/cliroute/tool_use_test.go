@@ -14,9 +14,9 @@ import (
 
 func ollamaIsToolless(driver string) bool { return driver == "ollama-tmux" }
 
-func toolUseRouter(t *testing.T, pol policy.Policy, prof profiles.Profile) *cliroute.Router {
+func toolUseRouter(t *testing.T, pol policy.Policy, prof profiles.Profile, ov llmroute.AgentOverride) *cliroute.Router {
 	t.Helper()
-	table, findings := cliroute.Compile(pol, nil, cliroute.SingleProfile{Agent: prof.Name, Profile: &prof})
+	table, findings := cliroute.Compile(pol, nil, cliroute.SingleProfile{Agent: prof.Name, Profile: &prof}, override(prof.Name, ov))
 	if errs := errorFindings(findings); len(errs) > 0 {
 		t.Fatalf("Compile reported errors: %+v", errs)
 	}
@@ -47,7 +47,7 @@ func runToolUseCases(t *testing.T, cases []toolUseCase) {
 	t.Helper()
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			d := mustResolve(t, toolUseRouter(t, tc.pol, tc.prof), tc.req)
+			d := mustResolve(t, toolUseRouter(t, tc.pol, tc.prof, llmroute.AgentOverride{}), tc.req)
 			if !reflect.DeepEqual(d.Plan.Candidates, tc.want) {
 				t.Fatalf("chain = %v, want %v (trace %v)", d.Plan.Candidates, tc.want, d.Trace)
 			}
@@ -59,8 +59,6 @@ func TestResolve_ALegacyWorktreePhaseDropsAToollessCLIWhoeverNamedIt(t *testing.
 	runToolUseCases(t, []toolUseCase{
 		{"the profile cli", policy.Policy{}, builderProfile("ollama-tmux", "claude-tmux"), worktreeRequest(nil), []string{"claude-tmux"}},
 		{"the profile cli_fallback", policy.Policy{}, builderProfile("claude-tmux", "ollama-tmux", "agy-tmux"), worktreeRequest(nil), []string{"claude-tmux", "agy-tmux"}},
-		{"an EVOLVE_BUILDER_CLI override", policy.Policy{}, builderProfile("claude-tmux", "agy-tmux"),
-			worktreeRequest(func(r *cliroute.Request) { r.Env = map[string]string{"EVOLVE_BUILDER_CLI": "ollama-tmux"} }), []string{"agy-tmux"}},
 		{"an EVOLVE_CLI override", policy.Policy{}, builderProfile("claude-tmux", "agy-tmux"),
 			worktreeRequest(func(r *cliroute.Request) { r.Env = map[string]string{"EVOLVE_CLI": "ollama-tmux"} }), []string{"agy-tmux"}},
 		{"the advisor overlay", policy.Policy{}, builderProfile("claude-tmux", "agy-tmux"),
@@ -117,8 +115,6 @@ func TestResolve_ADeclaredWorktreePhaseDropsAToollessCLIInAMultiFamilyTable(t *t
 	runToolUseCases(t, []toolUseCase{
 		{"the profile rule", routingPolicy(multi), builderProfile("ollama-tmux", "agy-tmux", "claude-tmux"), worktreeRequest(nil), []string{"agy-tmux", "claude-tmux"}},
 		{"the default rule", routingPolicy(withDefault), builderProfile("claude-tmux"), worktreeRequest(nil), []string{"agy-tmux", "claude-tmux"}},
-		{"an env override", routingPolicy(multi), builderProfile("claude-tmux", "agy-tmux"),
-			worktreeRequest(func(r *cliroute.Request) { r.Env = map[string]string{"EVOLVE_BUILDER_CLI": "ollama-tmux"} }), []string{"claude-tmux", "agy-tmux"}},
 		{"the advisor overlay", routingPolicy(multi), builderProfile("claude-tmux", "agy-tmux"),
 			worktreeRequest(func(r *cliroute.Request) { r.Overlay = llmroute.Overlay{CLI: "ollama"} }), []string{"claude-tmux", "agy-tmux"}},
 		{"the caller cli", routingPolicy(multi), builderProfile("claude-tmux", "agy-tmux"),
@@ -149,7 +145,7 @@ func TestResolve_AWorktreeChainLeftWithNoToolCapableCLIFailsLoudlyNamingTheDropp
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := toolUseRouter(t, tc.pol, tc.prof).Resolve(worktreeRequest(nil))
+			_, err := toolUseRouter(t, tc.pol, tc.prof, llmroute.AgentOverride{}).Resolve(worktreeRequest(nil))
 
 			var toolErr *cliroute.ToolUseError
 			if !errors.Is(err, cliroute.ErrRefused) || !errors.As(err, &toolErr) {
@@ -179,7 +175,7 @@ func TestResolve_ATraceNamesTheCLIsTheToolUseFilterDropped(t *testing.T) {
 	multi := policy.CLIRouting{CLIs: []string{"agy", "claude", "ollama"}, AfterChain: "stop"}
 	for name, pol := range map[string]policy.Policy{"legacy": {}, "declared": routingPolicy(multi)} {
 		t.Run(name, func(t *testing.T) {
-			d := mustResolve(t, toolUseRouter(t, pol, builderProfile("ollama-tmux", "claude-tmux")), worktreeRequest(nil))
+			d := mustResolve(t, toolUseRouter(t, pol, builderProfile("ollama-tmux", "claude-tmux"), llmroute.AgentOverride{}), worktreeRequest(nil))
 
 			if !traceMentions(d.Trace, "[ollama-tmux]", "no tool use") {
 				t.Fatalf("trace = %q, want a line naming the dropped CLI", d.Trace)
@@ -195,4 +191,22 @@ func traceMentions(trace []string, parts ...string) bool {
 		}
 	}
 	return false
+}
+
+func TestResolve_AWorktreePhaseDropsAToollessCLIOverride(t *testing.T) {
+	multi := policy.CLIRouting{CLIs: []string{"agy", "claude", "ollama"}, AfterChain: "stop"}
+	for name, tc := range map[string]struct {
+		pol  policy.Policy
+		want []string
+	}{
+		"legacy":   {policy.Policy{}, []string{"agy-tmux"}},
+		"declared": {routingPolicy(multi), []string{"claude-tmux", "agy-tmux"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := toolUseRouter(t, tc.pol, builderProfile("claude-tmux", "agy-tmux"), llmroute.AgentOverride{CLI: "ollama-tmux"})
+			if d := mustResolve(t, r, worktreeRequest(nil)); !reflect.DeepEqual(d.Plan.Candidates, tc.want) {
+				t.Fatalf("chain = %v, want %v (trace %v)", d.Plan.Candidates, tc.want, d.Trace)
+			}
+		})
+	}
 }

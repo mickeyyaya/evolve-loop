@@ -8,7 +8,7 @@ import (
 )
 
 func TestLoad_DeliverableKinds_FromRegistry(t *testing.T) {
-	cfg, _ := Load(filepath.Join("..", "..", "..", "docs", "architecture", "phase-registry.json"), map[string]string{})
+	cfg, _ := Load(filepath.Join("..", "..", "..", "docs", "architecture", "phase-registry.json"))
 	doc, ok := cfg.DeliverableKinds["document"]
 	if !ok {
 		t.Fatalf("registry declares no deliverable_kinds.document: %+v", cfg.DeliverableKinds)
@@ -73,7 +73,7 @@ func TestDocumentSpec_AndKindVocabulary(t *testing.T) {
 	if DeliverableKindCode != "code" || DeliverableKindDocument != "document" {
 		t.Fatalf("kind vocabulary drifted: %q %q", DeliverableKindCode, DeliverableKindDocument)
 	}
-	cfg, _ := Load(filepath.Join("..", "..", "..", "docs", "architecture", "phase-registry.json"), map[string]string{})
+	cfg, _ := Load(filepath.Join("..", "..", "..", "docs", "architecture", "phase-registry.json"))
 	if spec, ok := cfg.DocumentSpec(); !ok || spec.Root != "solutions" {
 		t.Errorf("DocumentSpec() = %+v ok=%v", spec, ok)
 	}
@@ -85,7 +85,7 @@ func TestDocumentSpec_AndKindVocabulary(t *testing.T) {
 	if err := os.WriteFile(reg, []byte(`{"config":{"deliverable_kinds":{"document":{"required_files":["x.md"]}}}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, ws := Load(reg, map[string]string{})
+	_, ws := Load(reg)
 	found := false
 	for _, w := range ws {
 		if strings.Contains(w.Message, "deliverable_kinds[document]") {

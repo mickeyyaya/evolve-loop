@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -33,8 +34,8 @@ type mandatorySet struct {
 	order       []string
 }
 
-func readMandatory(root string, env map[string]string) (mandatorySet, []string) {
-	cfg, ws := config.Load(config.RegistryPath(root), env)
+func readMandatory(root string) (mandatorySet, []string) {
+	cfg, ws := router.ConfigForProject(root, io.Discard)
 	var warnings []string
 	for _, w := range ws {
 		if config.IsRegistryFault(w) {

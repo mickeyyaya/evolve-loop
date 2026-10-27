@@ -22,7 +22,7 @@ func benchReorderLine(t *testing.T, now, until time.Time) string {
 	}
 	var logs []string
 	plan := llmroute.Plan{Candidates: []string{"agy-claude-tmux", "claude-tmux"}}
-	bridgechain.ApplyCLIHealthBench(root, "builder", plan, map[string]string{}, clock, func(f string, a ...any) { logs = append(logs, fmt.Sprintf(f, a...)) })
+	bridgechain.ApplyCLIHealthBench(root, "builder", plan, clock, func(f string, a ...any) { logs = append(logs, fmt.Sprintf(f, a...)) })
 	if len(logs) != 1 || !strings.Contains(logs[0], "bench reordered chain") {
 		t.Fatalf("a benched lead family logs one reorder line: %q", logs)
 	}

@@ -17,7 +17,7 @@ func TestCanary_CancelledContextTouchesNoBench(t *testing.T) {
 	cancel()
 	var out bytes.Buffer
 	probed := 0
-	runCLIHealthCanary(ctx, root, nil, func(string) (int, string, string) { probed++; return 1, "cancelled", "" }, &out)
+	runCLIHealthCanary(ctx, root, func(string) (int, string, string) { probed++; return 1, "cancelled", "" }, &out)
 	if probed != 0 {
 		t.Errorf("a cancelled context launches no probe, got %d", probed)
 	}

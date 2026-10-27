@@ -32,28 +32,25 @@ func TestNew_DefaultsToDiskAndNoCenter(t *testing.T) {
 		t.Fatal("New() wires no Center (the Null Object)")
 	}
 	reg := writeRegistry(t, `{"config":{"max_optional_insertions":9},"phases":[]}`)
-	cfg, ws := l.Load(reg, nil)
+	cfg, ws := l.Load(reg)
 	if cfg.MaxInsertions != 9 || len(ws) != 0 {
 		t.Fatalf("the default reader reads the disk: MaxInsertions=%d ws=%+v", cfg.MaxInsertions, ws)
 	}
 }
 
-func TestLoader_UseRegistryZeroNeverCallsTheReader(t *testing.T) {
+func TestLoader_TheRegistrySwitchOfTheEnvironmentIsNotRead(t *testing.T) {
+	t.Setenv("EVOLVE_USE_PHASE_REGISTRY", "0")
 	calls := 0
-	l, events := observed(t, WithReadFile(func(string) ([]byte, error) { calls++; return nil, fs.ErrNotExist }))
-	l.Load("/r/docs/architecture/phase-registry.json", map[string]string{"EVOLVE_USE_PHASE_REGISTRY": "0"})
-	if calls != 0 || len(*events) != 0 {
-		t.Fatalf("\"0\" skips the read: calls=%d events=%d", calls, len(*events))
-	}
-	l.Load("/r/docs/architecture/phase-registry.json", map[string]string{"EVOLVE_USE_PHASE_REGISTRY": "false"})
+	l, _ := observed(t, WithReadFile(func(string) ([]byte, error) { calls++; return nil, fs.ErrNotExist }))
+	l.Load("/r/docs/architecture/phase-registry.json")
 	if calls != 1 {
-		t.Fatalf("\"false\" keeps the registry on (Q1): calls=%d", calls)
+		t.Fatalf("the loader must read the registry, whatever the environment says: calls=%d", calls)
 	}
 }
 
 func TestLoader_Load_RegistryAbsentIsSilent(t *testing.T) {
 	l, events := observed(t, readerReturning(nil, &fs.PathError{Op: "open", Path: "/r/x.json", Err: fs.ErrNotExist}))
-	cfg, ws := l.Load("/r/x.json", nil)
+	cfg, ws := l.Load("/r/x.json")
 	if !reflect.DeepEqual(cfg, defaults()) || len(ws) != 0 || len(*events) != 0 {
 		t.Fatalf("absent registry: ws=%+v events=%d", ws, len(*events))
 	}
@@ -63,7 +60,7 @@ func TestLoader_Load_RegistryUnreadableWarnsAndRunsTheBaseline(t *testing.T) {
 	const path = "/r/docs/architecture/phase-registry.json"
 	readErr := &fs.PathError{Op: "open", Path: path, Err: syscall.EACCES}
 	l, events := observed(t, readerReturning(nil, readErr))
-	cfg, ws := l.Load(path, nil)
+	cfg, ws := l.Load(path)
 	if !reflect.DeepEqual(cfg, defaults()) {
 		t.Errorf("the loop runs on the compiled baseline: %+v", cfg)
 	}
@@ -85,7 +82,7 @@ func TestLoader_Load_RegistryUnreadableWarnsAndRunsTheBaseline(t *testing.T) {
 func TestLoader_Load_RegistryMalformedWarnsAndRunsTheBaseline(t *testing.T) {
 	const path = "/r/docs/architecture/phase-registry.json"
 	l, events := observed(t, readerReturning([]byte("{"), nil))
-	cfg, ws := l.Load(path, nil)
+	cfg, ws := l.Load(path)
 	if !reflect.DeepEqual(cfg.Mandatory, []string{"scout", "build", "audit", "ship"}) || cfg.Order != nil {
 		t.Errorf("the baseline omits triage and the registry order: %+v", cfg)
 	}
@@ -99,12 +96,10 @@ func TestLoader_Load_RegistryMalformedWarnsAndRunsTheBaseline(t *testing.T) {
 }
 
 func TestLoader_Load_StampsStepSourceKeyAndPathPerRange(t *testing.T) {
-	env := kitchenSinkEnv()
-	env["EVOLVE_CONDITIONAL_MANDATORY"] = "noColon"
 	reg := kitchenSinkRegistry()
-	_, ws := New().Load(reg, env)
-	if len(ws) != 13 {
-		t.Fatalf("thirteen warnings (the kitchen sink's twelve plus the missing-':' one), got %d: %+v", len(ws), ws)
+	_, ws := New().Load(reg)
+	if len(ws) != 9 {
+		t.Fatalf("nine warnings, got %d: %+v", len(ws), ws)
 	}
 	registryKeys := []string{"dynamic_routing", "routing_mode", "model_routing", "deliverable_kinds[document]", "conditional_mandatory[plan-review]", "phases[ship].enabled"}
 	for i, key := range registryKeys {
@@ -113,36 +108,21 @@ func TestLoader_Load_StampsStepSourceKeyAndPathPerRange(t *testing.T) {
 			t.Errorf("registry warning %d fields %v, want step/source=registry path=%s key=%s", i, f, reg, key)
 		}
 	}
-	envKeys := []string{"EVOLVE_COMMIT_EVIDENCE", "EVOLVE_SANDBOX", "EVOLVE_CONDITIONAL_MANDATORY", "EVOLVE_MAX_OPTIONAL_INSERTIONS"}
-	for i, key := range envKeys {
-		f := ws[6+i].Fields
-		if f["step"] != "env" || f["source"] != "env" || f["key"] != key || f["path"] != "" {
-			t.Errorf("env warning %d fields %v, want step/source=env key=%s", 6+i, f, key)
-		}
+	if f := ws[6].Fields; ws[6].Code != "weak-spine" || f["step"] != "spine" || f["missing"] != "audit+ship" {
+		t.Errorf("weak-spine fields: %+v", ws[6])
 	}
-	if w := ws[8]; w.Code != "unknown-value" || w.Message != `EVOLVE_CONDITIONAL_MANDATORY="noColon": missing ':' (want phase:expr)` || w.Fields["value"] != "noColon" || w.Fields["err"] == "" {
-		t.Errorf("the missing-':' arm warns (D3): %+v", w)
+	if f := ws[7].Fields; ws[7].Code != "spine-order" || f["step"] != "spine" || f["audit_pos"] != "1" || f["ship_pos"] != "0" {
+		t.Errorf("spine-order fields: %+v", ws[7])
 	}
-	if f := ws[10].Fields; ws[10].Code != "weak-spine" || f["step"] != "spine" || f["missing"] != "audit+ship" {
-		t.Errorf("weak-spine fields: %+v", ws[10])
-	}
-	if f := ws[11].Fields; ws[11].Code != "spine-order" || f["step"] != "spine" || f["audit_pos"] != "1" || f["ship_pos"] != "0" {
-		t.Errorf("spine-order fields: %+v", ws[11])
-	}
-	if f := ws[12].Fields; ws[12].Code != "inert-phase-enable" || f["step"] != "inert" || f["phase"] != "plan-review" || f["stage"] != "0" {
-		t.Errorf("inert-phase-enable fields: %+v", ws[12])
-	}
-	_, ws = New().Load("/nonexistent/phase-registry.json", map[string]string{"EVOLVE_DYNAMIC_ROUTING": "bogus", "EVOLVE_ROUTING_MODE": "bogus"})
-	if len(ws) != 2 || ws[0].Fields["key"] != "EVOLVE_DYNAMIC_ROUTING" || !strings.HasPrefix(ws[0].Message, "dynamic_routing=") ||
-		ws[1].Fields["key"] != "EVOLVE_ROUTING_MODE" || !strings.HasPrefix(ws[1].Message, "routing_mode=") || ws[1].Fields["default"] != "llm" {
-		t.Errorf("env-sourced unknown-value: %+v", ws)
+	if f := ws[8].Fields; ws[8].Code != "inert-phase-enable" || f["step"] != "inert" || f["phase"] != "plan-review" || f["stage"] != "0" {
+		t.Errorf("inert-phase-enable fields: %+v", ws[8])
 	}
 }
 
 func TestLoader_Load_EmitsEveryWarningOnceInOrderAndMatchesTheStreamGolden(t *testing.T) {
 	l, events := observed(t)
-	_, ws := l.Load(kitchenSinkRegistry(), kitchenSinkEnv())
-	if len(*events) != len(ws) || len(ws) != 12 {
+	_, ws := l.Load(kitchenSinkRegistry())
+	if len(*events) != len(ws) || len(ws) != 9 {
 		t.Fatalf("one event per warning: %d events, %d warnings", len(*events), len(ws))
 	}
 	type row struct{ Module, Kind, Code, Origin, Step string }
@@ -162,8 +142,8 @@ func TestLoader_Load_EmitsEveryWarningOnceInOrderAndMatchesTheStreamGolden(t *te
 }
 
 func TestLoad_FacadeReturnsTheLoaderValuesAndEmitsNothing(t *testing.T) {
-	cfg, ws := Load(kitchenSinkRegistry(), kitchenSinkEnv())
-	cfg2, ws2 := New().Load(kitchenSinkRegistry(), kitchenSinkEnv())
+	cfg, ws := Load(kitchenSinkRegistry())
+	cfg2, ws2 := New().Load(kitchenSinkRegistry())
 	if !reflect.DeepEqual(cfg, cfg2) || !reflect.DeepEqual(ws, ws2) {
 		t.Fatalf("the facade must return the Loader's values verbatim")
 	}
@@ -176,7 +156,7 @@ func TestApplyRegistry_MapWarningsAreSortedByKey(t *testing.T) {
 		rules = append(rules, `"`+k+`":"nonsense"`)
 	}
 	reg := writeRegistry(t, `{"config":{"deliverable_kinds":{`+strings.Join(kinds, ",")+`},"conditional_mandatory":{`+strings.Join(rules, ",")+`}},"phases":[]}`)
-	_, ws := Load(reg, nil)
+	_, ws := Load(reg)
 	if len(ws) != 16 {
 		t.Fatalf("sixteen warnings, got %d", len(ws))
 	}
@@ -252,19 +232,6 @@ func TestMustCondRule_PanicsWithTheDocumentedPrefix(t *testing.T) {
 func TestRegistryPath_IsTheDocsArchitectureSpelling(t *testing.T) {
 	if got, want := RegistryPath("/r"), filepath.Join("/r", "docs", "architecture", "phase-registry.json"); got != want {
 		t.Fatalf("RegistryPath = %q, want %q", got, want)
-	}
-}
-
-func TestParseSandboxMode_TrimsAndWarnsNamingTheCurrentDefault(t *testing.T) {
-	var ws []Warning
-	if got := parseSandboxMode(" on ", SandboxModeAuto, &ws); got != SandboxModeOn || len(ws) != 0 {
-		t.Errorf("trimmed value: %q ws=%v", got, ws)
-	}
-	if got := parseSandboxMode("bogus", SandboxModeAuto, &ws); got != SandboxModeAuto {
-		t.Errorf("unknown falls back to the current mode: %q", got)
-	}
-	if len(ws) != 1 || ws[0].Message != `EVOLVE_SANDBOX="bogus" unknown (want auto|on|off), defaulting to "auto"` || ws[0].Fields["default"] != "auto" || ws[0].Fields["key"] != "EVOLVE_SANDBOX" {
-		t.Errorf("warning: %+v", ws)
 	}
 }
 

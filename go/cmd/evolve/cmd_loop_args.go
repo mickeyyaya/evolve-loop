@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/goalhash"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
@@ -34,6 +36,7 @@ type loopArgFlags struct {
 	skipPreflight     bool
 	skipPreflightBoot bool
 	bypassPolicy      bool
+	sandboxOff        string
 	untilInboxEmpty   bool
 	preflightOnly     bool
 	detach            bool
@@ -68,6 +71,7 @@ func registerLoopArgFlags(fs *flag.FlagSet) *loopArgFlags {
 	fs.StringVar(&lf.logPath, "log", "", "with --detach: the file the detached loop's stdout and stderr are appended to (required with --detach)")
 	fs.BoolVar(&lf.bypassPolicy, "bypass-policy", false, "use --bypass-policy to bypass policy.json pin enforcement for every phase in this batch (operator escape hatch)")
 	fs.BoolVar(&lf.json, "json", false, "with --detach: print the launch as JSON and no text; the foreground loop prints its JSON result anyway")
+	fs.StringVar(&lf.sandboxOff, "sandbox-off", "", sandboxOffUsage)
 	return lf
 }
 
@@ -302,6 +306,7 @@ func buildLoopConfig(lf *loopArgFlags, goalHash, goalText, strategy string, maxC
 		SkipPreflight:     lf.skipPreflight,
 		SkipPreflightBoot: lf.skipPreflightBoot,
 		BypassPolicy:      lf.bypassPolicy,
+		SandboxOff:        lf.sandboxOff,
 		ChainMode:         lf.untilInboxEmpty,
 		PreflightOnly:     lf.preflightOnly,
 		Detach:            lf.detach,
@@ -358,29 +363,24 @@ func carriedName(name string) bool {
 	return strings.HasPrefix(name, "EVOLVE_") && ipcenv.Carried(name)
 }
 
-func buildCycleEnv(cfg loopConfig, osEnv []string) map[string]string {
-	out := carriedEnv(osEnv)
+func (cfg loopConfig) agentOverrides() cliroute.Overrides {
+	out := cliroute.Overrides{}
 	for agent, cli := range cfg.PerAgentCLI {
-		out["EVOLVE_"+phaseEnvAgentKey(agent)+"_CLI"] = cli
+		ov := out[agent]
+		ov.CLI = cli
+		out[agent] = ov
 	}
 	for agent, model := range cfg.PerAgentModel {
-		out["EVOLVE_"+phaseEnvAgentKey(agent)+"_MODEL"] = model
+		ov := out[agent]
+		ov.Model = model
+		out[agent] = ov
 	}
 	return out
 }
 
-func phaseEnvAgentKey(agent string) string {
-	b := make([]byte, 0, len(agent))
-	for i := 0; i < len(agent); i++ {
-		c := agent[i]
-		switch {
-		case c == '-':
-			b = append(b, '_')
-		case c >= 'a' && c <= 'z':
-			b = append(b, c-32)
-		default:
-			b = append(b, c)
-		}
+func (cfg loopConfig) sandboxMode() string {
+	if cfg.SandboxOff != "" {
+		return config.SandboxModeOff
 	}
-	return string(b)
+	return ""
 }

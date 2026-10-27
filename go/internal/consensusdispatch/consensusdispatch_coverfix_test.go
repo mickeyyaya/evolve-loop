@@ -182,7 +182,6 @@ func TestResolveEvolveBin_FallsBackToPathLookup(t *testing.T) {
 	pathDir := t.TempDir()
 	want := filepath.Join(pathDir, "evolve")
 	writeExec(t, want, "#!/bin/sh\nexit 0\n")
-	t.Setenv("EVOLVE_GO_BIN", "")
 	t.Setenv("PATH", pathDir)
 
 	got := resolveEvolveBin(filepath.Join(t.TempDir(), "hint"))

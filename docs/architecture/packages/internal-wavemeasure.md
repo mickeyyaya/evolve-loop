@@ -4,7 +4,7 @@
 
 ## Purpose
 
-`internal/wavemeasure` computes the measures of one wave run. They are the sized and the realized width, the utilization, the conflict rate and the count of admission waits. It is pure. It reads no file and starts no timer. The caller gives the facts and the clock.
+`internal/wavemeasure` computes the measures of one wave run. They are the sized and the realized width, the utilization, the conflict rate and the count of admission waits. It also gives the cost of the wave ([ADR-0158](../adr/0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md)). It is pure. It reads no file and starts no timer. The caller gives the facts and the clock.
 
 ## Design
 
@@ -17,7 +17,19 @@
 - **The optimistic failure rate (ADR-0143 W1b).** `Facts.OptimisticAdmissions` and `Facts.OptimisticFailures` give `optimistic_failure_rate`. It is the failures over the admissions, or 0 with no admission. It is the D3 rate of the wave-latency plan. Pinned by `TestCompute_TheOptimisticFailureRateIsFailuresOverAdmissions`.
 
   `wave.MeasureFacts` counts each todo once, over the same loop run as the pool lanes (`loopRun`: from the run-id time to the run end). An admission is a todo with an optimistic launch by the run loop pid. A failure is an admitted todo that failed in that window. The lane process has its own pid, so a failure matches by time only. Thus the rate stays in [0,1], and a lane launched before `started_at` counts. Pinned by `TestMeasureFacts_AFailureCountsOnlyWhenItsAdmissionIsCounted` and `TestMeasureFacts_TheOptimisticCountsUseThePoolLaneWindowOfTheRunLoop`.
-- **The JSON names are a contract.** `TestMeasures_TheJSONFieldNamesAreStable` pins the ten keys. The constants `FieldWidthSized` and `CodeAdmitWait` are the names that the writer and the reader share.
+- **The cost (ADR-0158).** `Facts.Cycles` holds one `CycleSpend` for each cycle of the run: its ship outcome and its `cyclespend.Spend`. `Compute` puts the cost into `Measures.Cost`. The arithmetic is `cyclespend.Totals`:
+
+  | Field | Formula |
+  |---|---|
+  | `started_cycles`, `shipped_cycles` | the cycles of the run, and the ones that shipped |
+  | `llm_minutes_per_shipped_cycle` | the LLM minutes of all cycles of the run, divided by the shipped cycles, rounded to 0.1 |
+  | `fresh_tokens_per_shipped_cycle`, `cache_read_tokens_per_shipped_cycle` | the tokens of all cycles, divided by the shipped cycles, rounded to 1 |
+  | `unmeasured_calls` | the LLM calls whose `usage_status` is not `measured` |
+  | `audit_rounds_per_cycle` | the sum of `audit_dispatches`, divided by the started cycles, rounded to 0.01 |
+  | `convergence_rate` | the shipped cycles divided by the started cycles |
+
+  A failed cycle adds its spend to the numerator, because its spend bought no ship. With no shipped cycle, each figure for each shipped cycle is `null`, not 0. With no cycle, the two rates are `null` too (`TestCompute_AWaveWithNoShipHasNoDefinedCost`, `TestCompute_AWaveWithNoCycleHasNoDefinedRate`). `wave status` prints one `cost:` line under the measures line (`cmd/evolve` `TestWaveStatus_TextPrintsOneCostLine`).
+- **The JSON names are a contract.** `TestMeasures_TheJSONFieldNamesAreStable` pins the eleven keys. The constants `FieldWidthSized` and `CodeAdmitWait` are the names that the writer and the reader share.
 
 ## Where the facts come from
 
@@ -29,6 +41,7 @@
 | a deadline stop | the pool: one `cycle.sealed` with `termination_reason: stopped: lane deadline` in the cycle stream, after the reap (`Pool.recover`). A run from before 2026-10-21 has only the lease signal `LOOP_ORCH_LANE_DEADLINE` with `action: stopped`. | `wave.ReadRunCycles`, the one reader of `wave status`, `wave watch` and `wave next`. It reads the seal through `wave.ReadCycles`. Then `wave.ApplyLaneDeadlines` is the fallback: it finds the cycle of that todo (`lane-scope.json`) that started last before the stop. When that cycle has no verdict and no termination, it sets `Termination: stopped: lane deadline` and ends the cycle at the stop. |
 | `Conflict` | ship: `recoverFromShipError` calls `recordShipError` before it recovers. Each ship error thus emits a `ship.error` with the code `SHIP_` plus the error code | `wave.ReadCycles` (`Cycle.Conflict`) |
 | `Landed` | the landing intent or the dossier commit | `wave.ReadCycles` (`Cycle.Shipped`) |
+| `Cycles` (the cost) | the bridge writes one row to `.evolve/runs/cycle-N/llm-calls.ndjson` for each LLM call. The orchestrator counts the audits in `audit_dispatches` of `cycle-state.json` | `wave.ReadCycles` (`Cycle.Spend`, through `cyclespend.Read`). An unreadable ledger gives a warning that names the cycle. |
 | the sized width | the loop: one INFO `loop.wave` record at each sizing (`recordWaveSized` in `cmd/evolve`) | `wave.MeasureFacts` over `wave.ReadLoopSignals` |
 | `AdmissionWaits` | the orchestrator (O3) | `wave.MeasureFacts`, by the string `LOOP_ORCH_ADMIT_WAIT`. PR #925 (O3) is not on main yet, so no registered code exists. When it lands, the reader takes the registered constant. |
 | `OptimisticAdmissions`, `OptimisticFailures` | the pool publishes `LOOP_ORCH_ADMISSION_OPTIMISTIC` when it launches an optimistic-only lane. That lane publishes `LOOP_ORCH_OPTIMISTIC_ADMISSION_FAILED` at its first composed-gate failure or rebase conflict | `wave.MeasureFacts` over `wave.ReadLoopSignals` |
@@ -53,6 +66,7 @@ The ship phase has no code named `REBASE_CONFLICT`. Its code is `GIT_FLEET_REBAS
 - A seal with no verdict does not replace an earlier seal with a verdict. Thus a lane that sealed PASS just before its stop stays PASS (`TestReadCycles_ALoopSealAfterARealSealKeepsTheVerdict`).
 - The loop seal of a deadline stop holds, and the deadline signal is only the fallback (`TestReadRunCycles_TheLoopSealHoldsAndTheDeadlineSignalIsTheFallback`). `wave watch` and `wave next` show the stops of wave 130 as `wave status` does (`cmd/evolve` `TestWaveWatchAndNext_Wave130ApplyTheDeadlineStopsLikeWaveStatus`).
 - The wave 130 signals give `width 1/4`, and the cycles 1955 and 1957 show as stopped (`cmd/evolve` `TestWaveStatus_Wave130CountsTheLiveLanesFromThePool`).
+- The cost of a wave of 2 shipped cycles and 1 failed cycle is the spend of the 3 cycles divided by 2 (`TestCompute_TheCostOfAShippedCycleCountsTheSpendOfEveryCycleOfTheWave`). `wave status --json` carries it (`cmd/evolve` `TestWaveStatus_JSONCarriesTheCostOfTheWave`).
 - The command reports the rate end to end (`cmd/evolve` `TestWaveStatus_ReportsTheConflictRate`), and the loop writes one sizing record for each wave (`TestDispatchFleetIteration_RecordsTheSizedWidth`).
 
 ## Limits

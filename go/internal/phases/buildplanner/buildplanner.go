@@ -42,7 +42,7 @@ func (p *Phase) ShouldSkip(req core.PhaseRequest) (bool, string, string, []core.
 	if len(signals.DigestDegraded) > 0 {
 		diags = append(diags, core.Diagnostic{Severity: "warning", Message: "build-planner routing digest degraded: " + strings.Join(signals.DigestDegraded, "; ")})
 	}
-	if router.PolicyForProject(req.ProjectRoot, req.Env).Enabled(string(core.PhaseBuildPlanner), signals) {
+	if router.PolicyForProject(req.ProjectRoot).Enabled(string(core.PhaseBuildPlanner), signals) {
 		return false, "", "", diags
 	}
 	return true, core.VerdictSKIPPED, string(core.PhaseBuild), diags

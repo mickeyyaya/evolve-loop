@@ -77,7 +77,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `BRIDGE_EXIT_REPL_BOOT_TIMEOUT` | a tmux REPL never showed its prompt marker within the boot budget (exit 80); transient — the boot strike is recorded before this event; the reason is the classified launch error (the exact string the outcome record and the retry backoff parse), fields exit_code, cause_code, transient, ctx_cancelled, launch_error (the persisted <agent>-launch-error.txt when written), call_id, cli, agent, step=classify |
 | `BRIDGE_EXIT_REQUIRED_TIER_UNAVAILABLE` | --require-full was set and the full model tier is unavailable (exit 99); plain failure; the reason is the classified launch error (the exact string the outcome record and the retry backoff parse), fields exit_code, cause_code, transient, ctx_cancelled, launch_error (the persisted <agent>-launch-error.txt when written), call_id, cli, agent, step=classify |
 | `BRIDGE_EXIT_RESPOND_LOOP_GUARD` | the auto-respond loop guard tripped (exit 86); transient; the reason is the classified launch error (the exact string the outcome record and the retry backoff parse), fields exit_code, cause_code, transient, ctx_cancelled, launch_error (the persisted <agent>-launch-error.txt when written), call_id, cli, agent, step=classify |
-| `BRIDGE_EXIT_SAFETY_GATE` | a launch died in a safety gate (exit 2: e.g. --human-input without the host opt-in); plain failure; the reason is the classified launch error (the exact string the outcome record and the retry backoff parse), fields exit_code, cause_code, transient, ctx_cancelled, launch_error (the persisted <agent>-launch-error.txt when written), call_id, cli, agent, step=classify |
+| `BRIDGE_EXIT_SAFETY_GATE` | a launch died in a safety gate (exit 2: e.g. a launch without --allow-bypass, or a --human-input with no audit); plain failure; the reason is the classified launch error (the exact string the outcome record and the retry backoff parse), fields exit_code, cause_code, transient, ctx_cancelled, launch_error (the persisted <agent>-launch-error.txt when written), call_id, cli, agent, step=classify |
 | `BRIDGE_EXIT_SIGNAL_DEATH` | the driver died of a signal or failed to start (exit -1): transient under a cancelled context (our own teardown — the deliverable-authority door), plain with a live one (a start failure); the ledger cause stays driver_error; the reason is the classified launch error (the exact string the outcome record and the retry backoff parse), fields exit_code, cause_code, transient, ctx_cancelled, launch_error (the persisted <agent>-launch-error.txt when written), call_id, cli, agent, step=classify |
 | `BRIDGE_EXIT_UNKNOWN_PROMPT` | the auto-responder escalated on an interactive prompt and wrote the escalation report, or a checkpoint corroborated a quota wall (exit 85); transient — one code whatever the pattern, which rides cause_code (rate_limit, model_unsupported, …; unknown_prompt for a prompt nobody recognised); the reason is the classified launch error (the exact string the outcome record and the retry backoff parse), fields exit_code, cause_code, transient, ctx_cancelled, launch_error (the persisted <agent>-launch-error.txt when written), call_id, cli, agent, step=classify |
 | `BRIDGE_FRESH_SESSION_RETRY` | a launch runs as the ONE fresh session of the same CLI that core.LaunchRecoverable starts after the session before it ended on a session-recoverable cause (dead_shell, cli_self_updated: the REPL process is gone, the CLI and account are fine); the dead row is on the ledger marked session_recoverable and this row is marked fresh_session_retry; the bridge marks a response session-recoverable never for a named session, a delivered run, a cancelled context or a deadline with no room for another wait interval (F31); fields call_id (the fresh dispatch), cli, agent |
@@ -126,8 +126,14 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `CONFIG_REGISTRY_MALFORMED` | docs/architecture/phase-registry.json was read but is not valid JSON (a trailing comma is the classic); the same compiled-baseline degrade as CONFIG_REGISTRY_UNREADABLE — no triage, no registry order — with the decoder's error in the reason; fields.step=registry, path, err |
 | `CONFIG_REGISTRY_UNREADABLE` | docs/architecture/phase-registry.json exists but could not be read (permissions, a directory at the path — absence is silent); every cycle runs on the compiled baseline, which omits triage, the registry order, the enabled/routing blocks, the goal recipes and the deliverable kinds; fields.step=registry, path, err |
 | `CONFIG_SPINE_ORDER` | the registry's phases[] order places ship before audit, so the artifact-backed floor cannot gate ship on a shippable audit by position; the legality graph and the audit verdict branch still block it; fields.step=spine, audit_pos, ship_pos |
-| `CONFIG_UNKNOWN_VALUE` | a routing dial's value is outside its closed vocabulary, or a registry contract is incomplete, and the documented fail-safe was taken — never a kill-path enable (a stage word → off, routing_mode → llm, model_routing → static, enabled → content, EVOLVE_SANDBOX → the current mode, a bad conditional rule or max_optional_insertions ignored); fields.step names the resolving step (registry, env or policy), fields.key the dial, fields.value the word, fields.default the fallback |
-| `CONFIG_WEAK_SPINE` | mandatory_phases (the registry's or EVOLVE_MANDATORY_PHASES) omits audit and/or ship, so the audit-before-ship guarantee rests on the legality graph and the audit verdict branch alone; the cycle proceeds; fields.step=spine, fields.missing = audit, ship or audit+ship |
+| `CONFIG_UNKNOWN_VALUE` | a routing dial's value is outside its closed vocabulary, or a registry contract is incomplete, and the documented fail-safe was taken — never a kill-path enable (a stage word → off, routing_mode → llm, model_routing → static, enabled → content, a bad conditional rule or max_optional_insertions ignored); fields.step names the resolving step (registry or policy), fields.key the dial, fields.value the word, fields.default the fallback |
+| `CONFIG_WEAK_SPINE` | the mandatory_phases of the phase registry omit audit and/or ship, so the audit-before-ship guarantee rests on the legality graph and the audit verdict branch alone; the cycle proceeds; fields.step=spine, fields.missing = audit, ship or audit+ship |
+
+### control
+
+| Code | Meaning |
+|---|---|
+| `CONTROL_BYPASS_USED` | an audited bypass is in use (ADR-0156 I-16, X18d): an operator parameter, after its control_bypass ledger entry is written, or a policy opt-in at the bridge adapter start; fields name, actor, reason and at |
 
 ### failurediag
 
@@ -154,6 +160,13 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `GATE_CONTRACT_SALVAGED` | a sole recoverable bad_verdict was repaired on disk and re-verified clean; the phase advanced on the repaired artifact |
 | `GATE_CONTRACT_VERIFIED` | the phase's declared deliverables were found in place (fields name the artifact, its size, the agent-owed files and the effects verified) and the phase advanced |
 | `GATE_CONTRACT_WOULD_BLOCK` | the deliverable violated its contract but the stage (shadow/advisory, or the report-size gate's) lets the phase advance; the reason is what enforce would have refused |
+
+### healing
+
+| Code | Meaning |
+|---|---|
+| `HEALING_INCIDENT_OPENED` | the incident detector opened an incident record under .evolve/incidents; fields incident, class, fingerprint, tier, state, transition, recurrence, stage (llm-isolation.md §18, §24) |
+| `HEALING_INCIDENT_REOPENED` | the incident detector reopened a closed incident, because its signal fired again after the close; the same fields as HEALING_INCIDENT_OPENED (llm-isolation.md §18, §22) |
 
 ### inbox
 
@@ -409,7 +422,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `SHIP_LANDING_RESUME_FETCH_FAILED` | the git fetch of origin before a landing resume failed; the resume decides on the last known origin ref, and its push reports an outage; fields.step=resume, branch, git_rc, git_err |
 | `SHIP_MANIFEST_GATE` | atomic-ship: a staged path was declared by no build/TDD report (cross-lane leak guard) |
 | `SHIP_MANUAL_DECLINED` | verify-class: the operator declined the manual ship |
-| `SHIP_MANUAL_NOT_TTY` | verify-class: a manual ship needs an interactive confirmation (or the auto-confirm environment) |
+| `SHIP_MANUAL_NOT_TTY` | verify-class: a manual ship needs an interactive confirmation (or the audited --auto-confirm=<reason> parameter) |
 | `SHIP_REPO_CONTRACT_GATE` | atomic-ship: a repo-contract guard suite is RED in the lane worktree; pushing would red main |
 | `SHIP_REPO_CONTRACT_INFRA` | atomic-ship: the repo-contract scanner toolchain died twice without a test-level failure (re-dispatchable) |
 | `SHIP_SCAN_SHADOW_ESCAPE` | the scan shadow found a stored green result for the content key of a package, and that package then failed in the real run; the content key misses an input of the test, and the scan cache cannot be enforced until the miss is closed |

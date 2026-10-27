@@ -76,7 +76,7 @@ func TestRetryLadderConfig_AuditFixBoundsHaveDefaultsAndOverrides(t *testing.T) 
 		t.Fatalf("explicit block = %+v", explicit)
 	}
 	def := policy.Policy{}.WorkflowConfig().RetryLadder.AuditFix
-	want := policy.AuditFixConfig{MaxFiles: 3, MaxLines: 40, MaxCodeLines: 10, MaxTokens: 6000, NoNewProductionLogic: true}
+	want := policy.AuditFixConfig{Stage: policy.RetryLadderShadow, MaxFiles: 3, MaxLines: 40, MaxCodeLines: 10, MaxTokens: 6000, NoNewProductionLogic: true}
 	if def != want {
 		t.Fatalf("default audit_fix = %+v, want %+v", def, want)
 	}
@@ -85,7 +85,7 @@ func TestRetryLadderConfig_AuditFixBoundsHaveDefaultsAndOverrides(t *testing.T) 
 		t.Fatalf("Load: %v", err)
 	}
 	got := p.WorkflowConfig().RetryLadder.AuditFix
-	if got != (policy.AuditFixConfig{MaxFiles: 2, MaxLines: 25, MaxCodeLines: 4, MaxTokens: 900}) {
+	if got != (policy.AuditFixConfig{Stage: policy.RetryLadderShadow, MaxFiles: 2, MaxLines: 25, MaxCodeLines: 4, MaxTokens: 900}) {
 		t.Fatalf("audit_fix = %+v", got)
 	}
 	for name, text := range map[string]string{
@@ -97,5 +97,22 @@ func TestRetryLadderConfig_AuditFixBoundsHaveDefaultsAndOverrides(t *testing.T) 
 		if _, err := loadPolicyText(t, text); err == nil || !strings.Contains(err.Error(), "workflow.retry_ladder.audit_fix") {
 			t.Fatalf("%s: Load error %v, want a refusal naming workflow.retry_ladder.audit_fix", name, err)
 		}
+	}
+}
+
+func TestAuditFixConfig_ReadsItsOwnStrictStage(t *testing.T) {
+	for stage, enforced := range map[string]bool{policy.AuditFixOff: false, policy.RetryLadderShadow: false, policy.RetryLadderEnforce: true} {
+		p, err := loadPolicyText(t, `{"workflow": {"retry_ladder": {"stage": "shadow", "audit_fix": {"stage": "`+stage+`"}}}}`)
+		if err != nil {
+			t.Fatalf("Load %s: %v", stage, err)
+		}
+		got := p.WorkflowConfig().RetryLadder
+		if got.AuditFix.Stage != stage || got.AuditFix.Enforced() != enforced || got.Enforced() {
+			t.Fatalf("stage %s: audit_fix = %+v, ladder enforced %v", stage, got.AuditFix, got.Enforced())
+		}
+	}
+	_, err := loadPolicyText(t, `{"workflow": {"retry_ladder": {"audit_fix": {"stage": "sometimes"}}}}`)
+	if err == nil || !strings.Contains(err.Error(), "workflow.retry_ladder.audit_fix.stage") {
+		t.Fatalf("Load error %v, want a refusal naming workflow.retry_ladder.audit_fix.stage", err)
 	}
 }

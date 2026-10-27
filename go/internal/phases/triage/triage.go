@@ -52,7 +52,7 @@ func (hooks) ArtifactFilename(_ core.PhaseRequest) string { return "triage-repor
 func (hooks) DefaultModel() string                        { return "auto" }
 
 func (hooks) ShouldSkip(req core.PhaseRequest) (bool, string, string, []core.Diagnostic) {
-	if !router.PolicyForProject(req.ProjectRoot, req.Env).ShouldRunPhase(string(core.PhaseTriage)) {
+	if !router.PolicyForProject(req.ProjectRoot).ShouldRunPhase(string(core.PhaseTriage)) {
 		return true, core.VerdictSKIPPED, string(core.PhaseTDD), nil
 	}
 	if d, refused := lanePinRefusal(req); refused {

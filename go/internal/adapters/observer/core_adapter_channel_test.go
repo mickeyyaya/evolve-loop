@@ -48,8 +48,7 @@ func TestChannelSourcePaths_TmuxFamily(t *testing.T) {
 		env  map[string]string
 	}{
 		{"default (unset → claude-tmux)", nil},
-		{"explicit claude-tmux", map[string]string{"EVOLVE_BUILD_CLI": "claude-tmux"}},
-		{"codex-tmux", map[string]string{"EVOLVE_BUILD_CLI": "codex-tmux"}},
+		{"the per-phase env is not read", map[string]string{"EVOLVE_BUILD_CLI": "claude-p"}},
 		{"global EVOLVE_CLI agy-tmux", map[string]string{"EVOLVE_CLI": "agy-tmux"}},
 	}
 	for _, tc := range cases {
@@ -69,21 +68,26 @@ func TestChannelSourcePaths_TmuxFamily(t *testing.T) {
 func TestChannelSourcePaths_Headless(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
-	a := &CoreAdapter{}
-	req := core.PhaseRequest{Workspace: ws, Env: map[string]string{"EVOLVE_BUILD_CLI": "claude-p"}}
+	a := &CoreAdapter{CLIFor: func(phase string) string {
+		if phase == "build" {
+			return "claude-p"
+		}
+		return ""
+	}}
+	req := core.PhaseRequest{Workspace: ws, Env: map[string]string{"EVOLVE_CLI": "claude-tmux"}}
 	stdout, stderr := a.channelSourcePaths(req, "build")
 	if stdout != "" || stderr != "" {
 		t.Errorf("headless must return empty paths (producer legacy), got stdout=%q stderr=%q", stdout, stderr)
 	}
 }
 
-func TestChannelSourcePaths_PerAgentKeyIgnoresProcessEnv(t *testing.T) {
+func TestChannelSourcePaths_AnEmptyOverrideFallsBackToTheGlobalCLI(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
-	a := &CoreAdapter{}
+	a := &CoreAdapter{CLIFor: func(string) string { return "" }}
 	req := core.PhaseRequest{
 		Workspace: ws,
-		Env:       map[string]string{"EVOLVE_TDD_ENGINEER_CLI": "claude-p"},
+		Env:       map[string]string{"EVOLVE_CLI": "claude-p"},
 	}
 	stdout, stderr := a.channelSourcePaths(req, "tdd-engineer")
 	if stdout != "" || stderr != "" {

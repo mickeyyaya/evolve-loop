@@ -1,8 +1,10 @@
 package retryladder
 
 import (
+	"cmp"
 	"path"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -18,6 +20,7 @@ const (
 	AuditFixRuleLines           = "lines_over_cap"
 	AuditFixRuleCodeLines       = "production_logic"
 	AuditFixRuleTokens          = "tokens_over_cap"
+	AuditFixRuleUncited         = "uncited"
 
 	AuditFixLinesPerUnspannedFile = 10
 	AuditFixTokensPerLine         = 12
@@ -36,6 +39,7 @@ type AuditFixEstimate struct {
 	Lines     int
 	CodeLines int
 	Tokens    int
+	Uncited   int
 }
 
 type AuditFixInput struct {
@@ -59,7 +63,6 @@ func ChooseAuditFix(in AuditFixInput) AuditFixChoice {
 }
 
 func auditFixRule(in AuditFixInput) string {
-	est, b := in.Estimate, in.Bounds
 	switch {
 	case in.Used:
 		return AuditFixRuleUsed
@@ -67,6 +70,14 @@ func auditFixRule(in AuditFixInput) string {
 		return AuditFixRuleNoFindings
 	case !in.AllPrescribed:
 		return AuditFixRuleUnprescribed
+	case in.Estimate.Uncited > 0:
+		return AuditFixRuleUncited
+	}
+	return cmp.Or(AuditFixOverBounds(in.Estimate, in.Bounds), AuditFixRuleSmallPrescribed)
+}
+
+func AuditFixOverBounds(est AuditFixEstimate, b AuditFixBounds) string {
+	switch {
 	case est.Files > b.MaxFiles:
 		return AuditFixRuleFiles
 	case est.Lines > b.MaxLines:
@@ -76,7 +87,7 @@ func auditFixRule(in AuditFixInput) string {
 	case est.Tokens > b.MaxTokens:
 		return AuditFixRuleTokens
 	}
-	return AuditFixRuleSmallPrescribed
+	return ""
 }
 
 func AllPrescribed(findings, prescriptions []string) bool {
@@ -100,11 +111,23 @@ func EstimateAuditFix(findings, prescriptions []string) AuditFixEstimate {
 			spans[m[1]] = max(spans[m[1]], spanLines(m[2], m[3]))
 		}
 	}
-	var est AuditFixEstimate
 	for file, lines := range spans {
 		if lines == 0 {
-			lines = AuditFixLinesPerUnspannedFile
+			spans[file] = AuditFixLinesPerUnspannedFile
 		}
+	}
+	est := EstimatePatch(spans)
+	for _, finding := range findings {
+		if len(CitedPaths(finding)) == 0 {
+			est.Uncited++
+		}
+	}
+	return est
+}
+
+func EstimatePatch(changed map[string]int) AuditFixEstimate {
+	var est AuditFixEstimate
+	for file, lines := range changed {
 		est.Files++
 		est.Lines += lines
 		if isProductionCode(file) {
@@ -113,6 +136,17 @@ func EstimateAuditFix(findings, prescriptions []string) AuditFixEstimate {
 	}
 	est.Tokens = est.Lines * AuditFixTokensPerLine
 	return est
+}
+
+func CitedPaths(texts ...string) []string {
+	var paths []string
+	for _, text := range texts {
+		for _, m := range citedPath.FindAllStringSubmatch(text, -1) {
+			paths = append(paths, m[1])
+		}
+	}
+	slices.Sort(paths)
+	return slices.Compact(paths)
 }
 
 func spanLines(from, to string) int {

@@ -1,5 +1,7 @@
 # internal/llmcalls
 
+> The proposed attribution fields of the row (cycle, run id, profile, round purpose) and the turn sidecar: [token-telemetry-2026-10](../../plans/token-telemetry-2026-10.md). The research: [token-telemetry-2026-10](../../research/token-telemetry-2026-10.md).
+
 ## Purpose
 
 `internal/llmcalls` owns the durable ledger of model-try records and the performance index derived from it. It holds no provider or orchestration logic. Producers supply finalized dispatch facts, and readers consume the same additive record schema.

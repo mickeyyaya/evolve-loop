@@ -1,7 +1,7 @@
 # Plan: a cycle stops on a blocker that the lane cannot fix, and a small prescribed fix costs one patch, not one build
 
-- **Status:** proposed, 2026-10-27.
-- **Decision:** [ADR-0158](../architecture/adr/0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md). **Research:** [cost-aware-repair-2026-10](../research/cost-aware-repair-2026-10.md). **Case:** [cycle 2035](../incidents/2026-10-27-cycle-2035-repair-loop.md). **Design of record for the rungs:** [retry-ladder.md](../architecture/retry-ladder.md).
+- **Status:** accepted 2026-10-27 (operator, "build now"). Item 1 (`cost-per-shipped-cycle-measure`) is built: `evolve wave status` prints the cost, and `evolve quality report --scope wave` publishes PQ5.
+- **Decision:** [ADR-0158](../architecture/adr/0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md). **Research:** [cost-aware-repair-2026-10](../research/cost-aware-repair-2026-10.md). **Case:** [cycle 2035](../incidents/2026-10-27-cycle-2035-repair-loop.md). **Design of record for the rungs:** [retry-ladder.md](../architecture/retry-ladder.md). **Measurement of the tokens by seat and round purpose:** [token-telemetry-2026-10](token-telemetry-2026-10.md).
 
 ## Table of contents
 
@@ -187,4 +187,4 @@ At `shadow`, each component records what it does at `enforce`. The shadow wave p
 - **Q1.** Does `audit_fix` fire often enough to pay for its build? The shadow wave of #1173 records `LADDER_AUDIT_FIX`. If it records `would` on fewer than 1 cycle in 20, build items 1 to 4 and their wiring (item 11), and stop.
 - **Q2.** Can the bridge send findings into a live build session before it closes? If not, item 8 becomes a hard rule in the build contract: no handoff without a GREEN self-check receipt for the tree.
 - **Q3.** Which family reviews an `audit_fix` patch when the chain has only one family that is healthy? The proposal is to decline the rung and take the repair round of today.
-- **Q4.** The spend limit counts fresh tokens and cache-read tokens apart. A cost in money needs a price for each family, which the policy does not have.
+- **Q4.** The spend limit counts fresh tokens and cache-read tokens apart. A cost in money needs a price for each family, which the policy does not have. The plan [token-telemetry-2026-10](token-telemetry-2026-10.md) proposes these weights as policy data (D8).

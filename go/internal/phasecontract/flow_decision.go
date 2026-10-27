@@ -93,6 +93,9 @@ var flowDecisions = []FlowDecision{
 		Allowed: []string{"cycle", "top_n", "deferred", "dropped", "superseded", "skip_shipped", "skip_rejected",
 			"escalate_block", "committed_floors", "deferred_floors", "phase_skip", "unified_commitment",
 			"unified_projection", "projected_by_orchestrator"}},
+	{Seat: FlowSeatSelfhealOrchestrator, ArtifactName: "diagnosis.json", Shape: JSONShapeObject,
+		Required: []string{"schema", "incident_id", "hypothesis", "evidence", "action", "expected_effect", "confidence"},
+		Allowed:  []string{"schema", "incident_id", "hypothesis", "evidence", "action", "alternative", "expected_effect", "confidence"}},
 }
 
 func FlowDecisions() []FlowDecision { return slices.Clone(flowDecisions) }

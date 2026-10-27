@@ -84,7 +84,7 @@ specific Read and Bash deny patterns:
 
 **Applies regardless of OS sandbox.** Works in both `sandbox-exec` (macOS),
 `bwrap` (Linux), AND in nested-Claude environments where the OS sandbox
-is disabled (`EVOLVE_SANDBOX=off`). This is the load-bearing layer.
+is disabled (`--sandbox-off=<reason>`). This is the load-bearing layer.
 
 **Applies only on Claude Code.** The bridge passes both lists to
 `claude-tmux` as `--allowedTools` and `--disallowedTools` (since 2026-10-20).

@@ -16,12 +16,14 @@ import (
 
 func runDossier(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "evolve dossier: usage: dossier verify | retro-mislabel [--project-root P] [--json] | publish [--dry-run] [--project-root P] | sweep [--dry-run] [--project-root P]")
+		fmt.Fprintln(stderr, "evolve dossier: usage: dossier verify | retro-mislabel [--project-root P] [--json] | publish [--dry-run] [--project-root P] | sweep [--dry-run] [--project-root P] | show <cycle> [--json] [--project-root P]")
 		return 10
 	}
 	switch args[0] {
 	case "verify":
 		return runDossierVerify(args[1:], stdout, stderr)
+	case "show":
+		return runDossierShow(args[1:], stdout, stderr)
 	case "retro-mislabel":
 		return runDossierRetroMislabel(args[1:], stdout, stderr)
 	case "publish":
@@ -29,7 +31,7 @@ func runDossier(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	case "sweep":
 		return runDossierSweep(args[1:], stdout, stderr)
 	default:
-		fmt.Fprintf(stderr, "evolve dossier: unknown subcommand %q (want: verify | retro-mislabel | publish | sweep)\n", args[0])
+		fmt.Fprintf(stderr, "evolve dossier: unknown subcommand %q (want: verify | show | retro-mislabel | publish | sweep)\n", args[0])
 		return 10
 	}
 }

@@ -14,10 +14,7 @@ var HardcodedOrder = []string{
 	"audit", "ship", "retrospective", "memo",
 }
 
-func List(registryPath string, useRegistry bool) ([]string, error) {
-	if !useRegistry {
-		return HardcodedOrder, nil
-	}
+func List(registryPath string) ([]string, error) {
 	if _, err := os.Stat(registryPath); err != nil {
 		return HardcodedOrder, nil
 	}

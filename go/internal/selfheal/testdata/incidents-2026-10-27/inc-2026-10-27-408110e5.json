@@ -1,0 +1,30 @@
+{
+  "schema": "evolve.incident/1",
+  "id": "inc-2026-10-27-408110e5",
+  "fingerprint": "claim-churn:retro-minting-files-through-inbox-add-lane",
+  "class": "claim-churn",
+  "subject": "retro-minting-files-through-inbox-add-lane",
+  "severity": "INCIDENT",
+  "tier": "T2",
+  "state": "open",
+  "sources": [
+    "cycle:1983",
+    "cycle:2001",
+    "cycle:2004",
+    "cycle:2008",
+    "cycle:2010",
+    "cycle:2015",
+    "cycle:2020",
+    "cycle:2026",
+    "cycle:2030",
+    "cycle:2035"
+  ],
+  "recurrence": 10,
+  "reopened": 0,
+  "attempts": 0,
+  "repro_test": "",
+  "summary": "cycles claimed item retro-minting-files-through-inbox-add-lane and none shipped it",
+  "opened_at": "2026-10-27T10:30:56.21104+08:00",
+  "last_seen_at": "2026-10-26T18:29:01Z",
+  "closed_at": null
+}

@@ -81,6 +81,7 @@ type PhaseRequest struct {
 	Signals                         map[string]string `json:"signals,omitempty"`
 	PreviousPhase                   string            `json:"previous_phase,omitempty"`
 	Env                             map[string]string `json:"env,omitempty"`
+	PermissionMode                  string            `json:"permission_mode,omitempty"`
 
 	BuildPlan string `json:"build_plan,omitempty"`
 

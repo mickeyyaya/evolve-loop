@@ -7,6 +7,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute/cliroutetest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
@@ -18,7 +19,7 @@ func TestResolve_AbsentTableMatchesLegacyGolden(t *testing.T) {
 	var runnerRecords, chainRecords []cliroutetest.Record
 	for _, v := range cliroutetest.Variants() {
 		root := v.ProjectRoot(t, cliroutetest.PhasesOf(agents))
-		table, findings := cliroute.Compile(legacyPolicyFor(v, v.Policy(t, root)), cat, profs)
+		table, findings := cliroute.Compile(legacyPolicyFor(v, v.Policy(t, root)), cat, profs, cliroute.WithOverrides(v.Overrides(agents)))
 		if len(findings) != 0 {
 			t.Fatalf("variant %s: the legacy projection has no findings, got %+v", v.Name, findings)
 		}
@@ -27,11 +28,11 @@ func TestResolve_AbsentTableMatchesLegacyGolden(t *testing.T) {
 			phase := cliroutetest.PhaseOf(agent)
 			runnerRecords = append(runnerRecords, legacyRecord(r, cliroutetest.ResolverRunner, v, agent, phase, cliroute.Request{
 				Agent: agent, Phase: phase, ProjectRoot: root, DefaultModel: cliroutetest.DefaultModel,
-				Env: v.EnvFor(agent), Overlay: v.Overlay,
+				Env: v.EnvFor(), Overlay: v.Overlay,
 			}))
 			chainRecords = append(chainRecords, legacyRecord(r, cliroutetest.ResolverBridgechain, v, agent, "", cliroute.Request{
 				Agent: agent, ProjectRoot: root, DefaultModel: cliroutetest.DefaultModel,
-				Env: v.EnvFor(agent), CallerCLI: v.CallerCLI,
+				Env: v.EnvFor(), CallerCLI: v.CallerCLI,
 			}))
 		}
 	}
@@ -55,7 +56,7 @@ func legacyRecord(r *cliroute.Router, resolver string, v cliroutetest.Variant, a
 
 func TestResolve_ALegacyDecisionNamesItsRuleAndAllowedSet(t *testing.T) {
 	p := policy.Policy{Pins: map[string]policy.Pin{"scout": {CLI: "claude"}}}
-	table, _ := cliroute.Compile(p, syntheticCatalog(), syntheticProfiles(t))
+	table, _ := cliroute.Compile(p, syntheticCatalog(), syntheticProfiles(t), override("memo", llmroute.AgentOverride{CLI: "claude-p"}))
 	r := mustRouter(t, table, cliroute.Host{LookPath: everyBinary()})
 	cases := []struct {
 		name    string
@@ -64,7 +65,7 @@ func TestResolve_ALegacyDecisionNamesItsRuleAndAllowedSet(t *testing.T) {
 		allowed []string
 	}{
 		{"pin", cliroute.Request{Agent: "scout", Phase: "scout"}, "legacy:pin", nil},
-		{"env", cliroute.Request{Agent: "memo", Phase: "memo", Env: map[string]string{"EVOLVE_MEMO_CLI": "claude-p"}}, "legacy:env", nil},
+		{"env", cliroute.Request{Agent: "memo", Phase: "memo"}, "legacy:env", nil},
 		{"caller", cliroute.Request{Agent: "memo", CallerCLI: "claude-p"}, "legacy:caller", nil},
 		{"profile", cliroute.Request{Agent: "auditor", Phase: "audit"}, "legacy:profile", []string{"claude"}},
 		{"default", cliroute.Request{Agent: "nobody"}, "legacy:default", nil},

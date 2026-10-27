@@ -83,7 +83,8 @@ func TestMeasureFacts_ReadsTheSizedWidthAndTheSignalsInsideTheRunWindow(t *testi
 
 	want := wavemeasure.Facts{
 		Start: clock(0), End: clock(60), WidthSized: 2, AdmissionWaits: 2,
-		Lanes: []wavemeasure.Lane{{Start: clock(1), End: clock(50), Landed: true, Conflict: true}, {Start: clock(2)}},
+		Lanes:  []wavemeasure.Lane{{Start: clock(1), End: clock(50), Landed: true, Conflict: true}, {Start: clock(2)}},
+		Cycles: []wavemeasure.CycleSpend{{Shipped: true}, {}},
 	}
 	if !reflect.DeepEqual(facts, want) || source != wave.WidthFromSignal || len(warnings) != 0 {
 		t.Errorf("MeasureFacts =\n%+v (%s, %q)\nwant\n%+v (%s)", facts, source, warnings, want, wave.WidthFromSignal)

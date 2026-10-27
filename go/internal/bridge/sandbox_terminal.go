@@ -7,10 +7,12 @@ import (
 	"os"
 	"runtime"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
 func sandboxTerminalPath(ctx context.Context, deps Deps, cfg *Config, session string) (string, error) {
-	if cmp.Or(deps.hostOS, runtime.GOOS) != "darwin" || cfg.Worktree == "" && !cfg.RequireSandbox || strings.TrimSpace(deps.Env[envSandboxMode]) == "off" {
+	if cmp.Or(deps.hostOS, runtime.GOOS) != "darwin" || cfg.Worktree == "" && !cfg.RequireSandbox || strings.TrimSpace(deps.SandboxMode) == config.SandboxModeOff {
 		return "", nil
 	}
 	reader, ok := deps.Tmux.(paneTTYReader)

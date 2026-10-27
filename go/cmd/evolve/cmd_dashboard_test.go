@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
@@ -112,5 +113,13 @@ func TestDashboard_DefaultRootFallsBackToEnvThenCwd(t *testing.T) {
 	}
 	if !bytes.Contains(out.Bytes(), []byte(`"root": "`+root+`"`)) {
 		t.Fatalf("env root not honoured: %s", out.String())
+	}
+}
+
+func TestDashboard_ASnapshotThatCannotBeWrittenIsExit1(t *testing.T) {
+	t.Parallel()
+	var stderr bytes.Buffer
+	if code := runDashboard([]string{"--snapshot", "--project-root", t.TempDir()}, nil, &failingWriter{}, &stderr); code != 1 || !strings.Contains(stderr.String(), "broken pipe") {
+		t.Errorf("code = %d, stderr = %q, want 1 and the write error", code, stderr.String())
 	}
 }

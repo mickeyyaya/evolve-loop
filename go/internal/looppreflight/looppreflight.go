@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -237,7 +236,7 @@ func resolve(opts Options) (resolved, error) {
 		o.probeCLI = doctor.Probe
 	}
 	if o.sandboxMode == nil {
-		o.sandboxMode = func() string { return os.Getenv("EVOLVE_SANDBOX") }
+		o.sandboxMode = func() string { return "" }
 	}
 	if o.hostProbe == nil {
 		o.hostProbe = func() preflight.Profile {

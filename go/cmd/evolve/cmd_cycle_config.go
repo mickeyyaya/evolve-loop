@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -69,7 +71,7 @@ func probeBuildHandoffFloor(projectRoot string) core.BuildHandoffFloor {
 		fmt.Fprintf(os.Stderr, "[policy] WARN %v (the build handoff floor uses the compiled workflow defaults, as the cycle does)\n", err)
 		pol = policy.Policy{}
 	}
-	cfg, _ := config.Load(config.RegistryPath(projectRoot), filterEvolveEnv(os.Environ()))
+	cfg, _ := config.Load(config.RegistryPath(projectRoot))
 	return core.WholeBuildHandoffFloor(composedBuildHandoffFloor(pol.WorkflowConfig(), cfg))
 }
 
@@ -81,4 +83,10 @@ func parseGateStage(stage string) config.Stage {
 func parseRouterStage(stage string) config.Stage {
 	s, _ := config.RouterStage(stage)
 	return s
+}
+
+func warnRetiredControls(w io.Writer, environ []string) {
+	for _, r := range ipcenv.RetiredInUse(environ) {
+		fmt.Fprintf(w, "[policy] WARN %s is set, but the pipeline does not read it (ADR-0156 I-16): use %s\n", r.Name, r.Use)
+	}
 }

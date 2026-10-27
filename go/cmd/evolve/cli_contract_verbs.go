@@ -68,8 +68,12 @@ var coreVerbs = []coreVerb{
 	{path: "inbox lint", class: availAlways},
 	{path: "inbox batches", class: availAlways},
 	{path: "signals tail", class: availAlways, stream: true},
+	{path: "events channels", class: availAlways},
+	{path: "events kinds", class: availAlways},
+	{path: "events watch", class: availAlways, stream: true},
 	{path: "ledger verify", class: availAlways},
 	{path: "dossier verify", class: availAlways},
+	{path: "dossier show", class: availAlways},
 	{path: "cli-routing show", class: availAlways},
 	{path: "cli-routing check", class: availAlways},
 	{path: "cli-routing explain", class: availAlways},
@@ -77,12 +81,15 @@ var coreVerbs = []coreVerb{
 	{path: "clihealth list", class: availAlways},
 	{path: "clihealth usage", class: availAlways},
 	{path: "agent list", class: availAlways},
+	{path: "agent capabilities", class: availAlways},
 	{path: "ci classify", class: availAlways},
 	{path: "scan secrets", class: availAlways},
 	{path: "docs ste-lint", class: availAlways},
 	{path: "quality report", class: availLeased},
 	{path: "quality compare", class: availLeased},
+	{path: "quality show", class: availAlways},
 	{path: "agent run", class: availLeased, codes: map[int]string{21: "dispatch"}},
+	{path: "inbox claim", class: availLeased},
 	{path: "inbox add", class: availLeased},
 	{path: "inbox consume", class: availLeased},
 	{path: "inbox edit", class: availQueued},
@@ -101,10 +108,12 @@ var coreVerbs = []coreVerb{
 	{path: "checkpoint prune", class: availLeased},
 	{path: "gc", class: availLeased},
 	{path: "loop-stop", class: availLeased},
+	{path: "wave stop", class: availLeased},
 	{path: "wave next", class: availBoundary, major: 2, codes: codeIndexRefreshCodes},
 	{path: "boundary run", class: availBoundary, codes: codeIndexRefreshCodes},
 	{path: "pr merge", class: availBoundary},
 	{path: "sync-main", class: availBoundary, codes: codeIndexRefreshCodes},
+	{path: "cycle resume", class: availBoundary},
 	{path: "cycle reset", class: availBoundary},
 	{path: "cli update", class: availBoundary},
 	{path: "loop", class: availBoundary},
@@ -117,4 +126,11 @@ func lookupCoreVerb(path string) (coreVerb, bool) {
 		}
 	}
 	return coreVerb{}, false
+}
+
+func coreVerbSchema(path string) string {
+	if v, ok := lookupCoreVerb(path); ok {
+		return v.schema()
+	}
+	return ""
 }

@@ -1,6 +1,8 @@
 package policy_test
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -80,5 +82,30 @@ func TestLoad_SandboxBlock(t *testing.T) {
 				t.Errorf("after Load, SandboxConfig() = %+v, want %+v", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestSandboxPolicy_SandboxModeIsAutoOrOnAndNeverOff(t *testing.T) {
+	for mode, want := range map[string]string{"": "auto", "auto": "auto", "on": "on"} {
+		pol, err := policy.Parse([]byte(`{"sandbox":{"mode":"` + mode + `"}}`))
+		if err != nil {
+			t.Fatalf("Parse(%q): %v", mode, err)
+		}
+		if got := pol.SandboxConfig().SandboxMode(); got != want {
+			t.Errorf("sandbox.mode %q gives %q, want %q", mode, got, want)
+		}
+	}
+	for _, mode := range []string{"off", "bogus"} {
+		_, err := policy.Parse([]byte(`{"sandbox":{"mode":"` + mode + `"}}`))
+		if err == nil || !strings.Contains(err.Error(), "--sandbox-off=<reason>") {
+			t.Errorf("Parse(sandbox.mode %q) err = %v, want a refusal that names the audited --sandbox-off parameter", mode, err)
+		}
+	}
+	var block policy.SandboxPolicy
+	if err := json.Unmarshal([]byte(`{"nested":"x"}`), &block); err == nil || !strings.Contains(err.Error(), "sandbox:") {
+		t.Errorf("an unknown key of the sandbox block: err = %v, want a sandbox refusal", err)
+	}
+	if got := (policy.SandboxPolicy{Mode: "off"}).SandboxMode(); got != "auto" {
+		t.Errorf("SandboxMode of a constructed off = %q, want auto: off is the audited --sandbox-off parameter, never a policy value", got)
 	}
 }

@@ -32,7 +32,7 @@ func TestAutoModel_NamedSeamExpandsAuto(t *testing.T) {
 		return "claude-opus-4-7", true
 	}
 
-	got := Resolve("auditor", "audit", "auto", nil, nil, expand, nil)
+	got := Resolve("auditor", "audit", "auto", nil, AgentOverride{}, nil, expand, nil)
 	if got.Model != "claude-opus-4-7" {
 		t.Errorf("Model = %q, want claude-opus-4-7 (AutoModel must expand the sentinel)", got.Model)
 	}

@@ -318,7 +318,7 @@ func TestRun_EventsProducerError_NonBlocking(t *testing.T) {
 	}
 }
 
-func TestRun_EnvOverridesModel(t *testing.T) {
+func TestRun_TheModelEnvKeyDoesNotOverrideTheModel(t *testing.T) {
 	hooks := &fakeHooks{phase: "scout", agent: "evolve-scout", model: "auto", verdict: core.VerdictPASS}
 	fb := &fakeBridge{writeArtifact: "x"}
 	r := New(Options{Hooks: hooks, Bridge: fb, Prompts: fakePromptsFS("evolve-scout", "x")})
@@ -330,8 +330,8 @@ func TestRun_EnvOverridesModel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	if fb.gotReq.Model != "opus" {
-		t.Errorf("Model=%q, want opus (env override)", fb.gotReq.Model)
+	if fb.gotReq.Model == "opus" {
+		t.Errorf("Model=%q came from EVOLVE_SCOUT_MODEL; the environment is not read", fb.gotReq.Model)
 	}
 }
 
@@ -524,13 +524,14 @@ func TestRun_PermissionModeOverride(t *testing.T) {
 	r := New(Options{Hooks: hooks, Bridge: fb, Prompts: fakePromptsFS("evolve-builder", "x")})
 	_, err := r.Run(context.Background(), core.PhaseRequest{
 		ProjectRoot: root, Workspace: t.TempDir(),
-		Env: map[string]string{"EVOLVE_BUILDER_PERMISSION_MODE": "plan"},
+		PermissionMode: "plan",
+		Env:            map[string]string{"EVOLVE_BUILDER_PERMISSION_MODE": "bypassPermissions"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if fb.gotReq.PermissionMode != "plan" {
-		t.Errorf("PermissionMode = %q, want \"plan\" (from EVOLVE_BUILDER_PERMISSION_MODE)", fb.gotReq.PermissionMode)
+		t.Errorf("PermissionMode = %q, want \"plan\" (from the request field, never the environment)", fb.gotReq.PermissionMode)
 	}
 	if len(fb.gotReq.ExtraFlags) != 0 {
 		t.Errorf("ExtraFlags should be empty (permission is typed config, not a raw flag); got %v", fb.gotReq.ExtraFlags)

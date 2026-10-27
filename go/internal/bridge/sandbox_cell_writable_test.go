@@ -74,7 +74,7 @@ func incidentCellLayout(t *testing.T) cellLayout {
 
 func wrapCellProfile(t *testing.T, deps Deps, goos string, l cellLayout) string {
 	t.Helper()
-	deps.Env, deps.ExecStage, deps.DispatchStore = map[string]string{"EVOLVE_SANDBOX": "on"}, "enforce", l.store
+	deps.SandboxMode, deps.ExecStage, deps.DispatchStore = "on", "enforce", l.store
 	deps.ReadStage, deps.GuaranteeStage = "enforce", "enforce"
 	prefix, ok := defaultSandboxWrapWithProbe(deps, fakeProbe(goos, true))(SandboxWrapRequest{
 		Phase: "itest", CLI: "claude-tmux", Worktree: l.worktree, Workspace: l.workspace, RepoRoot: l.root,

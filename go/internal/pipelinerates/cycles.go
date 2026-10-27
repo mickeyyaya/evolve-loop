@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclespend"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -23,6 +24,7 @@ type Cycle struct {
 	LaneDeadline bool
 	SystemFail   bool
 	Item, Commit string
+	Spend        cyclespend.Spend
 }
 
 func (c Cycle) DeadlineEnd() bool { return !c.Sealed || c.LaneDeadline }
@@ -130,10 +132,19 @@ func readCycle(dir string, id, w int) (Cycle, error) {
 		}
 	}
 	c.Shipped, c.Commit = run.Shipped, binding.Commit
+	c.Spend = readSpend(dir)
 	if len(triage.TopN) > 0 {
 		c.Item = triage.TopN[0].ID
 	}
 	return withSignals(c, filepath.Join(dir, signalcenter.StreamFileName))
+}
+
+func readSpend(dir string) cyclespend.Spend {
+	spend, err := cyclespend.Read(dir)
+	if err != nil {
+		spend.UnmeasuredCalls++
+	}
+	return spend
 }
 
 func withSignals(c Cycle, path string) (Cycle, error) {

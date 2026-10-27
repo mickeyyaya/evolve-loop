@@ -149,23 +149,39 @@ func TestDefaultPlanResolver_ProfileChainRunsBehindTheCallersPrimary(t *testing.
 	dir := filepath.Join(root, ".evolve", "profiles")
 	writeProfile(t, dir, "retrospective", map[string]any{"name": "retrospective", "cli": "codex-tmux", "cli_fallback": []string{"claude-tmux"}, "model_tier_default": "deep"})
 	resolve := bridgechain.DefaultPlanResolver(legacyRouter(t, dir))
-	plan := mustPlan(t, resolve, core.BridgeRequest{Agent: "retrospective", CLI: "codex-tmux", Model: "deep", ProjectRoot: root, Env: map[string]string{}})
+	plan := mustPlan(t, resolve, core.BridgeRequest{Agent: "retrospective", CLI: "codex-tmux", Model: "deep", ProjectRoot: root})
 	if strings.Join(plan.Candidates, " ") != "codex-tmux claude-tmux" || len(plan.Tiers) == 0 || plan.Tiers[0] != "deep" || !plan.TriggersFallback(81) {
 		t.Fatalf("plan = %+v", plan)
 	}
-	plan = mustPlan(t, resolve, core.BridgeRequest{Agent: "retrospective", CLI: "claude-p", Model: "deep", ProjectRoot: root, Env: map[string]string{}})
+	plan = mustPlan(t, resolve, core.BridgeRequest{Agent: "retrospective", CLI: "claude-p", Model: "deep", ProjectRoot: root})
 	if strings.Join(plan.Candidates, " ") != "claude-p codex-tmux claude-tmux" {
 		t.Fatalf("the caller's primary stays first: %v", plan.Candidates)
 	}
-	plan = mustPlan(t, resolve, core.BridgeRequest{Agent: "no-such-agent", CLI: "claude-p", Model: "sonnet", ProjectRoot: root, Env: map[string]string{}})
+	plan = mustPlan(t, resolve, core.BridgeRequest{Agent: "no-such-agent", CLI: "claude-p", Model: "sonnet", ProjectRoot: root})
 	if len(plan.Candidates) == 0 || plan.Candidates[0] != "claude-p" {
 		t.Fatalf("no profile: the caller's choice leads: %v", plan.Candidates)
 	}
 }
 
-func TestCLIHealthEnabled(t *testing.T) {
-	if !bridgechain.CLIHealthEnabled(map[string]string{}) || bridgechain.CLIHealthEnabled(map[string]string{"EVOLVE_CLI_HEALTH": "0"}) {
-		t.Fatal("EVOLVE_CLI_HEALTH defaults on and 0 disables")
+func TestCLIHealthOn_ReadsThePolicyKeyNotTheEnvironment(t *testing.T) {
+	t.Setenv("EVOLVE_CLI_HEALTH", "0")
+	root := t.TempDir()
+	if !bridgechain.CLIHealthOn(root) {
+		t.Fatal("cli_health.enabled defaults on, and the environment does not turn it off")
+	}
+	writeCLIHealthOff(t, root)
+	if bridgechain.CLIHealthOn(root) {
+		t.Fatal("cli_health.enabled false must turn the bench layer off")
+	}
+}
+
+func writeCLIHealthOff(t *testing.T, root string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".evolve", "policy.json"), []byte(`{"cli_health":{"enabled":false}}`), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -177,11 +193,12 @@ func TestApplyCLIHealthBench_DemotesABenchedFamily(t *testing.T) {
 	}
 	var logs []string
 	plan := llmroute.Plan{Candidates: []string{"codex-tmux", "claude-tmux"}}
-	out := bridgechain.ApplyCLIHealthBench(root, "retrospective", plan, map[string]string{}, now, func(f string, a ...any) { logs = append(logs, fmt.Sprintf(f, a...)) })
+	out := bridgechain.ApplyCLIHealthBench(root, "retrospective", plan, now, func(f string, a ...any) { logs = append(logs, fmt.Sprintf(f, a...)) })
 	if strings.Join(out.Candidates, " ") != "claude-tmux codex-tmux" || len(logs) != 1 {
 		t.Fatalf("out=%v logs=%q", out.Candidates, logs)
 	}
-	if same := bridgechain.ApplyCLIHealthBench(root, "retrospective", plan, map[string]string{"EVOLVE_CLI_HEALTH": "0"}, now, nil); strings.Join(same.Candidates, " ") != "codex-tmux claude-tmux" {
+	writeCLIHealthOff(t, root)
+	if same := bridgechain.ApplyCLIHealthBench(root, "retrospective", plan, now, nil); strings.Join(same.Candidates, " ") != "codex-tmux claude-tmux" {
 		t.Fatalf("disabled: %v", same.Candidates)
 	}
 }
@@ -196,13 +213,13 @@ func TestBenchOnEscalation_BenchesTheFamilyAFreshReportNames(t *testing.T) {
 		}
 	}
 	report(now().Add(-time.Hour))
-	bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: "codex-tmux", DispatchStart: now().Add(-time.Minute), Env: map[string]string{}}, now, nil)
+	bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: "codex-tmux", DispatchStart: now().Add(-time.Minute)}, now, nil)
 	if active := clihealth.NewStore(root, now).Active(); len(active) != 0 {
 		t.Fatalf("a stale report must not bench: %v", active)
 	}
 	report(now())
 	var logs []string
-	bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: "codex-tmux", DispatchStart: now().Add(-time.Minute), Env: map[string]string{}}, now, func(f string, a ...any) { logs = append(logs, fmt.Sprintf(f, a...)) })
+	bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: "codex-tmux", DispatchStart: now().Add(-time.Minute)}, now, func(f string, a ...any) { logs = append(logs, fmt.Sprintf(f, a...)) })
 	active := clihealth.NewStore(root, now).Active()
 	if _, ok := active["codex"]; !ok || len(logs) != 1 || !strings.Contains(logs[0], "benched family codex") {
 		t.Fatalf("active=%v logs=%q", active, logs)

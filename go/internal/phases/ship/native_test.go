@@ -151,8 +151,8 @@ func TestNative_G_BypassEnv_SilentlyIgnored(t *testing.T) {
 		Class:            ClassManual,
 		CommitMessage:    "emergency",
 		BypassCommitGate: true,
+		AutoConfirm:      "test",
 		Env: map[string]string{
-			"EVOLVE_SHIP_AUTO_CONFIRM":  "1",
 			"EVOLVE_BYPASS_SHIP_VERIFY": "1",
 		},
 	})
@@ -204,7 +204,7 @@ func TestNative_J_ManualAutoConfirm_Ships(t *testing.T) {
 		Class:            ClassManual,
 		CommitMessage:    "ci change",
 		BypassCommitGate: true,
-		Env:              map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"},
+		AutoConfirm:      "test",
 	})
 	if res.ExitCode != ExitOK {
 		t.Fatalf("want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)
@@ -414,7 +414,7 @@ func TestNative_T_ManualPreservesLastCycleNumber(t *testing.T) {
 		Class:            ClassManual,
 		CommitMessage:    "manual: ad-hoc fix",
 		BypassCommitGate: true,
-		Env:              map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"},
+		AutoConfirm:      "test",
 	})
 	if res.ExitCode != ExitOK {
 		t.Fatalf("want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)

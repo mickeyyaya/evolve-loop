@@ -11,6 +11,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/solutioncheck"
 )
 
+var solutionWorkdir = os.Getwd
+
 func runSolution(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 || args[0] != "check" {
 		fmt.Fprintln(stderr, "usage: evolve solution check <slug | solutions/slug> [--project-root DIR] [--registry PATH]")
@@ -26,7 +28,7 @@ func runSolution(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return 2
 	}
 	if *root == "" {
-		wd, err := os.Getwd()
+		wd, err := solutionWorkdir()
 		if err != nil {
 			fmt.Fprintf(stderr, "evolve solution: %v\n", err)
 			return 2
@@ -36,7 +38,7 @@ func runSolution(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if *registry == "" {
 		*registry = config.RegistryPath(*root)
 	}
-	cfg, warnings := config.Load(*registry, filterEvolveEnv(os.Environ()))
+	cfg, warnings := config.Load(*registry)
 	for _, w := range warnings {
 		fmt.Fprintf(stderr, "evolve solution: registry warning [%s]: %s\n", w.Code, w.Message)
 	}
