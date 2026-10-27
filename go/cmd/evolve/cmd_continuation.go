@@ -81,11 +81,13 @@ func runContinuationList(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
+var releaseContinuationBinding = inboxmover.ReleaseContinuationBinding
+
 func runContinuationRelease(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("continuation release", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	rootFlag := fs.String("project-root", "", "project root (default: the working directory)")
-	operator := fs.Bool("operator", false, "authorize this release as the operator (or set "+continuation.OperatorConfirmEnv+"=1)")
+	operator := fs.Bool("operator", false, "authorize this release as the operator")
 	force := fs.Bool("force", false, "release even while the binding's cycle still holds a live lease")
 	root, ok := continuationRoot(fs, args, rootFlag, stderr)
 	if !ok {
@@ -120,15 +122,12 @@ func runContinuationRelease(args []string, stdout, stderr io.Writer) int {
 	}
 
 	authority := "operator via -operator"
-	if !*operator {
-		authority = "operator via " + continuation.OperatorConfirmEnv + "=1"
-	}
 	reason := "operator-release"
 	if *force {
 		reason = fmt.Sprintf("operator-release (-force override of cycle %d's live lease)", bound.Cycle)
 	}
 
-	c, released, err := inboxmover.ReleaseContinuationBinding(
+	c, released, err := releaseContinuationBinding(
 		inboxmover.Options{ProjectRoot: root, Stderr: stderr}, scopeID, reason, authority)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve continuation release: %q: %v\n", scopeID, err)

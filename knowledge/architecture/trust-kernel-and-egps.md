@@ -184,7 +184,7 @@ verification:
 | Class | Verification |
 |---|---|
 | `cycle` (default) | Full audit-binding (§4) + EGPS `red_count==0` |
-| `manual` | Skips audit-binding; requires a fresh **commit-gate** attestation; interactive y/N (CI: `EVOLVE_SHIP_AUTO_CONFIRM=1`) |
+| `manual` | Skips audit-binding; requires a fresh **commit-gate** attestation; interactive y/N (CI: `--auto-confirm=<reason>`) |
 | `trivial` | Skips audit but `cycle_size_estimate=="trivial"` AND zero pipeline-critical paths touched |
 | `release` | Skips audit (the release pipeline mutates files post-audit); logs RELEASE loudly |
 

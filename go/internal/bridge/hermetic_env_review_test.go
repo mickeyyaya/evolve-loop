@@ -94,18 +94,15 @@ func TestN1_GateAndBypassVariablesReachNoSeatAtEnforce(t *testing.T) {
 func TestCellEnv_AnOptInPassesItsTargetAtEnforce(t *testing.T) {
 	t.Setenv("ANTHROPIC_BASE_URL", "https://proxy.example")
 	t.Setenv("OPENAI_API_KEY", "sk-test")
-	t.Setenv("BRIDGE_ALLOW_ANTHROPIC_BASE_URL", "")
-	t.Setenv("BRIDGE_ALLOW_OPENAI_API_KEY", "")
-	if names := envNames(dispatchEnv(Deps{EnvStage: "enforce"}, seatConfig("claude-p"))); slices.Contains(names, "ANTHROPIC_BASE_URL") {
-		t.Fatal("without the opt-in, ANTHROPIC_BASE_URL must not pass")
-	}
 	t.Setenv("BRIDGE_ALLOW_ANTHROPIC_BASE_URL", "1")
-	if !slices.Contains(dispatchEnv(Deps{EnvStage: "enforce"}, seatConfig("claude-p")), "ANTHROPIC_BASE_URL=https://proxy.example") {
-		t.Fatal("with BRIDGE_ALLOW_ANTHROPIC_BASE_URL=1 the opted-in endpoint must reach claude, or the route changes silently")
+	if names := envNames(dispatchEnv(Deps{EnvStage: "enforce"}, seatConfig("claude-p"))); slices.Contains(names, "ANTHROPIC_BASE_URL") {
+		t.Fatal("without the policy opt-in, ANTHROPIC_BASE_URL must not pass, whatever the environment says")
 	}
-	deps := Deps{EnvStage: "enforce", Env: map[string]string{"BRIDGE_ALLOW_OPENAI_API_KEY": "1"}}
-	if !slices.Contains(dispatchEnv(deps, seatConfig("codex")), "OPENAI_API_KEY=sk-test") {
-		t.Fatal("an opt-in set through Deps.Env must pass its target too")
+	if !slices.Contains(dispatchEnv(Deps{EnvStage: "enforce", AllowAnthropicBaseURL: true}, seatConfig("claude-p")), "ANTHROPIC_BASE_URL=https://proxy.example") {
+		t.Fatal("with bridge.allow_anthropic_base_url the opted-in endpoint must reach claude, or the route changes silently")
+	}
+	if !slices.Contains(dispatchEnv(Deps{EnvStage: "enforce", AllowOpenAIAPIKey: true}, seatConfig("codex")), "OPENAI_API_KEY=sk-test") {
+		t.Fatal("bridge.allow_openai_api_key must pass its target too")
 	}
 }
 

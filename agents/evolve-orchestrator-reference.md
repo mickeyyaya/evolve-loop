@@ -119,11 +119,11 @@ constraints rather than fighting them.
 
 ## Section: registry-dispatch
 
-Loaded when `EVOLVE_USE_PHASE_REGISTRY=1` (default). The phase sequence is driven by `docs/architecture/phase-registry.json`.
+Loaded always. The phase sequence is driven by `docs/architecture/phase-registry.json`.
 
 ```bash
 # Calibrate: read phase order from registry
-phase_list=$(EVOLVE_USE_PHASE_REGISTRY=1 bash legacy/scripts/dispatch/list-phase-order.sh)
+phase_list=$(bash legacy/scripts/dispatch/list-phase-order.sh)
 
 # Dispatch loop (registry-driven):
 while IFS= read -r phase_name; do

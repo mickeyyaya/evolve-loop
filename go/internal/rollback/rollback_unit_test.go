@@ -153,3 +153,22 @@ func TestRun_NilSteps_FallbacksAssigned(t *testing.T) {
 		t.Error("fake gh was never invoked; the default release step is not hermetic")
 	}
 }
+
+func TestRevertAndShipWith_ShipsWithAnAuditedAutoConfirmReason(t *testing.T) {
+	binDir := t.TempDir()
+	record := filepath.Join(t.TempDir(), "args")
+	installRepoEvolve(t, binDir, "#!/bin/sh\nprintf '%s\\n' \"$@\" > '"+record+"'\n")
+	fake := &fixtures.FakeExec{}
+	g := gitexec.Git{Dir: t.TempDir(), Exec: fake.Run}
+
+	if got := revertAndShipWith(g, binDir, "deadbeef", "bad build", "1.0.0"); got != "reverted" {
+		t.Fatalf("status = %q, want reverted", got)
+	}
+	raw, err := os.ReadFile(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), "--auto-confirm=rollback of v1.0.0: bad build\n") {
+		t.Errorf("ship args = %q, want the --auto-confirm reason", raw)
+	}
+}

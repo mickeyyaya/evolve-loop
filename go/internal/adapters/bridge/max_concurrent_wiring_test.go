@@ -13,3 +13,17 @@ func TestNewDefault_ProductionDepsCarryThePolicyAdmissionCaps(t *testing.T) {
 		t.Errorf("MaxConcurrent = %v, want %v from bridge.max_concurrent", got, want)
 	}
 }
+
+func TestNewDefault_TheSandboxModeComesFromThePolicyAndOffOnlyFromTheBypass(t *testing.T) {
+	dir := t.TempDir()
+	writePolicyJson(t, dir, `{"sandbox":{"mode":"on"}}`)
+	t.Setenv("EVOLVE_SANDBOX", "off")
+	a := NewDefault(dir, nil)
+	if got := a.productionEngineDeps(nil).SandboxMode; got != "on" {
+		t.Errorf("SandboxMode = %q, want on from sandbox.mode", got)
+	}
+	a.SetSandboxOff()
+	if got := a.productionEngineDeps(nil).SandboxMode; got != "off" {
+		t.Errorf("SandboxMode = %q, want off after SetSandboxOff", got)
+	}
+}

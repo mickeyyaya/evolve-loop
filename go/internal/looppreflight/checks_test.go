@@ -234,7 +234,7 @@ func TestRun_HostCapabilities_SandboxWantedOptOut_WarnsNotHalts(t *testing.T) {
 		t.Fatalf("explicit host opt-out must WARN loudly, not HALT (parity with the dispatch gate); got %s", r.OverallLevel)
 	}
 	c := findCheck(t, r, "host-capabilities")
-	if c.Level != LevelWarn || !strings.Contains(c.Detail, "UNCONFINED") || !strings.Contains(c.Detail, "EVOLVE_SANDBOX=off") {
+	if c.Level != LevelWarn || !strings.Contains(c.Detail, "UNCONFINED") || !strings.Contains(c.Detail, "--sandbox-off") {
 		t.Fatalf("want loud opt-out WARN, got %s (%s)", c.Level, c.Detail)
 	}
 }

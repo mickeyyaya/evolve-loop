@@ -17,7 +17,7 @@ func defaultSandboxWrap(deps Deps) SandboxWrapper {
 
 func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult) SandboxWrapper {
 	return func(req SandboxWrapRequest) ([]string, bool) {
-		mode := strings.TrimSpace(deps.Env[envSandboxMode])
+		mode := strings.TrimSpace(deps.SandboxMode)
 		if mode == "" {
 			mode = config.SandboxModeAuto
 		}
@@ -25,7 +25,7 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 		case config.SandboxModeOff, config.SandboxModeOn, config.SandboxModeAuto:
 		default:
 			if deps.Stderr != nil {
-				fmt.Fprintf(deps.Stderr, "[bridge] WARN: EVOLVE_SANDBOX=%q unrecognized (want auto|on|off); treating as auto\n", mode)
+				fmt.Fprintf(deps.Stderr, "[bridge] WARN: sandbox mode %q unrecognized (want auto|on|off); treating as auto\n", mode)
 			}
 			mode = config.SandboxModeAuto
 		}
@@ -37,7 +37,7 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 		wrap, reason := sandbox.ShouldWrap(sandbox.DetectNested(depEnvGetter(deps)), probe)
 		if !wrap {
 			if mode == config.SandboxModeOn && deps.Stderr != nil {
-				fmt.Fprintf(deps.Stderr, "[bridge] WARN: EVOLVE_SANDBOX=on but inner sandbox not applied; phase runs UNCONFINED at the inner layer. Reason: %s\n", reason)
+				fmt.Fprintf(deps.Stderr, "[bridge] WARN: sandbox.mode=on but inner sandbox not applied; phase runs UNCONFINED at the inner layer. Reason: %s\n", reason)
 			}
 			return nil, false
 		}
@@ -182,8 +182,6 @@ func depEnvGetter(deps Deps) func(string) string {
 	}
 }
 
-const envSandboxMode = "EVOLVE_SANDBOX"
-
 const modelNetworkRequired = true
 
 func sandboxPrefixForLaunch(deps Deps, cfg *Config, terminalPath string) ([]string, bool) {
@@ -274,10 +272,10 @@ func sandboxRequiredButUnavailable(deps Deps, cfg *Config, wrapped bool) bool {
 	}
 	ok, optOut, reason := sandbox.ConfinementSatisfied(
 		sandbox.DetectNested(depEnvGetter(deps)),
-		strings.TrimSpace(deps.Env[envSandboxMode]))
+		strings.TrimSpace(deps.SandboxMode))
 	if ok {
 		if optOut && deps.Stderr != nil {
-			fmt.Fprintf(deps.Stderr, "[bridge] WARN: EVOLVE_SANDBOX=off — host opt-out honoured; phase %q runs UNCONFINED despite its sandbox requirement\n", cfg.Agent)
+			fmt.Fprintf(deps.Stderr, "[bridge] WARN: --sandbox-off — host opt-out honoured; phase %q runs UNCONFINED despite its sandbox requirement\n", cfg.Agent)
 		}
 		return false
 	}

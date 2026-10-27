@@ -23,13 +23,7 @@ var markers = []marker{
 	{"EVOLVE_CLI", false},
 	{"BRIDGE_CLI", false}, {"BRIDGE_RUN_ID", false}, {"BRIDGE_COMPLETION", false}, {"BRIDGE_PERMISSION_MODE", false},
 	{"BRIDGE_SESSION_NAME", false}, {"BRIDGE_STREAM_OUTPUT", false}, {"BRIDGE_REQUIRE_FULL", false},
-	{"BRIDGE_REQUIRE_SANDBOX", false}, {"BRIDGE_HUMAN_INPUT_FLAG", false},
-}
-
-var unmovedControls = []string{
-	"EVOLVE_SANDBOX", "EVOLVE_USE_PHASE_REGISTRY", "EVOLVE_OPERATOR_CONFIRM", "EVOLVE_SHIP_AUTO_CONFIRM",
-	"EVOLVE_PHASE_*_BIN", "BRIDGE_ALLOW_BYPASS", "BRIDGE_DRY_RUN", "BRIDGE_ALLOW_ANTHROPIC_BASE_URL",
-	"BRIDGE_ALLOW_OPENAI_API_KEY", "BRIDGE_HUMAN_SIMULATION",
+	{"BRIDGE_REQUIRE_SANDBOX", false},
 }
 
 type RetiredControl struct{ Name, Use string }
@@ -54,6 +48,17 @@ var retiredControls = []RetiredControl{
 	{"EVOLVE_PROFILE_DIR", "the --profile-dir parameter of evolve phases"},
 	{"EVOLVE_PERSONA_OVERRIDE", "the --persona-override parameter of evolve phases"},
 	{"EVOLVE_GO_BIN", "go/bin/evolve or evolve on PATH"},
+	{"EVOLVE_SANDBOX", "policy.json sandbox.mode, or the audited --sandbox-off=<reason> parameter of evolve loop and evolve cycle run"},
+	{"EVOLVE_USE_PHASE_REGISTRY", "nothing: the phase registry is always on"},
+	{"EVOLVE_OPERATOR_CONFIRM", "the -operator parameter of evolve continuation"},
+	{"EVOLVE_SHIP_AUTO_CONFIRM", "the audited --auto-confirm=<reason> parameter of evolve ship"},
+	{"EVOLVE_PHASE_*_BIN", "nothing: the agent bridge runs each phase"},
+	{"BRIDGE_ALLOW_BYPASS", "the --allow-bypass parameter of evolve bridge launch"},
+	{"BRIDGE_DRY_RUN", "the --dry-run parameter of evolve bridge launch"},
+	{"BRIDGE_ALLOW_ANTHROPIC_BASE_URL", "policy.json bridge.allow_anthropic_base_url"},
+	{"BRIDGE_ALLOW_OPENAI_API_KEY", "policy.json bridge.allow_openai_api_key"},
+	{"BRIDGE_HUMAN_SIMULATION", "the audited --human-input=<reason> parameter of evolve bridge launch"},
+	{"BRIDGE_HUMAN_INPUT_FLAG", "the audited --human-input=<reason> parameter of evolve bridge launch"},
 }
 
 func Markers() []string {
@@ -72,10 +77,6 @@ func CellMarkers() []string {
 		}
 	}
 	return names
-}
-
-func UnmovedControls() []string {
-	return slices.Clone(unmovedControls)
 }
 
 func RetiredControls() []RetiredControl {
@@ -97,11 +98,5 @@ func RetiredInUse(environ []string) []RetiredControl {
 }
 
 func Carried(name string) bool {
-	if slices.ContainsFunc(markers, func(m marker) bool { return m.name == name }) {
-		return true
-	}
-	return slices.ContainsFunc(unmovedControls, func(pattern string) bool {
-		matched, _ := path.Match(pattern, name)
-		return matched
-	})
+	return slices.ContainsFunc(markers, func(m marker) bool { return m.name == name })
 }

@@ -71,7 +71,7 @@ func TestApplyRegistry_BadConditionalAndUnknownEnabled(t *testing.T) {
       "config": { "conditional_mandatory": {"tdd": "garbage"} },
       "phases": [ {"name":"tester","enabled":"maybe"} ]
     }`)
-	cfg, ws := Load(reg, map[string]string{})
+	cfg, ws := Load(reg)
 	if !hasWarning(ws, "unknown-value") {
 		t.Errorf("expected unknown-value warning for bad conditional + bad enabled")
 	}
@@ -86,7 +86,7 @@ func TestSkipWhenParsed(t *testing.T) {
       "phases": [ {"name":"retrospective","optional":true,
         "routing": {"skip_when": [ {"field":"triage.cycle_size","op":"eq","value":"trivial"} ] } } ]
     }`)
-	cfg, _ := Load(reg, map[string]string{})
+	cfg, _ := Load(reg)
 	tb := cfg.Triggers["retrospective"]
 	if len(tb.SkipWhen) != 1 || tb.SkipWhen[0].Field != "triage.cycle_size" {
 		t.Errorf("skip_when not parsed: %+v", tb)

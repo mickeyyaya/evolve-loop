@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	gobridge "github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bypass"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -52,6 +54,7 @@ type Adapter struct {
 	recoveryStage       string
 	fatalPaneStage      string
 	envStage            string
+	sandboxMode         string
 	envDrops            *gobridge.EnvDropLog
 	bridgeConfig        policy.BridgePolicy
 	efforts             policy.EffortTable
@@ -83,12 +86,28 @@ func NewDefault(projectRoot string, signals *signalcenter.Center) *Adapter {
 	}
 	a.recoveryStage, a.fatalPaneStage = pol.BridgeRecoveryStages()
 	a.envStage = pol.IsolationEnvStage()
+	a.sandboxMode = pol.SandboxConfig().SandboxMode()
 	a.paneCaptureMaxBytes = pol.AttemptPostmortemConfig().MaxPaneCaptureBytes
 	a.bootTimeoutStore = clihealth.NewStore(projectRoot, nil)
+	emitCredentialOptIns(signals, a.bridgeConfig, time.Now())
 	a.engineFactory = func(env map[string]string) core.Bridge {
 		return gobridge.NewEngine(a.productionEngineDeps(env))
 	}
 	return a
+}
+
+func emitCredentialOptIns(signals *signalcenter.Center, cfg policy.BridgePolicy, at time.Time) {
+	for _, o := range []struct {
+		name string
+		on   bool
+	}{
+		{"bridge.allow_anthropic_base_url", cfg.AllowAnthropicBaseURL},
+		{"bridge.allow_openai_api_key", cfg.AllowOpenAIAPIKey},
+	} {
+		if o.on {
+			bypass.Emit(signals, bypass.Use{Name: o.name, Reason: "policy.json passes the credential to each LLM cell", Actor: "policy.json", Origin: "NewDefault", At: at})
+		}
+	}
 }
 
 func (a *Adapter) productionEngineDeps(env map[string]string) gobridge.Deps {
@@ -108,6 +127,9 @@ func (a *Adapter) productionEngineDeps(env map[string]string) gobridge.Deps {
 		RecoveryStage:         a.recoveryStage,
 		FatalPaneStage:        a.fatalPaneStage,
 		EnvStage:              a.envStage,
+		SandboxMode:           a.sandboxMode,
+		AllowAnthropicBaseURL: a.bridgeConfig.AllowAnthropicBaseURL,
+		AllowOpenAIAPIKey:     a.bridgeConfig.AllowOpenAIAPIKey,
 		EnvDrops:              a.envDrops,
 		Signals:               a.signals,
 		CorroborateWall:       gobridge.DefaultWallCorroborator(nil, os.Stderr),
@@ -138,6 +160,8 @@ func (a *Adapter) SetPhaseIOStage(stage config.Stage) {
 func (a *Adapter) SetRecoveryStage(stage string) {
 	a.recoveryStage = stage
 }
+
+func (a *Adapter) SetSandboxOff() { a.sandboxMode = config.SandboxModeOff }
 
 func (a *Adapter) SetFatalPaneStage(stage string) {
 	a.fatalPaneStage = stage

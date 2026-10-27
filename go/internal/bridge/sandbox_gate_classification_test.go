@@ -23,9 +23,9 @@ func TestSandboxGate_NestedSessionDoesNotSatisfyRequirement(t *testing.T) {
 func TestSandboxGate_ExplicitOffIsAHostOptOutAndWarnsLoudly(t *testing.T) {
 	t.Parallel()
 	var errBuf strings.Builder
-	deps := Deps{Env: map[string]string{"EVOLVE_SANDBOX": "off"}, Stderr: &errBuf}
+	deps := Deps{SandboxMode: "off", Stderr: &errBuf}
 	if sandboxRequiredButUnavailable(deps, gateCfg(), false) {
-		t.Fatal("EVOLVE_SANDBOX=off is an explicit host opt-out — same posture as --human-input's host opt-in; it must be honoured")
+		t.Fatal("--sandbox-off is an explicit host opt-out — same posture as --human-input's host opt-in; it must be honoured")
 	}
 	if !strings.Contains(strings.ToLower(errBuf.String()), "unconfined") {
 		t.Errorf("the opt-out must be LOUD — stderr %q says nothing about running unconfined", errBuf.String())

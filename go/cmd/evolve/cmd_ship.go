@@ -26,12 +26,14 @@ func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	var bypassCommitGate bool
 	var bypassPrefixGate bool
 	var pushOnly bool
+	var autoConfirm string
 	var projectRoot string
 	var pluginRoot string
 	var pr shipPrRequest
 	fs.BoolVar(&pr.enabled, "pr", false, "after a successful manual ship, open the pull request of the pushed branch (or report the open one)")
 	fs.StringVar(&pr.bodyFile, "pr-body-file", "", "file holding the pull request body (requires --pr)")
 	fs.StringVar(&class, "class", "cycle", "commit class (cycle|manual|release|trivial)")
+	fs.StringVar(&autoConfirm, "auto-confirm", "", "manual class: skip the interactive confirmation; the value is the reason, which the ledger records (a bypass, refused inside an LLM cell)")
 	fs.BoolVar(&pushOnly, "push-only", false, "push an already-committed, provenance-verified ahead set (the sanctioned completion after GIT_PUSH_REJECTED + sync-main); commits nothing")
 	fs.BoolVar(&dryRun, "dry-run", false, "run all read-only checks but skip commit/push/release")
 	fs.BoolVar(&bypassCommitGate, "bypass-commit-gate", false, "emergency: skip manual commit-gate attestation")
@@ -43,6 +45,10 @@ func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 1
 	}
 	if !validShipArgs(fs, pushOnly, stderr) {
+		return 1
+	}
+	if autoConfirm != "" && class != string(ship.ClassManual) {
+		fmt.Fprintf(stderr, "evolve ship: --auto-confirm applies only to --class manual, not %q\n", class)
 		return 1
 	}
 
@@ -59,6 +65,12 @@ func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	signals, closeSignals := shipRootSignals(projectRoot, stderr)
 	defer closeSignals()
+	if autoConfirm != "" && !dryRun {
+		if err := newBypassAuditor(paths.EvolveDirOf(projectRoot), signals, stderr).record(bypassAutoConfirm, autoConfirm, "runShipCmd"); err != nil {
+			fmt.Fprintf(stderr, "evolve ship: %v\n", err)
+			return 1
+		}
+	}
 
 	opts := ship.Options{
 		Class:            ship.Class(class),
@@ -67,6 +79,7 @@ func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		BypassCommitGate: bypassCommitGate,
 		BypassPrefixGate: bypassPrefixGate,
 		PushOnly:         pushOnly,
+		AutoConfirm:      autoConfirm,
 		ProjectRoot:      projectRoot,
 		PluginRoot:       pluginRoot,
 		Stdin:            stdin,

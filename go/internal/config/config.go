@@ -41,16 +41,11 @@ func WithSignals(c func() *signalcenter.Center) Option {
 
 func (l *Loader) SignalsWired() bool { return l.center() != nil }
 
-func (l *Loader) Load(registryPath string, env map[string]string) (RoutingConfig, []Warning) {
+func (l *Loader) Load(registryPath string) (RoutingConfig, []Warning) {
 	var ws []Warning
 	cfg := defaults()
-	if env["EVOLVE_USE_PHASE_REGISTRY"] != "0" {
-		l.applyRegistryFile(&cfg, registryPath, &ws)
-	}
+	l.applyRegistryFile(&cfg, registryPath, &ws)
 	from := len(ws)
-	applyEnv(&cfg, env, &ws)
-	stamp(ws[from:], "step", "env", "source", "env")
-	from = len(ws)
 	validateSpine(cfg, &ws)
 	stamp(ws[from:], "step", "spine")
 	from = len(ws)
@@ -68,8 +63,8 @@ func (l *Loader) applyRegistryFile(cfg *RoutingConfig, registryPath string, ws *
 	stamp((*ws)[from:], "step", "registry", "source", "registry", "path", registryPath)
 }
 
-func Load(registryPath string, env map[string]string) (RoutingConfig, []Warning) {
-	return New().Load(registryPath, env)
+func Load(registryPath string) (RoutingConfig, []Warning) {
+	return New().Load(registryPath)
 }
 
 func RegistryPath(projectRoot string) string {
@@ -96,7 +91,6 @@ func defaults() RoutingConfig {
 func defaultRollout() RolloutStages {
 	return RolloutStages{
 		CommitEvidence:   StageOff,
-		SandboxMode:      SandboxModeAuto,
 		EvalGate:         StageEnforce,
 		ContractGate:     StageEnforce,
 		TriageCapGate:    StageEnforce,

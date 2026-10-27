@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/goalhash"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
@@ -34,6 +35,7 @@ type loopArgFlags struct {
 	skipPreflight     bool
 	skipPreflightBoot bool
 	bypassPolicy      bool
+	sandboxOff        string
 	untilInboxEmpty   bool
 	preflightOnly     bool
 	detach            bool
@@ -67,6 +69,7 @@ func registerLoopArgFlags(fs *flag.FlagSet) *loopArgFlags {
 	fs.BoolVar(&lf.relaunch, "relaunch", false, "the launch continues an earlier goal: skip the check of the inbox items that the goal names")
 	fs.StringVar(&lf.logPath, "log", "", "with --detach: the file the detached loop's stdout and stderr are appended to (required with --detach)")
 	fs.BoolVar(&lf.bypassPolicy, "bypass-policy", false, "use --bypass-policy to bypass policy.json pin enforcement for every phase in this batch (operator escape hatch)")
+	fs.StringVar(&lf.sandboxOff, "sandbox-off", "", sandboxOffUsage)
 	return lf
 }
 
@@ -301,6 +304,7 @@ func buildLoopConfig(lf *loopArgFlags, goalHash, goalText, strategy string, maxC
 		SkipPreflight:     lf.skipPreflight,
 		SkipPreflightBoot: lf.skipPreflightBoot,
 		BypassPolicy:      lf.bypassPolicy,
+		SandboxOff:        lf.sandboxOff,
 		ChainMode:         lf.untilInboxEmpty,
 		PreflightOnly:     lf.preflightOnly,
 		Detach:            lf.detach,
@@ -370,4 +374,11 @@ func (cfg loopConfig) agentOverrides() cliroute.Overrides {
 		out[agent] = ov
 	}
 	return out
+}
+
+func (cfg loopConfig) sandboxMode() string {
+	if cfg.SandboxOff != "" {
+		return config.SandboxModeOff
+	}
+	return ""
 }

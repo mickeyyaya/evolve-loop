@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## Changed — each bypass is an audited parameter or a policy key, not an environment name (X18d, 2026-10-27)
+
+- **The change.** No code reads the 10 class (c) names of [control-flags](docs/architecture/control-flags.md#classes-of-the-readers-outside-the-registry) from the environment now (ADR-0156 I-16). A set name has no effect, and the cycle start prints one `[policy] WARN` that names the replacement.
+- **Audited parameters.** `EVOLVE_SANDBOX=off` became `evolve loop --sandbox-off=<reason>` and `evolve cycle run --sandbox-off=<reason>`. `EVOLVE_SHIP_AUTO_CONFIRM=1` became `evolve ship --class manual --auto-confirm=<reason>`, and another class refuses it. `--human-input` of `evolve bridge launch` now takes a reason: `--human-input=<reason>`.
+- **The audit record.** Each use writes one `control_bypass` ledger entry, and then one `CONTROL_BYPASS_USED` signal with the name, the operator account, the reason and the time. A use inside an LLM cell is refused. An empty value means that the bypass is not in use, so write `--<name>=<reason>`.
+- **Policy keys.** `sandbox.mode` (`auto` or `on`) replaces the other values of `EVOLVE_SANDBOX`, and the parse refuses `off`. `bridge.allow_anthropic_base_url` and `bridge.allow_openai_api_key` replace `BRIDGE_ALLOW_ANTHROPIC_BASE_URL` and `BRIDGE_ALLOW_OPENAI_API_KEY`. Each opt-in that is on emits one `CONTROL_BYPASS_USED` signal at each start of the bridge adapter of a cycle.
+- **Removed bypasses.** `EVOLVE_USE_PHASE_REGISTRY` went: the loader always reads the phase registry. The environment form `EVOLVE_OPERATOR_CONFIRM` of `-operator` went. `EVOLVE_PHASE_<X>_BIN` went with `runner.PerPhase`, which had no caller.
+- **More removed bypasses.** The environment forms `BRIDGE_ALLOW_BYPASS` and `BRIDGE_DRY_RUN` of the `--allow-bypass` and `--dry-run` launch flags went. The `BRIDGE_HUMAN_SIMULATION` gate and the `BRIDGE_HUMAN_INPUT_FLAG` form went: only the audited `--human-input=<reason>` turns on human input. The release pipeline no longer sets `EVOLVE_SHIP_AUTO_CONFIRM`, because the release class asks for no confirmation.
+- **What to do.** Move each set name to its replacement in [policy-config](docs/architecture/policy-config.md#sandbox-mode-and-credential-opt-ins-x18d) or pass the parameter. A script that set `EVOLVE_SHIP_AUTO_CONFIRM=1` passes `--auto-confirm=<reason>`. The flag registry lost 3 rows.
+
 ## Changed — the operator knobs read `.evolve/policy.json`, not the environment (X18c, 2026-10-27)
 
 - **The change.** No code reads the 19 class (b) names of [control-flags](docs/architecture/control-flags.md#classes-of-the-readers-outside-the-registry) from the environment now (ADR-0156 I-16). A set name has no effect.

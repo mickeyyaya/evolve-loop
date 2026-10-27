@@ -15,7 +15,7 @@ func realRoutingConfig(t *testing.T) (config.RoutingConfig, phasespec.Catalog) {
 	t.Helper()
 	root := filepath.Join("..", "..", "..")
 	registry := config.RegistryPath(root)
-	cfg, _ := config.Load(registry, map[string]string{})
+	cfg, _ := config.Load(registry)
 	builtin, err := phasespec.Load(registry)
 	if err != nil {
 		t.Fatalf("load builtin catalog: %v", err)

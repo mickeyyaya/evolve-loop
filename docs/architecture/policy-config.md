@@ -150,6 +150,27 @@ These keys replace the class (b) environment names of [control-flags.md](control
 
 The other class (b) names have a home that is not a key here. `mandatory_phases` and `pins` are in the schema above. `evolve loop --cli <agent>=<driver>` and `--model <agent>=<tier>` set a per-run override, and `evolve worktree --lane` sets the lane. The agent profile holds `system_prompt` and `permission_mode`.
 
+## Sandbox mode and credential opt-ins (X18d)
+
+These keys replace class (c) environment names of [control-flags.md](control-flags.md#classes-of-the-readers-outside-the-registry) (X18d, ADR-0156 I-16).
+
+```jsonc
+{
+  "sandbox": { "mode": "on" },
+  "bridge": { "allow_anthropic_base_url": true, "allow_openai_api_key": true }
+}
+```
+
+| Key | Values | Effect | Former name |
+|---|---|---|---|
+| `sandbox.mode` | `auto` (the default), `on` | `on` prints a WARN when the inner sandbox cannot apply. The parse refuses `off` and each other word. | `EVOLVE_SANDBOX` |
+| `bridge.allow_anthropic_base_url` | `true`, `false` | `true` passes `ANTHROPIC_BASE_URL` to each LLM cell. Without the key, the Claude drivers refuse to start when it is set. | `BRIDGE_ALLOW_ANTHROPIC_BASE_URL` |
+| `bridge.allow_openai_api_key` | `true`, `false` | `true` passes `OPENAI_API_KEY` to each LLM cell. Without the key, the codex drivers refuse to start when it is set. | `BRIDGE_ALLOW_OPENAI_API_KEY` |
+
+At each start of the bridge adapter of a cycle, each credential opt-in that is on emits one `CONTROL_BYPASS_USED` signal with the actor `policy.json`. The signal does not depend on the stage `isolation.i2.stage`.
+
+A policy key cannot turn the sandbox off. The operator turns it off for one run with `evolve loop --sandbox-off=<reason>` or `evolve cycle run --sandbox-off=<reason>`. The run writes one `control_bypass` ledger entry and one `CONTROL_BYPASS_USED` signal, and a launch inside an LLM cell refuses the parameter.
+
 ## KB recall and lesson novelty (`research`)
 
 Two knobs over the lessons corpus (`.evolve/instincts/lessons`), both resolved by

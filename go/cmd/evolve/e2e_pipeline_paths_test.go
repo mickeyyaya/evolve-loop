@@ -21,7 +21,6 @@ func pipelineCycle(t *testing.T, evolveBin, fakeBin, repoRoot, goalHash string, 
 		"EVOLVE_CLI=claude-p",
 		"EVOLVE_RESEARCH_HOOK_DISABLED=1",
 		fakeCLIsFirstOnPath(t, fakeBin, "claude"),
-		"EVOLVE_SANDBOX=off",
 	)
 	env = append(env, isolatedHome(t)...)
 	for _, e := range extraEnv {
@@ -36,6 +35,7 @@ func pipelineCycle(t *testing.T, evolveBin, fakeBin, repoRoot, goalHash string, 
 		"--project-root", projRoot,
 		"--goal-hash", goalHash,
 		"--evolve-dir", filepath.Join(projRoot, ".evolve"),
+		"--sandbox-off=e2e fake CLIs need no confinement",
 	)
 	cmd.Env = env
 	cmd.Dir = projRoot

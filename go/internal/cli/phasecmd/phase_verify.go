@@ -168,7 +168,7 @@ func withFrozenPinViolations(res deliverable.Result, worktree string) deliverabl
 }
 
 func phaseVerifyPhaseIO() config.Stage {
-	cfg, _ := router.ConfigForProject(cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT"), cmdutil.FilterEvolveEnv(os.Environ()), os.Stderr)
+	cfg, _ := router.ConfigForProject(cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT"), os.Stderr)
 	return cfg.PhaseIO
 }
 

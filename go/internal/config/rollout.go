@@ -7,7 +7,6 @@ type RolloutStages struct {
 	ContractGate     Stage
 	TriageCapGate    Stage
 	TopNGate         Stage
-	SandboxMode      string
 	PhaseRecovery    Stage
 	SpineFloor       Stage
 	FatalPane        Stage

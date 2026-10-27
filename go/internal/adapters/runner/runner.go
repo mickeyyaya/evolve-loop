@@ -9,9 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
-	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
@@ -57,14 +55,6 @@ func (s *SubprocessRunner) Run(ctx context.Context, req core.PhaseRequest) (core
 		return core.PhaseResponse{}, fmt.Errorf("runner: parse response from %s: %w", s.phaseName, err)
 	}
 	return resp, nil
-}
-
-func PerPhase(phaseName string, inProc core.PhaseRunner, cmd CmdRunner) core.PhaseRunner {
-	envKey := "EVOLVE_PHASE_" + strings.ToUpper(phaseName) + "_BIN"
-	if binary := os.Getenv(envKey); binary != "" {
-		return NewSubprocess(phaseName, binary, cmd)
-	}
-	return inProc
 }
 
 func execRunner(ctx context.Context, name string, args []string,

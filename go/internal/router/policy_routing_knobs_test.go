@@ -19,7 +19,8 @@ func TestPolicyForProject_ReadsTheRoutingKnobsFromPolicyNotTheEnvironment(t *tes
 	if err := os.WriteFile(filepath.Join(root, ".evolve", "policy.json"), []byte(`{"router":{"dynamic_routing":"enforce","routing_mode":"static"}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	p := PolicyForProject(root, map[string]string{"EVOLVE_DYNAMIC_ROUTING": "off", "EVOLVE_ROUTING_MODE": "llm"})
+	t.Setenv("EVOLVE_DYNAMIC_ROUTING", "off")
+	p := PolicyForProject(root)
 	if p.Cfg.Stage != config.StageEnforce || p.Cfg.Mode != config.ModeStaticPreset {
 		t.Errorf("stage/mode = %v/%v, want enforce/static from policy.json", p.Cfg.Stage, p.Cfg.Mode)
 	}
@@ -54,7 +55,7 @@ func TestConfigForProject_WarnsOnARefusedPolicyAndUsesTheDefaults(t *testing.T) 
 		t.Fatal(err)
 	}
 	var warn strings.Builder
-	got, _ := ConfigForProject(root, nil, &warn)
+	got, _ := ConfigForProject(root, &warn)
 	if got.Mode != config.ModeDynamicLLM || !strings.Contains(warn.String(), "routing_mod") {
 		t.Errorf("mode %v warn %q, want the default mode and a WARN that names the key", got.Mode, warn.String())
 	}

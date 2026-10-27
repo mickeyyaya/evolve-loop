@@ -49,14 +49,14 @@ func (p PhasePolicy) ShouldRunPhase(phase string) bool {
 	}
 }
 
-func PolicyForProject(projectRoot string, env map[string]string, opts ...config.Option) PhasePolicy {
-	cfg, _ := ConfigForProject(projectRoot, env, os.Stderr, opts...)
+func PolicyForProject(projectRoot string, opts ...config.Option) PhasePolicy {
+	cfg, _ := ConfigForProject(projectRoot, os.Stderr, opts...)
 	return PhasePolicy{Cfg: cfg}
 }
 
-func ConfigForProject(projectRoot string, env map[string]string, warn io.Writer, opts ...config.Option) (config.RoutingConfig, []config.Warning) {
+func ConfigForProject(projectRoot string, warn io.Writer, opts ...config.Option) (config.RoutingConfig, []config.Warning) {
 	loader := config.New(opts...)
-	cfg, ws := loader.Load(config.RegistryPath(projectRoot), env)
+	cfg, ws := loader.Load(config.RegistryPath(projectRoot))
 	return ApplyPolicy(loader, cfg, policy.LoadOrDefaults(filepath.Join(projectRoot, ".evolve", "policy.json"), warn)), ws
 }
 

@@ -16,7 +16,12 @@ func mapLookup(m map[string]string) func(string) (string, bool) {
 
 func runLookup(t *testing.T, fr *fakeRunner, args []string, lookup map[string]string) (int, string) {
 	t.Helper()
-	eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(lookup)})
+	return runLookupWith(t, Deps{Runner: fr.runner(), LookupEnv: mapLookup(lookup)}, args)
+}
+
+func runLookupWith(t *testing.T, deps Deps, args []string) (int, string) {
+	t.Helper()
+	eng := NewEngine(deps)
 	var stdout, stderr bytes.Buffer
 	code := eng.LaunchArgs(context.Background(), args, nil, &stdout, &stderr)
 	return code, stderr.String()
@@ -68,10 +73,9 @@ func TestLaunchArgs_ClaudeP_AnthropicBaseURL_AllowedProceeds(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-p", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
-	code, _ := runLookup(t, fr, fx.args("claude-p"), map[string]string{
-		"ANTHROPIC_BASE_URL":              "http://127.0.0.1:4000",
-		"BRIDGE_ALLOW_ANTHROPIC_BASE_URL": "1",
-	})
+	code, _ := runLookupWith(t, Deps{Runner: fr.runner(), AllowAnthropicBaseURL: true, LookupEnv: mapLookup(map[string]string{
+		"ANTHROPIC_BASE_URL": "http://127.0.0.1:4000",
+	})}, fx.args("claude-p"))
 	if code != ExitOK {
 		t.Fatalf("exit = %d, want ExitOK (guard waived)", code)
 	}
@@ -97,10 +101,9 @@ func TestLaunchArgs_Codex_OpenAIKey_AllowedProceeds(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "codex", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
-	code, _ := runLookup(t, fr, fx.args("codex"), map[string]string{
-		"OPENAI_API_KEY":              "sk-x",
-		"BRIDGE_ALLOW_OPENAI_API_KEY": "1",
-	})
+	code, _ := runLookupWith(t, Deps{Runner: fr.runner(), AllowOpenAIAPIKey: true, LookupEnv: mapLookup(map[string]string{
+		"OPENAI_API_KEY": "sk-x",
+	})}, fx.args("codex"))
 	if code != ExitOK {
 		t.Fatalf("exit = %d, want ExitOK (guard waived)", code)
 	}

@@ -25,7 +25,7 @@ var codeDocs = map[ShipErrorCode]string{
 	CodeEGPSRedCount:                "verify-class: the EGPS gate reports red evals; red_count must be 0 to ship",
 	CodeControlPlaneViolation:       "verify-class: a cycle-class commit touches the control-plane integrity surface (ADR-0064); ship it manually",
 	CodeInvalidClass:                "verify-class: unknown ship class",
-	CodeManualNotTTY:                "verify-class: a manual ship needs an interactive confirmation (or the auto-confirm environment)",
+	CodeManualNotTTY:                "verify-class: a manual ship needs an interactive confirmation (or the audited --auto-confirm=<reason> parameter)",
 	CodeManualDeclined:              "verify-class: the operator declined the manual ship",
 	CodeCommitGateMissing:           "verify-class: no commit-gate attestation exists for the staged tree",
 	CodeCommitGateStale:             "verify-class: the commit-gate attestation is for a different tree",

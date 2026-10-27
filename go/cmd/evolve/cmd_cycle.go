@@ -158,8 +158,8 @@ func runCycleReset(args []string, stdout, stderr io.Writer) int {
 var cycleRunAbsoluteRoot = paths.AbsoluteRoot
 
 type cycleRunFlags struct {
-	projectRoot, goalHash, goalText, evolveDir string
-	simulate, bypassPolicy                     bool
+	projectRoot, goalHash, goalText, evolveDir, sandboxOff string
+	simulate, bypassPolicy                                 bool
 }
 
 func parseCycleRunFlags(args []string, stderr io.Writer) (cycleRunFlags, bool) {
@@ -172,6 +172,7 @@ func parseCycleRunFlags(args []string, stderr io.Writer) (cycleRunFlags, bool) {
 	fs.StringVar(&f.evolveDir, "evolve-dir", "", "path to .evolve/ state directory (default <project-root>/.evolve)")
 	fs.BoolVar(&f.simulate, "simulate", false, "no-LLM walk: every phase returns PASS without calling out (for parity-audit harness)")
 	fs.BoolVar(&f.bypassPolicy, "bypass-policy", false, "use --bypass-policy to bypass policy.json pin enforcement for every phase this run (operator escape hatch)")
+	fs.StringVar(&f.sandboxOff, "sandbox-off", "", sandboxOffUsage)
 	args = stripRemovedBudgetFlags(args, func(m string) {
 		fmt.Fprintf(stderr, "evolve cycle run: WARN: %s\n", m)
 	})
@@ -310,7 +311,7 @@ func wireCycleRun(f cycleRunFlags, projectRoot, evolveDir string, stderr io.Writ
 		return wireSimulateOrchestrator(projectRoot, evolveDir, stderr)
 	}
 	gcOrphanSessions("cycle-start", stderr)
-	return wireOrchestratorDepsFn(projectRoot, evolveDir, stderr, routingRun{bypass: f.bypassPolicy, env: filterEvolveEnv(os.Environ())})
+	return wireOrchestratorDepsFn(projectRoot, evolveDir, stderr, routingRun{bypass: f.bypassPolicy, env: filterEvolveEnv(os.Environ()), sandboxOff: f.sandboxOff})
 }
 
 func filterEvolveEnv(environ []string) map[string]string {
@@ -411,12 +412,15 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	ld := ledger.New(evolveDir, ledger.WithSignals(signals))
 
 	br := bridge.NewDefault(projectRoot, signals)
+	if err := newBypassAuditor(evolveDir, signals, console).applySandboxOff(br, run.sandboxOff); err != nil {
+		return orchDeps{Signals: signals, CloseSignals: closeSignals, RoutingErr: err}
+	}
 	br.SetOnStopReview(stopReviewRecorder(ld))
 	prm := cmdutil.NewPromptsLoader(projectRoot)
 
 	registryPath := config.RegistryPath(projectRoot)
 	loader := wiredRoutingConfigLoader(signals)
-	cfg, _ := loader.Load(registryPath, filterEvolveEnv(os.Environ()))
+	cfg, _ := loader.Load(registryPath)
 
 	var policyShipFloor []string
 	pol, policyErr := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))

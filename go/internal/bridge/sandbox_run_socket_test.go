@@ -15,7 +15,7 @@ import (
 
 func wrapDarwinBuild(t *testing.T, stderr io.Writer) ([]string, bool) {
 	t.Helper()
-	deps := Deps{Env: map[string]string{envSandboxMode: config.SandboxModeOn}, Stderr: stderr}
+	deps := Deps{SandboxMode: config.SandboxModeOn, Stderr: stderr}
 	return defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))(SandboxWrapRequest{
 		Phase: "build", Worktree: t.TempDir(), Workspace: t.TempDir(), RepoRoot: t.TempDir(), AllowNetwork: true,
 	})

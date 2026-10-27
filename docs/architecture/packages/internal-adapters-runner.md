@@ -7,7 +7,7 @@
 ## Design
 
 - **Independence.** The orchestrator sees only `core.PhaseRunner`, so it never knows which adapter is in play.
-- **`PerPhase`.** It reads `EVOLVE_PHASE_<NAME>_BIN` at run time. When the variable is set, it returns a `SubprocessRunner` for that binary. Otherwise it returns the in-process runner unchanged. The phase name is upper-cased to match the env-var convention (`EVOLVE_PHASE_BUILD_BIN`, not `EVOLVE_PHASE_build_BIN`).
+- **No environment switch.** X18d removed `PerPhase` and its `EVOLVE_PHASE_<NAME>_BIN` read (ADR-0156 I-16). No production code calls the package now. Its removal is a follow-up of X18d in [llm-isolation-2026-10.md](../../plans/llm-isolation-2026-10.md).
 - **`SubprocessRunner.Run`.** It writes the `PhaseRequest` as JSON to the subprocess stdin and reads stdout as the `PhaseResponse` JSON. It captures stderr for the diagnosis of a non-zero exit. The stderr text in the error is bounded.
 - **`CmdRunner` seam.** `NewSubprocess` takes a `CmdRunner`. A nil runner selects the default `exec.CommandContext` runner (the production wiring). Tests inject a fake.
 - **`execRunner`.** It maps an `exec.ExitError` to the exit code and a nil error, so the exit-code branches of the adapter work.

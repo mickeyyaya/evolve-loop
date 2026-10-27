@@ -7,8 +7,8 @@ import (
 	"testing"
 )
 
-func TestList_DisabledReturnsHardcoded(t *testing.T) {
-	got, err := List("/nonexistent.json", false)
+func TestList_AnAbsentRegistryReturnsHardcoded(t *testing.T) {
+	got, err := List("/nonexistent.json")
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
@@ -21,7 +21,7 @@ func TestList_DisabledReturnsHardcoded(t *testing.T) {
 }
 
 func TestList_MissingFileReturnsHardcoded(t *testing.T) {
-	got, err := List(filepath.Join(t.TempDir(), "no-such.json"), true)
+	got, err := List(filepath.Join(t.TempDir(), "no-such.json"))
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
@@ -37,7 +37,7 @@ func TestList_ValidRegistry(t *testing.T) {
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	got, err := List(path, true)
+	got, err := List(path)
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestList_InvalidJSON(t *testing.T) {
 	if err := os.WriteFile(path, []byte("not-json{"), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	if _, err := List(path, true); err == nil {
+	if _, err := List(path); err == nil {
 		t.Errorf("expected parse error")
 	}
 }
@@ -64,7 +64,7 @@ func TestList_EmptyPhasesArray(t *testing.T) {
 	if err := os.WriteFile(path, []byte(`{"phases":[]}`), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	if _, err := List(path, true); err == nil {
+	if _, err := List(path); err == nil {
 		t.Errorf("expected empty-array error")
 	}
 }
@@ -74,7 +74,7 @@ func TestList_StatOKButReadFails(t *testing.T) {
 	if err := os.Mkdir(dirAsRegistry, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	got, err := List(dirAsRegistry, true)
+	got, err := List(dirAsRegistry)
 	if err == nil {
 		t.Fatalf("expected read error for a directory path, got nil (result=%v)", got)
 	}
@@ -93,7 +93,7 @@ func TestList_FilterEmptyNames(t *testing.T) {
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	got, err := List(path, true)
+	got, err := List(path)
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}

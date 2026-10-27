@@ -25,7 +25,7 @@ func TestSpineReplay_LocalHistory(t *testing.T) {
 	}
 	sort.Strings(runs)
 
-	cfg, _ := config.Load(filepath.Join(root, "docs", "architecture", "phase-registry.json"), map[string]string{})
+	cfg, _ := config.Load(filepath.Join(root, "docs", "architecture", "phase-registry.json"))
 	sm := NewStateMachine()
 
 	type miss struct{ dir, next, why string }

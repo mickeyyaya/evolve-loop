@@ -112,6 +112,8 @@ type BridgePolicy struct {
 	AnthropicBaseURL      string         `json:"anthropic_base_url,omitempty"`
 	ModelFailover         string         `json:"model_failover,omitempty"`
 	MaxConcurrent         map[string]int `json:"max_concurrent,omitempty"`
+	AllowAnthropicBaseURL bool           `json:"allow_anthropic_base_url,omitempty"`
+	AllowOpenAIAPIKey     bool           `json:"allow_openai_api_key,omitempty"`
 }
 
 const ModelFailoverStageOn = "on"

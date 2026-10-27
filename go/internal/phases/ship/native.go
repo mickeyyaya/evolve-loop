@@ -55,6 +55,7 @@ type Options struct {
 	BypassCommitGate bool
 	BypassPrefixGate bool
 	PushOnly         bool
+	AutoConfirm      string
 
 	ProjectRoot string
 

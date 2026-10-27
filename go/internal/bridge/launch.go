@@ -3,6 +3,7 @@ package bridge
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -44,9 +45,9 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		return ExitBadFlags
 	}
 
-	if raw.humanInput {
-		if v, _ := lookupEnv(e.deps, "BRIDGE_HUMAN_SIMULATION"); v != "1" {
-			fmt.Fprintln(stderr, "[bridge] --human-input requires BRIDGE_HUMAN_SIMULATION=1 host opt-in")
+	if raw.humanReason != "" && !raw.dryRun && !raw.validateOnly {
+		if err := e.deps.auditBypass("human-input", raw.humanReason); err != nil {
+			fmt.Fprintf(stderr, "[bridge] launch: %v\n", err)
 			return ExitSafetyGate
 		}
 	}
@@ -129,7 +130,7 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		StreamOutput:       streamOut,
 		SessionName:        sessionName,
 		AllowBypass:        raw.allowBypass,
-		HumanInput:         raw.humanInput,
+		HumanInput:         raw.humanReason != "",
 		RequireFull:        raw.requireFull,
 		RequireSandbox:     raw.requireSandbox,
 		AllowedTools:       prof.AllowedTools,
@@ -211,8 +212,8 @@ type rawLaunch struct {
 	cli, profile, model, promptFile, workspace, stdoutLog, stderrLog, artifact string
 	cycle, worktree, projectRoot, agent, completion, effort                    string
 	permissionMode, sessionName, streamOutput, runID                           string
-	anthropicBaseURL, artifactTimeoutS, secondaryArtifacts                     string
-	validateOnly, dryRun, requireFull, requireSandbox, allowBypass, humanInput bool
+	anthropicBaseURL, artifactTimeoutS, secondaryArtifacts, humanReason        string
+	validateOnly, dryRun, requireFull, requireSandbox, allowBypass             bool
 	extra                                                                      []string
 }
 
@@ -291,10 +292,7 @@ func parseLaunchArgs(args []string, env map[string]string) (rawLaunch, error) {
 		streamOutput:   get("BRIDGE_STREAM_OUTPUT"),
 		requireFull:    truthy(get("BRIDGE_REQUIRE_FULL")),
 		requireSandbox: truthy(get("BRIDGE_REQUIRE_SANDBOX")),
-		allowBypass:    truthy(get("BRIDGE_ALLOW_BYPASS")),
-		dryRun:         truthy(get("BRIDGE_DRY_RUN")),
 		validateOnly:   truthy(get("VALIDATE_ONLY")),
-		humanInput:     truthy(get("BRIDGE_HUMAN_INPUT_FLAG")),
 	}
 
 	stringDest := map[string]*string{
@@ -307,6 +305,7 @@ func parseLaunchArgs(args []string, env map[string]string) (rawLaunch, error) {
 		"--session-name": &r.sessionName, "--completion": &r.completion,
 		"--anthropic-base-url": &r.anthropicBaseURL,
 		"--artifact-timeout-s": &r.artifactTimeoutS,
+		"--human-input":        &r.humanReason,
 	}
 
 	for i := 0; i < len(args); i++ {
@@ -326,7 +325,7 @@ func parseLaunchArgs(args []string, env map[string]string) (rawLaunch, error) {
 		case a == "--allow-bypass":
 			r.allowBypass = true
 		case a == "--human-input":
-			r.humanInput = true
+			return r, errors.New("--human-input needs a reason: pass --human-input=<why>")
 		case a == "--stream-output":
 			r.streamOutput = "true"
 		case a == "--no-stream-output":

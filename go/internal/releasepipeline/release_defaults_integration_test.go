@@ -112,7 +112,7 @@ git -C '` + repo.Dir + `' commit -q --allow-empty -m shipped`
 	if err != nil || head != repo.Git("rev-parse", "HEAD") || len(head) != 40 {
 		t.Fatalf("defaultShip = %q, %v; want the post-ship HEAD", head, err)
 	}
-	want := "ship\n--class\nrelease\nrelease: v1.2.3\nnotes=line one\nline two\nconfirm=1\n"
+	want := "ship\n--class\nrelease\nrelease: v1.2.3\nnotes=line one\nline two\nconfirm=\n"
 	if got := readRecord(t, record); got != want {
 		t.Fatalf("ship invocation = %q, want %q", got, want)
 	}

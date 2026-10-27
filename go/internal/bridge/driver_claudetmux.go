@@ -25,8 +25,8 @@ func (claudeTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int
 		return ExitCostLeak, nil
 	}
 	if v, ok := lookupEnv(deps, "ANTHROPIC_BASE_URL"); ok && v != "" {
-		if allow, _ := lookupEnv(deps, "BRIDGE_ALLOW_ANTHROPIC_BASE_URL"); allow != "1" {
-			fmt.Fprintln(deps.Stderr, "[claude-tmux] ANTHROPIC_BASE_URL set without BRIDGE_ALLOW_ANTHROPIC_BASE_URL=1; abort")
+		if !deps.AllowAnthropicBaseURL {
+			fmt.Fprintln(deps.Stderr, "[claude-tmux] ANTHROPIC_BASE_URL set without policy bridge.allow_anthropic_base_url; abort")
 			return ExitCostLeak, nil
 		}
 	}

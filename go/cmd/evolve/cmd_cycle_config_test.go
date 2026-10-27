@@ -190,7 +190,7 @@ func TestWireSimulateOrchestrator_CenterTopologyRendersConfigWarnings(t *testing
 		t.Fatalf("wiring the --simulate root must not load the registry (it resolves no RoutingConfig); a config line rendered: %q", out)
 	}
 	l := config.New(config.WithSignals(func() *signalcenter.Center { return d.Signals }))
-	if _, ws := l.Load(reg, nil); len(ws) != 1 || ws[0].Code != "registry-unreadable" {
+	if _, ws := l.Load(reg); len(ws) != 1 || ws[0].Code != "registry-unreadable" {
 		t.Fatalf("warnings: %+v", ws)
 	}
 	if out := console.String(); !strings.Contains(out, "[config]") || !strings.Contains(out, "CONFIG_REGISTRY_UNREADABLE") || !strings.Contains(out, "origin=Loader.Load") {

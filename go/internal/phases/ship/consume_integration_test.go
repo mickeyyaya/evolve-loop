@@ -293,7 +293,7 @@ func TestManualShip_NonShippableVerdictKeepsItemPickable(t *testing.T) {
 	res, err := runShip(t, repo, Options{
 		Class: ClassManual, CommitMessage: "fix: unfinished widget",
 		WorkspacePath: workspace, Stdout: io.Discard, Stderr: io.Discard,
-		Env: map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"},
+		AutoConfirm: "test",
 	})
 	if err != nil || res.ExitCode != ExitOK {
 		t.Fatalf("manual ship must still land (the code was reviewed): exit=%d err=%v logs=%v", res.ExitCode, err, res.Logs)

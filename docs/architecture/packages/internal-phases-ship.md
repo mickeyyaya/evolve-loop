@@ -192,7 +192,7 @@ These rules held in comments before the comment-zero change. Tests pin the ones 
 ### Class verification and confirmation
 
 - `verifyManualConfirm` stages with `git add -A` so the diff shows what will ship. The commit-gate attestation check must run after it. The computed tree SHA is then the tree that is committed. `Options.BypassCommitGate` skips only the attestation.
-- `--class manual` refuses a stdin that is not a terminal, because an LLM agent cannot answer the prompt. `EVOLVE_SHIP_AUTO_CONFIRM` is the CI escape. Only the exact word `yes` confirms.
+- `--class manual` refuses a stdin that is not a terminal, because an LLM agent cannot answer the prompt. The audited `--auto-confirm=<reason>` parameter (`Options.AutoConfirm`) is the CI escape. `evolve ship` writes one ledger entry and one `CONTROL_BYPASS_USED` signal for each use (X18d). Only the exact word `yes` confirms.
 - The bypass flags are explicit CLI flags. The ship package does not read bypass environment variables.
 - `errEmptyDiff` is the sentinel that `Run` turns into a clean exit. Nothing staged means exit 0.
 - `Config` zero values are the safe defaults. `PhaseIO` zero is `StageOff`, which keeps the prose verdict parse. `ManifestGate` zero is shadow. `RepoContractGate` zero is off, so a construction site is safe. The cmd_cycle wiring test asserts that the production site passes `enforce`.

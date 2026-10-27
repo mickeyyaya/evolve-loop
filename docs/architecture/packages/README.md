@@ -25,6 +25,7 @@ Each Go package directory has one page. The page holds what the code cannot say:
 | `internal/convergence` | the convergence policy's pure decision: the next rung of a repeat-until-accepted loop, the round to land, and what is deferred or filed (ADR-0126) | [internal-convergence.md](internal-convergence.md) |
 | `internal/recurrence` | the recurrence ledger over lesson patterns, its escalation policy, and the snapshot read and item counts the inbox rank uses | [internal-recurrence.md](internal-recurrence.md) |
 | `internal/cycleoutcome` | the closeout seam for a cycle that did not ship: the failure lifecycle of the committed ids and the planned no-work hand-over | [internal-cycleoutcome.md](internal-cycleoutcome.md) |
+| `internal/bypass` | the audit of a bypass parameter: the reason and cell check, and one ledger entry and one `CONTROL_BYPASS_USED` signal for each use (X18d) | [internal-bypass.md](internal-bypass.md) |
 | `internal/ipcenv` | the lane protocol keys a parent evolve process sets for its children, their set (`ProtocolKeys`), and the `EVOLVE_` scrub every judging `go test` runs under | [internal-ipcenv.md](internal-ipcenv.md) |
 | `internal/looppreflight` | the readiness gate `evolve loop` runs before the first wave | [internal-looppreflight.md](internal-looppreflight.md) |
 | `internal/cliupdate` | updates each subscribed CLI family at a loop boundary, smoke-tests a changed version and records the change for the drift check | [internal-cliupdate.md](internal-cliupdate.md) |

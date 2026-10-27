@@ -129,51 +129,6 @@ func TestSubprocess_Name(t *testing.T) {
 	}
 }
 
-func TestPerPhase_EnvUnset_ReturnsInProc(t *testing.T) {
-	t.Setenv("EVOLVE_PHASE_SCOUT_BIN", "")
-	inproc := &fakePhase{name: "scout", resp: core.PhaseResponse{Verdict: "PASS"}}
-	got := PerPhase("scout", inproc, nil)
-	if got != inproc {
-		t.Errorf("PerPhase returned different runner; want identity-equal to inproc")
-	}
-	_, _ = got.Run(context.Background(), core.PhaseRequest{Cycle: 1})
-	if inproc.runs != 1 {
-		t.Errorf("inProc.runs=%d, want 1", inproc.runs)
-	}
-}
-
-func TestPerPhase_EnvSet_ReturnsSubprocess(t *testing.T) {
-	t.Setenv("EVOLVE_PHASE_SCOUT_BIN", "/usr/local/bin/phase-scout")
-	resp := core.PhaseResponse{Phase: "scout", Verdict: "PASS"}
-	jsonOut, _ := json.Marshal(resp)
-	sc := &scriptedCmd{exitCode: 0, stdout: string(jsonOut)}
-	inproc := &fakePhase{name: "scout"}
-
-	got := PerPhase("scout", inproc, sc.runner())
-	if _, ok := got.(*SubprocessRunner); !ok {
-		t.Fatalf("PerPhase returned %T, want *SubprocessRunner", got)
-	}
-	out, err := got.Run(context.Background(), core.PhaseRequest{Cycle: 1})
-	if err != nil {
-		t.Fatalf("Run: %v", err)
-	}
-	if out.Verdict != "PASS" {
-		t.Errorf("Verdict=%q, want PASS", out.Verdict)
-	}
-	if inproc.runs != 0 {
-		t.Errorf("inproc.runs=%d, want 0 (subprocess took over)", inproc.runs)
-	}
-}
-
-func TestPerPhase_NormalizesPhaseName(t *testing.T) {
-	t.Setenv("EVOLVE_PHASE_BUILD_BIN", "/x")
-	inproc := &fakePhase{name: "build"}
-	got := PerPhase("build", inproc, (&scriptedCmd{stdout: "{}", exitCode: 0}).runner())
-	if _, ok := got.(*SubprocessRunner); !ok {
-		t.Errorf("expected SubprocessRunner for lowercase phase name + uppercase env")
-	}
-}
-
 func TestNewSubprocess_NilRunnerUsesExec(t *testing.T) {
 	r := NewSubprocess("scout", "/x", nil)
 	if r == nil {

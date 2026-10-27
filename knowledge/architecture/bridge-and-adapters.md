@@ -128,7 +128,7 @@ polls the artifact file (default); `"stdout"` completes on REPL-idle for agents
 that print their answer and write no file (the router/advisor). Only the `*-tmux`
 drivers honor it.
 
-OS-level **sandboxing** wraps every launch when `EVOLVE_SANDBOX=1`: `bridge.Deps.SandboxWrap`
+OS-level **sandboxing** wraps every launch unless the audited `--sandbox-off=<reason>` parameter turns it off: `bridge.Deps.SandboxWrap`
 calls `adapters/sandbox.GenerateSBPL` (macOS `sandbox-exec`) / `BwrapPrefix` (Linux
 `bwrap`), setting the repo root read-only while allowing writes to the worktree +
 workspace. This is the OS belt to the trust kernel's role-gate suspenders.

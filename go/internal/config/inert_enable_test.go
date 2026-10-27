@@ -12,23 +12,21 @@ func inertEnableWarn(ws []Warning) (Warning, bool) {
 }
 
 func TestLoad_PlanReviewEnabled_StageAdvisory_NoInertWarning(t *testing.T) {
-	_, ws := Load("", map[string]string{
-		"EVOLVE_DYNAMIC_ROUTING": "advisory",
-	})
+	_, ws := Load("")
 	if _, ok := inertEnableWarn(ws); ok {
 		t.Errorf("inert-warning fired with no enables at Stage=Advisory; got %+v", ws)
 	}
 }
 
 func TestLoad_SpinePhaseEnabled_NoInertWarning(t *testing.T) {
-	_, ws := Load("", map[string]string{})
+	_, ws := Load("")
 	if _, ok := inertEnableWarn(ws); ok {
 		t.Errorf("inert-warning fired with spine defaults; got %+v", ws)
 	}
 }
 
 func TestLoad_NoEnables_NoInertWarning(t *testing.T) {
-	_, ws := Load("", map[string]string{})
+	_, ws := Load("")
 	if _, ok := inertEnableWarn(ws); ok {
 		t.Errorf("inert-warning fired with no enables; got %+v", ws)
 	}
@@ -36,7 +34,7 @@ func TestLoad_NoEnables_NoInertWarning(t *testing.T) {
 
 func TestLoad_OtherWarningsStillEmit(t *testing.T) {
 	reg := writeRegistry(t, `{"config":{"mandatory_phases":["scout","build"]},"phases":[]}`)
-	_, ws := Load(reg, nil)
+	_, ws := Load(reg)
 	var sawWeak bool
 	for _, w := range ws {
 		if w.Code == "weak-spine" {

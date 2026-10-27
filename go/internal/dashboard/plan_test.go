@@ -47,7 +47,7 @@ func planFor(t *testing.T, root string, id int, loop LoopStatus) (*PhasePlan, []
 	t.Helper()
 	cs, _ := readCycle(root, id, nil)
 	cs = assignState(cs, loop)
-	set, _ := readMandatory(root, nil)
+	set, _ := readMandatory(root)
 	return readPlan(set, core.RunWorkspacePath(root, id), cs, loop, newStreamReader())
 }
 
@@ -106,7 +106,7 @@ func TestPlanStep_SealedCycleMarksUnreachedAndRounds(t *testing.T) {
 	cs, _ := readCycle(root, 1673, nil)
 	cs.HasDossier, cs.Verdict = true, "FAIL"
 	cs = assignState(cs, LoopStatus{})
-	set, _ := readMandatory(root, nil)
+	set, _ := readMandatory(root)
 	plan, _ := readPlan(set, core.RunWorkspacePath(root, 1673), cs, LoopStatus{}, newStreamReader())
 	if want := []string{"scout:pass", "triage:pass", "build:pass", "audit:fail", "retro:pass", "ship:unreached"}; !reflect.DeepEqual(statuses(plan), want) {
 		t.Errorf("steps = %v, want %v", statuses(plan), want)
@@ -179,7 +179,7 @@ func TestPhasePlan_TornSourcesAreSaidNotSubstituted(t *testing.T) {
 		t.Errorf("a stream that stops early is said: %v", warns)
 	}
 	writeFile(t, filepath.Join(root, "docs", "architecture", "phase-registry.json"), "{")
-	set, mw := readMandatory(root, nil)
+	set, mw := readMandatory(root)
 	if len(mw) != 1 || !strings.Contains(mw[0], "malformed") || !reflect.DeepEqual(set.mandatory, []string{"scout", "build", "audit", "ship"}) {
 		t.Errorf("malformed registry: set=%v warns=%v", set.mandatory, mw)
 	}
@@ -240,34 +240,6 @@ func TestServer_CycleDetailCarriesThePlan(t *testing.T) {
 	}
 }
 
-func TestServer_SnapshotReflectsTheInjectedEnvironment(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	writePlanFixture(t, root, 1682, []phasetiming.Entry{entry("scout", "PASS", "2026-09-14T08:15:00Z", "2026-09-14T08:18:00Z", 1)}, nil, "")
-	env := map[string]string{"EVOLVE_USE_PHASE_REGISTRY": "0", "EVOLVE_MANDATORY_PHASES": "scout,build,ship"}
-	set, warns := readMandatory(root, env)
-	if !reflect.DeepEqual(set.mandatory, []string{"scout", "build", "audit", "ship"}) {
-		t.Errorf("mandatory = %v (warns %v), want the compiled spine: the registry is off and EVOLVE_MANDATORY_PHASES is not read", set.mandatory, warns)
-	}
-	now := time.Date(2026, 9, 14, 9, 0, 0, 0, time.UTC)
-	snap := New(root, Options{Env: env}).Snapshot(now)
-	plain := Collect(root, now)
-	var withEnv, without *PhasePlan
-	for _, c := range snap.Cycles {
-		if c.ID == 1682 {
-			withEnv = c.Plan
-		}
-	}
-	for _, c := range plain.Cycles {
-		if c.ID == 1682 {
-			without = c.Plan
-		}
-	}
-	if withEnv == nil || without == nil || !reflect.DeepEqual(withEnv.Mandatory, []string{"scout", "build", "audit", "ship"}) || len(without.Mandatory) != 5 {
-		t.Errorf("snapshot mandatory = %v, collect mandatory = %v", withEnv, without)
-	}
-}
-
 func TestScanStream_ARoutingDispositionIsNotAPhaseRun(t *testing.T) {
 	path := filepath.Join(t.TempDir(), signalcenter.StreamFileName)
 	writeNDJSON(t, path,
@@ -291,7 +263,7 @@ func TestReadMandatory_AddsThePolicyMandatoryPhases(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, ".evolve", "policy.json"), []byte(`{"mandatory_phases":["retro"]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	set, _ := readMandatory(root, nil)
+	set, _ := readMandatory(root)
 	if n := len(set.mandatory); n == 0 || set.mandatory[n-1] != "retro" {
 		t.Errorf("mandatory = %v, want the policy phase retro appended", set.mandatory)
 	}

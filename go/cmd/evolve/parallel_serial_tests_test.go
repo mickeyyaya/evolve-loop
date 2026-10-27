@@ -1,6 +1,10 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestRunShipCmd_AutoConfirmOutsideAManualRunWritesNoRecord":                                        "swaps seam shipRunFn",
+	"main.TestRunContinuationRelease_AFailedOrLostReleaseIsExit1":                                           "swaps seam releaseContinuationBinding",
+	"main.TestSolutionCheck_TheDefaultRootIsTheWorkingDirectoryAndAnUnknownOneRefuses":                      "swaps seam solutionWorkdir",
+	"main.TestRunShipCmd_AutoConfirmIsAnAuditedBypass":                                                      "swaps seam shipRunFn",
 	"main.TestWireOrchestratorDeps_TheIntentRunnerReadsDeltaModeFromThePolicy":                              "sets runner.DefaultRouter through wireOrchestratorDeps",
 	"main.TestRunPlanAndExecute_ABadFlagOrAnUnreadableStdinStops":                                           "resets the phase registry",
 	"main.TestRunPlanAndExecute_AFailedPassStopsWithItsCode":                                                "resets the phase registry",

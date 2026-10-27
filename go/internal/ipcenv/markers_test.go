@@ -17,7 +17,7 @@ var classAMarkers = []string{
 	"EVOLVE_FANOUT_PARENT_AGENT", "EVOLVE_FANOUT_WORKER_ARTIFACT", "EVOLVE_FANOUT_CACHE_PREFIX_FILE",
 	"EVOLVE_BRIDGE_PIDFILE", "EVOLVE_PHASE_RECOVERY_STAGE", "EVOLVE_SHIP_RELEASE_NOTES", "EVOLVE_CLI",
 	"BRIDGE_CLI", "BRIDGE_RUN_ID", "BRIDGE_COMPLETION", "BRIDGE_PERMISSION_MODE", "BRIDGE_SESSION_NAME",
-	"BRIDGE_STREAM_OUTPUT", "BRIDGE_REQUIRE_FULL", "BRIDGE_REQUIRE_SANDBOX", "BRIDGE_HUMAN_INPUT_FLAG",
+	"BRIDGE_STREAM_OUTPUT", "BRIDGE_REQUIRE_FULL", "BRIDGE_REQUIRE_SANDBOX",
 }
 
 func TestMarkers_AreClassAOfTheControlFlagInventory(t *testing.T) {
@@ -52,7 +52,7 @@ func TestCellMarkers_AreTheMarkersThatReachAnLLMCell(t *testing.T) {
 	}
 }
 
-func TestCarried_IsAMarkerOrAControlNotYetMoved(t *testing.T) {
+func TestCarried_IsOnlyAMarker(t *testing.T) {
 	t.Parallel()
 	for name, want := range map[string]bool{
 		"EVOLVE_PROJECT_ROOT":              true,
@@ -61,8 +61,8 @@ func TestCarried_IsAMarkerOrAControlNotYetMoved(t *testing.T) {
 		"EVOLVE_AUDITOR_CLI":               false,
 		"EVOLVE_TDD_ENGINEER_MODEL":        false,
 		"EVOLVE_CLI_MAX_CONCURRENT_CLAUDE": false,
-		"EVOLVE_SANDBOX":                   true,
-		"BRIDGE_ALLOW_BYPASS":              true,
+		"EVOLVE_SANDBOX":                   false,
+		"BRIDGE_ALLOW_BYPASS":              false,
 		"EVOLVE_BYPASS_SHIP_GATE":          false,
 		"EVOLVE_SANDBOX_FALLBACK_ON_EPERM": false,
 		"EVOLVE_REQUIRE_INTENT":            false,
@@ -76,24 +76,9 @@ func TestCarried_IsAMarkerOrAControlNotYetMoved(t *testing.T) {
 	}
 }
 
-func TestUnmovedControls_AreWellFormedAndMatchNoMarker(t *testing.T) {
-	t.Parallel()
-	for _, pattern := range ipcenv.UnmovedControls() {
-		for _, name := range ipcenv.Markers() {
-			matched, err := path.Match(pattern, name)
-			if err != nil {
-				t.Fatalf("pattern %s is malformed: %v", pattern, err)
-			}
-			if matched {
-				t.Errorf("%s matches the pipeline marker %s", pattern, name)
-			}
-		}
-	}
-}
-
 func TestMarkerLists_ReturnFreshSlices(t *testing.T) {
 	t.Parallel()
-	for name, list := range map[string]func() []string{"Markers": ipcenv.Markers, "CellMarkers": ipcenv.CellMarkers, "UnmovedControls": ipcenv.UnmovedControls} {
+	for name, list := range map[string]func() []string{"Markers": ipcenv.Markers, "CellMarkers": ipcenv.CellMarkers} {
 		first := list()
 		first[0] = "MUTATED"
 		if list()[0] == "MUTATED" {
@@ -115,7 +100,7 @@ func TestRetiredInUse_NamesEachRetiredControlThatIsSetOnceWithItsReplacement(t *
 			t.Errorf("%s names no replacement", r.Name)
 		}
 	}
-	if want := []string{"EVOLVE_ROUTING_MODE", "EVOLVE_*_CLI"}; !slices.Equal(names, want) {
+	if want := []string{"EVOLVE_ROUTING_MODE", "EVOLVE_*_CLI", "EVOLVE_SANDBOX"}; !slices.Equal(names, want) {
 		t.Errorf("RetiredInUse = %v, want %v: a set name warns once, an empty or valueless one does not", names, want)
 	}
 }
@@ -127,11 +112,15 @@ func TestRetiredControls_AreNoLongerCarriedAndMatchNoMarker(t *testing.T) {
 		t.Fatal("RetiredControls is empty")
 	}
 	for _, r := range retired {
-		if slices.Contains(ipcenv.UnmovedControls(), r.Name) {
-			t.Errorf("%s is both retired and not yet moved", r.Name)
+		if ipcenv.Carried(r.Name) {
+			t.Errorf("the retired %s is still carried", r.Name)
 		}
 		for _, name := range ipcenv.Markers() {
-			if matched, _ := path.Match(r.Name, name); matched {
+			matched, err := path.Match(r.Name, name)
+			if err != nil {
+				t.Fatalf("pattern %s is malformed: %v", r.Name, err)
+			}
+			if matched {
 				t.Errorf("the retired %s matches the pipeline marker %s", r.Name, name)
 			}
 		}

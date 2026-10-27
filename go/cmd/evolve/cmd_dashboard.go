@@ -17,7 +17,7 @@ import (
 )
 
 var dashboardServe = func(ctx context.Context, root, addr string) error {
-	return dashboard.New(root, dashboard.Options{Env: envMap()}).ListenAndServe(ctx, addr)
+	return dashboard.New(root, dashboard.Options{}).ListenAndServe(ctx, addr)
 }
 
 func runDashboard(args []string, _ io.Reader, stdout, stderr io.Writer) int {
@@ -33,7 +33,7 @@ func runDashboard(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if *snapshotOnly {
 		enc := json.NewEncoder(stdout)
 		enc.SetIndent("", "  ")
-		if err := enc.Encode(dashboard.New(pr, dashboard.Options{Env: envMap()}).Snapshot(time.Now())); err != nil {
+		if err := enc.Encode(dashboard.New(pr, dashboard.Options{}).Snapshot(time.Now())); err != nil {
 			fmt.Fprintf(stderr, "evolve dashboard: %v\n", err)
 			return 1
 		}

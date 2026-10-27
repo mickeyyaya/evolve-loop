@@ -1,7 +1,9 @@
 package bridge
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"io"
 	"path/filepath"
 	"strings"
@@ -9,17 +11,18 @@ import (
 	"time"
 )
 
-func TestHumanActive(t *testing.T) {
+func TestHumanInput_NeedsAReasonAndAnAuditSink(t *testing.T) {
 	t.Parallel()
-	simOn := mapLookup(map[string]string{"BRIDGE_HUMAN_SIMULATION": "1"})
-	if humanActive(Deps{LookupEnv: simOn}, false) {
-		t.Fatal("humanInput=false → inactive")
+	if _, err := parseLaunchArgs([]string{"--human-input", "--stream-output"}, nil); err == nil || !strings.Contains(err.Error(), "--human-input=<why>") {
+		t.Errorf("a bare --human-input: err = %v, want a refusal that asks for the reason", err)
 	}
-	if humanActive(Deps{LookupEnv: mapLookup(nil)}, true) {
-		t.Fatal("no BRIDGE_HUMAN_SIMULATION → inactive")
+	if err := (Deps{}).auditBypass("human-input", "demo"); !errors.Is(err, errBypassNotAudited) {
+		t.Errorf("no sink: err = %v, want errBypassNotAudited", err)
 	}
-	if !humanActive(Deps{LookupEnv: simOn}, true) {
-		t.Fatal("both gates → active")
+	var got []string
+	deps := Deps{RecordBypass: func(name, reason string) error { got = append(got, name+"="+reason); return nil }}
+	if err := deps.auditBypass("human-input", "demo"); err != nil || len(got) != 1 || got[0] != "human-input=demo" {
+		t.Errorf("sink: err = %v, calls = %v, want one record", err, got)
 	}
 }
 
@@ -59,17 +62,12 @@ func TestHumanPrimitives(t *testing.T) {
 	humanReadingPause(deps, strings.Repeat("word ", 40))
 }
 
-func TestClaudeTmux_HumanInput_GateAndPath(t *testing.T) {
+func TestClaudeTmux_HumanInput_AnAuditedReasonTakesTheHumanPath(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 
-	code, se := runTmux(t, fx, &fakeTmux{}, nil, "--allow-bypass", "--human-input")
-	if code != ExitSafetyGate || !strings.Contains(se, "BRIDGE_HUMAN_SIMULATION") {
-		t.Fatalf("human-input gate: code=%d se=%q", code, se)
-	}
-
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault, "this model is deprecated, Continue?"}}
-	code2, se2 := runTmux(t, fx, tmux, map[string]string{"BRIDGE_HUMAN_SIMULATION": "1"}, "--allow-bypass", "--human-input")
+	code2, se2 := runTmuxAudited(t, fx, tmux, "--allow-bypass", "--human-input=demo")
 	if code2 != ExitRespondLoopGuard {
 		t.Fatalf("human path exit = %d, want ExitRespondLoopGuard", code2)
 	}
@@ -78,5 +76,43 @@ func TestClaudeTmux_HumanInput_GateAndPath(t *testing.T) {
 	}
 	if !strings.Contains(se2, "[human-input]") {
 		t.Fatalf("human path should log [human-input]; se=%q", se2)
+	}
+}
+
+func runTmuxAudited(t *testing.T, fx launchFixture, tmux *fakeTmux, extra ...string) (int, string) {
+	t.Helper()
+	eng := NewEngine(Deps{
+		Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil), CaptureBaseline: zeroBaselineCapture,
+		RecordBypass: func(string, string) error { return nil },
+	})
+	var stdout, stderr bytes.Buffer
+	code := eng.LaunchArgs(context.Background(), fx.args("claude-tmux", extra...), nil, &stdout, &stderr)
+	return code, stderr.String()
+}
+
+func TestLaunch_AHumanInputWithoutAnAuditIsRefused(t *testing.T) {
+	t.Parallel()
+	fx := newFixture(t, "claude-tmux", "")
+	code, se := runTmux(t, fx, &fakeTmux{}, nil, "--allow-bypass", "--human-input=demo")
+	if code != ExitSafetyGate || !strings.Contains(se, "no audit sink") {
+		t.Fatalf("code = %d, stderr = %q, want the safety gate", code, se)
+	}
+}
+
+func TestLaunch_ADryRunHumanInputNeedsNoAudit(t *testing.T) {
+	t.Parallel()
+	fx := newFixture(t, "claude-tmux", "")
+	code, se := runTmux(t, fx, &fakeTmux{}, nil, "--allow-bypass", "--human-input=demo", "--dry-run")
+	if strings.Contains(se, "no audit sink") || code == ExitSafetyGate {
+		t.Fatalf("code = %d, stderr = %q, want a dry run that writes no bypass record", code, se)
+	}
+}
+
+func TestLaunch_AValidateOnlyHumanInputNeedsNoAudit(t *testing.T) {
+	t.Parallel()
+	fx := newFixture(t, "claude-tmux", "")
+	code, se := runTmux(t, fx, &fakeTmux{}, nil, "--allow-bypass", "--human-input=demo", "--validate-only")
+	if strings.Contains(se, "no audit sink") || code == ExitSafetyGate {
+		t.Fatalf("code = %d, stderr = %q, want a validate-only run that writes no bypass record", code, se)
 	}
 }

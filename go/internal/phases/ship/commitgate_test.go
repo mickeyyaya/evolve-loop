@@ -34,7 +34,7 @@ func TestCommitGate_ManualMissingAttestation_Refuses(t *testing.T) {
 	res, _ := runShip(t, repo, Options{
 		Class:         ClassManual,
 		CommitMessage: "unreviewed change",
-		Env:           map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"},
+		AutoConfirm:   "test",
 	})
 	if res.ExitCode != ExitFailure {
 		t.Fatalf("want ExitFailure (missing commit-gate attestation is a config error), got %d (logs=%v)", res.ExitCode, res.Logs)
@@ -56,7 +56,7 @@ func TestCommitGate_ManualValidAttestation_Ships(t *testing.T) {
 	res, _ := runShip(t, repo, Options{
 		Class:         ClassManual,
 		CommitMessage: "reviewed change",
-		Env:           map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"},
+		AutoConfirm:   "test",
 	})
 	if res.ExitCode != ExitOK {
 		t.Fatalf("want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)
@@ -77,7 +77,7 @@ func TestCommitGate_ManualStaleAttestation_Refuses(t *testing.T) {
 	res, _ := runShip(t, repo, Options{
 		Class:         ClassManual,
 		CommitMessage: "actual change",
-		Env:           map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"},
+		AutoConfirm:   "test",
 	})
 	if res.ExitCode != ExitFailure {
 		t.Fatalf("want ExitFailure (stale commit-gate attestation is a config error), got %d (logs=%v)", res.ExitCode, res.Logs)
@@ -97,7 +97,7 @@ func TestCommitGate_ManualDryRun_SkipsAttestation(t *testing.T) {
 		Class:         ClassManual,
 		CommitMessage: "dry change",
 		DryRun:        true,
-		Env:           map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"},
+		AutoConfirm:   "test",
 	})
 	if res.ExitCode != ExitOK {
 		t.Fatalf("want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)
@@ -115,7 +115,7 @@ func TestCommitGate_ManualBypass_Ships(t *testing.T) {
 		Class:            ClassManual,
 		CommitMessage:    "bypassed change",
 		BypassCommitGate: true,
-		Env:              map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"},
+		AutoConfirm:      "test",
 	})
 	if res.ExitCode != ExitOK {
 		t.Fatalf("want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)
@@ -132,13 +132,13 @@ func TestCommitGate_GitLogTellsAWaivedCommitFromABypassedOne(t *testing.T) {
 	addRemote(t, repo)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nwaived change\n")
 	writeGateAttestation(t, repo, commitgate.Attestation{TreeStateSHA: treeStateSHA(t, repo), TS: "2026-10-01T00:00:00Z", ReviewWaiver: "comment-only", Tool: "shasum"})
-	if res, _ := runShip(t, repo, Options{Class: ClassManual, CommitMessage: "waived change", Env: map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"}}); res.ExitCode != ExitOK {
+	if res, _ := runShip(t, repo, Options{Class: ClassManual, CommitMessage: "waived change", AutoConfirm: "test"}); res.ExitCode != ExitOK {
 		t.Fatalf("waived ship: want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)
 	}
 	waived := runGitOut(t, repo, "log", "-1", "--format=%B")
 
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nbypassed change\n")
-	if res, _ := runShip(t, repo, Options{Class: ClassManual, CommitMessage: "bypassed change", BypassCommitGate: true, Env: map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"}}); res.ExitCode != ExitOK {
+	if res, _ := runShip(t, repo, Options{Class: ClassManual, CommitMessage: "bypassed change", BypassCommitGate: true, AutoConfirm: "test"}); res.ExitCode != ExitOK {
 		t.Fatalf("bypassed ship: want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)
 	}
 	bypassed := runGitOut(t, repo, "log", "-1", "--format=%B")

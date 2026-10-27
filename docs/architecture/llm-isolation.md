@@ -219,7 +219,7 @@ The permission bypass of the CLI has more than one source:
 |---|---|---|
 | `launchArgs` (`go/internal/bridge/engine.go:277`) | `--allow-bypass` on each phase dispatch | each phase pane |
 | `consensusdispatch.go:299` | `--allow-bypass` on each voter launch | each consensus voter |
-| `BRIDGE_ALLOW_BYPASS` (`launch.go`, `parseLaunchArgs`) | the same flag from the environment | a manual `evolve bridge launch` |
+| `--allow-bypass` of `evolve bridge launch` (`launch.go`, `parseLaunchArgs`) | the flag of a manual launch; X18d removed the `BRIDGE_ALLOW_BYPASS` environment form | a manual `evolve bridge launch` |
 | `launchPurposeConfig` (`launch_llm.go`) | `AllowBypass` on the `Config` | the `probe` and `smoke` purposes |
 
 Thus each phase runs with the permission bypass of its CLI. The permission prompt of the CLI is not the limit of a cell. The limit is the OS sandbox and the cell boundary of I-7. X3 does not change the phase grants.
@@ -306,7 +306,7 @@ The builder is `Deps.cellEnv` in `go/internal/bridge/hermetic_env.go`. Each LLM 
 | `enforce` | the union only, one `ISOLATION_I2_VIOLATION` for each dropped name, `action=refused` |
 | Base allowlist | the names of the table above and each `LC_*` name |
 | Pipeline markers | the cell part of the marker list, `ipcenv.CellMarkers()` (X18b): `EVOLVE_PROJECT_ROOT`, `EVOLVE_WORKTREE_ROOT`, `EVOLVE_CYCLE_STATE_FILE`, `EVOLVE_TMUX_SOCKET`, the four `EVOLVE_FLEET*` keys, `EVOLVE_DISPATCH_DEPTH` and `EVOLVE_PHASE`. It applies to the launcher and to `Deps.Env`. A gate or bypass name (`EVOLVE_BYPASS_*`, `EVOLVE_SANDBOX*`, `EVOLVE_MSG_TOKEN`, `BRIDGE_*`) never reaches a child at `enforce`. |
-| Operator opt-ins | `BRIDGE_ALLOW_ANTHROPIC_BASE_URL=1` passes `ANTHROPIC_BASE_URL`, and `BRIDGE_ALLOW_OPENAI_API_KEY=1` passes `OPENAI_API_KEY`. So the route that the operator opted into stays the route of the child. |
+| Operator opt-ins | The policy key `bridge.allow_anthropic_base_url` passes `ANTHROPIC_BASE_URL`, and `bridge.allow_openai_api_key` passes `OPENAI_API_KEY` (X18d). So the route that the operator opted into stays the route of the child. Each opt-in that is on emits `CONTROL_BYPASS_USED` at each start of the bridge adapter of a cycle. |
 | Excluded always | `EVOLVE_DISPATCH_ID` (the dispatch adds its own tag), and each name that is not a shell identifier |
 | Filter | `ipcenv.Keep`, the allowlist twin of the `ipcenv.Scrub` deny list |
 | Report once | `Deps.EnvDrops` (`EnvDropLog`) keeps the family and name pairs that it reported. The in-process adapter shares one log for its process. An engine with no log gets its own. |
@@ -376,7 +376,7 @@ A Go refusal only works when the marker reaches the pane. A sandbox rule only wo
 1. The launcher sets `EVOLVE_DISPATCH_DEPTH=1` and `EVOLVE_PHASE=<phase>` (proposed) on each phase pane.
 2. The existing refusals then fire: `evolve agent run` and the boundary writes. The other dispatch verbs do not read the markers yet (§7.1).
 3. The sandbox denies the exec of each manifest `binary` (§9). The rule covers `claude`, `agy`, `codex` and `ollama`. `gemini` has no manifest, so it has no rule (§7.1).
-4. Inside a phase, `EVOLVE_SANDBOX=off` is refused. The host opt-out stays for operator commands outside a phase.
+4. Inside a phase, the sandbox opt-out is refused. The host opt-out stays for operator commands outside a phase. Since X18d it is the audited `--sandbox-off=<reason>` parameter, not `EVOLVE_SANDBOX=off`.
 
 #### 7.1 As built (X4)
 
@@ -388,7 +388,7 @@ A worked example: the scout pane of cycle 7 runs `claude --version` from its Bas
 | Path of the markers | `Deps.cellEnv` adds them to `Deps.Env`, and both names are in `ipcenv.CellMarkers()`. So each stage of §6.1 gives them to the child. A tmux pane and a recipe pane also get them as `export` lines before the launch line. At `shadow` such a pane inherits the environment of the server. |
 | Refusals that now fire | `evolve agent run` (`go/internal/cli/agentcmd/run.go:93`) and the boundary writes (`go/cmd/evolve/boundary_write.go:14`). Both read the depth through `subagent.ReadDispatchDepth`, which calls `ipcenv.DispatchDepth`. `subagent run` only checks its depth cap of 3, and `phase`, `loop` and `wave` read no marker. |
 | Strength of the markers | advisory. `env -u EVOLVE_DISPATCH_DEPTH -u EVOLVE_PHASE evolve agent run` passes the marker refusal. The dispatch credential (§7.1.1) is the layer that does not depend on the agent. Row N4 now proves that layer. |
-| `EVOLVE_SANDBOX=off` in a phase | `launchSwept` refuses the launch when the launcher carries `EVOLVE_PHASE` and the mode is `off`. The error is `bridge.ErrSandboxOffInPhase`, the exit code is `ExitSafetyGate`, and the bridge emits `ISOLATION_I3_VIOLATION` with `action=refused` and `rule=sandbox.off.phase`. |
+| The sandbox opt-out in a phase | `bypass.Check` refuses `--sandbox-off` when `EVOLVE_PHASE` is set or the dispatch depth is more than 0 (X18d). As a second layer, `launchSwept` refuses the launch when the launcher carries `EVOLVE_PHASE` and `Deps.SandboxMode` is `off`. The error is `bridge.ErrSandboxOffInPhase`, the exit code is `ExitSafetyGate`, and the bridge emits `ISOLATION_I3_VIOLATION` with `action=refused` and `rule=sandbox.off.phase`. |
 | Why the phase marker and not the depth | A fan-out worker has depth 1 or more, but the pipeline starts it, not an agent. It carries no `EVOLVE_PHASE`, so a host opt-out still works for it. |
 | Exec deny set | `Deps.execDenyTargets`. The files: the `binary` of each registered manifest, found on `PATH` (`Deps.LookPath`) and resolved to its real path. The roots: each `install_roots` entry of a manifest (`~/` is the home directory), resolved to its real path when it exists. `claude-p` and `claude-tmux` declare `~/.local/share/claude/versions`, because the native installer keeps each earlier version there. `codex` and `codex-tmux` declare `/opt/homebrew/Caskroom/codex`. `gemini` has no manifest, so it has no rule. |
 | Stage source | the policy key `isolation.i3.stage`, read by `policy.IsolationExecStage`. An explicit `Deps.ExecStage` wins. The default is `shadow`. `Deps.envStage` and `Deps.execStage` share `Deps.isolationStage`. |
@@ -467,7 +467,7 @@ How the operator and the pipeline hold the credential:
 Known differences from the design:
 
 - The verb gate and the launch check are checks of the shipped binary. A cell that runs its own `evolve` binary, built from the source or an older one, has neither. The exec deny of §7.1 and the write scope of §9 are then the backstops. For each in-process path of the shipped binary, the launch check is the backstop of the verb gate.
-- A cell outside a sandbox can read the credential, so the gate passes. This is the same limit as each sandbox rule: `EVOLVE_SANDBOX=off` for a host run, and an unsupported host.
+- A cell outside a sandbox can read the credential, so the gate passes. This is the same limit as each sandbox rule: `--sandbox-off` for a host run, and an unsupported host.
 - In a cell the violation signal reaches stderr only. A cell cannot write `.evolve/events` (§9), and the verb does not know its cycle.
 - A credential with the wrong mode or content refuses each gated verb of the operator at `enforce`. The operator removes `~/.evolve/dispatch/held/credential`, and the next verb writes a new one.
 - A launch with no `Deps.Signals`, for example `ModelQueryRunner`, the CLI updater and the version inventory, emits no shadow signal. At `enforce` it is still refused.
@@ -692,7 +692,7 @@ The sandbox today generates SBPL for `sandbox-exec` and an argv for `bwrap` from
 |---|---|---|---|---|---|
 | Exec of LLM binaries | deny | `(deny process-exec (require-all (literal "<real path>") (require-not (signing-identifier "com.apple.sandbox-exec"))))` for each manifest `binary` and `/usr/bin/sandbox-exec`, and the same rule with `subpath` for each `install_roots` entry (§7.1) | `--ro-bind /dev/null <real path>` for each binary and `--tmpfs <root>` for each root, other families only (§7.1) | I-3 | built at `shadow` (X4, §7.1) |
 | Exec of other tools | allow | the current `(allow process-exec)` | as today | none | allowed |
-| `EVOLVE_SANDBOX=off` in a phase | refuse the launch | Go check | Go check | I-3, I-7 | refused (X4, §7.1) |
+| the sandbox opt-out (`--sandbox-off`) in a phase | refuse the launch | Go check | Go check | I-3, I-7 | refused (X4, §7.1) |
 | Read of the worktree and the repo source | allow | `(allow file-read* (subpath "<worktree>"))` | `--ro-bind` | none | allowed |
 | Read of the own workspace (`.evolve/runs/cycle-N/`), except `<ws>/.bridge/` | allow | `(allow file-read* file-read-data (subpath "<ws>"))` after the runs deny | `--bind <ws> <ws>` after the `tmpfs` | I-5 | built (X5, §8.5) |
 | Read of `inputs/index.json` and each indexed path | allow | `(allow file-read* file-read-data (literal "<path>"))` for each entry | `--ro-bind-try <path> <path>` | I-4 | built (X5) |
@@ -1096,7 +1096,7 @@ The contract reuses the shape of [llm-quality-indexes.md](llm-quality-indexes.md
 |---|---|---|
 | `ISOLATION_I1_VIOLATION` | I-1 | the launch API, when a caller outside the bridge registers a launch; the AST guard covers the static case |
 | `ISOLATION_I2_VIOLATION` | I-2 | the environment builder, for each dropped name |
-| `ISOLATION_I3_VIOLATION` | I-3 | built: the refusal of `EVOLVE_SANDBOX=off` in a phase (`rule=sandbox.off.phase`). Proposed: the sandbox report of a denied exec, and the refusal in `evolve agent run` (§7.1). |
+| `ISOLATION_I3_VIOLATION` | I-3 | built: the refusal of the sandbox opt-out in a phase (`rule=sandbox.off.phase`). Proposed: the sandbox report of a denied exec, and the refusal in `evolve agent run` (§7.1). |
 | `ISOLATION_I4_VIOLATION` | I-4 | built (X5): the sandbox report of a read of raw output or a write of `inputs/`, read by `Deps.reportReadViolations` on macOS |
 | `ISOLATION_I5_VIOLATION` | I-5 | built (X5): the sandbox report of a read of another run directory or a home secret, read by `Deps.reportReadViolations` on macOS |
 | `ISOLATION_I6_VIOLATION` | I-6 | the router, when a launch resolves through a compiled family default and not through routing data |
@@ -1482,7 +1482,7 @@ A deny list in the bridge cannot keep up with new names, which is the same reaso
 
 | Class | Count | Fix | Item |
 |---|---|---|---|
-| (a) pipeline markers | 24 `EVOLVE_*`, 9 `BRIDGE_*` | one named Go list, `ipcenv.Markers()` (built). It is the only source of `EVOLVE_*` and `BRIDGE_*` names in a cell. It grew from the bridge list of X2. | X18b |
+| (a) pipeline markers | 24 `EVOLVE_*`, 8 `BRIDGE_*` (X18d retired `BRIDGE_HUMAN_INPUT_FLAG`) | one named Go list, `ipcenv.Markers()` (built). It is the only source of `EVOLVE_*` and `BRIDGE_*` names in a cell. It grew from the bridge list of X2. | X18b |
 | (b) operator knobs | 19 | move into `.evolve/policy.json`, strict-decoded, or into a CLI parameter (built). The pipeline reads them at each cycle start. A former name that is set prints one WARN, and the policy value wins. | X18c |
 | (c) bypasses | 10 | an explicit CLI parameter that writes a ledger record and a `CONTROL_BYPASS_USED` signal, or removal | X18d |
 | (d) dead names | 6 | delete, with the registry rows | X18e |
@@ -1498,9 +1498,9 @@ X18a and X18b go first, in either order. X18c to X18e follow X18b, and X18c also
    - A best-effort reader that runs mid-wave calls `policy.LoadOrDefaults`. It prints one `[policy] WARN` line and uses the compiled defaults, but each safety floor fails closed to `enforce`. 20 former silent readers use it, and the docs floor of the build handoff uses it too. The five readers under `internal/bridge` and `internal/adapters/bridge` still drop the error, because builders X3 and X4 change that code now; item `control-flags-bridge-policy-readers` moves them.
    - Rollout: a strict binary refuses a key that a newer PR adds, as the `floors` key of X6 did. At the boundary, rebuild the plane binary (`make -C <plane>/go build`) before the next `wave next`. `wave next` names that remedy when it meets `ErrUnknownKey`. Each PR that adds a policy key must add the schema field in the same PR.
 2. **X18b** (built) adds the marker list and closes the `buildCycleEnv` leak.
-   - `ipcenv.Markers()` (`go/internal/ipcenv/markers.go`) has the 33 markers. `ipcenv.CellMarkers()` is the part that reaches an LLM cell, and the bridge reads it.
-   - `ipcenv.UnmovedControls()` has the 29 names and patterns of classes (b) and (c) that X18c and X18d have not moved. `ipcenv.Carried` accepts a marker or one of these.
-   - `buildCycleEnv` of `evolve loop` and the request of `evolve cycle run` copy only the `EVOLVE_*` names that `Carried` accepts (`carriedEnv`). No `BRIDGE_*` name of the shell reaches the cycle. `EVOLVE_BYPASS_SHIP_GATE` and each dead name stay out (`TestBuildCycleEnv_CarriesOnlyTheMarkersAndTheControlsNotYetMoved`). The class (b) knobs still reach the cycle, so X18b changes no knob.
+   - `ipcenv.Markers()` (`go/internal/ipcenv/markers.go`) had the 33 markers (32 since X18d). `ipcenv.CellMarkers()` is the part that reaches an LLM cell, and the bridge reads it.
+   - `ipcenv.UnmovedControls()` had the 29 names and patterns of classes (b) and (c) that X18c and X18d had not moved. `ipcenv.Carried` accepted a marker or one of these. Since X18d, `Carried` accepts only a marker.
+   - `buildCycleEnv` of `evolve loop` and the request of `evolve cycle run` copy only the `EVOLVE_*` names that `Carried` accepts (`carriedEnv`). No `BRIDGE_*` name of the shell reaches the cycle. `EVOLVE_BYPASS_SHIP_GATE` and each dead name stay out (`TestCarriedEnv_CarriesOnlyTheMarkers` since X18d). The class (b) knobs still reach the cycle, so X18b changes no knob.
    - Row N1 of the matrix sets `EVOLVE_SANDBOX` and `EVOLVE_BYPASS_SHIP_GATE` on the parent. At `enforce` no seat gets them, and at `shadow` the row fails.
    - It adds the AST guard `TestNoControlFlagReadOutsideTheMarkerList` (`go/internal/guards/control_flags_test.go`):
      - It walks each non-test Go file and finds each `os.Getenv`, `os.LookupEnv` and `envchain` read. A function that passes its parameter to such a read is a reader too. An index of a map whose name contains `env` is a read.
@@ -1512,8 +1512,13 @@ X18a and X18b go first, in either order. X18c to X18e follow X18b, and X18c also
    - `router.ApplyPolicy` is the one projection of the routing keys, so the cycle, `router.PolicyForProject`, `evolve phase verify` and the dashboard agree. `EVOLVE_COMMIT_EVIDENCE` had no consumer, so it got no key.
    - `evolve loop --cli` and `--model` reach the router as typed overrides (`cliroute.WithOverrides`), not as cycle environment names. The profile holds the system prompt and the permission mode, and `evolve plan-and-execute` sets `core.PhaseRequest.PermissionMode`.
    - The design replaces the shadow wave of the plan with a simpler rule. The policy value wins at once, and a former name that is set prints one `[policy] WARN` at the cycle start (`ipcenv.RetiredInUse`). The WARN stays for one release.
-   - `ipcenv.UnmovedControls()` keeps the 10 class (c) names. The ceiling of `TestControlFlagLists_OnlyShrink` went from 29 to 10, and `TestRetiredControls_HaveNoProductionRead` stops a class (b) reader from coming back.
-4. **X18d** turns each bypass into a parameter or removes it. `EVOLVE_OPERATOR_CONFIRM` already has the `-operator` flag as its primary surface.
+   - `ipcenv.UnmovedControls()` kept the 10 class (c) names. The ceiling of `TestControlFlagLists_OnlyShrink` went from 29 to 10, and `TestRetiredControls_HaveNoProductionRead` stops a class (b) reader from coming back.
+4. **X18d** (built) turns each bypass into a parameter or a policy key, or removes it. No code reads a class (c) name from the environment now.
+   - The new package `go/internal/bypass` holds the audit. `bypass.Check` refuses a use inside an LLM cell. `bypass.Record` writes one `control_bypass` ledger entry, and then one `CONTROL_BYPASS_USED` signal (module `control`) with the name, the operator account, the reason and the time. A failed ledger write refuses the bypass and emits no signal.
+   - The audited parameters are `--sandbox-off=<reason>` of `evolve loop` and `evolve cycle run`, `--auto-confirm=<reason>` of `evolve ship --class manual`, and `--human-input=<reason>` of `evolve bridge launch`. `rollback` passes `--auto-confirm` to its ship child with a reason. The engine refuses `--human-input` when its `Deps.RecordBypass` sink is not set. `--auto-confirm` writes no record in `--dry-run`, and `--human-input` writes none in `--dry-run` or `--validate-only`.
+   - The policy keys are `sandbox.mode` (`auto` or `on`; the parse refuses `off`), `bridge.allow_anthropic_base_url` and `bridge.allow_openai_api_key`. Each credential opt-in that is on emits `CONTROL_BYPASS_USED` once at each start of the bridge adapter (`bypass.Emit`, actor `policy.json`).
+   - X18d removed `EVOLVE_USE_PHASE_REGISTRY`, the environment form of `-operator`, and `EVOLVE_PHASE_<X>_BIN` with `runner.PerPhase`. It also removed the environment forms of `--allow-bypass`, `--dry-run` and `--human-input`, and the `BRIDGE_HUMAN_SIMULATION` gate.
+   - Each former name is in `ipcenv.RetiredControls()`, so a set name prints one `[policy] WARN`. X18d deleted `ipcenv.UnmovedControls()` and `TestControlFlagLists_OnlyShrink`, because the list became empty. The guard now allows only a marker.
 5. **X18e** (built) deletes the dead names and moves the test seams.
    - The dead names, their 5 registry rows, their writers and the persona text that named them are gone.
    - A test of the bridge sets `Deps.Binaries`. An E2E test puts the fake CLI first on `PATH`, and its project holds the `agents/` personas. The layout takes each directory from the project and plugin roots, and `evolve commit-gate run` reads no test switch.
