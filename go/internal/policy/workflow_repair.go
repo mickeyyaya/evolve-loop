@@ -3,6 +3,8 @@ package policy
 import (
 	"cmp"
 	"fmt"
+	"io"
+	"path/filepath"
 )
 
 const (
@@ -60,4 +62,13 @@ func (r *RepairPolicy) validate() error {
 		return fmt.Errorf("workflow.repair.fixability.stage must be %s, %s or %s, got %q", FixabilityOff, FixabilityShadow, FixabilityEnforce, stage)
 	}
 	return nil
+}
+
+func FixabilityFor(projectRoot, who string, warn io.Writer) FixabilityConfig {
+	pol, err := Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
+	if err != nil {
+		fmt.Fprintf(warn, "[%s] WARN policy: workflow.repair.fixability: %v; the fixability check holds shadow\n", who, err)
+		return Policy{}.repairConfig().Fixability
+	}
+	return pol.repairConfig().Fixability
 }

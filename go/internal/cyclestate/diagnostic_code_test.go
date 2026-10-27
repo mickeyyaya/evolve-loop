@@ -63,6 +63,7 @@ func TestRefusalDisposition_TableBesideTheVocabulary(t *testing.T) {
 		{DiagCodeTriageProtectedSurface, true, true, false},
 		{DiagCodeProtectedPredicateRoute, true, true, false},
 		{DiagCodeBlockerRoute, true, true, true},
+		{DiagCodeHandoffRoute, true, true, true},
 		{DiagCodeBuildRejected, true, false, false},
 		{DiagCodeTriageTopNEmpty, true, false, false},
 		{DiagCodeTriageCommitmentInvalid, false, false, false},
@@ -86,6 +87,12 @@ func TestCycleTerminationTriageClaimFailed_IsTheSealedSpelling(t *testing.T) {
 	}
 }
 
+func TestCycleTerminationHandedOff_IsTheSealedSpelling(t *testing.T) {
+	if CycleTerminationHandedOff != "handed-off" {
+		t.Errorf("the sealed termination reason is %q", CycleTerminationHandedOff)
+	}
+}
+
 func TestCycleTerminationBlockedNeedsConsole_IsTheSealedSpelling(t *testing.T) {
 	if CycleTerminationBlockedNeedsConsole != "blocked-needs-console" {
 		t.Errorf("the sealed termination reason is %q", CycleTerminationBlockedNeedsConsole)
@@ -93,9 +100,19 @@ func TestCycleTerminationBlockedNeedsConsole_IsTheSealedSpelling(t *testing.T) {
 }
 
 func TestRefusalDisposition_OnlyTheBuildRejectionYieldsToInfrastructure(t *testing.T) {
-	for _, code := range []string{DiagCodeTriageProtectedSurface, DiagCodeProtectedPredicateRoute, DiagCodeBlockerRoute, DiagCodeTriageTopNEmpty, DiagCodeTriageCommitmentInvalid, DiagCodeTriageScopeUnanswered, DiagCodeTriageLanePinMissing, DiagCodeBuildRejected} {
+	for _, code := range []string{DiagCodeTriageProtectedSurface, DiagCodeProtectedPredicateRoute, DiagCodeBlockerRoute, DiagCodeHandoffRoute, DiagCodeTriageTopNEmpty, DiagCodeTriageCommitmentInvalid, DiagCodeTriageScopeUnanswered, DiagCodeTriageLanePinMissing, DiagCodeBuildRejected} {
 		if got, want := RefusalDisposition(code).YieldsToInfra, code == DiagCodeBuildRejected; got != want {
 			t.Errorf("RefusalDisposition(%q).YieldsToInfra = %v, want %v: a build rejection is often an infrastructure symptom, an agent refusal is not", code, got, want)
+		}
+	}
+}
+
+func TestRepairHandoffSignal_IsTheSpellingThatTheReadersMatch(t *testing.T) {
+	got := []string{RepairHandoffSignal, RepairDecisionField, RepairReasonField, RepairBlockersField, RepairDecisionNone, RepairDecisionWould, RepairDecisionStop}
+	want := []string{"REPAIR_HANDOFF", "decision", "reason", "blockers", "none", "would_stop", "stop"}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("name %d = %q, want %q", i, got[i], want[i])
 		}
 	}
 }

@@ -2,9 +2,11 @@ package triagecap
 
 import (
 	"io"
+	"os"
 	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 func ExpandWithClusterMates(selection, backlog []FleetCandidate, perLane int) [][]FleetCandidate {
@@ -81,5 +83,5 @@ func PruneUndispatchable(evolveDir string, committed []FleetCandidate) []FleetCa
 }
 
 func readOnlyLifecycle(evolveDir string) inboxmover.Options {
-	return inboxmover.Options{InboxDir: filepath.Join(evolveDir, "inbox"), Stderr: io.Discard}
+	return inboxmover.Options{InboxDir: filepath.Join(evolveDir, "inbox"), Stderr: io.Discard, Companions: policy.FixabilityFor(filepath.Dir(evolveDir), "triagecap", os.Stderr)}
 }

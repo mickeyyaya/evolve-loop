@@ -277,6 +277,7 @@ func classifyPackEvents(r io.Reader, tee io.Writer) ([]packFailure, string) {
 	if err := sc.Err(); err != nil {
 		writeTee(tee, fmt.Sprintf("[ship] repo-contract gate: event stream read error: %v\n", err))
 	}
+	failed = failureLog.withoutPassedPackages(failed)
 	pkgs := make([]string, 0, len(buildFailPkgs))
 	for pkg := range buildFailPkgs {
 		pkgs = append(pkgs, pkg)
@@ -288,7 +289,7 @@ func classifyPackEvents(r io.Reader, tee io.Writer) ([]packFailure, string) {
 	if unattributedBuildFail && len(pkgs) == 0 {
 		failed = append(failed, packFailure{Package: "[build failed] (package unattributed)"})
 	}
-	return failed, failureLog.text.String()
+	return failed, failureLog.drain()
 }
 
 type packEvent struct {
@@ -301,13 +302,15 @@ type packEvent struct {
 }
 
 type packFailureLog struct {
-	pending map[string]*strings.Builder
-	named   map[string]bool
-	text    strings.Builder
+	pending  map[string]*strings.Builder
+	failures map[string]*strings.Builder
+	named    map[string]bool
+	passed   map[string]bool
+	text     strings.Builder
 }
 
 func newPackFailureLog() *packFailureLog {
-	return &packFailureLog{pending: map[string]*strings.Builder{}, named: map[string]bool{}}
+	return &packFailureLog{pending: map[string]*strings.Builder{}, failures: map[string]*strings.Builder{}, named: map[string]bool{}, passed: map[string]bool{}}
 }
 
 func (l *packFailureLog) note(ev packEvent) {
@@ -319,16 +322,62 @@ func (l *packFailureLog) note(ev packEvent) {
 		l.hold(key, ev.Output)
 	case ev.Action == "fail" && ev.Test != "":
 		l.named[ev.Package] = true
-		l.flush(key)
+		l.holdFailure(ev.Package, key)
 	case ev.Action == "fail":
 		l.flush(ev.FailedBuild)
 		if l.named[ev.Package] {
 			delete(l.pending, key)
 		}
+		l.flushFailures(ev.Package)
 		l.flush(key)
+	case ev.Action == "pass" && ev.Test == "":
+		l.passed[ev.Package] = true
+		delete(l.failures, ev.Package)
+		delete(l.pending, key)
 	case ev.Action == "pass" || ev.Action == "skip":
 		delete(l.pending, key)
 	}
+}
+
+func (l *packFailureLog) holdFailure(pkg, key string) {
+	b := l.failures[pkg]
+	if b == nil {
+		b = &strings.Builder{}
+		l.failures[pkg] = b
+	}
+	if p := l.pending[key]; p != nil {
+		b.WriteString(p.String())
+		delete(l.pending, key)
+	}
+}
+
+func (l *packFailureLog) flushFailures(pkg string) {
+	if b := l.failures[pkg]; b != nil {
+		l.text.WriteString(b.String())
+		delete(l.failures, pkg)
+	}
+}
+
+func (l *packFailureLog) withoutPassedPackages(failed []packFailure) []packFailure {
+	var out []packFailure
+	for _, f := range failed {
+		if !l.passed[f.Package] {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+func (l *packFailureLog) drain() string {
+	pkgs := make([]string, 0, len(l.failures))
+	for pkg := range l.failures {
+		pkgs = append(pkgs, pkg)
+	}
+	sort.Strings(pkgs)
+	for _, pkg := range pkgs {
+		l.flushFailures(pkg)
+	}
+	return l.text.String()
 }
 
 func (l *packFailureLog) hold(key, output string) {

@@ -332,3 +332,20 @@ func TestSupplyWiring_TheCensusTakesTheAdmissionRuleOfTheKey(t *testing.T) {
 		}
 	}
 }
+
+func TestSupplyWiring_TheCensusTakesTheCompanionStageOfThePolicy(t *testing.T) {
+	t.Parallel()
+	for body, want := range map[string]string{
+		`{"workflow": {"repair": {"fixability": {"stage": "enforce"}}}}`:  policy.FixabilityEnforce,
+		`{"workflow": {"repair": {"fixability": {"stage": "advisory"}}}}`: policy.FixabilityShadow,
+	} {
+		root := strictPolicyRoot(t, body)
+		var stderr strings.Builder
+		w := supplyWiring{root: root, evolveDir: filepath.Join(root, ".evolve"), now: func() time.Time { return time.Time{} }, stderr: &stderr}
+		got := w.census().Inbox.Companions.Stage
+		refused := strings.Contains(stderr.String(), "the fixability check holds shadow")
+		if got != want || refused != (want == policy.FixabilityShadow) {
+			t.Errorf("%s: census Companions = %v (warned %t), want %v", body, got, refused, want)
+		}
+	}
+}

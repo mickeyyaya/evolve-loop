@@ -54,3 +54,20 @@ func TestMeasureFacts_EachCycleGivesItsSpendAndItsShipOutcome(t *testing.T) {
 		t.Errorf("facts cycles = %+v, want %+v", f.Cycles, want)
 	}
 }
+
+func TestReadCycles_TheSpendLimitSignalGivesTheDecision(t *testing.T) {
+	t.Parallel()
+	p := newPlane(t)
+	p.write(".evolve/runs/cycle-7/cycle-state.json", `{"cycle_id":7,"phase":"audit"}`)
+	p.write(".evolve/runs/cycle-7/signals.ndjson", eventAt(1, "phase.outcome", "CYCLE_SPEND_LIMIT", `"decision":"over"`)+eventAt(2, "phase.outcome", "CYCLE_SPEND_LIMIT", `"decision":"stop"`))
+
+	got, _ := wave.ReadCycles(p.root, 0, 0)
+
+	if len(got) != 1 || got[0].SpendLimit != "stop" {
+		t.Errorf("ReadCycles = %+v, want the stop decision", got)
+	}
+	f, _ := wave.MeasureFacts(wave.Record{Number: 1, StartedAt: clock(0)}, nil, got, nil, 1)
+	if f.Cycles[0].SpendLimit != "stop" {
+		t.Errorf("facts = %+v, want the decision in the cycle spend", f.Cycles)
+	}
+}

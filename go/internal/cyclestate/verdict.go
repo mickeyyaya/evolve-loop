@@ -19,6 +19,8 @@ const CycleTerminationTddProtectedRoute = "tdd-protected-predicate-route"
 
 const CycleTerminationBlockedNeedsConsole = "blocked-needs-console"
 
+const CycleTerminationHandedOff = "handed-off"
+
 const CycleTerminationTriageClaimFailed = "triage-empty-commitment-claimable-work"
 
 const CycleTerminationLaneWorktreeDeferred = "lane-worktree-deferred"
@@ -38,3 +40,13 @@ func IsVerdict(s string) bool {
 	}
 	return false
 }
+
+const (
+	RepairHandoffSignal = "REPAIR_HANDOFF"
+	RepairDecisionField = "decision"
+	RepairReasonField   = "reason"
+	RepairBlockersField = "blockers"
+	RepairDecisionNone  = "none"
+	RepairDecisionWould = "would_stop"
+	RepairDecisionStop  = "stop"
+)

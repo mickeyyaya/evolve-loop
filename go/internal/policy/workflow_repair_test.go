@@ -1,6 +1,9 @@
 package policy
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -111,5 +114,31 @@ func TestWorkflowRepair_ExportTypesAndConstants(t *testing.T) {
 	var fc FixabilityConfig
 	if fc.Enforced() {
 		t.Fatal("zero FixabilityConfig should not be enforced")
+	}
+}
+
+func TestFixabilityFor_ReadsTheStageAndHoldsShadowOnAnUnreadablePolicy(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var warn strings.Builder
+	if got := FixabilityFor(root, "triage", &warn); got.Stage != FixabilityShadow || warn.Len() != 0 {
+		t.Fatalf("no policy file: %+v, warn %q; want shadow and no warning", got, warn.String())
+	}
+	write := func(body string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(root, ".evolve", "policy.json"), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(`{"workflow":{"repair":{"fixability":{"stage":"enforce"}}}}`)
+	if got := FixabilityFor(root, "triage", &warn); !got.Enforced() {
+		t.Fatalf("enforce policy: %+v, want enforced", got)
+	}
+	write(`{"workflow":{"repair":{"fixability":{"stage":"on"}}}}`)
+	got := FixabilityFor(root, "census", &warn)
+	if got.Stage != FixabilityShadow || !strings.Contains(warn.String(), "[census] WARN policy: workflow.repair.fixability") {
+		t.Fatalf("a refused policy: %+v, warn %q; want shadow and a WARN that names the caller", got, warn.String())
 	}
 }

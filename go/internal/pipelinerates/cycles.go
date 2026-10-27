@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclespend"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -25,6 +26,9 @@ type Cycle struct {
 	SystemFail   bool
 	Item, Commit string
 	Spend        cyclespend.Spend
+	HandoffWould int
+	HandedOff    bool
+	SpendLimit   string
 }
 
 func (c Cycle) DeadlineEnd() bool { return !c.Sealed || c.LaneDeadline }
@@ -161,8 +165,22 @@ func withSignals(c Cycle, path string) (Cycle, error) {
 			c.LaneDeadline = c.LaneDeadline || strings.Contains(e.Fields["termination_reason"], "lane deadline")
 		}
 		c.SystemFail = c.SystemFail || systemFailCode(e.Code)
+		if e.Code == cyclespend.SignalCode {
+			c.SpendLimit = e.Fields[cyclespend.FieldDecision]
+		}
+		if string(e.Code) == cyclestate.RepairHandoffSignal {
+			c.HandoffWould += boolInt(e.Fields[cyclestate.RepairDecisionField] == cyclestate.RepairDecisionWould)
+			c.HandedOff = c.HandedOff || e.Fields[cyclestate.RepairDecisionField] == cyclestate.RepairDecisionStop
+		}
 	}
 	return c, nil
+}
+
+func boolInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 func systemFailCode(code signalcenter.Code) bool {

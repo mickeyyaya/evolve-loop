@@ -17,7 +17,22 @@
 - **`Add` and `LLMMinutes`.** A window sums the spend of its cycles with `Add`. `LLMMinutes` gives the time in minutes.
 - **`Totals`.** It holds the started cycles, the shipped cycles and their summed spend. `PerShipped`, `AuditRoundsPerCycle` and `ConvergenceRate` are the one place of the arithmetic, and each returns false when its denominator is 0. `wavemeasure` and `pipelinerates` only round and publish the result.
 
+## The spend limit
+
+- **`Limits` and `Judge`.** `Judge(spend, limits, onOver)` checks the limits in this order: LLM minutes, fresh tokens, cache-read tokens, audit rounds. It names the first limit that the spend passes, with the value and the limit. At the limit, nothing stops: only a value above it counts. The action of a passed limit is `onOver`. `core` gives `stop` at `enforce` and `would_stop` at `shadow`.
+- **Where it acts.** `core.cycleRun.checkCycleSpend` asks `Judge` at each phase boundary of a fresh cycle, at the end of `recordAndBranch`. It reads the ledger of the workspace and takes the audit rounds from the live cycle state. It records `CYCLE_SPEND_LIMIT` (module `cycle`). At `shadow`, it records one `would_stop` for each cycle. At `enforce`, it records `over` at the first boundary over the limit where no stop is legal, and `stop` where the cycle stops.
+- **A partial ledger.** When the ledger does not load whole, the check prints a WARN, judges the part that loaded and sets `partial: true` (`TestCheckCycleSpend_AnUnreadableLedgerWarnsAndChecksTheRest`).
+- **The stop at `enforce`.** The cycle stops at the first failed phase that has a legal edge to retro, and that is a failed audit. A passing audit still ships, because its spend is already spent. The stop schedules retro and seals the cycle `handed-off` with the reason `spend_limit`, the limit and the salvage worktree ([internal-fixability](internal-fixability.md)). The seal has no findings and no console item, because a spend stop has none. When the fixability check sealed the same failed audit, the cycle keeps that one route (`TestCheckCycleSpend_AFixabilityHandoffOnTheSameAuditKeepsOneRoute`).
+- **Cycle 2035.** The ledger passes 90 LLM minutes after audit round 2 (`TestJudge_Cycle2035PassesItsLimitOfLLMMinutesAfterAuditRoundTwo`). Audit round 2 was WARN, so the cycle went to ship, and ship refused (`REPO_CONTRACT_GATE`). At `enforce`, the stop comes at the failed audit round 3. It saves repair round 2 (tdd and build, about 51.6 LLM minutes) and audit round 4 (`core` `TestCheckCycleSpend_Cycle2035AtEnforceStopsAndHandsOff`).
+- **The signal names.** `SignalCode` and `FieldDecision` are the names that `internal/core` writes and that `internal/wave` and `internal/pipelinerates` read.
+
 ## Invariants
 
 - The ledger of cycle 2035 gives 160.1 LLM minutes, 4,338,241 fresh tokens and 87,431,829 cache-read tokens, as the incident record says (F1.1). The fixture is `testdata/cycle-2035` (`TestRead_Cycle2035SpentTheNumbersOfItsIncidentRecord`).
+- Each limit stops alone and names its value (`TestJudge_EachLimitStopsAloneAndNamesItsValue`).
+- At `shadow`, the cycle records one `would_stop` and changes no flow (`core` `TestCheckCycleSpend_ShadowRecordsWouldStopOnceAndChangesNoFlow`).
 - A missing ledger is zero spend and no error (`TestRead_AWorkspaceWithNoLedgerSpentNothing`). An unreadable ledger is an error (`TestRead_AnUnreadableLedgerIsAnError`).
+
+## Limits
+
+- The resume path does not check the spend limit. A resumed cycle runs at most to its next seal.

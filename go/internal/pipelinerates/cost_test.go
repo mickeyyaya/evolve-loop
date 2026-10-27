@@ -3,6 +3,7 @@ package pipelinerates
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclespend"
@@ -40,8 +41,8 @@ func TestCostPerShip_TheSpendOfEveryCycleOfAWaveIsSharedByItsShips(t *testing.T)
 			t.Errorf("%s = %+v (found %t), want PQ5 %v at n %d", window, r, ok, want.value, want.n)
 		}
 	}
-	if len(rs) != 5 {
-		t.Errorf("readings = %d, want 5 for one wave", len(rs))
+	if len(rs) != 10 {
+		t.Errorf("readings = %d, want 10 for one wave", len(rs))
 	}
 }
 
@@ -93,5 +94,85 @@ func TestLoadCycles_AnUnreadableLLMCallLedgerCountsAsAnUnmeasuredCallAndKeepsThe
 
 	if err != nil || cycleByID(cycles, 2026).Spend.UnmeasuredCalls != 1 {
 		t.Errorf("LoadCycles = cycle 2026 spend %+v, %v; want the load to hold and one unmeasured call", cycleByID(cycles, 2026).Spend, err)
+	}
+}
+
+func TestCostPerShip_CountsTheHandoffStopsAndTheFalseStops(t *testing.T) {
+	t.Parallel()
+	cycles := []Cycle{{ID: 1, Wave: 9, Shipped: true, HandoffWould: 1}, {ID: 2, Wave: 9, HandoffWould: 2}, {ID: 3, Wave: 9, HandedOff: true}}
+
+	rs := CostPerShip(cycles)
+
+	for window, want := range map[string]float64{"wave:9/handoff-would-stops": 3, "wave:9/handoff-stops": 1, "wave:9/false-stops": 1} {
+		if r, ok := readingFor(rs, window); !ok || r.Interval.Value != want || r.N != 3 {
+			t.Errorf("%s = %+v, want %v at n 3", window, r, want)
+		}
+	}
+}
+
+func TestLoadCycles_TheFixabilitySignalsGiveTheHandoffCounts(t *testing.T) {
+	t.Parallel()
+	root := wavesFixture(t)
+	writeCycle(t, root, fixtureCycle{id: 2027, seal: "final verdict FAIL", codes: []string{"REPAIR_HANDOFF"}})
+	stream := filepath.Join(root, ".evolve", "runs", "cycle-2027", "signals.ndjson")
+	lines := `{"schema_version":"signal/1.0","seq":1,"ts":"2026-10-21T10:00:00Z","module":"repair","kind":"phase.outcome","code":"REPAIR_HANDOFF","severity":"WARN","origin":"F.e","reason":"r","fields":{"decision":"would_stop"}}` + "\n" +
+		`{"schema_version":"signal/1.0","seq":2,"ts":"2026-10-21T10:00:01Z","module":"repair","kind":"phase.outcome","code":"REPAIR_HANDOFF","severity":"WARN","origin":"F.e","reason":"r","fields":{"decision":"stop"}}` + "\n"
+	if err := os.WriteFile(stream, []byte(lines), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cycles, err := LoadCycles(root)
+
+	if c := cycleByID(cycles, 2027); err != nil || c.HandoffWould != 1 || !c.HandedOff {
+		t.Errorf("cycle 2027 = %+v, %v; want 1 would stop and a hand-off stop", c, err)
+	}
+}
+
+func TestCostPerShip_CountsTheSpendLimitStopsAndTheirFalseStops(t *testing.T) {
+	t.Parallel()
+	cycles := []Cycle{{ID: 1, Wave: 9, Shipped: true, SpendLimit: "would_stop"}, {ID: 2, Wave: 9, SpendLimit: "stop"}, {ID: 3, Wave: 9, SpendLimit: "would_stop"}}
+
+	rs := CostPerShip(cycles)
+
+	for window, want := range map[string]float64{"wave:9/spend-limit-would-stops": 2, "wave:9/spend-limit-stops": 1, "wave:9/false-stops": 1} {
+		if r, ok := readingFor(rs, window); !ok || r.Interval.Value != want {
+			t.Errorf("%s = %+v, want %v", window, r, want)
+		}
+	}
+}
+
+func TestLoadCycles_TheSpendLimitSignalGivesTheDecision(t *testing.T) {
+	t.Parallel()
+	root := wavesFixture(t)
+	writeCycle(t, root, fixtureCycle{id: 2027, seal: "final verdict FAIL"})
+	stream := filepath.Join(root, ".evolve", "runs", "cycle-2027", "signals.ndjson")
+	line := `{"schema_version":"signal/1.0","seq":1,"ts":"2026-10-21T10:00:00Z","module":"cycle","kind":"phase.outcome","code":"CYCLE_SPEND_LIMIT","severity":"WARN","origin":"F.e","reason":"r","fields":{"decision":"would_stop"}}` + "\n"
+	if err := os.WriteFile(stream, []byte(line), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cycles, err := LoadCycles(root)
+
+	if c := cycleByID(cycles, 2027); err != nil || c.SpendLimit != "would_stop" {
+		t.Errorf("cycle 2027 = %+v, %v; want the would_stop decision", c, err)
+	}
+}
+
+func TestLoadCycles_TheLastSpendLimitDecisionWins(t *testing.T) {
+	t.Parallel()
+	root := wavesFixture(t)
+	writeCycle(t, root, fixtureCycle{id: 2028, seal: "final verdict FAIL"})
+	stream := filepath.Join(root, ".evolve", "runs", "cycle-2028", "signals.ndjson")
+	event := func(seq int, decision string) string {
+		return `{"schema_version":"signal/1.0","seq":` + strconv.Itoa(seq) + `,"ts":"2026-10-21T10:00:00Z","module":"cycle","kind":"phase.outcome","code":"CYCLE_SPEND_LIMIT","severity":"WARN","origin":"F.e","reason":"r","fields":{"decision":"` + decision + `"}}` + "\n"
+	}
+	if err := os.WriteFile(stream, []byte(event(1, "over")+event(2, "stop")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cycles, err := LoadCycles(root)
+
+	if c := cycleByID(cycles, 2028); err != nil || c.SpendLimit != "stop" {
+		t.Errorf("cycle 2028 = %+v, %v; want the stop after the over boundary", c, err)
 	}
 }

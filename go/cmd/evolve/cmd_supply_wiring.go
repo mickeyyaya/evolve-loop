@@ -60,7 +60,7 @@ func (w supplyWiring) census() orchestrator.Census {
 	inboxDir := filepath.Join(w.evolveDir, "inbox")
 	protected := laneForbidden(w.root, w.stderr)
 	return orchestrator.Census{
-		Inbox:      inboxmover.Options{InboxDir: inboxDir, Stderr: io.Discard},
+		Inbox:      inboxmover.Options{InboxDir: inboxDir, Stderr: io.Discard, Companions: policy.FixabilityFor(w.root, "census", w.stderr)},
 		Rank:       rank,
 		Protected:  protected,
 		Graph:      w.graph,

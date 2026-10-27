@@ -120,6 +120,7 @@ var serialRequiredTests = map[string]string{
 	"core.TestCoverChangedFailures_EnforceRefusesTheChangedFunctionOfTheBuild":                      swapsCoverChangedProfiler,
 	"core.TestCoverChangedFailures_ShadowOffAndEveryPlumbingFaultLeaveTheHandoffAlone":              swapsCoverChangedProfiler,
 	"core.TestCoverChangedFailures_ExcludesACSTagOnlyPackageFromProfiler":                           swapsCoverChangedProfiler,
+	"core.TestExplanationGap_OneRejectionAlsoListsTheSteAndCoverageGaps":                            swapsCoverChangedProfiler,
 	"core.TestCoverChangedFailures_LeavesAFailureTheUnitRunAlsoRefusesToTheChangedPackageFloor":     swapsBuildSelfCheckRunner,
 	"core.TestCoverChangedFailures_StrictRunner":                                                    swapsCoverStrictRunner,
 	"core.TestBaseAndTreeList_AnUnreadableBaseWarnsAndKeepsTheTree":                                 swapsStderr,

@@ -20,6 +20,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover/lifecycle"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -56,6 +57,8 @@ type Options struct {
 	MainHeadFn func() (string, error)
 
 	IsProtectedPath func(path string) bool
+
+	Companions policy.FixabilityConfig
 
 	Signals *signalcenter.Center
 

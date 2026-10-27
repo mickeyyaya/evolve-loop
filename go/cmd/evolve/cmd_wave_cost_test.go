@@ -24,6 +24,10 @@ func TestWaveStatus_TextPrintsOneCostLine(t *testing.T) {
 		"no ship": {wavemeasure.Cost{Started: 1, AuditRoundsPerCycle: f64(4), ConvergenceRate: f64(0)},
 			"cost:    not defined (0 of 1 cycle(s) shipped) · audit rounds 4.00 per cycle · convergence 0.00\n"},
 		"no cycle": {wavemeasure.Cost{}, "cost:    no cycle\n"},
+		"hand-offs": {wavemeasure.Cost{Started: 2, AuditRoundsPerCycle: f64(1), ConvergenceRate: f64(0), HandoffStops: 1, HandoffWouldStops: 2, FalseStops: 1},
+			"cost:    not defined (0 of 2 cycle(s) shipped) · audit rounds 1.00 per cycle · convergence 0.00 · hand-off stops 1, would stops 2 · false stops 1\n"},
+		"spend limit": {wavemeasure.Cost{Started: 1, AuditRoundsPerCycle: f64(4), ConvergenceRate: f64(0), SpendLimitStops: 1, SpendLimitWouldStops: 0},
+			"cost:    not defined (0 of 1 cycle(s) shipped) · audit rounds 4.00 per cycle · convergence 0.00 · spend-limit stops 1, would stops 0\n"},
 	} {
 		var b strings.Builder
 		writeWaveMeasuresText(&b, wavemeasure.Measures{Cost: tc.cost})
