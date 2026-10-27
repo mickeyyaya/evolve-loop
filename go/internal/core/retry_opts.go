@@ -62,14 +62,19 @@ func (cr *cycleRun) backfillExhaustedArtifact(next Phase, err error, attempt, ma
 }
 
 func (cr *cycleRun) recoverShipError(next Phase, err error, resp PhaseResponse, attempts int) bool {
-	se, ok := AsShipError(err)
+	raised, ok := AsShipError(err)
 	if !ok {
 		return false
 	}
 	cr.preserveWorktree = true
 	fleetWidth := fleetWidthFromEnv(cr.req.Env)
+	se, declined := cr.carryAuditedChangeOverMovedMain(raised)
 	rec, recovering := cr.o.recoverFromShipError(cr.ctx, cr.req.ProjectRoot, cr.cycle, &cr.cs, se, cr.recoveryDepth, fleetWidth)
+	cr.reportRecoveryPath(shipRecovery{raised: raised, routed: se, next: rec, declined: declined})
 	if !recovering {
+		if se != raised {
+			cr.pendUnusedCarrier()
+		}
 		return false
 	}
 	cr.cs.ShipRecoveryCode = string(se.Code)

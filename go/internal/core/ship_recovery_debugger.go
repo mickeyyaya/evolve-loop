@@ -32,7 +32,7 @@ func (o *Orchestrator) resumeFleetRebaseRoute(ctx context.Context, projectRoot s
 	}
 	backoffSleep(contentionBackoff(depth))
 	o.holdShipWindow(ctx, projectRoot, cycle, cs.RunID)
-	if err := carryResolvedTree(ctx, cs.ActiveWorktree, gitCapture, fmt.Sprintf("cycle-%d/%s", cycle, cs.RunID)); err != nil {
+	if err := carryResolvedTree(ctx, cs.ActiveWorktree, gitCapture, carrierLabel(cycle, cs.RunID)); err != nil {
 		return o.abortRebaseReentry(cycle, *cs, "carry the resolved tree: "+err.Error())
 	}
 	ok, conflict := reauditRebase(ctx, projectRoot, cs)
@@ -103,8 +103,7 @@ func carryResolvedTree(ctx context.Context, worktree string, git gitFn, label st
 	if err != nil {
 		return err
 	}
-	carrier, err := gitStdout(ctx, git, worktree, "-c", "commit.gpgsign=false", "commit-tree", tree, "-p", base,
-		"-m", "evolve: the change with the debugger's conflict resolution", "-m", "Evolve-Carrier: "+label)
+	carrier, err := commitCarrier(ctx, git, worktree, AuditedChange{Base: base, Tree: tree, Label: label}, "evolve: the change with the debugger's conflict resolution")
 	if err != nil {
 		return err
 	}
