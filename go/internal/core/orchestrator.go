@@ -187,6 +187,8 @@ type Orchestrator struct {
 
 	stderr io.Writer
 
+	continuationShed func(projectRoot string, cycle int, declined continuation.Continuation) ([]string, error)
+
 	shipWindow *shipWindowHold
 
 	worktree WorktreeProvisioner
@@ -323,6 +325,22 @@ func WithContinuationResolver(fn func(projectRoot string, cycle int, scopeIDs []
 			o.continuationFor = fn
 		}
 	}
+}
+
+func WithContinuationShedder(fn func(projectRoot string, cycle int, declined continuation.Continuation) ([]string, error)) Option {
+	return func(o *Orchestrator) {
+		if fn != nil {
+			o.continuationShed = fn
+		}
+	}
+}
+
+func (o *Orchestrator) ContinuationShedProbe(projectRoot string, cycle int, declined continuation.Continuation) ([]string, bool, error) {
+	if o.continuationShed == nil {
+		return nil, false, nil
+	}
+	shed, err := o.continuationShed(projectRoot, cycle, declined)
+	return shed, true, err
 }
 
 func (o *Orchestrator) ScopePathProbe(projectRoot, taskID string) (string, bool) {

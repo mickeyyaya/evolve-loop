@@ -578,6 +578,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	opts = append(opts, core.WithFailureClassReader(failureClassReader(projectRoot)))
 	opts = append(opts, core.WithScopePathResolver(scopePathResolver))
 	opts = append(opts, core.WithContinuationResolver(continuationForScope))
+	opts = append(opts, core.WithContinuationShedder(hostContinuationShedder(signals)))
 	opts = append(opts, core.WithWorkflowConfig(wfCfg))
 	opts = append(opts, core.WithChronicleConfig(pol.ChronicleConfig()))
 	if fp, err := pol.FailurePolicyConfig(); err == nil {
@@ -644,6 +645,12 @@ func failureClassReader(projectRoot string) func(id string) string {
 
 func continuationForScope(root string, cycle int, scopeIDs []string) *continuation.Continuation {
 	return inboxmover.ResolveContinuationForScope(inboxmover.Options{ProjectRoot: root, Stderr: os.Stderr}, cycle, scopeIDs)
+}
+
+func hostContinuationShedder(signals *signalcenter.Center) func(string, int, continuation.Continuation) ([]string, error) {
+	return func(root string, cycle int, declined continuation.Continuation) ([]string, error) {
+		return inboxmover.ShedDeclinedContinuation(inboxmover.Options{ProjectRoot: root, Stderr: os.Stderr, Signals: signals}, cycle, declined)
+	}
 }
 
 func hostInboxClaimer(ld inboxmover.LedgerAppender, signals *signalcenter.Center, forbidden func(string) bool) deliverable.Claimer {
