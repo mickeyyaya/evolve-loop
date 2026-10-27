@@ -65,6 +65,9 @@ func TestChannel_EndToEnd(t *testing.T) {
 		waitForFeed(t, FeedPath(ws, "build"), `"corr_id":"c1"`)
 
 		appendRaw(t, ws, "build-stdout.log", `{"type":"assistant","message":{"content":[{"type":"text","text":"3 bullets: a,b,c"}]}}`)
+
+		waitForFeed(t, FeedPath(ws, "build"), "3 bullets: a,b,c")
+
 		appendRaw(t, ws, "build-stderr.log", `{"evolve_channel":"idle_reached","corr_id":"c1"}`)
 	}()
 

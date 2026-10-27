@@ -1,6 +1,6 @@
 # internal/tokenusage
 
-> Campaign design: [token-telemetry-2026-07.md](../../plans/token-telemetry-2026-07.md). Attribution decision: [ADR-0071](../adr/0071-token-telemetry-attribution-and-clean-boot.md), with its detail record [part5](../../research/token-optimization-2026/part5-campaign-implementation-2026-07-17.md). The all-zeros wiring post-mortem: [token-telemetry-zero-postmortem.md](../../research/code-audit-2026-07/token-telemetry-zero-postmortem.md). The operator dial and WARN: [policy-config.md § context_fill](../policy-config.md#context-fill-telemetry-context_fill). This page keeps the package-level detail those do not.
+> Campaign design: [token-telemetry-2026-07.md](../../plans/token-telemetry-2026-07.md). Attribution decision: [ADR-0071](../adr/0071-token-telemetry-attribution-and-clean-boot.md), with its detail record [part5](../../research/token-optimization-2026/part5-campaign-implementation-2026-07-17.md). The all-zeros wiring post-mortem: [token-telemetry-zero-postmortem.md](../../research/code-audit-2026-07/token-telemetry-zero-postmortem.md). The operator dial and WARN: [policy-config.md § context_fill](../policy-config.md#context-fill-telemetry-context_fill). This page keeps the package-level detail those do not. The proposed record for each turn and the gaps of the collectors: [token-telemetry-2026-10](../../plans/token-telemetry-2026-10.md) (plan) and [research](../../research/token-telemetry-2026-10.md).
 
 ## Purpose
 
