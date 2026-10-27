@@ -306,6 +306,8 @@ These rules held in comments before the comment-zero change. Tests pin the ones 
 ### Test fixtures
 
 - `tempRepoDir` removes best effort. On macOS runners, `os.RemoveAll` of a git work tree sometimes fails with EBADF under `-race` load. The failure turns a passing test red. The chmod walk makes git's read-only objects removable.
+- Git process starts set the wall time of the package. A macOS runner spends about 7 ms of CPU on each start, and the suite makes about 13,000 of them. So `addRemote` copies its bare origin with `gittest.BareFromTemplate`, and `emptyRepo` copies an empty repo from a template. The `makeRepo` template is already on `main`, so `addRemote` does not rename the branch.
+- The two parallel-default guard tests use about 3 s of CPU together. Their long CI elapsed time is a wait for CPU. Source parsing is less than 2 % of their CPU, so one parse for each test binary (inbox item `ci-wall-time-c9-one-parse-per-test-binary`) gives no measurable gain here.
 - `redPack` is a nonzero exit with named failures. `ambiguousPack` is a nonzero exit with none. `swapRepoContractTest` repeats its last outcome, so an over-eager retry loop shows in the invocation count.
 - The seam tests cannot reach `classifyPackEvents`. `TestClassifyPackEvents_SeparatesRealFailuresFromNoise` pins it directly.
 - The `landing_pins_test.go` goldens drive the three push sites against the repair matrix. They pin the argv, the stream routing, the logs, the result fields and the errors byte for byte. The capture was taken before the landing leaf was extracted.

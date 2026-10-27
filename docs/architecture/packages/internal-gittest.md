@@ -21,6 +21,7 @@
 - A fixture commits with no ambient git identity, and its own config keeps auto-maintenance off for any git run inside it. Pinned by `TestFixture_CommitsWithNoAmbientIdentity` and `TestMaintenanceConfig_TurnsBackgroundMaintenanceOff`.
 - `Clone` persists the fixture config in its own repo, because production fetches inside a clone never pass through `Repo.Git`. A clone of a bare origin tracks its `main`. Pinned by `TestBareAndClone_CarryTheFixtureConfig`.
 - `Repo.CloneBare` makes a bare clone that carries the same config as `Bare`, so a commit in it works on a runner with no identity. A test must not run a raw `git clone --bare`. Pinned by `TestCloneBare_CarriesTheFixtureIdentityAndMaintenanceConfig` and `TestNoTestRunsARawBareClone`.
+- `BareFromTemplate` copies a bare origin from a template that the test binary builds once. The copy carries the same config as `Bare`, and a later copy runs no git. A caller with many bare origins uses it to cut process starts. Its `TestMain` calls `RemoveTemplates`. Pinned by `TestBareFromTemplate_CopiesAnIndependentBareOriginBuiltOnce`.
 
 ## Findings
 
