@@ -46,7 +46,11 @@ func (f BuildHandoffFloor) Review(ctx context.Context, in ReviewInput) ReviewRes
 	if in.Phase != string(PhaseBuild) {
 		return ReviewResult{Approve: true}
 	}
-	failures := withProtectedFileNotes(f.Failures(ctx, in), in.Protected)
+	return floorRejection(f.Failures(ctx, in), in.Protected)
+}
+
+func floorRejection(found []string, protected func(string) bool) ReviewResult {
+	failures := withProtectedFileNotes(found, protected)
 	if len(failures) == 0 {
 		return ReviewResult{Approve: true}
 	}
@@ -61,17 +65,21 @@ func (o *Orchestrator) BuildHandoffFloorNames() []string {
 }
 
 func floorCheckNames(r DeliverableReviewer) []string {
+	return floorChecks(r).Names()
+}
+
+func floorChecks(r DeliverableReviewer) BuildHandoffFloor {
 	switch v := r.(type) {
 	case mandatoryExplanationReviewer:
-		return append(v.floor.Names(), floorCheckNames(v.next)...)
+		return append(append(BuildHandoffFloor{}, v.floor...), floorChecks(v.next)...)
 	case chainReviewer:
-		var names []string
+		var checks BuildHandoffFloor
 		for _, member := range v {
-			names = append(names, floorCheckNames(member)...)
+			checks = append(checks, floorChecks(member)...)
 		}
-		return names
+		return checks
 	case BuildHandoffFloor:
-		return v.Names()
+		return v
 	default:
 		return nil
 	}
