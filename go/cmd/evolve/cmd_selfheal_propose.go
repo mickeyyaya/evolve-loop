@@ -26,7 +26,7 @@ type proposeReport struct {
 }
 
 func runAgentCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	return agentcmd.New(agentcmd.Deps{InstallRouter: rootRouterInstaller, Bridge: agentRunBridge, Signals: agentRunSignals})(args, stdin, stdout, stderr)
+	return agentcmd.New(agentcmd.Deps{InstallRouter: rootRouterInstaller, Bridge: agentRunBridge, Signals: agentRunSignals, VerbSchema: coreVerbSchema})(args, stdin, stdout, stderr)
 }
 
 func runSelfhealPropose(env selfhealEnv, w codeEnvelopeWriter, root string, pol policy.Policy) int {

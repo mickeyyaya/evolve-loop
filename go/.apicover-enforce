@@ -830,6 +830,8 @@
 
 # dispatchcred - the pipeline dispatch credential that no agent cell can read (ADR-0154 I-3).
 ./internal/dispatchcred
+# agentclass - the agent class of each evolve verb: the one table of the class gate, agent capabilities and the bridge (ADR-0156).
+./internal/agentclass
 # inputindex - the artifact index inputs/index.json of each phase cell and its lineage (ADR-0154 I-4, I-5).
 ./internal/inputindex
 # contextcmd - the evolve context verbs that read the cell index of a phase agent (cell-context-index.md §7).

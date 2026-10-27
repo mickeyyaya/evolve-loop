@@ -162,6 +162,14 @@ var agentContract = []contractRow{
 		script: func(h contractHost) string {
 			return strippedMarkers + h.evolveBin + " wave next --refused-before-parse"
 		}},
+	{action: "X17e: evolve inbox add (class R) in a cell is refused at enforce", want: contractCredentialRefusal,
+		script: func(h contractHost) string {
+			return strippedMarkers + h.evolveBin + " inbox add --refused-before-parse"
+		}},
+	{action: "X17e: evolve inbox claim (class D) in a cell is refused at enforce", want: contractCredentialRefusal,
+		script: func(h contractHost) string {
+			return strippedMarkers + h.evolveBin + " inbox claim --refused-before-parse"
+		}},
 	{action: "rename an ancestor of the dispatch store under a writable home, then run evolve agent run", want: contractCredentialRefusal,
 		script: func(h contractHost) string {
 			ancestor := filepath.Dir(h.dispatch.Dir)

@@ -565,6 +565,14 @@ Every phase without write permission (registry `writes_source=false`: audit, adv
 > - A refusal is a built-in phase, a source-write profile, a call from inside a phase or a refused root router.
 > - `evolve agent list [--json]` names each profile that `agent run` accepts.
 
+> **The agent class of each verb (2026-10-27, X17e, spec [cli-contract.md](../architecture/cli-contract.md) §4.1 to §4.4):**
+>
+> - `evolve agent capabilities [--json] [--project-root P]` prints the class of each verb. `A` runs in a phase cell. `R` needs a request file. `D` is denied. Each verb that the list does not name is `D`.
+> - The text form prints one line for each verb: the verb, the class and, for `R`, the request kind. With `--json` the `data` of the envelope `evolve.agent.capabilities/1` is the document of §4.2. Exit 0, or 10 for a stray word.
+> - Each verb that is not `A` reads the dispatch credential first. A process outside a cell holds it, so the operator sees no change.
+> - In a cell at stage `enforce`, an `R` verb exits 3 and names its request path, for example `.evolve/runs/cycle-<N>/requests/inbox-add-<n>.json`. A `D` verb exits 3 and names no path. At stage `shadow` (the default) the verb runs and emits `ISOLATION_I3_VIOLATION`.
+> - The prompt of each phase cell ends with a short section that points to `evolve agent capabilities --json`.
+
 > **Operator commands (rebuild the plane binary; 2026-10-19, cycle 1963):**
 >
 > - `evolve rebuild [--project-root P] [--repin]` builds HEAD of P to `go/bin/evolve` and prints both binary SHAs.

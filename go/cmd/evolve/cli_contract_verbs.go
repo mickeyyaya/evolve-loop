@@ -81,6 +81,7 @@ var coreVerbs = []coreVerb{
 	{path: "clihealth list", class: availAlways},
 	{path: "clihealth usage", class: availAlways},
 	{path: "agent list", class: availAlways},
+	{path: "agent capabilities", class: availAlways},
 	{path: "ci classify", class: availAlways},
 	{path: "scan secrets", class: availAlways},
 	{path: "docs ste-lint", class: availAlways},
@@ -125,4 +126,11 @@ func lookupCoreVerb(path string) (coreVerb, bool) {
 		}
 	}
 	return coreVerb{}, false
+}
+
+func coreVerbSchema(path string) string {
+	if v, ok := lookupCoreVerb(path); ok {
+		return v.schema()
+	}
+	return ""
 }

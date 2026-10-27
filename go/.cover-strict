@@ -99,6 +99,7 @@
 ./internal/isolation 100
 ./internal/faketmux 100
 ./internal/dispatchcred 100
+./internal/agentclass 100
 ./internal/inputindex 100
 ./internal/cli/contextcmd 100
 ./internal/guidance 100

@@ -163,18 +163,30 @@ The column "Agent" of §5 gives the class of each core verb. These verbs are out
 
 | Verb | Agent class | Why |
 |---|---|---|
-| `phase verify <phase>` | A | It reads the deliverables. For `build` it runs the handoff probe (F5). |
+| `phase verify` | A | It reads the deliverables of a phase. For `build` it runs the handoff probe (F5). |
+| `phase lint` | D | It is a check of the phase catalog for the operator. A cell has no task that needs it. |
 | `selfcheck build` | A | the same probe as `phase verify build` (F5) |
 | `code callers`, `api`, `find`, `map` | A | one usage record in the own workspace (F4) |
-| `code refresh` | R (`code-refresh`, proposed) | It moves the shared index worktree to `origin/main` and rebuilds it ([code-index-cli.md](code-index-cli.md) §4, D5.5). In a cell it refuses with exit 3. |
-| `agent capabilities` (proposed, §4.2) | A | It reads the class table. |
-| `context index`, `context open` | A | They read the cell index and its bodies, and they write nothing ([cell-context-index.md](cell-context-index.md) §7). |
+| `code refresh` | R (`code-refresh`) | The request kind is proposed. The verb moves the shared index worktree to `origin/main` and rebuilds it ([code-index-cli.md](code-index-cli.md) §4, D5.5). In a cell it refuses with exit 3. |
+| `context index`, `open` | A | They read the cell index and its bodies, and they write nothing ([cell-context-index.md](cell-context-index.md) §7). |
 | `context stats` | D | It reads the access log of other cycles, which I-5 denies to a cell. |
 | `selfheal incidents` | R | It writes the incident records and publishes `selfheal.incident` events, which are shared state ([llm-isolation.md](llm-isolation.md) §18.5). `dispatch_gate.go` refuses it in a cell with no dispatch credential. |
 | `selfheal propose` | R | It starts the orchestrator agent through `evolve agent run` and writes the proposal records, which are shared state ([llm-isolation.md](llm-isolation.md) §18.6). `dispatch_gate.go` refuses it in a cell with no dispatch credential, and `evolve agent run` refuses inside a phase. |
 | `phase <name>` | R (`dispatch`) | It starts a phase agent. |
 | `subagent run` | D | The pipeline starts fan-out workers. A cell uses the subagents of its own harness. |
 | `reset-sha`, `release` | D | operator verbs |
+| `guidance index`, `check` | A | They read the rule registry and write nothing ([guidance-layers.md](guidance-layers.md) §10.3). |
+| `guard ship`, `phase`, `role`, `docdelete` | A | The hooks of a Claude Code cell run them before each tool call. A refusal with exit 3 is not a block for the hook, so the guard opens if the class gate refuses it (F10). They write only their own log. |
+| `postedit-validate` | A | The hook of a Claude Code cell runs it after each edit. It checks the syntax of one file and blocks nothing. |
+| `version`, `help` | A | They print text and write nothing. |
+| `acs suite` | A | The build, the TDD and the audit personas run it. It runs the predicates of the cycle in the worktree and writes the verdict in the own workspace (F14). |
+| `solution check` | A | The scout persona runs this check. It reads files and writes nothing shared (F14). |
+| `eval quality-check`, `diversity-check` | A | The scout persona runs these checks. They read one eval file and write nothing (F14). |
+| `guard triage-floors` | A | The triage persona runs this check. It reads the workspace and writes nothing shared (F14). |
+| `phases list` | A | It reads the phase catalog and writes nothing (F14). |
+| `subagent check-ctx-advisory` | A | It reads the context size and writes nothing (F14). |
+| `doctor probe` | A | It finds one tool on `PATH` and reads its version. An LLM binary as the tool hits the exec deny of the cell (I-3). The full `doctor` stays `D` (F13). |
+| `release-preflight`, `release-consistency` | A | The merge gate runs these read-only verifiers (F14). |
 
 #### Findings
 
@@ -192,7 +204,17 @@ The column "Agent" of §5 gives the class of each core verb. These verbs are out
 
 **F8** I read the other verbs that §5 marks `A` on `5c010d7a4`. They change no file, signal, lease, git ref or `gh` state. They read files, or they run `git`, `gh`, `go list` and `ps` reads. Examples: `status` runs `gh pr list` (`go/cmd/evolve/cmd_status.go:158`). `ledger verify` takes a shared `flock` on a lock file that exists (`go/internal/adapters/ledger/ledger.go:142`). `ci classify` can file an inbox item only when a rerun result is known, and only `--rerun` gets one (`go/internal/ciwatch/classify.go:153`, `:168`).
 
-**F6** `agent capabilities` is not a verb on `origin/main` (`go/cmd/evolve/registry.go:43`: `agent run` and `agent list` only).
+**F6** `agent capabilities` was not a verb on `5c010d7a4` (`go/cmd/evolve/registry.go:43`: `agent run` and `agent list` only). X17e adds it.
+
+**F10** The Claude Code hooks of a cell run `evolve guard ship`, `guard phase`, `guard role`, `guard docdelete` and `postedit-validate` in the cell (`.claude/settings.json`). A `PreToolUse` hook blocks only on exit 2. Other exit codes are an error that does not block. *Implication:* if the class gate refuses a guard with exit 3, the guard opens. These verbs must be `A`.
+
+**F13** The post-ship monitor persona runs the full `evolve doctor` and `evolve loop --dry-run` (`agents/evolve-post-ship-monitor.md:26-28`). The full doctor boots each LLM CLI, which I-3 forbids in a cell, and `loop` is a boundary verb. *Implication:* both stay `D`, and at `enforce` these steps of the persona refuse. The persona must change before the flip.
+
+**F14** The personas under `agents/` name verbs that a cell runs (`TestAgentClasses_EachVerbThatAPersonaRunsIsAOrR`, 2026-10-27). Before this change the table gave them no row, so they were `D`. *Implication:* scout, build, TDD, audit and triage cells refuse at `enforce`. Each read-only check gets an `A` row.
+
+**F12** The `Stop` hook runs `evolve prune-ephemeral --quiet || true` (`.claude/settings.json:58`). The verb deletes files of each cycle, so it stays `D`. *Implication:* at `enforce` the hook prunes nothing in a cell, and `|| true` hides the exit 3. The host prunes outside the cells.
+
+**F11** The host claims each item that triage commits (`claimCommitted`, `go/internal/deliverable/host_effects.go:101`). The triage persona can still run `evolve inbox-mover claim` in its cell as a probe, and it reads exit 3 as a console-routed item (`agents/evolve-triage.md:280-288`, `.evolve/profiles/triage.json:29-30`). `inbox-mover` is not in the allowlist, so it is `D`. *Implication:* at stage `enforce` each probe exits 3, and triage records each probed item as console-routed with no error. Before the flip to `enforce`, remove the probe from the persona and the `inbox-mover` grants from the profile.
 
 | Id | Decision | Because | Rejected options and why |
 |---|---|---|---|
@@ -203,12 +225,13 @@ The column "Agent" of §5 gives the class of each core verb. These verbs are out
 | D5 | `R` and `D` verbs need the dispatch credential (§4.4) | F2 | The markers only: `env -u` passes them. A sandbox deny of the `evolve` binary: the profiles must run `evolve phase verify`. |
 | D6 | `cli-routing set` is `D`. A routing change from an agent is a request of the kind `routing-proposal` (§4.3). | D1 rule 4 | `R` for `cli-routing set` itself: the verb writes the policy file at once. A change from a cell must wait for a judgement and for the boundary queue (§4 rule 3). |
 | D7 | `clihealth usage` is `D`. `cli-routing show` and `explain` are `A` only with `--static`. `ci classify --rerun` is `D`. | F7, F8 | `R` for `clihealth usage`: the operator and the boundary already read the usage, and a cell has no task that needs it. |
+| D11 | The hook verbs of F10, `version`, `help` and the checks of F14 are `A`. `prune-ephemeral` and the full `doctor` stay `D` (F12, F13). | F10, F12, F13, F14 | `D`: the guards of the cell open at `enforce`. A fourth class for hooks: the hooks change no shared state, so rule 2 of `A` holds for them. |
 
 What changes our mind: the orchestrator can approve more than 95% of the requests of one kind for two weeks. Then that kind can move to `A` with a cap. If an `A` verb gets a shared write, it moves to `R` in the same change.
 
 ### 4.2 The capabilities verb
 
-`evolve agent capabilities --json` (proposed, X17e) tells the agent of the current cell what it can do. It is `A` and `always`. Each family reads the same JSON, so no persona needs CLI-specific text.
+`evolve agent capabilities --json` (X17e) tells the agent of the current cell what it can do. It is `A` and `always`. Each family reads the same JSON, so no persona needs CLI-specific text.
 
 ```json
 {
@@ -233,7 +256,8 @@ What changes our mind: the orchestrator can approve more than 95% of the request
 
 | Field | Rule |
 |---|---|
-| `cell` | The pipeline fills it from its own record of the dispatch, not from the environment of the caller. Outside a cell it is `null`, and each verb shows its class for a cell. |
+| `cell` | The pipeline fills it from its own record of the dispatch, not from the environment of the caller. Outside a cell it is `null`, and each verb shows its class for a cell. As built, the verb has no record of the dispatch, so it always prints `null`. The bridge gives the cell its own request directory (§4.2.1). |
+| `verbs[].only_with`, `verbs[].denied_with` | only for an `A` verb with a flag rule: the class holds only with this flag, or the flag makes the verb `D` |
 | `verbs[].class` | the class of §4.1 and of the column "agent" of §5 |
 | `verbs[].input`, `verbs[].output` | the schema id of the arguments and of the `--json` envelope (§2). `text/1` marks a verb whose output is lines, not an envelope. |
 | `verbs[].request` | only for `R`: the request kind, the request schema and the path to write |
@@ -241,6 +265,16 @@ What changes our mind: the orchestrator can approve more than 95% of the request
 | `caps` | the caps for each request kind that the validator applies (§4.3). The values in the example are not defaults. |
 
 The neutral TaskAssignment (I-17) carries a pointer to this verb ([llm-isolation.md](llm-isolation.md) §28). The agent calls it once at the start, and again when it needs a verb that it has not used.
+
+#### 4.2.1 As built (X17e)
+
+- The table is Go data in `go/internal/agentclass` (`table.go`). The class gate, the capabilities verb and the bridge read it. No other list of classes exists.
+- `agent capabilities` without `--json` prints one line for each verb: the verb, the class and, for an `R` verb, the request kind. The last line is `default D`.
+- The bridge adds one short section to the prompt of each phase cell (`preparePrompt`, `go/internal/bridge/driver_common.go`). The section points to `evolve agent capabilities --json` and gives the request directory of the cell. It names no tool syntax of a family. A pane with no phase agent, for example a probe, gets no section.
+- `caps` is `{}`. The request validator of item `isolation-dispatch-request-channel` sets the caps when it lands.
+- One class rule is outside the table: `loop` with the word `status` after its flags is `loop status` (`agentClassOf`, `go/cmd/evolve/dispatch_gate.go`). The parse of the loop flags lives in `cmd/evolve`.
+- A flag rule reads the last instance of the flag, as the `flag` package does. For `only_with`, an instance right after another flag with no `=` can be the value of that flag, so it does not count. Thus `cli-routing show --json --static` is `D`, and `cli-routing show --static --json` is `A`. The error is to the safe side.
+- `TestAgentClasses_EachVerbThatAPersonaRunsIsAOrR` reads each `` `evolve <verb>` `` in `agents/*.md`. It reads the forms in backticks, after a path such as `./go/bin/`, and at the start of a line. It fails on a class `D` verb. The test names each exception with its reason: the fan-out of the pipeline (`subagent`, `aggregator`), F11 and F13.
 
 ### 4.3 Requests
 
@@ -289,7 +323,13 @@ The class is a rule, not advice. Three layers enforce it:
 
 The markers of X4 stay as a fast first check with a clear message. They are not the guard (F2).
 
-As built (item `isolation-dispatch-capability-token`): layers 1 and 2 cover each command that starts a dispatch ([llm-isolation.md](llm-isolation.md) §7.1.1). Examples are `agent run`, `phase <name>`, `loop`, `wave next`, `cycle run` and `boundary run`. Each LLM launch through the bridge launch API checks the credential too. The refusal exits 3 with the texts above. X17e adds the other `R` and `D` verbs when it builds the class table.
+As built (item `isolation-dispatch-capability-token`): layers 1 and 2 cover each command that starts a dispatch ([llm-isolation.md](llm-isolation.md) §7.1.1). Each LLM launch through the bridge launch API checks the credential too.
+
+As built (X17e): one gate checks each verb. `dispatchWith` finds the class of the call in the table (§4.2.1), and each verb that is not `A` reads the credential. No list of gated verbs exists. Thus `inbox claim`, `wave stop` and `loop-stop` refuse together, with each other `D` verb.
+
+- The refusal exits 3 with the texts above and adds the cause of the failed read.
+- An alias takes the class of its command. An unknown command exits 2 with no credential check.
+- The gate runs at the stage of the credential store, which is `shadow` until the operator sets `enforce`.
 
 ### 4.5 Signals and quality readings
 
@@ -302,7 +342,7 @@ Each request and each decision is a signal of the module `isolation` ([llm-isola
 | `isolation.request.decision` | WARN | `ISOLATION_REQUEST_REFUSED` (proposed) | the validator or the orchestrator refuses | `request`, `kind`, `decision`, `reason`, `stage` |
 | `isolation.violation` | WARN | `ISOLATION_I3_VIOLATION` | an `R` or `D` verb refuses in a cell (§4.4) | `rule` is `verb.class.r` or `verb.class.d`, and `target` is the verb |
 
-The last row closes a gap of X4: the refusal of `agent run` emits no signal yet.
+The last row closes a gap of X4. As built (X17e), each violation of the class gate emits it: `action=logged` at `shadow`, and `action=refused` at `enforce`. The request signals of the first three rows need item `isolation-dispatch-request-channel`.
 
 Three proposed readings of the quality panel ([llm-quality-indexes.md](llm-quality-indexes.md), ADR-0153) use these signals. An amendment of ADR-0153 adds them at stage `shadow`:
 
@@ -373,11 +413,12 @@ Limits:
 | `ledger verify` | always | A | yes | yes | `evolve.ledger.verify/1` | the text form prints on stderr; `--evolve-dir` still wins over the root |
 | `dossier verify` | always | A | yes | yes | `evolve.dossier.verify/1` | |
 | `dossier show` | always | A | yes | yes | `evolve.dossier.show/1` | the dossier of one cycle; X17d |
-| `cli-routing show`, `check`, `explain` | always | A (`show` and `explain` with `--static` only, F7) | yes | yes | `evolve.cli-routing.<verb>/1` | |
+| `cli-routing show`, `check`, `explain` | always | `show` A only with `--static`, `check` A, `explain` A only with `--static` (F7) | yes | yes | `evolve.cli-routing.<verb>/1` | |
 | `routing explain` | always | A | yes | yes | `evolve.routing.explain/1` | |
 | `clihealth list`, `usage` | always | `list` A, `usage` D (F7) | yes | yes | `evolve.clihealth.<verb>/1` | `usage` starts a usage probe of the CLI, not a model turn |
 | `agent list` | always | A | yes | yes | `evolve.agent.list/1` | ADR-0152 |
-| `ci classify` | always | A (`--rerun` is D) | yes | yes | `evolve.ci.classify/1` | `--rerun` makes it `leased` |
+| `agent capabilities` | always | A | yes | yes | `evolve.agent.capabilities/1` | the classes of §4.1 for a cell (§4.2); X17e |
+| `ci classify` | always | A unless `--rerun` (`--rerun` is D) | yes | yes | `evolve.ci.classify/1` | `--rerun` makes it `leased` |
 | `scan secrets` | always | A | yes | yes | `evolve.scan.secrets/1` | |
 | `docs ste-lint` | always | A | yes | yes | `evolve.docs.ste-lint/1` | |
 | `quality report` | leased | R (`quality-reading`) | yes | yes | `evolve.quality.report/1` | it publishes signals |
@@ -411,7 +452,6 @@ Verbs outside this table are tools for the operator or for the pipeline itself. 
 | Verb | Class | Today | Why |
 |---|---|---|---|
 | `events subscribe` | leased | absent: the subscription store and runner are component E8 | a service resumes a named cursor ([event-notification-protocol-2026-10](../plans/event-notification-protocol-2026-10.md) E8, E9) |
-| `agent capabilities [--json]` | always | absent (`c/registry.go:43`) | the agent of a cell reads its classes, schemas and request paths (§4.2). Its agent class is `A`. Component X17e. |
 | `guidance index [--audience X] [--phase P] [--cli F] [--json]`, `guidance check` | always | both exist (#1138); `index` prints an envelope and `check` has no `--json` | an agent of any family lists the rules of its case from the rule registry ([guidance-layers.md](guidance-layers.md) §10.3). The agent class of both is `A`. `guidance build` writes tracked files, so it stays an operator tool outside the core verbs. |
 
 `events` is the E9 component of the events plan. X17 does not build a second `events` verb. The X17 item depends on the E9 item, and the E9 item takes the envelope and the exit table of this file.
@@ -455,9 +495,9 @@ A third rule closes the other forms: `reservedGoalVerb` refuses a positional goa
 | A `queued` verb does not refuse during a wave | `TestInboxEdit_DuringAWaveQueuesAndExitsFour` (built) | X17c | shadow, then enforce |
 | The boundary applies the queue in time order with one signal each | `TestQueueApply_AppliesTheRequestsInTimeOrderAndEmitsOneSignalEach` (built) | X17c | enforce |
 | `gc` skips a resource that a live run owns | `TestGC_TakesItsLeaseAndSkipsLiveRuns` (built) | X17c | enforce |
-| The agent class of each verb in Go matches §4.1 and the column "Agent" of §5 | `TestAgentClasses_MatchTheContract` | X17e | enforce |
-| An `R` verb with no credential exits 3 and names the request path. A `D` verb exits 3. | `TestAgentClass_RefusesWithoutTheCredentialAndNamesTheRequestPath` | X17e | shadow one wave, then enforce |
-| A valid request is run by the pipeline, and its result reaches the lineage index | `TestAgentRequest_AnApprovedRequestIsRunByThePipeline` | X17e | enforce |
+| The agent class of each verb in Go matches §4.1 and the column "Agent" of §5, and each core verb has a class | `TestAgentClasses_MatchTheContract` (built) | X17e | enforce |
+| An `R` verb with no credential exits 3 and names the request path. A `D` verb exits 3. | `TestAgentClass_RefusesWithoutTheCredentialAndNamesTheRequestPath` (built); `TestAgentClass_EveryVerbOfTheTableIsGatedByItsClass` (built) | X17e | shadow one wave, then enforce |
+| A valid request is run by the pipeline, and its result reaches the lineage index | `TestAgentRequest_AnApprovedRequestIsRunByThePipeline` (not built: it needs item `isolation-dispatch-request-channel`) | X17e | enforce |
 
 ## Limits
 
@@ -466,3 +506,8 @@ A third rule closes the other forms: `reservedGoalVerb` refuses a positional goa
 - A `queued` change takes effect at the next boundary, not at once. A caller that needs it at once must wait for the `cli.queue.applied` signal.
 - The human text is not a contract. A script that parses it breaks without notice.
 - This file covers the core verbs only. About 80 other verbs keep their own usage text.
+- `agent capabilities` prints `cell` as `null`, also in a cell. The verb has no record of the dispatch, and it does not read the environment. The bridge gives the request directory of the cell in the prompt (§4.2.1).
+- The request channel of §4.3 is not built. An agent can write a request file, but no step of the pipeline reads it until item `isolation-dispatch-request-channel` lands.
+- Each verb that is not `A` reads the credential also for the operator. The first such verb on a new host writes `~/.evolve/dispatch/held/credential` (llm-isolation.md §7.1.1 D2).
+- At `enforce` the full `doctor` and `loop --dry-run` steps of the post-ship monitor refuse (F13). Change the persona before the flip.
+- At `enforce` the triage probe of F11 exits 3 and triage reads it as a console-routed item. Do not set the stage `enforce` of the credential store before the probe and its profile grants are removed.
