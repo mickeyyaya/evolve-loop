@@ -354,6 +354,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 
 | Code | Meaning |
 |---|---|
+| `REVIEW_AGENT_RUN_VERDICT_MISMATCH` | evolve agent run found that the report body of a review fails while the verdict field passes: the body states FAIL, states no verdict, or lists a CRITICAL or HIGH finding; the run verdict is FAIL; run_id names the run, fields.field_verdict the field, fields.stated the stated verdict, fields.critical and fields.high the counts |
 | `REVIEW_FINDINGS` | a code-review dispatch completed and its findings were recorded in the cycle's defect-ledger.json (source code-review); INFO, or WARN when the rows could not be recorded (fields.error) or the findings_repair or quality_index config fell back (fields.config_warning); fields.findings (counts by severity), verdict, would_repair (any finding or a scores gap: the round-1 projection of the loop's decision), stage, threshold, round, recorded, scores (the quality-index vector), gaps (empty when the scores qualify), overflow |
 | `REVIEW_SKIPPED` | a code-review dispatch was skipped and recorded nothing, so the walk continued and the audit stays the only gate; WARN; fields.reason malformed (the contract-correction ladder exhausted on the report, or its verdict stayed non-canonical after every retry), fields.round |
 
