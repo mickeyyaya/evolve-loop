@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"reflect"
 	"slices"
 	"testing"
 	"time"
@@ -207,7 +208,7 @@ func TestDecideFlushLeavesTheInputBatchUnchanged(t *testing.T) {
 	if len(decision.Hold) > 0 {
 		decision.Hold[0].ID = "mutated"
 	}
-	if !slices.Equal(batch, before) {
+	if !reflect.DeepEqual(batch, before) {
 		t.Errorf("input batch = %v after the decision, want %v", batch, before)
 	}
 }

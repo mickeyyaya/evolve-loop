@@ -21,6 +21,10 @@ type Deliverable struct {
 	DeliveredAt        time.Time
 	Risky              bool
 	UnblocksQueuedWork bool
+	InboxRank          int
+	Deps               []string
+	UnblocksCount      int
+	VerificationCost   int
 }
 
 type FlushPolicy struct {

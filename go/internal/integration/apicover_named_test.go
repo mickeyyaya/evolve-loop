@@ -29,4 +29,19 @@ func TestExportedSymbolsAreNamedByAnExecutedAssertion(t *testing.T) {
 	if DefaultMaxAgeMinutes != policy.MaxAgeMinutes {
 		t.Errorf("DefaultMaxAgeMinutes = %d, policy %d", DefaultMaxAgeMinutes, policy.MaxAgeMinutes)
 	}
+
+	d := Deliverable{
+		ID:               "sample",
+		InboxRank:        1,
+		Deps:             []string{"upstream"},
+		UnblocksCount:    2,
+		VerificationCost: 3,
+	}
+	if d.InboxRank != 1 || len(d.Deps) != 1 || d.UnblocksCount != 2 || d.VerificationCost != 3 {
+		t.Errorf("deliverable fields inconsistent: %+v", d)
+	}
+	ordered := OrderDeliverables([]Deliverable{d})
+	if len(ordered) != 1 || ordered[0].ID != "sample" {
+		t.Errorf("OrderDeliverables = %+v, want sample", ordered)
+	}
 }
