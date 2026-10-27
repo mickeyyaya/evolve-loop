@@ -10,6 +10,7 @@ The operator set the rule on 2026-10-25: earlier deliverables and the retry and 
 
 ## Design
 
+- **`FileEntry(root, path, class, kind, why)`** makes one entry from one pipeline file, with its digest and summary, by the rules of `Build`. A missing file or a symlink is no entry. The evidence index of the self-healing loop (`selfheal.WriteEvidence`, [llm-isolation.md](../llm-isolation.md) §18.6) uses it for its own classes.
 - **`Build(Request)`** reads only pipeline records. It returns an `Index` with the schema `evolve.inputs.index/2` (`Schema`). The index has the cycle, the phase, the item ids, the `attempt` number, the lineage, the entries and the notes. The root and the workspace must be absolute.
 - **Deliverables.** For each phase contract of `phasecontract.Contracts` that writes to the workspace, the artifact of each other phase is an entry when the file exists. `triage-decision.json`, `acs-verdict.json` and each `handoff-*.json` are entries too. A `handoff-*.json` has the kind `handoff-asks`.
 - **Records.** `WriteRecord(root, Record)` writes `.evolve/lineage/cycle-N.json` with the cycle, the run id and the item ids. `ReadRecord` reads it back. The caller gives the ids from the fleet scope of the orchestrator (`Request.ItemIDs`). No cell can write the directory.

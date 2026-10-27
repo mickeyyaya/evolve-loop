@@ -28,7 +28,7 @@ func FromSignals(events []signalcenter.Event) []Observation {
 		}
 		for _, rule := range signalRules {
 			if o, ok := rule(e); ok {
-				set.add(o, Evidence{ID: fmt.Sprintf("signal:%d.%d", e.PID, e.Seq), At: at})
+				set.add(o, Evidence{ID: signalEvidenceID(e), At: at})
 			}
 		}
 	}
@@ -79,4 +79,8 @@ func supplyShort(e signalcenter.Event) (Observation, bool) {
 		return Observation{}, false
 	}
 	return Observation{Class: ClassLaneStarvation, Subject: "supply", Severity: signalcenter.SeverityWarn, Summary: fmt.Sprintf("the lane supply is short: %s admissible for a window of %s", e.Fields["admissible"], e.Fields["window"])}, true
+}
+
+func signalEvidenceID(e signalcenter.Event) string {
+	return fmt.Sprintf("signal:%d.%d", e.PID, e.Seq)
 }

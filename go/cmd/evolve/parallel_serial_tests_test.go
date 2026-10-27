@@ -240,6 +240,8 @@ var serialTests = map[string]string{
 	"main.TestCmd_InboxWithdraw_RefusesAMalformedRequest":                                                   "sets env through a helper",
 	"main.TestCmd_InboxWithdraw_RemovesAPendingItemAndAddFilesTheIDAgain":                                   "sets env through a helper",
 	"main.TestAgentRun_EachDiffReviewerRunsOnANonClaudeFamily":                                              "assigns runner.DefaultRouter",
+	"main.TestSelfhealPropose_TheLiveIncidentsEachGetOneCheckedProposalThroughTheBridge":                    "assigns runner.DefaultRouter",
+	"main.TestSelfhealPropose_TheDefaultPassDiagnosesTheTwoMostSevereIncidents":                             "assigns runner.DefaultRouter",
 	"main.TestConsoleReviewChain_ANonClaudeSeatReviewsAndTheGateAttestsTheBridgeRecords":                    "assigns runner.DefaultRouter",
 	"main.TestConsoleBuildSeat_RoutingDataMovesTheSeatToAnotherFamily":                                      "assigns runner.DefaultRouter",
 	"main.TestAgentRunRoot_PublishesUnderTheAgentRoleAndWiresTheBridge":                                     "assigns attachRootEventsFn",

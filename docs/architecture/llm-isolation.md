@@ -1274,11 +1274,15 @@ The pipeline writes `.evolve/incidents/<id>.json`. The path is a protected surfa
 | `repro_test` | `go/internal/bridge/..._test.go:TestX` | the red test of the repair, after TDD |
 | `opened_at`, `closed_at` | RFC 3339 times | for OQ4 time to green |
 
-### 18.3 The evidence index
+### 18.3 The evidence index (built by X13, §18.6)
+
+X13 builds the classes `incident`, `signal`, `digest` and `retrospective`. The classes `lesson`, `ci-log` and `diff` have no entry yet (§18.6).
 
 The orchestrator agent reads `inputs/index.json` in the same format as §8.3. The classes are `incident`, `signal`, `digest`, `retrospective`, `lesson`, `ci-log` and `diff`. The agent opens an entry only when it needs it. It never reads a raw pane log: the pipeline puts a cut of the relevant lines into a `digest` entry.
 
-### 18.4 The diagnosis schema (proposed)
+### 18.4 The diagnosis schema (built by X13, §18.6)
+
+This is the design. §18.6 amends it: the built schema has no `tier` key and requires `expected_effect`.
 
 ```json
 {
@@ -1314,6 +1318,68 @@ X12 builds step 1 (detect) and step 5 (verify) in `go/internal/selfheal` ([packa
 | Stage | the policy key `healing.detector.stage`: `shadow` (default) or `off`. `enforce` is refused until X14. |
 
 The record has the fields of §18.2 and some more fields ([internal-selfheal.md](packages/internal-selfheal.md)). `.evolve/incidents/`, `go/internal/selfheal/`, `go/cmd/evolve/cmd_selfheal.go` and `go/internal/policy/healing.go` are in `guards.ProtectedSurfaceManifest`. The states are `open` and `closed`. X14 adds the other states of §18.2 with a new major schema version.
+
+### 18.6 As built (X13)
+
+X13 builds step 2 (diagnose). The orchestrator agent is the on-demand seat `selfheal-orchestrator`. The verb `evolve selfheal propose [--json]` runs it for each open incident ([package note](packages/internal-selfheal.md)). The seat proposes. It acts on nothing, and the pipeline records its proposal for X14.
+
+A worked example: the record `inc-2026-10-27-235078cd` (`ci-hang:main`, T1) has the sources `ci:40265789886` and `ci:40269772364`.
+
+1. The verb writes `.evolve/runs/selfheal-inc-2026-10-27-235078cd/inputs/index.json`. Entry `i1` is the incident record. A note names the two CI runs, because the pipeline has no CI log cut yet.
+2. The verb runs `evolve agent run selfheal-orchestrator --json` with an input that names the incident and the evidence workspace.
+3. The agent runs `evolve context open i1 --workspace <ws> --json` and writes `diagnosis.json`, for example the action `open-repair-item` with `files` and `repro`.
+4. `phasecontract.ParseDiagnosis` checks the file. The verb writes `.evolve/incidents/proposals/inc-2026-10-27-235078cd.json` with the state `proposed`.
+
+| Part | As built |
+|---|---|
+| Seat | `.evolve/phases/selfheal-orchestrator/phase.json` (catalog `on-demand`), the profile `.evolve/profiles/selfheal-orchestrator.json` and the persona `agents/evolve-selfheal-orchestrator.md`. `evolve agent run` launches it through the bridge. `cli_routing` picks the family: the shipped route is `agy-tmux`, `agy-claude-tmux`, `claude-tmux`. |
+| No dispatch (I-1, I-3) | The profile denies `Task`, `Agent`, `evolve agent`, `phase`, `subagent`, `loop`, `selfheal` and `inbox`, and each LLM CLI. It allows only `Read`, `Grep`, `Glob`, `evolve context index`, `evolve context open` and the write of `diagnosis.json`. The sandbox is on, read-only on the repository, with no network. |
+| Rows N3 and N4 | `TestAgentSandboxContract_TheSelfhealOrchestratorSeatHoldsN3AndN4` (darwin, tag `integration`) runs the rows under the profile of the seat. The cell cannot exec an LLM binary. `evolve agent run` and `evolve selfheal propose` with the markers stripped get the credential refusal. |
+| Evidence index | `selfheal.WriteEvidence` writes `.evolve/runs/selfheal-<incident id>/inputs/index.json` in the format `evolve.inputs.index/2` of §8.5. The seat reads it with `evolve context index` and `open --workspace`. |
+| Classes | `incident` is the record (`i1`, the required entry). `signal` is a cut of the source signals, and the `INBOX_CURATOR_PROPOSAL` signals whose `id` or `target` is the subject. `digest` and `retrospective` are `failure-digest.json` and `retrospective-report.md` of each source cycle. `lesson`, `ci-log` and `diff` have no entry yet. The index names the missing CI runs and the diff in `notes`. |
+| Diagnosis | `diagnosis.json`, the flow seat `selfheal-orchestrator` of `phasecontract.FlowDecisions`. `phasecontract.ParseDiagnosis` checks it; the table below has the rules. |
+| Low confidence | `Diagnosis.Proposed` returns `halt-and-escalate` for a `low` diagnosis. The record keeps the action of the agent in `diagnosis` and the proposed action in `action`. |
+| Proposal record | `.evolve/incidents/proposals/<incident id>.json`, schema `evolve.healing.proposal/1`. The state is `proposed` (the diagnosis passed), `refused` (it failed the check) or `failed` (the run gave no diagnosis). The directory is under the protected `.evolve/incidents/`. |
+| Pass | `selfheal.Pending` selects each open incident with no current proposal: INCIDENT first, then by id, at most `max_per_pass`. A proposal is current while the incident keeps its `recurrence` and `last_seen_at`. A `failed` run is tried again at the next pass. |
+| Stage | the policy key `healing.orchestrator.stage`: `shadow` (default) records the proposals, and `off` runs no agent. `enforce` is refused until X14. `healing.orchestrator.max_per_pass` is 2 by default. |
+| Boundary | `evolve boundary run` and `evolve wave next` run `evolve selfheal incidents` and then `evolve selfheal propose` after `evolve inbox curate --apply`. A failed agent run is a `failed` record and exit 0, so it does not stop the boundary. An I/O fault is exit 2 and stops the boundary. |
+
+The rules of `evolve.diagnosis/1`, for the validator of X14:
+
+| Key | Type | Rule |
+|---|---|---|
+| `schema` | string | `evolve.diagnosis/1` |
+| `incident_id` | string | the id of the incident of the run |
+| `hypothesis` | string | not empty |
+| `evidence` | array of strings | one id or more; each id is an entry of the evidence index |
+| `action` | object | `kind` is one word of the catalog; `params` has each required param and no param that the kind does not take |
+| `alternative` | object, optional | the same rules as `action` |
+| `expected_effect` | string | not empty |
+| `confidence` | string | `low`, `medium` or `high` |
+
+An unknown key at any level, a missing key, prose around the JSON or trailing data also fails the check.
+
+| `kind` | Required params | Optional params | Param rules |
+|---|---|---|---|
+| `retry-with-variation` | `item`, `variation` | none | `variation` is `model`, `tier` or `prompt-seed` |
+| `reroute-family` | `item`, `family` | none | none |
+| `quarantine-item` | `item` | `reason` | none |
+| `revert-last-landing` | `sha` | none | 7 to 40 lowercase hex characters |
+| `open-repair-item` | `files`, `repro` | none | each file is a clean path inside the repository |
+| `halt-and-escalate` | none | `reason` | none |
+
+Two changes from §18.4:
+
+- The diagnosis has no `tier` key. The tier comes from the incident record, so the agent cannot lower the tier of its own incident.
+- `expected_effect` is required, because the operator asked for the expected effect of each proposal (2026-10-27). X16 can verify it after a repair.
+
+The catalog of §19 also names `dispatch-phase-agent` (proposed). The schema refuses it until X14 adds it.
+
+Limits:
+
+- At `isolation.i5.stage=enforce`, an `evolve agent run` launch has no index grant (§8.5), so the seat cannot read the evidence workspace. The seat works at `shadow`. A read grant for the evidence workspace must land before the flip of `isolation.i5.stage`.
+- The `ci-log` and `diff` classes have no cut. A `flaky-test` diagnosis thus cannot name the test.
+- The verb runs one agent at a time. Each pass is cut at `max_per_pass` incidents, so a boundary waits for at most that number of runs.
 
 ## 19. The action catalog
 
@@ -1431,7 +1497,7 @@ The module is `healing` (built by X12, code prefix `HEALING_`), in the same shap
 | `incident.escalated` | INCIDENT | `HEALING_ESCALATED` | two failed repairs, two refused proposals, an open breaker or a `low` diagnosis |
 | `healing.violation` | WARN | `HEALING_I10_VIOLATION` to `HEALING_I14_VIOLATION` | an invariant of Part II breaks |
 
-As built (X12): one kind `selfheal.incident` with a field `transition` replaces `incident.opened` and `incident.closed` ([internal-selfheal.md](packages/internal-selfheal.md) has the codes). The kinds `incident.proposal`, `incident.refused` and `incident.escalated` come with X14.
+As built (X12): one kind `selfheal.incident` with a field `transition` replaces `incident.opened` and `incident.closed` ([internal-selfheal.md](packages/internal-selfheal.md) has the codes). The kinds `incident.proposal`, `incident.refused` and `incident.escalated` come with X14. X13 emits no signal: in `shadow` it writes the proposal records only (§18.6).
 
 The measures for the stage flips of §20.2 are proposed panel readings: repair success rate, false-diagnosis rate and OQ4 time to green. A false diagnosis is a repair whose verify failed and whose next diagnosis named another cause. An amendment of ADR-0153 adds them.
 
@@ -1441,8 +1507,9 @@ The measures for the stage flips of §20.2 are proposed panel readings: repair s
 |---|---|
 | Which incidents are open? | `evolve selfheal incidents --json`, or `evolve signals tail --channel selfheal.incident` |
 | Why did the pipeline refuse a proposal? | `evolve signals tail --channel errors --code HEALING_PROPOSAL_REFUSED --json` |
-| What did the orchestrator agent see? | `cat .evolve/runs/cycle-N/inputs/index.json` |
-| What stage is each tier at? | the `healing` block of `.evolve/policy.json`: `healing.detector.stage` is built (X12), and the tier keys are proposed |
+| What did the orchestrator agent see? | `evolve context index --workspace .evolve/runs/selfheal-<incident id> --json` |
+| What did the orchestrator agent propose? | `evolve selfheal propose --json`, or `cat .evolve/incidents/proposals/<incident id>.json` |
+| What stage is each tier at? | the `healing` block of `.evolve/policy.json`: `healing.detector.stage` (X12) and `healing.orchestrator.stage` (X13) are built, and the tier keys are proposed |
 
 | Code | What it means | What to do |
 |---|---|---|

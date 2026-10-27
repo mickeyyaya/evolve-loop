@@ -228,6 +228,8 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/selfheal/", Class: AuditVerdictGuarantee, Rationale: "the incident detector and the four close conditions of I-14: an agent that could edit them could close its own incident (ADR-0155, llm-isolation.md §21)"},
 	{Fragment: "/go/cmd/evolve/cmd_selfheal.go", Class: AuditVerdictGuarantee, Rationale: "evolve selfheal incidents: it chooses the evidence of the detector, builds the verifier of the four close conditions and writes the records (ADR-0155, llm-isolation.md §18.5)"},
 	{Fragment: "/go/internal/policy/healing.go", Class: PolicyGuarantee, Rationale: "the healing.detector.stage key and its validation (ADR-0155, llm-isolation.md §20.2)"},
+	{Fragment: "/go/internal/phasecontract/diagnosis.go", Class: GateGuarantee, Rationale: "the evolve.diagnosis/1 schema with the closed action catalog and the low-confidence escalation: an agent that could widen it could propose an action outside the catalog (ADR-0155, llm-isolation.md §18.4, §20.1)"},
+	{Fragment: "/go/cmd/evolve/cmd_selfheal_propose.go", Class: AuditVerdictGuarantee, Rationale: "evolve selfheal propose: it builds the evidence index, runs the orchestrator seat, checks each diagnosis.json and writes the proposal records (ADR-0155, llm-isolation.md §18.6)"},
 }
 
 func IsProtectedSurface(path string) bool {

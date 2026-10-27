@@ -114,7 +114,7 @@ func TestSelfhealIncidents_APassOpensTheFixtureIncidentsWritesTheRecordsAndPubli
 	t.Parallel()
 	root := selfhealProject(t, `{}`)
 	rc, e, stderr := runSelfhealJSON(t, selfhealTestEnv(fixtureGH), root)
-	if rc != 0 || !e.OK || e.Schema != selfhealSchema || e.Data.Stage != "shadow" || len(e.Warnings) != 0 {
+	if rc != 0 || !e.OK || e.Schema != selfhealSchemas[selfhealVerbIncidents] || e.Data.Stage != "shadow" || len(e.Warnings) != 0 {
 		t.Fatalf("rc=%d envelope=%+v stderr=%s", rc, e, stderr)
 	}
 	want := []string{

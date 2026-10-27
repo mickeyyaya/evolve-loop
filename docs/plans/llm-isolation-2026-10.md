@@ -183,7 +183,8 @@ The state on 2026-10-27. Each component re-reads this table before it starts.
 | X17c | built, stage `shadow` | #1180 | The inbox curation verbs and the `cli-routing` writers queue during a wave (policy `isolation.i15.stage`). The boundary step `queue-apply` applies the queue after `sync-main`. `gc` takes a lease and skips the process sweeps while a run is live. |
 | X11 | built | #1182 | `evolve agent run` writes a launch record for each run, and `commit-gate run --reviewers run:<label>` attests a review from it. `console-builder` is the build seat in a linked worktree, and `docs-review` is a profile. The spec is [agent-run.md](../architecture/agent-run.md) §7 and §8. |
 | X12 | built, stage `shadow` | branch `feat/selfheal-x12` | `go/internal/selfheal` turns signals, cycle state, CI runs and usage readings into records under `.evolve/incidents/`. The verb is `evolve selfheal incidents`. A pass over the data of 2026-10-27 opened 8 records. They include the repair loop of cycle 2035 (T0), the ten claims of cycles 1983 to 2035 and the CI hang of run 40265789886. Spec §18.5. |
-| X13 to X16, X17d, X18c, X18d, X19 | not started | none | |
+| X13 | built, stage `shadow` | branch `feat/selfheal-x13` | The seat `selfheal-orchestrator` reads the evidence index of an open incident and writes `diagnosis.json`. `phasecontract.ParseDiagnosis` refuses an action outside the closed catalog and an evidence id outside the index. The verb `evolve selfheal propose` records one proposal for each incident under `.evolve/incidents/proposals/`. Spec §18.6. |
+| X14 to X16, X17d, X18c, X18d, X19 | not started | none | |
 
 ### 6.2 The X6 follow-up (X6b)
 

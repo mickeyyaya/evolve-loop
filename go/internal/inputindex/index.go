@@ -103,3 +103,7 @@ func underRoot(projectRoot, rel string) (string, bool) {
 	}
 	return filepath.Join(projectRoot, clean), true
 }
+
+func FileEntry(projectRoot, path, class, kind, why string) (Entry, bool, error) {
+	return newEntry(projectRoot, source{path: path, class: class, kind: kind, why: why})
+}
