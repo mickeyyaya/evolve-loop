@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 func TestWireOrchestrator_TheNoWorkCheckAsksTheLaneMenu(t *testing.T) {
@@ -97,7 +98,7 @@ func TestLaneMenuOf_WithholdsProtectedAndWaitingItems(t *testing.T) {
 		{ID: "guarded", Files: []string{"go/internal/guarded/x.go"}},
 		{ID: "waiting", Deps: []string{"blocker"}},
 	}
-	ready := laneMenuOf(guarded)(inboxRoot, items)
+	ready := laneMenuOf(guarded, policy.FixabilityConfig{})(inboxRoot, items)
 	if len(ready) != 1 || ready[0].ID != "blocker" {
 		t.Errorf("the lane menu offers only the ready item: %+v", ready)
 	}
@@ -110,12 +111,22 @@ func TestLaneMenuOf_TheProductionPredicateWithholdsARootThatHoldsOnlyAProtectedF
 	if err := os.MkdirAll(inboxRoot, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	menu := laneMenuOf(laneForbidden(root, io.Discard))
+	menu := laneMenuOf(laneForbidden(root, io.Discard), policy.FixabilityConfig{})
 	items := []inboxbatch.Item{{ID: "protected-only", Files: []string{"go/internal/core/orchestrator.go"}}}
 	if ready := menu(inboxRoot, items); len(ready) != 0 {
 		t.Fatalf("a root whose only item declares a protected file offers no lane work, so the no-work check ends the cycle as planned no-work: %+v", ready)
 	}
 	if ready := menu(inboxRoot, []inboxbatch.Item{{ID: "lane-work", Files: []string{"go/internal/fleet/fleet.go"}}}); len(ready) != 1 {
 		t.Fatalf("ordinary lane work stays on the menu: %+v", ready)
+	}
+}
+
+func TestLaneMenuOf_AtEnforceTheNoWorkCheckAgreesWithTriageOnAConsoleCompanion(t *testing.T) {
+	t.Parallel()
+	items := []inboxbatch.Item{{ID: "x-lane", Route: "lane"}, {ID: "x-lane-ac-1-console", Route: "console-manual"}}
+	for stage, want := range map[string]int{policy.FixabilityEnforce: 0, policy.FixabilityShadow: 1} {
+		if ready := laneMenuOf(func(string) bool { return false }, policy.FixabilityConfig{Stage: stage})(t.TempDir(), items); len(ready) != want {
+			t.Errorf("stage %s: ready = %+v, want %d lane item(s)", stage, ready, want)
+		}
 	}
 }

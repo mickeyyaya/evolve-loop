@@ -217,11 +217,11 @@ The block configures `internal/convergence`, the one rule every repeat-until-acc
 
 ## Repair fixability (`workflow.repair.fixability`)
 
-The block sets the stage of lane fixability classification ([ADR-0158](adr/0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md)). The loader refuses a bad stage value with an error.
+The block sets the stage of lane fixability classification ([ADR-0158](adr/0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md), [internal-fixability](packages/internal-fixability.md)). One stage serves two checks: the check before a repair round, and the console companion check of the lane menu. The loader refuses a bad stage value with an error. `policy.FixabilityFor` holds `shadow` with a WARN when the policy file is refused.
 
 | Key | Meaning | Default |
 |---|---|---|
-| `stage` | `off` disables classification. `shadow` records decisions without stopping. `enforce` stops the repair round on a blocking handoff finding. | `shadow` |
+| `stage` | `off` disables classification. `shadow` records `REPAIR_HANDOFF` with `decision: would_stop`, and the repair round runs. A lane item with a console companion stays ready. `enforce` seals the cycle `handed-off` on a blocking handoff finding, with no repair round. A lane item with a console companion waits with the reason `console_companion_pending`. | `shadow` |
 
 ## Retry ladder (`workflow.retry_ladder`)
 

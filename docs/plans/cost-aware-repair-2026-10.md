@@ -1,7 +1,7 @@
 # Plan: a cycle stops on a blocker that the lane cannot fix, and a small prescribed fix costs one patch, not one build
 
-- **Status:** proposed, 2026-10-27.
-- **Decision:** [ADR-0158](../architecture/adr/0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md). **Research:** [cost-aware-repair-2026-10](../research/cost-aware-repair-2026-10.md). **Case:** [cycle 2035](../incidents/2026-10-27-cycle-2035-repair-loop.md). **Design of record for the rungs:** [retry-ladder.md](../architecture/retry-ladder.md). **Measurement of the tokens by seat and round purpose:** [token-telemetry-2026-10](token-telemetry-2026-10.md).
+- **Status:** proposed, 2026-10-27. Items 2 and 3 have two builds. §11 compares them and gives the parts that move onto the build on `main`.
+- **Decision:** [ADR-0158](../architecture/adr/0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md). **Research:** [cost-aware-repair-2026-10](../research/cost-aware-repair-2026-10.md). **Case:** [cycle 2035](../incidents/2026-10-27-cycle-2035-repair-loop.md). **Design of record for the rungs:** [retry-ladder.md](../architecture/retry-ladder.md).
 
 ## Table of contents
 
@@ -15,6 +15,7 @@
 - [8. Verification](#8-verification)
 - [9. Risks](#9-risks)
 - [10. Open questions](#10-open-questions)
+- [11. Status of the build](#11-status-of-the-build)
 
 ## 1. Request
 
@@ -188,3 +189,28 @@ At `shadow`, each component records what it does at `enforce`. The shadow wave p
 - **Q2.** Can the bridge send findings into a live build session before it closes? If not, item 8 becomes a hard rule in the build contract: no handoff without a GREEN self-check receipt for the tree.
 - **Q3.** Which family reviews an `audit_fix` patch when the chain has only one family that is healthy? The proposal is to decline the rung and take the repair round of today.
 - **Q4.** The spend limit counts fresh tokens and cache-read tokens apart. A cost in money needs a price for each family, which the policy does not have. The plan [token-telemetry-2026-10](token-telemetry-2026-10.md) proposes these weights as policy data (D8).
+
+## 11. Status of the build
+
+Items 2 and 3 have two builds:
+
+- Cycle 2039 landed item 2 on `main` as commit `13ec27e4c`. It added the package `go/internal/fixability`, the key `workflow.repair.fixability.stage` and the ACS `go/acs/cycle2039`, which pins the API.
+- The console built items 2 and 3 and their part of item 11 in [#1188](https://github.com/mickeyyaya/evolve-loop/pull/1188), with a different `go/internal/fixability`. [#1189](https://github.com/mickeyyaya/evolve-loop/pull/1189) (item 4) is on top of #1188.
+
+The console keeps the build on `main`, because it shipped and the ACS pins it. The branch `feat/adr0158-fixability-gaps` moves each behaviour of #1188 that `main` does not have onto the API of `main`. It adds no second package and does not change the ACS of cycle 2039. The branch `feat/cycle-spend-limit-v2` moves #1189 onto that branch.
+
+| Behaviour | Acceptance | `main` (cycle 2039) | #1188 | Result |
+|---|---|---|---|---|
+| Lane and handoff findings, the severity rule, the red paths, the salvage pointer, the stage key | item 2, criteria 1 to 5 | yes | yes | `main` stays |
+| A gate failure that names a cited path, the package of a cited Go file, or a test of the finding blocks | D3, "a deterministic gate fails on it" | no | yes | moved: `Input.GateFailures` |
+| The words "tests fail" or "predicate failed" in the defect block | D3, "the audit proves a red test"; round 1 has no gate failure | no; only a red path from the caller | yes | moved |
+| A console item id must be whole | D2 | no; a substring matches | yes | moved |
+| The fence is an input function | not in the acceptance | no; `guards.IsProtectedSurface` | yes | `main` stays; `core` gets the check through `core.WithRepairFixability`, because `guards` imports `core` |
+| The name of the rule that blocks, and JSON tags on the findings | not in the acceptance | no | yes | not moved |
+| `Companions` and `OpenConsole` | item 3, criteria 1 to 3 | no | yes | moved into `go/internal/fixability` |
+| Triage, the census, the wave seed and `evolve inbox batches` defer a lane item with a console companion | item 3, criterion 4 | no | yes, in `inboxmover.RankLaneMenu` | moved into `inboxmover.PartitionLaneMenu`, so the no-work check and `evolve inbox rank` agree with triage |
+| The check before a repair round: `REPAIR_HANDOFF`, `repair-handoff.json`, the `handed-off` seal, `HANDOFF_ROUTE`, no code FAIL count, the resume path | item 11 for items 2 and 3 | no | yes | moved |
+| `evolve wave status` prints `handed-off (<reason>: <blockers>)` | §8, G2 | no | yes | moved |
+| The wave measures and PQ5 count the stops, the `would_stop` decisions and the false stops | §8, the shadow wave numbers | no | yes | moved on `feat/cycle-spend-limit-v2`, because it needs item 1 ([#1184](https://github.com/mickeyyaya/evolve-loop/pull/1184)) |
+
+Item 3 names `go/internal/admission/admission.go` as its file. #1188 puts the check in `inboxmover.RankLaneMenu`. This branch puts it in `inboxmover.PartitionLaneMenu`, because all readers of the lane menu call it. The readers are triage, the census, the wave seed, the no-work check, `evolve inbox batches` and `evolve inbox rank`.

@@ -2,6 +2,7 @@ package core
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -41,6 +42,11 @@ func (o *Orchestrator) decideAfterAuditFail(cs CycleState) (Phase, string, *Syst
 			Evidence: env.Reason,
 			Halt:     true,
 		}
+	}
+
+	if reason, stop := o.repairHandoff(cs, fb, env); stop {
+		o.emitAuditRepairDecision(cs, PhaseRetro, declared, strings.TrimPrefix(reason, auditDeclineReasonPrefix))
+		return PhaseRetro, reason, nil
 	}
 
 	var proposal *adjudication

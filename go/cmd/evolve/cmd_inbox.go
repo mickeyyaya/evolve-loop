@@ -14,6 +14,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxrank"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/repostate"
 )
 
@@ -127,7 +128,7 @@ func loadPendingInbox(root, verb string, stderr io.Writer) (pendingInbox, error)
 		return pendingInbox{}, err
 	}
 	printLoadWarnings(stderr, "inbox "+verb, scan.Warnings)
-	opts := inboxmover.Options{InboxDir: inboxDir, Stderr: io.Discard}
+	opts := inboxmover.Options{InboxDir: inboxDir, Stderr: io.Discard, Companions: policy.FixabilityFor(root, "inbox "+verb, stderr)}
 	return pendingInbox{items: scan.Items, opts: opts, isProtected: laneForbidden(root, stderr)}, nil
 }
 
