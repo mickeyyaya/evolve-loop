@@ -211,7 +211,7 @@ The ladder serves the phases that produce a deliverable: build, tdd, scout, tria
 
 The raise reaches the dispatch through its own field, not the advisor overlay:
 
-- `PhaseRequest` carries the ladder rung beside `ModelRoutingCLI` and `ModelRoutingTier`. L3 added its effort part, `ModelRoutingEffort`. The runner puts it into `llmroute.Overlay.Effort`, and the bridge sends it as `--effort` over the tier default. On agy-tmux, a ladder effort above the variant of the model name is capped, and the launch writes the requested and the granted effort ([internal-bridge](packages/internal-bridge.md)).
+- `PhaseRequest` carries the ladder rung beside `Driver` and `Assignment.Tier`. L3 added its effort part, now `Assignment.Effort` (X19a). The runner puts it into `llmroute.Overlay.Effort`, and the bridge sends it as `--effort` over the tier default. On agy-tmux, a ladder effort above the variant of the model name is capped, and the launch writes the requested and the granted effort ([internal-bridge](packages/internal-bridge.md)).
 - A new `cliroute` step runs after `overlayTier`. It applies the ladder tier and effort, ignores `modelFixed`, and clamps them to `max_tier` and `max_effort`.
 - The allowed set and the family floor (`cli_routing.floors`, since X6) still apply. A floor seat never goes below its floor.
 - `evolve cli-routing set` validates `max_tier` and `max_effort` when it compiles the table.

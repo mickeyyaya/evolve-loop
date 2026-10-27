@@ -47,8 +47,8 @@ type escalationProbe struct {
 func (p *escalationProbe) Name() string { return p.phase }
 
 func (p *escalationProbe) Run(_ context.Context, req PhaseRequest) (PhaseResponse, error) {
-	p.lastCLI = req.ModelRoutingCLI
-	p.dispatched = append(p.dispatched, req.ModelRoutingCLI)
+	p.lastCLI = req.Driver.String()
+	p.dispatched = append(p.dispatched, req.Driver.String())
 	return PhaseResponse{Phase: p.phase, Verdict: VerdictPASS, ArtifactsDir: req.Workspace}, nil
 }
 
@@ -109,10 +109,10 @@ func TestContractCorrection_SecondBlockEscalatesToProfileFallback(t *testing.T) 
 		t.Fatalf("build dispatched %d times (%v), want 3 (initial + 2 corrections)", len(probe.dispatched), probe.dispatched)
 	}
 	if probe.dispatched[0] != "" {
-		t.Errorf("initial dispatch carried ModelRoutingCLI=%q, want \"\" — the phase's PRIMARY routing must be untouched (scoping constraint: escalate only the re-dispatch that already failed the contract)", probe.dispatched[0])
+		t.Errorf("initial dispatch carried Driver=%q, want \"\" — the phase's PRIMARY routing must be untouched (scoping constraint: escalate only the re-dispatch that already failed the contract)", probe.dispatched[0])
 	}
 	if probe.dispatched[2] != "codex-tmux" {
-		t.Errorf("correction 2 dispatched on ModelRoutingCLI=%q, want \"codex-tmux\" — the SECOND consecutive contract block must re-dispatch on the profile's cli_fallback BEFORE the third strike opens the circuit", probe.dispatched[2])
+		t.Errorf("correction 2 dispatched on Driver=%q, want \"codex-tmux\" — the SECOND consecutive contract block must re-dispatch on the profile's cli_fallback BEFORE the third strike opens the circuit", probe.dispatched[2])
 	}
 }
 
@@ -130,7 +130,7 @@ func TestContractCorrection_FirstBlockDoesNotEscalate(t *testing.T) {
 		t.Fatalf("build dispatched %d times (%v), want 2 (initial + 1 correction)", len(probe.dispatched), probe.dispatched)
 	}
 	if probe.dispatched[1] != "" {
-		t.Errorf("correction 1 dispatched on ModelRoutingCLI=%q, want \"\" \u2014 the FIRST contract block must NOT escalate the CLI (one bad turn is not a CLI verdict)", probe.dispatched[1])
+		t.Errorf("correction 1 dispatched on Driver=%q, want \"\" \u2014 the FIRST contract block must NOT escalate the CLI (one bad turn is not a CLI verdict)", probe.dispatched[1])
 	}
 }
 
@@ -149,7 +149,7 @@ func TestContractCorrection_HotBreakerEscalatesOnFirstCorrection(t *testing.T) {
 		t.Fatalf("build dispatched %v, want at least initial + 1 correction", probe.dispatched)
 	}
 	if probe.dispatched[1] != "codex-tmux" {
-		t.Errorf("correction 1 dispatched on ModelRoutingCLI=%q, want \"codex-tmux\" \u2014 with the breaker already at 1, this phase's first block IS the second consecutive block", probe.dispatched[1])
+		t.Errorf("correction 1 dispatched on Driver=%q, want \"codex-tmux\" \u2014 with the breaker already at 1, this phase's first block IS the second consecutive block", probe.dispatched[1])
 	}
 	var sawDemotion bool
 	for _, e := range led.entries {
@@ -186,7 +186,7 @@ func TestContractCorrection_NonContractRejectionNeverEscalates(t *testing.T) {
 	}
 	for i, cli := range probe.dispatched {
 		if cli != "" {
-			t.Errorf("dispatch %d carried ModelRoutingCLI=%q, want \"\" \u2014 a non-contract rejection must never escalate the CLI (dispatched=%v)", i, cli, probe.dispatched)
+			t.Errorf("dispatch %d carried Driver=%q, want \"\" \u2014 a non-contract rejection must never escalate the CLI (dispatched=%v)", i, cli, probe.dispatched)
 		}
 	}
 }
@@ -205,7 +205,7 @@ func TestContractCorrection_NoDeclaredFallbackEscalatesToUniversalClaude(t *test
 		t.Fatalf("build dispatched %d times (%v), want 3", len(probe.dispatched), probe.dispatched)
 	}
 	if probe.dispatched[2] != "claude-tmux" {
-		t.Errorf("correction 2 dispatched on ModelRoutingCLI=%q, want %q — a profile with no declared cli_fallback must escalate to the universal claude fallback", probe.dispatched[2], "claude-tmux")
+		t.Errorf("correction 2 dispatched on Driver=%q, want %q — a profile with no declared cli_fallback must escalate to the universal claude fallback", probe.dispatched[2], "claude-tmux")
 	}
 }
 
@@ -223,7 +223,7 @@ func TestContractCorrection_SameFamilyFallbackIsNotAnEscalation(t *testing.T) {
 		t.Fatalf("build dispatched %d times (%v), want 3", len(probe.dispatched), probe.dispatched)
 	}
 	if probe.dispatched[2] != "" {
-		t.Errorf("correction 2 dispatched on ModelRoutingCLI=%q, want \"\" — a primary already on the universal-fallback family has NO escalation target; re-pointing at the same family is not an escalation", probe.dispatched[2])
+		t.Errorf("correction 2 dispatched on Driver=%q, want \"\" — a primary already on the universal-fallback family has NO escalation target; re-pointing at the same family is not an escalation", probe.dispatched[2])
 	}
 }
 
@@ -402,7 +402,7 @@ func TestContractCorrection_DifferingBlockReasonsDoNotEscalate(t *testing.T) {
 		t.Fatalf("build dispatched %d times (%v), want 3 (initial + 2 corrections)", len(probe.dispatched), probe.dispatched)
 	}
 	if probe.dispatched[2] != "" {
-		t.Errorf("correction 2 dispatched on ModelRoutingCLI=%q, want \"\" — block 2's violation (%q) DIFFERS from block 1's (%q), so the two blocks are not one incapable-CLI signature and escalation must not fire",
+		t.Errorf("correction 2 dispatched on Driver=%q, want \"\" — block 2's violation (%q) DIFFERS from block 1's (%q), so the two blocks are not one incapable-CLI signature and escalation must not fire",
 			probe.dispatched[2], probe.reasonPerBlock[1], probe.reasonPerBlock[0])
 	}
 }
@@ -434,7 +434,7 @@ func TestContractCorrection_NormalizedIdenticalReasonsEscalate(t *testing.T) {
 		t.Fatalf("build dispatched %d times (%v), want 3 (initial + 2 corrections)", len(probe.dispatched), probe.dispatched)
 	}
 	if probe.dispatched[2] != "codex-tmux" {
-		t.Errorf("correction 2 dispatched on ModelRoutingCLI=%q, want \"codex-tmux\" — the two blocks are the SAME defect under normalizeReasonForFingerprint (they differ only in a duration token), so the second consecutive block must still escalate",
+		t.Errorf("correction 2 dispatched on Driver=%q, want \"codex-tmux\" — the two blocks are the SAME defect under normalizeReasonForFingerprint (they differ only in a duration token), so the second consecutive block must still escalate",
 			probe.dispatched[2])
 	}
 }
@@ -466,7 +466,7 @@ func TestContractCorrection_SubsetRepairStillEscalates(t *testing.T) {
 		t.Fatalf("build dispatched %d times (%v), want 3 (initial + 2 corrections)", len(probe.dispatched), probe.dispatched)
 	}
 	if probe.dispatched[2] != "codex-tmux" {
-		t.Errorf("correction 2 dispatched on ModelRoutingCLI=%q, want \"codex-tmux\" — block 2's violation codes {missing_verdict} are a SUBSET of block 1's {missing_section, missing_verdict}, i.e. the same defect partially repaired, so the second consecutive block MUST still escalate. Suppressing here is the cycle-1289 audit defect (whole-string compare of summarize() output).",
+		t.Errorf("correction 2 dispatched on Driver=%q, want \"codex-tmux\" — block 2's violation codes {missing_verdict} are a SUBSET of block 1's {missing_section, missing_verdict}, i.e. the same defect partially repaired, so the second consecutive block MUST still escalate. Suppressing here is the cycle-1289 audit defect (whole-string compare of summarize() output).",
 			probe.dispatched[2])
 	}
 }
@@ -495,7 +495,7 @@ func TestContractCorrection_SupersetRegressionStillEscalates(t *testing.T) {
 		t.Fatalf("build dispatched %d times (%v), want 3 (initial + 2 corrections)", len(probe.dispatched), probe.dispatched)
 	}
 	if probe.dispatched[2] != "codex-tmux" {
-		t.Errorf("correction 2 dispatched on ModelRoutingCLI=%q, want \"codex-tmux\" — block 2's codes {missing_verdict, missing_section} are a SUPERSET of block 1's {missing_verdict}: the original violation is still open and the correction added another, so the second consecutive block MUST still escalate",
+		t.Errorf("correction 2 dispatched on Driver=%q, want \"codex-tmux\" — block 2's codes {missing_verdict, missing_section} are a SUPERSET of block 1's {missing_verdict}: the original violation is still open and the correction added another, so the second consecutive block MUST still escalate",
 			probe.dispatched[2])
 	}
 }
@@ -521,7 +521,7 @@ func TestContractCorrection_DisjointViolationSetsDoNotEscalate(t *testing.T) {
 		t.Fatalf("build dispatched %d times (%v), want 3 (initial + 2 corrections)", len(probe.dispatched), probe.dispatched)
 	}
 	if probe.dispatched[2] != "" {
-		t.Errorf("correction 2 dispatched on ModelRoutingCLI=%q, want \"\" — block 1's codes {missing_section, empty_artifact} and block 2's {missing_verdict, bad_trailer} are DISJOINT, so these are two honest defects and escalation must NOT fire (scoping constraint 4)",
+		t.Errorf("correction 2 dispatched on Driver=%q, want \"\" — block 1's codes {missing_section, empty_artifact} and block 2's {missing_verdict, bad_trailer} are DISJOINT, so these are two honest defects and escalation must NOT fire (scoping constraint 4)",
 			probe.dispatched[2])
 	}
 }
@@ -550,7 +550,7 @@ func TestContractCorrection_ReorderedViolationSetEscalates(t *testing.T) {
 		t.Fatalf("build dispatched %d times (%v), want 3 (initial + 2 corrections)", len(probe.dispatched), probe.dispatched)
 	}
 	if probe.dispatched[2] != "codex-tmux" {
-		t.Errorf("correction 2 dispatched on ModelRoutingCLI=%q, want \"codex-tmux\" — both blocks carry the SAME code set {missing_section, missing_verdict}, differing only in violation ORDER and message wording, so the second consecutive block MUST still escalate",
+		t.Errorf("correction 2 dispatched on Driver=%q, want \"codex-tmux\" — both blocks carry the SAME code set {missing_section, missing_verdict}, differing only in violation ORDER and message wording, so the second consecutive block MUST still escalate",
 			probe.dispatched[2])
 	}
 }
@@ -577,7 +577,7 @@ func TestContractCorrection_UncodedReasonsFallBackToTextIdentity(t *testing.T) {
 		t.Fatalf("build dispatched %d times (%v), want 3 (initial + 2 corrections)", len(probe.dispatched), probe.dispatched)
 	}
 	if probe.dispatched[2] != "codex-tmux" {
-		t.Errorf("correction 2 dispatched on ModelRoutingCLI=%q, want \"codex-tmux\" — both blocks report the IDENTICAL code-less reason %q, so they are the same defect; a code-set gate that reads two empty sets as \"different\" would delete the ladder for every non-summarize reason shape",
+		t.Errorf("correction 2 dispatched on Driver=%q, want \"codex-tmux\" — both blocks report the IDENTICAL code-less reason %q, so they are the same defect; a code-set gate that reads two empty sets as \"different\" would delete the ladder for every non-summarize reason shape",
 			probe.dispatched[2], uncoded)
 	}
 }

@@ -39,7 +39,7 @@ func requireTestsRan(t *testing.T, out string, min int) {
 }
 
 func TestC476_001_RealPersonaComposedPromptCarriesTierAndCLI(t *testing.T) {
-	out, code := runGoTest(t, "TestComposePlanPrompt_RealPersonaExistingExampleCarriesTierAndCLI", true, corePkg)
+	out, code := runGoTest(t, "TestComposePlanPrompt_RealPersonaExistingExampleCarriesATierAndNoCLI", true, corePkg)
 	requireTestsRan(t, out, 1)
 	if code != 0 {
 		t.Errorf("real-persona composed-prompt liveness golden is red (exit=%d) — a bare existing-phase example survives in agents/evolve-router.md, competing with the Go {cli,tier} example\n%s", code, out)
@@ -48,7 +48,7 @@ func TestC476_001_RealPersonaComposedPromptCarriesTierAndCLI(t *testing.T) {
 
 func TestC476_002_PersonaFrontmatterAndDegradeContract(t *testing.T) {
 	out, code := runGoTest(t,
-		"TestRealPersonaFrontmatterOutputFormatEnumeratesTierCLI|TestParsePhasePlan_AbsentCLITierFieldsStayEmpty|TestSanitizeAdvisorTier_RejectsHighAndRawModel",
+		"TestRealPersonaFrontmatterOutputFormatEnumeratesTheTierOnly|TestParsePhasePlan_AbsentCLITierFieldsStayEmpty|TestSanitizeAdvisorTier_RejectsHighAndRawModel",
 		true, corePkg)
 	requireTestsRan(t, out, 3)
 	if code != 0 {

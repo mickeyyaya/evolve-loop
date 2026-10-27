@@ -12,6 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codereview"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispositionrouter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -117,7 +118,7 @@ func TestNoteContractGateDemotion_EachFailingSinkWarnsAndTheOthersStillRecord(t 
 			cr := demotionRunE4(t, root, ledger)
 
 			log := captureStderr(t, func() {
-				cr.noteContractGateDemotion(PhaseBuild, contractDispatch{cli: "claude-tmux", escalated: true}, 2, "missing Verdict line")
+				cr.noteContractGateDemotion(PhaseBuild, contractDispatch{driver: llmroute.Bind("claude-tmux"), escalated: true}, 2, "missing Verdict line")
 			})
 
 			if !strings.Contains(log, tc.wantWarn) {

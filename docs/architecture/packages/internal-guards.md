@@ -83,6 +83,11 @@ The hooks are defence in depth, because they fire only in Claude Code panes. The
 - **What the ship guard cannot see.** It is a PreToolUse screen, not a shell. A verb assembled at run time is outside its reach (`P=push; git $P`, an alias, a function, `eval` of computed text). A binary that an agent names `evolve` is also outside its reach. The ship tripwire, the commit gate and `evolve ship`'s self-SHA pin are the backstops ([ADR-0064](../adr/0064-pipeline-integrity-boundary.md)).
 - **`helpers.go`.** `cmdString` and `strField` read a string from `tool_input` and return "" when it is absent or not a string. The unexported alias `core_GuardInput` lets `helpers.go` take the core type without importing `core`.
 
+- **The CLI-neutral assignment guard** (I-17, X19a, `cli_neutral_assignment_test.go`). `TestNoCLISpecificsAboveTheDriver` walks the non-test Go files. It skips the bridge, the routing data (`llmroute`, `cliroute`, `policy`) and the homes of `TestFlowCodeNamesNoFamily`.
+- **The three rules of the guard.** A field of `PhaseRequest`, `PhasePlanEntry` or `MintSpec` must not name a CLI. A string literal must not hold the JSON key `"cli":`. A `==`, `!=` or `switch` must not test a driver identity. A driver identity is a name that ends in `cli` or `driver`, its `String()`, or a call of `Family`, `BaseCLI` or `Bind`. An empty-string check is not a branch.
+- **The limit of the name rule.** The rule reads names, not types, so a driver in a variable with another name passes it.
+- **The allowlist only shrinks.** `cliSpecificsAllowlist` counts the sites of each declaration. A count above its entry fails, and a count below its entry also fails, so a fixed site must leave the list. [The spec §28](../llm-isolation.md#28-the-cli-neutral-task-assignment-x19) gives the start count and the sites that stay.
+
 ## Invariants
 
 - **Every guard fails closed on missing state.** Missing storage or a cycle-state read error denies in `phase` and `role`; a nil ledger or any `Verify` error denies in `chain`. A guard that cannot see the cycle must not guess that none is running. Pinned by `TestPhase_NilStorageDenies`, `TestPhase_ReadCycleStateErrorDenies`, `TestRole_NilStorageDenies`, `TestRole_ReadCycleStateErrorDenies`, `TestChain_NilLedgerDenies`, `TestChain_DeniesOnAnyVerifyError` and `TestChain_DeniesBroken`.

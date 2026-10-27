@@ -31,8 +31,8 @@ func TestPhaseAdvisor_PlanEmitsMintPhases(t *testing.T) {
 	if mc.Dispatch.ModelTierDefault != "deep" {
 		t.Errorf("mint tier=%q, want deep", mc.Dispatch.ModelTierDefault)
 	}
-	if mc.Dispatch.CLI != "claude" {
-		t.Errorf("mint cli=%q, want claude", mc.Dispatch.CLI)
+	if mc.Dispatch.CLI != "" {
+		t.Errorf("mint cli=%q, want none: a stale cli in the advisor output never pins the minted phase", mc.Dispatch.CLI)
 	}
 }
 

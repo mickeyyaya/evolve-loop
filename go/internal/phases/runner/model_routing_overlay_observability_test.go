@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/log"
 )
 
@@ -32,14 +33,13 @@ func TestRunner_AdvisorOverlayAppliedLogsLine(t *testing.T) {
 
 	_, err := r.Run(context.Background(), core.PhaseRequest{
 		ProjectRoot: root, Workspace: t.TempDir(),
-		ModelRoutingCLI:  "codex-tmux",
-		ModelRoutingTier: "deep",
+		Assignment: core.TaskAssignment{Tier: "deep"},
 	})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	got := buf.String()
-	if !strings.Contains(got, "[runner] phase=scout advisor overlay cli=codex-tmux tier=deep") {
+	if !strings.Contains(got, "[runner] phase=scout advisor overlay tier=deep") {
 		t.Errorf("diag log missing the overlay-applied line; got:\n%s", got)
 	}
 }
@@ -71,8 +71,8 @@ func TestRunner_PolicyPinWinsOverAdvisorOverlay_SourceIsPin(t *testing.T) {
 
 	resp, err := r.Run(context.Background(), core.PhaseRequest{
 		ProjectRoot: root, Workspace: t.TempDir(),
-		ModelRoutingCLI:  "codex-tmux",
-		ModelRoutingTier: "deep",
+		Driver:     llmroute.Bind("codex-tmux"),
+		Assignment: core.TaskAssignment{Tier: "deep"},
 	})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -93,10 +93,13 @@ func TestRun_ModelSourceReflectsResolutionPath(t *testing.T) {
 		name       string
 		pinPhase   string
 		overlayCLI string
+		tier       string
 		wantSource string
 	}{
 		{name: "profile default, no pin no overlay", wantSource: "profile"},
-		{name: "advisor overlay, no pin", overlayCLI: "codex-tmux", wantSource: "advisor"},
+		{name: "an escalated driver, no pin", overlayCLI: "codex-tmux", wantSource: "escalation"},
+		{name: "an advisor tier, no pin", tier: "deep", wantSource: "advisor"},
+		{name: "an escalated driver beside an advisor tier", overlayCLI: "codex-tmux", tier: "deep", wantSource: "escalation"},
 		{name: "policy pin present", pinPhase: "scout", overlayCLI: "codex-tmux", wantSource: "pin"},
 	}
 	for _, tc := range cases {
@@ -111,7 +114,7 @@ func TestRun_ModelSourceReflectsResolutionPath(t *testing.T) {
 
 			resp, err := r.Run(context.Background(), core.PhaseRequest{
 				ProjectRoot: root, Workspace: t.TempDir(),
-				ModelRoutingCLI: tc.overlayCLI,
+				Driver: llmroute.Bind(tc.overlayCLI), Assignment: core.TaskAssignment{Tier: tc.tier},
 			})
 			if err != nil {
 				t.Fatalf("Run: %v", err)

@@ -1798,8 +1798,8 @@ CLI specifics live above the driver layer today (research F6.1 to F6.6):
 
 | Leak | Evidence on `72561f774` | Owner |
 |---|---|---|
-| A named CLI in the assignment | `core.PhaseRequest.ModelRoutingCLI`, `ModelRoutingTier`, `ModelRoutingEffort` (`go/internal/core/phase.go:101-105`); the runner overlay (`go/internal/phases/runner/routing.go:94`, `:113`) | X19a |
-| The advisor names a CLI | the plan schema asks for `"cli"` (`go/internal/core/advisor/prompt.go:90`) | X19a |
+| A named CLI in the assignment | `core.PhaseRequest.ModelRoutingCLI`, `ModelRoutingTier`, `ModelRoutingEffort` (`go/internal/core/phase.go:101-105`); the runner overlay (`go/internal/phases/runner/routing.go:94`, `:113`) | X19a (built) |
+| The advisor names a CLI | the plan schema asks for `"cli"` (`go/internal/core/advisor/prompt.go:90`) | X19a (built) |
 | CLI syntax in profiles | `cli` and `cli_fallback` in 93 agent profiles; Claude tool syntax in `allowed_tools` and `disallowed_tools`, for example `Bash(evolve phase verify:*)` in 93 profiles; `extra_flags_by_cli` in 27 profiles | X19b |
 | Claude tools in personas | 14 of 106 files under `agents/` | X19b |
 | Family and model literals in flow code | `phase_advisor.go:73`, `failure_advisor.go:54`, `phase_judge.go:28`, `contract_escalation.go:22`; the default model `opus` of four phases | X6, merged in #1123 after this read (not X19) |
@@ -1812,21 +1812,33 @@ I-6 says that flow logic names no family. It does not say what the assignment ho
 
 ### Solution
 
-**The neutral TaskAssignment (proposed).** The pipeline sends only these fields to the bridge:
+**The neutral TaskAssignment (X19a built the first part).** The pipeline sends only these fields to the bridge:
 
 | Field | Example | Today's source |
 |---|---|---|
 | role or profile id | `builder` | the profile name |
 | input index | `inputs/index.json` (§8) | the workspace paths in the persona |
 | output contract and schema | `build-report.md`, the `phasecontract` schema | `output_artifact` |
-| capability tier | `fast`, `balanced`, `deep`, `top` | `model_tier_default`, `ModelRoutingTier` |
-| effort intent | `low`, `medium`, `high` | `ModelRoutingEffort` |
+| capability tier | `fast`, `balanced`, `deep`, `top` | `model_tier_default`, `Assignment.Tier` (before X19a, `ModelRoutingTier`) |
+| effort intent | `low`, `medium`, `high` | `Assignment.Effort` (before X19a, `ModelRoutingEffort`) |
 | budgets and timeouts | turns, tokens, wall time | `max_turns`, `max_budget_usd` |
 | sandbox intents | read inputs, write worktree, run command class X, network yes or no | `allowed_tools`, `disallowed_tools`, `sandbox` |
 | persona text | the CLI-neutral persona | `agents/<name>.md` |
 | tool surface (amended 2026-10-26) | `evolve agent capabilities --json` | as built (X17e): a short section that `preparePrompt` adds to the prompt of each phase cell. It points to the verb and names the request directory of the cell. |
 
 **The driver binding is opaque.** `cli_routing` picks a driver identity, for example `agy-tmux`. The pipeline passes the identity through and never branches on it. Only the bridge reads it.
+
+**What X19a built (2026-10-27).** These changes are on the branch of item `cli-neutral-task-assignment-and-guard`:
+
+| Change | Where | Proof |
+|---|---|---|
+| `core.TaskAssignment` holds the tier and the effort. `PhaseRequest.Assignment` replaces `ModelRoutingTier` and `ModelRoutingEffort`. | `go/internal/core/phase.go` | `TestPhaseRequest_CarriesANeutralAssignmentAndNoDriverOnTheWire` |
+| `PhaseRequest.Driver` is an opaque `llmroute.Binding` with no JSON key. It replaces `ModelRoutingCLI`. Only the contract escalation sets it, and the runner reports the model source `escalation`. | `go/internal/core/phase.go`, `go/internal/llmroute/binding.go` | `TestBinding_CarriesTheDriverOpaquely` |
+| `llmroute.EscalationTarget` does the family comparison of the contract escalation, so core compares no two drivers. | `go/internal/core/contract_escalation.go` | `TestEscalationTarget_PicksTheFirstAllowedDriverOfAnotherFamily` and the contract escalation tests of `internal/core` |
+| The advisor plan has no `cli` field. `PhasePlanEntry` and `MintSpec` lost `CLI`, and the phase cards lost `allowed_clis`. The prompt and the persona `agents/evolve-router.md` ask for a tier only. The `advisor-plan` contract refuses a `cli` key in a plan entry, and the decoder drops a `cli` key in a `mint` block. | `go/internal/router`, `go/internal/core/advisor`, `go/internal/phasecontract/flow_decision.go` | `TestPhasePlanEntry_TheAdvisorCannotNameACLI`, `TestComposePlanPrompt_ElicitsATierAndNoCLI`, `TestFlowDecision_ValidateRejectsProseAndTheWrongShape` |
+| The plan clamp checks the tier envelope only. Its pin check and its model-catalog check needed a CLI, so X19a removed them and `WithModelCatalogLookup`. | `go/internal/router/model_routing_clamp.go` | `TestClampPlanModelRouting_*` |
+
+The remaining fields of the table above stay where they are today. X19b moves the sandbox intents and the persona text, and X19c adds the needed capabilities.
 
 **The driver and manifest layer holds everything else:**
 
@@ -1867,7 +1879,7 @@ This text replaces no part of X19b. X19b puts it in the personas when it makes t
 
 ### Guard
 
-`TestNoCLISpecificsAboveTheDriver` (proposed) walks each non-test Go file and each tracked profile and persona. Outside `internal/bridge` and the routing-data loader, it fails on:
+`TestNoCLISpecificsAboveTheDriver` (`go/internal/guards/cli_neutral_assignment_test.go`, built by X19a) walks each non-test Go file. X19b adds the tracked profiles and personas. Outside `internal/bridge` and the routing-data loader, it fails on:
 
 - a model name from any manifest `model_tier_map`;
 - a CLI flag from any manifest `default_args` or driver flag table;
@@ -1875,6 +1887,20 @@ This text replaces no part of X19b. X19b puts it in the personas when it makes t
 - a driver identity used in a comparison or a switch.
 
 The guard starts with an allowlist of today's sites, and the allowlist can only shrink. X6 removes the Go family literals, and X19a to X19c remove the rest.
+
+X19a built three rules of the list. A field of `PhaseRequest`, `PhasePlanEntry` or `MintSpec` must not name a CLI. A string literal must not hold the JSON key `"cli":`. A `==`, `!=` or `switch` must not test a driver identity. A driver identity is a name that ends in `cli` or `driver`, its `String()`, or a call of `Family`, `BaseCLI` or `Bind`.
+
+The exempt homes are the homes of `TestFlowCodeNamesNoFamily`, plus `internal/llmroute`, `internal/cliroute` and `internal/policy`. The model-name, CLI-flag and tool-pattern rules come with X19b.
+
+The allowlist counts the sites of each declaration. A count above its entry fails, and a count below its entry also fails, so each fixed site must leave the list. It started on `146776a26` with 10 sites and 11 findings. X19a removed 5 sites: `PhaseRequest`, `PhasePlanEntry`, `MintSpec`, the plan schema of the advisor prompt and the family comparison of the contract escalation. These 5 sites stay:
+
+| Site | Rule | Owner |
+|---|---|---|
+| `cmd/evolve/cmd_bridge.go` `emitProbeJSON` | a filter on the probed CLI name | an operator verb of the bridge; a later item |
+| `cmd/evolve/routing_run.go` `overrideAllowed` | a family compare on an operator override | the routing data of `cmd/evolve`; a later item |
+| `internal/cli/phasecmd/phases.go` `scaffoldProfileJSON` | the key `"cli":` in a new profile | X19b (the profiles) |
+| `internal/llmcalls/aggregate.go` `lessPerformance` | a sort key on the CLI name | a report, not a branch; a later item |
+| `internal/resolvellm/resolvellm.go` `Result.JSON` | the key `"cli":` in the resolver output | X19b |
 
 ### Relation to the other components
 
@@ -1893,7 +1919,7 @@ X19 lands in three items:
 
 | Item | Scope | Red test first | Depends on |
 |---|---|---|---|
-| X19a | The neutral `TaskAssignment`; `ModelRoutingCLI` leaves `PhaseRequest`; the advisor proposes a tier and capabilities, not a CLI; the guard with its shrinking allowlist | `TestNoCLISpecificsAboveTheDriver` lists `ModelRoutingCLI` and the advisor `"cli"` field | X6 |
+| X19a | The neutral `TaskAssignment`; `ModelRoutingCLI` leaves `PhaseRequest`; the advisor proposes a tier, not a CLI (the capabilities come with X19c); the guard with its shrinking allowlist | `TestNoCLISpecificsAboveTheDriver` lists `ModelRoutingCLI` and the advisor `"cli"` field | X6 |
 | X19b | Neutral sandbox intents in the profiles, which each driver translates. `extra_flags_by_cli` moves into the manifests. The 14 persona files that name a Claude Code tool or feature become neutral. | the guard lists `Bash(evolve phase verify:*)` in 93 profiles | X19a, X6b |
 | X19c | Capability negotiation: profiles name the needed capabilities, and the router refuses a seat with no capable driver | a seat that needs `edit` routes to a driver with no `edit` capability today | X9, X19a, X6b |
 
