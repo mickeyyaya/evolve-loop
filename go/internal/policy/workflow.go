@@ -34,6 +34,7 @@ type WorkflowPolicy struct {
 	RetryLadder              *RetryLadderPolicy    `json:"retry_ladder,omitempty"`
 	Repair                   *RepairPolicy         `json:"repair,omitempty"`
 	IntentDelta              bool                  `json:"intent_delta,omitempty"`
+	CycleSpend               *CycleSpendPolicy     `json:"cycle_spend,omitempty"`
 }
 
 type WorkflowConfig struct {
@@ -63,6 +64,7 @@ type WorkflowConfig struct {
 	RetryLadder              RetryLadderConfig
 	Repair                   RepairConfig
 	IntentDelta              bool
+	CycleSpend               CycleSpendConfig
 }
 
 func (p Policy) WorkflowConfig() WorkflowConfig {
@@ -97,6 +99,7 @@ func (p Policy) defaultWorkflowConfig() WorkflowConfig {
 		QualityIndex:             p.qualityIndexConfig(),
 		RetryLadder:              p.retryLadderConfig(),
 		Repair:                   p.repairConfig(),
+		CycleSpend:               p.cycleSpendConfig(),
 	}
 }
 

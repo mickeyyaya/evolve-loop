@@ -45,7 +45,7 @@ func MeasureFacts(rec Record, next *Record, cycles []Cycle, loop []signalcenter.
 			lane.Start, lane.End = c.StartedAt, c.EndedAt
 		}
 		f.Lanes = append(f.Lanes, lane)
-		f.Cycles = append(f.Cycles, wavemeasure.CycleSpend{Shipped: c.Shipped, Spend: c.Spend})
+		f.Cycles = append(f.Cycles, wavemeasure.CycleSpend{Shipped: c.Shipped, Spend: c.Spend, HandoffWould: c.HandoffWould, HandedOff: c.HandoffStop != "", SpendLimit: c.SpendLimit})
 	}
 	f.Lanes = append(f.Lanes, pool...)
 	f.OptimisticAdmissions, f.OptimisticFailures = countOptimistic(run, loop)

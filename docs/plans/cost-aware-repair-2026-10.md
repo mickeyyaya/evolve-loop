@@ -1,7 +1,7 @@
 # Plan: a cycle stops on a blocker that the lane cannot fix, and a small prescribed fix costs one patch, not one build
 
-- **Status:** accepted 2026-10-27 (operator, "build now"). Item 1 (`cost-per-shipped-cycle-measure`) is built: `evolve wave status` prints the cost, and `evolve quality report --scope wave` publishes PQ5. Items 2 and 3 have two builds. §11 compares them and gives the parts that move onto the build on `main`.
-- **Decision:** [ADR-0158](../architecture/adr/0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md). **Research:** [cost-aware-repair-2026-10](../research/cost-aware-repair-2026-10.md). **Case:** [cycle 2035](../incidents/2026-10-27-cycle-2035-repair-loop.md). **Design of record for the rungs:** [retry-ladder.md](../architecture/retry-ladder.md). **Measurement of the tokens by seat and round purpose:** [token-telemetry-2026-10](token-telemetry-2026-10.md).
+- **Status:** accepted 2026-10-27 (operator, "build now"). Item 1 (`cost-per-shipped-cycle-measure`) is built: `evolve wave status` prints the cost, and `evolve quality report --scope wave` publishes PQ5. Items 2 and 3 have two builds. §11 compares them and gives the parts that move onto the build on `main`. Item 4 is built at `shadow` with its part of item 11: the spend check at each phase boundary. At `enforce`, the stop of decision 16 acts only at a failed audit, and a passing audit still ships.
+- **Decision:** [ADR-0158](../architecture/adr/0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md). **Research:** [cost-aware-repair-2026-10](../research/cost-aware-repair-2026-10.md). **Case:** [cycle 2035](../incidents/2026-10-27-cycle-2035-repair-loop.md). **Design of record for the rungs:** [retry-ladder.md](../architecture/retry-ladder.md).
 
 ## Table of contents
 

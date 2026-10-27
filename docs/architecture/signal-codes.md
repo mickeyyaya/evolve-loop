@@ -135,6 +135,12 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 |---|---|
 | `CONTROL_BYPASS_USED` | an audited bypass is in use (ADR-0156 I-16, X18d): an operator parameter, after its control_bypass ledger entry is written, or a policy opt-in at the bridge adapter start; fields name, actor, reason and at |
 
+### cycle
+
+| Code | Meaning |
+|---|---|
+| `CYCLE_SPEND_LIMIT` | the spend of the cycle passed a limit of workflow.cycle_spend at a phase boundary (ADR-0158 decisions 14 to 16); fields.decision is would_stop (shadow, once for each cycle, the flow of today runs), over (enforce, the first boundary over the limit where no stop is legal) or stop (enforce, at the failed audit where the cycle goes to retro and seals handed-off; a passing audit still ships); fields.stage is shadow or enforce, fields.partial is true when the ledger did not load whole, fields.limit names the limit, fields.value and fields.max give the spend and the limit, and fields.phase the boundary |
+
 ### failurediag
 
 | Code | Meaning |
