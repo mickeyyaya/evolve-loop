@@ -1,0 +1,222 @@
+{
+  "schema_version": 2,
+  "cycle": 2065,
+  "run_id": "01M5YN5300F31EVS2DWD7AHH0J",
+  "goal": "Wave 145.\n\nWork the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree that it ships;\n- disposition its own defect ledger and the inherited ids;\n- record a terminal outcome on every exit;\n- never change a protected control-plane file with a tool;\n- leave no stale worktree.\n\nRouting:\n- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.\n- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.\n- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.\n\nCraft:\n- New and changed code has no comments. Names, types and tests give the intent.\n- Write each new document and each new log text in ASD-STE100.\n- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.\n- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.\n\nEvidence:\n- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.\n\nThe measure of this wave is the number of shipped cycles. Keep each cycle shipping.\n\nWave 144 facts (run 20261027T071914Z): 3 of 5 cycles shipped.\n- Cycle 2053: final verdict PASS. It shipped.\n- Cycle 2054: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…plain material path go/internal/routingtest/engine.go   Explanation Documentation: Changed Areas does not explain material path go/internal/routingtest/fakes.go. Last phase: aborted. It did not ship.\n- Cycle 2055: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…/history.go:24 internal/usageprobe.appendHistory 72.2% (13/18)     REFUSED internal/usageprobe/windows.go:31 internal/usageprobe.RecordObservation 90.9% (10/11). Last phase: aborted. It did not ship.\n- Cycle 2056: final verdict PASS. It shipped.\n- Cycle 2057: final verdict PASS. It shipped.\n- Pull requests merged at this boundary: none.\n\nEarlier waves:\n- Wave 141 (run 20261026T115530Z): 4 of 6 cycles shipped.\n- Wave 142 (run 20261026T182320Z): 1 of 2 cycles shipped.\n- Wave 143 (run 20261027T021525Z): 9 of 16 cycles shipped.",
+  "final_verdict": "FAIL",
+  "tasks": [
+    "cli-loop-dry-run-wave-plan-console"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 40683,
+      "started_at": "2026-10-27T12:25:58Z",
+      "ended_at": "2026-10-27T12:26:41Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 10,
+        "output": 1946,
+        "cache_read": 291481,
+        "cache_write": 30045
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 44611,
+      "started_at": "2026-10-27T12:27:20Z",
+      "ended_at": "2026-10-27T12:28:06Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 12,
+        "output": 2222,
+        "cache_read": 441939,
+        "cache_write": 42877
+      }
+    },
+    {
+      "name": "spec-verify",
+      "verdict": "PASS",
+      "duration_ms": 59148,
+      "started_at": "2026-10-27T12:28:06Z",
+      "ended_at": "2026-10-27T12:29:07Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 10,
+        "output": 3271,
+        "cache_read": 289622,
+        "cache_write": 41088
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 247950,
+      "started_at": "2026-10-27T12:29:07Z",
+      "ended_at": "2026-10-27T12:33:20Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 40,
+        "output": 22708,
+        "cache_read": 2269421,
+        "cache_write": 115839
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 37738,
+      "started_at": "2026-10-27T12:33:20Z",
+      "ended_at": "2026-10-27T13:22:23Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 10,
+        "output": 2002,
+        "cache_read": 338014,
+        "cache_write": 36706
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "FAIL",
+      "duration_ms": 594789,
+      "started_at": "2026-10-27T13:22:43Z",
+      "ended_at": "2026-10-27T13:47:00Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 28,
+        "output": 8162,
+        "cache_read": 1253169,
+        "cache_write": 69185
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "PASS",
+      "duration_ms": 68866,
+      "started_at": "2026-10-27T13:47:27Z",
+      "ended_at": "2026-10-27T13:48:46Z",
+      "archetype": "control",
+      "model_source": "profile",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 6300,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "audit|verdict-fail|3f8399f60b8f",
+    "pre_class": "verdict-fail",
+    "reasons": [
+      "the integration tier (`go test -tags integration`) reported 13 offender(s) locally. NOTE — host/CI parity gap: this host HAS tmux and CI runners do not, so every test guarded by requireTmux runs her",
+      "verdict-conflict: auditor narrative=PASS but 1 deterministic gate(s) forced FAIL [integration-tier gate] — the gate outranks the narrative (ship policy unchanged); both readings are recorded so the ",
+      "host predicate evidence: capture predicate tree: treefence: snapshot tree: gitexec: copy index /Users/danleemh/ai/claude/evolve-loop/.repo.git/worktrees/cycle-cd3ae73e-2065/index: write /var/folders/1"
+    ]
+  },
+  "system_failure": {
+    "category": "infra-systemic",
+    "level": "system",
+    "evidence": "orchestrator-classified infra-systemic: audit-fail-reason.json: integration-tier offenders are TempDir mkdir 'no space left on device'; host predicate evidence: gitexec index copy ENOSPC; audit-report.md L3 records disk 100% used; auditor narrative PASS, ACS 6/6 green",
+    "halt": true
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 2065",
+      "priority": "high"
+    }
+  ],
+  "timing": {
+    "total_ms": 1093785,
+    "phase_count": 7,
+    "retried_count": 0,
+    "longest_phase": "audit",
+    "longest_ms": 594789,
+    "by_archetype_ms": {
+      "build": 37738,
+      "control": 68866,
+      "evaluate": 594789,
+      "plan": 392392
+    },
+    "total_tokens": {
+      "input": 110,
+      "output": 46611,
+      "cache_read": 4883646,
+      "cache_write": 335740
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 10,
+        "output": 2002,
+        "cache_read": 338014,
+        "cache_write": 36706
+      },
+      "control": {
+        "input": 0,
+        "output": 6300,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "evaluate": {
+        "input": 28,
+        "output": 8162,
+        "cache_read": 1253169,
+        "cache_write": 69185
+      },
+      "plan": {
+        "input": 72,
+        "output": 30147,
+        "cache_read": 3292463,
+        "cache_write": 229849
+      }
+    },
+    "wasted_tokens": {
+      "input": 28,
+      "output": 8162,
+      "cache_read": 1253169,
+      "cache_write": 69185
+    },
+    "cache_hit_ratio": 0.9999774763522175,
+    "hot_phase_count": 6,
+    "hot_phases": [
+      "scout",
+      "triage",
+      "spec-verify",
+      "tdd",
+      "build",
+      "audit"
+    ]
+  },
+  "recalled_lessons": [
+    "cycle-1492-remedy-on-disk-in-four-places-reaches-no-agent-with-authority-to-apply-it",
+    "cycle-93-build-report-commit-sha-fabrication",
+    "cycle-1502-closure-citation-contract-never-reaches-the-auditor-it-grades",
+    "inst-L1544b",
+    "inst-L1549b"
+  ]
+}
