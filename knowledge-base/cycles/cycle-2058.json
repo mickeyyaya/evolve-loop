@@ -1,0 +1,274 @@
+{
+  "schema_version": 2,
+  "cycle": 2058,
+  "run_id": "01M5YDRJFTPR4FSCG40XSQTH4T",
+  "goal": "Wave 145.\n\nWork the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree that it ships;\n- disposition its own defect ledger and the inherited ids;\n- record a terminal outcome on every exit;\n- never change a protected control-plane file with a tool;\n- leave no stale worktree.\n\nRouting:\n- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.\n- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.\n- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.\n\nCraft:\n- New and changed code has no comments. Names, types and tests give the intent.\n- Write each new document and each new log text in ASD-STE100.\n- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.\n- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.\n\nEvidence:\n- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.\n\nThe measure of this wave is the number of shipped cycles. Keep each cycle shipping.\n\nWave 144 facts (run 20261027T071914Z): 3 of 5 cycles shipped.\n- Cycle 2053: final verdict PASS. It shipped.\n- Cycle 2054: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…plain material path go/internal/routingtest/engine.go   Explanation Documentation: Changed Areas does not explain material path go/internal/routingtest/fakes.go. Last phase: aborted. It did not ship.\n- Cycle 2055: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…/history.go:24 internal/usageprobe.appendHistory 72.2% (13/18)     REFUSED internal/usageprobe/windows.go:31 internal/usageprobe.RecordObservation 90.9% (10/11). Last phase: aborted. It did not ship.\n- Cycle 2056: final verdict PASS. It shipped.\n- Cycle 2057: final verdict PASS. It shipped.\n- Pull requests merged at this boundary: none.\n\nEarlier waves:\n- Wave 141 (run 20261026T115530Z): 4 of 6 cycles shipped.\n- Wave 142 (run 20261026T182320Z): 1 of 2 cycles shipped.\n- Wave 143 (run 20261027T021525Z): 9 of 16 cycles shipped.",
+  "final_verdict": "PASS",
+  "commit_sha": "7635ab3bb717069091a31f1a47cbd9be32cc60b5",
+  "tree_sha": "5047fbc5c99dcbe51508a8d25950bfca0e763f0f",
+  "tasks": [
+    "agent-messaging-m4-msg-cli"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 619247,
+      "started_at": "2026-10-27T10:16:57Z",
+      "ended_at": "2026-10-27T10:27:17Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 272174,
+        "output": 28541,
+        "cache_read": 8631866,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 34254,
+      "started_at": "2026-10-27T10:27:46Z",
+      "ended_at": "2026-10-27T10:28:22Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 8,
+        "output": 1317,
+        "cache_read": 276988,
+        "cache_write": 40319
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 780796,
+      "started_at": "2026-10-27T10:28:22Z",
+      "ended_at": "2026-10-27T10:41:26Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 74,
+        "output": 46817,
+        "cache_read": 4950212,
+        "cache_write": 140384
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 817262,
+      "started_at": "2026-10-27T10:41:26Z",
+      "ended_at": "2026-10-27T11:32:46Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 60,
+        "output": 8335,
+        "cache_read": 2811943,
+        "cache_write": 71825
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 152112,
+      "started_at": "2026-10-27T11:33:06Z",
+      "ended_at": "2026-10-27T11:43:30Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 36,
+        "output": 11208,
+        "cache_read": 1537727,
+        "cache_write": 62652
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 36544,
+      "started_at": "2026-10-27T11:44:00Z",
+      "ended_at": "2026-10-27T11:58:55Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 10,
+        "output": 1572,
+        "cache_read": 330506,
+        "cache_write": 34929
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 137914,
+      "started_at": "2026-10-27T11:59:21Z",
+      "ended_at": "2026-10-27T12:09:05Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 24,
+        "output": 7014,
+        "cache_read": 904513,
+        "cache_write": 50346
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "FAIL",
+      "duration_ms": 312739,
+      "started_at": "2026-10-27T12:09:34Z",
+      "ended_at": "2026-10-27T12:24:41Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 125629,
+      "started_at": "2026-10-27T12:24:41Z",
+      "ended_at": "2026-10-27T12:33:10Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 26,
+        "output": 7355,
+        "cache_read": 993783,
+        "cache_write": 49014
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "FAIL",
+      "duration_ms": 773035,
+      "started_at": "2026-10-27T12:33:36Z",
+      "ended_at": "2026-10-27T13:04:55Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 146561,
+      "started_at": "2026-10-27T13:04:56Z",
+      "ended_at": "2026-10-27T13:18:06Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 32,
+        "output": 8985,
+        "cache_read": 1245322,
+        "cache_write": 53956
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "PASS",
+      "duration_ms": 202926,
+      "started_at": "2026-10-27T13:18:25Z",
+      "ended_at": "2026-10-27T13:21:49Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "explanation_corrections": [
+    "docs/explain/builds/cycle-2058-01m5ydrjftpr4fscg40xsqth4t.md:22 claims \"the send tests fail\" with the fixed clock. That is stale: go/cmd/evolve/cmd_msg_test.go:197 now injects `time.Now` for the real waker, and the auditor's run printed 17/17 TestMsg PASS. The line should state that the tests pass and that the fixed clock is used only with a fake waker. The SHA256 matches the handoff. docs/explain/builds/cycle-2058-01m5ydrjftpr4fscg40xsqth4t.md:14 accurately describes go/cmd/evolve/cmd_msg.go:1. docs/explain/builds/cycle-2058-01m5ydrjftpr4fscg40xsqth4t.md:15 accurately describes go/cmd/evolve/registry.go:33. docs/explain/builds/cycle-2058-01m5ydrjftpr4fscg40xsqth4t.md:28 honestly states the wait limitation."
+  ],
+  "timing": {
+    "total_ms": 4139019,
+    "phase_count": 12,
+    "retried_count": 0,
+    "longest_phase": "build",
+    "longest_ms": 817262,
+    "by_archetype_ms": {
+      "build": 853806,
+      "control": 1288700,
+      "evaluate": 562216,
+      "plan": 1434297
+    },
+    "total_tokens": {
+      "input": 272444,
+      "output": 121144,
+      "cache_read": 21682860,
+      "cache_write": 503425
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 70,
+        "output": 9907,
+        "cache_read": 3142449,
+        "cache_write": 106754
+      },
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "evaluate": {
+        "input": 118,
+        "output": 34562,
+        "cache_read": 4681345,
+        "cache_write": 215968
+      },
+      "plan": {
+        "input": 272256,
+        "output": 76675,
+        "cache_read": 13859066,
+        "cache_write": 180703
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.9875909711840019,
+    "hot_phase_count": 9,
+    "hot_phases": [
+      "scout",
+      "triage",
+      "tdd",
+      "build",
+      "audit",
+      "build",
+      "audit",
+      "audit",
+      "audit"
+    ]
+  },
+  "recalled_lessons": [
+    "cycle-1502-closure-citation-contract-never-reaches-the-auditor-it-grades",
+    "cycle-93-build-report-commit-sha-fabrication",
+    "cycle-1492-remedy-on-disk-in-four-places-reaches-no-agent-with-authority-to-apply-it",
+    "inst-L1549b",
+    "inst-L1544b"
+  ]
+}
