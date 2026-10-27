@@ -86,10 +86,7 @@ func Emit(workspace string, d Decision) (string, error) {
 	if strings.TrimSpace(workspace) == "" {
 		return "", errors.New("regressiontia: empty workspace, refusing to drop the decision")
 	}
-	raw, err := json.MarshalIndent(d, "", "  ")
-	if err != nil {
-		return "", fmt.Errorf("regressiontia: marshal decision: %w", err)
-	}
+	raw, _ := json.MarshalIndent(d, "", "  ")
 	path := filepath.Join(workspace, ArtifactName)
 	if err := os.WriteFile(path, append(raw, '\n'), 0o644); err != nil {
 		return "", fmt.Errorf("regressiontia: write %s: %w", path, err)
@@ -131,23 +128,13 @@ func resolveDeps(moduleDir string, patterns []string) map[string][]string {
 	out := map[string][]string{}
 	for key, imports := range raw {
 		var pats []string
-		seen := map[string]struct{}{}
 		derivable := true
 		for _, dep := range imports {
 			if _, hatch := escapeHatches[dep]; hatch {
 				derivable = false
 				break
 			}
-			rel := strings.TrimPrefix(dep, modPath+"/")
-			if rel == dep {
-				continue
-			}
-			p := "./" + rel + "/..."
-			if _, dup := seen[p]; dup {
-				continue
-			}
-			seen[p] = struct{}{}
-			pats = append(pats, p)
+			pats = append(pats, "./"+strings.TrimPrefix(dep, modPath+"/")+"/...")
 		}
 		if !derivable || len(pats) == 0 {
 			continue
@@ -172,8 +159,8 @@ func listCorpusDeps(moduleDir string, patterns []string) (map[string][]string, s
 	if err != nil || modPath == "" {
 		return nil, ""
 	}
-	out, err := sysexec.Output(ctx, depsRunner, moduleDir, "go", "list", "-e", "-tags", "acs", "-test",
-		"-f", "{{.ImportPath}}|{{join .Deps \" \"}}", "./"+filepath.ToSlash(regressionDir)+"/...")
+	out, err := sysexec.Output(ctx, depsRunner, moduleDir, "go", "list", "-e", "-tags", "acs", "-test", "-deps",
+		"-f", "{{.ImportPath}}|{{join .Imports \" \"}}", "./"+filepath.ToSlash(regressionDir)+"/...")
 	if err != nil {
 		return nil, ""
 	}
@@ -182,26 +169,70 @@ func listCorpusDeps(moduleDir string, patterns []string) (map[string][]string, s
 	for _, p := range patterns {
 		want[p] = struct{}{}
 	}
-	deps := map[string][]string{}
+	graph := map[string][]string{}
+	starts := map[string][]string{}
 	for _, line := range strings.Split(out, "\n") {
 		self, rest, ok := strings.Cut(line, "|")
 		if !ok {
 			continue
 		}
+		node := stripVariant(self)
+		graph[node] = append(graph[node], stripVariants(strings.Fields(rest))...)
 		key := "./" + strings.TrimPrefix(testPackageOwner(self), modPath+"/")
-		if _, ok := want[key]; !ok {
-			continue
+		if _, ok := want[key]; ok && !strings.HasSuffix(node, ".test") {
+			starts[key] = append(starts[key], node)
 		}
-		deps[key] = append(deps[key], strings.Fields(rest)...)
+	}
+	deps := map[string][]string{}
+	for key, nodes := range starts {
+		deps[key] = moduleLocalReach(graph, modPath, nodes)
 	}
 	return deps, modPath
 }
 
-func testPackageOwner(importPath string) string {
-	if i := strings.Index(importPath, " ["); i >= 0 {
-		importPath = importPath[:i]
+func moduleLocalReach(graph map[string][]string, modPath string, starts []string) []string {
+	seen := map[string]struct{}{}
+	queue := append([]string(nil), starts...)
+	var reach []string
+	for len(queue) > 0 {
+		node := queue[0]
+		queue = queue[1:]
+		for _, imp := range graph[node] {
+			if _, dup := seen[imp]; dup {
+				continue
+			}
+			if strings.HasPrefix(imp, modPath+"/") {
+				seen[imp] = struct{}{}
+				reach = append(reach, imp)
+				queue = append(queue, imp)
+				continue
+			}
+			if _, hatch := escapeHatches[imp]; hatch {
+				seen[imp] = struct{}{}
+				reach = append(reach, imp)
+			}
+		}
 	}
-	importPath = strings.TrimSuffix(importPath, ".test")
+	return reach
+}
+
+func stripVariant(importPath string) string {
+	if i := strings.Index(importPath, " ["); i >= 0 {
+		return importPath[:i]
+	}
+	return importPath
+}
+
+func stripVariants(paths []string) []string {
+	out := make([]string, len(paths))
+	for i, p := range paths {
+		out[i] = stripVariant(p)
+	}
+	return out
+}
+
+func testPackageOwner(importPath string) string {
+	importPath = strings.TrimSuffix(stripVariant(importPath), ".test")
 	return strings.TrimSuffix(importPath, "_test")
 }
 

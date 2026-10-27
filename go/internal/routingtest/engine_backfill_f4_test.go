@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -167,6 +168,12 @@ func TestRunCycle_OrchestratorErrorFailsTheScenarioWithTheCause(t *testing.T) {
 	}
 
 	var ran, failed bool
+	devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	realStdout := os.Stdout
+	os.Stdout = devNull
 	ok := testing.RunTests(func(string, string) (bool, error) { return true, nil }, []testing.InternalTest{{
 		Name: "TestInnerRunCycleErrorF4",
 		F: func(inner *testing.T) {
@@ -177,6 +184,8 @@ func TestRunCycle_OrchestratorErrorFailsTheScenarioWithTheCause(t *testing.T) {
 		},
 	}})
 
+	os.Stdout = realStdout
+	devNull.Close()
 	if !ran || ok || !failed {
 		t.Fatalf("ran=%v ok=%v failed=%v: an orchestrator error must fail the scenario", ran, ok, failed)
 	}
