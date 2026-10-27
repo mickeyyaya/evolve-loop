@@ -43,6 +43,7 @@ var dispatchVerbCalls = []struct {
 	{[]string{"landing", "approve", "--bogus"}, "landing approve", "class D"},
 	{[]string{"landing", "reject", "--bogus"}, "landing reject", "class D"},
 	{[]string{"cycle", "run", "--bogus"}, "cycle run", "class D"},
+	{[]string{"cycle", "resume", "--bogus"}, "cycle resume", "class D"},
 	{[]string{"boundary", "run", "--bogus"}, "boundary run", "class D"},
 	{[]string{"bridge", "launch", "--bogus"}, "bridge launch", "class D"},
 	{[]string{"routing", "plan", "--bogus"}, "routing plan", "class D"},
