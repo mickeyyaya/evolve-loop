@@ -12,8 +12,8 @@ func TestParse_TheCycleSpendDefaultsAreTheADRValuesAtShadow(t *testing.T) {
 	t.Parallel()
 	for _, body := range []string{`{}`, `{"workflow": {}}`, `{"workflow": {"cycle_spend": {}}}`} {
 		p, err := Parse([]byte(body))
-		c := p.WorkflowConfig().CycleSpend
-		if err != nil || c.Stage != config.StageShadow || c.Limits != (cyclespend.Limits{MaxLLMMinutes: 90, MaxFreshTokens: 2_500_000, MaxCacheReadTokens: 40_000_000, MaxAuditRounds: 2}) {
+		var c CycleSpendConfig = p.WorkflowConfig().CycleSpend
+		if err != nil || c.Stage != config.StageShadow || c.Limits != DefaultCycleSpendLimits || DefaultCycleSpendLimits != (cyclespend.Limits{MaxLLMMinutes: 90, MaxFreshTokens: 2_500_000, MaxCacheReadTokens: 40_000_000, MaxAuditRounds: 2}) {
 			t.Errorf("%s: config = %+v, %v", body, c, err)
 		}
 	}
