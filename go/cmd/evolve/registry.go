@@ -30,6 +30,7 @@ var commands = []subcommand{
 	{Name: "install", Summary: "Manual install of agents + loop skill into ~/.claude (install [--ci])", Run: runInstall},
 	{Name: "uninstall", Summary: "Remove manually-installed agents + loop skill from ~/.claude (uninstall [--ci])", Run: runUninstall},
 	{Name: "guard", Summary: "Run a trust-kernel guard", Run: guardcmd.RunGuard},
+	{Name: "msg", Summary: "Agent messaging of one cycle: msg send | wait | reply (ADR-0129)", Run: runMsg},
 	{Name: "ledger", Summary: "Verify or tail the ledger", Run: runLedger},
 	{Name: "dossier", Summary: "Read and verify cycle dossiers (dossier verify)", Run: runDossier},
 	{Name: "audit", Summary: "Analyze auditor calibration evidence (audit calibration)", Run: runAudit},
