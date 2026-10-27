@@ -96,6 +96,9 @@ func (c Census) Count() (Supply, error) {
 	for _, w := range scan.Warnings {
 		s.Warnings = append(s.Warnings, w.String())
 	}
+	for _, would := range menu.WouldDefer {
+		s.Warnings = append(s.Warnings, "would defer "+would)
+	}
 	protected := s.refuse(menu.Console, menu.ConsoleReasons, consoleClass)
 	s.refuse(menu.Waiting, menu.WaitingReasons, func(string) string { return ClassWaitingDeps })
 	c.admit(&s, menu.Ranked)

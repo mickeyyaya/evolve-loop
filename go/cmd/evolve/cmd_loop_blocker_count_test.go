@@ -35,6 +35,22 @@ func TestCompleteSequentialCycle_AProvenBlockerDoesNotAdvanceTheConsecutiveFailC
 	}
 }
 
+func TestCompleteSequentialCycle_AHandedOffCycleDoesNotAdvanceTheConsecutiveFailCount(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	evolveDir, ws := seedFailedCycleInbox(t, root, "poison", 7)
+	var stdout, stderr bytes.Buffer
+	b := &loopBatchCoordinator{cfg: loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, deps: orchDeps{Ledger: newFakeLedger()}, result: &loopResult{}, stdout: &stdout, stderr: &stderr}
+	state := &sequentialBatchState{maxConsecutiveFails: 2, consecutiveFails: 1, stallCfg: goalStallConfig{threshold: 100, nonprogressThreshold: 100}}
+	handedOff := core.CycleResult{Cycle: 7, FinalVerdict: core.VerdictFAIL, TerminationReason: core.CycleTerminationHandedOff}
+
+	d := b.completeSequentialCycle(0, sequentialCycle{cycle: 7, workspace: ws, result: handedOff}, state)
+
+	if d.flow == batchStopIterations || state.consecutiveFails != 1 || b.result.ContinuedFailures != 0 {
+		t.Errorf("flow=%v streak=%d continued=%d; a hand-off is not a code FAIL", d.flow, state.consecutiveFails, b.result.ContinuedFailures)
+	}
+}
+
 func TestCompleteSequentialCycle_TheBudgetAndStallBranchesAfterAShip(t *testing.T) {
 	t.Parallel()
 	for name, tc := range map[string]struct {

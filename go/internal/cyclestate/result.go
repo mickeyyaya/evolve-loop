@@ -61,6 +61,7 @@ const (
 	DiagCodeTriageLanePinMissing    = "TRIAGE_LANE_PIN_MISSING"
 	DiagCodeProtectedPredicateRoute = "PROTECTED_PREDICATE_ROUTE"
 	DiagCodeBlockerRoute            = "BLOCKER_ROUTE"
+	DiagCodeHandoffRoute            = "HANDOFF_ROUTE"
 	DiagCodeBuildRejected           = "BUILD_DELIVERABLE_REJECTED"
 )
 
@@ -101,7 +102,7 @@ type Disposition struct {
 
 func RefusalDisposition(code string) Disposition {
 	switch code {
-	case DiagCodeBlockerRoute:
+	case DiagCodeBlockerRoute, DiagCodeHandoffRoute:
 		return Disposition{TaskLevel: true, RouteConsole: true, OutranksSentinel: true}
 	case DiagCodeTriageProtectedSurface, DiagCodeProtectedPredicateRoute:
 		return Disposition{TaskLevel: true, RouteConsole: true}

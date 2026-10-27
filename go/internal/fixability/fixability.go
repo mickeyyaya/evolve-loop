@@ -2,6 +2,7 @@ package fixability
 
 import (
 	"path"
+	"regexp"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
@@ -9,9 +10,15 @@ import (
 
 const ReasonHandoffBlocker = "handoff_blocker"
 
+var (
+	testName  = regexp.MustCompile(`\bTest[A-Za-z0-9_]+`)
+	provenRed = regexp.MustCompile(`(?i)\b(?:tests?|predicates?)(?:\s+\(\d+\))?\s+(?:fail|fails|failed)\b`)
+)
+
 type Input struct {
 	Defects          []string
 	RedPaths         []string
+	GateFailures     []string
 	OpenConsoleItems []string
 	Salvage          string
 }
@@ -43,7 +50,7 @@ func Classify(in Input) Decision {
 		f, paths := parseFinding(defect, in.OpenConsoleItems)
 		if isHandoffFinding(f, paths) {
 			handoff = append(handoff, f)
-			if isBlockerFinding(f, paths, in.RedPaths) {
+			if isBlockerFinding(f, paths, in.RedPaths) || provenRed.MatchString(f.Text) || gateNames(f, paths, in.GateFailures) {
 				blockers = append(blockers, f)
 				consoleItems = appendUnique(consoleItems, f.ConsoleItems...)
 			}
@@ -105,7 +112,7 @@ func severityFromID(id string) string {
 func matchConsoleItems(text string, openItems []string) []string {
 	var matched []string
 	for _, item := range openItems {
-		if item != "" && strings.Contains(text, item) {
+		if item != "" && idBoundary.mentions(text, item) {
 			matched = append(matched, item)
 		}
 	}
@@ -185,4 +192,63 @@ func appendUnique(items []string, add ...string) []string {
 		}
 	}
 	return items
+}
+
+type boundary struct{ joinsBefore, joinsAfter func(byte) bool }
+
+var (
+	idBoundary   = boundary{isIDByte, isIDByte}
+	pathBoundary = boundary{isPathLeadByte, isPathTailByte}
+	wordBoundary = boundary{isWordByte, isWordByte}
+)
+
+func gateNames(f Finding, paths []string, gateFailures []string) bool {
+	tests := testName.FindAllString(f.Text, -1)
+	for _, gate := range gateFailures {
+		for _, p := range paths {
+			if pathBoundary.mentions(gate, p) || citesPackageOf(gate, p) {
+				return true
+			}
+		}
+		for _, name := range tests {
+			if wordBoundary.mentions(gate, name) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func citesPackageOf(gate, p string) bool {
+	dir := path.Dir(p)
+	return strings.HasSuffix(p, ".go") && dir != "." && pathBoundary.mentions(gate, dir)
+}
+
+func (b boundary) mentions(text, token string) bool {
+	for start := 0; ; {
+		i := strings.Index(text[start:], token)
+		if i < 0 {
+			return false
+		}
+		at, end := start+i, start+i+len(token)
+		if (at == 0 || !b.joinsBefore(text[at-1])) && (end == len(text) || !b.joinsAfter(text[end])) {
+			return true
+		}
+		start = at + 1
+	}
+}
+func isWordByte(b byte) bool {
+	return b == '_' || b >= '0' && b <= '9' || b >= 'a' && b <= 'z' || b >= 'A' && b <= 'Z'
+}
+
+func isIDByte(b byte) bool {
+	return b == '-' || b >= '0' && b <= '9' || b >= 'a' && b <= 'z'
+}
+
+func isPathLeadByte(b byte) bool {
+	return isWordByte(b) || b == '-' || b == '.'
+}
+
+func isPathTailByte(b byte) bool {
+	return isWordByte(b) || b == '-' || b == '/'
 }

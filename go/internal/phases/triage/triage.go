@@ -32,6 +32,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/specrunner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -185,7 +186,7 @@ func inboxBatchesSection(projectRoot string, forbidden func(string) bool) string
 		forbidden = guards.IsProtectedScope
 	}
 	rank := rankInputs(projectRoot)
-	menu := inboxmover.RankLaneMenu(inboxmover.Options{InboxDir: inboxDir, Stderr: io.Discard}, items, forbidden, rank)
+	menu := inboxmover.RankLaneMenu(inboxmover.Options{InboxDir: inboxDir, Stderr: io.Discard, Companions: policy.FixabilityFor(projectRoot, "triage", os.Stderr)}, items, forbidden, rank)
 	var sect strings.Builder
 	sect.WriteString(skipped)
 	sect.WriteString(unknownClassNote(inboxrank.ClassWarnings(items, rank.Config)))

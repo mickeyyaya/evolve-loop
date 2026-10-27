@@ -350,6 +350,12 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `QUALITY_TQ4_BREACH` | the whole 95% interval of TQ4 (held-out share) is on the bad side of its threshold at stage report or gate (ADR-0153) |
 | `QUALITY_VACUOUS_DENOMINATOR` | a quality reading has n = 0 where the index expects data; a rule that holds on an empty set proves nothing (ADR-0153) |
 
+### repair
+
+| Code | Meaning |
+|---|---|
+| `REPAIR_HANDOFF` | the fixability check found a hand-off finding before a repair round (ADR-0158); fields.stage is shadow or enforce, fields.decision is none, would_stop (shadow) or stop (enforce: the cycle seals handed-off with no repair round), fields.reason is handoff_blocker on a stop or a would_stop, fields.blockers, fields.handoff and fields.lane list the finding ids, fields.console_items the console items the findings name and fields.salvage the worktree of the cycle |
+
 ### review
 
 | Code | Meaning |

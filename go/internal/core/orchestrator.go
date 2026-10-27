@@ -180,6 +180,7 @@ type Orchestrator struct {
 	compositionVerdictWriter func(ledgerPath string, in CompositionVerdictInput) error
 	laneMenu                 LaneMenuFn
 	protectedSurface         func(string) bool
+	repairFixability         func(RepairCheck) RepairFindings
 
 	scopedMergeReviewer ScopedMergeReviewer
 

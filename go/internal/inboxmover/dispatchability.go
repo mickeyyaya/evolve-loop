@@ -1,8 +1,12 @@
 package inboxmover
 
 import (
+	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/fixability"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxrank"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 type Dispatchability struct {
@@ -74,6 +78,7 @@ type LaneMenu struct {
 	ConsoleReasons []string
 	Waiting        []inboxbatch.Item
 	WaitingReasons []string
+	WouldDefer     []string
 }
 
 type RankedLaneMenu struct {
@@ -84,6 +89,31 @@ type RankedLaneMenu struct {
 func RankLaneMenu(opts Options, queue []inboxbatch.Item, isProtected func(string) bool, rank inboxrank.Inputs) RankedLaneMenu {
 	menu := PartitionLaneMenu(opts, queue, isProtected)
 	return RankedLaneMenu{LaneMenu: menu, Ranked: rank.Order(menu.Ready, queue)}
+}
+
+func (menu LaneMenu) deferCompanions(queue []inboxbatch.Item, isProtected func(string) bool, companions policy.FixabilityConfig) LaneMenu {
+	if companions.Stage == policy.FixabilityOff {
+		return menu
+	}
+	open := fixability.OpenConsole(queue, isProtected)
+	var ready []inboxbatch.Item
+	for _, it := range menu.Ready {
+		ids := fixability.Companions(it.ID, open)
+		if len(ids) == 0 {
+			ready = append(ready, it)
+			continue
+		}
+		reason := it.ID + ": " + fixability.ReasonConsoleCompanionPending + ": " + strings.Join(ids, ", ")
+		if !companions.Enforced() {
+			ready = append(ready, it)
+			menu.WouldDefer = append(menu.WouldDefer, reason)
+			continue
+		}
+		menu.Waiting = append(menu.Waiting, it)
+		menu.WaitingReasons = append(menu.WaitingReasons, reason)
+	}
+	menu.Ready = ready
+	return menu
 }
 
 func PartitionLaneMenu(opts Options, items []inboxbatch.Item, isProtected func(string) bool) LaneMenu {
@@ -100,5 +130,5 @@ func PartitionLaneMenu(opts Options, items []inboxbatch.Item, isProtected func(s
 			menu.Ready = append(menu.Ready, it)
 		}
 	}
-	return menu
+	return menu.deferCompanions(items, isProtected, opts.Companions)
 }
