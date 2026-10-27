@@ -17,6 +17,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wave"
 )
 
@@ -227,7 +228,7 @@ func contractCIRoot(t *testing.T) map[string]string {
 func contractAgentRun(t *testing.T, vars map[string]string) func([]string, io.Writer, io.Writer) int {
 	t.Helper()
 	run := agentcmd.New(agentcmd.Deps{
-		Bridge: func(string) core.Bridge {
+		Bridge: func(string, *signalcenter.Center) core.Bridge {
 			return contractBridge{report: "## Threat Model\nOne function.\n## Findings\nNone.\n## Verdict\nPASS\n"}
 		},
 		Getenv: func(string) string { return "" },
