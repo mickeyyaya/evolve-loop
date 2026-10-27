@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -144,5 +145,51 @@ func TestMoverReleaseClaim_RefusesARootCopyOfTheSameIDWithOtherBytes(t *testing.
 	}
 	if _, statErr := os.Stat(dup.Path); statErr != nil {
 		t.Errorf("the claim copy must stay: %v", statErr)
+	}
+}
+
+func TestMoverReleaseClaim_RestampsTheItemFromTheClaimingCycleManifest(t *testing.T) {
+	inbox := newInbox(t)
+	runs := filepath.Join(inbox, "..", "runs")
+	writeItem(t, filepath.Join(runs, "cycle-2008", "continuation-manifest.json"), `{"snapshot_sha":"new2008","cycle":2008}`)
+	writeItem(t, procPath(inbox, 2008, "retro.json"), `{"id":"retro","continuation":{"snapshot_sha":"old2004","cycle":2004}}`)
+	writeItem(t, procPath(inbox, 2009, "plain.json"), `{"id":"plain","continuation":{"snapshot_sha":"old2004","cycle":2004}}`)
+	m := New(inbox, nil, WithRunWorkspace(func(c int) string { return filepath.Join(runs, "cycle-"+strconv.Itoa(c)) }))
+
+	if _, err := m.ReleaseClaim("retro", Location{Path: procPath(inbox, 2008, "retro.json"), Cycle: 2008}, "deadline"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.ReleaseClaim("plain", Location{Path: procPath(inbox, 2009, "plain.json"), Cycle: 2009}, "deadline"); err != nil {
+		t.Fatal(err)
+	}
+
+	if doc := readJSON(t, filepath.Join(inbox, "retro.json")); !strings.Contains(string(doc["continuation"]), `"snapshot_sha":"new2008"`) {
+		t.Errorf("a deadline-stopped lane's newer snapshot must replace the adopted older one: %s", doc["continuation"])
+	}
+	if doc := readJSON(t, filepath.Join(inbox, "plain.json")); !strings.Contains(string(doc["continuation"]), `"snapshot_sha":"old2004"`) {
+		t.Errorf("no manifest in the claiming cycle keeps the item's binding: %s", doc["continuation"])
+	}
+}
+
+func TestMoverReleaseClaim_StampRewriteFailureStillReleases(t *testing.T) {
+	inbox := newInbox(t)
+	runs := filepath.Join(inbox, "..", "runs")
+	writeItem(t, filepath.Join(runs, "cycle-7", "continuation-manifest.json"), `{"snapshot_sha":"s7","cycle":7}`)
+	claim := procPath(inbox, 7, "t.json")
+	writeItem(t, claim, `{"id":"t"}`)
+	mkdirAll(t, tmpPathOf(claim))
+	rc := newRecordingCenter()
+	m := New(inbox, nil, WithSignals(rc.accessor()), WithRunWorkspace(func(int) string { return filepath.Join(runs, "cycle-7") }))
+
+	res, err := m.ReleaseClaim("t", Location{Path: claim, Cycle: 7}, "deadline")
+
+	if err != nil || res.Path != filepath.Join(inbox, "t.json") {
+		t.Fatalf("a failed stamp must not block the release: %+v %v", res, err)
+	}
+	if len(rc.events) != 1 || rc.events[0].Code != CodeItemRewriteFailed ||
+		rc.events[0].Origin != "Mover.ReleaseClaim" || rc.events[0].Cycle != 7 ||
+		rc.events[0].Fields["task_id"] != "t" || rc.events[0].Fields["path"] != claim ||
+		rc.events[0].Fields["step"] != "continuation_stamp" {
+		t.Errorf("the failed stamp must be a visible signal naming the claim: %+v", rc.events)
 	}
 }

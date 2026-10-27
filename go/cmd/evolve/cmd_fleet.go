@@ -12,8 +12,8 @@ import (
 	"strings"
 	"sync"
 	"syscall"
-	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
@@ -159,7 +159,7 @@ func execCycleLaunch(binPath string, simulate bool, projectRoot, goalHash, goalT
 		cmd.Stdout = ow
 		cmd.Stderr = ew
 		cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
-		cmd.WaitDelay = 10 * time.Second
+		cmd.WaitDelay = core.LaneLaunchWaitDelay
 		if err := cmd.Run(); err != nil {
 			var ee *exec.ExitError
 			if errors.As(err, &ee) {
