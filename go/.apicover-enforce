@@ -840,3 +840,5 @@
 # launchrecord - the bridge launch record of evolve agent run, which the commit gate reads to attest a review run (ADR-0154 X11).
 ./internal/launchrecord
 ./internal/integration
+# cyclespend - the LLM spend of one cycle from llm-calls.ndjson (ADR-0158).
+./internal/cyclespend

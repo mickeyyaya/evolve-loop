@@ -1,6 +1,7 @@
 # ADR-0155: The loop heals itself inside its boundaries: an agent proposes, and the pipeline disposes
 
 - **Status:** Proposed (2026-10-25). Amended on 2026-10-26 by the operator: the catalog gets the action "dispatch phase agent". The orchestrator also judges the dispatch request of a phase agent ([llm-isolation.md](../llm-isolation.md) §7.2). Amended on 2026-10-27 by [ADR-0157](0157-the-loop-works-its-own-code-a-narrow-fence-and-held-proposals.md): the T0 kernel is the file list of ADR-0157. A lane can change a T0 surface only as a held proposal that the operator approves.
+- **Amended by:** [ADR-0158](0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md) (Accepted, 2026-10-27). A hand-off finding that blocks escalates after zero repairs, and a spend limit applies to each cycle (decision 10). A finding on a T0 path is a hand-off finding (decision 15). I-11 stays.
 - **Plan:** [llm-isolation-2026-10](../../plans/llm-isolation-2026-10.md) §11. **Research:** [llm-isolation-2026-10](../../research/llm-isolation-2026-10.md) §5. **Design:** [llm-isolation](../llm-isolation.md#17-self-healing-within-boundaries), Part II "Self-healing within boundaries".
 - **Relates to:**
   - [ADR-0154](0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md): the orchestrator agent is an isolated worker under I-1 to I-9. This ADR adds I-10 to I-14.

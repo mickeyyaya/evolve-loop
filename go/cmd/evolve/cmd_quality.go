@@ -48,6 +48,9 @@ func waveQualityReaders() []qualityReader {
 		pipelineReader("CQ1", func(cs []pipelinerates.Cycle, root string) ([]qualitypanel.Reading, error) {
 			return codeshape.ChangedConformance(root, cs)
 		}),
+		pipelineReader("PQ5", func(cs []pipelinerates.Cycle, _ string) ([]qualitypanel.Reading, error) {
+			return pipelinerates.CostPerShip(cs), nil
+		}),
 	}
 }
 

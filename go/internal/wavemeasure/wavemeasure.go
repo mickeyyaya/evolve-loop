@@ -36,6 +36,8 @@ type Facts struct {
 
 	OptimisticAdmissions int
 	OptimisticFailures   int
+
+	Cycles []CycleSpend
 }
 
 type Measures struct {
@@ -52,11 +54,13 @@ type Measures struct {
 	OptimisticFailureRate float64 `json:"optimistic_failure_rate"`
 
 	Supply *Supply `json:"supply,omitempty"`
+
+	Cost Cost `json:"cost"`
 }
 
 func Compute(f Facts, now time.Time) Measures {
 	m := Measures{WidthSized: f.WidthSized, AdmissionWaits: f.AdmissionWaits,
-		OptimisticAdmissions: f.OptimisticAdmissions, OptimisticFailures: f.OptimisticFailures}
+		OptimisticAdmissions: f.OptimisticAdmissions, OptimisticFailures: f.OptimisticFailures, Cost: computeCost(f.Cycles)}
 	if f.OptimisticAdmissions > 0 {
 		m.OptimisticFailureRate = float64(f.OptimisticFailures) / float64(f.OptimisticAdmissions)
 	}
