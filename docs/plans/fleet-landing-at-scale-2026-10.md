@@ -1,6 +1,6 @@
 # Plan: fleet landings stay fast from 2 to 200 concurrent lanes
 
-- **Status:** proposed, 2026-10-13. S0 (these documents) is in review in the docs lane `cl-merge-scale`.
+- **Status:** proposed, 2026-10-13. S0 (these documents) is in review in the docs lane `cl-merge-scale`. ADR-0147 (proposed) amends this design on 2026-10-20: [§7.1](#71-status-after-adr-0147) marks the rows that it supersedes.
   - S3 and S4 are merged and unwired (#889).
   - **S5 is built (2026-10-16), in shadow.** The ship scan keys each package result and reads and writes the verdict store. It signals each hit and each escape, and one summary for each scan. The dial is `gates.scan_cache_gate` (default `shadow`).
   - Limit of S5: the scan has no producer of test logs yet. Every key is a whole-tree key, so a hit needs an identical tree. The S5 exit of 500 hits needs that producer first (see §12, Q6).
@@ -329,6 +329,24 @@ Each component is one lane, lands unwired first, and starts with its red tests. 
 | S15 | A fresh base at the start of the audit | `TestRefresh_AT1CompositionMovesTheBaseBeforeTheBinding`, `TestRefresh_AT3CompositionKeepsTheBase`, `TestRefresh_AConflictKeepsTheBase` | Q4, `pendRebasedChange` | yes (`core`) | shadow, then enforce |
 | S16 | The live benchmark at N = 2 and 20 (§9) | `TestBench_NFakeLanesLandSmallRealChangesThroughTheQueue` | `cyclesimulator`, S13 | no | n/a (a benchmark) |
 | S17 | The metrics in `evolve wave status` (§10) | `TestWaveStatus_PrintsTheLandingLine` | the signals | no | n/a (a report) |
+
+### 7.1 Status after ADR-0147
+
+[ADR-0147](../architecture/adr/0147-the-wave-orchestrator-owns-integration-and-decides-when-the-wave-reaches-main.md) (proposed) amends ADR-0134 on 2026-10-20. The wave orchestrator owns integration, and a lane no longer lands its own candidate. The plan audit of 2026-10-27 marked each row that is not done. The item `landing-plans-reconcile-with-adr-0147` gives each row its final status.
+
+| Id | Status after ADR-0147 |
+|---|---|
+| S0, S1, S3, S4, S5, S14 | As in the table above: done, dropped, or built in shadow. |
+| S2 | Open. The reconcile item decides the final status. The shards change the scan, not the owner of the landing. |
+| S6 | Open. The reconcile item decides the final status. The batch test I3b of ADR-0147 can use the verdict store. |
+| S7, S8 | Open. The reconcile item decides the final status. They change the test time of `cmd/evolve`, not the owner of the landing. |
+| S9 | Superseded by ADR-0147 (proposed), see item `landing-plans-reconcile-with-adr-0147`: the prefix check I3 verifies each deliverable on the integration tip. |
+| S10 | Superseded by ADR-0147 (proposed), see item `landing-plans-reconcile-with-adr-0147`: the order score I1 (item `wave-integration-i1-order-score`) uses the conflict graph. |
+| S11 | Superseded by ADR-0147 (proposed), see item `landing-plans-reconcile-with-adr-0147`: the batch PR I5 (item `wave-integration-i5-batch-pr`) lands a batch with one push. |
+| S12 | Superseded by ADR-0147 (proposed), see item `landing-plans-reconcile-with-adr-0147`. |
+| S13 | Open. The reconcile item decides the final status. |
+| S15 | Open. The reconcile item decides the final status. Q3 of the wave-integration plan sets the base of a new lane to `main`. |
+| S16, S17 | Open. The reconcile item decides the final status. |
 
 ## 8. Order and rollout
 

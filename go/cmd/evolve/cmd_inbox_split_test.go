@@ -499,3 +499,23 @@ func TestCmd_InboxSplit_RefusesAnItemWhoseTextNamesAConsoleFileByItsBasename(t *
 		t.Error("the tree changed")
 	}
 }
+
+func TestCmd_InboxSplit_PartsOfALegacyItemWithNoOriginAreConsoleFiled(t *testing.T) {
+	root := emptyInboxRoot(t)
+	t.Setenv("EVOLVE_PROJECT_ROOT", root)
+	legacy := filepath.Join(root, ".evolve", "inbox", "2026-10-01T00-00-00Z-mixed.json")
+	if err := os.WriteFile(legacy, []byte(splitItem("mixed", splitProtectedFile, splitLaneFile)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+
+	if rc := runInbox([]string{"split", "mixed"}, nil, &stdout, &stderr); rc != 0 {
+		t.Fatalf("split: rc = %d stderr = %q", rc, stderr.String())
+	}
+
+	for _, id := range []string{"mixed-console", "mixed-lane"} {
+		if got := filedItem(t, root, id)["origin"]; got != "console" {
+			t.Errorf("%s: origin = %v, want console", id, got)
+		}
+	}
+}

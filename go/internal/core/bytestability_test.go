@@ -61,6 +61,7 @@ var additiveCycleStateKeys = []string{
 	"failure_decision_untrusted",
 	"predicate_repair_brief",
 	"predicate_reroutes",
+	"ladder",
 }
 
 func jsonKeysOf(t *testing.T, v any) []string {

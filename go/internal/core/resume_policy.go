@@ -10,9 +10,12 @@ func (cr *cycleRun) applyDispatchPolicy(next Phase, req *PhaseRequest) {
 			req.ModelRoutingTier = tier
 		}
 	}
-	if tier, raised := cr.o.repairRoundTier(cr.req.ProjectRoot, next, cr.cs, req.ModelRoutingTier); raised {
-		req.ModelRoutingTier = tier
+	if !cr.o.workflowConfig.RetryLadder.Enforced() {
+		if tier, raised := cr.o.repairRoundTier(cr.req.ProjectRoot, next, cr.cs, req.ModelRoutingTier); raised {
+			req.ModelRoutingTier = tier
+		}
 	}
+	*req = cr.ladderForDispatch(next, *req)
 	if next == PhaseBuild {
 		if scale := cr.buildBudgetScale(); scale != 1.0 {
 			req.BudgetScale = scale

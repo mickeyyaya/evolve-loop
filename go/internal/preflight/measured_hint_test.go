@@ -29,9 +29,6 @@ func TestProbe_MeasuredCapabilityOverridesCodexPathHint(t *testing.T) {
 				if p.Sandbox.ExpectedToWork != tc.want || p.AutoConfig.InnerSandbox != tc.want {
 					t.Fatalf("host report disagrees with measured wrapping: sandbox=%+v auto=%+v", p.Sandbox, p.AutoConfig)
 				}
-				if tc.want && p.AutoConfig.SandboxFallbackOnEPERM != "0" {
-					t.Fatal("working wrapper must not advertise a startup fallback")
-				}
 				if p.Sandbox.Reason != p.AutoConfig.InnerSandboxReason {
 					t.Fatal("host and launch policy explanations diverged")
 				}

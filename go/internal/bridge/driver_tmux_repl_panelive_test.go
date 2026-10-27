@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 )
 
 type paneScriptTmux struct {
@@ -228,10 +229,10 @@ func TestRunTmuxREPL_ChannelOn_LiveFileOpenError_WARN(t *testing.T) {
 
 func TestPaneProfileFor(t *testing.T) {
 	t.Parallel()
-	if p := paneProfileFor(tmuxLaunch{name: "claude-tmux", promptMarker: "❯"}); p.Name != "claude" || p.BoundaryMarker != "❯" {
+	if p := paneProfileFor(tmuxLaunch{name: "claude-tmux", promptMarker: "❯"}); p.Name != panestream.FormatClaudeREPL || p.BoundaryMarker != "❯" {
 		t.Errorf("claude-tmux → %+v, want claude profile", p)
 	}
-	if p := paneProfileFor(tmuxLaunch{name: "agy-tmux", promptMarker: ">"}); p.Name != "agy" || !p.BoundaryExact {
+	if p := paneProfileFor(tmuxLaunch{name: "agy-tmux", promptMarker: ">"}); p.Name != panestream.FormatAgyREPL || !p.BoundaryExact {
 		t.Errorf("agy-tmux → %+v, want agy profile (BoundaryExact)", p)
 	}
 	if p := paneProfileFor(tmuxLaunch{name: "itest-tmux", promptMarker: "§"}); p.Name != "itest" || p.BoundaryMarker != "§" {

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/goalhash"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 )
 
@@ -344,24 +345,21 @@ func buildCycleContext(cfg loopConfig) map[string]string {
 	return out
 }
 
+func carriedEnv(osEnv []string) map[string]string {
+	out := map[string]string{}
+	for _, kv := range ipcenv.Keep(osEnv, carriedName) {
+		name, value, _ := strings.Cut(kv, "=")
+		out[name] = value
+	}
+	return out
+}
+
+func carriedName(name string) bool {
+	return strings.HasPrefix(name, "EVOLVE_") && ipcenv.Carried(name)
+}
+
 func buildCycleEnv(cfg loopConfig, osEnv []string) map[string]string {
-	out := make(map[string]string, 16)
-	for _, kv := range osEnv {
-		if !strings.HasPrefix(kv, "EVOLVE_") {
-			continue
-		}
-		eq := strings.IndexByte(kv, '=')
-		if eq <= 0 {
-			continue
-		}
-		out[kv[:eq]] = kv[eq+1:]
-	}
-	if cfg.Resume {
-		// IPC key "EVOLVE_RESUME" is split so the operator-flag registry guard
-		// does not classify this parent-to-child handoff as a configurable flag.
-		// SSOT IPC-protocol-allowed
-		out["EVOLVE_"+"RESUME"] = "1"
-	}
+	out := carriedEnv(osEnv)
 	for agent, cli := range cfg.PerAgentCLI {
 		out["EVOLVE_"+phaseEnvAgentKey(agent)+"_CLI"] = cli
 	}

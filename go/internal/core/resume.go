@@ -409,14 +409,15 @@ func (o *Orchestrator) reviewResumedDeliverable(
 		return resp, err
 	}
 	review := o.performEffectsAndReview(ctx, o.reviewInputFor(cs, phase, projectRoot, resp))
-	maxCorrections := (&cycleRun{o: o, cs: cs, retryConfig: o.retryConfig}).correctionLimitFor(phase, o.retryConfig.ContractCorrectionRetries)
-	for correction := 1; !review.Approve && correction <= maxCorrections; correction++ {
+	lr := &cycleRun{o: o, cs: cs, cycle: cycle, req: CycleRequest{ProjectRoot: projectRoot}, retryConfig: o.retryConfig}
+	maxCorrections := lr.correctionLimitFor(phase, o.retryConfig.ContractCorrectionRetries)
+	for correction := 1; !review.Approve && (correction <= maxCorrections || lr.climbResumed(phase, review, &req)); correction++ {
 		if err := o.resumedBlockerRoute(cs, cycle, phase, review); err != nil {
 			return resp, err
 		}
-		req.CorrectionDirective = composeCorrection(correction, review.Reason, review.Remediation)
+		req.CorrectionDirective = preferDigest(composeCorrection(correction, review.Reason, review.Remediation), req)
 		o.emitGateCorrection(gateCorrection{
-			origin: "Orchestrator.reviewResumedDeliverable", cycle: cycle, phase: phase, correction: correction, max: maxCorrections,
+			origin: originResumedCorrection, cycle: cycle, phase: phase, correction: correction, max: maxCorrections,
 			rung: interaction.RungRedispatch, cli: req.ModelRoutingCLI, reason: review.Reason,
 		})
 		req = count(phase, req)

@@ -67,6 +67,7 @@ func TestManifestV2_LoadsModelTierMapDirectly(t *testing.T) {
 	v2JSON := []byte(`{
 		"cli": "v2-cli",
 		"binary": "v2-bin",
+		"capabilities": ["tools"],
 		"model_tier_map": {
 			"fast":     "tiny-model",
 			"balanced": "mid-model",

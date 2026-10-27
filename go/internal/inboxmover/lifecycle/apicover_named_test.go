@@ -36,6 +36,7 @@ func TestAPI_EveryExportIsNamed(t *testing.T) {
 		_ error                                                              = ErrInvalidItem
 		_ string                                                             = RouteConsoleValue
 		_ func(*Mover, string) (int, bool)                                   = (*Mover).ReadFailureCount
+		_ func(*Mover, string) string                                        = (*Mover).ReadLastFailureClass
 		_ func(string, string) (Location, error)                             = Locate
 		_ func(string, string) (string, error)                               = FindFileByTaskID
 		_ func(int, int, bool) bool                                          = ShouldQuarantine

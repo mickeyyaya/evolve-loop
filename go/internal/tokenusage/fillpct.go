@@ -12,8 +12,6 @@ import (
 
 const FillPctUnmeasured = -1.0
 
-const claudeEffectiveWindow = 200_000
-
 const promptTokensUnmeasured = -1
 
 func PromptTokens(u cyclestate.TokenUsage) int {
@@ -32,17 +30,6 @@ func windowOccupancy(r Result) int {
 		return r.PeakPromptTokens
 	}
 	return PromptTokens(r.Usage)
-}
-
-func EffectiveWindow(driver string) int {
-	if HasCollector(driver) {
-		return claudeEffectiveWindow
-	}
-	switch strings.ToLower(driver) {
-	case "codex", "codex-tmux":
-		return claudeEffectiveWindow
-	}
-	return 0
 }
 
 func FillPct(promptTokens, window int) float64 {

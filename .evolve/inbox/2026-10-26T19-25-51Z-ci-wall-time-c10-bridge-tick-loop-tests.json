@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "each changed test asserts its tick count through the fake sleep and passes in under 2 s",
+    "each changed test asserts the same state changes as before",
+    "one test keeps the production thresholds"
+  ],
+  "created_at": "2026-10-26T19:23:03Z",
+  "deps": [],
+  "files": [
+    "go/internal/bridge/"
+  ],
+  "fix": "Give the bridge tick-loop tests test-scoped thresholds, so each test reaches its state in about 10 ticks or fewer. Keep one test with the production thresholds of 300 s and 1,200 s.",
+  "id": "ci-wall-time-c10-bridge-tick-loop-tests",
+  "kind": "test",
+  "notes": "Plan: docs/plans/ci-wall-time-2026-10.md section 6a, C10. The plan owner is a Sonnet lane. The surface is go/internal/bridge test files. Admission decides; the narrowed protected fence lands soon. The intended route is lane. On 2026-10-27, evolve inbox route-lane refused it, because go/internal/bridge/ is in the protected fence today. The item has no route field, so admission decides when the narrowed fence lands.",
+  "priority_class": "performance",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Plan docs/plans/ci-wall-time-2026-10.md, component C10 (decision D19). Spec: docs/architecture/ci-telemetry-and-critical-path.md. TransientDwell takes 102 s in total on main. The three pane-loss tests take 600 to 1,200 ticks each. C10 replaces C5 for these tests.",
+  "title": "CI wall time C10: the bridge tick-loop tests reach their state in fewer ticks",
+  "weight": 0.4
+}

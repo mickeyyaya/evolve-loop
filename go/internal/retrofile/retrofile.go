@@ -68,26 +68,8 @@ func FileActions(inboxDir string, cycle int, actions []PreventiveAction, default
 		if err := inboxbatch.RequirePriorityClass(a.PriorityClass); err != nil {
 			return written, fmt.Errorf("retrofile: action %s: %w", a.ID, err)
 		}
-		weight := defaultWeight
-		if a.WeightHint > 0 {
-			weight = a.WeightHint
-		}
 		path := filepath.Join(inboxDir, fmt.Sprintf("auto-retro-%d-%s.json", cycle, a.ID))
-		item := map[string]any{
-			"id":               a.ID,
-			"action":           a.Title,
-			"priority":         "HIGH",
-			"weight":           weight,
-			"files":            a.Files,
-			"evidence_pointer": a.Evidence,
-			"recurrence":       a.Recurrence,
-			"priority_class":   a.PriorityClass,
-			"injected_at":      now.UTC().Format(time.RFC3339),
-			"injected_by":      "retro-preventive-actions-autofiler",
-		}
-		if !(inboxbatch.Item{Files: a.Files}).HasDeclaredSurface() {
-			item["kind"] = inboxbatch.KindPipelineRepair
-		}
+		item := a.inboxItem(defaultWeight, now)
 		body, err := json.MarshalIndent(item, "", "  ")
 		if err != nil {
 			return written, fmt.Errorf("retrofile: encode item %s: %w", a.ID, err)
@@ -99,6 +81,30 @@ func FileActions(inboxDir string, cycle int, actions []PreventiveAction, default
 		existing[a.ID] = true
 	}
 	return written, nil
+}
+
+func (a PreventiveAction) inboxItem(defaultWeight float64, now time.Time) map[string]any {
+	weight := defaultWeight
+	if a.WeightHint > 0 {
+		weight = a.WeightHint
+	}
+	item := map[string]any{
+		"id":               a.ID,
+		"action":           a.Title,
+		"priority":         "HIGH",
+		"weight":           weight,
+		"files":            a.Files,
+		"evidence_pointer": a.Evidence,
+		"recurrence":       a.Recurrence,
+		"priority_class":   a.PriorityClass,
+		"origin":           inboxbatch.OriginRetro,
+		"injected_at":      now.UTC().Format(time.RFC3339),
+		"injected_by":      "retro-preventive-actions-autofiler",
+	}
+	if !(inboxbatch.Item{Files: a.Files}).HasDeclaredSurface() {
+		item["kind"] = inboxbatch.KindPipelineRepair
+	}
+	return item
 }
 
 func existingIDs(inboxDir string) (map[string]bool, error) {

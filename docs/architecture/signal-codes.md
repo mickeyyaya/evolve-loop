@@ -156,6 +156,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `INBOX_CLAIM_NOT_FOUND` | a lane claim named an id the inbox root does not hold (absent, already claimed into processing/, or parked); the claim returns ErrNotFound (exit 1) and moves nothing — the FAIL closeout's lane-scope claim of an id the triage persona already claimed reports this for an expected state; fields.step=locate, task_id, inbox_dir |
 | `INBOX_CLAIM_REFUSED` | a lane claim named an operator-owned item (route:console-* or a protected fix surface, ADR-0074 I1); the claim returns ErrConsoleRouted (exit 3) and the item stays at the root; fields.step=route, task_id, reason |
 | `INBOX_CONTINUATION_MANIFEST_UNREADABLE` | the FAILed cycle's continuation manifest exists but could not be read or parsed; every item of the drain releases unstamped (a later claim starts fresh instead of resuming the salvage); fields.step=manifest, workspace, err |
+| `INBOX_CURATOR_PROPOSAL` | the inbox curator proposes a change to one open item: consume it, reroute it or merge it (fields.kind, id, target, trigger, deterministic, stage, applied, evidence); the curator applies a deterministic proposal only in the enforce stage at the wave boundary, and a judgment proposal waits for the operator or the orchestrator |
 | `INBOX_ITEM_REWRITE_FAILED` | an item record could not be rewritten atomically: the closeout's route-console rewrite (step=route), the quarantine release's counter reset (fields.step=counter_reset — the item releases with its stale count), the drain's failure_count bump (fields.step=failure_bump — quarantine is skipped, the item releases to the root) or the drain's continuation stamp (fields.step=continuation_stamp — the item releases unstamped); fields.task_id, path, err |
 | `INBOX_ITEM_ROUTED_CONSOLE` | a closeout routed an item to console-manual: the FAIL closeout when a phase gate refused it deterministically (a top_n card naming a protected surface — the per-item breaker of the 2026-09-14 poison-loop incident), or the planned-no-work closeout when a fleet lane's triage answered for its scoped item without committing it (F30 — the reason names the bucket and the lane's evidence): fields.task_id, path, reason, step=route — the item is operator-owned from here on and no lane claims it again |
 | `INBOX_LANDED_CHECK_FAILED` | the landing probe could not answer for a processed-promotion's sha — in production the host's git probe (shaLandedOnMain) on an exec fault or a git exit outside {0,1}: an unknown sha, no local main, a non-git ProjectRoot; the promote fails OPEN (the sha is treated as landed) so a gate fault never blocks a promotion, and the item lands in processed/ with this line as the only trace; fields.step=landing, task_id, sha, err |
@@ -183,6 +184,15 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `ISOLATION_I7_VIOLATION` | I-7 CLI-neutral guarantees: a gate or the fence stopped a write that no hook stopped; fields.target names the path (ADR-0154) |
 | `ISOLATION_I8_VIOLATION` | I-8 typed flow decisions: a flow parser fell back to stdout or prose; fields.cell names the seat (ADR-0154) |
 | `ISOLATION_I9_VIOLATION` | I-9 proven substitution: no run-time emitter; the conformance matrix TestE2ECycleCLIMatrix is its guard (ADR-0154) |
+
+### ladder
+
+| Code | Meaning |
+|---|---|
+| `LADDER_AUDIT_FIX` | the audit_fix rule ran after an audit FAIL; fields.audit_fix is would (shadow), chosen (enforce) or decline, fields.audit_fix_rule names the rule that decided, and the other fields give its data: the findings, the prescriptions, the estimated files, lines, production code lines and tokens, and if a rung handler is registered |
+| `LADDER_DECISION` | the retry ladder chose the rung of the next try of a phase (ADR-0142); fields.stage is shadow (recorded, the dispatch does not change) or enforce, fields.origin the retry path, fields.rung the rung before, fields.next the chosen rung, fields.action raise, retry or stop, fields.class and fields.fingerprint the classified failure, fields.tier and fields.effort the target |
+| `LADDER_NO_HEADROOM` | no family of the chain has headroom at the next tier, so the ladder holds at R1 or stops; fields.rung is the rung before |
+| `LADDER_STOP_SPEC` | two tiers failed on the same check, so the ladder reclassified the failure as spec and stopped; fields.fingerprint names the check |
 
 ### ledger
 
@@ -379,6 +389,9 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `SHIP_GIT_PUSH_POLICY_REFUSED` | atomic-ship: origin refused the push by policy (a protected branch, a hook, a rule, a token scope or an access refusal); ship does not retry it, unwinds the lane to the audited shape, and the router ends the cycle with no re-audit (precondition) |
 | `SHIP_GIT_PUSH_REJECTED` | atomic-ship: the remote rejected the push |
 | `SHIP_GIT_STAGE_FAILED` | atomic-ship: staging failed (transient) |
+| `SHIP_HELD_FOR_OPERATOR` | atomic-ship: at held_proposals.stage enforce, a lane change that touches the fence or works a pipeline-kind item waits for evolve landing approve of its tree; main did not move (ADR-0157) |
+| `SHIP_HELD_PROPOSAL_REJECTED` | atomic-ship: the operator rejected this tree of a held proposal with evolve landing reject; main did not move (ADR-0157) |
+| `SHIP_HOLD_SHADOW` | at held_proposals.stage shadow, a lane landing that touches the fence or works a pipeline-kind item lands, and the ship records that enforce would hold it for the operator (ADR-0157); fields.cycle, tree, reasons |
 | `SHIP_INTEGRITY_TREE_DRIFT` | post-ship: the shipped tree drifted from the verified one (integrity) |
 | `SHIP_INVALID_CLASS` | verify-class: unknown ship class |
 | `SHIP_LANDING_BINARY_RESET_FAILED` | git checkout HEAD -- <binary> before the ff-merge exited non-zero or failed to spawn; the merge still runs and may fail if the tracked binary is dirty; fields.step=integrate, path, git_rc, git_err |

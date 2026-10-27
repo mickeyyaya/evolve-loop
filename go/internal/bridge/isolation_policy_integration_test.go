@@ -132,7 +132,7 @@ printf done > ` + shellQuotePOSIX(fx.artifact) + "\n"
 		t.Fatal(err)
 	}
 	var log strings.Builder
-	deps := Deps{Env: map[string]string{"BRIDGE_TESTING": "1", "BRIDGE_CODEX_BINARY": stub, "PATH": "/var/run/codex.system/bootstrap/usr/bin:" + os.Getenv("PATH")}, Stderr: &log, LookupEnv: mapLookup(nil)}
+	deps := Deps{Binaries: map[string]string{"codex": stub}, Env: map[string]string{"PATH": "/var/run/codex.system/bootstrap/usr/bin:" + os.Getenv("PATH")}, Stderr: &log, LookupEnv: mapLookup(nil)}
 	if !sandbox.DetectNested(depEnvGetter(deps)) {
 		t.Fatal("fixture must retain the Codex bootstrap session hint")
 	}

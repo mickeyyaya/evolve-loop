@@ -7,71 +7,12 @@ import (
 	"testing"
 )
 
-const conservativeWindowCeiling = 400_000
-
-var measuredNonClaudeFamilies = []struct {
-	family  string
-	variant string
-}{
-	{"codex", "codex-tmux"},
-	{"agy", "agy-tmux"},
-}
-
-func TestFillTelemetry_EffectiveWindowMeasuredNonClaudeFamilies(t *testing.T) {
-	for _, f := range measuredNonClaudeFamilies {
-		t.Run(f.family, func(t *testing.T) {
-			got := EffectiveWindow(f.family)
-			if got <= 0 {
-				t.Fatalf("EffectiveWindow(%q) = %d, want a finite conservative window — this family's launches are still reported unmeasured", f.family, got)
-			}
-			if got > conservativeWindowCeiling {
-				t.Errorf("EffectiveWindow(%q) = %d, want <= %d — an effective window must sit BELOW the advertised maximum, not at it", f.family, got, conservativeWindowCeiling)
-			}
-			if variant := EffectiveWindow(f.variant); variant != got {
-				t.Errorf("EffectiveWindow(%q) = %d but EffectiveWindow(%q) = %d — the tmux variant is the driver production actually launches; it must share its family's window", f.variant, variant, f.family, got)
-			}
-			if pct := FillPct(got/2, got); pct != 50 {
-				t.Errorf("half-full %s launch reads %v%%, want 50 — the mapped window is not the divisor", f.family, pct)
-			}
-		})
-	}
-}
-
-func TestFillTelemetry_EffectiveWindowUnsupportedFamiliesStayUnmeasured(t *testing.T) {
-	unmeasured := []string{
-		"ollama",
-		"ollama-tmux",
-		"no-such-cli-family",
-		"codexx",
-		"agyx",
-		"   ",
-		"-",
-	}
-	for _, driver := range unmeasured {
-		t.Run(driver, func(t *testing.T) {
-			if got := EffectiveWindow(driver); got != 0 {
-				t.Errorf("EffectiveWindow(%q) = %d, want 0 — publishing a guessed window for an unmeasured family fabricates the reading", driver, got)
-			}
-			if got := FillPct(120_000, EffectiveWindow(driver)); got != FillPctUnmeasured {
-				t.Errorf("fill for %q = %v, want FillPctUnmeasured", driver, got)
-			}
-		})
-	}
-}
-
-func TestFillTelemetry_EffectiveWindowClaudeFamilyUnchanged(t *testing.T) {
-	for _, driver := range []string{"", "claude", "claude-tmux"} {
-		if got := EffectiveWindow(driver); got != claudeEffectiveWindow {
-			t.Errorf("EffectiveWindow(%q) = %d, want %d — the claude calibration must survive the table widening", driver, got, claudeEffectiveWindow)
-		}
-	}
-}
-
 func TestFillTelemetry_ResolverStampsFillPctForMeasuredNonClaudeDriver(t *testing.T) {
 	events := writeDriverWindowEventsFixture(t, 100_000, 20_000)
 
 	got, err := DefaultResolver(t.TempDir())(Window{
 		Driver:        "codex",
+		ContextWindow: 200_000,
 		EventsLogPath: events,
 	})
 	if err != nil {
@@ -80,10 +21,7 @@ func TestFillTelemetry_ResolverStampsFillPctForMeasuredNonClaudeDriver(t *testin
 	if got.Source != SourceEventsResult {
 		t.Fatalf("Source = %q, want %q — the fixture did not reach the events tier", got.Source, SourceEventsResult)
 	}
-	window := EffectiveWindow("codex")
-	if window <= 0 {
-		t.Fatalf("EffectiveWindow(\"codex\") = %d — the resolver cannot stamp a reading without a mapped window", window)
-	}
+	window := 200_000
 	want := float64(120_000) / float64(window) * 100
 	if got.FillPct != want {
 		t.Errorf("resolver stamped FillPct = %v, want %v (120000 prompt-side tokens / %d window) — a measured codex launch must not read as unmeasured", got.FillPct, want, window)

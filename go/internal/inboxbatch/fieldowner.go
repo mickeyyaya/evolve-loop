@@ -61,6 +61,7 @@ const (
 	PremiseVerifiedAtField       = "premise_verified_at"
 	PremiseVerifiedSHAField      = "premise_verified_sha"
 	PremiseVerifiedEvidenceField = "premise_verified_evidence"
+	IntakeOverrideField          = "intake_override"
 )
 
 var (
@@ -103,6 +104,7 @@ var fieldRoles = map[string]FieldRole{
 	PremiseVerifiedAtField:       operatorStamp,
 	PremiseVerifiedSHAField:      operatorStamp,
 	PremiseVerifiedEvidenceField: operatorStamp,
+	IntakeOverrideField:          operatorStamp,
 }
 
 func RoleOf(key string) FieldRole {

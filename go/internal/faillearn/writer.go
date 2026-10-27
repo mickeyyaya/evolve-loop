@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 const publishedFileMode fs.FileMode = 0o644
@@ -17,6 +18,9 @@ func WriteArtifacts(ev FailureEvent, runDir, lessonsDir string, opts ...Option) 
 	var cfg writeConfig
 	for _, opt := range opts {
 		opt(&cfg)
+	}
+	if !ev.Now.IsZero() {
+		cfg.now = func() time.Time { return ev.Now }
 	}
 	if err := cfg.writeInboxItems(); err != nil {
 		return cfg.preserveDiagnosis(ev, runDir, err)

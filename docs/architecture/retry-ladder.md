@@ -101,15 +101,80 @@ Two worked rungs with today's policy:
 
 ## 5. Where the ladder runs
 
-Every retry path asks the decider for the next rung. None of them sets a tier or an effort itself.
+Each retry path gets its rung from one place, the ladder state of the cycle. L5 built this wiring on 2026-10-27:
 
-| Path | Today | With the ladder |
+- The contract correction, the resumed correction and the audit repair round ask one decider, `cycleRun.askLadder` (`go/internal/core/retry_ladder.go:49`). It calls `retryladder.Next`.
+- Gate remediation asks nothing. It keeps the rung that the decider stored.
+- The next-item rule reads the class of the last failure, not a try of this cycle. When the `failure_count` of a scoped item reaches the threshold, the rule stores R2 or R0 as the first rung of the cycle. It then records one `LADDER_DECISION`.
+
+| Path | Before L5 | With the ladder (L5) |
 |---|---|---|
-| Contract correction ladder | changes the CLI family on the second identical block (`core/cyclerun_correction.go:111`) | each correction is the next rung |
-| Audit repair round | raises tdd and build to `audit_retry_2plus` (`core/retry_tier_escalation.go:84`) | the next rung after the last correction |
-| Gate remediation | clears the overlay (`core/cyclerun_remediate.go:53`) | keeps the current rung |
-| Next item after a failure | starts the build at deep when `failure_count >= 1` (`core/retry_tier_escalation.go:31`) | starts at R2 only when the last failure was `capability` at R1 or higher |
+| Contract correction ladder | changed the CLI family on the second identical block | the same-rung corrections run first. When `fleet.contract_correction_retries` is spent, the loop asks the decider (`core/cyclerun_correction.go:58`). A raise gives one more try at the new rung. |
+| Resumed contract correction | the same corrections, with no tier change | the same rule, through `climbResumed` (`core/resume.go:414`) |
+| Audit repair round | raised tdd and build to `audit_retry_2plus` | the first tdd or build dispatch of each repair round asks the decider once (`ladderForDispatch`, `core/resume_policy.go:18`) |
+| Gate remediation | cleared the overlay | keeps the rung of the cycle (`keepLadderRung`, `core/cyclerun_remediate.go:54`) |
+| Next item after a failure | started the build at deep when `failure_count >= 1` | at `enforce`, starts at R2 with the deep tier only when the last failure of a scoped item was `capability` (`core/retry_tier_escalation.go:48`). The first rung of the cycle is then R2, so the try record and the later paths see it. |
 | Infra re-dispatch | the same request | unchanged |
+
+The stage key `workflow.retry_ladder.stage` selects the effect:
+
+- At `shadow`, the decider records `LADDER_DECISION` with the rung that it chose. The dispatch of today runs: the CLI escalation of the contract ladder, the `audit_retry_2plus` raise and the `failure_count` floor.
+- At `enforce`, the choice of the decider runs. The CLI escalation of the contract ladder is off, and the profile raise of the repair round is off.
+- The cycle state keeps the rung in `ladder` (`cyclestate.LadderState`). At `shadow`, that rung is the rung that the ladder chose but did not apply. At `enforce`, each later dispatch of a climbing seat in the cycle keeps the rung (D10).
+- A stop at `enforce` ends the correction loop. The handoff then takes the rejection exit of today. A stop in a repair round keeps the current rung for that round.
+
+### The audit_fix rung (decision only)
+
+The operator decided on 2026-10-27: "make sure audit will involve fix and trigger another review for its changes; balance cost and output". Cycle 2035 spent about 100 LLM minutes and 67 M cache-read tokens on a fix that the audit had already prescribed exactly. The four agy builds used 65 minutes and 50.6 M of those tokens. The fix was about 20 lines of a test helper and 2 goldens.
+
+`audit_fix` is a rung of the decider for the repair round after an audit FAIL. `retryladder.ChooseAuditFix` (`go/internal/retryladder/audit_fix.go`) applies these rules in order:
+
+| Order | Rule | Result |
+|---|---|---|
+| 1 | the cycle already chose `audit_fix` | `used_this_cycle`: no `audit_fix` |
+| 2 | the failure block has no defect | `no_findings`: no `audit_fix` |
+| 3 | a defect has no concrete prescription | `unprescribed`: no `audit_fix` |
+| 4 | the estimate is above `max_files`, `max_lines`, `max_code_lines` (with `no_new_production_logic`) or `max_tokens` | the name of that limit: no `audit_fix` |
+| 5 | none of the above | `small_prescribed`: `audit_fix` |
+
+- Every defect has a prescription when the failure block has at least as many non-blank `prescription` entries as `defects`.
+- `retryladder.EstimateAuditFix` reads the file paths that the defects and the prescriptions cite. A cited span `file:a-b` counts its lines, `file:a` counts 1 line, and a path without a span counts 10 lines. The lines of a non-test `.go` file are production code. The token estimate is 12 tokens for each line. These numbers are an estimate, and the shadow wave measures them.
+- The repair round records one `LADDER_AUDIT_FIX` signal with the rule and its data. `audit_fix` is `would` at `shadow`, `chosen` at `enforce` and `decline` otherwise. The cycle state keeps the choice in `ladder.audit_fix`, so a cycle chooses it at most once.
+- This change builds the decision only. A later builder builds the execution: the auditor applies the patch, then a fresh seat reviews the fix and runs the gates again.
+- The execution plugs in through `core.RungHandler` and `core.WithRungHandler(retryladder.RungAuditFix, h)`. The signal names the handler as `registered` or `absent`. Until a handler runs, the repair round keeps the rungs of this section.
+
+### Limits of the L5 wiring
+
+- At `enforce`, the ladder replaces the CLI escalation and the same-CLI salvage retry of the contract ladder. It also replaces the `audit_retry_2plus` raise. A repair round that the ladder does not raise runs at the current rung.
+- At `enforce`, a raise can add a try after `fleet.contract_correction_retries` is spent, also when that value is 0. The decider allows at most two raised tries, so the loop ends.
+- The decider gets the default bounds. `cliroute` then clamps the tier and the effort to the `max_tier` and `max_effort` of the agent. So the target in `LADDER_DECISION` can be above the served rung.
+- `retryladder.Climbs` holds the climbing seats as a list in Go, not as phase data. A new phase from `evolve phases create` does not climb.
+- The resumed correction uses a partial `cycleRun`. Its routing has no environment snapshot, and its ladder state stays inside the correction loop.
+- At `shadow`, the cycle state still records the rung that the ladder chose, and the audit repair ask still reads the findings. The dispatch does not change.
+- The rung of the cycle is the same for each climbing seat. A raise of scout also applies to tdd and build, above the floor of each seat.
+
+### Why the same-rung corrections come first
+
+The operator decided on 2026-10-27: "1 correction, then escalate". A failed build gets one correction at the same rung. The try after that one starts a fresh session at a raised rung. The console sets `fleet.contract_correction_retries` to 1 in a separate policy change.
+
+- Cycle 2035 of wave 142 recorded four build tries on agy, all at R0, in `llm-calls.ndjson`. Try 1 was the first build. Try 2 was correction 1/2, for an STE lint and a floor failure. Try 3 was correction 2/2, for 11 of 26 functions below 100% coverage. Try 4 was a repair round after an audit FAIL.
+- After try 4, the audit gave WARN and the ship stopped on `REPO_CONTRACT_GATE`. A second audit FAIL started repair round 2/2, and a fifth build dispatch has no try record. The operator reported that the cycle reached its lane deadline. The run dir does not record that stop.
+- Each of those tries was a new tmux session, with the names `n6`, `n7`, `n8` and `nd` in the run dir. `BRIDGE_CONTEXT_FILL_HIGH` reported 130.6%, 73.4% and 83.2% for build tries 1, 3 and 4. The fill grew inside each session, from the tool calls of the try. Each try also sent the full phase prompt again (49 KB in `build-prompt.txt`).
+- Thus a new session alone does not change the behavior of today. L6 changes the content of the prompt and the rung. A raised try gets a bounded digest in place of the correction text, at a stronger tier or effort.
+
+### The fresh session and the digest (L6)
+
+A raised try (R1 or R2 at `enforce`) gets three changes:
+
+- `PhaseRequest.Ladder` carries the rung, the class, the fingerprint and `context` `fresh` (`retryladder.Try`). The runner copies it into `BridgeRequest.Ladder` and puts its tier into `llmroute.Overlay.LadderTier` (`phases/runner/routing.go:94`). The effort goes into `ModelRoutingEffort`.
+- The correction directive is the digest (`retryladder.Digest.Render`, `retryladder/digest.go:26`). The digest has the failed checks verbatim and the audit findings (`audit_repair_findings` on a repair round). It also has the changed files of the worktree and the tries before this one, with their rungs, classes and fingerprints.
+- The digest stays inside `workflow.retry_ladder.digest_tokens` (default 2000). The size uses 4 bytes for each token. `Render` cuts a longer digest at a rune boundary, and the last line of the digest says so. The first failed check comes first, so a cut keeps it.
+
+Each phase dispatch is a new bridge launch with an ephemeral session, because no phase profile names a session. A test proves that a raised try opens a new session. Its try record has the rung, `context` `fresh` and `ladder_stage` `enforce`. The digest replaces the correction text of the old rung, and the prompt carries no transcript of an old pane.
+
+The tier step uses routing data only. `ladderRoute` (`core/retry_ladder.go:100`) reads the chain and the tier ceilings of the routing decision of the phase. It never names a family. The router then picks the first healthy family of the chain at the ladder tier. It clamps the tier and the effort to `max_tier` and `max_effort`.
+
+The auditor seat stays a judge. `retryladder.Climbs` is false for the auditor, the adversarial review, the code reviewer and the spec verifiers, so the decider does not run for them. A repair round goes back to tdd or build. The seat of the auditor never does the fix, and the auditor judges the fixed result.
 
 ### The failure record of an item
 
@@ -124,7 +189,8 @@ Each sealed FAIL of a lane item writes one failure record on the item. The next-
 - The closeout (`cycleoutcome.FailureInputsFor`) maps the cycle class to a classifier class. An `infra` or `quota` class is system-level, so the drain writes no record. At the retry ceiling, the drain parks a charged item in `quarantine/`.
 - The keys are loop stamps in the field-owner table (`inboxbatch/fieldowner.go`), so `sync-main` accepts them as stamps.
 - From 2026-10-13 to 2026-10-20, no lane FAIL charged its item. The blame rule did not know the `code-build-fail` and `code-audit-fail` spellings of the FAIL sentinel. So every item kept `failure_count` 0, and the deep floor and the ceiling did not fire. [internal-cycleoutcome.md](packages/internal-cycleoutcome.md) has the evidence.
-- A `spec` failure now also charges the item. Until L5 of the plan lands, a charged item starts its next build at deep. With D10, only a `capability` record does that.
+- A `spec` failure also charges the item. At `shadow`, a charged item starts its next build at deep, as before L5. At `enforce`, only a `capability` record does that. The orchestrator reads the class through `inboxmover.ReadLastFailureClass`.
+- The item records no rung. Thus the next-item rule reads the class only. It does not check the condition "at R1 or higher" of D10.
 
 The ladder serves the phases that produce a deliverable: build, tdd, scout, triage, fault localization and bug reproduction. Judge seats never climb.
 
@@ -134,7 +200,7 @@ The raise reaches the dispatch through its own field, not the advisor overlay:
 - A new `cliroute` step runs after `overlayTier`. It applies the ladder tier and effort, ignores `modelFixed`, and clamps them to `max_tier` and `max_effort`.
 - The allowed set and the family floor (`cli_routing.floors`, since X6) still apply. A floor seat never goes below its floor.
 - `evolve cli-routing set` validates `max_tier` and `max_effort` when it compiles the table.
-- L4 built these four rules in `cliroute` (`applyLadder`, `clampLadder`) and in `evolve cli-routing set` (`--max-tier`, `--max-effort`). The rung reaches the router as `llmroute.Overlay.LadderTier` and `Overlay.Effort`. L5 sets them from the decider ([internal-cliroute](packages/internal-cliroute.md)).
+- L4 built these four rules in `cliroute` (`applyLadder`, `clampLadder`) and in `evolve cli-routing set` (`--max-tier`, `--max-effort`). The rung reaches the router as `llmroute.Overlay.LadderTier` and `Overlay.Effort`. L5 sets them from the decider at `enforce` ([internal-cliroute](packages/internal-cliroute.md)).
 
 ## 6. The try record
 
@@ -153,7 +219,9 @@ Each dispatch writes one try record into `llm-calls.ndjson`. These fields are ne
 
 `attempt` counts every dispatch of the phase in the cycle, including the correction rounds.
 
-L0 writes these fields. Until L5 wires the decider, each try records `rung` `R0`, `context` `new` and `ladder_stage` `shadow`, and `failure_class`, `fingerprint` and `ladder_would` stay empty. `attempt` lives in the memory of the cycle run, so a resumed process starts it at 1 again. `served_model` is the transcript model of the try (`tokenusage.Result.ServedModel`), else the footer label that the launch model check verified, else empty ([internal-bridge](packages/internal-bridge.md)). `evolve ladder report` reads the records of the run dirs and prints, for each rung and class, the tries, the fixes and the tokens.
+L0 writes these fields, and `retryladder.Try.Mark` fills them from `BridgeRequest.Ladder`. A try without a ladder decision records `rung` `R0`, `context` `new` and `ladder_stage` `shadow`. At `shadow`, a try that follows a decision also records its `failure_class`, its `fingerprint` and `ladder_would`. A raised try at `enforce` records its rung, `context` `fresh` and `ladder_stage` `enforce`.
+
+`attempt` lives in the memory of the cycle run, so a resumed process starts it at 1 again. `served_model` is the transcript model of the try (`tokenusage.Result.ServedModel`), else the footer label that the launch model check verified, else empty ([internal-bridge](packages/internal-bridge.md)). `evolve ladder report` reads the records of the run dirs and prints, for each rung and class, the tries, the fixes and the tokens.
 
 ## 7. Policy
 
@@ -164,15 +232,24 @@ L0 writes these fields. Until L5 wires the decider, each try records `rung` `R0`
   }
 },
 "workflow": {
-  "retry_ladder": {"stage": "shadow"}
+  "retry_ladder": {
+    "stage": "shadow", "digest_tokens": 2000,
+    "audit_fix": {"max_files": 3, "max_lines": 40, "max_code_lines": 10, "max_tokens": 6000, "no_new_production_logic": true}
+  }
 }
 ```
+
+- `workflow.retry_ladder.stage` is `shadow` or `enforce`. An absent key means `shadow`. Another word fails the load of the policy. The checked-in policy sets `shadow`, so one wave records the decisions before L8 moves the stage.
+- `workflow.retry_ladder.digest_tokens` is the token budget of the digest of a raised try, from 64 to 16000. An absent key or 0 means 2000.
+- `workflow.retry_ladder.audit_fix` gives the size limits of the `audit_fix` rule. Each number is from 0 to its cap (50 files, 2000 lines, 2000 code lines, 64000 tokens), and 0 means the default. `no_new_production_logic` applies `max_code_lines`. Its default is true.
 
 - `model` is the base rung. Without `max_tier`, the ladder stops at `deep`. Without `max_effort`, it stops at `high`.
 - The ladder never sets `max` effort and never reaches the top tier unless `max_effort` or `max_tier` names it.
 - `evolve cli-routing set` is the only writer of the routing table, as for every other key.
 
 ## 8. Signals
+
+The codes belong to the signal module `ladder`, kind `ladder.decision`. `core/retry_ladder.go` registers them.
 
 | Code | Severity | Meaning |
 |---|---|---|

@@ -220,8 +220,8 @@ func TestRun_WarnVerdict_Strict(t *testing.T) {
 	if !errors.Is(err, ErrCheckFailed) {
 		t.Fatalf("strict WARN should fail, got err = %v", err)
 	}
-	if !strings.Contains(err.Error(), "STRICT_PASS") {
-		t.Errorf("err = %v, want contains 'STRICT_PASS'", err)
+	if !strings.Contains(err.Error(), "--strict-pass") {
+		t.Errorf("err = %v, want contains '--strict-pass'", err)
 	}
 }
 

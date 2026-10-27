@@ -49,20 +49,7 @@ func Resolve(lookupEnv func(string) string, cwd string) Layout {
 
 	evolveDir := EvolveDirOf(projectRoot)
 
-	profilesDir := lookupEnv("EVOLVE_PROFILES_DIR_OVERRIDE")
-	if profilesDir == "" {
-		profilesDir = filepath.Join(pluginRoot, ".evolve", "profiles")
-	}
-	adaptersDir := lookupEnv("EVOLVE_ADAPTERS_DIR_OVERRIDE")
-	if adaptersDir == "" {
-		adaptersDir = filepath.Join(pluginRoot, "adapters")
-	}
-	capabilityDir := filepath.Join(pluginRoot, "adapters")
-
-	ledgerFile := lookupEnv("EVOLVE_LEDGER_OVERRIDE")
-	if ledgerFile == "" {
-		ledgerFile = filepath.Join(evolveDir, "ledger.jsonl")
-	}
+	adaptersDir := filepath.Join(pluginRoot, "adapters")
 
 	cycleStateFile := CycleStateFileFor(evolveDir, lookupEnv(ipcenv.CycleStateFileKey))
 
@@ -72,10 +59,10 @@ func Resolve(lookupEnv func(string) string, cwd string) Layout {
 		EvolveDir:      evolveDir,
 		StateFile:      filepath.Join(evolveDir, "state.json"),
 		CycleStateFile: cycleStateFile,
-		LedgerFile:     ledgerFile,
-		ProfilesDir:    profilesDir,
+		LedgerFile:     filepath.Join(evolveDir, "ledger.jsonl"),
+		ProfilesDir:    filepath.Join(pluginRoot, ".evolve", "profiles"),
 		AdaptersDir:    adaptersDir,
-		CapabilityDir:  capabilityDir,
+		CapabilityDir:  adaptersDir,
 	}
 }
 

@@ -28,11 +28,18 @@ type PaneProfile struct {
 	ModelLabelRegex string
 }
 
+const (
+	FormatClaudeREPL = "claude-repl-v1"
+	FormatCodexREPL  = "codex-repl-v1"
+	FormatAgyREPL    = "agy-repl-v1"
+	FormatOllamaREPL = "ollama-repl-v1"
+)
+
 var Profiles = map[string]PaneProfile{
-	"claude": {Name: "claude", BoundaryMarker: "❯"},
-	"codex":  {Name: "codex", BoundaryMarker: "›"},
-	"agy":    {Name: "agy", BoundaryMarker: ">", BoundaryExact: true},
-	"ollama": {Name: "ollama", BoundaryMarker: ">>>", IdlePlaceholder: "Send a message"},
+	FormatClaudeREPL: {Name: FormatClaudeREPL, BoundaryMarker: "❯"},
+	FormatCodexREPL:  {Name: FormatCodexREPL, BoundaryMarker: "›"},
+	FormatAgyREPL:    {Name: FormatAgyREPL, BoundaryMarker: ">", BoundaryExact: true},
+	FormatOllamaREPL: {Name: FormatOllamaREPL, BoundaryMarker: ">>>", IdlePlaceholder: "Send a message"},
 }
 
 var busyAffordanceRE = regexp.MustCompile(`esc to interrupt|esc to cancel`)

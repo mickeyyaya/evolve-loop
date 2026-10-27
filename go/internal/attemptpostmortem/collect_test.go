@@ -47,7 +47,7 @@ func TestCollect_NamesTheKillServerProbeAsTheSuspectOfCycle1853BuildAttempt1(t *
 func TestCollect_AMissingTranscriptFallsBackToThePaneTail(t *testing.T) {
 	a := cycle1853BuildAttempt1(t)
 	missing := filepath.Join(t.TempDir(), "absent.jsonl")
-	rec, err := Collect(Input{Attempt: a, Transcript: TranscriptFor(a.CLI, missing), ScrollbackPath: fixtureFinalPane1}, DefaultConfig())
+	rec, err := Collect(Input{Attempt: a, Transcript: TranscriptFor(FormatClaudeJSONL, missing), ScrollbackPath: fixtureFinalPane1}, DefaultConfig())
 	if err != nil {
 		t.Fatalf("Collect: %v", err)
 	}
@@ -65,7 +65,7 @@ func TestCollect_AMissingTranscriptFallsBackToThePaneTail(t *testing.T) {
 func TestCollect_AnAgyAttemptWithNoPaneCaptureNamesTheSourceNone(t *testing.T) {
 	a := cycle1853BuildAttempt1(t)
 	a.CLI = "agy-claude-tmux"
-	rec, err := Collect(Input{Attempt: a, Transcript: TranscriptFor(a.CLI, fixtureAttempt1), ScrollbackPath: filepath.Join(t.TempDir(), "none.txt")}, DefaultConfig())
+	rec, err := Collect(Input{Attempt: a, Transcript: TranscriptFor("", fixtureAttempt1), ScrollbackPath: filepath.Join(t.TempDir(), "none.txt")}, DefaultConfig())
 	if err != nil {
 		t.Fatalf("Collect: %v", err)
 	}
@@ -80,7 +80,7 @@ func TestCollect_AnAgyAttemptWithNoPaneCaptureNamesTheSourceNone(t *testing.T) {
 func TestCollect_AnAgyAttemptWithAPaneCaptureNamesThePaneTail(t *testing.T) {
 	a := cycle1853BuildAttempt1(t)
 	a.CLI = "agy-claude-tmux"
-	rec, err := Collect(Input{Attempt: a, Transcript: TranscriptFor(a.CLI, ""), ScrollbackPath: fixtureFinalPane1}, DefaultConfig())
+	rec, err := Collect(Input{Attempt: a, Transcript: TranscriptFor(FormatClaudeJSONL, ""), ScrollbackPath: fixtureFinalPane1}, DefaultConfig())
 	if err != nil {
 		t.Fatalf("Collect: %v", err)
 	}
@@ -95,7 +95,7 @@ func TestCollect_TheCapsTruncateTheStoredText(t *testing.T) {
 	dir := t.TempDir()
 	pane := writeFile(t, dir, "pane.txt", "first line\n"+strings.Repeat("é", 30)+"\nLAST-LINE\n\n")
 	a := cycle1853BuildAttempt1(t)
-	rec, err := Collect(Input{Attempt: a, Transcript: TranscriptFor(a.CLI, fixtureAttempt1), ScrollbackPath: pane, WorktreeDelta: strings.Repeat("d", 50)}, cfg)
+	rec, err := Collect(Input{Attempt: a, Transcript: TranscriptFor(FormatClaudeJSONL, fixtureAttempt1), ScrollbackPath: pane, WorktreeDelta: strings.Repeat("d", 50)}, cfg)
 	if err != nil {
 		t.Fatalf("Collect: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestCollect_WithNoSessionActivityTheWindowEndsAtTheAttemptEnd(t *testing.T)
 
 func TestCollect_RefusesAnInvalidConfigAnInvalidAttemptAndAnUnreadablePane(t *testing.T) {
 	a := cycle1853BuildAttempt1(t)
-	noTranscript := TranscriptFor("codex", "")
+	noTranscript := TranscriptFor("", "")
 	if _, err := Collect(Input{Attempt: a, Transcript: noTranscript}, Config{}); err == nil {
 		t.Error("an empty config: err = nil, want the Validate error")
 	}
@@ -172,7 +172,7 @@ func TestCollect_ReadsOnlyTheLastMaxPaneCaptureBytesOfThePane(t *testing.T) {
 	pane := writeFile(t, t.TempDir(), "pane.txt", strings.Repeat("old output\n", 5000)+"LAST-BYTES")
 	a := cycle1853BuildAttempt1(t)
 
-	rec, err := Collect(Input{Attempt: a, Transcript: TranscriptFor("agy", ""), ScrollbackPath: pane}, cfg)
+	rec, err := Collect(Input{Attempt: a, Transcript: TranscriptFor("", ""), ScrollbackPath: pane}, cfg)
 
 	if err != nil || rec.PaneTail != "t\nLAST-BYTES" {
 		t.Fatalf("PaneTail = %q, %v; want only the last 12 bytes", rec.PaneTail, err)
@@ -183,7 +183,7 @@ func TestCollect_AShortPaneIsReadWhole(t *testing.T) {
 	pane := writeFile(t, t.TempDir(), "pane.txt", "short pane")
 	a := cycle1853BuildAttempt1(t)
 
-	rec, err := Collect(Input{Attempt: a, Transcript: TranscriptFor("agy", ""), ScrollbackPath: pane}, DefaultConfig())
+	rec, err := Collect(Input{Attempt: a, Transcript: TranscriptFor("", ""), ScrollbackPath: pane}, DefaultConfig())
 
 	if err != nil || rec.PaneTail != "short pane" {
 		t.Fatalf("PaneTail = %q, %v; want the whole short pane", rec.PaneTail, err)
@@ -201,7 +201,7 @@ func TestCollect_RefusesAPaneThatCannotBeStattedOrOpened(t *testing.T) {
 	a := cycle1853BuildAttempt1(t)
 	for name, path := range map[string]string{"a path under a file": filepath.Join(file, "pane.txt"), "an unreadable file": locked} {
 		t.Run(name, func(t *testing.T) {
-			_, err := Collect(Input{Attempt: a, Transcript: TranscriptFor("agy", ""), ScrollbackPath: path}, DefaultConfig())
+			_, err := Collect(Input{Attempt: a, Transcript: TranscriptFor("", ""), ScrollbackPath: path}, DefaultConfig())
 			if err == nil || !strings.Contains(err.Error(), "read the pane scrollback") {
 				t.Fatalf("Collect = %v, want the pane read error", err)
 			}

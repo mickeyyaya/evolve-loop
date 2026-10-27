@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "One guidance rule states the order of seams and links to docs/architecture/test-system.md section 5.3",
+    "The brief of a test lane names the rule",
+    "The review checklist has an item that asks for the reason of a new package-variable seam",
+    "evolve docs ste-lint --strict gives 0 findings on each touched doc"
+  ],
+  "created_at": "2026-10-26T19:30:00Z",
+  "deps": [],
+  "files": [
+    "guidance/rules/",
+    "guidance/index.md",
+    "docs/architecture/test-system.md"
+  ],
+  "fix": "Add the order of seams to the guidance rules registry as one rule with its one home, and add one line to the brief of a test lane (docs/architecture/test-system.md section 8.2) that points to it. Add a review checklist item: a new package-variable seam needs a reason. Follow skills/docs-write/SKILL.md. No code changes.",
+  "id": "test-system-efficiency-t7-seam-order-in-house-rules",
+  "kind": "docs",
+  "notes": "Plan link: docs/plans/test-system-efficiency-2026-10.md (component T7). Spec link: docs/architecture/test-system.md section 5.3. The plan owner is the console because the change is text only, not because of a gate file, so the route is lane.",
+  "priority_class": "hygiene",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Component T7 (decision D15) of the plan docs/plans/test-system-efficiency-2026-10.md. The spec is docs/architecture/test-system.md, section 5.3, which states the order: a field of the dependency struct, then a parameter, then a package variable. No guidance rule and no lane brief states this order.",
+  "title": "The house rules and the lane brief state the order of seams (test-system plan T7)",
+  "weight": 0.3
+}

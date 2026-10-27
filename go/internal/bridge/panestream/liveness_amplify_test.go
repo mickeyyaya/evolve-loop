@@ -7,7 +7,7 @@ import (
 )
 
 func TestAmp_DefaultDetector_StallCounterResetsOnContent(t *testing.T) {
-	profile := Profiles["claude"]
+	profile := Profiles["claude-repl-v1"]
 	const stall = 3
 	det := NewDefaultDetector(stall)
 
@@ -38,7 +38,7 @@ func TestAmp_DefaultDetector_StallCounterResetsOnContent(t *testing.T) {
 }
 
 func TestAmp_DefaultDetector_ConfidenceAlwaysInRange(t *testing.T) {
-	profile := Profiles["claude"]
+	profile := Profiles["claude-repl-v1"]
 	det := NewDefaultDetector(2)
 
 	det.Assess("⏺ content\n❯ \n", profile)
@@ -63,7 +63,7 @@ func TestAmp_DefaultDetector_ConfidenceAlwaysInRange(t *testing.T) {
 }
 
 func TestAmp_DefaultDetector_StallThresholdOneBoundary(t *testing.T) {
-	profile := Profiles["claude"]
+	profile := Profiles["claude-repl-v1"]
 	det := NewDefaultDetector(1)
 
 	det.Assess("⏺ content\n❯ \n", profile)
@@ -74,7 +74,7 @@ func TestAmp_DefaultDetector_StallThresholdOneBoundary(t *testing.T) {
 }
 
 func TestAmp_ClaudeDetector_DecreasingTokenFallsBackToDefault(t *testing.T) {
-	profile := Profiles["claude"]
+	profile := Profiles["claude-repl-v1"]
 	det := NewClaudeDetector(3)
 	base := NewDefaultDetector(3)
 
@@ -96,7 +96,7 @@ func TestAmp_ClaudeDetector_DecreasingTokenFallsBackToDefault(t *testing.T) {
 }
 
 func TestAmp_ClaudeDetector_LargeTokenNoOverflow(t *testing.T) {
-	profile := Profiles["claude"]
+	profile := Profiles["claude-repl-v1"]
 	det := NewClaudeDetector(3)
 
 	largeFrames := []string{
@@ -148,7 +148,7 @@ func TestAmp_DetectorFor_UnknownProfileReturnsProbe(t *testing.T) {
 }
 
 func TestAmp_DefaultDetector_QuietFramesNeverHung(t *testing.T) {
-	profile := Profiles["claude"]
+	profile := Profiles["claude-repl-v1"]
 	const stall = 2
 	det := NewDefaultDetector(stall)
 
@@ -167,7 +167,7 @@ func TestAmp_DefaultDetector_QuietFramesNeverHung(t *testing.T) {
 }
 
 func TestAmp_ClaudeDetector_UploadArrowNotConvergenceSignal(t *testing.T) {
-	profile := Profiles["claude"]
+	profile := Profiles["claude-repl-v1"]
 	det := NewClaudeDetector(3)
 	base := NewDefaultDetector(3)
 
@@ -189,7 +189,7 @@ func TestAmp_ClaudeDetector_UploadArrowNotConvergenceSignal(t *testing.T) {
 }
 
 func TestAmp_DefaultDetector_LargeFrameNoTimeout(t *testing.T) {
-	profile := Profiles["claude"]
+	profile := Profiles["claude-repl-v1"]
 	det := NewDefaultDetector(3)
 
 	var sb strings.Builder

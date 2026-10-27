@@ -1,0 +1,27 @@
+{
+  "id": "isolation-x9b-route-and-model-tables-from-manifests",
+  "kind": "refactor",
+  "priority_class": "maintainability",
+  "weight": 0.35,
+  "route": "console-manual",
+  "title": "LLM isolation X9b: the llmroute and modelquery tables read the manifests",
+  "summary": "X9 made the pane profiles, the token collectors, the transcript reader and the context window manifest data. The tables cliBinaryFor and interactiveDriverFor (go/internal/llmroute/llmroute.go) still copy the manifest field binary and the tmux driver of each family. modelquery keys pickerParsers (picker.go), the ByCLI listers (exec.go) and DefaultEffortListers (effort.go) by the family name. Spec: docs/architecture/llm-isolation.md §11.1, open parts.",
+  "fix": "llmroute cannot import bridge. Move the embedded manifests into a leaf package that resolves base, and let llmroute read the binary and the tmux driver from it. Add the manifest parser kinds for the model picker, the model list and the effort list, keyed by format id, and let the composition root build the modelquery tables from the manifests. Extend TestParserPackagesNameNoFamily to llmroute and modelquery.",
+  "acceptance": [
+    "RED first: TestParserPackagesNameNoFamily over llmroute and modelquery lists the family literals of the tables",
+    "llmroute.Drivers, Binary, Family and DefaultDriverForFamily give the same values before and after",
+    "A new manifest with a known picker format id lists its models with no Go change",
+    "Changed functions at 100% coverage; spec §11.1 and the llmroute and modelquery package notes updated"
+  ],
+  "deps": [
+    "isolation-manifest-parsers-and-collectors"
+  ],
+  "files": [
+    "go/internal/llmroute/llmroute.go",
+    "go/internal/modelquery/",
+    "go/internal/bridge/manifests/",
+    "go/cmd/evolve/cmd_models_live.go"
+  ],
+  "created_at": "2026-10-27T12:00:00Z",
+  "source": "console, X9 build (architecture review of the X9 diff, 2026-10-27)"
+}

@@ -20,7 +20,7 @@ const agyFinalScrollback = `> Think carefully about the task.
 `
 
 func TestDefaultResolver_AgyThoughtLineIsMeasuredNotUncovered(t *testing.T) {
-	res, err := DefaultResolver(t.TempDir())(Window{Driver: "agy-tmux", Scrollback: agyFinalScrollback, TokenLineRegex: agyTokenLineRegex})
+	res, err := DefaultResolver(t.TempDir())(Window{Driver: "agy-tmux", Collector: FormatAgyConversation, ContextWindow: 200_000, Scrollback: agyFinalScrollback, TokenLineRegex: agyTokenLineRegex})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +33,7 @@ func TestDefaultResolver_AgyThoughtLineIsMeasuredNotUncovered(t *testing.T) {
 }
 
 func TestDefaultResolver_TokenLinePatternIsDriverDataNotADriverName(t *testing.T) {
-	res, _ := DefaultResolver(t.TempDir())(Window{Driver: "agy-tmux", Scrollback: agyFinalScrollback})
+	res, _ := DefaultResolver(t.TempDir())(Window{Driver: "agy-tmux", Collector: FormatAgyConversation, ContextWindow: 200_000, Scrollback: agyFinalScrollback})
 	if res.Source != SourceNone || !strings.Contains(res.Warn, "uncovered") {
 		t.Errorf("without a declared token-line pattern the agy pane stays unmeasured: source=%q warn=%q", res.Source, res.Warn)
 	}

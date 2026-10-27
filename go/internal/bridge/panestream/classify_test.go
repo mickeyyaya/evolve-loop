@@ -46,7 +46,7 @@ func TestClassifyLine_DetectorsAgree(t *testing.T) {
 	if !isVolatileTailRow(schlepping) {
 		t.Error("trim (PaneDelta) must treat the spinner-stats line as volatile")
 	}
-	if !PaneBusy(schlepping+"\n❯ \n", Profiles["claude"]) {
+	if !PaneBusy(schlepping+"\n❯ \n", Profiles["claude-repl-v1"]) {
 		t.Error("PaneBusy must read a pane showing the schlepping frame as busy")
 	}
 

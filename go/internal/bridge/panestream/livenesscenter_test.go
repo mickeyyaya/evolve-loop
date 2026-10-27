@@ -8,7 +8,7 @@ import (
 
 func TestSignalCenter_ObserveAndAggregate(t *testing.T) {
 	sc := NewLivenessCenter()
-	p := Profiles["claude"]
+	p := Profiles["claude-repl-v1"]
 	sc.Observe("sess-1", "⏺ thinking\n(4s · ↓ 50 tokens)\n❯ \n", p)
 	sc.Observe("sess-1", "⏺ thinking\n(4s · ↓ 100 tokens)\n❯ \n", p)
 	state := sc.Aggregate()
@@ -19,7 +19,7 @@ func TestSignalCenter_ObserveAndAggregate(t *testing.T) {
 
 func TestSignalCenter_AggregateIsDeterministic(t *testing.T) {
 	sc := NewLivenessCenter()
-	p := Profiles["claude"]
+	p := Profiles["claude-repl-v1"]
 	sc.Observe("sess-1", "⏺ line A\n❯ \n", p)
 	sc.Observe("sess-1", "⏺ line A\n⏺ line B\n❯ \n", p)
 	s1 := sc.Aggregate()
@@ -48,7 +48,7 @@ func TestSignalCenter_EmptyCenter_DefinedState(t *testing.T) {
 func TestSignalCenter_ParallelProducerRaceClean(t *testing.T) {
 	const numProducers = 8
 	sc := NewLivenessCenter()
-	claudeProfile := Profiles["claude"]
+	claudeProfile := Profiles["claude-repl-v1"]
 	sharedKey := "shared-sess"
 
 	var wg sync.WaitGroup
@@ -110,7 +110,7 @@ func TestSignalCenter_RegisterEmptyOrDuplicateNoPanic(t *testing.T) {
 
 func TestSignalCenter_RegisterConcurrent(t *testing.T) {
 	sc := NewLivenessCenter()
-	p := Profiles["claude"]
+	p := Profiles["claude-repl-v1"]
 	var wg sync.WaitGroup
 	for i := 0; i < 8; i++ {
 		wg.Add(1)

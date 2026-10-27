@@ -8,7 +8,7 @@
 
 - `Record` and `Attempt`, the schema `attempt-postmortem/1.0`, with `Validate`, `ValidPhase`, `Path`, `NextNumber`, `Write`, `Create`, `Replace`, `ReadAll` and `BadRecord`;
 - the suspect rule, `findSuspect`;
-- the transcript port: `Transcript`, `ClaudeTranscript`, `TranscriptFor`, `WritesTranscript` and `ErrNoTranscript`;
+- the transcript port: `Transcript`, `ClaudeTranscript`, `TranscriptFor`, `KnownTranscriptFormat` and `ErrNoTranscript`;
 - the collector, `Collect(Input, Config)`;
 - the renderer, `Render(records, Config)`, with `SectionHeading`.
 
@@ -24,7 +24,7 @@ Two callers use the package (lane W1, 2026-10-10):
 
   A line that does not parse is skipped. A line over 8 MiB is also skipped, and the reader keeps the other lines. The count of skipped lines is in `Trace.SkippedLines` and in the record field `skipped_transcript_lines`. Only a read error of the file is an error.
 - **The result status.** No `tool_result` gives `no_result`. `is_error` false gives `ok`. "Exit code N" in the first line gives `signal` above 128, else `error` with the code. Other error text gives `error` with no code.
-- **The selection.** `WritesTranscript` is true for `claude` and each `claude-` CLI. `TranscriptFor` gives the Claude adapter for such a CLI with a path. Each other CLI, `agy-claude-tmux` included, gets `ErrNoTranscript`.
+- **The selection.** The manifest field `transcript.format` names the format id ([llm-isolation.md](../llm-isolation.md) §11.1, X9). `KnownTranscriptFormat(format)` is true for `FormatClaudeJSONL` (`claude-jsonl-v1`) only. `TranscriptFor(format, path)` gives the Claude adapter for that id with a path. Each other id, and the empty id, gets `ErrNoTranscript` with the id in the text. The runner reads the id from the manifest of the CLI (`transcriptFormatOf`), so `agy-claude-tmux` gets no transcript.
 - **The fallback.** When the transcript gives an error, or `Input.Transcript` is nil, the record has the error in `source_error`, no commands and no suspect. Its `command_source` is `pane_tail` when the collector read a pane tail, else `none`. Thus an agy record with no pane capture says that nothing was read.
 - **The suspect rule.** Walk the commands from the last to the first. The first command with no result, an exit by signal, or a start at or after `end - window` is the suspect. The end is the last transcript timestamp, else `EndedAt`. The rule runs on all the commands, before the cap on their count.
 - **The caps.** `capHead` keeps the start of a command or a delta and ends it with "…". `capTail` keeps the end of the pane tail and starts it with "…". The renderer caps again, because a record on disk is not trusted. It keeps the last `MaxRecords` abnormal records and the last `MaxCommands` commands of each record. It caps the CLI, the session, the dispatch id and the cause code at 120 runes, and it writes `unknown` for an empty field.
@@ -49,7 +49,7 @@ Two callers use the package (lane W1, 2026-10-10):
 - **One bad record does not drop the section.** `TestReadAll_SkipsOnlyTheBadRecordAndNamesItsPath`.
 - **No write over a record.** `TestWrite_TakesTheNextFreeNumberWhenTheRecordExists`, `TestCreate_RefusesAnExistingRecordAndReplaceOverwritesIt` and `TestCreate_AFailedWriteLeavesNoClaimedFile`.
 - **The real source.** `TestCollect_AnAgyAttemptWithNoPaneCaptureNamesTheSourceNone` and `TestCollect_AnAgyAttemptWithAPaneCaptureNamesThePaneTail`.
-- **The R2 review hardening.** `hardening_test.go` has one test for each item. The items are the bare phase, a nil transcript, the render caps, the skipped long line, the clamp to 0 s and the C0 strip. It also pins `MaxRecords`, `NextNumber`, `WritesTranscript` and `unknown` for an empty field.
+- **The R2 review hardening.** `hardening_test.go` has one test for each item. The items are the bare phase, a nil transcript, the render caps, the skipped long line, the clamp to 0 s and the C0 strip. It also pins `MaxRecords`, `NextNumber`, `KnownTranscriptFormat` and `unknown` for an empty field.
 
 ## Findings
 

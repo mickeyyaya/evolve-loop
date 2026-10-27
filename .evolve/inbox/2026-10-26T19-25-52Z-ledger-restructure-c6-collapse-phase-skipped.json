@@ -1,0 +1,28 @@
+{
+  "acceptance": [
+    "a decision with N skips writes one line that carries N {phase, reason} pairs, and the line round-trips",
+    "existing ledger history is not changed",
+    "each reader in the C6 row of the plan reads skipped_phases",
+    "a live wave writes about 41 lines for each cycle in place of about 123",
+    "each new and changed function has 100% coverage"
+  ],
+  "created_at": "2026-10-26T19:23:03Z",
+  "deps": [],
+  "files": [
+    "go/internal/core/decision_branch.go",
+    "go/internal/core/ports.go",
+    "docs/architecture/psmas-phase-scheduling.md",
+    "docs/architecture/packages/internal-core.md",
+    "knowledge/architecture/routing-and-advisor.md",
+    "knowledge/architecture/state-and-ledger.md"
+  ],
+  "fix": "Add skipped_phases as an additive omitempty field of the routing_decision line, with {phase, reason} pairs. Stop the phase_skipped lines going forward, and do not change history. Update each reader of the kind that the plan lists: the docs, the knowledge files, the orchestrator persona resume rule and the evals.",
+  "id": "ledger-restructure-c6-collapse-phase-skipped",
+  "kind": "feature",
+  "notes": "Plan: docs/plans/ledger-restructure-2026-10.md sections 4 and 7, C6. The surface is go/internal/core, not the ledger adapter or the hash chain. Admission decides; the narrowed protected fence lands soon. The intended route is lane. On 2026-10-27, evolve inbox route-lane refused it, because go/internal/core/ports.go is in the protected fence today. The item has no route field, so admission decides when the narrowed fence lands.",
+  "priority_class": "performance",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Plan docs/plans/ledger-restructure-2026-10.md, component C6 (decision D1). Decision record: docs/architecture/adr/0123-ledger-durable-evidence-segments-incremental-verify.md. go/internal/core/decision_branch.go:250 still appends one phase_skipped line for each skipped phase. The dossier has skipped_phases, but the ledger does not.",
+  "title": "Ledger C6: one routing_decision line carries skipped_phases with reasons, in place of one phase_skipped line for each phase",
+  "weight": 0.4
+}

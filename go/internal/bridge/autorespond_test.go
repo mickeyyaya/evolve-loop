@@ -19,7 +19,7 @@ func TestDecideAutoRespond_IdleGatesEscalateWhileBusy(t *testing.T) {
 	}
 
 	busyPane := "+\tpane := \"You've hit your usage limit. Upgrade to Pro\"\nWorking (1m 18s · esc to interrupt)"
-	busy := panestream.PaneBusy(busyPane, panestream.Profiles["codex"])
+	busy := panestream.PaneBusy(busyPane, panestream.Profiles["codex-repl-v1"])
 	if !busy {
 		t.Fatal("fixture invalid: the Working/esc-to-interrupt frame must read busy")
 	}
@@ -28,7 +28,7 @@ func TestDecideAutoRespond_IdleGatesEscalateWhileBusy(t *testing.T) {
 	}
 
 	idlePane := "■ You've hit your usage limit. Upgrade to Plus to continue, or try again at Jun 4th 3:45 PM."
-	idle := panestream.PaneBusy(idlePane, panestream.Profiles["codex"])
+	idle := panestream.PaneBusy(idlePane, panestream.Profiles["codex-repl-v1"])
 	if idle {
 		t.Fatal("fixture invalid: the idle banner must NOT read busy")
 	}
@@ -37,7 +37,7 @@ func TestDecideAutoRespond_IdleGatesEscalateWhileBusy(t *testing.T) {
 	}
 
 	approvalPane := "Would you like to make the following edits?\n  1. Yes, proceed\n  2. Yes, and don't ask again\n  3. No\n\nPress enter to confirm or esc to cancel"
-	if !panestream.PaneBusy(approvalPane, panestream.Profiles["codex"]) {
+	if !panestream.PaneBusy(approvalPane, panestream.Profiles["codex-repl-v1"]) {
 		t.Fatal("fixture invalid: the approval modal carries an esc-to-cancel affordance, must read busy")
 	}
 	if a, rc := decideAutoRespond(approvalPane, m.InteractivePrompts, map[string]int{}, true); rc != 1 {
@@ -206,14 +206,14 @@ func TestDecideAutoRespond_CodexModelUnsupportedIsIdleGated(t *testing.T) {
 	}
 	wall := "■ {\"type\":\"error\",\"status\":400,\"error\":{\"type\":\"invalid_request_error\",\"message\":\"The 'gpt-5.6-sol' model is not supported when using Codex with a ChatGPT account.\"}}"
 	busyPane := wall + "\nWorking (0m 04s · esc to interrupt)"
-	if !panestream.PaneBusy(busyPane, panestream.Profiles["codex"]) {
+	if !panestream.PaneBusy(busyPane, panestream.Profiles["codex-repl-v1"]) {
 		t.Fatal("fixture invalid: the Working frame must read busy")
 	}
 	if a, rc := decideAutoRespond(busyPane, m.InteractivePrompts, map[string]int{}, true); rc != 0 {
 		t.Errorf("busy pane must not escalate: got %q/%d", a, rc)
 	}
 	idlePane := wall + "\n\n›"
-	if panestream.PaneBusy(idlePane, panestream.Profiles["codex"]) {
+	if panestream.PaneBusy(idlePane, panestream.Profiles["codex-repl-v1"]) {
 		t.Fatal("fixture invalid: the idle prompt must not read busy")
 	}
 	if a, rc := decideAutoRespond(idlePane, m.InteractivePrompts, map[string]int{}, false); a != "escalate:model_unsupported" || rc != 85 {

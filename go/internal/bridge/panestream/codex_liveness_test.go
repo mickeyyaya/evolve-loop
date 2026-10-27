@@ -19,7 +19,7 @@ func codexFrame(t *testing.T, name string) string {
 }
 
 func TestCodexLiveness_ThinkingToAnswerConverging(t *testing.T) {
-	p := Profiles["codex"]
+	p := Profiles["codex-repl-v1"]
 	det := NewDefaultDetector(3)
 	think := codexFrame(t, "thinking.txt")
 	answer := codexFrame(t, "answer.txt")
@@ -34,7 +34,7 @@ func TestCodexLiveness_ThinkingToAnswerConverging(t *testing.T) {
 }
 
 func TestCodexLiveness_PrimingNotHung(t *testing.T) {
-	p := Profiles["codex"]
+	p := Profiles["codex-repl-v1"]
 	answer := codexFrame(t, "answer.txt")
 	det := NewDefaultDetector(1)
 	state, conf := det.Assess(answer, p)
@@ -47,7 +47,7 @@ func TestCodexLiveness_PrimingNotHung(t *testing.T) {
 }
 
 func TestCodexLiveness_StalledIdleNotHung(t *testing.T) {
-	p := Profiles["codex"]
+	p := Profiles["codex-repl-v1"]
 	answer := codexFrame(t, "answer.txt")
 	if PaneBusy(answer, p) {
 		t.Fatal("precondition: codex/answer.txt must not be busy (no busy affordance)")
@@ -71,7 +71,7 @@ func TestCodexLiveness_StalledIdleNotHung(t *testing.T) {
 }
 
 func TestCodexLiveness_ConfidenceInRange(t *testing.T) {
-	p := Profiles["codex"]
+	p := Profiles["codex-repl-v1"]
 	frames := []string{"thinking.txt", "answer.txt", "final.txt"}
 	for _, f := range frames {
 		t.Run(f, func(t *testing.T) {

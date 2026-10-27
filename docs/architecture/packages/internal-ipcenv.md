@@ -24,16 +24,24 @@
 
 - **`MsgTokenKey`** (`EVOLVE_MSG_TOKEN`) is the message token of one dispatch ([internal-agentmsg.md](internal-agentmsg.md)). `boot.Env` puts it in the environment of the dispatch. `Scrub` never forwards it.
 - **`DispatchDepthKey`** (`EVOLVE_DISPATCH_DEPTH`) and **`PhaseKey`** (`EVOLVE_PHASE`) are the markers of an agent cell ([llm-isolation.md](../llm-isolation.md) §7.1). The bridge sets both on each LLM child. `DispatchDepth` reads the depth and gives 0 for an absent, junk or negative value. `subagent.ReadDispatchDepth` calls it.
+- **`Markers` is the one list of the pipeline markers** (class (a) of [control-flags.md](../control-flags.md#classes-of-the-readers-outside-the-registry), X18b of [llm-isolation.md](../llm-isolation.md) §27). It holds 24 `EVOLVE_*` names and 9 `BRIDGE_*` names. Each consumer imports the list, and no consumer keeps a copy:
+  - `CellMarkers` is the part that reaches an LLM cell. `bridge.Deps.cellEnv` passes only these names from the `EVOLVE_` space. A token, a dispatch tag and a launch argument stay out (`TestCellMarkers_AreTheMarkersThatReachAnLLMCell`).
+  - `UnmovedControls` lists the operator knobs (class (b)) and the bypasses (class (c)) that X18c and X18d have not moved yet. A pattern with `*` names a family, for example `EVOLVE_*_CLI`. The list can only become shorter: `TestControlFlagLists_OnlyShrink` holds a ceiling of 29.
+  - `Carried` accepts a marker or a control that is not yet moved. `carriedEnv` of `cmd/evolve` uses it for the `EVOLVE_*` names, so a cycle gets no other `EVOLVE_*` name and no `BRIDGE_*` name of the operator shell.
+  - The guard `TestNoControlFlagReadOutsideTheMarkerList` (`internal/guards/control_flags_test.go`) reads each non-test Go file. It finds each read of an environment name, folds the constant concatenations, and fails on a name outside these lists. It also fails on a declared control that no code reads, so a moved name leaves the list. Since X18e no test seam is allowed.
+  - The list has no exported constants. An exported constant of this package must be in `ProtocolKeys`, and the new names are not lane protocol keys.
 - **`DispatchIDKey`** (`EVOLVE_DISPATCH_ID`) is the tag of one dispatch. The bridge sets it in the environment of the CLI it starts, and each descendant inherits it. The bridge at dispatch end and `evolve gc` read it from the environment of other processes to prove ownership ([internal-proctree.md](internal-proctree.md)). No Go code reads it from its own environment.
 
 ## Invariants
 
 - Every exported key constant is in `ProtocolKeys()`, and `Scrub` drops each (`TestProtocolKeys_AreEveryKeyThePackageDeclaresAndEachIsScrubbed`, `TestScrub_CoversEveryIPCKey`).
 - `ProtocolKeys` never hands out its backing array (`TestProtocolKeys_ReturnsAFreshSlice`).
+- `Markers` is class (a) of control-flags.md, and each protocol key is a marker (`TestMarkers_AreClassAOfTheControlFlagInventory`). `Markers`, `CellMarkers` and `UnmovedControls` give a fresh slice (`TestMarkerLists_ReturnFreshSlices`).
+- `Carried` refuses an unlisted name such as `EVOLVE_BYPASS_SHIP_GATE`, and no control is also a marker (`TestCarried_IsAMarkerOrAControlNotYetMoved`, `TestUnmovedControls_AreWellFormedAndMatchNoMarker`).
 - The namespace rule needs no second list: every key lives under `EVOLVE_`, so a key added tomorrow is scrubbed the day it is added (`TestScrub_CoversEveryIPCKey`). Only the key is inspected (`TestScrub_DropsEveryEvolveKeyAndKeepsTheToolchain`).
 - The width is read from the request environment and falls back to solo on garbage (`TestShipRecovery_ContentionBudgetScalesWithFleetWidth`). That `fleetWidthFromEnv` never reads `os.Getenv` has no test, so that half is unpinned.
 - Each constant's value is the wire contract (`TestIpcenv_ConstValues`, `TestTmuxSocketKey_IsTheBridgeSocketChannel`).
 
 ## Findings
 
-- **2026-10-01, ADR-0114 re-review**: `acs.predicate_env` could name a lane key (`EVOLVE_FLEET`, the tmux socket) and re-admit it to every predicate past the scrub. The ACS suite needed the lane key set to refuse them, and the tmux socket key lived in `internal/bridge`; it moved here and `ProtocolKeys` was added.
+- **2026-10-01, ADR-0114 re-review**: `acs.predicate_env` was able to name a lane key (`EVOLVE_FLEET`, the tmux socket) and admit it again to each predicate after the scrub. The ACS suite needed the set of lane keys to refuse them. The tmux socket key was in `internal/bridge`. It moved here, and `ProtocolKeys` was added.

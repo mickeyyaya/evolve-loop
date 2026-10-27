@@ -66,6 +66,16 @@ func (c Catalog) Empty() bool {
 	return len(c.CLIs) == 0
 }
 
+func (c Catalog) LiveCount() int {
+	n := 0
+	for _, e := range c.CLIs {
+		if e.Source == SourceLive {
+			n++
+		}
+	}
+	return n
+}
+
 func (c Catalog) DispatchModelChain(cli, tier string) []string {
 	entry, found := c.CLIs[cli]
 	if !found || entry.Source != SourceLive {

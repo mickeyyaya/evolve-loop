@@ -69,6 +69,7 @@ func fileCompanion(opts inboxmover.Options, cycle int, reason string, waiting []
 		"acceptance":     []string{"The defect that the retrospective of cycle " + strconv.Itoa(cycle) + " classified is repaired, and a test pins the repair"},
 		"route":          inboxmover.RouteConsoleValue,
 		"priority_class": "stability",
+		"origin":         inboxbatch.OriginCycle,
 		"weight":         companionWeight,
 	})
 	if _, err := inboxmover.File(opts, raw); err != nil {

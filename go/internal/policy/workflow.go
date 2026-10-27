@@ -31,6 +31,7 @@ type WorkflowPolicy struct {
 	FindingsRepair           *FindingsRepairPolicy `json:"findings_repair,omitempty"`
 	QualityIndex             *QualityIndexPolicy   `json:"quality_index,omitempty"`
 	Convergence              *ConvergencePolicy    `json:"convergence,omitempty"`
+	RetryLadder              *RetryLadderPolicy    `json:"retry_ladder,omitempty"`
 }
 
 type WorkflowConfig struct {
@@ -57,6 +58,7 @@ type WorkflowConfig struct {
 	InteractivePolicies      map[string]string
 	CodeReviewRepair         JudgeRepairConfig
 	QualityIndex             QualityIndexConfig
+	RetryLadder              RetryLadderConfig
 }
 
 func (p Policy) WorkflowConfig() WorkflowConfig {
@@ -77,6 +79,7 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 		InteractivePolicy:        "recommended_or_first",
 		CodeReviewRepair:         resolveJudgeRepair("code-review", p.codeReviewRepairPolicy()),
 		QualityIndex:             p.qualityIndexConfig(),
+		RetryLadder:              p.retryLadderConfig(),
 	}
 	if p.Workflow == nil {
 		return c

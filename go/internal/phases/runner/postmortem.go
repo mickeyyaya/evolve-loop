@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/attemptpostmortem"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/launchoutcome"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
@@ -108,12 +109,13 @@ func (b *BaseRunner) recordPostmortem(ctx context.Context, s postmortemScope, w 
 		Phase: s.phase, Cycle: s.req.Cycle, CLI: w.cli, StartedAt: w.start, EndedAt: w.end,
 		CauseCode: w.causeCode, ExitCode: w.exitCode, DispatchID: w.dispatchID,
 	}
-	transcript := b.locateTranscript(s, w)
+	format := transcriptFormatOf(w.cli)
+	transcript := b.locateTranscript(s, w, format)
 	a.Number = attemptpostmortem.NextNumber(s.req.Workspace, s.phase)
 	a.Session = sessionOf(transcript)
 	rec, err := attemptpostmortem.Collect(attemptpostmortem.Input{
 		Attempt:        a,
-		Transcript:     attemptpostmortem.TranscriptFor(w.cli, transcript),
+		Transcript:     attemptpostmortem.TranscriptFor(format, transcript),
 		ScrollbackPath: w.paneCapture,
 		WorktreeDelta:  b.worktreeDelta(ctx, s.req.Worktree),
 	}, s.cfg)
@@ -125,8 +127,16 @@ func (b *BaseRunner) recordPostmortem(ctx context.Context, s postmortemScope, w 
 	}
 }
 
-func (b *BaseRunner) locateTranscript(s postmortemScope, w launchWindow) string {
-	if !attemptpostmortem.WritesTranscript(w.cli) {
+func transcriptFormatOf(cli string) string {
+	m, err := bridge.LoadManifest(cli)
+	if err != nil {
+		return ""
+	}
+	return m.TranscriptFormat()
+}
+
+func (b *BaseRunner) locateTranscript(s postmortemScope, w launchWindow, format string) string {
+	if !attemptpostmortem.KnownTranscriptFormat(format) {
 		return ""
 	}
 	return tokenusage.LocateTranscript(tokenusage.ClaudeConfigRoot(s.req.Env), tokenusage.Window{

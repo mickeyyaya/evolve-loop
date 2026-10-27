@@ -16,6 +16,7 @@
 - [6b. Components after the queue measurement (C15 and C16)](#6b-components-after-the-queue-measurement-c15-and-c16)
 - [6c. Build status of C2 (2026-10-20)](#6c-build-status-of-c2-2026-10-20)
 - [6d. A hung job holds the main group (C17, 2026-10-26)](#6d-a-hung-job-holds-the-main-group-c17-2026-10-26)
+- [6e. Inbox items for the open components (2026-10-27)](#6e-inbox-items-for-the-open-components-2026-10-27)
 - [7. Order](#7-order)
 - [8. Verification](#8-verification)
 - [9. Risks](#9-risks)
@@ -423,6 +424,21 @@ On 2026-10-26 the console asked why main did not catch the reds of PR #1138. The
 | Id | Built as | Red test | What the build records |
 |---|---|---|---|
 | C17 | D27 in `.github/workflows/go.yml` | `TestGoWorkflow_EveryJobHasABoundedTimeout` fails when a `go.yml` job has no `timeout-minutes` or a value above 90 | The test pins the range 1 to 90, not the values 60 and 15. It cannot find the cause of the hang in F9.3. The log of that job is not available while the job runs. |
+
+## 6e. Inbox items for the open components (2026-10-27)
+
+The plan audit of 2026-10-27 found eight open components with no inbox item and no PR. Each one now has an item, so the loop can take it.
+
+| Id | Inbox item | Waits for |
+|---|---|---|
+| C1 | `ci-wall-time-c1-telemetry-report` | — |
+| C4 | `ci-wall-time-c4-cmd-evolve-serial-chain` | — |
+| C8 | `ci-wall-time-c8-deliverable-read-grace` | — |
+| C9 | `ci-wall-time-c9-one-parse-per-test-binary` | — |
+| C10 | `ci-wall-time-c10-bridge-tick-loop-tests` | — |
+| C12 | `ci-wall-time-c12-telemetry-report-fixes` | C1 |
+| C13 | `ci-wall-time-c13-macos-cpu-and-spawn-counts` | — |
+| C14 | `ci-wall-time-c14-fewer-git-spawns-on-macos` | C13, and decision D23 |
 
 ## 7. Order
 

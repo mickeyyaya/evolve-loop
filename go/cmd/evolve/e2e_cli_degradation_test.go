@@ -61,11 +61,8 @@ func runFallbackCycle(t *testing.T, cfg fallbackCfg) {
 
 	env := append(os.Environ(),
 		"EVOLVE_SANDBOX=off",
-		"EVOLVE_PROMPTS_DIR="+cfg.RepoRoot,
 		"EVOLVE_RESEARCH_HOOK_DISABLED=1",
-		"BRIDGE_TESTING=1",
-		"BRIDGE_CLAUDE_BINARY="+cfg.FakeBin,
-		"BRIDGE_CODEX_BINARY="+cfg.FakeBin,
+		fakeCLIsFirstOnPath(t, cfg.FakeBin, "claude", "codex"),
 		fmt.Sprintf("FAKE_CLI_CLAUDE_EXIT=%d", cfg.PrimaryExitCode),
 	)
 	env = append(env, isolatedHome(t)...)

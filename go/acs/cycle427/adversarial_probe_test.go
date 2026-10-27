@@ -60,7 +60,7 @@ func TestAmplify_CodexGenerating_IsBusy(t *testing.T) {
 	dir := filepath.Dir(file)
 	tdDir := filepath.Join(dir, "..", "..", "internal", "bridge", "panestream", "testdata", "codex")
 
-	p := panestream.Profiles["codex"]
+	p := panestream.Profiles["codex-repl-v1"]
 
 	nonBusy := []string{"thinking.txt", "answer.txt", "final.txt"}
 	for _, name := range nonBusy {
@@ -97,7 +97,7 @@ func TestAmplify_CodexGenerating_AnswerToGeneratingConverging(t *testing.T) {
 		t.Fatalf("testdata read: %v / %v", err1, err2)
 	}
 
-	p := panestream.Profiles["codex"]
+	p := panestream.Profiles["codex-repl-v1"]
 	det := panestream.NewDefaultDetector(3)
 	det.Assess(string(answer), p)
 	state, conf := det.Assess(string(gen), p)
@@ -118,7 +118,7 @@ func TestAmplify_CodexGenerating_StalledIsHung(t *testing.T) {
 		t.Fatalf("testdata generating.txt: %v", err)
 	}
 	gen := string(b)
-	p := panestream.Profiles["codex"]
+	p := panestream.Profiles["codex-repl-v1"]
 
 	if !panestream.PaneBusy(gen, p) {
 		t.Skip("generating.txt is no longer busy — TestAmplify_CodexGenerating_IsBusy tracks this; this test would be stale")
@@ -147,7 +147,7 @@ func TestAmplify_CodexGenerating_ConfidenceInRange(t *testing.T) {
 		t.Fatalf("testdata generating.txt: %v", err)
 	}
 	gen := string(b)
-	p := panestream.Profiles["codex"]
+	p := panestream.Profiles["codex-repl-v1"]
 	det := panestream.NewDefaultDetector(3)
 	_, c1 := det.Assess(gen, p)
 	_, c2 := det.Assess(gen, p)

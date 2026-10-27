@@ -344,6 +344,7 @@ func fileUnexplainedOutcomeDefect(projectRoot string, cycle int, detail string) 
 		"action":           fmt.Sprintf("Cycle %d ended FAILED_UNEXPLAINED (%s). Every terminal path must record a ship PASS, a salvage, or an abort_reason (ADR-0044 C1) — locate the escaping path and route it through recordPhaseOutcome.", cycle, detail),
 		"priority":         "HIGH",
 		"priority_class":   inboxbatch.ClassDebuggability,
+		"origin":           inboxbatch.OriginCycle,
 		"weight":           0.8,
 		"evidence_pointer": fmt.Sprintf(".evolve/runs/cycle-%d/phase-timing.json", cycle),
 		"injected_at":      time.Now().UTC().Format(time.RFC3339),
