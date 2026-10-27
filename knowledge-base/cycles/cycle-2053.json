@@ -1,0 +1,290 @@
+{
+  "schema_version": 2,
+  "cycle": 2053,
+  "run_id": "01M5Y4BP3MCJR04QQGRF37ZYS3",
+  "goal": "Wave 144.\n\nWork the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree that it ships;\n- disposition its own defect ledger and the inherited ids;\n- record a terminal outcome on every exit;\n- never change a protected control-plane file with a tool;\n- leave no stale worktree.\n\nRouting:\n- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.\n- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.\n- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.\n\nCraft:\n- New and changed code has no comments. Names, types and tests give the intent.\n- Write each new document and each new log text in ASD-STE100.\n- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.\n- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.\n\nEvidence:\n- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.\n\nThe measure of this wave is the number of shipped cycles. Keep each cycle shipping.\n\nWave 143 facts (run 20261027T021525Z): 9 of 16 cycles shipped.\n- Cycle 2037: final verdict PASS. It shipped.\n- Cycle 2038: final verdict PASS. It shipped.\n- Cycle 2039: final verdict PASS. It shipped.\n- Cycle 2040: final verdict PASS. It shipped.\n- Cycle 2041: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…st\u003e$'`) and fix the change before handoff: === RUN   TestInnerRunCycleErrorF4     engine.go:162: RunCycle: lease held --- FAIL: TestInnerRunCycleErrorF4 (0.01s). Last phase: aborted. It did not ship.\n- Cycle 2042: final verdict PASS. It shipped.\n- Cycle 2043: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=….go)   const   CycleSpendShadow (workflow_cycle_spend.go)   type    CycleSpendPolicy (workflow_cycle_spend.go) summary: 333 exported, 329 covered, 4 uncovere…. Last phase: aborted. It did not ship.\n- Cycle 2044: final verdict PASS. It shipped.\n- Cycle 2045: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…/fakes.go:38 internal/routingtest.seedWorkspace 75.0% (6/8)     REFUSED internal/routingtest/fakes.go:52 internal/routingtest.readRoutingDecisions 83.3% (10/12). Last phase: aborted. It did not ship.\n- Cycle 2046: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2046/go/internal/supersede == summary: 5 exported, 5 covered, 0 uncovered, 0 false-green, 0 ignored. Last phase: aborted. It did not ship.\n- Cycle 2047: final verdict PASS. It shipped.\n- Cycle 2048: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…   REFUSED cmd/evolve/cmd_ci_latency.go:53 cmd/evolve.runCILatency 0.0% (0/21)     REFUSED cmd/evolve/cmd_ci_latency.go:85 cmd/evolve.checkCILatency 0.0% (0/16). Last phase: aborted. It did not ship.\n- Cycle 2049: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…docs/explain/builds/cycle-N-01m5xtvnwk94g9ryfgzhqre9m0.md:8 STE-SENTENCE); fix each finding; `evolve docs ste-lint --strict --changed \u003cbase\u003e --added` lists them. Last phase: aborted. It did not ship.\n- Cycle 2050: final verdict PASS. It shipped.\n- Cycle 2051: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…docs/explain/builds/cycle-N-01m5xwqdjqyc9mhva9bxdvs52e.md:8 STE-SENTENCE); fix each finding; `evolve docs ste-lint --strict --changed \u003cbase\u003e --added` lists them. Last phase: aborted. It did not ship.\n- Cycle 2052: final verdict PASS. It shipped.\n- Pull requests merged at this boundary: none.\n\nEarlier waves:\n- Wave 140 (run 20261021T000432Z): 3 of 4 cycles shipped.\n- Wave 141 (run 20261026T115530Z): 4 of 6 cycles shipped.\n- Wave 142 (run 20261026T182320Z): 1 of 2 cycles shipped.",
+  "final_verdict": "PASS",
+  "commit_sha": "b350d132b0b438285703e74a9f891a74f1970ed0",
+  "tree_sha": "48de29dc6a132890cbfbebfbad69ef2b366756ab",
+  "tasks": [
+    "regression-tia-escape-hatch-is-transitive"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 45035,
+      "started_at": "2026-10-27T07:32:30Z",
+      "ended_at": "2026-10-27T07:33:18Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 10,
+        "output": 1930,
+        "cache_read": 251081,
+        "cache_write": 65689
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 75676,
+      "started_at": "2026-10-27T07:33:55Z",
+      "ended_at": "2026-10-27T07:35:12Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 10,
+        "output": 1553,
+        "cache_read": 358523,
+        "cache_write": 41234
+      }
+    },
+    {
+      "name": "fault-localization",
+      "verdict": "PASS",
+      "duration_ms": 98452,
+      "started_at": "2026-10-27T07:35:17Z",
+      "ended_at": "2026-10-27T07:36:57Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 12,
+        "output": 2354,
+        "cache_read": 105622,
+        "cache_write": 26257
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 298054,
+      "started_at": "2026-10-27T07:36:57Z",
+      "ended_at": "2026-10-27T07:41:57Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 48,
+        "output": 30279,
+        "cache_read": 2301525,
+        "cache_write": 94996
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 67117,
+      "started_at": "2026-10-27T07:41:57Z",
+      "ended_at": "2026-10-27T07:54:47Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 14,
+        "output": 2368,
+        "cache_read": 470232,
+        "cache_write": 33170
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "WARN",
+      "duration_ms": 164449,
+      "started_at": "2026-10-27T07:55:06Z",
+      "ended_at": "2026-10-27T08:03:05Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 26,
+        "output": 11613,
+        "cache_read": 1063028,
+        "cache_write": 59337
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 172705,
+      "started_at": "2026-10-27T08:03:37Z",
+      "ended_at": "2026-10-27T08:11:51Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 40,
+        "output": 5124,
+        "cache_read": 1524554,
+        "cache_write": 52421
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "WARN",
+      "duration_ms": 158620,
+      "started_at": "2026-10-27T08:12:19Z",
+      "ended_at": "2026-10-27T08:18:53Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 20,
+        "output": 10257,
+        "cache_read": 775553,
+        "cache_write": 55662
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "FAIL",
+      "duration_ms": 220390,
+      "started_at": "2026-10-27T08:19:32Z",
+      "ended_at": "2026-10-27T08:23:13Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "WARN",
+      "duration_ms": 175301,
+      "started_at": "2026-10-27T08:23:13Z",
+      "ended_at": "2026-10-27T08:27:24Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 34,
+        "output": 6599,
+        "cache_read": 1329325,
+        "cache_write": 50964
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "FAIL",
+      "duration_ms": 269395,
+      "started_at": "2026-10-27T08:27:51Z",
+      "ended_at": "2026-10-27T08:32:23Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "WARN",
+      "duration_ms": 337699,
+      "started_at": "2026-10-27T08:32:23Z",
+      "ended_at": "2026-10-27T08:39:38Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 54,
+        "output": 13128,
+        "cache_read": 2173198,
+        "cache_write": 58552
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "PASS",
+      "duration_ms": 252311,
+      "started_at": "2026-10-27T08:39:57Z",
+      "ended_at": "2026-10-27T08:44:11Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "explanation_corrections": [
+    "docs/explain/builds/cycle-2053-01m5y4bp3mcjr04qqgrf37zys3.md:29 Limitations does not say that on the real tree each of the 44 regression packages stays an escape hatch through pkg/acsassert, so the real shadow soak records would_skip=0. An audit probe of Compute gave selected=44 wouldskip=0 for three changes. Add this limitation and name the follow-up item regression-tia-declared-impact-surface.\ndocs/explain/builds/cycle-2053-01m5y4bp3mcjr04qqgrf37zys3.md:8 Summary is true only for a fixture module. Make it say that the real corpus skips no package yet. The implementation is at go/internal/regressiontia/regressiontia.go:194.\ndocs/explain/builds/cycle-2053-01m5y4bp3mcjr04qqgrf37zys3.md:14 matches the diff at go/internal/regressiontia/regressiontia.go:89 (marshal error branch) and go/internal/regressiontia/regressiontia.go:137 (skip and dedup branches removed). The SHA256 matches the handoff (shasum output equals 94f6d229…de639). The only material path, go/internal/regressiontia/regressiontia.go, has its own Changed Areas entry."
+  ],
+  "timing": {
+    "total_ms": 2335204,
+    "phase_count": 13,
+    "retried_count": 0,
+    "longest_phase": "audit",
+    "longest_ms": 337699,
+    "by_archetype_ms": {
+      "build": 239822,
+      "control": 742096,
+      "evaluate": 836069,
+      "plan": 517217
+    },
+    "total_tokens": {
+      "input": 268,
+      "output": 85205,
+      "cache_read": 10352641,
+      "cache_write": 538282
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 54,
+        "output": 7492,
+        "cache_read": 1994786,
+        "cache_write": 85591
+      },
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "evaluate": {
+        "input": 134,
+        "output": 41597,
+        "cache_read": 5341104,
+        "cache_write": 224515
+      },
+      "plan": {
+        "input": 80,
+        "output": 36116,
+        "cache_read": 3016751,
+        "cache_write": 228176
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.9999741135559097,
+    "hot_phase_count": 9,
+    "hot_phases": [
+      "scout",
+      "triage",
+      "tdd",
+      "build",
+      "audit",
+      "build",
+      "audit",
+      "audit",
+      "audit"
+    ]
+  },
+  "recalled_lessons": [
+    "cycle-1502-closure-citation-contract-never-reaches-the-auditor-it-grades",
+    "cycle-1492-remedy-on-disk-in-four-places-reaches-no-agent-with-authority-to-apply-it",
+    "cycle-93-build-report-commit-sha-fabrication",
+    "inst-L1549b",
+    "cycle-93-worktree-branch-unmerged-but-build-reports-pass"
+  ]
+}
