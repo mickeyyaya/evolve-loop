@@ -150,7 +150,7 @@ func checkBuildV1(ctx context.Context, binding CycleBinding) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("derive base-bound diff: %w", err)
 	}
-	diffSHA, err := diffSHA256(ctx, binding.Worktree, binding.BaseSHA)
+	diffSHA, err := pathStateSHA256(ctx, binding.Worktree, diffDomain(binding.BaseSHA), paths)
 	if err != nil {
 		return nil, fmt.Errorf("hash base-bound diff: %w", err)
 	}
@@ -269,7 +269,7 @@ func verifyResolvedV1(ctx context.Context, binding CycleBinding, verificationRoo
 	if !samePaths(view.MaterialPaths, material) {
 		return nil, true, fmt.Errorf("%s material_paths does not match the base-bound diff", manifestFilename)
 	}
-	diffSHA, err := diffSHA256(ctx, verificationRoot, binding.BaseSHA)
+	diffSHA, err := pathStateSHA256(ctx, verificationRoot, diffDomain(binding.BaseSHA), paths)
 	if err != nil {
 		return nil, true, fmt.Errorf("hash base-bound diff: %w", err)
 	}

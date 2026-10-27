@@ -60,9 +60,14 @@ func (r *Repo) initWorkTree() {
 func Bare(tb testing.TB) *Repo {
 	tb.Helper()
 	r := newRepo(tb)
+	r.initBare()
+	return r
+}
+
+func (r *Repo) initBare() {
+	r.tb.Helper()
 	r.Git("init", "-q", "--bare", "-b", "main")
 	r.quiet()
-	return r
 }
 
 func Clone(tb testing.TB, src string) *Repo {
