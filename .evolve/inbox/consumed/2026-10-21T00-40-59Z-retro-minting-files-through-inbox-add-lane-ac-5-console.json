@@ -1,0 +1,28 @@
+{
+  "acceptance": [
+    "Audit H1: the three TestWriteFloor tests and both inbox goldens of core/failurelearning expect the old floor item and must expect the filed item, so go test of that package passes. The tests must find the item by id suffix and ignore the .bump.lock file."
+  ],
+  "consumed": {
+    "at": "2026-10-27T02:15:05Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "PR 1176 landed the failurelearning floor tests and goldens"
+  },
+  "created_at": "2026-10-21T00:40:59Z",
+  "files": [
+    "go/internal/core/failurelearning/floor_test.go",
+    "go/internal/core/failurelearning/testdata/inbox-4f0ecc16.golden.json",
+    "go/internal/core/failurelearning/testdata/inbox-915304b4.golden.json"
+  ],
+  "fix": "Make the change that AC 5 needs on the protected path(s) go/internal/core/failurelearning/floor_test.go, go/internal/core/failurelearning/testdata/inbox-4f0ecc16.golden.json, go/internal/core/failurelearning/testdata/inbox-915304b4.golden.json, then prove the criterion with a test.",
+  "id": "retro-minting-files-through-inbox-add-lane-ac-5-console",
+  "kind": "refactor",
+  "priority_class": "stability",
+  "route": "lane",
+  "routed_at": "2026-10-26T23:34:22Z",
+  "routed_reason": "operator 2026-10-27: lane-safe item; the evo loop builds the Todo work (curator reroute proposal, no protected surface, no pipeline kind)",
+  "source": "cycle 2026, tdd test-report.md AC 5 (console-followup)",
+  "summary": "The TDD phase of cycle 2026 gave AC 5 of retro-minting-files-through-inbox-add-lane the console-followup disposition. A lane builder can never change the paths it needs (go/internal/core/failurelearning/floor_test.go, go/internal/core/failurelearning/testdata/inbox-4f0ecc16.golden.json, go/internal/core/failurelearning/testdata/inbox-915304b4.golden.json). The lane part ships without it, so the console owns this part.",
+  "title": "Console part of retro-minting-files-through-inbox-add-lane: AC 5, which needs a protected path changed",
+  "weight": 0.45
+}

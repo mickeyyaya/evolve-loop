@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "Red test first: a cycle whose context is cancelled by the lane deadline during build writes a salvage commit and a stamp.",
+    "The stamp step has its own deadline and cannot hold the lane past it.",
+    "A log line or signal records each deadline stamp."
+  ],
+  "created_at": "2026-10-27T06:34:50Z",
+  "deps": [],
+  "files": [
+    "go/internal/core/cyclerun_epilogue.go",
+    "go/internal/core/continuation_stamp.go"
+  ],
+  "fix": "Run the salvage commit and the continuation stamp on a context detached from the cycle context with its own short deadline, after the lane deadline fires. Keep the Clean-against-main check.",
+  "id": "deadline-stop-stamps-a-continuation",
+  "kind": "pipeline-repair",
+  "notes": "Console route: internal/core is on the fence.",
+  "origin": "console",
+  "priority": "P1",
+  "priority_class": "correctness",
+  "route": "console",
+  "source": "console, 2026-10-27, cycle resume investigation (scratchpad cycle-resume-research.md), operator question on resuming failed cycles",
+  "summary": "cyclerun_epilogue.go:24-25 returns early when the cycle context is cancelled, so a deadline stop writes no salvage snapshot and no stamp. The next attempt adopts an older snapshot or starts fresh. Cycles 2008, 2010, 2013, 2015 and 2034 lost 326.8 LLM minutes this way.",
+  "title": "A lane stopped at its lease deadline commits a snapshot and stamps a continuation",
+  "weight": 0.85
+}
