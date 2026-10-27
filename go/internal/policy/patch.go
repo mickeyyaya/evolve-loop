@@ -23,6 +23,9 @@ func Parse(raw []byte) (Policy, error) {
 	if err := p.Workflow.validateRetryLadder(); err != nil {
 		return Policy{}, err
 	}
+	if err := p.Workflow.validateRepair(); err != nil {
+		return Policy{}, err
+	}
 	if p.Isolation != nil {
 		if err := p.Isolation.Context.validate(); err != nil {
 			return Policy{}, fmt.Errorf("isolation.context: %w", err)

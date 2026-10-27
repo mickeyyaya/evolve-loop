@@ -32,6 +32,7 @@ type WorkflowPolicy struct {
 	QualityIndex             *QualityIndexPolicy   `json:"quality_index,omitempty"`
 	Convergence              *ConvergencePolicy    `json:"convergence,omitempty"`
 	RetryLadder              *RetryLadderPolicy    `json:"retry_ladder,omitempty"`
+	Repair                   *RepairPolicy         `json:"repair,omitempty"`
 }
 
 type WorkflowConfig struct {
@@ -59,6 +60,7 @@ type WorkflowConfig struct {
 	CodeReviewRepair         JudgeRepairConfig
 	QualityIndex             QualityIndexConfig
 	RetryLadder              RetryLadderConfig
+	Repair                   RepairConfig
 }
 
 func (p Policy) WorkflowConfig() WorkflowConfig {
@@ -80,6 +82,7 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 		CodeReviewRepair:         resolveJudgeRepair("code-review", p.codeReviewRepairPolicy()),
 		QualityIndex:             p.qualityIndexConfig(),
 		RetryLadder:              p.retryLadderConfig(),
+		Repair:                   p.repairConfig(),
 	}
 	if p.Workflow == nil {
 		return c
@@ -137,10 +140,7 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 		c.InteractivePolicy = p.Workflow.InteractivePolicy
 	}
 	if p.Workflow.InteractivePolicies != nil {
-		c.InteractivePolicies = make(map[string]string)
-		for k, v := range p.Workflow.InteractivePolicies {
-			c.InteractivePolicies[k] = v
-		}
+		c.InteractivePolicies = maps.Clone(p.Workflow.InteractivePolicies)
 	}
 	return c
 }

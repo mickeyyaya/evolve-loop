@@ -215,6 +215,14 @@ The block configures `internal/convergence`, the one rule every repeat-until-acc
 | `concentration_min_findings` | the findings (LOW or above) a window needs before its share is defined | 5 | below 1 fails the load |
 | `max_backward_edges` | the cycle loop's *N*: the backward edges (audit → build, retro → tdd, ship → ship, …) one cycle may take before it stops with a continuation (design §6.1) | 3 | below 1 fails the load |
 
+## Repair fixability (`workflow.repair.fixability`)
+
+The block sets the stage of lane fixability classification ([ADR-0158](adr/0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md)). The loader refuses a bad stage value with an error.
+
+| Key | Meaning | Default |
+|---|---|---|
+| `stage` | `off` disables classification. `shadow` records decisions without stopping. `enforce` stops the repair round on a blocking handoff finding. | `shadow` |
+
 ## Retry ladder (`workflow.retry_ladder`)
 
 The block sets the stage of the retry ladder and the size of the digest of a raised try ([ADR-0142](adr/0142-a-capability-failure-climbs-one-bounded-retry-ladder.md), [design](retry-ladder.md) §5 and §7). The loader refuses a bad value, and the load of the whole file fails.
