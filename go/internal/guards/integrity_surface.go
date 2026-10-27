@@ -196,6 +196,7 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/bridge/launch_llm.go", Class: SandboxGuarantee, Rationale: "the one launch API of an LLM (ADR-0154 I-1, X3)"},
 	{Fragment: "/go/internal/bridge/driver_tmux_boot.go", Class: SandboxGuarantee, Rationale: "the tmux boot that applies sandboxPrefixForLaunch to each tmux family"},
 	{Fragment: "/go/internal/bridge/dispatch_signal_guard_test.go", Class: GuardGuarantee, Rationale: "the kill-guard pin: a test that leaves SignalProcess nil never reaches kill(2)"},
+	{Fragment: "/go/internal/bridge/realtmux_sender_guard_test.go", Class: GuardGuarantee, Rationale: "the sender guard of the real tmux tests: it fails when a test Deps over execTmux{} has no SignalProcess, so the reap at kill-session would reach the default sender (the PR #1190 macOS panic)"},
 	{Fragment: "/go/internal/bridge/resolve_guard_test.go", Class: GuardGuarantee, Rationale: "the one-resolver guard: only bridge.Resolve builds a driver name"},
 	{Fragment: "/go/internal/bridge/selfmatch_guard_test.go", Class: GuardGuarantee, Rationale: "the self-match guard: the text of a tracked file never takes the shape of a live dialog rule"},
 	{Fragment: "/go/internal/bridge/selfmatch_guard_prefilter_test.go", Class: GuardGuarantee, Rationale: "the self-match prefilter gives the exhaustive verdict for each rule"},
