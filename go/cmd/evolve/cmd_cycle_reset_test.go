@@ -46,8 +46,8 @@ func TestRunCycleReset_LeaseFencing(t *testing.T) {
 		}
 		var out, errB bytes.Buffer
 		rc := runCycleReset([]string{"--project-root", root, "--evolve-dir", ev}, &out, &errB)
-		if rc != 1 {
-			t.Fatalf("rc=%d, want 1 (refuse live owner); stderr=%s", rc, errB.String())
+		if rc != cliExitRefused {
+			t.Fatalf("rc=%d, want 3 (refuse live owner); stderr=%s", rc, errB.String())
 		}
 		s := errB.String()
 		for _, want := range []string{"LIVE", strconv.Itoa(livePID), "evolve loop --resume"} {

@@ -119,7 +119,7 @@ func reportRoutingFindings(w io.Writer, findings []cliroute.Finding) {
 	}
 }
 
-const exitRoutingRefused = 2
+const exitRoutingRefused = cliExitRefused
 
 func roleResolver(r *cliroute.Router) func(string) (resolvellm.Result, error) {
 	return func(role string) (resolvellm.Result, error) {

@@ -53,7 +53,7 @@ type opener func(root, name string, cfg channel.Config) (appender, error)
 func New(cfg Config) (*Publisher, error) { return newPublisher(cfg, openLog) }
 
 func Roles() []string {
-	return []string{"cycle", "loop", "loop-chain", "ship", "subagent", "simulate", "phase-observer", "wave", "inbox", "ci", "subscriber", "quality", "dispatch"}
+	return []string{"cycle", "loop", "loop-chain", "ship", "subagent", "simulate", "phase-observer", "wave", "inbox", "ci", "subscriber", "quality", "dispatch", "agent"}
 }
 
 func openLog(root, name string, cfg channel.Config) (appender, error) {

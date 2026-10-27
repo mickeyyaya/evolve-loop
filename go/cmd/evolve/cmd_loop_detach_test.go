@@ -258,8 +258,8 @@ func TestLoopDetach_RefusesToLaunchBesideALiveRun(t *testing.T) {
 	}
 	probe := stubDetachChild(t, "lease", p)
 	rc, stdout, stderr := runDetach(t, p.args())
-	if rc != 1 {
-		t.Fatalf("--detach beside a live run must exit 1, got %d\nstdout:\n%s\nstderr:\n%s", rc, stdout, stderr)
+	if rc != cliExitRefused {
+		t.Fatalf("--detach beside a live run must exit 3, got %d\nstdout:\n%s\nstderr:\n%s", rc, stdout, stderr)
 	}
 	if len(probe.cmds) != 0 {
 		t.Errorf("--detach started %d child(ren) while a run was already live", len(probe.cmds))

@@ -7,12 +7,21 @@ import (
 )
 
 type Attestation struct {
-	TreeStateSHA string   `json:"tree_state_sha"`
-	TS           string   `json:"ts"`
-	ChecksPassed []string `json:"checks_passed"`
-	ReviewersRun []string `json:"reviewers_run"`
-	ReviewWaiver string   `json:"review_waiver,omitempty"`
-	Tool         string   `json:"tool"`
+	TreeStateSHA string      `json:"tree_state_sha"`
+	TS           string      `json:"ts"`
+	ChecksPassed []string    `json:"checks_passed"`
+	ReviewersRun []string    `json:"reviewers_run"`
+	ReviewWaiver string      `json:"review_waiver,omitempty"`
+	ReviewRuns   []ReviewRun `json:"review_runs,omitempty"`
+	Tool         string      `json:"tool"`
+}
+
+type ReviewRun struct {
+	RunID   string `json:"run_id"`
+	Profile string `json:"profile"`
+	CLI     string `json:"cli"`
+	Family  string `json:"family"`
+	Model   string `json:"model"`
 }
 
 type attestationField struct {
@@ -25,7 +34,7 @@ func (a *Attestation) Marshal() ([]byte, error) {
 }
 
 func (a *Attestation) marshalWith(marshal func(any) ([]byte, error)) ([]byte, error) {
-	lines := make([]string, 0, 6)
+	lines := make([]string, 0, 7)
 	for _, f := range a.fields() {
 		value, err := marshal(f.value)
 		if err != nil {
@@ -45,6 +54,9 @@ func (a *Attestation) fields() []attestationField {
 	}
 	if a.ReviewWaiver != "" {
 		fields = append(fields, attestationField{"review_waiver", a.ReviewWaiver})
+	}
+	if len(a.ReviewRuns) > 0 {
+		fields = append(fields, attestationField{"review_runs", a.ReviewRuns})
 	}
 	return append(fields, attestationField{"tool", a.Tool})
 }

@@ -56,6 +56,7 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/guidance/", Class: InstructionGuarantee, Rationale: "the rule registry check of CI and the generator of the L0 region that every agent of every family loads (ADR-0145)"},
 	{Fragment: "/guidance/rules/", Class: InstructionGuarantee, Rationale: "the rule registry: its L0 rules render into AGENTS.md, CLAUDE.md and GEMINI.md, so a tampered rule rewrites the invariants of every agent (ADR-0145)"},
 	{Fragment: "/go/internal/commitgate/", Class: GateGuarantee, Rationale: "the pre-commit quality gate (attestation writer the manual-ship reader trusts)"},
+	{Fragment: "/go/internal/launchrecord/", Class: GateGuarantee, Rationale: "the bridge launch record of evolve agent run (ADR-0154 X11): the commit gate attests a review run from it, so a cycle that weakened its tree binding or its run id check could attest a review that never saw the staged tree"},
 	{Fragment: "/go/internal/commentaudit/", Class: GateGuarantee, Rationale: "the comment rules the commit gate trusts: the comment-only proof behind its review waiver, the added-comment and removed-history refusals, the history archive's append-only check, and the build comment floor (ADR-0115)"},
 	{Fragment: "/go/internal/phaseintegrity/", Class: LedgerGuarantee, Rationale: "the per-phase integrity chain's DigestSource (ADR-0065)"},
 	{Fragment: "/go/internal/binaryguard/", Class: GuardGuarantee, Rationale: "the compiled-binary commit backstop at the commit chokepoint"},

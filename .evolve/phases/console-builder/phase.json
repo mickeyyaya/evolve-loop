@@ -1,0 +1,21 @@
+{
+  "name": "console-builder",
+  "catalog": "on-demand",
+  "archetype": "build",
+  "optional": true,
+  "agent": "evolve-console-builder",
+  "description": "the console build seat: builds one console-owned item in a given dev worktree and changes only the files that the console names",
+  "when_to_use": "never selected: the console runs it with `evolve agent run console-builder --worktree DIR --writable PATH...` and the item brief as the input",
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/console-builder-report.md"
+    ]
+  },
+  "classify": {
+    "require_sections": [
+      "Changes",
+      "Tests",
+      "Verdict"
+    ]
+  }
+}

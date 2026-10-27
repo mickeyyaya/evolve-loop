@@ -205,7 +205,7 @@ func TestNew_BuildsAPublisherOverTheChannelLogs(t *testing.T) {
 
 func TestRoles_IsTheClosedSetOfTheSpecRoots(t *testing.T) {
 	t.Parallel()
-	want := []string{"cycle", "loop", "loop-chain", "ship", "subagent", "simulate", "phase-observer", "wave", "inbox", "ci", "subscriber", "quality", "dispatch"}
+	want := []string{"cycle", "loop", "loop-chain", "ship", "subagent", "simulate", "phase-observer", "wave", "inbox", "ci", "subscriber", "quality", "dispatch", "agent"}
 
 	got := Roles()
 	got[0] = "changed"

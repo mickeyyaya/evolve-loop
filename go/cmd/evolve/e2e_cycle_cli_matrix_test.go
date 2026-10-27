@@ -329,8 +329,8 @@ func (r matrixRun) agentRunNotRefused() error {
 		if c.agentRun == "skip" {
 			continue
 		}
-		if c.agentRun != "2:yes" {
-			return fmt.Errorf("evolve agent run inside a %s phase pane (EVOLVE_DISPATCH_DEPTH=%s) was not refused: exit:named-refusal = %s, want 2:yes (%q)", c.binary, c.depth, c.agentRun, agentRunRefusal)
+		if c.agentRun != "3:yes" {
+			return fmt.Errorf("evolve agent run inside a %s phase pane (EVOLVE_DISPATCH_DEPTH=%s) was not refused: exit:named-refusal = %s, want 3:yes (%q)", c.binary, c.depth, c.agentRun, agentRunRefusal)
 		}
 		return nil
 	}

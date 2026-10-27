@@ -18,14 +18,19 @@ import (
 const (
 	signalCodesBegin = "<!-- GENERATED:signal-codes BEGIN — do not edit by hand; run `evolve signals codes generate` -->"
 	signalCodesEnd   = "<!-- GENERATED:signal-codes END -->"
-	signalsTailUsage = "evolve signals tail [--cycle N | --channel NAME] [--kind K[,K...]] [--code C[,C...]] [--follow] [--json]"
+	signalsTailUsage = "evolve signals tail [--cycle N | --channel NAME] [--kind K[,K...]] [--code C[,C...]] [--follow] [--json] [--project-root P]"
 )
 
 func runSignals(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) >= 1 && args[0] == "tail" {
 		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer stop()
-		return runSignalsTail(ctx, args[1:], tailEnv{ProjectRoot: envOrCwd("EVOLVE_PROJECT_ROOT"), Poll: time.Second}, stdout, stderr)
+		root, rest, ok := takeProjectRoot(args[1:])
+		if !ok {
+			fmt.Fprintln(stderr, "usage: "+signalsTailUsage)
+			return cliExitUsage
+		}
+		return runSignalsTail(ctx, rest, tailEnv{ProjectRoot: root, Poll: time.Second}, stdout, stderr)
 	}
 	if len(args) < 2 || args[0] != "codes" {
 		fmt.Fprintln(stderr, "usage: evolve signals codes <generate|check> | "+signalsTailUsage)

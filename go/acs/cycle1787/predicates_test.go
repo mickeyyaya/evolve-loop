@@ -144,7 +144,7 @@ func TestC1787_001_ClihealthListJSONPrintsOnlyActiveBenches(t *testing.T) {
 		Family       string    `json:"family"`
 		BenchedUntil time.Time `json:"benched_until"`
 	}
-	if err := json.Unmarshal([]byte(out), &entries); err != nil {
+	if err := json.Unmarshal(cliEnvelopeData(t, out), &entries); err != nil {
 		t.Fatalf("stdout is not a JSON array of entries: %v\n%s", err, out)
 	}
 	if len(entries) != 1 || entries[0].Family != "codex" || entries[0].BenchedUntil.IsZero() {
@@ -159,7 +159,7 @@ func TestC1787_002_ClihealthListHumanNamesFamilyAndEmptyStoreExitsZero(t *testin
 		t.Errorf("list must name the family and its reason: exit=%d out=%q stderr=%q", code, out, errOut)
 	}
 	emptyRoot := t.TempDir()
-	if out, errOut, code := evolve(t, "clihealth", "list", "--json", "--project-root", emptyRoot); code != 0 || strings.TrimSpace(out) != "[]" {
+	if out, errOut, code := evolve(t, "clihealth", "list", "--json", "--project-root", emptyRoot); code != 0 || string(cliEnvelopeData(t, out)) != "[]" {
 		t.Errorf("no benches prints [] and exits 0: exit=%d out=%q stderr=%q", code, out, errOut)
 	}
 }
@@ -396,7 +396,7 @@ func TestC1787_019_RawgitratchetRepoGateRunsThroughScan(t *testing.T) {
 func TestC1787_020_ClihealthClearOfAnExpiredBenchExitsOne(t *testing.T) {
 	root := benchStore(t, map[string]time.Duration{"agy": -time.Hour})
 	out, errOut, code := evolve(t, "clihealth", "list", "--json", "--project-root", root)
-	if code != 0 || strings.TrimSpace(out) != "[]" {
+	if code != 0 || string(cliEnvelopeData(t, out)) != "[]" {
 		t.Fatalf("precondition: an expired bench is not listed: exit=%d out=%q stderr=%q", code, out, errOut)
 	}
 	_, errOut, code = evolve(t, "clihealth", "clear", "agy", "--project-root", root)
@@ -417,4 +417,16 @@ func TestC1787_021_CliHealthHyphenatedSpellingServesListAndClear(t *testing.T) {
 	if got := storedFamilies(t, root); got["codex"] || !got["agy"] {
 		t.Errorf("`cli-health clear codex` removes only codex, store has %v", got)
 	}
+}
+
+func cliEnvelopeData(t *testing.T, stdout string) []byte {
+	t.Helper()
+	var e struct {
+		Schema string          `json:"schema"`
+		Data   json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &e); err != nil || e.Schema == "" {
+		t.Fatalf("stdout is not one cli-contract envelope: %v\n%s", err, stdout)
+	}
+	return e.Data
 }

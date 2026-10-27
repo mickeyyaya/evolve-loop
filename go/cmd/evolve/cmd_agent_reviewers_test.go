@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cli/agentcmd"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 var diffReviewerReports = map[string]string{
@@ -19,6 +21,7 @@ var diffReviewerReports = map[string]string{
 	"code-reviewer":         "## Findings\nNone.\n## Verdict\nVerdict: PASS\n",
 	"code-simplifier":       "## Simplifications\nNothing is worth a change.\n",
 	"go-reviewer":           "## Findings\nNone.\n## Verdict\nVerdict: PASS\n",
+	"docs-review":           "## Findings\nNone.\ndocs-review: 0 HIGH, 0 MEDIUM, 0 LOW\n## Verdict\nVerdict: PASS\n",
 }
 
 const agyFirstRouting = `{"cli_routing": {"clis": ["agy", "claude"], "default": ["agy", "claude"]}}` + "\n"
@@ -58,6 +61,14 @@ func diffReviewerProject(t *testing.T, name string) string {
 	return root
 }
 
+func quietSignals(string, io.Writer) (*signalcenter.Center, func()) {
+	return signalcenter.New(), func() {}
+}
+
+func fixedTreeState(sum string) func(context.Context, string) (string, error) {
+	return func(context.Context, string) (string, error) { return sum, nil }
+}
+
 func isClaudeFamilyDriver(cli string) bool {
 	return strings.HasPrefix(cli, "claude") || strings.HasPrefix(cli, "agy-claude")
 }
@@ -71,7 +82,9 @@ func TestAgentRun_EachDiffReviewerRunsOnANonClaudeFamily(t *testing.T) {
 			b := &reviewerBridge{report: report}
 			run := agentcmd.New(agentcmd.Deps{
 				InstallRouter: rootRouterInstaller,
-				Bridge:        func(string) core.Bridge { return b },
+				Bridge:        func(string, *signalcenter.Center) core.Bridge { return b },
+				Signals:       quietSignals,
+				TreeState:     fixedTreeState("tree"),
 				Getenv:        func(string) string { return "" },
 				Now:           func() time.Time { return time.Date(2026, 10, 26, 9, 0, 0, 0, time.UTC) },
 			})

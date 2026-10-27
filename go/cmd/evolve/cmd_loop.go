@@ -50,6 +50,7 @@ type loopConfig struct {
 	Relaunch          bool              `json:"relaunch,omitempty"`
 	LogPath           string            `json:"log_path,omitempty"`
 	DetachArgv        []string          `json:"-"`
+	JSON              bool              `json:"-"`
 	ResumeWaves       int               `json:"-"`
 	HandedOff         bool              `json:"-"`
 	announce          loopAnnouncer

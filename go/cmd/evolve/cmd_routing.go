@@ -50,20 +50,54 @@ func routingCycleRoot(fs *flag.FlagSet, cycle *int, root *string, args []string,
 	return cycleWorkspace(pr, *cycle), 0
 }
 
+type routingDecisionDoc struct {
+	Cycle     int                     `json:"cycle"`
+	Workspace string                  `json:"workspace"`
+	Plan      []router.PhasePlanEntry `json:"plan"`
+	Clamps    []router.Clamp          `json:"clamps"`
+	Span      *core.AdvisorSpan       `json:"span"`
+}
+
 func runRoutingExplain(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("routing explain", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	cycle := fs.Int("cycle", 0, "cycle number to explain (required, >=1)")
 	root := fs.String("project-root", "", "project root (default: cwd or EVOLVE_PROJECT_ROOT)")
+	asJSON := fs.Bool("json", false, "print the decision as JSON")
 	ws, code := routingCycleRoot(fs, cycle, root, args, "explain", stderr)
 	if ws == "" {
 		return code
 	}
+	doc := loadRoutingDecision(*cycle, ws)
+	if *asJSON {
+		return printVerbJSON("routing explain", doc, stdout, stderr)
+	}
 	fmt.Fprintf(stdout, "Routing decision — cycle %d\n  workspace: %s\n\n", *cycle, ws)
-	explainPlan(stdout, ws)
-	explainClamps(stdout, ws)
-	explainSpan(stdout, ws)
+	explainPlan(stdout, doc.Plan)
+	explainClamps(stdout, doc.Clamps)
+	explainSpan(stdout, doc.Span)
 	return 0
+}
+
+func loadRoutingDecision(cycle int, ws string) routingDecisionDoc {
+	doc := routingDecisionDoc{Cycle: cycle, Workspace: ws, Plan: []router.PhasePlanEntry{}, Clamps: []router.Clamp{}}
+	var entries []router.PhasePlanEntry
+	if readJSONArtifact(filepath.Join(ws, "phase-plan.json"), &entries) {
+		doc.Plan = append(doc.Plan, entries...)
+	}
+	files, _ := filepath.Glob(filepath.Join(ws, "routing-decision-*.json"))
+	slices.Sort(files)
+	for _, f := range files {
+		var dec router.RouterDecision
+		if readJSONArtifact(f, &dec) {
+			doc.Clamps = append(doc.Clamps, dec.Clamps...)
+		}
+	}
+	var span core.AdvisorSpan
+	if readJSONArtifact(filepath.Join(ws, "advisor-span-plan.json"), &span) {
+		doc.Span = &span
+	}
+	return doc
 }
 
 func runRoutingReplay(args []string, stdout, stderr io.Writer) int {
@@ -117,9 +151,8 @@ func runSet(entries []router.PhasePlanEntry) []string {
 	return out
 }
 
-func explainPlan(w io.Writer, ws string) {
-	var entries []router.PhasePlanEntry
-	if !readJSONArtifact(filepath.Join(ws, "phase-plan.json"), &entries) || len(entries) == 0 {
+func explainPlan(w io.Writer, entries []router.PhasePlanEntry) {
+	if len(entries) == 0 {
 		fmt.Fprintln(w, "Plan: (no phase plan recorded)")
 		fmt.Fprintln(w)
 		return
@@ -146,16 +179,7 @@ func writePlanEntries(w io.Writer, entries []router.PhasePlanEntry) {
 	}
 }
 
-func explainClamps(w io.Writer, ws string) {
-	files, _ := filepath.Glob(filepath.Join(ws, "routing-decision-*.json"))
-	slices.Sort(files)
-	var clamps []router.Clamp
-	for _, f := range files {
-		var dec router.RouterDecision
-		if readJSONArtifact(f, &dec) {
-			clamps = append(clamps, dec.Clamps...)
-		}
-	}
+func explainClamps(w io.Writer, clamps []router.Clamp) {
 	if len(clamps) == 0 {
 		fmt.Fprintln(w, "Clamps: (none — advisory plan passed the integrity floor unchanged)")
 		fmt.Fprintln(w)
@@ -168,9 +192,8 @@ func explainClamps(w io.Writer, ws string) {
 	fmt.Fprintln(w)
 }
 
-func explainSpan(w io.Writer, ws string) {
-	var span core.AdvisorSpan
-	if !readJSONArtifact(filepath.Join(ws, "advisor-span-plan.json"), &span) {
+func explainSpan(w io.Writer, span *core.AdvisorSpan) {
+	if span == nil {
 		fmt.Fprintln(w, "Span: (no decision span recorded)")
 		return
 	}

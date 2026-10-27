@@ -145,7 +145,7 @@ func TestDocsSteLint_JSONShape(t *testing.T) {
 	code, stdout, stderr := runDocsCLI("ste-lint", "--json", "--project-root", root)
 
 	var got decodedSteReport
-	if err := json.Unmarshal([]byte(stdout), &got); err != nil || code != 0 {
+	if err := json.Unmarshal(oneEnvelope(t, stdout).Data, &got); err != nil || code != 0 {
 		t.Fatalf("code %d, decode %v, stdout %q, stderr %q", code, err, stdout, stderr)
 	}
 	if got.FilesChecked != 3 || got.FilesWithFindings != 1 || got.FindingCount != 2 {
@@ -169,8 +169,9 @@ func TestDocsSteLint_AnEmptyResultIsEmptyJSONLists(t *testing.T) {
 
 	_, stdout, _ := runDocsCLI("ste-lint", "--json", "--project-root", root)
 
-	if !strings.Contains(stdout, `"findings": []`) || !strings.Contains(stdout, `"skipped": []`) || !strings.Contains(stdout, `"by_rule": {}`) {
-		t.Fatalf("stdout %q must carry empty lists, not null", stdout)
+	data := string(oneEnvelope(t, stdout).Data)
+	if !strings.Contains(data, `"findings":[]`) || !strings.Contains(data, `"skipped":[]`) || !strings.Contains(data, `"by_rule":{}`) {
+		t.Fatalf("data %q must carry empty lists, not null", data)
 	}
 }
 

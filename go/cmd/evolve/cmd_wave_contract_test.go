@@ -27,12 +27,12 @@ func TestWaveNext_JSONEnvelopeOnEveryExit(t *testing.T) {
 		launched    bool
 	}{
 		{name: "success", wantRC: 0, launched: true},
-		{name: "live loop", wantRC: exitRefused, wantRefused: "loop_live", wantError: "r-live", prep: func(p wavePlane, _ *waveHarness) {
+		{name: "live loop", wantRC: cliExitRefused, wantRefused: "loop_live", wantError: "r-live", prep: func(p wavePlane, _ *waveHarness) {
 			runDir := filepath.Join(p.evolveDir(), "runs", "cycle-1837")
 			_ = os.MkdirAll(runDir, 0o755)
 			_ = runlease.Write(runDir, runlease.Lease{RunID: "r-live", OwnerPID: os.Getpid()}, waveTestClock)
 		}},
-		{name: "number taken", args: []string{"--number", "1"}, wantRC: exitRefused, wantRefused: "number_taken", wantError: "not more than", prep: func(p wavePlane, _ *waveHarness) {
+		{name: "number taken", args: []string{"--number", "1"}, wantRC: cliExitRefused, wantRefused: "number_taken", wantError: "not more than", prep: func(p wavePlane, _ *waveHarness) {
 			_ = p.store().Save(wave.Record{Number: 4})
 		}},
 		{name: "usage", args: []string{"--max-cycles", "0"}, wantRC: exitUsage, wantError: "usage: --max-cycles"},
@@ -54,7 +54,7 @@ func TestWaveNext_JSONEnvelopeOnEveryExit(t *testing.T) {
 			rc := h.run(append([]string{"next", "--json", "--project-root", p.root}, c.args...)...)
 
 			e := decodeWaveEnvelope(t, h.stdout.Bytes())
-			if rc != c.wantRC || e.Schema != waveNextSchema || e.Refused != c.wantRefused || e.Launched != c.launched || e.Recorded != c.launched ||
+			if rc != c.wantRC || e.Refused != c.wantRefused || e.Launched != c.launched || e.Recorded != c.launched ||
 				!strings.HasPrefix(e.FailedStep, c.wantFailed) || (c.wantFailed == "") != (e.FailedStep == "") ||
 				!strings.Contains(e.Error, c.wantError) || (c.wantError == "") != (e.Error == "") {
 				t.Errorf("rc = %d envelope = %+v; want rc %d refused %q failed_step %q error containing %q launched %t",
@@ -173,19 +173,34 @@ func TestWaveWatch_FollowsANewerWave(t *testing.T) {
 	}
 }
 
-func TestWaveNote_ListJSON(t *testing.T) {
+func TestWaveNote_EachSubVerbPrintsTheActionAndItsNotes(t *testing.T) {
 	t.Parallel()
 	p := newWavePlane(t)
 	h := newWaveHarness()
+	decode := func() waveNoteResult {
+		var r waveNoteResult
+		if err := json.Unmarshal(h.stdout.Bytes(), &r); err != nil {
+			t.Fatalf("decode %q: %v", h.stdout.String(), err)
+		}
+		return r
+	}
 
-	empty := h.run("note", "list", "--json", "--project-root", p.root)
-	emptyOut := strings.TrimSpace(h.stdout.String())
-	h.run("note", "add", "watch PR 814", "--project-root", p.root)
-	h.run("note", "list", "--json", "--project-root", p.root)
+	empty, emptyList := h.run("note", "list", "--json", "--project-root", p.root), decode()
+	added, addResult := h.run("note", "add", "watch PR 814", "--json", "--project-root", p.root), decode()
+	listed, listResult := h.run("note", "list", "--json", "--project-root", p.root), decode()
+	cleared, clearResult := h.run("note", "clear", "--json", "--project-root", p.root), decode()
 
-	var notes []wave.Note
-	if err := json.Unmarshal(h.stdout.Bytes(), &notes); err != nil || empty != 0 || emptyOut != "[]" || len(notes) != 1 || notes[0].Text != "watch PR 814" {
-		t.Errorf("empty %d %q; notes %+v (decode %v); want [] then the one note", empty, emptyOut, notes, err)
+	if empty != 0 || emptyList.Action != "list" || emptyList.Notes == nil || len(emptyList.Notes) != 0 {
+		t.Errorf("empty list rc %d result %+v, want an empty list", empty, emptyList)
+	}
+	for _, c := range []struct {
+		rc     int
+		result waveNoteResult
+		action string
+	}{{added, addResult, "add"}, {listed, listResult, "list"}, {cleared, clearResult, "clear"}} {
+		if c.rc != 0 || c.result.Action != c.action || len(c.result.Notes) != 1 || c.result.Notes[0].Text != "watch PR 814" {
+			t.Errorf("%s: rc %d result %+v, want the one note", c.action, c.rc, c.result)
+		}
 	}
 }
 

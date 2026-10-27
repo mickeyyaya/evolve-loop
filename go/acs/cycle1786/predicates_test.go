@@ -233,8 +233,8 @@ func TestC1786_007_TimeoutMalformedOrWithoutWaitIsRejected(t *testing.T) {
 	} {
 		root := newProject(t)
 		_, _, code := runEvolve(t, bin, root, append(args, "--project-root", root)...)
-		if code != 1 {
-			t.Errorf("%s: exit=%d want 1", name, code)
+		if code != 10 {
+			t.Errorf("%s: exit=%d want the usage exit 10 of cli-contract.md §3", name, code)
 		}
 		if fileExists(brakePath(root)) {
 			t.Errorf("%s: a rejected invocation must not engage the brake", name)
@@ -263,7 +263,7 @@ func statusJSON(t *testing.T, bin, root string, args ...string) map[string]json.
 		t.Fatalf("status --json: exit=%d\n%s%s", code, stdout, stderr)
 	}
 	var doc map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(stdout), &doc); err != nil {
+	if err := json.Unmarshal(cliEnvelopeData(t, stdout), &doc); err != nil {
 		t.Fatalf("status --json is not one JSON object: %v\n%s", err, stdout)
 	}
 	return doc
@@ -673,7 +673,7 @@ func (fx ghFixture) statusJSON(t *testing.T, bin string) map[string]json.RawMess
 		t.Fatalf("status --json: exit=%d\n%s%s\ngh calls:\n%s", code, stdout, stderr, fx.calls())
 	}
 	var doc map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(stdout), &doc); err != nil {
+	if err := json.Unmarshal(cliEnvelopeData(t, stdout), &doc); err != nil {
 		t.Fatalf("status --json is not one JSON object: %v\n%s", err, stdout)
 	}
 	return doc
@@ -1357,4 +1357,16 @@ func fakeGHPRChecks(c ghCall) (string, error) {
 			"startedAt": fakeGHStamp, "completedAt": fakeGHStamp})
 	}
 	return renderFakeGH(c, out)
+}
+
+func cliEnvelopeData(t *testing.T, stdout string) []byte {
+	t.Helper()
+	var e struct {
+		Schema string          `json:"schema"`
+		Data   json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &e); err != nil || e.Schema == "" {
+		t.Fatalf("stdout is not one cli-contract envelope: %v\n%s", err, stdout)
+	}
+	return e.Data
 }

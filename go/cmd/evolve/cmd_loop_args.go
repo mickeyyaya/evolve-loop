@@ -14,6 +14,7 @@ import (
 )
 
 type loopArgFlags struct {
+	json              bool
 	projectRoot       string
 	evolveDir         string
 	goalHash          string
@@ -66,6 +67,7 @@ func registerLoopArgFlags(fs *flag.FlagSet) *loopArgFlags {
 	fs.BoolVar(&lf.relaunch, "relaunch", false, "the launch continues an earlier goal: skip the check of the inbox items that the goal names")
 	fs.StringVar(&lf.logPath, "log", "", "with --detach: the file the detached loop's stdout and stderr are appended to (required with --detach)")
 	fs.BoolVar(&lf.bypassPolicy, "bypass-policy", false, "use --bypass-policy to bypass policy.json pin enforcement for every phase in this batch (operator escape hatch)")
+	fs.BoolVar(&lf.json, "json", false, "with --detach: print the launch as JSON and no text; the foreground loop prints its JSON result anyway")
 	return lf
 }
 
@@ -196,7 +198,7 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 	}
 
 	cfg := buildLoopConfig(lf, resolvedGoalHash, resolvedGoalText, resolvedStrategy, resolvedCycles, posCycles, perAgentCLI, perAgentModel)
-	cfg.GoalSource = goalSourceName(lf, posGoal)
+	cfg.GoalSource, cfg.JSON = goalSourceName(lf, posGoal), lf.json
 	return withDetachLaunch(cfg, lf, args, len(args)-len(fs.Args()), stderr)
 }
 
@@ -261,7 +263,7 @@ func detachChildArgs(args []string, flagEnd int) []string {
 			continue
 		}
 		switch name, hasValue := flagTokenName(args[i]); name {
-		case "detach":
+		case "detach", "json":
 		case "log":
 			if !hasValue {
 				i++

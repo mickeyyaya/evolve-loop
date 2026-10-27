@@ -11,6 +11,7 @@ import (
 	"strconv"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 )
 
 func runLedger(args []string, _ io.Reader, stdout, stderr io.Writer) int {
@@ -20,7 +21,7 @@ func runLedger(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 	switch args[0] {
 	case "verify":
-		return runLedgerVerify(args[1:], stderr)
+		return runLedgerVerify(args[1:], stdout, stderr)
 	case "seal":
 		return runLedgerSeal(args[1:], stderr)
 	case "tail":
@@ -37,15 +38,35 @@ func runLedger(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
-func runLedgerVerify(args []string, stderr io.Writer) int {
+type ledgerVerifyResult struct {
+	Ledger            string `json:"ledger"`
+	Deep              bool   `json:"deep"`
+	Scope             string `json:"scope"`
+	AnchorSeq         int    `json:"anchor_seq,omitempty"`
+	AnchorLineSHA     string `json:"anchor_line_sha,omitempty"`
+	FromSealedSegment bool   `json:"from_sealed_segment"`
+	VerifiedFrom      string `json:"verified_from"`
+}
+
+func runLedgerVerify(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve ledger verify", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	var evolveDir string
-	var deep bool
-	fs.StringVar(&evolveDir, "evolve-dir", ".evolve", "path to .evolve/ state directory")
+	var evolveDir, projectRoot string
+	var deep, asJSON bool
+	fs.StringVar(&evolveDir, "evolve-dir", "", "path to .evolve/ state directory (default: <project root>/.evolve)")
+	fs.StringVar(&projectRoot, "project-root", "", "project root (default: $EVOLVE_PROJECT_ROOT or cwd)")
 	fs.BoolVar(&deep, "deep", false, "reconstruct sealed segments + live tail and verify end-to-end")
+	fs.BoolVar(&asJSON, "json", false, "print the result as JSON")
 	if err := fs.Parse(args); err != nil {
-		return 10
+		return cliExitUsage
+	}
+	if evolveDir == "" {
+		root, err := loopStopRoot(projectRoot, stderr)
+		if err != nil {
+			fmt.Fprintf(stderr, "[ledger] cwd: %v\n", err)
+			return cliExitIO
+		}
+		evolveDir = paths.EvolveDirOf(root)
 	}
 	l := ledger.New(evolveDir)
 	verify, scope := l.VerifyScope, "chain intact"
@@ -55,9 +76,14 @@ func runLedgerVerify(args []string, stderr io.Writer) int {
 	verified, err := verify(context.Background())
 	if err != nil {
 		fmt.Fprintf(stderr, "[ledger] BROKEN: %v\n", err)
-		return 2
+		return cliExitIO
 	}
-	fmt.Fprintf(stderr, "[ledger] OK: %s (%s/ledger.jsonl) — %s\n", scope, evolveDir, verifiedFrom(verified))
+	result := ledgerVerifyResult{Ledger: filepath.Join(evolveDir, "ledger.jsonl"), Deep: deep, Scope: scope,
+		AnchorSeq: verified.AnchorSeq, AnchorLineSHA: verified.AnchorLineSHA, FromSealedSegment: verified.FromSealedSegment, VerifiedFrom: verifiedFrom(verified)}
+	if asJSON {
+		return printVerbJSON("ledger verify", result, stdout, stderr)
+	}
+	fmt.Fprintf(stderr, "[ledger] OK: %s (%s/ledger.jsonl) — %s\n", scope, evolveDir, result.VerifiedFrom)
 	return 0
 }
 

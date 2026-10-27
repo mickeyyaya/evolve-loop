@@ -1,0 +1,34 @@
+{
+  "acceptance": [
+    "Red test first: with the four failure blocks of cycle 2035 and the fixability stage at enforce, the cycle stops after audit round 1 with the outcome handed-off and runs no repair round.",
+    "At shadow each component records its signal (REPAIR_HANDOFF, CYCLE_SPEND_LIMIT, CYCLE_SUPERSEDED, LADDER_AUDIT_FIX with audit_fix_handler registered) and the flow of today runs.",
+    "A cycle sealed handed-off or superseded writes the salvage pointer of its worktree, and the failure drain does not charge the item as a lane capability failure.",
+    "evolve wave status shows each handed-off and superseded cycle with its reason."
+  ],
+  "created_at": "2026-10-26T23:24:23Z",
+  "deps": [
+    "repair-fixability-handoff",
+    "cycle-spend-limit-stop-and-handoff",
+    "cycle-stops-when-console-takes-its-item",
+    "audit-fix-rung-handler"
+  ],
+  "files": [
+    "go/internal/core/audit_fail_decision.go",
+    "go/internal/core/build_explanation_handoff.go",
+    "go/internal/core/orchestrator.go",
+    "go/internal/core/cyclerun.go",
+    "go/internal/phases/audit/audit.go"
+  ],
+  "fix": "Call fixability before each repair round (computeRetryEnvelope callers) and seal a stop as handed-off with the salvage pointer. Ask cyclespend and supersede at each phase boundary and seal superseded or handed-off. Register the audit_fix handler with core.WithRungHandler(retryladder.RungAuditFix, h) at the composition root. Each call obeys its own stage key.",
+  "id": "wire-cost-aware-repair-call-sites",
+  "injected_by": "console-operator-session",
+  "kind": "feature",
+  "notes": "Route console-manual: build_explanation_handoff.go, orchestrator.go, cyclerun.go and phases/audit/audit.go are on the fence (integrity_surface.go:87, :99, :100, :140). Wire each lane package as soon as it lands; the deps list all four only for the last step.",
+  "priority": "P1",
+  "priority_class": "performance",
+  "route": "console-manual",
+  "source": "console, 2026-10-27, operator request on cycle 2035 (\"balance to cost and output\"). ADR-0158; plan docs/plans/cost-aware-repair-2026-10.md",
+  "summary": "The lane items repair-fixability-handoff, cycle-spend-limit-stop-and-handoff, cycle-stops-when-console-takes-its-item and audit-fix-rung-handler build pure packages. Their call sites are on the fence: the retry envelope callers and the phase loop in internal/core, the cycle seal, the composition root of the orchestrator and the audit session.",
+  "title": "Wire the fixability stop, the spend limit, the supersede check and the audit_fix handler into the cycle (ADR-0158)",
+  "weight": 0.78
+}

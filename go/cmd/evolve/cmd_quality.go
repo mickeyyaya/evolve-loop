@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	qualityUsage      = "usage: evolve quality report --scope wave|tree|judges|replay --project-root P | evolve quality compare --index PQ1|PQ4 --a WINDOW --b WINDOW [--paired] --project-root P (WINDOW: wave:N or waves:A-B)"
+	qualityUsage      = "usage: evolve quality report --scope wave|tree|judges|replay [--json] --project-root P | evolve quality compare --index PQ1|PQ4 --a WINDOW --b WINDOW [--paired] [--json] --project-root P (WINDOW: wave:N or waves:A-B)"
 	qualityPolicyPath = ".evolve/" + paths.PolicyFile
 )
 
@@ -104,40 +104,57 @@ func runQualityWith(env qualityEnv, args []string, stdout, stderr io.Writer) int
 	if len(args) > 0 && args[0] == "compare" {
 		return runQualityCompare(env, args[1:], stdout, stderr)
 	}
-	scope, root, err := parseQualityArgs(args, env.scopes)
+	a, err := parseQualityArgs(args, env.scopes)
 	if err != nil {
 		fmt.Fprintf(stderr, "quality: %v\n%s\n", err, qualityUsage)
 		return exitUsage
 	}
-	readers := env.scopes[scope]
+	human := humanWriter(stdout, a.json)
+	readers := env.scopes[a.scope]
 	if len(readers) == 0 {
-		fmt.Fprintf(stdout, "quality report: scope %s has no index readers yet (ADR-0153 components Q2 to Q10 add them)\n", scope)
+		fmt.Fprintf(human, "quality report: scope %s has no index readers yet (ADR-0153 components Q2 to Q10 add them)\n", a.scope)
 	}
-	center, closeCenter := env.newCenter(root, paths.EvolveDirOf(root), stderr)
+	center, closeCenter := env.newCenter(a.root, paths.EvolveDirOf(a.root), stderr)
 	defer closeCenter()
-	t := collectQuality(center, root, readers)
-	fmt.Fprintf(stdout, "quality report: scope %s: %d reading(s), %d breach(es), %d warning(s)\n", scope, t.readings, t.breaches, t.warnings)
+	t := collectQuality(center, a.root, readers)
+	if a.json {
+		return printVerbJSON("quality report", qualityReportResult{Scope: a.scope, Readings: t.readings, Breaches: t.breaches, Warnings: t.warnings}, stdout, stderr)
+	}
+	fmt.Fprintf(stdout, "quality report: scope %s: %d reading(s), %d breach(es), %d warning(s)\n", a.scope, t.readings, t.breaches, t.warnings)
 	return 0
 }
 
-func parseQualityArgs(args []string, scopes map[string][]qualityReader) (string, string, error) {
+type qualityReportArgs struct {
+	scope, root string
+	json        bool
+}
+
+type qualityReportResult struct {
+	Scope    string `json:"scope"`
+	Readings int    `json:"readings"`
+	Breaches int    `json:"breaches"`
+	Warnings int    `json:"warnings"`
+}
+
+func parseQualityArgs(args []string, scopes map[string][]qualityReader) (qualityReportArgs, error) {
+	var a qualityReportArgs
 	if len(args) == 0 || args[0] != "report" {
-		return "", "", errors.New("want the report verb")
+		return a, errors.New("want the report verb")
 	}
-	var scope, root string
-	operands, err := (cliFlags{values: map[string]*string{"--scope": &scope, "--project-root": &root}}).parse(args[1:])
+	operands, err := (cliFlags{values: map[string]*string{"--scope": &a.scope, "--project-root": &a.root}, bools: map[string]*bool{"--json": &a.json}}).parse(args[1:])
 	switch {
 	case err != nil:
-		return "", "", err
+		return a, err
 	case len(operands) > 0:
-		return "", "", fmt.Errorf("unexpected argument %q", operands[0])
-	case root == "":
-		return "", "", errors.New("--project-root is required")
+		return a, fmt.Errorf("unexpected argument %q", operands[0])
+	case a.root == "":
+		return a, errors.New("--project-root is required")
 	}
-	if _, ok := scopes[scope]; !ok {
-		return "", "", fmt.Errorf("scope %q is not wave, tree, judges or replay", scope)
+	if _, ok := scopes[a.scope]; !ok {
+		return a, fmt.Errorf("scope %q is not wave, tree, judges or replay", a.scope)
 	}
-	return scope, paths.AbsoluteRoot("--project-root", root, nil), nil
+	a.root = paths.AbsoluteRoot("--project-root", a.root, nil)
+	return a, nil
 }
 
 type qualityTally struct {

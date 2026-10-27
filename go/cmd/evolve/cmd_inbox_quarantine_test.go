@@ -32,7 +32,7 @@ func runQuarantineCLI(t *testing.T, root string, args ...string) (int, string, s
 	t.Helper()
 	t.Setenv("EVOLVE_PROJECT_ROOT", root)
 	var out, errb bytes.Buffer
-	code := runInboxQuarantine(args, nil, &out, &errb)
+	code := runInboxQuarantine(envOrCwd("EVOLVE_PROJECT_ROOT"), args, nil, &out, &errb)
 	return code, out.String(), errb.String()
 }
 

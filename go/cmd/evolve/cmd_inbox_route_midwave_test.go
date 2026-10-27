@@ -35,8 +35,8 @@ func TestCmd_InboxRouteVerbs_RefuseWhileALoopLaneIsLiveAndLeaveTheItemByteIdenti
 		}
 		var stdout, stderr bytes.Buffer
 		rc := runInbox(args, nil, &stdout, &stderr)
-		if rc != 1 || !strings.Contains(stderr.String(), "a loop lane is live") || !strings.Contains(stderr.String(), "cycle-1790") || !strings.Contains(stderr.String(), args[0]) {
-			t.Errorf("%v: rc = %d stderr = %q, want 1 naming the verb and the live lane", args, rc, stderr.String())
+		if rc != cliExitRefused || !strings.Contains(stderr.String(), "a loop lane is live") || !strings.Contains(stderr.String(), "cycle-1790") || !strings.Contains(stderr.String(), args[0]) {
+			t.Errorf("%v: rc = %d stderr = %q, want 3 naming the verb and the live lane", args, rc, stderr.String())
 		}
 		after, err := os.ReadFile(path)
 		if err != nil || !bytes.Equal(before, after) {

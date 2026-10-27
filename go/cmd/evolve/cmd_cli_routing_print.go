@@ -113,11 +113,22 @@ func runCLIRoutingExplain(args []string, stdout, stderr io.Writer) int {
 		phase = agentPhase(agent, view.catalog)
 	}
 	route := view.route(agent, phase)
-	printExplanation(stdout, routingMode(view.router), route)
+	if !f.json {
+		printExplanation(stdout, routingMode(view.router), route)
+	} else if rc := printVerbJSON("cli-routing explain", routingExplanation{Mode: routingMode(view.router), Route: route}, stdout, stderr); rc != cliExitOK {
+		return rc
+	} else if route.Error != "" {
+		fmt.Fprintf(stderr, "evolve cli-routing explain: refused: %s\n", route.Error)
+	}
 	if route.Error != "" {
 		return exitRoutingFinding
 	}
 	return 0
+}
+
+type routingExplanation struct {
+	Mode  string     `json:"mode"`
+	Route agentRoute `json:"route"`
 }
 
 func printExplanation(w io.Writer, mode string, a agentRoute) {

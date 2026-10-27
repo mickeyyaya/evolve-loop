@@ -8,12 +8,12 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 )
 
-func runInboxClaims(args []string, stdout, stderr io.Writer) int {
-	root, args, rootOK := takeProjectRoot(args)
+func runInboxClaims(root string, args []string, stdout, stderr io.Writer) int {
 	flags, operands, ok := splitInboxFlags(args, "--json")
-	if !ok || !rootOK || len(operands) != 0 {
+	if !ok || len(operands) != 0 {
 		fmt.Fprintln(stderr, inboxUsage("claims"))
 		return 10
 	}
@@ -54,12 +54,11 @@ type inboxReleaseArgs struct {
 	asJSON   bool
 }
 
-func parseInboxRelease(args []string) (inboxReleaseArgs, bool) {
-	root, args, rootOK := takeProjectRoot(args)
+func parseInboxRelease(root string, args []string) (inboxReleaseArgs, bool) {
 	keep, args, hasKeep, keepOK := takeFlagValue(args, "--keep")
 	flags, operands, ok := splitInboxFlags(args, "--json", "--stale")
 	a := inboxReleaseArgs{root: root, operands: operands, keep: inboxmover.KeepCopy(keep), hasKeep: hasKeep, stale: flags["--stale"], asJSON: flags["--json"]}
-	ok = ok && rootOK && keepOK && (!hasKeep || a.keep.Valid())
+	ok = ok && keepOK && (!hasKeep || a.keep.Valid())
 	if a.stale {
 		ok = ok && !hasKeep && len(operands) == 1
 	} else {
@@ -68,8 +67,8 @@ func parseInboxRelease(args []string) (inboxReleaseArgs, bool) {
 	return a, ok && strings.TrimSpace(operands[len(operands)-1]) != ""
 }
 
-func runInboxRelease(args []string, stdout, stderr io.Writer) int {
-	a, ok := parseInboxRelease(args)
+func runInboxRelease(root string, args []string, stdout, stderr io.Writer) int {
+	a, ok := parseInboxRelease(root, args)
 	if !ok {
 		fmt.Fprintln(stderr, inboxUsage("release"))
 		return 10
@@ -141,7 +140,7 @@ func takeProjectRoot(args []string) (string, []string, bool) {
 	if !found {
 		return envOrCwd("EVOLVE_PROJECT_ROOT"), args, true
 	}
-	return root, rest, ok
+	return paths.AbsoluteRoot("--project-root", root, nil), rest, ok
 }
 
 func takeFlagValue(args []string, name string) (string, []string, bool, bool) {

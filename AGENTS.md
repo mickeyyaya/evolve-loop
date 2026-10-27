@@ -50,7 +50,7 @@ The full rule set is in [guidance/index.md](guidance/index.md). Run `evolve guid
 
 - **Status reports** give the cycles that ran, the ships (for example 2/2) and the open PR numbers. They also give the failed CI jobs with their class, and the next action.
 - **Bypass mode** means "do not ask the user". It does not mean "skip integrity checks". Run the full pipeline every cycle, and follow the failure-adapter verdicts verbatim.
-- **Pre-commit review fleet:** code-simplifier, then architecture-reviewer and code-reviewer in parallel, then fix the findings, then commit. `evolve agent run <name>` runs each reviewer on any family. Fix each CRITICAL finding of architecture-reviewer before the commit. A diff of only `.md` files gets the `docs-review` skill and `--reviewers docs-review`; the code reviewers do not satisfy the gate. Only a proven comment removal needs no reviewer.
+- **Pre-commit review fleet:** code-simplifier, then architecture-reviewer and code-reviewer in parallel, then fix the findings, then commit. `evolve agent run <name>` runs each reviewer on any family. The console runs each review and each build through `evolve agent run`, and attests a review run with `--reviewers run:<run label>`. Fix each CRITICAL finding of architecture-reviewer before the commit. A diff of only `.md` files gets the `docs-review` skill and `--reviewers docs-review`; the code reviewers do not satisfy the gate. Only a proven comment removal needs no reviewer.
 - **Verify before you claim done.** Probe a CLI with `evolve doctor probe <tool>` before you call it unavailable. Read the real exports of a module before you call it. Report test counts: `N/N PASS, no regression`.
 - **CI failures:** classify each red with `evolve ci classify` before a retry. When a gate reports RED, verify the logic of the gate before you assume that the code is broken.
 - **Go:** run `gofmt -l .`, `go vet` and `go test -count=1` from `go/`. `-count=1` is required, because the test cache does not see the files that tests read through `..`.
@@ -304,6 +304,10 @@ Do not report "running" or "in progress" as a status without these numbers.
   - architecture-reviewer ([agents/evolve-diff-architecture-reviewer.md](agents/evolve-diff-architecture-reviewer.md)) blocks the commit: you must fix each CRITICAL finding (by the rubric of the profile) before the commit.
   - A pure-docs diff (every changed path ends in `.md`) gets a docs review, not a code review. Run the `docs-review` skill and pass `--reviewers docs-review`. The commit gate requires that capability, and the code reviewers do not satisfy it.
   - Only a proven comment removal needs no reviewer.
+  - **The console seats** (X11, [agent-run.md](docs/architecture/agent-run.md) §8). The console runs each build and each review through `evolve agent run` and the bridge. Routing data picks the family of each seat, and the Claude floor keeps `code-reviewer` and `adversarial-review` on Claude:
+    - A review: `evolve agent run <reviewer> --json --project-root <dev worktree>`, with the staged diff on stdin. The reviewers are the four above and `docs-review`. The audit of a diff is `adversarial-review`; no profile is named `auditor`.
+    - A build: `evolve agent run console-builder --worktree <dev worktree> --writable <path>...`, with the item and the brief as the input. The cell changes only the `--writable` files, and the console commits.
+    - Each run writes `.evolve/agent-runs/<run label>.json`. Pass `--reviewers run:<run label>` for each review run. The gate accepts only a review with a report, the verdict `PASS` or `WARN`, and the staged tree.
 
 ### Autonomous execution (bypass mode)
 

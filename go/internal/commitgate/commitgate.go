@@ -23,6 +23,8 @@ const (
 	ExitBadArgs     = 10
 )
 
+const AttestDirName = ".commit-gate"
+
 type Runner = sysexec.RunFunc
 
 type Options struct {
@@ -49,6 +51,7 @@ type Result struct {
 	Attestation  *Attestation
 	ChecksPassed []string
 	Langs        []string
+	reviewRuns   []ReviewRun
 }
 
 func (r *Result) log(format string, a ...any) {
@@ -62,16 +65,19 @@ func (o Options) Run(ctx context.Context) *Result {
 	}
 
 	files, code := o.changedFiles(ctx, res)
-	if code != ExitPass {
-		res.ExitCode = code
-		return res
+	if code == ExitPass {
+		code = o.refuseWhatNeverCommits(ctx, files, res)
 	}
-	if code := o.refuseWhatNeverCommits(ctx, files, res); code != ExitPass {
+	if code != ExitPass {
 		res.ExitCode = code
 		return res
 	}
 	langs := detectLangs(files)
 	res.Langs = langs
+	if o, code = o.resolveReviewRuns(ctx, res); code != ExitPass {
+		res.ExitCode = code
+		return res
+	}
 
 	waiver, code := o.reviewDecision(ctx, langs, res)
 	if code != ExitPass {
@@ -79,6 +85,21 @@ func (o Options) Run(ctx context.Context) *Result {
 		return res
 	}
 
+	if code := o.runLanes(ctx, files, langs, res); code != ExitPass {
+		res.ExitCode = code
+		return res
+	}
+
+	att, code := o.writeAttestation(ctx, waiver, res)
+	if code != ExitPass {
+		res.ExitCode = code
+		return res
+	}
+	res.Attestation = att
+	return res
+}
+
+func (o Options) runLanes(ctx context.Context, files, langs []string, res *Result) int {
 	for _, lang := range langs {
 		var laneCode int
 		switch lang {
@@ -92,18 +113,10 @@ func (o Options) Run(ctx context.Context) *Result {
 			laneCode = o.laneRust(ctx, files, res)
 		}
 		if laneCode != ExitPass {
-			res.ExitCode = laneCode
-			return res
+			return laneCode
 		}
 	}
-
-	att, code := o.writeAttestation(ctx, waiver, res)
-	if code != ExitPass {
-		res.ExitCode = code
-		return res
-	}
-	res.Attestation = att
-	return res
+	return ExitPass
 }
 
 func (o Options) reviewDecision(ctx context.Context, langs []string, res *Result) (waiver string, code int) {
@@ -191,7 +204,7 @@ func filesWithExt(files []string, ext string) []string {
 func (o Options) attestPath() string {
 	dir := o.AttestDir
 	if dir == "" {
-		dir = filepath.Join(o.RepoRoot, ".commit-gate")
+		dir = filepath.Join(o.RepoRoot, AttestDirName)
 	}
 	return filepath.Join(dir, "attestation.json")
 }
@@ -243,6 +256,7 @@ func (o Options) writeAttestation(ctx context.Context, waiver string, res *Resul
 		ChecksPassed: res.ChecksPassed,
 		ReviewersRun: splitReviewers(o.Reviewers),
 		ReviewWaiver: waiver,
+		ReviewRuns:   res.reviewRuns,
 		Tool:         tool,
 	}
 	body, err := att.Marshal()

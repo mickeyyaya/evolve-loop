@@ -188,7 +188,7 @@ func TestCLIRoutingWrite_IsRefusedInsideAPhaseAndWhileACycleRuns(t *testing.T) {
 	root := routingWriteProject(t, `{"cli_routing": {"clis": ["agy", "claude"], "default": ["agy", "claude"]}}`)
 	_, before := readRoutingPolicy(t, root)
 	t.Setenv("EVOLVE_DISPATCH_DEPTH", "1")
-	if rc, _, stderr := runRoutingVerb(t, inRoot(root, "set", "default", "claude")...); rc != exitRoutingFinding || !strings.Contains(stderr, "inside a phase") {
+	if rc, _, stderr := runRoutingVerb(t, inRoot(root, "set", "default", "claude")...); rc != cliExitRefused || !strings.Contains(stderr, "inside a phase") {
 		t.Fatalf("rc=%d stderr=%q: a phase agent cannot rewrite its own routing", rc, stderr)
 	}
 	t.Setenv("EVOLVE_DISPATCH_DEPTH", "")
@@ -199,7 +199,7 @@ func TestCLIRoutingWrite_IsRefusedInsideAPhaseAndWhileACycleRuns(t *testing.T) {
 	if err := runlease.Write(runDir, runlease.Lease{OwnerPID: os.Getpid()}, time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	if rc, _, stderr := runRoutingVerb(t, inRoot(root, "set", "default", "claude")...); rc != exitRoutingFinding || !strings.Contains(stderr, "cycle-7") {
+	if rc, _, stderr := runRoutingVerb(t, inRoot(root, "set", "default", "claude")...); rc != cliExitRefused || !strings.Contains(stderr, "cycle-7") {
 		t.Fatalf("rc=%d stderr=%q: the table never changes under a running cycle", rc, stderr)
 	}
 	if _, after := readRoutingPolicy(t, root); !bytes.Equal(before, after) {

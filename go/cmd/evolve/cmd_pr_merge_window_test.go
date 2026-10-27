@@ -48,7 +48,7 @@ func TestPRMerge_WithALiveLoopAndTheWindowOnADocsPRMergesAndAGoPRIsRefused(t *te
 
 	code := m.mergeAll(context.Background(), []string{"12", "13"})
 
-	if code != exitRefused || stdout.String() != "merged #12 "+mergeSHA+"\n" {
+	if code != cliExitRefused || stdout.String() != "merged #12 "+mergeSHA+"\n" {
 		t.Fatalf("exit %d stdout %q stderr %q; want #12 merged and #13 refused", code, stdout.String(), stderr.String())
 	}
 	want := "evolve pr merge: #13 refused: a loop is running: run cycle-9 (/r/cycle-9) is live; #13 waits for a boundary: 2 paths need a boundary: docs/plans/a.md, go/x.go\n"
@@ -73,7 +73,7 @@ func TestPRMerge_BelowTheOpenWindowALiveLoopRefusesEveryPRAsToday(t *testing.T) 
 			m, stdout, stderr := windowMerger(t, policyJSON, gh, alwaysLive)
 			code := m.mergeAll(context.Background(), []string{"12", "13"})
 			want := "evolve pr merge: refused: a loop is running: run cycle-9 (/r/cycle-9) is live\nevolve pr merge: not attempted: #12 #13\n"
-			if code != exitRefused || stdout.Len() != 0 || stderr.String() != want || len(gh.calls) != 0 {
+			if code != cliExitRefused || stdout.Len() != 0 || stderr.String() != want || len(gh.calls) != 0 {
 				t.Errorf("exit %d stdout %q stderr %q calls %v; want today's refusal of every PR and no gh call", code, stdout.String(), stderr.String(), gh.calls)
 			}
 		})
@@ -118,7 +118,7 @@ func TestPRMerge_ALoopThatStartsDuringTheWaitRefusesABoundaryPRAtTheMerge(t *tes
 	}
 	gh := windowGH()
 	m, _, stderr := windowMerger(t, windowOn, gh, live)
-	if code := m.mergeAll(context.Background(), []string{"13"}); code != exitRefused || !strings.Contains(stderr.String(), "#13 waits for a boundary") {
+	if code := m.mergeAll(context.Background(), []string{"13"}); code != cliExitRefused || !strings.Contains(stderr.String(), "#13 waits for a boundary") {
 		t.Errorf("exit %d stderr %q, want the boundary refusal at the merge", code, stderr.String())
 	}
 	if strings.Contains(strings.Join(gh.calls, "\n"), "pr merge 13") {

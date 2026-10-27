@@ -68,7 +68,7 @@ func TestWireOrchestratorDeps_OneRouterReachesEveryLaunchPath(t *testing.T) {
 	}
 }
 
-func TestRunCycleRun_ARefusedRoutingTableExitsTwo(t *testing.T) {
+func TestRunCycleRun_ARefusedRoutingTableExitsThree(t *testing.T) {
 	old := wireOrchestratorDepsFn
 	t.Cleanup(func() { wireOrchestratorDepsFn = old })
 	wireOrchestratorDepsFn = func(string, string, io.Writer, routingRun) orchDeps {
@@ -81,7 +81,7 @@ func TestRunCycleRun_ARefusedRoutingTableExitsTwo(t *testing.T) {
 	}
 }
 
-func TestRunLoop_ARefusedRoutingTableExitsTwo(t *testing.T) {
+func TestRunLoop_ARefusedRoutingTableExitsThree(t *testing.T) {
 	old := wireOrchestratorDepsFn
 	t.Cleanup(func() { wireOrchestratorDepsFn = old })
 	wireOrchestratorDepsFn = func(string, string, io.Writer, routingRun) orchDeps {

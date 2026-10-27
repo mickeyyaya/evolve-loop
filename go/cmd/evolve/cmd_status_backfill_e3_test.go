@@ -185,8 +185,8 @@ func TestRunStatus_RefusesBadInvocations(t *testing.T) {
 		wantCode int
 		want     string
 	}{
-		{"unknown flag", []string{"--nope"}, func(*testing.T) string { return "" }, 1, "flag provided but not defined"},
-		{"positional", []string{"extra"}, func(*testing.T) string { return "" }, 1, `evolve status: unexpected argument "extra"`},
+		{"unknown flag", []string{"--nope"}, func(*testing.T) string { return "" }, cliExitUsage, "flag provided but not defined"},
+		{"positional", []string{"extra"}, func(*testing.T) string { return "" }, cliExitUsage, `evolve status: unexpected argument "extra"`},
 		{"no .evolve", nil, func(t *testing.T) string { return t.TempDir() }, 2, "evolve status: cannot read the snapshot: "},
 	}
 	for _, tc := range cases {

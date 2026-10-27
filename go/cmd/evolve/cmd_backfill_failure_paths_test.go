@@ -234,7 +234,7 @@ func TestRunInboxQuarantineList_FailurePaths(t *testing.T) {
 		t.Setenv("EVOLVE_PROJECT_ROOT", root)
 		var stdout, stderr bytes.Buffer
 
-		code := runInboxQuarantine([]string{"list"}, nil, &stdout, &stderr)
+		code := runInboxQuarantine(envOrCwd("EVOLVE_PROJECT_ROOT"), []string{"list"}, nil, &stdout, &stderr)
 
 		if code != 1 || !strings.HasPrefix(stderr.String(), "inbox quarantine list: ") || stdout.Len() != 0 {
 			t.Errorf("code=%d stdout=%q stderr=%q, want 1 and a scan error", code, stdout.String(), stderr.String())
@@ -252,7 +252,7 @@ func TestRunInboxQuarantineList_FailurePaths(t *testing.T) {
 		t.Setenv("EVOLVE_PROJECT_ROOT", root)
 		var stderr bytes.Buffer
 
-		code := runInboxQuarantine([]string{"list", "--json"}, nil, &failingWriter{}, &stderr)
+		code := runInboxQuarantine(envOrCwd("EVOLVE_PROJECT_ROOT"), []string{"list", "--json"}, nil, &failingWriter{}, &stderr)
 
 		if code != 1 || !strings.Contains(stderr.String(), "inbox quarantine list: encode: broken pipe") {
 			t.Errorf("code=%d stderr=%q, want 1 and the encode failure", code, stderr.String())
