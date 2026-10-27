@@ -39,6 +39,7 @@ type Cycle struct {
 	Spend        cyclespend.Spend `json:"spend"`
 	HandoffWould int              `json:"handoff_would_stops,omitempty"`
 	HandoffStop  string           `json:"handoff_stop,omitempty"`
+	SpendLimit   string           `json:"spend_limit,omitempty"`
 	StartedAt    time.Time        `json:"-"`
 	EndedAt      time.Time        `json:"-"`
 }
@@ -184,7 +185,7 @@ func applySignals(c *Cycle, path string) []string {
 		case signalcenter.KindShipError:
 			c.Conflict = c.Conflict || shiperr.IsLandingConflict(e.Code)
 		}
-		applyHandoff(c, e)
+		applyStopSignals(c, e)
 	}
 	if chunk.Skipped > 0 {
 		return []string{fmt.Sprintf("cycle-%d: skipped %d malformed signal line(s) in %s", c.ID, chunk.Skipped, path)}
@@ -192,7 +193,10 @@ func applySignals(c *Cycle, path string) []string {
 	return nil
 }
 
-func applyHandoff(c *Cycle, e signalcenter.Event) {
+func applyStopSignals(c *Cycle, e signalcenter.Event) {
+	if e.Code == cyclespend.SignalCode {
+		c.SpendLimit = e.Fields[cyclespend.FieldDecision]
+	}
 	if e.Code != core.CodeRepairHandoff {
 		return
 	}

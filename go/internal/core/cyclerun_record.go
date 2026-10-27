@@ -141,5 +141,6 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 		cr.scheduledNext = branch
 	}
 
+	cr.checkCycleSpend()
 	return loopNext, nil
 }
