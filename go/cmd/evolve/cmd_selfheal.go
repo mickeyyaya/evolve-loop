@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
-	"reflect"
 	"slices"
 	"time"
 
@@ -17,6 +16,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/selfheal"
+	"github.com/mickeyyaya/evolve-loop/go/internal/shipjournal"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wave"
 )
@@ -27,7 +27,6 @@ const (
 	selfhealCIFields = "databaseId,headBranch,status,conclusion,attempt,createdAt,updatedAt"
 	selfhealCILimit  = "200"
 	selfhealGHWait   = 60 * time.Second
-	shipJournalFile  = "ship-journal.jsonl"
 )
 
 const (
@@ -40,10 +39,11 @@ var selfhealSchemas = map[string]string{selfhealVerbIncidents: "evolve.selfheal.
 var selfhealChannels = []string{"errors", "loop"}
 
 type selfhealEnv struct {
-	agent     func(args []string, stdin io.Reader, stdout, stderr io.Writer) int
+	agent     agentSeat
 	now       func() time.Time
 	gh        func(ctx context.Context, root string, args ...string) (string, error)
 	declared  func(family string) bool
+	families  func() []string
 	newCenter func(root, evolveDir string, console io.Writer) (*signalcenter.Center, func())
 }
 
@@ -59,7 +59,7 @@ type selfhealReport struct {
 }
 
 func runSelfheal(args []string, _ io.Reader, stdout, stderr io.Writer) int {
-	return runSelfhealWith(selfhealEnv{agent: runAgentCommand, now: time.Now, gh: ghOutput, declared: bridge.UsageWindowsDeclared, newCenter: newSelfhealCenter}, args, stdout, stderr)
+	return runSelfhealWith(selfhealEnv{agent: runAgentCommand, now: time.Now, gh: ghOutput, declared: bridge.UsageWindowsDeclared, families: bridge.InteractiveFamilies, newCenter: newSelfhealCenter}, args, stdout, stderr)
 }
 
 func newSelfhealCenter(root, evolveDir string, console io.Writer) (*signalcenter.Center, func()) {
@@ -92,7 +92,7 @@ func runSelfhealWith(env selfhealEnv, args []string, stdout, stderr io.Writer) i
 	}
 	report := selfhealReport{Stage: cfg.Stage, Incidents: existing, Transitions: []selfhealTransition{}}
 	if cfg.Stage != policy.HealingStageOff {
-		report, w.warnings, err = detectIncidents(env, a.root, cfg, existing, stderr)
+		report, w.warnings, err = detectIncidents(env, a.root, cfg, stderr)
 		if err != nil {
 			return w.fail(exitIO, "io", "evolve selfheal: "+err.Error())
 		}
@@ -118,7 +118,7 @@ func parseSelfhealArgs(args []string) (selfhealArgs, error) {
 	return a, nil
 }
 
-func detectIncidents(env selfhealEnv, root string, cfg policy.HealingDetectorPolicy, existing []selfheal.Incident, stderr io.Writer) (selfhealReport, []string, error) {
+func detectIncidents(env selfhealEnv, root string, cfg policy.HealingDetectorPolicy, stderr io.Writer) (selfhealReport, []string, error) {
 	now := env.now()
 	obs, verifier, warnings, err := gatherIncidentEvidence(env, root, cfg, now)
 	if err != nil {
@@ -127,8 +127,13 @@ func detectIncidents(env selfhealEnv, root string, cfg policy.HealingDetectorPol
 	for _, warning := range warnings {
 		fmt.Fprintln(stderr, "evolve selfheal: WARN: "+warning)
 	}
-	next, transitions := selfheal.Detect(existing, obs, verifier, now)
-	if err := writeChangedIncidents(selfheal.Dir(paths.EvolveDirOf(root)), existing, next); err != nil {
+	var next []selfheal.Incident
+	var transitions []selfheal.Transition
+	err = selfheal.UpdateIncidents(selfheal.Dir(paths.EvolveDirOf(root)), func(current []selfheal.Incident) ([]selfheal.Incident, error) {
+		next, transitions = selfheal.Detect(current, obs, verifier, now)
+		return next, nil
+	})
+	if err != nil {
 		return selfhealReport{}, nil, err
 	}
 	report := selfhealReport{Stage: cfg.Stage, Incidents: next, Transitions: []selfhealTransition{}}
@@ -141,7 +146,7 @@ func detectIncidents(env selfhealEnv, root string, cfg policy.HealingDetectorPol
 
 func gatherIncidentEvidence(env selfhealEnv, root string, cfg policy.HealingDetectorPolicy, now time.Time) ([]selfheal.Observation, selfheal.TreeVerifier, []string, error) {
 	evolveDir := paths.EvolveDirOf(root)
-	since := now.Add(-time.Duration(cfg.WindowHours) * time.Hour)
+	since := now.Add(-hours(cfg.WindowHours))
 	events, err := selfheal.LoadSignals(paths.EventChannelsRoot(evolveDir), selfhealChannels, since)
 	if err != nil {
 		return nil, selfheal.TreeVerifier{}, nil, err
@@ -168,7 +173,7 @@ func gatherIncidentEvidence(env selfhealEnv, root string, cfg policy.HealingDete
 }
 
 func cycleObservations(evolveDir string, limit int) ([]selfheal.Observation, []string) {
-	shipped, err := selfheal.LoadShipped(filepath.Join(evolveDir, shipJournalFile))
+	shipped, err := selfheal.LoadShipped(shipjournal.Path(evolveDir))
 	if err != nil {
 		return nil, []string{"the cycle rules did not run: " + err.Error()}
 	}
@@ -207,22 +212,6 @@ func selfhealCIRuns(env selfhealEnv, root string, since time.Time) ([]selfheal.C
 		}
 	}
 	return runs, nil
-}
-
-func writeChangedIncidents(dir string, before, after []selfheal.Incident) error {
-	old := map[string]selfheal.Incident{}
-	for _, inc := range before {
-		old[inc.ID] = inc
-	}
-	for _, inc := range after {
-		if prev, ok := old[inc.ID]; ok && reflect.DeepEqual(prev, inc) {
-			continue
-		}
-		if err := selfheal.WriteIncident(dir, inc); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func publishTransitions(env selfhealEnv, root, stage string, transitions []selfheal.Transition, stderr io.Writer) {

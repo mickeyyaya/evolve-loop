@@ -35,6 +35,8 @@ func runUsageProbe(ctx context.Context, projectRoot, evolveDir string, stderr io
 	newUsageProber(usageProbeDirs{projectRoot: projectRoot, evolveDir: evolveDir}, families, stderr).Run(ctx)
 }
 
+var preWaveUsagePaneFn = bridgeUsageProbe
+
 type usageProbeDirs struct {
 	projectRoot, evolveDir string
 }
@@ -43,12 +45,13 @@ func newUsageProber(dirs usageProbeDirs, families []string, stderr io.Writer) *u
 	factory := bridge.NewControllerFactory(dirs.projectRoot, filepath.Join(dirs.evolveDir, "usage-probe"), "usage-probe", bridge.Deps{})
 	return &usageprobe.Prober{
 		Families: families,
-		Probe:    bridgeUsageProbe(factory),
+		Probe:    preWaveUsagePaneFn(factory),
 		Classify: bridge.ClassifyExhausted,
 		Windows:  usageevidence.ReadWindowsNow,
 		Record:   recordUsageWindows(dirs.evolveDir),
 		Store:    clihealth.NewStore(dirs.projectRoot, nil),
 		Log:      stderr,
+		Timeout:  loadCLIHealthConfig(dirs.evolveDir).UsageEvidenceTimeout(),
 	}
 }
 

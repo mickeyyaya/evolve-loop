@@ -92,7 +92,7 @@ func RequestPath(workspace, kind string) string {
 	if workspace == "" {
 		workspace = cellTemplate
 	}
-	return filepath.Join(workspace, "requests", kind+"-<n>.json")
+	return filepath.Join(workspace, RequestsDir, kind+"-<n>.json")
 }
 
 func (m Match) Refusal(workspace string) string {

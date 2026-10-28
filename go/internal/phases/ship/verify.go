@@ -130,6 +130,9 @@ func verifyClass(ctx context.Context, opts *Options, res *RunResult) error {
 		if err := verifyNoControlPlaneEdits(ctx, opts, res); err != nil {
 			return err
 		}
+		if err := refuseWeakenedGates(ctx, opts, res); err != nil {
+			return err
+		}
 		if err := verifyAuditBinding(ctx, opts, res); err != nil {
 			return err
 		}

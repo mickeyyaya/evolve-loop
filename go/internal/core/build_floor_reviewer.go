@@ -12,6 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/apicover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
+	"github.com/mickeyyaya/evolve-loop/go/internal/coversplit"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchevents"
 	"github.com/mickeyyaya/evolve-loop/go/internal/docsfloor"
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
@@ -309,18 +310,55 @@ func scopedCoverProfile(ctx context.Context, in ReviewInput, moduleDir string, p
 	} else {
 		in.recordUnserializedFloor(root, lerr)
 	}
+	splits, err := coversplit.Load(moduleDir)
+	if err != nil {
+		return "", err.Error(), coverStatusPlumbingError
+	}
 	tmpDir, err := os.MkdirTemp("", "buildfloor-cover-*")
 	if err != nil {
 		return "", err.Error(), coverStatusPlumbingError
 	}
 	profile = filepath.Join(tmpDir, "cover.out")
-	cmd := sysexec.Command(ctx, "go", coverTestArgs(profile, pkgs, tags)...)
+	runs := coversplit.Plan(pkgs, splits)
+	if len(runs) == 1 {
+		out, status := runCoverPass(ctx, moduleDir, profile, runs[0].Args(), tags)
+		return profile, out, status
+	}
+	out, status := runSplitCoverPasses(ctx, moduleDir, profile, runs, tags)
+	return profile, out, status
+}
+
+func runCoverPass(ctx context.Context, moduleDir, profile string, args, tags []string) (string, int) {
+	cmd := sysexec.Command(ctx, "go", coverTestArgs(profile, args, tags)...)
 	cmd.Dir = moduleDir
 	cmd.Env = lanebudget.Env(ipcenv.Scrub(os.Environ()))
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return profile, string(out), coverStatusTestsFailed
+		return string(out), coverStatusTestsFailed
 	}
-	return profile, "", coverStatusOK
+	return "", coverStatusOK
+}
+
+func runSplitCoverPasses(ctx context.Context, moduleDir, profile string, runs []coversplit.Run, tags []string) (string, int) {
+	var parts [][]byte
+	for i, run := range runs {
+		part := fmt.Sprintf("%s.%d", profile, i)
+		if out, status := runCoverPass(ctx, moduleDir, part, run.Args(), tags); status != coverStatusOK {
+			return out, status
+		}
+		data, err := os.ReadFile(part)
+		if err != nil {
+			return err.Error(), coverStatusPlumbingError
+		}
+		parts = append(parts, data)
+	}
+	merged, err := coversplit.Merge(parts)
+	if err != nil {
+		return err.Error(), coverStatusPlumbingError
+	}
+	if err := os.WriteFile(profile, merged, 0o644); err != nil {
+		return err.Error(), coverStatusPlumbingError
+	}
+	return "", coverStatusOK
 }
 
 func changedFileBasenamesByDir(moduleDir string, dirs []string, changedPaths []string) map[string]map[string]bool {

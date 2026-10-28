@@ -116,6 +116,9 @@ func validateContinuation(ctx context.Context, projectRoot string, c *continuati
 	if err != nil {
 		return fmt.Errorf("continuation: adopt-time re-screen: %w", err)
 	}
+	if verdict == FleetRebaseConflict {
+		return fmt.Errorf("%w: snapshot %s no longer Clean against main (verdict=%d)", ErrContinuationConflict, c.SnapshotSHA[:12], int(verdict))
+	}
 	if verdict != FleetRebaseClean {
 		return fmt.Errorf("continuation: snapshot %s no longer Clean against main (verdict=%d)", c.SnapshotSHA[:12], int(verdict))
 	}
@@ -187,6 +190,7 @@ func (cr *cycleRun) adoptContinuationAfterTriage() error {
 	if err := validateContinuation(cr.ctx, cr.req.ProjectRoot, c); err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d continuation from cycle %d rejected (%v) — keeping fresh worktree\n", cr.cycle, c.Cycle, err)
 		releaseDeclinedBinding(cr.req.ProjectRoot, scopeIDs, c)
+		cr.o.shedDeclinedPointer(cr.req.ProjectRoot, cr.cycle, *c)
 		return nil
 	}
 	seeder, ok := cr.o.worktree.(interface {
@@ -225,6 +229,19 @@ func (cr *cycleRun) adoptContinuationAfterTriage() error {
 	}
 	fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d ADOPTED continuation: worktree re-seeded from cycle-%d snapshot %s (base %s)\n", cr.cycle, c.Cycle, c.SnapshotSHA[:12], base)
 	return nil
+}
+
+func (o *Orchestrator) shedDeclinedPointer(projectRoot string, cycle int, declined continuation.Continuation) {
+	if o.continuationShed == nil {
+		return
+	}
+	shed, err := o.continuationShed(projectRoot, cycle, declined)
+	if err != nil {
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN cycle %d continuation: the declined pointer of cycle %d was not shed: %v\n", cycle, declined.Cycle, err)
+	}
+	for _, id := range shed {
+		fmt.Fprintf(o.errOut(), "[orchestrator] cycle %d continuation: SHED the declined continuation pointer of %q (snapshot %s, cycle %d)\n", cycle, id, declined.SnapshotSHA, declined.Cycle)
+	}
 }
 
 func releaseDeclinedBinding(projectRoot string, scopeIDs []string, declined *continuation.Continuation) {

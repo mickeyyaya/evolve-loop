@@ -14,7 +14,7 @@ import (
 func envelopeProbePlan(tier string) *router.PhasePlan {
 	return &router.PhasePlan{Entries: []router.PhasePlanEntry{
 		{Phase: "scout", Run: true},
-		{Phase: "build", Run: true, CLI: "claude-tmux", Tier: tier},
+		{Phase: "build", Run: true, Tier: tier},
 		{Phase: "audit", Run: true},
 		{Phase: "ship", Run: true},
 	}}
@@ -53,7 +53,7 @@ func runBuildTierThroughCycle(t *testing.T, projectRoot, proposedTier string) st
 	if len(fr.requests) == 0 {
 		t.Fatal("build phase never dispatched")
 	}
-	return fr.requests[0].ModelRoutingTier
+	return fr.requests[0].Assignment.Tier
 }
 
 func TestModelTierEnvelope_CeilingClampsThroughRealProfileLookup(t *testing.T) {

@@ -216,37 +216,28 @@ func TestWithWall_MergesWindowsOfOneFamilyKeepingTheLatestResetAndEveryEvidence(
 	}
 }
 
-type flipCtxF3 struct {
-	context.Context
-	calls int
-}
-
-func (c *flipCtxF3) Err() error {
-	c.calls++
-	if c.calls > 1 {
-		return context.Canceled
-	}
-	return nil
-}
-
 func TestProbeOne_ACancelAfterTheProbeAnswersBenchesAndRecordsNothing(t *testing.T) {
 	t.Parallel()
 	log := &bytes.Buffer{}
 	touched := 0
+	ctx, cancel := context.WithCancel(context.Background())
 	p := &Prober{
-		Probe:    func(context.Context, string) (string, error) { return "a pane read just before the interrupt", nil },
+		Probe: func(context.Context, string) (string, error) {
+			cancel()
+			return "a pane read just before the interrupt", nil
+		},
 		Classify: func(string, string) bool { touched++; return true },
 		Windows:  func(string, string) []quotastate.UsageWindow { touched++; return agyWindows(100) },
 		Record:   func(string, []quotastate.UsageWindow) error { touched++; return nil },
 		Store:    clihealth.NewStore(t.TempDir(), func() time.Time { return probeNow }),
 		Log:      log,
 	}
-	ctx := &flipCtxF3{Context: context.Background()}
+	round := newProbeRound(ctx, []string{"agy"})
 
-	p.probeOne(ctx, "agy")
+	p.probeOne(ctx, round, "agy")
 
-	if touched != 0 || log.Len() != 0 || len(p.Store.Active()) != 0 || ctx.calls != 2 {
-		t.Fatalf("touched=%d log=%q benches=%v err-calls=%d", touched, log.String(), p.Store.Active(), ctx.calls)
+	if touched != 0 || log.Len() != 0 || len(p.Store.Active()) != 0 || len(round.close()) != 0 {
+		t.Fatalf("touched=%d log=%q benches=%v", touched, log.String(), p.Store.Active())
 	}
 }
 

@@ -86,9 +86,11 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 		return err
 	}
 	currentHEAD = strings.TrimSpace(currentHEAD)
-	if currentHEAD != entry.GitHEAD {
+	if rebound, detail := carryReboundHead(ctx, opts, testedRoot, entry.GitHEAD, currentHEAD); rebound {
+		res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: main moved since audit (audited=%s); the audit is re-bound to %s%s", entry.GitHEAD, currentHEAD, detail))
+	} else if currentHEAD != entry.GitHEAD {
 		return shipErr(core.CodeAuditBindingHeadMoved, core.ShipClassPrecondition, core.StageVerifyClass,
-			fmt.Sprintf("git HEAD has moved since audit (audited=%s current=%s) — re-run Auditor on the new state", entry.GitHEAD, currentHEAD),
+			fmt.Sprintf("git HEAD has moved since audit (audited=%s current=%s) — re-run Auditor on the new state%s", entry.GitHEAD, currentHEAD, detail),
 			"audited", entry.GitHEAD, "current", currentHEAD)
 	} else if filepath.Clean(testedRoot) == filepath.Clean(opts.ProjectRoot) {
 		currentTree, err := computeTreeStateSHA(ctx, opts)

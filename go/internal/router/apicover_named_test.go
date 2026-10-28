@@ -96,7 +96,7 @@ func TestRoutingSignals_HasEmptyTriageCommitment(t *testing.T) {
 func TestRouteInput_AdvisorContextTypes(t *testing.T) {
 	until := time.Date(2026, 6, 17, 12, 0, 0, 0, time.UTC)
 	writesSrc := true
-	mint := &MintSpec{Prompt: "audit the migration", Tier: "deep", CLI: "claude-tmux", WritesSource: &writesSrc}
+	mint := &MintSpec{Prompt: "audit the migration", Tier: "deep", WritesSource: &writesSrc}
 
 	in := RouteInput{
 		Current:        "scout",
@@ -165,8 +165,8 @@ func TestRouteInput_AdvisorContextTypes(t *testing.T) {
 	if gotMint == nil {
 		t.Fatalf("MintSpec entry dropped by clamp; out=%+v", out.Entries)
 	}
-	if gotMint.Prompt != "audit the migration" || gotMint.Tier != "deep" || gotMint.CLI != "claude-tmux" {
-		t.Errorf("MintSpec survived = %+v, want prompt/tier=deep/cli=claude-tmux preserved", gotMint)
+	if gotMint.Prompt != "audit the migration" || gotMint.Tier != "deep" {
+		t.Errorf("MintSpec survived = %+v, want prompt/tier=deep preserved", gotMint)
 	}
 	if gotMint.WritesSource == nil || *gotMint.WritesSource != true {
 		t.Errorf("MintSpec.WritesSource tri-state lost: %+v", gotMint.WritesSource)

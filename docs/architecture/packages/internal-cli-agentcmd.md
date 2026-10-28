@@ -39,9 +39,10 @@
   - A tree-state error is named on stderr and leaves the tree empty.
   - After a dispatch error the record has no verdict, and a writer run is marked `writes_source`.
   - A failed write is exit 21. `stageWorkspace` refuses a run label whose record exists, before the dispatch (exit 21).
+- **The run verdict** (`verdict.go`, [agent-run.md](../agent-run.md) §4.1). For a profile that requires a `Verdict` section, `reportVerdict` checks the field of the phase runner against the report body. One CRITICAL or HIGH finding, a stated FAIL or no stated verdict makes the run verdict FAIL. Then the run emits `REVIEW_AGENT_RUN_VERDICT_MISMATCH` with the run label as `run_id`. A stated WARN makes it WARN. The envelope, the exit code, the ledger entry and the launch record carry the run verdict, and the envelope carries the counts as `findings`.
 - **Output.** stdout carries the report text. With `--json` it carries the `Envelope` struct, which is the `data` of the envelope of [cli-contract.md](../cli-contract.md) §2. The envelope also names the driver, the family, the launch record and the worktree. A dispatch error goes to stderr and into `Envelope.Error`. A ledger error and a launch record error go there too.
 - **Signals.** SIGINT and SIGTERM cancel the dispatch context (`signal.NotifyContext`), so the ledger append and the workspace removal still run.
-- **Capabilities** (`capabilities.go`, X17e, [cli-contract.md](../cli-contract.md) §4.2). The verb prints `agentclass.Surface` with no cell. With `--json` the document is the `data` of the envelope `evolve.agent.capabilities/1`. The text form has one line for each verb and ends with `default D`. A stray word or an unknown flag is exit 10.
+- **Capabilities** (`capabilities.go`, X17e, [cli-contract.md](../cli-contract.md) §4.2). The verb prints `agentclass.Surface` with no cell. With `--json` the document is the `data` of the envelope `evolve.agent.capabilities/1`. The text form has one line for each verb and ends with `default D`. `caps.dispatch` is the block `isolation.dispatch_requests` of the policy of `--project-root`, with its defaults ([llm-isolation.md](../llm-isolation.md) §7.2.1). A stray word or an unknown flag is exit 10.
   - `--project-root` is accepted for the contract of §5, and the table is the same for each root.
   - Pinned by `TestAgentCapabilities_JSONListsEachVerbOfTheTableWithDefaultClassD` and `TestAgentCapabilities_TextNamesEachClassAndAStrayWordIsUsage`.
 
@@ -49,5 +50,9 @@
 
 - The run writes nothing outside its run workspace except the ledger files, the launch record and the event channels. Pinned by `TestAgentRun_AdversarialReviewDiffOnStdinPrintsTheReportAndLeavesNoCycleFootprint`, which snapshots the whole project before and after.
 - Each run leaves one launch record (`TestAgentRun_EachRunWritesABridgeLaunchRecordThatNamesTheDriverFamilyModelAndTree`), and a cell signal reaches the `isolation.violation` channel (`TestAgentRun_AnIsolationSignalOfTheBridgeReachesTheIsolationChannel`).
+- A review body that fails gives a FAIL run verdict, whatever the field says, and one signal that names the run (`TestAgentRun_AReportThatListsOneHighIsAFailVerdictThoughTheFieldSaysPass`).
 - A refused run dispatches nothing and writes nothing (`TestAgentRun_Refusals`, `TestAgentRun_RefusedRunWritesNothing`).
+- Each listed profile grants `Write` on `<workspace>/specrunner.ArtifactName(spec)`, and no `disallowed_tools` rule denies it ([agent-run.md](../agent-run.md) §6). `TestEveryAgentRunProfileGrantsWriteOnItsDeliverable` reads the shipped profiles and pins this rule. `TestDeliverableWriteProblem` proves that a blanket or a scoped deny fails the check.
+  - The grant is profile data, and the launcher does not derive it. The rule has a glob for the run label, so it is the same for each run. The cycle seats also keep their `Write` grants as data, for example `plan-reviewer.json`.
+  - A rename of a report or a move of the run workspace thus changes each profile. The guard test then names each profile that has no grant, so no copy can drift without a failure.
 - `evolve agent list` and `evolve agent run` read one catalog loader, `phasecmd.LoadCatalog`, and one rule: `phasecmd.SpecRunnable`, and a reader or a writer that `worktreeWriter` admits. The list marks a writer with `writes_source`.

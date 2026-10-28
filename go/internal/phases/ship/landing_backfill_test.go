@@ -16,6 +16,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/landing"
+	"github.com/mickeyyaya/evolve-loop/go/internal/shipjournal"
 )
 
 type argvMatch func(args []string) bool
@@ -72,13 +73,6 @@ func argvIs(want ...string) argvMatch {
 
 func argvStarts(want ...string) argvMatch {
 	return func(args []string) bool { return len(args) >= len(want) && reflect.DeepEqual(args[:len(want)], want) }
-}
-
-func skipWhenRoot(t *testing.T) {
-	t.Helper()
-	if os.Geteuid() == 0 {
-		t.Skip("root ignores directory permissions, so a read-only directory cannot fail a write")
-	}
 }
 
 func readOnlyDir(t *testing.T, dir string) {
@@ -275,7 +269,7 @@ func TestAppendShipJournal_AppendsOneTimestampedLinePerEntry(t *testing.T) {
 	root := t.TempDir()
 	before := time.Now().UTC().Add(-time.Second)
 
-	for _, e := range []shipJournalEntry{{SHA: "aaa", Class: "cycle", Cycle: 7}, {SHA: "bbb", Class: "manual"}} {
+	for _, e := range []shipjournal.Entry{{SHA: "aaa", Class: "cycle", Cycle: 7}, {SHA: "bbb", Class: "manual"}} {
 		if err := appendShipJournal(root, e); err != nil {
 			t.Fatal(err)
 		}
@@ -312,7 +306,7 @@ func TestAppendShipJournal_ReportsEveryWriteFailure(t *testing.T) {
 			root := t.TempDir()
 			arrange(t, root)
 
-			err := appendShipJournal(root, shipJournalEntry{SHA: "abc", Class: "cycle"})
+			err := appendShipJournal(root, shipjournal.Entry{SHA: "abc", Class: "cycle"})
 
 			if err == nil || journalHasSHA(root, "abc") {
 				t.Errorf("err = %v, journaled = %v: a failed journal write is an error and records nothing", err, journalHasSHA(root, "abc"))
@@ -431,7 +425,7 @@ func TestJournalMinted_JournalsEachMintedCommitOnce(t *testing.T) {
 			wantEntry: true, wantCycle: 4, wantEntries: 1},
 		{name: "a journaled commit is never journaled twice", opts: Options{CycleID: 4, Class: ClassCycle}, res: RunResult{CommitSHA: "abc"},
 			arrange: func(t *testing.T, root string) {
-				if err := appendShipJournal(root, shipJournalEntry{SHA: "abc", Class: "cycle", Cycle: 4}); err != nil {
+				if err := appendShipJournal(root, shipjournal.Entry{SHA: "abc", Class: "cycle", Cycle: 4}); err != nil {
 					t.Fatal(err)
 				}
 			}, wantEntry: true, wantCycle: 4, wantEntries: 1},

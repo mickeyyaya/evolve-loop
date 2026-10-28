@@ -48,10 +48,10 @@ func TestApplyDispatchPolicy_AuditRepairAsksTheLadderOncePerRound(t *testing.T) 
 	if len(decisions) != 1 || decisions[0].Fields["origin"] != originAuditRepair || decisions[0].Fields["class"] != string(retryladder.Capability) {
 		t.Fatalf("a repair round asked the ladder %d times: %+v", len(decisions), decisions)
 	}
-	if tdd.ModelRoutingTier != "deep" || build.ModelRoutingTier != "deep" {
-		t.Fatalf("shadow must keep the repair-round raise of today: tdd %q build %q", tdd.ModelRoutingTier, build.ModelRoutingTier)
+	if tdd.Assignment.Tier != "deep" || build.Assignment.Tier != "deep" {
+		t.Fatalf("shadow must keep the repair-round raise of today: tdd %q build %q", tdd.Assignment.Tier, build.Assignment.Tier)
 	}
-	if tdd.CorrectionDirective != "" || tdd.Ladder.LadderTier() != "" || tdd.ModelRoutingEffort != "" {
+	if tdd.CorrectionDirective != "" || tdd.Ladder.LadderTier() != "" || tdd.Assignment.Effort != "" {
 		t.Fatalf("shadow changed the re-entry dispatch: %+v", tdd)
 	}
 
@@ -77,8 +77,8 @@ func TestApplyDispatchPolicy_EnforceRaisesTheRepairRoundWithAFreshDigest(t *test
 	if !strings.Contains(tdd.CorrectionDirective, auditLadderReason) {
 		t.Fatalf("the re-entry digest lacks the audit failure:\n%s", tdd.CorrectionDirective)
 	}
-	if tdd.ModelRoutingTier != "" {
-		t.Fatalf("at enforce the ladder, not the profile override, raises the repair round: tier %q", tdd.ModelRoutingTier)
+	if tdd.Assignment.Tier != "" {
+		t.Fatalf("at enforce the ladder, not the profile override, raises the repair round: tier %q", tdd.Assignment.Tier)
 	}
 	if build.Ladder == nil || build.Ladder.Rung != tdd.Ladder.Rung || build.Ladder.Context == retryladder.ContextFresh || build.CorrectionDirective != "" {
 		t.Fatalf("the build of the same round must keep the rung without a second digest: %+v %q", build.Ladder, build.CorrectionDirective)
@@ -105,7 +105,7 @@ func TestMaybeRemediate_KeepsTheRungAtEnforceAndClearsItAtShadow(t *testing.T) {
 			cr := &cycleRun{o: o, ctx: context.Background(), cycle: 5, req: CycleRequest{ProjectRoot: t.TempDir()}, cs: CycleState{
 				CycleID: 5, WorkspacePath: t.TempDir(), Ladder: &LadderState{Rung: string(retryladder.R2), Tier: "deep", Effort: "high"},
 			}}
-			dr := &dispatchResult{resp: PhaseResponse{Verdict: VerdictFAIL}, runner: gate, phaseReq: PhaseRequest{ModelRoutingTier: "fast"}}
+			dr := &dispatchResult{resp: PhaseResponse{Verdict: VerdictFAIL}, runner: gate, phaseReq: PhaseRequest{Assignment: TaskAssignment{Tier: "fast"}}}
 			_, _ = cr.maybeRemediate(Phase("coverage-gate"), dr)
 			if len(builder.requests) != 1 {
 				t.Fatalf("remediation dispatched the builder %d times", len(builder.requests))
@@ -115,11 +115,11 @@ func TestMaybeRemediate_KeepsTheRungAtEnforceAndClearsItAtShadow(t *testing.T) {
 			if fix.Ladder != nil {
 				rung = fix.Ladder.Rung
 			}
-			if rung != tc.wantRung || (tc.wantRung != "" && (fix.Ladder.LadderTier() != "deep" || fix.ModelRoutingEffort != "high")) {
-				t.Fatalf("remediation fix at %s = %+v effort %q, want rung %q", tc.stage, fix.Ladder, fix.ModelRoutingEffort, tc.wantRung)
+			if rung != tc.wantRung || (tc.wantRung != "" && (fix.Ladder.LadderTier() != "deep" || fix.Assignment.Effort != "high")) {
+				t.Fatalf("remediation fix at %s = %+v effort %q, want rung %q", tc.stage, fix.Ladder, fix.Assignment.Effort, tc.wantRung)
 			}
-			if fix.ModelRoutingTier != "" {
-				t.Fatalf("remediation kept the gate tier %q", fix.ModelRoutingTier)
+			if fix.Assignment.Tier != "" {
+				t.Fatalf("remediation kept the gate tier %q", fix.Assignment.Tier)
 			}
 		})
 	}
@@ -183,8 +183,8 @@ func TestApplyDispatchPolicy_TheCountFloorStillRaisesACapabilityBuild(t *testing
 	cr.o.failureClassFor = func(string) string { return string(retryladder.Capability) }
 	req := PhaseRequest{}
 	cr.applyDispatchPolicy(PhaseBuild, &req)
-	if req.ModelRoutingTier != "deep" {
-		t.Fatalf("a capability failure must start the next build at deep, got %q", req.ModelRoutingTier)
+	if req.Assignment.Tier != "deep" {
+		t.Fatalf("a capability failure must start the next build at deep, got %q", req.Assignment.Tier)
 	}
 	if req.Ladder == nil || req.Ladder.Rung != retryladder.R2 || req.Ladder.LadderTier() != "deep" {
 		t.Fatalf("the next-item build does not carry the R2 start rung: %+v", req.Ladder)

@@ -1,0 +1,31 @@
+{
+  "acceptance": [
+    "Red test first: a boundary with a fake probe that reports agy exhausted writes the agy bench before the first lane admission.",
+    "A family whose probe fails is not benched and the boundary logs one WARN.",
+    "The wave status shows the benched families at launch."
+  ],
+  "consumed": {
+    "at": "2026-10-27T13:15:58Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "The pre-wave probe of the loop (runPreWaveProbes, before the pool admits a lane) already probed every installed family at wave 145 launch and benched agy-claude; the Gemini group was not yet exhausted then (the agy scouts ran Gemini 3.8 Flash for 60+ actions). This change bounds that probe by cli_health.usage_evidence_timeout_s, makes a failed or late probe one WARN that benches nothing, and shows the active benches in evolve wave status. No second probe step was added to boundary run."
+  },
+  "created_at": "2026-10-27T12:50:32Z",
+  "deps": [],
+  "files": [
+    "go/cmd/evolve/cmd_boundary.go",
+    "go/internal/clihealth/usage.go"
+  ],
+  "fix": "At the boundary (evolve boundary run / wave next preflight), run the bridge usage probe for each family that cli_routing can pick, and bench each exhausted scope through the existing clihealth bench, before the pool admits a lane. A failed probe is a WARN and does not bench.",
+  "id": "boundary-benches-exhausted-families",
+  "kind": "pipeline-repair",
+  "notes": "Console route: boundary and bridge probes.",
+  "origin": "console",
+  "priority": "P1",
+  "priority_class": "performance",
+  "route": "console",
+  "source": "console, 2026-10-27, operator \"investigate in watcher issue\"; wave-145 errors channel 10:05Z-12:40Z (1387 WARN signals)",
+  "summary": "Wave 145 launched at 10:05Z with agy at 100% weekly in both groups (Gemini resets in 143 h, Claude/GPT in 159 h). No bench existed, because the boundary probes only claude and a bench is written only after a lane exits 85 or someone runs the probe. All 4 first scouts (2058-2061) ran on agy and went busy-stagnant (LIVENESS_PANE_STAGNANT), and the router lost a launch to exit 85 (ADVISOR_LAUNCH_FAILED, c2059). A console usage probe at 12:5xZ then wrote the bench until 2026-10-28T18:53+08.",
+  "title": "Each wave launch probes the usage of every routed family and benches an exhausted one before the first lane",
+  "weight": 0.85
+}

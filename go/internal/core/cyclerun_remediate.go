@@ -50,7 +50,7 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 
 	fixStarted := cr.o.now().UTC().Format("2006-01-02T15:04:05Z07:00")
 	breq := dr.phaseReq
-	breq.ModelRoutingCLI, breq.ModelRoutingTier = "", ""
+	breq.Assignment.Tier = ""
 	breq = cr.keepLadderRung(PhaseBuild, breq)
 	breq.Fence = cr.o.fenceFor(PhaseBuild, cr.cs)
 	breq.CorrectionDirective = fmt.Sprintf(

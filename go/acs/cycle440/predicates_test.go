@@ -39,10 +39,6 @@ func TestC440_001_SuffixedCLIHonoredViaBaseName(t *testing.T) {
 	if code != 0 {
 		t.Errorf("C440_001a: policy.BaseCLI tests exit=%d\nstderr=%s", code, stderr)
 	}
-	_, stderr, code = runGoTest(t, "TestClampPlanModelRouting_SuffixedCLIHonoredViaBaseName", false, routerPkg)
-	if code != 0 {
-		t.Errorf("C440_001b: suffixed-CLI clamp test exit=%d\nstderr=%s", code, stderr)
-	}
 }
 
 func TestC440_002_DuplicatedBridgeHelperRemoved(t *testing.T) {
@@ -80,15 +76,8 @@ func TestC440_004_ApicoverNamingFloor(t *testing.T) {
 	}
 }
 
-func TestC440_005_GenuineCatalogMissStillClamps(t *testing.T) {
-	_, stderr, code := runGoTest(t, "TestClampPlanModelRouting_ClampsCatalogMiss", false, routerPkg)
-	if code != 0 {
-		t.Errorf("C440_005: catalog-miss-still-clamps test exit=%d\nstderr=%s", code, stderr)
-	}
-}
-
 func TestC440_006_AutoAppliesClampedOverlay(t *testing.T) {
-	_, stderr, code := runGoTest(t, "TestModelRouting_AutoApplies|TestModelRouting_CatalogMissClampsUnderAuto|TestPhaseRequest_ModelRoutingFieldsOmitEmptyByDefault", false, corePkg)
+	_, stderr, code := runGoTest(t, "TestModelRouting_AutoApplies|TestPhaseRequest_CarriesANeutralAssignmentAndNoDriverOnTheWire", false, corePkg)
 	if code != 0 {
 		t.Errorf("C440_006a: core auto-applies tests exit=%d\nstderr=%s", code, stderr)
 	}

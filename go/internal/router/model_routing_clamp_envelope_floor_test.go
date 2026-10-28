@@ -8,10 +8,10 @@ import (
 )
 
 func TestClampPlanModelRouting_NilEnvelopeFloorClampsUp(t *testing.T) {
-	prof := &profiles.Profile{CLI: "claude-tmux"}
-	plan := &PhasePlan{Entries: []PhasePlanEntry{{Phase: "build", Run: true, CLI: "claude", Tier: "fast"}}}
+	prof := &profiles.Profile{}
+	plan := &PhasePlan{Entries: []PhasePlanEntry{{Phase: "build", Run: true, Tier: "fast"}}}
 
-	out, clamps := ClampPlanModelRouting(plan, profileFunc(prof), nil)
+	out, clamps := ClampPlanModelRouting(plan, profileFunc(prof))
 
 	if len(clamps) != 1 {
 		t.Fatalf("clamps = %+v, want exactly one clamp-up (nil-envelope profile must still get the universal balanced floor)", clamps)
@@ -22,19 +22,16 @@ func TestClampPlanModelRouting_NilEnvelopeFloorClampsUp(t *testing.T) {
 	if got := out.Entries[0].Tier; policy.TierRank(got) != policy.TierRank("balanced") {
 		t.Errorf("tier clamped to %q, want balanced-rank (the universal floor)", got)
 	}
-	if out.Entries[0].CLI != "claude" {
-		t.Errorf("CLI mutated to %q, want unchanged claude (only the tier violated the floor)", out.Entries[0].CLI)
-	}
 }
 
 func TestClampPlanModelRouting_NilEnvelopeFloorAppliesAcrossPhases(t *testing.T) {
-	prof := &profiles.Profile{CLI: "claude-tmux"}
+	prof := &profiles.Profile{}
 	plan := &PhasePlan{Entries: []PhasePlanEntry{
-		{Phase: "scout", Run: true, CLI: "claude", Tier: "fast"},
-		{Phase: "audit", Run: true, CLI: "claude", Tier: "fast"},
+		{Phase: "scout", Run: true, Tier: "fast"},
+		{Phase: "audit", Run: true, Tier: "fast"},
 	}}
 
-	out, clamps := ClampPlanModelRouting(plan, profileFunc(prof), nil)
+	out, clamps := ClampPlanModelRouting(plan, profileFunc(prof))
 
 	if len(clamps) != 2 {
 		t.Fatalf("clamps = %+v, want two (the floor is universal, not hardcoded to one phase)", clamps)
@@ -47,11 +44,10 @@ func TestClampPlanModelRouting_NilEnvelopeFloorAppliesAcrossPhases(t *testing.T)
 }
 
 func TestClampPlanModelRouting_ExplicitEnvelopeNotOverriddenByDefault(t *testing.T) {
-	prof := &profiles.Profile{CLI: "claude-tmux",
-		ModelTierEnvelope: &profiles.ModelTierEnvelope{Min: "fast", Max: "deep"}}
-	plan := &PhasePlan{Entries: []PhasePlanEntry{{Phase: "build", Run: true, CLI: "claude", Tier: "fast"}}}
+	prof := &profiles.Profile{ModelTierEnvelope: &profiles.ModelTierEnvelope{Min: "fast", Max: "deep"}}
+	plan := &PhasePlan{Entries: []PhasePlanEntry{{Phase: "build", Run: true, Tier: "fast"}}}
 
-	out, clamps := ClampPlanModelRouting(plan, profileFunc(prof), nil)
+	out, clamps := ClampPlanModelRouting(plan, profileFunc(prof))
 
 	if len(clamps) != 0 {
 		t.Fatalf("clamps = %+v, want none (explicit envelope permits fast; default floor must not override it)", clamps)
@@ -62,10 +58,10 @@ func TestClampPlanModelRouting_ExplicitEnvelopeNotOverriddenByDefault(t *testing
 }
 
 func TestClampPlanModelRouting_NilEnvelopeWithinCeilingPassesThrough(t *testing.T) {
-	prof := &profiles.Profile{CLI: "claude-tmux"}
-	plan := &PhasePlan{Entries: []PhasePlanEntry{{Phase: "build", Run: true, CLI: "claude", Tier: "deep"}}}
+	prof := &profiles.Profile{}
+	plan := &PhasePlan{Entries: []PhasePlanEntry{{Phase: "build", Run: true, Tier: "deep"}}}
 
-	out, clamps := ClampPlanModelRouting(plan, profileFunc(prof), nil)
+	out, clamps := ClampPlanModelRouting(plan, profileFunc(prof))
 
 	if len(clamps) != 0 {
 		t.Fatalf("clamps = %+v, want none (deep is within the default ceiling)", clamps)

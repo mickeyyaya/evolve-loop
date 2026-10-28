@@ -26,9 +26,12 @@ func TestDriverNames_AreBuiltOnlyByResolve(t *testing.T) {
 		dir := filepath.Dir(rel)
 		byDir[dir] = append(byDir[dir], filepath.Join(root, rel))
 	}
+	constsByDir := map[string]map[string]string{}
+	for dir, paths := range byDir {
+		constsByDir[dir] = packageStrings(t, paths)
+	}
 	for _, rel := range files {
-		consts := packageStrings(t, byDir[filepath.Dir(rel)])
-		offenders = append(offenders, tmuxNameBuilds(t, filepath.Join(root, rel), rel, consts)...)
+		offenders = append(offenders, tmuxNameBuilds(t, filepath.Join(root, rel), rel, constsByDir[filepath.Dir(rel)])...)
 	}
 	if len(offenders) > 0 {
 		t.Errorf("%d site(s) build a driver name by hand; call bridge.Resolve:\n%s", len(offenders), strings.Join(offenders, "\n"))

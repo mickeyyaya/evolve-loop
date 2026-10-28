@@ -12,8 +12,9 @@ import (
 )
 
 func runInboxRouteConsole(root string, args []string, stdout, stderr io.Writer) int {
-	asJSON, args := takeInboxJSON(args)
-	if len(args) < 3 || strings.TrimSpace(args[0]) == "" || strings.TrimSpace(args[1]) == "" {
+	asJSON, gateArgs := takeInboxJSON(args)
+	blocker, args, ok := takeBlockedBy(gateArgs)
+	if !ok || len(args) < 3 || strings.TrimSpace(args[0]) == "" || strings.TrimSpace(args[1]) == "" {
 		fmt.Fprintln(stderr, inboxUsage("route-console"))
 		return 10
 	}
@@ -23,7 +24,7 @@ func runInboxRouteConsole(root string, args []string, stdout, stderr io.Writer) 
 		fmt.Fprintf(stderr, "inbox route-console: cycle %q is not a cycle number\n%s\n", args[2], inboxUsage("route-console"))
 		return 10
 	}
-	if rc, queued := inboxQueueGate(root, "route-console", args, asJSON, stdout, stderr); queued {
+	if rc, queued := inboxQueueGate(root, "route-console", gateArgs, asJSON, stdout, stderr); queued {
 		return rc
 	}
 	opts := inboxmover.Options{ProjectRoot: root, Stderr: stderr}
@@ -39,7 +40,11 @@ func runInboxRouteConsole(root string, args []string, stdout, stderr io.Writer) 
 		fmt.Fprintf(stderr, "inbox route-console: %s is held by cycle %d's claim; route it after that lane closes (or after evolve inbox-mover recover-orphans)\n", id, loc.Cycle)
 		return 1
 	}
-	res, err := inboxmover.RouteConsole(opts, id, reason, cycle)
+	res, err := inboxmover.RouteConsoleRequest(opts, inboxmover.RouteRequest{TaskID: id, Reason: reason, Cycle: cycle, BlockedBy: blocker})
+	if errors.Is(err, inboxmover.ErrInvalidItem) {
+		fmt.Fprintf(stderr, "inbox route-console: %v\n", err)
+		return 1
+	}
 	if err != nil {
 		fmt.Fprintf(stderr, "inbox route-console: %v\n", err)
 		return 2

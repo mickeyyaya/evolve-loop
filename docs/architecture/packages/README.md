@@ -24,6 +24,7 @@ Each Go package directory has one page. The page holds what the code cannot say:
 | `internal/inboxrank/rankinputs` | the one loader of the rank's inputs for an evolve dir: the policy's `inbox_priority` block and the recurrence ledger's item counts (ADR-0121, P2) | [internal-inboxrank-rankinputs.md](internal-inboxrank-rankinputs.md) |
 | `internal/convergence` | the convergence policy's pure decision: the next rung of a repeat-until-accepted loop, the round to land, and what is deferred or filed (ADR-0126) | [internal-convergence.md](internal-convergence.md) |
 | `internal/selfheal` | the incident detector of the self-healing loop: typed incident records from signals, cycle state, CI runs and usage readings; it never acts (ADR-0155, X12) | [internal-selfheal.md](internal-selfheal.md) |
+| `internal/gateclass` | the surface tiers and the gate classifier of I-10: it flags a cycle diff that weakens a gate (ADR-0155, X15) | [internal-gateclass.md](internal-gateclass.md) |
 | `internal/recurrence` | the recurrence ledger over lesson patterns, its escalation policy, and the snapshot read and item counts the inbox rank uses | [internal-recurrence.md](internal-recurrence.md) |
 | `internal/cycleoutcome` | the closeout seam for a cycle that did not ship: the failure lifecycle of the committed ids and the planned no-work hand-over | [internal-cycleoutcome.md](internal-cycleoutcome.md) |
 | `internal/bypass` | the audit of a bypass parameter: the reason and cell check, and one ledger entry and one `CONTROL_BYPASS_USED` signal for each use (X18d) | [internal-bypass.md](internal-bypass.md) |
@@ -45,6 +46,7 @@ Each Go package directory has one page. The page holds what the code cannot say:
 | `internal/failurelog` | the failure floor: the failed-cycle taxonomy, the failed-approach record in `state.json`, its expiry and the carryover-todo lifecycle | [internal-failurelog.md](internal-failurelog.md) |
 | `internal/triagecap` | bounds the coverage floors triage may commit per cycle | [internal-triagecap.md](internal-triagecap.md) |
 | `internal/covchanged` | the changed-function coverage gate: its parsers, its measurement, its verdict and its git adapter (one engine for the verb, the target and the floor) | [internal-covchanged.md](internal-covchanged.md) |
+| `internal/coversplit` | the coverage runs of a test package split from the package it tests: the `go/.cover-split` list, the plan, the profile merge and the guard | [internal-coversplit.md](internal-coversplit.md) |
 | `internal/cli/agentcmd` | the `evolve agent run` and `evolve agent list` commands: one read-only phase agent with no cycle (ADR-0152) | [internal-cli-agentcmd.md](internal-cli-agentcmd.md) |
 | `internal/cli/phasecmd` | the `evolve phase` and `evolve phases` commands | [internal-cli-phasecmd.md](internal-cli-phasecmd.md) |
 | `internal/cli/guardcmd` | the `evolve guard`, commit-gate and `evolve eval` commands | [internal-cli-guardcmd.md](internal-cli-guardcmd.md) |
@@ -94,6 +96,8 @@ Each Go package directory has one page. The page holds what the code cannot say:
 | `internal/phases/runner` | the shared phase engine: launch, fence, verify, correction ladder and host effects before the judge | [internal-phases-runner.md](internal-phases-runner.md) |
 | `internal/phases/audit` | the audit phase's EGPS gate: classifies audit-report.md and acs-verdict.json into a verdict | [internal-phases-audit.md](internal-phases-audit.md) |
 | `internal/phases/ship` | the native commit-and-push phase: audit-binding, EGPS gate, atomic commit+ff-merge+push | [internal-phases-ship.md](internal-phases-ship.md) |
+| `internal/phases/ship/shiptest` | the shared real-git fixtures of the ship tests and the black-box ship scenarios that run as their own test binary | [internal-phases-ship-shiptest.md](internal-phases-ship-shiptest.md) |
+| `internal/shipjournal` | the one format of `.evolve/ship-journal.jsonl`: the entry, the file name, the loop landing class and the time stamp | [internal-shipjournal.md](internal-shipjournal.md) |
 | `internal/shipmanifest` | the one selection of which paths Ship commits: declared report manifest, porcelain parsing, the staging pathspec | [internal-shipmanifest.md](internal-shipmanifest.md) |
 | `internal/deliverable` | the ADR-0100 declared-deliverables gate: verify, salvage and host effects | [internal-deliverable.md](internal-deliverable.md) |
 | `internal/core/advisor` | the routing advisor that plans and re-plans a cycle's phases | [internal-core-advisor.md](internal-core-advisor.md) |
@@ -233,6 +237,7 @@ Each Go package directory has one page. The page holds what the code cannot say:
 | `cmd/testlatency` | turns a `go test -json` stream into a Markdown latency report | [cmd-testlatency.md](cmd-testlatency.md) |
 | `cmd/e2elist` | prints the anchored `go test -run` pattern of the tests that only the e2e build tag compiles | [cmd-e2elist.md](cmd-e2elist.md) |
 | `cmd/darwinset` | prints `go/.darwin-set`, the packages whose code or tests differ on macOS | [cmd-darwinset.md](cmd-darwinset.md) |
+| `cmd/coversplit` | prints the `go test` arguments of each coverage run of the named packages | [cmd-coversplit.md](cmd-coversplit.md) |
 | `cmd/testrusage` | `go test -exec` wrapper that appends one resource record per test binary | [cmd-testrusage.md](cmd-testrusage.md) |
 | `cmd/hostsampler` | samples host CPU, memory, load and disk each second into NDJSON | [cmd-hostsampler.md](cmd-hostsampler.md) |
 | `internal/codequality` | runs the deterministic gofmt gates that mirror the CI format step | [internal-codequality.md](internal-codequality.md) |

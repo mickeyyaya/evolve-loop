@@ -58,8 +58,8 @@ var table = []Verb{
 	{Path: "help", Class: Allowed},
 	{Path: "quality report", Class: Request, Kind: "quality-reading"},
 	{Path: "quality compare", Class: Request, Kind: "quality-reading"},
-	{Path: "agent run", Class: Request, Kind: "dispatch"},
-	{Path: "phase <name>", Class: Request, Kind: "dispatch"},
+	{Path: "agent run", Class: Request, Kind: KindDispatch},
+	{Path: "phase <name>", Class: Request, Kind: KindDispatch},
 	{Path: "inbox add", Class: Request, Kind: "inbox-add"},
 	{Path: "code refresh", Class: Request, Kind: "code-refresh"},
 	{Path: "clihealth usage", Class: Denied},
@@ -96,5 +96,6 @@ var table = []Verb{
 	{Path: "selfheal propose", Class: Denied},
 	{Path: "subagent run", Class: Denied},
 	{Path: "reset-sha", Class: Denied},
+	{Path: "continuation adopt", Class: Denied},
 	{Path: "release", Class: Denied},
 }

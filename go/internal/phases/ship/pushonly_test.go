@@ -10,12 +10,13 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/shipjournal"
 )
 
 func initPushOnlyRepo(t *testing.T) (string, func(dir string, args ...string) string) {
 	t.Helper()
 	remote := gittest.Bare(t).Dir
-	root := gittest.Fixture(t).Dir
+	root := emptyRepo(t).Dir
 	run := func(dir string, args ...string) string {
 		t.Helper()
 		cmd := exec.Command("git", args...)
@@ -82,7 +83,7 @@ func TestPushOnly_PushesJournaledStrand(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := appendShipJournal(root, shipJournalEntry{SHA: sha, Class: string(ClassManual)}); err != nil {
+	if err := appendShipJournal(root, shipjournal.Entry{SHA: sha, Class: string(ClassManual)}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -114,7 +115,7 @@ func TestPushOnly_SyncMainMergeCountsAsProvenance(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := appendShipJournal(root, shipJournalEntry{SHA: sha, Class: string(ClassManual)}); err != nil {
+	if err := appendShipJournal(root, shipjournal.Entry{SHA: sha, Class: string(ClassManual)}); err != nil {
 		t.Fatal(err)
 	}
 	run(root, "fetch", "origin", "main")

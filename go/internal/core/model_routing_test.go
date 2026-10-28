@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
@@ -32,7 +33,7 @@ func (p *modelRoutingPlanner) Plan(router.RouteInput) (*router.PhasePlan, error)
 func buildProposingPlan() *router.PhasePlan {
 	return &router.PhasePlan{Entries: []router.PhasePlanEntry{
 		{Phase: "scout", Run: true},
-		{Phase: "build", Run: true, CLI: "claude-tmux", Tier: "deep"},
+		{Phase: "build", Run: true, Tier: "deep"},
 		{Phase: "audit", Run: true},
 		{Phase: "ship", Run: true},
 	}}
@@ -57,8 +58,8 @@ func TestModelRouting_AutoApplies(t *testing.T) {
 		t.Fatal("build phase never dispatched")
 	}
 	req := fr.requests[0]
-	if req.ModelRoutingCLI != "claude-tmux" || req.ModelRoutingTier != "deep" {
-		t.Errorf("ModelRoutingCLI/Tier = %q/%q, want claude-tmux/deep (auto applies the clamped plan proposal)", req.ModelRoutingCLI, req.ModelRoutingTier)
+	if !req.Driver.IsZero() || req.Assignment.Tier != "deep" {
+		t.Errorf("Driver/Tier = %q/%q, want no driver and the tier deep (auto applies the clamped tier; the routing data picks the driver)", req.Driver, req.Assignment.Tier)
 	}
 }
 
@@ -82,8 +83,8 @@ func TestModelRouting_AdvisoryLogsNotApplies(t *testing.T) {
 	if len(fr.requests) == 0 {
 		t.Fatal("build phase never dispatched")
 	}
-	if req := fr.requests[0]; req.ModelRoutingCLI != "" || req.ModelRoutingTier != "" {
-		t.Errorf("ModelRoutingCLI/Tier = %q/%q, want empty (advisory must NOT apply to dispatch)", req.ModelRoutingCLI, req.ModelRoutingTier)
+	if req := fr.requests[0]; !req.Driver.IsZero() || req.Assignment.Tier != "" {
+		t.Errorf("Driver/Tier = %q/%q, want empty (advisory must NOT apply to dispatch)", req.Driver, req.Assignment.Tier)
 	}
 
 	ws := RunWorkspacePath(projectRoot, res.Cycle)
@@ -99,8 +100,8 @@ func TestModelRouting_AdvisoryLogsNotApplies(t *testing.T) {
 	for _, e := range entries {
 		if e.Phase == "build" {
 			found = true
-			if e.CLI != "claude-tmux" || e.Tier != "deep" {
-				t.Errorf("recorded build entry = %+v, want the clamped {claude-tmux,deep} proposal logged", e)
+			if e.Tier != "deep" {
+				t.Errorf("recorded build entry = %+v, want the clamped tier deep logged", e)
 			}
 		}
 	}
@@ -127,8 +128,8 @@ func TestModelRouting_StaticIsNoop(t *testing.T) {
 	if len(fr.requests) == 0 {
 		t.Fatal("build phase never dispatched")
 	}
-	if req := fr.requests[0]; req.ModelRoutingCLI != "" || req.ModelRoutingTier != "" {
-		t.Errorf("ModelRoutingCLI/Tier = %q/%q, want empty (static is a noop)", req.ModelRoutingCLI, req.ModelRoutingTier)
+	if req := fr.requests[0]; !req.Driver.IsZero() || req.Assignment.Tier != "" {
+		t.Errorf("Driver/Tier = %q/%q, want empty (static is a noop)", req.Driver, req.Assignment.Tier)
 	}
 }
 
@@ -154,44 +155,27 @@ func TestModelRouting_AutoDegradesToProfileStatic(t *testing.T) {
 	if len(fr.requests) == 0 {
 		t.Fatal("build phase never dispatched")
 	}
-	if req := fr.requests[0]; req.ModelRoutingCLI != "" || req.ModelRoutingTier != "" {
-		t.Errorf("ModelRoutingCLI/Tier = %q/%q, want empty (nil plan ⇒ no overlay, ever)", req.ModelRoutingCLI, req.ModelRoutingTier)
+	if req := fr.requests[0]; !req.Driver.IsZero() || req.Assignment.Tier != "" {
+		t.Errorf("Driver/Tier = %q/%q, want empty (nil plan ⇒ no overlay, ever)", req.Driver, req.Assignment.Tier)
 	}
 }
 
-func TestModelRouting_CatalogMissClampsUnderAuto(t *testing.T) {
+func TestPhaseRequest_CarriesANeutralAssignmentAndNoDriverOnTheWire(t *testing.T) {
 	t.Parallel()
 
-	st := &fakeStorage{state: State{LastCycleNumber: 0}}
-	runners := buildRunners(nil)
-	alwaysMiss := func(cli, tier string) (string, bool) { return "", false }
-	o := NewOrchestrator(st, &fakeLedger{}, runners,
-		WithRouting(modelRoutingCfg(config.ModelRoutingAuto), router.StaticPreset{}),
-		WithPlanner(&modelRoutingPlanner{plan: buildProposingPlan()}),
-		WithModelCatalogLookup(alwaysMiss))
-
-	if _, err := o.RunCycle(context.Background(), CycleRequest{
-		ProjectRoot: t.TempDir(), GoalHash: "g", DisableWorkspaceGuard: true,
-	}); err != nil {
-		t.Fatalf("RunCycle: %v", err)
-	}
-	fr := runners[PhaseBuild].(*fakeRunner)
-	if len(fr.requests) == 0 {
-		t.Fatal("build phase never dispatched")
-	}
-	if req := fr.requests[0]; req.ModelRoutingCLI != "" || req.ModelRoutingTier != "" {
-		t.Errorf("ModelRoutingCLI/Tier = %q/%q, want empty — the injected catalog lookup reports every pair as unresolvable, so the clamp must reject it even under auto", req.ModelRoutingCLI, req.ModelRoutingTier)
-	}
-}
-
-func TestPhaseRequest_ModelRoutingFieldsOmitEmptyByDefault(t *testing.T) {
-	t.Parallel()
-
-	buf, err := json.Marshal(PhaseRequest{Cycle: 1, ProjectRoot: "/p", GoalHash: "g"})
+	req := PhaseRequest{Cycle: 1, Assignment: TaskAssignment{Tier: "deep", Effort: "high"}, Driver: llmroute.Bind("codex-tmux")}
+	buf, err := json.Marshal(req)
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	if strings.Contains(string(buf), "model_routing_cli") || strings.Contains(string(buf), "model_routing_tier") {
-		t.Errorf("zero-value PhaseRequest JSON contains model_routing_* keys: %s", buf)
+	if strings.Contains(string(buf), "codex") || strings.Contains(string(buf), "cli") || !strings.Contains(string(buf), `"assignment":{"tier":"deep","effort":"high"}`) {
+		t.Errorf("the request JSON carries the neutral assignment and never a driver: %s", buf)
+	}
+	var back PhaseRequest
+	if err := json.Unmarshal(buf, &back); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if back.Assignment != req.Assignment || !back.Driver.IsZero() {
+		t.Errorf("round trip = %+v / %q, want the assignment and no driver", back.Assignment, back.Driver)
 	}
 }

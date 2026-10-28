@@ -13,11 +13,11 @@ var nextCorrection = interaction.NextCorrection
 func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopAction, error) {
 	if cr.o.reviewer != nil && dr.resp.Verdict != VerdictSKIPPED {
 		rin := cr.o.reviewInputFor(cr.cs, next, cr.req.ProjectRoot, dr.resp)
-		baseRoutingCLI := dr.phaseReq.ModelRoutingCLI
+		baseDriver := dr.phaseReq.Driver
 		escalated := false
 		salvageRetried := false
 		var prevBlockIdentity contractBlockIdentity
-		rr := cr.reviewDeliverable(next, rin, contractDispatch{cli: baseRoutingCLI})
+		rr := cr.reviewDeliverable(next, rin, contractDispatch{driver: baseDriver})
 		maxCorrections := cr.correctionLimitFor(next, cr.retryConfig.ContractCorrectionRetries)
 		irec := interaction.NewRecorder(cr.cs.WorkspacePath)
 		decisionID := ""
@@ -80,7 +80,7 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 				sr := cr.o.salvageDeliverable(cr.ctx, rin)
 				switch {
 				case sr.Relocated && sr.Verified:
-					rr = cr.reviewDeliverable(next, rin, contractDispatch{cli: dr.phaseReq.ModelRoutingCLI, escalated: escalated, salvageRetried: salvageRetried})
+					rr = cr.reviewDeliverable(next, rin, contractDispatch{driver: dr.phaseReq.Driver, escalated: escalated, salvageRetried: salvageRetried})
 					res := interaction.ResultRejectedAgain
 					if rr.Approve {
 						res = interaction.ResultAccepted
@@ -152,7 +152,7 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 			dr.phaseReq.CorrectionDirective = preferDigest(directive, dr.phaseReq)
 			cr.o.emitGateCorrection(gateCorrection{
 				origin: originContractCorrection, cycle: cr.cycle, phase: next, correction: corr, max: maxCorrections,
-				rung: interaction.RungRedispatch, cli: dr.phaseReq.ModelRoutingCLI, escalated: escalated, salvageRetry: salvageRetry, reason: rr.Reason,
+				rung: interaction.RungRedispatch, cli: dr.phaseReq.Driver.String(), escalated: escalated, salvageRetry: salvageRetry, reason: rr.Reason,
 			})
 			dr.phaseReq = cr.countDispatch(next, dr.phaseReq)
 			obsCancel := cr.o.observer.Start(cr.ctx, string(next), dr.phaseReq)
@@ -186,7 +186,7 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 				return loopAbort, wrapCycleLevelError(next, phaseErr)
 			}
 			rin.Response = dr.resp
-			rr = cr.reviewDeliverable(next, rin, contractDispatch{cli: dr.phaseReq.ModelRoutingCLI, escalated: escalated, salvageRetried: salvageRetried})
+			rr = cr.reviewDeliverable(next, rin, contractDispatch{driver: dr.phaseReq.Driver, escalated: escalated, salvageRetried: salvageRetried})
 			if rr.Approve {
 				recordCorrection(interaction.ResultAccepted)
 			} else {
@@ -194,7 +194,7 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 			}
 		}
 		dr.phaseReq.CorrectionDirective = ""
-		dr.phaseReq.ModelRoutingCLI = baseRoutingCLI
+		dr.phaseReq.Driver = baseDriver
 		if !rr.Approve {
 			return cr.rejectAfterCorrections(next, dr, rr, maxCorrections)
 		}
@@ -209,8 +209,8 @@ func contractEscalationDue(rr ReviewResult, corr int, prev contractBlockIdentity
 }
 
 func (cr *cycleRun) escalateContractCLI(next Phase, dr *dispatchResult, rr ReviewResult, corr int) (bool, bool) {
-	failedCLI := cr.contractDispatchCLI(next, dr.phaseReq.ModelRoutingCLI)
-	esc, ok := cr.contractEscalationCLI(next, dr.phaseReq.ModelRoutingCLI)
+	failedCLI := cr.contractDispatchCLI(next, dr.phaseReq.Driver)
+	esc, ok := cr.contractEscalationTarget(next, dr.phaseReq.Driver)
 	if !ok {
 		fmt.Fprintf(cr.o.errOut(), "[orchestrator] phase %s: CONTRACT SALVAGE RETRY — %d consecutive contract blocks on cli=%s and no other CLI family is available to escalate to; correction %d re-dispatches on the SAME cli with a structured re-prompt carrying the validator output verbatim. Breaker-neutral: no extra dispatch, no extra correction, no routing change.\n",
 			next, rr.Blocks, failedCLI, corr)
@@ -222,6 +222,6 @@ func (cr *cycleRun) escalateContractCLI(next Phase, dr *dispatchResult, rr Revie
 	}
 	fmt.Fprintf(cr.o.errOut(), "[orchestrator] phase %s: CLI ESCALATION — %d consecutive identical block(s) on cli=%s; correction %d re-dispatches on cli=%s (these rejections never trigger cli_fallback, which is how an incapable CLI used to burn every round). The phase's primary routing is unchanged.\n",
 		next, blocksForLog, failedCLI, corr, esc)
-	dr.phaseReq.ModelRoutingCLI = esc
+	dr.phaseReq.Driver = esc
 	return true, false
 }

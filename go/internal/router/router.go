@@ -66,7 +66,6 @@ type PhaseCard struct {
 	Description       string                      `json:"description,omitempty"`
 	WhenToUse         string                      `json:"when_to_use,omitempty"`
 	Categories        []string                    `json:"categories,omitempty"`
-	AllowedCLIs       []string                    `json:"allowed_clis,omitempty"`
 	ModelTierEnvelope *profiles.ModelTierEnvelope `json:"model_tier_envelope,omitempty"`
 }
 
@@ -107,7 +106,6 @@ type PhasePlanEntry struct {
 	Phase         string    `json:"phase"`
 	Run           bool      `json:"run"`
 	Justification string    `json:"justification,omitempty"`
-	CLI           string    `json:"cli,omitempty"`
 	Tier          string    `json:"tier,omitempty"`
 	Mint          *MintSpec `json:"mint,omitempty"`
 	ForcedBy      string    `json:"forced_by,omitempty"`
@@ -116,7 +114,6 @@ type PhasePlanEntry struct {
 type MintSpec struct {
 	Prompt       string `json:"prompt"`
 	Tier         string `json:"tier,omitempty"`
-	CLI          string `json:"cli,omitempty"`
 	Description  string `json:"description,omitempty"`
 	WhenToUse    string `json:"when_to_use,omitempty"`
 	WritesSource *bool  `json:"writes_source,omitempty"`

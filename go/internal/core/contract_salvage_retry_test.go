@@ -52,7 +52,7 @@ func TestContractEscalation_SalvageRetry_WhenNoOtherFamily(t *testing.T) {
 		t.Fatalf("recorded %d directives (%v), want 3", len(probe.directives), probe.directives)
 	}
 	if probe.dispatched[2] != "" {
-		t.Errorf("correction 2 dispatched on ModelRoutingCLI=%q, want \"\" — with no other CLI family available the remedy is a structured re-prompt on the SAME CLI, never a same-family shuffle", probe.dispatched[2])
+		t.Errorf("correction 2 dispatched on Driver=%q, want \"\" — with no other CLI family available the remedy is a structured re-prompt on the SAME CLI, never a same-family shuffle", probe.dispatched[2])
 	}
 	if !strings.Contains(probe.directives[2], contractSalvageRetryDirectiveHeading) {
 		t.Errorf("correction 2 directive did not carry the structured re-prompt heading %q — with no escalation target the ladder currently falls through unremedied, which is the defect this cycle closes. directive=%q", contractSalvageRetryDirectiveHeading, probe.directives[2])

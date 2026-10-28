@@ -19,6 +19,8 @@ const (
 	CollectorTokens = "tokens"
 	CapabilityTools = "tools"
 	CapabilityEdit  = "edit"
+
+	CapabilityInprocessSubagents = "inprocess_subagents"
 )
 
 type TranscriptSpec struct {
@@ -33,7 +35,7 @@ var collectorFormats = map[string]func(string) bool{
 	CollectorTokens: tokenusage.HasCollector,
 }
 
-var knownCapabilities = []string{CapabilityTools, CapabilityEdit}
+var knownCapabilities = []string{CapabilityTools, CapabilityEdit, CapabilityInprocessSubagents}
 
 func knownPaneFormat(format string) bool {
 	_, ok := panestream.Profiles[format]

@@ -20,6 +20,10 @@ func recordsDir(projectRoot string) string {
 	return filepath.Join(projectRoot, ".evolve", "lineage")
 }
 
+func RequestsDir(projectRoot string, cycle int) string {
+	return filepath.Join(recordsDir(projectRoot), requestsDirName, "cycle-"+strconv.Itoa(cycle))
+}
+
 func recordPath(projectRoot string, cycle int) string {
 	return filepath.Join(recordsDir(projectRoot), "cycle-"+strconv.Itoa(cycle)+".json")
 }

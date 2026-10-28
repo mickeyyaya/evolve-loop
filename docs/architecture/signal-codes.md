@@ -171,8 +171,11 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 
 | Code | Meaning |
 |---|---|
-| `HEALING_INCIDENT_OPENED` | the incident detector opened an incident record under .evolve/incidents; fields incident, class, fingerprint, tier, state, transition, recurrence, stage (llm-isolation.md §18, §24) |
+| `HEALING_ESCALATED` | the catalog validator sent an incident to the operator: a second refusal, two failed repairs, an open breaker or a halt-and-escalate action; the same fields as HEALING_PROPOSAL_REFUSED (llm-isolation.md §19.1, §19.2, §24) |
+| `HEALING_I10_VIOLATION` | the gate classifier flagged a loop cycle diff that changes a kernel surface or weakens a gate (invariant I-10, llm-isolation.md §20.3); the build floor fails and ship refuses the cycle; fields.patterns names each pattern, fields.paths each flagged path |
+| `HEALING_INCIDENT_OPENED` | the incident detector opened an incident record under .evolve/incidents; fields incident, class, fingerprint, tier, state, transition, recurrence, stage, and from the live reaction on a sealed FAIL also reaction: would_brake, braked, brake_already_engaged or brake_failed (llm-isolation.md §18, §24) |
 | `HEALING_INCIDENT_REOPENED` | the incident detector reopened a closed incident, because its signal fired again after the close; the same fields as HEALING_INCIDENT_OPENED (llm-isolation.md §18, §22) |
+| `HEALING_PROPOSAL_REFUSED` | the catalog validator refused a proposal of the orchestrator agent; fields incident, class, tier, action, verdict, precondition, reason, stage (llm-isolation.md §19, §19.2, §24) |
 
 ### inbox
 
@@ -210,6 +213,8 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `ISOLATION_I7_VIOLATION` | I-7 CLI-neutral guarantees: a gate or the fence stopped a write that no hook stopped; fields.target names the path (ADR-0154) |
 | `ISOLATION_I8_VIOLATION` | I-8 typed flow decisions: a flow parser fell back to stdout or prose; fields.cell names the seat (ADR-0154) |
 | `ISOLATION_I9_VIOLATION` | I-9 proven substitution: no run-time emitter; the conformance matrix TestE2ECycleCLIMatrix is its guard (ADR-0154) |
+| `ISOLATION_REQUEST_FAILED` | the request channel approved a request of a cell, and the dispatch of the agent failed; the same fields as ISOLATION_REQUEST_REFUSED (llm-isolation.md §7.2.1) |
+| `ISOLATION_REQUEST_REFUSED` | the request channel refused a request of a cell: the validator (schema, kind, role, input, cap or depth) or the orchestrator agent; fields request, kind, role, decision, precondition, reason, stage (cli-contract.md §4.5, llm-isolation.md §7.2.1) |
 
 ### ladder
 
@@ -317,6 +322,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `ORCHESTRATOR_REBASE_REENTRY_ABORTED` | after a debugger resolved a fleet-rebase conflict, the host could not carry, rebase, pend or route the resolved tree (the reason names which), or the recovery budget was spent; the cycle ended instead of a reship on the base the ship diverged from |
 | `ORCHESTRATOR_RESUME_CARRIER_PENDED` | a resume found this cycle's Evolve-Carrier commit at the lane's HEAD (a crash between the fleet rebase and the pend) and pended it on its fork point before any phase ran, so the resumed cycle sees the change pending and never re-audits an empty diff |
 | `ORCHESTRATOR_SCOPE_DELTA` | the build handoff floor found a changed path outside the lane's declared scope (ADR-0087): fields.path, fields.class (closure, opportunistic, boundary or cross-lane) and fields.disposition (keep, carve or refuse) carry scopedelta's classification, and the reason is the classifier's own; WARN for carve and refuse, INFO for a computed closure; the floor reports and never blocks (shadow rollout) |
+| `ORCHESTRATOR_SHIP_RECOVERY_PATH` | a ship error that names a moved main (AUDIT_BINDING_HEAD_MOVED or GIT_FLEET_REBASE_NEEDED) took a recovery path; fields.path is rebind (the identity carry re-checked the merged tree and re-bound the audit, with no audit round), reaudit (an LLM audit round), rebuild, debugger, end, or the name of the next phase for any other route; fields.code is the routed code, fields.original_code the code ship raised and fields.reason why a moved HEAD was audited again |
 | `ORCHESTRATOR_SHIP_WINDOW_LEASE_BROKEN` | a ship recovery broke the ship-window lease of a live holder whose heartbeat passed the TTL, so two lanes can overlap in the window; fields.owner_pid and fields.heartbeat_at name the broken holder |
 | `ORCHESTRATOR_SYSTEM_FAILURE` | an ADR-0072 system-level failure was attached to the cycle (INCIDENT when it halts the loop, WARN otherwise); fields.category names the floor |
 
@@ -366,6 +372,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 
 | Code | Meaning |
 |---|---|
+| `REVIEW_AGENT_RUN_VERDICT_MISMATCH` | evolve agent run found that the report body of a review fails while the verdict field passes: the body states FAIL, states no verdict, or lists a CRITICAL or HIGH finding; the run verdict is FAIL; run_id names the run, fields.field_verdict the field, fields.stated the stated verdict, fields.critical and fields.high the counts |
 | `REVIEW_FINDINGS` | a code-review dispatch completed and its findings were recorded in the cycle's defect-ledger.json (source code-review); INFO, or WARN when the rows could not be recorded (fields.error) or the findings_repair or quality_index config fell back (fields.config_warning); fields.findings (counts by severity), verdict, would_repair (any finding or a scores gap: the round-1 projection of the loop's decision), stage, threshold, round, recorded, scores (the quality-index vector), gaps (empty when the scores qualify), overflow |
 | `REVIEW_SKIPPED` | a code-review dispatch was skipped and recorded nothing, so the walk continued and the audit stays the only gate; WARN; fields.reason malformed (the contract-correction ladder exhausted on the report, or its verdict stayed non-canonical after every retry), fields.round |
 
@@ -410,6 +417,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `SHIP_EGPS_RED_COUNT` | verify-class: the EGPS gate reports red evals; red_count must be 0 to ship |
 | `SHIP_EXPLANATION_DOCUMENTATION` | verify-explanation: the change ships without the explanation documentation its class requires |
 | `SHIP_FOREIGN_PREDICATE_PACKAGE` | atomic-ship: a cycle landing adds a file under go/acs/cycle<M>/ of a cycle other than the shipping one; archive the superseded package with its explanation record |
+| `SHIP_GATE_WEAKENED` | verify-class: the gate classifier flags a cycle-class commit that changes a kernel surface or weakens a gate (I-10, HEALING_I10_VIOLATION); ship it manually |
 | `SHIP_GIT_COMMIT_FAILED` | atomic-ship: the commit step failed |
 | `SHIP_GIT_DETACHED_HEAD` | atomic-ship: the tree is on a detached HEAD |
 | `SHIP_GIT_FF_MERGE_DIVERGED` | atomic-ship: the fast-forward merge to main diverged |
