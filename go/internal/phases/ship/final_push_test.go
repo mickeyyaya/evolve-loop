@@ -10,66 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
-
-func TestRun_NilPluginRoot_DefaultsToProjectRoot(t *testing.T) {
-	t.Parallel()
-	repo := makeRepo(t)
-	addRemote(t, repo)
-	mustWrite(t, filepath.Join(repo, "p.txt"), "change\n")
-	seedAudit(t, repo, "PASS")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	res, err := Run(ctx, Options{
-		Class:          ClassCycle,
-		CommitMessage:  "feat: nil pluginroot",
-		ProjectRoot:    repo,
-		PluginRoot:     "",
-		ShipBinaryPath: filepath.Join(repo, "ship-binary-fixture"),
-		Runner:         execRunner,
-		Stdin:          strings.NewReader(""),
-		Stdout:         io.Discard,
-		Stderr:         io.Discard,
-	})
-	if err != nil {
-		t.Fatalf("nil PluginRoot ship errored: %v (logs=%v)", err, res.Logs)
-	}
-	if res.ExitCode != ExitOK {
-		t.Fatalf("want ExitOK, got %d", res.ExitCode)
-	}
-}
-
-func TestRun_NilRunner_DefaultsToExecRunner(t *testing.T) {
-	t.Parallel()
-	repo := makeRepo(t)
-	addRemote(t, repo)
-	mustWrite(t, filepath.Join(repo, "q.txt"), "change\n")
-	seedAudit(t, repo, "PASS")
-
-	ctx := context.Background()
-	opts := Options{
-		Class:          ClassCycle,
-		CommitMessage:  "feat: nil runner",
-		ProjectRoot:    repo,
-		PluginRoot:     repo,
-		ShipBinaryPath: filepath.Join(repo, "ship-binary-fixture"),
-		Runner:         nil,
-		Stdin:          strings.NewReader(""),
-		Stdout:         io.Discard,
-		Stderr:         io.Discard,
-	}
-	res, err := Run(ctx, opts)
-	if err != nil {
-		t.Fatalf("nil Runner ship errored: %v (logs=%v)", err, res.Logs)
-	}
-	if res.ExitCode != ExitOK {
-		t.Fatalf("want ExitOK, got %d", res.ExitCode)
-	}
-}
 
 func TestRun_BypassShipVerify_NilEnvMap_FlagIgnored(t *testing.T) {
 	repo := makeRepo(t)
@@ -103,39 +46,6 @@ func TestRun_BypassShipVerify_NilEnvMap_FlagIgnored(t *testing.T) {
 	}
 }
 
-func TestShipFromWorktree_EmptyCycleBranch_Errors(t *testing.T) {
-	t.Parallel()
-	repo := makeRepo(t)
-	addRemote(t, repo)
-	wt := makeWorktree(t, repo, "real-cycle-branch")
-	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"),
-		`{"cycle_id":100,"active_worktree":"`+wt+`"}`)
-	seedAudit(t, repo, "PASS")
-
-	base := execRunner
-	hijack := func(ctx context.Context, name, cwd string, args, env []string,
-		stdin io.Reader, stdout, stderr io.Writer) (int, error) {
-		if name == "git" && len(args) >= 4 && args[0] == "-C" && args[1] == wt {
-			for _, a := range args {
-				if a == "symbolic-ref" {
-					return 0, nil
-				}
-			}
-		}
-		return base(ctx, name, cwd, args, env, stdin, stdout, stderr)
-	}
-
-	res, err := runShip(t, repo, Options{
-		Class:         ClassCycle,
-		CommitMessage: "feat: empty branch",
-		Runner:        hijack,
-	})
-	_ = res
-	if err == nil || !strings.Contains(err.Error(), "empty cycle branch") {
-		t.Fatalf("empty cycleBranch must error; got err=%v logs=%v", err, res.Logs)
-	}
-}
-
 func TestShipFromWorktree_PostPushTreeSHAMismatch_BreachLog(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
@@ -150,45 +60,6 @@ func TestShipFromWorktree_PostPushTreeSHAMismatch_BreachLog(t *testing.T) {
 	t.Skip("post-push tree-SHA mismatch path (gitops.go:247) is structurally " +
 		"unreachable: ff-merge preserves tree SHA, so pre-merge binding == " +
 		"post-push committed tree by construction.")
-}
-
-func TestShipFromWorktree_WriteShipBindingUsesFrozenCycleIdentity(t *testing.T) {
-	t.Parallel()
-	repo := makeRepo(t)
-	addRemote(t, repo)
-	wt := makeWorktree(t, repo, "binding-warn-branch")
-	mustWrite(t, filepath.Join(wt, "warn-file.txt"), "content\n")
-	csPath := filepath.Join(repo, ".evolve", "cycle-state.json")
-	mustWrite(t, csPath, `{"cycle_id":99,"active_worktree":"`+wt+`"}`)
-	seedAudit(t, repo, "PASS")
-
-	base := execRunner
-	hijack := func(ctx context.Context, name, cwd string, args, env []string,
-		stdin io.Reader, stdout, stderr io.Writer) (int, error) {
-		rc, err := base(ctx, name, cwd, args, env, stdin, stdout, stderr)
-		if name == "git" && len(args) > 0 && args[0] == "push" && rc == 0 {
-			_ = os.WriteFile(csPath, []byte(`{"phase":"done"}`), 0o644)
-		}
-		return rc, err
-	}
-
-	res, err := runShip(t, repo, Options{
-		Class:         ClassCycle,
-		CommitMessage: "feat: warn binding",
-		Runner:        hijack,
-	})
-	if err != nil {
-		t.Fatalf("writeShipBinding warn must not fail ship: %v", err)
-	}
-	if res.ExitCode != ExitOK {
-		t.Fatalf("want ExitOK, got %d (logs=%v)", res.ExitCode, res.Logs)
-	}
-	if containsLog(res, "WARN: could not write ship-binding.json") {
-		t.Errorf("mutable cycle-state rewrite redirected the frozen binding: %v", res.Logs)
-	}
-	if _, statErr := os.Stat(filepath.Join(repo, ".evolve", "runs", "cycle-99", "ship-binding.json")); statErr != nil {
-		t.Fatalf("typed cycle-99 ship binding missing: %v", statErr)
-	}
 }
 
 func TestPostShip_CycleClass_RepinError_PropagatesFromPostShip(t *testing.T) {

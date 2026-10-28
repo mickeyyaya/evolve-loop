@@ -230,30 +230,3 @@ func TestPhaseRun_NilRunner_Errors(t *testing.T) {
 		t.Fatalf("want 'runner required' error, got %v", err)
 	}
 }
-
-func TestPhaseRun_DefaultCommitMessage_WhenContextMissing(t *testing.T) {
-	t.Parallel()
-	repo := makeRepo(t)
-	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\ndefault-msg path\n")
-	seedAudit(t, repo, "PASS", map[string]string{"cycle": "42"})
-	addRemote(t, repo)
-
-	p := New(Config{Runner: execRunner})
-	resp, err := p.Run(context.Background(), core.PhaseRequest{
-		Cycle: 42,
-		RunID: "test-run", AuditRound: 1,
-		ProjectRoot: repo,
-		Workspace:   filepath.Join(repo, ".evolve", "runs", "cycle-42"),
-		Env:         map[string]string{"EVOLVE_PLUGIN_ROOT": repo},
-	})
-	if err != nil {
-		t.Fatalf("Run with default message errored: %v (diags=%v)", err, resp.Diagnostics)
-	}
-	if resp.Verdict != core.VerdictPASS {
-		t.Fatalf("want VerdictPASS, got %q (diags=%v)", resp.Verdict, resp.Diagnostics)
-	}
-	subject := strings.TrimSpace(runGitOut(t, repo, "log", "-1", "--format=%s"))
-	if !strings.Contains(subject, "evolve-cycle 42") {
-		t.Errorf("commit subject = %q, want synthesized 'evolve-cycle 42'", subject)
-	}
-}

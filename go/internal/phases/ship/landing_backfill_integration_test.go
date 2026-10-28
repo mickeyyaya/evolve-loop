@@ -22,10 +22,10 @@ import (
 
 func (l landingLane) worktreeShip(runner CmdRunner) (*worktreeShip, *Options, *RunResult) {
 	opts := l.options(runner, &sleepLog{})
-	opts.ProjectRoot, opts.PluginRoot, opts.ShipBinaryPath = l.repo, l.repo, filepath.Join(l.repo, "ship-binary-fixture")
+	opts.ProjectRoot, opts.PluginRoot, opts.ShipBinaryPath = l.Repo, l.Repo, filepath.Join(l.Repo, "ship-binary-fixture")
 	opts.Stdout, opts.Stderr = io.Discard, io.Discard
 	res := &RunResult{}
-	s := newWorktreeShip(context.Background(), &opts, res, "main", l.wt)
+	s := newWorktreeShip(context.Background(), &opts, res, "main", l.WT)
 	s.cycleBranch = landingBranch
 	return s, &opts, res
 }
@@ -34,7 +34,7 @@ func (l landingLane) preparedIntent(t *testing.T) landing.Intent {
 	t.Helper()
 	l.failEveryPush(t, githubServerError)
 	opts := l.options(execRunner, &sleepLog{})
-	opts.ProjectRoot = l.repo
+	opts.ProjectRoot = l.Repo
 	in, found, err := readLandingIntent(&opts)
 	if err != nil || !found || in.Status != landing.IntentPrepared {
 		t.Fatalf("precondition: a failed push leaves a prepared intent, got %+v found=%v err=%v", in, found, err)
@@ -65,31 +65,31 @@ func TestLand_AnUnreadableLaneTipStopsBeforeTheJournalOrTheIntent(t *testing.T) 
 	err := s.land("")
 
 	wantShipErr(t, err, core.CodeGitIO, core.ShipClassTransient, "exited 128")
-	if journal := readShipJournal(l.repo); len(journal) != 0 || pushed(fault.calls) != 0 {
+	if journal := readShipJournal(l.Repo); len(journal) != 0 || pushed(fault.calls) != 0 {
 		t.Errorf("journal %v, pushes %d: an unknown lane tip journals and pushes nothing", journal, pushed(fault.calls))
 	}
-	if _, found := readIntentAt(t, l.intentFile()); found || l.tip(t) != l.base {
-		t.Errorf("intent written=%v lane tip %s: nothing is prepared and the lane stays at %s", found, l.tip(t), l.base)
+	if _, found := readIntentAt(t, l.IntentFile()); found || l.Tip(t) != l.Base {
+		t.Errorf("intent written=%v lane tip %s: nothing is prepared and the lane stays at %s", found, l.Tip(t), l.Base)
 	}
 }
 
 func TestLand_ADivergedMainWithAStuckLaneRefReportsTheRefThatDidNotMove(t *testing.T) {
 	t.Parallel()
 	l := laneReadyToLand(t)
-	tree := strings.TrimSpace(runGitOut(t, l.wt, "write-tree"))
-	pending := strings.TrimSpace(runGitOut(t, l.wt, "-c", "commit.gpgsign=false", "commit-tree", tree, "-p", "HEAD", "-m", "evolve-cycle 1830"))
-	mustWrite(t, filepath.Join(l.repo, "boundary.txt"), "a boundary commit main gained\n")
-	runGit(t, l.repo, "add", "boundary.txt")
-	runGit(t, l.repo, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "boundary")
+	tree := strings.TrimSpace(runGitOut(t, l.WT, "write-tree"))
+	pending := strings.TrimSpace(runGitOut(t, l.WT, "-c", "commit.gpgsign=false", "commit-tree", tree, "-p", "HEAD", "-m", "evolve-cycle 1830"))
+	mustWrite(t, filepath.Join(l.Repo, "boundary.txt"), "a boundary commit main gained\n")
+	runGit(t, l.Repo, "add", "boundary.txt")
+	runGit(t, l.Repo, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "boundary")
 	fault := realGit(argvStarts("update-ref"), 1)
 	s, _, _ := l.worktreeShip(fault.runner())
 
 	err := s.land(pending)
 
 	se := wantShipErr(t, err, core.CodeGitIO, core.ShipClassTransient, "the lane ref did not move")
-	if se.Debug["commit"] != pending || fault.hits != 1 || l.tip(t) != l.base || pushed(fault.calls) != 0 {
+	if se.Debug["commit"] != pending || fault.hits != 1 || l.Tip(t) != l.Base || pushed(fault.calls) != 0 {
 		t.Errorf("debug %v, update-ref attempts %d, lane %s, pushes %d: the refusal names the commit whose ref did not move, and nothing is pushed",
-			se.Debug, fault.hits, l.tip(t), pushed(fault.calls))
+			se.Debug, fault.hits, l.Tip(t), pushed(fault.calls))
 	}
 }
 
@@ -144,17 +144,17 @@ func TestSettleLanding_EachSettleStepFailsOnItsOwnTerms(t *testing.T) {
 	}{
 		{name: "a committed tree the audit never bound refuses the landing", wantErr: core.CodeIntegrityTreeDrift, wantState: landing.IntentPrepared,
 			arrange: func(t *testing.T, l landingLane, opts *Options) {
-				opts.internalAuditBoundTreeSHA = strings.TrimSpace(runGitOut(t, l.repo, "rev-parse", l.base+"^{tree}"))
+				opts.internalAuditBoundTreeSHA = strings.TrimSpace(runGitOut(t, l.Repo, "rev-parse", l.Base+"^{tree}"))
 			}},
 		{name: "a binding that cannot be written only warns", wantWarn: "[ship] WARN: could not write ship-binding.json: no cycle_id in cycle-state.json", wantState: landing.IntentComplete,
 			arrange: func(t *testing.T, l landingLane, opts *Options) {
 				opts.CycleID = 0
-				mustWrite(t, filepath.Join(l.repo, ".evolve", "cycle-state.json"), `{"run_id":"`+landingRunID+`"}`)
+				mustWrite(t, filepath.Join(l.Repo, ".evolve", "cycle-state.json"), `{"run_id":"`+landingRunID+`"}`)
 			}},
 		{name: "an intent that cannot be marked complete only warns", wantWarn: "[ship] WARN: ship cannot mark the landing intent complete", wantState: landing.IntentPrepared,
 			arrange: func(t *testing.T, l landingLane, opts *Options) {
 				skipWhenRoot(t)
-				l.lockTheLandingDir(t)
+				l.LockTheLandingDir(t)
 			}},
 	}
 	for _, tc := range cases {
@@ -174,28 +174,10 @@ func TestSettleLanding_EachSettleStepFailsOnItsOwnTerms(t *testing.T) {
 			} else if err != nil || res.CommitSHA != in.CommitSHA || !containsLog(*res, tc.wantWarn) {
 				t.Errorf("err=%v commit=%q logs=%q: the landing settles with the WARN %q", err, res.CommitSHA, res.Logs, tc.wantWarn)
 			}
-			if status := landing.IntentStatus(l.intent(t)["status"].(string)); status != tc.wantState {
+			if status := landing.IntentStatus(l.Intent(t)["status"].(string)); status != tc.wantState {
 				t.Errorf("intent status %q, want %q", status, tc.wantState)
 			}
 		})
-	}
-}
-
-func TestRun_APolicyRefusalWhoseUnwoundIntentCannotBeWrittenReportsBoth(t *testing.T) {
-	t.Parallel()
-	skipWhenRoot(t)
-	l := laneReadyToLand(t)
-	outage := &pushOutage{failures: 1 << 20, stderr: githubPolicyError, onPush: func() { l.lockTheLandingDir(t) }}
-
-	_, err := runShip(t, l.repo, l.options(outage.runner(), &sleepLog{}))
-
-	wantShipErr(t, err, "GIT_PUSH_POLICY_REFUSED", core.ShipClassPrecondition, "")
-	if err == nil || !strings.Contains(err.Error(), "ship cannot mark the landing intent unwound") {
-		t.Errorf("err %v, want the policy refusal joined with the failed intent write", err)
-	}
-	l.wantAuditedShape(t)
-	if status := l.intent(t)["status"]; status != "prepared" || outage.pushes != 1 {
-		t.Errorf("intent %v, pushes %d: the unwind ran once and the intent stays prepared on disk", status, outage.pushes)
 	}
 }
 
@@ -210,12 +192,12 @@ func TestResumeLanding_DeclinesToResumeWithoutAHostWorktreeBranchOrLock(t *testi
 	}{
 		{name: "the host worktree is gone", wantCode: core.CodeWorktreeResolve, wantErr: "is unavailable",
 			arrange: func(l landingLane, opts *Options) *gitFault {
-				opts.ActiveWorktree = filepath.Join(l.repo, "no-such-lane")
+				opts.ActiveWorktree = filepath.Join(l.Repo, "no-such-lane")
 				return noFault()
 			}},
 		{name: "a ship from the project root",
 			arrange: func(l landingLane, opts *Options) *gitFault {
-				opts.ActiveWorktree = l.repo
+				opts.ActiveWorktree = l.Repo
 				return noFault()
 			}},
 		{name: "a detached host HEAD",
@@ -250,8 +232,8 @@ func TestResumeLanding_DeclinesToResumeWithoutAHostWorktreeBranchOrLock(t *testi
 					t.Errorf("code = %s, want %s", se.Code, tc.wantCode)
 				}
 			}
-			if resumed || pushed(fault.calls) != 0 || remoteHeadSHA(t, l.repo) != l.base || l.intent(t)["status"] != "prepared" {
-				t.Errorf("resumed=%v pushes=%d origin=%s intent=%v: nothing resumes and the intent stays prepared", resumed, pushed(fault.calls), remoteHeadSHA(t, l.repo), l.intent(t)["status"])
+			if resumed || pushed(fault.calls) != 0 || remoteHeadSHA(t, l.Repo) != l.Base || l.Intent(t)["status"] != "prepared" {
+				t.Errorf("resumed=%v pushes=%d origin=%s intent=%v: nothing resumes and the intent stays prepared", resumed, pushed(fault.calls), remoteHeadSHA(t, l.Repo), l.Intent(t)["status"])
 			}
 		})
 	}
@@ -272,17 +254,17 @@ func TestRun_ARollForwardWhoseLaneRefCannotMoveStopsTheResume(t *testing.T) {
 		}
 		return execRunner(ctx, name, cwd, args, env, stdin, stdout, stderr)
 	}
-	if res, _ := runShip(t, l.repo, l.options(kill, &sleepLog{})); res.ExitCode == ExitOK {
+	if res, _ := runShip(t, l.Repo, l.options(kill, &sleepLog{})); res.ExitCode == ExitOK {
 		t.Fatalf("precondition: the first ship stops before the lane ref moves: %v", res.Logs)
 	}
-	prepared := l.intent(t)["commit_sha"]
+	prepared := l.Intent(t)["commit_sha"]
 	fault := realGit(argvStarts("update-ref"), 1)
 
-	res, err := runShip(t, l.repo, l.options(fault.runner(), &sleepLog{}))
+	res, err := runShip(t, l.Repo, l.options(fault.runner(), &sleepLog{}))
 
 	wantShipErr(t, err, core.CodeGitIO, core.ShipClassTransient, "the lane ref did not move")
-	if l.tip(t) != l.base || pushed(fault.calls) != 0 || res.RepairOutcome == landingResumed || l.intent(t)["status"] != "prepared" || l.intent(t)["commit_sha"] != prepared {
-		t.Errorf("lane %s pushes %d outcome %q intent %v: a roll-forward that cannot move the ref resumes nothing", l.tip(t), pushed(fault.calls), res.RepairOutcome, l.intent(t))
+	if l.Tip(t) != l.Base || pushed(fault.calls) != 0 || res.RepairOutcome == landingResumed || l.Intent(t)["status"] != "prepared" || l.Intent(t)["commit_sha"] != prepared {
+		t.Errorf("lane %s pushes %d outcome %q intent %v: a roll-forward that cannot move the ref resumes nothing", l.Tip(t), pushed(fault.calls), res.RepairOutcome, l.Intent(t))
 	}
 }
 
@@ -296,13 +278,13 @@ func TestWitness_NamesWhatItCouldNotRead(t *testing.T) {
 		{name: "the cycle identity", want: "the cycle identity is unreadable: ",
 			arrange: func(t *testing.T, l landingLane, opts *Options) *gitFault {
 				opts.CycleID = 0
-				mustWrite(t, filepath.Join(l.repo, ".evolve", "cycle-state.json"), "{")
+				mustWrite(t, filepath.Join(l.Repo, ".evolve", "cycle-state.json"), "{")
 				return realGit(func([]string) bool { return false }, 0)
 			}},
 		{name: "the run identity", want: "the run identity is unreadable: ",
 			arrange: func(t *testing.T, l landingLane, opts *Options) *gitFault {
 				opts.RunID = ""
-				mustWrite(t, filepath.Join(l.repo, ".evolve", "cycle-state.json"), "{")
+				mustWrite(t, filepath.Join(l.Repo, ".evolve", "cycle-state.json"), "{")
 				return realGit(func([]string) bool { return false }, 0)
 			}},
 		{name: "the lane tip", want: "the lane tip is unreadable: ",
@@ -316,7 +298,7 @@ func TestWitness_NamesWhatItCouldNotRead(t *testing.T) {
 			}},
 		{name: "the sealed explanation", want: "the sealed Build explanation is unreadable: ",
 			arrange: func(t *testing.T, l landingLane, opts *Options) *gitFault {
-				mustWrite(t, filepath.Join(l.repo, ".evolve", "build-explanation-contracts", "cycle-1830.json"), "{")
+				mustWrite(t, filepath.Join(l.Repo, ".evolve", "build-explanation-contracts", "cycle-1830.json"), "{")
 				return realGit(func([]string) bool { return false }, 0)
 			}},
 	}
@@ -356,7 +338,7 @@ func TestWitness_AReadableLaneWitnessesThePreparedIntent(t *testing.T) {
 
 func TestExplanationViewSHA_HashesTheSealedViewDeterministically(t *testing.T) {
 	l := laneReadyToLand(t)
-	view, err := explanationdocs.LoadSnapshot(explanationdocs.CycleBinding{ProjectRoot: l.repo, Cycle: landingCycle, RunID: landingRunID})
+	view, err := explanationdocs.LoadSnapshot(explanationdocs.CycleBinding{ProjectRoot: l.Repo, Cycle: landingCycle, RunID: landingRunID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -366,14 +348,14 @@ func TestExplanationViewSHA_HashesTheSealedViewDeterministically(t *testing.T) {
 	}
 	sum := sha256.Sum256(body)
 
-	first, ferr := explanationViewSHA(l.repo, landingCycle, landingRunID)
-	second, serr := explanationViewSHA(l.repo, landingCycle, landingRunID)
+	first, ferr := explanationViewSHA(l.Repo, landingCycle, landingRunID)
+	second, serr := explanationViewSHA(l.Repo, landingCycle, landingRunID)
 
 	if ferr != nil || serr != nil || first != hex.EncodeToString(sum[:]) || first != second {
 		t.Errorf("hashes %q, %q (errs %v, %v), want both the sha256 of the sealed view %x", first, second, ferr, serr, sum)
 	}
 	stubMarshalJSON(t, errors.New("encode refused"))
-	if got, err := explanationViewSHA(l.repo, landingCycle, landingRunID); err == nil || got != "" {
+	if got, err := explanationViewSHA(l.Repo, landingCycle, landingRunID); err == nil || got != "" {
 		t.Errorf("an unencodable view = %q, %v; want an error and no hash", got, err)
 	}
 }
@@ -468,54 +450,16 @@ func TestRun_APostShipErrorAfterAResumeWarnsAndStillLands(t *testing.T) {
 	t.Parallel()
 	l := laneReadyToLand(t)
 	l.failEveryPush(t, githubServerError)
-	landingCommit := l.tip(t)
-	mustWrite(t, filepath.Join(l.repo, ".evolve", "state.json"), "{")
+	landingCommit := l.Tip(t)
+	mustWrite(t, filepath.Join(l.Repo, ".evolve", "state.json"), "{")
 
-	res, err := runShip(t, l.repo, l.options(execRunner, &sleepLog{}))
+	res, err := runShip(t, l.Repo, l.options(execRunner, &sleepLog{}))
 
-	if err != nil || res.ExitCode != ExitOK || res.RepairOutcome != landingResumed || remoteHeadSHA(t, l.repo) != landingCommit {
+	if err != nil || res.ExitCode != ExitOK || res.RepairOutcome != landingResumed || remoteHeadSHA(t, l.Repo) != landingCommit {
 		t.Fatalf("exit=%d err=%v outcome=%q: the resumed landing is on origin, so a post-ship hook error never fails it", res.ExitCode, err, res.RepairOutcome)
 	}
 	if !containsLog(res, "[ship] WARN: post-ship hook error: ") {
 		t.Errorf("logs %q lack the post-ship WARN", res.Logs)
-	}
-}
-
-func TestRun_APostPushReDispatchWithATamperedAuditFailsInsteadOfReportingSuccess(t *testing.T) {
-	t.Parallel()
-	repo, _ := shipWorktreeFixture(t, "cycle-1-tamper")
-	if res, err := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "evolve-cycle 1: goal=test"}); err != nil || res.ExitCode != ExitOK {
-		t.Fatalf("precondition: the first ship lands: exit=%d err=%v logs=%v", res.ExitCode, err, res.Logs)
-	}
-	landed := remoteHeadSHA(t, repo)
-	report := filepath.Join(repo, ".evolve", "runs", "cycle-1", "audit-report.md")
-	body, err := os.ReadFile(report)
-	if err != nil {
-		t.Fatal(err)
-	}
-	mustWrite(t, report, string(body)+"\nan edit after the audit\n")
-
-	res, err := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "evolve-cycle 1: goal=test"})
-
-	wantShipErr(t, err, core.CodeAuditBindingArtifactSHA, core.ShipClassPrecondition, "artifact mutated post-audit")
-	if res.ExitCode != ExitFailure || res.CommitSHA != "" || containsLog(res, "succeeding report-only") || remoteHeadSHA(t, repo) != landed {
-		t.Errorf("exit=%d commit=%q logs=%q: a post-push re-dispatch whose audit changed reports a failure, never a success", res.ExitCode, res.CommitSHA, res.Logs)
-	}
-}
-
-func TestRun_AResumeUnpushedWhosePushIsRefusedLeavesTheHeadMovedError(t *testing.T) {
-	t.Parallel()
-	repo := mergedUnpushedFixture(t, "cycle-246-refused")
-	preRemote := remoteHeadSHA(t, repo)
-	outage := &pushOutage{failures: 1 << 20, stderr: githubPolicyError}
-
-	res, err := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "evolve-cycle 1: goal=test", Runner: outage.runner()})
-
-	if se := mustShipErr(t, err); se.Code != core.CodeAuditBindingHeadMoved {
-		t.Errorf("code = %s, want the head-moved refusal to stand", se.Code)
-	}
-	if res.ExitCode == ExitOK || res.RepairOutcome == "resume-pushed" || outage.pushes == 0 || remoteHeadSHA(t, repo) != preRemote {
-		t.Errorf("exit=%d outcome=%q pushes=%d origin=%s: a refused push never completes the resume", res.ExitCode, res.RepairOutcome, outage.pushes, remoteHeadSHA(t, repo))
 	}
 }
 
@@ -712,13 +656,13 @@ func TestRun_AHeldIntegratorLockStopsAWorktreeShipBeforeItStages(t *testing.T) {
 	l := laneReadyToLand(t)
 	opts := l.options(execRunner, &sleepLog{})
 	opts.shipLock = func(string) (func(), error) { return nil, errors.New("held by a peer") }
-	staged := strings.TrimSpace(runGitOut(t, l.wt, "write-tree"))
+	staged := strings.TrimSpace(runGitOut(t, l.WT, "write-tree"))
 
-	res, err := runShip(t, l.repo, opts)
+	res, err := runShip(t, l.Repo, opts)
 
 	wantShipErr(t, err, core.CodeGitIO, core.ShipClassTransient, "acquire integrator lock (.evolve/ship.lock): held by a peer")
-	if res.ExitCode == ExitOK || l.tip(t) != l.base || strings.TrimSpace(runGitOut(t, l.wt, "write-tree")) != staged || len(readShipJournal(l.repo)) != 0 {
-		t.Errorf("exit=%d lane=%s: a held lock commits, stages and journals nothing", res.ExitCode, l.tip(t))
+	if res.ExitCode == ExitOK || l.Tip(t) != l.Base || strings.TrimSpace(runGitOut(t, l.WT, "write-tree")) != staged || len(readShipJournal(l.Repo)) != 0 {
+		t.Errorf("exit=%d lane=%s: a held lock commits, stages and journals nothing", res.ExitCode, l.Tip(t))
 	}
 }
 
@@ -731,7 +675,7 @@ func TestPrepareChanges_AnUnreadableLaneStatusStopsTheStage(t *testing.T) {
 	changes, err := s.prepareChanges()
 
 	wantShipErr(t, err, core.CodeGitIO, core.ShipClassTransient, "exited 128")
-	if changes != worktreeNoChanges || fault.hits != 1 || l.tip(t) != l.base {
-		t.Errorf("changes=%v status reads=%d lane=%s: an unreadable status reports no changes and commits nothing", changes, fault.hits, l.tip(t))
+	if changes != worktreeNoChanges || fault.hits != 1 || l.Tip(t) != l.Base {
+		t.Errorf("changes=%v status reads=%d lane=%s: an unreadable status reports no changes and commits nothing", changes, fault.hits, l.Tip(t))
 	}
 }

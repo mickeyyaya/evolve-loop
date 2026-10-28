@@ -110,7 +110,7 @@ flowchart LR
 ```
 
 1. **One instrumented run.** `make test-integration` is the only run that writes coverage for the runtime packages.
-2. **A profile only from a green run.** The run writes `coverage.partial.txt`. It renames the file to `coverage.txt` only when `go test` exits 0. At its start, the run deletes the old `coverage.txt`.
+2. **A profile only from a green run.** Each `go test` of the run writes its own profile. When each `go test` exits 0, the run joins the profiles into `coverage.partial.txt` and renames that file to `coverage.txt`. At its start, the run deletes the old `coverage.txt`.
 3. **Judges only read.** `cover-changed`, `cover-strict`, `apicover-check` and the function warnings read `coverage.txt`. A judge with no profile refuses.
 4. **A fresh profile.** A judge refuses a profile that is older than a changed source file. `covchanged` already does this check (`freshReader`).
 5. **One parser.** Each Go judge parses the profile through `covchanged.ParseProfile`.
@@ -286,7 +286,7 @@ The timeout is a stop for a hung run. The budget is the alarm for growth. On 202
 3. Add `t.Parallel` to independent slow tests (research F3.8).
 4. Build a shared binary one time for each package, with `sync.Once` or in `TestMain`.
 5. Replace a real wait with an injected clock or an event.
-6. Move a slow black-box test set to a sibling package directory. It then runs as its own test binary, at the same time as the original package.
+6. Move a slow black-box test set to a sibling package directory. It then runs as its own test binary, at the same time as the original package. List the sibling in `go/.cover-split` (§7.6).
 
 Do not raise the budget to make a pole pass. A raise needs a record in the plan with the reason.
 
@@ -297,6 +297,20 @@ Do not raise the budget to make a pole pass. A raise needs a record in the plan 
 ### 7.5 Change-scoped iteration
 
 A lane can run the tests of the packages that its change touches and of their importers, through `changedpkgs.ImporterClosure`. This gives fast feedback inside a lane. It never replaces the floor. The full floor runs before each pull request, and CI runs the full suite.
+
+### 7.6 Split test packages
+
+Go counts the coverage of a package only in the test binary of that package. A test set that moves to a sibling package (remedy 6) therefore no longer counts for the package that it tests. On 2026-10-28, the move of the landing tests of `internal/phases/ship` cut its coverage from 99.0% to 94.1%.
+
+The fix is a run with `-coverpkg` for the sibling, and one joined profile:
+
+1. `go/.cover-split` lists each split: `./<split package> ./<package it tests>`. [internal-coversplit.md](packages/internal-coversplit.md) has the format.
+2. `make test-integration` passes its packages to `cmd/coversplit`. The command prints one line for each `go test`. The first line is the main run. Each other line is the run of one split whose tested package is in the set.
+3. The recipe starts each split run in the background, then runs the main run. Each run writes its own profile, its own `-json` stream and its own exit status.
+4. The recipe appends the `-json` stream of each split run to `TEST_JSON`. When each run exits 0, `coversplit -merge` joins the profiles into `coverage.txt`. The ratchet and `ci classify` read each package of the stream as before.
+5. The build floor of a lane uses the same plan (`scopedCoverProfile` in `internal/core`). Thus the floor, CI and `evolve cover changed` see the same coverage.
+
+`TestEverySplitTestPackageHasItsCoverEntry` walks the module. It fails when a package tests an ancestor that it does not build on, and `go/.cover-split` does not list it. It also fails on a list line that names no split. The macOS job selects packages from `go/.darwin-set`. A split runs there when its tested package is in the set.
 
 ## 8. The lanes that write tests
 
@@ -332,6 +346,7 @@ The console merges the pull requests of a batch one at a time. After each merge,
 | A package keeps its floor | `make cover-strict`, CI step | in force; it becomes a judge (§4.3) |
 | An export is named and executed | `make apicover-check`, CI step | in force |
 | A judge needs a green run | the rename of `coverage.partial.txt` | plan T2 |
+| A split test package keeps the coverage of its package | `TestEverySplitTestPackageHasItsCoverEntry` (§7.6) | in force |
 | No new raw `git init` fixture | `internal/rawgitratchet` | in force |
 | A test pins the environment of a driver | `TestRunTmuxREPL_ArtifactDebounceHermeticUnderAmbientFleetEnv` | in force |
 | No new duplicate helper | the duplicate ratchet (§6.4) | plan T5 |

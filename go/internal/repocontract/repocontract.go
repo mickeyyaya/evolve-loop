@@ -149,6 +149,9 @@ var treeReadingSelections = []TestSelection{
 	{Package: "./internal/committedset", Tests: []string{
 		"TestDecisionBuckets_TheOneDeclarationOfTheDroppedAndSkipShippedWireTags",
 	}},
+	{Package: "./internal/coversplit", Tests: []string{
+		"TestEverySplitTestPackageHasItsCoverEntry",
+	}},
 	{Package: "./internal/core", Tests: []string{
 		"TestAgentSubprocessWriters_AllStampRunID",
 		"TestAgentSubprocessWriters_SetIsClosed",

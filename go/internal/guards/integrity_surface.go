@@ -161,6 +161,7 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/solutioncheck/", Class: GateGuarantee, Rationale: "ADR-0099 slice 2: the ONE engine that judges a document deliverable — the gate above delegates to it, so it is the surface a lane would actually soften"},
 	{Fragment: "/go/internal/core/solution_floor.go", Class: GateGuarantee, Rationale: "ADR-0099 slice 2: SolutionViolations/DocumentCycle — the shared classification + collection the floor, the audit gate and ship call"},
 	{Fragment: "/go/internal/phases/retro/explanation_review_gate.go", Class: AuditVerdictGuarantee, Rationale: "Retrospective explanation-review and correction-todo gate"},
+	{Fragment: "/go/internal/phases/ship/shiptest/", Class: GateGuarantee, Rationale: "the shared ship test fixtures and the black-box ship scenarios split from the ship phase: LaneReadyToLand seals a real build explanation, so a cycle that changed them could weaken the landing scenarios that prove the Ship gates"},
 	{Fragment: "/go/internal/phases/ship/native_explanation_gate.go", Class: GateGuarantee, Rationale: "canonical native Ship explanation re-verification gate"},
 	{Fragment: "/agents/evolve-builder.md", Class: InstructionGuarantee, Rationale: "Builder authority and explanation deliverable instructions"},
 	{Fragment: "/agents/evolve-builder-reference.md", Class: InstructionGuarantee, Rationale: "Builder explanation document schema"},

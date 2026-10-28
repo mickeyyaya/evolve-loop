@@ -857,3 +857,7 @@
 ./internal/gateclass
 # agentrequest - the request channel of a cell: the validator, the judgement and the dispatch of a phase agent request (llm-isolation.md §7.2.1).
 ./internal/agentrequest
+# coversplit - the coverage runs of a test package split from the package it tests: the go/.cover-split list, the plan, the profile merge and the guard that every split is listed.
+./internal/coversplit
+# shiptest - the shared real-git fixtures of the ship tests and the black-box ship scenarios split from internal/phases/ship.
+./internal/phases/ship/shiptest

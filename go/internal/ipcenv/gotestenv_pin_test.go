@@ -26,7 +26,7 @@ var exemptSpawners = map[string]string{
 	"internal/gotooltest/cache.go:ExecRunner":                        "runs go build only; the Cache composes every argv from build",
 	"internal/acssuite/acssuite.go:defaultGoExec":                    "receives the env predicateEnv built, operator keys and suite exports included; predicateEnv sits on a protected control-plane path (ADR-0064) and moves to ipcenv.GoTestEnv as console work",
 	"internal/commitgate/lanes.go:laneGo":                            "protected control-plane path (ADR-0064): a lane cannot edit it; console work routes its go test through sysexec.WithEnv(ipcenv.GoTestEnv())",
-	"internal/core/build_floor_reviewer.go:scopedCoverProfile":       "protected control-plane path (ADR-0064): console work swaps ipcenv.Scrub(os.Environ()) for ipcenv.GoTestEnv()",
+	"internal/core/build_floor_reviewer.go:runCoverPass":             "protected control-plane path (ADR-0064): console work swaps ipcenv.Scrub(os.Environ()) for ipcenv.GoTestEnv()",
 	"internal/core/phase_bindings_selfcheck.go:realGoUnitTest":       "protected control-plane path (ADR-0064): console work swaps ipcenv.Scrub(os.Environ()) for ipcenv.GoTestEnv()",
 	"internal/core/phase_bindings_selfcheck.go:realGoUnitTestTagged": "protected control-plane path (ADR-0064): console work swaps ipcenv.Scrub(os.Environ()) for ipcenv.GoTestEnv()",
 	"internal/phases/audit/ciparitygate/command.go:ACSDurable":       "protected control-plane path (ADR-0064): console work wraps its runner in scrubbedRun like the other gates",

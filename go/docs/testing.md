@@ -144,6 +144,8 @@ make test-latency   # → go/test/latency-report.md
 make test-integration TEST_TIMEOUT=30m
 ```
 
+A test package that a team split from the package it tests runs beside the main `go test` with `-coverpkg`. `go/.cover-split` lists each split, and the recipe joins its profile and its `-json` stream into the outputs of the run. The design is in [test-system.md §7.6](../../docs/architecture/test-system.md#76-split-test-packages).
+
 The budget for one package is 180 seconds of wall time under `-race`. Set `TEST_JSON` to a file name, and the same run also writes its `go test -json` stream there. The console keeps the plain test text, because `testlatency -render` rewrites the events. The run still ends with the exit status of `go test`, and `coverage.txt` still exists only after a green run. Then render the report:
 
 ```

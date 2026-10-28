@@ -75,13 +75,6 @@ func argvStarts(want ...string) argvMatch {
 	return func(args []string) bool { return len(args) >= len(want) && reflect.DeepEqual(args[:len(want)], want) }
 }
 
-func skipWhenRoot(t *testing.T) {
-	t.Helper()
-	if os.Geteuid() == 0 {
-		t.Skip("root ignores directory permissions, so a read-only directory cannot fail a write")
-	}
-}
-
 func readOnlyDir(t *testing.T, dir string) {
 	t.Helper()
 	if err := os.Chmod(dir, 0o555); err != nil {

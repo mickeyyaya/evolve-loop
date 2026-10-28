@@ -12,11 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/shipwindow"
 )
 
-func leaseHeld(root string) bool {
-	_, err := os.Stat(shipwindow.PathIn(filepath.Join(root, ".evolve")))
-	return err == nil
-}
-
 func TestEnterShipWindow_OnlyALiveCycleShipTakesTheLease(t *testing.T) {
 	t.Parallel()
 	for name, opts := range map[string]Options{

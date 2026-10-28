@@ -111,3 +111,5 @@
 ./internal/cyclespend 100
 ./internal/selfheal 100
 ./internal/citelemetry 100
+./internal/coversplit 100
+./internal/phases/ship/shiptest 100

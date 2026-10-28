@@ -78,30 +78,3 @@ func TestShipDirect_UnboundShipIsUnaffected(t *testing.T) {
 		t.Fatalf("an unbound direct ship must be unaffected by the binding guard: %v", err)
 	}
 }
-
-func TestShipDirect_LegitimateBoundShipIsNotBlocked(t *testing.T) {
-	t.Parallel()
-	repo := makeRepo(t)
-	addRemote(t, repo)
-	runGit(t, repo, "push", "-q", "origin", "main")
-
-	mustWrite(t, filepath.Join(repo, "direct-change.txt"), "the cycle's change\n")
-	seedAudit(t, repo, "PASS")
-
-	res, err := runShip(t, repo, Options{
-		Class:         ClassCycle,
-		CommitMessage: "feat: direct-path change",
-	})
-	if err != nil {
-		t.Fatalf("a legitimate bound direct ship must not be blocked, but it was rejected: %v\nlogs: %v", err, res.Logs)
-	}
-	var verified bool
-	for _, log := range res.Logs {
-		if strings.Contains(log, "tree-SHA binding verified") {
-			verified = true
-		}
-	}
-	if !verified {
-		t.Errorf("the ship succeeded but never logged a binding verification — the guard was inert rather than satisfied; logs: %v", res.Logs)
-	}
-}
