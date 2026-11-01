@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "Red test first: a test-only diff in a package with one base-red test is not refused for that test.",
+    "A test that is green on the base and red on the lane is still refused.",
+    "The rejection lists the base-red names as information."
+  ],
+  "created_at": "2026-10-27T18:33:25Z",
+  "deps": [],
+  "files": [
+    "go/internal/core/build_handoff_floor.go",
+    "go/internal/covergate"
+  ],
+  "fix": "Run the failing tests of a touched package on the base too (or read the base-red set the ship repo-contract gate already computes) and refuse only failures that are red on the lane and green on the base. Record the base-red names in the rejection as information.",
+  "id": "cover-changed-subtracts-base-red",
+  "kind": "pipeline-repair",
+  "notes": "Console route: the build floor in internal/core is on the fence.",
+  "origin": "console",
+  "priority": "P1",
+  "priority_class": "correctness",
+  "route": "console",
+  "source": "console, 2026-10-28, wave 145 cycle 2070 disposition",
+  "summary": "Cycle 2070 (item bridge-sandbox-contract-private-tmux-flake, a test-only fix) failed: the cover-changed build floor ran go/internal/bridge under -tags integration, real-tmux tests that are red on main failed, and the floor refused the diff. The disposition (layer pipeline-code) says there is no base subtraction.",
+  "title": "The cover-changed build floor subtracts tests that are already red on the base, so a test-only diff is not refused for base-red tests",
+  "weight": 0.8
+}

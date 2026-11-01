@@ -6,6 +6,12 @@
     "The stage key is strict with a range and is documented in STE.",
     "Every wave launch arms it (no console step needed)."
   ],
+  "consumed": {
+    "at": "2026-10-27T12:00:31Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "PR #1218 (feat/live-incident-on-cycle-sealed, stacked on #1211 and #1216): live reaction on each sealed FAIL, healing.live_reaction.stage; all acceptance met, CI green"
+  },
   "created_at": "2026-10-27T08:13:34Z",
   "deps": [
     "failure-class-fingerprint-recurrence"
@@ -15,7 +21,7 @@
     "go/cmd/evolve/cmd_selfheal.go",
     "go/internal/policy/healing.go"
   ],
-  "fix": "Subscribe the detector to cycle.sealed with final_verdict FAIL (event-triggered, like inbox curate --event): read the new class recurrence (item failure-class-fingerprint-recurrence) and emit selfheal.incident at once when a pipeline-code class recurs. Add policy healing.live_reaction.stage (off, shadow, enforce; default shadow): at enforce, a T0 or T1 pipeline-code incident with class recurrence >= 2 engages the loop brake and holds the lane items whose files overlap the failing check; at shadow it records would_brake.",
+  "fix": "Subscribe the detector to cycle.sealed with final_verdict FAIL (event-triggered, like inbox curate --event): read the new class recurrence (item failure-class-fingerprint-recurrence) and emit selfheal.incident at once when a pipeline-code class recurs. Add policy healing.live_reaction.stage (off, shadow, enforce; default shadow): at enforce, a T0 or T1 pipeline-code incident with class recurrence \u003e= 2 engages the loop brake and holds the lane items whose files overlap the failing check; at shadow it records would_brake.",
   "id": "live-incident-on-cycle-sealed",
   "kind": "pipeline-repair",
   "notes": "Console route: self-heal chain (X12/X13) and the loop brake.",

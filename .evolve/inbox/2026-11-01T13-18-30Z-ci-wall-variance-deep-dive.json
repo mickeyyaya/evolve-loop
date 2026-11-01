@@ -1,0 +1,31 @@
+{
+  "acceptance": [
+    "A research doc under docs/research in STE ranks the components by their share of the wall variance across the five runs, with per-test evidence.",
+    "The doc names what each top component waits on (CPU, process start, real tmux, git, sleeps).",
+    "A follow-up item for each fix is filed.",
+    "The ratchet hard fail is restored (remove -ratchet-report-only) once a fix or a noise-robust judgment lands."
+  ],
+  "created_at": "2026-11-01T13:18:30Z",
+  "deps": [],
+  "files": [
+    ".github/workflows/go.yml",
+    "go/cmd/testlatency",
+    "go/.test-latency.json"
+  ],
+  "fix": "Compare the CI artifacts of runs 40526866678, 40563673621, 40576371034, 40582532714 and 40611567029 (test-integration.json, test-rusage.ndjson, runner-samples.ndjson per OS): per test and per package wall vs CPU, which tests swing most, what they wait on (real tmux, git processes, sandbox-exec, sleeps, timeouts), and whether the swing follows runner load or specific components. Report the components ranked by their share of the variance, with evidence, and propose the fix and a ratchet judgment that holds on noisy runners. Then restore the hard fail.",
+  "id": "ci-wall-variance-deep-dive",
+  "intake_override": {
+    "reason": "CI gate investigation; console",
+    "console_route": true
+  },
+  "kind": "research",
+  "notes": "Console route: CI gate and test system. Runs as a cloud agent per the operator.",
+  "origin": "console",
+  "priority": "P1",
+  "priority_class": "stability",
+  "route": "console",
+  "source": "console, 2026-11-01, operator: remove the wall time to investigate why, deep dive, find which phase or component causes the flaky result",
+  "summary": "On 2026-10-28/11-01 the same batch (PR #1226) measured on macOS: internal/bridge 331 s in run 40582532714 and 748 s in run 40611567029; cmd/evolve 339 s vs 781 s; ship 131 s vs 165 s. The package wall ratchet failed on runner speed, not on code, so the operator made it report-only (testlatency -ratchet-report-only) until this item finds the cause.",
+  "title": "Find which component makes the CI package wall time swing between runs, then restore the hard wall ratchet",
+  "weight": 0.85
+}

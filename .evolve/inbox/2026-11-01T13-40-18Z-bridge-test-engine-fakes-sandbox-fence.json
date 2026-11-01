@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Red test first: a guard finds each test engine that reaches the real log show poll.",
+    "TestTryRecord_* and TestLaunchArgs_* run under 5 s on macOS.",
+    "Docs in STE."
+  ],
+  "created_at": "2026-11-01T13:40:18Z",
+  "deps": [],
+  "files": [
+    "go/internal/bridge"
+  ],
+  "fix": "newTestEngine injects fake SandboxReports and SandboxFence; a guard fails when a bridge test engine uses the real log show poll.",
+  "id": "bridge-test-engine-fakes-sandbox-fence",
+  "kind": "pipeline-repair",
+  "notes": "Console route: CI gate and test system.",
+  "origin": "console",
+  "priority": "P1",
+  "priority_class": "stability",
+  "route": "console",
+  "source": "console, 2026-11-01, research PR #1227 (docs/research/ci-wall-variance-2026-11.md), operator deep-dive request",
+  "summary": "NewEngine wires the real log show fence poll (engine.go:224/:227) with a 60 s deadline (read_isolation.go:39/:212). On macOS TestTryRecord_* took 63 s and 122 s and TestLaunchArgs_ProjectsProfileWriteSubpathsToTheWrapper 61 s: real waits, a flake that never shows on ubuntu.",
+  "title": "Bridge test engines inject fakes for the sandbox report and fence poll, so no test waits on the real 60 s log-show deadline",
+  "weight": 0.8
+}
