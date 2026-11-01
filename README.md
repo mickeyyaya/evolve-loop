@@ -372,10 +372,11 @@ If you find a gaming pattern that the framework did not catch, please file an is
 
 ## Version
 
-**Current (v22.30)** — the full release history is in [CHANGELOG.md](CHANGELOG.md). To cut a release, use `evolve release X.Y.Z`.
+**Current (v23.0)** — the full release history is in [CHANGELOG.md](CHANGELOG.md). To cut a release, use `evolve release X.Y.Z`.
 
 | Version | Date | Notes |
 |---|---|---|
+| v23.0 | Nov 2 | See the [23.0.0] section of CHANGELOG.md. |
 | v22.30 | Oct 18 | See the [22.30.0] section of CHANGELOG.md. |
 | v22.29 | Oct 16 | See the [22.29.0] section of CHANGELOG.md. |
 | v22.28 | Oct 12 | See the [22.28.0] section of CHANGELOG.md. |
