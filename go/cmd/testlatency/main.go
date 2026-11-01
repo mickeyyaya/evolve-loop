@@ -28,31 +28,20 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) > 0 && args[0] == "tighten" {
 		return runTighten(args[1:], stdin, stderr)
 	}
-	fs := newFlagSet("testlatency", stderr)
-	title := fs.String("title", "Test latency report", "report title")
-	top := fs.Int("top", 25, "number of rows in the slowest-tests table")
-	thrPkg := fs.Float64("threshold-pkg", 5.0, "flag packages whose wall time exceeds this (seconds)")
-	thrTest := fs.Float64("threshold-test", 1.0, "flag tests whose elapsed exceeds this (seconds)")
-	budget := fs.Duration("budget", 0, "lead the report with the packages whose wall time exceeds this (for example 180s)")
-	failOver := fs.Bool("fail-over-budget", false, "exit 1 when a package is over --budget")
-	pkgBudget := fs.Bool("package-budget", false, "apply addedtests.PackageWallBudget and exit 1 when a package exceeds it")
-	ratchetPath := fs.String("ratchet", "", "gate packages against this ratchet file: exit 1 above min(2 x class ceiling, -test-timeout)")
-	testTimeout := fs.String("test-timeout", "20m", "the go test timeout that caps every package limit")
-	reportOnly := fs.Bool("ratchet-report-only", false, "print each package above its ratchet limit but exit 0 for a breach; an unreadable ratchet or stream still fails")
-	render := fs.Bool("render", false, "write the Output field of each event to stdout (the plain go test text) and exit 0")
-	if err := fs.Parse(args); err != nil {
+	o, ok := parseOptions(args, stderr)
+	if !ok {
 		return 2
 	}
-	if *render {
+	if o.render {
 		renderOutput(stdin, stdout, stderr)
 		return 0
 	}
-	limit, enforce, err := resolveBudget(addedtests.PackageWallBudget, *pkgBudget, *failOver, *budget)
+	limit, enforce, err := resolveBudget(addedtests.PackageWallBudget, o.pkgBudget, o.failOver, o.budget)
 	if err != nil {
 		fmt.Fprintf(stderr, "testlatency: %v\n", err)
 		return 2
 	}
-	ratchet, timeout, ok := loadGate(*ratchetPath, *testTimeout, stderr)
+	ratchet, timeout, ok := loadGate(o.ratchetPath, o.testTimeout, stderr)
 	if !ok {
 		return 2
 	}
@@ -62,14 +51,14 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 1
 	}
 	fmt.Fprint(stdout, rep.Markdown(MarkdownOptions{
-		Title:        *title,
-		Top:          *top,
-		ThresholdPkg: *thrPkg,
-		ThresholdTst: *thrTest,
+		Title:        o.title,
+		Top:          o.top,
+		ThresholdPkg: o.thrPkg,
+		ThresholdTst: o.thrTest,
 		Budget:       limit.Seconds(),
 	}))
 	overBudget := enforce && len(rep.OverBudget(limit.Seconds())) > 0
-	gateFailed := ratchet.gate(stdout, stderr, rep, timeout) && !*reportOnly
+	gateFailed := ratchet.gate(stdout, stderr, rep, timeout) && !o.reportOnly
 	if overBudget || gateFailed {
 		return 1
 	}
@@ -88,4 +77,38 @@ func resolveBudget(wallBudget string, pkgBudget, failOver bool, budget time.Dura
 		return 0, false, fmt.Errorf("--fail-over-budget needs --budget")
 	}
 	return budget, failOver, nil
+}
+
+type options struct {
+	title       string
+	top         int
+	thrPkg      float64
+	thrTest     float64
+	budget      time.Duration
+	failOver    bool
+	pkgBudget   bool
+	ratchetPath string
+	testTimeout string
+	reportOnly  bool
+	render      bool
+}
+
+func parseOptions(args []string, stderr io.Writer) (options, bool) {
+	var o options
+	fs := newFlagSet("testlatency", stderr)
+	fs.StringVar(&o.title, "title", "Test latency report", "report title")
+	fs.IntVar(&o.top, "top", 25, "number of rows in the slowest-tests table")
+	fs.Float64Var(&o.thrPkg, "threshold-pkg", 5.0, "flag packages whose wall time exceeds this (seconds)")
+	fs.Float64Var(&o.thrTest, "threshold-test", 1.0, "flag tests whose elapsed exceeds this (seconds)")
+	fs.DurationVar(&o.budget, "budget", 0, "lead the report with the packages whose wall time exceeds this (for example 180s)")
+	fs.BoolVar(&o.failOver, "fail-over-budget", false, "exit 1 when a package is over --budget")
+	fs.BoolVar(&o.pkgBudget, "package-budget", false, "apply addedtests.PackageWallBudget and exit 1 when a package exceeds it")
+	fs.StringVar(&o.ratchetPath, "ratchet", "", "gate packages against this ratchet file: exit 1 above min(2 x class ceiling, -test-timeout)")
+	fs.StringVar(&o.testTimeout, "test-timeout", "20m", "the go test timeout that caps every package limit")
+	fs.BoolVar(&o.reportOnly, "ratchet-report-only", false, "print each package above its ratchet limit but exit 0 for a breach; an unreadable ratchet or stream still fails")
+	fs.BoolVar(&o.render, "render", false, "write the Output field of each event to stdout (the plain go test text) and exit 0")
+	if err := fs.Parse(args); err != nil {
+		return options{}, false
+	}
+	return o, true
 }
