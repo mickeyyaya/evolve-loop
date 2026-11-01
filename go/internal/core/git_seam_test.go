@@ -33,8 +33,13 @@ func (r *gitRec) run(_ context.Context, name, dir string, args, _ []string, _ io
 
 func useFakeGit(t *testing.T, r *gitRec) {
 	t.Helper()
+	swapGitRunner(t, r.run)
+}
+
+func swapGitRunner(t *testing.T, run sysexec.RunFunc) {
+	t.Helper()
 	orig := gitRunner
-	gitRunner = sysexec.RunFunc(r.run)
+	gitRunner = run
 	t.Cleanup(func() { gitRunner = orig })
 }
 

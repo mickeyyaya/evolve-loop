@@ -14,7 +14,8 @@
     "Bash(evolve ledger verify:*)",
     "Bash(evolve release-preflight:*)",
     "Bash(evolve release-consistency:*)",
-    "Bash(evolve phase verify:*)"
+    "Bash(evolve phase verify:*)",
+    "Write(.evolve/ephemeral/agent-runs/*/merge-to-main-gate-report.md)"
   ],
   "disallowed_tools": [
     "Edit",

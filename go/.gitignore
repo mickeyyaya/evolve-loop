@@ -5,6 +5,7 @@
 *.out
 coverage.html
 coverage.txt
+coverage.run.*
 coverage.func.txt
 coverage.apicover.txt
 apicover-report.txt

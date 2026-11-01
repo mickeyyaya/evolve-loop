@@ -419,3 +419,32 @@ func TestReadRecord_ReturnsTheItemIDsThatThePipelineRecorded(t *testing.T) {
 		t.Fatal("a malformed record is no record")
 	}
 }
+
+func TestBuild_ListsTheRequestRecordsOfTheCycleAndOfItsLineage(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t)
+	f.cycle(6, "item-a", nil)
+	f.cycle(7, "item-a", nil)
+	f.cycle(9, "item-b", nil)
+	own := filepath.Join(RequestsDir(f.root, 7), "dispatch-1.json")
+	f.write(strings.TrimPrefix(own, f.root+"/"), `{"summary":"dispatch-1 to fault-localization: run"}`)
+	f.write(strings.TrimPrefix(filepath.Join(RequestsDir(f.root, 6), "dispatch-1.json"), f.root+"/"), `{"summary":"dispatch-1 to premise-challenge: refused"}`)
+	f.write(strings.TrimPrefix(filepath.Join(RequestsDir(f.root, 9), "dispatch-1.json"), f.root+"/"), `{"summary":"another item"}`)
+
+	idx := f.build(7, "build")
+
+	mine, ok := entryOf(idx, KindRequest, 7)
+	if !ok || mine.Class != ClassDeliverable || mine.Summary != "dispatch-1 to fault-localization: run" || mine.Path != ".evolve/lineage/requests/cycle-7/dispatch-1.json" {
+		t.Fatalf("the request record of the own cycle must be a deliverable entry, got %+v in %+v", mine, idx.Entries)
+	}
+	earlier, ok := entryOf(idx, KindRequest, 6)
+	if !ok || earlier.Class != ClassLineage || !strings.Contains(earlier.Summary, "refused") {
+		t.Fatalf("the request record of a lineage cycle must be a lineage entry, got %+v", earlier)
+	}
+	if mine.Attempt != idx.Attempt || earlier.Attempt != idx.Attempt-1 {
+		t.Fatalf("each request entry carries the attempt of its cycle: own %d, lineage %d, index %d", mine.Attempt, earlier.Attempt, idx.Attempt)
+	}
+	if other, ok := entryOf(idx, KindRequest, 9); ok {
+		t.Fatalf("a cycle outside the lineage gives no request entry, got %+v", other)
+	}
+}

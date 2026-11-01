@@ -424,3 +424,36 @@ func TestFromTemplate_ABuilderThatStopsItsGoroutineFailsEveryLaterCaller(t *test
 		t.Fatalf("later caller failures = %q, want one naming the template and %q", rec.errs, errBuilderAborted)
 	}
 }
+
+func TestBareFromTemplate_CopiesAnIndependentBareOriginBuiltOnce(t *testing.T) {
+	resetTemplates(t)
+	execs := failGitExecs(t)
+	first := BareFromTemplate(t)
+	afterFirst := len(execs.cmds)
+	second := BareFromTemplate(t)
+
+	if len(execs.cmds) != afterFirst {
+		t.Errorf("git ran %d more times for a later caller, want 0: a copy needs no git", len(execs.cmds)-afterFirst)
+	}
+	for _, r := range []*Repo{first, second} {
+		if got := r.Git("rev-parse", "--is-bare-repository"); got != "true" {
+			t.Errorf("%s: --is-bare-repository = %q, want true", r.Dir, got)
+		}
+		assertPersistsMaintenanceConfig(t, r.Dir)
+		if got := rawConfig(t, r.Dir, "user.email"); got != "gittest@example.com" {
+			t.Errorf("%s: identity = %q, want the fixture identity", r.Dir, got)
+		}
+	}
+	seed := Fixture(t)
+	seed.Git("commit", "--allow-empty", "-q", "-m", "base")
+	seed.Git("push", "-q", first.Dir, "main")
+	if got := first.Git("rev-parse", "main"); got != seed.Git("rev-parse", "HEAD") {
+		t.Errorf("first origin main = %s, want the pushed commit", got)
+	}
+	if got := second.Git("for-each-ref"); got != "" {
+		t.Errorf("a push into one copy reached another: %q", got)
+	}
+	if got := FromTemplate(t, "a-work-tree", func(*Repo) error { return nil }).Git("rev-parse", "--is-bare-repository"); got != "false" {
+		t.Errorf("a work-tree template after the bare one: --is-bare-repository = %q, want false", got)
+	}
+}

@@ -75,9 +75,6 @@ func writeCard(b *strings.Builder, c router.PhaseCard) {
 		fmt.Fprintf(b, " — when: %s", hint)
 	}
 	b.WriteString("\n")
-	if len(c.AllowedCLIs) > 0 {
-		fmt.Fprintf(b, "  allowed_clis: %s\n", strings.Join(c.AllowedCLIs, ", "))
-	}
 	if env := c.ModelTierEnvelope; env != nil {
 		fmt.Fprintf(b, "  model_tier_envelope: {min: %s, default: %s, max: %s}\n", env.Min, env.Default, env.Max)
 	}

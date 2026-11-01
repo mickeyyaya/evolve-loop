@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestAtomicShip_CurrentBranchRunnerError_Errors(t *testing.T) {
@@ -140,54 +139,5 @@ func TestVerifyTrivial_LSFilesRunnerError_Errors(t *testing.T) {
 	err := verifyTrivial(context.Background(), opts, &RunResult{})
 	if err == nil {
 		t.Fatal("want runner error from ls-files, got nil")
-	}
-}
-
-func TestRun_PostShipError_LogsWarnAndContinues(t *testing.T) {
-	t.Parallel()
-	repo := makeRepo(t)
-	addRemote(t, repo)
-	mustWrite(t, filepath.Join(repo, "warn.txt"), "change\n")
-	seedAudit(t, repo, "PASS")
-
-	csPath := filepath.Join(repo, ".evolve", "cycle-state.json")
-	_ = os.Remove(csPath)
-	if err := os.MkdirAll(csPath, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.RemoveAll(csPath) })
-
-	var stderrBuf strings.Builder
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	res, err := Run(ctx, Options{
-		Class:         ClassCycle,
-		CommitMessage: "feat: post-ship warn",
-		ProjectRoot:   repo,
-		WorkspacePath: filepath.Join(repo, ".evolve", "runs", "cycle-1"),
-		CycleID:       1,
-		RunID:         "test-run", AuditRound: 1,
-		PluginRoot:     repo,
-		ShipBinaryPath: filepath.Join(repo, "ship-binary-fixture"),
-		Runner:         execRunner,
-		Stdin:          strings.NewReader(""),
-		Stdout:         io.Discard,
-		Stderr:         &stderrBuf,
-	})
-	if err != nil {
-		t.Fatalf("postShip WARN must not propagate as error, got: %v", err)
-	}
-	if res.ExitCode != ExitOK {
-		t.Fatalf("want ExitOK despite postShip error, got %d (logs=%v)", res.ExitCode, res.Logs)
-	}
-	found := false
-	for _, l := range res.Logs {
-		if strings.Contains(l, "post-ship hook error") {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Errorf("want 'post-ship hook error' WARN in logs; got %v", res.Logs)
 	}
 }

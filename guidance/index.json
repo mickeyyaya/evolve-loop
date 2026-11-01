@@ -193,8 +193,8 @@
       "id": "code-zero-comments",
       "layer": "L0",
       "kind": "rule",
-      "summary": "Code has no comments. Names, types and tests explain the code, and a design reason goes to the package note.",
-      "bytes": 572,
+      "summary": "MANDATORY: code has no comments and no Go doc comments. Never write, ask for or test a comment. A reason goes to the package note.",
+      "bytes": 1436,
       "path": "guidance/rules/code-zero-comments.md",
       "audience": [
         "all"

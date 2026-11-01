@@ -15,7 +15,7 @@ func changedAreaFailures(section string, changed, material []string) []string {
 	entries, failures := changedAreaEntries(section, normalized)
 	for _, materialPath := range material {
 		if entries[materialPath] == "" {
-			failures = append(failures, fmt.Sprintf("Explanation Documentation: Changed Areas does not explain material path %s", materialPath))
+			failures = append(failures, fmt.Sprintf(FailurePrefix+"Changed Areas does not explain material path %s", materialPath))
 		}
 	}
 	cited := make([]string, 0, len(entries))
@@ -25,7 +25,7 @@ func changedAreaFailures(section string, changed, material []string) []string {
 	sort.Strings(cited)
 	for _, citedPath := range cited {
 		if !coversAnyChangedPath(citedPath, normalized) {
-			failures = append(failures, fmt.Sprintf("Explanation Documentation: cited path %s is not in the Build diff", citedPath))
+			failures = append(failures, fmt.Sprintf(FailurePrefix+"cited path %s is not in the Build diff", citedPath))
 		}
 	}
 	return failures
@@ -105,11 +105,11 @@ func changedAreaEntries(body string, changed []string) (map[string]string, []str
 		for _, cited := range paths {
 			path := normalize(cited)
 			if !validRelative(path) {
-				failures = append(failures, "Explanation Documentation: Changed Areas contains an invalid repo-relative path")
+				failures = append(failures, FailurePrefix+"Changed Areas contains an invalid repo-relative path")
 				continue
 			}
 			if len(explanation) < minExplanationBytes {
-				failures = append(failures, fmt.Sprintf("Explanation Documentation: Changed Areas path %s needs a what/why explanation", path))
+				failures = append(failures, fmt.Sprintf(FailurePrefix+"Changed Areas path %s needs a what/why explanation", path))
 				continue
 			}
 			entries[path] = explanation

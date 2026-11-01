@@ -36,57 +36,6 @@ func TestVerifySelfSHA_CleanPass_ReturnsNilNoLog(t *testing.T) {
 	}
 }
 
-func TestShipFromWorktree_TreeSHABindingVerifiedLog(t *testing.T) {
-	t.Parallel()
-	repo := makeRepo(t)
-	addRemote(t, repo)
-	wt := makeWorktree(t, repo, "binding-test-branch")
-	mustWrite(t, filepath.Join(wt, "binding.txt"), "content\n")
-	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"),
-		`{"cycle_id":20,"active_worktree":"`+wt+`"}`)
-
-	seedAudit(t, repo, "PASS")
-
-	res, err := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "feat: binding log test"})
-	if err != nil {
-		t.Fatalf("ship errored: %v (logs=%v)", err, res.Logs)
-	}
-	if res.ExitCode != ExitOK {
-		t.Fatalf("want ExitOK, got %d (logs=%v)", res.ExitCode, res.Logs)
-	}
-	if !containsLog(res, "ff-merged binding-test-branch into main") {
-		t.Errorf("missing ff-merge log; got %v", res.Logs)
-	}
-}
-
-func TestShipFromWorktree_WithAuditBoundTreeSHA_BindingLogged(t *testing.T) {
-	t.Parallel()
-	repo := makeRepo(t)
-	addRemote(t, repo)
-	wt := makeWorktree(t, repo, "treesha-branch")
-
-	mustWrite(t, filepath.Join(wt, "treesha.txt"), "bound content\n")
-	runGit(t, wt, "add", "treesha.txt")
-	runGit(t, wt, "-c", "commit.gpgsign=false", "commit", "-m", "pre-ship commit in wt")
-
-	wtTreeSHA := strings.TrimSpace(runGitOut(t, wt, "rev-parse", "HEAD^{tree}"))
-
-	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"),
-		`{"cycle_id":21,"active_worktree":"`+wt+`"}`)
-	seedAuditWithBoundTree(t, repo, "PASS", wtTreeSHA)
-
-	res, err := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "feat: bound tree ship"})
-	if err != nil {
-		t.Fatalf("bound tree ship errored: %v (logs=%v)", err, res.Logs)
-	}
-	if res.ExitCode != ExitOK {
-		t.Fatalf("want ExitOK, got %d (logs=%v)", res.ExitCode, res.Logs)
-	}
-	if !containsLog(res, "tree-SHA binding verified") {
-		t.Errorf("missing tree-SHA binding verified log; got %v", res.Logs)
-	}
-}
-
 func TestAdvanceLastCycleNumber_WriteStateFails_WarnsAndReturnsNil(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridgechain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
@@ -268,6 +269,44 @@ func TestFailureCountReaderAndContinuationForScope_ReadTheProjectInbox(t *testin
 	}
 	if got := continuationForScope(root, 3, []string{"absent-task"}); got != nil {
 		t.Errorf("continuation = %+v, want nil with no prior attempt", got)
+	}
+}
+
+func TestWireOrchestratorDeps_RegistersTheContinuationShedder(t *testing.T) {
+	root := t.TempDir()
+	claim := filepath.Join(root, ".evolve", "inbox", "processing", "cycle-9")
+	if err := os.MkdirAll(claim, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(claim, "held.json"), []byte(`{"id":"held","continuation":{"snapshot_sha":"abc","cycle":4}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	deps := wireOrchestratorDeps(root, filepath.Join(root, ".evolve"), io.Discard, routingRun{})
+	shed, wired, err := deps.Orchestrator.ContinuationShedProbe(root, 9, continuation.Continuation{SnapshotSHA: "abc", Cycle: 4})
+
+	if !wired || err != nil || len(shed) != 1 || shed[0] != "held" {
+		t.Errorf("shed = %v, wired = %v; the composition root must register the continuation shedder", shed, wired)
+	}
+}
+
+func TestHostContinuationShedder_ShedsTheDeclinedPointerOfTheClaim(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	claim := filepath.Join(root, ".evolve", "inbox", "processing", "cycle-9")
+	if err := os.MkdirAll(claim, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	item := filepath.Join(claim, "held.json")
+	if err := os.WriteFile(item, []byte(`{"id":"held","continuation":{"snapshot_sha":"abc","cycle":4}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	shed, err := hostContinuationShedder(nil)(root, 9, continuation.Continuation{SnapshotSHA: "abc", Cycle: 4})
+
+	body, _ := os.ReadFile(item)
+	if err != nil || len(shed) != 1 || strings.Contains(string(body), `"continuation":`) {
+		t.Errorf("shed = %v, err = %v, item = %s; the host shedder must clear the claimed pointer", shed, err, body)
 	}
 }
 

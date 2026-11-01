@@ -6,7 +6,19 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"time"
 )
+
+const LaneLaunchWaitDelay = 10 * time.Second
+
+const defaultDeadlineStampBudget = LaneLaunchWaitDelay / 2
+
+func (o *Orchestrator) deadlineStampBudget() time.Duration {
+	if o.stampBudget > 0 {
+		return o.stampBudget
+	}
+	return defaultDeadlineStampBudget
+}
 
 func (cr *cycleRun) checkpointInterruptedPhase(cause error) {
 	if cr.ctx.Err() == nil || cr.cycleCompletedNormally || ResumeBoundaryCheckpointer == nil {
@@ -21,8 +33,11 @@ func (cr *cycleRun) checkpointInterruptedPhase(cause error) {
 }
 
 func (cr *cycleRun) abnormalEpilogue(cause error) {
-	if cr.cycleCompletedNormally || errors.Is(cause, ErrAllFamiliesExhausted) ||
-		(cr.ctx != nil && cr.ctx.Err() != nil) {
+	if cr.cycleCompletedNormally || errors.Is(cause, ErrAllFamiliesExhausted) {
+		return
+	}
+	if cr.ctx != nil && cr.ctx.Err() != nil {
+		cr.deadlineStamp()
 		return
 	}
 	epilogueCtx := context.Background()
@@ -43,6 +58,18 @@ func (cr *cycleRun) abnormalEpilogue(cause error) {
 	if werr := cr.o.storage.WriteCycleState(epilogueCtx, cr.cs); werr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d: abnormal-epilogue state write failed: %v\n", cr.cycle, werr)
 	}
+}
+
+func (cr *cycleRun) deadlineStamp() {
+	if cr.cs.ActiveWorktree == "" {
+		return
+	}
+	budget := cr.o.deadlineStampBudget()
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(cr.ctx), budget)
+	defer cancel()
+	fmt.Fprintf(cr.o.errOut(), "[orchestrator] cycle %d continuation: deadline stamp after the cycle context ended (%v): salvage snapshot and stamp run detached, budget %s\n",
+		cr.cycle, context.Cause(cr.ctx), budget)
+	cr.o.stampContinuationManifest(ctx, cr.cs, cr.cycle, cr.req.ProjectRoot)
 }
 
 func epilogueCauseSuffix(cause error) string {

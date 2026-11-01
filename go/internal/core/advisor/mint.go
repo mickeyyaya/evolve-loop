@@ -47,7 +47,7 @@ func MintConfigsFrom(entries []router.PhasePlanEntry) ([]phaseconfig.PhaseConfig
 				Description:  e.Mint.Description,
 				WhenToUse:    e.Mint.WhenToUse,
 			},
-			Dispatch: phaseconfig.Dispatch{CLI: e.Mint.CLI, ModelTierDefault: e.Mint.Tier},
+			Dispatch: phaseconfig.Dispatch{ModelTierDefault: e.Mint.Tier},
 			Prompt:   e.Mint.Prompt,
 		})
 	}

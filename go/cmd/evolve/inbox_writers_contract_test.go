@@ -49,10 +49,11 @@ var autofilers = []autofiler{
 const movesOrRewritesAnExistingItem = "moves or rewrites an item that is already filed, so the item keeps the class it was filed with"
 
 var inboxWritersThatFileNothing = map[string]string{
-	"internal/inboxfile":            "the filing writer: File refuses an item without a known class; autofilers mint through inboxfile",
-	"internal/inboxmover/lifecycle": "the lifecycle writer: File refuses an item without a known class (ADR-0121 decision 6); every other write " + movesOrRewritesAnExistingItem,
-	"internal/phases/ship.stage":    movesOrRewritesAnExistingItem + " (the ship's consumption into consumed/)",
-	"cmd/evolve.consumeInboxItem":   movesOrRewritesAnExistingItem + " (evolve inbox consume and the boundary step of evolve inbox curate)",
+	"internal/inboxfile":                            "the filing writer: File refuses an item without a known class; autofilers mint through inboxfile",
+	"internal/inboxmover/lifecycle":                 "the lifecycle writer: File refuses an item without a known class (ADR-0121 decision 6); every other write " + movesOrRewritesAnExistingItem,
+	"internal/phases/ship.stage":                    movesOrRewritesAnExistingItem + " (the ship's consumption into consumed/)",
+	"cmd/evolve.consumeInboxItem":                   movesOrRewritesAnExistingItem + " (evolve inbox consume and the boundary step of evolve inbox curate)",
+	"internal/phases/ship/shiptest.LaneReadyToLand": "a test fixture: it writes one item into the temporary repository that it builds for a ship scenario, never into the inbox of a project",
 }
 
 func TestInboxWriters_EveryAutofiledItemCarriesAKnownClass(t *testing.T) {

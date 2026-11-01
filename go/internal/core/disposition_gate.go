@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/dispositionrouter"
 )
 
 type disposition struct {
@@ -48,7 +50,7 @@ func readDispositionLegitimacy(workspace string, cycle int) string {
 
 var (
 	validLegitimacy = map[string]bool{"legit-rejection": true, "false-rejection": true, "infra-failure": true, "indeterminate": true}
-	validLayer      = map[string]bool{"task-code": true, "pipeline-code": true, "harness": true, "infra": true, "eval-contract": true}
+	validLayer      = map[string]bool{dispositionrouter.LayerTaskCode: true, dispositionrouter.LayerPipelineCode: true, dispositionrouter.LayerHarness: true, dispositionrouter.LayerInfra: true, dispositionrouter.LayerEvalContract: true}
 	validUrgency    = map[string]bool{"P0": true, "P1": true, "P2": true, "P3": true}
 	validRouting    = map[string]bool{"inbox": true, "carryover": true, "console": true, "drop": true}
 )
@@ -124,6 +126,9 @@ func crossCheckAgainstDigest(workspace string, d disposition) error {
 func (o *Orchestrator) finalizeRetroCompletion(workspace string) error {
 	if err := VerifyDisposition(workspace); err != nil {
 		return fmt.Errorf("disposition-gate: %w", err)
+	}
+	if _, err := recordFailureClass(workspace, o.now); err != nil {
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN failure class not recorded: %v\n", err)
 	}
 	return nil
 }

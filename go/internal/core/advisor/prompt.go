@@ -83,18 +83,19 @@ func writePlanResponseSchema(b *strings.Builder) {
 	b.WriteString("ALSO supply \"description\" (one line: what the phase produces) and \"when_to_use\" (the signal that should trigger ")
 	b.WriteString("SELECTing it) — this is the SELECT metadata a later cycle reads to reuse your phase instead of minting a duplicate.\n")
 
-	b.WriteString("\nYou MAY also propose a dispatch \"cli\" and abstract \"tier\" (fast|balanced|deep — never a raw model name) ")
-	b.WriteString("for an EXISTING phase, honoring its allowed_clis/model_tier_envelope above when shown. Omit both to leave the phase's profile-pinned default unchanged.\n")
+	b.WriteString("\nYou MAY also propose an abstract \"tier\" (fast|balanced|deep — never a raw model name) ")
+	b.WriteString("for an EXISTING phase, honoring its model_tier_envelope above when shown. Omit it to leave the phase's profile default unchanged. ")
+	b.WriteString("Never name a CLI or a model: the routing data picks the driver.\n")
 
 	b.WriteString("\n## Operator model-tier policy (apply when proposing a tier)\n")
 	b.WriteString("- deep: judgment-heavy phases — build, tdd, audit, architecture/design, adversarial review.\n")
 	b.WriteString("- balanced: review/scan/triage-class phases — the safe default for anything not covered below.\n")
 	b.WriteString("- fast: ONLY mechanical phases (doc-sync, changelog-sync, locale-format-check, close-checklist) — NEVER for a phase that writes source, renders a verdict, or scopes work. When in doubt, propose HIGHER.\n")
-	b.WriteString("- Judgment phases usually carry a min=balanced envelope above — don't fight the clamp with a low-tier proposal; propose a CLI only when deviating from the phase's profile default is justified.\n")
+	b.WriteString("- Judgment phases usually carry a min=balanced envelope above — don't fight the clamp with a low-tier proposal.\n")
 
 	b.WriteString("\n## Respond with STRICT JSON only (a bare array, no prose, no markdown fence):\n")
-	b.WriteString(`[{"phase":"<phase>","run":true,"justification":"<one sentence>","cli":"<cli>","tier":"balanced"},`)
-	b.WriteString(`{"phase":"<new-phase>","run":true,"justification":"<why>","mint":{"prompt":"<persona>","tier":"balanced","cli":"claude","description":"<what it produces>","when_to_use":"<when to select it>"}}]`)
+	b.WriteString(`[{"phase":"<phase>","run":true,"justification":"<one sentence>","tier":"balanced"},`)
+	b.WriteString(`{"phase":"<new-phase>","run":true,"justification":"<why>","mint":{"prompt":"<persona>","tier":"balanced","description":"<what it produces>","when_to_use":"<when to select it>"}}]`)
 	b.WriteString("\n")
 }
 

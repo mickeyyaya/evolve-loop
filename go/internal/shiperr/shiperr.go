@@ -59,6 +59,7 @@ const (
 	CodeEGPSRedCount ShipErrorCode = "EGPS_RED_COUNT"
 
 	CodeControlPlaneViolation ShipErrorCode = "CONTROL_PLANE_VIOLATION"
+	CodeGateWeakened          ShipErrorCode = "GATE_WEAKENED"
 
 	CodeInvalidClass         ShipErrorCode = "INVALID_CLASS"
 	CodeManualNotTTY         ShipErrorCode = "MANUAL_NOT_TTY"

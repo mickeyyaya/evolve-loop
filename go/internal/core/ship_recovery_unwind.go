@@ -42,7 +42,7 @@ func (o *Orchestrator) unwindBeforeFleetRebase(ctx context.Context, projectRoot 
 		fmt.Fprintf(o.errOut(), "[orchestrator] WARN cycle %d ship unwind skipped: read the audited tree: %v\n", cycle, err)
 		return unwindNone
 	}
-	audited := AuditedChange{Base: cs.WorktreeBaseSHA, Tree: tree, Label: fmt.Sprintf("cycle-%d/%s", cycle, cs.RunID)}
+	audited := AuditedChange{Base: cs.WorktreeBaseSHA, Tree: tree, Label: carrierLabel(cycle, cs.RunID)}
 	verdict, err := unwindDecline(ctx, cs.ActiveWorktree, audited, gitCapture)
 	if err == nil && verdict.declined == "" {
 		err = carryAuditedTree(ctx, cs.ActiveWorktree, audited, gitCapture)
@@ -78,8 +78,7 @@ func unwindShipCommit(ctx context.Context, worktree string, audited AuditedChang
 }
 
 func carryAuditedTree(ctx context.Context, worktree string, audited AuditedChange, git gitFn) error {
-	carrier, err := gitStdout(ctx, git, worktree, "-c", "commit.gpgsign=false", "commit-tree", audited.Tree, "-p", audited.Base,
-		"-m", "evolve: the audited change, unwound from its ship commit", "-m", "Evolve-Carrier: "+audited.Label)
+	carrier, err := commitCarrier(ctx, git, worktree, audited, "evolve: the audited change, unwound from its ship commit")
 	if err != nil {
 		return err
 	}

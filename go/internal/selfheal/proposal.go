@@ -35,6 +35,7 @@ type Proposal struct {
 	RunLabel           string                         `json:"run_label,omitempty"`
 	Diagnosis          *phasecontract.Diagnosis       `json:"diagnosis,omitempty"`
 	Action             *phasecontract.DiagnosisAction `json:"action,omitempty"`
+	Decision           *Decision                      `json:"decision,omitempty"`
 	Error              string                         `json:"error,omitempty"`
 	IncidentRecurrence int                            `json:"incident_recurrence"`
 	IncidentLastSeenAt time.Time                      `json:"incident_last_seen_at"`
@@ -49,9 +50,16 @@ func NewProposal(inc Incident, stage, runLabel string, at time.Time) Proposal {
 }
 
 func (p Proposal) WithDiagnosis(d phasecontract.Diagnosis) Proposal {
-	action := d.Proposed()
+	action := proposedAction(d)
 	p.State, p.Diagnosis, p.Action = ProposalProposed, &d, &action
 	return p
+}
+
+func proposedAction(d phasecontract.Diagnosis) phasecontract.DiagnosisAction {
+	if d.Confidence != phasecontract.ConfidenceLow {
+		return d.Action
+	}
+	return phasecontract.DiagnosisAction{Kind: phasecontract.ActionHaltAndEscalate, Params: phasecontract.DiagnosisParams{Reason: "a low-confidence diagnosis goes to the operator: " + d.Hypothesis}}
 }
 
 func (p Proposal) Refused(err error) Proposal {
@@ -64,21 +72,29 @@ func (p Proposal) Failed(err error) Proposal {
 	return p
 }
 
-func (p Proposal) current(inc Incident) bool {
-	return p.State != ProposalFailed && p.IncidentRecurrence == inc.Recurrence && p.IncidentLastSeenAt.Equal(inc.LastSeenAt)
+func (p Proposal) current(inc Incident, retryAt time.Time) bool {
+	if p.State == ProposalFailed {
+		return p.CreatedAt.After(retryAt)
+	}
+	return p.IncidentRecurrence == inc.Recurrence && p.IncidentLastSeenAt.Equal(inc.LastSeenAt)
 }
 
-func Pending(incidents []Incident, done map[string]Proposal, limit int) []Incident {
+type PassLimits struct {
+	Max     int
+	RetryAt time.Time
+}
+
+func Pending(incidents []Incident, done map[string]Proposal, limits PassLimits) []Incident {
 	var out []Incident
 	for _, inc := range incidents {
-		if p, ok := done[inc.ID]; inc.State == StateOpen && (!ok || !p.current(inc)) {
+		if p, ok := done[inc.ID]; inc.State == StateOpen && (!ok || !p.current(inc, limits.RetryAt)) {
 			out = append(out, inc)
 		}
 	}
 	slices.SortStableFunc(out, func(a, b Incident) int {
 		return cmp.Or(cmp.Compare(b.Severity.Level(), a.Severity.Level()), strings.Compare(a.ID, b.ID))
 	})
-	return out[:min(limit, len(out))]
+	return out[:min(limits.Max, len(out))]
 }
 
 func WriteProposal(dir string, p Proposal) error {

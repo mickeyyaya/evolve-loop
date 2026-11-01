@@ -29,7 +29,7 @@ This digest has the facts that each agent must have when it starts. The full rul
 - Ship only when the EGPS verdict has a red count of zero. Never edit the hash-chained ledger by hand.
 - Never fabricate a cycle number, a test count or a verdict. Report only what a command printed.
 - Do all development on a branch in a worktree, never on main. Main is the integration branch only.
-- Code has no comments. Names, types and tests explain the code, and a design reason goes to the package note. (enforced by `go/internal/commitgate/comments_added.go`)
+- MANDATORY: code has no comments and no Go doc comments. Never write, ask for or test a comment. A reason goes to the package note. (enforced by `go/internal/commitgate/comments_added.go`)
 - Write each document through the docs-write skill. The new text passes evolve docs ste-lint --strict. (enforced by `go/internal/stelint`)
 - Reach each outside service through a CLI, never through MCP. Build a CLI when a service has none.
 - Put research, lessons and failed approaches under docs/. Never delete a document; archive it.

@@ -20,8 +20,8 @@ type evalGateProbe struct {
 func (p *evalGateProbe) Name() string { return p.phase }
 
 func (p *evalGateProbe) Run(_ context.Context, req PhaseRequest) (PhaseResponse, error) {
-	p.lastCLI = req.ModelRoutingCLI
-	p.dispatched = append(p.dispatched, req.ModelRoutingCLI)
+	p.lastCLI = req.Driver.String()
+	p.dispatched = append(p.dispatched, req.Driver.String())
 	return PhaseResponse{Phase: p.phase, Verdict: VerdictPASS, ArtifactsDir: req.Workspace}, nil
 }
 

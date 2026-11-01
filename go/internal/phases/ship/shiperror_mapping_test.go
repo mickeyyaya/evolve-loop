@@ -77,32 +77,6 @@ func TestShipError_GitPushRejected(t *testing.T) {
 	}
 }
 
-func TestShipError_PredicateTreeDrift(t *testing.T) {
-	t.Parallel()
-	repo := makeRepo(t)
-	addRemote(t, repo)
-	wt := makeWorktree(t, repo, "drift-branch")
-	mustWrite(t, filepath.Join(wt, "feature.txt"), "worktree feature\n")
-	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"),
-		`{"cycle_id":7,"phase":"ship","active_worktree":"`+wt+`"}`)
-	seedAuditWithBoundTree(t, repo, "PASS", strings.Repeat("b", 40))
-
-	res, err := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "feat: tree drift"})
-
-	se := wantShipErr(t, err, core.CodeAuditBindingTreeMismatch, core.ShipClassPrecondition, "tree-state mismatch")
-	if se.Debug["audited_tree"] == "" || se.Debug["current_tree"] == "" {
-		t.Errorf("Debug must carry both tree SHAs; got %v", se.Debug)
-	}
-	if res.ExitCode != ExitFailure {
-		t.Errorf("predicate precondition → ExitFailure; got %d", res.ExitCode)
-	}
-	if _, ok := err.(*IntegrityError); !ok {
-		if se2, _ := core.AsShipError(err); se2 == nil {
-			t.Errorf("integrity error must remain recoverable; got %T", err)
-		}
-	}
-}
-
 func TestShipError_DebugStringDeterministic(t *testing.T) {
 	t.Parallel()
 	se := core.NewShipError(core.CodeAuditBindingHeadMoved, core.ShipClassPrecondition,

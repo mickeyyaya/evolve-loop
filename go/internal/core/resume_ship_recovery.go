@@ -1,8 +1,6 @@
 package core
 
 import (
-	"maps"
-
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 )
 
@@ -21,15 +19,7 @@ func (cr *cycleRun) staleBaseAsRebase(err error) error {
 	if !ok || !isLandingDivergence(se) || !cr.baseBehindMain() {
 		return err
 	}
-	debug := maps.Clone(se.Debug)
-	debug[shiperr.OriginalCodeKey] = string(se.Code)
-	return &ShipError{
-		Code:    CodeGitFleetRebaseNeeded,
-		Class:   ShipClassTransient,
-		Stage:   se.Stage,
-		Message: "resumed ship found main past the cycle base " + cr.cs.WorktreeBaseSHA + "; rebase and re-verify the merged tree: " + se.Message,
-		Debug:   debug,
-	}
+	return asFleetRebase(se, "resumed ship found main past the cycle base "+cr.cs.WorktreeBaseSHA+"; rebase and re-verify the merged tree")
 }
 
 func isLandingDivergence(se *ShipError) bool {

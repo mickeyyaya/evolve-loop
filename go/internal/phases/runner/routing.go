@@ -90,7 +90,7 @@ func (b *BaseRunner) routeRequest(req core.PhaseRequest, prep phasePreparation, 
 	}
 	return cliroute.Request{
 		Agent: prep.profileName, Phase: prep.phase, ProjectRoot: req.ProjectRoot, DefaultModel: b.hooks.DefaultModel(),
-		Env: req.Env, Overlay: llmroute.Overlay{CLI: req.ModelRoutingCLI, Tier: req.ModelRoutingTier, LadderTier: req.Ladder.LadderTier(), Effort: req.ModelRoutingEffort},
+		Env: req.Env, Overlay: llmroute.Overlay{CLI: req.Driver.String(), Tier: req.Assignment.Tier, LadderTier: req.Ladder.LadderTier(), Effort: req.Assignment.Effort},
 		Expand: autoExpander(resolve), BypassPolicy: req.BypassPolicy, NeedsTools: req.Worktree != "", Cycle: req.Cycle,
 	}
 }
@@ -109,7 +109,9 @@ func modelSourceOf(req core.PhaseRequest, d cliroute.Decision) string {
 	switch {
 	case d.Rule == cliroute.RuleLegacyPin:
 		return "pin"
-	case req.ModelRoutingCLI != "" || req.ModelRoutingTier != "":
+	case !req.Driver.IsZero():
+		return "escalation"
+	case req.Assignment.Tier != "":
 		return "advisor"
 	}
 	return "profile"
@@ -119,8 +121,10 @@ func (b *BaseRunner) logDecision(req core.PhaseRequest, prep phasePreparation, d
 	switch pin, pinned := overlayPolicy.PinFor(prep.phase); {
 	case d.Rule == cliroute.RuleLegacyPin && pinned:
 		log.Diag().Infof("[runner] phase=%s policy pin: cli=%q model=%q\n", prep.phase, pin.CLI, pin.Model)
-	case req.ModelRoutingCLI != "" || req.ModelRoutingTier != "":
-		b.diag.Infof("[runner] phase=%s advisor overlay cli=%s tier=%s\n", prep.phase, req.ModelRoutingCLI, req.ModelRoutingTier)
+	case !req.Driver.IsZero():
+		b.diag.Infof("[runner] phase=%s escalation overlay driver=%s tier=%s\n", prep.phase, req.Driver, req.Assignment.Tier)
+	case req.Assignment.Tier != "":
+		b.diag.Infof("[runner] phase=%s advisor overlay tier=%s\n", prep.phase, req.Assignment.Tier)
 	default:
 		b.diag.Infof("[runner] phase=%s no advisor overlay (profile default)\n", prep.phase)
 	}

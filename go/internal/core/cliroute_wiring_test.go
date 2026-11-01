@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
@@ -26,11 +27,11 @@ func TestContractEscalation_PicksFromTheTable(t *testing.T) {
 		t.Fatalf("Build: %v", err)
 	}
 	cr := &cycleRun{o: routedOrchestrator(r), req: CycleRequest{ProjectRoot: root}}
-	if got := cr.contractDispatchCLI(PhaseBuild, ""); got != "agy-tmux" {
+	if got := cr.contractDispatchCLI(PhaseBuild, llmroute.Binding{}); got != "agy-tmux" {
 		t.Fatalf("the deliverable came from the table's primary, got %q", got)
 	}
-	esc, ok := cr.contractEscalationCLI(PhaseBuild, "")
-	if !ok || esc != "claude-tmux" {
+	esc, ok := cr.contractEscalationTarget(PhaseBuild, llmroute.Binding{})
+	if !ok || esc.String() != "claude-tmux" {
 		t.Fatalf("the escalation steps to the table's next family, never the profile's codex: %q %v", esc, ok)
 	}
 }
@@ -48,7 +49,7 @@ func TestContractEscalation_NeverLeavesTheAllowedSet(t *testing.T) {
 		t.Fatalf("Build: %v", err)
 	}
 	cr := &cycleRun{o: routedOrchestrator(r), req: CycleRequest{ProjectRoot: root}}
-	if esc, ok := cr.contractEscalationCLI(PhaseBuild, ""); ok {
+	if esc, ok := cr.contractEscalationTarget(PhaseBuild, llmroute.Binding{}); ok {
 		t.Fatalf("a claude-only agent has no other family to escalate to: %q", esc)
 	}
 }
@@ -105,11 +106,11 @@ func TestContractEscalation_ARefusedRouteIsLoudOnBothPaths(t *testing.T) {
 	}
 	cr := &cycleRun{o: routedOrchestrator(r), req: CycleRequest{ProjectRoot: root}, envSnap: map[string]string{"EVOLVE_CLI": "codex-tmux"}}
 	var got string
-	dispatch := captureStderr(t, func() { got = cr.contractDispatchCLI(PhaseBuild, "") })
+	dispatch := captureStderr(t, func() { got = cr.contractDispatchCLI(PhaseBuild, llmroute.Binding{}) })
 	if got != "claude-tmux" || !strings.Contains(dispatch, "phase build: contract escalation has no route") || !strings.Contains(dispatch, "outside the allowed set") {
 		t.Fatalf("the dispatch-CLI lookup names its refusal instead of silently falling back: cli=%q stderr=%q", got, dispatch)
 	}
-	escalate := captureStderr(t, func() { _, _ = cr.contractEscalationCLI(PhaseBuild, "agy-tmux") })
+	escalate := captureStderr(t, func() { _, _ = cr.contractEscalationTarget(PhaseBuild, llmroute.Bind("agy-tmux")) })
 	if !strings.Contains(escalate, "phase build: contract escalation has no route") {
 		t.Fatalf("the escalation names the same refusal the same way: %q", escalate)
 	}
@@ -128,7 +129,7 @@ func TestContractEscalation_ADeclaredStopNeverEscalatesToTheUniversalFallback(t 
 		t.Fatalf("Build: %v", err)
 	}
 	cr := &cycleRun{o: routedOrchestrator(r), req: CycleRequest{ProjectRoot: root}}
-	if esc, ok := cr.contractEscalationCLI(PhaseBuild, ""); ok {
+	if esc, ok := cr.contractEscalationTarget(PhaseBuild, llmroute.Binding{}); ok {
 		t.Fatalf("after_chain stop leaves the builder agy alone; the legacy claude fallback must not override the table: %q", esc)
 	}
 }
@@ -141,10 +142,10 @@ func TestContractEscalation_ADeclaredTableWithNoRootRouterIsLoudAndNeverEscalate
 		t.Fatal(err)
 	}
 	cr := &cycleRun{o: &Orchestrator{}, req: CycleRequest{ProjectRoot: root}}
-	var esc string
+	var esc llmroute.Binding
 	var ok bool
 
-	stderr := captureStderr(t, func() { esc, ok = cr.contractEscalationCLI(PhaseBuild, "codex-tmux") })
+	stderr := captureStderr(t, func() { esc, ok = cr.contractEscalationTarget(PhaseBuild, llmroute.Bind("codex-tmux")) })
 
 	if ok || !strings.Contains(stderr, "contract escalation has no route") || !strings.Contains(stderr, "no compiled router") {
 		t.Fatalf("an orchestrator with no router must not escalate on its own under a declared table: esc=%q ok=%v stderr=%q", esc, ok, stderr)
@@ -165,10 +166,10 @@ func TestContractEscalation_ADeepDispatchNamesAndEscalatesOnlyWhatTheCeilingPerm
 	}
 	cr := &cycleRun{o: routedOrchestrator(r), req: CycleRequest{ProjectRoot: root}}
 
-	if got := cr.contractDispatchCLI(PhaseBuild, ""); got != "agy-claude-tmux" {
+	if got := cr.contractDispatchCLI(PhaseBuild, llmroute.Binding{}); got != "agy-claude-tmux" {
 		t.Fatalf("dispatched CLI = %q, want agy-claude-tmux: agy is not permitted at deep", got)
 	}
-	if esc, ok := cr.contractEscalationCLI(PhaseBuild, ""); !ok || esc != "claude-tmux" {
+	if esc, ok := cr.contractEscalationTarget(PhaseBuild, llmroute.Binding{}); !ok || esc.String() != "claude-tmux" {
 		t.Fatalf("escalation = %q %v, want claude-tmux: never the forbidden agy", esc, ok)
 	}
 }

@@ -65,7 +65,7 @@ func TestFloorGoTestRunners_BuildTheirArgvFromTheBudgetedBuilders(t *testing.T) 
 	for _, pin := range []struct{ path, runner, builder string }{
 		{"../core/phase_bindings_selfcheck.go", "realGoUnitTest", "unitTestArgs"},
 		{"../core/phase_bindings_selfcheck.go", "realGoUnitTestTagged", "taggedTestArgs"},
-		{"../core/build_floor_reviewer.go", "scopedCoverProfile", "coverTestArgs"},
+		{"../core/build_floor_reviewer.go", "runCoverPass", "coverTestArgs"},
 	} {
 		if !functionCalls(t, pin.path, pin.runner, pin.builder) {
 			t.Errorf("%s must build its go test argv with %s; an argv written in place can drop -timeout and run under Go's 10m default, which the -timeout scan cannot see", pin.runner, pin.builder)

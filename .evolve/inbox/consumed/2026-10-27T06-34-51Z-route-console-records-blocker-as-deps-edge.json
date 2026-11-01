@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "Red test first: route-lane --blocked-by X on item Y gives Y deps [X] and status waiting.",
+    "An unknown blocker id is refused with the id.",
+    "After X is consumed, Y is ready without a manual step."
+  ],
+  "consumed": {
+    "at": "2026-10-27T07:23:29Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "evolve inbox route-console and route-lane take --blocked-by \u003citem-id\u003e; the blocker joins deps through inboxmover.Edit, so the lane menu wakes the item when the blocker is consumed."
+  },
+  "created_at": "2026-10-27T06:34:51Z",
+  "deps": [],
+  "files": [
+    "go/internal/inboxmover/lifecycle/route.go",
+    "go/cmd/evolve/cmd_inbox.go"
+  ],
+  "fix": "Add --blocked-by \u003citem-id\u003e to evolve inbox route-console and route-lane: it checks that the blocker item exists and adds it to deps. A blocked item routed to the lane stays Waiting until the blocker is consumed.",
+  "id": "route-console-records-blocker-as-deps-edge",
+  "kind": "pipeline-repair",
+  "origin": "console",
+  "priority": "P2",
+  "priority_class": "stability",
+  "source": "console, 2026-10-27, cycle resume investigation (scratchpad cycle-resume-research.md), operator question on resuming failed cycles",
+  "summary": "Items parked for a blocker keep the blocker only as text with deps []. Nothing wakes them when the blocker lands (2041, 2045, 2046 in wave 143). The deps edge and the Waiting state already exist (dispatchability.go:25-69).",
+  "title": "A held item names its blocker item as a deps edge, so it wakes when the blocker is consumed",
+  "weight": 0.6
+}

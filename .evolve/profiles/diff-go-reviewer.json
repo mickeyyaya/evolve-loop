@@ -15,11 +15,11 @@
     "Read",
     "Grep",
     "Glob",
-    "Bash"
+    "Bash",
+    "Write(.evolve/ephemeral/agent-runs/*/diff-go-reviewer-report.md)"
   ],
   "disallowed_tools": [
-    "Edit",
-    "Write"
+    "Edit"
   ],
   "max_budget_usd": 1.0,
   "max_turns": 15,

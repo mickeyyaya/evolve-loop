@@ -7,9 +7,11 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 )
 
@@ -22,6 +24,36 @@ func WriteIncident(dir string, inc Incident) error {
 		return fmt.Errorf("incident %s: %w", inc.ID, err)
 	}
 	return atomicwrite.JSON(filepath.Join(dir, inc.ID+".json"), inc)
+}
+
+func UpdateIncidents(dir string, update func([]Incident) ([]Incident, error)) error {
+	return flock.WithPathLock(dir, func() error {
+		existing, err := LoadIncidents(dir)
+		if err != nil {
+			return err
+		}
+		next, err := update(existing)
+		if err != nil {
+			return err
+		}
+		return writeChanged(dir, existing, next)
+	})
+}
+
+func writeChanged(dir string, before, after []Incident) error {
+	old := map[string]Incident{}
+	for _, inc := range before {
+		old[inc.ID] = inc
+	}
+	for _, inc := range after {
+		if prev, ok := old[inc.ID]; ok && reflect.DeepEqual(prev, inc) {
+			continue
+		}
+		if err := WriteIncident(dir, inc); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func LoadIncidents(dir string) ([]Incident, error) {

@@ -77,7 +77,6 @@ Each already exists with a tuned persona + profile. SELECT one by naming it in y
 - bug-reproduction [evaluate] (bugfix) — when: bugfix cycles, before tdd/build
 - plan-review [evaluate] — when: Reviews the plan for scope creep.
 - security-sweep [evaluate, writes-source] (security, auth) — when: wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww …[truncated]
-  allowed_clis: claude-tmux, codex-tmux
   model_tier_envelope: {min: balanced, default: deep, max: top}
 - perf-benchmark [evaluate] — when: performance goals
 - architecture-design [plan] (design) — when: novel or cross-cutting goals
@@ -96,15 +95,15 @@ Each already exists with a tuned persona + profile. SELECT one by naming it in y
 If an objective signal calls for work no existing phase covers, you MAY add an entry for a brand-new phase by attaching a "mint" block. Give it a kebab-case phase name, an inline persona prompt, and a TIER (fast|balanced|deep — never a raw model name). Minted phases are always optional and clamped by the kernel; they can never reach ship without audit. Omit "mint" for existing phases. Minted phases default to writes_source:true; set "writes_source":false only for phases that never edit source.
 ALSO supply "description" (one line: what the phase produces) and "when_to_use" (the signal that should trigger SELECTing it) — this is the SELECT metadata a later cycle reads to reuse your phase instead of minting a duplicate.
 
-You MAY also propose a dispatch "cli" and abstract "tier" (fast|balanced|deep — never a raw model name) for an EXISTING phase, honoring its allowed_clis/model_tier_envelope above when shown. Omit both to leave the phase's profile-pinned default unchanged.
+You MAY also propose an abstract "tier" (fast|balanced|deep — never a raw model name) for an EXISTING phase, honoring its model_tier_envelope above when shown. Omit it to leave the phase's profile default unchanged. Never name a CLI or a model: the routing data picks the driver.
 
 ## Operator model-tier policy (apply when proposing a tier)
 - deep: judgment-heavy phases — build, tdd, audit, architecture/design, adversarial review.
 - balanced: review/scan/triage-class phases — the safe default for anything not covered below.
 - fast: ONLY mechanical phases (doc-sync, changelog-sync, locale-format-check, close-checklist) — NEVER for a phase that writes source, renders a verdict, or scopes work. When in doubt, propose HIGHER.
-- Judgment phases usually carry a min=balanced envelope above — don't fight the clamp with a low-tier proposal; propose a CLI only when deviating from the phase's profile default is justified.
+- Judgment phases usually carry a min=balanced envelope above — don't fight the clamp with a low-tier proposal.
 
 ## Respond with STRICT JSON only (a bare array, no prose, no markdown fence):
-[{"phase":"<phase>","run":true,"justification":"<one sentence>","cli":"<cli>","tier":"balanced"},{"phase":"<new-phase>","run":true,"justification":"<why>","mint":{"prompt":"<persona>","tier":"balanced","cli":"claude","description":"<what it produces>","when_to_use":"<when to select it>"}}]
+[{"phase":"<phase>","run":true,"justification":"<one sentence>","tier":"balanced"},{"phase":"<new-phase>","run":true,"justification":"<why>","mint":{"prompt":"<persona>","tier":"balanced","description":"<what it produces>","when_to_use":"<when to select it>"}}]
 
 Now write your whole-cycle plan as a strict JSON array to /ws/cycle-42/routing-replan.json (no prose, no fence).

@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 func gitIn(t *testing.T, dir string, args ...string) {
@@ -21,7 +19,7 @@ func gitIn(t *testing.T, dir string, args ...string) {
 
 func TestStageExplicitPaths_AlreadyStagedDeletion(t *testing.T) {
 	t.Parallel()
-	root := gittest.Fixture(t).Dir
+	root := emptyRepo(t).Dir
 	if err := os.WriteFile(filepath.Join(root, "doomed.txt"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +45,7 @@ func TestStageExplicitPaths_AlreadyStagedDeletion(t *testing.T) {
 
 func TestStageExplicitPaths_AlreadyStagedRename(t *testing.T) {
 	t.Parallel()
-	root := gittest.Fixture(t).Dir
+	root := emptyRepo(t).Dir
 	body := []byte("{\n  \"id\": \"some-item\",\n  \"weight\": 0.85,\n  \"title\": \"a queued item with enough body to score as a rename\"\n}\n")
 	if err := os.MkdirAll(filepath.Join(root, "inbox"), 0o755); err != nil {
 		t.Fatal(err)

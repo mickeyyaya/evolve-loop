@@ -177,8 +177,8 @@ func TestResumeLifecycle_RequestRetainsDifficultyAndRecurrence(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := o.runners[PhaseBuild].(*fakeRunner).requests[0]
-	if got.BudgetScale != 1.5 || got.ModelRoutingTier != "deep" {
-		t.Fatalf("resume dropped dispatch policy: scale=%v tier=%q", got.BudgetScale, got.ModelRoutingTier)
+	if got.BudgetScale != 1.5 || got.Assignment.Tier != "deep" {
+		t.Fatalf("resume dropped dispatch policy: scale=%v tier=%q", got.BudgetScale, got.Assignment.Tier)
 	}
 }
 
@@ -367,8 +367,8 @@ func TestResumeLifecycle_RecurrenceUsesPersistedLaneScope(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := o.runners[PhaseBuild].(*fakeRunner).requests[0]
-	if got.ModelRoutingTier != "deep" || got.Context["fleet_scope"] != "task-a" {
-		t.Fatalf("persisted task scope lost: tier=%q scope=%q", got.ModelRoutingTier, got.Context["fleet_scope"])
+	if got.Assignment.Tier != "deep" || got.Context["fleet_scope"] != "task-a" {
+		t.Fatalf("persisted task scope lost: tier=%q scope=%q", got.Assignment.Tier, got.Context["fleet_scope"])
 	}
 }
 

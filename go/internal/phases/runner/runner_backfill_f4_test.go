@@ -130,7 +130,8 @@ func TestLogDecision_ThePolicyPinAdvisorOverlayAndDefaultEachGetTheirOwnLine(t *
 		{"a legacy pin that the policy actually holds", core.PhaseRequest{}, cliroute.RuleLegacyPin, pinned, "", `policy pin: cli="claude-tmux" model="opus"`, "no advisor overlay", ""},
 		{"a legacy-pin decision without a policy pin falls to the default line", core.PhaseRequest{}, cliroute.RuleLegacyPin, policy.Policy{}, "no advisor overlay (profile default)", "", "policy pin", "policy pin"},
 		{"a policy pin without a legacy-pin decision is not announced", core.PhaseRequest{}, "", pinned, "no advisor overlay (profile default)", "", "", "policy pin"},
-		{"an advisor overlay", core.PhaseRequest{ModelRoutingCLI: "codex-tmux", ModelRoutingTier: "deep"}, "", policy.Policy{}, "advisor overlay cli=codex-tmux tier=deep", "", "no advisor overlay", ""},
+		{"an escalated driver", core.PhaseRequest{Driver: llmroute.Bind("codex-tmux"), Assignment: core.TaskAssignment{Tier: "deep"}}, "", policy.Policy{}, "escalation overlay driver=codex-tmux tier=deep", "", "advisor overlay", ""},
+		{"an advisor tier", core.PhaseRequest{Assignment: core.TaskAssignment{Tier: "deep"}}, "", policy.Policy{}, "advisor overlay tier=deep", "", "no advisor overlay", ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

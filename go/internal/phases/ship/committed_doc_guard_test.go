@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 )
 
@@ -20,7 +19,7 @@ const archivedDoc = "docs/private/research/archived-2026-10-20/guide.md"
 
 func docRepo(t *testing.T) string {
 	t.Helper()
-	root := gittest.Fixture(t).Dir
+	root := emptyRepo(t).Dir
 	writeDoc(t, root, "docs/guide.md", "# Guide\n\nThe committed guide body that a rename keeps.\n")
 	writeDoc(t, root, "knowledge-base/note.md", "# Note\n\nA committed research note.\n")
 	writeDoc(t, root, "go/tool.go", "package tool\n")

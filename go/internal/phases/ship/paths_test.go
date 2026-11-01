@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 func TestPreviewStagedSet_ListsEveryChangedPathAndLeavesTheIndexAlone(t *testing.T) {
@@ -51,7 +49,7 @@ func TestVerifyClass_ManualDryRunOnACleanTreeIsAnEmptyDiffExit(t *testing.T) {
 
 func TestPreviewStagedSet_ReportsAGitFailure(t *testing.T) {
 	t.Parallel()
-	opts := &Options{Class: ClassManual, DryRun: true, ProjectRoot: filepath.Join(gittest.Fixture(t).Dir, "missing"), Runner: execRunner}
+	opts := &Options{Class: ClassManual, DryRun: true, ProjectRoot: filepath.Join(emptyRepo(t).Dir, "missing"), Runner: execRunner}
 
 	if err := previewStagedSet(context.Background(), opts, &RunResult{}); err == nil {
 		t.Fatal("a failing git status must surface as an error")

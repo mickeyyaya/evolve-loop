@@ -1,0 +1,33 @@
+{
+  "acceptance": [
+    "RED first: a cycle diff that adds t.Skip to a guard test ships today; after the change the classifier refuses it",
+    "TestGateClassifier_FlagsEachWeakeningPattern has one case for each of the seven patterns",
+    "A T1 audit seat resolves to a family other than the builder (TestT1AuditSeatIsAnotherFamily)",
+    "Changed functions at 100% coverage"
+  ],
+  "consumed": {
+    "at": "2026-10-27T08:42:54Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "X15: go/internal/gateclass holds the tiers T0/T1/T2 and the classifier of the seven patterns of llm-isolation.md §20.3; the build floor fails a flagged build and ship refuses a flagged cycle diff with GATE_WEAKENED and HEALING_I10_VIOLATION (enforce); cliroute.Decision.IndependentOf is the T1 judge rule"
+  },
+  "created_at": "2026-10-25T12:00:15Z",
+  "deps": [
+    "isolation-artifact-index-read-isolation"
+  ],
+  "files": [
+    "go/internal/guards/",
+    "go/internal/phases/ship/integrity.go",
+    "go/internal/core/",
+    "go/internal/cliroute/"
+  ],
+  "fix": "Add the tier table and the classifier patterns of spec §20.3: protected path, removed guard or contract test, added t.Skip, lowered threshold or budget, stage moved off enforce, changed frozen check, changed catalog or tiers. Run it at the build floor and at ship beside the P2 check. A T0 flag in a loop cycle refuses the ship with HEALING_I10_VIOLATION. Depends on the frozen predicates of item tdd-predicates-frozen-at-handoff for I-11.",
+  "id": "selfheal-surface-tiers-gate-classifier",
+  "kind": "feature",
+  "priority_class": "security",
+  "route": "console-manual",
+  "source": "console, 2026-10-25, plan llm-isolation-2026-10 component X15 (ADR-0155)",
+  "summary": "ADR-0064 protects a path list (go/internal/guards/integrity_surface.go:184) and the ship refuses a cycle diff that touches it (go/internal/phases/ship/integrity.go:23). A weaker gate outside the list is not caught. Spec: docs/architecture/llm-isolation.md §20 and §21.",
+  "title": "Self-healing X15: surface tiers T0, T1, T2 and a diff classifier that flags a change to the kernel or a weaker gate",
+  "weight": 0.36
+}

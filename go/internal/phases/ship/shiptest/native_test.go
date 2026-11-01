@@ -1,0 +1,455 @@
+//go:build integration
+
+package shiptest_test
+
+import (
+	"encoding/json"
+	"fmt"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/statemap"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/shiptest"
+)
+
+func TestNative_A_NoAuditor_Refuses(t *testing.T) {
+	t.Parallel()
+	repo := shiptest.MakeRepo(t)
+	res, err := runShip(t, repo, ship.Options{Class: ship.ClassCycle, CommitMessage: "test commit"})
+	if res.ExitCode != ship.ExitFailure {
+		t.Fatalf("want ExitFailure, got %d (err=%v, logs=%v)", res.ExitCode, err, res.Logs)
+	}
+	shiptest.WantShipErr(t, err, core.CodeAuditBindingNoAuditor, core.ShipClassPrecondition, "no Auditor")
+	if !containsLog(res, "no Auditor") {
+		t.Errorf("missing 'no Auditor' log in: %v", res.Logs)
+	}
+}
+
+func TestNative_B_PASS_AuditMatching_Ships(t *testing.T) {
+	t.Parallel()
+	repo := shiptest.MakeRepo(t)
+	shiptest.MustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nmodified content\n")
+	shiptest.SeedAudit(t, repo, "PASS")
+	shiptest.AddRemote(t, repo)
+	res, err := runShip(t, repo, ship.Options{Class: ship.ClassCycle, CommitMessage: "feat: test"})
+	if res.ExitCode != ship.ExitOK {
+		t.Fatalf("want ExitOK, got %d (err=%v, logs=%v)", res.ExitCode, err, res.Logs)
+	}
+	if res.CommitSHA == "" {
+		t.Errorf("expected non-empty CommitSHA")
+	}
+}
+
+func TestNative_C_WARN_ShipsFluent(t *testing.T) {
+	t.Parallel()
+	repo := shiptest.MakeRepo(t)
+	shiptest.MustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nwarn change\n")
+	shiptest.SeedAudit(t, repo, "WARN")
+	shiptest.AddRemote(t, repo)
+	res, _ := runShip(t, repo, ship.Options{Class: ship.ClassCycle, CommitMessage: "feat: shipping with WARN"})
+	if res.ExitCode != ship.ExitOK {
+		t.Fatalf("want ExitOK, got %d (logs=%v)", res.ExitCode, res.Logs)
+	}
+	if !containsLog(res, "audit verdict: WARN — shipping") {
+		t.Errorf("missing WARN-shipping log in: %v", res.Logs)
+	}
+}
+
+func TestNative_C2_StrictAudit_WARN_Refused(t *testing.T) {
+	t.Parallel()
+	repo := shiptest.MakeRepo(t)
+	shiptest.MustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nwarn change strict\n")
+	shiptest.SeedAudit(t, repo, "WARN")
+	shiptest.WriteStrictAuditPolicy(t, repo)
+	res, _ := runShip(t, repo, ship.Options{
+		Class:         ship.ClassCycle,
+		CommitMessage: "should not ship",
+	})
+	if res.ExitCode != ship.ExitFailure {
+		t.Fatalf("want ExitFailure (WARN+strict is a re-auditable precondition), got %d", res.ExitCode)
+	}
+	if !containsLog(res, "workflow.strict_audit") {
+		t.Errorf("missing strict-audit message in: %v", res.Logs)
+	}
+}
+
+func TestNative_D_TreeStateMismatch_Refuses(t *testing.T) {
+	t.Parallel()
+	repo := shiptest.MakeRepo(t)
+	shiptest.MustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nversion 1 of audited content\n")
+	shiptest.SeedAudit(t, repo, "PASS")
+	shiptest.MustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nversion 1 of audited content\nversion 2 — added after audit\n")
+	res, _ := runShip(t, repo, ship.Options{Class: ship.ClassCycle, CommitMessage: "should refuse"})
+	if res.ExitCode != ship.ExitFailure {
+		t.Fatalf("want ExitFailure (tree-state mismatch is a re-auditable precondition), got %d (logs=%v)", res.ExitCode, res.Logs)
+	}
+	if !containsLog(res, "tree-state mismatch") {
+		t.Errorf("missing tree-state-mismatch in: %v", res.Logs)
+	}
+}
+
+func TestNative_E_HEADMismatch_Refuses(t *testing.T) {
+	t.Parallel()
+	repo := shiptest.MakeRepo(t)
+	shiptest.SeedAudit(t, repo, "PASS", map[string]string{
+		"head": "0000000000000000000000000000000000000000",
+	})
+	res, _ := runShip(t, repo, ship.Options{Class: ship.ClassCycle, CommitMessage: "should refuse"})
+	if res.ExitCode != ship.ExitFailure {
+		t.Fatalf("want ExitFailure (HEAD-moved is a re-auditable precondition), got %d", res.ExitCode)
+	}
+	if !containsLog(res, "HEAD has moved") {
+		t.Errorf("missing 'HEAD has moved' in: %v", res.Logs)
+	}
+}
+
+func TestNative_F_SelfSHATamperedWithinVersion_Refuses(t *testing.T) {
+	t.Parallel()
+	repo := shiptest.MakeRepo(t)
+	shiptest.MustMkdir(t, filepath.Join(repo, ".claude-plugin"))
+	shiptest.MustWrite(t, filepath.Join(repo, ".claude-plugin", "plugin.json"), `{"version":"1.0.0"}`)
+	shiptest.AddRemote(t, repo)
+
+	shiptest.MustWrite(t, filepath.Join(repo, "audited.txt"), "audited\n")
+	shiptest.SeedAudit(t, repo, "PASS")
+	res1, _ := runShip(t, repo, ship.Options{Class: ship.ClassCycle, CommitMessage: "first ship"})
+	if res1.ExitCode != ship.ExitOK {
+		t.Fatalf("first ship: want ExitOK got %d (logs=%v)", res1.ExitCode, res1.Logs)
+	}
+
+	shiptest.MustWrite(t, filepath.Join(repo, "ship-binary-fixture"), "ship-binary-v1\n# malicious comment\n")
+
+	shiptest.MustWrite(t, filepath.Join(repo, "another.txt"), "another change\n")
+	shiptest.SeedAudit(t, repo, "PASS")
+	res2, _ := runShip(t, repo, ship.Options{Class: ship.ClassCycle, CommitMessage: "second ship"})
+	if res2.ExitCode != ship.ExitIntegrity {
+		t.Fatalf("second ship: want ExitIntegrity got %d (logs=%v)", res2.ExitCode, res2.Logs)
+	}
+	if !containsLog(res2, "WITHIN plugin version") {
+		t.Errorf("missing 'WITHIN plugin version' in: %v", res2.Logs)
+	}
+}
+
+func TestNative_G_BypassEnv_SilentlyIgnored(t *testing.T) {
+	t.Parallel()
+	repo := shiptest.MakeRepo(t)
+	shiptest.MustWrite(t, filepath.Join(repo, "emergency.txt"), "emergency change\n")
+	shiptest.AddRemote(t, repo)
+	res, _ := runShip(t, repo, ship.Options{
+		Class:            ship.ClassManual,
+		CommitMessage:    "emergency",
+		BypassCommitGate: true,
+		AutoConfirm:      "test",
+		Env: map[string]string{
+			"EVOLVE_BYPASS_SHIP_VERIFY": "1",
+		},
+	})
+	if res.ExitCode != ship.ExitOK {
+		t.Fatalf("want ExitOK, got %d (logs=%v)", res.ExitCode, res.Logs)
+	}
+	if res.ClassUsed != ship.ClassManual {
+		t.Errorf("ClassUsed=%q, want ClassManual (set explicitly, not via bridge)", res.ClassUsed)
+	}
+}
+
+func TestNative_H_ClassRelease_ShipsNoAudit(t *testing.T) {
+	t.Parallel()
+	repo := shiptest.MakeRepo(t)
+	shiptest.MustWrite(t, filepath.Join(repo, "release.txt"), "release bump\n")
+	shiptest.AddRemote(t, repo)
+	res, _ := runShip(t, repo, ship.Options{Class: ship.ClassRelease, CommitMessage: "release: v9.99.99"})
+	if res.ExitCode != ship.ExitOK {
+		t.Fatalf("want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)
+	}
+	if !containsLog(res, "class: release") {
+		t.Errorf("missing 'class: release' log in: %v", res.Logs)
+	}
+}
+
+func TestNative_I_ManualNoTTY_Refuses(t *testing.T) {
+	t.Parallel()
+	repo := shiptest.MakeRepo(t)
+	shiptest.MustWrite(t, filepath.Join(repo, "manual.txt"), "manual change\n")
+	shiptest.AddRemote(t, repo)
+	res, _ := runShip(t, repo, ship.Options{
+		Class:         ship.ClassManual,
+		CommitMessage: "manual change",
+	})
+	if res.ExitCode != ship.ExitFailure {
+		t.Fatalf("want ExitFailure (not-a-tty is a config error), got %d (logs=%v)", res.ExitCode, res.Logs)
+	}
+	if !containsLog(res, "requires interactive stdin") {
+		t.Errorf("missing tty-required message in: %v", res.Logs)
+	}
+}
+
+func TestNative_J_ManualAutoConfirm_Ships(t *testing.T) {
+	t.Parallel()
+	repo := shiptest.MakeRepo(t)
+	shiptest.MustWrite(t, filepath.Join(repo, "ci.txt"), "ci change\n")
+	shiptest.AddRemote(t, repo)
+	res, _ := runShip(t, repo, ship.Options{
+		Class:            ship.ClassManual,
+		CommitMessage:    "ci change",
+		BypassCommitGate: true,
+		AutoConfirm:      "test",
+	})
+	if res.ExitCode != ship.ExitOK {
+		t.Fatalf("want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)
+	}
+	if !containsLog(res, "auto-confirmed") {
+		t.Errorf("missing 'auto-confirmed' in: %v", res.Logs)
+	}
+}
+
+func TestNative_K_BypassEnv_NoDeprecationLog(t *testing.T) {
+	t.Parallel()
+	repo := shiptest.MakeRepo(t)
+	shiptest.MustWrite(t, filepath.Join(repo, "bridge.txt"), "bridge change\n")
+	shiptest.SeedAudit(t, repo, "PASS")
+	shiptest.AddRemote(t, repo)
+	res, _ := runShip(t, repo, ship.Options{
+		Class:         ship.ClassCycle,
+		CommitMessage: "legacy bypass",
+		Env:           map[string]string{"EVOLVE_BYPASS_SHIP_VERIFY": "1"},
+	})
+	if res.ExitCode != ship.ExitOK {
+		t.Fatalf("want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)
+	}
+	if containsLog(res, "DEPRECATION: EVOLVE_BYPASS_SHIP_VERIFY=1") {
+		t.Errorf("deprecation log must not be emitted after bridge removal: %v", res.Logs)
+	}
+	if res.ClassUsed != ship.ClassCycle {
+		t.Errorf("ClassUsed=%q, want ClassCycle (flag no longer bridges to ClassManual)", res.ClassUsed)
+	}
+}
+
+func TestNative_L_InvalidClass_Rejected(t *testing.T) {
+	t.Parallel()
+	repo := shiptest.MakeRepo(t)
+	res, err := runShip(t, repo, ship.Options{Class: ship.Class("garbage"), CommitMessage: "msg"})
+	if err == nil {
+		t.Fatalf("want error, got nil (res=%+v)", res)
+	}
+	if !strings.Contains(err.Error(), "invalid --class") {
+		t.Errorf("missing 'invalid --class' in error: %v", err)
+	}
+}
+
+func TestNative_M_AuditorExit1_PASS_Ships(t *testing.T) {
+	t.Parallel()
+	repo := shiptest.MakeRepo(t)
+	shiptest.MustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nmodified for exit-1 test\n")
+	shiptest.SeedAudit(t, repo, "PASS", map[string]string{"exit_code": "1"})
+	shiptest.AddRemote(t, repo)
+	res, _ := runShip(t, repo, ship.Options{Class: ship.ClassCycle, CommitMessage: "feat: ship with exit-1"})
+	if res.ExitCode != ship.ExitOK {
+		t.Fatalf("want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)
+	}
+}
+
+func TestNative_N_AuditorExit2_Refuses(t *testing.T) {
+	t.Parallel()
+	repo := shiptest.MakeRepo(t)
+	shiptest.MustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nmodified for exit-2 test\n")
+	shiptest.SeedAudit(t, repo, "PASS", map[string]string{"exit_code": "2"})
+	res, _ := runShip(t, repo, ship.Options{Class: ship.ClassCycle, CommitMessage: "feat: ship with exit-2"})
+	if res.ExitCode != ship.ExitFailure {
+		t.Fatalf("want ExitFailure (auditor-exit-2 is a re-auditable precondition), got %d (logs=%v)", res.ExitCode, res.Logs)
+	}
+	if !containsLog(res, "Auditor exited 2") {
+		t.Errorf("missing 'Auditor exited 2' in: %v", res.Logs)
+	}
+}
+
+func TestNative_O_VerdictFAIL_Refuses(t *testing.T) {
+	t.Parallel()
+	repo := shiptest.MakeRepo(t)
+	shiptest.MustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nmodified for verdict-fail test\n")
+	shiptest.SeedAudit(t, repo, "FAIL")
+	res, _ := runShip(t, repo, ship.Options{Class: ship.ClassCycle, CommitMessage: "feat: ship with verdict fail"})
+	if res.ExitCode != ship.ExitFailure {
+		t.Fatalf("want ExitFailure (verdict-FAIL is a re-auditable precondition), got %d (logs=%v)", res.ExitCode, res.Logs)
+	}
+	if !containsLog(res, "Verdict: FAIL") && !containsLog(res, "auditor explicitly rejected") {
+		t.Errorf("missing FAIL verdict diagnostic in: %v", res.Logs)
+	}
+}
+
+func TestNative_P_DualVerdict_Refuses(t *testing.T) {
+	t.Parallel()
+	repo := shiptest.MakeRepo(t)
+	shiptest.MustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\ndual-verdict change\n")
+	auditPath := filepath.Join(repo, ".evolve", "runs", "cycle-1", "audit-report.md")
+	body := `<!-- challenge-token: testtoken123 -->
+# Audit Report — Cycle 1
+
+## Verdict
+**FAIL**
+
+But also somewhere in this report:
+Verdict: PASS
+
+(simulating cycle-25's actual audit-report.md inconsistency)
+`
+	shiptest.MustWrite(t, auditPath, body)
+	sha := shiptest.MustHashFile(t, auditPath)
+	headSHA := strings.TrimSpace(shiptest.RunGitOut(t, repo, "rev-parse", "HEAD"))
+	treeSHA := shiptest.TreeStateSHA(t, repo)
+	entry := map[string]any{
+		"ts": "2026-04-27T00:00:00Z", "cycle": 1, "role": "auditor",
+		"kind": "agent_subprocess", "model": "sonnet", "exit_code": 0,
+		"duration_s": "30", "artifact_path": auditPath, "artifact_sha256": sha,
+		"challenge_token": "testtoken123", "git_head": headSHA, "tree_state_sha": treeSHA,
+	}
+	line, _ := json.Marshal(entry)
+	shiptest.MustWrite(t, filepath.Join(repo, ".evolve", "ledger.jsonl"), string(line)+"\n")
+
+	res, _ := runShip(t, repo, ship.Options{Class: ship.ClassCycle, CommitMessage: "ship dual-verdict"})
+	if res.ExitCode != ship.ExitFailure {
+		t.Fatalf("want ExitFailure (dual-verdict is a re-auditable precondition), got %d (logs=%v)", res.ExitCode, res.Logs)
+	}
+	if !containsLog(res, "BOTH 'Verdict: FAIL' AND 'Verdict: PASS'") {
+		t.Errorf("missing dual-verdict message in: %v", res.Logs)
+	}
+}
+
+func TestNative_Q_PluginVersionBump_RePins(t *testing.T) {
+	t.Parallel()
+	repo := shiptest.MakeRepo(t)
+	shiptest.MustMkdir(t, filepath.Join(repo, ".claude-plugin"))
+	shiptest.MustWrite(t, filepath.Join(repo, ".claude-plugin", "plugin.json"), `{"version":"1.0.0"}`)
+	shiptest.AddRemote(t, repo)
+
+	shiptest.MustWrite(t, filepath.Join(repo, "q1.txt"), "first audited\n")
+	shiptest.SeedAudit(t, repo, "PASS")
+	res1, _ := runShip(t, repo, ship.Options{Class: ship.ClassCycle, CommitMessage: "first ship at v1.0.0"})
+	if res1.ExitCode != ship.ExitOK {
+		t.Fatalf("first ship: want ExitOK got %d (logs=%v)", res1.ExitCode, res1.Logs)
+	}
+
+	shiptest.MustWrite(t, filepath.Join(repo, ".claude-plugin", "plugin.json"), `{"version":"1.1.0"}`)
+	shiptest.MustWrite(t, filepath.Join(repo, "ship-binary-fixture"), "ship-binary-v2\n# v1.1.0 tweak\n")
+	shiptest.MustWrite(t, filepath.Join(repo, "q2.txt"), "second\n")
+	shiptest.SeedAudit(t, repo, "PASS")
+	res2, _ := runShip(t, repo, ship.Options{Class: ship.ClassCycle, CommitMessage: "ship at v1.1.0"})
+	if res2.ExitCode != ship.ExitOK {
+		t.Fatalf("second ship: want ExitOK got %d (logs=%v)", res2.ExitCode, res2.Logs)
+	}
+	if !containsLog(res2, "plugin version changed: '1.0.0' → '1.1.0'") {
+		t.Errorf("missing version-change log in: %v", res2.Logs)
+	}
+}
+
+func TestNative_R_LegacySHAOnlyPin_Migrates(t *testing.T) {
+	t.Parallel()
+	repo := shiptest.MakeRepo(t)
+	shiptest.MustMkdir(t, filepath.Join(repo, ".claude-plugin"))
+	shiptest.MustWrite(t, filepath.Join(repo, ".claude-plugin", "plugin.json"), `{"version":"2.0.0"}`)
+	binPath := filepath.Join(repo, "ship-binary-fixture")
+	currentSHA := shiptest.MustHashFile(t, binPath)
+	shiptest.MustWrite(t, filepath.Join(repo, ".evolve", "state.json"),
+		fmt.Sprintf(`{"expected_ship_sha":"%s"}`, currentSHA))
+	shiptest.MustWrite(t, filepath.Join(repo, "r.txt"), "audited\n")
+	shiptest.SeedAudit(t, repo, "PASS")
+	shiptest.AddRemote(t, repo)
+
+	res, _ := runShip(t, repo, ship.Options{Class: ship.ClassCycle, CommitMessage: "ship after migration"})
+	if res.ExitCode != ship.ExitOK {
+		t.Fatalf("want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)
+	}
+	stMap, _ := statemap.ReadStateMap(filepath.Join(repo, ".evolve", "state.json"))
+	if v := stMap["expected_ship_version"]; v != "2.0.0" {
+		t.Errorf("want expected_ship_version=2.0.0, got %q", v)
+	}
+	if !containsLog(res, "migrating legacy SHA-only pin") && !containsLog(res, "schema migration") {
+		t.Errorf("missing migration log in: %v", res.Logs)
+	}
+}
+
+func TestNative_S_CycleAdvancesLastCycleNumber(t *testing.T) {
+	t.Parallel()
+	repo := shiptest.MakeRepo(t)
+	shiptest.MustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nv8.34.0 cycle ship test\n")
+	shiptest.MustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"), `{"cycle_id":1,"phase":"ship"}`)
+	shiptest.SeedAudit(t, repo, "PASS")
+	shiptest.MustWrite(t, filepath.Join(repo, ".evolve", "state.json"), `{"lastCycleNumber":0}`)
+	shiptest.AddRemote(t, repo)
+
+	res, _ := runShip(t, repo, ship.Options{Class: ship.ClassCycle, CommitMessage: "feat: cycle 1 work"})
+	if res.ExitCode != ship.ExitOK {
+		t.Fatalf("want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)
+	}
+	stMap, _ := statemap.ReadStateMap(filepath.Join(repo, ".evolve", "state.json"))
+	got := stMap["lastCycleNumber"]
+	if got != float64(1) {
+		t.Errorf("want lastCycleNumber=1, got %v", got)
+	}
+	if !containsLog(res, "advanced state.json:lastCycleNumber to 1") {
+		t.Errorf("missing advance log in: %v", res.Logs)
+	}
+}
+
+func TestNative_T_ManualPreservesLastCycleNumber(t *testing.T) {
+	t.Parallel()
+	repo := shiptest.MakeRepo(t)
+	shiptest.MustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nmanual change v8.34\n")
+	shiptest.MustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"), `{"cycle_id":99,"phase":"ship"}`)
+	shiptest.MustWrite(t, filepath.Join(repo, ".evolve", "state.json"), `{"lastCycleNumber":5}`)
+	shiptest.AddRemote(t, repo)
+
+	res, _ := runShip(t, repo, ship.Options{
+		Class:            ship.ClassManual,
+		CommitMessage:    "manual: ad-hoc fix",
+		BypassCommitGate: true,
+		AutoConfirm:      "test",
+	})
+	if res.ExitCode != ship.ExitOK {
+		t.Fatalf("want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)
+	}
+	stMap, _ := statemap.ReadStateMap(filepath.Join(repo, ".evolve", "state.json"))
+	got := stMap["lastCycleNumber"]
+	if got != float64(5) {
+		t.Errorf("want lastCycleNumber=5 (unchanged), got %v", got)
+	}
+}
+
+func TestNative_U_ActualDiffFooter_CycleCommit(t *testing.T) {
+	t.Parallel()
+	repo := shiptest.MakeRepo(t)
+	shiptest.MustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\ndiff transparency test\n")
+	shiptest.MustWrite(t, filepath.Join(repo, "newfile.txt"), "new file content\n")
+	shiptest.MustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"), `{"cycle_id":2,"phase":"ship"}`)
+	shiptest.SeedAudit(t, repo, "PASS")
+	shiptest.AddRemote(t, repo)
+
+	res, _ := runShip(t, repo, ship.Options{Class: ship.ClassCycle, CommitMessage: "feat: claims do not match"})
+	if res.ExitCode != ship.ExitOK {
+		t.Fatalf("want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)
+	}
+	lastMsg := shiptest.RunGitOut(t, repo, "log", "-1", "--format=%B")
+	if !strings.Contains(lastMsg, "## Actual diff (v8.34.0+)") {
+		t.Errorf("missing actual-diff header in: %s", lastMsg)
+	}
+	if !strings.Contains(lastMsg, "fixture.txt") || !strings.Contains(lastMsg, "newfile.txt") {
+		t.Errorf("missing file entries in: %s", lastMsg)
+	}
+}
+
+func TestNative_V_ReleaseSkipsFooter(t *testing.T) {
+	t.Parallel()
+	repo := shiptest.MakeRepo(t)
+	shiptest.MustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nrelease content\n")
+	shiptest.AddRemote(t, repo)
+	res, _ := runShip(t, repo, ship.Options{Class: ship.ClassRelease, CommitMessage: "release: v9.0.0"})
+	if res.ExitCode != ship.ExitOK {
+		t.Fatalf("want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)
+	}
+	lastMsg := shiptest.RunGitOut(t, repo, "log", "-1", "--format=%B")
+	if strings.Contains(lastMsg, "## Actual diff") {
+		t.Errorf("release commit should NOT have actual-diff footer, got: %s", lastMsg)
+	}
+}

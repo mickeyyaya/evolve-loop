@@ -39,9 +39,6 @@ func TestParseDiagnosis_AcceptsADiagnosisOfTheCatalog(t *testing.T) {
 	if d.Action.Kind != ActionOpenRepairItem || !slices.Equal(d.Action.Params.Files, []string{"go/internal/gc/sweep.go"}) || d.Alternative == nil || d.Alternative.Params.SHA != "abc1234" {
 		t.Fatalf("decoded %+v", d)
 	}
-	if got := d.Proposed(); got.Kind != ActionOpenRepairItem {
-		t.Errorf("a medium diagnosis proposes its own action, got %+v", got)
-	}
 }
 
 func TestParseDiagnosis_EachEvidenceIDMustExistInTheIndex(t *testing.T) {
@@ -53,21 +50,6 @@ func TestParseDiagnosis_EachEvidenceIDMustExistInTheIndex(t *testing.T) {
 	empty := diagnosisWith(`"evidence":["i1","s2"]`, `"evidence":[]`)
 	if _, err := ParseDiagnosis(empty, "inc-2026-10-27-235078cd", diagnosisEvidence); err == nil || !strings.Contains(err.Error(), "names no evidence") {
 		t.Fatalf("a diagnosis with no evidence must be refused, got %v", err)
-	}
-}
-
-func TestDiagnosis_ProposedMapsALowConfidenceDiagnosisToHaltAndEscalate(t *testing.T) {
-	t.Parallel()
-	d, err := ParseDiagnosis(diagnosisWith(`"confidence":"medium"`, `"confidence":"low"`), "inc-2026-10-27-235078cd", diagnosisEvidence)
-	if err != nil {
-		t.Fatal(err)
-	}
-	got := d.Proposed()
-	if got.Kind != ActionHaltAndEscalate || !strings.Contains(got.Params.Reason, "low") || !strings.Contains(got.Params.Reason, d.Hypothesis) {
-		t.Fatalf("a low diagnosis must go to the operator, got %+v", got)
-	}
-	if d.Action.Kind != ActionOpenRepairItem {
-		t.Errorf("Proposed must not change the recorded action, got %+v", d.Action)
 	}
 }
 
@@ -93,6 +75,8 @@ func TestParseDiagnosis_Refusals(t *testing.T) {
 		{"an unknown variation", diagnosisWith(repair, `"kind":"retry-with-variation","params":{"item":"a","variation":"luck"}`), `variation "luck"`},
 		{"a sha that is not hex", diagnosisWith(repair, `"kind":"revert-last-landing","params":{"sha":"HEAD~1"}`), `sha "HEAD~1"`},
 		{"a file outside the repository", diagnosisWith(repair, `"kind":"open-repair-item","params":{"files":["../etc/passwd"],"repro":"r"}`), `file "../etc/passwd"`},
+		{"a dispatch with no request", diagnosisWith(repair, `"kind":"dispatch-phase-agent","params":{}`), `dispatch-phase-agent needs the param "request"`},
+		{"a dispatch of a request that is not a request name", diagnosisWith(repair, `"kind":"dispatch-phase-agent","params":{"request":"../x"}`), `request "../x"`},
 		{"a bad alternative", diagnosisWith(`"kind":"revert-last-landing","params":{"sha":"abc1234"}`, `"kind":"run-shell","params":{}`), `alternative: action kind "run-shell"`},
 	}
 	for _, c := range cases {
@@ -115,6 +99,7 @@ func TestParseDiagnosis_EachCatalogActionWithItsParamsIsAccepted(t *testing.T) {
 		ActionRevertLastLanding:  `"kind":"revert-last-landing","params":{"sha":"0123456789abcdef0123456789abcdef01234567"}`,
 		ActionOpenRepairItem:     repair,
 		ActionHaltAndEscalate:    `"kind":"halt-and-escalate","params":{}`,
+		ActionDispatchPhaseAgent: `"kind":"dispatch-phase-agent","params":{"request":"dispatch-1"}`,
 	}
 	if got := DiagnosisActions(); len(got) != len(actions) {
 		t.Fatalf("DiagnosisActions() = %v, want the %d actions of llm-isolation.md §19", got, len(actions))

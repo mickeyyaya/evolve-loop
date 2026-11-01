@@ -104,6 +104,12 @@ const LoopStopFile = "loop-stop"
 
 func LoopStopPath(evolveDir string) string { return filepath.Join(evolveDir, LoopStopFile) }
 
+const FailureDigestsDir = "failure-digests"
+
+func FailureDigestRecordPath(evolveDir string, cycle int) string {
+	return filepath.Join(evolveDir, FailureDigestsDir, "cycle-"+strconv.Itoa(cycle)+".json")
+}
+
 func EvolveDirOf(projectRoot string) string { return filepath.Join(projectRoot, ".evolve") }
 
 func EventChannelsRoot(evolveDir string) string { return filepath.Join(evolveDir, "events", "ch") }

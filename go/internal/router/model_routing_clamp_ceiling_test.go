@@ -4,19 +4,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
 func TestClampPlanModelRouting_ClampsAboveCeilingTier(t *testing.T) {
-	prof := &profiles.Profile{CLI: "claude-tmux", AllowedCLIs: []string{"claude"},
-		ModelTierEnvelope: &profiles.ModelTierEnvelope{Min: "fast", Max: "balanced"}}
-	catalog := modelcatalog.Catalog{CLIs: map[string]modelcatalog.CLIEntry{
-		"claude": {Source: modelcatalog.SourceLive, TierModels: map[string]string{"fast": "haiku", "balanced": "sonnet", "deep": "opus"}},
-	}}
-	plan := &PhasePlan{Entries: []PhasePlanEntry{{Phase: "memo", Run: true, CLI: "claude", Tier: "deep"}}}
+	prof := &profiles.Profile{ModelTierEnvelope: &profiles.ModelTierEnvelope{Min: "fast", Max: "balanced"}}
+	plan := &PhasePlan{Entries: []PhasePlanEntry{{Phase: "memo", Run: true, Tier: "deep"}}}
 
-	out, clamps := ClampPlanModelRouting(plan, profileFunc(prof), catalog.Lookup)
+	out, clamps := ClampPlanModelRouting(plan, profileFunc(prof))
 	if len(clamps) != 1 {
 		t.Fatalf("clamps = %+v, want exactly one (the ceiling)", clamps)
 	}
@@ -26,19 +21,13 @@ func TestClampPlanModelRouting_ClampsAboveCeilingTier(t *testing.T) {
 	if out.Entries[0].Tier != "balanced" {
 		t.Errorf("tier = %q, want %q (clamped down to envelope max)", out.Entries[0].Tier, "balanced")
 	}
-	if out.Entries[0].CLI != "claude" {
-		t.Errorf("CLI mutated to %q; only the tier violated a bound", out.Entries[0].CLI)
-	}
 }
 
 func TestClampPlanModelRouting_EnvelopelessDeepStaysLegal(t *testing.T) {
-	prof := &profiles.Profile{CLI: "claude-tmux", AllowedCLIs: []string{"claude"}}
-	catalog := modelcatalog.Catalog{CLIs: map[string]modelcatalog.CLIEntry{
-		"claude": {Source: modelcatalog.SourceLive, TierModels: map[string]string{"deep": "opus"}},
-	}}
-	plan := &PhasePlan{Entries: []PhasePlanEntry{{Phase: "audit", Run: true, CLI: "claude", Tier: "deep"}}}
+	prof := &profiles.Profile{}
+	plan := &PhasePlan{Entries: []PhasePlanEntry{{Phase: "audit", Run: true, Tier: "deep"}}}
 
-	out, clamps := ClampPlanModelRouting(plan, profileFunc(prof), catalog.Lookup)
+	out, clamps := ClampPlanModelRouting(plan, profileFunc(prof))
 	if len(clamps) != 0 {
 		t.Fatalf("clamps = %+v, want none (below the universal Max)", clamps)
 	}
@@ -48,13 +37,10 @@ func TestClampPlanModelRouting_EnvelopelessDeepStaysLegal(t *testing.T) {
 }
 
 func TestClampPlanModelRouting_EnvelopelessTopStaysLegal(t *testing.T) {
-	prof := &profiles.Profile{CLI: "claude-tmux", AllowedCLIs: []string{"claude"}}
-	catalog := modelcatalog.Catalog{CLIs: map[string]modelcatalog.CLIEntry{
-		"claude": {Source: modelcatalog.SourceLive, TierModels: map[string]string{"top": "opus"}},
-	}}
-	plan := &PhasePlan{Entries: []PhasePlanEntry{{Phase: "audit", Run: true, CLI: "claude", Tier: "top"}}}
+	prof := &profiles.Profile{}
+	plan := &PhasePlan{Entries: []PhasePlanEntry{{Phase: "audit", Run: true, Tier: "top"}}}
 
-	out, clamps := ClampPlanModelRouting(plan, profileFunc(prof), catalog.Lookup)
+	out, clamps := ClampPlanModelRouting(plan, profileFunc(prof))
 	if len(clamps) != 0 {
 		t.Fatalf("clamps = %+v, want none (top IS the universal ceiling, not above it)", clamps)
 	}

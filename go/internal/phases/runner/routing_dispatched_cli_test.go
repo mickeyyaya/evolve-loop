@@ -55,7 +55,7 @@ func TestLogDecision_ADeepSeatWhoseChainStartsWithAForbiddenCLILogsTheDispatched
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			b, root := deepCeilingBuilder(t, &fakeBridge{})
-			req := core.PhaseRequest{ProjectRoot: root, ModelRoutingTier: tc.tier}
+			req := core.PhaseRequest{ProjectRoot: root, Assignment: core.TaskAssignment{Tier: tc.tier}}
 			stderr := captureStderrF4(t, func() {
 				if _, resp, err := b.resolveDispatchPlan(req, builderPreparation(root)); err != nil || resp != nil {
 					t.Fatalf("resolveDispatchPlan: %v %+v", err, resp)
@@ -88,7 +88,7 @@ func TestRun_TheBridgeLaunchesTheCLITheRunnerLogged(t *testing.T) {
 	fb := &fakeBridge{writeArtifact: "# build artifact\n## Files Modified\n- a.go\n"}
 	b, root := deepCeilingBuilder(t, fb)
 	stderr := captureStderrF4(t, func() {
-		if _, err := b.Run(context.Background(), core.PhaseRequest{Cycle: 9, ProjectRoot: root, Workspace: t.TempDir(), ModelRoutingTier: "deep"}); err != nil {
+		if _, err := b.Run(context.Background(), core.PhaseRequest{Cycle: 9, ProjectRoot: root, Workspace: t.TempDir(), Assignment: core.TaskAssignment{Tier: "deep"}}); err != nil {
 			t.Fatalf("Run: %v", err)
 		}
 	})
