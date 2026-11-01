@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "Red test first: the rusage of runs 40582532714 (base) and 40611567029 passes, and 40526866678 fails on bridge.",
+    "Report-only below 3 reference packages.",
+    "CI steps use the CPU gate and no longer pass -ratchet-report-only.",
+    "Docs in STE."
+  ],
+  "created_at": "2026-11-01T13:40:17Z",
+  "deps": [],
+  "files": [
+    "go/cmd/testlatency",
+    "go/.test-latency.json",
+    ".github/workflows/go.yml"
+  ],
+  "fix": "testlatency reads test-rusage.ndjson, computes S, gates CPU/S against a per-OS baseline in .test-latency.json; report-only when fewer than 3 reference packages; baselines lower only on main. Then remove -ratchet-report-only from both CI steps.",
+  "id": "ratchet-speed-adjusted-cpu",
+  "kind": "pipeline-repair",
+  "notes": "Console route: CI gate and test system.",
+  "origin": "console",
+  "priority": "P1",
+  "priority_class": "stability",
+  "route": "console",
+  "source": "console, 2026-11-01, research PR #1227 (docs/research/ci-wall-variance-2026-11.md), operator deep-dive request",
+  "summary": "Wall time swings 2.3x with the macOS host class (3-core vs 5-core) and CPU speed (0.90-1.52x). Research #1227 replays a CPU rule: package user+sys CPU divided by the run speed index S (median CPU ratio of the other packages >= 2 s) fails above 1.35x baseline and +15 s; it passes the 3 clean runs and fails both quadratic-parse runs on both OSes.",
+  "title": "The package ratchet judges speed-adjusted CPU per OS, and wall stays a timeout cap and a report",
+  "weight": 0.85
+}

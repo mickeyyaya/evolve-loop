@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "Red test first: a guard fails on today profiles because the declared deliverable has no tool that can write it.",
+    "After the fix, the guard passes and Edit stays disallowed; the sandbox keeps the repo read-only.",
+    "A real evolve agent run code-simplifier on a small diff writes its report through Write on claude-tmux.",
+    "The profile docs and the cli-contract of agent run state the rule in STE."
+  ],
+  "created_at": "2026-10-27T11:41:23Z",
+  "deps": [],
+  "files": [
+    ".evolve/profiles/diff-code-simplifier.json",
+    ".evolve/profiles/diff-go-reviewer.json",
+    ".evolve/profiles/diff-code-reviewer.json",
+    ".evolve/profiles/diff-architecture-reviewer.json",
+    ".evolve/profiles/diff-docs-review.json"
+  ],
+  "fix": "Allow Write scoped to the run report path only (the profile tool rule for the agent-run workspace deliverable), keep Edit disallowed and the repo read-only. Add a guard test: each profile whose run has a declared deliverable must grant a tool that can write exactly that path.",
+  "id": "reviewer-profiles-may-write-their-report",
+  "kind": "pipeline-repair",
+  "notes": "Console route: .evolve/profiles is on the protected fence, and these profiles are the console review path.",
+  "origin": "console",
+  "priority": "P1",
+  "priority_class": "correctness",
+  "route": "console",
+  "source": "console, 2026-10-27, three code-simplifier stalls on the X14 boundary patch; kept workspace dev/cl-selfheal-x14/.evolve/ephemeral/agent-runs/agent-code-simplifier-20261027T112246Z-7922",
+  "summary": "The five profiles .evolve/profiles/diff-{code-simplifier,go-reviewer,code-reviewer,architecture-reviewer,docs-review}.json list Write in disallowed_tools, yet the run must write diff-<name>-report.md. A run passes only when the model chooses to write the file through Bash. On 2026-10-27 code-simplifier timed out 3 times on one X14 diff (runs agent-code-simplifier-20261027T104645Z-9179, ...T110431Z-f670, ...T112246Z-7922): the agent finished the review, said Write is disabled, refused to write through Bash and waited; the idle detector killed it after 900 s (exit 81). The same contract conflict as cycle 2061.",
+  "title": "Each diff reviewer profile may write its own report file, so a review never stalls on a disallowed Write",
+  "weight": 0.9
+}

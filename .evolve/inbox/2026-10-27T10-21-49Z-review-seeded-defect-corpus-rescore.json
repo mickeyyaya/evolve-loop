@@ -1,0 +1,31 @@
+{
+  "acceptance": [
+    "The corpus holds at least 20 past defects with class and expected finding.",
+    "JQ1 reports a number per reviewer and per class.",
+    "A changed reviewer persona triggers a rescore."
+  ],
+  "created_at": "2026-10-27T10:21:49Z",
+  "deps": [
+    "cli-capability-negotiation",
+    "cli-neutral-profiles-and-personas",
+    "cli-neutral-task-assignment-and-guard",
+    "isolation-dispatch-request-channel",
+    "selfheal-action-catalog-validator-budgets",
+    "selfheal-repair-cycle-path"
+  ],
+  "files": [
+    "docs/architecture/llm-quality-indexes.md",
+    "agents/evolve-diff-code-reviewer.md"
+  ],
+  "fix": "Build Q8 of ADR-0153: the corpus, the runner through `evolve agent run`, and a trigger on a change of a reviewer persona or model. Keep the corpus out of every prompt.",
+  "id": "review-seeded-defect-corpus-rescore",
+  "kind": "test",
+  "notes": " Operator 2026-10-27: build after the LLM isolation work is done (deps on the open X14, X16, X19a-c and dispatch request channel items).",
+  "origin": "console",
+  "priority": "medium",
+  "priority_class": "correctness",
+  "source": "Research: docs/research/code-review-at-anthropic-2026-10.md (Claude Code team code review, 2026-10-15), section 5, rank 6",
+  "summary": "Re-apply past real defects to a frozen tree. Score each reviewer prompt and model against them whenever either changes.",
+  "title": "Build the JQ1 corpus of past real bugs and rescore reviewers on each prompt or model change",
+  "weight": 0.65
+}

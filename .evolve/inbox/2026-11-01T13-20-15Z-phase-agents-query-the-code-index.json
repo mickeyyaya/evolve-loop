@@ -1,0 +1,28 @@
+{
+  "acceptance": [
+    "Red test first: the scout and build profiles grant evolve code, and a guard fails if a phase profile lacks it.",
+    "evolve code usage records the calling phase.",
+    "One wave after the change, evolve code usage shows calls from scout and build.",
+    "Personas and the code-index doc are updated in STE."
+  ],
+  "created_at": "2026-11-01T13:20:15Z",
+  "deps": [],
+  "files": [
+    ".evolve/profiles",
+    "agents/evolve-scout.md",
+    "agents/evolve-builder.md",
+    "go/cmd/evolve/cmd_code.go"
+  ],
+  "fix": "Grant evolve code find|callers|api|map in the scout, triage, tdd, build and audit profiles (class A), name it in their personas as the first way to locate code, refresh the index at wave start as well as at sync-main, and record phase in evolve code usage. Measure with token telemetry (T1/T3) whether build and scout context shrinks.",
+  "id": "phase-agents-query-the-code-index",
+  "kind": "feature",
+  "notes": "Console route: phase profiles are on the protected fence.",
+  "origin": "console",
+  "priority": "P2",
+  "priority_class": "performance",
+  "route": "console",
+  "source": "console, 2026-11-01, operator: did we continue refreshing the trail-code and ask LLM cli to read and query through it?",
+  "summary": "The code index at dev/code-index refreshes at each sync-main (now at 146776a26 while main is ahead), but phase agents never use it: evolve code usage for 7 days shows 5 calls, all outside any phase (4 find, 1 callers). No persona, skill, guidance rule or profile names evolve code, so scout, build, tdd and audit read code with grep and whole-file reads, which grows the context each turn (token telemetry: build and scout use 73% of tokens, mostly cache reads).",
+  "title": "Phase agents read code through the code index (evolve code), and its use is measured per phase",
+  "weight": 0.65
+}

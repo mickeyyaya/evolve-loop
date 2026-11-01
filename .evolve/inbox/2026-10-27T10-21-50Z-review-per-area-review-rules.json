@@ -1,0 +1,31 @@
+{
+  "acceptance": [
+    "Two pilot areas have review rules.",
+    "A reviewer brief for a change in a pilot area includes its rules.",
+    "Nit count per review falls against the baseline."
+  ],
+  "created_at": "2026-10-27T10:21:50Z",
+  "deps": [
+    "cli-capability-negotiation",
+    "cli-neutral-profiles-and-personas",
+    "cli-neutral-task-assignment-and-guard",
+    "isolation-dispatch-request-channel",
+    "selfheal-action-catalog-validator-budgets",
+    "selfheal-repair-cycle-path"
+  ],
+  "files": [
+    "agents/evolve-diff-code-reviewer.md",
+    "agents/evolve-diff-go-reviewer.md"
+  ],
+  "fix": "Design first: choose where the rules live in the guidance registry (ADR-0145). Pass the rules of the changed areas into the diff reviewer briefs.",
+  "id": "review-per-area-review-rules",
+  "kind": "docs",
+  "notes": " Operator 2026-10-27: build after the LLM isolation work is done (deps on the open X14, X16, X19a-c and dispatch request channel items).",
+  "origin": "console",
+  "priority": "low",
+  "priority_class": "maintainability",
+  "source": "Research: docs/research/code-review-at-anthropic-2026-10.md (Claude Code team code review, 2026-10-15), section 5, rank 7",
+  "summary": "Code owners write what failure looks like in their area, a cap on nits, and the rule that each finding cites file:line evidence.",
+  "title": "REVIEW.md-style rules for each area of the repository",
+  "weight": 0.4
+}
