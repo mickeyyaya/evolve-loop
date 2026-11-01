@@ -549,4 +549,10 @@ approaches / decision / results / retro) — lives at
 | [research/token-telemetry-2026-10.md](research/token-telemetry-2026-10.md) | Research: what the try record holds, the collectors of each driver and the largest consumers of waves 141 to 143. It also records what each CLI and the GenAI conventions supply, and the ranked gaps. |
 | [plans/token-telemetry-2026-10.md](plans/token-telemetry-2026-10.md) | Plan: five scored designs, the metrics, the nine components T1 to T9, their order and the reduction follow-ups. |
 
+## 2026-11-01 — the causes of the CI wall variance, and a ratchet for a noisy runner
+
+| Document | What it records |
+|---|---|
+| [research/ci-wall-variance-2026-11.md](research/ci-wall-variance-2026-11.md) | Research: the two macOS host classes, the CPU speed of each host and the wait type of each large test. It also gives the ranked causes and a ratchet on normalized package CPU. |
+
 <!-- GENERATED:research-index END -->
