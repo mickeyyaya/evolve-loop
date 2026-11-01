@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "Each run artifact names its core count and memory.",
+    "macOS runs use -p 3 on every host.",
+    "Docs in STE."
+  ],
+  "created_at": "2026-11-01T13:40:19Z",
+  "deps": [],
+  "files": [
+    ".github/workflows/go.yml",
+    "go/cmd/hostsampler"
+  ],
+  "fix": "runner-samples.ndjson records cores and memory; the macOS job passes an explicit -p 3; baselines are kept per host class.",
+  "id": "ci-runner-host-class-recorded",
+  "kind": "pipeline-repair",
+  "notes": "Console route: CI gate and test system.",
+  "origin": "console",
+  "priority": "P2",
+  "priority_class": "stability",
+  "route": "console",
+  "source": "console, 2026-11-01, research PR #1227 (docs/research/ci-wall-variance-2026-11.md), operator deep-dive request",
+  "summary": "The host class (3-core 7 GB vs 5-core 14 GB) is inferred from concurrency today; job logs do not print the core count, and go test -p follows the core count, so the same suite runs 3 or 5 binaries at once.",
+  "title": "CI records the runner core count and memory, and pins the macOS test parallelism",
+  "weight": 0.55
+}

@@ -5,6 +5,12 @@
     "Two failures with different failing checks give different class fingerprints.",
     "The doc of the failure digest states both fingerprints in STE."
   ],
+  "consumed": {
+    "at": "2026-10-27T11:07:43Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "PR #1216 (feat/failure-class-fingerprint): class fingerprint + class recurrence, console route staged, breaker by class; all acceptance met, CI green"
+  },
   "created_at": "2026-10-27T08:13:33Z",
   "deps": [],
   "files": [
