@@ -38,6 +38,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	pkgBudget := fs.Bool("package-budget", false, "apply addedtests.PackageWallBudget and exit 1 when a package exceeds it")
 	ratchetPath := fs.String("ratchet", "", "gate packages against this ratchet file: exit 1 above min(2 x class ceiling, -test-timeout)")
 	testTimeout := fs.String("test-timeout", "20m", "the go test timeout that caps every package limit")
+	reportOnly := fs.Bool("ratchet-report-only", false, "print each package above its ratchet limit but exit 0 for a breach; an unreadable ratchet or stream still fails")
 	render := fs.Bool("render", false, "write the Output field of each event to stdout (the plain go test text) and exit 0")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -68,7 +69,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		Budget:       limit.Seconds(),
 	}))
 	overBudget := enforce && len(rep.OverBudget(limit.Seconds())) > 0
-	gateFailed := ratchet.gate(stdout, stderr, rep, timeout)
+	gateFailed := ratchet.gate(stdout, stderr, rep, timeout) && !*reportOnly
 	if overBudget || gateFailed {
 		return 1
 	}
