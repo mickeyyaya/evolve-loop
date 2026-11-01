@@ -210,3 +210,43 @@ func TestPolicyParse_AcceptsTheIsolationI15Stage(t *testing.T) {
 		t.Fatalf("Parse = %v, stage %q; want the i15 stage accepted", err, p.IsolationQueueStage())
 	}
 }
+
+func TestIsolationDispatchRequests_DefaultsAndOverrides(t *testing.T) {
+	t.Parallel()
+	defaults := policy.Policy{}.IsolationDispatchRequests()
+	if defaults.Stage != policy.DispatchRequestStageShadow || defaults.PerCycle != 3 || defaults.MaxDepth != 1 || len(defaults.Roles) == 0 {
+		t.Fatalf("defaults = %+v, want stage shadow, 3 requests for each cycle, depth 1 and a default role list", defaults)
+	}
+	p, err := policy.Parse([]byte(`{"isolation":{"dispatch_requests":{"stage":"enforce","roles":["fault-localization"],"per_cycle":1,"max_depth":2}}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := p.IsolationDispatchRequests()
+	if got.Stage != policy.DispatchRequestStageEnforce || got.PerCycle != 1 || got.MaxDepth != 2 || len(got.Roles) != 1 || got.Roles[0] != "fault-localization" {
+		t.Fatalf("overrides = %+v", got)
+	}
+	got.Roles[0] = "changed"
+	if again := p.IsolationDispatchRequests(); again.Roles[0] != "fault-localization" {
+		t.Fatalf("the accessor must return a copy of the roles, got %+v", again)
+	}
+	off := policy.Policy{Isolation: &policy.IsolationPolicy{DispatchRequests: &policy.DispatchRequestsPolicy{Stage: policy.DispatchRequestStageOff}}}
+	if off.IsolationDispatchRequests().Stage != policy.DispatchRequestStageOff {
+		t.Fatal("the stage off must hold")
+	}
+}
+
+func TestParse_RefusesADispatchRequestsBlockThatNoReaderCanApply(t *testing.T) {
+	t.Parallel()
+	for body, want := range map[string]string{
+		`{"isolation":{"dispatch_requests":{"stage":"loud"}}}`:         `stage "loud"`,
+		`{"isolation":{"dispatch_requests":{"per_cycle":-1}}}`:         "per_cycle",
+		`{"isolation":{"dispatch_requests":{"max_depth":-1}}}`:         "max_depth",
+		`{"isolation":{"dispatch_requests":{"roles":["../builder"]}}}`: `role "../builder"`,
+		`{"isolation":{"dispatch_requests":{"budget":3}}}`:             "unknown policy key",
+	} {
+		_, err := policy.Parse([]byte(body))
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("Parse(%s) = %v, want an error that names %q", body, err, want)
+		}
+	}
+}

@@ -265,16 +265,3 @@ func TestPhaseBoundaryCheckpointer_FiresDuringRunCycle(t *testing.T) {
 		t.Errorf("checkpointer CycleState.CycleID=%d, want 10", lastCS.CycleID)
 	}
 }
-
-func TestOrchestrator_ModelCatalogLookupWired(t *testing.T) {
-	t.Parallel()
-	bare := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
-	if bare.ModelCatalogLookupWired() {
-		t.Error("bare orchestrator must report ModelCatalogLookupWired()=false — a nil lookup makes the clamp's catalog gate a no-op")
-	}
-	wired := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil),
-		WithModelCatalogLookup(func(cli, tier string) (string, bool) { return "opus", true }))
-	if !wired.ModelCatalogLookupWired() {
-		t.Error("orchestrator with WithModelCatalogLookup must report ModelCatalogLookupWired()=true")
-	}
-}

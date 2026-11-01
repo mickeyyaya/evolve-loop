@@ -105,10 +105,10 @@ func TestRepairRoundDispatch_RaisesBuildTierThroughLiveLoop(t *testing.T) {
 	if len(fr.requests) < 2 {
 		t.Fatalf("build dispatched %d time(s); the repair round never re-dispatched build", len(fr.requests))
 	}
-	if got := fr.requests[0].ModelRoutingTier; got != "" {
+	if got := fr.requests[0].Assignment.Tier; got != "" {
 		t.Errorf("first build dispatch tier = %q, want the profile default (no overlay)", got)
 	}
-	if got := fr.requests[len(fr.requests)-1].ModelRoutingTier; got != "deep" {
+	if got := fr.requests[len(fr.requests)-1].Assignment.Tier; got != "deep" {
 		t.Errorf("repair-round build dispatch tier = %q, want \"deep\" — the declared audit_retry_2plus override must reach the dispatched request", got)
 	}
 }
@@ -143,7 +143,7 @@ func TestRepairRoundResume_RaisesBuildTierAndArchivesPromptThroughResumePath(t *
 	if len(fr.requests) == 0 {
 		t.Fatal("the resumed repair round never re-dispatched build")
 	}
-	if got := fr.requests[len(fr.requests)-1].ModelRoutingTier; got != "deep" {
+	if got := fr.requests[len(fr.requests)-1].Assignment.Tier; got != "deep" {
 		t.Errorf("resumed repair-round build tier = %q, want \"deep\" — resume.go must apply repairRoundTier like the live loop", got)
 	}
 	if _, err := os.Stat(filepath.Join(ws, "build-prompt.round1.txt")); err != nil {

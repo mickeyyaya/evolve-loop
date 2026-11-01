@@ -1,8 +1,6 @@
 package selfheal
 
 import (
-	"bufio"
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,6 +16,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/defectledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/events/channel"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
+	"github.com/mickeyyaya/evolve-loop/go/internal/shipjournal"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/usageprobe"
 )
@@ -51,30 +50,31 @@ func signalTime(e signalcenter.Event) time.Time {
 }
 
 func LoadShipped(journalPath string) (map[int]bool, error) {
-	raw, err := os.ReadFile(journalPath)
-	if errors.Is(err, fs.ErrNotExist) {
-		return map[int]bool{}, nil
-	}
+	entries, err := readJSONL[shipjournal.Entry](journalPath)
 	if err != nil {
 		return nil, fmt.Errorf("ship journal: %w", err)
 	}
 	shipped := map[int]bool{}
-	scanner := bufio.NewScanner(bytes.NewReader(raw))
-	for line := 1; scanner.Scan(); line++ {
-		if len(bytes.TrimSpace(scanner.Bytes())) == 0 {
-			continue
-		}
-		var entry struct {
-			Cycle int `json:"cycle"`
-		}
-		if err := json.Unmarshal(scanner.Bytes(), &entry); err != nil {
-			return nil, fmt.Errorf("ship journal %s line %d: %w", journalPath, line, err)
-		}
-		if entry.Cycle > 0 {
-			shipped[entry.Cycle] = true
+	for _, e := range entries {
+		if e.Cycle > 0 {
+			shipped[e.Cycle] = true
 		}
 	}
 	return shipped, nil
+}
+
+func LoadLandings(journalPath string, since time.Time) ([]Landing, error) {
+	entries, err := readJSONL[shipjournal.Entry](journalPath)
+	if err != nil {
+		return nil, fmt.Errorf("ship journal: %w", err)
+	}
+	var out []Landing
+	for _, e := range entries {
+		if at, ok := e.Time(); e.Class == shipjournal.ClassCycle && ok && !at.Before(since) {
+			out = append(out, Landing{SHA: e.SHA, At: at})
+		}
+	}
+	return out, nil
 }
 
 var cycleDir = regexp.MustCompile(`^cycle-(\d+)$`)

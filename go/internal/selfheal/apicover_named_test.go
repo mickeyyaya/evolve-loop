@@ -7,7 +7,7 @@ import (
 
 func TestClasses_IsTheClosedSetOfTheDetectionRules(t *testing.T) {
 	t.Parallel()
-	want := []Class{ClassMainRed, ClassCIHang, ClassFlakyTest, ClassQuality, ClassIsolation, ClassStall, ClassSystem, ClassZeroShip, ClassLaneStarvation, ClassRepairLoop, ClassClaimChurn, ClassUsageBlind}
+	want := []Class{ClassMainRed, ClassCIHang, ClassFlakyTest, ClassQuality, ClassIsolation, ClassStall, ClassSystem, ClassZeroShip, ClassLaneStarvation, ClassRepairLoop, ClassClaimChurn, ClassUsageBlind, ClassPipelineDefect}
 	if !slices.Equal(Classes(), want) {
 		t.Fatalf("Classes() = %v", Classes())
 	}

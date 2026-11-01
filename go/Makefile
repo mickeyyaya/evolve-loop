@@ -121,10 +121,10 @@ TEST_JSON ?=
 TEST_RUSAGE ?=
 RUSAGE_EXEC = $(if $(strip $(TEST_RUSAGE)),-exec $(abspath $(BIN_DIR))/testrusage,)
 BUILD_RUSAGE = if [ -n "$(TEST_RUSAGE)" ]; then $(GO) build -o $(BIN_DIR)/testrusage ./cmd/testrusage || exit $$?; fi
-INTEGRATION_TEST = $(GO) test $(RUSAGE_EXEC) -race -count=1 -timeout $(TEST_TIMEOUT) -tags integration -coverprofile=coverage.partial.txt
+INTEGRATION_TEST = $(GO) test $(RUSAGE_EXEC) -race -count=1 -timeout $(TEST_TIMEOUT) -tags integration
 
-test-integration: ## Full non-ACS runtime suite with integration, race, and coverage (shared by CI and release); coverage.txt exists only after a green run; TEST_TIMEOUT=20m bounds each package; TEST_JSON=<file> also writes the go test -json stream while the console keeps the plain text; TEST_RUSAGE=1 runs every test binary through bin/testrusage (appends to TESTRUSAGE_OUT)
-	@rm -f coverage.txt coverage.partial.txt; \
+test-integration: ## Full non-ACS runtime suite with integration, race, and coverage (shared by CI and release); coverage.txt exists only after a green run; TEST_TIMEOUT=20m bounds each package; TEST_JSON=<file> also writes the go test -json stream while the console keeps the plain text; TEST_RUSAGE=1 runs every test binary through bin/testrusage (appends to TESTRUSAGE_OUT); a test package split from the package it tests (go/.cover-split) runs beside the main run with -coverpkg, and its profile and -json stream join the main ones
+	@rm -f coverage.txt coverage.partial.txt coverage.run.*; \
 	$(BUILD_RUSAGE); \
 	roots=./...; \
 	if [ -n "$(INTEGRATION_SET)" ]; then \
@@ -133,13 +133,41 @@ test-integration: ## Full non-ACS runtime suite with integration, race, and cove
 	fi; \
 	pkgs=$$($(GO) list -tags integration $$roots) || exit $$?; \
 	pkgs=$$(printf '%s\n' "$$pkgs" | grep -v '/acs/') || exit $$?; \
+	$(GO) build -o $(BIN_DIR)/coversplit ./cmd/coversplit || exit $$?; \
+	$(BIN_DIR)/coversplit $$pkgs > coverage.run.plan || { status=$$?; rm -f coverage.run.*; exit $$status; }; \
 	if [ -n "$(TEST_JSON)" ]; then \
 		$(GO) build -o $(BIN_DIR)/testlatency ./cmd/testlatency || exit $$?; \
-		status=$$( { { $(INTEGRATION_TEST) -json $$pkgs; echo $$? >&3; } | tee "$(TEST_JSON)" | $(BIN_DIR)/testlatency -render >&2; } 3>&1 ); \
-	else \
-		$(INTEGRATION_TEST) $$pkgs; status=$$?; \
+		: > "$(TEST_JSON)"; \
 	fi; \
-	status=$${status:-1}; if [ "$$status" -ne 0 ]; then rm -f coverage.partial.txt; exit "$$status"; fi; \
+	n=0; \
+	while IFS= read -r run; do \
+		n=$$((n+1)); \
+		if [ "$$n" -eq 1 ]; then pkgs=$$run; continue; fi; \
+		{ $(INTEGRATION_TEST) -coverprofile=coverage.run.$$n.txt $(if $(TEST_JSON),-json) $$run > coverage.run.$$n.out 2> coverage.run.$$n.err; echo $$? > coverage.run.$$n.status; } & \
+	done < coverage.run.plan; \
+	if [ -n "$(TEST_JSON)" ]; then \
+		status=$$( { { $(INTEGRATION_TEST) -coverprofile=coverage.run.1.txt -json $$pkgs; echo $$? >&3; } | tee -a "$(TEST_JSON)" | $(BIN_DIR)/testlatency -render >&2; } 3>&1 ); \
+	else \
+		$(INTEGRATION_TEST) -coverprofile=coverage.run.1.txt $$pkgs; status=$$?; \
+	fi; \
+	status=$${status:-1}; \
+	wait; \
+	i=2; \
+	while [ "$$i" -le "$$n" ]; do \
+		if [ -n "$(TEST_JSON)" ]; then \
+			tee -a "$(TEST_JSON)" < coverage.run.$$i.out | $(BIN_DIR)/testlatency -render >&2; \
+		else \
+			cat coverage.run.$$i.out; \
+		fi; \
+		cat coverage.run.$$i.err >&2; \
+		runstatus=$$(cat coverage.run.$$i.status 2>/dev/null) || runstatus=1; \
+		[ "$$runstatus" = 0 ] || status=$${runstatus:-1}; \
+		i=$$((i+1)); \
+	done; \
+	if [ "$$status" -ne 0 ]; then rm -f coverage.run.*; exit "$$status"; fi; \
+	profiles=; i=1; while [ "$$i" -le "$$n" ]; do profiles="$$profiles coverage.run.$$i.txt"; i=$$((i+1)); done; \
+	$(BIN_DIR)/coversplit -merge coverage.partial.txt $$profiles || { rm -f coverage.run.* coverage.partial.txt; exit 1; }; \
+	rm -f coverage.run.*; \
 	mv coverage.partial.txt coverage.txt
 
 test-integration-darwin: ## test-integration over the packages of go/.darwin-set only (the macOS CI job); fails when the set file is missing or names no package

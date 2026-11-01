@@ -16,7 +16,7 @@ Each row is one active rule of the registry. Open the body of a rule when your t
 | [ship-needs-egps-verdict](rules/ship-needs-egps-verdict.md) | Ship only when the EGPS verdict has a red count of zero. Never edit the hash-chained ledger by hand. | all | all | — | — |
 | [never-fabricate-results](rules/never-fabricate-results.md) | Never fabricate a cycle number, a test count or a verdict. Report only what a command printed. | all | all | — | — |
 | [dev-on-branches](rules/dev-on-branches.md) | Do all development on a branch in a worktree, never on main. Main is the integration branch only. | all | all | — | — |
-| [code-zero-comments](rules/code-zero-comments.md) | Code has no comments. Names, types and tests explain the code, and a design reason goes to the package note. | all | all | — | `go/internal/commitgate/comments_added.go` |
+| [code-zero-comments](rules/code-zero-comments.md) | MANDATORY: code has no comments and no Go doc comments. Never write, ask for or test a comment. A reason goes to the package note. | all | all | — | `go/internal/commitgate/comments_added.go` |
 | [docs-through-docs-write](rules/docs-through-docs-write.md) | Write each document through the docs-write skill. The new text passes evolve docs ste-lint --strict. | all | all | — | `go/internal/stelint` |
 | [cli-only-no-mcp](rules/cli-only-no-mcp.md) | Reach each outside service through a CLI, never through MCP. Build a CLI when a service has none. | all | all | — | — |
 | [findings-go-to-docs](rules/findings-go-to-docs.md) | Put research, lessons and failed approaches under docs/. Never delete a document; archive it. | all | all | — | — |

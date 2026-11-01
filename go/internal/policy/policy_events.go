@@ -29,6 +29,7 @@ func EventsDefaults() EventsPolicy {
 			{Name: "quality.reading", Route: "kind=quality.reading", QoS: "best_effort"},
 			{Name: "isolation.violation", Route: "kind=isolation.violation", QoS: "lossless"},
 			{Name: "selfheal.incident", Route: "kind=selfheal.incident", QoS: "lossless"},
+			{Name: "selfheal.decision", Route: "kind=selfheal.decision", QoS: "lossless"},
 			{Name: "signals", Route: "", QoS: "best_effort"},
 		},
 		SegmentMB:         16,

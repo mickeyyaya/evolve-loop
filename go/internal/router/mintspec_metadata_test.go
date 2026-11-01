@@ -22,11 +22,11 @@ func TestMintSpec_CarriesSelectMetadata(t *testing.T) {
 
 func TestMintSpec_MetadataOmitEmpty(t *testing.T) {
 	t.Parallel()
-	got, err := json.Marshal(MintSpec{Prompt: "p", Tier: "deep", CLI: "claude"})
+	got, err := json.Marshal(MintSpec{Prompt: "p", Tier: "deep"})
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	if want := `{"prompt":"p","tier":"deep","cli":"claude"}`; string(got) != want {
+	if want := `{"prompt":"p","tier":"deep"}`; string(got) != want {
 		t.Errorf("wire form changed:\n got %s\nwant %s (both new fields need omitempty)", got, want)
 	}
 }

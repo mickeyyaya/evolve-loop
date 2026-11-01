@@ -12,7 +12,10 @@ import (
 	"testing"
 )
 
-const templatePrefix = "gittest-template-"
+const (
+	templatePrefix   = "gittest-template-"
+	bareTemplateName = "gittest/bare"
+)
 
 var templates = &templateRegistry{byName: map[string]*template{}}
 
@@ -40,6 +43,16 @@ func (builderTB) Fatalf(format string, args ...any) {
 
 func FromTemplate(tb testing.TB, name string, build func(r *Repo) error) *Repo {
 	tb.Helper()
+	return copyOfTemplate(tb, name, (*Repo).initWorkTree, build)
+}
+
+func BareFromTemplate(tb testing.TB) *Repo {
+	tb.Helper()
+	return copyOfTemplate(tb, bareTemplateName, (*Repo).initBare, func(*Repo) error { return nil })
+}
+
+func copyOfTemplate(tb testing.TB, name string, initRepo func(*Repo), build func(r *Repo) error) *Repo {
+	tb.Helper()
 	tpl := templates.entry(name)
 	tpl.once.Do(func() {
 		defer func() {
@@ -47,7 +60,7 @@ func FromTemplate(tb testing.TB, name string, build func(r *Repo) error) *Repo {
 				tpl.err = errBuilderAborted
 			}
 		}()
-		tpl.dir, tpl.err = templates.build(tb, build)
+		tpl.dir, tpl.err = templates.build(tb, initRepo, build)
 	})
 	if tpl.err != nil {
 		tb.Fatalf("gittest: template %q: %v", name, tpl.err)
@@ -83,7 +96,7 @@ func (g *templateRegistry) entry(name string) *template {
 	return tpl
 }
 
-func (g *templateRegistry) build(tb testing.TB, build func(r *Repo) error) (dir string, err error) {
+func (g *templateRegistry) build(tb testing.TB, initRepo func(*Repo), build func(r *Repo) error) (dir string, err error) {
 	g.sweep.Do(func() { sweepDeadTemplates(os.TempDir()) })
 	if dir, err = os.MkdirTemp("", fmt.Sprintf("%s%d-", templatePrefix, os.Getpid())); err != nil {
 		return "", err
@@ -98,7 +111,7 @@ func (g *templateRegistry) build(tb testing.TB, build func(r *Repo) error) (dir 
 			err = fmt.Errorf("builder panicked: %v", fail)
 		}
 	}()
-	r.initWorkTree()
+	initRepo(r)
 	return dir, build(r)
 }
 

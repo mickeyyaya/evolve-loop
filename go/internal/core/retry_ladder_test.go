@@ -68,7 +68,7 @@ func TestContractCorrection_ShadowAsksTheDeciderAndDispatchesAsToday(t *testing.
 		if err != nil {
 			t.Fatal(err)
 		}
-		if strings.Contains(string(raw), "ladder") || req.ModelRoutingTier != "" || req.ModelRoutingEffort != "" || req.Ladder.LadderTier() != "" {
+		if strings.Contains(string(raw), "ladder") || req.Assignment.Tier != "" || req.Assignment.Effort != "" || req.Ladder.LadderTier() != "" {
 			t.Fatalf("shadow try %d changed the dispatch: %s", i, raw)
 		}
 	}
@@ -145,8 +145,8 @@ func TestContractCorrection_EnforceKeepsTheContractCLIEscalationOff(t *testing.T
 		WithRetryConfig(policy.RetryConfig{ContractCorrectionRetries: 3}), WithWorkflowConfig(ladderWorkflow(policy.RetryLadderEnforce)))
 	_, _ = o.RunCycle(context.Background(), CycleRequest{ProjectRoot: root, GoalHash: "g", DisableWorkspaceGuard: true})
 	for i, req := range probe.requests {
-		if req.ModelRoutingCLI != "" {
-			t.Fatalf("try %d moved to cli %q: at enforce the ladder, not the CLI escalation, picks the next try", i, req.ModelRoutingCLI)
+		if !req.Driver.IsZero() {
+			t.Fatalf("try %d moved to cli %q: at enforce the ladder, not the CLI escalation, picks the next try", i, req.Driver)
 		}
 	}
 }

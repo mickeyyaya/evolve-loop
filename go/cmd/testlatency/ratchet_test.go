@@ -179,3 +179,21 @@ func TestResolveBudget_RejectsABadWallBudget(t *testing.T) {
 		t.Error("want an error for an unparsable package wall budget")
 	}
 }
+
+func TestRatchet_ReportOnlyPrintsTheBreachAndExitsZero(t *testing.T) {
+	path := writeRatchetFile(t, `{"packages":{"p":{"class":"small","p90":10}}}`)
+	code, out, errOut := runWith(wallStream("p", 121), "-ratchet", path, "-ratchet-report-only")
+	if code != 0 {
+		t.Fatalf("a breach in report-only mode exits %d, want 0\n%s", code, errOut)
+	}
+	if !strings.Contains(out+errOut, "p ran 121") {
+		t.Errorf("report-only mode must still name the package above its limit; got stdout %q stderr %q", out, errOut)
+	}
+}
+
+func TestRatchet_ReportOnlyStillFailsOnAnUnreadableRatchet(t *testing.T) {
+	code, _, errOut := runWith(wallStream("p", 1), "-ratchet", filepath.Join(t.TempDir(), "absent.json"), "-ratchet-report-only")
+	if code != 2 || !strings.Contains(errOut, "absent.json") {
+		t.Errorf("exit %d stderr %q, want 2 naming absent.json", code, errOut)
+	}
+}

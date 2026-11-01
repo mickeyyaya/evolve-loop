@@ -1,0 +1,35 @@
+{
+  "acceptance": [
+    "Red test first: adopt on a stamped item gives a worktree at the snapshot plus main, and a findings file.",
+    "A conflicting snapshot is refused with the file list.",
+    "The verb is in the CLI contract with its class."
+  ],
+  "consumed": {
+    "at": "2026-10-27T07:52:49Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "evolve continuation adopt \u003citem-id\u003e --worktree \u003cpath\u003e adds the snapshot worktree, merges main through advanceContinuationBase and writes \u003cpath\u003e.findings.md; a conflicting snapshot is refused with its files; class D."
+  },
+  "created_at": "2026-10-27T06:34:52Z",
+  "deps": [],
+  "files": [
+    "go/cmd/evolve/cmd_continuation.go",
+    "go/internal/core/continuation_baseadvance.go"
+  ],
+  "fix": "Add evolve continuation adopt \u003citem-id\u003e --worktree \u003cpath\u003e: it creates a worktree from the snapshot, merges main in (the same code as continuation_baseadvance.go), and writes the prior audit findings and the red predicates next to it. It refuses a snapshot that is not Clean against main and names the conflicting files.",
+  "id": "console-adopts-a-continuation",
+  "intake_override": {
+    "reason": "Console route: it is the console salvage path and touches internal/core.",
+    "console_route": true
+  },
+  "kind": "feature",
+  "notes": "Console route: it is the console salvage path and touches internal/core.",
+  "origin": "console",
+  "priority": "P2",
+  "priority_class": "debuggability",
+  "route": "console",
+  "source": "console, 2026-10-27, cycle resume investigation (scratchpad cycle-resume-research.md), operator question on resuming failed cycles",
+  "summary": "The console has only evolve continuation list and release (cmd_continuation.go:17-31). In the cycle-2035 salvage the console applied the 26-file lane diff by hand.",
+  "title": "evolve continuation adopt gives the console the snapshot worktree, the findings and the red predicates in one step",
+  "weight": 0.55
+}

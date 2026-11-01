@@ -21,6 +21,14 @@ const (
 
 const GuardAbortClass = "guard-abort"
 
+const (
+	LayerTaskCode     = "task-code"
+	LayerPipelineCode = "pipeline-code"
+	LayerHarness      = "harness"
+	LayerInfra        = "infra"
+	LayerEvalContract = "eval-contract"
+)
+
 const RecurrenceConsoleFloor = 3
 
 const PendingActionsFile = "pending-actions.jsonl"

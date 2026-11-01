@@ -14,10 +14,12 @@ var agentSubprocessWriters = map[string]string{
 	"internal/subagent/subagentrun/ledger.go":   "out-of-process `evolve subagent run` — the cycle-1571 H1 writer, since ADR-0103 unit 16 the dispatcher's ledger step; stamped through a port, see centrallyStamped",
 	"internal/subagent/subagent.go":             "in-process Runner.Run",
 	"internal/cyclesimulator/cyclesimulator.go": "simulator",
+	"internal/phases/ship/shiptest/audit.go":    "the ship test fixture SeedAudit, which writes the auditor row a ship test binds",
 }
 
 var centrallyStamped = map[string]string{
 	"internal/core/phase_bindings.go":         "appends via o.ledger == stampingLedger (core/runid.go stamps run_id)",
+	"internal/phases/ship/shiptest/audit.go":  "a test fixture that stamps each row itself: SeedAudit copies the run_id of the fixture's cycle-state.json, or the default test-run, into each row it writes; TestSeedAudit_TheCycleStateAndTheOverridesShapeTheEntry pins the run id in the row",
 	"internal/subagent/subagentrun/ledger.go": "a leaf that cannot import core: its Dispatcher takes the resolver as the Deps.RunID port, which the ONE wired construction in internal/subagent/run.go (wiredDispatcher) binds to core.RunIDFromWorkspace, resolved once after admission; subagentrun/ledger_test.go and resolve_test.go are the behavioural pins (the run id reaches the emitted bytes)",
 }
 

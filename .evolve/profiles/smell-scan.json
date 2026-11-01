@@ -11,7 +11,8 @@
     "Read",
     "Grep",
     "Glob",
-    "Bash(evolve phase verify:*)"
+    "Bash(evolve phase verify:*)",
+    "Write(.evolve/ephemeral/agent-runs/*/smell-scan-report.md)"
   ],
   "disallowed_tools": [
     "Edit",

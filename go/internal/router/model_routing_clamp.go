@@ -13,12 +13,12 @@ func envelopeClamp(e *PhasePlanEntry, forcedTier, reason string) Clamp {
 	return Clamp{
 		Phase:    e.Phase,
 		Rule:     "model-routing-guardrail",
-		Proposed: fmt.Sprintf("%s={cli:%q,tier:%q}", e.Phase, e.CLI, e.Tier),
-		Forced:   fmt.Sprintf("%s={cli:%q,tier:%q} (%s)", e.Phase, e.CLI, forcedTier, reason),
+		Proposed: fmt.Sprintf("%s={tier:%q}", e.Phase, e.Tier),
+		Forced:   fmt.Sprintf("%s={tier:%q} (%s)", e.Phase, forcedTier, reason),
 	}
 }
 
-func ClampPlanModelRouting(plan *PhasePlan, profileFor func(phase string) *profiles.Profile, catalogLookup func(cli, tier string) (string, bool)) (*PhasePlan, []Clamp) {
+func ClampPlanModelRouting(plan *PhasePlan, profileFor func(phase string) *profiles.Profile) (*PhasePlan, []Clamp) {
 	if plan == nil {
 		return nil, nil
 	}
@@ -30,20 +30,10 @@ func ClampPlanModelRouting(plan *PhasePlan, profileFor func(phase string) *profi
 	var clamps []Clamp
 	for i := range out.Entries {
 		e := &out.Entries[i]
-		if e.CLI == "" && e.Tier == "" {
+		if e.Tier == "" {
 			continue
 		}
-		prof := profileFor(e.Phase)
-
-		if c, clamped := clampToTierEnvelope(e, prof); clamped {
-			clamps = append(clamps, c)
-			continue
-		}
-		if c, rejected := clampToProfilePin(e, prof); rejected {
-			clamps = append(clamps, c)
-			continue
-		}
-		if c, missed := clampToCatalog(e, catalogLookup); missed {
+		if c, clamped := clampToTierEnvelope(e, profileFor(e.Phase)); clamped {
 			clamps = append(clamps, c)
 		}
 	}
@@ -51,7 +41,7 @@ func ClampPlanModelRouting(plan *PhasePlan, profileFor func(phase string) *profi
 }
 
 func clampToTierEnvelope(e *PhasePlanEntry, prof *profiles.Profile) (Clamp, bool) {
-	if prof == nil || e.Tier == "" {
+	if prof == nil {
 		return Clamp{}, false
 	}
 	env := prof.ModelTierEnvelope
@@ -70,38 +60,6 @@ func clampToTierEnvelope(e *PhasePlanEntry, prof *profiles.Profile) (Clamp, bool
 		return c, true
 	}
 	return Clamp{}, false
-}
-
-func clampToProfilePin(e *PhasePlanEntry, prof *profiles.Profile) (Clamp, bool) {
-	pin := policy.Pin{CLI: e.CLI, Model: e.Tier}
-	if err := policy.ValidatePin(e.Phase, pin, prof); err == nil {
-		return Clamp{}, false
-	}
-	c := Clamp{
-		Phase:    e.Phase,
-		Rule:     "model-routing-guardrail",
-		Proposed: fmt.Sprintf("%s={cli:%q,tier:%q}", e.Phase, e.CLI, e.Tier),
-		Forced:   e.Phase + "={cli:,tier:} (profile default)",
-	}
-	e.CLI, e.Tier = "", ""
-	return c, true
-}
-
-func clampToCatalog(e *PhasePlanEntry, catalogLookup func(cli, tier string) (string, bool)) (Clamp, bool) {
-	if catalogLookup == nil || e.CLI == "" || e.Tier == "" {
-		return Clamp{}, false
-	}
-	if _, ok := catalogLookup(policy.BaseCLI(e.CLI), e.Tier); ok {
-		return Clamp{}, false
-	}
-	c := Clamp{
-		Phase:    e.Phase,
-		Rule:     "model-routing-catalog-miss",
-		Proposed: fmt.Sprintf("%s={cli:%q,tier:%q}", e.Phase, e.CLI, e.Tier),
-		Forced:   e.Phase + "={cli:,tier:} (profile default)",
-	}
-	e.CLI, e.Tier = "", ""
-	return c, true
 }
 
 func RejectionsFromClamps(clamps []Clamp) []PlanRejection {

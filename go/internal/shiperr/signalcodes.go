@@ -24,6 +24,7 @@ var codeDocs = map[ShipErrorCode]string{
 	CodeAuditBindingNoLedger:        "verify-class: the ledger is unreadable, so no audit binding can be verified",
 	CodeEGPSRedCount:                "verify-class: the EGPS gate reports red evals; red_count must be 0 to ship",
 	CodeControlPlaneViolation:       "verify-class: a cycle-class commit touches the control-plane integrity surface (ADR-0064); ship it manually",
+	CodeGateWeakened:                "verify-class: the gate classifier flags a cycle-class commit that changes a kernel surface or weakens a gate (I-10, HEALING_I10_VIOLATION); ship it manually",
 	CodeInvalidClass:                "verify-class: unknown ship class",
 	CodeManualNotTTY:                "verify-class: a manual ship needs an interactive confirmation (or the audited --auto-confirm=<reason> parameter)",
 	CodeManualDeclined:              "verify-class: the operator declined the manual ship",

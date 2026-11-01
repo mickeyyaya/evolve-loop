@@ -12,7 +12,8 @@
     "Grep",
     "Glob",
     "Bash",
-    "Bash(evolve phase verify:*)"
+    "Bash(evolve phase verify:*)",
+    "Write(.evolve/ephemeral/agent-runs/*/telemetry-coverage-check-report.md)"
   ],
   "disallowed_tools": [
     "Edit",

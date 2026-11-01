@@ -14,13 +14,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-func TestComposePlanPrompt_ElicitsTierAndCLI(t *testing.T) {
+func TestComposePlanPrompt_ElicitsATierAndNoCLI(t *testing.T) {
 	t.Parallel()
 	p := NewPhaseAdvisor(nil, WithPersona("PERSONA BODY"))
 	got := p.composePlanPrompt(baseRouteInput(), "routing-plan.json")
 
-	if !strings.Contains(got, `"cli":`) || !strings.Contains(got, `"tier":"balanced"`) {
-		t.Errorf("persona-path plan prompt missing the {cli,tier} schema/example; got:\n%s", got)
+	if strings.Contains(got, `"cli":`) || !strings.Contains(got, `"tier":"balanced"`) {
+		t.Errorf("persona-path plan prompt must show the tier example and never a cli key; got:\n%s", got)
 	}
 	tierIdx := strings.Index(got, `"tier":"balanced"`)
 	if tierIdx < 0 {
@@ -33,7 +33,7 @@ func TestComposePlanPrompt_ElicitsTierAndCLI(t *testing.T) {
 	}
 	obj := got[objStart : tierIdx+objEnd]
 	if strings.Contains(obj, "mint") {
-		t.Errorf("the {cli,tier} example must attach to an EXISTING phase (no \"mint\" block); object:\n%s", obj)
+		t.Errorf("the tier example must attach to an EXISTING phase (no \"mint\" block); object:\n%s", obj)
 	}
 }
 
@@ -67,9 +67,6 @@ func TestPhaseCardsFromCatalog_ProjectsDispatchGuardrails(t *testing.T) {
 		t.Fatalf("cards = %d, want 1", len(cards))
 	}
 	c := cards[0]
-	if len(c.AllowedCLIs) != 2 || c.AllowedCLIs[0] != "claude" {
-		t.Errorf("card.AllowedCLIs = %v, want [claude codex] projected from the spec", c.AllowedCLIs)
-	}
 	if c.ModelTierEnvelope == nil || c.ModelTierEnvelope.Min != "balanced" || c.ModelTierEnvelope.Max != "deep" {
 		t.Errorf("card.ModelTierEnvelope = %+v, want {min:balanced max:deep} projected from the spec", c.ModelTierEnvelope)
 	}
@@ -92,8 +89,8 @@ func TestComposePlanPrompt_RendersGuardrailLinesForCatalogPhase(t *testing.T) {
 	p := NewPhaseAdvisor(nil, WithPersona("PERSONA BODY"))
 	got := p.composePlanPrompt(in, "routing-plan.json")
 
-	if !strings.Contains(got, "allowed_clis: claude") {
-		t.Errorf("composed prompt missing allowed_clis guardrail line; got:\n%s", got)
+	if strings.Contains(got, "allowed_clis") {
+		t.Errorf("composed prompt shows the advisor a CLI list; the advisor proposes a tier only; got:\n%s", got)
 	}
 	if !strings.Contains(got, "model_tier_envelope: {min: balanced") {
 		t.Errorf("composed prompt missing model_tier_envelope guardrail line; got:\n%s", got)
@@ -128,8 +125,8 @@ func TestParsePhasePlan_AbsentCLITierFieldsStayEmpty(t *testing.T) {
 	if len(plan.Entries) != 1 {
 		t.Fatalf("entries = %d, want 1", len(plan.Entries))
 	}
-	if plan.Entries[0].CLI != "" || plan.Entries[0].Tier != "" {
-		t.Errorf("legacy-shape entry = %+v, want empty CLI/Tier (no overlay proposed)", plan.Entries[0])
+	if plan.Entries[0].Tier != "" {
+		t.Errorf("legacy-shape entry = %+v, want an empty tier (no overlay proposed)", plan.Entries[0])
 	}
 }
 
@@ -198,7 +195,7 @@ func existingPhaseExamples(s string) []string {
 	return out
 }
 
-func TestComposePlanPrompt_RealPersonaExistingExampleCarriesTierAndCLI(t *testing.T) {
+func TestComposePlanPrompt_RealPersonaExistingExampleCarriesATierAndNoCLI(t *testing.T) {
 	t.Parallel()
 	_, body := realRouterPersona(t)
 	p := NewPhaseAdvisor(nil, WithPersona(body))
@@ -209,20 +206,20 @@ func TestComposePlanPrompt_RealPersonaExistingExampleCarriesTierAndCLI(t *testin
 		t.Fatalf("found %d existing-phase schema example(s) in the real-persona prompt, want >=2 (the persona's own example + the Go-appended one); deleting the persona example is not a valid harmonization:\n%s", len(examples), got)
 	}
 	for _, ex := range examples {
-		if !strings.Contains(ex, `"tier"`) || !strings.Contains(ex, `"cli"`) {
-			t.Errorf("existing-phase schema example lacks {cli,tier} — a competing bare example the advisor will mimic:\n%s", ex)
+		if !strings.Contains(ex, `"tier"`) || strings.Contains(ex, `"cli"`) {
+			t.Errorf("existing-phase schema example must carry the tier and no cli — the advisor mimics the example:\n%s", ex)
 		}
 	}
 }
 
-func TestRealPersonaFrontmatterOutputFormatEnumeratesTierCLI(t *testing.T) {
+func TestRealPersonaFrontmatterOutputFormatEnumeratesTheTierOnly(t *testing.T) {
 	t.Parallel()
 	fm, _ := realRouterPersona(t)
 	of, ok := fm["output-format"].(string)
 	if !ok {
 		t.Fatalf("frontmatter output-format missing or not a string: %#v", fm["output-format"])
 	}
-	if !strings.Contains(of, "cli") || !strings.Contains(of, "tier") {
-		t.Errorf("frontmatter output-format must enumerate cli/tier; got: %q", of)
+	if strings.Contains(of, "[cli]") || !strings.Contains(of, "[tier]") {
+		t.Errorf("frontmatter output-format must enumerate the tier and no cli field; got: %q", of)
 	}
 }

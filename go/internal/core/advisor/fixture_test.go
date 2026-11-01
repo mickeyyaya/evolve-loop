@@ -93,7 +93,7 @@ func richCatalog() []router.PhaseCard {
 		{Name: "build", Role: "build", WritesSource: true},
 		{Name: "plan-review", Role: "evaluate", Optional: true, Description: "Reviews the plan for scope creep."},
 		{Name: "memo", Role: "plan", Optional: true},
-		{Name: "security-sweep", Role: "evaluate", Optional: true, WritesSource: true, Categories: []string{"security", "auth"}, WhenToUse: strings.Repeat("w", 141), AllowedCLIs: []string{"claude-tmux", "codex-tmux"}, ModelTierEnvelope: &profiles.ModelTierEnvelope{Min: "balanced", Default: "deep", Max: "top"}},
+		{Name: "security-sweep", Role: "evaluate", Optional: true, WritesSource: true, Categories: []string{"security", "auth"}, WhenToUse: strings.Repeat("w", 141), ModelTierEnvelope: &profiles.ModelTierEnvelope{Min: "balanced", Default: "deep", Max: "top"}},
 		{Name: "audit", Role: "evaluate"},
 		{Name: "perf-benchmark", Role: "evaluate", Optional: true, Description: "Benchmarks the hot path.", WhenToUse: "performance goals"},
 		{Name: "retro", Role: "plan", Optional: true},

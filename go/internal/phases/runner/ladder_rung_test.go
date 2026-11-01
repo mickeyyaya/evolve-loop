@@ -42,7 +42,7 @@ func TestRun_AnR0DispatchCarriesNoRung(t *testing.T) {
 
 func TestRouteRequest_TheLadderTierReachesTheRouterOverlay(t *testing.T) {
 	b := &BaseRunner{hooks: &fakeHooks{phase: "build", model: "sonnet"}}
-	got := b.routeRequest(core.PhaseRequest{Ladder: &retryladder.Try{Tier: "deep"}, ModelRoutingTier: "fast"}, phasePreparation{phase: "build", profileName: "builder"}, nil)
+	got := b.routeRequest(core.PhaseRequest{Ladder: &retryladder.Try{Tier: "deep"}, Assignment: core.TaskAssignment{Tier: "fast"}}, phasePreparation{phase: "build", profileName: "builder"}, nil)
 	if got.Overlay.LadderTier != "deep" || got.Overlay.Tier != "fast" {
 		t.Fatalf("overlay = %+v, want ladder tier deep beside the advisor tier fast", got.Overlay)
 	}

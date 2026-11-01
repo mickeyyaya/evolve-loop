@@ -255,6 +255,14 @@ The block configures `internal/inboxcurator`, the deterministic checks of the in
 
 The similarity is the token Jaccard of the title and the acceptance of two items. The live inbox of 2026-10-27 had 2,710 pairs of open items with a shared fix surface. The highest similarity was 0.52, and 13 pairs were between 0.3 and 0.5. These numbers set the defaults.
 
+## Live incident reaction (`healing.live_reaction`)
+
+The block configures the live reaction of the incident detector ([internal-selfheal.md](packages/internal-selfheal.md#the-live-reaction)). Each cycle process runs it on a `cycle.sealed` event with the verdict FAIL. It opens an incident at once when a `pipeline-code` failure class fails for the third time ([failure-identity-lifecycle.md §4](failure-identity-lifecycle.md#4-failure-class-fingerprint)).
+
+| Key | Meaning | Default | Refused |
+|---|---|---|---|
+| `stage` | `off` arms nothing. `shadow` writes the incident record and emits the `selfheal.incident` event with the field `reaction` `would_brake`. `enforce` also engages the loop brake `.evolve/loop-stop` once, so the rolling pool admits no new lane. | `shadow` | a value other than `off`, `shadow` or `enforce` |
+
 ## Convergence policy (`workflow.convergence`)
 
 The block configures `internal/convergence`, the one rule every repeat-until-accepted loop uses to choose its next rung ([ADR-0126](adr/0126-every-iterative-loop-converges-or-escalates.md), [design](convergence-policy.md) §8; `evolve convergence decide` prints a decision). Absent means the compiled defaults below.
@@ -329,6 +337,16 @@ The block sets the stage of the retrospective documents that the cycle closeout 
 | Key | Meaning | Default |
 |---|---|---|
 | `stage` | `off` writes no document. `shadow` writes the documents into the cycle workspace. `enforce` does the same until plan C4 to C6 add the publish and the todo retirement. The checked-in policy sets `enforce` (operator decision of 2026-10-27). | `shadow` |
+
+## Continuation age (`continuation`)
+
+The block sets how long a continuation binding lives (2026-10-27). `evolve gc` releases each binding older than `max_age_cycles` and removes its worktree ([cmd-evolve.md](packages/cmd-evolve.md)). The loader decodes the block strictly. An unknown key, or a value out of range, fails the load of the whole file, and the error names the key. When the file does not load, `evolve gc` skips the sweep with a WARN and releases nothing, because the age is then unknown.
+
+| Key | Meaning | Default | Refused |
+|---|---|---|---|
+| `max_age_cycles` | the number of cycles after which `evolve gc` releases a binding. The age is `lastCycleNumber` of `state.json` minus the cycle of the binding. | 100 | below 1, above 10000, or not a number |
+
+Why: on 2026-10-27 the registry held 101 bindings, and 89 of them came from cycles before 1900 (the oldest from cycle 1127). Each kept its worktree out of `evolve worktree cleanup --stale`.
 
 ## Context-fill telemetry (`context_fill`)
 

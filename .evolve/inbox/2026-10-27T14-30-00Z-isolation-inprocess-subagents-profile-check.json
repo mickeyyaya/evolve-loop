@@ -1,0 +1,24 @@
+{
+  "id": "isolation-inprocess-subagents-profile-check",
+  "kind": "feature",
+  "priority_class": "stability",
+  "weight": 0.3,
+  "route": "console-manual",
+  "title": "LLM isolation: a profile cannot ask for in-process subagents on a family whose manifest lacks inprocess_subagents",
+  "summary": "Item isolation-dispatch-request-channel declared the manifest capability inprocess_subagents (claude-p, claude-tmux), but no code reads it (llm-isolation.md §7.2, §7.2.1 known differences). The architecture review of that PR (round 3, HIGH) named the declared field with no reader.",
+  "fix": "Read bridge.CapabilityInprocessSubagents at the launch of a profile: a profile whose allowed_tools grant Task or Agent on a CLI without the capability is refused, or the grant is dropped with a signal. Decide the stage (shadow first). Measure which harnesses (codex, agy) run subagents in their own process before they declare the capability.",
+  "acceptance": [
+    "RED first: a profile with Task allowed on a CLI with no inprocess_subagents launches with no refusal and no signal",
+    "The launch refuses the grant at enforce and emits a signal at shadow",
+    "Changed functions at 100% coverage; llm-isolation.md §7.2 updated"
+  ],
+  "deps": [
+    "isolation-dispatch-request-channel"
+  ],
+  "files": [
+    "go/internal/bridge/",
+    "docs/architecture/llm-isolation.md"
+  ],
+  "created_at": "2026-10-27T14:30:00Z",
+  "source": "console, 2026-10-27, follow-up of item isolation-dispatch-request-channel (architecture review round 3, finding 2)"
+}

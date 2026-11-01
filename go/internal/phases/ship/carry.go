@@ -28,13 +28,37 @@ func carrySatisfied(ctx context.Context, opts *Options, dir, actual string) (boo
 		return true, fmt.Sprintf(" (the byte-identical rebase carry of cycle %d, re-proven)", rec.Cycle)
 	}
 	if found {
-		opts.Signals.Emit(signalcenter.Event{
-			Cycle: opts.CycleID, RunID: opts.RunID, Phase: "ship", Module: signalcenter.ModuleShip, Origin: "carrySatisfied",
-			Kind: signalcenter.KindShipWarning, Severity: signalcenter.SeverityWarn, Code: codeCarryNotReProven,
-			Reason: "carry not re-proven: " + reason, Fields: map[string]string{"carry_cycle": strconv.Itoa(rec.Cycle)},
-		})
+		emitCarryNotReProven(opts, "carrySatisfied", rec.Cycle, reason)
 	}
 	return false, reason
+}
+
+func emitCarryNotReProven(opts *Options, origin string, carryCycle int, reason string) {
+	opts.Signals.Emit(signalcenter.Event{
+		Cycle: opts.CycleID, RunID: opts.RunID, Phase: "ship", Module: signalcenter.ModuleShip, Origin: origin,
+		Kind: signalcenter.KindShipWarning, Severity: signalcenter.SeverityWarn, Code: codeCarryNotReProven,
+		Reason: "carry not re-proven: " + reason, Fields: map[string]string{"carry_cycle": strconv.Itoa(carryCycle)},
+	})
+}
+
+func carryReboundHead(ctx context.Context, opts *Options, dir, auditedHead, currentHead string) (bool, string) {
+	if currentHead == auditedHead || filepath.Clean(dir) == filepath.Clean(opts.ProjectRoot) {
+		return false, ""
+	}
+	rec, found, reason := boundCarryRecord(opts)
+	switch {
+	case reason == "" && rec.GitHead != currentHead:
+		reason = fmt.Sprintf("the carry of cycle %d names main at %s", rec.Cycle, rec.GitHead)
+	case reason == "":
+		reason = reProveCarry(ctx, opts, heldCarry{dir: dir, record: rec})
+	}
+	if reason != "" {
+		if found {
+			emitCarryNotReProven(opts, "carryReboundHead", rec.Cycle, reason)
+		}
+		return false, " (carry not re-bound: " + reason + ")"
+	}
+	return true, fmt.Sprintf(" by the byte-identical rebase carry of cycle %d, re-proven", rec.Cycle)
 }
 
 func boundCarryRecord(opts *Options) (ledger.CompositionVerdict, bool, string) {

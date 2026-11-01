@@ -8,6 +8,10 @@
       "class": "small",
       "p90": 0.28
     },
+    "cmd/coversplit": {
+      "class": "small",
+      "p90": 0.25
+    },
     "cmd/darwinset": {
       "class": "small",
       "p90": 0.29
@@ -435,6 +439,10 @@
     "internal/covchanged": {
       "class": "small",
       "p90": 0.47
+    },
+    "internal/coversplit": {
+      "class": "small",
+      "p90": 2.54
     },
     "internal/coverstrict": {
       "class": "small",
@@ -971,6 +979,10 @@
     "internal/phases/ship/landing": {
       "class": "small",
       "p90": 0.36
+    },
+    "internal/phases/ship/shiptest": {
+      "class": "small",
+      "p90": 21.9
     },
     "internal/phases/specrunner": {
       "class": "small",

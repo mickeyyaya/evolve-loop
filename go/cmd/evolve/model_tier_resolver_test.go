@@ -1,9 +1,6 @@
 package main
 
 import (
-	"io"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
@@ -42,20 +39,5 @@ func TestResolveModelTier_RejectsUnresolvablePairings(t *testing.T) {
 					tc.cli, tc.tier, model)
 			}
 		})
-	}
-}
-
-func TestWireOrchestrator_ModelCatalogLookupWired(t *testing.T) {
-	root := t.TempDir()
-	evolveDir := filepath.Join(root, ".evolve")
-	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	d := wireOrchestratorDeps(root, evolveDir, io.Discard, routingRun{})
-	if !d.Orchestrator.ModelCatalogLookupWired() {
-		t.Fatal("production composition root (wireOrchestratorDeps) does not wire core.WithModelCatalogLookup — " +
-			"router.ClampPlanModelRouting short-circuits on a nil lookup, so the catalog-resolvability gate is a " +
-			"silent no-op in every real cycle and the advisor can route a phase to a (cli,tier) that resolves to nothing")
 	}
 }

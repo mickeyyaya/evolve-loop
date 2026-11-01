@@ -17,6 +17,9 @@ func init() {
 		_, err := inboxmover.ReleaseCycleProcessingWithReason(inboxmover.Options{ProjectRoot: root}, cycle, reason)
 		return err
 	}
+	core.RealInboxForTest.Shed = func(root string, cycle int, declined continuation.Continuation) ([]string, error) {
+		return inboxmover.ShedDeclinedContinuation(inboxmover.Options{ProjectRoot: root}, cycle, declined)
+	}
 	core.RealInboxForTest.Claim = func(root, taskID, cycle string) error {
 		_, err := inboxmover.Claim(inboxmover.Options{ProjectRoot: root}, taskID, cycle)
 		return err

@@ -17,6 +17,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/landing"
+	"github.com/mickeyyaya/evolve-loop/go/internal/shipjournal"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -92,7 +93,7 @@ func (s *worktreeShip) catchUpMain() {
 func (s *worktreeShip) prepareLanding(commit string) (landing.Intent, error) {
 	in, err := s.newIntent(commit)
 	if err == nil {
-		err = appendShipJournal(s.opts.ProjectRoot, shipJournalEntry{SHA: commit, Class: string(s.opts.Class), Cycle: in.Cycle})
+		err = appendShipJournal(s.opts.ProjectRoot, shipjournal.Entry{SHA: commit, Class: string(s.opts.Class), Cycle: in.Cycle})
 	}
 	if err == nil {
 		err = writeLandingIntent(s.opts, in)

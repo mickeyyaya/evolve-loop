@@ -30,10 +30,22 @@ type ResolvedFingerprint struct {
 const resolvedFingerprintsFile = "resolved-fingerprints.json"
 
 func LoadResolvedFingerprints(evolveDir string) (map[string]bool, error) {
+	times, err := loadResolvedFingerprintTimes(evolveDir)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]bool, len(times))
+	for fp := range times {
+		out[fp] = true
+	}
+	return out, nil
+}
+
+func loadResolvedFingerprintTimes(evolveDir string) (map[string]time.Time, error) {
 	raw, err := os.ReadFile(filepath.Join(evolveDir, resolvedFingerprintsFile))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return map[string]bool{}, nil
+			return map[string]time.Time{}, nil
 		}
 		return nil, fmt.Errorf("resolved-fingerprints.json: %w", err)
 	}
@@ -41,13 +53,31 @@ func LoadResolvedFingerprints(evolveDir string) (map[string]bool, error) {
 	if err := json.Unmarshal(raw, &records); err != nil {
 		return nil, fmt.Errorf("resolved-fingerprints.json: %w", err)
 	}
-	out := make(map[string]bool, len(records))
+	out := make(map[string]time.Time, len(records))
 	for _, r := range records {
-		if r.Fingerprint != "" {
-			out[r.Fingerprint] = true
+		if r.Fingerprint == "" {
+			continue
+		}
+		at, err := resolvedAt(r)
+		if err != nil {
+			return nil, err
+		}
+		if prev, seen := out[r.Fingerprint]; !seen || at.After(prev) {
+			out[r.Fingerprint] = at
 		}
 	}
 	return out, nil
+}
+
+func resolvedAt(r ResolvedFingerprint) (time.Time, error) {
+	if r.ResolvedAt == "" {
+		return time.Time{}, nil
+	}
+	at, err := time.Parse(time.RFC3339, r.ResolvedAt)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("resolved-fingerprints.json: the record of %s: %w", r.Fingerprint, err)
+	}
+	return at, nil
 }
 
 func AppendResolvedFingerprint(evolveDir, fingerprint, resolvedBy string, resolvedAt time.Time) error {
@@ -119,6 +149,13 @@ func isUnexplainedDigest(d FailureDigest) bool {
 	return d.Unexplained || (d.PreClass == "unknown" && strings.HasPrefix(d.Fingerprint, "|unknown|"))
 }
 
+func breakerIdentity(d FailureDigest) string {
+	if d.ClassFingerprint != "" {
+		return d.ClassFingerprint
+	}
+	return d.Fingerprint
+}
+
 func EvaluateBlockerBreaker(digests []FailureDigest, cfg BlockerBreakerConfig) BlockerVerdict {
 	if cfg.GuardClassCeiling > 0 {
 		var guard []FailureDigest
@@ -148,23 +185,8 @@ func EvaluateBlockerBreaker(digests []FailureDigest, cfg BlockerBreakerConfig) B
 			}
 		}
 	}
-	if cfg.IdenticalFingerprintCeiling > 0 {
-		counts := map[string]int{}
-		for _, d := range digests {
-			if d.Fingerprint == "" || isUnexplainedDigest(d) {
-				continue
-			}
-			if cfg.AckedFingerprints[d.Fingerprint] {
-				continue
-			}
-			counts[d.Fingerprint]++
-			if counts[d.Fingerprint] >= cfg.IdenticalFingerprintCeiling {
-				return BlockerVerdict{
-					Halt: true, Rule: "identical-fingerprint", Fingerprint: d.Fingerprint, Count: counts[d.Fingerprint],
-					Reason: fmt.Sprintf("failure fingerprint %q recurred %d× in one batch (ceiling %d) — identical failure identities cannot be distinct honest defects", d.Fingerprint, counts[d.Fingerprint], cfg.IdenticalFingerprintCeiling),
-				}
-			}
-		}
+	if v, halt := identicalFingerprintRule(digests, cfg); halt {
+		return v
 	}
 	if cfg.ConsecutiveFailuresCeiling > 0 {
 		counted := map[int]FailureDigest{}
@@ -188,6 +210,27 @@ func EvaluateBlockerBreaker(digests []FailureDigest, cfg BlockerBreakerConfig) B
 		}
 	}
 	return BlockerVerdict{}
+}
+
+func identicalFingerprintRule(digests []FailureDigest, cfg BlockerBreakerConfig) (BlockerVerdict, bool) {
+	if cfg.IdenticalFingerprintCeiling <= 0 {
+		return BlockerVerdict{}, false
+	}
+	counts := map[string]int{}
+	for _, d := range digests {
+		id := breakerIdentity(d)
+		if d.Fingerprint == "" || isUnexplainedDigest(d) || cfg.AckedFingerprints[d.Fingerprint] || cfg.AckedFingerprints[id] {
+			continue
+		}
+		counts[id]++
+		if counts[id] >= cfg.IdenticalFingerprintCeiling {
+			return BlockerVerdict{
+				Halt: true, Rule: "identical-fingerprint", Fingerprint: id, Count: counts[id],
+				Reason: fmt.Sprintf("failure fingerprint %q recurred %d× in one batch (ceiling %d) — identical failure identities cannot be distinct honest defects", id, counts[id], cfg.IdenticalFingerprintCeiling),
+			}, true
+		}
+	}
+	return BlockerVerdict{}, false
 }
 
 func consecutiveRun(sortedCycles []int, ceiling int, transparent map[int]bool) (at, run int, ok bool) {

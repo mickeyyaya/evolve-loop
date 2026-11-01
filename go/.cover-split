@@ -1,0 +1,8 @@
+# coversplit — the test packages split from the package they test.
+# One `./<split package> ./<package it tests>` per line. A coverage run that
+# selects the tested package also runs the split package with
+# -coverpkg=<tested package>,<split package> and merges its profile, so the
+# tested package keeps the coverage of the tests that moved.
+# Read by internal/coversplit (make test-integration, the build floor) and
+# pinned by TestEverySplitTestPackageHasItsCoverEntry.
+./internal/phases/ship/shiptest ./internal/phases/ship

@@ -22,7 +22,7 @@ func (o *Orchestrator) clampedRaise(projectRoot string, phase Phase, currentTier
 	}
 	tmp := &router.PhasePlan{Entries: []router.PhasePlanEntry{{Phase: string(phase), Run: true, Tier: target}}}
 	profileFor := func(p string) *profiles.Profile { return o.profileForModelRouting(projectRoot, p) }
-	clamped, _ := router.ClampPlanModelRouting(tmp, profileFor, o.modelCatalogLookup)
+	clamped, _ := router.ClampPlanModelRouting(tmp, profileFor)
 	tier := clamped.Entries[0].Tier
 	if policy.TierRank(tier) <= policy.TierRank(currentTier) {
 		return "", false

@@ -52,3 +52,18 @@ func TestContextCodes_BelongToModuleIsolation(t *testing.T) {
 		}
 	}
 }
+
+func TestInit_RegistersTheRequestRefusalInModuleIsolation(t *testing.T) {
+	t.Parallel()
+	if m, ok := signalcenter.IsRegistered(CodeRequestRefused); !ok || m != signalcenter.ModuleIsolation || CodeRequestRefused != "ISOLATION_REQUEST_REFUSED" {
+		t.Fatalf("%s registered=%v module=%q, want module isolation (cli-contract.md §4.5)", CodeRequestRefused, ok, m)
+	}
+	if m, ok := signalcenter.IsRegistered(CodeRequestFailed); !ok || m != signalcenter.ModuleIsolation || CodeRequestFailed != "ISOLATION_REQUEST_FAILED" {
+		t.Fatalf("%s registered=%v module=%q, want module isolation (llm-isolation.md §7.2)", CodeRequestFailed, ok, m)
+	}
+	for _, k := range []signalcenter.Kind{signalcenter.KindIsolationRequest, signalcenter.KindIsolationRequestDecision} {
+		if !k.Known() {
+			t.Errorf("the kind %s of cli-contract.md §4.5 must be known", k)
+		}
+	}
+}

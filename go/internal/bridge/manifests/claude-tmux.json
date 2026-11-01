@@ -9,7 +9,7 @@
   "parsers": {"pane": "claude-repl-v1"},
   "collectors": {"tokens": "claude-jsonl-v1"},
   "transcript": {"format": "claude-jsonl-v1"},
-  "capabilities": ["tools", "edit"],
+  "capabilities": ["tools", "edit", "inprocess_subagents"],
   "home_reads": ["~/.claude", "~/.claude.json"],
   "context_window": 200000,
   "binary_min_version": "2.1.0",

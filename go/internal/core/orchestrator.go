@@ -171,8 +171,6 @@ type Orchestrator struct {
 
 	catalogRefreshStage func() string
 
-	modelCatalogLookup func(cli, tier string) (string, bool)
-
 	directivesProvider func(ctx context.Context, cycle int) directives.Set
 
 	compositionSnapshot      func(ctx context.Context, worktree, runID string) (CompositionAuditSnapshot, error)
@@ -187,6 +185,10 @@ type Orchestrator struct {
 	hostEffects HostEffects
 
 	stderr io.Writer
+
+	stampBudget time.Duration
+
+	continuationShed func(projectRoot string, cycle int, declined continuation.Continuation) ([]string, error)
 
 	shipWindow *shipWindowHold
 
@@ -241,6 +243,7 @@ type Orchestrator struct {
 	contractVerifier ContractVerifier
 
 	throughputRecorder ThroughputRecorder
+	requestHandoff     RequestHandoff
 
 	signals       *signalcenter.Center
 	signalMu      sync.Mutex
@@ -326,6 +329,22 @@ func WithContinuationResolver(fn func(projectRoot string, cycle int, scopeIDs []
 	}
 }
 
+func WithContinuationShedder(fn func(projectRoot string, cycle int, declined continuation.Continuation) ([]string, error)) Option {
+	return func(o *Orchestrator) {
+		if fn != nil {
+			o.continuationShed = fn
+		}
+	}
+}
+
+func (o *Orchestrator) ContinuationShedProbe(projectRoot string, cycle int, declined continuation.Continuation) ([]string, bool, error) {
+	if o.continuationShed == nil {
+		return nil, false, nil
+	}
+	shed, err := o.continuationShed(projectRoot, cycle, declined)
+	return shed, true, err
+}
+
 func (o *Orchestrator) ScopePathProbe(projectRoot, taskID string) (string, bool) {
 	if o.scopePathFor == nil {
 		return "", false
@@ -407,10 +426,6 @@ func WithCatalogRefresher(fn func(ctx context.Context) error) Option {
 
 func WithCatalogRefreshStage(fn func() string) Option {
 	return func(o *Orchestrator) { o.catalogRefreshStage = fn }
-}
-
-func WithModelCatalogLookup(fn func(cli, tier string) (string, bool)) Option {
-	return func(o *Orchestrator) { o.modelCatalogLookup = fn }
 }
 
 func WithDirectivesProvider(fn func(ctx context.Context, cycle int) directives.Set) Option {

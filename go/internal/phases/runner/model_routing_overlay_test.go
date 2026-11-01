@@ -8,6 +8,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 )
 
 func TestResolveRouting_AdvisorOverlayPreservesFamilyTransport(t *testing.T) {
@@ -32,9 +33,9 @@ func TestResolveRouting_AdvisorOverlayPreservesFamilyTransport(t *testing.T) {
 			runner := New(Options{Hooks: hooks, Bridge: bridge, Prompts: fakePromptsFS("evolve-scout", "x")})
 
 			if _, err := runner.Run(context.Background(), core.PhaseRequest{
-				ProjectRoot:     root,
-				Workspace:       t.TempDir(),
-				ModelRoutingCLI: tt.overlay,
+				ProjectRoot: root,
+				Workspace:   t.TempDir(),
+				Driver:      llmroute.Bind(tt.overlay),
 			}); err != nil {
 				t.Fatalf("Run: %v", err)
 			}
@@ -53,8 +54,8 @@ func TestRunner_ModelRoutingAuto_SoftOverlayAppliesAsPrimary(t *testing.T) {
 
 	_, err := r.Run(context.Background(), core.PhaseRequest{
 		ProjectRoot: root, Workspace: t.TempDir(),
-		ModelRoutingCLI:  "codex-tmux",
-		ModelRoutingTier: "deep",
+		Driver:     llmroute.Bind("codex-tmux"),
+		Assignment: core.TaskAssignment{Tier: "deep"},
 	})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -106,7 +107,7 @@ func TestRunner_ModelRoutingAuto_BenchedOverlayPrimaryFallsBack(t *testing.T) {
 
 	_, err := r.Run(context.Background(), core.PhaseRequest{
 		ProjectRoot: root, Workspace: t.TempDir(),
-		ModelRoutingCLI: "codex-tmux",
+		Driver: llmroute.Bind("codex-tmux"),
 	})
 	if err != nil {
 		t.Fatalf("Run: %v", err)

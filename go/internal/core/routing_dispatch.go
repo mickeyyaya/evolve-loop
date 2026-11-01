@@ -239,7 +239,6 @@ func phaseCardsFromCatalog(cat phasespec.Catalog) []router.PhaseCard {
 			Description:       spec.Description,
 			WhenToUse:         spec.WhenToUse,
 			Categories:        spec.Categories,
-			AllowedCLIs:       spec.AllowedCLIs,
 			ModelTierEnvelope: spec.ModelTierEnvelope,
 		})
 	}

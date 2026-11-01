@@ -42,7 +42,7 @@ func salvageClosing(remediation string) string {
 const ledgerKindContractGateDemoted = "contract_gate_demoted"
 
 type contractDispatch struct {
-	cli            string
+	driver         llmroute.Binding
 	escalated      bool
 	salvageRetried bool
 }
@@ -64,9 +64,9 @@ func phaseProfile(projectRoot, phase string) (*profiles.Profile, string) {
 	return nil, phase
 }
 
-func (cr *cycleRun) contractDispatchCLI(phase Phase, override string) string {
-	if override != "" {
-		return override
+func (cr *cycleRun) contractDispatchCLI(phase Phase, override llmroute.Binding) string {
+	if !override.IsZero() {
+		return override.String()
 	}
 	_, walk, routed := cr.routingWalk(phase)
 	if !routed {
@@ -75,22 +75,17 @@ func (cr *cycleRun) contractDispatchCLI(phase Phase, override string) string {
 	return walk.Candidates[0]
 }
 
-func (cr *cycleRun) contractEscalationCLI(phase Phase, dispatchedCLI string) (string, bool) {
+func (cr *cycleRun) contractEscalationTarget(phase Phase, dispatched llmroute.Binding) (llmroute.Binding, bool) {
 	d, walk, routed := cr.routingWalk(phase)
 	if !routed {
-		return "", false
+		return llmroute.Binding{}, false
 	}
-	failed := llmroute.Family(cmp.Or(dispatchedCLI, walk.Candidates[0]))
 	candidates := slices.Clone(walk.Candidates)
 	if d.Legacy() {
 		candidates = append(candidates, policy.SeatDefault(policy.SeatContractEscalation).CLI)
 	}
-	for _, c := range candidates {
-		if c != "" && llmroute.Family(c) != failed && escalationAllowed(phase, c, d) {
-			return c, true
-		}
-	}
-	return "", false
+	failed := cmp.Or(dispatched, llmroute.Bind(walk.Candidates[0]))
+	return llmroute.EscalationTarget(candidates, failed, func(c string) bool { return escalationAllowed(phase, c, d) })
 }
 
 func (cr *cycleRun) routingWalk(phase Phase) (cliroute.Decision, llmroute.Plan, bool) {
@@ -197,7 +192,7 @@ func formatContractGateDemotionWarn(phase, cli string, d contractDispatch, reaso
 }
 
 func (cr *cycleRun) noteContractGateDemotion(phase Phase, d contractDispatch, blocks int, reason string) {
-	cli := cr.contractDispatchCLI(phase, d.cli)
+	cli := cr.contractDispatchCLI(phase, d.driver)
 	warn := formatContractGateDemotionWarn(string(phase), cli, d, reason)
 	fmt.Fprintln(os.Stderr, warn)
 	if lerr := cr.o.ledger.Append(cr.ctx, LedgerEntry{

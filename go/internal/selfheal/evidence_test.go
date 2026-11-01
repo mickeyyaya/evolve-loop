@@ -266,3 +266,19 @@ func TestWriteEvidence_Faults(t *testing.T) {
 		}
 	})
 }
+
+func TestEvidencePrefixes_GiveEachClassItsOwnPrefix(t *testing.T) {
+	t.Parallel()
+	classes := []string{EvidenceIncident, EvidenceSignal}
+	for _, r := range cycleRecords {
+		classes = append(classes, r.class)
+	}
+	seen := map[string]string{}
+	for _, class := range classes {
+		prefix := evidencePrefixes[class]
+		if other, dup := seen[prefix]; prefix == "" || (dup && other != class) {
+			t.Errorf("the class %s has the prefix %q, and %q has it too", class, prefix, other)
+		}
+		seen[prefix] = class
+	}
+}

@@ -27,3 +27,14 @@ func TestExportedVocabularyNamed(t *testing.T) {
 		t.Fatalf("Intent vocabulary drifted: %+v", in)
 	}
 }
+
+func TestLayerNames_AreTheRetroLayerVocabulary(t *testing.T) {
+	t.Parallel()
+	got := []string{dispositionrouter.LayerTaskCode, dispositionrouter.LayerPipelineCode, dispositionrouter.LayerHarness, dispositionrouter.LayerInfra, dispositionrouter.LayerEvalContract}
+	want := []string{"task-code", "pipeline-code", "harness", "infra", "eval-contract"}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("layer %d = %q; want %q, the disposition.json root_cause.layer value", i, got[i], want[i])
+		}
+	}
+}

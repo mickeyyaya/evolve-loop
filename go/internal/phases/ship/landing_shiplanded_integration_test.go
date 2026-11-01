@@ -19,7 +19,7 @@ type landedWitness struct {
 func witnessLandings(t *testing.T, l landingLane, opts *Options) *landedWitness {
 	t.Helper()
 	w := &landedWitness{readStatusNow: func() string {
-		status, _ := l.intent(t)["status"].(string)
+		status, _ := l.Intent(t)["status"].(string)
 		return status
 	}}
 	center := signalcenter.New()
@@ -66,7 +66,7 @@ func TestSettleLanding_NoShipLandedWhileTheRealIntentCannotBeMarkedComplete(t *t
 	in := l.preparedIntent(t)
 	_, opts, res := l.worktreeShip(execRunner)
 	w := witnessLandings(t, l, opts)
-	l.lockTheLandingDir(t)
+	l.LockTheLandingDir(t)
 
 	if err := settleLanding(context.Background(), opts, res, in); err != nil {
 		t.Fatalf("settleLanding: %v", err)

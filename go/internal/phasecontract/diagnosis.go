@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/agentclass"
 )
 
 const (
@@ -23,6 +25,7 @@ const (
 	ActionRevertLastLanding  = "revert-last-landing"
 	ActionOpenRepairItem     = "open-repair-item"
 	ActionHaltAndEscalate    = "halt-and-escalate"
+	ActionDispatchPhaseAgent = "dispatch-phase-agent"
 )
 
 const (
@@ -39,6 +42,7 @@ const (
 	paramFiles     = "files"
 	paramRepro     = "repro"
 	paramReason    = "reason"
+	paramRequest   = "request"
 )
 
 type catalogAction struct {
@@ -54,6 +58,7 @@ var diagnosisCatalog = []catalogAction{
 	{kind: ActionRevertLastLanding, required: []string{paramSHA}},
 	{kind: ActionOpenRepairItem, required: []string{paramFiles, paramRepro}},
 	{kind: ActionHaltAndEscalate, optional: []string{paramReason}},
+	{kind: ActionDispatchPhaseAgent, required: []string{paramRequest}},
 }
 
 var (
@@ -71,6 +76,7 @@ type DiagnosisParams struct {
 	Files     []string `json:"files,omitempty"`
 	Repro     string   `json:"repro,omitempty"`
 	Reason    string   `json:"reason,omitempty"`
+	Request   string   `json:"request,omitempty"`
 }
 
 type DiagnosisAction struct {
@@ -170,7 +176,7 @@ func (p DiagnosisParams) set() []string {
 		held bool
 	}{
 		{paramItem, p.Item != ""}, {paramVariation, p.Variation != ""}, {paramFamily, p.Family != ""}, {paramSHA, p.SHA != ""},
-		{paramFiles, len(p.Files) > 0}, {paramRepro, p.Repro != ""}, {paramReason, p.Reason != ""},
+		{paramFiles, len(p.Files) > 0}, {paramRepro, p.Repro != ""}, {paramReason, p.Reason != ""}, {paramRequest, p.Request != ""},
 	} {
 		if f.held {
 			out = append(out, f.name)
@@ -185,6 +191,8 @@ func (p DiagnosisParams) check() error {
 		return fmt.Errorf("variation %q is not one of %v", p.Variation, variations)
 	case p.SHA != "" && !shaPattern.MatchString(p.SHA):
 		return fmt.Errorf("sha %q is not a hex commit id of 7 to 40 characters", p.SHA)
+	case p.Request != "" && !agentclass.ValidRequestName(p.Request):
+		return fmt.Errorf("request %q is not the name of a request file, such as dispatch-1", p.Request)
 	}
 	for _, f := range p.Files {
 		if !filepath.IsLocal(f) || filepath.Clean(f) != f {
@@ -192,11 +200,4 @@ func (p DiagnosisParams) check() error {
 		}
 	}
 	return nil
-}
-
-func (d Diagnosis) Proposed() DiagnosisAction {
-	if d.Confidence != ConfidenceLow {
-		return d.Action
-	}
-	return DiagnosisAction{Kind: ActionHaltAndEscalate, Params: DiagnosisParams{Reason: "a low-confidence diagnosis goes to the operator: " + d.Hypothesis}}
 }

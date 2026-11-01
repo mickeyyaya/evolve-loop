@@ -1,10 +1,10 @@
 # Failure Identity & Carryover Lifecycle
 
-> Cycle-1440. Covers the three seams that decide **what counts as the same failure**
+> Cycle-1440, and §4 on 2026-10-27. Covers the four seams that decide **what counts as the same failure**
 > and **when a remembered failure is done**. The seams are carryover retirement, staging-refusal
-> classification and reason fingerprint normalization.
+> classification, reason fingerprint normalization and the failure class fingerprint.
 
-Three subsystems answer one question — *is this the same defect I already saw?* —
+Four subsystems answer one question — *is this the same defect I already saw?* —
 and each had a leak that made the loop burn cycles re-working closed items.
 
 ## 1. Carryover retirement (PASS closeout)
@@ -101,6 +101,53 @@ The negative tests (`DistinctDefectsStayDistinct`,
 `TouchesOnlyTheNarrativeToken`, `DifferentPathspecStaysTransient`) refute a
 degenerate implementation. A normalizer that returns a constant, or a strike rule that
 merely counts, satisfies every positive test above.
+
+## 4. Failure class fingerprint
+
+A failure digest has two fingerprints. The exact fingerprint identifies one reason text. The class fingerprint identifies one root cause across cycles.
+
+**Problem (2026-10-27).** Cycles 2043, 2046 and 2055 failed on one pipeline-code defect. The explanation floor returns before the composed floor runs, so the single correction sees only part of the failures. Each reason names other files, functions and percentages. Thus each cycle got a new exact fingerprint (`0a48aa5747ca`, `c98f5503ae68`, `6e9e4730e355`) and recurrence 0. `RecurrenceConsoleFloor` and the identical-fingerprint breaker did not trip.
+
+| Fingerprint | Shape | Input | Use |
+|---|---|---|---|
+| Exact | `<phase>\|<pre-class>\|<hash>` | phase, pre-class and the normalized reason text | the disposition cross-check, the ack ledger, the exact recurrence |
+| Class | `<phase>\|<pre-class>\|class-<hash>` | phase, pre-class, the sorted names of the failing floor checks and the disposition layer | the class recurrence, the console floor and the blocker breaker |
+
+**Failing checks.** `failingChecks` (`go/internal/core/failure_class.go`) reads each build handoff floor reason. A failure line that starts with `explanationdocs.FailurePrefix` (`Explanation Documentation: `) names `explanation-documentation`. The prefix inside a failure does not count.
+
+Each producer in `go/internal/explanationdocs` builds its failure from that constant. `TestFailurePrefix_EveryChangedAreaFailureStartsWithIt` pins the Changed Areas producer. A floor failure count above the count of those lines names `composed-floor`. A reason from another gate names no check.
+
+The floor and the parser share the header constants `floorReasonHead` and `floorReasonCount` (`go/internal/core/build_handoff_floor.go`). `TestFailingChecks_ReadsTheReasonThatTheFloorWrites` sends a real `BuildHandoffFloor.Review` reason through the parser.
+
+`AssembleFailureDigest` writes the names to the `checks` field of the digest.
+
+**Order.** The digest is written before the retro, but the layer comes from the retro `disposition.json`. Thus the class is recorded after the retro, in `finalizeRetroCompletion`, when `VerifyDisposition` passes. `recordFailureClass` reads the layer from the disposition. It does not start a second LLM call. It writes the class fields to the harness digest record and to the workspace digest.
+
+**Later assembly.** A cycle that aborts in the retro phase seals through the abnormal-exit epilogue, and the epilogue assembles the digest again (cycles 2043, 2046 and 2055). `withRecordedClass` keeps the class fields of the harness record when the exact fingerprint did not change. A new exact fingerprint drops them, because the class belongs to the old failure.
+
+**Count.** Only the layers `pipeline-code`, `harness` and `infra` get a class. A `task-code` failure keeps only its exact fingerprint, so cycle 2048 does not count. `class_recurrence` is 1 plus the number of other records in `.evolve/failure-digests/` with the same class.
+
+Each class record carries `class_recorded_at`, the clock time of the retro completion. A record with a `class_recorded_at` before the last `resolved_at` of the class in `.evolve/resolved-fingerprints.json` does not count. Thus a resolved class starts again at 1. A file copy does not change the count, because the count does not read the file time.
+
+**Route.** `recordFailureClass` gives the class recurrence and the disposition routing to `dispositionrouter.Decide`. The result goes to `class_route` and `class_route_reason`, and the layer goes to `class_layer`. The third failure of the class routes to the console with the reason `floor: recurrence 3 >= 3`. A console route stages one autofile intent through `dispositionrouter.StageIntent` (item `failure-class-<hash>`, priority class `correctness`). The boundary applier files that item, as for each other staged intent.
+
+**Breaker.** The `identical-fingerprint` rule counts a digest by its class fingerprint when it has one, else by its exact fingerprint. An ack of either fingerprint removes the digest from the count.
+
+**Worked example.** The real reasons are fixtures in `go/internal/core/testdata/failureclass/`.
+
+| Cycle | Layer | Checks | Class recurrence | Route |
+|---|---|---|---|---|
+| 2043 | pipeline-code | `composed-floor` | 1 | queue |
+| 2046 | pipeline-code | `composed-floor` | 2 | queue |
+| 2048 | task-code | `composed-floor` | no class | none |
+| 2055 | pipeline-code | `composed-floor` | 3 | console |
+| 2054 | pipeline-code | `explanation-documentation` | 1 (other class) | queue |
+
+**Rejected option.** A class key from the detailed check names (`size`, `apicover`, `coverage`, `ste-lint`) splits the three cycles into three classes. Each cycle hit another set of composed-floor checks. The class key uses two groups that `build_handoff_floor.go` names beside each other: `explanation-documentation`, the mandatory floor, and `composed-floor`, each other floor check. Thus one root cause gives one class.
+
+**Limit.** The class is coarse. Two pipeline-code defects in one floor check share a class until an operator resolves the class. A malformed `resolved_at` is an error of the ack ledger, so the class record and the breaker each give a warning.
+
+Pinned by `TestFailureClass_TheFloorShortCircuitCyclesShareOneClassAndTheThirdRoutesToTheConsole`, `TestFailureClass_TheExplanationFloorVariantIsADifferentClass`, `TestFailureClassKey_EachPartSplitsTheClass`, `TestFailureClass_AResolvedClassStartsCountingAgain` and `TestBlockerBreaker_OneClassWithDistinctExactFingerprintsHalts`.
 
 ## Acceptance coverage
 

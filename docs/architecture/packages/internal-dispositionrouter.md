@@ -11,6 +11,7 @@
 - **Staging is JSONL.** `StageIntent` appends one record to `.evolve/escalations/pending-actions.jsonl`. It creates the directory on first use. The shared file lock serializes the append, so concurrent lanes cannot tear a line. `LoadIntents` reads the file in append order.
 - **Intent shapes.** An intent either escalates the weight of an existing open inbox item, or autofiles a new item for a pattern with no open item. `Weight` is the base weight that the escalation formula starts from. `Recurrence` is the count that it escalates for.
 - **Name.** The package is not named `router`. `internal/router` is the unrelated phase and model dispatch router. Two routers in one namespace are a collision, not reuse.
+- **The layer vocabulary.** `LayerTaskCode`, `LayerPipelineCode`, `LayerHarness`, `LayerInfra` and `LayerEvalContract` are the values of `root_cause.layer` in `disposition.json`. The disposition gate, the failure class of `internal/core` and the live reaction of `internal/selfheal` read these constants.
 - **Dependencies.** Stdlib and `internal/adapters/flock` only.
 
 ## Invariants

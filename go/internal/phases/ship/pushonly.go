@@ -11,27 +11,19 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/landing"
+	"github.com/mickeyyaya/evolve-loop/go/internal/shipjournal"
 )
 
-const shipJournalName = "ship-journal.jsonl"
-
 func shipJournalPath(projectRoot string) string {
-	return filepath.Join(projectRoot, ".evolve", shipJournalName)
-}
-
-type shipJournalEntry struct {
-	SHA   string `json:"sha"`
-	Class string `json:"class"`
-	TS    string `json:"ts"`
-	Cycle int    `json:"cycle,omitempty"`
+	return shipjournal.Path(paths.EvolveDirOf(projectRoot))
 }
 
 var marshalJSON = json.Marshal
 
-func appendShipJournal(projectRoot string, e shipJournalEntry) error {
-	e.TS = time.Now().UTC().Format(time.RFC3339)
-	line, err := marshalJSON(e)
+func appendShipJournal(projectRoot string, e shipjournal.Entry) error {
+	line, err := marshalJSON(e.Stamped(time.Now()))
 	if err != nil {
 		return err
 	}
@@ -47,8 +39,8 @@ func appendShipJournal(projectRoot string, e shipJournalEntry) error {
 	return errors.Join(werr, f.Close())
 }
 
-func readShipJournal(projectRoot string) map[string]shipJournalEntry {
-	entries := map[string]shipJournalEntry{}
+func readShipJournal(projectRoot string) map[string]shipjournal.Entry {
+	entries := map[string]shipjournal.Entry{}
 	f, err := os.Open(shipJournalPath(projectRoot))
 	if err != nil {
 		return entries
@@ -56,7 +48,7 @@ func readShipJournal(projectRoot string) map[string]shipJournalEntry {
 	defer func() { _ = f.Close() }()
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
-		var e shipJournalEntry
+		var e shipjournal.Entry
 		if json.Unmarshal(sc.Bytes(), &e) == nil && e.SHA != "" {
 			entries[e.SHA] = e
 		}
@@ -97,7 +89,7 @@ func runPushOnly(ctx context.Context, opts *Options, res *RunResult) error {
 	}
 	if len(unprovenanced) > 0 {
 		return fmt.Errorf("ship --push-only: REFUSED — %d ahead commit(s) lack ship provenance (not in %s, not a sync-main reconcile merge): [%s]. Push-only is a recovery for attested strands, never a guard bypass; land un-provenanced work through a normal `evolve ship`",
-			len(unprovenanced), shipJournalName, strings.Join(unprovenanced, ", "))
+			len(unprovenanced), shipjournal.FileName, strings.Join(unprovenanced, ", "))
 	}
 	if err := pushWithRepair(ctx, opts, res, landing.PushRequest{Branch: branch, Site: landing.SitePushOnly}); err != nil {
 		return err

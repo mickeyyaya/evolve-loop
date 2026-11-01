@@ -418,7 +418,7 @@ func (o *Orchestrator) reviewResumedDeliverable(
 		req.CorrectionDirective = preferDigest(composeCorrection(correction, review.Reason, review.Remediation), req)
 		o.emitGateCorrection(gateCorrection{
 			origin: originResumedCorrection, cycle: cycle, phase: phase, correction: correction, max: maxCorrections,
-			rung: interaction.RungRedispatch, cli: req.ModelRoutingCLI, reason: review.Reason,
+			rung: interaction.RungRedispatch, cli: req.Driver.String(), reason: review.Reason,
 		})
 		req = count(phase, req)
 		corrected, err := o.redispatchResumedCorrection(ctx, runner, req, phase, correction)

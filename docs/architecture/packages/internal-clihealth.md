@@ -12,6 +12,7 @@
 - The runner's bench writer and the loop canary both compose entries through `NewBenchEntry`. The strike, cooldown and evidence logic therefore cannot drift between them.
 - `BenchWall` is the one read-previous, compose, write sequence. `Bench`, `Clear` and `RecordBootStrike` are the other writers.
 - `Active` returns the family entries that routing must still avoid. `Expired` returns the canary candidates. Both skip model entries.
+- Two operator views read `Active` through one sorted list, `activeBenches` in `cmd/evolve`: `evolve clihealth list` and `evolve wave status` (since 2026-10-27). `wave status` prints one `benched:` line for each entry, so the console sees the benches that the pre-wave usage probe wrote at launch.
 - A model entry (`BenchModelUntil`, key `family\x00model`) benches one model of a family until its reset. `ActiveModels` returns them. No router or canary reads them yet.
 - `Benchable` is a deliberately closed set of escalation patterns. Re-dispatching a walled resource is guaranteed waste. Most escalations, such as trust prompts, are situational.
 

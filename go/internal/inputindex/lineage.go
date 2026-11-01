@@ -107,3 +107,18 @@ func lessonSources(projectRoot string, itemIDs []string, lineage []int) []source
 	}
 	return out
 }
+
+func requestSources(projectRoot string, cycle int, lineage []int, attempt int) []source {
+	var out []source
+	for i, n := range append(slices.Clone(lineage), cycle) {
+		class, why := ClassLineage, fmt.Sprintf("a request of lineage cycle %d and its result", n)
+		if n == cycle {
+			class, why = ClassDeliverable, "a request of an earlier agent of this cycle and its result"
+		}
+		records, _ := filepath.Glob(filepath.Join(RequestsDir(projectRoot, n), "*.json"))
+		for _, path := range records {
+			out = append(out, source{path: path, class: class, kind: KindRequest, cycle: n, attempt: attempt - len(lineage) + i, why: why})
+		}
+	}
+	return out
+}

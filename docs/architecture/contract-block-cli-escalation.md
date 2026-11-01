@@ -53,7 +53,7 @@ decisions from the same helpers (`Orchestrator.reviewInputFor`, `degradesRejecti
 
 ## Scoping
 
-The orchestrator applies escalation to `PhaseRequest.ModelRoutingCLI` **for that re-dispatch only**. It is a soft
+The orchestrator applies escalation to `PhaseRequest.Driver`, an opaque `llmroute.Binding` (X19a), **for that re-dispatch only**. It is a soft
 overlay (`llmroute.ApplySoftOverlay`) that promotes the target to chain primary and keeps the
 own chain of the profile behind it. The phase routing and the profile on disk are untouched. The
 non-compliance lives on the rare failure path, while the same CLI ships the common path fine.
@@ -82,7 +82,7 @@ The budget of round 2 buys the
 Three invariants, each pinned by a test in `go/internal/core/contract_salvage_retry_test.go`:
 
 - **Breaker-neutral.** It adds no dispatch, spends no extra correction, and does not touch
-  `ModelRoutingCLI` (there is no other family; that is the premise). The remedy does not touch `ReviewResult.Blocks`, the
+  `PhaseRequest.Driver` (there is no other family; that is the premise). The remedy does not touch `ReviewResult.Blocks`, the
   own counter of the breaker. So the circuit still opens on the third strike
   as the last resort.
 - **Disjoint from escalation.** It fires only on the `ok=false` arm. So a phase *with* a real

@@ -65,23 +65,31 @@ func TestSandboxPreservesLinkedWorktreeGitIndex(t *testing.T) {
 		t.Fatalf("main checkout write escaped confinement: %s", out)
 	}
 	args := append(prefix[1:], "git", "-C", wt, "add", "sample")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if out, err := exec.CommandContext(ctx, prefix[0], args...).CombinedOutput(); err != nil {
+	sandboxed := func(argv []string) ([]byte, error) {
+		t.Helper()
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		out, err := exec.CommandContext(ctx, prefix[0], argv...).CombinedOutput()
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			t.Fatalf("sandbox denial probes did not complete: %v (timeout is not confinement evidence)", ctxErr)
+		}
+		return out, err
+	}
+	if out, err := sandboxed(args); err != nil {
 		t.Fatalf("legitimate worktree staging denied: %v %s", err, out)
 	}
 	git(wt, "ls-files", "--error-unmatch", "sample")
 	commitArgs := append(append([]string{}, prefix[1:]...), "git", "-C", wt, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "fixture checkpoint")
-	if out, err := exec.CommandContext(ctx, prefix[0], commitArgs...).CombinedOutput(); err != nil {
+	if out, err := sandboxed(commitArgs); err != nil {
 		t.Fatalf("legitimate worktree checkpoint denied: %v %s", err, out)
 	}
 	writeConfig := append(append([]string{}, prefix[1:]...), "/bin/sh", "-c", `printf forbidden > "$1"`, "fixture", filepath.Join(root, ".git/config"))
-	if out, err := exec.CommandContext(ctx, prefix[0], writeConfig...).CombinedOutput(); err == nil {
+	if out, err := sandboxed(writeConfig); err == nil {
 		t.Fatalf("git grants exposed shared config: %s", out)
 	}
 	if probe.OS == "darwin" {
 		otherRef := append(append([]string{}, prefix[1:]...), "git", "-C", wt, "update-ref", "refs/heads/sibling", "HEAD")
-		if out, err := exec.CommandContext(ctx, prefix[0], otherRef...).CombinedOutput(); err == nil {
+		if out, err := sandboxed(otherRef); err == nil {
 			t.Fatalf("macOS exact-ref policy exposed sibling ref: %s", out)
 		}
 	}
@@ -92,12 +100,9 @@ func TestSandboxPreservesLinkedWorktreeGitIndex(t *testing.T) {
 		filepath.Join(root, ".git", "objects", "info", "alternates"),
 	} {
 		openControl := append(append([]string{}, prefix[1:]...), "/bin/sh", "-c", `: >> "$1"`, "fixture", control)
-		if out, err := exec.CommandContext(ctx, prefix[0], openControl...).CombinedOutput(); err == nil {
+		if out, err := sandboxed(openControl); err == nil {
 			t.Errorf("control metadata writable: %s (%s)", control, out)
 		}
-	}
-	if err := ctx.Err(); err != nil {
-		t.Fatalf("sandbox denial probes did not complete: %v (timeout is not confinement evidence)", err)
 	}
 }
 

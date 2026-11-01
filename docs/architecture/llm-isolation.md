@@ -12,7 +12,7 @@
 > - X1: merged in #1121. The conformance matrix of §14 and the module, kind, codes and channel of §15 are on `main`. The follow-up X1b (#1128) adds a fake `tmux` (`go/internal/faketmux`), so the rows M2 to M4 run a full cycle and are green.
 > - X2: merged in #1122 at stage `shadow` (the policy key `isolation.i2.stage`). The flip to `enforce` is an operator decision.
 > - X3: merged in #1127. The single launch API of §5.1 and its AST guard `TestOnlyTheBridgeStartsAnLLMBinary` are on `main`, and matrix row N2 is green.
-> - X4: merged in #1126, and the dispatch credential of I-3 merged in #1132.
+> - X4: merged in #1126, and the dispatch credential of I-3 merged in #1132. The request channel of §7.2.1 (item `isolation-dispatch-request-channel`) is built at stage `shadow`.
 > - X5: merged in #1133 at stage `shadow` (the policy key `isolation.i5.stage`).
 > - X6: merged in #1123. The routing data of §10 is on `main`: `cli_routing.floors`, with the compiled default in `go/internal/policy/routing_defaults.json`. The follow-up X6b (item `isolation-floor-profiles-allowed-clis-as-routing-data`) moves the `allowed_clis` pins of 7 profiles.
 > - X7: merged in #1135 at stage `shadow` (the policy key `isolation.i7.stage`). The sandbox holds the protected write rule for each family, `guard phase` follows §7.2 for `Agent` and `Task`, and rows N10 and N11 are green (§9.1).
@@ -448,7 +448,7 @@ evolve wave next: refused inside a phase: wave next is class D; it is an operato
 | The stage | the policy key `isolation.i3.stage`, the same stage as the exec deny, read from a file that the cell cannot change. The launcher writes it to `~/.evolve/dispatch/stage`, outside `held/`. A missing file is `shadow`. When the credential read is denied (`EPERM` or `EACCES`), a missing file is `enforce`. Only a launch makes a cell, and the launch writes the stage. A file that cannot be read, or a word that is not `off`, `shadow` or `enforce`, is `enforce`. |
 | `off` | no deny, no store write and no check |
 | `shadow` | The cell cannot read the credential. The verb emits `ISOLATION_I3_VIOLATION` with `action=logged` and runs. |
-| `enforce` | The verb emits `ISOLATION_I3_VIOLATION` with `action=refused` and exits 3. A class R refusal names the request path of its kind, for example `.evolve/runs/cycle-<N>/requests/dispatch-<n>.json`. Item `isolation-dispatch-request-channel` builds that channel. |
+| `enforce` | The verb emits `ISOLATION_I3_VIOLATION` with `action=refused` and exits 3. A class R refusal names the request path of its kind, for example `.evolve/runs/cycle-<N>/requests/dispatch-<n>.json`. The request channel of §7.2.1 reads that file. |
 | The signal | `rule=verb.class.r` or `verb.class.d`, `target` is the verb, `source=dispatch-credential` (cli-contract.md §4.5). The verb publishes it under the events role `dispatch`, and it goes to the stderr of the verb, which the pane captures. |
 | The hermetic env | No environment name carries the credential or its path. So X2 cannot pass it to a child (§6.1). |
 
@@ -521,9 +521,9 @@ How an in-harness subagent counts:
 - **Budget.** The usage of the subagent is usage of the CLI process, so it counts against the budget of the cell. The artifact timeout of the dispatch covers its time. A token cap for each seat is proposed.
 - **Telemetry.** The bridge records one dispatch for the CLI. A subagent gets no own dispatch record.
 - **Usage collector.** Each manifest usage collector must count the token usage of the subagents of the harness, or flag it as not counted. This is a requirement on the `collectors` field of X9 (§11, proposed).
-- **Manifest.** Each family manifest declares the capability `inprocess_subagents` (proposed) when its harness can run subagents in its own process. A profile cannot ask for subagents on a family without the capability.
+- **Manifest.** Each family manifest declares the capability `inprocess_subagents` when its harness can run subagents in its own process. As built, `claude-p` and `claude-tmux` declare it (§7.2.1). The rule "a profile cannot ask for subagents on a family without the capability" is proposed: no check reads the capability yet.
 
-The dispatch request (proposed, item `isolation-dispatch-request-channel`):
+The dispatch request (built by item `isolation-dispatch-request-channel`, §7.2.1):
 
 1. The agent writes a typed request, a declared output such as `requests/dispatch-<n>.json`. It names the target role, the reason, the inputs and the expected output.
 2. The pipeline validates the request in Go: the schema, the allowed roles and two caps.
@@ -532,6 +532,80 @@ The dispatch request (proposed, item `isolation-dispatch-request-channel`):
 3. The orchestrator agent of [ADR-0155](adr/0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md) judges if the request is reasonable. The catalog of §19 gets a new action, "dispatch phase agent" (ADR-0155, amended 2026-10-26).
 4. If the request is approved, the pipeline dispatches the agent. The result goes into the lineage index of the requester (§8).
 5. A refused request gets a recorded reason. The requesting agent never dispatches an agent itself.
+
+#### 7.2.1 The request channel (as built)
+
+A worked example. The build agent of cycle 7 needs the suspect files of a failure. It cannot run `evolve agent run fault-localization`: the verb is class R, and a cell has no dispatch credential (§7.1.1). The refusal names the request path. The agent writes `.evolve/runs/cycle-7/requests/dispatch-1.json`:
+
+```json
+{"schema":"evolve.request/1","kind":"dispatch","what":{"verb":"agent run","args":{"role":"fault-localization"}},
+ "why":"The build fails in a parser that the scout report does not name.","inputs":["build-report.md"],
+ "expected_output":{"artifact":"the suspect files of the failure"}}
+```
+
+1. The build phase ends. Before the dispatch returns, `cycleRun.handoffRequests` gives the cell to the channel (`go/internal/core/request_handoff.go`).
+2. `agentrequest.Channel.Handoff` reads `requests/dispatch-1.json` and emits `isolation.request`.
+3. The validator checks the file in Go, and each check passes:
+   - the strict schema and the kind `dispatch`;
+   - the role, which is in `isolation.dispatch_requests.roles`;
+   - the cycle cap (cycle 7 has fewer than 3 requests) and the depth cap (the depth is 1);
+   - the input `build-report.md`, which is a plain file of the workspace.
+4. The channel writes the evidence workspace `.evolve/runs/request-7-dispatch-1/`. Entry `q1` is a copy of the request, and entry `i1` is the input. A failure of this write refuses the request with the precondition `evidence`.
+5. The seat `selfheal-orchestrator` judges the request through `evolve agent run`. It writes `diagnosis.json` with `incident_id` `dispatch-1` and the action `dispatch-phase-agent`.
+6. `phasecontract.ParseDiagnosis` checks the judgement. `selfheal.Validator.Decide` checks the action against the catalog of §19, at tier T2, with the request as validated.
+7. At `enforce` the pipeline runs `evolve agent run fault-localization --json --keep --file <ws>/build-report.md`. The record `.evolve/lineage/requests/cycle-7/dispatch-1.json` gets the decision `run`, the run label and the report.
+8. The pipeline reads the requests in the kept workspace of that run at depth 2. Then it removes the workspace.
+9. The index of the next phase lists the record as a `deliverable` of kind `request` (§8). A retry of the item lists it as a `lineage` entry.
+
+| Item | As built |
+|---|---|
+| Request file | `requests/<kind>-<n>.json` in the workspace of the cell. The pipeline reads the files in order of the kind and the number. A file with another name is not read. One grammar in `go/internal/agentclass` (`RequestFile`, `ChildRequest`, `ValidRequestName`, `KindDispatch`) gives the file form, the name of a nested request and the name check of the judgement. |
+| Schema | `evolve.request/1` (`agentclass.RequestSchema`), parsed by `agentrequest`. An unknown key, trailing data, an empty `why` or no `expected_output.artifact` is a refusal. |
+| Kinds | `dispatch` only. The kind in the file name and in the file must be the same. The kinds `inbox-add`, `routing-proposal`, `quality-reading` and `code-refresh` of [cli-contract.md](cli-contract.md) §4.3 are refused with precondition `kind`. Item `cli-agent-tool-surface` adds their executors. |
+| Validator | `agentrequest.Channel.check`, in this order: `kind`, `role`, `cycle-cap`, `depth-cap`, `input`. Each input is a clean relative path to a plain file in the workspace of the requester, by the rule of `inputindex.FileEntry`. The same entries go into the evidence index. |
+| Policy | `isolation.dispatch_requests`: `stage` (`off`, `shadow`, `enforce`; default `shadow`), `roles` (default `fault-localization`, `premise-challenge`, `dependency-map`), `per_cycle` (default 3) and `max_depth` (default 1). A value of 0 takes the default. `evolve agent capabilities --json` prints the block as `caps.dispatch`. |
+| Cycle cap | the number of records of the cycle in `.evolve/lineage/requests/cycle-<N>/`. Each request that the channel reads counts, also a refused one. |
+| Depth | A request of a phase agent has depth 1. A request in the workspace of an agent that a request dispatched has the depth of its parent plus 1. Its name is `<parent>.<file>`, for example `dispatch-1.dispatch-1`. |
+| Judge | the seat `selfheal-orchestrator` (ADR-0155). Its persona has the section "Judge a dispatch request". `dispatch-phase-agent` approves. Each other action refuses, with `params.reason` or the hypothesis as the reason (precondition `judged`). |
+| Catalog | `dispatch-phase-agent` is the seventh action of `selfheal.CatalogActions` and of `phasecontract.DiagnosisActions`. Its tier is T2, and its precondition is `request-validated`: an approval of a request that the validator did not pass is refused. A catalog refusal has the precondition `catalog`, and its reason starts with the word of the catalog, for example `request-validated: ...`. |
+| `shadow` | The channel validates, judges and records. The decision is `approved`, and no agent runs. |
+| `enforce` | An approved request runs. A failed run gets the decision `failed`. |
+| Record | `evolve.request.record/1` in `.evolve/lineage/requests/cycle-<N>/<name>.json`, where no cell can write. The record keeps the `sha256` of the request. A file with a record and the same digest is not read again. A file with a record and another digest is a new request under a used name. The channel refuses it once with the precondition `name`. Its record name is `<name>~<12 hex digits>`. |
+| Index | `inputindex.Build` lists each record of the cycle (`deliverable`) and of each lineage cycle (`lineage`), with kind `request`. The summary names the request, the role, the decision and the reason. |
+| Signals | `isolation.request` (INFO) for each request that parses. `isolation.request.decision`: INFO for `run` and `approved`, WARN `ISOLATION_REQUEST_REFUSED` for a refusal, WARN `ISOLATION_REQUEST_FAILED` for a failed run. |
+| Errors | Three faults are errors: an unreadable `requests/` directory, a corrupt record and a record that cannot be written. Core then prints `[orchestrator] WARN request channel of <phase>`. The cycle goes on. A cancelled cycle reads no further request. The channel removes the kept workspace of each run, also after a failed run or a failed record. |
+| Manifest | the capability `inprocess_subagents` (`bridge.CapabilityInprocessSubagents`), declared by `claude-p` and `claude-tmux` |
+
+| Id | Decision | Because | Rejected options and why |
+|---|---|---|---|
+| RC1 | The channel reads the requests at the end of each phase dispatch, before the next phase. | The next phase then finds the result in its index (cli-contract.md §4.3: "The pipeline reads the requests at the handoff of the phase"). | A pass at the boundary: the requester and the next phases of the cycle never see the result. |
+| RC2 | The judge is the seat `selfheal-orchestrator`, and it answers with the diagnosis schema. | ADR-0155 names that seat as the orchestrator agent. The schema, the catalog and the validator of X13 and X14 then check the judgement with no new contract. | A new seat with a new judgement schema: a second profile, persona and routing row for one decision. |
+| RC3 | The validator runs before the judge. | A request that fails a Go check costs no LLM launch. | The judge first: a cap or a schema error then costs a launch. |
+| RC4 | The record lives in `.evolve/lineage/requests/`. | The repo is read-only for a cell, so a cell cannot forge a decision or a result (§8.5). | The workspace of the cell: the next phase of the cycle can write it. |
+| RC5 | A dispatched role runs through `evolve agent run`, which admits only a standalone profile. | `agent run` refuses a built-in phase and a writer with no worktree, so a request cannot start a second build. | A phase runner of the cycle: it reads and writes the cycle state. |
+
+Known differences from the design:
+
+- The kind `dispatch` is the only kind with an executor. The other request kinds of cli-contract.md §4.3 wait for item `cli-agent-tool-surface`.
+- A request with the role of a built-in phase, for example `scout`, is refused by `agent run`. The decision is `failed`.
+- The judge has the same limit as the diagnosis seat: at `isolation.i5.stage=enforce` it cannot read its evidence workspace (§18.6).
+- At `shadow` each valid request costs one launch of the judge.
+- A dispatched agent writes its requests into its own kept workspace. The profiles of the default roles have no `Write` tool grant, so a nested request is rare until a profile grants it.
+- The signals go to the signal stream. No events channel routes the kinds `isolation.request` and `isolation.request.decision` yet.
+- No check reads the capability `inprocess_subagents` yet. Item `isolation-inprocess-subagents-profile-check` adds the reader.
+- The evidence workspace of each request stays under `.evolve/runs/` as the record of the judgement, as the evidence of an incident does (§18.6).
+- The seats run in the process of the loop through `evolve agent run`, which takes no context. A cancel stops the channel between requests, not during a seat.
+
+The guards are these tests:
+
+- `TestDispatchRequest_AValidRequestIsDispatchedByThePipeline` and `TestAgentRequest_AnApprovedRequestIsRunByThePipeline`
+- `TestHandoff_AnUnreasonableRequestIsRefusedWithARecordedReason`
+- `TestHandoff_ARequestOfADispatchedAgentIsRefusedPastTheDepthCap` and `TestHandoff_ARequestPastTheCycleCapIsRefused`
+- `TestAgentRequest_ADirectAgentRunInACellIsRefusedAndNamesTheFileThatThePipelineReads` and the row "agent run" of `TestDispatchVerbs_RefuseWithoutTheDispatchCredential`
+- `TestHandoff_TheValidatorRefusesBeforeTheOrchestratorJudges` and `TestHandoff_TheCatalogDisposesOfTheJudgement`
+- `TestHandoff_ANewRequestUnderADecidedNameIsRefusedOnce`, `TestHandoff_ANestedRequestUnderTheDepthCapIsJudgedAndRun` and `TestRequestName_TheFileTheChildAndTheNameShareOneGrammar`
+- `TestDispatch_HandsTheRequestsOfTheFinishedPhaseToTheChannel`, `TestWireOrchestratorDeps_RequestChannelWired` and `TestBuild_ListsTheRequestRecordsOfTheCycleAndOfItsLineage`
+- `TestManifests_DeclareInProcessSubagentsOnlyForAHarnessThatRunsThem`
 
 ## 8. The artifact index
 
@@ -1121,6 +1195,8 @@ The contract reuses the shape of [llm-quality-indexes.md](llm-quality-indexes.md
 | `ISOLATION_I9_VIOLATION` | I-9 | none at run time; the matrix test is its guard |
 | `ISOLATION_CONTEXT_REQUIRED_UNOPENED` | I-4 | built (CX3): the bridge, when a cell closes without a read of a required entry of its index; kind `isolation.context`, INFO ([cell-context-index.md](cell-context-index.md) §8) |
 | `ISOLATION_CONTEXT_BUDGET_OVER` | I-4 | built (CX3): the bridge, when required entries of a layer passed its token budget; kind `isolation.context`, WARN ([cell-context-index.md](cell-context-index.md) §6) |
+| `ISOLATION_REQUEST_REFUSED` | I-3 | built: the request channel, when the validator or the orchestrator agent refuses a request; kind `isolation.request.decision`, WARN (§7.2.1) |
+| `ISOLATION_REQUEST_FAILED` | I-3 | built: the request channel, when the dispatch of an approved request fails; kind `isolation.request.decision`, WARN (§7.2.1) |
 
 ### 15.2 Fields of a violation
 
@@ -1316,9 +1392,9 @@ X12 builds step 1 (detect) and step 5 (verify) in `go/internal/selfheal` ([packa
 | Tier | T0 when the evidence names a protected surface, else T1 or T2 by class (§20.1) |
 | Pass | level-triggered: it reads the whole window each time. A closed record whose fingerprint is in the window again reopens, and an observed fingerprint cannot close. |
 | Close | `Incident.Close` with the four conditions of §22. A record with no `repro_test` stays open until X16. |
-| Stage | the policy key `healing.detector.stage`: `shadow` (default) or `off`. `enforce` is refused until X14. |
+| Stage | the policy key `healing.detector.stage`: `shadow` (default) or `off`. `enforce` is refused until X16 (item `selfheal-repair-cycle-path`). |
 
-The record has the fields of §18.2 and some more fields ([internal-selfheal.md](packages/internal-selfheal.md)). `.evolve/incidents/`, `go/internal/selfheal/`, `go/cmd/evolve/cmd_selfheal.go` and `go/internal/policy/healing.go` are in `guards.ProtectedSurfaceManifest`. The states are `open` and `closed`. X14 adds the other states of §18.2 with a new major schema version.
+The record has the fields of §18.2 and some more fields ([internal-selfheal.md](packages/internal-selfheal.md)). `.evolve/incidents/`, `go/internal/selfheal/`, `go/cmd/evolve/cmd_selfheal.go` and `go/internal/policy/healing.go` are in `guards.ProtectedSurfaceManifest`. The states are `open` and `closed`. X16 adds the other states of §18.2 with a new major schema version, because X16 runs the repairs that move a record through them.
 
 ### 18.6 As built (X13)
 
@@ -1339,10 +1415,10 @@ A worked example: the record `inc-2026-10-27-235078cd` (`ci-hang:main`, T1) has 
 | Evidence index | `selfheal.WriteEvidence` writes `.evolve/runs/selfheal-<incident id>/inputs/index.json` in the format `evolve.inputs.index/2` of §8.5. The seat reads it with `evolve context index` and `open --workspace`. |
 | Classes | `incident` is the record (`i1`, the required entry). `signal` is a cut of the source signals, and the `INBOX_CURATOR_PROPOSAL` signals whose `id` or `target` is the subject. `digest` and `retrospective` are `failure-digest.json` and `retrospective-report.md` of each source cycle. `lesson`, `ci-log` and `diff` have no entry yet. The index names the missing CI runs and the diff in `notes`. |
 | Diagnosis | `diagnosis.json`, the flow seat `selfheal-orchestrator` of `phasecontract.FlowDecisions`. `phasecontract.ParseDiagnosis` checks it; the table below has the rules. |
-| Low confidence | `Diagnosis.Proposed` returns `halt-and-escalate` for a `low` diagnosis. The record keeps the action of the agent in `diagnosis` and the proposed action in `action`. |
+| Low confidence | `Proposal.WithDiagnosis` records `halt-and-escalate` for a `low` diagnosis. The record keeps the action of the agent in `diagnosis` and the proposed action in `action`. The rule is in `selfheal`, not in `phasecontract`: the schema checks the shape, and the pipeline decides the action (X14). |
 | Proposal record | `.evolve/incidents/proposals/<incident id>.json`, schema `evolve.healing.proposal/1`. The state is `proposed` (the diagnosis passed), `refused` (it failed the check) or `failed` (the run gave no diagnosis). The directory is under the protected `.evolve/incidents/`. |
-| Pass | `selfheal.Pending` selects each open incident with no current proposal: INCIDENT first, then by id, at most `max_per_pass`. A proposal is current while the incident keeps its `recurrence` and `last_seen_at`. A `failed` run is tried again at the next pass. |
-| Stage | the policy key `healing.orchestrator.stage`: `shadow` (default) records the proposals, and `off` runs no agent. `enforce` is refused until X14. `healing.orchestrator.max_per_pass` is 2 by default. |
+| Pass | `selfheal.Pending` selects each open incident with no current proposal: INCIDENT first, then by id, at most `max_per_pass`. A proposal is current while the incident keeps its `recurrence` and `last_seen_at`. A `failed` run is tried again after `healing.orchestrator.retry_after_hours` (6 by default, X14). Until then, the incident gives its slot to the next incident. |
+| Stage | the policy key `healing.orchestrator.stage`: `shadow` (default) records the proposals, and `off` runs no agent. `enforce` is refused until X16. `healing.orchestrator.max_per_pass` is 2 by default. |
 | Boundary | `evolve boundary run` and `evolve wave next` run `evolve selfheal incidents` and then `evolve selfheal propose` after `evolve inbox curate --apply`. A failed agent run is a `failed` record and exit 0, so it does not stop the boundary. An I/O fault is exit 2 and stops the boundary. |
 
 The rules of `evolve.diagnosis/1`, for the validator of X14:
@@ -1368,13 +1444,14 @@ An unknown key at any level, a missing key, prose around the JSON or trailing da
 | `revert-last-landing` | `sha` | none | 7 to 40 lowercase hex characters |
 | `open-repair-item` | `files`, `repro` | none | each file is a clean path inside the repository |
 | `halt-and-escalate` | none | `reason` | none |
+| `dispatch-phase-agent` | `request` | none | the name of a request file, such as `dispatch-1` or `dispatch-1.dispatch-1` |
 
 Two changes from §18.4:
 
 - The diagnosis has no `tier` key. The tier comes from the incident record, so the agent cannot lower the tier of its own incident.
 - `expected_effect` is required, because the operator asked for the expected effect of each proposal (2026-10-27). X16 can verify it after a repair.
 
-The catalog of §19 also names `dispatch-phase-agent` (proposed). The schema refuses it until X14 adds it.
+The catalog of §19 also names `dispatch-phase-agent`. Item `isolation-dispatch-request-channel` added it to the schema and to the X14 catalog as the seventh action (§7.2.1). The seat proposes it only when it judges a dispatch request.
 
 Limits:
 
@@ -1394,7 +1471,7 @@ The catalog is closed and typed Go (X14). It extends the enums of `failure-decis
 | `revert-last-landing` | none | `main` is red; the incident names a landing of the loop in the window; the revert applies clean | T2, T1 | a revert PR through `evolve ship` |
 | `open-repair-item` | `fix_type: pipeline-repair` | a reproduction statement; the suspect files; the tier from the classifier (§20) | T1 to the loop, T0 to the operator | the inbox write |
 | `halt-and-escalate` | `halt-and-diagnose` | none | all | the loop halt and an operator item |
-| `dispatch-phase-agent` (proposed, amended 2026-10-26, §7.2) | none | a dispatch request that the pipeline validated; under the cap for each cycle and the depth cap; the target role is allowed | T2 | the pipeline dispatch |
+| `dispatch-phase-agent` (amended 2026-10-26, built by §7.2.1) | none | a dispatch request that the pipeline validated; under the cap for each cycle and the depth cap; the target role is allowed | T2 | the pipeline dispatch |
 
 A proposal that fails a precondition does not run. The pipeline emits `HEALING_PROPOSAL_REFUSED` with the failed precondition, and the incident goes to `halt-and-escalate` after the second refusal.
 
@@ -1409,6 +1486,69 @@ A proposal that fails a precondition does not run. The pipeline emits `HEALING_P
 | global stop | the existing zero-ship halt and the three-FAIL stop stay in force | unchanged |
 
 The budget values are routing-style policy data in the constitution. Only the operator changes them.
+
+### 19.2 As built (X14)
+
+X14 builds step 3 (decide) in `go/internal/selfheal` ([package note](packages/internal-selfheal.md)). It is deterministic Go. In `shadow` it records a decision for each proposal and applies nothing. The console does the repair.
+
+A worked example. The pass of §18.6 gives the record `inc-2026-10-27-235078cd` (`ci-hang:main`, T1) the action `open-repair-item` with the file `go/internal/gc/devidle.go`.
+
+1. `evolve selfheal propose` parses `diagnosis.json` and builds the proposal, as in §18.6.
+2. `Validator.Decide` finds the action in the catalog. `open-repair-item` runs at each tier, so the tier limit holds.
+3. It checks the precondition `files-exist`: the file is in the repository. The file `go/internal/gc/sweep.go` of §18.6 does not exist, so the same check refuses that diagnosis.
+4. It checks the repair controls of T1. No repair of the incident failed, and the breaker of the class `ci-hang` is closed. The ledger has 0 accepted T1 repairs in the last 24 hours.
+5. The decision is `accepted`. The verb writes it into the proposal record and appends it to `.evolve/incidents/decisions.jsonl`. Then it publishes one INFO `selfheal.decision` event.
+
+Three earlier accepted T1 repairs in the window change step 4. The decision is then `refused` with the precondition `budget`, and the event has the code `HEALING_PROPOSAL_REFUSED`. That is the guard of the plan: "a fourth T1 repair in one window runs" fails (`TestBudget_RefusesTheFourthT1RepairInAWindow`).
+
+The validator checks in this order. The first check that fails names the refusal.
+
+| Order | Check | Precondition name | Holds for |
+|---|---|---|---|
+| 1 | The action is in the catalog. | `catalog` | each action |
+| 2 | The tier of the incident is in the tier limit of §19. | `tier-limit` | each action |
+| 3 | The preconditions of the action (table below). | see below | each action |
+| 4 | The incident has fewer than 2 failed repairs (ADR-0126). | `converge` | a repair at T1 or T2 |
+| 5 | The breaker of the incident class is closed, or half-open with no repair yet. | `breaker` | a repair at T1 or T2 |
+| 6 | The budget of the tier has room in the window. | `budget` | a repair at T1 or T2 |
+
+A repair is `retry-with-variation`, `reroute-family`, `revert-last-landing` or `open-repair-item`. `quarantine-item` is an inbox move, and `halt-and-escalate` is a stop. `dispatch-phase-agent` is a dispatch with its own caps (§7.2.1). So no budget or breaker holds these three. The console repairs a T0 `open-repair-item` outside the loop, so no loop control holds it. Its decision is `accepted` and does not escalate.
+
+| Action | Preconditions | Inventory that the verb reads |
+|---|---|---|
+| `retry-with-variation` | `item-known`, `variation-new` | the pending inbox ids (`inboxfile.PendingIDs`); the accepted retries of the incident in the ledger |
+| `reroute-family` | `item-known`, `family-known` | the pending inbox ids; the installed CLI families (`bridge.InteractiveFamilies`) |
+| `quarantine-item` | `item-known`, `item-of-incident` | the pending inbox ids; the subject of the incident |
+| `revert-last-landing` | `main-red`, `landing-in-window` | an open `main-red` incident; the `cycle` landings of `ship-journal.jsonl` in the detector window |
+| `open-repair-item` | `files-exist` | the files of the repository |
+| `halt-and-escalate` | none | none |
+| `dispatch-phase-agent` | `request-validated` | the request that the channel validated (§7.2.1). The verb `selfheal propose` gives no request, so it refuses this action for an incident. |
+
+| Part | As built |
+|---|---|
+| Catalog | `selfheal.CatalogActions` is the closed list. `TestCatalog_HasEachKindOfTheDiagnosisSchema` fails when the catalog and `phasecontract.DiagnosisActions` differ. |
+| Budget | the accepted repairs of the tier in the ledger, in the last `window_hours`. A loop tier with no budget value refuses each repair, so a missing value cannot remove the bound. An accepted decision in `shadow` counts too, so `shadow` measures the budget that `enforce` will apply. |
+| Breaker | It reads the repair outcomes of the class in time order. `breaker_failures` failures in a row open it. It stays open for `breaker_open_hours`, then it is half-open. One accepted repair can run in the half-open state. A FAIL opens the breaker again, and a PASS closes it. |
+| Escalation | A decision escalates on a `converge` or `breaker` refusal, on the second refusal of one incident, and on an accepted `halt-and-escalate`. A low diagnosis is an accepted `halt-and-escalate`, so it escalates. |
+| Schema refusal | A diagnosis that fails `ParseDiagnosis` is a refusal with the precondition `diagnosis`. It counts for the second-refusal rule. A `failed` run is no proposal and gets no decision. |
+| Records | one line for each decision in `.evolve/incidents/decisions.jsonl` (schema `evolve.healing.decision/1`), and the field `decision` of the proposal record. The verb writes the ledger first, because the budget reads it. The repair outcomes are `.evolve/incidents/repairs.jsonl`, which X16 writes. The directory is protected. |
+| Dispatch | `Proposal.Dispatchable` returns the action only for an accepted decision, else `ErrNoAcceptedProposal` (`TestRepairDispatch_NeedsAnAcceptedProposal`). X16 calls it. In `shadow` nothing calls it. |
+| Stage | the policy key `healing.validator.stage`: `shadow` (default) records the decisions, and `off` decides nothing. `enforce` is refused until X16. |
+
+| Policy `healing.validator` | Default | Meaning |
+|---|---|---|
+| `window_hours` | 24 | the budget window |
+| `t1_repairs` | 3 | the T1 repairs in one window |
+| `t2_repairs` | 6 | the T2 repairs in one window |
+| `breaker_failures` | 2 | the failed repairs of one class in a row that open its breaker |
+| `breaker_open_hours` | 24 | the time that an open breaker stays open |
+
+Limits:
+
+- No repair runs before X16, so `repairs.jsonl` is empty. The `converge` and `breaker` checks thus refuse nothing on live data until X16 writes outcomes.
+- `family-known` checks that the family is installed. It does not check the health of the family or the routing floors of the seat. The incident names no seat.
+- `revert-last-landing` does not check that the revert applies clean. The executor of X16 must check it, because only a real revert can prove it.
+- The incident record keeps the states `open` and `closed`. An escalation is a decision and a signal, not a new incident state (§18.5).
 
 ## 20. Surface tiers and the gate classifier
 
@@ -1442,12 +1582,24 @@ A deterministic diff classifier (X15) runs at the build floor and at ship, besid
 | touches a protected path | `go/internal/guards/role.go` |
 | removes a test function in a guard package or a contract test | `func TestAgentSandboxContract` deleted |
 | adds `t.Skip` to a test that ran | a skipped matrix row |
-| lowers a threshold or a budget constant | `zero_ship_halt` from 2 to 3 |
+| lowers a threshold or a budget constant (as built: changes one, §20.4) | `zero_ship_halt` from 2 to 3 |
 | moves a stage key from `enforce` to `shadow` or `off` | `docs_floor.ste_stage` |
 | changes a frozen acceptance check | `go/acs/cycle<N>/` after the TDD digest (item `tdd-predicates-frozen-at-handoff`) |
 | changes the catalog, the budgets or the tier table | `healing` policy keys |
 
 A T0 flag in a loop cycle refuses the ship with `HEALING_I10_VIOLATION`. The repair goes to the operator queue as a proposal.
+
+### 20.4 As built (X15)
+
+- `go/internal/gateclass` holds the tier table and the classifier ([internal-gateclass.md](packages/internal-gateclass.md)). It is pure Go: the callers give it the diff, the untracked paths and the cycle.
+- The build floor runs it (`core.GateClassifierFloorChecks`). Each flag is a floor failure, and the builder must restore the change.
+- Ship runs it for `--class cycle` after the P2 check and before the audit binding (`refuseWeakenedGates`). A flag refuses the ship with `GATE_WEAKENED` and emits `HEALING_I10_VIOLATION`.
+- The classifier is at `enforce` and has no stage key. A manual ship does not run it.
+- The classifier flags by pattern at each tier. A T2 path, for example a guard test outside the protected list, gets a flag when a pattern matches. The tiers are data until X16 routes a repair by them.
+- The classifier flags each change of a threshold or budget number, not only a lower one. A raised halt count is also weaker, and a diff does not show the direction of the rule.
+- The `frozen-check` pattern flags a change of a predicate package of another cycle. The digest of item `tdd-predicates-frozen-at-handoff` is not built yet.
+- The T1 judge rule is `cliroute.Decision.IndependentOf`. It removes the builder family from the audit seat, or refuses with `ErrNoIndependentFamily`. X16 calls it for a T1 repair cycle.
+- The classifier package, the ship check and the floor check are on the protected list (`go/internal/guards/integrity_surface.go`). The manifest is the one home of the T0 paths. An entry with `Constitution: true` is also a healing constitution path.
 
 ## 21. No agent writes its own oracle (I-11)
 
@@ -1498,7 +1650,11 @@ The module is `healing` (built by X12, code prefix `HEALING_`), in the same shap
 | `incident.escalated` | INCIDENT | `HEALING_ESCALATED` | two failed repairs, two refused proposals, an open breaker or a `low` diagnosis |
 | `healing.violation` | WARN | `HEALING_I10_VIOLATION` to `HEALING_I14_VIOLATION` | an invariant of Part II breaks |
 
-As built (X12): one kind `selfheal.incident` with a field `transition` replaces `incident.opened` and `incident.closed` ([internal-selfheal.md](packages/internal-selfheal.md) has the codes). The kinds `incident.proposal`, `incident.refused` and `incident.escalated` come with X14. X13 emits no signal: in `shadow` it writes the proposal records only (§18.6).
+As built (X12): one kind `selfheal.incident` with a field `transition` replaces `incident.opened` and `incident.closed` ([internal-selfheal.md](packages/internal-selfheal.md) has the codes). X13 emits no signal: in `shadow` it writes the proposal records only (§18.6). X15 emits `HEALING_I10_VIOLATION` with the kind `gate.rejected` (§20.4).
+
+As built (X14): one kind `selfheal.decision` with a field `verdict` replaces `incident.proposal`, `incident.refused` and `incident.escalated`. The lossless channel `selfheal.decision` keeps each one. An accepted decision is INFO with no code. A refusal has the code `HEALING_PROPOSAL_REFUSED` and the field `precondition`. An escalated refusal adds a second event with the code `HEALING_ESCALATED`. An accepted `halt-and-escalate` is one `HEALING_ESCALATED` event.
+
+X14 emits no `HEALING_I12_VIOLATION` or `HEALING_I13_VIOLATION`: in `shadow` no repair runs, so no repair can break I-12 or I-13. X16 emits them at its dispatch.
 
 The measures for the stage flips of §20.2 are proposed panel readings: repair success rate, false-diagnosis rate and OQ4 time to green. A false diagnosis is a repair whose verify failed and whose next diagnosis named another cause. An amendment of ADR-0153 adds them.
 
@@ -1510,7 +1666,8 @@ The measures for the stage flips of §20.2 are proposed panel readings: repair s
 | Why did the pipeline refuse a proposal? | `evolve signals tail --channel errors --code HEALING_PROPOSAL_REFUSED --json` |
 | What did the orchestrator agent see? | `evolve context index --workspace .evolve/runs/selfheal-<incident id> --json` |
 | What did the orchestrator agent propose? | `evolve selfheal propose --json`, or `cat .evolve/incidents/proposals/<incident id>.json` |
-| What stage is each tier at? | the `healing` block of `.evolve/policy.json`: `healing.detector.stage` (X12) and `healing.orchestrator.stage` (X13) are built, and the tier keys are proposed |
+| What stage is each tier at? | the `healing` block of `.evolve/policy.json`: `healing.detector.stage` (X12), `healing.orchestrator.stage` (X13) and `healing.validator.stage` (X14) are built, and the tier keys are proposed |
+| What did the validator decide, and why? | `evolve signals tail --channel selfheal.decision --json`, or `.evolve/incidents/decisions.jsonl` |
 
 | Code | What it means | What to do |
 |---|---|---|
@@ -1641,8 +1798,8 @@ CLI specifics live above the driver layer today (research F6.1 to F6.6):
 
 | Leak | Evidence on `72561f774` | Owner |
 |---|---|---|
-| A named CLI in the assignment | `core.PhaseRequest.ModelRoutingCLI`, `ModelRoutingTier`, `ModelRoutingEffort` (`go/internal/core/phase.go:101-105`); the runner overlay (`go/internal/phases/runner/routing.go:94`, `:113`) | X19a |
-| The advisor names a CLI | the plan schema asks for `"cli"` (`go/internal/core/advisor/prompt.go:90`) | X19a |
+| A named CLI in the assignment | `core.PhaseRequest.ModelRoutingCLI`, `ModelRoutingTier`, `ModelRoutingEffort` (`go/internal/core/phase.go:101-105`); the runner overlay (`go/internal/phases/runner/routing.go:94`, `:113`) | X19a (built) |
+| The advisor names a CLI | the plan schema asks for `"cli"` (`go/internal/core/advisor/prompt.go:90`) | X19a (built) |
 | CLI syntax in profiles | `cli` and `cli_fallback` in 93 agent profiles; Claude tool syntax in `allowed_tools` and `disallowed_tools`, for example `Bash(evolve phase verify:*)` in 93 profiles; `extra_flags_by_cli` in 27 profiles | X19b |
 | Claude tools in personas | 14 of 106 files under `agents/` | X19b |
 | Family and model literals in flow code | `phase_advisor.go:73`, `failure_advisor.go:54`, `phase_judge.go:28`, `contract_escalation.go:22`; the default model `opus` of four phases | X6, merged in #1123 after this read (not X19) |
@@ -1655,21 +1812,33 @@ I-6 says that flow logic names no family. It does not say what the assignment ho
 
 ### Solution
 
-**The neutral TaskAssignment (proposed).** The pipeline sends only these fields to the bridge:
+**The neutral TaskAssignment (X19a built the first part).** The pipeline sends only these fields to the bridge:
 
 | Field | Example | Today's source |
 |---|---|---|
 | role or profile id | `builder` | the profile name |
 | input index | `inputs/index.json` (§8) | the workspace paths in the persona |
 | output contract and schema | `build-report.md`, the `phasecontract` schema | `output_artifact` |
-| capability tier | `fast`, `balanced`, `deep`, `top` | `model_tier_default`, `ModelRoutingTier` |
-| effort intent | `low`, `medium`, `high` | `ModelRoutingEffort` |
+| capability tier | `fast`, `balanced`, `deep`, `top` | `model_tier_default`, `Assignment.Tier` (before X19a, `ModelRoutingTier`) |
+| effort intent | `low`, `medium`, `high` | `Assignment.Effort` (before X19a, `ModelRoutingEffort`) |
 | budgets and timeouts | turns, tokens, wall time | `max_turns`, `max_budget_usd` |
 | sandbox intents | read inputs, write worktree, run command class X, network yes or no | `allowed_tools`, `disallowed_tools`, `sandbox` |
 | persona text | the CLI-neutral persona | `agents/<name>.md` |
 | tool surface (amended 2026-10-26) | `evolve agent capabilities --json` | as built (X17e): a short section that `preparePrompt` adds to the prompt of each phase cell. It points to the verb and names the request directory of the cell. |
 
 **The driver binding is opaque.** `cli_routing` picks a driver identity, for example `agy-tmux`. The pipeline passes the identity through and never branches on it. Only the bridge reads it.
+
+**What X19a built (2026-10-27).** These changes are on the branch of item `cli-neutral-task-assignment-and-guard`:
+
+| Change | Where | Proof |
+|---|---|---|
+| `core.TaskAssignment` holds the tier and the effort. `PhaseRequest.Assignment` replaces `ModelRoutingTier` and `ModelRoutingEffort`. | `go/internal/core/phase.go` | `TestPhaseRequest_CarriesANeutralAssignmentAndNoDriverOnTheWire` |
+| `PhaseRequest.Driver` is an opaque `llmroute.Binding` with no JSON key. It replaces `ModelRoutingCLI`. Only the contract escalation sets it, and the runner reports the model source `escalation`. | `go/internal/core/phase.go`, `go/internal/llmroute/binding.go` | `TestBinding_CarriesTheDriverOpaquely` |
+| `llmroute.EscalationTarget` does the family comparison of the contract escalation, so core compares no two drivers. | `go/internal/core/contract_escalation.go` | `TestEscalationTarget_PicksTheFirstAllowedDriverOfAnotherFamily` and the contract escalation tests of `internal/core` |
+| The advisor plan has no `cli` field. `PhasePlanEntry` and `MintSpec` lost `CLI`, and the phase cards lost `allowed_clis`. The prompt and the persona `agents/evolve-router.md` ask for a tier only. The `advisor-plan` contract refuses a `cli` key in a plan entry, and the decoder drops a `cli` key in a `mint` block. | `go/internal/router`, `go/internal/core/advisor`, `go/internal/phasecontract/flow_decision.go` | `TestPhasePlanEntry_TheAdvisorCannotNameACLI`, `TestComposePlanPrompt_ElicitsATierAndNoCLI`, `TestFlowDecision_ValidateRejectsProseAndTheWrongShape` |
+| The plan clamp checks the tier envelope only. Its pin check and its model-catalog check needed a CLI, so X19a removed them and `WithModelCatalogLookup`. | `go/internal/router/model_routing_clamp.go` | `TestClampPlanModelRouting_*` |
+
+The remaining fields of the table above stay where they are today. X19b moves the sandbox intents and the persona text, and X19c adds the needed capabilities.
 
 **The driver and manifest layer holds everything else:**
 
@@ -1710,7 +1879,7 @@ This text replaces no part of X19b. X19b puts it in the personas when it makes t
 
 ### Guard
 
-`TestNoCLISpecificsAboveTheDriver` (proposed) walks each non-test Go file and each tracked profile and persona. Outside `internal/bridge` and the routing-data loader, it fails on:
+`TestNoCLISpecificsAboveTheDriver` (`go/internal/guards/cli_neutral_assignment_test.go`, built by X19a) walks each non-test Go file. X19b adds the tracked profiles and personas. Outside `internal/bridge` and the routing-data loader, it fails on:
 
 - a model name from any manifest `model_tier_map`;
 - a CLI flag from any manifest `default_args` or driver flag table;
@@ -1718,6 +1887,20 @@ This text replaces no part of X19b. X19b puts it in the personas when it makes t
 - a driver identity used in a comparison or a switch.
 
 The guard starts with an allowlist of today's sites, and the allowlist can only shrink. X6 removes the Go family literals, and X19a to X19c remove the rest.
+
+X19a built three rules of the list. A field of `PhaseRequest`, `PhasePlanEntry` or `MintSpec` must not name a CLI. A string literal must not hold the JSON key `"cli":`. A `==`, `!=` or `switch` must not test a driver identity. A driver identity is a name that ends in `cli` or `driver`, its `String()`, or a call of `Family`, `BaseCLI` or `Bind`.
+
+The exempt homes are the homes of `TestFlowCodeNamesNoFamily`, plus `internal/llmroute`, `internal/cliroute` and `internal/policy`. The model-name, CLI-flag and tool-pattern rules come with X19b.
+
+The allowlist counts the sites of each declaration. A count above its entry fails, and a count below its entry also fails, so each fixed site must leave the list. It started on `146776a26` with 10 sites and 11 findings. X19a removed 5 sites: `PhaseRequest`, `PhasePlanEntry`, `MintSpec`, the plan schema of the advisor prompt and the family comparison of the contract escalation. These 5 sites stay:
+
+| Site | Rule | Owner |
+|---|---|---|
+| `cmd/evolve/cmd_bridge.go` `emitProbeJSON` | a filter on the probed CLI name | an operator verb of the bridge; a later item |
+| `cmd/evolve/routing_run.go` `overrideAllowed` | a family compare on an operator override | the routing data of `cmd/evolve`; a later item |
+| `internal/cli/phasecmd/phases.go` `scaffoldProfileJSON` | the key `"cli":` in a new profile | X19b (the profiles) |
+| `internal/llmcalls/aggregate.go` `lessPerformance` | a sort key on the CLI name | a report, not a branch; a later item |
+| `internal/resolvellm/resolvellm.go` `Result.JSON` | the key `"cli":` in the resolver output | X19b |
 
 ### Relation to the other components
 
@@ -1736,7 +1919,7 @@ X19 lands in three items:
 
 | Item | Scope | Red test first | Depends on |
 |---|---|---|---|
-| X19a | The neutral `TaskAssignment`; `ModelRoutingCLI` leaves `PhaseRequest`; the advisor proposes a tier and capabilities, not a CLI; the guard with its shrinking allowlist | `TestNoCLISpecificsAboveTheDriver` lists `ModelRoutingCLI` and the advisor `"cli"` field | X6 |
+| X19a | The neutral `TaskAssignment`; `ModelRoutingCLI` leaves `PhaseRequest`; the advisor proposes a tier, not a CLI (the capabilities come with X19c); the guard with its shrinking allowlist | `TestNoCLISpecificsAboveTheDriver` lists `ModelRoutingCLI` and the advisor `"cli"` field | X6 |
 | X19b | Neutral sandbox intents in the profiles, which each driver translates. `extra_flags_by_cli` moves into the manifests. The 14 persona files that name a Claude Code tool or feature become neutral. | the guard lists `Bash(evolve phase verify:*)` in 93 profiles | X19a, X6b |
 | X19c | Capability negotiation: profiles name the needed capabilities, and the router refuses a seat with no capable driver | a seat that needs `edit` routes to a driver with no `edit` capability today | X9, X19a, X6b |
 
@@ -1755,8 +1938,8 @@ X19 lands in three items:
 | I-9 Proven substitution | `TestE2ECycleCLIMatrix` rows M1 to M5 (exists, skipped today) | X1, X11 | `enforce` per row | none (a test guard) |
 | I-10 Constitution | `TestGateClassifier_FlagsEachWeakeningPattern` (one case for each pattern of §20.3); the ADR-0064 P2 check (exists) | X15 | `enforce` | `HEALING_I10_VIOLATION` |
 | I-11 No agent writes its own oracle | the TDD digest check (item `tdd-predicates-frozen-at-handoff`); `TestT1AuditSeatIsAnotherFamily` | X15, X16 | `enforce` | `HEALING_I11_VIOLATION` |
-| I-12 Orchestrator proposes, pipeline disposes | `TestValidator_RefusesAnActionOutsideTheCatalog`; `TestRepairDispatch_NeedsAnAcceptedProposal`; the orchestrator profile has no dispatch tool | X13, X14 | `shadow`, then `enforce` for each tier | `HEALING_I12_VIOLATION` |
-| I-13 Bounded autonomy | `TestBudget_RefusesTheFourthT1RepairInAWindow`; `TestBreaker_OpensAfterTwoFailedRepairs` | X14 | `enforce` | `HEALING_I13_VIOLATION` |
+| I-12 Orchestrator proposes, pipeline disposes | `TestValidator_RefusesAnActionOutsideTheCatalog` (built); `TestRepairDispatch_NeedsAnAcceptedProposal` (built); the orchestrator profile has no dispatch tool | X13, X14 | `shadow`, then `enforce` for each tier | `HEALING_I12_VIOLATION` |
+| I-13 Bounded autonomy | `TestBudget_RefusesTheFourthT1RepairInAWindow` (built); `TestBreaker_OpensAfterTwoFailedRepairs` (built) | X14 | `shadow` (built), then `enforce` with X16 | `HEALING_I13_VIOLATION` |
 | I-14 Evidence closes an incident | `TestIncident_ClosesOnlyWithTheFourConditions` | X12, X16 | `enforce` | `HEALING_I14_VIOLATION` |
 | I-15 The CLI is the service contract | `TestLoopStatus_AnExtraWordNeverStartsALoop`; `TestCLIContract_DocMatchesTheRegistry`; `TestCLIContract_EachCoreVerbPrintsOneEnvelope`; `TestAgentClasses_MatchTheContract` (X17e) | X17 | `enforce` | none (a test guard); X17e: `ISOLATION_I3_VIOLATION` with `rule=verb.class.r` or `verb.class.d` |
 | I-16 No ambient control | `TestNoControlFlagReadOutsideTheMarkerList` (AST); `TestPolicyParse_RefusesAnUnknownKey`; matrix row N1 extended with `EVOLVE_SANDBOX` and `EVOLVE_BYPASS_SHIP_GATE` | X18 | `enforce` | `CONTROL_BYPASS_USED` (INFO, for each audited bypass) |

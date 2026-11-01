@@ -115,6 +115,7 @@ var treeReadingSelections = []TestSelection{
 		"TestRootSignalCenter_NoRootDropsItsCloserAndEveryDepsLiteralCarriesIt",
 		"TestRoutingConfigLoader_ConstructionSitesArePinned",
 		"TestRunLoopChain_SetsBoundaryRefreshOnReExecStop",
+		"TestRunPreWaveProbes_AFakeProbeThatReadsAgyExhaustedBenchesAgyBeforeTheWaveAdmitsALane",
 		"TestRunPreWaveProbes_TheWaveBoundaryRecordsTheLaneTimeOnce",
 		"TestUnobservedLedgerRootsArePinned",
 		"TestWaveEngine_OneConstructionSite",
@@ -147,6 +148,9 @@ var treeReadingSelections = []TestSelection{
 	}},
 	{Package: "./internal/committedset", Tests: []string{
 		"TestDecisionBuckets_TheOneDeclarationOfTheDroppedAndSkipShippedWireTags",
+	}},
+	{Package: "./internal/coversplit", Tests: []string{
+		"TestEverySplitTestPackageHasItsCoverEntry",
 	}},
 	{Package: "./internal/core", Tests: []string{
 		"TestAgentSubprocessWriters_AllStampRunID",

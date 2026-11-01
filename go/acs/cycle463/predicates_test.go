@@ -42,7 +42,7 @@ func requireTestsRan(t *testing.T, out string, min int) {
 }
 
 func TestC463_001_PersonaPathElicitsTierAndCLI(t *testing.T) {
-	out, code := runGoTest(t, "TestComposePlanPrompt_ElicitsTierAndCLI|TestComposePlanPrompt_RendersOperatorModelPolicy", true, corePkg)
+	out, code := runGoTest(t, "TestComposePlanPrompt_ElicitsATierAndNoCLI|TestComposePlanPrompt_RendersOperatorModelPolicy", true, corePkg)
 	requireTestsRan(t, out, 2)
 	if code != 0 {
 		t.Errorf("persona-path tier/cli elicitation contract is red (exit=%d)\n%s", code, out)
@@ -151,7 +151,7 @@ func TestC463_012_T3RegressionVetAndRace(t *testing.T) {
 }
 
 func TestC463_013_ReplayOverlayAppliesUnderAuto(t *testing.T) {
-	out, code := runGoTest(t, "TestReplayPlanFromResponse_ModelRoutingOverlayAppliesUnderAuto", true, corePkg)
+	out, code := runGoTest(t, "TestReplayPlanFromResponse_OnlyTheTierOfAnAdvisorResponseReachesDispatch", true, corePkg)
 	requireTestsRan(t, out, 1)
 	if code != 0 {
 		t.Errorf("e2e replay-overlay contract is red (exit=%d)\n%s", code, out)

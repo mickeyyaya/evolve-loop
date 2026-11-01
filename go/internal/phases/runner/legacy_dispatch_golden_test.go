@@ -75,7 +75,7 @@ func runnerLegacyRecord(t *testing.T, v cliroutetest.Variant, router *cliroute.R
 	}
 	req := core.PhaseRequest{
 		ProjectRoot: root, Env: v.EnvFor(), BypassPolicy: v.Bypass,
-		ModelRoutingCLI: v.Overlay.CLI, ModelRoutingTier: v.Overlay.Tier,
+		Driver: llmroute.Bind(v.Overlay.CLI), Assignment: core.TaskAssignment{Tier: v.Overlay.Tier},
 	}
 	resolved, resp, err := b.resolveDispatchPlan(req, prep)
 	if err != nil {

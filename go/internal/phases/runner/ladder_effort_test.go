@@ -20,7 +20,7 @@ func dispatchedEffort(t *testing.T, req core.PhaseRequest) string {
 }
 
 func TestRun_ALadderEffortReachesTheBridgeRequest(t *testing.T) {
-	if got := dispatchedEffort(t, core.PhaseRequest{ModelRoutingEffort: "high"}); got != "high" {
+	if got := dispatchedEffort(t, core.PhaseRequest{Assignment: core.TaskAssignment{Effort: "high"}}); got != "high" {
 		t.Fatalf("bridge effort = %q, want the ladder effort high", got)
 	}
 	if got := dispatchedEffort(t, core.PhaseRequest{}); got != "" {

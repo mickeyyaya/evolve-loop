@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 )
 
 func contractEscalationRun(root string, env map[string]string) *cycleRun {
@@ -32,14 +34,14 @@ func TestContractEscalation_MintedPhaseResolvesItsOwnProfile(t *testing.T) {
 	writeCLIProfile(t, root, "adversarial-review", "agy-tmux", nil)
 	cr := contractEscalationRun(root, nil)
 
-	if got := cr.contractDispatchCLI("adversarial-review", ""); got != "agy-tmux" {
+	if got := cr.contractDispatchCLI("adversarial-review", llmroute.Binding{}); got != "agy-tmux" {
 		t.Errorf("contractDispatchCLI = %q, want \"agy-tmux\" — a minted phase's own profile must be resolved, or the demotion WARN names a CLI that never ran", got)
 	}
-	esc, ok := cr.contractEscalationCLI("adversarial-review", "")
+	esc, ok := cr.contractEscalationTarget("adversarial-review", llmroute.Binding{})
 	if !ok {
 		t.Fatal("no escalation target for a minted phase on agy-tmux — the phase in this fix's own live evidence would still be unescalatable")
 	}
-	if esc != "claude-tmux" {
+	if esc.String() != "claude-tmux" {
 		t.Errorf("escalation target = %q, want %q", esc, "claude-tmux")
 	}
 }
@@ -50,14 +52,14 @@ func TestContractEscalation_EnvOverrideDecidesTheFailedFamily(t *testing.T) {
 	writeCLIProfile(t, root, "builder", "claude-tmux", []string{"codex-tmux"})
 	cr := contractEscalationRun(root, map[string]string{"EVOLVE_CLI": "codex"})
 
-	if got := cr.contractDispatchCLI(PhaseBuild, ""); got != "codex" {
+	if got := cr.contractDispatchCLI(PhaseBuild, llmroute.Binding{}); got != "codex" {
 		t.Fatalf("contractDispatchCLI = %q, want \"codex\" (EVOLVE_CLI outranks profile.cli)", got)
 	}
-	esc, ok := cr.contractEscalationCLI(PhaseBuild, "")
+	esc, ok := cr.contractEscalationTarget(PhaseBuild, llmroute.Binding{})
 	if !ok {
 		t.Fatal("expected an escalation target away from the codex family")
 	}
-	if esc == "codex-tmux" || esc == "codex" {
+	if esc.String() == "codex-tmux" || esc.String() == "codex" {
 		t.Errorf("escalation target = %q — that is the SAME family that just failed the contract; the failed family must be derived from the env-resolved primary, not profile.cli", esc)
 	}
 }
@@ -68,14 +70,14 @@ func TestContractEscalation_DispatchOverrideDecidesTheFailedFamily(t *testing.T)
 	writeCLIProfile(t, root, "builder", "claude-tmux", []string{"agy-tmux"})
 	cr := contractEscalationRun(root, nil)
 
-	esc, ok := cr.contractEscalationCLI(PhaseBuild, "agy-tmux")
+	esc, ok := cr.contractEscalationTarget(PhaseBuild, llmroute.Bind("agy-tmux"))
 	if !ok {
 		t.Fatal("expected an escalation target away from the agy family")
 	}
-	if esc == "agy-tmux" {
+	if esc.String() == "agy-tmux" {
 		t.Error("escalated onto the overlay CLI that just failed the contract — the dispatch override must define the failed family")
 	}
-	if esc != "claude-tmux" {
+	if esc.String() != "claude-tmux" {
 		t.Errorf("escalation target = %q, want %q (the only other family available)", esc, "claude-tmux")
 	}
 }
@@ -90,7 +92,7 @@ func TestContractEscalation_RespectsAllowedCLIs(t *testing.T) {
 	})
 	cr := contractEscalationRun(root, nil)
 
-	if esc, ok := cr.contractEscalationCLI(PhaseBuild, ""); ok {
+	if esc, ok := cr.contractEscalationTarget(PhaseBuild, llmroute.Binding{}); ok {
 		t.Errorf("escalated to %q despite allowed_clis=[claude] — the escalation must stay inside the profile guardrails policy.ValidatePin enforces", esc)
 	}
 }
@@ -101,7 +103,7 @@ func TestContractEscalation_NoTargetWhenChainIsOneFamily(t *testing.T) {
 	writeCLIProfile(t, root, "triage", "claude-tmux", []string{"claude-p"})
 	cr := contractEscalationRun(root, nil)
 
-	if esc, ok := cr.contractEscalationCLI(PhaseTriage, ""); ok {
+	if esc, ok := cr.contractEscalationTarget(PhaseTriage, llmroute.Binding{}); ok {
 		t.Errorf("escalation target = %q, want none — claude-tmux and claude-p are the SAME family, so re-pointing changes nothing but the log", esc)
 	}
 }
@@ -111,10 +113,10 @@ func TestContractEscalation_AbsentProfileIsNilSafe(t *testing.T) {
 	root := t.TempDir()
 	cr := contractEscalationRun(root, nil)
 
-	if got := cr.contractDispatchCLI(PhaseBuild, ""); got != "claude-tmux" {
+	if got := cr.contractDispatchCLI(PhaseBuild, llmroute.Binding{}); got != "claude-tmux" {
 		t.Errorf("contractDispatchCLI = %q, want %q (the resolver's own no-profile default)", got, "claude-tmux")
 	}
-	if esc, ok := cr.contractEscalationCLI(PhaseBuild, ""); ok {
+	if esc, ok := cr.contractEscalationTarget(PhaseBuild, llmroute.Binding{}); ok {
 		t.Errorf("escalation target = %q, want none for a profile-less phase already on the default family", esc)
 	}
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/landing"
+	"github.com/mickeyyaya/evolve-loop/go/internal/shipjournal"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
@@ -22,7 +23,7 @@ import (
 type Class string
 
 const (
-	ClassCycle   Class = "cycle"
+	ClassCycle   Class = shipjournal.ClassCycle
 	ClassManual  Class = "manual"
 	ClassRelease Class = "release"
 	ClassTrivial Class = "trivial"
@@ -343,7 +344,7 @@ func journalMinted(opts *Options, res *RunResult) {
 		return
 	}
 	cid, _, cerr := cycleIDForShip(opts)
-	err := errors.Join(cerr, appendShipJournal(opts.ProjectRoot, shipJournalEntry{SHA: res.CommitSHA, Class: string(opts.Class), Cycle: cid}))
+	err := errors.Join(cerr, appendShipJournal(opts.ProjectRoot, shipjournal.Entry{SHA: res.CommitSHA, Class: string(opts.Class), Cycle: cid}))
 	if err != nil {
 		res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: the ship journal entry of %s is not complete: %v", res.CommitSHA, err))
 	}
