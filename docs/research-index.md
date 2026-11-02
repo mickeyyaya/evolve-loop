@@ -555,4 +555,10 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [research/code-review-at-anthropic-2026-10.md](research/code-review-at-anthropic-2026-10.md) | Research: the article by Osmani, Lunt and Wang (2026-10-15) on a verified, risk-tiered review flow. It reports a round cap of three, diff-only re-review, a verifier vote and the numbers 16% to 54% and 8.9% to 1.5%. The report compares each practice with the audit phase, ADR-0126 and ADR-0158, and ranks seven adoptions by saved LLM minutes. |
 
+## 2026-11-01 — the causes of the CI wall variance, and a ratchet for a noisy runner
+
+| Document | What it records |
+|---|---|
+| [research/ci-wall-variance-2026-11.md](research/ci-wall-variance-2026-11.md) | Research: the two macOS host classes, the CPU speed of each host and the wait type of each large test. It also gives the ranked causes and a ratchet on normalized package CPU. |
+
 <!-- GENERATED:research-index END -->
