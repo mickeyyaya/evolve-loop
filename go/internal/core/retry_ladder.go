@@ -146,33 +146,40 @@ func (cr *cycleRun) ladderForDispatch(phase Phase, req PhaseRequest) PhaseReques
 	if !cr.cs.AuditRepairActive || !repairSeededPhase(phase) || (cr.cs.Ladder != nil && cr.cs.Ladder.RepairRound == round) {
 		return cr.keepLadderRung(phase, req)
 	}
-	ask, auditFix := cr.auditLadderAsk(phase)
-	next, raised := cr.askLadder(ask, req)
-	cr.cs.Ladder = withRepairRound(cr.cs.Ladder, round, auditFix)
+	next, raised := cr.askLadder(cr.auditLadderAsk(phase), req)
+	cr.cs.Ladder = withRepairRound(cr.cs.Ladder, round)
 	if raised {
 		return next
 	}
 	return cr.keepLadderRung(phase, next)
 }
 
-func withRepairRound(st *LadderState, round int, auditFix string) *LadderState {
-	stamped := LadderState{Rung: string(retryladder.R0)}
-	if st != nil {
-		stamped = *st
-	}
+func withRepairRound(st *LadderState, round int) *LadderState {
+	stamped := ladderCopy(st)
 	stamped.RepairRound = round
-	stamped.AuditFix = cmp.Or(auditFix, stamped.AuditFix)
 	return &stamped
 }
 
-func (cr *cycleRun) auditLadderAsk(phase Phase) (ladderAsk, string) {
+func withAuditFix(st *LadderState, mark string) *LadderState {
+	stamped := ladderCopy(st)
+	stamped.AuditFix = cmp.Or(mark, stamped.AuditFix)
+	return &stamped
+}
+
+func ladderCopy(st *LadderState) LadderState {
+	if st == nil {
+		return LadderState{Rung: string(retryladder.R0)}
+	}
+	return *st
+}
+
+func (cr *cycleRun) auditLadderAsk(phase Phase) ladderAsk {
 	_, fb := cr.o.auditFailEnvelope(cr.cs, "")
-	auditFix := cr.recordAuditFix(phase, fb)
 	return ladderAsk{
 		phase: phase, origin: originAuditRepair, worktree: cr.cs.ActiveWorktree, failures: cr.cs.AuditFailReasons,
 		findings: composeRepairBrief(cr.cs, cr.o.errOut()),
 		facts:    retryladder.Facts{AuditClass: fb.Class, Reason: firstNonEmpty(cr.cs.AuditFailReasons...)},
-	}, auditFix
+	}
 }
 
 func (cr *cycleRun) nextItemStartRung(ids []string) retryladder.Rung {

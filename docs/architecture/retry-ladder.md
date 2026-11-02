@@ -149,14 +149,27 @@ The operator decided on 2026-10-27: "make sure audit will involve fix and trigge
 
 The handler is `internal/auditfix` ([package note](packages/internal-auditfix.md)). It uses two seats (ADR-0158 decisions 8 to 13):
 
-1. The auditor applies the patch in its loaded session, inside the cycle worktree. The patch changes only the cited files, inside the `audit_fix` bounds.
+1. A fixer seat applies the patch inside the cycle worktree. The patch changes only the cited files, inside the `audit_fix` bounds. The audit session cannot apply it, because it ended with its dispatch (see the wiring below).
 2. A fresh seat reviews only the patch and the prescriptions. Its session is never the session of the auditor. The routing picks another family when the chain has one, and a lower tier is allowed.
-3. The handoff floor, cover-changed and ACS run again on the patched tree. The original audit verdict stays the verdict for the rest of the diff.
-4. A pass lets the cycle go on to ship. A refused patch, a failed review or a red gate restores the tree. Then one escalation runs: a raised build with the L6 digest. A second failure stops the cycle with `audit_fix_exhausted`.
+3. The handoff floor, cover-changed and ACS run again on the patched tree.
+4. A pass sends the cycle to a second audit of the patched tree, and then to ship. No tdd or build round runs. A refused patch, a failed review or a red gate restores the tree. Then one escalation runs: a raised build with the L6 digest. A second failure stops the cycle with `audit_fix_exhausted`.
 5. A patch on a fence path joins the held proposal at `held_proposals` `enforce` (ADR-0157). At another stage, the handler refuses it.
 6. The handler writes `audit-fix.json` in the run directory. It has the patch, each finding id with its prescription, and the reason for each change.
 
-No production code registers the handler yet. The inbox item `wire-cost-aware-repair-call-sites` wires it, because the call sites are on the fence.
+The composition root registers the handler (`cmd/evolve/audit_fix_wiring.go`) with the ports of [internal/auditfixports](packages/internal-auditfixports.md). The stage is `workflow.retry_ladder.audit_fix.stage`, and the policy default stays `shadow`. `cycleRun.auditFixRound` (`go/internal/core/audit_fix_round.go`) runs after `decideAfterAuditFail` and maps the result of the handler:
+
+| Result | Next phase | Effect |
+|---|---|---|
+| `passed` or `held_proposal` | `audit`, through the decision-only edge `audit→audit` | The audit runs again on the patched tree. The ship gate binds the verdict of the last audit to its tree, so a FAIL verdict cannot ship the patch. No repair try is spent. |
+| `escalate` | the repair round of today | At `workflow.retry_ladder.stage` `enforce`, the first dispatch of the round is the raised build with the L6 digest. |
+| `audit_fix_exhausted` (a stop) | retro | The cycle seals `handed-off` with the salvage pointer of its worktree. |
+| `shadow`, `no_review_seat`, `not_chosen`, or a handler error | the branch of today | At `shadow`, the handler writes `audit-fix.json` and changes no file. |
+
+The wiring has three gaps against decisions 8 and 10 of ADR-0158:
+
+- The audit session is not resumable. Each phase dispatch is an ephemeral bridge session, and no phase profile names a session. So the fixer is a fresh `console-builder` seat of `evolve agent run` on the cycle worktree, with the audit report and the prescriptions as its input.
+- `evolve agent run` takes no family and no tier. The review port routes each candidate profile through `cliroute` and picks the first profile whose first family differs from the family of the fixer. When no candidate has another family, it gives no seat, and the repair round of today runs (plan §10, Q3). The tier is the tier of the routing of that profile, not always deep.
+- A resumed cycle does not run the round. `resumeAfterAudit` keeps the flow of today.
 
 ### Limits of the L5 wiring
 

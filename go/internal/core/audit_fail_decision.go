@@ -123,5 +123,5 @@ func firstNonEmpty(vals ...string) string {
 }
 
 func decisionOnlyEdge(from, to Phase) bool {
-	return from == PhaseAudit && (to == PhaseTDD || to == PhaseBuild)
+	return from == PhaseAudit && (to == PhaseTDD || to == PhaseBuild || to == PhaseAudit)
 }

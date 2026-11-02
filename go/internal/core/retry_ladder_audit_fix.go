@@ -2,6 +2,8 @@ package core
 
 import (
 	"context"
+	"maps"
+	"slices"
 	"strconv"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
@@ -45,12 +47,16 @@ func WithRungHandler(rung retryladder.Rung, h RungHandler) Option {
 	}
 }
 
+func (o *Orchestrator) RegisteredRungs() []retryladder.Rung {
+	return slices.Sorted(maps.Keys(o.rungHandlers))
+}
+
 func (o *Orchestrator) rungHandler(rung retryladder.Rung) (RungHandler, bool) {
 	h, ok := o.rungHandlers[rung]
 	return h, ok
 }
 
-func (cr *cycleRun) recordAuditFix(phase Phase, fb *phasecontract.FailureBlock) string {
+func (cr *cycleRun) recordAuditFix(phase Phase, fb *phasecontract.FailureBlock) (string, retryladder.AuditFixChoice) {
 	cfg := cr.o.workflowConfig.RetryLadder
 	estimate := retryladder.EstimateAuditFix(fb.Defects, fb.Prescription)
 	choice := retryladder.ChooseAuditFix(retryladder.AuditFixInput{
@@ -85,7 +91,7 @@ func (cr *cycleRun) recordAuditFix(phase Phase, fb *phasecontract.FailureBlock) 
 		Reason: "retry ladder audit_fix (" + cfg.AuditFix.Stage + ") " + mark + " by rule " + choice.Rule,
 	})
 	if mark == auditFixDecline || (mark == auditFixChosen && !registered) {
-		return ""
+		return "", choice
 	}
-	return mark
+	return mark, choice
 }

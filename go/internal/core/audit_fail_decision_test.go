@@ -235,7 +235,7 @@ func TestRouterCannotProposeTheAuditReentryEdges(t *testing.T) {
 
 	o := floorOrchestrator(fixedNextStrategy{next: "end"})
 
-	for _, to := range []Phase{PhaseTDD, PhaseBuild} {
+	for _, to := range []Phase{PhaseTDD, PhaseBuild, PhaseAudit} {
 		if !o.sm.CanTransition(PhaseAudit, to) {
 			t.Errorf("audit→%s must remain schedulable by decideAfterAuditFail", to)
 		}
