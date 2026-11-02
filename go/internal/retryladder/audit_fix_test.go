@@ -93,3 +93,12 @@ func TestAllPrescribed_NeedsAConcretePrescriptionForEachFinding(t *testing.T) {
 		}
 	}
 }
+
+func TestEstimateAuditFixTargets_CountsOnlyTheTargetFiles(t *testing.T) {
+	findings := []string{"docs/a.md: omits go/internal/a/a.go", "no path here"}
+	got := retryladder.EstimateAuditFixTargets(findings, []string{"docs/a.md", "go/internal/a/a_test.go"})
+	want := retryladder.AuditFixEstimate{Files: 2, Lines: 2 * retryladder.AuditFixLinesPerUnspannedFile, Tokens: 2 * retryladder.AuditFixLinesPerUnspannedFile * retryladder.AuditFixTokensPerLine, Uncited: 1}
+	if got != want {
+		t.Fatalf("estimate = %+v, want %+v", got, want)
+	}
+}

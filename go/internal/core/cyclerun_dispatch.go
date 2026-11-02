@@ -84,6 +84,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 		}
 	}
 	cr.applyDispatchPolicy(next, &phaseReq)
+	phaseReq.BeforeClose = cr.builderSelfCheckBeforeClose(next)
 	phaseReq.BuildPlan = readUpstreamBuildPlan(cr.o.cfg.PhaseIO, next, cr.workflowConfig.PhaseEnables, cr.cs.WorkspacePath)
 	if next != PhaseBuild {
 		projectBuildExplanation(cr.req.ProjectRoot, cr.cs).apply(&phaseReq)

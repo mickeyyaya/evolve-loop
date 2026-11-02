@@ -94,5 +94,5 @@ func (e *Engine) runAttempt(ctx context.Context, req core.BridgeRequest, args []
 			fmt.Fprintf(e.deps.Stderr, "[bridge] WARN pane watch: a previous attempt's snapshot could not be removed: %v\n", err)
 		}
 	}
-	return e.runScoped(ctx, args, req.Env)
+	return e.runScoped(ctx, args, req.Env, req.BeforeClose)
 }

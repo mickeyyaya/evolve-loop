@@ -41,6 +41,11 @@ func (cr *cycleRun) rejectAfterCorrections(next Phase, dr *dispatchResult, rr Re
 		dr.resp = cr.o.degradeExhaustedReview(cr.ctx, cr.cs, next, phaseErr)
 		return loopNext, nil
 	}
+	if next == PhaseBuild {
+		if act, handled := cr.floorResidualAuditFix(dr, rr, phaseErr); handled {
+			return act, nil
+		}
+	}
 	cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, rejectedOutcome(phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error(), cr.cs.PhaseStartedAt)))
 	cr.recordFailureLearning(next, phaseErr, max(corrections, 1))
 	return loopAbort, wrapCycleLevelError(next, phaseErr)

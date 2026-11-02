@@ -7,7 +7,26 @@ import (
 	"strings"
 )
 
-func changedAreaFailures(section string, changed, material []string) []string {
+type Omission struct {
+	Path     string
+	Document string
+	Failure  string
+}
+
+func omissionFailure(materialPath string) string {
+	return FailurePrefix + "Changed Areas does not explain material path " + materialPath
+}
+
+func (b CycleBinding) reportOmissions(document string, omitted []string) {
+	if b.OnOmission == nil {
+		return
+	}
+	for _, materialPath := range omitted {
+		b.OnOmission(Omission{Path: materialPath, Document: document, Failure: omissionFailure(materialPath)})
+	}
+}
+
+func changedAreaFindings(section string, changed, material []string) (failures, omitted []string) {
 	normalized := make([]string, 0, len(changed))
 	for _, changedPath := range changed {
 		normalized = append(normalized, normalize(changedPath))
@@ -15,7 +34,8 @@ func changedAreaFailures(section string, changed, material []string) []string {
 	entries, failures := changedAreaEntries(section, normalized)
 	for _, materialPath := range material {
 		if entries[materialPath] == "" {
-			failures = append(failures, fmt.Sprintf(FailurePrefix+"Changed Areas does not explain material path %s", materialPath))
+			omitted = append(omitted, materialPath)
+			failures = append(failures, omissionFailure(materialPath))
 		}
 	}
 	cited := make([]string, 0, len(entries))
@@ -28,7 +48,7 @@ func changedAreaFailures(section string, changed, material []string) []string {
 			failures = append(failures, fmt.Sprintf(FailurePrefix+"cited path %s is not in the Build diff", citedPath))
 		}
 	}
-	return failures
+	return failures, omitted
 }
 
 const maxCitationPatterns = 64

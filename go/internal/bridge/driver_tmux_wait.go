@@ -87,6 +87,9 @@ func (w replWaiter) wait() (replWaitResult, int) {
 		}
 		ready, _, note, derr := state.detector.poll(ctx)
 		logDetectorError := state.observeDetector(derr)
+		if ready && w.returnFindingsBeforeClose(state, elapsed) {
+			continue
+		}
 		if ready {
 			state.completed = true
 			if note != "" {

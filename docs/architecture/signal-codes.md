@@ -102,6 +102,12 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `BRIDGE_TOKEN_USAGE_WARNING` | the token resolver measured the attempt with a caveat (invalid counters, partial measurement); the caveat is the reason |
 | `BRIDGE_USAGE_EVIDENCE` | a CLI failed in a way quota could explain (a REPL boot timeout, no response, an escalation, a stall, a failed doctor probe), so the failure path queried the CLI's usage in a fresh session and recorded the verdict for the failing family: exhausted (a family-scoped window is used up: the verified cause, and the family is benched until the reset), healthy (quota ruled out for the family; an exhausted per-model window is named as a note, never as the cause), unavailable (the usage query failed too, which points at auth, install or network) or unknown (no usage window could be read); the reason is the verdict summary; fields driver, cli, family, verdict, trigger (exit N or stall), exit_code, cached, and record_error when the workspace record could not be written |
 
+### build
+
+| Code | Meaning |
+|---|---|
+| `BUILD_SELFCHECK_FINDINGS` | a build closed with no GREEN self-check receipt for its tree and the handoff floor found findings (ADR-0158 decision 18); fields.stage is shadow or enforce; fields.source is gate (shadow: the findings of the review gate, no floor run in the wait) or bridge (enforce: the floor run before the close); fields.decision is would_return_in_session (shadow), delivered (enforce, the paste into the live session succeeded) or delivery_failed (enforce, fields.error names why); fields.receipt is absent, red or stale; fields.findings is the count |
+
 ### carryover
 
 | Code | Meaning |
@@ -220,7 +226,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 
 | Code | Meaning |
 |---|---|
-| `LADDER_AUDIT_FIX` | the audit_fix rule ran after an audit FAIL; fields.audit_fix is would (shadow), chosen (enforce) or decline, fields.audit_fix_rule names the rule that decided, and the other fields give its data: the findings, the prescriptions, the estimated files, lines, production code lines and tokens, and if a rung handler is registered |
+| `LADDER_AUDIT_FIX` | the audit_fix rule ran after an audit FAIL or on the residual findings of the build handoff floor after the last build correction; fields.source is audit or build_floor, fields.audit_fix is would (shadow), chosen (enforce) or decline, fields.audit_fix_rule names the rule that decided, and the other fields give its data: the findings, the prescriptions, the estimated files, lines, production code lines and tokens, and if a rung handler is registered |
 | `LADDER_DECISION` | the retry ladder chose the rung of the next try of a phase (ADR-0142); fields.stage is shadow (recorded, the dispatch does not change) or enforce, fields.origin the retry path, fields.rung the rung before, fields.next the chosen rung, fields.action raise, retry or stop, fields.class and fields.fingerprint the classified failure, fields.tier and fields.effort the target |
 | `LADDER_NO_HEADROOM` | no family of the chain has headroom at the next tier, so the ladder holds at R1 or stops; fields.rung is the rung before |
 | `LADDER_STOP_SPEC` | two tiers failed on the same check, so the ladder reclassified the failure as spec and stopped; fields.fingerprint names the check |

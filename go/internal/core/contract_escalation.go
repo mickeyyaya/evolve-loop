@@ -240,7 +240,9 @@ func (d ContractGateDemotion) Intent() dispositionrouter.Intent {
 }
 
 func (cr *cycleRun) reviewDeliverable(phase Phase, in ReviewInput, d contractDispatch) ReviewResult {
+	in.residuals = &floorResidualLog{}
 	rr := cr.o.performEffectsAndReview(cr.ctx, in)
+	rr.Residuals = in.residuals.list()
 	if rr.Demoted {
 		cr.noteContractGateDemotion(phase, d, rr.Blocks, rr.Reason)
 	}
