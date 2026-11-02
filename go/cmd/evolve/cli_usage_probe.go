@@ -12,18 +12,19 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/quotastate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/usageevidence"
 	"github.com/mickeyyaya/evolve-loop/go/internal/usageprobe"
 )
 
-func runPreWaveProbes(ctx context.Context, projectRoot, evolveDir string, stderr io.Writer) error {
-	runCLIHealthCanary(ctx, projectRoot, defaultLiveProbe(ctx, projectRoot, bridge.Deps{Stderr: stderr}), stderr)
-	runUsageProbe(ctx, projectRoot, evolveDir, stderr)
+func runPreWaveProbes(ctx context.Context, projectRoot, evolveDir string, signals *signalcenter.Center, stderr io.Writer) error {
+	runCLIHealthCanary(ctx, projectRoot, defaultLiveProbe(ctx, projectRoot, bridge.Deps{Stderr: stderr, Signals: signals}), stderr)
+	runUsageProbe(ctx, projectRoot, evolveDir, signals, stderr)
 	recordLaneTimes(evolveDir, stderr)
 	return ctx.Err()
 }
 
-func runUsageProbe(ctx context.Context, projectRoot, evolveDir string, stderr io.Writer) {
+func runUsageProbe(ctx context.Context, projectRoot, evolveDir string, signals *signalcenter.Center, stderr io.Writer) {
 	if !usageProbeEnabled(evolveDir) {
 		return
 	}
@@ -32,7 +33,7 @@ func runUsageProbe(ctx context.Context, projectRoot, evolveDir string, stderr io
 		return
 	}
 	fmt.Fprintf(stderr, "[loop] usage-probe: checking %v for quota caps before dispatch\n", families)
-	newUsageProber(usageProbeDirs{projectRoot: projectRoot, evolveDir: evolveDir}, families, stderr).Run(ctx)
+	newUsageProber(usageProbeDirs{projectRoot: projectRoot, evolveDir: evolveDir}, families, signals, stderr).Run(ctx)
 }
 
 var preWaveUsagePaneFn = bridgeUsageProbe
@@ -41,7 +42,7 @@ type usageProbeDirs struct {
 	projectRoot, evolveDir string
 }
 
-func newUsageProber(dirs usageProbeDirs, families []string, stderr io.Writer) *usageprobe.Prober {
+func newUsageProber(dirs usageProbeDirs, families []string, signals *signalcenter.Center, stderr io.Writer) *usageprobe.Prober {
 	factory := bridge.NewControllerFactory(dirs.projectRoot, filepath.Join(dirs.evolveDir, "usage-probe"), "usage-probe", bridge.Deps{})
 	return &usageprobe.Prober{
 		Families: families,
@@ -50,6 +51,7 @@ func newUsageProber(dirs usageProbeDirs, families []string, stderr io.Writer) *u
 		Windows:  usageevidence.ReadWindowsNow,
 		Record:   recordUsageWindows(dirs.evolveDir),
 		Store:    clihealth.NewStore(dirs.projectRoot, nil),
+		Signals:  signals,
 		Log:      stderr,
 		Timeout:  loadCLIHealthConfig(dirs.evolveDir).UsageEvidenceTimeout(),
 	}

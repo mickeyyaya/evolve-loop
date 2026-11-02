@@ -59,6 +59,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 
 | Code | Meaning |
 |---|---|
+| `BRIDGE_AUTH_BENCH_CLEARED` | a launch, live smoke or usage read of a CLI family succeeded, so the cli-health store removed the auth bench (auth_recheck) of that family; quota benches stay; fields family, reason, source (clihealth.ClearSource: launch, smoke or usage_probe), key |
 | `BRIDGE_BOOT_STRIKE_CLEAR_FAILED` | the boot-strike store could not clear the driver's consecutive boot-timeout strike after a non-80 exit (the REPL booted); the strike count may stay stale and bench the driver early; fields step=clear_boot_strike, call_id, cli, agent |
 | `BRIDGE_BOOT_STRIKE_RECORD_FAILED` | the boot-strike store could not record the driver's boot-timeout strike after exit 80; the bench never escalates for this driver; the launch error still wraps the transient sentinel; fields step=record_boot_strike, call_id, cli, agent |
 | `BRIDGE_COMPLETED_ON_WORKTREE_EVIDENCE` | a correction re-dispatch of a source-writing phase went idle without rewriting its deliverable, and the agent had changed the worktree since dispatch (host state under .evolve/, the workspace and the deliverable's own locations never count), so the bridge completed on the carried deliverable instead of letting the idle wait end in exit 81; core's phase verify and review gate then judge the unchanged deliverable; the reason is the completion note; fields deliverable, changed_paths, paths (at most eight, then +N more), cli |

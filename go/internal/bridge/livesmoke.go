@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
@@ -52,6 +53,9 @@ func LiveSmokeTest(ctx context.Context, driverName string, cfg *Config, deps Dep
 	}
 	start := deps.Now()
 	rc, _ := launchPane(ctx, PurposeSmoke, d, cfg, deps)
+	if rc == ExitOK {
+		clearAuthBench(cfg.ProjectRoot, driverName, clihealth.SourceSmoke, deps)
+	}
 	result := LiveSmokeResult{RC: rc, Pattern: EscalationPattern(cfg.Workspace)}
 	if b, err := os.ReadFile(filepath.Join(cfg.Workspace, "tmux-final-scrollback.txt")); err == nil {
 		result.Scrollback = string(b)

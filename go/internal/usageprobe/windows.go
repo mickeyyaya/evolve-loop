@@ -87,9 +87,20 @@ func (p *Prober) read(family, pane string) reading {
 func (p *Prober) act(family string, r reading) {
 	switch {
 	case len(r.windows) > 0:
+		p.clearAuth(family)
 		p.judgeWindows(family, r.windows)
 	case r.regexWall:
 		p.benchFamily(family, r.pane)
+	}
+}
+
+func (p *Prober) clearAuth(family string) {
+	cleared, err := p.Store.ClearAuthBench(family, clihealth.SourceUsageProbe, p.Signals)
+	if err != nil {
+		fmt.Fprintf(p.Log, "[usage-probe] WARN %s: its usage screen was read, but its auth bench was not cleared: %v\n", family, err)
+	}
+	for _, e := range cleared {
+		fmt.Fprintf(p.Log, "[usage-probe] %s: its usage screen was read: the %s bench %s is cleared\n", family, e.Reason, e.Key())
 	}
 }
 

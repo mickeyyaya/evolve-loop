@@ -71,7 +71,7 @@ func TestNewUsageProber_ReadsEachCLIsWindowsThroughItsManifestAndBenchesTheRight
 		root := t.TempDir()
 		evolveDir := filepath.Join(root, ".evolve")
 		pane := usageFixture(t, tc.fixture)
-		p := newUsageProber(usageProbeDirs{projectRoot: root, evolveDir: evolveDir}, []string{tc.family}, io.Discard)
+		p := newUsageProber(usageProbeDirs{projectRoot: root, evolveDir: evolveDir}, []string{tc.family}, nil, io.Discard)
 		p.Probe = func(context.Context, string) (string, error) { return pane, nil }
 
 		p.Run(context.Background())

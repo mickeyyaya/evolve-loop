@@ -14,6 +14,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/clicontrol"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/quotastate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 const benchReason = clihealth.UsageProbePattern
@@ -25,6 +26,7 @@ type Prober struct {
 	Windows  func(family, pane string) []quotastate.UsageWindow
 	Record   func(cli string, windows []quotastate.UsageWindow) error
 	Store    *clihealth.Store
+	Signals  *signalcenter.Center
 	Log      io.Writer
 	Timeout  time.Duration
 }
@@ -99,7 +101,7 @@ func (p *Prober) unbenched() []string {
 	active := p.Store.Active()
 	var families []string
 	for _, family := range p.Families {
-		if _, benched := active[family]; !benched {
+		if e, benched := active[family]; !benched || clihealth.AuthBench(e.Reason) {
 			families = append(families, family)
 		}
 	}
