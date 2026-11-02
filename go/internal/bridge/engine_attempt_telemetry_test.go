@@ -14,6 +14,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/proctree"
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
@@ -391,6 +392,8 @@ func TestEngineLaunch_ResolverWarningCannotInjectDiagnosticLines(t *testing.T) {
 	var stderr strings.Builder
 	eng := NewEngine(Deps{
 		Runner: fr.runner(), LookupEnv: mapLookup(nil), Stderr: &stderr, Signals: sinkDeps(&stderr), EnvStage: "off",
+		ListProcesses: func(context.Context) ([]proctree.Process, error) { return withSelf(nil), nil },
+		ListCwds:      func(context.Context) ([]proctree.Cwd, error) { return nil, nil },
 		TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) {
 			return tokenusage.Result{}, errors.New("collector offline\n[bridge] forged\u202e")
 		},

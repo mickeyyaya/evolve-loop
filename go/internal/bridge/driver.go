@@ -18,6 +18,25 @@ type CLIPreflight interface {
 	Preflight(ctx context.Context, cfg *Config, deps Deps) error
 }
 
+type DeepProber interface {
+	DeepProbeArgs(m Manifest) []string
+}
+
+func headlessProbeArgs(m Manifest) []string {
+	model := m.ModelTierMap["fast"]
+	if model == "" {
+		model = m.DefaultModel
+	}
+	if model != "" {
+		return []string{"-p", "Reply only: PROBE_OK", "--model", model}
+	}
+	return []string{"-p", "Reply only: PROBE_OK"}
+}
+
+func (claudePDriver) DeepProbeArgs(m Manifest) []string {
+	return headlessProbeArgs(m)
+}
+
 var (
 	driverMu sync.RWMutex
 	drivers  = map[string]Driver{}
@@ -50,6 +69,7 @@ var bareDriverMap = map[string]string{
 	"claude": "claude-tmux",
 	"codex":  "codex-tmux",
 	"agy":    "agy-tmux",
+	"ollama": "ollama-tmux",
 }
 
 var errRetiredGemini = errors.New("the bare driver name gemini is retired: name an agy driver (agy, agy-tmux or agy-claude-tmux)")

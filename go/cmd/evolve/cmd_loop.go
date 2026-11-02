@@ -1,16 +1,20 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
+	"github.com/mickeyyaya/evolve-loop/go/internal/budgethistory"
 	_ "github.com/mickeyyaya/evolve-loop/go/internal/checkpoint"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cycleclassify"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cycleoutcome"
+	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/plane"
 )
 
@@ -112,10 +116,18 @@ func runLoopFrontDoor(cfg loopConfig, stdout, stderr io.Writer) int {
 	return runLoopDetached(cfg, stdout, stderr)
 }
 
-func printLoopDryRun(cfg loopConfig, stdout io.Writer) int {
+func loopDryRunPlan(cfg loopConfig, stderr io.Writer) loopwave.WavePlan {
+	fc := loadFleetConfig(cfg.EvolveDir, stderr, nil)
+	routing := loopwave.LoadRouting(cfg.EvolveDir, stderr)
+	engine := newWaveEngine(cfg, storage.New(cfg.EvolveDir), stderr, nilSignals)
+	return engine.Preview(context.Background(), fc, routing, nil, budgethistory.Throughput{}, time.Now())
+}
+
+func printLoopDryRun(cfg loopConfig, stdout, stderr io.Writer) int {
 	buf, _ := json.MarshalIndent(map[string]any{
-		"dry_run": true,
-		"config":  cfg,
+		"dry_run":   true,
+		"config":    cfg,
+		"wave_plan": loopDryRunPlan(cfg, stderr),
 	}, "", "  ")
 	fmt.Fprintln(stdout, string(buf))
 	return 0
@@ -131,7 +143,7 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) (exit i
 	}
 
 	if cfg.DryRun {
-		return printLoopDryRun(cfg, stdout)
+		return printLoopDryRun(cfg, stdout, stderr)
 	}
 
 	runtime := startLoopBatchRuntime()
