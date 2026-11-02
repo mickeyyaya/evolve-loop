@@ -137,3 +137,21 @@ func TestAuthBench_OnlyTheCredentialWallIsAuthClass(t *testing.T) {
 		}
 	}
 }
+
+func TestClearAuthBench_EachClearSourceReachesTheSignal(t *testing.T) {
+	t.Parallel()
+	for source, want := range map[ClearSource]string{SourceLaunch: "launch", SourceSmoke: "smoke", SourceUsageProbe: "usage_probe"} {
+		t.Run(want, func(t *testing.T) {
+			t.Parallel()
+			signals, events := recordingCenter()
+
+			if _, err := authBenchStore(t).ClearAuthBench("agy", source, signals); err != nil {
+				t.Fatal(err)
+			}
+
+			if got := events(); len(got) != 1 || got[0].Fields["source"] != want {
+				t.Errorf("events = %+v, want one event with source %q", got, want)
+			}
+		})
+	}
+}
