@@ -16,6 +16,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclespend"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmcalls"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/landing"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
@@ -28,20 +29,22 @@ var (
 )
 
 type Cycle struct {
-	ID           int              `json:"id"`
-	Todo         string           `json:"todo,omitempty"`
-	Phase        string           `json:"phase,omitempty"`
-	Verdict      string           `json:"verdict,omitempty"`
-	Termination  string           `json:"termination,omitempty"`
-	Shipped      bool             `json:"shipped"`
-	QuotaPauses  int              `json:"quota_pauses"`
-	Conflict     bool             `json:"conflict,omitempty"`
-	Spend        cyclespend.Spend `json:"spend"`
-	HandoffWould int              `json:"handoff_would_stops,omitempty"`
-	HandoffStop  string           `json:"handoff_stop,omitempty"`
-	SpendLimit   string           `json:"spend_limit,omitempty"`
-	StartedAt    time.Time        `json:"-"`
-	EndedAt      time.Time        `json:"-"`
+	ID           int                `json:"id"`
+	Todo         string             `json:"todo,omitempty"`
+	Phase        string             `json:"phase,omitempty"`
+	Verdict      string             `json:"verdict,omitempty"`
+	Termination  string             `json:"termination,omitempty"`
+	Shipped      bool               `json:"shipped"`
+	QuotaPauses  int                `json:"quota_pauses"`
+	Conflict     bool               `json:"conflict,omitempty"`
+	Spend        cyclespend.Spend   `json:"spend"`
+	LLMVerdict   cyclespend.Verdict `json:"llm_verdict"`
+	HandoffWould int                `json:"handoff_would_stops,omitempty"`
+	HandoffStop  string             `json:"handoff_stop,omitempty"`
+	SpendLimit   string             `json:"spend_limit,omitempty"`
+	StartedAt    time.Time          `json:"-"`
+	EndedAt      time.Time          `json:"-"`
+	failAt       time.Time
 }
 
 type cycleWindow struct{ floor, ceiling int }
@@ -124,7 +127,16 @@ func readCycle(root string, id int, live cyclestate.CycleState, d *dossier.Dossi
 		c.Shipped = c.Shipped || d.CommitSHA != ""
 		c.StartedAt, c.EndedAt = phaseSpan(c.StartedAt, c.EndedAt, d.Phases)
 	}
+	c.LLMVerdict = readVerdict(ws, c)
 	return c, warnings
+}
+
+func readVerdict(ws string, c Cycle) cyclespend.Verdict {
+	res, err := llmcalls.ReadWorkspace(ws)
+	if err != nil || len(res.Records) == 0 {
+		return cyclespend.Verdict{}
+	}
+	return cyclespend.VerdictOf(res.Records, c.failAt, c.Shipped)
 }
 
 func readSpend(ws string, id int, warnings []string) (cyclespend.Spend, []string) {
@@ -186,11 +198,18 @@ func applySignals(c *Cycle, path string) []string {
 			c.Conflict = c.Conflict || shiperr.IsLandingConflict(e.Code)
 		}
 		applyStopSignals(c, e)
+		if blocksCycle(e) {
+			c.failAt = earliest(c.failAt, eventTime(e))
+		}
 	}
 	if chunk.Skipped > 0 {
 		return []string{fmt.Sprintf("cycle-%d: skipped %d malformed signal line(s) in %s", c.ID, chunk.Skipped, path)}
 	}
 	return nil
+}
+
+func blocksCycle(e signalcenter.Event) bool {
+	return e.Kind == signalcenter.KindGateRejected || (e.Kind == signalcenter.KindPhaseOutcome && e.Fields["verdict"] == "FAIL")
 }
 
 func applyStopSignals(c *Cycle, e signalcenter.Event) {

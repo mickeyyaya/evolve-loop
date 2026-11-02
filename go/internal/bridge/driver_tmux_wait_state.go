@@ -28,6 +28,8 @@ type replWaitState struct {
 	completed               bool
 	transientShortcircuit   bool
 	nudgeSent               bool
+	findingsChecked         bool
+	heldAfterCompletion     bool
 	submitWedged            bool
 	nudgeEvent              *interaction.Event
 	nudgeAt                 time.Time

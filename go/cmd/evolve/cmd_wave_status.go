@@ -180,11 +180,27 @@ func waveCycleText(c wave.Cycle) string {
 		}
 		text = fmt.Sprintf("cycle %d: verdict %s, %s", c.ID, c.Verdict, shipped)
 	}
+	text += waveVerdictText(c)
 	if c.HandoffStop != "" {
 		text += ", handed-off (" + c.HandoffStop + ")"
 	}
 	if c.QuotaPauses > 0 {
 		text += fmt.Sprintf(", quota pauses %d", c.QuotaPauses)
+	}
+	return text
+}
+
+func waveVerdictText(c wave.Cycle) string {
+	v := c.LLMVerdict
+	switch {
+	case v.LLMMinutesToVerdict <= 0:
+		return ""
+	case c.Shipped:
+		return fmt.Sprintf(", %.1f LLM min to ship", v.LLMMinutesToVerdict)
+	}
+	text := fmt.Sprintf(", %.1f LLM min to verdict", v.LLMMinutesToVerdict)
+	if v.FailPointMinutes != nil && v.WasteMinutes != nil && v.FailFastRatio != nil {
+		text += fmt.Sprintf(", fail point %.1f min, waste %.1f min, fail-fast %.2f", *v.FailPointMinutes, *v.WasteMinutes, *v.FailFastRatio)
 	}
 	return text
 }

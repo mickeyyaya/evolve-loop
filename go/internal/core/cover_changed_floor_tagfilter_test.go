@@ -96,12 +96,16 @@ func TestCoverChangedFailures_UncoveredFunction(t *testing.T) {
 	paths := []string{"go/acs/cycle1916/predicates_test.go", "go/p/a.go"}
 
 	var enforce []string
+	enforceIn := floorInput(t, floorRoot(t, `{"cover_changed":{"stage":"enforce"}}`), repo, base)
+	enforceIn.residuals = &floorResidualLog{}
 	enforceErr := captureStderr(t, func() {
-		enforce = coverChangedFailures(context.Background(), floorInput(t, floorRoot(t, `{"cover_changed":{"stage":"enforce"}}`), repo, base), paths)
+		enforce = coverChangedFailures(context.Background(), enforceIn, paths)
 	})
 	var shadow []string
+	shadowIn := floorInput(t, floorRoot(t, `{"cover_changed":{"stage":"shadow"}}`), repo, base)
+	shadowIn.residuals = &floorResidualLog{}
 	shadowErr := captureStderr(t, func() {
-		shadow = coverChangedFailures(context.Background(), floorInput(t, floorRoot(t, `{"cover_changed":{"stage":"shadow"}}`), repo, base), paths)
+		shadow = coverChangedFailures(context.Background(), shadowIn, paths)
 	})
 
 	joined := strings.Join(enforce, "\n")
@@ -110,6 +114,12 @@ func TestCoverChangedFailures_UncoveredFunction(t *testing.T) {
 	}
 	if strings.Contains(joined, "p.F ") {
 		t.Errorf("enforce refuses the covered, unchanged p.F: %v", enforce)
+	}
+	if got := enforceIn.residuals.list(); len(enforce) != 1 || len(got) != 1 || got[0].Class != FloorResidualCoverChanged || got[0].Failure != enforce[0] || got[0].Source != "go/p/a.go" || got[0].Func != "p.MarkTruncated" {
+		t.Errorf("enforce residuals = %+v, want one typed residual of p.MarkTruncated in go/p/a.go that keeps the failure text", got)
+	}
+	if got := shadowIn.residuals.list(); len(got) != 0 {
+		t.Errorf("shadow residuals = %+v, want none", got)
 	}
 	if shadow != nil || !strings.Contains(shadowErr, "cover-changed (shadow)") || !strings.Contains(shadowErr, "p.MarkTruncated") {
 		t.Errorf("shadow = %v stderr = %q, want no failure and a shadow warning that names p.MarkTruncated", shadow, shadowErr)

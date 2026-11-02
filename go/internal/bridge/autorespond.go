@@ -179,6 +179,7 @@ func (ar *autoResponder) firedRuleName(prevCounts map[string]int) string {
 type pendingAutoRespond struct {
 	rule    string
 	re      *regexp.Regexp
+	tail    int
 	keys    string
 	at      time.Time
 	kind    string
@@ -305,7 +306,7 @@ func (ar *autoResponder) tickPane(ctx context.Context, session, pane string, cap
 		keysCSV := strings.TrimPrefix(action, "send:")
 		if ar.human {
 			humanReadingPause(ar.deps, pane)
-			humanSendKeysCSV(ctx, ar.deps, session, keysCSV)
+			humanSendKeysCSV(ctx, ar.deps, session, keysCSV, ar.firedRuleName(prevCounts))
 		} else {
 			sendKeySequence(ctx, ar.deps, session, keysCSV)
 			fmt.Fprintf(ar.deps.Stderr, "[auto-respond] sent keys: %s (rule=%s)\n", keysCSV, ar.firedRuleName(prevCounts))
@@ -349,7 +350,11 @@ func (ar *autoResponder) resolvePending(pane string) {
 	if ar.pending == nil || ar.pending.re == nil {
 		return
 	}
-	if !ar.pending.re.MatchString(pane) {
+	subject := pane
+	if ar.pending.tail > 0 {
+		subject = lastLines(subject, ar.pending.tail)
+	}
+	if !ar.pending.re.MatchString(subject) {
 		ar.record(ar.pending, interaction.ResultPromptCleared)
 		ar.pending = nil
 	}
@@ -374,13 +379,15 @@ func (ar *autoResponder) openPending(prevCounts map[string]int, keysCSV string) 
 		return
 	}
 	var re *regexp.Regexp
+	tail := 0
 	for _, p := range ar.prompts {
 		if p.Name == name {
 			re, _ = regexp.Compile(p.Regex)
+			tail = p.TailLines
 			break
 		}
 	}
-	ar.pending = &pendingAutoRespond{rule: name, re: re, keys: keysCSV, at: ar.deps.Now()}
+	ar.pending = &pendingAutoRespond{rule: name, re: re, tail: tail, keys: keysCSV, at: ar.deps.Now()}
 }
 
 func (ar *autoResponder) flushPending() {

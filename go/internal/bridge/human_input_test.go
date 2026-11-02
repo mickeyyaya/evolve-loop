@@ -53,7 +53,7 @@ func TestHumanPrimitives(t *testing.T) {
 
 	tmux2 := &fakeTmux{}
 	deps.Tmux = tmux2
-	humanSendKeysCSV(context.Background(), deps, "s", "y,,Enter")
+	humanSendKeysCSV(context.Background(), deps, "s", "y,,Enter", "rule")
 	if !tmux2.sentContains("y") {
 		t.Fatalf("human send should deliver 'y'; sent=%v", tmux2.sentKeys)
 	}

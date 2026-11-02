@@ -1,6 +1,6 @@
 # ADR-0158: A repair round runs only for a finding that the lane can fix, and the auditor applies a small prescribed fix
 
-- **Status:** Accepted (2026-10-27, operator). It amends [ADR-0155](0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md) decision 10, [ADR-0157](0157-the-loop-works-its-own-code-a-narrow-fence-and-held-proposals.md) decisions 8 to 10 and §5 of the [retry-ladder spec](../retry-ladder.md). It adds the index PQ5 to [ADR-0153](0153-quality-is-a-panel-of-separate-indexes-with-intervals-that-the-signal-center-publishes.md) and its [spec](../llm-quality-indexes.md). Each amended file has its "Amended by ADR-0158" note.
+- **Status:** Accepted (2026-10-27, operator). It amends [ADR-0155](0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md) decision 10, [ADR-0157](0157-the-loop-works-its-own-code-a-narrow-fence-and-held-proposals.md) decisions 8 to 10 and §5 of the [retry-ladder spec](../retry-ladder.md). It adds the index PQ5 to [ADR-0153](0153-quality-is-a-panel-of-separate-indexes-with-intervals-that-the-signal-center-publishes.md) and its [spec](../llm-quality-indexes.md). Each amended file has its "Amended by ADR-0158" note. The [addendum of 2026-11-02](#addendum-2026-11-02-the-build-floor-residual-source) widens the scope of decision 7.
 - **Plan:** [cost-aware-repair-2026-10](../../plans/cost-aware-repair-2026-10.md). **Research:** [cost-aware-repair-2026-10](../../research/cost-aware-repair-2026-10.md). **Case:** [cycle 2035](../../incidents/2026-10-27-cycle-2035-repair-loop.md). **Design:** [retry-ladder.md](../retry-ladder.md) §5.
 - **Relates to:**
   - [ADR-0126](0126-every-iterative-loop-converges-or-escalates.md): a loop converges or escalates. This ADR escalates at once when convergence is not possible.
@@ -127,6 +127,33 @@ The defaults live in `go/internal/policy`, because the checked-in `.evolve/polic
 - The order of the rules of `ChooseAuditFix` gets one rule first: a hand-off finding that blocks returns `handoff_blocker`, and the round stops.
 - `AllPrescribed` counts only the lane findings.
 - "1 correction, then escalate" (#1169) stays.
+
+## Addendum 2026-11-02: the build floor residual source
+
+The console asked on 2026-11-02: "A build that still fails its handoff floor after its one retry goes to the audit_fix rung instead of an abort."
+
+**A1** Decision 7 starts `audit_fix` only after an audit FAIL. A build whose handoff floor fails after its last correction aborts in `cycleRun.rejectAfterCorrections` (`go/internal/core/correction_exhaustion.go`). It never gets to the auditor.
+*Implication:* a finding with an exact fix costs the full cycle.
+
+**A2** Wave 148 has this case. Cycle 2092 and cycle 2095 aborted on cover-changed alone: 8 and 4 named functions below 100%, each with `file:line`. Cycle 2093 aborted on one Changed Areas omission that names a path (`runtime/.evolve/runs/cycle-209{2,3,5}/signals.ndjson`, `ORCHESTRATOR_PHASE_ABORTED`). Cycle 2076 aborted on five Changed Areas omissions. At least 10 of 24 FAILs in cycles 2040 to 2096 were such floor residuals (the console item).
+*Implication:* the floor already knows the file and the missing item, so the prescription is deterministic.
+
+| Id | Decision | Because | Rejected options and why |
+|---|---|---|---|
+| D7a | The residual findings of the build handoff floor are a second source of `audit_fix`. Each residual must be of a prescribable class: a cover-changed refusal of a named function, or a Changed Areas omission of a named path. | A1, A2 | A targeted builder correction round for Changed Areas: it duplicates this rung with an extra builder dispatch. Its draft stays unmerged. |
+| D7b | The floor check gives each residual as a typed value at its source. The cycle does not parse the failure text. The failure block carries the typed edit targets, so the estimate and the fence of the handler do not read paths from the text. | A2 | A regular expression over the floor reason: a change of the text breaks the class without a test failure. The paths in the text: a source file or an omitted path counts as an edit, and most A2 cases go above the bounds. |
+| D7c | One residual of another class keeps the abort of today: a red test, a predicate, a scope breach, the size ratchet, cover-strict or apicover. | decision 4 | Partial repair: the build had its retry, and a logic failure needs a new build. |
+| D7d | The round is the round of decisions 8 to 13, with the same handler, bounds, stage key and allowance of one round for each cycle. `LADDER_AUDIT_FIX` gets `fields.source`: `audit` or `build_floor`. | decision 24 | A second mechanism: it duplicates the bounds, the review seat and the record. |
+
+The results of the handler map as follows:
+
+| Result | Effect |
+|---|---|
+| `passed` or `held_proposal` | The build counts as delivered. The cycle goes to the audit as usual. |
+| `escalate`, `shadow`, `not_chosen`, a handler error or no handler | The build aborts as today. The build already had its retry. |
+| `audit_fix_exhausted` (a stop) | The cycle seals `handed-off` with the salvage pointer, as decision 5 says. |
+
+What changes this decision: if the shadow wave shows that most floor residuals fail the bounds, revisit the default bounds. If a `passed` round on a residual later fails the audit, revisit D7a.
 
 ## Consequences
 

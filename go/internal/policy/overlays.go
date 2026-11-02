@@ -34,6 +34,7 @@ type OverlayRule struct {
 	Models       []string           `json:"models,omitempty"`
 	Tiers        []string           `json:"tiers,omitempty"`
 	When         []config.Condition `json:"when,omitempty"`
+	Paths        []string           `json:"paths,omitempty"`
 	WritesSource bool               `json:"writes_source,omitempty"`
 	Skills       []string           `json:"skills,omitempty"`
 }
@@ -45,6 +46,7 @@ type OverlayDispatch struct {
 	Tier         string
 	Signals      map[string]string
 	WritesSource bool
+	ScopePaths   []string
 }
 
 const SelfReviewSkill = "code-review-simplify"
@@ -211,6 +213,7 @@ func (r OverlayRule) matches(d OverlayDispatch) bool {
 		matchDim(r.CLIs, d.CLI) &&
 		matchDim(r.Models, d.Model) &&
 		matchTier(r.Tiers, d.Tier) &&
+		matchPaths(r.Paths, d.ScopePaths) &&
 		matchWhen(r.When, d.Signals)
 }
 
@@ -301,4 +304,53 @@ func matchDim(patterns []string, value string) bool {
 		}
 	}
 	return false
+}
+
+func matchPaths(patterns, scope []string) bool {
+	if len(patterns) == 0 {
+		return true
+	}
+	for _, pat := range patterns {
+		for _, p := range scope {
+			if matchPathSegments(strings.Split(pat, "/"), strings.Split(p, "/")) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func matchPathSegments(pat, name []string) bool {
+	if len(pat) == 0 {
+		return len(name) == 0
+	}
+	if pat[0] == "**" {
+		for i := 0; i <= len(name); i++ {
+			if matchPathSegments(pat[1:], name[i:]) {
+				return true
+			}
+		}
+		return false
+	}
+	if len(name) == 0 {
+		return false
+	}
+	ok, err := path.Match(pat[0], name[0])
+	return err == nil && ok && matchPathSegments(pat[1:], name[1:])
+}
+
+func (o *OverlaysPolicy) validatePaths() error {
+	if o == nil {
+		return nil
+	}
+	for i, r := range o.Rules {
+		for _, pat := range r.Paths {
+			for _, seg := range strings.Split(pat, "/") {
+				if _, err := path.Match(seg, ""); err != nil {
+					return fmt.Errorf("overlays.rules[%d].paths: malformed glob %q: %w", i, pat, err)
+				}
+			}
+		}
+	}
+	return nil
 }

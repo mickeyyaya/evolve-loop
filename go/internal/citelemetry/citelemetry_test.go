@@ -184,7 +184,7 @@ func TestLimitOf_FirstRuleThatHoldsWins(t *testing.T) {
 		{"busy binary", &Rusage{WallS: 10, UserS: 8}, nil, "cpu"},
 	}
 	for _, c := range cases {
-		if got := limitOf(c.r, c.s); got != c.want {
+		if got := limitOf(c.r, c.s, ubuntuRunnerCPUs, 0); got != c.want {
 			t.Errorf("%s: limit = %q, want %q", c.name, got, c.want)
 		}
 	}

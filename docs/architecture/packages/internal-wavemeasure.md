@@ -73,6 +73,15 @@ The ship phase has no code named `REBASE_CONFLICT`. Its code is `GIT_FLEET_REBAS
 - The cost of a wave of 2 shipped cycles and 1 failed cycle is the spend of the 3 cycles divided by 2 (`TestCompute_TheCostOfAShippedCycleCountsTheSpendOfEveryCycleOfTheWave`). `wave status --json` carries it (`cmd/evolve` `TestWaveStatus_JSONCarriesTheCostOfTheWave`).
 - The command reports the rate end to end (`cmd/evolve` `TestWaveStatus_ReportsTheConflictRate`), and the loop writes one sizing record for each wave (`TestDispatchFleetIteration_RecordsTheSizedWidth`).
 
+## The verdict measure
+
+- **Source.** `wave.ReadCycles` sets `llm_verdict` for each cycle. `cyclespend.VerdictOf` computes it from the ledger.
+- **Fail point.** The fail point is the LLM minutes before the first blocking signal. A blocking signal is `gate.rejected` or a `phase.outcome` with the verdict FAIL.
+- **Waste.** The waste is the LLM minutes after the fail point. The fail-fast ratio is the fail point divided by the minutes to the verdict.
+- **Shipped cycle.** A shipped cycle has minutes to ship. It has no fail point, no waste and no fail-fast ratio.
+- **Wave medians.** `median_llm_minutes_to_verdict` and `median_fail_fast_ratio` are in the cost of the wave. A cycle with no ledger time stays out of both medians.
+- **Output.** `evolve wave status` shows the values of each cycle and the two medians. `wave status --json` carries `llm_verdict` for each cycle.
+
 ## Limits
 
 - The run window starts when `wave next` records the wave. It holds the boundary steps before the first lane, so a short run has a low utilization.

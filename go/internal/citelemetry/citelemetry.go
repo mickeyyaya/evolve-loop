@@ -83,7 +83,7 @@ func build(in input) (Report, error) {
 	if !ok {
 		return rep, nil
 	}
-	return withPackages(rep, bound)
+	return withPackages(rep, bound, critical.name)
 }
 
 func validate(in input) error {

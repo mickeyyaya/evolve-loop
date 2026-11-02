@@ -86,6 +86,7 @@ type Deps struct {
 	onDispatchID          func(string)
 	onLaunchEffort        func(string)
 	onServedModel         func(string)
+	beforeClose           core.CloseCheck
 	PaneCaptureMaxBytes   int
 	onPaneCapture         func(string)
 	KeychainProbe         func(service string) bool
@@ -424,9 +425,10 @@ func markFreshSessionRetry(rec *llmcalls.Record) { rec.FreshSessionRetry = true 
 
 func markSessionRecoverable(rec *llmcalls.Record) { rec.SessionRecoverable = true }
 
-func (e *Engine) runScoped(ctx context.Context, args []string, env map[string]string) launchRun {
+func (e *Engine) runScoped(ctx context.Context, args []string, env map[string]string, beforeClose core.CloseCheck) launchRun {
 	var run launchRun
 	callDeps := e.deps
+	callDeps.beforeClose = beforeClose
 	prevOnBoot := callDeps.OnBoot
 	callDeps.OnBoot = func(ms int64) {
 		run.bootMS = ms

@@ -36,4 +36,5 @@ You MAY also propose an abstract "tier" (fast|balanced|deep — never a raw mode
 ## Respond with STRICT JSON only (a bare array, no prose, no markdown fence):
 [{"phase":"<phase>","run":true,"justification":"<one sentence>","tier":"balanced"},{"phase":"<new-phase>","run":true,"justification":"<why>","mint":{"prompt":"<persona>","tier":"balanced","description":"<what it produces>","when_to_use":"<when to select it>"}}]
 
+Artifact path: /ws/cycle-7/routing-plan.json
 Now write your whole-cycle plan as a strict JSON array to /ws/cycle-7/routing-plan.json (no prose, no fence).
