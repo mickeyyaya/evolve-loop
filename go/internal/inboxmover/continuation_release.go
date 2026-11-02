@@ -64,18 +64,17 @@ func retiredAtCycle(path string) int {
 		return 0
 	}
 	var doc struct {
-		Cycle    any `json:"cycle"`
-		Consumed struct {
-			Cycle any `json:"cycle"`
-		} `json:"consumed"`
+		Cycle any `json:"cycle"`
 	}
-	if json.Unmarshal(body, &doc) != nil {
-		return 0
-	}
+	_ = json.Unmarshal(body, &doc)
 	if n := cycleOf(doc.Cycle); n > 0 {
 		return n
 	}
-	return cycleOf(doc.Consumed.Cycle)
+	rec, ok, _ := ParseConsumedRecord(body)
+	if ok {
+		return cycleOf(rec.Cycle)
+	}
+	return 0
 }
 
 func cycleOf(v any) int {

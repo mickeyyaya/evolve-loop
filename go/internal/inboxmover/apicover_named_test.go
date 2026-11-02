@@ -127,3 +127,14 @@ func TestRecoverResult_NamesAndCountsOrphans(t *testing.T) {
 		t.Errorf("recovered file must be at inbox root; stat err=%v", err)
 	}
 }
+
+func TestConsumedRecord_NamedExports(t *testing.T) {
+	rec, ok, err := ParseConsumedRecord([]byte(`{"consumed":{"at":"now","via":"test","cycle":42}}`))
+	if err != nil || !ok {
+		t.Fatalf("ParseConsumedRecord: %v (ok=%v)", err, ok)
+	}
+	var typed ConsumedRecord = rec
+	if typed.Cycle != "42" || typed.At != "now" || typed.Via != "test" {
+		t.Errorf("ConsumedRecord fields mismatch: %#v", typed)
+	}
+}
