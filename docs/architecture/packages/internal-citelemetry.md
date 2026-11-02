@@ -17,11 +17,12 @@
 - **Limit.** The first rule that holds names the limit of a package. The rules follow in order.
   - No rusage record: `unknown`.
   - Swap above 1024 MB: `memory`.
-  - Every sample above 90% busy: `cpu-saturation`.
+  - Every sample above 90% busy: `cpu-saturation`. When every sample has a run queue, the lowest run queue must also exceed the CPU count (3 for macOS, 4 for ubuntu).
+  - CPU below 0.5 s: `wait`.
+  - Wall above twice the floor (serial sum plus longest parallel test): `contention`.
   - System CPU above user CPU, with 0.5 s of CPU or more: `subprocesses-and-syscalls`.
   - CPU below half of the wall time: `wait`.
   - Otherwise: `cpu`.
-- **Contention.** The `contention` limit of decision D21 is the work of C12.
 - **Incomplete packages.** A package that started but has no result is listed in `incomplete`, not in `packages`.
 - **G1.** The macOS job time is the longest job with `macOS` in its name. The ubuntu test step time is the longest step that starts with `test` in a job with `ubuntu` in its name.
 - **Failure.** Any unreadable or malformed input returns an error. The command prints no report then.

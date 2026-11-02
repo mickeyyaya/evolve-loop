@@ -19,11 +19,16 @@ const (
 	limitSyscalls  = "subprocesses-and-syscalls"
 	limitWait      = "wait"
 	limitCPU       = "cpu"
+	limitContended = "contention"
 
 	swapLimitMB          = 1024
 	saturatedBusyPct     = 90
 	syscallRuleMinCPUS   = 0.5
 	waitEfficiencyFloor  = 0.5
+	tinyCPUSeconds       = 0.5
+	contentionFactor     = 2
+	macosRunnerCPUs      = 3
+	ubuntuRunnerCPUs     = 4
 	unitSerial           = "serial"
 	unitParallel         = "parallel"
 	subtestSeparator     = "/"
@@ -48,12 +53,15 @@ type Sampler struct {
 	CPUBusyMaxPct float64 `json:"cpu_busy_max_pct"`
 	SwapUsedMaxMB float64 `json:"swap_used_max_mb"`
 	cpuBusyMin    float64
+	runqueueMin   int
+	hasRunqueue   bool
 }
 
 type sample struct {
 	Ts         time.Time `json:"ts"`
 	CPUBusyPct float64   `json:"cpu_busy_pct"`
 	SwapUsedMB float64   `json:"swap_used_mb"`
+	Runqueue   *int      `json:"runqueue"`
 }
 
 type event struct {
@@ -141,6 +149,25 @@ func testStep(t testRun) PathStep {
 	return PathStep{Level: levelTest, Unit: t.name, Seconds: t.seconds}
 }
 
+func (p *packageRun) floor() float64 {
+	var serialSum, longestParallel float64
+	for _, t := range p.tests {
+		if t.parallel {
+			longestParallel = max(longestParallel, t.seconds)
+			continue
+		}
+		serialSum += t.seconds
+	}
+	return serialSum + longestParallel
+}
+
+func runnerCPUs(jobName string) int {
+	if strings.Contains(jobName, macosJobMark) {
+		return macosRunnerCPUs
+	}
+	return ubuntuRunnerCPUs
+}
+
 func modulePrefix(records []rusageRecord, runs []*packageRun) string {
 	votes := map[string]int{}
 	for _, r := range records {
@@ -176,7 +203,13 @@ func summarize(samples []sample, from, to time.Time) *Sampler {
 			continue
 		}
 		if s == nil {
-			s = &Sampler{cpuBusyMin: x.CPUBusyPct}
+			s = &Sampler{cpuBusyMin: x.CPUBusyPct, hasRunqueue: true}
+		}
+		switch {
+		case x.Runqueue == nil:
+			s.hasRunqueue = false
+		case s.Samples == 0 || *x.Runqueue < s.runqueueMin:
+			s.runqueueMin = *x.Runqueue
 		}
 		s.Samples++
 		s.CPUBusyMaxPct = max(s.CPUBusyMaxPct, x.CPUBusyPct)
@@ -186,7 +219,14 @@ func summarize(samples []sample, from, to time.Time) *Sampler {
 	return s
 }
 
-func limitOf(r *Rusage, s *Sampler) string {
+func saturated(s *Sampler, cpus int) bool {
+	if s == nil || s.cpuBusyMin <= saturatedBusyPct {
+		return false
+	}
+	return !s.hasRunqueue || s.runqueueMin > cpus
+}
+
+func limitOf(r *Rusage, s *Sampler, cpus int, floor float64) string {
 	if r == nil {
 		return limitUnknown
 	}
@@ -194,8 +234,12 @@ func limitOf(r *Rusage, s *Sampler) string {
 	switch {
 	case s != nil && s.SwapUsedMaxMB > swapLimitMB:
 		return limitMemory
-	case s != nil && s.cpuBusyMin > saturatedBusyPct:
+	case saturated(s, cpus):
 		return limitSaturated
+	case cpu < tinyCPUSeconds:
+		return limitWait
+	case floor > 0 && r.WallS > contentionFactor*floor:
+		return limitContended
 	case cpu >= syscallRuleMinCPUS && r.SystemS > r.UserS:
 		return limitSyscalls
 	case cpu < waitEfficiencyFloor*r.WallS:
@@ -204,7 +248,7 @@ func limitOf(r *Rusage, s *Sampler) string {
 	return limitCPU
 }
 
-func withPackages(rep Report, bound artifacts) (Report, error) {
+func withPackages(rep Report, bound artifacts, jobName string) (Report, error) {
 	events, err := decodeLines[event](bound.testJSON)
 	if err != nil {
 		return Report{}, err
@@ -229,7 +273,7 @@ func withPackages(rep Report, bound artifacts) (Report, error) {
 		sampler := summarize(samples, p.start, p.end)
 		rep.Packages = append(rep.Packages, Package{
 			Package: p.name, Result: p.result, WallS: p.wall,
-			Limit: limitOf(usage[p.name], sampler), Rusage: usage[p.name], Sampler: sampler,
+			Limit: limitOf(usage[p.name], sampler, runnerCPUs(jobName), p.floor()), Rusage: usage[p.name], Sampler: sampler,
 		})
 	}
 	slices.SortStableFunc(rep.Packages, func(a, b Package) int {
