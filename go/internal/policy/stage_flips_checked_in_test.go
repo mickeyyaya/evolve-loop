@@ -17,9 +17,10 @@ func TestTheCheckedInPolicy_EnforcesTheStagesTheOperatorMoved(t *testing.T) {
 		t.Error("catalog.auto_refresh is not true, want true")
 	}
 	stages := map[string]string{
-		"catalog.refresh_stage": catalog.RefreshStage,
-		"comment_floor.stage":   p.CommentFloorConfig().Stage,
-		"retrospectives.stage":  p.RetrospectivesConfig().Stage,
+		"catalog.refresh_stage":        catalog.RefreshStage,
+		"comment_floor.stage":          p.CommentFloorConfig().Stage,
+		"retrospectives.stage":         p.RetrospectivesConfig().Stage,
+		"fleet.orchestrator.admission": p.FleetConfig().Orchestrator.Admission,
 	}
 	for key, got := range stages {
 		if got != "enforce" {
