@@ -3,6 +3,7 @@ package bridge
 import (
 	"context"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 )
@@ -149,8 +150,12 @@ func TestDoctorReport_BoundByDoctor(t *testing.T) {
 	}
 
 	deep := res.DeepProbe
-	if !deep.Ran || !deep.Passed {
-		t.Fatalf("DeepProbe = %+v, want Ran && Passed", deep)
+	if !deep.Ran || !deep.Passed || deep.Err != "" {
+		t.Fatalf("DeepProbe = %+v, want Ran && Passed without Err", deep)
+	}
+	failingDeep := DeepProbe{Ran: true, Passed: false, Err: "err"}
+	if failingDeep.Err != "err" {
+		t.Fatalf("DeepProbe.Err = %q, want err", failingDeep.Err)
 	}
 }
 
@@ -164,5 +169,14 @@ func TestAuthInfo_OllamaOptional(t *testing.T) {
 	}
 	if !auth.AuthOptional {
 		t.Fatal("AuthInfo.AuthOptional = false, want true (local ollama needs no auth)")
+	}
+}
+
+func TestDeepProber_InterfaceNamedAndExercised(t *testing.T) {
+	t.Parallel()
+	var prober DeepProber = agyDriver{}
+	args := prober.DeepProbeArgs(Manifest{ModelTierMap: map[string]string{"fast": "gemini-3.5-flash"}})
+	if len(args) == 0 || !slices.Contains(args, "gemini-3.5-flash") {
+		t.Fatalf("DeepProber.DeepProbeArgs = %v, want to contain gemini-3.5-flash", args)
 	}
 }

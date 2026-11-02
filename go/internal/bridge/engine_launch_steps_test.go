@@ -12,6 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/launchoutcome"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/proctree"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -39,7 +40,12 @@ func recordingDeps(t *testing.T) (Deps, *[]signalcenter.Event, *strings.Builder)
 	t.Helper()
 	c, got := recordingSignals()
 	stderr := new(strings.Builder)
-	return Deps{Signals: c, Stderr: stderr}, got, stderr
+	return Deps{
+		Signals:       c,
+		Stderr:        stderr,
+		ListProcesses: func(context.Context) ([]proctree.Process, error) { return withSelf(nil), nil },
+		ListCwds:      func(context.Context) ([]proctree.Cwd, error) { return nil, nil },
+	}, got, stderr
 }
 
 func TestRecordModelAttempt_ReturnsTheAttemptContext(t *testing.T) {

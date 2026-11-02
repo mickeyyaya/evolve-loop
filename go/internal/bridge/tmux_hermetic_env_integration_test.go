@@ -44,7 +44,7 @@ func TestRealTmux_ASecretValueIsInNoArgvAndNoLeftoverFile(t *testing.T) {
 	if !hasLine(got, "CLAUDE_CODE_OAUTH_TOKEN="+sentinel) {
 		t.Fatalf("the pane must still get the secret; env:\n%s", got)
 	}
-	ps, err := exec.Command("ps", "-axww", "-o", "args").Output()
+	ps, err := psArgsOrFallback()
 	if err != nil {
 		t.Fatalf("ps: %v", err)
 	}

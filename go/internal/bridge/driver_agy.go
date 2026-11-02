@@ -9,6 +9,10 @@ type agyDriver struct{}
 
 func (agyDriver) Name() string { return "agy" }
 
+func (agyDriver) DeepProbeArgs(m Manifest) []string {
+	return headlessProbeArgs(m)
+}
+
 func (agyDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, error) {
 	if cfg.PermissionMode != "" {
 		fmt.Fprintf(deps.Stderr, "[agy] permission_mode='%s' is not supported on this CLI\n", cfg.PermissionMode)

@@ -11,6 +11,10 @@ type codexDriver struct{}
 
 func (codexDriver) Name() string { return "codex" }
 
+func (codexDriver) DeepProbeArgs(m Manifest) []string {
+	return []string{"exec"}
+}
+
 func (codexDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, error) {
 	if cfg.PermissionMode != "" {
 		fmt.Fprintf(deps.Stderr, "[codex] permission_mode='%s' is not supported on this CLI\n", cfg.PermissionMode)

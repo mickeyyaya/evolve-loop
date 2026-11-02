@@ -35,6 +35,14 @@ func (f *fakeTmux) NewSession(_ context.Context, name string, _, _ int) error {
 	return nil
 }
 
+func (f *fakeTmux) NewSessionEnv(ctx context.Context, name string, width, height int, _ string, _ []string) error {
+	return f.NewSession(ctx, name, width, height)
+}
+
+func (f *fakeTmux) SessionEnvFingerprint(_ context.Context, _ string) (string, error) {
+	return "", nil
+}
+
 func (f *fakeTmux) SendKeys(_ context.Context, _, keys string, enter bool) error {
 	f.sentKeys = append(f.sentKeys, keys)
 	f.sentSeq = append(f.sentSeq, fmt.Sprintf("%s|%v", keys, enter))
