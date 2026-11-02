@@ -59,10 +59,23 @@ func TestWrapPasted_EmptyTextGivesNoBlock(t *testing.T) {
 
 const canonicalTTYLineLimit = 1024
 
-func TestAuthority_EveryLineFitsACanonicalModeTTYLine(t *testing.T) {
-	for i, line := range strings.Split(Authority(), "\n") {
-		if len(line) >= canonicalTTYLineLimit {
-			t.Errorf("Authority line %d has %d bytes, want < %d: a line-mode REPL drops the rest of an overlong pasted line", i+1, len(line), canonicalTTYLineLimit)
+func TestInjectedBlocks_EveryLineFitsACanonicalModeTTYLine(t *testing.T) {
+	blocks := []struct {
+		name string
+		text string
+	}{
+		{"Authority", Authority()},
+		{"Block", Block(Facts{Agent: "build", Cycle: 7, Session: "evolve-session", PromptFile: "/w/prompt.txt", PastedFile: "/w/pasted.txt", Artifact: "/w/report.md"})},
+		{"WrapPasted", WrapPasted("first line\nsecond line")},
+	}
+	for _, blk := range blocks {
+		if blk.text == "" {
+			t.Errorf("%s produced no text, so its line length is unchecked", blk.name)
+		}
+		for i, line := range strings.Split(blk.text, "\n") {
+			if len(line) >= canonicalTTYLineLimit {
+				t.Errorf("%s line %d has %d bytes, want < %d: a line-mode REPL drops the rest of an overlong pasted line", blk.name, i+1, len(line), canonicalTTYLineLimit)
+			}
 		}
 	}
 }
