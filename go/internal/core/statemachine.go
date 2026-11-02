@@ -100,7 +100,7 @@ func NewStateMachine() *StateMachine {
 		PhaseTDD:          {PhaseBuildPlanner: true, PhaseBuild: true},
 		PhaseBuildPlanner: {PhaseBuild: true},
 		PhaseBuild:        {PhaseAudit: true},
-		PhaseAudit:        {PhaseShip: true, PhaseRetro: true, PhaseTDD: true, PhaseBuild: true},
+		PhaseAudit:        {PhaseShip: true, PhaseRetro: true, PhaseTDD: true, PhaseBuild: true, PhaseAudit: true},
 		PhaseRetro:        {PhaseShip: true, PhaseTDD: true, PhaseEnd: true, PhaseAudit: true},
 		PhaseShip:         {PhaseEnd: true, PhaseDebugger: true, PhaseAudit: true, PhaseBuild: true, PhaseTDD: true, PhaseShip: true},
 		PhaseDebugger:     {PhaseShip: true, PhaseAudit: true, PhaseBuild: true, PhaseTDD: true, PhaseEnd: true},
