@@ -17,10 +17,16 @@ Built on 2026-10-17 as O3 of the wave-orchestrator plan, in the `shadow` stage. 
 - **Paths to packages.** A `.go` file under `go/` maps to its directory package. Another path under `go/` (a package directory, or package data such as `testdata/`) maps to the nearest enclosing known package. A path outside `go/` maps to no package. The module root is not a package, so `go/.cover-strict` maps to no package.
   - The files `go/go.mod`, `go/go.sum` and `go/Makefile` map to no package, but each holds the hub cell. `go.mod` and `go.sum` are global-zone files (`fleet.GlobalZoneFiles`). The package names the Makefile.
 - **The hub set.** A package is a hub when at least `hub_min_importers` module packages import it, directly or transitively. The count is the transitive importer count, because it reproduces the ADR-0134 research F2.16 numbers (§Findings).
-- **The footprint of a todo.** `E(t)` is the set of packages that the todo edits. `D(E)` is the union of the module-internal transitive deps of those packages, minus the hubs. A leaf package has no importer, so nothing compiles against it: it adds nothing to `D(E)`. `cmd/evolve` is the main leaf. The todo holds the hub cell in three cases:
-  - it edits a hub package;
-  - it names a global-zone file;
-  - it has no files, and its text names no known package.
+- **The footprint of a todo.** `E(t)` is the set of packages that the todo edits. `D(E)` is the union of the module-internal transitive deps of those packages, minus the hubs. A leaf package has no importer, so nothing compiles against it: it adds nothing to `D(E)`. `cmd/evolve` is the main leaf.
+  - The rule applies to each edited package, not to the whole edit set (`reachRoots`).
+  - A package that the todo edits only through `_test.go` files adds nothing. No other package compiles against its tests.
+  - A package that is not in the graph yet has no deps, so it adds nothing.
+  - Before 2026-11-02, one non-leaf package in the set gave every edited package its reach. A lane edited one test of `cmd/evolve` and one file of `internal/policy`. It then reached the 313 deps of `cmd/evolve`, and wave 149 ran one lane of four.
+  - Pinned by `TestAdmit_AMixedEditSetTakesReachOnlyFromItsNonLeafCodePackages`, `TestAdmit_ATestOnlyEditOfAPackageHoldsNoReachOverItsDeps` `TestAdmit_ACodeEditOfAPackageStillHoldsReachOverItsDeps`, `TestAdmit_ALeafCodeEditBesideANonLeafEditAddsNoReachOfItsOwn` and `TestAdmit_ATodoNamedOnlyByItsTextStillHoldsTheReachOfItsPackages`.
+  - The todo holds the hub cell in three cases:
+    - it edits a hub package;
+    - it names a global-zone file;
+    - it has no files, and its text names no known package.
 - **The conflict rule.** Two todos conflict when one of these holds:
   1. both hold the hub cell;
   2. `E(t1)` and `E(t2)` meet;
