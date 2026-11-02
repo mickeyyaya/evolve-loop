@@ -243,7 +243,12 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	}
 	var lifecycleLedger inboxmover.LedgerAppender = d.Ledger
 	orch, signals := d.Orchestrator, d.Signals
-	result, err := orch.RunCycle(context.Background(), f.request(projectRoot, os.Environ()))
+	lane := laneResume{projectRoot: projectRoot, evolveDir: evolveDir, scope: fleetLaneScope(), record: recordResume,
+		claim: hostInboxClaimer(lifecycleLedger, signals, laneForbiddenTo(projectRoot, signals.Emit)), signals: signals, stderr: stderr,
+		release: func(cycle int) error {
+			return releaseDeferredLaneClaims(projectRoot, cycle, laneQuotaDeferredReason, stderr, lifecycleLedger, signals)
+		}}
+	result, err := lane.run(context.Background(), orch, f.request(projectRoot, os.Environ()))
 	if errors.Is(err, core.ErrAllFamiliesExhausted) {
 		return cycleRunQuotaExit(result.Cycle, projectRoot, evolveDir, fleetLaneFromEnv(), stdout, stderr, lifecycleLedger, signals)
 	}
