@@ -11,7 +11,6 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/auditfix"
-	"github.com/mickeyyaya/evolve-loop/go/internal/cli/agentcmd"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
@@ -28,7 +27,7 @@ type liveCycle struct {
 }
 
 func (c *liveCycle) fixer(extra string) AgentRun {
-	return func(_ context.Context, args []string, _ string) (agentcmd.Envelope, error) {
+	return func(_ context.Context, args []string, _ string) (SeatResult, error) {
 		c.fixerRuns++
 		wt := args[slices.Index(args, "--worktree")+1]
 		for _, rel := range append([]string{helperTest}, extra) {
@@ -36,19 +35,19 @@ func (c *liveCycle) fixer(extra string) AgentRun {
 				continue
 			}
 			if err := os.MkdirAll(filepath.Dir(filepath.Join(wt, rel)), 0o755); err != nil {
-				return agentcmd.Envelope{}, err
+				return SeatResult{}, err
 			}
 			if err := os.WriteFile(filepath.Join(wt, rel), []byte("package pkg\n\nfunc countJSON() int { return 1 }\n"), 0o644); err != nil {
-				return agentcmd.Envelope{}, err
+				return SeatResult{}, err
 			}
 		}
-		return agentcmd.Envelope{Verdict: core.VerdictPASS}, nil
+		return SeatResult{Verdict: core.VerdictPASS}, nil
 	}
 }
 
 func reviewer(verdict string) AgentRun {
-	return func(context.Context, []string, string) (agentcmd.Envelope, error) {
-		return agentcmd.Envelope{Verdict: verdict, RunLabel: "agent-go-reviewer-it", Family: "agy"}, nil
+	return func(context.Context, []string, string) (SeatResult, error) {
+		return SeatResult{Verdict: verdict, RunLabel: "agent-go-reviewer-it", Family: "agy"}, nil
 	}
 }
 

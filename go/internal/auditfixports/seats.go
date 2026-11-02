@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/auditfix"
-	"github.com/mickeyyaya/evolve-loop/go/internal/cli/agentcmd"
 )
 
 const (
@@ -14,7 +13,16 @@ const (
 	auditReport  = "audit-report.md"
 )
 
-type AgentRun func(ctx context.Context, args []string, input string) (agentcmd.Envelope, error)
+type SeatResult struct {
+	RunLabel string
+	Family   string
+	Verdict  string
+	Critical int
+	High     int
+	Error    string
+}
+
+type AgentRun func(ctx context.Context, args []string, input string) (SeatResult, error)
 
 type Route func(profile string) (auditfix.Seat, error)
 

@@ -29,7 +29,7 @@ The operator asked on 2026-10-27: "make sure audit will involve fix and trigger 
 6. It takes a snapshot, sends the prescriptions to the auditor and reads the diff from the snapshot.
 7. It refuses an empty patch, an uncited file, or a fence path outside a held proposal. It also refuses a patch above the `audit_fix` bounds, from `retryladder.AuditFixOverBounds` on the measured diff.
 8. The fresh seat reviews the patch. Then the gates run.
-9. A refusal, a failed review or a red gate restores the snapshot and returns `Escalate`. The caller then runs one raised build with the L6 digest.
+9. A refusal, a failed review or a red gate restores the snapshot and returns `Escalate`. The caller then runs the repair round of today. At `workflow.retry_ladder.stage` `enforce`, its first dispatch is the raised build with the L6 digest.
 10. A pass returns `Handled` with `passed`, and the caller runs the audit again. A patch on a fence path at `held_proposals` `enforce` returns `held_proposal`, and the ship check of ADR-0157 holds the landing.
 
 Each outcome except `off` and `not_chosen` writes `audit-fix.json` in the run directory. The record has the stage, the outcome, the refusal, the failed reasons and the two seats. It also has each finding id with its prescription, the cited files, and the patch with the reason of each change. `ReadRecord` reads it.

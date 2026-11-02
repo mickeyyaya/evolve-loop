@@ -11,11 +11,9 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/auditfix"
-	"github.com/mickeyyaya/evolve-loop/go/internal/cli/agentcmd"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
-	"github.com/mickeyyaya/evolve-loop/go/internal/reportdoc"
 	"github.com/mickeyyaya/evolve-loop/go/internal/retryladder"
 )
 
@@ -32,12 +30,12 @@ type agentCall struct {
 }
 
 type fakeAgent struct {
-	env   agentcmd.Envelope
+	env   SeatResult
 	err   error
 	calls []agentCall
 }
 
-func (f *fakeAgent) run(_ context.Context, args []string, input string) (agentcmd.Envelope, error) {
+func (f *fakeAgent) run(_ context.Context, args []string, input string) (SeatResult, error) {
 	f.calls = append(f.calls, agentCall{args: args, input: input})
 	return f.env, f.err
 }
@@ -61,7 +59,7 @@ func prescriptions() []auditfix.Prescription {
 
 func TestFixer_RunsTheConsoleBuilderOnlyOnTheCitedFilesOfTheWorktree(t *testing.T) {
 	t.Parallel()
-	agent := &fakeAgent{env: agentcmd.Envelope{Verdict: core.VerdictPASS}}
+	agent := &fakeAgent{env: SeatResult{Verdict: core.VerdictPASS}}
 	f := Fixer{Run: agent.run, Route: routes(map[string]string{FixerProfile: "claude"}), ProjectRoot: root}
 	req := auditfix.FixRequest{Cycle: 2035, Workspace: "/runs/cycle-2035", Worktree: "/wt/2035", Prescriptions: prescriptions(), Cited: []string{citedTest},
 		Bounds: retryladder.AuditFixBounds{MaxFiles: 3, MaxLines: 40, MaxCodeLines: 10, NoNewProductionLogic: true}}
@@ -136,14 +134,14 @@ func TestReviewer_ReviewsOnlyThePatchAndThePrescriptionsAndReadsTheTypedVerdict(
 	t.Parallel()
 	for _, tc := range []struct {
 		name string
-		env  agentcmd.Envelope
+		env  SeatResult
 		err  error
 		pass bool
 	}{
-		{"pass", agentcmd.Envelope{Verdict: core.VerdictPASS}, nil, true},
-		{"warn", agentcmd.Envelope{Verdict: core.VerdictWARN}, nil, true},
-		{"fail", agentcmd.Envelope{Verdict: core.VerdictFAIL, RunLabel: "agent-go-reviewer-1", Family: "agy", Findings: reportdoc.SeverityCounts{High: 2}}, errors.New("exit 1"), false},
-		{"no verdict", agentcmd.Envelope{}, nil, false},
+		{"pass", SeatResult{Verdict: core.VerdictPASS}, nil, true},
+		{"warn", SeatResult{Verdict: core.VerdictWARN}, nil, true},
+		{"fail", SeatResult{Verdict: core.VerdictFAIL, RunLabel: "agent-go-reviewer-1", Family: "agy", High: 2}, errors.New("exit 1"), false},
+		{"no verdict", SeatResult{}, nil, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			agent := &fakeAgent{env: tc.env, err: tc.err}
@@ -166,7 +164,7 @@ func TestReviewer_ReviewsOnlyThePatchAndThePrescriptionsAndReadsTheTypedVerdict(
 
 func TestReviewer_ADispatchErrorOrAnUnwritableWorkspaceIsLoud(t *testing.T) {
 	t.Parallel()
-	agent := &fakeAgent{env: agentcmd.Envelope{Verdict: core.VerdictFAIL, Error: "no launch"}, err: errSeat}
+	agent := &fakeAgent{env: SeatResult{Verdict: core.VerdictFAIL, Error: "no launch"}, err: errSeat}
 	if _, err := (Reviewer{Run: agent.run}).Review(context.Background(), reviewRequest(t)); !errors.Is(err, errSeat) {
 		t.Fatalf("Review = %v, want the dispatch error", err)
 	}
