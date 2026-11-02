@@ -21,6 +21,7 @@ func writeIntentProfile(t *testing.T, dir, name, cli string, extraByCLI map[stri
 		"model_tier_default": "sonnet",
 		"allowed_tools":      []string{"Read", "Write"},
 		"extra_flags_by_cli": extraByCLI,
+		"settings_scope":     "project",
 	}
 	data, err := json.MarshalIndent(body, "", "  ")
 	if err != nil {
@@ -47,7 +48,6 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 	claudeRaw := []string{
 		"--exclude-dynamic-system-prompt-sections",
 		"--disable-slash-commands",
-		"--setting-sources", "project",
 		"--plugin-dir", ".evolve/plugin",
 	}
 	extraByCLI := map[string][]string{"claude-tmux": claudeRaw}
@@ -63,7 +63,7 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 			cli:    "claude-tmux",
 			binary: "claude",
 			marker: "❯",
-			want:   "claude --strict-mcp-config --model sonnet --dangerously-skip-permissions --effort medium --append-system-prompt-file {identity} --allowedTools Read Write --exclude-dynamic-system-prompt-sections --disable-slash-commands --setting-sources project --plugin-dir .evolve/plugin",
+			want:   `claude --strict-mcp-config --model sonnet --dangerously-skip-permissions --setting-sources project --settings '{"skipDangerousModePermissionPrompt":true}' --effort medium --append-system-prompt-file {identity} --allowedTools Read Write --exclude-dynamic-system-prompt-sections --disable-slash-commands --plugin-dir .evolve/plugin`,
 			absent: []string{"--no-session-persistence"},
 		},
 		{

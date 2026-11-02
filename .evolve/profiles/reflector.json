@@ -96,13 +96,12 @@
   "turn_budget_hint": 6,
   "output_artifact": ".evolve/runs/cycle-{cycle}/learn/reflector-synthesis.md",
   "challenge_token_required": false,
+  "settings_scope": "project",
   "extra_flags_by_cli": {
     "claude-tmux": [
       "--strict-mcp-config",
       "--exclude-dynamic-system-prompt-sections",
-      "--disable-slash-commands",
-      "--setting-sources",
-      "project"
+      "--disable-slash-commands"
     ]
   },
   "sandbox": {

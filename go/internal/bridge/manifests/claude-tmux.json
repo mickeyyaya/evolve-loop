@@ -95,9 +95,12 @@
       "values": {
         "project": [
           "--setting-sources",
-          "project"
+          "project",
+          "--settings",
+          "{\"skipDangerousModePermissionPrompt\":true}"
         ]
-      }
+      },
+      "note": "project scope drops the user settings; --settings re-declares only the bypass acceptance (docs/architecture/packages/internal-bridge.md)"
     },
     "session_mode": {
       "channel": "controller"

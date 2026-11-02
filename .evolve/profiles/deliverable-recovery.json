@@ -62,13 +62,12 @@
   "max_budget_usd": 1.0,
   "max_turns": 20,
   "output_artifact": ".evolve/runs/cycle-{cycle}/deliverable-recovery.json",
+  "settings_scope": "project",
   "extra_flags_by_cli": {
     "claude-tmux": [
       "--strict-mcp-config",
       "--exclude-dynamic-system-prompt-sections",
-      "--disable-slash-commands",
-      "--setting-sources",
-      "project"
+      "--disable-slash-commands"
     ]
   },
   "model_tier_envelope": {

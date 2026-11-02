@@ -59,13 +59,12 @@
   "turn_budget_hint": 8,
   "output_artifact": ".evolve/runs/cycle-{cycle}/routing-proposal.json",
   "challenge_token_required": false,
+  "settings_scope": "project",
   "extra_flags_by_cli": {
     "claude-tmux": [
       "--strict-mcp-config",
       "--exclude-dynamic-system-prompt-sections",
-      "--disable-slash-commands",
-      "--setting-sources",
-      "project"
+      "--disable-slash-commands"
     ]
   },
   "sandbox": {

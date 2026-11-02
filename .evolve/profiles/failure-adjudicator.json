@@ -52,13 +52,12 @@
   "max_budget_usd": 0.5,
   "max_turns": 8,
   "output_artifact": ".evolve/runs/cycle-{cycle}/failure-adjudication.json",
+  "settings_scope": "project",
   "extra_flags_by_cli": {
     "claude-tmux": [
       "--strict-mcp-config",
       "--exclude-dynamic-system-prompt-sections",
-      "--disable-slash-commands",
-      "--setting-sources",
-      "project"
+      "--disable-slash-commands"
     ]
   },
   "model_tier_envelope": {

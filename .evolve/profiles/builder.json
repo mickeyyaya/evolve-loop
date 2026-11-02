@@ -64,13 +64,12 @@
   "output_artifact": ".evolve/runs/cycle-{cycle}/build-report.md",
   "challenge_token_required": true,
   "isolation": "worktree",
+  "settings_scope": "project",
   "extra_flags_by_cli": {
     "claude-tmux": [
       "--strict-mcp-config",
       "--exclude-dynamic-system-prompt-sections",
       "--disable-slash-commands",
-      "--setting-sources",
-      "project",
       "--plugin-dir",
       ".evolve/plugin"
     ]
