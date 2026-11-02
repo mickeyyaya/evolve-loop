@@ -107,7 +107,8 @@ type PhaseRequest struct {
 	BudgetScale float64          `json:"budget_scale,omitempty"`
 	Attempt     int              `json:"attempt,omitempty"`
 
-	Ladder *retryladder.Try `json:"-"`
+	Ladder      *retryladder.Try `json:"-"`
+	BeforeClose CloseCheck       `json:"-"`
 }
 
 type TaskAssignment struct {

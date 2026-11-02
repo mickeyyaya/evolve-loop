@@ -102,6 +102,12 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `BRIDGE_TOKEN_USAGE_WARNING` | the token resolver measured the attempt with a caveat (invalid counters, partial measurement); the caveat is the reason |
 | `BRIDGE_USAGE_EVIDENCE` | a CLI failed in a way quota could explain (a REPL boot timeout, no response, an escalation, a stall, a failed doctor probe), so the failure path queried the CLI's usage in a fresh session and recorded the verdict for the failing family: exhausted (a family-scoped window is used up: the verified cause, and the family is benched until the reset), healthy (quota ruled out for the family; an exhausted per-model window is named as a note, never as the cause), unavailable (the usage query failed too, which points at auth, install or network) or unknown (no usage window could be read); the reason is the verdict summary; fields driver, cli, family, verdict, trigger (exit N or stall), exit_code, cached, and record_error when the workspace record could not be written |
 
+### build
+
+| Code | Meaning |
+|---|---|
+| `BUILD_SELFCHECK_FINDINGS` | the build session closed with no GREEN self-check receipt for its tree and the handoff floor found findings (ADR-0158 decision 18); fields.decision is would_return_in_session (shadow: recorded in builder-selfcheck-findings.json, the flow of today runs) or return_in_session (enforce: the bridge returns the findings into the live session once), fields.stage is shadow or enforce and fields.findings is the count |
+
 ### carryover
 
 | Code | Meaning |

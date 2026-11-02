@@ -113,3 +113,20 @@ func TestCycleSpend_EachKeyIsStrictInTheLoadedPolicy(t *testing.T) {
 		t.Errorf("load = %+v, %v", p.WorkflowConfig().CycleSpend, err)
 	}
 }
+
+func TestBuilderSelfCheck_TheStageIsStrictInTheLoadedPolicy(t *testing.T) {
+	t.Parallel()
+	for _, body := range []string{
+		`{"workflow": {"builder_selfcheck": {"stage": "advisory"}}}`,
+		`{"workflow": {"builder_selfcheck": {"stages": "enforce"}}}`,
+	} {
+		root := strictPolicyRoot(t, body)
+		if _, err := policy.Load(filepath.Join(root, ".evolve", "policy.json")); err == nil || !strings.Contains(err.Error(), "builder_selfcheck") {
+			t.Errorf("%s: err = %v, want a refusal that names workflow.builder_selfcheck", body, err)
+		}
+	}
+	p, err := policy.Load(filepath.Join(strictPolicyRoot(t, `{"workflow": {"builder_selfcheck": {"stage": "enforce"}}}`), ".evolve", "policy.json"))
+	if err != nil || p.WorkflowConfig().BuilderSelfCheck.Stage != config.StageEnforce {
+		t.Errorf("load = %+v, %v", p.WorkflowConfig().BuilderSelfCheck, err)
+	}
+}
