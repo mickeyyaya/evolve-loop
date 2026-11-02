@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/auditfix"
-	"github.com/mickeyyaya/evolve-loop/go/internal/cli/agentcmd"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
@@ -58,12 +57,12 @@ const reviewBrief = "Review only the attached patch against the attached prescri
 	"The patch must do what each prescription says and nothing more. It must add no regression, no empty test and no new production logic. " +
 	"Give each defect as a finding with its severity, and end with the verdict.\n"
 
-func reviewVerdict(env agentcmd.Envelope) auditfix.Verdict {
+func reviewVerdict(env SeatResult) auditfix.Verdict {
 	if env.Verdict == core.VerdictPASS || env.Verdict == core.VerdictWARN {
 		return auditfix.Verdict{Pass: true}
 	}
 	return auditfix.Verdict{Reasons: []string{fmt.Sprintf("review %s (%s) verdict %q with %d critical and %d high findings",
-		env.RunLabel, env.Family, env.Verdict, env.Findings.Critical, env.Findings.High)}}
+		env.RunLabel, env.Family, env.Verdict, env.Critical, env.High)}}
 }
 
 func writeReviewInputs(req auditfix.ReviewRequest) ([]string, error) {

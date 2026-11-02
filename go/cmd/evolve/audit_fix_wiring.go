@@ -31,8 +31,9 @@ func auditFixRung(s auditFixSite) core.Option {
 }
 
 func newAuditFixHandler(s auditFixSite) *auditfix.Handler {
-	run := func(_ context.Context, args []string, input string) (agentcmd.Envelope, error) {
-		return runAgentSeat(s.agent, args, input, s.stderr)
+	run := func(_ context.Context, args []string, input string) (auditfixports.SeatResult, error) {
+		env, err := runAgentSeat(s.agent, args, input, s.stderr)
+		return seatResultOf(env), err
 	}
 	wf := s.pol.WorkflowConfig()
 	return auditfix.New(auditfix.Config{Stage: wf.RetryLadder.AuditFix.Stage, HoldFence: s.pol.HeldProposalsStage() == config.StageEnforce}, auditfix.Ports{
@@ -41,4 +42,11 @@ func newAuditFixHandler(s auditFixSite) *auditfix.Handler {
 		Gates:    auditfixports.Gates{Floor: core.WholeBuildHandoffFloor(composedBuildHandoffFloor(wf, s.cfg)), Protected: protectedMembership, ProjectRoot: s.root, ACS: acssuite.Run},
 		Worktree: auditfixports.Worktree{Git: gitexec.Isolated},
 	})
+}
+
+func seatResultOf(env agentcmd.Envelope) auditfixports.SeatResult {
+	return auditfixports.SeatResult{
+		RunLabel: env.RunLabel, Family: env.Family, Verdict: env.Verdict,
+		Critical: env.Findings.Critical, High: env.Findings.High, Error: env.Error,
+	}
 }

@@ -152,7 +152,7 @@ The handler is `internal/auditfix` ([package note](packages/internal-auditfix.md
 1. A fixer seat applies the patch inside the cycle worktree. The patch changes only the cited files, inside the `audit_fix` bounds. The audit session cannot apply it, because it ended with its dispatch (see the wiring below).
 2. A fresh seat reviews only the patch and the prescriptions. Its session is never the session of the auditor. The routing picks another family when the chain has one, and a lower tier is allowed.
 3. The handoff floor, cover-changed and ACS run again on the patched tree.
-4. A pass sends the cycle to a second audit of the patched tree, and then to ship. No tdd or build round runs. A refused patch, a failed review or a red gate restores the tree. Then one escalation runs: a raised build with the L6 digest. A second failure stops the cycle with `audit_fix_exhausted`.
+4. A pass sends the cycle to a second audit of the patched tree, and then to ship. No tdd or build round runs. A refused patch, a failed review or a red gate restores the tree. Then the repair round of today runs once. At `workflow.retry_ladder.stage` `enforce`, it starts with the raised build. A second failure stops the cycle with `audit_fix_exhausted`.
 5. A patch on a fence path joins the held proposal at `held_proposals` `enforce` (ADR-0157). At another stage, the handler refuses it.
 6. The handler writes `audit-fix.json` in the run directory. It has the patch, each finding id with its prescription, and the reason for each change.
 
