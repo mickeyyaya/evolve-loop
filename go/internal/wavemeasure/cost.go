@@ -2,6 +2,7 @@ package wavemeasure
 
 import (
 	"math"
+	"sort"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclespend"
 )
@@ -9,6 +10,7 @@ import (
 type CycleSpend struct {
 	Shipped      bool
 	Spend        cyclespend.Spend
+	Verdict      cyclespend.Verdict
 	HandoffWould int
 	HandedOff    bool
 	SpendLimit   string
@@ -28,6 +30,8 @@ type Cost struct {
 	FalseStops                     int      `json:"false_stops"`
 	SpendLimitStops                int      `json:"spend_limit_stops"`
 	SpendLimitWouldStops           int      `json:"spend_limit_would_stops"`
+	MedianLLMMinutesToVerdict      *float64 `json:"median_llm_minutes_to_verdict"`
+	MedianFailFastRatio            *float64 `json:"median_fail_fast_ratio"`
 }
 
 func computeCost(cycles []CycleSpend) Cost {
@@ -49,7 +53,33 @@ func computeCost(cycles []CycleSpend) Cost {
 	if rate, ok := t.ConvergenceRate(); ok {
 		c.ConvergenceRate = &rate
 	}
+	c.MedianLLMMinutesToVerdict, c.MedianFailFastRatio = verdictMedians(cycles)
 	return c
+}
+
+func verdictMedians(cycles []CycleSpend) (*float64, *float64) {
+	var minutes, ratios []float64
+	for _, cy := range cycles {
+		if cy.Verdict.LLMMinutesToVerdict > 0 {
+			minutes = append(minutes, cy.Verdict.LLMMinutesToVerdict)
+		}
+		if cy.Verdict.FailFastRatio != nil {
+			ratios = append(ratios, *cy.Verdict.FailFastRatio)
+		}
+	}
+	return median(minutes, 10), median(ratios, 100)
+}
+
+func median(values []float64, scale float64) *float64 {
+	if len(values) == 0 {
+		return nil
+	}
+	sort.Float64s(values)
+	mid := len(values) / 2
+	if len(values)%2 == 1 {
+		return rounded(values[mid], scale)
+	}
+	return rounded((values[mid-1]+values[mid])/2, scale)
 }
 
 func (c Cost) withHandoff(cy CycleSpend) Cost {

@@ -26,6 +26,14 @@
 - **Cycle 2035.** The ledger passes 90 LLM minutes after audit round 2 (`TestJudge_Cycle2035PassesItsLimitOfLLMMinutesAfterAuditRoundTwo`). Audit round 2 was WARN, so the cycle went to ship, and ship refused (`REPO_CONTRACT_GATE`). At `enforce`, the stop comes at the failed audit round 3. It saves repair round 2 (tdd and build, about 51.6 LLM minutes) and audit round 4 (`core` `TestCheckCycleSpend_Cycle2035AtEnforceStopsAndHandsOff`).
 - **The signal names.** `SignalCode` and `FieldDecision` are the names that `internal/core` writes and that `internal/wave` and `internal/pipelinerates` read.
 
+## The verdict measure
+
+- **`VerdictOf`.** `VerdictOf(calls, failAt, shipped)` gives the LLM minutes to the verdict of a cycle. `failAt` is the time of the first blocking signal.
+- **Fail point.** A failed cycle gets a fail point: the minutes of the calls that ended at or before `failAt`.
+- **Waste.** The waste is the minutes of the calls that ended after `failAt`. A call with no time never counts as waste.
+- **Fail-fast ratio.** The fail-fast ratio is the fail point divided by the total minutes. It is unset when the total is 0.
+- **Shipped cycle.** A shipped cycle, or a cycle with no blocking signal, has no fail point.
+
 ## Invariants
 
 - The ledger of cycle 2035 gives 160.1 LLM minutes, 4,338,241 fresh tokens and 87,431,829 cache-read tokens, as the incident record says (F1.1). The fixture is `testdata/cycle-2035` (`TestRead_Cycle2035SpentTheNumbersOfItsIncidentRecord`).

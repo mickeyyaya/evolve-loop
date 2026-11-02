@@ -85,7 +85,7 @@ func TestCost_TheJSONFieldNamesAreStable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, key := range []string{"started_cycles", "shipped_cycles", "llm_minutes_per_shipped_cycle", "fresh_tokens_per_shipped_cycle", "cache_read_tokens_per_shipped_cycle", "unmeasured_calls", "audit_rounds_per_cycle", "convergence_rate", "handoff_stops", "handoff_would_stops", "false_stops", "spend_limit_stops", "spend_limit_would_stops"} {
+	for _, key := range []string{"started_cycles", "shipped_cycles", "llm_minutes_per_shipped_cycle", "fresh_tokens_per_shipped_cycle", "cache_read_tokens_per_shipped_cycle", "unmeasured_calls", "audit_rounds_per_cycle", "convergence_rate", "handoff_stops", "handoff_would_stops", "false_stops", "spend_limit_stops", "spend_limit_would_stops", "median_llm_minutes_to_verdict", "median_fail_fast_ratio"} {
 		if !strings.Contains(string(raw), `"`+key+`":`) {
 			t.Errorf("json %s has no key %s", raw, key)
 		}

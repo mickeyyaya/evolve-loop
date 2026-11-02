@@ -80,6 +80,12 @@ func writeWaveCostText(w io.Writer, c wavemeasure.Cost) {
 			*c.LLMMinutesPerShippedCycle, *c.FreshTokensPerShippedCycle/1e6, *c.CacheReadTokensPerShippedCycle/1e6, c.Shipped, c.Started)
 	}
 	fmt.Fprintf(w, " · audit rounds %.2f per cycle · convergence %.2f", *c.AuditRoundsPerCycle, *c.ConvergenceRate)
+	if c.MedianLLMMinutesToVerdict != nil {
+		fmt.Fprintf(w, " · median %.1f LLM min to verdict", *c.MedianLLMMinutesToVerdict)
+	}
+	if c.MedianFailFastRatio != nil {
+		fmt.Fprintf(w, " · median fail-fast %.2f", *c.MedianFailFastRatio)
+	}
 	if c.UnmeasuredCalls > 0 {
 		fmt.Fprintf(w, " · %d call(s) unmeasured", c.UnmeasuredCalls)
 	}
