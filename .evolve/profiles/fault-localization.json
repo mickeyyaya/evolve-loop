@@ -26,6 +26,7 @@
   "max_turns": 12,
   "output_artifact": "fault-localization-report.md",
   "challenge_token_required": true,
+  "settings_scope": "project",
   "extra_flags_by_cli": {
     "claude-tmux": [
       "--tools",
@@ -38,9 +39,7 @@
       "ToolSearch",
       "--strict-mcp-config",
       "--exclude-dynamic-system-prompt-sections",
-      "--disable-slash-commands",
-      "--setting-sources",
-      "project"
+      "--disable-slash-commands"
     ]
   },
   "parallel_eligible": false,

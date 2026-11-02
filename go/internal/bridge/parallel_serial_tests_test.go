@@ -94,6 +94,8 @@ var serialTests = map[string]string{
 	"bridge.TestRandomStamp_HexEncodesSixEntropyBytes":                                    "swaps seam randRead",
 	"bridge.TestRealizeFor_OnlyAManifestWithASystemPromptChannelCarriesTheFile":           "swaps seam modelCatalogDirFn",
 	"bridge.TestRealizeFor_RealManifests_NoCrossCLILeak":                                  "swaps seam modelCatalogDirFn",
+	"bridge.TestRealizeFor_ClaudeProjectScopeRedeclaresTheBypassAcceptance":               "swaps seam modelCatalogDirFn",
+	"bridge.TestRealizeFor_ClaudeWithoutProjectScopeAddsNoFlagSettings":                   "swaps seam modelCatalogDirFn",
 	"bridge.TestRealizeScalar_OmitsModelWhenResolutionLeavesATierName":                    "swaps seam modelCatalogDirFn",
 	"bridge.TestRealizerWiring_NoCrossCLILeak":                                            "swaps seam modelCatalogDirFn",
 	"bridge.TestRunTmuxREPL_ExtendTimeout":                                                "swaps seam manifestFS",

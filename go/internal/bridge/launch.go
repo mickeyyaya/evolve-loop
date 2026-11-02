@@ -245,6 +245,7 @@ func launchIntentFor(cfg *Config, prof Profile, efforts policy.EffortTable) Laun
 		Effort:          cmp.Or(cfg.Effort, LaunchEffort(cfg.CLI, cfg.Model, efforts, prof.Name)),
 		AllowedTools:    prof.AllowedTools,
 		DisallowedTools: prof.DisallowedTools,
+		SettingsScope:   prof.SettingsScope,
 		RawByCLI:        prof.ExtraFlagsByCLI,
 	}
 	intent.LadderEffort = cfg.Effort

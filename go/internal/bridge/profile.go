@@ -22,6 +22,7 @@ type Profile struct {
 	StreamOutput    bool
 	SessionName     string
 	Sandbox         *ProfileSandbox
+	SettingsScope   string
 	ExtraFlagsByCLI map[string][]string
 }
 
@@ -67,6 +68,7 @@ type profileWire struct {
 	Sandbox         *ProfileSandbox     `json:"sandbox"`
 	EffortLevel     json.RawMessage     `json:"effort_level"`
 	EffortOverrides json.RawMessage     `json:"effort_overrides"`
+	SettingsScope   string              `json:"settings_scope"`
 	ExtraFlagsByCLI map[string][]string `json:"extra_flags_by_cli"`
 }
 
@@ -108,6 +110,7 @@ func LoadProfile(path string) (Profile, error) {
 		PermissionMode:  w.PermissionMode,
 		SessionName:     w.SessionName,
 		Sandbox:         w.Sandbox,
+		SettingsScope:   w.SettingsScope,
 		ExtraFlagsByCLI: w.ExtraFlagsByCLI,
 	}
 	if w.StreamOutput != nil {
