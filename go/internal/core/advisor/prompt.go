@@ -34,7 +34,13 @@ func buildRoutingPrompt(in router.RouteInput) string {
 }
 
 func writeDecisionFile(b *strings.Builder, in router.RouteInput, d decision) {
-	fmt.Fprintf(b, "Write this JSON to %s. The pipeline reads only that file and checks it against its schema; it reads nothing that you print.\n", filepath.Join(in.Workspace, d.artifactFile()))
+	path := filepath.Join(in.Workspace, d.artifactFile())
+	writeArtifactAnchor(b, path)
+	fmt.Fprintf(b, "Write this JSON to %s. The pipeline reads only that file and checks it against its schema; it reads nothing that you print.\n", path)
+}
+
+func writeArtifactAnchor(b *strings.Builder, path string) {
+	fmt.Fprintf(b, "\nArtifact path: %s\n", path)
 }
 
 func isFailureTransition(in router.RouteInput) bool {
@@ -116,7 +122,9 @@ func (a *Advisor) composePlanPrompt(in router.RouteInput, d decision, artifactFi
 	}
 	WriteCatalogWithOnDemand(&b, in.Catalog, in.OnDemandPhases)
 	writePlanResponseSchema(&b)
-	fmt.Fprintf(&b, "\nNow write your whole-cycle plan as a strict JSON array to %s (no prose, no fence).\n", filepath.Join(in.Workspace, artifactFile))
+	path := filepath.Join(in.Workspace, artifactFile)
+	writeArtifactAnchor(&b, path)
+	fmt.Fprintf(&b, "Now write your whole-cycle plan as a strict JSON array to %s (no prose, no fence).\n", path)
 	return b.String()
 }
 
