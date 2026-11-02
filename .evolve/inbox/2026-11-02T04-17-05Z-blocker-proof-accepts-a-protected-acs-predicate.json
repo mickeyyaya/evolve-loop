@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "Red test first: a protected-path blocker that cites a frozen predicate file (go/acs/cycle<N>/predicates_test.go) and the conflicting TDD predicate is accepted when the cited line exists and the frozen-check gate flags that path.",
+    "A blocker that cites a test file the lane may edit is still refused.",
+    "An accepted protected-path blocker routes the item to the console with the builder's patch attached, instead of failing the cycle.",
+    "Docs in STE."
+  ],
+  "created_at": "2026-11-02T04:21:00Z",
+  "deps": [],
+  "files": [
+    "go/internal/core"
+  ],
+  "fix": "The blocker proof refuses every blocker whose cited file is a test file ('is not a non-test Go source file in the tree'). Cycles 2073 and 2089 (wave 147-148) declared correct blockers on protected acs predicates (a TDD predicate that can never pass; a frozen predicate that calls a removed API) and both were refused, so the cycle spent its build retries and failed. Accept a protected-path blocker on a frozen or this-cycle acs predicate when the cited line exists and the gate classifier flags the path, and route the item to the console with the patch.",
+  "id": "blocker-proof-accepts-a-protected-acs-predicate",
+  "kind": "pipeline-repair",
+  "notes": "Console route: orchestrator blocker proof. Find the refusal with grep 'is not a non-test Go source file'.",
+  "origin": "console",
+  "priority": "P1",
+  "priority_class": "stability",
+  "route": "console",
+  "source": "console, 2026-11-02, ORCHESTRATOR_BLOCKER_REFUSED in cycles 2073 and 2089",
+  "summary": "A correct protected-path blocker on an acs predicate is always refused, so a lane that hits a frozen or impossible predicate burns its retries and fails.",
+  "title": "The blocker proof accepts a protected-path blocker on an acs predicate and routes the item to the console",
+  "weight": 0.75
+}
