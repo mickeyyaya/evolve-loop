@@ -23,7 +23,7 @@ func cycleRunQuotaExit(cycle int, projectRoot, evolveDir string, fleetLane bool,
 	if err := releaseDeferredLaneClaims(projectRoot, cycle, laneQuotaDeferredReason, stderr, lifecycle, signals); err != nil {
 		fmt.Fprintf(stderr, "evolve cycle run: WARN: could not release cycle %d claims: %v\n", cycle, err)
 	} else {
-		fmt.Fprintf(stderr, "evolve cycle run: fleet lane deferred on a quota wall: cycle %d claims are pending again (%s); the next wave plans them, no resume needed\n", cycle, laneQuotaDeferredReason)
+		fmt.Fprintf(stderr, "evolve cycle run: fleet lane deferred on a quota wall: cycle %d claims are pending again (%s); the next lane of the todo resumes the cycle at its paused phase\n", cycle, laneQuotaDeferredReason)
 	}
 	lr.StopReason = "quota-pause"
 	lr.emit(stdout)
