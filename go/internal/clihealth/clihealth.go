@@ -293,7 +293,7 @@ func (s *Store) withLock(fn func() error) error {
 
 func (s *Store) Active() map[string]Entry {
 	return s.filter(func(e Entry) bool {
-		return e.Model == "" && (e.Reason == CredentialPattern || s.now().Before(e.BenchedUntil))
+		return e.Model == "" && (AuthBench(e.Reason) || s.now().Before(e.BenchedUntil))
 	})
 }
 

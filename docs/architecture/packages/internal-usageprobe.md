@@ -77,6 +77,8 @@ The probe is opt-in (`cli_health.proactive_probe`, compiled default off; this pr
   - When several windows match, `closerWindow` keeps the longest model name, and then the highest used percent. Thus the pick does not depend on the order of the observation map.
   - A window model matches the whole tier model, or a start of it that a space follows.
 
+- A family on an auth bench (`clihealth.AuthBench`) is probed; a family on any other active bench is skipped. The family's own screen can give usage windows. Then `act` calls `Store.ClearAuthBench` with the source `usage_probe` before it judges the windows, because a read screen proves the login. `Prober.Signals` carries the loop's Center. Pinned by `TestProber_AUsageReadWithWindowsClearsTheAuthBench` and `TestProber_AFailedOrWindowlessUsageReadKeepsTheAuthBench`.
+
 ## Invariants
 
 - **The probe never invents a cap.** An unsupported usage command, a probe error, an unreadable pane, or a healthy pane writes no bench. Pinned by the `TestProber_*` tests in `usageprobe_test.go`.

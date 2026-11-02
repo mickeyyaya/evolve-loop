@@ -52,6 +52,8 @@ var serialTests = map[string]string{
 	"bridge.TestEffortRealize_Matrix":                                                     "swaps seam modelCatalogDirFn",
 	"bridge.TestEngineLaunchThreadsRunID":                                                 "calls process-global setter Register",
 	"bridge.TestEngineLaunch_ArtifactTimeout_SummaryBeatsEarlierBridgeChatter":            "calls process-global setter ResetDriversForTesting",
+	"bridge.TestClearAuthBench_NoProjectRootNeverClearsTheStoreOfTheWorkingDirectory":     "changes the working directory",
+	"bridge.TestEngineLaunch_ASuccessfulLaunchClearsTheAuthBenchAndAFailedOneKeepsIt":     "calls process-global setter Register",
 	"bridge.TestEngineLaunch_BootStrikeClearFailure_IsABridgeWarning":                     "calls process-global setter Register",
 	"bridge.TestEngineLaunch_BootStrikeRecordFailure_IsABridgeWarning":                    "calls process-global setter Register",
 	"bridge.TestEngineLaunch_ClaudeTmuxCarriesTheProfileDenyList":                         "swaps seam modelCatalogDirFn",

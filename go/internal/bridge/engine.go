@@ -342,6 +342,7 @@ func (e *Engine) launchModel(ctx context.Context, req core.BridgeRequest) (core.
 	e.reportFreshSession(c, req)
 	e.clearBootStrike(c, req.CLI, run.code)
 	if run.code == ExitOK {
+		clearAuthBench(req.ProjectRoot, req.CLI, clihealth.SourceLaunch, e.deps)
 		e.readResult(c, req, in.stdoutLog, &resp)
 		return resp, nil
 	}
