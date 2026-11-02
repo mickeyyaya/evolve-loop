@@ -47,6 +47,11 @@ func (s *serverLossTmux) HasSession(ctx context.Context, name string) bool {
 	return !s.serverGone && s.fakeTmux.HasSession(ctx, name)
 }
 
+const (
+	paneLossTestTimeoutS = 40
+	paneLossTestTicks    = paneLossTestTimeoutS / 2
+)
+
 type paneLossRun struct {
 	code          int
 	stderr        string
@@ -57,10 +62,10 @@ type paneLossRun struct {
 
 func dispatchUntilPaneLoss(t *testing.T, tm *serverLossTmux, lose func(*serverLossTmux)) paneLossRun {
 	t.Helper()
-	return dispatchUntilPaneLossIn(t, context.Background(), tm, lose)
+	return dispatchUntilPaneLossIn(t, context.Background(), paneLossTestTimeoutS, tm, lose)
 }
 
-func dispatchUntilPaneLossIn(t *testing.T, ctx context.Context, tm *serverLossTmux, lose func(*serverLossTmux)) paneLossRun {
+func dispatchUntilPaneLossIn(t *testing.T, ctx context.Context, timeoutS int, tm *serverLossTmux, lose func(*serverLossTmux)) paneLossRun {
 	t.Helper()
 	fx := newFixture(t, "claude-tmux", "")
 	tm.paneSeq = []string{tmuxPromptMarkerDefault}
@@ -78,7 +83,7 @@ func dispatchUntilPaneLossIn(t *testing.T, ctx context.Context, tm *serverLossTm
 	eng := newTestEngine(Deps{
 		Tmux:               tm,
 		Sleep:              sleep,
-		ArtifactTimeoutS:   1200,
+		ArtifactTimeoutS:   timeoutS,
 		ArtifactMaxExtends: 1,
 		CaptureBaseline:    zeroBaselineCapture,
 	})
@@ -92,7 +97,7 @@ func TestRunTmuxREPL_ATmuxServerKilledMidPhaseEndsTheDispatchAsPaneLostWithinOne
 	t.Parallel()
 	tm := &serverLossTmux{}
 
-	run := dispatchUntilPaneLoss(t, tm, func(s *serverLossTmux) { s.serverGone = true })
+	run := dispatchUntilPaneLossIn(t, context.Background(), 1200, tm, func(s *serverLossTmux) { s.serverGone = true })
 
 	if run.code != ExitArtifactTimeout {
 		t.Fatalf("exit = %d, want %d; stderr:\n%s", run.code, ExitArtifactTimeout, run.stderr)
@@ -118,7 +123,7 @@ func TestRunTmuxREPL_ACaptureFailureOnALiveSessionDoesNotEndTheDispatch(t *testi
 	if got := launchoutcome.CauseCode(run.code, run.stderr); got == string(launchoutcome.TimeoutPaneLost) {
 		t.Fatalf("cause_code = %q: has-session still finds the session, so a capture failure alone is not a lost pane", got)
 	}
-	if run.waitTicks < 1200/2 {
+	if run.waitTicks < paneLossTestTicks {
 		t.Errorf("wait ticks = %d, want the full review interval: a live session keeps its dispatch", run.waitTicks)
 	}
 }
@@ -132,7 +137,7 @@ func TestRunTmuxREPL_OneTickWithoutTheSessionIsNotYetAPaneLoss(t *testing.T) {
 	if got := launchoutcome.CauseCode(run.code, run.stderr); got == string(launchoutcome.TimeoutPaneLost) {
 		t.Fatalf("cause_code = %q: one failed has-session is a blip; the loss needs %d consecutive ticks", got, paneLossConfirmTicks)
 	}
-	if run.waitTicks < 1200/2 {
+	if run.waitTicks < paneLossTestTicks {
 		t.Errorf("wait ticks = %d, want the full review interval after a one-tick blip", run.waitTicks)
 	}
 }
@@ -143,7 +148,7 @@ func TestRunTmuxREPL_ACancelDuringTheLossConfirmationEndsAsContextCancelledNever
 	defer cancel()
 	tm := &serverLossTmux{cancelAt: paneLossConfirmTicks, cancel: cancel}
 
-	run := dispatchUntilPaneLossIn(t, ctx, tm, func(s *serverLossTmux) { s.serverGone = true })
+	run := dispatchUntilPaneLossIn(t, ctx, paneLossTestTimeoutS, tm, func(s *serverLossTmux) { s.serverGone = true })
 
 	if got := launchoutcome.CauseCode(run.code, run.stderr); got != string(launchoutcome.TimeoutContextCancelled) {
 		t.Fatalf("cause_code = %q, want %q: a cancel that lands while the loss is being confirmed is our own teardown, not a lost pane; stderr:\n%s", got, launchoutcome.TimeoutContextCancelled, run.stderr)

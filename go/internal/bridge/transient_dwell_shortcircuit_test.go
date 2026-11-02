@@ -14,7 +14,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 )
 
-const transientRedispatchDelayFloor = 15 * time.Second
+const (
+	transientRedispatchDelayFloor = 15 * time.Second
+	dwellTestTimeoutS             = 70
+	dwellTestTicks                = dwellTestTimeoutS / 2
+	dwellResetTimeoutS            = 140
+	dwellResetTicks               = dwellResetTimeoutS / 2
+)
 
 type transientDwellRun struct {
 	code    int
@@ -42,6 +48,16 @@ func runTransientDwell(t *testing.T, fx launchFixture, paneSeq []string, stage s
 	code := eng.LaunchArgs(context.Background(),
 		fx.args("claude-tmux", "--allow-bypass", "--agent=router"), nil, &stdout, &stderr)
 	return transientDwellRun{code: code, stderr: stderr.String(), sleeps: sleeps, reviews: rev.events, ws: fx.ws}
+}
+
+func (r transientDwellRun) waitTicks() int {
+	n := 0
+	for _, d := range r.sleeps {
+		if d == artifactWaitInterval {
+			n++
+		}
+	}
+	return n
 }
 
 func (r transientDwellRun) longestSleep() time.Duration {
@@ -229,8 +245,11 @@ func TestRunTmuxREPL_TransientDwell_DoesNotFireBeforeSixtySeconds(t *testing.T) 
 func TestRunTmuxREPL_TransientDwell_ResetsOnNonMatchingFrame(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
-	run := runTransientDwell(t, fx, alternatingPanes(t, 4000), "enforce", 300)
+	run := runTransientDwell(t, fx, alternatingPanes(t, dwellResetTicks*2), "enforce", dwellResetTimeoutS)
 
+	if run.waitTicks() < dwellResetTicks {
+		t.Errorf("wait ticks = %d, want >= %d: the run must reach the full review interval", run.waitTicks(), dwellResetTicks)
+	}
 	if len(run.reviews) == 0 {
 		t.Fatalf("RED (AC-3): an intermittent transient frame fast-failed the phase — the dwell must RESET on " +
 			"every non-matching observation, so a flickering pattern never crosses 60s")
@@ -250,8 +269,11 @@ func TestRunTmuxREPL_TransientDwell_BusyPaneIsNeverPreempted(t *testing.T) {
 	if !panestream.PaneBusy(busy, panestream.Profiles["claude-repl-v1"]) {
 		t.Fatal("fixture premise gone: the busy affordance no longer reads as busy")
 	}
-	run := runTransientDwell(t, fx, []string{busy}, "enforce", 300)
+	run := runTransientDwell(t, fx, []string{busy}, "enforce", dwellTestTimeoutS)
 
+	if run.waitTicks() < dwellTestTicks {
+		t.Errorf("wait ticks = %d, want >= %d: the run must reach the full review interval", run.waitTicks(), dwellTestTicks)
+	}
 	if len(run.reviews) == 0 {
 		t.Fatalf("RED (AC-4): a BUSY pane was fast-failed — the transient dwell must carry the same busy guard " +
 			"as fatalPaneVerdict, or a working agent is killed for text it merely rendered")
@@ -264,8 +286,11 @@ func TestRunTmuxREPL_TransientDwell_BusyPaneIsNeverPreempted(t *testing.T) {
 func TestRunTmuxREPL_TransientDwell_ShadowObservesWithoutActing(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
-	run := runTransientDwell(t, fx, []string{livePane529(t)}, "shadow", 300)
+	run := runTransientDwell(t, fx, []string{livePane529(t)}, "shadow", dwellTestTimeoutS)
 
+	if run.waitTicks() < dwellTestTicks {
+		t.Errorf("wait ticks = %d, want >= %d: the run must reach the full review interval", run.waitTicks(), dwellTestTicks)
+	}
 	if len(run.reviews) == 0 {
 		t.Fatalf("RED (AC-5): shadow ACTED — the default stage must be behavior-neutral (legacy verdict decides)")
 	}
@@ -299,8 +324,11 @@ func TestRunTmuxREPL_TransientDwell_EnforceRecordsFastFailed(t *testing.T) {
 func TestRunTmuxREPL_TransientDwell_OffStageIsLegacy(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
-	run := runTransientDwell(t, fx, []string{livePane529(t)}, "off", 300)
+	run := runTransientDwell(t, fx, []string{livePane529(t)}, "off", dwellTestTimeoutS)
 
+	if run.waitTicks() < dwellTestTicks {
+		t.Errorf("wait ticks = %d, want >= %d: the run must reach the full review interval", run.waitTicks(), dwellTestTicks)
+	}
 	if len(run.reviews) == 0 {
 		t.Fatalf("RED (AC-5): stage=off still preempted the reviewer — off must be the legacy flow exactly")
 	}
