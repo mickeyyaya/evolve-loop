@@ -52,6 +52,7 @@ var transitionCodes = map[fleet.PoolTransitionKind]signalcenter.Code{
 	fleet.PoolExited:     CodeLaneExited,
 	fleet.PoolBackfilled: CodeLaneBackfilled,
 	fleet.PoolIdle:       CodePoolIdle,
+	fleet.PoolHeld:       CodePoolHeld,
 	fleet.PoolResupplied: CodePoolResupplied,
 }
 
@@ -123,7 +124,7 @@ func (p Pool) transition(t fleet.PoolTransition) {
 	if t.Kind == fleet.PoolLaunched || t.Kind == fleet.PoolBackfilled {
 		p.FamilyHolds.forget(t.Todo)
 	}
-	if t.Kind == fleet.PoolIdle && p.MinLanes > 0 && t.Live < p.MinLanes && (p.Halted == nil || !p.Halted()) {
+	if (t.Kind == fleet.PoolIdle || t.Kind == fleet.PoolHeld) && p.MinLanes > 0 && t.Live < p.MinLanes && (p.Halted == nil || !p.Halted()) {
 		uFields := map[string]string{
 			"live":      strconv.Itoa(t.Live),
 			"target":    strconv.Itoa(t.Target),
