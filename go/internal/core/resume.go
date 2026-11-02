@@ -334,7 +334,7 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		return CycleResult{}, fmt.Errorf("RunCycleFromPhase: invalid resume phase %q", resumePoint.Phase)
 	}
 
-	release, err := o.storage.AcquireLock(ctx)
+	release, err := o.acquireCycleLock(ctx, req.Env)
 	if err != nil {
 		return CycleResult{}, fmt.Errorf("acquire lock: %w", err)
 	}
