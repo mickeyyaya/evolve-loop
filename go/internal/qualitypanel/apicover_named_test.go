@@ -47,3 +47,18 @@ func TestMutationResult_ACleanRunWithNothingSkippedEqualsTheEmptySkipLists(t *te
 		t.Errorf("result = %+v, want %+v", res, wantResult)
 	}
 }
+
+func TestRevertSensitivityExports_AreNamed(t *testing.T) {
+	t.Parallel()
+	outcomes := []RevertOutcome{RevertTestsPassed, RevertTestsFailed, RevertNotCompiled}
+	if len(outcomes) != 3 || outcomes[0] == outcomes[1] || outcomes[1] == outcomes[2] {
+		t.Errorf("outcomes = %v, want three distinct values", outcomes)
+	}
+	var runner RevertRunner = GitRevertRunner{}
+	skip := RevertSkip{Hunk: Hunk{File: "a.go"}, Reason: "r"}
+	var res RevertResult
+	res, err := MeasureRevertSensitivity(RevertInput{PlaneRoot: "/p", MainRoot: "/m", ScratchDir: "/s"}, runner)
+	if err != nil || runner == nil || skip.Hunk.File != "a.go" || len(res.Events(StageShadow)) == 0 {
+		t.Errorf("err=%v events=%d, want a no-data reading", err, len(res.Events(StageShadow)))
+	}
+}

@@ -105,15 +105,19 @@ func mutationReading(index string, r Reading, in MutationInput) Reading {
 }
 
 func checkScratch(in MutationInput) error {
-	for label, path := range map[string]string{"scratch": in.ScratchDir, "plane": in.PlaneRoot, "main": in.MainRoot} {
+	return checkScratchDirs("mutation", in.ScratchDir, in.PlaneRoot, in.MainRoot)
+}
+
+func checkScratchDirs(kind, scratchDir, planeRoot, mainRoot string) error {
+	for label, path := range map[string]string{"scratch": scratchDir, "plane": planeRoot, "main": mainRoot} {
 		if !filepath.IsAbs(path) {
-			return fmt.Errorf("mutation %s path %q is not absolute", label, path)
+			return fmt.Errorf("%s %s path %q is not absolute", kind, label, path)
 		}
 	}
-	scratch := filepath.Clean(in.ScratchDir)
-	for label, root := range map[string]string{"plane": in.PlaneRoot, "main": in.MainRoot} {
+	scratch := filepath.Clean(scratchDir)
+	for label, root := range map[string]string{"plane": planeRoot, "main": mainRoot} {
 		if within(filepath.Clean(root), scratch) {
-			return fmt.Errorf("mutation scratch %q is inside the %s tree %q", scratch, label, root)
+			return fmt.Errorf("%s scratch %q is inside the %s tree %q", kind, scratch, label, root)
 		}
 	}
 	return nil
