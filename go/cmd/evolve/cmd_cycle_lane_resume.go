@@ -40,6 +40,12 @@ func fleetLaneScope() []string {
 	return core.ScopeIDs(os.Getenv(ipcenv.FleetScopeKey))
 }
 
+func laneClaimReleaser(projectRoot string, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) func(int) error {
+	return func(cycle int) error {
+		return releaseDeferredLaneClaims(projectRoot, cycle, laneQuotaDeferredReason, stderr, lifecycle, signals)
+	}
+}
+
 func (l laneResume) run(ctx context.Context, orch cycleStarter, req core.CycleRequest) (core.CycleResult, error) {
 	rp := l.adopt()
 	if rp == nil {

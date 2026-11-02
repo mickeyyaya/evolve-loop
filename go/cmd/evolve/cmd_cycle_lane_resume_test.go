@@ -91,9 +91,7 @@ func seedPausedScope(t *testing.T, todos []string, cycle, attempts int) pausedLa
 func (p pausedLane) lane(stderr *bytes.Buffer, signals *signalcenter.Center, scope ...string) laneResume {
 	return laneResume{projectRoot: p.root, evolveDir: p.evolveDir, scope: scope, record: checkpoint.RecordResume,
 		claim: hostInboxClaimer(nil, signals, nil), signals: signals, stderr: stderr,
-		release: func(cycle int) error {
-			return releaseDeferredLaneClaims(p.root, cycle, laneQuotaDeferredReason, stderr, nil, signals)
-		}}
+		release: laneClaimReleaser(p.root, stderr, nil, signals)}
 }
 
 func laneRequest() core.CycleRequest {
