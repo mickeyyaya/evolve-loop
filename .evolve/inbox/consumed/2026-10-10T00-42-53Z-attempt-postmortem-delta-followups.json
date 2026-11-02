@@ -3,6 +3,12 @@
     "An operator stop writes no record that names a command that finished OK",
     "An agy record names its real source"
   ],
+  "consumed": {
+    "at": "2026-11-02T23:18:41Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Console stale audit 2026-11-03 against origin/main cd47eb445: DONE — 736e71ed9 \"attempt postmortem covers every end (ADR-0130 follow-ups)\"; postmortem.go:78/100 ctx.Err/Canceled exclusion; TestCollect_AnAgyAttemptWithNoPaneCaptureNamesTheSourceNone; postmortem_wiring_test.go \"want none under a cancelled context\""
+  },
   "created_at": "2026-10-10T00:42:53Z",
   "files": [
     "go/internal/phases/runner/postmortem.go",

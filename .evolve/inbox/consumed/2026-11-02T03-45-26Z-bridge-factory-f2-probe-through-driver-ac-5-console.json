@@ -2,6 +2,12 @@
   "acceptance": [
     "The frozen cycle 1325 mint predicates call bridge.Resolve instead of the removed DriverFor, so go/acs/cycle1325 compiles"
   ],
+  "consumed": {
+    "at": "2026-11-02T23:18:41Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Console stale audit 2026-11-03 against origin/main cd47eb445: DONE — 727811d7c \"fix(acs): migrate the frozen cycle1325 predicate off bridge.DriverFor\" (#1235); go/acs/cycle1325/predicates_test.go:75 calls bridge.Resolve(bridge.DefaultDriverSet(), \"claude\")"
+  },
   "created_at": "2026-11-02T03:45:26Z",
   "fix": "Make the change that AC 5 needs on the protected path(s) go/acs/cycle1325/predicates_test.go, then prove the criterion with a test.",
   "id": "bridge-factory-f2-probe-through-driver-ac-5-console",

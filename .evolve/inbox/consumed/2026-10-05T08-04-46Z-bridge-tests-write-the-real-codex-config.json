@@ -3,6 +3,12 @@
     "Running go test ./internal/bridge/ leaves ~/.codex/config.toml and ~/.codex/version.json byte-identical (red first: a test that launches codex through the engine with HOME at a temp dir and asserts the trust entry lands there and nowhere else)",
     "The codex preflight still writes the real home in production launches"
   ],
+  "consumed": {
+    "at": "2026-11-02T23:18:41Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Console stale audit 2026-11-03 against origin/main cd47eb445: DONE — 3862aafec \"tests never write the operator codex config\" (codexHome honours CODEX_HOME; bridge+cmd/evolve TestMains point it at scratch); test TestCodexConfigPath_InTestsIsAScratchFileUnderTheTempDir"
+  },
   "created_at": "2026-10-05T08:10:00Z",
   "files": [
     "go/internal/bridge/codex_pretrust.go",
@@ -16,7 +22,7 @@
   "kind": "pipeline-repair",
   "priority_class": "hygiene",
   "source": "console lane cl-codexupdate, 2026-10-05: grep of ~/.codex/config.toml ([projects] entries named after bridge tests) while investigating the codex update menu",
-  "summary": "Engine.Launch runs codexTmuxDriver.Preflight, which calls pretrustCodexProjects (cfg.codexConfigPath unset, so ~/.codex/config.toml) and dismissCodexUpdateNag (codexVersionPathFn default, so ~/.codex/version.json). Tests that drive codex-tmux through Engine.LaunchArgs or Engine.Launch without overriding HOME (TestAdversarialFaultMatrix's codex cases, TestCodexTmux_*, TestRealizerWiring_NoCrossCLILeak/codex-tmux and others) append a [projects.\"<t.TempDir()>\"] trust entry to the real file on every run. On this host, 2026-10-05: ~/.codex/config.toml is 20,051,224 bytes with 141,664 [projects] entries, 140,371 of them test temp directories (e.g. /var/folders/.../TestCodexTmux_HappyPath1565143437/001), plus 7 leftover config.toml.tmp.* files. Every real codex launch parses that file, and every bridge test run grows it.",
+  "summary": "Engine.Launch runs codexTmuxDriver.Preflight, which calls pretrustCodexProjects (cfg.codexConfigPath unset, so ~/.codex/config.toml) and dismissCodexUpdateNag (codexVersionPathFn default, so ~/.codex/version.json). Tests that drive codex-tmux through Engine.LaunchArgs or Engine.Launch without overriding HOME (TestAdversarialFaultMatrix's codex cases, TestCodexTmux_*, TestRealizerWiring_NoCrossCLILeak/codex-tmux and others) append a [projects.\"\u003ct.TempDir()\u003e\"] trust entry to the real file on every run. On this host, 2026-10-05: ~/.codex/config.toml is 20,051,224 bytes with 141,664 [projects] entries, 140,371 of them test temp directories (e.g. /var/folders/.../TestCodexTmux_HappyPath1565143437/001), plus 7 leftover config.toml.tmp.* files. Every real codex launch parses that file, and every bridge test run grows it.",
   "title": "Bridge tests that launch codex through the engine write the developer's real ~/.codex/config.toml and version.json (20 MB, 140,371 test trust entries)",
   "weight": 0.5
 }

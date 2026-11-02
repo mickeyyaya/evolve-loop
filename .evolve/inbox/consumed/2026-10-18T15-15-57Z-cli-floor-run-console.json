@@ -4,6 +4,12 @@
     "A red tier exits 1 naming it, and the other tiers still run and report",
     "The tier commands match CI's (a test compares them with required.yml's steps)"
   ],
+  "consumed": {
+    "at": "2026-11-02T23:18:41Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Console stale audit 2026-11-03 against origin/main cd47eb445: DONE — b6e7c8f2e (cycle, consumed cli-floor-run-lane) go/cmd/evolve/cmd_floor.go; TestFloorRun_FmtTierUsesTheToolchainCIPins, TestFloorRun_TierCommandsMatchRequiredCI, TestFloorRun_RefusesWithExit2; runtime-reference.md:56"
+  },
   "created_at": "2026-09-30T10:51:41Z",
   "deps": [
     "cli-ratchet-check"

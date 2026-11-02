@@ -1,0 +1,36 @@
+{
+  "absorbs": [
+    "llmroute-default-trigger-aliasing#4",
+    "policy-resolver-hygiene#3"
+  ],
+  "acceptance": [
+    "No production caller composes a manifest name from BaseCLI+\"-tmux\" (grep proves it)",
+    "setup.tierModelsFor(\"codex\") and the advisor clamp probe resolve through bridge.FamilyManifest",
+    "go test -count=1 ./internal/setup/... ./internal/bridge/... ./cmd/... green",
+    "(merged at the inbox review 2026-09-27) One family-naming seam. Absorb policy-resolver-hygiene part (3): delete setup.baseCLI and use policy.BaseCLI. Absorb llmroute-default-trigger-aliasing part (4): the overlay rung's strings.HasPrefix(c, ov.CLI+\"-\") at model_routing_overlay.go:32 should call Family(). Widen the acceptance grep to cover all seven name-building sites."
+  ],
+  "class": "single-source",
+  "connects_to": [
+    "go/internal/setup/setup.go",
+    "go/cmd/evolve/model_tier_resolver.go",
+    "go/internal/bridge/manifest.go"
+  ],
+  "consumed": {
+    "at": "2026-11-02T23:18:41Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Console stale audit 2026-11-03 against origin/main cd47eb445: DONE — e3874ecd3 (setup.tierModelsFor -\u003e llmroute.DefaultDriverForFamily); TestDefaultDriverForFamily_MapsAFamilyToItsTmuxDriver; grep: no `+\"-tmux\"` composition, no setup.baseCLI, overlay HasPrefix(c, ov.CLI) gone"
+  },
+  "created_at": "2026-09-09T00:20:00Z",
+  "fix": "Add bridge.FamilyManifest(family string) (Manifest, error): resolve a BASE family (\"codex\", \"claude\", \"agy\") to the manifest that DECLARES its model_tier_map by scanning ManifestNames() for BaseCLI(name)==family with a declared map (prefer the -tmux transport), so callers stop composing \u003cbase\u003e-tmux. NOTE (architecture review 2026-09-09): setup.tierModelsFor receives a BASE family and LoadManifest(\"claude\") has no manifest (only claude-p/claude-tmux), so the facade must scan, not load the family name directly. Point setup.tierModelsFor and cmd/evolve/model_tier_resolver.go at it; delete familyDriverManifest’s switch. Wiring proof: a fixture headless manifest with model_tier_map_from is resolved identically by both callers.",
+  "id": "bridge-family-manifest-facade",
+  "kind": "pipeline-repair",
+  "merge_notes": [
+    "inbox review 2026-09-27: absorbed policy-resolver-hygiene#3, llmroute-default-trigger-aliasing#4. One family-naming seam. Absorb policy-resolver-hygiene part (3): delete setup.baseCLI and use policy.BaseCLI. Absorb llmroute-default-trigger-aliasing part (4): the overlay rung's strings.HasPrefix(c, ov.CLI+\"-\") at model_routing_overlay.go:32 should call Family(). Widen the acceptance grep to cover all seven name-building sites."
+  ],
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: A replicated naming belief across about seven call sites, the never-duplicate class. It is not failing, but each new family or transport multiplies the drift points.",
+  "summary": "Architecture review of the 2026-09-09 codex cutover (HIGH): 'which manifest owns a family's tier table' is composed by string concatenation (BaseCLI+\"-tmux\") in setup.familyDriverManifest and the advisor clamp probe (cmd/evolve/model_tier_resolver.go:33). The drivers no longer need it (headless manifests carry an explicit model_tier_map_from pointer since that PR), but the two pre-existing composers still do.",
+  "title": "Family→tier-table manifest rule is a string recipe in setup.familyDriverManifest and cmd/evolve/model_tier_resolver.go — one bridge.FamilyManifest seam",
+  "weight": 0.6
+}

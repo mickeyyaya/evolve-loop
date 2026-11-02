@@ -4,6 +4,12 @@
     ".evolve/pipeline-escalation.json",
     "/Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2065"
   ],
+  "consumed": {
+    "at": "2026-11-02T23:18:41Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Console stale audit 2026-11-03 against origin/main cd47eb445: OBSOLETE — host disk 100% full (ENOSPC) is an environment event, not a code defect; disk floor preflight exists (2f1b6fc47, looppreflight/diskspace.go TestRun_DiskSpace_BelowFloorHaltsNamingTheFix) and gc trims (af363ab32, cmd_gc_scope.go diskFreeAboveTrim)"
+  },
   "created_at": "2026-10-27T13:48:47Z",
   "fix": "Root-cause the pipeline failure described by the recorded evidence: orchestrator-classified infra-systemic: audit-fail-reason.json: integration-tier offenders are TempDir mkdir 'no space left on device'; host predicate evidence: gitexec index copy ENOSPC; audit-report.md L3 records disk 100% used; auditor narrative PASS, ACS 6/6 green. Add a regression test that reproduces it. Do NOT retry the halted task until the pipeline is fixed.",
   "id": "pipeline-defect-infra-systemic-cycle2065",

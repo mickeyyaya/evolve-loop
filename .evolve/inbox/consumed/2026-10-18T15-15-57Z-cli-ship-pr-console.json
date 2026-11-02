@@ -4,6 +4,12 @@
     "A branch that already has an open PR reports it instead of creating a second one",
     "--pr on main exits 10"
   ],
+  "consumed": {
+    "at": "2026-11-02T23:18:41Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Console stale audit 2026-11-03 against origin/main cd47eb445: DONE — 241e0782d (cycle 1992, cli-ship-pr-lane) added cmd_ship_pr.go; tests TestRunShipCmd_Pr_CreatesThePullRequestAndPrintsItsNumber, _ReportsAnOpenPullRequestInsteadOfCreatingASecond, _OnMainExits10BeforeShipOrGhRun"
+  },
   "created_at": "2026-09-30T10:51:14Z",
   "files": [
     "go/internal/phases/ship/landing"
