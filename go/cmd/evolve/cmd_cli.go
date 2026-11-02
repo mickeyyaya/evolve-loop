@@ -173,7 +173,7 @@ func manifestUpdateFamilies(installed []string, set bridge.DriverSet, log io.Wri
 func credentialWall(store *clihealth.Store) func(family string) (string, bool) {
 	return func(family string) (string, bool) {
 		e, benched := store.Active()[family]
-		if !benched || e.Reason != clihealth.CredentialPattern {
+		if !benched || !clihealth.AuthBench(e.Reason) {
 			return "", false
 		}
 		return e.OperatorAction, true

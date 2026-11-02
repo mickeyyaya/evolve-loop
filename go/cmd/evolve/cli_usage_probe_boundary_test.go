@@ -51,7 +51,7 @@ func TestRunPreWaveProbes_AFakeProbeThatReadsAgyExhaustedBenchesAgyBeforeTheWave
 	installPreWaveUsagePane(t, func(context.Context, string) (string, error) { return pane, nil })
 	var log bytes.Buffer
 
-	if err := runPreWaveProbes(context.Background(), root, evolveDir, &log); err != nil {
+	if err := runPreWaveProbes(context.Background(), root, evolveDir, nil, &log); err != nil {
 		t.Fatalf("runPreWaveProbes: %v\n%s", err, log.String())
 	}
 
@@ -67,7 +67,7 @@ func TestRunPreWaveProbes_AFailedProbeBenchesNothingAndLogsOneWarn(t *testing.T)
 	installPreWaveUsagePane(t, func(context.Context, string) (string, error) { return "", errors.New("boot timed out") })
 	var log bytes.Buffer
 
-	if err := runPreWaveProbes(context.Background(), root, evolveDir, &log); err != nil {
+	if err := runPreWaveProbes(context.Background(), root, evolveDir, nil, &log); err != nil {
 		t.Fatalf("runPreWaveProbes: %v", err)
 	}
 
@@ -88,7 +88,7 @@ func TestRunPreWaveProbes_TheUsageEvidenceTimeoutBoundsAProbeThatNeverAnswers(t 
 	var log bytes.Buffer
 	start := time.Now()
 
-	if err := runPreWaveProbes(context.Background(), root, evolveDir, &log); err != nil {
+	if err := runPreWaveProbes(context.Background(), root, evolveDir, nil, &log); err != nil {
 		t.Fatalf("runPreWaveProbes: %v", err)
 	}
 
