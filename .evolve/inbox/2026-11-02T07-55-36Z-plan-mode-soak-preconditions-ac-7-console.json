@@ -1,0 +1,16 @@
+{
+  "acceptance": [
+    "Build the /plan or Shift+Tab entry plumbing for codex"
+  ],
+  "created_at": "2026-11-02T07:55:36Z",
+  "fix": "Make the change that AC 7 needs on the protected path(s) go/internal/bridge/driver_codex.go, then prove the criterion with a test.",
+  "id": "plan-mode-soak-preconditions-ac-7-console",
+  "kind": "task",
+  "origin": "cycle",
+  "priority_class": "feature",
+  "route": "console-manual",
+  "source": "cycle 2104, tdd test-report.md AC 7 (console-followup)",
+  "summary": "The TDD phase of cycle 2104 gave AC 7 of plan-mode-soak-preconditions the console-followup disposition. A lane builder can never change the paths it needs (go/internal/bridge/driver_codex.go). The lane part ships without it, so the console owns this part.",
+  "title": "Console part of plan-mode-soak-preconditions: AC 7, which needs a protected path changed",
+  "weight": 0.35
+}

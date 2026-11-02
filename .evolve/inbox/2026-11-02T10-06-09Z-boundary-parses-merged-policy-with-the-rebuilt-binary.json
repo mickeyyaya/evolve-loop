@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "Red test first: a boundary whose sync-main merges a policy.json with a key that only the merged code reads completes: the code index refresh and every later step parse the policy with the rebuilt binary, or the refresh runs after the rebuild step.",
+    "A policy key that no reader of the merged tree knows still fails the boundary with its name.",
+    "Docs in STE: the boundary steps doc records the order."
+  ],
+  "created_at": "2026-11-02T10:10:00Z",
+  "deps": [],
+  "files": [
+    "go/cmd/evolve/cmd_syncmain.go",
+    "go/cmd/evolve/cmd_wave_boundary.go"
+  ],
+  "fix": "The wave-149 boundary stopped at step 4: sync-main merged PR #1236, which added the policy key workflow.builder_selfcheck together with its reader, then refreshed the code index with the pre-merge binary, whose strict policy loader refused the unknown key. The rebuild is step 11. Move the code index refresh after the rebuild, or have sync-main rebuild before any step that parses the merged policy, so a reader and its key can land in one PR.",
+  "id": "boundary-parses-merged-policy-with-the-rebuilt-binary",
+  "kind": "pipeline-repair",
+  "notes": "Console route: boundary steps. Recovered by hand: make -C go build, reset-sha, rerun wave next.",
+  "origin": "console",
+  "priority": "P1",
+  "priority_class": "stability",
+  "route": "console",
+  "source": "console, 2026-11-02, wave-149 boundary step 4",
+  "summary": "A PR that adds a policy key with its reader stops the next boundary, because sync-main parses the merged policy with the old binary before the rebuild step.",
+  "title": "The boundary parses the merged policy with the rebuilt binary",
+  "weight": 0.7
+}

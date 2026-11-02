@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "go vet -tags acs ./acs/... reports no compile error on main.",
+    "A required CI step compiles every acs package (go vet -tags acs ./acs/... or go test -tags acs -run '^$' ./acs/...), so an API change that breaks a frozen predicate fails its own PR.",
+    "Each migration keeps the predicate's intent; a predicate whose subject no longer exists is archived with a reason, not deleted silently.",
+    "Docs in STE: the acs predicate quality gate doc records the compile guard."
+  ],
+  "created_at": "2026-11-02T04:20:00Z",
+  "deps": [],
+  "files": [
+    "go/acs",
+    ".github/workflows"
+  ],
+  "fix": "Ten frozen acs packages do not compile on main (2026-11-02, go vet -tags acs ./acs/...): cycle1275 (router.MintSpec.CLI removed), cycle1391 and cycle16 (systemprompt.Resolve arity), cycle1694 (treefence.TakeTracked removed), cycle1911 (bridgechain.ApplyCLIHealthBench arity), cycle24 (llmroute.Resolve arity), cycle298 (unused os import), cycle334 (quotareset.Options.HoursFn removed), cycle523 and cycle541 (fleet.PlanFromTriage arity). cycle1325 is fixed in PR #1235. CI never builds the acs tag, so API changes rot frozen predicates unseen, and a lane item that must change such an API deadlocks on the frozen-check gate (cycle 2089).",
+  "id": "acs-packages-compile-and-ci-guards-them",
+  "kind": "pipeline-repair",
+  "notes": "Console route: frozen predicates are protected paths, so the migration is console work.",
+  "origin": "console",
+  "priority": "P1",
+  "priority_class": "stability",
+  "route": "console",
+  "source": "console, 2026-11-02, wave 148 cycle 2089 deadlock",
+  "summary": "Ten frozen acs predicate packages no longer compile on main because CI never builds the acs tag; a lane that changes their API deadlocks on the frozen-check gate.",
+  "title": "Every acs predicate package compiles, and CI compiles the acs tag",
+  "weight": 0.75
+}

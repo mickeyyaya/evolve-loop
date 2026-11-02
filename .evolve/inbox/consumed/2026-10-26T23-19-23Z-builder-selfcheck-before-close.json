@@ -4,6 +4,12 @@
     "A receipt for another tree digest counts as no receipt.",
     "At shadow the floor records would_return_in_session and the flow of today runs. workflow.builder_selfcheck.stage is a strict stage key (off, shadow, enforce; default shadow)."
   ],
+  "consumed": {
+    "at": "2026-11-02T15:38:17Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "built from the console in PR #1236 (ADR-0158 retry approach)"
+  },
   "created_at": "2026-10-26T23:19:23Z",
   "deps": [],
   "files": [

@@ -190,10 +190,7 @@ func (a Admitter) footprintOf(td fleet.Todo) footprint {
 		fp.edits[p] = true
 		fp.hub = fp.hub || hubs[p]
 	}
-	if a.allLeaves(pkgs) {
-		return fp
-	}
-	for _, p := range pkgs {
+	for _, p := range a.reachRoots(td, pkgs) {
 		for _, d := range a.Graph.Deps(p) {
 			if !hubs[d] {
 				fp.reach[d] = true
@@ -203,24 +200,50 @@ func (a Admitter) footprintOf(td fleet.Todo) footprint {
 	return fp
 }
 
-func (a Admitter) allLeaves(pkgs []string) bool {
-	lg, ok := a.Graph.(leafGraph)
-	if !ok || len(pkgs) == 0 {
-		return false
+func (a Admitter) reachRoots(td fleet.Todo, pkgs []string) []string {
+	code := a.codePackages(td)
+	lg, leafAware := a.Graph.(leafGraph)
+	var roots []string
+	for _, p := range pkgs {
+		if (leafAware && lg.IsLeaf(p)) || (code != nil && !code[p]) {
+			continue
+		}
+		roots = append(roots, p)
 	}
-	return !slices.ContainsFunc(pkgs, func(p string) bool { return !lg.IsLeaf(p) })
+	return roots
+}
+
+func (a Admitter) codePackages(td fleet.Todo) map[string]bool {
+	files := fileList(td)
+	if len(files) == 0 {
+		return nil
+	}
+	code := map[string]bool{}
+	for _, f := range files {
+		if strings.HasSuffix(f, "_test.go") {
+			continue
+		}
+		for _, p := range a.Graph.Packages([]string{f}) {
+			code[p] = true
+		}
+	}
+	return code
 }
 
 func (a Admitter) edited(td fleet.Todo) (pkgs []string, hub bool) {
-	files := td.Files
-	if len(files) == 1 && files[0] == td.ID {
-		files = nil
-	}
+	files := fileList(td)
 	if len(files) > 0 {
 		return a.Graph.Packages(files), slices.ContainsFunc(files, globalZone)
 	}
 	pkgs = a.Graph.Packages(namedPaths(a.text(td.ID)))
 	return pkgs, len(pkgs) == 0
+}
+
+func fileList(td fleet.Todo) []string {
+	if len(td.Files) == 1 && td.Files[0] == td.ID {
+		return nil
+	}
+	return td.Files
 }
 
 func namedPaths(text string) []string {
