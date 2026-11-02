@@ -29,17 +29,31 @@ func WriteSelfCheckReceipt(ctx context.Context, workspace, worktree string, gree
 	return nil
 }
 
-func selfCheckReceiptGreen(ctx context.Context, workspace, worktree string) bool {
+const (
+	receiptGreen  = "green"
+	receiptRed    = "red"
+	receiptStale  = "stale"
+	receiptAbsent = "absent"
+)
+
+func selfCheckReceiptState(ctx context.Context, workspace, worktree string) string {
 	raw, err := os.ReadFile(filepath.Join(workspace, SelfCheckReceiptFile))
 	if err != nil {
-		return false
+		return receiptAbsent
 	}
 	var receipt selfCheckReceipt
-	if json.Unmarshal(raw, &receipt) != nil || !receipt.Green {
-		return false
+	if json.Unmarshal(raw, &receipt) != nil {
+		return receiptAbsent
 	}
 	tree, err := worktreeTreeDigest(ctx, worktree)
-	return err == nil && tree == receipt.Tree
+	switch {
+	case err != nil || tree != receipt.Tree:
+		return receiptStale
+	case receipt.Green:
+		return receiptGreen
+	default:
+		return receiptRed
+	}
 }
 
 func worktreeTreeDigest(ctx context.Context, worktree string) (string, error) {

@@ -319,7 +319,7 @@ The block sets the stage of the build handoff floor before the build session clo
 
 | Key | Range | Meaning | Default |
 |---|---|---|---|
-| `stage` | `0`, `off`, `shadow`, `enforce` | `shadow`: the check runs when the build has no GREEN self-check receipt for its tree. When the floor finds a fault, the orchestrator writes `builder-selfcheck-findings.json`. It records `BUILD_SELFCHECK_FINDINGS` with `decision: would_return_in_session`. The flow of today runs. `enforce`: the record has `decision: return_in_session`, and the bridge sends the findings into the live session one time. The next write of the deliverable closes it. | `shadow` |
+| `stage` | `0`, `off`, `shadow`, `enforce` | `shadow`: the wait runs no floor. When the review gate rejects the build on the floor and the build has no GREEN self-check receipt for its tree, the orchestrator writes `builder-selfcheck-findings.json`. It records `BUILD_SELFCHECK_FINDINGS` with `source: gate` and `decision: would_return_in_session`. `enforce`: the bridge runs the floor before the close and sends the findings into the live session one time. The record says `delivered` or `delivery_failed`. | `shadow` |
 
 ## Documentation floors (`docs_floor`)
 

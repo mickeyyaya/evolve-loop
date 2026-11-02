@@ -219,6 +219,6 @@ Item 3 names `go/internal/admission/admission.go` as its file. #1188 puts the ch
 Item 8 (`builder-selfcheck-before-close`) is on the branch `feat/builder-selfcheck-before-close`, at `shadow`:
 
 - `evolve selfcheck build` and `evolve phase verify build` write a receipt with the tree digest of the worktree ([internal-cli-phasecmd](../architecture/packages/internal-cli-phasecmd.md)).
-- A build dispatch carries a check before the close ([internal-core](../architecture/packages/internal-core.md)). With no GREEN receipt for the tree and with floor findings, it records `BUILD_SELFCHECK_FINDINGS` and `builder-selfcheck-findings.json`.
-- At `enforce`, the bridge pastes the findings into the live session one time ([internal-bridge](../architecture/packages/internal-bridge.md)). The review gate runs the floor again after the close.
+- At `shadow`, the wait runs no floor. The orchestrator records the findings of the review gate as `would_return_in_session` when the build has no GREEN receipt for its tree ([internal-core](../architecture/packages/internal-core.md)).
+- At `enforce`, a build dispatch carries a check before the close. The bridge runs it inside the deadline of the wait and pastes the findings into the live session one time ([internal-bridge](../architecture/packages/internal-bridge.md)). The record says `delivered` or `delivery_failed`. The review gate runs the floor again after the close.
 - The key is `workflow.builder_selfcheck.stage` ([policy-config](../architecture/policy-config.md)).

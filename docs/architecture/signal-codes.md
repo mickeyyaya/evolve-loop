@@ -106,7 +106,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 
 | Code | Meaning |
 |---|---|
-| `BUILD_SELFCHECK_FINDINGS` | the build session closed with no GREEN self-check receipt for its tree and the handoff floor found findings (ADR-0158 decision 18); fields.decision is would_return_in_session (shadow: recorded in builder-selfcheck-findings.json, the flow of today runs) or return_in_session (enforce: the bridge returns the findings into the live session once), fields.stage is shadow or enforce and fields.findings is the count |
+| `BUILD_SELFCHECK_FINDINGS` | a build closed with no GREEN self-check receipt for its tree and the handoff floor found findings (ADR-0158 decision 18); fields.stage is shadow or enforce; fields.source is gate (shadow: the findings of the review gate, no floor run in the wait) or bridge (enforce: the floor run before the close); fields.decision is would_return_in_session (shadow), delivered (enforce, the paste into the live session succeeded) or delivery_failed (enforce, fields.error names why); fields.receipt is absent, red or stale; fields.findings is the count |
 
 ### carryover
 

@@ -18,12 +18,15 @@ const CodeBuilderSelfCheck signalcenter.Code = "BUILD_SELFCHECK_FINDINGS"
 const (
 	BuilderSelfCheckFindingsFile = "builder-selfcheck-findings.json"
 
-	selfCheckWouldReturn = "would_return_in_session"
-	selfCheckReturn      = "return_in_session"
+	selfCheckWouldReturn    = "would_return_in_session"
+	selfCheckDelivered      = "delivered"
+	selfCheckDeliveryFailed = "delivery_failed"
+	selfCheckSourceBridge   = "bridge"
+	selfCheckSourceGate     = "gate"
 )
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleBuild, CodeBuilderSelfCheck, "the build session closed with no GREEN self-check receipt for its tree and the handoff floor found findings (ADR-0158 decision 18); fields.decision is would_return_in_session (shadow: recorded in builder-selfcheck-findings.json, the flow of today runs) or return_in_session (enforce: the bridge returns the findings into the live session once), fields.stage is shadow or enforce and fields.findings is the count")
+	signalcenter.RegisterCode(signalcenter.ModuleBuild, CodeBuilderSelfCheck, "a build closed with no GREEN self-check receipt for its tree and the handoff floor found findings (ADR-0158 decision 18); fields.stage is shadow or enforce; fields.source is gate (shadow: the findings of the review gate, no floor run in the wait) or bridge (enforce: the floor run before the close); fields.decision is would_return_in_session (shadow), delivered (enforce, the paste into the live session succeeded) or delivery_failed (enforce, fields.error names why); fields.receipt is absent, red or stale; fields.findings is the count")
 }
 
 type builderSelfCheck struct {
@@ -38,55 +41,75 @@ type builderSelfCheck struct {
 type selfCheckFindings struct {
 	Cycle    int      `json:"cycle"`
 	Stage    string   `json:"stage"`
+	Source   string   `json:"source"`
 	Decision string   `json:"decision"`
+	Receipt  string   `json:"receipt"`
+	Error    string   `json:"error,omitempty"`
 	Findings []string `json:"findings"`
 }
 
+func (cr *cycleRun) selfCheckFor(in ReviewInput, floor BuildHandoffFloor) builderSelfCheck {
+	return builderSelfCheck{
+		stage: cr.o.workflowConfig.BuilderSelfCheck.Stage, floor: floor, in: in,
+		signals: cr.o.signals, runID: cr.o.signalRunID(), errOut: cr.o.errOut(),
+	}
+}
+
 func (cr *cycleRun) builderSelfCheckBeforeClose(next Phase) CloseCheck {
-	stage := cr.o.workflowConfig.BuilderSelfCheck.Stage
-	if next != PhaseBuild || stage == config.StageOff {
+	if next != PhaseBuild || cr.o.workflowConfig.BuilderSelfCheck.Stage != config.StageEnforce {
 		return nil
 	}
 	floor := floorChecks(cr.o.reviewer)
 	if len(floor) == 0 {
 		return nil
 	}
-	return builderSelfCheck{
-		stage: stage, floor: floor, in: ReviewInputFor(cr.cs, PhaseBuild, cr.req.ProjectRoot),
-		signals: cr.o.signals, runID: cr.o.signalRunID(), errOut: cr.o.errOut(),
-	}.beforeClose
+	return cr.selfCheckFor(ReviewInputFor(cr.cs, PhaseBuild, cr.req.ProjectRoot), floor).beforeClose
 }
 
-func (c builderSelfCheck) beforeClose(ctx context.Context) string {
-	if selfCheckReceiptGreen(ctx, c.in.Workspace, c.in.Worktree) {
-		return ""
+func (cr *cycleRun) recordShadowSelfCheck(next Phase, in ReviewInput, rr ReviewResult) {
+	if next != PhaseBuild || cr.o.workflowConfig.BuilderSelfCheck.Stage != config.StageShadow || rr.Approve || !strings.HasPrefix(rr.Reason, floorReasonHead) {
+		return
+	}
+	receipt := selfCheckReceiptState(cr.ctx, in.Workspace, in.Worktree)
+	if receipt == receiptGreen {
+		return
+	}
+	cr.selfCheckFor(in, nil).record(selfCheckFindings{Source: selfCheckSourceGate, Decision: selfCheckWouldReturn, Receipt: receipt, Findings: rr.Failures})
+}
+
+func (c builderSelfCheck) beforeClose(ctx context.Context) (string, func(error)) {
+	receipt := selfCheckReceiptState(ctx, c.in.Workspace, c.in.Worktree)
+	if receipt == receiptGreen {
+		return "", nil
 	}
 	findings := c.floor.Failures(ctx, c.in)
-	if len(findings) == 0 {
-		return ""
+	if len(findings) == 0 || ctx.Err() != nil {
+		return "", nil
 	}
-	decision := selfCheckWouldReturn
-	if c.stage == config.StageEnforce {
-		decision = selfCheckReturn
+	report := func(delivery error) {
+		rec := selfCheckFindings{Source: selfCheckSourceBridge, Decision: selfCheckDelivered, Receipt: receipt, Findings: findings}
+		if delivery != nil {
+			rec.Decision, rec.Error = selfCheckDeliveryFailed, delivery.Error()
+		}
+		c.record(rec)
 	}
-	c.record(decision, findings)
-	if decision != selfCheckReturn {
-		return ""
-	}
-	return selfCheckFindingsMessage(findings)
+	return selfCheckFindingsMessage(findings), report
 }
 
-func (c builderSelfCheck) record(decision string, findings []string) {
-	rec := selfCheckFindings{Cycle: c.in.Cycle, Stage: c.stage.String(), Decision: decision, Findings: findings}
+func (c builderSelfCheck) record(rec selfCheckFindings) {
+	rec.Cycle, rec.Stage = c.in.Cycle, c.stage.String()
 	if err := atomicwrite.JSON(filepath.Join(c.in.Workspace, BuilderSelfCheckFindingsFile), rec); err != nil {
 		fmt.Fprintf(c.errOut, "[builder-selfcheck] WARN findings record not written: %v\n", err)
 	}
 	c.signals.Emit(signalcenter.Event{
 		Cycle: c.in.Cycle, RunID: c.runID, Phase: string(PhaseBuild),
-		Module: signalcenter.ModuleBuild, Origin: "builderSelfCheck.beforeClose", Kind: signalcenter.KindPhaseOutcome,
+		Module: signalcenter.ModuleBuild, Origin: "builderSelfCheck.record", Kind: signalcenter.KindPhaseOutcome,
 		Severity: signalcenter.SeverityWarn, Code: CodeBuilderSelfCheck,
-		Reason: fmt.Sprintf("build handoff floor before close (%s): %s, %d finding(s)", rec.Stage, decision, len(findings)),
-		Fields: map[string]string{"stage": rec.Stage, "decision": decision, "findings": strconv.Itoa(len(findings))},
+		Reason: fmt.Sprintf("build handoff floor before close (%s, %s): %s, %d finding(s)", rec.Stage, rec.Source, rec.Decision, len(rec.Findings)),
+		Fields: map[string]string{
+			"stage": rec.Stage, "source": rec.Source, "decision": rec.Decision, "receipt": rec.Receipt,
+			"error": rec.Error, "findings": strconv.Itoa(len(rec.Findings)),
+		},
 	})
 }
 

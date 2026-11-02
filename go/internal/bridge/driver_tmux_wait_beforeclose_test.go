@@ -66,19 +66,41 @@ func idleFrames(n int) []string {
 	return frames
 }
 
-func runBeforeCloseREPL(t *testing.T, ctx context.Context, tm *sessionAgentTmux, check core.CloseCheck) (int, *atomic.Int32, string) {
+type closeCheckProbe struct {
+	calls    atomic.Int32
+	reports  []error
+	findings string
+	block    chan struct{}
+	onReport func()
+}
+
+func (p *closeCheckProbe) check(context.Context) (string, func(error)) {
+	p.calls.Add(1)
+	if p.block != nil {
+		<-p.block
+	}
+	if p.findings == "" {
+		return "", nil
+	}
+	return p.findings, func(err error) {
+		p.reports = append(p.reports, err)
+		if p.onReport != nil {
+			p.onReport()
+		}
+	}
+}
+
+func findingsProbe() *closeCheckProbe { return &closeCheckProbe{findings: floorFindingsFixture} }
+
+func runBeforeCloseREPL(t *testing.T, ctx context.Context, tm *sessionAgentTmux, probe *closeCheckProbe) (int, string) {
 	t.Helper()
 	cfg := fixtureConfig(t)
 	tm.artifact = cfg.Artifact
-	calls := &atomic.Int32{}
 	var stderr bytes.Buffer
 	deps := fixtureDeps(tm)
 	deps.Stderr = &stderr
-	if check != nil {
-		deps.beforeClose = func(ctx context.Context) string {
-			calls.Add(1)
-			return check(ctx)
-		}
+	if probe != nil {
+		deps.beforeClose = probe.check
 	}
 	code, err := runTmuxREPL(ctx, cfg, deps, tmuxLaunch{
 		name: "claude-tmux", session: "fixture-before-close", launchCmd: "claude", promptMarker: "❯", bootIntervalS: 1,
@@ -86,25 +108,27 @@ func runBeforeCloseREPL(t *testing.T, ctx context.Context, tm *sessionAgentTmux,
 	if err != nil {
 		t.Fatalf("runTmuxREPL error: %v", err)
 	}
-	return code, calls, stderr.String()
+	return code, stderr.String()
 }
-
-func returnFindings(context.Context) string { return floorFindingsFixture }
 
 func TestRunTmuxREPL_TheFloorFindingsEnterTheLiveSessionOnceBeforeItCloses(t *testing.T) {
 	t.Parallel()
 	tm := &sessionAgentTmux{FakeTmuxController: &FakeTmuxController{CaptureFrames: idleFrames(60)}}
+	probe := findingsProbe()
 
-	code, calls, stderr := runBeforeCloseREPL(t, context.Background(), tm, returnFindings)
+	code, stderr := runBeforeCloseREPL(t, context.Background(), tm, probe)
 
 	if code != ExitOK {
 		t.Fatalf("exit = %d, want ExitOK; stderr=%s", code, stderr)
 	}
-	if calls.Load() != 1 {
-		t.Fatalf("the check ran %d times, want once per session", calls.Load())
+	if probe.calls.Load() != 1 {
+		t.Fatalf("the check ran %d times, want once per session", probe.calls.Load())
 	}
 	if len(tm.pasted) != 2 || tm.pasted[1] != floorFindingsFixture {
 		t.Fatalf("pastes = %q; want the prompt, then exactly the floor findings", tm.pasted)
+	}
+	if len(probe.reports) != 1 || probe.reports[0] != nil {
+		t.Fatalf("reports = %v; want one report of a delivered paste", probe.reports)
 	}
 	if tm.writes != 2 || strings.Contains(stderr, "did not write") || !strings.Contains(stderr, "returned the handoff floor findings") {
 		t.Errorf("writes %d; the session must complete on the write that follows the findings:\n%s", tm.writes, stderr)
@@ -114,11 +138,12 @@ func TestRunTmuxREPL_TheFloorFindingsEnterTheLiveSessionOnceBeforeItCloses(t *te
 func TestRunTmuxREPL_NoFindingsClosesTheSessionAsToday(t *testing.T) {
 	t.Parallel()
 	tm := &sessionAgentTmux{FakeTmuxController: &FakeTmuxController{CaptureFrames: idleFrames(60)}}
+	probe := &closeCheckProbe{}
 
-	code, calls, _ := runBeforeCloseREPL(t, context.Background(), tm, func(context.Context) string { return "" })
+	code, _ := runBeforeCloseREPL(t, context.Background(), tm, probe)
 
-	if code != ExitOK || calls.Load() != 1 || len(tm.pasted) != 1 {
-		t.Fatalf("exit %d, check calls %d, pastes %d; want ExitOK, one check, only the prompt paste", code, calls.Load(), len(tm.pasted))
+	if code != ExitOK || probe.calls.Load() != 1 || len(tm.pasted) != 1 {
+		t.Fatalf("exit %d, check calls %d, pastes %d; want ExitOK, one check, only the prompt paste", code, probe.calls.Load(), len(tm.pasted))
 	}
 }
 
@@ -126,32 +151,54 @@ func TestRunTmuxREPL_WithNoCheckTheSessionClosesAsToday(t *testing.T) {
 	t.Parallel()
 	tm := &sessionAgentTmux{FakeTmuxController: &FakeTmuxController{CaptureFrames: idleFrames(60)}}
 
-	code, _, _ := runBeforeCloseREPL(t, context.Background(), tm, nil)
+	code, _ := runBeforeCloseREPL(t, context.Background(), tm, nil)
 
 	if code != ExitOK || len(tm.pasted) != 1 {
 		t.Fatalf("exit %d, pastes %d; want ExitOK and only the prompt paste", code, len(tm.pasted))
 	}
 }
 
-func TestRunTmuxREPL_AFailedDeliveryClosesTheSessionAsToday(t *testing.T) {
+func TestRunTmuxREPL_AFailedDeliveryIsReportedAndClosesTheSessionAsToday(t *testing.T) {
 	t.Parallel()
 	tm := &sessionAgentTmux{FakeTmuxController: &FakeTmuxController{CaptureFrames: idleFrames(60)}, pasteErrAt: 2}
+	probe := findingsProbe()
 
-	code, calls, stderr := runBeforeCloseREPL(t, context.Background(), tm, returnFindings)
+	code, stderr := runBeforeCloseREPL(t, context.Background(), tm, probe)
 
-	if code != ExitOK || calls.Load() != 1 || tm.writes != 1 || !strings.Contains(stderr, "did not enter the live session") {
-		t.Fatalf("exit %d, check calls %d, writes %d; a delivery that cannot enter the session must complete with the first deliverable:\n%s", code, calls.Load(), tm.writes, stderr)
+	if code != ExitOK || probe.calls.Load() != 1 || tm.writes != 1 || !strings.Contains(stderr, "did not enter the live session") {
+		t.Fatalf("exit %d, check calls %d, writes %d; a delivery that cannot enter the session must complete with the first deliverable:\n%s", code, probe.calls.Load(), tm.writes, stderr)
+	}
+	if len(probe.reports) != 1 || probe.reports[0] == nil || !strings.Contains(probe.reports[0].Error(), "paste refused") {
+		t.Fatalf("reports = %v; want one report that carries the paste error", probe.reports)
+	}
+}
+
+func TestRunTmuxREPL_AFloorPastTheWaitDeadlineDeliversNothing(t *testing.T) {
+	t.Parallel()
+	tm := &sessionAgentTmux{FakeTmuxController: &FakeTmuxController{CaptureFrames: idleFrames(60)}}
+	probe := findingsProbe()
+	probe.block = make(chan struct{})
+	t.Cleanup(func() { close(probe.block) })
+
+	code, stderr := runBeforeCloseREPL(t, context.Background(), tm, probe)
+
+	if code != ExitOK || len(tm.pasted) != 1 || len(probe.reports) != 0 {
+		t.Fatalf("exit %d, pastes %d, reports %d; a floor past its deadline must deliver nothing and close as today", code, len(tm.pasted), len(probe.reports))
+	}
+	if !strings.Contains(stderr, "WARN: the handoff floor before close passed its deadline of 1s") {
+		t.Errorf("stderr must WARN with the deadline and the elapsed time:\n%s", stderr)
 	}
 }
 
 func TestRunTmuxREPL_ASessionThatNeverRewritesAfterTheFindingsKeepsItsFirstDeliverable(t *testing.T) {
 	t.Parallel()
 	tm := &sessionAgentTmux{FakeTmuxController: &FakeTmuxController{CaptureFrames: idleFrames(200)}, rewritesOff: true}
+	probe := findingsProbe()
 
-	code, calls, stderr := runBeforeCloseREPL(t, context.Background(), tm, returnFindings)
+	code, stderr := runBeforeCloseREPL(t, context.Background(), tm, probe)
 
-	if code != ExitOK || calls.Load() != 1 || len(tm.pasted) != 2 || !strings.Contains(stderr, "the first deliverable stands") {
-		t.Fatalf("exit %d, check calls %d, pastes %d; the returned findings must never turn a complete session into a timeout:\n%s", code, calls.Load(), len(tm.pasted), stderr)
+	if code != ExitOK || probe.calls.Load() != 1 || len(tm.pasted) != 2 || !strings.Contains(stderr, "the first deliverable stands") {
+		t.Fatalf("exit %d, check calls %d, pastes %d; the returned findings must never turn a complete session into a timeout:\n%s", code, probe.calls.Load(), len(tm.pasted), stderr)
 	}
 	if !strings.Contains(strings.Join(tm.SentKeys, "\n"), tm.artifact) {
 		t.Errorf("the idle session must get the nudge to write the deliverable again: sent %q", tm.SentKeys)
@@ -163,14 +210,13 @@ func TestRunTmuxREPL_ACancelledWaitAfterTheFindingsIsNotASuccess(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	tm := &sessionAgentTmux{FakeTmuxController: &FakeTmuxController{CaptureFrames: idleFrames(200)}, rewritesOff: true}
+	probe := findingsProbe()
+	probe.onReport = cancel
 
-	code, calls, stderr := runBeforeCloseREPL(t, ctx, tm, func(ctx context.Context) string {
-		cancel()
-		return floorFindingsFixture
-	})
+	code, stderr := runBeforeCloseREPL(t, ctx, tm, probe)
 
-	if code == ExitOK || calls.Load() != 1 || strings.Contains(stderr, "the first deliverable stands") {
-		t.Fatalf("exit %d, check calls %d; a cancelled wait must not report the held deliverable as a success:\n%s", code, calls.Load(), stderr)
+	if code == ExitOK || probe.calls.Load() != 1 || strings.Contains(stderr, "the first deliverable stands") {
+		t.Fatalf("exit %d, check calls %d; a cancelled wait must not report the held deliverable as a success:\n%s", code, probe.calls.Load(), stderr)
 	}
 }
 
@@ -179,16 +225,12 @@ func TestRunAttempt_TheRequestCheckReachesTheSessionWait(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	tm := &sessionAgentTmux{FakeTmuxController: &FakeTmuxController{CaptureFrames: idleFrames(200)}, artifact: fx.artifact}
 	eng := newTestEngine(Deps{Tmux: tm, Sleep: func(time.Duration) {}, ArtifactTimeoutS: 1, RecoveryStage: "off"})
-	calls := &atomic.Int32{}
-	req := core.BridgeRequest{BeforeClose: func(context.Context) string {
-		calls.Add(1)
-		return ""
-	}}
+	probe := &closeCheckProbe{}
 
-	run := eng.runAttempt(context.Background(), req, fx.args("claude-tmux", "--allow-bypass"))
+	run := eng.runAttempt(context.Background(), core.BridgeRequest{BeforeClose: probe.check}, fx.args("claude-tmux", "--allow-bypass"))
 
-	if run.code != ExitOK || calls.Load() != 1 {
-		t.Fatalf("exit %d, check calls %d; the check of the request must run once in the session wait:\n%s", run.code, calls.Load(), run.stderr)
+	if run.code != ExitOK || probe.calls.Load() != 1 {
+		t.Fatalf("exit %d, check calls %d; the check of the request must run once in the session wait:\n%s", run.code, probe.calls.Load(), run.stderr)
 	}
 }
 

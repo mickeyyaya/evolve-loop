@@ -180,7 +180,7 @@ const (
 	CompletionWorktreeEvidence CompletionContract = "worktree-evidence"
 )
 
-type CloseCheck func(ctx context.Context) string
+type CloseCheck func(ctx context.Context) (findings string, report func(delivery error))
 
 type BridgeRequest struct {
 	CLI                 string             `json:"cli"`

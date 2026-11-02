@@ -18,6 +18,7 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 		salvageRetried := false
 		var prevBlockIdentity contractBlockIdentity
 		rr := cr.reviewDeliverable(next, rin, contractDispatch{driver: baseDriver})
+		cr.recordShadowSelfCheck(next, rin, rr)
 		maxCorrections := cr.correctionLimitFor(next, cr.retryConfig.ContractCorrectionRetries)
 		irec := interaction.NewRecorder(cr.cs.WorkspacePath)
 		decisionID := ""
