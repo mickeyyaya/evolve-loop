@@ -288,6 +288,9 @@ func TestWatch_ASlowSourceTimesOutWithoutBlockingTheRest(t *testing.T) {
 	if report.Results[0].Status != StatusError || report.Results[1].Status != StatusRecorded {
 		t.Errorf("results = %+v", report.Results)
 	}
+	if !strings.Contains(report.Results[0].Detail, "deadline") {
+		t.Errorf("detail = %q, want the deadline text", report.Results[0].Detail)
+	}
 	if time.Since(begun) > 1500*time.Millisecond {
 		t.Errorf("the watch waited %s for a source whose timeout is 100ms", time.Since(begun))
 	}

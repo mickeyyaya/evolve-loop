@@ -332,6 +332,7 @@ func TestFetchHTTP_CutsABodyPastTheLimitAndFlagsIt(t *testing.T) {
 func TestWatch_AnOversizedBodyIsRecordedWithATruncationNote(t *testing.T) {
 	srv := oversizedServer(t)
 	opts := optionsFor(t.TempDir(), fileSource("cc", srv.URL))
+	opts.Timeout = 60 * time.Second
 
 	first := only(t, Watch(context.Background(), opts))
 	second := only(t, Watch(context.Background(), opts))
