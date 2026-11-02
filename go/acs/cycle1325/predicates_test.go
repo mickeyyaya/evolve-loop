@@ -72,23 +72,27 @@ func TestRegister_BareCLI_PersistsResolvedDriverName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Register(bare claude): %v", err)
 	}
-	want := bridge.DriverFor("claude")
+	resolved, err := bridge.Resolve(bridge.DefaultDriverSet(), "claude")
+	if err != nil {
+		t.Fatalf("bridge.Resolve(claude): %v", err)
+	}
+	want := resolved.Driver
 	if want != "claude-tmux" {
-		t.Fatalf("test assumption broken: bridge.DriverFor(\"claude\")=%q, want claude-tmux", want)
+		t.Fatalf("test assumption broken: bridge.Resolve(claude).Driver=%q, want claude-tmux", want)
 	}
 	if res.Spec.Name == "" {
 		t.Fatal("Register returned an empty spec")
 	}
 	got := persistedProfileCLI(t, r.ProfilesDir, "minted-driver-probe")
 	if got != want {
-		t.Errorf("persisted profile cli=%q, want %q (bridge.DriverFor projection) — a bare family name reached disk unresolved", got, want)
+		t.Errorf("persisted profile cli=%q, want %q (bridge.Resolve projection) — a bare family name reached disk unresolved", got, want)
 	}
 }
 
 func TestRegister_UnresolvableCLI_RejectedNotPersisted(t *testing.T) {
 	r := newTestRegistrar(t)
 	const bogus = "not-a-real-cli-family"
-	if _, ok := bridge.LookupDriver(bridge.DriverFor(bogus)); ok {
+	if _, err := bridge.Resolve(bridge.DefaultDriverSet(), bogus); err == nil {
 		t.Fatalf("test assumption broken: %q unexpectedly resolves to a registered driver", bogus)
 	}
 
