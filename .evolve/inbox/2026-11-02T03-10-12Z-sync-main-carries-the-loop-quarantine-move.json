@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Red test first: sync-main on a tree whose only change is a loop quarantine move (tracked inbox item deleted, the same id under .evolve/inbox/quarantine/ untracked, the content equal apart from the loop's stamps) does not refuse, and main records the move.",
+    "Any other deletion or edit of a tracked inbox item still refuses.",
+    "Docs in STE: the sync-main section of the boundary docs records the rule."
+  ],
+  "created_at": "2026-11-02T03:12:00Z",
+  "deps": [],
+  "files": [
+    "go/cmd/evolve/cmd_syncmain.go"
+  ],
+  "fix": "sync-main tolerates the loop's inbox stamps but treats the loop's own quarantine move as a foreign change, so the boundary stops at step 4 with the brake on until the console publishes the move by hand (PR #1234). Classify a quarantine move like a stamp: commit or carry the move as loop-owned inbox state, the same way consumed items are carried.",
+  "id": "sync-main-carries-the-loop-quarantine-move",
+  "kind": "pipeline-repair",
+  "notes": "Console route: boundary sync. Seen 2026-11-02 at the wave-148 boundary (landing-plans-reconcile-with-adr-0147).",
+  "origin": "console",
+  "priority": "P1",
+  "priority_class": "stability",
+  "route": "console",
+  "source": "console, 2026-11-02, wave-148 boundary stopped at sync-main",
+  "summary": "A loop quarantine move of an inbox item makes evolve sync-main refuse, which stops the whole boundary and keeps the brake on.",
+  "title": "sync-main carries the loop's own inbox quarantine move instead of stopping the boundary",
+  "weight": 0.7
+}

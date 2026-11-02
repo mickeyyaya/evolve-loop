@@ -1,0 +1,38 @@
+{
+  "acceptance": [
+    "Red test first: a build rejected after its last correction with only a cover-changed residual (named function, file:line) reaches audit, and at audit_fix enforce the auditfix handler receives one prescribed finding per residual.",
+    "A residual with any logic failure (a red test, a failing predicate, a scope breach) still aborts as today.",
+    "At shadow the decision is recorded as LADDER_AUDIT_FIX would with the floor-residual source, and the flow of today runs.",
+    "ADR-0158 and retry-ladder.md carry the amendment, STE lint 0.",
+    "Measured over one shadow wave: the count of cycles whose only FAIL cause was a floor residual."
+  ],
+  "consumed": {
+    "at": "2026-11-02T15:38:17Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "built from the console in PR #1236 (ADR-0158 retry approach)"
+  },
+  "created_at": "2026-11-02T05:00:00Z",
+  "deps": [
+    "wire-cost-aware-repair-call-sites",
+    "builder-selfcheck-before-close"
+  ],
+  "files": [
+    "go/internal/core/correction_exhaustion.go",
+    "go/internal/retryladder",
+    "docs/architecture/retry-ladder.md",
+    "docs/architecture/adr/0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md"
+  ],
+  "fix": "When the build review rejects after its last correction and every residual is a deterministic floor finding with a concrete prescription (the floor names the path and the missing item: an uncovered function, an unexplained Changed Areas path), seal the build as a floor residual and hand it to the audit phase with the residuals as prescribed findings, so retryladder.ChooseAuditFix and the auditfix handler run (patch in the auditor's session, fresh-seat review, floor rerun, one escalation, then handed-off). Logic failures (tests red, predicates, scope) still abort. Amend ADR-0158 decision 7 and retry-ladder.md section 5 with an 'Amended by' note; stage key under workflow.retry_ladder.audit_fix, shadow first.",
+  "id": "build-floor-residual-goes-to-audit-fix",
+  "kind": "pipeline-repair",
+  "notes": "Console route: fence paths. Replaces the draft 'changed-areas-omission-gets-a-targeted-reauthor' (an extra builder correction round), which duplicated the ADR-0158 design; its unmerged draft sits in dev/cl-changed-areas (branch fix/changed-areas-omission-reauthor, uncommitted) and is not to be merged.",
+  "origin": "console",
+  "priority": "P1",
+  "priority_class": "stability",
+  "route": "console",
+  "source": "console, 2026-11-02, wave 148 cycle 2093 (and 2076)",
+  "summary": "ADR-0158 designs: the build retries once, then the auditor applies a small prescribed fix in its loaded session and a fresh seat of another family reviews only the patch. As specified, audit_fix triggers only after an audit FAIL; a build whose handoff floor still fails after its one correction aborts at the build review gate (cycleRun.rejectAfterCorrections) and never reaches the auditor. In cycles 2040-2096 at least 10 of 24 FAILs were such deterministic floor residuals: coverage of changed functions (2092, 2095), Changed Areas omissions (2076, 2093), the cycle's own tests.",
+  "title": "A build that still fails its handoff floor after its one retry goes to the audit_fix rung instead of an abort (ADR-0158)",
+  "weight": 0.8
+}

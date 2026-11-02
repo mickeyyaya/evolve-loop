@@ -1,0 +1,16 @@
+{
+  "acceptance": [
+    "TestC2066_004 and TestC2066_005 are reconciled with the C12 rule order, by a supersession of the two cycle-2066 assertions or new fixture timings for them (audit defect H1)"
+  ],
+  "created_at": "2026-11-02T06:51:44Z",
+  "fix": "Make the change that AC 6 needs on the protected path(s) go/acs/cycle2066/predicates_test.go, then prove the criterion with a test.",
+  "id": "ci-wall-time-c12-telemetry-report-fixes-ac-6-console",
+  "kind": "bug",
+  "origin": "cycle",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "source": "cycle 2100, tdd test-report.md AC 6 (console-followup)",
+  "summary": "The TDD phase of cycle 2100 gave AC 6 of ci-wall-time-c12-telemetry-report-fixes the console-followup disposition. A lane builder can never change the paths it needs (go/acs/cycle2066/predicates_test.go). The lane part ships without it, so the console owns this part.",
+  "title": "Console part of ci-wall-time-c12-telemetry-report-fixes: AC 6, which needs a protected path changed",
+  "weight": 0.4
+}

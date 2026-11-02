@@ -1,0 +1,31 @@
+{
+  "acceptance": [
+    "Red test first: an auth_recheck (or credential-wall) bench on a family clears when a bridge probe of that family succeeds (doctor live, the usage probe, or a phase launch that reaches the REPL), and the clear is recorded as a signal.",
+    "A failed probe keeps the bench.",
+    "Docs in STE: the clihealth package note records which successes clear which bench reasons."
+  ],
+  "consumed": {
+    "at": "2026-11-02T15:38:17Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "built from the console in PR #1238"
+  },
+  "created_at": "2026-11-02T11:10:00Z",
+  "deps": [],
+  "files": [
+    "go/internal/clihealth",
+    "go/internal/bridgechain"
+  ],
+  "fix": "2026-11-02: the claude CLI lost its login twice (waves 147 and 149). After the operator re-logged in, the claude family kept an auth_recheck bench until 22:47+08 although `evolve doctor live claude-tmux` answered LIVE OK (served claude-opus-5-5). The bench orders claude last, so lanes walked into the exhausted agy pools and paused on quota. The loop log also showed 'credential wall on the cli-health bench ... the bench clears itself once a probe succeeds', but no successful probe cleared it; the console had to run `evolve clihealth clear claude`. A successful probe of the family must clear its auth bench.",
+  "id": "a-successful-probe-clears-the-auth-bench",
+  "kind": "pipeline-repair",
+  "notes": "Console route: cli health and routing.",
+  "origin": "console",
+  "priority": "P1",
+  "priority_class": "stability",
+  "route": "console",
+  "source": "console, 2026-11-02, wave 149 quota pauses after the second re-login",
+  "summary": "An auth_recheck bench stays after the operator logs in again and a probe succeeds, so lanes walk to exhausted families until the console clears the bench by hand.",
+  "title": "A successful probe clears the auth bench of its family",
+  "weight": 0.75
+}
