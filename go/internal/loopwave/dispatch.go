@@ -63,19 +63,27 @@ type Outcome struct {
 
 type planObserver func(wave, count int, cfg policy.OrchestratorConfig, todos []fleet.Todo, specs []fleet.CycleSpec) func()
 
+func planLanes(ctx context.Context, req DispatchRequest, count int) ([]fleet.Todo, []fleet.CycleSpec, error) {
+	decisionJSON, cardPackages, err := req.Plan(ctx, req.Wave)
+	if err != nil {
+		return nil, nil, &StepError{Wave: req.Wave, Step: StepPlan, Err: err}
+	}
+	todos, _, err := fleet.TodosFromTriage(decisionJSON, cardPackages, req.Routed)
+	if err != nil {
+		return nil, nil, &StepError{Wave: req.Wave, Step: StepAdapt, Err: err}
+	}
+	specs, _ := fleet.PlanCycles(todos, count)
+	return todos, specs, nil
+}
+
 func dispatch(ctx context.Context, req DispatchRequest, count int, observe planObserver) (Outcome, error) {
 	if err := req.Preflight(); err != nil {
 		return Outcome{}, &StepError{Wave: req.Wave, Step: StepPreflight, Err: err}
 	}
-	decisionJSON, cardPackages, err := req.Plan(ctx, req.Wave)
+	todos, specs, err := planLanes(ctx, req, count)
 	if err != nil {
-		return Outcome{}, &StepError{Wave: req.Wave, Step: StepPlan, Err: err}
+		return Outcome{}, err
 	}
-	todos, _, err := fleet.TodosFromTriage(decisionJSON, cardPackages, req.Routed)
-	if err != nil {
-		return Outcome{}, &StepError{Wave: req.Wave, Step: StepAdapt, Err: err}
-	}
-	specs, _ := fleet.PlanCycles(todos, count)
 	if len(specs) == 0 {
 		return Outcome{}, nil
 	}

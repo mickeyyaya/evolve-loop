@@ -12,9 +12,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
-func (e *Engine) PlanFn(count int) PlanFn {
+func (e *Engine) PlanFn(count int) PlanFn { return e.planFn(count, true) }
+
+func (e *Engine) planFn(count int, release bool) PlanFn {
 	return func(ctx context.Context, wave int) ([]byte, []string, error) {
-		e.releaseStaleClaims(wave)
+		if release {
+			e.releaseStaleClaims(wave)
+		}
 		if lastCycle, err := e.ports.LastCycle(ctx); err == nil && lastCycle > 0 {
 			companion := filepath.Join(e.ports.Workspace(lastCycle), triagecap.TriageDecisionName())
 			if data, rerr := os.ReadFile(companion); rerr == nil {
