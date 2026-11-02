@@ -116,7 +116,18 @@ func EstimateAuditFix(findings, prescriptions []string) AuditFixEstimate {
 			spans[file] = AuditFixLinesPerUnspannedFile
 		}
 	}
-	est := EstimatePatch(spans)
+	return withUncited(EstimatePatch(spans), findings)
+}
+
+func EstimateAuditFixTargets(findings, targets []string) AuditFixEstimate {
+	spans := map[string]int{}
+	for _, target := range targets {
+		spans[target] = AuditFixLinesPerUnspannedFile
+	}
+	return withUncited(EstimatePatch(spans), findings)
+}
+
+func withUncited(est AuditFixEstimate, findings []string) AuditFixEstimate {
 	for _, finding := range findings {
 		if len(CitedPaths(finding)) == 0 {
 			est.Uncited++

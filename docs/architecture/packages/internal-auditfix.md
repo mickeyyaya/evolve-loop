@@ -34,6 +34,8 @@ The operator asked on 2026-10-27: "make sure audit will involve fix and trigger 
 
 Each outcome except `off` and `not_chosen` writes `audit-fix.json` in the run directory. The record has the stage, the outcome, the refusal, the failed reasons and the two seats. It also has each finding id with its prescription, the cited files, and the patch with the reason of each change. `ReadRecord` reads it.
 
+When the failure block has typed `Targets`, the cited files are those targets only. Otherwise the record reads the cited files from the text of the defects and the prescriptions. Pinned by `TestHandle_TypedTargetsAreTheOnlyCitedFiles`.
+
 ## Invariants
 
 - **The fixer seat never reviews.** `TestHandle_TheFixerSeatIsNeverTheReviewerSeat` gives the session of the auditor, and then no session, as the review seat. Each case declines before the auditor runs.

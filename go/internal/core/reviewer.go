@@ -24,6 +24,7 @@ type ReviewInput struct {
 	Protected      func(string) bool
 	Stderr         io.Writer
 	Signals        *signalcenter.Center
+	residuals      *floorResidualLog
 }
 
 func (in ReviewInput) errOut() io.Writer {
@@ -43,6 +44,7 @@ type ReviewResult struct {
 	DeliverableAbsent bool
 	Failures          []string
 	ProvenBlocker     string
+	Residuals         []FloorResidual
 }
 
 type DeliverableReviewer interface {

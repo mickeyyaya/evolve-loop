@@ -61,6 +61,7 @@ type CycleBinding struct {
 	Cycle           int
 	RunID           string
 	ContractVersion int
+	OnOmission      func(Omission)
 }
 
 type reportDeclaration struct {
@@ -385,7 +386,9 @@ func validateRequired(ctx context.Context, binding CycleBinding, changed, materi
 	if err != nil {
 		return failures, err
 	}
-	failures = append(failures, validateDocument(body, binding.Cycle, authoredBase(view), changed, material)...)
+	documented, omitted := documentFindings(body, binding.Cycle, authoredBase(view), changed, material)
+	failures = append(failures, documented...)
+	binding.reportOmissions(want, omitted)
 	if view.DocumentSHA256 != "" && view.DocumentSHA256 != sha {
 		failures = append(failures, FailurePrefix+"document SHA256 mismatch")
 	}
@@ -393,7 +396,7 @@ func validateRequired(ctx context.Context, binding CycleBinding, changed, materi
 	return failures, nil
 }
 
-func validateDocument(body string, cycle int, baseSHA string, changed, material []string) []string {
+func documentFindings(body string, cycle int, baseSHA string, changed, material []string) ([]string, []string) {
 	required := []struct {
 		heading  string
 		minBytes int
@@ -435,7 +438,8 @@ func validateDocument(body string, cycle int, baseSHA string, changed, material 
 			sections[requirement.heading] = section
 		}
 	}
-	return append(failures, changedAreaFailures(sections["Changed Areas"], changed, material)...)
+	areas, omitted := changedAreaFindings(sections["Changed Areas"], changed, material)
+	return append(failures, areas...), omitted
 }
 
 func readBuildReport(workspace string) (string, error) {

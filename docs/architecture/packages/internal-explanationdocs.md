@@ -13,6 +13,7 @@
 - `DocumentPath` is collision-resistant per run. A fresh clone's local cycle counter therefore cannot collide with a document that another installation published.
 - `checkBuildV1` and `verifyResolvedV1` read the base-bound diff one time. The diff hash folds the same path list that the check classified, so each check starts three fewer git processes.
 - `FailurePrefix` (`Explanation Documentation: `) starts each failure that the package returns. The failure class parser of `internal/core` counts the explanation failures of a floor reason with the same constant ([failure-identity-lifecycle.md §4](../failure-identity-lifecycle.md#4-failure-class-fingerprint)).
+- `CycleBinding.OnOmission` gets each Changed Areas omission as a typed `Omission`: the material path, the cycle document and the failure text. `validateRequired` calls it after the document check. A nil `OnOmission` changes nothing. The build floor of `internal/core` uses it to find a residual omission without a parse of the text (ADR-0158 addendum of 2026-11-02). Pinned by `TestCheckBuild_ReportsEachChangedAreasOmissionAsATypedFinding`.
 
 ## Invariants
 
