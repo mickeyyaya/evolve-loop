@@ -28,9 +28,69 @@ func TestClosesInboxIDs(t *testing.T) {
 			want: []string{"consumption-rides-landing-ship", "second-item"},
 		},
 		{
-			name: "marker is case insensitive, indented, and CRLF tolerant",
-			body: "  closes-inbox: indented-item\r\nCLOSES-INBOX: shouty-item\r\n",
-			want: []string{"indented-item", "shouty-item"},
+			name: "marker is case insensitive and CRLF tolerant",
+			body: "closes-inbox: lower-item\r\nCLOSES-INBOX: shouty-item\r\n",
+			want: []string{"lower-item", "shouty-item"},
+		},
+		{
+			name: "space-indented marker is quoted text, not a claim",
+			body: "  Closes-Inbox: indented-item\n",
+			want: nil,
+		},
+		{
+			name: "tab-indented marker is quoted text, not a claim",
+			body: "\tCloses-Inbox: tabbed-item\n",
+			want: nil,
+		},
+		{
+			name: "nested bullet marker is quoted text, not a claim",
+			body: "- parent\n  - Closes-Inbox: nested-item\n",
+			want: nil,
+		},
+		{
+			name: "marker inside a backtick fence is quoted text",
+			body: "```\nCloses-Inbox: fenced-item\n```\n",
+			want: nil,
+		},
+		{
+			name: "marker inside a tilde fence is quoted text",
+			body: "~~~text\nCloses-Inbox: tilde-item\n~~~\n",
+			want: nil,
+		},
+		{
+			name: "marker inside an unclosed fence stays quoted to the end",
+			body: "```\nCloses-Inbox: unclosed-item\n",
+			want: nil,
+		},
+		{
+			name: "fence closer must match the opener character",
+			body: "```\n~~~\nCloses-Inbox: still-fenced\n```\n",
+			want: nil,
+		},
+		{
+			name: "info-string fence opener still opens a fence",
+			body: "```markdown\n- Closes-Inbox: fenced-bullet\n```\n",
+			want: nil,
+		},
+		{
+			name: "column-zero marker after a closed fence is a claim",
+			body: "```\nCloses-Inbox: fenced-item\n```\nCloses-Inbox: real-item\n",
+			want: []string{"real-item"},
+		},
+		{
+			name: "column-zero marker before a fence is a claim",
+			body: "Closes-Inbox: real-item\n```\nCloses-Inbox: fenced-item\n```\n",
+			want: []string{"real-item"},
+		},
+		{
+			name: "column-zero bullet marker is still a claim",
+			body: "- Closes-Inbox: bullet-item\n* Closes-Inbox: star-item\n+ Closes-Inbox: plus-item\n",
+			want: []string{"bullet-item", "star-item", "plus-item"},
+		},
+		{
+			name: "blockquoted marker is quoted text",
+			body: "> Closes-Inbox: quoted-item\n",
+			want: nil,
 		},
 		{
 			name: "duplicates collapse, first-seen order preserved",

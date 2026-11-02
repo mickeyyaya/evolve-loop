@@ -297,7 +297,9 @@ approaches / decision / results / retro) — lives at
 | [research/practice-agy-cli-changelog-page-2026-10.md](research/practice-agy-cli-changelog-page-2026-10.md) | Research: the agy changelog page updates for v1.4.0 through v2.24.0 and the snapshot diff of search filter labels read as data. No persona changes before the M2 baseline. |
 | [research/practice-claude-model-release-notes-2026-10.md](research/practice-claude-model-release-notes-2026-10.md) | Research: the Claude model release notes updates for Opus 5.5 fast mode rate limits and research preview status read as data. No persona changes before the M2 baseline. |
 | [research/practice-claude-model-release-notes-2026-11.md](research/practice-claude-model-release-notes-2026-11.md) | Research: the Claude model release notes updates read as data. They cover the Opus 4.8 fast mode deprecation, the usage analytics API and the 128 MB request size. No persona changes before the M2 baseline. |
+| [research/practice-claude-prompting-guide-2026-11.md](research/practice-claude-prompting-guide-2026-11.md) | Research: the Claude prompting guide lines on aggressive capital wording read as data. A proposal for one-persona diets of the builder, the auditor and the scout under ADR-0133, with marker counts as the before measure. No persona changes before the M2 baseline. |
 | [research/practice-agy-cli-changelog-2026-11.md](research/practice-agy-cli-changelog-2026-11.md) | Research: the agy changelog updates for versions 1.4.3 through 1.4.12 read as data. No persona changes before the M2 baseline. |
+| [research/practice-agy-cli-changelog-page-2026-11.md](research/practice-agy-cli-changelog-page-2026-11.md) | Research: the agy changelog page releases v2.28.2 through v2.27.0 read as data. They belong to the desktop app tab, not the CLI. No persona changes before the M2 baseline. |
 
 ## 2026-10-13 — fleet landing at scale: 200 concurrent lanes (ADR-0134)
 
@@ -562,5 +564,11 @@ approaches / decision / results / retro) — lives at
 | Document | What it records |
 |---|---|
 | [research/ci-wall-variance-2026-11.md](research/ci-wall-variance-2026-11.md) | Research: the two macOS host classes, the CPU speed of each host and the wait type of each large test. It also gives the ranked causes and a ratchet on normalized package CPU. |
+
+## 2026-11-03 — the Claude Code changelog 2.1.316 read as data
+
+| Document | What it records |
+|---|---|
+| [research/claude-code-changelog-2.1.316-review.md](research/claude-code-changelog-2.1.316-review.md) | Research: the Claude Code changelog for version 2.1.316 read as untrusted data. No persona changes under ADR-0133 before the M2 baseline. |
 
 <!-- GENERATED:research-index END -->
