@@ -73,6 +73,7 @@ func explanationDocumentationFailures(ctx context.Context, in ReviewInput) []str
 		Cycle:           in.Cycle,
 		RunID:           in.RunID,
 		ContractVersion: in.ExplanationDocumentationVersion,
+		OnOmission:      in.residuals.noteOmission,
 	})
 }
 

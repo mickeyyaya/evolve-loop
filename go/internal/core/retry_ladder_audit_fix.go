@@ -56,9 +56,9 @@ func (o *Orchestrator) rungHandler(rung retryladder.Rung) (RungHandler, bool) {
 	return h, ok
 }
 
-func (cr *cycleRun) recordAuditFix(phase Phase, fb *phasecontract.FailureBlock) (string, retryladder.AuditFixChoice) {
+func (cr *cycleRun) recordAuditFix(phase Phase, fb *phasecontract.FailureBlock, source string) (string, retryladder.AuditFixChoice) {
 	cfg := cr.o.workflowConfig.RetryLadder
-	estimate := retryladder.EstimateAuditFix(fb.Defects, fb.Prescription)
+	estimate := auditFixEstimate(fb)
 	choice := retryladder.ChooseAuditFix(retryladder.AuditFixInput{
 		Findings: len(fb.Defects), Prescriptions: len(fb.Prescription), AllPrescribed: retryladder.AllPrescribed(fb.Defects, fb.Prescription),
 		Estimate: estimate, Used: cr.cs.Ladder != nil && cr.cs.Ladder.AuditFix != "",
@@ -80,7 +80,7 @@ func (cr *cycleRun) recordAuditFix(phase Phase, fb *phasecontract.FailureBlock) 
 		handler = "registered"
 	}
 	fields := map[string]string{
-		"stage": cfg.AuditFix.Stage, "audit_fix": mark, "audit_fix_rule": choice.Rule, "audit_fix_handler": handler,
+		"stage": cfg.AuditFix.Stage, "source": source, "audit_fix": mark, "audit_fix_rule": choice.Rule, "audit_fix_handler": handler,
 		"audit_fix_findings": strconv.Itoa(choice.Input.Findings), "audit_fix_prescriptions": strconv.Itoa(choice.Input.Prescriptions),
 		"audit_fix_files": strconv.Itoa(estimate.Files), "audit_fix_lines": strconv.Itoa(estimate.Lines),
 		"audit_fix_code_lines": strconv.Itoa(estimate.CodeLines), "audit_fix_tokens": strconv.Itoa(estimate.Tokens),
@@ -94,4 +94,11 @@ func (cr *cycleRun) recordAuditFix(phase Phase, fb *phasecontract.FailureBlock) 
 		return "", choice
 	}
 	return mark, choice
+}
+
+func auditFixEstimate(fb *phasecontract.FailureBlock) retryladder.AuditFixEstimate {
+	if len(fb.Targets) > 0 {
+		return retryladder.EstimateAuditFixTargets(fb.Defects, fb.Targets)
+	}
+	return retryladder.EstimateAuditFix(fb.Defects, fb.Prescription)
 }

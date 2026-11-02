@@ -45,6 +45,8 @@
 - **`PromptArtifactFilename`** has three readers: the bridge writes `<agent>-prompt.txt`, the audit's probe quarantine anchors on it, and the repair-round archiver retires it through `RoundArchiveFilename`.
 - **Roots and the token read.** `Roots.Worktree` is checked only for stray reports. It is never a write target. `ChallengeToken` trims the text of `challenge-token.txt`, and only a non-empty token counts.
 
+- **`FailureBlock.Targets`** is a host-only list of the files that an `audit_fix` patch can edit. Its JSON tag is `-`, so an agent sentinel cannot set it and a rendered block does not show it. The build floor residual source of `internal/core` fills it (ADR-0158 addendum of 2026-11-02).
+
 ## Invariants
 
 - **A decision file belongs to one launch (I-8, X8).** `FlowDecision.Clear` removes the file before a launch and fails closed. `Read` refuses a file older than the launch with `ErrFlowFileStale` at each stage (`TestFlowDecision_ReadRejectsAFileWrittenBeforeTheLaunchAtEveryStage`).

@@ -443,3 +443,17 @@ func TestHandle_SumsTheChangesOfOneFileAndKeepsNoIDFromProse(t *testing.T) {
 		t.Fatalf("refusal %q finding %q, want %q and no finding id from a prefix with a space", rec.Refusal, rec.Prescriptions[0].Finding, retryladder.AuditFixRuleLines)
 	}
 }
+
+func TestHandle_TypedTargetsAreTheOnlyCitedFiles(t *testing.T) {
+	ports := passingPorts(12, citedTest)
+	fb := smallFix(citedTest)
+	fb.Targets = []string{"docs/explain/builds/cycle-7-run.md"}
+	in := rungInput(t, fb)
+
+	if _, err := auditfix.New(auditfix.Config{Stage: policy.RetryLadderShadow}, ports.ports()).Handle(context.Background(), in); err != nil {
+		t.Fatal(err)
+	}
+	if rec := readRecord(t, in.Workspace); !slices.Equal(rec.Cited, fb.Targets) {
+		t.Fatalf("cited = %v, want only the typed targets %v", rec.Cited, fb.Targets)
+	}
+}

@@ -67,7 +67,9 @@ func coverChangedFunctionFailures(ctx context.Context, in ReviewInput, stage con
 		return nil
 	}
 	headline := fmt.Sprintf("%d of %d changed function(s) are below 100%% statement coverage (go test -tags integration -coverprofile); test each one", len(v.Refused), v.Changed)
-	return coverChangedReport(coverChangedResult(stage, headline, v.Problems()))
+	failures := coverChangedReport(coverChangedResult(stage, headline, v.Problems()))
+	in.residuals.add(coverResiduals(failures, v.Refused, moduleRepoPrefix(in.Worktree, moduleDir))...)
+	return failures
 }
 
 const coverStrictHeadline = "changed package(s) listed in go/.cover-strict are below their floor; test each uncovered block below, unless its note says a test cannot reach it"

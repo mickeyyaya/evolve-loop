@@ -276,10 +276,11 @@ func newRecord(in core.RungInput, stage string) Record {
 		}
 		prescriptions[i] = p
 	}
-	return Record{
-		Cycle: in.Cycle, Stage: stage, Prescriptions: prescriptions,
-		Cited: retryladder.CitedPaths(append(slices.Clone(fb.Defects), fb.Prescription...)...),
+	cited := slices.Clone(fb.Targets)
+	if len(cited) == 0 {
+		cited = retryladder.CitedPaths(append(slices.Clone(fb.Defects), fb.Prescription...)...)
 	}
+	return Record{Cycle: in.Cycle, Stage: stage, Prescriptions: prescriptions, Cited: cited}
 }
 
 func findingID(defect string) string {
