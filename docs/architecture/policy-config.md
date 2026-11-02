@@ -321,6 +321,14 @@ The block sets the stage of the build handoff floor before the build session clo
 |---|---|---|---|
 | `stage` | `0`, `off`, `shadow`, `enforce` | `shadow`: the wait runs no floor. When the review gate rejects the build on the floor and the build has no GREEN self-check receipt for its tree, the orchestrator writes `builder-selfcheck-findings.json`. It records `BUILD_SELFCHECK_FINDINGS` with `source: gate` and `decision: would_return_in_session`. `enforce`: the bridge runs the floor before the close and sends the findings into the live session one time. The record says `delivered` or `delivery_failed`. | `shadow` |
 
+## Supersede check (`workflow.supersede`)
+
+The block sets the stage of the check that finds that the console took the item of a live cycle ([ADR-0158](adr/0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md) decision 13, [internal-supersede](packages/internal-supersede.md)). The loader refuses an unknown stage and an unknown key with the key name. To get the default, leave the key out.
+
+| Key | Range | Meaning | Default |
+|---|---|---|---|
+| `stage` | `0`, `off`, `shadow`, `enforce` | `off` and `0` turn the check off. `shadow` records a supersede. `enforce` stops the cycle: it runs no more phases. | `shadow` |
+
 ## Documentation floors (`docs_floor`)
 
 The block sets the stages of the two documentation floors of the build handoff. The docs floor only WARNs. The STE floor fails the handoff at `ste_stage: enforce`. The loader decodes the block strictly. An unknown key, or a `stage` or `ste_stage` word that is not `0`, `off`, `shadow` or `enforce`, fails the load of the whole file. Thus a typo key in `docs_floor` stops every consumer of the policy, not only the two floors.
