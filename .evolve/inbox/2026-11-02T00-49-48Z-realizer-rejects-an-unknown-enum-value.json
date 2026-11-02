@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "Red test first: a profile whose settings_scope, permission_mode or another enum param holds a value its manifest does not define fails LoadProfile or the realizer with an error naming the value.",
+    "A launch never starts with an unknown enum value silently dropped.",
+    "Docs in STE: the bridge package note records the rule."
+  ],
+  "created_at": "2026-11-02T00:50:00Z",
+  "deps": [],
+  "files": [
+    "go/internal/bridge/realizer.go",
+    "go/internal/bridge/profile.go"
+  ],
+  "fix": "realizeScalar adds no flag and gives no error for a value absent from the param's values, so a typo such as settings_scope Project boots a clean-boot seat with the full user settings. Reject an unknown enum value at LoadProfile, or return an error from the realizer that fails the launch.",
+  "id": "realizer-rejects-an-unknown-enum-value",
+  "kind": "pipeline-repair",
+  "notes": "Console route: bridge launch path. Found by the adversarial review of PR #1231 (LOW, pre-existing).",
+  "origin": "console",
+  "priority": "P2",
+  "priority_class": "stability",
+  "route": "console",
+  "source": "console, 2026-11-02, adversarial review of PR #1231",
+  "summary": "An enum param value that the manifest does not define realizes no flags and no error; a profile typo silently drops the clean-boot settings scope.",
+  "title": "The realizer fails loudly on a manifest enum value it does not define",
+  "weight": 0.55
+}
