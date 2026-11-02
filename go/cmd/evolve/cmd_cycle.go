@@ -15,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
+	"github.com/mickeyyaya/evolve-loop/go/internal/auditfixports"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridgechain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
@@ -592,7 +593,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	opts = append(opts, core.WithHostEffects(hostEffects))
 	opts = append(opts, core.WithLaneMenu(laneMenuOf(forbidden, wfCfg.Repair.Fixability)))
 	opts = append(opts, core.WithProtectedSurface(protectedMembership))
-	opts = append(opts, core.WithRepairFixability(repairFixability(protectedMembership, os.Stderr)))
+	opts = append(opts, core.WithRepairFixability(repairFixability(protectedMembership, os.Stderr)), auditFixRung(auditFixSite{root: projectRoot, pol: pol, cfg: cfg, route: auditfixports.RouterRoute(cliRouter.Resolve, projectRoot), agent: runAgentCommand, stderr: os.Stderr}))
 	opts = append(opts, core.WithSignalCenter(signals))
 	opts = append(opts, core.WithRequestHandoff(requestHandoff(pol, runAgentCommand, signals.Emit, console)))
 

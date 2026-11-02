@@ -30,6 +30,7 @@ var (
 
 type fakePorts struct {
 	reviewSeat   auditfix.Seat
+	auditorErr   error
 	seatErr      error
 	snapErr      error
 	applyErr     error
@@ -44,6 +45,7 @@ type fakePorts struct {
 	fixes        []auditfix.FixRequest
 	reviews      []auditfix.ReviewRequest
 	gateRuns     []string
+	gateReq      auditfix.GateRequest
 	restoredFrom []string
 }
 
@@ -57,7 +59,7 @@ func passingPorts(lines int, path string) *fakePorts {
 	}
 }
 
-func (f *fakePorts) Seat() auditfix.Seat { return auditorSeat }
+func (f *fakePorts) Seat() (auditfix.Seat, error) { return auditorSeat, f.auditorErr }
 
 func (f *fakePorts) ApplyFix(_ context.Context, req auditfix.FixRequest) (map[string]string, error) {
 	f.fixes = append(f.fixes, req)
@@ -76,8 +78,8 @@ func (f *fakePorts) Review(_ context.Context, req auditfix.ReviewRequest) (audit
 	return f.review, f.reviewErr
 }
 
-func (f *fakePorts) Run(_ context.Context, worktree string) (auditfix.Verdict, error) {
-	f.gateRuns = append(f.gateRuns, worktree)
+func (f *fakePorts) Run(_ context.Context, req auditfix.GateRequest) (auditfix.Verdict, error) {
+	f.gateRuns, f.gateReq = append(f.gateRuns, req.Worktree), req
 	return f.gate, f.gateErr
 }
 
@@ -145,6 +147,9 @@ func TestHandle_AppliesACitedPatchAndAFreshSeatOfAnotherFamilyReviewsIt(t *testi
 
 	if err != nil || got != (core.RungResult{Handled: true, Reason: auditfix.ReasonPassed}) {
 		t.Fatalf("Handle = %+v, %v, want handled and passed", got, err)
+	}
+	if ports.fixes[0].Workspace != in.Workspace || ports.reviews[0].Workspace != in.Workspace || ports.gateReq != (auditfix.GateRequest{Cycle: 2035, Workspace: in.Workspace, Worktree: in.Worktree}) {
+		t.Fatalf("fix %+v review %+v gate %+v, want the run directory of the cycle at each port", ports.fixes[0], ports.reviews[0], ports.gateReq)
 	}
 	if len(ports.fixes) != 1 || ports.fixes[0].Worktree != in.Worktree || ports.fixes[0].Bounds != bounds() ||
 		!slices.Equal(ports.fixes[0].Cited, []string{citedTest}) || ports.fixes[0].Prescriptions[0].Finding != "H1" {
@@ -269,6 +274,7 @@ func TestHandle_AFailedReviewOrARedGateEscalatesOnceThenStops(t *testing.T) {
 				t.Fatalf("record %+v gates %d restores %d, want refusal %q with its reason", rec, len(ports.gateRuns), len(ports.restoredFrom), tc.refusal)
 			}
 
+			in.Choice = retryladder.AuditFixChoice{Rule: retryladder.AuditFixRuleUsed}
 			second, err := h.Handle(context.Background(), in)
 			if err != nil || second != (core.RungResult{Handled: true, Stop: true, Reason: auditfix.ReasonExhausted}) {
 				t.Fatalf("second Handle = %+v, %v, want a stop with %s", second, err, auditfix.ReasonExhausted)
@@ -329,6 +335,7 @@ func TestHandle_APortErrorIsLoudAndRestoresTheTree(t *testing.T) {
 		edit     func(*fakePorts)
 		restores int
 	}{
+		{"auditor seat", func(f *fakePorts) { f.auditorErr = errPort }, 0},
 		{"review seat", func(f *fakePorts) { f.seatErr = errPort }, 0},
 		{"snapshot", func(f *fakePorts) { f.snapErr = errPort }, 0},
 		{"apply", func(f *fakePorts) { f.applyErr = errPort }, 1},
@@ -434,5 +441,19 @@ func TestHandle_SumsTheChangesOfOneFileAndKeepsNoIDFromProse(t *testing.T) {
 	rec := readRecord(t, in.Workspace)
 	if rec.Refusal != retryladder.AuditFixRuleLines || rec.Prescriptions[0].Finding != "" {
 		t.Fatalf("refusal %q finding %q, want %q and no finding id from a prefix with a space", rec.Refusal, rec.Prescriptions[0].Finding, retryladder.AuditFixRuleLines)
+	}
+}
+
+func TestHandle_TypedTargetsAreTheOnlyCitedFiles(t *testing.T) {
+	ports := passingPorts(12, citedTest)
+	fb := smallFix(citedTest)
+	fb.Targets = []string{"docs/explain/builds/cycle-7-run.md"}
+	in := rungInput(t, fb)
+
+	if _, err := auditfix.New(auditfix.Config{Stage: policy.RetryLadderShadow}, ports.ports()).Handle(context.Background(), in); err != nil {
+		t.Fatal(err)
+	}
+	if rec := readRecord(t, in.Workspace); !slices.Equal(rec.Cited, fb.Targets) {
+		t.Fatalf("cited = %v, want only the typed targets %v", rec.Cited, fb.Targets)
 	}
 }

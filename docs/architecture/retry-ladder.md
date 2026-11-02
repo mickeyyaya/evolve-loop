@@ -149,14 +149,47 @@ The operator decided on 2026-10-27: "make sure audit will involve fix and trigge
 
 The handler is `internal/auditfix` ([package note](packages/internal-auditfix.md)). It uses two seats (ADR-0158 decisions 8 to 13):
 
-1. The auditor applies the patch in its loaded session, inside the cycle worktree. The patch changes only the cited files, inside the `audit_fix` bounds.
+1. A fixer seat applies the patch inside the cycle worktree. The patch changes only the cited files, inside the `audit_fix` bounds. The audit session cannot apply it, because it ended with its dispatch (see the wiring below).
 2. A fresh seat reviews only the patch and the prescriptions. Its session is never the session of the auditor. The routing picks another family when the chain has one, and a lower tier is allowed.
-3. The handoff floor, cover-changed and ACS run again on the patched tree. The original audit verdict stays the verdict for the rest of the diff.
-4. A pass lets the cycle go on to ship. A refused patch, a failed review or a red gate restores the tree. Then one escalation runs: a raised build with the L6 digest. A second failure stops the cycle with `audit_fix_exhausted`.
+3. The handoff floor, cover-changed and ACS run again on the patched tree.
+4. A pass sends the cycle to a second audit of the patched tree, and then to ship. No tdd or build round runs. A refused patch, a failed review or a red gate restores the tree. Then the repair round of today runs once. At `workflow.retry_ladder.stage` `enforce`, it starts with the raised build. A second failure stops the cycle with `audit_fix_exhausted`.
 5. A patch on a fence path joins the held proposal at `held_proposals` `enforce` (ADR-0157). At another stage, the handler refuses it.
 6. The handler writes `audit-fix.json` in the run directory. It has the patch, each finding id with its prescription, and the reason for each change.
 
-No production code registers the handler yet. The inbox item `wire-cost-aware-repair-call-sites` wires it, because the call sites are on the fence.
+The composition root registers the handler (`cmd/evolve/audit_fix_wiring.go`) with the ports of [internal/auditfixports](packages/internal-auditfixports.md). The stage is `workflow.retry_ladder.audit_fix.stage`, and the policy default stays `shadow`. `cycleRun.auditFixRound` (`go/internal/core/audit_fix_round.go`) runs after `decideAfterAuditFail` and maps the result of the handler:
+
+| Result | Next phase | Effect |
+|---|---|---|
+| `passed` or `held_proposal` | `audit`, through the decision-only edge `audit→audit` | The audit runs again on the patched tree. The ship gate binds the verdict of the last audit to its tree, so a FAIL verdict cannot ship the patch. No repair try is spent. |
+| `escalate` | the repair round of today | At `workflow.retry_ladder.stage` `enforce`, the first dispatch of the round is the raised build with the L6 digest. |
+| `audit_fix_exhausted` (a stop) | retro | The cycle seals `handed-off` with the salvage pointer of its worktree. |
+| `shadow`, `no_review_seat`, `not_chosen`, or a handler error | the branch of today | At `shadow`, the handler writes `audit-fix.json` and changes no file. |
+
+The wiring has three gaps against decisions 8 and 10 of ADR-0158:
+
+- The audit session is not resumable. Each phase dispatch is an ephemeral bridge session, and no phase profile names a session. So the fixer is a fresh `console-builder` seat of `evolve agent run` on the cycle worktree, with the audit report and the prescriptions as its input.
+- `evolve agent run` takes no family and no tier. The review port routes each candidate profile through `cliroute` and picks the first profile whose first family differs from the family of the fixer. When no candidate has another family, it gives no seat, and the repair round of today runs (plan §10, Q3). The tier is the tier of the routing of that profile, not always deep.
+- A resumed cycle does not run the round. `resumeAfterAudit` keeps the flow of today.
+
+### The build floor residual source
+
+> Amended by the [ADR-0158 addendum of 2026-11-02](adr/0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md#addendum-2026-11-02-the-build-floor-residual-source).
+
+A build whose handoff floor still fails after its last correction can also start the `audit_fix` round. Before, `cycleRun.rejectAfterCorrections` aborted such a build. Wave 148 aborted cycles 2092, 2093 and 2095 on floor findings that named the file and the missing item.
+
+`cycleRun.floorResidualAuditFix` (`go/internal/core/build_floor_residual.go`) runs only for the build phase. It reads `ReviewResult.Residuals`, the typed residuals of the last review:
+
+| Class | Source | Defect | Prescription |
+|---|---|---|---|
+| `cover_changed` | `coverChangedFunctionFailures` adds one residual for each refused function of `covchanged.Verdict.Refused` | `<file>:<line> <func> is below 100% statement coverage` | `add tests in <file stem>_test.go that cover <func> (<file>:<line>) to 100% statement coverage` |
+| `changed_areas` | `explanationdocs.CycleBinding.OnOmission` gives each `Omission` | `<document>: Changed Areas does not explain material path <path>` | `add a Changed Areas line for <path> in <document>` |
+
+- Each residual keeps the exact failure text that its check returned. The round runs only when each floor failure of the review has a residual. One other failure keeps the abort of today: a red test, a predicate, a scope breach, the size ratchet, cover-strict or apicover.
+- The residuals become one `phasecontract.FailureBlock` of class `build-floor-residual`, with one defect and one prescription for each residual. The evidence paths are the cited files.
+- The block also has typed `Targets`: the test file of each refused function, and the document of each omission. `EstimateAuditFixTargets` estimates only these files, and the handler lets the patch change only these files. A source file or an omitted path is not an edit target. So five omissions in one document are one file of 10 lines, inside the default bounds.
+- `cycleRun.runAuditFix` is the one call path of the handler for both sources. It records `LADDER_AUDIT_FIX` with `fields.source` (`audit` or `build_floor`) and asks the registered handler. The stage key is `workflow.retry_ladder.audit_fix.stage`.
+- A `passed` or `held_proposal` result delivers the build, and the cycle goes to the audit. A stop seals the cycle `handed-off` with `audit_fix_exhausted` and the salvage pointer. Each other result aborts the build as today. At `shadow`, the handler writes `audit-fix.json` and the build aborts.
+- The file paths of `covchanged` are relative to the Go module. The source adds the module directory, so each cited path is relative to the repository root.
 
 ### Limits of the L5 wiring
 

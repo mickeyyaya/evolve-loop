@@ -180,6 +180,8 @@ const (
 	CompletionWorktreeEvidence CompletionContract = "worktree-evidence"
 )
 
+type CloseCheck func(ctx context.Context) (findings string, report func(delivery error))
+
 type BridgeRequest struct {
 	CLI                 string             `json:"cli"`
 	Profile             string             `json:"profile"`
@@ -213,6 +215,7 @@ type BridgeRequest struct {
 	OperatorDirectives  string             `json:"operator_directives,omitempty"`
 	SessionName         string             `json:"session_name,omitempty"`
 	Ladder              *retryladder.Try   `json:"-"`
+	BeforeClose         CloseCheck         `json:"-"`
 }
 
 type BridgeResponse struct {

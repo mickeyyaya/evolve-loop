@@ -6,6 +6,10 @@ func (w replWaiter) closeout(state *replWaitState) (replWaitResult, int) {
 	if state.completed {
 		return state.result, ExitOK
 	}
+	if state.heldDeliverableStands() {
+		fmt.Fprintf(w.deps.Stderr, "%s the session did not write %s again after the returned findings (%s); the first deliverable stands and the review gate judges it\n", w.prefix, w.cfg.Artifact, waitEndOf(state))
+		return state.result, ExitOK
+	}
 
 	fmt.Fprintf(w.deps.Stderr, "%s FAIL: completion never signalled (artifact %s; %s)\n", w.prefix, w.cfg.Artifact, waitEndOf(state))
 	fmt.Fprintf(w.deps.Stderr, "%s diagnostic: files present under workspace %s:\n", w.prefix, w.cfg.Workspace)

@@ -38,6 +38,7 @@ const (
 )
 
 type Seat struct {
+	Profile string `json:"profile,omitempty"`
 	Family  string `json:"family"`
 	Tier    string `json:"tier"`
 	Session string `json:"session"`
@@ -67,6 +68,7 @@ type Verdict struct {
 
 type FixRequest struct {
 	Cycle         int
+	Workspace     string
 	Worktree      string
 	Prescriptions []Prescription
 	Cited         []string
@@ -74,13 +76,14 @@ type FixRequest struct {
 }
 
 type ReviewRequest struct {
+	Workspace     string
 	Seat          Seat
 	Patch         Patch
 	Prescriptions []Prescription
 }
 
 type Auditor interface {
-	Seat() Seat
+	Seat() (Seat, error)
 	ApplyFix(ctx context.Context, req FixRequest) (map[string]string, error)
 }
 
@@ -89,8 +92,14 @@ type Reviewer interface {
 	Review(ctx context.Context, req ReviewRequest) (Verdict, error)
 }
 
+type GateRequest struct {
+	Cycle     int
+	Workspace string
+	Worktree  string
+}
+
 type Gates interface {
-	Run(ctx context.Context, worktree string) (Verdict, error)
+	Run(ctx context.Context, req GateRequest) (Verdict, error)
 }
 
 type Worktree interface {
@@ -138,7 +147,7 @@ func New(cfg Config, ports Ports) *Handler {
 
 func (h *Handler) Handle(ctx context.Context, in core.RungInput) (core.RungResult, error) {
 	switch {
-	case in.Rung != retryladder.RungAuditFix || !in.Choice.Choose:
+	case in.Rung != retryladder.RungAuditFix:
 		return core.RungResult{Reason: ReasonNotChosen}, nil
 	case h.cfg.Stage == policy.AuditFixOff:
 		return core.RungResult{Reason: ReasonOff}, nil
@@ -151,6 +160,8 @@ func (h *Handler) Handle(ctx context.Context, in core.RungInput) (core.RungResul
 	switch {
 	case found && prior.Outcome == ReasonEscalate:
 		return finish(in.Workspace, rec, core.RungResult{Handled: true, Stop: true, Reason: ReasonExhausted})
+	case !in.Choice.Choose:
+		return core.RungResult{Reason: ReasonNotChosen}, nil
 	case h.cfg.Stage != policy.RetryLadderEnforce:
 		return finish(in.Workspace, rec, core.RungResult{Reason: ReasonShadow})
 	}
@@ -158,7 +169,11 @@ func (h *Handler) Handle(ctx context.Context, in core.RungInput) (core.RungResul
 }
 
 func (h *Handler) apply(ctx context.Context, in core.RungInput, rec Record) (core.RungResult, error) {
-	rec.Auditor = h.ports.Auditor.Seat()
+	auditor, err := h.ports.Auditor.Seat()
+	if err != nil {
+		return core.RungResult{}, fmt.Errorf("auditfix: auditor seat: %w", err)
+	}
+	rec.Auditor = auditor
 	seat, err := h.ports.Reviewer.ReviewSeat(ctx, rec.Auditor)
 	if err != nil {
 		return core.RungResult{}, fmt.Errorf("auditfix: review seat: %w", err)
@@ -183,7 +198,7 @@ func (h *Handler) apply(ctx context.Context, in core.RungInput, rec Record) (cor
 
 func (h *Handler) patch(ctx context.Context, in core.RungInput, rec Record, base string) (Patch, error) {
 	reasons, err := h.ports.Auditor.ApplyFix(ctx, FixRequest{
-		Cycle: in.Cycle, Worktree: in.Worktree, Prescriptions: rec.Prescriptions, Cited: rec.Cited, Bounds: in.Choice.Input.Bounds,
+		Cycle: in.Cycle, Workspace: in.Workspace, Worktree: in.Worktree, Prescriptions: rec.Prescriptions, Cited: rec.Cited, Bounds: in.Choice.Input.Bounds,
 	})
 	if err != nil {
 		return Patch{}, fmt.Errorf("auditfix: apply: %w", err)
@@ -200,7 +215,7 @@ func (h *Handler) patch(ctx context.Context, in core.RungInput, rec Record, base
 }
 
 func (h *Handler) judge(ctx context.Context, in core.RungInput, rec Record, base string) (core.RungResult, error) {
-	review, err := h.ports.Reviewer.Review(ctx, ReviewRequest{Seat: rec.Reviewer, Patch: rec.Patch, Prescriptions: rec.Prescriptions})
+	review, err := h.ports.Reviewer.Review(ctx, ReviewRequest{Workspace: in.Workspace, Seat: rec.Reviewer, Patch: rec.Patch, Prescriptions: rec.Prescriptions})
 	if err != nil {
 		return core.RungResult{}, errors.Join(fmt.Errorf("auditfix: review: %w", err), h.ports.Worktree.Restore(ctx, in.Worktree, base))
 	}
@@ -208,7 +223,7 @@ func (h *Handler) judge(ctx context.Context, in core.RungInput, rec Record, base
 		rec.Refusal = RefusalReview
 		return h.escalate(ctx, in, rec, base, review.Reasons)
 	}
-	gates, err := h.ports.Gates.Run(ctx, in.Worktree)
+	gates, err := h.ports.Gates.Run(ctx, GateRequest{Cycle: in.Cycle, Workspace: in.Workspace, Worktree: in.Worktree})
 	if err != nil {
 		return core.RungResult{}, errors.Join(fmt.Errorf("auditfix: gates: %w", err), h.ports.Worktree.Restore(ctx, in.Worktree, base))
 	}
@@ -261,10 +276,11 @@ func newRecord(in core.RungInput, stage string) Record {
 		}
 		prescriptions[i] = p
 	}
-	return Record{
-		Cycle: in.Cycle, Stage: stage, Prescriptions: prescriptions,
-		Cited: retryladder.CitedPaths(append(slices.Clone(fb.Defects), fb.Prescription...)...),
+	cited := slices.Clone(fb.Targets)
+	if len(cited) == 0 {
+		cited = retryladder.CitedPaths(append(slices.Clone(fb.Defects), fb.Prescription...)...)
 	}
+	return Record{Cycle: in.Cycle, Stage: stage, Prescriptions: prescriptions, Cited: cited}
 }
 
 func findingID(defect string) string {

@@ -243,11 +243,22 @@ func TestContractLadderAsk_CarriesTheRemedyBesideTheCheck(t *testing.T) {
 func TestWithRepairRound_StampsACopy(t *testing.T) {
 	t.Parallel()
 	prior := &LadderState{Rung: "R2", RepairRound: 1}
-	got := withRepairRound(prior, 2, "")
+	got := withRepairRound(prior, 2)
 	if got == prior || got.RepairRound != 2 || got.Rung != "R2" || prior.RepairRound != 1 {
 		t.Fatalf("withRepairRound = %+v, prior %+v: want a stamped copy", got, prior)
 	}
-	if fresh := withRepairRound(nil, 3, "would"); fresh.RepairRound != 3 || fresh.Rung != string(retryladder.R0) || fresh.AuditFix != "would" {
+	if fresh := withRepairRound(nil, 3); fresh.RepairRound != 3 || fresh.Rung != string(retryladder.R0) {
 		t.Fatalf("withRepairRound(nil) = %+v", fresh)
+	}
+}
+
+func TestWithAuditFix_StampsACopyAndKeepsAnEarlierMark(t *testing.T) {
+	t.Parallel()
+	prior := &LadderState{Rung: "R1", AuditFix: auditFixChosen}
+	if kept := withAuditFix(prior, ""); kept == prior || kept.AuditFix != auditFixChosen || kept.Rung != "R1" {
+		t.Fatalf("withAuditFix(prior, \"\") = %+v: want a copy that keeps the earlier mark", kept)
+	}
+	if fresh := withAuditFix(nil, auditFixWould); fresh.AuditFix != auditFixWould || fresh.Rung != string(retryladder.R0) {
+		t.Fatalf("withAuditFix(nil) = %+v", fresh)
 	}
 }

@@ -17,6 +17,7 @@ type FailureBlock struct {
 	Defects       []string `json:"defects,omitempty"`
 	EvidencePaths []string `json:"evidence_paths,omitempty"`
 	Prescription  []string `json:"prescription,omitempty"`
+	Targets       []string `json:"-"`
 }
 
 type VerdictSentinel struct {

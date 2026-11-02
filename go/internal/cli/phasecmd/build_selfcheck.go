@@ -30,7 +30,17 @@ func (s BuildSelfCheck) Verify(stderr io.Writer) (BuildSelfCheckResult, error) {
 	if err != nil {
 		return BuildSelfCheckResult{Result: res, Unbound: unbound}, err
 	}
-	return BuildSelfCheckResult{Result: s.withFloor(res, in, stderr), Unbound: unbound}, nil
+	checked := s.withFloor(res, in, stderr)
+	if unbound == nil {
+		writeSelfCheckReceipt(in, checked.OK, stderr)
+	}
+	return BuildSelfCheckResult{Result: checked, Unbound: unbound}, nil
+}
+
+func writeSelfCheckReceipt(in core.ReviewInput, green bool, stderr io.Writer) {
+	if err := core.WriteSelfCheckReceipt(context.Background(), in.Workspace, in.Worktree, green); err != nil {
+		fmt.Fprintf(stderr, "build self-check: WARN no self-check receipt (%v), so the build session gets the floor findings again before it closes\n", err)
+	}
 }
 
 func contractHalf(in core.ReviewInput, unbound error) (deliverable.Result, error) {

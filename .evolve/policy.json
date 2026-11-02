@@ -200,7 +200,13 @@
   },
   "workflow": {
     "retry_ladder": {
-      "stage": "shadow"
+      "stage": "shadow",
+      "audit_fix": {
+        "stage": "enforce"
+      }
+    },
+    "builder_selfcheck": {
+      "stage": "enforce"
     }
   }
 }
