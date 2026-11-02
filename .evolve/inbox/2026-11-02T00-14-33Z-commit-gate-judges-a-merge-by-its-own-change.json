@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "Red test first: a staged merge of origin/main into a branch whose own diff against main is only Markdown under docs/ passes with --reviewers docs-review.",
+    "Red test first: --files limits the review decision and the waiver check, not only the lane files.",
+    "A merge whose own diff against the first parent's merge base adds code still needs the code reviewers.",
+    "Docs in STE: the commitgate package note records the merge rule."
+  ],
+  "created_at": "2026-11-02T00:40:00Z",
+  "deps": [],
+  "files": [
+    "go/internal/commitgate"
+  ],
+  "fix": "changeListing ignores Options.Files, and the gate has no merge handling, so a merge of main counts each main file (for example the release binary go/evolve and .claude-plugin/marketplace.json) as new change. Route --files through changeListing. When MERGE_HEAD exists, judge the branch's own change: the diff of the merge result against the merge-in parent.",
+  "id": "commit-gate-judges-a-merge-by-its-own-change",
+  "kind": "pipeline-repair",
+  "notes": "Console route: commit gate. Seen on PR #1227 on 2026-11-02; the work-around was a fresh docs-only branch (#1230).",
+  "origin": "console",
+  "priority": "P2",
+  "priority_class": "stability",
+  "route": "console",
+  "source": "console, 2026-11-02, PR #1227 sync with main after v23.0.0",
+  "summary": "A merge of origin/main into a docs PR failed the commit gate: the gate read main's release files as new change and asked for code reviewers, and --files did not change the review decision.",
+  "title": "The commit gate judges a merge of main by the branch's own change, and --files reaches the review decision",
+  "weight": 0.6
+}

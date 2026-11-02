@@ -2,6 +2,7 @@
   "acceptance": [
     "Red test first: the rusage of runs 40582532714 (base) and 40611567029 passes, and 40526866678 fails on bridge.",
     "Report-only below 3 reference packages.",
+    "A PR that adds real work to a package passes when it raises that package's baseline in the same PR, and fails when it does not.",
     "CI steps use the CPU gate and no longer pass -ratchet-report-only.",
     "Docs in STE."
   ],
@@ -12,7 +13,7 @@
     "go/.test-latency.json",
     ".github/workflows/go.yml"
   ],
-  "fix": "testlatency reads test-rusage.ndjson, computes S, gates CPU/S against a per-OS baseline in .test-latency.json; report-only when fewer than 3 reference packages; baselines lower only on main. Then remove -ratchet-report-only from both CI steps.",
+  "fix": "testlatency reads test-rusage.ndjson, computes S, gates CPU/S against a per-OS baseline in .test-latency.json; report-only when fewer than 3 reference packages. The baseline lowers on main, and it rises only through a baseline-file change in the same PR, so the reviewers see the raise (research section 6.2 step 7): the gate reads the baseline file at the base ref and at the PR head, and accepts a higher C(p) only when the PR changes that file. Then remove -ratchet-report-only from both CI steps.",
   "id": "ratchet-speed-adjusted-cpu",
   "kind": "pipeline-repair",
   "notes": "Console route: CI gate and test system.",
@@ -20,7 +21,7 @@
   "priority": "P1",
   "priority_class": "stability",
   "route": "console",
-  "source": "console, 2026-11-01, research PR #1227 (docs/research/ci-wall-variance-2026-11.md), operator deep-dive request",
+  "source": "console, 2026-11-01, research PR #1230 (replaces #1227) (docs/research/ci-wall-variance-2026-11.md), operator deep-dive request",
   "summary": "Wall time swings 2.3x with the macOS host class (3-core vs 5-core) and CPU speed (0.90-1.52x). Research #1227 replays a CPU rule: package user+sys CPU divided by the run speed index S (median CPU ratio of the other packages >= 2 s) fails above 1.35x baseline and +15 s; it passes the 3 clean runs and fails both quadratic-parse runs on both OSes.",
   "title": "The package ratchet judges speed-adjusted CPU per OS, and wall stays a timeout cap and a report",
   "weight": 0.85

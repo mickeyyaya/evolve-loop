@@ -10,7 +10,7 @@
     "go/cmd/evolve",
     "go/internal/bridge"
   ],
-  "fix": "One shared, immutable module read per test binary for the scanners; TestPRRefresh_* uses --depth 1 or a fixture; bridge builds ./cmd/evolve once per test binary.",
+  "fix": "One shared, immutable module read per test binary for the scanners. TestPRRefresh_*: gittest.Clone clones a local path, so git ignores --depth 1 and hardlinks the objects; measure the checkout and the generators apart, then reuse a gittest.FromTemplate fixture or run fewer generators. Bridge builds ./cmd/evolve once per test binary only with one shared dispatch root, or a root set at run time, because each build embeds -X dispatchcred.root (research R5, R7).",
   "id": "cmd-evolve-tests-read-module-once",
   "kind": "pipeline-repair",
   "notes": "Console route: CI gate and test system.",
@@ -18,8 +18,8 @@
   "priority": "P2",
   "priority_class": "performance",
   "route": "console",
-  "source": "console, 2026-11-01, research PR #1227 (docs/research/ci-wall-variance-2026-11.md), operator deep-dive request",
+  "source": "console, 2026-11-01, research PR #1230 (replaces #1227) (docs/research/ci-wall-variance-2026-11.md), operator deep-dive request",
   "summary": "36 whole-module scan sites in 23 cmd/evolve test files; pinned tests went from 3-12 s to 21-37 s on the slow host; TestPRRefresh_* does a full git clone (61-156 s). Bridge sandbox-contract tests each build ./cmd/evolve (27-42 s to 92-98 s).",
-  "title": "cmd/evolve tests read the module once per test binary, and TestPRRefresh clones shallowly",
+  "title": "cmd/evolve tests read the module once per test binary, and TestPRRefresh measures its clone cost before a fixture change",
   "weight": 0.6
 }
