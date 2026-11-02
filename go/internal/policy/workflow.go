@@ -36,6 +36,7 @@ type WorkflowPolicy struct {
 	IntentDelta              bool                    `json:"intent_delta,omitempty"`
 	CycleSpend               *CycleSpendPolicy       `json:"cycle_spend,omitempty"`
 	BuilderSelfCheck         *BuilderSelfCheckPolicy `json:"builder_selfcheck,omitempty"`
+	Supersede                *SupersedePolicy        `json:"supersede,omitempty"`
 }
 
 type WorkflowConfig struct {
@@ -67,6 +68,7 @@ type WorkflowConfig struct {
 	IntentDelta              bool
 	CycleSpend               CycleSpendConfig
 	BuilderSelfCheck         BuilderSelfCheckConfig
+	Supersede                SupersedeConfig
 }
 
 func (p Policy) WorkflowConfig() WorkflowConfig {
@@ -103,6 +105,7 @@ func (p Policy) defaultWorkflowConfig() WorkflowConfig {
 		Repair:                   p.repairConfig(),
 		CycleSpend:               p.cycleSpendConfig(),
 		BuilderSelfCheck:         p.builderSelfCheckConfig(),
+		Supersede:                p.supersedeConfig(),
 	}
 }
 

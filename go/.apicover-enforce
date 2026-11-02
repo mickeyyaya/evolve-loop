@@ -863,3 +863,4 @@
 ./internal/coversplit
 # shiptest - the shared real-git fixtures of the ship tests and the black-box ship scenarios split from internal/phases/ship.
 ./internal/phases/ship/shiptest
+./internal/supersede
