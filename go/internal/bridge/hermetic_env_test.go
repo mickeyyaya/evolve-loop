@@ -84,7 +84,7 @@ func TestCellEnv_ShadowKeepsTodaysEnvAndReportsEachDroppedNameWithoutItsValue(t 
 		t.Setenv(k, v)
 	}
 	center := signalcenter.New()
-	deps := Deps{Signals: center, EnvDrops: &EnvDropLog{}}
+	deps := Deps{Signals: center, EnvDrops: &EnvDropLog{}, EnvStage: "shadow"}
 	cfg := seatConfig("claude-tmux")
 
 	env := dispatchEnv(deps, cfg)
@@ -145,7 +145,7 @@ func TestEnvDropLog_ReportsEachNameOnceForEachFamily(t *testing.T) {
 		t.Setenv(k, v)
 	}
 	center := signalcenter.New()
-	deps := Deps{Signals: center, EnvDrops: &EnvDropLog{}}
+	deps := Deps{Signals: center, EnvDrops: &EnvDropLog{}, EnvStage: "shadow"}
 	dispatchEnv(deps, seatConfig("codex"))
 	dispatchEnv(deps, seatConfig("codex"))
 	dispatchEnv(deps, seatConfig("agy"))

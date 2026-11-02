@@ -27,9 +27,10 @@ type AuthInfo struct {
 }
 
 type DeepProbe struct {
-	Ran        bool  `json:"ran"`
-	Passed     bool  `json:"passed"`
-	DurationMS int64 `json:"duration_ms"`
+	Ran        bool   `json:"ran"`
+	Passed     bool   `json:"passed"`
+	DurationMS int64  `json:"duration_ms"`
+	Err        string `json:"err,omitempty"`
 }
 
 type DoctorResult struct {
@@ -135,28 +136,30 @@ func (e *Engine) doctorEnvWarnings(cli string) []string {
 }
 
 func (e *Engine) doctorDeep(ctx context.Context, cli, binary string) DeepProbe {
-	switch cli {
-	case "claude-tmux", "codex-tmux", "agy-tmux", "ollama-tmux":
+	driver, ok := LookupDriver(cli)
+	if !ok {
 		return DeepProbe{Ran: false}
 	}
-	var probeArgs []string
-	switch cli {
-	case "claude-p":
-		probeArgs = []string{"-p", "Reply only: PROBE_OK", "--model", "haiku"}
-	case "codex":
-		probeArgs = []string{"exec"}
-	case "agy":
-		probeArgs = []string{"-p", "Reply only: PROBE_OK"}
-	default:
+	prober, ok := driver.(DeepProber)
+	if !ok {
 		return DeepProbe{Ran: false}
 	}
+	m, err := LoadManifest(cli)
+	if err != nil {
+		return DeepProbe{Ran: true, Passed: false, Err: err.Error()}
+	}
+	probeArgs := prober.DeepProbeArgs(m)
 	cctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	start := e.deps.Now()
 	var out bytes.Buffer
 	rc, err := LaunchLLM(cctx, e.deps, LLMExec{Purpose: PurposeProbe, Binary: binary, Args: probeArgs, Stdout: &out, Stderr: &out})
 	dur := e.deps.Now().Sub(start).Milliseconds()
-	return DeepProbe{Ran: true, Passed: err == nil && rc == 0, DurationMS: dur}
+	probe := DeepProbe{Ran: true, Passed: err == nil && rc == 0, DurationMS: dur}
+	if err != nil {
+		probe.Err = err.Error()
+	}
+	return probe
 }
 
 func (e *Engine) doctorOne(ctx context.Context, cli string, deep bool) DoctorResult {

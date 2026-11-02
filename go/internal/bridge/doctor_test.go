@@ -5,6 +5,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 )
@@ -160,6 +162,27 @@ func TestDoctorDeep(t *testing.T) {
 	if dp := ef.doctorDeep(context.Background(), "claude-p", "claude"); !dp.Ran || dp.Passed {
 		t.Fatalf("claude-p deep fail = %+v", dp)
 	}
+	errEngine := doctorEngine(nil, nil, -1, errNoBin)
+	if dp := errEngine.doctorDeep(context.Background(), "claude-p", "claude"); !dp.Ran || dp.Passed || dp.Err == "" {
+		t.Fatalf("claude-p deep error = %+v", dp)
+	}
+}
+
+func TestDoctorDeep_ManifestLoadError(t *testing.T) {
+	project := t.TempDir()
+	manifests := filepath.Join(project, ".evolve", "bridge-manifests")
+	if err := os.MkdirAll(manifests, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(manifests, "agy.json"), []byte("{bad"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("EVOLVE_PROJECT_ROOT", project)
+	e := doctorEngine(nil, nil, 0, nil)
+	dp := e.doctorDeep(context.Background(), "agy", "agy")
+	if !dp.Ran || dp.Passed || !strings.Contains(dp.Err, "invalid JSON") {
+		t.Fatalf("doctorDeep with corrupt manifest = %+v", dp)
+	}
 }
 
 func TestDoctorVersion_Error(t *testing.T) {
@@ -208,5 +231,21 @@ func mkfile(t *testing.T, path, body string) {
 	}
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestHeadlessProbeArgs(t *testing.T) {
+	t.Parallel()
+	m1 := Manifest{ModelTierMap: map[string]string{"fast": "fast-m"}}
+	if got := headlessProbeArgs(m1); !slices.Equal(got, []string{"-p", "Reply only: PROBE_OK", "--model", "fast-m"}) {
+		t.Fatalf("got %v", got)
+	}
+	m2 := Manifest{DefaultModel: "def-m"}
+	if got := headlessProbeArgs(m2); !slices.Equal(got, []string{"-p", "Reply only: PROBE_OK", "--model", "def-m"}) {
+		t.Fatalf("got %v", got)
+	}
+	m3 := Manifest{}
+	if got := headlessProbeArgs(m3); !slices.Equal(got, []string{"-p", "Reply only: PROBE_OK"}) {
+		t.Fatalf("got %v", got)
 	}
 }

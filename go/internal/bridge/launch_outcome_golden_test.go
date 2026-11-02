@@ -14,6 +14,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmcalls"
+	"github.com/mickeyyaya/evolve-loop/go/internal/proctree"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -63,6 +64,12 @@ func launchThroughFixture(t *testing.T, ctx context.Context, deps Deps, script [
 	}
 	if deps.Now == nil {
 		deps.Now = func() time.Time { return time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC) }
+	}
+	if deps.ListProcesses == nil {
+		deps.ListProcesses = func(context.Context) ([]proctree.Process, error) { return withSelf(nil), nil }
+	}
+	if deps.ListCwds == nil {
+		deps.ListCwds = func(context.Context) ([]proctree.Cwd, error) { return nil, nil }
 	}
 	req.CLI, req.Profile, req.Model, req.Workspace = launchOutcomeFixtureCLI, writeProfile(t, ws, "unit10", ""), "auto", ws
 	req.Prompt, req.ArtifactPath, req.ExtraFlags = "x", filepath.Join(ws, "a.md"), script

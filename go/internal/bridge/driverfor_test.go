@@ -14,10 +14,12 @@ func TestDriverFor_BareAndDriverNames(t *testing.T) {
 		{"claude", "claude-tmux"},
 		{"codex", "codex"},
 		{"agy", "agy"},
+		{"ollama", "ollama-tmux"},
 		{"claude-tmux", "claude-tmux"},
 		{"claude-p", "claude-p"},
 		{"codex-tmux", "codex-tmux"},
 		{"agy-tmux", "agy-tmux"},
+		{"ollama-tmux", "ollama-tmux"},
 		{"no-such-cli", "no-such-cli"},
 		{"", ""},
 	}

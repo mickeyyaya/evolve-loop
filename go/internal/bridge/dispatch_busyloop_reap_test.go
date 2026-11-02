@@ -108,7 +108,7 @@ func TestDispatchSweep_AnUntaggedBusyLoopOrphanedInTheWorktreeStopsWhenTheDispat
 		return syscall.Kill(pid, sig)
 	}
 	var stderr bytes.Buffer
-	deps := Deps{Stderr: &stderr, ListProcesses: proctree.ExecLister(), ListCwds: proctree.ExecCwdLister(), SignalProcess: onlyTheLoop, Sleep: time.Sleep}
+	deps := Deps{Stderr: &stderr, ListProcesses: fallbackLister(proctree.ExecLister()), ListCwds: proctree.ExecCwdLister(), SignalProcess: onlyTheLoop, Sleep: time.Sleep}
 	sweep := newDispatchSweep(mintDispatchID(&Config{RunID: "busyloop", Cycle: 1762, Agent: "audit"}, 1), t.TempDir(), worktree, t.TempDir(), started)
 
 	sweep.finish(context.Background(), deps)
