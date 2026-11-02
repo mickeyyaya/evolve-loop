@@ -83,14 +83,14 @@ func TestUnderfill_ARunningPoolWarnsOnEveryIdleTransitionBelowMinLanes(t *testin
 	}
 	<-done
 
-	if got, want := fieldsOf(events, CodePoolUnderfilled, "live"), []string{"1", "1", "0"}; !reflect.DeepEqual(got, want) {
-		t.Errorf("underfilled live = %v, want %v: one WARN for each idle transition", got, want)
+	if got, want := fieldsOf(events, CodePoolUnderfilled, "live"), []string{"1", "1", "1", "0"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("underfilled live = %v, want %v: one WARN for the hold at the start and one for each idle transition", got, want)
 	}
-	if got, want := fieldsOf(events, CodePoolUnderfilled, "ready"), []string{"1", "0", "0"}; !reflect.DeepEqual(got, want) {
-		t.Errorf("underfilled ready = %v, want %v: the todos still pending at each idle", got, want)
+	if got, want := fieldsOf(events, CodePoolUnderfilled, "ready"), []string{"2", "1", "0", "0"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("underfilled ready = %v, want %v: the todos still pending at the start hold and at each idle", got, want)
 	}
-	if got, want := len(events.withCode(CodePoolIdle)), len(events.withCode(CodePoolUnderfilled)); got != want {
-		t.Errorf("idle events = %d, underfilled = %d, want one WARN for each idle", got, want)
+	if got, want := len(events.withCode(CodePoolIdle))+len(events.withCode(CodePoolHeld)), len(events.withCode(CodePoolUnderfilled)); got != want {
+		t.Errorf("idle and held events = %d, underfilled = %d, want one WARN for each idle or held transition", got, want)
 	}
 }
 

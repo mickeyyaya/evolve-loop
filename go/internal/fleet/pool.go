@@ -32,6 +32,7 @@ const (
 	PoolBackfilled PoolTransitionKind = "backfilled"
 	PoolResupplied PoolTransitionKind = "resupplied"
 	PoolIdle       PoolTransitionKind = "idle"
+	PoolHeld       PoolTransitionKind = "held"
 )
 
 type PoolTransition struct {
@@ -56,6 +57,7 @@ type pool struct {
 	known        map[string]bool
 	launches     int
 	completions  chan completion
+	lastHeld     [2]int
 }
 
 type completion struct {
@@ -68,7 +70,8 @@ func RunPool(ctx context.Context, cfg PoolConfig, backlog []Todo, launch LaunchF
 		return noLaunchResults(len(backlog))
 	}
 	p := newPool(ctx, cfg, backlog, launch, onTransition)
-	p.fill(PoolLaunched, true)
+	_, refused := p.fill(PoolLaunched, true)
+	p.held(refused)
 	kick := cfg.Kick
 	for len(p.running) > 0 {
 		select {
@@ -80,7 +83,8 @@ func RunPool(ctx context.Context, cfg PoolConfig, backlog []Todo, launch LaunchF
 				kick = nil
 				continue
 			}
-			p.fill(PoolBackfilled, false)
+			_, refused := p.fill(PoolBackfilled, false)
+			p.held(refused)
 		}
 	}
 	return p.results
@@ -136,10 +140,14 @@ func (p *pool) settle(idx int) {
 	}
 	delete(p.running, idx)
 	p.emit(PoolExited, p.backlog[idx].ID)
-	if p.fill(PoolBackfilled, false) {
+	if full, _ := p.fill(PoolBackfilled, false); full {
 		return
 	}
-	if !p.resupply() || !p.fill(PoolBackfilled, false) {
+	if !p.resupply() {
+		p.emit(PoolIdle, "")
+		return
+	}
+	if full, _ := p.fill(PoolBackfilled, false); !full {
 		p.emit(PoolIdle, "")
 	}
 }
@@ -151,11 +159,12 @@ func (p *pool) width() int {
 	return max(1, min(p.limit, p.cfg.Window()))
 }
 
-func (p *pool) fill(kind PoolTransitionKind, initial bool) (full bool) {
+func (p *pool) fill(kind PoolTransitionKind, initial bool) (full, refused bool) {
 	width := p.width()
 	for len(p.running) < width && len(p.pending) > 0 && p.open() {
 		at := p.next(initial)
 		if at < 0 && len(p.running) > 0 {
+			refused = true
 			break
 		}
 		at = max(at, 0)
@@ -163,7 +172,16 @@ func (p *pool) fill(kind PoolTransitionKind, initial bool) (full bool) {
 		p.pending = append(p.pending[:at:at], p.pending[at+1:]...)
 		p.dispatch(idx, kind)
 	}
-	return len(p.running) >= width
+	return len(p.running) >= width, refused
+}
+
+func (p *pool) held(refused bool) {
+	state := [2]int{len(p.running), len(p.pending)}
+	if !refused || state == p.lastHeld {
+		return
+	}
+	p.lastHeld = state
+	p.emit(PoolHeld, "")
 }
 
 func (p *pool) open() bool {
