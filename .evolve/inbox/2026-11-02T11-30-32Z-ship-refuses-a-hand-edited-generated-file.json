@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Red test first: a cycle whose tree has a research dossier row in docs/research-index.md but no entry row (evolve docs index check stale) is refused at the build handoff floor with the exact fix (add the row to its entry file), or the build-derived regen step regenerates every derived file and refuses a hand edit of a generated file.",
+    "The check covers each generated file the PR refresh test needs in sync: docs/research-index.md, docs/architecture/signal-codes.md, go/.darwin-set.",
+    "Docs in STE."
+  ],
+  "created_at": "2026-11-02T11:32:00Z",
+  "deps": [],
+  "files": [
+    "go/internal/core/build_handoff_floor.go"
+  ],
+  "fix": "Cycle 2112 (commit 7ab5f571d) wrote a row into the generated docs/research-index.md by hand, without its entry file. main then failed `evolve docs index check`, and the CI test TestPRRefresh_TheRealGeneratorsOfACloneCommitOnlyTheStaleIndex failed its precondition on every PR merged with main (PR #1237 went red for it). The build handoff floor or the build-derived regen must run every derived-file check (docs index, signal codes, darwin set) and refuse or repair before ship.",
+  "id": "ship-refuses-a-hand-edited-generated-file",
+  "kind": "pipeline-repair",
+  "notes": "Console route: build floor. Repaired on main by PR #1237 (entry row added).",
+  "origin": "console",
+  "priority": "P1",
+  "priority_class": "stability",
+  "route": "console",
+  "source": "console, 2026-11-02, PR #1237 CI red on TestPRRefresh precondition",
+  "summary": "A lane shipped a hand edit of a generated index, which turned main stale and made CI red for every PR merged with main.",
+  "title": "A cycle cannot ship a hand edit of a generated file: the derived-file checks run before ship",
+  "weight": 0.75
+}

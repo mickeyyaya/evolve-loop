@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Red test first: primary exit 81 cause submit_wedged, remaining candidates benched: the primary is retried once in a fresh session, and a retry that succeeds returns its response.",
+    "A non-transient primary failure still walks the chain in bench order.",
+    "Docs in STE: the bridgechain package note records the rule."
+  ],
+  "created_at": "2026-11-02T03:41:00Z",
+  "deps": [],
+  "files": [
+    "go/internal/bridgechain/bridgechain.go"
+  ],
+  "fix": "In bridgechain.Walking.Launch, when the primary exits with a transient cause (submit_wedged, and other causes the bridge classifies transient) and every later candidate is benched, retry the primary once in a fresh session (core.LaunchWithFreshSession) before the walk continues. Keep the bench as advice; do not filter it.",
+  "id": "transient-cause-retries-primary-before-benched-fallback",
+  "kind": "pipeline-repair",
+  "notes": "Console route: routing and failover.",
+  "origin": "console",
+  "priority": "P1",
+  "priority_class": "stability",
+  "route": "console",
+  "source": "console, 2026-11-02, wave 148 ops watcher (cycle 2090)",
+  "summary": "Cycle 2090: claude-tmux failed with the transient cause submit_wedged (exit 81), and the chain walked to agy-tmux, which was benched and exhausted (exit 85), so the cycle failed. The bench orders the chain by design (bench is advice, not a veto, bridgechain.ApplyCLIHealthBench); the gap is that a transient cause on a healthy primary does not retry that primary first.",
+  "title": "A transient launch cause retries the primary in a fresh session before the chain walks to a benched family",
+  "weight": 0.7
+}

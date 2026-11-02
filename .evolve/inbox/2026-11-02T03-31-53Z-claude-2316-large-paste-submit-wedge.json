@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "Red test first: a faketmux REPL that ignores Enter for 20 s after the paste and then accepts it ends submitted_after_resend (today: submit_wedged).",
+    "A table test pins the verifySubmitted resend schedule from config.",
+    "A live bridge run of 4 concurrent claude seats with a 55 KB prompt submits 4/4, three times in a row.",
+    "Docs in STE: the bridge package note records the readiness and resend rules, with the evidence."
+  ],
+  "created_at": "2026-11-02T03:40:00Z",
+  "deps": [],
+  "files": [
+    "go/internal/bridge"
+  ],
+  "fix": "Readiness is the first render of the prompt marker, and the Enter resends stop about 11 s after the paste (gaps 0.5/1.5/2.5 s). (1) Judge submission on a positive signal (the history/paste-cache entry, or the composer leaving '[Pasted text'). (2) Resend on a deadline schedule of about 2, 5, 10, 20, 30 s, set in config. (3) Before the paste, wait for an idle pane (unchanged for at least 1 s after the marker). (4) Stagger concurrent claude-tmux boots or gate them with a boot semaphore. First prove whether a late Enter submits: rebuild with longer gaps and a pane dump per resend, launch 4 at once.",
+  "id": "claude-2316-large-paste-submit-wedge",
+  "kind": "pipeline-repair",
+  "notes": "Console route: bridge prompt delivery. Investigation 2026-11-02 (subagent, 8 live runs). Related public reports: claudeissues #52812 (tmux submit ignored), crow PR #274 (paste-buffer/Enter race).",
+  "origin": "console",
+  "priority": "P1",
+  "priority_class": "stability",
+  "route": "console",
+  "source": "console, 2026-11-02, wave 148 ops watcher (cycle 2090)",
+  "summary": "claude-tmux leaves a bracketed paste unsubmitted when seats boot together: reproduced through the bridge 3/4 wedged with 4 concurrent launches, 0/4 sequential (55 KB prompt). Not new in 2.1.316 and not size- or phase-specific: prompt-site resends rose from 3/430 (2.1.303-305) to 59 resends + 2 wedges /412 (2.1.311) and 11 + 4 /179 (2.1.316); routers wedge too. Claude never accepted the Enter (no ~/.claude/history.jsonl or paste-cache entry for wedged sessions).",
+  "title": "A pasted prompt submits reliably when several claude seats boot at the same moment",
+  "weight": 0.8
+}
