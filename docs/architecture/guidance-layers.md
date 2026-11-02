@@ -42,7 +42,7 @@ Three limits of the budget:
 
 | Trigger | Example | Loader for the console | Loader for a phase agent |
 |---|---|---|---|
-| Path | a Go test file, `docs/**`, `.github/**`, `.evolve/inbox/**`, the kill-guard code | `.claude/rules/<name>.md` with `paths:` | an overlay rule with a `Paths` selector, matched to the lane scope |
+| Path | a Go test file, `docs/**`, `.github/**`, `.evolve/inbox/**`, the kill-guard code | `.claude/rules/<name>.md` with `paths:` | an overlay rule with a `Paths` selector, matched to the lane scope (`ScopePaths` of the dispatch against `OverlayRule.Paths`) |
 | Action | a commit, a merge, a wave boundary, an inbox route, a routing change, a brief to a subagent | a PreToolUse hook on the command adds the checklist as `additionalContext` | none: the phase persona holds its procedure, and the action hooks do not fire there |
 | Task | write a document, run research, design, review, test, triage CI | a skill that the L0 map names, with a description that says when to load it | an overlay rule by kind and phase |
 | Failure | a gate refusal, a red CI, a quota wall, a stall, a review FAIL | the error text of the check names the rule and the skill | the correction directive carries the same text |

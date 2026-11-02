@@ -37,6 +37,9 @@ func Parse(raw []byte) (Policy, error) {
 			return Policy{}, fmt.Errorf("isolation.dispatch_requests: %w", err)
 		}
 	}
+	if err := p.Overlays.validatePaths(); err != nil {
+		return Policy{}, err
+	}
 	if err := p.Healing.validate(); err != nil {
 		return Policy{}, fmt.Errorf("healing.%w", err)
 	}
