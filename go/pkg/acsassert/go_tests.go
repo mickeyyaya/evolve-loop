@@ -33,32 +33,58 @@ func GoTests(tb TB, spec GoTestSpec) bool {
 		tb.Errorf("go test pattern %q names %v, which Names does not list: a name outside Names is never checked for a pass", spec.Pattern, unlisted)
 		return false
 	}
-	args := []string{"test", "-json", "-count=1", "-v"}
-	if spec.Race {
-		args = append(args, "-race")
+	args := append(append([]string{"test", "-json", "-count=1", "-v"}, buildFlags(spec)...), "-run", spec.Pattern, spec.Package)
+	ctx, cancel := callerDeadline(tb)
+	defer cancel()
+	importPath, err := resolveImportPath(ctx, spec)
+	if err != nil {
+		tb.Errorf("%v", err)
+		return false
 	}
-	if spec.Tags != "" {
-		args = append(args, "-tags", spec.Tags)
-	}
-	args = append(args, "-run", spec.Pattern, spec.Package)
-	ctx := context.Background()
-	if caller, ok := tb.(interface{ Deadline() (time.Time, bool) }); ok {
-		if deadline, set := caller.Deadline(); set {
-			var cancel context.CancelFunc
-			ctx, cancel = context.WithDeadline(ctx, deadline)
-			defer cancel()
-		}
-	}
-	out, stderr, code, err := sysexec.Capture(ctx, sysexec.WithEnv(sysexec.DefaultRunner, ipcenv.GoTestEnv()), spec.Dir, "go", args...)
+	out, stderr, code, err := sysexec.Capture(ctx, goTestRunner(), spec.Dir, "go", args...)
 	if err != nil || code != 0 {
 		tb.Errorf("go %v exited %d (err=%v)\nstdout:\n%s\nstderr:\n%s", args, code, err, out, stderr)
 		return false
 	}
-	if err := validateGoTests(out, spec.Package, spec.Names); err != nil {
+	if err := validateGoTests(out, importPath, spec.Names); err != nil {
 		tb.Errorf("go %v: %v\nstdout:\n%s\nstderr:\n%s", args, err, out, stderr)
 		return false
 	}
 	return true
+}
+
+func callerDeadline(tb TB) (context.Context, context.CancelFunc) {
+	if caller, ok := tb.(interface{ Deadline() (time.Time, bool) }); ok {
+		if deadline, set := caller.Deadline(); set {
+			return context.WithDeadline(context.Background(), deadline)
+		}
+	}
+	return context.WithCancel(context.Background())
+}
+
+func goTestRunner() sysexec.RunFunc {
+	return sysexec.WithEnv(sysexec.DefaultRunner, ipcenv.GoTestEnv())
+}
+
+func buildFlags(spec GoTestSpec) []string {
+	var flags []string
+	if spec.Race {
+		flags = append(flags, "-race")
+	}
+	if spec.Tags != "" {
+		flags = append(flags, "-tags", spec.Tags)
+	}
+	return flags
+}
+
+func resolveImportPath(ctx context.Context, spec GoTestSpec) (string, error) {
+	args := append(append([]string{"list", "-f", "{{.ImportPath}}"}, buildFlags(spec)...), spec.Package)
+	out, stderr, code, err := sysexec.Capture(ctx, goTestRunner(), spec.Dir, "go", args...)
+	path := strings.TrimSpace(out)
+	if err != nil || code != 0 || path == "" || strings.Contains(path, "\n") {
+		return "", fmt.Errorf("go list cannot resolve package %q to one import path: exit %d (err=%v)\nstdout:\n%s\nstderr:\n%s", spec.Package, code, err, out, stderr)
+	}
+	return path, nil
 }
 
 type goTestRun struct {
