@@ -187,6 +187,7 @@ At `shadow`, each component records what it does at `enforce`. The shadow wave p
 
 - **Q1.** Does `audit_fix` fire often enough to pay for its build? The shadow wave of #1173 records `LADDER_AUDIT_FIX`. If it records `would` on fewer than 1 cycle in 20, build items 1 to 4 and their wiring (item 11), and stop.
 - **Q2.** Can the bridge send findings into a live build session before it closes? If not, item 8 becomes a hard rule in the build contract: no handoff without a GREEN self-check receipt for the tree.
+  - Answer (2026-11-02): yes, for each `*-tmux` driver. The REPL waiter of the bridge runs the check when the deliverable first appears and pastes the findings into the pane. A driver without a live pane (`claude-p`) runs the flow of today. See item 8 in §11.
 - **Q3.** Which family reviews an `audit_fix` patch when the chain has only one family that is healthy? The proposal is to decline the rung and take the repair round of today.
 - **Q4.** The spend limit counts fresh tokens and cache-read tokens apart. A cost in money needs a price for each family, which the policy does not have. The plan [token-telemetry-2026-10](token-telemetry-2026-10.md) proposes these weights as policy data (D8).
 
@@ -214,3 +215,10 @@ The console keeps the build on `main`, because it shipped and the ACS pins it. T
 | The wave measures and PQ5 count the stops, the `would_stop` decisions and the false stops | §8, the shadow wave numbers | no | yes | moved on `feat/cycle-spend-limit-v2`, with item 4 |
 
 Item 3 names `go/internal/admission/admission.go` as its file. #1188 puts the check in `inboxmover.RankLaneMenu`. This branch puts it in `inboxmover.PartitionLaneMenu`, because all readers of the lane menu call it. The readers are triage, the census, the wave seed, the no-work check, `evolve inbox batches` and `evolve inbox rank`.
+
+Item 8 (`builder-selfcheck-before-close`) is on the branch `feat/builder-selfcheck-before-close`, at `shadow`:
+
+- `evolve selfcheck build` and `evolve phase verify build` write a receipt with the tree digest of the worktree ([internal-cli-phasecmd](../architecture/packages/internal-cli-phasecmd.md)).
+- At `shadow`, the wait runs no floor. The orchestrator records the findings of the review gate as `would_return_in_session` when the build has no GREEN receipt for its tree ([internal-core](../architecture/packages/internal-core.md)).
+- At `enforce`, a build dispatch carries a check before the close. The bridge runs it inside the deadline of the wait and pastes the findings into the live session one time ([internal-bridge](../architecture/packages/internal-bridge.md)). The record says `delivered` or `delivery_failed`. The review gate runs the floor again after the close.
+- The key is `workflow.builder_selfcheck.stage` ([policy-config](../architecture/policy-config.md)).
