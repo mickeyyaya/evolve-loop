@@ -347,3 +347,15 @@ func TestFloorResidualBlock_AnUnknownClassIsNotPrescribable(t *testing.T) {
 		t.Fatalf("block = %+v, want no block for an unknown class", fb)
 	}
 }
+
+func TestFloorResidualClass_OnlyTheTwoTypedClassesArePrescribable(t *testing.T) {
+	t.Parallel()
+	omission := FloorResidual{Class: FloorResidualChangedAreas, Document: "docs/explain/builds/c.md", Path: "go/internal/x/x.go"}
+	got, ok := omission.prescribe()
+	if !ok || got.target != omission.Document || got.text != "add a Changed Areas line for go/internal/x/x.go in docs/explain/builds/c.md" {
+		t.Fatalf("Changed Areas omission = %+v, %v; want a docs-only prescription that targets the explanation document", got, ok)
+	}
+	if _, ok := (FloorResidual{Class: FloorResidualClass("size_ratchet")}).prescribe(); ok {
+		t.Fatal("an unknown residual class must not be prescribable, so the build aborts as today")
+	}
+}

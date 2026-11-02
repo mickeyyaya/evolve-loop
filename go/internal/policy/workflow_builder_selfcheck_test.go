@@ -43,7 +43,7 @@ func TestParse_TheBuilderSelfCheckRefusesAnUnknownStageOrKey(t *testing.T) {
 func TestBuilderSelfCheckConfig_ABuiltPolicyWithAnUnknownStageHoldsShadow(t *testing.T) {
 	t.Parallel()
 	p := Policy{Workflow: &WorkflowPolicy{BuilderSelfCheck: &BuilderSelfCheckPolicy{Stage: "advisory"}}}
-	if got := p.builderSelfCheckConfig().Stage; got != config.StageShadow {
-		t.Errorf("stage = %v, want shadow", got)
+	if got := p.builderSelfCheckConfig(); got != (BuilderSelfCheckConfig{Stage: config.StageShadow}) {
+		t.Errorf("config = %+v, want the shadow stage", got)
 	}
 }
