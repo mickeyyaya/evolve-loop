@@ -51,7 +51,7 @@ The build floor fails the build with this flag. If the flag reaches ship, ship r
   | `healing-constitution` | the constitution predicate is true for a changed or untracked path |
 
   The patterns `changed-threshold` and `stage-off-enforce` skip a `_test.go` file, because a test fixture sets these values freely.
-  A guard test file is in `guards/`, `repocontract/`, `sizeratchet/`, `rawgitratchet/` or `go/acs/regression/`. A `_test.go` file with `guard` in its name is also a guard test file.
+  A guard test file is in `guards/`, `repocontract/`, `sizeratchet/`, `rawgitratchet/` or `go/acs/regression/`. A `_test.go` file with `guard` in its name is also a guard test file. `IsGuardTest` is this rule. The review-class registry uses it, so a guard test is not a test-only change there ([internal-reviewclass.md](internal-reviewclass.md)).
 - **A changed threshold, not only a lower one.** Spec §20.3 names a lower threshold. A raised halt count is also weaker (`zero_ship_halt` from 2 to 3), and the diff does not show the direction of the rule. Thus the classifier flags each change of such a number. The operator ships a correct change with `evolve ship --class manual`.
 - **A new test is not a skip of a test that ran.** A skip in a new test file, or a skip that the diff moves, gives no flag.
 - **The signal** (`ViolationEvent`). The code is `HEALING_I10_VIOLATION` in the module `healing`, with the kind `gate.rejected` and the severity WARN. `fields.patterns` and `fields.paths` name each flag.

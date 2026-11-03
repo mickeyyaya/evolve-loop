@@ -864,3 +864,5 @@
 # shiptest - the shared real-git fixtures of the ship tests and the black-box ship scenarios split from internal/phases/ship.
 ./internal/phases/ship/shiptest
 ./internal/supersede
+# reviewclass - the change-class table of review routing: the review seats and the deterministic checks of each changed path (review-routing plan S1).
+./internal/reviewclass

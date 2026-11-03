@@ -1,6 +1,7 @@
 package guards
 
 import (
+	"iter"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -243,6 +244,11 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/gateclass/", Class: GateGuarantee, Rationale: "the gate classifier and the surface tiers of I-10: an agent that could edit them could weaken a gate and pass its own check (ADR-0155, llm-isolation.md §20)", Constitution: true},
 	{Fragment: "/go/internal/phases/ship/gate_classifier_gate.go", Class: GateGuarantee, Rationale: "the ship check that refuses a cycle diff the gate classifier flags (ADR-0155, llm-isolation.md §20.3)"},
 	{Fragment: "/go/internal/core/gate_classifier_floor.go", Class: GateGuarantee, Rationale: "the build floor check that fails a build the gate classifier flags (ADR-0155, llm-isolation.md §20.3)"},
+	{Fragment: "/go/internal/reviewclass/", Class: GateGuarantee, Rationale: "the change-class registry of review routing: it decides which review seats and deterministic checks a change needs, so a lane that could edit it could lower the review of its own change (review-routing plan D1, G5)"},
+	{Fragment: "/go/cmd/evolve/cmd_review_class.go", Class: GateGuarantee, Rationale: "evolve review-class: it reads the diff into the change-class registry and prints the seats and checks of the change (review-routing plan S1)"},
+	{Fragment: "/.github/workflows/", Class: GateGuarantee, Rationale: "the CI workflows: the required aggregator and the jobs that gate a merge, so a lane that could edit them could remove the check of its own change (review-routing plan G5)"},
+	{Fragment: "/agents/evolve-diff-", Class: AuditVerdictGuarantee, Rationale: "the personas of the pre-commit review seats: what each diff reviewer reviews and how it reports (review-routing plan G5)"},
+	{Fragment: "/.evolve/profiles/diff-", Class: SandboxGuarantee, Rationale: "the dispatch profiles of the pre-commit review seats: their tools and their read boundary (review-routing plan G5)"},
 }
 
 func IsProtectedSurface(path string) bool {
@@ -254,17 +260,37 @@ func IsHealingConstitution(path string) bool {
 }
 
 func matchesManifest(path string, keep func(ProtectedSurfaceEntry) bool) bool {
-	p, ok := normalizeSurfacePath(path)
-	if !ok {
-		return false
-	}
-	pd := p + "/"
-	for _, e := range ProtectedSurfaceManifest {
-		if keep(e) && strings.Contains(pd, e.Fragment) {
+	for e := range manifestEntriesOf(path) {
+		if keep(e) {
 			return true
 		}
 	}
 	return false
+}
+
+func manifestEntriesOf(path string) iter.Seq[ProtectedSurfaceEntry] {
+	return func(yield func(ProtectedSurfaceEntry) bool) {
+		p, ok := normalizeSurfacePath(path)
+		if !ok {
+			return
+		}
+		pd := p + "/"
+		for _, e := range ProtectedSurfaceManifest {
+			if strings.Contains(pd, e.Fragment) && !yield(e) {
+				return
+			}
+		}
+	}
+}
+
+func SurfaceClassesOf(path string) []GuaranteeClass {
+	var out []GuaranteeClass
+	for e := range manifestEntriesOf(path) {
+		if !slices.Contains(out, e.Class) {
+			out = append(out, e.Class)
+		}
+	}
+	return out
 }
 
 func IsProtectedScope(path string) bool {

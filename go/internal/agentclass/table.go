@@ -25,6 +25,7 @@ var table = []Verb{
 	{Path: "ci classify", Class: Allowed, DeniedWith: "--rerun"},
 	{Path: "scan secrets", Class: Allowed},
 	{Path: "docs ste-lint", Class: Allowed},
+	{Path: "review-class", Class: Allowed},
 	{Path: "quality show", Class: Allowed},
 	{Path: "events channels", Class: Allowed},
 	{Path: "events kinds", Class: Allowed},
