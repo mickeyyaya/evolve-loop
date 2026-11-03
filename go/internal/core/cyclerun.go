@@ -222,13 +222,9 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 	}
 	failClean := func() { run(false, false) }
 
-	release := func() error { return nil }
-	if !fleetMode(req.Env) {
-		acquired, err := o.storage.AcquireLock(ctx)
-		if err != nil {
-			return cycleInit{}, nil, fmt.Errorf("acquire lock: %w", err)
-		}
-		release = acquired
+	release, err := o.acquireCycleLock(ctx, req.Env)
+	if err != nil {
+		return cycleInit{}, nil, fmt.Errorf("acquire lock: %w", err)
 	}
 	stack = append(stack, func(_, _ bool) { _ = release() })
 
