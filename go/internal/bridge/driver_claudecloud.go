@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"time"
 
@@ -28,10 +29,11 @@ const (
 	cloudLaunchOrigin   = "launchCloud"
 	cloudMaxPromptBytes = 120 << 10
 	cloudWithheldToken  = "withheld-from-the-cloud-session"
+	cloudExitWord       = "exit"
 )
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeCloudLaunched, "a cloud seat started a cloud session: the CLI printed the session line, the view line and a resume line with the id of the view line within the deadline of its manifest; the dispatch outcome is launched and the deliverable is a later pull request of that session; fields cli, session_id, url, title, repo, branch, profile")
+	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeCloudLaunched, "a cloud seat started a cloud session: the CLI printed the session line, the view line and a resume line with the id of the view line, then exited, within the deadline of its manifest; the dispatch outcome is launched and the deliverable is a later pull request of that session; fields cli, session_id, url, title, repo, branch, profile")
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeCloudLaunchRefused, "a cloud seat refused a launch before it started a session: the working tree is on no branch, the branch has no upstream or has commits that are not pushed, the remote is not on a host that the manifest names, or the remote head is not the local head just before the launch; the reason names the cause; fields cli, profile, dir")
 }
 
@@ -81,12 +83,12 @@ func launchCloud(ctx context.Context, cfg *Config, deps Deps, m Manifest) (int, 
 	if rc, stop, err := l.stopOn(err, "read the repository of "+l.dir); stop {
 		return rc, err
 	}
+	if rc, stop, err := l.stopOn(deps.cloudRemote(ctx, l.dir, repo), "read the remote head of branch "+repo.Branch); stop {
+		return rc, err
+	}
 	promptFile, err := l.writePrompt()
 	if err != nil {
 		return ExitBadFlags, err
-	}
-	if rc, stop, err := l.stopOn(deps.cloudRemote(ctx, l.dir, repo), "read the remote head of branch "+repo.Branch); stop {
-		return rc, err
 	}
 	confirmed, rc, err := l.start(ctx, promptFile)
 	if rc != ExitOK {
@@ -158,6 +160,10 @@ func (l cloudLaunch) writePrompt() (string, error) {
 }
 
 func (l cloudLaunch) start(ctx context.Context, promptFile string) (cloudConfirmation, int, error) {
+	nonce, err := l.deps.NewChallengeToken()
+	if err != nil {
+		return cloudConfirmation{}, ExitBadFlags, fmt.Errorf("%s mint the exit row of the launch: %w", l.prefix, err)
+	}
 	session, _ := resolveSession(&Config{Agent: l.cfg.Agent, RunID: l.cfg.RunID, Cycle: l.cfg.Cycle}, l.deps, cloudSessionPrefix)
 	if err := l.deps.startSession(ctx, session, l.dir, l.deps.paneEnv(l.cfg)); err != nil {
 		return cloudConfirmation{}, ExitBadFlags, fmt.Errorf("%s new-session: %w", l.prefix, err)
@@ -166,19 +172,19 @@ func (l cloudLaunch) start(ctx context.Context, promptFile string) (cloudConfirm
 	if err := primePaneShell(ctx, l.deps, l.cfg, session, l.dir); err != nil {
 		return cloudConfirmation{}, ExitBadFlags, fmt.Errorf("%s %w", l.prefix, err)
 	}
-	if err := l.deps.Tmux.SendKeys(ctx, session, l.command(promptFile), true); err != nil {
+	if err := l.deps.Tmux.SendKeys(ctx, session, l.command(promptFile, nonce), true); err != nil {
 		return cloudConfirmation{}, ExitBadFlags, fmt.Errorf("%s send the launch to session %s: %w", l.prefix, session, err)
 	}
 	fmt.Fprintf(l.deps.Stderr, "%s launching in the private session %s\n", l.prefix, session)
-	return l.await(ctx, session)
+	return l.await(ctx, session, regexp.MustCompile(`(?m)^\s*`+regexp.QuoteMeta(nonce+"-"+cloudExitWord)+`\s*$`))
 }
 
-func (l cloudLaunch) command(promptFile string) string {
+func (l cloudLaunch) command(promptFile, nonce string) string {
 	flags := append(slices.Clone(l.cfg.Realization.LaunchFlags), l.m.CloudLaunch.Args...)
-	return launchCmdLine(resolveBinary(l.deps, l.m.Binary), flags) + ` -- "$(cat ` + shellQuotePOSIX(promptFile) + `)"`
+	return launchCmdLine(resolveBinary(l.deps, l.m.Binary), flags) + ` -- "$(cat ` + shellQuotePOSIX(promptFile) + `)"; printf '%s-%s\n' ` + shellQuotePOSIX(nonce) + ` ` + cloudExitWord
 }
 
-func (l cloudLaunch) await(ctx context.Context, session string) (cloudConfirmation, int, error) {
+func (l cloudLaunch) await(ctx context.Context, session string, exited *regexp.Regexp) (cloudConfirmation, int, error) {
 	deadline := l.m.CloudLaunch.DeadlineS
 	for range deadline {
 		l.deps.Sleep(time.Second)
@@ -194,12 +200,20 @@ func (l cloudLaunch) await(ctx context.Context, session string) (cloudConfirmati
 			continue
 		}
 		pane = stripANSI(pane)
-		if c, ok := l.patterns.confirmation(pane); ok {
-			return c, ExitOK, nil
+		exit := exited.FindStringIndex(pane)
+		if exit != nil {
+			pane = pane[:exit[0]]
+			if c, ok := l.patterns.confirmation(pane); ok {
+				return c, ExitOK, nil
+			}
 		}
 		if reason, failed := l.patterns.failure(pane); failed {
 			fmt.Fprintf(l.deps.Stderr, "%s FAIL: the CLI refused the launch: %s\n", l.prefix, reason)
 			return cloudConfirmation{}, ExitBadFlags, nil
+		}
+		if exit != nil {
+			fmt.Fprintf(l.deps.Stderr, "%s FAIL: the CLI exited with no session confirmation; the state of the launch is unknown, so read the cloud sessions of the account before a new launch\n", l.prefix)
+			return cloudConfirmation{}, ExitSafetyGate, nil
 		}
 	}
 	fmt.Fprintf(l.deps.Stderr, "%s FAIL: no session confirmation within %ds; the state of the launch is unknown, so read the cloud sessions of the account before a new launch\n", l.prefix, deadline)

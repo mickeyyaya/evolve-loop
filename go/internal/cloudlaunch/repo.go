@@ -99,7 +99,7 @@ func (r Repo) MatchRemote(ctx context.Context, run sysexec.RunFunc, dir string) 
 	if err != nil {
 		return refuse("the tree %s has no local head to compare with branch %s: %v", dir, r.Branch, err)
 	}
-	listed, err := sysexec.Output(ctx, run, dir, "git", "ls-remote", "--exit-code", r.Remote, r.Merge)
+	listed, err := sysexec.Output(ctx, run, dir, "git", "ls-remote", "--exit-code", "--", r.Remote, r.Merge)
 	remote, found := refHead(listed, r.Merge)
 	if err != nil || !found {
 		return refuse("cannot read the head of %s on %s: check the network and the credentials of the remote", r.Merge, r.Remote)

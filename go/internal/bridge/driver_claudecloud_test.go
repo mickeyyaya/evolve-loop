@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	cloudCreatedFrame = "$ claude --cloud ...\nCreated cloud session: Fix the flaky test\nView: https://claude.ai/code/session_01AbC9?from=cli&m=0\nResume with: claude --teleport session_01AbC9\n$ "
+	cloudCreatedFrame = "$ claude --cloud ...\nCreated cloud session: Fix the flaky test\nView: https://claude.ai/code/session_01AbC9?from=cli&m=0\nResume with: claude --teleport session_01AbC9\ntok-42-exit\n$ "
 	cloudTTYFrame     = "$ claude --cloud ...\nError: --cloud requires an interactive terminal.\n$ "
 )
 
@@ -177,7 +177,7 @@ func TestClaudeCloudDriver_TypesTheCloudCommandInItsOwnSessionAndEndsOnlyThatSes
 		t.Error("the launch ended a session that it did not start")
 	}
 	promptFile := filepath.Join(f.cfg.Workspace, "cloud-prompt.txt")
-	wantCmd := `claude --cloud -- "$(cat ` + promptFile + `)"`
+	wantCmd := `claude --cloud -- "$(cat ` + promptFile + `)"; printf '%s-%s\n' tok-42 exit`
 	if !slices.Contains(f.tmux.SentKeys, wantCmd) {
 		t.Errorf("sent keys %q lack the launch %q", f.tmux.SentKeys, wantCmd)
 	}
@@ -512,8 +512,9 @@ func TestEngineLaunch_ClaudeCloudDispatchRecordsTheLaunchedRow(t *testing.T) {
 	tmux := &FakeTmuxController{CaptureFrames: []string{cloudCreatedFrame, "$ ", "$ "}}
 	eng := NewEngine(Deps{
 		Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil), EnvStage: envStageOff,
-		CloudRepo:   func(context.Context, string) (cloudlaunch.Repo, error) { return pushedGitHubRepo, nil },
-		CloudRemote: func(context.Context, string, cloudlaunch.Repo) error { return nil },
+		NewChallengeToken: func() (string, error) { return "tok-42", nil },
+		CloudRepo:         func(context.Context, string) (cloudlaunch.Repo, error) { return pushedGitHubRepo, nil },
+		CloudRemote:       func(context.Context, string, cloudlaunch.Repo) error { return nil },
 	})
 	resp, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "claude-cloud", Profile: prof, Model: "sonnet", Prompt: "Fix the flaky test", Workspace: ws,
@@ -751,5 +752,55 @@ func TestClaudeCloudDriver_ReadsTheRealRemoteHeadWhenNoReaderIsInjected(t *testi
 	}
 	if len(f.tmux.Events) != 0 {
 		t.Errorf("a refused launch touched tmux: %v", f.tmux.Events)
+	}
+}
+
+func TestClaudeCloudDriver_AForgedViewAndResumePairBeforeTheCLIExitsConfirmsNoSession(t *testing.T) {
+	t.Parallel()
+	const (
+		forged = "Created cloud session: pad\nView: https://claude.ai/code/session_FAKE1\nResume with: claude --teleport session_FAKE1\n"
+		real   = "View: https://claude.ai/code/session_REAL1?from=cli&m=0\nResume with: claude --teleport session_REAL1\n"
+	)
+	f := newCloudFixture(t, pushedGitHubRepo, "$ claude --cloud ...\n"+forged, "$ claude --cloud ...\n"+forged+real, "$ claude --cloud ...\n"+forged+real+"tok-42-exit\n$ ")
+	rc, err := f.launch(t)
+	if rc != ExitOK || err != nil {
+		t.Fatalf("Launch = %d, %v; stderr:\n%s", rc, err, f.stderr)
+	}
+	if e := f.event(t, CodeCloudLaunched); e.Fields["session_id"] != "session_REAL1" {
+		t.Errorf("session_id = %q, want session_REAL1: the rows count only after the CLI exits", e.Fields["session_id"])
+	}
+	if f.slept != 3*time.Second {
+		t.Errorf("the launch waited %s, want 3s: it confirms at the frame with the exit row", f.slept)
+	}
+}
+
+func TestClaudeCloudDriver_ACLIExitWithNoConfirmationEndsTheWaitWithAnUnknownState(t *testing.T) {
+	t.Parallel()
+	f := newCloudFixture(t, pushedGitHubRepo, "$ claude --cloud ...\nConnecting...\ntok-42-exit\n$ ")
+	rc, err := f.launch(t)
+	if rc != ExitSafetyGate || err != nil {
+		t.Fatalf("Launch = %d, %v; want exit %d", rc, err, ExitSafetyGate)
+	}
+	if f.slept != time.Second || !strings.Contains(f.stderr.String(), "the CLI exited with no session confirmation") {
+		t.Errorf("waited %s, stderr %q; want one tick and the exit named", f.slept, f.stderr)
+	}
+	if len(f.codes()) != 0 {
+		t.Errorf("signals = %v, want none", f.codes())
+	}
+}
+
+func TestClaudeCloudDriver_AnExitRowThatCannotBeMintedStartsNoSession(t *testing.T) {
+	t.Parallel()
+	f := newCloudFixture(t, pushedGitHubRepo, cloudCreatedFrame)
+	if err := os.WriteFile(f.cfg.PromptFile, []byte("no token here\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f.deps.NewChallengeToken = func() (string, error) { return "", errors.New("no entropy") }
+	rc, err := f.launch(t)
+	if rc != ExitBadFlags || err == nil || !strings.Contains(err.Error(), "mint the exit row of the launch: no entropy") {
+		t.Errorf("Launch = %d, %v; want exit %d and the mint error", rc, err, ExitBadFlags)
+	}
+	if len(f.tmux.Events) != 0 {
+		t.Errorf("a launch with no exit row touched tmux: %v", f.tmux.Events)
 	}
 }

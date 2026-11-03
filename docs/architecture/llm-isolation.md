@@ -303,7 +303,7 @@ How a launch runs:
 2. The driver reads the repository of the worktree, else of the project root. An unpushed branch or another host gives exit 2, the reason on stderr and one `BRIDGE_CLOUD_LAUNCH_REFUSED` signal.
 3. Just before the session starts, the driver reads the remote head with `git ls-remote`. A remote head that is not the local head gives exit 2. The cloud prompt holds no challenge token and no absolute path.
 4. The driver starts a private tmux session (`evolve-cloud-…`) with the I-2 environment of the manifest. The pane runs `claude --cloud "$(cat <workspace>/cloud-prompt.txt)"`.
-5. The driver reads the pane once each second, up to `deadline_s` (120). The three confirmation lines give the session. The `Resume with:` row must come last and name the id of the `View:` row. An `Error:` line gives exit 10 with the text of the CLI.
+5. The driver reads the pane once each second, up to `deadline_s` (120). After the CLI exits, the three confirmation lines give the session. A nonce exit row marks the exit. The `Resume with:` row must come last and name the id of the `View:` row. An `Error:` line gives exit 10 with the text of the CLI.
 6. The driver ends its own session only. It writes the launch report to the artifact and emits one `BRIDGE_CLOUD_LAUNCHED` signal. The engine writes the llm-calls row. `evolve agent run` copies the session into its launch record, and `evolve cloud list` prints it.
 
 The capabilities of the seat follow the X19c model: the manifest declares only what the seat serves.
