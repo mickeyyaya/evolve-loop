@@ -14,6 +14,7 @@
 - **Integrity chain.** The per-phase digest chain is best-effort in this file. A garbled chain reads as empty and never blocks a cycle. The tamper-evident record is the hash-chained ledger anchor, which a security check verifies.
 - **Quota wake time.** The resume time comes from the first source that exists. The sources are, in order: an operator override in policy, a hint that the CLI adapter scraped into the workspace, and an estimate. Only the quota wall has a reset instant, so a phase-complete checkpoint never invents one.
 - **Auto-resume cap.** `DefaultAutoResumeAttempts` is the default cap that `Compose` stamps on each block.
+- **A lane resume is exclusive.** `RecordLaneResume` counts one resume like `RecordResume`. Under the same flock, it then calls `core.TakeResumeLease` on the directory of the state file. If another lane holds a fresh lease, the call returns `*core.ResumeHeldError` and writes no count. The flock serializes the lanes, and a spent budget takes no lease. The flow is in [checkpoint-resume.md](../checkpoint-resume.md#one-lane-adopts-a-paused-cycle).
 
 ## Invariants
 
@@ -23,6 +24,7 @@
 - A phase-complete write carries the integrity chain. Pinned by `TestPhaseBoundaryCheckpointer_CarriesIntegrityChain` and `TestComposeWithIntegrity_CarriesChain`.
 - The phase-complete reason is canonical and validated. Pinned by `TestReasonPhaseComplete_IsValid` and `TestComposeChecked_AcceptsPhaseComplete`.
 - The quota wake time follows the source order, and a routine checkpoint never invents one. Pinned by `TestQuotaBoundaryCheckpointer_UsesWorkspaceHint`, `TestQuotaBoundaryCheckpointer_HonoursOperatorOverride` and `TestPhaseBoundaryCheckpointer_DoesNotFabricateWakeAt`.
+- Two concurrent lane resumes of one paused cycle admit exactly one lane. The other lane gets a typed refusal that names the holder. Pinned by `TestRecordLaneResume_TwoConcurrentLaneResumesOfOnePausedCycleAdmitExactlyOne` and `TestRecordLaneResume_ASpentBudgetTakesNoLease`.
 - Each boundary writer records the cycle base as `gitHead`: the run's `worktree_base_sha`, else its `pre_cycle_head` (`cycleBase`, 2026-10-21). `core.LoadResumeState` warns when `origin/main` has moved past that base, and resumes. Pinned by `TestBoundaryCheckpointers_RecordTheCycleBaseAsGitHead`.
 
 ## Findings

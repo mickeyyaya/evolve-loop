@@ -45,16 +45,30 @@ The lane flow now has three steps:
 Before the lane runs the cycle, it does these steps in this order:
 
 1. It makes sure that each todo of the scope is pending or already held by the paused cycle. This check changes nothing, so a refusal here spends no auto-resume.
-2. It records one auto-resume through `checkpoint.RecordResume`. This call is the only budget rule. It refuses the resume when the auto-resume budget of the checkpoint is spent. Thus a family that stays walled cannot loop the lane.
+2. It records one auto-resume through `checkpoint.RecordLaneResume`. This call is the only budget rule. It refuses the resume when the auto-resume budget of the checkpoint is spent. Thus a family that stays walled cannot loop the lane. The same call also takes the run lease of the paused cycle. Step 2 has its own section below.
 3. It claims the todos back for the paused cycle through the claimer of the cycle (`hostInboxClaimer`). It then makes sure that the paused cycle holds each todo. If a todo is still not held, it releases each claim of the paused cycle through `releaseDeferredLaneClaims`. Thus no todo stays claimed by a cycle that does not run.
 4. It removes the wave goal from the request, so the checkpoint goal stays the goal of the cycle.
 5. It publishes `ORCHESTRATOR_LANE_RESUMED` with the scope, the phase and the auto-resume count.
 
 If one of these steps fails, the lane starts a fresh cycle. A refused resume thus costs a fresh cycle, never a held lane. A resume that hits a quota wall again writes a new quota checkpoint and keeps the auto-resume count.
 
-A resumed lane does not take the project lock. `RunCycle` and `RunCycleFromPhase` ask one rule, `Orchestrator.acquireCycleLock` (`go/internal/core/orchestrator.go`): a fleet lane (`EVOLVE_FLEET=1`) skips the lock, and a sequential cycle takes it. In wave 150, before this rule, the resume of cycle 2106 took the project lock for its full run. One millisecond later, the resume of cycle 2107 stopped with `acquire lock: core: project lock held by another process`. The lane exited, it spent one auto-resume, and the pool had one less live lane.
+### One lane adopts a paused cycle
 
-Proof: `go/internal/core/lane_resume_test.go`, `go/cmd/evolve/cmd_cycle_lane_resume_test.go`, the lock tests in `go/internal/core/fleet_lock_test.go`, and the wiring test `TestCycleRunRoot_AFleetLaneResumesTheQuotaPausedCycleOfItsTodoAtThePausedPhaseWhileASiblingHoldsTheProjectLock`. The wiring test runs the real `evolve cycle run` root with a paused build while the real project lock is held. Scout does not run, and Build runs at once.
+A resumed lane does not take the project lock. Thus the project lock cannot stop two lanes that resume the same paused cycle. Before this rule, two lanes with the same scope can both pass `FindLaneResume` and both record a resume. Both lanes then reclaimed the same cycle, and two builders wrote into one worktree.
+
+`checkpoint.RecordLaneResume` (`go/internal/checkpoint/autoresume.go`) makes the adoption exclusive. Under the flock of the state file, it counts the auto-resume. It then calls `core.TakeResumeLease` (`go/internal/core/lane_resume.go`) on the workspace of the paused cycle. A spent budget takes no lease.
+
+If the workspace has a fresh run lease, the call refuses with `*core.ResumeHeldError`. This error names the run ID, the owner PID and the heartbeat of the holder. The refusal writes no auto-resume, and the lane starts a fresh cycle. If no fresh lease exists, the call writes a lease with the PID of the lane. `RunCycleFromPhase` then replaces this lease with its own heartbeat lease.
+
+Proof: `TestRecordLaneResume_TwoConcurrentLaneResumesOfOnePausedCycleAdmitExactlyOne`, `TestRecordLaneResume_ASpentBudgetTakesNoLease` and the `TestTakeResumeLease_*` tests.
+
+### The project lock of a resume
+
+`RunCycle` and `RunCycleFromPhase` ask one rule, `Orchestrator.acquireCycleLock` (`go/internal/core/orchestrator.go`). A fresh fleet cycle (`EVOLVE_FLEET=1`) skips the lock. A resume skips the lock only when it is a fleet lane with a fleet scope (`EVOLVE_FLEET=1` and a non-empty `EVOLVE_FLEET_SCOPE`). A sequential `evolve loop --resume` can inherit `EVOLVE_FLEET=1` from its shell. It has no fleet scope, so it takes the project lock. A sequential cycle always takes the lock.
+
+In wave 150, before this rule, the resume of cycle 2106 took the project lock for its full run. One millisecond later, the resume of cycle 2107 stopped with `acquire lock: core: project lock held by another process`. The lane exited, it spent one auto-resume, and the pool had one less live lane.
+
+Proof: `go/internal/core/lane_resume_test.go`, `go/cmd/evolve/cmd_cycle_lane_resume_test.go`, `TestRunCycleFromPhase_ASequentialResumeThatInheritedTheFleetFlagWithoutAScopeTakesTheProjectLock`, the lock tests in `go/internal/core/fleet_lock_test.go`, and the wiring test `TestCycleRunRoot_AFleetLaneResumesTheQuotaPausedCycleOfItsTodoAtThePausedPhaseWhileASiblingHoldsTheProjectLock`. The wiring test runs the real `evolve cycle run` root with a paused build while the real project lock is held. Scout does not run, and Build runs at once.
 
 ## Terminal closeout
 

@@ -2,9 +2,14 @@ package core
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
 const laneQuotaReason = "quota-likely"
@@ -51,6 +56,30 @@ func latestAttempt(states []perRunState, scope []string) (perRunState, bool) {
 
 func laneQuotaPaused(st perRunState) bool {
 	return st.enabled && st.reason == laneQuotaReason && !st.leased && st.phase != string(PhaseEnd) && st.phase != "aborted"
+}
+
+type ResumeHeldError struct {
+	Workspace string
+	Holder    runlease.Lease
+}
+
+func (e *ResumeHeldError) Error() string {
+	return fmt.Sprintf("resume: %s is held by run %q, pid %d (heartbeat %s)", e.Workspace, e.Holder.RunID, e.Holder.OwnerPID, e.Holder.HeartbeatAt)
+}
+
+func TakeResumeLease(workspace string, now time.Time) error {
+	held, ok, err := runlease.Read(workspace)
+	if err != nil {
+		return fmt.Errorf("resume: %w", err)
+	}
+	if ok && runlease.Fresh(held, now, 0) {
+		return &ResumeHeldError{Workspace: workspace, Holder: held}
+	}
+	return runlease.Write(workspace, runlease.Lease{OwnerPID: os.Getpid()}, now)
+}
+
+func scopedFleetLane(env map[string]string) bool {
+	return fleetMode(env) && len(ScopeIDs(env[ipcenv.FleetScopeKey])) > 0
 }
 
 func normalizedIDs(raw []string) []string {

@@ -40,7 +40,7 @@ func TestRunCycleFromPhase_AFleetLaneResumesWhileAnotherLaneHoldsTheProjectLock(
 	st.lockHeld = true
 	runners := buildRunners(nil)
 	o := NewOrchestrator(st, &fakeLedger{}, runners, WithWorktreeProvisioner(&fakeWorktree{path: st.cycleState.ActiveWorktree}))
-	req := CycleRequest{ProjectRoot: projectRoot, GoalHash: "g", Env: map[string]string{"EVOLVE_FLEET": "1"}}
+	req := CycleRequest{ProjectRoot: projectRoot, GoalHash: "g", Env: map[string]string{"EVOLVE_FLEET": "1", "EVOLVE_FLEET_SCOPE": "todo-a"}}
 
 	if _, err := o.RunCycleFromPhase(context.Background(), req, &ResumePoint{Phase: string(PhaseBuild), CycleID: 9}); err != nil {
 		t.Fatalf("RunCycleFromPhase in a fleet lane: %v (a resumed lane must not refuse on the project lock of a sibling lane)", err)
@@ -60,5 +60,27 @@ func TestRunCycleFromPhase_OutsideAFleetTheResumeTakesTheProjectLock(t *testing.
 	}
 	if st.lockCount != 1 || st.lockHeld {
 		t.Errorf("lockCount = %d, held after return = %v; want one lock, released", st.lockCount, st.lockHeld)
+	}
+}
+
+func TestRunCycleFromPhase_ASequentialResumeThatInheritedTheFleetFlagWithoutAScopeTakesTheProjectLock(t *testing.T) {
+	t.Parallel()
+	for name, env := range map[string]map[string]string{
+		"no scope":    {"EVOLVE_FLEET": "1"},
+		"blank scope": {"EVOLVE_FLEET": "1", "EVOLVE_FLEET_SCOPE": " , "},
+		"scope only":  {"EVOLVE_FLEET_SCOPE": "todo-a"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			projectRoot, st := resumedCycleNine(t)
+			o := NewOrchestrator(st, &fakeLedger{}, buildRunners(nil), WithWorktreeProvisioner(&fakeWorktree{path: st.cycleState.ActiveWorktree}))
+
+			if _, err := o.RunCycleFromPhase(context.Background(), CycleRequest{ProjectRoot: projectRoot, GoalHash: "g", Env: env}, &ResumePoint{Phase: string(PhaseBuild), CycleID: 9}); err != nil {
+				t.Fatalf("RunCycleFromPhase: %v", err)
+			}
+			if st.lockCount != 1 {
+				t.Errorf("env %v took the project lock %d times, want 1: only a lane with a fleet scope may skip it", env, st.lockCount)
+			}
+		})
 	}
 }
