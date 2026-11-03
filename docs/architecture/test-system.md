@@ -225,6 +225,10 @@ Many tests build the same starting repository. `gittest.FromTemplate(t, name, bu
 5. A test that needs a unique history keeps its own build.
 6. A test binary calls `gittest.RemoveTemplates()` from `TestMain`, after `m.Run`. A binary that does not call it leaves its template in the temporary directory. The next binary removes the templates of processes that have exited.
 
+#### Host credentials
+
+A test calls `gittest.IsolateHostCredentials()` to clear the host git and GitHub credentials.
+
 ### 6.2 Where a new helper goes
 
 1. Use the standard library first: `os.WriteFile`, `slices.Equal`, `slices.Contains`, `strings.Contains`, `strconv.Itoa`, `maps.Equal`.
