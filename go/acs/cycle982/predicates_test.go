@@ -116,7 +116,7 @@ func TestC982_003_ConcurrentEnqueueNoLostWork(t *testing.T) {
 
 func TestC982_004_PrefixQueueGuardsSharedState(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	path := root + "/go/internal/fleet/prefixqueue.go"
+	path := root + "/go/internal/prefixqueue/prefixqueue.go"
 	if !acsassert.FileExists(t, path) {
 		t.Fatalf("prefixqueue.go missing at %s", path)
 	}

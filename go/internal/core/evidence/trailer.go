@@ -15,6 +15,7 @@ const (
 	KeyChallenge    = "Challenge-Token"
 	KeyArtifactSHA  = "Evolve-Artifact-SHA256"
 	KeyArtifactPath = "Evolve-Artifact-Path"
+	KeyAuditTree    = "Evolve-Audit-Tree"
 )
 
 type Trailer struct {
