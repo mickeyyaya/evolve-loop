@@ -794,6 +794,8 @@ A contract row pins the order: a read of an unrelated run after the repo grant i
 
 The macOS Keychain is reached through a system service, not through a file read. The deny of `$HOME` therefore does not stop the Claude OAuth login. X5 proves it with a contract row: the cell reads the item `Claude Code-credentials` of a fixture keychain with `security find-generic-password`.
 
+The Claude Code harness reads `~/.config/gh` for its PR status footer, with no agent request. On 2026-11-03 the logs held about 1,128 `ISOLATION_I5_VIOLATION` reads of that directory by LLM cells. The `--settings` data of the claude manifests sets `"prStatusFooterEnabled":false`, and the footer is off (AD1-2). The key name comes from the strings of the 2.1.316 binary, because the public docs do not name it. `TestEveryClaudeSettingsFlagTurnsThePRStatusFooterOff` pins the key on each claude `--settings` flag. The setting stops one reader only, and the cell tool view (AD1-3) covers the other readers.
+
 ### 9.1 As built (X7)
 
 Before X7, the four kernel guards were Claude Code PreToolUse hooks only (`.claude/settings.json`, research F1.6). An agy, codex or ollama pane got none of them. X7 puts each guarantee in a layer that does not depend on the CLI. The hooks stay as defence in depth in Claude Code panes.

@@ -97,7 +97,7 @@
           "--setting-sources",
           "project",
           "--settings",
-          "{\"skipDangerousModePermissionPrompt\":true}"
+          "{\"skipDangerousModePermissionPrompt\":true,\"prStatusFooterEnabled\":false}"
         ]
       },
       "note": "project scope drops the user settings; --settings re-declares only the bypass acceptance (docs/architecture/packages/internal-bridge.md)"

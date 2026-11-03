@@ -63,7 +63,7 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 			cli:    "claude-tmux",
 			binary: "claude",
 			marker: "❯",
-			want:   `claude --strict-mcp-config --model sonnet --dangerously-skip-permissions --setting-sources project --settings '{"skipDangerousModePermissionPrompt":true}' --effort medium --append-system-prompt-file {identity} --allowedTools Read Write --exclude-dynamic-system-prompt-sections --disable-slash-commands --plugin-dir .evolve/plugin`,
+			want:   `claude --strict-mcp-config --model sonnet --dangerously-skip-permissions --setting-sources project --settings '{"skipDangerousModePermissionPrompt":true,"prStatusFooterEnabled":false}' --effort medium --append-system-prompt-file {identity} --allowedTools Read Write --exclude-dynamic-system-prompt-sections --disable-slash-commands --plugin-dir .evolve/plugin`,
 			absent: []string{"--no-session-persistence"},
 		},
 		{
