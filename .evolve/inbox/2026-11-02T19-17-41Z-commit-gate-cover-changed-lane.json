@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "the gate refuses a commit with a changed function below 100%",
+    "one test run feeds selfcheck, apicover and Check",
+    "100% coverage on changed functions"
+  ],
+  "campaign": "docs/plans/cover-changed-gate-2026-10",
+  "created_at": "2026-11-02T19:17:41Z",
+  "deps": [],
+  "files": [
+    "go/internal/commitgate"
+  ],
+  "fix": "Run the changed packages with -coverprofile in the commit gate's Go lane and call covchanged Workspace.Check; reuse the one test run (M4).",
+  "id": "commit-gate-cover-changed-lane",
+  "kind": "feature",
+  "notes": "commit gate is protected",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "console, 2026-11-03, plan audit of docs/plans (operator request: no task overlooked); plan docs/plans/cover-changed-gate-2026-10.md",
+  "summary": "Plan D2/Q1 deferred it to the next item; commitgate has no coverprofile or covchanged call. CI catches the gap later (PR #1239 lost a CI round to it).",
+  "title": "Cover-changed D2: the commit gate measures changed-function coverage",
+  "weight": 0.45
+}

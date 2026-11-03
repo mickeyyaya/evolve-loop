@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "each path tags its process tree",
+    "gc reaps a leaked probe session in a test with an injected sender"
+  ],
+  "campaign": "docs/plans/dispatch-process-hygiene-2026-10",
+  "created_at": "2026-11-02T19:17:42Z",
+  "deps": [],
+  "files": [
+    "go/internal/bridge"
+  ],
+  "fix": "Route each of these launch paths through the tagged proctree so gc can reap them.",
+  "id": "dispatch-hygiene-other-kill-paths",
+  "kind": "bug",
+  "notes": "never test-drive a live kill guard; inject the sender",
+  "origin": "console",
+  "priority_class": "stability",
+  "source": "console, 2026-11-03, plan audit of docs/plans (operator request: no task overlooked); plan docs/plans/dispatch-process-hygiene-2026-10.md",
+  "summary": "Plan 'Later' list; modelprobe-sessionrecord-unreapable covers only the session registry path.",
+  "title": "Dispatch hygiene: tag and reap the probe sessions of capture_models, launch_model_verification and recipe_adapter",
+  "weight": 0.3
+}

@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "a resumed cycle continues at its recorded rung",
+    "test covers a quota-paused resume"
+  ],
+  "campaign": "docs/plans/retry-ladder-2026-10",
+  "created_at": "2026-11-02T19:17:49Z",
+  "deps": [],
+  "files": [
+    "go/internal/core/resume.go"
+  ],
+  "fix": "Persist and restore the ladder state across a resume for every retry path.",
+  "id": "retry-ladder-resume-keeps-ladder-state",
+  "kind": "bug",
+  "notes": "protected core resume path",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "console, 2026-11-03, plan audit of docs/plans (operator request: no task overlooked); plan docs/plans/retry-ladder-2026-10.md",
+  "summary": "Plan section 5: a resumed run keeps ladder state only inside the correction loop.",
+  "title": "Retry ladder gap 2: a resumed run keeps its ladder state outside the correction loop",
+  "weight": 0.4
+}

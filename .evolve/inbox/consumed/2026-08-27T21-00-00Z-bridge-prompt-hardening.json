@@ -1,24 +1,33 @@
 {
-  "id": "bridge-prompt-hardening",
-  "kind": "sweep",
-  "weight": 0.6,
-  "title": "Sweep: bridge prompt hardening (24 auditor prescriptions amortised)",
-  "summary": "Bridge/prompt-delivery prescriptions: persona composition, tmux dispatch, prompt-body assembly. Amortised from 24 content-hash carryoverTodos that were unreachable by any operator directive: their ids were 32-char hashes, so goal-text could never name them and triage could not prioritise them (all 144 were stamped priority=high, which is the same as none being high). Queue audit 2026-08-27. Member prescriptions verbatim below; work them as one sweep, smallest-blast-radius first, and retire the group when the theme is clean.",
+  "consumed": {
+    "at": "2026-11-03T01:18:16Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Retired by operator decision 2026-11-03 (docs/plans/architecture-decisions-2026-11.md AD2-0): of 24 members, 3 cited paths are gone and the rest landed or were one-off cycle instructions. The survivor is filed as tmux-submit-verify-eight-rune-floor."
+  },
+  "created_at": "2026-08-27T21:00:00Z",
   "files": [
     "go/internal/core/defectledger/schema.go",
     "go/internal/bridge/driver_tmux_wait_disposition.go",
     "go/internal/bridge/driver_tmux_wait_closeout.go"
   ],
+  "id": "bridge-prompt-hardening",
+  "kind": "sweep",
+  "merge_notes": [
+    "inbox review 2026-09-27: prescription d82379d5 moved to retro-events-stream-missing; fix it there, not here.",
+    "inbox review 2026-09-27: prescription d562cfbb moved to retro-events-stream-missing; fix it there, not here.",
+    "inbox review 2026-09-27: prescription d47b63a9 moved to retro-events-stream-missing; fix it there, not here."
+  ],
   "prescriptions": [
     {
       "origin_id": "d365e57d980d38614cb45ecc7a56c60bb",
       "first_seen_cycle": 1418,
-      "text": "PRESCRIPTION: go/internal/phases/audit/defect_ledger.go:757-765 — the inlined dispositionSchemaExample's DEFERRED entry carries a fully-formed reusable `reason` and is echoed straight into the failing agent's next prompt, while the DEFERRED branch at :672-678 checks only non-emptiness; replace it with a self-evidently non-reusable placeholder such as \"<why THIS id is deferred — one sentence naming the id's defect>\" while keeping id/status/evidence literal"
+      "text": "PRESCRIPTION: go/internal/phases/audit/defect_ledger.go:757-765 — the inlined dispositionSchemaExample's DEFERRED entry carries a fully-formed reusable `reason` and is echoed straight into the failing agent's next prompt, while the DEFERRED branch at :672-678 checks only non-emptiness; replace it with a self-evidently non-reusable placeholder such as \"\u003cwhy THIS id is deferred — one sentence naming the id's defect\u003e\" while keeping id/status/evidence literal"
     },
     {
       "origin_id": "d567cbc5a4c061d558e92335705a1b271",
       "first_seen_cycle": 1444,
-      "text": "PRESCRIPTION: In go/internal/tokenusage/fillpct.go, saturate or reject a negative/overflowed sum in PromptTokens and return FillPctUnmeasured from FillPct when promptTokens < 0; keep over-100% readings unclamped"
+      "text": "PRESCRIPTION: In go/internal/tokenusage/fillpct.go, saturate or reject a negative/overflowed sum in PromptTokens and return FillPctUnmeasured from FillPct when promptTokens \u003c 0; keep over-100% readings unclamped"
     },
     {
       "origin_id": "d22c4497b5a5a621ddf2a6a2bb0555e12",
@@ -33,12 +42,12 @@
     {
       "origin_id": "d0a3d0c2ddcc6ce1dcc46d98778f87503",
       "first_seen_cycle": 1517,
-      "text": "PRESCRIPTION: Extend the agents/evolve-auditor.md:190 exemption clause to name the <!-- evolve-audit-chain --> block alongside acs-verdict.json / Ledger Entry JSON / AC-cite table — fold onto the existing line, the persona budget has one line of headroom (750/751)"
+      "text": "PRESCRIPTION: Extend the agents/evolve-auditor.md:190 exemption clause to name the \u003c!-- evolve-audit-chain --\u003e block alongside acs-verdict.json / Ledger Entry JSON / AC-cite table — fold onto the existing line, the persona budget has one line of headroom (750/751)"
     },
     {
       "origin_id": "dbb895087ef294cd241ccf3230265db0a",
       "first_seen_cycle": 1526,
-      "text": "PRESCRIPTION: Apply the same >=8-rune floor to the forward branch of pendingAtInputLine (driver_tmux_submitverify.go:88) so a short echo candidate cannot arm a re-send, and add a table row to TestPendingAtInputLine covering a sub-floor echo."
+      "text": "PRESCRIPTION: Apply the same \u003e=8-rune floor to the forward branch of pendingAtInputLine (driver_tmux_submitverify.go:88) so a short echo candidate cannot arm a re-send, and add a table row to TestPendingAtInputLine covering a sub-floor echo."
     },
     {
       "origin_id": "d7fe0c9796bf7cf46a879f22764970af8",
@@ -63,7 +72,7 @@
     {
       "origin_id": "de0511b4f0492f47efc4cbc40a358bd95",
       "first_seen_cycle": 1550,
-      "text": "PRESCRIPTION: Add t.Skip(\"pending fix: artifactDetector must require a post-dispatch write\") to TestArtifactDetector_PreExistingArtifactRequiresPostDispatchWrite, or revert go/internal/bridge/completion_test.go from this lane's tree and carry the reproducer forward via next-cycle-brief.json, then re-run: cd go && go test -count=1 ./internal/bridge/..."
+      "text": "PRESCRIPTION: Add t.Skip(\"pending fix: artifactDetector must require a post-dispatch write\") to TestArtifactDetector_PreExistingArtifactRequiresPostDispatchWrite, or revert go/internal/bridge/completion_test.go from this lane's tree and carry the reproducer forward via next-cycle-brief.json, then re-run: cd go \u0026\u0026 go test -count=1 ./internal/bridge/..."
     },
     {
       "origin_id": "d5406d70a3d0010de46fbfd49ea0cc0a1",
@@ -131,13 +140,10 @@
       "text": "PRESCRIPTION: Before ship, un-track the out-of-lane phase spec: git rm --cached .evolve/phases/production-path-wiring-proof/phase.json - do NOT delete it from disk, dispatch reads minted stubs from disk; alternatively land it as its own reviewed change WITH an agents/evolve-production-path-wiring-proof.md persona"
     }
   ],
-  "created_at": "2026-08-27T21:00:00Z",
-  "merge_notes": [
-    "inbox review 2026-09-27: prescription d82379d5 moved to retro-events-stream-missing; fix it there, not here.",
-    "inbox review 2026-09-27: prescription d562cfbb moved to retro-events-stream-missing; fix it there, not here.",
-    "inbox review 2026-09-27: prescription d47b63a9 moved to retro-events-stream-missing; fix it there, not here."
-  ],
   "priority_class": "hygiene",
   "priority_rationale": "inbox review 2026-09-27: Once the relaunch moves out, two text fixes remain. Agents can echo the reusable DEFERRED reason verbatim, which keeps this above the floor.",
-  "review_status": "inbox review 2026-09-27: PARTIAL. 18 of 24 prescriptions are fixed or obsolete. FIXED: fillpct saturation (tokenusage/fillpct.go:22-58); peak-turn contributors (bridge/attempt_telemetry.go:219-222); agy exhausted_regex no longer has a bare rate-limit match (manifests/agy-tmux.json); the 8-rune echo floor now applies in both directions (driver_tmux_submitverify.go:70,73); a capture error mid-resend is logged (:128-133); agy submit-verify now reports an explicit 'NOT verified' (:101-104); the prompt-wedge short-circuit now polls t"
+  "review_status": "inbox review 2026-09-27: PARTIAL. 18 of 24 prescriptions are fixed or obsolete. FIXED: fillpct saturation (tokenusage/fillpct.go:22-58); peak-turn contributors (bridge/attempt_telemetry.go:219-222); agy exhausted_regex no longer has a bare rate-limit match (manifests/agy-tmux.json); the 8-rune echo floor now applies in both directions (driver_tmux_submitverify.go:70,73); a capture error mid-resend is logged (:128-133); agy submit-verify now reports an explicit 'NOT verified' (:101-104); the prompt-wedge short-circuit now polls t",
+  "summary": "Bridge/prompt-delivery prescriptions: persona composition, tmux dispatch, prompt-body assembly. Amortised from 24 content-hash carryoverTodos that were unreachable by any operator directive: their ids were 32-char hashes, so goal-text could never name them and triage could not prioritise them (all 144 were stamped priority=high, which is the same as none being high). Queue audit 2026-08-27. Member prescriptions verbatim below; work them as one sweep, smallest-blast-radius first, and retire the group when the theme is clean.",
+  "title": "Sweep: bridge prompt hardening (24 auditor prescriptions amortised)",
+  "weight": 0.6
 }

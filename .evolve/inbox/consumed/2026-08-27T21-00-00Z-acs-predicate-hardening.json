@@ -1,9 +1,11 @@
 {
-  "id": "acs-predicate-hardening",
-  "kind": "sweep",
-  "weight": 0.6,
-  "title": "Sweep: acs predicate hardening (20 auditor prescriptions amortised)",
-  "summary": "ACS predicate authoring and shared acsassert helpers: end-of-options handling, uniqueness-checked lookups, satisfiability, scoped selection. Amortised from 20 content-hash carryoverTodos that were unreachable by any operator directive: their ids were 32-char hashes, so goal-text could never name them and triage could not prioritise them (all 144 were stamped priority=high, which is the same as none being high). Queue audit 2026-08-27. Member prescriptions verbatim below; work them as one sweep, smallest-blast-radius first, and retire the group when the theme is clean.",
+  "consumed": {
+    "at": "2026-11-03T01:18:16Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Retired by operator decision 2026-11-03 (docs/plans/architecture-decisions-2026-11.md AD2-0): the sweep is split per member. Two survivors are filed as acsassert-end-of-options-and-sha and inbox-consumed-record-lookup-unique. One member landed (acssuite NoPredicatesID); the per-cycle predicate fixes of cycles 1437-1552 are historical, and go/acs/cycle1517 is gone."
+  },
+  "created_at": "2026-08-27T21:00:00Z",
   "files": [
     "go/internal/acssuite/acssuite.go",
     "go/cmd/evolve/cmd_acs.go",
@@ -15,6 +17,8 @@
     "go/acs/cycle1546/predicates_test.go",
     "go/acs/cycle1547/predicates_test.go"
   ],
+  "id": "acs-predicate-hardening",
+  "kind": "sweep",
   "prescriptions": [
     {
       "origin_id": "d58e5d3800af6f11f9478e4a32cc3b907",
@@ -24,7 +28,7 @@
     {
       "origin_id": "da74397473973ecb2ae54d8ae0bff33a1",
       "first_seen_cycle": 1420,
-      "text": "PRESCRIPTION: Make the consumed-record lookup uniqueness-checked (fail on >1 record carrying the same id) in shared pkg/acsassert code so the next consume cycle inherits it"
+      "text": "PRESCRIPTION: Make the consumed-record lookup uniqueness-checked (fail on \u003e1 record carrying the same id) in shared pkg/acsassert code so the next consume cycle inherits it"
     },
     {
       "origin_id": "dcdc82e4cd641d47a8e2f0e18a0ca1c53",
@@ -99,7 +103,7 @@
     {
       "origin_id": "d280215abf79027d2b0f4bfcde82f34ce",
       "first_seen_cycle": 1536,
-      "text": "PRESCRIPTION: Bind continuation cycles' ACS scope to the ancestor's go/acs/cycle<ancestor> package so inherited acceptance predicates count toward the shipping cycle's red_count"
+      "text": "PRESCRIPTION: Bind continuation cycles' ACS scope to the ancestor's go/acs/cycle\u003cancestor\u003e package so inherited acceptance predicates count toward the shipping cycle's red_count"
     },
     {
       "origin_id": "dfa899f5b45db36f32500bdb042bfeb9a",
@@ -109,7 +113,7 @@
     {
       "origin_id": "dc0aa144eb892d25b6d79d53eac3841fa",
       "first_seen_cycle": 1552,
-      "text": "PRESCRIPTION: Move or alias the cycle-scoped ACS predicates so `evolve acs suite --cycle <N>` grades a continuation lane's predicates instead of reporting cycle=0"
+      "text": "PRESCRIPTION: Move or alias the cycle-scoped ACS predicates so `evolve acs suite --cycle \u003cN\u003e` grades a continuation lane's predicates instead of reporting cycle=0"
     },
     {
       "origin_id": "dc0b8eea1eefe4eca719602a256ae745b",
@@ -117,8 +121,10 @@
       "text": "PRESCRIPTION: evolve acs suite resolved 0 predicates when invoked from go/ yet still wrote verdict=PASS green=0 total=0 — a suite that resolved no predicates should refuse rather than emit PASS"
     }
   ],
-  "created_at": "2026-08-27T21:00:00Z",
   "priority_class": "hygiene",
   "priority_rationale": "inbox review 2026-09-27: Most open members are single-predicate or shared-helper hygiene. The two integrity-relevant ones (a red predicate landing under a green gate; an empty suite reading PASS) have designed or better-scoped homes.",
-  "review_status": "inbox review 2026-09-27: PARTIAL. Of 20 members: 5 FIXED. d3f8e38c: ClassifyBadVerdict now pairs fences through an open-run index (go/internal/deliverable/salvage_instrument.go:146-157). d7a213a9: TestC1444_006 already runs -run 'TestProductionDeps.*ContextFill' (acs/cycle1444:160). d67bacd7: cycle1488:130 uses FileNotContains. d1822a29: worktreeBaseTreeSHA takes the lane base (core/phase_bindings.go:202,249). daf12fce: the auditor persona inlines the 32KB budget above the Reference Index (agents/evolve-auditor.md:221 vs :273). "
+  "review_status": "inbox review 2026-09-27: PARTIAL. Of 20 members: 5 FIXED. d3f8e38c: ClassifyBadVerdict now pairs fences through an open-run index (go/internal/deliverable/salvage_instrument.go:146-157). d7a213a9: TestC1444_006 already runs -run 'TestProductionDeps.*ContextFill' (acs/cycle1444:160). d67bacd7: cycle1488:130 uses FileNotContains. d1822a29: worktreeBaseTreeSHA takes the lane base (core/phase_bindings.go:202,249). daf12fce: the auditor persona inlines the 32KB budget above the Reference Index (agents/evolve-auditor.md:221 vs :273). ",
+  "summary": "ACS predicate authoring and shared acsassert helpers: end-of-options handling, uniqueness-checked lookups, satisfiability, scoped selection. Amortised from 20 content-hash carryoverTodos that were unreachable by any operator directive: their ids were 32-char hashes, so goal-text could never name them and triage could not prioritise them (all 144 were stamped priority=high, which is the same as none being high). Queue audit 2026-08-27. Member prescriptions verbatim below; work them as one sweep, smallest-blast-radius first, and retire the group when the theme is clean.",
+  "title": "Sweep: acs predicate hardening (20 auditor prescriptions amortised)",
+  "weight": 0.6
 }

@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "Red test first: a stub-driver test: a fixture item with a landed commit yields a `consume` proposal.",
+    "100% statement coverage on each changed function; zero code comments.",
+    "The spec and package note of the changed package state the change in STE."
+  ],
+  "campaign": "architecture-decisions-2026-11",
+  "created_at": "2026-11-03T00:33:16Z",
+  "files": [
+    "go/cmd/evolve"
+  ],
+  "fix": "Graft D: an on-demand LLM curator, `evolve inbox audit`. It writes proposals only. It runs when the count of probe-less old items crosses a policy threshold",
+  "id": "arch-decisions-ad2-9-graft-d-an-on-demand-llm-curator",
+  "intake_override": {
+    "reason": "console: starts an LLM",
+    "console_route": true
+  },
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "source": "operator decisions 2026-11-03; plan docs/plans/architecture-decisions-2026-11.md component AD2-9",
+  "summary": "Component AD2-9 of the 2026-11-03 architecture decisions plan. Graft D: an on-demand LLM curator, `evolve inbox audit`. It writes proposals only. It runs when the count of probe-less old items crosses a policy threshold Stage: none. Size: M. Route: console: starts an LLM. Plan: docs/plans/architecture-decisions-2026-11.md; research: docs/research/architecture-decisions-2026-11.md.",
+  "title": "AD2-9: Graft D: an on-demand LLM curator, evolve inbox audit",
+  "weight": 0.8
+}

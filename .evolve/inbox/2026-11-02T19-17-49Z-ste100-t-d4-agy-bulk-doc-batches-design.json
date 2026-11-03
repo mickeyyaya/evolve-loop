@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "the plan records the decision with a scored table",
+    "batch items exist for S2-S8"
+  ],
+  "campaign": "docs/plans/ste100-docs-rewrite-2026-10",
+  "created_at": "2026-11-02T19:17:49Z",
+  "deps": [],
+  "files": [
+    "docs/plans/ste100-docs-rewrite-2026-10.md"
+  ],
+  "fix": "Score options A, B and C, record the choice in the plan, then split ste-rewrite-campaign-remaining into batches that follow it.",
+  "id": "ste100-t-d4-agy-bulk-doc-batches-design",
+  "intake_override": {
+    "reason": "operator decision or console research from the 2026-11-03 plan audit; a lane cannot decide it",
+    "console_route": true
+  },
+  "kind": "research",
+  "notes": "",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "route": "console-manual",
+  "source": "console, 2026-11-03, plan audit of docs/plans (operator request: no task overlooked); plan docs/plans/ste100-docs-rewrite-2026-10.md",
+  "summary": "Plan section 9: 'Until the design lands, the batches wait'. S2-S8 rest on this decision (a doc-rewrite kind, a phase, or routing: options A, B, C).",
+  "title": "STE rewrite T-D4: design how agy runs the bulk doc-rewrite batches",
+  "weight": 0.45
+}
