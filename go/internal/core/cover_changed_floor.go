@@ -44,7 +44,9 @@ func coverChangedFailures(ctx context.Context, in ReviewInput, paths []string) [
 		if unitRunRefuses(ctx, in, moduleDir, pkgs) {
 			return nil
 		}
-		return coverChangedReport(coverChangedResult(stage, coverChangedTestsFailedHeadline, []string{floorFailureDiagnostic(out)}))
+		if lines := laneRedLines(ctx, in, pkgs, out); lines != nil {
+			return coverChangedReport(coverChangedResult(stage, coverChangedTestsFailedHeadline, lines))
+		}
 	case coverStatusPlumbingError:
 		fmt.Fprintf(os.Stderr, "[build-floor] WARN cover-changed could not make a coverage profile (%s); `make -C go cover-changed` and CI still judge coverage\n", out)
 		return nil

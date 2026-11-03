@@ -136,6 +136,7 @@ func TestCoverChangedFailures_AFailingTestRefusesAtEnforceAndOnlyWarnsAtShadow(t
 	repo, base := coverChangedRepo(t)
 	stubCoverChangedProfiler(t, coverChangedProfile, "--- FAIL: TestF\nFAIL\tp", coverStatusTestsFailed)
 	stubSelfCheckRunner(t, "ok\tp", true)
+	stubCoverChangedBaseRunner(t, nil, nil)
 
 	enforce := coverChangedFailures(context.Background(), floorInput(t, floorRoot(t, `{"cover_changed":{"stage":"enforce"}}`), repo, base), []string{"go/p/a.go"})
 	shadow := coverChangedFailures(context.Background(), floorInput(t, floorRoot(t, `{"cover_changed":{"stage":"shadow"}}`), repo, base), []string{"go/p/a.go"})
