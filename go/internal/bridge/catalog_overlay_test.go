@@ -127,3 +127,35 @@ func TestModelCatalogDirFn_Injectable(t *testing.T) {
 	}
 	_ = filepath.Join(want, modelcatalog.FileName)
 }
+
+func TestApplyCatalogTierMap_AManifestWithNoModelChoiceKeepsNoTierMap(t *testing.T) {
+	t.Parallel()
+	got := applyCatalogTierMap(Manifest{CLI: "claude-cloud"}, liveCatalog())
+	if len(got.ModelTierMap) != 0 {
+		t.Fatalf("the catalog gave a tier map to a seat that declares no model choice: %v", got.ModelTierMap)
+	}
+}
+
+func TestApplyCatalogTierMap_AManifestWithAModelTierParamStillOverlays(t *testing.T) {
+	t.Parallel()
+	m := Manifest{CLI: "claude-tmux", Params: map[string]ParamSpec{"model_tier": {Channel: "flag", Flag: "--model"}}}
+	got := applyCatalogTierMap(m, liveCatalog())
+	if got.ModelTierMap["deep"] != "claude-opus-4-8" {
+		t.Fatalf("a seat with a model_tier param lost the overlay: %v", got.ModelTierMap)
+	}
+}
+
+func TestLoadManifest_TheCloudSeatKeepsNoTierMapUnderALiveCatalog(t *testing.T) {
+	dir := t.TempDir()
+	if err := modelcatalog.Write(dir, liveCatalog()); err != nil {
+		t.Fatal(err)
+	}
+	injectCatalogDir(t, dir)
+	m, err := LoadManifest("claude-cloud")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(m.ModelTierMap) != 0 {
+		t.Fatalf("the overlay gave back the tier map that the manifest removes: %v", m.ModelTierMap)
+	}
+}

@@ -16,6 +16,8 @@
 | `Path(evolveDir, runID)` | the file of a run. It refuses a run id that is not one name of letters, digits, `.`, `_` and `-`, with a letter or a digit first. |
 | `Write(evolveDir, r)` | creates the record file (`O_EXCL`) and returns its path. It refuses to replace a record (`fs.ErrExist`). |
 | `Read(evolveDir, runID)` | reads the record. It refuses a file that is not JSON and a file that holds another run id. |
+| `Record.Cloud` | the `cloudlaunch.Session` of a run on a cloud seat, else nil (JSON key `cloud`) |
+| `List(evolveDir)` | each record of `Subdir`, in the order of `ts`. No directory gives no record. A bad record fails the list, and the error names the run. |
 
 ## Invariants
 

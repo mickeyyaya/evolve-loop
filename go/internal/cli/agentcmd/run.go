@@ -18,6 +18,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cli/phasecmd"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cloudlaunch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/launchrecord"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmcalls"
@@ -54,6 +55,7 @@ type Envelope struct {
 	LaunchRecord string                   `json:"launch_record,omitempty"`
 	Worktree     string                   `json:"worktree,omitempty"`
 	Workspace    string                   `json:"workspace,omitempty"`
+	Cloud        *cloudlaunch.Session     `json:"cloud,omitempty"`
 	Error        string                   `json:"error,omitempty"`
 }
 
@@ -89,6 +91,7 @@ type launchOutcome struct {
 	verdict    string
 	findings   reportdoc.SeverityCounts
 	writer     bool
+	cloudSeat  bool
 	treeBefore string
 	treeAfter  string
 }
@@ -210,7 +213,12 @@ func (c command) launch(ctx context.Context, r standaloneRun, signals *signalcen
 	out.report, out.hasReport = readReport(r)
 	out.cli, out.model, out.family = spy.cli, spy.model, llmroute.Family(spy.cli)
 	out.writer = len(r.writable) > 0
-	if out.runErr == nil {
+	out.cloudSeat = c.deps.CloudSeat(out.cli)
+	switch {
+	case out.runErr != nil:
+	case out.cloudSession() != nil:
+		out = out.withLaunchVerdict()
+	default:
 		out = out.withReportVerdict(r, signals)
 	}
 	return out
@@ -308,6 +316,17 @@ func (out launchOutcome) reportSHA() string {
 	return hex.EncodeToString(sum[:])
 }
 
+func (out launchOutcome) cloudSession() *cloudlaunch.Session {
+	if !out.cloudSeat || out.runErr != nil {
+		return nil
+	}
+	s, launched := cloudlaunch.Parse(out.report)
+	if !launched {
+		return nil
+	}
+	return &s
+}
+
 func (out launchOutcome) launchedModel() string {
 	if out.resp.ResolvedModel != "" {
 		return out.resp.ResolvedModel
@@ -331,7 +350,7 @@ func writeLaunchRecord(r standaloneRun, out launchOutcome, now time.Time) (strin
 	rec := launchrecord.Record{
 		RunID: r.label, Profile: r.spec.Name, CLI: out.cli, Family: out.family, Model: out.launchedModel(),
 		Verdict: out.verdict, WritesSource: out.writer, TreeBefore: out.treeBefore, TreeAfter: out.treeAfter, ArtifactSHA256: out.reportSHA(),
-		Worktree: r.worktree, TS: now.UTC().Format(time.RFC3339),
+		Worktree: r.worktree, TS: now.UTC().Format(time.RFC3339), Cloud: out.cloudSession(),
 	}
 	path, err := launchrecord.Write(paths.EvolveDirOf(r.root), rec)
 	if err != nil {
@@ -350,7 +369,7 @@ func emit(o runOptions, r standaloneRun, out launchOutcome, recordPath string, f
 		Profile: r.spec.Name, RunLabel: r.label, Verdict: resp.Verdict, Findings: out.findings, Report: out.report,
 		Model: out.launchedModel(), ModelSource: resp.ModelSource, CostUSD: resp.CostUSD, Tokens: resp.Tokens,
 		DurationMS: resp.DurationMS, Diagnostics: resp.Diagnostics,
-		CLI: out.cli, Family: out.family, LaunchRecord: recordPath, Worktree: r.worktree,
+		CLI: out.cli, Family: out.family, LaunchRecord: recordPath, Worktree: r.worktree, Cloud: out.cloudSession(),
 	}
 	if o.keep {
 		env.Workspace = r.workspace

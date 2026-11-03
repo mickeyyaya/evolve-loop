@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "cli": "claude-cloud",
+  "base": "claude-tmux",
+  "transport": "cloud",
+  "default_tier": "full",
+  "tier_dependencies": {
+    "full": ["claude", "tmux", "git"],
+    "hybrid": null,
+    "degraded": null
+  },
+  "capabilities": ["tools", "edit"],
+  "parsers": null,
+  "collectors": null,
+  "transcript": null,
+  "prompt_marker": null,
+  "transient_regex": null,
+  "default_args": [],
+  "default_model": null,
+  "update_argv": null,
+  "mcp_config_files": null,
+  "default_env": null,
+  "model_tier_map": null,
+  "model_freshness": null,
+  "params": null,
+  "controls": null,
+  "interactive_prompts": [],
+  "_notes_on_removed_patterns": null,
+  "note": "A cloud seat: claude --cloud starts a Claude Code session in the cloud and exits. The session clones the GitHub remote at the pushed branch and delivers a pull request later. It draws on the cloud-session credit of the account. It has no usage probe, no model choice and no local transcript.",
+  "cloud_launch": {
+    "args": ["--cloud"],
+    "session_regex": "(?m)^\\s*Created cloud session:\\s*(?P<title>\\S.*?)\\s*$",
+    "view_regex": "(?m)^\\s*View:\\s*(?P<url>https://claude\\.ai/\\S*?(?P<id>session_[A-Za-z0-9]+)\\S*)\\s*$",
+    "fail_regex": "(?m)^\\s*Error:\\s*(?P<reason>.*\\S)\\s*$",
+    "deadline_s": 120,
+    "remote_hosts": ["github.com"]
+  }
+}

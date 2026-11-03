@@ -109,7 +109,7 @@ func TestDoctorAuth_ClaudeKeychain(t *testing.T) {
 		LookupEnv:     mapLookup(map[string]string{"HOME": home}),
 		KeychainProbe: func(string) bool { return false },
 	})
-	for _, cli := range []string{"claude-p", "claude-tmux"} {
+	for _, cli := range []string{"claude-p", "claude-tmux", "claude-cloud"} {
 		if a := eng2.doctorAuth(cli); a.Configured {
 			t.Fatalf("%s: no file + no keychain should be unconfigured; got %+v", cli, a)
 		}
@@ -121,8 +121,10 @@ func TestDoctorEnvWarnings(t *testing.T) {
 	e := doctorEngine(map[string]string{
 		"ANTHROPIC_API_KEY": "k", "ANTHROPIC_BASE_URL": "u", "OPENAI_API_KEY": "o",
 	}, nil, 0, nil)
-	if w := e.doctorEnvWarnings("claude-p"); len(w) != 2 {
-		t.Fatalf("claude warnings = %v", w)
+	for _, cli := range []string{"claude-p", "claude-tmux", "claude-cloud"} {
+		if w := e.doctorEnvWarnings(cli); len(w) != 2 {
+			t.Fatalf("%s warnings = %v", cli, w)
+		}
 	}
 	if w := e.doctorEnvWarnings("codex"); len(w) != 1 {
 		t.Fatalf("codex warnings = %v", w)
@@ -247,5 +249,12 @@ func TestHeadlessProbeArgs(t *testing.T) {
 	m3 := Manifest{}
 	if got := headlessProbeArgs(m3); !slices.Equal(got, []string{"-p", "Reply only: PROBE_OK"}) {
 		t.Fatalf("got %v", got)
+	}
+}
+
+func TestDoctorDeep_TheCloudSeatRunsNoDeepProbe(t *testing.T) {
+	t.Parallel()
+	if got := doctorEngine(nil, nil, 0, nil).doctorDeep(context.Background(), "claude-cloud", "claude"); got.Ran {
+		t.Errorf("doctorDeep(claude-cloud) = %+v; a deep probe of the cloud seat would start a cloud session", got)
 	}
 }

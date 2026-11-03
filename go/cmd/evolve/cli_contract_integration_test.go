@@ -213,6 +213,13 @@ func contractAgentRoot(t *testing.T) map[string]string {
 	return map[string]string{"root": root}
 }
 
+func contractBadLaunchRecord(t *testing.T) map[string]string {
+	t.Helper()
+	vars := contractBareRoot(t)
+	contractWrite(t, vars["root"], ".evolve/agent-runs/agent-x-1.json", "{")
+	return vars
+}
+
 func contractSteRoot(t *testing.T) map[string]string {
 	t.Helper()
 	vars := contractPlane(t)

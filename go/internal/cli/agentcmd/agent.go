@@ -53,6 +53,7 @@ type Deps struct {
 	Getenv        func(string) string
 	Now           func() time.Time
 	VerbSchema    func(path string) string
+	CloudSeat     func(cli string) bool
 }
 
 func defaultBridge(projectRoot string, _ *signalcenter.Center) core.Bridge {
@@ -85,6 +86,9 @@ func New(d Deps) func(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 	}
 	if d.Now == nil {
 		d.Now = time.Now
+	}
+	if d.CloudSeat == nil {
+		d.CloudSeat = func(string) bool { return false }
 	}
 	if d.VerbSchema == nil {
 		d.VerbSchema = func(string) string { return "" }

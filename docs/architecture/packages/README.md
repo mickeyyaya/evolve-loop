@@ -48,6 +48,7 @@ Each Go package directory has one page. The page holds what the code cannot say:
 | `internal/covchanged` | the changed-function coverage gate: its parsers, its measurement, its verdict and its git adapter (one engine for the verb, the target and the floor) | [internal-covchanged.md](internal-covchanged.md) |
 | `internal/coversplit` | the coverage runs of a test package split from the package it tests: the `go/.cover-split` list, the plan, the profile merge and the guard | [internal-coversplit.md](internal-coversplit.md) |
 | `internal/cli/agentcmd` | the `evolve agent run` and `evolve agent list` commands: one read-only phase agent with no cycle (ADR-0152) | [internal-cli-agentcmd.md](internal-cli-agentcmd.md) |
+| `internal/cli/cloudcmd` | the `evolve cloud list` command: the cloud sessions of the launch records | [internal-cli-cloudcmd.md](internal-cli-cloudcmd.md) |
 | `internal/cli/phasecmd` | the `evolve phase` and `evolve phases` commands | [internal-cli-phasecmd.md](internal-cli-phasecmd.md) |
 | `internal/cli/guardcmd` | the `evolve guard`, commit-gate and `evolve eval` commands | [internal-cli-guardcmd.md](internal-cli-guardcmd.md) |
 | `internal/topngate` | holds a build to the tasks triage selected | [internal-topngate.md](internal-topngate.md) |
@@ -223,6 +224,7 @@ Each Go package directory has one page. The page holds what the code cannot say:
 | `internal/core/outcome` | the recording chokepoint for every terminal phase disposition | [internal-core-outcome.md](internal-core-outcome.md) |
 | `internal/cliadmit` | cross-process admission control for shared LLM CLIs | [internal-cliadmit.md](internal-cliadmit.md) |
 | `internal/ciwatch` | the CI watch that files a fix-forward item for a red run | [internal-ciwatch.md](internal-ciwatch.md) |
+| `internal/cloudlaunch` | the typed outcome of a cloud session launch and the repository checks before it | [internal-cloudlaunch.md](internal-cloudlaunch.md) |
 | `internal/llmcalls` | the model-try ledger and its performance index | [internal-llmcalls.md](internal-llmcalls.md) |
 | `internal/core/failurediag` | the phase failure sidecar and the delivery-failure classifier | [internal-core-failurediag.md](internal-core-failurediag.md) |
 | `internal/releaseconsistency` | the version-marker consistency check of a release | [internal-releaseconsistency.md](internal-releaseconsistency.md) |

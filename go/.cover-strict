@@ -114,3 +114,5 @@
 ./internal/citelemetry 100
 ./internal/coversplit 100
 ./internal/phases/ship/shiptest 100
+./internal/cloudlaunch 100
+./internal/cli/cloudcmd 100

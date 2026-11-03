@@ -424,6 +424,7 @@ Limits:
 | `clihealth list`, `usage` | always | `list` A, `usage` D (F7) | yes | yes | `evolve.clihealth.<verb>/1` | `usage` starts a usage probe of the CLI, not a model turn |
 | `agent list` | always | A | yes | yes | `evolve.agent.list/1` | ADR-0152 |
 | `agent capabilities` | always | A | yes | yes | `evolve.agent.capabilities/1` | the classes of §4.1 for a cell (§4.2); X17e |
+| `cloud list` | always | A | yes | yes | `evolve.cloud.list/1` | the cloud sessions of the launch records; it starts nothing |
 | `ci classify` | always | A unless `--rerun` (`--rerun` is D) | yes | yes | `evolve.ci.classify/1` | `--rerun` makes it `leased` |
 | `scan secrets` | always | A | yes | yes | `evolve.scan.secrets/1` | |
 | `docs ste-lint` | always | A | yes | yes | `evolve.docs.ste-lint/1` | |

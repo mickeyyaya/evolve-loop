@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/cloudlaunch"
 )
 
 func sample() Record {
@@ -131,5 +133,73 @@ func TestWrite_ADirectoryThatCannotBeMadeFails(t *testing.T) {
 	}
 	if _, err := Write(dir, sample()); err == nil {
 		t.Error("Write under a file = nil error, want a refusal")
+	}
+}
+
+func TestWriteThenRead_KeepsTheCloudSession(t *testing.T) {
+	dir := t.TempDir()
+	want := sample()
+	want.Cloud = &cloudlaunch.Session{Schema: cloudlaunch.Schema, Outcome: cloudlaunch.OutcomeLaunched, ID: "session_01", URL: "https://claude.ai/code/session_01", Title: "t", Repo: "acme/w", Branch: "main", CLI: "claude-cloud", TS: "2026-11-03T10:00:00Z"}
+	if _, err := Write(dir, want); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Read(dir, want.RunID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Cloud == nil || *got.Cloud != *want.Cloud {
+		t.Errorf("Read Cloud = %+v, want %+v", got.Cloud, want.Cloud)
+	}
+}
+
+func TestList_ReturnsEachRecordInTimeOrder(t *testing.T) {
+	dir := t.TempDir()
+	late, early := sample(), sample()
+	late.RunID, late.TS = "agent-a-2", "2026-11-03T11:00:00Z"
+	early.RunID, early.TS = "agent-z-1", "2026-11-03T09:00:00Z"
+	for _, r := range []Record{late, early} {
+		if _, err := Write(dir, r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(dir, Subdir, "notes.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(dir, Subdir, "dir.json"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	got, err := List(dir)
+	if err != nil {
+		t.Fatalf("List = %v", err)
+	}
+	if len(got) != 2 || got[0].RunID != early.RunID || got[1].RunID != late.RunID {
+		t.Errorf("List = %+v, want the early then the late record", got)
+	}
+}
+
+func TestList_NoRecordDirectoryIsAnEmptyList(t *testing.T) {
+	got, err := List(t.TempDir())
+	if err != nil || len(got) != 0 {
+		t.Errorf("List of no directory = %v, %v; want an empty list", got, err)
+	}
+}
+
+func TestList_FailsOnABadRecordOrAnUnreadableDirectory(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, Subdir), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, Subdir, "agent-x-1.json"), []byte("{"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := List(dir); err == nil || !strings.Contains(err.Error(), "agent-x-1") {
+		t.Errorf("List with a bad record = %v, want an error that names the run", err)
+	}
+	file := t.TempDir()
+	if err := os.WriteFile(filepath.Join(file, Subdir), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := List(file); err == nil {
+		t.Error("List of a file in place of the directory = nil error, want a failure")
 	}
 }

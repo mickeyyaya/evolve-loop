@@ -56,6 +56,8 @@ func (o Options) reviewRun(id, tree string) (ReviewRun, string) {
 		return ReviewRun{}, "the record has no bridge launch"
 	case rec.WritesSource:
 		return ReviewRun{}, "the run is a writer, not a review"
+	case rec.Cloud != nil:
+		return ReviewRun{}, "the run launched a cloud session, so no reviewer read the staged tree"
 	case rec.Verdict != core.VerdictPASS && rec.Verdict != core.VerdictWARN:
 		return ReviewRun{}, fmt.Sprintf("the review gave the verdict %q, not PASS or WARN", rec.Verdict)
 	case rec.ArtifactSHA256 == "":

@@ -82,6 +82,7 @@ var coreVerbs = []coreVerb{
 	{path: "clihealth usage", class: availAlways},
 	{path: "agent list", class: availAlways},
 	{path: "agent capabilities", class: availAlways},
+	{path: "cloud list", class: availAlways},
 	{path: "ci classify", class: availAlways},
 	{path: "scan secrets", class: availAlways},
 	{path: "docs ste-lint", class: availAlways},
