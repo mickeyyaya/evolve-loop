@@ -252,3 +252,123 @@ func TestFloorRun_RatchetTierRunsTheRatchetCheck(t *testing.T) {
 		t.Errorf("ratchet plan %q does not run `ratchet check`", lines)
 	}
 }
+
+func floorMakeRecipe(t *testing.T, makefile, target string) []string {
+	t.Helper()
+	raw, err := os.ReadFile(makefile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var recipe []string
+	inTarget := false
+	for _, line := range strings.Split(string(raw), "\n") {
+		if strings.HasPrefix(line, "\t") {
+			if inTarget {
+				recipe = append(recipe, strings.TrimSpace(line))
+			}
+			continue
+		}
+		inTarget = strings.HasPrefix(line, target+":")
+	}
+	return recipe
+}
+
+func floorAcsVetPatterns(recipe []string) []string {
+	var patterns []string
+	for _, line := range recipe {
+		fields := strings.Fields(line)
+		vet := slices.Index(fields, "vet")
+		if vet < 0 || !slices.Equal(fields[vet+1:min(vet+3, len(fields))], []string{"-tags", "acs"}) {
+			continue
+		}
+		for _, f := range fields[vet+3:] {
+			if strings.HasPrefix(f, "./") {
+				patterns = append(patterns, f)
+			}
+		}
+	}
+	return patterns
+}
+
+func floorPatternCovers(patterns []string, dir string) bool {
+	return slices.ContainsFunc(patterns, func(p string) bool {
+		if prefix, ok := strings.CutSuffix(p, "/..."); ok {
+			return dir == prefix || strings.HasPrefix(dir, prefix+"/")
+		}
+		return dir == p
+	})
+}
+
+func floorGoListSkips(name string) bool {
+	return name == "testdata" || strings.HasPrefix(name, "_") || strings.HasPrefix(name, ".")
+}
+
+func floorAcsPackageDirs(t *testing.T, goRoot string) []string {
+	t.Helper()
+	seen := map[string]bool{}
+	root := filepath.Join(goRoot, "acs")
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() && path != root && floorGoListSkips(d.Name()) {
+			return filepath.SkipDir
+		}
+		if d.IsDir() || !strings.HasSuffix(path, ".go") {
+			return nil
+		}
+		rel, err := filepath.Rel(goRoot, filepath.Dir(path))
+		seen["./"+filepath.ToSlash(rel)] = true
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dirs := make([]string, 0, len(seen))
+	for dir := range seen {
+		dirs = append(dirs, dir)
+	}
+	slices.Sort(dirs)
+	return dirs
+}
+
+func TestFloorRun_VetAcsRecipeCoversEveryAcsPackage(t *testing.T) {
+	t.Parallel()
+	goRoot := filepath.Join(floorRepoRoot(t), "go")
+	patterns := floorAcsVetPatterns(floorMakeRecipe(t, filepath.Join(goRoot, "Makefile"), "vet-acs"))
+	if len(patterns) == 0 {
+		t.Fatal("go/Makefile vet-acs runs no `vet -tags acs <pattern>`: the compile guard is gone, or the recipe form changed and this parser must follow it")
+	}
+	dirs := floorAcsPackageDirs(t, goRoot)
+	if len(dirs) < 2 {
+		t.Fatalf("found %d acs package dirs, want the regression tier and the frozen cycle packages", len(dirs))
+	}
+	for _, dir := range dirs {
+		if !floorPatternCovers(patterns, dir) {
+			t.Errorf("vet-acs patterns %q skip %s, so a broken frozen predicate there reaches main", patterns, dir)
+		}
+	}
+}
+
+func TestFloorAcsVetPatterns_ReadsOnlyTheAcsTaggedVet(t *testing.T) {
+	t.Parallel()
+	recipe := []string{
+		"$(GO) vet -tags acs ./acs/... ./x",
+		"$(GO) vet ./other/...",
+		"$(GO) vet -tags",
+		"echo vet -tags e2e ./e2e/...",
+	}
+	if got, want := floorAcsVetPatterns(recipe), []string{"./acs/...", "./x"}; !slices.Equal(got, want) {
+		t.Errorf("patterns = %q, want %q", got, want)
+	}
+	for dir, want := range map[string]bool{"./acs": true, "./acs/cycle16": true, "./acsx": false, "./x": true, "./x/y": false} {
+		if got := floorPatternCovers([]string{"./acs/...", "./x"}, dir); got != want {
+			t.Errorf("covers(%s) = %v, want %v", dir, got, want)
+		}
+	}
+	for name, want := range map[string]bool{"testdata": true, "_old": true, ".git": true, "cycle16": false} {
+		if got := floorGoListSkips(name); got != want {
+			t.Errorf("skips(%s) = %v, want %v", name, got, want)
+		}
+	}
+}
