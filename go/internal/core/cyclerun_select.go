@@ -54,7 +54,7 @@ func (cr *cycleRun) selectNext() (Phase, loopAction, error) {
 		cr.routingSeq++
 		signals, _ := router.Digest(cr.cs.WorkspacePath, cr.cs.CompletedPhases)
 		cr.reportProseFallbacks(signals)
-		dec := cr.o.strategy.Decide(router.RouteInput{
+		dec := cr.decideRoute(router.RouteInput{
 			Current:        string(cr.current),
 			Verdict:        cr.lastVerdict,
 			Signals:        signals,
@@ -116,4 +116,9 @@ func (cr *cycleRun) selectNext() (Phase, loopAction, error) {
 		return next, loopBreak, nil
 	}
 	return next, loopNext, nil
+}
+
+func (cr *cycleRun) decideRoute(in router.RouteInput) router.RouterDecision {
+	in.ActiveWorktree = cr.cs.ActiveWorktree
+	return cr.o.strategy.Decide(in)
 }

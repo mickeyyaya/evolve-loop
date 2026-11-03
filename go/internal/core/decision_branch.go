@@ -38,6 +38,7 @@ func (o *Orchestrator) decideAfterRetroRouted(ctx context.Context, cycle int, cs
 	in.Verdict = retroVerdict
 	in.History = entriesFromRecords(history)
 	in.Now = o.now()
+	in.ActiveWorktree = cs.ActiveWorktree
 	rdec := o.strategy.Decide(in)
 
 	branch := PhaseEnd
