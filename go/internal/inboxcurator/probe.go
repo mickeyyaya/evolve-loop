@@ -55,13 +55,13 @@ type probeShape struct {
 
 var (
 	testProbeRE   = regexp.MustCompile(`^(?:Test|Benchmark|Fuzz)[A-Za-z0-9_]*$`)
-	symbolProbeRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*$`)
+	symbolProbeRE = regexp.MustCompile(`^(?:[A-Za-z0-9_-]+/)*[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*$`)
 	policyKeyRE   = regexp.MustCompile(`^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*$`)
 )
 
 var probeShapes = map[inboxbatch.ProbeKind]probeShape{
 	inboxbatch.ProbeTestExists:   {testProbeRE.MatchString, "a Test, Benchmark or Fuzz name", false, RepoTree.testExists},
-	inboxbatch.ProbeSymbolExists: {symbolProbeRE.MatchString, "a pkg.Name", false, RepoTree.symbolExists},
+	inboxbatch.ProbeSymbolExists: {symbolProbeRE.MatchString, "a pkg.Name or a dir/pkg.Name under go/", false, RepoTree.symbolExists},
 	inboxbatch.ProbeTextAbsent:   {isRepoPath, "a repository path", true, RepoTree.textAbsent},
 	inboxbatch.ProbePolicyValue:  {policyKeyRE.MatchString, "a dotted policy key", true, RepoTree.policyValue},
 }
@@ -148,21 +148,34 @@ func (t RepoTree) testExists(p inboxbatch.Probe) ProbeResult {
 }
 
 func (t RepoTree) symbolExists(p inboxbatch.Probe) ProbeResult {
-	pkg, name, _ := strings.Cut(p.Target, ".")
-	found := false
-	err := walkGoFiles(t.FS, "go", isSourceFile, func(file string, body []byte) error {
+	qualifier, name := splitSymbol(p.Target)
+	pkg, root := path.Base(qualifier), path.Join("go", qualifier)
+	if !strings.Contains(qualifier, "/") {
+		root = "go"
+	}
+	found, dirs := false, map[string]bool{}
+	err := walkGoFiles(t.FS, root, isSourceFile, func(file string, body []byte) error {
 		clause, err := parser.ParseFile(token.NewFileSet(), file, body, parser.PackageClauseOnly)
-		if err != nil || clause.Name.Name != pkg {
+		if err != nil || clause.Name.Name != pkg || (root != "go" && path.Dir(file) != root) {
 			return err
 		}
+		dirs[path.Dir(file)] = true
 		parsed, err := parser.ParseFile(token.NewFileSet(), file, body, parser.SkipObjectResolution)
 		found = found || (err == nil && declares(parsed, name))
 		return err
 	})
-	if err != nil {
+	switch {
+	case err != nil:
 		return verdict(p, false, err.Error())
+	case len(dirs) > 1:
+		return verdict(p, false, fmt.Sprintf("package %s is in %d directories; name its directory under go/, for example internal/%s.%s", pkg, len(dirs), pkg, name))
 	}
 	return verdict(p, found, "no top-level declaration of that name in the package")
+}
+
+func splitSymbol(target string) (string, string) {
+	i := strings.LastIndex(target, ".")
+	return target[:i], target[i+1:]
 }
 
 func isSourceFile(name string) bool {

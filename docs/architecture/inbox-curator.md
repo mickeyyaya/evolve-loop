@@ -119,9 +119,9 @@ An item can declare `probes`: typed checks that tell when its work is done. The 
 | Kind | `target` | `value` | Passes when |
 |---|---|---|---|
 | `test_exists` | a `Test`, `Benchmark` or `Fuzz` name | none | a `_test.go` file under `go/` defines the test |
-| `symbol_exists` | `pkg.Name` | none | a non-test file of package `pkg` under `go/` declares `Name` at the top level |
+| `symbol_exists` | `pkg.Name`, or `dir/pkg.Name` with `dir` under `go/` | none | a non-test file of package `pkg` declares `Name` at the top level. A package name in two directories fails, so name the directory |
 | `text_absent` | a repository path | the text | the file exists and does not hold the text |
-| `policy_value` | a dotted key of `.evolve/policy.json` | the value | the value at the key equals `value` |
+| `policy_value` | a dotted key of `.evolve/policy.json` | the value | the value at the key equals `value`. A JSON string compares as its text, and every other value compares as its compact JSON, so `true` matches the boolean and the string |
 
 Example: `{"kind": "policy_value", "target": "inbox.curator.stage", "value": "enforce"}` passes after the stage flip of AD2-5.
 

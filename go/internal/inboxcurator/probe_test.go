@@ -91,6 +91,22 @@ func TestRepoTree_SymbolExistsFindsATopLevelNameOfThePackage(t *testing.T) {
 	})
 }
 
+func TestRepoTree_SymbolExistsRefusesAPackageNameOfTwoDirectoriesUnlessTheDirectoryIsNamed(t *testing.T) {
+	fsys := probeFS()
+	fsys["go/cmd/a/main.go"] = &fstest.MapFile{Data: []byte("package a\n\nfunc Elsewhere() {}\n")}
+	tree := RepoTree{FS: fsys}
+	if got := tree.Check(probe(inboxbatch.ProbeSymbolExists, "a.Elsewhere", "")); got.Pass || !strings.Contains(got.Detail, "2 directories") {
+		t.Errorf("an ambiguous package = %+v, want a fail that names the two directories", got)
+	}
+	checkAll(t, tree, map[inboxbatch.Probe]bool{
+		probe(inboxbatch.ProbeSymbolExists, "cmd/a.Elsewhere", ""):             true,
+		probe(inboxbatch.ProbeSymbolExists, "internal/a.Elsewhere", ""):        false,
+		probe(inboxbatch.ProbeSymbolExists, "internal/a.Exported", ""):         true,
+		probe(inboxbatch.ProbeSymbolExists, "internal/a/testdata.Fixture", ""): false,
+		probe(inboxbatch.ProbeSymbolExists, "internal/gone.Exported", ""):      false,
+	})
+}
+
 func TestRepoTree_SymbolExistsFailsWithTheReasonOnATreeItCannotRead(t *testing.T) {
 	noGo := RepoTree{FS: fstest.MapFS{"docs/x.md": {Data: []byte("x")}}}
 	if got := noGo.Check(probe(inboxbatch.ProbeSymbolExists, "a.Exported", "")); got.Pass || got.Detail == "" {
@@ -161,6 +177,7 @@ func TestCheckProbes_RefusesAMalformedProbe(t *testing.T) {
 	good := []inboxbatch.Probe{
 		probe(inboxbatch.ProbeTestExists, "TestAlpha", ""),
 		probe(inboxbatch.ProbeSymbolExists, "inboxcurator.Admit", ""),
+		probe(inboxbatch.ProbeSymbolExists, "internal/inboxcurator.Admit", ""),
 		probe(inboxbatch.ProbeTextAbsent, "docs/x.md", "old phrase"),
 		probe(inboxbatch.ProbePolicyValue, "inbox.curator.stage", "enforce"),
 	}
@@ -187,8 +204,8 @@ func TestCheckProbes_RefusesAMalformedProbe(t *testing.T) {
 		"no policy value":           {probe(inboxbatch.ProbePolicyValue, "inbox.curator.stage", ""), "needs a value"},
 	} {
 		err := CheckProbes(append(slices.Clone(good), tc.p))
-		if !errors.Is(err, ErrIntake) || !strings.Contains(err.Error(), tc.why) || !strings.Contains(err.Error(), "probe 5") {
-			t.Errorf("%s: err = %v, want ErrIntake naming probe 5 and %q", name, err, tc.why)
+		if !errors.Is(err, ErrIntake) || !strings.Contains(err.Error(), tc.why) || !strings.Contains(err.Error(), "probe 6") {
+			t.Errorf("%s: err = %v, want ErrIntake naming probe 6 and %q", name, err, tc.why)
 		}
 	}
 }
