@@ -57,7 +57,7 @@
   - The nested-`.evolve/` rule matches only below the root, because the root corpus ships.
   - A stale `allowed` entry fails the test. It pre-approves a future regression at that path.
 - **Stripping keeps operational directives** (`TestAuditorStripKeepsOperationalContract`, `TestPersonaStripKeepsOperationalSentinels`). The body is stripped as the runner's dispatch path strips it (`prompts.ParseFrontmatter`, then `prompts.StripOnDemandSections`).
-  - In a tracked, dispatched persona, no line that matches the sentinel regex may sit below the `## Reference Index` marker.
+  - In a tracked, dispatched persona, no line that matches the sentinel regex can sit below the `## Reference Index` marker. The regex and the scan are `prompts.StrippedDirectives`.
   - The regex is deliberately coarse. A false positive costs a relocation above the marker. A false negative strips a directive from every dispatch.
   - Reference documents (`*-reference.md`) are read on demand and never dispatched through the strip, so the test skips them.
   - `pendingCuration` is empty and may only shrink. An entry needs a written justification. An excepted persona that becomes clean fails the test until it is removed from the list.

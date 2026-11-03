@@ -3,15 +3,12 @@ package phasecoherence
 import (
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/repostate"
 )
-
-var operationalSentinelRE = regexp.MustCompile(`MANDATORY|STOP CRITERION|Completion Gates|force-FAIL|REQUIRED|POSTHOC|Verdict Rules|Constitutional audit`)
 
 func strippedPersonaBody(t *testing.T, root, name string) (string, string) {
 	t.Helper()
@@ -64,13 +61,8 @@ func TestPersonaStripKeepsOperationalSentinels(t *testing.T) {
 		}
 		personas++
 		t.Run(name, func(t *testing.T) {
-			body, stripped := strippedPersonaBody(t, root, name)
-			var strippedSentinels []string
-			for _, line := range strings.Split(body, "\n") {
-				if operationalSentinelRE.MatchString(line) && !strings.Contains(stripped, line) {
-					strippedSentinels = append(strippedSentinels, strings.TrimSpace(line))
-				}
-			}
+			body, _ := strippedPersonaBody(t, root, name)
+			strippedSentinels := prompts.StrippedDirectives(body)
 			if pendingCuration[name] {
 				if len(strippedSentinels) == 0 {
 					t.Errorf("%s is now clean — remove it from pendingCuration so the sentinel guard arms for it", name)

@@ -39,6 +39,7 @@ Each Go package directory has one page. The page holds what the code cannot say:
 | `internal/policy` | loads `.evolve/policy.json` into resolved configuration | [internal-policy.md](internal-policy.md) |
 | `internal/profiles` | loads the agent profiles in `.evolve/profiles/` | [internal-profiles.md](internal-profiles.md) |
 | `internal/prompts` | loads agent personas and skill docs | [internal-prompts.md](internal-prompts.md) |
+| `internal/reviewcheck` | the deterministic checks of the review routing plan: inbox integrity, persona strip and the permission widening trace | [internal-reviewcheck.md](internal-reviewcheck.md) |
 | `internal/quotareset` | computes the wake-up time of a quota pause from the best evidence it has: override, hint, bench, configured hours or unknown | [internal-quotareset.md](internal-quotareset.md) |
 | `internal/recovery` | the decisions of the Phase Recovery Pipeline | [internal-recovery.md](internal-recovery.md) |
 | `internal/router` | the deterministic phase-routing kernel | [internal-router.md](internal-router.md) |
