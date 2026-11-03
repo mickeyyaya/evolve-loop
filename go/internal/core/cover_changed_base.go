@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -21,9 +20,12 @@ import (
 var coverChangedBaseRunner = baseFailingTests
 
 func laneRedLines(ctx context.Context, in ReviewInput, pkgs []string, out string) []string {
-	failed := failedTestNames(out)
+	failed, unnamed := failedTests(out)
+	if unnamed || len(failed) == 0 {
+		return []string{floorFailureDiagnostic(out), "a failure without a test name (a build failure, a panic or a timeout) counts against the lane"}
+	}
 	baseRed, laneOnly := coverChangedBaseRed(ctx, in, pkgs, failed)
-	if len(failed) > 0 && len(laneOnly) == 0 {
+	if len(laneOnly) == 0 {
 		fmt.Fprintf(in.errOut(), "[build-floor] NOTE cover-changed: each failing test is red on the base %s too, so the floor does not refuse it: %s\n", floorBase(in), strings.Join(baseRed, ", "))
 		return nil
 	}
@@ -35,9 +37,6 @@ func laneRedLines(ctx context.Context, in ReviewInput, pkgs []string, out string
 }
 
 func coverChangedBaseRed(ctx context.Context, in ReviewInput, pkgs, failed []string) (baseRed, laneOnly []string) {
-	if len(failed) == 0 {
-		return nil, nil
-	}
 	red, err := coverChangedBaseRunner(ctx, in, pkgs, failed)
 	if err != nil {
 		fmt.Fprintf(in.errOut(), "[build-floor] WARN cover-changed could not run the failing tests on the base %s (%v); the floor refuses each failure\n", floorBase(in), err)
@@ -59,7 +58,7 @@ func baseFailingTests(ctx context.Context, in ReviewInput, pkgs, names []string)
 		return nil, err
 	}
 	defer func() { _ = os.RemoveAll(dir) }()
-	tree, err := exportTree(ctx, in.Worktree, floorBase(in), dir)
+	tree, err := gitexec.Git{Dir: in.Worktree, Exec: gitRunner}.ExportTree(ctx, floorBase(in), dir)
 	if err != nil {
 		return nil, err
 	}
@@ -67,40 +66,41 @@ func baseFailingTests(ctx context.Context, in ReviewInput, pkgs, names []string)
 	cmd.Dir = codequality.ModuleDir(tree)
 	cmd.Env = lanebudget.Env(ipcenv.GoTestEnv())
 	out, _ := cmd.CombinedOutput()
-	return failedTestNames(string(out)), nil
+	red, _ := failedTests(string(out))
+	return red, nil
 }
 
-func exportTree(ctx context.Context, worktree, rev, dir string) (string, error) {
-	tree := filepath.Join(dir, "tree")
-	git := gitexec.Git{Dir: worktree, Exec: sysexec.WithEnv(gitRunner, append(ipcenv.Scrub(os.Environ()), "GIT_INDEX_FILE="+filepath.Join(dir, "index")))}
-	for _, args := range [][]string{{"read-tree", rev}, {"checkout-index", "--all", "--prefix=" + tree + "/"}} {
-		if err := git.Run(ctx, args...); err != nil {
-			return "", err
-		}
-	}
-	return tree, nil
-}
-
-func baseTestArgs(pkgs, names []string) []string {
-	quoted := make([]string, len(names))
-	for i, n := range names {
-		quoted[i] = regexp.QuoteMeta(n)
+func baseTestArgs(pkgs, keys []string) []string {
+	quoted := make([]string, len(keys))
+	for i, k := range keys {
+		quoted[i] = regexp.QuoteMeta(k[strings.LastIndex(k, ".")+1:])
 	}
 	args := []string{"test", "-count=1", "-timeout", addedtests.PackageTimeout, "-tags", strings.Join(covchanged.DefaultTags, ","), "-run", "^(" + strings.Join(quoted, "|") + ")$"}
 	return lanebudget.Args(append(args, pkgs...))
 }
 
-func failedTestNames(out string) []string {
-	var names []string
+func failedTests(out string) (keys []string, unnamed bool) {
+	var pending []string
 	for _, line := range strings.Split(out, "\n") {
-		rest, ok := strings.CutPrefix(line, "--- FAIL: ")
+		if rest, ok := strings.CutPrefix(line, "--- FAIL: "); ok {
+			name, _, _ := strings.Cut(rest, " ")
+			pending = append(pending, name)
+			continue
+		}
+		unnamed = unnamed || strings.HasPrefix(line, "panic: ")
+		rest, ok := strings.CutPrefix(line, "FAIL\t")
 		if !ok {
 			continue
 		}
-		if name, _, _ := strings.Cut(rest, " "); !slices.Contains(names, name) {
-			names = append(names, name)
+		fields := append(strings.Fields(rest), "")
+		unnamed = unnamed || len(pending) == 0
+		for _, name := range pending {
+			if key := fields[0] + "." + name; !slices.Contains(keys, key) {
+				keys = append(keys, key)
+			}
 		}
+		pending = nil
 	}
-	slices.Sort(names)
-	return names
+	slices.Sort(keys)
+	return keys, unnamed || len(pending) > 0
 }

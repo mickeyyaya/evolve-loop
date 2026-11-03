@@ -42,7 +42,7 @@ func TestCoverChangedFailures_ATestRedOnTheBaseDoesNotRefuseTheLane(t *testing.T
 	repo, base := coverChangedRepo(t)
 	stubCoverChangedProfiler(t, coverChangedFullProfile, "--- FAIL: TestRealTmux (0.10s)\n    tmux_test.go:9: no tmux\nFAIL\tp\n", coverStatusTestsFailed)
 	stubSelfCheckRunner(t, "ok\tp", true)
-	calls := stubCoverChangedBaseRunner(t, []string{"TestRealTmux"}, nil)
+	calls := stubCoverChangedBaseRunner(t, []string{"p.TestRealTmux"}, nil)
 	var stderr injectedStderr
 
 	failures := coverChangedFailures(context.Background(), enforceFloorInput(t, repo, base, &stderr), []string{"go/p/a.go"})
@@ -50,10 +50,10 @@ func TestCoverChangedFailures_ATestRedOnTheBaseDoesNotRefuseTheLane(t *testing.T
 	if failures != nil {
 		t.Errorf("failures = %v, want none: the only failing test is red on the base too", failures)
 	}
-	if want := []baseRunCall{{[]string{"./p"}, []string{"TestRealTmux"}}}; !reflect.DeepEqual(*calls, want) {
+	if want := []baseRunCall{{[]string{"./p"}, []string{"p.TestRealTmux"}}}; !reflect.DeepEqual(*calls, want) {
 		t.Errorf("base runs = %+v, want %+v", *calls, want)
 	}
-	if note := stderr.String(); !strings.Contains(note, "red on the base "+base+" too") || !strings.Contains(note, "TestRealTmux") {
+	if note := stderr.String(); !strings.Contains(note, "red on the base "+base+" too") || !strings.Contains(note, "p.TestRealTmux") {
 		t.Errorf("stderr = %q, want a note that names the base-red test", note)
 	}
 }
@@ -62,14 +62,14 @@ func TestCoverChangedFailures_ALaneOnlyRedTestIsRefusedAndNamesTheBaseRed(t *tes
 	repo, base := coverChangedRepo(t)
 	stubCoverChangedProfiler(t, coverChangedFullProfile, "--- FAIL: TestRealTmux (0.10s)\n--- FAIL: TestNew (0.00s)\nFAIL\tp\n", coverStatusTestsFailed)
 	stubSelfCheckRunner(t, "ok\tp", true)
-	calls := stubCoverChangedBaseRunner(t, []string{"TestRealTmux", "TestOther"}, nil)
+	calls := stubCoverChangedBaseRunner(t, []string{"p.TestRealTmux", "p.TestOther"}, nil)
 
 	failures := coverChangedFailures(context.Background(), enforceFloorInput(t, repo, base, &injectedStderr{}), []string{"go/p/a.go"})
 
 	if len(failures) != 1 {
 		t.Fatalf("failures = %v, want one refusal", failures)
 	}
-	for _, want := range []string{coverChangedTestsFailedHeadline, "red on the lane and green on the base: TestNew", "information: red on the base too, not refused: TestRealTmux"} {
+	for _, want := range []string{coverChangedTestsFailedHeadline, "red on the lane and green on the base: p.TestNew", "information: red on the base too, not refused: p.TestRealTmux"} {
 		if !strings.Contains(failures[0], want) {
 			t.Errorf("the refusal does not carry %q:\n%s", want, failures[0])
 		}
@@ -77,7 +77,7 @@ func TestCoverChangedFailures_ALaneOnlyRedTestIsRefusedAndNamesTheBaseRed(t *tes
 	if strings.Contains(failures[0], "TestOther") {
 		t.Errorf("the refusal names TestOther, which did not fail on the lane:\n%s", failures[0])
 	}
-	if want := []string{"TestNew", "TestRealTmux"}; len(*calls) != 1 || !slices.Equal((*calls)[0].names, want) {
+	if want := []string{"p.TestNew", "p.TestRealTmux"}; len(*calls) != 1 || !slices.Equal((*calls)[0].names, want) {
 		t.Errorf("base runs = %+v, want one run of %v", *calls, want)
 	}
 }
@@ -93,10 +93,12 @@ func TestCoverChangedFailures_ABaseRunFaultOrNoTestNameCountsEveryFailure(t *tes
 	}{
 		"the base run fails": {"--- FAIL: TestRealTmux (0.10s)\nFAIL\tp\n", errors.New("no base tree"), 1, "could not run the failing tests on the base"},
 		"no test name":       {"# p\np/a_test.go:3:1: syntax error\nFAIL\tp [build failed]\n", nil, 0, ""},
+		"a named base-red test beside an unnamed failure": {"--- FAIL: TestRealTmux (0.10s)\nFAIL\tp\t0.2s\n# q\nq/b.go:3:1: undefined: x\nFAIL\tq [build failed]\n", nil, 0, ""},
+		"a panic hides the rest of the package":           {"--- FAIL: TestRealTmux (0.10s)\npanic: boom\nFAIL\tp\t0.2s\n", nil, 0, ""},
 	} {
 		t.Run(name, func(t *testing.T) {
 			stubCoverChangedProfiler(t, coverChangedFullProfile, tc.output, coverStatusTestsFailed)
-			calls := stubCoverChangedBaseRunner(t, []string{"TestRealTmux"}, tc.err)
+			calls := stubCoverChangedBaseRunner(t, []string{"p.TestRealTmux"}, tc.err)
 			var stderr injectedStderr
 
 			failures := coverChangedFailures(context.Background(), enforceFloorInput(t, repo, base, &stderr), []string{"go/p/a.go"})
@@ -111,16 +113,33 @@ func TestCoverChangedFailures_ABaseRunFaultOrNoTestNameCountsEveryFailure(t *tes
 	}
 }
 
-func TestFailedTestNames_ReadsTheTopLevelFailuresOnce(t *testing.T) {
+func TestFailedTests_KeysEachTopLevelFailureByItsPackage(t *testing.T) {
 	t.Parallel()
 
-	out := "=== RUN   TestA\n--- FAIL: TestB (0.00s)\n    --- FAIL: TestB/sub (0.00s)\n--- FAIL: TestA (0.01s)\n--- PASS: TestC (0.00s)\n--- FAIL: TestB (0.00s)\nFAIL\tp\n"
+	out := "=== RUN   TestA\n--- FAIL: TestB (0.00s)\n    --- FAIL: TestB/sub (0.00s)\n--- FAIL: TestA (0.01s)\n--- PASS: TestC (0.00s)\nFAIL\texample.com/m/p\t0.1s\n--- FAIL: TestA (0.00s)\nFAIL\texample.com/m/q\t0.1s\nok  \texample.com/m/r\t0.1s\nFAIL\n"
 
-	if got, want := failedTestNames(out), []string{"TestA", "TestB"}; !slices.Equal(got, want) {
-		t.Errorf("failedTestNames = %v, want %v", got, want)
+	if got, unnamed := failedTests(out); !slices.Equal(got, []string{"example.com/m/p.TestA", "example.com/m/p.TestB", "example.com/m/q.TestA"}) || unnamed {
+		t.Errorf("failedTests = %v, %v; want three package-keyed names and no unnamed failure", got, unnamed)
 	}
-	if got := failedTestNames("ok\tp\n"); got != nil {
-		t.Errorf("failedTestNames of a green run = %v, want nil", got)
+	if got, unnamed := failedTests("ok\tp\n"); got != nil || unnamed {
+		t.Errorf("failedTests of a green run = %v, %v; want nil, false", got, unnamed)
+	}
+}
+
+func TestFailedTests_AFailureWithoutATestNameIsUnnamed(t *testing.T) {
+	t.Parallel()
+
+	for name, out := range map[string]string{
+		"build failure":          "FAIL\tp [build failed]\n",
+		"package line only":      "FAIL\tp\t0.1s\n",
+		"bare package line":      "FAIL\t\n",
+		"panic":                  "--- FAIL: TestA (0.00s)\npanic: boom\nFAIL\tp\t0.1s\n",
+		"name with no package":   "--- FAIL: TestA (0.00s)\n",
+		"named and a build fail": "--- FAIL: TestA (0.00s)\nFAIL\tp\t0.1s\nFAIL\tq [setup failed]\n",
+	} {
+		if _, unnamed := failedTests(out); !unnamed {
+			t.Errorf("%s: unnamed = false, want true", name)
+		}
 	}
 }
 
@@ -142,9 +161,9 @@ func TestBaseFailingTests_RunsTheNamedTestsOnTheBaseTree(t *testing.T) {
 	t.Parallel()
 	repo, base := baseRedRepo(t)
 
-	got, err := baseFailingTests(context.Background(), ReviewInput{Worktree: repo.Dir, WorktreeBaseSHA: base}, []string{"./p"}, []string{"TestGreen", "TestRed"})
+	got, err := baseFailingTests(context.Background(), ReviewInput{Worktree: repo.Dir, WorktreeBaseSHA: base}, []string{"./p"}, []string{"example.com/m/p.TestGreen", "example.com/m/p.TestRed"})
 
-	if err != nil || !slices.Equal(got, []string{"TestRed"}) {
+	if err != nil || !slices.Equal(got, []string{"example.com/m/p.TestRed"}) {
 		t.Errorf("baseFailingTests = %v, %v; want [TestRed]: TestGreen is green on the base", got, err)
 	}
 }
