@@ -16,6 +16,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotestname"
 )
 
 var (
@@ -98,7 +100,7 @@ func declaredTests(goDir string) (map[string]bool, error) {
 		if err != nil {
 			return err
 		}
-		if d.IsDir() && skippedDirectory(d.Name()) {
+		if d.IsDir() && gotestname.IgnoredDir(d.Name()) {
 			return filepath.SkipDir
 		}
 		if d.IsDir() || !strings.HasSuffix(path, "_test.go") {
@@ -116,10 +118,6 @@ func declaredTests(goDir string) (map[string]bool, error) {
 		return nil
 	})
 	return declared, err
-}
-
-func skippedDirectory(name string) bool {
-	return name == "testdata" || name == "vendor" || strings.HasPrefix(name, ".")
 }
 
 func goFilesByDirectory(acsDir, skip string) (map[string][]string, error) {

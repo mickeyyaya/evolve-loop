@@ -28,7 +28,7 @@ func fixtureRoot(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
 	writeFile(t, root, "go/internal/core/blocker.go", "package core\n\nfunc Blocker() {}\n")
-	writeFile(t, root, "go/internal/core/blocker_test.go", "package core\n\nimport \"testing\"\n\nfunc TestBlockerTrips(t *testing.T) {}\n\nfunc FuzzBlockerInput(f *testing.F) {}\n\nfunc helperNotATest(t *testing.T) {}\n")
+	writeFile(t, root, "go/internal/core/blocker_test.go", "package core\n\nimport \"testing\"\n\nfunc TestBlockerTrips(t *testing.T) {}\n\nfunc FuzzBlockerInput(f *testing.F) {}\n\nfunc helperNotATest(t *testing.T) {}\n\nfunc Testify(t *testing.T) {}\n")
 	writeFile(t, root, "go/internal/other/other_test.go", "package other\n\nimport \"testing\"\n\nfunc TestOtherOnly(t *testing.T) {}\n")
 	writeFile(t, root, "go/internal/broken/broken_test.go", "package broken\n\nfunc TestBroken(\n")
 	writeFile(t, root, "go/acs/cycle1950/predicates_test.go", "//go:build acs\n\npackage cycle1950\n\nimport \"testing\"\n\nfunc TestC1950_001_Declared(t *testing.T) {}\n")
@@ -77,6 +77,7 @@ func TestResolve(t *testing.T) {
 		{"test cited in a file that does not declare it", "test", "go/internal/other/other_test.go:TestBlockerTrips", false},
 		{"test cited in a file that does not exist", "test", "go/internal/core/gone_test.go:TestBlockerTrips", false},
 		{"helper without a Test prefix", "test", "helperNotATest", false},
+		{"a name go test does not run because a lower-case letter follows Test", "test", "Testify", false},
 		{"test name only in a file that does not parse", "test", "TestBroken", false},
 		{"test name only in a non-test file", "test", "Blocker", false},
 		{"test cited in a non-test file", "test", "go/internal/core/blocker.go:TestBlockerTrips", false},

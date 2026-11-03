@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — a guard refuses a test function with an empty body (ADR-0158 decision 19, 2026-11-03)
+
+- **The guard.** `go/acs/regression/emptytests` parses each `*_test.go` file of the module. It fails on a `Test`, `Fuzz` or `Benchmark` function whose body has no statement. A body of only a comment fails. A body of only `t.Skip` with a reason passes.
+- **The baseline.** `baseline.txt` lists the offenders that pass. It is empty, because main has no offender. An entry that matches no offender fails.
+- **A shared name rule.** The new package `internal/gotestname` holds the `go test` rules for a test name and for an ignored directory. `emptytests`, `acsnames`, `internal/ciparity` and `internal/handoff/evidence` use it. Other packages still keep their own copy of these rules. A `test` evidence reference to a name such as `Testify` no longer resolves.
+- **Where it runs.** The CI job `acs-durable` and the `acs-durable` tier of the build handoff floor run it.
+- Docs: [acs-predicate-quality-gate.md](docs/architecture/acs-predicate-quality-gate.md#test-functions-have-a-body-emptytests-2026-11-03).
+
 ## Changed — the inbox and routing writers queue during a wave, and `gc` takes a lease (X17c, 2026-10-27)
 
 - **The queue.** `inbox edit`, `withdraw`, `verify`, `route-console`, `route-lane` and `cli-routing set`, `unset`, `init`, `migrate` can run while a loop lane is live. With the policy key `isolation.i15.stage` at `enforce`, each one writes one request to `.evolve/queue/` and exits 4. The compiled stage is `shadow`: the verb refuses with exit 3 and names the file that `enforce` writes.
