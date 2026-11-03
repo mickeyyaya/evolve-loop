@@ -57,6 +57,18 @@ The heal does not check for a dirty plane tree. The build uses the working tree,
 | 10 | `error: "usage: …"` | A bad argument. | Fix the arguments. |
 | other | `failed_step`, `error` | A step failed with this exit code. The wave is not recorded, and the notes stay. | Fix the cause, then run step 2 again. A failure before the brake release leaves the brake on, which is the safe state. |
 
+### Resume the paused cycles
+
+Quota pauses can leave more than one cycle with a checkpoint. Use `evolve cycle resume --all` before `evolve wave next` to give each paused cycle an auto-resume budget. The verb starts no cycle.
+
+| Step | Command | Result |
+|---|---|---|
+| 1 | `evolve cycle resume --all --dry-run` | It lists each paused cycle and changes nothing. |
+| 2 | `evolve cycle resume --all` | It grants one auto-resume budget to each paused cycle. |
+| 3 | `evolve wave next` | The pool puts the granted scopes first, and the lanes continue the paused cycles. |
+
+See [checkpoint-resume.md](../architecture/checkpoint-resume.md#resume-every-paused-cycle-at-once) for the rules.
+
 ### The code index refresh
 
 The code index refresh is part of `sync-main`. It is not a separate step, and the console does not run `git` in `dev/code-index` by hand. After `sync-main` merges `main`, it moves the index worktree (`code_index.index_dir`, `dev/code-index` by default) to `origin/main`, detached. Then it runs the incremental `trail build`. Lanes thus start on a fresh index. The refresh writes only the index worktree ([code-index-cli.md](../architecture/code-index-cli.md) §4).

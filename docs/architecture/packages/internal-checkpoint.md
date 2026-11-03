@@ -24,6 +24,7 @@
 - The phase-complete reason is canonical and validated. Pinned by `TestReasonPhaseComplete_IsValid` and `TestComposeChecked_AcceptsPhaseComplete`.
 - The quota wake time follows the source order, and a routine checkpoint never invents one. Pinned by `TestQuotaBoundaryCheckpointer_UsesWorkspaceHint`, `TestQuotaBoundaryCheckpointer_HonoursOperatorOverride` and `TestPhaseBoundaryCheckpointer_DoesNotFabricateWakeAt`.
 - Each boundary writer records the cycle base as `gitHead`: the run's `worktree_base_sha`, else its `pre_cycle_head` (`cycleBase`, 2026-10-21). `core.LoadResumeState` warns when `origin/main` has moved past that base, and resumes. Pinned by `TestBoundaryCheckpointers_RecordTheCycleBaseAsGitHead`.
+- **An operator grant restores the budget of a spent quota pause** (`GrantOperatorResume`, `BudgetLeft` and `ResumeReady` in `autoresume.go`). The rules are in [checkpoint-resume.md](../checkpoint-resume.md#resume-every-paused-cycle-at-once).
 
 ## Findings
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
@@ -56,6 +57,10 @@ func productionPoolPlanFn(cfg loopConfig, storage core.Storage, count int, stder
 			return nil, err
 		}
 		todos, _, err := fleet.TodosFromTriage(decisionJSON, cardPackages, consoleRoutedResolver(cfg, stderr))
-		return todos, err
+		paused, perr := core.PausedLaneScopes(cfg.ProjectRoot, cfg.EvolveDir, core.ResumeOptions{Log: stderr})
+		if perr != nil {
+			fmt.Fprintf(stderr, "[pool] WARN: the scan for paused lane cycles failed (%v); the plan keeps the triage order\n", perr)
+		}
+		return pausedPlan{paused: paused, now: time.Now(), itemFiles: inboxItemFiles(cfg.EvolveDir)}.order(todos), err
 	}
 }
