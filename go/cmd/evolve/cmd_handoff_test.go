@@ -9,7 +9,9 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/handoff"
 	"github.com/mickeyyaya/evolve-loop/go/internal/handoff/request"
@@ -589,5 +591,48 @@ func TestHandoffVerbs_AreInTheRegistryTheUsageTextAndTheRuntimeReference(t *test
 		if !strings.Contains(string(doc), want) {
 			t.Errorf("runtime-reference.md lacks %q", want)
 		}
+	}
+}
+
+func TestHandoffCheck_ALinkedLedgerIsRefusedAndItsTargetIsNeverEchoed(t *testing.T) {
+	t.Parallel()
+	p := newHCProject(t)
+	p.cycle1950()
+	secret := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(secret, []byte(`{"schema_version":1,"pair":"tdd-build","request_digest":"SECRET-TOKEN"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(p.runDir(1950), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(secret, filepath.Join(p.runDir(1950), "handoff-tdd-build.json")); err != nil {
+		t.Fatal(err)
+	}
+	rc, stdout, stderr := runHC(t, checkArgs(p, 1950, "tdd-build")...)
+	if rc == 0 || strings.Contains(stdout+stderr, "SECRET-TOKEN") || !strings.Contains(stdout+stderr, "not a regular file") {
+		t.Fatalf("rc=%d stdout=%q stderr=%q, want a refusal that names the rule and never the target", rc, stdout, stderr)
+	}
+}
+
+func TestHandoffCheck_AFIFOFailuresFileDoesNotHangTheCheck(t *testing.T) {
+	t.Parallel()
+	p := newHCProject(t)
+	req := p.cycle1950()
+	p.ledger(1950, req, hcMetPredicate(hcCoverAsk), hcMetPredicate(hcGuardAsk))
+	if err := syscall.Mkfifo(filepath.Join(p.runDir(1950), "handoff-tdd-build-failures.json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan string, 1)
+	go func() {
+		_, stdout, stderr := runHC(t, checkArgs(p, 1950, "tdd-build")...)
+		done <- stdout + stderr
+	}()
+	select {
+	case out := <-done:
+		if !strings.Contains(out, "not a regular file") {
+			t.Fatalf("output %q, want the regular-file refusal", out)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("a FIFO failures file hung the handoff check")
 	}
 }

@@ -287,7 +287,7 @@ func handoffInboxResolver(root string) request.PathResolver {
 }
 
 func readHandoffLedger(path string) ([]byte, error) {
-	raw, err := os.ReadFile(path)
+	raw, err := core.ReadHandoffLedger(path)
 	if err == nil && handoff.IsCheckOnly(raw) {
 		return nil, fmt.Errorf("%s holds only the check record: %w", filepath.Base(path), fs.ErrNotExist)
 	}
@@ -295,7 +295,7 @@ func readHandoffLedger(path string) ([]byte, error) {
 }
 
 func readHandoffFailures(path string) ([]string, error) {
-	raw, err := os.ReadFile(path)
+	raw, err := core.ReadHandoffLedger(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}

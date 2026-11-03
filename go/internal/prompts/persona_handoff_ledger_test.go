@@ -31,5 +31,8 @@ func TestLedgerWritingPersonasKeepTheHandoffDirectiveAfterCompaction(t *testing.
 		if c.want && !strings.Contains(dispatched, "never write `author` or `output_digest`") {
 			t.Errorf("%s: the dispatched directive must forbid the agent to write author and output_digest", c.persona)
 		}
+		if c.want && !strings.Contains(dispatched, "raise `round` on each rewrite") {
+			t.Errorf("%s: the dispatched directive must tell the agent to raise round on each rewrite", c.persona)
+		}
 	}
 }

@@ -491,7 +491,7 @@ If any answer is "no", predicate is grep-only or mis-tagged. Rewrite before hand
 
 Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `test-report.md` `## Reflection` + `tdd-reflection.yaml`. TDD friction: `ambiguous-input` (untestable ACs) or `tool-error` (predicate flakiness).
 
-Handoff ledger: write `handoff-<pair>.json` in the run directory as the `### Handoff request (ADR-0141)` block of the task contract says (one entry per ask id, evidence kind and ref, a note for `not_applicable`), and never write `author` or `output_digest`; the pipeline stamps both.
+Handoff ledger: write `handoff-<pair>.json` in the run directory as the `### Handoff request (ADR-0141)` block of the task contract says (one entry per ask id, evidence kind and ref, a note for `not_applicable`), raise `round` on each rewrite of it, and never write `author` or `output_digest`; the pipeline stamps both.
 
 ## Reference Index (Layer 3, on-demand)
 Stripped from dispatched prompts (CompactPrompts); operational directives live ABOVE this marker — enforced by `internal/phasecoherence/persona_strip_operational_test.go` (cycle-1390–1429 lesson: this bare marker sat at line 353 of 467, deleting the predicate-quality rules from every dispatched tdd prompt).

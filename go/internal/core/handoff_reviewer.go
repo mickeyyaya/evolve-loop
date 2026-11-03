@@ -5,16 +5,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/handoff"
 	"github.com/mickeyyaya/evolve-loop/go/internal/handoff/request"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inputindex"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
@@ -27,6 +30,35 @@ type HandoffReviewer struct {
 }
 
 var errHandoffLedgerNotObject = errors.New("the ledger is not a JSON object, so it is kept as written")
+
+var errHandoffLedgerNotRegular = errors.New("the ledger is not a regular file, so the pipeline neither reads nor rewrites it")
+
+func ReadHandoffLedger(path string) ([]byte, error) {
+	return readHandoffLedgerWith(path, openLedgerWithoutBlocking)
+}
+
+func openLedgerWithoutBlocking(path string) (*os.File, error) {
+	return os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK, 0)
+}
+
+func readHandoffLedgerWith(path string, open func(string) (*os.File, error)) ([]byte, error) {
+	before, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	if !before.Mode().IsRegular() || inputindex.HardLinked(before) {
+		return nil, errHandoffLedgerNotRegular
+	}
+	f, err := open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+	if after, err := f.Stat(); err != nil || !os.SameFile(before, after) {
+		return nil, errHandoffLedgerNotRegular
+	}
+	return io.ReadAll(f)
+}
 
 var handoffPairEndingAt = map[string]string{
 	string(PhaseTDD):   request.PairTriageTDD,
@@ -56,7 +88,11 @@ func staleOutputCheck(check handoff.Check, stale string) handoff.Check {
 }
 
 func (r HandoffReviewer) Review(ctx context.Context, in ReviewInput) ReviewResult {
-	stale := stampHandoffAuthor(in, r.outputTree(ctx, in))
+	tree := ""
+	if _, paired := handoffLedgerPairOf[in.Phase]; paired {
+		tree = r.outputTree(ctx, in)
+	}
+	stale := stampHandoffAuthor(in, tree)
 	pair, ok := handoffPairEndingAt[in.Phase]
 	if !ok {
 		return ReviewResult{Approve: true}
@@ -93,7 +129,7 @@ func enforcedHandoffRejection(phase, pair string, check handoff.Check) ReviewRes
 func recordHandoffCheck(workspace, pair string, check handoff.Check) error {
 	path := filepath.Join(workspace, "handoff-"+pair+".json")
 	doc := map[string]any{}
-	raw, err := os.ReadFile(path)
+	raw, err := ReadHandoffLedger(path)
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
 		doc["schema_version"] = handoff.SchemaVersion

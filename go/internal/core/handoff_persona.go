@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -16,6 +15,8 @@ import (
 )
 
 const handoffRequestHeading = "### Handoff request (ADR-0141)\n"
+
+const handoffUnattributed = "unattributed"
 
 var handoffLedgerPairOf = map[string]string{
 	string(PhaseTriage): request.PairScoutTriage,
@@ -30,17 +31,21 @@ func handoffRequestBlock(phase Phase, cs CycleState, resolve request.PathResolve
 	}
 	req, err := request.ForPair(pair, request.Site{Workspace: cs.WorkspacePath, Worktree: cs.ActiveWorktree, Cycle: cs.CycleID, Resolve: resolve})
 	if err != nil {
-		return fmt.Sprintf("%sHandoff request: none for pair %s (%v)\n\n", handoffRequestHeading, pair, err)
+		return fmt.Sprintf("%sHandoff request: none for pair %s (%s)\n\n", handoffRequestHeading, pair, oneLine(err.Error()))
 	}
 	var b strings.Builder
 	b.WriteString(handoffRequestHeading)
 	fmt.Fprintf(&b, "pair: %s\nrequest_digest: %s\nledger: %s\n", req.Pair, req.Digest(), filepath.Join(cs.WorkspacePath, "handoff-"+req.Pair+".json"))
-	b.WriteString("Write the ledger with schema_version 1, this pair, this request_digest, one entry per ask below (status met|unmet|blocked|not_applicable, evidence pointers kind+ref, a note for not_applicable) and the round. Never write `author` or `output_digest`; the pipeline stamps both.\n")
+	b.WriteString("Write the ledger with schema_version 1, this pair, this request_digest, one entry per ask below (status met|unmet|blocked|not_applicable, evidence pointers kind+ref, a note for not_applicable) and the round. Raise `round` on each rewrite of the ledger. Never write `author` or `output_digest`; the pipeline stamps both.\n")
 	for _, ask := range req.Asks {
-		fmt.Fprintf(&b, "- %s [required] %s (evidence: %s)\n", ask.ID, ask.Text, ask.EvidenceKind)
+		fmt.Fprintf(&b, "- %s [required] %s (evidence: %s)\n", oneLine(ask.ID), oneLine(ask.Text), ask.EvidenceKind)
 	}
 	b.WriteString("\n")
 	return b.String()
+}
+
+func oneLine(text string) string {
+	return strings.Join(strings.Fields(text), " ")
 }
 
 func stampHandoffAuthor(in ReviewInput, tree string) string {
@@ -50,14 +55,30 @@ func stampHandoffAuthor(in ReviewInput, tree string) string {
 	}
 	stale, err := stampLedger(filepath.Join(in.Workspace, "handoff-"+pair+".json"), in, tree)
 	if err != nil {
-		fmt.Fprintf(in.errOut(), "[orchestrator] WARN handoff %s: the author was not stamped: %v\n", pair, err)
+		fmt.Fprintf(in.errOut(), "[orchestrator] WARN handoff %s: the ledger was not stamped: %v\n", pair, err)
 	}
 	return stale
 }
 
+type handoffStamp struct {
+	Round int `json:"round"`
+}
+
+func ledgerRound(raw json.RawMessage) int {
+	var round int
+	_ = json.Unmarshal(raw, &round)
+	return round
+}
+
+func stampedRound(raw json.RawMessage) int {
+	var stamp handoffStamp
+	_ = json.Unmarshal(raw, &stamp)
+	return stamp.Round
+}
+
 func stampLedger(path string, in ReviewInput, tree string) (string, error) {
-	raw, err := os.ReadFile(path)
-	if errors.Is(err, fs.ErrNotExist) {
+	raw, err := ReadHandoffLedger(path)
+	if errors.Is(err, fs.ErrNotExist) || (err == nil && handoff.IsCheckOnly(raw)) {
 		return "", nil
 	}
 	if err != nil {
@@ -67,26 +88,32 @@ func stampLedger(path string, in ReviewInput, tree string) (string, error) {
 	if json.Unmarshal(raw, &fields) != nil || fields == nil {
 		return "", errHandoffLedgerNotObject
 	}
-	author, found, err := dispatchAuthor(in.Workspace, in.Phase, in.Cycle)
-	if err != nil {
-		return "", err
+	stamp := map[string]any{}
+	author, found, authorErr := dispatchAuthor(in.Workspace, in.Phase, in.Cycle)
+	if !found {
+		author = handoff.Author{CLI: handoffUnattributed}
+		cause := "no matching record"
+		if authorErr != nil {
+			cause = authorErr.Error()
+		}
+		fmt.Fprintf(in.errOut(), "[orchestrator] WARN handoff %s: no dispatch record names the author, so it is set to %s (%s)\n", filepath.Base(path), handoffUnattributed, cause)
 	}
+	stamp["author"] = author
 	var recorded string
 	_ = json.Unmarshal(fields["output_digest"], &recorded)
-	stamp := map[string]any{}
-	if found {
-		stamp["author"] = author
-	}
+	round := ledgerRound(fields["round"])
 	stale := ""
 	switch {
 	case tree == "":
 	case recorded == "":
 		stamp["output_digest"] = tree
-	case recorded != tree:
+		stamp["stamp"] = handoffStamp{Round: round}
+	case recorded == tree:
+	case round > stampedRound(fields["stamp"]):
+		stamp["output_digest"] = tree
+		stamp["stamp"] = handoffStamp{Round: round}
+	default:
 		stale = recorded
-	}
-	if len(stamp) == 0 {
-		return stale, nil
 	}
 	doc := make(map[string]any, len(fields)+len(stamp))
 	for key, value := range fields {
