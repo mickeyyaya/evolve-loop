@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
+	"github.com/mickeyyaya/evolve-loop/go/internal/integration"
 )
 
 const landingWitnessGitTimeout = 10 * time.Second
@@ -77,7 +78,18 @@ func bindingWitnessesLanding(ev landingEvidence) bool {
 	}
 	onHead, headErr := isAncestor(ctx, ev.ProjectRoot, commit, "HEAD")
 	beforeCycle, preErr := isAncestor(ctx, ev.ProjectRoot, commit, ev.PreCycleHEAD)
-	return headErr == nil && preErr == nil && onHead && !beforeCycle
+	if headErr == nil && preErr == nil && onHead && !beforeCycle {
+		return true
+	}
+	return landedByRecord(ctx, ev, commit)
+}
+
+func landedByRecord(ctx context.Context, ev landingEvidence, commit string) bool {
+	rec, found := integration.FindRecord(ev.ProjectRoot, ev.Cycle)
+	if !found || !rec.HoldsCommit(commit) {
+		return false
+	}
+	return integration.Repo{Dir: ev.ProjectRoot, Git: integration.SysGit()}.LandedOnRef(ctx, rec, "HEAD")
 }
 
 func isAncestor(ctx context.Context, dir, commit, ref string) (bool, error) {
