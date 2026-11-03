@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
@@ -39,10 +41,17 @@ func (a *Advisor) preflight(in router.RouteInput, d decision) error {
 	if a.checkDepth != nil && a.checkDepth(in.Env) {
 		return fmt.Errorf("%s: recursion guard: depth check failed", d.errPfx())
 	}
+	if fleetWithoutWorktree(in) {
+		return fmt.Errorf("%s: fleet mode needs RouteInput.ActiveWorktree, got none", d.errPfx())
+	}
 	if err := phasecontract.MustFlowDecision(d.flowSeat()).Clear(filepath.Join(in.Workspace, d.artifactFile())); err != nil {
 		return fmt.Errorf("%s: %w", d.errPfx(), err)
 	}
 	return nil
+}
+
+func fleetWithoutWorktree(in router.RouteInput) bool {
+	return envchain.BoolValue(in.Env[ipcenv.FleetKey], false) && strings.TrimSpace(in.ActiveWorktree) == ""
 }
 
 func (a *Advisor) profilePath(in router.RouteInput) string {

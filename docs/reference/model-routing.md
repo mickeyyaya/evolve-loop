@@ -13,7 +13,7 @@ Each profile in `.evolve/profiles/` names a default tier and an envelope (`model
 | `fast` | haiku | Gemini 3.8 Flash (Low) | Claude Sonnet 5.5 (Low) | gpt-5.6-luna |
 | `balanced` | sonnet | Gemini 3.8 Flash (High) | Claude Sonnet 5.5 (Medium) | gpt-5.6-terra |
 | `deep` | opus | Gemini 4 Argon (Medium) | Claude Opus 5.5 (Medium) | gpt-5.6-sol |
-| `top` | opus | Gemini 4 Argon (High) | Claude Opus 5.5 (Medium) | gpt-5.6-sol |
+| `top` | opus | Gemini 4 Argon (Medium) | Claude Opus 5.5 (Medium) | gpt-5.6-sol |
 
 In Claude Code 2.1.293, the `haiku` alias of the `fast` tier resolves to Haiku 5.5 (checked on 2026-10-08). agy has no Haiku model, so the `fast` tier of `agy-claude-tmux` is Claude Sonnet 5.5 (Low).
 

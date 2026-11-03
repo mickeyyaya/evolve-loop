@@ -81,3 +81,32 @@ func TestStoreResultTypes_Named(t *testing.T) {
 		t.Fatalf("ImportResult = %+v, want %+v", importResult, wantImport)
 	}
 }
+
+func TestImportTagged_Named(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	source := filepath.Join(dir, "source.ndjson")
+	destination := filepath.Join(dir, "destination.ndjson")
+	if err := Append(source, Record{SchemaVersion: SchemaVersion, CallID: "tagged", Phase: "build"}); err != nil {
+		t.Fatalf("Append source: %v", err)
+	}
+	result, err := ImportTagged(destination, source, "run-1", "profile-1")
+	if err != nil {
+		t.Fatalf("ImportTagged: %v", err)
+	}
+	if result != (ImportResult{Imported: 1}) {
+		t.Fatalf("ImportResult = %+v, want one imported", result)
+	}
+	again, err := ImportTagged(destination, source, "run-2", "profile-2")
+	if err != nil || again != (ImportResult{Duplicates: 1}) {
+		t.Fatalf("second ImportTagged = %+v, %v; want one duplicate", again, err)
+	}
+	read, err := Read(destination)
+	if err != nil || len(read.Records) != 1 {
+		t.Fatalf("Read = %+v, %v", read, err)
+	}
+	if got := read.Records[0]; got.RunID != "run-1" || got.Profile != "profile-1" {
+		t.Fatalf("tags = %q/%q, want run-1/profile-1", got.RunID, got.Profile)
+	}
+}

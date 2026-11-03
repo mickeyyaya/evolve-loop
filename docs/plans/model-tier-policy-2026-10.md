@@ -249,7 +249,7 @@ Both values are start values in `.evolve/policy.json`, not in code. Tune them fr
 
 | Id | Component | Red test first | Depends on |
 |---|---|---|---|
-| P1 | D4: the manifest maps agy `top` to `Gemini 4 Argon (Medium)`, and the pin test follows | `TestAgyTierModelsPinnedToVerifiedNames` expects Medium at `top` | — |
+| P1 | D4: the manifest maps agy `top` to `Gemini 4 Argon (Medium)`, and the pin test follows. **Built: cycle 2134.** | `TestAgyTierModelsPinnedToVerifiedNames` expects Medium at `top` | — |
 | P2 | D3 and D8: a `catalog.tier_pins` field in the strict policy schema, a `TierPins` field on `RefreshDeps`, and the pin step in `liveTiers`. **Open: item `model-tier-policy-p2-catalog-tier-pins`.** | Red tests: a refresh with a pin returns the pinned model. A pin to an absent model makes `Refresh` return an error. A pin applies when the prior is reusable. A changed pin changes the fingerprint. | — |
 | Q1 | the `/usage` reader reads every agy 1.4.0 group and label, and finds why `clihealth usage agy` read no window. **Built: commit `105281615`.** | a fixture of the 1.4.0 screen gives three pools with 91.90, 0.00 and 98.62 | — |
 | Q2 | D9: a `GEMINI 4 ARGON` scope with `per_model: true`, and a bench that honours a model-scoped window. This is the fix of inbox `agy-model-429-benches-whole-family`. **Built: PR #987, commit `716e9bd2a`.** | an Argon wall benches the Argon pool, and a Flash dispatch still runs; the tests of that inbox item | Q1 |
