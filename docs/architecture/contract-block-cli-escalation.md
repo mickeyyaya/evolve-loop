@@ -126,7 +126,7 @@ apart.
 Two fall-backs are load-bearing:
 
 - **Code-less reasons.** Not every reason on this path is a `summarize()` rendering. When *either*
-  block yields no code, identity falls back to `normalizeReasonForFingerprint`. This is the own primitive of the blocker breaker. It drops identity-noise tokens such as go-test durations. If `∅ ∩ ∅` reads as
+  block yields no code, identity falls back to `failurefp.Normalize`. The blocker breaker and the retry ladder use this one normalizer. It drops identity-noise tokens such as go-test durations. If `∅ ∩ ∅` reads as
   "different defect", the ladder silently disappears for every non-summarize reason shape.
 - **Hot breaker.** The contract-gate breaker is process-global. A cycle that aborted mid-ladder
   leaves it hot. Then the next phase can arrive at `Blocks >= 2` on the FIRST block of its ladder, where no

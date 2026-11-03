@@ -161,6 +161,7 @@ Each Go package directory has one page. The page holds what the code cannot say:
 | `internal/bedrock` | emits the byte-identical trust-boundary prefix of a subagent invocation, for prompt caching | [internal-bedrock.md](internal-bedrock.md) |
 | `internal/textutil` | byte-based string-shortening helpers for human-facing diagnostics | [internal-textutil.md](internal-textutil.md) |
 | `internal/textcap` | the two rune-cap text rules: trim and ` …[truncated]`, or the bare ellipsis | [internal-textcap.md](internal-textcap.md) |
+| `internal/failurefp` | the one failure-reason normalizer of the blocker breaker and the retry ladder | [internal-failurefp.md](internal-failurefp.md) |
 | `internal/phases/flakererunscan` | the native flake-rerun phase: reruns a test and flags it flaky when its outcomes disagree | [internal-phases-flakererunscan.md](internal-phases-flakererunscan.md) |
 | `internal/guardslog` | appends one timestamped guard-log line and returns the close error | [internal-guardslog.md](internal-guardslog.md) |
 | `internal/continuation` | the continuation binding: the one schema, the per-cycle manifest, the scope-keyed registry and the release authority gate (ADR-0076) | [internal-continuation.md](internal-continuation.md) |

@@ -11,6 +11,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispositionrouter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/failurefp"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -161,7 +162,7 @@ func contractArtifactDetermined(code string) bool {
 }
 
 func newContractBlockIdentity(reason string) contractBlockIdentity {
-	id := contractBlockIdentity{observed: true, normalized: normalizeReasonForFingerprint(reason)}
+	id := contractBlockIdentity{observed: true, normalized: failurefp.Normalize(reason)}
 	for _, m := range contractViolationCodeRE.FindAllStringSubmatch(reason, -1) {
 		if id.codes == nil {
 			id.codes = make(map[string]struct{})

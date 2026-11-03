@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispositionrouter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/failurefp"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 )
 
@@ -420,7 +421,7 @@ func TestContractCorrection_NormalizedIdenticalReasonsEscalate(t *testing.T) {
 			"build deliverable failed contract: [missing_section] required section 'Findings' not found (1.495s)",
 		},
 	}
-	if a, b := normalizeReasonForFingerprint(probe.reasonPerBlock[0]), normalizeReasonForFingerprint(probe.reasonPerBlock[1]); a != b {
+	if a, b := failurefp.Normalize(probe.reasonPerBlock[0]), failurefp.Normalize(probe.reasonPerBlock[1]); a != b {
 		t.Fatalf("fixture invalid: the two reasons must normalize identically, got %q vs %q", a, b)
 	}
 	if probe.reasonPerBlock[0] == probe.reasonPerBlock[1] {
@@ -455,7 +456,7 @@ func TestContractCorrection_SubsetRepairStillEscalates(t *testing.T) {
 	if probe.reasonPerBlock[0] == probe.reasonPerBlock[1] {
 		t.Fatal("fixture invalid: the two reasons must differ VERBATIM")
 	}
-	if a, b := normalizeReasonForFingerprint(probe.reasonPerBlock[0]), normalizeReasonForFingerprint(probe.reasonPerBlock[1]); a == b {
+	if a, b := failurefp.Normalize(probe.reasonPerBlock[0]), failurefp.Normalize(probe.reasonPerBlock[1]); a == b {
 		t.Fatalf("fixture invalid: the two reasons must stay DIFFERENT under normalizeReasonForFingerprint (else the pre-fix compare already escalates), got %q == %q", a, b)
 	}
 

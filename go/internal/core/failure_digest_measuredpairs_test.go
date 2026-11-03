@@ -1,6 +1,10 @@
 package core
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/failurefp"
+)
 
 const (
 	measuredReasonCycle2071 = "phase scout: scout: bridge: bridge: launch exit=81: artifact-timeout: cause=submit_wedged reason=\"nudge submit_wedged (resends=3)\" phase=scout cycle=2071 driver=claude-tmux artifact=\"scout-report.md\" waited=300s interval=300s extends_used=0 max_extends=6 last_review=pause liveness=idle progressed=false busy=false transient=false detector_error=\"\": core: bridge artifact timeout; the dispatch walk claude-tmux@balanced=81 -> agy-tmux@balanced=85 -> agy-claude-tmux@balanced=85 met a quota wall, but rung claude-tmux@balanced failed with no evidence of exhaustion, so the walk is not a quota pause"
@@ -34,7 +38,7 @@ func TestNormalizeReasonForFingerprint_MeasuredNearDuplicatePairsShareOneFingerp
 			b := fingerprint(tc.phase, tc.class, []string{tc.b})
 			if (a == b) != tc.wantSame {
 				t.Errorf("same fingerprint = %v, want %v\n a -> %q\n b -> %q", a == b, tc.wantSame,
-					normalizeReasonForFingerprint(tc.a), normalizeReasonForFingerprint(tc.b))
+					failurefp.Normalize(tc.a), failurefp.Normalize(tc.b))
 			}
 		})
 	}
@@ -52,8 +56,8 @@ func TestNormalizeReasonForFingerprint_EachFoldRewritesOnlyItsToken(t *testing.T
 		{"12 findings and 1 finding", "<n> findings and <n> finding"},
 		{"2 deterministic check failure(s)", "2 deterministic check failure(s)"},
 	} {
-		if got := normalizeReasonForFingerprint(tc.in); got != tc.want {
-			t.Errorf("normalizeReasonForFingerprint(%q) = %q, want %q", tc.in, got, tc.want)
+		if got := failurefp.Normalize(tc.in); got != tc.want {
+			t.Errorf("failurefp.Normalize(%q) = %q, want %q", tc.in, got, tc.want)
 		}
 	}
 }

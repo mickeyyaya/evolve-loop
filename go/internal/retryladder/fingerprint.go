@@ -8,15 +8,10 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/failurefp"
 )
 
-var (
-	violationCodeToken      = regexp.MustCompile(`\[([A-Za-z0-9_.:-]+)\]`)
-	narrativeVerdictToken   = regexp.MustCompile(`narrative=(?:PASS|FAIL|WARN|SKIPPED)\b`)
-	goTestDurationToken     = regexp.MustCompile(`\b\d+\.\d+s\b`)
-	cycleNumberToken        = regexp.MustCompile(`(?i)\bcycle[ -]\d+(?:-\d+)*`)
-	attemptDenominatorToken = regexp.MustCompile(`(?i)\b(attempt|retry)\s+\d+\s*(?:/|of)\s*\d+`)
-)
+var violationCodeToken = regexp.MustCompile(`\[([A-Za-z0-9_.:-]+)\]`)
 
 func Fingerprint(reason string) string {
 	reason = cyclestate.WithoutDetail(reason)
@@ -26,7 +21,7 @@ func Fingerprint(reason string) string {
 	if codes := violationCodes(reason); len(codes) > 0 {
 		return "codes:" + strings.Join(codes, ",")
 	}
-	sum := sha256.Sum256([]byte(normalize(reason)))
+	sum := sha256.Sum256([]byte(failurefp.Normalize(reason)))
 	return "text:" + hex.EncodeToString(sum[:])[:12]
 }
 
@@ -37,11 +32,4 @@ func violationCodes(reason string) []string {
 	}
 	slices.Sort(codes)
 	return slices.Compact(codes)
-}
-
-func normalize(reason string) string {
-	reason = narrativeVerdictToken.ReplaceAllString(reason, "narrative=<verdict>")
-	reason = cycleNumberToken.ReplaceAllString(reason, "cycle-N")
-	reason = attemptDenominatorToken.ReplaceAllString(reason, "${1} <n>/<n>")
-	return strings.TrimSpace(goTestDurationToken.ReplaceAllString(reason, "<dur>"))
 }

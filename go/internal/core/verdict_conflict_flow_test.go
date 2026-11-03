@@ -1,6 +1,7 @@
 package core
 
 import (
+	"github.com/mickeyyaya/evolve-loop/go/internal/failurefp"
 	"strings"
 	"testing"
 )
@@ -110,8 +111,8 @@ func TestNormalizeReasonForFingerprint_TouchesOnlyTheNarrativeToken(t *testing.T
 		{"verdict=PASS but the gate", "verdict=PASS but the gate"},
 		{"EGPS: red_count=1 [ProbeIsolation]", "EGPS: red_count=1 [ProbeIsolation]"},
 	} {
-		if got := normalizeReasonForFingerprint(tc.in); got != tc.want {
-			t.Errorf("normalizeReasonForFingerprint(%q) = %q, want %q", tc.in, got, tc.want)
+		if got := failurefp.Normalize(tc.in); got != tc.want {
+			t.Errorf("failurefp.Normalize(%q) = %q, want %q", tc.in, got, tc.want)
 		}
 	}
 }

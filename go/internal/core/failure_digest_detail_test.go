@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/failurefp"
 )
 
 func digestOf(t *testing.T, reason string) FailureDigest {
@@ -46,7 +47,7 @@ func TestNormalizeReasonForFingerprint_ContractBlocksShareAnIdentityAcrossTheirD
 	t.Parallel()
 
 	reason := "contract gate blocked build"
-	if normalizeReasonForFingerprint(cyclestate.WithDetail(reason, "a.go, b.go")) != normalizeReasonForFingerprint(reason) {
+	if failurefp.Normalize(cyclestate.WithDetail(reason, "a.go, b.go")) != failurefp.Normalize(reason) {
 		t.Fatal("a contract block's identity ignores its detail, so the escalation counts repeats")
 	}
 }
