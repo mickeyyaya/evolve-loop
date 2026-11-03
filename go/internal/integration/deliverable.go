@@ -59,7 +59,7 @@ const (
 var (
 	waveID       = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 	ErrNoPatch   = errors.New("integration: the commit has no patch")
-	ErrBadWaveID = errors.New("integration: the wave id is outside ^[A-Za-z0-9._-]+$")
+	ErrBadWaveID = errors.New("integration: the wave id is outside " + waveID.String())
 )
 
 func CycleTrailer(cycle int) string { return evidence.KeyCycle + ": " + strconv.Itoa(cycle) }

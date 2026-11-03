@@ -232,3 +232,35 @@ func TestWriteRecord_ARewriteKeepsTheIndexEntries(t *testing.T) {
 		t.Fatalf("FindRecordByCommit = %+v, %v", r, ok)
 	}
 }
+
+func TestFindRecordByCommit_AStaleEntryBeforeTheCurrentOneDoesNotHideIt(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	moved := strings.Repeat("1", 40)
+	writeRecordFor(t, root, "w1", 7, moved)
+	writeRecordFor(t, root, "w1", 7, strings.Repeat("2", 40))
+	writeRecordFor(t, root, "w1", 8, moved)
+	if r, ok := FindRecordByCommit(root, moved); !ok || r.Cycle != 8 {
+		t.Fatalf("FindRecordByCommit = %+v, %v, want cycle 8 past the stale entry of cycle 7", r, ok)
+	}
+}
+
+func TestFindRecordByCommit_ANonObjectIDNeverReachesTheIndex(t *testing.T) {
+	root := t.TempDir()
+	writeRecordFor(t, root, "w1", 7, strings.Repeat("a", 40))
+	planted := filepath.Join(root, ".evolve", "waves", "integration-w1", commitIndexDir, "zz-7")
+	if err := os.WriteFile(planted, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	reads := countRecordReads(t)
+	if _, ok := FindRecordByCommit(root, "zz"); ok || *reads != 0 {
+		t.Fatalf("ok=%v reads=%d, want a refusal before any read", ok, *reads)
+	}
+}
+
+func TestErrBadWaveIDNamesThePatternWaveDirEnforces(t *testing.T) {
+	t.Parallel()
+	if !strings.HasSuffix(ErrBadWaveID.Error(), waveID.String()) {
+		t.Fatalf("ErrBadWaveID = %q, want it to name %s", ErrBadWaveID, waveID)
+	}
+}
