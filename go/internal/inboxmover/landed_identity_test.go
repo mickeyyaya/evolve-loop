@@ -31,7 +31,11 @@ func composedRoot(t *testing.T, composeMessage string) (root, lane string) {
 	r.Git("commit", "-q", "-m", composeMessage)
 	rec := integration.DeliverableRecord{Wave: "w1", Cycle: 77, Trailer: integration.CycleTrailer(77),
 		Commits: []integration.CommitIdentity{{SHA: lane, BaseSHA: base, PatchID: patch}}}
-	if _, err := integration.WriteRecord(integration.WaveDir(r.Dir, "w1"), rec); err != nil {
+	dir, err := integration.WaveDir(r.Dir, "w1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := integration.WriteRecord(dir, rec); err != nil {
 		t.Fatal(err)
 	}
 	return r.Dir, lane

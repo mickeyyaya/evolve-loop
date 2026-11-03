@@ -49,9 +49,14 @@ type LandedCommit struct {
 }
 
 const (
-	riskHigh     = "high"
-	recordPrefix = "deliverable-"
+	riskHigh       = "high"
+	recordPrefix   = "deliverable-"
+	waveDirPrefix  = "integration-"
+	commitIndexDir = "commits"
+	indexSep       = "-"
 )
+
+var waveID = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 
 func CycleTrailer(cycle int) string { return evidence.KeyCycle + ": " + strconv.Itoa(cycle) }
 
@@ -106,8 +111,26 @@ func (r DeliverableRecord) Deliverable() Deliverable {
 	}
 }
 
-func WaveDir(projectRoot, wave string) string {
-	return filepath.Join(projectRoot, ".evolve", "waves", "integration-"+wave)
+var (
+	ErrNoPatch   = errors.New("integration: the commit has no patch")
+	ErrBadWaveID = errors.New("integration: the wave id is outside ^[A-Za-z0-9._-]+$")
+)
+
+func WaveDir(projectRoot, wave string) (string, error) {
+	if !waveID.MatchString(wave) {
+		return "", fmt.Errorf("%w: %q", ErrBadWaveID, wave)
+	}
+	return filepath.Join(wavesDir(projectRoot), waveDirPrefix+wave), nil
+}
+
+func wavesDir(projectRoot string) string { return filepath.Join(projectRoot, ".evolve", "waves") }
+
+func RetireWave(projectRoot, wave string) error {
+	dir, err := WaveDir(projectRoot, wave)
+	if err != nil {
+		return err
+	}
+	return os.RemoveAll(dir)
 }
 
 func RecordPath(dir string, cycle int) string {
@@ -128,6 +151,9 @@ func WriteRecord(dir string, r DeliverableRecord) (string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("integration: create record directory: %w", err)
 	}
+	if err := indexCommits(dir, r); err != nil {
+		return "", fmt.Errorf("integration: index deliverable record: %w", err)
+	}
 	path := RecordPath(dir, r.Cycle)
 	tmp, err := stageRecord(dir, append(raw, '\n'))
 	if err != nil {
@@ -138,6 +164,37 @@ func WriteRecord(dir string, r DeliverableRecord) (string, error) {
 		return "", fmt.Errorf("integration: publish deliverable record: %w", err)
 	}
 	return path, nil
+}
+
+func indexCommits(dir string, r DeliverableRecord) error {
+	for _, c := range r.Commits {
+		if !objectID.MatchString(c.SHA) {
+			return fmt.Errorf("commit %q is not a full object id", c.SHA)
+		}
+	}
+	index := filepath.Join(dir, commitIndexDir)
+	if err := os.MkdirAll(index, 0o755); err != nil {
+		return err
+	}
+	for _, c := range r.Commits {
+		if err := touchIndexEntry(filepath.Join(index, c.SHA+indexSep+strconv.Itoa(r.Cycle))); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+var openIndexEntry = os.OpenFile
+
+func touchIndexEntry(path string) error {
+	f, err := openIndexEntry(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+	if errors.Is(err, os.ErrExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return f.Close()
 }
 
 var createRecordTemp = os.CreateTemp
@@ -155,8 +212,10 @@ func stageRecord(dir string, body []byte) (string, error) {
 	return f.Name(), nil
 }
 
+var readRecordFile = os.ReadFile
+
 func ReadRecord(path string) (DeliverableRecord, error) {
-	raw, err := os.ReadFile(path)
+	raw, err := readRecordFile(path)
 	if err != nil {
 		return DeliverableRecord{}, fmt.Errorf("integration: read deliverable record: %w", err)
 	}

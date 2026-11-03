@@ -1,7 +1,6 @@
 package core
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -10,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
+	"github.com/mickeyyaya/evolve-loop/go/internal/integration"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
-	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 const CodeComposedGateDeclined signalcenter.Code = "ORCHESTRATOR_COMPOSED_GATE_DECLINED"
@@ -206,15 +205,5 @@ func (o *Orchestrator) scopedMergeCarryForward(ctx context.Context, cycle int, c
 }
 
 func compositionPatchID(diff []byte) (string, error) {
-	cmd := sysexec.Command(context.Background(), "git", "patch-id", "--stable")
-	cmd.Stdin = bytes.NewReader(diff)
-	out, err := cmd.Output()
-	if err != nil {
-		return "", fmt.Errorf("git patch-id --stable: %w", err)
-	}
-	fields := strings.Fields(string(out))
-	if len(fields) == 0 {
-		return "", fmt.Errorf("git patch-id --stable: empty output (empty diff?)")
-	}
-	return fields[0], nil
+	return integration.Repo{Git: integration.SysGit()}.DiffPatchID(context.Background(), string(diff))
 }

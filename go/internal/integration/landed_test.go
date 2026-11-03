@@ -191,6 +191,8 @@ func TestLandedOnRefSkipsACandidateWhoseDiffCannotBeRead(t *testing.T) {
 	}
 }
 
+func shaOf(hex string) string { return strings.Repeat(hex, 40/len(hex)) }
+
 func writeRecordFor(t *testing.T, root, wave string, cycle int, sha string) {
 	t.Helper()
 	rec := DeliverableRecord{Wave: wave, Cycle: cycle, Trailer: CycleTrailer(cycle),
@@ -203,10 +205,10 @@ func writeRecordFor(t *testing.T, root, wave string, cycle int, sha string) {
 func TestFindRecord_FindsByCycleAcrossWaves(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeRecordFor(t, root, "w1", 7, "aaa")
-	writeRecordFor(t, root, "w2", 8, "bbb")
+	writeRecordFor(t, root, "w1", 7, shaOf("a"))
+	writeRecordFor(t, root, "w2", 8, shaOf("b"))
 	r, ok := FindRecord(root, 8)
-	if !ok || r.Wave != "w2" || r.Commits[0].SHA != "bbb" {
+	if !ok || r.Wave != "w2" || r.Commits[0].SHA != shaOf("b") {
 		t.Fatalf("FindRecord(8) = %+v, %v", r, ok)
 	}
 	if _, ok := FindRecord(root, 9); ok {
@@ -224,7 +226,7 @@ func TestFindRecord_SkipsAnUnreadableRecordAndABadPattern(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(bad, "deliverable-7.json"), []byte("{not json"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	writeRecordFor(t, root, "w1", 7, "aaa")
+	writeRecordFor(t, root, "w1", 7, shaOf("a"))
 	r, ok := FindRecord(root, 7)
 	if !ok || r.Wave != "w1" {
 		t.Fatalf("FindRecord(7) = %+v, %v, want the readable record", r, ok)
@@ -237,13 +239,13 @@ func TestFindRecord_SkipsAnUnreadableRecordAndABadPattern(t *testing.T) {
 func TestFindRecordByCommit_FindsByAnyCommitSHA(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeRecordFor(t, root, "w1", 7, "aaa")
-	writeRecordFor(t, root, "w1", 8, "bbb")
-	r, ok := FindRecordByCommit(root, "bbb")
+	writeRecordFor(t, root, "w1", 7, shaOf("a"))
+	writeRecordFor(t, root, "w1", 8, shaOf("b"))
+	r, ok := FindRecordByCommit(root, shaOf("b"))
 	if !ok || r.Cycle != 8 {
 		t.Fatalf("FindRecordByCommit(bbb) = %+v, %v", r, ok)
 	}
-	if _, ok := FindRecordByCommit(root, "ccc"); ok {
+	if _, ok := FindRecordByCommit(root, shaOf("c")); ok {
 		t.Error("an unknown commit found a record")
 	}
 }
