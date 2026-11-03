@@ -55,7 +55,7 @@
       - The base of the head commit is an ancestor of `origin/main`.
       - `sizeratchet.Scan` and `rawgitratchet.Scan` are clean on `origin/main` with the lists of the pull request.
       - Required CI is green on the head. The check is `awaitGreen` of `evolve pr merge`, and the merge is its `mergeHead` with `--match-head-commit`.
-      - The stage key is `boundary.ratchet_merge.stage`, and the default is `shadow`. At `shadow` the step prints `ratchet merge: would merge #<n> at <sha>` and does not merge. At `enforce` it merges and prints `ratchet merge: merged #<n> <sha>`. At `off` it checks no gate.
+      - The stage key is `boundary.ratchet_merge.stage`, and the default is `shadow`. At `shadow` the step prints `ratchet merge: would merge #<n> at <sha>` and does not merge. At `enforce` it merges and prints `ratchet merge: merged #<n> <sha>`. At `off` it checks no gate. `policy.Load` refuses an unknown word, and the step then prints a WARN and merges nothing.
       - CI that is not green prints `ratchet merge: #<n> held: <cause>` on stdout. Any other gate failure prints `WARN: ratchet merge: #<n>: <cause>` on stderr. Then the step replaces the tip with the list from `origin/main`.
       - The step never merges a fork's pull request, because it never selects one.
       - **No idle force-push.** When the regenerated lists equal the lists at the tip, the step does not push, and it prints `ratchet tighten: #<n> already holds this list`. A push restarts required CI, which takes about 20 minutes.

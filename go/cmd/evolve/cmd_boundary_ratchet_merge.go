@@ -11,11 +11,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
-	"github.com/mickeyyaya/evolve-loop/go/internal/rawgitratchet"
-	"github.com/mickeyyaya/evolve-loop/go/internal/sizeratchet"
 )
-
-var ratchetLists = []string{"go/" + sizeratchet.OffendersRelPath, "go/" + rawgitratchet.BaselineRelPath}
 
 type ratchetMergeGate struct {
 	stage  config.Stage
@@ -30,7 +26,7 @@ func ratchetMergeGateFor(root string, stderr io.Writer) (ratchetMergeGate, error
 	var g ratchetMergeGate
 	pol, err := policy.Load(paths.PolicyPath(paths.EvolveDirOf(root)))
 	if err == nil {
-		g.stage, err = pol.BoundaryRatchetMergeStage()
+		g.stage = pol.BoundaryRatchetMergeStage()
 	}
 	if err == nil && g.stage != config.StageOff {
 		g.merger, err = ratchetPRMerger(root, stderr)
@@ -98,13 +94,11 @@ func fetchBranchTip(wt, ref string) (string, error) {
 }
 
 func scanWithListsOf(wt, tip string) error {
-	if err := runGitSteps(wt, append([]string{"checkout", tip, "--"}, ratchetLists...)); err != nil {
+	if err := runGitSteps(wt, append([]string{"checkout", tip, "--"}, ratchetListPaths()...)); err != nil {
 		return err
 	}
-	module := filepath.Join(wt, "go")
-	sizeErr := sizeratchet.Scan(module)
-	_, rawErr := rawgitratchet.Scan(module)
-	return errors.Join(sizeErr, rawErr, runGitSteps(wt, append([]string{"checkout", "HEAD", "--"}, ratchetLists...)))
+	scanErr := scanRatchets(filepath.Join(wt, "go"))
+	return errors.Join(scanErr, runGitSteps(wt, append([]string{"checkout", "HEAD", "--"}, ratchetListPaths()...)))
 }
 
 func tipHoldsLists(wt, ref, lease string) (bool, error) {
@@ -114,7 +108,7 @@ func tipHoldsLists(wt, ref, lease string) (bool, error) {
 	_, err := fetchBranchTip(wt, ref)
 	var diff string
 	if err == nil {
-		diff, err = ratchetCmd(wt, "git", append([]string{"diff", "--name-only", lease, "--"}, ratchetLists...)...)
+		diff, err = ratchetCmd(wt, "git", append([]string{"diff", "--name-only", lease, "--"}, ratchetListPaths()...)...)
 	}
 	return err == nil && diff == "", err
 }

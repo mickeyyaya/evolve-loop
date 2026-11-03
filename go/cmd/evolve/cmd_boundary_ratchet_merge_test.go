@@ -85,13 +85,15 @@ type ratchetPRFixture struct {
 func newRatchetPRFixture(t *testing.T, prList, stage string) ratchetPRFixture {
 	t.Helper()
 	o := newRatchetOrigin(t, 60, `{"internal/fixture.Big": 90}`)
-	return pushRatchetPR(t, o, "main", prList, stage)
+	return pushRatchetPR(t, o, "main", map[string]string{ratchetListPath: prList}, stage)
 }
 
-func pushRatchetPR(t *testing.T, o ratchetOrigin, from, prList, stage string) ratchetPRFixture {
+func pushRatchetPR(t *testing.T, o ratchetOrigin, from string, lists map[string]string, stage string) ratchetPRFixture {
 	t.Helper()
 	o.plane.Git("checkout", "-q", "-b", "tighten", from)
-	o.plane.Write(ratchetListPath, prList)
+	for path, body := range lists {
+		o.plane.Write(path, body)
+	}
 	o.plane.Git("commit", "-q", "-am", "an older tighten")
 	o.plane.Git("push", "-q", "origin", "HEAD:refs/heads/"+ratchetPRBranch)
 	o.plane.Git("checkout", "-q", "main")
@@ -164,6 +166,20 @@ func TestBoundaryRatchetMerge_ARedScanHoldsTheMergeWarnsAndReplacesTheTip(t *tes
 		t.Errorf("stdout %q, want the tip of #7 replaced", out)
 	}
 	f.assertProposed(t, ratchetPRBranch, main)
+}
+
+func TestBoundaryRatchetMerge_ARedRawGitScanHoldsTheMerge(t *testing.T) {
+	o := newRatchetOrigin(t, 60, `{"internal/fixture.Big": 90}`)
+	f := pushRatchetPR(t, o, "main", map[string]string{ratchetListPath: tightRatchetList, rawGitBaselinePath: "{}\n"}, "enforce")
+
+	rc, out, errOut := f.tighten(t)
+
+	if rc != 0 || len(f.merge.mergeCalls()) != 0 || !strings.Contains(errOut, "WARN: ratchet merge: #7") || !strings.Contains(errOut, "rawgitratchet") {
+		t.Fatalf("rc=%d stdout=%q stderr=%q merges=%q, want a WARN for the red raw-git scan and no merge", rc, out, errOut, f.merge.mergeCalls())
+	}
+	if f.branchTip() == f.tip {
+		t.Errorf("the tip of #7 holds the red raw-git baseline after the step, want it replaced")
+	}
 }
 
 func TestBoundaryRatchetMerge_CINotGreenHoldsTheMerge(t *testing.T) {
@@ -266,7 +282,7 @@ func TestBoundaryRatchetMerge_AGateFailureWarnsAndHoldsTheMerge(t *testing.T) {
 			o.plane.Git("checkout", "-q", "-b", "side")
 			o.plane.Git("commit", "-q", "--allow-empty", "-m", "a commit that never landed")
 			o.plane.Git("checkout", "-q", "main")
-			return pushRatchetPR(t, o, "side", tightRatchetList, "enforce")
+			return pushRatchetPR(t, o, "side", map[string]string{ratchetListPath: tightRatchetList}, "enforce")
 		}, "is not on origin/main"},
 		{"a list overlay that cannot be checked out", func(t *testing.T) ratchetPRFixture {
 			f := newRatchetPRFixture(t, tightRatchetList, "enforce")
@@ -280,7 +296,7 @@ func TestBoundaryRatchetMerge_AGateFailureWarnsAndHoldsTheMerge(t *testing.T) {
 		}, "the merge was refused"},
 		{"an unknown stage", func(t *testing.T) ratchetPRFixture {
 			return newRatchetPRFixture(t, tightRatchetList, "sometimes")
-		}, "boundary.ratchet_merge.stage"},
+		}, `boundary.ratchet_merge: stage "sometimes"`},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

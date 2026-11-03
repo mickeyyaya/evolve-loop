@@ -60,24 +60,55 @@ func landRatchetTighten(root string, stdout, stderr io.Writer) (err error) {
 	return tightenAndPropose(root, wt, stdout, stderr)
 }
 
-type tightenedList struct {
+type boundaryRatchet struct {
 	rel     string
+	tighten func(string) ([]string, []byte, error)
+	scan    func(string) error
+}
+
+var boundaryRatchets = []boundaryRatchet{
+	{sizeratchet.OffendersRelPath, sizeratchet.TightenModule, sizeratchet.Scan},
+	{rawgitratchet.BaselineRelPath, rawgitratchet.TightenModule, scanRawGit},
+}
+
+func scanRawGit(module string) error {
+	_, err := rawgitratchet.Scan(module)
+	return err
+}
+
+func (r boundaryRatchet) repoPath() string { return "go/" + r.rel }
+
+func ratchetListPaths() []string {
+	paths := make([]string, 0, len(boundaryRatchets))
+	for _, r := range boundaryRatchets {
+		paths = append(paths, r.repoPath())
+	}
+	return paths
+}
+
+func scanRatchets(module string) error {
+	var errs []error
+	for _, r := range boundaryRatchets {
+		errs = append(errs, r.scan(module))
+	}
+	return errors.Join(errs...)
+}
+
+type tightenedList struct {
+	boundaryRatchet
 	changes []string
 	encoded []byte
 }
 
 func tightenLists(module string) ([]tightenedList, error) {
 	var lists []tightenedList
-	for _, t := range []struct {
-		rel     string
-		tighten func(string) ([]string, []byte, error)
-	}{{sizeratchet.OffendersRelPath, sizeratchet.TightenModule}, {rawgitratchet.BaselineRelPath, rawgitratchet.TightenModule}} {
-		changes, encoded, err := t.tighten(module)
+	for _, r := range boundaryRatchets {
+		changes, encoded, err := r.tighten(module)
 		if err != nil {
 			return nil, err
 		}
 		if len(changes) > 0 {
-			lists = append(lists, tightenedList{rel: t.rel, changes: changes, encoded: encoded})
+			lists = append(lists, tightenedList{boundaryRatchet: r, changes: changes, encoded: encoded})
 		}
 	}
 	return lists, nil
@@ -88,14 +119,13 @@ func writeTightenedLists(module string, lists []tightenedList) (paths, changes [
 		if werr := ratchetWrite(filepath.Join(module, filepath.FromSlash(l.rel)), l.encoded, 0o644); werr != nil {
 			return nil, nil, werr
 		}
-		paths = append(paths, "go/"+l.rel)
+		paths = append(paths, l.repoPath())
 		changes = append(changes, l.changes...)
 	}
-	if serr := sizeratchet.Scan(module); serr != nil {
-		return nil, nil, serr
+	if err := scanRatchets(module); err != nil {
+		return nil, nil, err
 	}
-	_, err = rawgitratchet.Scan(module)
-	return paths, changes, err
+	return paths, changes, nil
 }
 
 func tightenAndPropose(root, wt string, stdout, stderr io.Writer) error {
@@ -135,7 +165,11 @@ func proposeTightened(wt string, pr ratchetPR, stdout io.Writer) error {
 		return err
 	}
 	fmt.Fprintln(stdout, strings.Join(changes, "\n"))
-	fmt.Fprintln(stdout, pr.report(pushed))
+	if !pushed {
+		fmt.Fprintf(stdout, "ratchet tighten: #%d already holds this list (%s)\n", pr.Number, pr.HeadRefName)
+		return nil
+	}
+	fmt.Fprintln(stdout, pr.report())
 	return nil
 }
 
@@ -146,12 +180,9 @@ type ratchetPR struct {
 	Fork        bool   `json:"isCrossRepository"`
 }
 
-func (p ratchetPR) report(pushed bool) string {
-	switch {
-	case p.Number == 0:
+func (p ratchetPR) report() string {
+	if p.Number == 0 {
 		return "ratchet tighten: opened a pull request from " + p.HeadRefName
-	case !pushed:
-		return fmt.Sprintf("ratchet tighten: #%d already holds this list (%s)", p.Number, p.HeadRefName)
 	}
 	return fmt.Sprintf("ratchet tighten: updated pull request #%d (%s)", p.Number, p.HeadRefName)
 }

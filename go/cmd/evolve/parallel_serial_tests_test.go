@@ -1,6 +1,7 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestBoundaryRatchetMerge_ARedRawGitScanHoldsTheMerge":                                             "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
 	"main.TestBoundaryRatchetMerge_AMergeWithNoMergeCommitReadRelistsAndNeverPushesTheMergedBranch":         "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
 	"main.TestBoundaryRatchetMerge_GreenGatesMergeThenRegenerate":                                           "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
 	"main.TestBoundaryRatchetMerge_ARedScanHoldsTheMergeWarnsAndReplacesTheTip":                             "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",

@@ -27,22 +27,17 @@ func TestBoundaryRatchetMergeStage_DefaultsToShadowAndReadsTheKey(t *testing.T) 
 			if err != nil {
 				t.Fatal(err)
 			}
-			got, err := p.BoundaryRatchetMergeStage()
-			if err != nil || got != tc.want {
-				t.Errorf("BoundaryRatchetMergeStage = %v, %v, want %v", got, err, tc.want)
+			if got := p.BoundaryRatchetMergeStage(); got != tc.want {
+				t.Errorf("BoundaryRatchetMergeStage = %v, want %v", got, tc.want)
 			}
 		})
 	}
 }
 
-func TestBoundaryRatchetMergeStage_AnUnknownWordFailsClosed(t *testing.T) {
-	p, err := policy.Parse([]byte(`{"boundary":{"ratchet_merge":{"stage":"sometimes"}}}`))
-	if err != nil {
-		t.Fatal(err)
-	}
-	got, err := p.BoundaryRatchetMergeStage()
-	if err == nil || got != config.StageOff || !strings.Contains(err.Error(), "boundary.ratchet_merge.stage") {
-		t.Errorf("BoundaryRatchetMergeStage = %v, %v, want off and an error naming the key", got, err)
+func TestBoundaryRatchetMergePolicy_AnUnknownStageFailsTheParse(t *testing.T) {
+	_, err := policy.Parse([]byte(`{"boundary":{"ratchet_merge":{"stage":"sometimes"}}}`))
+	if err == nil || !strings.Contains(err.Error(), "boundary.ratchet_merge") || !strings.Contains(err.Error(), "sometimes") {
+		t.Errorf("Parse = %v, want an error naming boundary.ratchet_merge and the word", err)
 	}
 }
 
@@ -61,14 +56,21 @@ func TestTheCheckedInPolicy_HoldsTheShadowStagesThatWaitForEvidence(t *testing.T
 	if p.Boundary == nil || p.Boundary.RatchetMerge == nil || p.Boundary.RatchetMerge.Stage != "shadow" {
 		t.Fatalf("boundary.ratchet_merge = %+v, want the key checked in at shadow", p.Boundary)
 	}
-	if got, err := p.BoundaryRatchetMergeStage(); err != nil || got != config.StageShadow {
-		t.Errorf("boundary.ratchet_merge.stage = %v, %v, want shadow", got, err)
+	if got := p.BoundaryRatchetMergeStage(); got != config.StageShadow {
+		t.Errorf("boundary.ratchet_merge.stage = %v, want shadow", got)
 	}
 }
 
-func TestBoundaryPolicy_ABuiltBoundaryRatchetMergePolicyHoldsItsStage(t *testing.T) {
-	p := policy.Policy{Boundary: &policy.BoundaryPolicy{RatchetMerge: &policy.BoundaryRatchetMergePolicy{Stage: "enforce"}}}
-	if got, err := p.BoundaryRatchetMergeStage(); err != nil || got != config.StageEnforce {
-		t.Errorf("BoundaryRatchetMergeStage = %v, %v, want enforce from a built policy", got, err)
+func TestBoundaryPolicy_ABuiltBoundaryRatchetMergePolicyWithAnUnknownStageMergesNothing(t *testing.T) {
+	p := policy.Policy{Boundary: &policy.BoundaryPolicy{RatchetMerge: &policy.BoundaryRatchetMergePolicy{Stage: "sometimes"}}}
+	if got := p.BoundaryRatchetMergeStage(); got != config.StageOff {
+		t.Errorf("BoundaryRatchetMergeStage = %v, want off for a built policy that skipped the parse check", got)
+	}
+}
+
+func TestBoundaryRatchetMergePolicy_UnmarshalJSONRefusesABadShape(t *testing.T) {
+	var b policy.BoundaryRatchetMergePolicy
+	if err := b.UnmarshalJSON([]byte(`{"stage":3}`)); err == nil || !strings.Contains(err.Error(), "boundary.ratchet_merge") {
+		t.Errorf("UnmarshalJSON = %v, want a decode error naming boundary.ratchet_merge", err)
 	}
 }
