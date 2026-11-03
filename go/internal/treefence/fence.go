@@ -48,6 +48,7 @@ func TakeStaged(ctx context.Context, worktree string, pathspec []string) (Snapsh
 type Result struct {
 	Restored []string
 	Kept     []string
+	after    string
 }
 
 func Take(ctx context.Context, worktree string) (Snapshot, error) {
@@ -94,7 +95,7 @@ func (s Snapshot) Restore(ctx context.Context) (Result, error) {
 	sort.Strings(restored)
 	kept := append(keptAdded, keptChanged...)
 	sort.Strings(kept)
-	return Result{Restored: restored, Kept: kept}, errors.Join(errs...)
+	return Result{Restored: restored, Kept: kept, after: after}, errors.Join(errs...)
 }
 
 func (s Snapshot) Differing(ctx context.Context, base Snapshot) ([]string, error) {
@@ -285,6 +286,15 @@ type Fence struct {
 	snap         *Snapshot
 	takeErr      error
 	retakenAfter error
+	workspace    string
+}
+
+func (f *Fence) WithWorkspace(workspace string) *Fence {
+	if f == nil {
+		return nil
+	}
+	f.workspace = workspace
+	return f
 }
 
 func Begin(ctx context.Context, worktree string, readOnly bool, writable ...string) *Fence {
@@ -328,6 +338,8 @@ func writableSet(paths []string) map[string]bool {
 	return set
 }
 
+const patchFileName = "fence-reverted.patch"
+
 type Outcome struct {
 	Verified     bool
 	Restored     []string
@@ -335,6 +347,9 @@ type Outcome struct {
 	TakeErr      error
 	RestoreErr   error
 	RetakenAfter error
+	patchPath    string
+	patchErr     error
+	workspace    string
 }
 
 func (f *Fence) End(ctx context.Context) Outcome {
@@ -351,7 +366,30 @@ func (f *Fence) End(ctx context.Context) Outcome {
 	if err == nil {
 		err = f.snap.verify(ctx)
 	}
-	return Outcome{Verified: err == nil, Restored: res.Restored, Kept: res.Kept, RestoreErr: err, RetakenAfter: f.retakenAfter}
+	out := Outcome{Verified: err == nil, Restored: res.Restored, Kept: res.Kept, RestoreErr: err, RetakenAfter: f.retakenAfter, workspace: f.workspace}
+	if len(res.Restored) > 0 && f.workspace != "" && res.after != "" {
+		out.savePatch(ctx, f.snap.Worktree, f.snap.Tree, res.after, res.Restored)
+	}
+	return out
+}
+
+func (o *Outcome) savePatch(ctx context.Context, worktree, tree, after string, paths []string) {
+	args := append([]string{"diff-tree", "-p", "--binary", tree, after, "--"}, paths...)
+	patch, err := git(ctx, worktree, nil, args...)
+	if err != nil {
+		o.patchErr = err
+		return
+	}
+	if err := os.MkdirAll(o.workspace, 0o755); err != nil {
+		o.patchErr = err
+		return
+	}
+	target := filepath.Join(o.workspace, patchFileName)
+	if err := os.WriteFile(target, []byte(patch), 0o644); err != nil {
+		o.patchErr = err
+		return
+	}
+	o.patchPath = target
 }
 
 const listMax = 12
@@ -372,9 +410,15 @@ func (o Outcome) Diagnostics(phase string) []cyclestate.Diagnostic {
 			more = fmt.Sprintf(" … +%d more", len(shown)-listMax)
 			shown = shown[:listMax]
 		}
-		out = append(out, cyclestate.Diagnostic{Severity: "warning", Message: fmt.Sprintf(
+		msg := fmt.Sprintf(
 			"worktree fence: read-only phase %s wrote %d path(s) into its worktree; restored to the dispatched tree: %s%s",
-			phase, len(o.Restored), strings.Join(shown, ", "), more)})
+			phase, len(o.Restored), strings.Join(shown, ", "), more)
+		if o.patchPath != "" {
+			msg += fmt.Sprintf(" (reverted patch: %s)", o.patchPath)
+		} else if o.patchErr != nil {
+			msg += fmt.Sprintf(" (could not save %s: %v)", filepath.Join(o.workspace, patchFileName), o.patchErr)
+		}
+		out = append(out, cyclestate.Diagnostic{Severity: "warning", Message: msg})
 	}
 	if len(o.Kept) > 0 {
 		out = append(out, cyclestate.Diagnostic{Severity: "warning", Message: fmt.Sprintf(
