@@ -255,6 +255,6 @@ flowchart LR
 - The test proves the footprint with a fake bridge. It does not prove what a real CLI writes outside its sandbox grants.
 - The record binds a review to the tree, not to its input. A review with another input at the same tree also attests the commit.
 - The record has no signature. A process outside a cell can write one, as it can pass a plain reviewer name. The record adds the provenance of the bridge, not a proof.
-- The `--writable` paths are exact files. A new file of the build needs its own `--writable` path.
+- The `--writable` paths are exact files. A `--writable` that names a directory is a usage error (exit 10), and the run starts no seat. A new file of the build needs its own `--writable` path.
 - The bridge grants the Git metadata writes of a linked worktree to a writer, so a build cell can commit in its worktree. The profile denies `git commit` as a tool, and the commit gate refuses a review record of another tree.
 - A Linux host refuses the Git metadata grants of a linked worktree (`sandboxGitWritePaths`), so the build seat runs only on macOS today.

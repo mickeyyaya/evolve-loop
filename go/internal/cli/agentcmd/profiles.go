@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
 	"path"
 	"path/filepath"
 	"slices"
@@ -79,6 +80,9 @@ func admitWriter(spec phasespec.PhaseSpec, root string, o runOptions) error {
 	for _, rel := range o.writable {
 		if !filepath.IsLocal(rel) || filepath.Clean(rel) != rel {
 			return refusal{exitUsage, fmt.Sprintf("--writable %q is not a clean path inside the worktree", rel)}
+		}
+		if info, err := os.Stat(filepath.Join(o.worktree, rel)); err == nil && info.IsDir() {
+			return refusal{exitUsage, fmt.Sprintf("--writable %q is a directory: name each file that the writer can change", rel)}
 		}
 	}
 	return nil
