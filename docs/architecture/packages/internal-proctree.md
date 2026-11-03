@@ -40,6 +40,8 @@ The bridge uses it at the end of each dispatch (`internal/bridge/dispatch_reap.g
 - **The tree directory** is mode 0700.
 - **`DispatchID` is the single source of the tag format**: `<run>/<cycle>/<agent>/p<owner-pid>n<nonce>`. The bridge mints it with `String()`, and gc reads it with `ParseDispatchID`. A slash in the run or the agent becomes `_`, so the parts cannot shift. `ParseDispatchID` refuses an owner pid of 0 or 1.
 
+- **The start of a process comes from the kernel.** `StartOf` and `StartTime` run no program. On darwin they read `sysctl kern.proc.pid`, and on linux they read `/proc`. So a build sandbox that denies the exec of the setuid `ps` binary does not affect them (cycles 2122 and 2133 failed on that exec). `evolve wave` reads the start time of the loop process through `StartTime`.
+
 ## Invariants
 
 - The arguments and the environment stay apart (`TestParseProcArgs2_KeepsArgumentsAndEnvironmentApart`, `TestTaggedWith_ATagInTheArgumentsIsNoProof`).
@@ -60,3 +62,4 @@ The bridge uses it at the end of each dispatch (`internal/bridge/dispatch_reap.g
 - A descendant that calls `setsid`, leaves the pane tree before the record and is an Apple binary has no tag and no record. A Linux cgroup per dispatch can close this gap. The host is macOS, so this is a later item.
 - The start time has a resolution of one second.
 - A process in uninterruptible sleep survives SIGKILL. The caller reports it.
+- `StartTime` on linux adds the start ticks of `/proc/<pid>/stat` to the `btime` line of `/proc/stat`. It assumes the fixed Linux tick rate of 100 Hz (CLK_TCK), so the start is exact only to that tick. Other platforms have no reader and return an error.

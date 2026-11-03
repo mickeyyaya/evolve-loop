@@ -14,7 +14,7 @@ var metadataAllowlist = map[string]bool{
 	"build-planner": true, "cache-strategy-scan": true, "caching-strategy-design": true,
 	"capacity-plan": true, "changelog-sync": true, "cicd-pipeline-audit": true,
 	"cleanup-sweep": true, "close-checklist": true, "compat-surface-check": true,
-	"container-hardening-scan": true, "context-condense": true, "contract-fuzz-probe": true,
+	"container-hardening-scan": true, "contract-fuzz-probe": true,
 	"coverage-gate": true, "data-integrity-check": true, "data-model-design": true,
 	"dependency-audit": true, "dependency-map": true, "doc-sync": true,
 	"error-handling-scan": true, "fault-localization": true, "flake-rerun-scan": true,
