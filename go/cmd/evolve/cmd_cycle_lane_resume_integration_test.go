@@ -34,7 +34,7 @@ func (r countingPhaseRunner) Run(ctx context.Context, req core.PhaseRequest) (co
 	return cycleRunQuotaRunner{}.Run(ctx, req)
 }
 
-func TestCycleRunRoot_AFleetLaneResumesTheQuotaPausedCycleOfItsTodoAtThePausedPhase(t *testing.T) {
+func TestCycleRunRoot_AFleetLaneResumesTheQuotaPausedCycleOfItsTodoAtThePausedPhaseWhileASiblingHoldsTheProjectLock(t *testing.T) {
 	bin := t.TempDir()
 	fakeclitest.Install(t, filepath.Join(bin, "tmux"), "#!/bin/sh\nexit 0\n")
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
@@ -72,6 +72,11 @@ func TestCycleRunRoot_AFleetLaneResumesTheQuotaPausedCycleOfItsTodoAtThePausedPh
 	os.Unsetenv(ipcenv.CycleStateFileKey)
 	t.Setenv(ipcenv.FleetKey, "1")
 	t.Setenv(ipcenv.FleetScopeKey, "paused-item")
+	releaseSiblingLock, err := st.AcquireLock(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = releaseSiblingLock() })
 	var scoutCalls, buildCalls atomic.Int32
 	old := wireOrchestratorDepsFn
 	t.Cleanup(func() { wireOrchestratorDepsFn = old })
