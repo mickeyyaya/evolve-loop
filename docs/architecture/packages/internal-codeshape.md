@@ -8,7 +8,7 @@
 
 ## Design
 
-- **Production files.** `Production` takes a path relative to `go/`. It keeps `.go` files that are not tests and not under `acs/`, `test/`, `testdata/`, `vendor/` or a hidden directory.
+- **Production files.** `Production` takes a path relative to `go/`. It keeps `.go` files that are not tests and not under `acs/` or `test/`. It also refuses each file that `gotestname.UnderIgnoredDir` names. On 2026-11-03 the rule started to skip a directory that starts with `_`, as the go tool does. `Scan` skips the same directories.
 - **The four limits.** `ParseFuncs` measures each function: lines, cyclomatic complexity, nesting depth and parameters. Cyclomatic is 1 plus each `if`, `for`, `range`, non-default `case`, non-default `select` case, `&&` and `||`. Nesting counts `if`, `for`, `range`, `switch`, `select` and function literals. An `else if` stays at the level of its chain, as in gocognit. A function conforms at 30 lines, cyclomatic 10, nesting 3 and 4 parameters or fewer.
 - **CQ1 on the tree.** `TreeConformance` is a census of every production function. Its own threshold is 0.878, one point under the 0.888 baseline, because the registry threshold of 0.90 is for changed functions.
 - **CQ1 on changed functions.** `ChangedFuncs` reads `git show -U0 --no-renames --diff-merges=first-parent` of a ship commit. It parses each changed production file at that commit and keeps each function that a new hunk touches. `ChangedConformance` emits one reading per ship of the closing wave, with its cycle, and one reading for the wave.

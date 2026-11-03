@@ -2,9 +2,6 @@ package acssuite
 
 import (
 	"fmt"
-
-	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
-	"github.com/mickeyyaya/evolve-loop/go/internal/gopkgpattern"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -12,6 +9,10 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gopkgpattern"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotestname"
 )
 
 type ScopeFinding struct {
@@ -69,7 +70,7 @@ func fileScopeFindings(file *ast.File, name string, consts map[string]string, in
 	var findings []ScopeFinding
 	for _, decl := range file.Decls {
 		fn, ok := decl.(*ast.FuncDecl)
-		if !ok || fn.Body == nil || !strings.HasPrefix(fn.Name.Name, "Test") {
+		if !ok || fn.Body == nil || !gotestname.HasPrefix(fn.Name.Name, "Test") {
 			continue
 		}
 		for _, pat := range functionPackagePatterns(fn, consts) {

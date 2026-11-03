@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## Changed — one home for the go test name and ignored-directory rules (2026-11-03)
+
+- **The migration.** Twelve directory walks and six test-name checks now call `internal/gotestname`. No other copy of the two rules is left under `go/`.
+- **The name rule.** A function such as `Testify` is not a test. Five checks used to accept it: `acspathscan`, the `acssuite` scope lint, `evalgate` Gate C, `handoff/request` and `paralleltest`.
+- **The directory rule.** Seven walks now also skip `vendor`, a hidden directory or a directory that starts with `_`. They are `coverstrict`, `codeshape`, `commentaudit`, `triagecap`, `test/structure`, `evolve docs ste-lint` and the e2e scan of `ciparity`. The scan of the `acs` tree in `acsnames` changes in the same way.
+- **The helper.** `gotestname.UnderIgnoredDir` applies the directory rule to each directory of a file path.
+- Docs: [internal-gotestname.md](docs/architecture/packages/internal-gotestname.md).
+
 ## Added — a guard refuses a test function with an empty body (ADR-0158 decision 19, 2026-11-03)
 
 - **The guard.** `go/acs/regression/emptytests` parses each `*_test.go` file of the module. It fails on a `Test`, `Fuzz` or `Benchmark` function whose body has no statement. A body of only a comment fails. A body of only `t.Skip` with a reason passes.

@@ -23,7 +23,7 @@
   - `ScoutTriage` makes one ask per selected slug. It trims, drops blanks and repeated slugs.
   - `TriageTDD` reads the committed set and the inbox record of each committed id. It makes one ask per acceptance entry, with the inbox source and the verbatim text. It returns `ErrNoCommittedSet` or `ErrUnresolvedItem` when it cannot build the whole request.
   - `TriageTDDFromItems` is the pure part of `TriageTDD`: it takes loaded inbox items.
-  - `TDDBuild` parses the `_test.go` files of an ACS cycle package and makes one ask per predicate. It returns `ErrNoPredicates` for a package without one.
+  - `TDDBuild` parses the `_test.go` files of an ACS cycle package and makes one ask per predicate. It returns `ErrNoPredicates` for a package without one. A predicate has a name that passes `gotestname.HasPrefix` with `Test`. Since 2026-11-03 a function such as `Testify` is not a predicate.
 
 ## Exits
 

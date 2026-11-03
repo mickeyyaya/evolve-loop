@@ -12,6 +12,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotestname"
 )
 
 type Config struct {
@@ -178,7 +180,7 @@ func testingTName(fd *ast.FuncDecl) string {
 
 func isTopLevelTest(fd *ast.FuncDecl) bool {
 	return fd.Recv == nil && fd.Body != nil &&
-		strings.HasPrefix(fd.Name.Name, "Test") && fd.Name.Name != "TestMain"
+		gotestname.HasPrefix(fd.Name.Name, "Test") && fd.Name.Name != "TestMain"
 }
 
 func isMethodCallOn(n ast.Node, recv, method string) bool {

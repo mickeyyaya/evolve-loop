@@ -304,7 +304,7 @@ func TestPackageDocHolder_PrefersDocGoThenTheDirsOwnFileThenTheFirstNonTestFile(
 func TestStripDirs_SkipsWhatIsNotProjectCode(t *testing.T) {
 	root := t.TempDir()
 	src := "package x\n\n// kept, not project code\nvar V int\n"
-	for _, dir := range []string{"testdata", "vendor/v", ".cache"} {
+	for _, dir := range []string{"testdata", "vendor/v", ".cache", "_scratch"} {
 		writeFiles(t, filepath.Join(root, dir), map[string]string{"x.go": src})
 	}
 
@@ -312,7 +312,7 @@ func TestStripDirs_SkipsWhatIsNotProjectCode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, dir := range []string{"testdata", "vendor/v", ".cache"} {
+	for _, dir := range []string{"testdata", "vendor/v", ".cache", "_scratch"} {
 		if got := readFile(t, filepath.Join(root, dir, "x.go")); got != src {
 			t.Errorf("%s/x.go was rewritten; Rank's skip set is not project code", dir)
 		}

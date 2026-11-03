@@ -384,3 +384,16 @@ func TestViolations_AnUnreadableFixtureFileIsAnError(t *testing.T) {
 		t.Fatal("an unreadable fixture must be an error, not a silent gap")
 	}
 }
+
+func TestViolations_ADirectoryGoTestIgnoresIsNotAPredicatePackage(t *testing.T) {
+	for _, dir := range []string{"vendor", ".hidden", "_scratch"} {
+		got := violationsFor(t, map[string]string{
+			"internal/decl/decl_test.go":           declaresRenamed,
+			"acs/cycle9/predicates_test.go":        predicateFile("var argv = []string{\"-run\", \"^TestRenamed$\"}\n"),
+			"acs/cycle9/" + dir + "/probe/main.go": "package main\n\nvar argv = []string{\"-run\", \"^TestElsewhere$\"}\n",
+		}, nil)
+		if len(got) != 0 {
+			t.Errorf("%s: violations = %q, want none: go test ignores %s, so it holds no predicate", dir, got, dir)
+		}
+	}
+}

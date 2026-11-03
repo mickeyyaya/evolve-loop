@@ -22,6 +22,7 @@ const e2eTag = "e2e"
 func E2ETestNames(moduleDir string, roots, tags []string) ([]string, error) {
 	var names []string
 	for _, root := range roots {
+		start := filepath.Join(moduleDir, root)
 		walk := func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return err
@@ -29,14 +30,14 @@ func E2ETestNames(moduleDir string, roots, tags []string) ([]string, error) {
 			if !d.IsDir() {
 				return nil
 			}
-			if d.Name() == "testdata" {
+			if path != start && gotestname.IgnoredDir(d.Name()) {
 				return filepath.SkipDir
 			}
 			found, err := e2eTestsIn(path, tags)
 			names = append(names, found...)
 			return err
 		}
-		if err := filepath.WalkDir(filepath.Join(moduleDir, root), walk); err != nil {
+		if err := filepath.WalkDir(start, walk); err != nil {
 			return nil, err
 		}
 	}

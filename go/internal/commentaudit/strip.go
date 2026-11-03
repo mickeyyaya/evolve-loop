@@ -15,6 +15,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotestname"
 )
 
 const (
@@ -337,7 +339,7 @@ func goFilesByDir(root string) (map[string][]string, error) {
 			return err
 		}
 		if d.IsDir() {
-			if path != root && isSkippedDir(d.Name()) {
+			if path != root && gotestname.IgnoredDir(d.Name()) {
 				return filepath.SkipDir
 			}
 			return nil

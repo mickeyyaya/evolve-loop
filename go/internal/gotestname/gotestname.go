@@ -1,6 +1,8 @@
 package gotestname
 
 import (
+	"path"
+	"path/filepath"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -28,4 +30,13 @@ func HasPrefix(name, prefix string) bool {
 
 func IgnoredDir(name string) bool {
 	return name == "testdata" || name == "vendor" || strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_")
+}
+
+func UnderIgnoredDir(file string) bool {
+	for _, dir := range strings.Split(path.Dir(filepath.ToSlash(file)), "/") {
+		if dir != "." && IgnoredDir(dir) {
+			return true
+		}
+	}
+	return false
 }

@@ -20,6 +20,6 @@
 - **An empty binding set is an error**, never a silent pass. Pinned by `TestBoundTestFiles_NoTestFilesIsAnErrorNotAnEmptyPass`.
 - **An unparsable bound file fails the scan** instead of dropping out of it. Pinned by `TestSites_UnparsableFileFails`.
 - **A listed file missing from disk is skipped.** Pinned by `TestSites_CountsEachShapeOutsideTheOwner`.
-- **Directories named `vendor` or `testdata`, or starting with `.` or `_`, are never bound.** Pinned by `TestBoundTestFiles_BindsTrackedOnly`.
+- **Directories named `vendor` or `testdata`, or starting with `.` or `_`, are never bound.** The rule is `gotestname.IgnoredDir`. Pinned by `TestBoundTestFiles_BindsTrackedOnly`.
 - **The list is a ceiling.** Unlisted and grown files each fail by name, and shrunk and migrated files pass. Pinned by `TestCheck_TheBaselineIsACeiling`.
 - **Two lanes that shrink sites in different packages rebase identically**, and one boundary tighten then lowers both entries. Pinned by `TestTightenModule_TwoLanesThatShrinkSitesInDifferentPackagesRebaseIdentically` and `TestTightenModule_EachStageFailureIsReturned`.

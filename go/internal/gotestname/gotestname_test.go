@@ -28,3 +28,12 @@ func TestIgnoredDir_NamesTheDirectoriesTheGoToolIgnores(t *testing.T) {
 		}
 	}
 }
+
+func TestUnderIgnoredDir_ChecksEachDirectoryOfAFilePath(t *testing.T) {
+	t.Parallel()
+	for file, want := range map[string]bool{"a.go": false, "./a.go": false, "internal/a.go": false, "/abs/a.go": false, "testdata/a.go": true, "x/vendor/y/a.go": true, ".git/a.go": true, "a/_scratch/a.go": true, "../a.go": true, "testdata.go": false} {
+		if got := UnderIgnoredDir(file); got != want {
+			t.Errorf("UnderIgnoredDir(%q) = %v, want %v", file, got, want)
+		}
+	}
+}

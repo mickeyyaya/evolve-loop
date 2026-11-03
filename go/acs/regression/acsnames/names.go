@@ -127,7 +127,7 @@ func goFilesByDirectory(acsDir, skip string) (map[string][]string, error) {
 			return err
 		}
 		if d.IsDir() {
-			if d.Name() == "testdata" || path == skip {
+			if path == skip || path != acsDir && gotestname.IgnoredDir(d.Name()) {
 				return filepath.SkipDir
 			}
 			return nil

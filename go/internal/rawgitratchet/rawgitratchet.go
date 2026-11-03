@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotestname"
 	"github.com/mickeyyaya/evolve-loop/go/internal/repostate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sizeratchet"
 )
@@ -46,19 +47,7 @@ func BoundTestFiles(root string) (files []string, note string, err error) {
 }
 
 func isBound(rel string) bool {
-	if !strings.HasSuffix(rel, "_test.go") {
-		return false
-	}
-	for _, seg := range strings.Split(path.Dir(rel), "/") {
-		if skipDir(seg) {
-			return false
-		}
-	}
-	return true
-}
-
-func skipDir(name string) bool {
-	return name == "vendor" || name == "testdata" || (name != "." && strings.HasPrefix(name, ".")) || strings.HasPrefix(name, "_")
+	return strings.HasSuffix(rel, "_test.go") && !gotestname.UnderIgnoredDir(rel)
 }
 
 var onDiskRel = filepath.Rel
@@ -70,7 +59,7 @@ func onDiskTestFiles(root string) ([]string, error) {
 			return err
 		}
 		if d.IsDir() {
-			if p != root && skipDir(d.Name()) {
+			if p != root && gotestname.IgnoredDir(d.Name()) {
 				return filepath.SkipDir
 			}
 			return nil

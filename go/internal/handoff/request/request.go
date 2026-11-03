@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotestname"
 	"github.com/mickeyyaya/evolve-loop/go/internal/handoff"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
@@ -122,7 +123,7 @@ func TDDBuild(dir string) (handoff.Request, error) {
 }
 
 func isPredicate(fn *ast.FuncDecl) bool {
-	if fn.Recv != nil || !strings.HasPrefix(fn.Name.Name, "Test") {
+	if fn.Recv != nil || !gotestname.HasPrefix(fn.Name.Name, "Test") {
 		return false
 	}
 	params := fn.Type.Params.List

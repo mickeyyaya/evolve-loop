@@ -7,6 +7,7 @@
 ## Design
 
 - `CheckLimits` checks the non-test Go files directly in a directory, whatever their build constraints, because the scanner checks source and ignores build selection.
+- `SourceFiles` lists the non-test Go files under each directory that a guard names. Below each start directory, it skips each directory that `gotestname.IgnoredDir` names. On 2026-11-03 the skip set started to include a directory that starts with `.` or `_`.
 
 ## Invariants
 

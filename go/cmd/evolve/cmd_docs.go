@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotestname"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/stelint"
 )
@@ -197,7 +198,7 @@ func walkWanted(dir string, wanted func(string) bool) ([]string, error) {
 		switch {
 		case err != nil:
 			return err
-		case d.IsDir() && (d.Name() == "testdata" || (strings.HasPrefix(d.Name(), ".") && path != dir)):
+		case d.IsDir() && path != dir && gotestname.IgnoredDir(d.Name()):
 			return filepath.SkipDir
 		case !d.IsDir() && wanted(d.Name()):
 			out = append(out, path)

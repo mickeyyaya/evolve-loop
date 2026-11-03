@@ -35,6 +35,9 @@ func TestE2ETestNames_FollowsTheBuildTagAcrossRoots(t *testing.T) {
 		"cmd/a/notphases_test.go":  "//go:build e2e && !evolve_test_phases\n\npackage a\nimport \"testing\"\nfunc TestExcludedByTag(t *testing.T) {}\n",
 		"cmd/a/integ_test.go":      "//go:build integration\n\npackage a\nimport \"testing\"\nfunc TestIntegrationOnly(t *testing.T) {}\n",
 		"cmd/a/testdata/x_test.go": "//go:build e2e\n\npackage x\nimport \"testing\"\nfunc TestInTestdata(t *testing.T) {}\n",
+		"cmd/a/vendor/v/v_test.go": "//go:build e2e\n\npackage v\nimport \"testing\"\nfunc TestInVendor(t *testing.T) {}\n",
+		"cmd/a/.hidden/h_test.go":  "//go:build e2e\n\npackage h\nimport \"testing\"\nfunc TestInHidden(t *testing.T) {}\n",
+		"cmd/a/_scratch/s_test.go": "//go:build e2e\n\npackage s\nimport \"testing\"\nfunc TestInScratch(t *testing.T) {}\n",
 		"test/e2e/z_test.go":       "//go:build e2e\n\npackage e2e\nimport \"testing\"\nfunc TestZ(t *testing.T) {}\nfunc TestTaggedA(t *testing.T) {}\n",
 		"test/e2e/phase_test.go":   "//go:build evolve_test_phases\n\npackage e2e\nimport \"testing\"\nfunc TestPhaseOnly(t *testing.T) {}\n",
 	})
@@ -139,5 +142,19 @@ func TestE2EMain_PrintsTheAnchoredPatternOrFailsLoudly(t *testing.T) {
 				t.Fatalf("E2EMain(%v) = %d, stdout %q, stderr %q; want %d, %q, %q", tc.args, code, stdout.String(), stderr.String(), tc.code, tc.stdout, tc.stderr)
 			}
 		})
+	}
+}
+
+func TestE2ETestNames_ARootTheGoToolIgnoresIsStillWalked(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeE2EFixture(t, root, map[string]string{
+		".hidden/a_test.go": "//go:build e2e\n\npackage a\nimport \"testing\"\nfunc TestAtRoot(t *testing.T) {}\n",
+	})
+
+	got, err := E2ETestNames(root, []string{".hidden"}, e2eTags())
+
+	if err != nil || !reflect.DeepEqual(got, []string{"TestAtRoot"}) {
+		t.Fatalf("E2ETestNames(.hidden) = %v, %v, want [TestAtRoot]", got, err)
 	}
 }

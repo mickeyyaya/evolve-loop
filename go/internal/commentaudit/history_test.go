@@ -134,7 +134,7 @@ func TestRemovedHistory_ADeletedFileRecordsItsHistory(t *testing.T) {
 }
 
 func TestRemovedHistory_SkipsWhatIsNotProjectCode(t *testing.T) {
-	files := []string{"go/p/testdata/x.go", "go/vendor/v/v.go", "go/.cache/c.go"}
+	files := []string{"go/p/testdata/x.go", "go/vendor/v/v.go", "go/.cache/c.go", "go/_scratch/s.go"}
 	before := map[string]string{}
 	for _, f := range files {
 		before[f] = withHistory

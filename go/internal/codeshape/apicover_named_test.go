@@ -7,7 +7,7 @@ import (
 
 func TestProduction_OnlyNonTestSourceOutsideFixtureTrees(t *testing.T) {
 	t.Parallel()
-	want := map[string]bool{"internal/a/a.go": true, "cmd/x/main.go": true, "internal/a/a_test.go": false, "internal/a/testdata/f.go": false, "acs/c1/p.go": false, "test/e2e/x.go": false, "vendor/v/v.go": false, ".git/x.go": false, "internal/a/doc.md": false}
+	want := map[string]bool{"internal/a/a.go": true, "cmd/x/main.go": true, "internal/a/a_test.go": false, "internal/a/testdata/f.go": false, "acs/c1/p.go": false, "test/e2e/x.go": false, "vendor/v/v.go": false, ".git/x.go": false, "internal/_scratch/s.go": false, "internal/a/doc.md": false}
 	for path, ok := range want {
 		if Production(path) != ok {
 			t.Errorf("Production(%q) = %v, want %v", path, !ok, ok)

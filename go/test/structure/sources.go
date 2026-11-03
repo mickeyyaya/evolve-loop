@@ -9,16 +9,19 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotestname"
 )
 
 func SourceFiles(root string, dirs ...string) ([]string, error) {
 	var files []string
 	for _, dir := range dirs {
-		err := filepath.WalkDir(filepath.Join(root, dir), func(path string, d fs.DirEntry, err error) error {
+		start := filepath.Join(root, dir)
+		err := filepath.WalkDir(start, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
-			if d.IsDir() && (d.Name() == "testdata" || d.Name() == "vendor") {
+			if d.IsDir() && path != start && gotestname.IgnoredDir(d.Name()) {
 				return filepath.SkipDir
 			}
 			if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {

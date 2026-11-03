@@ -69,6 +69,7 @@ func fixtureTree(t *testing.T) string {
 	writeFile(t, root, "internal/b/testdata/x.go", "package x\n\nfunc Skip() {}\n")
 	writeFile(t, root, "acs/c1/p.go", "package c1\n\nfunc Skip() {}\n")
 	writeFile(t, root, ".hidden/h.go", "package h\n\nfunc Skip() {}\n")
+	writeFile(t, root, "internal/b/_scratch/s.go", "package s\n\nfunc Skip() {}\n")
 	writeFile(t, root, "cmd/tool/main.go", "package main\n\nfunc main() {}\n")
 	return root
 }

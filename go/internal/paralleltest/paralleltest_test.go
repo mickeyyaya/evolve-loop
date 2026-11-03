@@ -38,6 +38,7 @@ func TestViolations_JudgesTheShapeOfEachTopLevelTest(t *testing.T) {
 		{"listed but parallel is flagged", "func TestF(t *testing.T) {\n\tt.Parallel()\n}\n", listed, "fix.TestF: calls t.Parallel but is listed as serial"},
 		{"listed but absent is flagged", "func TestF(t *testing.T) {\n\tt.Parallel()\n}\n", map[string]string{"fix.TestGone": "r"}, "fix.TestGone: listed as serial but no such test exists"},
 		{"TestMain is not judged", "func TestMain(m *testing.M) {}\n", nil, ""},
+		{"a function go test does not run is not judged", "func Testify(t *testing.T) {\n\t_ = 1\n}\n", nil, ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

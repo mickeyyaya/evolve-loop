@@ -3,6 +3,7 @@ package triagecap
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -179,4 +180,21 @@ func repoRoot(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return filepath.Dir(filepath.Dir(filepath.Dir(wd)))
+}
+
+func TestKnownPackages_SkipsTheDirectoriesGoTestIgnores(t *testing.T) {
+	root := t.TempDir()
+	for _, dir := range []string{"go/internal/kept", "go/internal/vendor", "go/internal/kept/_scratch", "go/internal/.hidden", "go/internal/testdata", "go/cmd/tool"} {
+		if err := os.MkdirAll(filepath.Join(root, dir), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, dir, "a.go"), []byte("package a\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got := KnownPackages(root)
+	slices.Sort(got)
+	if want := []string{"kept", "tool"}; !slices.Equal(got, want) {
+		t.Errorf("KnownPackages = %v, want %v", got, want)
+	}
 }

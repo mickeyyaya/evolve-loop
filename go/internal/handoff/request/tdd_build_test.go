@@ -160,3 +160,16 @@ func TestTDDBuild_RequestBindsALedgerThatValidates(t *testing.T) {
 	}
 	requireMetLedgerValidates(t, req)
 }
+
+func TestTDDBuild_AFunctionGoTestDoesNotRunIsNotAPredicate(t *testing.T) {
+	dir := writePackage(t, map[string]string{
+		"a_test.go": "//go:build acs\n\npackage cycle9001\n\nimport \"testing\"\n\nfunc Testify(t *testing.T) {}\n\nfunc TestC9001_001_First(t *testing.T) {}\n",
+	})
+	got, err := request.TDDBuild(dir)
+	if err != nil {
+		t.Fatalf("TDDBuild: %v", err)
+	}
+	if len(got.Asks) != 1 || got.Asks[0].ID != "TestC9001_001_First" {
+		t.Errorf("Testify is not a test name, so it is not a predicate; got %+v", got.Asks)
+	}
+}

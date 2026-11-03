@@ -15,6 +15,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotestname"
 )
 
 const MaxLines = 50
@@ -33,7 +35,7 @@ func Walk(root string) ([]FuncSpan, error) {
 		}
 		name := d.Name()
 		if d.IsDir() {
-			if path != root && skipDir(name) {
+			if path != root && gotestname.IgnoredDir(name) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -49,10 +51,6 @@ func Walk(root string) ([]FuncSpan, error) {
 		return nil, fmt.Errorf("sizeratchet: walk %s: %w", root, err)
 	}
 	return spans, nil
-}
-
-func skipDir(name string) bool {
-	return name == "vendor" || name == "testdata" || strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_")
 }
 
 func walkFile(fset *token.FileSet, root, path string) ([]FuncSpan, error) {

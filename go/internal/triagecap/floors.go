@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotestname"
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagedecision"
 )
 
@@ -257,7 +258,7 @@ func KnownPackages(projectRoot string) []string {
 				return nil
 			}
 			name := d.Name()
-			if strings.HasPrefix(name, ".") || name == "testdata" {
+			if gotestname.IgnoredDir(name) {
 				return filepath.SkipDir
 			}
 			if dirHasGoFiles(path) {

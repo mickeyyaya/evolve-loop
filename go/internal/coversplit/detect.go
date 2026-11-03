@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotestname"
 )
 
 type imports struct {
@@ -70,10 +72,6 @@ func modulePath(moduleDir string) (string, error) {
 	return "", fmt.Errorf("coversplit: go.mod in %s names no module", moduleDir)
 }
 
-func skipDir(name string) bool {
-	return name == "vendor" || name == "testdata" || strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_")
-}
-
 func packageImports(moduleDir string) (map[string]imports, error) {
 	dirs := map[string]imports{}
 	err := filepath.WalkDir(moduleDir, func(p string, d fs.DirEntry, err error) error {
@@ -81,7 +79,7 @@ func packageImports(moduleDir string) (map[string]imports, error) {
 			return err
 		}
 		if d.IsDir() {
-			if p != moduleDir && skipDir(d.Name()) {
+			if p != moduleDir && gotestname.IgnoredDir(d.Name()) {
 				return filepath.SkipDir
 			}
 			return nil

@@ -15,6 +15,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotestname"
 )
 
 type HistoryEntry struct {
@@ -37,7 +39,7 @@ func RemovedHistoryAcrossDiff(files []string, before, after func(string) ([]byte
 	var removed []HistoryEntry
 	addedElsewhere := map[string]int{}
 	for _, f := range files {
-		if !strings.HasSuffix(f, ".go") || isOutsideProjectCode(f) {
+		if !strings.HasSuffix(f, ".go") || gotestname.UnderIgnoredDir(f) {
 			continue
 		}
 		gone, arrived, err := unmatchedHistory(f, before, after)

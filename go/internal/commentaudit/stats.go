@@ -11,6 +11,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotestname"
 )
 
 type FileStats struct {
@@ -42,18 +44,10 @@ func hasCommitSHA(line string) bool {
 	})
 }
 
-func isSkippedDir(name string) bool {
-	return name == "testdata" || name == "vendor" || (strings.HasPrefix(name, ".") && name != ".")
-}
-
 const documentationRoot = "docs/"
 
 func isDocumentation(file string) bool {
 	return strings.HasPrefix(filepath.ToSlash(file), documentationRoot)
-}
-
-func isOutsideProjectCode(file string) bool {
-	return slices.ContainsFunc(strings.Split(path.Dir(filepath.ToSlash(file)), "/"), isSkippedDir)
 }
 
 func Stats(src []byte) FileStats {
@@ -189,7 +183,7 @@ func Rank(fsys fs.FS) ([]PackageStats, error) {
 			return err
 		}
 		if d.IsDir() {
-			if isSkippedDir(d.Name()) {
+			if p != "." && gotestname.IgnoredDir(d.Name()) {
 				return fs.SkipDir
 			}
 			return nil
