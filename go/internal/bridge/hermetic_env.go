@@ -158,7 +158,7 @@ func (deps Deps) cellEnv(cfg *Config) ([]string, bool) {
 	if stage != envStageEnforce {
 		return driverEnv(deps, cfg.Realization.Env), false
 	}
-	return hermeticEnv(parent, passthrough, cfg.Realization.Env, deps.Env), true
+	return hermeticEnv(parent, passthrough, cellToolEnv(cfg), deps.Env), true
 }
 
 func (deps Deps) reportDroppedEnv(cfg *Config, stage string, names []string) {

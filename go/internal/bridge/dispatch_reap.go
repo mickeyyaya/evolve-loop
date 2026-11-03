@@ -230,6 +230,7 @@ func launchSwept(ctx context.Context, driver Driver, cfg *Config, deps Deps) (in
 	defer deps.sweep.finish(ctx, deps)
 	started := time.Now()
 	defer deps.reportReadViolations(ctx, cfg, started)
+	deps.prepareCellToolView(cfg)
 	return driver.Launch(ctx, cfg, deps)
 }
 

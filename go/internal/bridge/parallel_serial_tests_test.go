@@ -1,6 +1,9 @@
 package bridge
 
 var serialTests = map[string]string{
+	"bridge.TestCellEnv_ARelativeWorkspaceGetsAnAbsoluteCellToolView":                                           "changes the working directory",
+	"bridge.TestAgentSandboxContract_N8b_ACellGhCallSaysNotLoggedInAndReadsNoHostConfig":                        "sets env HOME, PATH, GH_TOKEN",
+	"bridge.TestAgentSandboxContract_N8c_ACellGitHasNoCredentialHelper":                                         "sets env HOME, PATH, GH_TOKEN",
 	"bridge.TestNewSessionEnv_ReturnsOnlyAfterThePaneHasRemovedItsFile":                                         "sets env through a helper",
 	"bridge.TestNewSessionEnv_APaneThatNeverReadsItsFileFailsTheStartRemovesTheFileAndKillsOnlyItsOwnSessionID": "sets env through a helper, swaps seam cellEnvConsumeTimeout",
 	"bridge.TestNewSessionEnv_AStartThatPrintsNoSessionIDKillsNothing":                                          "sets env through a helper",
