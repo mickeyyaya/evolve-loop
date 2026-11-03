@@ -94,7 +94,13 @@ func pushRatchetPR(t *testing.T, o ratchetOrigin, from string, lists map[string]
 	for path, body := range lists {
 		o.plane.Write(path, body)
 	}
-	o.plane.Git("commit", "-q", "-am", "an older tighten")
+	o.plane.Git("add", "-A")
+	o.plane.Git("commit", "-q", "--allow-empty", "-m", "an older tighten")
+	return publishRatchetPR(t, o, stage)
+}
+
+func publishRatchetPR(t *testing.T, o ratchetOrigin, stage string) ratchetPRFixture {
+	t.Helper()
 	o.plane.Git("push", "-q", "origin", "HEAD:refs/heads/"+ratchetPRBranch)
 	o.plane.Git("checkout", "-q", "main")
 	if stage != "" {
@@ -128,6 +134,16 @@ func (f ratchetPRFixture) mergeOnOrigin() {
 	f.gh.list = "[]"
 }
 
+func (f *fakeGH) prLists() int {
+	n := 0
+	for _, c := range f.calls {
+		if len(c) > 1 && c[0] == "pr" && c[1] == "list" {
+			n++
+		}
+	}
+	return n
+}
+
 func (f ratchetPRFixture) branchTip() string { return f.bare.Git("rev-parse", ratchetPRBranch) }
 
 func TestBoundaryRatchetMerge_GreenGatesMergeThenRegenerate(t *testing.T) {
@@ -153,32 +169,114 @@ func TestBoundaryRatchetMerge_GreenGatesMergeThenRegenerate(t *testing.T) {
 	f.planeIsUntouched(t)
 }
 
-func TestBoundaryRatchetMerge_ARedScanHoldsTheMergeWarnsAndReplacesTheTip(t *testing.T) {
-	f := newRatchetPRFixture(t, "{\n  \"internal/fixture.Big\": 60\n}\n", "enforce")
+func TestBoundaryRatchetMerge_AListThatIsNotTheStepsListIsHeldAndReplaced(t *testing.T) {
+	cases := map[string]map[string]string{
+		"a red size list":        {ratchetListPath: "{\n  \"internal/fixture.Big\": 60\n}\n"},
+		"a raised allowance":     {ratchetListPath: "{\n  \"internal/fixture.Big\": 900\n}\n"},
+		"a stale allowance":      {ratchetListPath: "{\n  \"internal/fixture.Big\": 80\n}\n"},
+		"a new key":              {ratchetListPath: "{\n  \"internal/fixture.Big\": 64,\n  \"internal/fixture.Gone\": 5\n}\n"},
+		"a red raw-git baseline": {ratchetListPath: tightRatchetList, rawGitBaselinePath: "{}\n"},
+		"a raised raw-git count": {ratchetListPath: tightRatchetList, rawGitBaselinePath: "{\"internal/fixture/raw_test.go\": 9}"},
+	}
+	for name, lists := range cases {
+		t.Run(name, func(t *testing.T) {
+			o := newRatchetOrigin(t, 60, `{"internal/fixture.Big": 90}`)
+			f := pushRatchetPR(t, o, "main", lists, "enforce")
+			main := f.originHead()
+
+			rc, out, errOut := f.tighten(t)
+
+			if rc != 0 || errOut != "" || len(f.merge.mergeCalls()) != 0 || !strings.Contains(out, "ratchet merge: #7 held: the lists at "+shortSHA(f.tip)+" are not the lists that the step writes") {
+				t.Fatalf("rc=%d stdout=%q stderr=%q merges=%q, want a held line and no merge", rc, out, errOut, f.merge.mergeCalls())
+			}
+			if f.branchTip() == f.tip || !strings.Contains(out, "updated pull request #7") {
+				t.Errorf("stdout %q, want the tip of #7 replaced", out)
+			}
+			f.assertProposed(t, ratchetPRBranch, main)
+		})
+	}
+}
+
+func TestBoundaryRatchetMerge_ATipThatChangesMoreThanTheListsIsNeverMerged(t *testing.T) {
+	o := newRatchetOrigin(t, 60, `{"internal/fixture.Big": 90}`)
+	f := pushRatchetPR(t, o, "main", map[string]string{
+		ratchetListPath:                   tightRatchetList,
+		"go/internal/fixture/raw_test.go": "package fixture\n",
+	}, "enforce")
 	main := f.originHead()
 
 	rc, out, errOut := f.tighten(t)
 
-	if rc != 0 || len(f.merge.mergeCalls()) != 0 || !strings.Contains(errOut, "WARN: ratchet merge: #7") || !strings.Contains(errOut, "function-size ratchet violated") {
-		t.Fatalf("rc=%d stdout=%q stderr=%q merges=%q, want a WARN for the red scan and no merge", rc, out, errOut, f.merge.mergeCalls())
+	if rc != 0 || len(f.merge.mergeCalls()) != 0 || !strings.Contains(errOut, "WARN: ratchet merge: #7: "+shortSHA(f.tip)+" changes go/internal/fixture/raw_test.go") {
+		t.Fatalf("rc=%d stdout=%q stderr=%q merges=%q, want a WARN that names the extra file and no merge", rc, out, errOut, f.merge.mergeCalls())
 	}
-	if f.branchTip() == f.tip || !strings.Contains(out, "updated pull request #7") {
-		t.Errorf("stdout %q, want the tip of #7 replaced", out)
+	if f.branchTip() == f.tip {
+		t.Errorf("the tip of #7 still holds the extra file after the step, want it replaced by the step's own commit")
 	}
 	f.assertProposed(t, ratchetPRBranch, main)
 }
 
-func TestBoundaryRatchetMerge_ARedRawGitScanHoldsTheMerge(t *testing.T) {
+func TestBoundaryRatchetMerge_TheRefusalNamesAnExtraPathWithASpaceWhole(t *testing.T) {
 	o := newRatchetOrigin(t, 60, `{"internal/fixture.Big": 90}`)
-	f := pushRatchetPR(t, o, "main", map[string]string{ratchetListPath: tightRatchetList, rawGitBaselinePath: "{}\n"}, "enforce")
+	f := pushRatchetPR(t, o, "main", map[string]string{
+		ratchetListPath:              tightRatchetList,
+		"go/internal/fixture/a b.go": "package fixture\n",
+	}, "enforce")
+
+	rc, _, errOut := f.tighten(t)
+
+	if rc != 0 || len(f.merge.mergeCalls()) != 0 || !strings.Contains(errOut, shortSHA(f.tip)+" changes go/internal/fixture/a b.go,") {
+		t.Fatalf("rc=%d stderr=%q merges=%q, want a WARN that names the whole extra path and no merge", rc, errOut, f.merge.mergeCalls())
+	}
+}
+
+func TestBoundaryRatchetMerge_AMergeCommitTipIsNeverMerged(t *testing.T) {
+	o := newRatchetOrigin(t, 60, `{"internal/fixture.Big": 90}`)
+	o.plane.Git("checkout", "-q", "-b", "side")
+	o.plane.Write(ratchetListPath, tightRatchetList)
+	o.plane.Git("commit", "-q", "-am", "a side tighten")
+	o.plane.Git("checkout", "-q", "-b", "tighten", "main")
+	o.plane.Git("merge", "-q", "--no-ff", "-m", "a merge tip", "side")
+	f := publishRatchetPR(t, o, "enforce")
 
 	rc, out, errOut := f.tighten(t)
 
-	if rc != 0 || len(f.merge.mergeCalls()) != 0 || !strings.Contains(errOut, "WARN: ratchet merge: #7") || !strings.Contains(errOut, "rawgitratchet") {
-		t.Fatalf("rc=%d stdout=%q stderr=%q merges=%q, want a WARN for the red raw-git scan and no merge", rc, out, errOut, f.merge.mergeCalls())
+	if rc != 0 || len(f.merge.mergeCalls()) != 0 || !strings.Contains(errOut, "WARN: ratchet merge: #7: "+shortSHA(f.tip)+" has 2 parents") {
+		t.Fatalf("rc=%d stdout=%q stderr=%q merges=%q, want a WARN for the merge commit and no merge", rc, out, errOut, f.merge.mergeCalls())
 	}
 	if f.branchTip() == f.tip {
-		t.Errorf("the tip of #7 holds the red raw-git baseline after the step, want it replaced")
+		t.Errorf("the merge commit is still the tip of #7, want it replaced by the step's own commit")
+	}
+}
+
+func TestBoundaryRatchetMerge_TheGateNeverLaysThePullRequestListsOverTheWorktree(t *testing.T) {
+	f := newRatchetPRFixture(t, tightRatchetList, "shadow")
+
+	f.tighten(t)
+
+	for _, c := range f.gh.gitCalls {
+		if strings.HasPrefix(c, "checkout "+f.tip) || strings.HasPrefix(c, "checkout HEAD --") {
+			t.Fatalf("git %q ran: the gate must not check out the lists of the pull request into the worktree it tightens from", c)
+		}
+	}
+}
+
+func TestBoundaryRatchetTighten_ADatedBranchThatHoldsTheListGetsAPullRequestReport(t *testing.T) {
+	o := newRatchetOrigin(t, 60, `{"internal/fixture.Big": 90}`)
+	branch := ratchetBranchPrefix + time.Now().UTC().Format("2006-01-02")
+	o.plane.Git("checkout", "-q", "-b", "closed")
+	o.plane.Write(ratchetListPath, tightRatchetList)
+	o.plane.Git("commit", "-q", "-am", ratchetTightenMessage)
+	o.plane.Git("push", "-q", "origin", "HEAD:refs/heads/"+branch)
+	o.plane.Git("checkout", "-q", "main")
+	gh := &fakeGH{list: "[]"}
+	gh.install(t)
+	t.Setenv("EVOLVE_DISPATCH_DEPTH", "")
+
+	rc, out, errOut := o.tighten(t)
+
+	if rc != 0 || errOut != "" || flagAfter(gh.created(), "--head") != branch || !strings.Contains(out, "ratchet tighten: opened a pull request from "+branch) || strings.Contains(out, "#0") {
+		t.Fatalf("rc=%d stdout=%q stderr=%q create=%q, want a pull request opened from %s and reported", rc, out, errOut, gh.created(), branch)
 	}
 }
 
@@ -197,8 +295,8 @@ func TestBoundaryRatchetMerge_CINotGreenHoldsTheMerge(t *testing.T) {
 			if rc != 0 || errOut != "" || len(f.merge.mergeCalls()) != 0 || !strings.Contains(out, "ratchet merge: #7 held: required CI") {
 				t.Errorf("rc=%d stdout=%q stderr=%q merges=%q, want a held line and no merge", rc, out, errOut, f.merge.mergeCalls())
 			}
-			if f.originHead() != main {
-				t.Errorf("origin main moved without a merge")
+			if f.originHead() != main || f.gh.prLists() != 1 {
+				t.Errorf("origin main moved or gh pr list ran %d times, want no merge and no refresh", f.gh.prLists())
 			}
 		})
 	}
@@ -217,6 +315,9 @@ func TestBoundaryRatchetMerge_ShadowLogsAWouldMergeLineAndNeverMerges(t *testing
 			}
 			if merges := f.merge.mergeCalls(); len(merges) != 0 || f.originHead() != main {
 				t.Errorf("merges %q, want no merge call in shadow", merges)
+			}
+			if lists := f.gh.prLists(); lists != 1 {
+				t.Errorf("gh pr list ran %d times, want 1: a shadow gate attempts no merge, so the step must not refresh", lists)
 			}
 		})
 	}
@@ -284,11 +385,25 @@ func TestBoundaryRatchetMerge_AGateFailureWarnsAndHoldsTheMerge(t *testing.T) {
 			o.plane.Git("checkout", "-q", "main")
 			return pushRatchetPR(t, o, "side", map[string]string{ratchetListPath: tightRatchetList}, "enforce")
 		}, "is not on origin/main"},
-		{"a list overlay that cannot be checked out", func(t *testing.T) ratchetPRFixture {
+		{"a parent read that fails", func(t *testing.T) ratchetPRFixture {
 			f := newRatchetPRFixture(t, tightRatchetList, "enforce")
-			f.gh.failGit = "checkout"
+			f.gh.failGit = "rev-list"
 			return f
-		}, "git checkout refused"},
+		}, "git rev-list refused"},
+		{"a diff of the pull request that fails", func(t *testing.T) ratchetPRFixture {
+			f := newRatchetPRFixture(t, tightRatchetList, "enforce")
+			f.gh.failGit = "diff --no-renames --name-only -z HEAD..."
+			return f
+		}, "git diff --no-renames --name-only -z HEAD... refused"},
+		{"a list diff that fails", func(t *testing.T) ratchetPRFixture {
+			f := newRatchetPRFixture(t, tightRatchetList, "enforce")
+			f.gh.failGit = "diff --no-renames --name-only " + f.tip
+			return f
+		}, "refused"},
+		{"a tip that changes nothing", func(t *testing.T) ratchetPRFixture {
+			o := newRatchetOrigin(t, 60, `{"internal/fixture.Big": 90}`)
+			return pushRatchetPR(t, o, "main", nil, "enforce")
+		}, "changes no ratchet list"},
 		{"a refused merge", func(t *testing.T) ratchetPRFixture {
 			f := newRatchetPRFixture(t, tightRatchetList, "enforce")
 			f.merge.failMerge = true
@@ -390,11 +505,16 @@ func TestPRMerger_MergeHeadIsTheMergeStepOfPRMerge(t *testing.T) {
 }
 
 func TestBoundaryRatchetMerge_AMergeWithNoMergeCommitReadRelistsAndNeverPushesTheMergedBranch(t *testing.T) {
-	f := newRatchetPRFixture(t, "{\n  \"internal/fixture.Big\": 70\n}\n", "enforce")
+	f := newRatchetPRFixture(t, tightRatchetList, "enforce")
 	f.merge.mergeOID = "unknown"
 	f.merge.onMerge = func() {
-		f.bare.Git("update-ref", "refs/heads/main", f.tip)
-		f.gh.list = "[]"
+		f.mergeOnOrigin()
+		f.plane.Git("fetch", "-q", "origin")
+		f.plane.Git("checkout", "-q", "-b", "shrink", "origin/main")
+		f.plane.Write(bigFixturePath, bigFixtureSource(55))
+		f.plane.Git("commit", "-q", "-am", "shrink Big")
+		f.plane.Git("push", "-q", "origin", "HEAD:main")
+		f.plane.Git("checkout", "-q", "main")
 	}
 
 	rc, out, errOut := f.tighten(t)

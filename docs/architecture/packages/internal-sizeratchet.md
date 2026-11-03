@@ -20,6 +20,45 @@
 - **One constant.** `OffendersRelPath` is the module-relative path of the list. Each message and each caller uses it.
 - **Loud failure.** A missing offender list is an error, not an empty allowance set.
 
+## The merge gate
+
+This section is the one home of the contract of the merge gate. [runtime-reference.md](../../operations/runtime-reference.md) and [internal-policy.md](internal-policy.md) link here.
+
+The step first writes the tightened lists from `origin/main` into its worktree, and both scans must be clean on them. Then it checks the open tighten pull request. The merge needs each of these gates:
+
+1. The head that `git fetch` reads equals the `headRefOid` that `gh pr list` gave.
+2. The head commit has one parent. A merge commit can bring any history through its second parent, so the step refuses it.
+3. The parent of the head commit is an ancestor of `origin/main`.
+4. The files that change between the merge base and the head are a non-empty subset of `ratchetListPaths()`. This is the same table that the tighten step writes, so the two lists cannot differ.
+5. The lists at the head are equal to the lists that the step wrote from `origin/main`. So the merge lands only the tree that the step itself writes now. A list that raises an allowance, adds a key or is stale fails this gate.
+6. Required CI is green on the head. The check is `awaitGreen` of `evolve pr merge`, and the merge is its `mergeHead` with `--match-head-commit`.
+
+Gates 2 to 5 make the branch prefix and the non-fork bit insufficient for a merge. A writer who pushes a `chore/ratchet-tighten-*` branch with other code gets no merge. The step also never selects a fork's pull request.
+
+The stage key is `boundary.ratchet_merge.stage`, and the default is `shadow`:
+
+| Stage | What the step does |
+|---|---|
+| `shadow` | It checks each gate, prints `ratchet merge: would merge #<n> at <sha>` and does not merge. |
+| `enforce` | It merges and prints `ratchet merge: merged #<n> <sha>`. |
+| `off` | It checks no gate. |
+
+The step reports a failed gate like this:
+
+- A refusal from gate 5, the CI wait or the merge admission prints `ratchet merge: #<n> held: <cause>` on stdout. A stale list is the normal case of gate 5.
+- Any other gate failure prints `WARN: ratchet merge: #<n>: <cause>` on stderr. An unknown stage word is one example, because `policy.Load` refuses it.
+- In both cases the step then replaces the tip with its own commit of the lists from `origin/main`.
+
+After it tries a merge at `enforce`, the step checks out the new `origin/main`, lists the open pull requests again and tightens again. So it never pushes onto the branch of a merged pull request. A shadow or held gate does not refresh.
+
+**No idle force-push.** The step does not push when the tip is a commit that passes gates 2 to 4 and holds the regenerated lists. Then it prints `ratchet tighten: #<n> already holds this list`. A push restarts required CI, which takes about 20 minutes. A tip with other content always gets the step's own commit.
+
+**The gate lays no list over the worktree.** An earlier version checked out the lists of the pull request into the worktree and then restored them. A failed restore left the lists of the pull request in the worktree that the step tightens from. Gate 5 compares the lists with `git diff` and writes nothing, so that state cannot occur.
+
+**Limits.** Gate 5 accepts only the current lists. When a listed function shrinks on `main` between two boundaries, the step replaces the tip. Then CI runs again before the next boundary can merge it. The tests use a fake CI result, so they do not prove the CI wait against GitHub. Gate 6 trusts the required checks of `main`.
+
+The key goes to `enforce` after 3 clean boundaries at `shadow` (plan AD4-5). The design is option E of section 4.2 of `docs/research/architecture-decisions-2026-11.md` (docs branch, 2026-11-03). Pinned by the `TestBoundaryRatchetMerge_*` tests in `go/cmd/evolve`.
+
 ## Invariants
 
 - **Every allowance exceeds `MaxLines`.** `parseOffenders` rejects an entry at or under the limit, so a function within the limit cannot hold an entry.
@@ -38,8 +77,4 @@
   - **Wired at the boundary (2026-10-20).** The boundary step `ratchet-tighten` (`go/cmd/evolve/cmd_boundary_ratchet.go`) runs `TightenModule` and `Scan` in a temporary worktree of `origin/main`. It commits only `offenders.json` on a branch `chore/ratchet-tighten-<date>` and opens a pull request, or updates the open one. The pull request merges at a wave boundary. A failure warns and does not stop the boundary. The rejected options are in [runtime-reference.md](../../operations/runtime-reference.md) (`evolve ratchet tighten`).
   - **The raw-git half (2026-10-21).** `rawgitratchet/baseline.json` had the same shared-file shape, and `rawgitratchet.Check` was exact-match. Now one tighten over a `map[string]int` serves both lists, with a floor for each list. `TightenCounts` and `TightenEncoded` take the floor: `MaxLines` here and zero sites for the raw-git list. `Tighten` and `TightenModule` call them.
     - The boundary step commits both lists in one pull request ([internal-rawgitratchet.md](internal-rawgitratchet.md)). Pinned by `TestTightenCounts_KeepsOnlyCountsAboveTheFloorAtTheirLowerValue` and `TestTightenEncoded_NamesEachChangeAndEncodesTheTightList`.
-  - **The step merges its own pull request (2026-11-03, plan AD4-4).** The pull request sat open because no step named it (PR #1070, two weeks). The step now merges the open tighten pull request before it tightens again. The merge needs three gates:
-    - The base of the head commit is an ancestor of `origin/main`.
-    - `Scan` and `rawgitratchet.Scan` are clean on `origin/main` with the lists of the pull request.
-    - Required CI is green on the head, through the CI wait of `evolve pr merge`.
-    - The stage key is `boundary.ratchet_merge.stage` (default `shadow`). A red scan holds the merge with a WARN, and the step replaces the tip. An unchanged list gets no force-push, so CI does not restart. The rules are in [runtime-reference.md](../../operations/runtime-reference.md). Pinned by the `TestBoundaryRatchetMerge_*` tests in `go/cmd/evolve`.
+  - **The step merges its own pull request (2026-11-03, plan AD4-4).** The pull request stayed open because no step merged it (PR #1070, two weeks). Now the step merges the open tighten pull request, then it tightens again from the new `origin/main`. The gate is in `go/cmd/evolve/cmd_boundary_ratchet_merge.go`, and [the merge gate](#the-merge-gate) has its contract.

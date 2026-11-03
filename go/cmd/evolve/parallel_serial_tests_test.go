@@ -1,10 +1,13 @@
 package main
 
 var serialTests = map[string]string{
-	"main.TestBoundaryRatchetMerge_ARedRawGitScanHoldsTheMerge":                                             "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
 	"main.TestBoundaryRatchetMerge_AMergeWithNoMergeCommitReadRelistsAndNeverPushesTheMergedBranch":         "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
 	"main.TestBoundaryRatchetMerge_GreenGatesMergeThenRegenerate":                                           "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
-	"main.TestBoundaryRatchetMerge_ARedScanHoldsTheMergeWarnsAndReplacesTheTip":                             "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
+	"main.TestBoundaryRatchetMerge_AListThatIsNotTheStepsListIsHeldAndReplaced":                             "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
+	"main.TestBoundaryRatchetMerge_ATipThatChangesMoreThanTheListsIsNeverMerged":                            "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
+	"main.TestBoundaryRatchetMerge_TheRefusalNamesAnExtraPathWithASpaceWhole":                               "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
+	"main.TestBoundaryRatchetMerge_AMergeCommitTipIsNeverMerged":                                            "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
+	"main.TestBoundaryRatchetMerge_TheGateNeverLaysThePullRequestListsOverTheWorktree":                      "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
 	"main.TestBoundaryRatchetMerge_CINotGreenHoldsTheMerge":                                                 "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
 	"main.TestBoundaryRatchetMerge_ShadowLogsAWouldMergeLineAndNeverMerges":                                 "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
 	"main.TestBoundaryRatchetMerge_OffEvaluatesNoGate":                                                      "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",

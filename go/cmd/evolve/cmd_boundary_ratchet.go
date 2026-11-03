@@ -57,7 +57,7 @@ func landRatchetTighten(root string, stdout, stderr io.Writer) (err error) {
 		return err
 	}
 	defer func() { err = errors.Join(err, runGitSteps(root, []string{"worktree", "remove", "--force", wt})) }()
-	return tightenAndPropose(root, wt, stdout, stderr)
+	return ratchetStep{root: root, wt: wt, stdout: stdout, stderr: stderr}.tightenAndPropose()
 }
 
 type boundaryRatchet struct {
@@ -114,62 +114,77 @@ func tightenLists(module string) ([]tightenedList, error) {
 	return lists, nil
 }
 
-func writeTightenedLists(module string, lists []tightenedList) (paths, changes []string, err error) {
+type tightened struct {
+	paths   []string
+	changes []string
+}
+
+func writeTightenedLists(module string, lists []tightenedList) (tightened, error) {
+	var t tightened
 	for _, l := range lists {
-		if werr := ratchetWrite(filepath.Join(module, filepath.FromSlash(l.rel)), l.encoded, 0o644); werr != nil {
-			return nil, nil, werr
+		if err := ratchetWrite(filepath.Join(module, filepath.FromSlash(l.rel)), l.encoded, 0o644); err != nil {
+			return tightened{}, err
 		}
-		paths = append(paths, l.repoPath())
-		changes = append(changes, l.changes...)
+		t.paths = append(t.paths, l.repoPath())
+		t.changes = append(t.changes, l.changes...)
 	}
-	if err := scanRatchets(module); err != nil {
-		return nil, nil, err
-	}
-	return paths, changes, nil
+	return t, scanRatchets(module)
 }
 
-func tightenAndPropose(root, wt string, stdout, stderr io.Writer) error {
-	pr, err := openTightenPR(wt)
-	if err == nil && pr.Number != 0 && landTightenPR(root, wt, pr, stdout, stderr) {
-		err = runGitSteps(wt, []string{"fetch", "--quiet", "origin", "main"}, []string{"checkout", "--quiet", "--detach", "origin/main"})
-		if err == nil {
-			pr, err = openTightenPR(wt)
-		}
-	}
-	if err != nil {
-		return err
-	}
-	return proposeTightened(wt, pr, stdout)
-}
-
-func proposeTightened(wt string, pr ratchetPR, stdout io.Writer) error {
+func tightenWorktree(wt string) (tightened, error) {
 	module := filepath.Join(wt, "go")
 	lists, err := tightenLists(module)
 	if err != nil {
+		return tightened{}, err
+	}
+	return writeTightenedLists(module, lists)
+}
+
+type ratchetStep struct {
+	root, wt       string
+	stdout, stderr io.Writer
+}
+
+func (s ratchetStep) tightenAndPropose() error {
+	pr, err := openTightenPR(s.wt)
+	if err != nil {
 		return err
 	}
-	if len(lists) == 0 {
-		fmt.Fprintln(stdout, "ratchet tighten: tight")
-		return nil
-	}
-	paths, changes, err := writeTightenedLists(module, lists)
-	pushed := false
-	if err == nil {
-		pushed, err = commitAndPushTightenBranch(wt, pr.HeadRefName, paths)
-	}
-	if err == nil && pr.Number == 0 {
-		_, err = ratchetCmd(wt, "gh", "pr", "create", "--base", ratchetPRBase, "--head", pr.HeadRefName,
-			"--title", ratchetTightenMessage, "--body", ratchetTightenBody+strings.Join(changes, "\n"))
+	lists, err := tightenWorktree(s.wt)
+	if err == nil && pr.Number != 0 && s.landTightenPR(pr) {
+		err = runGitSteps(s.wt, []string{"fetch", "--quiet", "origin", "main"}, []string{"checkout", "--quiet", "--force", "--detach", "origin/main"})
+		if err == nil {
+			pr, err = openTightenPR(s.wt)
+		}
+		if err == nil {
+			lists, err = tightenWorktree(s.wt)
+		}
 	}
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(stdout, strings.Join(changes, "\n"))
-	if !pushed {
-		fmt.Fprintf(stdout, "ratchet tighten: #%d already holds this list (%s)\n", pr.Number, pr.HeadRefName)
+	return s.proposeTightened(pr, lists)
+}
+
+func (s ratchetStep) proposeTightened(pr ratchetPR, lists tightened) error {
+	if len(lists.paths) == 0 {
+		fmt.Fprintln(s.stdout, "ratchet tighten: tight")
 		return nil
 	}
-	fmt.Fprintln(stdout, pr.report())
+	pushed, err := commitAndPushTightenBranch(s.wt, pr.HeadRefName, lists.paths)
+	if err == nil && pr.Number == 0 {
+		_, err = ratchetCmd(s.wt, "gh", "pr", "create", "--base", ratchetPRBase, "--head", pr.HeadRefName,
+			"--title", ratchetTightenMessage, "--body", ratchetTightenBody+strings.Join(lists.changes, "\n"))
+	}
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(s.stdout, strings.Join(lists.changes, "\n"))
+	if !pushed && pr.Number != 0 {
+		fmt.Fprintf(s.stdout, "ratchet tighten: #%d already holds this list (%s)\n", pr.Number, pr.HeadRefName)
+		return nil
+	}
+	fmt.Fprintln(s.stdout, pr.report())
 	return nil
 }
 
@@ -211,7 +226,12 @@ func commitAndPushTightenBranch(wt, branch string, paths []string) (bool, error)
 		return false, err
 	}
 	lease, _, _ := strings.Cut(tip, "\t")
-	if same, err := tipHoldsLists(wt, ref, lease); same || err != nil {
+	if lease != "" {
+		if _, err := fetchBranchTip(wt, ref); err != nil {
+			return false, err
+		}
+	}
+	if same, err := leaseHoldsTheStepLists(wt, lease); same || err != nil {
 		return false, err
 	}
 	return true, runGitSteps(wt,
