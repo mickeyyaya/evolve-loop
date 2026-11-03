@@ -104,6 +104,7 @@ func TestRootSignalCenter_EveryRootSubscribesThePublisher(t *testing.T) {
 			"cmd/evolve/cmd_cycle.go:agentRunSignals",
 			"cmd/evolve/cmd_cycle.go:wireOrchestratorDeps",
 			"cmd/evolve/cmd_cycle_simulate.go:wireSimulateOrchestrator",
+			"cmd/evolve/cmd_inbox_audit.go:newInboxAuditCenter",
 			"cmd/evolve/cmd_inbox_curator.go:runInboxCurate",
 			"cmd/evolve/cmd_loop_chain.go:maybeRefreshChainBoundary",
 			"cmd/evolve/cmd_loop_chain.go:runLoopChain",

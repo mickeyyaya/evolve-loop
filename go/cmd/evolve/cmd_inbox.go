@@ -47,6 +47,7 @@ func inboxVerbs() []inboxVerb {
 		{"route-lane", "route-lane <id> <reason> [--blocked-by <item-id>] [--json]", withoutStdin(runInboxRouteLane)},
 		{"consume", "consume <item-path> [--resolution <text>] [--cycle <n>|console] [--json]", withoutStdin(runInboxConsume)},
 		{"curate", "curate [--json] [--apply | --event] [--project-root P]   (--event reads one ship.landed wire record from stdin)", runInboxCurate},
+		{"audit", "audit [--force] [--json] [--project-root P]", withoutStdin(runInboxAudit)},
 		{"quarantine", "quarantine list [--json] | quarantine release <id>", runInboxQuarantine},
 		{"ack-fingerprint", "ack-fingerprint <item-path>", withoutStdin(runInboxAckFingerprint)},
 	}

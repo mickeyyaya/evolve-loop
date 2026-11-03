@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — `evolve inbox audit`, an on-demand LLM curator that only proposes (AD2-9, 2026-11-03)
+
+- **The verb.** `evolve inbox audit [--force] [--json]` selects the old console items whose acceptance names no test. At `inbox.curator.audit.trigger_count` or more, it starts the read-only seat `inbox-curator` through `evolve agent run`. `--force` starts it at a lower count.
+- **The proposals.** The seat proposes `consume`, `retire` or `keep` for each item. Go refuses a `consume` that cites no commit of the checked-out branch. The verb writes the proposals to `.evolve/inbox-audit/` and moves no item.
+- **Policy.** The new sub-block `inbox.curator.audit` holds `min_age_days` (14), `trigger_count` (40) and `max_items` (20).
+- Docs: [inbox-curator §5](docs/architecture/inbox-curator.md#5-on-demand-the-llm-audit-ad2-9), [policy-config](docs/architecture/policy-config.md).
+
 ## Changed — the inbox and routing writers queue during a wave, and `gc` takes a lease (X17c, 2026-10-27)
 
 - **The queue.** `inbox edit`, `withdraw`, `verify`, `route-console`, `route-lane` and `cli-routing set`, `unset`, `init`, `migrate` can run while a loop lane is live. With the policy key `isolation.i15.stage` at `enforce`, each one writes one request to `.evolve/queue/` and exits 4. The compiled stage is `shadow`: the verb refuses with exit 3 and names the file that `enforce` writes.
