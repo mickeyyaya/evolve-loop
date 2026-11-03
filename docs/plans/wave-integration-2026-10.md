@@ -130,7 +130,7 @@ Each lane passed its own tests on its own base. The integration branch holds a t
 | # | Component | Home | Route | Inbox item |
 |---|---|---|---|---|
 | I0 | The deliverable record of D2. The kind `ship.delivered` and the codes `SHIP_INTEGRATION_*` in the Signal Center registry. At `enforce`, a fleet lane's ship stops before `main`. | `go/internal/phases/ship`, `go/internal/core` | console | `wave-integration-i0-deliverable-record` |
-| I0h | The hardening of I0 before `enforce`. A commit with no patch is a precondition refusal (`ErrNoPatch`). `WaveDir` refuses an unsafe wave id (`ErrBadWaveID`). A commit index makes a lookup read one record, and `RetireWave` removes a wave at its boundary (I10). The lost-landing floor bounds its record search by `PreCycleHEAD`. `Repo.DiffPatchID` is the one call of `git patch-id --stable`. | `go/internal/integration`, `go/internal/phases/ship`, `go/internal/core`, `go/internal/adapters/ledger` | console | `wave-integration-i0-hardening-before-enforce` |
+| I0h | The hardening of I0 before `enforce`. A commit with no patch is a precondition refusal (`ErrNoPatch`). `WaveDir` refuses an unsafe wave id (`ErrBadWaveID`). A commit index makes a lookup read one record, and the prune of a wave at its boundary moves to I10. The lost-landing floor bounds its record search by `PreCycleHEAD`. `Repo.DiffPatchID` is the one call of `git patch-id --stable`. | `go/internal/integration`, `go/internal/phases/ship`, `go/internal/core`, `go/internal/adapters/ledger` | console | `wave-integration-i0-hardening-before-enforce` |
 | I1 | The order score of D3, as a pure function | `go/internal/integration` (new) | lane | `wave-integration-i1-order-score` |
 | I2 | The compose engine: one commit for each deliverable, the overlap proof and the tier, reusing the ADR-0128 code (`planlanding.go`, `landprefixes.go`) | `go/internal/integration`, `go/internal/phases/ship` | console | `wave-integration-i2-compose-engine` |
 | I3 | The prefix check, the ejection and the ejection brief to the lane | `go/internal/integration`, `go/internal/orchestrator` | console | `wave-integration-i3-prefix-check-ejection` |
@@ -140,7 +140,7 @@ Each lane passed its own tests on its own base. The integration branch holds a t
 | I6 | The bookkeeping batch of D12 | `go/internal/core`, `go/internal/inboxmover` | console | `wave-integration-i6-bookkeeping-batch` |
 | I7 | The compose again after a console merge into `main` | `go/internal/integration` | lane | `wave-integration-i7-recompose-after-console-merge` |
 | I8 | `evolve wave integration status` and the signals | `go/cmd/evolve`, `go/internal/signalcenter` | lane | `wave-integration-i8-status-verb` |
-| I10 | The integration record of D19, with the lease epoch, the adoption on resume and `--force-with-lease` | `go/internal/integration`, `go/internal/core` | console | `wave-integration-i10-integration-record` |
+| I10 | The integration record of D19, with the lease epoch, the adoption on resume and `--force-with-lease`. The prune of the deliverable records of a wave at its boundary. | `go/internal/integration`, `go/internal/core` | console | `wave-integration-i10-integration-record` |
 | I11 | The fast-forward of the plane's `main` after each merge, and the feeds of D21 | `go/internal/core`, `go/internal/orchestrator` | console | `wave-integration-i11-plane-main-feeds` |
 | I9 | The move to `enforce` | `.evolve/policy.json` | operator | `wave-integration-i9-enforce-flip` |
 

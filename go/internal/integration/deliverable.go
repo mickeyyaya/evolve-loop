@@ -124,14 +124,6 @@ func WaveDir(projectRoot, wave string) (string, error) {
 
 func wavesDir(projectRoot string) string { return filepath.Join(projectRoot, ".evolve", "waves") }
 
-func RetireWave(projectRoot, wave string) error {
-	dir, err := WaveDir(projectRoot, wave)
-	if err != nil {
-		return err
-	}
-	return os.RemoveAll(dir)
-}
-
 func RecordPath(dir string, cycle int) string {
 	return filepath.Join(dir, recordPrefix+strconv.Itoa(cycle)+".json")
 }

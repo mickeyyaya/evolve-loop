@@ -123,28 +123,6 @@ func TestWriteRecord_ReportsAnIndexThatCannotBeWritten(t *testing.T) {
 	}
 }
 
-func TestRetireWave_RemovesTheRecordsOfOneWaveOnly(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	writeRecordFor(t, root, "w1", 7, strings.Repeat("a", 40))
-	writeRecordFor(t, root, "w2", 8, strings.Repeat("b", 40))
-	if err := RetireWave(root, "w1"); err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := FindRecordByCommit(root, strings.Repeat("a", 40)); ok {
-		t.Error("a retired wave still vouches for its commit")
-	}
-	if _, ok := FindRecord(root, 8); !ok {
-		t.Error("retiring w1 removed the record of w2")
-	}
-	if err := RetireWave(root, "../w2"); !errors.Is(err, ErrBadWaveID) {
-		t.Errorf("RetireWave(../w2) = %v, want ErrBadWaveID", err)
-	}
-	if _, ok := FindRecord(root, 8); !ok {
-		t.Error("a refused id removed a record")
-	}
-}
-
 func TestLandedSince_BoundsTheSearchByTheCommitBeforeTheCycle(t *testing.T) {
 	t.Parallel()
 	c := composeLane(t, "compose: the lane work\n\n"+CycleTrailer(landedCycle))
