@@ -4,7 +4,9 @@
 
 `internal/gotestname` holds two rules of the `go test` tool. The first rule says which function names are tests. The second rule says which directories the go tool ignores. Before this package, three guards had their own copy of the name rule, and the copies did not agree.
 
-This package is the one home of these rules. On 2026-11-03 the last copies moved here. Before that change, twelve packages kept a copy of the directory rule and six kept a copy of the name rule. Ten of the directory copies and all six name copies did not agree with this package.
+Each check that reads the syntax tree gets these rules from this package. On 2026-11-03 the copies of those checks moved here. Before that change, twelve walks kept a copy of the directory rule and seven checks kept a copy of the name rule. Ten of the directory copies and six of the name copies did not agree with this package.
+
+Four text scanners still match test names with a regular expression. They are `testFuncRE` in `internal/inboxcurator/testindex.go`, the `git grep` pattern in `internal/inboxcurator/gitlog.go`, `testNameRE` in `internal/inboxcurator/landing.go` and `predicateTest` in `internal/continuation/repair_first.go`. They accept a name such as `Testify`. They need a migration of their own.
 
 ## Design
 
@@ -20,6 +22,7 @@ This package is the one home of these rules. On 2026-11-03 the last copies moved
 The name rule:
 
 - `acs/regression/emptytests`: the empty-test guard of ADR-0158 decision 19.
+- `acs/regression/acsnames`: the `Test` and `Fuzz` functions of the index of declared tests.
 - `internal/ciparity`: the `Test` functions of the e2e files.
 - `internal/handoff/evidence`: a `test` evidence reference resolves only when its name is a test.
 - `internal/handoff/request`: the predicates of a TDD to build request.
@@ -38,5 +41,6 @@ The directory rule:
 
 ## Lessons
 
-- Six copies of the name rule used a plain prefix match. They accepted `Testify`, which `go test` never runs. Five of them now refuse it. The copy in the `acssuite` inventory already refused it.
+- Seven copies of the name rule used a plain prefix match or a regular expression. Six of them accepted `Testify`, which `go test` never runs, and now refuse it. The copy in the `acssuite` inventory already refused it.
+- **`..` counts as ignored.** `UnderIgnoredDir("../a.go")` is true, because `..` starts with `.`. The old segment copies gave the same result. No caller passes a path that leaves the tree.
 - The evidence copy used a plain prefix match. It accepted `Testify`, which `go test` never runs. With this package, a reference to such a name does not resolve.

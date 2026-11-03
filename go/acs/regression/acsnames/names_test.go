@@ -397,3 +397,21 @@ func TestViolations_ADirectoryGoTestIgnoresIsNotAPredicatePackage(t *testing.T) 
 		}
 	}
 }
+
+func TestDeclaredTests_AFunctionGoTestDoesNotRunIsNotDeclared(t *testing.T) {
+	goDir := writeTree(t, map[string]string{
+		"a/a_test.go": "package a\n\nfunc Testify(t *testing.T) {}\n\nfunc Fuzzy(f *testing.F) {}\n\nfunc TestReal(t *testing.T) {}\n",
+	})
+	got, err := declaredTests(goDir)
+	if err != nil || len(got) != 1 || !got["TestReal"] {
+		t.Fatalf("declaredTests = %v, %v, want only TestReal: go test runs neither Testify nor Fuzzy", got, err)
+	}
+}
+
+func TestDeclaredTests_ARootTheGoToolIgnoresIsStillWalked(t *testing.T) {
+	goDir := filepath.Join(writeTree(t, map[string]string{".hidden/a/a_test.go": "package a\n\nfunc TestReal(t *testing.T) {}\n"}), ".hidden")
+	got, err := declaredTests(goDir)
+	if err != nil || !got["TestReal"] {
+		t.Fatalf("declaredTests(.hidden) = %v, %v, want TestReal", got, err)
+	}
+}

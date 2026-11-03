@@ -4,8 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## Changed — one home for the go test name and ignored-directory rules (2026-11-03)
 
-- **The migration.** Twelve directory walks and six test-name checks now call `internal/gotestname`. No other copy of the two rules is left under `go/`.
-- **The name rule.** A function such as `Testify` is not a test. Five checks used to accept it: `acspathscan`, the `acssuite` scope lint, `evalgate` Gate C, `handoff/request` and `paralleltest`.
+- **The migration.** Twelve directory walks and seven test-name checks now call `internal/gotestname`. No check that reads the syntax tree keeps its own copy of the two rules. Four text scanners still match test names with a regular expression.
+- **The name rule.** A function such as `Testify` is not a test. Six checks used to accept it: `acspathscan`, the `acssuite` scope lint, `evalgate` Gate C, `handoff/request`, `paralleltest` and the index of declared tests in `acsnames`.
 - **The directory rule.** Seven walks now also skip `vendor`, a hidden directory or a directory that starts with `_`. They are `coverstrict`, `codeshape`, `commentaudit`, `triagecap`, `test/structure`, `evolve docs ste-lint` and the e2e scan of `ciparity`. The scan of the `acs` tree in `acsnames` changes in the same way.
 - **The helper.** `gotestname.UnderIgnoredDir` applies the directory rule to each directory of a file path.
 - Docs: [internal-gotestname.md](docs/architecture/packages/internal-gotestname.md).

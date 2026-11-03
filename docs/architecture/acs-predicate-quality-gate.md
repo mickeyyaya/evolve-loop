@@ -243,7 +243,7 @@ Four negative controls are pinned in the tests of `pkg/acsassert`. They are prin
 
 ### How it works
 
-1. `declaredTests` parses every `*_test.go` file of the module. It keeps each top-level function `TestX` and `FuzzX` that has no receiver. A raw string or a comment declares nothing. The scan skips each directory that `gotestname.IgnoredDir` names.
+1. `declaredTests` parses every `*_test.go` file of the module. It keeps each top-level function `TestX` and `FuzzX` that has no receiver. The name passes `gotestname.HasPrefix` with `Test` or `Fuzz`, so `Testify` is not declared. A raw string or a comment declares nothing. The scan skips each directory that `gotestname.IgnoredDir` names.
 2. `findViolations` parses each package under `go/acs`, except the package of the check. It keeps only the packages that run tests by name. Below `go/acs`, it skips each directory that `gotestname.IgnoredDir` names. Before 2026-11-03 it skipped only `testdata`.
 3. For each string in those packages, `parseAlternatives` splits the text at `|`. It reads the anchors `^` and `$` as a regular expression does. It cuts a subtest filter at `/`. It expands a group after a prefix, so `TestA_(B|C)` names `TestA_B` and `TestA_C`. A string that holds anything but test names is not a reference.
 4. A name resolves when a test matches it. The match is exact, a prefix or a substring, by rule D2.

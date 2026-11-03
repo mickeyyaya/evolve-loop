@@ -100,7 +100,7 @@ func declaredTests(goDir string) (map[string]bool, error) {
 		if err != nil {
 			return err
 		}
-		if d.IsDir() && gotestname.IgnoredDir(d.Name()) {
+		if d.IsDir() && path != goDir && gotestname.IgnoredDir(d.Name()) {
 			return filepath.SkipDir
 		}
 		if d.IsDir() || !strings.HasSuffix(path, "_test.go") {
@@ -111,7 +111,7 @@ func declaredTests(goDir string) (map[string]bool, error) {
 			return err
 		}
 		for _, decl := range file.Decls {
-			if fn, isFunc := decl.(*ast.FuncDecl); isFunc && fn.Recv == nil && nameRE.MatchString(fn.Name.Name) {
+			if fn, isFunc := decl.(*ast.FuncDecl); isFunc && fn.Recv == nil && (gotestname.HasPrefix(fn.Name.Name, "Test") || gotestname.HasPrefix(fn.Name.Name, "Fuzz")) {
 				declared[fn.Name.Name] = true
 			}
 		}
