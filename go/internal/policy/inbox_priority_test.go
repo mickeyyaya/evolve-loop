@@ -16,7 +16,7 @@ func TestInboxPriorityConfig_AnAbsentBlockIsTheCompiledDefault(t *testing.T) {
 
 	want := policy.InboxPriorityConfig{
 		ClassOrder:      operatorClassOrder,
-		Factors:         policy.InboxPriorityFactors{Base: 0.45, Class: 0.20, Unblocks: 0.15, Recurrence: 0.10, Age: 0.05, Goal: 0.05},
+		Factors:         policy.InboxPriorityFactors{Base: 0.45, Class: 0.20, Unblocks: 0.15, Recurrence: 0.10, Freshness: 0.05, Goal: 0.05},
 		AgeHalflifeDays: 30,
 		UnblocksCap:     3,
 		RecurrenceCap:   5,
@@ -30,7 +30,7 @@ func TestInboxPriorityConfig_AnAbsentBlockIsTheCompiledDefault(t *testing.T) {
 func TestInboxPriorityConfig_TheDefaultFactorsSumToOne(t *testing.T) {
 	f := policy.Policy{}.InboxPriorityConfig().Factors
 
-	if sum := f.Base + f.Class + f.Unblocks + f.Recurrence + f.Age + f.Goal; sum < 0.999999 || sum > 1.000001 {
+	if sum := f.Base + f.Class + f.Unblocks + f.Recurrence + f.Freshness + f.Goal; sum < 0.999999 || sum > 1.000001 {
 		t.Fatalf("default factors sum to %v; a score must stay in [0, 1]", sum)
 	}
 }
@@ -38,7 +38,7 @@ func TestInboxPriorityConfig_TheDefaultFactorsSumToOne(t *testing.T) {
 func TestInboxPriorityConfig_EveryNamedValueOverridesTheDefault(t *testing.T) {
 	p, err := loadPolicyText(t, `{"inbox_priority": {
 		"class_order": ["hygiene", "security"],
-		"factors": {"base": 1, "class": 0, "unblocks": 0, "recurrence": 0, "age": 0, "goal": 0.5},
+		"factors": {"base": 1, "class": 0, "unblocks": 0, "recurrence": 0, "freshness": 0, "goal": 0.5},
 		"age_halflife_days": 7,
 		"unblocks_cap": 2,
 		"recurrence_cap": 9,
@@ -86,7 +86,7 @@ func TestInboxPriorityConfig_ReturnsACopyTheCallerCannotCorrupt(t *testing.T) {
 func TestLoad_InboxPriorityRefusesAnUnknownKey(t *testing.T) {
 	for name, text := range map[string]string{
 		"in the block":   `{"inbox_priority": {"class_ordr": ["security"]}}`,
-		"in the factors": `{"inbox_priority": {"factors": {"base": 1, "class": 0, "unblocks": 0, "recurrence": 0, "age": 0, "goal": 0, "urgency": 1}}}`,
+		"in the factors": `{"inbox_priority": {"factors": {"base": 1, "class": 0, "unblocks": 0, "recurrence": 0, "freshness": 0, "goal": 0, "urgency": 1}}}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := loadPolicyText(t, text)
@@ -99,7 +99,7 @@ func TestLoad_InboxPriorityRefusesAnUnknownKey(t *testing.T) {
 }
 
 func TestLoad_InboxPriorityRefusesAFactorsBlockThatOmitsAFactor(t *testing.T) {
-	all := map[string]string{"base": "0.4", "class": "0.2", "unblocks": "0.2", "recurrence": "0.1", "age": "0.05", "goal": "0.05"}
+	all := map[string]string{"base": "0.4", "class": "0.2", "unblocks": "0.2", "recurrence": "0.1", "freshness": "0.05", "goal": "0.05"}
 	for omitted := range all {
 		t.Run(omitted, func(t *testing.T) {
 			var pairs []string
@@ -118,6 +118,28 @@ func TestLoad_InboxPriorityRefusesAFactorsBlockThatOmitsAFactor(t *testing.T) {
 	}
 }
 
+func TestLoad_InboxPriorityReadsALegacyAgeKeyAsTheFreshnessWeight(t *testing.T) {
+	p, err := loadPolicyText(t, `{"inbox_priority": {"factors": {"base": 0.4, "class": 0.2, "unblocks": 0.2, "recurrence": 0.1, "age": 0.07, "goal": 0.03}}}`)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	got := p.InboxPriorityConfig().Factors
+
+	want := policy.InboxPriorityFactors{Base: 0.4, Class: 0.2, Unblocks: 0.2, Recurrence: 0.1, Freshness: 0.07, Goal: 0.03}
+	if got != want {
+		t.Fatalf("factors = %+v, want %+v: the operator policy.json still names the weight age", got, want)
+	}
+}
+
+func TestLoad_InboxPriorityRefusesAFactorsBlockNamingNeitherFreshnessNorAge(t *testing.T) {
+	_, err := loadPolicyText(t, `{"inbox_priority": {"factors": {"base": 0.4, "class": 0.2, "unblocks": 0.2, "recurrence": 0.1, "goal": 0.1}}}`)
+
+	if err == nil || !strings.Contains(err.Error(), `"freshness"`) {
+		t.Fatalf("err = %v, want a load failure naming freshness", err)
+	}
+}
+
 func TestLoad_InboxPriorityRefusesAnInvalidValue(t *testing.T) {
 	for name, tc := range map[string]struct{ block, why string }{
 		"an empty class order":       {`{"class_order": []}`, "class_order"},
@@ -125,8 +147,8 @@ func TestLoad_InboxPriorityRefusesAnInvalidValue(t *testing.T) {
 		"a padded class":             {`{"class_order": [" security"]}`, "class_order"},
 		"a class listed twice":       {`{"class_order": ["security", "hygiene", "security"]}`, "twice"},
 		"a blank campaign":           {`{"active_campaigns": [""]}`, "active_campaigns"},
-		"a negative factor":          {`{"factors": {"base": -0.1, "class": 0, "unblocks": 0, "recurrence": 0, "age": 0, "goal": 1}}`, "base"},
-		"every factor zero":          {`{"factors": {"base": 0, "class": 0, "unblocks": 0, "recurrence": 0, "age": 0, "goal": 0}}`, "factors"},
+		"a negative factor":          {`{"factors": {"base": -0.1, "class": 0, "unblocks": 0, "recurrence": 0, "freshness": 0, "goal": 1}}`, "base"},
+		"every factor zero":          {`{"factors": {"base": 0, "class": 0, "unblocks": 0, "recurrence": 0, "freshness": 0, "goal": 0}}`, "factors"},
 		"a zero half-life":           {`{"age_halflife_days": 0}`, "age_halflife_days"},
 		"a zero unblocks cap":        {`{"unblocks_cap": 0}`, "unblocks_cap"},
 		"a negative recurrence cap":  {`{"recurrence_cap": -1}`, "recurrence_cap"},

@@ -13,7 +13,7 @@ const (
 	defaultInboxClassFactor      = 0.20
 	defaultInboxUnblocksFactor   = 0.15
 	defaultInboxRecurrenceFactor = 0.10
-	defaultInboxAgeFactor        = 0.05
+	defaultInboxFreshnessFactor  = 0.05
 	defaultInboxGoalFactor       = 0.05
 	defaultInboxAgeHalflifeDays  = 30
 	defaultInboxUnblocksCap      = 3
@@ -25,7 +25,7 @@ var defaultInboxClassOrder = []string{
 	"correctness", "stability", "performance", "debuggability", "feature", "maintainability", "hygiene", "security",
 }
 
-var inboxFactorNames = []string{"base", "class", "unblocks", "recurrence", "age", "goal"}
+var inboxFactorNames = []string{"base", "class", "unblocks", "recurrence", "freshness", "goal"}
 
 type InboxPriorityPolicy struct {
 	ClassOrder      []string              `json:"class_order,omitempty"`
@@ -42,8 +42,9 @@ type InboxPriorityFactors struct {
 	Class      float64 `json:"class"`
 	Unblocks   float64 `json:"unblocks"`
 	Recurrence float64 `json:"recurrence"`
-	Age        float64 `json:"age"`
+	Freshness  float64 `json:"freshness"`
 	Goal       float64 `json:"goal"`
+	Age        float64 `json:"age,omitempty"`
 }
 
 type InboxPriorityConfig struct {
@@ -82,9 +83,18 @@ func (f *InboxPriorityFactors) UnmarshalJSON(raw []byte) error {
 	}
 	for _, name := range inboxFactorNames {
 		if _, ok := named[name]; !ok {
+			if name == "freshness" {
+				if _, okAge := named["age"]; okAge {
+					continue
+				}
+			}
 			return fmt.Errorf("factors: %q is missing; name every one of %s (0 turns a factor off)", name, strings.Join(inboxFactorNames, ", "))
 		}
 	}
+	if _, ok := named["freshness"]; !ok {
+		decoded.Freshness = decoded.Age
+	}
+	decoded.Age = 0
 	*f = InboxPriorityFactors(decoded)
 	return nil
 }
@@ -150,7 +160,7 @@ func (f InboxPriorityFactors) validate() error {
 }
 
 func (f InboxPriorityFactors) weights() []float64 {
-	return []float64{f.Base, f.Class, f.Unblocks, f.Recurrence, f.Age, f.Goal}
+	return []float64{f.Base, f.Class, f.Unblocks, f.Recurrence, f.Freshness, f.Goal}
 }
 
 func defaultInboxPriority() InboxPriorityConfig {
@@ -158,7 +168,7 @@ func defaultInboxPriority() InboxPriorityConfig {
 		ClassOrder: slices.Clone(defaultInboxClassOrder),
 		Factors: InboxPriorityFactors{
 			Base: defaultInboxBaseFactor, Class: defaultInboxClassFactor, Unblocks: defaultInboxUnblocksFactor,
-			Recurrence: defaultInboxRecurrenceFactor, Age: defaultInboxAgeFactor, Goal: defaultInboxGoalFactor,
+			Recurrence: defaultInboxRecurrenceFactor, Freshness: defaultInboxFreshnessFactor, Goal: defaultInboxGoalFactor,
 		},
 		AgeHalflifeDays: defaultInboxAgeHalflifeDays,
 		UnblocksCap:     defaultInboxUnblocksCap,

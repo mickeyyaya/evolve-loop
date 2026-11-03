@@ -21,14 +21,14 @@ const (
 	FactorClass      Factor = "class"
 	FactorUnblocks   Factor = "unblocks"
 	FactorRecurrence Factor = "recurrence"
-	FactorAge        Factor = "age"
+	FactorFreshness  Factor = "freshness"
 	FactorGoal       Factor = "goal"
 )
 
 const hoursPerDay = 24
 
 func Factors() []Factor {
-	return []Factor{FactorBase, FactorClass, FactorUnblocks, FactorRecurrence, FactorAge, FactorGoal}
+	return []Factor{FactorBase, FactorClass, FactorUnblocks, FactorRecurrence, FactorFreshness, FactorGoal}
 }
 
 type Context struct {
@@ -174,7 +174,7 @@ func (s scorer) score(it inboxbatch.Item) Breakdown {
 		{Factor: FactorClass, Value: s.classValue(facts.ClassPosition), Weight: f.Class},
 		{Factor: FactorUnblocks, Value: capped(facts.Unblocks, s.cfg.UnblocksCap), Weight: f.Unblocks},
 		{Factor: FactorRecurrence, Value: capped(facts.Recurrence, s.cfg.RecurrenceCap), Weight: f.Recurrence},
-		{Factor: FactorAge, Value: s.ageValue(facts.AgeDays), Weight: f.Age},
+		{Factor: FactorFreshness, Value: s.freshnessValue(facts.AgeDays, facts.Dated), Weight: f.Freshness},
 		{Factor: FactorGoal, Value: indicator(facts.CampaignActive), Weight: f.Goal},
 	}
 	b := Breakdown{Terms: features, Facts: facts}
@@ -217,6 +217,9 @@ func (s scorer) unblocks(id string) int {
 }
 
 func (s scorer) ageDays(it inboxbatch.Item) (float64, bool) {
+	if verified := it.VerifiedAt(); !verified.IsZero() {
+		return max(0, s.now.Sub(verified).Hours()/hoursPerDay), true
+	}
 	filed := it.FiledAt()
 	if filed.IsZero() {
 		return 0, false
@@ -232,11 +235,14 @@ func (s scorer) classValue(position int) float64 {
 	return float64(classes-position) / float64(classes)
 }
 
-func (s scorer) ageValue(days float64) float64 {
-	if days <= 0 {
+func (s scorer) freshnessValue(days float64, dated bool) float64 {
+	if !dated {
 		return 0
 	}
-	return 1 - math.Pow(0.5, days/s.cfg.AgeHalflifeDays)
+	if days <= 0 {
+		return 1
+	}
+	return math.Pow(0.5, days/s.cfg.AgeHalflifeDays)
 }
 
 func capped(count, ceiling int) float64 {

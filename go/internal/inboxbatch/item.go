@@ -18,31 +18,32 @@ import (
 )
 
 type Item struct {
-	ID              string                     `json:"id"`
-	Title           string                     `json:"title"`
-	Summary         json.RawMessage            `json:"summary,omitempty"`
-	Weight          float64                    `json:"weight"`
-	Kind            string                     `json:"kind"`
-	Class           string                     `json:"class"`
-	Priority        string                     `json:"priority"`
-	PriorityClass   string                     `json:"priority_class"`
-	Origin          string                     `json:"origin"`
-	Campaign        string                     `json:"campaign"`
-	Files           []string                   `json:"files"`
-	ProtectedFiles  []string                   `json:"protected_files"`
-	ConnectsTo      []string                   `json:"connects_to"`
-	Deps            []string                   `json:"deps"`
-	Route           string                     `json:"route"`
-	RoutedReason    json.RawMessage            `json:"routed_reason,omitempty"`
-	InjectedBy      string                     `json:"injected_by"`
-	Continuation    *continuation.Continuation `json:"continuation,omitempty"`
-	Acceptance      []string                   `json:"acceptance,omitempty"`
-	DeliverableKind string                     `json:"deliverable_kind,omitempty"`
-	CreatedAt       string                     `json:"created_at,omitempty"`
-	Path            string                     `json:"-"`
-	mentions        []string
-	basenames       []string
-	priorityNote    string
+	ID                string                     `json:"id"`
+	Title             string                     `json:"title"`
+	Summary           json.RawMessage            `json:"summary,omitempty"`
+	Weight            float64                    `json:"weight"`
+	Kind              string                     `json:"kind"`
+	Class             string                     `json:"class"`
+	Priority          string                     `json:"priority"`
+	PriorityClass     string                     `json:"priority_class"`
+	Origin            string                     `json:"origin"`
+	Campaign          string                     `json:"campaign"`
+	Files             []string                   `json:"files"`
+	ProtectedFiles    []string                   `json:"protected_files"`
+	ConnectsTo        []string                   `json:"connects_to"`
+	Deps              []string                   `json:"deps"`
+	Route             string                     `json:"route"`
+	RoutedReason      json.RawMessage            `json:"routed_reason,omitempty"`
+	InjectedBy        string                     `json:"injected_by"`
+	Continuation      *continuation.Continuation `json:"continuation,omitempty"`
+	Acceptance        []string                   `json:"acceptance,omitempty"`
+	DeliverableKind   string                     `json:"deliverable_kind,omitempty"`
+	CreatedAt         string                     `json:"created_at,omitempty"`
+	PremiseVerifiedAt json.RawMessage            `json:"premise_verified_at,omitempty"`
+	Path              string                     `json:"-"`
+	mentions          []string
+	basenames         []string
+	priorityNote      string
 }
 
 type ItemKey struct{ ID, Path string }
@@ -128,6 +129,24 @@ func (it Item) FiledAt() time.Time {
 		if t, err := time.Parse(FilenameStampLayout, base[:len(FilenameStampLayout)]); err == nil {
 			return t
 		}
+	}
+	return time.Time{}
+}
+
+func (it Item) VerifiedAt() time.Time {
+	if len(it.PremiseVerifiedAt) == 0 {
+		return time.Time{}
+	}
+	var stamp string
+	if err := json.Unmarshal(it.PremiseVerifiedAt, &stamp); err != nil {
+		return time.Time{}
+	}
+	clean := strings.TrimSpace(stamp)
+	if clean == "" {
+		return time.Time{}
+	}
+	if t, err := time.Parse(time.RFC3339, clean); err == nil {
+		return t
 	}
 	return time.Time{}
 }

@@ -256,6 +256,7 @@ func runInboxLint(root string, args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	isProtectedBase := protectedBasenameJudge(root, inbox.isProtected, stderr)
+	lintDeadPaths(root, inbox.items, stderr)
 	var undeclared []inboxLintEntry
 	for _, it := range inbox.items {
 		if routed, _ := inboxbatch.ConsoleRouted(it, inbox.isProtected); routed || it.HasDeclaredSurface() {
@@ -286,6 +287,30 @@ func runInboxLint(root string, args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+func lintDeadPaths(root string, items []inboxbatch.Item, stderr io.Writer) {
+	tracked, err := repostate.TrackedTree(root, ".")
+	if err != nil {
+		return
+	}
+	trackedFiles := make(map[string]bool, len(tracked))
+	trackedDirs := make(map[string]bool, len(tracked))
+	for _, f := range tracked {
+		clean := filepath.Clean(filepath.ToSlash(f))
+		trackedFiles[clean] = true
+		for d := filepath.Dir(clean); d != "." && d != "/" && d != ""; d = filepath.Dir(d) {
+			trackedDirs[d] = true
+		}
+	}
+	for _, it := range items {
+		for _, p := range it.DeclaredPaths() {
+			clean := filepath.Clean(filepath.ToSlash(p))
+			if !trackedFiles[clean] && !trackedDirs[clean] {
+				fmt.Fprintf(stderr, "inbox lint: warning: %s: %s is gone on main\n", it.ID, p)
+			}
+		}
+	}
 }
 
 func protectedBasenameJudge(root string, isProtected func(string) bool, stderr io.Writer) func(string) bool {
