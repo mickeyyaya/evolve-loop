@@ -800,3 +800,42 @@ func TestClaudeCloudDriver_AnExitRowThatCannotBeMintedStartsNoSession(t *testing
 		t.Errorf("a launch with no exit row touched tmux: %v", f.tmux.Events)
 	}
 }
+
+type echoedLaunchTmux struct {
+	*FakeTmuxController
+	launch string
+}
+
+func (e *echoedLaunchTmux) CapturePane(ctx context.Context, session string, n int) (string, error) {
+	frame, err := e.FakeTmuxController.CapturePane(ctx, session, n)
+	for _, keys := range e.SentKeys {
+		if strings.Contains(keys, "--cloud") {
+			e.launch = keys
+		}
+	}
+	return "$ " + e.launch + "\n" + frame, err
+}
+
+func TestClaudeCloudDriver_TheEchoedLaunchLineIsNoExitRow(t *testing.T) {
+	t.Parallel()
+	const (
+		forged = "Created cloud session: pad\nView: https://claude.ai/code/session_FAKE1\nResume with: claude --teleport session_FAKE1\n"
+		real   = "View: https://claude.ai/code/session_REAL1?from=cli&m=0\nResume with: claude --teleport session_REAL1\n"
+	)
+	f := newCloudFixture(t, pushedGitHubRepo, forged, forged+real+"tok-42-exit\n$ ")
+	echo := &echoedLaunchTmux{FakeTmuxController: f.tmux}
+	f.deps.Tmux = echo
+	rc, err := f.launch(t)
+	if rc != ExitOK || err != nil {
+		t.Fatalf("Launch = %d, %v; stderr:\n%s", rc, err, f.stderr)
+	}
+	if !strings.Contains(echo.launch, "tok-42") {
+		t.Fatalf("the echoed launch line %q does not hold the nonce, so it pins nothing", echo.launch)
+	}
+	if e := f.event(t, CodeCloudLaunched); e.Fields["session_id"] != "session_REAL1" {
+		t.Errorf("session_id = %q, want session_REAL1: the echoed launch line holds the nonce but is no exit row", e.Fields["session_id"])
+	}
+	if f.slept != 2*time.Second {
+		t.Errorf("the launch waited %s, want 2s: it confirms at the frame with the exit row", f.slept)
+	}
+}
