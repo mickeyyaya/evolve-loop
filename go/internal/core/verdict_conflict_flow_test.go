@@ -1,9 +1,10 @@
 package core
 
 import (
-	"github.com/mickeyyaya/evolve-loop/go/internal/failurefp"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/failurefp"
 )
 
 func TestVerdictConflict_ErrorDiagnosticReachesAuditFailReasons(t *testing.T) {

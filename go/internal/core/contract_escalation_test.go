@@ -435,7 +435,7 @@ func TestContractCorrection_NormalizedIdenticalReasonsEscalate(t *testing.T) {
 		t.Fatalf("build dispatched %d times (%v), want 3 (initial + 2 corrections)", len(probe.dispatched), probe.dispatched)
 	}
 	if probe.dispatched[2] != "codex-tmux" {
-		t.Errorf("correction 2 dispatched on Driver=%q, want \"codex-tmux\" — the two blocks are the SAME defect under normalizeReasonForFingerprint (they differ only in a duration token), so the second consecutive block must still escalate",
+		t.Errorf("correction 2 dispatched on Driver=%q, want \"codex-tmux\" — the two blocks are the SAME defect under failurefp.Normalize (they differ only in a duration token), so the second consecutive block must still escalate",
 			probe.dispatched[2])
 	}
 }
@@ -457,7 +457,7 @@ func TestContractCorrection_SubsetRepairStillEscalates(t *testing.T) {
 		t.Fatal("fixture invalid: the two reasons must differ VERBATIM")
 	}
 	if a, b := failurefp.Normalize(probe.reasonPerBlock[0]), failurefp.Normalize(probe.reasonPerBlock[1]); a == b {
-		t.Fatalf("fixture invalid: the two reasons must stay DIFFERENT under normalizeReasonForFingerprint (else the pre-fix compare already escalates), got %q == %q", a, b)
+		t.Fatalf("fixture invalid: the two reasons must stay DIFFERENT under failurefp.Normalize (else the pre-fix compare already escalates), got %q == %q", a, b)
 	}
 
 	if _, err := runEscalationCycle(t, root, probe); err == nil {
