@@ -77,7 +77,7 @@ func resumeHolder(workspace string, now time.Time) (runlease.Lease, bool, error)
 	l, ok, err := runlease.Read(workspace)
 	if err != nil {
 		info, serr := os.Stat(runlease.PathIn(workspace))
-		return runlease.Lease{}, serr != nil || now.Sub(info.ModTime()) < runlease.DefaultTTL, err
+		return runlease.Lease{}, serr == nil && now.Sub(info.ModTime()) < runlease.DefaultTTL, err
 	}
 	return l, ok && runlease.Fresh(l, now, 0), nil
 }

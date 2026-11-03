@@ -109,3 +109,22 @@ func TestReleaseResumeLease_ACorruptLeaseIsLeftAndReported(t *testing.T) {
 		t.Errorf("a corrupt lease was removed: %v", err)
 	}
 }
+
+func TestResumeHolder_ALeaseThatCannotBeStattedFreesThePausedCycleForFindAndTake(t *testing.T) {
+	t.Parallel()
+	evolveDir, worktree := t.TempDir(), t.TempDir()
+	ws := filepath.Dir(seedLaneRun(t, evolveDir, quotaPausedRun(5, worktree, "item-a")))
+	if err := os.Symlink(runlease.FileName, runlease.PathIn(ws)); err != nil {
+		t.Fatal(err)
+	}
+
+	_, found := FindLaneResume(t.TempDir(), evolveDir, []string{"item-a"}, ResumeOptions{})
+	err := TakeResumeLease(ws, time.Now())
+
+	if !found {
+		t.Error("FindLaneResume skipped a cycle whose lease has no age: the cycle is stranded")
+	}
+	if got, ok, rerr := runlease.Read(ws); err != nil || rerr != nil || !ok || got.OwnerPID != os.Getpid() {
+		t.Errorf("TakeResumeLease = %v, lease = (%+v, %v, %v); want the cycle reclaimed by pid %d", err, got, ok, rerr, os.Getpid())
+	}
+}

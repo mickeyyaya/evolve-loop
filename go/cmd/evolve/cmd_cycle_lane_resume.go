@@ -33,10 +33,17 @@ type laneResume struct {
 	stderr                 io.Writer
 }
 
-func newLaneResume(projectRoot, evolveDir string, scope []string, lifecycle inboxmover.LedgerAppender, forbidden func(string) bool, signals *signalcenter.Center, stderr io.Writer) laneResume {
+type laneHost struct {
+	lifecycle inboxmover.LedgerAppender
+	forbidden func(string) bool
+	signals   *signalcenter.Center
+	stderr    io.Writer
+}
+
+func newLaneResume(projectRoot, evolveDir string, scope []string, h laneHost) laneResume {
 	return laneResume{projectRoot: projectRoot, evolveDir: evolveDir, scope: scope, record: checkpoint.RecordLaneResume,
-		claim:   hostInboxClaimer(lifecycle, signals, forbidden),
-		release: laneClaimReleaser(projectRoot, stderr, lifecycle, signals), signals: signals, stderr: stderr}
+		claim:   hostInboxClaimer(h.lifecycle, h.signals, h.forbidden),
+		release: laneClaimReleaser(projectRoot, h.stderr, h.lifecycle, h.signals), signals: h.signals, stderr: h.stderr}
 }
 
 func fleetLaneScope() []string {

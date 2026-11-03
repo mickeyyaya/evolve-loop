@@ -89,7 +89,7 @@ func seedPausedScope(t *testing.T, todos []string, cycle, attempts int) pausedLa
 }
 
 func (p pausedLane) lane(stderr *bytes.Buffer, signals *signalcenter.Center, scope ...string) laneResume {
-	return newLaneResume(p.root, p.evolveDir, scope, nil, nil, signals, stderr)
+	return newLaneResume(p.root, p.evolveDir, scope, laneHost{signals: signals, stderr: stderr})
 }
 
 func laneRequest() core.CycleRequest {

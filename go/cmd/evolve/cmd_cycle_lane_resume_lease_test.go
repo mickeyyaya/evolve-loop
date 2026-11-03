@@ -27,7 +27,7 @@ func TestNewLaneResume_TheComposedRecordRefusesACycleThatAnotherLaneHolds(t *tes
 		t.Fatal(err)
 	}
 
-	_, admitted, err := newLaneResume(p.root, p.evolveDir, []string{"item-a"}, nil, nil, nil, &bytes.Buffer{}).record(p.statePath, true)
+	_, admitted, err := newLaneResume(p.root, p.evolveDir, []string{"item-a"}, laneHost{stderr: &bytes.Buffer{}}).record(p.statePath, true)
 
 	var held *core.ResumeHeldError
 	if admitted || !errors.As(err, &held) || held.Holder.RunID != "lane-b-run" {

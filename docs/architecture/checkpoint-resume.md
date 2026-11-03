@@ -62,7 +62,7 @@ If the workspace has a fresh run lease, the call refuses with `*core.ResumeHeldE
 
 One function, `resumeHolder` (`go/internal/core/lane_resume.go`), decides if a lease holds the workspace. `FindLaneResume` and `TakeResumeLease` both call it, so they cannot disagree. A fresh lease holds the workspace, and an expired lease does not.
 
-A corrupt or unreadable lease holds the workspace until its file modification time is older than the lease TTL (`runlease.DefaultTTL`). After that time, the next lane reclaims the cycle. Thus a live holder keeps the cycle, and a damaged lease never strands it. Before this rule, `FindLaneResume` read a corrupt lease as free and `TakeResumeLease` read it as held. Each lane then found the cycle and was refused, so the cycle stayed paused.
+A corrupt or unreadable lease holds the workspace until its file modification time is older than the lease TTL (`runlease.DefaultTTL`). After that time, the next lane reclaims the cycle. A lease file with no readable modification time holds nothing. Thus a live holder keeps the cycle, and a damaged lease never strands it. Before this rule, `FindLaneResume` read a corrupt lease as free and `TakeResumeLease` read it as held. Each lane then found the cycle and was refused, so the cycle stayed paused.
 
 An adoption can fail after the lane takes the admission lease. The reclaim of the todos can fail, or `RunCycleFromPhase` can return an error before its heartbeat starts. In both cases, the lane calls `core.ReleaseResumeLease`. This call removes the lease only when it is still the admission lease of this process. A heartbeat lease of the resumed run stays. Thus a failed adoption does not block the paused cycle for a full TTL.
 
