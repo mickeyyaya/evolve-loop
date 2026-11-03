@@ -149,3 +149,93 @@ func TestClosesInboxIDs(t *testing.T) {
 		})
 	}
 }
+
+func TestClosesInboxIDs_NoneIsAnExplicitEmptySet(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		body string
+		want []string
+	}{
+		{"plain none", "Closes-Inbox: none\n", nil},
+		{"shouty none", "CLOSES-INBOX: NONE\r\n", nil},
+		{"bullet none", "- Closes-Inbox: None\n", nil},
+		{"backticked none", "Closes-Inbox: `none`\n", nil},
+		{"none beside a real id on another line", "Closes-Inbox: none\nCloses-Inbox: real-item\n", []string{"real-item"}},
+		{"none in a list is still dropped", "Closes-Inbox: real-item, none\n", []string{"real-item"}},
+		{"none-prefixed id is a real id", "Closes-Inbox: none-of-the-above\n", []string{"none-of-the-above"}},
+		{"fenced none", "```\nCloses-Inbox: none\n```\n", nil},
+	}
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := ClosesInboxIDs([]byte(tc.body)); !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("ClosesInboxIDs(%q) = %#v, want %#v", tc.body, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestRefsInboxIDs_ReadsItsOwnMarkerOnly(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		body      string
+		wantRefs  []string
+		wantClose []string
+	}{
+		{"refs line never closes", "Refs-Inbox: partial-item\n", []string{"partial-item"}, nil},
+		{"closes line never refs", "Closes-Inbox: done-item\n", nil, []string{"done-item"}},
+		{"both markers split", "Closes-Inbox: done-item\nRefs-Inbox: partial-item, other.item\n", []string{"partial-item", "other.item"}, []string{"done-item"}},
+		{"bullet and case", "- refs-inbox: `a-item`\n* REFS-INBOX: b-item\n", []string{"a-item", "b-item"}, nil},
+		{"fenced refs is quoted text", "```\nRefs-Inbox: fenced\n```\nRefs-Inbox: real\n", []string{"real"}, nil},
+		{"tilde fence", "~~~\nRefs-Inbox: fenced\n~~~\n", nil, nil},
+		{"indented refs is quoted", "  Refs-Inbox: indented\n", nil, nil},
+		{"none is an empty set", "Refs-Inbox: none\n", nil, nil},
+		{"dedupe keeps first-seen order", "Refs-Inbox: b, a\nRefs-Inbox: a, c\n", []string{"b", "a", "c"}, nil},
+		{"similar marker", "Refs-Inbox-Maybe: x\n", nil, nil},
+	}
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := RefsInboxIDs([]byte(tc.body)); !reflect.DeepEqual(got, tc.wantRefs) {
+				t.Errorf("RefsInboxIDs(%q) = %#v, want %#v", tc.body, got, tc.wantRefs)
+			}
+			if got := ClosesInboxIDs([]byte(tc.body)); !reflect.DeepEqual(got, tc.wantClose) {
+				t.Errorf("ClosesInboxIDs(%q) = %#v, want %#v", tc.body, got, tc.wantClose)
+			}
+		})
+	}
+}
+
+func TestDeclaresInboxTrailer_NoneCountsAndAbsentDoesNot(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		body string
+		want bool
+	}{
+		{"closes none declares", "Closes-Inbox: none\n", true},
+		{"closes ids declare", "Closes-Inbox: a-item\n", true},
+		{"refs declares", "Refs-Inbox: a-item\n", true},
+		{"refs none declares", "- Refs-Inbox: none\n", true},
+		{"empty marker line declares", "Closes-Inbox:\n", true},
+		{"absent", "# Build Report\nAll green.\n", false},
+		{"empty body", "", false},
+		{"fenced marker is quoted", "```\nCloses-Inbox: none\n```\n", false},
+		{"prose mention", "This Closes-Inbox: none was a mention.\n", false},
+		{"similar marker", "Closes-Inbox-Maybe: none\n", false},
+		{"trailer after a fence", "```\nx\n```\nRefs-Inbox: a\n", true},
+	}
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := DeclaresInboxTrailer([]byte(tc.body)); got != tc.want {
+				t.Errorf("DeclaresInboxTrailer(%q) = %v, want %v", tc.body, got, tc.want)
+			}
+		})
+	}
+}
