@@ -83,9 +83,9 @@ func TestReadIsolation_GrantsTheIndexedPathsAndGuardsTheRunsTheRawOutputAndTheSe
 	t.Parallel()
 	c := newReadCell(t)
 	c.index(t)
-	ri := Deps{ReadStage: "enforce"}.readIsolation(c.request(), c.home)
+	ri := Deps{ReadStage: "enforce", SecretStage: "shadow"}.readIsolation(c.request(), c.home)
 	want := sandbox.ReadIsolation{
-		Enforce: true, SecretEnforce: true, Tag: "d42", RunsDir: c.runs, Workspace: c.ws,
+		Enforce: true, Tag: "d42", RunsDir: c.runs, Workspace: c.ws,
 		Grants:      []string{inputindex.Path(c.ws), filepath.Join(c.ws, "scout-report.md"), filepath.Join(c.runs, "cycle-6", "retrospective-report.md")},
 		RawSuffixes: inputindex.RawOutputSuffixes(),
 		RawFiles:    []string{filepath.Join(c.ws, "scout-stdout.log")},
@@ -155,7 +155,7 @@ func TestReadIsolation_TheSecretStageDeniesTheSecretsWhileTheReadStageStaysShado
 	}{
 		{Deps{ReadStage: "shadow", SecretStage: "enforce"}, false, true, c.ws},
 		{Deps{ReadStage: "shadow", SecretStage: "shadow"}, false, false, c.ws},
-		{Deps{ReadStage: "enforce", SecretStage: "shadow"}, true, true, c.ws},
+		{Deps{ReadStage: "enforce", SecretStage: "shadow"}, true, false, c.ws},
 		{Deps{ReadStage: "off", SecretStage: "enforce"}, false, false, ""},
 	}
 	for _, tc := range cases {
@@ -164,6 +164,16 @@ func TestReadIsolation_TheSecretStageDeniesTheSecretsWhileTheReadStageStaysShado
 			t.Errorf("read %s, secret %s: Enforce=%v SecretEnforce=%v Workspace=%q; want %v %v %q",
 				tc.deps.ReadStage, tc.deps.SecretStage, ri.Enforce, ri.SecretEnforce, ri.Workspace, tc.enforce, tc.secretEnforce, tc.workspace)
 		}
+	}
+}
+
+func TestSecretStage_ReadsIsolationI5SecretOfThePolicyApartFromI5(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeFixtureFile(t, filepath.Join(root, ".evolve", "policy.json"), `{"isolation":{"i5":{"stage":"shadow"},"i5_secret":{"stage":"enforce"}}}`)
+	deps := Deps{Env: map[string]string{"EVOLVE_PROJECT_ROOT": root}}
+	if got, read := deps.secretStage(), deps.readStage(); got != "enforce" || read != "shadow" {
+		t.Fatalf("secretStage = %q, readStage = %q; want enforce from isolation.i5_secret and shadow from isolation.i5", got, read)
 	}
 }
 

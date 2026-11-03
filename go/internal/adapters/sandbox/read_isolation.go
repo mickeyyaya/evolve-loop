@@ -43,13 +43,15 @@ func (ri ReadIsolation) secretsDenied() bool {
 	return ri.Enforce || ri.SecretEnforce
 }
 
-func (ri ReadIsolation) guard(b *strings.Builder, op, filter, rule, invariant string) {
-	ri.guardAt(b, ri.Enforce, op, filter, rule, invariant)
+func (ri ReadIsolation) secretScope() ReadIsolation {
+	scope := ri
+	scope.Enforce = ri.secretsDenied()
+	return scope
 }
 
-func (ri ReadIsolation) guardAt(b *strings.Builder, deny bool, op, filter, rule, invariant string) {
+func (ri ReadIsolation) guard(b *strings.Builder, op, filter, rule, invariant string) {
 	message := fmt.Sprintf("%s%s rule=%s inv=%s", CellMessagePrefix, ri.Tag, rule, invariant)
-	if deny {
+	if ri.Enforce {
 		fmt.Fprintf(b, "(deny %s %s (with message %q))\n", op, filter, message)
 		return
 	}
@@ -65,11 +67,12 @@ func writeReadIsolation(b *strings.Builder, ri ReadIsolation) {
 	if ri.RunsDir != "" {
 		ri.guard(b, "file-read-data", fmt.Sprintf("(subpath %q)", ri.RunsDir), RuleRunsUnrelated, "I5")
 	}
+	secrets := ri.secretScope()
 	for _, d := range ri.SecretDirs {
-		ri.guardAt(b, ri.secretsDenied(), "file-read-data", fmt.Sprintf("(subpath %q)", d), RuleHomeSecret, "I5")
+		secrets.guard(b, "file-read-data", fmt.Sprintf("(subpath %q)", d), RuleHomeSecret, "I5")
 	}
 	for _, f := range ri.SecretFiles {
-		ri.guardAt(b, ri.secretsDenied(), "file-read-data", fmt.Sprintf("(literal %q)", f), RuleHomeSecret, "I5")
+		secrets.guard(b, "file-read-data", fmt.Sprintf("(literal %q)", f), RuleHomeSecret, "I5")
 	}
 	fmt.Fprintf(b, "(allow file-read* file-read-data (subpath %q))\n", ri.Workspace)
 	writeGrantReports(b, ri.Grants, grantMessage)

@@ -53,9 +53,8 @@ func (deps Deps) readIsolation(req SandboxWrapRequest, home string) sandbox.Read
 	if stage == envStageOff || req.Workspace == "" || req.RepoRoot == "" {
 		return sandbox.ReadIsolation{}
 	}
-	enforce := stage == envStageEnforce
 	ri := sandbox.ReadIsolation{
-		Enforce: enforce, SecretEnforce: enforce || deps.secretStage() == envStageEnforce, Tag: req.Tag, RawSuffixes: inputindex.RawOutputSuffixes(),
+		Enforce: stage == envStageEnforce, SecretEnforce: deps.secretStage() == envStageEnforce, Tag: req.Tag, RawSuffixes: inputindex.RawOutputSuffixes(),
 		Workspace: canonicalOrSelf(req.Workspace),
 	}
 	if runs := canonicalOrSelf(filepath.Join(req.RepoRoot, ".evolve", "runs")); isDir(runs) {

@@ -27,6 +27,13 @@ func TestTheCheckedInPolicy_EnforcesTheStagesTheOperatorMoved(t *testing.T) {
 			t.Errorf("%s = %q, want enforce", key, got)
 		}
 	}
+}
+
+func TestTheCheckedInPolicy_KeepsTheSecretStageAtShadowUntilTheOperatorMovesIt(t *testing.T) {
+	p, err := policy.Load(filepath.Join("..", "..", "..", ".evolve", "policy.json"))
+	if err != nil {
+		t.Fatalf("the checked-in policy must pass the strict decoder: %v", err)
+	}
 	if got := p.IsolationSecretStage(); got != "shadow" {
 		t.Errorf("isolation.i5_secret.stage = %q, want shadow until one wave logs zero read.home.secret signals", got)
 	}
