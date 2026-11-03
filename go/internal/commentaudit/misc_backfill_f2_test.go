@@ -142,6 +142,7 @@ func TestRank_SkipsVendoredHiddenAndTestdataDirsF2(t *testing.T) {
 		"vendor/v.go":    {Data: src},
 		"testdata/t.go":  {Data: src},
 		".hidden/h.go":   {Data: src},
+		"_scratch/s.go":  {Data: src},
 		"keep/readme.md": {Data: []byte("# not go")},
 	}
 

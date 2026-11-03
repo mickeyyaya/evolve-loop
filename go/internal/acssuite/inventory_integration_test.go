@@ -50,6 +50,7 @@ func TestDeclaredPredicateTests_KeepsOnlyTopLevelExportedTestFunctions(t *testin
 			"func (suite) TestMethod(t *testing.T) {}\n" +
 			"func TestMain(m *testing.M) { os.Exit(m.Run()) }\n" +
 			"func Testlowercase(t *testing.T) {}\n" +
+			"func Testify(t *testing.T) {}\n" +
 			"func Test(t *testing.T) {}\n" +
 			"func TestÜnicode(t *testing.T) {}\n" +
 			"func TestRequired(t *testing.T) {}\n" +

@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/covchanged"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotestname"
 )
 
 type Floor struct {
@@ -182,7 +183,7 @@ func refuseStale(moduleDir, profilePath string, measuredNano int64) error {
 			return fmt.Errorf("coverstrict: walk %s: %w", path, err)
 		}
 		if d.IsDir() {
-			if path != moduleDir && skippedDir(d.Name()) {
+			if path != moduleDir && gotestname.IgnoredDir(d.Name()) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -199,10 +200,6 @@ func refuseStale(moduleDir, profilePath string, measuredNano int64) error {
 		}
 		return nil
 	})
-}
-
-func skippedDir(name string) bool {
-	return name == "testdata" || name == "vendor" || strings.HasPrefix(name, ".")
 }
 
 func watchedFile(name string) bool {

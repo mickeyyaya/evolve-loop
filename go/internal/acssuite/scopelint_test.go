@@ -200,3 +200,14 @@ func TestC9999_006_suites_stay_green(t *testing.T) {
 		t.Errorf("floor cancellation must be loud in Warnings; got %v", v.Warnings)
 	}
 }
+
+func TestLintPredicateScope_AFunctionGoTestDoesNotRunIsNotLinted(t *testing.T) {
+	dir := writeCyclePredicates(t, "package cycle9999\n\nimport \"testing\"\n\nfunc Testify(t *testing.T) {\n\t_ = []string{\"go\", \"test\", \"./internal/core/...\"}\n}\n")
+	findings, err := LintPredicateScope(dir, []string{"./internal/bridge/..."})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(findings) != 0 {
+		t.Errorf("Testify is not a test name, so it has no scope findings; got %+v", findings)
+	}
+}

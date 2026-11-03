@@ -344,3 +344,24 @@ func TestFloorBinding_MalformedCompanionIgnoredWithoutFloorPredicates(t *testing
 		t.Errorf("with no floor predicate there is nothing to bind; got reason=%q block=%v", reason, block)
 	}
 }
+
+func TestFloorPredicateTargets_AFunctionGoTestDoesNotRunBindsNoFloor(t *testing.T) {
+	pred := filepath.Join(t.TempDir(), "predicates_test.go")
+	src := "package cycle300\n\nimport \"testing\"\n\nfunc Testify_CoreCoverageFloor(t *testing.T) { _ = \"./internal/core/...\" }\n"
+	if err := os.WriteFile(pred, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := floorPredicateTargets(pred); got != nil {
+		t.Errorf("Testify is not a test name, so it binds no floor; got %v", got)
+	}
+}
+
+func TestFloorPredicateTargets_AFileThatDoesNotParseBindsNoFloor(t *testing.T) {
+	pred := filepath.Join(t.TempDir(), "predicates_test.go")
+	if err := os.WriteFile(pred, []byte("package cycle300\n\nfunc TestC300_001_CoreCoverageFloor(\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := floorPredicateTargets(pred); got != nil {
+		t.Errorf("an unparsable predicate file binds no floor; got %v", got)
+	}
+}

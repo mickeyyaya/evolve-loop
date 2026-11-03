@@ -32,6 +32,8 @@ func TestSourceFiles_ListsNonTestGoFilesOutsideTestdataAndVendor(t *testing.T) {
 		"internal/a/b/b.go":        "package b",
 		"internal/a/testdata/x.go": "package x",
 		"internal/a/vendor/v/v.go": "package v",
+		"internal/a/.hidden/h.go":  "package h",
+		"internal/a/_scratch/s.go": "package s",
 		"internal/other/other.go":  "package other",
 		"cmd/tool/main.go":         "package main",
 	})
@@ -86,5 +88,17 @@ func TestSelectorUses_AnUnparsableFileIsAnError(t *testing.T) {
 
 	if _, err := SelectorUses(root, "bad.go", "time", "Sleep"); err == nil {
 		t.Errorf("SelectorUses(bad.go) = nil error, want a parse error")
+	}
+}
+
+func TestSourceFiles_ARootTheGoToolIgnoresIsStillWalked(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{".hidden/a.go": "package a"})
+
+	got, err := SourceFiles(root, ".hidden")
+
+	if err != nil || !slices.Equal(got, []string{filepath.Join(".hidden", "a.go")}) {
+		t.Errorf("SourceFiles(.hidden) = %q, %v, want [.hidden/a.go]", got, err)
 	}
 }

@@ -384,3 +384,34 @@ func TestViolations_AnUnreadableFixtureFileIsAnError(t *testing.T) {
 		t.Fatal("an unreadable fixture must be an error, not a silent gap")
 	}
 }
+
+func TestViolations_ADirectoryGoTestIgnoresIsNotAPredicatePackage(t *testing.T) {
+	for _, dir := range []string{"vendor", ".hidden", "_scratch"} {
+		got := violationsFor(t, map[string]string{
+			"internal/decl/decl_test.go":           declaresRenamed,
+			"acs/cycle9/predicates_test.go":        predicateFile("var argv = []string{\"-run\", \"^TestRenamed$\"}\n"),
+			"acs/cycle9/" + dir + "/probe/main.go": "package main\n\nvar argv = []string{\"-run\", \"^TestElsewhere$\"}\n",
+		}, nil)
+		if len(got) != 0 {
+			t.Errorf("%s: violations = %q, want none: go test ignores %s, so it holds no predicate", dir, got, dir)
+		}
+	}
+}
+
+func TestDeclaredTests_AFunctionGoTestDoesNotRunIsNotDeclared(t *testing.T) {
+	goDir := writeTree(t, map[string]string{
+		"a/a_test.go": "package a\n\nfunc Testify(t *testing.T) {}\n\nfunc Fuzzy(f *testing.F) {}\n\nfunc TestReal(t *testing.T) {}\n",
+	})
+	got, err := declaredTests(goDir)
+	if err != nil || len(got) != 1 || !got["TestReal"] {
+		t.Fatalf("declaredTests = %v, %v, want only TestReal: go test runs neither Testify nor Fuzzy", got, err)
+	}
+}
+
+func TestDeclaredTests_ARootTheGoToolIgnoresIsStillWalked(t *testing.T) {
+	goDir := filepath.Join(writeTree(t, map[string]string{".hidden/a/a_test.go": "package a\n\nfunc TestReal(t *testing.T) {}\n"}), ".hidden")
+	got, err := declaredTests(goDir)
+	if err != nil || !got["TestReal"] {
+		t.Fatalf("declaredTests(.hidden) = %v, %v, want TestReal", got, err)
+	}
+}

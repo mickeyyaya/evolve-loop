@@ -5,8 +5,9 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"path/filepath"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotestname"
 )
 
 const (
@@ -37,15 +38,7 @@ func Conforming(funcs []Func) (k, n int) {
 }
 
 func Production(rel string) bool {
-	if !strings.HasSuffix(rel, ".go") || strings.HasSuffix(rel, "_test.go") || strings.HasPrefix(rel, "acs/") || strings.HasPrefix(rel, "test/") {
-		return false
-	}
-	for _, seg := range strings.Split(filepath.ToSlash(filepath.Dir(rel)), "/") {
-		if seg == "testdata" || seg == "vendor" || strings.HasPrefix(seg, ".") && seg != "." {
-			return false
-		}
-	}
-	return true
+	return strings.HasSuffix(rel, ".go") && !strings.HasSuffix(rel, "_test.go") && !strings.HasPrefix(rel, "acs/") && !strings.HasPrefix(rel, "test/") && !gotestname.UnderIgnoredDir(rel)
 }
 
 func parseFile(file string, src []byte) (*ast.File, *token.FileSet, error) {

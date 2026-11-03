@@ -13,9 +13,8 @@ import (
 	"slices"
 	"strings"
 	"time"
-	"unicode"
-	"unicode/utf8"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotestname"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
@@ -71,11 +70,7 @@ func declaredPredicateTests(ctx context.Context, moduleDir, pattern string, env 
 			}
 			for _, decl := range file.Decls {
 				fn, ok := decl.(*ast.FuncDecl)
-				if !ok || fn.Recv != nil || fn.Name.Name == "TestMain" || !strings.HasPrefix(fn.Name.Name, "Test") {
-					continue
-				}
-				suffix := strings.TrimPrefix(fn.Name.Name, "Test")
-				if first, _ := utf8.DecodeRuneInString(suffix); suffix != "" && unicode.IsLower(first) {
+				if !ok || fn.Recv != nil || fn.Name.Name == "TestMain" || !gotestname.HasPrefix(fn.Name.Name, "Test") {
 					continue
 				}
 				expected[pkg.ImportPath+"/"+fn.Name.Name] = true

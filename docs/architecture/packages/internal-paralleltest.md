@@ -7,6 +7,7 @@
 ## Design
 
 - The guard reads sources, so it is a pure static check with no build of the package under test.
+- A top-level test has a name that passes `gotestname.HasPrefix` with `Test`, and it is not `TestMain`. Since 2026-11-03 the guard does not judge a function such as `Testify`, because `go test` never runs it.
 
 ## Invariants
 

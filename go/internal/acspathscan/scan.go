@@ -13,6 +13,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotestname"
 )
 
 type Need struct {
@@ -48,7 +50,7 @@ func Needs(dir string, member func(string) bool) ([]Need, error) {
 		}
 		for _, decl := range parsed.Decls {
 			fn, ok := decl.(*ast.FuncDecl)
-			if !ok || fn.Body == nil || !strings.HasPrefix(fn.Name.Name, "Test") {
+			if !ok || fn.Body == nil || !gotestname.HasPrefix(fn.Name.Name, "Test") {
 				continue
 			}
 			for _, p := range readPaths(fn.Body) {

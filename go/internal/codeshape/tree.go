@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotestname"
 )
 
 const windowSize = 5
@@ -29,7 +31,7 @@ func Scan(goRoot string) (Tree, error) {
 			return err
 		}
 		rel, _ := filepath.Rel(goRoot, p)
-		if d.IsDir() && rel != "." && skippedDir(d.Name()) {
+		if d.IsDir() && rel != "." && gotestname.IgnoredDir(d.Name()) {
 			return fs.SkipDir
 		}
 		if d.IsDir() || !Production(filepath.ToSlash(rel)) {
@@ -149,8 +151,4 @@ func (t Tree) Depths() []float64 {
 		}
 	}
 	return out
-}
-
-func skippedDir(name string) bool {
-	return name == "vendor" || name == "testdata" || strings.HasPrefix(name, ".")
 }

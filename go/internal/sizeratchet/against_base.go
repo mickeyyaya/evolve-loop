@@ -7,18 +7,12 @@ import (
 	"io/fs"
 	"path"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotestname"
 )
 
 func measured(rel string) bool {
-	if !strings.HasSuffix(rel, ".go") || strings.HasSuffix(rel, "_test.go") {
-		return false
-	}
-	for _, seg := range strings.Split(path.Dir(rel), "/") {
-		if seg != "." && skipDir(seg) {
-			return false
-		}
-	}
-	return true
+	return strings.HasSuffix(rel, ".go") && !strings.HasSuffix(rel, "_test.go") && !gotestname.UnderIgnoredDir(rel)
 }
 
 func readSpans(read func(string) ([]byte, error), prefix string, paths []string) ([]FuncSpan, error) {

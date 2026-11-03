@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotestname"
 	"github.com/mickeyyaya/evolve-loop/go/internal/handoff"
 )
 
@@ -23,8 +24,6 @@ type Source struct {
 	Cycle    int
 	Commands []string
 }
-
-var testPrefixes = []string{"Test", "Fuzz", "Benchmark"}
 
 func Resolve(src Source, ev handoff.Evidence) error {
 	var ok bool
@@ -67,7 +66,7 @@ func lineCount(body []byte) int {
 
 func testResolves(goDir, ref string) bool {
 	file, name := splitRef(ref)
-	if !isTestName(name) {
+	if !gotestname.Is(name) {
 		return false
 	}
 	if file != "" {
@@ -88,7 +87,7 @@ func testResolves(goDir, ref string) bool {
 
 func predicateResolves(src Source, ref string) bool {
 	file, name := splitRef(ref)
-	if !isTestName(name) {
+	if !gotestname.Is(name) {
 		return false
 	}
 	pkgRel := "go/acs/cycle" + strconv.Itoa(src.Cycle)
@@ -123,15 +122,6 @@ func declares(path, name string) bool {
 	}
 	for _, decl := range parsed.Decls {
 		if fn, ok := decl.(*ast.FuncDecl); ok && fn.Recv == nil && fn.Name.Name == name {
-			return true
-		}
-	}
-	return false
-}
-
-func isTestName(name string) bool {
-	for _, prefix := range testPrefixes {
-		if strings.HasPrefix(name, prefix) {
 			return true
 		}
 	}

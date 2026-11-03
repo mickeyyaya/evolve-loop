@@ -9,7 +9,7 @@
 ## Design
 
 - **A leaf package.** It imports only the standard library. The core decision and the closeout both call it, so the rule has one definition.
-- **Reads, not mentions.** A path counts only inside a `func Test*` body, as an argument of a file read. A variable counts if it carries the path to such a read.
+- **Reads, not mentions.** A path counts only inside the body of a test function, as an argument of a file read. A test function has a name that passes `gotestname.HasPrefix` with `Test`, so `Testify` is not one (2026-11-03). A variable counts if it carries the path to such a read.
 - **The repo root is named.** A `filepath.Join` counts if all arguments are literals, or if the first argument is `RepoRoot(t)` or a variable that holds it. A temp directory base does not count.
 - **Faults are loud.** A bad pattern or a file that does not parse returns an error. The paths from the other files are still returned.
 

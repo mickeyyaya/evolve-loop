@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotestname"
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
@@ -98,7 +99,7 @@ func floorPredicateTargets(predPath string) []string {
 	seen := map[string]bool{}
 	for _, decl := range f.Decls {
 		fn, ok := decl.(*ast.FuncDecl)
-		if !ok || fn.Body == nil || !strings.HasPrefix(fn.Name.Name, "Test") || !floorNameRE.MatchString(fn.Name.Name) {
+		if !ok || fn.Body == nil || !gotestname.HasPrefix(fn.Name.Name, "Test") || !floorNameRE.MatchString(fn.Name.Name) {
 			continue
 		}
 		ast.Inspect(fn.Body, func(n ast.Node) bool {
@@ -106,10 +107,7 @@ func floorPredicateTargets(predPath string) []string {
 			if !ok || lit.Kind != token.STRING {
 				return true
 			}
-			s, uerr := strconv.Unquote(lit.Value)
-			if uerr != nil {
-				return true
-			}
+			s, _ := strconv.Unquote(lit.Value)
 			s = strings.TrimSuffix(s, "/...")
 			if !pkgPathLitRE.MatchString(s) {
 				return true

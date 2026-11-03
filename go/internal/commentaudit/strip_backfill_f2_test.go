@@ -175,7 +175,7 @@ func FuzzStripCommentsF2(f *testing.F) {
 
 func TestGoFilesByDir_AToolNamedRootIsStillWalkedF2(t *testing.T) {
 	t.Parallel()
-	for _, name := range []string{"vendor", ".hidden", "testdata"} {
+	for _, name := range []string{"vendor", ".hidden", "testdata", "_scratch"} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			root := filepath.Join(t.TempDir(), name)

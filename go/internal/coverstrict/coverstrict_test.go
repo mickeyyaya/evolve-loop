@@ -225,7 +225,7 @@ func TestCheck_RefusesAnyModuleInputNewerThanTheProfile(t *testing.T) {
 }
 
 func TestCheck_SkipsTestdataVendorAndDotDirectories(t *testing.T) {
-	for _, dir := range []string{"testdata", "vendor", ".hidden", "p/testdata"} {
+	for _, dir := range []string{"testdata", "vendor", ".hidden", "p/testdata", "_scratch", "p/_scratch"} {
 		t.Run(dir, func(t *testing.T) {
 			tree := newStrictTree(t, "./p 70\n")
 			if err := os.MkdirAll(filepath.Join(tree.root, filepath.FromSlash(dir)), 0o755); err != nil {

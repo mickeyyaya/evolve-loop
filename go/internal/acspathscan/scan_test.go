@@ -199,3 +199,12 @@ func TestSnapshot_ReportsEachFault(t *testing.T) {
 		t.Error("a destination file that cannot be written")
 	}
 }
+
+func TestNeeds_AFunctionGoTestDoesNotRunIsNotScanned(t *testing.T) {
+	t.Parallel()
+	got, err := scan(t, `
+func Testify(t *testing.T) { os.ReadFile("agents/evolve-auditor.md") }`)
+	if err != nil || len(got) != 0 {
+		t.Errorf("Testify is not a test name, so it has no needs: got %+v err=%v", got, err)
+	}
+}
