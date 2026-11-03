@@ -297,6 +297,29 @@ A predicate is repointed when a successor test pins the same scenario. It is nar
 
 The same item changes one more predicate. `TestC1678_011` now parses the standard output alone. It used to append the standard error after the output, and a warning on the standard error made the JSON invalid.
 
+## Test functions have a body (`emptytests`, 2026-11-03)
+
+A test function with an empty body passes and proves nothing. The test-smell catalog calls it the Empty Test. In cycle 2035 the builder added three empty tests to satisfy `acsnames` ([the incident](../incidents/2026-10-27-cycle-2035-repair-loop.md)). No audit found them. ADR-0158 decision 19 adds a guard that refuses them.
+
+### How it works
+
+1. `findOffenders` parses every `*_test.go` file of the module with `go/parser`. It skips `testdata`, `vendor` and the directories whose names start with `.` or `_`.
+2. A test is a top-level function with no receiver. Its name is `Test`, `Fuzz` or `Benchmark`. It can also start with one of them and a letter that is not lower case, as `go test` reads it.
+3. A test whose body has no statement is an offender. A body that holds only a comment has no statement, so it is an offender. A body that holds only `t.Skip` with a reason passes.
+4. The message gives the file, the line and the function. It tells the author to assert the behavior or to call `t.Skip` with a reason.
+5. `baseline.txt` holds one offender for each line, as the path and the function name. A baseline offender passes. An entry that matches no offender fails, so the baseline only gets smaller.
+6. A scan that cannot do its work is an error. The cases are a missing module, a module with no test file and a file that does not parse.
+
+On 2026-11-03 the module has no offender, so the baseline is empty. The three tests of cycle 2035 never reached main, because the console removed them in the lane.
+
+The test `TestNoNewTestFunctionHasAnEmptyBody` runs the check on the real tree. It runs in the CI job `acs-durable` and in the `acs-durable` tier of the build handoff floor. Both run `go test -count=1 -tags acs ./acs/regression/...`.
+
+### Limits
+
+- The guard reads only the syntax. A body with one statement that asserts nothing, for example `_ = t`, passes.
+- A method of a test suite is not a test for this guard. A function with a receiver passes.
+- `go/acs/regression/` is a protected surface. A loop lane cannot add an entry to the baseline. The console adds it.
+
 ## Lifecycle
 
 ```
@@ -326,6 +349,7 @@ gate_discover_to_build (next cycle): mutation gate FAIL at kill_rate < 0.7
 - `agents/evolve-orchestrator.md` — EGPS Tester Phase section (Layer 4)
 - `.evolve/profiles/tdd-engineer.json` — Layer 1 author separation
 - `.evolve/profiles/builder.json` — Builder predicate-authorship denial
+- `go/acs/regression/emptytests/emptytests.go` — the empty-test guard (ADR-0158 decision 19)
 - `go/internal/evalqualitycheck/flakylint.go` — Layer 5 lint (the five patterns + false-positive discipline)
 - `go/internal/evalgate/flakyshape.go` — Layer 5 gate hook (Gate D, end of `tdd`)
 - `go/internal/gopkgpattern/` — package-pattern scope rule shared with `internal/acssuite`'s run-time scope-lint
