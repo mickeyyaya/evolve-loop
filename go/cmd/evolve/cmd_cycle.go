@@ -480,13 +480,13 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 		return orchDeps{Signals: signals, CloseSignals: closeSignals, RoutingErr: err}
 	}
 	w := &orchWiring{projectRoot: projectRoot, evolveDir: evolveDir, console: console, run: run, signals: signals}
-	wireOrchestratorStores(w)
+	wireHostWatchersAndStores(w)
 	br := bridge.NewDefault(projectRoot, signals)
 	if err := newBypassAuditor(evolveDir, signals, console).applySandboxOff(br, run.sandboxOff); err != nil {
 		return failed(err)
 	}
 	br.SetOnStopReview(stopReviewRecorder(w.ld))
-	for _, step := range []func(*orchWiring) error{wireOrchestratorPolicy, wireOrchestratorRouter} {
+	for _, step := range []func(*orchWiring) error{wirePromptsAndPolicy, wireCatalogAndRouter} {
 		if err := step(w); err != nil {
 			return failed(err)
 		}
@@ -501,6 +501,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	wirePhaseRunners(w)
 	br.SetContractResolver(phasecontract.NewCatalogResolver(w.catalog.Get))
 	wireBridgeStages(br, w.cfg)
+	applyUserRouting(w)
 	wireSpecRunners(w)
 	if err := wireOrchestratorAdvisor(w); err != nil {
 		return failed(err)
@@ -509,7 +510,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	return orchDeps{
 		Storage:      w.st,
 		Ledger:       w.ld,
-		Orchestrator: orchestratorOf(w),
+		Orchestrator: newWiredOrchestrator(w),
 		Signals:      signals,
 		CloseSignals: closeSignals,
 		Bridge:       br,
@@ -518,14 +519,14 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	}
 }
 
-func wireOrchestratorStores(w *orchWiring) {
+func wireHostWatchersAndStores(w *orchWiring) {
 	watchOptimisticAdmission(w.signals, os.Getenv)
 	warnRetiredControls(w.console, os.Environ())
 	w.st = storage.New(w.evolveDir)
 	w.ld = ledger.New(w.evolveDir, ledger.WithSignals(w.signals))
 }
 
-func wireOrchestratorPolicy(w *orchWiring) error {
+func wirePromptsAndPolicy(w *orchWiring) error {
 	w.prm = cmdutil.NewPromptsLoader(w.projectRoot)
 	w.registryPath = config.RegistryPath(w.projectRoot)
 	loader := wiredRoutingConfigLoader(w.signals)
@@ -556,7 +557,7 @@ func wireOrchestratorPolicy(w *orchWiring) error {
 	return nil
 }
 
-func wireOrchestratorRouter(w *orchWiring) error {
+func wireCatalogAndRouter(w *orchWiring) error {
 	w.catalog, w.builtinCat, w.userSpecs = loadPhaseCatalog(w.projectRoot, w.registryPath, w.prm, w.signals.Emit)
 	cliRouter, routingErr := wireCLIRouter(routerSite{root: w.projectRoot, catalog: w.catalog}, w.run, w.console)
 	if routingErr != nil {
@@ -585,8 +586,11 @@ func wirePhaseRunners(w *orchWiring) {
 	}
 }
 
-func wireSpecRunners(w *orchWiring) {
+func applyUserRouting(w *orchWiring) {
 	emitRoutingDefects(w.signals.Emit, "wireOrchestratorDeps", phasespec.ApplyUserRouting(&w.cfg, w.userSpecs, w.builtinCat))
+}
+
+func wireSpecRunners(w *orchWiring) {
 	specCfg := specrunner.Config{Bridge: w.walked, Prompts: w.prm, ContractVerifier: w.verifierOf, HostEffects: w.hostEffectsOf}
 	for _, s := range w.catalog.UserPhases() {
 		if len(phasespec.ValidateUserSpecWithCatalog(s, w.builtinCat)) > 0 {
@@ -606,9 +610,13 @@ func wireOrchestratorAdvisor(w *orchWiring) error {
 	return advErr
 }
 
-func orchestratorOf(w *orchWiring) *core.Orchestrator {
+func newWiredOrchestrator(w *orchWiring) *core.Orchestrator {
 	opts := baseOptionsOf(w)
-	opts = append(opts, reviewerOptionsOf(w)...)
+	reviewerOpts, verifier := reviewerOptionsOf(w)
+	if verifier != nil {
+		w.contractVerifier = verifier
+	}
+	opts = append(opts, reviewerOpts...)
 	opts = append(opts, tailOptionsOf(w)...)
 	w.hostEffects = deliverable.NewHostEffects(w.catalog, hostInboxClaimer(w.ld, w.signals, w.forbidden))
 	opts = append(opts, core.WithHostEffects(w.hostEffects))
@@ -643,8 +651,9 @@ func baseOptionsOf(w *orchWiring) []core.Option {
 	return append(opts, phaseObserverOptions(w.pol.ObserverConfig(), cfg.PhaseRecovery.String(), observerDeps{signals: signals, usage: explainUsage, overrides: run.overrides})...)
 }
 
-func reviewerOptionsOf(w *orchWiring) []core.Option {
+func reviewerOptionsOf(w *orchWiring) ([]core.Option, runner.ContractVerifier) {
 	cfg, pol, signals := w.cfg, w.pol, w.signals
+	var verifier runner.ContractVerifier
 	var reviewers []core.DeliverableReviewer
 	if floor := composedBuildHandoffFloor(pol.WorkflowConfig(), cfg); len(floor) > 0 {
 		reviewers = append(reviewers, floor)
@@ -656,7 +665,7 @@ func reviewerOptionsOf(w *orchWiring) []core.Option {
 		rev := deliverable.NewReviewerWithCatalogStageReportSize(
 			cfg.ContractGate, w.catalog, cfg.PhaseIO,
 			parseGateStage(w.gatesCfg.ReportSizeGate), pol.ReportBudgetConfig().HandoffTokens, deliverable.WithSignals(signals))
-		w.contractVerifier = rev
+		verifier = rev
 		reviewers = append(reviewers, rev)
 	}
 	if cfg.TriageCapGate != config.StageOff {
@@ -673,7 +682,7 @@ func reviewerOptionsOf(w *orchWiring) []core.Option {
 	if cfg.ContractGate != config.StageOff {
 		opts = append(opts, core.WithContractVerifier(deliverable.NewVerifierWithCatalogStage(w.catalog, cfg.PhaseIO)))
 	}
-	return opts
+	return opts, verifier
 }
 
 func tailOptionsOf(w *orchWiring) []core.Option {
