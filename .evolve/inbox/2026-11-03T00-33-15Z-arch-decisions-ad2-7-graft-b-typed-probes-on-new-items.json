@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "Red test first: `TestAdmit_RefusesAnItemWhoseProbesAlreadyPass`, `TestSweep_EveryDeclaredPathGoneIsAQuarantine`.",
+    "100% statement coverage on each changed function; zero code comments.",
+    "The spec and package note of the changed package state the change in STE."
+  ],
+  "campaign": "architecture-decisions-2026-11",
+  "created_at": "2026-11-03T00:33:15Z",
+  "files": [
+    "go/internal/inboxbatch"
+  ],
+  "fix": "Graft B: typed `probes` on new items. Intake refuses an item whose probes already pass. A sweep consumes when all probes pass and quarantines when every declared path is gone",
+  "id": "arch-decisions-ad2-7-graft-b-typed-probes-on-new-items",
+  "intake_override": {
+    "reason": "console",
+    "console_route": true
+  },
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "source": "operator decisions 2026-11-03; plan docs/plans/architecture-decisions-2026-11.md component AD2-7",
+  "summary": "Component AD2-7 of the 2026-11-03 architecture decisions plan. Graft B: typed `probes` on new items. Intake refuses an item whose probes already pass. A sweep consumes when all probes pass and quarantines when every declared path is gone Stage: follows `inbox.curator.stage`. Size: M to L. Route: console. Plan: docs/plans/architecture-decisions-2026-11.md; research: docs/research/architecture-decisions-2026-11.md.",
+  "title": "AD2-7: Graft B: typed probes on new items",
+  "weight": 0.8
+}

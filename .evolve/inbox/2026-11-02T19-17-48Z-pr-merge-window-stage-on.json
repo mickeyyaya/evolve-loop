@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "operator decision recorded"
+  ],
+  "campaign": "docs/plans/pr-merge-latency-2026-10",
+  "created_at": "2026-11-02T19:17:48Z",
+  "deps": [
+    "wave-integration-i9-enforce-flip"
+  ],
+  "files": [
+    ".evolve/policy.json"
+  ],
+  "fix": "After I9 enforce, give the operator the flip.",
+  "id": "pr-merge-window-stage-on",
+  "kind": "feature",
+  "notes": "operator decision",
+  "origin": "console",
+  "priority_class": "performance",
+  "route": "console-manual",
+  "source": "console, 2026-11-03, plan audit of docs/plans (operator request: no task overlooked); plan docs/plans/pr-merge-latency-2026-10.md",
+  "summary": "Plan section 7 order step 4; gated on fleet.integration.stage enforce (I9).",
+  "title": "PR merge latency: turn pr.merge_window.stage on after wave integration I9",
+  "weight": 0.3
+}

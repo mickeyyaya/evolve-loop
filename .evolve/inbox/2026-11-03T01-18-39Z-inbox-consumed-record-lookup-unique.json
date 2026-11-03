@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Red test first: two consumed records with one id give an error that names both paths.",
+    "One record gives that record; none gives the not-found error unchanged.",
+    "100% statement coverage on each changed function; zero code comments."
+  ],
+  "created_at": "2026-11-03T01:18:39Z",
+  "files": [
+    "go/internal/inboxmover"
+  ],
+  "fix": "Make the consumed-record lookup return an error that names both paths when more than one record matches the id. Find the lookup by its callers in go/acs and go/internal/inboxmover.",
+  "id": "inbox-consumed-record-lookup-unique",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "operator decision 2026-11-03, docs/plans/architecture-decisions-2026-11.md AD2-0/AD3-4; survivor of acs-predicate-hardening",
+  "summary": "An ACS predicate reads the consumed record of an inbox id. When two consumed records carry the same id, the lookup returns the first one, so a predicate can pass on the wrong record.",
+  "title": "The consumed-record lookup refuses more than one record for one id",
+  "weight": 0.6
+}

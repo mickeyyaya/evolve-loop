@@ -1,0 +1,71 @@
+{
+  "consumed": {
+    "at": "2026-11-03T01:18:16Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Retired by operator decision 2026-11-03 (docs/plans/architecture-decisions-2026-11.md AD2-0): superseded by the ship-binding work (fb2025b24, the audit tree binding); .evolve/ledger.json is gone."
+  },
+  "created_at": "2026-08-27T21:00:00Z",
+  "files": [
+    "go/acs/cycle1420/predicates_test.go",
+    "go/cmd/evolve/cmd_acs.go",
+    "go/internal/core/cyclerun_dispatch.go",
+    "go/internal/core/defectledger/defectledger.go",
+    "go/internal/phases/ship/audit.go",
+    "go/internal/phases/ship/gitops.go"
+  ],
+  "id": "ledger-binding-runid",
+  "kind": "sweep",
+  "merge_notes": [
+    "inbox review 2026-09-27: prescription 1453 moved to acssuite-relative-evolvedir-litter; fix it there, not here."
+  ],
+  "prescriptions": [
+    {
+      "origin_id": "d000c233e197151b13967f71b7c279533",
+      "first_seen_cycle": 1420,
+      "text": "PRESCRIPTION: Assert state-root identity in stateRoot (e.g. require .evolve/ledger.jsonl and .git under the resolved path) instead of trusting a non-empty EVOLVE_PROJECT_ROOT plus sibling presence"
+    },
+    {
+      "origin_id": "d0472ee7f7ca3ad2dd316921d71aa84cb",
+      "first_seen_cycle": 1453,
+      "text": "PRESCRIPTION: Invoke evolve acs suite from the project root, or pass an explicit output path: it resolves .evolve/runs/\u003ccycle\u003e/ relative to cwd, so a worktree cwd silently writes acs-verdict.json outside the workspace that ship and audit read."
+    },
+    {
+      "origin_id": "db8dbeb87f66dd9fb8f1103def7b8ad6e",
+      "first_seen_cycle": 1502,
+      "text": "PRESCRIPTION: Persist acs-verdict.json in the same transaction that emits the build handoff, or fail the audit-phase preflight by name when it is missing, instead of relying on the auditor re-running the suite"
+    },
+    {
+      "origin_id": "d8b9b6458fc8abb79a71b11188aa0f70a",
+      "first_seen_cycle": 1502,
+      "text": "PRESCRIPTION: Generate the continuation-defect block delivered to Builder from the ancestor named in continuation-manifest.json so builder and auditor cannot disagree about inherited ids"
+    },
+    {
+      "origin_id": "d200aca37fd17b836acd380bc432062e1",
+      "first_seen_cycle": 1548,
+      "text": "PRESCRIPTION: Require the builder's ACS regression slice to persist its subprocess output to \u003cworkspace\u003e/acs-verdict.json before the metric may be quoted in build-report.md; a sentinel evidence_path that does not resolve on disk must fail the build-to-audit gate."
+    },
+    {
+      "origin_id": "db0d387ec007f8355a8a339b5844d8833",
+      "first_seen_cycle": 1561,
+      "text": "PRESCRIPTION: Recompute the shipping-tree delta AFTER the build-to-audit transition reset and append it to build-report.md (or emit a shipping-delta.json sidecar), so the handoff narrative and the tree that ships are derived from the same bytes; today the reset at cycle-state.json phase_started_at re-parents the inherited continuation commit into the index after the builder has already written its report."
+    },
+    {
+      "origin_id": "d5c0a0189aca347548b36c5a9ef6746d5",
+      "first_seen_cycle": 1568,
+      "text": "PRESCRIPTION: Fence lane rebases against a running audit phase (or re-bind audit_bound_tree_sha at gate time from cycle-state.json:active_worktree HEAD): the prior dispatch of this very cycle bound a tree that no ref carries once the rebase landed"
+    },
+    {
+      "origin_id": "d843991f870c8c179bf291f71b62087a3",
+      "first_seen_cycle": 1570,
+      "text": "PRESCRIPTION: Class fix: bind the audit to the tree that ships - the 21:42 pass stamped audit_bound_tree_sha 3e89a1c0 while the commit is tree 7ef291bb, so 4 files crossed the audit boundary unreviewed"
+    }
+  ],
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: The binding-integrity members have been closed by #503, #535, #648 and ADR-0105; what remains is predicate-helper and CLI path hygiene.",
+  "review_status": "inbox review 2026-09-27: PARTIAL. Of 8 members, 4 are addressed. db8dbeb8: #535 (09d32a19) regenerates acs-verdict on the host at audit and fails by name ('host predicate execution'), classification.go:83-112. d8b9b645: defectledger lineage and prompt derive inherited defects from the continuation manifest or registry (go/internal/core/defectledger/lineage.go, prompt.go). d5c0a018 and d843991f: the audit binding fails closed (#503, 28e7f455), a worktree ship binds its own tree (#648, 5806b56b), and the ADR-0105 C4 carry re-prove",
+  "summary": "Ledger binding and run-scoping prescriptions: run_id stamping, auditor binding, cross-run refusal. Amortised from 8 content-hash carryoverTodos that were unreachable by any operator directive: their ids were 32-char hashes, so goal-text could never name them and triage could not prioritise them (all 144 were stamped priority=high, which is the same as none being high). Queue audit 2026-08-27. Member prescriptions verbatim below; work them as one sweep, smallest-blast-radius first, and retire the group when the theme is clean.",
+  "surface_note": "2026-09-26 console curation (F29 follow-up): files[] typed from a read-only classification against guards.ProtectedSurfaceManifest — protected=true (/go/internal/core/cyclerun_dispatch.go, /go/internal/core/defectledger/, /go/internal/phases/ship/gitops.go), confidence=medium. Sweep of 8: stateRoot is the cycle1420 test helper, and cmd_acs.go's --evolve-dir defaults to a cwd-relative '.evolve'; both are unprotected, but the acs-verdict build-to-audit check, the inherited-defect block and the tree-drift check behind audit_bound_tree_sha are protected; the shipping-delta prescription is new code with no existing home.",
+  "title": "Sweep: ledger binding runid (8 auditor prescriptions amortised)",
+  "weight": 0.55
+}

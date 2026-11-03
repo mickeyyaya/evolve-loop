@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "cyclerun.go reads no fleet decision from os.Getenv; every fleet decision in newCycleRun calls fleetMode(req.Env)",
+    "a test with EVOLVE_FLEET=0 in the request env shows the cycle is sequential in every branch of newCycleRun",
+    "internal/core stays at 100% statement coverage"
+  ],
+  "created_at": "2026-11-02T19:04:19Z",
+  "deps": [],
+  "files": [
+    "go/internal/core/cyclerun.go"
+  ],
+  "fix": "Replace the process env read at cyclerun.go:260 with fleetMode(req.Env), so one belief decides whether a cycle is a fleet lane.",
+  "id": "core-fleet-lane-test-reads-the-request-env",
+  "kind": "refactor",
+  "notes": "Pre-existing; outside the #1242 diff, so not a blocker there.",
+  "origin": "console",
+  "priority": "P3",
+  "priority_class": "maintainability",
+  "source": "console, 2026-11-02, architecture review of PR #1242 (MEDIUM)",
+  "summary": "go/internal/core/cyclerun.go:260 tests os.Getenv(ipcenv.FleetKey) != \"\" while the lock rule and line 275 use fleetMode(req.Env). With EVOLVE_FLEET=0, or a request Env that differs from the process env, the two give different answers.",
+  "title": "newCycleRun reads EVOLVE_FLEET from the request env, not the process env",
+  "weight": 0.3
+}

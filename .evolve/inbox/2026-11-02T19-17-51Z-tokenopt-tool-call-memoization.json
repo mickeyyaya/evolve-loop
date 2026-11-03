@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "a research note with a measured estimate",
+    "build or drop recorded in the plan"
+  ],
+  "campaign": "docs/plans/token-telemetry-2026-07",
+  "created_at": "2026-11-02T19:17:51Z",
+  "deps": [],
+  "files": [
+    "go/internal/bridge"
+  ],
+  "fix": "Research first whether the CLIs allow it; build only if measured savings justify it.",
+  "id": "tokenopt-tool-call-memoization",
+  "intake_override": {
+    "reason": "operator decision or console research from the 2026-11-03 plan audit; a lane cannot decide it",
+    "console_route": true
+  },
+  "kind": "feature",
+  "notes": "",
+  "origin": "console",
+  "priority_class": "performance",
+  "route": "console-manual",
+  "source": "console, 2026-11-03, plan audit of docs/plans (operator request: no task overlooked); plan docs/plans/token-telemetry-2026-07.md",
+  "summary": "Named in the 2026-07 plan research base item 3; no inbox item.",
+  "title": "Token optimization: memoize identical read-only tool calls inside one phase",
+  "weight": 0.2
+}
