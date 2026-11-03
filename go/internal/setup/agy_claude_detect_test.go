@@ -8,7 +8,7 @@ import (
 )
 
 func TestTierModelsFor_AgyClaudeReadsTheAgyClaudeTargetsTierMap(t *testing.T) {
-	t.Setenv("EVOLVE_MODEL_CATALOG_DIR", t.TempDir())
+	t.Setenv("EVOLVE_PROJECT_ROOT", t.TempDir())
 	want := map[string]string{
 		"fast":     "Claude Sonnet 5.5 (Low)",
 		"balanced": "Claude Sonnet 5.5 (Medium)",
@@ -27,7 +27,7 @@ func TestCapManifest_AgyClaudeRunsTheAntigravityBinary(t *testing.T) {
 }
 
 func TestDetectCLIs_ReportsAgyClaudeBesideAgy(t *testing.T) {
-	t.Setenv("EVOLVE_MODEL_CATALOG_DIR", t.TempDir())
+	t.Setenv("EVOLVE_PROJECT_ROOT", t.TempDir())
 	ready := func(cli string) bridge.DoctorResult {
 		return bridge.DoctorResult{
 			CLI: cli, Verdict: "ready",
@@ -49,7 +49,7 @@ func TestDetectCLIs_ReportsAgyClaudeBesideAgy(t *testing.T) {
 }
 
 func TestTierModelsFor_EveryFamilyReadsItsInteractiveTargetsTierMap(t *testing.T) {
-	t.Setenv("EVOLVE_MODEL_CATALOG_DIR", t.TempDir())
+	t.Setenv("EVOLVE_PROJECT_ROOT", t.TempDir())
 	targets := map[string]string{
 		"claude":     "claude-tmux",
 		"codex":      "codex-tmux",

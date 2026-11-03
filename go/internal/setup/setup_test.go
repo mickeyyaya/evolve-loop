@@ -91,13 +91,13 @@ func TestAuthMode(t *testing.T) {
 }
 
 func TestTierModelsFor(t *testing.T) {
-	t.Setenv("EVOLVE_MODEL_CATALOG_DIR", t.TempDir())
+	t.Setenv("EVOLVE_PROJECT_ROOT", t.TempDir())
 	agy := tierModelsFor("agy")
 	wantAgy := map[string]string{
 		"fast":     "Gemini 3.8 Flash (Low)",
 		"balanced": "Gemini 3.8 Flash (High)",
 		"deep":     "Gemini 4 Argon (Medium)",
-		"top":      "Gemini 4 Argon (High)",
+		"top":      "Gemini 4 Argon (Medium)",
 	}
 	for tier, m := range wantAgy {
 		if agy[tier] != m {

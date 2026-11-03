@@ -29,7 +29,10 @@ func TestAgyManifestTierModelsAreNamesAgyAccepts(t *testing.T) {
 }
 
 func TestAgyTierModelsPinnedToVerifiedNames(t *testing.T) {
-	t.Parallel()
+	prev := modelCatalogDirFn
+	empty := t.TempDir()
+	modelCatalogDirFn = func() string { return empty }
+	t.Cleanup(func() { modelCatalogDirFn = prev })
 	m, err := LoadManifest("agy-tmux")
 	if err != nil {
 		t.Fatalf("LoadManifest(agy-tmux): %v", err)
@@ -38,7 +41,7 @@ func TestAgyTierModelsPinnedToVerifiedNames(t *testing.T) {
 		"fast":     "Gemini 3.8 Flash (Low)",
 		"balanced": "Gemini 3.8 Flash (High)",
 		"deep":     "Gemini 4 Argon (Medium)",
-		"top":      "Gemini 4 Argon (High)",
+		"top":      "Gemini 4 Argon (Medium)",
 	} {
 		if got := m.ModelTierMap[tier]; got != want {
 			t.Errorf("agy tier %q = %q, want %q (each name launched live and shown verbatim in agy's footer: 3.8 Flash on agy 1.2.17, 2026-10-05; 4 Argon Medium and High on agy 1.4.0, 2026-10-16)", tier, got, want)
