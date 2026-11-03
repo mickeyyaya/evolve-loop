@@ -5,6 +5,12 @@
     "A real evolve agent run code-simplifier on a small diff writes its report through Write on claude-tmux.",
     "The profile docs and the cli-contract of agent run state the rule in STE."
   ],
+  "consumed": {
+    "at": "2026-11-02T23:18:41Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Console stale audit 2026-11-03 against origin/main cd47eb445: DONE — e503e2db2 fix: let each agent-run profile write its report with Write (merged cda6bf0a9 #1220); TestEveryAgentRunProfileGrantsWriteOnItsDeliverable in go/internal/cli/agentcmd/agent_deliverable_grant_test.go"
+  },
   "created_at": "2026-10-27T11:41:23Z",
   "deps": [],
   "files": [
@@ -23,7 +29,7 @@
   "priority_class": "correctness",
   "route": "console",
   "source": "console, 2026-10-27, three code-simplifier stalls on the X14 boundary patch; kept workspace dev/cl-selfheal-x14/.evolve/ephemeral/agent-runs/agent-code-simplifier-20261027T112246Z-7922",
-  "summary": "The five profiles .evolve/profiles/diff-{code-simplifier,go-reviewer,code-reviewer,architecture-reviewer,docs-review}.json list Write in disallowed_tools, yet the run must write diff-<name>-report.md. A run passes only when the model chooses to write the file through Bash. On 2026-10-27 code-simplifier timed out 3 times on one X14 diff (runs agent-code-simplifier-20261027T104645Z-9179, ...T110431Z-f670, ...T112246Z-7922): the agent finished the review, said Write is disabled, refused to write through Bash and waited; the idle detector killed it after 900 s (exit 81). The same contract conflict as cycle 2061.",
+  "summary": "The five profiles .evolve/profiles/diff-{code-simplifier,go-reviewer,code-reviewer,architecture-reviewer,docs-review}.json list Write in disallowed_tools, yet the run must write diff-\u003cname\u003e-report.md. A run passes only when the model chooses to write the file through Bash. On 2026-10-27 code-simplifier timed out 3 times on one X14 diff (runs agent-code-simplifier-20261027T104645Z-9179, ...T110431Z-f670, ...T112246Z-7922): the agent finished the review, said Write is disabled, refused to write through Bash and waited; the idle detector killed it after 900 s (exit 81). The same contract conflict as cycle 2061.",
   "title": "Each diff reviewer profile may write its own report file, so a review never stalls on a disallowed Write",
   "weight": 0.9
 }
