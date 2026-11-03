@@ -3,7 +3,6 @@ package agentcmd
 import (
 	"cmp"
 	"fmt"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -40,18 +39,9 @@ func declaresVerdict(spec phasespec.PhaseSpec) bool {
 	})
 }
 
-var trailingFencedVerdictRE = regexp.MustCompile("(?:^|\\n)[^\\S\\n]*(?:`{3,}|~{3,})[^\\n]*\\n\\s*##[^\\S\\n]*Verdict[^\\S\\n]*\\n\\s*Verdict:[^\\S\\n]*(PASS|FAIL|WARN|SKIPPED)[^\\S\\n]*\\n\\s*(?:`{3,}|~{3,})\\s*$")
-
-func trailingFencedVerdict(report string) string {
-	if m := trailingFencedVerdictRE.FindStringSubmatch(report); m != nil {
-		return m[1]
-	}
-	return ""
-}
-
 func statedVerdict(report string) string {
 	sentinel, _ := phasecontract.ParseVerdictSentinel(report)
-	return cmp.Or(sentinel, reportdoc.Verdict(report), trailingFencedVerdict(report))
+	return cmp.Or(sentinel, reportdoc.Verdict(report))
 }
 
 func reportVerdict(spec phasespec.PhaseSpec, field, report string) derivedVerdict {

@@ -210,16 +210,6 @@ func parseDefectSignals(center *signalcenter.Center) []signalcenter.Event {
 	return out
 }
 
-func TestAgentRun_AVerdictInATrailingFencedVerdictBlockIsTheStatedVerdict(t *testing.T) {
-	report := threatModel + "## Findings\nNone.\n```\n## Verdict\nVerdict: PASS\n```\n"
-
-	env, code, center, _ := runWithSignals(t, report)
-
-	if env.Verdict != core.VerdictPASS || code != 0 || len(mismatchSignals(center)) != 0 || len(parseDefectSignals(center)) != 0 {
-		t.Errorf("verdict %q exit %d mismatch %d defect %d, want PASS, exit 0 and no signal", env.Verdict, code, len(mismatchSignals(center)), len(parseDefectSignals(center)))
-	}
-}
-
 func TestAgentRun_NoStatedVerdictWithNoBlockingFindingEmitsAParseDefect(t *testing.T) {
 	env, code, center, _ := runWithSignals(t, threatModel+"## Findings\nNone.\n## Verdict\nIt is a PASS for me\n")
 
@@ -243,32 +233,34 @@ func TestAgentRun_NoStatedVerdictWithAHighFindingEmitsNoParseDefect(t *testing.T
 	}
 }
 
-func TestReportVerdict_AFencedVerdictBlockStillFailsOnABlockingFindingOrAStatedFail(t *testing.T) {
+func TestReportVerdict_TheParseDefectNeedsNoStatedVerdictAndNoBlockingFinding(t *testing.T) {
 	spec := phasespec.PhaseSpec{Name: "go-reviewer", Classify: &phasespec.ClassifyRules{RequireSections: []string{"Findings", "Verdict"}}}
-	for _, body := range []string{
-		"## Findings\n- [HIGH] a.go:1 — x\n```\n## Verdict\nVerdict: PASS\n```\n",
-		"## Findings\n- [CRITICAL] a.go:1 — x\n```\n## Verdict\nVerdict: PASS\n```\n",
-		"## Findings\nNone.\n```markdown\n## Verdict\nVerdict: FAIL\n```\n",
-	} {
-		got := reportVerdict(spec, core.VerdictPASS, body)
+	cases := []struct {
+		name, body  string
+		parseDefect bool
+	}{
+		{"no stated verdict and no finding", "## Findings\nNone.\n## Verdict\nsee above\n", true},
+		{"no stated verdict and one HIGH", "## Findings\n- [HIGH] a.go:1 — x\n## Verdict\nsee above\n", false},
+		{"no stated verdict and one CRITICAL", "## Findings\n- [CRITICAL] a.go:1 — x\n## Verdict\nsee above\n", false},
+		{"a stated FAIL and no finding", "## Findings\nNone.\n## Verdict\nVerdict: FAIL\n", false},
+		{"a fenced verdict only", "## Findings\nNone.\n```\n## Verdict\nVerdict: PASS\n```\n", true},
+		{"a fenced HIGH and a fenced PASS", "```\n## Findings\n- [HIGH] a.go:1 — x\n## Verdict\nVerdict: PASS\n```\n", true},
+	}
+	for _, c := range cases {
+		got := reportVerdict(spec, core.VerdictPASS, c.body)
 
-		if got.verdict != core.VerdictFAIL || !got.mismatch || got.parseDefect || got.stated == "" {
-			t.Errorf("reportVerdict(%q) = %+v, want a stated verdict, FAIL, a mismatch and no parse defect", body, got)
+		if got.verdict != core.VerdictFAIL || !got.mismatch || got.parseDefect != c.parseDefect {
+			t.Errorf("%s: reportVerdict = %+v, want FAIL, a mismatch and parseDefect %v", c.name, got, c.parseDefect)
 		}
 	}
 }
 
-func TestReportVerdict_AFencedVerdictThatIsNotTheTrailingVerdictOnlyBlockIsNotRead(t *testing.T) {
+func TestReportVerdict_AFencedVerdictStatesNoVerdict(t *testing.T) {
 	spec := phasespec.PhaseSpec{Name: "go-reviewer", Classify: &phasespec.ClassifyRules{RequireSections: []string{"Findings", "Verdict"}}}
-	for _, body := range []string{
-		"## Findings\nNone.\n```\n## Verdict\nVerdict: PASS\n```\nMore text after the fence.\n",
-		"## Findings\nNone.\n```\n## Verdict\nVerdict: PASS\nan example line\n```\n",
-		"## Findings\nNone.\n```\nVerdict: PASS\n```\n",
-	} {
-		got := reportVerdict(spec, core.VerdictPASS, body)
 
-		if got.stated != "" || got.verdict != core.VerdictFAIL || !got.parseDefect {
-			t.Errorf("reportVerdict(%q) = %+v, want no stated verdict, FAIL and a parse defect", body, got)
-		}
+	got := reportVerdict(spec, core.VerdictPASS, "## Findings\nNone.\n```\n## Verdict\nVerdict: PASS\n```\n")
+
+	if got.stated != "" {
+		t.Errorf("stated = %q, want no stated verdict from a fence", got.stated)
 	}
 }
