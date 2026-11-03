@@ -93,14 +93,14 @@ func TestReadIsolation_ACellKeepsTheSignInOfItsOwnBinaryOutOfTheSecretList(t *te
 		}
 		writeFixtureFile(t, path, "secret\n")
 	}
-	for cli, binary := range map[string]string{"codex-tmux": "codex", "codex": "codex", "agy-tmux": "agy", "agy-claude-tmux": "agy", "claude-tmux": "claude"} {
+	for cli, binary := range map[string]string{"codex-tmux": "codex", "codex": "codex", "agy-tmux": "agy", "agy-claude-tmux": "agy", "claude-tmux": "claude", "no-such-cli": ""} {
 		req := c.request()
 		req.CLI = cli
 		ri := Deps{ReadStage: "enforce"}.readIsolation(req, c.home)
 		listed := slices.Concat(ri.SecretDirs, ri.SecretFiles)
 		for _, s := range widerSecrets {
 			held := slices.Contains(listed, filepath.Join(c.home, s.rel))
-			if held == (s.owner == binary) {
+			if held != (s.owner == "" || s.owner != binary) {
 				t.Errorf("a %s cell: secret %s listed = %v, owner %q", cli, s.rel, held, s.owner)
 			}
 		}
