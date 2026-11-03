@@ -774,7 +774,7 @@ The sandbox today generates SBPL for `sandbox-exec` and an argv for `bwrap` from
 | Read of other files under `.evolve/runs/` | deny | `(deny file-read-data (subpath ".evolve/runs"))` before the literal grants | `--tmpfs .evolve/runs` | I-5 | built at `shadow` (X5) |
 | Read of raw output (`*-stdout.log`, `*-final-pane.txt`; the CLI transcripts in `$HOME` stay open, §8.5 and §11.1) | deny | `(deny file-read-data (require-all (subpath ".evolve/runs") (regex #"(-stdout\.log\|...)$")))` and a deny of `<ws>/.bridge/`, after the grants | `--ro-bind /dev/null <file>` for each raw file of the workspace, `--tmpfs <ws>/.bridge` | I-4 | built at `shadow` (X5); the logs stay in the workspace |
 | Read of the CLI's own config in `$HOME` | allow | `(allow file-read* (subpath "~/.<cli dir>"))` from manifest `home_reads` | `--ro-bind` | I-5 | allowed (all of `$HOME`) |
-| Read of secrets in `$HOME` | deny | `(deny file-read-data ...)` for `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.netrc`, `~/.config/gh`, `~/.docker/config.json`, `~/.kube`, and the dirs of the other families | `--tmpfs <dir>`, `--ro-bind /dev/null <file>` | I-5 | built at `shadow` for the listed secrets (X5); not the dirs of the other families |
+| Read of secrets in `$HOME` | deny | `(deny file-read-data ...)` for each entry of the secret list below, and the dirs of the other families | `--tmpfs <dir>`, `--ro-bind /dev/null <file>` | I-5 | built at `shadow` for the listed secrets (X5, AD1-6); not the dirs of the other families |
 | Read of the rest of `$HOME` | deny at `enforce` | no grant | not bound | I-5 | allowed |
 | Write of the worktree and the own run dir | allow | as today (`go/internal/bridge/sandbox_paths.go:161-201`) | as today | I-7 | allowed |
 | Write of another cycle, `.evolve/events/`, `.evolve/resume-witness/` | deny | as today | as today | I-7 | denied |
@@ -782,6 +782,17 @@ The sandbox today generates SBPL for `sandbox-exec` and an argv for `bwrap` from
 | Write of `inputs/` | deny | `(deny file-write* (subpath "<ws>/inputs"))` | `--ro-bind-try` | I-4 | built at `shadow` (X5) |
 | Network | allow | as today | as today | none (a limit) | allowed |
 | Signal of a host process | deny | as today | as today | I-7 | denied |
+
+The I-5 secret list is the `homeSecrets` data in `go/internal/bridge/read_isolation.go`. Each entry is a path below `$HOME`:
+
+- `.ssh`, `.aws`, `.gnupg`, `.netrc`, `.config/gh`, `.docker/config.json` and `.kube` (X5).
+- `.git-credentials`, `.config/git/credentials`, `.config/gcloud`, `.azure`, `.npmrc`, `.pypirc` and `.cargo/credentials.toml` (AD1-6).
+- `.codex/auth.json`, with the owner `codex` (AD1-6).
+- `.gemini/oauth_creds.json` and `.gemini/mcp-oauth-tokens.json`, with the owner `agy` (AD1-6).
+
+An entry with an owner is the sign-in of a model CLI. The cell of that CLI needs its own sign-in to call the model. Thus the entry is a secret for each cell except a cell whose manifest `binary` is the owner. The `home_reads` check uses the same rule: the codex manifest can grant `~/.codex`, and a claude manifest cannot. An entry without an owner is a secret for each cell.
+
+The repository does not name the `.gemini` OAuth files. The two names come from the Gemini CLI defaults (synthesis), and an `agy` login can use other names.
 
 The SBPL rule order matters: a later rule wins. The generator writes the rules in this order:
 
