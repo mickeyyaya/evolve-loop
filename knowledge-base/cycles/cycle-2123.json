@@ -1,0 +1,212 @@
+{
+  "schema_version": 2,
+  "cycle": 2123,
+  "run_id": "01M6F058HZ3A84Y7N0Q9GNTGHB",
+  "goal": "Wave 150.\n\nWork the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree that it ships;\n- disposition its own defect ledger and the inherited ids;\n- record a terminal outcome on every exit;\n- never change a protected control-plane file with a tool;\n- leave no stale worktree.\n\nRouting:\n- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.\n- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.\n- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.\n\nCraft:\n- New and changed code has no comments. Names, types and tests give the intent.\n- Write each new document and each new log text in ASD-STE100.\n- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.\n- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.\n\nEvidence:\n- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.\n\nThe measure of this wave is the number of shipped cycles. Keep each cycle shipping.\n\nWave 149 facts (run 20261102T100612Z): 3 of 10 cycles shipped.\n- Cycle 2105: final verdict PASS. It shipped.\n- Cycle 2106: no final verdict. Last phase: triage. It did not ship. Quota pauses: 1.\n- Cycle 2107: no final verdict. Last phase: triage. It did not ship. Quota pauses: 1.\n- Cycle 2108: no final verdict. Last phase: scout. It did not ship. Quota pauses: 1.\n- Cycle 2109: no final verdict. Last phase: scout. It did not ship. Quota pauses: 1.\n- Cycle 2110: final verdict PASS. It shipped.\n- Cycle 2111: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…terAnotherCommandStillCounts1939617332/001/.git/objects/pack: directory not empty --- FAIL: TestDocDelete_EnteringADocRootAfterAnotherCommandStillCounts (0.08s). Last phase: aborted. It did not ship.\n- Cycle 2112: final verdict PASS. It shipped.\n- Cycle 2113: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=… github.com/mickeyyaya/evolve-loop/go/cmd/evolve 256.935s ok   github.com/mickeyyaya/evolve-loop/go/internal/loopwave 0.486s coverage: 100.0% of statements FAIL. Last phase: aborted. It did not ship.\n- Cycle 2114: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…-write/ must be a protected surface — the kernel preloads it into phase prompts (audit-F1) --- FAIL: TestProtectedSurface_CompiledDefaultOverlaySkills (0.00s). Last phase: aborted. It did not ship.\n- Pull requests merged at this boundary: none.\n\nEarlier waves:\n- Wave 146 (run 20261101T235937Z): 0 of 2 cycles shipped.\n- Wave 147 (run 20261102T011732Z): 1 of 16 cycles shipped.\n- Wave 148 (run 20261102T031345Z): 8 of 16 cycles shipped.",
+  "final_verdict": "PASS",
+  "commit_sha": "3491a4878893c5cc4fac1dfaeef5baee90d5c58f",
+  "tree_sha": "c80bfca3b08268c09f30b8e7348bfed7da267f55",
+  "tasks": [
+    "practice-claude-prompting-guide-6080fed9-202611020008"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 41944,
+      "started_at": "2026-11-02T20:46:41Z",
+      "ended_at": "2026-11-02T20:47:28Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 10,
+        "output": 2721,
+        "cache_read": 295264,
+        "cache_write": 26299
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 52367,
+      "started_at": "2026-11-02T20:48:23Z",
+      "ended_at": "2026-11-02T20:49:18Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 10,
+        "output": 1520,
+        "cache_read": 362477,
+        "cache_write": 42281
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 151772,
+      "started_at": "2026-11-02T20:49:18Z",
+      "ended_at": "2026-11-02T20:51:52Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 34,
+        "output": 16679,
+        "cache_read": 1487673,
+        "cache_write": 70594
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 388797,
+      "started_at": "2026-11-02T20:51:52Z",
+      "ended_at": "2026-11-02T20:59:35Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 38,
+        "output": 11520,
+        "cache_read": 1632006,
+        "cache_write": 62810
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 74569,
+      "started_at": "2026-11-02T21:00:10Z",
+      "ended_at": "2026-11-02T21:07:04Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 12,
+        "output": 6144,
+        "cache_read": 418140,
+        "cache_write": 48519
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 114120,
+      "started_at": "2026-11-02T21:07:25Z",
+      "ended_at": "2026-11-02T21:09:46Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 6,
+        "output": 1689,
+        "cache_read": 184311,
+        "cache_write": 32979
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 66099,
+      "started_at": "2026-11-02T21:10:06Z",
+      "ended_at": "2026-11-02T21:12:27Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 18,
+        "output": 4484,
+        "cache_read": 642575,
+        "cache_write": 41834
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "PASS",
+      "duration_ms": 35345,
+      "started_at": "2026-11-02T21:12:48Z",
+      "ended_at": "2026-11-02T21:13:24Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "explanation_corrections": [
+    "docs/explain/builds/cycle-2123-01m6f058hz3a84y7n0q9gntghb.md:14 Changed Areas has no entry for the material diff paths .evolve/evals/practice-claude-prompting-guide-proposal.md:1 and go/acs/cycle2123/predicates_test.go:1. The SHA256 matches the handoff (shasum printed f482c1d1...d89d). Summary, Rationale and Limitations agree with docs/research/practice-claude-prompting-guide-2026-11.md:1 and docs/research-index.md:300."
+  ],
+  "timing": {
+    "total_ms": 925013,
+    "phase_count": 8,
+    "retried_count": 0,
+    "longest_phase": "build",
+    "longest_ms": 388797,
+    "by_archetype_ms": {
+      "build": 502917,
+      "control": 35345,
+      "evaluate": 140668,
+      "plan": 246083
+    },
+    "total_tokens": {
+      "input": 128,
+      "output": 44757,
+      "cache_read": 5022446,
+      "cache_write": 325316
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 44,
+        "output": 13209,
+        "cache_read": 1816317,
+        "cache_write": 95789
+      },
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "evaluate": {
+        "input": 30,
+        "output": 10628,
+        "cache_read": 1060715,
+        "cache_write": 90353
+      },
+      "plan": {
+        "input": 54,
+        "output": 20920,
+        "cache_read": 2145414,
+        "cache_write": 139174
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.9999745150594098,
+    "hot_phase_count": 7,
+    "hot_phases": [
+      "scout",
+      "triage",
+      "tdd",
+      "build",
+      "audit",
+      "build",
+      "audit"
+    ]
+  },
+  "recalled_lessons": [
+    "cycle-1502-closure-citation-contract-never-reaches-the-auditor-it-grades",
+    "cycle-93-build-report-commit-sha-fabrication",
+    "cycle-1496-a-retry-carries-the-items-spec-and-never-its-predecessors-lesson",
+    "inst-L1549b",
+    "inst-L1544b"
+  ]
+}
