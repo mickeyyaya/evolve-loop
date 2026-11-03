@@ -23,6 +23,7 @@ type HandoffChecker func(in ReviewInput, pair string) handoff.Check
 type HandoffReviewer struct {
 	config policy.HandoffConfig
 	check  HandoffChecker
+	tree   func(ReviewInput) string
 }
 
 var errHandoffLedgerNotObject = errors.New("the ledger is not a JSON object, so it is kept as written")
@@ -36,12 +37,31 @@ func NewHandoffReviewer(config policy.HandoffConfig, check HandoffChecker) Hando
 	return HandoffReviewer{config: config, check: check}
 }
 
-func (r HandoffReviewer) Review(_ context.Context, in ReviewInput) ReviewResult {
+const handoffOutcomeInvalid = "invalid"
+
+func (r HandoffReviewer) outputTree(ctx context.Context, in ReviewInput) string {
+	if r.tree != nil {
+		return r.tree(in)
+	}
+	return worktreeContentSHA(ctx, in.ProjectRoot, in.Worktree, in.Workspace)
+}
+
+func staleOutputCheck(check handoff.Check, stale string) handoff.Check {
+	if stale == "" {
+		return check
+	}
+	check.Outcome = handoffOutcomeInvalid
+	check.Errors = append(slices.Clone(check.Errors), fmt.Sprintf("output_digest %s is stale: the ledger names an earlier output than the current tree", stale))
+	return check
+}
+
+func (r HandoffReviewer) Review(ctx context.Context, in ReviewInput) ReviewResult {
+	stale := stampHandoffAuthor(in, r.outputTree(ctx, in))
 	pair, ok := handoffPairEndingAt[in.Phase]
 	if !ok {
 		return ReviewResult{Approve: true}
 	}
-	check := r.check(in, pair)
+	check := staleOutputCheck(r.check(in, pair), stale)
 	check.Stage = r.config[pair].Stage
 	if err := recordHandoffCheck(in.Workspace, pair, check); err != nil {
 		fmt.Fprintf(in.errOut(), "[orchestrator] WARN handoff %s: the check record was not written: %v\n", pair, err)

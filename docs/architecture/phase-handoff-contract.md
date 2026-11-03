@@ -138,7 +138,7 @@ B writes `.evolve/runs/cycle-N/handoff-<pair>.json` next to its report. The sche
 
 - `status` is one of `met`, `unmet`, `blocked` and `not_applicable`. A `not_applicable` entry must have a `note`.
 - `request_digest` binds the ledger to one request. A ledger for an old request does not count.
-- `output_digest` is the tree digest of the output, so the audit binding (`go/internal/phases/ship/audit.go:27`) and the ledger name the same tree.
+- `output_digest` is the tree digest of the output, so the audit binding (`go/internal/phases/ship/audit.go:27`) and the ledger name the same tree. `worktreeContentSHA` (`go/internal/core/phase_bindings.go`) computes it, and the pipeline writes it. An agent never writes it. A ledger with a different `output_digest` is stale. The check outcome of that ledger is `invalid`, and the error names the stale digest.
 - `author` comes from the dispatch record, not from the agent, so an agent cannot write another identity.
 
 ## 5. The check
@@ -171,9 +171,23 @@ The check has two layers. The deterministic layer always runs first.
 
 **The pass condition:** each `required` ask is `met`, the deterministic layer resolved its evidence, and the judge (if any) agrees. A stated confidence never counts (research P2.10).
 
+### Where the block is rendered and the author is stamped (H9)
+
+`Orchestrator.seedTaskContract` (`go/internal/core/task_contract.go`) appends the request block to the task contract of the `tdd` and `build` phases. A document cycle has no block. The block comes from `request.TriageTDD` and `request.TDDBuild`, the builders that the check uses, so the request has one source. It shows the pair, `request_digest`, the path of the ledger and one line for each ask: `<id> [required] <text> (evidence: <kind>)`. When no request can be built, the block says `Handoff request: none for pair <pair>` and names the reason. The `triage` phase has no block, because its committed set does not exist until the phase ends.
+
+The persona of tdd and build writes the ledger and never writes `author` or `output_digest`. The persona of triage has no directive yet, because the `scout-triage` pair has no request block. `core.HandoffReviewer` calls `stampHandoffAuthor` before the check, after the phase returns. The stamp sets `author` from the latest `llm-calls.ndjson` record of the phase and cycle. It uses `cli`, the served model, and the requested model as `tier`. It keeps every other key.
+
+The same stamp sets `output_digest` to the current tree digest when the ledger has none. A ledger that already holds a different `output_digest` keeps it, and the stamp reports it as stale (§5, H8). A round-2 rewrite without the digest gets the new tree digest.
+
+It writes no `author` when the ledger is absent, when the file is not a JSON object, or when no record exists. It writes no `output_digest` when the tree digest is empty, for example when the cycle has no worktree. An absent ledger stays absent.
+
+The block and the check build the request through one helper, `request.ForPair`. The block reads the item files that the upper half of the task contract read (`fleet_scope_paths` first). So the `request_digest` in the prompt equals the digest that the check rebuilds.
+
 ### Where the check runs (H8)
 
 `core.HandoffReviewer` (`go/internal/core/handoff_reviewer.go`) is a `core.DeliverableReviewer`. `go/cmd/evolve/cmd_cycle.go` puts it last in the reviewer chain of each cycle. At the end of the `tdd` phase it checks `triage-tdd`. At the end of the `build` phase it checks `tdd-build`. The other pairs have no check yet.
+
+The stamp of §4 runs before the check. When the ledger names a stale `output_digest`, the reviewer sets the outcome to `invalid`. It adds an error that names the stale digest. The stage rules below stay the same.
 
 The check is the same code as `evolve handoff check` (`evaluateHandoffAt` in `go/cmd/evolve/cmd_handoff.go`). The reviewer reads the ledger in the run directory of the cycle and the inbox of the project root. It reads the ACS predicates and the evidence in the worktree.
 
