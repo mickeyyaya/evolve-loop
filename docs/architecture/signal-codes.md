@@ -441,6 +441,12 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `SHIP_HELD_FOR_OPERATOR` | atomic-ship: at held_proposals.stage enforce, a lane change that touches the fence or works a pipeline-kind item waits for evolve landing approve of its tree; main did not move (ADR-0157) |
 | `SHIP_HELD_PROPOSAL_REJECTED` | atomic-ship: the operator rejected this tree of a held proposal with evolve landing reject; main did not move (ADR-0157) |
 | `SHIP_HOLD_SHADOW` | at held_proposals.stage shadow, a lane landing that touches the fence or works a pipeline-kind item lands, and the ship records that enforce would hold it for the operator (ADR-0157); fields.cycle, tree, reasons |
+| `SHIP_INTEGRATION_COMPOSED` | a deliverable composed onto the integration branch and passed its L1 gates; fields.wave, fields.cycle and fields.batch name it |
+| `SHIP_INTEGRATION_DELIVERED` | a fleet lane delivered its record to the integration of the wave (kind ship.delivered); fields.wave, fields.cycle, fields.commits and fields.record name it, and at enforce the lane's ship stopped before main |
+| `SHIP_INTEGRATION_EJECTED` | a deliverable went back to its lane; fields.cause names why (conflict, gate or proof) and fields.layer names the layer that found it |
+| `SHIP_INTEGRATION_FLUSHED` | a batch PR opened; fields.trigger names the flush trigger and fields.pr the PR |
+| `SHIP_INTEGRATION_MERGED` | a batch PR merged into main by a fast-forward to the tested tip; fields.pr names the PR and fields.tip the tip |
+| `SHIP_INTEGRATION_REVERTED` | the check after a merge reverted one cycle commit alone; fields.cycle names it and fields.commit the reverted commit |
 | `SHIP_INTEGRITY_TREE_DRIFT` | post-ship: the shipped tree drifted from the verified one (integrity) |
 | `SHIP_INVALID_CLASS` | verify-class: unknown ship class |
 | `SHIP_LANDING_BINARY_RESET_FAILED` | git checkout HEAD -- <binary> before the ff-merge exited non-zero or failed to spawn; the merge still runs and may fail if the tracked binary is dirty; fields.step=integrate, path, git_rc, git_err |

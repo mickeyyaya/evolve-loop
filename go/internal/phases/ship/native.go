@@ -106,6 +106,8 @@ type Options struct {
 	land *landing.Landing
 
 	relPath func(base, target string) (string, error)
+
+	Integration *Integration
 }
 
 type Now struct {

@@ -769,6 +769,26 @@ The keys are under `.evolve/policy.json` `fleet`.
 
 Each code goes into the Signal Center registry under the module prefix `SHIP_`. The kind `ship.delivered` is new (I0).
 
+#### Built: the deliverable record (I0, 2026-11-03)
+
+I0 is built. The record type and its writer are in `go/internal/integration/deliverable.go`. The ship writes it in `go/internal/phases/ship/deliverable.go`.
+
+- **The record.** `DeliverableRecord` holds every field of D2. The file is `.evolve/waves/integration-<wave>/deliverable-<cycle>.json`. It sits next to the integration record of D19. Each commit holds its `sha`, its `base_sha` (the base of the lane) and its `patch_id`.
+- **The hook.** A lane is a fleet lane when its ship has an `Integration`. The ship writes the record before the landing. It then publishes `ship.delivered` with the code `SHIP_INTEGRATION_DELIVERED`.
+- **Shadow.** The ship lands as before. The git operations that change state and the ship log stay the same. A failed write is a warning.
+- **Enforce.** The ship moves the lane ref to the commit, so the commit stays reachable. It then stops. It pushes nothing and writes no landing intent. A failed write is an error of the class `transient`.
+- **The landed identity.** A cycle is found on main by its trailer and the patch-id of a commit of its record. `integration.LandedOnRef` does the lookup in one place. Three callers use it: `isLanded` in the consume check of the ship, the ledger entry (`core/lost_landing_floor.go`) and the inbox closeout (`shaLandedOnMain` in `inboxmover`).
+
+Each caller tests ancestry first. It uses the record only when the commit is not an ancestor. Without a record, the ancestry rule stands. So a compose that gave the commit a new SHA does not hide a landed cycle.
+- **The wiring.** `cmd_cycle.go` sets `ship.Config.Integration` for a fleet lane, from `fleet.integration.stage`. A solo cycle has no `Integration`, so its ship does not change. A wrong stage fails the run before the first phase.
+
+The six `SHIP_INTEGRATION_*` codes are in the registry. I0 emits only `SHIP_INTEGRATION_DELIVERED`. The other five wait for the components that emit them (I2, I3, I5).
+
+Open items:
+
+- The wave id is the constant `current` until I2 supplies the id of the wave. The risk class, the inbox rank and the deps are empty in the record of a lane until I2 and I3 know them.
+- At enforce, `postShip` still runs after the stopped ship. The consume check finds the cycle not landed, so the inbox items stay in `processing/`. I2 and I3 decide if a delivered cycle holds its items until the merge.
+
 **State: proposed (2026-10-20).** The components are I0 to I11 and I3b of the plan.
 
 ## Guards

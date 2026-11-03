@@ -31,6 +31,9 @@ func (s *worktreeShip) land(pending string) error {
 	if err != nil {
 		return err
 	}
+	if delivered, err := s.deliver(commit, pending); err != nil || delivered {
+		return err
+	}
 	s.catchUpMain()
 	if err := s.checkLanding(commit); err != nil {
 		if merr := s.moveLaneRef(pending); merr != nil {
