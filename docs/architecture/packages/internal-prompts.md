@@ -17,6 +17,7 @@
   - An opening fence with no closing one is an error.
   - Inline arrays split on commas outside quotes, with no escape handling.
 - **On-demand strip.** A persona's static reference tail sits under a `## Reference Index` heading and is the same on every dispatch. `StripOnDemandSections` cuts the body at the first line that is exactly `## Reference Index` or starts with `## Reference Index ` (the production form is `## Reference Index (Layer 3, on-demand)`). The match is line-anchored, case-sensitive, H2 only, and CRLF-aware, so an inline prose mention never triggers it. A body without the heading comes back unchanged, and the strip is idempotent.
+- **The lost directives.** `StrippedDirectives` returns each line below the marker that matches the operational sentinel regex and is not also above the marker. The keep-guard `internal/phasecoherence/persona_strip_operational_test.go` and `evolve persona strip-check` both call it, so the regex has one home.
 - **Router compaction is in place.** `agents/evolve-router.md`'s phase catalog is the router's working menu, so it is not stripped at a marker. Its size is held by the router tests instead. The catalog keeps its 66 rows at a pinned byte size. The prose above it has an anti-bloat ceiling.
 
 ## Invariants

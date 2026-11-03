@@ -32,6 +32,7 @@ func inboxVerbs() []inboxVerb {
 	return []inboxVerb{
 		{"batches", "batches [--json] [--max N]", withoutStdin(runInboxBatches)},
 		{"lint", "lint [--json]", withoutStdin(runInboxLint)},
+		{"integrity", "integrity --base B [--json]", withoutStdin(runInboxIntegrity)},
 		{"list", "list [--status " + strings.Join(menuStatusNames[:], "|") + "] [--kind K] [--route R] [--json]", withoutStdin(runInboxList)},
 		{"show", "show <id> [--json]", withoutStdin(runInboxShow)},
 		{"rank", "rank [--list " + strings.Join(rankListNames, "|") + "] [--top N] [--explain <id>] [--json]", withoutStdin(runInboxRank)},

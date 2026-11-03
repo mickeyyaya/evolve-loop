@@ -864,3 +864,5 @@
 # shiptest - the shared real-git fixtures of the ship tests and the black-box ship scenarios split from internal/phases/ship.
 ./internal/phases/ship/shiptest
 ./internal/supersede
+# reviewcheck - the deterministic checks of the review routing plan: inbox integrity, persona strip and the permission widening trace.
+./internal/reviewcheck
