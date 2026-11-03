@@ -21,7 +21,7 @@
 | `Refusal` | the error type of each refusal. Its `Reason` names the cause. |
 | `RemoteHost(url)`, `RepoSlug(url)` | the host in lower case and the `owner/name` of an HTTPS, SSH or scp-form remote URL |
 
-The cloud session clones the GitHub remote at the pushed branch. A local commit that is not pushed is not in the clone. Thus the check refuses the launch before a session starts, and the reason names the count of commits.
+The cloud session clones the remote at the pushed branch, from a host that the manifest names (`remote_hosts`). The refusal text names those hosts from the data, never one host in prose. A local commit that is not pushed is not in the clone. Thus the check refuses the launch before a session starts, and the reason names the count of commits.
 
 ## Invariants
 

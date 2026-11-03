@@ -42,13 +42,15 @@ func ReadRepo(ctx context.Context, run sysexec.RunFunc, dir string) (Repo, error
 	if err != nil {
 		return r, refuse("branch %s and its upstream cannot be compared: fetch the remote first: %v", r.Branch, err)
 	}
-	r.Ahead, _ = strconv.Atoi(ahead)
+	if r.Ahead, err = strconv.Atoi(ahead); err != nil {
+		return r, refuse("branch %s: the count of unpushed commits %q is not a number: %v", r.Branch, ahead, err)
+	}
 	return r, nil
 }
 
 func (r Repo) Check(hosts []string) error {
 	if host := RemoteHost(r.URL); !slices.Contains(hosts, host) {
-		return refuse("the remote %s of branch %s is on %q, not a GitHub remote (%s): the cloud session clones from GitHub", r.Remote, r.Branch, host, strings.Join(hosts, ", "))
+		return refuse("the remote %s of branch %s is on %q, not on a host of the manifest (%s): the cloud session clones only from those hosts", r.Remote, r.Branch, host, strings.Join(hosts, ", "))
 	}
 	if r.Ahead > 0 {
 		return refuse("branch %s has %d commit(s) that are not pushed to %s: the cloud session clones the remote branch, so push first", r.Branch, r.Ahead, r.Remote)

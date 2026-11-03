@@ -203,9 +203,13 @@ func DropToolless(p Plan, toolless func(driver string) bool) (Plan, []string) {
 	if toolless == nil {
 		return p, nil
 	}
+	return DropDrivers(p, toolless)
+}
+
+func DropDrivers(p Plan, drop func(driver string) bool) (Plan, []string) {
 	var kept, dropped []string
 	for _, cli := range p.Candidates {
-		if toolless(defaultDriverForFamily(cli)) {
+		if drop(defaultDriverForFamily(cli)) {
 			dropped = append(dropped, cli)
 		} else {
 			kept = append(kept, cli)

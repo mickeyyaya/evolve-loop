@@ -81,6 +81,7 @@ var serialTests = map[string]string{
 	"bridge.TestLinuxLinkedGitMetadataIsolationFailsClosed":                                   "changes the working directory",
 	"bridge.TestLoadManifest_LiveCatalogOverlays":                                             "swaps seam modelCatalogDirFn",
 	"bridge.TestLoadManifest_ModelTierMapFrom_UnresolvableIsAnError":                          "swaps seam bridgeManifestDirFn",
+	"bridge.TestLoadManifest_TheCloudSeatKeepsNoTierMapUnderALiveCatalog":                     "swaps seam modelCatalogDirFn",
 	"bridge.TestLoadManifest_NoCatalogIsUnchanged":                                            "swaps seam modelCatalogDirFn",
 	"bridge.TestManifestBase_AMalformedTargetIsStillReportedAsInvalidJSON":                    "swaps seam bridgeManifestDirFn",
 	"bridge.TestManifestBase_ATargetIsAMergePatchOverItsBinarysManifest":                      "swaps seam bridgeManifestDirFn",

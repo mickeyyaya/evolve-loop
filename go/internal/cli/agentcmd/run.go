@@ -188,7 +188,11 @@ func (c command) launch(ctx context.Context, r standaloneRun, signals *signalcen
 	out.cli, out.model, out.family = spy.cli, spy.model, llmroute.Family(spy.cli)
 	out.writer = len(r.writable) > 0
 	out.cloudSeat = c.deps.CloudSeat(out.cli)
-	if out.runErr == nil {
+	switch {
+	case out.runErr != nil:
+	case out.cloudSession() != nil:
+		out = out.withLaunchVerdict()
+	default:
 		out = out.withReportVerdict(r, signals)
 	}
 	return out
@@ -274,7 +278,7 @@ func (out launchOutcome) reportSHA() string {
 }
 
 func (out launchOutcome) cloudSession() *cloudlaunch.Session {
-	if !out.cloudSeat {
+	if !out.cloudSeat || out.runErr != nil {
 		return nil
 	}
 	s, launched := cloudlaunch.Parse(out.report)

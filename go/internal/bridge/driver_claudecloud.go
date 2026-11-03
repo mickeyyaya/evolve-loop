@@ -70,6 +70,9 @@ func launchCloud(ctx context.Context, cfg *Config, deps Deps, m Manifest) (int, 
 	if err := ensureDirs(cfg); err != nil {
 		return ExitBadFlags, fmt.Errorf("%s %w", l.prefix, err)
 	}
+	if err := os.Remove(cfg.Artifact); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return ExitBadFlags, fmt.Errorf("%s clear the artifact of an earlier seat: %w", l.prefix, err)
+	}
 	repo, err := deps.cloudRepo(ctx, l.dir)
 	if err == nil {
 		err = repo.Check(m.CloudLaunch.RemoteHosts)
@@ -112,8 +115,10 @@ func (deps Deps) cloudRepo(ctx context.Context, dir string) (cloudlaunch.Repo, e
 
 func (l cloudLaunch) refuse(err *cloudlaunch.Refusal) int {
 	fmt.Fprintf(l.deps.Stderr, "%s safety gate: launch refused: %v\n", l.prefix, err)
-	l.emit(CodeCloudLaunchRefused, signalcenter.KindBridgeWarning, signalcenter.SeverityWarn, err.Error(),
-		map[string]string{"cli": l.m.CLI, "profile": l.cfg.Profile, "dir": l.dir})
+	l.emit(signalcenter.Event{
+		Code: CodeCloudLaunchRefused, Kind: signalcenter.KindBridgeWarning, Severity: signalcenter.SeverityWarn, Reason: err.Error(),
+		Fields: map[string]string{"cli": l.m.CLI, "profile": l.cfg.Profile, "dir": l.dir},
+	})
 	return ExitSafetyGate
 }
 
@@ -150,7 +155,7 @@ func (l cloudLaunch) start(ctx context.Context, promptFile string) (cloudConfirm
 
 func (l cloudLaunch) command(promptFile string) string {
 	flags := append(slices.Clone(l.cfg.Realization.LaunchFlags), l.m.CloudLaunch.Args...)
-	return launchCmdLine(resolveBinary(l.deps, l.m.Binary), flags) + ` "$(cat ` + shellQuotePOSIX(promptFile) + `)"`
+	return launchCmdLine(resolveBinary(l.deps, l.m.Binary), flags) + ` -- "$(cat ` + shellQuotePOSIX(promptFile) + `)"`
 }
 
 func (l cloudLaunch) await(ctx context.Context, session string) (cloudConfirmation, int, error) {
@@ -160,7 +165,7 @@ func (l cloudLaunch) await(ctx context.Context, session string) (cloudConfirmati
 		if err := ctx.Err(); err != nil {
 			return cloudConfirmation{}, ExitSafetyGate, err
 		}
-		pane, err := l.deps.Tmux.CapturePane(ctx, session, cloudScrollback)
+		pane, err := l.capture(ctx, session)
 		if err != nil && !l.deps.Tmux.HasSession(ctx, session) {
 			fmt.Fprintf(l.deps.Stderr, "%s FAIL: the pane of session %s is gone: %v; the state of the launch is unknown, so read the cloud sessions of the account before a new launch\n", l.prefix, session, err)
 			return cloudConfirmation{}, ExitSafetyGate, nil
@@ -181,6 +186,13 @@ func (l cloudLaunch) await(ctx context.Context, session string) (cloudConfirmati
 	return cloudConfirmation{}, ExitSafetyGate, nil
 }
 
+func (l cloudLaunch) capture(ctx context.Context, session string) (string, error) {
+	if j, ok := l.deps.Tmux.(JoinedPaneCapturer); ok {
+		return j.CapturePaneJoined(ctx, session, cloudScrollback)
+	}
+	return l.deps.Tmux.CapturePane(ctx, session, cloudScrollback)
+}
+
 func (l cloudLaunch) record(repo cloudlaunch.Repo, c cloudConfirmation) (int, error) {
 	s := cloudlaunch.Session{
 		Schema: cloudlaunch.Schema, Outcome: cloudlaunch.OutcomeLaunched, ID: c.id, URL: c.url, Title: c.title,
@@ -188,9 +200,11 @@ func (l cloudLaunch) record(repo cloudlaunch.Repo, c cloudConfirmation) (int, er
 		TS: l.deps.Now().UTC().Format(time.RFC3339),
 	}
 	fmt.Fprintf(l.deps.Stderr, "%s launched cloud session %s: %s\n", l.prefix, s.ID, s.URL)
-	l.emit(CodeCloudLaunched, signalcenter.KindPhaseDispatched, signalcenter.SeverityInfo,
-		fmt.Sprintf("cloud session %s launched on %s, branch %s; its deliverable is a later pull request", s.ID, s.Repo, s.Branch),
-		map[string]string{"cli": s.CLI, "session_id": s.ID, "url": s.URL, "title": s.Title, "repo": s.Repo, "branch": s.Branch, "profile": s.Profile})
+	l.emit(signalcenter.Event{
+		Code: CodeCloudLaunched, Kind: signalcenter.KindPhaseDispatched, Severity: signalcenter.SeverityInfo,
+		Reason: fmt.Sprintf("cloud session %s launched on %s, branch %s; its deliverable is a later pull request", s.ID, s.Repo, s.Branch),
+		Fields: map[string]string{"cli": s.CLI, "session_id": s.ID, "url": s.URL, "title": s.Title, "repo": s.Repo, "branch": s.Branch, "profile": s.Profile},
+	})
 	challenge, _ := phasecontract.ChallengeToken(l.cfg.Workspace)
 	if err := os.WriteFile(l.cfg.Artifact, []byte(cloudlaunch.Render(s, challenge)), 0o644); err != nil {
 		return ExitBadFlags, fmt.Errorf("%s cloud session %s (%s) is launched, but its report was not written: %w", l.prefix, s.ID, s.URL, err)
@@ -198,12 +212,11 @@ func (l cloudLaunch) record(repo cloudlaunch.Repo, c cloudConfirmation) (int, er
 	return ExitOK, nil
 }
 
-func (l cloudLaunch) emit(code signalcenter.Code, kind signalcenter.Kind, severity signalcenter.Severity, reason string, fields map[string]string) {
+func (l cloudLaunch) emit(e signalcenter.Event) {
 	id := configIdentity(l.cfg)
-	l.deps.Signals.Emit(signalcenter.Event{
-		Cycle: id.cycle, RunID: id.runID, Phase: id.phase, Module: signalcenter.ModuleBridge, Origin: cloudLaunchOrigin,
-		Kind: kind, Severity: severity, Code: code, Reason: reason, Fields: fields,
-	})
+	e.Cycle, e.RunID, e.Phase = id.cycle, id.runID, id.phase
+	e.Module, e.Origin = signalcenter.ModuleBridge, cloudLaunchOrigin
+	l.deps.Signals.Emit(e)
 }
 
 func init() { Register(claudeCloudDriver{}) }

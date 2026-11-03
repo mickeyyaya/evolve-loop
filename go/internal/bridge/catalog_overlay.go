@@ -59,7 +59,15 @@ func loadCatalogCached() modelcatalog.Catalog {
 	return cat
 }
 
+func declaresModelChoice(m Manifest) bool {
+	_, param := m.Params["model_tier"]
+	return param || len(m.ModelTierMap) > 0
+}
+
 func applyCatalogTierMap(m Manifest, cat modelcatalog.Catalog) Manifest {
+	if !declaresModelChoice(m) {
+		return m
+	}
 	base := policy.BaseCLI(m.CLI)
 	var merged map[string]string
 	for _, tier := range modelcatalog.CanonicalTiers {

@@ -95,12 +95,13 @@ func routingHost(logw io.Writer, now func() time.Time) cliroute.Host {
 				logf("[cliroute] "+format, args...)
 			})
 		},
-		Logf:      logf,
-		Toolless:  gobridge.LacksToolUse,
-		WeekUsed:  projectWeekUsed(now),
-		LaneTimes: projectLaneTimes,
-		TierWeek:  projectTierWeek(now, resolveModelTier),
-		Now:       now,
+		Logf:       logf,
+		Toolless:   gobridge.LacksToolUse,
+		CloudHosts: gobridge.CloudRemoteHosts,
+		WeekUsed:   projectWeekUsed(now),
+		LaneTimes:  projectLaneTimes,
+		TierWeek:   projectTierWeek(now, resolveModelTier),
+		Now:        now,
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -105,7 +106,7 @@ func TestCheck_RefusesUnpushedCommitsAndAnotherHost(t *testing.T) {
 	other := pushed
 	other.URL = "https://user:secret@gitlab.com/acme/widgets.git"
 	reason := refusalReason(t, other.Check(hosts))
-	if !strings.Contains(reason, "gitlab.com") || !strings.Contains(reason, "not a GitHub remote") {
+	if !strings.Contains(reason, "gitlab.com") || !strings.Contains(reason, "not on a host of the manifest (github.com)") {
 		t.Errorf("host refusal = %q, want it to name the host", reason)
 	}
 	if strings.Contains(reason, "secret") {
@@ -120,6 +121,7 @@ func TestRemoteHostAndRepoSlug_ReadEachURLForm(t *testing.T) {
 		{"ssh://git@github.com/acme/widgets.git", "github.com", "acme/widgets"},
 		{"git@github.com:acme/widgets.git", "github.com", "acme/widgets"},
 		{"github.com:acme/widgets", "github.com", "acme/widgets"},
+		{"git@GitHub.com:acme/widgets.git", "github.com", "acme/widgets"},
 		{"https://GitHub.com/acme/widgets", "github.com", "acme/widgets"},
 		{"/srv/git/widgets.git", "", ""},
 		{"https://%zz", "", ""},
@@ -131,5 +133,20 @@ func TestRemoteHostAndRepoSlug_ReadEachURLForm(t *testing.T) {
 		if got := RepoSlug(tc.url); got != tc.slug {
 			t.Errorf("RepoSlug(%q) = %q, want %q", tc.url, got, tc.slug)
 		}
+	}
+}
+
+func TestReadRepo_RefusesAnUnpushedCountThatIsNotANumber(t *testing.T) {
+	r := pushedRepo(t, "https://github.com/acme/widgets.git")
+	wrapped := func(ctx context.Context, name, cwd string, args, env []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
+		if name == "git" && len(args) > 0 && args[0] == "rev-list" {
+			_, _ = io.WriteString(stdout, "hook: 2 commits\n")
+			return 0, nil
+		}
+		return sysexec.DefaultRunner(ctx, name, cwd, args, env, stdin, stdout, stderr)
+	}
+	_, err := ReadRepo(context.Background(), wrapped, r.Dir)
+	if reason := refusalReason(t, err); !strings.Contains(reason, "is not a number") {
+		t.Errorf("refusal = %q, want the count named as not a number", reason)
 	}
 }

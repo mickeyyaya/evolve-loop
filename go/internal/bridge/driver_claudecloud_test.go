@@ -176,7 +176,7 @@ func TestClaudeCloudDriver_TypesTheCloudCommandInItsOwnSessionAndEndsOnlyThatSes
 		t.Error("the launch ended a session that it did not start")
 	}
 	promptFile := filepath.Join(f.cfg.Workspace, "cloud-prompt.txt")
-	wantCmd := `claude --cloud "$(cat ` + promptFile + `)"`
+	wantCmd := `claude --cloud -- "$(cat ` + promptFile + `)"`
 	if !slices.Contains(f.tmux.SentKeys, wantCmd) {
 		t.Errorf("sent keys %q lack the launch %q", f.tmux.SentKeys, wantCmd)
 	}
@@ -224,6 +224,9 @@ func TestClaudeCloudDriver_ADeadlineWithNoCreatedLineFailsWithoutAFallbackExit(t
 	if !strings.Contains(f.stderr.String(), "no session confirmation within 120s") {
 		t.Errorf("stderr lacks the deadline reason:\n%s", f.stderr)
 	}
+	if f.slept != 120*time.Second {
+		t.Errorf("waited %v, want the 120s deadline in full", f.slept)
+	}
 	if _, err := os.Stat(f.cfg.Artifact); !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("a launch with no confirmation wrote an artifact: %v", err)
 	}
@@ -266,7 +269,7 @@ func TestClaudeCloudDriver_RefusesAnUnpushedBranchOrAnotherHostBeforeAnySession(
 		want string
 	}{
 		"unpushed":   {ahead, "2 commit(s) that are not pushed"},
-		"non-GitHub": {gitlab, "not a GitHub remote"},
+		"non-GitHub": {gitlab, "not on a host of the manifest (github.com)"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			f := newCloudFixture(t, tc.repo)
@@ -380,14 +383,31 @@ func TestLaunchCloud_FailsOnAPromptOrAnArtifactItCannotWrite(t *testing.T) {
 		t.Errorf("Launch with an unwritable cloud prompt = %d, %v", rc, err)
 	}
 	h := newCloudFixture(t, pushedGitHubRepo, cloudCreatedFrame)
-	if err := os.Mkdir(h.cfg.Artifact, 0o755); err != nil {
-		t.Fatal(err)
+	if os.Geteuid() == 0 {
+		t.Skip("a read-only directory does not stop root")
 	}
+	h.deps.Sleep = func(time.Duration) { _ = os.Chmod(h.cfg.Workspace, 0o500) }
+	t.Cleanup(func() { _ = os.Chmod(h.cfg.Workspace, 0o700) })
 	if rc, err := h.launch(t); rc != ExitBadFlags || err == nil || !strings.Contains(err.Error(), "session_01AbC9") {
 		t.Errorf("Launch with an unwritable artifact = %d, %v; want an error that names the launched session", rc, err)
 	}
 	if got := h.codes(); !slices.Equal(got, []signalcenter.Code{CodeCloudLaunched}) {
 		t.Errorf("signals = %v; a launched session is signalled before its report is written", got)
+	}
+}
+
+func TestLaunchCloud_AnArtifactThatCannotBeClearedStopsTheLaunchBeforeTmux(t *testing.T) {
+	t.Parallel()
+	f := newCloudFixture(t, pushedGitHubRepo, cloudCreatedFrame)
+	if err := os.MkdirAll(filepath.Join(f.cfg.Artifact, "held"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rc, err := f.launch(t)
+	if rc != ExitBadFlags || err == nil || !strings.Contains(err.Error(), "clear the artifact") {
+		t.Errorf("Launch = %d, %v; want a refusal that names the artifact", rc, err)
+	}
+	if len(f.tmux.Events) != 0 {
+		t.Errorf("a launch that could not clear the artifact touched tmux: %v", f.tmux.Events)
 	}
 }
 
@@ -505,7 +525,7 @@ func TestEngineLaunch_ClaudeCloudDispatchRecordsTheLaunchedRow(t *testing.T) {
 		t.Errorf("the response carries no launched session: %q", resp.Stdout)
 	}
 	launch := slices.IndexFunc(tmux.SentKeys, func(k string) bool { return strings.Contains(k, "--cloud") })
-	if launch < 0 || !strings.HasPrefix(tmux.SentKeys[launch], `claude --cloud "$(cat `) {
+	if launch < 0 || !strings.HasPrefix(tmux.SentKeys[launch], `claude --cloud -- "$(cat `) {
 		t.Errorf("sent keys = %q, want the bare cloud launch with no local flag", tmux.SentKeys)
 	}
 	read, err := llmcalls.ReadWorkspace(ws)
@@ -591,5 +611,61 @@ func TestClaudeCloudManifest_InheritsOnlyTheKeysTheSeatServes(t *testing.T) {
 		if !slices.Contains(allowed, key) {
 			t.Errorf("claude-cloud inherits %q from its base; remove it in the manifest or add it here when the seat serves it", key)
 		}
+	}
+}
+
+type joinedTmux struct {
+	*FakeTmuxController
+	joined, plain int
+}
+
+func (j *joinedTmux) CapturePane(ctx context.Context, session string, n int) (string, error) {
+	j.plain++
+	return j.FakeTmuxController.CapturePane(ctx, session, n)
+}
+
+func (j *joinedTmux) CapturePaneJoined(ctx context.Context, session string, n int) (string, error) {
+	j.joined++
+	return j.FakeTmuxController.CapturePane(ctx, session, n)
+}
+
+func TestClaudeCloudDriver_ReadsTheConfirmationFromTheJoinedPaneWhenTheControllerOffersIt(t *testing.T) {
+	t.Parallel()
+	f := newCloudFixture(t, pushedGitHubRepo, cloudCreatedFrame)
+	j := &joinedTmux{FakeTmuxController: f.tmux}
+	f.deps.Tmux = j
+	rc, err := f.launch(t)
+	if rc != ExitOK || err != nil {
+		t.Fatalf("Launch = %d, %v; want a launch", rc, err)
+	}
+	if j.joined == 0 {
+		t.Error("the wait read no joined pane: a wrapped title row could forge the view line")
+	}
+	if j.plain > 1 {
+		t.Errorf("the wait read %d plain panes; only the cleanup capture may be plain", j.plain)
+	}
+}
+
+func TestClaudeCloudDriver_ClearsTheArtifactOfAnEarlierSeatBeforeItStarts(t *testing.T) {
+	t.Parallel()
+	ahead := pushedGitHubRepo
+	ahead.Ahead = 1
+	for name, f := range map[string]*cloudFixture{
+		"a refusal":  newCloudFixture(t, ahead),
+		"a deadline": newCloudFixture(t, pushedGitHubRepo),
+	} {
+		t.Run(name, func(t *testing.T) {
+			stale := cloudlaunch.Render(cloudlaunch.Session{Schema: cloudlaunch.Schema, Outcome: cloudlaunch.OutcomeLaunched, ID: "session_FORGED"}, "")
+			if err := os.WriteFile(f.cfg.Artifact, []byte(stale), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			f.tmux.CaptureFrames = append(make([]string, 0, 130), slices.Repeat([]string{"Connecting...\n"}, 125)...)
+			if _, err := f.launch(t); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := os.Stat(f.cfg.Artifact); !errors.Is(err, os.ErrNotExist) {
+				t.Errorf("the artifact of an earlier seat survived a failed cloud launch: %v", err)
+			}
+		})
 	}
 }

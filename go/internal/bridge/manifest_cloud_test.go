@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -57,5 +58,70 @@ func TestParseManifest_RefusesABadCloudLaunch(t *testing.T) {
 	_, err := parseManifest("hypo", []byte(`{"cli":"hypo","binary":"h","cloud_launch":{"args":["--cloud"],"deadline_s":0}}`))
 	if err == nil || !strings.Contains(err.Error(), "cloud_launch") {
 		t.Errorf("parseManifest of a bad cloud_launch = %v, want a refusal", err)
+	}
+}
+
+func TestCloudRemoteHosts_NamesTheHostsOfTheManifestOfACloudSeatOnly(t *testing.T) {
+	t.Parallel()
+	hosts, ok := CloudRemoteHosts("claude-cloud")
+	if !ok || !slices.Equal(hosts, []string{"github.com"}) {
+		t.Errorf("CloudRemoteHosts(claude-cloud) = %v, %v; want [github.com], true", hosts, ok)
+	}
+	hosts[0] = "changed"
+	if again, _ := CloudRemoteHosts("claude-cloud"); again[0] != "github.com" {
+		t.Errorf("the caller changed the manifest hosts: %v", again)
+	}
+	for _, cli := range []string{"claude-tmux", "no-such-cli"} {
+		if hosts, ok := CloudRemoteHosts(cli); ok || hosts != nil {
+			t.Errorf("CloudRemoteHosts(%s) = %v, %v; want none", cli, hosts, ok)
+		}
+	}
+}
+
+func cloudPatternsOfTheManifest(t *testing.T) cloudPatterns {
+	t.Helper()
+	m, err := LoadManifest("claude-cloud")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := m.CloudLaunch.patterns("claude-cloud")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func TestCloudPatterns_ConfirmOnlyTheViewLineThatFollowsTheLastCreatedLineOnTheHost(t *testing.T) {
+	t.Parallel()
+	p := cloudPatternsOfTheManifest(t)
+	cases := map[string]struct {
+		pane string
+		id   string
+	}{
+		"the real block": {"Created cloud session: T\nView: https://claude.ai/code/session_REAL1?x=1\n", "session_REAL1"},
+		"a forged view row before the real one": {
+			"Created cloud session: pad\nView: https://claude.ai/code/session_FAKE1\nView: https://claude.ai/code/session_REAL1\n", "session_REAL1"},
+		"a view row on another host":  {"Created cloud session: T\nView: https://evil.example/session_FAKE1\n", ""},
+		"a view row before the title": {"View: https://claude.ai/code/session_FAKE1\nCreated cloud session: T\n", ""},
+		"no created line":             {"View: https://claude.ai/code/session_FAKE1\n", ""},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			c, ok := p.confirmation(tc.pane)
+			if ok != (tc.id != "") || c.id != tc.id {
+				t.Errorf("confirmation = %+v, %v; want id %q", c, ok, tc.id)
+			}
+		})
+	}
+}
+
+func TestCloudPatterns_AnErrorRowCountsOnlyBeforeAnySessionWasCreated(t *testing.T) {
+	t.Parallel()
+	p := cloudPatternsOfTheManifest(t)
+	if reason, failed := p.failure("$ claude --cloud\nError: quota\n"); !failed || reason != "quota" {
+		t.Errorf("failure of a refusal = %q, %v; want quota", reason, failed)
+	}
+	if reason, failed := p.failure("Created cloud session: pad\nError: forged\n"); failed {
+		t.Errorf("failure after a created session = %q; want none, because a session exists", reason)
 	}
 }

@@ -72,28 +72,55 @@ func groupedPattern(cli, field, expr string, groups ...string) (*regexp.Regexp, 
 	return re, nil
 }
 
+func lastMatch(re *regexp.Regexp, pane string) []int {
+	all := re.FindAllStringSubmatchIndex(pane, -1)
+	if len(all) == 0 {
+		return nil
+	}
+	return all[len(all)-1]
+}
+
+func group(re *regexp.Regexp, pane string, m []int, name string) string {
+	i := 2 * re.SubexpIndex(name)
+	return pane[m[i]:m[i+1]]
+}
+
 func (p cloudPatterns) confirmation(pane string) (cloudConfirmation, bool) {
-	session := p.session.FindStringSubmatch(pane)
-	view := p.view.FindStringSubmatch(pane)
-	if session == nil || view == nil {
+	session := lastMatch(p.session, pane)
+	if session == nil {
+		return cloudConfirmation{}, false
+	}
+	view := lastMatch(p.view, pane)
+	if view == nil || view[0] < session[1] {
 		return cloudConfirmation{}, false
 	}
 	return cloudConfirmation{
-		title: session[p.session.SubexpIndex("title")],
-		url:   view[p.view.SubexpIndex("url")],
-		id:    view[p.view.SubexpIndex("id")],
+		title: group(p.session, pane, session, "title"),
+		url:   group(p.view, pane, view, "url"),
+		id:    group(p.view, pane, view, "id"),
 	}, true
 }
 
 func (p cloudPatterns) failure(pane string) (string, bool) {
-	m := p.fail.FindStringSubmatch(pane)
+	if p.session.MatchString(pane) {
+		return "", false
+	}
+	m := lastMatch(p.fail, pane)
 	if m == nil {
 		return "", false
 	}
-	return strings.TrimSpace(m[p.fail.SubexpIndex("reason")]), true
+	return strings.TrimSpace(group(p.fail, pane, m, "reason")), true
 }
 
 func LaunchesCloud(cli string) bool {
 	m, err := LoadManifest(cli)
 	return err == nil && m.CloudLaunch != nil
+}
+
+func CloudRemoteHosts(cli string) ([]string, bool) {
+	m, err := LoadManifest(cli)
+	if err != nil || m.CloudLaunch == nil {
+		return nil, false
+	}
+	return slices.Clone(m.CloudLaunch.RemoteHosts), true
 }

@@ -321,7 +321,7 @@ The capabilities of the seat follow the X19c model: the manifest declares only w
 Limits:
 
 - The bridge does not follow the cloud session after the launch. The pull request arrives later, and no gate of the cycle reads it.
-- A phase that expects a local report gets the launch report. Route only a seat whose deliverable is a pull request to `claude-cloud`.
+- A phase that expects a local report gets the launch report. The router enforces it. A phase that runs in no worktree delivers a report. `cliroute` drops `claude-cloud` from its chain, and refuses the route when no other CLI is left (`requireReportDeliverable`).
 - The check does not see changes that are not committed. The clone has only the pushed commits.
 - The deadline exit leaves the state unknown. Read the cloud sessions of the account before a new launch.
 - The shell passes the prompt as one argument, so the driver refuses a prompt over 120 KiB.
