@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 	"github.com/mickeyyaya/evolve-loop/go/internal/reviewclass"
 )
 
@@ -19,6 +20,16 @@ const (
 )
 
 var reviewClassRoot = resolveRepoRoot
+
+var productionReviewSurface = reviewclass.Surface{Protected: guards.IsProtectedSurface, Guarantees: guaranteeNames}
+
+func guaranteeNames(p string) []string {
+	var out []string
+	for _, g := range guards.SurfaceClassesOf(p) {
+		out = append(out, string(g))
+	}
+	return out
+}
 
 type reviewClassArgs struct {
 	base, projectRoot string
@@ -52,7 +63,7 @@ func runReviewClass(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "%sread the diff against %s: %v\n", reviewClassPrefix, a.base, err)
 		return exitIO
 	}
-	data := reviewClassData{ProjectRoot: root, Base: a.base, Paths: append([]string{}, d.Paths...), Requirements: reviewclass.Classify(d)}
+	data := reviewClassData{ProjectRoot: root, Base: a.base, Paths: append([]string{}, d.Paths...), Requirements: reviewclass.Classify(productionReviewSurface, d)}
 	if a.json {
 		return printVerbJSON("review-class", data, stdout, stderr)
 	}

@@ -1,14 +1,8 @@
 package reviewclass
 
 import (
-	"context"
-	"path/filepath"
 	"slices"
-	"strings"
 	"testing"
-
-	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
-	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 var planTable = []struct {
@@ -60,7 +54,7 @@ func TestClasses_EveryClassOfThePlanTableExists(t *testing.T) {
 
 func TestClasses_TheSecuritySeatOfT0FollowsTheGuaranteeClass(t *testing.T) {
 	t.Parallel()
-	want := []guards.GuaranteeClass{guards.SandboxGuarantee, guards.DispatchCredentialGuarantee, guards.PolicyGuarantee}
+	want := []string{"sandbox-rule", "dispatch-credential", "policy-parser"}
 	for _, id := range []ID{C11, C12} {
 		c, _ := Lookup(id)
 		if !slices.Equal(c.SecurityWhen, want) {
@@ -92,36 +86,11 @@ func TestLookup_FindsAClassAndRefusesAnUnknownID(t *testing.T) {
 	}
 }
 
-func trackedPaths(t *testing.T) []string {
-	t.Helper()
-	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
-	if err != nil {
-		t.Fatal(err)
-	}
-	out, err := sysexec.Output(context.Background(), sysexec.DefaultRunner, root, "git", "-c", "core.quotePath=false", "ls-files", "-z")
-	if err != nil {
-		t.Skipf("no git work tree: %v", err)
-	}
-	return strings.Split(strings.Trim(out, "\x00"), "\x00")
-}
-
-func TestKnownDefaults_EachTrackedPathHasAClassOrAListedDefault(t *testing.T) {
+func TestKnownDefaults_EachEntryIsAPrefixOrAGlobThatKnownDefaultFinds(t *testing.T) {
 	t.Parallel()
-	used := map[string]bool{}
-	for _, p := range trackedPaths(t) {
-		if ids := hitIDs(Classify(paths(p)).Classes); !slices.Equal(ids, []ID{C13}) {
-			continue
-		}
-		pattern, ok := knownDefault(p)
-		if !ok {
-			t.Errorf("%s matches no class and no entry of KnownDefaults: give it a class or list it as C13 territory", p)
-			continue
-		}
-		used[pattern] = true
-	}
 	for _, pattern := range KnownDefaults() {
-		if !used[pattern] {
-			t.Errorf("KnownDefaults entry %q matches no tracked C13 path: remove it", pattern)
+		if got, ok := KnownDefault(pattern); !ok || got != pattern {
+			t.Errorf("KnownDefault(%q) = %q, %v; want the entry itself", pattern, got, ok)
 		}
 	}
 }
@@ -134,12 +103,12 @@ func TestKnownDefault_MatchesADirectoryPrefixOrAGlob(t *testing.T) {
 	}{
 		{"knowledge-base/x/y.json", true},
 		{"go/Makefile", true},
-		{"go/internal/x/data.json", true},
+		{"go/acs/cycle9/x.json", true},
 		{"knowledge-base", false},
 		{"src/x.ts", false},
 	} {
-		if _, ok := knownDefault(tc.path); ok != tc.ok {
-			t.Errorf("knownDefault(%q) = %v, want %v", tc.path, ok, tc.ok)
+		if _, ok := KnownDefault(tc.path); ok != tc.ok {
+			t.Errorf("KnownDefault(%q) = %v, want %v", tc.path, ok, tc.ok)
 		}
 	}
 }

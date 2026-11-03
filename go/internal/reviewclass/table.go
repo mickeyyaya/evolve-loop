@@ -1,6 +1,8 @@
 package reviewclass
 
-import "github.com/mickeyyaya/evolve-loop/go/internal/guards"
+import (
+	"github.com/mickeyyaya/evolve-loop/go/internal/gateclass"
+)
 
 const (
 	seatSimplifierName   = "code-simplifier"
@@ -57,31 +59,47 @@ var (
 	t0Seats      = []Seat{simplifierSeat, goOrCodeSeat, architectureSeat, adversarialSeat}
 	goCodeChecks = []Check{lanes, coverChanged, apicover}
 	t0Checks     = []Check{lanes, coverChanged, apicover, gateFlags, guardMutation}
-	securityWhen = []guards.GuaranteeClass{guards.SandboxGuarantee, guards.DispatchCredentialGuarantee, guards.PolicyGuarantee}
+	securityWhen = []string{"sandbox-rule", "dispatch-credential", "policy-parser"}
+)
+
+var (
+	gateInputs    = []string{"go/.apicover-enforce", "go/.cover-strict", "go/.darwin-set", "go/.test-latency.json"}
+	personaDirs   = []string{"skills/", "guidance/rules/"}
+	promptDirs    = []string{"agents/", ".evolve/phases/"}
+	notDocDirs    = []string{"agents/", "skills/", "guidance/", ".evolve/phases/"}
+	packageDirs   = []string{"go/internal/", "go/cmd/"}
+	manifestGlobs = []string{".evolve/profiles/*.json", ".evolve/phases/*/*.json", "go/internal/bridge/manifests/*.json"}
+	manifestDirs  = []string{".claude-plugin/"}
+	inboxDirs     = []string{".evolve/inbox/"}
+	workflowDirs  = []string{".github/workflows/"}
 )
 
 var table = []Class{
-	{ID: C0, Name: "Comment-only", Detect: "a Go file that commentaudit.Equivalent proves comment-only (rule R4)", Checks: []Check{commentEquivalence}, Cap: "$0"},
-	{ID: C1, Name: "Docs", Detect: "*.md outside agents/, skills/ and guidance/, and not a whole generated file", Seats: []Seat{docsSeat}, Checks: []Check{steLint, docsIndexCheck, committedDocGuard}, Cap: "$1"},
-	{ID: C2, Name: "Inbox data", Detect: ".evolve/inbox/**", Checks: []Check{inboxLint, inboxIntegrity}, Cap: "$0"},
-	{ID: C3, Name: "Generated outputs", Detect: "an output of a derived.Catalog entry", Checks: []Check{derivedCheck}, Cap: "$0"},
-	{ID: C4, Name: "Gate inputs", Detect: "go/.apicover-enforce, go/.cover-strict, go/.darwin-set, go/.test-latency.json", Seats: []Seat{codeSeat}, Checks: []Check{floorListRegression}, Cap: "$1"},
-	{ID: C5, Name: "Go tests only", Detect: "*_test.go or go/**/testdata/, not a guard test (gateclass.IsGuardTest)", Seats: []Seat{goTestsSeat}, Checks: []Check{goTestChecks, testFlags}, Cap: "$1"},
-	{ID: C6, Name: "Go T2", Detect: "Go code or a guard test of tier T2 (gateclass.TierOf)", Seats: goCodeSeats, Checks: goCodeChecks, Cap: "$2"},
-	{ID: C7, Name: "Go T1", Detect: "a file under go/ of tier T1 (core, bridge, cliroute, gc) that is not test-only: Go code, a guard test or a data file", Seats: goT1Seats, Checks: goCodeChecks, Cap: "$4"},
-	{ID: C8, Name: "Persona or prompt", Detect: "agents/*.md, skills/**, guidance/rules/**", Seats: []Seat{architectureSeat, docsSeat}, Checks: []Check{personaStrip, skillsCheck, guidanceCheck, steLint}, Cap: "$3"},
-	{ID: C9, Name: "Manifests and profiles", Detect: ".evolve/profiles/*.json, .evolve/phases/**.json, go/internal/bridge/manifests/*.json, .claude-plugin/**", Seats: []Seat{codeSeat, securitySeat}, Checks: []Check{profileLoad, skillsCheck, permissionWidening}, Cap: "$2"},
-	{ID: C10, Name: "CI workflows", Detect: ".github/workflows/**", Seats: []Seat{codeSeat, architectureSeat}, Checks: []Check{requiredNeeds, ciRoutesGenerated}, Cap: "$3"},
-	{ID: C11, Name: "T0 protected", Detect: "guards.IsProtectedSurface", Seats: t0Seats, SecurityWhen: securityWhen, Checks: t0Checks, Cap: "about $5.6 to $6.8"},
-	{ID: C12, Name: "Stage flip", Detect: "a gateclass stage-off-enforce flag", Seats: t0Seats, SecurityWhen: securityWhen, Checks: []Check{operatorApproved}, Cap: "C11"},
+	{ID: C0, Name: "Comment-only", Detect: "a Go file that commentaudit.Equivalent proves comment-only; it replaces the other classes of the file (rule R4)", Checks: []Check{commentEquivalence}, Cap: "$0"},
+	{ID: C1, Name: "Docs", Detect: "*.md outside " + listOf(notDocDirs) + ", and not a whole generated file", Seats: []Seat{docsSeat}, Checks: []Check{steLint, docsIndexCheck, committedDocGuard}, Cap: "$1", match: onPath(isDoc)},
+	{ID: C2, Name: "Inbox data", Detect: "under " + listOf(inboxDirs), Checks: []Check{inboxLint, inboxIntegrity}, Cap: "$0", match: onPath(underAny(inboxDirs))},
+	{ID: C3, Name: "Generated outputs", Detect: "an output of a derived.Catalog entry", Checks: []Check{derivedCheck}, Cap: "$0", match: onPath(isGenerated)},
+	{ID: C4, Name: "Gate inputs", Detect: "one of " + listOf(gateInputs), Seats: []Seat{codeSeat}, Checks: []Check{floorListRegression}, Cap: "$1", match: onPath(isGateInput)},
+	{ID: C5, Name: "Go tests only", Detect: "*_test.go, or a file under a testdata/ directory in go/, that gateclass.IsGuardTest does not name", Seats: []Seat{goTestsSeat}, Checks: []Check{goTestChecks, testFlags}, Cap: "$1", match: onPath(isTestOnly)},
+	{ID: C6, Name: "Go T2", Detect: "a Go file, or a file under " + listOf(packageDirs) + ", that is not test-only and has gateclass.TierOf T2", Seats: goCodeSeats, Checks: goCodeChecks, Cap: "$2", match: onPath(isCodeOf(gateclass.T2))},
+	{ID: C7, Name: "Go T1", Detect: "a Go file, or a file under " + listOf(packageDirs) + ", that is not test-only and has gateclass.TierOf T1", Seats: goT1Seats, Checks: goCodeChecks, Cap: "$4", match: onPath(isCodeOf(gateclass.T1))},
+	{ID: C8, Name: "Persona or prompt", Detect: "*.md under " + listOf(promptDirs) + ", or a file under " + listOf(personaDirs), Seats: []Seat{architectureSeat, docsSeat}, Checks: []Check{personaStrip, skillsCheck, guidanceCheck, steLint}, Cap: "$3", match: onPath(isPersona)},
+	{ID: C9, Name: "Manifests and profiles", Detect: "a match of " + listOf(manifestGlobs) + ", or a file under " + listOf(manifestDirs), Seats: []Seat{codeSeat, securitySeat}, Checks: []Check{profileLoad, skillsCheck, permissionWidening}, Cap: "$2", match: onPath(isManifest)},
+	{ID: C10, Name: "CI workflows", Detect: "under " + listOf(workflowDirs), Seats: []Seat{codeSeat, architectureSeat}, Checks: []Check{requiredNeeds, ciRoutesGenerated}, Cap: "$3", match: onPath(underAny(workflowDirs))},
+	{ID: C11, Name: "T0 protected", Detect: "the Protected predicate of the Surface (guards.IsProtectedSurface in production)", Seats: t0Seats, SecurityWhen: securityWhen, Checks: t0Checks, Cap: "about $5.6 to $6.8", match: Surface.isProtected},
+	{ID: C12, Name: "Stage flip", Detect: "a gateclass stage-off-enforce flag in the file", Seats: t0Seats, SecurityWhen: securityWhen, Checks: []Check{operatorApproved}, Cap: "C11"},
 	{ID: C13, Name: "Default", Detect: "a changed path that matches no other class (fail closed)", Seats: goCodeSeats, Checks: goCodeChecks, Cap: "$2"},
 }
 
-var gateInputs = []string{"go/.apicover-enforce", "go/.cover-strict", "go/.darwin-set", "go/.test-latency.json"}
-
 var knownDefaults = []string{
 	"knowledge-base/",
-	"docs/",
+	"docs/architecture/phase-descriptor.schema.json",
+	"docs/architecture/phase-registry.json",
+	"docs/assets/",
+	"docs/explain/",
+	"docs/private/",
+	"docs/reports/",
+	"docs/research/",
 	".agents/skills/",
 	".evolve/commit-prefix-scope.json",
 	".evolve/inbox-parked/",
@@ -102,11 +120,9 @@ var knownDefaults = []string{
 	"go/.golangci.yml",
 	"go/Makefile",
 	"go/acs/",
-	"go/cmd/evolve/templates/",
 	"go/evolve",
 	"go/go.mod",
 	"go/go.sum",
-	"go/internal/",
 	"go/vendor/",
 	"go/vulncheck-allowlist.json",
 	".editorconfig",

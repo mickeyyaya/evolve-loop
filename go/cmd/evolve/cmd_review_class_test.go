@@ -6,10 +6,13 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
+	"github.com/mickeyyaya/evolve-loop/go/internal/reviewclass"
 )
 
 func reviewClassRepo(t *testing.T) string {
@@ -146,5 +149,67 @@ func TestRunReviewClass_ARootThatCannotBeFoundIsAnIOFailure(t *testing.T) {
 func TestReviewClassGit_ACommandThatCannotStartIsAnError(t *testing.T) {
 	if _, err := reviewClassGit(filepath.Join(t.TempDir(), "absent"))("status"); err == nil {
 		t.Error("git in an absent directory returned no error")
+	}
+}
+
+func TestProductionReviewSurface_ReadsTheProtectedManifest(t *testing.T) {
+	for _, tc := range []struct {
+		path     string
+		classes  []reviewclass.ID
+		security bool
+	}{
+		{"go/internal/bridge/sandbox_paths.go", []reviewclass.ID{reviewclass.C7, reviewclass.C11}, true},
+		{"go/internal/guards/role.go", []reviewclass.ID{reviewclass.C6, reviewclass.C11}, false},
+		{".evolve/policy.json", []reviewclass.ID{reviewclass.C11}, true},
+		{"agents/evolve-scout.md", []reviewclass.ID{reviewclass.C8}, false},
+	} {
+		got := reviewclass.Classify(productionReviewSurface, reviewclass.Diff{Paths: []string{tc.path}})
+		var ids []reviewclass.ID
+		for _, h := range got.Classes {
+			ids = append(ids, h.Class)
+		}
+		security := slices.ContainsFunc(got.Seats, func(s reviewclass.Seat) bool { return s.String() == "security" })
+		if !slices.Equal(ids, tc.classes) || security != tc.security {
+			t.Errorf("%s: classes %v security %v, want %v %v", tc.path, ids, security, tc.classes, tc.security)
+		}
+	}
+}
+
+func TestGuaranteeNames_AreTheGuaranteeClassesOfTheManifest(t *testing.T) {
+	want := []string{string(guards.SandboxGuarantee), string(guards.DispatchCredentialGuarantee), string(guards.PolicyGuarantee)}
+	for _, id := range []reviewclass.ID{reviewclass.C11, reviewclass.C12} {
+		c, _ := reviewclass.Lookup(id)
+		if !slices.Equal(c.SecurityWhen, want) {
+			t.Errorf("%s SecurityWhen = %v, want the guards classes %v", id, c.SecurityWhen, want)
+		}
+	}
+	if got := guaranteeNames("go/internal/bridge/sandbox_paths.go"); !slices.Equal(got, []string{"sandbox-rule"}) {
+		t.Errorf("guaranteeNames = %v", got)
+	}
+}
+
+func TestReviewClass_EachTrackedPathHasAClassOrAKnownDefault(t *testing.T) {
+	root := findRepoRoot(t)
+	out, err := reviewClassGit(root)("-c", "core.quotePath=false", "ls-files", "-z")
+	if err != nil {
+		t.Fatal(err)
+	}
+	used := map[string]bool{}
+	for _, p := range strings.Split(strings.Trim(out, "\x00"), "\x00") {
+		got := reviewclass.Classify(productionReviewSurface, reviewclass.Diff{Paths: []string{p}})
+		if len(got.Classes) != 1 || got.Classes[0].Class != reviewclass.C13 {
+			continue
+		}
+		pattern, ok := reviewclass.KnownDefault(p)
+		if !ok {
+			t.Errorf("%s matches no class and no entry of reviewclass.KnownDefaults: give it a class or list it as C13 territory", p)
+			continue
+		}
+		used[pattern] = true
+	}
+	for _, pattern := range reviewclass.KnownDefaults() {
+		if !used[pattern] {
+			t.Errorf("KnownDefaults entry %q matches no tracked C13 path: remove it", pattern)
+		}
 	}
 }

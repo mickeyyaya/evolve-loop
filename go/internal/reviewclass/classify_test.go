@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -37,6 +38,31 @@ type classCase struct {
 
 func paths(p ...string) Diff { return Diff{Paths: p} }
 
+var fakeGuarantees = map[string]string{
+	"go/internal/guards/":                 "guard",
+	"go/internal/bridge/sandbox_paths.go": "sandbox-rule",
+	".claude/settings.json":               "guard",
+	".evolve/policy.json":                 "policy-parser",
+	".github/workflows/":                  "ship-or-commit-gate",
+}
+
+func fakeGuaranteesOf(p string) []string {
+	var out []string
+	for prefix, class := range fakeGuarantees {
+		if strings.HasPrefix(p, prefix) {
+			out = append(out, class)
+		}
+	}
+	return out
+}
+
+var fakeSurface = Surface{
+	Protected:  func(p string) bool { return len(fakeGuaranteesOf(p)) > 0 },
+	Guarantees: fakeGuaranteesOf,
+}
+
+func classify(d Diff) Requirements { return Classify(fakeSurface, d) }
+
 var classCases = []classCase{
 	{"C0 a proven comment-only Go file", Diff{Paths: []string{"go/internal/guards/role.go"}, CommentOnly: []string{"go/internal/guards/role.go"}}, []ID{C0}, nil, []string{"comment-equivalence"}},
 	{"C1 a document", paths("docs/guide.md"), []ID{C1}, []string{seatDocs}, docCheckIDs},
@@ -50,6 +76,10 @@ var classCases = []classCase{
 	{"C7 Go T1 code", paths("go/internal/core/widget.go"), []ID{C7}, t1SeatNames, goCheckIDs},
 	{"C7 a data file of a T1 package", paths("go/internal/bridge/recipe/recipes/plugin-install.json"), []ID{C7}, t1SeatNames, goCheckIDs},
 	{"C5 needs a Go testdata directory", paths("agents/testdata/x.md"), []ID{C8}, []string{seatArchitecture, seatDocs}, []string{"persona-strip", "skills-check", "guidance-check", "ste-lint"}},
+	{"C3 a whole generated document", paths("commands/audit.md"), []ID{C3}, nil, []string{"derived-check:skill-projections"}},
+	{"C8 a phase prompt", paths(".evolve/phases/scout/agent.md"), []ID{C8}, []string{seatArchitecture, seatDocs}, []string{"persona-strip", "skills-check", "guidance-check", "ste-lint"}},
+	{"C6 a data file of a T2 package", paths("go/internal/policy/routing_defaults.json"), []ID{C6}, goSeatNames, goCheckIDs},
+	{"C13 a file under agents/ that is not a persona", paths("agents/x.json"), []ID{C13}, goSeatNames, goCheckIDs},
 	{"C8 a persona", paths("agents/evolve-scout.md"), []ID{C8}, []string{seatArchitecture, seatDocs}, []string{"persona-strip", "skills-check", "guidance-check", "ste-lint"}},
 	{"C8 a skill file", paths("skills/widget/reference.md"), []ID{C8}, []string{seatArchitecture, seatDocs}, []string{"persona-strip", "skills-check", "guidance-check", "ste-lint"}},
 	{"C9 a profile", paths(".evolve/profiles/scout.json"), []ID{C9}, []string{seatCode, seatSecurity}, []string{"profile-load", "skills-check", "permission-widening"}},
@@ -95,7 +125,7 @@ func TestClassify_EachClassGetsItsSeatsAndChecks(t *testing.T) {
 	t.Parallel()
 	for _, tc := range classCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := Classify(tc.diff)
+			got := classify(tc.diff)
 			if ids := hitIDs(got.Classes); !slices.Equal(ids, tc.classes) {
 				t.Errorf("classes = %v, want %v", ids, tc.classes)
 			}
@@ -111,7 +141,7 @@ func TestClassify_EachClassGetsItsSeatsAndChecks(t *testing.T) {
 
 func TestClassify_EachHitNamesItsClassAndItsSortedPaths(t *testing.T) {
 	t.Parallel()
-	got := Classify(paths("go/internal/widget/b.go", "go/internal/widget/a.go", "docs/x.md"))
+	got := classify(paths("go/internal/widget/b.go", "go/internal/widget/a.go", "docs/x.md"))
 	want := []Hit{
 		{Class: C1, Name: "Docs", Paths: []string{"docs/x.md"}},
 		{Class: C6, Name: "Go T2", Paths: []string{"go/internal/widget/a.go", "go/internal/widget/b.go"}},
@@ -123,17 +153,17 @@ func TestClassify_EachHitNamesItsClassAndItsSortedPaths(t *testing.T) {
 
 func TestClassify_AnEmptyDiffPrintsEmptyListsNotNull(t *testing.T) {
 	t.Parallel()
-	if got, want := Classify(Diff{}), (Requirements{Classes: []Hit{}, Seats: []Seat{}, Checks: []Check{}}); !reflect.DeepEqual(got, want) {
-		t.Errorf("Classify(Diff{}) = %+v, want %+v", got, want)
+	if got, want := classify(Diff{}), (Requirements{Classes: []Hit{}, Seats: []Seat{}, Checks: []Check{}}); !reflect.DeepEqual(got, want) {
+		t.Errorf("classify(Diff{}) = %+v, want %+v", got, want)
 	}
-	if got, want := mustJSON(t, Classify(Diff{})), `{"classes":[],"seats":[],"checks":[]}`; got != want {
+	if got, want := mustJSON(t, classify(Diff{})), `{"classes":[],"seats":[],"checks":[]}`; got != want {
 		t.Errorf("JSON = %s, want %s", got, want)
 	}
 }
 
 func TestClassify_AGeneratedCheckNamesTheVerbOfItsEntry(t *testing.T) {
 	t.Parallel()
-	got := Classify(paths(".codex-plugin/plugin.json")).Checks
+	got := classify(paths(".codex-plugin/plugin.json")).Checks
 	if len(got) != 1 || got[0].Rule != "evolve skills check" {
 		t.Errorf("checks = %+v, want one check with the rule %q", got, "evolve skills check")
 	}
@@ -141,7 +171,7 @@ func TestClassify_AGeneratedCheckNamesTheVerbOfItsEntry(t *testing.T) {
 
 func TestClassify_APlannedSeatAndCheckNameTheirComponent(t *testing.T) {
 	t.Parallel()
-	got := Classify(paths("go/internal/bridge/sandbox_paths.go"))
+	got := classify(paths("go/internal/bridge/sandbox_paths.go"))
 	planned := map[string]string{}
 	for _, s := range got.Seats {
 		planned[s.String()] = s.Planned
@@ -191,4 +221,23 @@ func mustJSON(t *testing.T, v any) string {
 		t.Fatal(err)
 	}
 	return string(b)
+}
+
+func TestClassify_ASurfaceWithNoPredicatesFailsClosed(t *testing.T) {
+	t.Parallel()
+	got := Classify(Surface{}, paths("docs/guide.md"))
+	if ids := hitIDs(got.Classes); !slices.Equal(ids, []ID{C1, C11}) {
+		t.Errorf("classes = %v, want [C1 C11]", ids)
+	}
+	if seats := seatStrings(got.Seats); !slices.Contains(seats, seatSecurity) {
+		t.Errorf("seats = %v, want the security seat", seats)
+	}
+}
+
+func TestSurface_TheGuaranteesOfAPathDecideTheSecuritySeat(t *testing.T) {
+	t.Parallel()
+	s := Surface{Protected: func(string) bool { return true }, Guarantees: func(string) []string { return []string{"guard"} }}
+	if seats := seatStrings(Classify(s, paths("x.go")).Seats); slices.Contains(seats, seatSecurity) {
+		t.Errorf("seats = %v: a guard path needs no security seat", seats)
+	}
 }

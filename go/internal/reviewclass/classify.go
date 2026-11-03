@@ -7,7 +7,6 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/derived"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gateclass"
-	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 )
 
 const TierDeep = "deep"
@@ -43,7 +42,7 @@ func Lookup(id ID) (Class, bool) {
 
 func KnownDefaults() []string { return slices.Clone(knownDefaults) }
 
-func knownDefault(p string) (string, bool) {
+func KnownDefault(p string) (string, bool) {
 	for _, pattern := range knownDefaults {
 		if strings.HasSuffix(pattern, "/") && strings.HasPrefix(p, pattern) {
 			return pattern, true
@@ -94,24 +93,17 @@ func mergeCheck(checks []Check, c Check) []Check {
 	return append(checks, c)
 }
 
-type matcher struct {
-	id    ID
-	match func(string) bool
+func listOf(items []string) string { return strings.Join(items, ", ") }
+
+func onPath(match func(string) bool) func(Surface, string) bool {
+	return func(_ Surface, p string) bool { return match(p) }
 }
 
-var matchers = []matcher{
-	{C1, isDoc},
-	{C2, func(p string) bool { return strings.HasPrefix(p, ".evolve/inbox/") }},
-	{C3, isGenerated},
-	{C4, func(p string) bool { return slices.Contains(gateInputs, p) }},
-	{C5, isTestOnly},
-	{C6, isGoCodeOf(gateclass.T2)},
-	{C7, isT1Code},
-	{C8, isPersona},
-	{C9, isManifest},
-	{C10, func(p string) bool { return strings.HasPrefix(p, ".github/workflows/") }},
-	{C11, guards.IsProtectedSurface},
+func underAny(dirs []string) func(string) bool {
+	return func(p string) bool { return hasAnyPrefix(p, dirs...) }
 }
+
+func (s Surface) isProtected(p string) bool { return s.Protected == nil || s.Protected(p) }
 
 func isWholeGenerated(p string) bool {
 	_, o, ok := derived.OutputOf(p)
@@ -123,12 +115,14 @@ func isGenerated(p string) bool {
 	return ok
 }
 
+func isGateInput(p string) bool { return slices.Contains(gateInputs, p) }
+
 func hasAnyPrefix(p string, prefixes ...string) bool {
 	return slices.ContainsFunc(prefixes, func(prefix string) bool { return strings.HasPrefix(p, prefix) })
 }
 
 func isDoc(p string) bool {
-	return strings.HasSuffix(p, ".md") && !hasAnyPrefix(p, "agents/", "skills/", "guidance/") && !isWholeGenerated(p)
+	return strings.HasSuffix(p, ".md") && !hasAnyPrefix(p, notDocDirs...) && !isWholeGenerated(p)
 }
 
 func inTestdata(p string) bool {
@@ -139,35 +133,32 @@ func isTestOnly(p string) bool {
 	return inTestdata(p) || (strings.HasSuffix(p, "_test.go") && !gateclass.IsGuardTest(p))
 }
 
-func isGoCodeOf(tier gateclass.Tier) func(string) bool {
+func isCodeOf(tier gateclass.Tier) func(string) bool {
 	return func(p string) bool {
-		return strings.HasSuffix(p, ".go") && !isTestOnly(p) && gateclass.TierOf(p, nil) == tier
+		code := strings.HasSuffix(p, ".go") || hasAnyPrefix(p, packageDirs...)
+		return code && !isTestOnly(p) && gateclass.TierOf(p, nil) == tier
 	}
 }
 
-func isT1Code(p string) bool {
-	return strings.HasPrefix(p, "go/") && !isTestOnly(p) && gateclass.TierOf(p, nil) == gateclass.T1
-}
-
 func isPersona(p string) bool {
-	return (strings.HasPrefix(p, "agents/") && strings.HasSuffix(p, ".md")) || hasAnyPrefix(p, "skills/", "guidance/rules/")
+	return (hasAnyPrefix(p, promptDirs...) && strings.HasSuffix(p, ".md")) || hasAnyPrefix(p, personaDirs...)
 }
 
 func isManifest(p string) bool {
-	profile, _ := path.Match(".evolve/profiles/*.json", p)
-	cli, _ := path.Match("go/internal/bridge/manifests/*.json", p)
-	phase := strings.HasPrefix(p, ".evolve/phases/") && strings.HasSuffix(p, ".json")
-	return profile || cli || phase || strings.HasPrefix(p, ".claude-plugin/")
+	return slices.ContainsFunc(manifestGlobs, func(glob string) bool {
+		ok, _ := path.Match(glob, p)
+		return ok
+	}) || hasAnyPrefix(p, manifestDirs...)
 }
 
-func (d Diff) classesOf(p string) []ID {
+func (d Diff) classesOf(s Surface, p string) []ID {
 	if slices.Contains(d.CommentOnly, p) {
 		return []ID{C0}
 	}
 	var ids []ID
-	for _, m := range matchers {
-		if m.match(p) {
-			ids = append(ids, m.id)
+	for _, c := range table {
+		if c.match != nil && c.match(s, p) {
+			ids = append(ids, c.ID)
 		}
 	}
 	if slices.Contains(d.StageFlips, p) {
@@ -179,10 +170,10 @@ func (d Diff) classesOf(p string) []ID {
 	return ids
 }
 
-func Classify(d Diff) Requirements {
+func Classify(s Surface, d Diff) Requirements {
 	byClass := map[ID][]string{}
 	for _, p := range d.Paths {
-		for _, id := range d.classesOf(p) {
+		for _, id := range d.classesOf(s, p) {
 			byClass[id] = append(byClass[id], p)
 		}
 	}
@@ -194,8 +185,8 @@ func Classify(d Diff) Requirements {
 		}
 		slices.Sort(hitPaths)
 		req.Classes = append(req.Classes, Hit{Class: c.ID, Name: c.Name, Paths: hitPaths})
-		for _, s := range c.seatsFor(hitPaths) {
-			req.Seats = mergeSeat(req.Seats, s)
+		for _, seat := range c.seatsFor(s, hitPaths) {
+			req.Seats = mergeSeat(req.Seats, seat)
 		}
 		for _, check := range c.checksFor(hitPaths) {
 			req.Checks = mergeCheck(req.Checks, check)
@@ -204,16 +195,19 @@ func Classify(d Diff) Requirements {
 	return req
 }
 
-func (c Class) seatsFor(hitPaths []string) []Seat {
+func (c Class) seatsFor(s Surface, hitPaths []string) []Seat {
 	seats := c.clone().Seats
-	if slices.ContainsFunc(hitPaths, c.needsSecurity) {
+	if len(c.SecurityWhen) > 0 && slices.ContainsFunc(hitPaths, func(p string) bool { return c.needsSecurity(s, p) }) {
 		seats = append(seats, securitySeat)
 	}
 	return seats
 }
 
-func (c Class) needsSecurity(p string) bool {
-	return slices.ContainsFunc(guards.SurfaceClassesOf(p), func(g guards.GuaranteeClass) bool { return slices.Contains(c.SecurityWhen, g) })
+func (c Class) needsSecurity(s Surface, p string) bool {
+	if s.Guarantees == nil {
+		return true
+	}
+	return slices.ContainsFunc(s.Guarantees(p), func(g string) bool { return slices.Contains(c.SecurityWhen, g) })
 }
 
 func (c Class) checksFor(hitPaths []string) []Check {

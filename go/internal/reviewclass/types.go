@@ -1,7 +1,5 @@
 package reviewclass
 
-import "github.com/mickeyyaya/evolve-loop/go/internal/guards"
-
 type ID string
 
 const (
@@ -36,13 +34,19 @@ type Check struct {
 }
 
 type Class struct {
-	ID           ID                      `json:"id"`
-	Name         string                  `json:"name"`
-	Detect       string                  `json:"detect"`
-	Seats        []Seat                  `json:"seats"`
-	SecurityWhen []guards.GuaranteeClass `json:"security_when,omitempty"`
-	Checks       []Check                 `json:"checks"`
-	Cap          string                  `json:"cap"`
+	ID           ID       `json:"id"`
+	Name         string   `json:"name"`
+	Detect       string   `json:"detect"`
+	Seats        []Seat   `json:"seats"`
+	SecurityWhen []string `json:"security_when,omitempty"`
+	Checks       []Check  `json:"checks"`
+	Cap          string   `json:"cap"`
+	match        func(Surface, string) bool
+}
+
+type Surface struct {
+	Protected  func(path string) bool
+	Guarantees func(path string) []string
 }
 
 type Diff struct {

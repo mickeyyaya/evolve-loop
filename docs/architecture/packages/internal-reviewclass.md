@@ -25,23 +25,24 @@ Rule R1 gives the union. The seats are `code-simplifier`, `go-reviewer|code-revi
 - **The table is data.** `Classes` returns a copy of the 14 rows C0 to C13. Each row has an ID, a name, a detection rule, the seats, the checks and the cost cap of the plan. A caller cannot change the registry through the copy.
 - **A seat is a set of alternatives.** `Seat.Any` lists the personas that satisfy the seat. C6 needs `go-reviewer` or `code-reviewer`, so its seat is `go-reviewer|code-reviewer`. A seat can also have a lens, a tier and the other-family rule.
 - **A planned item says so.** A seat or a check that a later component builds has `Planned` set to that component, for example `S2` or `S6`. The verb prints `(planned S2)` after it. Thus the output does not claim a check that does not exist yet.
+- **The surface is injected.** `Classify` takes a `Surface`: the `Protected` predicate and the `Guarantees` function of a path. The verb gives `guards.IsProtectedSurface` and `guards.SurfaceClassesOf`. The package imports neither `guards` nor `core`, so a reader in `core` (S7) can import it with no cycle. This is the pattern of `gateclass`. A `Surface` with no predicate fails closed: each path is protected, and each T0 path needs the security seat.
+- **Each row owns its matcher.** A class row holds its match function, and its detection text comes from the same lists. Thus the table and the matchers cannot drift apart.
 - **One path can have more than one class.** Each class has its own matcher, and a path gets each class whose matcher is true. Thus a protected Go file is C6 or C7 and also C11.
 - **The matchers.**
 
   | Class | Matcher |
   |---|---|
   | C0 | the caller proved the Go file comment-only |
-  | C1 | `*.md` outside `agents/`, `skills/` and `guidance/`, and not a whole generated file |
+  | C1 | `*.md` outside `agents/`, `skills/`, `guidance/` and `.evolve/phases/`, and not a whole generated file |
   | C2 | under `.evolve/inbox/` |
   | C3 | an output of a `derived.Catalog` entry |
   | C4 | one of the four floor-list files |
   | C5 | `*_test.go` or a path under a `testdata/` directory in `go/`, when `gateclass.IsGuardTest` is false |
-  | C6 | Go code or a guard test, with tier T2 from `gateclass.TierOf` |
-  | C7 | a file under `go/` with tier T1 that is not test-only: Go code, a guard test or a data file, for example a bridge recipe |
-  | C8 | `agents/*.md`, `skills/` or `guidance/rules/` |
+  | C6, C7 | a Go file, or a file under `go/internal/` or `go/cmd/`, that is not test-only, with tier T2 or T1 from `gateclass.TierOf`. Thus the data file of a package, for example a bridge recipe, is code. |
+  | C8 | `*.md` under `agents/` or `.evolve/phases/` (the phase prompts), or a file under `skills/` or `guidance/rules/` |
   | C9 | a profile, a phase spec, a bridge CLI manifest or `.claude-plugin/` |
   | C10 | under `.github/workflows/` |
-  | C11 | `guards.IsProtectedSurface` |
+  | C11 | the `Protected` predicate of the `Surface` |
   | C12 | the caller found a `stage-off-enforce` flag of `gateclass` in the file |
   | C13 | no other matcher is true |
 
@@ -50,9 +51,9 @@ Rule R1 gives the union. The seats are `code-simplifier`, `go-reviewer|code-revi
 - **R3, raise only.** A matcher can add a class to a path. No matcher removes a class from a path.
 - **R4, the narrow waiver.** A proven comment-only Go file gets C0 and no other class, also when the file is protected. The proof compares the syntax tree and the directives, so the code of the file does not change. This is the waiver of the commit gate today.
 - **Generated files.** A generated file gets C3. A whole generated file does not also get C1, because no person writes its text. A generated region in a document gets C1 and C3, because a person writes the rest of the file.
-- **The conditional security seat.** C11 and C12 have `SecurityWhen`: the sandbox, the dispatch-credential and the policy guarantee classes. `Classify` adds the `security` seat when a path of the class has one of these classes. `guards.SurfaceClassesOf` gives the classes of a path.
+- **The conditional security seat.** C11 and C12 have `SecurityWhen`: the names of the sandbox, the dispatch-credential and the policy guarantee classes. `Classify` adds the `security` seat when the `Guarantees` of a path of the class include one of these names. `TestGuaranteeNames_AreTheGuaranteeClassesOfTheManifest` pins the names to the `guards` constants.
 - **The generated check.** C3 lists the `Check` verb of each `derived.Catalog` entry that the diff touches, for example `evolve skills check`.
-- **C13 fails closed.** A path that no matcher knows gets the C6 seats and the C6 checks. `KnownDefaults` lists the tracked C13 territory, for example `knowledge-base/` and `go/go.mod`. `TestKnownDefaults_EachTrackedPathHasAClassOrAListedDefault` fails when a tracked path has no class and no entry. It also fails when an entry matches no tracked path.
+- **C13 fails closed.** A path that no matcher knows gets the C6 seats and the C6 checks. `KnownDefaults` lists the tracked C13 territory, for example `knowledge-base/` and `go/go.mod`. `TestReviewClass_EachTrackedPathHasAClassOrAKnownDefault` in `go/cmd/evolve` uses the production surface. It fails when a tracked path has no class and no entry. It also fails when an entry matches no tracked path.
 - **Read.** `Read` takes a git function and a file reader from the caller, so the package runs no command. It reads the changed and the untracked paths against the base. It runs `gateclass.Read` and `gateclass.Classify` for the stage flips. It proves each changed Go file comment-only with `commentaudit.Equivalent`. A file under `testdata/`, a new file and a file that does not parse are not comment-only.
 
 ## Invariants
@@ -69,4 +70,5 @@ Rule R1 gives the union. The seats are `code-simplifier`, `go-reviewer|code-revi
 - No gate reads the table yet. S4 adds the commit gate at the `review_routing.stage` key, S5 adds CI and S7 adds the lane phase.
 - The size rule of graft G1 is absent. Open question Q1 of the plan sets its line count.
 - C12 finds only a stage that goes from `enforce` to `shadow` or `off`, because that is the `gateclass` pattern. A flip to `enforce` is not C12.
+- `core/floor_lists_regression.go` also names the four floor-list files of C4. The registry cannot import `core`, so the two lists are separate until a leaf package holds the names.
 - The verb compares the working tree with the base. It does not read the index alone, so a staged and an unstaged change look the same.
