@@ -291,3 +291,11 @@ func TestWriteRecordNeverWritesThroughALinkAtAStagingName(t *testing.T) {
 		t.Errorf("the record write followed a link to %s: %q", victim, got)
 	}
 }
+
+func TestHoldsCommit_VouchesOnlyForACommitOfTheRecord(t *testing.T) {
+	t.Parallel()
+	r := DeliverableRecord{Commits: []CommitIdentity{{SHA: "aaa"}, {SHA: "bbb"}}}
+	if !r.HoldsCommit("bbb") || r.HoldsCommit("ccc") || (DeliverableRecord{}).HoldsCommit("") {
+		t.Error("HoldsCommit vouches for a commit that the record does not hold")
+	}
+}

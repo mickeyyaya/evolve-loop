@@ -864,3 +864,5 @@
 # shiptest - the shared real-git fixtures of the ship tests and the black-box ship scenarios split from internal/phases/ship.
 ./internal/phases/ship/shiptest
 ./internal/supersede
+# ADR-0147 I2 (2026-11-03): the prefix queue of the landing composer, moved out of internal/fleet into a leaf package.
+./internal/prefixqueue

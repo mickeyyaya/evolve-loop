@@ -24,3 +24,14 @@ func TestTrailerKeys_DriveBuildAndParse(t *testing.T) {
 		t.Errorf("KeyChallenge round-trip: Challenge=%q want %q", got.Challenge, in.Challenge)
 	}
 }
+
+func TestKeyAuditTree_IsATrailerKeyThatParseKeepsInTheBlock(t *testing.T) {
+	t.Parallel()
+	if KeyAuditTree != "Evolve-Audit-Tree" {
+		t.Fatalf("KeyAuditTree = %q, want Evolve-Audit-Tree", KeyAuditTree)
+	}
+	msg := "subject\n" + Trailer{Cycle: 7}.Build() + KeyAuditTree + ": abc\n"
+	if got := Parse(msg); got.Cycle != 7 {
+		t.Errorf("Parse(a block that ends with %s) lost the cycle: %+v", KeyAuditTree, got)
+	}
+}
