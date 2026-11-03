@@ -10,6 +10,8 @@ var serialTests = map[string]string{
 	"main.TestCycleResume_DryRunNamesThePausedCycleAndStartsNothing":                                        "swaps seams cycleResumeLoad and loopLaunchFn",
 	"main.TestCycleResume_EachRefusalHasItsExitCode":                                                        "swaps seams cycleResumeLoad and loopLaunchFn",
 	"main.TestCycleResume_LaunchesTheLoopOnThePausedCycle":                                                  "swaps seams cycleResumeLoad and loopLaunchFn",
+	"main.TestCycleResumeAll_AGrantErrorIsReportedAndTheOthersAreStillGranted":                              "swaps seam cycleGrantResume",
+	"main.TestCycleResumeAll_AGrantErrorUnderJSONStillExitsNonZero":                                         "swaps seam cycleGrantResume",
 	"main.TestCycleResume_ReadsTheCheckpointOfTheRoot":                                                      "swaps seam loopLaunchFn",
 	"main.TestDossierShow_AnUnreadableWorkingDirectoryIsAnIOError":                                          "swaps seam processGetwd",
 	"main.TestGC_TakesItsLeaseAndSkipsLiveRuns":                                                             "swaps seams gcInjectedReapers and gcInjectedProcessHost",

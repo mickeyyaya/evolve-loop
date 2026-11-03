@@ -600,6 +600,7 @@ The cycle's production composition root, `wireOrchestratorDeps` in `cmd_cycle.go
   - With `--ci` (or `CI=true`), it validates the plugin layout and installs nothing. `uninstall --ci` is a dry run and never touches the `.evolve/` of the project. A read error or empty input to the prompt is a "no".
 - **`evolve bridge watch` and `evolve bridge introspect`.** `watch` never writes the feed or the inbox. `--follow` starts at the end of the file, so lines that the first pass printed do not repeat. `watchFollowInterval` is a variable, so tests can shorten the poll. `introspect` reads the pane offline from `--pane-file`, or captures it from the live REPL.
 - **Test harness reasons.** `cmd_fleet_soak_test.go` and `cmd_cycle_projroot_test.go` stay serial: the first assigns the package-level `soakLaunchFn` and `soakKiller` variables, the second calls `os.Chdir`. The `waitForFollow` style tests re-append on each tick, because the follow loop seeds its offset asynchronously and skips an earlier append. A fixture that makes a path a directory, or a file where a directory belongs, provokes a read or mkdir fault that differs from absence.
+- **`cycle resume --all` grants every paused cycle** (`cmd_cycle_resume_all.go`). It starts no cycle, and `--dry-run` grants nothing. The pool plan puts each ready paused scope before the triage todos (`pausedPlan.order` in `cmd_loop_pool_paused.go`). The scope keeps the files of its triage todo or of its inbox items.
 
 ## Findings
 

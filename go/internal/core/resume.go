@@ -30,6 +30,7 @@ type ResumePoint struct {
 	SavedAt         string
 	AutoAttempts    int
 	AutoMaxAttempts int
+	QuotaResetAt    string
 	StatePath       string
 }
 
@@ -288,6 +289,7 @@ func loadResumeStateFrom(statePath, projectRoot string, opts ResumeOptions) (*Re
 		SavedAt:         strFromAny(cp["savedAt"]),
 		AutoAttempts:    intFromAny(cp["autoResumeAttempts"]),
 		AutoMaxAttempts: intFromAny(cp["autoResumeMaxAttempts"]),
+		QuotaResetAt:    strFromAny(cp["quotaResetAt"]),
 	}
 	if rp.Phase == "" {
 		return nil, fmt.Errorf("%w: checkpoint.resumeFromPhase missing", ErrStaleCheckpoint)
