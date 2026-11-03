@@ -307,7 +307,7 @@ A test function with an empty body passes and proves nothing. The test-smell cat
 2. A test is a top-level function with no receiver. Its name is `Test`, `Fuzz` or `Benchmark`. It can also start with one of them and a letter that is not lower case, as `go test` reads it.
 3. A test whose body has no statement is an offender. A body that holds only a comment has no statement, so it is an offender. A body that holds only `t.Skip` with a reason passes.
 4. The message gives the file, the line and the function. It tells the author to assert the behavior or to call `t.Skip` with a reason.
-5. `baseline.txt` holds one offender for each line, as the path and the function name. A baseline offender passes. An entry that matches no offender fails, so the baseline only gets smaller.
+5. `baseline.txt` holds one offender for each line, as the path and the function name. A line holds nothing else. A baseline offender passes. An entry that matches no offender fails, so the baseline only gets smaller.
 6. A scan that cannot do its work is an error. The cases are a missing module, a module with no test file and a file that does not parse.
 
 On 2026-11-03 the module has no offender, so the baseline is empty. The three tests of cycle 2035 never reached main, because the console removed them in the lane.
@@ -318,6 +318,7 @@ The test `TestNoNewTestFunctionHasAnEmptyBody` runs the check on the real tree. 
 
 - The guard reads only the syntax. A body with one statement that asserts nothing, for example `_ = t`, passes.
 - A method of a test suite is not a test for this guard. A function with a receiver passes.
+- The guard reads only top-level functions. A subtest whose function literal is empty, for example `t.Run("case", func(t *testing.T) {})`, passes.
 - `go/acs/regression/` is a protected surface. A loop lane cannot add an entry to the baseline. The console adds it.
 
 ## Lifecycle
