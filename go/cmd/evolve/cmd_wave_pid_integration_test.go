@@ -20,3 +20,14 @@ func TestProcessStartTime_ReadsTheRunningProcess(t *testing.T) {
 		t.Error("processStartTime(-1) reported a start time for no process")
 	}
 }
+
+func TestProcessStartTime_NeedsNoPsOnThePath(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+
+	started, ok := processStartTime(os.Getpid())
+
+	now := time.Now()
+	if !ok || started.After(now) || now.Sub(started) > time.Hour {
+		t.Errorf("processStartTime(self) with an empty PATH = %v, %t; want a start in the last hour: the kernel read needs no exec", started, ok)
+	}
+}

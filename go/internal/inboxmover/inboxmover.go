@@ -20,6 +20,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover/lifecycle"
+	"github.com/mickeyyaya/evolve-loop/go/internal/integration"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -112,9 +113,21 @@ func shaLandedOnMain(root, sha string) (bool, error) {
 	case code == 0:
 		return true, nil
 	case code == 1:
-		return false, nil
+		return landedByRecord(root, sha), nil
 	}
 	return true, fmt.Errorf("git merge-base --is-ancestor %s main exit=%d: %s", sha, code, strings.TrimSpace(stderr))
+}
+
+const landedIdentityTimeout = 30 * time.Second
+
+func landedByRecord(root, sha string) bool {
+	rec, found := integration.FindRecordByCommit(root, sha)
+	if !found {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), landedIdentityTimeout)
+	defer cancel()
+	return integration.Repo{Dir: root, Git: integration.SysGit()}.LandedOnRef(ctx, rec, "main")
 }
 
 func readActiveCycle(cycleStatePath string) (string, error) {
