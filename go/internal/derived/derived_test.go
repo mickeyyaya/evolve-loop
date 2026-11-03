@@ -214,7 +214,7 @@ func TestPathspecs_ListEveryOutputPattern(t *testing.T) {
 	}
 }
 
-func TestStale_AnInputChangeMakesItsEntryStale(t *testing.T) {
+func TestStale_AnInputOrAHandEditedOutputMakesItsEntryStale(t *testing.T) {
 	dirs := GoInputDirs{SkillcheckClosure: {"go/internal/phasespec"}, CodeRegistrars: {"go/internal/core"}}
 	cases := []struct {
 		name    string
@@ -227,7 +227,9 @@ func TestStale_AnInputChangeMakesItsEntryStale(t *testing.T) {
 		{"a code registrar", []string{"go/internal/core/signal.go"}, []string{"signal-codes"}},
 		{"a research-index entry", []string{"docs/research-index/2026-10-21-a.md"}, []string{"research-index"}},
 		{"a file that only shares a prefix", []string{".claude-plugin/plugin.json.bak", "go/internal/phasespecx/a.go"}, nil},
-		{"an output alone", []string{flagsDoc}, nil},
+		{"an output alone", []string{flagsDoc}, []string{"flag-index"}},
+		{"a hand-edited research index with no entry", []string{"docs/research-index.md", "docs/research/a.md"}, []string{"research-index"}},
+		{"a skill body outside its generated region", []string{"skills/build/SKILL.md"}, []string{"skill-projections"}},
 		{"nothing", nil, nil},
 	}
 	for _, c := range cases {

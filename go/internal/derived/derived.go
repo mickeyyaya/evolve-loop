@@ -159,7 +159,7 @@ func (e Entry) touchesOutput(paths []string) bool {
 func Stale(changed []string, dirs GoInputDirs) []Entry {
 	var stale []Entry
 	for _, e := range Catalog() {
-		if e.touchesInput(changed, dirs) {
+		if e.touchesInput(changed, dirs) || e.touchesOutput(changed) {
 			stale = append(stale, e)
 		}
 	}
