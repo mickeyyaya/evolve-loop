@@ -37,3 +37,17 @@ func TestNormalize_DropsTheDetailSpan(t *testing.T) {
 		t.Errorf("Normalize(%q) = %q, want %q", in, got, plain)
 	}
 }
+
+func TestNormalize_IsIdempotent(t *testing.T) {
+	t.Parallel()
+
+	for _, in := range []string{
+		"phase=scout cycle=2071 runs/cycle-2049-01m5xtvnwk94g9ryfgzhqre9m0/x 2 finding(s) attempt 2/3 0.31s narrative=FAIL",
+		cyclestate.WithDetail("  floor red in cycle 12 ", "paths"),
+	} {
+		once := failurefp.Normalize(in)
+		if twice := failurefp.Normalize(once); twice != once {
+			t.Errorf("Normalize(Normalize(%q)) = %q, want %q", in, twice, once)
+		}
+	}
+}
