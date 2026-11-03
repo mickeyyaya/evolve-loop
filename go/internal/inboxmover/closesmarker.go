@@ -5,12 +5,42 @@ import (
 	"strings"
 )
 
-const closesInboxMarker = "closes-inbox:"
+const (
+	closesInboxMarker = "closes-inbox:"
+	refsInboxMarker   = "refs-inbox:"
+	noInboxIDs        = "none"
+)
 
 var inboxIDPattern = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 
 func ClosesInboxIDs(body []byte) []string {
+	return markerIDs(body, closesInboxMarker)
+}
+
+func RefsInboxIDs(body []byte) []string {
+	return markerIDs(body, refsInboxMarker)
+}
+
+func DeclaresInboxTrailer(body []byte) bool {
+	declared := false
+	scanMarkerLines(body, func(string) { declared = true }, closesInboxMarker, refsInboxMarker)
+	return declared
+}
+
+func markerIDs(body []byte, marker string) []string {
 	var ids []string
+	scanMarkerLines(body, func(rest string) {
+		for _, field := range strings.Split(rest, ",") {
+			id := strings.Trim(strings.TrimSpace(field), "`")
+			if inboxIDPattern.MatchString(id) && !strings.EqualFold(id, noInboxIDs) {
+				ids = append(ids, id)
+			}
+		}
+	}, marker)
+	return dedupeIDs(ids)
+}
+
+func scanMarkerLines(body []byte, visit func(rest string), markers ...string) {
 	var inFence bool
 	var fenceChar byte
 	for _, rawLine := range strings.Split(string(body), "\n") {
@@ -37,21 +67,20 @@ func ClosesInboxIDs(body []byte) []string {
 			}
 			continue
 		}
-		rest, ok := cutClosesInboxMarker(line)
-		if !ok {
-			continue
-		}
-		for _, field := range strings.Split(rest, ",") {
-			id := strings.Trim(strings.TrimSpace(field), "`")
-			if inboxIDPattern.MatchString(id) {
-				ids = append(ids, id)
+		for _, marker := range markers {
+			if rest, ok := cutInboxMarker(line, marker); ok {
+				visit(rest)
+				break
 			}
 		}
 	}
-	return dedupeIDs(ids)
 }
 
 func cutClosesInboxMarker(line string) (string, bool) {
+	return cutInboxMarker(line, closesInboxMarker)
+}
+
+func cutInboxMarker(line, marker string) (string, bool) {
 	s := strings.TrimSuffix(line, "\r")
 	if len(s) > 0 && (s[0] == '-' || s[0] == '*' || s[0] == '+') {
 		s = s[1:]
@@ -60,8 +89,8 @@ func cutClosesInboxMarker(line string) (string, bool) {
 		}
 		s = strings.TrimLeft(s, " \t")
 	}
-	if len(s) < len(closesInboxMarker) || !strings.EqualFold(s[:len(closesInboxMarker)], closesInboxMarker) {
+	if len(s) < len(marker) || !strings.EqualFold(s[:len(marker)], marker) {
 		return "", false
 	}
-	return s[len(closesInboxMarker):], true
+	return s[len(marker):], true
 }
