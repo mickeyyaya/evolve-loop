@@ -20,7 +20,7 @@ func isDocsOnly(files []string) bool {
 }
 
 func (o Options) requiredReviewSatisfied(files, langs []string, res *Result) bool {
-	if !isDocsOnly(files) {
+	if reviewClassOf(files) != reviewClassDocs {
 		return o.reviewersSatisfied(langs, res)
 	}
 	if capSatisfied(normalizeReviewers(o.Reviewers), docsReviewSyn) {

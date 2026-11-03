@@ -12,6 +12,7 @@ type Attestation struct {
 	ChecksPassed []string    `json:"checks_passed"`
 	ReviewersRun []string    `json:"reviewers_run"`
 	ReviewWaiver string      `json:"review_waiver,omitempty"`
+	ReviewClass  string      `json:"review_class,omitempty"`
 	ReviewRuns   []ReviewRun `json:"review_runs,omitempty"`
 	Tool         string      `json:"tool"`
 }
@@ -34,7 +35,7 @@ func (a *Attestation) Marshal() ([]byte, error) {
 }
 
 func (a *Attestation) marshalWith(marshal func(any) ([]byte, error)) ([]byte, error) {
-	lines := make([]string, 0, 7)
+	lines := make([]string, 0, 8)
 	for _, f := range a.fields() {
 		value, err := marshal(f.value)
 		if err != nil {
@@ -54,6 +55,9 @@ func (a *Attestation) fields() []attestationField {
 	}
 	if a.ReviewWaiver != "" {
 		fields = append(fields, attestationField{"review_waiver", a.ReviewWaiver})
+	}
+	if a.ReviewClass != "" {
+		fields = append(fields, attestationField{"review_class", a.ReviewClass})
 	}
 	if len(a.ReviewRuns) > 0 {
 		fields = append(fields, attestationField{"review_runs", a.ReviewRuns})

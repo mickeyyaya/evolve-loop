@@ -14,6 +14,10 @@ import (
 
 const reviewRunPrefix = "run:"
 
+func ReviewRunToken(runID string) string {
+	return reviewRunPrefix + runID
+}
+
 func isReviewRun(token string) bool {
 	return strings.HasPrefix(stripWhitespace(token), reviewRunPrefix)
 }

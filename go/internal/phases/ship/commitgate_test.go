@@ -308,3 +308,34 @@ func TestCommitGate_CyclePersonaLint(t *testing.T) {
 		t.Errorf("--class cycle ship must run the persona lint; logs=%v", res.Logs)
 	}
 }
+
+func TestCommitGate_AManualCommitCarriesItsReviewClassAndItsReviewRuns(t *testing.T) {
+	t.Parallel()
+	repo := makeRepo(t)
+	excludeCommitGate(t, repo)
+	addRemote(t, repo)
+	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nreviewed change\n")
+	writeGateAttestation(t, repo, commitgate.Attestation{
+		TreeStateSHA: treeStateSHA(t, repo),
+		TS:           "2026-11-03T00:00:00Z",
+		ReviewersRun: []string{"code-simplifier", "go-reviewer"},
+		ReviewClass:  "code",
+		ReviewRuns: []commitgate.ReviewRun{
+			{RunID: "agent-code-simplifier-1", Profile: "code-simplifier"},
+			{RunID: "agent-go-reviewer-2", Profile: "go-reviewer"},
+		},
+		Tool: "shasum",
+	})
+	if res, _ := runShip(t, repo, Options{Class: ClassManual, CommitMessage: "reviewed change", AutoConfirm: "test"}); res.ExitCode != ExitOK {
+		t.Fatalf("want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)
+	}
+
+	class := runGitOut(t, repo, "log", "-1", "--format=%(trailers:key=Review-class,valueonly)")
+	runs := runGitOut(t, repo, "log", "-1", "--format=%(trailers:key=Review-run,valueonly)")
+	if strings.TrimSpace(class) != "code" {
+		t.Errorf("Review-class trailer = %q, want code", class)
+	}
+	if got := strings.Join(strings.Fields(runs), " "); got != "run:agent-code-simplifier-1 run:agent-go-reviewer-2" {
+		t.Errorf("Review-run trailers = %q, want one run: id per review run", runs)
+	}
+}

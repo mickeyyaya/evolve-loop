@@ -30,6 +30,12 @@ func reviewTrailer(opts *Options) string {
 		writeTrailer(&b, "Reviewed-by", r)
 	}
 	writeTrailer(&b, "Review-waived", att.ReviewWaiver)
+	writeTrailer(&b, "Review-class", att.ReviewClass)
+	for _, run := range att.ReviewRuns {
+		if run.RunID != "" {
+			writeTrailer(&b, "Review-run", commitgate.ReviewRunToken(run.RunID))
+		}
+	}
 	if b.Len() == 0 {
 		return ""
 	}

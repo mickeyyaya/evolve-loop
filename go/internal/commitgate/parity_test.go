@@ -19,6 +19,7 @@ const goldenAttestation = `{
   "ts": "<TS>",
   "checks_passed": [%CHECKS%],
   "reviewers_run": ["code-simplifier","go-reviewer"],
+  "review_class": "code",
   "tool": "%TOOL%"
 }
 `

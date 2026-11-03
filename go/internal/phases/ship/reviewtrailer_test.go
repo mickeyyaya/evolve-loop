@@ -76,3 +76,19 @@ func TestReviewTrailer(t *testing.T) {
 		}
 	})
 }
+
+func TestReviewTrailer_NamesTheReviewClassAndEachReviewRun(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writeGateAttestation(t, dir, commitgate.Attestation{
+		TreeStateSHA: "x",
+		ReviewersRun: []string{"go-reviewer"},
+		ReviewClass:  "code",
+		ReviewRuns:   []commitgate.ReviewRun{{RunID: "agent-go-reviewer-1", Profile: "go-reviewer"}, {RunID: "bad\nSigned-off-by: x"}, {Profile: "code-simplifier"}},
+	})
+	got := reviewTrailer(&Options{Class: ClassManual, ProjectRoot: dir})
+	want := "\n\nReviewed-by: go-reviewer\nReview-class: code\nReview-run: run:agent-go-reviewer-1"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}

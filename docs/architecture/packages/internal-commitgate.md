@@ -90,11 +90,27 @@
   - `checks_passed`: in execution order.
   - `reviewers_run`.
   - `review_waiver`: present only when the review waiver applied.
+  - `review_class`: the class of review that the gate applied. The values are `comment-only`, `docs` and `code` (`reviewClassOf`, `review_class.go`). `reviewClassOf` is the one home of the docs-only decision, and `requiredReviewSatisfied` reads it.
+  - These are the S0 names of [review routing](../../plans/review-routing-2026-11.md). They map to the S1 registry classes as follows: `comment-only` is C0, `docs` is C1, and `code` is C4 to C13. After S1, a mixed diff can carry one `Review-class` trailer for each class.
   - `review_runs`: present only when a `run:` token applied. Each entry has the run id, the profile, the driver, the family and the model.
   - `tool`: `shasum` when present, else `sha256sum` (neither is ExitGitFatal).
 
-  The reader (`internal/phases/ship`) decodes into this same `Attestation` type, so the schema has one home. The reader consumes `tree_state_sha`, `reviewers_run` and `review_waiver`. It turns each reviewer into a `Reviewed-by` trailer and the waiver into a `Review-waived` trailer. Ship's tests write their attestations with this package's `Marshal`. `TestAttestation_MarshalWritesValidJSONForAnyReviewerName` round-trips every field, so a writer key that drifts from its struct tag fails a test.
-- **The byte layout** is the deleted bash heredoc's. It has a two-space indent, one field per line, inline arrays with no spacing (`["a","b"]`, `[]` when empty) and a trailing newline. `Marshal` encodes every value with `encoding/json`, so any reviewer name writes valid JSON (`TestAttestation_MarshalWritesValidJSONForAnyReviewerName`). The layout is unchanged for an attestation with no waiver (`TestRun_AttestationStableBytes`, `TestRun_EmptyArraysMarshalInline`, the golden). A waiver adds one line before `tool` (`TestAttestation_AWaiverIsWrittenOnlyWhenOneApplied`).
+  The reader (`internal/phases/ship`) decodes into this same `Attestation` type, so the schema has one home. The reader consumes `tree_state_sha`, `reviewers_run`, `review_waiver`, `review_class` and `review_runs`. It writes these trailers:
+
+  - one `Reviewed-by` trailer for each reviewer;
+  - one `Review-waived` trailer for the waiver;
+  - one `Review-class` trailer for the class;
+  - one `Review-run: run:<run id>` trailer for each review run. `ReviewRunToken` is the one spelling of the token. It is the token that `--reviewers` accepts.
+
+  Ship's tests write their attestations with this package's `Marshal`. `TestAttestation_MarshalWritesValidJSONForAnyReviewerName` round-trips every field, so a writer key that drifts from its struct tag fails a test.
+- **The byte layout** is the deleted bash heredoc's. It has a two-space indent, one field per line, inline arrays with no spacing (`["a","b"]`, `[]` when empty) and a trailing newline. `Marshal` encodes every value with `encoding/json`, so any reviewer name writes valid JSON (`TestAttestation_MarshalWritesValidJSONForAnyReviewerName`). An attestation with no waiver and no class keeps the old layout (`TestRun_AttestationStableBytes`, `TestRun_EmptyArraysMarshalInline`). A waiver adds one line before `tool` (`TestAttestation_AWaiverIsWrittenOnlyWhenOneApplied`). The gate always writes a class line, after the waiver and before the runs (`TestAttestation_TheReviewClassIsWrittenAfterTheWaiverAndBeforeTheRuns`, the golden).
+- **The review record on main (review-routing S0).**
+  - Issue: from 2026-10-09, no console commit on main has a `Reviewed-by` trailer. The attestations stay in `dev/*/.commit-gate`, so CI and history do not see the reviews.
+  - Cause: only `evolve ship --class manual` writes the trailers (`reviewTrailer`). The console commits after 2026-10-09 do not have the ship diff footer either. Thus a bare `git commit` on a PR branch made them, and ship did not run.
+  - Gap: a commit through ship also lost the review runs and the class, because the trailer named only the profiles.
+  - Solution: the gate records `review_class`. Ship writes `Review-class` and one `Review-run` trailer for each run, so `git log --format=%(trailers)` reads them.
+  - Limit: this change does not stop a bare `git commit`. The ship guard and the plan of [review routing](../../plans/review-routing-2026-11.md) (S5) close that gap.
+  - Pinned by `TestRun_TheAttestationNamesTheReviewClassOfTheChange`, `TestReviewTrailer_NamesTheReviewClassAndEachReviewRun` and `TestCommitGate_AManualCommitCarriesItsReviewClassAndItsReviewRuns` (a real git commit).
 - **`Runner` is exactly `sysexec.RunFunc`**, so production passes `sysexec.DefaultRunner` and tests inject a fake without touching PATH (`TestRunner_AliasIsRunFunc`).
 
 ## Invariants
