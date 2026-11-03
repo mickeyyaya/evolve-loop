@@ -48,7 +48,7 @@ func TestReadRepo_APushedBranchGivesItsRemoteAndNoCommitAhead(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadRepo = %v", err)
 	}
-	want := Repo{Branch: "feature/x", Remote: "origin", URL: "https://github.com/acme/widgets.git", Ahead: 0}
+	want := Repo{Branch: "feature/x", Remote: "origin", Merge: "refs/heads/feature/x", URL: "https://github.com/acme/widgets.git", Ahead: 0}
 	if got != want {
 		t.Errorf("ReadRepo = %+v, want %+v", got, want)
 	}
@@ -75,6 +75,7 @@ func TestReadRepo_RefusesATreeItCannotLaunchFrom(t *testing.T) {
 	}{
 		{"detached HEAD", func(r *gittest.Repo) { r.Git("checkout", "-q", "--detach") }, "on no branch"},
 		{"no upstream remote", func(r *gittest.Repo) { r.Git("config", "--unset", "branch.feature/x.remote") }, "has no upstream"},
+		{"no upstream branch", func(r *gittest.Repo) { r.Git("config", "--unset", "branch.feature/x.merge") }, "has no upstream branch"},
 		{"a remote with no URL", func(r *gittest.Repo) { r.Git("config", "branch.feature/x.remote", "nosuch") }, "has no URL"},
 		{"no upstream ref", func(r *gittest.Repo) { r.Git("update-ref", "-d", "refs/remotes/origin/feature/x") }, "cannot be compared"},
 	}
@@ -148,5 +149,73 @@ func TestReadRepo_RefusesAnUnpushedCountThatIsNotANumber(t *testing.T) {
 	_, err := ReadRepo(context.Background(), wrapped, r.Dir)
 	if reason := refusalReason(t, err); !strings.Contains(reason, "is not a number") {
 		t.Errorf("refusal = %q, want the count named as not a number", reason)
+	}
+}
+
+func remoteBackedRepo(t *testing.T) (*gittest.Repo, *gittest.Repo, Repo) {
+	t.Helper()
+	bare := gittest.Bare(t)
+	r := pushedRepo(t, bare.Dir)
+	r.Git("push", "-q", "origin", "feature/x")
+	repo, err := ReadRepo(context.Background(), sysexec.DefaultRunner, r.Dir)
+	if err != nil {
+		t.Fatalf("ReadRepo = %v", err)
+	}
+	return r, bare, repo
+}
+
+func TestRepoMatchRemote_AcceptsARemoteHeadThatIsTheLocalHead(t *testing.T) {
+	r, _, repo := remoteBackedRepo(t)
+	if err := repo.MatchRemote(context.Background(), sysexec.DefaultRunner, r.Dir); err != nil {
+		t.Errorf("MatchRemote of a pushed branch = %v, want nil", err)
+	}
+}
+
+func TestRepoMatchRemote_RefusesARemoteHeadThatDiffersFromTheLocalHead(t *testing.T) {
+	cases := map[string]func(t *testing.T, r, bare *gittest.Repo){
+		"a push from elsewhere": func(t *testing.T, _, bare *gittest.Repo) {
+			other := gittest.Clone(t, bare.Dir)
+			other.Git("checkout", "-q", "feature/x")
+			other.Git("commit", "-q", "--allow-empty", "-m", "elsewhere")
+			other.Git("push", "-q", "origin", "feature/x")
+		},
+		"a local commit after the check": func(_ *testing.T, r, _ *gittest.Repo) {
+			r.Git("commit", "-q", "--allow-empty", "-m", "late")
+		},
+	}
+	for name, change := range cases {
+		t.Run(name, func(t *testing.T) {
+			r, bare, repo := remoteBackedRepo(t)
+			change(t, r, bare)
+			err := repo.MatchRemote(context.Background(), sysexec.DefaultRunner, r.Dir)
+			if reason := refusalReason(t, err); !strings.Contains(reason, "differs from the local head") || !strings.Contains(reason, "feature/x") {
+				t.Errorf("refusal = %q, want the differing heads named", reason)
+			}
+			if strings.Contains(err.Error(), bare.Dir) {
+				t.Errorf("refusal = %q names the URL of the remote", err)
+			}
+		})
+	}
+}
+
+func TestRepoMatchRemote_RefusesWhenAHeadCannotBeRead(t *testing.T) {
+	r, _, repo := remoteBackedRepo(t)
+	noBranch := repo
+	noBranch.Merge = "refs/heads/absent"
+	if reason := refusalReason(t, noBranch.MatchRemote(context.Background(), sysexec.DefaultRunner, r.Dir)); !strings.Contains(reason, "cannot read the head of refs/heads/absent on origin") {
+		t.Errorf("refusal for an absent remote branch = %q", reason)
+	}
+	if reason := refusalReason(t, repo.MatchRemote(context.Background(), sysexec.DefaultRunner, t.TempDir())); !strings.Contains(reason, "has no local head") {
+		t.Errorf("refusal outside a repository = %q", reason)
+	}
+	suffix := func(ctx context.Context, name, cwd string, args, env []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
+		if name == "git" && len(args) > 0 && args[0] == "ls-remote" {
+			_, _ = io.WriteString(stdout, "0123\trefs/heads/other/refs/heads/feature/x\n")
+			return 0, nil
+		}
+		return sysexec.DefaultRunner(ctx, name, cwd, args, env, stdin, stdout, stderr)
+	}
+	if reason := refusalReason(t, repo.MatchRemote(context.Background(), suffix, r.Dir)); !strings.Contains(reason, "cannot read the head of refs/heads/feature/x on origin") {
+		t.Errorf("refusal for a ref that only ends with the branch = %q", reason)
 	}
 }

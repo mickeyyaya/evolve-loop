@@ -67,6 +67,7 @@ func newCloudFixture(t *testing.T, repo cloudlaunch.Repo, frames ...string) *clo
 		NewChallengeToken: func() (string, error) { return "tok-42", nil },
 		Sleep:             func(d time.Duration) { f.slept += d },
 		CloudRepo:         func(context.Context, string) (cloudlaunch.Repo, error) { return repo, nil },
+		CloudRemote:       func(context.Context, string, cloudlaunch.Repo) error { return nil },
 	}
 	return f
 }
@@ -184,8 +185,8 @@ func TestClaudeCloudDriver_TypesTheCloudCommandInItsOwnSessionAndEndsOnlyThatSes
 		t.Errorf("the pane did not change to the worktree %s: %q", f.cfg.Worktree, f.tmux.SentKeys)
 	}
 	prompt, _ := os.ReadFile(promptFile)
-	if string(prompt) != "Fix the flaky test. Token tok-42\n" {
-		t.Errorf("cloud prompt = %q, want the resolved prompt", prompt)
+	if string(prompt) != "Fix the flaky test. Token "+cloudWithheldToken+"\n" {
+		t.Errorf("cloud prompt = %q, want the resolved prompt with the token withheld", prompt)
 	}
 }
 
@@ -511,7 +512,8 @@ func TestEngineLaunch_ClaudeCloudDispatchRecordsTheLaunchedRow(t *testing.T) {
 	tmux := &FakeTmuxController{CaptureFrames: []string{cloudCreatedFrame, "$ ", "$ "}}
 	eng := NewEngine(Deps{
 		Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil), EnvStage: envStageOff,
-		CloudRepo: func(context.Context, string) (cloudlaunch.Repo, error) { return pushedGitHubRepo, nil },
+		CloudRepo:   func(context.Context, string) (cloudlaunch.Repo, error) { return pushedGitHubRepo, nil },
+		CloudRemote: func(context.Context, string, cloudlaunch.Repo) error { return nil },
 	})
 	resp, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "claude-cloud", Profile: prof, Model: "sonnet", Prompt: "Fix the flaky test", Workspace: ws,
@@ -667,5 +669,87 @@ func TestClaudeCloudDriver_ClearsTheArtifactOfAnEarlierSeatBeforeItStarts(t *tes
 				t.Errorf("the artifact of an earlier seat survived a failed cloud launch: %v", err)
 			}
 		})
+	}
+}
+
+func TestClaudeCloudDriver_TheCloudPromptHoldsNoChallengeTokenAndNoAbsolutePath(t *testing.T) {
+	t.Parallel()
+	f := newCloudFixture(t, pushedGitHubRepo, cloudCreatedFrame)
+	if err := os.WriteFile(f.cfg.PromptFile, []byte("Line one: <!-- challenge-token: $CHALLENGE_TOKEN -->\nWrite $ARTIFACT_PATH.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if rc, err := f.launch(t); rc != ExitOK || err != nil {
+		t.Fatalf("Launch = %d, %v; stderr:\n%s", rc, err, f.stderr)
+	}
+	raw, err := os.ReadFile(filepath.Join(f.cfg.Workspace, cloudPromptFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	prompt := string(raw)
+	want := "Line one: <!-- challenge-token: " + cloudWithheldToken + " -->\nWrite builder-report.md.\n"
+	if prompt != want {
+		t.Errorf("cloud prompt = %q, want %q", prompt, want)
+	}
+	for _, leak := range []string{"tok-42", f.cfg.Workspace, f.cfg.Worktree, string(filepath.Separator) + "builder-report.md"} {
+		if strings.Contains(prompt, leak) {
+			t.Errorf("the cloud prompt holds %q:\n%s", leak, prompt)
+		}
+	}
+	report, _ := os.ReadFile(f.cfg.Artifact)
+	if !strings.HasPrefix(string(report), "<!-- challenge-token: tok-42 -->\n") {
+		t.Errorf("the local report lost the challenge token:\n%s", report)
+	}
+}
+
+func TestClaudeCloudDriver_ARemoteHeadThatDiffersFromTheLocalHeadRefusesTheLaunch(t *testing.T) {
+	t.Parallel()
+	f := newCloudFixture(t, pushedGitHubRepo, cloudCreatedFrame)
+	var checked cloudlaunch.Repo
+	var dir string
+	f.deps.CloudRemote = func(_ context.Context, d string, r cloudlaunch.Repo) error {
+		checked, dir = r, d
+		return &cloudlaunch.Refusal{Reason: "the head of feature/x on origin differs from the local head"}
+	}
+	rc, err := f.launch(t)
+	if rc != ExitSafetyGate || err != nil {
+		t.Fatalf("Launch = %d, %v; want exit %d", rc, err, ExitSafetyGate)
+	}
+	if checked != pushedGitHubRepo || dir != f.cfg.Worktree {
+		t.Errorf("the remote check read %+v in %q, want the read repository in the worktree", checked, dir)
+	}
+	if len(f.tmux.Events) != 0 {
+		t.Errorf("a refused launch touched tmux: %v", f.tmux.Events)
+	}
+	if e := f.event(t, CodeCloudLaunchRefused); !strings.Contains(e.Reason, "differs from the local head") {
+		t.Errorf("refusal signal = %+v", e)
+	}
+	if !strings.Contains(f.stderr.String(), "launch refused: the head of feature/x") {
+		t.Errorf("stderr lacks the refusal:\n%s", f.stderr)
+	}
+}
+
+func TestClaudeCloudDriver_ARemoteReadErrorThatIsNoRefusalIsABadFlag(t *testing.T) {
+	t.Parallel()
+	f := newCloudFixture(t, pushedGitHubRepo, cloudCreatedFrame)
+	f.deps.CloudRemote = func(context.Context, string, cloudlaunch.Repo) error { return errors.New("network down") }
+	rc, err := f.launch(t)
+	if rc != ExitBadFlags || err == nil || !strings.Contains(err.Error(), "read the remote head of branch feature/x: network down") {
+		t.Errorf("Launch = %d, %v; want exit %d and the read error", rc, err, ExitBadFlags)
+	}
+	if len(f.tmux.Events) != 0 || len(f.codes()) != 0 {
+		t.Errorf("tmux %v, signals %v; want none", f.tmux.Events, f.codes())
+	}
+}
+
+func TestClaudeCloudDriver_ReadsTheRealRemoteHeadWhenNoReaderIsInjected(t *testing.T) {
+	t.Parallel()
+	f := newCloudFixture(t, pushedGitHubRepo, cloudCreatedFrame)
+	f.deps.CloudRemote = nil
+	rc, err := f.launch(t)
+	if rc != ExitSafetyGate || err != nil || !strings.Contains(f.stderr.String(), "has no local head") {
+		t.Errorf("Launch in a tree with no git = %d, %v; stderr:\n%s", rc, err, f.stderr)
+	}
+	if len(f.tmux.Events) != 0 {
+		t.Errorf("a refused launch touched tmux: %v", f.tmux.Events)
 	}
 }

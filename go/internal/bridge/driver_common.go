@@ -46,31 +46,45 @@ func preparePrompt(cfg *Config, deps Deps) (string, error) {
 }
 
 func resolvePromptText(cfg *Config, deps Deps) (string, error) {
+	template, token, err := readPromptTemplate(cfg, deps)
+	if err != nil {
+		return "", err
+	}
+	return fillPrompt(template, token, cfg.Artifact), nil
+}
+
+func readPromptTemplate(cfg *Config, deps Deps) (content, token string, err error) {
 	raw, err := os.ReadFile(cfg.PromptFile)
 	if err != nil {
-		return "", fmt.Errorf("read prompt: %w", err)
+		return "", "", fmt.Errorf("read prompt: %w", err)
 	}
-	content := string(raw)
-	if strings.Contains(content, "$CHALLENGE_TOKEN") {
-		var tok string
-		if existing, err := os.ReadFile(filepath.Join(cfg.Workspace, "challenge-token.txt")); err == nil {
-			if v := strings.TrimSpace(string(existing)); v != "" {
-				tok = v
-			}
-		}
-		if tok == "" {
-			minted, err := deps.NewChallengeToken()
-			if err != nil {
-				return "", fmt.Errorf("mint challenge token: %w", err)
-			}
-			if err := os.WriteFile(filepath.Join(cfg.Workspace, "challenge-token.txt"), []byte(minted+"\n"), 0o644); err != nil {
-				return "", fmt.Errorf("write challenge token: %w", err)
-			}
-			tok = minted
-		}
-		content = strings.ReplaceAll(content, "$CHALLENGE_TOKEN", tok)
+	content = string(raw)
+	if !strings.Contains(content, "$CHALLENGE_TOKEN") {
+		return content, "", nil
 	}
-	return strings.ReplaceAll(content, "$ARTIFACT_PATH", cfg.Artifact), nil
+	token, err = workspaceChallengeToken(cfg, deps)
+	return content, token, err
+}
+
+func workspaceChallengeToken(cfg *Config, deps Deps) (string, error) {
+	path := filepath.Join(cfg.Workspace, "challenge-token.txt")
+	if existing, err := os.ReadFile(path); err == nil {
+		if tok := strings.TrimSpace(string(existing)); tok != "" {
+			return tok, nil
+		}
+	}
+	minted, err := deps.NewChallengeToken()
+	if err != nil {
+		return "", fmt.Errorf("mint challenge token: %w", err)
+	}
+	if err := os.WriteFile(path, []byte(minted+"\n"), 0o644); err != nil {
+		return "", fmt.Errorf("write challenge token: %w", err)
+	}
+	return minted, nil
+}
+
+func fillPrompt(content, token, artifact string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(content, "$CHALLENGE_TOKEN", token), "$ARTIFACT_PATH", artifact)
 }
 
 func ensureDirs(cfg *Config) error {

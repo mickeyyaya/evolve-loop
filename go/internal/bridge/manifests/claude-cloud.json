@@ -31,6 +31,7 @@
     "args": ["--cloud"],
     "session_regex": "(?m)^\\s*Created cloud session:\\s*(?P<title>\\S.*?)\\s*$",
     "view_regex": "(?m)^\\s*View:\\s*(?P<url>https://claude\\.ai/\\S*?(?P<id>session_[A-Za-z0-9]+)\\S*)\\s*$",
+    "resume_regex": "(?m)^\\s*Resume with:\\s*claude\\s+--teleport\\s+(?P<id>session_[A-Za-z0-9]+)\\s*$",
     "fail_regex": "(?m)^\\s*Error:\\s*(?P<reason>.*\\S)\\s*$",
     "deadline_s": 120,
     "remote_hosts": ["github.com"]

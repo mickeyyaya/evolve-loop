@@ -27,11 +27,12 @@ const (
 	cloudScrollback     = 200
 	cloudLaunchOrigin   = "launchCloud"
 	cloudMaxPromptBytes = 120 << 10
+	cloudWithheldToken  = "withheld-from-the-cloud-session"
 )
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeCloudLaunched, "a cloud seat started a cloud session: the CLI printed the session line and the view line within the deadline of its manifest; the dispatch outcome is launched and the deliverable is a later pull request of that session; fields cli, session_id, url, title, repo, branch, profile")
-	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeCloudLaunchRefused, "a cloud seat refused a launch before it started a session: the working tree is on no branch, the branch has no upstream or has commits that are not pushed, or the remote is not on a host that the manifest names; the reason names the cause; fields cli, profile, dir")
+	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeCloudLaunched, "a cloud seat started a cloud session: the CLI printed the session line, the view line and a resume line with the id of the view line within the deadline of its manifest; the dispatch outcome is launched and the deliverable is a later pull request of that session; fields cli, session_id, url, title, repo, branch, profile")
+	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeCloudLaunchRefused, "a cloud seat refused a launch before it started a session: the working tree is on no branch, the branch has no upstream or has commits that are not pushed, the remote is not on a host that the manifest names, or the remote head is not the local head just before the launch; the reason names the cause; fields cli, profile, dir")
 }
 
 type claudeCloudDriver struct{}
@@ -77,16 +78,15 @@ func launchCloud(ctx context.Context, cfg *Config, deps Deps, m Manifest) (int, 
 	if err == nil {
 		err = repo.Check(m.CloudLaunch.RemoteHosts)
 	}
-	var refusal *cloudlaunch.Refusal
-	if errors.As(err, &refusal) {
-		return l.refuse(refusal), nil
-	}
-	if err != nil {
-		return ExitBadFlags, fmt.Errorf("%s read the repository of %s: %w", l.prefix, l.dir, err)
+	if rc, stop, err := l.stopOn(err, "read the repository of "+l.dir); stop {
+		return rc, err
 	}
 	promptFile, err := l.writePrompt()
 	if err != nil {
 		return ExitBadFlags, err
+	}
+	if rc, stop, err := l.stopOn(deps.cloudRemote(ctx, l.dir, repo), "read the remote head of branch "+repo.Branch); stop {
+		return rc, err
 	}
 	confirmed, rc, err := l.start(ctx, promptFile)
 	if rc != ExitOK {
@@ -113,6 +113,25 @@ func (deps Deps) cloudRepo(ctx context.Context, dir string) (cloudlaunch.Repo, e
 	return cloudlaunch.ReadRepo(ctx, sysexec.DefaultRunner, dir)
 }
 
+func (deps Deps) cloudRemote(ctx context.Context, dir string, repo cloudlaunch.Repo) error {
+	if deps.CloudRemote != nil {
+		return deps.CloudRemote(ctx, dir, repo)
+	}
+	return repo.MatchRemote(ctx, sysexec.DefaultRunner, dir)
+}
+
+func (l cloudLaunch) stopOn(err error, what string) (int, bool, error) {
+	var refusal *cloudlaunch.Refusal
+	switch {
+	case err == nil:
+		return ExitOK, false, nil
+	case errors.As(err, &refusal):
+		return l.refuse(refusal), true, nil
+	default:
+		return ExitBadFlags, true, fmt.Errorf("%s %s: %w", l.prefix, what, err)
+	}
+}
+
 func (l cloudLaunch) refuse(err *cloudlaunch.Refusal) int {
 	fmt.Fprintf(l.deps.Stderr, "%s safety gate: launch refused: %v\n", l.prefix, err)
 	l.emit(signalcenter.Event{
@@ -123,10 +142,11 @@ func (l cloudLaunch) refuse(err *cloudlaunch.Refusal) int {
 }
 
 func (l cloudLaunch) writePrompt() (string, error) {
-	prompt, err := resolvePromptText(l.cfg, l.deps)
+	template, _, err := readPromptTemplate(l.cfg, l.deps)
 	if err != nil {
 		return "", fmt.Errorf("%s %w", l.prefix, err)
 	}
+	prompt := fillPrompt(template, cloudWithheldToken, filepath.Base(l.cfg.Artifact))
 	if len(prompt) > cloudMaxPromptBytes {
 		return "", fmt.Errorf("%s the prompt has %d bytes, over the argument limit of %d: the pane passes it as one argument of the CLI", l.prefix, len(prompt), cloudMaxPromptBytes)
 	}

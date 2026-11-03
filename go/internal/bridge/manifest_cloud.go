@@ -11,13 +11,14 @@ type CloudLaunchSpec struct {
 	Args         []string `json:"args"`
 	SessionRegex string   `json:"session_regex"`
 	ViewRegex    string   `json:"view_regex"`
+	ResumeRegex  string   `json:"resume_regex"`
 	FailRegex    string   `json:"fail_regex"`
 	DeadlineS    int      `json:"deadline_s"`
 	RemoteHosts  []string `json:"remote_hosts"`
 }
 
 type cloudPatterns struct {
-	session, view, fail *regexp.Regexp
+	session, view, resume, fail *regexp.Regexp
 }
 
 type cloudConfirmation struct {
@@ -47,6 +48,9 @@ func (s *CloudLaunchSpec) patterns(cli string) (cloudPatterns, error) {
 		return cloudPatterns{}, err
 	}
 	if p.view, err = groupedPattern(cli, "view_regex", s.ViewRegex, "url", "id"); err != nil {
+		return cloudPatterns{}, err
+	}
+	if p.resume, err = groupedPattern(cli, "resume_regex", s.ResumeRegex, "id"); err != nil {
 		return cloudPatterns{}, err
 	}
 	if p.fail, err = groupedPattern(cli, "fail_regex", s.FailRegex, "reason"); err != nil {
@@ -87,17 +91,22 @@ func group(re *regexp.Regexp, pane string, m []int, name string) string {
 
 func (p cloudPatterns) confirmation(pane string) (cloudConfirmation, bool) {
 	session := lastMatch(p.session, pane)
-	if session == nil {
+	resume := lastMatch(p.resume, pane)
+	if session == nil || resume == nil || resume[0] < session[1] {
 		return cloudConfirmation{}, false
 	}
-	view := lastMatch(p.view, pane)
+	view := lastMatch(p.view, pane[:resume[0]])
 	if view == nil || view[0] < session[1] {
+		return cloudConfirmation{}, false
+	}
+	id := group(p.view, pane, view, "id")
+	if group(p.resume, pane, resume, "id") != id {
 		return cloudConfirmation{}, false
 	}
 	return cloudConfirmation{
 		title: group(p.session, pane, session, "title"),
 		url:   group(p.view, pane, view, "url"),
-		id:    group(p.view, pane, view, "id"),
+		id:    id,
 	}, true
 }
 

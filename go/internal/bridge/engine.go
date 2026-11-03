@@ -99,6 +99,7 @@ type Deps struct {
 	Floors                policy.Floors
 	ListProcesses         proctree.Lister
 	CloudRepo             func(ctx context.Context, dir string) (cloudlaunch.Repo, error)
+	CloudRemote           func(ctx context.Context, dir string, repo cloudlaunch.Repo) error
 	ListCwds              proctree.CwdLister
 	SignalProcess         proctree.Signaler
 	sweep                 *dispatchSweep
