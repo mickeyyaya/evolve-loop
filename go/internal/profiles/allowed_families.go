@@ -8,7 +8,7 @@ import (
 func BaseCLI(cli string) string {
 	s := strings.TrimSpace(cli)
 	for {
-		next := strings.TrimSuffix(strings.TrimSuffix(s, "-tmux"), "-p")
+		next := strings.TrimSuffix(strings.TrimSuffix(strings.TrimSuffix(s, "-tmux"), "-p"), "-cloud")
 		if next == s {
 			return next
 		}

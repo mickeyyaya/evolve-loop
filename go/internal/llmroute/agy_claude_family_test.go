@@ -95,3 +95,12 @@ func TestDrivers_ListsEveryKnownDriverSortedWithItsBinary(t *testing.T) {
 		}
 	}
 }
+
+func TestClaudeCloud_IsAClaudeDriverThatRoutingNamesExactly(t *testing.T) {
+	if !KnownDriver("claude-cloud") || Binary("claude-cloud") != "claude" || Family("claude-cloud") != "claude" {
+		t.Errorf("claude-cloud: known %v, binary %q, family %q; want a known claude driver", KnownDriver("claude-cloud"), Binary("claude-cloud"), Family("claude-cloud"))
+	}
+	if DefaultDriverForFamily("claude") != "claude-tmux" {
+		t.Errorf("the claude family selector = %q, want claude-tmux: the cloud seat is chosen only by its exact name", DefaultDriverForFamily("claude"))
+	}
+}

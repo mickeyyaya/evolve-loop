@@ -120,4 +120,6 @@ var serialTests = map[string]string{
 	"bridge.TestLaunch_AmplifiedAuditorReturnsTheQuotaExitWhenAllThreeWallWithOpusFirst":                        "swaps seam modelCatalogDirFn through the process-global setter SetModelCatalogDirFn",
 	"bridge.TestLaunch_AmplifiedAuditorTriesNoModelTwiceWhenTheFallbackListRepeatsThePrimary":                   "swaps seam modelCatalogDirFn through the process-global setter SetModelCatalogDirFn",
 	"bridge.TestLaunch_AmplifiedAuditorKeepsOnlyTheFableSuccessWhenFableLeads":                                  "swaps seam modelCatalogDirFn through the process-global setter SetModelCatalogDirFn",
+	"bridge.TestClaudeCloudDriver_AManifestThatDoesNotLoadRefusesTheLaunch":                                     "swaps seam bridgeManifestDirFn",
+	"bridge.TestLoadManifest_TheCloudSeatKeepsNoTierMapUnderALiveCatalog":                                       "swaps seam modelCatalogDirFn",
 }

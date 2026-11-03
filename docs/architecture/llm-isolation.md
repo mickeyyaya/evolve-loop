@@ -266,6 +266,68 @@ Limits:
 - The recipe sessions do not use the sandbox. The probe reason of the manifest covers them.
 - `modelquery` cannot import the bridge, because the bridge imports `modelquery`. Thus `cmd/evolve` injects `bridge.ModelQueryRunner` through `modelquery.UseLauncher`. With no launcher, a model query starts nothing and returns an error.
 
+### 5.2 The cloud seat (`claude-cloud`)
+
+The operator asked on 2026-11-03: "build a agent bridge for claude --cloud usage". The clarification of the same day: "build the driver for claude --cloud and follow the same agent bridge abstraction layer to invoke any functionalities".
+
+**F5.2.1** `claude --cloud "<task>"` starts a Claude Code session in the cloud and exits. The operator measured the output on 2026-11-03 in a tmux pane, with exit 0:
+
+```
+Created cloud session: <title>
+View: https://claude.ai/code/session_<id>?from=cli&m=0
+Resume with: claude --teleport session_<id>
+```
+
+*Implication:* the launch is short. The work happens later, in the cloud, and the deliverable is a pull request.
+
+**F5.2.2** With no TTY, the CLI exits with `Error: --cloud requires an interactive terminal.` (measured 2026-11-03).
+*Implication:* the seat needs a pane. The tmux code of the bridge already gives one.
+
+**F5.2.3** The cloud VM clones the GitHub remote of the current directory at the current branch (measured 2026-11-03).
+*Implication:* a commit that is not pushed is not in the clone. A remote that is not on GitHub has no clone.
+
+**F5.2.4** Before this change, the operator started each cloud session by hand, outside the bridge. That launch broke I-1.
+
+| Id | Decision | Because | Rejected options and why |
+|---|---|---|---|
+| D5.2.1 | The cloud seat is a bridge driver, `claude-cloud`, with its own manifest. Routing data selects it. | F5.2.4, the clarification | A launcher verb (`evolve cloud launch`): it starts an LLM outside the driver registry and the routing table. |
+| D5.2.2 | The manifest names `base: claude-tmux` and removes each capability that the seat cannot serve. | one home for each fact | A copy of the claude manifest: two allowlists drift. |
+| D5.2.3 | The output patterns are manifest data (`cloud_launch`). | the clarification | A parser in Go for the claude lines: a family branch in code. |
+| D5.2.4 | The driver refuses a branch with commits that are not pushed, or a remote on another host, before a session starts. | F5.2.3 | A launch with a warning: the session clones an old tree and spends credit. |
+| D5.2.5 | The outcome is typed: `launched`, with the session id and URL. The deliverable is a later pull request. | F5.2.1 | A wait for the pull request: the bridge holds a pane for the whole cloud run. |
+| D5.2.6 | No confirmation at the deadline is exit 2, which starts no fallback. | F5.2.1 | Exit 80: the fallback walk starts a second session while the first one can be live. |
+
+How a launch runs:
+
+1. A phase dispatch or `evolve agent run <profile>` reaches `claude-cloud` when the profile or a `cli_routing` rule names it. The route goes through `Engine.LaunchArgs`, as for each driver.
+2. The driver reads the repository of the worktree, else of the project root. An unpushed branch or another host gives exit 2, the reason on stderr and one `BRIDGE_CLOUD_LAUNCH_REFUSED` signal.
+3. The driver starts a private tmux session (`evolve-cloud-…`) with the I-2 environment of the manifest. The pane runs `claude --cloud "$(cat <workspace>/cloud-prompt.txt)"`.
+4. The driver reads the pane once each second, up to `deadline_s` (120). The two confirmation lines give the session. An `Error:` line gives exit 10 with the text of the CLI.
+5. The driver ends its own session only. It writes the launch report to the artifact and emits one `BRIDGE_CLOUD_LAUNCHED` signal. The engine writes the llm-calls row. `evolve agent run` copies the session into its launch record, and `evolve cloud list` prints it.
+
+The capabilities of the seat follow the X19c model: the manifest declares only what the seat serves.
+
+| Capability | Cloud seat | Where |
+|---|---|---|
+| Launch | yes | `claudeCloudDriver.Launch` |
+| Version and doctor probe | yes, through `LaunchLLM` with the binary `claude` | `doctor.go` |
+| Deep probe | no: a probe starts a cloud session | no `DeepProber` |
+| Usage probe, model list, model tiers | no | `controls`, `model_tier_map` and `params` are absent |
+| Local transcript, token count | no | `parsers`, `collectors` and `transcript` are absent |
+| Tools and edits | yes, in the cloud | `capabilities: ["tools", "edit"]` |
+
+**Billing.** A cloud session draws on the cloud-session credit of the account. A routine run of the routines API draws on plan usage instead, so the seat uses `claude --cloud` and never a routine. The llm-calls row of a cloud dispatch has no token count, because the work is not local.
+
+Limits:
+
+- The bridge does not follow the cloud session after the launch. The pull request arrives later, and no gate of the cycle reads it.
+- A phase that expects a local report gets the launch report. The router enforces it. A phase that runs in no worktree delivers a report. `cliroute` drops `claude-cloud` from its chain, and refuses the route when no other CLI is left (`requireReportDeliverable`).
+- The check does not see changes that are not committed. The clone has only the pushed commits.
+- The deadline exit leaves the state unknown. Read the cloud sessions of the account before a new launch.
+- The shell passes the prompt as one argument, so the driver refuses a prompt over 120 KiB.
+- The pane is 220 columns wide. A longer title wraps, and the record keeps only its first row.
+- The check reads the local tracking ref of the upstream. It does not fetch, so a remote that moved since the last fetch is not seen.
+
 ## 6. Hermetic environment
 
 ### Issue

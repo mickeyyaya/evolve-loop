@@ -117,15 +117,15 @@ func (e *Engine) doctorAuth(cli string) AuthInfo {
 func (e *Engine) doctorEnvWarnings(cli string) []string {
 	var w []string
 	set := func(k string) bool { v, ok := lookupEnv(e.deps, k); return ok && v != "" }
-	switch cli {
-	case "claude-p", "claude-tmux":
+	switch driverBinary(cli) {
+	case "claude":
 		if set("ANTHROPIC_API_KEY") {
 			w = append(w, "ANTHROPIC_API_KEY is set; would route through API billing, not subscription")
 		}
 		if set("ANTHROPIC_BASE_URL") {
 			w = append(w, "ANTHROPIC_BASE_URL is set; proxy mode would invalidate subscription billing")
 		}
-	case "codex", "codex-tmux":
+	case "codex":
 		if set("OPENAI_API_KEY") {
 			if !e.deps.AllowOpenAIAPIKey {
 				w = append(w, "OPENAI_API_KEY is set; bridge will refuse without policy bridge.allow_openai_api_key")

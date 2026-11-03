@@ -780,6 +780,28 @@ Auto-bumped version markers: `.claude-plugin/plugin.json`, `.claude-plugin/marke
 
 Full vocabulary (push, tag, release, propagate, publish, ship): [docs/guides/publishing-releases.md](../guides/publishing-releases.md).
 
+## Start a cloud build: the `claude-cloud` seat
+
+The `claude-cloud` driver starts a Claude Code session in the cloud through the bridge. The session clones the GitHub remote at the pushed branch, does the task and opens a pull request later. The design is [llm-isolation.md](../architecture/llm-isolation.md) §5.2.
+
+1. Commit the work, then push the branch: `git push -u origin <branch>`. The driver refuses a branch with commits that are not pushed, and a remote that is not on GitHub.
+2. Route the seat to the cloud driver. Add a rule to `cli_routing.agents` in `.evolve/policy.json`, for example `"console-builder": {"cli": ["claude-cloud"]}`. A profile with `"cli": "claude-cloud"` also selects it.
+3. Check the route: `evolve cli-routing explain console-builder --static`. The chain starts with `claude-cloud`.
+4. Write the task to a file, then run `evolve agent run <profile> --input task.md --json` with the flags of the profile. A writer profile also needs `--worktree` and `--writable`.
+5. Read the session from the envelope (`data.cloud`) or with `evolve cloud list`. Open the URL to follow the session.
+
+The launch takes about two seconds. The run ends when the CLI prints the session line and the view line, at most 120 seconds after the start. The deliverable is the pull request of the cloud session, not the report of the run.
+
+| Result | Exit of the driver | What to do |
+|---|---|---|
+| `launched` | 0 | Follow the URL. The pull request arrives later. |
+| Refused: commits not pushed, no upstream, another host | 2 | Push the branch or fix the remote, then run again. |
+| The prompt is over 120 KiB | 10 | Shorten the task file. The shell passes it as one argument. |
+| `Error:` from the CLI, for example no TTY | 10 | Read the reason on stderr. The pane of the bridge gives a TTY, so a TTY error is a bridge defect. |
+| No confirmation within 120 seconds | 2 | The state is unknown. Read the cloud sessions of the account before a new launch. |
+
+A cloud session draws on the cloud-session credit of the account, not on plan usage. Do not use a routine of the routines API for a cloud build: a routine draws on plan usage.
+
 ## Documentation lint: `evolve docs ste-lint`
 
 The lint checks text against the ASD-STE100 house rules ([the standard](../conventions/ste100-writing.md), [the plan](../plans/ste100-docs-rewrite-2026-10.md), [the package notes](../architecture/packages/internal-stelint.md)). It reads the house list of words from the standard under the project root.

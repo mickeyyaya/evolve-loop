@@ -30,12 +30,13 @@ func registerBuiltins() {
 	Register(agyTmuxDriver{target: "agy-tmux"})
 	Register(agyTmuxDriver{target: "agy-claude-tmux"})
 	Register(ollamaTmuxDriver{})
+	Register(claudeCloudDriver{})
 }
 
 func TestDriverRegistry(t *testing.T) {
 	names := DriverNames()
-	if len(names) != 8 {
-		t.Fatalf("DriverNames = %v (len %d), want exactly 8 builtins", names, len(names))
+	if len(names) != 9 {
+		t.Fatalf("DriverNames = %v (len %d), want exactly 9 builtins", names, len(names))
 	}
 	for i := 1; i < len(names); i++ {
 		if names[i-1] > names[i] {

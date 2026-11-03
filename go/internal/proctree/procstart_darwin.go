@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"syscall"
+	"time"
 )
 
 const (
@@ -19,15 +20,33 @@ func readProcStart(pid int) (string, error) {
 }
 
 func startOfVia(call sysctlCall, pid int) (string, error) {
+	sec, usec, err := kinfoStart(call, pid)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%d.%06d", sec, usec), nil
+}
+
+func readProcStartTime(pid int) (time.Time, error) {
+	return startTimeVia(sysctl, pid)
+}
+
+func startTimeVia(call sysctlCall, pid int) (time.Time, error) {
+	sec, usec, err := kinfoStart(call, pid)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return time.Unix(sec, int64(usec)*int64(time.Microsecond)), nil
+}
+
+func kinfoStart(call sysctlCall, pid int) (int64, int32, error) {
 	buf := make([]byte, kinfoProcBytes)
 	size := uintptr(len(buf))
 	if err := call([]int32{ctlKern, kernProc, kernProcPID, int32(pid)}, &buf[0], &size); err != nil {
-		return "", err
+		return 0, 0, err
 	}
 	if size < kinfoProcBytes {
-		return "", syscall.ESRCH
+		return 0, 0, syscall.ESRCH
 	}
-	sec := int64(binary.LittleEndian.Uint64(buf[0:8]))
-	usec := int32(binary.LittleEndian.Uint32(buf[8:12]))
-	return fmt.Sprintf("%d.%06d", sec, usec), nil
+	return int64(binary.LittleEndian.Uint64(buf[0:8])), int32(binary.LittleEndian.Uint32(buf[8:12])), nil
 }

@@ -51,6 +51,7 @@
   - The gate computes the tree-state SHA once and reads the launch record of each run (`launchrecord.Read`).
   - It refuses the commit (ExitFail, `DENY: review run <label> does not attest this commit`) when the record is absent or unreadable, or holds another run id.
   - It also refuses a record with no driver, a writer record, a verdict other than `PASS` or `WARN`, no report hash, or another tree (`Record.BoundTo`).
+  - It refuses a record of a launched cloud session (`Record.Cloud`). A cloud seat gives `PASS` when the session starts, but the deliverable is a later pull request, so no reviewer read the staged tree.
   - A tree-state error is ExitGitFatal. A gate with no `run:` token reads no record and no extra tree.
   - Each accepted token becomes the profile name of the run, so the reviewer precondition reads it like a named reviewer.
   - Pinned by `TestRun_BridgeRunReviewsSatisfyTheGateAndTheAttestationNamesEachRun`, `TestRun_ABridgeRunThatCannotAttestIsDenied` and `TestRun_NamedReviewersAloneReadNoTreeBeforeTheLanes`.

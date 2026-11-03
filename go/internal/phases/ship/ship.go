@@ -28,6 +28,7 @@ type Config struct {
 	ManifestGate     string
 	RepoContractGate string
 	Signals          *signalcenter.Center
+	Integration      *Integration
 }
 
 type Phase struct {
@@ -38,6 +39,7 @@ type Phase struct {
 	manifestGate     string
 	repoContractGate string
 	signals          *signalcenter.Center
+	integration      *Integration
 }
 
 func New(c Config) *Phase {
@@ -45,7 +47,7 @@ func New(c Config) *Phase {
 	if nowFn == nil {
 		nowFn = time.Now
 	}
-	return &Phase{runner: c.Runner, nowFn: nowFn, sleep: c.Sleep, phaseIO: c.PhaseIO, manifestGate: c.ManifestGate, repoContractGate: c.RepoContractGate, signals: c.Signals}
+	return &Phase{runner: c.Runner, nowFn: nowFn, sleep: c.Sleep, phaseIO: c.PhaseIO, manifestGate: c.ManifestGate, repoContractGate: c.RepoContractGate, signals: c.Signals, integration: c.Integration}
 }
 
 func (p *Phase) Name() string { return phaseName }
@@ -113,6 +115,7 @@ func (p *Phase) shipOptions(req core.PhaseRequest, msg string) Options {
 		Runner:                          p.runner,
 		Sleep:                           p.sleep,
 		Signals:                         p.signals,
+		Integration:                     p.integration,
 	}
 }
 

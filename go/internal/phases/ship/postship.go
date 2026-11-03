@@ -204,7 +204,10 @@ func isLanded(ctx context.Context, opts *Options, sha string) bool {
 	if branch == "" {
 		return false
 	}
-	return isAncestor(ctx, opts, sha, "origin/"+branch)
+	if isAncestor(ctx, opts, sha, "origin/"+branch) {
+		return true
+	}
+	return landedByIdentity(ctx, opts, sha, "HEAD", "origin/"+branch)
 }
 
 func readBuildReport(cycleDir string) []byte {

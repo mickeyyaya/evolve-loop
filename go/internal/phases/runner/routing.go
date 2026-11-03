@@ -79,7 +79,7 @@ func (b *BaseRunner) launchRouter(req core.PhaseRequest, prep phasePreparation) 
 			return nil, policy.Policy{}, err
 		}
 	}
-	router, err := cliroute.NewSingleProfileRouter(loaded, cliroute.SingleProfile{Agent: prep.profileName, Profile: prep.profile}, cliroute.Host{Bench: b.bench, Toolless: bridge.LacksToolUse})
+	router, err := cliroute.NewSingleProfileRouter(loaded, cliroute.SingleProfile{Agent: prep.profileName, Profile: prep.profile}, cliroute.Host{Bench: b.bench, Toolless: bridge.LacksToolUse, CloudHosts: bridge.CloudRemoteHosts})
 	return router, loaded, err
 }
 

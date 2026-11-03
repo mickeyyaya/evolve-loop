@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	gobridge "github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cli/agentcmd"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxfile"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
@@ -39,7 +40,11 @@ type proposalDecider struct {
 }
 
 func runAgentCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	return agentcmd.New(agentcmd.Deps{InstallRouter: rootRouterInstaller, Bridge: agentRunBridge, Signals: agentRunSignals, VerbSchema: coreVerbSchema})(args, stdin, stdout, stderr)
+	return agentcmd.New(agentRunDeps())(args, stdin, stdout, stderr)
+}
+
+func agentRunDeps() agentcmd.Deps {
+	return agentcmd.Deps{InstallRouter: rootRouterInstaller, Bridge: agentRunBridge, Signals: agentRunSignals, VerbSchema: coreVerbSchema, CloudSeat: gobridge.LaunchesCloud}
 }
 
 func runSelfhealPropose(env selfhealEnv, w codeEnvelopeWriter, root string, pol policy.Policy) int {

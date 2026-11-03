@@ -56,7 +56,11 @@ func (v resolver) legacyDispatch(req Request) (Decision, error) {
 	if err != nil {
 		return Decision{}, refused(req.Agent, err)
 	}
-	return Decision{Plan: toolPlan, Rule: rule, Allowed: prof.AllowedFamilies(), Trace: slices.Concat(clamped, notes)}, nil
+	reportPlan, reportNotes, err := v.requireReportDeliverable(req, rule, toolPlan)
+	if err != nil {
+		return Decision{}, refused(req.Agent, err)
+	}
+	return Decision{Plan: reportPlan, Rule: rule, Allowed: prof.AllowedFamilies(), Trace: slices.Concat(clamped, notes, reportNotes)}, nil
 }
 
 func (t Table) legacyPin(phase string, prof *profiles.Profile) (*policy.Pin, error) {

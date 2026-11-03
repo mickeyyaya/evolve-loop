@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cloudlaunch"
 	"io"
 	"os"
 	"os/exec"
@@ -97,6 +98,7 @@ type Deps struct {
 	ModelChain            func(cli, model string) []string
 	Floors                policy.Floors
 	ListProcesses         proctree.Lister
+	CloudRepo             func(ctx context.Context, dir string) (cloudlaunch.Repo, error)
 	ListCwds              proctree.CwdLister
 	SignalProcess         proctree.Signaler
 	sweep                 *dispatchSweep

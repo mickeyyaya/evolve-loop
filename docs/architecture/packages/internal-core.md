@@ -1180,6 +1180,7 @@ The reasons that the comments of the routing-dispatch, state-machine, safety-inv
   - A cycle never mutates its project root, so worktree fixtures hand the orchestrator a detached worktree and not the repository itself. This is a fixture convention. No single test pins it. `TestRecordAuditBinding_InPlaceRootDegradesToNoTreeSHA` pins the related in-place case.
   - An option that only integration-tagged tests execute needs an untagged test that names and runs it. Otherwise the apicover gate scores it false-green. This is a convention. No test pins it.
 - **Spine replay harness.** `TestSpineReplay_LocalHistory` is an operator harness that is skipped in CI. It replays a project's real `.evolve/runs` history and checks if any historical cycle trips the spine floor at enforce. Run it before widening the floor (new anchors, new gates): `EVOLVE_SPINE_REPLAY_DIR=<project-root> go test -v -run TestSpineReplay_LocalHistory ./internal/core/`.
+- **`PausedLaneScopes` lists every paused lane scope** (`lane_resume_all.go`). The rules are in [checkpoint-resume.md](../checkpoint-resume.md#resume-every-paused-cycle-at-once).
 
 ## Findings
 

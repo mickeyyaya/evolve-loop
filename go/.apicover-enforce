@@ -864,3 +864,7 @@
 # shiptest - the shared real-git fixtures of the ship tests and the black-box ship scenarios split from internal/phases/ship.
 ./internal/phases/ship/shiptest
 ./internal/supersede
+
+# claude-cloud driver (PR #1272): evolve cloud reads the launch records; cloudlaunch holds the typed launch outcome and the repository checks.
+./internal/cli/cloudcmd
+./internal/cloudlaunch
