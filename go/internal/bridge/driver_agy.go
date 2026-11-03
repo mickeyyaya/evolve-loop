@@ -29,7 +29,7 @@ func (agyDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, error
 
 	switch cfg.Model {
 	case "haiku", "sonnet", "opus", "auto", "":
-		fmt.Fprintf(deps.Stderr, "[agy] tier '%s' → agy default (gemini-3.5-flash); agy has no -m flag\n", cfg.Model)
+		fmt.Fprintf(deps.Stderr, "[agy] tier '%s' → agy default; agy has no -m flag\n", cfg.Model)
 	default:
 		fmt.Fprintf(deps.Stderr, "[agy] WARN: model '%s' is not a Claude tier alias — agy ignores it anyway\n", cfg.Model)
 	}

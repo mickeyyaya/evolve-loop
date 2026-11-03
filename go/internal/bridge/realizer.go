@@ -11,13 +11,14 @@ import (
 )
 
 type ParamSpec struct {
-	Channel  string              `json:"channel"`
-	Flag     string              `json:"flag,omitempty"`
-	From     string              `json:"from,omitempty"`
-	Template string              `json:"template,omitempty"`
-	Values   map[string][]string `json:"values,omitempty"`
-	Default  string              `json:"default,omitempty"`
-	Note     string              `json:"note,omitempty"`
+	Channel    string              `json:"channel"`
+	Flag       string              `json:"flag,omitempty"`
+	From       string              `json:"from,omitempty"`
+	Template   string              `json:"template,omitempty"`
+	Values     map[string][]string `json:"values,omitempty"`
+	Default    string              `json:"default,omitempty"`
+	Unresolved string              `json:"unresolved,omitempty"`
+	Note       string              `json:"note,omitempty"`
 }
 
 var unresolvedModelTokens = append([]string{"auto", "high"}, modelcatalog.CanonicalTiers...)
@@ -158,9 +159,13 @@ func realizeScalar(r *Realization, m Manifest, param, value string) {
 	if spec.From == "model_tier_map" || spec.From == "tier_alias" {
 		resolved = resolveTierModel(m, value)
 	}
-	if param == "model_tier" && isUnresolvedModelToken(resolved) {
-		r.ModelOmitted = resolved
-		return
+	if param == "model_tier" && (isUnresolvedModelToken(resolved) || (spec.Unresolved != "" && isUnresolvedModelToken(legacyTierAlias(resolved)))) {
+		if fallback := m.ModelTierMap[spec.Unresolved]; spec.Unresolved != "" && fallback != "" {
+			resolved = fallback
+		} else {
+			r.ModelOmitted = resolved
+			return
+		}
 	}
 	switch spec.Channel {
 	case "flag":

@@ -59,11 +59,14 @@ func TestAgyModelTierResolvesThroughCatalogOverlay(t *testing.T) {
 	}
 }
 
-func TestAgyModelTierAutoSentinelOmitted(t *testing.T) {
+func TestAgyModelTierAutoSentinelCarriesFastModel(t *testing.T) {
 	m := loadAgyManifestOffline(t)
 	r := Realize(m, LaunchIntent{ModelTier: "auto"})
-	if containsToken(r.LaunchFlags, "--model") || containsToken(r.LaunchFlags, "auto") {
-		t.Fatalf("tier=auto must omit the model param entirely; LaunchFlags = %v", r.LaunchFlags)
+	if !containsToken(r.LaunchFlags, "--model") || !containsToken(r.LaunchFlags, m.ModelTierMap["fast"]) {
+		t.Fatalf("tier=auto must pass the manifest fast model; LaunchFlags = %v", r.LaunchFlags)
+	}
+	if containsToken(r.LaunchFlags, "auto") {
+		t.Fatalf("the token auto must never reach agy; LaunchFlags = %v", r.LaunchFlags)
 	}
 	if len(r.REPLInput) != 0 {
 		t.Fatalf("tier=auto must not seed REPL input; got %v", r.REPLInput)

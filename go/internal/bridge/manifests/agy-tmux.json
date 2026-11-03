@@ -39,7 +39,8 @@
     "model_tier": {
       "channel": "flag",
       "flag": "--model",
-      "from": "model_tier_map"
+      "from": "model_tier_map",
+      "unresolved": "fast"
     },
     "effort": {
       "channel": "noop"
