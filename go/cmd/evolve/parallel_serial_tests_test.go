@@ -1,6 +1,7 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestMain_ClearsInheritedCellMarkers":                                                              "reads the process environment",
 	"main.TestRunContinuationAdopt_ATildePathInTheRegistryIsExpanded":                                       "sets env through a helper",
 	"main.TestRunContinuationAdopt_ATildePathOnTheStampIsExpanded":                                          "sets env through a helper",
 	"main.TestEventsWatch_TheDefaultEnvironmentArmsTheKernelAndTheSignals":                                  "installs the process signal handlers of the watch",

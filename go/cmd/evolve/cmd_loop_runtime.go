@@ -19,14 +19,17 @@ type loopBatchRuntime struct {
 	ctx         context.Context
 	stopSignal  context.CancelFunc
 	closeSocket func()
+	ownsSocket  bool
 }
 
 func startLoopBatchRuntime() loopBatchRuntime {
 	ctx, stop := loopSignalContext(context.Background())
-	if os.Getenv(bridge.TmuxSocketEnv) == "" {
+	owns := os.Getenv(bridge.TmuxSocketEnv) == ""
+	if owns {
 		_ = os.Setenv(bridge.TmuxSocketEnv, bridge.DeriveRunSocket(os.Getpid()))
 	}
 	return loopBatchRuntime{
+		ownsSocket:  owns,
 		ctx:         ctx,
 		stopSignal:  stop,
 		closeSocket: runSocketTeardown(os.Getenv(bridge.TmuxSocketEnv), swarm.ExecKillServer),
@@ -36,6 +39,9 @@ func startLoopBatchRuntime() loopBatchRuntime {
 func (r loopBatchRuntime) close() {
 	r.closeSocket()
 	r.stopSignal()
+	if r.ownsSocket {
+		_ = os.Unsetenv(bridge.TmuxSocketEnv)
+	}
 }
 
 const runSocketTeardownTimeout = 10 * time.Second

@@ -13,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchcred"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gotooltest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
 	"github.com/mickeyyaya/evolve-loop/go/internal/practicewatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -20,6 +21,12 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	for _, name := range ipcenv.CellMarkers() {
+		if err := os.Unsetenv(name); err != nil {
+			fmt.Fprintf(os.Stderr, "TestMain: unset %s: %v\n", name, err)
+			os.Exit(1)
+		}
+	}
 	disableWorkspaceGuardForTest = true
 	runLoopPreflightFn = func(loopConfig, io.Writer) looppreflight.Result {
 		return looppreflight.Result{}
