@@ -50,7 +50,7 @@ func TestDigest_ACompletedShipIsTheCycleClass(t *testing.T) {
 	}
 }
 
-func TestDigest_RunDirArtifactBytesSumsEveryFile(t *testing.T) {
+func TestDigest_RunDirArtifactBytesCountsOnlyReportArtifacts(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
 	writeFile(t, ws, "scout-report.md", "12345")
@@ -62,11 +62,11 @@ func TestDigest_RunDirArtifactBytesSumsEveryFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sig.RunDir.ArtifactBytes != 12 {
-		t.Fatalf("RunDir.ArtifactBytes = %d, want 12", sig.RunDir.ArtifactBytes)
+	if sig.RunDir.ArtifactBytes != 5 {
+		t.Fatalf("RunDir.ArtifactBytes = %d, want 5", sig.RunDir.ArtifactBytes)
 	}
-	if !evalCondition(sig, config.Condition{Field: "run_dir.artifact_bytes", Op: "gt", Value: float64(11)}) {
-		t.Fatal("run_dir.artifact_bytes gt 11 must hold for a 12-byte run dir")
+	if !evalCondition(sig, config.Condition{Field: "run_dir.artifact_bytes", Op: "gt", Value: float64(4)}) {
+		t.Fatal("run_dir.artifact_bytes gt 4 must hold for a 5-byte report artifact run dir")
 	}
 }
 

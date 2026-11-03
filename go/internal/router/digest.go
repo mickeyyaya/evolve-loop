@@ -92,9 +92,13 @@ func handoffMayWrite(phase, key string, owners map[string]bool) bool {
 
 func runDirArtifactBytes(workspace string, degraded *[]string) int64 {
 	var total int64
-	err := filepath.WalkDir(workspace, func(_ string, d fs.DirEntry, err error) error {
+	cleanWorkspace := filepath.Clean(workspace)
+	err := filepath.WalkDir(workspace, func(path string, d fs.DirEntry, err error) error {
 		if err != nil || !d.Type().IsRegular() {
 			return err
+		}
+		if filepath.Clean(filepath.Dir(path)) != cleanWorkspace || !isReportArtifact(d.Name()) {
+			return nil
 		}
 		info, err := d.Info()
 		if err == nil {
@@ -106,6 +110,10 @@ func runDirArtifactBytes(workspace string, degraded *[]string) int64 {
 		*degraded = append(*degraded, "run_dir: artifact bytes: "+err.Error())
 	}
 	return total
+}
+
+func isReportArtifact(name string) bool {
+	return strings.HasSuffix(name, "-report.md") || (strings.HasPrefix(name, "handoff-") && strings.HasSuffix(name, ".json"))
 }
 
 func digestFlowStage(workspace string) phasecontract.FlowStage {
