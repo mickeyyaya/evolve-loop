@@ -35,6 +35,7 @@ type Policy struct {
 	PracticeWatch      *PracticeWatchPolicy      `json:"practice_watch,omitempty"`
 	CodeIndex          *CodeIndexPolicy          `json:"code_index,omitempty"`
 	PR                 *PRPolicy                 `json:"pr,omitempty"`
+	Boundary           *BoundaryPolicy           `json:"boundary,omitempty"`
 	Bridge             *BridgePolicy             `json:"bridge,omitempty"`
 	QuotaReset         *QuotaResetConfig         `json:"quota_reset,omitempty"`
 	Resume             *ResumeConfig             `json:"resume,omitempty"`
