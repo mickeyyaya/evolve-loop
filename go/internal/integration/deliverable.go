@@ -56,7 +56,11 @@ const (
 	indexSep       = "-"
 )
 
-var waveID = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+var (
+	waveID       = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+	ErrNoPatch   = errors.New("integration: the commit has no patch")
+	ErrBadWaveID = errors.New("integration: the wave id is outside ^[A-Za-z0-9._-]+$")
+)
 
 func CycleTrailer(cycle int) string { return evidence.KeyCycle + ": " + strconv.Itoa(cycle) }
 
@@ -110,11 +114,6 @@ func (r DeliverableRecord) Deliverable() Deliverable {
 		Deps:        slices.Clone(r.Deps),
 	}
 }
-
-var (
-	ErrNoPatch   = errors.New("integration: the commit has no patch")
-	ErrBadWaveID = errors.New("integration: the wave id is outside ^[A-Za-z0-9._-]+$")
-)
 
 func WaveDir(projectRoot, wave string) (string, error) {
 	if !waveID.MatchString(wave) {
@@ -177,11 +176,24 @@ func indexCommits(dir string, r DeliverableRecord) error {
 		return err
 	}
 	for _, c := range r.Commits {
-		if err := touchIndexEntry(filepath.Join(index, c.SHA+indexSep+strconv.Itoa(r.Cycle))); err != nil {
+		if err := touchIndexEntry(filepath.Join(index, indexName(c.SHA, r.Cycle))); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+var indexCycle = regexp.MustCompile(`^[0-9]+$`)
+
+func indexName(sha string, cycle int) string { return sha + indexSep + strconv.Itoa(cycle) }
+
+func indexedCycle(entry, sha string) (int, bool) {
+	digits, ok := strings.CutPrefix(filepath.Base(entry), sha+indexSep)
+	if !ok || !indexCycle.MatchString(digits) {
+		return 0, false
+	}
+	cycle, err := strconv.Atoi(digits)
+	return cycle, err == nil
 }
 
 var openIndexEntry = os.OpenFile

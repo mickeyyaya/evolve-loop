@@ -7,7 +7,6 @@ import (
 	"io"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
@@ -31,7 +30,7 @@ func SysGit() GitFunc {
 		}
 		code, err := sysexec.DefaultRunner(ctx, gitBin, dir, args, nil, in, &out, &errOut)
 		if err != nil {
-			return "", fmt.Errorf("integration: git %s: %w", strings.Join(args, " "), err)
+			return "", fmt.Errorf("integration: git %s: %s: %w", strings.Join(args, " "), strings.TrimSpace(errOut.String()), err)
 		}
 		if code != 0 {
 			return "", fmt.Errorf("integration: git %s exit=%d: %s", strings.Join(args, " "), code, strings.TrimSpace(errOut.String()))
@@ -137,8 +136,7 @@ func FindRecordByCommit(root, sha string) (DeliverableRecord, bool) {
 	}
 	var paths []string
 	for _, e := range entries {
-		cycle, err := strconv.Atoi(strings.TrimPrefix(filepath.Base(e), sha+indexSep))
-		if err == nil {
+		if cycle, ok := indexedCycle(e, sha); ok {
 			paths = append(paths, RecordPath(filepath.Dir(filepath.Dir(e)), cycle))
 		}
 	}

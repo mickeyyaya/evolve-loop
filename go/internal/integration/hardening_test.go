@@ -198,9 +198,17 @@ func TestFindRecordByCommit_SkipsAMalformedEntryAndABadPattern(t *testing.T) {
 	root := t.TempDir()
 	sha := strings.Repeat("a", 40)
 	writeRecordFor(t, root, "w1", 7, sha)
-	planted := filepath.Join(root, ".evolve", "waves", "integration-w1", commitIndexDir, sha+"-x")
-	if err := os.WriteFile(planted, nil, 0o644); err != nil {
-		t.Fatal(err)
+	for _, suffix := range []string{"-x", "--3", "-+7", "-99999999999999999999"} {
+		planted := filepath.Join(root, ".evolve", "waves", "integration-w1", commitIndexDir, sha+suffix)
+		if err := os.WriteFile(planted, nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, ok := indexedCycle(sha+"--3", sha); ok {
+		t.Error("a signed cycle in an index entry must not parse")
+	}
+	if _, ok := indexedCycle("other-7", sha); ok {
+		t.Error("an entry of another commit must not parse")
 	}
 	if r, ok := FindRecordByCommit(root, sha); !ok || r.Cycle != 7 {
 		t.Fatalf("FindRecordByCommit = %+v, %v, want cycle 7 past the malformed entry", r, ok)
