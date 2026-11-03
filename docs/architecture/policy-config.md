@@ -85,7 +85,8 @@ defaults, but each safety floor fails closed to `enforce`: `docs_floor.stage`,
       "consume_min_share": 0.5,
       "kinds": ["bug", "docs", "feature", "fix", "hardening", "maintenance",
                 "pipeline-integrity", "pipeline-repair", "refactor", "research",
-                "security", "sweep", "task", "techdebt", "test"]
+                "security", "sweep", "task", "techdebt", "test"],
+      "audit": { "min_age_days": 14, "trigger_count": 40, "max_items": 20 }
     }
   },
 
@@ -254,6 +255,18 @@ The block configures `internal/inboxcurator`, the deterministic checks of the in
 | `kinds` | the `kind` values that `evolve inbox add` accepts | the 15 kinds above | empty, a blank or padded entry, a duplicate |
 
 The similarity is the token Jaccard of the title and the acceptance of two items. The live inbox of 2026-10-27 had 2,710 pairs of open items with a shared fix surface. The highest similarity was 0.52, and 13 pairs were between 0.3 and 0.5. These numbers set the defaults.
+
+### The audit (`inbox.curator.audit`)
+
+The sub-block configures `evolve inbox audit`, the on-demand LLM seat that proposes `consume`, `retire` or `keep` for old items ([inbox-curator.md §5](inbox-curator.md#5-on-demand-the-llm-audit-ad2-9)). The seat only proposes, so the block has no stage.
+
+| Key | Meaning | Default | Refused |
+|---|---|---|---|
+| `min_age_days` | an item that the operator filed this number of days ago or earlier is old | 14 | 0 or less, or not a number |
+| `trigger_count` | the count of old probe-less console items at which the verb starts the seat. `--force` starts it at a lower count | 40 | 0 or less, or not a number |
+| `max_items` | the number of the oldest candidates that one seat run judges | 20 | 0 or less, or not a number |
+
+The audit of 2026-11-03 used 4 agents and about 650k tokens for 309 items. A cap of 20 items keeps one run small.
 
 ## Live incident reaction (`healing.live_reaction`)
 

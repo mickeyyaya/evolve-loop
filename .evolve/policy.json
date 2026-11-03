@@ -150,7 +150,12 @@
       "stage": "shadow",
       "overlap_refuse": 0.5,
       "overlap_warn": 0.3,
-      "consume_min_share": 0.5
+      "consume_min_share": 0.5,
+      "audit": {
+        "min_age_days": 14,
+        "trigger_count": 40,
+        "max_items": 20
+      }
     }
   },
   "inbox_priority": {

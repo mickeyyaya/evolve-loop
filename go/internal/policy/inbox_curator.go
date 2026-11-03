@@ -24,11 +24,12 @@ type InboxPolicy struct {
 }
 
 type InboxCuratorPolicy struct {
-	Stage           string   `json:"stage,omitempty"`
-	OverlapRefuse   *float64 `json:"overlap_refuse,omitempty"`
-	OverlapWarn     *float64 `json:"overlap_warn,omitempty"`
-	ConsumeMinShare *float64 `json:"consume_min_share,omitempty"`
-	Kinds           []string `json:"kinds,omitempty"`
+	Stage           string            `json:"stage,omitempty"`
+	OverlapRefuse   *float64          `json:"overlap_refuse,omitempty"`
+	OverlapWarn     *float64          `json:"overlap_warn,omitempty"`
+	ConsumeMinShare *float64          `json:"consume_min_share,omitempty"`
+	Kinds           []string          `json:"kinds,omitempty"`
+	Audit           *InboxAuditPolicy `json:"audit,omitempty"`
 }
 
 type InboxCuratorConfig struct {

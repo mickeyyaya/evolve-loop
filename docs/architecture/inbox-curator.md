@@ -23,7 +23,8 @@ The operator's design is event-driven: the review runs on events and never polls
 | Fix surface | The repository paths that the `files` list of an item declares (`inboxbatch.Item.DeclaredPaths`). |
 | Similarity | The Jaccard index of the token sets of the title and the acceptance of two items. |
 | Named test | A `Test…`, `Benchmark…` or `Fuzz…` name in an acceptance criterion. |
-| Proposal | A typed change to one open item: `consume`, `reroute` or `merge`, with its evidence. |
+| Proposal | A typed change to one open item: `consume`, `reroute` or `merge`, with its evidence. The audit (section 5) also proposes `retire` and `keep`. |
+| Probe-less item | An open item whose acceptance names no test. The deterministic checks cannot judge it. |
 | Deterministic proposal | A proposal whose check is a fact that Go can verify. Only such a proposal can be applied. |
 | Stage | `inbox.curator.stage`: `shadow` publishes the proposals, `enforce` also applies the deterministic ones. |
 
@@ -112,6 +113,37 @@ The cursor has these cases:
 
 **A declined proposal.** A judgment proposal repeats at each boundary until the operator acts. The operator declines a lane reroute with `evolve inbox route-console <id> <reason> 0`. The stamped `routed_reason` explains the route, so the curator stops the proposal. The operator declines a sweep `consume` with an edit of the acceptance, or ends it with `evolve inbox consume`.
 
+### 5. On demand: the LLM audit (AD2-9)
+
+The deterministic checks reach few items, because most items name no test. Graft D of [the architecture decisions plan](../plans/architecture-decisions-2026-11.md) (component AD2-9) adds an LLM seat that only proposes.
+
+`evolve inbox audit [--force] [--json] [--project-root P]` does these steps:
+
+1. It selects the candidates. A candidate is a pending console item that is probe-less and older than `min_age_days`. The oldest item comes first. An item with no filing time counts as the oldest.
+2. It compares the count of candidates with `trigger_count`. Below the threshold it starts no seat and exits 0. `--force` starts the seat at any count above 0.
+3. It keeps the oldest `max_items` candidates. For each one it collects facts from the checked-out branch:
+   - the commits that touch a declared path after the filing (`landed_commits`, at most `inboxcurator.AuditLandedLimit`);
+   - the declared paths that are not in the tree, or that are outside the repository (`gone_paths`).
+4. It starts the read-only seat `inbox-curator` through `evolve agent run`, so the bridge routes and sandboxes it. The input is one `evolve.inbox.audit-input/1` object and the contract of the audit.
+5. The seat writes `inbox-audit.json` with the schema `evolve.inbox.audit/1`. It gives a verdict for each candidate, with a reason and evidence.
+6. Go checks each verdict against the rules of `inboxcurator.AuditRules`. Each refusal is a `WARN` line, and the other verdicts stand.
+
+One Go table holds the verdicts (`AuditVerdicts`), the input fields (`AuditCandidateFields`) and the refusal rules. `ParseAudit` checks the rules, and `AuditContract` renders all three into the prompt of the seat. The persona does not repeat them, so the prompt and the check cannot drift apart.
+
+7. It writes the report to `.evolve/inbox-audit/<time>-<run label>.json`. Git ignores that directory, so the tree stays clean.
+8. It publishes each `consume` and `retire` as one `INBOX_CURATOR_PROPOSAL` signal with the trigger `audit` and `applied=false`.
+
+The audit never moves or changes an item. Each proposal is a judgment proposal (D8). The operator applies it with `evolve inbox consume` or `evolve inbox withdraw`.
+
+| Exit | Meaning |
+|---|---|
+| `0` | done, also below the threshold |
+| `1` | the seat report is not an `evolve.inbox.audit/1` object |
+| `2` | an I/O error or a failed seat |
+| `10` | usage |
+
+The seat persona is [evolve-inbox-curator.md](../../agents/evolve-inbox-curator.md). Its profile is `.evolve/profiles/inbox-curator.json`. The profile allows only `Read`, `Grep`, `Glob`, the git read commands `log` and `show`, and a write of `inbox-audit.json`. It denies `git grep`, because its `-O` option runs a program. The sandbox is read-only on the repository and has no network.
+
 ### The verb
 
 `evolve inbox curate [--json] [--apply | --event | --follow [--since S]] [--project-root P]`
@@ -131,7 +163,7 @@ The verb takes one mode at most. `--since` takes `new` (the default), `all`, `la
 
 ### Policy
 
-The block is `inbox.curator` (its `policy-config.md` section lands with the intake PR). The operator named the key `inbox.curator.stage`, so the block is nested under `inbox`, beside the older top-level `inbox_priority`. The keys: `stage` (default `shadow`), `overlap_refuse` (0.5), `overlap_warn` (0.3), `consume_min_share` (0.5) and `kinds`.
+The block is `inbox.curator` (its `policy-config.md` section lands with the intake PR). The operator named the key `inbox.curator.stage`, so the block is nested under `inbox`, beside the older top-level `inbox_priority`. The keys: `stage` (default `shadow`), `overlap_refuse` (0.5), `overlap_warn` (0.3), `consume_min_share` (0.5) and `kinds`. The sub-block `audit` holds `min_age_days` (14), `trigger_count` (40) and `max_items` (20) for section 5.
 
 ## Limits
 
@@ -152,3 +184,7 @@ The block is `inbox.curator` (its `policy-config.md` section lands with the inta
 | A lane cannot apply a proposal | `TestCmd_InboxCurate_ApplyIsRefusedWhileALaneIsLive` |
 | A `ship.landed` event is curated with no poll | `TestCuratorRun_FollowCuratesEachLandingAndSkipsOtherRecords`, `TestLandingReader_ReadsTheShipChannelOfTheRoot` |
 | The next `sync-main` is not refused after an apply | `TestCmd_InboxCurate_TheBoundaryCommitsWhatItApplied` |
+| A fixture item with a landed commit gets a `consume` proposal from the audit seat, and nothing moves | `TestCmd_InboxAudit_AFixtureItemWithALandedCommitYieldsAConsumeProposalThroughTheBridgeAndNothingMoves` |
+| The audit starts no seat below the threshold unless forced | `TestCmd_InboxAudit_BelowTheThresholdNoSeatRunsUnlessForced` |
+| A `consume` with no landed commit is refused | `TestParseAudit_RefusesAnUnknownIDARepeatAnUnknownVerdictAnEmptyReasonAndAConsumeWithNoLandedCommit` |
+| The audit seat is read-only | `TestInboxCurator_IsAReadOnlySeatThatWritesOnlyItsAuditReport` |

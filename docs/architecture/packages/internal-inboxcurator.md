@@ -100,3 +100,17 @@ The package has four parts:
 - `TestOpenItems_ReadsTheRootAndEveryClaimAndNamesAnUnreadableFile` and the two error tests.
 - The verb: `TestCmd_InboxAdd_ADuplicateIsRefusedNamingTheOverlappingID` and the other tests in `go/cmd/evolve/cmd_inbox_add_intake_test.go`.
 - The curator: `TestMatchLanding_ProposesADeterministicConsumeWhenTheSurfaceChangedAndEveryNamedTestExists`, `TestReroutes_AGateFileItemOnTheLaneRouteIsADeterministicRerouteToTheConsole`, `TestCurate_ALandingRunsTheMatchAndARoutingChangeRunsTheRerouteCheck`, and in `go/cmd/evolve/cmd_inbox_curator_test.go` `TestCmd_InboxCurate_TheBoundaryConsumesAnItemWhoseAcceptanceMergedInEnforce` and `TestCmd_InboxCurate_ApplyIsRefusedWhileALaneIsLive`.
+
+## The audit (2026-11-03, AD2-9)
+
+The audit is the on-demand LLM check of [inbox-curator.md §5](../inbox-curator.md#5-on-demand-the-llm-audit-ad2-9). The package holds its deterministic half. The seat runs in `evolve inbox audit`.
+
+- **`Probeless(item)`** is true when the acceptance names no test (`NamedTests`).
+- **`StaleProbeless(items, cutoff)`** keeps the probe-less items filed before the cutoff, oldest first. An item with no filing time counts as the oldest.
+- **`CandidateSource{Git, Limit, Exists}.Candidate(item)`** builds one `AuditCandidate`. It lists up to `Limit` commits (`AuditLandedLimit` in the verb) that touch a declared path after the filing. It runs `git --literal-pathspecs log --since`. A declared path that is not local to the repository (`filepath.IsLocal`) is gone, and git and `Exists` never see it. A path that `Exists` does not find is also gone. A git failure is an error that names the item.
+- **`IsLandedCommit(git, sha)`** is true for a hex commit id that is an ancestor of `HEAD`.
+- **The contract table.** `AuditVerdicts()` gives each verdict with its use and its evidence. `AuditCandidateFields()` gives each input field with its meaning, in the order of the JSON fields of `AuditCandidate`. `AuditRules()` gives the text of each refusal rule. `AuditContract()` renders the three lists and the output schema for the prompt of the seat. This is the one home of the contract.
+- **`ParseAudit(raw, candidates, landed)`** reads the `evolve.inbox.audit/1` report of the seat strictly. A document error is an error. It checks each verdict against the same rule table, so the first rule that refuses names the reason in `AuditResult.Refused`. The other verdicts stand. Each `Proposal` has the trigger `audit` (`TriggerAudit`) and is never deterministic. The kinds `retire` (`ProposeRetire`) and `keep` (`ProposeKeep`) exist only for the audit.
+
+The package moves no file for the audit. No LLM edits the inbox.
+

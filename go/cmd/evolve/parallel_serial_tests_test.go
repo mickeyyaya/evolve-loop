@@ -904,4 +904,15 @@ var serialTests = map[string]string{
 	"main.TestWaveNext_APolicyKeyTheBinaryDoesNotKnowRebuildsAndReExecsBeforeTheParse":                                     "swaps seam bootRefreshBinaryCommitFn",
 	"main.TestWaveNext_AFreshBinaryLaunchesWithNoRebuild":                                                                  "swaps seam bootRefreshBinaryCommitFn",
 	"main.TestWaveNext_TheRefreshOptOutHoldsWhenThePolicyHasAnUnknownKey":                                                  "swaps seam bootRefreshBinaryCommitFn",
+
+	"main.TestCmd_InboxAudit_AFixtureItemWithALandedCommitYieldsAConsumeProposalThroughTheBridgeAndNothingMoves": "assigns runner.DefaultRouter",
+	"main.TestCmd_InboxAudit_BelowTheThresholdNoSeatRunsUnlessForced":                                            "assigns runner.DefaultRouter",
+	"main.TestCmd_InboxAudit_TheSeatGetsAtMostMaxItemsOldestFirst":                                               "assigns runner.DefaultRouter",
+	"main.TestCmd_InboxAudit_ARefusedVerdictIsAWarningAndTheRestStands":                                          "assigns runner.DefaultRouter",
+	"main.TestCmd_InboxAudit_ThePlainOutputSaysWhyNoSeatRan":                                                     "assigns runner.DefaultRouter",
+	"main.TestCmd_InboxAudit_EachFailureHasItsExitCode":                                                          "assigns runner.DefaultRouter",
+	"main.TestCmd_InboxAudit_ARecordThatCannotBeWrittenIsAnIOFailure":                                            "assigns runner.DefaultRouter",
+	"main.TestCmd_InboxAudit_AReportThatIsNotTheSchemaNamesTheRunOfThePaidSeat":                                  "assigns runner.DefaultRouter",
+	"main.TestCmd_InboxAudit_ForceWithNoOldItemRunsNoSeat":                                                       "assigns runner.DefaultRouter",
+	"main.TestCmd_InboxAudit_AJSONEncodeFailureIsAnIOFailure":                                                    "assigns runner.DefaultRouter",
 }
