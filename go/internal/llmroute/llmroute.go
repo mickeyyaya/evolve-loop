@@ -22,6 +22,7 @@ var defaultFallbackOnExit = []int{80, 81, 85, ExitModelMismatch, 124, 127}
 var cliBinaryFor = map[string]string{
 	"claude-p":        "claude",
 	"claude-tmux":     "claude",
+	"claude-cloud":    "claude",
 	"codex":           "codex",
 	"codex-tmux":      "codex",
 	"agy":             "agy",

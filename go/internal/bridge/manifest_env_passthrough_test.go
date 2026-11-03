@@ -40,7 +40,7 @@ func TestRealize_EnvPassthroughIsCopiedIntoTheRealization(t *testing.T) {
 func TestManifests_EachFamilyPassesItsConfigDirAndProxies(t *testing.T) {
 	t.Parallel()
 	want := map[string]string{
-		"claude-tmux": "CLAUDE_CONFIG_DIR", "claude-p": "CLAUDE_CONFIG_DIR",
+		"claude-tmux": "CLAUDE_CONFIG_DIR", "claude-p": "CLAUDE_CONFIG_DIR", "claude-cloud": "CLAUDE_CONFIG_DIR",
 		"codex": "CODEX_HOME", "codex-tmux": "CODEX_HOME",
 		"agy": "XDG_CONFIG_HOME", "agy-tmux": "XDG_CONFIG_HOME", "agy-claude-tmux": "XDG_CONFIG_HOME",
 		"ollama-tmux": "OLLAMA_HOST",

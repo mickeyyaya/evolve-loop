@@ -1,6 +1,7 @@
 package bridge
 
 var serialTests = map[string]string{
+	"bridge.TestClaudeCloudDriver_AManifestThatDoesNotLoadRefusesTheLaunch":                                     "swaps seam bridgeManifestDirFn",
 	"bridge.TestNewSessionEnv_ReturnsOnlyAfterThePaneHasRemovedItsFile":                                         "sets env through a helper",
 	"bridge.TestNewSessionEnv_APaneThatNeverReadsItsFileFailsTheStartRemovesTheFileAndKillsOnlyItsOwnSessionID": "sets env through a helper, swaps seam cellEnvConsumeTimeout",
 	"bridge.TestNewSessionEnv_AStartThatPrintsNoSessionIDKillsNothing":                                          "sets env through a helper",

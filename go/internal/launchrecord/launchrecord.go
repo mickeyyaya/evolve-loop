@@ -4,26 +4,32 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
+	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/cloudlaunch"
 )
 
 const Subdir = "agent-runs"
 
 type Record struct {
-	RunID          string `json:"run_id"`
-	Profile        string `json:"profile"`
-	CLI            string `json:"cli"`
-	Family         string `json:"family"`
-	Model          string `json:"model"`
-	Verdict        string `json:"verdict"`
-	WritesSource   bool   `json:"writes_source,omitempty"`
-	TreeBefore     string `json:"tree_state_sha_before"`
-	TreeAfter      string `json:"tree_state_sha_after"`
-	ArtifactSHA256 string `json:"artifact_sha256,omitempty"`
-	Worktree       string `json:"worktree,omitempty"`
-	TS             string `json:"ts"`
+	RunID          string               `json:"run_id"`
+	Profile        string               `json:"profile"`
+	CLI            string               `json:"cli"`
+	Family         string               `json:"family"`
+	Model          string               `json:"model"`
+	Verdict        string               `json:"verdict"`
+	WritesSource   bool                 `json:"writes_source,omitempty"`
+	TreeBefore     string               `json:"tree_state_sha_before"`
+	TreeAfter      string               `json:"tree_state_sha_after"`
+	ArtifactSHA256 string               `json:"artifact_sha256,omitempty"`
+	Worktree       string               `json:"worktree,omitempty"`
+	TS             string               `json:"ts"`
+	Cloud          *cloudlaunch.Session `json:"cloud,omitempty"`
 }
 
 func (r Record) BoundTo(treeStateSHA string) bool {
@@ -73,4 +79,28 @@ func Read(evolveDir, runID string) (Record, error) {
 		return Record{}, fmt.Errorf("launch record %s: the file holds the run id %q", runID, r.RunID)
 	}
 	return r, nil
+}
+
+func List(evolveDir string) ([]Record, error) {
+	entries, err := os.ReadDir(filepath.Join(evolveDir, Subdir))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("launch records: %w", err)
+	}
+	var out []Record
+	for _, e := range entries {
+		runID, isRecord := strings.CutSuffix(e.Name(), ".json")
+		if !isRecord || e.IsDir() {
+			continue
+		}
+		r, err := Read(evolveDir, runID)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	slices.SortStableFunc(out, func(a, b Record) int { return strings.Compare(a.TS, b.TS) })
+	return out, nil
 }

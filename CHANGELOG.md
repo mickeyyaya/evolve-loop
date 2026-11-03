@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — the `claude-cloud` bridge seat starts a Claude Code cloud session (2026-11-03)
+
+- **The driver.** `claude-cloud` is a bridge driver with the manifest `claude-cloud.json` (`base: claude-tmux`). It runs `claude --cloud "<task>"` in a private tmux pane. It reads the session line and the view line, then ends only its own session. The outcome is `launched`; the deliverable is a later pull request of the cloud session.
+- **Selection is routing data.** A profile or a `cli_routing` rule that names `claude-cloud` selects the seat for `evolve agent run` and for a cycle dispatch. There is no launch verb.
+- **Refusals.** Before a session starts, the driver refuses a branch with commits that are not pushed, and a remote that is not on GitHub. The refusal is exit 2 and the signal `BRIDGE_CLOUD_LAUNCH_REFUSED`. A launch emits `BRIDGE_CLOUD_LAUNCHED`.
+- **Records.** `evolve agent run` writes the session to the `cloud` key of its launch record and of its `--json` envelope. `evolve cloud list [--json]` prints the recorded sessions. It is a core verb of class A.
+- **Billing.** A cloud session draws on the cloud-session credit of the account, not on plan usage.
+- Docs: [llm-isolation §5.2](docs/architecture/llm-isolation.md), [runtime-reference](docs/operations/runtime-reference.md), [cli-contract §5](docs/architecture/cli-contract.md), [internal-bridge](docs/architecture/packages/internal-bridge.md), [internal-cloudlaunch](docs/architecture/packages/internal-cloudlaunch.md).
+
 ## Changed — the inbox and routing writers queue during a wave, and `gc` takes a lease (X17c, 2026-10-27)
 
 - **The queue.** `inbox edit`, `withdraw`, `verify`, `route-console`, `route-lane` and `cli-routing set`, `unset`, `init`, `migrate` can run while a loop lane is live. With the policy key `isolation.i15.stage` at `enforce`, each one writes one request to `.evolve/queue/` and exits 4. The compiled stage is `shadow`: the verb refuses with exit 3 and names the file that `enforce` writes.
