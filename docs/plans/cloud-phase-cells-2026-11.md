@@ -3,7 +3,7 @@
 - **Status:** proposed, 2026-11-03. Nothing is built. The operator answers section 10 before the build starts.
 - **Research:** [cloud-phase-cells-2026-11](../research/cloud-phase-cells-2026-11.md). Each id below (F1.4, P2.2, R3) points into it.
 - **Specs that the components update when they land:** [llm-isolation.md](../architecture/llm-isolation.md), [wave-orchestrator.md](../architecture/wave-orchestrator.md), [phase-handoff-contract.md](../architecture/phase-handoff-contract.md).
-- **ADRs in force:** [ADR-0154](../architecture/adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md) (invariants I-1 to I-9), [ADR-0139](../architecture/adr/0139-a-wave-orchestrator-supplies-admits-and-backfills-every-lane.md) (the pool). Component CC-12 adds one ADR.
+- **ADRs in force:** [ADR-0154](../architecture/adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md) (I-1 to I-9, I-17), [ADR-0155](../architecture/adr/0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md) (I-10 to I-14), [ADR-0156](../architecture/adr/0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md) (I-15, I-16), [ADR-0139](../architecture/adr/0139-a-wave-orchestrator-supplies-admits-and-backfills-every-lane.md) (the pool). Component CC-12 adds one ADR.
 - **Related work:** the driver `claude-cloud` on the branch `cloud/bridge-claude-cloud`, and the decision set D1 to D4 on the branch `docs/architecture-decisions-2026-11`.
 
 **Terms used throughout:**
@@ -20,7 +20,7 @@ The operator wrote on 2026-11-03:
 
 > "prioritize claude --cloud as highest priority ... Then full 8 cycles concurrency on claude cloud phase agent cycle"
 
-The brief adds two limits. Cloud sessions bill the cloud-session credit of the account. Routines bill plan usage and must not be used. Four local lanes already push the host load to 45 on 14 cores.
+The brief adds two limits. Cloud sessions bill the cloud-session credit of the account. Routines bill plan usage and must not be used. Four local lanes already push the host load to 45 on 14 cores. The fleet research measured 15 to 18 at width 4 and 37 to 63 during lane floors (F1.16).
 
 ## 2. Facts
 
@@ -49,7 +49,7 @@ Goals:
 1. G-1: each phase agent of a cycle can run in a cloud session, selected by routing data only.
 2. G-2: up to 8 lanes run at one time, each with at most one active cloud seat.
 3. G-3: each kernel gate runs locally, in the order of the state machine, on a local tree.
-4. G-4: each of I-1 to I-8 holds for a cloud cell, and I-9 has a matrix row.
+4. G-4: each of I-1 to I-8, I-11 and I-15 to I-17 holds for a cloud cell. I-9 has a matrix row.
 5. G-5: a failed, late or rogue session never changes `main`. It never blocks a lane past its wait budget.
 6. G-6: one routing change returns each phase to a local driver.
 
@@ -126,7 +126,7 @@ The steps in words:
 3. The driver runs `claude --cloud` in a tmux pane, in a pipeline checkout of the cell branch. Thus the session clones that branch (P2.2). The prompt holds the challenge token. The token is not in the tree.
 4. The driver reads the session id and the url from the pane, and writes them to `.evolve/lineage/cloud/cycle-2104/build-t1.json`.
 5. The driver polls `git ls-remote origin refs/heads/cloud-cell/cycle-a1b2-2104/build-t1`. A new head whose message passes `evidence.Parse(msg).Verify(phase, token)` ends the wait (F1.3).
-6. The importer fetches the head and computes the diff from the dispatch commit. The `build` phase is a source writer (F1.10), so the diff can touch the worktree minus the protected surface. A change under `.cell/` is allowed only at `.cell/out/<declared file>`.
+6. The importer fetches exactly the verified commit, and it refuses a branch whose head moved past that commit. It computes the diff from the dispatch commit. The `build` phase is a source writer (F1.10). Its diff can touch the worktree, minus the protected surface and the oracle paths (I-11). A change under `.cell/` is allowed only at `.cell/out/<declared file>`.
 7. The importer copies `.cell/out/build-report.md` into the workspace after the launch time (F1.11). It applies the source diff, with `.cell/` excluded, to the local worktree.
 8. The driver deletes the cell branch and returns exit 0. The runner judges, and the gates run as today.
 
@@ -151,18 +151,18 @@ Route: `console` means the console builds it, because it touches a protected sur
 | Id | What | Files | Stage | Size | Proving test (red first) | Route |
 |---|---|---|---|---|---|---|
 | CC-0 | A live probe: boot time, clone time and the pane output of the session id. It also checks a push to `cloud-cell/**`, the follow-up JSON and the end of an idle session. The results go into a research addendum | `go/cmd/evolve` (`evolve doctor probe claude-cloud`), `docs/research` | none | S | `TestDoctorProbe_ClaudeCloudReportsBootCloneAndPushTimes` on a fake CLI | console |
-| CC-1 | The manifest `claude-cloud.json` with `"transport": "cloud"`, a session-id regex, a base wait and the slot cap. Merge with the driver of `cloud/bridge-claude-cloud` | `go/internal/bridge/manifests/`, `go/internal/bridge` | none | S | `TestLoadManifest_ClaudeCloudHasCloudTransportAndSessionRegex` | console: bridge |
+| CC-1 | The manifest `claude-cloud.json` with `"transport": "cloud"`, a session-id regex, a base wait and the slot cap. The driver reuses the tmux pane code. The 5 callers of `IsTmuxDriver` get a cloud case. Merge with the driver of `cloud/bridge-claude-cloud` | `go/internal/bridge/manifests/`, `go/internal/bridge` | none | S | `TestLoadManifest_ClaudeCloudHasCloudTransportAndSessionRegex` | console: bridge |
 | CC-2 | A new package `cloudcell`: the dispatch commit, the private-path deny check, the cell branch name, the push through the pipeline push path | `go/internal/cloudcell` | none | M | `TestDispatch_TheTreeHoldsTheWorktreeAndOnlyIndexedInputs`, `TestDispatch_RefusesAPrivatePath` | console: uses the push path |
 | CC-3 | The completion contract `remote-git`: poll `ls-remote`, fetch, verify the evidence and the token | `go/internal/core/ports.go`, `go/internal/bridge/completion.go` | none | M | `TestRemoteGitDetector_AHeadWithoutTheTokenNeverCompletes` | console: bridge |
-| CC-4 | The importer: the diff fence by phase class, the copy of declared files by name, the apply of the source diff, the lineage record | `go/internal/cloudcell` | none: refuses from the start (CD5) | M to L | `TestImport_ANonWriterPhaseThatChangesASourceFileIsRefused`, `TestImport_AProtectedPathIsRefused`, `TestImport_TheCopiedFileIsNewerThanTheLaunch` | console |
+| CC-4 | The importer. It imports only the verified commit and fences the diff by phase class and oracle paths. It copies declared files by name, applies the source diff and writes the lineage record | `go/internal/cloudcell` | none: refuses from the start (CD5) | M to L | `TestImport_ANonWriterPhaseThatChangesASourceFileIsRefused`, `TestImport_AProtectedPathIsRefused`, `TestImport_AChangedOraclePathIsRefused`, `TestImport_AHeadPastTheVerifiedCommitIsRefused`, `TestImport_TheCopiedFileIsNewerThanTheLaunch` | console |
 | CC-5 | The branch sweep and the rogue-ref detector. It deletes the cell branch at the end of the seat and sweeps orphans. It alarms on a moved ref outside `cloud-cell/**` | `go/internal/cloudcell`, `go/cmd/evolve` | `cloud_cells.ref_guard.stage`: `shadow`, then `enforce` | S | `TestRefGuard_AMovedMainWithoutALandingJournalEntryAlarms` | console |
 | CC-6 | The timeout ladder: the base wait from the manifest, one follow-up nudge, then exit `81`. A new try gets a new branch | `go/internal/bridge` | none | S | `TestCloudWait_ALatePushToAnOldTryIsIgnored` | console: bridge |
 | CC-7 | Usage telemetry: a billing snapshot before and after each seat, and the session url in the dispatch record | `go/internal/bridge/billing.go`, `go/internal/cyclespend` | none | S | `TestCloudSeat_WritesABillingDeltaAndTheSessionURL` | console: bridge |
 | CC-8 | The I-9 matrix row: a fake `claude` that emulates `--cloud` by a push to a local bare remote | `go/internal/isolation/matrix.go`, `go/cmd/evolve/e2e_cycle_cli_matrix_test.go`, `go/internal/fakeclitest` | none | M | the new row of `TestE2ECycleCLIMatrix` for `claude-cloud` | console |
 | CC-9 | Routing data, stage C: `claude-cloud` first in the chains of `tdd-engineer` and `builder`, and `bridge.max_concurrent.claude-cloud: 4` | `.evolve/policy.json` | data | XS | `evolve cli-routing explain builder` names `claude-cloud` | console: policy |
 | CC-10 | Host-load admission: hold a new lane while the 1-minute load for each CPU is above `fleet.admission.max_load_per_cpu` | `go/internal/policy/fleet.go`, `go/internal/fleet/pool.go` | `shadow`, then `enforce` | S to M | `TestPool_HoldsALaneWhileTheLoadPerCPUIsAboveThePolicyValue` with an injected load reader | console: policy |
-| CC-11 | Width 8: `fleet.count: 8`, `bridge.max_concurrent.claude-cloud: 8`, the routing of each phase to `claude-cloud`. It needs `fleet.integration.stage: enforce` (ADR-0147) first | `.evolve/policy.json` | data | XS | `evolve wave watch` shows 8 lanes in flight | console: policy |
-| CC-12 | Docs: an ADR for cloud cells and a remote-cell section in `llm-isolation.md` with the I-1 to I-9 table. Also a width section in `wave-orchestrator.md` and the cloud handoff in `phase-handoff-contract.md` | `docs/architecture` | none | S | `evolve docs ste-lint --strict`, docs-review | console |
+| CC-11 | Width 8: `fleet.count: 8`, `bridge.max_concurrent.claude-cloud: 8`, the routing of each phase to `claude-cloud`. It needs `fleet.integration.stage: enforce` (ADR-0147) first. These keys are proposed | `.evolve/policy.json` | data | XS | `evolve wave watch` shows 8 lanes in flight | console: policy |
+| CC-12 | Docs: an ADR for cloud cells and a remote-cell section in `llm-isolation.md` with the invariant tables. An "Amended by" note on D1 for the push exception. Also a width section in `wave-orchestrator.md` and the cloud handoff in `phase-handoff-contract.md` | `docs/architecture` | none | S | `evolve docs ste-lint --strict`, docs-review | console |
 
 ## 7. Order
 
@@ -176,7 +176,7 @@ Route: `console` means the console builds it, because it touches a protected sur
 8. CC-11. Width 8 only after ADR-0147 is at `enforce` and stage C held for one wave.
 9. CC-12 lands with CC-9, so the spec matches the first real route.
 
-The total is about 1 L, 5 M and 6 S or XS components (an estimate from the table).
+The total is 13 components: 3 M, 1 M to L, 1 S to M and 8 S or XS (an estimate from the table).
 
 ## 8. Verification
 
@@ -188,13 +188,13 @@ The total is about 1 L, 5 M and 6 S or XS components (an estimate from the table
 | G-4 | the I-9 row for `claude-cloud`, and 0 importer fence refusals that a gate missed | no row | row green |
 | G-5 | rogue-ref alarms, orphan cell branches older than one day | none measured | 0 and 0 |
 | G-6 | a routing change back to `claude-tmux` passes the matrix row | not proven | proven by CC-8 |
-| host load | the 1-minute load average at width 8, from `uptime` samples | 15 to 63 at width 4 (F1.16) | below `max_load_per_cpu` times 14 |
+| host load | the 1-minute load average at width 8, from `uptime` samples | 15 to 18 at width 4, 37 to 63 during lane floors (F1.16) | below `max_load_per_cpu` times 14 |
 
 ## 9. Risks
 
 | Risk | Control |
 |---|---|
-| A session pushes to `main` or to a lane branch | a GitHub ruleset limits the cloud push to `cloud-cell/**`, and CC-5 alarms on any other moved ref |
+| A session pushes to `main` or to a lane branch | a GitHub ruleset limits the push of the cloud actor to `cloud-cell/**`. CC-0 finds that actor first, so the ruleset does not block the pipeline. CC-5 alarms on any other moved ref |
 | A session opens a PR | the prompt forbids it. CC-5 lists the open PRs from `cloud-cell/**` heads and alarms |
 | Private data on a public branch (F1.20) | the deny check of CC-2, the branch delete of CC-5 |
 | A burst of launches is throttled (P2.8) | the `cliadmit` slot cap and a stagger in CC-1 |
@@ -221,7 +221,7 @@ Each question has the recommended answer first.
    - (b) Width 8 with per-lane landing, and the queue above 6 lanes is accepted.
    - (c) The width stops at 6.
 4. **How is the cloud push limited (D1 exception)?**
-   - (a) A GitHub ruleset on `cloud-cell/**` plus the rogue-ref detector. *Recommended.*
+   - (a) A GitHub ruleset for the cloud actor on `cloud-cell/**`, plus the rogue-ref detector. *Recommended.*
    - (b) The detector only.
    - (c) No exception: wait for a return channel without a push.
 5. **Where do the inputs travel? The repository is public.**
@@ -240,5 +240,6 @@ Each question has the recommended answer first.
 
 - The billing facts conflict: the brief says cloud-session credit, the docs say plan usage (research §2.3). CC-7 measures it.
 - The pane output of `claude --cloud` and the push to a branch outside `claude/` are not measured. CC-0 measures them.
+- The GitHub actor of a cloud push is not known. If it is the same actor as the pipeline, a ruleset cannot split them, and Q4 falls back to (b).
 - The merge of CC-1 with the driver of `cloud/bridge-claude-cloud` depends on the shape of that branch. It is not on the remote on 2026-11-03.
 - Windows: the driver uses tmux. A Windows host needs another TTY host. That gap is the same as for `claude-tmux`.

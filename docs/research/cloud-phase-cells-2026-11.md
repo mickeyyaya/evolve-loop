@@ -39,7 +39,7 @@ The operator wrote on 2026-11-03: "prioritize claude --cloud as highest priority
 **F1.3** Completion has four modes: `artifact`, `stdout`, `git` and `worktree-evidence` (`go/internal/core/ports.go:177-180`). The `git` mode accepts a new commit only when `evidence.Parse(msg).Verify(phase, challengeToken)` passes (`go/internal/bridge/completion.go:110-159`).
 *Implication:* a commit with a challenge token already proves that one seat finished. A remote variant of the `git` mode reuses this proof.
 
-**F1.4** The tmux driver waits for an artifact for 300 s by default (`go/internal/bridge/driver_tmux_repl.go:18`). The stop reviewer extends the window up to 6 times (`go/internal/bridge/stopreview.go:64`). The exit code `81` marks an artifact timeout (`go/internal/bridge/exitcodes.go`).
+**F1.4** The tmux driver waits for an artifact for 300 s by default (`go/internal/bridge/driver_tmux_repl.go:20`). The stop reviewer extends the window up to 6 times (`go/internal/bridge/stopreview.go:64`). The exit code `81` marks an artifact timeout (`go/internal/bridge/exitcodes.go`).
 *Implication:* the wait, the extension and the exit codes exist. A cloud cell needs a longer base wait, because a session first boots a VM and clones.
 
 **F1.5** A phase gets a fresh session for each candidate CLI (`launchWithFreshSession`, `go/internal/phases/runner/dispatch.go:25-91`).
@@ -53,7 +53,7 @@ The operator wrote on 2026-11-03: "prioritize claude --cloud as highest priority
 **F1.7** The ledger field `author` "comes from the dispatch record, not from the agent" ([phase-handoff-contract.md](../architecture/phase-handoff-contract.md) line 142). Lineage and request records live under `.evolve/lineage/`, because "the repo is read-only for a cell" ([llm-isolation.md](../architecture/llm-isolation.md) lines 584, 713).
 *Implication:* a trusted record is a file that the pipeline writes where a cell cannot write. A cell branch is agent-written. The pipeline must never read a trusted record from it.
 
-**F1.8** The ship gate requires an audit entry with `GitHEAD` and `TreeStateSHA`, and an EGPS receipt with `RedCount == 0`. The current HEAD must equal the audited HEAD (`go/internal/phases/ship/audit.go:27-126`, `:303`).
+**F1.8** The ship gate requires an audit entry with `GitHEAD` and `TreeStateSHA`, and an EGPS receipt with `RedCount == 0`. The current HEAD must equal the audited HEAD, or the gate re-binds the audit after a move of `main` (`go/internal/phases/ship/audit.go:27-126`, `:303`).
 *Implication:* the ship gate accepts only a tree that the local audit bound. A branch from elsewhere passes only after a local fetch and a local audit.
 
 **F1.9** The ship path pushes `git push origin <commit>:refs/heads/<branch>` (`go/internal/phases/ship/landing/push.go:91-96`). Push-only refuses commits without journal provenance (`go/internal/phases/ship/pushonly.go:64-104`).
@@ -89,6 +89,15 @@ The table maps each invariant to a cloud cell (synthesis, from F1.2 to F1.13).
 | I-8 typed flow decisions | `go/internal/phasecontract/flow_decision.go` | kept. The importer writes the decision file, and the schema checks it | F1.11 |
 | I-9 proven substitution | `TestE2ECycleCLIMatrix` | open until a matrix row runs a fake cloud CLI | a fake `claude` that pushes to a local bare remote |
 
+The brief names I-1 to I-9. Later ADRs add more invariants in force ([llm-isolation.md](../architecture/llm-isolation.md) lines 1939-1946). The four that a cloud cell touches are below (synthesis).
+
+| Invariant | Status in a cloud cell | What keeps it |
+|---|---|---|
+| I-11 no agent writes its own oracle | at risk: the clone holds the frozen predicates, and the agent can edit them | the importer refuses a return diff that touches the oracle paths of the seat, as the local TDD digest check does |
+| I-15 the CLI is the service contract | kept: the driver calls `claude --cloud` and `git`, never MCP | the CLI contract rows |
+| I-16 no ambient control | kept: the base wait and the slot cap are manifest and policy data | `TestNoControlFlagReadOutsideTheMarkerList` |
+| I-17 the assignment is CLI-neutral | kept: the cloud specifics stay below the driver | `TestNoCLISpecificsAboveTheDriver` |
+
 ### 1.5 The fleet and the host
 
 **F1.14** A lane is a local `evolve cycle run` child process with its own worktree under `.evolve/worktrees/` and the branch `cycle-<lane>-<N>` (`go/cmd/evolve/cmd_fleet.go:127-157`, `go/internal/runscope/runscope.go:43-45`). The policy sets `fleet.count: 4` and `min_lanes: 4` (`.evolve/policy.json:121-128`).
@@ -109,7 +118,7 @@ The table maps each invariant to a cloud cell (synthesis, from F1.2 to F1.13).
 **F1.19** The median cycle is 58.9 minutes, with a p90 of 102.4 minutes ([fleet-landing-at-scale-2026-10.md](fleet-landing-at-scale-2026-10.md) F2.14).
 *Implication:* a boot cost of a few minutes for each phase is a visible but bounded share of a cycle.
 
-**F1.20** The repository `mickeyyaya/evolve-loop` is public (`list_repos`, 2026-11-03).
+**F1.20** The repository `mickeyyaya/evolve-loop` is public (`gh api repos/mickeyyaya/evolve-loop --jq .visibility` printed `public`, 2026-11-03).
 *Implication:* each cell branch is public while it exists. A dispatch commit must hold no private data.
 
 **F1.21** The decision D1 of 2026-11-03 says: "no cell gets a credential", and the pipeline pushes and opens PRs (`docs/plans/architecture-decisions-2026-11.md` on the branch `docs/architecture-decisions-2026-11`, D1).
@@ -219,10 +228,10 @@ B fails two hard rules: it runs four phases with no kernel gate between them, an
 |---|---|---|
 | R1 | Route C first: `tdd` and `build` go to `claude-cloud` for one wave. Then route the other phases | section 4.3 |
 | R2 | A remote completion mode reuses the evidence and challenge-token proof of the `git` mode | F1.3 |
-| R3 | The importer fences the return: a source-writer phase can change the worktree minus the protected surface. Each other phase can add only its declared files | F1.10, F1.13 |
+| R3 | The importer fences the return: a source-writer phase can change the worktree minus the protected surface and the oracle paths (I-11). Each other phase can add only its declared files | F1.10, F1.13 |
 | R4 | The importer copies declared files by name into the workspace and writes no trusted record from the branch | F1.7, F1.11 |
 | R5 | The dispatch commit holds the worktree tree and the indexed inputs only. A deny check refuses private paths before the push | F1.20 |
-| R6 | A GitHub ruleset limits the cloud push to `cloud-cell/**`. A local detector alarms on any other ref that moved during a session | F1.21, P2.2 |
+| R6 | A GitHub ruleset limits the push of the cloud actor to `cloud-cell/**`. The probe first finds which GitHub actor a cloud push uses. A local detector alarms on any other moved ref | F1.21, P2.2 |
 | R7 | The driver staggers launches and keeps a slot cap through `cliadmit` | P2.8 |
 | R8 | A host-load admission rule holds a new lane while the load for each CPU is above a policy value | F1.15, F1.16 |
 | R9 | Width 8 waits for the orchestrator-owned integration (ADR-0147) at `enforce` | F1.18 |
