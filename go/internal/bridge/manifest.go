@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -173,16 +174,8 @@ func parseManifestWithStderr(cli string, data []byte, stderr io.Writer) (Manifes
 	if m.ProbeBootRetries < 0 {
 		return Manifest{}, fmt.Errorf("bridge:manifest: probe_boot_retries for cli=%s is %d; it counts retries, so it cannot be negative", cli, m.ProbeBootRetries)
 	}
-	for key, value := range m.DefaultEnv {
-		if !isShellIdentifier(key) {
-			return Manifest{}, fmt.Errorf("bridge:manifest: default_env key %q for cli=%s is not a shell identifier", key, cli)
-		}
-		if isReservedEnvKey(key) {
-			return Manifest{}, fmt.Errorf("bridge:manifest: default_env key %q for cli=%s is reserved: the loop's, the bridge's and the credential variables are not a manifest's to set", key, cli)
-		}
-		if hasControlByte(value) {
-			return Manifest{}, fmt.Errorf("bridge:manifest: default_env value for %q (cli=%s) carries a control byte; it is typed into a pane", key, cli)
-		}
+	if err := validateEnvEntries("bridge:manifest: default_env", "cli="+cli, m.DefaultEnv); err != nil {
+		return Manifest{}, err
 	}
 	if err := validateEnvPassthrough(cli, m.EnvPassthrough); err != nil {
 		return Manifest{}, err
@@ -234,6 +227,20 @@ func validateEnvPassthrough(cli string, names []string) error {
 	for _, name := range names {
 		if !isShellIdentifier(name) || isReservedEnvKey(name) {
 			return fmt.Errorf("bridge:manifest: env_passthrough name %q for cli=%s is not a shell identifier, or it is a loop, bridge or credential variable", name, cli)
+		}
+	}
+	return nil
+}
+
+func validateEnvEntries(field, owner string, env map[string]string) error {
+	for _, key := range slices.Sorted(maps.Keys(env)) {
+		switch {
+		case !isShellIdentifier(key):
+			return fmt.Errorf("%s key %q for %s is not a shell identifier", field, key, owner)
+		case isReservedEnvKey(key):
+			return fmt.Errorf("%s key %q for %s is reserved: the loop's, the bridge's and the credential variables are not data to set", field, key, owner)
+		case hasControlByte(env[key]):
+			return fmt.Errorf("%s value for %q (%s) carries a control byte; it is typed into a pane", field, key, owner)
 		}
 	}
 	return nil

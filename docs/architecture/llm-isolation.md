@@ -847,30 +847,32 @@ Known differences from the design:
 
 The sandbox denies the read of `~/.config/gh` and `~/.ssh` (row N8). The tools in a cell still look there first, and each failed read gives a `read.home.secret` signal. The tool view sends each tool to an empty config of the cell. Thus a `gh` or `git` call in a cell finds no host config and no credential. The plan is component AD1-3 of decision D1 in `docs/plans/architecture-decisions-2026-11.md`.
 
-A worked example: the build cell of cycle 7 has the workspace `.evolve/runs/cycle-7`. At `enforce` the bridge makes the empty directory `.evolve/runs/cycle-7/.cell/gh` and writes `.evolve/runs/cycle-7/.cell/gitconfig`. The cell runs `gh auth status`, and `gh` prints `You are not logged into any GitHub hosts.` The cell runs `git credential fill`, and `git` finds no helper and asks for no password.
+A worked example: the build cell of cycle 7 has the workspace `.evolve/runs/cycle-7`. At `enforce` the bridge writes the view under `.evolve/runs/cycle-7/.cell/` before the launch. The cell runs `gh auth status`, and `gh` prints `You are not logged into any GitHub hosts.` The cell runs `git credential fill`, and `git` finds no helper and asks for no password.
 
-| Variable | Value | Effect |
-|---|---|---|
-| `GH_CONFIG_DIR` | `<ws>/.cell/gh` (empty) | `gh` reads no `hosts.yml` of the host, so it has no login |
-| `GIT_CONFIG_NOSYSTEM` | `1` | `git` reads no system config, for example `/etc/gitconfig` |
-| `GIT_CONFIG_GLOBAL` | `<ws>/.cell/gitconfig` | `git` reads no `~/.gitconfig`. The file sets `credential.helper` to an empty value, so the helper list is empty |
-| `GIT_TERMINAL_PROMPT` | `0` | `git` asks for no user name and no password |
-| `GIT_SSH_COMMAND` | `ssh -F /dev/null -o IdentitiesOnly=yes -o IdentityFile=/dev/null -o BatchMode=yes` | `ssh` reads no `~/.ssh/config`, no key and no agent key, and it asks for nothing |
+The one home of the names and the values is `go/internal/bridge/cellview/tool-view.json`. This section tells what each part does and gives no copy of a value.
+
+| Part of the view | Effect |
+|---|---|
+| the `gh` config directory | `gh` reads an empty directory of the cell, not `~/.config/gh`, so it has no login |
+| the system and global `git` config | `git` reads no system config and no `~/.gitconfig`. It reads a cell gitconfig that resets the credential helper list |
+| the terminal prompt | `git` asks for no user name and no password |
+| the `ssh` command of `git` | `ssh` reads no `~/.ssh/config`, no key and no agent key, and it asks for nothing |
 
 | Item | As built |
 |---|---|
-| Data | the embedded file `go/internal/bridge/cellview/tool-view.json`. It gives the cell directory, the variables, the empty directories and the files. The token `{cell}` stands for `<ws>/.cell`. No Go code names a tool or a family |
-| Check of the data | `parseCellToolView` refuses a reserved variable or a variable that is not a shell identifier. It also refuses a control byte and a path outside the cell directory. Bad data stops the binary at its start |
-| Where it applies | `Deps.cellToolEnv` adds the variables to the manifest `default_env` of `cfg.Realization.Env` in the `enforce` branch of `cellEnv`. A tool view variable wins over a manifest value |
+| Data | the embedded file above. It gives the cell directory, the variables, the empty directories and the files. The token `{cell}` stands for `<ws>/.cell`. No Go code names a tool or a family |
+| Check of the data | `parseCellToolView` applies `validateEnvEntries`, the check of the manifest `default_env`, and refuses a path outside the cell directory. Bad data stops the binary at its start |
+| Where it applies | `cellToolEnv` adds the variables to the manifest `default_env` of `cfg.Realization.Env` in the `enforce` branch of `cellEnv`. A tool view variable wins over a manifest value. `cellEnv` writes no file |
+| Where the files come from | `Deps.prepareCellToolView` writes the directories and the files before the driver starts. `launchSwept` (each phase) and `launchPane` (each probe and smoke) call it at `enforce` |
 | Stage source | the policy key `isolation.i2.stage`, the same stage as the hermetic environment (§6). At `shadow` and `off` the cell gets no tool view |
 | A cell with no workspace | no tool view, for example the version probe of `probeEnv` |
-| A failed write | a `[bridge] WARN cell tool view:` line. The cell keeps the variables. A missing config directory or file also gives no login and no helper |
+| A failed write | a `[bridge] WARN cell tool view:` line on `Deps.Stderr`, or on the process stderr when `Deps.Stderr` is not set. The cell keeps the variables. A missing config directory or file also gives no login and no helper |
 
 The guards are these tests:
 
 - `TestAgentSandboxContract_N8b_ACellGhCallSaysNotLoggedInAndReadsNoHostConfig` (build tag `integration`). A fake `gh` reads the config directory as the real `gh` does. A fixture `HOME` holds a `hosts.yml`, and the launcher sets `GH_TOKEN`. The cell call says that it is not logged in, and it reads only the cell directory.
 - `TestAgentSandboxContract_N8c_ACellGitHasNoCredentialHelper` (build tag `integration`). The real `git` runs with a fixture `HOME` and a fixture system config. Each one sets `credential.helper=store`, and a fixture `.git-credentials` holds a token. The cell `git` has no helper, `git credential fill` finds no token, and the `ssh` command reads no key.
-- `TestCellEnv_EnforceHoldsEachKeyOfTheCellToolView`, `TestCellEnv_ShadowAndOffAddNoCellToolView` and `TestParseCellToolView_TheEmbeddedDataHoldsEachKey`.
+- `TestCellEnv_EnforceHoldsEachKeyOfTheCellToolView`, `TestCellEnv_ShadowAndOffAddNoCellToolView`, `TestParseCellToolView_TheEmbeddedDataHoldsEachKey` and `TestLaunchEntries_WriteTheCellToolViewBeforeTheDriverStarts`.
 
 Limits:
 

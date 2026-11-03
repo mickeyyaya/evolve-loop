@@ -71,6 +71,7 @@ func launchPane(ctx context.Context, purpose LaunchPurpose, driver Driver, cfg *
 		return ExitSafetyGate, err
 	}
 	launchPurposeConfig(purpose, cfg)
+	deps.prepareCellToolView(cfg)
 	return driver.Launch(ctx, cfg, deps)
 }
 

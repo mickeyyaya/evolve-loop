@@ -228,9 +228,9 @@ The spec is [llm-isolation.md](../llm-isolation.md) §6 and §6.1. An LLM child 
 - At `enforce`, a named session is used again only when its `@evolve_env` fingerprint matches the cell environment (`checkReusedSessionEnv`).
 - The signal code is `isolation.ViolationCode(2)`, which `internal/isolation` registers.
 - `LaunchLLM` gives `probeEnv(bin)` to the version inventory and the model queries, so they follow the same stage.
-- At `enforce`, `Deps.cellToolEnv` adds the cell tool view to the env of a cell that has a workspace (`cell_tool_view.go`, AD1-3, spec [llm-isolation](../llm-isolation.md) §9.2). The variables are `GH_CONFIG_DIR`, `GIT_CONFIG_NOSYSTEM`, `GIT_CONFIG_GLOBAL`, `GIT_TERMINAL_PROMPT` and `GIT_SSH_COMMAND`.
-- The data of the tool view is the embedded file `cellview/tool-view.json`. The Go code names no tool and no family. A tool view variable wins over the manifest `default_env`.
-- The bridge makes the empty directory `<ws>/.cell/gh` and writes `<ws>/.cell/gitconfig`, which sets an empty `credential.helper`. A failed write gives a `WARN` line, and the cell keeps the variables.
+- At `enforce`, `cellToolEnv` adds the cell tool view to the env of a cell that has a workspace (`cell_tool_view.go`, AD1-3, spec [llm-isolation](../llm-isolation.md) §9.2). The names and the values have one home: `cellview/tool-view.json`. The Go code names no tool and no family. A tool view variable wins over the manifest `default_env`.
+- `cellEnv` writes no file. `Deps.prepareCellToolView` writes the files of the view before the driver starts, from `launchSwept` and `launchPane`. A failed write gives a `WARN` line, and the cell keeps the variables.
+- `validateEnvEntries` is the one check of an env map from data. The manifest `default_env` and the tool view both use it.
 
 ### The single launch API (`launch_llm.go`, X3 of ADR-0154)
 

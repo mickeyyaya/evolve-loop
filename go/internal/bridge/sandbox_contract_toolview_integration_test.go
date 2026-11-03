@@ -55,7 +55,9 @@ func (h toolViewHost) cell(t *testing.T, stdin string, name string, args ...stri
 	t.Helper()
 	cfg := seatConfig("claude-tmux")
 	cfg.Workspace = h.workspace
-	env, hermetic := Deps{EnvStage: "enforce"}.cellEnv(cfg)
+	deps := Deps{EnvStage: "enforce"}
+	deps.prepareCellToolView(cfg)
+	env, hermetic := deps.cellEnv(cfg)
 	if !hermetic {
 		t.Fatal("the contract runs at enforce")
 	}

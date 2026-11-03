@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"cmp"
 	_ "embed"
 	"encoding/json"
 	"errors"
@@ -34,12 +35,7 @@ func parseCellToolView(raw []byte) (cellToolView, error) {
 	if !filepath.IsLocal(v.Dir) {
 		return cellToolView{}, fmt.Errorf("bridge:cell tool view: dir %q is not a local path of the workspace", v.Dir)
 	}
-	var errs []error
-	for key, value := range v.Env {
-		if !isShellIdentifier(key) || isReservedEnvKey(key) || hasControlByte(value) {
-			errs = append(errs, fmt.Errorf("bridge:cell tool view: env %q is not a shell identifier, is reserved, or its value carries a control byte", key))
-		}
-	}
+	errs := []error{validateEnvEntries("bridge:cell tool view: env", "the embedded data", v.Env)}
 	for _, name := range slices.Concat(v.Dirs, slices.Sorted(maps.Keys(v.Files))) {
 		if !filepath.IsLocal(name) {
 			errs = append(errs, fmt.Errorf("bridge:cell tool view: %q is not a local path of the cell dir", name))
@@ -80,19 +76,30 @@ func (v cellToolView) write(workspace string) error {
 	return nil
 }
 
-func (deps Deps) cellToolEnv(cfg *Config) map[string]string {
+func cellWorkspace(cfg *Config) string {
+	abs, _ := filepath.Abs(cfg.Workspace)
+	return cmp.Or(abs, cfg.Workspace)
+}
+
+func cellToolEnv(cfg *Config) map[string]string {
 	if cfg.Workspace == "" {
 		return cfg.Realization.Env
 	}
-	workspace := cfg.Workspace
-	if abs, err := filepath.Abs(workspace); err == nil {
-		workspace = abs
-	}
-	if err := defaultCellToolView.write(workspace); err != nil && deps.Stderr != nil {
-		fmt.Fprintf(deps.Stderr, "[bridge] WARN cell tool view: %v (the cell keeps the tool view env, so each tool finds no host config)\n", err)
-	}
 	env := map[string]string{}
 	maps.Copy(env, cfg.Realization.Env)
-	maps.Copy(env, defaultCellToolView.envFor(workspace))
+	maps.Copy(env, defaultCellToolView.envFor(cellWorkspace(cfg)))
 	return env
+}
+
+func (deps Deps) prepareCellToolView(cfg *Config) {
+	if cfg.Workspace == "" || deps.envStage() != envStageEnforce {
+		return
+	}
+	if err := defaultCellToolView.write(cellWorkspace(cfg)); err != nil {
+		w := deps.Stderr
+		if w == nil {
+			w = os.Stderr
+		}
+		fmt.Fprintf(w, "[bridge] WARN cell tool view: %v (the cell keeps the tool view env, so each tool finds no host config)\n", err)
+	}
 }

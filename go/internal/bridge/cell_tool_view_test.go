@@ -2,6 +2,13 @@ package bridge
 
 import (
 	"bytes"
+	"context"
+	"fmt"
+	"io"
+	"syscall"
+	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/proctree"
 	"maps"
 	"os"
 	"path/filepath"
@@ -24,11 +31,16 @@ func toolViewSeat(t *testing.T) *Config {
 func TestCellEnv_EnforceHoldsEachKeyOfTheCellToolView(t *testing.T) {
 	t.Parallel()
 	cfg := toolViewSeat(t)
-	env, hermetic := Deps{EnvStage: "enforce"}.cellEnv(cfg)
+	deps := Deps{EnvStage: "enforce"}
+	env, hermetic := deps.cellEnv(cfg)
 	if !hermetic {
 		t.Fatal("enforce must give the hermetic env")
 	}
 	cell := filepath.Join(cfg.Workspace, ".cell")
+	if _, err := os.Stat(cell); !os.IsNotExist(err) {
+		t.Fatalf("cellEnv computes the env and writes no file: %v", err)
+	}
+	deps.prepareCellToolView(cfg)
 	want := map[string]string{
 		"GH_CONFIG_DIR":       filepath.Join(cell, "gh"),
 		"GIT_CONFIG_NOSYSTEM": "1",
@@ -68,7 +80,9 @@ func TestCellEnv_ShadowAndOffAddNoCellToolView(t *testing.T) {
 	t.Parallel()
 	for _, stage := range []string{"shadow", "off"} {
 		cfg := toolViewSeat(t)
-		env, _ := Deps{EnvStage: stage}.cellEnv(cfg)
+		deps := Deps{EnvStage: stage}
+		deps.prepareCellToolView(cfg)
+		env, _ := deps.cellEnv(cfg)
 		if got := envValue(env, "GIT_CONFIG_GLOBAL"); strings.HasPrefix(got, cfg.Workspace) {
 			t.Errorf("%s: the cell got the tool view %q; it follows isolation.i2.stage", stage, got)
 		}
@@ -82,7 +96,9 @@ func TestCellEnv_ACellWithNoWorkspaceGetsNoCellToolView(t *testing.T) {
 	t.Setenv("GH_CONFIG_DIR", "/host/gh")
 	cfg := seatConfig("claude-tmux")
 	cfg.Realization.Env = nil
-	env, _ := Deps{EnvStage: "enforce"}.cellEnv(cfg)
+	deps := Deps{EnvStage: "enforce"}
+	deps.prepareCellToolView(cfg)
+	env, _ := deps.cellEnv(cfg)
 	for _, key := range cellToolViewKeys {
 		if envValue(env, key) != "" {
 			t.Errorf("%s is set for a cell with no workspace", key)
@@ -101,7 +117,9 @@ func TestCellEnv_AnUnwritableToolViewWarnsAndKeepsTheEnv(t *testing.T) {
 			t.Fatal(err)
 		}
 		var stderr bytes.Buffer
-		env, _ := Deps{EnvStage: "enforce", Stderr: &stderr}.cellEnv(cfg)
+		deps := Deps{EnvStage: "enforce", Stderr: &stderr}
+		deps.prepareCellToolView(cfg)
+		env, _ := deps.cellEnv(cfg)
 		if !strings.Contains(stderr.String(), "[bridge] WARN cell tool view:") {
 			t.Errorf("%s: no warning on stderr: %q", name, stderr.String())
 		}
@@ -165,7 +183,9 @@ func TestCellEnv_ARelativeWorkspaceGetsAnAbsoluteCellToolView(t *testing.T) {
 	t.Cleanup(func() { _ = os.Chdir(previous) })
 	cfg := seatConfig("claude-tmux")
 	cfg.Workspace = "ws"
-	env, _ := Deps{EnvStage: "enforce"}.cellEnv(cfg)
+	deps := Deps{EnvStage: "enforce"}
+	deps.prepareCellToolView(cfg)
+	env, _ := deps.cellEnv(cfg)
 	want, err := filepath.Abs(filepath.Join("ws", ".cell", "gitconfig"))
 	if err != nil {
 		t.Fatal(err)
@@ -175,5 +195,50 @@ func TestCellEnv_ARelativeWorkspaceGetsAnAbsoluteCellToolView(t *testing.T) {
 	}
 	if _, err := os.Stat(want); err != nil {
 		t.Fatalf("the bridge must write the gitconfig at the absolute path: %v", err)
+	}
+}
+
+func TestPrepareCellToolView_AFailedWriteWithNoStderrWarnsOnTheProcessStderr(t *testing.T) {
+	t.Parallel()
+	cfg := toolViewSeat(t)
+	if err := os.WriteFile(filepath.Join(cfg.Workspace, ".cell"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	Deps{EnvStage: "enforce"}.prepareCellToolView(cfg)
+	if info, err := os.Stat(filepath.Join(cfg.Workspace, ".cell")); err != nil || info.IsDir() {
+		t.Fatalf("the failed write must leave the blocker file: info=%v err=%v", info, err)
+	}
+}
+
+type toolViewProbeDriver struct{ seen *bool }
+
+func (toolViewProbeDriver) Name() string { return "tool-view-probe" }
+
+func (d toolViewProbeDriver) Launch(_ context.Context, cfg *Config, _ Deps) (int, error) {
+	_, err := os.Stat(filepath.Join(cfg.Workspace, ".cell", "gitconfig"))
+	*d.seen = err == nil
+	return ExitOK, nil
+}
+
+func TestLaunchEntries_WriteTheCellToolViewBeforeTheDriverStarts(t *testing.T) {
+	t.Parallel()
+	deps := Deps{EnvStage: "enforce", Stderr: io.Discard, Env: map[string]string{}, LookupEnv: mapLookup(nil), Now: time.Now,
+		ListProcesses: func(context.Context) ([]proctree.Process, error) { return nil, nil },
+		ListCwds:      func(context.Context) ([]proctree.Cwd, error) { return nil, nil },
+		SignalProcess: func(pid int, _ syscall.Signal) error {
+			return fmt.Errorf("the test signals no process, got pid %d", pid)
+		},
+	}
+	for name, launch := range map[string]func(Driver, *Config) (int, error){
+		"launchPane": func(d Driver, cfg *Config) (int, error) {
+			return launchPane(context.Background(), PurposeSmoke, d, cfg, deps)
+		},
+		"launchSwept": func(d Driver, cfg *Config) (int, error) { return launchSwept(context.Background(), d, cfg, deps) },
+	} {
+		var seen bool
+		cfg := &Config{CLI: "claude-tmux", Agent: "scout", Workspace: t.TempDir()}
+		if rc, err := launch(toolViewProbeDriver{seen: &seen}, cfg); rc != ExitOK || err != nil || !seen {
+			t.Errorf("%s: rc=%d err=%v; the driver saw the cell gitconfig=%v, want true", name, rc, err, seen)
+		}
 	}
 }
