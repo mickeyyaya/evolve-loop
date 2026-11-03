@@ -101,3 +101,23 @@ func TestResolveDispatchPlan_TheLaunchRouterOfARunnerWithNoRootRouterFiltersToo(
 		t.Fatalf("the per-launch router judges tool use with the bridge manifests: %+v %+v %v", resolved.plan, resp, err)
 	}
 }
+
+func TestResolveDispatchPlan_AReportPhaseOfTheLaunchRouterDropsTheCloudSeat(t *testing.T) {
+	root := writeFallbackProfile(t, "evolve-scout", "claude-cloud", []string{"claude-tmux"})
+
+	resolved, resp, err := scoutRunner(nil).resolveDispatchPlan(core.PhaseRequest{ProjectRoot: root}, scoutPreparation(root))
+
+	if want := []string{"claude-tmux"}; err != nil || resp != nil || !reflect.DeepEqual(resolved.plan.Candidates, want) {
+		t.Fatalf("a report phase never launches the cloud seat: %v %+v %v, want %v", resolved.plan.Candidates, resp, err, want)
+	}
+}
+
+func TestResolveDispatchPlan_AWorktreePhaseOfTheLaunchRouterKeepsTheCloudSeat(t *testing.T) {
+	root := writeFallbackProfile(t, "evolve-scout", "claude-cloud", []string{"claude-tmux"})
+
+	resolved, resp, err := scoutRunner(nil).resolveDispatchPlan(core.PhaseRequest{ProjectRoot: root, Worktree: cycleWorktree}, scoutPreparation(root))
+
+	if want := []string{"claude-cloud", "claude-tmux"}; err != nil || resp != nil || !reflect.DeepEqual(resolved.plan.Candidates, want) {
+		t.Fatalf("a worktree phase may launch the cloud seat: %v %+v %v, want %v", resolved.plan.Candidates, resp, err, want)
+	}
+}

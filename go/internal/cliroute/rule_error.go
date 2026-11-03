@@ -42,3 +42,13 @@ type ToolUseError struct {
 func (e *ToolUseError) Error() string {
 	return fmt.Sprintf("rule %s leaves no CLI with tool use for a worktree phase: %v dropped", e.Rule, e.Dropped)
 }
+
+type DeliverableError struct {
+	Rule    string
+	Dropped []string
+	Hosts   []string
+}
+
+func (e *DeliverableError) Error() string {
+	return fmt.Sprintf("rule %s leaves no CLI that delivers a report: %v dropped, because a cloud seat delivers a pull request on a host of %v", e.Rule, e.Dropped, e.Hosts)
+}

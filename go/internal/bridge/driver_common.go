@@ -38,6 +38,14 @@ func exportLines(env map[string]string) []string {
 }
 
 func preparePrompt(cfg *Config, deps Deps) (string, error) {
+	content, err := resolvePromptText(cfg, deps)
+	if err != nil || cfg.Agent == "" {
+		return content, err
+	}
+	return strings.TrimRight(content, "\n") + "\n\n" + agentclass.Brief(cfg.Workspace), nil
+}
+
+func resolvePromptText(cfg *Config, deps Deps) (string, error) {
 	raw, err := os.ReadFile(cfg.PromptFile)
 	if err != nil {
 		return "", fmt.Errorf("read prompt: %w", err)
@@ -62,11 +70,7 @@ func preparePrompt(cfg *Config, deps Deps) (string, error) {
 		}
 		content = strings.ReplaceAll(content, "$CHALLENGE_TOKEN", tok)
 	}
-	content = strings.ReplaceAll(content, "$ARTIFACT_PATH", cfg.Artifact)
-	if cfg.Agent == "" {
-		return content, nil
-	}
-	return strings.TrimRight(content, "\n") + "\n\n" + agentclass.Brief(cfg.Workspace), nil
+	return strings.ReplaceAll(content, "$ARTIFACT_PATH", cfg.Artifact), nil
 }
 
 func ensureDirs(cfg *Config) error {

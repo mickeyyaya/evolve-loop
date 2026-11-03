@@ -196,6 +196,7 @@ Before X11, a console review ran as an in-process Claude Code subagent. It left 
 | `artifact_sha256` | the SHA-256 of the report, when there is one |
 | `worktree` | the `--worktree` directory |
 | `ts` | the UTC write time |
+| `cloud` | the launched cloud session of a run on a cloud seat: id, URL, title, repository, branch, profile, driver and time ([llm-isolation.md](llm-isolation.md) §5.2). A run on any other seat has no `cloud` key. |
 
 - `launchrecord.Write` creates the file and refuses to replace a record. The run refuses a run label whose record exists, before the dispatch (exit 21).
 - A wrapper of the bridge (`launchSpy`) reads the driver and the model from each launch request. A fallback walk launches more than once, so the record names the last launch.

@@ -102,6 +102,7 @@ type Manifest struct {
 	Capabilities            []string                 `json:"capabilities,omitempty"`
 	HomeReads               []string                 `json:"home_reads,omitempty"`
 	ContextWindow           int                      `json:"context_window,omitempty"`
+	CloudLaunch             *CloudLaunchSpec         `json:"cloud_launch,omitempty"`
 }
 
 type ControlSpec struct {
@@ -187,7 +188,7 @@ func parseManifestWithStderr(cli string, data []byte, stderr io.Writer) (Manifes
 	if err := validateEnvPassthrough(cli, m.EnvPassthrough); err != nil {
 		return Manifest{}, err
 	}
-	if err := errors.Join(validateMCPConfigFiles(cli, m.MCPConfigFiles), validateInstallRoots(cli, m.InstallRoots)); err != nil {
+	if err := errors.Join(validateMCPConfigFiles(cli, m.MCPConfigFiles), validateInstallRoots(cli, m.InstallRoots), validateCloudLaunch(cli, m.CloudLaunch)); err != nil {
 		return Manifest{}, err
 	}
 	if err := checkFormats(cli, m, stderr); err != nil {

@@ -20,19 +20,8 @@ func (claudeTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int
 		fmt.Fprintln(deps.Stderr, "[claude-tmux] NOTE: stream_output=true is no-op for this driver — tmux scrollback already streams to stdout-log")
 	}
 
-	if v, ok := lookupEnv(deps, "ANTHROPIC_API_KEY"); ok && v != "" {
-		fmt.Fprintln(deps.Stderr, "[claude-tmux] ANTHROPIC_API_KEY is set — would create an ambiguous credential path; abort")
-		return ExitCostLeak, nil
-	}
-	if v, ok := lookupEnv(deps, "ANTHROPIC_BASE_URL"); ok && v != "" {
-		if !deps.AllowAnthropicBaseURL {
-			fmt.Fprintln(deps.Stderr, "[claude-tmux] ANTHROPIC_BASE_URL set without policy bridge.allow_anthropic_base_url; abort")
-			return ExitCostLeak, nil
-		}
-	}
-	if cfg.AnthropicBaseURL != "" {
-		fmt.Fprintln(deps.Stderr, "[claude-tmux] policy bridge.anthropic_base_url set — proxy mode; abort")
-		return ExitCostLeak, nil
+	if rc, refused := claudeCredentialGate(cfg, deps, "[claude-tmux]"); refused {
+		return rc, nil
 	}
 
 	session, named := resolveSession(cfg, deps, "evolve-bridge-")
@@ -54,6 +43,22 @@ func (claudeTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int
 		bootOnly:        cfg.BootOnly,
 		guardDeadShell:  true,
 	})
+}
+
+func claudeCredentialGate(cfg *Config, deps Deps, prefix string) (int, bool) {
+	if v, ok := lookupEnv(deps, "ANTHROPIC_API_KEY"); ok && v != "" {
+		fmt.Fprintln(deps.Stderr, prefix+" ANTHROPIC_API_KEY is set — would create an ambiguous credential path; abort")
+		return ExitCostLeak, true
+	}
+	if v, ok := lookupEnv(deps, "ANTHROPIC_BASE_URL"); ok && v != "" && !deps.AllowAnthropicBaseURL {
+		fmt.Fprintln(deps.Stderr, prefix+" ANTHROPIC_BASE_URL set without policy bridge.allow_anthropic_base_url; abort")
+		return ExitCostLeak, true
+	}
+	if cfg.AnthropicBaseURL != "" {
+		fmt.Fprintln(deps.Stderr, prefix+" policy bridge.anthropic_base_url set — proxy mode; abort")
+		return ExitCostLeak, true
+	}
+	return ExitOK, false
 }
 
 func init() { Register(claudeTmuxDriver{}) }

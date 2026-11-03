@@ -31,6 +31,10 @@ type TmuxController interface {
 	KillSession(ctx context.Context, session string) error
 }
 
+type JoinedPaneCapturer interface {
+	CapturePaneJoined(ctx context.Context, session string, scrollback int) (string, error)
+}
+
 type PaneCommander interface {
 	PaneCommand(ctx context.Context, session string) (string, error)
 }
@@ -320,12 +324,23 @@ func (t execTmux) SendKeys(ctx context.Context, session, keys string, enter bool
 	return err
 }
 
-func (t execTmux) CapturePane(ctx context.Context, session string, scrollback int) (string, error) {
-	args := []string{"capture-pane", "-p", "-t", ExactSessionTarget(session)}
-	if scrollback > 0 {
-		args = []string{"capture-pane", "-p", "-S", fmt.Sprintf("-%d", scrollback), "-t", ExactSessionTarget(session)}
+func capturePaneArgs(session string, scrollback int, joined bool) []string {
+	args := []string{"capture-pane", "-p"}
+	if joined {
+		args = append(args, "-J")
 	}
-	return t.run(ctx, args...)
+	if scrollback > 0 {
+		args = append(args, "-S", fmt.Sprintf("-%d", scrollback))
+	}
+	return append(args, "-t", ExactSessionTarget(session))
+}
+
+func (t execTmux) CapturePane(ctx context.Context, session string, scrollback int) (string, error) {
+	return t.run(ctx, capturePaneArgs(session, scrollback, false)...)
+}
+
+func (t execTmux) CapturePaneJoined(ctx context.Context, session string, scrollback int) (string, error) {
+	return t.run(ctx, capturePaneArgs(session, scrollback, true)...)
 }
 
 func (t execTmux) LoadBuffer(ctx context.Context, session, file string) error {

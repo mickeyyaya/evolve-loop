@@ -22,6 +22,7 @@ var defaultFallbackOnExit = []int{80, 81, 85, ExitModelMismatch, 124, 127}
 var cliBinaryFor = map[string]string{
 	"claude-p":        "claude",
 	"claude-tmux":     "claude",
+	"claude-cloud":    "claude",
 	"codex":           "codex",
 	"codex-tmux":      "codex",
 	"agy":             "agy",
@@ -202,9 +203,13 @@ func DropToolless(p Plan, toolless func(driver string) bool) (Plan, []string) {
 	if toolless == nil {
 		return p, nil
 	}
+	return DropDrivers(p, toolless)
+}
+
+func DropDrivers(p Plan, drop func(driver string) bool) (Plan, []string) {
 	var kept, dropped []string
 	for _, cli := range p.Candidates {
-		if toolless(defaultDriverForFamily(cli)) {
+		if drop(defaultDriverForFamily(cli)) {
 			dropped = append(dropped, cli)
 		} else {
 			kept = append(kept, cli)

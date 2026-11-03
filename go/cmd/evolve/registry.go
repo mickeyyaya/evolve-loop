@@ -43,6 +43,7 @@ var commands = []subcommand{
 	{Name: "inbox", Summary: "The backlog: batches (the grouping triage consumes) | list | show | add | edit | verify | withdraw | route-console | route-lane | consume | quarantine | ack-fingerprint (evolve inbox --help)", Run: runInbox},
 	{Name: "phase", Summary: "Run a single phase in-process", Run: runPhase},
 	{Name: "agent", Summary: "Run one phase agent with no cycle, through the bridge: agent run <profile> [--input FILE|-] [--file PATH]... [--worktree DIR [--writable PATH]...] [--json] [--keep] [--project-root P] prints the report on stdout (--json: one envelope with the report, verdict, driver, family, model, cost, tokens and the launch record); each run writes .evolve/agent-runs/<run label>.json; agent list [--json] names the profiles; agent capabilities [--json] prints the agent class of each verb (exit 0 pass, 1 fail, 3 refused, 21 dispatch error, 10 usage, 11 input)", Run: runAgentCommand},
+	{Name: "cloud", Summary: "Read the cloud sessions that a cloud seat launched: cloud list [--json] [--project-root P] prints the session id, URL, title and time of each launch record with a cloud session; it starts nothing (exit 0 listed, 1 a launch record that does not read, 10 usage)", Run: runCloudCommand},
 	{Name: "phases", Summary: "List/validate/scaffold phase definitions (the phase catalog)", Run: phasecmd.RunPhases},
 	{Name: "serve-phase", Summary: "Envelope-framed phase subprocess", Run: phasecmd.NewRunServePhase(rootRouterInstaller)},
 	{Name: "cycle", Summary: "Run one full cycle", Run: runCycle},
