@@ -13,8 +13,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"unicode"
-	"unicode/utf8"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotestname"
 )
 
 const e2eTag = "e2e"
@@ -113,18 +113,9 @@ func testFuncNames(path string) ([]string, error) {
 	}
 	var names []string
 	for _, decl := range file.Decls {
-		if fn, ok := decl.(*ast.FuncDecl); ok && fn.Recv == nil && isTestName(fn.Name.Name) {
+		if fn, ok := decl.(*ast.FuncDecl); ok && fn.Recv == nil && gotestname.HasPrefix(fn.Name.Name, "Test") {
 			names = append(names, fn.Name.Name)
 		}
 	}
 	return names, nil
-}
-
-func isTestName(name string) bool {
-	rest, ok := strings.CutPrefix(name, "Test")
-	if !ok {
-		return false
-	}
-	first, _ := utf8.DecodeRuneInString(rest)
-	return !unicode.IsLower(first)
 }

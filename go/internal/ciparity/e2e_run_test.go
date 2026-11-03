@@ -141,12 +141,3 @@ func TestE2EMain_PrintsTheAnchoredPatternOrFailsLoudly(t *testing.T) {
 		})
 	}
 }
-
-func TestIsTestName_FollowsGoTestDiscovery(t *testing.T) {
-	t.Parallel()
-	for name, want := range map[string]bool{"Test": true, "TestA": true, "Test_x": true, "Test1": true, "Testify": false, "TestÄ": true, "Tes": false, "helper": false, "BenchmarkX": false} {
-		if got := isTestName(name); got != want {
-			t.Errorf("isTestName(%q) = %v, want %v", name, got, want)
-		}
-	}
-}

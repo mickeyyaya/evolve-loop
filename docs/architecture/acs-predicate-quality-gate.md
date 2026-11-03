@@ -243,7 +243,7 @@ Four negative controls are pinned in the tests of `pkg/acsassert`. They are prin
 
 ### How it works
 
-1. `declaredTests` parses every `*_test.go` file of the module. It keeps each top-level function `TestX` and `FuzzX` that has no receiver. A raw string or a comment declares nothing. The scan skips `testdata`, `vendor` and hidden directories.
+1. `declaredTests` parses every `*_test.go` file of the module. It keeps each top-level function `TestX` and `FuzzX` that has no receiver. A raw string or a comment declares nothing. The scan skips each directory that `gotestname.IgnoredDir` names.
 2. `findViolations` parses each package under `go/acs`, except the package of the check. It keeps only the packages that run tests by name.
 3. For each string in those packages, `parseAlternatives` splits the text at `|`. It reads the anchors `^` and `$` as a regular expression does. It cuts a subtest filter at `/`. It expands a group after a prefix, so `TestA_(B|C)` names `TestA_B` and `TestA_C`. A string that holds anything but test names is not a reference.
 4. A name resolves when a test matches it. The match is exact, a prefix or a substring, by rule D2.
@@ -303,9 +303,9 @@ A test function with an empty body passes and proves nothing. The test-smell cat
 
 ### How it works
 
-1. `findOffenders` parses every `*_test.go` file of the module with `go/parser`. It skips `testdata`, `vendor` and the directories whose names start with `.` or `_`.
-2. A test is a top-level function with no receiver. Its name is `Test`, `Fuzz` or `Benchmark`. It can also start with one of them and a letter that is not lower case, as `go test` reads it.
-3. A test whose body has no statement is an offender. A body that holds only a comment has no statement, so it is an offender. A body that holds only `t.Skip` with a reason passes.
+1. `findOffenders` parses every `*_test.go` file of the module with `go/parser`. It skips each directory that `gotestname.IgnoredDir` names.
+2. A test is a top-level function with no receiver whose name passes `gotestname.Is`. The rules are in [the package note](packages/internal-gotestname.md).
+3. A test whose body has no statement is an offender. A body that holds only a comment has no statement, so it is an offender. A body that holds only `t.Skip` with a reason passes. A declaration with no body is not an offender.
 4. The message gives the file, the line and the function. It tells the author to assert the behavior or to call `t.Skip` with a reason.
 5. `baseline.txt` holds one offender for each line, as the path and the function name. A line holds nothing else. A baseline offender passes. An entry that matches no offender fails, so the baseline only gets smaller.
 6. A scan that cannot do its work is an error. The cases are a missing module, a module with no test file and a file that does not parse.

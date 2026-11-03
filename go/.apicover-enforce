@@ -864,3 +864,5 @@
 # shiptest - the shared real-git fixtures of the ship tests and the black-box ship scenarios split from internal/phases/ship.
 ./internal/phases/ship/shiptest
 ./internal/supersede
+# gotestname - the one home of the go test rules for a test name and an ignored directory (ADR-0158 decision 19).
+./internal/gotestname

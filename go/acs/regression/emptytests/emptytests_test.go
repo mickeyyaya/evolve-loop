@@ -98,6 +98,14 @@ func TestFindOffenders_FuzzAndBenchmarkCountAndOtherFunctionsDoNot(t *testing.T)
 	}
 }
 
+func TestFindOffenders_ABodylessDeclarationIsNotAnOffender(t *testing.T) {
+	goDir := writeTree(t, map[string]string{"a/a_test.go": "package a\n\nimport \"testing\"\n\nfunc TestAsm(t *testing.T)\n"})
+	offenders, err := findOffenders(goDir)
+	if err != nil || len(offenders) != 0 {
+		t.Fatalf("findOffenders = %v, %v, want no offender and no error", offenders, err)
+	}
+}
+
 func TestFindOffenders_SkipsTestdataVendorAndHiddenDirectories(t *testing.T) {
 	empty := "package x\n\nimport \"testing\"\n\nfunc TestX(t *testing.T) {}\n"
 	goDir := writeTree(t, map[string]string{

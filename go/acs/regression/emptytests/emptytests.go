@@ -12,9 +12,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"unicode"
-	"unicode/utf8"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotestname"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
@@ -47,7 +46,7 @@ func findOffenders(goDir string) ([]offender, error) {
 		}
 		for _, decl := range file.Decls {
 			fn, isFunc := decl.(*ast.FuncDecl)
-			if !isFunc || fn.Recv != nil || fn.Body == nil || len(fn.Body.List) > 0 || !isTestName(fn.Name.Name) {
+			if !isFunc || fn.Recv != nil || fn.Body == nil || len(fn.Body.List) > 0 || !gotestname.Is(fn.Name.Name) {
 				continue
 			}
 			offenders = append(offenders, offender{rel, fset.Position(fn.Pos()).Line, fn.Name.Name})
@@ -62,23 +61,11 @@ func isTestFile(rel string) bool {
 	}
 	dirs := strings.Split(rel, "/")
 	for _, dir := range dirs[:len(dirs)-1] {
-		if dir == "testdata" || dir == "vendor" || strings.HasPrefix(dir, ".") || strings.HasPrefix(dir, "_") {
+		if gotestname.IgnoredDir(dir) {
 			return false
 		}
 	}
 	return true
-}
-
-func isTestName(name string) bool {
-	for _, prefix := range []string{"Test", "Fuzz", "Benchmark"} {
-		rest, found := strings.CutPrefix(name, prefix)
-		if !found {
-			continue
-		}
-		next, _ := utf8.DecodeRuneInString(rest)
-		return !unicode.IsLower(next)
-	}
-	return false
 }
 
 func readBaseline(path string) (map[string]bool, error) {
