@@ -17,7 +17,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
 	"github.com/mickeyyaya/evolve-loop/go/internal/auditfixports"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridgechain"
-	"github.com/mickeyyaya/evolve-loop/go/internal/checkpoint"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
@@ -244,9 +243,7 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	}
 	var lifecycleLedger inboxmover.LedgerAppender = d.Ledger
 	orch, signals := d.Orchestrator, d.Signals
-	lane := laneResume{projectRoot: projectRoot, evolveDir: evolveDir, scope: fleetLaneScope(), record: checkpoint.RecordLaneResume,
-		claim:   hostInboxClaimer(lifecycleLedger, signals, laneForbiddenTo(projectRoot, signals.Emit)),
-		release: laneClaimReleaser(projectRoot, stderr, lifecycleLedger, signals), signals: signals, stderr: stderr}
+	lane := newLaneResume(projectRoot, evolveDir, fleetLaneScope(), lifecycleLedger, laneForbiddenTo(projectRoot, signals.Emit), signals, stderr)
 	result, err := lane.run(context.Background(), orch, f.request(projectRoot, os.Environ()))
 	if errors.Is(err, core.ErrAllFamiliesExhausted) {
 		return cycleRunQuotaExit(result.Cycle, projectRoot, evolveDir, fleetLaneFromEnv(), stdout, stderr, lifecycleLedger, signals)

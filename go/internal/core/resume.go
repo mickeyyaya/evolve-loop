@@ -16,7 +16,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
-	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
 type ResumePoint struct {
@@ -188,9 +187,7 @@ func readPerRunState(dir string) (perRunState, bool) {
 		st.enabled, _ = cp["enabled"].(bool)
 		st.reason, st.savedAt = strFromAny(cp["reason"]), strFromAny(cp["savedAt"])
 	}
-	if l, ok, _ := runlease.Read(dir); ok && runlease.Fresh(l, time.Now(), 0) {
-		st.leased = true
-	}
+	_, st.leased, _ = resumeHolder(dir, time.Now())
 	return st, true
 }
 
@@ -334,7 +331,7 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		return CycleResult{}, fmt.Errorf("RunCycleFromPhase: invalid resume phase %q", resumePoint.Phase)
 	}
 
-	release, err := o.acquireCycleLock(ctx, scopedFleetLane(req.Env))
+	release, err := o.acquireCycleLock(ctx, req.Env, scopedFleetLane)
 	if err != nil {
 		return CycleResult{}, fmt.Errorf("acquire lock: %w", err)
 	}
