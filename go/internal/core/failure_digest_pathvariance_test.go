@@ -1,6 +1,10 @@
 package core
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/failurefp"
+)
 
 func TestNormalizeReasonForFingerprint_CycleNumberedPathsFold(t *testing.T) {
 	t.Parallel()
@@ -27,7 +31,7 @@ func TestNormalizeReasonForFingerprint_CycleNumberedPathsFold(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got, want := normalizeReasonForFingerprint(tc.a), normalizeReasonForFingerprint(tc.b); got != want {
+			if got, want := failurefp.Normalize(tc.a), failurefp.Normalize(tc.b); got != want {
 				t.Errorf("cycle-numbered path variance still splits the fingerprint:\n a -> %q\n b -> %q", got, want)
 			}
 		})
@@ -42,7 +46,7 @@ func TestNormalizeReasonForFingerprint_AttemptDenominatorFolds(t *testing.T) {
 		{"launch refused: no CLI family available, retry 1 of 4", "launch refused: no CLI family available, retry 3 of 4"},
 	}
 	for _, tc := range cases {
-		if got, want := normalizeReasonForFingerprint(tc.a), normalizeReasonForFingerprint(tc.b); got != want {
+		if got, want := failurefp.Normalize(tc.a), failurefp.Normalize(tc.b); got != want {
 			t.Errorf("attempt-denominator variance still splits the fingerprint:\n a -> %q\n b -> %q", got, want)
 		}
 	}
@@ -73,9 +77,9 @@ func TestNormalizeReasonForFingerprint_DistinctDefectsStayDistinct(t *testing.T)
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if normalizeReasonForFingerprint(tc.a) == normalizeReasonForFingerprint(tc.b) {
+			if failurefp.Normalize(tc.a) == failurefp.Normalize(tc.b) {
 				t.Errorf("two DIFFERENT defects collapsed into one fingerprint %q — over-normalization blinds the breaker",
-					normalizeReasonForFingerprint(tc.a))
+					failurefp.Normalize(tc.a))
 			}
 		})
 	}
@@ -84,10 +88,10 @@ func TestNormalizeReasonForFingerprint_DistinctDefectsStayDistinct(t *testing.T)
 func TestNormalizeReasonForFingerprint_ExistingPinsStayGreen(t *testing.T) {
 	t.Parallel()
 
-	if a, b := normalizeReasonForFingerprint("verdict conflict narrative=PASS"), normalizeReasonForFingerprint("verdict conflict narrative=WARN"); a != b {
+	if a, b := failurefp.Normalize("verdict conflict narrative=PASS"), failurefp.Normalize("verdict conflict narrative=WARN"); a != b {
 		t.Errorf("narrative=<verdict> pin regressed: %q vs %q", a, b)
 	}
-	if a, b := normalizeReasonForFingerprint("protectedsurface red in 1.478s"), normalizeReasonForFingerprint("protectedsurface red in 1.495s"); a != b {
+	if a, b := failurefp.Normalize("protectedsurface red in 1.478s"), failurefp.Normalize("protectedsurface red in 1.495s"); a != b {
 		t.Errorf("go-test duration pin regressed: %q vs %q", a, b)
 	}
 }

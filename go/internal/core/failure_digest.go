@@ -13,6 +13,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
+	"github.com/mickeyyaya/evolve-loop/go/internal/failurefp"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recurrence"
@@ -140,19 +141,11 @@ func readAuditFailReason(workspace string) (phase string, reasons []string) {
 func fingerprint(phase, preClass string, reasons []string) string {
 	normalized := make([]string, 0, len(reasons))
 	for _, r := range reasons {
-		normalized = append(normalized, normalizeReasonForFingerprint(r))
+		normalized = append(normalized, failurefp.Normalize(r))
 	}
 	sum := sha256.Sum256([]byte(phase + "\x00" + preClass + "\x00" + strings.Join(normalized, "\x00")))
 	return phase + "|" + preClass + "|" + hex.EncodeToString(sum[:])[:12]
 }
-
-var narrativeVerdictToken = regexp.MustCompile(`narrative=(?:PASS|FAIL|WARN|SKIPPED)\b`)
-
-var goTestDurationToken = regexp.MustCompile(`\b\d+\.\d+s\b`)
-
-var cycleNumberToken = regexp.MustCompile(`(?i)\bcycle[ -]\d+(?:-\d+)*`)
-
-var attemptDenominatorToken = regexp.MustCompile(`(?i)\b(attempt|retry)\s+\d+\s*(?:/|of)\s*\d+`)
 
 func withoutDetails(reasons []string) []string {
 	out := make([]string, len(reasons))
@@ -160,14 +153,6 @@ func withoutDetails(reasons []string) []string {
 		out[i] = cyclestate.WithoutDetail(r)
 	}
 	return out
-}
-
-func normalizeReasonForFingerprint(reason string) string {
-	reason = cyclestate.WithoutDetail(reason)
-	reason = narrativeVerdictToken.ReplaceAllString(reason, "narrative=<verdict>")
-	reason = cycleNumberToken.ReplaceAllString(reason, "cycle-N")
-	reason = attemptDenominatorToken.ReplaceAllString(reason, "${1} <n>/<n>")
-	return goTestDurationToken.ReplaceAllString(reason, "<dur>")
 }
 
 func (o *Orchestrator) ensureFailureDigest(cycle int, projectRoot, workspace, fallbackPhase, fallbackReason string) {

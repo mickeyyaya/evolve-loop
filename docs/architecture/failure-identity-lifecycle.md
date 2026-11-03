@@ -71,7 +71,7 @@ router routes to continuation/salvage instead of another doomed try.
 
 ## 3. Reason fingerprint normalization
 
-`normalizeReasonForFingerprint` (`go/internal/core/failure_digest.go`) projects a
+`failurefp.Normalize` (`go/internal/failurefp/normalize.go`) projects a
 reason onto its **defect identity** for the identical-fingerprint breaker
 (`IdenticalFingerprintCeiling = 3`). Display and identity are two projections of one
 reason string. The digest, the dossier and `audit-fail-reason.json` all keep the

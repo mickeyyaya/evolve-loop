@@ -198,7 +198,7 @@ check and the harness's post-phase gate can never drift.
     rung consumes a block without a re-dispatch.
   - The count alone is not the signature (cycle-1289). The block must also be the **same defect** as
     the one that triggered the previous correction. The comparison uses the own
-    identity primitive of the blocker breaker, `normalizeReasonForFingerprint` (`internal/core/failure_digest.go`), and not
+    identity primitive of the blocker breaker, `failurefp.Normalize` (`internal/failurefp`), and not
     a second hashing scheme.
     - Two blocks that report one defect in verbatim-different text
       (duration tokens, narrative verdicts) still escalate.

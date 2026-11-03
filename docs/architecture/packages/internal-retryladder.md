@@ -30,7 +30,7 @@
 ## Invariants
 
 - The package does not import `internal/core`. Predicate `TestC1973_003` checks this.
-- The normalizer copies the rules of `core/failure_digest.go`. A rule change must change both until a later cycle moves the shared rules into one package.
+- `Fingerprint` hashes the text of `failurefp.Normalize`, the one normalizer that the blocker breaker also uses. The package keeps no copy of a fold. Pinned by `TestFingerprint_HashesTheOneSharedNormalizer`.
 - A raise moves the rung up, so a chain has at most three raised tries. No target has a tier above `max_tier` or an effort above `max_effort`.
 - `Next` has one production caller, `core.cycleRun.askLadder` ([spec §5](../retry-ladder.md#5-where-the-ladder-runs)). The contract correction, the resumed correction and the audit repair round ask it.
 - At a budget of `policy.MinRetryLadderDigestTokens` (64) or more, a digest is never longer than its budget. The first failed check comes first. The policy refuses a smaller budget other than 0.
