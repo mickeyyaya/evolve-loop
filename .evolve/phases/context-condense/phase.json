@@ -2,6 +2,7 @@
   "name": "context-condense",
   "archetype": "control",
   "agent": "evolve-context-condense",
+  "description": "Condense workspace reports when artifacts exceed replay threshold (run_dirs=133, p95=45248, max=74833, threshold=51200).",
   "inputs": {
     "files": [
       ".evolve/runs/cycle-{cycle}/scout-report.md"
@@ -30,7 +31,7 @@
       {
         "field": "run_dir.artifact_bytes",
         "op": "gt",
-        "value": 102400
+        "value": 51200
       }
     ]
   },

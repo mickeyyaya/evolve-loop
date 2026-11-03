@@ -2,8 +2,17 @@
 
 package proctree
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
+
+var errProcStartUnsupported = errors.New("procstart: this platform has no reader for the process start time")
 
 func readProcStart(int) (string, error) {
-	return "", errors.New("procstart: this platform has no reader for the process start time")
+	return "", errProcStartUnsupported
+}
+
+func readProcStartTime(int) (time.Time, error) {
+	return time.Time{}, errProcStartUnsupported
 }

@@ -1,0 +1,235 @@
+{
+  "schema_version": 2,
+  "cycle": 2085,
+  "run_id": "01M6D1D1394AXT2APKJQPGB9DY",
+  "goal": "Wave 147.\n\nWork the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree that it ships;\n- disposition its own defect ledger and the inherited ids;\n- record a terminal outcome on every exit;\n- never change a protected control-plane file with a tool;\n- leave no stale worktree.\n\nRouting:\n- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.\n- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.\n- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.\n\nCraft:\n- New and changed code has no comments. Names, types and tests give the intent.\n- Write each new document and each new log text in ASD-STE100.\n- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.\n- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.\n\nEvidence:\n- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.\n\nThe measure of this wave is the number of shipped cycles. Keep each cycle shipping.\n\nWave 146 facts (run 20261101T235937Z): 0 of 2 cycles shipped.\n- Cycle 2071: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) teardown=submit_wedged: …lanced=85 -\u003e agy-claude-tmux@balanced=85 met a quota wall, but rung claude-tmux@balanced failed with no evidence of exhaustion, so the walk is not a quota pause. Last phase: aborted. It did not ship.\n- Cycle 2072: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) teardown=submit_wedged: …lanced=85 -\u003e agy-claude-tmux@balanced=85 met a quota wall, but rung claude-tmux@balanced failed with no evidence of exhaustion, so the walk is not a quota pause. Last phase: aborted. It did not ship.\n- Pull requests merged at this boundary: none.\n\nEarlier waves:\n- Wave 143 (run 20261027T021525Z): 9 of 16 cycles shipped.\n- Wave 144 (run 20261027T071914Z): 3 of 5 cycles shipped.\n- Wave 145 (run 20261027T100547Z): 6 of 13 cycles shipped.",
+  "final_verdict": "FAIL",
+  "tasks": [
+    "convergence-policy-v5-audit-repair-decide"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "FAIL",
+      "duration_ms": 44810,
+      "started_at": "2026-11-02T02:29:54Z",
+      "ended_at": "2026-11-02T02:31:55Z",
+      "archetype": "plan",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 72121,
+      "started_at": "2026-11-03T05:14:14Z",
+      "ended_at": "2026-11-03T05:15:27Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 20,
+        "output": 5856,
+        "cache_read": 640406,
+        "cache_write": 35240
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 45197,
+      "started_at": "2026-11-03T05:15:27Z",
+      "ended_at": "2026-11-03T05:16:14Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 10,
+        "output": 1575,
+        "cache_read": 364461,
+        "cache_write": 42063
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 524711,
+      "started_at": "2026-11-03T05:16:14Z",
+      "ended_at": "2026-11-03T05:25:04Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 102,
+        "output": 62365,
+        "cache_read": 7800831,
+        "cache_write": 183957
+      }
+    },
+    {
+      "name": "build-planner",
+      "verdict": "WARN",
+      "duration_ms": 7,
+      "started_at": "2026-11-03T05:25:04Z",
+      "ended_at": "2026-11-03T05:25:12Z",
+      "archetype": "plan",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 870041,
+      "started_at": "2026-11-03T05:25:12Z",
+      "ended_at": "2026-11-03T06:15:03Z",
+      "archetype": "build",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 46,
+        "output": 12857,
+        "cache_read": 2236213,
+        "cache_write": 77488
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 243363,
+      "started_at": "2026-11-03T06:15:03Z",
+      "ended_at": "2026-11-03T06:26:26Z",
+      "archetype": "evaluate",
+      "model_source": "profile",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 12,
+        "output": 7043,
+        "cache_read": 452673,
+        "cache_write": 56708
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "FAIL",
+      "duration_ms": 902612,
+      "started_at": "2026-11-03T06:26:26Z",
+      "ended_at": "2026-11-03T06:41:30Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "ship|unknown|cf9f927b78f5",
+    "pre_class": "unknown",
+    "reasons": [
+      "cycle aborted in phase ship (abnormal-exit epilogue) cause=…tomic-ship] ship: fleet ff-merge cycle-cd3ae73e-2085 into main diverged (a peer cycle moved main mid-pipeline); rebase + re-verify the mer"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 2085",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase ship"
+    }
+  ],
+  "phases_run_verdict_not_adopted": [
+    {
+      "phase": "build-planner",
+      "verdict": "SKIPPED"
+    }
+  ],
+  "timing": {
+    "total_ms": 2702862,
+    "phase_count": 8,
+    "retried_count": 1,
+    "longest_phase": "ship",
+    "longest_ms": 902612,
+    "by_archetype_ms": {
+      "build": 870041,
+      "control": 902612,
+      "evaluate": 243363,
+      "plan": 686846
+    },
+    "total_tokens": {
+      "input": 190,
+      "output": 89696,
+      "cache_read": 11494584,
+      "cache_write": 395456
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 46,
+        "output": 12857,
+        "cache_read": 2236213,
+        "cache_write": 77488
+      },
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "evaluate": {
+        "input": 12,
+        "output": 7043,
+        "cache_read": 452673,
+        "cache_write": 56708
+      },
+      "plan": {
+        "input": 132,
+        "output": 69796,
+        "cache_read": 8805698,
+        "cache_write": 261260
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.9999834707494032,
+    "hot_phase_count": 5,
+    "hot_phases": [
+      "scout",
+      "triage",
+      "tdd",
+      "build",
+      "audit"
+    ]
+  },
+  "recalled_lessons": [
+    "cycle-1502-closure-citation-contract-never-reaches-the-auditor-it-grades",
+    "inst-L1544b",
+    "inst-L1549b",
+    "cycle-93-build-report-commit-sha-fabrication",
+    "cycle-1492-remedy-on-disk-in-four-places-reaches-no-agent-with-authority-to-apply-it"
+  ]
+}
