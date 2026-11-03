@@ -113,14 +113,21 @@ func Read(path string) (ReadResult, error) {
 func ReadWorkspace(workspace string) (ReadResult, error) { return Read(Path(workspace)) }
 
 func Import(destination, source string) (ImportResult, error) {
+	return importWith(destination, source, func(_ Record, line []byte) ([]byte, error) { return line, nil })
+}
+
+func ImportTagged(destination, source, runID, profile string) (ImportResult, error) {
+	return importWith(destination, source, func(rec Record, _ []byte) ([]byte, error) {
+		rec.RunID, rec.Profile = runID, profile
+		return json.Marshal(rec)
+	})
+}
+
+func importWith(destination, source string, rewrite func(Record, []byte) ([]byte, error)) (ImportResult, error) {
 	var result ImportResult
 	err := flock.WithPathLock(destination, func() error {
-		identities := make(map[string]struct{})
-		if err := scanRaw(destination, func(line []byte) {
-			if id, ok := recordIdentity(line); ok {
-				identities[id] = struct{}{}
-			}
-		}); err != nil && !errors.Is(err, os.ErrNotExist) {
+		identities, err := indexIdentities(destination)
+		if err != nil {
 			return fmt.Errorf("index destination model-attempt ledger %q: %w", destination, err)
 		}
 
@@ -129,16 +136,21 @@ func Import(destination, source string) (ImportResult, error) {
 			if writeErr != nil {
 				return
 			}
-			id, ok := recordIdentity(line)
+			rec, ok := parseRecord(line)
 			if !ok {
 				result.Skipped++
 				return
 			}
+			id := identityOf(rec, line)
 			if _, exists := identities[id]; exists {
 				result.Duplicates++
 				return
 			}
-			if err := appendLineLocked(destination, line); err != nil {
+			out, err := rewrite(rec, line)
+			if err == nil {
+				err = appendLineLocked(destination, out)
+			}
+			if err != nil {
 				writeErr = err
 				return
 			}
@@ -153,10 +165,20 @@ func Import(destination, source string) (ImportResult, error) {
 		}
 		return nil
 	})
-	if err != nil {
-		return result, err
+	return result, err
+}
+
+func indexIdentities(path string) (map[string]struct{}, error) {
+	identities := make(map[string]struct{})
+	err := scanRaw(path, func(line []byte) {
+		if rec, ok := parseRecord(line); ok {
+			identities[identityOf(rec, line)] = struct{}{}
+		}
+	})
+	if errors.Is(err, os.ErrNotExist) {
+		err = nil
 	}
-	return result, nil
+	return identities, err
 }
 
 func scanRaw(path string, visit func([]byte)) error {
@@ -176,16 +198,20 @@ func scanRaw(path string, visit func([]byte)) error {
 	return scanner.Err()
 }
 
-func recordIdentity(line []byte) (string, bool) {
+func parseRecord(line []byte) (Record, bool) {
 	var rec Record
 	if err := json.Unmarshal(line, &rec); err != nil || !validRecord(rec) {
-		return "", false
+		return Record{}, false
 	}
+	return rec, true
+}
+
+func identityOf(rec Record, line []byte) string {
 	if rec.CallID != "" {
-		return "call:" + rec.CallID, true
+		return "call:" + rec.CallID
 	}
 	digest := sha256.Sum256(line)
-	return "legacy:" + hex.EncodeToString(digest[:]), true
+	return "legacy:" + hex.EncodeToString(digest[:])
 }
 
 func validRecord(rec Record) bool { return rec.Phase != "" }
