@@ -435,236 +435,274 @@ func newRoleSignalCenter(role, projectRoot, evolveDir string, console io.Writer)
 	return signals, attachRootEventsFn(signals, role, evolveDir, console)
 }
 
-type orchWiring struct {
-	projectRoot      string
-	evolveDir        string
-	console          io.Writer
-	run              routingRun
-	signals          *signalcenter.Center
-	st               *storage.FilesystemStorage
-	ld               *ledger.FileLedger
-	prm              *prompts.Loader
-	registryPath     string
-	cfg              config.RoutingConfig
-	pol              policy.Policy
-	policyShipFloor  []string
-	swCfg            swarmrunner.Config
-	gatesCfg         policy.GatesConfig
-	shipIntegration  *ship.Integration
-	wfCfg            policy.WorkflowConfig
-	catalog          phasespec.Catalog
-	builtinCat       phasespec.Catalog
-	userSpecs        []phasespec.PhaseSpec
-	cliRouter        *cliroute.Router
-	explainUsage     usageevidence.Explain
-	walked           *bridgechain.Walking
-	publisher        func(phasespec.Catalog)
-	contractVerifier runner.ContractVerifier
-	hostEffects      core.HostEffects
-	forbidden        func(string) bool
-	runners          map[core.Phase]core.PhaseRunner
-	advisor          *core.PhaseAdvisor
+type wiringSite struct {
+	projectRoot string
+	evolveDir   string
+	console     io.Writer
+	run         routingRun
+	signals     *signalcenter.Center
 }
 
-func (w *orchWiring) verifierOf() runner.ContractVerifier { return w.contractVerifier }
+type policyWiring struct {
+	prm          *prompts.Loader
+	registryPath string
+	stagedCfg    config.RoutingConfig
+	pol          policy.Policy
+	shipFloor    []string
+	swCfg        swarmrunner.Config
+	gates        policy.GatesConfig
+	integration  *ship.Integration
+	wfCfg        policy.WorkflowConfig
+}
 
-func (w *orchWiring) hostEffectsOf() core.HostEffects { return w.hostEffects }
+type catalogWiring struct {
+	catalog    phasespec.Catalog
+	builtinCat phasespec.Catalog
+	userSpecs  []phasespec.PhaseSpec
+	router     *cliroute.Router
+}
+
+type lateBinds struct {
+	verifier    runner.ContractVerifier
+	hostEffects core.HostEffects
+}
+
+func (l *lateBinds) verifierOf() runner.ContractVerifier { return l.verifier }
+
+func (l *lateBinds) hostEffectsOf() core.HostEffects { return l.hostEffects }
+
+type runnerWiring struct {
+	site      wiringSite
+	pw        policyWiring
+	cw        catalogWiring
+	walked    *bridgechain.Walking
+	forbidden func(string) bool
+	late      *lateBinds
+}
+
+type optionWiring struct {
+	runnerWiring
+	cfg          config.RoutingConfig
+	st           *storage.FilesystemStorage
+	ld           *ledger.FileLedger
+	runners      map[core.Phase]core.PhaseRunner
+	explainUsage usageevidence.Explain
+	advisor      *core.PhaseAdvisor
+	publisher    func(phasespec.Catalog)
+}
 
 func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run routingRun) orchDeps {
-	if evolveDir != "" {
-		d := evolveDir
-		bridge.SetModelCatalogDirFn(func() string { return d })
-	}
+	pinModelCatalogDir(evolveDir)
 	signals, closeSignals := newRoleSignalCenter(run.centerRole(), projectRoot, evolveDir, console)
 	failed := func(err error) orchDeps {
 		return orchDeps{Signals: signals, CloseSignals: closeSignals, RoutingErr: err}
 	}
-	w := &orchWiring{projectRoot: projectRoot, evolveDir: evolveDir, console: console, run: run, signals: signals}
-	wireHostWatchersAndStores(w)
+	site := wiringSite{projectRoot: projectRoot, evolveDir: evolveDir, console: console, run: run, signals: signals}
+	st, ld := wireHostWatchersAndStores(site)
 	br := bridge.NewDefault(projectRoot, signals)
 	if err := newBypassAuditor(evolveDir, signals, console).applySandboxOff(br, run.sandboxOff); err != nil {
 		return failed(err)
 	}
-	br.SetOnStopReview(stopReviewRecorder(w.ld))
-	for _, step := range []func(*orchWiring) error{wirePromptsAndPolicy, wireCatalogAndRouter} {
-		if err := step(w); err != nil {
-			return failed(err)
-		}
+	br.SetOnStopReview(stopReviewRecorder(ld))
+	pw, cw, err := wirePolicyAndRouter(site)
+	if err != nil {
+		return failed(err)
 	}
-	cliRouter := w.cliRouter
+	cliRouter := cw.router
 	explainUsage := usageEvidenceFn(projectRoot, evolveDir, console)
-	w.explainUsage = explainUsage
-	w.walked = bridgechain.New(withUsageEvidence(br, explainUsage, signals),
+	walked := bridgechain.New(withUsageEvidence(br, explainUsage, signals),
 		bridgechain.DefaultPlanResolver(cliRouter),
 		bridgechain.WithBench(cycleBenchOnEscalation),
 		bridgechain.WithLog(cycleDiagf))
-	wirePhaseRunners(w)
-	br.SetContractResolver(phasecontract.NewCatalogResolver(w.catalog.Get))
-	wireBridgeStages(br, w.cfg)
-	applyUserRouting(w)
-	wireSpecRunners(w)
-	if err := wireOrchestratorAdvisor(w); err != nil {
+	rw := newRunnerWiring(site, pw, cw, walked)
+	runners := phaseRunnersOf(rw)
+	br.SetContractResolver(phasecontract.NewCatalogResolver(cw.catalog.Get))
+	wireBridgeStages(br, pw.stagedCfg)
+	cfg, advisor, err := wireRoutingAndAdvisor(rw, runners)
+	if err != nil {
 		return failed(err)
 	}
-	w.publisher = catalogPublisher(br, cliRouter)
+	ow := optionWiring{runnerWiring: rw, cfg: cfg, st: st, ld: ld, runners: runners, explainUsage: explainUsage, advisor: advisor, publisher: catalogPublisher(br, cliRouter)}
 	return orchDeps{
-		Storage:      w.st,
-		Ledger:       w.ld,
-		Orchestrator: newWiredOrchestrator(w),
+		Storage:      st,
+		Ledger:       ld,
+		Orchestrator: newWiredOrchestrator(ow),
 		Signals:      signals,
 		CloseSignals: closeSignals,
 		Bridge:       br,
-		Runners:      w.runners,
+		Runners:      runners,
 		Router:       cliRouter,
 	}
 }
 
-func wireHostWatchersAndStores(w *orchWiring) {
-	watchOptimisticAdmission(w.signals, os.Getenv)
-	warnRetiredControls(w.console, os.Environ())
-	w.st = storage.New(w.evolveDir)
-	w.ld = ledger.New(w.evolveDir, ledger.WithSignals(w.signals))
+func pinModelCatalogDir(evolveDir string) {
+	if evolveDir != "" {
+		bridge.SetModelCatalogDirFn(func() string { return evolveDir })
+	}
 }
 
-func wirePromptsAndPolicy(w *orchWiring) error {
-	w.prm = cmdutil.NewPromptsLoader(w.projectRoot)
-	w.registryPath = config.RegistryPath(w.projectRoot)
-	loader := wiredRoutingConfigLoader(w.signals)
-	cfg, _ := loader.Load(w.registryPath)
-	pol, policyErr := policy.Load(filepath.Join(w.projectRoot, ".evolve", "policy.json"))
+func wireHostWatchersAndStores(s wiringSite) (*storage.FilesystemStorage, *ledger.FileLedger) {
+	watchOptimisticAdmission(s.signals, os.Getenv)
+	warnRetiredControls(s.console, os.Environ())
+	return storage.New(s.evolveDir), ledger.New(s.evolveDir, ledger.WithSignals(s.signals))
+}
+
+func wirePolicyAndRouter(s wiringSite) (policyWiring, catalogWiring, error) {
+	pw, err := wirePromptsAndPolicy(s)
+	if err != nil {
+		return pw, catalogWiring{}, err
+	}
+	cw, err := wireCatalogAndRouter(s, pw)
+	return pw, cw, err
+}
+
+func wirePromptsAndPolicy(s wiringSite) (policyWiring, error) {
+	prm := cmdutil.NewPromptsLoader(s.projectRoot)
+	registryPath := config.RegistryPath(s.projectRoot)
+	loader := wiredRoutingConfigLoader(s.signals)
+	cfg, _ := loader.Load(registryPath)
+	var shipFloor []string
+	pol, policyErr := policy.Load(filepath.Join(s.projectRoot, ".evolve", "policy.json"))
 	if policyErr != nil {
-		fmt.Fprintf(w.console, "[policy] WARN %v (mandatory merge skipped; the routing table refuses it before any dispatch)\n", policyErr)
+		fmt.Fprintf(s.console, "[policy] WARN %v (mandatory merge skipped; the routing table refuses it before any dispatch)\n", policyErr)
 		pol = policy.Policy{}
 	} else {
 		cfg = router.ApplyPolicy(loader, cfg, pol)
 		if floor, overridden := pol.FloorPhases(); overridden {
-			w.policyShipFloor = floor
+			shipFloor = floor
 		}
 	}
-	w.pol = pol
-	newLiveReaction(w.evolveDir, pol.HealingLiveReaction(), w.console).arm(w.signals)
-	w.swCfg = swarmrunner.Config{Stage: pol.SwarmConfig().Stage, PortBase: pol.SwarmConfig().PortBase, WorktreeBase: pol.WorktreeBase()}
-	w.gatesCfg = pol.GatesConfig()
-	shipIntegration, integrationErr := shipIntegrationOf(pol, fleetLaneFromEnv(), fleetLaneScope())
+	newLiveReaction(s.evolveDir, pol.HealingLiveReaction(), s.console).arm(s.signals)
+	swCfg := swarmrunner.Config{Stage: pol.SwarmConfig().Stage, PortBase: pol.SwarmConfig().PortBase, WorktreeBase: pol.WorktreeBase()}
+	gates := pol.GatesConfig()
+	integration, integrationErr := shipIntegrationOf(pol, fleetLaneFromEnv(), fleetLaneScope())
 	if integrationErr != nil {
-		return integrationErr
+		return policyWiring{}, integrationErr
 	}
-	w.shipIntegration = shipIntegration
 	routerCfg := pol.RouterConfig()
 	recoveryCfg := pol.RecoveryConfig()
-	w.cfg, _ = loader.ApplyPolicyStages(cfg, policyStagesOf(w.gatesCfg, recoveryCfg, routerCfg, pol.ParallelEvaluateConfig()))
-	w.wfCfg = pol.WorkflowConfig()
-	return nil
+	staged, _ := loader.ApplyPolicyStages(cfg, policyStagesOf(gates, recoveryCfg, routerCfg, pol.ParallelEvaluateConfig()))
+	return policyWiring{prm: prm, registryPath: registryPath, stagedCfg: staged, pol: pol, shipFloor: shipFloor, swCfg: swCfg, gates: gates, integration: integration, wfCfg: pol.WorkflowConfig()}, nil
 }
 
-func wireCatalogAndRouter(w *orchWiring) error {
-	w.catalog, w.builtinCat, w.userSpecs = loadPhaseCatalog(w.projectRoot, w.registryPath, w.prm, w.signals.Emit)
-	cliRouter, routingErr := wireCLIRouter(routerSite{root: w.projectRoot, catalog: w.catalog}, w.run, w.console)
+func wireCatalogAndRouter(s wiringSite, pw policyWiring) (catalogWiring, error) {
+	catalog, builtinCat, userSpecs := loadPhaseCatalog(s.projectRoot, pw.registryPath, pw.prm, s.signals.Emit)
+	cliRouter, routingErr := wireCLIRouter(routerSite{root: s.projectRoot, catalog: catalog}, s.run, s.console)
 	if routingErr != nil {
-		return routingErr
+		return catalogWiring{}, routingErr
 	}
 	runner.DefaultRouter = cliRouter
-	w.cliRouter = cliRouter
-	return nil
+	return catalogWiring{catalog: catalog, builtinCat: builtinCat, userSpecs: userSpecs, router: cliRouter}, nil
 }
 
-func wirePhaseRunners(w *orchWiring) {
-	w.contractVerifier = deliverable.PlainVerifier{PhaseIO: w.cfg.PhaseIO}
-	w.forbidden = laneForbiddenTo(w.projectRoot, w.signals.Emit)
-	walked, prm, cfg, signals, verifierOf, hostEffectsOf := w.walked, w.prm, w.cfg, w.signals, w.verifierOf, w.hostEffectsOf
-	w.runners = map[core.Phase]core.PhaseRunner{
-		core.PhaseIntent:       intent.New(intent.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, CompactPrompts: cfg.CompactPrompts, DeltaMode: w.wfCfg.IntentDelta}),
-		core.PhaseScout:        swarmrunner.New(scout.New(scout.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), walked, swarm.ModeReader, w.swCfg),
-		core.PhaseTriage:       triage.New(triage.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts, LaneForbidden: w.forbidden}),
+func newRunnerWiring(s wiringSite, pw policyWiring, cw catalogWiring, walked *bridgechain.Walking) runnerWiring {
+	late := &lateBinds{verifier: deliverable.PlainVerifier{PhaseIO: pw.stagedCfg.PhaseIO}}
+	return runnerWiring{site: s, pw: pw, cw: cw, walked: walked, forbidden: laneForbiddenTo(s.projectRoot, s.signals.Emit), late: late}
+}
+
+func phaseRunnersOf(rw runnerWiring) map[core.Phase]core.PhaseRunner {
+	walked, prm, cfg, signals, pw := rw.walked, rw.pw.prm, rw.pw.stagedCfg, rw.site.signals, rw.pw
+	verifierOf, hostEffectsOf := rw.late.verifierOf, rw.late.hostEffectsOf
+	return map[core.Phase]core.PhaseRunner{
+		core.PhaseIntent:       intent.New(intent.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, CompactPrompts: cfg.CompactPrompts, DeltaMode: pw.wfCfg.IntentDelta}),
+		core.PhaseScout:        swarmrunner.New(scout.New(scout.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), walked, swarm.ModeReader, pw.swCfg),
+		core.PhaseTriage:       triage.New(triage.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts, LaneForbidden: rw.forbidden}),
 		core.PhaseTDD:          tdd.New(tdd.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, CompactPrompts: cfg.CompactPrompts}),
 		core.PhaseBuildPlanner: buildplanner.New(buildplanner.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf}).BaseRunner(),
-		core.PhaseBuild:        swarmrunner.New(build.New(build.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), walked, swarm.ModeWriter, w.swCfg),
+		core.PhaseBuild:        swarmrunner.New(build.New(build.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), walked, swarm.ModeWriter, pw.swCfg),
 		core.PhaseAudit:        audit.NewDefaultWithStageCompactSpec(walked, prm, cfg.PhaseIO, cfg.CompactPrompts, documentSpecPtr(cfg), audit.WithContractVerifier(verifierOf), audit.WithHostEffects(hostEffectsOf), audit.WithSignals(func() *signalcenter.Center { return signals })),
-		core.PhaseShip:         ship.New(ship.Config{Runner: sysexec.DefaultRunner, PhaseIO: cfg.PhaseIO, ManifestGate: w.gatesCfg.ManifestGate, RepoContractGate: w.gatesCfg.RepoContractGate, Signals: signals, Integration: w.shipIntegration}),
-		core.PhaseRetro:        retro.New(retro.Config{Bridge: walked, Prompts: prm, Model: "auto", CompactPrompts: cfg.CompactPrompts, Router: w.cliRouter, ContractVerifier: verifierOf}),
+		core.PhaseShip:         ship.New(ship.Config{Runner: sysexec.DefaultRunner, PhaseIO: cfg.PhaseIO, ManifestGate: pw.gates.ManifestGate, RepoContractGate: pw.gates.RepoContractGate, Signals: signals, Integration: pw.integration}),
+		core.PhaseRetro:        retro.New(retro.Config{Bridge: walked, Prompts: prm, Model: "auto", CompactPrompts: cfg.CompactPrompts, Router: rw.cw.router, ContractVerifier: verifierOf}),
 		core.PhaseDebugger:     debugger.New(debugger.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, CompactPrompts: cfg.CompactPrompts}),
 	}
 }
 
-func applyUserRouting(w *orchWiring) {
-	emitRoutingDefects(w.signals.Emit, "wireOrchestratorDeps", phasespec.ApplyUserRouting(&w.cfg, w.userSpecs, w.builtinCat))
+func wireRoutingAndAdvisor(rw runnerWiring, runners map[core.Phase]core.PhaseRunner) (config.RoutingConfig, *core.PhaseAdvisor, error) {
+	cfg := routedConfig(rw)
+	registerSpecRunners(rw, runners)
+	advisor, err := wireOrchestratorAdvisor(rw)
+	return cfg, advisor, err
 }
 
-func wireSpecRunners(w *orchWiring) {
-	specCfg := specrunner.Config{Bridge: w.walked, Prompts: w.prm, ContractVerifier: w.verifierOf, HostEffects: w.hostEffectsOf}
-	for _, s := range w.catalog.UserPhases() {
-		if len(phasespec.ValidateUserSpecWithCatalog(s, w.builtinCat)) > 0 {
+func routedConfig(rw runnerWiring) config.RoutingConfig {
+	cfg := rw.pw.stagedCfg
+	emitRoutingDefects(rw.site.signals.Emit, "wireOrchestratorDeps", phasespec.ApplyUserRouting(&cfg, rw.cw.userSpecs, rw.cw.builtinCat))
+	return cfg
+}
+
+func registerSpecRunners(rw runnerWiring, runners map[core.Phase]core.PhaseRunner) {
+	specCfg := specrunner.Config{Bridge: rw.walked, Prompts: rw.pw.prm, ContractVerifier: rw.late.verifierOf, HostEffects: rw.late.hostEffectsOf}
+	for _, s := range rw.cw.catalog.UserPhases() {
+		if len(phasespec.ValidateUserSpecWithCatalog(s, rw.cw.builtinCat)) > 0 {
 			continue
 		}
-		if _, exists := w.runners[core.Phase(s.Name)]; !exists {
-			w.runners[core.Phase(s.Name)] = specrunner.New(s, specCfg)
+		if _, exists := runners[core.Phase(s.Name)]; !exists {
+			runners[core.Phase(s.Name)] = specrunner.New(s, specCfg)
 		}
 	}
-	registerBuiltinSpecRunners(w.runners, w.builtinCat, specCfg, os.Stderr)
+	registerBuiltinSpecRunners(runners, rw.cw.builtinCat, specCfg, os.Stderr)
 }
 
-func wireOrchestratorAdvisor(w *orchWiring) error {
-	signals := w.signals
-	advisor, advErr := wireRouterAdvisor(routerAdvisorWiring{router: w.cliRouter, root: w.projectRoot, bridge: w.walked, prompts: w.prm, signals: signals})
-	w.advisor = advisor
-	return advErr
+func wireOrchestratorAdvisor(rw runnerWiring) (*core.PhaseAdvisor, error) {
+	signals := rw.site.signals
+	return wireRouterAdvisor(routerAdvisorWiring{router: rw.cw.router, root: rw.site.projectRoot, bridge: rw.walked, prompts: rw.pw.prm, signals: signals})
 }
 
-func newWiredOrchestrator(w *orchWiring) *core.Orchestrator {
-	opts := baseOptionsOf(w)
-	reviewerOpts, verifier := reviewerOptionsOf(w)
+func newWiredOrchestrator(ow optionWiring) *core.Orchestrator {
+	opts := baseOptionsOf(ow)
+	reviewerOpts, verifier := reviewerOptionsOf(ow)
 	if verifier != nil {
-		w.contractVerifier = verifier
+		ow.late.verifier = verifier
 	}
 	opts = append(opts, reviewerOpts...)
-	opts = append(opts, tailOptionsOf(w)...)
-	w.hostEffects = deliverable.NewHostEffects(w.catalog, hostInboxClaimer(w.ld, w.signals, w.forbidden))
-	opts = append(opts, core.WithHostEffects(w.hostEffects))
-	opts = append(opts, core.WithLaneMenu(laneMenuOf(w.forbidden, w.wfCfg.Repair.Fixability)))
+	opts = append(opts, tailOptionsOf(ow)...)
+	ow.late.hostEffects = deliverable.NewHostEffects(ow.cw.catalog, hostInboxClaimer(ow.ld, ow.site.signals, ow.forbidden))
+	opts = append(opts, core.WithHostEffects(ow.late.hostEffects))
+	opts = append(opts, core.WithLaneMenu(laneMenuOf(ow.forbidden, ow.pw.wfCfg.Repair.Fixability)))
 	opts = append(opts, core.WithProtectedSurface(protectedMembership))
-	opts = append(opts, core.WithRepairFixability(repairFixability(protectedMembership, os.Stderr)), auditFixRung(auditFixSite{root: w.projectRoot, pol: w.pol, cfg: w.cfg, route: auditfixports.RouterRoute(w.cliRouter.Resolve, w.projectRoot), agent: runAgentCommand, stderr: os.Stderr}))
-	opts = append(opts, core.WithSignalCenter(w.signals))
-	opts = append(opts, core.WithRequestHandoff(requestHandoff(w.pol, runAgentCommand, w.signals.Emit, w.console)))
-	return core.NewOrchestrator(w.st, w.ld, w.runners, opts...)
+	opts = append(opts, core.WithRepairFixability(repairFixability(protectedMembership, os.Stderr)), auditFixRung(auditFixSite{root: ow.site.projectRoot, pol: ow.pw.pol, cfg: ow.cfg, route: auditfixports.RouterRoute(ow.cw.router.Resolve, ow.site.projectRoot), agent: runAgentCommand, stderr: os.Stderr}))
+	opts = append(opts, core.WithSignalCenter(ow.site.signals))
+	opts = append(opts, core.WithRequestHandoff(requestHandoff(ow.pw.pol, runAgentCommand, ow.site.signals.Emit, ow.site.console)))
+	return core.NewOrchestrator(ow.st, ow.ld, ow.runners, opts...)
 }
 
-func baseOptionsOf(w *orchWiring) []core.Option {
-	projectRoot, console, run, cfg, catalog := w.projectRoot, w.console, w.run, w.cfg, w.catalog
-	walked, signals, cliRouter, explainUsage := w.walked, w.signals, w.cliRouter, w.explainUsage
-	strategy := router.Select(cfg, w.advisor)
+func baseOptionsOf(ow optionWiring) []core.Option {
+	projectRoot, console, run, cfg, catalog := ow.site.projectRoot, ow.site.console, ow.site.run, ow.cfg, ow.cw.catalog
+	walked, signals, cliRouter, explainUsage := ow.walked, ow.site.signals, ow.cw.router, ow.explainUsage
+	strategy := router.Select(cfg, ow.advisor)
 	opts := []core.Option{
 		core.WithRouting(cfg, strategy),
 		core.WithCatalog(catalog),
-		core.WithPlanner(w.advisor),
+		core.WithPlanner(ow.advisor),
 		core.WithFailureAdviser(core.NewFailureAdvisor(walked, append(failureAdvisorOpts(projectRoot, cliRouter, console), core.WithFailureAdvisorSignals(signals))...)),
 		core.WithThroughputRecorder(triagecap.Recorder(projectRoot)),
-		core.WithCatalogPublisher(w.publisher),
+		core.WithCatalogPublisher(ow.publisher),
 		core.WithCLIRouter(cliRouter),
 		core.WithRegistrar(registrarMinter{r: phaseregistrar.Registrar{
 			Bridge:       walked,
-			Prompts:      w.prm,
-			ProfilesDir:  filepath.Join(w.evolveDir, "profiles"),
-			PhasesDir:    filepath.Join(w.evolveDir, "phases"),
+			Prompts:      ow.pw.prm,
+			ProfilesDir:  filepath.Join(ow.site.evolveDir, "profiles"),
+			PhasesDir:    filepath.Join(ow.site.evolveDir, "phases"),
 			RegistryPath: mintregistry.Path(projectRoot),
 		}}),
 	}
-	return append(opts, phaseObserverOptions(w.pol.ObserverConfig(), cfg.PhaseRecovery.String(), observerDeps{signals: signals, usage: explainUsage, overrides: run.overrides})...)
+	return append(opts, phaseObserverOptions(ow.pw.pol.ObserverConfig(), cfg.PhaseRecovery.String(), observerDeps{signals: signals, usage: explainUsage, overrides: run.overrides})...)
 }
 
-func reviewerOptionsOf(w *orchWiring) ([]core.Option, runner.ContractVerifier) {
-	cfg, pol, signals := w.cfg, w.pol, w.signals
+func reviewerOptionsOf(ow optionWiring) ([]core.Option, runner.ContractVerifier) {
+	cfg, pol, signals := ow.cfg, ow.pw.pol, ow.site.signals
 	var verifier runner.ContractVerifier
 	var reviewers []core.DeliverableReviewer
 	if floor := composedBuildHandoffFloor(pol.WorkflowConfig(), cfg); len(floor) > 0 {
 		reviewers = append(reviewers, floor)
 	}
 	if cfg.EvalGate != config.StageOff {
-		reviewers = append(reviewers, evalGateReviewer(cfg.EvalGate, hostFollowupFiler(w.ld, signals, w.forbidden, pol.InboxPriorityConfig().ClassOrder)))
+		reviewers = append(reviewers, evalGateReviewer(cfg.EvalGate, hostFollowupFiler(ow.ld, signals, ow.forbidden, pol.InboxPriorityConfig().ClassOrder)))
 	}
 	if cfg.ContractGate != config.StageOff {
 		rev := deliverable.NewReviewerWithCatalogStageReportSize(
-			cfg.ContractGate, w.catalog, cfg.PhaseIO,
-			parseGateStage(w.gatesCfg.ReportSizeGate), pol.ReportBudgetConfig().HandoffTokens, deliverable.WithSignals(signals))
+			cfg.ContractGate, ow.cw.catalog, cfg.PhaseIO,
+			parseGateStage(ow.pw.gates.ReportSizeGate), pol.ReportBudgetConfig().HandoffTokens, deliverable.WithSignals(signals))
 		verifier = rev
 		reviewers = append(reviewers, rev)
 	}
@@ -680,26 +718,26 @@ func reviewerOptionsOf(w *orchWiring) ([]core.Option, runner.ContractVerifier) {
 		opts = append(opts, core.WithReviewer(core.ChainReviewers(reviewers...)))
 	}
 	if cfg.ContractGate != config.StageOff {
-		opts = append(opts, core.WithContractVerifier(deliverable.NewVerifierWithCatalogStage(w.catalog, cfg.PhaseIO)))
+		opts = append(opts, core.WithContractVerifier(deliverable.NewVerifierWithCatalogStage(ow.cw.catalog, cfg.PhaseIO)))
 	}
 	return opts, verifier
 }
 
-func tailOptionsOf(w *orchWiring) []core.Option {
-	projectRoot, pol := w.projectRoot, w.pol
+func tailOptionsOf(ow optionWiring) []core.Option {
+	projectRoot, pol := ow.site.projectRoot, ow.pw.pol
 	opts := []core.Option{
-		core.WithCatalogRefresher(makeCatalogRefresher(projectRoot, w.evolveDir, pol.CatalogConfig().RefreshStage)),
+		core.WithCatalogRefresher(makeCatalogRefresher(projectRoot, ow.site.evolveDir, pol.CatalogConfig().RefreshStage)),
 		core.WithCatalogRefreshStage(catalogRefreshStage(pol)),
 		core.WithDirectivesProvider(makeDirectivesProvider(projectRoot)),
 		core.WithKB(research.NewFileKBWithRecall(kbRootsAbs(projectRoot), kbRecallK(projectRoot))),
-		core.WithShipFloor(w.policyShipFloor),
+		core.WithShipFloor(ow.pw.shipFloor),
 		core.WithRetryConfig(pol.RetryConfig()),
 		core.WithFailureCountReader(failureCountReader(projectRoot)),
 		core.WithFailureClassReader(failureClassReader(projectRoot)),
 		core.WithScopePathResolver(scopePathResolver),
 		core.WithContinuationResolver(continuationForScope),
-		core.WithContinuationShedder(hostContinuationShedder(w.signals)),
-		core.WithWorkflowConfig(w.wfCfg),
+		core.WithContinuationShedder(hostContinuationShedder(ow.site.signals)),
+		core.WithWorkflowConfig(ow.pw.wfCfg),
 		core.WithChronicleConfig(pol.ChronicleConfig()),
 	}
 	if fp, err := pol.FailurePolicyConfig(); err == nil {

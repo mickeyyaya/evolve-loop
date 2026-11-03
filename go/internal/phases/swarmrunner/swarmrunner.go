@@ -239,6 +239,13 @@ func (d *Decorator) ContractVerifierWired() bool {
 	return false
 }
 
+func (d *Decorator) ContractVerifierIs(v any) bool {
+	if w, ok := d.inner.(interface{ ContractVerifierIs(any) bool }); ok {
+		return w.ContractVerifierIs(v)
+	}
+	return false
+}
+
 func (d *Decorator) HostEffectsWired() bool {
 	if w, ok := d.inner.(interface{ HostEffectsWired() bool }); ok {
 		return w.HostEffectsWired()
