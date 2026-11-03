@@ -843,6 +843,44 @@ Known differences from the design:
   - Outside a cell, during a cycle, the hook denies a call whose `subagent_type` names a phase persona. A phase persona is `evolve-*`, with or without a plugin prefix. Thus the console or an operator session cannot act as a phase. A generic subagent passes.
   - The marker is advisory, because an agent can set or unset it. That is acceptable, because the hook is defence in depth. The cell boundary (sandbox, exec deny, dispatch credential) is the limit.
 
+### 9.2 The cell tool view (AD1-3)
+
+The sandbox denies the read of `~/.config/gh` and `~/.ssh` (row N8). The tools in a cell still look there first, and each failed read gives a `read.home.secret` signal. The tool view sends each tool to an empty config of the cell. Thus a `gh` or `git` call in a cell finds no host config and no credential. The plan is component AD1-3 of decision D1 in `docs/plans/architecture-decisions-2026-11.md`.
+
+A worked example: the build cell of cycle 7 has the workspace `.evolve/runs/cycle-7`. At `enforce` the bridge makes the empty directory `.evolve/runs/cycle-7/.cell/gh` and writes `.evolve/runs/cycle-7/.cell/gitconfig`. The cell runs `gh auth status`, and `gh` prints `You are not logged into any GitHub hosts.` The cell runs `git credential fill`, and `git` finds no helper and asks for no password.
+
+| Variable | Value | Effect |
+|---|---|---|
+| `GH_CONFIG_DIR` | `<ws>/.cell/gh` (empty) | `gh` reads no `hosts.yml` of the host, so it has no login |
+| `GIT_CONFIG_NOSYSTEM` | `1` | `git` reads no system config, for example `/etc/gitconfig` |
+| `GIT_CONFIG_GLOBAL` | `<ws>/.cell/gitconfig` | `git` reads no `~/.gitconfig`. The file sets `credential.helper` to an empty value, so the helper list is empty |
+| `GIT_TERMINAL_PROMPT` | `0` | `git` asks for no user name and no password |
+| `GIT_SSH_COMMAND` | `ssh -F /dev/null -o IdentitiesOnly=yes -o IdentityFile=/dev/null -o BatchMode=yes` | `ssh` reads no `~/.ssh/config`, no key and no agent key, and it asks for nothing |
+
+| Item | As built |
+|---|---|
+| Data | the embedded file `go/internal/bridge/cellview/tool-view.json`. It gives the cell directory, the variables, the empty directories and the files. The token `{cell}` stands for `<ws>/.cell`. No Go code names a tool or a family |
+| Check of the data | `parseCellToolView` refuses a reserved variable or a variable that is not a shell identifier. It also refuses a control byte and a path outside the cell directory. Bad data stops the binary at its start |
+| Where it applies | `Deps.cellToolEnv` adds the variables to the manifest `default_env` of `cfg.Realization.Env` in the `enforce` branch of `cellEnv`. A tool view variable wins over a manifest value |
+| Stage source | the policy key `isolation.i2.stage`, the same stage as the hermetic environment (§6). At `shadow` and `off` the cell gets no tool view |
+| A cell with no workspace | no tool view, for example the version probe of `probeEnv` |
+| A failed write | a `[bridge] WARN cell tool view:` line. The cell keeps the variables. A missing config directory or file also gives no login and no helper |
+
+The guards are these tests:
+
+- `TestAgentSandboxContract_N8b_ACellGhCallSaysNotLoggedInAndReadsNoHostConfig` (build tag `integration`). A fake `gh` reads the config directory as the real `gh` does. A fixture `HOME` holds a `hosts.yml`, and the launcher sets `GH_TOKEN`. The cell call says that it is not logged in, and it reads only the cell directory.
+- `TestAgentSandboxContract_N8c_ACellGitHasNoCredentialHelper` (build tag `integration`). The real `git` runs with a fixture `HOME` and a fixture system config. Each one sets `credential.helper=store`, and a fixture `.git-credentials` holds a token. The cell `git` has no helper, `git credential fill` finds no token, and the `ssh` command reads no key.
+- `TestCellEnv_EnforceHoldsEachKeyOfTheCellToolView`, `TestCellEnv_ShadowAndOffAddNoCellToolView` and `TestParseCellToolView_TheEmbeddedDataHoldsEachKey`.
+
+Limits:
+
+- The tool view changes the environment only. A cell can set the variables again, or change the files in `<ws>/.cell`, because the workspace is writable. The sandbox deny of the host secrets (row N8) is still the limit. AD1-8 adds the same view to the `bwrap` path.
+- `GIT_CONFIG_GLOBAL` needs `git` 2.32 or later. An older `git` ignores it and reads `~/.gitconfig`.
+- The bridge makes the workspace path absolute before it writes the view, because the cell runs in the worktree, not in the workspace.
+- Row N8b runs a fake `gh`, so it proves the environment, not the code of the real `gh`.
+- A `credential.helper` in the `.git/config` of the repository still applies, because `git` reads the repository config after the global config.
+- The two contract tests do not run in the sandbox. They prove the environment, not the profile.
+
 ## 10. Routing data
 
 ### Issue
