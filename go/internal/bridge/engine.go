@@ -46,6 +46,7 @@ type Deps struct {
 	ExecStage             string
 	DispatchStore         func() (dispatchcred.Store, error)
 	ReadStage             string
+	SecretStage           string
 	GuaranteeStage        string
 	TokenAttributionStage string
 	EnvDrops              *EnvDropLog

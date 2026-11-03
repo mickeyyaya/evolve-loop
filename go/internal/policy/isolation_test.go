@@ -106,6 +106,27 @@ func TestIsolationReadStageAndLineageMax_ReadTheI5BlockApartFromI2AndI3(t *testi
 	}
 }
 
+func TestIsolationSecretStage_ReadsTheI5SecretBlockApartFromI5(t *testing.T) {
+	t.Parallel()
+	cases := map[string]string{
+		``: "",
+		`{"isolation":{"i5":{"stage":"enforce"}}}`:                                "",
+		`{"isolation":{"i5":{"stage":"shadow"},"i5_secret":{"stage":"enforce"}}}`: "enforce",
+		`{"isolation":{"i5_secret":{"stage":"shadow"}}}`:                          "shadow",
+	}
+	for body, want := range cases {
+		var p policy.Policy
+		if body != "" {
+			if err := json.Unmarshal([]byte(body), &p); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if got := p.IsolationSecretStage(); got != want {
+			t.Errorf("%s: IsolationSecretStage = %q, want %q", body, got, want)
+		}
+	}
+}
+
 func TestIsolationGuaranteeStage_ReadsIsolationI7StageAndDefaultsToEmpty(t *testing.T) {
 	t.Parallel()
 	cases := map[string]string{

@@ -27,4 +27,7 @@ func TestTheCheckedInPolicy_EnforcesTheStagesTheOperatorMoved(t *testing.T) {
 			t.Errorf("%s = %q, want enforce", key, got)
 		}
 	}
+	if got := p.IsolationSecretStage(); got != "shadow" {
+		t.Errorf("isolation.i5_secret.stage = %q, want shadow until one wave logs zero read.home.secret signals", got)
+	}
 }

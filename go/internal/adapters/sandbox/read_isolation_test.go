@@ -133,6 +133,42 @@ func TestBwrapPrefix_ShadowOrNoWorkspaceBindsNothingForReadIsolation(t *testing.
 	}
 }
 
+func TestGenerateSBPL_SecretStageEnforceDeniesSecretsWhileRunsStayReportOnly(t *testing.T) {
+	cfg := readIsolationConfig(false)
+	cfg.ReadIsolation.SecretEnforce = true
+	sbpl := GenerateSBPL(cfg)
+	for _, want := range []string{
+		`(deny file-read-data (subpath "/home/u/.ssh") (with message "evolve-cell=d42 rule=read.home.secret inv=I5"))`,
+		`(deny file-read-data (literal "/home/u/.netrc") (with message "evolve-cell=d42 rule=read.home.secret inv=I5"))`,
+		`(allow file-read-data (subpath "/repo/.evolve/runs") (with report) (with message "evolve-cell=d42 rule=read.runs.unrelated inv=I5"))`,
+		`(allow file-read-data (subpath "/repo/.evolve/runs/cycle-7/.bridge") (with report) (with message "evolve-cell=d42 rule=read.raw.output inv=I4"))`,
+		`(allow file-write* (subpath "/repo/.evolve/runs/cycle-7/inputs") (with report) (with message "evolve-cell=d42 rule=write.inputs inv=I4"))`,
+	} {
+		if !strings.Contains(sbpl, want) {
+			t.Fatalf("the secret stage at enforce must emit %s:\n%s", want, sbpl)
+		}
+	}
+	if got := strings.Count(sbpl, "(deny file-read-data"); got != 2 {
+		t.Fatalf("only the two secret reads are denied, got %d denies:\n%s", got, sbpl)
+	}
+}
+
+func TestBwrapPrefix_SecretStageEnforceHidesSecretsWhileRunsStayVisible(t *testing.T) {
+	cfg := readIsolationConfig(false)
+	cfg.ReadIsolation.SecretEnforce = true
+	joined := strings.Join(BwrapPrefix(cfg), " ")
+	for _, want := range []string{"--tmpfs /home/u/.ssh", "--ro-bind /dev/null /home/u/.netrc"} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("the secret stage at enforce must emit %q:\n%s", want, joined)
+		}
+	}
+	for _, unwanted := range []string{"--tmpfs /repo/.evolve/runs ", "--ro-bind-try", "scout-stdout.log", ".bridge"} {
+		if strings.Contains(joined, unwanted) {
+			t.Fatalf("the runs and raw-output rules stay report-only, got %q:\n%s", unwanted, joined)
+		}
+	}
+}
+
 func TestReadIsolation_RuleIDsAreTheSignalRulesOfTheSpec(t *testing.T) {
 	got := []string{RuleRunsUnrelated, RuleHomeSecret, RuleRawOutput, RuleRawOutputWrite, RuleInputsWrite, RulePipelineFileWrite, CellMessagePrefix}
 	want := []string{"read.runs.unrelated", "read.home.secret", "read.raw.output", "write.raw.output", "write.inputs", "write.pipeline.file", "evolve-cell="}

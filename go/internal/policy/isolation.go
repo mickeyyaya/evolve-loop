@@ -23,12 +23,13 @@ var (
 )
 
 type IsolationPolicy struct {
-	I2  IsolationInvariantPolicy `json:"i2,omitempty"`
-	I3  IsolationInvariantPolicy `json:"i3,omitempty"`
-	I5  IsolationInvariantPolicy `json:"i5,omitempty"`
-	I7  IsolationInvariantPolicy `json:"i7,omitempty"`
-	I8  IsolationInvariantPolicy `json:"i8,omitempty"`
-	I15 IsolationInvariantPolicy `json:"i15,omitempty"`
+	I2       IsolationInvariantPolicy `json:"i2,omitempty"`
+	I3       IsolationInvariantPolicy `json:"i3,omitempty"`
+	I5       IsolationInvariantPolicy `json:"i5,omitempty"`
+	I5Secret IsolationInvariantPolicy `json:"i5_secret,omitempty"`
+	I7       IsolationInvariantPolicy `json:"i7,omitempty"`
+	I8       IsolationInvariantPolicy `json:"i8,omitempty"`
+	I15      IsolationInvariantPolicy `json:"i15,omitempty"`
 
 	LineageMax int `json:"lineage_max,omitempty"`
 
@@ -85,6 +86,13 @@ func (p Policy) IsolationReadStage() string {
 		return ""
 	}
 	return p.Isolation.I5.Stage
+}
+
+func (p Policy) IsolationSecretStage() string {
+	if p.Isolation == nil {
+		return ""
+	}
+	return p.Isolation.I5Secret.Stage
 }
 
 func (p Policy) IsolationQueueStage() string {

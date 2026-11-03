@@ -194,6 +194,9 @@
   "isolation": {
     "i2": {
       "stage": "enforce"
+    },
+    "i5_secret": {
+      "stage": "shadow"
     }
   },
   "retry": {
