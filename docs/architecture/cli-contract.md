@@ -427,6 +427,7 @@ Limits:
 | `ci classify` | always | A unless `--rerun` (`--rerun` is D) | yes | yes | `evolve.ci.classify/1` | `--rerun` makes it `leased` |
 | `scan secrets` | always | A | yes | yes | `evolve.scan.secrets/1` | |
 | `docs ste-lint` | always | A | yes | yes | `evolve.docs.ste-lint/1` | |
+| `review-class` | always | A | yes | yes | `evolve.review-class/1` | the change classes, review seats and checks of the diff against `--base` (default `HEAD`); it runs only `git diff`, `git ls-files` and `git show` |
 | `quality report` | leased | R (`quality-reading`) | yes | yes | `evolve.quality.report/1` | it publishes signals |
 | `quality compare` | leased | R (`quality-reading`) | yes | yes | `evolve.quality.compare/1` | it publishes one PQ3 reading |
 | `quality show` | always | A | yes | yes | `evolve.quality.show/1` | the readings of `quality report` with no publish (§4.1 D2); X17d |

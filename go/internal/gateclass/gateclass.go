@@ -155,6 +155,10 @@ var testFunc = regexp.MustCompile(`^func (Test\w*)\(`)
 
 var guardTestPath = regexp.MustCompile(`(^|/)(guards|repocontract|sizeratchet|rawgitratchet)/|guard[^/]*_test\.go$|^go/acs/regression/`)
 
+func IsGuardTest(path string) bool {
+	return guardTestPath.MatchString(path)
+}
+
 func addedTestNames(files []fileDiff) map[string][]string {
 	names := map[string][]string{}
 	for _, f := range files {
@@ -169,7 +173,7 @@ func addedTestNames(files []fileDiff) map[string][]string {
 
 func movedTo(from string, targets []string) bool {
 	return slices.ContainsFunc(targets, func(to string) bool {
-		return guardTestPath.MatchString(to) || path.Dir(to) == path.Dir(from)
+		return IsGuardTest(to) || path.Dir(to) == path.Dir(from)
 	})
 }
 
@@ -180,7 +184,7 @@ func (f fileDiff) removedGuardTests(movedTests map[string][]string) []Flag {
 		if m == nil || movedTo(f.path, movedTests[m[1]]) {
 			continue
 		}
-		if guardTestPath.MatchString(f.path) || strings.Contains(m[1], "Contract") {
+		if IsGuardTest(f.path) || strings.Contains(m[1], "Contract") {
 			out = append(out, Flag{Pattern: PatternRemovedGuardTest, Path: f.path, Detail: m[1]})
 		}
 	}
