@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gopkgpattern"
 )
 
 var floorTiers = []string{"fmt", "vet", "integration", "e2e", "acs-durable", "apicover", "cover", "ratchet"}
@@ -253,22 +255,32 @@ func TestFloorRun_RatchetTierRunsTheRatchetCheck(t *testing.T) {
 	}
 }
 
-func floorMakeRecipe(t *testing.T, makefile, target string) []string {
+func makeRecipe(t *testing.T, goRoot, target string) []string {
 	t.Helper()
-	raw, err := os.ReadFile(makefile)
+	raw, err := os.ReadFile(filepath.Join(goRoot, "Makefile"))
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("read go/Makefile: %v", err)
 	}
 	var recipe []string
-	inTarget := false
+	found, inTarget := false, false
 	for _, line := range strings.Split(string(raw), "\n") {
-		if strings.HasPrefix(line, "\t") {
-			if inTarget {
-				recipe = append(recipe, strings.TrimSpace(line))
-			}
+		if !strings.HasPrefix(line, "\t") {
+			inTarget = strings.HasPrefix(line, target+":")
+			found = found || inTarget
 			continue
 		}
-		inTarget = strings.HasPrefix(line, target+":")
+		if !inTarget {
+			continue
+		}
+		line = strings.TrimSpace(line)
+		if n := len(recipe); n > 0 && strings.HasSuffix(recipe[n-1], "\\") {
+			recipe[n-1] = strings.TrimSuffix(recipe[n-1], "\\") + " " + line
+			continue
+		}
+		recipe = append(recipe, line)
+	}
+	if !found {
+		t.Fatalf("go/Makefile has no %s target", target)
 	}
 	return recipe
 }
@@ -282,7 +294,7 @@ func floorAcsVetPatterns(recipe []string) []string {
 			continue
 		}
 		for _, f := range fields[vet+3:] {
-			if strings.HasPrefix(f, "./") {
+			if gopkgpattern.IsPackagePattern(f) {
 				patterns = append(patterns, f)
 			}
 		}
@@ -291,11 +303,13 @@ func floorAcsVetPatterns(recipe []string) []string {
 }
 
 func floorPatternCovers(patterns []string, dir string) bool {
+	dirKey := gopkgpattern.Key(dir)
 	return slices.ContainsFunc(patterns, func(p string) bool {
-		if prefix, ok := strings.CutSuffix(p, "/..."); ok {
-			return dir == prefix || strings.HasPrefix(dir, prefix+"/")
+		key := gopkgpattern.Key(p)
+		if !gopkgpattern.IsRecursive(p) {
+			return dirKey == key
 		}
-		return dir == p
+		return key == "" || dirKey == key || strings.HasPrefix(dirKey, key+"/")
 	})
 }
 
@@ -332,10 +346,10 @@ func floorAcsPackageDirs(t *testing.T, goRoot string) []string {
 	return dirs
 }
 
-func TestFloorRun_VetAcsRecipeCoversEveryAcsPackage(t *testing.T) {
+func TestMakefile_VetAcsCoversEveryAcsPackage(t *testing.T) {
 	t.Parallel()
 	goRoot := filepath.Join(floorRepoRoot(t), "go")
-	patterns := floorAcsVetPatterns(floorMakeRecipe(t, filepath.Join(goRoot, "Makefile"), "vet-acs"))
+	patterns := floorAcsVetPatterns(makeRecipe(t, goRoot, "vet-acs"))
 	if len(patterns) == 0 {
 		t.Fatal("go/Makefile vet-acs runs no `vet -tags acs <pattern>`: the compile guard is gone, or the recipe form changed and this parser must follow it")
 	}
@@ -353,7 +367,7 @@ func TestFloorRun_VetAcsRecipeCoversEveryAcsPackage(t *testing.T) {
 func TestFloorAcsVetPatterns_ReadsOnlyTheAcsTaggedVet(t *testing.T) {
 	t.Parallel()
 	recipe := []string{
-		"$(GO) vet -tags acs ./acs/... ./x",
+		"$(GO) vet -tags acs ./acs/... ./x $(ACS_PKGS) main.go",
 		"$(GO) vet ./other/...",
 		"$(GO) vet -tags",
 		"echo vet -tags e2e ./e2e/...",
@@ -366,9 +380,28 @@ func TestFloorAcsVetPatterns_ReadsOnlyTheAcsTaggedVet(t *testing.T) {
 			t.Errorf("covers(%s) = %v, want %v", dir, got, want)
 		}
 	}
+	if !floorPatternCovers([]string{"./..."}, "./acs/cycle16") {
+		t.Error("the whole-module pattern does not cover ./acs/cycle16")
+	}
 	for name, want := range map[string]bool{"testdata": true, "_old": true, ".git": true, "cycle16": false} {
 		if got := floorGoListSkips(name); got != want {
 			t.Errorf("skips(%s) = %v, want %v", name, got, want)
 		}
+	}
+}
+
+func TestMakeRecipe_JoinsContinuedLinesAndRequiresTheTarget(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	mk := "other:\n\techo no\nvet-acs: ## doc\n\t$(GO) vet -tags acs \\\n\t\t./acs/...\n\techo done\n\nnext:\n\techo no\n"
+	if err := os.WriteFile(filepath.Join(dir, "Makefile"), []byte(mk), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"$(GO) vet -tags acs  ./acs/...", "echo done"}
+	if got := makeRecipe(t, dir, "vet-acs"); !slices.Equal(got, want) {
+		t.Errorf("recipe = %q, want %q", got, want)
+	}
+	if got := floorAcsVetPatterns(makeRecipe(t, dir, "vet-acs")); !slices.Equal(got, []string{"./acs/..."}) {
+		t.Errorf("patterns of a continued line = %q, want [./acs/...]", got)
 	}
 }
