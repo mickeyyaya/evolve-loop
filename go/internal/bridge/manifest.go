@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/credsource"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/quotastate"
@@ -242,7 +243,7 @@ func validateEnvPassthrough(cli string, names []string) error {
 var credentialEnvKeys = map[string]bool{"ANTHROPIC_API_KEY": true, "ANTHROPIC_BASE_URL": true, "OPENAI_API_KEY": true}
 
 func isReservedEnvKey(key string) bool {
-	return credentialEnvKeys[key] || strings.HasPrefix(key, "EVOLVE_") || strings.HasPrefix(key, "BRIDGE_")
+	return credentialEnvKeys[key] || slices.Contains(credsource.ChildVariables, key) || strings.HasPrefix(key, "EVOLVE_") || strings.HasPrefix(key, "BRIDGE_")
 }
 
 func hasControlByte(s string) bool {

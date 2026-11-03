@@ -12,6 +12,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/credsource"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/landing"
@@ -100,6 +101,8 @@ type Options struct {
 	repairAttempted map[core.ShipErrorCode]bool
 
 	shipLock func(path string) (release func(), err error)
+
+	credentialSource func() (credsource.Source, error)
 
 	Signals *signalcenter.Center
 

@@ -42,6 +42,9 @@ func Parse(raw []byte) (Policy, error) {
 		if err := p.Isolation.DispatchRequests.validate(); err != nil {
 			return Policy{}, fmt.Errorf("isolation.dispatch_requests: %w", err)
 		}
+		if err := p.Isolation.CredentialSource.validate(); err != nil {
+			return Policy{}, fmt.Errorf("isolation.credential_source: %w", err)
+		}
 	}
 	if err := p.Overlays.validatePaths(); err != nil {
 		return Policy{}, err

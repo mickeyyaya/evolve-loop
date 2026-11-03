@@ -23,6 +23,7 @@ func (o *Options) wiredLanding() *landing.Landing {
 	opts := []landing.Option{
 		landing.WithRun(phaseName, o.CycleID, o.RunID),
 		landing.WithSignals(func() *signalcenter.Center { return o.Signals }),
+		landing.WithCredentialProbe(o.credentialProbe),
 	}
 	if o.Sleep != nil {
 		opts = append(opts, landing.WithSleep(o.Sleep))
