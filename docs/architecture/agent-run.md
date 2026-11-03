@@ -111,7 +111,7 @@ An evaluate phase gets `goal` by default, but a plan phase gets no key. The pers
 
 - A profile that requires a `Verdict` section declares a review report. For such a profile, the run reads the report body after the dispatch (`reportVerdict` in `go/internal/cli/agentcmd/verdict.go`).
 - The body gives two values:
-  - the stated verdict: the `evolve-verdict` sentinel, else the `Verdict` line (`reportdoc.Verdict`);
+  - the stated verdict: the `evolve-verdict` sentinel, else the `Verdict` line outside the fences (`reportdoc.Verdict`), else a trailing fenced verdict block (`trailingFencedVerdict`). That block holds only a `## Verdict` heading and one `Verdict: X` line, and only blank lines follow it;
   - the counts by severity (`reportdoc.CountSeverities`). A finding line starts with `[CRITICAL]`, `[HIGH]`, `[MEDIUM]` or `[LOW]`. `[MAJOR]` counts as HIGH, and `[MINOR]` counts as LOW. A count table row and a counts line (two or more counts on one line) also count. For each severity, the larger of the listed and the declared count is the count.
 - When the field is PASS or WARN, these rules apply in this order:
 
@@ -119,10 +119,11 @@ An evaluate phase gets `goal` by default, but a plan phase gets no key. The pers
 |---|---|---|
 | one or more CRITICAL or HIGH findings | FAIL | `REVIEW_AGENT_RUN_VERDICT_MISMATCH` |
 | the stated verdict is FAIL | FAIL | `REVIEW_AGENT_RUN_VERDICT_MISMATCH` |
-| no stated verdict | FAIL | `REVIEW_AGENT_RUN_VERDICT_MISMATCH` |
+| no stated verdict | FAIL | `REVIEW_AGENT_RUN_VERDICT_MISMATCH`, and `REVIEW_AGENT_RUN_VERDICT_PARSE_DEFECT` when the body lists 0 CRITICAL and 0 HIGH |
 | the stated verdict is WARN | WARN | none |
 | the stated verdict is PASS or SKIPPED | the field | none |
 
+- **F4.2** On 2026-11-03, three code-reviewer reports put the verdict in a trailing fence, and each clean review became FAIL. Thus the parser reads that one trailing block. A missing verdict in a clean body is a parse defect. Its signal and its error diagnostic make the defect visible. The run verdict stays FAIL.
 - A field of FAIL or SKIPPED stays as it is. A profile with no `Verdict` section keeps the field, for example `code-simplifier` and the orchestrator seat of the self-healing loop.
 - The signal is WARN in the module `review`. Its `run_id` is the run label, and its reason names the run label too. Its fields give the field verdict, the stated verdict and the CRITICAL and HIGH counts. The envelope gets one error diagnostic with the same reason.
 - The run verdict goes to the envelope, the exit code, the ledger entry and the launch record. Thus `evolve commit-gate run --reviewers run:<run label>` refuses the run, because its record verdict is FAIL (§7).
