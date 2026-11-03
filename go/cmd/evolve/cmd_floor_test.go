@@ -30,6 +30,7 @@ var floorCIParity = []floorCIStep{
 	{tier: "e2e", workflow: "go.yml", job: "build-test", want: "make test-e2e"},
 	{tier: "apicover", workflow: "go.yml", job: "build-test", want: "make apicover-check"},
 	{tier: "cover", workflow: "go.yml", job: "build-test", want: "make cover-strict"},
+	{tier: "acs-durable", workflow: "ci.yml", job: "acs-durable", want: "make vet-acs"},
 	{tier: "acs-durable", workflow: "ci.yml", job: "acs-durable", want: "go test -count=1 -tags acs ./acs/regression/..."},
 }
 

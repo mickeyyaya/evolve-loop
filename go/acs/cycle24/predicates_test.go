@@ -82,6 +82,7 @@ func TestC24_008_LlmrouteSkipsEnvForPerAgentCLI(t *testing.T) {
 	auditorPlan := llmroute.Resolve(
 		"auditor", "audit", "balanced",
 		map[string]string{},
+		llmroute.AgentOverride{},
 		nil,
 		nil,
 		nil,
@@ -97,6 +98,7 @@ func TestC24_008_LlmrouteSkipsEnvForPerAgentCLI(t *testing.T) {
 	tddPlan := llmroute.Resolve(
 		"tdd-engineer", "tdd", "balanced",
 		map[string]string{},
+		llmroute.AgentOverride{},
 		nil,
 		nil,
 		nil,
@@ -115,6 +117,7 @@ func TestC24_NEG1_ProfileCLIIsHonored(t *testing.T) {
 	plan := llmroute.Resolve(
 		"auditor", "audit", "balanced",
 		map[string]string{},
+		llmroute.AgentOverride{},
 		prof,
 		nil,
 		nil,

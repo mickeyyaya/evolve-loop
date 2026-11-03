@@ -45,7 +45,7 @@ export GIT_CONFIG_VALUE_1 := 0
 
 export GORACE := $(strip $(GORACE) atexit_sleep_ms=0)
 
-.PHONY: build test test-component test-integration test-e2e test-acs-durable test-all \
+.PHONY: build test test-component test-integration test-e2e test-acs-durable vet-acs test-all \
         test-latency test-budget cover apicover lint tidy clean help dist dist-clean \
         cover-strict cover-changed apicover-enforce apicover-check \
         test-integration-darwin cover-changed-darwin cover-strict-darwin darwin-set \
@@ -197,6 +197,9 @@ test-e2e: ## E2E tier: only the tests of e2e-tagged files, full-cycle subprocess
 
 test-acs-durable: ## Durable ACS regression tier (//go:build acs); artifact-free predicates, mirrors the ci.yml acs-durable gate
 	$(GO) test -count=1 -tags acs ./acs/regression/...
+
+vet-acs: ## Compile and vet every acs package (//go:build acs), so an API change that breaks a frozen predicate fails its own PR
+	$(GO) vet -tags acs ./acs/...
 
 test-all: test-integration ## All runtime tiers, preserving no-race E2E and its test-only phase tag
 	$(MAKE) -f "$(firstword $(MAKEFILE_LIST))" test-e2e

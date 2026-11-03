@@ -394,9 +394,9 @@ func TestC1694_011_PredicateInputsAreInTheShipTree(t *testing.T) {
 	if err != nil {
 		t.Fatalf("treefence.Take(%s): %v", root, err)
 	}
-	tracked, err := treefence.TakeTracked(ctx, root)
+	tracked, err := treefence.TakeStaged(ctx, root, nil)
 	if err != nil {
-		t.Fatalf("treefence.TakeTracked(%s): %v", root, err)
+		t.Fatalf("treefence.TakeStaged(%s): %v", root, err)
 	}
 	if full.Tree != tracked.Tree {
 		untracked, _, _ := runIn(t, root, "git", "-C", root, "ls-files", "--others", "--exclude-standard")

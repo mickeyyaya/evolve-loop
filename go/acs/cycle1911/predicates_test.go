@@ -77,7 +77,7 @@ func expectedChainsForWalledGroup(groups map[string]string, walled string) map[s
 
 func chainFor(t *testing.T, root, tier string) []string {
 	t.Helper()
-	return bridgechain.ApplyCLIHealthBench(root, "build", seatPlan(tier), map[string]string{}, fixedNow, nil).Candidates
+	return bridgechain.ApplyCLIHealthBench(root, "build", seatPlan(tier), fixedNow, nil).Candidates
 }
 
 func TestC1911_001_AgyCompactResetKeepsTheWallLineAndCapsAt24h(t *testing.T) {

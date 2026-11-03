@@ -67,7 +67,7 @@ func TestC541_003_PlanFromTriage_FleetWidthDecision_TwoDisjointSpecs(t *testing.
 	if err != nil {
 		t.Fatalf("marshal decision: %v", err)
 	}
-	specs, err := fleet.PlanFromTriage(decision, nil, 2)
+	specs, _, err := fleet.PlanFromTriage(decision, nil, 2, nil)
 	if err != nil {
 		t.Fatalf("PlanFromTriage: %v", err)
 	}

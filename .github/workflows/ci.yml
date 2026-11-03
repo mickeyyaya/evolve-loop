@@ -65,5 +65,7 @@ jobs:
         with:
           go-version: '1.23'
           cache-dependency-path: go/go.sum
+      - name: Compile every acs package
+        run: cd go && make vet-acs
       - name: ACS durable regression suite
         run: cd go && go test -count=1 -tags acs ./acs/regression/...

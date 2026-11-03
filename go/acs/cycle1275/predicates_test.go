@@ -50,7 +50,7 @@ func planWithMint(t *testing.T, mintJSON string) *router.PhasePlan {
 
 func TestC1275_001_MintedPhaseCarriesSelectMetadata(t *testing.T) {
 	plan := planWithMint(t, `{"prompt":"You detect wire-schema drift between the advisor and the router.",`+
-		`"tier":"balanced","cli":"claude",`+
+		`"tier":"balanced",`+
 		`"description":"Reports wire-schema drift between advisor output and router types.",`+
 		`"when_to_use":"Select when a cycle edits router wire structs or the advisor response contract."}`)
 
@@ -70,14 +70,14 @@ func TestC1275_001_MintedPhaseCarriesSelectMetadata(t *testing.T) {
 	if !strings.Contains(mc.Prompt, "wire-schema drift") {
 		t.Errorf("mint prompt not carried: %q", mc.Prompt)
 	}
-	if mc.Dispatch.ModelTierDefault != "balanced" || mc.Dispatch.CLI != "claude" {
-		t.Errorf("mint dispatch=%+v, want tier=balanced cli=claude", mc.Dispatch)
+	if mc.Dispatch.ModelTierDefault != "balanced" || mc.Dispatch.CLI != "" {
+		t.Errorf("mint dispatch=%+v, want tier=balanced and no CLI (a mint is CLI-neutral)", mc.Dispatch)
 	}
 }
 
 func TestC1275_002_MintSpecWireContract(t *testing.T) {
 	var spec router.MintSpec
-	raw := `{"prompt":"p","tier":"deep","cli":"claude","description":"what it produces","when_to_use":"when to select it"}`
+	raw := `{"prompt":"p","tier":"deep","description":"what it produces","when_to_use":"when to select it"}`
 	if err := json.Unmarshal([]byte(raw), &spec); err != nil {
 		t.Fatalf("unmarshal MintSpec: %v", err)
 	}
@@ -143,7 +143,7 @@ func mintExampleHasMetadata(prompt string) bool {
 }
 
 func TestC1275_004_MintWithoutMetadataStaysBackwardCompatible(t *testing.T) {
-	plan := planWithMint(t, `{"prompt":"legacy persona","tier":"deep","cli":"claude","writes_source":false}`)
+	plan := planWithMint(t, `{"prompt":"legacy persona","tier":"deep","writes_source":false}`)
 	if len(plan.MintPhases) != 1 {
 		t.Fatalf("MintPhases=%d, want 1 — a metadata-less mint must still register", len(plan.MintPhases))
 	}
@@ -155,11 +155,11 @@ func TestC1275_004_MintWithoutMetadataStaysBackwardCompatible(t *testing.T) {
 		t.Errorf("legacy mint fields regressed: %+v (writes_source=%v)", mc.Dispatch, mc.WritesSource)
 	}
 
-	got, err := json.Marshal(router.MintSpec{Prompt: "p", Tier: "deep", CLI: "claude"})
+	got, err := json.Marshal(router.MintSpec{Prompt: "p", Tier: "deep"})
 	if err != nil {
 		t.Fatalf("marshal MintSpec: %v", err)
 	}
-	if want := `{"prompt":"p","tier":"deep","cli":"claude"}`; string(got) != want {
+	if want := `{"prompt":"p","tier":"deep"}`; string(got) != want {
 		t.Errorf("MintSpec wire form changed for unset metadata:\n got %s\nwant %s (both new fields need omitempty)", got, want)
 	}
 }
