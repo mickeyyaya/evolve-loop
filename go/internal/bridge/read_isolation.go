@@ -138,11 +138,12 @@ func secretsOf(home string) (dirs, files []string) {
 type readReport struct {
 	denied                  bool
 	target, rule, invariant string
+	process, pid            string
 }
 
 var cellTag = regexp.MustCompile(`^[A-Za-z0-9._:/-]+$`)
 
-var readReportLine = regexp.MustCompile(`^Sandbox: [^\n]*?\(\d+\) (allow|deny)(?:\(\d+\))? \S+ ([^\n]+)\n` + regexp.QuoteMeta(sandbox.CellMessagePrefix) + `\S+ rule=(\S+) inv=(I\d+)`)
+var readReportLine = regexp.MustCompile(`^Sandbox: (?:([^\n]*?)\((\d+)\) )?(allow|deny)(?:\(\d+\))? \S+ ([^\n]+)\n` + regexp.QuoteMeta(sandbox.CellMessagePrefix) + `\S+ rule=(\S+) inv=(I\d+)`)
 
 func parseReadReports(raw []byte) []readReport {
 	var out []readReport
@@ -160,12 +161,12 @@ func parseReadReports(raw []byte) []readReport {
 		if m == nil {
 			continue
 		}
-		key := m[3] + "\x00" + m[2]
+		key := m[5] + "\x00" + m[4] + "\x00" + m[1]
 		if seen[key] {
 			continue
 		}
 		seen[key] = true
-		out = append(out, readReport{denied: m[1] == "deny", target: m[2], rule: m[3], invariant: m[4]})
+		out = append(out, readReport{denied: m[3] == "deny", target: m[4], rule: m[5], invariant: m[6], process: m[1], pid: m[2]})
 	}
 	return out
 }
@@ -281,7 +282,7 @@ func (deps Deps) emitReadViolation(cfg *Config, stage string, r readReport) {
 		Reason: "the cell " + cfg.Agent + " read " + target + " outside its grants",
 		Fields: map[string]string{
 			"invariant": r.invariant, "stage": stage, "action": action, "cell": cfg.Agent, "family": cfg.CLI,
-			"target": target, "rule": r.rule, "source": "sbpl-report",
+			"target": target, "rule": r.rule, "source": "sbpl-report", "process": r.process, "pid": r.pid,
 		},
 	})
 }

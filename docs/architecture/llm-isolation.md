@@ -754,7 +754,7 @@ Known differences from the design:
 - Linux has no report. At `shadow` the `bwrap` prefix adds nothing, and no signal comes.
 - On Linux, `bwrap` masks the raw files that exist at the launch. A raw log that the bridge makes later is not masked. The SBPL rule matches by name, so macOS has no such gap. The item `isolation-home-transcripts-before-i4-enforce` tracks the Linux gap too.
 - A grant is kept only when its real path is inside `.evolve/runs/` and is not raw output. A lesson under `.evolve/instincts/lessons/` gets no grant, because the repo grant already covers it.
-- The kernel can merge repeated reports, so the reader sees each rule and target once. The unified log can lag the end of the cell, so the reader waits for a fence report first ([cell-context-index.md](cell-context-index.md) §8). The fence makes a lost report unlikely, but it does not prove its absence. A failed read prints `WARN isolation read reports`.
+- The kernel can merge repeated reports, so the reader sees each rule, target and process name once. Each signal names the process and its id from the report line. A report line without a process name still gives a signal, with empty `process` and `pid` fields. The unified log can lag the end of the cell, so the reader waits for a fence report first ([cell-context-index.md](cell-context-index.md) §8). The fence makes a lost report unlikely, but it does not prove its absence. A failed read prints `WARN isolation read reports`.
 - Only the phases of a cycle get an index. A flow seat (advisor, judge, router) and an `evolve agent run` launch get no index, so at `enforce` they read only their own workspace inside `.evolve/runs/`.
 - The `message` class and the `context` class of §8.1 have no entries yet. Component CX4 of [cell-context-index.md](cell-context-index.md) adds them. The inbox item file and `lane-scope.json` stay readable, because the repo grant covers `.evolve/inbox/` and the workspace grant covers `lane-scope.json`.
 - An `evolve` verb that the agent runs inside the cell and that reads other run directories is a violation at `shadow`. The `shadow` signals must show none before the flip to `enforce`.
@@ -1212,6 +1212,8 @@ Each value is a string, and a signal keeps at most 12 keys (`go/internal/signalc
 | `target` | `.evolve/runs/cycle-1990/audit-report.md` | the path, the binary or the variable name; never a variable value |
 | `rule` | `read.runs.unrelated` | the id of the sandbox rule or the check |
 | `source` | `sbpl-report` | `sbpl-report`, `launcher`, `router`, `parser` or `gate` |
+| `process` | `ssh` | the name of the process that made the read; `sbpl-report` only. It is empty when the report has no name |
+| `pid` | `4417` | the process id of that process; `sbpl-report` only. It is empty when the report has no id |
 
 ### 15.3 Streams and channels
 
