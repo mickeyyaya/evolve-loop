@@ -52,7 +52,9 @@ Before the lane runs the cycle, it does these steps in this order:
 
 If one of these steps fails, the lane starts a fresh cycle. A refused resume thus costs a fresh cycle, never a held lane. A resume that hits a quota wall again writes a new quota checkpoint and keeps the auto-resume count.
 
-Proof: `go/internal/core/lane_resume_test.go`, `go/cmd/evolve/cmd_cycle_lane_resume_test.go`, and the wiring test `TestCycleRunRoot_AFleetLaneResumesTheQuotaPausedCycleOfItsTodoAtThePausedPhase`. The wiring test runs the real `evolve cycle run` root with a paused build. Scout does not run, and Build runs at once.
+A resumed lane does not take the project lock. `RunCycle` and `RunCycleFromPhase` ask one rule, `Orchestrator.acquireCycleLock` (`go/internal/core/orchestrator.go`): a fleet lane (`EVOLVE_FLEET=1`) skips the lock, and a sequential cycle takes it. In wave 150, before this rule, the resume of cycle 2106 took the project lock for its full run. One millisecond later, the resume of cycle 2107 stopped with `acquire lock: core: project lock held by another process`. The lane exited, it spent one auto-resume, and the pool had one less live lane.
+
+Proof: `go/internal/core/lane_resume_test.go`, `go/cmd/evolve/cmd_cycle_lane_resume_test.go`, the lock tests in `go/internal/core/fleet_lock_test.go`, and the wiring test `TestCycleRunRoot_AFleetLaneResumesTheQuotaPausedCycleOfItsTodoAtThePausedPhaseWhileASiblingHoldsTheProjectLock`. The wiring test runs the real `evolve cycle run` root with a paused build while the real project lock is held. Scout does not run, and Build runs at once.
 
 ## Terminal closeout
 
