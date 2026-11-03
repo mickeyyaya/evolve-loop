@@ -2,7 +2,9 @@
 
 ## Purpose
 
-`internal/gotestname` is the one home of two rules of the `go test` tool. The first rule says which function names are tests. The second rule says which directories the go tool ignores. Before this package, three guards had their own copy of the name rule, and the copies did not agree.
+`internal/gotestname` holds two rules of the `go test` tool. The first rule says which function names are tests. The second rule says which directories the go tool ignores. Before this package, three guards had their own copy of the name rule, and the copies did not agree.
+
+This package is not yet the one home of these rules. Other packages still keep their own copy of each rule. Two consumers below also keep a partial copy of the directory rule. The e2e scan of `internal/ciparity` and the scan of the `acs` files in `acs/regression/acsnames` skip only `testdata`. These copies need a migration. When you change a rule here, the remaining copies keep the old rule.
 
 ## Design
 
@@ -15,7 +17,7 @@
 
 - `acs/regression/emptytests`: the empty-test guard of ADR-0158 decision 19.
 - `acs/regression/acsnames`: the directories that the index of declared tests skips.
-- `internal/ciparity`: the `Test` functions of the e2e files.
+- `internal/ciparity`: the `Test` functions of the e2e files, and the directories that the scan of the darwin set skips.
 - `internal/handoff/evidence`: a `test` evidence reference resolves only when its name is a test.
 
 ## Lessons

@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 - **The guard.** `go/acs/regression/emptytests` parses each `*_test.go` file of the module. It fails on a `Test`, `Fuzz` or `Benchmark` function whose body has no statement. A body of only a comment fails. A body of only `t.Skip` with a reason passes.
 - **The baseline.** `baseline.txt` lists the offenders that pass. It is empty, because main has no offender. An entry that matches no offender fails.
-- **One name rule.** The new package `internal/gotestname` holds the `go test` rules for a test name and for an ignored directory. `emptytests`, `acsnames`, `internal/ciparity` and `internal/handoff/evidence` use it. A `test` evidence reference to a name such as `Testify` no longer resolves.
+- **A shared name rule.** The new package `internal/gotestname` holds the `go test` rules for a test name and for an ignored directory. `emptytests`, `acsnames`, `internal/ciparity` and `internal/handoff/evidence` use it. Other packages still keep their own copy of these rules. A `test` evidence reference to a name such as `Testify` no longer resolves.
 - **Where it runs.** The CI job `acs-durable` and the `acs-durable` tier of the build handoff floor run it.
 - Docs: [acs-predicate-quality-gate.md](docs/architecture/acs-predicate-quality-gate.md#test-functions-have-a-body-emptytests-2026-11-03).
 

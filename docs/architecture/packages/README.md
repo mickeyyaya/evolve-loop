@@ -16,7 +16,7 @@ Each Go package directory has one page. The page holds what the code cannot say:
 | `internal/events/wake` | blocks a channel reader until the kernel posts a change, a process exit or an output hangup (kqueue, inotify); no poll (ADR-0127, E3) | [internal-events-wake.md](internal-events-wake.md) |
 | `internal/events/reader` | follows event channels: arm, catch up and wait; the cursor rules, the duplicate window and the last will of a loop (ADR-0127, E5) | [internal-events-reader.md](internal-events-reader.md) |
 | `internal/fleet` | plans and runs concurrent, file-disjoint cycle lanes | [internal-fleet.md](internal-fleet.md) |
-| `internal/gotestname` | the one home of the `go test` rules for a test function name and for the directories that the go tool ignores | [internal-gotestname.md](internal-gotestname.md) |
+| `internal/gotestname` | the shared `go test` rules for a test function name and for the directories that the go tool ignores | [internal-gotestname.md](internal-gotestname.md) |
 | `internal/guards` | the in-process trust kernel: the six guards `evolve guard` runs | [internal-guards.md](internal-guards.md) |
 | `internal/heldproposal` | the rule, the record and the operator approval of a held proposal (ADR-0157) | [internal-heldproposal.md](internal-heldproposal.md) |
 | `internal/inboxbatch` | the inbox item model and the deterministic half of task selection | [internal-inboxbatch.md](internal-inboxbatch.md) |

@@ -17,6 +17,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotestname"
 )
 
 const DarwinSetFile = ".darwin-set"
@@ -64,7 +66,7 @@ func darwinPackages(moduleDir string, read readFunc) ([]string, error) {
 }
 
 func skipsDarwinScan(path, name, rel string) bool {
-	if name == "testdata" || name == "vendor" || strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") || rel == "acs" {
+	if gotestname.IgnoredDir(name) || rel == "acs" {
 		return true
 	}
 	_, err := os.Stat(filepath.Join(path, "go.mod"))
