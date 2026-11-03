@@ -318,3 +318,37 @@ func TestLaunch_DispatchWiringFlowsToTheLauncher(t *testing.T) {
 		}
 	}
 }
+
+func TestLaunch_FleetModeRefusesAnEmptyOrBlankActiveWorktreeBeforeAnyLaunch(t *testing.T) {
+	for _, fleet := range []string{"1", "true"} {
+		for _, active := range []string{"", "   "} {
+			fl := &fakeLauncher{stdout: planJSON()}
+			in := tempInput(t)
+			in.Env = map[string]string{"EVOLVE_CLI": "claude-tmux", "EVOLVE_FLEET": fleet}
+			in.ActiveWorktree = active
+			_, err := New(fl, defaultIdentity(), plainWriter).Plan(in)
+			if err == nil || !strings.Contains(err.Error(), "ActiveWorktree") {
+				t.Errorf("EVOLVE_FLEET=%s worktree=%q: err=%v, want a refusal naming ActiveWorktree", fleet, active, err)
+			}
+			if fl.calls != 0 {
+				t.Errorf("EVOLVE_FLEET=%s worktree=%q: %d launches before the refusal", fleet, active, fl.calls)
+			}
+		}
+	}
+}
+
+func TestLaunch_FleetModeThreadsItsActiveWorktreeAndSingleModeKeepsTheWorkspaceFallback(t *testing.T) {
+	fl := &fakeLauncher{stdout: planJSON()}
+	in := tempInput(t)
+	in.Env = map[string]string{"EVOLVE_CLI": "claude-tmux", "EVOLVE_FLEET": "1"}
+	in.ActiveWorktree = "/wt/cycle-7"
+	if _, err := New(fl, defaultIdentity(), plainWriter).Plan(in); err != nil || fl.gotReq.Worktree != "/wt/cycle-7" {
+		t.Fatalf("fleet with a worktree: err=%v worktree=%q", err, fl.gotReq.Worktree)
+	}
+	fl = &fakeLauncher{stdout: planJSON()}
+	in = tempInput(t)
+	in.Env["EVOLVE_FLEET"] = "0"
+	if _, err := New(fl, defaultIdentity(), plainWriter).Plan(in); err != nil || fl.gotReq.Worktree != in.Workspace {
+		t.Fatalf("single mode: err=%v worktree=%q, want %q", err, fl.gotReq.Worktree, in.Workspace)
+	}
+}

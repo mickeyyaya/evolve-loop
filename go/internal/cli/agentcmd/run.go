@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"syscall"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cloudlaunch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/launchrecord"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmcalls"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/specrunner"
@@ -159,7 +161,7 @@ func (c command) run(args []string, stdin io.Reader, stdout, stderr io.Writer) i
 		return refuse(err, stderr)
 	}
 	now := c.deps.Now()
-	r.label = runLabel(r.spec.Name, now)
+	r.label = freshLabel(r.spec.Name, r.root, now)
 	r.workspace = filepath.Join(paths.EvolveDirOf(r.root), runsSubpath, r.label)
 	if err := stageWorkspace(r, r.input); err != nil {
 		fmt.Fprintf(stderr, "evolve agent run: create the run workspace: %v\n", err)
@@ -173,10 +175,34 @@ func (c command) run(args []string, stdin io.Reader, stdout, stderr io.Writer) i
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	out := c.launch(ctx, r, signals, stderr)
+	keepLLMCalls(r, stderr)
 	recordPath, recordErr := writeLaunchRecord(r, out, now)
 	recordErr = errors.Join(appendLedger(r, out, now), recordErr)
 	emit(o, r, out, recordPath, errors.Join(out.runErr, recordErr), stdout)
 	return finish(out.resp, out.runErr, recordErr, stderr)
+}
+
+func keepLLMCalls(r standaloneRun, stderr io.Writer) {
+	res, err := importLLMCalls(r)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve agent run: keep the %s rows: %v\n", llmcalls.Filename, err)
+		return
+	}
+	if res.Skipped > 0 {
+		fmt.Fprintf(stderr, "evolve agent run: %s: skipped %d malformed row(s)\n", llmcalls.Filename, res.Skipped)
+	}
+}
+
+func importLLMCalls(r standaloneRun) (llmcalls.ImportResult, error) {
+	source := llmcalls.Path(r.workspace)
+	if _, err := os.Stat(source); errors.Is(err, os.ErrNotExist) {
+		return llmcalls.ImportResult{}, nil
+	}
+	dir := filepath.Join(paths.EvolveDirOf(r.root), launchrecord.Subdir)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return llmcalls.ImportResult{}, err
+	}
+	return llmcalls.ImportTagged(filepath.Join(dir, llmcalls.Filename), source, r.label, r.spec.Name)
 }
 
 func (c command) launch(ctx context.Context, r standaloneRun, signals *signalcenter.Center, stderr io.Writer) launchOutcome {
@@ -227,6 +253,19 @@ func refuse(err error, stderr io.Writer) int {
 func runLabel(profile string, now time.Time) string {
 	suffix := (now.Nanosecond() ^ os.Getpid()) & 0xffff
 	return fmt.Sprintf("agent-%s-%s-%04x", profile, now.UTC().Format("20060102T150405Z"), suffix)
+}
+
+var (
+	labelMu    sync.Mutex
+	labelIssue = map[string]int{}
+)
+
+func freshLabel(profile, root string, now time.Time) string {
+	labelMu.Lock()
+	defer labelMu.Unlock()
+	n := labelIssue[root]
+	labelIssue[root] = n + 1
+	return runLabel(profile, now.Add(time.Duration(n)))
 }
 
 func stageWorkspace(r standaloneRun, input string) error {

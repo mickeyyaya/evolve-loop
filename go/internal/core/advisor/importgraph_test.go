@@ -12,6 +12,8 @@ var allowedImports = map[string]bool{
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/phaseidentity": true,
 	"github.com/mickeyyaya/evolve-loop/go/internal/config":               true,
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate":           true,
+	"github.com/mickeyyaya/evolve-loop/go/internal/envchain":             true,
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv":               true,
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute":             true,
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog":         true,
 	"github.com/mickeyyaya/evolve-loop/go/internal/panetrust":            true,
@@ -46,7 +48,7 @@ func TestImportGraph_LeafImportsOnlyTheDeclaredPackages(t *testing.T) {
 			switch {
 			case allowedImports[path]:
 			case strings.Contains(path, "/internal/"):
-				t.Errorf("%s imports %s: the advisor is a leaf — stdlib plus the fifteen declared packages only", name, path)
+				t.Errorf("%s imports %s: the advisor is a leaf — stdlib plus the seventeen declared packages only", name, path)
 			case strings.Contains(strings.SplitN(path, "/", 2)[0], "."):
 				t.Errorf("%s imports third-party %s: stdlib only", name, path)
 			}
