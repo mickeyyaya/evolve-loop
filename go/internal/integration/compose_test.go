@@ -179,7 +179,7 @@ func TestCompose_OneCommitWithTheCycleAndTheAuditBindingTrailers(t *testing.T) {
 			t.Errorf("the composed message lacks %q:\n%s", line, msg)
 		}
 	}
-	if parsed := evidence.Parse(msg); parsed.Cycle != 501 || parsed.ArtifactSHA != fixtureArtifact {
+	if parsed := evidence.Parse(msg); parsed.Cycle != 501 || parsed.ArtifactSHA != fixtureArtifact || parsed.AuditTree != rec.Audit.TreeSHA {
 		t.Errorf("evidence.Parse(composed message) = %+v", parsed)
 	}
 	if !HasCycleTrailer(msg, 501) || !f.repo.LandedOnRef(context.Background(), rec, got.Batch.Branch) {
@@ -482,10 +482,10 @@ func TestCompose_AConflictExitWithoutConflictedPathsIsAnError(t *testing.T) {
 	rec := f.lane(t, 598, map[string]string{"a.txt": "a\n"})
 	b := f.batch(t)
 	real := SysGit()
-	for name, fault := range map[string]*GitError{
-		"no output":               {Code: 1},
-		"a tree and no path":      {Code: 1, Stdout: f.base + "\x00\x00"},
-		"exit 1 with a run fault": {Code: 1, Stdout: f.base + "\x00a.txt\x00\x00", Err: errors.New("killed")},
+	for want, fault := range map[string]*GitError{
+		"named no path": {Code: 1},
+		"no path":       {Code: 1, Stdout: f.base + "\x00\x00"},
+		"killed":        {Code: 1, Stdout: f.base + "\x00a.txt\x00\x00", Err: errors.New("killed")},
 	} {
 		git := func(ctx context.Context, dir, stdin string, args ...string) (string, error) {
 			if args[0] == "merge-tree" {
@@ -496,8 +496,29 @@ func TestCompose_AConflictExitWithoutConflictedPathsIsAnError(t *testing.T) {
 		c := Composer{Repo: Repo{Dir: f.g.Dir, Git: git}, Stage: policy.FleetIntegrationShadow}
 		_, err := c.Compose(context.Background(), b, rec)
 		var ej *Ejection
-		if err == nil || errors.As(err, &ej) {
-			t.Errorf("%s: Compose = %v, want a plain error", name, err)
+		if err == nil || errors.As(err, &ej) || !strings.Contains(err.Error(), want) {
+			t.Errorf("Compose = %v, want a plain error that says %q", err, want)
 		}
+	}
+}
+
+func TestCompose_TheEjectionDiffRunsNoRepoDiffDriver(t *testing.T) {
+	t.Parallel()
+	f := newComposeFixture(t)
+	rec := f.lane(t, 597, map[string]string{"a.txt": "a\n"})
+	real := SysGit()
+	var diffArgs []string
+	git := func(ctx context.Context, dir, stdin string, args ...string) (string, error) {
+		if args[0] == "diff" {
+			diffArgs = args
+		}
+		return real(ctx, dir, stdin, args...)
+	}
+	c := Composer{Repo: Repo{Dir: f.g.Dir, Git: git}, Stage: policy.FleetIntegrationEnforce, Gate: (&gateLog{fail: func(string) error { return errors.New("red") }}).gate}
+	if _, err := c.Compose(context.Background(), f.batch(t), rec); err == nil {
+		t.Fatal("Compose passed a red gate")
+	}
+	if !slices.Contains(diffArgs, "--no-ext-diff") || !slices.Contains(diffArgs, "--no-textconv") {
+		t.Errorf("the ejection diff ran as %v, want --no-ext-diff and --no-textconv", diffArgs)
 	}
 }

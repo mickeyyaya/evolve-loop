@@ -154,11 +154,24 @@ func TestPrefixCheck_AGitFailureStopsTheCheck(t *testing.T) {
 	recs := threeDeliverables(t, f)
 	b := f.batch(t)
 	for _, verb := range []string{"merge-tree", "update-ref"} {
-		c := Composer{Repo: Repo{Dir: f.g.Dir, Git: failOn(verb)}, Stage: policy.FleetIntegrationShadow}
+		faulted, after := false, 0
+		inner := failOn(verb)
+		git := func(ctx context.Context, dir, stdin string, args ...string) (string, error) {
+			if faulted {
+				after++
+			}
+			out, err := inner(ctx, dir, stdin, args...)
+			faulted = faulted || args[0] == verb
+			return out, err
+		}
+		c := Composer{Repo: Repo{Dir: f.g.Dir, Git: git}, Stage: policy.FleetIntegrationShadow}
 		got, err := c.PrefixCheck(context.Background(), b, recs)
 		var ej *Ejection
 		if err == nil || errors.As(err, &ej) {
 			t.Errorf("%s fault: PrefixCheck = %+v, %v, want a plain error", verb, got, err)
+		}
+		if after != 0 {
+			t.Errorf("%s fault: %d git calls ran after the fault, want 0", verb, after)
 		}
 	}
 	if tip := f.g.Git("rev-parse", "refs/heads/"+b.Branch); tip != b.Tip {

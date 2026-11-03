@@ -203,8 +203,7 @@ func (c Composer) eject(ctx context.Context, b Batch, e *Ejection) error {
 
 func composeMessage(rec DeliverableRecord) string {
 	return fmt.Sprintf("evolve-cycle %d: integrate\n", rec.Cycle) +
-		evidence.Trailer{Cycle: rec.Cycle, ArtifactSHA: rec.Audit.ArtifactSHA}.Build() +
-		evidence.KeyAuditTree + ": " + rec.Audit.TreeSHA + "\n"
+		evidence.Trailer{Cycle: rec.Cycle, ArtifactSHA: rec.Audit.ArtifactSHA, AuditTree: rec.Audit.TreeSHA}.Build()
 }
 
 func (r Repo) mergeTree(ctx context.Context, commit, onto string) (string, []string, error) {
