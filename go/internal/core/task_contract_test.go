@@ -626,7 +626,11 @@ func TestSeedTaskContract_RendersIdenticallyForPinDecisionAndDeferral(t *testing
 				PhaseTDD:   taskContractPreamble + c.body,
 				PhaseAudit: taskContractPreamble + c.body + renderPredicates(inventory),
 			} {
-				if got := o.seedTaskContract(context.Background(), c.ctx, phase, CycleState{WorkspacePath: ws}, dir)[CtxKeyTaskContract]; got != want {
+				got := o.seedTaskContract(context.Background(), c.ctx, phase, CycleState{WorkspacePath: ws}, dir)[CtxKeyTaskContract]
+				if phase == PhaseTDD {
+					got, _, _ = strings.Cut(got, handoffRequestHeading)
+				}
+				if got != want {
 					t.Errorf("%s block changed:\n--- got\n%s\n--- want\n%s", phase, got, want)
 				}
 			}
@@ -702,5 +706,26 @@ func TestContractCriteria_CountsTheFiledCriteriaOfEachCommittedItem(t *testing.T
 
 	if got, none := ContractCriteria(ws, dir, resolve), ContractCriteria(ws, dir, nil); got != 3 || none != 0 {
 		t.Errorf("ContractCriteria = %d (want 3: two items, an unresolved id skipped) and %d without a resolver (want 0)", got, none)
+	}
+}
+
+func TestSeedTaskContract_AFleetScopePathItemRendersTheSameAcceptanceInBothHalves(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeItem(t, dir, "alpha", `{"id":"alpha","title":"Alpha","acceptance":["alpha resolver criterion"]}`)
+	scope := filepath.Join(t.TempDir(), "alpha.json")
+	if err := os.WriteFile(scope, []byte(`{"id":"alpha","title":"Alpha","acceptance":["alpha fleet criterion"]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ws := t.TempDir()
+	writeWSFile(t, ws, LaneScopeFile, `{"todo_ids":["alpha"]}`)
+	o := personaOrchestrator(dir)
+	got := o.seedTaskContract(context.Background(), map[string]string{"fleet_scope": "alpha", "fleet_scope_paths": "alpha=" + scope}, PhaseTDD, CycleState{WorkspacePath: ws}, dir)[CtxKeyTaskContract]
+	if strings.Contains(got, "alpha resolver criterion") {
+		t.Errorf("the request block must read the item the contract read:\n%s", got)
+	}
+	if strings.Count(got, "alpha fleet criterion") < 2 || !strings.Contains(got, "alpha#1 [required] alpha fleet criterion") {
+		t.Errorf("both halves must name the fleet-scope criterion:\n%s", got)
 	}
 }
