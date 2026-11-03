@@ -155,7 +155,8 @@ func admitInboxItem(raw []byte, req inboxAddRequest, cfg policy.InboxCuratorConf
 		fmt.Fprintf(stderr, "inbox add: WARN the overlap check skips a file: %s\n", w.String())
 	}
 	rules := inboxcurator.Rules{Kinds: cfg.Kinds, IsProtected: opts.IsProtectedPath,
-		Thresholds: inboxcurator.Thresholds{Refuse: cfg.OverlapRefuse, Warn: cfg.OverlapWarn}}
+		Thresholds: inboxcurator.Thresholds{Refuse: cfg.OverlapRefuse, Warn: cfg.OverlapWarn},
+		Tree:       inboxcurator.RepoTree{FS: os.DirFS(opts.ProjectRoot)}}
 	adm, err := inboxcurator.Admit(item, open, rules, inboxcurator.Override{Reason: req.reason, AllowOverlap: req.allowOverlap})
 	reportOverlaps(item.ID, adm.Warned, "WARN ", stderr)
 	if rc := intakeExitCode(item.ID, err, stderr); rc != 0 {

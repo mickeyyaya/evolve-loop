@@ -34,7 +34,7 @@ The package has four parts:
 
 ## The curator (2026-10-27)
 
-- **`Proposal`** is one typed change to one open item. `Kind` is `consume`, `reroute` or `merge` (`ProposalKind`). `Trigger` is `landing`, `sweep` or `routing`. `Deterministic` is true only when Go verified the fact behind it. `Proposal.Event(stage, applied)` is the `INBOX_CURATOR_PROPOSAL` signal of the module `inbox`.
+- **`Proposal`** is one typed change to one open item. `Kind` is `consume`, `reroute`, `merge` or `quarantine` (`ProposalKind`). `Trigger` is `landing`, `sweep` or `routing`. `Deterministic` is true only when Go verified the fact behind it. `Proposal.Event(stage, applied)` is the `INBOX_CURATOR_PROPOSAL` signal of the module `inbox`.
 - **`NamedTests(item)`** lists the `Test…`, `Benchmark…` and `Fuzz…` names in the acceptance, and says if every criterion names one.
 - **`MatchLanding(change, open, hasTest, minShare)`** proposes `consume` for an item when the `Change` touched its fix surface and at least `minShare` of its named tests exist. The proposal is deterministic only when all of these are true:
   - every criterion names a test, and every named test exists;
@@ -74,6 +74,19 @@ The package has four parts:
 | judgment reroute to a lane | 37 console routes that no fact explains and no `routed_reason` records |
 | `merge` | 0: the only pair at or above 0.5 is a declared dependency |
 
+## Typed probes (2026-11-03)
+
+The plan row is AD2-7 (graft B) of the architecture decisions of 2026-11. The spec is section 5 of [inbox-curator.md](../inbox-curator.md#5-typed-probes).
+
+- **`RepoTree`** is the tree that a probe reads. `FS` is the repository root as an `fs.FS`. `HasTest` is optional. When it is nil, `test_exists` reads the `_test.go` files under `go/`. The boundary step gives the index that it already has.
+- **`CheckProbes(probes)`** refuses an unknown kind, a target of the wrong shape, a missing value and an extra value. The error wraps `ErrIntake` and names the probe by its position. `CheckIntake` runs it.
+- **`RepoTree.Check(probe)`** gives a `ProbeResult` with `Pass` and a `Detail` for a fail. `ProbeResult.String()` is the evidence line, for example `test_exists TestAlpha: pass`. One table maps each kind to its shape and its check, so a new kind has one home.
+- **`ProbesPass(probes, tree)`** is true when the list is not empty and every probe passes. A list with no probes is not done.
+- **`RepoTree.Exists(path)`** is false only when the path does not exist. A path that `fs.ValidPath` refuses counts as present, so a bad path never starts a quarantine.
+- **`Admit`** refuses an item when every probe passes, with `ErrAlreadyDone`. It refuses a probe item when no declared path exists, because the sweep then cannot tell a dead premise from new work. An override does not change either refusal.
+- **`SweepProbes(open, tree)`** runs at the backstop in `Curate`. A probe item with every declared path gone gives a judgment `quarantine` (`ProposeQuarantine`). Otherwise, an item whose probes all pass gives a deterministic `consume`. The verb applies no `quarantine` proposal.
+- **`IndexTests`** reads the tree through `fs.FS` now. The probe check and the boundary step share one walk, `walkGoFiles`.
+
 ## Decisions and rejected options
 
 | Choice | Rejected options and why |
@@ -83,6 +96,9 @@ The package has four parts:
 | A declared relation is not an overlap | Refuse it too: a dependent item names its target on purpose, and the split verb files such pairs. |
 | One `Admit` verdict in the package | Rules in the verb: the curator and any later filer need the same verdict. |
 | Overlap exits 3 | Exit 1 for every refusal: a script cannot tell a duplicate from a malformed item. Plan P3 named exit 3 for an overlap. |
+| A probe is an object with `kind`, `target` and `value` | A string such as `test_exists TestA`: a path or a text with a space needs a quote rule. Four typed fields per kind: the schema grows with each kind. |
+| A probe item needs one declared path on the tree | Quarantine every item with no path: a new item that adds a file has no path yet. Record the paths at intake: a new stamp field. |
+| The quarantine proposal is a judgment | A deterministic quarantine: a rename also removes the old path, and no inbox verb moves a root item to `quarantine/` yet. |
 | Autofilers are not refused at write time | Refuse their writes: an autofiler runs inside a cycle and cannot ask the operator. The curator finds their duplicates at the wave boundary instead ([inbox-curator.md](../inbox-curator.md)). |
 
 ## Limits
@@ -98,5 +114,7 @@ The package has four parts:
 - `TestCheckIntake_RefusesAnUnknownOriginKindOrSurface`, `TestUnderivedConsoleRoute_FlagsAConsoleRouteThatNoFactExplains`.
 - `TestAdmit_RefusesAnOverlapUnlessAllowedWithAReason`, `TestAdmit_AnUnexplainedConsoleRouteNeedsAReason`, `TestAdmit_AClearItemHasNoRecordAndABadOneIsRefused`.
 - `TestOpenItems_ReadsTheRootAndEveryClaimAndNamesAnUnreadableFile` and the two error tests.
+- The probes: `TestAdmit_RefusesAnItemWhoseProbesAlreadyPass`, `TestAdmit_RefusesAProbeItemWhoseDeclaredPathsAreAllGone`, `TestSweep_EveryDeclaredPathGoneIsAQuarantine`, `TestSweepProbes_EveryProbePassingIsADeterministicConsume`, `TestCheckProbes_RefusesAMalformedProbe` and `TestCurate_TheBackstopRunsTheProbeSweep`.
+- One test for each probe kind: `TestRepoTree_TestExistsPassesForATestOfTheTree`, `TestRepoTree_SymbolExistsFindsATopLevelNameOfThePackage`, `TestRepoTree_TextAbsentPassesWhenTheFileLacksTheText` and `TestRepoTree_PolicyValueMatchesTheValueAtADottedKey`.
 - The verb: `TestCmd_InboxAdd_ADuplicateIsRefusedNamingTheOverlappingID` and the other tests in `go/cmd/evolve/cmd_inbox_add_intake_test.go`.
 - The curator: `TestMatchLanding_ProposesADeterministicConsumeWhenTheSurfaceChangedAndEveryNamedTestExists`, `TestReroutes_AGateFileItemOnTheLaneRouteIsADeterministicRerouteToTheConsole`, `TestCurate_ALandingRunsTheMatchAndARoutingChangeRunsTheRerouteCheck`, and in `go/cmd/evolve/cmd_inbox_curator_test.go` `TestCmd_InboxCurate_TheBoundaryConsumesAnItemWhoseAcceptanceMergedInEnforce` and `TestCmd_InboxCurate_ApplyIsRefusedWhileALaneIsLive`.

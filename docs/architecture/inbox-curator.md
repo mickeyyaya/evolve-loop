@@ -112,6 +112,23 @@ The cursor has these cases:
 
 **A declined proposal.** A judgment proposal repeats at each boundary until the operator acts. The operator declines a lane reroute with `evolve inbox route-console <id> <reason> 0`. The stamped `routed_reason` explains the route, so the curator stops the proposal. The operator declines a sweep `consume` with an edit of the acceptance, or ends it with `evolve inbox consume`.
 
+### 5. Typed probes
+
+An item can declare `probes`: typed checks that tell when its work is done. The plan row is AD2-7 (graft B) of the architecture decisions of 2026-11. Go checks each probe on the tree with no LLM.
+
+| Kind | `target` | `value` | Passes when |
+|---|---|---|---|
+| `test_exists` | a `Test`, `Benchmark` or `Fuzz` name | none | a `_test.go` file under `go/` defines the test |
+| `symbol_exists` | `pkg.Name` | none | a non-test file of package `pkg` under `go/` declares `Name` at the top level |
+| `text_absent` | a repository path | the text | the file exists and does not hold the text |
+| `policy_value` | a dotted key of `.evolve/policy.json` | the value | the value at the key equals `value` |
+
+Example: `{"kind": "policy_value", "target": "inbox.curator.stage", "value": "enforce"}` passes after the stage flip of AD2-5.
+
+- **At intake** `evolve inbox add` refuses a malformed probe. It refuses an item when every probe already passes, because the work is done. It also refuses a probe item when no declared path exists on the tree. These refusals exit 1, and no override files the item.
+- **At the boundary** the sweep checks the probe items. When every probe passes, it proposes a deterministic `consume`, so the `enforce` stage applies it. When every declared path is gone, it proposes a `quarantine`. This proposal is a judgment, because a moved file also removes a path.
+- A probe that cannot be read fails. A missing file, an unreadable file and a torn policy file give a fail, never a pass.
+
 ### The verb
 
 `evolve inbox curate [--json] [--apply | --event | --follow [--since S]] [--project-root P]`
@@ -152,3 +169,5 @@ The block is `inbox.curator` (its `policy-config.md` section lands with the inta
 | A lane cannot apply a proposal | `TestCmd_InboxCurate_ApplyIsRefusedWhileALaneIsLive` |
 | A `ship.landed` event is curated with no poll | `TestCuratorRun_FollowCuratesEachLandingAndSkipsOtherRecords`, `TestLandingReader_ReadsTheShipChannelOfTheRoot` |
 | The next `sync-main` is not refused after an apply | `TestCmd_InboxCurate_TheBoundaryCommitsWhatItApplied` |
+| An item whose probes pass is refused at add | `TestAdmit_RefusesAnItemWhoseProbesAlreadyPass`, `TestCmd_InboxAdd_RefusesAnItemWhoseProbesAlreadyPassOnTheTree` |
+| A probe item with no path left is a quarantine | `TestSweep_EveryDeclaredPathGoneIsAQuarantine`, `TestCmd_InboxCurate_TheBoundaryConsumesAProbeItemAndProposesAQuarantine` |

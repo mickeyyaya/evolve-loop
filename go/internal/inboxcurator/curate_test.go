@@ -66,7 +66,7 @@ func TestFirstPerItem_KeepsTheFirstUnlessALaterOneIsDeterministic(t *testing.T) 
 }
 
 func TestProposalKind_SpellsEachKindAsItsSignalField(t *testing.T) {
-	for kind, want := range map[ProposalKind]string{ProposeConsume: "consume", ProposeReroute: "reroute", ProposeMerge: "merge"} {
+	for kind, want := range map[ProposalKind]string{ProposeConsume: "consume", ProposeReroute: "reroute", ProposeMerge: "merge", ProposeQuarantine: "quarantine"} {
 		if got := (Proposal{Kind: kind}).Event("shadow", false).Fields["kind"]; got != want {
 			t.Errorf("kind field = %q, want %q", got, want)
 		}

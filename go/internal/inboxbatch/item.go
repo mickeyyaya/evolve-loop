@@ -39,6 +39,7 @@ type Item struct {
 	Acceptance      []string                   `json:"acceptance,omitempty"`
 	DeliverableKind string                     `json:"deliverable_kind,omitempty"`
 	CreatedAt       string                     `json:"created_at,omitempty"`
+	Probes          []Probe                    `json:"probes,omitempty"`
 	Path            string                     `json:"-"`
 	mentions        []string
 	basenames       []string

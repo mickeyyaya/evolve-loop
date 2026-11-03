@@ -162,6 +162,7 @@ func (r *curatorRun) curate(changes []inboxcurator.Change, backstop bool) (curat
 		HasTest:    func(name string) bool { return tests[name] || definedByAChange(changes, name) },
 		Thresholds: inboxcurator.Thresholds{Refuse: r.cfg.OverlapRefuse, Warn: r.cfg.OverlapWarn}, MinShare: r.cfg.ConsumeMinShare,
 	}
+	in.Tree = inboxcurator.RepoTree{FS: os.DirFS(r.req.root), HasTest: in.HasTest}
 	return r.settle(inboxcurator.Curate(in), in.IsProtected), nil
 }
 
