@@ -8,6 +8,7 @@
 
 ## Design
 
+- **Typed probes.** `Item.Probes` holds the optional `probes` list of an item. Each `Probe` has a `Kind`, a `Target` and a `Value`. `ProbeKinds()` lists the four kinds in a fixed order. This package only decodes the probes. `internal/inboxcurator` checks them ([internal-inboxcurator.md](internal-inboxcurator.md#typed-probes-2026-11-03)).
 - **Why batch.** Consuming one item per cycle pays the full scout, triage, tdd, build, audit and ship overhead for each item. A batch spreads that cost over items that share a campaign or a package area.
 - **Rules as a Strategy, clusters by union-find.** Each `Rule` emits `Edge`s, and each edge carries its own human-readable `Reason`, so the interface has one method and no name accessor. `Classify` unions every rule's edges (`clusterByRules`) and orders each cluster's members by the injected rank (`rankOrder`). It splits each cluster at `MaxItems` (`chunkCluster`) and ranks the clusters by their best-ranked member. Classify is split into those helpers so each stays under 50 lines. A new signal is a new `Rule` passed through `Config.Rules`; no classifier change is needed.
 - **The default rule set is `campaignRule` and `fileAreaRule`.** The order is presentation only, since edges union.

@@ -18,6 +18,9 @@ func CheckIntake(it inboxbatch.Item, kinds []string) error {
 	if !slices.Contains(kinds, it.Kind) {
 		return fmt.Errorf("%w: kind %q is not one of the policy's inbox.curator.kinds: %s", ErrIntake, it.Kind, strings.Join(kinds, ", "))
 	}
+	if err := CheckProbes(it.Probes); err != nil {
+		return err
+	}
 	return checkSurface(it)
 }
 
@@ -54,6 +57,7 @@ type Rules struct {
 	Kinds       []string
 	Thresholds  Thresholds
 	IsProtected func(string) bool
+	Tree        RepoTree
 }
 
 type Override struct {
@@ -93,6 +97,9 @@ func (e *OverlapError) IDs() []string {
 
 func Admit(it inboxbatch.Item, open []inboxbatch.Item, r Rules, o Override) (Admission, error) {
 	if err := CheckIntake(it, r.Kinds); err != nil {
+		return Admission{}, err
+	}
+	if err := judgeProbes(it, r.Tree); err != nil {
 		return Admission{}, err
 	}
 	record := Record{Reason: o.Reason}

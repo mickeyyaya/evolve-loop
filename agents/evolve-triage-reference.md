@@ -19,6 +19,7 @@ Files written by `legacy/scripts/utility/inject-task.sh` to `.evolve/inbox/<ts>-
 | `operator_note` | string | no | Free-form operator context |
 | `injected_at` | ISO8601 | auto | Set by inject-task.sh |
 | `injected_by` | enum | auto | `operator` \| `test` \| `automation` |
+| `probes` | list of objects | no | Typed checks of the work: `{kind, target, value}`. The kinds are `test_exists`, `symbol_exists`, `text_absent` and `policy_value` ([inbox-curator.md](../docs/architecture/inbox-curator.md#5-typed-probes)) |
 
 ## Ingestion Algorithm
 
