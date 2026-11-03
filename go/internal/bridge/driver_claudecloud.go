@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cloudlaunch"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
@@ -86,7 +85,7 @@ func launchCloud(ctx context.Context, cfg *Config, deps Deps, m Manifest) (int, 
 	if rc, stop, err := l.stopOn(deps.cloudRemote(ctx, l.dir, repo), "read the remote head of branch "+repo.Branch); stop {
 		return rc, err
 	}
-	promptFile, err := l.writePrompt()
+	promptFile, token, err := l.writePrompt()
 	if err != nil {
 		return ExitBadFlags, err
 	}
@@ -94,7 +93,7 @@ func launchCloud(ctx context.Context, cfg *Config, deps Deps, m Manifest) (int, 
 	if rc != ExitOK {
 		return rc, err
 	}
-	return l.record(repo, confirmed)
+	return l.record(repo, confirmed, token)
 }
 
 func cloudWorkingDir(cfg *Config) string {
@@ -143,20 +142,20 @@ func (l cloudLaunch) refuse(err *cloudlaunch.Refusal) int {
 	return ExitSafetyGate
 }
 
-func (l cloudLaunch) writePrompt() (string, error) {
-	template, _, err := readPromptTemplate(l.cfg, l.deps)
+func (l cloudLaunch) writePrompt() (string, string, error) {
+	template, token, err := promptTemplateAndToken(l.cfg, l.deps)
 	if err != nil {
-		return "", fmt.Errorf("%s %w", l.prefix, err)
+		return "", "", fmt.Errorf("%s %w", l.prefix, err)
 	}
 	prompt := fillPrompt(template, cloudWithheldToken, filepath.Base(l.cfg.Artifact))
 	if len(prompt) > cloudMaxPromptBytes {
-		return "", fmt.Errorf("%s the prompt has %d bytes, over the argument limit of %d: the pane passes it as one argument of the CLI", l.prefix, len(prompt), cloudMaxPromptBytes)
+		return "", "", fmt.Errorf("%s the prompt has %d bytes, over the argument limit of %d: the pane passes it as one argument of the CLI", l.prefix, len(prompt), cloudMaxPromptBytes)
 	}
 	path := filepath.Join(l.cfg.Workspace, cloudPromptFile)
 	if err := os.WriteFile(path, []byte(prompt), 0o600); err != nil {
-		return "", fmt.Errorf("%s write the cloud prompt: %w", l.prefix, err)
+		return "", "", fmt.Errorf("%s write the cloud prompt: %w", l.prefix, err)
 	}
-	return path, nil
+	return path, token, nil
 }
 
 func (l cloudLaunch) start(ctx context.Context, promptFile string) (cloudConfirmation, int, error) {
@@ -227,7 +226,7 @@ func (l cloudLaunch) capture(ctx context.Context, session string) (string, error
 	return l.deps.Tmux.CapturePane(ctx, session, cloudScrollback)
 }
 
-func (l cloudLaunch) record(repo cloudlaunch.Repo, c cloudConfirmation) (int, error) {
+func (l cloudLaunch) record(repo cloudlaunch.Repo, c cloudConfirmation, challenge string) (int, error) {
 	s := cloudlaunch.Session{
 		Schema: cloudlaunch.Schema, Outcome: cloudlaunch.OutcomeLaunched, ID: c.id, URL: c.url, Title: c.title,
 		Repo: cloudlaunch.RepoSlug(repo.URL), Branch: repo.Branch, Profile: l.cfg.Profile, CLI: l.m.CLI,
@@ -239,7 +238,6 @@ func (l cloudLaunch) record(repo cloudlaunch.Repo, c cloudConfirmation) (int, er
 		Reason: fmt.Sprintf("cloud session %s launched on %s, branch %s; its deliverable is a later pull request", s.ID, s.Repo, s.Branch),
 		Fields: map[string]string{"cli": s.CLI, "session_id": s.ID, "url": s.URL, "title": s.Title, "repo": s.Repo, "branch": s.Branch, "profile": s.Profile},
 	})
-	challenge, _ := phasecontract.ChallengeToken(l.cfg.Workspace)
 	if err := os.WriteFile(l.cfg.Artifact, []byte(cloudlaunch.Render(s, challenge)), 0o644); err != nil {
 		return ExitBadFlags, fmt.Errorf("%s cloud session %s (%s) is launched, but its report was not written: %w", l.prefix, s.ID, s.URL, err)
 	}

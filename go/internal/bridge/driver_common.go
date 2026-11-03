@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/agentclass"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 func resolveBinary(deps Deps, defaultName string) string {
@@ -46,38 +47,32 @@ func preparePrompt(cfg *Config, deps Deps) (string, error) {
 }
 
 func resolvePromptText(cfg *Config, deps Deps) (string, error) {
-	template, token, err := readPromptTemplate(cfg, deps)
+	template, token, err := promptTemplateAndToken(cfg, deps)
 	if err != nil {
 		return "", err
 	}
 	return fillPrompt(template, token, cfg.Artifact), nil
 }
 
-func readPromptTemplate(cfg *Config, deps Deps) (content, token string, err error) {
+func promptTemplateAndToken(cfg *Config, deps Deps) (template, token string, err error) {
 	raw, err := os.ReadFile(cfg.PromptFile)
 	if err != nil {
 		return "", "", fmt.Errorf("read prompt: %w", err)
 	}
-	content = string(raw)
-	if !strings.Contains(content, "$CHALLENGE_TOKEN") {
-		return content, "", nil
-	}
-	token, err = workspaceChallengeToken(cfg, deps)
-	return content, token, err
+	template = string(raw)
+	token, err = getOrMintChallengeToken(cfg, deps, template)
+	return template, token, err
 }
 
-func workspaceChallengeToken(cfg *Config, deps Deps) (string, error) {
-	path := filepath.Join(cfg.Workspace, "challenge-token.txt")
-	if existing, err := os.ReadFile(path); err == nil {
-		if tok := strings.TrimSpace(string(existing)); tok != "" {
-			return tok, nil
-		}
+func getOrMintChallengeToken(cfg *Config, deps Deps, template string) (string, error) {
+	if tok, ok := phasecontract.ChallengeToken(cfg.Workspace); ok || !strings.Contains(template, "$CHALLENGE_TOKEN") {
+		return tok, nil
 	}
 	minted, err := deps.NewChallengeToken()
 	if err != nil {
 		return "", fmt.Errorf("mint challenge token: %w", err)
 	}
-	if err := os.WriteFile(path, []byte(minted+"\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(cfg.Workspace, "challenge-token.txt"), []byte(minted+"\n"), 0o644); err != nil {
 		return "", fmt.Errorf("write challenge token: %w", err)
 	}
 	return minted, nil

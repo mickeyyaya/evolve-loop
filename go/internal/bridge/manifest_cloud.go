@@ -92,7 +92,7 @@ func group(re *regexp.Regexp, pane string, m []int, name string) string {
 func (p cloudPatterns) confirmation(pane string) (cloudConfirmation, bool) {
 	session := lastMatch(p.session, pane)
 	resume := lastMatch(p.resume, pane)
-	if session == nil || resume == nil || resume[0] < session[1] {
+	if session == nil || resume == nil {
 		return cloudConfirmation{}, false
 	}
 	view := lastMatch(p.view, pane[:resume[0]])

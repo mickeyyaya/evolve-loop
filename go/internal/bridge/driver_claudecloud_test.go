@@ -384,11 +384,7 @@ func TestLaunchCloud_FailsOnAPromptOrAnArtifactItCannotWrite(t *testing.T) {
 		t.Errorf("Launch with an unwritable cloud prompt = %d, %v", rc, err)
 	}
 	h := newCloudFixture(t, pushedGitHubRepo, cloudCreatedFrame)
-	if os.Geteuid() == 0 {
-		t.Skip("a read-only directory does not stop root")
-	}
-	h.deps.Sleep = func(time.Duration) { _ = os.Chmod(h.cfg.Workspace, 0o500) }
-	t.Cleanup(func() { _ = os.Chmod(h.cfg.Workspace, 0o700) })
+	h.deps.Sleep = func(time.Duration) { _ = os.MkdirAll(filepath.Join(h.cfg.Artifact, "held"), 0o755) }
 	if rc, err := h.launch(t); rc != ExitBadFlags || err == nil || !strings.Contains(err.Error(), "session_01AbC9") {
 		t.Errorf("Launch with an unwritable artifact = %d, %v; want an error that names the launched session", rc, err)
 	}
