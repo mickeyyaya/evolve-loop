@@ -30,8 +30,12 @@ func TestKeyAuditTree_IsATrailerKeyThatParseKeepsInTheBlock(t *testing.T) {
 	if KeyAuditTree != "Evolve-Audit-Tree" {
 		t.Fatalf("KeyAuditTree = %q, want Evolve-Audit-Tree", KeyAuditTree)
 	}
-	msg := "subject\n" + Trailer{Cycle: 7}.Build() + KeyAuditTree + ": abc\n"
-	if got := Parse(msg); got.Cycle != 7 {
-		t.Errorf("Parse(a block that ends with %s) lost the cycle: %+v", KeyAuditTree, got)
+	in := Trailer{Cycle: 7, ArtifactSHA: "def", AuditTree: "abc"}
+	block := in.Build()
+	if !strings.Contains(block, KeyAuditTree+": abc\n") {
+		t.Errorf("Build() must emit the audit tree under %s; got:\n%s", KeyAuditTree, block)
+	}
+	if got := Parse("subject\n" + block); got != in {
+		t.Errorf("Parse(Build()) = %+v, want %+v", got, in)
 	}
 }
