@@ -475,3 +475,29 @@ func TestCompose_NeverPassesAMergeTreeOutputThatIsNotAnObjectIDToCommitTree(t *t
 		t.Errorf("Compose = %v, want the object id refusal", err)
 	}
 }
+
+func TestCompose_AConflictExitWithoutConflictedPathsIsAnError(t *testing.T) {
+	t.Parallel()
+	f := newComposeFixture(t)
+	rec := f.lane(t, 598, map[string]string{"a.txt": "a\n"})
+	b := f.batch(t)
+	real := SysGit()
+	for name, fault := range map[string]*GitError{
+		"no output":               {Code: 1},
+		"a tree and no path":      {Code: 1, Stdout: f.base + "\x00\x00"},
+		"exit 1 with a run fault": {Code: 1, Stdout: f.base + "\x00a.txt\x00\x00", Err: errors.New("killed")},
+	} {
+		git := func(ctx context.Context, dir, stdin string, args ...string) (string, error) {
+			if args[0] == "merge-tree" {
+				return "", fault
+			}
+			return real(ctx, dir, stdin, args...)
+		}
+		c := Composer{Repo: Repo{Dir: f.g.Dir, Git: git}, Stage: policy.FleetIntegrationShadow}
+		_, err := c.Compose(context.Background(), b, rec)
+		var ej *Ejection
+		if err == nil || errors.As(err, &ej) {
+			t.Errorf("%s: Compose = %v, want a plain error", name, err)
+		}
+	}
+}

@@ -193,7 +193,7 @@ func (c Composer) prove(lane, peer []string) overlap.Proof {
 }
 
 func (c Composer) eject(ctx context.Context, b Batch, e *Ejection) error {
-	diff, err := c.Repo.Git(ctx, c.Repo.Dir, "", "diff", "--end-of-options", b.Base, b.Tip)
+	diff, err := c.Repo.Git(ctx, c.Repo.Dir, "", "diff", "--no-ext-diff", "--no-textconv", "--end-of-options", b.Base, b.Tip)
 	if err != nil {
 		return fmt.Errorf("integration: read the diff that cycle %d met: %w", e.Cycle, err)
 	}
@@ -210,18 +210,22 @@ func composeMessage(rec DeliverableRecord) string {
 func (r Repo) mergeTree(ctx context.Context, commit, onto string) (string, []string, error) {
 	out, err := r.Git(ctx, r.Dir, "", "merge-tree", "--write-tree", "--name-only", "-z", "--merge-base="+commit+"^", "--end-of-options", onto, commit)
 	var ge *GitError
-	conflict := errors.As(err, &ge) && ge.Code == 1
-	if conflict {
-		out = ge.Stdout
-	} else if err != nil {
+	if errors.As(err, &ge) && ge.Code == 1 && ge.Err == nil {
+		return conflictedPaths(ge.Stdout)
+	}
+	if err != nil {
 		return "", nil, fmt.Errorf("integration: compose %s onto %s: %w", commit, onto, err)
 	}
+	return strings.TrimSpace(strings.Split(out, "\x00")[0]), nil, nil
+}
+
+func conflictedPaths(out string) (string, []string, error) {
 	fields := strings.Split(out, "\x00")
-	if !conflict {
-		return strings.TrimSpace(fields[0]), nil, nil
+	end := slices.Index(fields, "")
+	if end < 2 {
+		return "", nil, fmt.Errorf("integration: merge-tree reported a conflict but named no path: %q", out)
 	}
-	end := slices.Index(fields[1:], "")
-	return "", fields[1 : end+1], nil
+	return "", fields[1:end], nil
 }
 
 func (r Repo) commitTree(ctx context.Context, tree, parent, msg string) (string, error) {
