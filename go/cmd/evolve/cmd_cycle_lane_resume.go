@@ -33,6 +33,19 @@ type laneResume struct {
 	stderr                 io.Writer
 }
 
+type laneHost struct {
+	lifecycle inboxmover.LedgerAppender
+	forbidden func(string) bool
+	signals   *signalcenter.Center
+	stderr    io.Writer
+}
+
+func newLaneResume(projectRoot, evolveDir string, scope []string, h laneHost) laneResume {
+	return laneResume{projectRoot: projectRoot, evolveDir: evolveDir, scope: scope, record: checkpoint.RecordLaneResume,
+		claim:   hostInboxClaimer(h.lifecycle, h.signals, h.forbidden),
+		release: laneClaimReleaser(projectRoot, h.stderr, h.lifecycle, h.signals), signals: h.signals, stderr: h.stderr}
+}
+
 func fleetLaneScope() []string {
 	if !fleetLaneFromEnv() {
 		return nil
@@ -52,7 +65,14 @@ func (l laneResume) run(ctx context.Context, orch cycleStarter, req core.CycleRe
 		return orch.RunCycle(ctx, req)
 	}
 	defer core.ActivateResumeStatePath(rp, l.evolveDir)()
+	defer l.unlease(rp)
 	return orch.RunCycleFromPhase(ctx, resumedRequest(req), rp)
+}
+
+func (l laneResume) unlease(rp *core.ResumePoint) {
+	if err := core.ReleaseResumeLease(filepath.Dir(rp.StatePath)); err != nil {
+		fmt.Fprintf(l.stderr, "evolve cycle run: WARN: cycle %d: cannot release the admission lease: %v\n", rp.CycleID, err)
+	}
 }
 
 func resumedRequest(req core.CycleRequest) core.CycleRequest {
@@ -82,6 +102,7 @@ func (l laneResume) adopt() *core.ResumePoint {
 	}
 	if err := l.reclaim(rp.CycleID); err != nil {
 		fmt.Fprintf(l.stderr, "evolve cycle run: lane %s: cycle %d cannot take its todo back (%v); the lane starts a fresh cycle\n", name, rp.CycleID, err)
+		l.unlease(rp)
 		return nil
 	}
 	rp.AutoAttempts = cp.AutoResumeAttempts

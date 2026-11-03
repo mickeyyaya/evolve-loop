@@ -34,14 +34,15 @@ func (r countingPhaseRunner) Run(ctx context.Context, req core.PhaseRequest) (co
 	return cycleRunQuotaRunner{}.Run(ctx, req)
 }
 
-func TestCycleRunRoot_AFleetLaneResumesTheQuotaPausedCycleOfItsTodoAtThePausedPhaseWhileASiblingHoldsTheProjectLock(t *testing.T) {
+func seedRootPausedCycle(t *testing.T) (root, ws, statePath string, st *storage.FilesystemStorage) {
+	t.Helper()
 	bin := t.TempDir()
 	fakeclitest.Install(t, filepath.Join(bin, "tmux"), "#!/bin/sh\nexit 0\n")
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
-	root := t.TempDir()
+	root = t.TempDir()
 	initLoopContractRepo(t, root)
 	evolveDir := filepath.Join(root, ".evolve")
-	ws := core.RunWorkspacePath(root, 7)
+	ws = core.RunWorkspacePath(root, 7)
 	inbox := filepath.Join(evolveDir, "inbox")
 	for _, d := range []string{ws, inbox} {
 		if err := os.MkdirAll(d, 0o755); err != nil {
@@ -55,9 +56,9 @@ func TestCycleRunRoot_AFleetLaneResumesTheQuotaPausedCycleOfItsTodoAtThePausedPh
 			t.Fatal(err)
 		}
 	}
-	statePath := filepath.Join(ws, core.CycleStateFile)
+	statePath = filepath.Join(ws, core.CycleStateFile)
 	t.Setenv(ipcenv.CycleStateFileKey, statePath)
-	st := storage.New(evolveDir)
+	st = storage.New(evolveDir)
 	ctx := context.Background()
 	cs := core.CycleState{CycleID: 7, RunID: "paused-run", Phase: "build", WorkspacePath: ws, GoalHash: "paused-goal", CompletedPhases: []string{"scout", "triage"}}
 	if err := st.WriteState(ctx, core.State{LastCycleNumber: 7}); err != nil {
@@ -72,23 +73,34 @@ func TestCycleRunRoot_AFleetLaneResumesTheQuotaPausedCycleOfItsTodoAtThePausedPh
 	os.Unsetenv(ipcenv.CycleStateFileKey)
 	t.Setenv(ipcenv.FleetKey, "1")
 	t.Setenv(ipcenv.FleetScopeKey, "paused-item")
-	releaseSiblingLock, err := st.AcquireLock(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = releaseSiblingLock() })
-	var scoutCalls, buildCalls atomic.Int32
+	return root, ws, statePath, st
+}
+
+func wireCountingOrchestrator(t *testing.T, st *storage.FilesystemStorage) (scoutCalls, buildCalls *atomic.Int32) {
+	t.Helper()
+	scoutCalls, buildCalls = &atomic.Int32{}, &atomic.Int32{}
 	old := wireOrchestratorDepsFn
 	t.Cleanup(func() { wireOrchestratorDepsFn = old })
 	wireOrchestratorDepsFn = func(string, string, io.Writer, routingRun) orchDeps {
 		ledger := newFakeLedger()
 		runners := map[core.Phase]core.PhaseRunner{
-			core.PhaseScout: countingPhaseRunner{name: "scout", calls: &scoutCalls},
-			core.PhaseBuild: countingPhaseRunner{name: "build", calls: &buildCalls},
+			core.PhaseScout: countingPhaseRunner{name: "scout", calls: scoutCalls},
+			core.PhaseBuild: countingPhaseRunner{name: "build", calls: buildCalls},
 		}
 		orch := core.NewOrchestrator(st, ledger, runners, core.WithRetryConfig(policy.RetryConfig{PhaseMaxAttempts: 2}))
 		return orchDeps{Storage: st, Ledger: ledger, Orchestrator: orch}
 	}
+	return scoutCalls, buildCalls
+}
+
+func TestCycleRunRoot_AFleetLaneResumesTheQuotaPausedCycleOfItsTodoAtThePausedPhaseWhileASiblingHoldsTheProjectLock(t *testing.T) {
+	root, _, statePath, st := seedRootPausedCycle(t)
+	releaseSiblingLock, err := st.AcquireLock(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = releaseSiblingLock() })
+	scoutCalls, buildCalls := wireCountingOrchestrator(t, st)
 	var stdout, stderr bytes.Buffer
 
 	rc := runCycleRun([]string{"--project-root", root, "--goal-hash", "next-wave-goal", "--goal", "next wave"}, &stdout, &stderr)
@@ -105,5 +117,23 @@ func TestCycleRunRoot_AFleetLaneResumesTheQuotaPausedCycleOfItsTodoAtThePausedPh
 	cp := readCheckpoint(t, statePath)
 	if cp.AutoResumeAttempts != 1 || cp.Reason != checkpoint.ReasonQuotaLikely || cp.ResumeFromPhase != "build" {
 		t.Errorf("checkpoint = %+v, want the walled resume to keep a quota checkpoint at build with 1 auto-resume spent", cp)
+	}
+}
+
+func TestCycleRunRoot_ALaneDoesNotAdoptAPausedCycleWhoseLeaseIsUnreadable(t *testing.T) {
+	root, ws, statePath, st := seedRootPausedCycle(t)
+	if err := os.WriteFile(filepath.Join(ws, ".lease"), []byte("{not json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	wireCountingOrchestrator(t, st)
+	var stdout, stderr bytes.Buffer
+
+	runCycleRun([]string{"--project-root", root, "--goal-hash", "next-wave-goal", "--goal", "next wave"}, &stdout, &stderr)
+
+	if strings.Contains(stderr.String(), "resumes cycle 7") {
+		t.Errorf("stderr = %s, want no adoption of cycle 7 while its lease is unreadable and fresh", stderr.String())
+	}
+	if cp := readCheckpoint(t, statePath); cp.AutoResumeAttempts != 0 {
+		t.Errorf("checkpoint = %+v, want no auto-resume spent on a held cycle", cp)
 	}
 }

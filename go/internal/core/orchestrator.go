@@ -510,8 +510,8 @@ func fleetMode(env map[string]string) bool {
 	return envchain.BoolValue(env[ipcenv.FleetKey], false)
 }
 
-func (o *Orchestrator) acquireCycleLock(ctx context.Context, env map[string]string) (func() error, error) {
-	if fleetMode(env) {
+func (o *Orchestrator) acquireCycleLock(ctx context.Context, env map[string]string, skipLock func(map[string]string) bool) (func() error, error) {
+	if skipLock(env) {
 		return func() error { return nil }, nil
 	}
 	return o.storage.AcquireLock(ctx)
