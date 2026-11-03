@@ -12,6 +12,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciwatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
@@ -360,6 +361,36 @@ func TestBoundaryRatchetMerge_AnUnchangedListIsNotForcePushed(t *testing.T) {
 		t.Errorf("%s moved to %s: an unchanged list must not restart CI with a force-push", ratchetPRBranch, f.branchTip())
 	}
 	f.planeIsUntouched(t)
+}
+
+func TestBoundaryRatchetMerge_ATipPushedFromAnotherCloneIsFetchedAndNotForcePushed(t *testing.T) {
+	o := newRatchetOrigin(t, 60, `{"internal/fixture.Big": 90}`)
+	other := gittest.Clone(t, o.bare.Dir)
+	other.Write(ratchetListPath, tightRatchetList)
+	other.Git("commit", "-q", "-am", ratchetTightenMessage)
+	other.Git("push", "-q", "origin", "HEAD:refs/heads/"+ratchetPRBranch)
+	tip := o.bare.Git("rev-parse", ratchetPRBranch)
+	writeRatchetPolicy(t, o.plane.Dir, `{"boundary":{"ratchet_merge":{"stage":"off"}}}`)
+	gh := &fakeGH{list: `[{"number":7,"headRefName":"` + ratchetPRBranch + `","headRefOid":"` + tip + `"}]`}
+	gh.install(t)
+	t.Setenv("EVOLVE_DISPATCH_DEPTH", "")
+
+	rc, out, errOut := o.tighten(t)
+
+	if rc != 0 || errOut != "" || !strings.Contains(out, "ratchet tighten: #7 already holds this list") || o.bare.Git("rev-parse", ratchetPRBranch) != tip {
+		t.Fatalf("rc=%d stdout=%q stderr=%q, want the fetched tip kept with no force-push", rc, out, errOut)
+	}
+}
+
+func TestBoundaryRatchetMerge_AGitFaultInTheLeaseCheckWarnsAndNeverPushes(t *testing.T) {
+	f := newRatchetPRFixture(t, "{\n  \"internal/fixture.Big\": 80\n}\n", "off")
+	f.gh.failGit = "rev-list"
+
+	rc, _, errOut := f.tighten(t)
+
+	if rc != 0 || !strings.Contains(errOut, "WARN: ratchet tighten") || !strings.Contains(errOut, "git rev-list refused") || f.branchTip() != f.tip {
+		t.Fatalf("rc=%d stderr=%q, want the git fault reported and no push", rc, errOut)
+	}
 }
 
 func TestBoundaryRatchetMerge_AGateFailureWarnsAndHoldsTheMerge(t *testing.T) {

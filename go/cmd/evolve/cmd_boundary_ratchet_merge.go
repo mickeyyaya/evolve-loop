@@ -37,9 +37,12 @@ func ratchetMergeGateFor(root string, stderr io.Writer) (ratchetMergeGate, error
 
 func (s ratchetStep) landTightenPR(pr ratchetPR) bool {
 	g, err := ratchetMergeGateFor(s.root, s.stderr)
-	attempted := false
+	attempted, line := false, ""
 	if err == nil {
-		attempted, err = g.land(context.Background(), s, pr)
+		attempted, line, err = g.land(context.Background(), s.wt, pr)
+	}
+	if line != "" {
+		fmt.Fprintln(s.stdout, line)
 	}
 	var refusal prRefusal
 	switch {
@@ -51,23 +54,22 @@ func (s ratchetStep) landTightenPR(pr ratchetPR) bool {
 	return attempted
 }
 
-func (g ratchetMergeGate) land(ctx context.Context, s ratchetStep, pr ratchetPR) (bool, error) {
+func (g ratchetMergeGate) land(ctx context.Context, wt string, pr ratchetPR) (bool, string, error) {
 	if g.stage == config.StageOff {
-		return false, nil
+		return false, "", nil
 	}
 	n := strconv.Itoa(pr.Number)
-	if err := g.check(ctx, s.wt, pr); err != nil {
-		return false, err
+	if err := g.check(ctx, wt, pr); err != nil {
+		return false, "", err
 	}
 	if g.stage != config.StageEnforce {
-		fmt.Fprintf(s.stdout, "ratchet merge: would merge #%s at %s\n", n, shortSHA(pr.HeadRefOid))
-		return false, nil
+		return false, fmt.Sprintf("ratchet merge: would merge #%s at %s", n, shortSHA(pr.HeadRefOid)), nil
 	}
 	sha, err := g.merger.mergeHead(ctx, n, pr.HeadRefOid)
-	if err == nil {
-		fmt.Fprintf(s.stdout, "ratchet merge: merged #%s %s\n", n, sha)
+	if err != nil {
+		return true, "", err
 	}
-	return true, err
+	return true, fmt.Sprintf("ratchet merge: merged #%s %s", n, sha), nil
 }
 
 func (g ratchetMergeGate) check(ctx context.Context, wt string, pr ratchetPR) error {
@@ -81,7 +83,7 @@ func (g ratchetMergeGate) check(ctx context.Context, wt string, pr ratchetPR) er
 	if err := stepCommitError(wt, tip); err != nil {
 		return err
 	}
-	holds, err := tipHoldsLists(wt, tip)
+	holds, err := tipHoldsWorktreeLists(wt, tip)
 	switch {
 	case err != nil:
 		return err
@@ -97,10 +99,10 @@ func stepCommitError(wt, tip string) error {
 		return err
 	}
 	if n := len(strings.Fields(parents)) - 1; n != 1 {
-		return fmt.Errorf("%s has %d parents, and a tighten commit has one", shortSHA(tip), n)
+		return notAStepCommit(fmt.Sprintf("%s has %d parents, and a tighten commit has one", shortSHA(tip), n))
 	}
 	if _, err := ratchetCmd(wt, "git", "merge-base", "--is-ancestor", tip+"^", "HEAD"); err != nil {
-		return fmt.Errorf("the base of %s is not on origin/main: %w", shortSHA(tip), err)
+		return notAStepCommit(fmt.Sprintf("the base of %s is not on origin/main: %v", shortSHA(tip), err))
 	}
 	names, err := ratchetCmd(wt, "git", "diff", "--no-renames", "--name-only", "-z", "HEAD..."+tip)
 	if err != nil {
@@ -109,14 +111,18 @@ func stepCommitError(wt, tip string) error {
 	return onlyRatchetLists(tip, slices.DeleteFunc(strings.Split(names, "\x00"), func(p string) bool { return p == "" }))
 }
 
+type notAStepCommit string
+
+func (e notAStepCommit) Error() string { return string(e) }
+
 func onlyRatchetLists(tip string, changed []string) error {
 	if len(changed) == 0 {
-		return fmt.Errorf("%s changes no ratchet list", shortSHA(tip))
+		return notAStepCommit(shortSHA(tip) + " changes no ratchet list")
 	}
 	allowed := ratchetListPaths()
 	for _, path := range changed {
 		if !slices.Contains(allowed, path) {
-			return fmt.Errorf("%s changes %s, and a tighten commit changes only %s", shortSHA(tip), path, strings.Join(allowed, ", "))
+			return notAStepCommit(fmt.Sprintf("%s changes %s, and a tighten commit changes only %s", shortSHA(tip), path, strings.Join(allowed, ", ")))
 		}
 	}
 	return nil
@@ -129,14 +135,20 @@ func fetchBranchTip(wt, ref string) (string, error) {
 	return ratchetCmd(wt, "git", "rev-parse", "FETCH_HEAD")
 }
 
-func tipHoldsLists(wt, tip string) (bool, error) {
+func tipHoldsWorktreeLists(wt, tip string) (bool, error) {
 	diff, err := ratchetCmd(wt, "git", append([]string{"diff", "--no-renames", "--name-only", tip, "--"}, ratchetListPaths()...)...)
 	return err == nil && diff == "", err
 }
 
 func leaseHoldsTheStepLists(wt, lease string) (bool, error) {
-	if lease == "" || stepCommitError(wt, lease) != nil {
+	if lease == "" {
 		return false, nil
 	}
-	return tipHoldsLists(wt, lease)
+	var shape notAStepCommit
+	if err := stepCommitError(wt, lease); errors.As(err, &shape) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+	return tipHoldsWorktreeLists(wt, lease)
 }

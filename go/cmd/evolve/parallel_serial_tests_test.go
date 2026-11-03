@@ -6,6 +6,7 @@ var serialTests = map[string]string{
 	"main.TestBoundaryRatchetMerge_AListThatIsNotTheStepsListIsHeldAndReplaced":                             "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
 	"main.TestBoundaryRatchetMerge_ATipThatChangesMoreThanTheListsIsNeverMerged":                            "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
 	"main.TestBoundaryRatchetMerge_TheRefusalNamesAnExtraPathWithASpaceWhole":                               "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
+	"main.TestBoundaryRatchetMerge_AGitFaultInTheLeaseCheckWarnsAndNeverPushes":                             "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
 	"main.TestBoundaryRatchetMerge_AMergeCommitTipIsNeverMerged":                                            "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
 	"main.TestBoundaryRatchetMerge_TheGateNeverLaysThePullRequestListsOverTheWorktree":                      "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
 	"main.TestBoundaryRatchetMerge_CINotGreenHoldsTheMerge":                                                 "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
