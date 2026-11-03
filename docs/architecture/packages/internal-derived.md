@@ -27,7 +27,8 @@
 - **The skill projections are outputs.** Pinned by `TestCatalog_SkillProjectionsAreDerivedOutputs`.
 - **The router recipes are no entry.** Pinned by `TestCatalog_TheRouterRecipeRegionIsNotAnEntry`.
 - **A block inside the region is derived, and a block outside it is genuine.** Pinned by `TestRegionConflict_ABlockInsideTheRegionIsDerived` and `TestRegionConflict_ABlockOutsideTheRegionIsGenuine`.
-- **A hand-edited output makes its entry stale.** Pinned by `TestStale_AnInputOrAHandEditedOutputMakesItsEntryStale`.
+- **A hand-edited output makes its entry stale.** Pinned by `TestStale_AnInputOrAHandEditedOutputMakesItsEntryStale`. Its case `commands/build.md` is an output and no input, so it fails when `Stale` reads only the inputs.
+- **A failed check removes the hand row.** Pinned in `core` by `TestNormalizeBuildWorktree_AFailedCheckRegeneratesTheIndexAndTheReportNamesIt`. It fails when `Refresh` skips `Regenerate`.
 - **Cross staleness needs both sides.** Pinned by `TestFires_CrossStalenessNeedsBothSides`.
 - **A leftover conflict marker fails the regeneration.** Pinned by `TestRegen_RefusesALeftoverConflictMarker`.
 - **Two research-index PRs merge in either order to one index.** Pinned in `researchindex` by `TestTwoEntryPRs_MergeInEitherOrderToOneIndexWithNoHandMerge`.

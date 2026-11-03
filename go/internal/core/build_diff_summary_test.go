@@ -35,7 +35,7 @@ func TestWriteBuildDiffSummary_ANoOpCycleReportsZeroFilesFromItsBase(t *testing.
 	worktree, base, workspace := noOpCycle(t)
 	var warn bytes.Buffer
 
-	writeBuildDiffSummary(context.Background(), worktree, base, workspace, &warn)
+	writeBuildDiffSummary(context.Background(), buildDiffInputs{Worktree: worktree, Base: base, Workspace: workspace}, &warn)
 
 	body, _ := os.ReadFile(filepath.Join(workspace, "build-report.md"))
 	if !strings.Contains(string(body), "| files_changed | 0 <!-- host-derived") || !strings.Contains(string(body), "- **Files changed:** 0 (host-derived") {
@@ -51,7 +51,7 @@ func TestWriteBuildDiffSummary_ANoBaseWarnsAndStatesAbsent(t *testing.T) {
 	worktree, _, workspace := noOpCycle(t)
 	var warn bytes.Buffer
 
-	writeBuildDiffSummary(context.Background(), worktree, "", workspace, &warn)
+	writeBuildDiffSummary(context.Background(), buildDiffInputs{Worktree: worktree, Base: "", Workspace: workspace}, &warn)
 
 	body, _ := os.ReadFile(filepath.Join(workspace, "build-report.md"))
 	if strings.Contains(string(body), "| files_changed | pending") || !strings.Contains(string(body), "| files_changed | absent") {
@@ -66,7 +66,7 @@ func TestWriteBuildDiffSummary_NoReportIsANoOpAndAFailedWriteWarns(t *testing.T)
 	t.Parallel()
 	worktree, base, workspace := noOpCycle(t)
 	var warn bytes.Buffer
-	writeBuildDiffSummary(context.Background(), worktree, base, t.TempDir(), &warn)
+	writeBuildDiffSummary(context.Background(), buildDiffInputs{Worktree: worktree, Base: base, Workspace: t.TempDir()}, &warn)
 	if warn.Len() != 0 {
 		t.Errorf("no report must stay quiet: %q", warn.String())
 	}
@@ -74,7 +74,7 @@ func TestWriteBuildDiffSummary_NoReportIsANoOpAndAFailedWriteWarns(t *testing.T)
 	if err := os.Chmod(report, 0o444); err != nil {
 		t.Fatal(err)
 	}
-	writeBuildDiffSummary(context.Background(), worktree, base, workspace, &warn)
+	writeBuildDiffSummary(context.Background(), buildDiffInputs{Worktree: worktree, Base: base, Workspace: workspace}, &warn)
 	if !strings.Contains(warn.String(), "build-diff-summary: write") {
 		t.Errorf("a failed write must warn: %q", warn.String())
 	}

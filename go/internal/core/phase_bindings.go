@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -291,8 +292,8 @@ func (o *Orchestrator) normalizeBuildWorktree(ctx context.Context, completed Pha
 	}
 	normalizeBuildGofmt(cs.ActiveWorktree)
 	if completed == PhaseBuild {
-		o.normalizeDerivedProjections(ctx, cs.ActiveWorktree)
-		writeBuildDiffSummary(ctx, cs.ActiveWorktree, cs.WorktreeBaseSHA, cs.WorkspacePath, o.errOut())
+		regenerated := o.normalizeDerivedProjections(ctx, cs.ActiveWorktree)
+		writeBuildDiffSummary(ctx, buildDiffInputs{Worktree: cs.ActiveWorktree, Base: cs.WorktreeBaseSHA, Workspace: cs.WorkspacePath, Regenerated: regenerated}, o.errOut())
 		writeCoveringTests(ctx, cs.ActiveWorktree, cs.WorkspacePath, o.errOut())
 		if !o.workflowConfig.BuildFloorEnforced {
 			o.buildSelfCheck(ctx, cs.ActiveWorktree)
@@ -301,12 +302,30 @@ func (o *Orchestrator) normalizeBuildWorktree(ctx context.Context, completed Pha
 	ensureCoveringTests(ctx, cs.ActiveWorktree, cs.WorkspacePath, o.errOut())
 }
 
-func (o *Orchestrator) normalizeDerivedProjections(ctx context.Context, worktree string) {
+func (o *Orchestrator) normalizeDerivedProjections(ctx context.Context, worktree string) []string {
 	if worktree == "" {
-		return
+		return nil
 	}
 	stale := derived.Stale(changedWorktreePaths(ctx, worktree), goInputsFor(ctx, worktree))
+	before := derivedOutputContents(ctx, gitCapture, worktree, stale, o.errOut())
 	regenStaleProjections(ctx, worktree, stale, refreshDerivedEntry, stageDerivedEntry)
+	return changedDerivedOutputs(before, derivedOutputContents(ctx, gitCapture, worktree, stale, o.errOut()))
+}
+
+func derivedOutputContents(ctx context.Context, git gitFn, worktree string, entries []derived.Entry, warn io.Writer) map[string]string {
+	contents := map[string]string{}
+	for _, e := range entries {
+		paths, err := entryOutputPaths(ctx, git, worktree, e)
+		if err != nil {
+			fmt.Fprintf(warn, "[orchestrator] WARN build-derived-regen: list outputs of %s: %v\n", e.Name, err)
+		}
+		for _, p := range paths {
+			if body, err := os.ReadFile(filepath.Join(worktree, filepath.FromSlash(p))); err == nil {
+				contents[p] = string(body)
+			}
+		}
+	}
+	return contents
 }
 
 func changedWorktreePaths(ctx context.Context, worktree string) []string {
@@ -339,4 +358,20 @@ func normalizeBuildGofmt(worktree string) {
 	if len(fixed) > 0 {
 		fmt.Fprintf(os.Stderr, "[orchestrator] build-gofmt: ran gofmt -s over %d changed file(s) before audit (gate verifies): %s\n", len(fixed), strings.Join(fixed, ", "))
 	}
+}
+
+func changedDerivedOutputs(before, after map[string]string) []string {
+	var changed []string
+	for p, body := range after {
+		if old, ok := before[p]; !ok || old != body {
+			changed = append(changed, p)
+		}
+	}
+	for p := range before {
+		if _, ok := after[p]; !ok {
+			changed = append(changed, p)
+		}
+	}
+	slices.Sort(changed)
+	return changed
 }

@@ -10,13 +10,19 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
-func writeBuildDiffSummary(ctx context.Context, worktree, base, workspace string, warn io.Writer) {
-	path, body, ok := buildReportFile(workspace)
+type buildDiffInputs struct {
+	Worktree, Base, Workspace string
+	Regenerated               []string
+}
+
+func writeBuildDiffSummary(ctx context.Context, in buildDiffInputs, warn io.Writer) {
+	path, body, ok := buildReportFile(in.Workspace)
 	if !ok {
 		return
 	}
-	summary, err := builddiff.Derive(ctx, gitexec.Git{Dir: worktree, Exec: gitRunner}, base)
-	next, warnings := builddiff.Apply(body, summary, base, err)
+	summary, err := builddiff.Derive(ctx, gitexec.Git{Dir: in.Worktree, Exec: gitRunner}, in.Base)
+	summary.Regenerated = in.Regenerated
+	next, warnings := builddiff.Apply(body, summary, in.Base, err)
 	for _, w := range warnings {
 		fmt.Fprintf(warn, "[orchestrator] WARN %s\n", w)
 	}

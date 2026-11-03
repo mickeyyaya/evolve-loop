@@ -230,12 +230,17 @@ func stageEntryWith(ctx context.Context, git gitFn, worktree, entry string) erro
 	if !ok {
 		return fmt.Errorf("no derived entry %q", entry)
 	}
-	paths, err := gitStdout(ctx, git, worktree, append([]string{"ls-files", "-z", "--cached", "--others", "--exclude-standard", "--"}, e.Pathspecs()...)...)
-	if err != nil || len(nulPaths(paths)) == 0 {
+	paths, err := entryOutputPaths(ctx, git, worktree, e)
+	if err != nil || len(paths) == 0 {
 		return err
 	}
-	_, err = gitStdout(ctx, git, worktree, append([]string{"add", "-A", "--"}, nulPaths(paths)...)...)
+	_, err = gitStdout(ctx, git, worktree, append([]string{"add", "-A", "--"}, paths...)...)
 	return err
+}
+
+func entryOutputPaths(ctx context.Context, git gitFn, worktree string, e derived.Entry) ([]string, error) {
+	listed, err := gitStdout(ctx, git, worktree, append([]string{"ls-files", "-z", "--cached", "--others", "--exclude-standard", "--"}, e.Pathspecs()...)...)
+	return nulPaths(listed), err
 }
 
 func goInputsFor(ctx context.Context, worktree string) derived.GoInputDirs {
