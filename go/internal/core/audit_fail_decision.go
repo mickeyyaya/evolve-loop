@@ -55,20 +55,30 @@ func (o *Orchestrator) decideAfterAuditFail(cs CycleState) (Phase, string, *Syst
 	}
 	action, clamped := clampAdjudication(env, proposal)
 
-	suffix := ""
-	switch {
-	case clamped:
-		suffix = " [adjudication clamped to the policy envelope]"
-	case proposal != nil && proposal.Justification != "":
-		suffix = " [adjudicated: " + proposal.Justification + "]"
-	}
+	suffix := adjudicationSuffix(clamped, proposal)
 
-	if next, isRetry := reentryPhase(action); isRetry {
+	stopReason := o.consultAuditRepairConvergence(cs)
+	next, isRetry := reentryPhase(action)
+	if isRetry && stopReason == "" {
 		o.emitAuditRepairDecision(cs, next, declared, env.Reason+suffix)
 		return next, auditRepairReasonPrefix + string(action) + ": " + env.Reason + suffix, nil
 	}
-	o.emitAuditRepairDecision(cs, PhaseRetro, declared, env.Reason+suffix)
-	return PhaseRetro, auditDeclineReasonPrefix + env.Reason + suffix, nil
+	reason := env.Reason + suffix
+	if isRetry {
+		reason = stopReason + ": " + reason
+	}
+	o.emitAuditRepairDecision(cs, PhaseRetro, declared, reason)
+	return PhaseRetro, auditDeclineReasonPrefix + reason, nil
+}
+
+func adjudicationSuffix(clamped bool, proposal *adjudication) string {
+	switch {
+	case clamped:
+		return " [adjudication clamped to the policy envelope]"
+	case proposal != nil && proposal.Justification != "":
+		return " [adjudicated: " + proposal.Justification + "]"
+	}
+	return ""
 }
 
 func (o *Orchestrator) auditFailEnvelope(cs CycleState, floorCandidate string) (retryEnvelope, *phasecontract.FailureBlock) {

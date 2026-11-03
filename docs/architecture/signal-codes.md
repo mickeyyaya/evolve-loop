@@ -144,6 +144,12 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 |---|---|
 | `CONTROL_BYPASS_USED` | an audited bypass is in use (ADR-0156 I-16, X18d): an operator parameter, after its control_bypass ledger entry is written, or a policy opt-in at the bridge adapter start; fields name, actor, reason and at |
 
+### convergence
+
+| Code | Meaning |
+|---|---|
+| `CONVERGENCE_RUNG` | the convergence policy decided the next rung of the audit-repair loop after an audit FAIL; fields.stage is shadow (recorded, the repair flow does not change) or enforce (a Stop ends the repair), fields.loop, fields.round, fields.action, fields.rung and fields.blocking_bar give the decision, fields.fresh_context is true when the next fixer starts without the failed context |
+
 ### cycle
 
 | Code | Meaning |

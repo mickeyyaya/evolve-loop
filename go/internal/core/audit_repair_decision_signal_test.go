@@ -24,7 +24,11 @@ func TestDecideAfterAuditFail_EmitsTheRepairDecision(t *testing.T) {
 		}
 		c := signalcenter.New()
 		var got []signalcenter.Event
-		c.Subscribe(func(e signalcenter.Event) { got = append(got, e) })
+		c.Subscribe(func(e signalcenter.Event) {
+			if e.Code != CodeConvergenceRung {
+				got = append(got, e)
+			}
+		})
 		o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil), WithSignalCenter(c))
 		next, _, _ := o.decideAfterAuditFail(CycleState{CycleID: 1684, WorkspacePath: ws, AuditRepairAttempts: attempts})
 		return next, got

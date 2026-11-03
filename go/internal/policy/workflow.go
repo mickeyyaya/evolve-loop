@@ -69,6 +69,7 @@ type WorkflowConfig struct {
 	CycleSpend               CycleSpendConfig
 	BuilderSelfCheck         BuilderSelfCheckConfig
 	Supersede                SupersedeConfig
+	Convergence              ConvergenceConfig
 }
 
 func (p Policy) WorkflowConfig() WorkflowConfig {
@@ -106,6 +107,7 @@ func (p Policy) defaultWorkflowConfig() WorkflowConfig {
 		CycleSpend:               p.cycleSpendConfig(),
 		BuilderSelfCheck:         p.builderSelfCheckConfig(),
 		Supersede:                p.supersedeConfig(),
+		Convergence:              p.ConvergenceConfig(),
 	}
 }
 
