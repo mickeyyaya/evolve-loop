@@ -1,0 +1,99 @@
+{
+  "schema_version": 2,
+  "cycle": 2164,
+  "run_id": "01M6KK4W5TV478AN9960SP5W2F",
+  "goal": "Wave 155.\n\nWork the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree that it ships;\n- disposition its own defect ledger and the inherited ids;\n- record a terminal outcome on every exit;\n- never change a protected control-plane file with a tool;\n- leave no stale worktree.\n\nRouting:\n- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.\n- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.\n- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.\n\nCraft:\n- New and changed code has no comments. Names, types and tests give the intent.\n- Write each new document and each new log text in ASD-STE100.\n- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.\n- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.\n\nEvidence:\n- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.\n\nThe measure of this wave is the number of shipped cycles. Keep each cycle shipping.\n\nWave 154 facts (run 20261104T032203Z): 0 of 9 cycles shipped.\n- Cycle 2152: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…cycle-N/ [inbox-mover] claimed: 2026-11-02T00-00-00Z-item-a.json → processing/cycle-N/ FAIL FAIL github.com/mickeyyaya/evolve-loop/go/cmd/evolve 152.073s FAIL. Last phase: aborted. It did not ship.\n- Cycle 2153: no final verdict. Last phase: audit. It did not ship. Quota pauses: 1.\n- Cycle 2154: no final verdict. Last phase: build. It did not ship. Quota pauses: 1.\n- Cycle 2155: no final verdict. Last phase: build. It did not ship. Quota pauses: 1.\n- Cycle 2156: no final verdict. Last phase: tdd. It did not ship. Quota pauses: 1.\n- Cycle 2157: no final verdict. Last phase: scout. It did not ship. Quota pauses: 1.\n- Cycle 2158: no final verdict. Last phase: scout. It did not ship. Quota pauses: 1.\n- Cycle 2159: no final verdict. Last phase: scout. It did not ship. Quota pauses: 1.\n- Cycle 2160: no final verdict. Last phase: scout. It did not ship. Quota pauses: 1.\n- Pull requests merged at this boundary: none.\n\nOperator notes for wave 155:\n- Batches five and six landed: the console train, I3, I3b, I6 and I10 are on main at shadow. Resume 2153 to 2160. The items host-sentinel-inside-the-loop and wave-orchestrator-o6-wire-oversight-into-the-loop are routed to the console.\n\nEarlier waves:\n- Wave 151 (run 20261103T022654Z): 11 of 15 cycles shipped.\n- Wave 152 (run 20261103T165142Z): 1 of 9 cycles shipped.\n- Wave 153 (run 20261104T002909Z): 0 of 1 cycles shipped.",
+  "final_verdict": "WARN",
+  "tasks": [
+    "resumed-build-abort-skips-the-retrospective-and-the-correction"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 40519,
+      "started_at": "2026-11-04T15:35:19Z",
+      "ended_at": "2026-11-04T15:36:01Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 14,
+        "output": 2427,
+        "cache_read": 364169,
+        "cache_write": 32633
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 29233,
+      "started_at": "2026-11-04T15:38:23Z",
+      "ended_at": "2026-11-04T15:38:54Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 6,
+        "output": 1137,
+        "cache_read": 203231,
+        "cache_write": 42647
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "WARN",
+      "ended_at": "2026-11-04T15:38:54Z",
+      "archetype": "plan",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "timing": {
+    "total_ms": 69752,
+    "phase_count": 3,
+    "retried_count": 0,
+    "longest_phase": "scout",
+    "longest_ms": 40519,
+    "by_archetype_ms": {
+      "plan": 69752
+    },
+    "total_tokens": {
+      "input": 20,
+      "output": 3564,
+      "cache_read": 567400,
+      "cache_write": 75280
+    },
+    "tokens_by_archetype": {
+      "plan": {
+        "input": 20,
+        "output": 3564,
+        "cache_read": 567400,
+        "cache_write": 75280
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.9999647527404745,
+    "hot_phase_count": 2,
+    "hot_phases": [
+      "scout",
+      "triage"
+    ]
+  },
+  "recalled_lessons": [
+    "cycle-93-build-report-commit-sha-fabrication",
+    "cycle-1502-closure-citation-contract-never-reaches-the-auditor-it-grades",
+    "cycle-1496-a-retry-carries-the-items-spec-and-never-its-predecessors-lesson",
+    "cycle-1492-remedy-on-disk-in-four-places-reaches-no-agent-with-authority-to-apply-it",
+    "inst-L1549b"
+  ]
+}
