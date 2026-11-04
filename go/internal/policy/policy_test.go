@@ -347,3 +347,28 @@ func TestWorkflowConfig_UniversalFallbackExcludeDefaultsToAgy(t *testing.T) {
 		t.Fatalf("custom = %v", got)
 	}
 }
+
+func TestRetryConfig_FloorConvergenceRounds(t *testing.T) {
+	t.Parallel()
+
+	if got := (Policy{}).RetryConfig().FloorConvergenceRounds; got != 1 {
+		t.Fatalf("default FloorConvergenceRounds = %d, want 1", got)
+	}
+	if got := (Policy{Retry: &RetryPolicy{FloorConvergenceRounds: 9}}).RetryConfig().FloorConvergenceRounds; got != 3 {
+		t.Fatalf("capped FloorConvergenceRounds = %d, want 3", got)
+	}
+	var loaded Policy
+	if err := json.Unmarshal([]byte(`{"retry":{"floor_convergence_rounds":0}}`), &loaded); err != nil {
+		t.Fatal(err)
+	}
+	if got := loaded.RetryConfig().FloorConvergenceRounds; got != 0 {
+		t.Fatalf("explicit zero FloorConvergenceRounds = %d, want 0", got)
+	}
+	var plain Policy
+	if err := json.Unmarshal([]byte(`{"retry":{"floor_convergence_rounds":2}}`), &plain); err != nil {
+		t.Fatal(err)
+	}
+	if got := plain.RetryConfig().FloorConvergenceRounds; got != 2 {
+		t.Fatalf("configured FloorConvergenceRounds = %d, want 2", got)
+	}
+}

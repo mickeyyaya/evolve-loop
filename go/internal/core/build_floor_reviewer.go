@@ -113,7 +113,7 @@ func changedPackageFloorChecks(ctx context.Context, in ReviewInput, paths []stri
 	if in.Worktree == "" {
 		return nil
 	}
-	pkgs := floorScopedPackages(changedGoTestPackages(paths), in.errOut())
+	pkgs := floorTestPackages(paths, in.errOut())
 	moduleDir := codequality.ModuleDir(in.Worktree)
 	pkgs = buildTagVisiblePackages(ctx, moduleDir, pkgs, in.errOut())
 	taggedFails := addedTaggedTestFailures(ctx, in, moduleDir)
@@ -141,13 +141,15 @@ func changedPackageFloorChecks(ctx context.Context, in ReviewInput, paths []stri
 	return floorLinesFor(fails, taggedFails, namingFails)
 }
 
+const floorTestsFailMarker = ": unit tests FAIL"
+
 func floorLinesFor(fails, taggedFails []selfCheckFailure, namingFails []string) []string {
 	out := make([]string, 0, len(fails)+len(taggedFails)+len(namingFails))
 	for _, f := range fails {
-		out = append(out, fmt.Sprintf("%s: unit tests FAIL\n%s", f.Pkg, floorFailureDiagnostic(f.Output)))
+		out = append(out, fmt.Sprintf("%s"+floorTestsFailMarker+"\n%s", f.Pkg, floorFailureDiagnostic(f.Output)))
 	}
 	for _, f := range taggedFails {
-		out = append(out, fmt.Sprintf("%s: unit tests FAIL\n%s", f.Pkg, floorFailureDiagnostic(f.Output)))
+		out = append(out, fmt.Sprintf("%s"+floorTestsFailMarker+"\n%s", f.Pkg, floorFailureDiagnostic(f.Output)))
 	}
 	out = append(out, namingFails...)
 	return out
@@ -174,7 +176,7 @@ func addedTaggedTestFailures(ctx context.Context, in ReviewInput, moduleDir stri
 		if len(g.Tags) == 0 {
 			continue
 		}
-		for _, pkg := range g.Packages {
+		for _, pkg := range withoutEnvExclusive(g.Packages, in.errOut()) {
 			run := func() (string, bool) { return buildSelfCheckTaggedRunner(ctx, moduleDir, pkg, g.Tags) }
 			label := pkg + " (-tags " + strings.Join(g.Tags, ",") + ")"
 			if out, ok := run(); !ok {
@@ -361,12 +363,22 @@ func (p coverPlan) run(ctx context.Context) (string, int) {
 
 func (p coverPlan) retake(ctx context.Context, in ReviewInput, first string) (string, int) {
 	status := coverStatusTestsFailed
-	out, _ := in.retakeFloorRun(p.label, first, func() (string, bool) {
+	out, _ := in.retakeFloorOutcome(p.label, first, func() (string, floorRetakeOutcome) {
 		var out string
 		out, status = p.run(ctx)
-		return out, status == coverStatusOK
+		return out, coverRetakeOutcome(status)
 	})
 	return coverRetakeResult(first, out, status)
+}
+
+func coverRetakeOutcome(status int) floorRetakeOutcome {
+	switch status {
+	case coverStatusOK:
+		return floorRetakeGreen
+	case coverStatusPlumbingError:
+		return floorRetakeUnrunnable
+	}
+	return floorRetakeRed
 }
 
 func runCoverPass(ctx context.Context, moduleDir, profile string, args, tags []string) (string, int) {

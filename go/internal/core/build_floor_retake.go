@@ -25,24 +25,68 @@ func init() {
 
 func floorScopedPackages(pkgs []string, warn io.Writer) []string {
 	scoped, envExclusive, _ := ciparity.TierScope(pkgs)
-	if len(envExclusive) > 0 {
-		fmt.Fprintf(warn, "[build-floor] NOTE: env-exclusive package(s) %s are not run at the floor under a live loop, as at the audit tier. Backstop: %s\n",
-			strings.Join(envExclusive, ", "), ciparity.EnvExclusiveBackstopNote(envExclusive))
-	}
+	noteEnvExclusive(envExclusive, warn)
 	return scoped
 }
 
-func (in ReviewInput) retakeFloorRun(label, first string, rerun func() (string, bool)) (string, bool) {
-	release := in.acquireFloorRetakeLock()
-	out, ok := rerun()
-	release()
-	failed := out
-	if ok {
-		failed = first
+func withoutEnvExclusive(pkgs []string, warn io.Writer) []string {
+	var kept, skipped []string
+	for _, p := range pkgs {
+		if ciparity.EnvExclusivePkg(p) {
+			skipped = append(skipped, p)
+			continue
+		}
+		kept = append(kept, p)
 	}
-	_, tests := goTestFailureLines(failed)
-	in.emitFloorRetake(label, tests, ok)
-	return out, ok
+	noteEnvExclusive(skipped, warn)
+	return kept
+}
+
+func noteEnvExclusive(skipped []string, warn io.Writer) {
+	if len(skipped) > 0 {
+		fmt.Fprintf(warn, "[build-floor] NOTE: env-exclusive package(s) %s are not run at the floor under a live loop, as at the audit tier. Backstop: %s\n",
+			strings.Join(skipped, ", "), ciparity.EnvExclusiveBackstopNote(skipped))
+	}
+}
+
+type floorRetakeOutcome int
+
+const (
+	floorRetakeGreen floorRetakeOutcome = iota
+	floorRetakeRed
+	floorRetakeUnrunnable
+)
+
+func floorTestPackages(paths []string, warn io.Writer) []string {
+	return floorScopedPackages(changedGoTestPackages(paths), warn)
+}
+
+func (in ReviewInput) retakeFloorRun(label, first string, rerun func() (string, bool)) (string, bool) {
+	out, outcome := in.retakeFloorOutcome(label, first, func() (string, floorRetakeOutcome) {
+		out, ok := rerun()
+		if ok {
+			return out, floorRetakeGreen
+		}
+		return out, floorRetakeRed
+	})
+	return out, outcome == floorRetakeGreen
+}
+
+func (in ReviewInput) retakeFloorOutcome(label, first string, rerun func() (string, floorRetakeOutcome)) (string, floorRetakeOutcome) {
+	release := in.acquireFloorRetakeLock()
+	out, outcome := rerun()
+	release()
+	switch outcome {
+	case floorRetakeGreen:
+		_, tests := goTestFailureLines(first)
+		in.emitFloorRetakeGreen(label, tests)
+	case floorRetakeRed:
+		_, tests := goTestFailureLines(out)
+		in.emitFloorRetakeRed(label, tests)
+	default:
+		fmt.Fprintf(in.errOut(), "[build-floor] WARN: the retake of %s could not run (%s), so the first red stands\n", label, strings.TrimSpace(out))
+	}
+	return out, outcome
 }
 
 func (in ReviewInput) retakeSelfCheckFailures(fails []selfCheckFailure, rerun func(pkg string) (string, bool)) []selfCheckFailure {
@@ -73,19 +117,34 @@ func floorRetakeLock(root string) (func(), error) {
 	return flock.LockWithin(ciparity.TierLockPath(root), floorRetakeLockWait, func() {})
 }
 
-func (in ReviewInput) emitFloorRetake(label string, tests []string, green bool) {
-	code, verdict, kind := CodeBuildFloorRetakeRed, "red", signalcenter.KindGateRejected
-	if green {
-		code, verdict, kind = CodeBuildFloorRetakeGreen, "green", signalcenter.KindGatePassed
-	}
+type floorRetakeShape struct {
+	code    signalcenter.Code
+	verdict string
+	kind    signalcenter.Kind
+}
+
+var (
+	floorRetakeGreenShape = floorRetakeShape{CodeBuildFloorRetakeGreen, "green", signalcenter.KindGatePassed}
+	floorRetakeRedShape   = floorRetakeShape{CodeBuildFloorRetakeRed, "red", signalcenter.KindGateRejected}
+)
+
+func (in ReviewInput) emitFloorRetakeGreen(label string, tests []string) {
+	in.emitFloorRetake(label, tests, floorRetakeGreenShape)
+}
+
+func (in ReviewInput) emitFloorRetakeRed(label string, tests []string) {
+	in.emitFloorRetake(label, tests, floorRetakeRedShape)
+}
+
+func (in ReviewInput) emitFloorRetake(label string, tests []string, shape floorRetakeShape) {
 	names := strings.Join(tests, ",")
-	reason := fmt.Sprintf("build floor: %s was RED, and its serialized retake is %s; failed test(s): %s", label, strings.ToUpper(verdict), cmp.Or(names, "none named in the output"))
-	fmt.Fprintf(in.errOut(), "[build-floor] %s %s\n", code, reason)
+	reason := fmt.Sprintf("build floor: %s was RED, and its serialized retake is %s; failed test(s): %s", label, strings.ToUpper(shape.verdict), cmp.Or(names, "none named in the output"))
+	fmt.Fprintf(in.errOut(), "[build-floor] %s %s\n", shape.code, reason)
 	in.Signals.Emit(signalcenter.Event{
 		Cycle: in.Cycle, RunID: in.RunID, Phase: string(PhaseBuild),
-		Module: signalcenter.ModuleBuild, Origin: "ReviewInput.emitFloorRetake", Kind: kind,
-		Severity: signalcenter.SeverityWarn, Code: code, Reason: reason,
-		Fields: map[string]string{"pkg": label, "tests": names, "retake": verdict},
+		Module: signalcenter.ModuleBuild, Origin: "ReviewInput.emitFloorRetake", Kind: shape.kind,
+		Severity: signalcenter.SeverityWarn, Code: shape.code, Reason: reason,
+		Fields: map[string]string{"pkg": label, "tests": names, "retake": shape.verdict},
 	})
 }
 

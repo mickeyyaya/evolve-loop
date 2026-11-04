@@ -407,42 +407,70 @@ func (o *Orchestrator) reviewResumedDeliverable(
 	if o.reviewer == nil || resp.Verdict == VerdictSKIPPED {
 		return resp, nil
 	}
-	if err := o.recoverPhaseLeak(ctx, phaseLeakScope{projectRoot: projectRoot, cycleState: cs, phase: phase, baseline: phaseBaseline}); err != nil {
+	scope := phaseLeakScope{projectRoot: projectRoot, cycleState: cs, phase: phase, baseline: phaseBaseline}
+	if err := o.recoverPhaseLeak(ctx, scope); err != nil {
 		return resp, err
 	}
 	review := o.performEffectsAndReview(ctx, o.reviewInputFor(cs, phase, projectRoot, resp))
-	lr := &cycleRun{o: o, cs: cs, cycle: cycle, req: CycleRequest{ProjectRoot: projectRoot}, retryConfig: o.retryConfig}
+	rv := resumedCorrector{o: o, ctx: ctx, scope: scope, cycle: cycle, runner: runner, count: count}
+	return rv.correct(req, resp, review)
+}
+
+type resumedCorrector struct {
+	o      *Orchestrator
+	ctx    context.Context
+	scope  phaseLeakScope
+	cycle  int
+	runner PhaseRunner
+	count  func(Phase, PhaseRequest) PhaseRequest
+}
+
+func (rv resumedCorrector) correct(req PhaseRequest, resp PhaseResponse, review ReviewResult) (PhaseResponse, error) {
+	o, cs, phase := rv.o, rv.scope.cycleState, rv.scope.phase
+	lr := &cycleRun{o: o, cs: cs, cycle: rv.cycle, req: CycleRequest{ProjectRoot: rv.scope.projectRoot}, retryConfig: o.retryConfig}
 	maxCorrections := lr.correctionLimitFor(phase, o.retryConfig.ContractCorrectionRetries)
-	for correction := 1; !review.Approve && (correction <= maxCorrections || lr.climbResumed(phase, review, &req)); correction++ {
-		if err := o.resumedBlockerRoute(cs, cycle, phase, review); err != nil {
+	conv := o.newFloorConvergence(rv.cycle, phase, review.Failures)
+	for correction := 1; !review.Approve && (correction <= maxCorrections || lr.climbResumed(phase, review, &req) || conv.grant()); correction++ {
+		if err := o.resumedBlockerRoute(cs, rv.cycle, phase, review); err != nil {
 			return resp, err
 		}
 		req.CorrectionDirective = preferDigest(composeCorrection(correction, review.Reason, review.Remediation), req)
 		o.emitGateCorrection(gateCorrection{
-			origin: originResumedCorrection, cycle: cycle, phase: phase, correction: correction, max: maxCorrections,
+			origin: originResumedCorrection, cycle: rv.cycle, phase: phase, correction: correction, max: maxCorrections + conv.used,
 			rung: interaction.RungRedispatch, cli: req.Driver.String(), reason: review.Reason,
 		})
-		req = count(phase, req)
-		corrected, err := o.redispatchResumedCorrection(ctx, runner, req, phase, correction)
+		req = rv.count(phase, req)
+		corrected, err := o.redispatchResumedCorrection(rv.ctx, rv.runner, req, phase, correction)
 		if err != nil {
 			return corrected, err
 		}
 		resp = corrected
-		if err := o.recoverPhaseLeak(ctx, phaseLeakScope{projectRoot: projectRoot, cycleState: cs, phase: phase, baseline: phaseBaseline}); err != nil {
+		if err := o.recoverPhaseLeak(rv.ctx, rv.scope); err != nil {
 			return resp, err
 		}
-		o.normalizeBuildWorktree(ctx, phase, cs, projectRoot)
-		review = o.performEffectsAndReview(ctx, o.reviewInputFor(cs, phase, projectRoot, resp))
+		o.normalizeBuildWorktree(rv.ctx, phase, cs, rv.scope.projectRoot)
+		review = o.performEffectsAndReview(rv.ctx, o.reviewInputFor(cs, phase, rv.scope.projectRoot, resp))
+		conv.observe(review.Failures)
 	}
 	if review.Approve {
 		return resp, nil
 	}
-	phaseErr := fmt.Errorf("resume review gate: phase %q deliverable rejected after %d correction(s): %s", phase, maxCorrections, review.Reason)
-	if o.degradesRejection(cs, phase, review) {
-		return o.degradeExhaustedReview(ctx, cs, phase, phaseErr), nil
-	}
-	return resp, phaseErr
+	return rv.reject(resp, review, maxCorrections+conv.used)
 }
+
+func (rv resumedCorrector) reject(resp PhaseResponse, review ReviewResult, corrections int) (PhaseResponse, error) {
+	cs, phase := rv.scope.cycleState, rv.scope.phase
+	phaseErr := fmt.Errorf("resume review gate: phase %q deliverable rejected after %d correction(s): %s", phase, corrections, review.Reason)
+	if rv.o.degradesRejection(cs, phase, review) {
+		return rv.o.degradeExhaustedReview(rv.ctx, cs, phase, phaseErr), nil
+	}
+	return resp, resumedRejection{err: phaseErr}
+}
+
+type resumedRejection struct{ err error }
+
+func (r resumedRejection) Error() string { return r.err.Error() }
+func (r resumedRejection) Unwrap() error { return r.err }
 
 func (o *Orchestrator) redispatchResumedCorrection(ctx context.Context, runner PhaseRunner, req PhaseRequest, phase Phase, correction int) (PhaseResponse, error) {
 	cancel := o.observer.Start(ctx, string(phase), req)
