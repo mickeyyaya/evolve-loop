@@ -109,6 +109,9 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 
 | Code | Meaning |
 |---|---|
+| `BUILD_FLOOR_CONVERGING` | a build floor rejection after a correction held fewer findings than the one before, or the same number of other findings, so the build got one further correction inside the policy bound retry.floor_convergence_rounds; fields.before and after (the finding counts), round (the further correction in use), bound (the policy limit) |
+| `BUILD_FLOOR_RETAKE_GREEN` | a build floor test run was RED once and GREEN on its one serialized retake under the integration-tier lock, so the build goes on; fields.pkg (the package or the run), tests (the failed top-level test names of the first run; evolve ci classify also keys a failure on its package and top-level test), retake=green |
+| `BUILD_FLOOR_RETAKE_RED` | a build floor test run was RED and its one serialized retake under the integration-tier lock was RED again, so the floor fails; fields.pkg (the package or the run), tests (the failed top-level test names of the retake; evolve ci classify also keys a failure on its package and top-level test), retake=red |
 | `BUILD_SELFCHECK_FINDINGS` | a build closed with no GREEN self-check receipt for its tree and the handoff floor found findings (ADR-0158 decision 18); fields.stage is shadow or enforce; fields.source is gate (shadow: the findings of the review gate, no floor run in the wait) or bridge (enforce: the floor run before the close); fields.decision is would_return_in_session (shadow), delivered (enforce, the paste into the live session succeeded) or delivery_failed (enforce, fields.error names why); fields.receipt is absent, red or stale; fields.findings is the count |
 
 ### carryover

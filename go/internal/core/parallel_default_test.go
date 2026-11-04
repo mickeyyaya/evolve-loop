@@ -25,6 +25,8 @@ const (
 	swapsReauditRebase              = "test swaps package variable reauditRebase"
 	swapsBackoffSleep               = "test swaps package variable backoffSleep"
 	swapsBuildSelfCheckRunner       = "test swaps package variable buildSelfCheckRunner"
+	swapsBuildSelfCheckTaggedRunner = "test swaps package variable buildSelfCheckTaggedRunner"
+	swapsFloorRetakeLockWait        = "test swaps package variable floorRetakeLockWait"
 	swapsChallengeTokenRead         = "test swaps package variable challengeTokenRead"
 	swapsCoverChangedProfiler       = "test swaps package variable coverChangedProfiler"
 	swapsCoverLockWait              = "test swaps package variable coverLockWait"
@@ -117,6 +119,13 @@ var serialRequiredTests = map[string]string{
 	"core.TestBuildSelfCheck_NoGoChangesIsNoOp":                                                     swapsBuildSelfCheckRunner,
 	"core.TestBuildSelfCheck_WritesArtifactOnFailure":                                               swapsBuildSelfCheckRunner,
 	"core.TestChangedPackageFloorChecks_RunsAddedTagGatedPackagesUnderTheirTags":                    swapsBuildSelfCheckRunner,
+	"core.TestChangedPackageFloorChecks_AOneOffRedIsRetakenAndTheBuildGoesOn":                       swapsBuildSelfCheckRunner,
+	"core.TestChangedPackageFloorChecks_ASecondRedFailsTheFloorAndNamesTheTest":                     swapsBuildSelfCheckRunner,
+	"core.TestChangedPackageFloorChecks_TheFloorKeepsTheAuditTierScope":                             swapsBuildSelfCheckRunner,
+	"core.TestRetakeFloorRun_WaitsOnTheLockFileOfTheAuditRetake":                                    swapsFloorRetakeLockWait,
+	"core.TestAddedTaggedTestFailures_AOneOffRedIsRetaken":                                          swapsBuildSelfCheckTaggedRunner,
+	"core.TestAddedTaggedTestFailures_NeverRunsAnEnvExclusivePackage":                               swapsBuildSelfCheckTaggedRunner,
+	"core.TestCoverChangedFailures_ARedTheRetakeConfirmedIsNotCancelledByAGreenUnitRun":             swapsBuildSelfCheckRunner,
 	"core.TestDefaultBuildFloorChecks_IncludesPersonaBudgetCheck":                                   swapsBuildSelfCheckRunner,
 	"core.TestPersonaBudgetFailures":                                                                swapsBuildSelfCheckRunner,
 	"core.TestRecordAndBranch_BuildGraduationGuardAborts":                                           swapsBuildSelfCheckRunner,
@@ -128,7 +137,8 @@ var serialRequiredTests = map[string]string{
 	"core.TestCoverChangedFailures_ShadowOffAndEveryPlumbingFaultLeaveTheHandoffAlone":              swapsCoverChangedProfiler,
 	"core.TestCoverChangedFailures_ExcludesACSTagOnlyPackageFromProfiler":                           swapsCoverChangedProfiler,
 	"core.TestExplanationGap_OneRejectionAlsoListsTheSteAndCoverageGaps":                            swapsCoverChangedProfiler,
-	"core.TestCoverChangedFailures_LeavesAFailureTheUnitRunAlsoRefusesToTheChangedPackageFloor":     swapsBuildSelfCheckRunner,
+	"core.TestCoverChangedFailures_AConfirmedRedIsAFindingAndNoLaterRunIsAsked":                     swapsBuildSelfCheckRunner,
+	"core.TestCoverChangedFailures_WhenCoverageCannotStartTheUnitRunStillJudgesThePackages":         swapsBuildSelfCheckRunner,
 	"core.TestCoverChangedFailures_StrictRunner":                                                    swapsCoverStrictRunner,
 	"core.TestBaseAndTreeList_AnUnreadableBaseWarnsAndKeepsTheTree":                                 swapsStderr,
 	"core.TestBaseAndTreeList_AnUnreadableTreeListWarnsAndKeepsTheBase":                             swapsStderr,

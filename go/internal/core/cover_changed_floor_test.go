@@ -200,17 +200,32 @@ func TestFloorStage_AnUnknownWordTurnsTheCheckOffAndNamesIt(t *testing.T) {
 	}
 }
 
-func TestCoverChangedFailures_LeavesAFailureTheUnitRunAlsoRefusesToTheChangedPackageFloor(t *testing.T) {
+func TestCoverChangedFailures_AConfirmedRedIsAFindingAndNoLaterRunIsAsked(t *testing.T) {
 	repo, base := coverChangedRepo(t)
 	stubCoverChangedProfiler(t, coverChangedProfile, "--- FAIL: TestF\nFAIL\tp", coverStatusTestsFailed)
 	ran := stubSelfCheckRunner(t, "--- FAIL: TestF\nFAIL\tp", false)
 
-	failures := coverChangedFailures(context.Background(), floorInput(t, floorRoot(t, `{"cover_changed":{"stage":"enforce"}}`), repo, base), []string{"go/p/a.go"})
+	failures := coverChangedFailures(context.Background(), floorInput(t, floorRoot(t, `{"cover_changed":{"stage":"enforce"}}`), repo, base), []string{"go/p/f.go"})
 
-	if failures != nil {
-		t.Errorf("failures = %v, want none: the changed-package floor already refuses the failing unit run", failures)
+	if len(failures) != 1 || !strings.Contains(failures[0], "TestF") {
+		t.Errorf("failures = %v, want the confirmed red as a finding", failures)
 	}
-	if !slices.Equal(*ran, []string{"./p"}) {
-		t.Errorf("unit run packages = %v, want [./p]", *ran)
+	if len(*ran) != 0 {
+		t.Errorf("unit run packages = %v, want none: no later run may overrule a confirmed red", *ran)
+	}
+}
+
+func TestCoverChangedFailures_WhenCoverageCannotStartTheUnitRunStillJudgesThePackages(t *testing.T) {
+	repo, base := coverChangedRepo(t)
+	stubCoverChangedProfiler(t, "", "bad .cover-split", coverStatusPlumbingError)
+	ran := stubSelfCheckRunner(t, "--- FAIL: TestF\nFAIL\tp", false)
+
+	failures := coverChangedFailures(context.Background(), floorInput(t, floorRoot(t, `{"cover_changed":{"stage":"enforce"}}`), repo, base), []string{"go/p/f.go"})
+
+	if len(failures) != 1 || !strings.Contains(failures[0], "TestF") {
+		t.Errorf("failures = %v, want the red that the unit run found", failures)
+	}
+	if !slices.Equal(*ran, []string{"./p", "./p"}) {
+		t.Errorf("unit run packages = %v, want [./p ./p]: the run and its one retake", *ran)
 	}
 }
