@@ -2,11 +2,9 @@ package guards
 
 import (
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/proctree"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -35,26 +33,16 @@ func DeniedPath(in core.GuardInput) string {
 	return ""
 }
 
-func DenialStream(projectRoot string, cycle int) string {
-	if cycle > 0 {
-		return filepath.Join(paths.RunWorkspace(projectRoot, cycle), signalcenter.StreamFileName)
-	}
-	return filepath.Join(paths.EvolveDirOf(projectRoot), signalcenter.StreamFileName)
-}
-
-func RecordDenial(projectRoot, dispatchID string, d Denial) {
+func DenialEvent(dispatchID string, d Denial) (signalcenter.Event, bool) {
 	id, ok := proctree.ParseDispatchID(dispatchID)
 	if !ok {
-		return
+		return signalcenter.Event{}, false
 	}
-	center := signalcenter.New(signalcenter.WithPID(os.Getpid()))
-	center.Subscribe(center.NDJSONSink(func(cycle int) string { return DenialStream(projectRoot, cycle) }))
-	center.Emit(signalcenter.Event{
-		Module: signalcenter.ModuleGuard, Origin: "guards.RecordDenial", Kind: signalcenter.KindIsolationViolation,
+	return signalcenter.Event{
+		Module: signalcenter.ModuleGuard, Origin: "guards.DenialEvent", Kind: signalcenter.KindIsolationViolation,
 		Code: CodeDenied, Severity: signalcenter.SeverityWarn, Cycle: id.Cycle, RunID: id.Run, Phase: id.Agent,
 		Reason: d.Reason, Fields: map[string]string{"guard": d.Guard, "path": d.Path, "dispatch_id": dispatchID},
-	})
-	center.Flush()
+	}, true
 }
 
 const denialWindowBytes = 4 << 20
@@ -72,7 +60,8 @@ func DenialOf(projectRoot, dispatchID string) (Denial, bool) {
 	if !ok {
 		return Denial{}, false
 	}
-	chunk, _ := signalcenter.ReadStream(DenialStream(projectRoot, id.Cycle), tailOffset(DenialStream(projectRoot, id.Cycle)))
+	stream := core.SignalStreamPath(projectRoot, id.Cycle)
+	chunk, _ := signalcenter.ReadStream(stream, tailOffset(stream))
 	var denial Denial
 	found := false
 	for _, e := range chunk.Events {

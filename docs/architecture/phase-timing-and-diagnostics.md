@@ -212,7 +212,7 @@ A stall with no denial keeps the previous behavior exactly. The cause is `review
 How the parts connect:
 
 1. The guard hook denies the tool call. `guardcmd.RunGuard` calls `guards.RecordDenial` at its one shared denial path (`go/internal/cli/guardcmd/guard.go`).
-2. `guards.RecordDenial` writes `GUARD_DENIED` to `.evolve/runs/cycle-<N>/signals.ndjson`. With no cycle, it writes to `.evolve/signals.ndjson` (`go/internal/guards/denial.go`).
+2. `guards.RecordDenial` writes `GUARD_DENIED` to the stream that `core.SignalStreamPath` gives: `.evolve/runs/cycle-<N>/signals.ndjson`, or `.evolve/signals.ndjson` with no cycle (`go/internal/guards/denial.go`).
 3. At the stall limit, the bridge closeout calls `guards.DenialOf` with its project root and dispatch id (`go/internal/bridge/driver_tmux_wait_closeout.go`).
 4. The timeout marker has `cause=guard_refused` and the reason `guard <name> denied <path>: <reason>`.
 5. `launchoutcome.Classify` gives the cause code `guard_refused`. `llmroute.TieringExit` makes it terminal, and both dispatch chains stop (`go/internal/phases/runner/dispatch.go`, `go/internal/bridgechain/bridgechain.go`).

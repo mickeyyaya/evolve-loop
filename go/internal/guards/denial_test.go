@@ -2,25 +2,34 @@ package guards
 
 import (
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 const deniedDispatch = "run-41/7/build/p4242n1t9"
 
-func TestRecordDenial_EmitsGuardDeniedWithTheRunIDForThatDispatch(t *testing.T) {
+func recordDenial(root, dispatchID string, d Denial) {
+	e, ok := DenialEvent(dispatchID, d)
+	if !ok {
+		return
+	}
+	center := signalcenter.New()
+	center.Subscribe(center.NDJSONSink(func(cycle int) string { return core.SignalStreamPath(root, cycle) }))
+	center.Emit(e)
+	center.Flush()
+}
+
+func TestDenialEvent_IsGuardDeniedWithTheRunIDForThatDispatch(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 
-	RecordDenial(root, deniedDispatch, Denial{Guard: "role", Path: "/repo/x.go", Reason: "role guard: outside workspace"})
+	recordDenial(root, deniedDispatch, Denial{Guard: "role", Path: "/repo/x.go", Reason: "role guard: outside workspace"})
 
-	chunk, err := signalcenter.ReadStream(DenialStream(root, 7), 0)
+	chunk, err := signalcenter.ReadStream(core.SignalStreamPath(root, 7), 0)
 	if err != nil || len(chunk.Events) != 1 {
 		t.Fatalf("events %+v err %v: one GUARD_DENIED in the run stream", chunk.Events, err)
 	}
@@ -39,8 +48,8 @@ func TestRecordDenial_EmitsGuardDeniedWithTheRunIDForThatDispatch(t *testing.T) 
 func TestDenialOf_ReadsBackOnlyTheDenialOfThatDispatch(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	RecordDenial(root, "run-41/7/build/p4242n2t9", Denial{Guard: "ship", Path: "git push", Reason: "other dispatch"})
-	RecordDenial(root, deniedDispatch, Denial{Guard: "role", Path: "/repo/x.go", Reason: "outside workspace"})
+	recordDenial(root, "run-41/7/build/p4242n2t9", Denial{Guard: "ship", Path: "git push", Reason: "other dispatch"})
+	recordDenial(root, deniedDispatch, Denial{Guard: "role", Path: "/repo/x.go", Reason: "outside workspace"})
 
 	got, found := DenialOf(root, deniedDispatch)
 
@@ -62,25 +71,14 @@ func TestDenialOf_ReadsBackOnlyTheDenialOfThatDispatch(t *testing.T) {
 func TestDenialOf_NoCellOrNoStreamReadsNone(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	RecordDenial(root, "", Denial{Guard: "role"})
-	if _, err := os.Stat(DenialStream(root, 0)); !os.IsNotExist(err) {
-		t.Fatalf("a denial outside a cell records nothing: %v", err)
+	if _, ok := DenialEvent("", Denial{Guard: "role"}); ok {
+		t.Fatal("a denial outside a cell is no event")
 	}
 	if _, found := DenialOf(root, ""); found {
 		t.Fatal("no dispatch id reads no denial")
 	}
 	if _, found := DenialOf(root, deniedDispatch); found {
 		t.Fatal("no stream reads no denial")
-	}
-}
-
-func TestDenialStream_ACycleWritesTheRunStreamAndNoCycleTheRootStream(t *testing.T) {
-	t.Parallel()
-	if got := DenialStream("/p", 7); got != filepath.Join(paths.RunWorkspace("/p", 7), signalcenter.StreamFileName) {
-		t.Fatalf("cycle stream %q", got)
-	}
-	if got := DenialStream("/p", 0); got != filepath.Join(paths.EvolveDirOf("/p"), signalcenter.StreamFileName) {
-		t.Fatalf("root stream %q", got)
 	}
 }
 
@@ -101,8 +99,8 @@ func TestDeniedPath_NamesTheFileTheCommandOrThePersona(t *testing.T) {
 func TestDenialOf_ReadsOnlyTheTailWindowOfTheStream(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	RecordDenial(root, deniedDispatch, Denial{Guard: "role", Path: "/old.go", Reason: "long ago"})
-	f, err := os.OpenFile(DenialStream(root, 7), os.O_APPEND|os.O_WRONLY, 0o644)
+	recordDenial(root, deniedDispatch, Denial{Guard: "role", Path: "/old.go", Reason: "long ago"})
+	f, err := os.OpenFile(core.SignalStreamPath(root, 7), os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +114,7 @@ func TestDenialOf_ReadsOnlyTheTailWindowOfTheStream(t *testing.T) {
 	if _, found := DenialOf(root, deniedDispatch); found {
 		t.Fatal("a denial before the tail window must not count")
 	}
-	RecordDenial(root, deniedDispatch, Denial{Guard: "role", Path: "/new.go", Reason: "now"})
+	recordDenial(root, deniedDispatch, Denial{Guard: "role", Path: "/new.go", Reason: "now"})
 	if got, found := DenialOf(root, deniedDispatch); !found || got.Path != "/new.go" {
 		t.Fatalf("a denial inside the tail window counts: %+v %v", got, found)
 	}
