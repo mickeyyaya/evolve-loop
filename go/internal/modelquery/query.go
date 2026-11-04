@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
@@ -105,6 +106,9 @@ func liveTiers(ctx context.Context, cli string, deps RefreshDeps) (liveResult, e
 	if prior, ok := deps.Prior.CLIs[cli]; ok && isReusablePrior(prior, fp) {
 		return liveResult{tiers: prior.TierModels, available: ids, hash: fp}, nil
 	}
+	if tiers, ok := carryAcrossBump(cli, deps.Prior.CLIs[cli], ids, deps.Freshness[cli]); ok {
+		return liveResult{tiers: tiers, available: ids, hash: fp}, nil
+	}
 	mapped, err := deps.Classifier.Classify(ctx, cli, ids)
 	if err != nil {
 		return liveResult{}, fmt.Errorf("classify models: %w", err)
@@ -117,9 +121,46 @@ func liveTiers(ctx context.Context, cli string, deps RefreshDeps) (liveResult, e
 }
 
 func isReusablePrior(prior modelcatalog.CLIEntry, fp string) bool {
-	return prior.CandidatesHash != "" && prior.CandidatesHash == fp &&
-		prior.Source == modelcatalog.SourceLive &&
-		coversCanonicalTiers(prior.TierModels)
+	return prior.CandidatesHash != "" && prior.CandidatesHash == fp && isSoundPrior(prior)
+}
+
+func isSoundPrior(prior modelcatalog.CLIEntry) bool {
+	return prior.Source == modelcatalog.SourceLive && coversCanonicalTiers(prior.TierModels)
+}
+
+func carryAcrossBump(cli string, prior modelcatalog.CLIEntry, ids []string, p FreshnessPolicy) (map[string]string, bool) {
+	if !isSoundPrior(prior) || len(prior.Available) == 0 || !sameLineages(prior.Available, ids) {
+		return nil, false
+	}
+	if !priorDerivedFromItsOffering(cli, prior, p) {
+		return nil, false
+	}
+	tiers := PromoteLatest(prior.TierModels, ids, p)
+	for _, model := range tiers {
+		if !slices.Contains(ids, model) {
+			return nil, false
+		}
+	}
+	return tiers, true
+}
+
+func priorDerivedFromItsOffering(cli string, prior modelcatalog.CLIEntry, p FreshnessPolicy) bool {
+	return prior.CandidatesHash != "" && prior.CandidatesHash == Fingerprint(FingerprintInput{
+		CLI: cli, Candidates: prior.Available, Policy: p, Tiers: modelcatalog.CanonicalTiers,
+	})
+}
+
+func sameLineages(a, b []string) bool {
+	ga, gb := GroupByLineage(a), GroupByLineage(b)
+	if len(ga) != len(gb) {
+		return false
+	}
+	for key := range ga {
+		if _, ok := gb[key]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func coversCanonicalTiers(tiers map[string]string) bool {
