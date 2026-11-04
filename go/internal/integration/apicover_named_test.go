@@ -1,6 +1,9 @@
 package integration
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 func TestExportedSymbolsAreNamedByAnExecutedAssertion(t *testing.T) {
 	triggers := []FlushTrigger{TriggerNone, TriggerWaveEnd, TriggerCapReached, TriggerMaxAge, TriggerUnblocksQueuedWork, TriggerRiskyAlone}
@@ -43,5 +46,20 @@ func TestExportedSymbolsAreNamedByAnExecutedAssertion(t *testing.T) {
 	ordered := OrderDeliverables([]Deliverable{d})
 	if len(ordered) != 1 || ordered[0].ID != "sample" {
 		t.Errorf("OrderDeliverables = %+v, want sample", ordered)
+	}
+}
+
+func TestIntegrationRecordExportsAreNamedByAnExecutedAssertion(t *testing.T) {
+	t.Parallel()
+	spy := &closerSpy{}
+	a := Adopter{Closer: spy}
+	if err := a.Closer.ClosePR(context.Background(), 5, "integration/w1-b1"); err != nil || len(spy.closed) != 1 {
+		t.Errorf("ClosePR = %v, closed %v", err, spy.closed)
+	}
+	if IntegrationSchema == RecordSchema {
+		t.Errorf("the integration schema %q must differ from the deliverable schema", IntegrationSchema)
+	}
+	if ErrStaleEpoch == nil || ErrBranchMoved == nil || ErrStaleEpoch == ErrBranchMoved {
+		t.Error("the two adoption errors must be distinct and set")
 	}
 }
