@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cloudlaunch"
@@ -27,6 +28,7 @@ const (
 	cloudScrollback     = 200
 	cloudLaunchOrigin   = "launchCloud"
 	cloudMaxPromptBytes = 120 << 10
+	cloudTaskPrefix     = "Task:\n"
 )
 
 func init() {
@@ -131,10 +133,17 @@ func (l cloudLaunch) writePrompt() (string, error) {
 		return "", fmt.Errorf("%s the prompt has %d bytes, over the argument limit of %d: the pane passes it as one argument of the CLI", l.prefix, len(prompt), cloudMaxPromptBytes)
 	}
 	path := filepath.Join(l.cfg.Workspace, cloudPromptFile)
-	if err := os.WriteFile(path, []byte(prompt), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(cloudTaskArgument(prompt)), 0o600); err != nil {
 		return "", fmt.Errorf("%s write the cloud prompt: %w", l.prefix, err)
 	}
 	return path, nil
+}
+
+func cloudTaskArgument(prompt string) string {
+	if strings.HasPrefix(strings.TrimSpace(prompt), "-") {
+		return cloudTaskPrefix + prompt
+	}
+	return prompt
 }
 
 func (l cloudLaunch) start(ctx context.Context, promptFile string) (cloudConfirmation, int, error) {
@@ -155,7 +164,7 @@ func (l cloudLaunch) start(ctx context.Context, promptFile string) (cloudConfirm
 
 func (l cloudLaunch) command(promptFile string) string {
 	flags := append(slices.Clone(l.cfg.Realization.LaunchFlags), l.m.CloudLaunch.Args...)
-	return launchCmdLine(resolveBinary(l.deps, l.m.Binary), flags) + ` -- "$(cat ` + shellQuotePOSIX(promptFile) + `)"`
+	return launchCmdLine(resolveBinary(l.deps, l.m.Binary), flags) + ` "$(cat ` + shellQuotePOSIX(promptFile) + `)"`
 }
 
 func (l cloudLaunch) await(ctx context.Context, session string) (cloudConfirmation, int, error) {
