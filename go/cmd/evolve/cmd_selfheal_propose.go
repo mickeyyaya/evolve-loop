@@ -14,6 +14,7 @@ import (
 	gobridge "github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cli/agentcmd"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxfile"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -101,10 +102,8 @@ func proposeDiagnoses(env selfhealEnv, root string, pol policy.Policy, stderr io
 	if err != nil {
 		return report, nil, err
 	}
-	var proposals []selfheal.Proposal
-	for _, inc := range pending {
-		proposals = append(proposals, decider.decide(diagnoseIncident(env, root, inc, signals, cfg.Stage, now, stderr), inc, now))
-	}
+	round := diagnosisRound{env: env, root: root, signals: signals, stage: cfg.Stage, now: now, stderr: stderr, decider: decider}
+	proposals := round.run(pending)
 	if err := decider.appendLedger(evolveDir); err != nil {
 		return report, nil, err
 	}
@@ -116,6 +115,28 @@ func proposeDiagnoses(env selfhealEnv, root string, pol policy.Policy, stderr io
 	}
 	decider.publish(env, root, stderr)
 	return report, decider.warnings, nil
+}
+
+type diagnosisRound struct {
+	env     selfhealEnv
+	root    string
+	signals []signalcenter.Event
+	stage   string
+	now     time.Time
+	stderr  io.Writer
+	decider *proposalDecider
+}
+
+func (r diagnosisRound) run(pending []selfheal.Incident) []selfheal.Proposal {
+	var proposals []selfheal.Proposal
+	for i, inc := range pending {
+		p := r.decider.decide(diagnoseIncident(r.env, r.root, inc, r.signals, r.stage, r.now, r.stderr), inc, r.now)
+		proposals = append(proposals, p)
+		if p.Cause == llmroute.CauseGuardRefused {
+			return append(proposals, selfheal.SkipAfterGuardRefusal(pending[i+1:], r.stage, r.now)...)
+		}
+	}
+	return proposals
 }
 
 func hours(n int) time.Duration { return time.Duration(n) * time.Hour }
@@ -206,7 +227,9 @@ func diagnoseIncident(env selfhealEnv, root string, inc selfheal.Incident, signa
 	run, err := runOrchestratorAgent(env, root, inc, stderr)
 	p := selfheal.NewProposal(inc, stage, run.RunLabel, now)
 	if err != nil {
-		return p.Failed(err)
+		p = p.Failed(err)
+		p.Cause = run.Cause
+		return p
 	}
 	d, err := phasecontract.ParseDiagnosis([]byte(run.Report), inc.ID, selfheal.EntryIDs(idx))
 	if err != nil {

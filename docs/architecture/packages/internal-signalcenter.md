@@ -9,7 +9,7 @@ The quality indexes (ADR-0153, proposed) plan to publish through this package as
 ## Design
 
 - `Event` is the one schema. `Emit` stamps `SchemaVersion`, `Seq`, `PID` and `TS`. Producers fill the rest. The schema has no nested structs, so one event is one greppable line. Structured detail goes in the artifact that `fields.path` names.
-- `Module` and `Kind` are closed sets. `Code` has the form `MODULE_SNAKE_CASE` and is registered by its owning module. `Severity` follows the schema-1.0 contract: INFO (10) logs only, WARN (20) notes and flags, and INCIDENT (30) acts.
+- `Module` and `Kind` are closed sets. The module `guard` owns the code `GUARD_DENIED`. `Code` has the form `MODULE_SNAKE_CASE` and is registered by its owning module. `Severity` follows the schema-1.0 contract: INFO (10) logs only, WARN (20) notes and flags, and INCIDENT (30) acts.
 - `Center` is the process-scoped fan-out. A nil `*Center` is a Null Object. Every method is safe and does nothing.
 - The sinks are listeners. `NDJSONSink` is the durable record, one file per cycle. `StderrSink` is the one module-tagged line renderer. `ConsoleSink` is the stderr half at WARN and above. The composition roots share that threshold.
 - `Summary` is one listener's per-cycle view. It follows the current cycle by itself.

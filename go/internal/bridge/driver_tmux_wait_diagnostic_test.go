@@ -41,6 +41,11 @@ func TestSelectArtifactTimeoutCausePrecedence(t *testing.T) {
 			evidence: artifactTimeoutEvidence{transient: true, reviewAction: ReviewStop},
 			want:     artifactTimeoutTransientUpstream,
 		},
+		{
+			name:     "a guard denial outranks the review",
+			evidence: artifactTimeoutEvidence{guardDenied: true, reviewAction: ReviewPause},
+			want:     artifactTimeoutGuardRefused,
+		},
 		{name: "review stop", evidence: artifactTimeoutEvidence{reviewAction: ReviewStop}, want: artifactTimeoutReviewStop},
 		{name: "review pause", evidence: artifactTimeoutEvidence{reviewAction: ReviewPause}, want: artifactTimeoutReviewPause},
 		{name: "unknown action fails closed", evidence: artifactTimeoutEvidence{reviewAction: ReviewAction("unexpected")}, want: artifactTimeoutIncomplete},

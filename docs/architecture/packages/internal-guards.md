@@ -87,6 +87,9 @@ The hooks are defence in depth, because they fire only in Claude Code panes. The
 - **The three rules of the guard.** A field of `PhaseRequest`, `PhasePlanEntry` or `MintSpec` must not name a CLI. A string literal must not hold the JSON key `"cli":`. A `==`, `!=` or `switch` must not test a driver identity. A driver identity is a name that ends in `cli` or `driver`, its `String()`, or a call of `Family`, `BaseCLI` or `Bind`. An empty-string check is not a branch.
 - **The limit of the name rule.** The rule reads names, not types, so a driver in a variable with another name passes it.
 - **The allowlist only shrinks.** `cliSpecificsAllowlist` counts the sites of each declaration. A count above its entry fails, and a count below its entry also fails, so a fixed site must leave the list. [The spec §28](../llm-isolation.md#28-the-cli-neutral-task-assignment-x19) gives the start count and the sites that stay.
+- **The guard denial record** (`denial.go`). `RecordDenial` writes one `GUARD_DENIED` event to the signal stream of the run. The dispatch id gives the run id, the cycle and the phase. `DenialStream` gives the path: `.evolve/runs/cycle-<N>/signals.ndjson`, or `.evolve/signals.ndjson` with no cycle.
+- **The read-back.** `DenialOf` reads back the last denial of one dispatch id. A call outside a cell (no dispatch id) writes and reads nothing. `DeniedPath` names the file, the command or the persona of the denied call.
+- **The summary.** `Summary` gives `guard <name> denied <path>: <reason>`. The decision logic of each guard does not change. Design: [The terminal refusal](../phase-timing-and-diagnostics.md#the-terminal-refusal).
 
 ## Invariants
 

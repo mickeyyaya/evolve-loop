@@ -126,6 +126,7 @@ func TestTimeoutCauseVocabulary_DriverAndClassifierAgree(t *testing.T) {
 		{transient: true},
 		{reviewAction: ReviewStop},
 		{reviewAction: ReviewPause},
+		{guardDenied: true},
 		{},
 	}
 	seen := map[artifactTimeoutCause]bool{}
@@ -140,8 +141,8 @@ func TestTimeoutCauseVocabulary_DriverAndClassifierAgree(t *testing.T) {
 			t.Errorf("driver cause %q is not in the classifier's closed set", cause)
 		}
 	}
-	if len(seen) != 7 {
-		t.Errorf("the driver selects %d distinct causes, want the seven-token vocabulary", len(seen))
+	if len(seen) != 8 {
+		t.Errorf("the driver selects %d distinct causes, want the eight-token vocabulary", len(seen))
 	}
 }
 

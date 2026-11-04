@@ -135,9 +135,9 @@ func TestCauseCode_UsesTypedArtifactCauseOnly(t *testing.T) {
 	}
 }
 
-func TestTimeoutCause_KnownIsExactlyTheEightTokens(t *testing.T) {
-	known := []TimeoutCause{TimeoutContextCancelled, TimeoutPaneLost, TimeoutDetectorError, TimeoutSubmitWedged, TimeoutTransientUpstream, TimeoutReviewStop, TimeoutReviewPause, TimeoutIncomplete}
-	wantSpelling := []string{"context_cancelled", "pane_lost", "completion_detector_error", "submit_wedged", "transient_upstream", "review_stop", "review_pause", "incomplete"}
+func TestTimeoutCause_KnownIsExactlyTheNineTokens(t *testing.T) {
+	known := []TimeoutCause{TimeoutContextCancelled, TimeoutPaneLost, TimeoutDetectorError, TimeoutSubmitWedged, TimeoutTransientUpstream, TimeoutReviewStop, TimeoutReviewPause, TimeoutIncomplete, TimeoutGuardRefused}
+	wantSpelling := []string{"context_cancelled", "pane_lost", "completion_detector_error", "submit_wedged", "transient_upstream", "review_stop", "review_pause", "incomplete", "guard_refused"}
 	for i, c := range known {
 		if !c.Known() || string(c) != wantSpelling[i] {
 			t.Errorf("%q must be Known and spelled %q", c, wantSpelling[i])

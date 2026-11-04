@@ -265,6 +265,8 @@ var serialTests = map[string]string{
 	"main.TestCmd_InboxWithdraw_RemovesAPendingItemAndAddFilesTheIDAgain":                                   "sets env through a helper",
 	"main.TestAgentRun_EachDiffReviewerRunsOnANonClaudeFamily":                                              "assigns runner.DefaultRouter",
 	"main.TestSelfhealPropose_TheLiveIncidentsEachGetOneCheckedProposalThroughTheBridge":                    "assigns runner.DefaultRouter",
+	"main.TestJourney_AGuardDenialEndsTheChainAndTheSelfhealPass":                                           "assigns runner.DefaultRouter",
+	"main.TestJourney_AStallWithNoDenialKeepsTheFallbackChainAndThePass":                                    "assigns runner.DefaultRouter",
 	"main.TestSelfhealPropose_ATornShipJournalIsAWarningAndRefusesOnlyTheRevert":                            "assigns runner.DefaultRouter",
 	"main.TestSelfhealPropose_TheBudgetRefusesTheFourthT1RepairOfAWindow":                                   "assigns runner.DefaultRouter",
 	"main.TestSelfhealPropose_TheValidatorDecidesEachProposalAndRecordsWouldApplyDecisions":                 "assigns runner.DefaultRouter",

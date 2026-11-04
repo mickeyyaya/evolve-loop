@@ -37,6 +37,12 @@
 - **A lint error is a loud, non-blocking skip, named once by its caller.** An unreadable path, an unparseable file or a directory with no `.go` files prints `evolve eval quality-check: <lint>: <error> (advisory lint skipped)` on stderr and contributes PASS. The name is the table's, the one the receipt prints (`flaky-lint`, `unsatisfiable-lint`); `internal/evalqualitycheck` returns its errors without a lint name, so each caller names the lint once in its own words (the gates say `flaky-shape lint`, `unsatisfiable-lint`). Pinned by `TestRunEval_QualityCheckPredicateLintSkipNamesEachLintOnce`.
 - **Advisory severity joins monotonically.** Each lint returns WARN when it found anything and PASS otherwise, and `maxEvalLevel` joins it with the eval's own level. The join can raise PASS to WARN but never lower a tautology HALT, whichever lints are added.
 
+## The guard denial record
+
+- `RunGuard` has one denial path. On each denial, it calls `guards.RecordDenial` with the guard name, the denied path and the reason. Design: [The terminal refusal](../phase-timing-and-diagnostics.md#the-terminal-refusal).
+- The project root is `EVOLVE_PROJECT_ROOT`, else the parent of `--evolve-dir`. The dispatch id is `EVOLVE_DISPATCH_ID`. The bridge writes these dispatch markers into the cell. They do not change a decision. Outside a cell, the record is empty.
+- Pinned by `TestRunGuard_ADenialInACellEmitsGuardDeniedForThatDispatch` and `TestRunGuard_AnAllowRecordsNoDenial`.
+
 ## Invariants
 
 - The unsatisfiable-predicate lint runs through the binary's real entry point: `TestDispatch_EvalQualityCheckPrintsTheUnsatisfiableLintReceipt` (`cmd/evolve`) drives `dispatch` with `eval quality-check <eval.md> -predicates <file>` and requires exit 1 and the `unsatisfiable-lint` receipt.

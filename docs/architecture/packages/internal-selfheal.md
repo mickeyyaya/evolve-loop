@@ -79,12 +79,13 @@ The operator asked on 2026-10-27 for "the LLM judgment step" that reads the open
 | Evidence index | `WriteEvidence(root, incident, signals)` | `.evolve/runs/selfheal-<incident id>/inputs/index.json` with the format `evolve.inputs.index/2` |
 | Entry ids | `EntryIDs(index)` | the ids that a diagnosis can cite |
 | Selection | `Pending(incidents, proposals, limit)` | the open incidents with no current proposal, INCIDENT first |
-| Record | `NewProposal`, `WithDiagnosis`, `Refused`, `Failed`, `WriteProposal`, `LoadProposals` | `.evolve/incidents/proposals/<incident id>.json` with the schema `evolve.healing.proposal/1` |
+| Record | `NewProposal`, `WithDiagnosis`, `Refused`, `Failed`, `SkipAfterGuardRefusal`, `WriteProposal`, `LoadProposals` | `.evolve/incidents/proposals/<incident id>.json` with the schema `evolve.healing.proposal/1` |
 
 - **The classes of the index.** `EvidenceIncident` is the record, `i1`, the one required entry. `EvidenceSignal` is a cut of the signals that the record names, and of the `INBOX_CURATOR_PROPOSAL` signals that name its subject. `EvidenceDigest` and `EvidenceRetrospective` are `failure-digest.json` and `retrospective-report.md` of each source cycle. Each id is the prefix of its class in the table `evidencePrefixes` and a number, for example `s1`. The table gives each class its own prefix, so a later class `diff` cannot take the `d` of `digest`.
 - **The notes.** The index names the evidence that it does not hold: the runs of a `ci:` source and the diff. The pipeline has no cut of a CI log or a diff yet.
 - **A fresh index.** Each pass removes the evidence workspace first, so a cut of an earlier pass never stays. Each entry carries the `sha256` of its file, so `evolve context open` refuses a changed file.
 - **A current proposal.** A proposal is current while its incident keeps the `recurrence` and the `last_seen_at` of the diagnosis. A `failed` run is current for `healing.orchestrator.retry_after_hours` (6). After that the next pass tries it again. So a run that fails at each try does not take a pass slot at each boundary. A `refused` diagnosis is current: the next pass does not pay for the same mistake.
+- **A skipped record.** A `skipped` record has the same backoff as a `failed` run.
 - **The proposed action.** `WithDiagnosis` keeps the diagnosis of the agent and stores the proposed action in `action`. A `low` diagnosis records `halt-and-escalate`. The rule is in this package, because the pipeline decides the action and `phasecontract` checks only the shape.
 
 The verb `evolve selfheal propose [--json] [--project-root P]` runs one pass. The JSON envelope has the schema `evolve.selfheal.propose/1`.
@@ -96,7 +97,9 @@ The verb `evolve selfheal propose [--json] [--project-root P]` runs one pass. Th
 
 - The verb reads the channels `errors`, `loop` and `inbox` over the window of `healing.detector.window_hours`.
 - It runs `evolve agent run selfheal-orchestrator --json` in the process, with an input that names the incident and its evidence workspace. `phasecontract.ParseDiagnosis` checks the `diagnosis.json` of the run against the ids of the index.
-- A failed run or a refused diagnosis is a record and a warning, and the exit is 0. An I/O fault is exit 2. The agent class is R.
+- A failed run or a refused diagnosis is a record and a warning, and the exit is 0.
+- **A guard refusal stops the pass.** When the run of a diagnosis ends with the cause `guard_refused`, the pass starts no other diagnosis. `SkipAfterGuardRefusal` records each other pending incident with the state `skipped`, the cause `guard_refused` and the reason. The next pass tries them again after the backoff.
+- Pinned by `TestJourney_AGuardDenialEndsTheChainAndTheSelfhealPass` (`cmd/evolve`). Design: [The terminal refusal](../phase-timing-and-diagnostics.md#the-terminal-refusal). An I/O fault is exit 2. The agent class is R.
 - The boundary runs `selfheal incidents` and then `selfheal propose` after `inbox curate --apply`.
 - The tests use the 8 records of the live pass of 2026-10-27 (`testdata/incidents-2026-10-27/`) and a fake bridge (`TestSelfhealPropose_TheLiveIncidentsEachGetOneCheckedProposalThroughTheBridge`).
 

@@ -21,6 +21,7 @@ const (
 	artifactTimeoutReviewStop        = launchoutcome.TimeoutReviewStop
 	artifactTimeoutReviewPause       = launchoutcome.TimeoutReviewPause
 	artifactTimeoutIncomplete        = launchoutcome.TimeoutIncomplete
+	artifactTimeoutGuardRefused      = launchoutcome.TimeoutGuardRefused
 )
 
 type artifactTimeoutEvidence struct {
@@ -29,6 +30,7 @@ type artifactTimeoutEvidence struct {
 	terminalDetectorErrored bool
 	submitWedged            bool
 	transient               bool
+	guardDenied             bool
 	reviewAction            ReviewAction
 }
 
@@ -44,6 +46,8 @@ func selectArtifactTimeoutCause(e artifactTimeoutEvidence) artifactTimeoutCause 
 		return artifactTimeoutSubmitWedged
 	case e.transient:
 		return artifactTimeoutTransientUpstream
+	case e.guardDenied:
+		return artifactTimeoutGuardRefused
 	case e.reviewAction == ReviewStop:
 		return artifactTimeoutReviewStop
 	case e.reviewAction == ReviewPause:
@@ -79,12 +83,10 @@ func newArtifactTimeoutDiagnostic(w replWaiter, state *replWaitState, transient 
 		terminalDetectorErrored: state.terminalDetectorErrored,
 		submitWedged:            state.submitWedged,
 		transient:               transient,
+		guardDenied:             state.guardDenial != nil,
 		reviewAction:            state.lastVerdict.Action,
 	}
-	reason := state.lastVerdict.Reason
-	if state.cancellationErr != nil {
-		reason = state.cancellationErr.Error()
-	}
+	reason := timeoutReason(state)
 	detectorError := ""
 	if state.lastDetectorErr != nil {
 		detectorError = state.lastDetectorErr.Error()
@@ -107,6 +109,16 @@ func newArtifactTimeoutDiagnostic(w replWaiter, state *replWaitState, transient 
 		transient:     transient,
 		detectorError: detectorError,
 	}
+}
+
+func timeoutReason(state *replWaitState) string {
+	switch {
+	case state.cancellationErr != nil:
+		return state.cancellationErr.Error()
+	case state.guardDenial != nil:
+		return state.guardDenial.Summary()
+	}
+	return state.lastVerdict.Reason
 }
 
 func (d artifactTimeoutDiagnostic) String() string {

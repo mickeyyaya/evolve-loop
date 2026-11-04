@@ -172,6 +172,7 @@ the free-form evidence:
 | `transient_upstream` | The launched family's manifest recognized a temporary provider failure in the agent-stripped pane. | Retry after provider recovery; do not raise the artifact budget first. |
 | `review_stop` | The reviewer or fatal-pane gate selected a terminal stop. | Read `reason` and the escalation report. |
 | `review_pause` | The reviewer selected an investigation pause. | Compare liveness and extension counters, then read the escalation report. |
+| `guard_refused` | A kernel guard denied a tool call of this dispatch, and then the stall limit ended the run. The chain stops. | Read `reason`: it names the guard and the path. Fix the guard or the task. Do not retry on a different family. |
 | `incomplete` | No known terminal signal explained the missing completion. | Treat it as an unclassified bridge defect and preserve the logs. |
 
 `reason` and `detector_error` are independently bounded and escaped. Long
@@ -191,6 +192,35 @@ free-form evidence cannot displace the host-written terminal marker.
 The complete exit-81 summary is capped at 1,024 Unicode code points. Other
 bridge errors retain their existing shorter bound. Exit code 81 and
 `ErrArtifactTimeout` semantics are unchanged.
+
+### The terminal refusal
+
+Operator request, 2026-11-04: "A guard denial does not walk each family." A refused agent walked three families, and a second incident repeated it. The two incidents cost 35 minutes at one boundary.
+
+**F6.1** Before this change, a denied agent waited at its prompt. The 300-second stall limit ended it with exit 81 and `cause=review_pause`. `llmroute.TieringExit` returned 81, and exit 81 is a fallback trigger, so the chain started the next family (`go/internal/llmroute/tier_fallback.go`). Then `evolve selfheal propose` started the diagnosis of its next incident. The summary said "after a quota wall", which was false.
+*Implication:* a guard denial cannot depend on the family, so a retry on a different family cannot change it.
+
+| Id | Decision | Because | Rejected options and why |
+|---|---|---|---|
+| D1 | Each guard denial in a phase cell writes `GUARD_DENIED` to the signal stream of the run. The hook process reads the dispatch id from `EVOLVE_DISPATCH_ID`, so the event has the run id, the cycle, the phase and the dispatch id. | F6.1 | A marker in the pane: the pane text is not host-owned, and an agent can print it. |
+| D2 | When the stall limit ends a run, the bridge reads the denials of that dispatch. A denial makes the terminal reason `guard_refused`. The reason names the guard and the path. | F6.1 | Match on the run id only: each try of a phase in one cycle has the same run id. An old denial must not change the cause of a new try. |
+| D3 | `TieringExit(81, guard_refused)` returns `ExitGuardRefusedTerminal`. No fallback trigger names this exit, so the dispatch chain stops after one try. | F6.1 | A new exit code from the bridge: each consumer of exit 81 must then change. |
+| D4 | `evolve selfheal propose` stops the pass after a diagnosis that ends with `guard_refused`. It records each other pending incident as `skipped` with this reason. A skipped incident gets the retry backoff of a failed run. | F6.1 | Continue the pass: the next diagnosis uses the same seat and the same guards, so it stalls again. |
+
+A stall with no denial keeps the previous behavior exactly. The cause is `review_pause` or another cause in the table. The chain walks to the next family.
+
+How the parts connect:
+
+1. The guard hook denies the tool call. `guardcmd.RunGuard` calls `guards.RecordDenial` at its one shared denial path (`go/internal/cli/guardcmd/guard.go`).
+2. `guards.RecordDenial` writes `GUARD_DENIED` to `.evolve/runs/cycle-<N>/signals.ndjson`. With no cycle, it writes to `.evolve/signals.ndjson` (`go/internal/guards/denial.go`).
+3. At the stall limit, the bridge closeout calls `guards.DenialOf` with its project root and dispatch id (`go/internal/bridge/driver_tmux_wait_closeout.go`).
+4. The timeout marker has `cause=guard_refused` and the reason `guard <name> denied <path>: <reason>`.
+5. `launchoutcome.Classify` gives the cause code `guard_refused`. `llmroute.TieringExit` makes it terminal, and both dispatch chains stop (`go/internal/phases/runner/dispatch.go`, `go/internal/bridgechain/bridgechain.go`).
+6. `evolve agent run` puts the cause in the `cause` field of its JSON envelope. `evolve selfheal propose` reads it and stops the pass.
+
+The journey tests are `TestJourney_AGuardDenialEndsTheChainAndTheSelfhealPass` and `TestJourney_AStallWithNoDenialKeepsTheFallbackChainAndThePass` (`go/cmd/evolve/selfheal_guard_refused_journey_test.go`). The bridge journey is `TestLaunchArgs_AStallAfterAGuardDenialEndsWithTheTerminalReasonGuardRefused` (`go/internal/bridge/guard_refused_stall_test.go`). It runs the real role hook when the pane receives the dispatch id.
+
+Limits: the hook must be able to write the stream of the run. If the write fails, the stall keeps its previous cause, and the chain walks as before. The denial changes the cause only when a stall limit ends the run. A run that completes after a denial is not changed.
 
 ### Verified Submission Delivery Failures — Issue / Gap / Solution
 

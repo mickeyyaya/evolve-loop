@@ -15,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
@@ -132,12 +133,21 @@ func RunGuard(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "%s\n", buf)
 	}
 	if !dec.Allow {
+		recordCellDenial(evolveDir, guards.Denial{Guard: name, Path: guards.DeniedPath(in), Reason: dec.Reason})
 		if dec.Reason != "" {
 			fmt.Fprintf(stderr, "[guard:%s] DENY: %s\n", name, dec.Reason)
 		}
 		return 2
 	}
 	return 0
+}
+
+func recordCellDenial(evolveDir string, d guards.Denial) {
+	root := os.Getenv("EVOLVE_PROJECT_ROOT")
+	if root == "" {
+		root = filepath.Dir(evolveDir)
+	}
+	guards.RecordDenial(root, os.Getenv(ipcenv.DispatchIDKey), d)
 }
 
 func readGuardInput(r io.Reader) (core.GuardInput, error) {

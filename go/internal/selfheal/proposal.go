@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
@@ -21,6 +22,7 @@ const (
 	ProposalProposed = "proposed"
 	ProposalRefused  = "refused"
 	ProposalFailed   = "failed"
+	ProposalSkipped  = "skipped"
 	proposalsDirName = "proposals"
 )
 
@@ -37,6 +39,7 @@ type Proposal struct {
 	Action             *phasecontract.DiagnosisAction `json:"action,omitempty"`
 	Decision           *Decision                      `json:"decision,omitempty"`
 	Error              string                         `json:"error,omitempty"`
+	Cause              string                         `json:"cause,omitempty"`
 	IncidentRecurrence int                            `json:"incident_recurrence"`
 	IncidentLastSeenAt time.Time                      `json:"incident_last_seen_at"`
 	CreatedAt          time.Time                      `json:"created_at"`
@@ -72,8 +75,20 @@ func (p Proposal) Failed(err error) Proposal {
 	return p
 }
 
+const guardRefusedSkip = "the pass stopped: the diagnosis before this one ended in a guard refusal, and a guard denial cannot depend on the family"
+
+func SkipAfterGuardRefusal(rest []Incident, stage string, at time.Time) []Proposal {
+	out := make([]Proposal, 0, len(rest))
+	for _, inc := range rest {
+		p := NewProposal(inc, stage, "", at)
+		p.State, p.Error, p.Cause = ProposalSkipped, guardRefusedSkip, llmroute.CauseGuardRefused
+		out = append(out, p)
+	}
+	return out
+}
+
 func (p Proposal) current(inc Incident, retryAt time.Time) bool {
-	if p.State == ProposalFailed {
+	if p.State == ProposalFailed || p.State == ProposalSkipped {
 		return p.CreatedAt.After(retryAt)
 	}
 	return p.IncidentRecurrence == inc.Recurrence && p.IncidentLastSeenAt.Equal(inc.LastSeenAt)
