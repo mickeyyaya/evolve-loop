@@ -22,11 +22,7 @@ func FileToPackage(file string) (string, bool) {
 	if strings.ContainsAny(p, " \t\n") {
 		return "", false
 	}
-	dir := path.Dir(strings.TrimPrefix(p, "go/"))
-	if dir == "." || dir == "" {
-		return "./...", true
-	}
-	return "./" + dir + "/...", true
+	return dirPattern(path.Dir(strings.TrimPrefix(p, "go/"))), true
 }
 
 type handoffDoc struct {

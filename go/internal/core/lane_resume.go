@@ -67,7 +67,7 @@ func laneResumable(last perRunState, ships map[int]time.Time, projectRoot string
 }
 
 func laneQuotaPaused(st perRunState) bool {
-	return st.enabled && st.reason == laneQuotaReason && !st.leased && st.phase != string(PhaseEnd) && st.phase != "aborted"
+	return st.enabled && st.reason == laneQuotaReason && !st.leased && !IsTerminalPhase(st.phase)
 }
 
 func normalizedIDs(raw []string) []string {

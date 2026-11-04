@@ -165,6 +165,9 @@ type Orchestrator struct {
 
 	dossierDestination DossierDestination
 
+	bookkeepingStage string
+	bookkeepingSink  BookkeepingSink
+
 	gitDirtyPaths func(ctx context.Context, repoRoot string) ([]string, error)
 
 	catalogRefresh func(ctx context.Context) error
@@ -683,6 +686,7 @@ const (
 	DossierCommitted DossierDestination = iota
 	DossierFilesOnly
 	DossierPending
+	DossierBatched
 )
 
 func WithDossierDestination(d DossierDestination) Option {

@@ -146,6 +146,9 @@ var treeReadingSelections = []TestSelection{
 		"TestCoveringTests_ReachableFromProduction",
 		"TestDirectImporters_ReachableFromProduction",
 	}},
+	{Package: "./internal/ciparity", Tests: []string{
+		"TestEnvExclusive_TheCIJobsTheBridgeBackstopNamesRunTheTmuxTier",
+	}},
 	{Package: "./internal/committedset", Tests: []string{
 		"TestDecisionBuckets_TheOneDeclarationOfTheDroppedAndSkipShippedWireTags",
 	}},
@@ -185,9 +188,6 @@ var treeReadingSelections = []TestSelection{
 		"TestDefectLedgerSeam_OneConstructionSite",
 		"TestNullLedgerFacades_HaveNoProductionCaller",
 	}},
-	{Package: "./internal/phases/audit/ciparitygate", Tests: []string{
-		"TestEnvExclusive_TheCIJobsTheBridgeBackstopNamesRunTheTmuxTier",
-	}},
 	{Package: "./internal/phases/runner", Tests: []string{
 		"TestVerdictEngine_OneConstructionSite",
 	}},
@@ -214,9 +214,14 @@ var treeReadingSelections = []TestSelection{
 		"TestNoTestRunsARawBareClone",
 		"TestNoTrackedFileRegistersAnMCPServer",
 		"TestOnlyTheTrailAdapterRunsTheTrailBinary",
+		"TestParallelLanesAddingDistinctPackagesComposeInBothMergeOrders",
+		"TestParallelLanesAddingOneIdenticalLineKeepOneLineInBothMergeOrders",
+		"TestParallelLanesAddingOnePackageFailTheGuardInBothMergeOrders",
+		"TestRegistryFilesHoldEachPackageOnce",
 		"TestTheCodeIndexAbstractionRunsNoProcessAndNamesNoBackend",
 		"TestTheMCPConfigReaderOnlyReads",
 		"TestTheTrailAdapterIsTheHomeThatRunsAProcess",
+		"TestUnionMergesTriesBothOrders",
 	}},
 }
 

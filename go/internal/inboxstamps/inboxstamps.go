@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
@@ -254,6 +255,25 @@ func applyStamps(root string, stamps []Stamp) error {
 		}
 	}
 	return errors.Join(failures...)
+}
+
+func (p Plan) HoldKept(sink core.BookkeepingSink) error {
+	return holdStamps(sink, Paths(p.Kept), keptMessage)
+}
+
+func (p Plan) HoldReplay(sink core.BookkeepingSink) error {
+	return holdStamps(sink, Paths(p.Replay), replayMessage)
+}
+
+func holdStamps(sink core.BookkeepingSink, paths []string, message string) error {
+	if len(paths) == 0 {
+		return nil
+	}
+	entry := core.BookkeepingEntry{Kind: core.BookkeepingInboxStamp, Paths: paths, Message: message}
+	if err := sink.Add(entry); err != nil {
+		return fmt.Errorf("hold the inbox stamps for the bookkeeping batch: %w", err)
+	}
+	return nil
 }
 
 func (p Plan) CommitReplay(ctx context.Context, g Git) error {

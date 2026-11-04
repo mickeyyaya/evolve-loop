@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
@@ -69,7 +70,7 @@ func (g *Gates) IntegrationTier(req Request) ([]string, error) {
 }
 
 func (g *Gates) tierPackages(ctx context.Context, req Request, dir string, changed []string) ([]string, error) {
-	scoped, envExclusive, wholeModule := tierScope(changed)
+	scoped, envExclusive, wholeModule := ciparity.TierScope(changed)
 	if wholeModule {
 		pkgs, err := g.wholeSuite(ctx, dir)
 		if err != nil {
@@ -80,7 +81,7 @@ func (g *Gates) tierPackages(ctx context.Context, req Request, dir string, chang
 	if len(envExclusive) == 0 {
 		return scoped, nil
 	}
-	skipped, backstop := strings.Join(envExclusive, ", "), envExclusiveBackstopNote(envExclusive)
+	skipped, backstop := strings.Join(envExclusive, ", "), ciparity.EnvExclusiveBackstopNote(envExclusive)
 	if len(scoped) == 0 {
 		err := fmt.Errorf("touched package(s) %s are env-exclusive under a live loop. Backstop: %s (ADR-0069)", skipped, backstop)
 		g.warn(gateTier, req, CodeTierEnvExclusiveSkipped, err.Error(), "scope", "all", "pkgs", skipped, "remainder", "0", "backstop", backstop)

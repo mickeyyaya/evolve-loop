@@ -868,3 +868,4 @@
 # claude-cloud driver (PR #1272): evolve cloud reads the launch records; cloudlaunch holds the typed launch outcome and the repository checks.
 ./internal/cli/cloudcmd
 ./internal/cloudlaunch
+./internal/closesinbox

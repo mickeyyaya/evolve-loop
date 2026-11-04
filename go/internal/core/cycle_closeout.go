@@ -109,12 +109,19 @@ func (cr *cycleRun) dossierParams(outcome string) cycleDossierParams {
 		ExplanationCorrections: cr.cs.ExplanationCorrections,
 		PhaseTimings:           cr.flushPhaseTimings(),
 		Destination:            cr.dossierDestination(),
+		Sink:                   cr.o.bookkeepingSink,
 	}
 }
 
 func (cr *cycleRun) dossierDestination() DossierDestination {
-	if cr.o.dossierDestination == DossierCommitted && fleetMode(cr.req.Env) {
+	if cr.o.dossierDestination != DossierCommitted {
+		return cr.o.dossierDestination
+	}
+	if fleetMode(cr.req.Env) {
 		return DossierPending
 	}
-	return cr.o.dossierDestination
+	if cr.o.batchesBookkeeping() {
+		return DossierBatched
+	}
+	return DossierCommitted
 }

@@ -67,8 +67,8 @@ func TestPool_TwoTodosOfOneFamilyRunOneAfterTheOther(t *testing.T) {
 	done := runPool(Pool{Target: 4, MinLanes: 4, Admit: admit, Launch: g.launch, Publish: events.publish, FamilyHolds: holds}, backlog)
 
 	first, second := waitStart(t, g), waitStart(t, g)
-	if first != "ctx-cap" || second != "solo" {
-		t.Fatalf("launched %q then %q, want ctx-cap and solo: ctx-telemetry waits for its sibling", first, second)
+	if got := map[string]bool{first: true, second: true}; !got["ctx-cap"] || !got["solo"] {
+		t.Fatalf("launched %q and %q, want ctx-cap and solo in either order: ctx-telemetry waits for its sibling", first, second)
 	}
 	g.finish("solo", 0)
 	select {

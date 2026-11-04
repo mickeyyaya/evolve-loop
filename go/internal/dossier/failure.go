@@ -13,11 +13,12 @@ const (
 )
 
 const (
-	PreClassInfraError  = "infra-error"
-	PreClassGuardAbort  = "guard-abort"
-	PreClassGateBlock   = "gate-block"
-	PreClassVerdictFail = "verdict-fail"
-	PreClassUnknown     = "unknown"
+	PreClassInfraError         = "infra-error"
+	PreClassGuardAbort         = "guard-abort"
+	PreClassGateBlock          = "gate-block"
+	PreClassVerdictFail        = "verdict-fail"
+	PreClassShipRebaseConflict = "ship-rebase-conflict"
+	PreClassUnknown            = "unknown"
 )
 
 const (

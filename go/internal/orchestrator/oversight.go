@@ -12,6 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/events/filter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/events/reader"
+	"github.com/mickeyyaya/evolve-loop/go/internal/integration"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -48,9 +49,12 @@ type Oversight struct {
 	Landing LandingObserver
 	Locate  func(Lane) (int, bool)
 	Resize  func() (target int, paused []string)
+	Brief   func(lane, text string) error
 	Publish Publish
 
 	cycles    map[int]Lane
+	delivered map[int]Lane
+	ended     map[int]bool
 	foreign   map[int]uint64
 	conflicts map[int]bool
 	paused    map[string]bool
@@ -90,7 +94,7 @@ func (o *Oversight) Run(ctx context.Context) error {
 	if o.Events == nil || o.Leases == nil || o.Intake == nil || o.Locate == nil || o.Resize == nil {
 		return errOversightPorts
 	}
-	o.cycles, o.foreign, o.conflicts, o.paused = map[int]Lane{}, map[int]uint64{}, map[int]bool{}, map[string]bool{}
+	o.cycles, o.delivered, o.ended, o.foreign, o.conflicts, o.paused = map[int]Lane{}, map[int]Lane{}, map[int]bool{}, map[int]uint64{}, map[int]bool{}, map[string]bool{}
 	for {
 		items, err := o.Events.Next(ctx, time.Time{})
 		if err != nil {
@@ -112,6 +116,8 @@ func (o *Oversight) handle(e signalcenter.Event) {
 		o.rebased(e)
 	case quotaSignals[e.Code]:
 		o.requota(e)
+	case e.Code == CodeIntegrationEjected:
+		o.ejected(e)
 	case e.Kind == signalcenter.KindCycleSealed:
 		o.sealed(e)
 	case e.Kind == signalcenter.KindShipLanded:
@@ -180,13 +186,19 @@ func (o *Oversight) sealed(e signalcenter.Event) {
 	if e.Fields[cyclestate.SealedTerminationField] == cyclestate.CycleTerminationLaneDeadline {
 		return
 	}
+	verdict := e.Fields[cyclestate.SealedVerdictField]
+	if verdict == cyclestate.VerdictFAIL {
+		o.ended[e.Cycle] = true
+	}
 	h, ok := o.laneOf(e.Cycle)
 	if !ok {
 		return
 	}
 	delete(o.cycles, e.Cycle)
 	delete(o.conflicts, e.Cycle)
-	verdict := e.Fields[cyclestate.SealedVerdictField]
+	if verdict != cyclestate.VerdictFAIL && !o.ended[e.Cycle] {
+		o.delivered[e.Cycle] = h.lane
+	}
 	a := action{names: []string{"record_verdict"}, lane: h.lane.Key, fields: map[string]string{"verdict": verdict}}
 	if verdict == cyclestate.VerdictFAIL && h.live {
 		a.names = append(a.names, "free_cells")
@@ -195,7 +207,54 @@ func (o *Oversight) sealed(e signalcenter.Event) {
 	o.do(e, a)
 }
 
+var errNoBriefPort = errors.New("orchestrator: the oversight has no brief port")
+
+func (o *Oversight) ejectee(cycle int) (held, bool) {
+	if h, ok := o.laneOf(cycle); ok {
+		return h, true
+	}
+	lane, ok := o.delivered[cycle]
+	return held{lane: lane, live: ok && o.lives(lane)}, ok
+}
+
+func (o *Oversight) ejected(e signalcenter.Event) {
+	h, ok := o.ejectee(e.Cycle)
+	if !ok || o.ended[e.Cycle] {
+		return
+	}
+	if !h.live {
+		o.do(e, action{names: []string{"lane_left"}, lane: h.lane.Key})
+		return
+	}
+	o.do(e, action{names: []string{"brief_lane", "hold_cells"}, lane: h.lane.Key, apply: func() {
+		o.Intake.Hold(h.lane.Key)
+		o.sendBrief(h.lane.Key, e)
+	}})
+}
+
+func (o *Oversight) sendBrief(lane string, e signalcenter.Event) {
+	err := o.deliverBrief(lane, e.Fields[integration.FieldBriefFile])
+	if err != nil {
+		o.Publish.emit("Oversight.ejected", CodeEjectionBriefFailed, signalcenter.SeverityWarn,
+			"the ejection brief did not reach lane "+lane,
+			o.stamped(map[string]string{"lane": lane, "cycle": strconv.Itoa(e.Cycle), "error": err.Error()}))
+	}
+}
+
+func (o *Oversight) deliverBrief(lane, file string) error {
+	if o.Brief == nil {
+		return errNoBriefPort
+	}
+	text, err := integration.ReadBrief(file)
+	if err != nil {
+		return err
+	}
+	return o.Brief(lane, text)
+}
+
 func (o *Oversight) landed(e signalcenter.Event) {
+	o.ended[e.Cycle] = true
+	delete(o.delivered, e.Cycle)
 	conflict := o.conflicts[e.Cycle]
 	delete(o.conflicts, e.Cycle)
 	h, ok := o.laneOf(e.Cycle)

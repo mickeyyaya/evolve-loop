@@ -35,6 +35,7 @@ func (p Policy) RetryConfig() RetryConfig {
 		RetryBackoffBaseS:         defaultRetryBackoffBaseS,
 		PhaseLatencyCeilingS:      defaultPhaseLatencyCeilingS,
 		ContractCorrectionRetries: defaultContractCorrectionRetries,
+		FloorConvergenceRounds:    defaultFloorConvergenceRounds,
 	}
 	if p.Retry == nil {
 		return c
@@ -54,6 +55,9 @@ func (p Policy) RetryConfig() RetryConfig {
 		c.ContractCorrectionRetries = min(p.Retry.ContractCorrectionRetries, maxContractCorrectionRetries)
 	} else if p.Retry.ContractCorrectionRetries > 0 {
 		c.ContractCorrectionRetries = min(p.Retry.ContractCorrectionRetries, maxContractCorrectionRetries)
+	}
+	if p.Retry.floorConvergenceRoundsSet || p.Retry.FloorConvergenceRounds > 0 {
+		c.FloorConvergenceRounds = min(max(p.Retry.FloorConvergenceRounds, 0), maxFloorConvergenceRounds)
 	}
 	return c
 }

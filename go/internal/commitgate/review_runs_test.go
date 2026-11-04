@@ -177,3 +177,36 @@ func TestAttestDirName_IsTheDefaultAttestationDirectory(t *testing.T) {
 		t.Errorf("attestPath = %q, AttestDirName = %q; want %q under .commit-gate", got, AttestDirName, want)
 	}
 }
+
+func TestVerifyAttestedRunsAcceptsOnlyLaunchedRunsBoundToTheTree(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	tree := stagedTree()
+	for _, rec := range []launchrecord.Record{reviewRun("r-ok", "code-reviewer"), reviewRun("r-ok2", "go-reviewer")} {
+		if _, err := launchrecord.Write(filepath.Join(root, ".evolve"), rec); err != nil {
+			t.Fatal(err)
+		}
+	}
+	other := reviewRun("r-other", "code-reviewer")
+	other.TreeAfter = "changed"
+	if _, err := launchrecord.Write(filepath.Join(root, ".evolve"), other); err != nil {
+		t.Fatal(err)
+	}
+	cases := map[string]struct {
+		att  Attestation
+		fail bool
+	}{
+		"a run by token and by list": {Attestation{TreeStateSHA: tree, ReviewersRun: []string{"run:r-ok", " run:r-ok2"}, ReviewRuns: []ReviewRun{{RunID: "r-ok"}}}, false},
+		"no run":                     {Attestation{TreeStateSHA: tree}, true},
+		"a name with no run":         {Attestation{TreeStateSHA: tree, ReviewersRun: []string{"code-reviewer"}}, true},
+		"a run with no record":       {Attestation{TreeStateSHA: tree, ReviewersRun: []string{"run:ghost"}}, true},
+		"a run of another tree":      {Attestation{TreeStateSHA: tree, ReviewRuns: []ReviewRun{{RunID: "r-other"}}}, true},
+		"one bad run among good":     {Attestation{TreeStateSHA: tree, ReviewersRun: []string{"run:r-ok", "run:ghost"}}, true},
+	}
+	for name, c := range cases {
+		err := VerifyAttestedRuns(root, c.att)
+		if (err != nil) != c.fail {
+			t.Errorf("%s: err = %v, want failure=%v", name, err, c.fail)
+		}
+	}
+}

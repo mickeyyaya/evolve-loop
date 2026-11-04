@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 type ReauditErrorKind string
@@ -47,6 +48,7 @@ type ReauditInput struct {
 	Cycle       int
 	Ledger      Ledger
 	Audit       PhaseRunner
+	Signals     *signalcenter.Center
 }
 
 type ReauditResult struct {
@@ -69,7 +71,7 @@ func ReauditCycle(ctx context.Context, in ReauditInput) (ReauditResult, error) {
 	if lease, live := runlease.LiveOwner(cs.WorkspacePath, time.Now()); live {
 		return ReauditResult{}, fail(ReauditLiveLease, fmt.Errorf("run %s is owned by live pid %d", lease.RunID, lease.OwnerPID))
 	}
-	ok, conflict := reauditRebase(ctx, in.ProjectRoot, &cs)
+	ok, conflict := rebaseReport{in.Signals, in.Cycle, "ReauditCycle"}.run(ctx, in.ProjectRoot, &cs)
 	if conflict {
 		return ReauditResult{}, &ReauditError{Kind: ReauditConflict, Cycle: in.Cycle, Conflicts: cs.ShipRecoveryConflicts}
 	}

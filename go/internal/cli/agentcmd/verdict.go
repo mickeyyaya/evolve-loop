@@ -16,17 +16,21 @@ import (
 
 const CodeVerdictMismatch signalcenter.Code = "REVIEW_AGENT_RUN_VERDICT_MISMATCH"
 
+const CodeVerdictParseDefect signalcenter.Code = "REVIEW_AGENT_RUN_VERDICT_PARSE_DEFECT"
+
 const verdictSection = "Verdict"
 
 func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleReview, CodeVerdictMismatch, "evolve agent run found that the report body of a review fails while the verdict field passes: the body states FAIL, states no verdict, or lists a CRITICAL or HIGH finding; the run verdict is FAIL; run_id names the run, fields.field_verdict the field, fields.stated the stated verdict, fields.critical and fields.high the counts")
+	signalcenter.RegisterCode(signalcenter.ModuleReview, CodeVerdictParseDefect, "evolve agent run found no stated verdict in a review report that lists no CRITICAL and no HIGH finding; the parser or the report format has a defect, and the run verdict stays FAIL; run_id names the run, fields.field_verdict the field verdict")
 }
 
 type derivedVerdict struct {
-	verdict  string
-	stated   string
-	findings reportdoc.SeverityCounts
-	mismatch bool
+	verdict     string
+	stated      string
+	findings    reportdoc.SeverityCounts
+	mismatch    bool
+	parseDefect bool
 }
 
 func declaresVerdict(spec phasespec.PhaseSpec) bool {
@@ -51,6 +55,7 @@ func reportVerdict(spec phasespec.PhaseSpec, field, report string) derivedVerdic
 	switch {
 	case d.findings.Blocking() > 0, d.stated == core.VerdictFAIL, d.stated == "":
 		d.verdict, d.mismatch = core.VerdictFAIL, true
+		d.parseDefect = d.stated == "" && d.findings.Blocking() == 0
 	case d.stated == core.VerdictWARN:
 		d.verdict = core.VerdictWARN
 	}
@@ -76,11 +81,28 @@ func (out launchOutcome) withReportVerdict(r standaloneRun, signals *signalcente
 	d := reportVerdict(r.spec, field, out.report)
 	out.verdict, out.findings, out.resp.Verdict = d.verdict, d.findings, d.verdict
 	if d.mismatch {
-		event := mismatchEvent(r, field, d)
-		signals.Emit(event)
-		out.resp.Diagnostics = append(slices.Clip(out.resp.Diagnostics), core.Diagnostic{Severity: "error", Message: event.Reason})
+		out = out.withSignal(signals, mismatchEvent(r, field, d))
+	}
+	if d.parseDefect {
+		out = out.withSignal(signals, parseDefectEvent(r, field))
 	}
 	return out
+}
+
+func (out launchOutcome) withSignal(signals *signalcenter.Center, event signalcenter.Event) launchOutcome {
+	signals.Emit(event)
+	out.resp.Diagnostics = append(slices.Clip(out.resp.Diagnostics), core.Diagnostic{Severity: "error", Message: event.Reason})
+	return out
+}
+
+func parseDefectEvent(r standaloneRun, field string) signalcenter.Event {
+	return signalcenter.Event{
+		RunID: r.label, Phase: r.spec.Name, Module: signalcenter.ModuleReview, Origin: "agentcmd.reportVerdict",
+		Kind: signalcenter.KindPhaseOutcome, Code: CodeVerdictParseDefect, Severity: signalcenter.SeverityWarn,
+		Reason: fmt.Sprintf("agent run %s: the report body lists no CRITICAL and no HIGH finding, but the parser found no stated verdict; the run verdict is FAIL, so check the report format and the parser",
+			r.label),
+		Fields: map[string]string{"field_verdict": field},
+	}
 }
 
 func (out launchOutcome) withLaunchVerdict() launchOutcome {

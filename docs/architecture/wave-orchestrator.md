@@ -441,6 +441,7 @@ The oversight finds the lane of an event by the cycle number. A lane that no cyc
 | a stall report | the code `LIVENESS_PHASE_STALLED` | `Leases.Stall` publishes `LOOP_ORCH_LANE_STALLED` once |
 | a quota signal | the code `BRIDGE_USAGE_EVIDENCE` or `LIVENESS_PANE_EXHAUSTED` | run the sizing step, set the limit of the intake, and publish `LOOP_ORCH_FAMILY_PAUSED` for each new family |
 | a halt | kind `loop.halt` | stop all admission |
+| the ejection code | the code `SHIP_INTEGRATION_EJECTED` | read the brief from `fields.brief_file`, send it to the live lane and hold its cells again. A failed send publishes `LOOP_ORCH_EJECTION_BRIEF_FAILED`. Nothing emits this code yet |
 
 At `shadow`, an action publishes `LOOP_ORCH_OVERSIGHT_ACTION` with `applied` false, and nothing else changes. A heartbeat and a stall are observations, so both stages apply them.
 
@@ -654,7 +655,7 @@ The stage key is one key for the whole orchestrator (ADR-0139 decision 16). Each
 
 ## 15. Integration
 
-> [ADR-0147](adr/0147-the-wave-orchestrator-owns-integration-and-decides-when-the-wave-reaches-main.md) (Proposed, 2026-10-20) · plan: [wave-integration-2026-10](../plans/wave-integration-2026-10.md) (D1 to D23) · research: [wave-integration-2026-10](../research/wave-integration-2026-10.md) (F2.1 to F2.7, M1 to M16).
+> [ADR-0147](adr/0147-the-wave-orchestrator-owns-integration-and-decides-when-the-wave-reaches-main.md) (Proposed, 2026-10-20) · plan: [wave-integration-2026-10](../plans/wave-integration-2026-10.md) (D1 to D31; [the amendment](../plans/wave-integration-2026-10.md#10-amendment-of-2026-11-04-console-prs-enter-the-train) adds console PRs) · research: [wave-integration-2026-10](../research/wave-integration-2026-10.md) (F2.1 to F2.7, M1 to M16).
 
 ### Issue
 
@@ -777,7 +778,7 @@ I0 is built. The record type and its writer are in `go/internal/integration/deli
 - **The hook.** A lane is a fleet lane when its ship has an `Integration`. The ship writes the record before the landing. It then publishes `ship.delivered` with the code `SHIP_INTEGRATION_DELIVERED`.
 - **Shadow.** The ship lands as before. The git operations that change state and the ship log stay the same. A failed write is a warning.
 - **Enforce.** The ship moves the lane ref to the commit, so the commit stays reachable. It then stops. It pushes nothing and writes no landing intent. A failed write is an error of the class `transient`.
-- **The landed identity.** A cycle is found on main by its trailer and the patch-id of a commit of its record. `integration.LandedOnRef` does the lookup in one place. Three callers use it: `isLanded` in the consume check of the ship, the ledger entry (`core/lost_landing_floor.go`) and the inbox closeout (`shaLandedOnMain` in `inboxmover`).
+- **The landed identity.** A cycle is found on main by its trailer and the patch-id of each commit of its record. The patch-id reads one line of context and keeps whitespace. `integration.LandedOnRef` does the lookup in one place. Three callers use it: `isLanded` in the consume check of the ship, the ledger entry (`core/lost_landing_floor.go`) and the inbox closeout (`shaLandedOnMain` in `inboxmover`).
 
 Each caller tests ancestry first. It uses the record only when the commit is not an ancestor. Without a record, the ancestry rule stands. So a compose that gave the commit a new SHA does not hide a landed cycle.
 - **The wiring.** `cmd_cycle.go` sets `ship.Config.Integration` for a fleet lane, from `fleet.integration.stage`. A solo cycle has no `Integration`, so its ship does not change. A wrong stage fails the run before the first phase.

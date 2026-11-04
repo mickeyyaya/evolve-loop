@@ -15,6 +15,7 @@ const (
 	KeyChallenge    = "Challenge-Token"
 	KeyArtifactSHA  = "Evolve-Artifact-SHA256"
 	KeyArtifactPath = "Evolve-Artifact-Path"
+	KeyAuditTree    = "Evolve-Audit-Tree"
 )
 
 type Trailer struct {
@@ -23,6 +24,7 @@ type Trailer struct {
 	Challenge    string
 	ArtifactSHA  string
 	ArtifactPath string
+	AuditTree    string
 }
 
 func (t Trailer) Build() string {
@@ -35,6 +37,7 @@ func (t Trailer) Build() string {
 	writeLine(&b, KeyChallenge, t.Challenge)
 	writeLine(&b, KeyArtifactSHA, t.ArtifactSHA)
 	writeLine(&b, KeyArtifactPath, t.ArtifactPath)
+	writeLine(&b, KeyAuditTree, t.AuditTree)
 	return b.String()
 }
 
@@ -56,10 +59,7 @@ func Parse(msg string) Trailer {
 	}
 	var t Trailer
 	for _, ln := range lines[start:] {
-		key, val, ok := cutTrailer(ln)
-		if !ok {
-			continue
-		}
+		key, val, _ := cutTrailer(ln)
 		switch key {
 		case KeyPhase:
 			t.Phase = val
@@ -73,6 +73,8 @@ func Parse(msg string) Trailer {
 			t.ArtifactSHA = val
 		case KeyArtifactPath:
 			t.ArtifactPath = val
+		case KeyAuditTree:
+			t.AuditTree = val
 		}
 	}
 	return t

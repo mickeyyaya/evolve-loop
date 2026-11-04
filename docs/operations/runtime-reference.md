@@ -72,6 +72,9 @@
   - **The refusals.** The verb exits 1 in these cases: the profile is missing, or a `.go` file of a listed package is newer than the profile. The floors file can be missing, be a directory, or hold an invalid line. A listed package can have no statements in the profile, or be below its floor. The exit is 0 when clean, 2 for a module with no `go.mod`, and 10 for a usage error. `--json` prints `clean` and one result per package.
   - **The package set.** `--packages <file>` judges only the floors of the packages in the file, with the format of `cover changed --packages`. A file that cannot be read or holds an invalid line exits 2.
   - **The wiring.** `make cover-strict` runs the verb on ubuntu (Go 1.23) over every floor. The macOS job runs `make cover-strict-darwin`, which adds `--packages .darwin-set`. `make test-integration` writes `coverage.txt` only when every test passes, so a failed run leaves no profile and the gate refuses.
+- The line-list registries `go/.cover-strict` and `go/.apicover-enforce` use `merge=union` in `.gitattributes`. Two kinds of merge apply the driver and keep both lines: a merge or rebase in a worktree, and the train compose. A GitHub PR merge does not apply it. A PR can still conflict at the end of the file, and the fix keeps both lines. An author appends a line at the end.
+- The guard `TestRegistryFilesHoldEachPackageOnce` in `go/test/structure` keeps each package once. The key is the package, so two `.cover-strict` lines that differ only in the floor are a repeat.
+- When both branches add one package with different lines, the registry guard fails in each merge order. Identical lines merge into one line, and the guard passes. Its message names the line and the fix: keep one line for the package. A union merge keeps a line that one branch removed, if the other branch adds a line next to it. Review each floor removal after the merge.
 
 ## Autonomous execution (bypass-permissions / yolo / auto-approve) — full text
 

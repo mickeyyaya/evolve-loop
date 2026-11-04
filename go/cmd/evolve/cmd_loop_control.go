@@ -158,7 +158,7 @@ func reconcileStaleCycleState(ctx context.Context, st core.Storage, projectRoot 
 		return
 	}
 	stalePhase := cs.Phase
-	cs.Phase = "aborted"
+	cs.Phase = string(core.PhaseAborted)
 	cs.ActiveAgent = ""
 	if err := st.WriteCycleState(ctx, cs); err != nil {
 		fmt.Fprintf(stderr, "[loop] WARN: state-coherence: stale cycle %d phase=%s (%s) — reconcile write failed: %v\n", cs.CycleID, stalePhase, owner, err)
@@ -169,8 +169,7 @@ func reconcileStaleCycleState(ctx context.Context, st core.Storage, projectRoot 
 }
 
 func claimsLivePhase(cs core.CycleState) bool {
-	switch cs.Phase {
-	case "", "aborted", string(core.PhaseEnd):
+	if cs.Phase == "" || core.IsTerminalPhase(cs.Phase) {
 		return false
 	}
 	return cs.CycleID != 0 && !slices.Contains(cs.CompletedPhases, cs.Phase)

@@ -18,7 +18,7 @@ import (
 const (
 	codeIntegrationDelivered signalcenter.Code = "SHIP_INTEGRATION_DELIVERED"
 	codeIntegrationComposed  signalcenter.Code = "SHIP_INTEGRATION_COMPOSED"
-	codeIntegrationEjected   signalcenter.Code = "SHIP_INTEGRATION_EJECTED"
+	codeIntegrationEjected                     = integration.CodeEjected
 	codeIntegrationFlushed   signalcenter.Code = "SHIP_INTEGRATION_FLUSHED"
 	codeIntegrationMerged    signalcenter.Code = "SHIP_INTEGRATION_MERGED"
 	codeIntegrationReverted  signalcenter.Code = "SHIP_INTEGRATION_REVERTED"
@@ -28,7 +28,7 @@ func init() {
 	for c, doc := range map[signalcenter.Code]string{
 		codeIntegrationDelivered: "a fleet lane delivered its record to the integration of the wave (kind ship.delivered); fields.wave, fields.cycle, fields.commits and fields.record name it, and at enforce the lane's ship stopped before main",
 		codeIntegrationComposed:  "a deliverable composed onto the integration branch and passed its L1 gates; fields.wave, fields.cycle and fields.batch name it",
-		codeIntegrationEjected:   "a deliverable went back to its lane; fields.cause names why (conflict, gate or proof) and fields.layer names the layer that found it",
+		codeIntegrationEjected:   "a deliverable went back to its lane; fields.cause names why (conflict, gate or proof), fields.paths the conflicted paths and fields.brief_file the file that holds the brief for the lane (the brief is too long for an event field)",
 		codeIntegrationFlushed:   "a batch PR opened; fields.trigger names the flush trigger and fields.pr the PR",
 		codeIntegrationMerged:    "a batch PR merged into main by a fast-forward to the tested tip; fields.pr names the PR and fields.tip the tip",
 		codeIntegrationReverted:  "the check after a merge reverted one cycle commit alone; fields.cycle names it and fields.commit the reverted commit",

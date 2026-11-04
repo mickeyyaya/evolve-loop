@@ -26,8 +26,11 @@ The hooks are defence in depth, because they fire only in Claude Code panes. The
   - `--bypass` allows (with an alarm on a protected path).
   - An always-safe path (`/tmp/`, `<home>/.claude/`) is allowed unless it is protected.
   - Missing storage or a cycle-state read error denies.
-  - Outside a cycle (`CycleID == 0`) everything is allowed.
-  - Inside a cycle a protected path is denied with an alarm.
+  - Outside an active cycle everything is allowed. A cycle is active when `CycleID` is not zero and the phase is not terminal.
+  - A terminal phase (`end` or `aborted`) is active only while the run lease has a live owner. A dead owner, a stale lease or no lease is not active. A lease that cannot be read keeps the refusal, and the reason says that the lease can not be read.
+  - The guard reads the lease with `runlease.OwnerLive` and never writes state. The pid check and the clock are fields of `Role`, so a test injects them. `core.IsTerminalPhase` is the one home of the terminal-phase belief.
+  - A terminal phase with a dead owner reads as no active cycle, the same as `CycleID == 0`. A protected path is then allowed, because the console edits those paths outside a cycle. This is a deliberate choice.
+  - Inside an active cycle (a live phase, a live owner or an unreadable lease) a protected path is denied with an alarm.
   - Then retro is allowed to write the lesson corpus `.evolve/instincts/lessons/`.
   - Then any phase is allowed to write under its workspace.
   - Then a worktree phase (`core.WorktreePhase`: tdd and build) is allowed to write under the active worktree.

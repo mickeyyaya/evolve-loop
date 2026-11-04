@@ -176,7 +176,7 @@ func TestClaudeCloudDriver_TypesTheCloudCommandInItsOwnSessionAndEndsOnlyThatSes
 		t.Error("the launch ended a session that it did not start")
 	}
 	promptFile := filepath.Join(f.cfg.Workspace, "cloud-prompt.txt")
-	wantCmd := `claude --cloud -- "$(cat ` + promptFile + `)"`
+	wantCmd := `claude --cloud "$(cat ` + promptFile + `)"`
 	if !slices.Contains(f.tmux.SentKeys, wantCmd) {
 		t.Errorf("sent keys %q lack the launch %q", f.tmux.SentKeys, wantCmd)
 	}
@@ -525,7 +525,7 @@ func TestEngineLaunch_ClaudeCloudDispatchRecordsTheLaunchedRow(t *testing.T) {
 		t.Errorf("the response carries no launched session: %q", resp.Stdout)
 	}
 	launch := slices.IndexFunc(tmux.SentKeys, func(k string) bool { return strings.Contains(k, "--cloud") })
-	if launch < 0 || !strings.HasPrefix(tmux.SentKeys[launch], `claude --cloud -- "$(cat `) {
+	if launch < 0 || !strings.HasPrefix(tmux.SentKeys[launch], `claude --cloud "$(cat `) {
 		t.Errorf("sent keys = %q, want the bare cloud launch with no local flag", tmux.SentKeys)
 	}
 	read, err := llmcalls.ReadWorkspace(ws)
@@ -667,5 +667,49 @@ func TestClaudeCloudDriver_ClearsTheArtifactOfAnEarlierSeatBeforeItStarts(t *tes
 				t.Errorf("the artifact of an earlier seat survived a failed cloud launch: %v", err)
 			}
 		})
+	}
+}
+
+func TestCloudTaskArgument_ATaskNeverReachesTheCLIAsAnOption(t *testing.T) {
+	t.Parallel()
+	cases := map[string]string{
+		"Fix the flaky test":     "Fix the flaky test",
+		"--dangerous do a thing": "Task:\n--dangerous do a thing",
+		"\n  -x leading space":   "Task:\n\n  -x leading space",
+		"\t-x tab":               "Task:\n\t-x tab",
+	}
+	for in, want := range cases {
+		if got := cloudTaskArgument(in); got != want {
+			t.Errorf("cloudTaskArgument(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestClaudeCloudCommand_PassesNoSeparatorBecauseTheRealCLIRefusesIt(t *testing.T) {
+	t.Parallel()
+	l := cloudLaunch{m: Manifest{Binary: "claude", CloudLaunch: &CloudLaunchSpec{Args: []string{"--cloud"}}}, cfg: &Config{}, deps: Deps{}}
+	if got := l.command("/w/p.txt"); strings.Contains(got, " -- ") {
+		t.Fatalf("command = %q: claude --cloud -- <task> fails with 'Error: --cloud requires a description.'", got)
+	}
+	if got := l.command("/w/a b.txt"); !strings.HasSuffix(got, `"$(cat '/w/a b.txt')"`) {
+		t.Fatalf("command = %q, want the prompt path quoted", got)
+	}
+}
+
+func TestClaudeCloudDriver_ADashTaskReachesThePromptFileWithItsPrefix(t *testing.T) {
+	t.Parallel()
+	f := newCloudFixture(t, pushedGitHubRepo, cloudCreatedFrame)
+	if err := os.WriteFile(f.cfg.PromptFile, []byte("--dangerous do a thing\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if rc, err := f.launch(t); rc != ExitOK || err != nil {
+		t.Fatalf("launch = %d, %v", rc, err)
+	}
+	got, err := os.ReadFile(filepath.Join(f.cfg.Workspace, "cloud-prompt.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "Task:\n--dangerous do a thing\n" {
+		t.Errorf("cloud-prompt.txt = %q", got)
 	}
 }
