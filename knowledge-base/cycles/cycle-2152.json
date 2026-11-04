@@ -1,0 +1,180 @@
+{
+  "schema_version": 2,
+  "cycle": 2152,
+  "run_id": "01M6JFNHEBTJTBKJ7TK5D14ZYR",
+  "goal": "Wave 154.\n\nWork the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree that it ships;\n- disposition its own defect ledger and the inherited ids;\n- record a terminal outcome on every exit;\n- never change a protected control-plane file with a tool;\n- leave no stale worktree.\n\nRouting:\n- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.\n- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.\n- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.\n\nCraft:\n- New and changed code has no comments. Names, types and tests give the intent.\n- Write each new document and each new log text in ASD-STE100.\n- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.\n- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.\n\nEvidence:\n- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.\n\nThe measure of this wave is the number of shipped cycles. Keep each cycle shipping.\n\nWave 153 facts (run 20261104T002909Z): 0 of 1 cycles shipped.\n- Cycle 2151: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…nternal/repocontract 2.567s coverage: 100.0% of statements ok   github.com/mickeyyaya/evolve-loop/go/internal/sysexec 5.112s coverage: 100.0% of statements FAIL. Last phase: aborted. It did not ship.\n- Pull requests merged at this boundary: none.\n\nOperator notes for wave 154:\n- Resume paused cycles 2144-2150 concurrently through lanes. Cycle 2151 sealed FAIL at the build floor: internal/bridge red under -tags integration with no test name, 6/6 reruns green on the same tree; treat a nameless floor red as infra.\n\nEarlier waves:\n- Wave 150 (run 20261102T171134Z): 7 of 12 cycles shipped.\n- Wave 151 (run 20261103T022654Z): 11 of 15 cycles shipped.\n- Wave 152 (run 20261103T165142Z): 1 of 9 cycles shipped.",
+  "final_verdict": "FAIL",
+  "tasks": [
+    "recovery-retrospective-c4-stage-key-publish"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 45566,
+      "started_at": "2026-11-04T05:15:47Z",
+      "ended_at": "2026-11-04T05:16:34Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 12,
+        "output": 3237,
+        "cache_read": 315640,
+        "cache_write": 71013
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 35733,
+      "started_at": "2026-11-04T05:17:35Z",
+      "ended_at": "2026-11-04T05:18:12Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 10,
+        "output": 1677,
+        "cache_read": 369908,
+        "cache_write": 43896
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 322136,
+      "started_at": "2026-11-04T05:18:12Z",
+      "ended_at": "2026-11-04T05:23:36Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 42,
+        "output": 23978,
+        "cache_read": 2278121,
+        "cache_write": 97083
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "FAIL",
+      "duration_ms": 1275523,
+      "started_at": "2026-11-04T05:23:36Z",
+      "ended_at": "2026-11-04T06:47:30Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 18,
+        "output": 2900,
+        "cache_read": 506652,
+        "cache_write": 40667
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "PASS",
+      "duration_ms": 532797,
+      "started_at": "2026-11-04T06:47:30Z",
+      "ended_at": "2026-11-04T06:56:23Z",
+      "archetype": "control",
+      "model_source": "profile",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 24,
+        "output": 23876,
+        "cache_read": 1028964,
+        "cache_write": 96487
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "build|gate-block|b67d756456e1",
+    "pre_class": "gate-block",
+    "reasons": [
+      "review gate: phase \"build\" deliverable rejected after 1 correction(s): build handoff floor: 1 deterministic check failure(s) — fix these exactly before handoff: ./cmd/evolve: unit tests FAIL …26-1"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 2152",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase retro"
+    }
+  ],
+  "timing": {
+    "total_ms": 2211755,
+    "phase_count": 5,
+    "retried_count": 0,
+    "longest_phase": "build",
+    "longest_ms": 1275523,
+    "by_archetype_ms": {
+      "build": 1275523,
+      "control": 532797,
+      "plan": 403435
+    },
+    "total_tokens": {
+      "input": 106,
+      "output": 55668,
+      "cache_read": 4499285,
+      "cache_write": 349146
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 18,
+        "output": 2900,
+        "cache_read": 506652,
+        "cache_write": 40667
+      },
+      "control": {
+        "input": 24,
+        "output": 23876,
+        "cache_read": 1028964,
+        "cache_write": 96487
+      },
+      "plan": {
+        "input": 64,
+        "output": 28892,
+        "cache_read": 2963669,
+        "cache_write": 211992
+      }
+    },
+    "wasted_tokens": {
+      "input": 18,
+      "output": 2900,
+      "cache_read": 506652,
+      "cache_write": 40667
+    },
+    "cache_hit_ratio": 0.9999764412561611,
+    "hot_phase_count": 5,
+    "hot_phases": [
+      "scout",
+      "triage",
+      "tdd",
+      "build",
+      "retro"
+    ]
+  },
+  "recalled_lessons": [
+    "cycle-1502-closure-citation-contract-never-reaches-the-auditor-it-grades",
+    "cycle-93-build-report-commit-sha-fabrication",
+    "cycle-1448-minted-phase-persona-evaporates-when-its-phase-json-lands",
+    "inst-L1549b",
+    "inst-L1537a"
+  ]
+}
