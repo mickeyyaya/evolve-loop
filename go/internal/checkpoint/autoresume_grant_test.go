@@ -88,8 +88,8 @@ func TestResumeReady_IsTheBudgetRuleOfAdmissionPlusAPassedReset(t *testing.T) {
 		{"an unknown reset with no budget", 0, 0, "", false, false},
 	}
 	for _, tc := range cases {
-		if got := ResumeReady(tc.attempts, tc.max, tc.resetAt, now); got != tc.ready {
-			t.Errorf("%s: ResumeReady = %v, want %v", tc.name, got, tc.ready)
+		if got, err := ResumeReady(tc.attempts, tc.max, tc.resetAt, now); got != tc.ready || err != nil {
+			t.Errorf("%s: ResumeReady = %v err %v, want %v", tc.name, got, err, tc.ready)
 		}
 		if got := BudgetLeft(tc.attempts, tc.max); got != tc.budgeted {
 			t.Errorf("%s: BudgetLeft = %v, want %v", tc.name, got, tc.budgeted)

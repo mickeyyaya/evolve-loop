@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"io"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -16,7 +18,8 @@ import (
 type pausedPlan struct {
 	paused    []core.PausedScope
 	now       time.Time
-	itemFiles func(id string) []string
+	itemFiles func(id string) ([]string, bool)
+	warn      io.Writer
 }
 
 func (pp pausedPlan) order(triage []fleet.Todo) []fleet.Todo {
@@ -26,18 +29,22 @@ func (pp pausedPlan) order(triage []fleet.Todo) []fleet.Todo {
 		if !pp.ready(p) {
 			continue
 		}
-		var lead fleet.Todo
-		lead, rest = pp.lead(p, rest)
-		head = append(head, lead)
+		if lead, remaining, ok := pp.lead(p, rest); ok {
+			head, rest = append(head, lead), remaining
+		}
 	}
 	return append(head, rest...)
 }
 
 func (pp pausedPlan) ready(p core.PausedScope) bool {
-	return checkpoint.ResumeReady(p.AutoAttempts, p.AutoMaxAttempts, p.QuotaResetAt, pp.now)
+	ready, err := checkpoint.ResumeReady(p.AutoAttempts, p.AutoMaxAttempts, p.QuotaResetAt, pp.now)
+	if err != nil {
+		fmt.Fprintf(pp.warn, "[pool] WARN: paused cycle %d: %v\n", p.Cycle, err)
+	}
+	return ready
 }
 
-func (pp pausedPlan) lead(p core.PausedScope, triage []fleet.Todo) (fleet.Todo, []fleet.Todo) {
+func (pp pausedPlan) lead(p core.PausedScope, triage []fleet.Todo) (fleet.Todo, []fleet.Todo, bool) {
 	id := strings.Join(p.Scope, ",")
 	lead, found := fleet.Todo{ID: id}, false
 	var rest []fleet.Todo
@@ -54,25 +61,27 @@ func (pp pausedPlan) lead(p core.PausedScope, triage []fleet.Todo) (fleet.Todo, 
 	}
 	if !found {
 		for _, todo := range p.Scope {
-			lead.Files = append(lead.Files, pp.itemFiles(todo)...)
+			files, located := pp.itemFiles(todo)
+			found = found || located
+			lead.Files = append(lead.Files, files...)
 		}
 	}
 	slices.Sort(lead.Files)
 	lead.Files = slices.Compact(lead.Files)
-	return lead, rest
+	return lead, rest, found
 }
 
-func inboxItemFiles(evolveDir string) func(id string) []string {
+func inboxItemFiles(evolveDir string) func(id string) ([]string, bool) {
 	inbox := filepath.Join(evolveDir, "inbox")
-	return func(id string) []string {
+	return func(id string) ([]string, bool) {
 		loc, err := inboxmover.Locate(inbox, id)
 		if err != nil {
-			return nil
+			return nil, false
 		}
 		item, _, err := inboxbatch.LoadFile(loc.Path)
 		if err != nil {
-			return nil
+			return nil, false
 		}
-		return item.DeclaredPaths()
+		return item.DeclaredPaths(), true
 	}
 }

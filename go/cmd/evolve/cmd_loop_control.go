@@ -17,6 +17,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cycleclassify"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/quotareset"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sessionreaper"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
@@ -282,12 +283,8 @@ func quotaPauseOf(cycle int, cp checkpoint.Checkpoint) quotaPause {
 }
 
 func parseWakeAt(s string) (time.Time, bool) {
-	for _, layout := range []string{time.RFC3339, "2006-01-02T15:04:05-0700"} {
-		if t, err := time.Parse(layout, s); err == nil {
-			return t, true
-		}
-	}
-	return time.Time{}, false
+	t, err := quotareset.ParseISO(s)
+	return t, err == nil
 }
 
 func quotaPauseLine(qp quotaPause, now time.Time) string {

@@ -176,7 +176,7 @@ func TestPausedPlan_PutsReadyPausesFirstAndKeepsTheirTriageTodo(t *testing.T) {
 	}
 	files := map[string][]string{"untriaged": {"u.go", "u.go", "t.go"}}
 
-	got := pausedPlan{paused: paused, now: now, itemFiles: func(id string) []string { return files[id] }}.order(triage)
+	got := pausedPlan{paused: paused, now: now, itemFiles: func(id string) ([]string, bool) { f, ok := files[id]; return f, ok }}.order(triage)
 
 	want := []fleet.Todo{
 		{ID: "granted", Files: []string{"a.go"}, Priority: 5, OutputContract: "pr", DependsOn: []string{"x"}},
@@ -195,7 +195,7 @@ func TestPausedPlan_AMultiTodoScopeLeadsWithTheFilesOfEachOfItsTriageTodos(t *te
 	triage := []fleet.Todo{{ID: "a", Files: []string{"a.go"}}, {ID: "other", Files: []string{"o.go"}}, {ID: "b", Files: []string{"b.go", "a.go"}}}
 	paused := []core.PausedScope{{Cycle: 9, Scope: []string{"a", "b"}, AutoMaxAttempts: 3}}
 
-	got := pausedPlan{paused: paused, now: time.Now(), itemFiles: func(string) []string { return nil }}.order(triage)
+	got := pausedPlan{paused: paused, now: time.Now(), itemFiles: func(string) ([]string, bool) { return nil, false }}.order(triage)
 
 	want := []fleet.Todo{{ID: "a,b", Files: []string{"a.go", "b.go"}}, {ID: "other", Files: []string{"o.go"}}}
 	if !reflect.DeepEqual(got, want) {
@@ -210,17 +210,17 @@ func TestInboxItemFiles_ReadsTheDeclaredFilesOfAPendingItem(t *testing.T) {
 	writeE2File(t, filepath.Join(evolveDir, "inbox", "2026-11-03T00-00-00Z-broken.json"), `{"id":"broken","files":`)
 	read := inboxItemFiles(evolveDir)
 
-	if got := read("held"); !reflect.DeepEqual(got, []string{"go/x.go"}) {
-		t.Errorf("files of held = %v", got)
+	if got, ok := read("held"); !ok || !reflect.DeepEqual(got, []string{"go/x.go"}) {
+		t.Errorf("files of held = %v located %v", got, ok)
 	}
-	if got := read("missing"); got != nil {
-		t.Errorf("files of a missing item = %v, want none", got)
+	if got, ok := read("missing"); ok || got != nil {
+		t.Errorf("files of a missing item = %v located %v, want none", got, ok)
 	}
-	if got := read("broken"); got != nil {
-		t.Errorf("files of an unreadable item = %v, want none", got)
+	if got, ok := read("broken"); ok || got != nil {
+		t.Errorf("files of an unreadable item = %v located %v, want none", got, ok)
 	}
 	writeE2File(t, filepath.Join(evolveDir, "inbox", "2026-11-03T00-00-00Z-typed.json"), `{"id":"typed","files":5}`)
-	if got := read("typed"); got != nil {
+	if got, ok := read("typed"); ok || got != nil {
 		t.Errorf("files of an item that does not decode = %v, want none", got)
 	}
 }
