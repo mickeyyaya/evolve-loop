@@ -209,7 +209,10 @@ This counts textual conflicts only. It does not prove that the composed tree pas
 *Implication:* each PR shares a file with about 7 others on average. Each merge can break those peers, and it leaves all others behind `main`. Partition by file alone gives less than a batch that composes in order.
 
 **F5.13 (Measured, local)** The most shared files are registries: `docs/architecture/packages/internal-bridge.md` (9 PRs), `docs/architecture/llm-isolation.md` (8), `docs/architecture/packages/README.md` (7) and `docs/architecture/signal-codes.md` (6). In the direct conflicts, `go/.cover-strict` caused 3 of 9, and no other file caused a conflict in those 3 PRs. The wider `union` arm gained 3 PRs, the same count.
-*Implication:* one line list causes a third of today's direct conflicts. `docs/research-index/` already shows the fix for prose registries: one entry file for each change, and a generator.
+*Implication:* one line list causes a third of today's direct conflicts.
+
+**F5.13a (Primary, local)** GitHub does not apply `union` on a PR merge ([pr-merge-latency D9](../plans/pr-merge-latency-2026-10.md)). A bare clone conflicts without `--attr-source` ([F9.2](concurrent-cycle-landing-2026-10.md)), and a local test confirms this. Our measure used that flag.
+*Implication:* this gain exists only in the train compose, and the compose must pass `--attr-source`. `docs/research-index/` already shows the fix for prose registries: one entry file for each change, and a generator.
 
 **F5.14 (Primary, local)** We composed PRs by hand three times: #1050 (28 PRs), #1067 (19 PRs) and #1097 (29 PRs). Batch #1270 (8 PRs) is open and red. The tree `dev/cl-wi-i5` holds `Merger.Land`, which takes deliverable records and does the flush, the CI wait, the fast-forward and the split. It has no entry for a console PR.
 *Implication:* the console train is one adapter on top of work that exists, and the manual procedure proves the demand.
