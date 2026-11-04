@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -42,7 +43,7 @@ func (d *deniedPaneTmux) runRoleHook(dispatchID string) {
 	}
 }
 
-func stallAfterHook(t *testing.T, root, deniedTo string) (int, string) {
+func stallAfterHook(t *testing.T, root, deniedTo string, panes ...string) (int, string) {
 	t.Helper()
 	ws := paths.RunWorkspace(root, 7)
 	if err := os.MkdirAll(ws, 0o755); err != nil {
@@ -53,15 +54,31 @@ func stallAfterHook(t *testing.T, root, deniedTo string) (int, string) {
 		t.Fatal(err)
 	}
 	fx := newFixture(t, "claude-tmux", "")
-	tmux := &deniedPaneTmux{fakeTmux: &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}, t: t, root: root, deniedTo: deniedTo}
+	tmux := &deniedPaneTmux{fakeTmux: &fakeTmux{paneSeq: append([]string{tmuxPromptMarkerDefault}, panes...)}, t: t, root: root, deniedTo: deniedTo}
 	eng := newTestEngine(Deps{
 		Tmux: tmux, Sleep: func(time.Duration) {}, CaptureBaseline: zeroBaselineCapture, ArtifactTimeoutS: 2,
-		Reviewer: &scriptedReviewer{verdicts: []ReviewVerdict{{Action: ReviewPause, Reason: "the pane shows no progress"}}},
+		Reviewer: &scriptedReviewer{verdicts: reviewFor(panes)},
 	})
 	var stdout, stderr bytes.Buffer
 	code := eng.LaunchArgs(context.Background(), fx.args("claude-tmux", "--allow-bypass", "--agent=build", "--cycle=7",
 		"--run-id=run-41", "--project-root="+root), nil, &stdout, &stderr)
 	return code, stderr.String()
+}
+
+func reviewFor(panes []string) []ReviewVerdict {
+	pause := ReviewVerdict{Action: ReviewPause, Reason: "the pane shows no progress"}
+	if len(panes) == 0 {
+		return []ReviewVerdict{pause}
+	}
+	return []ReviewVerdict{{Action: ReviewExtend, Reason: "the pane moves"}, pause}
+}
+
+func progressingPanes(n int) []string {
+	panes := make([]string, n)
+	for i := range panes {
+		panes[i] = "working, step " + strconv.Itoa(i) + "\n" + tmuxPromptMarkerDefault
+	}
+	return panes
 }
 
 func TestLaunchArgs_AStallAfterAGuardDenialEndsWithTheTerminalReasonGuardRefused(t *testing.T) {
@@ -106,5 +123,17 @@ func TestTimeoutReason_ACancellationThenADenialThenTheReview(t *testing.T) {
 		if got := timeoutReason(state); got != want {
 			t.Errorf("timeoutReason = %q, want %q", got, want)
 		}
+	}
+}
+
+func TestLaunchArgs_ADenialThatTheAgentRecoveredFromDoesNotEndTheChain(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("EVOLVE_PROJECT_ROOT", root)
+	t.Setenv(ipcenv.DispatchIDKey, "")
+	code, stderr := stallAfterHook(t, root, "/elsewhere/go/internal/x.go", progressingPanes(200)...)
+
+	out := launchoutcome.Classify(code, nil, stderr)
+	if code != ExitArtifactTimeout || out.CauseCode == string(launchoutcome.TimeoutGuardRefused) {
+		t.Fatalf("exit %d cause %q: the pane progressed after the denial, so the stall is not the refusal: %s", code, out.CauseCode, launchoutcome.ArtifactTimeoutSummary(stderr))
 	}
 }

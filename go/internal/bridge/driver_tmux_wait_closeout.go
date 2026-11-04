@@ -28,7 +28,7 @@ func (w replWaiter) closeout(state *replWaitState) (replWaitResult, int) {
 	strippedPane := strippedForExhaustionScan(state.result.lastGoodPane, w.responder.injectedPrompt)
 	warnExhaustionRegexDrift(w.deps.Stderr, w.prefix, w.launch.name, strippedPane, state.paneProfile.ExhaustedRegex)
 	transient := classifyTransientPane(w.launch.name, strippedPane)
-	if denial, found := guards.DenialOf(w.cfg.ProjectRoot, w.cfg.DispatchID); found {
+	if denial, found := guards.DenialOf(w.cfg.ProjectRoot, w.cfg.DispatchID); found && !denial.At.Before(state.lastProgressAt) {
 		state.guardDenial = &denial
 	}
 	w.writeArtifactTimeoutMarker(state, transient)

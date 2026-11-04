@@ -220,7 +220,9 @@ How the parts connect:
 
 The journey tests are `TestJourney_AGuardDenialEndsTheChainAndTheSelfhealPass` and `TestJourney_AStallWithNoDenialKeepsTheFallbackChainAndThePass` (`go/cmd/evolve/selfheal_guard_refused_journey_test.go`). The bridge journey is `TestLaunchArgs_AStallAfterAGuardDenialEndsWithTheTerminalReasonGuardRefused` (`go/internal/bridge/guard_refused_stall_test.go`). It runs the real role hook when the pane receives the dispatch id.
 
-Limits: the hook must be able to write the stream of the run. If the write fails, the stall keeps its previous cause, and the chain walks as before. The denial changes the cause only when a stall limit ends the run. A run that completes after a denial is not changed.
+A denial counts only when the pane showed no progress after it. If the agent continues after a denial and a different stall ends the run later, the cause does not change, and the chain walks. The bridge reads only the last 4 MiB of the stream.
+
+Limits: the hook must be able to write the stream of the run. If the write fails, the stall keeps its previous cause, and the chain walks as before. The hook and the bridge must use the same project root. The tmux boot exports `EVOLVE_PROJECT_ROOT` from the launch configuration. With no project root, the hook uses the parent of `--evolve-dir`. A run that completes after a denial is not changed.
 
 ### Verified Submission Delivery Failures — Issue / Gap / Solution
 

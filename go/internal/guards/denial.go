@@ -3,6 +3,7 @@ package guards
 import (
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
@@ -20,6 +21,7 @@ type Denial struct {
 	Guard  string
 	Path   string
 	Reason string
+	At     time.Time
 }
 
 func (d Denial) Summary() string { return "guard " + d.Guard + " denied " + d.Path + ": " + d.Reason }
@@ -55,17 +57,28 @@ func RecordDenial(projectRoot, dispatchID string, d Denial) {
 	center.Flush()
 }
 
+const denialWindowBytes = 4 << 20
+
+func tailOffset(path string) int64 {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return 0
+	}
+	return max(0, fi.Size()-denialWindowBytes)
+}
+
 func DenialOf(projectRoot, dispatchID string) (Denial, bool) {
 	id, ok := proctree.ParseDispatchID(dispatchID)
 	if !ok {
 		return Denial{}, false
 	}
-	chunk, _ := signalcenter.ReadStream(DenialStream(projectRoot, id.Cycle), 0)
+	chunk, _ := signalcenter.ReadStream(DenialStream(projectRoot, id.Cycle), tailOffset(DenialStream(projectRoot, id.Cycle)))
 	var denial Denial
 	found := false
 	for _, e := range chunk.Events {
 		if e.Code == CodeDenied && e.Fields["dispatch_id"] == dispatchID {
-			denial, found = Denial{Guard: e.Fields["guard"], Path: e.Fields["path"], Reason: e.Reason}, true
+			at, _ := time.Parse(time.RFC3339Nano, e.TS)
+			denial, found = Denial{Guard: e.Fields["guard"], Path: e.Fields["path"], Reason: e.Reason, At: at}, true
 		}
 	}
 	return denial, found

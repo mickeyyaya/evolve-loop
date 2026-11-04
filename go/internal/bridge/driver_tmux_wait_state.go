@@ -42,6 +42,7 @@ type replWaitState struct {
 	lastDetectorErr         error
 	cancellationErr         error
 	guardDenial             *guards.Denial
+	lastProgressAt          time.Time
 	attempt                 int
 	intervalStartS          int
 	waitedS                 int

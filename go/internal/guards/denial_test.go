@@ -3,7 +3,9 @@ package guards
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
@@ -42,7 +44,11 @@ func TestDenialOf_ReadsBackOnlyTheDenialOfThatDispatch(t *testing.T) {
 
 	got, found := DenialOf(root, deniedDispatch)
 
-	if !found || got != (Denial{Guard: "role", Path: "/repo/x.go", Reason: "outside workspace"}) {
+	if !found || got.At.IsZero() || got.At.After(time.Now()) {
+		t.Fatalf("the denial must carry the time of its event: %+v", got)
+	}
+	got.At = time.Time{}
+	if got != (Denial{Guard: "role", Path: "/repo/x.go", Reason: "outside workspace"}) {
 		t.Fatalf("got %+v found %v", got, found)
 	}
 	if got.Summary() != "guard role denied /repo/x.go: outside workspace" {
@@ -89,5 +95,29 @@ func TestDeniedPath_NamesTheFileTheCommandOrThePersona(t *testing.T) {
 		if got := DeniedPath(in); got != want {
 			t.Errorf("DeniedPath(%+v) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+func TestDenialOf_ReadsOnlyTheTailWindowOfTheStream(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	RecordDenial(root, deniedDispatch, Denial{Guard: "role", Path: "/old.go", Reason: "long ago"})
+	f, err := os.OpenFile(DenialStream(root, 7), os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	filler := strings.Repeat("x", 1023) + "\n"
+	for range denialWindowBytes/len(filler) + 1 {
+		if _, err := f.WriteString(filler); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = f.Close()
+	if _, found := DenialOf(root, deniedDispatch); found {
+		t.Fatal("a denial before the tail window must not count")
+	}
+	RecordDenial(root, deniedDispatch, Denial{Guard: "role", Path: "/new.go", Reason: "now"})
+	if got, found := DenialOf(root, deniedDispatch); !found || got.Path != "/new.go" {
+		t.Fatalf("a denial inside the tail window counts: %+v %v", got, found)
 	}
 }
