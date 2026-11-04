@@ -36,7 +36,7 @@ The six practices are in decisions 2 and 3 (proof), 5 (liveness), 6 (refusal), 7
 11. A reviewed console PR enters the train as a deliverable (integration plan D24, D25, I12).
 12. The console train goes live before lane `enforce`, because it replaces a manual procedure (integration plan D27).
 13. A member PR does not update its branch. The batch CI decides (integration plan D26).
-14. A sorted line list uses `union`, and a guard test checks order and uniqueness (integration plan D28, I13).
+14. A line list uses `union`, and a guard test checks that each key appears once (integration plan D28, I13).
 15. `main` gets branch protection in two steps, as the train takes over each writer (integration plan D31).
 
 ## Consequences
