@@ -62,6 +62,7 @@ func runCycleReaudit(args []string, stdout, stderr io.Writer) int {
 		Cycle:       cycle,
 		Ledger:      ledger.New(evolveDir),
 		Audit:       audit,
+		Signals:     deps.Signals,
 	})
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve cycle reaudit: %v\n", err)
