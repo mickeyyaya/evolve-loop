@@ -146,6 +146,9 @@ var treeReadingSelections = []TestSelection{
 		"TestCoveringTests_ReachableFromProduction",
 		"TestDirectImporters_ReachableFromProduction",
 	}},
+	{Package: "./internal/ciparity", Tests: []string{
+		"TestEnvExclusive_TheCIJobsTheBridgeBackstopNamesRunTheTmuxTier",
+	}},
 	{Package: "./internal/committedset", Tests: []string{
 		"TestDecisionBuckets_TheOneDeclarationOfTheDroppedAndSkipShippedWireTags",
 	}},
@@ -184,9 +187,6 @@ var treeReadingSelections = []TestSelection{
 		"TestCIParityGates_OneConstructionSite",
 		"TestDefectLedgerSeam_OneConstructionSite",
 		"TestNullLedgerFacades_HaveNoProductionCaller",
-	}},
-	{Package: "./internal/phases/audit/ciparitygate", Tests: []string{
-		"TestEnvExclusive_TheCIJobsTheBridgeBackstopNamesRunTheTmuxTier",
 	}},
 	{Package: "./internal/phases/runner", Tests: []string{
 		"TestVerdictEngine_OneConstructionSite",
