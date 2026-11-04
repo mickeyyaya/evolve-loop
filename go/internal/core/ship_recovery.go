@@ -51,7 +51,7 @@ func (o *Orchestrator) recoverShipErrorRoute(ctx context.Context, projectRoot st
 		}
 		o.holdShipWindow(ctx, projectRoot, cycle, cs.RunID)
 		unwind := o.unwindUnlessPredictedConflict(ctx, projectRoot, cycle, *cs, predictedConflict)
-		ok, conflict := rebaseRecordingConflicts(ctx, projectRoot, cs)
+		ok, conflict := rebaseReport{o.signals, cycle, "Orchestrator.recoverFromShipError"}.run(ctx, projectRoot, cs)
 		if unwind == unwindDone || (ok && unwind == unwindKeepsConsumption) {
 			if err := pendRebasedChange(ctx, cs.ActiveWorktree, gitCapture); err != nil {
 				fmt.Fprintf(o.errOut(), "[orchestrator] cycle %d pend the audited change failed: %v\n", cycle, err)
@@ -77,6 +77,13 @@ func (o *Orchestrator) recoverShipErrorRoute(ctx context.Context, projectRoot st
 		}
 	}
 	return o.routeShipRecovery(se, recoverCode, recoverClass)
+}
+
+func recoveryReasonCode(code string, conflicts []string) string {
+	if code == string(CodeGitFleetRebaseNeeded) && len(conflicts) > 0 {
+		return string(CodeGitFleetRebaseConflict)
+	}
+	return code
 }
 
 func (o *Orchestrator) routeShipRecovery(se *ShipError, recoverCode ShipErrorCode, recoverClass ShipErrorClass) (Phase, bool) {
@@ -249,61 +256,193 @@ func goInputsFor(ctx context.Context, worktree string) derived.GoInputDirs {
 const maxRebaseContinueSteps = 100
 
 func rebaseCycleBranchOntoMain(ctx context.Context, projectRoot, worktree string) (ok bool, conflicts []string) {
+	ok, conflicts, _ = rebaseLane(ctx, projectRoot, laneRebase{worktree: worktree})
+	return ok, conflicts
+}
+
+type laneRebase struct {
+	worktree string
+	own      []string
+}
+
+func rebaseLane(ctx context.Context, projectRoot string, lane laneRebase) (ok bool, conflicts, stamped []string) {
+	worktree := lane.worktree
 	if worktree == "" {
-		return false, nil
+		return false, nil, nil
 	}
 	if inPlaceWorktree(worktree, projectRoot) {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN fleet rebase refused: the active worktree is the project root — a cycle never rebases the operator's tree\n")
-		return false, nil
+		return false, nil, nil
 	}
 	if remote, ok := originMainRef(ctx, gitCapture, worktree); ok {
 		if err := refuseUnprovenAhead(ctx, gitCapture, worktree, remote, strings.TrimPrefix(remote, "origin/")); err != nil {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN fleet rebase refused: %v\n", err)
-			return false, nil
+			return false, nil, nil
 		}
 	}
-	return rebaseWithDerivedRegen(ctx, worktree, gitCapture, regenerateDerivedArtifact, derivedConflictIn(worktree))
+	fr := &fleetRebase{worktree: worktree, git: gitCapture, regen: regenerateDerivedArtifact, classify: derivedConflictIn(worktree), inbox: newInboxStamps(lane.own)}
+	ok, conflicts = fr.run(ctx)
+	if !ok {
+		return false, conflicts, nil
+	}
+	return true, conflicts, fr.stamped
 }
 
 func rebaseWithDerivedRegen(ctx context.Context, worktree string, git gitFn, regen regenFn, classify derivedClassifier) (ok bool, conflicts []string) {
-	abort := func() {
-		cctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		_, _, _ = git(cctx, worktree, "rebase", "--abort")
+	return (&fleetRebase{worktree: worktree, git: git, regen: regen, classify: classify}).run(ctx)
+}
+
+type fleetRebase struct {
+	worktree string
+	git      gitFn
+	regen    regenFn
+	classify derivedClassifier
+	inbox    inboxStamps
+	stamped  []string
+}
+
+func (f *fleetRebase) abort() {
+	cctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	_, _, _ = f.git(cctx, f.worktree, "rebase", "--abort")
+	f.stamped = nil
+}
+
+func (f *fleetRebase) anchor(ctx context.Context) (string, error) {
+	if len(f.inbox.own) == 0 {
+		return "", nil
 	}
-	if _, exit, err := git(ctx, worktree, "rebase", "main"); err == nil && exit == 0 {
+	return gitStdout(ctx, f.git, f.worktree, "rev-parse", "HEAD")
+}
+
+func (f *fleetRebase) mergedTree(ctx context.Context, head string) (string, error) {
+	out, code, err := f.git(ctx, f.worktree, "merge-tree", "--write-tree", "--no-messages", "main", head)
+	if err != nil {
+		return "", err
+	}
+	tree, _, _ := strings.Cut(out, "\n")
+	if tree = strings.TrimSpace(tree); code > 1 || tree == "" {
+		return "", fmt.Errorf("git merge-tree main %s: exit %d", head, code)
+	}
+	return tree, nil
+}
+
+func derivedExcludes() []string {
+	var specs []string
+	for _, e := range derived.Catalog() {
+		for _, spec := range e.Pathspecs() {
+			specs = append(specs, ":(exclude)"+spec)
+		}
+	}
+	return specs
+}
+
+func (f *fleetRebase) auditedDrift(ctx context.Context, head string) ([]string, error) {
+	tree, err := f.mergedTree(ctx, head)
+	if err != nil {
+		return nil, err
+	}
+	args := append([]string{"diff", "--name-only", "-z", tree, "HEAD", "--", ".", ":(exclude)" + inboxRoot}, derivedExcludes()...)
+	out, err := gitStdout(ctx, f.git, f.worktree, args...)
+	return nulPaths(out), err
+}
+
+func (f *fleetRebase) restore(ctx context.Context, head string) {
+	if _, err := gitStdout(ctx, f.git, f.worktree, "reset", "--hard", head); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] fleet rebase of %s: restore of the audited commit %s failed: %v\n", f.worktree, head, err)
+	}
+	f.stamped = nil
+}
+
+func (f *fleetRebase) run(ctx context.Context) (ok bool, conflicts []string) {
+	head, err := f.anchor(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] fleet rebase of %s: cannot read the audited commit (%v); not rebasing\n", f.worktree, err)
+		return false, nil
+	}
+	ok, conflicts = f.rebaseAll(ctx)
+	if !ok || len(f.stamped) == 0 {
+		return ok, conflicts
+	}
+	drift, err := f.auditedDrift(ctx, head)
+	if err == nil && len(drift) == 0 {
+		return ok, conflicts
+	}
+	return false, f.refuse(ctx, head, drift, err)
+}
+
+func (f *fleetRebase) refuse(ctx context.Context, head string, drift []string, err error) []string {
+	stamped := f.stamped
+	fmt.Fprintf(os.Stderr, "[orchestrator] fleet rebase of %s: the rebased change does not hold the audited code after the inbox resolve (drift %v, proof error %v); restoring %s\n", f.worktree, drift, err, head)
+	f.restore(ctx, head)
+	if err != nil {
+		return nil
+	}
+	return append(drift, stamped...)
+}
+
+func (f *fleetRebase) rebaseAll(ctx context.Context) (ok bool, conflicts []string) {
+	if _, exit, err := f.git(ctx, f.worktree, "rebase", "main"); err == nil && exit == 0 {
 		return true, nil
 	}
-	if len(unmergedRebasePaths(ctx, worktree, git)) == 0 {
-		abort()
-		fmt.Fprintf(os.Stderr, "[orchestrator] fleet rebase of %s onto main failed without conflicts (infra); aborted\n", worktree)
+	if len(unmergedRebasePaths(ctx, f.worktree, f.git)) == 0 {
+		f.abort()
+		fmt.Fprintf(os.Stderr, "[orchestrator] fleet rebase of %s onto main failed without conflicts (infra); aborted\n", f.worktree)
 		return false, nil
 	}
 	for step := 0; step < maxRebaseContinueSteps; step++ {
-		unmerged := unmergedRebasePaths(ctx, worktree, git)
-		if len(unmerged) == 0 {
-			if _, c, e := git(ctx, worktree, "rebase", "--skip"); e == nil && c == 0 {
-				return true, nil
-			}
-			continue
-		}
-		entries, genuine := groupDerivedConflicts(unmerged, classify)
-		if len(genuine) > 0 {
-			abort()
-			fmt.Fprintf(os.Stderr, "[orchestrator] fleet rebase of %s: non-derived conflict on %s (overlapping work) → debugger\n", worktree, strings.Join(genuine, ", "))
-			return false, genuine
-		}
-		if !(derivedRebase{worktree: worktree, git: git, regen: regen}).regenerate(ctx, entries) {
-			abort()
-			return false, nil
-		}
-		if _, c, e := git(ctx, worktree, "-c", "core.editor=true", "rebase", "--continue"); e == nil && c == 0 {
-			return true, nil
+		done, ok, conflicts := f.replay(ctx)
+		if done {
+			return ok, conflicts
 		}
 	}
-	abort()
-	fmt.Fprintf(os.Stderr, "[orchestrator] fleet rebase of %s exceeded %d replay steps; aborted\n", worktree, maxRebaseContinueSteps)
+	f.abort()
+	fmt.Fprintf(os.Stderr, "[orchestrator] fleet rebase of %s exceeded %d replay steps; aborted\n", f.worktree, maxRebaseContinueSteps)
 	return false, nil
+}
+
+func (f *fleetRebase) replay(ctx context.Context) (done, ok bool, conflicts []string) {
+	unmerged := unmergedRebasePaths(ctx, f.worktree, f.git)
+	if len(unmerged) == 0 {
+		return f.skipEmpty(ctx)
+	}
+	unmerged, settled, err := f.inbox.resolve(ctx, f.worktree, f.git, unmerged)
+	if err != nil {
+		f.abort()
+		fmt.Fprintf(os.Stderr, "[orchestrator] fleet rebase of %s: a git step failed while resolving the inbox (%v); aborted\n", f.worktree, err)
+		return true, false, nil
+	}
+	for _, p := range settled {
+		if !slices.Contains(f.stamped, p) {
+			f.stamped = append(f.stamped, p)
+		}
+	}
+	entries, genuine := groupDerivedConflicts(unmerged, f.classify)
+	if len(genuine) > 0 {
+		f.abort()
+		fmt.Fprintf(os.Stderr, "[orchestrator] fleet rebase of %s: non-derived conflict on %s (overlapping work) → debugger\n", f.worktree, strings.Join(genuine, ", "))
+		return true, false, genuine
+	}
+	if !(derivedRebase{worktree: f.worktree, git: f.git, regen: f.regen}).regenerate(ctx, entries) {
+		f.abort()
+		return true, false, nil
+	}
+	if _, c, e := f.git(ctx, f.worktree, "-c", "core.editor=true", "rebase", "--continue"); e == nil && c == 0 {
+		return true, true, nil
+	}
+	return false, false, nil
+}
+
+func (f *fleetRebase) skipEmpty(ctx context.Context) (done, ok bool, conflicts []string) {
+	if _, code, err := f.git(ctx, f.worktree, "diff", "--cached", "--quiet"); err != nil || code != 0 {
+		f.abort()
+		fmt.Fprintf(os.Stderr, "[orchestrator] fleet rebase of %s: the replay holds a staged change that did not commit; aborted so the audited commit is kept\n", f.worktree)
+		return true, false, nil
+	}
+	if _, c, e := f.git(ctx, f.worktree, "rebase", "--skip"); e == nil && c == 0 {
+		return true, true, nil
+	}
+	return false, false, nil
 }
 
 type derivedRebase struct {
@@ -341,8 +480,9 @@ func groupDerivedConflicts(paths []string, classify derivedClassifier) (entries,
 }
 
 func rebaseRecordingConflicts(ctx context.Context, projectRoot string, cs *CycleState) (ok, conflict bool) {
-	ok, conflicts := rebaseCycleBranchOntoMain(ctx, projectRoot, cs.ActiveWorktree)
+	ok, conflicts, stamped := rebaseLane(ctx, projectRoot, laneRebase{worktree: cs.ActiveWorktree, own: LaneScopeIDs(cs.WorkspacePath)})
 	cs.ShipRecoveryConflicts = conflicts
+	cs.ShipRecoveryStamped = stamped
 	return ok, len(conflicts) > 0
 }
 

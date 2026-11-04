@@ -42,6 +42,7 @@ var additiveCycleStateKeys = []string{
 	"audit_fail_reasons",
 	"failed_at",
 	"ship_fail_reasons",
+	"ship_recovery_stamped",
 	"bookkeeping_regrade_attempted",
 	"audit_repair_attempts",
 	"audit_repair_active",

@@ -277,6 +277,8 @@ func TestRebaseWithDerivedRegen_EmptyCommitAfterResolve_Skips(t *testing.T) {
 			return "", 0, nil
 		case strings.Contains(j, "rebase --continue"):
 			return "nothing to commit", 1, nil
+		case j == "diff --cached --quiet":
+			return "", 0, nil
 		case strings.Contains(j, "rebase --skip"):
 			return "", 0, nil
 		}
@@ -517,6 +519,8 @@ func TestRebaseWithDerivedRegen_SkipRetriesThenCompletes(t *testing.T) {
 			return "", 0, nil
 		case strings.Contains(j, "rebase --continue"):
 			return "nothing to commit", 1, nil
+		case j == "diff --cached --quiet":
+			return "", 0, nil
 		case strings.Contains(j, "rebase --skip"):
 			skips++
 			if skips == 1 {
@@ -566,6 +570,8 @@ func TestRebaseWithDerivedRegen_SkipThenNewDerivedConflict_Resolves(t *testing.T
 			if contN == 1 {
 				return "nothing to commit", 1, nil
 			}
+			return "", 0, nil
+		case j == "diff --cached --quiet":
 			return "", 0, nil
 		case strings.Contains(j, "rebase --skip"):
 			skipN++

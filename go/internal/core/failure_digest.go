@@ -53,6 +53,7 @@ type preClassRule struct {
 var preClassRules = []preClassRule{
 	{dossier.PreClassInfraError, []string{"infra teardown", "quota", "bridge", "teardown"}},
 	{dossier.PreClassGuardAbort, []string{"statemap severed", "guard aborted", "guard abort", "statemap"}},
+	{dossier.PreClassShipRebaseConflict, []string{"git_fleet_rebase_conflict", "fleet rebase conflict", "fleet_rebase_conflict"}},
 	{dossier.PreClassGateBlock, []string{"egps", "floor blocked", "red_count", "gate block", "blocked ship", "handoff floor", "deliverable rejected", "deterministic check", "repo-contract", "would red main", "scanner pack"}},
 	{dossier.PreClassVerdictFail, []string{"failed to compile", "predicate", "verdict", "acs"}},
 }

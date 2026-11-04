@@ -48,9 +48,12 @@ const (
 	swapsQuotaBoundaryCheckpointer  = "test swaps package variable QuotaBoundaryCheckpointer"
 	swapsStderr                     = "test swaps os.Stderr"
 	swapsWorktreeAddRetrySleep      = "test swaps package variable worktreeAddRetrySleep"
+	swapsGitOnPath                  = "test puts a faulting git shim on the process PATH"
 )
 
 var serialRequiredTests = map[string]string{
+	"core.TestShipJourney_AFailedContinueAfterAResolveKeepsTheAuditedCommit":                        swapsGitOnPath,
+	"core.TestShipJourney_AFailedStageReadIsNotTheLaneDeletingTheItem":                              swapsGitOnPath,
 	"core.TestReauditCycle_MovedBaseRebasesAuditsAndRecordsTheBinding":                              swapsReauditRebase,
 	"core.TestReauditCycle_RequestIsDerivedFromTheCycleState":                                       swapsReauditRebase,
 	"core.TestReauditCycle_TheAuditRunsBehindTheReadOnlyFence":                                      swapsReauditRebase,
