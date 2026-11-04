@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net"
 	"os"
 	"os/exec"
@@ -368,8 +369,10 @@ func (h contractHost) agent(t *testing.T, row contractRow) (string, error) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	defer reapPrivateTmuxServers(h.scratch)
 	args := append(append([]string{}, h.prefix[1:]...), "/bin/sh", "-c", row.script(h))
 	cmd := exec.CommandContext(ctx, h.prefix[0], args...)
+	cmd.WaitDelay = contractAgentWaitDelay
 	cmd.Env = paneEnv(os.Environ())
 	for _, kv := range row.env {
 		cmd.Env = append(cmd.Env, strings.Replace(kv, "<run>", h.runSocket+","+h.runPID+",0", 1))
@@ -379,6 +382,21 @@ func (h contractHost) agent(t *testing.T, row contractRow) (string, error) {
 		t.Fatalf("inconclusive: the agent command timed out: %q", out)
 	}
 	return strings.TrimSpace(string(out)), err
+}
+
+const contractAgentWaitDelay = 2 * time.Second
+
+const contractReapDeadline = 3 * time.Second
+
+func reapPrivateTmuxServers(scratch string) {
+	_ = filepath.WalkDir(scratch, func(path string, d fs.DirEntry, err error) error {
+		if err == nil && d.Type()&fs.ModeSocket != 0 {
+			ctx, cancel := context.WithTimeout(context.Background(), contractReapDeadline)
+			defer cancel()
+			_ = exec.CommandContext(ctx, "tmux", "-S", path, "kill-server").Run()
+		}
+		return nil
+	})
 }
 
 func paneEnv(env []string) []string {
