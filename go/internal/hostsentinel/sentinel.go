@@ -29,6 +29,8 @@ func (r Release) outcome(apply bool) string {
 	return "failed"
 }
 
+const throttleSlack = 10
+
 type Ports struct {
 	Sample  func(context.Context) Sample
 	Release func(ctx context.Context, breaches []Breach, apply bool) []Release
@@ -94,7 +96,10 @@ func (s *Sentinel) Tick(ctx context.Context) Status {
 
 func (s *Sentinel) floor(sample Sample) bool {
 	r, ok := sample.Readings[MetricDiskFree]
-	below := ok && r.Err == "" && r.Value < float64(s.cfg.FloorBytes)
+	if !ok || r.Err != "" {
+		return s.hold.Load()
+	}
+	below := r.Value < float64(s.cfg.FloorBytes)
 	hold := below && s.cfg.Stage == StageEnforce
 	s.hold.Store(hold)
 	if below {
@@ -121,7 +126,7 @@ func (s *Sentinel) warnFailed(sample Sample) {
 }
 
 func (s *Sentinel) emit(at time.Time, e signalcenter.Event) {
-	if last, seen := s.last[e.Code]; seen && at.Sub(last) < s.cfg.Interval {
+	if last, seen := s.last[e.Code]; seen && at.Sub(last) < s.cfg.Interval-s.cfg.Interval/throttleSlack {
 		return
 	}
 	s.last[e.Code] = at

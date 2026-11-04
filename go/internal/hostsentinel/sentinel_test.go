@@ -196,7 +196,7 @@ func TestTick_OverEachThresholdEmitsOneHostSignalAndARepeatInTheIntervalDoesNotF
 	if n := len(r.codes()); n != len(want) {
 		t.Fatalf("a repeat within the interval emitted again: %v", r.codes())
 	}
-	at = start.Add(time.Minute)
+	at = start.Add(57 * time.Second)
 	s.Tick(context.Background())
 	if n := len(r.codes()); n != 2*len(want) {
 		t.Fatalf("a breach that lasts past the interval must signal again, got %v", r.codes())
@@ -263,6 +263,18 @@ func TestTick_AReleaseThatFailsIsNamedInTheSignal(t *testing.T) {
 	s.Tick(context.Background())
 	if got := r.events[0].Fields["released"]; got != "cache=failed" {
 		t.Fatalf("released field = %q, want cache=failed", got)
+	}
+}
+
+func TestTick_AFailedDiskReadingKeepsTheFloorHold(t *testing.T) {
+	t.Parallel()
+	var r recorder
+	sample := overEveryThreshold(time.Unix(5, 0))
+	s := New(testConfig(t, "enforce"), r.ports(func(context.Context) Sample { return sample }))
+	s.Tick(context.Background())
+	sample = Sample{At: time.Unix(500, 0), Readings: map[Metric]Reading{MetricDiskFree: Measured(0, errors.New("statfs failed"))}}
+	if st := s.Tick(context.Background()); !st.HoldLanes || !s.HoldLanes() {
+		t.Fatal("a failed disk reading does not prove free disk, so the hold stays")
 	}
 }
 
