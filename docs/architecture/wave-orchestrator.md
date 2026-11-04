@@ -441,6 +441,7 @@ The oversight finds the lane of an event by the cycle number. A lane that no cyc
 | a stall report | the code `LIVENESS_PHASE_STALLED` | `Leases.Stall` publishes `LOOP_ORCH_LANE_STALLED` once |
 | a quota signal | the code `BRIDGE_USAGE_EVIDENCE` or `LIVENESS_PANE_EXHAUSTED` | run the sizing step, set the limit of the intake, and publish `LOOP_ORCH_FAMILY_PAUSED` for each new family |
 | a halt | kind `loop.halt` | stop all admission |
+| the ejection code | the code `SHIP_INTEGRATION_EJECTED` | read the brief from `fields.brief_file`, send it to the live lane and hold its cells again. A failed send publishes `LOOP_ORCH_EJECTION_BRIEF_FAILED`. Nothing emits this code yet |
 
 At `shadow`, an action publishes `LOOP_ORCH_OVERSIGHT_ACTION` with `applied` false, and nothing else changes. A heartbeat and a stall are observations, so both stages apply them.
 

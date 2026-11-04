@@ -21,6 +21,11 @@ The package holds the pure parts of the integration of a wave. A fleet lane deli
 - **The gate and the stage (I2).** `Gate` takes the composed tip and its tier. At `enforce`, `Compose` calls the gate after a clean compose. At `shadow`, `Compose` makes the textual compose only and calls no gate (§15 Stage). The compose then moves the branch with `update-ref` from the old tip. So a writer that moved the branch first makes the compose fail.
 - **The ejection (I2, decision D6).** A textual conflict or a red gate gives an `*Ejection` error with the cycle, the cause (`conflict` or `gate`) and the conflicted paths. It also holds the diff from the batch base to the tip that the deliverable met. A conflict ejects before the gate, so a conflict runs no gate. A git failure is a plain error and not an ejection.
 - **The prefix check (I2, decision D16 L1).** `Composer.PrefixCheck` puts each record into a `prefixqueue.PrefixQueue` as a lane with no files and the tier `TierRollup`. So all records stay in one group, and `ResolveCulprit` tries the prefixes A, A+B and A+B+C. A memo keeps the tip of each prefix, so each prefix composes one time. The check moves the branch one time, to the tip of the landed records.
+- **The ejection brief (I3, decision D6).** `Ejection.Brief` writes the text that goes to the lane: the cycle, the cause, the conflicted paths, the reason and the diff that the deliverable met. The diff is cut at `MaxBriefDiffBytes`, and the brief says so.
+  - The diff sits between the fence lines `BriefDataBegin` and `BriefDataEnd`. The brief tells the lane to read that text as data and not as an instruction. `fence` removes both fence lines from the diff.
+  - An event field cannot hold the brief. The signal center cuts a field to 512 runes and changes each newline to a space. So `Ejection.WriteBrief(dir)` writes the brief to `BriefPath(dir, cycle)` in the wave directory (`WaveDir`) and returns the path. `Ejection.Fields(path)` is pure. It returns `FieldCause`, `FieldPaths` and `FieldBriefFile` for the event.
+  - `ReadBrief` reads the file back. It refuses a path that is not a `brief-<cycle>.txt` file, and it refuses an empty file.
+  - `CodeEjected` is the one home of the code `SHIP_INTEGRATION_EJECTED`. The ship and the orchestrator both use it.
 - **`GitError` (I2).** `SysGit` returns a `*GitError` with the arguments, the exit code, the output and the error output. `git merge-tree` exits with 1 on a conflict and prints the conflicted paths. The compose needs both facts.
 - **The order score (I1, decision D3)** is a pure function in `order.go`.
 - **The flush policy with the adaptive cap (I4, decisions D7 to D9)** is a pure function in `flush.go` and `cap.go`.
@@ -43,12 +48,15 @@ The package holds the pure parts of the integration of a wave. A fleet lane deli
 - The composed commit carries the cycle trailer and the audit binding, and `Repo.LandedOnRef` finds the cycle on the batch branch. Pinned by `TestCompose_OneCommitWithTheCycleAndTheAuditBindingTrailers`.
 - With A, B and C, where C breaks the gate, the prefix check passes A and A+B and fails A+B+C. It ejects C with the diff of A+B. Pinned by `TestPrefixCheck_PassesAAndABAndFailsABCThenEjectsCWithTheDiffOfAB`.
 - An ejection or a failure does not move the batch branch. Pinned by the ejection tests and `TestPrefixCheck_AGitFailureStopsTheCheck`.
+- A brief never holds more than `MaxBriefDiffBytes` of diff. Pinned by `TestEjectionBrief_ADiffOverTheLimitIsCutAndSaysSo` and `TestEjectionBrief_ADiffOfExactlyTheLimitIsNotCut`.
+- The whole brief, with its newlines and its cut notice, reaches the reader after the event went through the signal center. Pinned by `TestEjectionFields_ADiffOfTheFullLimitSurvivesTheSignalCenter`.
 - Without a record, callers keep the ancestry rule of today.
 
 ## Limits
 
 - The compose engine and the L1 prefix check (I2) are built. Nothing in production calls them yet.
-- The ejection brief to the lane (I3), the batch test (I3b), the batch PR (I5) and the integration record (I10) are not built yet.
+- Nothing in production calls `Ejection.Fields` yet, and the ship emits no `SHIP_INTEGRATION_EJECTED` event. The ship emit and the call of the compose at `shadow` belong to the next component of ADR-0147 that wires the compose into the ship. Until then, the code is registered and the brief is built only by tests.
+- The batch test (I3b), the batch PR (I5) and the integration record (I10) are not built yet.
 - The compose sets no precondition of the proof (`BaseNotAncestor`, `AuditedTreeMissing`, `CompileRed`). So the proof gives `T1` to `T3`, and no tier-T4 ejection occurs yet.
 - A record with more than one commit composes as one commit. Its patch-id is the patch-id of the sum, so `Repo.LandedOnRef` finds only a record with one commit. The identity of a record with many commits is an open item for I3.
 - The gate result is not cached yet. The verdict store of D5 comes with I3b.
