@@ -1397,6 +1397,18 @@ The reasons that the comments of the phase-I/O, ports, reset, resume, repair, re
   - The wired-probe interfaces exist because core cannot import `internal/deliverable`.
 - **Tests that swap package hooks are serial.** In `quota_defer_retro_skip_test.go` and `quota_exhaustion_test.go`, the tests that assign `QuotaBoundaryCheckpointer` (or the sibling checkpoint hook) do not call `t.Parallel()`. The other tests in these files are parallel.
 
+## The bookkeeping batch
+
+- **Status: the mechanism exists. No production code uses it.** `evolve cycle` does not call `WithBookkeeping`.
+- **I11 owns the wiring.** I11 owns the feeds and the `BookkeepingFlusher` wiring. It must add a `WithBookkeeping` call at the composition root, a durable sink, and a test on the composed path. I9 must not set the stage to enforce before this. At each stage, including enforce, the dossier closeout commits to `main` as before. Nothing is live.
+- **What the mechanism does.** `WithBookkeeping(stage, sink)` sets the stage and the sink. At enforce with a sink, a non-fleet closeout uses `DossierBatched`: it writes the two files and adds one `BookkeepingEntry`. It makes no commit. At shadow, or with no sink, the closeout commits. A batched closeout with no sink fails with an error.
+- **A fleet lane is not batched.** A lane always uses `DossierPending`. `dossier.PublishPending` then commits the pair to the plane's `main`, and it does not read the stage. The F2.7 race stays for each lane. The owner is I5, at the flush of a code batch, together with I11.
+- **The sink must be durable before it is wired.** `BookkeepingBatch` is in memory. A one-shot process loses its entries when it exits. I5 supplies a sink that survives a process, and the flusher. Wire the sink only then.
+- **The inbox stamps are not batched.** `evolve sync-main` still calls `CommitKept` and `CommitReplay`. The owner is I11. `inboxstamps.Plan.HoldKept` and `HoldReplay` take a `BookkeepingSink` and add one `BookkeepingInboxStamp` entry. A list with no path adds nothing. `inboxmover` has no holder, because `BookkeepingSink` is the one port.
+- **`BookkeepingFlusher` is a declared port.** `integration.SkipsL2` and `integration.FlushDue` hold the pure policy for I5.
+- **A failed write adds no entry.** `writeCycleDossier` writes the two files first and then adds the entry. An entry never names a file that was not written. A test pins this order.
+- **One home for the pair.** `dossier.CorpusPair` gives the paths and the commit message. The committed write and the batch entry both use it.
+
 ## Test seams and the coverage floor
 
 The package is held at 100.0% statement coverage with `-tags integration`. The line `./internal/core 100` in `go/.cover-strict` enforces this floor. Cycles 1946 and 1950 built this work. Both cycles ended in FAIL, and the console landed it afterward.

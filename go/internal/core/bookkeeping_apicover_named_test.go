@@ -17,3 +17,17 @@ func TestApicoverNamed_BookkeepingReasonClassifiers(t *testing.T) {
 		t.Error("BookkeepingConflictAuditReason accepted a FAIL-narrative record")
 	}
 }
+
+func TestBookkeepingExportsAreNamedByAnExecutedAssertion(t *testing.T) {
+	t.Parallel()
+	var kind BookkeepingKind = BookkeepingDossier
+	if kind == BookkeepingInboxStamp {
+		t.Errorf("the kinds %q and %q must differ", kind, BookkeepingInboxStamp)
+	}
+	spy := &recordingFlusher{}
+	var flusher BookkeepingFlusher = spy
+	entry := BookkeepingEntry{Kind: kind, Message: "m", Paths: []string{"p"}}
+	if err := flusher.Flush([]BookkeepingEntry{entry}); err != nil || len(spy.got) != 1 || spy.got[0].Kind != BookkeepingDossier {
+		t.Errorf("Flush = %v, got %+v", err, spy.got)
+	}
+}

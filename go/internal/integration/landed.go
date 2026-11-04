@@ -50,7 +50,7 @@ func (e *GitError) Error() string {
 }
 
 func fullObjectID(sha string) error {
-	if !objectID.MatchString(sha) {
+	if !objectID.MatchString(sha) || strings.Trim(sha, "0") == "" {
 		return fmt.Errorf("integration: %q is not a full object id", sha)
 	}
 	return nil

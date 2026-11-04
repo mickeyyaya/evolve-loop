@@ -3,7 +3,6 @@ package dossier
 import (
 	"context"
 	"fmt"
-	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -68,7 +67,7 @@ func commitPairGit(g gitexec.Git, base string) error {
 		return nil
 	}
 
-	msg := fmt.Sprintf("dossier: %s closeout", path.Base(base))
+	msg := closeoutMessage(base)
 	var lastErr error
 	for attempt := 1; attempt <= commitMaxAttempts; attempt++ {
 		_, stderr, code, err := g.Capture(ctx, "commit", "-m", msg, "--", jsonName, mdName)

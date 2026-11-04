@@ -55,6 +55,7 @@ const (
 	riskHigh        = "high"
 	recordPrefix    = "deliverable-"
 	prRecordPrefix  = recordPrefix + "pr-"
+	wavePrefix      = "integration-"
 	SourceConsolePR = "console-pr"
 	ConsoleWave     = "console"
 )
@@ -176,7 +177,7 @@ func (r DeliverableRecord) id() string {
 }
 
 func WaveDir(projectRoot, wave string) string {
-	return filepath.Join(projectRoot, ".evolve", "waves", "integration-"+wave)
+	return filepath.Join(projectRoot, ".evolve", "waves", wavePrefix+wave)
 }
 
 func RecordPath(dir string, cycle int) string {
@@ -201,29 +202,38 @@ func WriteRecord(dir string, r DeliverableRecord) (string, error) {
 	if err := r.Validate(); err != nil {
 		return "", err
 	}
-	raw, err := marshalRecord(r, "", "  ")
+	return recordFile{Path: r.path(dir), Kind: "deliverable record", Prefix: recordPrefix}.publish(r)
+}
+
+type recordFile struct {
+	Path   string
+	Kind   string
+	Prefix string
+}
+
+func (f recordFile) publish(v any) (string, error) {
+	raw, err := marshalRecord(v, "", "  ")
 	if err != nil {
-		return "", fmt.Errorf("integration: encode deliverable record: %w", err)
+		return "", fmt.Errorf("integration: encode %s: %w", f.Kind, err)
 	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(f.Path), 0o755); err != nil {
 		return "", fmt.Errorf("integration: create record directory: %w", err)
 	}
-	path := r.path(dir)
-	tmp, err := stageRecord(dir, append(raw, '\n'))
+	tmp, err := stageRecord(filepath.Dir(f.Path), f.Prefix, append(raw, '\n'))
 	if err != nil {
-		return "", fmt.Errorf("integration: write deliverable record: %w", err)
+		return "", fmt.Errorf("integration: write %s: %w", f.Kind, err)
 	}
-	if err := os.Rename(tmp, path); err != nil {
+	if err := os.Rename(tmp, f.Path); err != nil {
 		_ = os.Remove(tmp)
-		return "", fmt.Errorf("integration: publish deliverable record: %w", err)
+		return "", fmt.Errorf("integration: publish %s: %w", f.Kind, err)
 	}
-	return path, nil
+	return f.Path, nil
 }
 
 var createRecordTemp = os.CreateTemp
 
-func stageRecord(dir string, body []byte) (string, error) {
-	f, err := createRecordTemp(dir, recordPrefix+"*.tmp")
+func stageRecord(dir, prefix string, body []byte) (string, error) {
+	f, err := createRecordTemp(dir, prefix+"*.tmp")
 	if err != nil {
 		return "", err
 	}
@@ -235,14 +245,21 @@ func stageRecord(dir string, body []byte) (string, error) {
 	return f.Name(), nil
 }
 
-func ReadRecord(path string) (DeliverableRecord, error) {
+func loadRecord(path, kind string, into any) error {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return DeliverableRecord{}, fmt.Errorf("integration: read deliverable record: %w", err)
+		return fmt.Errorf("integration: read %s: %w", kind, err)
 	}
+	if err := json.Unmarshal(raw, into); err != nil {
+		return fmt.Errorf("integration: parse %s %s: %w", kind, path, err)
+	}
+	return nil
+}
+
+func ReadRecord(path string) (DeliverableRecord, error) {
 	var r DeliverableRecord
-	if err := json.Unmarshal(raw, &r); err != nil {
-		return DeliverableRecord{}, fmt.Errorf("integration: parse deliverable record %s: %w", path, err)
+	if err := loadRecord(path, "deliverable record", &r); err != nil {
+		return DeliverableRecord{}, err
 	}
 	if r.Schema != RecordSchema {
 		return DeliverableRecord{}, fmt.Errorf("integration: deliverable record %s has schema %q, want %q", path, r.Schema, RecordSchema)

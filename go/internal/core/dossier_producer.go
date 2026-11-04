@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -24,6 +25,7 @@ type cycleDossierParams struct {
 	ExplanationCorrections []string
 	PhaseTimings           []phaseTimingEntry
 	Destination            DossierDestination
+	Sink                   BookkeepingSink
 }
 
 func defaultGitMutationLock(projectRoot string) (func(), error) {
@@ -73,6 +75,20 @@ func writeCycleDossier(lock gitMutationLocker, p cycleDossierParams) error {
 	}
 	if err := dossier.Write(d, dir, commit); err != nil {
 		return fmt.Errorf("write dossier: %w", err)
+	}
+	if p.Destination == DossierBatched {
+		return batchDossier(p)
+	}
+	return nil
+}
+
+func batchDossier(p cycleDossierParams) error {
+	if p.Sink == nil {
+		return errors.New("bookkeeping batch: a batched dossier has no sink")
+	}
+	paths, message := dossier.CorpusPair(p.Cycle)
+	if err := p.Sink.Add(BookkeepingEntry{Kind: BookkeepingDossier, Paths: paths, Message: message}); err != nil {
+		return fmt.Errorf("bookkeeping batch refused the dossier: %w", err)
 	}
 	return nil
 }
