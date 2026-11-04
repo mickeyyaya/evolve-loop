@@ -2,11 +2,11 @@ package integration
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
@@ -29,8 +29,11 @@ func SysGit() GitFunc {
 			in = strings.NewReader(stdin)
 		}
 		code, err := sysexec.DefaultRunner(ctx, gitBin, dir, args, nil, in, &out, &errOut)
-		if err != nil || code != 0 {
-			return "", fmt.Errorf("integration: git %s exit=%d: %s %v", strings.Join(args, " "), code, strings.TrimSpace(errOut.String()), err)
+		if err != nil {
+			return "", fmt.Errorf("integration: git %s: %s: %w", strings.Join(args, " "), strings.TrimSpace(errOut.String()), err)
+		}
+		if code != 0 {
+			return "", fmt.Errorf("integration: git %s exit=%d: %s", strings.Join(args, " "), code, strings.TrimSpace(errOut.String()))
 		}
 		return out.String(), nil
 	}
@@ -50,24 +53,44 @@ func (r Repo) PatchID(ctx context.Context, sha string) (string, error) {
 		return "", fmt.Errorf("integration: read the diff of %s: %w", sha, err)
 	}
 	if strings.TrimSpace(diff) == "" {
-		return "", fmt.Errorf("integration: commit %s has no patch", sha)
+		return "", fmt.Errorf("%w: %s is a merge or an empty commit", ErrNoPatch, sha)
 	}
-	out, err := r.Git(ctx, r.Dir, diff, "patch-id", "--stable")
+	id, err := r.DiffPatchID(ctx, diff)
 	if err != nil {
 		return "", fmt.Errorf("integration: patch-id of %s: %w", sha, err)
 	}
+	return id, nil
+}
+
+func (r Repo) DiffPatchID(ctx context.Context, diff string) (string, error) {
+	out, err := r.Git(ctx, r.Dir, diff, "patch-id", "--stable")
+	if err != nil {
+		return "", fmt.Errorf("git patch-id --stable: %w", err)
+	}
 	fields := strings.Fields(out)
 	if len(fields) == 0 {
-		return "", fmt.Errorf("integration: patch-id of %s printed nothing", sha)
+		return "", errors.New("git patch-id --stable: empty output (empty diff?)")
 	}
 	return fields[0], nil
 }
 
 func (r Repo) LandedOnRef(ctx context.Context, rec DeliverableRecord, ref string) bool {
+	return r.landedIn(ctx, rec, ref)
+}
+
+func (r Repo) LandedSince(ctx context.Context, rec DeliverableRecord, ref, since string) bool {
+	if !objectID.MatchString(since) {
+		return false
+	}
+	return r.landedIn(ctx, rec, ref, "^"+since)
+}
+
+func (r Repo) landedIn(ctx context.Context, rec DeliverableRecord, ref string, exclude ...string) bool {
 	if len(rec.Commits) == 0 || !r.patchesAreOwn(ctx, rec) {
 		return false
 	}
-	log, err := r.Git(ctx, r.Dir, "", "log", "-z", "--format=%H%n%B", "--end-of-options", rec.Commits[0].BaseSHA+".."+ref)
+	args := append([]string{"log", "-z", "--format=%H%n%B", "--end-of-options", rec.Commits[0].BaseSHA + ".." + ref}, exclude...)
+	log, err := r.Git(ctx, r.Dir, "", args...)
 	if err != nil {
 		return false
 	}
@@ -96,18 +119,31 @@ func (r Repo) patchesAreOwn(ctx context.Context, rec DeliverableRecord) bool {
 }
 
 func FindRecord(root string, cycle int) (DeliverableRecord, bool) {
-	return firstRecord(root, strconv.Itoa(cycle)+".json", func(r DeliverableRecord) bool { return r.Cycle == cycle })
-}
-
-func FindRecordByCommit(root, sha string) (DeliverableRecord, bool) {
-	return firstRecord(root, "*.json", func(r DeliverableRecord) bool { return r.HoldsCommit(sha) })
-}
-
-func firstRecord(root, name string, match func(DeliverableRecord) bool) (DeliverableRecord, bool) {
-	paths, err := filepath.Glob(filepath.Join(WaveDir(root, "*"), recordPrefix+name))
+	paths, err := filepath.Glob(RecordPath(filepath.Join(wavesDir(root), waveDirPrefix+"*"), cycle))
 	if err != nil {
 		return DeliverableRecord{}, false
 	}
+	return firstRecord(paths, func(r DeliverableRecord) bool { return r.Cycle == cycle })
+}
+
+func FindRecordByCommit(root, sha string) (DeliverableRecord, bool) {
+	if !objectID.MatchString(sha) {
+		return DeliverableRecord{}, false
+	}
+	entries, err := filepath.Glob(filepath.Join(wavesDir(root), waveDirPrefix+"*", commitIndexDir, sha+indexSep+"*"))
+	if err != nil {
+		return DeliverableRecord{}, false
+	}
+	var paths []string
+	for _, e := range entries {
+		if cycle, ok := indexedCycle(e, sha); ok {
+			paths = append(paths, RecordPath(filepath.Dir(filepath.Dir(e)), cycle))
+		}
+	}
+	return firstRecord(paths, func(r DeliverableRecord) bool { return r.HoldsCommit(sha) })
+}
+
+func firstRecord(paths []string, match func(DeliverableRecord) bool) (DeliverableRecord, bool) {
 	for _, p := range paths {
 		if r, err := ReadRecord(p); err == nil && match(r) {
 			return r, true

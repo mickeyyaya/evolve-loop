@@ -77,3 +77,27 @@ func TestDetectLostLanding_ARecordThatDoesNotHoldTheBindingCommitDoesNotVouchFor
 		t.Fatal("the record of the cycle holds the lane commit, not the binding commit, so it must not mask the lost landing")
 	}
 }
+
+func TestDetectLostLanding_AComposeThatLandedBeforeTheCycleIsNotThisCyclesLanding(t *testing.T) {
+	t.Parallel()
+	l := composedLanding(t, integration.CycleTrailer(identityCycle))
+	ws := shipRanAndFailed(t)
+	plantBinding(t, ws, dossier.ShipBinding{CommitSHA: l.lane, TreeSHACommitted: l.laneTree, Cycle: identityCycle})
+	preCycle := gitRev(t, l.repo, "HEAD")
+	sig := detectLostLanding(landingEvidence{Workspace: ws, ProjectRoot: l.repo, PreCycleHEAD: preCycle, Cycle: identityCycle, FinalVerdict: VerdictPASS})
+	if sig == nil {
+		t.Fatal("the compose was on HEAD before the cycle began, so the record must not vouch for a landing of this cycle")
+	}
+}
+
+func TestDetectLostLanding_ARecordNeedsAPreCycleHEADToBoundItsSearch(t *testing.T) {
+	t.Parallel()
+	l := composedLanding(t, integration.CycleTrailer(identityCycle))
+	ws := shipRanAndFailed(t)
+	plantBinding(t, ws, dossier.ShipBinding{CommitSHA: l.lane, TreeSHACommitted: l.laneTree, Cycle: identityCycle})
+	for _, pre := range []string{"", "HEAD~1", "--all"} {
+		if detectLostLanding(landingEvidence{Workspace: ws, ProjectRoot: l.repo, PreCycleHEAD: pre, Cycle: identityCycle, FinalVerdict: VerdictPASS}) == nil {
+			t.Errorf("PreCycleHEAD %q is not an object id, so the record search must fail closed", pre)
+		}
+	}
+}

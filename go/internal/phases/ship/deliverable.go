@@ -46,7 +46,7 @@ type Integration struct {
 	Deps      []string
 }
 
-func (o *Options) integrationDir() string {
+func (o *Options) integrationDir() (string, error) {
 	return integration.WaveDir(o.ProjectRoot, o.Integration.Wave)
 }
 
@@ -61,7 +61,7 @@ func (s *worktreeShip) deliver(commit, pending string) (bool, error) {
 			s.logf("[ship] WARN: deliverable record not written: %v - the ship lands as before", err)
 			return false, nil
 		}
-		return false, shipErr(core.CodeStateIO, core.ShipClassTransient, core.StageAtomicShip,
+		return false, shipErr(core.CodeStateIO, deliverableErrorClass(err), core.StageAtomicShip,
 			"ship: deliverable record not written, so ship delivered nothing: "+err.Error(), "commit", commit)
 	}
 	s.emitDelivered(rec, path)
@@ -76,12 +76,23 @@ func (s *worktreeShip) deliver(commit, pending string) (bool, error) {
 	return true, nil
 }
 
+func deliverableErrorClass(err error) core.ShipErrorClass {
+	if errors.Is(err, integration.ErrNoPatch) || errors.Is(err, integration.ErrBadWaveID) {
+		return core.ShipClassPrecondition
+	}
+	return core.ShipClassTransient
+}
+
 func (s *worktreeShip) writeDeliverable(commit string) (integration.DeliverableRecord, string, error) {
+	dir, err := s.opts.integrationDir()
+	if err != nil {
+		return integration.DeliverableRecord{}, "", err
+	}
 	rec, err := s.buildDeliverable(commit)
 	if err != nil {
 		return rec, "", err
 	}
-	path, err := integration.WriteRecord(s.opts.integrationDir(), rec)
+	path, err := integration.WriteRecord(dir, rec)
 	return rec, path, err
 }
 
@@ -155,7 +166,11 @@ func landedByIdentity(ctx context.Context, opts *Options, sha string, refs ...st
 	if err != nil || !ok {
 		return false
 	}
-	rec, err := integration.ReadRecord(integration.RecordPath(opts.integrationDir(), cid))
+	dir, err := opts.integrationDir()
+	if err != nil {
+		return false
+	}
+	rec, err := integration.ReadRecord(integration.RecordPath(dir, cid))
 	if err != nil || !rec.HoldsCommit(sha) {
 		return false
 	}

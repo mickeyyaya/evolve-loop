@@ -5,6 +5,7 @@ package ship
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -15,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/integration"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/shiptest"
@@ -154,7 +156,11 @@ func TestDeliver_AFleetShipWritesOneRecordWithEveryD2Field(t *testing.T) {
 	if len(delivered) != 1 {
 		t.Fatalf("ship.delivered events = %d, want 1", len(delivered))
 	}
-	wantPath := integration.RecordPath(integration.WaveDir(l.Repo, testWave), shiptest.LandingCycle)
+	waveDir, err := integration.WaveDir(l.Repo, testWave)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantPath := integration.RecordPath(waveDir, shiptest.LandingCycle)
 	f := delivered[0].Fields
 	if f["wave"] != testWave || f["cycle"] != "1830" || f["commits"] != "1" || f["record"] != wantPath {
 		t.Errorf("ship.delivered fields = %v, want wave %s cycle 1830 commits 1 record %s", f, testWave, wantPath)
@@ -560,5 +566,38 @@ func TestLand_AnIntentThatCannotBePreparedIsAbandonedBeforeMain(t *testing.T) {
 	}
 	if rr.pushs != 0 {
 		t.Errorf("pushes = %d, want none after an abandoned landing", rr.pushs)
+	}
+}
+
+func TestDeliver_ANoPatchCommitIsARefusalNotATransientFault(t *testing.T) {
+	t.Parallel()
+	l := shiptest.LaneReadyToLand(t)
+	shiptest.MustWrite(t, filepath.Join(l.WT, "patched.txt"), "patched\n")
+	shiptest.RunGit(t, l.WT, "add", "patched.txt")
+	shiptest.RunGit(t, l.WT, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "the lane work")
+	shiptest.RunGit(t, l.WT, "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "nothing to patch")
+	opts := laneOptions(l, nil, fleetIntegration(policy.FleetIntegrationEnforce))
+	s := &worktreeShip{ctx: context.Background(), opts: &opts, worktree: l.WT, result: &RunResult{}}
+	_, err := s.deliver(shiptest.HeadSHA(t, l.WT), "")
+	var se *core.ShipError
+	if !errors.As(err, &se) || se.Class != core.ShipClassPrecondition || !strings.Contains(err.Error(), integration.ErrNoPatch.Error()) {
+		t.Fatalf("err = %v, want a precondition refusal that names ErrNoPatch", err)
+	}
+}
+
+func TestDeliver_ABadWaveIDIsARefusalAndFindsNoLanding(t *testing.T) {
+	t.Parallel()
+	l := shiptest.LaneReadyToLand(t)
+	in := fleetIntegration(policy.FleetIntegrationEnforce)
+	in.Wave = "../escape"
+	opts := laneOptions(l, nil, in)
+	s := &worktreeShip{ctx: context.Background(), opts: &opts, worktree: l.WT, result: &RunResult{}}
+	_, err := s.deliver(l.Tip(t), "")
+	var se *core.ShipError
+	if !errors.As(err, &se) || se.Class != core.ShipClassPrecondition || !strings.Contains(err.Error(), integration.ErrBadWaveID.Error()) {
+		t.Fatalf("err = %v, want a precondition refusal that names ErrBadWaveID", err)
+	}
+	if landedByIdentity(context.Background(), &opts, l.Tip(t), "HEAD") {
+		t.Error("a bad wave id must find no landing")
 	}
 }

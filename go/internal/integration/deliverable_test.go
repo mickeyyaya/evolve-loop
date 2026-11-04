@@ -10,14 +10,19 @@ import (
 	"time"
 )
 
+var (
+	shaA1 = strings.Repeat("a1", 20)
+	shaA2 = strings.Repeat("a2", 20)
+)
+
 func fullRecord() DeliverableRecord {
 	return DeliverableRecord{
 		Wave:    "w7",
 		Cycle:   42,
 		Trailer: CycleTrailer(42),
 		Commits: []CommitIdentity{
-			{SHA: "a1", BaseSHA: "b0", PatchID: "p1"},
-			{SHA: "a2", BaseSHA: "a1", PatchID: "p2"},
+			{SHA: shaA1, BaseSHA: "b0", PatchID: "p1"},
+			{SHA: shaA2, BaseSHA: shaA1, PatchID: "p2"},
 		},
 		Audit:       AuditBinding{TreeSHA: "tree1", ArtifactSHA: "art1"},
 		Scope:       []string{"go/internal/x"},
@@ -52,9 +57,16 @@ func TestRecordRoundTripKeepsEveryD2Field(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("round trip\n got %+v\nwant %+v", got, want)
 	}
-	entries, _ := os.ReadDir(dir)
-	if len(entries) != 1 {
-		t.Fatalf("dir holds %d entries, want only the record", len(entries))
+	var names []string
+	for _, sub := range []string{".", commitIndexDir} {
+		entries, _ := os.ReadDir(filepath.Join(dir, sub))
+		for _, e := range entries {
+			names = append(names, e.Name())
+		}
+	}
+	wantNames := []string{commitIndexDir, "deliverable-42.json", shaA1 + "-42", shaA2 + "-42"}
+	if !reflect.DeepEqual(names, wantNames) {
+		t.Fatalf("dir holds %v, want only the record and its commit index %v", names, wantNames)
 	}
 }
 
@@ -157,10 +169,14 @@ func TestDeliverableMapsTheOrderingFacts(t *testing.T) {
 
 func TestWaveDirIsWhereFindRecordLooks(t *testing.T) {
 	root := t.TempDir()
-	if _, err := WriteRecord(WaveDir(root, "w9"), fullRecord()); err != nil {
+	got, err := WaveDir(root, "w9")
+	if err != nil {
 		t.Fatal(err)
 	}
-	if got := WaveDir(root, "w9"); got != filepath.Join(root, ".evolve", "waves", "integration-w9") {
+	if _, err := WriteRecord(got, fullRecord()); err != nil {
+		t.Fatal(err)
+	}
+	if got != filepath.Join(root, ".evolve", "waves", "integration-w9") {
 		t.Fatalf("WaveDir = %s", got)
 	}
 	if r, ok := FindRecord(root, 42); !ok || r.Wave != "w7" {

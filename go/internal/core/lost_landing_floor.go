@@ -89,7 +89,7 @@ func landedByRecord(ctx context.Context, ev landingEvidence, commit string) bool
 	if !found || !rec.HoldsCommit(commit) {
 		return false
 	}
-	return integration.Repo{Dir: ev.ProjectRoot, Git: integration.SysGit()}.LandedOnRef(ctx, rec, "HEAD")
+	return integration.Repo{Dir: ev.ProjectRoot, Git: integration.SysGit()}.LandedSince(ctx, rec, "HEAD", ev.PreCycleHEAD)
 }
 
 func isAncestor(ctx context.Context, dir, commit, ref string) (bool, error) {
