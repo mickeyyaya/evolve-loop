@@ -38,20 +38,20 @@ func IsolateHostCredentials() (func() error, error) {
 		backups[i] = envBackup{key: key, val: val, set: set}
 	}
 
-	os.Setenv("GH_CONFIG_DIR", dir)
-	os.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
-	os.Setenv("GIT_CONFIG_NOSYSTEM", "1")
-	os.Setenv("GIT_TERMINAL_PROMPT", "0")
-	os.Setenv("GIT_SSH_COMMAND", "ssh -o BatchMode=yes")
-	os.Unsetenv("GH_TOKEN")
-	os.Unsetenv("GITHUB_TOKEN")
+	_ = os.Setenv("GH_CONFIG_DIR", dir)
+	_ = os.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	_ = os.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	_ = os.Setenv("GIT_TERMINAL_PROMPT", "0")
+	_ = os.Setenv("GIT_SSH_COMMAND", "ssh -o BatchMode=yes")
+	_ = os.Unsetenv("GH_TOKEN")
+	_ = os.Unsetenv("GITHUB_TOKEN")
 
 	restore := func() error {
 		for _, b := range backups {
 			if b.set {
-				os.Setenv(b.key, b.val)
+				_ = os.Setenv(b.key, b.val)
 			} else {
-				os.Unsetenv(b.key)
+				_ = os.Unsetenv(b.key)
 			}
 		}
 		if rmErr := removeAll(dir); rmErr != nil {
