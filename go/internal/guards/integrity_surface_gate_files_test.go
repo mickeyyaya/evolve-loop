@@ -44,6 +44,8 @@ var protectedGateFiles = []struct {
 	{"go/internal/core/floor_lists_regression.go", GateGuarantee},
 	{"go/internal/core/floor_lists_regression_test.go", GateGuarantee},
 	{"go/internal/core/cover_changed_floor.go", GateGuarantee},
+	{"go/internal/core/cover_changed_base.go", GateGuarantee},
+	{"go/internal/core/cover_changed_base_test.go", GateGuarantee},
 	{"go/internal/profiles/gate_inputs_realtree_test.go", GuardGuarantee},
 	{"go/internal/core/ste_floor.go", GateGuarantee},
 	{"go/internal/stelint/added.go", GateGuarantee},

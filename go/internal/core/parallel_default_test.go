@@ -27,6 +27,7 @@ const (
 	swapsBuildSelfCheckRunner       = "test swaps package variable buildSelfCheckRunner"
 	swapsChallengeTokenRead         = "test swaps package variable challengeTokenRead"
 	swapsCoverChangedProfiler       = "test swaps package variable coverChangedProfiler"
+	swapsCoverChangedBaseRunner     = "test swaps package variable coverChangedBaseRunner"
 	swapsCoverLockWait              = "test swaps package variable coverLockWait"
 	swapsCoverStrictRunner          = "test swaps package variable coverStrictRunner"
 	swapsCoveringTestsDeriver       = "test swaps package variable coveringTestsDeriver"
@@ -121,6 +122,9 @@ var serialRequiredTests = map[string]string{
 	"core.TestPlanCycle_ACallerTokenIsNeverReminted":                                                swapsChallengeTokenRead,
 	"core.TestPlanCycle_AFailedTokenMintLeavesNoTokenAnywhere":                                      swapsChallengeTokenRead,
 	"core.TestCoverChangedFailures_AFailingTestRefusesAtEnforceAndOnlyWarnsAtShadow":                swapsCoverChangedProfiler,
+	"core.TestCoverChangedFailures_ATestRedOnTheBaseDoesNotRefuseTheLane":                           swapsCoverChangedBaseRunner,
+	"core.TestCoverChangedFailures_ALaneOnlyRedTestIsRefusedAndNamesTheBaseRed":                     swapsCoverChangedBaseRunner,
+	"core.TestCoverChangedFailures_ABaseRunFaultOrNoTestNameCountsEveryFailure":                     swapsCoverChangedBaseRunner,
 	"core.TestCoverChangedFailures_EnforceRefusesTheChangedFunctionOfTheBuild":                      swapsCoverChangedProfiler,
 	"core.TestCoverChangedFailures_ShadowOffAndEveryPlumbingFaultLeaveTheHandoffAlone":              swapsCoverChangedProfiler,
 	"core.TestCoverChangedFailures_ExcludesACSTagOnlyPackageFromProfiler":                           swapsCoverChangedProfiler,

@@ -82,3 +82,14 @@ func copyIndex(src, dst string) error {
 	}
 	return os.Chtimes(dst, info.ModTime(), info.ModTime())
 }
+
+func (g Git) ExportTree(ctx context.Context, rev, dir string) (string, error) {
+	tree := filepath.Join(dir, "tree")
+	scratch := Git{Dir: g.Dir, Exec: isolate(g.Exec, "GIT_INDEX_FILE="+filepath.Join(dir, "index"))}
+	for _, args := range [][]string{{"read-tree", rev}, {"checkout-index", "--all", "--prefix=" + tree + "/"}} {
+		if err := scratch.Run(ctx, args...); err != nil {
+			return "", err
+		}
+	}
+	return tree, nil
+}
