@@ -27,6 +27,7 @@ func (l *Ledger) arm(req Request) (continuation.Continuation, bool, Verdict) {
 	case !isContinuation && hasRegistry:
 		registryPath := continuation.RegistryPath(req.ProjectRoot)
 		v := blockedOn(fmt.Sprintf("defect ledger: this workspace holds no continuation manifest, but the root-owned %s binds this lane's scope to cycle-%d — the manifest was deleted or never written. Inherited defects are reconciled from the registry binding; the missing manifest is itself the finding.", registryPath, registryCont.Cycle))
+		v.Diagnostics[0].Code = string(CodeManifestMissing)
 		l.emit("Ledger.Reconcile", req, CodeManifestMissing, v.Diagnostics[0].Message, map[string]string{"step": "arm", "blocked": "true", "registry_path": registryPath, "ancestor_cycle": strconv.Itoa(registryCont.Cycle)})
 		return registryCont, true, v
 	case hasRegistry && registryCont.Cycle != cont.Cycle:
@@ -92,4 +93,12 @@ func hasOwedRow(doc Doc) bool {
 		}
 	}
 	return false
+}
+
+func AncestorOwes(projectRoot string, cycle int) (bool, error) {
+	doc, _, fault := read(paths.RunWorkspace(projectRoot, cycle))
+	if fault != nil {
+		return false, fault
+	}
+	return hasOwedRow(doc), nil
 }

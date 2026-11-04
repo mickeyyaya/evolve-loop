@@ -389,6 +389,19 @@ WORKSPACE manifest under a live binding still blocks. Declination by the
 ORCHESTRATOR now releases. Full rationale and rejected alternatives:
 [ADR-0085](adr/0085-continuation-registry-release.md).
 
+## Registry lifecycle: adopt or release at lane resume (2026-11-04)
+
+A resumed lane cycle skips triage, so the triage adoption does not run for it. In wave 152, cycles 2107, 2108 and 2109 resumed on scopes that the registry bound to older cycles. Each workspace held no manifest, so the gate blocked each audit.
+
+`laneResume.adopt` now settles the binding at claim time, before the resumed phase runs. `scopeBinding.settle` reads the registry entries of the lane scope in the order of the gate:
+
+- **A manifest is already in the workspace.** The settle step does nothing. The gate compares the manifest with the registry.
+- **The binding names the resumed cycle.** The settle step does nothing.
+- **The binding names an older cycle that owes no defect.** `defectledger.AncestorOwes` reads the ancestor ledger. The resumed cycle supersedes the snapshot of that ancestor. The step releases the binding through `inboxmover.ReleaseContinuationBinding`. The item file records the reason `lane-resume-cycle-<N>`.
+- **Any other binding.** The step writes the binding into the workspace manifest, and the gate grades the inherited defects. A failed release or an unreadable ancestor ledger also adopts.
+
+The anti-tamper rule does not change. A deleted or rewritten manifest of an adopting cycle still blocks. The missing-manifest block now carries the code `AUDIT_LEDGER_MANIFEST_MISSING` in its diagnostic. The repair ladder does not read that code yet.
+
 ## Code-review rows (ADR-0124, 2026-10-07)
 
 **Issue.** The audit was the only writer of the ledger, so a defect reached the record only after the gate rejected. The new `code-review` phase ([ADR-0124](adr/0124-code-review-phase.md), [design](review-loop-and-quality-index.md)) reviews the diff of the build before the audit. Its findings need the same addressable home.
