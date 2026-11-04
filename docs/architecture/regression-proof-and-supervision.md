@@ -185,7 +185,7 @@ A composed cycle then reads as not landed, so component I7 of the [integration p
 
 ### Solution
 
-The diff that feeds `patch-id` uses `-U0`. The trailer decides first, and the patch-id confirms. A deliverable record gains a schema version, because the old ids do not compare with the new ones.
+The diff that feeds `patch-id` uses `-U1`, one line of context. Research F3.9 shows why: `-U3` breaks on a nearby peer edit, and `-U0` matches the same text at another position. A peer edit next to the change is a merge conflict, so it never reaches this compare. The trailer decides first, and the patch-id checks the recorded change. A deliverable record gains a schema version, because the old ids do not compare with the new ones.
 
 ## 9. Seat health states
 

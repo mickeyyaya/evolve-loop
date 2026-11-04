@@ -70,14 +70,14 @@ These facts define the questions for the outside research.
 **F3.8** The test `TestPool_TwoTodosOfOneFamilyRunOneAfterTheOther` required an order of two concurrent launches (`go/internal/orchestrator/family_holds_test.go:71`). It failed on PR #1286 and passed 200 of 200 local runs under `-race`. A forced 50 ms delay reproduced the exact CI message.
 *Implication:* a stress run does not prove a flake. A forced order does.
 
-**F3.9** The landed identity of I0 uses `git patch-id --stable` on a default diff (`go/internal/integration/landed.go:55`). We tested this on git 2.54.0 with one cycle commit and one peer commit.
+**F3.9** The landed identity of I0 uses `git patch-id --stable` on a default diff (`go/internal/integration/landed.go:55`). We tested three context widths on git 2.54.0. A build seat proposed the one-line width, and our test confirms it.
 
-| Peer edit | Default context (3 lines) | Zero context (`-U0`) |
-|---|---|---|
-| 2 lines from the cycle change | Patch-ids differ | Patch-ids match |
-| 5 lines from the cycle change | Patch-ids match | Patch-ids match |
+| Case | 3 lines (default) | 1 line (`-U1`) | 0 lines (`-U0`) |
+|---|---|---|---|
+| Peer edit 2 lines from the cycle change | Patch-ids differ: **wrong** | Match: right | Match: right |
+| Same change text at another position | Differ: right | Differ: right | Match: **wrong** |
 
-*Implication:* a composed cycle can read as "not landed" when a peer edits nearby lines. A zero-context patch-id does not have this fault in this test.
+*Implication:* only one line of context passes both cases. A peer edit next to the change is a merge conflict, so that case never reaches this compare. Repeated blocks with the same neighbors still read as equal, and the trailer limits this.
 
 ## 4. The project landscape
 
@@ -352,7 +352,7 @@ Synthesis. "Have" means that the feature exists on `main` or in a built tree. "P
 | Adaptive window | Zuul | integration plan D8 (I4) | Have |
 | Independent changes land apart | Uber SubmitQueue | Partition is a later stage | Later, by F5.3 |
 | Cheap check before CI | Uber; Plaid | L1 prefix and L2 batch | Part |
-| Landed identity | Uber input hashes | `patch-id` with context | **Fault (F3.9)** |
+| Landed identity | Uber input hashes | `patch-id` with 3 context lines | **Fault (F3.9)** |
 | One authority for scheduling | Symphony | ADR-0154 | Have |
 | Stall limit | Symphony §8.5 | 300-second limit | Have |
 | Terminal reason decides retry | Symphony §7.2; OTP | Retry ladder of ADR-0142 | **Gap (F3.5)** |
@@ -382,7 +382,7 @@ Synthesis. The plan makes the decisions. These are the inputs. The table says wh
 | Derived liveness | F3.4, F5.6, F7.4 | Adopt |
 | Terminal refusal | F3.5, F6.2, F6.5 | Adopt |
 | Floor retake and kept test names | F3.3, F9.1, F9.3 | Adopt |
-| Zero-context landed identity | F3.9 | Adopt |
+| One-line-context landed identity | F3.9 | Adopt |
 | Stated bar for `enforce` | F6.6 | Adopt |
 | Named seat health states | F6.4 | Adopt |
 | Partition of independent changes | F5.3 | Later |

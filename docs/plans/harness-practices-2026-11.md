@@ -34,7 +34,7 @@ The operator, 2026-11-04:
 | The role guard reads a nonzero `cycle_id` as an active cycle, also after the seal. | F3.4 |
 | Two refused agents walked the families for 35 minutes in one boundary. | F3.5 |
 | Ten CRITICAL findings sat on 5 green, fully covered trees. | F3.6 |
-| A default patch-id changes when a peer edits a line 2 lines away. A zero-context patch-id does not. | F3.9 |
+| A default patch-id changes on a peer edit 2 lines away. A zero-context one matches a change at another position. One line of context passes both. | F3.9 |
 | Gas Town uses the same batch-then-bisect design as ADR-0147. | F5.1 |
 | Uber's open source queue has no release and needs MySQL. | F5.2 |
 | SWE-bench resolves a task only when `FAIL_TO_PASS` and `PASS_TO_PASS` both pass. | F8.1 |
@@ -106,7 +106,7 @@ These ids belong to this plan. "integration plan D10" and "integration D22" name
 | D5 | A cycle is active when its phase is live, or when its owner lease is live or unreadable. | F3.4, F5.6, F7.4 |
 | D6 | A stall after a guard denial is terminal for the chain and the pass. | F3.5, F6.2, F6.5 |
 | D7 | The floor shares the audit scope, retakes once serialized, and keeps each failed test name. | F3.2, F3.3, F9.1, F9.3 |
-| D8 | The landed identity uses a zero-context patch-id. | F3.9, F5.3 |
+| D8 | The landed identity uses a patch-id with one line of context. | F3.9, F5.3 |
 | D9 | Each agent seat has one named health state in `evolve wave status`. | F6.4 |
 | D10 | A move to `enforce` cites recent measured evidence. The operator decides. | F6.6 |
 | D11 | A removal test runs after the M2 baseline, one component at a time. | F13.1 |
@@ -121,7 +121,7 @@ The route follows the rule of ADR-0147 §6: an item that touches a gate file is 
 | R1 | `role-guard-derives-the-active-cycle` | A cycle aborts, the boundary self-heal agent writes its own output, and the wave starts. A live owner still gets the refusal. | console-manual |
 | R2 | `guard-denial-ends-the-dispatch-chain` | An agent is denied and stalls. The chain stops after one stall limit, the second diagnosis does not start, and the signal says refused. | console-manual |
 | R3 | `build-floor-keeps-audit-rules` | A floor run fails one test once. The retake passes, the cycle goes on, and a signal names the test. A second red names the test and fails. | console-manual |
-| R4 | `landed-identity-zero-context` (also a precondition of I12) | A peer edits a line 2 lines from a cycle change. The composed cycle reads as landed. | console-manual |
+| R4 | `landed-identity-zero-context` (also a precondition of I12) | A peer edits a line 2 lines from a cycle change: the cycle reads as landed. The same text at another position does not. | console-manual |
 | R5 | `journey-registry-and-trailer` | A row that names a missing test fails the guard. A `fix:` commit with no trailer gets a shadow signal. | console-manual |
 | R6 | `regression-proof-gate` | A fix with a test that passes without the fix gets `NOT_PROVEN`. A real proof gets `PROVEN`. A compile failure gets `INCONCLUSIVE`. | console-manual |
 | R7 | `agent-seat-health-states` | A pane that waits at its prompt with no deliverable reads `blocked`. A dead session reads `zombie`. | lane |
@@ -174,7 +174,7 @@ Each component has 100% coverage on each changed function, a test that is red wi
 | A retake hides a real intermittent fault | One retake only. Each one emits a signal with the test name, and `evolve ci classify` reads the recurrence. |
 | The guard allows a write while an orphan agent runs | Only a terminal phase plus a dead lease proves it. Any doubt keeps the refusal. |
 | The red run loads the host during a wave | One package only, under the build pool cap. |
-| The zero-context patch-id matches an unrelated commit with the same text | The trailer decides first. The patch-id only confirms. |
+| The patch-id matches a repeated block with the same neighbors | The trailer decides first. The patch-id only confirms. |
 
 ## 10. Open questions
 

@@ -221,7 +221,7 @@ The operator asked on 2026-11-04: "should we update the merging component plan b
 | D27 | The console train goes live before lane `enforce`. It has its own operator verb, and it uses no lane path. | F5.14 | Wait for I9: the queue stays until then. |
 | D28 | `go/.cover-strict` and `go/.apicover-enforce` use the `union` merge driver. A guard test checks order and uniqueness. | F5.13 | `union` on prose: it can join two edits into wrong text. |
 | D29 | A prose registry moves to one entry file for each change and a generator, as `docs/research-index/` does. It moves when its count of shared PRs stays high. | F5.13 | Move each file now: the measured gain does not justify the size. |
-| D30 | The landed identity uses a zero-context patch-id. | F3.9 | The default context: a nearby peer edit changes the id. |
+| D30 | The landed identity uses a patch-id with one line of context. | F3.9 | The default context: a nearby peer edit changes the id. No context: the same text at another position matches. |
 | D31 | `main` gets branch protection in two steps. See below. | F5.10, operator 2026-11-04 | One required check when I12 lands: at `shadow`, lanes still push `main`, and the check refuses them. |
 
 D24 replaces the part of D13 that applies to a PR in the batch. A console PR that merges outside the train still makes the orchestrator compose again.

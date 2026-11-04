@@ -30,7 +30,7 @@ The six practices are in decisions 2 and 3 (proof), 5 (liveness), 6 (refusal), 7
 5. A cycle is active when its phase is live, or its owner lease is live or unreadable (plan D5, R1).
 6. A stall after a guard denial is terminal for the chain and the pass (plan D6, R2).
 7. The build floor uses the audit scope and retake, and keeps each failed test name (plan D7, R3).
-8. The landed identity is the cycle trailer plus a zero-context patch-id (plan D8, R4; integration plan D30).
+8. The landed identity is the cycle trailer plus a one-line-context patch-id (plan D8, R4; integration plan D30).
 9. A move to `enforce` needs two consecutive clean shadow waves. The operator decides (plan D10, R8).
 10. Each new check starts at `shadow`.
 11. A reviewed console PR enters the train as a deliverable (integration plan D24, D25, I12).
