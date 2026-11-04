@@ -220,7 +220,10 @@ func composeMessage(rec DeliverableRecord) string {
 }
 
 func (r Repo) mergeTree(ctx context.Context, commit, onto string) (string, []string, error) {
-	out, err := r.Git(ctx, r.Dir, "", "merge-tree", "--write-tree", "--name-only", "-z", "--merge-base="+commit+"^", "--end-of-options", onto, commit)
+	if err := fullObjectID(onto); err != nil {
+		return "", nil, err
+	}
+	out, err := r.Git(ctx, r.Dir, "", "--attr-source="+onto, "merge-tree", "--write-tree", "--name-only", "-z", "--merge-base="+commit+"^", "--end-of-options", onto, commit)
 	var ge *GitError
 	if errors.As(err, &ge) && ge.Code == 1 && ge.Err == nil {
 		return conflictedPaths(ge.Stdout)

@@ -161,7 +161,7 @@ func TestPrefixCheck_AGitFailureStopsTheCheck(t *testing.T) {
 				after++
 			}
 			out, err := inner(ctx, dir, stdin, args...)
-			faulted = faulted || args[0] == verb
+			faulted = faulted || gitVerb(args) == verb
 			return out, err
 		}
 		c := Composer{Repo: Repo{Dir: f.g.Dir, Git: git}, Stage: policy.FleetIntegrationShadow}
