@@ -126,6 +126,7 @@ type waveHarness struct {
 	graph     graphLoader
 	refresh   func(loopConfig, io.Writer) bootBinaryRefreshResult
 	refreshed []loopConfig
+	diskFree  func(string) (uint64, error)
 	stdout    bytes.Buffer
 	stderr    bytes.Buffer
 }
@@ -178,6 +179,12 @@ func (h *waveHarness) env(root string) waveEnv {
 				return h.refresh(cfg, w)
 			}
 			return bootBinaryRefreshResult{}
+		},
+		diskFree: func(path string) (uint64, error) {
+			if h.diskFree != nil {
+				return h.diskFree(path)
+			}
+			return 1 << 40, nil
 		},
 	}
 }

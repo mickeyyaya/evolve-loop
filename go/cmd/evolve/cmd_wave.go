@@ -13,6 +13,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cli/opscmd"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/proctree"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
@@ -54,6 +55,7 @@ type waveEnv struct {
 	loadGraph     graphLoader
 	refreshBinary func(loopConfig, io.Writer) bootBinaryRefreshResult
 	openEvents    func(evolveDir string) (eventSource, error)
+	diskFree      func(path string) (uint64, error)
 }
 
 type wavePlaneDirs struct {
@@ -71,7 +73,7 @@ func defaultWaveEnv() waveEnv {
 		resolveRoot: loopStopRoot, executable: os.Executable, pidStarted: processStartTime,
 		dispatch: dispatchWaveVerb(sysexec.DefaultRunner), now: time.Now, sleep: time.Sleep,
 		pidAlive: runlease.PIDAlive, saveRecord: wave.Store.Save, mainHead: gitMainHead, mergedPRs: gitMergedPRs, loadGraph: loadModuleGraph,
-		refreshBinary: bootBinaryRefresh, openEvents: openWaveEvents,
+		refreshBinary: bootBinaryRefresh, openEvents: openWaveEvents, diskFree: looppreflight.DiskFreeBytes,
 	}
 }
 
