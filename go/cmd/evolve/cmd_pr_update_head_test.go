@@ -198,12 +198,75 @@ func TestPRMerger_UpdateBranchTimeout(t *testing.T) {
 			if len(ci.heads) != 0 {
 				t.Errorf("no new head was seen, so CI must not be awaited on any head; fetched %q", ci.heads)
 			}
-			if *slept > m.wait+m.poll {
-				t.Errorf("the head wait must stay inside --wait %s, slept %s", m.wait, *slept)
+			if *slept > m.headWaitBound()+m.poll {
+				t.Errorf("the head wait must stay inside its bound %s, slept %s", m.headWaitBound(), *slept)
 			}
 			if c.code == cliExitRefused && *slept == 0 {
 				t.Errorf("a lagging head must be polled for before the refusal, slept %s", *slept)
 			}
 		})
+	}
+}
+
+func TestPRMerger_UpdateBranchWithoutWaitReportsTheNewHead(t *testing.T) {
+	t.Parallel()
+	gh := &laggingGitHub{
+		prs:          map[string]*laggingPR{"916": {oldHead: "old916", newHead: "new916", staleViews: 1}},
+		behindBefore: map[string]int{"old916": 4},
+		merged:       map[string]string{},
+	}
+	ci := &ciLog{}
+	m, stdout, stderr, slept := laggingMerger(gh, ci)
+	m.wait = 0
+	result, code := m.merge(context.Background(), []string{"916", "917"})
+	if code != cliExitOK || stdout.String() != "#916 updated to new916; CI runs on the new head\n" {
+		t.Fatalf("exit %d stdout %q stderr %q; want the new head reported with exit 0", code, stdout.String(), stderr.String())
+	}
+	if result.Updated == nil || *result.Updated != (prMerged{PR: "916", SHA: "new916"}) || len(result.Merged) != 0 || result.Refused != "" {
+		t.Errorf("result = %+v, want #916 updated to new916 and nothing merged or refused", result)
+	}
+	if strings.Join(result.NotAttempted, ",") != "917" || !strings.HasSuffix(stderr.String(), "not attempted: #917\n") {
+		t.Errorf("result %+v stderr %q, want #917 not attempted", result, stderr.String())
+	}
+	if len(callsWith(gh.calls, "pr merge")) != 0 || len(ci.heads) != 0 {
+		t.Errorf("without --wait the verb must neither merge nor await CI: calls %q fetched %q", gh.calls, ci.heads)
+	}
+	if *slept != m.poll {
+		t.Errorf("slept %s, want one poll before the second read", *slept)
+	}
+}
+
+func TestPRMerger_HeadWaitBoundIsAtLeastTheMoveBound(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		wait, want time.Duration
+	}{
+		{0, prHeadMoveBound},
+		{10 * time.Second, prHeadMoveBound},
+		{5 * time.Minute, 5 * time.Minute},
+	} {
+		if got := (prMerger{wait: c.wait}).headWaitBound(); got != c.want {
+			t.Errorf("wait %s: head wait bound %s, want %s", c.wait, got, c.want)
+		}
+	}
+}
+
+func TestPRMerger_UpdateBranchWithoutWaitRefusesAtTheBound(t *testing.T) {
+	t.Parallel()
+	gh := &laggingGitHub{
+		prs:          map[string]*laggingPR{"12": {oldHead: "old12", newHead: "new12", staleViews: 1 << 20}},
+		behindBefore: map[string]int{"old12": 4},
+		merged:       map[string]string{},
+	}
+	ci := &ciLog{}
+	m, stdout, stderr, slept := laggingMerger(gh, ci)
+	m.wait = 0
+	code := m.mergeAll(context.Background(), []string{"12"})
+	want := "#12 refused: head is still old12 after update-branch; waited 1m0s\n"
+	if code != cliExitRefused || stdout.Len() != 0 || !strings.HasSuffix(stderr.String(), want) {
+		t.Fatalf("exit %d stdout %q stderr %q; want a refusal naming the bound", code, stdout.String(), stderr.String())
+	}
+	if *slept < prHeadMoveBound-m.poll || *slept > prHeadMoveBound {
+		t.Errorf("slept %s, want the full head bound %s", *slept, prHeadMoveBound)
 	}
 }

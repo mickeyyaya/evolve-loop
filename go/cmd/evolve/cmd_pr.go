@@ -157,6 +157,7 @@ type prMerged struct {
 
 type prMergeResult struct {
 	Merged       []prMerged `json:"merged"`
+	Updated      *prMerged  `json:"updated,omitempty"`
 	Refused      string     `json:"refused,omitempty"`
 	NotAttempted []string   `json:"not_attempted"`
 }
@@ -262,6 +263,13 @@ func (m prMerger) merge(ctx context.Context, prs []string) (prMergeResult, int) 
 	}
 	for i, n := range prs {
 		sha, err := m.mergeOne(ctx, n)
+		var updated prHeadUpdated
+		if errors.As(err, &updated) {
+			result.Updated, result.NotAttempted = &prMerged{PR: n, SHA: string(updated)}, append(result.NotAttempted, prs[i+1:]...)
+			fmt.Fprintf(m.stdout, "#%s %s\n", n, updated)
+			m.notAttempted(prs[i+1:])
+			return result, cliExitOK
+		}
 		if err != nil {
 			result.Refused, result.NotAttempted = "#"+n+" "+err.Error(), append(result.NotAttempted, prs[i+1:]...)
 			code := m.report("#"+n+" ", err)
@@ -422,11 +430,23 @@ func (m prMerger) upToDate(ctx context.Context, n string, pr prView) (prView, er
 		return pr, err
 	}
 	fmt.Fprintf(m.stderr, "%s#%s updated with %s\n", prMergePrefix, n, pr.BaseRefName)
-	return m.awaitNewHead(ctx, n, pr.HeadRefOid)
+	if pr, err = m.awaitNewHead(ctx, n, pr.HeadRefOid); err != nil || m.wait > 0 {
+		return pr, err
+	}
+	return pr, prHeadUpdated(pr.HeadRefOid)
 }
 
+const prHeadMoveBound = 60 * time.Second
+
+type prHeadUpdated string
+
+func (u prHeadUpdated) Error() string { return "updated to " + string(u) + "; CI runs on the new head" }
+
+func (m prMerger) headWaitBound() time.Duration { return max(m.wait, prHeadMoveBound) }
+
 func (m prMerger) awaitNewHead(ctx context.Context, n, oldHead string) (prView, error) {
-	deadline := m.now().Add(m.wait)
+	bound := m.headWaitBound()
+	deadline := m.now().Add(bound)
 	for {
 		pr, err := m.view(ctx, n)
 		if err != nil {
@@ -436,7 +456,7 @@ func (m prMerger) awaitNewHead(ctx context.Context, n, oldHead string) (prView, 
 			return pr, nil
 		}
 		if m.now().Add(m.poll).After(deadline) {
-			return pr, refusef("head is still %s after update-branch", shortSHA(oldHead))
+			return pr, refusef("head is still %s after update-branch; waited %s", shortSHA(oldHead), bound)
 		}
 		m.sleep(m.poll)
 	}
