@@ -90,7 +90,7 @@ func (e *Engine) recordModelAttempt(
 	if usageStatus == llmcalls.UsageMeasured || usageStatus == llmcalls.UsagePartial {
 		resp.Tokens = core.TokenUsage(result.Usage)
 	}
-	e.emitTokenWarnings(req, code, start, end, callID, attempt, result)
+	e.emitTokenWarnings(req, code, start, end, callID, attempt, result, dispatched.model)
 
 	dispatched.source = cmp.Or(dispatched.source, llmcalls.DispatchNotStarted)
 	exitCode := code
@@ -235,8 +235,9 @@ func joinMeasurementWarning(existing, addition string) string {
 	return existing + "; " + addition
 }
 
-func (e *Engine) emitTokenWarnings(req core.BridgeRequest, code int, start, end time.Time, callID string, attempt int, result tokenusage.Result) {
+func (e *Engine) emitTokenWarnings(req core.BridgeRequest, code int, start, end time.Time, callID string, attempt int, result tokenusage.Result, picked string) {
 	logContext := e.attemptContext(req, callID, attempt)
+	logContext.servedModelCheck(picked, result.ServedModel)
 	if result.Warn != "" {
 		logContext.warn(CodeTokenUsageWarning, result.Warn)
 	}

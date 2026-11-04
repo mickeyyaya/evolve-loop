@@ -1,0 +1,69 @@
+//go:build acs
+
+package cycle2145
+
+import (
+	"path/filepath"
+	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+)
+
+func goTests(t *testing.T, pkg, pattern string, names ...string) {
+	t.Helper()
+	acsassert.GoTests(t, acsassert.GoTestSpec{
+		Dir:     filepath.Join(acsassert.RepoRoot(t), "go"),
+		Package: pkg,
+		Pattern: pattern,
+		Names:   names,
+	})
+}
+
+func TestC2145_001_ALaunchWhoseServedModelDiffersFromTheCatalogPickEmitsTheMismatchSignal(t *testing.T) {
+	goTests(t, "./internal/bridge",
+		"^(TestLaunchModelVerification_AgyClaudeBootingAnotherClaudeModelFailsOverWithTheMismatchSignal|TestLaunchModelVerification_AgyClaudeBootingAnOlderVersionOfThePickedModelIsAMismatch|TestLaunchModelVerification_ThePickedModelAtAnotherEffortStillVerifies|TestLaunchModelVerification_AgyTmuxBootingAnotherGeminiModelIsAMismatch)$",
+		"TestLaunchModelVerification_AgyClaudeBootingAnotherClaudeModelFailsOverWithTheMismatchSignal",
+		"TestLaunchModelVerification_AgyClaudeBootingAnOlderVersionOfThePickedModelIsAMismatch",
+		"TestLaunchModelVerification_ThePickedModelAtAnotherEffortStillVerifies",
+		"TestLaunchModelVerification_AgyTmuxBootingAnotherGeminiModelIsAMismatch")
+}
+
+func TestC2145_002_ClaudeTmuxReadsMessageModelFromTheTranscriptAndSignalsAMismatch(t *testing.T) {
+	goTests(t, "./internal/bridge",
+		"^(TestServedModel_AClaudeTmuxTranscriptModelOfAnotherTierEmitsTheMismatchSignal|TestServedModel_AClaudeTmuxTranscriptModelOfThePickedTierEmitsNothing|TestServedModel_AClaudeTmuxWithNoTranscriptModelEmitsNothing|TestServedModel_AClaudeTmuxFullIdPickServedByAnOlderVersionEmitsTheMismatchSignal|TestServedModel_AClaudeTmuxFullIdPickServedByItselfEmitsNothing)$",
+		"TestServedModel_AClaudeTmuxTranscriptModelOfAnotherTierEmitsTheMismatchSignal",
+		"TestServedModel_AClaudeTmuxTranscriptModelOfThePickedTierEmitsNothing",
+		"TestServedModel_AClaudeTmuxWithNoTranscriptModelEmitsNothing",
+		"TestServedModel_AClaudeTmuxFullIdPickServedByAnOlderVersionEmitsTheMismatchSignal",
+		"TestServedModel_AClaudeTmuxFullIdPickServedByItselfEmitsNothing")
+}
+
+func TestC2145_003_AgyTmuxDeclaresTheGeminiLaunchModelRuleAndTheDriverRunsIt(t *testing.T) {
+	goTests(t, "./internal/bridge",
+		"^(TestLaunchModelCheckFor_AgyTmuxDeclaresTheGeminiRule|TestLaunchModelVerification_AgyTmuxBootingClaudeFailsOverWithTheMismatchSignal|TestLaunchModelVerification_AgyTmuxBootingItsPickedGeminiDeliversThePrompt|TestLaunchModelCheckFor_ReadsTheRuleFromTheResolvedManifest|TestVerifiesLaunchModel_IsTheTargetDriversOwnCheck|TestEveryManifestDeclaringALaunchModelRuleIsDrivenByAVerifier|TestLaunchModelCheckFor_AnOperatorOverrideThatDropsTheRuleTurnsTheCheckOff)$",
+		"TestLaunchModelCheckFor_AgyTmuxDeclaresTheGeminiRule",
+		"TestLaunchModelVerification_AgyTmuxBootingClaudeFailsOverWithTheMismatchSignal",
+		"TestLaunchModelVerification_AgyTmuxBootingItsPickedGeminiDeliversThePrompt",
+		"TestLaunchModelCheckFor_ReadsTheRuleFromTheResolvedManifest",
+		"TestVerifiesLaunchModel_IsTheTargetDriversOwnCheck",
+		"TestEveryManifestDeclaringALaunchModelRuleIsDrivenByAVerifier",
+		"TestLaunchModelCheckFor_AnOperatorOverrideThatDropsTheRuleTurnsTheCheckOff")
+}
+
+func TestC2145_004_TheBoundaryUpdateStallIsBoundedByABudgetThatCutsToASkipNeverAFailure(t *testing.T) {
+	goTests(t, "./internal/cliupdate",
+		"^(TestDefaultBoundaryBudget_AdmitsOneFullFamilyAndCutsTheTwoFamilyWorstCase|TestUpdate_EveryStepRunsUnderTheDefaultBoundaryDeadlineWhenTheCallerSetsNoBudget|TestUpdate_AStalledFamilyIsCutAtTheBudgetAndNoLaterFamilyStarts|TestUpdate_ABudgetCutAfterTheUpdaterIsNeverASmokeFailure|TestUpdate_ACancelledBoundaryStaysAnInterruptAndNamesNoBudget|TestUpdate_AFamilyThatFinishesInsideTheBudgetIsReportedAsBefore)$",
+		"TestDefaultBoundaryBudget_AdmitsOneFullFamilyAndCutsTheTwoFamilyWorstCase",
+		"TestUpdate_EveryStepRunsUnderTheDefaultBoundaryDeadlineWhenTheCallerSetsNoBudget",
+		"TestUpdate_AStalledFamilyIsCutAtTheBudgetAndNoLaterFamilyStarts",
+		"TestUpdate_ABudgetCutAfterTheUpdaterIsNeverASmokeFailure",
+		"TestUpdate_ACancelledBoundaryStaysAnInterruptAndNamesNoBudget",
+		"TestUpdate_AFamilyThatFinishesInsideTheBudgetIsReportedAsBefore")
+}
+
+func TestC2145_005_ANonPositiveBoundaryBudgetFallsBackToTheDefaultDeadlineAndNeverExpiresAHealthyFamily(t *testing.T) {
+	goTests(t, "./internal/cliupdate",
+		"^(TestUpdate_ANonPositiveBudgetIsTheDefaultDeadlineNotAnExpiredOne|TestUpdateAmplified_ANegativeBudgetFallsBackToTheDefaultDeadline)$",
+		"TestUpdate_ANonPositiveBudgetIsTheDefaultDeadlineNotAnExpiredOne",
+		"TestUpdateAmplified_ANegativeBudgetFallsBackToTheDefaultDeadline")
+}

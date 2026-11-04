@@ -156,7 +156,7 @@ func (c *coldStartTmux) CapturePane(ctx context.Context, session string, scrollb
 	if len(c.sessions) > 0 && session == c.sessions[0] {
 		return "Antigravity CLI\n  signing in…", nil
 	}
-	return "Antigravity CLI\n\n? for shortcuts", nil
+	return "Antigravity CLI\n\n" + agyFooterGeminiFlash, nil
 }
 
 func TestBootProbeRetry_AnAgyThatDrawsItsREPLLateOnItsFirstLaunchOnlyBootsOnTheRetry(t *testing.T) {

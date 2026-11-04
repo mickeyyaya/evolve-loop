@@ -95,6 +95,10 @@ type bootedModelRun struct {
 	responder *autoResponder
 }
 
+func (r bootedModelRun) pickedModelName() string {
+	return modelNameOf(r.cfg.Realization.modelDispatchEffect.model)
+}
+
 type footerLabel struct {
 	label  string
 	family string
@@ -131,7 +135,7 @@ func (lp tmuxLaunch) verifyBootedModel(ctx context.Context, run bootedModelRun) 
 	if lp.named {
 		_ = killSessionSwept(ctx, run.deps, lp.session)
 	}
-	run.deps.Signals.Emit(lp.mismatchEvent(run.cfg, w.footer.label, observed))
+	run.deps.Signals.Emit(lp.mismatchEvent(run, w.footer.label, observed))
 	return ExitModelMismatch
 }
 
@@ -147,7 +151,7 @@ func (lp tmuxLaunch) awaitDispatchedFamily(ctx context.Context, run bootedModelR
 				return labelWait{footer: last, guardErr: guardErr}
 			}
 			footer := footerLabelOf(panestream.FooterModelLabel(pane, lp.modelCheck.labelRegex, modelLabelTailLines))
-			if footer.family == lp.modelCheck.family && !repoll {
+			if footer.family == lp.modelCheck.family && sameModelName(servedModelNameOf(footer.label), run.pickedModelName()) && !repoll {
 				return labelWait{footer: footer, verified: true}
 			}
 			last = cmp.Or(footer, last)
@@ -199,14 +203,20 @@ func (lp tmuxLaunch) handOffDeadPane(run bootedModelRun) int {
 	return ExitArtifactTimeout
 }
 
-func (lp tmuxLaunch) mismatchEvent(cfg *Config, label, observed string) signalcenter.Event {
-	id := configIdentity(cfg)
+func (lp tmuxLaunch) mismatchEvent(run bootedModelRun, label, observed string) signalcenter.Event {
+	id := configIdentity(run.cfg)
 	return signalcenter.Event{
 		Cycle: id.cycle, RunID: id.runID, Phase: id.phase, Module: signalcenter.ModuleBridge, Origin: "tmuxLaunch.verifyBootedModel",
 		Kind: signalcenter.KindBridgeWarning, Severity: signalcenter.SeverityWarn, Code: CodeDispatchModelMismatch,
 		Reason: fmt.Sprintf("%s booted %s, not the %s family it dispatches: killed before the prompt, the walk moves to the next CLI", lp.name, observed, lp.modelCheck.family),
-		Fields: map[string]string{"expected": lp.modelCheck.family, "observed": observed, "label": label, "cli": lp.name, "phase": id.phase},
+		Fields: map[string]string{"expected": lp.modelCheck.family, "observed": observed, "label": label, "cli": lp.name, "phase": id.phase,
+			"expected_model": run.pickedModelName(), "served_model": servedModelNameOf(label)},
 	}
+}
+
+func servedModelNameOf(label string) string {
+	name, _, _ := strings.Cut(label, "·")
+	return modelNameOf(name)
 }
 
 func servedModelOfFooterLabel(label string) string {

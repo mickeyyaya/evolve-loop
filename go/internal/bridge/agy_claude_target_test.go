@@ -54,7 +54,8 @@ func bootAgyClaudeLogged(t *testing.T, intent LaunchIntent, stderr io.Writer) []
 		AllowBypass: true, BootOnly: true,
 		Realization: RealizeFor("agy-claude-tmux", intent),
 	}
-	tm := &FakeTmuxController{CaptureFrames: slices.Repeat([]string{agyFooterClaudeOpus}, 12)}
+	footer := footerShowing(modelNameOf(cfg.Realization.modelDispatchEffect.model), "high")
+	tm := &FakeTmuxController{CaptureFrames: slices.Repeat([]string{footer}, 12)}
 	deps := Deps{
 		Tmux: tm, Sleep: func(time.Duration) {}, Stderr: stderr,
 		LookupEnv: mapLookup(map[string]string{"EVOLVE_PHASE_RECOVERY": "off"}),
