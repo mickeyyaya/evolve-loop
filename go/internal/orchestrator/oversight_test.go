@@ -872,7 +872,7 @@ func TestSubscribe_FollowsTheFourChannelsAndRefusesABadStartOrRoute(t *testing.T
 }
 
 func TestCodes_TheOversightRegistersItsCodesUnderTheLoopModule(t *testing.T) {
-	for _, code := range []signalcenter.Code{CodeOversightAction, CodeFamilyPaused, CodeSupply, CodeSupplyShort} {
+	for _, code := range []signalcenter.Code{CodeOversightAction, CodeFamilyPaused, CodeSupply, CodeSupplyShort, CodeEjectionBriefFailed} {
 		if m, ok := signalcenter.IsRegistered(code); !ok || m != signalcenter.ModuleLoop {
 			t.Errorf("%s is registered under %q, %v, want the loop module", code, m, ok)
 		}
