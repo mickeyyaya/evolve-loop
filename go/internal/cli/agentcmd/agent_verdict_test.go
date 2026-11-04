@@ -59,6 +59,9 @@ func TestAgentRun_AReportThatListsOneHighIsAFailVerdictThoughTheFieldSaysPass(t 
 	if len(signals) != 1 || signals[0].RunID != env.RunLabel || !strings.Contains(signals[0].Reason, env.RunLabel) {
 		t.Fatalf("mismatch signals = %+v, want one that names the run %s", signals, env.RunLabel)
 	}
+	if defects := parseDefectSignals(center); len(defects) != 0 {
+		t.Errorf("parse defect signals = %+v, want none for a report that lists a real HIGH", defects)
+	}
 	wantFields := map[string]string{"field_verdict": "PASS", "stated": "PASS", "critical": "0", "high": "1"}
 	if !maps.Equal(signals[0].Fields, wantFields) {
 		t.Errorf("signal fields = %+v, want %+v", signals[0].Fields, wantFields)
@@ -225,11 +228,48 @@ func TestAgentRun_NoStatedVerdictWithNoBlockingFindingEmitsAParseDefect(t *testi
 	}
 }
 
-func TestAgentRun_NoStatedVerdictWithAHighFindingEmitsNoParseDefect(t *testing.T) {
-	env, _, center, _ := runWithSignals(t, threatModel+"## Findings\n- [HIGH] go/x.go:1 — a bug — fix it\n## Verdict\nsee above\n")
+func TestReportVerdict_ANonPassFieldEmitsNoParseDefect(t *testing.T) {
+	t.Parallel()
+	spec := phasespec.PhaseSpec{Name: "go-reviewer", Classify: &phasespec.ClassifyRules{RequireSections: []string{"Findings", "Verdict"}}}
+	for _, field := range []string{core.VerdictFAIL, core.VerdictSKIPPED} {
+		got := reportVerdict(spec, field, "## Findings\nNone.\n## Verdict\nsee above\n")
 
-	if env.Verdict != core.VerdictFAIL || len(parseDefectSignals(center)) != 0 {
-		t.Errorf("verdict %q defect %d, want FAIL and no parse defect", env.Verdict, len(parseDefectSignals(center)))
+		if got.verdict != field || got.mismatch || got.parseDefect {
+			t.Errorf("field %s: reportVerdict = %+v, want the field kept, no mismatch and no parse defect", field, got)
+		}
+	}
+}
+
+func TestAgentRun_AFencedVerdictOnlyReportEmitsOneParseDefect(t *testing.T) {
+	t.Parallel()
+
+	env, code, center, _ := runWithSignals(t, threatModel+"## Findings\nNone.\n```\n## Verdict\nVerdict: PASS\n```\n")
+
+	if env.Verdict != core.VerdictFAIL || code != exitFail {
+		t.Fatalf("verdict %q exit %d, want FAIL and exit 1", env.Verdict, code)
+	}
+	if defects, mismatches := parseDefectSignals(center), mismatchSignals(center); len(defects) != 1 || len(mismatches) != 1 {
+		t.Errorf("mismatch %d defect %d, want 1 and 1", len(mismatches), len(defects))
+	}
+}
+
+func TestParseDefectEvent_CarriesTheFieldTheSeverityAndTheRunLabel(t *testing.T) {
+	t.Parallel()
+	spec := phasespec.PhaseSpec{Name: "go-reviewer"}
+
+	e := parseDefectEvent(standaloneRun{label: "run-label-7", spec: spec}, core.VerdictWARN)
+
+	if e.Phase != "go-reviewer" {
+		t.Errorf("phase = %q, want go-reviewer", e.Phase)
+	}
+	if e.Fields["field_verdict"] != core.VerdictWARN {
+		t.Errorf("field_verdict = %q, want WARN", e.Fields["field_verdict"])
+	}
+	if e.Severity != signalcenter.SeverityWarn {
+		t.Errorf("severity = %v, want WARN", e.Severity)
+	}
+	if !strings.Contains(e.Reason, "run-label-7") {
+		t.Errorf("reason = %q, want it to name the run label", e.Reason)
 	}
 }
 

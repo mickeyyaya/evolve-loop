@@ -123,9 +123,9 @@ An evaluate phase gets `goal` by default, but a plan phase gets no key. The pers
 | the stated verdict is WARN | WARN | none |
 | the stated verdict is PASS or SKIPPED | the field | none |
 
-- **F4.2** On 2026-11-03, three code-reviewer reports put the verdict in a trailing fence, and each clean review became FAIL. The cause was a fenced verdict template in the diff reviewer personas. PR #1246 removes that template at the source.
+- **F4.2** On 2026-11-03, three code-reviewer reports put the verdict in a trailing fence, and each clean review became FAIL. The cause was a fenced verdict template in the diff reviewer personas. The fix removes that template, but it is not in this tree yet.
   *Implication:* the run does not read a fenced verdict. A second fence grammar duplicates `reportdoc` and `phasecontract`. Also, `reportdoc.CountSeverities` counts no fenced finding, so a fenced PASS can hide a fenced HIGH.
-- Prerequisite: merge PR #1246 first, or clean reviews fail with a parse defect. Its test `TestDiffReviewerPersonas_NeverShowTheVerdictLineInsideACodeFence` guards the personas.
+- The persona guard is the test `TestDiffReviewerPersonas_NeverShowTheVerdictLineInsideACodeFence`. It is not in this tree yet. Until both land, a fenced verdict line in a persona makes clean reviews fail with a parse defect.
 - No stated verdict with 0 CRITICAL and 0 HIGH is a parse defect. The run also emits `REVIEW_AGENT_RUN_VERDICT_PARSE_DEFECT` and adds one more error diagnostic. The signal shows a clean review that the report format or the parser failed. The run verdict stays FAIL, and the mismatch signal fires too.
 - A field of FAIL or SKIPPED stays as it is. A profile with no `Verdict` section keeps the field, for example `code-simplifier` and the orchestrator seat of the self-healing loop.
 - The signal is WARN in the module `review`. Its `run_id` is the run label, and its reason names the run label too. Its fields give the field verdict, the stated verdict and the CRITICAL and HIGH counts. The envelope gets one error diagnostic with the same reason.
