@@ -336,16 +336,17 @@ var codeSteps = map[signalcenter.Code][]string{
 	CodeLandedCheckFailed:              {"landing"},
 	CodeReleaseDoubleMove:              {"release_cycle"},
 	CodeReleaseMoveFailed:              {"release_cycle", "recover_orphans"},
-	CodeQuarantineFailed:               {"quarantine"},
+	CodeQuarantineFailed:               {"quarantine", "prebuild_breaker"},
 	CodeContinuationManifestUnreadable: {"manifest"},
-	CodeItemRewriteFailed:              {"counter_reset", "failure_bump", "continuation_stamp", "route"},
+	CodeItemRewriteFailed:              {"counter_reset", "failure_bump", "prebuild_record", "continuation_stamp", "route"},
 	CodeItemRoutedConsole:              {"route"},
 	CodeRouteNotFound:                  {"locate"},
+	CodeItemPrebuildBreaker:            {"prebuild_breaker"},
 }
 
 func TestMover_Codes_RegisteredUnderInbox_DocsNameTheirSteps_NoLedgerDouble(t *testing.T) {
-	if len(codeSteps) != 14 {
-		t.Fatalf("the unit registers 14 codes, the table names %d", len(codeSteps))
+	if len(codeSteps) != 15 {
+		t.Fatalf("the unit registers 15 codes, the table names %d", len(codeSteps))
 	}
 	docs := map[signalcenter.Code]string{}
 	for _, cd := range signalcenter.RegisteredCodes()[signalcenter.ModuleInbox] {

@@ -24,6 +24,9 @@ type CycleOutcome struct {
 	RoutedIDs    []string
 	FailureClass string
 	Fingerprint  string
+
+	Prebuild        bool
+	PrebuildCeiling int
 }
 
 type OutcomeResult struct {
@@ -81,6 +84,9 @@ func ApplyCycleOutcome(opts Options, oc CycleOutcome) (OutcomeResult, error) {
 		Committed:    idSet(committed),
 		FailureClass: oc.FailureClass,
 		Fingerprint:  oc.Fingerprint,
+
+		Prebuild:        oc.Prebuild,
+		PrebuildCeiling: oc.PrebuildCeiling,
 	})
 	for _, p := range rr.Paths {
 		if strings.Contains(p, filepath.Join(opts.InboxDir, "quarantine")+string(filepath.Separator)) {

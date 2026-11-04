@@ -47,6 +47,7 @@ type FailureThresholds struct {
 	NoWorkHandoffHaltCeiling        int `json:"no_work_handoff_halt_ceiling,omitempty"`
 	NoWorkHandoffWindow             int `json:"no_work_handoff_window,omitempty"`
 	BuildDeepEscalateAtFailures     int `json:"build_deep_escalate_at_failures,omitempty"`
+	PrebuildFailureCeiling          int `json:"prebuild_failure_ceiling,omitempty"`
 }
 
 type SystemFailurePolicy struct {
@@ -72,7 +73,7 @@ func DefaultSystemFailurePolicy() SystemFailurePolicy {
 			CategoryIntentMalformed:       {Level: LevelTask, Action: ActionDeferOrQuarantine, FixType: FixTypeReintent},
 			CategoryExplanationCorrection: {Level: LevelTask, Action: ActionRetryWithFix, FixType: "explanation-correction", MaxRetries: 1},
 		},
-		Thresholds:         FailureThresholds{RepeatCeiling: 2, VerifiedNotLandedCeiling: 2, TaskRetryCeiling: 2, GuardClassHaltCeiling: 2, IdenticalFingerprintHaltCeiling: 3, UnexplainedFailuresHaltCeiling: 3, ConsecutiveFailuresHaltCeiling: 3, LaneDeferralHaltCeiling: 3, ZeroShipHalt: 2, NoWorkHandoffHaltCeiling: 4, NoWorkHandoffWindow: 12, BuildDeepEscalateAtFailures: 1},
+		Thresholds:         FailureThresholds{RepeatCeiling: 2, VerifiedNotLandedCeiling: 2, TaskRetryCeiling: 2, GuardClassHaltCeiling: 2, IdenticalFingerprintHaltCeiling: 3, UnexplainedFailuresHaltCeiling: 3, ConsecutiveFailuresHaltCeiling: 3, LaneDeferralHaltCeiling: 3, ZeroShipHalt: 2, NoWorkHandoffHaltCeiling: 4, NoWorkHandoffWindow: 12, BuildDeepEscalateAtFailures: 1, PrebuildFailureCeiling: 2},
 		OnTaskRetryCeiling: "quarantine",
 		OnSystemLevel:      "halt-loop-and-escalate",
 	}
@@ -118,6 +119,7 @@ func mergeThresholds(base, override FailureThresholds) FailureThresholds {
 	out.NoWorkHandoffHaltCeiling = positiveOr(override.NoWorkHandoffHaltCeiling, base.NoWorkHandoffHaltCeiling)
 	out.NoWorkHandoffWindow = positiveOr(override.NoWorkHandoffWindow, base.NoWorkHandoffWindow)
 	out.BuildDeepEscalateAtFailures = positiveOr(override.BuildDeepEscalateAtFailures, base.BuildDeepEscalateAtFailures)
+	out.PrebuildFailureCeiling = positiveOr(override.PrebuildFailureCeiling, base.PrebuildFailureCeiling)
 	return out
 }
 

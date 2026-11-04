@@ -61,7 +61,7 @@ func cardIDOf(line string) string {
 }
 
 func consoleRouteReason(path string) string {
-	return fmt.Sprintf("protected-surface: %s — control-plane changes go through the console route (operator-gated), not lane top_n", path)
+	return fmt.Sprintf("%s %s — control-plane changes go through the console route (operator-gated), not lane top_n", committedset.ProtectedSurfaceReasonPrefix, path)
 }
 
 func routeProtectedCards(decisionPath string, cards []protectedCard, bound []string) error {
