@@ -69,6 +69,7 @@ type CycleState struct {
 	AuditRepairAttempts             int            `json:"audit_repair_attempts,omitempty"`
 	ShipRecoveryCode                string         `json:"ship_recovery_code,omitempty"`
 	ShipRecoveryConflicts           []string       `json:"ship_recovery_conflicts,omitempty"`
+	ShipRecoveryStamped             []string       `json:"ship_recovery_stamped,omitempty"`
 	AuditDeclineReason              string         `json:"audit_decline_reason,omitempty"`
 	AuditDispatches                 int            `json:"audit_dispatches,omitempty"`
 	AuditRepairActive               bool           `json:"audit_repair_active,omitempty"`

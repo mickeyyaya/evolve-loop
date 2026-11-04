@@ -41,27 +41,46 @@ func coverChangedFailures(ctx context.Context, in ReviewInput, paths []string) [
 	}
 	switch status {
 	case coverStatusTestsFailed:
-		if unitRunRefuses(ctx, in, moduleDir, pkgs) {
-			return nil
-		}
 		return coverChangedReport(coverChangedResult(stage, coverChangedTestsFailedHeadline, []string{floorFailureDiagnostic(out)}))
 	case coverStatusPlumbingError:
 		fmt.Fprintf(os.Stderr, "[build-floor] WARN cover-changed could not make a coverage profile (%s); `make -C go cover-changed` and CI still judge coverage\n", out)
-		return nil
+		return coverChangedReport(coverChangedResult(stage, coverChangedTestsFailedHeadline, unitRunFailures(ctx, in, moduleDir, pkgs)))
 	}
-	failures := coverChangedFunctionFailures(ctx, in, stage, moduleDir, profile)
+	failures := coverChangedFunctionFailures(ctx, in, coverMeasure{stage: stage, moduleDir: moduleDir, profile: profile, pkgs: pkgs})
 	floors := baseAndTreeList(ctx, in, moduleDir, ".cover-strict")
 	return append(failures, coverStrictFailures(stage, moduleDir, profile, pkgs, floors, newBlockNoter(in.Worktree, moduleDir, in.Protected))...)
 }
 
-func unitRunRefuses(ctx context.Context, in ReviewInput, moduleDir string, pkgs []string) bool {
+func unitRunFailures(ctx context.Context, in ReviewInput, moduleDir string, pkgs []string) []string {
 	visible := buildTagVisiblePackages(ctx, moduleDir, pkgs, in.errOut())
-	return len(runBuildSelfCheck(ctx, moduleDir, visible, buildSelfCheckRunner)) > 0
+	fails := in.retakeSelfCheckFailures(runBuildSelfCheck(ctx, moduleDir, visible, buildSelfCheckRunner), func(pkg string) (string, bool) {
+		return buildSelfCheckRunner(ctx, moduleDir, pkg)
+	})
+	var details []string
+	for _, f := range fails {
+		details = append(details, floorFailureDiagnostic(f.Output))
+	}
+	return details
 }
 
-func coverChangedFunctionFailures(ctx context.Context, in ReviewInput, stage config.Stage, moduleDir, profile string) []string {
+type coverMeasure struct {
+	stage              config.Stage
+	moduleDir, profile string
+	pkgs               []string
+}
+
+func coverPackageSet(pkgs []string) covchanged.PackageSet {
+	set := covchanged.PackageSet{}
+	for _, p := range pkgs {
+		set[strings.TrimPrefix(p, "./")] = true
+	}
+	return set
+}
+
+func coverChangedFunctionFailures(ctx context.Context, in ReviewInput, m coverMeasure) []string {
+	stage, moduleDir := m.stage, m.moduleDir
 	ws := covchanged.Workspace{ModuleDir: moduleDir, Run: gitRunner}
-	v, err := ws.Check(ctx, covchanged.Options{Base: floorBase(in), Profile: profile, Tags: covchanged.DefaultTags})
+	v, err := ws.Check(ctx, covchanged.Options{Base: floorBase(in), Profile: m.profile, Tags: covchanged.DefaultTags, Packages: coverPackageSet(m.pkgs)})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[build-floor] WARN cover-changed could not measure the change (%v); `make -C go cover-changed` and CI still judge coverage\n", err)
 		return nil
@@ -139,7 +158,7 @@ func coverChangedResult(stage config.Stage, headline string, lines []string) (fa
 
 func coverChangedPackages(moduleDir string, paths []string) []string {
 	var out []string
-	for _, pkg := range changedGoTestPackages(paths) {
+	for _, pkg := range floorTestPackages(paths, io.Discard) {
 		rel := strings.TrimPrefix(pkg, "./")
 		if slices.Contains(strings.Split(path.Clean(rel), "/"), "testdata") {
 			continue

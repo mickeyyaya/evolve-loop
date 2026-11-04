@@ -18,8 +18,8 @@ func TestBuildFloorSelfCheckFailures_KeepsTailDiagnostic(t *testing.T) {
 	if !strings.Contains(got, "--- FAIL: TestLoop_MaxCyclesExit_ClearsCompletedMarker") {
 		t.Errorf("the FAIL line was truncated away:\n%s\n\ngo test writes its verdict at the TAIL, so keeping the head hands the operator the noise and drops the diagnosis (the literal cycle-1268 failure reason)", got)
 	}
-	if !strings.HasPrefix(got, "…") {
-		t.Errorf("a trimmed diagnostic must be marked as trimmed; got prefix %q", got[:1])
+	if !strings.Contains(got, "…") {
+		t.Errorf("a trimmed diagnostic must be marked as trimmed; got %q", got)
 	}
 	if short := "FAIL\tpkg\t0.1s\n"; floorFailureDiagnostic(short) != short {
 		t.Errorf("short output was altered: %q", floorFailureDiagnostic(short))

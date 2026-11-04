@@ -27,7 +27,7 @@ func (c Composer) PrefixCheck(ctx context.Context, b Batch, recs []DeliverableRe
 			return PrefixResult{Batch: b}, err
 		default:
 			res.Batch = st.Batch
-			res.Landed = append(res.Landed, rec.Cycle)
+			res.Landed = append(res.Landed, rec.Ref())
 		}
 	}
 	if len(res.Landed) == 0 {
@@ -41,12 +41,12 @@ func (c Composer) PrefixCheck(ctx context.Context, b Batch, recs []DeliverableRe
 
 func (c Composer) checkPrefix(b Batch, recs []DeliverableRecord) error {
 	errs := []error{c.ready(b)}
-	seen := map[int]bool{}
+	seen := map[string]bool{}
 	for _, rec := range recs {
-		if seen[rec.Cycle] {
-			errs = append(errs, fmt.Errorf("integration: cycle %d is in the batch twice", rec.Cycle))
+		if seen[rec.id()] {
+			errs = append(errs, fmt.Errorf("integration: %s is in the batch twice", rec.Label()))
 		}
-		seen[rec.Cycle] = true
+		seen[rec.id()] = true
 		errs = append(errs, checkComposable(rec))
 	}
 	return errors.Join(errs...)

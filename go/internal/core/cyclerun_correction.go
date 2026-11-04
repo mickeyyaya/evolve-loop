@@ -33,6 +33,7 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 		if cr.o.contractVerifier == nil {
 			rungBudget[interaction.RungSalvage] = 0
 		}
+		conv := cr.o.newFloorConvergence(cr.cycle, next, rr.Failures)
 		corr := 0
 		salvagedFromInvalid := ""
 		var prevPredicates []string
@@ -55,9 +56,12 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 				RungBudget: rungBudget,
 			})
 			if act.Rung == "" {
-				var raised bool
-				if dr.phaseReq, raised = cr.askLadder(contractLadderAsk(next, originContractCorrection, rin.Worktree, rr), dr.phaseReq); !raised {
+				proceed, granted := cr.raiseOrGrant(contractLadderAsk(next, originContractCorrection, rin.Worktree, rr), dr, conv)
+				if !proceed {
 					break
+				}
+				if granted {
+					maxCorrections++
 				}
 				act.Rung = interaction.RungRedispatch
 			}
@@ -188,6 +192,7 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 			}
 			rin.Response = dr.resp
 			rr = cr.reviewDeliverable(next, rin, contractDispatch{driver: dr.phaseReq.Driver, escalated: escalated, salvageRetried: salvageRetried})
+			conv.observe(rr.Failures)
 			if rr.Approve {
 				recordCorrection(interaction.ResultAccepted)
 			} else {
@@ -202,6 +207,15 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 	}
 
 	return loopNext, nil
+}
+
+func (cr *cycleRun) raiseOrGrant(ask ladderAsk, dr *dispatchResult, conv *floorConvergence) (proceed, granted bool) {
+	var raised bool
+	if dr.phaseReq, raised = cr.askLadder(ask, dr.phaseReq); raised {
+		return true, false
+	}
+	granted = conv.grant()
+	return granted, granted
 }
 
 func contractEscalationDue(rr ReviewResult, corr int, prev contractBlockIdentity) bool {

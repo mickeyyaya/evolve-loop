@@ -12,24 +12,27 @@ type RetryPolicy struct {
 	RetryBackoffBaseS         int `json:"retry_backoff_base_s,omitempty"`
 	PhaseLatencyCeilingS      int `json:"phase_latency_ceiling_s,omitempty"`
 	ContractCorrectionRetries int `json:"contract_correction_retries,omitempty"`
+	FloorConvergenceRounds    int `json:"floor_convergence_rounds,omitempty"`
 
 	retryBackoffBaseSSet         bool
 	contractCorrectionRetriesSet bool
+	floorConvergenceRoundsSet    bool
 }
 
 func (r *RetryPolicy) UnmarshalJSON(data []byte) error {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
 	type retryPolicy RetryPolicy
 	var decoded retryPolicy
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(data, &fields); err != nil {
-		return err
-	}
 	*r = RetryPolicy(decoded)
 	_, r.retryBackoffBaseSSet = fields["retry_backoff_base_s"]
 	_, r.contractCorrectionRetriesSet = fields["contract_correction_retries"]
+	_, r.floorConvergenceRoundsSet = fields["floor_convergence_rounds"]
 	return nil
 }
 
@@ -38,6 +41,7 @@ type RetryConfig struct {
 	RetryBackoffBaseS         int
 	PhaseLatencyCeilingS      int
 	ContractCorrectionRetries int
+	FloorConvergenceRounds    int
 }
 
 const (
@@ -47,6 +51,8 @@ const (
 	defaultPhaseLatencyCeilingS      = 900
 	defaultContractCorrectionRetries = 2
 	maxContractCorrectionRetries     = 5
+	defaultFloorConvergenceRounds    = 1
+	maxFloorConvergenceRounds        = 3
 )
 
 type SwarmPolicy struct {

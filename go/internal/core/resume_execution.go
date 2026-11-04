@@ -189,6 +189,15 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 			pauseOnQuotaWall()
 			return result, err
 		}
+		var rejected resumedRejection
+		if errors.As(err, &rejected) {
+			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, rejectedOutcome(phaseOutcomeFrom(next, resp, attempts, err.Error(), cs.PhaseStartedAt)))
+			o.recordFailureLearning(ctx, failureLearningRequest{
+				CycleRequest: req, Cycle: cycle, Failed: next, Err: err, Attempt: max(attempts, 1),
+				State: &state, CycleState: &cs, Context: ctxSnap, Env: envSnap, Result: &result, Timings: &phaseTimings,
+			})
+			return result, wrapCycleLevelError(next, err)
+		}
 		if err != nil {
 			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempts, err.Error(), cs.PhaseStartedAt))
 			return result, err

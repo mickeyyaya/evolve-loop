@@ -142,6 +142,36 @@ A mixed pull request also runs the `ste-lint` job, together with the suites of i
 
 `make test` is not in the floor. It stays as the fast loop of a developer. `lint` still compiles the default build, so a fast test that uses a tagged symbol still fails the floor.
 
+### 4.5 Floor parity
+
+The build handoff floor of a cycle and the integration tier of the audit use the same rules for a test run. Before this change, one red at the floor ended the cycle, and the floor report did not name the test.
+
+**F4.5.1** Cycle 2151 ended on one red of `internal/bridge` at the build floor. The report had no test name. Six reruns of the same tree passed (operator request, 2026-11-04).
+*Implication:* one red under a live loop is not yet evidence of a defect. The audit tier retakes a red run once (the "Retake on red" rule in [internal-phases-audit-ciparitygate.md](packages/internal-phases-audit-ciparitygate.md)), but the floor did not.
+
+**F4.5.2** The floor diagnostic kept only the last 400 bytes of the `go test` output (`go/internal/core/build_floor_reviewer.go`, `floorFailureDiagnostic`, before this change). `go test` writes the `--- FAIL:` line before the later output of other tests, so a long tail pushed the name out.
+
+*Implication:* the bound must keep the names first and the tail second.
+
+**F4.5.3** Cycle 2146 went from 5 floor findings to 1, and cycle 2149 from failing tests to 1. Each ended after 1 correction (`go/internal/core/cyclerun_correction.go`, `go/internal/core/resume.go`, before this change). A resumed rejection also got no retrospective, and its digest had no class.
+
+| Id | Decision | Because | Rejected options and why |
+|---|---|---|---|
+| D4.5.1 | The floor and the audit tier call one scope function, `ciparity.TierScope`. One function, `floorTestPackages`, gives the packages of each floor run: the unit run, the coverage run and the changed-function check. The floor does not run the tests of an env-exclusive package under a live loop. CI is the backstop, as at the audit tier. The unit run also drops `/acs/` packages, because the acs-durable gate of the audit runs them. | F4.5.1 | A second copy of the scope in `internal/core`: two homes for one rule drift apart. `internal/core` does not import `internal/phases/audit/ciparitygate`. Thus the function moved down to `internal/ciparity`, which both packages import. |
+| D4.5.2 | A red floor run retakes only its failed package once, under the lock of the audit retake (`ciparity.TierLockPath`). A green retake lets the build go on and emits `BUILD_FLOOR_RETAKE_GREEN`. A red retake fails the floor and emits `BUILD_FLOOR_RETAKE_RED`. | F4.5.1 | No retake: the cycle-2151 failure stays. Two or more retakes: a real defect costs more wall time, and the audit uses one. |
+| D4.5.3 | The diagnostic keeps each `--- FAIL:` line and each `FAIL <package>` line first, then the tail of the output, in the same 400-byte bound. | F4.5.2 | A larger bound: a long tail still pushes the name out. |
+| D4.5.4 | A floor rejection after a correction can hold fewer findings than the one before, or the same number of other findings. Then the build gets one further correction, up to `retry.floor_convergence_rounds` (default 1, maximum 3, 0 turns it off), and emits `BUILD_FLOOR_CONVERGING`. More findings, or the same findings again, end the cycle as before. Findings are the same when `normalizeReasonForFingerprint` gives the same text, so other durations do not change a finding. Only the Build phase gets a round, and both loops ask the retry ladder first. A resumed rejection ends the cycle as a cycle-level failure and runs the failure learning. | F4.5.3 | A fixed larger correction budget: a build that does not converge costs more. A bound in code or in the environment: the operator cannot tune it in policy.json. |
+
+The retake applies to the three test runs of the floor. These are the plain unit run, the run of each added tag-gated package and the coverage run. The coverage run is `scopedCoverProfile`. The apicover naming check and the cover-changed check use it. Its retake starts after the first pass releases the verification lock. Thus a lane does not hold that lock while it waits for the integration-tier lock.
+
+The coverage run retakes its whole package set, because the coverage profile must hold each package.
+
+Each signal names the package or the package set in `fields.pkg`. It names the failed top-level tests in `fields.tests`. `evolve ci classify` also keys a failure on its package and its top-level test name. The floor also writes the same line to its stderr.
+
+The journey test is `go/cmd/evolve/build_floor_retake_journey_test.go`. It drives `evolve selfcheck build` and the host floor on a real module whose test fails once.
+
+Limits: a test that fails on each run still fails the floor, as it must. A lock wait past `ciparity.TierLockWait` runs the retake unserialized, with a WARN.
+
 ## 5. Isolation
 
 ### 5.1 The hermetic rule

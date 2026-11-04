@@ -35,7 +35,7 @@ func (o *Orchestrator) resumeFleetRebaseRoute(ctx context.Context, projectRoot s
 	if err := carryResolvedTree(ctx, cs.ActiveWorktree, gitCapture, carrierLabel(cycle, cs.RunID)); err != nil {
 		return o.abortRebaseReentry(cycle, *cs, "carry the resolved tree: "+err.Error())
 	}
-	ok, conflict := reauditRebase(ctx, projectRoot, cs)
+	ok, conflict := rebaseReport{o.signals, cycle, "Orchestrator.resumeFleetRebaseAfterDebugger"}.run(ctx, projectRoot, cs)
 	switch {
 	case ok:
 	case conflict:
