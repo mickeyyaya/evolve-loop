@@ -163,3 +163,22 @@ func TestEmitLaneResumed_PublishesAnInfoEventWithTheResumeFacts(t *testing.T) {
 		t.Errorf("IsRegistered(%s) = %q, %v; want the orchestrator module", CodeLaneResumed, m, ok)
 	}
 }
+
+func TestEmitLaneBindingSettled_PublishesAWarnEventWithTheSettlementFacts(t *testing.T) {
+	t.Parallel()
+	c, got := recordingCenter()
+
+	EmitLaneBindingSettled(c, BindingSettlement{Cycle: 2109, Ancestor: 2092, ScopeID: "item-a", Action: "released", Standing: "absent"})
+
+	if len(*got) != 1 {
+		t.Fatalf("events = %d, want 1", len(*got))
+	}
+	e := (*got)[0]
+	want := map[string]string{"scope_id": "item-a", "ancestor_cycle": "2092", "action": "released", "standing": "absent"}
+	if e.Code != CodeLaneBindingSettled || e.Severity != signalcenter.SeverityWarn || e.Kind != signalcenter.KindLoopWave || e.Cycle != 2109 || !reflect.DeepEqual(e.Fields, want) {
+		t.Errorf("event = %+v, want a WARN %s for cycle 2109 with fields %v", e, CodeLaneBindingSettled, want)
+	}
+	if m, ok := signalcenter.IsRegistered(CodeLaneBindingSettled); !ok || m != signalcenter.ModuleOrchestrator {
+		t.Errorf("IsRegistered(%s) = %q, %v; want the orchestrator module", CodeLaneBindingSettled, m, ok)
+	}
+}

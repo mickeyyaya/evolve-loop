@@ -87,7 +87,7 @@ func (l laneResume) adopt() *core.ResumePoint {
 		fmt.Fprintf(l.stderr, "evolve cycle run: lane %s: cycle %d cannot take its todo back (%v); the lane starts a fresh cycle\n", name, rp.CycleID, err)
 		return nil
 	}
-	l.binding().settle(rp.CycleID, l.scope)
+	l.binding().settle(rp.CycleID)
 	rp.AutoAttempts = cp.AutoResumeAttempts
 	core.EmitLaneResumed(l.signals, rp, l.scope)
 	fmt.Fprintf(l.stderr, "evolve cycle run: lane %s resumes cycle %d at phase %s (auto-resume %d of %d)\n", name, rp.CycleID, rp.Phase, rp.AutoAttempts, rp.AutoMaxAttempts)
@@ -125,56 +125,93 @@ func (l laneResume) inboxDir() string {
 type scopeBinding struct {
 	projectRoot string
 	stderr      io.Writer
-	release     func(scopeID, reason string) (bool, error)
+	signals     *signalcenter.Center
+	release     func(inboxmover.ReleaseRequest) (bool, error)
+}
+
+type pendingBinding struct {
+	ws       string
+	cycle    int
+	id       string
+	c        continuation.Continuation
+	standing string
 }
 
 func (l laneResume) binding() scopeBinding {
-	return scopeBinding{projectRoot: l.projectRoot, stderr: l.stderr, release: func(id, reason string) (bool, error) {
-		_, released, err := inboxmover.ReleaseContinuationBinding(inboxmover.Options{ProjectRoot: l.projectRoot, InboxDir: l.inboxDir(), Stderr: l.stderr, Signals: l.signals}, id, reason, "runtime (lane resume)")
+	opts := inboxmover.Options{ProjectRoot: l.projectRoot, InboxDir: l.inboxDir(), Stderr: l.stderr, Signals: l.signals}
+	return scopeBinding{projectRoot: l.projectRoot, stderr: l.stderr, signals: l.signals, release: func(req inboxmover.ReleaseRequest) (bool, error) {
+		req.By = "runtime (lane resume)"
+		_, released, err := inboxmover.ReleaseContinuationBindingFor(opts, req)
 		return released, err
 	}}
 }
 
-func (b scopeBinding) settle(cycle int, scope []string) {
+func (b scopeBinding) settle(cycle int) {
 	ws := paths.RunWorkspace(b.projectRoot, cycle)
 	if _, has, err := continuation.ReadManifest(ws); err != nil || has {
 		return
 	}
-	for _, id := range scope {
-		c, ok, err := continuation.ReadRegistryEntry(b.projectRoot, id)
-		if err != nil || !ok {
-			continue
-		}
-		if c.Cycle == cycle {
+	ids := core.LaneScopeIDs(ws)
+	for range ids {
+		id, c, ok := defectledger.FirstBinding(b.projectRoot, ids)
+		if !ok || c.Cycle == cycle {
 			return
 		}
-		if !b.releasable(cycle, id, c) {
-			b.adopt(ws, cycle, id, c)
+		p := pendingBinding{ws: ws, cycle: cycle, id: id, c: c}
+		p.standing = b.standing(p)
+		if p.standing != standingAbsent && p.standing != standingSettled || !b.releaseBinding(p) {
+			b.recordBinding(p)
 			return
 		}
 	}
 }
 
-func (b scopeBinding) releasable(cycle int, id string, c continuation.Continuation) bool {
-	if c.Cycle > cycle {
-		return false
+const (
+	standingAbsent     = "absent"
+	standingSettled    = "settled"
+	standingOwed       = "owed"
+	standingUnreadable = "unreadable"
+	standingNewer      = "newer"
+)
+
+func (b scopeBinding) standing(p pendingBinding) string {
+	if p.c.Cycle > p.cycle {
+		return standingNewer
 	}
-	if owes, err := defectledger.AncestorOwes(b.projectRoot, c.Cycle); err != nil || owes {
-		return false
+	st, err := defectledger.AncestorStanding(b.projectRoot, p.c.Cycle)
+	switch {
+	case err != nil:
+		fmt.Fprintf(b.stderr, "evolve cycle run: cycle %d cannot read the ledger of cycle-%d (%v); it records the binding of %s\n", p.cycle, p.c.Cycle, err, p.id)
+		return standingUnreadable
+	case st == defectledger.StandingOwed:
+		return standingOwed
+	case st == defectledger.StandingSettled:
+		return standingSettled
 	}
-	released, err := b.release(id, fmt.Sprintf("lane-resume-cycle-%d: ancestor cycle-%d left no defect ledger and the resumed cycle supersedes its snapshot", cycle, c.Cycle))
+	return standingAbsent
+}
+
+func (b scopeBinding) releaseBinding(p pendingBinding) bool {
+	reason := fmt.Sprintf("lane-resume-cycle-%d: ancestor cycle-%d owes no defect (ledger %s) and the resumed cycle supersedes its snapshot", p.cycle, p.c.Cycle, p.standing)
+	released, err := b.release(inboxmover.ReleaseRequest{ScopeID: p.id, Cycle: p.c.Cycle, Reason: reason})
 	if err != nil || !released {
-		fmt.Fprintf(b.stderr, "evolve cycle run: cycle %d cannot release the binding of %s to cycle-%d (released %v, err %v); it adopts the binding\n", cycle, id, c.Cycle, released, err)
+		fmt.Fprintf(b.stderr, "evolve cycle run: cycle %d cannot release the binding of %s to cycle-%d (released %v, err %v); it records the binding\n", p.cycle, p.id, p.c.Cycle, released, err)
 		return false
 	}
-	fmt.Fprintf(b.stderr, "evolve cycle run: cycle %d RELEASED the binding of %s to cycle-%d: the ancestor left no defect ledger\n", cycle, id, c.Cycle)
+	fmt.Fprintf(b.stderr, "evolve cycle run: cycle %d RELEASED the binding of %s to cycle-%d: the ancestor owes no defect (ledger %s)\n", p.cycle, p.id, p.c.Cycle, p.standing)
+	b.settled(p, "released")
 	return true
 }
 
-func (b scopeBinding) adopt(ws string, cycle int, id string, c continuation.Continuation) {
-	if err := continuation.WriteManifest(ws, c); err != nil {
-		fmt.Fprintf(b.stderr, "evolve cycle run: cycle %d cannot adopt the binding of %s to cycle-%d (%v); the defect-ledger gate blocks the audit\n", cycle, id, c.Cycle, err)
+func (b scopeBinding) recordBinding(p pendingBinding) {
+	if err := continuation.WriteManifest(p.ws, p.c); err != nil {
+		fmt.Fprintf(b.stderr, "evolve cycle run: cycle %d cannot record the binding of %s to cycle-%d in its manifest (%v); the defect-ledger gate blocks the audit\n", p.cycle, p.id, p.c.Cycle, err)
 		return
 	}
-	fmt.Fprintf(b.stderr, "evolve cycle run: cycle %d ADOPTED the binding of %s to cycle-%d before its resume\n", cycle, id, c.Cycle)
+	fmt.Fprintf(b.stderr, "evolve cycle run: cycle %d RECORDED the binding of %s to cycle-%d in its manifest before its resume\n", p.cycle, p.id, p.c.Cycle)
+	b.settled(p, "recorded")
+}
+
+func (b scopeBinding) settled(p pendingBinding, action string) {
+	core.EmitLaneBindingSettled(b.signals, core.BindingSettlement{Cycle: p.cycle, Ancestor: p.c.Cycle, ScopeID: p.id, Action: action, Standing: p.standing})
 }

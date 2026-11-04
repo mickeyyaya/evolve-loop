@@ -39,13 +39,18 @@ func (l *Ledger) arm(req Request) (continuation.Continuation, bool, Verdict) {
 }
 
 func (l *Ledger) laneRegistryBinding(req Request) (continuation.Continuation, bool) {
-	for _, id := range l.laneScope(req.Workspace) {
-		c, ok, rerr := continuation.ReadRegistryEntry(req.ProjectRoot, id)
+	_, c, ok := FirstBinding(req.ProjectRoot, l.laneScope(req.Workspace))
+	return c, ok
+}
+
+func FirstBinding(projectRoot string, ids []string) (string, continuation.Continuation, bool) {
+	for _, id := range ids {
+		c, ok, rerr := continuation.ReadRegistryEntry(projectRoot, id)
 		if rerr == nil && ok {
-			return c, true
+			return id, c, true
 		}
 	}
-	return continuation.Continuation{}, false
+	return "", continuation.Continuation{}, false
 }
 
 type lineage struct {
@@ -95,10 +100,23 @@ func hasOwedRow(doc Doc) bool {
 	return false
 }
 
-func AncestorOwes(projectRoot string, cycle int) (bool, error) {
-	doc, _, fault := read(paths.RunWorkspace(projectRoot, cycle))
-	if fault != nil {
-		return false, fault
+type Standing int
+
+const (
+	StandingAbsent Standing = iota
+	StandingSettled
+	StandingOwed
+)
+
+func AncestorStanding(projectRoot string, cycle int) (Standing, error) {
+	doc, has, fault := read(paths.RunWorkspace(projectRoot, cycle))
+	switch {
+	case fault != nil:
+		return StandingAbsent, fault
+	case !has:
+		return StandingAbsent, nil
+	case hasOwedRow(doc):
+		return StandingOwed, nil
 	}
-	return hasOwedRow(doc), nil
+	return StandingSettled, nil
 }

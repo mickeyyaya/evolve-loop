@@ -78,24 +78,24 @@ func TestLaneResume_ABindingWhoseAncestorLeftNoLedgerIsReleasedAndTheGateDoesNot
 	}
 }
 
-func TestScopeBinding_AFailedReleaseFallsBackToAdoption(t *testing.T) {
+func TestScopeBinding_AFailedReleaseFallsBackToRecordingTheBinding(t *testing.T) {
 	t.Parallel()
 	p := seedPausedLane(t, "item-a", 2109)
 	c := p.bind(t, "item-a", 2092)
 	var stderr bytes.Buffer
-	b := scopeBinding{projectRoot: p.root, stderr: &stderr, release: func(string, string) (bool, error) { return false, errors.New("boom") }}
+	b := scopeBinding{projectRoot: p.root, stderr: &stderr, release: func(inboxmover.ReleaseRequest) (bool, error) { return false, errors.New("boom") }}
 
-	b.settle(2109, []string{"item-a"})
+	b.settle(2109)
 
 	if m, ok, _ := continuation.ReadManifest(paths.RunWorkspace(p.root, 2109)); !ok || m.Cycle != c.Cycle {
-		t.Fatalf("manifest = %+v, %v; want adoption after the failed release", m, ok)
+		t.Fatalf("manifest = %+v, %v; want the binding recorded after the failed release", m, ok)
 	}
 	if !strings.Contains(stderr.String(), "cannot release the binding of item-a to cycle-2092 (released false, err boom)") {
 		t.Errorf("stderr = %q; want the release failure reported", stderr.String())
 	}
 }
 
-func TestLaneResume_ABindingWhoseAncestorOwesDefectsIsAdoptedIntoTheWorkspace(t *testing.T) {
+func TestLaneResume_ABindingWhoseAncestorOwesDefectsIsRecordedInTheWorkspaceManifest(t *testing.T) {
 	t.Parallel()
 	p := seedPausedLane(t, "item-a", 2108)
 	p.bind(t, "item-a", 2093)
@@ -106,22 +106,22 @@ func TestLaneResume_ABindingWhoseAncestorOwesDefectsIsAdoptedIntoTheWorkspace(t 
 
 	m, ok, err := continuation.ReadManifest(paths.RunWorkspace(p.root, 2108))
 	if err != nil || !ok || m.Cycle != 2093 {
-		t.Fatalf("manifest = %+v, %v, %v; want the binding to cycle-2093 adopted", m, ok, err)
+		t.Fatalf("manifest = %+v, %v, %v; want the binding to cycle-2093 recorded", m, ok, err)
 	}
 	if _, ok, _ := continuation.ReadRegistryEntry(p.root, "item-a"); !ok {
-		t.Fatal("the adopted binding was released; want it kept")
+		t.Fatal("the recorded binding was released; want it kept")
 	}
 	for _, d := range p.gate().Diagnostics {
 		if strings.Contains(d.Message, "holds no continuation manifest") {
 			t.Fatalf("gate still reports a missing manifest: %s", d.Message)
 		}
 	}
-	if !strings.Contains(stderr.String(), "ADOPTED the binding of item-a to cycle-2093") {
-		t.Errorf("stderr = %q; want the adopt line", stderr.String())
+	if !strings.Contains(stderr.String(), "RECORDED the binding of item-a to cycle-2093") {
+		t.Errorf("stderr = %q; want the record line", stderr.String())
 	}
 }
 
-func TestLaneResume_ADeletedOrRewrittenManifestOfAnAdoptingCycleStillBlocks(t *testing.T) {
+func TestLaneResume_ADeletedOrRewrittenManifestOfARecordingCycleStillBlocks(t *testing.T) {
 	t.Parallel()
 	for _, tamper := range []string{"delete", "rewrite"} {
 		t.Run(tamper, func(t *testing.T) {
@@ -157,7 +157,7 @@ func TestLaneResume_AManifestAlreadyInTheWorkspaceIsLeftForTheGate(t *testing.T)
 	p.resume(t, &bytes.Buffer{}, "item-a")
 
 	if _, ok, _ := continuation.ReadRegistryEntry(p.root, "item-a"); !ok {
-		t.Fatal("a binding the workspace already adopted was released")
+		t.Fatal("a binding the workspace already recorded was released")
 	}
 }
 
@@ -177,7 +177,7 @@ func TestLaneResume_TheCycleOwnBindingAndAnUnboundScopeAreLeftAlone(t *testing.T
 	}
 }
 
-func TestLaneResume_ANewerBindingIsAdoptedNotReleased(t *testing.T) {
+func TestLaneResume_ANewerBindingIsRecordedNotReleased(t *testing.T) {
 	t.Parallel()
 	p := seedPausedLane(t, "item-a", 2090)
 	p.bind(t, "item-a", 2107)
@@ -185,11 +185,11 @@ func TestLaneResume_ANewerBindingIsAdoptedNotReleased(t *testing.T) {
 	p.resume(t, &bytes.Buffer{}, "item-a")
 
 	if m, ok, _ := continuation.ReadManifest(paths.RunWorkspace(p.root, 2090)); !ok || m.Cycle != 2107 {
-		t.Fatalf("manifest = %+v, %v; want the newer binding adopted", m, ok)
+		t.Fatalf("manifest = %+v, %v; want the newer binding recorded", m, ok)
 	}
 }
 
-func TestLaneResume_AnUnreadableAncestorLedgerIsAdoptedSoTheGateGradesIt(t *testing.T) {
+func TestLaneResume_AnUnreadableAncestorLedgerIsRecordedSoTheGateGradesIt(t *testing.T) {
 	t.Parallel()
 	p := seedPausedLane(t, "item-a", 2109)
 	p.bind(t, "item-a", 2092)
@@ -198,7 +198,7 @@ func TestLaneResume_AnUnreadableAncestorLedgerIsAdoptedSoTheGateGradesIt(t *test
 	p.resume(t, &bytes.Buffer{}, "item-a")
 
 	if m, ok, _ := continuation.ReadManifest(paths.RunWorkspace(p.root, 2109)); !ok || m.Cycle != 2092 {
-		t.Fatalf("manifest = %+v, %v; want the binding adopted", m, ok)
+		t.Fatalf("manifest = %+v, %v; want the binding recorded", m, ok)
 	}
 	if v := p.gate(); !v.Blocked {
 		t.Fatalf("gate = %+v; want the unreadable ancestor ledger to block", v)
@@ -218,8 +218,8 @@ func TestLaneResume_AManifestThatCannotBeWrittenIsReported(t *testing.T) {
 
 	p.resume(t, &stderr, "item-a")
 
-	if !strings.Contains(stderr.String(), "cannot adopt the binding of item-a to cycle-2093") {
-		t.Errorf("stderr = %q; want the adopt failure reported", stderr.String())
+	if !strings.Contains(stderr.String(), "cannot record the binding of item-a to cycle-2093") {
+		t.Errorf("stderr = %q; want the record failure reported", stderr.String())
 	}
 }
 
