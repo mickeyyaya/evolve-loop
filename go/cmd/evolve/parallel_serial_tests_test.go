@@ -757,6 +757,8 @@ var serialTests = map[string]string{
 	"main.TestRunSalvageList_LandedIsATriStateThatNeverFailsTheRun":                                                        "swaps seam salvageGitRunner",
 	"main.TestRunSalvageList_UnreadableLeavesExitTwoAfterPrintingTheReadableOnes":                                          "swaps seam salvageGitRunner",
 	"main.TestRunSelfcheck_AnUnreadableReportCannotBeJudgedAndExitsTwo":                                                    "swaps seam buildHandoffFloorFor",
+	"main.TestBuildFloorJourney_Cycle2151_AOneOffRedIsRetakenAndTheBuildGoesOn":                                            "sets env through a helper",
+	"main.TestBuildFloorJourney_Cycle2151_ASecondRedFailsTheFloorAndNamesTheTest":                                          "sets env through a helper",
 	"main.TestRunSelfcheck_CleanExitZero":                                                                                  "swaps seam buildHandoffFloorFor",
 	"main.TestRunSelfcheck_FindingsExitOneAndPrinted":                                                                      "swaps seam buildHandoffFloorFor",
 	"main.TestRunSelfcheck_WithoutACycleBindingNeverClaimsSafe":                                                            "swaps seam buildHandoffFloorFor",

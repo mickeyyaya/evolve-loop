@@ -113,7 +113,7 @@ func changedPackageFloorChecks(ctx context.Context, in ReviewInput, paths []stri
 	if in.Worktree == "" {
 		return nil
 	}
-	pkgs := changedGoTestPackages(paths)
+	pkgs := floorScopedPackages(changedGoTestPackages(paths), in.errOut())
 	moduleDir := codequality.ModuleDir(in.Worktree)
 	pkgs = buildTagVisiblePackages(ctx, moduleDir, pkgs, in.errOut())
 	taggedFails := addedTaggedTestFailures(ctx, in, moduleDir)
@@ -130,7 +130,9 @@ func changedPackageFloorChecks(ctx context.Context, in ReviewInput, paths []stri
 			plain = append(plain, p)
 		}
 	}
-	fails := runBuildSelfCheck(ctx, moduleDir, plain, buildSelfCheckRunner)
+	fails := in.retakeSelfCheckFailures(runBuildSelfCheck(ctx, moduleDir, plain, buildSelfCheckRunner), func(pkg string) (string, bool) {
+		return buildSelfCheckRunner(ctx, moduleDir, pkg)
+	})
 	namingFails := apicoverNamingFailures(ctx, in, moduleDir, enforced, paths)
 	removeBuildSelfCheckArtifact(in.Worktree)
 	if len(fails) > 0 {
@@ -173,8 +175,12 @@ func addedTaggedTestFailures(ctx context.Context, in ReviewInput, moduleDir stri
 			continue
 		}
 		for _, pkg := range g.Packages {
-			if out, ok := buildSelfCheckTaggedRunner(ctx, moduleDir, pkg, g.Tags); !ok {
-				fails = append(fails, selfCheckFailure{Pkg: pkg + " (-tags " + strings.Join(g.Tags, ",") + ")", Output: out})
+			run := func() (string, bool) { return buildSelfCheckTaggedRunner(ctx, moduleDir, pkg, g.Tags) }
+			label := pkg + " (-tags " + strings.Join(g.Tags, ",") + ")"
+			if out, ok := run(); !ok {
+				if out, ok = in.retakeFloorRun(label, out, run); !ok {
+					fails = append(fails, selfCheckFailure{Pkg: label, Output: out})
+				}
 			}
 		}
 	}
@@ -187,7 +193,15 @@ func floorFailureDiagnostic(output string) string {
 	if len(output) <= floorFailureDiagnosticMax {
 		return output
 	}
-	return "…" + output[len(output)-floorFailureDiagnosticMax:]
+	var head string
+	if lines, _ := goTestFailureLines(output); len(lines) > 0 {
+		head = strings.Join(lines, "\n") + "\n"
+	}
+	tail := floorFailureDiagnosticMax - len(head)
+	if tail <= 0 {
+		return strings.ToValidUTF8(head[:floorFailureDiagnosticMax], "") + "…"
+	}
+	return head + "…" + strings.ToValidUTF8(output[len(output)-tail:], "")
 }
 
 func buildTagVisiblePackages(ctx context.Context, moduleDir string, pkgs []string, warn io.Writer) []string {
@@ -305,28 +319,54 @@ func scopedCoverFunc(ctx context.Context, in ReviewInput, moduleDir string, pkgs
 }
 
 func scopedCoverProfile(ctx context.Context, in ReviewInput, moduleDir string, pkgs, tags []string) (profile, output string, status int) {
-	root := filepath.Dir(moduleDir)
+	plan, out, status := firstCoverPass(ctx, in, coverPlan{moduleDir: moduleDir, label: strings.Join(pkgs, ","), pkgs: pkgs, tags: tags})
+	if status == coverStatusTestsFailed {
+		out, status = plan.retake(ctx, in, out)
+	}
+	return plan.profile, out, status
+}
+
+func firstCoverPass(ctx context.Context, in ReviewInput, plan coverPlan) (coverPlan, string, int) {
+	root := filepath.Dir(plan.moduleDir)
 	if release, lerr := verifylock.AcquireWithin(ctx, root, coverLockWait, in.errOut()); lerr == nil {
 		defer release()
 	} else {
 		in.recordUnserializedFloor(root, lerr)
 	}
-	splits, err := coversplit.Load(moduleDir)
+	splits, err := coversplit.Load(plan.moduleDir)
 	if err != nil {
-		return "", err.Error(), coverStatusPlumbingError
+		return plan, err.Error(), coverStatusPlumbingError
 	}
 	tmpDir, err := os.MkdirTemp("", "buildfloor-cover-*")
 	if err != nil {
-		return "", err.Error(), coverStatusPlumbingError
+		return plan, err.Error(), coverStatusPlumbingError
 	}
-	profile = filepath.Join(tmpDir, "cover.out")
-	runs := coversplit.Plan(pkgs, splits)
-	if len(runs) == 1 {
-		out, status := runCoverPass(ctx, moduleDir, profile, runs[0].Args(), tags)
-		return profile, out, status
+	plan.profile, plan.runs = filepath.Join(tmpDir, "cover.out"), coversplit.Plan(plan.pkgs, splits)
+	out, status := plan.run(ctx)
+	return plan, out, status
+}
+
+type coverPlan struct {
+	moduleDir, profile, label string
+	runs                      []coversplit.Run
+	pkgs, tags                []string
+}
+
+func (p coverPlan) run(ctx context.Context) (string, int) {
+	if len(p.runs) == 1 {
+		return runCoverPass(ctx, p.moduleDir, p.profile, p.runs[0].Args(), p.tags)
 	}
-	out, status := runSplitCoverPasses(ctx, moduleDir, profile, runs, tags)
-	return profile, out, status
+	return runSplitCoverPasses(ctx, p.moduleDir, p.profile, p.runs, p.tags)
+}
+
+func (p coverPlan) retake(ctx context.Context, in ReviewInput, first string) (string, int) {
+	status := coverStatusTestsFailed
+	out, _ := in.retakeFloorRun(p.label, first, func() (string, bool) {
+		var out string
+		out, status = p.run(ctx)
+		return out, status == coverStatusOK
+	})
+	return coverRetakeResult(first, out, status)
 }
 
 func runCoverPass(ctx context.Context, moduleDir, profile string, args, tags []string) (string, int) {
