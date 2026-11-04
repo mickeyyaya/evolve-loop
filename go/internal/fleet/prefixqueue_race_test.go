@@ -1,4 +1,4 @@
-package prefixqueue
+package fleet
 
 import (
 	"fmt"

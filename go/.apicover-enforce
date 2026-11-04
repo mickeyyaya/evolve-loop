@@ -868,5 +868,3 @@
 # claude-cloud driver (PR #1272): evolve cloud reads the launch records; cloudlaunch holds the typed launch outcome and the repository checks.
 ./internal/cli/cloudcmd
 ./internal/cloudlaunch
-# ADR-0147 I2 (2026-11-03): the prefix queue of the landing composer, moved out of internal/fleet into a leaf package.
-./internal/prefixqueue

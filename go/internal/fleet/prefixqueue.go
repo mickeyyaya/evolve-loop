@@ -1,6 +1,9 @@
-package prefixqueue
+package fleet
 
-import "sync"
+import (
+	"fmt"
+	"sync"
+)
 
 type RiskTier int
 
@@ -128,4 +131,24 @@ func (q *PrefixQueue) ResolveCulprit(verify func(laneIDs []string) bool) (landed
 		landed = landed[:last]
 	}
 	return landed, ejected
+}
+
+type LandingMode string
+
+const (
+	LandingPerLane     LandingMode = "per-lane"
+	LandingPrefixQueue LandingMode = "prefix-queue"
+)
+
+func DefaultLandingMode() LandingMode {
+	return LandingPerLane
+}
+
+func ParseLandingMode(s string) (LandingMode, error) {
+	switch LandingMode(s) {
+	case LandingPerLane, LandingPrefixQueue:
+		return LandingMode(s), nil
+	default:
+		return "", fmt.Errorf("invalid landing mode %q: want %q or %q", s, LandingPerLane, LandingPrefixQueue)
+	}
 }

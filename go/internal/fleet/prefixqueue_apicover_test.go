@@ -1,4 +1,4 @@
-package prefixqueue
+package fleet
 
 import (
 	"reflect"
@@ -91,24 +91,17 @@ func TestPrefixQueueType_ZeroValue(t *testing.T) {
 	}
 }
 
-func TestPrefixQueue_ASharedFileStartsANewGroup(t *testing.T) {
-	t.Parallel()
-	q := NewPrefixQueue()
-	q.Enqueue(LaneCandidate{ID: "A", Tier: TierMaybe, Files: []string{"a/a.go"}})
-	q.Enqueue(LaneCandidate{ID: "B", Tier: TierMaybe, Files: []string{"a/a.go"}})
-	want := [][]string{{"A"}, {"B"}}
-	if got := q.ComposePrefixes(); !reflect.DeepEqual(got, want) {
-		t.Errorf("ComposePrefixes() = %v, want %v", got, want)
+func TestLandingMode_Vocabulary(t *testing.T) {
+	if DefaultLandingMode() != LandingPerLane {
+		t.Errorf("DefaultLandingMode() = %q, want %q", DefaultLandingMode(), LandingPerLane)
 	}
-}
-
-func TestPrefixQueue_ResolveCulpritTrimsARedUnionOfGreenGroups(t *testing.T) {
-	t.Parallel()
-	q := NewPrefixQueue()
-	q.Enqueue(LaneCandidate{ID: "A", Tier: TierIffy, Files: []string{"a/a.go"}})
-	q.Enqueue(LaneCandidate{ID: "B", Tier: TierIffy, Files: []string{"b/b.go"}})
-	landed, ejected := q.ResolveCulprit(func(ids []string) bool { return len(ids) < 2 })
-	if !reflect.DeepEqual(landed, []string{"A"}) || !reflect.DeepEqual(ejected, []string{"B"}) {
-		t.Errorf("ResolveCulprit() = (%v, %v), want ([A], [B])", landed, ejected)
+	for _, m := range []LandingMode{LandingPerLane, LandingPrefixQueue} {
+		got, err := ParseLandingMode(string(m))
+		if err != nil || got != m {
+			t.Errorf("ParseLandingMode(%q) = (%q,%v), want (%q,nil)", m, got, err, m)
+		}
+	}
+	if _, err := ParseLandingMode("bogus"); err == nil {
+		t.Error("ParseLandingMode(\"bogus\") = nil error, want a validation error")
 	}
 }

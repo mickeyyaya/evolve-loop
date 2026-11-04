@@ -41,7 +41,7 @@ func TestPrefixCheck_PassesAAndABAndFailsABCThenEjectsCWithTheDiffOfAB(t *testin
 	log := &gateLog{}
 	log.fail = func(tip string) error {
 		if f.holds(tip, "c.txt") {
-			return errors.New("TestC failed")
+			return &GateRed{Failures: []string{"TestC"}}
 		}
 		return nil
 	}
@@ -183,7 +183,7 @@ func TestPrefixCheck_EveryDeliverableRedLeavesTheBranch(t *testing.T) {
 	t.Parallel()
 	f := newComposeFixture(t)
 	b := f.batch(t)
-	red := &gateLog{fail: func(string) error { return errors.New("red") }}
+	red := &gateLog{fail: func(string) error { return &GateRed{} }}
 	got, err := enforcing(f, red).PrefixCheck(context.Background(), b, threeDeliverables(t, f))
 	if err != nil || got.Landed != nil || len(got.Ejected) != 3 || got.Batch != b {
 		t.Fatalf("PrefixCheck = %+v, %v, want three ejections and the batch unchanged", got, err)

@@ -29,6 +29,14 @@ type Batch struct {
 
 type Gate func(ctx context.Context, tip string, tier overlap.Tier) error
 
+type GateRed struct {
+	Failures []string
+}
+
+func (e *GateRed) Error() string {
+	return "integration: the gate is red: " + strings.Join(e.Failures, ", ")
+}
+
 type OverlapFacts struct {
 	Module   overlap.Module
 	Catalogs overlap.Catalogs
@@ -155,8 +163,13 @@ func (c Composer) attempt(ctx context.Context, b Batch, rec DeliverableRecord) (
 	if err != nil || c.Stage == policy.FleetIntegrationShadow {
 		return st, err
 	}
-	if err := c.Gate(ctx, st.Batch.Tip, st.Proof.Tier); err != nil {
+	err = c.Gate(ctx, st.Batch.Tip, st.Proof.Tier)
+	var red *GateRed
+	switch {
+	case errors.As(err, &red):
 		return Composed{}, c.eject(ctx, b, &Ejection{Cycle: rec.Cycle, Cause: CauseGate, Err: err})
+	case err != nil:
+		return Composed{}, fmt.Errorf("integration: the gate of cycle %d did not run: %w", rec.Cycle, err)
 	}
 	return st, nil
 }

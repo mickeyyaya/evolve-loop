@@ -241,7 +241,7 @@ func TestCompose_ARedGateEjectsAndKeepsTheBranch(t *testing.T) {
 	f := newComposeFixture(t)
 	rec := f.lane(t, 521, map[string]string{"a.txt": "a\n"})
 	b := f.batch(t)
-	red := errors.New("TestSomething failed")
+	red := &GateRed{Failures: []string{"TestSomething"}}
 	_, err := enforcing(f, &gateLog{fail: func(string) error { return red }}).Compose(context.Background(), b, rec)
 	var ej *Ejection
 	if !errors.As(err, &ej) || ej.Cause != CauseGate || ej.Cycle != 521 || !errors.Is(ej.Err, red) {
@@ -514,11 +514,89 @@ func TestCompose_TheEjectionDiffRunsNoRepoDiffDriver(t *testing.T) {
 		}
 		return real(ctx, dir, stdin, args...)
 	}
-	c := Composer{Repo: Repo{Dir: f.g.Dir, Git: git}, Stage: policy.FleetIntegrationEnforce, Gate: (&gateLog{fail: func(string) error { return errors.New("red") }}).gate}
+	c := Composer{Repo: Repo{Dir: f.g.Dir, Git: git}, Stage: policy.FleetIntegrationEnforce, Gate: (&gateLog{fail: func(string) error { return &GateRed{} }}).gate}
 	if _, err := c.Compose(context.Background(), f.batch(t), rec); err == nil {
 		t.Fatal("Compose passed a red gate")
 	}
 	if !slices.Contains(diffArgs, "--no-ext-diff") || !slices.Contains(diffArgs, "--no-textconv") {
 		t.Errorf("the ejection diff ran as %v, want --no-ext-diff and --no-textconv", diffArgs)
+	}
+}
+
+func TestCompose_AGateThatCannotRunIsAnErrorNotAnEjection(t *testing.T) {
+	t.Parallel()
+	f := newComposeFixture(t)
+	rec := f.lane(t, 596, map[string]string{"a.txt": "a\n"})
+	b := f.batch(t)
+	broken := errors.New("gate could not start: no such binary")
+	_, err := enforcing(f, &gateLog{fail: func(string) error { return broken }}).Compose(context.Background(), b, rec)
+	var ej *Ejection
+	if !errors.Is(err, broken) || errors.As(err, &ej) {
+		t.Fatalf("Compose = %v, want the plain gate error and no ejection", err)
+	}
+	if tip := f.g.Git("rev-parse", "refs/heads/"+b.Branch); tip != f.base {
+		t.Errorf("a gate that could not run moved the batch branch to %s", tip)
+	}
+}
+
+func TestCompose_TheModuleFactsReachTheProof(t *testing.T) {
+	t.Parallel()
+	f := newComposeFixture(t)
+	a := f.lane(t, 595, map[string]string{"go/a/a.go": "package a\n"})
+	b := f.lane(t, 594, map[string]string{"go/b/b.go": "package b\n"})
+	comp := enforcing(f, &gateLog{})
+	comp.Overlap = &OverlapFacts{Catalogs: plainCatalogs{}, Module: overlap.Module{Path: "m", Packages: []overlap.Package{
+		{ImportPath: "m/a", Dir: "go/a", Files: []string{"go/a/a.go"}},
+		{ImportPath: "m/b", Dir: "go/b", Files: []string{"go/b/b.go"}},
+	}}}
+	first, err := comp.Compose(context.Background(), f.batch(t), a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := comp.Compose(context.Background(), first.Batch, b)
+	if err != nil || got.Proof.Tier != overlap.T1 || !slices.Equal(got.Proof.Rules, []overlap.Rule{overlap.RuleDisjoint}) {
+		t.Errorf("proof = %s %v (err %v), want T1 [disjoint]", got.Proof.Tier, got.Proof.Rules, err)
+	}
+}
+
+func TestCompose_AnExitOtherThanOneIsAnErrorEvenWithPathsOnStdout(t *testing.T) {
+	t.Parallel()
+	f := newComposeFixture(t)
+	rec := f.lane(t, 593, map[string]string{"a.txt": "a\n"})
+	b := f.batch(t)
+	real := SysGit()
+	git := func(ctx context.Context, dir, stdin string, args ...string) (string, error) {
+		if args[0] == "merge-tree" {
+			return "", &GitError{Args: args, Code: 128, Stdout: f.base + "\x00a.txt\x00\x00"}
+		}
+		return real(ctx, dir, stdin, args...)
+	}
+	c := Composer{Repo: Repo{Dir: f.g.Dir, Git: git}, Stage: policy.FleetIntegrationShadow}
+	_, err := c.Compose(context.Background(), b, rec)
+	var ej *Ejection
+	if err == nil || errors.As(err, &ej) {
+		t.Errorf("Compose = %v, want a plain error", err)
+	}
+}
+
+func TestCompose_ARecordWhoseContextAPeerChangedDoesNotReadAsLandedYet(t *testing.T) {
+	t.Parallel()
+	f := newComposeFixture(t)
+	a := f.lane(t, 592, map[string]string{sharedFile: "one\ntwo\nthree\nFOUR\nfive\nsix\nseven\neight\nnine\nten\n"})
+	b := f.lane(t, 591, map[string]string{sharedFile: "one\ntwo\nthree\nfour\nfive\nSIX\nseven\neight\nnine\nten\n"})
+	comp := enforcing(f, &gateLog{})
+	first, err := comp.Compose(context.Background(), f.batch(t), a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := comp.Compose(context.Background(), first.Batch, b)
+	if err != nil {
+		t.Fatalf("Compose(B): %v", err)
+	}
+	if !HasCycleTrailer(f.show(t, second.Batch.Tip), 591) {
+		t.Fatal("the composed commit of B lacks its cycle trailer")
+	}
+	if f.repo.LandedOnRef(context.Background(), b, second.Batch.Branch) {
+		t.Error("LandedOnRef found B; the limit in internal-integration.md is stale, update it")
 	}
 }
