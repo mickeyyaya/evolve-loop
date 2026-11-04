@@ -79,7 +79,7 @@ func (o Options) Run(ctx context.Context) *Result {
 		return res
 	}
 
-	waiver, code := o.reviewDecision(ctx, langs, res)
+	review, code := o.reviewDecision(ctx, langs, res)
 	if code != ExitPass {
 		res.ExitCode = code
 		return res
@@ -90,7 +90,7 @@ func (o Options) Run(ctx context.Context) *Result {
 		return res
 	}
 
-	att, code := o.writeAttestation(ctx, waiver, res)
+	att, code := o.writeAttestation(ctx, review, res)
 	if code != ExitPass {
 		res.ExitCode = code
 		return res
@@ -119,17 +119,18 @@ func (o Options) runLanes(ctx context.Context, files, langs []string, res *Resul
 	return ExitPass
 }
 
-func (o Options) reviewDecision(ctx context.Context, langs []string, res *Result) (waiver string, code int) {
+func (o Options) reviewDecision(ctx context.Context, langs []string, res *Result) (reviewOutcome, int) {
 	waived, refused := o.reviewWaiver(ctx)
-	switch {
-	case waived != "":
+	if waived != "" {
 		res.log("reviewers not required: %s", waived)
-		return commentOnlyWaiver, ExitPass
-	case !o.requiredReviewSatisfied(o.listedChange(ctx), langs, res):
-		res.log("no review waiver: %s", refused)
-		return "", ExitFail
+		return reviewOutcome{waiver: commentOnlyWaiver, class: reviewClassCommentOnly}, ExitPass
 	}
-	return "", ExitPass
+	files := o.listedChange(ctx)
+	if !o.requiredReviewSatisfied(files, langs, res) {
+		res.log("no review waiver: %s", refused)
+		return reviewOutcome{}, ExitFail
+	}
+	return reviewOutcome{class: reviewClassOf(files)}, ExitPass
 }
 
 func (o Options) changedFiles(ctx context.Context, res *Result) ([]string, int) {
@@ -239,7 +240,7 @@ func (o Options) ensureTool(tool, install, manual string, res *Result) int {
 	}
 }
 
-func (o Options) writeAttestation(ctx context.Context, waiver string, res *Result) (*Attestation, int) {
+func (o Options) writeAttestation(ctx context.Context, review reviewOutcome, res *Result) (*Attestation, int) {
 	sum, err := treestate.SHA(ctx, o.Runner, o.RepoRoot, o.Env)
 	if err != nil {
 		res.log("cannot compute tree SHA")
@@ -255,7 +256,8 @@ func (o Options) writeAttestation(ctx context.Context, waiver string, res *Resul
 		TS:           o.Now().UTC().Format("2006-01-02T15:04:05Z"),
 		ChecksPassed: res.ChecksPassed,
 		ReviewersRun: splitReviewers(o.Reviewers),
-		ReviewWaiver: waiver,
+		ReviewWaiver: review.waiver,
+		ReviewClass:  review.class,
 		ReviewRuns:   res.reviewRuns,
 		Tool:         tool,
 	}
