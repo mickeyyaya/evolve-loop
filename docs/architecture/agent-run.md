@@ -200,6 +200,7 @@ Before X11, a console review ran as an in-process Claude Code subagent. It left 
 | `artifact_sha256` | the SHA-256 of the report, when there is one |
 | `worktree` | the `--worktree` directory |
 | `ts` | the UTC write time |
+| `cloud` | the launched cloud session of a run on a cloud seat: id, URL, title, repository, branch, profile, driver and time ([llm-isolation.md](llm-isolation.md) §5.2). A run on any other seat has no `cloud` key. |
 
 - `launchrecord.Write` creates the file and refuses to replace a record. The run refuses a run label whose record exists, before the dispatch (exit 21).
 - A wrapper of the bridge (`launchSpy`) reads the driver and the model from each launch request. A fallback walk launches more than once, so the record names the last launch.
@@ -259,6 +260,6 @@ flowchart LR
 - The test proves the footprint with a fake bridge. It does not prove what a real CLI writes outside its sandbox grants.
 - The record binds a review to the tree, not to its input. A review with another input at the same tree also attests the commit.
 - The record has no signature. A process outside a cell can write one, as it can pass a plain reviewer name. The record adds the provenance of the bridge, not a proof.
-- The `--writable` paths are exact files. A new file of the build needs its own `--writable` path.
+- The `--writable` paths are exact files. A `--writable` that names a directory is a usage error (exit 10), and the run starts no seat. A new file of the build needs its own `--writable` path.
 - The bridge grants the Git metadata writes of a linked worktree to a writer, so a build cell can commit in its worktree. The profile denies `git commit` as a tool, and the commit gate refuses a review record of another tree.
 - A Linux host refuses the Git metadata grants of a linked worktree (`sandboxGitWritePaths`), so the build seat runs only on macOS today.

@@ -8,7 +8,7 @@
 
 ## Design
 
-- **`New(Deps)`** returns the standard subcommand function. `Deps` has seven seams:
+- **`New(Deps)`** returns the standard subcommand function. `Deps` has eight seams:
 
 | Seam | Default |
 |---|---|
@@ -19,6 +19,7 @@
 | `Getenv` | `os.Getenv` |
 | `Now` | `time.Now` |
 | `VerbSchema(path)` | no schema, so each `A` verb shows `text/1`; cmd/evolve passes `coreVerbSchema`, the envelope schema of each core verb |
+| `CloudSeat(cli)` | false for each driver, so no report is a cloud launch; cmd/evolve passes `bridge.LaunchesCloud`, true for a manifest with `cloud_launch` |
 
   Tests inject a fake bridge and a fake tree state, so no test launches a real CLI or reads a real tree.
 - **One dispatch path.** The run builds its runner with `phasecmd.NewSpecRunner`, the constructor that `evolve phase` uses. The routing table, the fallback walk, the sandbox and the verdict all come from the shared phase runner.
@@ -43,6 +44,13 @@
   - The stated verdict is the sentinel, else the `Verdict` line outside the fences. A fenced verdict line states no verdict. The run does not keep its own fence grammar, because `reportdoc` and `phasecontract` own that grammar. Also, a fenced finding counts 0, so a fenced PASS can hide a fenced HIGH.
   - No stated verdict with 0 CRITICAL and 0 HIGH findings is a parse defect. The run verdict stays FAIL. The run also emits `REVIEW_AGENT_RUN_VERDICT_PARSE_DEFECT` and adds one more error diagnostic. The signal shows a clean review that the report format or the parser failed. Pinned by `TestReportVerdict_TheParseDefectNeedsNoStatedVerdictAndNoBlockingFinding`.
   - The envelope, the exit code, the ledger entry and the launch record carry the run verdict, and the envelope carries the counts as `findings`.
+- **The run verdict** (`verdict.go`, [agent-run.md](../agent-run.md) §4.1). For a profile that requires a `Verdict` section, `reportVerdict` checks the field of the phase runner against the report body. One CRITICAL or HIGH finding, a stated FAIL or no stated verdict makes the run verdict FAIL. Then the run emits `REVIEW_AGENT_RUN_VERDICT_MISMATCH` with the run label as `run_id`. A stated WARN makes it WARN. The envelope, the exit code, the ledger entry and the launch record carry the run verdict, and the envelope carries the counts as `findings`.
+- **A cloud seat** ([llm-isolation.md](../llm-isolation.md) §5.2). The launched driver can be a cloud seat (`Deps.CloudSeat`), with a report that holds a launched session (`cloudlaunch.Parse`). Then `launchOutcome.cloudSession` puts the session in the launch record and in `Envelope.Cloud`.
+  - A session block in the report of another seat is text, not a launch (`TestAgentRun_ASessionBlockFromAnotherSeatIsNotACloudLaunch`).
+  - `cloudSession` returns a session only when the dispatch had no error. The report of a failed cloud seat is never a launch (`TestAgentRun_AFailedCloudSeatRecordsNoSessionFromAStaleBlock`).
+  - A launched session has no review: its deliverable is a later pull request. `withLaunchVerdict` gives it the verdict PASS and one `info` diagnostic. It skips the section contract of the profile and `reportVerdict` (`TestAgentRun_ALaunchedCloudSeatPassesWithNoReportDerivation`).
+  - A report seat with the same block keeps its report verdict (`TestAgentRun_AReportSeatKeepsTheReportVerdictOfAReportWithASessionBlock`).
+  - Pinned by `TestAgentRun_ACloudSeatReportPutsTheSessionInTheRecordAndTheEnvelope`.
 - **Output.** stdout carries the report text. With `--json` it carries the `Envelope` struct, which is the `data` of the envelope of [cli-contract.md](../cli-contract.md) §2. The envelope also names the driver, the family, the launch record and the worktree. A dispatch error goes to stderr and into `Envelope.Error`. A ledger error and a launch record error go there too.
 - **Signals.** SIGINT and SIGTERM cancel the dispatch context (`signal.NotifyContext`), so the ledger append and the workspace removal still run.
 - **Capabilities** (`capabilities.go`, X17e, [cli-contract.md](../cli-contract.md) §4.2). The verb prints `agentclass.Surface` with no cell. With `--json` the document is the `data` of the envelope `evolve.agent.capabilities/1`. The text form has one line for each verb and ends with `default D`. `caps.dispatch` is the block `isolation.dispatch_requests` of the policy of `--project-root`, with its defaults ([llm-isolation.md](../llm-isolation.md) §7.2.1). A stray word or an unknown flag is exit 10.

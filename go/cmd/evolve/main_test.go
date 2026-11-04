@@ -21,6 +21,11 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	restore, err := gittest.IsolateHostCredentials()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "TestMain: isolate host credentials: %v\n", err)
+		os.Exit(1)
+	}
 	for _, name := range ipcenv.CellMarkers() {
 		if err := os.Unsetenv(name); err != nil {
 			fmt.Fprintf(os.Stderr, "TestMain: unset %s: %v\n", name, err)
@@ -96,6 +101,9 @@ func TestMain(m *testing.M) {
 	}
 	if err := gittest.RemoveTemplates(); err != nil {
 		fmt.Fprintf(os.Stderr, "TestMain: remove git templates: %v\n", err)
+	}
+	if err := restore(); err != nil {
+		fmt.Fprintf(os.Stderr, "TestMain: restore host credentials: %v\n", err)
 	}
 	os.Exit(code)
 }

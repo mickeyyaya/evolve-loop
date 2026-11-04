@@ -113,3 +113,58 @@ func TestStartOf_AnUnusedPidIsESRCH(t *testing.T) {
 		t.Errorf("StartOf(MaxInt32) = %q, %v, want ESRCH", got, err)
 	}
 }
+
+func TestStartTimeVia_IsThePStarttimeOfTheAskedPid(t *testing.T) {
+	t.Parallel()
+	f := &fakeKinfo{raw: kinfoWithStart(1760011223, 4567)}
+
+	got, err := startTimeVia(f.call, 4242)
+
+	want := time.Unix(1760011223, 4567000)
+	if err != nil || !got.Equal(want) {
+		t.Errorf("startTimeVia = %v, %v, want %v", got, err, want)
+	}
+	if len(f.mibs) != 1 || !slices.Equal(f.mibs[0], []int32{ctlKern, kernProc, kernProcPID, 4242}) {
+		t.Errorf("sysctl mibs = %v, want one KERN_PROC_PID read for pid 4242", f.mibs)
+	}
+}
+
+func TestStartTimeVia_AGonePidIsESRCH(t *testing.T) {
+	t.Parallel()
+	f := &fakeKinfo{}
+
+	got, err := startTimeVia(f.call, 4242)
+
+	if !errors.Is(err, syscall.ESRCH) || !got.IsZero() {
+		t.Errorf("startTimeVia = %v, %v, want ESRCH and a zero time", got, err)
+	}
+}
+
+func TestStartTimeVia_AKernelErrorIsReturned(t *testing.T) {
+	t.Parallel()
+	f := &fakeKinfo{err: syscall.EPERM, raw: kinfoWithStart(1, 1)}
+
+	got, err := startTimeVia(f.call, 4242)
+
+	if !errors.Is(err, syscall.EPERM) || !got.IsZero() {
+		t.Errorf("startTimeVia = %v, %v, want EPERM and a zero time", got, err)
+	}
+}
+
+func TestStartTime_ThisProcessStartedWithinTheLastHour(t *testing.T) {
+	t.Parallel()
+	got, err := StartTime(os.Getpid())
+
+	if err != nil || got.After(time.Now()) || time.Since(got) > time.Hour {
+		t.Errorf("StartTime(self) = %v, %v, want a start in the last hour", got, err)
+	}
+}
+
+func TestStartTime_AnUnusedPidIsESRCH(t *testing.T) {
+	t.Parallel()
+	got, err := StartTime(math.MaxInt32)
+
+	if !errors.Is(err, syscall.ESRCH) || !got.IsZero() {
+		t.Errorf("StartTime(MaxInt32) = %v, %v, want ESRCH and a zero time", got, err)
+	}
+}

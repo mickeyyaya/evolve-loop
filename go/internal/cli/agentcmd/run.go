@@ -12,13 +12,16 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cli/phasecmd"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cloudlaunch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/launchrecord"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmcalls"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/specrunner"
@@ -52,6 +55,7 @@ type Envelope struct {
 	LaunchRecord string                   `json:"launch_record,omitempty"`
 	Worktree     string                   `json:"worktree,omitempty"`
 	Workspace    string                   `json:"workspace,omitempty"`
+	Cloud        *cloudlaunch.Session     `json:"cloud,omitempty"`
 	Error        string                   `json:"error,omitempty"`
 }
 
@@ -87,6 +91,7 @@ type launchOutcome struct {
 	verdict    string
 	findings   reportdoc.SeverityCounts
 	writer     bool
+	cloudSeat  bool
 	treeBefore string
 	treeAfter  string
 }
@@ -156,7 +161,7 @@ func (c command) run(args []string, stdin io.Reader, stdout, stderr io.Writer) i
 		return refuse(err, stderr)
 	}
 	now := c.deps.Now()
-	r.label = runLabel(r.spec.Name, now)
+	r.label = freshLabel(r.spec.Name, r.root, now)
 	r.workspace = filepath.Join(paths.EvolveDirOf(r.root), runsSubpath, r.label)
 	if err := stageWorkspace(r, r.input); err != nil {
 		fmt.Fprintf(stderr, "evolve agent run: create the run workspace: %v\n", err)
@@ -170,10 +175,34 @@ func (c command) run(args []string, stdin io.Reader, stdout, stderr io.Writer) i
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	out := c.launch(ctx, r, signals, stderr)
+	keepLLMCalls(r, stderr)
 	recordPath, recordErr := writeLaunchRecord(r, out, now)
 	recordErr = errors.Join(appendLedger(r, out, now), recordErr)
 	emit(o, r, out, recordPath, errors.Join(out.runErr, recordErr), stdout)
 	return finish(out.resp, out.runErr, recordErr, stderr)
+}
+
+func keepLLMCalls(r standaloneRun, stderr io.Writer) {
+	res, err := importLLMCalls(r)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve agent run: keep the %s rows: %v\n", llmcalls.Filename, err)
+		return
+	}
+	if res.Skipped > 0 {
+		fmt.Fprintf(stderr, "evolve agent run: %s: skipped %d malformed row(s)\n", llmcalls.Filename, res.Skipped)
+	}
+}
+
+func importLLMCalls(r standaloneRun) (llmcalls.ImportResult, error) {
+	source := llmcalls.Path(r.workspace)
+	if _, err := os.Stat(source); errors.Is(err, os.ErrNotExist) {
+		return llmcalls.ImportResult{}, nil
+	}
+	dir := filepath.Join(paths.EvolveDirOf(r.root), launchrecord.Subdir)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return llmcalls.ImportResult{}, err
+	}
+	return llmcalls.ImportTagged(filepath.Join(dir, llmcalls.Filename), source, r.label, r.spec.Name)
 }
 
 func (c command) launch(ctx context.Context, r standaloneRun, signals *signalcenter.Center, stderr io.Writer) launchOutcome {
@@ -184,7 +213,12 @@ func (c command) launch(ctx context.Context, r standaloneRun, signals *signalcen
 	out.report, out.hasReport = readReport(r)
 	out.cli, out.model, out.family = spy.cli, spy.model, llmroute.Family(spy.cli)
 	out.writer = len(r.writable) > 0
-	if out.runErr == nil {
+	out.cloudSeat = c.deps.CloudSeat(out.cli)
+	switch {
+	case out.runErr != nil:
+	case out.cloudSession() != nil:
+		out = out.withLaunchVerdict()
+	default:
 		out = out.withReportVerdict(r, signals)
 	}
 	return out
@@ -219,6 +253,19 @@ func refuse(err error, stderr io.Writer) int {
 func runLabel(profile string, now time.Time) string {
 	suffix := (now.Nanosecond() ^ os.Getpid()) & 0xffff
 	return fmt.Sprintf("agent-%s-%s-%04x", profile, now.UTC().Format("20060102T150405Z"), suffix)
+}
+
+var (
+	labelMu    sync.Mutex
+	labelIssue = map[string]int{}
+)
+
+func freshLabel(profile, root string, now time.Time) string {
+	labelMu.Lock()
+	defer labelMu.Unlock()
+	n := labelIssue[root]
+	labelIssue[root] = n + 1
+	return runLabel(profile, now.Add(time.Duration(n)))
 }
 
 func stageWorkspace(r standaloneRun, input string) error {
@@ -269,6 +316,17 @@ func (out launchOutcome) reportSHA() string {
 	return hex.EncodeToString(sum[:])
 }
 
+func (out launchOutcome) cloudSession() *cloudlaunch.Session {
+	if !out.cloudSeat || out.runErr != nil {
+		return nil
+	}
+	s, launched := cloudlaunch.Parse(out.report)
+	if !launched {
+		return nil
+	}
+	return &s
+}
+
 func (out launchOutcome) launchedModel() string {
 	if out.resp.ResolvedModel != "" {
 		return out.resp.ResolvedModel
@@ -292,7 +350,7 @@ func writeLaunchRecord(r standaloneRun, out launchOutcome, now time.Time) (strin
 	rec := launchrecord.Record{
 		RunID: r.label, Profile: r.spec.Name, CLI: out.cli, Family: out.family, Model: out.launchedModel(),
 		Verdict: out.verdict, WritesSource: out.writer, TreeBefore: out.treeBefore, TreeAfter: out.treeAfter, ArtifactSHA256: out.reportSHA(),
-		Worktree: r.worktree, TS: now.UTC().Format(time.RFC3339),
+		Worktree: r.worktree, TS: now.UTC().Format(time.RFC3339), Cloud: out.cloudSession(),
 	}
 	path, err := launchrecord.Write(paths.EvolveDirOf(r.root), rec)
 	if err != nil {
@@ -311,7 +369,7 @@ func emit(o runOptions, r standaloneRun, out launchOutcome, recordPath string, f
 		Profile: r.spec.Name, RunLabel: r.label, Verdict: resp.Verdict, Findings: out.findings, Report: out.report,
 		Model: out.launchedModel(), ModelSource: resp.ModelSource, CostUSD: resp.CostUSD, Tokens: resp.Tokens,
 		DurationMS: resp.DurationMS, Diagnostics: resp.Diagnostics,
-		CLI: out.cli, Family: out.family, LaunchRecord: recordPath, Worktree: r.worktree,
+		CLI: out.cli, Family: out.family, LaunchRecord: recordPath, Worktree: r.worktree, Cloud: out.cloudSession(),
 	}
 	if o.keep {
 		env.Workspace = r.workspace

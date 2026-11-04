@@ -8,13 +8,13 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cli/opscmd"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/proctree"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wave"
@@ -25,7 +25,6 @@ const (
 	waveBuildVerb       = "wave-build"
 	waveWatchPoll       = 5 * time.Second
 	waveStatusMaxCycles = 20
-	psStartLayout       = "Mon Jan 2 15:04:05 2006"
 	waveUsage           = `usage: evolve wave next [--max-cycles N] [--merge n,...] [--note TEXT]... [--number N] [--dry-run] [--json] [--project-root P]
        evolve wave status [--json] [--project-root P]
        evolve wave supply [--json] [--project-root P]
@@ -130,13 +129,7 @@ func waveOwnsPID(env waveEnv, rec wave.Record) (bool, string) {
 }
 
 func processStartTime(pid int) (time.Time, bool) {
-	var out strings.Builder
-	env := append(os.Environ(), "LC_ALL=C")
-	rc, err := sysexec.DefaultRunner(context.Background(), "ps", "", []string{"-o", "lstart=", "-p", strconv.Itoa(pid)}, env, nil, &out, io.Discard)
-	if err != nil || rc != 0 {
-		return time.Time{}, false
-	}
-	at, err := time.ParseInLocation(psStartLayout, strings.Join(strings.Fields(out.String()), " "), time.Local)
+	at, err := proctree.StartTime(pid)
 	return at, err == nil
 }
 

@@ -3,6 +3,7 @@
 package modelquery
 
 import (
+	"bytes"
 	"context"
 	"os/exec"
 	"slices"
@@ -10,7 +11,20 @@ import (
 	"time"
 )
 
+func useExecLauncher(t *testing.T) {
+	t.Helper()
+	UseLauncher(func(ctx context.Context, name string, args []string, stdin string) (string, error) {
+		cmd := exec.CommandContext(ctx, name, args...)
+		var out bytes.Buffer
+		cmd.Stdout, cmd.Stderr = &out, &out
+		err := cmd.Run()
+		return out.String(), err
+	})
+	t.Cleanup(func() { UseLauncher(nil) })
+}
+
 func TestLive_HelpEffortLadders(t *testing.T) {
+	useExecLauncher(t)
 	for _, tc := range []struct {
 		cli      string
 		mustHave []string
@@ -45,6 +59,7 @@ func TestLive_CodexStillHidesItsLadderFromHelp(t *testing.T) {
 	if _, err := exec.LookPath("codex"); err != nil {
 		t.Skipf("codex not installed here: %v", err)
 	}
+	useExecLauncher(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -61,6 +76,7 @@ func TestLive_DiscoveredLadderReachesTheCatalog(t *testing.T) {
 	if _, err := exec.LookPath("claude"); err != nil {
 		t.Skipf("claude not installed here: %v", err)
 	}
+	useExecLauncher(t)
 	cat, err := Refresh(context.Background(), RefreshDeps{
 		CLIs:          []string{"claude"},
 		Lister:        fakeLister{ids: map[string][]string{"claude": {"haiku", "sonnet", "opus"}}},

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/usageprobe"
 )
@@ -27,6 +28,10 @@ const (
 
 var ErrBootTimeout = errors.New("the REPL never drew its prompt")
 
+const DefaultBoundaryBudget = 20 * time.Minute
+
+var errBoundaryBudget = errors.New("the boundary budget was spent")
+
 const noUpdaterDetail = "the family manifest declares no update_argv"
 
 type Family struct {
@@ -42,6 +47,7 @@ type Seams struct {
 	Run      func(ctx context.Context, f Family) error
 	Smoke    func(ctx context.Context, family string) error
 	Explain  func(ctx context.Context, family string) usageprobe.Evidence
+	Budget   time.Duration
 }
 
 type Result struct {
@@ -74,6 +80,12 @@ func Plan(families []Family) Report {
 
 func Update(ctx context.Context, families []Family, s Seams, history []Record) Report {
 	rep := Report{Results: make([]Result, 0, len(families))}
+	budget := s.Budget
+	if budget <= 0 {
+		budget = DefaultBoundaryBudget
+	}
+	ctx, cancel := context.WithTimeoutCause(ctx, budget, errBoundaryBudget)
+	defer cancel()
 	for _, f := range families {
 		rep.Results = append(rep.Results, updateOne(ctx, f, s, lastSeen(history, f.Name)))
 	}
@@ -213,6 +225,9 @@ func (r Result) failedSmoke(ctx context.Context, s Seams, notes []string, err er
 }
 
 func (r Result) interrupted(ctx context.Context) Result {
+	if errors.Is(context.Cause(ctx), errBoundaryBudget) {
+		return r.with(StatusSkipped, "the boundary budget was spent before this step finished; the next boundary smoke-tests the unrecorded version")
+	}
 	return r.with(StatusSkipped, "interrupted: "+ctx.Err().Error())
 }
 

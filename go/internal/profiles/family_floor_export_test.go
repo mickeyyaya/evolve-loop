@@ -29,7 +29,7 @@ func TestProfile_CrossFamilyWithDecodes(t *testing.T) {
 }
 
 func TestBaseCLI_StripsDriverSuffixesRepeatedly(t *testing.T) {
-	for in, want := range map[string]string{"claude-tmux": "claude", " agy-tmux ": "agy", "claude-p": "claude", "codex": "codex", "x-p-tmux": "x", "all": "all"} {
+	for in, want := range map[string]string{"claude-tmux": "claude", " agy-tmux ": "agy", "claude-p": "claude", "claude-cloud": "claude", "codex": "codex", "x-p-tmux": "x", "all": "all"} {
 		if got := BaseCLI(in); got != want {
 			t.Errorf("BaseCLI(%q) = %q, want %q", in, got, want)
 		}

@@ -34,6 +34,7 @@ var bridgeLaunchAPI = []string{"LaunchLLM", "launchSwept", "launchPane", "launch
 var bridgeDriverLaunchFuncs = []string{
 	"driver_agy.go:agyDriver.Launch", "driver_agytmux.go:agyTmuxLaunch", "driver_claudep.go:claudePDriver.Launch",
 	"driver_claudetmux.go:claudeTmuxDriver.Launch", "driver_codex.go:codexDriver.Launch", "driver_codextmux.go:codexTmuxDriver.Launch",
+	"driver_claudecloud.go:cloudLaunch.command",
 }
 
 var shellPrograms = []string{"sh", "bash", "zsh", "dash", "tmux"}

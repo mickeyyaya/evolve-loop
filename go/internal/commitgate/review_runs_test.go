@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/cloudlaunch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/launchrecord"
 )
 
@@ -106,6 +107,8 @@ func TestRun_ABridgeRunThatCannotAttestIsDenied(t *testing.T) {
 	skipped.Verdict = "SKIPPED"
 	noReport := reviewRun("r-go", "go-reviewer")
 	noReport.Verdict, noReport.ArtifactSHA256 = "WARN", ""
+	cloud := reviewRun("r-go", "code-reviewer")
+	cloud.CLI, cloud.Cloud = "claude-cloud", &cloudlaunch.Session{ID: "session_01AbC9"}
 	cases := []struct {
 		name   string
 		record *launchrecord.Record
@@ -121,6 +124,7 @@ func TestRun_ABridgeRunThatCannotAttestIsDenied(t *testing.T) {
 		{"a writer run", &writer, "run:r-go", "a writer"},
 		{"a SKIPPED review", &skipped, "run:r-go", "not PASS or WARN"},
 		{"a WARN review with no report", &noReport, "run:r-go", "no report"},
+		{"a launched cloud session", &cloud, "run:r-go", "launched a cloud session"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

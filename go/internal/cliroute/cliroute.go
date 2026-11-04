@@ -41,15 +41,16 @@ type ProfileSource interface {
 }
 
 type Host struct {
-	LookPath  func(string) (string, error)
-	Discover  func() []string
-	Bench     func(projectRoot, phase string, plan llmroute.Plan) llmroute.Plan
-	Toolless  func(driver string) bool
-	Logf      func(format string, args ...any)
-	WeekUsed  func(projectRoot string) (map[string]float64, error)
-	LaneTimes func(projectRoot string) ([]lanetime.FamilyLane, error)
-	TierWeek  func(projectRoot, family, tier string) (quotastate.UsageWindow, bool, error)
-	Now       func() time.Time
+	LookPath   func(string) (string, error)
+	Discover   func() []string
+	Bench      func(projectRoot, phase string, plan llmroute.Plan) llmroute.Plan
+	Toolless   func(driver string) bool
+	CloudHosts func(driver string) ([]string, bool)
+	Logf       func(format string, args ...any)
+	WeekUsed   func(projectRoot string) (map[string]float64, error)
+	LaneTimes  func(projectRoot string) ([]lanetime.FamilyLane, error)
+	TierWeek   func(projectRoot, family, tier string) (quotastate.UsageWindow, bool, error)
+	Now        func() time.Time
 }
 
 type Launch string

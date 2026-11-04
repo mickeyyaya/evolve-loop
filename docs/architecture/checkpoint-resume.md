@@ -56,6 +56,45 @@ A resumed lane does not take the project lock. `RunCycle` and `RunCycleFromPhase
 
 Proof: `go/internal/core/lane_resume_test.go`, `go/cmd/evolve/cmd_cycle_lane_resume_test.go`, the lock tests in `go/internal/core/fleet_lock_test.go`, and the wiring test `TestCycleRunRoot_AFleetLaneResumesTheQuotaPausedCycleOfItsTodoAtThePausedPhaseWhileASiblingHoldsTheProjectLock`. The wiring test runs the real `evolve cycle run` root with a paused build while the real project lock is held. Scout does not run, and Build runs at once.
 
+## Resume every paused cycle at once
+
+On 2026-11-03 the operator asked: "resume should take place for all cycles concurrently ... It must be able to support any cycle to resume". `evolve cycle resume` resumes only the newest paused cycle, one at a time. A pause with an unknown reset time sets the auto-resume budget to 0 (`withQuotaReset`). The lane refuses such a resume, starts a fresh cycle, and the paused work is lost.
+
+`evolve cycle resume --all` starts no cycle. It does these steps:
+
+1. `core.PausedLaneScopes` (`go/internal/core/lane_resume_all.go`) lists each lane scope whose newest cycle a lane can resume.
+   - It uses the one rule of `laneResume.adopt`: `laneResumable` and `newestPerScope` in `go/internal/core/lane_resume.go`.
+   - Under that rule, the cycle did not ship and did not end. It holds an enabled quota checkpoint that loads, and no live run holds it.
+   - The list is in cycle order. A read error of the runs directory is an error. The log names each checkpoint that does not load.
+2. `checkpoint.GrantOperatorResume` gives a fresh budget only to an enabled quota checkpoint whose budget is spent.
+   - The attempts become 0, and the maximum becomes at least `DefaultAutoResumeAttempts`.
+   - The operator action and the reset time are cleared. The reset source becomes `operator-grant`.
+   - The reason, the phase and the enabled flag stay.
+   - A checkpoint that still has budget does not change. Thus a second `--all`, or a grant after a lane adopted the cycle, does not reset the count.
+3. The verb prints one line for each cycle (`granted`, `has budget`, `would grant` or `not granted`) and the next step, `evolve wave next`. If the scan fails, the verb exits with `cliExitIO`. If one grant fails, the verb reports it and exits with a non-zero code. The other cycles are still granted.
+
+The budget is 0 for an unknown reset time because no automatic retry can know when the quota returns. Thus the operator must decide. The grant is that decision.
+
+The lane rule does not use the cross-launch staleness rule of the single resume ("a cycle of another launch started or shipped after this checkpoint"). In a wave, the sibling lanes always start and ship after a pause. With that rule, the lane rule refuses each paused lane cycle. `TestPausedLaneScopes_ASiblingLaneThatStartedLaterDoesNotMakeAPausedLaneStale` holds this decision.
+
+The pool then puts each ready paused scope at the head of the backlog (`pausedPlan.order` in `go/cmd/evolve/cmd_loop_pool_paused.go`):
+
+- A scope is ready when `checkpoint.ResumeReady` is true. Its budget is not spent (`checkpoint.BudgetLeft`, the rule of admission). Its known reset time is not in the future.
+- The reset time is an order hint only. A pause that waits for a known reset keeps its triage place. Admission (`RecordResume`) does not check the reset time, so a lane that draws that triage todo still resumes the cycle.
+- The lead todo is the triage todo of the scope, with its files, priority, dependencies and output contract. The pool serializes lanes on their files, so a resumed lane keeps its file claims. A scope that is not in the triage list takes the declared files of its inbox items.
+- The triage todos of the scope do not appear again.
+
+The lanes adopt the scopes through `laneResume.adopt`, and the cycles run at the same time. If the scan fails, the pool writes a warning and keeps the triage order.
+
+Use `evolve cycle resume` for one cycle in the foreground. Use `--all` when several cycles wait.
+
+Two tests guard the concurrent resume (`go/cmd/evolve/cmd_cycle_resume_concurrent_test.go`). They seed four lane cycles that paused on an unknown reset, as cycles 2137, 2138, 2139 and 2141 of wave 151 did:
+
+- `TestResumeAll_WithoutTheGrantEachLaneOfAnUnknownResetWallRefusesItsPausedCycle` proves the gap: with no grant, no lane adopts its paused cycle.
+- `TestResumeAll_EveryPausedCycleResumesConcurrentlyAtItsOwnPhaseAfterOneGrant` runs one `evolve cycle resume --all`, then checks the backlog order (`pausedPlan.order`), then starts the four lane adoptions at the same time. Each lane must adopt its own cycle at its paused phase, spend exactly one resume, and hold its own todo again. `ORCHESTRATOR_LANE_RESUMED` must fire once for each cycle. The test runs with the race detector. It fails without the grant and without the paused-first order. `TestProductionPoolPlanFn_AGrantedPausedLaneLeadsTheRealBacklogWithItsFiles` drives the real `productionPoolPlanFn`, and it fails when the plan does not call `pausedPlan.order`.
+
+The test calls `laneResume.adopt` in goroutines, not `laneResume.run`. `run` sets the state file of the cycle in the process environment, which is safe only because each production lane is its own process. Two lanes that adopt the same scope are not covered here; that case is the run lease (PR #1256).
+
 ## Terminal closeout
 
 Fresh and resumed execution use the same closeout semantics: final outcome reconciliation, lost-landing detection, preservation of salvageable work, carryover, and dossier creation. Terminal replay must not double-count outcomes or delete preserved work before durable state exists. Exhausting a transition bound is a diagnosed failure, not successful completion.

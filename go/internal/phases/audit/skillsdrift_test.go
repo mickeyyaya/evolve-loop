@@ -43,11 +43,11 @@ func TestSkillsCheckOffenders(t *testing.T) {
 }
 
 func TestWorktreeSkillsDrift_RunsTheWorktreeGeneratorCheck(t *testing.T) {
+	t.Parallel()
 	root := filepath.Join(t.TempDir(), "lane")
 	fake := &fixtures.FakeExec{}
-	withFakeRunner(t, fake.Run)
 
-	got, err := worktreeSkillsDrift(context.Background(), root)
+	got, err := worktreeSkillsDrift(context.Background(), root, fake.Run, time.Hour)
 
 	var notice gateWarning
 	if got != nil || !errors.As(err, &notice) || !strings.Contains(notice.Error(), "the host generator could not compare") {
@@ -69,6 +69,7 @@ func TestWorktreeSkillsDrift_RunsTheWorktreeGeneratorCheck(t *testing.T) {
 }
 
 func TestWorktreeSkillsDrift_Outcomes(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name      string
 		resp      fixtures.ExecResponse
@@ -84,9 +85,9 @@ func TestWorktreeSkillsDrift_Outcomes(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			withFakeRunner(t, (&fixtures.FakeExec{Default: tc.resp}).Run)
+			fake := &fixtures.FakeExec{Default: tc.resp}
 
-			got, err := worktreeSkillsDrift(context.Background(), t.TempDir())
+			got, err := worktreeSkillsDrift(context.Background(), t.TempDir(), fake.Run, time.Hour)
 
 			if !reflect.DeepEqual(got, tc.want) {
 				t.Errorf("offenders = %q, want %q", got, tc.want)
@@ -102,17 +103,18 @@ func TestWorktreeSkillsDrift_Outcomes(t *testing.T) {
 }
 
 func TestWorktreeSkillsDrift_BoundsTheRunWithTheGateLimit(t *testing.T) {
+	t.Parallel()
 	var deadline time.Time
 	var hasDeadline bool
-	withFakeRunner(t, func(ctx context.Context, _, _ string, _, _ []string, _ io.Reader, _, _ io.Writer) (int, error) {
+	run := func(ctx context.Context, _, _ string, _, _ []string, _ io.Reader, _, _ io.Writer) (int, error) {
 		deadline, hasDeadline = ctx.Deadline()
 		return 0, nil
-	})
+	}
+	want := ciparitygate.DefaultTimeouts().GoVet
 	start := time.Now()
 
-	worktreeSkillsDrift(context.Background(), t.TempDir())
+	worktreeSkillsDrift(context.Background(), t.TempDir(), run, want)
 
-	want := ciparitygate.DefaultTimeouts().GoVet
 	if !hasDeadline {
 		t.Fatal("the worktree run must carry a deadline")
 	}
@@ -122,15 +124,13 @@ func TestWorktreeSkillsDrift_BoundsTheRunWithTheGateLimit(t *testing.T) {
 }
 
 func TestWorktreeSkillsDrift_ATimeoutCannotGradeAndSaysSo(t *testing.T) {
-	orig := worktreeSkillsCheckLimit
-	worktreeSkillsCheckLimit = 20 * time.Millisecond
-	t.Cleanup(func() { worktreeSkillsCheckLimit = orig })
-	withFakeRunner(t, func(ctx context.Context, _, _ string, _, _ []string, _ io.Reader, _, _ io.Writer) (int, error) {
+	t.Parallel()
+	run := func(ctx context.Context, _, _ string, _, _ []string, _ io.Reader, _, _ io.Writer) (int, error) {
 		<-ctx.Done()
 		return -1, nil
-	})
+	}
 
-	got, err := worktreeSkillsDrift(context.Background(), t.TempDir())
+	got, err := worktreeSkillsDrift(context.Background(), t.TempDir(), run, 20*time.Millisecond)
 
 	if got != nil || err == nil || !strings.Contains(err.Error(), "is NOT graded") || !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("a timed-out worktree run = (%v, %v), want a loud could-not-run error that wraps the deadline", got, err)

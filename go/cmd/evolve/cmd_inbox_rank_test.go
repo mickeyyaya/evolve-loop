@@ -82,8 +82,8 @@ func TestCmd_InboxRank_TableShowsRankScoreBreakdownIDAndTitle(t *testing.T) {
 	if want := append(header, "id", "title"); !slices.Equal(strings.Fields(lines[1]), want) {
 		t.Errorf("header = %q, want the columns %v: the factors in the order the rows print them", lines[1], want)
 	}
-	if fields := strings.Fields(lines[2]); len(fields) < 10 || fields[0] != "1" || fields[1] != "0.3200" || fields[2] != "0.2700" ||
-		fields[3] != "0.0500" || fields[4] != "0.0000" || fields[6] != "0.0000" || fields[8] != "tidy-docs" || !strings.HasSuffix(lines[2], "tidy the docs") {
+	if fields := strings.Fields(lines[2]); len(fields) < 10 || fields[0] != "1" || fields[1] != "0.3700" || fields[2] != "0.2700" ||
+		fields[3] != "0.0500" || fields[4] != "0.0000" || fields[6] != "0.0500" || fields[8] != "tidy-docs" || !strings.HasSuffix(lines[2], "tidy the docs") {
 		t.Errorf("row 1 = %q, want rank, score, the six contributions, id and title", lines[2])
 	}
 	if fields := strings.Fields(lines[3]); len(fields) < 10 || fields[0] != "2" || fields[1] != "0.2800" || fields[3] != "0.0250" ||
@@ -133,15 +133,15 @@ func TestCmd_InboxRank_ExplainPrintsEachFactorsValueWeightAndContribution(t *tes
 	rc, stdout, _ := rankAt(t, "--explain", "console-only")
 
 	want := []string{
-		"console-only: rank 1 of 1 on the console list, score 0.3475",
+		"console-only: rank 1 of 1 on the console list, score 0.3225",
 		"  factor       value  weight  contribution  from",
 		"  base        0.3000  0.4500        0.1350  weight 0.3",
 		"  class       0.8750  0.2000        0.1750  stability, 2 of 8 in class_order",
 		"  unblocks    0.0000  0.1500        0.0000  0 queued item(s) wait on it (cap 3)",
 		"  recurrence  0.0000  0.1000        0.0000  0 recurrence(s) of its failure pattern (cap 5)",
-		"  age         0.7500  0.0500        0.0375  60.0 day(s) since filing (half-life 30 days)",
+		"  freshness   0.2500  0.0500        0.0125  60.0 day(s) since filing (half-life 30 days)",
 		"  goal        0.0000  0.0500        0.0000  no campaign",
-		"  score                             0.3475",
+		"  score                             0.3225",
 	}
 	for _, line := range want {
 		if rc != 0 || !strings.Contains(stdout, line) {

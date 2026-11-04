@@ -27,6 +27,12 @@ type cycleModelRow struct {
 func runCycleModels(args []string, stdout, stderr io.Writer) int {
 	flags := flag.NewFlagSet("evolve cycle models", flag.ContinueOnError)
 	flags.SetOutput(stderr)
+	flags.Usage = func() {
+		fmt.Fprintf(stderr, "Usage of %s:\n", flags.Name())
+		flags.VisitAll(func(f *flag.Flag) {
+			fmt.Fprintf(stderr, "  --%s\n    \t%s\n", f.Name, f.Usage)
+		})
+	}
 	var (
 		projectRoot string
 		evolveDir   string

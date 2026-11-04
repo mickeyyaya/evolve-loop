@@ -34,6 +34,7 @@ const usage = `Usage: evolve agent <subcommand>
       evolve commit-gate run --reviewers run:<run label> attests it.
       --worktree runs the agent in a linked git worktree.
       A writer needs --worktree and one --writable PATH for each file that it can change.
+      A --writable PATH names a file, never a directory: the run refuses a directory.
       The pipeline restores each other file of the worktree after the run.
       A review report that lists a CRITICAL or HIGH finding, or states FAIL, gives the verdict FAIL.
       Exit 0 PASS/WARN/SKIPPED, 1 FAIL, 3 refused, 21 dispatch error, 10 usage, 11 input.
@@ -52,6 +53,7 @@ type Deps struct {
 	Getenv        func(string) string
 	Now           func() time.Time
 	VerbSchema    func(path string) string
+	CloudSeat     func(cli string) bool
 }
 
 func defaultBridge(projectRoot string, _ *signalcenter.Center) core.Bridge {
@@ -84,6 +86,9 @@ func New(d Deps) func(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 	}
 	if d.Now == nil {
 		d.Now = time.Now
+	}
+	if d.CloudSeat == nil {
+		d.CloudSeat = func(string) bool { return false }
 	}
 	if d.VerbSchema == nil {
 		d.VerbSchema = func(string) string { return "" }

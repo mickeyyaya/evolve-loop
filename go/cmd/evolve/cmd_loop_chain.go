@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -16,7 +17,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseintegrity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
-	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
 )
 
@@ -58,11 +58,9 @@ func defaultChainBoundaryFleetLaneActive(cfg loopConfig) (active bool, err error
 }
 
 func defaultChainRebuild(projectRoot string) error {
-	cmd := sysexec.Command(context.Background(), "make", "-C", "go", "build")
-	cmd.Dir = projectRoot
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("make -C go build: %w: %s", err, strings.TrimSpace(string(out)))
+	var out bytes.Buffer
+	if err := defaultBootRefreshRebuild(projectRoot, &out); err != nil {
+		return fmt.Errorf("make -C go build: %w: %s", err, strings.TrimSpace(out.String()))
 	}
 	return nil
 }

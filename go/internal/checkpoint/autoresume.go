@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 )
@@ -32,11 +33,55 @@ func RecordResume(path string, auto bool) (Checkpoint, bool, error) {
 	return cp, admitted, nil
 }
 
+func GrantOperatorResume(path string) (Checkpoint, bool, error) {
+	var cp Checkpoint
+	granted := false
+	err := flock.WithPathLock(path, func() error {
+		existing, err := readBlockAt(path)
+		if err != nil {
+			return err
+		}
+		if !budgetSpent(existing) {
+			cp = existing
+			return nil
+		}
+		cp, granted = grantedBudget(existing), true
+		return applyWithHooks(defaultHooks(), path, cp)
+	})
+	if err != nil {
+		return Checkpoint{}, false, err
+	}
+	return cp, granted, nil
+}
+
+func budgetSpent(cp Checkpoint) bool {
+	return cp.Enabled && cp.Reason == ReasonQuotaLikely && !BudgetLeft(cp.AutoResumeAttempts, cp.AutoResumeMaxAttempts)
+}
+
+func BudgetLeft(attempts, maxAttempts int) bool { return attempts < maxAttempts }
+
+func ResumeReady(attempts, maxAttempts int, resetAt string, now time.Time) bool {
+	if !BudgetLeft(attempts, maxAttempts) {
+		return false
+	}
+	at, err := time.Parse(time.RFC3339, resetAt)
+	return err != nil || !at.After(now)
+}
+
+func grantedBudget(cp Checkpoint) Checkpoint {
+	cp.AutoResumeAttempts, cp.OperatorAction, cp.QuotaResetAt = 0, "", ""
+	cp.QuotaResetSource = operatorGrantSource
+	cp.AutoResumeMaxAttempts = max(cp.AutoResumeMaxAttempts, DefaultAutoResumeAttempts)
+	return cp
+}
+
+const operatorGrantSource = "operator-grant"
+
 func nextResume(cp Checkpoint, auto bool) (Checkpoint, bool) {
 	switch {
 	case !auto:
 		cp.AutoResumeAttempts, cp.OperatorAction = 0, ""
-	case cp.AutoResumeAttempts >= cp.AutoResumeMaxAttempts:
+	case !BudgetLeft(cp.AutoResumeAttempts, cp.AutoResumeMaxAttempts):
 		return withAutoResumeBudget(cp, cp.AutoResumeAttempts), false
 	default:
 		cp.AutoResumeAttempts++

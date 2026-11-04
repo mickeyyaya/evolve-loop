@@ -10,9 +10,13 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 )
 
-const startTicksField = 19
+const (
+	startTicksField     = 19
+	clockTicksPerSecond = 100
+)
 
 var errProcStatMalformed = errors.New("procstart: stat is malformed")
 
@@ -46,4 +50,50 @@ func startTicks(stat string) (string, error) {
 		return "", fmt.Errorf("%w: %q", errProcStatMalformed, stat)
 	}
 	return fields[startTicksField], nil
+}
+
+func readProcStartTime(pid int) (time.Time, error) {
+	return startTimeAt("/proc", pid)
+}
+
+func startTimeAt(root string, pid int) (time.Time, error) {
+	stat, err := os.ReadFile(root + "/" + strconv.Itoa(pid) + "/stat")
+	if errors.Is(err, fs.ErrNotExist) {
+		return time.Time{}, syscall.ESRCH
+	}
+	if err != nil {
+		return time.Time{}, err
+	}
+	field, err := startTicks(string(stat))
+	if err != nil {
+		return time.Time{}, err
+	}
+	ticks, err := strconv.ParseInt(field, 10, 64)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("%w: %w", errProcStatMalformed, err)
+	}
+	boot, err := bootTime(root)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return boot.Add(time.Duration(ticks) * time.Second / clockTicksPerSecond), nil
+}
+
+func bootTime(root string) (time.Time, error) {
+	body, err := os.ReadFile(root + "/stat")
+	if err != nil {
+		return time.Time{}, err
+	}
+	for _, line := range strings.Split(string(body), "\n") {
+		value, found := strings.CutPrefix(line, "btime ")
+		if !found {
+			continue
+		}
+		sec, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
+		if err != nil {
+			return time.Time{}, fmt.Errorf("%w: btime: %w", errProcStatMalformed, err)
+		}
+		return time.Unix(sec, 0), nil
+	}
+	return time.Time{}, fmt.Errorf("%w: no btime line", errProcStatMalformed)
 }

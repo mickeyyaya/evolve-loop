@@ -32,6 +32,33 @@ func TestItem_FiledAt(t *testing.T) {
 	}
 }
 
+func TestItem_VerifiedAt(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		item Item
+		want string
+	}{
+		{"empty verified_at is zero", Item{}, ""},
+		{"object verified_at is zero", Item{PremiseVerifiedAt: []byte(`{"note":1}`)}, ""},
+		{"empty string verified_at is zero", Item{PremiseVerifiedAt: []byte(`""`)}, ""},
+		{"valid RFC3339 verified_at", Item{PremiseVerifiedAt: []byte(`"2026-09-30T10:00:00Z"`)}, "2026-09-30T10:00:00Z"},
+		{"unparseable verified_at is zero", Item{PremiseVerifiedAt: []byte(`"yesterday"`)}, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.item.VerifiedAt()
+			if tc.want == "" {
+				if !got.IsZero() {
+					t.Fatalf("VerifiedAt = %v, want zero", got)
+				}
+				return
+			}
+			if s := got.UTC().Format("2006-01-02T15:04:05Z"); s != tc.want {
+				t.Fatalf("VerifiedAt = %s, want %s", s, tc.want)
+			}
+		})
+	}
+}
+
 func TestItem_DeclaredPaths(t *testing.T) {
 	it := Item{Files: []string{"go/internal/ship/consume.go (gate condition)", "go/internal/x.go:178", "N/A", "role.go", "go/internal/inboxbatch/"}}
 	want := []string{"go/internal/ship/consume.go", "go/internal/x.go", "go/internal/inboxbatch/"}

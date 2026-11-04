@@ -34,13 +34,18 @@ type modelCheckLaunch struct {
 
 func launchAgyClaudeOver(t *testing.T, frames []string) modelCheckLaunch {
 	t.Helper()
-	d, ok := LookupDriver("agy-claude-tmux")
+	return launchTargetOver(t, "agy-claude-tmux", "deep", frames)
+}
+
+func launchTargetOver(t *testing.T, cli, tier string, frames []string) modelCheckLaunch {
+	t.Helper()
+	d, ok := LookupDriver(cli)
 	if !ok {
-		t.Fatal("agy-claude-tmux is not a registered driver")
+		t.Fatalf("%s is not a registered driver", cli)
 	}
 	cfg := fixtureConfig(t)
 	cfg.AllowBypass, cfg.Agent, cfg.Cycle = true, "auditor", 7
-	cfg.Realization = RealizeFor("agy-claude-tmux", LaunchIntent{ModelTier: "deep", Permission: "bypass"})
+	cfg.Realization = RealizeFor(cli, LaunchIntent{ModelTier: tier, Permission: "bypass"})
 	center := signalcenter.New()
 	tm := &artifactOnPasteTmux{FakeTmuxController: &FakeTmuxController{CaptureFrames: frames}, artifact: cfg.Artifact}
 	var stderr bytes.Buffer
@@ -174,8 +179,8 @@ func TestLaunchModelCheckFor_ReadsTheRuleFromTheResolvedManifest(t *testing.T) {
 		t.Fatalf("agy-claude-tmux check %+v: want the claude family, the base's label regex and a positive wait", check)
 	}
 	plain, err := launchModelCheckFor("agy-tmux")
-	if err != nil || plain.enabled() {
-		t.Fatalf("agy-tmux check %+v (%v): the base declares no rule, so its Gemini seats are not checked", plain, err)
+	if err != nil || plain.family != "gemini" || !plain.enabled() {
+		t.Fatalf("agy-tmux check %+v (%v): the base declares the gemini rule, so its Gemini seats are checked", plain, err)
 	}
 	if _, err := launchModelCheckFor("no-such-cli"); err == nil {
 		t.Fatal("an unknown target must fail loudly, never read as unchecked")
@@ -184,7 +189,7 @@ func TestLaunchModelCheckFor_ReadsTheRuleFromTheResolvedManifest(t *testing.T) {
 
 func TestVerifiesLaunchModel_IsTheTargetDriversOwnCheck(t *testing.T) {
 	t.Parallel()
-	for cli, want := range map[string]bool{"agy-claude-tmux": true, "agy-tmux": false, "claude-tmux": false} {
+	for cli, want := range map[string]bool{"agy-claude-tmux": true, "agy-tmux": true, "claude-tmux": false} {
 		got, err := VerifiesLaunchModel(cli)
 		if err != nil || got != want {
 			t.Errorf("VerifiesLaunchModel(%s) = (%v, %v), want %v", cli, got, err, want)
@@ -235,7 +240,7 @@ func TestParseManifest_RefusesALaunchModelRuleItCannotRun(t *testing.T) {
 
 func TestLaunchModelCheckFor_AnOperatorOverrideThatDropsTheRuleTurnsTheCheckOff(t *testing.T) {
 	dir := t.TempDir()
-	writeManifestFile(t, dir, "agy-claude-tmux", `{"cli":"agy-claude-tmux","base":"agy-tmux","model_family":"claude"}`)
+	writeManifestFile(t, dir, "agy-claude-tmux", `{"cli":"agy-claude-tmux","base":"agy-tmux","model_family":"claude","launch_model_verification":null}`)
 	useBridgeManifestDir(t, dir)
 
 	check, err := launchModelCheckFor("agy-claude-tmux")

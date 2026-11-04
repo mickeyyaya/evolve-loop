@@ -55,7 +55,7 @@ func (e *Engine) clearArtifact(req core.BridgeRequest) {
 	}
 }
 
-var familyModelWords = map[string][]string{"claude": {"claude", "opus", "sonnet", "haiku"}}
+var familyModelWords = map[string][]string{"claude": {"claude", "fable", "opus", "sonnet", "haiku"}}
 
 func isFamilyModel(family, model string) bool {
 	lower := strings.ToLower(model)

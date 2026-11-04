@@ -78,7 +78,7 @@ func termSource(f inboxrank.Factor, doc explainedItemDoc, cfg policy.InboxPriori
 		return fmt.Sprintf("%d queued item(s) wait on it (cap %d)", facts.Unblocks, cfg.UnblocksCap)
 	case inboxrank.FactorRecurrence:
 		return fmt.Sprintf("%d recurrence(s) of its failure pattern (cap %d)", facts.Recurrence, cfg.RecurrenceCap)
-	case inboxrank.FactorAge:
+	case inboxrank.FactorFreshness:
 		if !facts.Dated {
 			return "no filing date"
 		}

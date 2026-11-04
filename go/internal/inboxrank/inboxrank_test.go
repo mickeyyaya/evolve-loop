@@ -18,6 +18,26 @@ import (
 
 var rankNow = time.Date(2026, 10, 6, 0, 0, 0, 0, time.UTC)
 
+func filedItem(t *testing.T, id, created, verified string) inboxbatch.Item {
+	t.Helper()
+	doc := map[string]any{"id": id, "weight": 0.5, "priority_class": "stability"}
+	if created != "" {
+		doc["created_at"] = created
+	}
+	if verified != "" {
+		doc["premise_verified_at"] = verified
+	}
+	raw, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var it inboxbatch.Item
+	if err := json.Unmarshal(raw, &it); err != nil {
+		t.Fatal(err)
+	}
+	return it
+}
+
 func defaults() policy.InboxPriorityConfig { return policy.Policy{}.InboxPriorityConfig() }
 
 func item(id string, edits ...func(*inboxbatch.Item)) inboxbatch.Item {
@@ -135,12 +155,68 @@ func TestOrder_UnblocksCountsEachDependentOnceAndSurvivesADependencyCycle(t *tes
 	}
 }
 
-func TestOrder_AnOldItemRisesOverAnIdenticalNewOne(t *testing.T) {
-	items := []inboxbatch.Item{item("a-new", filed("2026-10-05")), item("b-old", filed("2026-07-08"))}
+func TestRank_AnUnverifiedItemOlderThanTheWindowRanksBelowAFreshOne(t *testing.T) {
+	items := []inboxbatch.Item{
+		filedItem(t, "a-old", "2026-07-08", ""),
+		filedItem(t, "b-fresh", "2026-10-05", ""),
+	}
 
 	ranked := inboxrank.Order(items, defaults(), ctxFor(items...))
 
-	assertFirst(t, ranked, "b-old", "a-new")
+	assertFirst(t, ranked, "b-fresh", "a-old")
+}
+
+func TestRank_APremiseVerifiedInsideTheWindowKeepsAnOldItemFresh(t *testing.T) {
+	items := []inboxbatch.Item{
+		filedItem(t, "a-unverified", "2026-07-08", ""),
+		filedItem(t, "b-verified", "2026-07-08", "2026-10-05T00:00:00Z"),
+	}
+
+	ranked := inboxrank.Order(items, defaults(), ctxFor(items...))
+
+	assertFirst(t, ranked, "b-verified", "a-unverified")
+}
+
+func TestRank_FreshnessHalvesEachWindowFromTheVerificationOrElseTheFiling(t *testing.T) {
+	cases := []struct {
+		name     string
+		filed    string
+		verified string
+		want     float64
+	}{
+		{"filed today is fully fresh", "2026-10-06", "", 1},
+		{"one window since filing is one half", "2026-09-06", "", 0.5},
+		{"two windows since filing is one quarter", "2026-08-07", "", 0.25},
+		{"a verification today restores an old filing", "2026-07-08", "2026-10-06T00:00:00Z", 1},
+		{"the verification date, not the filing, sets the age", "2026-07-08", "2026-09-06T00:00:00Z", 0.5},
+		{"a future filing is fully fresh", "2026-11-01", "", 1},
+		{"an undated unverified item has no freshness", "", "", 0},
+		{"a verification dates an undated item", "", "2026-10-06T00:00:00Z", 1},
+		{"an unreadable stamp falls back to the filing", "2026-09-06", "yesterday", 0.5},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			it := filedItem(t, "x", tc.filed, tc.verified)
+
+			got := termValue(inboxrank.Score(it, defaults(), ctxFor(it)), inboxrank.FactorFreshness)
+
+			if got != tc.want {
+				t.Errorf("freshness = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestFactors_NameFreshnessInPlaceOfAge(t *testing.T) {
+	var names []string
+	for _, f := range inboxrank.Factors() {
+		names = append(names, string(f))
+	}
+
+	want := []string{"base", "class", "unblocks", "recurrence", "freshness", "goal"}
+	if !slices.Equal(names, want) {
+		t.Errorf("factors = %v, want %v", names, want)
+	}
 }
 
 func TestOrder_AnActiveCampaignMemberRises(t *testing.T) {
@@ -292,7 +368,7 @@ func TestScore_ContributionsAddUpToTheScore(t *testing.T) {
 }
 
 func TestFactors_ListsEveryFactorOnceInScoreOrder(t *testing.T) {
-	want := []inboxrank.Factor{inboxrank.FactorBase, inboxrank.FactorClass, inboxrank.FactorUnblocks, inboxrank.FactorRecurrence, inboxrank.FactorAge, inboxrank.FactorGoal}
+	want := []inboxrank.Factor{inboxrank.FactorBase, inboxrank.FactorClass, inboxrank.FactorUnblocks, inboxrank.FactorRecurrence, inboxrank.FactorFreshness, inboxrank.FactorGoal}
 
 	got := inboxrank.Factors()
 	got[0] = "mutated"
@@ -392,10 +468,10 @@ func TestScore_NormalizesEveryFeatureIntoTheUnitInterval(t *testing.T) {
 		{"no class is zero", item("n", class("")), inboxrank.FactorClass, 0},
 		{"unblocks beyond the cap is one", queue[0], inboxrank.FactorUnblocks, 1},
 		{"recurrence beyond the cap is one", queue[0], inboxrank.FactorRecurrence, 1},
-		{"one half-life of age is one half", item("o", filed("2026-09-06")), inboxrank.FactorAge, 0.5},
-		{"filed today has no age", item("t", filed("2026-10-06")), inboxrank.FactorAge, 0},
-		{"a future filing has no age", item("f", filed("2026-11-01")), inboxrank.FactorAge, 0},
-		{"an undated item has no age", item("d", filed("")), inboxrank.FactorAge, 0},
+		{"one half-life of age is one half", item("o", filed("2026-09-06")), inboxrank.FactorFreshness, 0.5},
+		{"filed today is fully fresh", item("t", filed("2026-10-06")), inboxrank.FactorFreshness, 1},
+		{"a future filing is fully fresh", item("f", filed("2026-11-01")), inboxrank.FactorFreshness, 1},
+		{"an undated item has no freshness", item("d", filed("")), inboxrank.FactorFreshness, 0},
 		{"no campaign is not a goal", item("g", campaign("")), inboxrank.FactorGoal, 0},
 	}
 	for _, tc := range cases {

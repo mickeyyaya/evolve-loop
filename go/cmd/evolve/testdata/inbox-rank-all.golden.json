@@ -11,7 +11,7 @@
      "path": ".evolve/inbox/2026-10-06T00-00-00Z-tidy-docs.json",
      "weight": 0.6,
      "declared": false,
-     "score": 0.32,
+     "score": 0.37,
      "terms": [
       {
        "factor": "base",
@@ -38,10 +38,10 @@
        "contribution": 0
       },
       {
-       "factor": "age",
-       "value": 0,
+       "factor": "freshness",
+       "value": 1,
        "weight": 0.05,
-       "contribution": 0
+       "contribution": 0.05
       },
       {
        "factor": "goal",
@@ -94,7 +94,7 @@
        "contribution": 0
       },
       {
-       "factor": "age",
+       "factor": "freshness",
        "value": 0.5,
        "weight": 0.05,
        "contribution": 0.025
@@ -128,7 +128,7 @@
      "path": ".evolve/inbox/2026-08-07T00-00-00Z-console-only.json",
      "weight": 0.3,
      "declared": false,
-     "score": 0.34750000000000003,
+     "score": 0.32250000000000006,
      "terms": [
       {
        "factor": "base",
@@ -155,10 +155,10 @@
        "contribution": 0
       },
       {
-       "factor": "age",
-       "value": 0.75,
+       "factor": "freshness",
+       "value": 0.25,
        "weight": 0.05,
-       "contribution": 0.037500000000000006
+       "contribution": 0.0125
       },
       {
        "factor": "goal",
@@ -189,7 +189,7 @@
      "path": ".evolve/inbox/2026-10-06T00-00-00Z-after-sec.json",
      "weight": 0.5,
      "declared": false,
-     "score": 0.325,
+     "score": 0.375,
      "terms": [
       {
        "factor": "base",
@@ -216,10 +216,10 @@
        "contribution": 0
       },
       {
-       "factor": "age",
-       "value": 0,
+       "factor": "freshness",
+       "value": 1,
        "weight": 0.05,
-       "contribution": 0
+       "contribution": 0.05
       },
       {
        "factor": "goal",
