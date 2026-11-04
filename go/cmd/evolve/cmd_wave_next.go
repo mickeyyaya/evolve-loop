@@ -161,7 +161,7 @@ func prepareWave(env waveEnv, a waveNextArgs, stderr io.Writer) (wavePlan, error
 	if err := checkWaveIdle(env, &plan); err != nil {
 		return plan, err
 	}
-	if err := checkWaveDisk(env, &plan); err != nil {
+	if err := checkWaveDisk(env, &plan, stderr); err != nil {
 		return plan, err
 	}
 	if !a.dryRun {
@@ -204,8 +204,8 @@ func checkWaveIdle(env waveEnv, plan *wavePlan) error {
 	return nil
 }
 
-func checkWaveDisk(env waveEnv, plan *wavePlan) error {
-	pol, _ := policy.Load(filepath.Join(plan.plane.evolveDir, "policy.json"))
+func checkWaveDisk(env waveEnv, plan *wavePlan, stderr io.Writer) error {
+	pol := policy.LoadOrDefaults(filepath.Join(plan.plane.evolveDir, "policy.json"), stderr)
 	check := looppreflight.CheckDiskSpace(plan.plane.evolveDir, pol.PreflightConfig().MinFreeBytes(), env.diskFree)
 	if check.Level == looppreflight.LevelPass {
 		return nil

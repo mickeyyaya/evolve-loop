@@ -2,9 +2,15 @@ package main
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
 func TestWaveNext_RefusesBelowTheFreeSpaceFloorBeforeAnyStep(t *testing.T) {
@@ -69,5 +75,48 @@ func TestWaveNext_ADryRunAndAnUnmeasurableDiskWarnInsteadOfRefusing(t *testing.T
 				t.Errorf("rc = %d envelope = %+v; want no refusal and a warning naming %q", rc, e, c.want)
 			}
 		})
+	}
+}
+
+func TestDefaultWaveEnv_MeasuresTheRealDisk(t *testing.T) {
+	t.Parallel()
+	got := defaultWaveEnv().diskFree
+
+	if got == nil || reflect.ValueOf(got).Pointer() != reflect.ValueOf(looppreflight.DiskFreeBytes).Pointer() {
+		t.Fatal("the production wave env must measure through looppreflight.DiskFreeBytes")
+	}
+}
+
+func TestWaveNext_ALiveLoopOutranksALowDisk(t *testing.T) {
+	t.Parallel()
+	p := newWavePlane(t)
+	runDir := filepath.Join(p.evolveDir(), "runs", "cycle-1837")
+	_ = os.MkdirAll(runDir, 0o755)
+	_ = runlease.Write(runDir, runlease.Lease{RunID: "r-live", OwnerPID: os.Getpid()}, waveTestClock)
+	h := newWaveHarness()
+	h.diskFree = func(string) (uint64, error) { return 273 << 20, nil }
+
+	rc := h.run("next", "--json", "--project-root", p.root)
+
+	if e := decodeWaveEnvelope(t, h.stdout.Bytes()); rc != cliExitRefused || e.Refused != waveRefusedLive {
+		t.Fatalf("rc = %d envelope = %+v; want %s, because stopping the live loop comes before freeing the disk", rc, e, waveRefusedLive)
+	}
+}
+
+func TestWaveNext_ABadPolicyBelowTheFloorNamesTheParseError(t *testing.T) {
+	t.Parallel()
+	p := newWavePlane(t)
+	p.write(".evolve/policy.json", `{`)
+	h := newWaveHarness()
+	h.diskFree = func(string) (uint64, error) { return 273 << 20, nil }
+
+	rc := h.run("next", "--json", "--project-root", p.root)
+
+	e := decodeWaveEnvelope(t, h.stdout.Bytes())
+	if rc != cliExitRefused || e.Refused != waveRefusedDiskLow {
+		t.Fatalf("rc = %d envelope = %+v; want a %s refusal on the default floor", rc, e, waveRefusedDiskLow)
+	}
+	if !strings.Contains(h.stderr.String(), "policy: parse") || !strings.Contains(h.stderr.String(), "compiled defaults") {
+		t.Errorf("stderr %q; want a warning that the policy was refused and the defaults apply", h.stderr.String())
 	}
 }
