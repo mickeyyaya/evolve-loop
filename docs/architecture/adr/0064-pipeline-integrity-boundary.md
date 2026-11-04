@@ -32,6 +32,12 @@ The semantic boundary that the OS sandbox is not — and that works regardless o
   - **P2 stays the backstop, and its refusal now recovers into BUILD** (`router` `control-plane-rebuild`, ordered before `precondition-reaudit`, within the constant ship-recovery budget of 2). A re-audit re-verifies the same diff, and the debugger cannot change what a cycle may write; the builder can, and on re-entry the floor names the path. Ship passes the builder nothing else.
   - Record: [2026-09-26-lane-edited-the-control-plane-through-a-shell-tool](../../incidents/2026-09-26-lane-edited-the-control-plane-through-a-shell-tool.md).
 
+- **Amendment 2026-11-04 — an aborted or ended cycle with a dead owner is not an active cycle.** P1 first treated every cycle with `CycleID != 0` as active. A cycle that aborted left its state file in place, so the console was not able to edit the control plane to repair the pipeline.
+  - The rule now: a cycle is active when `CycleID` is not zero and the phase is not terminal. A terminal phase (`end` or `aborted`) stays active only while the run lease has a live owner. `core.IsTerminalPhase` holds the terminal-phase belief.
+  - A dead owner, a stale lease or no lease reads as no active cycle, the same as `CycleID == 0`. A protected write is then allowed with no alarm. This is a deliberate decision, not a guard defect.
+  - A lease that cannot be read keeps the refusal, and the reason says so.
+  - Record: [internal-guards](../packages/internal-guards.md) and [ADR-0159](0159-the-loop-keeps-its-integration-train-and-takes-six-practices-from-the-2026-harness-projects.md).
+
 ### Pillar 2 — honest metric (in progress)
 
 The boundary alone does not close metric-gaming, because a phase legitimately edits *source* readers. Derive the campaign metric from the actual env read-set R (forward taint + constant folding, so the split-const folds into R; a row can't drop without deleting the real reader), pin `EVOLVE_` as the reserved operator-dial prefix (anti-rename), fail closed, and require a removed key's declared replacement (cobra/config) to actually remove it from R. A **co-equal** LLM goal-integrity lens (not a downstream backstop) carries the residual *semantic* classes.
