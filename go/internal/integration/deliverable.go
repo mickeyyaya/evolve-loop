@@ -15,7 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/evidence"
 )
 
-const RecordSchema = "evolve.deliverable/1"
+const RecordSchema = "evolve.deliverable/2"
 
 type CommitIdentity struct {
 	SHA     string `json:"sha"`
@@ -196,16 +196,17 @@ func FindLanded(landed []LandedCommit, r DeliverableRecord) bool {
 	if len(r.Commits) == 0 {
 		return false
 	}
-	present := make(map[string]bool, len(landed))
+	available := make(map[string]int, len(landed))
 	for _, l := range landed {
 		if HasCycleTrailer(l.Message, r.Cycle) {
-			present[l.PatchID] = true
+			available[l.PatchID]++
 		}
 	}
 	for _, c := range r.Commits {
-		if !present[c.PatchID] {
+		if available[c.PatchID] == 0 {
 			return false
 		}
+		available[c.PatchID]--
 	}
 	return true
 }

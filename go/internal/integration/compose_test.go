@@ -579,7 +579,7 @@ func TestCompose_AnExitOtherThanOneIsAnErrorEvenWithPathsOnStdout(t *testing.T) 
 	}
 }
 
-func TestCompose_ARecordWhoseContextAPeerChangedDoesNotReadAsLandedYet(t *testing.T) {
+func TestCompose_ARecordWhoseContextAPeerChangedReadsAsLanded(t *testing.T) {
 	t.Parallel()
 	f := newComposeFixture(t)
 	a := f.lane(t, 592, map[string]string{sharedFile: "one\ntwo\nthree\nFOUR\nfive\nsix\nseven\neight\nnine\nten\n"})
@@ -596,7 +596,7 @@ func TestCompose_ARecordWhoseContextAPeerChangedDoesNotReadAsLandedYet(t *testin
 	if !HasCycleTrailer(f.show(t, second.Batch.Tip), 591) {
 		t.Fatal("the composed commit of B lacks its cycle trailer")
 	}
-	if f.repo.LandedOnRef(context.Background(), b, second.Batch.Branch) {
-		t.Error("LandedOnRef found B; the limit in internal-integration.md is stale, update it")
+	if !f.repo.LandedOnRef(context.Background(), b, second.Batch.Branch) {
+		t.Error("LandedOnRef missed B after a peer changed its context")
 	}
 }
