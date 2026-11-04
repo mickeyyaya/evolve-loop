@@ -2,7 +2,10 @@ package integration
 
 import (
 	"context"
+	"slices"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/acsrunner"
 )
 
 func TestExportedSymbolsAreNamedByAnExecutedAssertion(t *testing.T) {
@@ -69,5 +72,26 @@ func TestConsoleTrainExportsAreNamedByAnExecutedAssertion(t *testing.T) {
 	var host PRHost = &fakeHost{ready: []int{9}}
 	if ready, err := host.Ready(context.Background()); err != nil || len(ready) != 1 || ready[0] != 9 {
 		t.Errorf("PRHost.Ready = %v, %v", ready, err)
+	}
+}
+
+func TestBatchTestExportsAreNamedByAnExecutedAssertion(t *testing.T) {
+	var test PackageTest = func(_ context.Context, tip, pkg string) (TestOutcome, error) {
+		return TestOutcome{Green: tip == "tip" && pkg == "pkg", Output: pkg}, nil
+	}
+	if out, err := test(context.Background(), "tip", "pkg"); err != nil || !out.Green || out.Output != "pkg" {
+		t.Errorf("PackageTest = %+v, %v", out, err)
+	}
+	var seen int
+	var run PredicateRun = func(_ context.Context, _ string, cycle int) (acsrunner.Verdict, error) {
+		seen = cycle
+		return acsrunner.Verdict{}, nil
+	}
+	if _, err := run(context.Background(), "tip", 7); err != nil || seen != 7 {
+		t.Errorf("PredicateRun saw cycle %d, %v", seen, err)
+	}
+	merged := LayerVerdict{Pass: true, Ran: []string{"a"}}.merge(LayerVerdict{Ran: []string{"b"}, Red: []string{"c"}})
+	if !merged.Pass || !slices.Equal(merged.Ran, []string{"a", "b"}) || !slices.Equal(merged.Red, []string{"c"}) {
+		t.Errorf("LayerVerdict.merge = %+v", merged)
 	}
 }
