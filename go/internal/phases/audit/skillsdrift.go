@@ -6,21 +6,31 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/audit/ciparitygate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/skillcheck"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 const skillsGeneratorPrefix = "go/internal/skillcheck/"
-
-var worktreeSkillsCheckLimit = ciparitygate.DefaultTimeouts().GoVet
 
 type gateWarning string
 
 func (w gateWarning) Error() string { return string(w) }
 
 func skillsDriftCheckDefault(req core.PhaseRequest) ([]string, error) {
+	return newSkillsDriftCheck(runCmd, ciparitygate.DefaultTimeouts().GoVet)(req)
+}
+
+func newSkillsDriftCheck(run sysexec.RunFunc, limit time.Duration) func(core.PhaseRequest) ([]string, error) {
+	return func(req core.PhaseRequest) ([]string, error) {
+		return skillsDriftCheck(req, run, limit)
+	}
+}
+
+func skillsDriftCheck(req core.PhaseRequest, run sysexec.RunFunc, limit time.Duration) ([]string, error) {
 	root := req.Worktree
 	if root == "" {
 		root = req.ProjectRoot
@@ -29,7 +39,7 @@ func skillsDriftCheckDefault(req core.PhaseRequest) ([]string, error) {
 		return nil, nil
 	}
 	if carriesSkillsGenerator(root) {
-		return worktreeSkillsDrift(context.Background(), root)
+		return worktreeSkillsDrift(context.Background(), root, run, limit)
 	}
 	return skillcheck.Check(root)
 }
@@ -39,12 +49,12 @@ func carriesSkillsGenerator(root string) bool {
 	return err == nil && info.IsDir()
 }
 
-func worktreeSkillsDrift(parent context.Context, root string) ([]string, error) {
+func worktreeSkillsDrift(parent context.Context, root string, run sysexec.RunFunc, limit time.Duration) ([]string, error) {
 	inv := core.WorktreeEvolveInvocation(root, "skills", "check")
-	ctx, cancel := context.WithTimeout(parent, worktreeSkillsCheckLimit)
+	ctx, cancel := context.WithTimeout(parent, limit)
 	defer cancel()
 	var report strings.Builder
-	code, err := runCmd(ctx, "go", inv.Dir, inv.Args, inv.Env, nil, nil, &report)
+	code, err := run(ctx, "go", inv.Dir, inv.Args, inv.Env, nil, nil, &report)
 	if offenders := skillsCheckOffenders(report.String()); code != 0 && len(offenders) > 0 {
 		return offenders, nil
 	}

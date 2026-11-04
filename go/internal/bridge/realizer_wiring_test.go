@@ -69,7 +69,7 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 		{
 			cli:    "agy-tmux",
 			binary: "agy",
-			marker: "? for shortcuts",
+			marker: agyFooterGeminiFlash,
 			want:   "agy --model 'Gemini 3.8 Flash (High)' --dangerously-skip-permissions",
 			absent: []string{" -m ", "--setting-sources", "--plugin-dir", "--exclude-dynamic-system-prompt-sections", "--no-session-persistence"},
 		},
@@ -129,7 +129,7 @@ func TestEngineLaunch_EnablesBypassForInProcessPath(t *testing.T) {
 	if err := os.WriteFile(artifact, []byte("DONE\n"), 0o644); err != nil {
 		t.Fatalf("seed artifact: %v", err)
 	}
-	tmux := &fakeTmux{paneSeq: []string{"? for shortcuts"}}
+	tmux := &fakeTmux{paneSeq: []string{agyFooterGeminiFlash}}
 	var stderr bytes.Buffer
 	eng := NewEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil), Stderr: &stderr, CaptureBaseline: zeroBaselineCapture})
 	resp, err := eng.Launch(context.Background(), core.BridgeRequest{

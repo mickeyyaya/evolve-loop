@@ -251,7 +251,7 @@ func requireStaleBaseAbort(t *testing.T, out staleBaseOutcome) {
 			continue
 		}
 		found = true
-		if reason := e.Fields["abort_reason"]; strings.Contains(reason, string(CodeGitFFMergeDiverged)) || !strings.Contains(reason, string(CodeGitFleetRebaseNeeded)) {
+		if reason := e.Fields["abort_reason"]; strings.Contains(reason, string(CodeGitFFMergeDiverged)) || !(strings.Contains(reason, string(CodeGitFleetRebaseNeeded)) || strings.Contains(reason, string(CodeGitFleetRebaseConflict))) {
 			t.Fatalf("a resumed cycle whose base is behind main aborted on %s: %s", CodeGitFFMergeDiverged, e.Fields["abort_reason"])
 		}
 	}

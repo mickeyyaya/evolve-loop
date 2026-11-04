@@ -838,3 +838,51 @@ func TestBatchTest_ADeliverableThatEditsOnlyAGoFixtureOrAVendoredFileStillTestsA
 		})
 	}
 }
+
+func TestBatchTest_ConsoleRecordsKeepTheirIdentityThroughL2(t *testing.T) {
+	t.Parallel()
+	f := newComposeFixture(t)
+	recs := []DeliverableRecord{
+		f.console(t, 11, "console eleven", map[string]string{goFile("a"): "package alpha\n"}),
+		f.console(t, 12, "console twelve", map[string]string{goFile("b"): "package beta\n"}),
+		f.console(t, 13, "console thirteen", map[string]string{goFile("c"): "package gamma\n"}),
+	}
+	s := newSeams(f)
+	s.testFail = func(_, pkg string, _ int) error {
+		if strings.Contains(pkg, "beta") {
+			return errors.New("TestBeta failed")
+		}
+		return nil
+	}
+	got, err := s.batchTest(f).Check(context.Background(), f.batch(t), recs)
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	if !slices.Equal(got.Landed, []int{11, 13}) || len(got.Verdicts) != 3 {
+		t.Errorf("landed %v with %d verdicts, want [11 13] and one verdict for each PR", got.Landed, len(got.Verdicts))
+	}
+	if len(got.Ejected) != 1 || got.Ejected[0].Ref() != 12 || got.Ejected[0].PR != 12 || got.Ejected[0].Label() != "PR #12" {
+		t.Fatalf("ejected = %+v, want PR 12", got.Ejected)
+	}
+	if len(s.predRuns) != 0 {
+		t.Errorf("predicates ran for %v, want none: a console record has no cycle predicate", s.predRuns)
+	}
+	if rest := withoutEjected(recs, got.Ejected); len(rest) != 2 || rest[0].Ref() != 11 || rest[1].Ref() != 13 {
+		t.Errorf("the batch keeps %v after the ejection, want PRs 11 and 13", rest)
+	}
+}
+
+func TestBatchTest_APredicateRunErrorReachesTheLaneBrief(t *testing.T) {
+	t.Parallel()
+	f := newComposeFixture(t)
+	s := newSeams(f)
+	s.predBoth = true
+	got, err := s.batchTest(f).Check(context.Background(), f.batch(t), twoDeliverables(t, f))
+	if err != nil || len(got.Ejected) == 0 {
+		t.Fatalf("Check = %+v, %v, want an ejection", got, err)
+	}
+	const cause = "acsrunner go test: exit status 1"
+	if !strings.Contains(got.Verdicts[701].Output, cause) || !strings.Contains(got.Ejected[0].Err.Error(), cause) {
+		t.Errorf("verdict output %q and ejection %q must hold the predicate error", got.Verdicts[701].Output, got.Ejected[0].Err)
+	}
+}

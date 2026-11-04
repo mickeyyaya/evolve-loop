@@ -129,6 +129,8 @@ A source-hash ratchet enforces the `decisionVersion` bump discipline (`decisionv
   - The prior `Source == "live"` (a detect entry is never laundered into an authoritative one).
   - The prior covers every canonical tier (a pre-fix `top`-less entry reclassifies once instead of staying sticky forever).
 
+  A version bump within one lineage set carries the prior tier map through `PromoteLatest` (`carryAcrossBump`). It makes zero classifier calls. The carry needs one more condition. The prior hash must equal `Fingerprint` of the prior `Available` list under the current `decisionVersion`, policy and tiers. A `decisionVersion` bump, a policy change, an empty hash or an unknown hash classifies again. The entry takes the new hash only after that classification.
+
   `decisionVersion` is bumped by hand on any prompt/promotion change, so a fix is never silently reused away.
 
 ### Provider-aware entries: `agy-claude` (2026-10-06)

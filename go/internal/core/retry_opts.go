@@ -83,7 +83,7 @@ func (cr *cycleRun) recoverShipError(next Phase, err error, resp PhaseResponse, 
 	cr.ctxSnap["ship_error_stage"] = string(se.Stage)
 	cr.ctxSnap["ship_error_debug"] = se.DebugString()
 	cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempts,
-		fmt.Sprintf("ship error %s: recovering via %s (attempt %d/%d)", se.Code, rec, cr.recoveryDepth+1, shipRecoveryBudget(se.Code, fleetWidth)), cr.cs.PhaseStartedAt))
+		fmt.Sprintf("ship error %s: recovering via %s (attempt %d/%d)", recoveryReasonCode(string(se.Code), cr.cs.ShipRecoveryConflicts), rec, cr.recoveryDepth+1, shipRecoveryBudget(se.Code, fleetWidth)), cr.cs.PhaseStartedAt))
 	cr.recoveryDepth++
 	cr.scheduledNext = rec
 	cr.current = PhaseShip

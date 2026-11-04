@@ -59,6 +59,9 @@ func TestAgentRun_AReportThatListsOneHighIsAFailVerdictThoughTheFieldSaysPass(t 
 	if len(signals) != 1 || signals[0].RunID != env.RunLabel || !strings.Contains(signals[0].Reason, env.RunLabel) {
 		t.Fatalf("mismatch signals = %+v, want one that names the run %s", signals, env.RunLabel)
 	}
+	if defects := parseDefectSignals(center); len(defects) != 0 {
+		t.Errorf("parse defect signals = %+v, want none for a report that lists a real HIGH", defects)
+	}
 	wantFields := map[string]string{"field_verdict": "PASS", "stated": "PASS", "critical": "0", "high": "1"}
 	if !maps.Equal(signals[0].Fields, wantFields) {
 		t.Errorf("signal fields = %+v, want %+v", signals[0].Fields, wantFields)
@@ -197,5 +200,107 @@ func TestReportVerdict_AHeadingMarkedVerdictSectionDeclaresAReview(t *testing.T)
 
 	if got.verdict != core.VerdictFAIL || !got.mismatch {
 		t.Errorf("reportVerdict = %+v, want FAIL and a mismatch", got)
+	}
+}
+
+func parseDefectSignals(center *signalcenter.Center) []signalcenter.Event {
+	var out []signalcenter.Event
+	for _, e := range center.Recent() {
+		if e.Code == CodeVerdictParseDefect {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+func TestAgentRun_NoStatedVerdictWithNoBlockingFindingEmitsAParseDefect(t *testing.T) {
+	env, code, center, _ := runWithSignals(t, threatModel+"## Findings\nNone.\n## Verdict\nIt is a PASS for me\n")
+
+	if env.Verdict != core.VerdictFAIL || code != exitFail {
+		t.Fatalf("verdict %q exit %d, want FAIL and exit 1", env.Verdict, code)
+	}
+	defects := parseDefectSignals(center)
+	if len(defects) != 1 || defects[0].RunID != env.RunLabel || defects[0].Fields["field_verdict"] != core.VerdictPASS {
+		t.Fatalf("parse defect signals = %+v, want one that names the run %s and the field PASS", defects, env.RunLabel)
+	}
+	if !slices.Contains(env.Diagnostics, core.Diagnostic{Severity: "error", Message: defects[0].Reason}) {
+		t.Errorf("diagnostics = %+v, want the error diagnostic of the parse defect", env.Diagnostics)
+	}
+}
+
+func TestReportVerdict_ANonPassFieldEmitsNoParseDefect(t *testing.T) {
+	t.Parallel()
+	spec := phasespec.PhaseSpec{Name: "go-reviewer", Classify: &phasespec.ClassifyRules{RequireSections: []string{"Findings", "Verdict"}}}
+	for _, field := range []string{core.VerdictFAIL, core.VerdictSKIPPED} {
+		got := reportVerdict(spec, field, "## Findings\nNone.\n## Verdict\nsee above\n")
+
+		if got.verdict != field || got.mismatch || got.parseDefect {
+			t.Errorf("field %s: reportVerdict = %+v, want the field kept, no mismatch and no parse defect", field, got)
+		}
+	}
+}
+
+func TestAgentRun_AFencedVerdictOnlyReportEmitsOneParseDefect(t *testing.T) {
+	t.Parallel()
+
+	env, code, center, _ := runWithSignals(t, threatModel+"## Findings\nNone.\n```\n## Verdict\nVerdict: PASS\n```\n")
+
+	if env.Verdict != core.VerdictFAIL || code != exitFail {
+		t.Fatalf("verdict %q exit %d, want FAIL and exit 1", env.Verdict, code)
+	}
+	if defects, mismatches := parseDefectSignals(center), mismatchSignals(center); len(defects) != 1 || len(mismatches) != 1 {
+		t.Errorf("mismatch %d defect %d, want 1 and 1", len(mismatches), len(defects))
+	}
+}
+
+func TestParseDefectEvent_CarriesTheFieldTheSeverityAndTheRunLabel(t *testing.T) {
+	t.Parallel()
+	spec := phasespec.PhaseSpec{Name: "go-reviewer"}
+
+	e := parseDefectEvent(standaloneRun{label: "run-label-7", spec: spec}, core.VerdictWARN)
+
+	if e.Phase != "go-reviewer" {
+		t.Errorf("phase = %q, want go-reviewer", e.Phase)
+	}
+	if e.Fields["field_verdict"] != core.VerdictWARN {
+		t.Errorf("field_verdict = %q, want WARN", e.Fields["field_verdict"])
+	}
+	if e.Severity != signalcenter.SeverityWarn {
+		t.Errorf("severity = %v, want WARN", e.Severity)
+	}
+	if !strings.Contains(e.Reason, "run-label-7") {
+		t.Errorf("reason = %q, want it to name the run label", e.Reason)
+	}
+}
+
+func TestReportVerdict_TheParseDefectNeedsNoStatedVerdictAndNoBlockingFinding(t *testing.T) {
+	spec := phasespec.PhaseSpec{Name: "go-reviewer", Classify: &phasespec.ClassifyRules{RequireSections: []string{"Findings", "Verdict"}}}
+	cases := []struct {
+		name, body  string
+		parseDefect bool
+	}{
+		{"no stated verdict and no finding", "## Findings\nNone.\n## Verdict\nsee above\n", true},
+		{"no stated verdict and one HIGH", "## Findings\n- [HIGH] a.go:1 — x\n## Verdict\nsee above\n", false},
+		{"no stated verdict and one CRITICAL", "## Findings\n- [CRITICAL] a.go:1 — x\n## Verdict\nsee above\n", false},
+		{"a stated FAIL and no finding", "## Findings\nNone.\n## Verdict\nVerdict: FAIL\n", false},
+		{"a fenced verdict only", "## Findings\nNone.\n```\n## Verdict\nVerdict: PASS\n```\n", true},
+		{"a fenced HIGH and a fenced PASS", "```\n## Findings\n- [HIGH] a.go:1 — x\n## Verdict\nVerdict: PASS\n```\n", true},
+	}
+	for _, c := range cases {
+		got := reportVerdict(spec, core.VerdictPASS, c.body)
+
+		if got.verdict != core.VerdictFAIL || !got.mismatch || got.parseDefect != c.parseDefect {
+			t.Errorf("%s: reportVerdict = %+v, want FAIL, a mismatch and parseDefect %v", c.name, got, c.parseDefect)
+		}
+	}
+}
+
+func TestReportVerdict_AFencedVerdictStatesNoVerdict(t *testing.T) {
+	spec := phasespec.PhaseSpec{Name: "go-reviewer", Classify: &phasespec.ClassifyRules{RequireSections: []string{"Findings", "Verdict"}}}
+
+	got := reportVerdict(spec, core.VerdictPASS, "## Findings\nNone.\n```\n## Verdict\nVerdict: PASS\n```\n")
+
+	if got.stated != "" {
+		t.Errorf("stated = %q, want no stated verdict from a fence", got.stated)
 	}
 }

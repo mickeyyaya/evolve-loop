@@ -241,7 +241,7 @@ func TestCompose_ARedGateEjectsAndKeepsTheBranch(t *testing.T) {
 	f := newComposeFixture(t)
 	rec := f.lane(t, 521, map[string]string{"a.txt": "a\n"})
 	b := f.batch(t)
-	red := errors.New("TestSomething failed")
+	red := &GateRed{Failures: []string{"TestSomething"}}
 	_, err := enforcing(f, &gateLog{fail: func(string) error { return red }}).Compose(context.Background(), b, rec)
 	var ej *Ejection
 	if !errors.As(err, &ej) || ej.Cause != CauseGate || ej.Cycle != 521 || !errors.Is(ej.Err, red) {
@@ -394,7 +394,7 @@ func TestCompose_RefusesAnUnsafeInputBeforeGit(t *testing.T) {
 func failOn(verb string) GitFunc {
 	real := SysGit()
 	return func(ctx context.Context, dir, stdin string, args ...string) (string, error) {
-		if args[0] == verb {
+		if gitVerb(args) == verb {
 			return "", &GitError{Args: args, Code: 128, Err: errors.New(verb + " broke")}
 		}
 		return real(ctx, dir, stdin, args...)
@@ -462,7 +462,7 @@ func TestCompose_NeverPassesAMergeTreeOutputThatIsNotAnObjectIDToCommitTree(t *t
 	b := f.batch(t)
 	real := SysGit()
 	forged := func(ctx context.Context, dir, stdin string, args ...string) (string, error) {
-		switch args[0] {
+		switch gitVerb(args) {
 		case "merge-tree":
 			return "--help\n", nil
 		case "commit-tree":
@@ -488,7 +488,7 @@ func TestCompose_AConflictExitWithoutConflictedPathsIsAnError(t *testing.T) {
 		"killed":        {Code: 1, Stdout: f.base + "\x00a.txt\x00\x00", Err: errors.New("killed")},
 	} {
 		git := func(ctx context.Context, dir, stdin string, args ...string) (string, error) {
-			if args[0] == "merge-tree" {
+			if gitVerb(args) == "merge-tree" {
 				return "", fault
 			}
 			return real(ctx, dir, stdin, args...)
@@ -514,11 +514,268 @@ func TestCompose_TheEjectionDiffRunsNoRepoDiffDriver(t *testing.T) {
 		}
 		return real(ctx, dir, stdin, args...)
 	}
-	c := Composer{Repo: Repo{Dir: f.g.Dir, Git: git}, Stage: policy.FleetIntegrationEnforce, Gate: (&gateLog{fail: func(string) error { return errors.New("red") }}).gate}
+	c := Composer{Repo: Repo{Dir: f.g.Dir, Git: git}, Stage: policy.FleetIntegrationEnforce, Gate: (&gateLog{fail: func(string) error { return &GateRed{} }}).gate}
 	if _, err := c.Compose(context.Background(), f.batch(t), rec); err == nil {
 		t.Fatal("Compose passed a red gate")
 	}
 	if !slices.Contains(diffArgs, "--no-ext-diff") || !slices.Contains(diffArgs, "--no-textconv") {
 		t.Errorf("the ejection diff ran as %v, want --no-ext-diff and --no-textconv", diffArgs)
 	}
+}
+
+func TestCompose_AGateThatCannotRunIsAnErrorNotAnEjection(t *testing.T) {
+	t.Parallel()
+	f := newComposeFixture(t)
+	rec := f.lane(t, 596, map[string]string{"a.txt": "a\n"})
+	b := f.batch(t)
+	broken := errors.New("gate could not start: no such binary")
+	_, err := enforcing(f, &gateLog{fail: func(string) error { return broken }}).Compose(context.Background(), b, rec)
+	var ej *Ejection
+	if !errors.Is(err, broken) || errors.As(err, &ej) {
+		t.Fatalf("Compose = %v, want the plain gate error and no ejection", err)
+	}
+	if tip := f.g.Git("rev-parse", "refs/heads/"+b.Branch); tip != f.base {
+		t.Errorf("a gate that could not run moved the batch branch to %s", tip)
+	}
+}
+
+func TestCompose_TheModuleFactsReachTheProof(t *testing.T) {
+	t.Parallel()
+	f := newComposeFixture(t)
+	a := f.lane(t, 595, map[string]string{"go/a/a.go": "package a\n"})
+	b := f.lane(t, 594, map[string]string{"go/b/b.go": "package b\n"})
+	comp := enforcing(f, &gateLog{})
+	comp.Overlap = &OverlapFacts{Catalogs: plainCatalogs{}, Module: overlap.Module{Path: "m", Packages: []overlap.Package{
+		{ImportPath: "m/a", Dir: "go/a", Files: []string{"go/a/a.go"}},
+		{ImportPath: "m/b", Dir: "go/b", Files: []string{"go/b/b.go"}},
+	}}}
+	first, err := comp.Compose(context.Background(), f.batch(t), a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := comp.Compose(context.Background(), first.Batch, b)
+	if err != nil || got.Proof.Tier != overlap.T1 || !slices.Equal(got.Proof.Rules, []overlap.Rule{overlap.RuleDisjoint}) {
+		t.Errorf("proof = %s %v (err %v), want T1 [disjoint]", got.Proof.Tier, got.Proof.Rules, err)
+	}
+}
+
+func TestCompose_AnExitOtherThanOneIsAnErrorEvenWithPathsOnStdout(t *testing.T) {
+	t.Parallel()
+	f := newComposeFixture(t)
+	rec := f.lane(t, 593, map[string]string{"a.txt": "a\n"})
+	b := f.batch(t)
+	real := SysGit()
+	git := func(ctx context.Context, dir, stdin string, args ...string) (string, error) {
+		if gitVerb(args) == "merge-tree" {
+			return "", &GitError{Args: args, Code: 128, Stdout: f.base + "\x00a.txt\x00\x00"}
+		}
+		return real(ctx, dir, stdin, args...)
+	}
+	c := Composer{Repo: Repo{Dir: f.g.Dir, Git: git}, Stage: policy.FleetIntegrationShadow}
+	_, err := c.Compose(context.Background(), b, rec)
+	var ej *Ejection
+	if err == nil || errors.As(err, &ej) {
+		t.Errorf("Compose = %v, want a plain error", err)
+	}
+}
+
+func TestCompose_ARecordWhoseContextAPeerChangedReadsAsLanded(t *testing.T) {
+	t.Parallel()
+	f := newComposeFixture(t)
+	a := f.lane(t, 592, map[string]string{sharedFile: "one\ntwo\nthree\nFOUR\nfive\nsix\nseven\neight\nnine\nten\n"})
+	b := f.lane(t, 591, map[string]string{sharedFile: "one\ntwo\nthree\nfour\nfive\nSIX\nseven\neight\nnine\nten\n"})
+	comp := enforcing(f, &gateLog{})
+	first, err := comp.Compose(context.Background(), f.batch(t), a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := comp.Compose(context.Background(), first.Batch, b)
+	if err != nil {
+		t.Fatalf("Compose(B): %v", err)
+	}
+	if !HasCycleTrailer(f.show(t, second.Batch.Tip), 591) {
+		t.Fatal("the composed commit of B lacks its cycle trailer")
+	}
+	if !f.repo.LandedOnRef(context.Background(), b, second.Batch.Branch) {
+		t.Error("LandedOnRef missed B after a peer changed its context")
+	}
+}
+
+func (f composeFixture) withBase(t *testing.T, files map[string]string) composeFixture {
+	t.Helper()
+	for _, name := range slices.Sorted(mapKeys(files)) {
+		f.g.Write(name, files[name])
+	}
+	f.g.Git("add", ".")
+	f.g.Git("commit", "-q", "-m", "attributes")
+	f.base = headOf(f.g)
+	return f
+}
+
+func (f composeFixture) bare(t *testing.T) composeFixture {
+	t.Helper()
+	f.repo = Repo{Dir: f.g.CloneBare(f.g.Dir, t.TempDir()+"/bare.git").Dir, Git: SysGit()}
+	return f
+}
+
+func composeTwo(t *testing.T, f composeFixture, a, b DeliverableRecord) error {
+	t.Helper()
+	comp := Composer{Repo: f.repo, Stage: policy.FleetIntegrationShadow}
+	batch, err := f.repo.StartBatch(context.Background(), Batch{Wave: fixtureWave, Index: 1, Base: f.base})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := comp.Compose(context.Background(), batch, a)
+	if err != nil {
+		t.Fatalf("Compose(A): %v", err)
+	}
+	_, err = comp.Compose(context.Background(), first.Batch, b)
+	return err
+}
+
+func TestCompose_TheAttributesOfTheTipDecideWhenOnlyTheTipHoldsThem(t *testing.T) {
+	t.Parallel()
+	f := newComposeFixture(t).withBase(t, map[string]string{"list": "base\n"})
+	a := f.lane(t, 621, map[string]string{".gitattributes": "list merge=union\n", "list": "base\nfrom-a\n"})
+	b := f.lane(t, 622, map[string]string{"list": "base\nfrom-b\n"})
+	if err := composeTwo(t, f.bare(t), a, b); err != nil {
+		t.Fatalf("Compose(B) = %v, want the union of the tip to hold", err)
+	}
+}
+
+func TestCompose_ALaneCannotBringAUnionAttributeOverAConflictAtTheTip(t *testing.T) {
+	t.Parallel()
+	f := newComposeFixture(t).withBase(t, map[string]string{"list": "base\n"})
+	a := f.lane(t, 623, map[string]string{"list": "base\nfrom-a\n"})
+	b := f.lane(t, 624, map[string]string{".gitattributes": "list merge=union\n", "list": "base\nfrom-b\n"})
+	var ej *Ejection
+	if err := composeTwo(t, f.bare(t), a, b); !errors.As(err, &ej) || !slices.Contains(ej.Paths, "list") {
+		t.Fatalf("Compose(B) = %v, want an ejection on list, because the lane alone holds the attribute", err)
+	}
+}
+
+func TestCompose_AnUncommittedAttributeInTheWorkTreeDoesNotDecide(t *testing.T) {
+	t.Parallel()
+	f := newComposeFixture(t).withBase(t, map[string]string{"list": "base\n"})
+	a := f.lane(t, 625, map[string]string{"list": "base\nfrom-a\n"})
+	b := f.lane(t, 626, map[string]string{"list": "base\nfrom-b\n"})
+	f.g.Write(".gitattributes", "list merge=union\n")
+	var ej *Ejection
+	if err := composeTwo(t, f, a, b); !errors.As(err, &ej) || !slices.Contains(ej.Paths, "list") {
+		t.Fatalf("Compose(B) = %v, want an ejection on list, because only the work tree holds the attribute", err)
+	}
+}
+
+func TestCompose_ABareCloneHonoursTheMergeAttributesOfTheTip(t *testing.T) {
+	t.Parallel()
+	f := newComposeFixture(t).withBase(t, map[string]string{".gitattributes": "list merge=union\n", "list": "base\n"})
+	a := f.lane(t, 611, map[string]string{"list": "base\nfrom-a\n"})
+	b := f.lane(t, 612, map[string]string{"list": "base\nfrom-b\n"})
+	bare := f.bare(t)
+	comp := Composer{Repo: bare.repo, Stage: policy.FleetIntegrationShadow}
+	batch, err := bare.repo.StartBatch(context.Background(), Batch{Wave: fixtureWave, Index: 1, Base: f.base})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := comp.Compose(context.Background(), batch, a)
+	if err != nil {
+		t.Fatalf("Compose(A): %v", err)
+	}
+	second, err := comp.Compose(context.Background(), first.Batch, b)
+	var ej *Ejection
+	if errors.As(err, &ej) || err != nil {
+		t.Fatalf("Compose(B) in a bare clone = %v, want the union merge to hold with no ejection", err)
+	}
+	got, err := bare.repo.Git(context.Background(), bare.repo.Dir, "", "show", second.Batch.Tip+":list")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range []string{"from-a", "from-b"} {
+		if !strings.Contains(got, line) {
+			t.Errorf("composed list = %q, want the line %q", got, line)
+		}
+	}
+}
+
+func TestCompose_ABareCloneStillEjectsARealConflictWithoutAUnionAttribute(t *testing.T) {
+	t.Parallel()
+	f := newComposeFixture(t).withBase(t, map[string]string{".gitattributes": "list merge=union\n", "list": "base\n", "plain": "base\n"})
+	a := f.lane(t, 613, map[string]string{"plain": "base\nfrom-a\n"})
+	b := f.lane(t, 614, map[string]string{"plain": "base\nfrom-b\n"})
+	bare := f.bare(t)
+	comp := Composer{Repo: bare.repo, Stage: policy.FleetIntegrationShadow}
+	batch, err := bare.repo.StartBatch(context.Background(), Batch{Wave: fixtureWave, Index: 1, Base: f.base})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := comp.Compose(context.Background(), batch, a)
+	if err != nil {
+		t.Fatalf("Compose(A): %v", err)
+	}
+	_, err = comp.Compose(context.Background(), first.Batch, b)
+	var ej *Ejection
+	if !errors.As(err, &ej) || ej.Cause != CauseConflict || !slices.Equal(ej.Paths, []string{"plain"}) {
+		t.Fatalf("Compose(B) = %v, want a conflict ejection on [plain]", err)
+	}
+}
+
+func TestCompose_ATipThatIsNotAnObjectIDNeverReachesMergeTree(t *testing.T) {
+	t.Parallel()
+	f := newComposeFixture(t)
+	rec := f.lane(t, 615, map[string]string{"a.txt": "a\n"}, map[string]string{"b.txt": "b\n"})
+	real := SysGit()
+	git := func(ctx context.Context, dir, stdin string, args ...string) (string, error) {
+		switch gitVerb(args) {
+		case "commit-tree":
+			return "--help\n", nil
+		case "merge-tree":
+			if slices.Contains(args, "--help") {
+				t.Errorf("merge-tree ran with %v", args)
+			}
+		}
+		return real(ctx, dir, stdin, args...)
+	}
+	c := Composer{Repo: Repo{Dir: f.g.Dir, Git: git}, Stage: policy.FleetIntegrationShadow}
+	if _, err := c.Compose(context.Background(), f.batch(t), rec); err == nil || !strings.Contains(err.Error(), "full object id") {
+		t.Errorf("Compose = %v, want the object id refusal", err)
+	}
+}
+
+func gitVerb(args []string) string {
+	for _, a := range args {
+		if !strings.HasPrefix(a, "-") {
+			return a
+		}
+	}
+	return ""
+}
+
+func (f composeFixture) console(t *testing.T, pr int, message string, files map[string]string) DeliverableRecord {
+	t.Helper()
+	f.g.Git("checkout", "-q", "-b", "pr-"+strconv.Itoa(pr), f.base)
+	for _, name := range slices.Sorted(mapKeys(files)) {
+		f.g.Write(name, files[name])
+	}
+	f.g.Git("add", ".")
+	f.g.Git("commit", "-q", "-m", message)
+	sha := headOf(f.g)
+	patch, err := f.repo.PatchID(context.Background(), sha)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.g.Git("checkout", "-q", "main")
+	return DeliverableRecord{
+		Source: SourceConsolePR, Wave: ConsoleWave, PR: pr,
+		Commits: []CommitIdentity{{SHA: sha, BaseSHA: f.base, PatchID: patch}},
+		Audit:   AuditBinding{TreeSHA: treeSHA40, ArtifactSHA: fixtureArtifact},
+	}
+}
+
+func (f composeFixture) batchAt(t *testing.T, index int) Batch {
+	t.Helper()
+	b, err := f.repo.StartBatch(context.Background(), Batch{Wave: fixtureWave, Index: index, Base: f.base})
+	if err != nil {
+		t.Fatalf("StartBatch: %v", err)
+	}
+	return b
 }

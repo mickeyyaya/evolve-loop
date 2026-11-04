@@ -110,8 +110,8 @@ Each retry path gets its rung from one place, the ladder state of the cycle. L5 
 
 | Path | Before L5 | With the ladder (L5) |
 |---|---|---|
-| Contract correction ladder | changed the CLI family on the second identical block | the same-rung corrections run first. When `fleet.contract_correction_retries` is spent, the loop asks the decider (`core/cyclerun_correction.go:58`). A raise gives one more try at the new rung. |
-| Resumed contract correction | the same corrections, with no tier change | the same rule, through `climbResumed` (`core/resume.go:414`) |
+| Contract correction ladder | changed the CLI family on the second identical block | the same-rung corrections run first. When `fleet.contract_correction_retries` is spent, the loop asks the decider (`core/cyclerun_correction.go:58`). A raise gives one more try at the new rung. When the decider does not raise and the build floor converges, the loop gives one further try at the same rung (test-system D4.5.4). |
+| Resumed contract correction | the same corrections, with no tier change | the same rule and the same order, through `climbResumed` (`core/resume.go`) |
 | Audit repair round | raised tdd and build to `audit_retry_2plus` | the first tdd or build dispatch of each repair round asks the decider once (`ladderForDispatch`, `core/resume_policy.go:18`) |
 | Gate remediation | cleared the overlay | keeps the rung of the cycle (`keepLadderRung`, `core/cyclerun_remediate.go:54`) |
 | Next item after a failure | started the build at deep when `failure_count >= 1` | at `enforce`, starts at R2 with the deep tier only when the last failure of a scoped item was `capability` (`core/retry_tier_escalation.go:48`). The first rung of the cycle is then R2, so the try record and the later paths see it. |

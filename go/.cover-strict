@@ -116,4 +116,3 @@
 ./internal/phases/ship/shiptest 100
 ./internal/cloudlaunch 100
 ./internal/cli/cloudcmd 100
-./internal/prefixqueue 100

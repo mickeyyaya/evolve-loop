@@ -241,6 +241,7 @@ func TestSkillsDriftGate_ReworkedReportProtocolStillFails(t *testing.T) {
 }
 
 func TestSkillsDriftGate_TreeWithoutTheGeneratorSourceIsGradedInProcess(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		edit func(t *testing.T, root string)
@@ -258,10 +259,9 @@ func TestSkillsDriftGate_TreeWithoutTheGeneratorSourceIsGradedInProcess(t *testi
 			root := committedSkillsRepo(t, skillsSourceFiles, skillsSourceDirs).Dir
 			tc.edit(t, root)
 			fake := &fixtures.FakeExec{}
-			withFakeRunner(t, fake.Run)
 			req := core.PhaseRequest{Cycle: 7, Worktree: root, ProjectRoot: t.TempDir()}
 
-			gotDiags := skillsGateDiagnostics(t, skillsDriftCheckDefault, req)
+			gotDiags := skillsGateDiagnostics(t, newSkillsDriftCheck(fake.Run, time.Hour), req)
 			wantDiags := skillsGateDiagnostics(t, func(r core.PhaseRequest) ([]string, error) { return skillcheck.Check(r.Worktree) }, req)
 
 			if !reflect.DeepEqual(gotDiags, wantDiags) {
@@ -317,14 +317,12 @@ func TestSkillsDriftGate_Cycle1840ReplayPasses(t *testing.T) {
 }
 
 func TestSkillsDriftGate_ARealRunnerTimeoutCannotGradeAndSaysSo(t *testing.T) {
-	orig := worktreeSkillsCheckLimit
-	worktreeSkillsCheckLimit = 200 * time.Millisecond
-	t.Cleanup(func() { worktreeSkillsCheckLimit = orig })
-	withFakeRunner(t, func(ctx context.Context, _, _ string, _, env []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
+	t.Parallel()
+	run := func(ctx context.Context, _, _ string, _, env []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 		return sysexec.DefaultRunner(ctx, "sleep", "", []string{"30"}, env, stdin, stdout, stderr)
-	})
+	}
 
-	got, err := worktreeSkillsDrift(context.Background(), t.TempDir())
+	got, err := worktreeSkillsDrift(context.Background(), t.TempDir(), run, 200*time.Millisecond)
 
 	if got != nil || err == nil || !strings.Contains(err.Error(), "is NOT graded") || !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("a real runner killed by the deadline = (%q, %v), want a loud could-not-run error that wraps the deadline", got, err)

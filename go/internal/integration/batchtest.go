@@ -7,12 +7,10 @@ import (
 	"maps"
 	"slices"
 	"strconv"
-	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acsrunner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
-	"github.com/mickeyyaya/evolve-loop/go/internal/prefixqueue"
 )
 
 const CauseBatch = "batch"
@@ -57,14 +55,12 @@ type BatchResult struct {
 }
 
 type batchRun struct {
-	ctx      context.Context
-	t        BatchTest
-	prefix   *prefixRun
-	memo     map[string]bool
-	verdicts map[int]LayerVerdict
-	met      map[int]string
-	flaky    []string
-	fatal    error
+	ctx    context.Context
+	t      BatchTest
+	cur    Batch
+	cycles []int
+	res    BatchResult
+	flaky  []string
 }
 
 func AffectedSet(root string, edited []string) ([]string, error) {
@@ -85,23 +81,19 @@ func (t BatchTest) Check(ctx context.Context, b Batch, recs []DeliverableRecord)
 	if err := t.seams(); err != nil {
 		return BatchResult{}, err
 	}
-	compose := t.Composer
-	compose.Stage = policy.FleetIntegrationShadow
+	t.Composer.Stage = policy.FleetIntegrationShadow
 	b.Tip = b.Base
-	prefix, err := compose.newPrefixRun(ctx, b, recs)
-	if err != nil || len(recs) == 0 {
+	if err := t.Composer.checkPrefix(b, recs); err != nil || len(recs) == 0 {
 		return BatchResult{}, err
 	}
-	run := &batchRun{ctx: ctx, t: t, prefix: prefix, memo: map[string]bool{}, verdicts: map[int]LayerVerdict{}, met: map[int]string{}}
-	q := prefixqueue.NewPrefixQueue()
+	run := &batchRun{ctx: ctx, t: t, cur: b, res: BatchResult{Verdicts: map[int]LayerVerdict{}, Tip: b.Base}}
 	for _, rec := range recs {
-		q.Enqueue(prefixqueue.LaneCandidate{ID: strconv.Itoa(rec.Cycle), Tier: prefixqueue.TierRollup})
+		if err := run.step(rec); err != nil {
+			return BatchResult{}, err
+		}
 	}
-	landed, ejected := q.ResolveCulprit(run.verify)
-	if run.fatal != nil {
-		return BatchResult{}, run.fatal
-	}
-	return run.result(landed, ejected)
+	run.res.Flaky = slices.Compact(slices.Sorted(slices.Values(run.flaky)))
+	return run.res, nil
 }
 
 func (t BatchTest) seams() error {
@@ -111,85 +103,53 @@ func (t BatchTest) seams() error {
 	return nil
 }
 
-func (r *batchRun) verify(ids []string) bool {
-	if r.fatal != nil {
-		return false
+func (r *batchRun) step(rec DeliverableRecord) error {
+	st, err := r.t.Composer.attempt(r.ctx, r.cur, rec)
+	var ej *Ejection
+	switch {
+	case errors.As(err, &ej):
+		r.res.Ejected = append(r.res.Ejected, ej)
+		return nil
+	case err != nil:
+		return err
 	}
-	key := strings.Join(ids, ",")
-	ok, seen := r.memo[key]
-	if !seen {
-		ok = r.evaluate(ids)
-		r.memo[key] = ok
+	cycles := slices.Clone(r.cycles)
+	if !rec.Console() {
+		cycles = append(cycles, rec.Cycle)
 	}
-	return ok
-}
-
-func (r *batchRun) evaluate(ids []string) bool {
-	tip, ok := r.prefix.tipOf(ids)
-	if r.prefix.fatal != nil {
-		r.fatal = r.prefix.fatal
-		return false
-	}
-	if !ok {
-		return false
-	}
-	in, err := r.input(ids, tip)
+	v, err := r.verdict(st.Batch.Tip, cycles)
 	if err != nil {
-		r.fatal = err
-		return false
+		return err
 	}
-	v, err := r.t.layer(r.ctx, in)
-	if err != nil {
-		r.fatal = err
-		return false
-	}
-	last := in.cycles[len(in.cycles)-1]
-	r.verdicts[last] = v
-	r.met[last], _ = r.prefix.tipOf(ids[:len(ids)-1])
+	r.res.Verdicts[rec.Ref()] = v
 	r.flaky = append(r.flaky, v.Flaky...)
-	return v.Pass
+	if !v.Pass {
+		return r.eject(rec, v)
+	}
+	r.cur, r.cycles = st.Batch, cycles
+	r.res.Landed = append(r.res.Landed, rec.Ref())
+	r.res.Tip = st.Batch.Tip
+	return nil
 }
 
-func (r *batchRun) input(ids []string, tip string) (layerInput, error) {
-	paths, err := r.prefix.c.Repo.changedPaths(r.ctx, r.prefix.b.Base, tip)
-	cycles := make([]int, len(ids))
-	for i, id := range ids {
-		cycles[i] = r.prefix.recs[id].Cycle
+func (r *batchRun) verdict(tip string, cycles []int) (LayerVerdict, error) {
+	paths, err := r.t.Composer.Repo.changedPaths(r.ctx, r.cur.Base, tip)
+	if err != nil {
+		return LayerVerdict{}, err
 	}
-	return layerInput{tip: tip, edited: editedPackages(paths), cycles: cycles}, err
+	return r.t.layer(r.ctx, layerInput{tip: tip, edited: editedPackages(paths), cycles: cycles})
 }
 
-func (r *batchRun) result(landed, ejected []string) (BatchResult, error) {
-	res := BatchResult{Verdicts: r.verdicts, Flaky: slices.Compact(slices.Sorted(slices.Values(r.flaky)))}
-	res.Tip, _ = r.prefix.tipOf(landed)
-	for _, id := range landed {
-		res.Landed = append(res.Landed, r.prefix.recs[id].Cycle)
-	}
-	for _, id := range ejected {
-		ej, err := r.ejection(id)
-		if err != nil {
-			return BatchResult{}, err
-		}
-		res.Ejected = append(res.Ejected, ej)
-	}
-	return res, nil
-}
-
-func (r *batchRun) ejection(id string) (*Ejection, error) {
-	if ej := r.prefix.ejections[id]; ej != nil {
-		return ej, nil
-	}
-	cycle := r.prefix.recs[id].Cycle
-	v := r.verdicts[cycle]
-	ej := &Ejection{Cycle: cycle, Cause: CauseBatch, Paths: v.Red, Err: fmt.Errorf("the batch test is red on %v\n%s", v.Red, v.Output)}
-	b := r.prefix.b
-	b.Tip = r.met[cycle]
-	err := r.prefix.c.eject(r.ctx, b, ej)
+func (r *batchRun) eject(rec DeliverableRecord, v LayerVerdict) error {
+	ej := ejectionOf(rec, CauseBatch)
+	ej.Paths, ej.Err = v.Red, fmt.Errorf("the batch test is red on %v\n%s", v.Red, v.Output)
+	err := r.t.Composer.eject(r.ctx, r.cur, ej)
 	var got *Ejection
-	if errors.As(err, &got) {
-		return got, nil
+	if !errors.As(err, &got) {
+		return err
 	}
-	return nil, err
+	r.res.Ejected = append(r.res.Ejected, got)
+	return nil
 }
 
 type layerInput struct {
@@ -258,27 +218,30 @@ func (t BatchTest) testPackage(ctx context.Context, tip, pkg string) (LayerVerdi
 }
 
 func (t BatchTest) runPredicates(ctx context.Context, tip string, cycle int) (LayerVerdict, error) {
-	red, err := t.predicateRed(ctx, tip, cycle)
+	red, _, err := t.predicateRed(ctx, tip, cycle)
 	if err != nil || len(red) == 0 {
 		return LayerVerdict{}, err
 	}
-	still, err := t.predicateRed(ctx, tip, cycle)
+	still, note, err := t.predicateRed(ctx, tip, cycle)
 	if err != nil {
 		return LayerVerdict{}, err
 	}
 	if len(still) > 0 {
-		return LayerVerdict{Red: still, Flaky: slices.DeleteFunc(slices.Clone(red), func(n string) bool { return slices.Contains(still, n) })}, nil
+		return LayerVerdict{Red: still, Output: note, Flaky: slices.DeleteFunc(slices.Clone(red), func(n string) bool { return slices.Contains(still, n) })}, nil
 	}
 	return LayerVerdict{Flaky: red}, nil
 }
 
-func (t BatchTest) predicateRed(ctx context.Context, tip string, cycle int) ([]string, error) {
+func (t BatchTest) predicateRed(ctx context.Context, tip string, cycle int) ([]string, string, error) {
 	v, err := t.Predicates(ctx, tip, cycle)
 	red := redPredicates(v, cycle)
 	if err != nil && (ctx.Err() != nil || len(red) == 0) {
-		return nil, err
+		return nil, "", err
 	}
-	return red, nil
+	if err != nil {
+		return red, "predicates of cycle " + strconv.Itoa(cycle) + ": " + err.Error() + "\n", nil
+	}
+	return red, "", nil
 }
 
 func redPredicates(v acsrunner.Verdict, cycle int) []string {

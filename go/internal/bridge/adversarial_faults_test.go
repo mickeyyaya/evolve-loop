@@ -29,7 +29,7 @@ func adversarialFaultCases() []adversarialFaultCase {
 	}{
 		{"claude", "claude-tmux", tmuxPromptMarkerDefault},
 		{"codex", "codex-tmux", "›"},
-		{"agy", "agy-tmux", "? for shortcuts"},
+		{"agy", "agy-tmux", agyFooterGeminiFlash},
 	}
 	var out []adversarialFaultCase
 	for _, f := range families {
@@ -68,6 +68,9 @@ func adversarialFaultCases() []adversarialFaultCase {
 		)
 	}
 	for i := range out {
+		if out[i].family == "agy" && len(out[i].panes) > 1 && out[i].panes[0] == out[i].marker {
+			out[i].panes = append([]string{out[i].marker}, out[i].panes...)
+		}
 		if out[i].family == "codex" && out[i].fault == "update-menu" {
 			out[i].panes = []string{cycle274CodexUpdateMenu, "ready ›"}
 			out[i].assert = func(t *testing.T, tmux *fakeTmux, _ string) {

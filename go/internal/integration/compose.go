@@ -17,6 +17,7 @@ import (
 const (
 	CauseConflict = "conflict"
 	CauseGate     = "gate"
+	CauseHead     = "head move"
 )
 
 type Batch struct {
@@ -28,6 +29,14 @@ type Batch struct {
 }
 
 type Gate func(ctx context.Context, tip string, tier overlap.Tier) error
+
+type GateRed struct {
+	Failures []string
+}
+
+func (e *GateRed) Error() string {
+	return "integration: the gate is red: " + strings.Join(e.Failures, ", ")
+}
 
 type OverlapFacts struct {
 	Module   overlap.Module
@@ -48,6 +57,7 @@ type Composed struct {
 
 type Ejection struct {
 	Cycle int
+	PR    int
 	Cause string
 	Paths []string
 	Diff  string
@@ -55,13 +65,31 @@ type Ejection struct {
 }
 
 func (e *Ejection) Error() string {
-	return fmt.Sprintf("integration: cycle %d ejected on a %s %v: %v", e.Cycle, e.Cause, e.Paths, e.Err)
+	return fmt.Sprintf("integration: %s ejected on a %s %v: %v", e.Label(), e.Cause, e.Paths, e.Err)
 }
 
 var (
 	waveName       = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]*$`)
 	artifactDigest = regexp.MustCompile(`^[0-9a-f]{64}$`)
 )
+
+func (e *Ejection) Ref() int {
+	if e.PR > 0 {
+		return e.PR
+	}
+	return e.Cycle
+}
+
+func (e *Ejection) Label() string {
+	if e.PR > 0 {
+		return "PR #" + strconv.Itoa(e.PR)
+	}
+	return "cycle " + strconv.Itoa(e.Cycle)
+}
+
+func ejectionOf(rec DeliverableRecord, cause string) *Ejection {
+	return &Ejection{Cycle: rec.Cycle, PR: rec.PR, Cause: cause}
+}
 
 func batchBranch(wave string, index int) string {
 	return "integration/w" + wave + "-b" + strconv.Itoa(index)
@@ -101,19 +129,22 @@ func checkComposable(rec DeliverableRecord) error {
 	if err := rec.Validate(); err != nil {
 		return err
 	}
-	if rec.Trailer != CycleTrailer(rec.Cycle) {
+	if !rec.Console() && rec.Trailer != CycleTrailer(rec.Cycle) {
 		return fmt.Errorf("integration: record trailer %q is not the trailer of cycle %d", rec.Trailer, rec.Cycle)
 	}
 	if !artifactDigest.MatchString(rec.Audit.ArtifactSHA) {
-		return fmt.Errorf("integration: cycle %d has no audit artifact digest", rec.Cycle)
+		return fmt.Errorf("integration: %s has no audit artifact digest", rec.Label())
 	}
-	ids := []string{rec.Audit.TreeSHA}
+	var ids []string
+	if rec.Audit.TreeSHA != "" || !rec.Console() {
+		ids = append(ids, rec.Audit.TreeSHA)
+	}
 	for _, c := range rec.Commits {
 		ids = append(ids, c.SHA, c.BaseSHA)
 	}
 	for _, id := range ids {
 		if err := fullObjectID(id); err != nil {
-			return fmt.Errorf("integration: cycle %d: %w", rec.Cycle, err)
+			return fmt.Errorf("integration: %s: %w", rec.Label(), err)
 		}
 	}
 	return nil
@@ -155,14 +186,22 @@ func (c Composer) attempt(ctx context.Context, b Batch, rec DeliverableRecord) (
 	if err != nil || c.Stage == policy.FleetIntegrationShadow {
 		return st, err
 	}
-	if err := c.Gate(ctx, st.Batch.Tip, st.Proof.Tier); err != nil {
-		return Composed{}, c.eject(ctx, b, &Ejection{Cycle: rec.Cycle, Cause: CauseGate, Err: err})
+	err = c.Gate(ctx, st.Batch.Tip, st.Proof.Tier)
+	var red *GateRed
+	switch {
+	case errors.As(err, &red):
+		return Composed{}, c.eject(ctx, b, withErr(ejectionOf(rec, CauseGate), err))
+	case err != nil:
+		return Composed{}, fmt.Errorf("integration: the gate of %s did not run: %w", rec.Label(), err)
 	}
 	return st, nil
 }
 
 func (c Composer) apply(ctx context.Context, b Batch, rec DeliverableRecord) (Composed, error) {
-	msg := composeMessage(rec)
+	msg, err := c.message(ctx, rec)
+	if err != nil {
+		return Composed{}, err
+	}
 	tip := b.Tip
 	for _, commit := range rec.Commits {
 		tree, conflicted, err := c.Repo.mergeTree(ctx, commit.SHA, tip)
@@ -170,9 +209,13 @@ func (c Composer) apply(ctx context.Context, b Batch, rec DeliverableRecord) (Co
 			return Composed{}, err
 		}
 		if len(conflicted) > 0 {
-			return Composed{}, c.eject(ctx, b, &Ejection{Cycle: rec.Cycle, Cause: CauseConflict, Paths: conflicted, Err: errors.New("textual conflict")})
+			return Composed{}, c.eject(ctx, b, withPaths(ejectionOf(rec, CauseConflict), conflicted))
 		}
-		if tip, err = c.Repo.commitTree(ctx, tree, b.Tip, msg); err != nil {
+		parent := b.Tip
+		if rec.Console() {
+			parent = tip
+		}
+		if tip, err = c.Repo.commitTree(ctx, tree, parent, msg); err != nil {
 			return Composed{}, err
 		}
 	}
@@ -195,9 +238,19 @@ func (c Composer) prove(lane, peer []string) overlap.Proof {
 func (c Composer) eject(ctx context.Context, b Batch, e *Ejection) error {
 	diff, err := c.Repo.Git(ctx, c.Repo.Dir, "", "diff", "--no-ext-diff", "--no-textconv", "--end-of-options", b.Base, b.Tip)
 	if err != nil {
-		return fmt.Errorf("integration: read the diff that cycle %d met: %w", e.Cycle, err)
+		return fmt.Errorf("integration: read the diff that %s met: %w", e.Label(), err)
 	}
 	e.Diff = diff
+	return e
+}
+
+func withErr(e *Ejection, err error) *Ejection {
+	e.Err = err
+	return e
+}
+
+func withPaths(e *Ejection, paths []string) *Ejection {
+	e.Paths, e.Err = paths, errors.New("textual conflict")
 	return e
 }
 
@@ -207,7 +260,10 @@ func composeMessage(rec DeliverableRecord) string {
 }
 
 func (r Repo) mergeTree(ctx context.Context, commit, onto string) (string, []string, error) {
-	out, err := r.Git(ctx, r.Dir, "", "merge-tree", "--write-tree", "--name-only", "-z", "--merge-base="+commit+"^", "--end-of-options", onto, commit)
+	if err := fullObjectID(onto); err != nil {
+		return "", nil, err
+	}
+	out, err := r.Git(ctx, r.Dir, "", "--attr-source="+onto, "merge-tree", "--write-tree", "--name-only", "-z", "--merge-base="+commit+"^", "--end-of-options", onto, commit)
 	var ge *GitError
 	if errors.As(err, &ge) && ge.Code == 1 && ge.Err == nil {
 		return conflictedPaths(ge.Stdout)

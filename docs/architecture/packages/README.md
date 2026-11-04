@@ -35,7 +35,6 @@ Each Go package directory has one page. The page holds what the code cannot say:
 | `internal/usageprobe` | reads the usage screen of each CLI into typed windows through its manifest. It benches each family at a cap before the first phase of a wave, and records the windows | [internal-usageprobe.md](internal-usageprobe.md) |
 | `internal/usageevidence` | queries a failing CLI's usage on every failure path, records the verdict in the workspace and as a signal, and decorates the bridge with it | [internal-usageevidence.md](internal-usageevidence.md) |
 | `internal/overlap` | the overlap proof of the landing queue: the zones, the closure, the evidence and the tier, with the `go list` adapter (ADR-0128, Q3) | [internal-overlap.md](internal-overlap.md) |
-| `internal/prefixqueue` | the prefix queue of the landing composer, a leaf package that `fleet` and `integration` both use (ADR-0078, ADR-0147 I2) | [internal-prefixqueue.md](internal-prefixqueue.md) |
 | `internal/phasecoherence` | drift reports between the hand-edited surfaces that define a phase | [internal-phasecoherence.md](internal-phasecoherence.md) |
 | `internal/policy` | loads `.evolve/policy.json` into resolved configuration | [internal-policy.md](internal-policy.md) |
 | `internal/profiles` | loads the agent profiles in `.evolve/profiles/` | [internal-profiles.md](internal-profiles.md) |

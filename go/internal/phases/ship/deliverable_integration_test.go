@@ -163,8 +163,8 @@ func TestDeliver_AFleetShipWritesOneRecordWithEveryD2Field(t *testing.T) {
 
 func independentPatchID(t *testing.T, repo, sha string) string {
 	t.Helper()
-	diff := shiptest.RunGitOut(t, repo, "diff-tree", "-p", "--root", sha)
-	cmd := exec.Command("git", "patch-id", "--stable")
+	diff := shiptest.RunGitOut(t, repo, "diff-tree", "-p", "-U1", "--root", sha)
+	cmd := exec.Command("git", "patch-id", "--verbatim")
 	cmd.Stdin = strings.NewReader(diff)
 	out, err := cmd.Output()
 	if err != nil {

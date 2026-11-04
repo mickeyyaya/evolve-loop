@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -291,5 +292,125 @@ func TestPatchID_RefusesAnythingButAFullObjectID(t *testing.T) {
 	}
 	if called {
 		t.Error("git ran for a sha that is not a full object id")
+	}
+}
+
+type peerFixture struct {
+	composeFixture
+	record DeliverableRecord
+}
+
+func peerEditNearALaneChange(t *testing.T, laneMessage string) peerFixture {
+	t.Helper()
+	f := newComposeFixture(t)
+	rec := f.lane(t, landedCycle, map[string]string{sharedFile: "one\ntwo\nthree\nfour\nFIVE\nsix\nseven\neight\nnine\nten\n"})
+	f.g.Write(sharedFile, "one\ntwo\nthree\nfour\nfive\nsix\nSEVEN\neight\nnine\nten\n")
+	f.g.Git("add", ".")
+	f.g.Git("commit", "-q", "-m", "peer edit two lines away")
+	f.g.Git("cherry-pick", "--no-commit", rec.Commits[0].SHA)
+	f.g.Git("commit", "-q", "-m", laneMessage)
+	return peerFixture{composeFixture: f, record: rec}
+}
+
+func TestLandedOnRefSurvivesAPeerEditTwoLinesFromTheCycleChange(t *testing.T) {
+	t.Parallel()
+	p := peerEditNearALaneChange(t, "compose: the lane work\n\n"+CycleTrailer(landedCycle))
+	if !p.repo.LandedOnRef(context.Background(), p.record, "HEAD") {
+		t.Fatal("a peer edit two lines from the cycle change made a composed cycle read as not landed")
+	}
+}
+
+func TestLandedOnRefRejectsACommitWithOtherContentAfterAPeerEdit(t *testing.T) {
+	t.Parallel()
+	p := peerEditNearALaneChange(t, "compose: the lane work\n\n"+CycleTrailer(landedCycle+1))
+	p.g.Write(sharedFile, "one\ntwo\nthree\nfour\nOTHER\nsix\nSEVEN\neight\nnine\nten\n")
+	p.g.Git("add", ".")
+	p.g.Git("commit", "-q", "-m", "other content\n\n"+CycleTrailer(landedCycle))
+	if p.repo.LandedOnRef(context.Background(), p.record, "HEAD") {
+		t.Fatal("a commit with the trailer and other content read as landed")
+	}
+}
+
+func TestPatchID_AsksGitForADiffOfOneContextLine(t *testing.T) {
+	t.Parallel()
+	var seen []string
+	spy := func(_ context.Context, _, _ string, args ...string) (string, error) {
+		if args[0] == "diff-tree" {
+			seen = args
+			return "diff --git a b\n+x\n", nil
+		}
+		return "abc 000\n", nil
+	}
+	if _, err := (Repo{Dir: t.TempDir(), Git: spy}).PatchID(context.Background(), strings.Repeat("a", 40)); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(seen, "-U1") {
+		t.Fatalf("diff-tree args = %v, want -U1", seen)
+	}
+}
+
+func landOnMain(p composeFixture, content, message string) {
+	p.g.Write(sharedFile, content)
+	p.g.Git("add", ".")
+	p.g.Git("commit", "-q", "-m", message)
+}
+
+func TestLandedOnRefRejectsTheSameLinesAtAnotherPosition(t *testing.T) {
+	t.Parallel()
+	f := newComposeFixture(t)
+	rec := f.lane(t, landedCycle, map[string]string{sharedFile: "one\ntwo\nNEW\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n"})
+	landOnMain(f, "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nNEW\nnine\nten\n", "other place\n\n"+CycleTrailer(landedCycle))
+	if f.repo.LandedOnRef(context.Background(), rec, "HEAD") {
+		t.Fatal("the same added line at another place in the file read as landed")
+	}
+}
+
+func TestLandedOnRefRejectsAChangeThatDiffersOnlyInWhitespace(t *testing.T) {
+	t.Parallel()
+	f := newComposeFixture(t)
+	rec := f.lane(t, landedCycle, map[string]string{sharedFile: "one\ntwo\n\tNEW\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n"})
+	landOnMain(f, "one\ntwo\n    NEW\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n", "other spacing\n\n"+CycleTrailer(landedCycle)+"\n")
+	if f.repo.LandedOnRef(context.Background(), rec, "HEAD") {
+		t.Fatal("a change that differs only in whitespace read as landed")
+	}
+}
+
+func TestLandedOnRefReadsTheSameChangeAtTheSamePlaceAsLanded(t *testing.T) {
+	t.Parallel()
+	f := newComposeFixture(t)
+	rec := f.lane(t, landedCycle, map[string]string{sharedFile: "one\ntwo\nNEW\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n"})
+	landOnMain(f, "one\ntwo\nNEW\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n", "same place\n\n"+CycleTrailer(landedCycle))
+	if !f.repo.LandedOnRef(context.Background(), rec, "HEAD") {
+		t.Fatal("the same change at the same place read as not landed")
+	}
+}
+
+func TestLandedOnRefNeedsACommitForEachCommitOfTheRecord(t *testing.T) {
+	t.Parallel()
+	f := newComposeFixture(t)
+	f.g.Write("dup.txt", "a\nb\na\nb\n")
+	f.g.Git("add", ".")
+	f.g.Git("commit", "-q", "-m", "dup base")
+	f.base = headOf(f.g)
+	rec := f.lane(t, landedCycle, map[string]string{"dup.txt": "a\nX\nb\na\nb\n"}, map[string]string{"dup.txt": "a\nX\nb\na\nX\nb\n"})
+	if rec.Commits[0].PatchID != rec.Commits[1].PatchID {
+		t.Fatal("fixture: the two commits must share a patch id")
+	}
+	f.g.Git("cherry-pick", "--no-commit", rec.Commits[0].SHA)
+	f.g.Git("commit", "-q", "-m", "half\n\n"+CycleTrailer(landedCycle))
+	if f.repo.LandedOnRef(context.Background(), rec, "HEAD") {
+		t.Fatal("one landed commit satisfied two commits of the record")
+	}
+}
+
+func TestFindLanded_ConsumesEachLandedCommitOnce(t *testing.T) {
+	t.Parallel()
+	rec := DeliverableRecord{Cycle: 9, Commits: []CommitIdentity{{PatchID: "p"}, {PatchID: "p"}}}
+	one := []LandedCommit{{Message: "m\n\n" + CycleTrailer(9), PatchID: "p"}}
+	if FindLanded(one, rec) {
+		t.Fatal("one commit satisfied two entries")
+	}
+	if !FindLanded(append(one, one...), rec) {
+		t.Fatal("two commits did not satisfy two entries")
 	}
 }

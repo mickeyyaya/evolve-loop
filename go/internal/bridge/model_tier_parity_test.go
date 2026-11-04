@@ -114,7 +114,7 @@ func TestAgyTierDeepLaunchCarriesModelToPane(t *testing.T) {
 	}
 	frames := make([]string, 12)
 	for i := range frames {
-		frames[i] = "? for shortcuts"
+		frames[i] = footerShowing(modelNameOf(cfg.Realization.modelDispatchEffect.model), "low")
 	}
 	tm := &FakeTmuxController{CaptureFrames: frames}
 	deps := Deps{

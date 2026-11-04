@@ -58,8 +58,13 @@ func TestDefaultBuildFloorChecks_SeesCommittedBuilderWork(t *testing.T) {
 	fails := DefaultBuildFloorChecks(context.Background(), ReviewInput{
 		Phase: string(PhaseBuild), Worktree: wt, WorktreeBaseSHA: base,
 	})
-	if len(fails) != 1 || !strings.Contains(fails[0], "bad") {
-		t.Fatalf("base-diff floor must catch the committed failing package; got %v", fails)
+	if len(fails) == 0 {
+		t.Fatal("base-diff floor must catch the committed failing package")
+	}
+	for _, fail := range fails {
+		if !strings.Contains(fail, "bad") {
+			t.Fatalf("each finding must name the failing package; got %v", fails)
+		}
 	}
 	write("go/.apicover-enforce", "./bad\n")
 	write("go/bad/extra.go", "package bad\n\n// Unnamed is exported but no test names it.\nfunc Unnamed() int { return 1 }\n")

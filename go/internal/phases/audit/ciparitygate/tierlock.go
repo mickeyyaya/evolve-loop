@@ -1,11 +1,10 @@
 package ciparitygate
 
 import (
-	"path/filepath"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
-	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 )
 
 func (g *Gates) acquireLock(at gateOrigin, req Request) (release func(), note string) {
@@ -13,7 +12,7 @@ func (g *Gates) acquireLock(at gateOrigin, req Request) (release func(), note st
 	if root == "" {
 		return g.lockDegraded(at, req, lockNoRoot, "lock unavailable: no project root")
 	}
-	path := filepath.Join(paths.EvolveDirOf(root), "locks", "integration-tier.lock")
+	path := ciparity.TierLockPath(root)
 	deadline := g.now().Add(g.timeouts.TierLockWait)
 	for {
 		rel, held, err := flock.TryLock(path)
