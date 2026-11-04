@@ -283,6 +283,16 @@ func TestInboxStamps_OwnsNeedsANonEmptyId(t *testing.T) {
 	}
 }
 
+func TestInboxStamps_OwnsReadsTheIdThroughTheInboxReader(t *testing.T) {
+	t.Parallel()
+
+	s := newInboxStamps([]string{"item one"})
+
+	if !s.owns(`{"id":"item\u0007one"}`) {
+		t.Fatal("an id the inbox reader cleans to the id of the cycle must read as owned")
+	}
+}
+
 func TestMergeInboxItem(t *testing.T) {
 	t.Parallel()
 

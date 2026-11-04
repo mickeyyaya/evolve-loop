@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -76,7 +77,7 @@ func (s inboxStamps) owns(item string) bool {
 	var head struct {
 		ID string `json:"id"`
 	}
-	return json.Unmarshal([]byte(item), &head) == nil && head.ID != "" && s.own[head.ID]
+	return json.Unmarshal([]byte(item), &head) == nil && head.ID != "" && s.own[inboxbatch.ItemID(head.ID, "")]
 }
 
 type stageReader struct {
