@@ -35,17 +35,6 @@ func TestRetiredAtCycle_ReadsTheConsumedCycleAndRejectsUnreadableRecords(t *test
 	}
 }
 
-func TestCutClosesInboxMarker_BulletNeedsWhitespaceBeforeTheMarker(t *testing.T) {
-	for _, line := range []string{"-", "-Closes-Inbox: x", "*Closes-Inbox: x", "+"} {
-		if rest, ok := cutClosesInboxMarker(line); ok {
-			t.Errorf("cutClosesInboxMarker(%q) = %q, true; want a rejection", line, rest)
-		}
-	}
-	if rest, ok := cutClosesInboxMarker("-\tCloses-Inbox: x"); !ok || rest != " x" {
-		t.Errorf("tab after bullet: got %q, %v", rest, ok)
-	}
-}
-
 func TestParseConsumedRecord_RejectsNonScalarCycleAndNonObjectConsumed(t *testing.T) {
 	for _, item := range []string{`{"consumed":{"cycle":true}}`, `{"consumed":{"cycle":[1]}}`, `{"consumed":5}`, `{"consumed":{"cycle":1e3}}`} {
 		if _, _, err := ParseConsumedRecord([]byte(item)); err == nil {

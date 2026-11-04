@@ -178,3 +178,33 @@ early boundary: #1012 waited 1h35m0s (bound 1h0m0s); pool 2/4 lanes: run evolve 
 | Turn off the CLI health check | policy `wave.health_drivers: []` |
 | Run more cycles in each wave | policy `wave.max_cycles`, or `--max-cycles N` |
 | Show more cycles in the facts section | policy `wave.facts_max_cycles` (default 20) |
+
+## The console PR train
+
+The design is in [§10 of the integration plan](../plans/wave-integration-2026-10.md#10-amendment-of-2026-11-04-console-prs-enter-the-train).
+
+The console opens many PRs by hand. Each PR waits for a merge. The train puts the ready PRs into one batch and lands the batch with the engine of this plan.
+
+- **Record.** A console PR has a record with the source `console-pr`. The record holds the PR number, the commits of the PR and a review binding. It holds no cycle number. A lane record keeps its cycle number and its trailer, and it validates as before.
+- **Review binding.** The command refuses a binding that does not cover the PR. A word that you declare yourself never binds.
+- **Attestation.** An attestation binds a PR only when its `tree_state_sha` equals the digest of the PR diff. The diff runs from the parent of the first commit to the last commit. An attestation with a waiver does not bind.
+- **Review runs.** The attestation must name a review run. Each run that it names must have a launch record. The record must show a reviewer that did not write source, a PASS or WARN verdict, a report and the same tree. A reviewer name with no launch record does not bind.
+- **Class.** A class comes from a closed list. Each class has a rule on the changed paths. The class `docs-review` uses the rule of the commit gate: every changed path ends in `.md`. A class that is not in the list does not bind.
+- **Instruction files.** The class never covers an instruction file. These are `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, and each path under `agents/`, `skills/`, `.claude/`, `commands/` and `guidance/`. Use an attestation for these paths.
+- **Record command.** `evolve integration record-pr --pr N` with `--attestation FILE` or `--class NAME` writes the record. The record is in the wave `console`.
+- **Head check.** After the fetch, the command compares the head of each PR with the last commit in its record. If they differ, the command refuses the PR. The refusal says to record the review again. A PR with a new commit is never landed with its old commits.
+- **Head check in the landing.** The command reads the head again before each CI run and before the fast-forward. A PR whose head moved is ejected. It stays open, and its comment names the commits that did not land.
+- **Head check after the fast-forward.** The command reads the head one more time before it closes a PR. If the head moved, the PR stays open and its record is spent. The comment names the new commits.
+- **Batch command.** `evolve integration batch [--dry-run] [PR...]` takes the PRs that you name. Without a name, it takes the open PRs that are not drafts and are not batch PRs of the train. A PR with no record is refused, and the refusal names the PR. The command pushes nothing in that case.
+- **Order and ejection.** The command orders the PRs with the order of the engine and composes them one by one. A PR that conflicts is ejected. The PR gets a brief with the paths and stays open. The same rule holds when `main` moves during the landing: the recompose ejects the PR that now conflicts, and the clean PRs still land.
+- **Dry run.** The dry run prints the order, the ejections and the size of the batch. It does not push and does not touch a PR.
+- **Landing.** `Merger.Land` opens one batch PR, watches the CI and moves `main` with one fast-forward (plan decision D11). A red batch is split as in plan decision D10. A run that has not started yet is not an error. The command waits for the run to register, up to five tries. Then it stops with an error.
+- **Red and gh errors.** The command reads the verdict from the conclusion of the run. The conclusion `failure` is red. A run that was cancelled, a run that is not finished, and any error of `gh` stop the batch with an error. They never brief a PR.
+- **Landed PRs.** A PR that is on `main` does not land again. A rerun after a failed close closes the PR and does not move `main`. A record is spent when its PR closes.
+- **Landed identity.** The command composes each commit of a console PR as one commit on `main`, in order. Each composed commit has the `Source-PR` line. A PR is landed when each of its commits has a composed commit with the same patch-id. The patch-id is read with zero lines of context. A peer PR in the same file does not change the result.
+- **Landed check error.** If git fails during the landed check, the command stops with an error. It lands nothing.
+- **Exit code.** The command exits with 1 when it ejects a PR. This holds for an ejection at the plan, at the landing and on a red CI. It also holds when a PR head moved after the landing. The error names each PR. The command prints a line when the CI was red once and green on the rerun.
+- **Member PRs.** The command never pushes to the branch of a member PR. After a green landing, each landed PR closes with a comment that links the batch PR.
+- **Inbox.** The composed commit keeps each `Closes-Inbox` id of the member commits, one id on each line. One parser reads the marker. It is in the package `closesinbox`, and the lane ship path uses the same parser.
+- **Inbox move.** After the landing, the command moves each named inbox item to `processed` in the checkout where it runs. This move changes the working tree only. The command does not commit or push it, because only `evolve ship` commits and pushes.
+- **Inbox command.** The command prints the `evolve ship --class manual --paths` command that puts the move on `main`. Run that command. An item that is not in the checkout is not moved, and the output does not name it.

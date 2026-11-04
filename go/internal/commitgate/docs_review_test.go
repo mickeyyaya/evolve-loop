@@ -62,8 +62,8 @@ func TestIsDocsOnly_EveryPathMustBeMarkdown(t *testing.T) {
 		{nil, false},
 	}
 	for _, tc := range tests {
-		if got := isDocsOnly(tc.files); got != tc.want {
-			t.Fatalf("isDocsOnly(%v) = %v, want %v", tc.files, got, tc.want)
+		if got := DocsOnly(tc.files); got != tc.want {
+			t.Fatalf("DocsOnly(%v) = %v, want %v", tc.files, got, tc.want)
 		}
 	}
 }
@@ -125,7 +125,7 @@ func TestListedChange_AListingErrorGivesNoPathSoTheCodeReviewApplies(t *testing.
 
 	paths := o.listedChange(context.Background())
 
-	if paths != nil || isDocsOnly(paths) {
+	if paths != nil || DocsOnly(paths) {
 		t.Fatalf("listedChange = %v, want nil", paths)
 	}
 }

@@ -86,6 +86,7 @@ func TestInboxCenterlessRootsArePinned(t *testing.T) {
 		"cmd/evolve/cmd_inbox_route_lane.go":    "operator command `evolve inbox route-lane` — 06-F1",
 		"cmd/evolve/cmd_inbox_split.go":         "operator command `evolve inbox split` — 06-F1",
 		"cmd/evolve/cmd_inbox_add.go":           "operator command `evolve inbox add` — 06-F1",
+		"cmd/evolve/cmd_integration_batch.go":   "operator command `evolve integration batch`, the inbox close after a landing — a console verb prints its own lines",
 		"cmd/evolve/cmd_practice.go":            "operator command `evolve practice watch` and the boundary watch, the one filing of a research item — 06-F1",
 		"cmd/evolve/cmd_continuation.go":        "operator command `evolve continuation` — 06-F1",
 		"cmd/evolve/cmd_continuation_adopt.go":  "operator command `evolve continuation adopt`: the read-only dispatch-state probe of the item — never writes",

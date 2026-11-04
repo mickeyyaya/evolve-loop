@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -60,18 +61,20 @@ type Repo struct {
 	Git GitFunc
 }
 
+var errNoPatch = errors.New("empty diff")
+
 func (r Repo) PatchID(ctx context.Context, sha string) (string, error) {
 	if err := fullObjectID(sha); err != nil {
 		return "", err
 	}
-	diff, err := r.Git(ctx, r.Dir, "", "diff-tree", "-p", "--root", "--end-of-options", sha)
+	diff, err := r.Git(ctx, r.Dir, "", "diff-tree", "-p", "-U1", "--root", "--end-of-options", sha)
 	if err != nil {
 		return "", fmt.Errorf("integration: read the diff of %s: %w", sha, err)
 	}
 	if strings.TrimSpace(diff) == "" {
-		return "", fmt.Errorf("integration: commit %s has no patch", sha)
+		return "", fmt.Errorf("integration: commit %s has no patch: %w", sha, errNoPatch)
 	}
-	out, err := r.Git(ctx, r.Dir, diff, "patch-id", "--stable")
+	out, err := r.Git(ctx, r.Dir, diff, "patch-id", "--verbatim")
 	if err != nil {
 		return "", fmt.Errorf("integration: patch-id of %s: %w", sha, err)
 	}
@@ -83,35 +86,91 @@ func (r Repo) PatchID(ctx context.Context, sha string) (string, error) {
 }
 
 func (r Repo) LandedOnRef(ctx context.Context, rec DeliverableRecord, ref string) bool {
-	if len(rec.Commits) == 0 || !r.patchesAreOwn(ctx, rec) {
-		return false
-	}
-	log, err := r.Git(ctx, r.Dir, "", "log", "-z", "--format=%H%n%B", "--end-of-options", rec.Commits[0].BaseSHA+".."+ref)
-	if err != nil {
-		return false
-	}
-	var candidates []LandedCommit
-	for _, entry := range strings.Split(log, logEntrySep) {
-		sha, message, ok := strings.Cut(strings.TrimLeft(entry, "\n"), "\n")
-		if !ok || !HasCycleTrailer(message, rec.Cycle) {
-			continue
-		}
-		patch, err := r.PatchID(ctx, sha)
-		if err != nil {
-			continue
-		}
-		candidates = append(candidates, LandedCommit{SHA: sha, Message: message, PatchID: patch})
-	}
-	return FindLanded(candidates, rec)
+	landed, err := r.CheckLanded(ctx, rec, ref)
+	return landed && err == nil
 }
 
-func (r Repo) patchesAreOwn(ctx context.Context, rec DeliverableRecord) bool {
-	for _, c := range rec.Commits {
-		if patch, err := r.PatchID(ctx, c.SHA); err != nil || patch != c.PatchID {
-			return false
+func (r Repo) CheckLanded(ctx context.Context, rec DeliverableRecord, ref string) (bool, error) {
+	if len(rec.Commits) == 0 {
+		return false, nil
+	}
+	if own, err := r.patchesAreOwn(ctx, rec); err != nil || !own {
+		return false, err
+	}
+	entries, err := r.ownedEntries(ctx, rec, ref)
+	if err != nil {
+		return false, err
+	}
+	if rec.Console() {
+		return r.consoleLanded(ctx, rec, entries)
+	}
+	return r.laneLanded(ctx, rec, entries)
+}
+
+type logEntry struct {
+	sha     string
+	message string
+}
+
+func (r Repo) ownedEntries(ctx context.Context, rec DeliverableRecord, ref string) ([]logEntry, error) {
+	log, err := r.Git(ctx, r.Dir, "", "log", "-z", "--format=%H%n%B", "--end-of-options", rec.Commits[0].BaseSHA+".."+ref)
+	if err != nil {
+		return nil, fmt.Errorf("integration: list the commits that landed on %s: %w", ref, err)
+	}
+	var owned []logEntry
+	for _, entry := range strings.Split(log, logEntrySep) {
+		sha, message, ok := strings.Cut(strings.TrimLeft(entry, "\n"), "\n")
+		if ok && rec.OwnsMessage(message) {
+			owned = append(owned, logEntry{sha: sha, message: message})
 		}
 	}
-	return true
+	return owned, nil
+}
+
+func (r Repo) laneLanded(ctx context.Context, rec DeliverableRecord, entries []logEntry) (bool, error) {
+	var candidates []LandedCommit
+	for _, e := range entries {
+		patch, err := r.PatchID(ctx, e.sha)
+		if err != nil {
+			return false, err
+		}
+		candidates = append(candidates, LandedCommit{SHA: e.sha, Message: e.message, PatchID: patch})
+	}
+	return FindLanded(candidates, rec), nil
+}
+
+func (r Repo) consoleLanded(ctx context.Context, rec DeliverableRecord, entries []logEntry) (bool, error) {
+	present := make(map[string]bool, len(entries))
+	for _, e := range entries {
+		id, err := r.PatchID(ctx, e.sha)
+		if errors.Is(err, errNoPatch) {
+			continue
+		}
+		if err != nil {
+			return false, err
+		}
+		present[id] = true
+	}
+	for _, c := range rec.Commits {
+		id, err := r.PatchID(ctx, c.SHA)
+		if err != nil || !present[id] {
+			return false, err
+		}
+	}
+	return true, nil
+}
+
+func (r Repo) patchesAreOwn(ctx context.Context, rec DeliverableRecord) (bool, error) {
+	for _, c := range rec.Commits {
+		patch, err := r.PatchID(ctx, c.SHA)
+		if err != nil {
+			return false, err
+		}
+		if patch != c.PatchID {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 func FindRecord(root string, cycle int) (DeliverableRecord, bool) {

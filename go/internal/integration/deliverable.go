@@ -15,7 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/evidence"
 )
 
-const RecordSchema = "evolve.deliverable/1"
+const RecordSchema = "evolve.deliverable/2"
 
 type CommitIdentity struct {
 	SHA     string `json:"sha"`
@@ -26,10 +26,13 @@ type CommitIdentity struct {
 type AuditBinding struct {
 	TreeSHA     string `json:"tree_sha"`
 	ArtifactSHA string `json:"artifact_sha"`
+	Class       string `json:"class,omitempty"`
 }
 
 type DeliverableRecord struct {
 	Schema      string           `json:"schema"`
+	Source      string           `json:"source,omitempty"`
+	PR          int              `json:"pr,omitempty"`
 	Wave        string           `json:"wave"`
 	Cycle       int              `json:"cycle"`
 	Trailer     string           `json:"trailer"`
@@ -49,9 +52,12 @@ type LandedCommit struct {
 }
 
 const (
-	riskHigh     = "high"
-	recordPrefix = "deliverable-"
-	wavePrefix   = "integration-"
+	riskHigh        = "high"
+	recordPrefix    = "deliverable-"
+	prRecordPrefix  = recordPrefix + "pr-"
+	wavePrefix      = "integration-"
+	SourceConsolePR = "console-pr"
+	ConsoleWave     = "console"
 )
 
 func CycleTrailer(cycle int) string { return evidence.KeyCycle + ": " + strconv.Itoa(cycle) }
@@ -61,12 +67,7 @@ func (r DeliverableRecord) Validate() error {
 	if r.Wave == "" {
 		missing = append(missing, "wave")
 	}
-	if r.Cycle <= 0 {
-		missing = append(missing, "cycle")
-	}
-	if r.Trailer == "" {
-		missing = append(missing, "trailer")
-	}
+	missing = append(missing, r.identityMissing()...)
 	if len(r.Commits) == 0 {
 		missing = append(missing, "commits")
 	}
@@ -76,7 +77,68 @@ func (r DeliverableRecord) Validate() error {
 	if len(missing) > 0 {
 		return fmt.Errorf("integration: deliverable record lacks %s", strings.Join(missing, ", "))
 	}
+	return r.bindingErr()
+}
+
+func (r DeliverableRecord) identityMissing() []string {
+	switch r.Source {
+	case "":
+		return r.laneMissing()
+	case SourceConsolePR:
+		return r.consoleMissing()
+	}
+	return []string{"a known source (got " + strconv.Quote(r.Source) + ")"}
+}
+
+func (r DeliverableRecord) laneMissing() []string {
+	var m []string
+	if r.Cycle <= 0 {
+		m = append(m, "cycle")
+	}
+	if r.Trailer == "" {
+		m = append(m, "trailer")
+	}
+	return m
+}
+
+func (r DeliverableRecord) consoleMissing() []string {
+	var m []string
+	if r.PR <= 0 {
+		m = append(m, "pr")
+	}
+	if r.Cycle != 0 {
+		m = append(m, "no cycle (a console record has none)")
+	}
+	return m
+}
+
+func (r DeliverableRecord) bindingErr() error {
+	if !r.Console() {
+		return nil
+	}
+	if !artifactDigest.MatchString(r.Audit.ArtifactSHA) {
+		return fmt.Errorf("integration: %s has no recorded review binding: the artifact digest is missing", r.Label())
+	}
+	if r.Audit.TreeSHA == "" && r.Audit.Class == "" {
+		return fmt.Errorf("integration: %s has no recorded review binding: name an attestation tree or a review class", r.Label())
+	}
 	return nil
+}
+
+func (r DeliverableRecord) Console() bool { return r.Source == SourceConsolePR }
+
+func (r DeliverableRecord) Ref() int {
+	if r.Console() {
+		return r.PR
+	}
+	return r.Cycle
+}
+
+func (r DeliverableRecord) Label() string {
+	if r.Console() {
+		return "PR #" + strconv.Itoa(r.PR)
+	}
+	return "cycle " + strconv.Itoa(r.Cycle)
 }
 
 func (c CommitIdentity) missing() []string {
@@ -99,12 +161,19 @@ func (r DeliverableRecord) HoldsCommit(sha string) bool {
 
 func (r DeliverableRecord) Deliverable() Deliverable {
 	return Deliverable{
-		ID:          "cycle-" + strconv.Itoa(r.Cycle),
+		ID:          r.id(),
 		DeliveredAt: r.DeliveredAt,
 		Risky:       r.Risk == riskHigh,
 		InboxRank:   r.InboxRank,
 		Deps:        slices.Clone(r.Deps),
 	}
+}
+
+func (r DeliverableRecord) id() string {
+	if r.Console() {
+		return "pr-" + strconv.Itoa(r.PR)
+	}
+	return "cycle-" + strconv.Itoa(r.Cycle)
 }
 
 func WaveDir(projectRoot, wave string) string {
@@ -115,6 +184,17 @@ func RecordPath(dir string, cycle int) string {
 	return filepath.Join(dir, recordPrefix+strconv.Itoa(cycle)+".json")
 }
 
+func PRRecordPath(dir string, pr int) string {
+	return filepath.Join(dir, prRecordPrefix+strconv.Itoa(pr)+".json")
+}
+
+func (r DeliverableRecord) path(dir string) string {
+	if r.Console() {
+		return PRRecordPath(dir, r.PR)
+	}
+	return RecordPath(dir, r.Cycle)
+}
+
 var marshalRecord = json.MarshalIndent
 
 func WriteRecord(dir string, r DeliverableRecord) (string, error) {
@@ -122,7 +202,7 @@ func WriteRecord(dir string, r DeliverableRecord) (string, error) {
 	if err := r.Validate(); err != nil {
 		return "", err
 	}
-	return recordFile{Path: RecordPath(dir, r.Cycle), Kind: "deliverable record", Prefix: recordPrefix}.publish(r)
+	return recordFile{Path: r.path(dir), Kind: "deliverable record", Prefix: recordPrefix}.publish(r)
 }
 
 type recordFile struct {
@@ -209,20 +289,43 @@ func HasCycleTrailer(message string, cycle int) bool {
 	return false
 }
 
+func sourcePRLine(pr int) string { return "Source-PR: #" + strconv.Itoa(pr) }
+
+func HasSourcePR(message string, pr int) bool {
+	if pr <= 0 {
+		return false
+	}
+	want := sourcePRLine(pr)
+	for _, l := range strings.Split(message, "\n") {
+		if strings.TrimSpace(l) == want {
+			return true
+		}
+	}
+	return false
+}
+
+func (r DeliverableRecord) OwnsMessage(message string) bool {
+	if r.Console() {
+		return HasSourcePR(message, r.PR)
+	}
+	return HasCycleTrailer(message, r.Cycle)
+}
+
 func FindLanded(landed []LandedCommit, r DeliverableRecord) bool {
 	if len(r.Commits) == 0 {
 		return false
 	}
-	present := make(map[string]bool, len(landed))
+	available := make(map[string]int, len(landed))
 	for _, l := range landed {
-		if HasCycleTrailer(l.Message, r.Cycle) {
-			present[l.PatchID] = true
+		if r.OwnsMessage(l.Message) {
+			available[l.PatchID]++
 		}
 	}
 	for _, c := range r.Commits {
-		if !present[c.PatchID] {
+		if available[c.PatchID] == 0 {
 			return false
 		}
+		available[c.PatchID]--
 	}
 	return true
 }
