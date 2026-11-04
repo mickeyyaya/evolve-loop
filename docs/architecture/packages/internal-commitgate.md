@@ -6,7 +6,7 @@
 
 `internal/commitgate` is the pre-commit quality gate that the `/commit` skill runs as `evolve commit-gate run`. It does these steps:
 
-1. It refuses what never commits (a compiled executable, an added comment, a removed history comment no archive page records).
+1. It refuses what never commits: a compiled executable, an added comment, an unrecorded history removal or a dropped journey row.
 2. It detects the languages of the changed files.
 3. It checks that a simplifier and one reviewer were declared (unless the change is a proven comment removal).
 4. It runs lint and targeted tests per language.
@@ -124,6 +124,22 @@
   - The archive pages are those under `docs/history/code-comments/`, the generated `README.md` index aside.
   - An unreadable HEAD or an unlistable change is ExitGitFatal.
   - Pinned by `TestRun_ARewrittenHistoryPageIsRefusedEvenWhenTheChangeIsWaived` and `TestRefuseRewrittenHistory_AnUnreadableArchiveIsAFault`.
+
+- **A journey row goes away only with `retired` and a reason.**
+  - `refuseDroppedJourneys` (`journey_rows.go`) runs with the other refusals in `refuseWhatNeverCommits`, and only when the change set holds `go/test/journeys/journeys.json`.
+  - It loads the new registry with `journeys.Load`. A deleted or invalid registry is refused (ExitFail).
+  - It reads the registry at `HEAD` through `commentaudit.ReadAtBase`, as the comment refusals do. A registry new at this commit has no rows to keep. An unreadable `HEAD` is ExitGitFatal.
+  - A base that does not parse has no rows to keep, and the gate writes one log line about it.
+  - It refuses each id of `HEAD` that is not in the new file (`journeys.Registry.Removed`), and it names the ids.
+  - Pinned by `TestRefuseDroppedJourneys_ARowGoesAwayOnlyWithRetiredAndAReason`, `TestRefuseDroppedJourneys_PassesWhenTheRegistryIsNotChangedOrHasNoBase` and the journey `TestJourney_AJourneyRowGoesAwayOnlyWithRetiredAndAReason` (`go/cmd/evolve`).
+
+- **The fix-proof check blocks nothing.**
+  - `reportFixProof` (`fix_proof.go`) runs first in `Run`. It applies only when `FixProofStage` is `config.StageShadow` and the subject type of `Message` is `fix` (`commitprefixgate.SubjectType`).
+  - A message with no valid `Fix-Journey` trailer gives `FIX_PROOF_MISSING`. An id that is not an active row, or an unreadable registry, gives `FIX_PROOF_UNKNOWN`. `Fix-Journey: none <reason>` gives nothing.
+  - Each finding is one log line and one WARN event on `Signals` (module `fix_proof`, kind `fix_proof.warning`, fields `stage` and `subject`). The exit code does not change.
+  - The command layer (`internal/cli/guardcmd`) sets `Message` from `--message`, and `Signals` from a center that the role `commit-gate` publishes.
+  - It sets the stage from `policy.RegressionProofStageFor`. If the policy does not load, it writes one WARN line, and the stage stays `shadow`.
+  - Pinned by `TestReportFixProof_EmitsTheCodeOfEachFindingAtShadow`, `TestRun_ReportsTheFixProofBeforeAnyLane` and the journey `TestJourney_AFixCommitWithNoFixJourneyTrailerGetsFixProofMissingAndStillPasses` (`go/cmd/evolve`). The spec is [regression-proof-and-supervision.md §3.5](../regression-proof-and-supervision.md#35-the-shadow-check).
 
 - **The attestation binds to sha256(`git diff HEAD`).** `TestGolden_GoPipelineWritesByteExactAttestation` runs the real pipeline over a real repo, computes the SHA independently and checks both the binding and the ts-normalized byte layout. `TestRun_AttestationStableBytes` and `TestRun_EmptyArraysMarshalInline` pin the layout from the writer side.
 - **The gate never mutates the host.** Without a test seam, a missing auto-installable tool is reported as ExitToolMissing with the manual install hint; `Run` never shells out an installer (`TestEnsureTool_ForceMissingSeam`, `TestEnsureTool_NotAutoInstallable`).

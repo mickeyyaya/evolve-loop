@@ -27,6 +27,7 @@
 - **Globs follow bash `case` rules, not `path/filepath.Match`.** `*` crosses `/`. `?` is one character. `[abc]` is a class.
 - **`matchPath` tries four forms in order.** They are the direct glob, `**` collapsed to `*`, `prefix/**` (anything below the prefix) and `**/suffix` (the suffix at any depth, or alone).
 - **The guards log is best effort.** `appendGuardsLog` discards its error at that boundary on purpose. A read-only sandbox is expected to fail there, and the gate must never show that failure. The open, write and close live in `guardslog.Append`.
+- **`SubjectType`** gives the type of the conventional subject, for example `fix` for `fix(gate)!: a`, or an empty string. `Run` and the fix-proof check of `internal/commitgate` read the subject through the same `prefixRE`.
 - **The diff comes through the `GetDiffPaths` seam.** The default shells out to git. `ModeStaged` runs `git diff --cached --name-only`. `ModeRef` runs `git diff <ref>..HEAD --name-only`.
 
 ## Invariants

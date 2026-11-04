@@ -17,7 +17,7 @@ func (o Options) refuseWhatNeverCommits(ctx context.Context, files []string, res
 	if code := o.refuseBinaries(files, res); code != ExitPass {
 		return code
 	}
-	for _, refuse := range []func(context.Context, []string, *Result) int{o.refuseAddedComments, o.refuseUnrecordedHistory, o.refuseRewrittenHistory} {
+	for _, refuse := range []func(context.Context, []string, *Result) int{o.refuseAddedComments, o.refuseUnrecordedHistory, o.refuseRewrittenHistory, o.refuseDroppedJourneys} {
 		if code := refuse(ctx, files, res); code != ExitPass {
 			return code
 		}

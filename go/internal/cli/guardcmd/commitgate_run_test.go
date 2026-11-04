@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/commitgate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
@@ -69,5 +70,34 @@ func TestRunCommitGate_WithNoProjectRootTakesTheRepoOfTheWorkingDirectory(t *tes
 	errb.Reset()
 	if rc := RunCommitGate([]string{"run", "--reviewers", "docs-review"}, nil, &out, &errb); rc == 0 || !strings.Contains(errb.String(), "not in a git repo") {
 		t.Fatalf("rc %d stderr %q: outside a git repo the gate must refuse", rc, errb.String())
+	}
+}
+
+func TestCommitGateRoot_ARelativeProjectRootBecomesAbsolute(t *testing.T) {
+	t.Parallel()
+	root, code := commitGateRoot("repo", nil, nil)
+
+	if code != commitgate.ExitPass || !filepath.IsAbs(root) || filepath.Base(root) != "repo" {
+		t.Fatalf("commitGateRoot(repo) = %q, %d; want an absolute path that ends in repo", root, code)
+	}
+}
+
+func TestFixProofStage_AnUnreadablePolicyWarnsAndKeepsShadow(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".evolve", "policy.json"), []byte(`{"regression_proof":`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var errb bytes.Buffer
+
+	if got := fixProofStage(root, &errb); got != config.StageShadow || !strings.Contains(errb.String(), "regression_proof") {
+		t.Fatalf("fixProofStage = %v, stderr %q; want shadow and a warning that names regression_proof", got, errb.String())
+	}
+	errb.Reset()
+	if got := fixProofStage(t.TempDir(), &errb); got != config.StageShadow || errb.Len() != 0 {
+		t.Fatalf("fixProofStage with no policy = %v, stderr %q; want shadow and no warning", got, errb.String())
 	}
 }

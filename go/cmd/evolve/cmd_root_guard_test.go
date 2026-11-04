@@ -95,6 +95,7 @@ func TestRootSignalCenter_EveryRootSubscribesThePublisher(t *testing.T) {
 	want := map[string][]string{
 		"signalcenter.New": {
 			"cmd/evolve/cmd_cycle.go:newRootSignalCenter",
+			"internal/cli/guardcmd/commitgate.go:commitGateSignals",
 			"internal/cli/phasecmd/phase_observer.go:observerSignalCenter",
 		},
 		"newRootSignalCenter": {"cmd/evolve/cmd_cycle.go:newRoleSignalCenter"},
@@ -114,7 +115,7 @@ func TestRootSignalCenter_EveryRootSubscribesThePublisher(t *testing.T) {
 			"cmd/evolve/dispatch_gate.go:emitDispatchViolation",
 		},
 		"attachRootEventsFn": {"cmd/evolve/cmd_cycle.go:newRoleSignalCenter"},
-		"rootwire.Attach":    {"internal/cli/phasecmd/phase_observer.go:observerSignalCenter"},
+		"rootwire.Attach":    {"internal/cli/guardcmd/commitgate.go:commitGateSignals", "internal/cli/phasecmd/phase_observer.go:observerSignalCenter"},
 	}
 
 	got := callSitesOf(files, "signalcenter.New", "newRootSignalCenter", "newRoleSignalCenter", "attachRootEventsFn", "rootwire.Attach")
@@ -306,6 +307,7 @@ func TestRootSignalCenter_EveryRootDefersItsCloser(t *testing.T) {
 		"cmd/evolve/cmd_loop_chain.go:maybeRefreshChainBoundary",
 		"cmd/evolve/cmd_ship.go:runShipCmd",
 		"cmd/evolve/cmd_subagent.go:runSubagentRun",
+		"internal/cli/guardcmd/commitgate.go:RunCommitGate",
 		"internal/cli/phasecmd/phase_observer.go:RunPhaseObserver",
 	} {
 		if flow.roots[floor] == nil {

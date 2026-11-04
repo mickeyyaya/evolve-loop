@@ -11,6 +11,10 @@
 - **`Trailer`.** `Phase` and `Challenge` are load-bearing for completion verification. The artifact fields are forensic provenance: which deliverable the commit evidences.
 - **`Build`.** It renders a leading blank line, then one `Key: Value` line for each non-empty field, in a stable order. Deterministic output gives reproducible commits and is cache friendly. `Cycle` is emitted when it is above 0.
 - **`Parse`.** It reads the trailing block of the message: the contiguous run of trailer lines at the end. It walks backward from the end. Unknown keys are ignored, and missing keys leave the zero value. A message without a trailer block gives a zero `Trailer`.
+- **`ParseFixJourney`.** It reads the last `Fix-Journey` line (`KeyFixJourney`) of the message, in any paragraph. The reason: `evolve ship` adds a diff footer after the trailers of the operator.
+  - `Fix-Journey: <id>` gives `ID`. `Fix-Journey: none <reason>` gives `Reason`, and `None` is true.
+  - A message with no such trailer gives a zero `FixJourney`.
+  - The parser checks only the grammar. The commit gate checks the id against the journey registry ([regression-proof-and-supervision.md §3.4](../regression-proof-and-supervision.md#34-the-fix-journey-trailer)).
 - **Key grammar.** A key is a non-empty run of `[A-Za-z0-9-]` (`cutTrailer`, `isKeyByte`). `isTrailerLine` accepts prose such as `see: http://...` only loosely. The backward contiguous-run scan in `Parse` is what bounds the block.
 
 ## Invariants
@@ -18,3 +22,4 @@
 - **The block is contiguous.** `Build` emits no blank line between trailer lines, because a blank line ends the trailer run that `Parse` reads. This is what makes `Parse` round-trip `Build`.
 - **Body colons are not trailers.** An earlier body line that contains a colon is never read as a trailer, because only the final contiguous run counts.
 - **`Verify` fails closed.** It needs a non-empty phase and a non-empty expected token, and both must match. An empty expected token is rejected, so a missing token can never satisfy verification. A trailer with an empty `Phase` builds a block that `Verify` can never accept, so every emitter must set `Phase`.
+- **A `none` needs a reason.** `Fix-Journey: none` with no reason, an empty value and a value of two words that does not start with `none` give `ErrFixJourneyInvalid` (`TestParseFixJourney_RefusesNoneWithNoReasonAndTwoWords`).

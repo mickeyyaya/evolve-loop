@@ -171,6 +171,13 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `FAILURELEARNING_RECURRENCE_LEDGER_FAILED` | the recurrence ledger keyed by the failing pattern could not be loaded, updated or saved (fields.op = load | record | save); Count() stays stale for this pattern, the phase failure is never masked; fields.step=recurrence, path |
 | `FAILURELEARNING_REMEDIATION_TRUNCATED` | a failed phase self-reported more defects than the remediation cap; the first ones are filed as inbox items and the rest dropped — fix the emitter or raise the cap; fields.step=floor, reported, filed |
 
+### fix_proof
+
+| Code | Meaning |
+|---|---|
+| `FIX_PROOF_MISSING` | evolve commit-gate run at regression_proof.stage shadow: the --message subject has the type fix and the message has no valid Fix-Journey line (Fix-Journey: <id> or Fix-Journey: none <reason>); WARN, blocks nothing; fields stage, subject (regression-proof-and-supervision.md §3) |
+| `FIX_PROOF_UNKNOWN` | evolve commit-gate run at regression_proof.stage shadow: the Fix-Journey line of a fix commit names an id that is not an active row of go/test/journeys/journeys.json, or the registry cannot be read; WARN, blocks nothing; fields stage, subject (regression-proof-and-supervision.md §3) |
+
 ### gate.contract
 
 | Code | Meaning |

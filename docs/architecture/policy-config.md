@@ -263,6 +263,14 @@ The block configures the live reaction of the incident detector ([internal-selfh
 |---|---|---|---|
 | `stage` | `off` arms nothing. `shadow` writes the incident record and emits the `selfheal.incident` event with the field `reaction` `would_brake`. `enforce` also engages the loop brake `.evolve/loop-stop` once, so the rolling pool admits no new lane. | `shadow` | a value other than `off`, `shadow` or `enforce` |
 
+## Regression proof (`regression_proof`)
+
+The block sets the stage of the check of the `Fix-Journey` trailer ([regression-proof-and-supervision.md §3.5](regression-proof-and-supervision.md#35-the-shadow-check)). `evolve commit-gate run` reads it through `policy.RegressionProofStageFor`. A policy that does not load gives the default.
+
+| Key | Meaning | Default | Refused |
+|---|---|---|---|
+| `stage` | `off` checks nothing. `shadow` emits `FIX_PROOF_MISSING` or `FIX_PROOF_UNKNOWN` for a `fix:` commit and blocks nothing. | `shadow` | a value other than `off` or `shadow` |
+
 ## Convergence policy (`workflow.convergence`)
 
 The block configures `internal/convergence`, the one rule every repeat-until-accepted loop uses to choose its next rung ([ADR-0126](adr/0126-every-iterative-loop-converges-or-escalates.md), [design](convergence-policy.md) §8; `evolve convergence decide` prints a decision). Absent means the compiled defaults below.

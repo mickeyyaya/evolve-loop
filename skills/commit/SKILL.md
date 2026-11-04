@@ -25,7 +25,8 @@ Follow in order. **Do not edit any file between step 4 and step 5.** An edit mak
    | b | **one review**: the matching language reviewer (`go-reviewer` / `python-reviewer` / `typescript-reviewer` / `rust-reviewer`) **OR** the general `code-reviewer` / `/code-review` — pick **one** | correctness, security, semantics |
 
    Prefer the language reviewer when there's a clear primary language (richer); use the general `code-reviewer` for mixed/other languages. The combined `evo:code-review-simplify` skill satisfies **both a and b** in a single pass.
-4. **Scan for secrets, then run the gate**: first `"$CLAUDE_PROJECT_DIR/go/bin/evolve" scan secrets --staged`, then `"$CLAUDE_PROJECT_DIR/go/bin/evolve" commit-gate run --reviewers "<comma-list of what you ran>"`. Give a review run as `run:<run label>`.
+4. **Scan for secrets, then run the gate**: first `"$CLAUDE_PROJECT_DIR/go/bin/evolve" scan secrets --staged`, then `"$CLAUDE_PROJECT_DIR/go/bin/evolve" commit-gate run --reviewers "<comma-list of what you ran>" --message "<the commit message>"`. Give a review run as `run:<run label>`.
+   - Give the message that step 5 commits. If the subject starts with `fix:`, add the line `Fix-Journey: <id>` (a row of `go/test/journeys/journeys.json`) or `Fix-Journey: none <reason>`. At `regression_proof.stage` `shadow`, the gate prints `FIX_PROOF_MISSING` or `FIX_PROOF_UNKNOWN` and blocks nothing ([the spec](../../docs/architecture/regression-proof-and-supervision.md#34-the-fix-journey-trailer)).
    - The scan is read-only and deterministic. It checks the added lines of the staged diff. It prints each finding as `<file>:<line>: <rule>: <masked match>` (raw secrets are never printed).
    - **exit 0** → run the gate. **exit 1** → remove the secret, re-stage, return to step 3.
    - **exit 2** → git failed (not a repo, bad revision). Stop and report.
