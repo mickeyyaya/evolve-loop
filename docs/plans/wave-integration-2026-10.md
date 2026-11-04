@@ -2,6 +2,7 @@
 
 - **Status:** proposed, 2026-10-20. The operator decided the questions of §7 on 2026-10-27. Each component of §6 has an inbox item since 2026-10-27.
 - **Research:** [wave-integration-2026-10](../research/wave-integration-2026-10.md). **Decision:** [ADR-0147](../architecture/adr/0147-the-wave-orchestrator-owns-integration-and-decides-when-the-wave-reaches-main.md). **Design:** [wave-orchestrator §15](../architecture/wave-orchestrator.md#15-integration).
+- **Amended:** 2026-11-04, [§10](#10-amendment-of-2026-11-04-console-prs-enter-the-train).
 - **Amends:** [ADR-0139](../architecture/adr/0139-a-wave-orchestrator-supplies-admits-and-backfills-every-lane.md) (the orchestrator now owns landing), [ADR-0128](../architecture/adr/0128-landing-queue-tiered-reverification.md) and [ADR-0134](../architecture/adr/0134-fleet-landings-scale-through-content-keyed-verification-and-group-commit.md) (their composition, proof, tiers and conflict-graph order become parts of the integration engine).
 
 ## Table of contents
@@ -15,6 +16,7 @@
 - [7. Open questions for the operator](#7-open-questions-for-the-operator)
 - [8. Verification](#8-verification)
 - [9. Limits](#9-limits)
+- [10. Amendment of 2026-11-04: console PRs enter the train](#10-amendment-of-2026-11-04-console-prs-enter-the-train)
 
 ## 1. The problem
 
@@ -191,3 +193,72 @@ The operator accepted each proposed answer on 2026-10-27. Nothing in §6 waits o
 - The prefix check catches what the scoped gates test. A defect outside them can pass, and the CI of the batch PR is the backstop.
 - Two deliverables that pass alone can fail together (research M14). The prefix check catches it only when a test covers the interaction.
 - The orchestrator is the single writer of `main` for the loop.
+
+## 10. Amendment of 2026-11-04: console PRs enter the train
+
+The operator asked on 2026-11-04: "should we update the merging component plan based on your latest research result? I would like to continue to finish the merging component tasks with the latest update to solve every PR has to be queued on main which continuing generating merge conflicts".
+
+**The answer is yes.** This plan solved the race between lanes. It left each console PR on its own path to `main`. D13 even treats a console merge as an outside event that forces a new compose. Sections 1 to 9 stay in force, and this section adds to them.
+
+### Why the plan changes
+
+| Finding | What it changes |
+|---|---|
+| `main` has no branch protection (research [F5.10](../research/harness-practices-2026-11.md#our-own-pr-queue-measured)) | The queue is our own process, so we can change it. |
+| 23 of 40 open PRs compose into one batch (F5.11) | Most of the queue can land with one CI run. |
+| 135 of 780 PR pairs share a file (F5.12) | Each PR shares a file with about 7 others, and each merge leaves all others behind `main`. |
+| `go/.cover-strict` causes 3 of 9 direct conflicts (F5.13) | One line list has a small fix. |
+| Three hand batches landed 76 PRs (F5.14) | The console train automates a procedure that works. |
+| A default patch-id changes on a nearby peer edit (F3.9) | The landed identity needs a fix before a batch relies on it. |
+
+### New decisions
+
+| Id | Decision | Because | Rejected options and why |
+|---|---|---|---|
+| D24 | A reviewed console PR is a deliverable of the train, with the source `console-pr`. Its record holds the PR number, its head, its review binding and its scope. | F5.10, F5.14 | A separate queue for console PRs: it keeps two writers of `main`. |
+| D25 | `evolve integration batch` takes each ready PR, composes in order, ejects each conflict and opens one PR. | F5.11, F5.14 | A batch by hand: three batches show that it works, and each one costs an operator hours. |
+| D26 | A member PR does not update its branch. The batch CI decides. Only an ejected PR rebases, on the integration tip. | F5.12 | `update-branch` for each PR: it moves each other PR behind and reruns CI. |
+| D27 | The console train goes live before lane `enforce`. It has its own operator verb, and it uses no lane path. | F5.14 | Wait for I9: the queue stays until then. |
+| D28 | `go/.cover-strict` and `go/.apicover-enforce` use the `union` merge driver. A guard test checks order and uniqueness. | F5.13 | `union` on prose: it can join two edits into wrong text. |
+| D29 | A prose registry moves to one entry file for each change and a generator, as `docs/research-index/` does. It moves when its count of shared PRs stays high. | F5.13 | Move each file now: the measured gain does not justify the size. |
+| D30 | The landed identity uses a zero-context patch-id. | F3.9 | The default context: a nearby peer edit changes the id. |
+| D31 | `main` gets branch protection in two steps. See below. | F5.10, operator 2026-11-04 | One required check when I12 lands: at `shadow`, lanes still push `main`, and the check refuses them. |
+
+D24 replaces the part of D13 that applies to a PR in the batch. A console PR that merges outside the train still makes the orchestrator compose again.
+
+### New components
+
+| Id | Component | Red test first, as a journey | Owner | Inbox item |
+|---|---|---|---|---|
+| I12 | The console train: the record adapter and `evolve integration batch` | Three reviewed PRs, one in conflict: two land with one fast-forward, and the third gets its brief. | console | `wave-integration-i12-console-pr-train` |
+| I13 | The `union` driver for line lists, with the guard test | Two PRs add one line each to `go/.cover-strict`, and both compose. A duplicate line fails the guard. | console | `wave-integration-i13-line-lists-union` |
+
+### The amended order
+
+The goal of the order is to end the queue first. The lane work follows.
+
+1. **I2 with R4.** The compose engine and the fixed identity. Everything below needs them.
+2. **I13.** It is small and independent, and it removes a third of the direct conflicts at once.
+3. **I10, then I3 and I3b.** The record, the ejection brief and the batch test.
+4. **I5, then I12.** The flush and the merge, then the console train. **The queue on `main` ends here.**
+5. **I6, I7, I11 and I8.** The lane parts for `enforce`.
+6. **I9.** The operator moves lanes to `enforce` after two consecutive clean shadow waves ([ADR-0159](../architecture/adr/0159-the-loop-keeps-its-integration-train-and-takes-six-practices-from-the-2026-harness-projects.md)).
+
+Until step 4 lands, these components land as one more hand batch, because the train cannot carry itself.
+
+### Branch protection on `main`
+
+The operator decided on 2026-11-04: `main` gets branch protection once the train is live. The train replaces each writer of `main` in two steps, so the protection has two steps.
+
+| Step | When | Rule | Why this order |
+|---|---|---|---|
+| 1 | I12 lands | Refuse a force-push and a branch delete | A lane push is a fast-forward, so this rule does not stop a wave. |
+| 2 | I9 moves lanes to `enforce` | Add one required check | No lane writes `main` then. The tested tip carries its green check. |
+
+Step 2 requires no pull request and no up-to-date rule. D11 pushes the tested tip as a fast-forward, and each of these rules can refuse that push. A test on a scratch branch must prove this push before the rule applies to `main`. The inbox item is `main-branch-protection-in-two-steps`.
+
+### What this does not prove
+
+- The figure of 23 counts textual composition. A batch can still fail its tests, and D10 then splits it.
+- The simulation ran once, on one day, in the order of creation. The order score of D3 can give a different count.
+- A file conflict with a registry is the cheapest class. The other 14 ejected PRs need a rebase in any design.
