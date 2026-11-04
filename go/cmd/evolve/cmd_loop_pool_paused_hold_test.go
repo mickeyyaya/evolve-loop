@@ -14,7 +14,7 @@ import (
 )
 
 func holdPlan(evolveDir string, paused []core.PausedScope, warn *bytes.Buffer) pausedPlan {
-	return pausedPlan{paused: paused, now: time.Now(), adoptable: inboxAdoptable(evolveDir), itemFiles: inboxItemFiles(evolveDir), warn: warn}
+	return pausedPlan{paused: paused, now: time.Now(), adoptable: inboxAdoptable(evolveDir, nil), itemFiles: inboxItemFiles(evolveDir), warn: warn}
 }
 
 func seedHoldInbox(t *testing.T, evolveDir string, ids ...string) {
@@ -102,7 +102,7 @@ func TestPausedPlan_ALostFileClaimWarnsAndNamesTheItem(t *testing.T) {
 
 func TestInboxAdoptable_RefusesAnEmptyScope(t *testing.T) {
 	t.Parallel()
-	if err := inboxAdoptable(t.TempDir())(core.PausedScope{Cycle: 3}); err == nil {
+	if err := inboxAdoptable(t.TempDir(), nil)(core.PausedScope{Cycle: 3}); err == nil {
 		t.Fatal("an empty scope must be refused")
 	}
 }

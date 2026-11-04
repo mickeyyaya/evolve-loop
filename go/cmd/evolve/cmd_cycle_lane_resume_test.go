@@ -262,7 +262,9 @@ func TestLaneResume_APartialClaimIsReleasedAndTheLaneStartsAFreshCycle(t *testin
 		release error
 		want    []string
 	}{
-		{"a todo the claimer skips", hostInboxClaimer(nil, nil, nil), nil, []string{"item-b is not claimed by cycle 7 (cycle 0 holds it)"}},
+		{"a todo the claimer skips", func(inboxDir string, cycle int, ids []string) error {
+			return hostInboxClaimer(nil, nil, nil)(inboxDir, cycle, ids[:1])
+		}, nil, []string{"item-b is not claimed by cycle 7 (cycle 0 holds it)"}},
 		{"a failed claim and a failed release", func(inboxDir string, cycle int, ids []string) error {
 			if err := hostInboxClaimer(nil, nil, nil)(inboxDir, cycle, ids[:1]); err != nil {
 				return err
@@ -274,7 +276,6 @@ func TestLaneResume_APartialClaimIsReleasedAndTheLaneStartsAFreshCycle(t *testin
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			p := seedPausedScope(t, []string{"item-a", "item-b"}, 7, 0)
-			p.addItem(t, "item-b", map[string]any{"route": "console-only"})
 			var stderr bytes.Buffer
 			var got startedCycle
 			lane := p.lane(&stderr, nil, "item-a", "item-b")

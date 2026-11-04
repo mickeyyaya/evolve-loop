@@ -61,6 +61,6 @@ func productionPoolPlanFn(cfg loopConfig, storage core.Storage, count int, stder
 		if perr != nil {
 			fmt.Fprintf(stderr, "[pool] WARN: the scan for paused lane cycles failed (%v); the plan keeps the triage order\n", perr)
 		}
-		return pausedPlan{paused: paused, now: time.Now(), adoptable: inboxAdoptable(cfg.EvolveDir), itemFiles: inboxItemFiles(cfg.EvolveDir), warn: stderr}.order(todos), err
+		return pausedPlan{paused: paused, now: time.Now(), adoptable: inboxAdoptable(cfg.EvolveDir, laneForbidden(cfg.ProjectRoot, stderr)), itemFiles: inboxItemFiles(cfg.EvolveDir), warn: stderr}.order(todos), err
 	}
 }

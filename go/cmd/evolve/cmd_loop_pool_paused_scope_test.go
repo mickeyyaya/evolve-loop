@@ -23,7 +23,7 @@ func TestPausedPlan_APartlyGoneScopeIsNotPutFirstAndWarns(t *testing.T) {
 		writeE2File(t, filepath.Join(evolveDir, "inbox", "2026-11-03T00-00-00Z-"+present+".json"), `{"id":"`+present+`","files":["go/x.go"]}`)
 		var warn bytes.Buffer
 
-		got := pausedPlan{paused: paused, now: time.Now(), adoptable: inboxAdoptable(evolveDir), itemFiles: inboxItemFiles(evolveDir), warn: &warn}.order(nil)
+		got := pausedPlan{paused: paused, now: time.Now(), adoptable: inboxAdoptable(evolveDir, nil), itemFiles: inboxItemFiles(evolveDir), warn: &warn}.order(nil)
 
 		if len(got) != 0 {
 			t.Errorf("only %s located: backlog = %+v, want none", present, got)
@@ -40,7 +40,7 @@ func TestPausedPlan_ATypedFilesItemTheLaneCanAdoptIsPutFirst(t *testing.T) {
 	writeE2File(t, filepath.Join(evolveDir, "inbox", "2026-11-03T00-00-00Z-typed.json"), `{"id":"typed","files":5}`)
 	paused := []core.PausedScope{{Cycle: 9, Scope: []string{"typed"}, AutoMaxAttempts: 3}}
 
-	got := pausedPlan{paused: paused, now: time.Now(), adoptable: inboxAdoptable(evolveDir), itemFiles: inboxItemFiles(evolveDir)}.order(nil)
+	got := pausedPlan{paused: paused, now: time.Now(), adoptable: inboxAdoptable(evolveDir, nil), itemFiles: inboxItemFiles(evolveDir)}.order(nil)
 
 	if want := []fleet.Todo{{ID: "typed"}}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("backlog = %+v, want %+v", got, want)

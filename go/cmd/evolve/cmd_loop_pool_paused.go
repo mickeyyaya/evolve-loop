@@ -83,13 +83,13 @@ func (pp pausedPlan) lead(p core.PausedScope, triage []fleet.Todo) (fleet.Todo, 
 	return lead, rest, true
 }
 
-func inboxAdoptable(evolveDir string) func(p core.PausedScope) error {
+func inboxAdoptable(evolveDir string, protected func(string) bool) func(p core.PausedScope) error {
 	inbox := filepath.Join(evolveDir, "inbox")
 	return func(p core.PausedScope) error {
 		if len(p.Scope) == 0 {
 			return errors.New("the scope has no item")
 		}
-		return scopeHold{inbox: inbox, scope: p.Scope}.adoptableBy(p.Cycle)
+		return scopeHold{inbox: inbox, scope: p.Scope, protected: protected}.adoptableBy(p.Cycle)
 	}
 }
 

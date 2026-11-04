@@ -133,7 +133,7 @@ func TestResumeAll_EveryPausedCycleResumesConcurrentlyAtItsOwnPhaseAfterOneGrant
 	if err != nil {
 		t.Fatal(err)
 	}
-	backlog := pausedPlan{paused: paused, now: time.Now(), adoptable: inboxAdoptable(evolveDir), itemFiles: inboxItemFiles(evolveDir)}.order([]fleet.Todo{{ID: walledTodo(2139), Files: []string{"go/x.go"}}, {ID: "fresh-item"}})
+	backlog := pausedPlan{paused: paused, now: time.Now(), adoptable: inboxAdoptable(evolveDir, nil), itemFiles: inboxItemFiles(evolveDir)}.order([]fleet.Todo{{ID: walledTodo(2139), Files: []string{"go/x.go"}}, {ID: "fresh-item"}})
 	var order []string
 	for _, td := range backlog {
 		order = append(order, td.ID)
