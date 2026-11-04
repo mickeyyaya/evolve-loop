@@ -654,7 +654,7 @@ The stage key is one key for the whole orchestrator (ADR-0139 decision 16). Each
 
 ## 15. Integration
 
-> [ADR-0147](adr/0147-the-wave-orchestrator-owns-integration-and-decides-when-the-wave-reaches-main.md) (Proposed, 2026-10-20) · plan: [wave-integration-2026-10](../plans/wave-integration-2026-10.md) (D1 to D31, with the [amendment of 2026-11-04](../plans/wave-integration-2026-10.md#10-amendment-of-2026-11-04-console-prs-enter-the-train) that adds I12 and I13 and puts console PRs in the train) · research: [wave-integration-2026-10](../research/wave-integration-2026-10.md) (F2.1 to F2.7, M1 to M16).
+> [ADR-0147](adr/0147-the-wave-orchestrator-owns-integration-and-decides-when-the-wave-reaches-main.md) (Proposed, 2026-10-20) · plan: [wave-integration-2026-10](../plans/wave-integration-2026-10.md) (D1 to D31; [the amendment](../plans/wave-integration-2026-10.md#10-amendment-of-2026-11-04-console-prs-enter-the-train) adds console PRs) · research: [wave-integration-2026-10](../research/wave-integration-2026-10.md) (F2.1 to F2.7, M1 to M16).
 
 ### Issue
 
