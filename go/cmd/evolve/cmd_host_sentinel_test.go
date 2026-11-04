@@ -15,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
 	"github.com/mickeyyaya/evolve-loop/go/internal/hostsentinel"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
@@ -135,11 +136,7 @@ func TestNewHostSentinel_OffAndAnUnknownStageBuildNoSentinel(t *testing.T) {
 		if warn != "" && !strings.Contains(stderr.String(), warn) {
 			t.Errorf("%s: stderr %q, want the bad stage named", body, stderr.String())
 		}
-		host, stop := startHostSentinel(context.Background(), cfg, nil, io.Discard)
-		stop()
-		if host != nil {
-			t.Errorf("%s started a sentinel", body)
-		}
+		startHostSentinel(context.Background(), nil)()
 	}
 }
 
@@ -148,7 +145,8 @@ func TestStartHostSentinel_TheDefaultPolicyRunsAtShadowAndStopsWithTheLoop(t *te
 	evolveDir := filepath.Join(t.TempDir(), ".evolve")
 	writeHostPolicy(t, evolveDir, `{}`)
 	ctx, cancel := context.WithCancel(context.Background())
-	host, stop := startHostSentinel(ctx, loopConfig{ProjectRoot: filepath.Dir(evolveDir), EvolveDir: evolveDir}, nil, io.Discard)
+	host := newHostSentinel(loopConfig{ProjectRoot: filepath.Dir(evolveDir), EvolveDir: evolveDir}, nil, io.Discard)
+	stop := startHostSentinel(ctx, host)
 	if host == nil || host.HoldLanes() {
 		t.Fatal("the default policy must start a shadow sentinel that holds no lane")
 	}
@@ -173,7 +171,7 @@ func TestHostGatedLaunch_BelowTheFloorNoNewLaneStartsAndARunningLaneContinues(t 
 		Sample: func(context.Context) hostsentinel.Sample {
 			return hostsentinel.Sample{At: time.Now(), Readings: map[hostsentinel.Metric]hostsentinel.Reading{hostsentinel.MetricDiskFree: {Value: disk}}}
 		},
-		Release: func(context.Context, []hostsentinel.Breach, bool) []hostsentinel.Release { return nil },
+		Release: func(context.Context, []hostsentinel.Breach, hostsentinel.Stage) []hostsentinel.Release { return nil },
 		Emit:    func(signalcenter.Event) {},
 		Save:    func(hostsentinel.Status) error { return nil },
 		Warn:    func(string) {},
@@ -270,5 +268,21 @@ func TestNewHostSentinel_AStatusThatCannotBeSavedIsAWarningAndTheTickReturns(t *
 	host.Tick(context.Background())
 	if !strings.Contains(stderr.String(), "[host] WARN: host sentinel: the last sample was not saved") {
 		t.Fatalf("stderr = %q, want the failed save as a warning", stderr.String())
+	}
+}
+
+func TestHostSentinelConfig_TheCacheAndTheDiskLimitsComeFromTheGCBlock(t *testing.T) {
+	t.Parallel()
+	pol := policy.Policy{GC: &gc.Policy{GoCacheMaxGB: 3, CacheTrimFreeGB: 7}}
+	c, err := hostSentinelConfig(pol)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Limits[hostsentinel.MetricGoCache] != 3e9 || c.Limits[hostsentinel.MetricDiskFree] != 7e9 {
+		t.Fatalf("limits = %v, want the gc cap 3e9 and the gc trim floor 7e9", c.Limits)
+	}
+	c, err = hostSentinelConfig(policy.Policy{HostSentinel: &hostsentinel.Policy{DiskLowGiB: 2}})
+	if err != nil || c.Limits[hostsentinel.MetricDiskFree] != 2*(1<<30) {
+		t.Fatalf("without a gc trim floor the sentinel limit applies: %v, %v", c.Limits, err)
 	}
 }

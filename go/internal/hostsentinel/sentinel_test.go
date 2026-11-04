@@ -30,11 +30,11 @@ type recorder struct {
 func (r *recorder) ports(sample func(context.Context) Sample) Ports {
 	return Ports{
 		Sample: sample,
-		Release: func(_ context.Context, b []Breach, apply bool) []Release {
+		Release: func(_ context.Context, b []Breach, stage Stage) []Release {
 			r.mu.Lock()
 			defer r.mu.Unlock()
 			r.releases = append(r.releases, b)
-			r.applied = append(r.applied, apply)
+			r.applied = append(r.applied, stage == StageEnforce)
 			return r.release
 		},
 		Emit: func(e signalcenter.Event) {
@@ -426,7 +426,7 @@ func TestStatusSummary_NamesEachReadingTheBreachesAndTheHold(t *testing.T) {
 		Breaches: []Breach{{Code: CodeDiskLow}, {Code: CodeOrphansHigh}}}
 	s.Sample.Readings[MetricTmux] = Measured(0, errors.New("no tmux"))
 	got := s.Summary()
-	for _, want := range []string{"2026-11-04T09:00:00Z", "stage enforce", "disk free 0.27 GB", "go cache 148.18 GB", "tmux failed", "orphans 324", "load per cpu 3.50", "HOST_DISK_LOW,HOST_ORPHANS_HIGH", "new lanes held"} {
+	for _, want := range []string{"2026-11-04T09:00:00Z", "stage enforce", "disk free 0.25 GiB", "go cache 138.00 GiB", "tmux failed", "orphans 324", "load per cpu 3.50", "HOST_DISK_LOW,HOST_ORPHANS_HIGH", "new lanes held"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("Summary() = %q, want %q", got, want)
 		}

@@ -53,8 +53,8 @@ type check struct {
 }
 
 var checks = []check{
-	{MetricDiskFree, CodeDiskLow, true, "disk free", gbText},
-	{MetricGoCache, CodeCacheHigh, false, "go cache", gbText},
+	{MetricDiskFree, CodeDiskLow, true, "disk free", gibText},
+	{MetricGoCache, CodeCacheHigh, false, "go cache", gibText},
 	{MetricTmux, CodeTmuxHigh, false, "tmux", countText},
 	{MetricOrphans, CodeOrphansHigh, false, "orphans", countText},
 	{MetricLoad, CodeLoadHigh, false, "load per cpu", loadText},
@@ -92,6 +92,6 @@ func ParseLoadavg(data []byte, cpus int) (float64, error) {
 	return load / float64(cpus), nil
 }
 
-func gbText(v float64) string    { return fmt.Sprintf("%.2f GB", v/1e9) }
+func gibText(v float64) string   { return fmt.Sprintf("%.2f GiB", v/bytesPerGiB) }
 func countText(v float64) string { return strconv.FormatFloat(v, 'f', 0, 64) }
 func loadText(v float64) string  { return strconv.FormatFloat(v, 'f', 2, 64) }

@@ -17,11 +17,11 @@ type Release struct {
 	Report    []string `json:"report,omitempty"`
 }
 
-func (r Release) outcome(apply bool) string {
+func (r Release) outcome(stage Stage) string {
 	switch {
 	case r.LeaseHeld:
 		return "lease_held"
-	case !apply:
+	case stage != StageEnforce:
 		return "would"
 	case r.Applied:
 		return "applied"
@@ -33,7 +33,7 @@ const throttleSlack = 10
 
 type Ports struct {
 	Sample  func(context.Context) Sample
-	Release func(ctx context.Context, breaches []Breach, apply bool) []Release
+	Release func(ctx context.Context, breaches []Breach, stage Stage) []Release
 	Emit    func(signalcenter.Event)
 	Save    func(Status) error
 	Warn    func(string)
@@ -78,11 +78,10 @@ func (s *Sentinel) Tick(ctx context.Context) Status {
 	sample := s.ports.Sample(ctx)
 	st := Status{Stage: s.cfg.Stage, Sample: sample, Breaches: Evaluate(sample, s.cfg)}
 	s.warnFailed(sample)
-	apply := s.cfg.Stage == StageEnforce
 	if len(st.Breaches) > 0 {
-		st.Releases = s.ports.Release(ctx, st.Breaches, apply)
+		st.Releases = s.ports.Release(ctx, st.Breaches, s.cfg.Stage)
 	}
-	released := releasedField(st.Releases, apply)
+	released := releasedField(st.Releases, s.cfg.Stage)
 	for _, b := range st.Breaches {
 		s.emit(sample.At, signalcenter.Event{Code: b.Code, Reason: string(b.Metric) + " is over its threshold",
 			Fields: map[string]string{"metric": string(b.Metric), "value": number(b.Value), "threshold": number(b.Threshold), "stage": string(s.cfg.Stage), "released": released}})
@@ -134,10 +133,10 @@ func (s *Sentinel) emit(at time.Time, e signalcenter.Event) {
 	s.ports.Emit(e)
 }
 
-func releasedField(releases []Release, apply bool) string {
+func releasedField(releases []Release, stage Stage) string {
 	parts := make([]string, len(releases))
 	for i, r := range releases {
-		parts[i] = r.Scope + "=" + r.outcome(apply)
+		parts[i] = r.Scope + "=" + r.outcome(stage)
 	}
 	return strings.Join(parts, ",")
 }

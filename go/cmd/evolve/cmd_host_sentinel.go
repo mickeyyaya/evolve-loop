@@ -30,22 +30,17 @@ var hostReleaseScope = map[hostsentinel.Metric]string{
 	hostsentinel.MetricOrphans:  gcScopeOrphans,
 }
 
-func startHostSentinel(ctx context.Context, cfg loopConfig, signals *signalcenter.Center, stderr io.Writer) (*hostsentinel.Sentinel, func()) {
-	host := newHostSentinel(cfg, signals, stderr)
+func startHostSentinel(ctx context.Context, host *hostsentinel.Sentinel) func() {
 	if host == nil {
-		return nil, func() {}
+		return func() {}
 	}
-	return host, host.Start(ctx)
+	return host.Start(ctx)
 }
 
 func newHostSentinel(cfg loopConfig, signals *signalcenter.Center, stderr io.Writer) *hostsentinel.Sentinel {
 	pol := policy.LoadOrDefaults(filepath.Join(cfg.EvolveDir, "policy.json"), stderr)
 	gcPol := gcBlock(pol)
-	block := hostsentinel.Policy{}
-	if pol.HostSentinel != nil {
-		block = *pol.HostSentinel
-	}
-	hc, err := block.Config(gcPol.GoCacheMaxBytes())
+	hc, err := hostSentinelConfig(pol)
 	if err != nil {
 		fmt.Fprintf(stderr, "[host] WARN: %v; the host sentinel does not run\n", err)
 		return nil
@@ -60,6 +55,19 @@ func newHostSentinel(cfg loopConfig, signals *signalcenter.Center, stderr io.Wri
 		Save:    func(st hostsentinel.Status) error { return hostsentinel.WriteStatus(cfg.EvolveDir, st) },
 		Warn:    func(m string) { fmt.Fprintf(stderr, "[host] WARN: %s\n", m) },
 	})
+}
+
+func hostSentinelConfig(pol policy.Policy) (hostsentinel.Config, error) {
+	gcPol := gcBlock(pol)
+	block := hostsentinel.Policy{}
+	if pol.HostSentinel != nil {
+		block = *pol.HostSentinel
+	}
+	hc, err := block.Config(gcPol.GoCacheMaxBytes())
+	if trim := gcPol.CacheTrimFreeBytes(); err == nil && trim > 0 {
+		hc.Limits[hostsentinel.MetricDiskFree] = float64(trim)
+	}
+	return hc, err
 }
 
 func hostProbes(projectRoot string, gcPol gc.Policy) map[hostsentinel.Metric]hostProbe {
@@ -127,18 +135,19 @@ func hostScopes(breaches []hostsentinel.Breach) []string {
 	return scopes
 }
 
-func hostRelease(projectRoot string) func(context.Context, []hostsentinel.Breach, bool) []hostsentinel.Release {
-	return func(_ context.Context, breaches []hostsentinel.Breach, apply bool) []hostsentinel.Release {
+func hostRelease(projectRoot string) func(context.Context, []hostsentinel.Breach, hostsentinel.Stage) []hostsentinel.Release {
+	return func(_ context.Context, breaches []hostsentinel.Breach, stage hostsentinel.Stage) []hostsentinel.Release {
 		var out []hostsentinel.Release
 		for _, scope := range hostScopes(breaches) {
-			out = append(out, runHostScope(projectRoot, scope, apply))
+			out = append(out, runHostScope(projectRoot, scope, stage))
 		}
 		return out
 	}
 }
 
-func runHostScope(projectRoot, scope string, apply bool) hostsentinel.Release {
+func runHostScope(projectRoot, scope string, stage hostsentinel.Stage) hostsentinel.Release {
 	args := []string{"--only", scope, "--project-root", projectRoot}
+	apply := stage == hostsentinel.StageEnforce
 	if !apply {
 		args = append(args, "--dry-run")
 	}

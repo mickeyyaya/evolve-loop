@@ -59,7 +59,7 @@ The sentinel emits each code one time in each interval. A breach that continues 
 | `orphans` | The count of finished-cycle orphan processes | `host_sentinel.orphans_max` (above) | `HOST_ORPHANS_HIGH` | `orphans` |
 | `load_per_cpu` | The one-minute load of `/proc/loadavg` divided by the CPU count | `host_sentinel.load_per_cpu_max` (above) | `HOST_LOAD_HIGH` | none |
 
-The cache threshold is the gc cap. The sentinel does not keep a second cache setting.
+The cache threshold is the gc cap. When `gc.cache_trim_free_gb` is set, it is also the disk-low threshold, because the cache scope trims only under that value. The sentinel does not keep a second copy of these settings.
 
 ### 4.3 The gc scopes that are safe during a wave
 
@@ -99,7 +99,7 @@ The values above are the defaults. The stage is `off`, `shadow` (the default) or
 `evolve wave status` shows the last sample on one line, for example:
 
 ```
-host:    sampled 2026-11-04T09:00:00Z, stage shadow: disk free 0.27 GB, go cache 148.18 GB, tmux 11, orphans 324, load per cpu 3.50; breaches HOST_DISK_LOW,HOST_CACHE_HIGH,HOST_ORPHANS_HIGH
+host:    sampled 2026-11-04T09:00:00Z, stage shadow: disk free 0.25 GiB, go cache 138.00 GiB, tmux 11, orphans 324, load per cpu 3.50; breaches HOST_DISK_LOW,HOST_CACHE_HIGH,HOST_ORPHANS_HIGH
 ```
 
 The JSON has the full status in `host`.
