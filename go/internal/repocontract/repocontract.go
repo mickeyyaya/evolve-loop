@@ -214,9 +214,14 @@ var treeReadingSelections = []TestSelection{
 		"TestNoTestRunsARawBareClone",
 		"TestNoTrackedFileRegistersAnMCPServer",
 		"TestOnlyTheTrailAdapterRunsTheTrailBinary",
+		"TestParallelLanesAddingDistinctPackagesComposeInBothMergeOrders",
+		"TestParallelLanesAddingOneIdenticalLineKeepOneLineInBothMergeOrders",
+		"TestParallelLanesAddingOnePackageFailTheGuardInBothMergeOrders",
+		"TestRegistryFilesHoldEachPackageOnce",
 		"TestTheCodeIndexAbstractionRunsNoProcessAndNamesNoBackend",
 		"TestTheMCPConfigReaderOnlyReads",
 		"TestTheTrailAdapterIsTheHomeThatRunsAProcess",
+		"TestUnionMergesTriesBothOrders",
 	}},
 }
 

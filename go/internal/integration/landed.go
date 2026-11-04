@@ -30,10 +30,29 @@ func SysGit() GitFunc {
 		}
 		code, err := sysexec.DefaultRunner(ctx, gitBin, dir, args, nil, in, &out, &errOut)
 		if err != nil || code != 0 {
-			return "", fmt.Errorf("integration: git %s exit=%d: %s %v", strings.Join(args, " "), code, strings.TrimSpace(errOut.String()), err)
+			return "", &GitError{Args: args, Code: code, Stdout: out.String(), Stderr: errOut.String(), Err: err}
 		}
 		return out.String(), nil
 	}
+}
+
+type GitError struct {
+	Args   []string
+	Code   int
+	Stdout string
+	Stderr string
+	Err    error
+}
+
+func (e *GitError) Error() string {
+	return fmt.Sprintf("integration: git %s exit=%d: %s %v", strings.Join(e.Args, " "), e.Code, strings.TrimSpace(e.Stderr), e.Err)
+}
+
+func fullObjectID(sha string) error {
+	if !objectID.MatchString(sha) {
+		return fmt.Errorf("integration: %q is not a full object id", sha)
+	}
+	return nil
 }
 
 type Repo struct {
@@ -42,17 +61,17 @@ type Repo struct {
 }
 
 func (r Repo) PatchID(ctx context.Context, sha string) (string, error) {
-	if !objectID.MatchString(sha) {
-		return "", fmt.Errorf("integration: %q is not a full object id", sha)
+	if err := fullObjectID(sha); err != nil {
+		return "", err
 	}
-	diff, err := r.Git(ctx, r.Dir, "", "diff-tree", "-p", "--root", "--end-of-options", sha)
+	diff, err := r.Git(ctx, r.Dir, "", "diff-tree", "-p", "-U1", "--root", "--end-of-options", sha)
 	if err != nil {
 		return "", fmt.Errorf("integration: read the diff of %s: %w", sha, err)
 	}
 	if strings.TrimSpace(diff) == "" {
 		return "", fmt.Errorf("integration: commit %s has no patch", sha)
 	}
-	out, err := r.Git(ctx, r.Dir, diff, "patch-id", "--stable")
+	out, err := r.Git(ctx, r.Dir, diff, "patch-id", "--verbatim")
 	if err != nil {
 		return "", fmt.Errorf("integration: patch-id of %s: %w", sha, err)
 	}

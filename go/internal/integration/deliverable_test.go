@@ -291,3 +291,37 @@ func TestWriteRecordNeverWritesThroughALinkAtAStagingName(t *testing.T) {
 		t.Errorf("the record write followed a link to %s: %q", victim, got)
 	}
 }
+
+func TestHoldsCommit_VouchesOnlyForACommitOfTheRecord(t *testing.T) {
+	t.Parallel()
+	r := DeliverableRecord{Commits: []CommitIdentity{{SHA: "aaa"}, {SHA: "bbb"}}}
+	if !r.HoldsCommit("bbb") || r.HoldsCommit("ccc") || (DeliverableRecord{}).HoldsCommit("") {
+		t.Error("HoldsCommit vouches for a commit that the record does not hold")
+	}
+}
+
+func TestReadRecordRefusesARecordOfTheContextWidthSchema(t *testing.T) {
+	dir := t.TempDir()
+	path := RecordPath(dir, 42)
+	raw := `{"schema":"evolve.deliverable/1","wave":"w7","cycle":42,"trailer":"Evolve-Cycle: 42","commits":[{"sha":"a1","base_sha":"b0","patch_id":"p1"}]}`
+	if err := os.WriteFile(path, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReadRecord(path); err == nil || !strings.Contains(err.Error(), "evolve.deliverable/1") || !strings.Contains(err.Error(), RecordSchema) {
+		t.Fatalf("err = %v, want a refusal that names both schemas", err)
+	}
+}
+
+func TestFindRecord_AnOldSchemaRecordReadsAsNoRecord(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(WaveDir(root, "w7"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	raw := `{"schema":"evolve.deliverable/1","wave":"w7","cycle":42,"trailer":"Evolve-Cycle: 42","commits":[{"sha":"a1","base_sha":"b0","patch_id":"p1"}]}`
+	if err := os.WriteFile(RecordPath(WaveDir(root, "w7"), 42), []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := FindRecord(root, 42); ok {
+		t.Fatal("FindRecord returned a record of the old schema")
+	}
+}

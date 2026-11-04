@@ -24,3 +24,18 @@ func TestTrailerKeys_DriveBuildAndParse(t *testing.T) {
 		t.Errorf("KeyChallenge round-trip: Challenge=%q want %q", got.Challenge, in.Challenge)
 	}
 }
+
+func TestKeyAuditTree_IsATrailerKeyThatParseKeepsInTheBlock(t *testing.T) {
+	t.Parallel()
+	if KeyAuditTree != "Evolve-Audit-Tree" {
+		t.Fatalf("KeyAuditTree = %q, want Evolve-Audit-Tree", KeyAuditTree)
+	}
+	in := Trailer{Cycle: 7, ArtifactSHA: "def", AuditTree: "abc"}
+	block := in.Build()
+	if !strings.Contains(block, KeyAuditTree+": abc\n") {
+		t.Errorf("Build() must emit the audit tree under %s; got:\n%s", KeyAuditTree, block)
+	}
+	if got := Parse("subject\n" + block); got != in {
+		t.Errorf("Parse(Build()) = %+v, want %+v", got, in)
+	}
+}
