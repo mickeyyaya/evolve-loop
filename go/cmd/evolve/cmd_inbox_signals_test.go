@@ -166,7 +166,7 @@ func TestInboxCenterlessRootsArePinned(t *testing.T) {
 	if calls != 4 {
 		t.Errorf("the four package-level call sites (cmd_cycle.go ×3 with the result closeout, cmd_loop_sequential_outcome.go ×1) must be present, found %d", calls)
 	}
-	centerRoots := map[string]bool{"cmd/evolve/cmd_cycle.go": true, "internal/cli/phasecmd/phase_observer.go": true}
+	centerRoots := map[string]bool{"cmd/evolve/cmd_cycle.go": true, "internal/cli/phasecmd/phase_observer.go": true, "internal/cli/guardcmd/commitgate.go": true}
 	got := nonTestConstructionsOf(t, moduleRoot, `\bsignalcenter\.New\(`)
 	unexpected := false
 	for _, g := range got {
@@ -175,7 +175,7 @@ func TestInboxCenterlessRootsArePinned(t *testing.T) {
 		}
 	}
 	if unexpected || len(got) != len(centerRoots) {
-		t.Errorf("the production Centers are built only at the two process roots (cmd_cycle.go, phasecmd/phase_observer.go); found %v", got)
+		t.Errorf("the production Centers are built only at the three process roots (cmd_cycle.go, phasecmd/phase_observer.go, guardcmd/commitgate.go); found %v", got)
 	}
 }
 

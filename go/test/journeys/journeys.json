@@ -1,0 +1,16 @@
+{
+  "rows": [
+    {
+      "id": "concurrent-resume",
+      "journey": "After one operator grant, each paused cycle resumes at its own phase, and all of them resume at the same time.",
+      "test": "cmd/evolve.TestResumeAll_EveryPausedCycleResumesConcurrentlyAtItsOwnPhaseAfterOneGrant",
+      "issue": "concurrent-resume-of-every-paused-cycle"
+    },
+    {
+      "id": "family-lane",
+      "journey": "Two inbox items of one family run one after the other, never in two lanes at the same time.",
+      "test": "internal/orchestrator.TestPool_TwoTodosOfOneFamilyRunOneAfterTheOther",
+      "issue": "cycle-2066"
+    }
+  ]
+}

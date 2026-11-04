@@ -54,6 +54,7 @@ type Policy struct {
 	ContextFill        *ContextFillPolicy        `json:"context_fill,omitempty"`
 	Research           *ResearchPolicy           `json:"research,omitempty"`
 	RegressionTIA      *RegressionTIAPolicy      `json:"regression_tia,omitempty"`
+	RegressionProof    *RegressionProofPolicy    `json:"regression_proof,omitempty"`
 	Classify           *ClassifyPolicy           `json:"classify,omitempty"`
 	Catalog            *CatalogPolicy            `json:"catalog,omitempty"`
 	Recovery           *RecoveryPolicy           `json:"recovery,omitempty"`

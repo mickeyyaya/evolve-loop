@@ -44,8 +44,8 @@ func writeLine(b *strings.Builder, key, val string) {
 	}
 }
 
-func Parse(msg string) Trailer {
-	lines := strings.Split(strings.TrimRight(msg, "\n"), "\n")
+func trailerBlock(msg string) []string {
+	lines := strings.Split(strings.TrimRight(msg, "\r\n"), "\n")
 	start := len(lines)
 	for i := len(lines) - 1; i >= 0; i-- {
 		if isTrailerLine(lines[i]) {
@@ -54,12 +54,13 @@ func Parse(msg string) Trailer {
 		}
 		break
 	}
+	return lines[start:]
+}
+
+func Parse(msg string) Trailer {
 	var t Trailer
-	for _, ln := range lines[start:] {
-		key, val, ok := cutTrailer(ln)
-		if !ok {
-			continue
-		}
+	for _, ln := range trailerBlock(msg) {
+		key, val, _ := cutTrailer(ln)
 		switch key {
 		case KeyPhase:
 			t.Phase = val

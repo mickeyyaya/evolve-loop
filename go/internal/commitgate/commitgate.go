@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/treestate"
 )
@@ -41,8 +43,13 @@ type Options struct {
 
 	TestInstall  string
 	ForceMissing string
-	lookPath     func(string) (string, error)
-	relPath      func(base, target string) (string, error)
+
+	Message       string
+	FixProofStage config.Stage
+	Signals       *signalcenter.Center
+
+	lookPath func(string) (string, error)
+	relPath  func(base, target string) (string, error)
 }
 
 type Result struct {
@@ -63,6 +70,7 @@ func (o Options) Run(ctx context.Context) *Result {
 	if o.lookPath == nil {
 		o.lookPath = lookPathDefault
 	}
+	o.reportFixProof(res)
 
 	files, code := o.changedFiles(ctx, res)
 	if code == ExitPass {

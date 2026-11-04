@@ -67,6 +67,22 @@ type PrefixRule struct {
 
 var prefixRE = regexp.MustCompile(`^([a-z][a-z-]*(\([a-z0-9-]+\))?)!?:`)
 
+func subjectLine(msg string) string {
+	return strings.TrimLeft(strings.SplitN(msg, "\n", 2)[0], " \t")
+}
+
+func subjectPrefix(msg string) string {
+	if m := prefixRE.FindStringSubmatch(subjectLine(msg)); m != nil {
+		return m[1]
+	}
+	return ""
+}
+
+func SubjectType(msg string) string {
+	typ, _, _ := strings.Cut(subjectPrefix(msg), "(")
+	return typ
+}
+
 func Run(opts Options) (Result, error) {
 	res := Result{}
 
@@ -131,12 +147,8 @@ func Run(opts Options) (Result, error) {
 	}
 	res.Manifest = &manifest
 
-	firstLine := strings.TrimLeft(strings.SplitN(opts.CommitMsg, "\n", 2)[0], " \t")
-	m := prefixRE.FindStringSubmatch(firstLine)
-	prefix := ""
-	if len(m) >= 2 {
-		prefix = m[1]
-	}
+	firstLine := subjectLine(opts.CommitMsg)
+	prefix := subjectPrefix(opts.CommitMsg)
 	res.Prefix = prefix
 	if prefix == "" {
 		logf("WARN: no conventional-commit prefix in '%s' — pass-through", firstLine)

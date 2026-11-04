@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — a registry names each journey and its test (2026-11-04)
+
+- **The registry.** `go/test/journeys/journeys.json` has one row for each critical user journey: an `id`, a `journey` sentence, a `test`, an `issue` and an optional `retired` reason. The parser is `go/internal/journeys`.
+- **The guard.** `TestRegistry_EveryActiveRowNamesATestInTheTree` fails when an active row names a test that is not in the tree. It parses the Go source and runs no test.
+- **Retire, do not delete.** `evolve commit-gate run` refuses a change that drops a row of `HEAD`. A row goes away only with `retired` and a reason.
+- **The trailer.** A `fix:` commit names its journey with `Fix-Journey: <id>` or `Fix-Journey: none <reason>`. `evolve commit-gate run --message` emits `FIX_PROOF_MISSING` or `FIX_PROOF_UNKNOWN` at `regression_proof.stage` `shadow` (the default), and blocks nothing.
+- **Protected.** `/go/test/journeys/` and `/go/internal/journeys/` are on the protected surface.
+- Docs: [regression-proof-and-supervision §3](docs/architecture/regression-proof-and-supervision.md), [internal-journeys](docs/architecture/packages/internal-journeys.md), [policy-config](docs/architecture/policy-config.md).
+
 ## Added — the `claude-cloud` bridge seat starts a Claude Code cloud session (2026-11-03)
 
 - **The driver.** `claude-cloud` is a bridge driver with the manifest `claude-cloud.json` (`base: claude-tmux`). It runs `claude --cloud "<task>"` in a private tmux pane. It reads the session line and the view line, then ends only its own session. The outcome is `launched`; the deliverable is a later pull request of the cloud session.

@@ -79,13 +79,14 @@ const (
 	ModuleCycle           Module = "cycle"
 	ModuleTokens          Module = "tokens"
 	ModuleConvergence     Module = "convergence"
+	ModuleFixProof        Module = "fix_proof"
 )
 
 var knownModules = map[Module]bool{
 	ModuleOrchestrator: true, ModuleAdvisor: true, ModuleRunner: true, ModuleBridge: true, ModuleLiveness: true,
 	ModuleShip: true, ModuleAudit: true, ModuleTriage: true, ModuleScout: true, ModuleBuild: true, ModuleTDD: true,
 	ModuleGateContract: true, ModuleGateEval: true, ModuleGateRepo: true, ModuleInbox: true, ModuleConfig: true,
-	ModuleLoop: true, ModuleWatchdog: true, ModuleObserver: true, ModuleDashboard: true, ModuleLedger: true, ModuleOutcome: true, ModuleFailureDiag: true, ModuleCarryover: true, ModuleFailureLearning: true, ModuleSignalCenter: true, ModuleReview: true, ModuleQuality: true, ModuleIsolation: true, ModuleCLI: true, ModuleLadder: true, ModuleHealing: true, ModuleControl: true, ModuleRepair: true, ModuleCycle: true, ModuleTokens: true, ModuleConvergence: true,
+	ModuleLoop: true, ModuleWatchdog: true, ModuleObserver: true, ModuleDashboard: true, ModuleLedger: true, ModuleOutcome: true, ModuleFailureDiag: true, ModuleCarryover: true, ModuleFailureLearning: true, ModuleSignalCenter: true, ModuleReview: true, ModuleQuality: true, ModuleIsolation: true, ModuleCLI: true, ModuleLadder: true, ModuleHealing: true, ModuleControl: true, ModuleRepair: true, ModuleCycle: true, ModuleTokens: true, ModuleConvergence: true, ModuleFixProof: true,
 }
 
 func (m Module) Known() bool { return knownModules[m] }
@@ -153,6 +154,7 @@ const (
 	KindSelfhealIncident       Kind = "selfheal.incident"
 	KindSelfhealDecision       Kind = "selfheal.decision"
 	KindControlBypass          Kind = "control.bypass"
+	KindFixProofWarning        Kind = "fix_proof.warning"
 )
 
 const (
@@ -167,7 +169,7 @@ var knownKinds = map[Kind]bool{
 	KindLedgerAppended: true, KindOutcomeWarning: true, KindFailureDiagWarning: true, KindCarryoverWarning: true, KindFailureLearningWarning: true, KindConfigWarning: true, KindAdvisorWarning: true, KindRunnerWarning: true, KindInboxWarning: true, KindAuditWarning: true, KindObserverWarning: true, KindCycleSealed: true, KindLoopWave: true, KindLoopHalt: true, KindLoopWarning: true,
 	KindLoopEscalation: true, KindLoopStarted: true, KindLoopExit: true, KindLoopLost: true, KindListenerPanicked: true, KindRegistryDrift: true, KindSinkDropped: true,
 	KindQualityReading: true, KindQualityBreach: true, KindQualityWarning: true, KindIsolationViolation: true, KindIsolationContext: true, KindIsolationRequest: true, KindIsolationRequestDecision: true, KindCLIQueueApplied: true, KindLadderDecision: true, KindSelfhealIncident: true, KindSelfhealDecision: true,
-	KindControlBypass: true,
+	KindControlBypass: true, KindFixProofWarning: true,
 }
 
 var terminalKinds = map[Kind]bool{

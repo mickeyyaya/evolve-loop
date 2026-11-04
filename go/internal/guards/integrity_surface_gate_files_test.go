@@ -153,6 +153,9 @@ var protectedGateFiles = []struct {
 	{"go/internal/phases/ship/held_proposal_gate.go", GateGuarantee},
 	{"go/cmd/evolve/cmd_landing.go", GateGuarantee},
 	{"go/internal/policy/held_proposals.go", PolicyGuarantee},
+	{"go/test/journeys/journeys.json", GateGuarantee},
+	{"go/test/journeys/registry_test.go", GateGuarantee},
+	{"go/internal/journeys/journeys.go", GateGuarantee},
 }
 
 var freedByTheNarrowFence = []string{
