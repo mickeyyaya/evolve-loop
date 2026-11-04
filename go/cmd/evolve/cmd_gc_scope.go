@@ -2,12 +2,44 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
+	"slices"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
 	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
 )
 
-const gcScopeCache = "cache"
+const (
+	gcScopeCache   = "cache"
+	gcScopeOrphans = "orphans"
+)
+
+var gcMidWaveScopes = map[string]func(gcRun, string) int{
+	gcScopeCache:   gcRun.cacheScope,
+	gcScopeOrphans: gcRun.orphanScope,
+}
+
+func gcScopeNames() string {
+	names := make([]string, 0, len(gcMidWaveScopes))
+	for name := range gcMidWaveScopes {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	return strings.Join(names, ", ")
+}
+
+func (r gcRun) orphanScope(projectRoot string) int {
+	projectRoot, pol, ok := r.loadPolicy(projectRoot)
+	if !ok {
+		return 1
+	}
+	opts := worktreeGCOptions(projectRoot, filepath.Join(projectRoot, ".evolve"), pol.Worktrees, r.stdout)
+	if r.step(func(s gcRun) bool { return s.cycleProcesses(opts) }) {
+		return 1
+	}
+	return 0
+}
 
 var gcDiskFreeBytes = looppreflight.DiskFreeBytes
 

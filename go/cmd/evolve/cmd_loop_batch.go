@@ -8,6 +8,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/hostsentinel"
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -30,6 +31,7 @@ type loopBatchCoordinator struct {
 	zeroShip     zeroShipTally
 	loadGraph    graphLoader
 	lastGraph    graphLoad
+	host         *hostsentinel.Sentinel
 }
 
 func (b *loopBatchCoordinator) run() int {
