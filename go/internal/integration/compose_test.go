@@ -749,3 +749,33 @@ func gitVerb(args []string) string {
 	}
 	return ""
 }
+
+func (f composeFixture) console(t *testing.T, pr int, message string, files map[string]string) DeliverableRecord {
+	t.Helper()
+	f.g.Git("checkout", "-q", "-b", "pr-"+strconv.Itoa(pr), f.base)
+	for _, name := range slices.Sorted(mapKeys(files)) {
+		f.g.Write(name, files[name])
+	}
+	f.g.Git("add", ".")
+	f.g.Git("commit", "-q", "-m", message)
+	sha := headOf(f.g)
+	patch, err := f.repo.PatchID(context.Background(), sha)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.g.Git("checkout", "-q", "main")
+	return DeliverableRecord{
+		Source: SourceConsolePR, Wave: ConsoleWave, PR: pr,
+		Commits: []CommitIdentity{{SHA: sha, BaseSHA: f.base, PatchID: patch}},
+		Audit:   AuditBinding{TreeSHA: treeSHA40, ArtifactSHA: fixtureArtifact},
+	}
+}
+
+func (f composeFixture) batchAt(t *testing.T, index int) Batch {
+	t.Helper()
+	b, err := f.repo.StartBatch(context.Background(), Batch{Wave: fixtureWave, Index: index, Base: f.base})
+	if err != nil {
+		t.Fatalf("StartBatch: %v", err)
+	}
+	return b
+}
