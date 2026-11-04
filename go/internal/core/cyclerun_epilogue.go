@@ -53,7 +53,7 @@ func (cr *cycleRun) abnormalEpilogue(cause error) {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d: abnormal-epilogue dossier not written: %v\n", cr.cycle, derr)
 	}
 	cr.o.stampContinuationManifest(epilogueCtx, cr.cs, cr.cycle, cr.req.ProjectRoot)
-	cr.cs.Phase = "aborted"
+	cr.cs.Phase = string(PhaseAborted)
 	cr.cs.ActiveAgent = ""
 	if werr := cr.o.storage.WriteCycleState(epilogueCtx, cr.cs); werr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d: abnormal-epilogue state write failed: %v\n", cr.cycle, werr)

@@ -125,7 +125,7 @@ func discoverPerRunResumeState(evolveDir, projectRoot string, opts ResumeOptions
 	var cands []perRunState
 	var refusals refusalList
 	for _, st := range states {
-		if _, shipped := ships[st.cycle]; shipped || st.phase == string(PhaseEnd) || st.phase == "aborted" {
+		if _, shipped := ships[st.cycle]; shipped || IsTerminalPhase(st.phase) {
 			continue
 		}
 		verdict := perRunVerdict(st, states, ships, opts)

@@ -5,14 +5,18 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
 type Role struct {
 	storage core.Storage
 	bypass  bool
 	home    string
+	now     func() time.Time
+	alive   func(int) bool
 }
 
 func NewRole(s core.Storage, bypass bool) *Role {
@@ -20,7 +24,7 @@ func NewRole(s core.Storage, bypass bool) *Role {
 }
 
 func newRoleWithHome(s core.Storage, bypass bool, home string) *Role {
-	return &Role{storage: s, bypass: bypass, home: home}
+	return &Role{storage: s, bypass: bypass, home: home, now: time.Now, alive: runlease.PIDAlive}
 }
 
 func (r *Role) Name() string { return "role" }
@@ -54,9 +58,15 @@ func (r *Role) Decide(ctx context.Context, in core.GuardInput) core.GuardDecisio
 	if err != nil {
 		return core.GuardDecision{Allow: false, Reason: "role guard: cycle-state read failed: " + err.Error()}
 	}
-	if cs.CycleID == 0 {
+	active, leaseErr := r.cycleActive(cs)
+	if !active {
 		return core.GuardDecision{Allow: true}
 	}
+	return decideInCycle(cs, path, leaseErr)
+}
+
+func decideInCycle(cs core.CycleState, path string, leaseErr error) core.GuardDecision {
+	note := leaseNote(leaseErr)
 	if IsProtectedSurface(path) {
 		return core.GuardDecision{
 			Allow: false,
@@ -64,7 +74,7 @@ func (r *Role) Decide(ctx context.Context, in core.GuardInput) core.GuardDecisio
 			Reason: "INTEGRITY VIOLATION (control-plane boundary): phase=" + cs.Phase +
 				" attempted to modify the pipeline control plane (path=" + path +
 				"). The gate/metric/guard/contract that grades a cycle may not be edited by that cycle; " +
-				"control-plane changes require human-gated `evolve ship --class manual` outside a cycle.",
+				"control-plane changes require human-gated `evolve ship --class manual` outside a cycle." + note,
 		}
 	}
 	if cs.Phase == "retro" && isLessonsCorpusPath(path) {
@@ -79,8 +89,32 @@ func (r *Role) Decide(ctx context.Context, in core.GuardInput) core.GuardDecisio
 	return core.GuardDecision{
 		Allow: false,
 		Reason: "role guard: phase=" + cs.Phase + " may not write outside workspace " +
-			cs.WorkspacePath + " (path=" + path + "); pass --bypass to override in an emergency",
+			cs.WorkspacePath + " (path=" + path + "); pass --bypass to override in an emergency" + note,
 	}
+}
+
+func leaseNote(err error) string {
+	if err == nil {
+		return ""
+	}
+	return "; the run lease could not be read, so the owner counts as live: " + err.Error()
+}
+
+func (r *Role) cycleActive(cs core.CycleState) (bool, error) {
+	if cs.CycleID == 0 {
+		return false, nil
+	}
+	if !core.IsTerminalPhase(cs.Phase) {
+		return true, nil
+	}
+	if cs.WorkspacePath == "" {
+		return false, nil
+	}
+	lease, ok, err := runlease.Read(cs.WorkspacePath)
+	if err != nil {
+		return true, err
+	}
+	return ok && runlease.OwnerLive(lease, r.now(), runlease.DefaultTTL, r.alive), nil
 }
 
 func isLessonsCorpusPath(path string) bool {
