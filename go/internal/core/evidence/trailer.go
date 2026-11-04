@@ -59,10 +59,7 @@ func Parse(msg string) Trailer {
 	}
 	var t Trailer
 	for _, ln := range lines[start:] {
-		key, val, ok := cutTrailer(ln)
-		if !ok {
-			continue
-		}
+		key, val, _ := cutTrailer(ln)
 		switch key {
 		case KeyPhase:
 			t.Phase = val
