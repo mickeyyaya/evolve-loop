@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -18,7 +19,8 @@ import (
 type pausedPlan struct {
 	paused    []core.PausedScope
 	now       time.Time
-	itemFiles func(id string) ([]string, bool)
+	adoptable func(p core.PausedScope) error
+	itemFiles func(p core.PausedScope) ([]string, error)
 	warn      io.Writer
 }
 
@@ -39,13 +41,23 @@ func (pp pausedPlan) order(triage []fleet.Todo) []fleet.Todo {
 func (pp pausedPlan) ready(p core.PausedScope) bool {
 	ready, err := checkpoint.ResumeReady(p.AutoAttempts, p.AutoMaxAttempts, p.QuotaResetAt, pp.now)
 	if err != nil {
-		fmt.Fprintf(pp.warn, "[pool] WARN: paused cycle %d: %v\n", p.Cycle, err)
+		pp.warnf("[pool] WARN: paused cycle %d: %v\n", p.Cycle, err)
 	}
 	return ready
 }
 
+func (pp pausedPlan) warnf(format string, args ...any) {
+	if pp.warn != nil {
+		fmt.Fprintf(pp.warn, format, args...)
+	}
+}
+
 func (pp pausedPlan) lead(p core.PausedScope, triage []fleet.Todo) (fleet.Todo, []fleet.Todo, bool) {
 	id := strings.Join(p.Scope, ",")
+	if err := pp.adoptable(p); err != nil {
+		pp.warnf("[pool] WARN: paused cycle %d: scope %s is not put first: %v\n", p.Cycle, id, err)
+		return fleet.Todo{}, triage, false
+	}
 	lead, found := fleet.Todo{ID: id}, false
 	var rest []fleet.Todo
 	for _, td := range triage {
@@ -60,28 +72,51 @@ func (pp pausedPlan) lead(p core.PausedScope, triage []fleet.Todo) (fleet.Todo, 
 		lead.Files = append(lead.Files, td.Files...)
 	}
 	if !found {
-		for _, todo := range p.Scope {
-			files, located := pp.itemFiles(todo)
-			found = found || located
-			lead.Files = append(lead.Files, files...)
+		files, err := pp.itemFiles(p)
+		if err != nil {
+			pp.warnf("[pool] WARN: paused cycle %d: scope %s keeps its place without some file claims: %v\n", p.Cycle, id, err)
 		}
+		lead.Files = files
 	}
 	slices.Sort(lead.Files)
 	lead.Files = slices.Compact(lead.Files)
-	return lead, rest, found
+	return lead, rest, true
 }
 
-func inboxItemFiles(evolveDir string) func(id string) ([]string, bool) {
+func inboxAdoptable(evolveDir string) func(p core.PausedScope) error {
 	inbox := filepath.Join(evolveDir, "inbox")
-	return func(id string) ([]string, bool) {
-		loc, err := inboxmover.Locate(inbox, id)
-		if err != nil {
-			return nil, false
+	return func(p core.PausedScope) error {
+		if len(p.Scope) == 0 {
+			return errors.New("the scope has no item")
 		}
-		item, _, err := inboxbatch.LoadFile(loc.Path)
-		if err != nil {
-			return nil, false
-		}
-		return item.DeclaredPaths(), true
+		return scopeHold{inbox: inbox, scope: p.Scope}.adoptableBy(p.Cycle)
 	}
+}
+
+func inboxItemFiles(evolveDir string) func(p core.PausedScope) ([]string, error) {
+	inbox := filepath.Join(evolveDir, "inbox")
+	return func(p core.PausedScope) ([]string, error) {
+		var files []string
+		var lost []error
+		for _, id := range p.Scope {
+			declared, err := declaredFiles(inbox, id)
+			files = append(files, declared...)
+			if err != nil {
+				lost = append(lost, err)
+			}
+		}
+		return files, errors.Join(lost...)
+	}
+}
+
+func declaredFiles(inbox, id string) ([]string, error) {
+	loc, err := inboxmover.Locate(inbox, id)
+	if err != nil {
+		return nil, fmt.Errorf("the files of %s are unknown: %w", id, err)
+	}
+	item, _, err := inboxbatch.LoadFile(loc.Path)
+	if err != nil {
+		return nil, fmt.Errorf("the files of %s are unknown: %w", id, err)
+	}
+	return item.DeclaredPaths(), nil
 }

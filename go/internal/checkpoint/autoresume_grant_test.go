@@ -84,6 +84,7 @@ func TestResumeReady_IsTheBudgetRuleOfAdmissionPlusAPassedReset(t *testing.T) {
 		{"budget left, no reset time", 0, 3, "", true, true},
 		{"budget spent", 3, 3, "", false, false},
 		{"a reset time that passed", 1, 3, now.Add(-time.Minute).Format(time.RFC3339), true, true},
+		{"a reset at this instant", 1, 3, now.Format(time.RFC3339), true, true},
 		{"a reset time still ahead", 1, 3, now.Add(time.Minute).Format(time.RFC3339), false, true},
 		{"an unknown reset with no budget", 0, 0, "", false, false},
 	}

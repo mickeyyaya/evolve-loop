@@ -84,7 +84,8 @@ The pool then puts each ready paused scope at the head of the backlog (`pausedPl
 - An unreadable reset time that is not empty does not stop the resume. `ResumeReady` reports the scope as ready and returns an error, and the pool writes a `[pool] WARN` line that names the cycle.
 - The reset time is an order hint only. A pause that waits for a known reset keeps its triage place. Admission (`RecordResume`) does not check the reset time, so a lane that draws that triage todo still resumes the cycle.
 - The lead todo is the triage todo of the scope, with its files, priority, dependencies and output contract. The pool serializes lanes on their files, so a resumed lane keeps its file claims. A scope that is not in the triage list takes the declared files of its inbox items.
-- The pool does not put a scope first when no triage todo matches it and none of its inbox items is found. Such a scope has no file claim, and its todo is gone.
+- The pool does not put a scope first when the lane cannot take it back. The pool asks the rule of `laneResume.adopt` (`scopeHold.adoptableBy`) for each paused scope. It asks also when a triage todo matches the scope. Each item of the scope must be in the inbox and not held by another cycle. One missing item skips the scope, and the pool writes a `[pool] WARN` line that names the cycle, the scope and the cause. The triage todos of a skipped scope keep their plain triage place.
+- An item that is in the inbox but has no readable file list stays in its scope. The pool then writes a `[pool] WARN` line that names the cycle and the item, and the lead todo has no file claim from that item.
 - An untriaged scope leads with only its ID and its files. Its dependencies and its output contract are not recorded yet.
 - The triage todos of the scope do not appear again.
 

@@ -264,8 +264,8 @@ func (qp quotaPause) resumeDelay(now time.Time) (time.Duration, bool) {
 	if qp.MaxAttempts <= qp.Attempts {
 		return 0, false
 	}
-	wake, ok := parseWakeAt(qp.WakeAt)
-	if !ok {
+	wake, err := quotareset.ParseISO(qp.WakeAt)
+	if err != nil {
 		return 0, false
 	}
 	return min(maxResumeDelay, max(minResumeDelay, wake.Sub(now)+minResumeDelay)), true
@@ -280,11 +280,6 @@ func quotaPauseOf(cycle int, cp checkpoint.Checkpoint) quotaPause {
 		MaxAttempts:    cp.AutoResumeMaxAttempts,
 		OperatorAction: cp.OperatorAction,
 	}
-}
-
-func parseWakeAt(s string) (time.Time, bool) {
-	t, err := quotareset.ParseISO(s)
-	return t, err == nil
 }
 
 func quotaPauseLine(qp quotaPause, now time.Time) string {
