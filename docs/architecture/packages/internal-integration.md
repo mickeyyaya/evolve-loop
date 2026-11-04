@@ -56,3 +56,21 @@ The package holds the pure parts of the integration of a wave. A fleet lane deli
 - I3 must bind the identity to the commit that the compose made, before the ledger, the closeout and the consume check use it. The identity of a record with many commits is an open item for I3.
 - The gate result is not cached yet. The verdict store of D5 comes with I3b.
 - Until they exist, `fleet.integration.stage` stays `shadow`, and a fleet ship writes the record and lands as before.
+
+## The console PR train
+
+A lane record has a cycle number and a trailer. A console PR record has the source console-pr, a PR number and no cycle number. DeliverableRecord.Ref gives the number of either kind, and Label gives its name for a message.
+
+The review binding of a console PR covers the change of the PR. Train.Record gives the binder the evidence: the commits, the changed paths and the digest of the diff. AttestedBinding accepts an attestation only when its tree equals that digest. ClassBinding accepts a class only when the rule of the class covers the paths. The caller owns the attestation schema and the closed list of classes, because this package cannot import the commit gate. That package imports this one through core.
+
+Train plans and lands the ready PRs. Plan does three things and pushes nothing:
+
+- It refuses a PR whose head is not the last recorded commit.
+- It sets aside a PR that is already on main.
+- It composes the rest in a scratch branch. The branch name holds the wave and "-plan", so a plan never meets the branch of a landing.
+
+Land does these steps, and it never changes a member branch:
+
+- It opens one batch PR and moves main with one fast-forward.
+- It closes the inbox items that the landed commits name.
+- It closes each landed PR with a link to the batch, and it spends the record.

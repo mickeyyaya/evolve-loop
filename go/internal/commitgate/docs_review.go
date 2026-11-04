@@ -7,7 +7,7 @@ import (
 
 var docsReviewSyn = []string{"docs-review"}
 
-func isDocsOnly(files []string) bool {
+func DocsOnly(files []string) bool {
 	if len(files) == 0 {
 		return false
 	}
@@ -20,7 +20,7 @@ func isDocsOnly(files []string) bool {
 }
 
 func (o Options) requiredReviewSatisfied(files, langs []string, res *Result) bool {
-	if !isDocsOnly(files) {
+	if !DocsOnly(files) {
 		return o.reviewersSatisfied(langs, res)
 	}
 	if capSatisfied(normalizeReviewers(o.Reviewers), docsReviewSyn) {
