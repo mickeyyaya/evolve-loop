@@ -12,21 +12,21 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/retryladder"
 )
 
-func TestChargesPrebuild_OnlyAFailureThatStoppedBeforeBuildAndIsNotInfraOrQuota(t *testing.T) {
+func TestBuildStage_OnlyAPhaseRecordProvesWhereTheCycleStopped(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
-	if chargesPrebuild(ws, retryladder.Unknown) {
-		t.Error("no phase record: the cycle cannot be proven to stop before build")
+	if pre, past := buildStage(ws, retryladder.Unknown); pre || past {
+		t.Errorf("no phase record = (%v, %v), want (false, false): the stage is unknown", pre, past)
 	}
 	writeJSON(t, phasetiming.Path(ws), []phasetiming.Entry{{Phase: "scout", Verdict: cyclestate.VerdictPASS}, {Phase: "triage", Verdict: cyclestate.VerdictFAIL}})
 	for class, want := range map[retryladder.Class]bool{retryladder.Unknown: true, retryladder.Spec: true, retryladder.Infra: false, retryladder.Quota: false} {
-		if got := chargesPrebuild(ws, class); got != want {
-			t.Errorf("chargesPrebuild(%s) = %v, want %v", class, got, want)
+		if pre, past := buildStage(ws, class); pre != want || past {
+			t.Errorf("buildStage(%s) = (%v, %v), want (%v, false)", class, pre, past, want)
 		}
 	}
 	writeJSON(t, phasetiming.Path(ws), []phasetiming.Entry{{Phase: "triage", Verdict: cyclestate.VerdictPASS}, {Phase: "build", Verdict: cyclestate.VerdictFAIL}})
-	if chargesPrebuild(ws, retryladder.Unknown) {
-		t.Error("a cycle that reached build is not a pre-build failure")
+	if pre, past := buildStage(ws, retryladder.Infra); pre || !past {
+		t.Errorf("a cycle that reached build = (%v, %v), want (false, true)", pre, past)
 	}
 }
 
@@ -35,7 +35,7 @@ func TestFailureInputsFor_CarriesThePrebuildCeilingAndTheBeforeBuildFact(t *test
 	_, _, ws := seedProject(t, "p", []string{"p"})
 	writeJSON(t, phasetiming.Path(ws), []phasetiming.Entry{{Phase: "scout", Verdict: cyclestate.VerdictFAIL}})
 	in := FailureInputsFor(t.TempDir(), t.TempDir(), ws, 7, io.Discard)
-	if !in.Prebuild || in.PrebuildCeiling != 2 {
+	if !in.Prebuild || in.PastBuild || in.PrebuildCeiling != 2 {
 		t.Errorf("Prebuild = %v, PrebuildCeiling = %d; want true, 2", in.Prebuild, in.PrebuildCeiling)
 	}
 }

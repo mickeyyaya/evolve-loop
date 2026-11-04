@@ -69,7 +69,7 @@ func TestMover_Release_AFailureThatReachedBuildResetsTheConsecutiveCount(t *test
 	writeItem(t, procPath(inbox, 6, "p.json"), `{"id":"poison","prebuild_failure_cycles":[5]}`)
 	writeItem(t, procPath(inbox, 6, "c.json"), `{"id":"clean"}`)
 	q := prebuildPolicy("poison")
-	q.Committed["clean"], q.Prebuild = true, false
+	q.Committed["clean"], q.Prebuild, q.PastBuild = true, false, true
 	if _, err := New(inbox, nil).Release(6, "", q); err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,7 @@ func TestRecordPrebuild_TheSameCycleCountsOnce(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "p.json")
 	writeItem(t, path, `{"id":"poison","prebuild_failure_cycles":[7]}`)
-	cycles, err := recordPrebuild(path, 7, true)
+	cycles, err := recordPrebuild(path, 7, &Policy{Prebuild: true})
 	if err != nil || len(cycles) != 1 {
 		t.Fatalf("cycles = %v, err = %v", cycles, err)
 	}
@@ -120,5 +120,19 @@ func TestMover_Release_APreBuildParkThatCannotMoveFallsOpenAndNamesTheBreakerSte
 	}
 	if strings.Contains(stderr.String(), "prebuild breaker:") {
 		t.Error("no breaker warning when the park did not happen")
+	}
+}
+
+func TestMover_Release_AFailureWithNoBuildFactKeepsTheConsecutiveCount(t *testing.T) {
+	t.Parallel()
+	inbox := newInbox(t)
+	writeItem(t, procPath(inbox, 6, "p.json"), `{"id":"poison","prebuild_failure_cycles":[5]}`)
+	q := prebuildPolicy("poison")
+	q.Prebuild = false
+	if _, err := New(inbox, nil).Release(6, "", q); err != nil {
+		t.Fatal(err)
+	}
+	if got := string(readJSON(t, filepath.Join(inbox, "p.json"))["prebuild_failure_cycles"]); got != "[5]" {
+		t.Errorf("prebuild_failure_cycles = %s, want [5]: a cycle with no build fact neither counts nor resets", got)
 	}
 }

@@ -26,6 +26,7 @@ type CycleOutcome struct {
 	Fingerprint  string
 
 	Prebuild        bool
+	PastBuild       bool
 	PrebuildCeiling int
 }
 
@@ -86,6 +87,7 @@ func ApplyCycleOutcome(opts Options, oc CycleOutcome) (OutcomeResult, error) {
 		Fingerprint:  oc.Fingerprint,
 
 		Prebuild:        oc.Prebuild,
+		PastBuild:       oc.PastBuild,
 		PrebuildCeiling: oc.PrebuildCeiling,
 	})
 	for _, p := range rr.Paths {

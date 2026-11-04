@@ -14,7 +14,7 @@ import (
 var errItemUnchanged = errors.New("lifecycle: item unchanged")
 
 func (m *Mover) parkPrebuild(d drained, cycle int, q *Policy) (bool, string) {
-	cycles, err := recordPrebuild(d.src, cycle, q.Prebuild)
+	cycles, err := recordPrebuild(d.src, cycle, q)
 	if err != nil {
 		m.warn(fault{code: CodeItemRewriteFailed, origin: "Mover.Release", cycle: cycle, legacy: "WARN: ",
 			reason: fmt.Sprintf("release-cycle: prebuild failure record failed for %s (%v) — the breaker is skipped, releasing to inbox root", d.base, err),
@@ -35,13 +35,13 @@ func (m *Mover) parkPrebuild(d drained, cycle int, q *Policy) (bool, string) {
 	return parked, at
 }
 
-func recordPrebuild(path string, cycle int, prebuild bool) ([]int, error) {
+func recordPrebuild(path string, cycle int, q *Policy) ([]int, error) {
 	var cycles []int
 	err := rewriteItemJSON(path, admitEvery, func(item map[string]json.RawMessage) error {
 		raw, had := item[inboxbatch.PrebuildFailureCyclesField]
-		if !prebuild {
+		if !q.Prebuild {
 			delete(item, inboxbatch.PrebuildFailureCyclesField)
-			return unchangedUnless(had)
+			return unchangedUnless(had && q.PastBuild)
 		}
 		_ = json.Unmarshal(raw, &cycles)
 		if slices.Contains(cycles, cycle) {

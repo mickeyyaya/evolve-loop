@@ -14,20 +14,17 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/retryladder"
 )
 
-func chargesPrebuild(workspace string, class retryladder.Class) bool {
-	if class == retryladder.Infra || class == retryladder.Quota {
-		return false
-	}
+func buildStage(workspace string, class retryladder.Class) (prebuild, pastBuild bool) {
 	entries, err := phasetiming.Read(workspace)
 	if err != nil || len(entries) == 0 {
-		return false
+		return false, false
 	}
 	for _, e := range entries {
 		if e.Phase == string(core.PhaseBuild) {
-			return false
+			return false, true
 		}
 	}
-	return true
+	return class != retryladder.Infra && class != retryladder.Quota, false
 }
 
 func routeProtectedAnswers(opts inboxmover.Options, in FailureInputs, stderr io.Writer) []string {

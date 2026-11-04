@@ -23,6 +23,7 @@ type Policy struct {
 	Fingerprint  string
 
 	Prebuild        bool
+	PastBuild       bool
 	PrebuildCeiling int
 }
 

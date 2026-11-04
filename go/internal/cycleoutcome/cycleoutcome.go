@@ -40,6 +40,7 @@ type FailureInputs struct {
 	Defer           core.RecordedDefer
 	PriorityClasses []string
 	Prebuild        bool
+	PastBuild       bool
 	PrebuildCeiling int
 }
 
@@ -87,6 +88,7 @@ func ApplyFailure(in FailureInputs) (inboxmover.OutcomeResult, error) {
 		FailureClass:    string(in.FailureClass),
 		Fingerprint:     in.Fingerprint,
 		Prebuild:        in.Prebuild,
+		PastBuild:       in.PastBuild,
 		PrebuildCeiling: in.PrebuildCeiling,
 	})
 	if err != nil {
@@ -144,7 +146,7 @@ func FailureInputsFor(projectRoot, evolveDir, workspace string, cycle int, stder
 		PriorityClasses: pol.InboxPriorityConfig().ClassOrder,
 		PrebuildCeiling: failPol.Thresholds.PrebuildFailureCeiling,
 	}
-	in.Prebuild = chargesPrebuild(workspace, in.FailureClass)
+	in.Prebuild, in.PastBuild = buildStage(workspace, in.FailureClass)
 	if cls.Class == cycleclassify.ClassPhaseRefusal {
 		in.Refusal, in.RefusalDetail, in.RefusalSubject = cls.Marker, cls.Detail, cls.Subject
 	}
