@@ -47,6 +47,14 @@ The package holds the pure parts of the integration of a wave. A fleet lane deli
   - `ReadBrief` reads the file back. It refuses a path that is not a `brief-<cycle>.txt` file, and it refuses an empty file.
   - `CodeEjected` is the one home of the code `SHIP_INTEGRATION_EJECTED`. The ship and the orchestrator both use it.
 - **`GitError` (I2).** `SysGit` returns a `*GitError` with the arguments, the exit code, the output and the error output. `git merge-tree` exits with 1 on a conflict and prints the conflicted paths. The compose needs both facts.
+- **The integration record (I10, decision D19).** `IntegrationRecord` holds the wave, the batch index, the base, the branch, the tip, the PR, the members and the lease epoch. `IntegrationRecord.Batch` is the one projection to a `Batch`. `Validate`, `PushBranch`, `PublishBranch` and `DeleteBatch` all use `Batch.check`, so the branch shape has one home. A resumed compose can use the same projection.
+- **The record file (I10).** `WriteIntegrationRecord` and `ReadIntegrationRecord` keep one file for each wave at `IntegrationRecordPath`, which is `WaveDir` plus `.json`. They share the atomic publish with `WriteRecord` (`recordFile.publish`).
+- **The record checks (I10).** `ReadIntegrationRecord` refuses a record that sits in the file of another wave. `WriteIntegrationRecord` refuses an epoch lower than the epoch on disk.
+- **The branch writes (I10).** `Repo.PublishBranch` is the first write of a batch branch. Its lease says that the remote branch must not exist. `Repo.PushBranch` is each later write, with `--force-with-lease` on the recorded tip. Both push to `origin`.
+- **The batch delete (I10).** `Repo.DeleteBatch` deletes the local branch only at the batch tip. The all-zero object id is not an object id (`fullObjectID`). Git reads it as "any value" in a delete, and as a delete in a push.
+- **The adoption (I10).** `Adopter.Adopt` checks the record, the epoch, the local branch and the branch on `origin`. Only an exit code 1 of git is a moved branch (`ErrBranchMoved`). Any other git failure is returned with its cause.
+- **The fence (I10).** A newer epoch closes the PR through `PRCloser`, with the head branch. Then it writes a fence commit on the recorded tip, with the same tree.
+- **The fence push (I10).** The fence always moves the remote branch, with a lease on the remote tip that `Adopt` read. When the branch is not on `origin`, the lease says that the branch must not exist, so the fence creates it. So the lease of an older holder fails. `PublishBranch` of an older holder fails too. The adopted record holds the fence commit as its tip.
 - **The order score (I1, decision D3)** is a pure function in `order.go`.
 - **The flush policy with the adaptive cap (I4, decisions D7 to D9)** is a pure function in `flush.go` and `cap.go`.
 
@@ -87,6 +95,10 @@ The package holds the pure parts of the integration of a wave. A fleet lane deli
 - A console record keeps its PR number through L2. `Landed`, `Verdicts` and the ejection use `DeliverableRecord.Ref`, and a console record gets no cycle predicate. Pinned by `TestBatchTest_ConsoleRecordsKeepTheirIdentityThroughL2`.
 - A brief never holds more than `MaxBriefDiffBytes` of diff. Pinned by `TestEjectionBrief_ADiffOverTheLimitIsCutAndSaysSo` and `TestEjectionBrief_ADiffOfExactlyTheLimitIsNotCut`.
 - The whole brief, with its newlines and its cut notice, reaches the reader after the event went through the signal center. Pinned by `TestEjectionFields_ADiffOfTheFullLimitSurvivesTheSignalCenter`.
+- A record whose branch is not the branch of its wave and index does not validate. Pinned by `TestIntegrationRecord_RefusesABranchThatIsNotTheBranchOfItsWaveAndIndex`.
+- The zero object id never reaches git as a tip. Pinned by `TestDeleteBatch_RefusesTheZeroObjectID` and `TestPushBranch_RefusesUnsafeInputBeforeGit`.
+- A batch publishes, resumes and pushes again with no hand push. Pinned by `TestBatchLifecycle_CutPublishRecordAdoptPushWithNoHandPush`.
+- After an adoption, the holder of an older epoch cannot push or publish the branch, also when the branch was not published before. Pinned by `TestAdopter_AdoptionFencesTheBranchSoAStaleHolderCannotPush` and `TestAdopter_ABranchThatWasNeverPublishedIsFencedOnTheRemoteToo`. The journey is pinned by `TestJourney_ANewLeaseHolderTakesAnUnpublishedBatchAndTheOldHolderIsShutOut`. An older holder cannot write a lower epoch to the record file. Pinned by `TestWriteIntegrationRecord_RefusesToRollTheEpochBack`.
 - Without a record, callers keep the ancestry rule of today.
 
 ## Limits
@@ -96,6 +108,20 @@ The package holds the pure parts of the integration of a wave. A fleet lane deli
 - The compose engine and the L1 prefix check (I2) are built. Nothing in production calls them yet.
 - Nothing in production calls `Ejection.Fields` yet, and the ship emits no `SHIP_INTEGRATION_EJECTED` event. The ship emit and the call of the compose at `shadow` belong to the next component of ADR-0147 that wires the compose into the ship. Until then, the code is registered and the brief is built only by tests.
 - The batch test (I3b), the batch PR (I5) and the integration record (I10) are not built yet.
+- The integration record primitives (I10) are built and tested. Nothing in production calls them. The stage stays `shadow`.
+- The ejection brief to the lane (I3), the batch test (I3b) and the batch PR (I5) are not built yet.
+- What I10 still needs from other components, for `enforce`: a reader in `go/internal/core` for a persisted lease epoch (only an in-memory counter exists today).
+- It also needs a `gh` adapter that implements `PRCloser`. The adapter closes a PR that is already closed without an error.
+- It also needs the discard path of D19, the caller that writes the record, and the push of the batch PR (I5, I11).
+- The epoch check of `WriteIntegrationRecord` reads the file and then writes it. It does not hold a lock. Two holders that write at the same time can pass the check. The fence on the remote branch is the guard for the branch, and the lock belongs to the wiring of the lease.
+- `Adopt` closes the PR before it writes the fence commit. If the fence fails, a retry closes the PR again, so the `gh` adapter must accept a PR that is closed already.
+- A crash after the fence push and before the record write leaves two states. The remote branch is at the fence commit. The record is at the old tip. A second `Adopt` of that record gives `ErrBranchMoved`. The discard path of D19 (I5) must take this state as input.
+- The fence commit message names the epoch. So a resume can find a fence that was pushed and not recorded.
+- A holder that reads the record again receives the new epoch and the new tip, so `PushBranch` and `WriteIntegrationRecord` do not stop it. The caller must compare its own lease epoch with the record. This check belongs to the wiring of the lease (I11).
+- The record file is one file for each wave. A write of another batch index at the same epoch replaces the earlier batch. Until I5 decides one record for each batch, the batches of a wave must not overlap.
+- The fence commit has no `Evolve-Cycle` trailer. `LandedOnRef` skips it. I5 must drop or recompose the fence commits before a flush to `main`.
+- A corrupt record file blocks each later write for that wave. This is on purpose, and it is pinned by `TestWriteIntegrationRecord_NeverReplacesAFileItCannotReadBack`. The discard path (I5) removes such a file.
+- `DeleteBatch` deletes the local branch only. The cleanup of the remote branch belongs to I5.
 - The compose sets no precondition of the proof (`BaseNotAncestor`, `AuditedTreeMissing`, `CompileRed`). So the proof gives `T1` to `T3`, and no tier-T4 ejection occurs yet.
 - A record with more than one commit composes as one commit. Its patch-id is the patch-id of the sum, so `Repo.LandedOnRef` finds only a record with one commit. The identity of a record with many commits is an open item for I3.
 - The batch test (I3b) is built. `BatchTest.Check` has no production caller. The train lands on CI alone until an owner wires it.

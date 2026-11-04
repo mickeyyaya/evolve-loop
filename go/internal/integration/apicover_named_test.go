@@ -52,6 +52,21 @@ func TestExportedSymbolsAreNamedByAnExecutedAssertion(t *testing.T) {
 	}
 }
 
+func TestIntegrationRecordExportsAreNamedByAnExecutedAssertion(t *testing.T) {
+	t.Parallel()
+	spy := &closerSpy{}
+	a := Adopter{Closer: spy}
+	if err := a.Closer.ClosePR(context.Background(), 5, "integration/w1-b1"); err != nil || len(spy.closed) != 1 {
+		t.Errorf("ClosePR = %v, closed %v", err, spy.closed)
+	}
+	if IntegrationSchema == RecordSchema {
+		t.Errorf("the integration schema %q must differ from the deliverable schema", IntegrationSchema)
+	}
+	if ErrStaleEpoch == nil || ErrBranchMoved == nil || ErrStaleEpoch == ErrBranchMoved {
+		t.Error("the two adoption errors must be distinct and set")
+	}
+}
+
 func TestConsoleTrainExportsAreNamedByAnExecutedAssertion(t *testing.T) {
 	if MaxMoves < 1 {
 		t.Errorf("MaxMoves = %d, want at least one recompose after main moves", MaxMoves)

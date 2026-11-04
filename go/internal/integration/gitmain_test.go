@@ -9,13 +9,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
-type originFixture struct {
+type gitMainFixture struct {
 	origin *gittest.Repo
 	work   *gittest.Repo
 	main   GitMain
 }
 
-func newOriginFixture(t *testing.T) originFixture {
+func newGitMainFixture(t *testing.T) gitMainFixture {
 	t.Helper()
 	origin := gittest.Bare(t)
 	work := gittest.Clone(t, origin.Dir)
@@ -23,12 +23,12 @@ func newOriginFixture(t *testing.T) originFixture {
 	work.Git("add", ".")
 	work.Git("commit", "-q", "-m", "one")
 	work.Git("push", "-q", "origin", "HEAD:refs/heads/main")
-	return originFixture{origin: origin, work: work, main: GitMain{Repo: Repo{Dir: work.Dir, Git: SysGit()}}}
+	return gitMainFixture{origin: origin, work: work, main: GitMain{Repo: Repo{Dir: work.Dir, Git: SysGit()}}}
 }
 
 func TestGitMainHeadIsTheRemoteMain(t *testing.T) {
 	t.Parallel()
-	f := newOriginFixture(t)
+	f := newGitMainFixture(t)
 	head, err := f.main.Head(context.Background())
 	if err != nil || head != headOf(f.work) {
 		t.Errorf("Head = %q, %v, want %q", head, err, headOf(f.work))
@@ -37,7 +37,7 @@ func TestGitMainHeadIsTheRemoteMain(t *testing.T) {
 
 func TestGitMainFastForwardMovesMainToTheTip(t *testing.T) {
 	t.Parallel()
-	f := newOriginFixture(t)
+	f := newGitMainFixture(t)
 	f.work.Write("b.txt", "b\n")
 	f.work.Git("add", ".")
 	f.work.Git("commit", "-q", "-m", "two")
@@ -52,7 +52,7 @@ func TestGitMainFastForwardMovesMainToTheTip(t *testing.T) {
 
 func TestGitMainFastForwardRefusesANonFastForward(t *testing.T) {
 	t.Parallel()
-	f := newOriginFixture(t)
+	f := newGitMainFixture(t)
 	f.work.Git("checkout", "-q", "-b", "side", "HEAD~0")
 	f.work.Write("c.txt", "c\n")
 	f.work.Git("add", ".")

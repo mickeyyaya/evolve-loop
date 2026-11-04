@@ -244,7 +244,7 @@ func TestGhCIOpenPushesWithALeaseThenCreatesThePR(t *testing.T) {
 		gitCalls = append(gitCalls, args)
 		return "", nil
 	}}, Gh: s.run}
-	b := Batch{Wave: "1", Index: 2, Base: sha('0'), Branch: "integration/w1-b2", Tip: sha('a')}
+	b := Batch{Wave: "1", Index: 2, Base: sha('b'), Branch: "integration/w1-b2", Tip: sha('a')}
 	pr, err := ci.Open(context.Background(), b)
 	if err != nil || pr.Number != 42 || pr.Tip != b.Tip {
 		t.Fatalf("Open = %+v, %v, want PR 42 at the tip", pr, err)
@@ -266,7 +266,7 @@ func TestGhCIOpenReusesAnOpenPRFromTheRecordedList(t *testing.T) {
 		}
 		return "", 0, nil
 	}}
-	b := Batch{Wave: "1", Index: 1, Base: sha('0'), Branch: "integration/w1-b1", Tip: sha('a')}
+	b := Batch{Wave: "1", Index: 1, Base: sha('b'), Branch: "integration/w1-b1", Tip: sha('a')}
 	pr, err := newGhCI(t, s).Open(context.Background(), b)
 	if err != nil || pr.Number != 1295 {
 		t.Fatalf("Open = %+v, %v, want PR 1295", pr, err)
@@ -281,7 +281,7 @@ func TestGhCIOpenReusesAnOpenPRFromTheRecordedList(t *testing.T) {
 func TestGhCIOpenFailures(t *testing.T) {
 	t.Parallel()
 	boom := errors.New("boom")
-	b := Batch{Wave: "1", Index: 1, Base: sha('0'), Branch: "integration/w1-b1", Tip: sha('a')}
+	b := Batch{Wave: "1", Index: 1, Base: sha('b'), Branch: "integration/w1-b1", Tip: sha('a')}
 	forCreate := func(out string, code int, err error) func([]string) (string, int, error) {
 		return func(args []string) (string, int, error) {
 			if has(args, "pr", "create") {
