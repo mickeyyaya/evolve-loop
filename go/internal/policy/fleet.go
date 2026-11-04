@@ -20,13 +20,13 @@ type RetryPolicy struct {
 }
 
 func (r *RetryPolicy) UnmarshalJSON(data []byte) error {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
 	type retryPolicy RetryPolicy
 	var decoded retryPolicy
 	if err := json.Unmarshal(data, &decoded); err != nil {
-		return err
-	}
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(data, &fields); err != nil {
 		return err
 	}
 	*r = RetryPolicy(decoded)
