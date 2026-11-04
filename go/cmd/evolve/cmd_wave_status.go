@@ -13,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/heldproposal"
+	"github.com/mickeyyaya/evolve-loop/go/internal/hostsentinel"
 	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wave"
@@ -41,6 +42,7 @@ type waveStatusReport struct {
 	Warnings      []string              `json:"warnings,omitempty"`
 	Held          []heldproposal.Record `json:"held,omitempty"`
 	Benched       []clihealth.Entry     `json:"benched,omitempty"`
+	Host          *hostsentinel.Status  `json:"host,omitempty"`
 }
 
 func parseWaveReadArgs(args []string) (projectRoot string, asJSON bool, err error) {
@@ -95,6 +97,7 @@ func buildWaveStatus(env waveEnv, plane wavePlaneDirs, records []wave.Record) wa
 	}
 	report.Held, report.Warnings = heldForOperator(plane.evolveDir, report.Warnings)
 	report.Benched = activeBenches(clihealth.NewStore(plane.root, env.now))
+	report.Host, report.Warnings = hostForOperator(plane.evolveDir, report.Warnings)
 	if len(records) == 0 {
 		return report
 	}
@@ -143,6 +146,9 @@ func writeWaveStatusText(w io.Writer, r waveStatusReport) {
 		fmt.Fprintf(w, "last:    wave %d: %s\n", r.LastWave.Wave, r.LastWave.Outcome)
 	}
 	fmt.Fprintf(w, "notes:   %d queued\n", r.NotesQueued)
+	if r.Host != nil {
+		fmt.Fprintf(w, "host:    %s\n", r.Host.Summary())
+	}
 	for _, b := range r.Benched {
 		fmt.Fprintf(w, "benched: %s %s until %s\n", b.Key(), b.Reason, b.BenchedUntil.Format(time.RFC3339))
 	}
@@ -152,6 +158,14 @@ func writeWaveStatusText(w io.Writer, r waveStatusReport) {
 	for _, warn := range r.Warnings {
 		fmt.Fprintf(w, "WARN:    %s\n", warn)
 	}
+}
+
+func hostForOperator(evolveDir string, warnings []string) (*hostsentinel.Status, []string) {
+	st, err := hostsentinel.ReadStatus(evolveDir)
+	if err != nil {
+		return nil, append(warnings, "host sentinel: "+err.Error())
+	}
+	return st, warnings
 }
 
 func heldForOperator(evolveDir string, warnings []string) ([]heldproposal.Record, []string) {

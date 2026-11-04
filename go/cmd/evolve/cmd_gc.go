@@ -29,14 +29,14 @@ func runGC(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	dryRun := fs.Bool("dry-run", false, "preview only: list what WOULD be released (orphan tmux sessions and sockets, finished-cycle orphan processes, stale dispatch processes and orphan log tails, worktrees and branches, run dirs, logs of the log catalog, go build cache entries, empty claim dirs of stale cycles), mutating nothing")
 	projectRoot := fs.String("project-root", "", "repository root `dir` the workspace (worktree/branch) sweep is aimed at; required: a non-dry run without it is refused, while --dry-run alone falls back to the current directory.\n\tNOTE the deliberate asymmetry: an explicit 'evolve gc' APPLIES the workspace sweep (an operator run is enforce),\n\twhile the in-loop hook's default mode stays 'shadow' (plan + publish only) — policy.json owns the loop's mode,\n\tthe operator owns their own invocation. Use --dry-run to preview.")
-	only := fs.String("only", "", "run one `scope` and no other sweep. The one scope is cache: the go build cache trim and the pipeline temp sweep. It touches no worktree, branch, session or process, so it is safe while lanes run. When gc.cache_trim_free_gb is set, it trims only while disk free is under that value")
+	only := fs.String("only", "", "run one `scope` and no other sweep. Each scope is safe while lanes run. cache: the go build cache trim and the pipeline temp sweep, which touch no worktree, branch, session or process; when gc.cache_trim_free_gb is set, it trims only while disk free is under that value. orphans: the finished-cycle orphan processes (ppid 1, cwd in a closed cycle tree that no live lane holds); it touches no worktree, session or socket")
 	asJSON := fs.Bool("json", false, "print the result as JSON: the scope and the report lines")
 	leaseWait := fs.Duration("lease-wait", 0, "wait up to this long for the gc lease that another gc holds; 0 refuses at once (exit 3)")
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}
-	if *only != "" && *only != gcScopeCache {
-		fmt.Fprintf(stderr, "evolve gc: unknown --only scope %q (valid: %s)\n", *only, gcScopeCache)
+	if _, known := gcMidWaveScopes[*only]; *only != "" && !known {
+		fmt.Fprintf(stderr, "evolve gc: unknown --only scope %q (valid: %s)\n", *only, gcScopeNames())
 		return 10
 	}
 	root, code, ok := resolveGCProjectRoot(*projectRoot, *dryRun, stderr)
@@ -113,8 +113,8 @@ type gcResult struct {
 const gcLeaseFile = "gc.lock"
 
 func (r gcRun) sweep(root, only string) int {
-	if only == gcScopeCache {
-		return r.cacheScope(root)
+	if scope, ok := gcMidWaveScopes[only]; ok {
+		return scope(r, root)
 	}
 	failed := false
 	if len(r.liveRuns) == 0 {

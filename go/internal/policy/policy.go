@@ -3,7 +3,10 @@
 // See docs/architecture/packages/internal-policy.md.
 package policy
 
-import "github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
+import (
+	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/hostsentinel"
+)
 
 type Pin struct {
 	CLI   string `json:"cli,omitempty"`
@@ -27,6 +30,7 @@ type Policy struct {
 	FailureFloor        *FailureFloor        `json:"failure_floor,omitempty"`
 	SystemFailurePolicy *SystemFailurePolicy `json:"failure_policy,omitempty"`
 	GC                  *gcpolicy.Policy     `json:"gc,omitempty"`
+	HostSentinel        *hostsentinel.Policy `json:"host_sentinel,omitempty"`
 	Fanout              *FanoutPolicy        `json:"fanout,omitempty"`
 	Observer            *ObserverPolicy      `json:"observer,omitempty"`
 

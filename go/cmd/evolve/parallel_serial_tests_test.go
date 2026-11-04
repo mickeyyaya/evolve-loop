@@ -1,6 +1,12 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestHostSentinelJourney_AtEnforceALowDiskMidWaveTrimsTheStaleCacheSignalsAndSparesTheLiveLane":    "sets env through a helper",
+	"main.TestHostSentinelJourney_AtShadowTheSameHostReleasesNothing":                                       "sets env through a helper",
+	"main.TestHostSentinel_AGCLeaseHeldByTheBoundaryMakesTheReleaseSkipNotWait":                             "sets env through a helper",
+	"main.TestRunGC_OnlyOrphansDryRunNamesTheTargetAndStopsNothing":                                         "sets env through a helper",
+	"main.TestRunGC_OnlyOrphansSparesAProcessAndTheWorktreeOfALiveLane":                                     "sets env through a helper",
+	"main.TestRunGC_OnlyOrphansTerminatesAFinishedCycleOrphanWhileALaneHoldsALiveLease":                     "sets env through a helper",
 	"main.TestMain_ClearsInheritedCellMarkers":                                                              "reads the process environment",
 	"main.TestRunContinuationAdopt_ATildePathInTheRegistryIsExpanded":                                       "sets env through a helper",
 	"main.TestRunContinuationAdopt_ATildePathOnTheStampIsExpanded":                                          "sets env through a helper",

@@ -33,6 +33,12 @@ This page tells the console (an operator or an LLM) how to run each wave through
   - It also has the lane time to a PASS for each CLI family. The measure covers the last 20 builds of the whole history, not only of the wave. A family with no pass shows `none`.
   - The JSON gives each duration in nanoseconds. A wave that is still live is read to its last signal.
   - The definitions are in [internal-lanetime.md](../architecture/packages/internal-lanetime.md). The plan is [wave-latency-2026-10](../plans/wave-latency-2026-10.md).
+- The host sentinel reads the host during the wave. Each 3 minutes (`host_sentinel.interval_seconds`) it reads the disk free, the Go build cache, the tmux sessions, the orphan processes and the load per CPU. The design is in [host-sentinel.md](../architecture/host-sentinel.md).
+  - Each reading over its threshold gives one `HOST_*` signal with `value` and `threshold`: `HOST_DISK_LOW`, `HOST_CACHE_HIGH`, `HOST_TMUX_HIGH`, `HOST_ORPHANS_HIGH` or `HOST_LOAD_HIGH`. The codes are in [signal-codes.md](../architecture/signal-codes.md#host).
+  - At `shadow` (the default) the sentinel only signals and previews the release. At `enforce` it runs `evolve gc --only cache` for the disk and the cache, and `evolve gc --only orphans` for the orphans. It never stops a running tmux session, a live lane or its worktree.
+  - When the boundary holds the gc lease, the sentinel skips the release (`released=cache=lease_held`). It does not wait.
+  - Below `host_sentinel.floor_gib` at `enforce`, no new lane starts (`HOST_FLOOR_HOLD`). The running lanes continue.
+  - `wave status` shows the last sample on the line `host:` (JSON `host`). A failed sample writes a `[host] WARN` line and `HOST_SAMPLE_FAILED`. The loop continues.
 - To follow the wave, run `evolve wave watch` under a monitor. It prints one line for each phase change, seal, deadline stop, ship and quota pause. It exits when the loop exits. When a newer wave starts, it prints `wave-started` and follows the newer wave.
 
 ## 3. At the boundary

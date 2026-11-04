@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — a host sentinel inside the loop (2026-11-04)
+
+- **The sentinel.** While `evolve loop` runs, a sentinel reads the host each 3 minutes. It reads the disk free, the Go build cache, the tmux sessions, the finished-cycle orphan processes and the load per CPU. Each reading over its threshold gives one `HOST_*` signal with the value and the threshold, one time in each interval.
+- **The stages.** The policy block `host_sentinel` sets the stage, the interval, the thresholds and the floor. At `shadow` (the default) the sentinel signals and previews the release only. At `enforce` it runs `evolve gc --only cache` and `evolve gc --only orphans`. When the boundary holds the gc lease, it skips and does not wait.
+- **The floor.** Below `host_sentinel.floor_gib` at `enforce`, no new lane starts (`HOST_FLOOR_HOLD`). The running lanes continue.
+- **`evolve gc --only orphans`** is a new scope that is safe during a wave. It stops only a finished-cycle orphan (parent pid 1, a closed cycle tree, no live lane). It touches no worktree, session or socket.
+- **`evolve wave status`** shows the last sample on the line `host:` (JSON `host`).
+- Docs: [host-sentinel.md](docs/architecture/host-sentinel.md), [wave-operations §2](docs/operations/wave-operations.md), [signal-codes](docs/architecture/signal-codes.md#host), [internal-hostsentinel](docs/architecture/packages/internal-hostsentinel.md).
+
 ## Added — the `claude-cloud` bridge seat starts a Claude Code cloud session (2026-11-03)
 
 - **The driver.** `claude-cloud` is a bridge driver with the manifest `claude-cloud.json` (`base: claude-tmux`). It runs `claude --cloud "<task>"` in a private tmux pane. It reads the session line and the view line, then ends only its own session. The outcome is `launched`; the deliverable is a later pull request of the cloud session.

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -168,4 +169,12 @@ func totalSize(entries []goCacheEntry) int64 {
 		total += e.size
 	}
 	return total
+}
+
+func GoCacheBytes(dir string) (int64, error) {
+	entries, errs := listGoCache(dir)
+	if len(errs) > 0 {
+		return 0, errors.New(strings.Join(errs, "; "))
+	}
+	return totalSize(entries), nil
 }

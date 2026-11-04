@@ -192,6 +192,18 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `HEALING_INCIDENT_REOPENED` | the incident detector reopened a closed incident, because its signal fired again after the close; the same fields as HEALING_INCIDENT_OPENED (llm-isolation.md §18, §22) |
 | `HEALING_PROPOSAL_REFUSED` | the catalog validator refused a proposal of the orchestrator agent; fields incident, class, tier, action, verdict, precondition, reason, stage (llm-isolation.md §19, §19.2, §24) |
 
+### host
+
+| Code | Meaning |
+|---|---|
+| `HOST_CACHE_HIGH` | the host sentinel read a go build cache over the gc.go_cache_max_gb cap during a wave; the release is the gc cache scope; fields.value and fields.threshold give the reading and the limit, fields.stage is shadow (signal and a gc preview only) or enforce (the mid-wave-safe gc scopes run), fields.released names each scope as would, applied, failed or lease_held; one signal per code per interval |
+| `HOST_DISK_LOW` | the host sentinel read disk free under host_sentinel.disk_low_gib during a wave; the release is the gc cache scope; fields.value and fields.threshold give the reading and the limit, fields.stage is shadow (signal and a gc preview only) or enforce (the mid-wave-safe gc scopes run), fields.released names each scope as would, applied, failed or lease_held; one signal per code per interval |
+| `HOST_FLOOR_HOLD` | the host sentinel read disk free under host_sentinel.floor_gib; at enforce no new lane starts (the launch defers) and the running lanes continue, at shadow fields.held=false names the hold it would make; fields.value, threshold, stage |
+| `HOST_LOAD_HIGH` | the host sentinel read a one-minute load per cpu over host_sentinel.load_per_cpu_max during a wave; there is no release, the signal is for the operator; fields.value and fields.threshold give the reading and the limit, fields.stage is shadow (signal and a gc preview only) or enforce (the mid-wave-safe gc scopes run), fields.released names each scope as would, applied, failed or lease_held; one signal per code per interval |
+| `HOST_ORPHANS_HIGH` | the host sentinel counted more finished-cycle orphan processes (ppid 1 in a closed cycle tree) than host_sentinel.orphans_max during a wave; the release is the gc orphans scope; fields.value and fields.threshold give the reading and the limit, fields.stage is shadow (signal and a gc preview only) or enforce (the mid-wave-safe gc scopes run), fields.released names each scope as would, applied, failed or lease_held; one signal per code per interval |
+| `HOST_SAMPLE_FAILED` | one or more host readings failed (fields.metrics); the sentinel warns, checks no threshold for those metrics and the loop continues; one signal per interval |
+| `HOST_TMUX_HIGH` | the host sentinel counted more tmux bridge sessions than host_sentinel.tmux_sessions_max during a wave; a session is boundary-only, so there is no mid-wave release; fields.value and fields.threshold give the reading and the limit, fields.stage is shadow (signal and a gc preview only) or enforce (the mid-wave-safe gc scopes run), fields.released names each scope as would, applied, failed or lease_held; one signal per code per interval |
+
 ### inbox
 
 | Code | Meaning |

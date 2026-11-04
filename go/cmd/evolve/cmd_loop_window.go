@@ -178,7 +178,7 @@ func (b *loopBatchCoordinator) diskSpaceHalt(iteration int) (batchDecision, bool
 }
 
 func (b *loopBatchCoordinator) dispatchPool(iteration int, fleetConfig policy.FleetConfig, waveBinary string) (batchDecision, bool) {
-	poolLaunch := execCycleLaunch(waveBinary, false, b.cfg.ProjectRoot, b.cfg.GoalHash, b.cfg.GoalText, b.stdout, b.stderr)
+	poolLaunch := hostGatedLaunch(b.host, execCycleLaunch(waveBinary, false, b.cfg.ProjectRoot, b.cfg.GoalHash, b.cfg.GoalText, b.stdout, b.stderr))
 	run, mode := rollingPool(fleetConfig, poolLaunch), "rolling"
 	if fleetConfig.Orchestrator.Stage == orchestrator.StageEnforce {
 		run, mode = b.orchestratedRun(fleetConfig, poolLaunch, iteration), "orchestrator"
@@ -215,7 +215,7 @@ func (b *loopBatchCoordinator) waveRequest(iteration int, cfg policy.FleetConfig
 		Wave:      iteration,
 		Preflight: productionWavePreflight(b.cfg.ProjectRoot),
 		Plan:      b.wave().PlanFn(cfg.Count),
-		Launcher:  b.wave().Launcher(iteration, cfg.Concurrency, b.shadowLease(cfg.Orchestrator, execCycleLaunch(waveBinary, false, b.cfg.ProjectRoot, b.cfg.GoalHash, b.cfg.GoalText, b.stdout, b.stderr))),
+		Launcher:  b.wave().Launcher(iteration, cfg.Concurrency, b.shadowLease(cfg.Orchestrator, hostGatedLaunch(b.host, execCycleLaunch(waveBinary, false, b.cfg.ProjectRoot, b.cfg.GoalHash, b.cfg.GoalText, b.stdout, b.stderr)))),
 		Routed:    b.wave().RoutedResolver(),
 	}
 }

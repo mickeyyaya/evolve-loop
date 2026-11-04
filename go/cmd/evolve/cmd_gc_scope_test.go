@@ -60,7 +60,7 @@ func TestRunGC_OnlyRefusesAnUnknownScopeBeforeAnySweep(t *testing.T) {
 	if code := runGC([]string{"--only", "worktrees", "--project-root", t.TempDir()}, nil, &stdout, &stderr); code != 10 {
 		t.Errorf("exit %d, want 10", code)
 	}
-	if !strings.Contains(stderr.String(), `unknown --only scope "worktrees" (valid: cache)`) || stdout.Len() != 0 {
+	if !strings.Contains(stderr.String(), `unknown --only scope "worktrees" (valid: cache, orphans)`) || stdout.Len() != 0 {
 		t.Errorf("stdout=%q stderr=%q, want only the refusal on stderr", stdout.String(), stderr.String())
 	}
 }

@@ -170,6 +170,9 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) (exit i
 
 	maintainBatchState(cfg, wc.AutoPrune, stderr)
 
+	host := newHostSentinel(cfg, deps.Signals, stderr)
+	defer startHostSentinel(ctx, host)()
+
 	cycleEnv := carriedEnv(os.Environ())
 	cycleCtx := buildCycleContext(cfg)
 
@@ -198,6 +201,7 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) (exit i
 		workflow:     wc,
 		stdout:       stdout,
 		stderr:       stderr,
+		host:         host,
 	}).run()
 }
 
