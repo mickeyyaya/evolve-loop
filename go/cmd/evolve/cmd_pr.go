@@ -157,7 +157,6 @@ type prMerged struct {
 
 type prMergeResult struct {
 	Merged       []prMerged `json:"merged"`
-	Updated      *prMerged  `json:"updated,omitempty"`
 	Refused      string     `json:"refused,omitempty"`
 	NotAttempted []string   `json:"not_attempted"`
 }
@@ -263,13 +262,6 @@ func (m prMerger) merge(ctx context.Context, prs []string) (prMergeResult, int) 
 	}
 	for i, n := range prs {
 		sha, err := m.mergeOne(ctx, n)
-		var updated prHeadUpdated
-		if errors.As(err, &updated) {
-			result.Updated, result.NotAttempted = &prMerged{PR: n, SHA: string(updated)}, append(result.NotAttempted, prs[i+1:]...)
-			fmt.Fprintf(m.stdout, "#%s %s\n", n, updated)
-			m.notAttempted(prs[i+1:])
-			return result, cliExitOK
-		}
 		if err != nil {
 			result.Refused, result.NotAttempted = "#"+n+" "+err.Error(), append(result.NotAttempted, prs[i+1:]...)
 			code := m.report("#"+n+" ", err)
@@ -430,17 +422,10 @@ func (m prMerger) upToDate(ctx context.Context, n string, pr prView) (prView, er
 		return pr, err
 	}
 	fmt.Fprintf(m.stderr, "%s#%s updated with %s\n", prMergePrefix, n, pr.BaseRefName)
-	if pr, err = m.awaitNewHead(ctx, n, pr.HeadRefOid); err != nil || m.wait > 0 {
-		return pr, err
-	}
-	return pr, prHeadUpdated(pr.HeadRefOid)
+	return m.awaitNewHead(ctx, n, pr.HeadRefOid)
 }
 
 const prHeadMoveBound = 60 * time.Second
-
-type prHeadUpdated string
-
-func (u prHeadUpdated) Error() string { return "updated to " + string(u) + "; CI runs on the new head" }
 
 func (m prMerger) headWaitBound() time.Duration { return max(m.wait, prHeadMoveBound) }
 

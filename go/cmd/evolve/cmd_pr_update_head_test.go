@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strconv"
 	"strings"
@@ -208,31 +209,87 @@ func TestPRMerger_UpdateBranchTimeout(t *testing.T) {
 	}
 }
 
-func TestPRMerger_UpdateBranchWithoutWaitReportsTheNewHead(t *testing.T) {
-	t.Parallel()
-	gh := &laggingGitHub{
+func pendingFetch(_ context.Context, _ string) (ciwatch.RunStatus, error) {
+	return ciwatch.RunStatus{Status: "in_progress"}, nil
+}
+
+func movedHeadGitHub() *laggingGitHub {
+	return &laggingGitHub{
 		prs:          map[string]*laggingPR{"916": {oldHead: "old916", newHead: "new916", staleViews: 1}},
 		behindBefore: map[string]int{"old916": 4},
 		merged:       map[string]string{},
 	}
-	ci := &ciLog{}
-	m, stdout, stderr, slept := laggingMerger(gh, ci)
+}
+
+func TestPRMerger_UpdateBranchWithoutWaitMergesAGreenNewHead(t *testing.T) {
+	t.Parallel()
+	gh := movedHeadGitHub()
+	m, stdout, stderr, _ := laggingMerger(gh, &ciLog{})
 	m.wait = 0
-	result, code := m.merge(context.Background(), []string{"916", "917"})
-	if code != cliExitOK || stdout.String() != "#916 updated to new916; CI runs on the new head\n" {
-		t.Fatalf("exit %d stdout %q stderr %q; want the new head reported with exit 0", code, stdout.String(), stderr.String())
+	code := m.mergeAll(context.Background(), []string{"916"})
+	if code != cliExitOK || !strings.HasPrefix(stdout.String(), "merged #916 ") {
+		t.Fatalf("exit %d stdout %q stderr %q; want #916 merged on the new head", code, stdout.String(), stderr.String())
 	}
-	if result.Updated == nil || *result.Updated != (prMerged{PR: "916", SHA: "new916"}) || len(result.Merged) != 0 || result.Refused != "" {
-		t.Errorf("result = %+v, want #916 updated to new916 and nothing merged or refused", result)
+	if merges := callsWith(gh.calls, "pr merge 916"); len(merges) != 1 || !strings.HasSuffix(merges[0], "--match-head-commit new916") {
+		t.Errorf("want one merge bound to the new head, got %q", merges)
 	}
-	if strings.Join(result.NotAttempted, ",") != "917" || !strings.HasSuffix(stderr.String(), "not attempted: #917\n") {
-		t.Errorf("result %+v stderr %q, want #917 not attempted", result, stderr.String())
+}
+
+func TestPRMerger_UpdateBranchWithoutWaitRefusesAPendingNewHead(t *testing.T) {
+	t.Parallel()
+	gh := movedHeadGitHub()
+	m, stdout, stderr, _ := laggingMerger(gh, &ciLog{})
+	m.wait = 0
+	m.fetch = pendingFetch
+	code := m.mergeAll(context.Background(), []string{"916", "917"})
+	if code != cliExitRefused || stdout.Len() != 0 || !strings.Contains(stderr.String(), "#916 refused: required CI in_progress on new916; pending") {
+		t.Fatalf("exit %d stdout %q stderr %q; want exit 3 naming the new head", code, stdout.String(), stderr.String())
 	}
-	if len(callsWith(gh.calls, "pr merge")) != 0 || len(ci.heads) != 0 {
-		t.Errorf("without --wait the verb must neither merge nor await CI: calls %q fetched %q", gh.calls, ci.heads)
+	if len(callsWith(gh.calls, "pr merge")) != 0 || !strings.HasSuffix(stderr.String(), "not attempted: #917\n") {
+		t.Errorf("a pending head must merge nothing and leave #917 not attempted: %q %q", gh.calls, stderr.String())
 	}
-	if *slept != m.poll {
-		t.Errorf("slept %s, want one poll before the second read", *slept)
+}
+
+func TestPRMerger_HeadWaitOutlastsTheMoveBoundWhenWaitIsLonger(t *testing.T) {
+	t.Parallel()
+	gh := movedHeadGitHub()
+	gh.prs["916"].staleViews = 90
+	m, stdout, stderr, slept := laggingMerger(gh, &ciLog{})
+	m.wait = 5 * time.Minute
+	code := m.mergeAll(context.Background(), []string{"916"})
+	if code != cliExitOK || !strings.HasPrefix(stdout.String(), "merged #916 ") {
+		t.Fatalf("exit %d stdout %q stderr %q; want the head awaited past %s", code, stdout.String(), stderr.String(), prHeadMoveBound)
+	}
+	if *slept <= prHeadMoveBound {
+		t.Errorf("slept %s, want more than %s", *slept, prHeadMoveBound)
+	}
+}
+
+func TestPRMergeJourney_UpdateBranchTrainWithAPendingNewHead(t *testing.T) {
+	t.Parallel()
+	a, err := parsePRMergeArgs([]string{"916", "917", "--update-branch", "--json"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, _, _, _ := laggingMerger(movedHeadGitHub(), &ciLog{})
+	m.wait = a.wait
+	m.updateBranch = a.updateBranch
+	m.fetch = pendingFetch
+	var out, errOut strings.Builder
+	code := mergePRs(m, a, &out, &errOut)
+	var env struct {
+		Merged       []prMerged `json:"merged"`
+		Refused      string     `json:"refused"`
+		NotAttempted []string   `json:"not_attempted"`
+	}
+	if err := json.Unmarshal([]byte(out.String()), &env); err != nil {
+		t.Fatalf("stdout %q is not JSON: %v", out.String(), err)
+	}
+	if code != cliExitRefused || len(env.Merged) != 0 || !strings.Contains(env.Refused, "required CI in_progress on new916") || strings.Join(env.NotAttempted, ",") != "917" {
+		t.Errorf("exit %d envelope %+v stderr %q; want a refusal on the new head with #917 not attempted", code, env, errOut.String())
+	}
+	if strings.Contains(out.String(), `"updated"`) {
+		t.Errorf("the result has no updated key any more: %q", out.String())
 	}
 }
 
