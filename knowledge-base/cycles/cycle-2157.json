@@ -1,0 +1,214 @@
+{
+  "schema_version": 2,
+  "cycle": 2157,
+  "run_id": "01M6JTNZSWYFXCZG3NMZP2Z896",
+  "goal": "Wave 154.\n\nWork the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree that it ships;\n- disposition its own defect ledger and the inherited ids;\n- record a terminal outcome on every exit;\n- never change a protected control-plane file with a tool;\n- leave no stale worktree.\n\nRouting:\n- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.\n- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.\n- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.\n\nCraft:\n- New and changed code has no comments. Names, types and tests give the intent.\n- Write each new document and each new log text in ASD-STE100.\n- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.\n- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.\n\nEvidence:\n- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.\n\nThe measure of this wave is the number of shipped cycles. Keep each cycle shipping.\n\nWave 153 facts (run 20261104T002909Z): 0 of 1 cycles shipped.\n- Cycle 2151: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…nternal/repocontract 2.567s coverage: 100.0% of statements ok   github.com/mickeyyaya/evolve-loop/go/internal/sysexec 5.112s coverage: 100.0% of statements FAIL. Last phase: aborted. It did not ship.\n- Pull requests merged at this boundary: none.\n\nOperator notes for wave 154:\n- Resume paused cycles 2144-2150 concurrently through lanes. Cycle 2151 sealed FAIL at the build floor: internal/bridge red under -tags integration with no test name, 6/6 reruns green on the same tree; treat a nameless floor red as infra.\n\nEarlier waves:\n- Wave 150 (run 20261102T171134Z): 7 of 12 cycles shipped.\n- Wave 151 (run 20261103T022654Z): 11 of 15 cycles shipped.\n- Wave 152 (run 20261103T165142Z): 1 of 9 cycles shipped.",
+  "final_verdict": "FAIL",
+  "tasks": [
+    "retry-ladder-resume-keeps-ladder-state"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "FAIL",
+      "duration_ms": 41871,
+      "started_at": "2026-11-04T08:27:46Z",
+      "ended_at": "2026-11-04T08:29:36Z",
+      "archetype": "plan",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 58260,
+      "started_at": "2026-11-04T14:23:42Z",
+      "ended_at": "2026-11-04T14:24:42Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 16,
+        "output": 3154,
+        "cache_read": 446933,
+        "cache_write": 68241
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 51475,
+      "started_at": "2026-11-04T14:24:42Z",
+      "ended_at": "2026-11-04T14:25:34Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 10,
+        "output": 1529,
+        "cache_read": 364651,
+        "cache_write": 42671
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 292994,
+      "started_at": "2026-11-04T14:25:34Z",
+      "ended_at": "2026-11-04T14:30:28Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 62,
+        "output": 27855,
+        "cache_read": 3673025,
+        "cache_write": 125010
+      }
+    },
+    {
+      "name": "build-planner",
+      "verdict": "WARN",
+      "duration_ms": 1,
+      "started_at": "2026-11-04T14:30:28Z",
+      "ended_at": "2026-11-04T14:30:29Z",
+      "archetype": "plan",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "FAIL",
+      "duration_ms": 764308,
+      "started_at": "2026-11-04T14:30:29Z",
+      "ended_at": "2026-11-04T15:22:47Z",
+      "archetype": "build",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 70,
+        "output": 15823,
+        "cache_read": 3394933,
+        "cache_write": 83111
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "PASS",
+      "duration_ms": 281414,
+      "started_at": "2026-11-04T15:22:47Z",
+      "ended_at": "2026-11-04T15:27:29Z",
+      "archetype": "control",
+      "model_source": "profile",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 34,
+        "output": 28133,
+        "cache_read": 1747840,
+        "cache_write": 115124
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "build|infra-error|026f4c77b144",
+    "pre_class": "infra-error",
+    "reasons": [
+      "resume review gate: phase \"build\" deliverable rejected after 2 correction(s): build handoff floor: 3 deterministic check failure(s) — fix these exactly before handoff: the tests of the changed packa"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 2157",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase retro"
+    }
+  ],
+  "phases_run_verdict_not_adopted": [
+    {
+      "phase": "build-planner",
+      "verdict": "SKIPPED"
+    }
+  ],
+  "timing": {
+    "total_ms": 1490323,
+    "phase_count": 7,
+    "retried_count": 1,
+    "longest_phase": "build",
+    "longest_ms": 764308,
+    "by_archetype_ms": {
+      "build": 764308,
+      "control": 281414,
+      "plan": 444601
+    },
+    "total_tokens": {
+      "input": 192,
+      "output": 76494,
+      "cache_read": 9627382,
+      "cache_write": 434157
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 70,
+        "output": 15823,
+        "cache_read": 3394933,
+        "cache_write": 83111
+      },
+      "control": {
+        "input": 34,
+        "output": 28133,
+        "cache_read": 1747840,
+        "cache_write": 115124
+      },
+      "plan": {
+        "input": 88,
+        "output": 32538,
+        "cache_read": 4484609,
+        "cache_write": 235922
+      }
+    },
+    "wasted_tokens": {
+      "input": 70,
+      "output": 15823,
+      "cache_read": 3394933,
+      "cache_write": 83111
+    },
+    "cache_hit_ratio": 0.9999800572813047,
+    "hot_phase_count": 5,
+    "hot_phases": [
+      "scout",
+      "triage",
+      "tdd",
+      "build",
+      "retro"
+    ]
+  },
+  "recalled_lessons": [
+    "cycle-1502-closure-citation-contract-never-reaches-the-auditor-it-grades",
+    "inst-L1549b",
+    "cycle-93-build-report-commit-sha-fabrication",
+    "inst-L1544b",
+    "inst-L1537a"
+  ]
+}
