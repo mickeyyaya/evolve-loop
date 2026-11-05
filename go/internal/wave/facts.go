@@ -35,6 +35,7 @@ type Cycle struct {
 	Verdict      string             `json:"verdict,omitempty"`
 	Termination  string             `json:"termination,omitempty"`
 	Shipped      bool               `json:"shipped"`
+	Resumed      bool               `json:"resumed,omitempty"`
 	QuotaPauses  int                `json:"quota_pauses"`
 	Conflict     bool               `json:"conflict,omitempty"`
 	Spend        cyclespend.Spend   `json:"spend"`
@@ -72,13 +73,10 @@ func readCycleRange(root string, floor, ceiling int) ([]Cycle, []string, []ReadF
 	}
 	failures = appendFailure(failures, filepath.Join(evolveDir, "runs"), collectIDs(filepath.Join(evolveDir, "runs"), runDirName, w, ids))
 	failures = appendFailure(failures, filepath.Join(evolveDir, "landing"), collectIDs(filepath.Join(evolveDir, "landing"), landingFileName, w, ids))
-	livePath := core.ResolveCycleStatePath(evolveDir)
-	live, _, err := readState(livePath)
+	live, liveFailures := readLive(evolveDir)
+	failures = append(failures, liveFailures...)
 	var cycles []Cycle
 	var warnings []string
-	if !errors.Is(err, fs.ErrNotExist) {
-		failures = appendFailure(failures, livePath, err)
-	}
 	for _, id := range sortedKeys(ids) {
 		c, warn, bad := readCycle(root, id, live, dossiers[id])
 		cycles = append(cycles, c)
@@ -86,6 +84,15 @@ func readCycleRange(root string, floor, ceiling int) ([]Cycle, []string, []ReadF
 		failures = append(failures, bad...)
 	}
 	return cycles, warnings, failures
+}
+
+func readLive(evolveDir string) (cyclestate.CycleState, []ReadFailure) {
+	livePath := core.ResolveCycleStatePath(evolveDir)
+	live, _, err := readState(livePath)
+	if errors.Is(err, fs.ErrNotExist) {
+		return live, nil
+	}
+	return live, appendFailure(nil, livePath, err)
 }
 
 func appendFailure(failures []ReadFailure, path string, err error) []ReadFailure {

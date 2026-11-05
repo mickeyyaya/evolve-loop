@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
@@ -236,6 +237,9 @@ func settleLanding(ctx context.Context, opts *Options, res *RunResult, in landin
 		res.Logs = append(res.Logs, "[ship] WARN: could not write ship-binding.json: "+err.Error())
 	}
 	in.Status = landing.IntentComplete
+	if in.CompletedAt == "" {
+		in.CompletedAt = (&worktreeShip{opts: opts}).deliveredAt().Format(time.RFC3339)
+	}
 	if err := writeLandingIntent(opts, in); err != nil {
 		res.Logs = append(res.Logs, "[ship] WARN: ship cannot mark the landing intent complete (a retry settles it again and changes nothing): "+err.Error())
 	} else {
