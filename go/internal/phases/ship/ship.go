@@ -86,6 +86,8 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 	return p.runNative(ctx, req, msg, start)
 }
 
+func (p *Phase) IntegrationWired() bool { return p.integration != nil }
+
 func NewWithDefaultRunner() *Phase {
 	return NewWithDefaultRunnerStage(config.StageOff)
 }

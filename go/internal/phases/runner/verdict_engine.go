@@ -79,6 +79,10 @@ func (b *BaseRunner) ContractVerifierWired() bool {
 	return !b.verifyInjected && b.contractVerifier != nil && b.contractVerifier() != nil
 }
 
+func (b *BaseRunner) ContractVerifierIs(v any) bool {
+	return b.ContractVerifierWired() && any(b.contractVerifier()) == v
+}
+
 const (
 	reconcileSettleRetries  = verdict.SettleRetries
 	reconcileSettleInterval = verdict.SettleInterval

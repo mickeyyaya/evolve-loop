@@ -92,3 +92,24 @@ func TestSwarmDecorator_ForwardsContractVerifierWired(t *testing.T) {
 		t.Error("a runner without the capability reports false")
 	}
 }
+
+type contractIdentityRunner struct {
+	plainRunner
+	bound any
+}
+
+func (w contractIdentityRunner) ContractVerifierIs(v any) bool { return w.bound == v }
+
+func TestSwarmDecorator_ForwardsContractVerifierIs(t *testing.T) {
+	gate := &struct{ name string }{"gate"}
+	d := New(contractIdentityRunner{bound: gate}, nil, swarm.ModeWriter, Config{})
+	if !d.ContractVerifierIs(gate) {
+		t.Error("the Decorator reports the inner runner's bound verifier")
+	}
+	if d.ContractVerifierIs(&struct{ name string }{"gate"}) {
+		t.Error("the Decorator reports no match for another verifier")
+	}
+	if New(plainRunner{}, nil, swarm.ModeWriter, Config{}).ContractVerifierIs(gate) {
+		t.Error("a runner without the capability reports false")
+	}
+}
