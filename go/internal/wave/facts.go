@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclespend"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
@@ -140,7 +141,7 @@ func readCycle(root string, id int, live cyclestate.CycleState, d *dossier.Dossi
 	c := Cycle{ID: id}
 	var failures []ReadFailure
 	todo, err := readTodo(ws)
-	failures = appendFailure(failures, filepath.Join(ws, core.LaneScopeFile), err)
+	failures = appendFailure(failures, committedset.LanePinPath(ws), err)
 	c.Todo = todo
 	st, ok, stateFailures := workspaceState(ws, id, live)
 	failures = append(failures, stateFailures...)

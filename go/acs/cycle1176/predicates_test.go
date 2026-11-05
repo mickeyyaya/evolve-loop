@@ -15,8 +15,9 @@ import (
 )
 
 const (
-	cmdEvolvePkg = "github.com/mickeyyaya/evolve-loop/go/cmd/evolve"
-	waveCycle    = 1176
+	cmdEvolvePkg    = "github.com/mickeyyaya/evolve-loop/go/cmd/evolve"
+	cycleOutcomePkg = "github.com/mickeyyaya/evolve-loop/go/internal/cycleoutcome"
+	waveCycle       = 1176
 )
 
 func laneFixture(t *testing.T, seed int) string {
@@ -181,9 +182,9 @@ func TestC1176_006_WavePlanSeedDropsConsumedScope(t *testing.T) {
 }
 
 func TestC1176_007_CommittedIDsReaderFeedsTheFailSite(t *testing.T) {
-	requirePassing(t, cmdEvolvePkg, []string{
-		"TestFailedCycleCommittedIDs_ReadsTopNAndSkipShipped",
-		"TestFailedCycleCommittedIDs_ExcludesDeferredAndDropped",
-		"TestFailedCycleCommittedIDs_AbsentOrCorruptDecisionIsNil",
+	requirePassing(t, cycleOutcomePkg, []string{
+		"TestFailedCommitted_NoPinKeepsTopNThenSkipShipped",
+		"TestFailedCommitted_NoPinLeavesOutADeferredIDOfTopN",
+		"TestFailedCommitted_AbsentCorruptOrEmptyDecisionIsEmpty",
 	})
 }

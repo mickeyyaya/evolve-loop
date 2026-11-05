@@ -2,7 +2,9 @@ package committedset
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -88,15 +90,22 @@ func ReadLaneDoc(workspace string) (LanePinDoc, error) {
 		return LanePinDoc{TodoIDs: nonBlank(r.ItemIDs), GoalHash: r.GoalHash}, nil
 	}
 	body, err := os.ReadFile(filepath.Join(workspace, LanePinFile))
-	if err != nil {
+	if errors.Is(err, fs.ErrNotExist) {
 		return LanePinDoc{}, err
+	}
+	if err != nil {
+		return LanePinDoc{}, fmt.Errorf("%s unreadable: %w", LanePinFile, err)
 	}
 	var doc LanePinDoc
 	if err := json.Unmarshal(body, &doc); err != nil {
-		return LanePinDoc{}, fmt.Errorf("parse %s: %w", LanePinFile, err)
+		return LanePinDoc{}, fmt.Errorf("%s malformed: %w", LanePinFile, err)
 	}
 	doc.TodoIDs = nonBlank(doc.TodoIDs)
 	return doc, nil
+}
+
+func LanePinPath(workspace string) string {
+	return filepath.Join(workspace, LanePinFile)
 }
 
 func LaneDoc(workspace string) (LanePinDoc, bool) {

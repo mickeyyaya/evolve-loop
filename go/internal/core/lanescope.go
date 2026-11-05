@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"io"
 	"io/fs"
 	"os"
@@ -13,6 +12,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
@@ -26,18 +26,14 @@ const LaneScopeFile = "lane-scope.json"
 type LaneScope = committedset.LanePinDoc
 
 func ReadLaneScope(workspace string) (*LaneScope, error) {
-	b, err := os.ReadFile(filepath.Join(workspace, LaneScopeFile))
+	doc, err := committedset.ReadLaneDoc(workspace)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("%s unreadable: %w", LaneScopeFile, err)
+		return nil, err
 	}
-	var ls LaneScope
-	if err := json.Unmarshal(b, &ls); err != nil {
-		return nil, fmt.Errorf("%s malformed: %w", LaneScopeFile, err)
-	}
-	return &ls, nil
+	return &doc, nil
 }
 
 func loadLaneScope(workspace string) *LaneScope {

@@ -131,6 +131,8 @@ var protectedGateFiles = []struct {
 	{"go/internal/policy/core.go", PolicyGuarantee},
 	{"go/internal/policy/strict_keys.go", PolicyGuarantee},
 	{"go/internal/core/statemachine.go", PhaseOrderGuarantee},
+	{"go/internal/committedset/lanepin_guard_forms_test.go", GuardGuarantee},
+	{"go/internal/committedset/lanepin_reader_guard_test.go", GuardGuarantee},
 	{"go/internal/bridge/dispatch_signal_guard_test.go", GuardGuarantee},
 	{"go/internal/bridge/realtmux_sender_guard_test.go", GuardGuarantee},
 	{"go/internal/bridge/resolve_guard_test.go", GuardGuarantee},

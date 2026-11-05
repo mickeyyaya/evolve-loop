@@ -111,6 +111,7 @@ var allowedPinFileRefs = map[string]string{
 	"internal/core/lane_pin_drift.go|reportLanePinDrift":        "the text of the signal",
 	"internal/bridge/read_isolation.go|readIsolation":           "the sandbox pin that blocks a cell write",
 	"internal/topngate/gate.go|check":                           "a message",
+	"internal/core/blocker_outcome.go|consoleRouteChoice":       "a path in a failure text",
 	"internal/phases/triage/triage.go|lanePinRefusal":           "a message",
 }
 

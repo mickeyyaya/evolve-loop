@@ -1,9 +1,12 @@
 package committedset
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -211,5 +214,40 @@ func TestLanePin_ARecordOfAnotherRootShapeIsNotReadFromTheWorkspacePath(t *testi
 		if got := LanePin(ws); !slices.Equal(got, []string{"file"}) {
 			t.Errorf("%s: LanePin = %v, want [file]", name, got)
 		}
+	}
+}
+
+func TestDrift_CarriesThePinPathAndBothListsOfAForgedFile(t *testing.T) {
+	t.Parallel()
+	root, ws := laneFixture(t, "cycle-6")
+	if err := WriteRecord(root, Record{Cycle: 6, ItemIDs: []string{"a"}}); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, LanePinPath(ws), `{"todo_ids":["forged"]}`)
+	want := Drift{Path: filepath.Join(ws, LanePinFile), Record: []string{"a"}, File: []string{"forged"}}
+	got, drifted := LaneDrift(ws)
+	if !drifted || got.Path != want.Path || !slices.Equal(got.Record, want.Record) || !slices.Equal(got.File, want.File) {
+		t.Fatalf("LaneDrift = %+v %v, want %+v", got, drifted, want)
+	}
+}
+
+func TestReadLaneDoc_NamesTheFileInEachFailure(t *testing.T) {
+	t.Parallel()
+	_, ws := laneFixture(t, "cycle-7")
+	if _, err := ReadLaneDoc(ws); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("an absent file must stay not-exist, got %v", err)
+	}
+	writeFile(t, LanePinPath(ws), `{bad`)
+	if _, err := ReadLaneDoc(ws); err == nil || !strings.Contains(err.Error(), LanePinFile+" malformed") {
+		t.Fatalf("malformed error = %v", err)
+	}
+	if err := os.Remove(LanePinPath(ws)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(LanePinPath(ws), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReadLaneDoc(ws); err == nil || !strings.Contains(err.Error(), LanePinFile+" unreadable") {
+		t.Fatalf("unreadable error = %v", err)
 	}
 }
