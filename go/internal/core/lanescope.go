@@ -24,29 +24,15 @@ const LaneScopeFile = "lane-scope.json"
 type LaneScope = committedset.LanePinDoc
 
 func loadLaneScope(workspace string) *LaneScope {
-	if workspace == "" {
+	doc, ok := committedset.LaneDoc(workspace)
+	if !ok {
 		return nil
 	}
-	b, err := os.ReadFile(filepath.Join(workspace, LaneScopeFile))
-	if err != nil {
-		if !os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN %s unreadable: %v (falling back to env fleet scope)\n", LaneScopeFile, err)
-		}
-		return nil
-	}
-	var ls LaneScope
-	if err := json.Unmarshal(b, &ls); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN %s malformed: %v (falling back to env fleet scope)\n", LaneScopeFile, err)
-		return nil
-	}
-	return &ls
+	return &doc
 }
 
 func LaneScopeIDs(workspace string) []string {
-	if scope := loadLaneScope(workspace); scope != nil && len(scope.TodoIDs) > 0 {
-		return scope.TodoIDs
-	}
-	return nil
+	return committedset.LanePin(workspace)
 }
 
 func materializeLaneScope(workspace, scope, goalHash string) {

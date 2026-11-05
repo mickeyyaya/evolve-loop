@@ -54,6 +54,7 @@ type cycleRun struct {
 	lastBlockerRefusal  string
 	spendLimitSeen      bool
 	spendLimitStopped   bool
+	lanePinDriftSeen    bool
 
 	req            CycleRequest
 	cycle          int
@@ -418,11 +419,11 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 		ctxSnap[k] = v
 	}
 
-	if ls := loadLaneScope(cs.WorkspacePath); ls != nil {
-		ctxSnap["fleet_scope"] = strings.Join(ls.TodoIDs, ",")
-	} else if scope := envSnap[ipcenv.FleetScopeKey]; scope != "" {
+	if scope := envSnap[ipcenv.FleetScopeKey]; scope != "" {
 		ctxSnap["fleet_scope"] = scope
 		materializeLaneScope(cs.WorkspacePath, scope, req.GoalHash)
+	} else if ls := loadLaneScope(cs.WorkspacePath); ls != nil {
+		ctxSnap["fleet_scope"] = strings.Join(ls.TodoIDs, ",")
 	}
 	if scope := ctxSnap["fleet_scope"]; scope != "" && o.scopePathFor != nil {
 		var pairs []string

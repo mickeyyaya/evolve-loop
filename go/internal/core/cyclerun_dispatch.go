@@ -93,7 +93,10 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 		phaseReq.Input = cr.assemblePhaseIO(next, phaseWorktree, phaseCtx)
 	}
 	spec, _ := cr.o.catalog.Get(string(next))
-	writeInputIndex(indexTarget{projectRoot: cr.req.ProjectRoot, workspace: cr.cs.WorkspacePath, runID: cr.cs.RunID, cycle: cr.cycle, specInputs: spec.Inputs.Files}, next, fleetScopeIDs(cr.ctxSnap["fleet_scope"]), cr.o.errOut())
+	if err := writeInputIndex(indexTarget{projectRoot: cr.req.ProjectRoot, workspace: cr.cs.WorkspacePath, runID: cr.cs.RunID, goalHash: cr.req.GoalHash, cycle: cr.cycle, specInputs: spec.Inputs.Files}, next, fleetScopeIDs(cr.ctxSnap["fleet_scope"]), cr.o.errOut()); err != nil {
+		return dispatchResult{}, loopAbort, fmt.Errorf("phase %s: %w", next, err)
+	}
+	defer cr.reportLanePinDrift(next)
 	var resp PhaseResponse
 	var err error
 	shipRecovered := false

@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -11,14 +12,19 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
+var ErrLaneRecordUnwritable = errors.New("the lane record cannot be written")
+
 type indexTarget struct {
-	projectRoot, workspace, runID string
-	cycle                         int
-	specInputs                    []string
+	projectRoot, workspace, runID, goalHash string
+	cycle                                   int
+	specInputs                              []string
 }
 
-func writeInputIndex(at indexTarget, phase Phase, itemIDs []string, warn io.Writer) {
+func writeInputIndex(at indexTarget, phase Phase, itemIDs []string, warn io.Writer) error {
 	record, err := cycleRecord(at, itemIDs)
+	if err != nil && len(itemIDs) > 0 {
+		return fmt.Errorf("%w for cycle %d: %w", ErrLaneRecordUnwritable, at.cycle, err)
+	}
 	var idx inputindex.Index
 	if err == nil {
 		pol := policy.LoadOrDefaults(filepath.Join(at.projectRoot, ".evolve", "policy.json"), warn)
@@ -33,6 +39,7 @@ func writeInputIndex(at indexTarget, phase Phase, itemIDs []string, warn io.Writ
 		_ = os.Remove(inputindex.Path(workspace))
 		fmt.Fprintf(warn, "[orchestrator] WARN input index for %s: %v (the cell gets no index and no lineage grants)\n", phase, err)
 	}
+	return nil
 }
 
 func contextPolicy(c policy.IsolationContextPolicy, phase Phase, inputs []string) inputindex.ContextPolicy {
@@ -54,9 +61,17 @@ func cycleRecord(at indexTarget, itemIDs []string) (inputindex.Record, error) {
 	if !filepath.IsAbs(at.projectRoot) {
 		return inputindex.Record{}, fmt.Errorf("the project root %q is not absolute", at.projectRoot)
 	}
-	if recorded, ok := inputindex.ReadRecord(at.projectRoot, at.cycle); ok && recorded.RunID == at.runID {
-		return recorded, nil
+	record := inputindex.Record{Cycle: at.cycle, RunID: at.runID, ItemIDs: itemIDs, GoalHash: at.goalHash}
+	if recorded, ok := inputindex.ReadRecord(at.projectRoot, at.cycle); ok {
+		if recorded.RunID == at.runID {
+			return recorded, nil
+		}
+		if len(recorded.ItemIDs) > 0 {
+			record.ItemIDs = recorded.ItemIDs
+			if recorded.GoalHash != "" {
+				record.GoalHash = recorded.GoalHash
+			}
+		}
 	}
-	record := inputindex.Record{Cycle: at.cycle, RunID: at.runID, ItemIDs: itemIDs}
 	return record, inputindex.WriteRecord(at.projectRoot, record)
 }
