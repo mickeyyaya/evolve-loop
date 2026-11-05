@@ -123,7 +123,9 @@ func TestParseFailingTests_TheTextOfARealRunStillCarriesThePrintedFixtures(t *te
 }
 
 func TestWithFailures_ARerunAttemptReadsTheLogOnly(t *testing.T) {
-	calls := routedGHF1(t, ghRouteF1{prefix: "run view 7 --log-failed --attempt 2", out: ghLog("j", "make: *** [lint] Error 2")})
+	calls := routedGHF1(t,
+		ghRouteF1{prefix: "run view 7 --log-failed --attempt 2", out: ghLog("j", "make: *** [lint] Error 2")},
+		ghRouteF1{prefix: "run view 7 --attempt 2 --json jobs", out: `{"jobs":[]}`})
 	st := failedRun(7)
 	st.Attempt = 2
 	got, err := ghClassifySource{root: "."}.withFailures(context.Background(), st)
@@ -131,7 +133,7 @@ func TestWithFailures_ARerunAttemptReadsTheLogOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []FailingTest{{Step: "make lint", Jobs: []string{"j"}}}
-	if fmt.Sprint(got.FailingTests) != fmt.Sprint(want) || len(*calls) != 1 {
+	if fmt.Sprint(got.FailingTests) != fmt.Sprint(want) || len(*calls) != 2 {
 		t.Errorf("FailingTests = %+v after calls %v, want %+v from the log alone", got.FailingTests, *calls, want)
 	}
 }
@@ -293,6 +295,8 @@ func artifactGH(t *testing.T, log string, download func(name string, try int, de
 		switch {
 		case strings.HasPrefix(joined, "run view 9 --log-failed"):
 			return []byte(log), nil
+		case strings.HasPrefix(joined, "run view 9 --json jobs"):
+			return []byte(`{"jobs":[]}`), nil
 		case strings.HasPrefix(joined, "api repos/{owner}/{repo}/actions/runs/9/artifacts"):
 			return []byte(`{"artifacts":[{"name":"coverage-x","expired":false},{"name":"coverage-y","expired":false}]}`), nil
 		}

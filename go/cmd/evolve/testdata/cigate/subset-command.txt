@@ -1,0 +1,5 @@
+Each run-<id>-subset.log holds lines of `gh run view <id> --log-failed`, byte-equal and in order.
+A line is kept when it matches the pattern below, or when it is in the last 244 lines of the log.
+run-41844945011-subset.log is the whole log, because it has only 75 lines.
+
+awk -v total="$(wc -l < "$log")" 'NR > total - 244 || /--- FAIL: |FAIL\t|Artifact .* has been successfully uploaded|make(\[[0-9]+\])?: \*\*\*/' "$log"

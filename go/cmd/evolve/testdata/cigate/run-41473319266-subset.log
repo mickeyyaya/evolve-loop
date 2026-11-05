@@ -1,0 +1,312 @@
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:43:42.6919950Z --- FAIL: TestPersonaStopCriterionDedupe_CombinedLineCountReduced
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:43:45.0992635Z     --- FAIL: TestF
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:43:45.0993135Z FAIL	p
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:20.6038387Z --- FAIL: TestC1761_009_OnlyTargetPackagesTouched (0.02s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:20.6040273Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle10	0.239s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:20.6049371Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:20.6593256Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:20.6603915Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:20.7061710Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:20.7068703Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:20.7443862Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:20.9032189Z --- FAIL: TestC1761_009_OnlyTargetPackagesTouched (0.02s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:20.9033272Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle10	0.239s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:20.9669194Z --- FAIL: TestC1761_009_OnlyTargetPackagesTouched (0.02s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:20.9671475Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle10	0.239s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:21.1790323Z --- FAIL: TestC1761_009_OnlyTargetPackagesTouched (0.02s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:21.1791526Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle10	0.239s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:21.3137857Z --- FAIL: TestC1761_009_OnlyTargetPackagesTouched (0.02s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:21.3140458Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle10	0.239s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:21.3585769Z --- FAIL: TestC1761_009_OnlyTargetPackagesTouched (0.02s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:21.3587053Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle10	0.239s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:36.6670345Z --- FAIL: TestC1946_001_CoreStatementCoverageIsFull (197.14s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:36.6809181Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1946	197.400s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:51.2149264Z --- FAIL: TestC1950_001_CoreLeaseBreakerCarryforwardBatchReachesFullCoverage (1.19s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:51.2152008Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1950	1.471s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:51.3042258Z --- FAIL: TestC1950_001_CoreLeaseBreakerCarryforwardBatchReachesFullCoverage (1.19s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:51.3049540Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1950	1.471s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:51.6726808Z --- FAIL: TestC1946_001_CoreStatementCoverageIsFull (197.14s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:51.6775373Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1946	197.400s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:52.8684723Z --- FAIL: TestC1946_001_CoreStatementCoverageIsFull (197.14s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:52.8689318Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1946	197.400s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:52.9459416Z --- FAIL: TestC1946_001_CoreStatementCoverageIsFull (197.14s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:44:52.9461159Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1946	197.400s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:49:10.3062351Z make: *** [Makefile:235: cover-changed] Error 1
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-02T15:49:13.2739906Z Artifact coverage-ubuntu-latest-go1.23 has been successfully uploaded! Final size is 9093781 bytes. Artifact ID is 13156672657
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:42:10.1403970Z --- FAIL: TestPersonaStopCriterionDedupe_CombinedLineCountReduced
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:42:13.8523310Z     --- FAIL: TestF
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:42:13.8628670Z FAIL	p
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:45:51.6049740Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:45:51.6057390Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:45:52.5437020Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:45:52.5453410Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:45:52.9779530Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:46:08.0493580Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:46:11.7824640Z --- FAIL: TestC1761_009_OnlyTargetPackagesTouched (0.02s)
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:46:11.8230290Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle10	0.239s
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:46:17.6042450Z --- FAIL: TestC1761_009_OnlyTargetPackagesTouched (0.02s)
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:46:17.6346650Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle10	0.239s
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:46:20.4435530Z --- FAIL: TestC1761_009_OnlyTargetPackagesTouched (0.02s)
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:46:20.4537990Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle10	0.239s
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:46:26.4539440Z --- FAIL: TestC1761_009_OnlyTargetPackagesTouched (0.02s)
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:46:26.4880220Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle10	0.239s
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:46:28.6807350Z --- FAIL: TestC1761_009_OnlyTargetPackagesTouched (0.02s)
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:46:28.6809060Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle10	0.239s
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:46:28.8977700Z --- FAIL: TestC1761_009_OnlyTargetPackagesTouched (0.02s)
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:46:28.9218270Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle10	0.239s
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:48:51.8037200Z --- FAIL: TestC1946_001_CoreStatementCoverageIsFull (197.14s)
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:48:51.8040220Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1946	197.400s
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:50:13.9754260Z --- FAIL: TestC1946_001_CoreStatementCoverageIsFull (197.14s)
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:50:14.0163550Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1946	197.400s
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:50:17.1622100Z --- FAIL: TestC1946_001_CoreStatementCoverageIsFull (197.14s)
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:50:17.1989820Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1946	197.400s
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:50:17.3753220Z --- FAIL: TestC1950_001_CoreLeaseBreakerCarryforwardBatchReachesFullCoverage (1.19s)
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:50:17.3857840Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1950	1.471s
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:50:17.5644240Z --- FAIL: TestC1946_001_CoreStatementCoverageIsFull (197.14s)
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:50:17.6052000Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1946	197.400s
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:50:17.9691500Z --- FAIL: TestC1950_001_CoreLeaseBreakerCarryforwardBatchReachesFullCoverage (1.19s)
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:50:18.0042980Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1950	1.471s
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2110860Z github.com/mickeyyaya/evolve-loop/go/internal/phasestream/classify.go:274:			formatUser					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2111120Z github.com/mickeyyaya/evolve-loop/go/internal/phasestream/classify.go:309:			formatSystem					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2111380Z github.com/mickeyyaya/evolve-loop/go/internal/phasestream/classify.go:329:			classifyPlain					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2111630Z github.com/mickeyyaya/evolve-loop/go/internal/phasestream/classify.go:339:			decodeFull					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2111880Z github.com/mickeyyaya/evolve-loop/go/internal/phasestream/classify.go:347:			isNoise						100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2112140Z github.com/mickeyyaya/evolve-loop/go/internal/phasestream/classify.go:367:			isSpinnerRune					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2112400Z github.com/mickeyyaya/evolve-loop/go/internal/phasestream/classify.go:377:			isBorderRune					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2112670Z github.com/mickeyyaya/evolve-loop/go/internal/phasestream/correlation.go:22:			newCorrelator					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2112930Z github.com/mickeyyaya/evolve-loop/go/internal/phasestream/correlation.go:26:			observe						100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2113200Z github.com/mickeyyaya/evolve-loop/go/internal/phasestream/marker.go:21:				detectInfraMarker				100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2113450Z github.com/mickeyyaya/evolve-loop/go/internal/phasestream/marker.go:31:				InfraMarker					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2113690Z github.com/mickeyyaya/evolve-loop/go/internal/phasestream/mask.go:5:				isEvictable					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2113970Z github.com/mickeyyaya/evolve-loop/go/internal/phasestream/mask.go:9:				MaskStaleObservations				100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2114230Z github.com/mickeyyaya/evolve-loop/go/internal/phasestream/mask.go:29:				maskObservation					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2114490Z github.com/mickeyyaya/evolve-loop/go/internal/phasestream/normalizer.go:40:			groupKiller					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2114770Z github.com/mickeyyaya/evolve-loop/go/internal/phasestream/normalizer.go:46:			NewNormalizer					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2115090Z github.com/mickeyyaya/evolve-loop/go/internal/phasestream/normalizer.go:61:			Poll						100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2115370Z github.com/mickeyyaya/evolve-loop/go/internal/phasestream/normalizer.go:102:			classifyNewLines				100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2115630Z github.com/mickeyyaya/evolve-loop/go/internal/phasestream/normalizer.go:120:			tailFile					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2115910Z github.com/mickeyyaya/evolve-loop/go/internal/phasestream/normalizer.go:154:			writeEnvelope					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2116180Z github.com/mickeyyaya/evolve-loop/go/internal/phasestream/produce.go:23:			Produce						100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2116490Z github.com/mickeyyaya/evolve-loop/go/internal/phasestream/produce.go:68:			classifyLines					92.3%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2116750Z github.com/mickeyyaya/evolve-loop/go/internal/phasestream/produce.go:87:			writeEventsFile					77.3%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2116990Z github.com/mickeyyaya/evolve-loop/go/internal/preflight/preflight.go:88:			Probe						100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2117250Z github.com/mickeyyaya/evolve-loop/go/internal/preflight/preflight.go:205:			hostOSType					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2117550Z github.com/mickeyyaya/evolve-loop/go/internal/preflight/preflight.go:214:			MeasuredSandboxCapability			100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2117830Z github.com/mickeyyaya/evolve-loop/go/internal/preflight/preflight.go:219:			selectWorktreeBase				100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2118100Z github.com/mickeyyaya/evolve-loop/go/internal/preflight/preflight.go:240:			probeWritable					90.9%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2118350Z github.com/mickeyyaya/evolve-loop/go/internal/preflight/preflight.go:257:			projectHash8					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2118610Z github.com/mickeyyaya/evolve-loop/go/internal/preflight/preflight.go:262:			cacheDirPath					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2118860Z github.com/mickeyyaya/evolve-loop/go/internal/preflight/preflight.go:281:			unameR						100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2119120Z github.com/mickeyyaya/evolve-loop/go/internal/preflight/preflight.go:289:			getEnvDefault					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2119380Z github.com/mickeyyaya/evolve-loop/go/internal/preflight/preflight.go:296:			lookPathPtr					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2119640Z github.com/mickeyyaya/evolve-loop/go/internal/preflight/preflight.go:304:			MarshalJSON					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2119900Z github.com/mickeyyaya/evolve-loop/go/internal/preflight/preflight.go:309:			PrettyJSON					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2120140Z github.com/mickeyyaya/evolve-loop/go/internal/preflight/preflight.go:314:			Summary						100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2120400Z github.com/mickeyyaya/evolve-loop/go/internal/preflight/preflight.go:336:			WriteToFile					80.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2120640Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/cwd.go:24:				ExecCwdLister					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2120850Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/cwd.go:28:				ListCwds					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2121100Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/cwd.go:40:				ParseCwdListing					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2121330Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/cwd.go:69:				OrphanUnder					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2121550Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/cwd.go:85:				Under						100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2121780Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/cwd.go:89:				baseForms					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2121990Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/cwd.go:96:				within						100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2122200Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/cwd.go:110:				inside						100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2122430Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/cwd.go:115:				resolved					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2122670Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/dispatchid.go:20:			String						100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2122910Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/dispatchid.go:24:			idPart						100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2123190Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/dispatchid.go:26:			ParseDispatchID					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2123740Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/list.go:16:				NewLister					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2124010Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/list.go:31:				withArgs					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2124310Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/list.go:42:				ExecLister					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2124610Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/procargs.go:15:				parseProcArgs2					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2124990Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/procargs.go:33:				parseProcFiles					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2125290Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/procargs.go:37:				splitNUL					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2125530Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/procargs.go:45:				ownEnv						100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2125840Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/procargs_darwin.go:17:			readProcArgs					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2126270Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/procargs_darwin.go:21:			readProcArgsVia					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2126710Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/procargs_darwin.go:37:			sysctl						100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2127380Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/procstart.go:3:				StartOf						100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2128030Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/procstart_darwin.go:17:			readProcStart					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2128430Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/procstart_darwin.go:21:			startOfVia					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2128760Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/proof.go:17:				Identity					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2129000Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/proof.go:19:				Select						100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2129240Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/proof.go:29:				TaggedWith					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2129510Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/proof.go:36:				Recorded					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2129960Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/proof.go:46:				AnyOf						100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2130230Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/proof.go:52:				Descendants					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2130490Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/proof.go:70:				Identities					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2130740Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/reap.go:34:				Reap						100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2131040Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/reap.go:62:				protected					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2131310Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/reap.go:75:				send						100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2131590Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/reap.go:91:				stillMatching					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2131900Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/reap.go:100:				and						100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2132240Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/shared.go:33:				SharedHelper					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2132610Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/shared.go:37:				matches						100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2132920Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/shared.go:52:				programNames					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2133690Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/shared.go:60:				OwnedByDispatch					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2134000Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/table.go:25:				parsePS						100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2134360Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/table.go:35:				parsePSRow					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2134650Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/tree.go:23:				TreeFile					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2135110Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/tree.go:33:				SaveTree					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2135670Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/tree.go:37:				saveTree					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2135960Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/tree.go:58:				writeTemp					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2136240Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/tree.go:72:				LoadTree					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2136520Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/tree.go:94:				RemoveTree					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2136870Z github.com/mickeyyaya/evolve-loop/go/internal/proctree/tree.go:103:				TreeDir						100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2137270Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/findings.go:18:				SeverityRank					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2137540Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/findings.go:41:				Findings					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2137830Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/findings.go:56:				issuesBounds					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2138150Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/findings.go:73:				scanFindings					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2138510Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/findings.go:83:				parseFindingLine				100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2139000Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/findings.go:107:			tsvFindings					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2139300Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/findings.go:126:			cleanTitle					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2139560Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/findings.go:130:			Verdict						100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2139840Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/findings.go:145:			FindingKey					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2140210Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/open_nofollow_unix.go:10:		OpenRegularNoFollow				100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2140500Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/reportdoc.go:22:			Section						100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2140960Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/reportdoc.go:46:			isSectionBoundary				100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2141230Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/reportdoc.go:65:			HasSection					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2141500Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/reportdoc.go:70:			Fields						100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2141790Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/reportdoc.go:102:			RequireReasoning				100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2142090Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/reportdoc.go:109:			ReasonedReview					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2142440Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/reportdoc.go:125:			RequirePathLineEvidence				88.9%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2142800Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/reportdoc.go:141:			RequirePathLineEvidenceAt			78.6%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2143100Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/reportdoc.go:164:			citationLine					95.7%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2143440Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/reportdoc.go:198:			citationRangeContinues				75.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2143730Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/reportdoc.go:206:			ReviewFields					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2144050Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/reportdoc.go:215:			EvidenceOrBody					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2144380Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/reportdoc.go:222:			citationBoundaryBefore				75.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2144710Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/reportdoc.go:230:			citationBoundaryAfter				100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2145030Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/reportdoc.go:234:			referencedLineCount				80.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2145410Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/reportdoc.go:258:			ValidReference					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2145820Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/reportdoc.go:264:			readCurrentReference				100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2147000Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/reportdoc.go:327:			readBaseReference				100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2147400Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/reportdoc.go:367:			visibleLines					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2147720Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/reportdoc.go:372:			visibleLinesIdx					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2148060Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/reportdoc.go:402:			stripHTMLComments				100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2148500Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/reportdoc.go:426:			isIndentedCode					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2149130Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/reportdoc.go:430:			isParagraphText					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2149510Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/reportdoc.go:438:			opensFence					85.7%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2149880Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/reportdoc.go:450:			closesFence					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2150250Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/reportdoc.go:459:			markerRun					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2150590Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/reportdoc.go:468:			levelTwoHeading					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2150990Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/severity_counts.go:15:			Blocking					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2151360Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/severity_counts.go:29:			fold						100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2151810Z github.com/mickeyyaya/evolve-loop/go/internal/reportdoc/severity_counts.go:36:			CountSeverities					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2152190Z github.com/mickeyyaya/evolve-loop/go/internal/testhost/testhost.go:24:				Unavailable					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2152490Z github.com/mickeyyaya/evolve-loop/go/internal/testhost/testhost.go:33:				Tool						100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2152830Z github.com/mickeyyaya/evolve-loop/go/internal/testhost/testhost.go:46:				requires					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2153120Z github.com/mickeyyaya/evolve-loop/go/internal/testhost/testhost.go:55:				Unavailable					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2153420Z github.com/mickeyyaya/evolve-loop/go/internal/testhost/testhost.go:60:				Tool						100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2153760Z github.com/mickeyyaya/evolve-loop/go/internal/testhost/testhost.go:65:				currentHost					100.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2153890Z total:												(statements)					97.0%
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2362600Z ##[group]Run base="$COVER_BASE"
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2363180Z ^[[36;1mbase="$COVER_BASE"^[[0m
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2363410Z ^[[36;1mif [ -z "$base" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then^[[0m
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2363490Z ^[[36;1m  base=$(git rev-parse HEAD~1)^[[0m
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2363560Z ^[[36;1mfi^[[0m
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2363660Z ^[[36;1mecho "cover-changed base: $base"^[[0m
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2363820Z ^[[36;1mmake cover-changed-darwin COVER_CHANGED_BASE="$base"^[[0m
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2709600Z shell: /bin/bash -e {0}
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2709670Z env:
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2709810Z   COVER_BASE: 93e8c1cc71d7b4788e1dbb68d9149a2298ea405e
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.2709870Z ##[endgroup]
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.4468630Z cover-changed base: 93e8c1cc71d7b4788e1dbb68d9149a2298ea405e
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:44.5046600Z go run ./cmd/evolve cover changed --base 93e8c1cc71d7b4788e1dbb68d9149a2298ea405e --root . --packages .darwin-set
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:48.2662500Z cover changed: REFUSED cmd/evolve/cmd_cycle.go:221 cmd/evolve.runCycleRun 96.9% (31/32)
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:48.2677080Z exit status 1
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:48.2677610Z cover changed: 16 changed, 15 full, 1 refused, 3 exempt
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:48.2760380Z make: *** [cover-changed-darwin] Error 1
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:48.2857040Z ##[error]Process completed with exit code 2.
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:48.3502000Z ##[group]Run actions/upload-artifact@v4
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:48.3502390Z with:
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:48.3502700Z   name: coverage-macos-latest-go1.23
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:48.3503220Z   path: go/coverage.txt
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	go/test-integration.json
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	go/test-e2e.json
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	go/test-rusage.ndjson
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	go/runner-samples.ndjson
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:48.3503900Z   if-no-files-found: warn
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:48.3504220Z   compression-level: 6
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:48.3505000Z   overwrite: false
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:48.3505300Z   include-hidden-files: false
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:48.3505550Z ##[endgroup]
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:49.1266130Z (node:86372) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:49.1267940Z (Use `node --trace-deprecation ...` to show where the warning was created)
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:49.1353070Z Multiple search paths detected. Calculating the least common ancestor of all paths
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:49.1360200Z The least common ancestor is /Users/runner/work/evolve-loop/evolve-loop/go. This will be the root directory of the artifact
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:49.1361730Z With the provided path, there will be 4 files uploaded
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:49.1364090Z Artifact name is valid!
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:49.1365040Z Root directory input is valid!
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:49.4887910Z Beginning upload of artifact content to blob storage
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:50.4277110Z (node:86372) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:50.9785830Z Uploaded bytes 6109244
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:51.0179860Z Finished uploading artifact content to blob storage!
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:51.0180590Z SHA256 digest of uploaded artifact zip is ddcf7bb12d314cec9a2f17dc6d0c93ddf6926d6ce25bf2b68fff83f4bd358f73
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:51.0181290Z Finalizing artifact upload
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:51.5144280Z Artifact coverage-macos-latest-go1.23.zip successfully finalized. Artifact ID 13156209458
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:51.5145470Z Artifact coverage-macos-latest-go1.23 has been successfully uploaded! Final size is 6109244 bytes. Artifact ID is 13156209458
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:51.5203450Z Artifact download URL: https://github.com/mickeyyaya/evolve-loop/actions/runs/41473319266/artifacts/13156209458
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:51.5639450Z Post job cleanup.
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:51.8106500Z [command]/opt/homebrew/bin/git version
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:51.8265320Z git version 2.56.0
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:51.8289350Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/ae870f37-e79a-4fb5-b1d8-3ac0651b7f56/.gitconfig'
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:51.8303200Z Temporarily overriding HOME='/Users/runner/work/_temp/ae870f37-e79a-4fb5-b1d8-3ac0651b7f56' before making global git config changes
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:51.8306140Z Adding repository directory to the temporary git global config as a safe directory
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:51.8309580Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/evolve-loop/evolve-loop
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:51.8538760Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:51.8675260Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:52.1179130Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:52.1224080Z http.https://github.com/.extraheader
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:52.1238490Z [command]/opt/homebrew/bin/git config --local --unset-all http.https://github.com/.extraheader
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:52.1273260Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:52.3162750Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:52.3466550Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:52.5544520Z Cleaning up orphan processes
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:53:59.5812820Z Terminate orphan process: pid (2947) (hostsampler)
+go / build + test (Go 1.23, macOS, the darwin package set)	UNKNOWN STEP	2026-11-02T15:54:01.3117320Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-go@v5, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+CI required	Require every selected suite to succeed	﻿2026-11-02T15:54:12.4472539Z ##[group]Run if [[ "$ROUTE_RESULT" != success ]]; then
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4473086Z ^[[36;1mif [[ "$ROUTE_RESULT" != success ]]; then^[[0m
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4473524Z ^[[36;1m  echo "CI prerequisite did not succeed: $ROUTE_RESULT" >&2^[[0m
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4474038Z ^[[36;1m  exit 1^[[0m
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4474296Z ^[[36;1mfi^[[0m
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4474732Z ^[[36;1mcase "$DOCS_ONLY:$DOCS_REQUIRED:$VALIDATE_RESULT:$PLUGIN_RESULT:$ACS_RESULT" in^[[0m
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4475617Z ^[[36;1m  false:true:success:success:success|false:false:success:success:success|true:true:skipped::) ;;^[[0m
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4476496Z ^[[36;1m  *) echo "plugin and durable ACS validation did not match the route: $DOCS_ONLY:$DOCS_REQUIRED:$VALIDATE_RESULT:$PLUGIN_RESULT:$ACS_RESULT" >&2; exit 1 ;;^[[0m
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4477169Z ^[[36;1mesac^[[0m
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4477461Z ^[[36;1mcase "$DOCS_REQUIRED:$STE_LINT_RESULT" in^[[0m
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4477837Z ^[[36;1m  true:success|false:skipped) ;;^[[0m
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4478321Z ^[[36;1m  *) echo "STE lint did not match the route: $DOCS_REQUIRED:$STE_LINT_RESULT" >&2; exit 1 ;;^[[0m
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4478827Z ^[[36;1mesac^[[0m
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4479117Z ^[[36;1mcase "$INBOX_REQUIRED:$INBOX_RESULT" in^[[0m
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4479485Z ^[[36;1m  true:success|false:skipped) ;;^[[0m
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4479973Z ^[[36;1m  *) echo "inbox lint did not match the route: $INBOX_REQUIRED:$INBOX_RESULT" >&2; exit 1 ;;^[[0m
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4480458Z ^[[36;1mesac^[[0m
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4480967Z ^[[36;1mfor result in "$GO_REQUIRED:$GO_RESULT:$GO_SUITE_RESULT" "$LANDING_REQUIRED:$LANDING_RESULT:$LANDING_SUITE_RESULT"; do^[[0m
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4481548Z ^[[36;1m  case "$result" in^[[0m
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4481885Z ^[[36;1m    true:success:success|false:skipped:) ;;^[[0m
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4482338Z ^[[36;1m    *) echo "required CI work did not succeed: $result" >&2; exit 1 ;;^[[0m
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4482752Z ^[[36;1m  esac^[[0m
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4483025Z ^[[36;1mdone^[[0m
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4483431Z ^[[36;1mecho 'Every required suite succeeded; other suites were explicitly unselected.'^[[0m
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4831350Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4832010Z env:
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4832275Z   ROUTE_RESULT: success
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4832555Z   DOCS_ONLY: false
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4832816Z   DOCS_REQUIRED: true
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4833360Z   STE_LINT_RESULT: success
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4833645Z   VALIDATE_RESULT: success
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4833924Z   PLUGIN_RESULT: success
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4834196Z   ACS_RESULT: success
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4834461Z   GO_REQUIRED: true
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4834715Z   GO_RESULT: failure
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4834981Z   GO_SUITE_RESULT: failure
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4835412Z   LANDING_REQUIRED: true
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4835687Z   LANDING_RESULT: success
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4835975Z   LANDING_SUITE_RESULT: success
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4836270Z   INBOX_REQUIRED: false
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4836540Z   INBOX_RESULT: skipped
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4836810Z ##[endgroup]
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.4990801Z required CI work did not succeed: true:failure:failure
+CI required	Require every selected suite to succeed	2026-11-02T15:54:12.5016275Z ##[error]Process completed with exit code 1.
