@@ -15,6 +15,8 @@ const LanePinFile = "lane-scope.json"
 
 const DecisionFile = "triage-decision.json"
 
+const ProtectedSurfaceReasonPrefix = "protected-surface:"
+
 func Committed(workspace string) ([]string, bool) {
 	ids, source := CommittedWithSource(workspace)
 	return ids, source != SourceUnknown

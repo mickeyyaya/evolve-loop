@@ -80,7 +80,21 @@ func (m *Mover) readStamp(cycle int) *continuation.Continuation {
 }
 
 func (m *Mover) parkAtCeiling(d drained, reason string, cycle int, q *Policy) (bool, string) {
-	if q == nil || q.SystemLevel || q.Routed || q.RoutedIDs[d.taskID] || (q.Committed != nil && !q.Committed[d.taskID]) {
+	if !q.charges(d.taskID) {
+		return false, ""
+	}
+	if parked, at := m.parkTaskLevel(d, reason, cycle, q); parked {
+		return true, at
+	}
+	return m.parkPrebuild(d, cycle, q)
+}
+
+func (q *Policy) charges(taskID string) bool {
+	return q != nil && !q.Routed && !q.RoutedIDs[taskID] && (q.Committed == nil || q.Committed[taskID])
+}
+
+func (m *Mover) parkTaskLevel(d drained, reason string, cycle int, q *Policy) (bool, string) {
+	if q.SystemLevel {
 		return false, ""
 	}
 	count, bumpErr := bumpWith(d.src, failureRecord{reason: reason, class: q.FailureClass, fingerprint: q.Fingerprint}, func(n int) bool { return ShouldQuarantine(n, q.Ceiling, q.SystemLevel) })
@@ -93,21 +107,25 @@ func (m *Mover) parkAtCeiling(d drained, reason string, cycle int, q *Policy) (b
 	if !ShouldQuarantine(count, q.Ceiling, q.SystemLevel) {
 		return false, ""
 	}
-	pr, pErr := m.Promote(d.taskID, "quarantine", PromoteOpts{Cycle: strconv.Itoa(cycle)})
 	fields := map[string]string{"task_id": d.taskID, "failure_count": strconv.Itoa(count), "ceiling": strconv.Itoa(q.Ceiling), "step": "quarantine"}
+	return m.quarantine(d, cycle, fmt.Sprintf("task-level failure #%d >= ceiling %d", count, q.Ceiling), fields)
+}
+
+func (m *Mover) quarantine(d drained, cycle int, why string, fields map[string]string) (bool, string) {
+	pr, pErr := m.Promote(d.taskID, "quarantine", PromoteOpts{Cycle: strconv.Itoa(cycle)})
 	switch {
 	case pErr != nil:
 		fields["outcome"], fields["err"] = "error", pErr.Error()
 		m.warn(fault{code: CodeQuarantineFailed, origin: "Mover.Release", cycle: cycle, legacy: "ERROR: ", fields: fields,
-			reason: fmt.Sprintf("quarantine failed for '%s' (task-level failure #%d >= ceiling %d) — releasing to inbox root instead, it WILL be re-picked: %v", d.taskID, count, q.Ceiling, pErr)})
+			reason: fmt.Sprintf("quarantine failed for '%s' (%s) — releasing to inbox root instead, it WILL be re-picked: %v", d.taskID, why, pErr)})
 		return false, ""
 	case pr.NoOp:
 		fields["outcome"] = "noop"
 		m.warn(fault{code: CodeQuarantineFailed, origin: "Mover.Release", cycle: cycle, legacy: "WARN: ", fields: fields,
-			reason: fmt.Sprintf("quarantine no-op for '%s' (task-level failure #%d >= ceiling %d) — not parked, releasing to inbox root instead", d.taskID, count, q.Ceiling)})
+			reason: fmt.Sprintf("quarantine no-op for '%s' (%s) — not parked, releasing to inbox root instead", d.taskID, why)})
 		return false, ""
 	}
-	m.linef("quarantined: %s (task-level failure #%d >= ceiling %d) ← processing/cycle-%d/", d.base, count, q.Ceiling, cycle)
+	m.linef("quarantined: %s (%s) ← processing/cycle-%d/", d.base, why, cycle)
 	return true, pr.DestPath
 }
 

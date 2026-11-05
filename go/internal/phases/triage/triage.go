@@ -194,8 +194,8 @@ func inboxBatchesSection(projectRoot string, forbidden func(string) bool) string
 	sect.WriteString(consoleRoutedNote(menu.Console))
 	sect.WriteString(dependencyBlockedNote(menu.WaitingReasons))
 	fmt.Fprintf(&sect, "- protected_surfaces: a top_n card must not name a path under a control-plane surface; drop such an item with reason "+
-		"`protected-surface: <path>` (the host routes it to the console, and moves a card that still names one out of top_n): %s\n",
-		strings.Join(protectedSurfaceFragments(), ", "))
+		"`%s <path>` (the host routes it to the console, and moves a card that still names one out of top_n): %s\n",
+		committedset.ProtectedSurfaceReasonPrefix, strings.Join(protectedSurfaceFragments(), ", "))
 	return sect.String()
 }
 

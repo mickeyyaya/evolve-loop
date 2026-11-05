@@ -40,6 +40,9 @@ type FailureInputs struct {
 	Signals         *signalcenter.Center
 	Defer           core.RecordedDefer
 	PriorityClasses []string
+	Prebuild        bool
+	PastBuild       bool
+	PrebuildCeiling int
 }
 
 func (in FailureInputs) WithLedger(l inboxmover.LedgerAppender) FailureInputs {
@@ -70,17 +73,21 @@ func ApplyFailure(in FailureInputs) (inboxmover.OutcomeResult, error) {
 	if !routed {
 		routedIDs = routeDeferral(opts, in, committed, stderr)
 	}
+	routedIDs = append(routedIDs, routeProtectedAnswers(opts, in, stderr)...)
 	res, err := inboxmover.ApplyCycleOutcome(opts, inboxmover.CycleOutcome{
-		Cycle:        in.Cycle,
-		Passed:       false,
-		CommittedIDs: committed,
-		Reason:       in.Reason,
-		Ceiling:      in.Ceiling,
-		SystemLevel:  in.SystemLevel,
-		Routed:       routed,
-		RoutedIDs:    routedIDs,
-		FailureClass: string(in.FailureClass),
-		Fingerprint:  in.Fingerprint,
+		Cycle:           in.Cycle,
+		Passed:          false,
+		CommittedIDs:    committed,
+		Reason:          in.Reason,
+		Ceiling:         in.Ceiling,
+		SystemLevel:     in.SystemLevel,
+		Routed:          routed,
+		RoutedIDs:       routedIDs,
+		FailureClass:    string(in.FailureClass),
+		Fingerprint:     in.Fingerprint,
+		Prebuild:        in.Prebuild,
+		PastBuild:       in.PastBuild,
+		PrebuildCeiling: in.PrebuildCeiling,
 	})
 	if err != nil {
 		return res, fmt.Errorf("apply cycle %d failure outcome: %w", in.Cycle, err)
@@ -135,7 +142,9 @@ func FailureInputsFor(projectRoot, evolveDir, workspace string, cycle int, stder
 		Fingerprint:     retryladder.Fingerprint(firstFailureReason(workspace)),
 		Stderr:          stderr,
 		PriorityClasses: pol.InboxPriorityConfig().ClassOrder,
+		PrebuildCeiling: failPol.Thresholds.PrebuildFailureCeiling,
 	}
+	in.Prebuild, in.PastBuild = buildStage(workspace, in.FailureClass)
 	if cls.Class == cycleclassify.ClassPhaseRefusal {
 		in.Refusal, in.RefusalDetail, in.RefusalSubject = cls.Marker, cls.Detail, cls.Subject
 	}
