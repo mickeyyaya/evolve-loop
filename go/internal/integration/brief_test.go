@@ -208,3 +208,17 @@ func TestBrief_APathAndAReasonFromOtherLanesStayInsideTheFence(t *testing.T) {
 		t.Errorf("the end marker appears %d times, want 1 so that no text can close the fence", n)
 	}
 }
+
+func TestSignalCodes_EachHomeCodeKeepsItsWireName(t *testing.T) {
+	t.Parallel()
+	for code, want := range map[signalcenter.Code]string{
+		CodeMerged:   "SHIP_INTEGRATION_MERGED",
+		CodeComposed: "SHIP_INTEGRATION_COMPOSED",
+		CodeFlushed:  "SHIP_INTEGRATION_FLUSHED",
+		CodeEjected:  "SHIP_INTEGRATION_EJECTED",
+	} {
+		if string(code) != want {
+			t.Errorf("code = %q, want %q", code, want)
+		}
+	}
+}

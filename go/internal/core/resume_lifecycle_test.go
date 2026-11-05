@@ -495,3 +495,18 @@ func TestResumeLifecycle_ThePersistedPreCycleHeadReachesTheCloseout(t *testing.T
 		})
 	}
 }
+
+func TestResumeLifecycle_APoolIDGapBelowThePausedCycleIsHarmless(t *testing.T) {
+	t.Parallel()
+
+	o, st, req, rp := resumedLifecycleFixture(t)
+	st.state.LastCycleNumber = 5
+	st.state.LastAllocatedCycleNumber = 7
+	got, err := o.RunCycleFromPhase(context.Background(), req, rp)
+	if err != nil {
+		t.Fatalf("a burned pool id at 6 broke the resume of cycle 7: %v", err)
+	}
+	if got.Cycle != 7 || st.state.LastCycleNumber != 7 {
+		t.Fatalf("resume = cycle %d, state %+v, want cycle 7", got.Cycle, st.state)
+	}
+}

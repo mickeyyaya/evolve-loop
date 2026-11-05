@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -75,5 +76,36 @@ func TestDetectLostLanding_ARecordThatDoesNotHoldTheBindingCommitDoesNotVouchFor
 	sig := detectLostLanding(landingEvidence{Workspace: ws, ProjectRoot: l.repo, PreCycleHEAD: l.base, Cycle: identityCycle, FinalVerdict: VerdictPASS})
 	if sig == nil {
 		t.Fatal("the record of the cycle holds the lane commit, not the binding commit, so it must not mask the lost landing")
+	}
+}
+
+func TestDetectLostLanding_TheRecordOfALaterPoolVouchesWhenAnEarlierPoolOfTheCycleHoldsAnotherCommit(t *testing.T) {
+	t.Parallel()
+	l := composedLanding(t, integration.CycleTrailer(identityCycle))
+	older := integration.DeliverableRecord{Wave: "5", Cycle: identityCycle, Trailer: integration.CycleTrailer(identityCycle),
+		Commits: []integration.CommitIdentity{{SHA: "oldcommit", BaseSHA: l.base, PatchID: "p"}}}
+	if _, err := integration.WriteRecord(filepath.Join(l.repo, ".evolve", "waves", "integration-5"), older); err != nil {
+		t.Fatal(err)
+	}
+	if sig := detectForRewritten(t, l); sig != nil {
+		t.Fatalf("pool 5 holds oldcommit but the record of the later wave holds the lane commit, so the landing is vouched for: %+v", sig)
+	}
+}
+
+func TestDetectLostLanding_ARecordOfAnotherCycleDoesNotVouchForTheBindingCommit(t *testing.T) {
+	t.Parallel()
+	other := identityCycle + 1
+	l := composedLanding(t, integration.CycleTrailer(other))
+	dir := filepath.Join(l.repo, ".evolve", "waves", "integration-w1")
+	if err := os.Remove(integration.RecordPath(dir, identityCycle)); err != nil {
+		t.Fatal(err)
+	}
+	rec := l.record
+	rec.Cycle, rec.Trailer = other, integration.CycleTrailer(other)
+	if _, err := integration.WriteRecord(dir, rec); err != nil {
+		t.Fatal(err)
+	}
+	if sig := detectForRewritten(t, l); sig == nil {
+		t.Fatal("a record of another cycle vouched for this cycle's binding commit")
 	}
 }

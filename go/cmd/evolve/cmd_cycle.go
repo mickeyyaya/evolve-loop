@@ -181,6 +181,7 @@ var cycleRunAbsoluteRoot = paths.AbsoluteRoot
 type cycleRunFlags struct {
 	projectRoot, goalHash, goalText, evolveDir, sandboxOff string
 	simulate, bypassPolicy                                 bool
+	pool                                                   int
 }
 
 func parseCycleRunFlags(args []string, stderr io.Writer) (cycleRunFlags, bool) {
@@ -194,6 +195,7 @@ func parseCycleRunFlags(args []string, stderr io.Writer) (cycleRunFlags, bool) {
 	fs.BoolVar(&f.simulate, "simulate", false, "no-LLM walk: every phase returns PASS without calling out (for parity-audit harness)")
 	fs.BoolVar(&f.bypassPolicy, "bypass-policy", false, "use --bypass-policy to bypass policy.json pin enforcement for every phase this run (operator escape hatch)")
 	fs.StringVar(&f.sandboxOff, "sandbox-off", "", sandboxOffUsage)
+	fs.IntVar(&f.pool, "pool", 0, "pool id that the loop minted for this fleet lane; names the integration record directory")
 	args = stripRemovedBudgetFlags(args, func(m string) {
 		fmt.Fprintf(stderr, "evolve cycle run: WARN: %s\n", m)
 	})
@@ -202,6 +204,10 @@ func parseCycleRunFlags(args []string, stderr io.Writer) (cycleRunFlags, bool) {
 	}
 	if f.goalHash == "" {
 		fmt.Fprintln(stderr, "evolve cycle run: --goal-hash is required")
+		return f, false
+	}
+	if f.pool < 0 {
+		fmt.Fprintf(stderr, "evolve cycle run: --pool %d is negative\n", f.pool)
 		return f, false
 	}
 	return f, true
@@ -335,7 +341,7 @@ func wireCycleRun(f cycleRunFlags, projectRoot, evolveDir string, stderr io.Writ
 		return wireSimulateOrchestrator(projectRoot, evolveDir, stderr)
 	}
 	gcOrphanSessions("cycle-start", stderr)
-	return wireOrchestratorDepsFn(projectRoot, evolveDir, stderr, routingRun{bypass: f.bypassPolicy, env: filterEvolveEnv(os.Environ()), sandboxOff: f.sandboxOff})
+	return wireOrchestratorDepsFn(projectRoot, evolveDir, stderr, routingRun{bypass: f.bypassPolicy, env: filterEvolveEnv(os.Environ()), sandboxOff: f.sandboxOff, pool: f.pool})
 }
 
 func filterEvolveEnv(environ []string) map[string]string {
@@ -475,7 +481,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	newLiveReaction(evolveDir, pol.HealingLiveReaction(), console).arm(signals)
 	swCfg := swarmrunner.Config{Stage: pol.SwarmConfig().Stage, PortBase: pol.SwarmConfig().PortBase, WorktreeBase: pol.WorktreeBase()}
 	gatesCfg := pol.GatesConfig()
-	shipIntegration, integrationErr := shipIntegrationOf(pol, fleetLaneFromEnv(), fleetLaneScope())
+	shipIntegration, integrationErr := shipIntegrationOf(pol, fleetLaneFromEnv(), fleetLaneScope(), run.pool, console)
 	if integrationErr != nil {
 		return orchDeps{Signals: signals, CloseSignals: closeSignals, RoutingErr: integrationErr}
 	}

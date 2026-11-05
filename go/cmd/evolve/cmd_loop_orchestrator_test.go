@@ -84,7 +84,7 @@ func TestWaveRequest_TheBarrierLaunchCarriesAShadowLease(t *testing.T) {
 	t.Parallel()
 	b, console := iscsCoordinator(t.TempDir(), t.TempDir(), nil)
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage", Orchestrator: enforceOrchestrator}
-	b.waveRequest(0, fc, "/nonexistent-binary")
+	b.waveRequest(0, fc, b.cycleLaunch("/nonexistent-binary", 0))
 	if _, ok := b.leases["shadow"]; !ok {
 		t.Errorf("lease tables = %v, want a shadow table for the wave launch", b.leases)
 	}
