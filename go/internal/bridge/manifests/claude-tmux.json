@@ -223,8 +223,9 @@
     },
     {
       "name": "auth_recheck",
-      "regex": "Please log in|Authentication required|Login expired",
+      "regex": "(?m)^⏺ (Login expired|Not logged in|OAuth token revoked) · Please run /login\\s*$|^\\s*(Please log in( to continue)?|Authentication required|Login expired\\. Please log in again\\.|Login expired · run /login)[.!]?\\s*$",
       "response_keys": null,
+      "tail_lines": 12,
       "policy": "escalate",
       "note": "Bridge cannot complete OAuth; escalate to operator"
     },

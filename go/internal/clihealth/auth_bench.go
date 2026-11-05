@@ -21,7 +21,7 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeAuthBenchCleared, "a launch, live smoke or usage read of a CLI family succeeded, so the cli-health store removed the auth bench (auth_recheck) of that family; quota benches stay; fields family, reason, source (clihealth.ClearSource: launch, smoke or usage_probe), key")
 }
 
-func AuthBench(reason string) bool { return reason == CredentialPattern }
+func AuthBench(reason string) bool { return LoginPattern(reason) }
 
 func (s *Store) ClearAuthBench(family string, source ClearSource, signals *signalcenter.Center) ([]Entry, error) {
 	if benches, _ := s.Load(); len(authBenchKeys(benches, family)) == 0 {
