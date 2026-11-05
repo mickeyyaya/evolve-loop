@@ -54,11 +54,11 @@ type LanePinDoc struct {
 }
 
 func LanePin(workspace string) []string {
-	var pin LanePinDoc
-	if !readJSON(workspace, LanePinFile, &pin) {
+	doc, _ := LaneDoc(workspace)
+	if len(doc.TodoIDs) == 0 {
 		return nil
 	}
-	return nonBlank(pin.TodoIDs)
+	return doc.TodoIDs
 }
 
 func DecisionTopN(workspace string) (ids []string, decided bool) {
@@ -91,6 +91,20 @@ func Deferred(workspace string) []string {
 	out := make([]string, 0, len(decision.Deferred))
 	for _, t := range decision.Deferred {
 		if id := strings.TrimSpace(t.ID); id != "" {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+func ShippedIDs(workspace string) []string {
+	var decision SkipShippedBucket
+	if !readJSON(workspace, DecisionFile, &decision) {
+		return nil
+	}
+	var out []string
+	for _, e := range decision.SkipShipped {
+		if id := strings.TrimSpace(e.TaskID); id != "" {
 			out = append(out, id)
 		}
 	}

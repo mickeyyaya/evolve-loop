@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -56,10 +57,7 @@ func ApplyFailure(in FailureInputs) (inboxmover.OutcomeResult, error) {
 	if stderr == nil {
 		stderr = io.Discard
 	}
-	committed := CommittedIDsFor(in.Workspace)
-	if len(committed) == 0 {
-		committed = committedset.Unanswered(in.Workspace)
-	}
+	committed := failedCommitted(in.Workspace)
 	opts := inboxmover.Options{
 		ProjectRoot:     in.ProjectRoot,
 		Ledger:          in.Ledger,
@@ -182,16 +180,26 @@ func firstFailureReason(workspace string) string {
 	return doc.Reasons[0]
 }
 
-func CommittedIDsFor(workspace string) []string {
-	body, err := os.ReadFile(filepath.Join(workspace, "triage-decision.json"))
-	if err != nil {
-		return nil
+func failedCommitted(workspace string) []string {
+	if pin := committedset.LanePin(workspace); len(pin) > 0 {
+		topN, _ := committedset.DecisionTopN(workspace)
+		named := slices.DeleteFunc(slices.Clone(pin), func(id string) bool { return !containsID(topN, id) })
+		if len(named) > 0 {
+			return named
+		}
+		return committedset.Unanswered(workspace)
 	}
-	return inboxmover.CommittedIDs(body)
+	ids, _ := committedset.Committed(workspace)
+	for _, id := range committedset.ShippedIDs(workspace) {
+		if !containsID(ids, id) {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 }
 
 func LaneScopeIDs(workspace string) []string {
-	return core.LaneScopeIDs(workspace)
+	return committedset.LanePin(workspace)
 }
 
 func IsTaskLevelResult(cls cycleclassify.Result) bool {

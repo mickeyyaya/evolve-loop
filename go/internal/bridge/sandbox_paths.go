@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inputindex"
 	"github.com/mickeyyaya/evolve-loop/go/internal/plane"
 	"github.com/mickeyyaya/evolve-loop/go/internal/verifylock"
@@ -199,6 +200,9 @@ func refuseRunDirsReach(declared, grant, root string, ownRunDir bool) error {
 	}
 	if covers, inside := reaches(folded, strings.ToLower(inputindex.AccessDir(canonicalRoot))); covers || inside {
 		return fmt.Errorf("write grant %q covers the access log of the cell context index (%s); the pipeline alone writes it", declared, grant)
+	}
+	if covers, inside := reaches(folded, strings.ToLower(committedset.RecordsDir(canonicalRoot))); covers || inside {
+		return fmt.Errorf("write grant %q covers the lineage records of the pipeline (%s); the host record decides what a cycle may do to the queue, and the pipeline alone writes it", declared, grant)
 	}
 	return nil
 }

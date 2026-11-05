@@ -217,6 +217,20 @@ var agentContract = []contractRow{
 		script: func(h contractHost) string {
 			return `echo '{"cycle":9}' > ` + h.root + "/.evolve/waves/integration-current/deliverable-9.json"
 		}},
+	{action: "overwrite the existing lineage record of the own cycle", want: contractDeny,
+		script: func(h contractHost) string {
+			return `echo '{"cycle":7,"item_ids":["item-b","item-c"]}' > ` + h.root + "/.evolve/lineage/cycle-7.json"
+		},
+		check: func(t *testing.T, h contractHost, _ string) {
+			record, ok := inputindex.ReadRecord(h.root, 7)
+			if !ok || len(record.ItemIDs) != 1 || record.ItemIDs[0] != "item-a" {
+				t.Fatalf("the record of cycle 7 must keep [item-a] after the denied write, got %+v %v", record, ok)
+			}
+		}},
+	{action: "write a file in the own workspace", want: contractAllow,
+		script: func(h contractHost) string {
+			return "echo kept > " + h.run + "/notes.txt && cat " + h.run + "/notes.txt"
+		}},
 	{action: "rewrite the lane-scope.json of the own workspace", want: contractDeny,
 		script: func(h contractHost) string { return `echo '{"todo_ids":["item-b"]}' > ` + h.run + "/lane-scope.json" }},
 	{action: "a retry opens its predecessor's retrospective through inputs/index.json", want: contractAllow,

@@ -75,7 +75,7 @@ func TestLaneScopePin_FileInjectsFleetScopeToPhases(t *testing.T) {
 	}
 }
 
-func TestLaneScopePin_TwoLanesSeeOnlyOwnScope(t *testing.T) {
+func TestLaneScopePin_TwoLanesSeeTheScopeOfTheirHostEnv(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
@@ -86,11 +86,11 @@ func TestLaneScopePin_TwoLanesSeeOnlyOwnScope(t *testing.T) {
 		ownGoal   string
 		driftEnv  string
 	}{
-		{lastCycle: 10, cycle: 11, ownScope: "todo-lane-a", ownGoal: "goal-a", driftEnv: "todo-lane-b"},
-		{lastCycle: 20, cycle: 21, ownScope: "todo-lane-b", ownGoal: "goal-b", driftEnv: "todo-lane-a"},
+		{lastCycle: 10, cycle: 11, ownScope: "todo-lane-a", ownGoal: "goal-a", driftEnv: "todo-lane-a"},
+		{lastCycle: 20, cycle: 21, ownScope: "todo-lane-b", ownGoal: "goal-b", driftEnv: "todo-lane-b"},
 	}
 	for _, lane := range lanes {
-		writeLaneScopeFixture(t, RunWorkspacePath(root, lane.cycle), []string{lane.ownScope}, lane.ownGoal)
+		writeLaneScopeFixture(t, RunWorkspacePath(root, lane.cycle), []string{"forged-by-a-cell"}, lane.ownGoal)
 		runners := buildRunners(nil)
 		o := NewOrchestrator(&fakeStorage{state: State{LastCycleNumber: lane.lastCycle}}, &fakeLedger{}, runners)
 		_, err := o.RunCycle(context.Background(), CycleRequest{
@@ -103,7 +103,7 @@ func TestLaneScopePin_TwoLanesSeeOnlyOwnScope(t *testing.T) {
 		}
 		for _, p := range []Phase{PhaseScout, PhaseTriage, PhaseBuild} {
 			if got := phaseScopeSeen(t, runners, p); got != lane.ownScope {
-				t.Errorf("lane cycle %d phase %s: Context[fleet_scope]=%q, want %q (lane-scope.json must beat env drift %q)",
+				t.Errorf("lane cycle %d phase %s: Context[fleet_scope]=%q, want %q (the host env must beat the workspace file %q)",
 					lane.cycle, p, got, lane.ownScope, lane.driftEnv)
 			}
 		}

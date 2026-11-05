@@ -41,22 +41,15 @@ func ReadLaneScope(workspace string) (*LaneScope, error) {
 }
 
 func loadLaneScope(workspace string) *LaneScope {
-	if workspace == "" {
+	doc, ok := committedset.LaneDoc(workspace)
+	if !ok {
 		return nil
 	}
-	ls, err := ReadLaneScope(workspace)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN %v (falling back to env fleet scope)\n", err)
-		return nil
-	}
-	return ls
+	return &doc
 }
 
 func LaneScopeIDs(workspace string) []string {
-	if scope := loadLaneScope(workspace); scope != nil && len(scope.TodoIDs) > 0 {
-		return scope.TodoIDs
-	}
-	return nil
+	return committedset.LanePin(workspace)
 }
 
 func materializeLaneScope(workspace, scope, goalHash string) {

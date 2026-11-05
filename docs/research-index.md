@@ -580,6 +580,10 @@ approaches / decision / results / retro) — lives at
 | [architecture/adr/0159-the-loop-keeps-its-integration-train-and-takes-six-practices-from-the-2026-harness-projects.md](architecture/adr/0159-the-loop-keeps-its-integration-train-and-takes-six-practices-from-the-2026-harness-projects.md) | Decision: no outside system replaces ADR-0147, and six practices close the failures of this period. |
 | [architecture/regression-proof-and-supervision.md](architecture/regression-proof-and-supervision.md) | Spec of record: the regression proof gate, the journey registry, derived liveness and the terminal refusal. |
 
+## One trust root for the inbox queue (2026-11-05)
+
+[Plan](plans/queue-authority-from-host-facts-2026-11.md) and [ADR-0160](architecture/adr/0160-the-host-lineage-record-is-the-one-trust-root-for-what-a-cycle-may-do-to-the-queue.md). After five blocked rounds, the design moves authority from a file that a cell can write to the host lineage record. One reader serves about 30 sites, a typed reason keeps agent text out of each route, and the mover refuses at the sink.
+
 ## 2026-11-05 — the queue trust root: the host record decides what a cycle may do to the inbox queue (ADR-0160)
 
 | Document | What it records |
