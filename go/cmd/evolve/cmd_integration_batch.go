@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"maps"
 	"os"
 	"path"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -17,11 +19,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/integration"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 const (
 	integrationBatchUsage  = "usage: evolve integration batch [--dry-run] [PR...]"
-	integrationRecordUsage = "usage: evolve integration record-pr --pr N (--attestation FILE | --class NAME)"
+	integrationRecordUsage = "usage: evolve integration record-pr --pr N (--reviewed | --class NAME)"
 	inboxDir               = ".evolve/inbox/"
 )
 
@@ -170,9 +173,9 @@ func joinInts(items []int) string {
 }
 
 func recordPRVerb(env integrationEnv, args []string, stdout, stderr io.Writer) int {
-	var help bool
-	var pr, attestation, class string
-	operands, err := cliFlags{bools: map[string]*bool{"--help": &help}, values: map[string]*string{"--pr": &pr, "--attestation": &attestation, "--class": &class}}.parse(args)
+	var help, reviewed bool
+	var pr, class string
+	operands, err := cliFlags{bools: map[string]*bool{"--help": &help, "--reviewed": &reviewed}, values: map[string]*string{"--pr": &pr, "--class": &class}}.parse(args)
 	if help && err == nil {
 		fmt.Fprintln(stdout, integrationRecordUsage)
 		return 0
@@ -184,20 +187,47 @@ func recordPRVerb(env integrationEnv, args []string, stdout, stderr io.Writer) i
 		err = fmt.Errorf("unexpected operand %q", operands[0])
 	case convErr != nil || n <= 0:
 		err = fmt.Errorf("--pr %q must be a PR number", pr)
-	case (attestation == "") == (class == ""):
-		err = errors.New("name exactly one of --attestation and --class")
+	case reviewed == (class != ""):
+		err = errors.New("name exactly one of --reviewed and --class")
 	}
 	if err != nil {
 		return usageFail(stderr, err, integrationRecordUsage)
 	}
-	return recordPR(env.train(), recordRequest{pr: n, bind: binderFor(env.Root, attestation, class)}, cliIO{stdout, stderr})
+	c := cliIO{stdout, stderr}
+	bind := classBinder(class)
+	if reviewed {
+		store, err := commitgate.ReviewStoreDir(context.Background(), sysexec.DefaultRunner, env.Root)
+		if err != nil {
+			return c.fail(err)
+		}
+		bind = reviewedBinder(store)
+	}
+	return recordPR(env.train(), recordRequest{pr: n, bind: bind}, c)
 }
 
-func binderFor(root, attestation, class string) integration.Binder {
-	if attestation == "" {
-		return classBinder(class)
+func reviewedBinder(store string) integration.Binder {
+	return func(ev integration.Evidence) (integration.AuditBinding, error) {
+		label := integration.ShortSHA(ev.DiffSHA)
+		path := filepath.Join(store, ev.DiffSHA+".json")
+		raw, err := os.ReadFile(path)
+		if errors.Is(err, fs.ErrNotExist) {
+			base, head := integration.ShortSHA(ev.Base), integration.ShortSHA(ev.Commits[len(ev.Commits)-1])
+			reason := fmt.Sprintf("no review record for its whole change %s (%s..%s), looked in %s. Next: in a worktree at %s, run git restore --source=%s --staged --worktree -- . , run the review seats and evolve commit-gate run, then run record-pr again.", label, base, head, store, base, head)
+			return integration.AuditBinding{}, errors.New(reason)
+		}
+		if err != nil {
+			return integration.AuditBinding{}, fmt.Errorf("read the record of change %s at %s: %w", label, path, err)
+		}
+		var rec commitgate.ReviewRecord
+		if err := json.Unmarshal(raw, &rec); err != nil {
+			reason := fmt.Sprintf("the record of change %s at %s does not parse: %v. Next: run the review seats and evolve commit-gate run again, then run record-pr again.", label, path, err)
+			return integration.AuditBinding{}, errors.New(reason)
+		}
+		if reason := commitgate.CheckReviewedChange(rec, label, ev.Paths); reason != "" {
+			return integration.AuditBinding{}, errors.New(reason)
+		}
+		return integration.AttestedBinding(ev, rec.Attestation.TreeStateSHA, integration.Digest(raw))
 	}
-	return attestedBinder(root, attestation)
 }
 
 var instructionRoots = []string{"agents/", "skills/", ".claude/", "commands/", "guidance/"}
@@ -219,26 +249,6 @@ func classBinder(class string) integration.Binder {
 			return integration.AuditBinding{}, fmt.Errorf("%q is not a review class (known: %s)", class, strings.Join(slices.Sorted(maps.Keys(reviewClasses)), ", "))
 		}
 		return integration.ClassBinding(ev, class, covers)
-	}
-}
-
-func attestedBinder(root, path string) integration.Binder {
-	return func(ev integration.Evidence) (integration.AuditBinding, error) {
-		raw, err := os.ReadFile(path)
-		if err != nil {
-			return integration.AuditBinding{}, fmt.Errorf("read the attestation: %w", err)
-		}
-		var att commitgate.Attestation
-		if err := json.Unmarshal(raw, &att); err != nil {
-			return integration.AuditBinding{}, fmt.Errorf("parse the attestation: %w", err)
-		}
-		if att.ReviewWaiver != "" {
-			return integration.AuditBinding{}, errors.New("a waiver is not a review")
-		}
-		if err := commitgate.VerifyAttestedRuns(root, att); err != nil {
-			return integration.AuditBinding{}, err
-		}
-		return integration.AttestedBinding(ev, att.TreeStateSHA, integration.Digest(raw))
 	}
 }
 

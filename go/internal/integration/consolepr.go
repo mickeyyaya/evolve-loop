@@ -29,6 +29,7 @@ func Digest(raw []byte) string {
 func digest(parts ...string) string { return Digest([]byte(strings.Join(parts, "\n"))) }
 
 type Evidence struct {
+	Base    string
 	Commits []string
 	Paths   []string
 	DiffSHA string

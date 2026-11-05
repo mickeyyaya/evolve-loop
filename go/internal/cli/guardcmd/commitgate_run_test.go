@@ -67,7 +67,47 @@ func TestRunCommitGate_WithNoProjectRootTakesTheRepoOfTheWorkingDirectory(t *tes
 		t.Fatal(err)
 	}
 	errb.Reset()
-	if rc := RunCommitGate([]string{"run", "--reviewers", "docs-review"}, nil, &out, &errb); rc == 0 || !strings.Contains(errb.String(), "not in a git repo") {
-		t.Fatalf("rc %d stderr %q: outside a git repo the gate must refuse", rc, errb.String())
+	if rc := RunCommitGate([]string{"run", "--reviewers", "docs-review"}, nil, &out, &errb); rc != commitgate.ExitGitFatal || strings.TrimSpace(errb.String()) != "[commit-gate] not in a git repo" {
+		t.Fatalf("rc %d stderr %q: outside a git repo the gate must refuse, with the root reason alone", rc, errb.String())
+	}
+}
+
+func TestRunCommitGate_FromASubdirectoryTheAttestationIsAtTheRepoRoot(t *testing.T) {
+	repo := stagedDocsRepo(t)
+	t.Setenv("CG_ATTEST_DIR", "")
+	sub := filepath.Join(repo, "deep")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(wd) })
+	if err := os.Chdir(sub); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+
+	rc := RunCommitGate([]string{"run", "--reviewers", "docs-review", "--no-install"}, nil, &out, &errb)
+
+	if rc != 0 {
+		t.Fatalf("rc %d stderr %q, want a pass", rc, errb.String())
+	}
+	if _, err := os.Stat(filepath.Join(sub, commitgate.AttestDirName)); err == nil {
+		t.Errorf("the attestation landed under the subdirectory %s, want the repo root", sub)
+	}
+	if _, err := os.Stat(filepath.Join(repo, commitgate.AttestDirName, "attestation.json")); err != nil {
+		t.Errorf("no attestation at the repo root: %v", err)
+	}
+}
+
+func TestRunCommitGate_AnUnresolvableReviewStoreIsGitFatalWithItsReason(t *testing.T) {
+	var out, errb bytes.Buffer
+
+	rc := RunCommitGate([]string{"run", "--project-root", t.TempDir(), "--reviewers", "docs-review", "--no-install"}, nil, &out, &errb)
+
+	if rc != commitgate.ExitGitFatal || !strings.Contains(errb.String(), "[commit-gate] cannot resolve the review store") {
+		t.Errorf("rc %d stderr %q, want ExitGitFatal and the review store reason", rc, errb.String())
 	}
 }
