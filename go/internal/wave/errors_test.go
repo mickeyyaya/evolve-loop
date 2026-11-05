@@ -146,7 +146,9 @@ func TestReadCycles_WarnsOnAnUnreadableLandingIntentAndSignalStream(t *testing.T
 	got, warnings := wave.ReadCycles(p.root, 0, 0)
 
 	joined := strings.Join(warnings, "\n")
-	if len(got) != 2 || len(warnings) != 2 || !strings.Contains(joined, "cycle-7: landing intent") || !strings.Contains(joined, "cycle-8: signalcenter: read stream") {
+	intent := filepath.Join(p.root, ".evolve", "landing", "cycle-7.json") + ": "
+	stream := filepath.Join(p.root, ".evolve", "runs", "cycle-8", "signals.ndjson") + ": "
+	if len(got) != 2 || len(warnings) != 2 || !strings.Contains(joined, intent) || !strings.Contains(joined, stream) {
 		t.Errorf("ReadCycles = %+v, warnings %q; want cycles 7 and 8 with one warning each", got, warnings)
 	}
 }

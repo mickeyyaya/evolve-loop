@@ -45,6 +45,7 @@ type workflowJobContract struct {
 type workflowStepContract struct {
 	ContinueOnError  string `yaml:"continue-on-error"`
 	ID               string
+	Name             string
 	Run              string
 	Uses             string
 	If               string

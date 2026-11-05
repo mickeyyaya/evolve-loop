@@ -61,6 +61,8 @@ var treeReadingSelections = []TestSelection{
 		"TestBridgeEngineRoots_EachWiresATokenResolver",
 		"TestCLIContract_AlwaysVerbsWriteNothing",
 		"TestCLIContract_EachCoreVerbPrintsOneEnvelope",
+		"TestCLIContract_EachDebugCallIsSilentAndHasARoot",
+		"TestCLIContract_HarnessKillsEachMutantOfDossierShow",
 		"TestCLIUpdateWiring_ABootTimeoutWithADrainedWindowIsAVerifiedQuotaCauseAndBenchesUntilTheReset",
 		"TestCLIUpdateWiring_ABootTimeoutWithHealthyUsageStaysABootTimeout",
 		"TestCLIUpdateWiring_ASmokeFailureWhileTheFamilyIsDrainedIsAVerifiedQuotaCause",

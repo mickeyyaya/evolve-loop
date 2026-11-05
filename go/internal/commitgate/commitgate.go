@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/launchrecord"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/treestate"
 )
@@ -33,6 +34,7 @@ type Options struct {
 	Files     string
 	NoInstall bool
 	AttestDir string
+	ReviewDir string
 	Env       []string
 	Runner    Runner
 	Now       func() time.Time
@@ -46,12 +48,13 @@ type Options struct {
 }
 
 type Result struct {
-	ExitCode     int
-	Logs         []string
-	Attestation  *Attestation
-	ChecksPassed []string
-	Langs        []string
-	reviewRuns   []ReviewRun
+	ExitCode      int
+	Logs          []string
+	Attestation   *Attestation
+	ChecksPassed  []string
+	Langs         []string
+	reviewRuns    []ReviewRun
+	launchRecords []launchrecord.Record
 }
 
 func (r *Result) log(format string, a ...any) {
@@ -62,6 +65,12 @@ func (o Options) Run(ctx context.Context) *Result {
 	res := &Result{ExitCode: ExitPass}
 	if o.lookPath == nil {
 		o.lookPath = lookPathDefault
+	}
+
+	if o.ReviewDir == "" {
+		res.log("no review store directory: the gate cannot record the review of this change")
+		res.ExitCode = ExitGitFatal
+		return res
 	}
 
 	files, code := o.changedFiles(ctx, res)
@@ -120,13 +129,19 @@ func (o Options) runLanes(ctx context.Context, files, langs []string, res *Resul
 }
 
 func (o Options) reviewDecision(ctx context.Context, langs []string, res *Result) (waiver string, code int) {
-	waived, refused := o.reviewWaiver(ctx)
-	switch {
-	case waived != "":
-		res.log("reviewers not required: %s", waived)
-		return commentOnlyWaiver, ExitPass
-	case !o.requiredReviewSatisfied(o.listedChange(ctx), langs, res):
-		res.log("no review waiver: %s", refused)
+	refused := ""
+	if len(res.reviewRuns) == 0 {
+		waived, why := o.reviewWaiver(ctx)
+		if waived != "" {
+			res.log("reviewers not required: %s", waived)
+			return commentOnlyWaiver, ExitPass
+		}
+		refused = why
+	}
+	if !o.requiredReviewSatisfied(o.listedChange(ctx), langs, res) {
+		if refused != "" {
+			res.log("no review waiver: %s", refused)
+		}
 		return "", ExitFail
 	}
 	return "", ExitPass
@@ -258,6 +273,9 @@ func (o Options) writeAttestation(ctx context.Context, waiver string, res *Resul
 		ReviewWaiver: waiver,
 		ReviewRuns:   res.reviewRuns,
 		Tool:         tool,
+	}
+	if code := o.writeReviewRecord(att, res); code != ExitPass {
+		return nil, code
 	}
 	body, err := att.Marshal()
 	if err == nil {

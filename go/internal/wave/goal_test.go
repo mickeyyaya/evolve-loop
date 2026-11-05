@@ -11,16 +11,17 @@ func TestFacts_Outcome(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		cycles []wave.Cycle
+		ships  []int
 		want   string
 	}{
-		{nil, "no cycle ran"},
-		{[]wave.Cycle{{ID: 1, Shipped: true}, {ID: 2, Verdict: "FAIL"}}, "1 of 2 cycles shipped"},
-		{[]wave.Cycle{{ID: 1, Shipped: true}}, "1 of 1 cycles shipped"},
-		{[]wave.Cycle{{ID: 1}, {ID: 2}, {ID: 3}}, "0 of 3 cycles shipped"},
+		{nil, nil, "no cycle ran"},
+		{[]wave.Cycle{{ID: 1}, {ID: 2, Verdict: "FAIL"}}, []int{1}, "1 of 2 cycles shipped"},
+		{[]wave.Cycle{{ID: 1}}, []int{1}, "1 of 1 cycles shipped"},
+		{[]wave.Cycle{{ID: 1}, {ID: 2}, {ID: 3}}, nil, "0 of 3 cycles shipped"},
 	}
 	for _, c := range cases {
-		if got := (wave.Facts{Cycles: c.cycles}).Outcome(); got != c.want {
-			t.Errorf("Outcome(%+v) = %q, want %q", c.cycles, got, c.want)
+		if got := (wave.Facts{Cycles: c.cycles, Ships: c.ships}).Outcome(); got != c.want {
+			t.Errorf("Outcome(%+v, ships %v) = %q, want %q", c.cycles, c.ships, got, c.want)
 		}
 	}
 }
@@ -33,6 +34,7 @@ func TestFacts_Section(t *testing.T) {
 			{ID: 1835, Verdict: "WARN", Shipped: true},
 			{ID: 1836, Phase: "scout", QuotaPauses: 1},
 		},
+		Ships:     []int{1835},
 		MergedPRs: []string{"814", "816"},
 	}
 
@@ -61,7 +63,7 @@ func TestFacts_SectionWithNoPullRequest(t *testing.T) {
 
 func TestCompose(t *testing.T) {
 	t.Parallel()
-	last := wave.Facts{Wave: 81, RunID: "r81", Cycles: []wave.Cycle{{ID: 1835, Verdict: "PASS", Shipped: true}}}
+	last := wave.Facts{Wave: 81, RunID: "r81", Cycles: []wave.Cycle{{ID: 1835, Verdict: "PASS", Shipped: true}}, Ships: []int{1835}}
 	in := wave.GoalInput{
 		Next:     82,
 		Standing: "Work the inbox.\n\n",
@@ -118,11 +120,15 @@ func TestCompose_AnOpenRecordShowsItsOutcomeAsUnknown(t *testing.T) {
 func TestFacts_SectionBoundsTheCycleList(t *testing.T) {
 	t.Parallel()
 	var cycles []wave.Cycle
+	var ships []int
 	for id := 1; id <= 150; id++ {
 		cycles = append(cycles, wave.Cycle{ID: id, Verdict: "PASS", Shipped: id%2 == 0})
+		if id%2 == 0 {
+			ships = append(ships, id)
+		}
 	}
 
-	got := wave.Facts{Wave: 9, RunID: "r9", Cycles: cycles, Limit: 20}.Section()
+	got := wave.Facts{Wave: 9, RunID: "r9", Cycles: cycles, Ships: ships, Limit: 20}.Section()
 
 	lines := strings.Split(got, "\n")
 	if len(lines) != 23 || len(got) > 2048 {
@@ -139,5 +145,19 @@ func TestFacts_SectionWithoutALimitShowsEveryCycle(t *testing.T) {
 
 	if strings.Contains(got, "not shown") || strings.Count(got, "- Cycle ") != 2 {
 		t.Errorf("Section() = %q, want both cycles and no omitted line", got)
+	}
+}
+
+func TestFacts_OutcomeCountsTheReadShipsAndNeverTheFlags(t *testing.T) {
+	t.Parallel()
+	cycles := []wave.Cycle{{ID: 5, Resumed: true}, {ID: 12, Shipped: true}, {ID: 13, Shipped: true}}
+	if got := (wave.Facts{Cycles: cycles, Ships: []int{5}}).Outcome(); got != "1 of 3 cycles shipped" {
+		t.Errorf("Outcome = %q, want the read ship 5 counted and the flags of cycles 12 and 13 ignored", got)
+	}
+	if got := (wave.Facts{Cycles: cycles, Ships: []int{}}).Outcome(); got != "0 of 3 cycles shipped" {
+		t.Errorf("Outcome = %q, want 0 when the read found no ship", got)
+	}
+	if got := (wave.Facts{Cycles: cycles}).Outcome(); got != "0 of 3 cycles shipped" {
+		t.Errorf("Outcome = %q, want 0 when no ship list was given: the flags of cycles 12 and 13 are forgeable", got)
 	}
 }

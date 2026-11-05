@@ -63,6 +63,7 @@ func TestGolden_GoPipelineWritesByteExactAttestation(t *testing.T) {
 		Reviewers: reviewers,
 		Files:     "lib.go",
 		AttestDir: attDir,
+		ReviewDir: filepath.Join(dir, "review-store"),
 		Env:       os.Environ(),
 		Runner:    sysexec.DefaultRunner,
 		Now:       func() time.Time { return time.Now() },

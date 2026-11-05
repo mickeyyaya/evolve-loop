@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/integration"
-	"github.com/mickeyyaya/evolve-loop/go/internal/launchrecord"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
@@ -40,43 +39,6 @@ func TestIntegrationPauseForWaitsAndStopsOnCancel(t *testing.T) {
 	cancel()
 	if err := pauseFor(time.Hour)(ctx); !errors.Is(err, context.Canceled) {
 		t.Errorf("pause = %v, want the cancel", err)
-	}
-}
-
-func TestIntegrationAttestedBinderRefusesWhatIsNotAReview(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	ev := integration.Evidence{Commits: []string{"c"}, Paths: []string{"a.go"}, DiffSHA: strings.Repeat("a", 64)}
-	if _, err := launchrecord.Write(filepath.Join(root, ".evolve"), reviewLaunch("r1", ev.DiffSHA)); err != nil {
-		t.Fatal(err)
-	}
-	write := func(body string) string {
-		p := filepath.Join(t.TempDir(), "att.json")
-		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		return p
-	}
-	for name, body := range map[string]string{
-		"not json":          `{`,
-		"no review":         `{"tree_state_sha":"` + ev.DiffSHA + `","reviewers_run":[]}`,
-		"waiver":            `{"tree_state_sha":"` + ev.DiffSHA + `","reviewers_run":["run:r1"],"review_waiver":"w"}`,
-		"other tree":        `{"tree_state_sha":"` + strings.Repeat("b", 64) + `","reviewers_run":["run:r1"]}`,
-		"empty array":       `[]`,
-		"a name no run":     `{"tree_state_sha":"` + ev.DiffSHA + `","reviewers_run":["nobody-ran-this"]}`,
-		"a run with no log": `{"tree_state_sha":"` + ev.DiffSHA + `","reviewers_run":["run:ghost"]}`,
-	} {
-		if _, err := attestedBinder(root, write(body))(ev); err == nil {
-			t.Errorf("%s: the attestation bound the PR", name)
-		}
-	}
-	good := write(`{"tree_state_sha":"` + ev.DiffSHA + `","reviewers_run":[],"review_runs":[{"run_id":"r1"}]}`)
-	b, err := attestedBinder(root, good)(ev)
-	if err != nil || b.TreeSHA != ev.DiffSHA || len(b.ArtifactSHA) != 64 {
-		t.Errorf("binding = %+v, %v, want a launched run to count as a review", b, err)
-	}
-	if _, err := attestedBinder(root, filepath.Join(t.TempDir(), "none.json"))(ev); err == nil {
-		t.Error("a missing attestation file bound the PR")
 	}
 }
 

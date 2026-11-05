@@ -21,18 +21,26 @@ const (
 )
 
 func ReadLoopSignals(root string) ([]signalcenter.Event, []string) {
+	events, warnings, failure := readLoopStream(root)
+	if failure.Err != nil {
+		warnings = append(warnings, failure.Err.Error())
+	}
+	return events, warnings
+}
+
+func readLoopStream(root string) ([]signalcenter.Event, []string, ReadFailure) {
 	path := filepath.Join(paths.EvolveDirOf(root), signalcenter.StreamFileName)
 	chunk, err := signalcenter.ReadStream(path, 0)
 	if errors.Is(err, fs.ErrNotExist) {
-		return nil, nil
+		return nil, nil, ReadFailure{}
 	}
 	if err != nil {
-		return nil, []string{err.Error()}
+		return nil, nil, ReadFailure{Path: path, Err: err}
 	}
 	if chunk.Skipped > 0 {
-		return chunk.Events, []string{fmt.Sprintf("skipped %d malformed signal line(s) in %s", chunk.Skipped, path)}
+		return chunk.Events, []string{fmt.Sprintf("skipped %d malformed signal line(s) in %s", chunk.Skipped, path)}, ReadFailure{}
 	}
-	return chunk.Events, nil
+	return chunk.Events, nil, ReadFailure{}
 }
 
 func MeasureFacts(rec Record, next *Record, cycles []Cycle, loop []signalcenter.Event, policyWidth int) (wavemeasure.Facts, string) {

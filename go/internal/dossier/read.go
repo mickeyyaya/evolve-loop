@@ -6,9 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
-	"strconv"
-	"strings"
 )
 
 type SkipEvidence string
@@ -78,38 +75,6 @@ func ReadCommitted(projectRoot string, minCycle int) []*Dossier {
 }
 
 func ReadDir(dir string, minCycle int) []*Dossier {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil
-	}
-	type numbered struct {
-		path  string
-		cycle int
-	}
-	var files []numbered
-	for _, e := range entries {
-		if e.IsDir() || filepath.Ext(e.Name()) != ".json" {
-			continue
-		}
-		base := strings.TrimSuffix(e.Name(), ".json")
-		n, cerr := strconv.Atoi(strings.TrimPrefix(base, "cycle-"))
-		if cerr != nil || n < minCycle {
-			continue
-		}
-		files = append(files, numbered{path: filepath.Join(dir, e.Name()), cycle: n})
-	}
-	sort.Slice(files, func(i, j int) bool { return files[i].cycle < files[j].cycle })
-	out := make([]*Dossier, 0, len(files))
-	for _, f := range files {
-		data, rerr := os.ReadFile(f.path)
-		if rerr != nil {
-			continue
-		}
-		d, perr := ParseJSON(data)
-		if perr != nil {
-			continue
-		}
-		out = append(out, d)
-	}
-	return out
+	dossiers, _ := ReadDirChecked(dir, minCycle, 0)
+	return dossiers
 }

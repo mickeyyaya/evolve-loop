@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	integrationUsage      = "usage: evolve integration watch --tip SHA\n       evolve integration record-pr --pr N (--attestation FILE | --class NAME)\n       evolve integration batch [--dry-run] [PR...]\n  watch: exit 0 = CI green, 1 = CI red, 2 = no run to watch or gh failed, 10 = usage\n  record-pr and batch: exit 0 = done, 1 = refused or a PR was ejected, 2 = git or gh failed, 10 = usage"
+	integrationUsage      = "usage: evolve integration watch --tip SHA\n       evolve integration record-pr --pr N (--reviewed | --class NAME)\n       evolve integration batch [--dry-run] [PR...]\n  watch: exit 0 = CI green, 1 = CI red, 2 = no run to watch or gh failed, 10 = usage\n  record-pr and batch: exit 0 = done, 1 = refused or a PR was ejected, 2 = git or gh failed, 10 = usage"
 	integrationWatchUsage = "usage: evolve integration watch --tip SHA"
 	integrationPrefix     = "evolve integration: "
 )

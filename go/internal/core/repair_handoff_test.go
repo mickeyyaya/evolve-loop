@@ -242,8 +242,13 @@ func TestSealHandedOff_SetsTheTerminationAndRoutesTheCommittedItem(t *testing.T)
 	unrouted := CycleResult{}
 	two := []phaseTimingEntry{{Phase: "audit"}}
 	center, events := captureSignals()
-	multi := &cycleRun{o: &Orchestrator{signals: center}, cs: CycleState{WorkspacePath: t.TempDir()}}
-	if !multi.sealHandedOff(&unrouted, two, repairHandoffReasonPrefix+"x") || len(two[0].Diagnostics) != 0 || len(eventsWithCode(*events, CodeBlockerRefused)) != 1 {
-		t.Errorf("a cycle with no single committed item = %+v, events %d; want the seal, no route and one refusal signal", two, len(*events))
+	ws = t.TempDir()
+	multi := &cycleRun{o: &Orchestrator{signals: center}, cs: CycleState{WorkspacePath: ws}, cycle: 12}
+	if !multi.sealHandedOff(&unrouted, two, repairHandoffReasonPrefix+"x") || len(two[0].Diagnostics) != 0 {
+		t.Errorf("a cycle with no single committed item = %+v; want the seal and no route", two)
+	}
+	wantText := "cycle 12 handed off. No item routes to the console: neither " + filepath.Join(ws, "lane-scope.json") + " nor " + filepath.Join(ws, "triage-decision.json") + " gives a commitment. Next: the console reads both paths. The hand-off reason: x"
+	if got := eventsWithCode(*events, CodeHandoffNoRoute); len(got) != 1 || got[0].Reason != wantText || len(eventsWithCode(*events, CodeBlockerRefused)) != 0 {
+		t.Errorf("events = %+v; want one %s with %q", *events, CodeHandoffNoRoute, wantText)
 	}
 }

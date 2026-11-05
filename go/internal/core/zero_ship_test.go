@@ -1,10 +1,6 @@
 package core
 
-import (
-	"os"
-	"path/filepath"
-	"testing"
-)
+import "testing"
 
 func TestEvaluateZeroShip(t *testing.T) {
 	t.Parallel()
@@ -67,59 +63,10 @@ func TestEvaluateZeroShip_DoesNotMutateItsInput(t *testing.T) {
 	}
 }
 
-func writeShipTiming(t *testing.T, evolveDir string, dir, timing string) {
-	t.Helper()
-	d := filepath.Join(evolveDir, "runs", dir)
-	if err := os.MkdirAll(d, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(d, "phase-timing.json"), []byte(timing), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestCollectCycleShips_ClassifiesRangeAndSortsByCycle(t *testing.T) {
+func TestEvaluateZeroShip_ReasonStatesTheRunAndTheCeilingAndNothingElse(t *testing.T) {
 	t.Parallel()
-	evolveDir := t.TempDir()
-	writeShipTiming(t, evolveDir, "cycle-12", `[{"phase":"triage","verdict":"SKIPPED","abort_reason":"triage-empty-commitment"}]`)
-	writeShipTiming(t, evolveDir, "cycle-10", `[{"phase":"ship","verdict":"PASS"}]`)
-	writeShipTiming(t, evolveDir, "cycle-3", `[{"phase":"ship","verdict":"PASS"}]`)
-	writeShipTiming(t, evolveDir, "not-a-cycle", `[{"phase":"ship","verdict":"PASS"}]`)
-
-	got := CollectCycleShips(evolveDir, 10)
-
-	want := []CycleShip{{Cycle: 10, Shipped: true}, {Cycle: 12, Shipped: false}}
-	if len(got) != len(want) {
-		t.Fatalf("CollectCycleShips = %+v, want %+v", got, want)
-	}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Errorf("CollectCycleShips[%d] = %+v, want %+v", i, got[i], want[i])
-		}
-	}
-}
-
-func TestCollectCycleShips_MissingRunsDirIsEmpty(t *testing.T) {
-	t.Parallel()
-	if got := CollectCycleShips(t.TempDir(), 0); got != nil {
-		t.Errorf("CollectCycleShips without a runs dir = %+v, want nil", got)
-	}
-}
-
-func TestCountShips(t *testing.T) {
-	t.Parallel()
-	cases := []struct {
-		name   string
-		cycles []CycleShip
-		want   int
-	}{
-		{"none", nil, 0},
-		{"all zero-ship", []CycleShip{{Cycle: 1}, {Cycle: 2}}, 0},
-		{"mixed", []CycleShip{{Cycle: 1, Shipped: true}, {Cycle: 2}, {Cycle: 3, Shipped: true}}, 2},
-	}
-	for _, tc := range cases {
-		if got := CountShips(tc.cycles); got != tc.want {
-			t.Errorf("%s: CountShips = %d, want %d", tc.name, got, tc.want)
-		}
+	got := EvaluateZeroShip([]int{1, 0, 0, 0}, 2).Reason
+	if want := "3 consecutive waves landed no ship (ceiling 2)"; got != want {
+		t.Errorf("Reason = %q, want %q", got, want)
 	}
 }

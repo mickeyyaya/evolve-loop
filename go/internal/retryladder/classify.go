@@ -42,7 +42,6 @@ type Facts struct {
 	QuotaBench         bool
 	TeardownError      bool
 	AuditClass         string
-	ProvenBlocker      bool
 	LaneScope          []string
 	Floors             []FloorFailure
 	DeliverableMissing bool
@@ -92,7 +91,7 @@ func isInfraExit(code int) bool {
 }
 
 func isSpecFailure(f Facts) bool {
-	if f.ProvenBlocker || f.AuditClass == "intent-malformed" || f.AuditClass == "intent-rejected" {
+	if f.AuditClass == "intent-malformed" || f.AuditClass == "intent-rejected" {
 		return true
 	}
 	return slices.ContainsFunc(f.Floors, func(fl FloorFailure) bool {

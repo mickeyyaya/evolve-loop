@@ -52,7 +52,7 @@ The runner refuses to write an attestation unless `--reviewers` declares, by cap
 - a **simplify** reviewer (`code-simplifier` / `code-review-simplify` / `refactor`), AND
 - **one review** reviewer — either the general `code-reviewer` / `code-review`, or the matching `<lang>-reviewer` for a changed language (`go-reviewer`, `python-reviewer`, `typescript-reviewer`, `rust-reviewer`). Only one is needed.
 
-**A docs-only change needs the docs review.** When every changed path ends in `.md`, the runner requires the capability "docs review" (`docs-review`) in place of simplify and review. The code reviewers do not satisfy it. Run [docs-review](../docs-review/SKILL.md), then pass `--reviewers docs-review`.
+**A docs-only change needs the docs review.** When every changed path ends in `.md`, the runner requires the capability "docs review" (`docs-review`) in place of simplify and review. The code reviewers do not satisfy it. Run [docs-review](../docs-review/SKILL.md) with `git diff --cached | evolve agent run docs-review --json`, then pass `--reviewers run:<run label>`.
 
 **A review run attests itself.** Pass `run:<run label>` for each review that ran through `evolve agent run`:
 

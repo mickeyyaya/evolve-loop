@@ -90,7 +90,7 @@ func composeWaveGoal(env waveEnv, plan *wavePlan, cfg policy.WaveConfig, standin
 }
 
 func lastWaveFacts(env waveEnv, plan *wavePlan, last wave.Record) wave.Facts {
-	cycles, _, warnings := wave.ReadRunCycles(plan.plane.root, last.CycleFloor, 0)
+	read, warnings := readWaveOf(plan.plane, last)
 	plan.warnings = append(plan.warnings, warnings...)
 	prs := slices.Clone(plan.args.boundary.prs)
 	if last.MainSHA != "" {
@@ -105,7 +105,7 @@ func lastWaveFacts(env waveEnv, plan *wavePlan, last wave.Record) wave.Facts {
 		b, _ := strconv.Atoi(y)
 		return a - b
 	})
-	return wave.Facts{Wave: last.Number, RunID: last.RunID, Cycles: cycles, MergedPRs: slices.Compact(prs)}
+	return wave.Facts{Wave: last.Number, RunID: last.RunID, Cycles: read.Cycles, Ships: read.Ships, MergedPRs: slices.Compact(prs)}
 }
 
 func waveBoundaryArgs(env waveEnv, plan wavePlan, cfg policy.WaveConfig) boundaryArgs {

@@ -22,7 +22,8 @@ var explanationLifecycleCallPins = []struct {
 	{"../core/orchestrator.go", "RunCycle", "sealBuildExplanationContext"},
 	{"../core/cyclerun_dispatch.go", "dispatch", "projectBuildExplanation"},
 	{"../core/resume_execution.go", "run", "explanationdocs.RefreshResult"},
-	{"../core/resume_execution.go", "run", "sealBuildExplanationContext"},
+	{"../core/resume_execution.go", "run", "sealResumedBuildEntry"},
+	{"../core/resume_execution.go", "sealResumedBuildEntry", "sealBuildExplanationContext"},
 	{"../core/resume_execution.go", "run", "projectBuildExplanation"},
 }
 

@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 const intentDir = "landing"
@@ -35,6 +36,7 @@ type Intent struct {
 	Branch                string       `json:"branch"`
 	LaneBranch            string       `json:"lane_branch"`
 	Status                IntentStatus `json:"status"`
+	CompletedAt           string       `json:"completed_at,omitempty"`
 }
 
 func IntentPath(evolveDir string, cycle int) string {
@@ -58,4 +60,9 @@ func ReadIntent(path string) (Intent, bool, error) {
 		return Intent{}, false, err
 	}
 	return in, true, nil
+}
+
+func (in Intent) Completed() (time.Time, bool) {
+	at, err := time.Parse(time.RFC3339, in.CompletedAt)
+	return at, err == nil
 }

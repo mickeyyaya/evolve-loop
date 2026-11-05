@@ -19,6 +19,8 @@ const (
 	BlockerKindPredicateConflict = "predicate-conflict"
 	blockerDefectWord            = "BLOCKER"
 	DiagCodeBlockerRoute         = cyclestate.DiagCodeBlockerRoute
+	DiagCodeBlockerUnroutable    = cyclestate.DiagCodeBlockerUnroutable
+	DiagCodeBlockerIncomplete    = cyclestate.DiagCodeBlockerIncomplete
 )
 
 type BlockerClaim struct {
@@ -31,6 +33,7 @@ type BlockerClaim struct {
 
 type BlockerCase struct {
 	Phase               string
+	Cycle               int
 	Worktree            string
 	PredicatesAtRequest map[string]string
 	PredicatesNow       map[string]string
@@ -41,11 +44,13 @@ type BlockerCase struct {
 	Defects             []string
 	Explainable         func(failure string) bool
 	EvidenceFault       string
+	BaseFault           string
 }
 
 type BlockerProof struct {
-	Proven   []BlockerClaim
-	Refusals []string
+	Proven    []BlockerClaim
+	Refusals  []string
+	Statement blockerStatement
 }
 
 func (p BlockerProof) Blocked() bool { return len(p.Proven) > 0 && len(p.Refusals) == 0 }
@@ -72,8 +77,8 @@ func (p deterministicBlockerProver) Prove(c BlockerCase) BlockerProof {
 	if len(claims) == 0 || len(c.Failures) == 0 {
 		return BlockerProof{}
 	}
-	if why := caseFault(c); why != "" {
-		return BlockerProof{Refusals: []string{why}}
+	if why, step := caseFault(c); why != "" {
+		return BlockerProof{Refusals: []string{why}, Statement: notProven(why, step)}
 	}
 	var proof BlockerProof
 	for _, claim := range claims {
@@ -84,26 +89,77 @@ func (p deterministicBlockerProver) Prove(c BlockerCase) BlockerProof {
 		proof.Proven = append(proof.Proven, claim)
 	}
 	if len(proof.Proven) == 0 {
+		proof.Statement = notProven(strings.Join(proof.Refusals, "; "), claimStep)
 		return proof
 	}
+	var unexplained []string
 	for _, f := range c.Failures {
 		if !explainedFailure(f, proof.Proven, c.Explainable) {
 			proof.Refusals = append(proof.Refusals, "no proven blocker explains the floor failure "+firstLine(f))
+			unexplained = append(unexplained, firstLine(f))
 		}
 	}
+	proof.Statement = proof.refusalStatement(unexplained)
 	return proof
 }
 
-func caseFault(c BlockerCase) string {
+const claimStep = "correct the BLOCKER line of your report so each claim is true, or fix the failures without declaring a blocker."
+
+func notProven(why, step string) blockerStatement {
+	return blockerStatement{fact: "the declared blocker is not proven: " + why, step: step}
+}
+
+func (p BlockerProof) refusalStatement(unexplained []string) blockerStatement {
+	if len(p.Refusals) == 0 {
+		return blockerStatement{}
+	}
+	if len(unexplained) < len(p.Refusals) {
+		return notProven(strings.Join(p.Refusals, "; "), claimStep)
+	}
+	paths := make([]string, 0, len(p.Proven))
+	for _, claim := range p.Proven {
+		if !slices.Contains(paths, claim.Path) {
+			paths = append(paths, claim.Path)
+		}
+	}
+	list := strings.Join(paths, ", ")
+	return blockerStatement{
+		fact: "the blocker on " + list + " is proven, and these failures are not explained: " + strings.Join(unexplained, "; "),
+		step: "fix only these failures. Do not change " + list + ".",
+	}
+}
+
+func caseFault(c BlockerCase) (string, string) {
 	switch {
 	case c.Explainable == nil:
-		return "the caller gave no failure kinds that a blocker can explain"
+		return "the caller gave no failure kinds that a blocker can explain", claimStep
 	case c.EvidenceFault != "":
-		return "the evidence is not complete: " + c.EvidenceFault
+		return "the evidence could not be read: " + c.EvidenceFault, "declare the blocker again. The host reads the evidence again."
 	case !maps.Equal(c.PredicatesAtRequest, c.PredicatesNow):
-		return "the lane changed the predicates of the cycle after the phase request, so no failure of theirs can prove a blocker"
+		return "the lane changed the predicates of the cycle after the phase request: " + predicateEdits(c), "restore each changed file and remove each added file, then declare the blocker again."
 	}
-	return ""
+	return "", ""
+}
+
+func predicateEdits(c BlockerCase) string {
+	dir := fmt.Sprintf("go/acs/cycle%d/", c.Cycle)
+	var edits []string
+	for _, name := range slices.Sorted(maps.Keys(c.PredicatesAtRequest)) {
+		now, kept := c.PredicatesNow[name]
+		switch {
+		case !kept:
+			edits = append(edits, dir+name+" (removed)")
+		case now != c.PredicatesAtRequest[name]:
+			edits = append(edits, dir+name)
+		}
+	}
+	for _, name := range slices.Sorted(maps.Keys(c.PredicatesNow)) {
+		if _, had := c.PredicatesAtRequest[name]; !had {
+			edits = append(edits, dir+name+" (added)")
+		}
+	}
+	slices.Sort(edits)
+	return strings.Join(edits, ", ")
 }
 
 func (p deterministicBlockerProver) verify(claim BlockerClaim, c BlockerCase) string {

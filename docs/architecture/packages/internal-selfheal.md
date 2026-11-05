@@ -160,6 +160,7 @@ The live reaction runs the detection on each `cycle.sealed` event with `final_ve
 - The package never acts. It writes only its own records, the decision ledger and the evidence workspaces. It changes no inbox item, no policy and no git ref.
 - The incident records, the package, the verb file `cmd_selfheal.go` and the stage key are protected surfaces (`guards.ProtectedSurfaceManifest`). The verb file is protected because it chooses the evidence and builds the verifier. `cmd_selfheal_live.go` is protected too, because it opens incidents and engages the loop brake. `cmd_selfheal_propose.go` is protected for the same reason, and the proposal records are under the protected directory. `TestNoAgentProfileCanWriteTheIncidentRecords` checks that no agent profile has a write grant over `.evolve/incidents/`.
 - Each rule is a pure function. Only the loaders read files, and only the verb starts `gh`.
+- The loader of the ship journal (`sources.go`) calls `shipjournal.Read`. The package has no second parser of `ship-journal.jsonl`. `readJSONL` stays for the decision ledger only.
 
 ## Findings
 

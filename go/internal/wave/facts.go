@@ -35,6 +35,7 @@ type Cycle struct {
 	Verdict      string             `json:"verdict,omitempty"`
 	Termination  string             `json:"termination,omitempty"`
 	Shipped      bool               `json:"shipped"`
+	Resumed      bool               `json:"resumed,omitempty"`
 	QuotaPauses  int                `json:"quota_pauses"`
 	Conflict     bool               `json:"conflict,omitempty"`
 	Spend        cyclespend.Spend   `json:"spend"`
@@ -52,10 +53,16 @@ type cycleWindow struct{ floor, ceiling int }
 func (w cycleWindow) holds(id int) bool { return id > w.floor && (w.ceiling == 0 || id <= w.ceiling) }
 
 func ReadCycles(root string, floor, ceiling int) ([]Cycle, []string) {
+	cycles, warnings, failures := readCycleRange(root, floor, ceiling)
+	return cycles, foldFailures(warnings, failures)
+}
+
+func readCycleRange(root string, floor, ceiling int) ([]Cycle, []string, []ReadFailure) {
 	w := cycleWindow{floor: floor, ceiling: ceiling}
 	evolveDir := paths.EvolveDirOf(root)
 	dossiers := map[int]*dossier.Dossier{}
-	for _, d := range dossier.ReadCommitted(root, floor+1) {
+	committed, failures := dossier.ReadDirChecked(dossier.CyclesDir(root), floor+1, ceiling)
+	for _, d := range committed {
 		if w.holds(d.Cycle) {
 			dossiers[d.Cycle] = d
 		}
@@ -64,25 +71,49 @@ func ReadCycles(root string, floor, ceiling int) ([]Cycle, []string) {
 	for id := range dossiers {
 		ids[id] = true
 	}
-	collectIDs(filepath.Join(evolveDir, "runs"), runDirName, w, ids)
-	collectIDs(filepath.Join(evolveDir, "landing"), landingFileName, w, ids)
-	livePath := core.ResolveCycleStatePath(evolveDir)
-	live, _, err := readState(livePath)
+	failures = appendFailure(failures, filepath.Join(evolveDir, "runs"), collectIDs(filepath.Join(evolveDir, "runs"), runDirName, w, ids))
+	failures = appendFailure(failures, filepath.Join(evolveDir, "landing"), collectIDs(filepath.Join(evolveDir, "landing"), landingFileName, w, ids))
+	live, liveFailures := readLive(evolveDir)
+	failures = append(failures, liveFailures...)
 	var cycles []Cycle
 	var warnings []string
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		warnings = append(warnings, fmt.Sprintf("%s: %v", livePath, err))
-	}
 	for _, id := range sortedKeys(ids) {
-		c, warn := readCycle(root, id, live, dossiers[id])
+		c, warn, bad := readCycle(root, id, live, dossiers[id])
 		cycles = append(cycles, c)
 		warnings = append(warnings, warn...)
+		failures = append(failures, bad...)
 	}
-	return cycles, warnings
+	return cycles, warnings, failures
 }
 
-func collectIDs(dir string, name *regexp.Regexp, w cycleWindow, ids map[int]bool) {
-	entries, _ := os.ReadDir(dir)
+func readLive(evolveDir string) (cyclestate.CycleState, []ReadFailure) {
+	livePath := core.ResolveCycleStatePath(evolveDir)
+	live, _, err := readState(livePath)
+	if errors.Is(err, fs.ErrNotExist) {
+		return live, nil
+	}
+	return live, appendFailure(nil, livePath, err)
+}
+
+func appendFailure(failures []ReadFailure, path string, err error) []ReadFailure {
+	if err == nil {
+		return failures
+	}
+	return append(failures, ReadFailure{Path: path, Err: err})
+}
+
+func foldFailures(warnings []string, failures []ReadFailure) []string {
+	for _, f := range failures {
+		warnings = append(warnings, f.Error())
+	}
+	return warnings
+}
+
+func collectIDs(dir string, name *regexp.Regexp, w cycleWindow, ids map[int]bool) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
 	for _, e := range entries {
 		m := name.FindStringSubmatch(e.Name())
 		if m == nil {
@@ -92,6 +123,7 @@ func collectIDs(dir string, name *regexp.Regexp, w cycleWindow, ids map[int]bool
 			ids[id] = true
 		}
 	}
+	return nil
 }
 
 func sortedKeys(set map[int]bool) []int {
@@ -103,22 +135,27 @@ func sortedKeys(set map[int]bool) []int {
 	return out
 }
 
-func readCycle(root string, id int, live cyclestate.CycleState, d *dossier.Dossier) (Cycle, []string) {
+func readCycle(root string, id int, live cyclestate.CycleState, d *dossier.Dossier) (Cycle, []string, []ReadFailure) {
 	ws := paths.RunWorkspace(root, id)
 	c := Cycle{ID: id}
-	if todos := core.LaneScopeIDs(ws); len(todos) > 0 {
-		c.Todo = todos[0]
-	}
-	st, ok, warnings := workspaceState(ws, id, live)
+	var failures []ReadFailure
+	todo, err := readTodo(ws)
+	failures = appendFailure(failures, filepath.Join(ws, core.LaneScopeFile), err)
+	c.Todo = todo
+	st, ok, stateFailures := workspaceState(ws, id, live)
+	failures = append(failures, stateFailures...)
 	if ok {
 		c.Phase, c.Shipped = st.Phase, st.Shipped
 	}
-	c.Spend, warnings = readSpend(ws, id, warnings)
-	warnings = append(warnings, applySignals(&c, filepath.Join(ws, signalcenter.StreamFileName))...)
-	intent, found, err := landing.ReadIntent(landing.IntentPath(paths.EvolveDirOf(root), id))
-	if err != nil {
-		warnings = append(warnings, fmt.Sprintf("cycle-%d: landing intent: %v", id, err))
-	}
+	var spendFailures []ReadFailure
+	c.Spend, spendFailures = readSpend(ws)
+	failures = append(failures, spendFailures...)
+	streamPath := filepath.Join(ws, signalcenter.StreamFileName)
+	warnings, streamErr := applySignals(&c, streamPath)
+	failures = appendFailure(failures, streamPath, streamErr)
+	intentPath := landing.IntentPath(paths.EvolveDirOf(root), id)
+	intent, found, err := landing.ReadIntent(intentPath)
+	failures = appendFailure(failures, intentPath, err)
 	c.Shipped = c.Shipped || (found && intent.Status == landing.IntentComplete)
 	if d != nil {
 		if c.Verdict == "" {
@@ -128,7 +165,15 @@ func readCycle(root string, id int, live cyclestate.CycleState, d *dossier.Dossi
 		c.StartedAt, c.EndedAt = phaseSpan(c.StartedAt, c.EndedAt, d.Phases)
 	}
 	c.LLMVerdict = readVerdict(ws, c)
-	return c, warnings
+	return c, warnings, failures
+}
+
+func readTodo(ws string) (string, error) {
+	scope, err := core.ReadLaneScope(ws)
+	if err != nil || scope == nil || len(scope.TodoIDs) == 0 {
+		return "", err
+	}
+	return scope.TodoIDs[0], nil
 }
 
 func readVerdict(ws string, c Cycle) cyclespend.Verdict {
@@ -139,29 +184,30 @@ func readVerdict(ws string, c Cycle) cyclespend.Verdict {
 	return cyclespend.VerdictOf(res.Records, c.failAt, c.Shipped)
 }
 
-func readSpend(ws string, id int, warnings []string) (cyclespend.Spend, []string) {
+func readSpend(ws string) (cyclespend.Spend, []ReadFailure) {
 	spend, err := cyclespend.Read(ws)
-	if errors.Is(err, cyclespend.ErrLedger) {
-		warnings = append(warnings, fmt.Sprintf("cycle-%d: llm spend: %v", id, err))
+	if !errors.Is(err, cyclespend.ErrLedger) {
+		return spend, nil
 	}
-	return spend, warnings
+	return spend, appendFailure(nil, llmcalls.Path(ws), err)
 }
 
-func workspaceState(ws string, id int, live cyclestate.CycleState) (cyclestate.CycleState, bool, []string) {
+func workspaceState(ws string, id int, live cyclestate.CycleState) (cyclestate.CycleState, bool, []ReadFailure) {
 	if live.CycleID == id {
 		return live, true, nil
 	}
-	var warnings []string
+	var failures []ReadFailure
 	for _, name := range []string{core.CycleStateFile, core.RunStateFile} {
-		st, ok, err := readState(filepath.Join(ws, name))
+		path := filepath.Join(ws, name)
+		st, ok, err := readState(path)
 		if ok {
-			return st, true, warnings
+			return st, true, failures
 		}
-		if err != nil && !errors.Is(err, fs.ErrNotExist) {
-			warnings = append(warnings, fmt.Sprintf("cycle-%d: %s: %v", id, name, err))
+		if !errors.Is(err, fs.ErrNotExist) {
+			failures = appendFailure(failures, path, err)
 		}
 	}
-	return cyclestate.CycleState{}, false, warnings
+	return cyclestate.CycleState{}, false, failures
 }
 
 func readState(path string) (cyclestate.CycleState, bool, error) {
@@ -176,13 +222,13 @@ func readState(path string) (cyclestate.CycleState, bool, error) {
 	return st, st.CycleID > 0, nil
 }
 
-func applySignals(c *Cycle, path string) []string {
+func applySignals(c *Cycle, path string) ([]string, error) {
 	chunk, err := signalcenter.ReadStream(path, 0)
 	if errors.Is(err, fs.ErrNotExist) {
-		return nil
+		return nil, nil
 	}
 	if err != nil {
-		return []string{fmt.Sprintf("cycle-%d: %v", c.ID, err)}
+		return nil, err
 	}
 	for _, e := range chunk.Events {
 		c.StartedAt = earliest(c.StartedAt, eventTime(e))
@@ -203,9 +249,9 @@ func applySignals(c *Cycle, path string) []string {
 		}
 	}
 	if chunk.Skipped > 0 {
-		return []string{fmt.Sprintf("cycle-%d: skipped %d malformed signal line(s) in %s", c.ID, chunk.Skipped, path)}
+		return []string{fmt.Sprintf("cycle-%d: skipped %d malformed signal line(s) in %s", c.ID, chunk.Skipped, path)}, nil
 	}
-	return nil
+	return nil, nil
 }
 
 func blocksCycle(e signalcenter.Event) bool {

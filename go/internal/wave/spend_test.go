@@ -37,8 +37,9 @@ func TestReadCycles_WarnsOnAnUnreadableLLMCallLedger(t *testing.T) {
 
 	_, warnings := wave.ReadCycles(p.root, 0, 0)
 
-	if len(warnings) != 1 || !strings.Contains(warnings[0], "cycle-4: llm spend") {
-		t.Errorf("warnings = %q, want one that names the llm spend of cycle-4", warnings)
+	ledger := filepath.Join(p.root, ".evolve", "runs", "cycle-4", "llm-calls.ndjson")
+	if len(warnings) != 1 || !strings.HasPrefix(warnings[0], ledger+": ") {
+		t.Errorf("warnings = %q, want one that starts with the ledger path of cycle-4", warnings)
 	}
 }
 

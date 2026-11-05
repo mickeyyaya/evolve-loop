@@ -100,7 +100,8 @@ func buildWaveStatus(env waveEnv, plane wavePlaneDirs, records []wave.Record) wa
 		return report
 	}
 	cur := records[len(records)-1]
-	cycles, loop, warnings := wave.ReadRunCycles(plane.root, cur.CycleFloor, 0)
+	read, warnings := readWaveOf(plane, cur)
+	cycles, loop := read.Cycles, read.Loop
 	report.Wave, report.RunID, report.PID = cur.Number, cur.RunID, cur.PID
 	report.Warnings = append(report.Warnings, warnings...)
 	report.Warnings = append(report.Warnings, poolPreflightWarnings(loop, cur.StartedAt)...)
@@ -112,8 +113,8 @@ func buildWaveStatus(env waveEnv, plane wavePlaneDirs, records []wave.Record) wa
 	if startWarning != "" {
 		report.Warnings = append(report.Warnings, startWarning)
 	}
-	report.Outcome = wave.Facts{Cycles: cycles}.Outcome()
-	runs, measureWarnings := measureWaveRuns(plane, records, cycles, loop, report.PIDAlive || report.LoopLive, env.now())
+	report.Outcome = wave.Facts{Cycles: cycles, Ships: read.Ships}.Outcome()
+	runs, measureWarnings := measureWaveRuns(plane, records, cyclesAboveFloor(cycles, cur.CycleFloor), loop, report.PIDAlive || report.LoopLive, env.now())
 	report.Runs, report.Measures = runs, runs[len(runs)-1].Measures
 	report.Warnings = append(report.Warnings, measureWarnings...)
 	if over := len(cycles) - waveStatusMaxCycles; over > 0 {
@@ -197,6 +198,9 @@ func waveCycleText(c wave.Cycle) string {
 		text = fmt.Sprintf("cycle %d: verdict %s, %s", c.ID, c.Verdict, shipped)
 	}
 	text += waveVerdictText(c)
+	if c.Resumed {
+		text += " (resumed)"
+	}
 	if c.HandoffStop != "" {
 		text += ", handed-off (" + c.HandoffStop + ")"
 	}
@@ -264,7 +268,8 @@ func (w *waveWatcher) poll() (bool, error) {
 	if err := w.pollSignals(); err != nil {
 		return false, err
 	}
-	cycles, _, warnings := wave.ReadRunCycles(w.plane.root, w.cur.CycleFloor, 0)
+	read, warnings := readWaveOf(w.plane, w.cur)
+	cycles := read.Cycles
 	loopLive, startWarning := waveLoopLive(w.env, w.plane.evolveDir, w.cur)
 	for _, warn := range append(warnings, startWarning) {
 		w.warnOnce(warn)
@@ -358,4 +363,32 @@ func writeWaveEvent(w io.Writer, number int, e wave.Event, asJSON bool) error {
 	}
 	_, err := fmt.Fprintf(w, "wave %d: %s\n", number, e)
 	return err
+}
+
+func readWaveOf(plane wavePlaneDirs, rec wave.Record) (wave.WaveRead, []string) {
+	stage, stageWarning := shipStageOf(plane.evolveDir)
+	read := wave.ReadWave(plane.root, wave.WaveWindow{Floor: rec.CycleFloor, From: wave.RunFrom(rec), Stage: stage})
+	warnings := foldWaveRead(read)
+	if stageWarning != "" {
+		warnings = append(warnings, stageWarning)
+	}
+	return read, warnings
+}
+
+func foldWaveRead(read wave.WaveRead) []string {
+	warnings := append([]string(nil), read.Warnings...)
+	for _, f := range append(append([]wave.ReadFailure(nil), read.Failures...), read.ShipFailures...) {
+		warnings = append(warnings, f.Error())
+	}
+	return warnings
+}
+
+func cyclesAboveFloor(cycles []wave.Cycle, floor int) []wave.Cycle {
+	var out []wave.Cycle
+	for _, c := range cycles {
+		if c.ID > floor {
+			out = append(out, c)
+		}
+	}
+	return out
 }

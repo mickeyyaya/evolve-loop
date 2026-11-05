@@ -9,6 +9,7 @@ type Facts struct {
 	Wave      int
 	RunID     string
 	Cycles    []Cycle
+	Ships     []int
 	MergedPRs []string
 	Limit     int
 }
@@ -17,13 +18,7 @@ func (f Facts) Outcome() string {
 	if len(f.Cycles) == 0 {
 		return "no cycle ran"
 	}
-	shipped := 0
-	for _, c := range f.Cycles {
-		if c.Shipped {
-			shipped++
-		}
-	}
-	return fmt.Sprintf("%d of %d cycles shipped", shipped, len(f.Cycles))
+	return fmt.Sprintf("%d of %d cycles shipped", len(f.Ships), len(f.Cycles))
 }
 
 func (f Facts) Section() string {

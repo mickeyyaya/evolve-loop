@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -20,7 +20,7 @@ const (
 
 func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeBlockerRouted, "a phase's gate failures are all explained by a blocker the host proved (a protected path the fix needs, or two of the cycle's own predicates that conflict); the correction rounds stop, the cycle seals FAIL with termination reason blocked-needs-console and the BLOCKER_ROUTE diagnostic routes the item to the console; the reason is the proof and the lane's diagnosis")
-	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeBlockerRefused, "a phase's verdict declared a BLOCKER defect that the host could not prove, or that does not explain every gate failure; the correction rounds continue as for any rejection; the reason lists each refusal")
+	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeBlockerRefused, "a phase's verdict declared a BLOCKER defect that the host did not accept; a refused claim keeps the correction rounds with the refusal in each directive, while an unroutable proof or an unreadable predicate base ends the rounds and the cycle; the reason states which")
 }
 
 var acsPredicateFailure = regexp.MustCompile(`^\./acs/cycle[0-9]+ \(-tags [^)]*\): unit tests FAIL`)
@@ -45,6 +45,7 @@ func (cr *cycleRun) buildBlockerCase(next Phase, rin ReviewInput, rr ReviewResul
 	return BlockerCase{
 		Phase:               string(next),
 		Worktree:            rin.Worktree,
+		Cycle:               cr.cycle,
 		PredicatesAtRequest: cr.predicatesAtBuild,
 		PredicatesNow:       cyclePredicateSources(rin.Worktree, cr.cycle),
 		Changed:             diff.changed,
@@ -54,6 +55,7 @@ func (cr *cycleRun) buildBlockerCase(next Phase, rin ReviewInput, rr ReviewResul
 		Defects:             defects,
 		Explainable:         buildFloorExplainable,
 		EvidenceFault:       fault,
+		BaseFault:           cr.predicateBaseFault,
 	}, true
 }
 
@@ -115,31 +117,60 @@ func phaseVerdictDefects(workspace string, phase Phase) []string {
 	return s.Failure.Defects
 }
 
-func (cr *cycleRun) provenBlocker(next Phase, rin ReviewInput, rr ReviewResult) (Diagnostic, bool) {
+func (cr *cycleRun) provenBlocker(next Phase, rin ReviewInput, rr ReviewResult) (BlockerOutcome, Diagnostic, blockerStatement) {
 	if rr.ProvenBlocker != "" {
-		item, ok := cr.consoleRouteItem(next)
-		return blockerRouteDiagnostic(item, rr.ProvenBlocker), ok
+		item, gap, ok := consoleRouteChoice(cr.cs.WorkspacePath)
+		if !ok {
+			return cr.endedBlocker(next, Unroutable, DiagCodeBlockerUnroutable, gap.unroutable())
+		}
+		return Routable, blockerRouteDiagnostic(item, rr.ProvenBlocker), blockerStatement{}
 	}
 	c, ok := cr.buildBlockerCase(next, rin, rr)
 	if !ok {
-		return Diagnostic{}, false
+		return NoClaim, Diagnostic{}, blockerStatement{}
+	}
+	if c.BaseFault != "" {
+		return cr.endedBlocker(next, Incomplete, DiagCodeBlockerIncomplete, incompleteStatement(c.BaseFault))
 	}
 	proof := NewBlockerProver().Prove(c)
 	if !proof.Blocked() {
-		cr.refuseBlocker(next, "the declared blocker is not proven: "+strings.Join(proof.Refusals, "; "))
-		return Diagnostic{}, false
+		return Refused, Diagnostic{}, proof.Statement
 	}
-	item, ok := cr.consoleRouteItem(next)
-	return BlockerRouteDiagnostic(string(next), item, proof), ok
+	item, gap, routable := consoleRouteChoice(cr.cs.WorkspacePath)
+	if !routable {
+		return cr.endedBlocker(next, Unroutable, DiagCodeBlockerUnroutable, gap.unroutable())
+	}
+	return Routable, BlockerRouteDiagnostic(string(next), item, proof), blockerStatement{}
 }
 
-func (cr *cycleRun) consoleRouteItem(next Phase) (string, bool) {
-	committed, decided := committedset.Committed(cr.cs.WorkspacePath)
-	if !decided || len(committed) != 1 {
-		cr.refuseBlocker(next, fmt.Sprintf("the blocker is proven, but the console route names one item and the cycle committed %v", committed))
-		return "", false
+func incompleteStatement(fault string) blockerStatement {
+	return blockerStatement{
+		fact: "the declared blocker cannot be judged: " + fault + ". This cycle ends with no charge to its items, because no correction can supply a base. The resume batch stops, and starting a new batch seals a new base",
+		step: "start a new batch. If it repeats, file a pipeline item.",
 	}
-	return committed[0], true
+}
+
+func (cr *cycleRun) endedBlocker(next Phase, outcome BlockerOutcome, code string, s blockerStatement) (BlockerOutcome, Diagnostic, blockerStatement) {
+	cr.refuseBlocker(next, s.text())
+	return outcome, Diagnostic{Severity: cyclestate.SeverityError, Code: code, Message: s.text()}, s
+}
+
+func (cr *cycleRun) sendRefusal(next Phase, s blockerStatement) string {
+	cr.refuseBlocker(next, s.text())
+	return s.text()
+}
+
+func (cr *cycleRun) sendLastRefusal(next Phase, s blockerStatement, text func(blockerStatement) string) {
+	if !s.empty() {
+		cr.refuseBlocker(next, text(s))
+	}
+}
+
+func withBlockerRefusal(reason, refusal string) string {
+	if refusal == "" {
+		return reason
+	}
+	return reason + "\n\nThe host refused your BLOCKER claim: " + refusal
 }
 
 func (cr *cycleRun) endOnProvenBlocker(next Phase, dr *dispatchResult, diag Diagnostic) (loopAction, error) {
@@ -163,17 +194,6 @@ func (cr *cycleRun) recordProvenBlocker(next Phase, dr *dispatchResult, diag Dia
 type resumedBlocker struct{ diag Diagnostic }
 
 func (b resumedBlocker) Error() string { return b.diag.Message }
-
-func (o *Orchestrator) resumedBlockerRoute(cs CycleState, cycle int, phase Phase, review ReviewResult) error {
-	if review.ProvenBlocker == "" {
-		return nil
-	}
-	item, ok := (&cycleRun{o: o, cs: cs, cycle: cycle}).consoleRouteItem(phase)
-	if !ok {
-		return nil
-	}
-	return resumedBlocker{diag: blockerRouteDiagnostic(item, review.ProvenBlocker)}
-}
 
 func (cr *cycleRun) endResumeOnBlocker(next Phase, dr *dispatchResult, diag Diagnostic, result CycleResult, timings []phaseTimingEntry, cursor *resumeCursor) (CycleResult, []phaseTimingEntry) {
 	cr.result, cr.phaseTimings = result, timings
