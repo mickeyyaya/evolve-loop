@@ -189,6 +189,7 @@ The column "Agent" of §5 gives the class of each core verb. These verbs are out
 | `phases list` | A | It reads the phase catalog and writes nothing (F14). |
 | `subagent check-ctx-advisory` | A | It reads the context size and writes nothing (F14). |
 | `doctor probe` | A | It finds one tool on `PATH` and reads its version. An LLM binary as the tool hits the exec deny of the cell (I-3). The full `doctor` stays `D` (F13). |
+| `auth store-times` | A | It prints the time of the credentials file and of the Keychain item of the Claude Code login. It only stats the file and reads no credential (seat-login-isolation L0). |
 | `release-preflight`, `release-consistency` | A | The merge gate runs these read-only verifiers (F14). |
 
 #### Findings
