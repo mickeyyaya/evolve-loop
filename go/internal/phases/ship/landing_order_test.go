@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/landing"
@@ -119,5 +120,54 @@ func TestWorktreeShipLand_AMainThatMovedPastTheLaneNeverPushesNorPrepares(t *tes
 		if _, found, _ := landing.ReadIntent(intentPath(opts, 7)); found || journalHasSHA(opts.ProjectRoot, pinHead) {
 			t.Errorf("fleet=%v: a divergence leaves no intent and no journal entry for core's rebase to trip on", fleet)
 		}
+	}
+}
+
+func TestWorktreeShipLand_TheCompleteIntentCarriesTheSecondItCompleted(t *testing.T) {
+	t.Parallel()
+	opts, _, s, res := scriptedLanding(t, false)
+	at := time.Date(2026, 11, 4, 10, 30, 7, 0, time.UTC)
+	opts.NowFn = func() Now { return Now{Unix: at.Unix(), RFC3339: at.Format(time.RFC3339)} }
+
+	if err := s.land(""); err != nil {
+		t.Fatalf("land: %v\n%s", err, strings.Join(res.Logs, "\n"))
+	}
+
+	in := landingIntentOf(t, opts)
+	if got, ok := in.Completed(); !ok || !got.Equal(at) {
+		t.Fatalf("CompletedAt = %q, want %v: a landing belongs to the window that holds its completion", in.CompletedAt, at)
+	}
+}
+
+func TestSettleLanding_ARetryNeverMovesTheSecondALandingCompleted(t *testing.T) {
+	t.Parallel()
+	opts, _, s, res := scriptedLanding(t, false)
+	first := time.Date(2026, 11, 4, 10, 30, 7, 0, time.UTC)
+	opts.NowFn = func() Now { return Now{Unix: first.Unix(), RFC3339: first.Format(time.RFC3339)} }
+	if err := s.land(""); err != nil {
+		t.Fatalf("land: %v\n%s", err, strings.Join(res.Logs, "\n"))
+	}
+	later := first.Add(time.Hour)
+	opts.NowFn = func() Now { return Now{Unix: later.Unix(), RFC3339: later.Format(time.RFC3339)} }
+
+	if err := settleLanding(context.Background(), opts, res, landingIntentOf(t, opts)); err != nil {
+		t.Fatalf("settleLanding: %v", err)
+	}
+
+	if got, ok := landingIntentOf(t, opts).Completed(); !ok || !got.Equal(first) {
+		t.Fatalf("Completed() = %v, want %v: a retry settles again and a landed ship stays in its own window", got, first)
+	}
+}
+
+func TestWorktreeShipLand_ARejectedPushLeavesNoCompletionTime(t *testing.T) {
+	t.Parallel()
+	opts, r, s, _ := scriptedLanding(t, false)
+	r.on("push origin "+pinHead+":refs/heads/main", scriptedCall{exit: 1})
+	r.on("fetch origin "+pinBranch, scriptedCall{exit: 1})
+
+	_ = s.land("")
+
+	if in := landingIntentOf(t, opts); in.CompletedAt != "" {
+		t.Fatalf("CompletedAt = %q on a prepared intent", in.CompletedAt)
 	}
 }

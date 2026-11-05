@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -24,11 +25,17 @@ const (
 	zsFirstWave = 11
 )
 
+type zsClock struct{ cur time.Time }
+
+func (c *zsClock) now() time.Time { return c.cur.Add(time.Second) }
+
 type zsOrch struct {
 	noSignals
 	evolveDir string
 	timings   []string
 	calls     int
+	clock     *zsClock
+	t         *testing.T
 }
 
 func (o *zsOrch) RunCycle(context.Context, core.CycleRequest) (core.CycleResult, error) {
@@ -41,6 +48,10 @@ func (o *zsOrch) RunCycle(context.Context, core.CycleRequest) (core.CycleResult,
 	}
 	if err := os.WriteFile(filepath.Join(dir, "phase-timing.json"), []byte(timing), 0o644); err != nil {
 		return core.CycleResult{}, err
+	}
+	o.clock.cur = o.clock.cur.Add(time.Minute)
+	if timing == zsShipped {
+		zwShipAt(o.t, o.evolveDir, cycle, o.clock.cur)
 	}
 	return core.CycleResult{Cycle: cycle, FinalVerdict: core.VerdictPASS}, nil
 }
@@ -59,6 +70,11 @@ type zsRun struct {
 
 func runZeroShipLoop(t *testing.T, failurePolicy string, cycles int, timings ...string) zsRun {
 	t.Helper()
+	return runZeroShipLoopSeeded(t, nil, failurePolicy, cycles, timings...)
+}
+
+func runZeroShipLoopSeeded(t *testing.T, seed func(evolveDir string), failurePolicy string, cycles int, timings ...string) zsRun {
+	t.Helper()
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
 	writeLoopFinalizeFixture(t, evolveDir, 5, 5)
@@ -66,11 +82,15 @@ func runZeroShipLoop(t *testing.T, failurePolicy string, cycles int, timings ...
 	if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), []byte(policyJSON), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	if seed != nil {
+		seed(evolveDir)
+	}
 	defer installStubDeps(t, &fixtures.FakeStorage{}, newFakeLedger())()
-	prev := loopOrchOverride
-	orch := &zsOrch{evolveDir: evolveDir, timings: timings}
-	loopOrchOverride = orch
-	defer func() { loopOrchOverride = prev }()
+	prev, prevClock := loopOrchOverride, loopClock
+	clock := &zsClock{cur: zwBase}
+	orch := &zsOrch{evolveDir: evolveDir, timings: timings, clock: clock, t: t}
+	loopOrchOverride, loopClock = orch, clock.now
+	defer func() { loopOrchOverride, loopClock = prev, prevClock }()
 
 	var stdout, stderr bytes.Buffer
 	rc := runLoop([]string{
@@ -177,44 +197,40 @@ func zsCoordinator(t *testing.T, evolveDir, root string) *loopBatchCoordinator {
 	return b
 }
 
-func zsWriteWave(t *testing.T, evolveDir string, firstCycle int, timings ...string) {
-	t.Helper()
-	for i, timing := range timings {
-		writeCycleTiming(t, evolveDir, firstCycle+i, timing)
-	}
-}
-
 func TestPrepareIteration_ZeroShip_AWaveIsTheCyclesBetweenTwoIterationBoundaries(t *testing.T) {
-	root := t.TempDir()
-	evolveDir := filepath.Join(root, ".evolve")
-	zsWriteWave(t, evolveDir, 8, zsNoWork, zsNoWork, zsNoWork)
-	b := zsCoordinator(t, evolveDir, root)
+	h := newZW(t)
 	fc, bin := policy.FleetConfig{Count: 2}, ""
-	const batchStart = 10
-
-	prepare := func(iteration int) batchDecision { return b.prepareIteration(iteration, &fc, &bin, batchStart) }
-
-	if d := prepare(0); d.flow != batchProceed {
-		t.Fatalf("iteration 0 launches: cycles at or below the batch start are not this batch's waves: %+v", d)
+	prepare := func(iteration, seconds int) batchDecision {
+		h.now = h.at(seconds)
+		return h.b.prepareIteration(iteration, &fc, &bin, zwFloor)
 	}
-	zsWriteWave(t, evolveDir, 11, zsNoWork, zsFailed)
-	if d := prepare(1); d.flow != batchProceed {
+
+	if d := prepare(0, 1); d.flow != batchProceed {
+		t.Fatalf("iteration 0 launches: no lane has run yet: %+v", d)
+	}
+	h.cycle(11)
+	h.cycle(12)
+	if d := prepare(1, 60); d.flow != batchProceed {
 		t.Fatalf("one zero-ship fleet wave is below the ceiling: %+v", d)
 	}
-	zsWriteWave(t, evolveDir, 13, zsNoWork, zsShipped)
-	if d := prepare(2); d.flow != batchProceed {
+	h.cycle(13)
+	h.cycle(14)
+	h.ship(14, h.at(90))
+	if d := prepare(2, 120); d.flow != batchProceed {
 		t.Fatalf("a wave with one ship among its lanes is a productive wave and resets the count: %+v", d)
 	}
-	zsWriteWave(t, evolveDir, 15, zsNoWork, zsFailed)
-	if d := prepare(3); d.flow != batchProceed {
+	h.cycle(15)
+	h.cycle(16)
+	if d := prepare(3, 180); d.flow != batchProceed {
 		t.Fatalf("one zero-ship wave after the ship is below the ceiling: %+v", d)
 	}
-	zsWriteWave(t, evolveDir, 17, zsFailed, zsNoWork)
-	d := prepare(4)
+	h.cycle(17)
+	h.cycle(18)
+	d := prepare(4, 240)
 	if d.flow != batchReturn || d.exitCode != systemFailureHaltExitCode {
 		t.Fatalf("two consecutive zero-ship fleet waves halt before iteration 4 launches: %+v", d)
 	}
-	if b.result.StopReason == "" {
+	if h.b.result.StopReason == "" {
 		t.Error("the halt records a stop reason on the loop result")
 	}
 }
@@ -233,25 +249,18 @@ func TestPrepareIteration_ZeroShip_AnIterationThatLaunchedNothingIsNotAWave(t *t
 }
 
 func TestZeroShipHalt_UnreadableFailurePolicyWarnsAndKeepsTheCompiledDefault(t *testing.T) {
-	root := t.TempDir()
-	evolveDir := filepath.Join(root, ".evolve")
-	zsWriteWave(t, evolveDir, 11, zsNoWork)
+	h := newZW(t)
 	badPolicy := `{"failure_policy":{"categories":{"bogus":{"level":"nope","action":"nope"}}}}`
-	if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), []byte(badPolicy), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	b := zsCoordinator(t, evolveDir, root)
-	var stderr bytes.Buffer
-	b.stderr = &stderr
+	h.write(".evolve/policy.json", badPolicy)
+	h.wantNoHalt(1)
+	h.cycle(11)
 
-	if rc, halted := b.zeroShipHalt(10); halted || rc != 0 {
-		t.Fatalf("one zero-ship wave is below the default ceiling: rc=%d halted=%v", rc, halted)
+	h.wantNoHalt(60)
+	if !strings.Contains(h.stderr.String(), "failure policy unreadable") {
+		t.Errorf("an unreadable failure policy warns on stderr:\n%s", h.stderr.String())
 	}
-	if !strings.Contains(stderr.String(), "failure policy unreadable") {
-		t.Errorf("an unreadable failure policy warns on stderr:\n%s", stderr.String())
-	}
-	zsWriteWave(t, evolveDir, 12, zsNoWork)
-	if _, halted := b.zeroShipHalt(10); !halted {
+	h.cycle(12)
+	if _, halted := h.boundary(120); !halted {
 		t.Error("the compiled default ceiling of two still halts on the second zero-ship wave")
 	}
 }

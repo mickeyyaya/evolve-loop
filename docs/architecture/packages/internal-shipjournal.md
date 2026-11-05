@@ -13,11 +13,12 @@ The architecture review of X14 (2026-10-27) found two copies of the entry type a
 - **The entry.** `Entry` has `sha`, `class`, `ts` and `cycle`. `Stamped` sets `ts` in `TimeFormat` (RFC 3339, UTC), and `Time` parses it back. An entry with no `ts` has no time.
 - **The names.** `FileName` is the file name, and `Path(evolveDir)` is its path. `ClassCycle` is the class of a loop landing, and `ship.ClassCycle` is this value.
 - **A leaf.** The package imports only the standard library. So `selfheal` reads the journal and does not import the ship phase and its dependencies.
+- **The reader.** `Read(path)` is the one reader of the file. An absent file is an empty `Journal`. A line that does not parse is skipped, and `Strict()` returns the error of the first such line. The ship phase (`readShipJournal`), `selfheal` (`sources.go`) and `wave.ShipsIn` all read through it, so the file has one parser.
 
 ## Invariants
 
 - The writer stamp is the reader time: `TestEntry_TheStampOfTheWriterIsTheTimeOfTheReader`.
-- The package does no I/O. The ship phase appends, and each reader reads the file itself.
+- The package only reads. The ship phase appends. `Read` never writes the file.
 
 ## Findings
 

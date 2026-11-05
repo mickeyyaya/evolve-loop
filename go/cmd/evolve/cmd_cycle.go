@@ -387,14 +387,16 @@ type rootLedger interface {
 	inboxmover.LedgerAppender
 }
 
-func newRootSignalCenter(projectRoot, evolveDir string, console io.Writer) *signalcenter.Center {
-	signals := signalcenter.New(signalcenter.WithPID(os.Getpid()))
+func newRootSignalCenter(projectRoot, evolveDir string, console io.Writer, opts ...signalcenter.Option) *signalcenter.Center {
+	signals := signalcenter.New(append([]signalcenter.Option{signalcenter.WithPID(os.Getpid())}, opts...)...)
 	signals.Subscribe(listenWhen(cycleStamped, signals.NDJSONSink(func(cycle int) string {
 		return filepath.Join(core.RunWorkspacePath(projectRoot, cycle), signalcenter.StreamFileName)
 	})))
-	signals.Subscribe(listenWhen(legacyProjectRecord, signals.NDJSONSink(func(int) string {
+	projectStream := signals.NDJSONSink(func(int) string {
 		return filepath.Join(evolveDir, signalcenter.StreamFileName)
-	})))
+	})
+	signals.Subscribe(listenWhen(legacyProjectRecord, projectStream))
+	signals.Subscribe(listenWhen(laneResumed, projectStream))
 	signals.Subscribe(signalcenter.ConsoleSink(console))
 	return signals
 }
@@ -408,6 +410,8 @@ func listenWhen(keep func(signalcenter.Event) bool, l signalcenter.Listener) sig
 }
 
 func cycleStamped(e signalcenter.Event) bool { return e.Cycle != 0 }
+
+func laneResumed(e signalcenter.Event) bool { return e.Code == core.CodeLaneResumed }
 
 var legacyProjectKinds = map[signalcenter.Kind]bool{
 	signalcenter.KindPhaseDispatched: true, signalcenter.KindPhaseOutcome: true, signalcenter.KindPhaseAborted: true,
