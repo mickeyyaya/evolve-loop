@@ -2,7 +2,7 @@
 
 - **Status:** proposed, 2026-10-20. The operator decided the questions of §7 on 2026-10-27. Each component of §6 has an inbox item since 2026-10-27.
 - **Research:** [wave-integration-2026-10](../research/wave-integration-2026-10.md). **Decision:** [ADR-0147](../architecture/adr/0147-the-wave-orchestrator-owns-integration-and-decides-when-the-wave-reaches-main.md). **Design:** [wave-orchestrator §15](../architecture/wave-orchestrator.md#15-integration).
-- **Amended:** 2026-11-04, [§10](#10-amendment-of-2026-11-04-console-prs-enter-the-train).
+- **Amended:** 2026-11-04, [§10](#10-amendment-of-2026-11-04-console-prs-enter-the-train). 2026-11-05, [§11](#11-amendment-of-2026-11-05-the-lane-side-gets-a-driver-i14).
 - **Amends:** [ADR-0139](../architecture/adr/0139-a-wave-orchestrator-supplies-admits-and-backfills-every-lane.md) (the orchestrator now owns landing), [ADR-0128](../architecture/adr/0128-landing-queue-tiered-reverification.md) and [ADR-0134](../architecture/adr/0134-fleet-landings-scale-through-content-keyed-verification-and-group-commit.md) (their composition, proof, tiers and conflict-graph order become parts of the integration engine).
 
 ## Table of contents
@@ -17,6 +17,7 @@
 - [8. Verification](#8-verification)
 - [9. Limits](#9-limits)
 - [10. Amendment of 2026-11-04: console PRs enter the train](#10-amendment-of-2026-11-04-console-prs-enter-the-train)
+- [11. Amendment of 2026-11-05: the lane side gets a driver (I14)](#11-amendment-of-2026-11-05-the-lane-side-gets-a-driver-i14)
 
 ## 1. The problem
 
@@ -139,10 +140,10 @@ Each lane passed its own tests on its own base. The integration branch holds a t
 | I4 | The flush policy of D7 to D9, with the adaptive cap, as a pure function | `go/internal/integration` | lane | `wave-integration-i4-flush-policy` |
 | I5 | The batch PR: push and open it, and wake on CI through the `gh run watch` child of D22. Fast-forward `main` to the tested tip (D11). Re-run and split on red. | `go/internal/integration`, `go/cmd/evolve` | console | `wave-integration-i5-batch-pr` |
 | I6 | The bookkeeping batch of D12 | `go/internal/core`, `go/internal/inboxmover` | console | `wave-integration-i6-bookkeeping-batch` |
-| I7 | The compose again after a console merge into `main` | `go/internal/integration` | lane | `wave-integration-i7-recompose-after-console-merge` |
-| I8 | `evolve wave integration status` and the signals | `go/cmd/evolve`, `go/internal/signalcenter` | lane | `wave-integration-i8-status-verb` |
+| I7 | The compose again after a console merge into `main`. Amended by [§11](#11-amendment-of-2026-11-05-the-lane-side-gets-a-driver-i14): `Merger.land` meets it, and two behaviours move into I14. | `go/internal/integration` | lane | `wave-integration-i7-recompose-after-console-merge` |
+| I8 | `evolve wave integration status` and the signals. Amended by [§11](#11-amendment-of-2026-11-05-the-lane-side-gets-a-driver-i14): the verb is `evolve integration status`, and I14 absorbs it. | `go/cmd/evolve`, `go/internal/signalcenter` | lane | `wave-integration-i8-status-verb` |
 | I10 | The integration record of D19, with the lease epoch, the adoption on resume and `--force-with-lease` | `go/internal/integration`, `go/internal/core` | console | `wave-integration-i10-integration-record` |
-| I11 | The fast-forward of the plane's `main` after each merge, and the feeds of D21 | `go/internal/core`, `go/internal/orchestrator` | console | `wave-integration-i11-plane-main-feeds` |
+| I11 | The fast-forward of the plane's `main` after each merge, and the feeds of D21. Amended by [§11](#11-amendment-of-2026-11-05-the-lane-side-gets-a-driver-i14): I14 absorbs it. | `go/internal/core`, `go/internal/orchestrator` | console | `wave-integration-i11-plane-main-feeds` |
 | I9 | The move to `enforce` | `.evolve/policy.json` | operator | `wave-integration-i9-enforce-flip` |
 
 The ids name the components; the order is below. I1 and I4 are pure and come first. I0 to I3 make shadow possible. I5, I6, I10 and I11 are needed only for enforce.
@@ -232,6 +233,7 @@ D24 replaces the part of D13 that applies to a PR in the batch. A console PR tha
 |---|---|---|---|---|
 | I12 | The console train: the record adapter and `evolve integration batch` | Three reviewed PRs, one in conflict: two land with one fast-forward, and the third gets its brief. | console | `wave-integration-i12-console-pr-train` |
 | I13 | The `union` driver for line lists, with the guard test | Two PRs add one line each to `go/.cover-strict`, and both compose in either order, also in a bare clone. A repeated package with other lines fails the guard. | console | `wave-integration-i13-line-lists-union` |
+| I14 | The integration driver of lanes ([spec](../architecture/integration-driver.md)). Proposed by the console on 2026-11-05. | At enforce today, a delivered lane record never reaches `main`. This test is red first, and then the shadow journey follows. | console | `wave-integration-i14-integration-driver` |
 
 ### The amended order
 
@@ -262,3 +264,49 @@ Step 2 requires no pull request and no up-to-date rule. D11 pushes the tested ti
 - The figure of 23 counts textual composition. A batch can still fail its tests, and D10 then splits it.
 - The simulation ran once, on one day, in the order of creation. The order score of D3 can give a different count.
 - A file conflict with a registry is the cheapest class. The other 14 ejected PRs need a rebase in any design.
+
+## 11. Amendment of 2026-11-05: the lane side gets a driver (I14)
+
+The operator's goal of 2026-11-04 stays: "finish the merging component tasks with the latest update to solve every PR has to be queued on main which continuing generating merge conflicts". The operator decided on 2026-11-04 that enforce needs two clean shadow waves, and that I9 is the operator's flip. Sections 1 to 10 stay in force, and this section adds to them. The spec of record is [integration-driver](../architecture/integration-driver.md).
+
+The console proposes the items below. The operator has not yet approved them.
+
+- The new component I14, and the shelving of the `Recomposer`.
+- The held shadow base, the pool id and the epoch file.
+- The `delivered` inbox state.
+- The move of the verb family and the split into three PRs.
+
+### The lane side has no driver
+
+Only the console train (`evolve integration batch`) calls the engine. No production code calls `DecideFlush`, `PrefixCheck` or `WriteIntegrationRecord`. No production code emits `SHIP_INTEGRATION_COMPOSED`, `_FLUSHED`, `_MERGED`, `_REVERTED` or `_EJECTED`. `orchestrator.Oversight` has no production constructor, so `Window.CleanLanding` and `Window.Conflict` have no live caller.
+
+So at enforce a lane ship stops before `main`, and at shadow nothing composes. "Two clean shadow waves" has no evidence today. The sequence of §6 never named the component that connects the engine to the lanes.
+
+### New and amended decisions
+
+| Id | Decision | Because | Rejected options and why |
+|---|---|---|---|
+| D32 | A new component I14, the integration driver, connects the engine to the lanes. It runs under both pool kinds, with one Actor strategy for each stage. | The evidence above. No component of §6 owns it. | Spread the wiring over I7, I8 and I11: each one needs the same driver and record. |
+| D33 | I7 is met by `Merger.land`, which composes again when `main` moves (`go/internal/integration/batchpr.go:69`, `:167`). Two behaviours move into I14: the early `Watch` return and the skip of a landed member. The `Recomposer` is shelved. | `Merger.land` already does the compose again. The `Recomposer` has no caller and does not land. | Keep the `Recomposer`: it is a second mechanism for one job. |
+| D34 | I14 absorbs I11 and I8. | The plane sync, the feeds and the status verb need the driver and its record. | A separate I11 and I8: they have no input without the driver. |
+| D35 | The feed of D21 comes from the driver and not from the signal `SHIP_INTEGRATION_EJECTED`. The fact is the same, and the driver knows it first. | The driver holds the conflict and the merge before any signal. | Keep the signal feed: it adds a step that can lose the event. |
+| D36 | I8 is `evolve integration status`, class A, read-only. It moves out of the `wave` family. | The record is the record of a pool, and the console train already sits under `integration`. | `evolve wave integration status`: the verb of D21 does not say which pool. |
+| D37 | Amends D19 and I10. The record is `WaveRecord`, one for each pool, and `IntegrationRecord` becomes its batch element. `.evolve/integration-epoch` is the lease epoch that D19 named. | D19 assumed a loop lease, and only lane leases exist (`wave-orchestrator.md` §8). A wave has many flushes, and one `IntegrationRecord` holds one batch. | Keep one record for each wave: a later flush replaces the earlier batch. |
+
+D32 to D37 are console proposals, and the operator has not ruled on them. D33 amends I7 and D13 only for a lane batch. The console train keeps its path. D35 amends D21. D37 amends D19 and I10: the fence, `Adopter` and `--force-with-lease` stay, and they take the epoch from the file.
+
+### The amended order
+
+1. I14 PR (a): names, the pool id through to the lane, `IsAncestor` and the wave record type.
+2. I14 PR (b): the epoch, the private ref, `Driver`, `ShadowActor`, the wave-end wrapper and `evolve integration status` with the verdict. Enforce refuses to start.
+3. Two clean shadow waves can then be read with `status`.
+4. I14 PR (c): `EnforceActor`, the gate adapters and the open inputs F2, F3, F11, F12 and findings 3 to 5. PR (c) gets its own card and review before its code.
+5. I9. The operator moves the lanes to `enforce`.
+
+I5, I6, I10, I12 and I13 are landed, and this order starts after them. PR (c) is the first caller of I5 and I10 for a lane batch. I6 holds two predicates and no flush, so PR (c) builds the flush.
+
+### What this does not prove
+
+- Shadow proves the driver, the record, the order and the conflict count on a held base. It does not prove CI, the merge or the ejection handling.
+- The conflict counts at shadow are an upper bound, because a lane forked later counts as `conflicted_base_ahead`.
+- D3 stays unmeasured at shadow, because `Risk` and `Deps` are not supplied.
