@@ -52,6 +52,13 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 		}
 
 		home, _ := os.UserHomeDir()
+		holders, err := ensureSeatHolder(home)
+		if err != nil {
+			if deps.Stderr != nil {
+				fmt.Fprint(deps.Stderr, seatHolderRefusal(err))
+			}
+			return nil, false
+		}
 		cfg := sandbox.Config{
 			TerminalPath:  req.TerminalPath,
 			RepoRoot:      req.RepoRoot,
@@ -66,6 +73,7 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 		deps.warnCredentialCoversCell(cred.write, req)
 		cfg.DenyReadPaths = append(slices.Clone(cfg.DenyReadPaths), cred.read...)
 		cfg.DenyPaths = append(slices.Clone(cfg.DenyPaths), cred.write...)
+		cfg = withSeatHolderDeny(cfg, holders...)
 		cfg.ExecDenyPaths, cfg.ExecDenyRoots, cfg.ExecDenyEnforce = deps.execDeny(req.CLI, probe.OS)
 		cfg.ReadIsolation = deps.readIsolation(req, home)
 		gitWrites, gitDenies, err := sandboxGitWritePaths(req.Worktree, probe.OS)
