@@ -11,7 +11,19 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 )
 
+type ReleaseRequest struct {
+	ScopeID string
+	Cycle   int
+	Reason  string
+	By      string
+}
+
 func ReleaseContinuationBinding(opts Options, scopeID, reason, releasedBy string) (continuation.Continuation, bool, error) {
+	return ReleaseContinuationBindingFor(opts, ReleaseRequest{ScopeID: scopeID, Reason: reason, By: releasedBy})
+}
+
+func ReleaseContinuationBindingFor(opts Options, req ReleaseRequest) (continuation.Continuation, bool, error) {
+	scopeID, reason, releasedBy := req.ScopeID, req.Reason, req.By
 	opts.resolveOpts()
 	if err := cycleWorktreeRefusal(opts.InboxDir); err != nil {
 		return continuation.Continuation{}, false, err
@@ -23,7 +35,7 @@ func ReleaseContinuationBinding(opts Options, scopeID, reason, releasedBy string
 	if err != nil {
 		return continuation.Continuation{}, false, fmt.Errorf("inboxmover: continuation registry unreadable while releasing %q: %w", scopeID, err)
 	}
-	if !ok {
+	if !ok || (req.Cycle != 0 && c.Cycle != req.Cycle) {
 		return continuation.Continuation{}, false, nil
 	}
 	if path := FindScopeItemFile(opts, scopeID); path != "" {

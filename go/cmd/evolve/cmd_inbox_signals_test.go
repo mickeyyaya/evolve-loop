@@ -102,6 +102,7 @@ func TestInboxCenterlessRootsArePinned(t *testing.T) {
 		"internal/cycleoutcome/cycleoutcome.go": "the FAIL closeout — WIRED (Signals: in.Signals); listed because its literal is the one that names the field",
 		"internal/cycleoutcome/nowork.go":       "the planned-no-work closeout (F30) — WIRED (Signals: in.Signals); listed for the same reason",
 		"cmd/evolve/cmd_inbox_curator_apply.go": "the reroute of `evolve inbox curate --apply` — WIRED (Signals: r.signals, the inbox root Center); listed because its literal names the field",
+		"cmd/evolve/cmd_cycle_lane_resume.go":   "the release of a bound scope whose ancestor left no defect ledger, at lane resume — WIRED (Signals: l.signals); listed because its literal names the field",
 	}
 	literalRE := regexp.MustCompile(`inboxmover\.Options\{`)
 	moduleRoot := filepath.Join("..", "..")

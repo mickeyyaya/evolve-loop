@@ -126,8 +126,21 @@ func parseHint(hint string, nowT time.Time) (time.Time, bool) {
 	return candidate, true
 }
 
+const isoLayout = "2006-01-02T15:04:05-0700"
+
 func isoFormat(t time.Time) string {
-	return t.Format("2006-01-02T15:04:05-0700")
+	return t.Format(isoLayout)
+}
+
+func ParseISO(s string) (time.Time, error) {
+	t, err := time.Parse(isoLayout, s)
+	if err == nil {
+		return t, nil
+	}
+	if t, rfcErr := time.Parse(time.RFC3339, s); rfcErr == nil {
+		return t, nil
+	}
+	return time.Time{}, fmt.Errorf("quotareset: the reset time %q is neither %s nor RFC3339: %w", s, isoLayout, err)
 }
 
 func (r Result) Format() string {

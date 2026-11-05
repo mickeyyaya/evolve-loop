@@ -425,8 +425,13 @@ func (m prMerger) upToDate(ctx context.Context, n string, pr prView) (prView, er
 	return m.awaitNewHead(ctx, n, pr.HeadRefOid)
 }
 
+const prHeadMoveBound = 60 * time.Second
+
+func (m prMerger) headWaitBound() time.Duration { return max(m.wait, prHeadMoveBound) }
+
 func (m prMerger) awaitNewHead(ctx context.Context, n, oldHead string) (prView, error) {
-	deadline := m.now().Add(m.wait)
+	bound := m.headWaitBound()
+	deadline := m.now().Add(bound)
 	for {
 		pr, err := m.view(ctx, n)
 		if err != nil {
@@ -436,7 +441,7 @@ func (m prMerger) awaitNewHead(ctx context.Context, n, oldHead string) (prView, 
 			return pr, nil
 		}
 		if m.now().Add(m.poll).After(deadline) {
-			return pr, refusef("head is still %s after update-branch", shortSHA(oldHead))
+			return pr, refusef("head is still %s after update-branch; waited %s", shortSHA(oldHead), bound)
 		}
 		m.sleep(m.poll)
 	}

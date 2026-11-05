@@ -13,6 +13,8 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/goalhash"
+	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wave"
 )
 
@@ -20,6 +22,7 @@ const (
 	waveDryRunDetail   = "planned"
 	waveRefusedLive    = "loop_live"
 	waveRefusedNumber  = "number_taken"
+	waveRefusedDiskLow = "host_disk_low"
 	waveRecordAttempts = 2
 )
 
@@ -158,6 +161,9 @@ func prepareWave(env waveEnv, a waveNextArgs, stderr io.Writer) (wavePlan, error
 	if err := checkWaveIdle(env, &plan); err != nil {
 		return plan, err
 	}
+	if err := checkWaveDisk(env, &plan, stderr); err != nil {
+		return plan, err
+	}
 	if !a.dryRun {
 		env.refreshBinary(loopConfig{ProjectRoot: plane.root, EvolveDir: plane.evolveDir}, stderr)
 	}
@@ -195,6 +201,20 @@ func checkWaveIdle(env waveEnv, plan *wavePlan) error {
 		}
 		plan.warnings = append(plan.warnings, msg)
 	}
+	return nil
+}
+
+func checkWaveDisk(env waveEnv, plan *wavePlan, stderr io.Writer) error {
+	pol := policy.LoadOrDefaults(filepath.Join(plan.plane.evolveDir, "policy.json"), stderr)
+	check := looppreflight.CheckDiskSpace(plan.plane.evolveDir, pol.PreflightConfig().MinFreeBytes(), env.diskFree)
+	if check.Level == looppreflight.LevelPass {
+		return nil
+	}
+	msg := check.Message + "; " + check.Detail
+	if check.Level == looppreflight.LevelHalt && !plan.args.dryRun {
+		return &waveRefusal{code: waveRefusedDiskLow, err: errors.New(msg)}
+	}
+	plan.warnings = append(plan.warnings, msg)
 	return nil
 }
 

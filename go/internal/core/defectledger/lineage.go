@@ -27,6 +27,7 @@ func (l *Ledger) arm(req Request) (continuation.Continuation, bool, Verdict) {
 	case !isContinuation && hasRegistry:
 		registryPath := continuation.RegistryPath(req.ProjectRoot)
 		v := blockedOn(fmt.Sprintf("defect ledger: this workspace holds no continuation manifest, but the root-owned %s binds this lane's scope to cycle-%d — the manifest was deleted or never written. Inherited defects are reconciled from the registry binding; the missing manifest is itself the finding.", registryPath, registryCont.Cycle))
+		v.Diagnostics[0].Code = string(CodeManifestMissing)
 		l.emit("Ledger.Reconcile", req, CodeManifestMissing, v.Diagnostics[0].Message, map[string]string{"step": "arm", "blocked": "true", "registry_path": registryPath, "ancestor_cycle": strconv.Itoa(registryCont.Cycle)})
 		return registryCont, true, v
 	case hasRegistry && registryCont.Cycle != cont.Cycle:
@@ -38,13 +39,18 @@ func (l *Ledger) arm(req Request) (continuation.Continuation, bool, Verdict) {
 }
 
 func (l *Ledger) laneRegistryBinding(req Request) (continuation.Continuation, bool) {
-	for _, id := range l.laneScope(req.Workspace) {
-		c, ok, rerr := continuation.ReadRegistryEntry(req.ProjectRoot, id)
+	_, c, ok := FirstBinding(req.ProjectRoot, l.laneScope(req.Workspace))
+	return c, ok
+}
+
+func FirstBinding(projectRoot string, ids []string) (string, continuation.Continuation, bool) {
+	for _, id := range ids {
+		c, ok, rerr := continuation.ReadRegistryEntry(projectRoot, id)
 		if rerr == nil && ok {
-			return c, true
+			return id, c, true
 		}
 	}
-	return continuation.Continuation{}, false
+	return "", continuation.Continuation{}, false
 }
 
 type lineage struct {
@@ -92,4 +98,25 @@ func hasOwedRow(doc Doc) bool {
 		}
 	}
 	return false
+}
+
+type Standing int
+
+const (
+	StandingAbsent Standing = iota
+	StandingSettled
+	StandingOwed
+)
+
+func AncestorStanding(projectRoot string, cycle int) (Standing, error) {
+	doc, has, fault := read(paths.RunWorkspace(projectRoot, cycle))
+	switch {
+	case fault != nil:
+		return StandingAbsent, fault
+	case !has:
+		return StandingAbsent, nil
+	case hasOwedRow(doc):
+		return StandingOwed, nil
+	}
+	return StandingSettled, nil
 }

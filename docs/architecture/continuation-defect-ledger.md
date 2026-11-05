@@ -389,6 +389,28 @@ WORKSPACE manifest under a live binding still blocks. Declination by the
 ORCHESTRATOR now releases. Full rationale and rejected alternatives:
 [ADR-0085](adr/0085-continuation-registry-release.md).
 
+## Registry lifecycle: record or release at lane resume (2026-11-04)
+
+A resumed lane cycle skips triage, so the triage adoption does not run for it. In wave 152, cycles 2107, 2108 and 2109 resumed on scopes that the registry bound to older cycles. Each workspace held no manifest, so the gate blocked each audit.
+
+The word "adopt" keeps one meaning. The triage adoption writes the manifest, seeds the worktree from the snapshot and seeds the disposition skeleton. The lane resume does only a part of this, so its action has its own name: record.
+
+`laneResume.adopt` settles the binding at claim time, after the claim is admitted and before the resumed phase runs. `scopeBinding.settle` walks `defectledger.FirstBinding` over `core.LaneScopeIDs` of the workspace. This is the list and the order that the gate reads. It is not the sorted fleet scope. Each step:
+
+- **A manifest is already in the workspace.** The settle step does nothing. The gate compares the manifest with the registry.
+- **The first binding names the resumed cycle.** The settle step does nothing.
+- **The binding names an older cycle that owes no defect.** `defectledger.AncestorStanding` is `absent` or `settled`. The resumed cycle supersedes the snapshot of that ancestor. The step releases the binding through `inboxmover.ReleaseContinuationBindingFor`, pinned to the cycle that the step checked. If a sibling lane rebinds the scope in between, nothing is deleted and nothing is noted. The item file records the reason `lane-resume-cycle-<N>` and the standing of the ledger.
+- **After a release.** The walk goes on to the next binding.
+- **Any other binding.** The step records the binding in the workspace manifest, and the gate grades the inherited defects. These cases end here: a failed release, an unreadable ancestor ledger, an ancestor that owes a defect and a newer binding.
+
+**Trace.** A deleted manifest looks the same as a manifest that was never written. Each release and each record therefore emits `ORCHESTRATOR_LANE_BINDING_SETTLED` (WARN). The event carries the action and the standing of the ancestor ledger. A release with the standing `absent` drops a debt that no ledger can prove. The event is the record of it.
+
+**Anti-tamper.** After the settle step, a deleted or rewritten manifest still blocks. The gate cannot see a manifest that is deleted before a resume. The settle step cannot tell it from a manifest that was never written. The event above is the trace for that case.
+
+**Failure route of the block.** The missing-manifest block carries the code `AUDIT_LEDGER_MANIFEST_MISSING` in its diagnostic. The failure classifier reads this code. A record that ends on the block, with no retro entry after it, is a `phase-refusal` that is not task level. The cycle then counts as a system-level failure.
+
+The code has no `RefusalDisposition` case yet. After a retro entry, the record is not a refusal. The test `TestFailureInputsFor_TheCodeOfAMissingManifestBlockMovesAnAuditFailToASystemLevelPhaseRefusal` pins this route.
+
 ## Code-review rows (ADR-0124, 2026-10-07)
 
 **Issue.** The audit was the only writer of the ledger, so a defect reached the record only after the gate rejected. The new `code-review` phase ([ADR-0124](adr/0124-code-review-phase.md), [design](review-loop-and-quality-index.md)) reviews the diff of the build before the audit. Its findings need the same addressable home.
