@@ -23,6 +23,8 @@ const (
 	Pathspec       = ".evolve/inbox/"
 	keptMessage    = "chore(inbox): the loop's inbox stamps from the plane"
 	replayMessage  = "chore(inbox): the loop's inbox stamps replayed onto origin's edits"
+	moveMessage    = "chore(inbox): the loop's quarantine moves from the plane"
+	quarantineDir  = Pathspec + "quarantine/"
 	statusCodeSize = 3
 )
 
@@ -39,7 +41,13 @@ type Stamp struct {
 type Partition struct {
 	Stamps  []Stamp
 	Claimed []Claimed
+	Moved   []Move
 	Other   []string
+}
+
+type Move struct {
+	Path           string
+	QuarantinePath string
 }
 
 type Plan struct {
@@ -72,11 +80,17 @@ func Classify(ctx context.Context, g Git) (Partition, error) {
 			return Partition{}, err
 		}
 		claimed, held := tree.claimOf(entry[:2], path)
+		moved, isMove, err := tree.quarantineMove(ctx, g, entry[:2], path)
+		if err != nil {
+			return Partition{}, err
+		}
 		switch {
 		case ok:
 			partition.Stamps = append(partition.Stamps, stamp)
 		case held:
 			partition.Claimed = append(partition.Claimed, claimed)
+		case isMove:
+			partition.Moved = append(partition.Moved, moved)
 		default:
 			partition.Other = append(partition.Other, path)
 		}
@@ -101,10 +115,15 @@ func (w worktree) lifecycleOnlyChange(ctx context.Context, g Git, status, path s
 	if !ok {
 		return Stamp{}, false, nil
 	}
+	stamp, ok := stampBetween(path, head, now)
+	return stamp, ok && len(stamp.Set)+len(stamp.Removed) > 0, nil
+}
+
+func stampBetween(path string, head, now map[string]json.RawMessage) (Stamp, bool) {
 	stamp := Stamp{Path: path, Set: map[string]json.RawMessage{}}
 	for _, key := range changedKeys(head, now) {
 		if !inboxmover.IsMoverWritten(key) || (inboxbatch.RoleOf(key).IsGrowOnly() && !grows(head[key], now[key])) {
-			return Stamp{}, false, nil
+			return Stamp{}, false
 		}
 		if value, present := now[key]; present {
 			stamp.Set[key] = value
@@ -112,7 +131,39 @@ func (w worktree) lifecycleOnlyChange(ctx context.Context, g Git, status, path s
 			stamp.Removed = append(stamp.Removed, key)
 		}
 	}
-	return stamp, len(stamp.Set)+len(stamp.Removed) > 0, nil
+	return stamp, true
+}
+
+func (w worktree) quarantineMove(ctx context.Context, g Git, status, path string) (Move, bool, error) {
+	if status != " D" || filepath.Dir(path) != filepath.Clean(Pathspec) {
+		return Move{}, false, nil
+	}
+	to := quarantineDir + filepath.Base(path)
+	now, ok := decodeFields(w.read(to))
+	if !ok {
+		return Move{}, false, nil
+	}
+	head, headOK, err := itemAt(ctx, g, "HEAD", path)
+	if err != nil || !headOK {
+		return Move{}, false, err
+	}
+	_, ok = stampBetween(path, head, now)
+	return Move{Path: path, QuarantinePath: to}, ok, nil
+}
+
+func CommitMoves(ctx context.Context, g Git, moves []Move) error {
+	if len(moves) == 0 {
+		return nil
+	}
+	var added, paths []string
+	for _, move := range moves {
+		added = append(added, move.QuarantinePath)
+		paths = append(paths, move.Path, move.QuarantinePath)
+	}
+	if err := run(ctx, g, append([]string{"add", "--"}, added...)...); err != nil {
+		return err
+	}
+	return commitPaths(ctx, g, moveMessage, paths)
 }
 
 func grows(before, after json.RawMessage) bool {

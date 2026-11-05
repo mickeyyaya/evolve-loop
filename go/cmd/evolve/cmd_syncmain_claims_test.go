@@ -124,3 +124,48 @@ func TestSyncMain_AHandRestoredCopyEqualToTheClaimIsRemovedWithNoStamps(t *testi
 		t.Errorf("the claim stays: %v", err)
 	}
 }
+
+func TestSyncMain_AQuarantineMoveThatCannotBeRecordedRefusesBeforeTheMerge(t *testing.T) {
+	t.Parallel()
+	repo, _ := smInitRepoWithRemote(t)
+	item := filepath.Join(repo, ".evolve", "inbox", "moved.json")
+	quarantined := filepath.Join(repo, ".evolve", "inbox", "quarantine", "moved.json")
+	body := `{"id":"moved","weight":0.5}`
+	if err := os.MkdirAll(filepath.Dir(item), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(item, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	smGit(t, repo, "add", "-f", ".evolve/inbox")
+	smGit(t, repo, "commit", "-q", "-m", "inbox")
+	if err := os.MkdirAll(filepath.Dir(quarantined), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(item, quarantined); err != nil {
+		t.Fatal(err)
+	}
+	fakeclitest.Install(t, filepath.Join(repo, ".git", "hooks", "pre-commit"), "#!/bin/sh\nexit 1\n")
+	headBefore := smHead(t, repo)
+
+	var out, errb bytes.Buffer
+	code := runSyncMain([]string{"--project-root", repo}, nil, &out, &errb)
+
+	if code != 1 || !strings.Contains(errb.String(), "recording the loop's quarantine moves failed") {
+		t.Errorf("sync-main = %d (stderr %q), want exit 1 naming the failed move record", code, errb.String())
+	}
+	if got := smHead(t, repo); got != headBefore {
+		t.Errorf("HEAD moved from %s to %s: no merge may follow a failed record", headBefore, got)
+	}
+}
+
+func TestSyncMain_AnUnreadableTreeFailsLoudlyNamingTheRead(t *testing.T) {
+	t.Parallel()
+	var errb bytes.Buffer
+
+	stamps, code := refuseDirtBeyondInboxStamps(t.TempDir(), &errb)
+
+	if code != 1 || stamps != nil || !strings.Contains(errb.String(), "evolve sync-main: reading the tree's changes failed:") {
+		t.Errorf("got stamps=%v code=%d stderr=%q, want exit 1 naming the failed read", stamps, code, errb.String())
+	}
+}

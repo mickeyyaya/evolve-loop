@@ -189,7 +189,8 @@ func liveLeaseWorkspace(root string) string {
 }
 
 func refuseDirtBeyondInboxStamps(root string, stderr io.Writer) ([]inboxstamps.Stamp, int) {
-	partition, err := inboxstamps.Classify(context.Background(), gitexec.Default(root))
+	g := gitexec.Default(root)
+	partition, err := inboxstamps.Classify(context.Background(), g)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve sync-main: reading the tree's changes failed: %v\n", err)
 		return nil, 1
@@ -197,6 +198,10 @@ func refuseDirtBeyondInboxStamps(root string, stderr io.Writer) ([]inboxstamps.S
 	if len(partition.Other) > 0 {
 		fmt.Fprintf(stderr, "evolve sync-main: refused — tracked files have uncommitted changes beyond the loop's inbox stamps; commit or stash first:\n  %s\n", strings.Join(partition.Other, "\n  "))
 		return nil, cliExitRefused
+	}
+	if err := inboxstamps.CommitMoves(context.Background(), g, partition.Moved); err != nil {
+		fmt.Fprintf(stderr, "evolve sync-main: recording the loop's quarantine moves failed: %v\n", err)
+		return nil, 1
 	}
 	return partition.Stamps, 0
 }
