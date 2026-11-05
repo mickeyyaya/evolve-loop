@@ -66,6 +66,7 @@ func cycleRecord(at indexTarget, itemIDs []string) (inputindex.Record, error) {
 		if recorded.RunID == at.runID {
 			return recorded, nil
 		}
+		record.RoutedIDs = recorded.RoutedIDs
 		if len(recorded.ItemIDs) > 0 {
 			record.ItemIDs = recorded.ItemIDs
 			if recorded.GoalHash != "" {

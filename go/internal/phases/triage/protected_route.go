@@ -1,20 +1,21 @@
 package triage
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
 	"slices"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
+	"github.com/mickeyyaya/evolve-loop/go/internal/triagedecision"
 )
 
-type protectedCard struct{ ID, Path, Via string }
+type protectedCard struct {
+	ID, Path, Via, Reason string
+	Committed             bool
+}
 
 func protectedTopNCards(body string, forbidden func(string) bool) []protectedCard {
 	if forbidden == nil {
@@ -65,44 +66,37 @@ func consoleRouteReason(path string) string {
 }
 
 func routeProtectedCards(decisionPath string, cards []protectedCard, bound []string) error {
-	for _, c := range cards {
+	ids := make([]string, len(cards))
+	for i, c := range cards {
 		if c.ID == "" {
 			return fmt.Errorf("route protected cards: the card naming %s has no id", c.Path)
 		}
+		ids[i] = c.ID
 	}
-	raw, err := os.ReadFile(decisionPath)
-	if err != nil {
-		return fmt.Errorf("route protected cards: %w", err)
-	}
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &fields); err != nil {
-		return fmt.Errorf("route protected cards: decision: %w", err)
-	}
-	topN, err := rawArray(fields["top_n"])
-	if err != nil {
-		return fmt.Errorf("route protected cards: top_n: %w", err)
-	}
-	escalations, err := rawArray(fields["escalate_block"])
-	if err != nil {
-		return fmt.Errorf("route protected cards: escalate_block: %w", err)
-	}
-	kept, removed := removeRoutedCards(topN, cards)
-	escalated := escalatedIDs(escalations)
-	for _, c := range cards {
-		if !removed[c.ID] && !escalated[c.ID] {
-			return fmt.Errorf("route protected cards: card %q is not in the decision's top_n", c.ID)
+	err := triagedecision.ApplyRoutes(decisionPath, ids, func(e triagedecision.Edit) ([]triagedecision.Route, error) {
+		for _, c := range cards {
+			if !e.Removed[c.ID] && !e.Escalated[c.ID] {
+				return nil, fmt.Errorf("card %q is not in the decision's top_n", c.ID)
+			}
 		}
-	}
-	routed := cards
-	if len(kept) == 0 {
-		routed = withBoundItem(cards, bound, raw)
-	}
-	fields["top_n"], _ = json.Marshal(kept)
-	fields["escalate_block"], _ = json.Marshal(appendEscalations(escalations, escalated, routed))
-	if err := atomicwrite.JSON(decisionPath, fields); err != nil {
+		routed := cards
+		if e.Kept == 0 {
+			routed = withBoundItem(cards, bound, e.Raw)
+		}
+		return routesOf(routed), nil
+	})
+	if err != nil {
 		return fmt.Errorf("route protected cards: %w", err)
 	}
 	return nil
+}
+
+func routesOf(cards []protectedCard) []triagedecision.Route {
+	routes := make([]triagedecision.Route, len(cards))
+	for i, c := range cards {
+		routes[i] = triagedecision.Route{ID: c.ID, Reason: c.routeReason()}
+	}
+	return routes
 }
 
 func withBoundItem(cards []protectedCard, bound []string, decision []byte) []protectedCard {
@@ -132,75 +126,22 @@ func answersFor(decision []byte, id string) bool {
 	return false
 }
 
-func removeRoutedCards(topN []json.RawMessage, cards []protectedCard) ([]json.RawMessage, map[string]bool) {
-	routed := map[string]bool{}
-	for _, c := range cards {
-		routed[c.ID] = true
-	}
-	kept := make([]json.RawMessage, 0, len(topN))
-	removed := map[string]bool{}
-	for _, card := range topN {
-		id := rawField(card, "id")
-		if routed[id] {
-			removed[id] = true
-			continue
-		}
-		kept = append(kept, card)
-	}
-	return kept, removed
-}
-
-func escalatedIDs(escalations []json.RawMessage) map[string]bool {
-	out := map[string]bool{}
-	for _, e := range escalations {
-		out[rawField(e, "task_id")] = true
-	}
-	return out
-}
-
-func appendEscalations(escalations []json.RawMessage, escalated map[string]bool, cards []protectedCard) []json.RawMessage {
-	for _, c := range cards {
-		if escalated[c.ID] {
-			continue
-		}
-		entry, _ := json.Marshal(struct {
-			TaskID string `json:"task_id"`
-			Reason string `json:"reason"`
-		}{c.ID, c.routeReason()})
-		escalations = append(escalations, entry)
-		escalated[c.ID] = true
-	}
-	return escalations
-}
-
-func rawArray(raw json.RawMessage) ([]json.RawMessage, error) {
-	if len(raw) == 0 || string(raw) == "null" {
-		return nil, nil
-	}
-	var out []json.RawMessage
-	err := json.Unmarshal(raw, &out)
-	return out, err
-}
-
-func rawField(obj json.RawMessage, key string) string {
-	var m map[string]json.RawMessage
-	if json.Unmarshal(obj, &m) != nil {
-		return ""
-	}
-	var s string
-	_ = json.Unmarshal(m[key], &s)
-	return s
-}
-
 func routedCardDiagnostics(cards []protectedCard) []core.Diagnostic {
 	out := make([]core.Diagnostic, 0, len(cards))
 	for _, c := range cards {
 		out = append(out, core.Diagnostic{
 			Severity: cyclestate.SeverityWarning,
-			Message:  fmt.Sprintf("top_n card %q names protected surface %q — routed to the console by the host (escalate_block), not committed", c.ID, c.Path),
+			Message:  c.routedText(),
 			Code:     cyclestate.DiagCodeTriageProtectedSurface,
 			Subject:  c.ID,
 		})
 	}
 	return out
+}
+
+func (c protectedCard) routedText() string {
+	if c.Committed {
+		return fmt.Sprintf("committed item %q is console-routed (%s): routed to the console by the host (escalate_block), not committed. Next: the console builds it. This lane has no work for it.", c.ID, c.Reason)
+	}
+	return fmt.Sprintf("top_n card %q names protected surface %q — routed to the console by the host (escalate_block), not committed", c.ID, c.Path)
 }

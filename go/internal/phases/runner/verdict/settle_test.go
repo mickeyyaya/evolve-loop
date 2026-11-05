@@ -55,7 +55,7 @@ func TestSettle_HonoursCancellationBeforeAndAfterTheSleep(t *testing.T) {
 func TestRootsFor_CarriesCycleAndEvolveDirOnlyWithAProjectRoot(t *testing.T) {
 	d := Dispatch{Cycle: 42, Workspace: "ws", Worktree: "wt", ProjectRoot: "root", ExplanationDocumentationVersion: 3, ArtifactPath: "ws/audit-report.md"}
 	got := rootsFor(d)
-	want := phasecontract.Roots{Workspace: "ws", Worktree: "wt", EvolveDir: paths.EvolveDirOf("root"), DispatchedArtifact: "ws/audit-report.md", ExplanationDocumentationVersion: 3, Cycle: 42}
+	want := phasecontract.Roots{Workspace: "ws", Worktree: "wt", EvolveDir: paths.EvolveDirOf("root"), DispatchedArtifact: "ws/audit-report.md", ExplanationDocumentationVersion: 3, Cycle: 42, ClaimAttempted: true}
 	if got != want {
 		t.Errorf("rootsFor = %+v, want %+v", got, want)
 	}

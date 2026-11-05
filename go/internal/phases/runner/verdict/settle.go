@@ -3,8 +3,8 @@ package verdict
 import (
 	"context"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
-	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
@@ -34,13 +34,10 @@ func (e *Engine) settle(ctx context.Context, id Identity, phase string, roots ph
 }
 
 func rootsFor(d Dispatch) phasecontract.Roots {
-	roots := phasecontract.Roots{
-		Workspace: d.Workspace, Worktree: d.Worktree, DispatchedArtifact: d.ArtifactPath,
-		ExplanationDocumentationVersion: d.ExplanationDocumentationVersion,
-		Cycle:                           d.Cycle,
-	}
-	if d.ProjectRoot != "" {
-		roots.EvolveDir = paths.EvolveDirOf(d.ProjectRoot)
-	}
+	roots := deliverable.RootsFor(core.ReviewInput{
+		Cycle: d.Cycle, Phase: d.Phase, Workspace: d.Workspace, Worktree: d.Worktree,
+		ProjectRoot: d.ProjectRoot, ExplanationDocumentationVersion: d.ExplanationDocumentationVersion,
+	})
+	roots.DispatchedArtifact = d.ArtifactPath
 	return roots
 }

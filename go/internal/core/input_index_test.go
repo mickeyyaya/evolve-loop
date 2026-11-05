@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"os"
 	"path/filepath"
 	"slices"
@@ -249,5 +250,43 @@ func TestCycleRecord_ARecordWithNoIDsTakesTheIDsOfTheNewRun(t *testing.T) {
 	got, err := cycleRecord(indexTarget{projectRoot: root, workspace: ws, runID: "run-2", cycle: 6}, []string{"x"})
 	if err != nil || !slices.Equal(got.ItemIDs, []string{"x"}) {
 		t.Fatalf("record = %+v %v, want [x]", got, err)
+	}
+}
+
+func TestCycleRecord_ANewRunOfACycleKeepsTheRoutedIDsOfItsRecord(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	ws := filepath.Join(root, ".evolve", "runs", "cycle-6")
+	if _, err := cycleRecord(indexTarget{projectRoot: root, workspace: ws, runID: "run-1", goalHash: "goal-a", cycle: 6}, []string{"a", "b"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := committedset.RecordRoutes(root, 6, []string{"a"}); err != nil {
+		t.Fatal(err)
+	}
+	second, err := cycleRecord(indexTarget{projectRoot: root, workspace: ws, runID: "run-2", goalHash: "other", cycle: 6}, []string{"x"})
+	if err != nil || !slices.Equal(second.RoutedIDs, []string{"a"}) {
+		t.Fatalf("second record = %+v %v, want RoutedIDs [a]", second, err)
+	}
+	stored, _ := inputindex.ReadRecord(root, 6)
+	if !slices.Equal(stored.RoutedIDs, []string{"a"}) {
+		t.Fatalf("stored record = %+v", stored)
+	}
+}
+
+func TestCycleRecord_ARecordWithNoIDsStillKeepsItsRoutedIDsOnANewRun(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	ws := filepath.Join(root, ".evolve", "runs", "cycle-6")
+	if _, err := cycleRecord(indexTarget{projectRoot: root, workspace: ws, runID: "r1", goalHash: "g", cycle: 6}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := committedset.RecordRoutes(root, 6, []string{"a"}); err != nil {
+		t.Fatal(err)
+	}
+
+	second, err := cycleRecord(indexTarget{projectRoot: root, workspace: ws, runID: "r2", goalHash: "g", cycle: 6}, nil)
+
+	if err != nil || !slices.Equal(second.RoutedIDs, []string{"a"}) {
+		t.Fatalf("second record = %+v %v, want RoutedIDs [a]", second, err)
 	}
 }

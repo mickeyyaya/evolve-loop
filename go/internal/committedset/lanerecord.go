@@ -13,10 +13,11 @@ import (
 )
 
 type Record struct {
-	Cycle    int      `json:"cycle"`
-	RunID    string   `json:"run_id,omitempty"`
-	ItemIDs  []string `json:"item_ids"`
-	GoalHash string   `json:"goal_hash,omitempty"`
+	Cycle     int      `json:"cycle"`
+	RunID     string   `json:"run_id,omitempty"`
+	ItemIDs   []string `json:"item_ids"`
+	GoalHash  string   `json:"goal_hash,omitempty"`
+	RoutedIDs []string `json:"routed_ids,omitempty"`
 }
 
 type Drift struct {
@@ -57,18 +58,26 @@ func LoadRecord(path string) (Record, error) {
 	return r, err
 }
 
-func workspaceRecord(workspace string) (Record, bool) {
+func workspaceTarget(workspace string) (projectRoot string, cycle int, ok bool) {
 	m := workspaceRe.FindStringSubmatch(filepath.Base(workspace))
 	runs := filepath.Dir(workspace)
 	evolve := filepath.Dir(runs)
 	if m == nil || filepath.Base(runs) != "runs" || filepath.Base(evolve) != ".evolve" {
-		return Record{}, false
+		return "", 0, false
 	}
 	cycle, err := strconv.Atoi(m[1])
 	if err != nil {
+		return "", 0, false
+	}
+	return filepath.Dir(evolve), cycle, true
+}
+
+func workspaceRecord(workspace string) (Record, bool) {
+	root, cycle, ok := workspaceTarget(workspace)
+	if !ok {
 		return Record{}, false
 	}
-	return ReadRecord(filepath.Dir(evolve), cycle)
+	return ReadRecord(root, cycle)
 }
 
 func ReadLaneDoc(workspace string) (LanePinDoc, error) {
@@ -106,4 +115,44 @@ func LaneDrift(workspace string) (Drift, bool) {
 	}
 	d := Drift{Path: filepath.Join(workspace, LanePinFile), Record: nonBlank(r.ItemIDs), File: nonBlank(file.TodoIDs)}
 	return d, !slices.Equal(d.Record, d.File)
+}
+
+func RecordRoutes(projectRoot string, cycle int, ids []string) error {
+	r, ok := ReadRecord(projectRoot, cycle)
+	if !ok {
+		return fmt.Errorf("committedset: no lineage record for cycle %d under %s", cycle, projectRoot)
+	}
+	for _, id := range nonBlank(ids) {
+		if !slices.Contains(r.RoutedIDs, id) {
+			r.RoutedIDs = append(r.RoutedIDs, id)
+		}
+	}
+	return WriteRecord(projectRoot, r)
+}
+
+func RecordWorkspaceRoutes(workspace string, ids []string) error {
+	root, cycle, ok := workspaceTarget(workspace)
+	if !ok {
+		return fmt.Errorf("committedset: workspace %s is not a cycle workspace", workspace)
+	}
+	return RecordRoutes(root, cycle, ids)
+}
+
+func RoutedIDs(workspace string) []string {
+	r, ok := workspaceRecord(workspace)
+	if !ok {
+		return nil
+	}
+	return slices.Clone(r.RoutedIDs)
+}
+
+func UnroutedPin(workspace string) []string {
+	routed := RoutedIDs(workspace)
+	var pin []string
+	for _, id := range LanePin(workspace) {
+		if !slices.Contains(routed, id) {
+			pin = append(pin, id)
+		}
+	}
+	return pin
 }
