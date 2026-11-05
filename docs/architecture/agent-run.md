@@ -228,6 +228,7 @@ The console ran its builds and its reviews in-process, outside the bridge. Thus 
   - its sandbox denies `.evolve/agent-runs` and `.commit-gate`, so the cell cannot forge a launch record or an attestation;
   - the run has `--worktree` and one `--writable PATH` for each file that it can change. Each path is clean and inside the worktree.
 - The request of a run with a worktree has a fence. A reader gets an empty fence, so the runner restores each change of the worktree. The build seat gets the `--writable` paths, so the runner keeps only those changes.
+- The runner restores the index of each path that differs from its state at dispatch, except the writable paths. A seat can stage a file outside the writable list and then delete it or write it back. Then `git status` shows no AD, MM or D status, and the envelope names each such path. The reverted patch holds the change of a stage on disk. A stage that the seat undid on disk gives no reverted patch. A retracted phase gets the same restore.
 - The console then reviews the diff with the review seats. It runs the commit gate with the `run:` tokens of the review runs, and commits as before.
 
 ```mermaid

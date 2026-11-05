@@ -14,19 +14,29 @@ func (s Snapshot) Retract(ctx context.Context, keepDir string) (Result, error) {
 		return Result{}, errNotRestorable
 	}
 	after, err := writeTree(ctx, s.Worktree)
-	if err != nil || after == s.Tree {
-		return Result{}, err
-	}
-	added, changed, err := s.diff(ctx, after)
 	if err != nil {
 		return Result{}, err
 	}
-	for _, rel := range append(added, changed...) {
-		if err := keepWrite(s.Worktree, keepDir, rel); err != nil {
-			return Result{}, err
-		}
+	if err := s.keepDiff(ctx, after, keepDir); err != nil {
+		return Result{}, err
 	}
 	return s.Restore(ctx)
+}
+
+func (s Snapshot) keepDiff(ctx context.Context, after, keepDir string) error {
+	if after == s.Tree {
+		return nil
+	}
+	added, changed, err := s.diff(ctx, after)
+	if err != nil {
+		return err
+	}
+	for _, rel := range append(added, changed...) {
+		if err := keepWrite(s.Worktree, keepDir, rel); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 var (

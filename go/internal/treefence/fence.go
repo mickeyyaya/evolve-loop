@@ -25,6 +25,13 @@ type Snapshot struct {
 	Tree     string
 	mode     snapshotMode
 	writable map[string]bool
+	index    indexState
+}
+
+type indexState map[string][]string
+
+func (s Snapshot) absentEntry() string {
+	return "0 " + strings.Repeat("0", len(s.Tree)) + " 0"
 }
 
 type snapshotMode uint8
@@ -59,13 +66,84 @@ func Take(ctx context.Context, worktree string) (Snapshot, error) {
 	if err != nil {
 		return Snapshot{}, err
 	}
-	return Snapshot{Worktree: worktree, Tree: tree}, nil
+	index, err := readIndex(ctx, worktree)
+	if err != nil {
+		return Snapshot{}, err
+	}
+	return Snapshot{Worktree: worktree, Tree: tree, index: index}, nil
 }
 
 func (s Snapshot) Restore(ctx context.Context) (Result, error) {
 	if s.mode != allFiles {
 		return Result{}, errNotRestorable
 	}
+	res, workErr := s.restoreWorkingCopy(ctx)
+	indexed, indexErr := s.restoreIndex(ctx)
+	res.Restored = mergeSorted(res.Restored, indexed)
+	return res, errors.Join(workErr, indexErr)
+}
+
+func mergeSorted(a, b []string) []string {
+	merged := append(slices.Clone(a), b...)
+	sort.Strings(merged)
+	return slices.Compact(merged)
+}
+
+func readIndex(ctx context.Context, worktree string) (indexState, error) {
+	out, err := git(ctx, worktree, nil, "ls-files", "-s", "-z")
+	if err != nil {
+		return nil, err
+	}
+	state := indexState{}
+	for _, entry := range strings.Split(out, "\x00") {
+		if entry == "" {
+			continue
+		}
+		meta, rel, ok := strings.Cut(entry, "\t")
+		if !ok || rel == "" {
+			return nil, fmt.Errorf("treefence: malformed index entry %q", entry)
+		}
+		state[rel] = append(state[rel], meta)
+	}
+	return state, nil
+}
+
+func (s Snapshot) indexDrift(ctx context.Context) ([]string, error) {
+	current, err := readIndex(ctx, s.Worktree)
+	if err != nil {
+		return nil, err
+	}
+	var drift []string
+	for _, state := range []indexState{s.index, current} {
+		for rel := range state {
+			if !s.writable[rel] && !slices.Equal(s.index[rel], current[rel]) {
+				drift = append(drift, rel)
+			}
+		}
+	}
+	sort.Strings(drift)
+	return slices.Compact(drift), nil
+}
+
+func (s Snapshot) restoreIndex(ctx context.Context) ([]string, error) {
+	drift, err := s.indexDrift(ctx)
+	if err != nil || len(drift) == 0 {
+		return nil, err
+	}
+	var feed strings.Builder
+	for _, rel := range drift {
+		feed.WriteString(s.absentEntry() + "\t" + rel + "\x00")
+	}
+	for _, rel := range drift {
+		for _, meta := range s.index[rel] {
+			feed.WriteString(meta + "\t" + rel + "\x00")
+		}
+	}
+	_, err = gitIn(ctx, s.Worktree, feed.String(), "update-index", "-z", "--index-info")
+	return drift, err
+}
+
+func (s Snapshot) restoreWorkingCopy(ctx context.Context) (Result, error) {
 	after, err := writeTree(ctx, s.Worktree)
 	if err != nil {
 		return Result{}, err
@@ -123,6 +201,20 @@ func (s Snapshot) partition(paths []string) (fenced, kept []string) {
 }
 
 func (s Snapshot) verify(ctx context.Context) error {
+	if err := s.verifyTree(ctx); err != nil {
+		return err
+	}
+	drift, err := s.indexDrift(ctx)
+	if err != nil {
+		return err
+	}
+	if len(drift) > 0 {
+		return fmt.Errorf("treefence: restored index differs from dispatch snapshot: %s", strings.Join(drift, ", "))
+	}
+	return nil
+}
+
+func (s Snapshot) verifyTree(ctx context.Context) error {
 	tree, err := writeTree(ctx, s.Worktree)
 	if err != nil || tree == s.Tree {
 		return err
@@ -271,9 +363,18 @@ func gitEnv(extra []string) []string {
 }
 
 func git(ctx context.Context, dir string, env []string, args ...string) (string, error) {
+	return run(ctx, dir, env, "", args...)
+}
+
+func gitIn(ctx context.Context, dir, stdin string, args ...string) (string, error) {
+	return run(ctx, dir, nil, stdin, args...)
+}
+
+func run(ctx context.Context, dir string, env []string, stdin string, args ...string) (string, error) {
 	cmd := sysexec.Command(ctx, "git", args...)
 	cmd.Dir = dir
 	cmd.Env = gitEnv(env)
+	cmd.Stdin = strings.NewReader(stdin)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	if err := cmd.Run(); err != nil {

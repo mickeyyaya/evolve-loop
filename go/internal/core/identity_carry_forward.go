@@ -84,7 +84,7 @@ func (o *Orchestrator) gatesOnIntactTree(ctx context.Context, worktree, tree str
 	fence := treefence.Begin(ctx, worktree, true)
 	gates, outcomes := o.runGateSet(ctx, worktree)
 	outcome := fence.End(ctx)
-	if outcome.TakeErr != nil || outcome.RestoreErr != nil {
+	if outcome.TakeErr != nil || outcome.RestoreErr != nil || len(outcome.Restored) > 0 {
 		return nil, nil, false
 	}
 	after, err := gitStdout(ctx, gitCapture, worktree, "write-tree")
