@@ -15,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/defectledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
@@ -34,6 +35,7 @@ type laneResume struct {
 	release                func(cycle int) error
 	signals                *signalcenter.Center
 	stderr                 io.Writer
+	protected              func(string) bool
 }
 
 func fleetLaneScope() []string {
@@ -74,7 +76,7 @@ func (l laneResume) adopt() *core.ResumePoint {
 		return nil
 	}
 	name := strings.Join(l.scope, ",")
-	if err := l.heldBy(rp.CycleID, true); err != nil {
+	if err := l.hold().adoptableBy(rp.CycleID); err != nil {
 		fmt.Fprintf(l.stderr, "evolve cycle run: lane %s: cycle %d cannot take its todo back (%v); the lane starts a fresh cycle\n", name, rp.CycleID, err)
 		return nil
 	}
@@ -97,7 +99,7 @@ func (l laneResume) adopt() *core.ResumePoint {
 func (l laneResume) reclaim(cycle int) error {
 	err := l.claim(l.inboxDir(), cycle, l.scope)
 	if err == nil {
-		err = l.heldBy(cycle, false)
+		err = l.hold().heldBy(cycle)
 	}
 	if err == nil {
 		return nil
@@ -105,15 +107,47 @@ func (l laneResume) reclaim(cycle int) error {
 	return errors.Join(err, l.release(cycle))
 }
 
-func (l laneResume) heldBy(cycle int, pendingToo bool) error {
-	for _, id := range l.scope {
-		loc, err := inboxmover.Locate(l.inboxDir(), id)
+func (l laneResume) hold() scopeHold {
+	return scopeHold{inbox: l.inboxDir(), scope: l.scope, protected: l.protected}
+}
+
+type scopeHold struct {
+	inbox     string
+	scope     []string
+	protected func(string) bool
+}
+
+func (h scopeHold) adoptableBy(cycle int) error {
+	return h.walk(cycle, func(owner int) bool { return owner == cycle || owner == 0 }, h.notConsoleRouted)
+}
+
+func (h scopeHold) heldBy(cycle int) error {
+	return h.walk(cycle, func(owner int) bool { return owner == cycle }, func(string, string) error { return nil })
+}
+
+func (h scopeHold) walk(cycle int, accepts func(owner int) bool, check func(id, path string) error) error {
+	for _, id := range h.scope {
+		loc, err := inboxmover.Locate(h.inbox, id)
 		if err != nil {
 			return fmt.Errorf("locate %s: %w", id, err)
 		}
-		if loc.Cycle != cycle && (!pendingToo || loc.Cycle != 0) {
+		if !accepts(loc.Cycle) {
 			return fmt.Errorf("%s is not claimed by cycle %d (cycle %d holds it)", id, cycle, loc.Cycle)
 		}
+		if err := check(id, loc.Path); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (h scopeHold) notConsoleRouted(id, path string) error {
+	item, _, err := inboxbatch.LoadFile(path)
+	if err != nil {
+		return nil
+	}
+	if routed, reason := inboxbatch.ConsoleRouted(item, h.protected); routed {
+		return fmt.Errorf("%s is console-routed (%s): the operator works it, no lane resumes it", id, reason)
 	}
 	return nil
 }

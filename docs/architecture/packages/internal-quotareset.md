@@ -21,6 +21,8 @@
 
 `Result.Format` prints two lines. The first is the wake time in ISO 8601 with the local zone offset. Its layout is `%Y-%m-%dT%H:%M:%S%z`, as in the shell script that this package ports. The second is `source=<source>`. Pinned by `TestResult_Format` and `TestFormat`.
 
+`ParseISO` reads a reset time in this layout or in RFC3339. The offset of this layout has no colon, so an RFC3339 parser rejects it. Each reader of `quotaResetAt` uses `ParseISO`. Pinned by `TestParseISO_ReadsBothLayoutsAndRejectsTheRest`.
+
 The hint time `H:MMam` or `H:MMpm` is read from the first 32 bytes. A time that is still ahead today means today. An earlier time means tomorrow. Pinned by `TestCompute_ParsedHint_FutureToday`, `TestCompute_ParsedHint_RollsToTomorrow` and `TestCompute_HintLongerThan32CharsTruncated`.
 
 The options have no other fields (2026-10-09: the dead `Env` seam and `HoursFn` are removed).
