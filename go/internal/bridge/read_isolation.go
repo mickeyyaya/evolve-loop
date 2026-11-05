@@ -44,13 +44,17 @@ func (deps Deps) readStage() string {
 	return deps.isolationStage(deps.ReadStage, policy.Policy.IsolationReadStage)
 }
 
+func (deps Deps) secretStage() string {
+	return deps.isolationStage(deps.SecretStage, policy.Policy.IsolationSecretStage)
+}
+
 func (deps Deps) readIsolation(req SandboxWrapRequest, home string) sandbox.ReadIsolation {
 	stage := deps.readStage()
 	if stage == envStageOff || req.Workspace == "" || req.RepoRoot == "" {
 		return sandbox.ReadIsolation{}
 	}
 	ri := sandbox.ReadIsolation{
-		Enforce: stage == envStageEnforce, Tag: req.Tag, RawSuffixes: inputindex.RawOutputSuffixes(),
+		Enforce: stage == envStageEnforce, SecretEnforce: deps.secretStage() == envStageEnforce, Tag: req.Tag, RawSuffixes: inputindex.RawOutputSuffixes(),
 		Workspace: canonicalOrSelf(req.Workspace),
 	}
 	if runs := canonicalOrSelf(filepath.Join(req.RepoRoot, ".evolve", "runs")); isDir(runs) {
@@ -271,7 +275,7 @@ func (deps Deps) emitReadViolation(cfg *Config, stage string, r readReport) {
 	id := configIdentity(cfg)
 	action := "logged"
 	if r.denied {
-		action = "refused"
+		action, stage = "refused", envStageEnforce
 	}
 	target := relToProject(cfg.ProjectRoot, r.target)
 	n, _ := strconv.Atoi(strings.TrimPrefix(r.invariant, "I"))

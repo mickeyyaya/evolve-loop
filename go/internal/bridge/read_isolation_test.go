@@ -83,7 +83,7 @@ func TestReadIsolation_GrantsTheIndexedPathsAndGuardsTheRunsTheRawOutputAndTheSe
 	t.Parallel()
 	c := newReadCell(t)
 	c.index(t)
-	ri := Deps{ReadStage: "enforce"}.readIsolation(c.request(), c.home)
+	ri := Deps{ReadStage: "enforce", SecretStage: "shadow"}.readIsolation(c.request(), c.home)
 	want := sandbox.ReadIsolation{
 		Enforce: true, Tag: "d42", RunsDir: c.runs, Workspace: c.ws,
 		Grants:      []string{inputindex.Path(c.ws), filepath.Join(c.ws, "scout-report.md"), filepath.Join(c.runs, "cycle-6", "retrospective-report.md")},
@@ -100,7 +100,7 @@ func TestReadIsolation_GrantsTheIndexedPathsAndGuardsTheRunsTheRawOutputAndTheSe
 }
 
 func readIsolationEqual(a, b sandbox.ReadIsolation) bool {
-	return a.Enforce == b.Enforce && a.Tag == b.Tag && a.RunsDir == b.RunsDir && a.Workspace == b.Workspace &&
+	return a.Enforce == b.Enforce && a.SecretEnforce == b.SecretEnforce && a.Tag == b.Tag && a.RunsDir == b.RunsDir && a.Workspace == b.Workspace &&
 		slices.Equal(a.Grants, b.Grants) && slices.Equal(a.RawSuffixes, b.RawSuffixes) && slices.Equal(a.RawFiles, b.RawFiles) &&
 		slices.Equal(a.RawDirs, b.RawDirs) && slices.Equal(a.SecretDirs, b.SecretDirs) && slices.Equal(a.SecretFiles, b.SecretFiles) &&
 		slices.Equal(a.PinnedFiles, b.PinnedFiles) && slices.Equal(a.ReportOnly, b.ReportOnly)
@@ -142,6 +142,38 @@ func TestReadIsolation_AMalformedIndexGrantsNothingAndWarns(t *testing.T) {
 	ri := Deps{ReadStage: "enforce", Stderr: &stderr}.readIsolation(c.request(), c.home)
 	if len(ri.Grants) != 0 || !strings.Contains(stderr.String(), "WARN input index") {
 		t.Fatalf("grants = %v, stderr = %q; a malformed index must grant nothing and warn", ri.Grants, stderr.String())
+	}
+}
+
+func TestReadIsolation_TheSecretStageDeniesTheSecretsWhileTheReadStageStaysShadow(t *testing.T) {
+	t.Parallel()
+	c := newReadCell(t)
+	cases := []struct {
+		deps                   Deps
+		enforce, secretEnforce bool
+		workspace              string
+	}{
+		{Deps{ReadStage: "shadow", SecretStage: "enforce"}, false, true, c.ws},
+		{Deps{ReadStage: "shadow", SecretStage: "shadow"}, false, false, c.ws},
+		{Deps{ReadStage: "enforce", SecretStage: "shadow"}, true, false, c.ws},
+		{Deps{ReadStage: "off", SecretStage: "enforce"}, false, false, ""},
+	}
+	for _, tc := range cases {
+		ri := tc.deps.readIsolation(c.request(), c.home)
+		if ri.Enforce != tc.enforce || ri.SecretEnforce != tc.secretEnforce || ri.Workspace != tc.workspace {
+			t.Errorf("read %s, secret %s: Enforce=%v SecretEnforce=%v Workspace=%q; want %v %v %q",
+				tc.deps.ReadStage, tc.deps.SecretStage, ri.Enforce, ri.SecretEnforce, ri.Workspace, tc.enforce, tc.secretEnforce, tc.workspace)
+		}
+	}
+}
+
+func TestSecretStage_ReadsIsolationI5SecretOfThePolicyApartFromI5(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeFixtureFile(t, filepath.Join(root, ".evolve", "policy.json"), `{"isolation":{"i5":{"stage":"shadow"},"i5_secret":{"stage":"enforce"}}}`)
+	deps := Deps{Env: map[string]string{"EVOLVE_PROJECT_ROOT": root}}
+	if got, read := deps.secretStage(), deps.readStage(); got != "enforce" || read != "shadow" {
+		t.Fatalf("secretStage = %q, readStage = %q; want enforce from isolation.i5_secret and shadow from isolation.i5", got, read)
 	}
 }
 
@@ -218,7 +250,7 @@ func TestReportReadViolations_EmitsOneSignalForEachGuardedReadOfTheCell(t *testi
 		logged.Fields["rule"] != "read.runs.unrelated" || logged.Fields["source"] != "sbpl-report" || logged.Fields["stage"] != "shadow" || logged.Fields["cell"] != "build" || logged.Fields["family"] != "agy" || logged.Cycle != 7 {
 		t.Fatalf("the allowed read must be an I5 violation with action=logged: %+v", logged)
 	}
-	if refused.Code != isolation.ViolationCode(4) || refused.Fields["action"] != "refused" || refused.Fields["invariant"] != "I4" {
+	if refused.Code != isolation.ViolationCode(4) || refused.Fields["action"] != "refused" || refused.Fields["invariant"] != "I4" || refused.Fields["stage"] != "enforce" {
 		t.Fatalf("the denied read of raw output must be an I4 violation with action=refused: %+v", refused)
 	}
 }
