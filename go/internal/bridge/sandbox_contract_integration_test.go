@@ -205,6 +205,18 @@ var agentContract = []contractRow{
 		script: func(h contractHost) string {
 			return `echo '{"cycle":9,"item_ids":["item-a"]}' > ` + h.root + "/.evolve/lineage/cycle-9.json"
 		}},
+	{action: "B5: append a ship to .evolve/ship-journal.jsonl", want: contractDeny,
+		script: func(h contractHost) string {
+			return `echo '{"cycle":9,"class":"cycle","sha":"forged"}' >> ` + h.root + "/.evolve/ship-journal.jsonl"
+		}},
+	{action: "B5: write a landing record in .evolve/landing/", want: contractDeny,
+		script: func(h contractHost) string {
+			return `echo '{"cycle":9,"status":"complete","commit_sha":"forged"}' > ` + h.root + "/.evolve/landing/cycle-9.json"
+		}},
+	{action: "B5: write a deliverable record in .evolve/waves/", want: contractDeny,
+		script: func(h contractHost) string {
+			return `echo '{"cycle":9}' > ` + h.root + "/.evolve/waves/integration-current/deliverable-9.json"
+		}},
 	{action: "rewrite the lane-scope.json of the own workspace", want: contractDeny,
 		script: func(h contractHost) string { return `echo '{"todo_ids":["item-b"]}' > ` + h.run + "/lane-scope.json" }},
 	{action: "a retry opens its predecessor's retrospective through inputs/index.json", want: contractAllow,
@@ -443,7 +455,7 @@ func (h *contractHost) withProject(t *testing.T) {
 	h.otherCycle = filepath.Join(h.root, ".evolve", "runs", "cycle-8")
 	h.events = filepath.Join(h.root, ".evolve", "events")
 	h.resumeWitness = filepath.Join(h.root, ".evolve", "resume-witness")
-	for _, dir := range []string{h.run, h.otherCycle, h.events, h.resumeWitness, inputindex.AccessDir(h.root)} {
+	for _, dir := range []string{h.run, h.otherCycle, h.events, h.resumeWitness, inputindex.AccessDir(h.root), filepath.Join(h.root, ".evolve", "landing"), filepath.Join(h.root, ".evolve", "waves", "integration-current")} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
 		}

@@ -1207,6 +1207,12 @@ The reasons that the comments of the routing-dispatch, state-machine, safety-inv
 - **Spine replay harness.** `TestSpineReplay_LocalHistory` is an operator harness that is skipped in CI. It replays a project's real `.evolve/runs` history and checks if any historical cycle trips the spine floor at enforce. Run it before widening the floor (new anchors, new gates): `EVOLVE_SPINE_REPLAY_DIR=<project-root> go test -v -run TestSpineReplay_LocalHistory ./internal/core/`.
 - **`PausedLaneScopes` lists every paused lane scope** (`lane_resume_all.go`). The rules are in [checkpoint-resume.md](../checkpoint-resume.md#resume-every-paused-cycle-at-once).
 
+## The zero-ship signal (B5)
+
+- `EvaluateZeroShip(waveShips, ceiling)` is the pure rule. It halts when the last `ceiling` waves each have zero ships. Its `Reason` states the run and the ceiling and nothing else: `N consecutive waves landed no ship (ceiling C)`. The caller adds the cycles and the next step.
+- `CollectCycleShips` and `CountShips` are gone. They counted a cycle as shipped when `ClassifyOutcome` said shipped or salvaged. That rule counted a salvaged cycle that never landed, and it read only the cycles above a floor.
+- `ResumedCycleIDs(root, from, to)` returns the ids of the cycles with a `lane.resumed` event in `[from, to)`, and it returns its read failures. `wave.ReadWave` uses it to find the members of a wave that are at or below the floor. It reads only the project stream, because a run stream is cell-writable and a forged line must not add a member. `newRootSignalCenter` writes each resume event to that stream.
+
 ## Findings
 
 - **cycle 1941, wave 126 (first seen on cycle 1628): a resumed ship met a moved main, and a passed audit ended FAIL.** Inbox item `resume-does-not-refresh-a-stale-worktree-base`. Spec: [retry-hooks-and-spine-telemetry](../retry-hooks-and-spine-telemetry.md) section 1.

@@ -98,7 +98,4 @@ func laneCycle(cycles []Cycle, todo string, at time.Time) int {
 	return found
 }
 
-func ReadRunCycles(root string, floor, ceiling int) ([]Cycle, []signalcenter.Event, []string) {
-	r := ReadRunRange(root, floor, ceiling)
-	return r.Cycles, r.Loop, foldFailures(r.Warnings, r.Failures)
-}
+func RunFrom(rec Record) time.Time { return loopRunOf(rec, nil).from }

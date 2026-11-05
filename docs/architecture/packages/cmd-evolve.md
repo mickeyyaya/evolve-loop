@@ -602,6 +602,18 @@ The cycle's production composition root, `wireOrchestratorDeps` in `cmd_cycle.go
 - **Test harness reasons.** `cmd_fleet_soak_test.go` and `cmd_cycle_projroot_test.go` stay serial: the first assigns the package-level `soakLaunchFn` and `soakKiller` variables, the second calls `os.Chdir`. The `waitForFollow` style tests re-append on each tick, because the follow loop seeds its offset asynchronously and skips an earlier append. A fixture that makes a path a directory, or a file where a directory belongs, provokes a read or mkdir fault that differs from absence.
 - **`cycle resume --all` grants every paused cycle** (`cmd_cycle_resume_all.go`). It starts no cycle, and `--dry-run` grants nothing. The pool plan puts each ready paused scope before the triage todos (`pausedPlan.order` in `cmd_loop_pool_paused.go`). The scope keeps the files of its triage todo or of its inbox items.
 
+## The ship count of a wave (B5)
+
+- **One reader.** `buildWaveStatus`, `waveWatcher.poll`, `lastWaveFacts` and `zeroShipHalt` read a wave through `wave.ReadWave` (`readWaveOf` in `cmd_wave_status.go`). A wave is a time window with a floor. The first `From` of the status entries is `wave.RunFrom(rec)`. The stage comes from `shipStageOf`, and a bad policy gives the shadow stage with a warning.
+- **The ship count.** The count is `wave.ShipsIn`: a ship is a journal entry of the class `cycle` with a complete landing record of the same SHA. At the stage `enforce`, it is a deliverable record. A `shipped` flag in `run.json` or `phase-timing.json` counts nothing.
+- **The status.** `Facts.Outcome` counts `Ships` when the read set it. A cycle at or below the floor that the wave resumed or shipped is a member, and its row ends with ` (resumed)`. `measureWaveRuns` gets only the cycles above the floor, so a wave prints one number over its life.
+- **The halt.** `zeroShipTally` holds one `from`, one `floor` and one entry for each wave. It has no ship state of its own. `run` sets `from` to the start time of the coordinator, beside `batchStartCycle`.
+- **The boundary.** The first boundary of a process adds no entry. A later boundary reads `[from, now)` with the floor, then sets `from` to `now`. It adds an entry when the wave has members or ships. The floor is `max(floor, highest id)`.
+- **A failed read.** A failure of the ship source stops the append. `from` and the floor do not move, and the boundary prints `[loop] WARN: zero-ship: wave not counted: cannot read the ship source <path>: <cause>; next: fix the read, then run evolve wave status`. Each other failure prints `[loop] WARN: zero-ship: cannot read <path>: <cause>; the ship count of this wave does not depend on it`, and the wave counts.
+- **The evidence.** The halt text is `zero-ship: N consecutive waves landed no ship (ceiling C) over cycles <ids>; next: evolve dossier show <id>, then find the root cause before another wave (operating-policy.md section 4.1)`. The ids are the cycles of the last N waves only.
+- **The clock.** `loopClock` is the one seam of the clock of the loop. A test replaces it, so a ship stamp in seconds falls in a known window.
+- **Pinned by** `TestZeroShipHalt_*` and `TestRunLoop_ZeroShip_*` in `cmd_loop_zeroship_window_test.go` and `cmd_loop_zero_ship_test.go`, and `TestBuildWaveStatus_*`, `TestWaveWatcherPoll_*` and `TestLastWaveFacts_*` in `cmd_wave_read_wave_test.go`.
+
 ## Findings
 
 - **cycle 230**: `evolve acs suite` trusted the caller's working directory as the suite root, and the resulting topology nondeterminism false-FAILed cycles 226 and 227. The suite root now comes from the kernel-owned cycle state.

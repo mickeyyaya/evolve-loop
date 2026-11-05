@@ -198,6 +198,7 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) (exit i
 		workflow:     wc,
 		stdout:       stdout,
 		stderr:       stderr,
+		now:          loopClock,
 	}).run()
 }
 

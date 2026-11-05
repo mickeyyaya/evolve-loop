@@ -3,6 +3,7 @@ package wave_test
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -256,10 +257,9 @@ func TestReadRunRange_AnUnreadableLedgerIsOneFailureNotTwo(t *testing.T) {
 	denyRead(t, ledger)
 
 	r := wave.ReadRunRange(root, 0, 0)
-	_, _, warnings := wave.ReadRunCycles(root, 0, 0)
 
-	if len(r.Failures) != 1 || len(warnings) != 1 {
-		t.Errorf("failures %v, warnings %v, want one of each: one read failed once", failurePaths(r), warnings)
+	if len(r.Failures) != 1 || len(r.Warnings) != 0 {
+		t.Errorf("failures %v, warnings %v, want one failure and no warning: one read failed once", failurePaths(r), r.Warnings)
 	}
 }
 
@@ -275,7 +275,7 @@ func TestReadRunRange_AMalformedSignalLineIsAWarningNotAFailure(t *testing.T) {
 	}
 }
 
-func TestReadRunCycles_ADeniedRunsDirectoryReachesTheWarningsEvenWhenAFileUnderItIsNamed(t *testing.T) {
+func TestReadRunRange_ADeniedRunsDirectoryReachesTheFailuresEvenWhenAFileUnderItIsNamed(t *testing.T) {
 	t.Parallel()
 	root, _ := rangeRoot(t, "cycle-5")
 	runs := filepath.Join(root, ".evolve", "runs")
@@ -286,14 +286,14 @@ func TestReadRunCycles_ADeniedRunsDirectoryReachesTheWarningsEvenWhenAFileUnderI
 	writeRangeFile(t, intent, `{}`)
 	denyRead(t, runs)
 
-	_, _, warnings := wave.ReadRunCycles(root, 0, 0)
+	r := wave.ReadRunRange(root, 0, 0)
 
-	for _, w := range warnings {
-		if strings.HasPrefix(w, runs+": ") {
+	for _, f := range r.Failures {
+		if strings.HasPrefix(f.Error(), runs+": ") {
 			return
 		}
 	}
-	t.Errorf("warnings = %v, want one that starts with %s: ", warnings, runs)
+	t.Errorf("failures = %v, want one that starts with %s: ", failurePaths(r), runs)
 }
 
 func TestReadRunRange_ACorruptDossierAboveTheCeilingIsNotAFailureOfTheRange(t *testing.T) {
@@ -342,16 +342,16 @@ func TestReadRunRange_ATornLoopStreamKeepsItsGoodEvents(t *testing.T) {
 	}
 }
 
-func TestReadRunCycles_ACorruptLaneScopeReachesTheWarnings(t *testing.T) {
+func TestReadRunRange_ACorruptLaneScopeReachesTheFailures(t *testing.T) {
 	t.Parallel()
 	root, ws := rangeRoot(t, "cycle-5")
 	scope := filepath.Join(ws, "lane-scope.json")
 	writeRangeFile(t, scope, `{not json`)
 
-	_, _, warnings := wave.ReadRunCycles(root, 0, 0)
+	r := wave.ReadRunRange(root, 0, 0)
 
-	if !strings.Contains(strings.Join(warnings, "\n"), scope) {
-		t.Errorf("warnings = %v, want one that names %s", warnings, scope)
+	if !slices.Contains(failurePaths(r), scope) {
+		t.Errorf("failures = %v, want one that names %s", failurePaths(r), scope)
 	}
 }
 
