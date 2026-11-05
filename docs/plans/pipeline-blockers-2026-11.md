@@ -62,7 +62,7 @@ The operator, 2026-11-04 and 2026-11-05:
 
 **Non-goals**
 
-- This plan adds one rule beside the convergence ladder: a count of blocks for each task (Q1).
+- This plan adds no rule beside the convergence ladder. The redesign is a rung of that ladder (Q1).
 - This plan does not audit each other signal code. The inbox item `signal-catalog-accuracy-audit` owns that check.
 - This plan does not build a general outage detector (research §3).
 - This plan does not rewrite past waves. Past waves keep their old numbers.
@@ -128,7 +128,12 @@ The route follows the rule of [ADR-0074](../architecture/adr/0074-typed-signal-c
 | B9 | One INFO signal for each launch, and a true WARN for a lost pipeline value | A launch with ten extra launcher variables emits one signal that names all ten. | console-manual |
 | B10 | A logout is reported as a logout | A journey test with the real logged-out output reports the logout with the `/login` step. A real quota wall still reports quota. | console-manual |
 | B11 | The console train accepts a PR that passed the commit gate | A PR committed through the commit gate reaches `record-pr` through the real verbs. An unreviewed commit is refused, and the text names the commit. | console-manual, design first |
-| P1 | The block count of a task crosses rounds and rebuilds, and more than three blocks returns `redesign` | A task at four blocks returns `redesign`, and a task at three does not. | console-manual |
+| R1 | The host holds one block count for each subject. It crosses rounds, rebuilds, cycles and resumes | A journey test through a real resume keeps the count. A seat cannot write the count. | console-manual, design first |
+| R2 | `convergence.Decide` takes the count and returns `ActionRedesign` past three, then `ActionToOperator` after one redesign. The field `Decision.Redesign` keeps its meaning | A subject at four blocks returns `ActionRedesign`, and at three it does not. A second count at four returns `ActionToOperator`. | console-manual, design first |
+| R3 | Audit repair, the code-review loop and `evolve convergence decide` act on `redesign` | Each entry has a wiring test. At `shadow` the flow does not change, and the signal fires. | console-manual, design first |
+| R4 | The failure events feed the count, and an item at the task ceiling routes to the console | Each halt keeps its ceiling, and its filed item carries the count and the rung. An item at the ceiling is not quarantined. A quota wall and a logout add nothing. | console-manual, design first |
+| R5 | A subject on the redesign rung leaves the lane queue and routes to the console with a digest of its findings | A journey test shows that no lane claims the subject, and that a passed card returns it. Depends on trust root PR 2. | console-manual, design first |
+| R6 | The text of `CONVERGENCE_REDESIGN` and `CONVERGENCE_TO_OPERATOR` has all six signal parts | An equality test reads each whole text (P2). | console-manual |
 | P2 | An equality helper for the text of a signal | A message with a missing cause fails the helper. A message with all six parts passes. | console-manual |
 | P3 | The debug verbs `signals count` and `agent show` (names are proposals). `evolve debug cycle N` of ADR-0162 answers for one cycle | Each verb prints the facts of F1.20 from a fixture, and each has a golden test of its output. | console-manual |
 
@@ -175,14 +180,14 @@ The seven staged fixes have review findings. The design check starts from them. 
 ## 7. Order
 
 1. **B11, design first.** Until the train accepts a reviewed PR, each console fix needs a manual landing. The design check and the review come before any test.
-2. **P1, P2 and the design cards of B2, B3, B5 and B8.** These four fixes have two blocks each, so two more blocks trigger D6. The cards use the list in section 6.
+2. **R1 to R6, P2 and the design cards of B2, B3, B5 and B8.** R5 depends on trust root PR 2. These four fixes have two blocks each, so two more blocks trigger D6. The cards use the list in section 6.
 3. **B10.** A logout near 01:00 was followed by a stop reason of `quota-pause` at 56 percent usage. The link to each cycle is not proven (Q4). The design check is short, and the fix needs a captured real output (Q2).
 4. **The cards of B4, B6 and B9, then the builds of B2 to B9.** Each build runs in parallel on its own branch from `origin/main`.
 5. **P3.** The first verb is `signals count`, because the audit of wave 155 needed it.
 6. **B7.** Cycle 2153 holds it. The console checks the rows when it lands.
 7. **One batch.** Each merge waits for the next boundary, with the coverage gates run before CI.
 
-The reason for the order: a landing path (B11) comes first. A rule change (P1, P2) comes before the fixes that use it. The fix with the largest cost (B10) comes before the fixes that cost minutes.
+The reason for the order: a landing path (B11) comes first. A rule change (R1 to R6, P2) comes before the fixes that use it. The fix with the largest cost (B10) comes before the fixes that cost minutes.
 
 ## 8. Verification
 
@@ -215,7 +220,7 @@ Each component has 100% coverage on each changed function, a red-first test and 
 
 | Id | Question | Our proposal |
 |---|---|---|
-| Q1 | The operator said "blocked over 3 times". This plan reads that as more than three blocks, so the fourth block starts the redesign. ADR-0126 stops a loop at round 3. How do the two meet? | Open, for the operator to confirm. Until then, this plan follows the words of the operator. |
+| Q1 | The operator said "blocked over 3 times". ADR-0126 stops a loop at round 3. How do the two meet? | Closed in part. The operator ordered the path: the redesign is "part of escalation path". The reading of `J_0` to `J_3` as four blocks is a console proposal, open for the operator to confirm. [ADR-0126](../architecture/adr/0126-every-iterative-loop-converges-or-escalates.md) decisions 12 to 17 hold the path. |
 | Q2 | What does a logged-out claude pane print? | Capture one real output as a fixture before B10 is built. I did not find it in the files that I read. |
 | Q3 | Why did the 6 protected files of 2026-09-14 and 15 ship (F1.8)? | Check the 4 commits before B4 is closed. |
 | Q4 | Which code wrote `quota-pause` for the logout (F1.12)? | Trace it in the design check of B10. |

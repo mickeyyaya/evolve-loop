@@ -5,7 +5,7 @@
 - **Relates to:**
   - [ADR-0162](0162-the-console-reads-through-a-tested-read-only-debug-family-and-writes-no-scratch-scripts.md): it owns the verb for one cycle, `evolve debug cycle N`.
   - [ADR-0159](0159-the-loop-keeps-its-integration-train-and-takes-six-practices-from-the-2026-harness-projects.md): this ADR adds a design check and a signal rule to the journey proof of that ADR. It changes none of its decisions.
-  - [ADR-0126](0126-every-iterative-loop-converges-or-escalates.md): this ADR adds a count of blocks for each task beside the ladder (plan Q1). It changes no rung.
+  - [ADR-0126](0126-every-iterative-loop-converges-or-escalates.md): the redesign of decisions 9 and 10 is a rung of its one escalation path (ADR-0126 decisions 12 to 17). ADR-0126 owns the count.
   - [ADR-0156](0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md): the debug verbs are verbs of the CLI contract, with the agent class A.
   - [ADR-0101](0101-signal-center.md): the signal contract is a rule for the text of the signals that the Signal Center carries.
 - **Evidence:**
@@ -39,7 +39,7 @@ Seven fixes were built before a design review, and the review found the design f
 6. The writer of a failure sets its class from a host fact, never from words in text.
 7. Each fact has one reader: one count, one parser and one rule for the tree.
 8. The test of a signal reads the whole text with equality.
-9. More than three blocks on a task stops its fix rounds and starts an architecture redesign.
+9. More than three blocks on a subject stops its fix rounds and starts an architecture redesign.
 10. A redesign writes a new design card, and the same review reads it before the build.
 11. A logout is its own cause, and an unknown cause never defaults to quota.
 12. The console writes no scratch script. A step done by hand twice becomes a tested verb.

@@ -243,6 +243,8 @@ The sources agree: give an error a typed identity and branch on it.
 
 **R7** A task with more than three blocks gets a redesign at the top tier, from the architecture side. The design check reads it before the build. Source: F1.14, F1.18.
 
+**Note on R7.** I read only search summaries of these sources on 2026-11-05. They support bounded retries, a breaker and a hand-off to a person (P3.1, P3.2). The summaries agree on no number. One practitioner post, which is not a standard, argues that a limit stops cost and that the work itself must change (P3.3). So the limit of three comes from the operator, not from outside practice.
+
 **R8** A step that the console does by hand twice becomes a tested verb. Source: F1.20.
 
 ## Gaps in this research
@@ -271,3 +273,6 @@ The sources agree: give an error a typed identity and branch on it.
 - [codec issue 43](https://github.com/void-layer/codec/issues/43) (summary only)
 - [Alert runbook links](https://oneuptime.com/blog/post/2026-01-30-alert-runbook-links/markdown) (summary only; vendor blog)
 - [SRE runbooks template](https://github.com/Inblade/sre-runbooks) (summary only)
+- P3.1 [Error handling, retries and escalation paths](https://open-exam-prep.com/study-guides/github-ai-developer/tool-use-mcp/error-retries-escalation) (search summary only; study guide)
+- P3.2 [Preventing the agent death spiral](https://dev.to/debashish_ghosal/preventing-the-agent-death-spiral-why-your-ai-agents-need-a-circuit-breaker-9h7) (search summary only; blog)
+- P3.3 [AI agent failure loops](https://dev.to/gshevchenko/ai-agent-failure-loops-when-persistence-becomes-a-quality-bug-4mmg) (search summary only; blog)

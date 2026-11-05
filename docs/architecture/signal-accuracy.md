@@ -207,24 +207,26 @@ The convergence ladder already counts the rounds. Round 3 is rung 2, "change the
 
 ### Solution
 
-A task that has more than three blocks stops its fix rounds and gets a redesign. The count is for each task, across review rounds and rebuilds, so it is not the round count of the ladder. Plan Q1 holds the open question on how the two meet.
+A task that has more than three blocks stops its fix rounds and gets a redesign. The redesign is a rung of the one escalation path in [`convergence-policy.md` §3.3](convergence-policy.md#33-one-escalation-path-the-redesign-rung), which owns the count. The count, its failure classes and the limit of one redesign are console proposals (ADR-0126, Proposed).
 
 ```mermaid
 flowchart TD
-    A[Review verdict FAIL] --> B[Add one to the block count of the task]
+    A[Review verdict or counted failure] --> B[Add one to the block count of the subject]
     B --> C{More than three?}
     C -->|No| D[Fix round]
     C -->|Yes| E[Stop the fix rounds. Redesign from the architecture side]
     E --> F[A new design card, read by the same review]
+    F --> G{A second count past three?}
+    G -->|Yes| H[Operator]
 ```
 
 | Step | Rule |
 |---|---|
-| Count | One block is one FAIL verdict with an open blocking finding. The count is for each task, across review rounds and rebuilds. |
-| Trigger | More than three blocks stops the fix rounds (component P1). |
+| Count | One block is one judgment with an open CRITICAL or HIGH defect, or one counted failure event. The convergence policy §3.3 lists them. |
+| Trigger | More than three blocks stops the fix rounds (components R1 and R2). |
 | Redesign | The console runs the redesign at the top tier. The input is the reports of all blocks and the design card. |
 | Output | A new design card. The same architecture review reads it before any new test. |
-| After the redesign | The count of the new design starts at zero. More than three blocks escalates it again. |
+| After the redesign | The count starts at zero. A second count past three goes to the operator. |
 
 The count of blocks is also the measure for ADR-0161 decision 9.
 
@@ -258,7 +260,7 @@ Each verb has a golden test of its output from a fixture. Each verb is class A. 
 | A class is set by the writer | A table test with a hostile text for each writer | Proposed |
 | A fact has one reader | A test that gives all consumers one disk state | Proposed |
 | Each entry is wired | One wiring test for each entry of the design card | Proposed |
-| A task with more than three blocks gets a redesign | The block count of the task (component P1) | Proposed |
+| A task with more than three blocks gets a redesign | The block count of the subject (components R1 and R2) | Proposed |
 | A debug verb is read-only | `evolve agent capabilities --json` lists it as class A | Proposed |
 
 ## Limits
