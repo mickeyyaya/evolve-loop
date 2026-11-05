@@ -28,6 +28,7 @@ type Change struct {
 type Summary struct {
 	Files, Added, Deleted int
 	Changes               []Change
+	Regenerated           []string
 }
 
 func (s Summary) String() string {

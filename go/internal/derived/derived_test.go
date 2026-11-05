@@ -229,7 +229,7 @@ func TestStale_AnInputOrAHandEditedOutputMakesItsEntryStale(t *testing.T) {
 		{"a file that only shares a prefix", []string{".claude-plugin/plugin.json.bak", "go/internal/phasespecx/a.go"}, nil},
 		{"an output alone", []string{flagsDoc}, []string{"flag-index"}},
 		{"a hand-edited research index with no entry", []string{"docs/research-index.md", "docs/research/a.md"}, []string{"research-index"}},
-		{"a skill body outside its generated region", []string{"skills/build/SKILL.md"}, []string{"skill-projections"}},
+		{"a hand-edited command stub", []string{"commands/build.md"}, []string{"skill-projections"}},
 		{"nothing", nil, nil},
 	}
 	for _, c := range cases {
