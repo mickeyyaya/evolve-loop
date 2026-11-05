@@ -14,7 +14,10 @@ import (
 )
 
 const (
-	CodeEjected signalcenter.Code = "SHIP_INTEGRATION_EJECTED"
+	CodeEjected  signalcenter.Code = "SHIP_INTEGRATION_EJECTED"
+	CodeMerged   signalcenter.Code = "SHIP_INTEGRATION_MERGED"
+	CodeComposed signalcenter.Code = "SHIP_INTEGRATION_COMPOSED"
+	CodeFlushed  signalcenter.Code = "SHIP_INTEGRATION_FLUSHED"
 
 	MaxBriefDiffBytes = 16384
 

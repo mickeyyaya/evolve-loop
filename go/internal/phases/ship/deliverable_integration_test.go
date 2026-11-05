@@ -562,3 +562,56 @@ func TestLand_AnIntentThatCannotBePreparedIsAbandonedBeforeMain(t *testing.T) {
 		t.Errorf("pushes = %d, want none after an abandoned landing", rr.pushs)
 	}
 }
+
+func moveRecordToPool(t *testing.T, l shiptest.Lane, rec integration.DeliverableRecord, pool string) {
+	t.Helper()
+	rec.Wave = pool
+	if _, err := integration.WriteRecord(integration.WaveDir(l.Repo, pool), rec); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLanded_AResumedLaneFindsTheRecordOfAnEarlierPoolByCommit(t *testing.T) {
+	t.Parallel()
+	l, _, _, err, _ := shipLane(t, fleetIntegration(policy.FleetIntegrationEnforce), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := recordOf(t, l)
+	shiptest.RunGit(t, l.Repo, "checkout", "-q", "main")
+	landedCommitFor(t, l.Repo, rec)
+	decoy := rec
+	decoy.Commits = []integration.CommitIdentity{{SHA: strings.Repeat("d", 40), BaseSHA: rec.Commits[0].BaseSHA, PatchID: "p"}}
+	moveRecordToPool(t, l, decoy, "3")
+	moveRecordToPool(t, l, rec, "5")
+	if err := os.RemoveAll(integration.WaveDir(l.Repo, testWave)); err != nil {
+		t.Fatal(err)
+	}
+	in := fleetIntegration(policy.FleetIntegrationEnforce)
+	in.Wave = "9"
+	opts := laneOptions(l, nil, in)
+	if !landedByIdentity(context.Background(), &opts, rec.Commits[0].SHA, "HEAD") {
+		t.Error("the resumed lane of pool 9 must find the record of pool 5 that holds the commit")
+	}
+}
+
+func TestLanded_ARecordOfAnotherCycleDoesNotVouchForTheCommit(t *testing.T) {
+	t.Parallel()
+	l, _, _, err, _ := shipLane(t, fleetIntegration(policy.FleetIntegrationEnforce), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := recordOf(t, l)
+	shiptest.RunGit(t, l.Repo, "checkout", "-q", "main")
+	other := rec
+	other.Cycle, other.Trailer = rec.Cycle+1, integration.CycleTrailer(rec.Cycle+1)
+	landedCommitFor(t, l.Repo, other)
+	moveRecordToPool(t, l, other, "4")
+	if err := os.RemoveAll(integration.WaveDir(l.Repo, testWave)); err != nil {
+		t.Fatal(err)
+	}
+	opts := laneOptions(l, nil, fleetIntegration(policy.FleetIntegrationEnforce))
+	if landedByIdentity(context.Background(), &opts, rec.Commits[0].SHA, "HEAD") {
+		t.Error("a record of another cycle vouched for the commit")
+	}
+}

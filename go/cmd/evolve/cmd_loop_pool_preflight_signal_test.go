@@ -59,7 +59,7 @@ func newPoolPreflightFixture(t *testing.T, dirty bool) poolPreflightFixture {
 
 func (f poolPreflightFixture) dispatch(t *testing.T, iteration int) (batchDecision, bool) {
 	t.Helper()
-	d, done := f.b.dispatchPool(iteration, poolPreflightFleet, "/nonexistent-binary")
+	d, done := f.b.dispatchPool(iteration, poolPreflightFleet, f.b.cycleLaunch("/nonexistent-binary", 0))
 	f.b.deps.Signals.Flush()
 	f.closeSignals()
 	return d, done

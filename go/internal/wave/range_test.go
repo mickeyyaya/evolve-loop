@@ -366,3 +366,21 @@ func TestReadRunRange_TheTodoOfACycleIsTheFirstIDOfItsScope(t *testing.T) {
 		t.Errorf("cycles = %+v, want todo first-todo", r.Cycles)
 	}
 }
+
+func TestReadRunRange_ABurnedPoolNumberLeavesNoPhantomCycleAndNoFailure(t *testing.T) {
+	t.Parallel()
+	root, _ := rangeRoot(t, "cycle-11")
+	if err := os.MkdirAll(filepath.Join(root, ".evolve", "runs", "cycle-13"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	r := wave.ReadRunRange(root, 10, 13)
+
+	var ids []int
+	for _, c := range r.Cycles {
+		ids = append(ids, c.ID)
+	}
+	if !slices.Equal(ids, []int{11, 13}) || len(r.Failures) != 0 {
+		t.Errorf("cycles %v failures %v, want exactly 11 and 13 with no failure for the pool number 12", ids, failurePaths(r))
+	}
+}

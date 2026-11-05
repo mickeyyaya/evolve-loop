@@ -134,7 +134,7 @@ This answers the question that the package note left open: one record file for e
 - The same patches keep their first owner, so a past verdict does not change.
 - Different patches are a new member of the current pool.
 - `Tick` and the verdict read members across all `integration-*.json`. The first record that holds a member owns it.
-- A resumed lane takes the current pool id, and `FindRecord` tolerates that. `landedByIdentity` uses `FindRecordByCommit` and checks the cycle.
+- A resumed lane takes the current pool id. A lookup goes by commit, so that is safe. `landedByIdentity` uses `RecordForCommit`, which finds the record by commit and checks the cycle.
 
 **Pool id.** The loop mints it with `core.AllocateCycleNumber` before launch, so it is unique and each lane sorts above it. One pool costs one cycle number. It reaches `execCycleLaunch` as a closure parameter, and then the cycle run as a CLI parameter. `CycleSpec` does not change.
 

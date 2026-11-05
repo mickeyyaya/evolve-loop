@@ -21,6 +21,7 @@ type routingRun struct {
 	role       string
 	overrides  cliroute.Overrides
 	sandboxOff string
+	pool       int
 }
 
 func (r routingRun) centerRole() string {

@@ -85,8 +85,8 @@ func bindingWitnessesLanding(ev landingEvidence) bool {
 }
 
 func landedByRecord(ctx context.Context, ev landingEvidence, commit string) bool {
-	rec, found := integration.FindRecord(ev.ProjectRoot, ev.Cycle)
-	if !found || !rec.HoldsCommit(commit) {
+	rec, found := integration.RecordForCommit(ev.ProjectRoot, ev.Cycle, commit)
+	if !found {
 		return false
 	}
 	return integration.Repo{Dir: ev.ProjectRoot, Git: integration.SysGit()}.LandedOnRef(ctx, rec, "HEAD")

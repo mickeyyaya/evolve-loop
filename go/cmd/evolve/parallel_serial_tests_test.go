@@ -1,6 +1,8 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestRunCycleRun_AFleetLaneWithAPoolWritesTheDeliverableRecordAtShipAndOneWithoutWritesNone":       "swaps seam wireOrchestratorDepsFn and sets env",
+	"main.TestRunCycleRun_PoolReachesTheWiringAsTheRoutingRunPool":                                          "swaps seam wireOrchestratorDepsFn",
 	"main.TestMain_ClearsInheritedCellMarkers":                                                              "reads the process environment",
 	"main.TestRunContinuationAdopt_ATildePathInTheRegistryIsExpanded":                                       "sets env through a helper",
 	"main.TestRunContinuationAdopt_ATildePathOnTheStampIsExpanded":                                          "sets env through a helper",
