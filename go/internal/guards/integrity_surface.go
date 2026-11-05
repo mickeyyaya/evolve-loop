@@ -203,6 +203,8 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/bridge/launch.go", Class: SandboxGuarantee, Rationale: "the launch flags that carry --require-sandbox into the driver Config"},
 	{Fragment: "/go/internal/bridge/launch_llm.go", Class: SandboxGuarantee, Rationale: "the one launch API of an LLM (ADR-0154 I-1, X3)"},
 	{Fragment: "/go/internal/bridge/driver_tmux_boot.go", Class: SandboxGuarantee, Rationale: "the tmux boot that applies sandboxPrefixForLaunch to each tmux family"},
+	{Fragment: "/go/internal/committedset/lanepin_guard_forms_test.go", Class: GuardGuarantee, Rationale: "the form guard of the lane pin: it fails when a production file names the pin file in a form that the reader guard does not see, so a cell cannot forge the pin by a spelling the scan misses"},
+	{Fragment: "/go/internal/committedset/lanepin_reader_guard_test.go", Class: GuardGuarantee, Rationale: "the reader guard of the lane pin: it fails when production code outside committedset names the pin file, so the host lineage record stays the one trust root of a pin"},
 	{Fragment: "/go/internal/bridge/dispatch_signal_guard_test.go", Class: GuardGuarantee, Rationale: "the kill-guard pin: a test that leaves SignalProcess nil never reaches kill(2)"},
 	{Fragment: "/go/internal/bridge/realtmux_sender_guard_test.go", Class: GuardGuarantee, Rationale: "the sender guard of the real tmux tests: it fails when a test Deps over execTmux{} has no SignalProcess, so the reap at kill-session would reach the default sender (the PR #1190 macOS panic)"},
 	{Fragment: "/go/internal/bridge/resolve_guard_test.go", Class: GuardGuarantee, Rationale: "the one-resolver guard: only bridge.Resolve builds a driver name"},

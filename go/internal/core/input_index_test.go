@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"os"
 	"path/filepath"
 	"slices"
@@ -155,7 +156,7 @@ func TestDispatch_ALaneScopeThatACellRewroteNeitherNamesTheItemNorJoinsTheLineag
 	}
 }
 
-func TestWriteInputIndex_TheFirstRecordOfTheRunWinsOverALaterScopeAndANewRunReplacesIt(t *testing.T) {
+func TestWriteInputIndex_TheFirstRecordOfTheCycleWinsOverALaterScopeAndANewRunKeepsItsIDs(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	ws := filepath.Join(root, ".evolve", "runs", "cycle-5")
@@ -176,8 +177,8 @@ func TestWriteInputIndex_TheFirstRecordOfTheRunWinsOverALaterScopeAndANewRunRepl
 	run2 := run1
 	run2.runID = "run-2"
 	writeInputIndex(run2, PhaseScout, []string{"item-b"}, &warn)
-	if idx, err := inputindex.Read(ws); err != nil || !slices.Equal(idx.ItemIDs, []string{"item-b"}) {
-		t.Fatalf("a new run of the cycle number must not inherit a stale record: %+v %v", idx, err)
+	if idx, err := inputindex.Read(ws); err != nil || !slices.Equal(idx.ItemIDs, []string{"item-a"}) {
+		t.Fatalf("a new run of the cycle must keep the ids of its record, so a forged scope on resume changes nothing: %+v %v", idx, err)
 	}
 }
 
@@ -213,5 +214,79 @@ func TestWriteInputIndex_CarriesThePolicyContextAndTheSpecInputs(t *testing.T) {
 	idx, err = inputindex.Read(ws)
 	if err != nil || len(idx.Required) != 1 || idx.Entries[slices.IndexFunc(idx.Entries, func(e inputindex.Entry) bool { return e.Required })].Kind != "test-report" {
 		t.Fatalf("the policy list of the audit wins over the spec inputs: %+v err %v", idx.Entries, err)
+	}
+}
+
+func TestCycleRecord_ANewRunOfACycleKeepsTheIDsOfItsRecord(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	ws := filepath.Join(root, ".evolve", "runs", "cycle-6")
+	writeLaneScopeFixture(t, ws, []string{"a"}, "goal-a")
+	first, err := cycleRecord(indexTarget{projectRoot: root, workspace: ws, runID: "run-1", goalHash: "goal-a", cycle: 6}, []string{"a"})
+	if err != nil || first.GoalHash != "goal-a" {
+		t.Fatalf("first record = %+v %v, want the goal hash of the request", first, err)
+	}
+	writeLaneScopeFixture(t, ws, []string{"b", "c"}, "forged")
+	second, err := cycleRecord(indexTarget{projectRoot: root, workspace: ws, runID: "run-2", goalHash: "other", cycle: 6}, []string{"b", "c"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(second.ItemIDs, []string{"a"}) || second.RunID != "run-2" || second.GoalHash != "goal-a" {
+		t.Fatalf("second record = %+v, want the ids and goal hash of the first with the new run", second)
+	}
+	stored, _ := inputindex.ReadRecord(root, 6)
+	if stored.RunID != "run-2" || !slices.Equal(stored.ItemIDs, []string{"a"}) {
+		t.Fatalf("stored record = %+v", stored)
+	}
+}
+
+func TestCycleRecord_ARecordWithNoIDsTakesTheIDsOfTheNewRun(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	ws := filepath.Join(root, ".evolve", "runs", "cycle-6")
+	if _, err := cycleRecord(indexTarget{projectRoot: root, workspace: ws, runID: "run-1", cycle: 6}, nil); err != nil {
+		t.Fatal(err)
+	}
+	got, err := cycleRecord(indexTarget{projectRoot: root, workspace: ws, runID: "run-2", cycle: 6}, []string{"x"})
+	if err != nil || !slices.Equal(got.ItemIDs, []string{"x"}) {
+		t.Fatalf("record = %+v %v, want [x]", got, err)
+	}
+}
+
+func TestCycleRecord_ANewRunOfACycleKeepsTheRoutedIDsOfItsRecord(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	ws := filepath.Join(root, ".evolve", "runs", "cycle-6")
+	if _, err := cycleRecord(indexTarget{projectRoot: root, workspace: ws, runID: "run-1", goalHash: "goal-a", cycle: 6}, []string{"a", "b"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := committedset.RecordRoutes(root, 6, []string{"a"}); err != nil {
+		t.Fatal(err)
+	}
+	second, err := cycleRecord(indexTarget{projectRoot: root, workspace: ws, runID: "run-2", goalHash: "other", cycle: 6}, []string{"x"})
+	if err != nil || !slices.Equal(second.RoutedIDs, []string{"a"}) {
+		t.Fatalf("second record = %+v %v, want RoutedIDs [a]", second, err)
+	}
+	stored, _ := inputindex.ReadRecord(root, 6)
+	if !slices.Equal(stored.RoutedIDs, []string{"a"}) {
+		t.Fatalf("stored record = %+v", stored)
+	}
+}
+
+func TestCycleRecord_ARecordWithNoIDsStillKeepsItsRoutedIDsOnANewRun(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	ws := filepath.Join(root, ".evolve", "runs", "cycle-6")
+	if _, err := cycleRecord(indexTarget{projectRoot: root, workspace: ws, runID: "r1", goalHash: "g", cycle: 6}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := committedset.RecordRoutes(root, 6, []string{"a"}); err != nil {
+		t.Fatal(err)
+	}
+
+	second, err := cycleRecord(indexTarget{projectRoot: root, workspace: ws, runID: "r2", goalHash: "g", cycle: 6}, nil)
+
+	if err != nil || !slices.Equal(second.RoutedIDs, []string{"a"}) {
+		t.Fatalf("second record = %+v %v, want RoutedIDs [a]", second, err)
 	}
 }

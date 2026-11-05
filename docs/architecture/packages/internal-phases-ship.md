@@ -278,7 +278,7 @@ These rules held in comments before the comment-zero change. Tests pin the ones 
 - Promotion and drain are the two halves of one PASS transition, so both go through `ApplyCycleOutcome`. The "drain complete" line is a success claim and stays inside the success branch.
 - `triageDecisionBytes` prefers the companion that the agent wrote, because it carries `skip_shipped`. Next it uses a deterministic projection of `triage-report.md`, which has `top_n` only. Last it returns nil. An unreadable companion keeps its WARN and is never lowered to INFO. The projection is saved, so a re-run sees the same companion.
 - `committedInboxIDs` widens by lane scope only for a PASS landing. A non-PASS verdict leaves work pickable. A nil decision body falls back to the lane-scope ids.
-- The widening relies on `lane-scope.json` living in a freshly provisioned per-cycle workspace. A change that recycles a workspace must re-check it.
+- The widening relies on the pin, the host record first, which `LaneScopeIDs` reads. The record outlives a workspace and keeps its ids across runs. A change that recycles a workspace must re-check those ids.
 - If triage names a scope id, only the named scope ids consume. A menu mate that triage left unmentioned stays pickable.
 - `consumeCommittedItems` is gated on the verdict string PASS alone. This is the same authority as `landedPASS` in postship. `acsrunner` writes `red_count:0` beside a FAIL verdict for a suite that never finished, so `red_count` is weaker.
 - On the cycle path, `acssuite.ReadVerdict` already refuses that shape. The manual path has no such reader, so this gate is its only guard. A missing verdict is a loud warning and not a silent skip.

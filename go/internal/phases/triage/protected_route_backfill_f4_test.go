@@ -84,27 +84,6 @@ func TestRouteProtectedCards_UnwritableDecisionDirectoryIsReported(t *testing.T)
 	}
 }
 
-func TestRawField_NonObjectsAndNonStringValuesYieldEmpty(t *testing.T) {
-	t.Parallel()
-	cases := []struct {
-		obj  string
-		want string
-	}{
-		{`{"id":"abc"}`, "abc"},
-		{`{"id":7}`, ""},
-		{`{"other":"x"}`, ""},
-		{`"just a string"`, ""},
-		{`[1,2]`, ""},
-		{`not json`, ""},
-		{``, ""},
-	}
-	for _, tc := range cases {
-		if got := rawField([]byte(tc.obj), "id"); got != tc.want {
-			t.Errorf("rawField(%q,id) = %q, want %q", tc.obj, got, tc.want)
-		}
-	}
-}
-
 func TestRankInputs_UnreadablePolicyWarnsOnStderrAndStillRanks(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {

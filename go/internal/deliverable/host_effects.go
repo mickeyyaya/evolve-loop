@@ -22,13 +22,14 @@ import (
 type Claimer func(inboxDir string, cycle int, ids []string) error
 
 type HostEffects struct {
-	resolver phasecontract.Resolver
-	spec     func(string) (phasespec.PhaseSpec, bool)
-	claim    Claimer
+	resolver  phasecontract.Resolver
+	spec      func(string) (phasespec.PhaseSpec, bool)
+	claim     Claimer
+	forbidden func(string) bool
 }
 
-func NewHostEffects(cat phasespec.Catalog, claim Claimer) *HostEffects {
-	return &HostEffects{resolver: phasecontract.NewCatalogResolver(cat.Get), spec: cat.Get, claim: claim}
+func NewHostEffects(cat phasespec.Catalog, claim Claimer, forbidden func(string) bool) *HostEffects {
+	return &HostEffects{resolver: phasecontract.NewCatalogResolver(cat.Get), spec: cat.Get, claim: claim, forbidden: forbidden}
 }
 
 func (h *HostEffects) Perform(_ context.Context, in core.ReviewInput) error {
@@ -43,7 +44,7 @@ func (h *HostEffects) Perform(_ context.Context, in core.ReviewInput) error {
 		if perform == nil {
 			continue
 		}
-		if err := perform(h, roots); err != nil {
+		if err := perform(h, c, roots); err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", name, err))
 		}
 	}
@@ -58,7 +59,7 @@ type deriver func(primary []byte, roots phasecontract.Roots) ([]byte, error)
 
 var derivers = map[string]deriver{
 	"triage-decision.json": func(primary []byte, roots phasecontract.Roots) ([]byte, error) {
-		return triagedecision.Derive(primary, roots.Cycle, committedset.LanePin(roots.Workspace))
+		return triagedecision.DeriveRouted(primary, roots.Cycle, committedset.UnroutedPin(roots.Workspace), committedset.RoutedIDs(roots.Workspace))
 	},
 }
 

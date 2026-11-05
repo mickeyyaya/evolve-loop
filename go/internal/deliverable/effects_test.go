@@ -62,7 +62,7 @@ func TestVerify_DeclaredEffectInboxClaim(t *testing.T) {
 		wantCode string
 		mentions []string
 	}{
-		{"committed item still in the inbox root", claimFixture{committedToX, "inbox"}, CodeMissingEffect, []string{"inbox-claim", "x", strconv.Itoa(cycle)}},
+		{"committed item still in the inbox root", claimFixture{committedToX, "inbox"}, CodeMissingEffect, []string{"x", "not claimed yet"}},
 		{"committed item claimed by this cycle", claimFixture{committedToX, "cycle-" + strconv.Itoa(cycle)}, "", nil},
 		{"committed item held by another cycle", claimFixture{committedToX, "cycle-3"}, CodeMissingEffect, []string{"x", "cycle-3"}},
 		{"committed id has no inbox file (scout-originated)", claimFixture{committedToX, ""}, "", nil},

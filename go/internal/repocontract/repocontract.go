@@ -153,6 +153,7 @@ var treeReadingSelections = []TestSelection{
 	}},
 	{Package: "./internal/committedset", Tests: []string{
 		"TestDecisionBuckets_TheOneDeclarationOfTheDroppedAndSkipShippedWireTags",
+		"TestPinFileRefs_OnlyTheListedPlacesOutsideCommittedsetNameThePinFile",
 	}},
 	{Package: "./internal/coversplit", Tests: []string{
 		"TestEverySplitTestPackageHasItsCoverEntry",

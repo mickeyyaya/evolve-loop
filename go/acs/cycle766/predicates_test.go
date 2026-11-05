@@ -29,7 +29,7 @@ func TestC766_001_lane_scope_file_injects_fleet_scope(t *testing.T) {
 }
 
 func TestC766_002_two_lanes_see_only_own_scope(t *testing.T) {
-	runGoTest(t, corePkg, "TestLaneScopePin_TwoLanesSeeOnlyOwnScope")
+	runGoTest(t, corePkg, "TestLaneScopePin_TwoLanesSeeTheScopeOfTheirHostEnv")
 }
 
 func TestC766_003_absent_file_falls_back_to_env(t *testing.T) {

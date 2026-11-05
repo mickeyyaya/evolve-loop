@@ -1,7 +1,6 @@
 package core
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -93,13 +92,5 @@ func laneWorkspace(evolveDir string, cycle int) string {
 }
 
 func readLanePin(evolveDir string, cycle int) (LaneScope, error) {
-	var pin LaneScope
-	body, err := os.ReadFile(filepath.Join(laneWorkspace(evolveDir, cycle), LaneScopeFile))
-	if err != nil {
-		return pin, err
-	}
-	if err := json.Unmarshal(body, &pin); err != nil {
-		return pin, fmt.Errorf("parse %s: %w", LaneScopeFile, err)
-	}
-	return pin, nil
+	return committedset.ReadLaneDoc(laneWorkspace(evolveDir, cycle))
 }

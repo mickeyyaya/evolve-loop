@@ -300,8 +300,8 @@ reproducer before this landing. Each is now a tree-resident lock in
 | F4 | LOW | `writeIfAbsent` was stat-then-write. Before the fix, two fleet lanes were able to both observe "absent". The DEF-4 equality check only observed the race afterwards. | No exclusive create. | Publish by `os.Link` from a fully-written temp file in the same directory. Create-or-EEXIST is one atomic step, and no partial artifact can appear under the real name. |
 
 **Known ceiling.** The F2 fallback needs the scope of the lane to look the binding up.
-A workspace with BOTH the manifest and `lane-scope.json` destroyed is not
-recoverable from the registry alone. Arming on any registry entry
+A workspace with BOTH the manifest and the pin destroyed is not
+recoverable from the registry alone, unless the host record holds the pin. Arming on any registry entry
 blocks every ordinary cycle in a project where any lane ever preserved work. This
 is recorded and not papered over.
 

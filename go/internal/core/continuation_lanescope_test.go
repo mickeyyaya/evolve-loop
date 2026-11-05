@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
 func writeLaneScope(t *testing.T, workspace string, ids ...string) {
@@ -142,19 +143,6 @@ func TestStampContinuationManifest_UnstampableWorkRegistersNothing(t *testing.T)
 	}
 }
 
-type laneScopeTriageRunner struct {
-	*fakeRunner
-	todoIDs []string
-}
-
-func (r *laneScopeTriageRunner) Run(ctx context.Context, req PhaseRequest) (PhaseResponse, error) {
-	body, _ := json.Marshal(LaneScope{TodoIDs: r.todoIDs, GoalHash: "g"})
-	if err := os.WriteFile(filepath.Join(req.Workspace, LaneScopeFile), body, 0o644); err != nil {
-		return PhaseResponse{}, err
-	}
-	return r.fakeRunner.Run(ctx, req)
-}
-
 func productionScopeResolver(t *testing.T) func(string, int, []string) *continuation.Continuation {
 	t.Helper()
 	return func(root string, cycle int, scopeIDs []string) *continuation.Continuation {
@@ -186,14 +174,10 @@ func TestRunCycle_AdoptsContinuationFromLaneScopeWithoutAnyClaim(t *testing.T) {
 	buildR := runners[PhaseBuild].(*fakeRunner)
 	probe := &worktreeProbeRunner{fakeRunner: buildR, probeFile: "prior_work.go"}
 	runners[PhaseBuild] = probe
-	runners[PhaseTriage] = &laneScopeTriageRunner{
-		fakeRunner: runners[PhaseTriage].(*fakeRunner),
-		todoIDs:    []string{"lane-only-scope"},
-	}
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners,
 		WithContinuationResolver(productionScopeResolver(t)))
 
-	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: root, GoalHash: "g"}); err != nil {
+	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: root, GoalHash: "g", Env: map[string]string{ipcenv.FleetScopeKey: "lane-only-scope"}}); err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}
 	if buildR.calls == 0 {
@@ -235,14 +219,10 @@ func TestRunCycle_UnrelatedLaneScopeDoesNotAdopt(t *testing.T) {
 	buildR := runners[PhaseBuild].(*fakeRunner)
 	probe := &worktreeProbeRunner{fakeRunner: buildR, probeFile: "prior_work.go"}
 	runners[PhaseBuild] = probe
-	runners[PhaseTriage] = &laneScopeTriageRunner{
-		fakeRunner: runners[PhaseTriage].(*fakeRunner),
-		todoIDs:    []string{"lane-B"},
-	}
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners,
 		WithContinuationResolver(productionScopeResolver(t)))
 
-	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: root, GoalHash: "g"}); err != nil {
+	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: root, GoalHash: "g", Env: map[string]string{ipcenv.FleetScopeKey: "lane-B"}}); err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}
 	if probe.sawFile {
@@ -256,17 +236,13 @@ func TestAdoptContinuation_PassesLaneScopeIDsToResolver(t *testing.T) {
 	root, _ := initContinuationRepo(t, 1085)
 	var gotScopes [][]string
 	runners := buildRunners(nil)
-	runners[PhaseTriage] = &laneScopeTriageRunner{
-		fakeRunner: runners[PhaseTriage].(*fakeRunner),
-		todoIDs:    []string{"scope-x", "scope-y"},
-	}
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners,
 		WithContinuationResolver(func(_ string, _ int, scopeIDs []string) *continuation.Continuation {
 			gotScopes = append(gotScopes, append([]string(nil), scopeIDs...))
 			return nil
 		}))
 
-	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: root, GoalHash: "g"}); err != nil {
+	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: root, GoalHash: "g", Env: map[string]string{ipcenv.FleetScopeKey: "scope-x,scope-y"}}); err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}
 	if len(gotScopes) == 0 {

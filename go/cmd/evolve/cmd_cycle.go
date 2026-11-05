@@ -601,7 +601,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	opts = append(opts, core.WithWorktreeBase(pol.WorktreeBase()))
 
 	opts = append(opts, compositionOptions()...)
-	hostEffects = deliverable.NewHostEffects(catalog, hostInboxClaimer(ld, signals, forbidden))
+	hostEffects = newHostEffects(catalog, ld, signals, forbidden)
 	opts = append(opts, core.WithHostEffects(hostEffects), core.WithLaneMenu(laneMenuOf(forbidden, wfCfg.Repair.Fixability)))
 	opts = append(opts, core.WithProtectedSurface(protectedMembership))
 	opts = append(opts, core.WithRepairFixability(repairFixability(protectedMembership, os.Stderr)), auditFixRung(auditFixSite{root: projectRoot, pol: pol, cfg: cfg, route: auditfixports.RouterRoute(cliRouter.Resolve, projectRoot), agent: runAgentCommand, stderr: os.Stderr}))
@@ -665,6 +665,10 @@ func hostContinuationShedder(signals *signalcenter.Center) func(string, int, con
 	return func(root string, cycle int, declined continuation.Continuation) ([]string, error) {
 		return inboxmover.ShedDeclinedContinuation(inboxmover.Options{ProjectRoot: root, Stderr: os.Stderr, Signals: signals}, cycle, declined)
 	}
+}
+
+func newHostEffects(catalog phasespec.Catalog, ld inboxmover.LedgerAppender, signals *signalcenter.Center, forbidden func(string) bool) *deliverable.HostEffects {
+	return deliverable.NewHostEffects(catalog, hostInboxClaimer(ld, signals, forbidden), forbidden)
 }
 
 func hostInboxClaimer(ld inboxmover.LedgerAppender, signals *signalcenter.Center, forbidden func(string) bool) deliverable.Claimer {

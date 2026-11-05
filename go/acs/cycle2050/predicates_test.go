@@ -56,7 +56,7 @@ func completePhase(t *testing.T, cat phasespec.Catalog, phase, report string) st
 	}
 	in := core.ReviewInput{Phase: phase, Cycle: 7, Workspace: ws, ProjectRoot: t.TempDir()}
 	claimNothing := func(string, int, []string) error { return nil }
-	if err := deliverable.NewHostEffects(cat, claimNothing).Perform(context.Background(), in); err != nil {
+	if err := deliverable.NewHostEffects(cat, claimNothing, nil).Perform(context.Background(), in); err != nil {
 		t.Logf("Perform(%s): %v", phase, err)
 	}
 	return ws
