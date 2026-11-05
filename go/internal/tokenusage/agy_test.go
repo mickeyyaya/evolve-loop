@@ -75,7 +75,7 @@ func TestAgyConversationCollector_Agy14BuildPaneHasNoTokenLineButItsConversation
 		t.Errorf("peak prompt = %d, peak usage %+v, want the largest single generation", got.PeakPromptTokens, got.PeakUsage)
 	}
 	if len(store.queries) != 2 || !strings.Contains(store.queries[0], `instr(workspace_uris, '"file://`+agy14Worktree+`"')`) ||
-		!strings.Contains(store.queries[0], "last_user_input_time >= '2026-10-19 07:07:30.696469'") || !strings.Contains(store.queries[0], "last_user_input_time <= '2026-10-19 07:23:34.167863'") {
+		!strings.Contains(store.queries[0], "input_time >= '2026-10-19 07:07:30.696469'") || !strings.Contains(store.queries[0], "input_time <= '2026-10-19 07:23:34.167863'") {
 		t.Errorf("queries = %q, want the conversations of the worktree whose user input falls in the dispatch window", store.queries)
 	}
 }

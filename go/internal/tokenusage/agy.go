@@ -71,8 +71,13 @@ func AgyConversationCollector(root string, w Window, query SQLiteQuery) Collecto
 	}
 }
 
+const agyConversationsQuery = "select conversation_id from (" +
+	"select conversation_id, workspace_uris, strftime('%%Y-%%m-%%d %%H:%%M:%%S', last_user_input_time) || '.' || substr(substr(fraction, 1, length(fraction) - length(ltrim(fraction, '0123456789'))) || '000000', 1, 6) as input_time from (" +
+	"select conversation_id, workspace_uris, last_user_input_time, case when substr(last_user_input_time, 20, 1) = '.' then substr(last_user_input_time, 21) else '' end as fraction from conversation_summaries)) " +
+	"where instr(workspace_uris, '\"file://%s\"') > 0 and input_time >= '%s' and input_time <= '%s' order by input_time;"
+
 func agyConversationsSQL(w Window) string {
-	return fmt.Sprintf("select conversation_id from conversation_summaries where instr(workspace_uris, '\"file://%s\"') > 0 and last_user_input_time >= '%s' and last_user_input_time <= '%s' order by last_user_input_time;",
+	return fmt.Sprintf(agyConversationsQuery,
 		strings.ReplaceAll(w.Worktree, "'", "''"), w.Start.UTC().Format(agyTimeLayout), w.End.UTC().Format(agyTimeLayout))
 }
 
