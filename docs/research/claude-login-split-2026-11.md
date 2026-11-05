@@ -86,6 +86,10 @@ The dummy item did not remain on the host (exit 44 from the host read).
 **F3.4** On 2026-11-05 the two stores differ in time. The Keychain item was last written at 07:12:37 UTC (`mdat`), which is the `/login` of the operator. `~/.claude/.credentials.json` was last written at 07:05:24 UTC, 5 seconds after the first `revoked` line, and `/login` did not change it.
 *Implication:* the two stores do not move together. This is one data point. A save replaces the file, so its birth time gives no more evidence.
 
+**F3.7** On the operator's instruction, the console ran a fingerprint check on 2026-11-05, which printed no credential. The check prints `jq -r` of each refresh token through `shasum -a 256`. The Keychain gives `f977a536`. The file gives `01ba4719`, the SHA-256 of one newline, so its refresh token is empty.
+
+*Implication:* the file was last written at 07:05:24 UTC, and it is empty now. `/login` replaced the Keychain item, so the state of the Keychain at the failure is lost. Issue [#54443](https://github.com/anthropics/claude-code/issues/54443) reports the same empty token after `400 invalid_grant`. A process that can write the Keychain has no reason to use the file (F3.1), which points at a sandboxed seat. No log names the process, so this is synthesis, and plan L0 must record the store times across the next failure.
+
 **F3.5** The bridge passes each seat the real `HOME` (`go/internal/bridge/hermetic_env.go:28`).
 *Implication:* each seat on the host shares one stored login, so one bad refresh reaches each seat.
 
@@ -133,7 +137,7 @@ The answer: the failures rise sharply on 2026-11-02, and the sandbox alone does 
 
 | Claim | State | What settles it |
 |---|---|---|
-| A sandboxed seat refreshes, and writes the file | Inferred from F3.2, F3.4, F4.1. No log shows a seat refresh. | A fingerprint comparison of the two stores, run by the operator (plan L0) |
+| A sandboxed seat refreshes, and writes the file | Partly supported. F3.7 shows a write to the file at the failure, and that write cleared the token. It does not show which process spent the token before that. | A log of the store times across one failure (plan L0) |
 | The access token lasts about 8 hours | Public reports only. Gaps of 8.5, 8.8 and 10.1 h agree, and others do not. | The stored expiry, read by the operator (plan L0) |
 | One rotation kills the other holders | Reported in F4.1 and F4.4. Not stated by Anthropic. | The plan does not need this settled |
 | The cause of the rise on 11-02 | Open (F5.3) | L0 and L2 of the plan test the split. Neither separates the CLI update from PR #1231. |
