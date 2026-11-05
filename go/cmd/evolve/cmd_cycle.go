@@ -390,7 +390,7 @@ type rootLedger interface {
 func newRootSignalCenter(projectRoot, evolveDir string, console io.Writer) *signalcenter.Center {
 	signals := signalcenter.New(signalcenter.WithPID(os.Getpid()))
 	signals.Subscribe(listenWhen(cycleStamped, signals.NDJSONSink(func(cycle int) string {
-		return filepath.Join(core.RunWorkspacePath(projectRoot, cycle), signalcenter.StreamFileName)
+		return core.SignalStreamPath(projectRoot, cycle)
 	})))
 	signals.Subscribe(listenWhen(legacyProjectRecord, signals.NDJSONSink(func(int) string {
 		return filepath.Join(evolveDir, signalcenter.StreamFileName)

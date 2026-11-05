@@ -18,13 +18,14 @@ const (
 	TimeoutReviewStop        TimeoutCause = "review_stop"
 	TimeoutReviewPause       TimeoutCause = "review_pause"
 	TimeoutIncomplete        TimeoutCause = "incomplete"
+	TimeoutGuardRefused      TimeoutCause = "guard_refused"
 )
 
 func (c TimeoutCause) Known() bool {
 	switch c {
 	case TimeoutContextCancelled, TimeoutPaneLost, TimeoutDetectorError, TimeoutSubmitWedged,
 		TimeoutTransientUpstream, TimeoutReviewStop, TimeoutReviewPause,
-		TimeoutIncomplete:
+		TimeoutIncomplete, TimeoutGuardRefused:
 		return true
 	}
 	return false

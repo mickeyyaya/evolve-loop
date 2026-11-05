@@ -15,7 +15,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
@@ -79,7 +81,15 @@ func appendIntegrityAlarm(alarmPath, guardName string, in core.GuardInput, reaso
 	_, _ = f.Write(append(buf, '\n'))
 }
 
+type Guard struct {
+	Emit func(projectRoot string, e signalcenter.Event)
+}
+
 func RunGuard(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	return Guard{}.Run(args, stdin, stdout, stderr)
+}
+
+func (g Guard) Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve guard", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	var evolveDir string
@@ -116,12 +126,12 @@ func RunGuard(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "evolve guard %s: stdin parse: %v\n", name, err)
 		return 10
 	}
-	g, err := buildGuard(name, evolveDir, bypass)
+	kernel, err := buildGuard(name, evolveDir, bypass)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve guard: %v\n", err)
 		return 10
 	}
-	dec := g.Decide(context.Background(), in)
+	dec := kernel.Decide(context.Background(), in)
 	logPath := filepath.Join(evolveDir, "guards.log")
 	appendGuardsLog(logPath, name, dec.Allow, dec.Reason)
 	if dec.Alarm {
@@ -132,12 +142,25 @@ func RunGuard(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "%s\n", buf)
 	}
 	if !dec.Allow {
+		g.recordCellDenial(evolveDir, guards.Denial{Guard: name, Path: guards.DeniedPath(in), Reason: dec.Reason})
 		if dec.Reason != "" {
 			fmt.Fprintf(stderr, "[guard:%s] DENY: %s\n", name, dec.Reason)
 		}
 		return 2
 	}
 	return 0
+}
+
+func (g Guard) recordCellDenial(evolveDir string, d guards.Denial) {
+	e, inCell := guards.DenialEvent(os.Getenv(ipcenv.DispatchIDKey), d)
+	if g.Emit == nil || !inCell {
+		return
+	}
+	root := os.Getenv("EVOLVE_PROJECT_ROOT")
+	if root == "" {
+		root = filepath.Dir(evolveDir)
+	}
+	g.Emit(root, e)
 }
 
 func readGuardInput(r io.Reader) (core.GuardInput, error) {

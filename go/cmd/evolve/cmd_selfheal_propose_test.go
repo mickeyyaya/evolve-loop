@@ -103,7 +103,7 @@ func proposeProject(t *testing.T, healing string) string {
 	return root
 }
 
-func fakeBridgeAgent(t *testing.T, b *diagnosisBridge) func([]string, io.Reader, io.Writer, io.Writer) int {
+func fakeBridgeAgent(t *testing.T, b core.Bridge) func([]string, io.Reader, io.Writer, io.Writer) int {
 	t.Helper()
 	orig := runner.DefaultRouter
 	t.Cleanup(func() { runner.DefaultRouter = orig })

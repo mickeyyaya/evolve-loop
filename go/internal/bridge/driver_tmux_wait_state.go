@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
+	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
@@ -40,6 +41,8 @@ type replWaitState struct {
 	paneLossTicks           int
 	lastDetectorErr         error
 	cancellationErr         error
+	guardDenial             *guards.Denial
+	lastProgressAt          time.Time
 	attempt                 int
 	intervalStartS          int
 	waitedS                 int

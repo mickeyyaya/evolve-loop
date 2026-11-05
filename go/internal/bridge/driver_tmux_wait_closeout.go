@@ -1,6 +1,10 @@
 package bridge
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
+)
 
 func (w replWaiter) closeout(state *replWaitState) (replWaitResult, int) {
 	if state.completed {
@@ -24,6 +28,9 @@ func (w replWaiter) closeout(state *replWaitState) (replWaitResult, int) {
 	strippedPane := strippedForExhaustionScan(state.result.lastGoodPane, w.responder.injectedPrompt)
 	warnExhaustionRegexDrift(w.deps.Stderr, w.prefix, w.launch.name, strippedPane, state.paneProfile.ExhaustedRegex)
 	transient := classifyTransientPane(w.launch.name, strippedPane)
+	if denial, found := guards.DenialOf(w.cfg.ProjectRoot, w.cfg.DispatchID); found && !denial.At.Before(state.lastProgressAt) {
+		state.guardDenial = &denial
+	}
 	w.writeArtifactTimeoutMarker(state, transient)
 
 	if state.transientShortcircuit && w.ctx.Err() == nil {

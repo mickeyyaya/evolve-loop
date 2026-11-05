@@ -57,6 +57,7 @@ type Envelope struct {
 	Workspace    string                   `json:"workspace,omitempty"`
 	Cloud        *cloudlaunch.Session     `json:"cloud,omitempty"`
 	Error        string                   `json:"error,omitempty"`
+	Cause        string                   `json:"cause,omitempty"`
 }
 
 type runOptions struct {
@@ -375,9 +376,17 @@ func emit(o runOptions, r standaloneRun, out launchOutcome, recordPath string, f
 		env.Workspace = r.workspace
 	}
 	if failure != nil {
-		env.Error = failure.Error()
+		env.Error, env.Cause = failure.Error(), launchCause(failure)
 	}
 	printJSON(stdout, env)
+}
+
+func launchCause(err error) string {
+	var cause core.LaunchCause
+	if errors.As(err, &cause) {
+		return cause.Cause
+	}
+	return ""
 }
 
 func exitCode(resp core.PhaseResponse, runErr error) int {

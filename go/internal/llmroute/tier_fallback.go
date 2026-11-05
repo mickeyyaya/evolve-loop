@@ -82,9 +82,19 @@ var ErrNoPermittedAttempt = errors.New("llmroute: the tier ceiling permits no at
 
 const ExitUnknownPromptNotQuota = 1085
 
+const (
+	CauseGuardRefused        = "guard_refused"
+	ExitGuardRefusedTerminal = 1081
+)
+
+const exitArtifactTimeout = 81
+
 func TieringExit(exit int, cause string) int {
-	if exit == exitQuotaExhausted && cause == "unknown_prompt" {
+	switch {
+	case exit == exitQuotaExhausted && cause == "unknown_prompt":
 		return ExitUnknownPromptNotQuota
+	case exit == exitArtifactTimeout && cause == CauseGuardRefused:
+		return ExitGuardRefusedTerminal
 	}
 	return exit
 }

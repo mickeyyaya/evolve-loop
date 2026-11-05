@@ -21,6 +21,7 @@
   - Only exit 81 has this rule. No other cause changes.
 - **The marker.** `ArtifactTimeoutMarker` prefixes the one self-describing summary line. It is hyphenated and followed by colon-space. It can then never collide with the `artifact_timeout` stop-kind string. The classifier takes the last `[bridge]`-prefixed candidate. Earlier free-form diagnostics are sanitized, and closeout writes the authoritative marker last.
 - **The typed sub-cause never comes from prose.** `timeoutCauseCode` reads only the `cause=` value. It accepts the value only if `Known()` says so. On exit 81 the cause code of the ledger is that sub-cause, else the code of the row.
+- **`guard_refused`.** The closeout writes this cause when the stall limit ends a dispatch that a kernel guard denied. The reason names the guard and the path, so the summary never says quota. `llmroute.CauseGuardRefused` spells the same token, and `TestTimeoutGuardRefused_IsTheCauseThatEndsTheChain` keeps the two spellings one. This leaf does not import `llmroute`.
 - **Exit 85 (unknown prompt).** The report line is the escalation line of the auto-responder, else the corroborated quota wall, else nothing. The ledger sub-cause is the pattern that the responder matched. A corroborated wall gives `rate_limit`. A prompt that nobody recognised gives an empty sub-cause.
 - **Bounds.** The cause line and the summary are cut at a rune boundary, never inside a UTF-8 sequence. `maxCauseRunes` bounds the cause line. The larger `maxSummaryRunes` bounds the summary. A cut ends in an ellipsis.
 

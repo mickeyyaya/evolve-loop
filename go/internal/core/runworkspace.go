@@ -8,6 +8,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 func ResolveCycleStatePath(evolveDir string) string {
@@ -42,4 +43,11 @@ const CycleStateFile = "cycle-state.json"
 
 func RunWorkspacePath(projectRoot string, cycle int) string {
 	return paths.RunWorkspace(projectRoot, cycle)
+}
+
+func SignalStreamPath(projectRoot string, cycle int) string {
+	if cycle > 0 {
+		return filepath.Join(RunWorkspacePath(projectRoot, cycle), signalcenter.StreamFileName)
+	}
+	return filepath.Join(paths.EvolveDirOf(projectRoot), signalcenter.StreamFileName)
 }

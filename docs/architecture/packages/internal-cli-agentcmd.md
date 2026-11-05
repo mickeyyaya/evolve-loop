@@ -57,6 +57,8 @@
   - `--project-root` is accepted for the contract of §5, and the table is the same for each root.
   - Pinned by `TestAgentCapabilities_JSONListsEachVerbOfTheTableWithDefaultClassD` and `TestAgentCapabilities_TextNamesEachClassAndAStrayWordIsUsage`.
 
+- **The cause of a failed launch.** The JSON envelope has the field `cause`. It is the `core.LaunchCause` of the run error, for example `guard_refused`. A caller reads this typed field and never parses the error text.
+
 ## Invariants
 
 - The run writes nothing outside its run workspace except the ledger files, the launch record and the event channels. Pinned by `TestAgentRun_AdversarialReviewDiffOnStdinPrintsTheReportAndLeavesNoCycleFootprint`, which snapshots the whole project before and after.

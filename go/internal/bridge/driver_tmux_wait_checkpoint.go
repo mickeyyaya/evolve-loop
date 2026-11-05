@@ -40,6 +40,9 @@ func (w replWaiter) reviewCheckpoint(state *replWaitState, elapsed int, curPane 
 	}
 
 	progressed := state.livenessCenter.Changed(w.launch.session)
+	if progressed {
+		state.lastProgressAt = w.deps.Now()
+	}
 	if renderWedged && livenessState == panestream.LivenessIdle {
 		livenessState = panestream.LivenessBusyButStagnant
 	}
