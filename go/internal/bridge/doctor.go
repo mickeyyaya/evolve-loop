@@ -61,11 +61,24 @@ func (e *Engine) doctorHome() string {
 	return os.Getenv("HOME")
 }
 
+const ClaudeKeychainService = "Claude Code-credentials"
+
+func ClaudeCredentialsPath(home string) string {
+	return filepath.Join(home, ".claude", ".credentials.json")
+}
+
+func KeychainAttributesArgs(service string) []string {
+	return []string{"find-generic-password", "-s", service}
+}
+
 func defaultKeychainProbe(d Deps) func(service string) bool {
-	if runtime.GOOS != "darwin" {
+	return keychainProbe(runtime.GOOS, d.Runner)
+}
+
+func keychainProbe(goos string, runner CmdRunner) func(service string) bool {
+	if goos != "darwin" {
 		return func(string) bool { return false }
 	}
-	runner := d.Runner
 	return func(service string) bool {
 		if runner == nil || service == "" {
 			return false
@@ -73,7 +86,7 @@ func defaultKeychainProbe(d Deps) func(service string) bool {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 		rc, err := runner(ctx, "security", "",
-			[]string{"find-generic-password", "-s", service}, nil, nil, io.Discard, io.Discard)
+			KeychainAttributesArgs(service), nil, nil, io.Discard, io.Discard)
 		return err == nil && rc == 0
 	}
 }
@@ -82,11 +95,11 @@ func (e *Engine) doctorAuth(cli string) AuthInfo {
 	home := e.doctorHome()
 	switch driverBinary(cli) {
 	case "claude":
-		if fileNonEmpty(filepath.Join(home, ".claude", ".credentials.json")) {
+		if fileNonEmpty(ClaudeCredentialsPath(home)) {
 			return AuthInfo{Configured: true, Source: "file:credentials.json"}
 		}
-		if e.deps.KeychainProbe != nil && e.deps.KeychainProbe("Claude Code-credentials") {
-			return AuthInfo{Configured: true, Source: "keychain:Claude Code-credentials"}
+		if e.deps.KeychainProbe != nil && e.deps.KeychainProbe(ClaudeKeychainService) {
+			return AuthInfo{Configured: true, Source: "keychain:" + ClaudeKeychainService}
 		}
 		return AuthInfo{Hint: "Run `claude login` or check the macOS Keychain"}
 	case "codex":

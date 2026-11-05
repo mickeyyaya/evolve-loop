@@ -55,6 +55,7 @@ var table = []Verb{
 	{Path: "doctor probe", Class: Allowed},
 	{Path: "release-preflight", Class: Allowed},
 	{Path: "release-consistency", Class: Allowed},
+	{Path: "auth store-times", Class: Allowed},
 	{Path: "version", Class: Allowed},
 	{Path: "help", Class: Allowed},
 	{Path: "quality report", Class: Request, Kind: "quality-reading"},
