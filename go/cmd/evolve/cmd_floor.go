@@ -49,7 +49,7 @@ var floorTierTable = []floorTier{
 	staticFloorTier("vet", "go vet ./...", "GOOS=darwin go vet ./..."),
 	staticFloorTier("integration", "make test-integration"),
 	staticFloorTier("e2e", "make test-e2e"),
-	staticFloorTier("acs-durable", "go test -count=1 -tags acs ./acs/regression/..."),
+	staticFloorTier("acs-durable", "make vet-acs", "go test -count=1 -tags acs ./acs/regression/..."),
 	staticFloorTier("apicover", "make apicover-check"),
 	staticFloorTier("cover", "make cover-strict"),
 	staticFloorTier("ratchet", "go run ./cmd/evolve ratchet check --root ."),

@@ -1,9 +1,6 @@
 package main
 
 import (
-	"os"
-	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 )
@@ -14,16 +11,7 @@ func TestComposedApicoverGate_TargetRecipeEnforces(t *testing.T) {
 	if !ok {
 		t.Fatal("composedGateTargets has no apicover entry — MissingComposedGates would fail-closed, but the gate would never run")
 	}
-	mk, err := os.ReadFile(filepath.Join(apicoverGoRoot(t), "Makefile"))
-	if err != nil {
-		t.Fatalf("read go/Makefile: %v", err)
-	}
-	re := regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(target) + `:[^\n]*\n((?:\t[^\n]*\n?)+)`)
-	m := re.FindSubmatch(mk)
-	if m == nil {
-		t.Fatalf("composedGateTargets[\"apicover\"] = %q, but go/Makefile has no such target — the composed gate would report fail-closed on every run", target)
-	}
-	recipe := string(m[1])
+	recipe := strings.Join(makeRecipe(t, apicoverGoRoot(t), target), "\n")
 	if !strings.Contains(recipe, "-enforce") {
 		t.Fatalf("composedGateTargets[\"apicover\"] = %q whose recipe never passes -enforce — apicover.Run exits 0 regardless of uncovered exports, so the composed gate is a no-op (the six-recurrence warnship-apicover-ci-gap class).\nrecipe:\n%s", target, recipe)
 	}

@@ -3,7 +3,6 @@
 package cycle298
 
 import (
-	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -11,7 +10,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/flagregistry"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 

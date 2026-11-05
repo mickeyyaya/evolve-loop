@@ -107,7 +107,7 @@ func TestC1391_005_ResolvePrefersDigestFileWhenPresent(t *testing.T) {
 	}
 	writeProfileFile(t, dir, "scout", `{"name":"scout","digest_file":"digest.md","system_prompt_file":"rules.md"}`)
 
-	got := systemprompt.Resolve("scout", dir, nil)
+	got := systemprompt.Resolve("scout", dir)
 	if got != "digest content here" {
 		t.Errorf("Resolve() = %q, want digest_file content %q (digest_file must win over system_prompt_file when present)", got, "digest content here")
 	}
@@ -120,7 +120,7 @@ func TestC1391_006_ResolveFallsBackWhenDigestFileMissing(t *testing.T) {
 	}
 	writeProfileFile(t, dir, "scout", `{"name":"scout","digest_file":"missing-digest.md","system_prompt_file":"rules.md"}`)
 
-	got := systemprompt.Resolve("scout", dir, nil)
+	got := systemprompt.Resolve("scout", dir)
 	if got != "fallback content" {
 		t.Errorf("Resolve() = %q, want fallback to system_prompt_file content %q when digest_file is absent on disk", got, "fallback content")
 	}
@@ -130,7 +130,7 @@ func TestC1391_007_ResolveUnchangedWhenDigestFileUnset(t *testing.T) {
 	dir := t.TempDir()
 	writeProfileFile(t, dir, "build", `{"name":"build","system_prompt":"be terse"}`)
 
-	got := systemprompt.Resolve("build", dir, nil)
+	got := systemprompt.Resolve("build", dir)
 	if got != "be terse" {
 		t.Errorf("Resolve() = %q, want %q (existing inline system_prompt precedence must be unaffected by the digest_file addition)", got, "be terse")
 	}

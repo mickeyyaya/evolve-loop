@@ -40,7 +40,7 @@ func assertNoCompileInParseHint(t *testing.T) {
 func TestC334_001_ParseHintBehaviourPreservedViaCompute(t *testing.T) {
 	fixedNow := quotareset.Options{Now: func() time.Time { return refNow }}
 	withHours := func(h float64) quotareset.Options {
-		return quotareset.Options{Now: func() time.Time { return refNow }, HoursFn: func() float64 { return h }}
+		return quotareset.Options{Now: func() time.Time { return refNow }, DefaultHours: h}
 	}
 
 	if r, err := quotareset.Compute(writeHint(t, "resets 8:30pm"), fixedNow); err != nil {

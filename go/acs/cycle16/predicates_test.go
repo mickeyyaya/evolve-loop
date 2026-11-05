@@ -145,7 +145,7 @@ func TestC16_004_ProcessEnvDoesNotOverrideSystemprompt(t *testing.T) {
 
 	t.Setenv("EVOLVE_SYSTEM_PROMPT", "from-process-env")
 
-	got := systemprompt.Resolve("build", dir, nil)
+	got := systemprompt.Resolve("build", dir)
 	if got != "from-profile" {
 		t.Errorf("RED: systemprompt.Resolve with process env set returned %q; want \"from-profile\".\n"+
 			"Builder must update systemprompt.go to call envchain.ResolveNoOS (drops os.Getenv tier).\n"+

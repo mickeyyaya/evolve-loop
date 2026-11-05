@@ -33,7 +33,7 @@ func TestC523_001_OverlappingDeclaredFilesCollapseToOneLane(t *testing.T) {
 		{"id":"alpha","files":["go/internal/fleet/triageplan.go"]},
 		{"id":"beta","files":["go/internal/fleet/triageplan.go"]}
 	]}`)
-	specs, err := fleet.PlanFromTriage(decisionJSON, nil, 2)
+	specs, _, err := fleet.PlanFromTriage(decisionJSON, nil, 2, nil)
 	if err != nil {
 		t.Fatalf("PlanFromTriage returned error: %v", err)
 	}
@@ -50,7 +50,7 @@ func TestC523_002_DisjointDeclaredFilesSpreadToCountLanes(t *testing.T) {
 		{"id":"alpha","files":["go/internal/fleet/a.go"]},
 		{"id":"beta","files":["go/internal/fleet/b.go"]}
 	]}`)
-	specs, err := fleet.PlanFromTriage(decisionJSON, nil, 2)
+	specs, _, err := fleet.PlanFromTriage(decisionJSON, nil, 2, nil)
 	if err != nil {
 		t.Fatalf("PlanFromTriage returned error: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestC523_003_NoDeclaredFilesFallsBackToIdIsland(t *testing.T) {
 		{"id":"gamma"},
 		{"id":"delta"}
 	]}`)
-	specs, err := fleet.PlanFromTriage(decisionJSON, nil, 2)
+	specs, _, err := fleet.PlanFromTriage(decisionJSON, nil, 2, nil)
 	if err != nil {
 		t.Fatalf("PlanFromTriage returned error: %v", err)
 	}
@@ -84,7 +84,7 @@ func TestC523_004_CountBelowTwoCollapsesAllToSingleLane(t *testing.T) {
 		{"id":"alpha","files":["go/internal/fleet/a.go"]},
 		{"id":"beta","files":["go/internal/fleet/b.go"]}
 	]}`)
-	specs, err := fleet.PlanFromTriage(decisionJSON, nil, 1)
+	specs, _, err := fleet.PlanFromTriage(decisionJSON, nil, 1, nil)
 	if err != nil {
 		t.Fatalf("PlanFromTriage returned error: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestC523_005_MixedBacklogGroupsOverlapAndIsolatesDisjoint(t *testing.T) {
 		{"id":"beta","files":["go/internal/fleet/shared.go"]},
 		{"id":"gamma","files":["go/internal/fleet/other.go"]}
 	]}`)
-	specs, err := fleet.PlanFromTriage(decisionJSON, nil, 2)
+	specs, _, err := fleet.PlanFromTriage(decisionJSON, nil, 2, nil)
 	if err != nil {
 		t.Fatalf("PlanFromTriage returned error: %v", err)
 	}

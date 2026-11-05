@@ -297,6 +297,37 @@ A predicate is repointed when a successor test pins the same scenario. It is nar
 
 The same item changes one more predicate. `TestC1678_011` now parses the standard output alone. It used to append the standard error after the output, and a warning on the standard error made the JSON invalid.
 
+## Every acs package compiles in CI (2026-11-03)
+
+CI now compiles every package under `go/acs`, so a change that breaks a frozen predicate fails its own pull request.
+
+**F1.** On 2026-11-02, `cd go && go vet -tags acs ./acs/...` showed compile errors in 10 packages. Each error came from a changed internal API.
+*Implication:* nothing compiled the `acs` tag outside `go/acs/regression`, so the breaks went to `main` without a red check.
+
+**F2.** A lane must not edit a frozen predicate. A lane that touched a broken package stopped at the frozen-check gate, and it had no repair path.
+*Implication:* the change that breaks a predicate must also repair it, in the same pull request.
+
+| Id | Decision | Because | Rejected option and why |
+|---|---|---|---|
+| D1 | The CI job `acs-durable` runs `make vet-acs` before its durable suite. The target runs `go vet -tags acs ./acs/...`. | F1, F2 | A new job in `required.yml`. The job `acs-durable` already feeds `acs_result` to the required aggregator, so a new job adds wiring and no protection. |
+| D2 | The `acs-durable` tier of `evolve floor` runs the same target. | The floor mirrors the required CI steps, and `TestFloorRun_TierCommandsMatchRequiredCI` pins each pair. | Leave the floor as it was. A local floor run then passes on a tree that CI refuses. |
+| D3 | Each broken predicate moves to the current API and keeps its assertion. | Every subject still exists, so no predicate goes to the archive. | Archive the 10 packages. Their behavior still exists, and the archive then hides live protection. |
+
+The target takes about 15 s on a cloud host (measured 2026-11-03). It runs on each pull request that is not docs-only.
+
+### The migrations of 2026-11-03
+
+| Package | API change | Migration | Intent kept |
+|---|---|---|---|
+| `cycle1275` | `router.MintSpec` has no `CLI` field since X19a (35360e6b). | The mint inputs drop the `cli` key. `TestC1275_001` requires a mint with no CLI. `TestC1275_004` expects the wire form `{"prompt":"p","tier":"deep"}`. | A minted phase carries its select metadata, and unset metadata stays out of the wire form. |
+| `cycle16`, `cycle1391` | `systemprompt.Resolve` has no environment argument. | The calls pass the agent and the profile directory. | The process environment does not override the profile, and the digest file wins over the prompt file. |
+| `cycle1694` | `treefence` has no `TakeTracked`. No commit on `main` defines it. | `TestC1694_011` calls `treefence.TakeStaged(ctx, root, nil)`. With no path, the snapshot holds the tracked edits and the staged files. | An untracked input that is not in the ship tree fails the predicate. |
+| `cycle1911` | `bridgechain.ApplyCLIHealthBench` has no environment map. | The call drops the map. | A scoped bench changes the chain of the walled model group only. |
+| `cycle24` | `llmroute.Resolve` takes an `llmroute.AgentOverride` after the environment map. | The calls pass an empty `llmroute.AgentOverride{}`. | The process environment does not select the CLI or the model, and a profile CLI wins. |
+| `cycle298` | The file has no `TestC298_001`, but its imports `os` and `flagregistry` stayed. | The two unused imports go. | The other three predicates do not change. |
+| `cycle334` | `quotareset.Options` has the value `DefaultHours` in place of the function `HoursFn`. | The helper sets `DefaultHours`. | A hint that does not parse falls back to the default hours. |
+| `cycle523`, `cycle541` | `fleet.PlanFromTriage` takes a `fleet.RoutedFn` and also returns the refused items. | The calls pass `nil` as the function and ignore the refused items. | The plan partitions the lanes by the declared files of each card. |
+
 ## Lifecycle
 
 ```
