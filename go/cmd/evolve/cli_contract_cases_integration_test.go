@@ -7,11 +7,13 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -32,6 +34,11 @@ func failCall(want int, prep func(*testing.T) map[string]string, args ...string)
 
 func unheld(c contractCall) contractCall {
 	c.unheld = true
+	return c
+}
+
+func silent(c contractCall) contractCall {
+	c.silent = true
 	return c
 }
 
@@ -64,7 +71,7 @@ var contractCases = []contractVerbCases{
 	{"events watch", []contractCall{okCall(contractLoopChannel, "events", "watch", "--channel", "loop", "--since", "all", "--until", "kind=loop.exit", prFlag, "{root}"), usageCall(contractPlane, "events", "watch", prFlag, "{root}"), failCall(cliExitInput, contractPlane, "events", "watch", "--channel", "nosuch", prFlag, "{root}")}},
 	{"ledger verify", []contractCall{okCall(contractPlane, "ledger", "verify", prFlag, "{root}"), usageCall(contractPlane, "ledger", "verify", "--bogus", prFlag, "{root}"), failCall(cliExitIO, contractBrokenLedger, "ledger", "verify", prFlag, "{root}")}},
 	{"dossier verify", []contractCall{okCall(contractPlane, "dossier", "verify", prFlag, "{root}"), usageCall(contractPlane, "dossier", "verify", "extra", prFlag, "{root}"), failCall(cliExitFailed, contractBadDossier, "dossier", "verify", prFlag, "{root}")}},
-	{"dossier show", []contractCall{okCall(contractDossier, "dossier", "show", "1", prFlag, "{root}"), usageCall(contractPlane, "dossier", "show", prFlag, "{root}"), failCall(cliExitFailed, contractPlane, "dossier", "show", "5", prFlag, "{root}")}},
+	{"dossier show", []contractCall{silent(okCall(contractDossier, "dossier", "show", "1", prFlag, "{root}")), silent(usageCall(contractPlane, "dossier", "show", prFlag, "{root}")), silent(failCall(cliExitFailed, contractPlane, "dossier", "show", "5", prFlag, "{root}"))}},
 	{"cli-routing show", []contractCall{okCall(contractRouting, "cli-routing", "show", "--static", prFlag, "{root}"), usageCall(contractRouting, "cli-routing", "show", "--bogus", prFlag, "{root}"), failCall(cliExitFailed, contractBadPolicy, "cli-routing", "show", "--static", prFlag, "{root}")}},
 	{"cli-routing check", []contractCall{okCall(contractRouting, "cli-routing", "check", prFlag, "{root}"), usageCall(contractRouting, "cli-routing", "check", "extra", prFlag, "{root}"), failCall(cliExitFailed, contractBadPolicy, "cli-routing", "check", prFlag, "{root}")}},
 	{"cli-routing explain", []contractCall{okCall(contractRouting, "cli-routing", "explain", "auditor", "--static", prFlag, "{root}"), usageCall(contractRouting, "cli-routing", "explain", prFlag, "{root}"), failCall(cliExitFailed, contractBadPolicy, "cli-routing", "explain", "auditor", "--static", prFlag, "{root}")}},
@@ -244,28 +251,100 @@ func contractArgs(args []string, vars map[string]string) []string {
 	return append(out, "--json")
 }
 
-func contractTreeHash(t *testing.T, root string) string {
+func contractSnapshot(t *testing.T, roots []string) map[string]string {
 	t.Helper()
-	h := sha256.New()
-	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		rel, _ := filepath.Rel(root, path)
-		h.Write([]byte(rel + "\x00" + d.Type().String() + "\x00"))
-		if d.Type().IsRegular() {
-			body, err := os.ReadFile(path)
+	snap := map[string]string{}
+	for _, root := range roots {
+		err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
-			h.Write(body)
+			info, err := d.Info()
+			if err != nil {
+				return err
+			}
+			sum := sha256.New()
+			if d.Type().IsRegular() {
+				body, err := os.ReadFile(path)
+				if err != nil {
+					return err
+				}
+				sum.Write(body)
+			}
+			snap[path] = fmt.Sprintf("%s %o %d %s", d.Type().String(), info.Mode().Perm(), info.ModTime().UnixNano(), hex.EncodeToString(sum.Sum(nil)))
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
 		}
-		return nil
-	})
+	}
+	return snap
+}
+
+func contractChanged(before, after map[string]string) []string {
+	var changed []string
+	for path, state := range after {
+		if before[path] != state {
+			changed = append(changed, path)
+		}
+	}
+	for path := range before {
+		if _, ok := after[path]; !ok {
+			changed = append(changed, path)
+		}
+	}
+	sort.Strings(changed)
+	return changed
+}
+
+func contractHashes(v coreVerb, c contractCall) bool {
+	if strings.HasPrefix(v.path, "debug ") {
+		return true
+	}
+	return v.class == availAlways && c.kind == contractSuccess
+}
+
+func contractShims(t *testing.T) string {
+	t.Helper()
+	bin := t.TempDir()
+	log := filepath.Join(t.TempDir(), "calls.log")
+	script := "#!/bin/sh\necho \"$(basename \"$0\") $*\" >> " + log + "\nexit 99\n"
+	for _, tool := range []string{"git", "gh"} {
+		if err := os.WriteFile(filepath.Join(bin, tool), []byte(script), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", bin)
+	return log
+}
+
+func contractScratch(t *testing.T, name string) string {
+	t.Helper()
+	dir := t.TempDir()
+	t.Setenv(name, dir)
+	return dir
+}
+
+func contractWorkdir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	prev, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
 	}
-	return hex.EncodeToString(h.Sum(nil))
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(prev) })
+	return dir
+}
+
+func contractGate(t *testing.T, c contractCall) dispatchGate {
+	t.Helper()
+	if c.unheld {
+		return dispatchGate{open: unheldStore(t, "enforce")}
+	}
+	return dispatchGate{open: heldStore(t)}
 }
 
 func runContractCall(t *testing.T, v coreVerb, c contractCall) {
@@ -275,23 +354,31 @@ func runContractCall(t *testing.T, v coreVerb, c contractCall) {
 		vars = c.prep(t)
 	}
 	args := contractArgs(c.args, vars)
-	before := ""
-	if root := vars["root"]; root != "" && v.class == availAlways && c.kind == contractSuccess {
-		before = contractTreeHash(t, root)
+	gate := contractGate(t, c)
+	shimLog := ""
+	if c.silent {
+		shimLog = contractShims(t)
+	}
+	watched := []string{vars["root"], contractScratch(t, "HOME"), contractScratch(t, "TMPDIR"), contractWorkdir(t)}
+	var before map[string]string
+	if vars["root"] != "" && contractHashes(v, c) {
+		before = contractSnapshot(t, watched)
 	}
 	var stdout, stderr bytes.Buffer
 	var rc int
-	switch {
-	case c.run != nil:
+	if c.run != nil {
 		rc = runEnveloped(v, func(o, e io.Writer) int { return c.run(t, vars)(args, o, e) }, &stdout, &stderr)
-	case c.unheld:
-		rc = dispatchWith(dispatchGate{open: unheldStore(t, "enforce")}, args, strings.NewReader(c.stdin), &stdout, &stderr)
-	default:
-		rc = dispatchWith(dispatchGate{open: heldStore(t)}, args, strings.NewReader(c.stdin), &stdout, &stderr)
+	} else {
+		rc = dispatchWith(gate, args, strings.NewReader(c.stdin), &stdout, &stderr)
 	}
 	checkContractEnvelope(t, v, c, rc, stdout.String(), stderr.String())
-	if before != "" && contractTreeHash(t, vars["root"]) != before {
-		t.Errorf("%s is an always verb, but %v changed the tree of %s", v.path, args, vars["root"])
+	if before != nil {
+		if changed := contractChanged(before, contractSnapshot(t, watched)); len(changed) > 0 {
+			t.Errorf("%s is an always verb, but %v changed the tree: %v", v.path, args, changed)
+		}
+	}
+	if raw, _ := os.ReadFile(shimLog); len(raw) > 0 {
+		t.Errorf("%s %v ran a forbidden command: %s", v.path, args, raw)
 	}
 }
 

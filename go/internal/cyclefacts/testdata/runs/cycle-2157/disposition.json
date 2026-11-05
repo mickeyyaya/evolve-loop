@@ -1,0 +1,12 @@
+{
+  "cycle": 2157,
+  "fingerprint": "build|infra-error|026f4c77b144",
+  "recurrence": 0,
+  "legitimacy": "legit-rejection",
+  "root_cause": {"layer": "pipeline-code", "summary": "the resume review loop never runs the blocker prover, so a declared protected-path blocker on a misrouted console item got more corrections instead of the console route"},
+  "salvage": {"worktree_has_value": true, "pointer": ".evolve/worktrees/cycle-cd3ae73e-2157 (base f2fdca10f, uncommitted TDD tests, eval and serial-list entry; fix design in build-report.md)"},
+  "urgency": "P1",
+  "justification": "The floor reds are real: the production fix is absent, per build-report.md and red-run.txt. resume.go:417 calls resumedBlockerRoute, only cyclerun_correction.go:40 calls provenBlocker, and signals.ndjson has no blocker signal. The digest pre_class infra-error is a false label from the needle quota matching a test name.",
+  "routing": "console",
+  "proposed_item": ""
+}
