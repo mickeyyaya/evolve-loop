@@ -23,6 +23,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelquery"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/setup"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
@@ -33,7 +34,7 @@ func shouldRefreshCatalog(cat modelcatalog.Catalog, now time.Time, autoRefresh b
 	return cat.IsStale(now, modelcatalog.DefaultTTL)
 }
 
-func makeCatalogRefresher(projectRoot, evolveDir, stage string) func(context.Context) error {
+func makeCatalogRefresher(projectRoot, evolveDir, stage string, emit signalcenter.Listener) func(context.Context) error {
 	return func(ctx context.Context) error {
 		return runStagedCatalogRefresh(ctx, evolveDir, stage, func(ctx context.Context, prior modelcatalog.Catalog) (modelcatalog.Catalog, error) {
 			plugin := os.Getenv("EVOLVE_PLUGIN_ROOT")
@@ -45,11 +46,11 @@ func makeCatalogRefresher(projectRoot, evolveDir, stage string) func(context.Con
 				PluginRoot: plugin, AdaptersDir: filepath.Join(plugin, "adapters"),
 			})
 			return liveRefresh(ctx, rep, projectRoot, evolveDir, prior, os.Stderr)
-		}, time.Now, os.Stderr)
+		}, time.Now, os.Stderr, emit)
 	}
 }
 
-func runStagedCatalogRefresh(ctx context.Context, evolveDir, stage string, refresh func(context.Context, modelcatalog.Catalog) (modelcatalog.Catalog, error), now func() time.Time, log io.Writer) error {
+func runStagedCatalogRefresh(ctx context.Context, evolveDir, stage string, refresh func(context.Context, modelcatalog.Catalog) (modelcatalog.Catalog, error), now func() time.Time, log io.Writer, emit signalcenter.Listener) error {
 	if stage != "shadow" && stage != "enforce" {
 		return nil
 	}
@@ -82,13 +83,14 @@ func runStagedCatalogRefresh(ctx context.Context, evolveDir, stage string, refre
 		}
 		return modelcatalog.WriteShadow(evolveDir, fresh)
 	}
-	return commitKeepingLivePicks(evolveDir, live, fresh, log)
+	return commitKeepingLivePicks(evolveDir, live, fresh, log, emit)
 }
 
-func commitKeepingLivePicks(evolveDir string, live, fresh modelcatalog.Catalog, log io.Writer) error {
+func commitKeepingLivePicks(evolveDir string, live, fresh modelcatalog.Catalog, log io.Writer, emit signalcenter.Listener) error {
 	merged, kept := modelcatalog.KeepLivePicks(live, fresh)
 	for _, cli := range kept {
 		fmt.Fprintf(log, "[models] WARN catalog_refresh_degraded %s: the live list failed (%s); the prior live pick stays\n", cli, fresh.CLIs[cli].FallbackReason)
+		emit(modelcatalog.RefreshDegradedEvent("commitKeepingLivePicks", cli, fresh.CLIs[cli].FallbackReason))
 	}
 	_, cerr := modelcatalog.Commit(evolveDir, merged, log)
 	return cerr

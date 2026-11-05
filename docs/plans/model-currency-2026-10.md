@@ -5,7 +5,7 @@
 > - **Decision:** a newer CLI version found at a wave boundary is installed **automatically at that boundary**, smoke-tested, and the catalog is then refreshed.
 > - **Extends:** [model-discovery-and-catalog.md](../architecture/model-discovery-and-catalog.md).
 > - **Decision record:** ADR-0120, which lands with C2.
-> - **C3 status (2026-10-27):** the C3 stage flip that the operator approved landed: the checked-in policy sets `catalog.auto_refresh: true` and `catalog.refresh_stage: enforce`. Two C3 guards landed with it. The boot refresh and the `catalog_refresh_degraded` ledger event are open, and C2 is not built. Item: `model-currency-c3-adopt-only-live-picks`. See [C3 landing notes](#c3-landing-notes-2026-10-27).
+> - **C3 status (2026-10-27):** the C3 stage flip that the operator approved landed: the checked-in policy sets `catalog.auto_refresh: true` and `catalog.refresh_stage: enforce`. Two C3 guards landed with it. The boot refresh and the `CONFIG_CATALOG_REFRESH_DEGRADED` Signal Center event landed later (cycle 2176). C2 is not built. Item: `model-currency-c3-adopt-only-live-picks`. See [C3 landing notes](#c3-landing-notes-2026-10-27).
 
 ## Context: why the loop ran Gemini 3.7 Flash while 3.8 was available
 
@@ -33,7 +33,7 @@ The operator's routing table then decides which **families** may run each tier (
 |---|---|---|---|
 | C1 | **Classifier fallback + loud degradation + offline 3.8 baseline** (in flight, `dev/cl-models38`) | The classifier walks every ready CLI until one classifies. Each CLI that falls back to `detect` is reported per CLI. If none classified live, the command exits non-zero. agy `model_tier_map` becomes fast = Gemini 3.8 Flash (Low), balanced = Gemini 3.8 Flash (High). | B1, B2 |
 | C2 | **Lineage-keyed reuse** | The reuse gate keys on the **set of lineages** (version-free `LineageKey`s) plus the policy, not on the exact candidates. The classifier runs only for a **new lineage**. See [Component details](#component-details). | B3 |
-| C3 | **Always checked, always adopted** | `catalog.refresh_stage: enforce` in the checked-in policy, as the operator decided. The refresh runs at **loop boot** (open, not built) and at cycle start, gated by the TTL. Adoption is **per family** and only from a live listing. See [Component details](#component-details). | B4 (catalog half) |
+| C3 | **Always checked, always adopted** | `catalog.refresh_stage: enforce` in the checked-in policy, as the operator decided. The refresh runs at **loop boot** and at cycle start, gated by the TTL. Adoption is **per family** and only from a live listing. See [Component details](#component-details). | B4 (catalog half) |
 | C4 | **Boundary CLI update** | New verb `evolve cli update [--dry-run] [--json]`. It runs the updater of each subscribed family before the catalog refresh, at the wave boundary. See [Component details](#component-details). | B4 (CLI half) |
 | C5 | **Launch verification** | After a pane boots, the model it reports (agy's banner/footer model; claude's transcript `message.model`) is compared with the catalog's pick for that tier. A mismatch is an abnormal event (`dispatch_model_mismatch`) naming expected and observed, never a block: the policy is "logic, not format". **The agy-claude family slice landed 2026-10-07 and fails over instead of only reporting; see "C5 landing notes" below.** | proves currency on every dispatch |
 | C6 | **Classifier routing** | The model-classifier launch resolves its CLI through the CLI routing table (`internal/cliroute`), replacing the `classifierCLIPreference` literal. This joins the L1b "every launch path" list. Filed as an inbox item by C1. | removes the Go-literal preference |
@@ -82,8 +82,8 @@ The operator's routing table then decides which **families** may run each tier (
   - a list with a new lineage calls the classifier exactly once and announces the lineage;
   - `TestPromoteLatest_*` stays green.
 - **C3:**
-  - a family whose live list fails keeps its prior live pick (never `detect`) and writes `catalog_refresh_degraded`;
-  - a boot-time refresh is TTL-gated (open, not built);
+  - a family whose live list fails keeps its prior live pick (never `detect`) and emits `CONFIG_CATALOG_REFRESH_DEGRADED`;
+  - a boot-time refresh is TTL-gated (landed, cycle 2176);
   - the checked-in policy resolves to `enforce`;
   - a refresh with zero live classifications writes neither catalog and keeps `FetchedAt`, on the live and the shadow catalog. Thus the next cycle start tries again, and does not wait 24h;
   - the verb (`countLiveAndFallback`) and the cycle-start path (`runStagedCatalogRefresh`) both decide this through the one `modelcatalog` predicate (`Catalog.LiveCount()` or its final name), not two copies.
@@ -194,8 +194,8 @@ The operator moved the catalog refresh from `shadow` to `enforce` on 2026-10-27.
 
 **Open after this step.**
 
-- The refresh does not run at loop boot. It runs at each cycle start only.
-- `catalog_refresh_degraded` is a WARN line in the phase log, not a ledger or Signal Center event.
+- Closed in cycle 2176: the refresh runs at loop boot. `bootGateHalts` calls `refreshCatalogAtLoopBoot` after the CLI update and before the preflight. The same TTL gate applies, and a refresher error is one WARN line.
+- Closed in cycle 2176: a family that keeps its prior live pick emits `CONFIG_CATALOG_REFRESH_DEGRADED` (`modelcatalog.RefreshDegradedEvent`) as a Signal Center `config.warning`, one event for each family. The WARN line stays.
 - C2 (lineage-keyed reuse) is not built. A version bump thus calls the classifier once, as it did at `shadow`.
 
 ## C5 landing notes: the agy-claude family slice (2026-10-07)

@@ -133,6 +133,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 
 | Code | Meaning |
 |---|---|
+| `CONFIG_CATALOG_REFRESH_DEGRADED` | a catalog refresh could not list the live models of one CLI family, so the prior live pick of that family stays in the committed catalog; the fields name the family and the fallback reason, and the origin names the composition step |
 | `CONFIG_INERT_PHASE_ENABLE` | a phase is force-enabled (enabled: on) while dynamic_routing is below advisory and it is neither mandatory nor in the static state machine, so the enable never runs it (the cycle-120 confusion); set dynamic_routing>=advisory or remove the enable; fields.step=inert, phase, stage |
 | `CONFIG_PHASE_ROUTING_DEFECT` | loading or routing the phase catalog found a defect that the cycle survives: a builtin registry that does not load, a user spec dropped, clamped or demoted (no persona), an invalid spec left unrouted, a minted phase that is rejected or clashes with a runner, or an anchor that does not resolve, so the phase is placed before audit, a pre-build phase whose slot falls after build, which is left unrouted; the reason is the warning verbatim and the origin names the composition step (cycle wiring or a mint) |
 | `CONFIG_REGISTRY_MALFORMED` | docs/architecture/phase-registry.json was read but is not valid JSON (a trailing comma is the classic); the same compiled-baseline degrade as CONFIG_REGISTRY_UNREADABLE — no triage, no registry order — with the decoder's error in the reason; fields.step=registry, path, err |

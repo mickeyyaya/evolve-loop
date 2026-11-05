@@ -36,7 +36,7 @@ func TestRunStagedCatalogRefresh_ZeroLiveClassificationsWriteNeitherCatalog(t *t
 
 		rerr := runStagedCatalogRefresh(context.Background(), dir, stage, func(context.Context, modelcatalog.Catalog) (modelcatalog.Catalog, error) {
 			return detectOnly(stageNow(), "agy", "gemini-3.5-flash"), nil
-		}, stageNow, &log)
+		}, stageNow, &log, noEmit)
 
 		if rerr != nil {
 			t.Fatalf("%s: %v", stage, rerr)
@@ -68,7 +68,7 @@ func TestRunStagedCatalogRefresh_EnforceKeepsThePriorLivePickOfAFamilyWhoseListF
 
 	err := runStagedCatalogRefresh(context.Background(), dir, "enforce", func(context.Context, modelcatalog.Catalog) (modelcatalog.Catalog, error) {
 		return fresh, nil
-	}, stageNow, &log)
+	}, stageNow, &log, noEmit)
 
 	if err != nil {
 		t.Fatalf("enforce: %v", err)
@@ -105,7 +105,7 @@ func TestRunStagedCatalogRefresh_AnUnreadableCatalogIsRefreshedAndARefreshErrorI
 
 		err := runStagedCatalogRefresh(context.Background(), dir, tc.stage, func(context.Context, modelcatalog.Catalog) (modelcatalog.Catalog, error) {
 			return modelcatalog.Catalog{}, boom
-		}, stageNow, &log)
+		}, stageNow, &log, noEmit)
 
 		if !errors.Is(err, boom) {
 			t.Errorf("%s: err = %v, want the refresh error", tc.stage, err)

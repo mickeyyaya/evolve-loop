@@ -363,15 +363,16 @@ func agentRunBridge(projectRoot string, signals *signalcenter.Center) core.Bridg
 }
 
 type orchDeps struct {
-	Storage      core.Storage
-	Ledger       rootLedger
-	Orchestrator *core.Orchestrator
-	Signals      *signalcenter.Center
-	CloseSignals func()
-	Bridge       *bridge.Adapter
-	Runners      map[core.Phase]core.PhaseRunner
-	Router       *cliroute.Router
-	RoutingErr   error
+	Storage          core.Storage
+	Ledger           rootLedger
+	Orchestrator     *core.Orchestrator
+	Signals          *signalcenter.Center
+	CloseSignals     func()
+	Bridge           *bridge.Adapter
+	Runners          map[core.Phase]core.PhaseRunner
+	Router           *cliroute.Router
+	RoutingErr       error
+	CatalogRefresher func(context.Context) error
 }
 
 func (d orchDeps) closeSignals() {
@@ -572,8 +573,8 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	if cfg.ContractGate != config.StageOff {
 		opts = append(opts, core.WithContractVerifier(deliverable.NewVerifierWithCatalogStage(catalog, cfg.PhaseIO)))
 	}
-	opts = append(opts, core.WithCatalogRefresher(makeCatalogRefresher(projectRoot, evolveDir, pol.CatalogConfig().RefreshStage)))
-	opts = append(opts, core.WithCatalogRefreshStage(catalogRefreshStage(pol)))
+	catalogRefresher := makeCatalogRefresher(projectRoot, evolveDir, pol.CatalogConfig().RefreshStage, signals.Emit)
+	opts = append(opts, core.WithCatalogRefresher(catalogRefresher), core.WithCatalogRefreshStage(catalogRefreshStage(pol)))
 
 	opts = append(opts, core.WithDirectivesProvider(makeDirectivesProvider(projectRoot)))
 
@@ -597,22 +598,22 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 
 	opts = append(opts, compositionOptions()...)
 	hostEffects = deliverable.NewHostEffects(catalog, hostInboxClaimer(ld, signals, forbidden))
-	opts = append(opts, core.WithHostEffects(hostEffects))
-	opts = append(opts, core.WithLaneMenu(laneMenuOf(forbidden, wfCfg.Repair.Fixability)))
+	opts = append(opts, core.WithHostEffects(hostEffects), core.WithLaneMenu(laneMenuOf(forbidden, wfCfg.Repair.Fixability)))
 	opts = append(opts, core.WithProtectedSurface(protectedMembership))
 	opts = append(opts, core.WithRepairFixability(repairFixability(protectedMembership, os.Stderr)), auditFixRung(auditFixSite{root: projectRoot, pol: pol, cfg: cfg, route: auditfixports.RouterRoute(cliRouter.Resolve, projectRoot), agent: runAgentCommand, stderr: os.Stderr}))
 	opts = append(opts, core.WithSignalCenter(signals))
 	opts = append(opts, core.WithRequestHandoff(requestHandoff(pol, runAgentCommand, signals.Emit, console)))
 
 	return orchDeps{
-		Storage:      st,
-		Ledger:       ld,
-		Orchestrator: core.NewOrchestrator(st, ld, runners, opts...),
-		Signals:      signals,
-		CloseSignals: closeSignals,
-		Bridge:       br,
-		Runners:      runners,
-		Router:       cliRouter,
+		Storage:          st,
+		Ledger:           ld,
+		Orchestrator:     core.NewOrchestrator(st, ld, runners, opts...),
+		Signals:          signals,
+		CloseSignals:     closeSignals,
+		Bridge:           br,
+		Runners:          runners,
+		Router:           cliRouter,
+		CatalogRefresher: catalogRefresher,
 	}
 }
 

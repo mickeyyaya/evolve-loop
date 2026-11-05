@@ -64,6 +64,7 @@ func bootGateHalts(ctx context.Context, cfg loopConfig, deps orchDeps, lr *loopR
 	if bootCLIUpdateHalts(ctx, cfg, deps, lr, stdout, stderr) {
 		return true
 	}
+	refreshCatalogAtLoopBoot(ctx, deps.CatalogRefresher, stderr)
 	if loopPreflightHalts(cfg, stderr) {
 		lr.StopReason = "preflight_failed"
 		lr.emit(stdout)

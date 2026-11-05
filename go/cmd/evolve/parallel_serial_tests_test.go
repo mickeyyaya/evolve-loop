@@ -621,6 +621,7 @@ var serialTests = map[string]string{
 	"main.TestRunInbox_Consume_StampEdgeCases":                                                                             "sets env through a helper",
 	"main.TestRunInbox_Consume_WithFlagsStampsConsumedRecord":                                                              "sets env through a helper",
 	"main.TestRunLand_AHubThatVanishesAfterTheWorktreeIsAnIOError":                                                         "swaps seam landDevHub",
+	"main.TestRunLoopBatch_RefreshesTheCatalogOnceBeforeThePreflight":                                                      "swaps seams wireOrchestratorDepsFn and runLoopPreflightFn",
 	"main.TestRunLoopBatch_AnnouncesTheLoopAndExitsWithItsCode":                                                            "swaps seam wireOrchestratorDepsFn",
 	"main.TestRunLoopBatch_AnnouncesThroughARealPublisherBeforeItCloses":                                                   "swaps seam wireOrchestratorDepsFn",
 	"main.TestRunLoopBatch_GCHookFiresAfterFinalizeAtBatchEnd":                                                             "swaps seam loopOrchOverride",

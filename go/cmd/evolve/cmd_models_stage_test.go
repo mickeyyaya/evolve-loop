@@ -31,7 +31,7 @@ func TestRunStagedCatalogRefresh_OffIsNoOp(t *testing.T) {
 	err := runStagedCatalogRefresh(context.Background(), dir, "off", func(context.Context, modelcatalog.Catalog) (modelcatalog.Catalog, error) {
 		calls++
 		return modelcatalog.Catalog{}, nil
-	}, stageNow, os.Stderr)
+	}, stageNow, os.Stderr, noEmit)
 	if err != nil || calls != 0 {
 		t.Fatalf("off: err=%v calls=%d, want nil/0", err, calls)
 	}
@@ -57,7 +57,7 @@ func TestRunStagedCatalogRefresh_ShadowWritesShadowOnly(t *testing.T) {
 			t.Errorf("first shadow run should see an EMPTY prior (no shadow file yet), got %#v", prior)
 		}
 		return cannedCatalog(stageNow(), "codex", "gpt-5.6"), nil
-	}, stageNow, &log)
+	}, stageNow, &log, noEmit)
 	if rerr != nil {
 		t.Fatalf("shadow refresh: %v", rerr)
 	}
@@ -87,7 +87,7 @@ func TestRunStagedCatalogRefresh_ShadowTTLGatesOnShadowFile(t *testing.T) {
 	err := runStagedCatalogRefresh(context.Background(), dir, "shadow", func(_ context.Context, prior modelcatalog.Catalog) (modelcatalog.Catalog, error) {
 		calls++
 		return prior, nil
-	}, stageNow, os.Stderr)
+	}, stageNow, os.Stderr, noEmit)
 	if err != nil || calls != 0 {
 		t.Fatalf("fresh shadow should gate the run: err=%v calls=%d", err, calls)
 	}
@@ -100,7 +100,7 @@ func TestRunStagedCatalogRefresh_ShadowTTLGatesOnShadowFile(t *testing.T) {
 			t.Errorf("Prior should be the SHADOW catalog, got %#v", prior)
 		}
 		return cannedCatalog(stageNow(), "codex", "gpt-5.6"), nil
-	}, stageNow, os.Stderr)
+	}, stageNow, os.Stderr, noEmit)
 	if err != nil || calls != 1 {
 		t.Fatalf("stale shadow should run once: err=%v calls=%d", err, calls)
 	}
@@ -111,7 +111,7 @@ func TestRunStagedCatalogRefresh_EnforceCommitsLive(t *testing.T) {
 	dir := t.TempDir()
 	err := runStagedCatalogRefresh(context.Background(), dir, "enforce", func(_ context.Context, prior modelcatalog.Catalog) (modelcatalog.Catalog, error) {
 		return cannedCatalog(stageNow(), "codex", "gpt-5.6"), nil
-	}, stageNow, os.Stderr)
+	}, stageNow, os.Stderr, noEmit)
 	if err != nil {
 		t.Fatalf("enforce: %v", err)
 	}

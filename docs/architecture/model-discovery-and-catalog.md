@@ -206,6 +206,8 @@ The operator's answer is the [model currency plan](../plans/model-currency-2026-
 
 C4 has landed. `evolve cli update` ([internal-cliupdate.md](packages/internal-cliupdate.md)) runs the manifest updater (`update_argv`) of each subscribed family at loop boot and at each later wave boundary. It smoke-tests a changed version with `evolve doctor live`, and it halts the next wave when that smoke fails. It runs before the catalog refresh, so the refresh lists the new version's models.
 
+C3 has landed in full. The loop boot refreshes the catalog once, after the CLI update and before the preflight, and the TTL gates it. A family whose live list failed keeps its prior live pick and emits `CONFIG_CATALOG_REFRESH_DEGRADED`, a Signal Center `config.warning` event.
+
 CLIs stay frozen within a wave, and `cli-version-drift` treats a change the updater recorded in `.evolve/cli-updates.json` as expected. The listers of agy (`agy models`, `agy --help`) start through `modelquery.UseLauncher(bridge.ModelQueryRunner)`. They get the `default_env` of the agy manifest, so a refresh does not start the self-updater of agy in a wave.
 
 ## Deferred
