@@ -26,8 +26,10 @@ const ratchetListPath = "go/" + sizeratchet.OffendersRelPath
 type fakeGH struct {
 	list     string
 	failVerb string
+	failGit  string
 	lease    string
 	calls    [][]string
+	gitCalls []string
 }
 
 func (f *fakeGH) install(t *testing.T) {
@@ -35,9 +37,17 @@ func (f *fakeGH) install(t *testing.T) {
 	prev := ratchetRun
 	t.Cleanup(func() { ratchetRun = prev })
 	ratchetRun = f.run
+	(&fakeRatchetMerge{ci: ciPending}).install(t)
 }
 
 func (f *fakeGH) run(ctx context.Context, name, dir string, args, env []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
+	if name == "git" {
+		f.gitCalls = append(f.gitCalls, strings.Join(args, " "))
+	}
+	if name == "git" && f.failGit != "" && strings.HasPrefix(strings.Join(args, " "), f.failGit) {
+		fmt.Fprintln(stderr, "git "+f.failGit+" refused")
+		return 1, nil
+	}
 	if name == "git" && len(args) > 0 && args[0] == "ls-remote" && f.lease != "" {
 		fmt.Fprintf(stdout, "%s\t%s\n", f.lease, args[len(args)-1])
 		return 0, nil
@@ -106,13 +116,7 @@ func newRatchetOriginWith(t *testing.T, funcLines int, offenders, rawBaseline st
 	seed := gittest.Fixture(t)
 	seed.Write("go/internal/fixture/raw_test.go", "package fixture\n\nimport \"testing\"\n\nfunc TestRaw(t *testing.T) {\n\t_ = []string{"+strconv.Quote("gi"+"t")+", "+strconv.Quote("in"+"it")+"}\n}\n")
 	seed.Write(rawGitBaselinePath, rawBaseline)
-	var src strings.Builder
-	src.WriteString("package fixture\n\nfunc Big() int {\n\ttotal := 0\n")
-	for i := 0; i < funcLines; i++ {
-		fmt.Fprintf(&src, "\ttotal += %d\n", i)
-	}
-	src.WriteString("\treturn total\n}\n")
-	seed.Write("go/internal/fixture/big.go", src.String())
+	seed.Write(bigFixturePath, bigFixtureSource(funcLines))
 	if offenders != "" {
 		seed.Write(ratchetListPath, offenders)
 	}
@@ -122,6 +126,18 @@ func newRatchetOriginWith(t *testing.T, funcLines int, offenders, rawBaseline st
 	seed.Git("remote", "add", "origin", bare.Dir)
 	seed.Git("push", "-q", "origin", "main")
 	return ratchetOrigin{bare: bare, plane: gittest.Clone(t, bare.Dir)}
+}
+
+const bigFixturePath = "go/internal/fixture/big.go"
+
+func bigFixtureSource(funcLines int) string {
+	var src strings.Builder
+	src.WriteString("package fixture\n\nfunc Big() int {\n\ttotal := 0\n")
+	for i := 0; i < funcLines; i++ {
+		fmt.Fprintf(&src, "\ttotal += %d\n", i)
+	}
+	src.WriteString("\treturn total\n}\n")
+	return src.String()
 }
 
 func (o ratchetOrigin) tighten(t *testing.T) (int, string, string) {
@@ -240,10 +256,11 @@ func TestBoundaryRatchetTighten_UpdatesTheOpenTightenPullRequest(t *testing.T) {
 	o := newRatchetOrigin(t, 60, `{"internal/fixture.Big": 90}`)
 	const branch = ratchetBranchPrefix + "2026-10-01"
 	o.plane.Git("checkout", "-q", "-b", "stale")
-	o.plane.Git("commit", "-q", "--allow-empty", "-m", "an older tighten")
+	o.plane.Write(ratchetListPath, "{\n  \"internal/fixture.Big\": 80\n}\n")
+	o.plane.Git("commit", "-q", "-am", "an older tighten")
 	o.plane.Git("push", "-q", "origin", "HEAD:refs/heads/"+branch)
 	o.plane.Git("checkout", "-q", "main")
-	gh := &fakeGH{list: `[{"number":12,"headRefName":"feat/other"},{"number":9,"headRefName":"chore/ratchet-tighten-fork","isCrossRepository":true},{"number":7,"headRefName":"` + branch + `"}]`}
+	gh := &fakeGH{list: `[{"number":12,"headRefName":"feat/other"},{"number":9,"headRefName":"chore/ratchet-tighten-fork","isCrossRepository":true},{"number":7,"headRefName":"` + branch + `","headRefOid":"` + o.bare.Git("rev-parse", branch) + `"}]`}
 	gh.install(t)
 	t.Setenv("EVOLVE_DISPATCH_DEPTH", "")
 	main := o.originHead()
@@ -271,8 +288,8 @@ func TestBoundaryRatchetTighten_ATightListLandsNothing(t *testing.T) {
 	if rc != 0 || errOut != "" || !strings.Contains(out, "ratchet tighten: tight") || o.originHead() != before {
 		t.Fatalf("rc=%d stdout=%q stderr=%q origin moved=%v, want a tight report and no commit", rc, out, errOut, o.originHead() != before)
 	}
-	if len(gh.calls) != 0 {
-		t.Errorf("gh ran %q for a tight list", gh.calls)
+	if len(gh.calls) != 1 || gh.calls[0][1] != "list" {
+		t.Errorf("gh ran %q for a tight list, want only the pull request list", gh.calls)
 	}
 	o.planeIsUntouched(t)
 }
@@ -307,6 +324,12 @@ func TestBoundaryRatchetTighten_AFailureWarnsAndNeverStopsTheBoundary(t *testing
 			}
 			return o
 		}, fakeGH{list: "[]"}, "protected"},
+		{"git cannot read the branch tip", func(t *testing.T) ratchetOrigin {
+			return newRatchetOrigin(t, 60, `{"internal/fixture.Big": 90}`)
+		}, fakeGH{list: "[]", failGit: "ls-remote"}, "git ls-remote refused"},
+		{"git cannot fetch the branch tip that ls-remote names", func(t *testing.T) ratchetOrigin {
+			return newRatchetOrigin(t, 60, `{"internal/fixture.Big": 90}`)
+		}, fakeGH{list: "[]", lease: strings.Repeat("a", 40)}, "fetch"},
 		{"a plane without origin", func(t *testing.T) ratchetOrigin {
 			o := newRatchetOrigin(t, 60, `{"internal/fixture.Big": 90}`)
 			o.plane.Git("remote", "remove", "origin")

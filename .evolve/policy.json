@@ -191,6 +191,11 @@
   "retrospectives": {
     "stage": "enforce"
   },
+  "boundary": {
+    "ratchet_merge": {
+      "stage": "shadow"
+    }
+  },
   "isolation": {
     "i2": {
       "stage": "enforce"

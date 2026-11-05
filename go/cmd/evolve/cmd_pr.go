@@ -401,10 +401,14 @@ func (m prMerger) mergeOne(ctx context.Context, n string) (string, error) {
 	if behind > 0 {
 		return "", refusef("base moved during the wait: %s is behind %s by %d", shortSHA(pr.HeadRefOid), pr.BaseRefName, behind)
 	}
+	return m.mergeHead(ctx, n, pr.HeadRefOid)
+}
+
+func (m prMerger) mergeHead(ctx context.Context, n, head string) (string, error) {
 	if err := m.admit(ctx, n); err != nil {
 		return "", err
 	}
-	if _, err := m.gh(ctx, "pr", "merge", n, "--"+m.method, "--match-head-commit", pr.HeadRefOid); err != nil {
+	if _, err := m.gh(ctx, "pr", "merge", n, "--"+m.method, "--match-head-commit", head); err != nil {
 		return "", err
 	}
 	return m.mergedSHA(ctx, n)

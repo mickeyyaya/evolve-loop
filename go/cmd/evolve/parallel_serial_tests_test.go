@@ -1,6 +1,21 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestBoundaryRatchetMerge_AMergeWithNoMergeCommitReadRelistsAndNeverPushesTheMergedBranch":         "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
+	"main.TestBoundaryRatchetMerge_GreenGatesMergeThenRegenerate":                                           "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
+	"main.TestBoundaryRatchetMerge_AListThatIsNotTheStepsListIsHeldAndReplaced":                             "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
+	"main.TestBoundaryRatchetMerge_ATipThatChangesMoreThanTheListsIsNeverMerged":                            "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
+	"main.TestBoundaryRatchetMerge_TheRefusalNamesAnExtraPathWithASpaceWhole":                               "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
+	"main.TestBoundaryRatchetMerge_AGitFaultInTheLeaseCheckWarnsAndNeverPushes":                             "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
+	"main.TestBoundaryRatchetMerge_AMergeCommitTipIsNeverMerged":                                            "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
+	"main.TestBoundaryRatchetMerge_TheGateNeverLaysThePullRequestListsOverTheWorktree":                      "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
+	"main.TestBoundaryRatchetMerge_CINotGreenHoldsTheMerge":                                                 "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
+	"main.TestBoundaryRatchetMerge_ShadowLogsAWouldMergeLineAndNeverMerges":                                 "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
+	"main.TestBoundaryRatchetMerge_OffEvaluatesNoGate":                                                      "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
+	"main.TestBoundaryRatchetMerge_AForkPullRequestIsNeverMerged":                                           "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
+	"main.TestBoundaryRatchetMerge_AnUnchangedListIsNotForcePushed":                                         "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
+	"main.TestBoundaryRatchetMerge_AGateFailureWarnsAndHoldsTheMerge":                                       "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
+	"main.TestBoundaryRatchetMerge_AFailedRefreshAfterTheMergeWarns":                                        "swaps seams ratchetRun and ratchetPRMerger and sets env through a helper",
 	"main.TestMain_ClearsInheritedCellMarkers":                                                              "reads the process environment",
 	"main.TestRunContinuationAdopt_ATildePathInTheRegistryIsExpanded":                                       "sets env through a helper",
 	"main.TestRunContinuationAdopt_ATildePathOnTheStampIsExpanded":                                          "sets env through a helper",
