@@ -99,7 +99,6 @@ func laneCycle(cycles []Cycle, todo string, at time.Time) int {
 }
 
 func ReadRunCycles(root string, floor, ceiling int) ([]Cycle, []signalcenter.Event, []string) {
-	cycles, warnings := ReadCycles(root, floor, ceiling)
-	loop, loopWarnings := ReadLoopSignals(root)
-	return ApplyLaneDeadlines(cycles, loop), loop, append(warnings, loopWarnings...)
+	r := ReadRunRange(root, floor, ceiling)
+	return r.Cycles, r.Loop, foldFailures(r.Warnings, r.Failures)
 }
