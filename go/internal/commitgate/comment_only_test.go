@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/launchrecord"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
@@ -26,6 +27,7 @@ type waiverCase struct {
 	atHead    map[string]string
 	reviewers string
 	wantRun   int
+	records   []launchrecord.Record
 }
 
 func runWaiverCase(t *testing.T, c waiverCase) *Result {
@@ -40,6 +42,11 @@ func runWaiverCase(t *testing.T, c waiverCase) *Result {
 			t.Fatal(err)
 		}
 		if err := os.Symlink(target, filepath.Join(root, p)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, r := range c.records {
+		if _, err := launchrecord.Write(filepath.Join(root, ".evolve"), r); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -228,5 +235,38 @@ func TestRun_ARealGitRenameCannotHideItsSourceFromTheWaiver(t *testing.T) {
 	why, refused := o.reviewWaiver(context.Background())
 	if why != "" || refused != "agents/x.md: not a regular file" {
 		t.Fatalf("a persona moved into docs/ must not ride a comment-only waiver: waived=%q refused=%q", why, refused)
+	}
+}
+
+func TestRun_ACommentRemovalWithBoundReviewRunsGetsANormalRecordAndNoWaiver(t *testing.T) {
+	t.Parallel()
+	res := runWaiverCase(t, waiverCase{
+		files:     "x.go\n",
+		onDisk:    map[string]string{"x.go": trimmedComment},
+		atHead:    map[string]string{"x.go": commentedAtHead},
+		reviewers: "run:r-simplify,run:r-go",
+		records:   []launchrecord.Record{reviewRun("r-simplify", "code-simplifier"), reviewRun("r-go", "go-reviewer")},
+	})
+
+	att := res.Attestation
+	if att.ReviewWaiver != "" || len(att.ReviewRuns) != 2 || strings.Join(att.ReviewersRun, ",") != "code-simplifier,go-reviewer" {
+		t.Errorf("attestation %+v, want the two runs and no waiver", att)
+	}
+}
+
+func TestRun_ACommentRemovalWhoseRunsLackACapabilityIsDeniedNotWaived(t *testing.T) {
+	t.Parallel()
+	res := runWaiverCase(t, waiverCase{
+		files:     "x.go\n",
+		onDisk:    map[string]string{"x.go": trimmedComment},
+		atHead:    map[string]string{"x.go": commentedAtHead},
+		reviewers: "run:r-simplify",
+		records:   []launchrecord.Record{reviewRun("r-simplify", "code-simplifier")},
+		wantRun:   ExitFail,
+	})
+
+	logs := strings.Join(res.Logs, "\n")
+	if res.Attestation != nil || !strings.Contains(logs, "missing required review capability: review") || strings.Contains(logs, "no review waiver") {
+		t.Errorf("attestation %v logs %q, want a capability denial and no waiver line", res.Attestation, logs)
 	}
 }

@@ -62,6 +62,8 @@ const (
 	DiagCodeProtectedPredicateRoute = "PROTECTED_PREDICATE_ROUTE"
 	DiagCodeBlockerRoute            = "BLOCKER_ROUTE"
 	DiagCodeHandoffRoute            = "HANDOFF_ROUTE"
+	DiagCodeBlockerUnroutable       = "BLOCKER_UNROUTABLE"
+	DiagCodeBlockerIncomplete       = "BLOCKER_INCOMPLETE"
 	DiagCodeBuildRejected           = "BUILD_DELIVERABLE_REJECTED"
 )
 
@@ -104,6 +106,10 @@ func RefusalDisposition(code string) Disposition {
 	switch code {
 	case DiagCodeBlockerRoute, DiagCodeHandoffRoute:
 		return Disposition{TaskLevel: true, RouteConsole: true, OutranksSentinel: true}
+	case DiagCodeBlockerUnroutable:
+		return Disposition{TaskLevel: true, OutranksSentinel: true}
+	case DiagCodeBlockerIncomplete:
+		return Disposition{OutranksSentinel: true}
 	case DiagCodeTriageProtectedSurface, DiagCodeProtectedPredicateRoute:
 		return Disposition{TaskLevel: true, RouteConsole: true}
 	case DiagCodeBuildRejected:

@@ -2,7 +2,6 @@ package commitgate
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -36,47 +35,26 @@ func (o Options) resolveReviewRuns(ctx context.Context, res *Result) (Options, i
 			names = append(names, token)
 			continue
 		}
-		run, refused := o.reviewRun(id, tree)
+		rec, err := launchrecord.Read(paths.EvolveDirOf(o.RepoRoot), id)
+		if err != nil {
+			res.log("DENY: review run %s does not attest this commit: %s", id, err)
+			return o, ExitFail
+		}
+		run, refused := CheckReviewRun(rec, tree)
 		if refused != "" {
 			res.log("DENY: review run %s does not attest this commit: %s", id, refused)
 			return o, ExitFail
 		}
 		names = append(names, run.Profile)
 		res.reviewRuns = append(res.reviewRuns, run)
+		res.launchRecords = append(res.launchRecords, rec)
 	}
 	o.Reviewers = strings.Join(names, ",")
 	return o, ExitPass
 }
 
-func VerifyAttestedRuns(repoRoot string, att Attestation) error {
-	var ids []string
-	for _, token := range att.ReviewersRun {
-		if id, ok := strings.CutPrefix(stripWhitespace(token), reviewRunPrefix); ok {
-			ids = append(ids, id)
-		}
-	}
-	for _, run := range att.ReviewRuns {
-		ids = append(ids, run.RunID)
-	}
-	slices.Sort(ids)
-	ids = slices.Compact(ids)
-	if len(ids) == 0 {
-		return errors.New("the attestation names no review run, and a reviewer name that no launch record proves is not a review")
-	}
-	o := Options{RepoRoot: repoRoot}
-	for _, id := range ids {
-		if _, refused := o.reviewRun(id, att.TreeStateSHA); refused != "" {
-			return fmt.Errorf("review run %s does not attest this change: %s", id, refused)
-		}
-	}
-	return nil
-}
-
-func (o Options) reviewRun(id, tree string) (ReviewRun, string) {
-	rec, err := launchrecord.Read(paths.EvolveDirOf(o.RepoRoot), id)
+func CheckReviewRun(rec launchrecord.Record, tree string) (ReviewRun, string) {
 	switch {
-	case err != nil:
-		return ReviewRun{}, err.Error()
 	case rec.CLI == "":
 		return ReviewRun{}, "the record has no bridge launch"
 	case rec.WritesSource:

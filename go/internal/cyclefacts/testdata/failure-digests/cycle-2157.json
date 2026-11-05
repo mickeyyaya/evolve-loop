@@ -1,0 +1,1 @@
+{"cycle":2157,"fingerprint":"build|infra-error|026f4c77b144","pre_class":"infra-error","recurrence":0,"checks":["composed-floor"],"class_fingerprint":"build|infra-error|class-a98f6ebafaba","class_layer":"pipeline-code","class_recurrence":2,"class_recorded_at":"2026-11-04T15:27:29.014393Z","class_route":"console","class_route_reason":"advisory raise: queue -\u003e console"}

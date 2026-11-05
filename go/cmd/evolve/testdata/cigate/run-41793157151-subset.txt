@@ -1,0 +1,281 @@
+plugin and durable ACS / acs-durable	UNKNOWN STEP	2026-11-04T07:35:19.2491543Z --- FAIL: TestApicoverEnforce_CoversEveryInternalPackage (2.43s)
+plugin and durable ACS / acs-durable	UNKNOWN STEP	2026-11-04T07:35:19.2588870Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/regression/apicover	2.435s
+plugin and durable ACS / acs-durable	UNKNOWN STEP	2026-11-04T07:36:34.5077687Z --- FAIL: TestDocGo_EveryInternalPackageDocumented (2.11s)
+plugin and durable ACS / acs-durable	UNKNOWN STEP	2026-11-04T07:36:34.5084774Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/regression/docgo	2.118s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:40:19.2861700Z --- FAIL: TestPersonaStopCriterionDedupe_CombinedLineCountReduced
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:40:23.0155331Z     --- FAIL: TestF
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:40:23.0181288Z FAIL	p
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:03.5581475Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:03.9982256Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:03.9987652Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:04.0384465Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:04.0418204Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:04.1073114Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:04.6067629Z --- FAIL: TestC1761_009_OnlyTargetPackagesTouched (0.02s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:04.6068852Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle10	0.239s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:04.6665907Z --- FAIL: TestC1761_009_OnlyTargetPackagesTouched (0.02s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:04.6667789Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle10	0.239s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:05.4573468Z --- FAIL: TestC1761_009_OnlyTargetPackagesTouched (0.02s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:05.4642540Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle10	0.239s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:14.3645988Z --- FAIL: TestC1761_009_OnlyTargetPackagesTouched (0.02s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:14.3649249Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle10	0.239s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:14.5059600Z --- FAIL: TestC1761_009_OnlyTargetPackagesTouched (0.02s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:14.5060734Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle10	0.239s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:14.5366936Z --- FAIL: TestC1761_009_OnlyTargetPackagesTouched (0.02s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:14.5368716Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle10	0.239s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:20.1144646Z --- FAIL: TestC1946_001_CoreStatementCoverageIsFull (197.14s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:20.1146841Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1946	197.400s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:22.0727314Z --- FAIL: TestC1950_001_CoreLeaseBreakerCarryforwardBatchReachesFullCoverage (1.19s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:22.0797427Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1950	1.471s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:22.1511432Z --- FAIL: TestC1950_001_CoreLeaseBreakerCarryforwardBatchReachesFullCoverage (1.19s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:22.1515405Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1950	1.471s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:22.1522818Z --- FAIL: TestC1946_001_CoreStatementCoverageIsFull (197.14s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:22.1540792Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1946	197.400s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:22.2637282Z --- FAIL: TestC1946_001_CoreStatementCoverageIsFull (197.14s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:22.2959395Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1946	197.400s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:33.6638749Z --- FAIL: TestC1946_001_CoreStatementCoverageIsFull (197.14s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:41:33.6640498Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1946	197.400s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0198489Z summary: 2 exported, 2 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0198737Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0211530Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/lanetime ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0212016Z summary: 19 exported, 19 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0212251Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0219493Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/mergewindow ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0220097Z summary: 12 exported, 12 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0220466Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0220657Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/ledgertip ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0221046Z summary: 1 exported, 1 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0221615Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0237447Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/builddiff ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0237862Z summary: 6 exported, 6 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0238081Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0242221Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/researchindex ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0242729Z summary: 7 exported, 7 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0242952Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0244504Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/auditcascade ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0244928Z summary: 6 exported, 6 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0245149Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0262909Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/recoveryretro ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0263450Z summary: 14 exported, 14 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0263658Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0311649Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/cli/agentcmd ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0312117Z summary: 5 exported, 5 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0312328Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0350232Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/qualitypanel ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0350698Z summary: 67 exported, 67 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0350924Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0373573Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/pipelinerates ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0374379Z summary: 22 exported, 22 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0374629Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0386380Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/codeshape ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0387141Z summary: 24 exported, 24 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0387384Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0392611Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/isolation ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0393159Z summary: 9 exported, 9 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0393382Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0423216Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/faketmux ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0423790Z summary: 4 exported, 4 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0424135Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0431108Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/dispatchcred ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0431692Z summary: 10 exported, 10 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0432021Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0441978Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/agentclass ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0442578Z summary: 21 exported, 21 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0442927Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0464335Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/inputindex ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0464994Z summary: 41 exported, 41 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0465213Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0475937Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/cli/contextcmd ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0476762Z summary: 5 exported, 5 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0477143Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0492137Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/guidance ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0492803Z summary: 34 exported, 34 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0493175Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0497994Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/heldproposal ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0498665Z summary: 28 exported, 28 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0499030Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0513883Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/inboxfile ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0514579Z summary: 14 exported, 14 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0514960Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0519207Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/launchrecord ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0519949Z summary: 7 exported, 7 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0520504Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0627228Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/integration ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0627840Z UNCOVERED (no test names it): 5
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0628201Z   const   MaxMoves (batchpr.go)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0628542Z   method  DeliverableRecord.Console (deliverable.go)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0628873Z   type    GhFunc (ghci.go)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0629127Z   type    Outcome (batchpr.go)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0629398Z   type    PRHost (train.go)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0629743Z summary: 113 exported, 108 covered, 5 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0630027Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0635547Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/fixability ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0636535Z summary: 9 exported, 9 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0636969Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0644717Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/cyclespend ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0645449Z summary: 30 exported, 30 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0645848Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0712588Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/selfheal ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0713323Z summary: 131 exported, 131 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0713726Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0714034Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/shipjournal ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0714678Z summary: 7 exported, 7 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0715046Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0726925Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/auditfix ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0727670Z summary: 33 exported, 33 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0728071Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0747558Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/auditfixports ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0748166Z summary: 17 exported, 17 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0748396Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0758712Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/citelemetry ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0759295Z summary: 8 exported, 8 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0759603Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0766358Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/gateclass ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0767059Z summary: 20 exported, 20 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0767284Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0785949Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/agentrequest ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0786780Z summary: 27 exported, 27 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0787157Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0794376Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/coversplit ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0795208Z summary: 11 exported, 11 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0795576Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0846584Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/phases/ship/shiptest ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0847368Z summary: 47 exported, 47 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0847690Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0853722Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/supersede ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0854589Z summary: 8 exported, 8 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0855009Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0861645Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/cli/cloudcmd ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0862358Z summary: 1 exported, 1 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0862724Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0866379Z == /home/runner/work/evolve-loop/evolve-loop/go/internal/cloudlaunch ==
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0867085Z summary: 12 exported, 12 covered, 0 uncovered, 0 false-green, 0 ignored
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0867406Z 
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0874539Z make: *** [Makefile:260: apicover-check] Error 1
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0881081Z ##[error]Process completed with exit code 2.
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0935596Z ##[group]Run actions/upload-artifact@v4
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0935902Z with:
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0936107Z   name: coverage-ubuntu-latest-go1.23
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0936860Z   path: go/coverage.txt
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	go/apicover-report.txt
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	go/test-integration.json
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	go/test-e2e.json
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	go/test-rusage.ndjson
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	go/runner-samples.ndjson
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0937359Z   if-no-files-found: warn
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0937581Z   compression-level: 6
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0937782Z   overwrite: false
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0937980Z   include-hidden-files: false
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.0938198Z ##[endgroup]
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.2409236Z (node:186045) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.2409829Z (Use `node --trace-deprecation ...` to show where the warning was created)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.2466220Z Multiple search paths detected. Calculating the least common ancestor of all paths
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.2479246Z The least common ancestor is /home/runner/work/evolve-loop/evolve-loop/go. This will be the root directory of the artifact
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.2480010Z With the provided path, there will be 6 files uploaded
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.2480604Z Artifact name is valid!
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.2480942Z Root directory input is valid!
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:08.5658687Z Beginning upload of artifact content to blob storage
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:09.4465594Z (node:186045) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:10.3217032Z Uploaded bytes 8388608
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:10.4012895Z Uploaded bytes 9205258
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:10.4662942Z Finished uploading artifact content to blob storage!
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:10.4664135Z SHA256 digest of uploaded artifact zip is b51beb8a32c95b8a9e152453b53bc840d391b134b009b77ff778e81e12db5f3e
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:10.4664758Z Finalizing artifact upload
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:10.9850497Z Artifact coverage-ubuntu-latest-go1.23.zip successfully finalized. Artifact ID 13303944683
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:10.9851286Z Artifact coverage-ubuntu-latest-go1.23 has been successfully uploaded! Final size is 9205258 bytes. Artifact ID is 13303944683
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:10.9855991Z Artifact download URL: https://github.com/mickeyyaya/evolve-loop/actions/runs/41793157151/artifacts/13303944683
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:11.0060991Z Post job cleanup.
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:11.0819383Z [command]/usr/bin/git version
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:11.0853304Z git version 2.56.0
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:11.0883045Z Temporarily overriding HOME='/home/runner/work/_temp/ffe23d91-113f-4c62-889d-871db4dd4b89' before making global git config changes
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:11.0884191Z Adding repository directory to the temporary git global config as a safe directory
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:11.0888446Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/evolve-loop/evolve-loop
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:11.0920892Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:11.0948415Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:11.1174983Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:11.1192488Z http.https://github.com/.extraheader
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:11.1202581Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:11.1262692Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:11.1465338Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:11.1492967Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:11.1828360Z Evaluate and set job outputs
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:11.1833729Z Set output 'result'
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:11.1835286Z Cleaning up orphan processes
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:11.2023516Z Terminate orphan process: pid (4124) (hostsampler)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T07:48:11.2116157Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-go@v5, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+CI required	UNKNOWN STEP	﻿2026-11-04T07:51:29.9306252Z Current runner version: '2.338.2'
+CI required	UNKNOWN STEP	2026-11-04T07:51:29.9332478Z ##[group]Runner Image Provisioner
+CI required	UNKNOWN STEP	2026-11-04T07:51:29.9333450Z Hosted Compute Agent
+CI required	UNKNOWN STEP	2026-11-04T07:51:29.9334138Z Version: 20261021.618
+CI required	UNKNOWN STEP	2026-11-04T07:51:29.9334964Z Commit: 21505ad2541d5be6135ed84fc33697146cf75b8e
+CI required	UNKNOWN STEP	2026-11-04T07:51:29.9336008Z Build Date: 2026-10-21T00:45:21Z
+CI required	UNKNOWN STEP	2026-11-04T07:51:29.9336910Z Worker ID: {0d975eb2-f314-42f0-9346-1289cebb927a}
+CI required	UNKNOWN STEP	2026-11-04T07:51:29.9337787Z Region: eastus
+CI required	UNKNOWN STEP	2026-11-04T07:51:29.9338443Z Cloud: Azure
+CI required	UNKNOWN STEP	2026-11-04T07:51:29.9339195Z ##[endgroup]
+CI required	UNKNOWN STEP	2026-11-04T07:51:29.9340856Z ##[group]Operating System
+CI required	UNKNOWN STEP	2026-11-04T07:51:29.9341667Z Ubuntu
+CI required	UNKNOWN STEP	2026-11-04T07:51:29.9342338Z 24.04.5
+CI required	UNKNOWN STEP	2026-11-04T07:51:29.9342928Z LTS
+CI required	UNKNOWN STEP	2026-11-04T07:51:29.9343616Z ##[endgroup]
+CI required	UNKNOWN STEP	2026-11-04T07:51:29.9344291Z ##[group]Runner Image
+CI required	UNKNOWN STEP	2026-11-04T07:51:29.9345086Z Image: ubuntu-24.04
+CI required	UNKNOWN STEP	2026-11-04T07:51:29.9345956Z Version: 20261025.353.1
+CI required	UNKNOWN STEP	2026-11-04T07:51:29.9347585Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261025.353/images/ubuntu/Ubuntu2404-Readme.md
+CI required	UNKNOWN STEP	2026-11-04T07:51:29.9349624Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261025.353
+CI required	UNKNOWN STEP	2026-11-04T07:51:29.9350988Z ##[endgroup]
+CI required	UNKNOWN STEP	2026-11-04T07:51:29.9352346Z ##[group]GITHUB_TOKEN Permissions
+CI required	UNKNOWN STEP	2026-11-04T07:51:29.9354356Z Contents: read
+CI required	UNKNOWN STEP	2026-11-04T07:51:29.9355059Z Metadata: read
+CI required	UNKNOWN STEP	2026-11-04T07:51:29.9356034Z ##[endgroup]
+CI required	UNKNOWN STEP	2026-11-04T07:51:29.9358317Z Secret source: Actions
+CI required	UNKNOWN STEP	2026-11-04T07:51:29.9359432Z Cache mode: write
+CI required	UNKNOWN STEP	2026-11-04T07:51:29.9360323Z Prepare workflow directory
+CI required	UNKNOWN STEP	2026-11-04T07:51:29.9717611Z Prepare all required actions
+CI required	UNKNOWN STEP	2026-11-04T07:51:29.9831254Z Complete job name: CI required
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1018903Z ##[group]Run if [[ "$ROUTE_RESULT" != success ]]; then
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1019911Z ^[[36;1mif [[ "$ROUTE_RESULT" != success ]]; then^[[0m
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1020850Z ^[[36;1m  echo "CI prerequisite did not succeed: $ROUTE_RESULT" >&2^[[0m
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1021875Z ^[[36;1m  exit 1^[[0m
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1022402Z ^[[36;1mfi^[[0m
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1023340Z ^[[36;1mcase "$DOCS_ONLY:$DOCS_REQUIRED:$VALIDATE_RESULT:$PLUGIN_RESULT:$ACS_RESULT" in^[[0m
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1024839Z ^[[36;1m  false:true:success:success:success|false:false:success:success:success|true:true:skipped::) ;;^[[0m
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1026982Z ^[[36;1m  *) echo "plugin and durable ACS validation did not match the route: $DOCS_ONLY:$DOCS_REQUIRED:$VALIDATE_RESULT:$PLUGIN_RESULT:$ACS_RESULT" >&2; exit 1 ;;^[[0m
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1028460Z ^[[36;1mesac^[[0m
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1029094Z ^[[36;1mcase "$DOCS_REQUIRED:$STE_LINT_RESULT" in^[[0m
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1029908Z ^[[36;1m  true:success|false:skipped) ;;^[[0m
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1031030Z ^[[36;1m  *) echo "STE lint did not match the route: $DOCS_REQUIRED:$STE_LINT_RESULT" >&2; exit 1 ;;^[[0m
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1032089Z ^[[36;1mesac^[[0m
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1032724Z ^[[36;1mcase "$INBOX_REQUIRED:$INBOX_RESULT" in^[[0m
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1033521Z ^[[36;1m  true:success|false:skipped) ;;^[[0m
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1034604Z ^[[36;1m  *) echo "inbox lint did not match the route: $INBOX_REQUIRED:$INBOX_RESULT" >&2; exit 1 ;;^[[0m
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1035868Z ^[[36;1mesac^[[0m
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1036949Z ^[[36;1mfor result in "$GO_REQUIRED:$GO_RESULT:$GO_SUITE_RESULT" "$LANDING_REQUIRED:$LANDING_RESULT:$LANDING_SUITE_RESULT"; do^[[0m
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1038211Z ^[[36;1m  case "$result" in^[[0m
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1038933Z ^[[36;1m    true:success:success|false:skipped:) ;;^[[0m
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1039925Z ^[[36;1m    *) echo "required CI work did not succeed: $result" >&2; exit 1 ;;^[[0m
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1040884Z ^[[36;1m  esac^[[0m
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1041422Z ^[[36;1mdone^[[0m
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1042313Z ^[[36;1mecho 'Every required suite succeeded; other suites were explicitly unselected.'^[[0m
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1459167Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1459967Z env:
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1460327Z   ROUTE_RESULT: success
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1460725Z   DOCS_ONLY: false
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1461095Z   DOCS_REQUIRED: true
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1461747Z   STE_LINT_RESULT: success
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1462142Z   VALIDATE_RESULT: failure
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1462533Z   PLUGIN_RESULT: success
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1462916Z   ACS_RESULT: failure
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1463282Z   GO_REQUIRED: true
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1463637Z   GO_RESULT: failure
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1464003Z   GO_SUITE_RESULT: failure
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1464394Z   LANDING_REQUIRED: true
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1464775Z   LANDING_RESULT: success
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1465174Z   LANDING_SUITE_RESULT: success
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1465834Z   INBOX_REQUIRED: false
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1466359Z   INBOX_RESULT: skipped
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1466900Z ##[endgroup]
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1625848Z plugin and durable ACS validation did not match the route: false:true:failure:success:failure
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1653823Z ##[error]Process completed with exit code 1.
+CI required	UNKNOWN STEP	2026-11-04T07:51:30.1816505Z Cleaning up orphan processes

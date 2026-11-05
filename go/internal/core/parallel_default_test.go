@@ -87,6 +87,7 @@ var serialRequiredTests = map[string]string{
 	"core.TestAdvanceContinuationBase_UnresolvableMain":                                             swapsGitRunner,
 	"core.TestSnapshotPreservedWorktree_GitStepFailures":                                            swapsGitRunner,
 	"core.TestValidateContinuation_Rejections":                                                      swapsGitRunner,
+	"core.TestLoadLaneScope_AnEmptyWorkspaceReadsNothingFromTheWorkingDirectory":                    changesDirectory,
 	"core.TestDetectLostLanding_NoWorkspaceDoesNotReadTheProcessCWD":                                changesDirectory,
 	"core.TestEnsureFailureDigest_MissingWorkspaceNeverWritesToWorkingDirectory":                    changesDirectory,
 	"core.TestGitAndFileHelperCoverage":                                                             changesDirectory,

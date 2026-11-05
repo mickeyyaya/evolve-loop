@@ -3,9 +3,11 @@ package core
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -23,23 +25,31 @@ const LaneScopeFile = "lane-scope.json"
 
 type LaneScope = committedset.LanePinDoc
 
+func ReadLaneScope(workspace string) (*LaneScope, error) {
+	b, err := os.ReadFile(filepath.Join(workspace, LaneScopeFile))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("%s unreadable: %w", LaneScopeFile, err)
+	}
+	var ls LaneScope
+	if err := json.Unmarshal(b, &ls); err != nil {
+		return nil, fmt.Errorf("%s malformed: %w", LaneScopeFile, err)
+	}
+	return &ls, nil
+}
+
 func loadLaneScope(workspace string) *LaneScope {
 	if workspace == "" {
 		return nil
 	}
-	b, err := os.ReadFile(filepath.Join(workspace, LaneScopeFile))
+	ls, err := ReadLaneScope(workspace)
 	if err != nil {
-		if !os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN %s unreadable: %v (falling back to env fleet scope)\n", LaneScopeFile, err)
-		}
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN %v (falling back to env fleet scope)\n", err)
 		return nil
 	}
-	var ls LaneScope
-	if err := json.Unmarshal(b, &ls); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN %s malformed: %v (falling back to env fleet scope)\n", LaneScopeFile, err)
-		return nil
-	}
-	return &ls
+	return ls
 }
 
 func LaneScopeIDs(workspace string) []string {

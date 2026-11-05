@@ -580,4 +580,32 @@ approaches / decision / results / retro) — lives at
 | [architecture/adr/0159-the-loop-keeps-its-integration-train-and-takes-six-practices-from-the-2026-harness-projects.md](architecture/adr/0159-the-loop-keeps-its-integration-train-and-takes-six-practices-from-the-2026-harness-projects.md) | Decision: no outside system replaces ADR-0147, and six practices close the failures of this period. |
 | [architecture/regression-proof-and-supervision.md](architecture/regression-proof-and-supervision.md) | Spec of record: the regression proof gate, the journey registry, derived liveness and the terminal refusal. |
 
+## 2026-11-05 — the queue trust root: the host record decides what a cycle may do to the inbox queue (ADR-0160)
+
+| Document | What it records |
+|---|---|
+| [research/queue-trust-root-2026-11.md](research/queue-trust-root-2026-11.md) | Research: six blocked review rounds, the agent-writable files that give authority over the queue, and the faults that the review of PR 1 found. It adds outside work and one stated gap. Findings F1.1 to F1.14, P2.1 to P2.7, refinements R1 to R11. |
+| [plans/queue-authority-from-host-facts-2026-11.md](plans/queue-authority-from-host-facts-2026-11.md) | Plan: six designs with scores, and the winner, one trust root. Decisions D1 to D18 and components K1 to B2 with red tests. It corrects an old claim: PR 1 closes the pin file, and PR 3 closes the PASS path. |
+| [architecture/adr/0160-the-host-lineage-record-is-the-one-trust-root-for-what-a-cycle-may-do-to-the-queue.md](architecture/adr/0160-the-host-lineage-record-is-the-one-trust-root-for-what-a-cycle-may-do-to-the-queue.md) | Decision (Proposed): the host record is the only source of which items a cycle owns. It has one reader, a typed route reason, a mover refusal and a brake. |
+| [architecture/queue-trust-root.md](architecture/queue-trust-root.md) | Spec of record: the host record, its one reader and guard, and the drift signal. It also covers the write boundary, the typed route reason, the mover refusal and the breaker. |
+
+## 2026-11-05 — pipeline blockers of wave 155: design check, six test rows and accurate signals
+
+| Document | What it records |
+|---|---|
+| [research/pipeline-blockers-2026-11.md](research/pipeline-blockers-2026-11.md) | Research: the eleven blockers of wave 155, the 38 review findings of seven blocked fixes, and outside practice on error signals. |
+| [plans/pipeline-blockers-2026-11.md](plans/pipeline-blockers-2026-11.md) | Plan: a design card, six test rows, a signal contract, a redesign past three blocks and two debug verbs. |
+| [architecture/adr/0161-a-pipeline-blocker-fix-meets-six-test-rows-and-a-signal-states-its-cause-and-next-step.md](architecture/adr/0161-a-pipeline-blocker-fix-meets-six-test-rows-and-a-signal-states-its-cause-and-next-step.md) | Decision: thirteen rules for the fix of a pipeline blocker and for the content of a signal. |
+| [architecture/signal-accuracy.md](architecture/signal-accuracy.md) | Spec of record: the six parts of a signal, the source of a class, the one-reader rule, the logout cause and the debug verbs. |
+| [incidents/2026-11-05-wave-155-false-signals-and-the-logout.md](incidents/2026-11-05-wave-155-false-signals-and-the-logout.md) | Incident: false counts and classes, a logout read as quota, and seven blocked fixes. |
+
+## 2026-11-05 — a read-only debug CLI for the console and for agents
+
+| Document | What it records |
+|---|---|
+| [research/debug-cli-2026-11.md](research/debug-cli-2026-11.md) | Research: why scratch scripts fail, what four architecture rounds found in the code, and current practice for an agent-facing CLI. |
+| [plans/debug-cli-2026-11.md](plans/debug-cli-2026-11.md) | Plan: a family that composes the owners, nine decisions and thirteen test-first components. |
+| [architecture/adr/0162-the-console-reads-through-a-tested-read-only-debug-family-and-writes-no-scratch-scripts.md](architecture/adr/0162-the-console-reads-through-a-tested-read-only-debug-family-and-writes-no-scratch-scripts.md) | Decision: the console reads through tested read-only verbs and writes no scratch script. |
+| [architecture/debug-cli.md](architecture/debug-cli.md) | Spec of record: the verbs, exit codes, items, source kinds, cycle states, the rule for `next` and the read-only proof. |
+
 <!-- GENERATED:research-index END -->

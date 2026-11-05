@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -32,6 +33,7 @@ func TestLoop_CycleLevelFailureContinues(t *testing.T) {
 	projectRoot := t.TempDir()
 	initLoopContractRepo(t, projectRoot)
 	writeDispatchPolicy(t, filepath.Join(projectRoot, ".evolve"), "off")
+	raiseZeroShipCeiling(t, filepath.Join(projectRoot, ".evolve"))
 	scout := &secondCallErrRunner{name: "scout"}
 
 	prev := wireOrchestratorDepsFn
@@ -85,5 +87,13 @@ func TestLoop_CycleLevelFailureContinues(t *testing.T) {
 
 	if !strings.Contains(stderr.String(), "synthetic scout bridge death") {
 		t.Errorf("stderr does not mention the cycle failure cause; failures must be logged loudly\nstderr=%q", stderr.String())
+	}
+}
+
+func raiseZeroShipCeiling(t *testing.T, evolveDir string) {
+	t.Helper()
+	content := `{"dispatch":{"policy":"off"},"workflow":{"auto_prune":false},"failure_policy":{"thresholds":{"zero_ship_halt":9}}}`
+	if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }

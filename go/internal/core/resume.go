@@ -392,49 +392,68 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 
 }
 
-func (o *Orchestrator) reviewResumedDeliverable(
-	ctx context.Context,
-	projectRoot string,
-	cycle int,
-	cs CycleState,
-	phase Phase,
-	runner PhaseRunner,
-	req PhaseRequest,
-	resp PhaseResponse,
-	phaseBaseline map[string]bool,
-	count func(Phase, PhaseRequest) PhaseRequest,
-) (PhaseResponse, error) {
-	if o.reviewer == nil || resp.Verdict == VerdictSKIPPED {
-		return resp, nil
+type resumedDeliverable struct {
+	ctx         context.Context
+	projectRoot string
+	cycle       int
+	cs          CycleState
+	phase       Phase
+	runner      PhaseRunner
+	req         PhaseRequest
+	resp        PhaseResponse
+	baseline    map[string]bool
+	count       func(Phase, PhaseRequest) PhaseRequest
+	predicates  predicateBase
+}
+
+func (o *Orchestrator) reviewResumedDeliverable(in resumedDeliverable) (PhaseResponse, error) {
+	if o.reviewer == nil || in.resp.Verdict == VerdictSKIPPED {
+		return in.resp, nil
 	}
-	scope := phaseLeakScope{projectRoot: projectRoot, cycleState: cs, phase: phase, baseline: phaseBaseline}
-	if err := o.recoverPhaseLeak(ctx, scope); err != nil {
-		return resp, err
+	scope := phaseLeakScope{projectRoot: in.projectRoot, cycleState: in.cs, phase: in.phase, baseline: in.baseline}
+	if err := o.recoverPhaseLeak(in.ctx, scope); err != nil {
+		return in.resp, err
 	}
-	review := o.performEffectsAndReview(ctx, o.reviewInputFor(cs, phase, projectRoot, resp))
-	rv := resumedCorrector{o: o, ctx: ctx, scope: scope, cycle: cycle, runner: runner, count: count}
-	return rv.correct(req, resp, review)
+	review := o.performEffectsAndReview(in.ctx, o.reviewInputFor(in.cs, in.phase, in.projectRoot, in.resp))
+	rv := resumedCorrector{o: o, ctx: in.ctx, scope: scope, cycle: in.cycle, runner: in.runner, count: in.count, predicates: in.predicates}
+	return rv.correct(in.req, in.resp, review)
 }
 
 type resumedCorrector struct {
-	o      *Orchestrator
-	ctx    context.Context
-	scope  phaseLeakScope
-	cycle  int
-	runner PhaseRunner
-	count  func(Phase, PhaseRequest) PhaseRequest
+	o          *Orchestrator
+	ctx        context.Context
+	scope      phaseLeakScope
+	cycle      int
+	runner     PhaseRunner
+	count      func(Phase, PhaseRequest) PhaseRequest
+	predicates predicateBase
 }
 
 func (rv resumedCorrector) correct(req PhaseRequest, resp PhaseResponse, review ReviewResult) (PhaseResponse, error) {
 	o, cs, phase := rv.o, rv.scope.cycleState, rv.scope.phase
-	lr := &cycleRun{o: o, cs: cs, cycle: rv.cycle, req: CycleRequest{ProjectRoot: rv.scope.projectRoot}, retryConfig: o.retryConfig}
+	lr := &cycleRun{ctx: rv.ctx, predicatesAtBuild: rv.predicates.sources, predicateBaseFault: rv.predicates.fault, o: o, cs: cs, cycle: rv.cycle, req: CycleRequest{ProjectRoot: rv.scope.projectRoot}, retryConfig: o.retryConfig}
 	maxCorrections := lr.correctionLimitFor(phase, o.retryConfig.ContractCorrectionRetries)
 	conv := o.newFloorConvergence(rv.cycle, phase, review.Failures)
-	for correction := 1; !review.Approve && (correction <= maxCorrections || lr.climbResumed(phase, review, &req) || conv.grant()); correction++ {
-		if err := o.resumedBlockerRoute(cs, rv.cycle, phase, review); err != nil {
-			return resp, err
+	var refused blockerStatement
+	for correction := 1; !review.Approve; correction++ {
+		var outcome BlockerOutcome
+		var diag Diagnostic
+		outcome, diag, refused = lr.provenBlocker(phase, o.reviewInputFor(cs, phase, rv.scope.projectRoot, resp), review)
+		rounds := blockerRoundsDecision(outcome)
+		if rounds.End {
+			if outcome == Routable {
+				return resp, resumedBlocker{diag: diag}
+			}
+			return resp, NewBlockerEnd(outcome, diag)
 		}
-		req.CorrectionDirective = preferDigest(composeCorrection(correction, review.Reason, review.Remediation), req)
+		if correction > maxCorrections && !lr.climbResumed(phase, review, &req) && !conv.grant() {
+			break
+		}
+		refusal := ""
+		if rounds.Claim {
+			refusal = lr.sendRefusal(phase, refused)
+		}
+		req.CorrectionDirective = withBlockerRefusal(preferDigest(composeCorrection(correction, review.Reason, review.Remediation), req), refusal)
 		o.emitGateCorrection(gateCorrection{
 			origin: originResumedCorrection, cycle: rv.cycle, phase: phase, correction: correction, max: maxCorrections + conv.used,
 			rung: interaction.RungRedispatch, cli: req.Driver.String(), reason: review.Reason,
@@ -455,6 +474,7 @@ func (rv resumedCorrector) correct(req PhaseRequest, resp PhaseResponse, review 
 	if review.Approve {
 		return resp, nil
 	}
+	lr.sendLastRefusal(phase, refused, blockerStatement.lastRound)
 	return rv.reject(resp, review, maxCorrections+conv.used)
 }
 

@@ -554,3 +554,12 @@ func TestTrainEjectBriefsAComposeErrorOfTheBatch(t *testing.T) {
 		t.Errorf("brief = %q, want the ci cause", got)
 	}
 }
+
+func TestShortSHA_CutsALongIDAndKeepsAShortOne(t *testing.T) {
+	t.Parallel()
+	for in, want := range map[string]string{"0123456789abcdef": "0123456", "0123456": "0123456", "abc": "abc", "": ""} {
+		if got := ShortSHA(in); got != want {
+			t.Errorf("ShortSHA(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

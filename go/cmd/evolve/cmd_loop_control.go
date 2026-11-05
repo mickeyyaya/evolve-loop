@@ -102,6 +102,8 @@ type loopCycleRunner interface {
 
 var loopOrchOverride loopCycleRunner
 
+var loopClock = time.Now
+
 func consecutiveFailBreaker(failed bool, streak, max int) (newStreak int, stop bool) {
 	if !failed {
 		return 0, false

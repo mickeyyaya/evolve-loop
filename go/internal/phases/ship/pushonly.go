@@ -1,7 +1,6 @@
 package ship
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -41,15 +40,12 @@ func appendShipJournal(projectRoot string, e shipjournal.Entry) error {
 
 func readShipJournal(projectRoot string) map[string]shipjournal.Entry {
 	entries := map[string]shipjournal.Entry{}
-	f, err := os.Open(shipJournalPath(projectRoot))
+	j, err := shipjournal.Read(shipJournalPath(projectRoot))
 	if err != nil {
 		return entries
 	}
-	defer func() { _ = f.Close() }()
-	sc := bufio.NewScanner(f)
-	for sc.Scan() {
-		var e shipjournal.Entry
-		if json.Unmarshal(sc.Bytes(), &e) == nil && e.SHA != "" {
+	for _, e := range j.Entries {
+		if e.SHA != "" {
 			entries[e.SHA] = e
 		}
 	}

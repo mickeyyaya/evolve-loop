@@ -1,0 +1,9 @@
+{
+  "category": "code-build-fail",
+  "level": "task",
+  "evidence": "build-report.md verdict declares BLOCKER protected-path go/internal/core/resume_execution.go:182; integrity_surface.go:1",
+  "justification": "The floor correctly refused a Build with no fix, so the verdict is coherent and no system halt is needed; the item is co",
+  "action": "defer-or-quarantine",
+  "fix_type": "pipeline-repair",
+  "schema_version": 1
+}

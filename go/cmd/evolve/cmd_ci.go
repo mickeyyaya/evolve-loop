@@ -88,6 +88,7 @@ func runCI(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "%s%v\n", ciClassifyPrefix, err)
 		return exitIO
 	}
+	writeClassifyWarnings(stderr, ciClassifyPrefix, rep)
 	if err := writeClassifyReport(stdout, rep, a.asJSON); err != nil {
 		fmt.Fprintf(stderr, "%s%v\n", ciClassifyPrefix, err)
 		return exitIO
@@ -173,7 +174,7 @@ func writeClassifyReport(w io.Writer, rep ciwatch.ClassifyReport, asJSON bool) e
 	fmt.Fprintln(&b, ciClassifyHeader)
 	for _, f := range rep.Failures {
 		e := f.Evidence
-		fmt.Fprintf(&b, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", f.Label, orDash(f.Package), orDash(cmp.Or(f.Test, f.Step)), f.Rule,
+		fmt.Fprintf(&b, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", f.Label, orDash(f.Package), orDash(failureLabel(f.FailingTest)), f.Rule,
 			e.Touched, e.BaseRed, e.RecurredOnMain, e.RerunGreen)
 	}
 	fmt.Fprintf(&b, "retry-safe: %s\n", map[bool]string{true: "yes", false: "no"}[rep.RetrySafe])
@@ -181,9 +182,23 @@ func writeClassifyReport(w io.Writer, rep ciwatch.ClassifyReport, asJSON bool) e
 	return err
 }
 
+func failureLabel(f ciwatch.FailingTest) string {
+	label := cmp.Or(f.Test, f.Step)
+	if f.Detail == "" {
+		return label
+	}
+	return label + ": " + f.Detail
+}
+
 func orDash(s string) string {
 	if s == "" {
 		return "-"
 	}
 	return s
+}
+
+func writeClassifyWarnings(w io.Writer, prefix string, rep ciwatch.ClassifyReport) {
+	for _, warning := range rep.Warnings {
+		fmt.Fprintf(w, "%sWARN: %s\n", prefix, warning)
+	}
 }

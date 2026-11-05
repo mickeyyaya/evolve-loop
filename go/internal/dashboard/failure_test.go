@@ -150,3 +150,15 @@ func TestReadAuditRounds_NonContiguousArchiveIndices(t *testing.T) {
 		t.Fatalf("final round delta vs round 2 = %+v (H1 carried, H2 resolved, L1 new)", rounds[1])
 	}
 }
+
+func TestReadFailure_TakesTheFingerprintOfTheDigestWhenNoOtherSourceHasOne(t *testing.T) {
+	t.Parallel()
+	ws := core.RunWorkspacePath(t.TempDir(), 2157)
+	writeFile(t, filepath.Join(ws, failureDigestFile), `{"fingerprint":"build|infra-error|026f4c77b144","pre_class":"infra-error"}`)
+
+	f, warns := readFailure(ws, nil)
+
+	if len(warns) != 0 || f == nil || f.Fingerprint != "build|infra-error|026f4c77b144" || f.PreClass != "infra-error" {
+		t.Fatalf("failure = %+v warnings %v, want the fingerprint and class of the digest", f, warns)
+	}
+}

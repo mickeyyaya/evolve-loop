@@ -49,10 +49,21 @@ func signalTime(e signalcenter.Event) time.Time {
 	return at
 }
 
-func LoadShipped(journalPath string) (map[int]bool, error) {
-	entries, err := readJSONL[shipjournal.Entry](journalPath)
+func readStrictJournal(journalPath string) ([]shipjournal.Entry, error) {
+	j, err := shipjournal.Read(journalPath)
+	if err == nil {
+		err = j.Strict()
+	}
 	if err != nil {
 		return nil, fmt.Errorf("ship journal: %w", err)
+	}
+	return j.Entries, nil
+}
+
+func LoadShipped(journalPath string) (map[int]bool, error) {
+	entries, err := readStrictJournal(journalPath)
+	if err != nil {
+		return nil, err
 	}
 	shipped := map[int]bool{}
 	for _, e := range entries {
@@ -64,9 +75,9 @@ func LoadShipped(journalPath string) (map[int]bool, error) {
 }
 
 func LoadLandings(journalPath string, since time.Time) ([]Landing, error) {
-	entries, err := readJSONL[shipjournal.Entry](journalPath)
+	entries, err := readStrictJournal(journalPath)
 	if err != nil {
-		return nil, fmt.Errorf("ship journal: %w", err)
+		return nil, err
 	}
 	var out []Landing
 	for _, e := range entries {

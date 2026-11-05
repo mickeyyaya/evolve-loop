@@ -12,3 +12,4 @@
 ./internal/handoff/evidence
 ./internal/handoff/exit
 ./internal/handoff/request
+./internal/cyclefacts

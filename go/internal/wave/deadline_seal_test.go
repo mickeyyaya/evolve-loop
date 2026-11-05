@@ -9,7 +9,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/wave"
 )
 
-func TestReadRunCycles_TheLoopSealHoldsAndTheDeadlineSignalIsTheFallback(t *testing.T) {
+func TestReadRunRange_TheLoopSealHoldsAndTheDeadlineSignalIsTheFallback(t *testing.T) {
 	t.Parallel()
 	p := newPlane(t)
 	stop := func(minutes int, todo string) string {
@@ -22,27 +22,27 @@ func TestReadRunCycles_TheLoopSealHoldsAndTheDeadlineSignalIsTheFallback(t *test
 	p.write(".evolve/runs/cycle-8/signals.ndjson", eventAt(2, "ledger.appended", "", "")+
 		eventAt(32, "cycle.sealed", "", `"termination_reason":"`+cyclestate.CycleTerminationLaneDeadline+`"`))
 
-	cycles, loop, warnings := wave.ReadRunCycles(p.root, 6, 0)
+	r := wave.ReadRunRange(p.root, 6, 0)
 
 	want := []wave.Cycle{
 		{ID: 7, Todo: "unsealed", Termination: cyclestate.CycleTerminationLaneDeadline, StartedAt: clock(1), EndedAt: clock(30)},
 		{ID: 8, Todo: "sealed", Termination: cyclestate.CycleTerminationLaneDeadline, StartedAt: clock(2), EndedAt: clock(32)},
 	}
-	if !reflect.DeepEqual(cycles, want) || len(loop) != 2 || len(warnings) != 0 {
-		t.Errorf("ReadRunCycles =\n%+v\nwant\n%+v\nloop %d events, warnings %q", cycles, want, len(loop), warnings)
+	if !reflect.DeepEqual(r.Cycles, want) || len(r.Loop) != 2 || len(r.Warnings) != 0 || len(r.Failures) != 0 {
+		t.Errorf("ReadRunRange =\n%+v\nwant\n%+v\nloop %d events, warnings %q, failures %v", r.Cycles, want, len(r.Loop), r.Warnings, failurePaths(r))
 	}
 }
 
-func TestReadRunCycles_JoinsTheWarningsOfBothStreams(t *testing.T) {
+func TestReadRunRange_KeepsTheWarningsOfBothStreams(t *testing.T) {
 	t.Parallel()
 	p := newPlane(t)
 	p.write(".evolve/signals.ndjson", "not json\n")
 	p.write(".evolve/runs/cycle-7/signals.ndjson", "not json\n")
 
-	_, _, warnings := wave.ReadRunCycles(p.root, 6, 0)
+	r := wave.ReadRunRange(p.root, 6, 0)
 
-	if len(warnings) != 2 {
-		t.Errorf("warnings = %q, want one for the cycle stream and one for the loop stream", warnings)
+	if len(r.Warnings) != 2 {
+		t.Errorf("warnings = %q, want one for the cycle stream and one for the loop stream", r.Warnings)
 	}
 }
 

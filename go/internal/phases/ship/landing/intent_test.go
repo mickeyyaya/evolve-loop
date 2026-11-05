@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestIntentPath_KeepsEveryCycleInTheHostOwnedLandingDir(t *testing.T) {
@@ -90,4 +91,29 @@ func TestWriteIntent_FailsWhenTheLandingDirCannotHoldIt(t *testing.T) {
 
 func TestIntent_CannotFailToMarshal(t *testing.T) {
 	assertMarshalCannotFail(t, reflect.TypeOf(Intent{}), "Intent")
+}
+
+func TestIntent_CompletedReadsTheStampAndAPastRecordHasNone(t *testing.T) {
+	t.Parallel()
+	path := IntentPath(t.TempDir(), 9)
+	in := preparedIntent()
+	in.CompletedAt = "2026-11-04T10:30:07Z"
+	if err := WriteIntent(path, in); err != nil {
+		t.Fatal(err)
+	}
+	got, _, _ := ReadIntent(path)
+	if at, ok := got.Completed(); !ok || !at.Equal(time.Date(2026, 11, 4, 10, 30, 7, 0, time.UTC)) {
+		t.Errorf("Completed = %v %v", at, ok)
+	}
+	past := `{"cycle":3,"commit_sha":"abc","status":"complete"}`
+	if err := os.WriteFile(path, []byte(past), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old, found, err := ReadIntent(path)
+	if !found || err != nil || old.CompletedAt != "" {
+		t.Fatalf("past record: %+v %v %v", old, found, err)
+	}
+	if _, ok := old.Completed(); ok {
+		t.Error("a past record has no completion time")
+	}
 }

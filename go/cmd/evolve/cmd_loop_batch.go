@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
@@ -28,6 +29,7 @@ type loopBatchCoordinator struct {
 	preWave      func(iteration int) (batchDecision, bool)
 	leases       map[string]*orchestrator.Leases
 	zeroShip     zeroShipTally
+	now          func() time.Time
 	loadGraph    graphLoader
 	lastGraph    graphLoad
 }
@@ -69,6 +71,7 @@ func (b *loopBatchCoordinator) run() int {
 	stallCfg := loadGoalStallConfig(cfg.EvolveDir)
 
 	batchStartCycle, _ := readBatchWindowFloor(context.Background(), deps.Storage)
+	b.zeroShip.from = b.clock()
 	sequentialState := sequentialBatchState{
 		dispPolicy:          dispPolicy,
 		threshold:           threshold,

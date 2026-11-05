@@ -38,8 +38,9 @@ type Plan struct {
 }
 
 const (
-	refMain       = "refs/evolve/main"
-	alreadyLanded = "The commits of this PR are already on main. This PR is closed. Its branch is unchanged."
+	refMain         = "refs/evolve/main"
+	noBindingPrefix = "cannot record a review binding: "
+	alreadyLanded   = "The commits of this PR are already on main. This PR is closed. Its branch is unchanged."
 )
 
 type Refusal struct {
@@ -392,9 +393,12 @@ func (t Train) Record(ctx context.Context, pr int, bind Binder) (string, error) 
 	if err != nil {
 		return "", err
 	}
+	if ev.DiffSHA == Digest(nil) {
+		return "", &Refusal{PR: pr, Reason: noBindingPrefix + "its commits have no net change. Next: close the PR."}
+	}
 	binding, err := bind(ev)
 	if err != nil {
-		return "", &Refusal{PR: pr, Reason: "cannot record a review binding: " + err.Error()}
+		return "", &Refusal{PR: pr, Reason: noBindingPrefix + err.Error()}
 	}
 	rec := DeliverableRecord{Source: SourceConsolePR, Wave: ConsoleWave, PR: pr, Commits: commits, Audit: binding}
 	return WriteRecord(WaveDir(t.Root, ConsoleWave), rec)
@@ -411,7 +415,7 @@ func (t Train) evidence(ctx context.Context, commits []CommitIdentity) (Evidence
 	if err != nil {
 		return Evidence{}, err
 	}
-	ev := Evidence{Paths: paths, DiffSHA: Digest([]byte(diff))}
+	ev := Evidence{Base: first, Paths: paths, DiffSHA: Digest([]byte(diff))}
 	for _, c := range commits {
 		ev.Commits = append(ev.Commits, c.SHA)
 	}
@@ -420,12 +424,27 @@ func (t Train) evidence(ctx context.Context, commits []CommitIdentity) (Evidence
 
 func (t Train) prCommits(ctx context.Context, pr int) ([]CommitIdentity, error) {
 	repo := t.Composer.Repo
-	out, err := repo.Git(ctx, repo.Dir, "", "rev-list", "--reverse", "refs/evolve/main..refs/evolve/pr/"+strconv.Itoa(pr))
+	out, err := repo.Git(ctx, repo.Dir, "", "rev-list", "--reverse", "--parents", "refs/evolve/main..refs/evolve/pr/"+strconv.Itoa(pr))
 	if err != nil {
 		return nil, fmt.Errorf("integration: list the commits of PR #%d: %w", pr, err)
 	}
 	var commits []CommitIdentity
-	for _, sha := range strings.Fields(out) {
+	for _, line := range strings.Split(out, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
+			continue
+		}
+		sha := fields[0]
+		if len(fields) > 2 {
+			return nil, &Refusal{PR: pr, Reason: noBindingPrefix + mergeReason(sha, fields[1:])}
+		}
+		names, err := repo.Git(ctx, repo.Dir, "", "diff-tree", "--no-commit-id", "--name-only", "-r", "--root", "--end-of-options", sha)
+		if err != nil {
+			return nil, fmt.Errorf("integration: read the files of %s: %w", sha, err)
+		}
+		if strings.TrimSpace(names) == "" {
+			return nil, &Refusal{PR: pr, Reason: noBindingPrefix + "commit " + ShortSHA(sha) + " changes nothing. Next: put the other commits on a new branch from origin/main without it."}
+		}
 		parent, err := repo.Git(ctx, repo.Dir, "", "rev-parse", sha+"^")
 		if err != nil {
 			return nil, fmt.Errorf("integration: read the parent of %s: %w", sha, err)
@@ -440,4 +459,16 @@ func (t Train) prCommits(ctx context.Context, pr int) ([]CommitIdentity, error) 
 		return nil, fmt.Errorf("integration: PR #%d has no commits on main", pr)
 	}
 	return commits, nil
+}
+
+func ShortSHA(sha string) string {
+	return sha[:min(7, len(sha))]
+}
+
+func mergeReason(sha string, parents []string) string {
+	short := make([]string, len(parents))
+	for i, p := range parents {
+		short[i] = ShortSHA(p)
+	}
+	return "commit " + ShortSHA(sha) + " is a merge of " + strings.Join(short, " and ") + ", and the train composes a linear PR. Next: put the commits on a new branch from origin/main, open a PR, and run record-pr on it."
 }

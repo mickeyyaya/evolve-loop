@@ -69,7 +69,7 @@ func (p wavePlane) seedWave81() {
 	p.write(".evolve/runs/cycle-1835/run.json", `{"cycle_id":1835,"phase":"ship"}`)
 	p.write(".evolve/runs/cycle-1835/signals.ndjson",
 		`{"schema_version":"1.0","seq":1,"pid":1,"ts":"2026-10-08T11:00:00Z","module":"orchestrator","origin":"x","kind":"cycle.sealed","severity":"INFO","reason":"r","fields":{"final_verdict":"WARN"}}`+"\n")
-	p.write(".evolve/landing/cycle-1835.json", `{"cycle":1835,"status":"complete"}`)
+	zwShipAt(p.t, p.evolveDir(), 1835, waveTestClock.Add(-3*time.Hour))
 	p.write(".evolve/runs/cycle-1836/run.json", `{"cycle_id":1836,"phase":"scout"}`)
 	logPath := filepath.Join(p.root, "old-loop.log")
 	p.write("old-loop.log", "done\n")

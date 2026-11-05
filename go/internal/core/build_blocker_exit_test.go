@@ -2,6 +2,8 @@ package core
 
 import (
 	"context"
+	"errors"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,6 +19,7 @@ import (
 
 type claimingBuild struct {
 	defects    []string
+	rounds     [][]string
 	dispatches *int
 }
 
@@ -24,7 +27,11 @@ func (claimingBuild) Name() string { return string(PhaseBuild) }
 
 func (b claimingBuild) Run(_ context.Context, req PhaseRequest) (PhaseResponse, error) {
 	*b.dispatches++
-	sentinel := phasecontract.RenderVerdictSentinelWithFailure("build", VerdictFAIL, &phasecontract.FailureBlock{Class: "code-build-fail", Defects: b.defects})
+	defects := b.defects
+	if len(b.rounds) > 0 {
+		defects = b.rounds[min(*b.dispatches, len(b.rounds))-1]
+	}
+	sentinel := phasecontract.RenderVerdictSentinelWithFailure("build", VerdictFAIL, &phasecontract.FailureBlock{Class: "code-build-fail", Defects: defects})
 	if err := os.WriteFile(filepath.Join(req.Workspace, "build-report.md"), []byte("## Changes\n- tests\n"+sentinel+"\n"), 0o644); err != nil {
 		return PhaseResponse{}, err
 	}
@@ -47,9 +54,22 @@ type blockerRun struct {
 	workspace  string
 	worktree   *fakeWorktree
 	signals    []signalcenter.Event
+	directives []string
 }
 
 func runBlockerCycle(t *testing.T, failures, defects []string, member func(string) bool, decision string, env map[string]string) blockerRun {
+	t.Helper()
+	return runBlockerCycleWith(t, failures, defects, member, decision, env, nil)
+}
+
+type blockerExtra func(t *testing.T, root string) []Option
+
+func runBlockerCycleWith(t *testing.T, failures, defects []string, member func(string) bool, decision string, env map[string]string, tune func(map[Phase]PhaseRunner), extras ...blockerExtra) blockerRun {
+	t.Helper()
+	return runBlockerRounds(t, failures, claimingBuild{defects: defects}, member, decision, env, tune, extras...)
+}
+
+func runBlockerRounds(t *testing.T, failures []string, build claimingBuild, member func(string) bool, decision string, env map[string]string, tune func(map[Phase]PhaseRunner), extras ...blockerExtra) blockerRun {
 	t.Helper()
 	root := writeClaimableInbox(t, 1)
 	repo := gittest.Fixture(t)
@@ -62,7 +82,11 @@ func runBlockerCycle(t *testing.T, failures, defects []string, member func(strin
 	run := blockerRun{worktree: &fakeWorktree{path: repo.Dir}}
 	runners := buildRunners(nil)
 	runners[PhaseTriage] = triageDecisionRunner{verdict: VerdictPASS, decision: decision}
-	runners[PhaseBuild] = claimingBuild{defects: defects, dispatches: &run.dispatches}
+	if tune != nil {
+		tune(runners)
+	}
+	spy := &resumedBuildRun{}
+	runners[PhaseBuild] = directiveSpy{inner: claimingBuild{defects: build.defects, rounds: build.rounds, dispatches: &run.dispatches}, run: spy}
 	center := signalcenter.New()
 	var mu sync.Mutex
 	center.Subscribe(func(e signalcenter.Event) {
@@ -74,10 +98,14 @@ func runBlockerCycle(t *testing.T, failures, defects []string, member func(strin
 	if member != nil {
 		opts = append(opts, WithProtectedSurface(member))
 	}
+	for _, extra := range extras {
+		opts = append(opts, extra(t, root)...)
+	}
 	run.result, run.err = NewOrchestrator(&fakeStorage{state: State{LastCycleNumber: 9}}, &fakeLedger{}, runners, opts...).RunCycle(context.Background(), CycleRequest{
 		ProjectRoot: root, GoalHash: "lane-goal", Env: env,
 	})
 	center.Flush()
+	run.directives = spy.directives
 	run.workspace = filepath.Join(root, ".evolve", "runs", "cycle-10")
 	return run
 }
@@ -199,5 +227,126 @@ func TestIsProvenBlockerResult_OnlyTheBlockedFailEnding(t *testing.T) {
 		if got := IsProvenBlockerResult(tc.result); got != tc.want {
 			t.Errorf("%s: got %v, want %v", name, got, tc.want)
 		}
+	}
+}
+
+func (r blockerRun) reasonOf(code signalcenter.Code) (string, bool) {
+	for _, e := range r.signals {
+		if e.Code == code {
+			return e.Reason, true
+		}
+	}
+	return "", false
+}
+
+func TestBuildBlockerExit_TheFreshSignalsCarryTheExactText(t *testing.T) {
+	t.Parallel()
+	routed := runBlockerCycle(t, []string{cycle1946PredicateFailure}, []string{cycle1946Claim}, protectsSelfcheck, oneCardDecision, laneEnv)
+	wantRouted := "blocked: needs console — phase build stopped on a proven blocker the lane cannot remove: protected-path: the fix needs " + selfcheckPath + ", a protected control-plane path (the lane said: " + cycle1946Claim + ")"
+	if got, ok := routed.reasonOf(CodeBlockerRouted); !ok || got != wantRouted {
+		t.Errorf("routed reason = %q ok=%v\nwant %q", got, ok, wantRouted)
+	}
+
+	fake := "BLOCKER protected-path " + breakerPath + ":76 I would rather not test this"
+	refused := runBlockerCycle(t, []string{cycle1950Failure}, []string{fake}, protectsSelfcheck, oneCardDecision, laneEnv)
+	wantRefused := "the declared blocker is not proven: \"" + fake + "\": " + breakerPath + " is not on the protected-surface manifest, so the lane can edit it. Next: correct the BLOCKER line of your report so each claim is true, or fix the failures without declaring a blocker."
+	if got, ok := refused.reasonOf(CodeBlockerRefused); !ok || got != wantRefused {
+		t.Errorf("refused reason = %q ok=%v\nwant %q", got, ok, wantRefused)
+	}
+	if len(refused.directives) < 2 || !strings.Contains(refused.directives[1], "The host refused your BLOCKER claim: "+wantRefused) {
+		t.Errorf("directives = %q; the fresh correction tells the lane why the host refused the claim", refused.directives)
+	}
+}
+
+func TestBuildBlockerExit_NoRouteTextNamesTheCauseAndTheNextStep(t *testing.T) {
+	t.Parallel()
+	twoCards := `{"top_n":[{"id":"claimable-lane-item"},{"id":"other-item"}]}`
+	run := runBlockerCycle(t, []string{cycle1946PredicateFailure}, []string{cycle1946Claim}, protectsSelfcheck, twoCards, nil)
+	want := "the blocker is proven, and the triage decision commits items claimable-lane-item, other-item, and a console route needs exactly one, so this cycle ends with no route. Next: at the boundary, the console routes each item that needs this path with evolve inbox route-console <id> <reason> <cycle>. A quarantined item needs evolve inbox quarantine release <id> first."
+	if got, ok := run.reasonOf(CodeBlockerRefused); !ok || got != want {
+		t.Errorf("reason = %q ok=%v\nwant %q", got, ok, want)
+	}
+}
+
+func TestBuildBlockerExit_TheFreshBuildEntrySealsThePredicateBase(t *testing.T) {
+	t.Parallel()
+	run := runBlockerCycle(t, []string{cycle1946PredicateFailure}, []string{cycle1946Claim}, protectsSelfcheck, oneCardDecision, laneEnv)
+	got, _ := readPredicateSnapshot(run.workspace)
+	want := cyclePredicateSources(run.worktree.path, 10)
+	if len(want) == 0 || !maps.Equal(got, want) {
+		t.Errorf("sealed base = %v\nwant the predicate sources of cycle 10 %v", got, want)
+	}
+}
+
+func TestBuildBlockerExit_AnUnroutableBlockerEndsAfterTheFirstDispatchWithNoDirective(t *testing.T) {
+	t.Parallel()
+	for _, tc := range blockerEndCases {
+		if tc.outcome != Unroutable || !tc.fresh {
+			continue
+		}
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			run := runBlockerCycle(t, []string{cycle1946PredicateFailure}, []string{cycle1946Claim}, protectsSelfcheck, tc.decision, tc.env)
+
+			var ended blockerEnd
+			if !errors.As(run.err, &ended) || ended.outcome != Unroutable {
+				t.Fatalf("err = %v; want the typed end of an unroutable blocker", run.err)
+			}
+			if run.dispatches != 1 {
+				t.Errorf("build dispatched %d times; the end spends no correction round", run.dispatches)
+			}
+			if len(run.directives) != 1 || run.directives[0] != "" {
+				t.Errorf("directives = %q; no directive follows the first dispatch", run.directives)
+			}
+			if run.result.TerminationReason == CycleTerminationBlockedNeedsConsole {
+				t.Errorf("result = %+v; only a routable blocker routes", run.result)
+			}
+			entries, err := phasetiming.Read(run.workspace)
+			if err != nil || len(entries) == 0 {
+				t.Fatalf("phase timing: %v", err)
+			}
+			last := entries[len(entries)-1]
+			for i := len(entries) - 1; i >= 0 && last.Phase == string(PhaseRetro); i-- {
+				last = entries[i]
+			}
+			if codes := cyclestate.ErrorCodes(last.Diagnostics); last.Verdict != string(VerdictFAIL) || len(codes) == 0 || codes[0] != cyclestate.DiagCodeBlockerUnroutable {
+				t.Errorf("ending entry = %+v; want the FAIL outcome to lead with %s", last, cyclestate.DiagCodeBlockerUnroutable)
+			}
+		})
+	}
+}
+
+type sealBlockingRunner struct{ inner PhaseRunner }
+
+func (r sealBlockingRunner) Name() string { return r.inner.Name() }
+
+func (r sealBlockingRunner) Run(ctx context.Context, req PhaseRequest) (PhaseResponse, error) {
+	if err := os.MkdirAll(filepath.Join(req.Workspace, predicateSnapshotFile+".tmp", "held"), 0o755); err != nil {
+		return PhaseResponse{}, err
+	}
+	return r.inner.Run(ctx, req)
+}
+
+func TestBuildBlockerExit_ASealFailureAbortsBeforeAnyDispatch(t *testing.T) {
+	t.Parallel()
+	run := runBlockerCycleWith(t, []string{cycle1946PredicateFailure}, []string{cycle1946Claim}, protectsSelfcheck, oneCardDecision, laneEnv, func(runners map[Phase]PhaseRunner) {
+		runners[PhaseTDD] = sealBlockingRunner{inner: runners[PhaseTDD]}
+	})
+	if run.err == nil || !strings.Contains(run.err.Error(), "seal predicate baseline") {
+		t.Fatalf("err = %v; a base that cannot be stored stops the cycle", run.err)
+	}
+	if run.dispatches != 0 {
+		t.Errorf("build dispatched %d times; the seal precedes the dispatch", run.dispatches)
+	}
+}
+
+func TestProvenBlocker_AReviewerDeclaredBlockerWithNoItemEndsUnroutableWithItsOwnCode(t *testing.T) {
+	t.Parallel()
+	h := exhaustionHarness(t, PhaseBuild, codeReviewSpec(), "scout")
+
+	outcome, diag, statement := h.cr.provenBlocker(PhaseBuild, ReviewInput{}, ReviewResult{ProvenBlocker: "blocked: needs console — proof"})
+
+	if outcome != Unroutable || diag.Code != DiagCodeBlockerUnroutable || statement.empty() {
+		t.Fatalf("outcome %d code %q statement %+v; a reviewer-declared blocker with no committed item is unroutable and keeps that code", outcome, diag.Code, statement)
 	}
 }

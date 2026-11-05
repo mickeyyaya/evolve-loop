@@ -37,12 +37,20 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 		corr := 0
 		salvagedFromInvalid := ""
 		var prevPredicates []string
+		var refused blockerStatement
 		for !rr.Approve {
-			if diag, ok := cr.provenBlocker(next, rin, rr); ok {
-				return cr.endOnProvenBlocker(next, dr, diag)
+			var outcome BlockerOutcome
+			var diag Diagnostic
+			outcome, diag, refused = cr.provenBlocker(next, rin, rr)
+			rounds := blockerRoundsDecision(outcome)
+			if rounds.End {
+				return cr.endOnBlocker(next, dr, outcome, diag)
 			}
 			predicates := acsPredicateFailures(rr.Failures, cr.cycle)
 			if cr.predicateDefectRepeats(next, dr, prevPredicates, predicates) {
+				if rounds.Claim {
+					cr.sendRefusal(next, refused)
+				}
 				return cr.routePredicateDefectToTDD(dr, predicates), nil
 			}
 			act := nextCorrection(interaction.CorrectionInput{
@@ -144,6 +152,10 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 					CostUSD:   dr.resp.CostUSD,
 				})
 			}
+			refusal := ""
+			if rounds.Claim {
+				refusal = cr.sendRefusal(next, refused)
+			}
 			directive := composeCorrection(corr, rr.Reason, rr.Remediation)
 			if salvageRetry {
 				directive = composeContractSalvageRetry(corr, rr.Reason, rr.Remediation)
@@ -154,7 +166,7 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 				}
 				salvagedFromInvalid = ""
 			}
-			dr.phaseReq.CorrectionDirective = preferDigest(directive, dr.phaseReq)
+			dr.phaseReq.CorrectionDirective = withBlockerRefusal(preferDigest(directive, dr.phaseReq), refusal)
 			cr.o.emitGateCorrection(gateCorrection{
 				origin: originContractCorrection, cycle: cr.cycle, phase: next, correction: corr, max: maxCorrections,
 				rung: interaction.RungRedispatch, cli: dr.phaseReq.Driver.String(), escalated: escalated, salvageRetry: salvageRetry, reason: rr.Reason,
@@ -202,7 +214,7 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 		dr.phaseReq.CorrectionDirective = ""
 		dr.phaseReq.Driver = baseDriver
 		if !rr.Approve {
-			return cr.rejectAfterCorrections(next, dr, rr, maxCorrections)
+			return cr.rejectRefused(next, dr, rr, maxCorrections, refused)
 		}
 	}
 
