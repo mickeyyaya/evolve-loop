@@ -270,7 +270,7 @@ A halt keeps its ceiling and still stops the loop. The item it files carries the
 1. The fix rounds stop. The best round stays preserved, and every open finding is filed.
 2. The subject leaves the lane queue and routes to the console, with a digest of all findings.
 3. A top-tier seat names what the findings share, from the architecture side.
-4. The seat writes a new design card (ADR-0161). The card can keep the design if it answers each finding.
+4. The seat writes a new design card (ADR-0161). No seat and no console can waive this rung.
 5. The architecture review reads the card before any code. Strict TDD follows the review.
 6. The count restarts when the redesign starts. Card blocks and code blocks both count.
 7. A second count past three goes to the operator (`CONVERGENCE_TO_OPERATOR`).

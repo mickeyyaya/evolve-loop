@@ -79,7 +79,9 @@ On 2026-10-07 the operator stopped L2 at round 7 ("It just retry for too many ti
     - A subject is a task, or a failure fingerprint when a failure has no task.
     - A block is one judgment with an open CRITICAL or HIGH defect, or one failure event of decision 16.
     - Only the pipeline writes the count. A seat cannot write it.
-14. **Three retries, then a redesign.** The fourth block starts the redesign rung.
+14. **Three retries, then a redesign.** A failed fourth review starts the redesign rung.
+    - The operator (2026-11-06): "once we failed to 4th review, it should trigger the redesign".
+    - A fourth failure starts the rung even when a seat finds no shared design fault. The rung then writes its card, and the review reads it.
     - When each judgment holds a CRITICAL or HIGH defect, `J_0` is block 1 and `J_3` is block 4. Then "no round 4" and "blocked over 3 times" are one count.
     - A Stop with three blocks or fewer keeps the rule of decision 5, with no redesign. A round with only MEDIUM findings adds no block.
     - The count does not depend on a loop's budget. The audit repair envelope caps its repairs, so block 4 often comes in a later cycle.
@@ -90,7 +92,7 @@ On 2026-10-07 the operator stopped L2 at round 7 ("It just retry for too many ti
     - The fix rounds stop. The best round stays preserved, and every open finding is filed.
     - The subject leaves the lane queue and routes to the console, with a digest of all its findings.
     - A top-tier seat names what the findings share, and writes a new design card (ADR-0161).
-    - The architecture review reads the card before any code. The card can keep the design if it answers each finding.
+    - The architecture review reads the card before any code. No seat and no console can waive this rung.
     - The count restarts when the redesign starts. Card blocks and code blocks both count.
     - A second count past three goes to the operator, with no second automatic redesign.
 16. **Pipeline failures feed the same count.** The breakers keep their ceilings and their halts.
@@ -104,7 +106,7 @@ On 2026-10-07 the operator stopped L2 at round 7 ("It just retry for too many ti
     - The table in the [convergence policy §3.3](../convergence-policy.md#33-one-escalation-path-the-redesign-rung) maps each class.
 17. **The signal states the rung.** `CONVERGENCE_REDESIGN` names the subject, the count, the trigger, the cause or "unknown", the evidence and the next step. `CONVERGENCE_TO_OPERATOR` does the same for the last rung.
 
-Console proposals: the block definition, the `J_0` to `J_3` reading, the host-held count, the restart, the task ceiling rule, one redesign, and decision 16. The operator has not ruled on them. They ride `workflow.convergence.stage`, and each change of stage is an operator decision.
+Console proposals: the block definition, the host-held count, the restart, the task ceiling rule, one redesign, and decision 16. The operator has not ruled on them. They ride `workflow.convergence.stage`, and each change of stage is an operator decision.
 
 ## Alternatives considered
 
@@ -124,7 +126,7 @@ Console proposals: the block definition, the `J_0` to `J_3` reading, the host-he
 ## Consequences
 
 - **At most three fix rounds per loop,** and the best qualifying round lands.
-- **The redesign has a cost at the top tier,** and the fourth patch is gone. A fourth block with a sound design pays for one card that says why the design holds.
+- **The redesign has a cost at the top tier,** and the fourth patch is gone. A fourth failed review pays for one new design card, and no seat can waive the rung.
 - **Today no code does this.** `Decision.Redesign` holds only a component list, and only the CLI prints it. The halts stop the loop and start no redesign. Plan components R1 to R6 of [pipeline-blockers-2026-11](../../plans/pipeline-blockers-2026-11.md) build it.
 - **Code-review's budget is unchanged** (3 fixes = 4 reviews), but each round now changes an input.
 - **Inbox growth from deferrals and filings.** It is tracked: each follow-up carries its origin loop and round, and the deferred-then-closed share is measured.
