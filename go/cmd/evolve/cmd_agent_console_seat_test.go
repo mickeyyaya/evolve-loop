@@ -96,7 +96,7 @@ func TestConsoleReviewChain_ANonClaudeSeatReviewsAndTheGateAttestsTheBridgeRecor
 	}
 
 	res := commitgate.Options{
-		RepoRoot: root, Reviewers: strings.Join(tokens, ","), Runner: consoleGateRunner, NoInstall: true,
+		RepoRoot: root, ReviewDir: filepath.Join(root, "review-store"), Reviewers: strings.Join(tokens, ","), Runner: consoleGateRunner, NoInstall: true,
 		Env: os.Environ(), Now: func() time.Time { return time.Date(2026, 10, 27, 9, 5, 0, 0, time.UTC) },
 	}.Run(context.Background())
 

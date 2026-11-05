@@ -23,7 +23,7 @@ func (o Options) requiredReviewSatisfied(files, langs []string, res *Result) boo
 	if !DocsOnly(files) {
 		return o.reviewersSatisfied(langs, res)
 	}
-	if capSatisfied(normalizeReviewers(o.Reviewers), docsReviewSyn) {
+	if len(MissingReviewCapabilities(files, langs, strings.Split(o.Reviewers, ","))) == 0 {
 		return true
 	}
 	res.log("DENY: missing required review capability: docs review")

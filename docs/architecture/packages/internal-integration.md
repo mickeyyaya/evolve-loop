@@ -144,7 +144,9 @@ The package holds the pure parts of the integration of a wave. A fleet lane deli
 
 A lane record has a cycle number and a trailer. A console PR record has the source console-pr, a PR number and no cycle number. DeliverableRecord.Ref gives the number of either kind, and Label gives its name for a message.
 
-The review binding of a console PR covers the change of the PR. Train.Record gives the binder the evidence: the commits, the changed paths and the digest of the diff. AttestedBinding accepts an attestation only when its tree equals that digest. ClassBinding accepts a class only when the rule of the class covers the paths. The caller owns the attestation schema and the closed list of classes, because this package cannot import the commit gate. That package imports this one through core.
+The review binding of a console PR covers the change of the PR. Train.Record gives the binder the evidence: the commits, the changed paths and the digest of the diff. AttestedBinding accepts a review record only when its tree equals that digest. ClassBinding accepts a class only when the rule of the class covers the paths.
+
+The commit gate writes the review record, and it holds a copy of each launch record that it names. A review record of a docs-only change needs a run of the docs review, and the plain name does not satisfy the check. The class `docs-review` checks only the paths, and it proves no run. The caller owns the record schema and the closed list of classes, because this package cannot import the commit gate. That package imports this one through core.
 
 Train plans and lands the ready PRs. Plan does three things and pushes nothing:
 

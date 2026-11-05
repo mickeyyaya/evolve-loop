@@ -2,8 +2,28 @@ package commitgate
 
 import "strings"
 
+const docsReviewCapability = "docs review"
+
 func (o Options) reviewersSatisfied(langs []string, res *Result) bool {
-	norm := normalizeReviewers(o.Reviewers)
+	missing := MissingReviewCapabilities(nil, langs, strings.Split(o.Reviewers, ","))
+	if len(missing) == 0 {
+		return true
+	}
+	res.log("DENY: missing required review capability: %s", strings.Join(missing, " "))
+	res.log("  simplify ← code-simplifier | code-review-simplify | refactor")
+	res.log("  review   ← code-reviewer | code-review | a matching <lang>-reviewer (ECC variants OK)")
+	res.log("run them, then pass --reviewers (use the /commit skill).")
+	return false
+}
+
+func MissingReviewCapabilities(files, langs, reviewers []string) []string {
+	norm := normalizeReviewers(reviewers)
+	if DocsOnly(files) {
+		if capSatisfied(norm, docsReviewSyn) {
+			return nil
+		}
+		return []string{docsReviewCapability}
+	}
 
 	simplifySyn := []string{"code-simplifier", "code-review-simplify", "refactor"}
 	reviewSyn := []string{"code-reviewer", "code-review", "code-review-simplify"}
@@ -27,19 +47,12 @@ func (o Options) reviewersSatisfied(langs []string, res *Result) bool {
 	if !capSatisfied(norm, reviewSyn) {
 		missing = append(missing, "review")
 	}
-	if len(missing) == 0 {
-		return true
-	}
-	res.log("DENY: missing required review capability: %s", strings.Join(missing, " "))
-	res.log("  simplify ← code-simplifier | code-review-simplify | refactor")
-	res.log("  review   ← code-reviewer | code-review | a matching <lang>-reviewer (ECC variants OK)")
-	res.log("run them, then pass --reviewers (use the /commit skill).")
-	return false
+	return missing
 }
 
-func normalizeReviewers(csv string) map[string]bool {
+func normalizeReviewers(reviewers []string) map[string]bool {
 	set := map[string]bool{}
-	for _, r := range strings.Split(csv, ",") {
+	for _, r := range reviewers {
 		r = stripWhitespace(stripNamespacePrefix(r))
 		if r != "" {
 			set[r] = true

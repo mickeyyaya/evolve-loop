@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -59,7 +60,7 @@ func TestTrainRecordFailsLoudly(t *testing.T) {
 
 func TestTrainRecordReportsEachGitStepThatFails(t *testing.T) {
 	t.Parallel()
-	for _, verb := range []string{"rev-list", "rev-parse", "diff-tree", "diff"} {
+	for _, verb := range []string{"rev-list", "rev-parse", "diff-tree", "patch-id", "diff"} {
 		r := newTrainRig(t)
 		r.f.console(t, 9, "feat: a", map[string]string{"a.txt": "a\n"})
 		r.f.g.Git("push", "-q", "origin", "pr-9:refs/pull/9/head")
@@ -90,6 +91,9 @@ func TestTrainRecordHandsTheBinderTheEvidenceOfThePR(t *testing.T) {
 		t.Fatal(err)
 	}
 	diff := r.f.g.Git("diff", r.f.base, rec.Commits[0].SHA) + "\n"
+	if got.Base != r.f.base {
+		t.Errorf("evidence base = %q, want the base %q of the first commit", got.Base, r.f.base)
+	}
 	if got.DiffSHA != Digest([]byte(diff)) || !slices.Equal(got.Commits, []string{rec.Commits[0].SHA}) || !slices.Equal(got.Paths, []string{"b.go", "docs/a.md"}) {
 		t.Errorf("evidence = %+v, want the digest of the PR diff, its commit and its paths", got)
 	}
@@ -120,12 +124,79 @@ func TestTrainRecordReportsAFailedPathListing(t *testing.T) {
 	r.f.g.Git("push", "-q", "origin", "pr-9:refs/pull/9/head")
 	real := r.train.Composer.Repo.Git
 	r.train.Composer.Repo.Git = func(ctx context.Context, dir, in string, args ...string) (string, error) {
-		if slices.Contains(args, "--name-only") {
+		if slices.Contains(args, "-z") {
 			return "", errors.New("listing failed")
 		}
 		return real(ctx, dir, in, args...)
 	}
 	if _, err := r.train.Record(context.Background(), 9, classBinder("docs-review")); err == nil || !strings.Contains(err.Error(), "listing failed") {
 		t.Errorf("Record = %v, want the listing error", err)
+	}
+}
+
+func recordRefusal(t *testing.T, r *trainRig, pr int) string {
+	t.Helper()
+	r.f.g.Git("push", "-q", "origin", "pr-"+strconv.Itoa(pr)+":refs/pull/"+strconv.Itoa(pr)+"/head")
+	bound := false
+	bind := func(Evidence) (AuditBinding, error) { bound = true; return AuditBinding{}, nil }
+	_, err := r.train.Record(context.Background(), pr, bind)
+	var refusal *Refusal
+	if !errors.As(err, &refusal) {
+		t.Fatalf("Record = %v, want a Refusal", err)
+	}
+	if bound {
+		t.Error("the binder ran on a PR that the train cannot compose")
+	}
+	return err.Error()
+}
+
+func TestTrainRecordRefusesAMergeCommitWithATypedNextStep(t *testing.T) {
+	t.Parallel()
+	r := newTrainRig(t)
+	g := r.f.g
+	g.Git("checkout", "-q", "-b", "side", r.f.base)
+	g.Write("side.txt", "side\n")
+	g.Git("add", ".")
+	g.Git("commit", "-q", "-m", "side")
+	side := strings.TrimSpace(g.Git("rev-parse", "HEAD"))
+	g.Git("checkout", "-q", "-b", "pr-12", r.f.base)
+	g.Write("own.txt", "own\n")
+	g.Git("add", ".")
+	g.Git("commit", "-q", "-m", "own")
+	own := strings.TrimSpace(g.Git("rev-parse", "HEAD"))
+	g.Git("merge", "-q", "--no-ff", "-m", "merge", "side")
+	merge := strings.TrimSpace(g.Git("rev-parse", "HEAD"))
+	want := "integration: PR #12 cannot record a review binding: commit " + merge[:7] + " is a merge of " + own[:7] + " and " + side[:7] + ", and the train composes a linear PR. Next: put the commits on a new branch from origin/main, open a PR, and run record-pr on it."
+	if got := recordRefusal(t, r, 12); got != want {
+		t.Errorf("refusal =\n%s\nwant\n%s", got, want)
+	}
+}
+
+func TestTrainRecordRefusesAnEmptyCommitWithATypedNextStep(t *testing.T) {
+	t.Parallel()
+	r := newTrainRig(t)
+	g := r.f.g
+	g.Git("checkout", "-q", "-b", "pr-13", r.f.base)
+	g.Git("commit", "-q", "--allow-empty", "-m", "nothing")
+	empty := strings.TrimSpace(g.Git("rev-parse", "HEAD"))
+	want := "integration: PR #13 cannot record a review binding: commit " + empty[:7] + " changes nothing. Next: put the other commits on a new branch from origin/main without it."
+	if got := recordRefusal(t, r, 13); got != want {
+		t.Errorf("refusal =\n%s\nwant\n%s", got, want)
+	}
+}
+
+func TestTrainRecordRefusesAPRWithNoNetChange(t *testing.T) {
+	t.Parallel()
+	r := newTrainRig(t)
+	g := r.f.g
+	g.Git("checkout", "-q", "-b", "pr-14", r.f.base)
+	g.Write("temp.txt", "t\n")
+	g.Git("add", ".")
+	g.Git("commit", "-q", "-m", "add")
+	g.Git("rm", "-q", "temp.txt")
+	g.Git("commit", "-q", "-m", "remove")
+	want := "integration: PR #14 cannot record a review binding: its commits have no net change. Next: close the PR."
+	if got := recordRefusal(t, r, 14); got != want {
+		t.Errorf("refusal =\n%s\nwant\n%s", got, want)
 	}
 }

@@ -178,35 +178,36 @@ func TestAttestDirName_IsTheDefaultAttestationDirectory(t *testing.T) {
 	}
 }
 
-func TestVerifyAttestedRunsAcceptsOnlyLaunchedRunsBoundToTheTree(t *testing.T) {
+func TestCheckReviewRun_JudgesARecordAgainstATreeWithoutReadingDisk(t *testing.T) {
 	t.Parallel()
-	root := t.TempDir()
 	tree := stagedTree()
-	for _, rec := range []launchrecord.Record{reviewRun("r-ok", "code-reviewer"), reviewRun("r-ok2", "go-reviewer")} {
-		if _, err := launchrecord.Write(filepath.Join(root, ".evolve"), rec); err != nil {
-			t.Fatal(err)
-		}
-	}
-	other := reviewRun("r-other", "code-reviewer")
-	other.TreeAfter = "changed"
-	if _, err := launchrecord.Write(filepath.Join(root, ".evolve"), other); err != nil {
-		t.Fatal(err)
+	mutate := func(f func(*launchrecord.Record)) launchrecord.Record {
+		r := reviewRun("r1", "go-reviewer")
+		f(&r)
+		return r
 	}
 	cases := map[string]struct {
-		att  Attestation
-		fail bool
+		rec    launchrecord.Record
+		reason string
 	}{
-		"a run by token and by list": {Attestation{TreeStateSHA: tree, ReviewersRun: []string{"run:r-ok", " run:r-ok2"}, ReviewRuns: []ReviewRun{{RunID: "r-ok"}}}, false},
-		"no run":                     {Attestation{TreeStateSHA: tree}, true},
-		"a name with no run":         {Attestation{TreeStateSHA: tree, ReviewersRun: []string{"code-reviewer"}}, true},
-		"a run with no record":       {Attestation{TreeStateSHA: tree, ReviewersRun: []string{"run:ghost"}}, true},
-		"a run of another tree":      {Attestation{TreeStateSHA: tree, ReviewRuns: []ReviewRun{{RunID: "r-other"}}}, true},
-		"one bad run among good":     {Attestation{TreeStateSHA: tree, ReviewersRun: []string{"run:r-ok", "run:ghost"}}, true},
+		"no launch":       {mutate(func(r *launchrecord.Record) { r.CLI = "" }), "the record has no bridge launch"},
+		"a writer":        {mutate(func(r *launchrecord.Record) { r.WritesSource = true }), "the run is a writer, not a review"},
+		"a cloud session": {mutate(func(r *launchrecord.Record) { r.Cloud = &cloudlaunch.Session{} }), "the run launched a cloud session, so no reviewer read the staged tree"},
+		"a FAIL verdict":  {mutate(func(r *launchrecord.Record) { r.Verdict = "FAIL" }), `the review gave the verdict "FAIL", not PASS or WARN`},
+		"no report":       {mutate(func(r *launchrecord.Record) { r.ArtifactSHA256 = "" }), "the review wrote no report"},
+		"another tree":    {mutate(func(r *launchrecord.Record) { r.TreeAfter = "moved" }), "the review did not see the staged tree (the tree changed during or after the review)"},
 	}
 	for name, c := range cases {
-		err := VerifyAttestedRuns(root, c.att)
-		if (err != nil) != c.fail {
-			t.Errorf("%s: err = %v, want failure=%v", name, err, c.fail)
+		run, reason := CheckReviewRun(c.rec, tree)
+		if reason != c.reason || run != (ReviewRun{}) {
+			t.Errorf("%s: run %+v reason %q, want no run and %q", name, run, reason, c.reason)
+		}
+	}
+	for _, verdict := range []string{"PASS", "WARN"} {
+		rec := mutate(func(r *launchrecord.Record) { r.Verdict = verdict })
+		run, reason := CheckReviewRun(rec, tree)
+		if reason != "" || run != (ReviewRun{RunID: "r1", Profile: "go-reviewer", CLI: "agy-tmux", Family: "agy", Model: "gemini-3-pro"}) {
+			t.Errorf("%s: run %+v reason %q, want the run and no reason", verdict, run, reason)
 		}
 	}
 }

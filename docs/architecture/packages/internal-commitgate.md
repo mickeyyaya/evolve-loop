@@ -25,7 +25,9 @@
     - no sha256 tool;
     - a binary-guard error;
     - an unreadable HEAD;
-    - an attestation write failure.
+    - an attestation write failure;
+    - an empty review store directory;
+    - a review record write failure.
   - 3: a required tool is missing and was not installed.
   - 10: bad CLI arguments (the cmd layer returns it).
 - **`Run` order:**
@@ -34,7 +36,8 @@
   3. language detection;
   4. the review waiver or the reviewer precondition (`reviewDecision`, which returns the waiver to record);
   5. the language lanes in sorted order;
-  6. the attestation (whose writer logs the PASS line).
+  6. the review record, at `<git common dir>/evolve/reviews/<TreeStateSHA>.json`. It holds the attestation and a copy of each launch record that it names. Removing a worktree does not remove the proof;
+  7. the attestation (whose writer logs the PASS line). It comes last, so that a failed record write leaves no passing attestation for ship to accept.
 
   Every failure maps onto an exit code. `Run` never panics on a missing tool, a lint failure or a git error.
 - **The change set** is the `--files` override (whitespace-separated) or `git diff --name-only HEAD`, with blank lines dropped. An empty set is ExitFail: nothing to gate.
@@ -64,6 +67,7 @@
   - Every path must be a regular file and must not sit under `testdata/`.
   - Every path must be either a Go file that `commentaudit.Equivalent` proves comment-only against HEAD or Markdown under `docs/`.
   - At least one Go file must be proven.
+  - The change must have resolved no review run. A proven review gives a normal record, so a comment-only change has a route through `evolve integration record-pr --reviewed`.
 
   A denied waiver logs the path and the reason. A granted waiver is recorded in the attestation as `review_waiver: "comment-only"` (`commentOnlyWaiver`). Ship turns it into a `Review-waived: comment-only` trailer. So `git log` tells a waived commit from a `--bypass-commit-gate` one (`TestRun_AWaivedCommitRecordsItsWaiverAndAReviewedOneDoesNot`).
 - **Lanes skip files deleted from the working tree**, since a deleted file carries nothing to lint. The Go, Python and Rust lanes skip them through `existingFilesWithExt`. The Node lane skips them through `fileExists` over `nodeExts` (`TestLaneNode_ADeletedFileNeverReachesEslint`, `TestLaneNode_OnlyDeletedFilesRunNoLint`).

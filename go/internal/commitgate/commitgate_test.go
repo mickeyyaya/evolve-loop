@@ -54,8 +54,9 @@ func baseOpts(root string, present ...string) Options {
 		have[t] = true
 	}
 	return Options{
-		RepoRoot: root,
-		Now:      fixedClock(),
+		RepoRoot:  root,
+		ReviewDir: filepath.Join(root, "review-store"),
+		Now:       fixedClock(),
 		lookPath: func(tool string) (string, error) {
 			if have[tool] {
 				return "/usr/bin/" + tool, nil

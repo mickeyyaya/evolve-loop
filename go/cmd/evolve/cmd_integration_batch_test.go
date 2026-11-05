@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -205,7 +204,7 @@ func TestIntegrationBatchUsageAndFailures(t *testing.T) {
 		{"batch", "--help"},
 		{"record-pr"},
 		{"record-pr", "--pr", "1"},
-		{"record-pr", "--pr", "1", "--class", "c", "--attestation", "p"},
+		{"record-pr", "--pr", "1", "--class", "c", "--reviewed"},
 		{"record-pr", "--pr", "x", "--class", "c"},
 		{"record-pr", "--help"},
 		{"record-pr", "--pr", "1", "--class", "c", "extra"},
@@ -222,9 +221,6 @@ func TestIntegrationBatchUsageAndFailures(t *testing.T) {
 		if rc != exitUsage {
 			t.Errorf("%v: rc=%d, want %d", args, rc, exitUsage)
 		}
-	}
-	if rc, _, errb := j.run("record-pr", "--pr", "1", "--attestation", filepath.Join(t.TempDir(), "none.json")); rc != exitRefused || errb == "" {
-		t.Errorf("a missing attestation: rc=%d %q", rc, errb)
 	}
 	if rc, _, _ := j.run("record-pr", "--pr", "1", "--class", "Not A Class"); rc != exitRefused {
 		t.Errorf("a bad class: rc=%d, want %d", rc, exitRefused)

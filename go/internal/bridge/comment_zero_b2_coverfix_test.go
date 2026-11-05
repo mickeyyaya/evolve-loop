@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 	"github.com/mickeyyaya/evolve-loop/go/internal/verifylock"
 )
@@ -169,5 +170,47 @@ func TestSandboxGitWritePaths_ALinkedWorktreePaneMayTakeTheHostVerificationLock(
 	lock, hub := verifylock.LockPath(worktree)
 	if !hub || lock != filepath.Join(common, "evolve-verify.lock") || !slices.Contains(writes, lock) {
 		t.Errorf("verifylock.LockPath = %q (hub %t), grants = %v; want <common>/evolve-verify.lock granted", lock, hub, writes)
+	}
+}
+
+func realLinkedWorktree(t *testing.T) (worktree, store string) {
+	t.Helper()
+	main := gittest.Fixture(t)
+	main.Write("a.txt", "a\n")
+	main.Git("add", "a.txt")
+	main.Git("commit", "-q", "-m", "init")
+	base, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	worktree = filepath.Join(base, "wt")
+	main.Git("worktree", "add", "-q", "-b", "feature", worktree)
+	common := main.Git("-C", worktree, "rev-parse", "--path-format=absolute", "--git-common-dir")
+	return worktree, filepath.Join(common, "evolve", "reviews")
+}
+
+func TestSandboxGitWritePaths_NoGrantTouchesTheReviewStoreOfARealLinkedWorktree(t *testing.T) {
+	t.Parallel()
+	worktree, store := realLinkedWorktree(t)
+	writes, _, err := sandboxGitWritePaths(worktree, "darwin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(writes) == 0 {
+		t.Fatal("a linked worktree must be granted its own git writes, or this test proves nothing")
+	}
+	wantStore, err := canonicalSandboxPath(store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, w := range writes {
+		grant, err := canonicalSandboxPath(w)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sep := string(filepath.Separator)
+		if grant == wantStore || strings.HasPrefix(grant, wantStore+sep) || strings.HasPrefix(wantStore, grant+sep) {
+			t.Errorf("write grant %q is at, under or a parent of the review store %q: a sandboxed seat could forge a review record", grant, wantStore)
+		}
 	}
 }
