@@ -608,4 +608,11 @@ approaches / decision / results / retro) — lives at
 | [architecture/adr/0162-the-console-reads-through-a-tested-read-only-debug-family-and-writes-no-scratch-scripts.md](architecture/adr/0162-the-console-reads-through-a-tested-read-only-debug-family-and-writes-no-scratch-scripts.md) | Decision: the console reads through tested read-only verbs and writes no scratch script. |
 | [architecture/debug-cli.md](architecture/debug-cli.md) | Spec of record: the verbs, exit codes, items, source kinds, cycle states, the rule for `next` and the read-only proof. |
 
+## 2026-11-05 — why the Claude Code login fails, and how a seat stops ending it
+
+| Document | What it records |
+|---|---|
+| [research/claude-login-split-2026-11.md](research/claude-login-split-2026-11.md) | Research: 264 auth errors in 7 clusters since 11-02, and an older console pattern. A sandboxed seat cannot write the Keychain. |
+| [plans/seat-login-isolation-2026-11.md](plans/seat-login-isolation-2026-11.md) | Plan: five scored designs. A seat loses its path to the stored login. The choice waits for the operator. |
+
 <!-- GENERATED:research-index END -->
