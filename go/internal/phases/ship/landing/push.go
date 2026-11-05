@@ -68,6 +68,7 @@ func (l *Landing) Push(ctx context.Context, req PushRequest) (PushResult, error)
 		return out, fail(stepPush, shiperr.CodeArgs, shiperr.ShipClassConfig, "ship: a worktree push names no commit, so ship pushes nothing",
 			shiperr.BranchKey, req.Branch)
 	}
+	l.reportCredential(ctx, req)
 	if attempt := l.send(ctx, req); attempt.failed() {
 		if rerr := l.answerRejection(ctx, req, attempt, &out); rerr != nil {
 			return out, rerr
@@ -75,6 +76,15 @@ func (l *Landing) Push(ctx context.Context, req PushRequest) (PushResult, error)
 	}
 	out.Head = l.landedHead(ctx, req)
 	return out, nil
+}
+
+func (l *Landing) reportCredential(ctx context.Context, req PushRequest) {
+	if l.probe == nil {
+		return
+	}
+	if line := l.probe(ctx); line != "" {
+		emitLog(req.Log, line)
+	}
 }
 
 func (l *Landing) send(ctx context.Context, req PushRequest) pushAttempt {

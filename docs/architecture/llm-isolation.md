@@ -549,6 +549,37 @@ The guards are these tests:
 - `TestSandboxWrap_TheCellCannotReadTheDispatchCredentialOnMacOS` and `TestSandboxWrap_TheCellCannotReadTheDispatchCredentialOnLinux`
 - `TestDefault_IsUnderThePasswdHomeAndIgnoresHOME` and `TestStore_HoldRefusesAForgedOrMaskedCredential`
 
+#### 7.1.2 The credential source (D1, cross-OS, as built at `shadow`)
+
+The pipeline is the only credential holder. Only `git push` and `gh` of the ship path need a credential, and the pipeline runs both. A cell never needs a credential. The package `go/internal/credsource` gives the pipeline one interface to the credential store of each OS ([package note](packages/internal-credsource.md)).
+
+A worked example: `evolve ship --class manual --pr` runs on a Linux host with the policy stage `shadow`. Before the push, the ship log gets this line:
+
+```
+[credential] shadow: source file answered for github.com; the push and gh keep today's credential path
+```
+
+| Platform | Credential source | Command |
+|---|---|---|
+| macOS | Keychain | `security find-generic-password -s evolve-loop -a <host> -w` |
+| Linux | libsecret, then a file with mode 0600 | `secret-tool lookup service evolve-loop host <host>`, then `~/.config/evolve-loop/credentials/<host>` |
+| Windows | Credential Manager | `powershell.exe` with a `CredReadW` script for the target `evolve-loop:<host>` |
+
+| Part | As built |
+|---|---|
+| The selection | A table maps `runtime.GOOS` to a realization. There is no feature flag. An OS that is not in the table gives an error. |
+| The stage | The policy key `isolation.credential_source.stage`. The values are `off` and `shadow`, and a missing key is `off`. The checked-in policy sets `shadow`. The parser refuses `enforce` until the operator answers D1-OP1. |
+| `shadow` | Before each push and before `gh pr`, the pipeline logs which store answered, or the cause. The push and `gh` use today's credential path. The lookup has a limit of 5 seconds, so an unlock prompt cannot stop the ship. |
+| The secret | No log line, error or signal holds the secret. |
+| The cell | No cell environment holds a variable that carries a token to `gh` (`credsource.ChildVariables`). The manifest parser refuses each of them, and I-2 at `enforce` drops each of them. |
+| The limit | At I-2 `shadow` or `off`, a cell gets the environment of the operator shell. A token in that shell then reaches the cell. This is the I-2 limit, not a limit of the source. |
+
+The guards are these tests:
+
+- `TestCredentialSource_ACellEnvironmentHasNoSourceVariable` and `TestParseManifest_RefusesEachCredentialSourceVariable`
+- `TestKeychain_LookupTable`, `TestLibsecret_LookupTable` and `TestCredentialManager_LookupTable`. Each test injects a command runner. No test runs the real `security`, `secret-tool` or `powershell.exe`.
+- `TestCredentialReport_EachStageAndEachAnswer`, `TestWiredLanding_ThePushLogsWhichCredentialSourceAnsweredAndKeepsTodaysPush` and `TestRunShipCmd_Pr_LogsWhichCredentialSourceAnsweredBeforeGh`
+
 #### 7.2 The boundary of I-3 (operator, 2026-10-26)
 
 The operator refined I-3 two times on 2026-10-26:

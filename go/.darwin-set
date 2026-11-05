@@ -11,6 +11,7 @@
 ./internal/bridge
 ./internal/capability
 ./internal/core
+./internal/credsource
 ./internal/cycleclassify
 ./internal/events/reader
 ./internal/events/wake

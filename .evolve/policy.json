@@ -194,6 +194,9 @@
   "isolation": {
     "i2": {
       "stage": "enforce"
+    },
+    "credential_source": {
+      "stage": "shadow"
     }
   },
   "retry": {

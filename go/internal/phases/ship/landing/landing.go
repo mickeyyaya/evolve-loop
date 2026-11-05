@@ -52,6 +52,7 @@ type Landing struct {
 	runID   string
 	signals func() *signalcenter.Center
 	sleep   func(time.Duration)
+	probe   func(context.Context) string
 }
 
 type Option func(*Landing)
@@ -70,6 +71,10 @@ func WithSignals(c func() *signalcenter.Center) Option {
 
 func WithSleep(sleep func(time.Duration)) Option {
 	return func(l *Landing) { l.sleep = sleep }
+}
+
+func WithCredentialProbe(probe func(context.Context) string) Option {
+	return func(l *Landing) { l.probe = probe }
 }
 
 func WithRun(phase string, cycle int, runID string) Option {

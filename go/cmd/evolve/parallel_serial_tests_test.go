@@ -784,6 +784,7 @@ var serialTests = map[string]string{
 	"main.TestRunShipCmd_Pr_ARefusedShipOpensNoPullRequest":                                                                "swaps seam shipRunFn and PATH",
 	"main.TestRunShipCmd_Pr_BodyFileReachesGhAndRequiresPr":                                                                "swaps seam shipRunFn and PATH",
 	"main.TestRunShipCmd_Pr_CreatesThePullRequestAndPrintsItsNumber":                                                       "swaps seam shipRunFn and PATH",
+	"main.TestRunShipCmd_Pr_LogsWhichCredentialSourceAnsweredBeforeGh":                                                     "swaps seams shipRunFn and shipPrCredentialSource, and PATH",
 	"main.TestRunShipCmd_Pr_OnMainExits10BeforeShipOrGhRun":                                                                "swaps seam shipRunFn and PATH",
 	"main.TestRunShipCmd_Pr_OnlyTheManualClassMayOpenAPullRequest":                                                         "swaps seam shipRunFn and PATH",
 	"main.TestRunShipCmd_Pr_ReportsAnOpenPullRequestInsteadOfCreatingASecond":                                              "swaps seam shipRunFn and PATH",

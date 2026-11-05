@@ -35,6 +35,8 @@ type IsolationPolicy struct {
 	Context *IsolationContextPolicy `json:"context,omitempty"`
 
 	DispatchRequests *DispatchRequestsPolicy `json:"dispatch_requests,omitempty"`
+
+	CredentialSource *CredentialSourcePolicy `json:"credential_source,omitempty"`
 }
 
 type DispatchRequestsPolicy struct {

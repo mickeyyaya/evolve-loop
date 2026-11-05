@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/credsource"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
@@ -18,6 +19,8 @@ const (
 	shipPrGhFailExit  = 2
 	shipPrBaseBranch  = "main"
 )
+
+var shipPrCredentialSource = credsource.Default
 
 type shipPrRequest struct {
 	enabled  bool
@@ -133,6 +136,9 @@ func resolveShipPrBranch(pr shipPrRequest, class string, pushOnly bool, projectR
 }
 
 func openShipPr(pr shipPrRequest, projectRoot, branch, message string, stdout, stderr io.Writer) int {
+	if line := ship.CredentialReport(context.Background(), projectRoot, shipPrCredentialSource); line != "" {
+		fmt.Fprintln(stderr, line)
+	}
 	if err := ensurePullRequest(context.Background(), projectRoot, branch, shipPrTitle(message), pr.bodyFile, stdout); err != nil {
 		fmt.Fprintf(stderr, "evolve ship: pull request: %v\n", err)
 		return shipPrGhFailExit
