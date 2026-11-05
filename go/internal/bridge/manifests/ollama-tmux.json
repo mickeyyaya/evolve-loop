@@ -57,6 +57,7 @@
       "name": "auth_required",
       "regex": "ollama signin|sign in to ollama|authentication required|unauthorized",
       "response_keys": null,
+      "tail_lines": 12,
       "policy": "escalate",
       "note": "Cloud :cloud-suffixed models require OLLAMA_API_KEY or a prior `ollama signin`; local tags need no auth"
     },

@@ -30,6 +30,7 @@
       "name": "auth_recheck",
       "regex": "Authentication required|Please log in|Sign in to (Antigravity|Google|Gemini)|Login expired",
       "response_keys": null,
+      "tail_lines": 12,
       "policy": "escalate",
       "note": "Bridge cannot complete OAuth/Google login; escalate to operator"
     },
