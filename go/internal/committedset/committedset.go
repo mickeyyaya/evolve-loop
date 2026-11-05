@@ -25,10 +25,10 @@ func Committed(workspace string) ([]string, bool) {
 	if len(ids) == 0 {
 		ids = topN
 	}
-	deferred := Deferred(workspace)
+	released := append(Deferred(workspace), RoutedIDs(workspace)...)
 	out := make([]string, 0, len(ids))
 	for _, id := range ids {
-		if !contains(deferred, id) {
+		if !contains(released, id) {
 			out = append(out, id)
 		}
 	}

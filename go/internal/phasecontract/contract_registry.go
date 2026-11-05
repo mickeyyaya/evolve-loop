@@ -35,6 +35,7 @@ type Roots struct {
 	DispatchedArtifact              string
 	ExplanationDocumentationVersion int
 	Cycle                           int
+	ClaimAttempted                  bool
 }
 
 const (

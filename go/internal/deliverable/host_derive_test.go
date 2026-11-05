@@ -38,7 +38,7 @@ func performTriage(t *testing.T, report, pin, decision string) (string, error) {
 		writeFile(t, in.Workspace, "triage-report.md", report)
 	}
 	var calls []claimCall
-	err := NewHostEffects(derivingCatalog(t), recordingClaimer(&calls)).Perform(context.Background(), in)
+	err := NewHostEffects(derivingCatalog(t), recordingClaimer(&calls), nil).Perform(context.Background(), in)
 	return filepath.Join(in.Workspace, "triage-decision.json"), err
 }
 

@@ -34,7 +34,7 @@ func TestNonSpinePhaseDeclaredSignalsReachTheRoutingDigest(t *testing.T) {
 	ws := t.TempDir()
 	writeFile(t, ws, "test-amplification-report.md", amplificationReportWithSignals)
 	in := core.ReviewInput{Phase: "test-amplification", Cycle: 7, Workspace: ws, ProjectRoot: t.TempDir()}
-	if err := NewHostEffects(cat, recordingClaimer(&[]claimCall{})).Perform(context.Background(), in); err != nil {
+	if err := NewHostEffects(cat, recordingClaimer(&[]claimCall{}), nil).Perform(context.Background(), in); err != nil {
 		t.Fatalf("Perform: %v", err)
 	}
 	sig, err := router.Digest(ws, []string{"scout", "test-amplification"})
@@ -96,7 +96,7 @@ func TestWriteHandoffSignals_WritesNothingWhenThereIsNothingToWrite(t *testing.T
 				writeFile(t, ws, "test-amplification-report.md", tc.report)
 			}
 			in := core.ReviewInput{Phase: "test-amplification", Cycle: 7, Workspace: ws, ProjectRoot: t.TempDir()}
-			if err := NewHostEffects(cat, recordingClaimer(&[]claimCall{})).Perform(context.Background(), in); err != nil {
+			if err := NewHostEffects(cat, recordingClaimer(&[]claimCall{}), nil).Perform(context.Background(), in); err != nil {
 				t.Fatalf("Perform: %v", err)
 			}
 			if handoff(ws) {
@@ -134,7 +134,7 @@ func TestPerform_ReportsAHandoffSignalsWriteFailure(t *testing.T) {
 	}
 	t.Cleanup(func() { os.Chmod(ws, 0o700) })
 	in := core.ReviewInput{Phase: "test-amplification", Cycle: 7, Workspace: ws, ProjectRoot: t.TempDir()}
-	err = NewHostEffects(cat, recordingClaimer(&[]claimCall{})).Perform(context.Background(), in)
+	err = NewHostEffects(cat, recordingClaimer(&[]claimCall{}), nil).Perform(context.Background(), in)
 	if err == nil || !strings.Contains(err.Error(), "handoff signals") {
 		t.Fatalf("Perform error = %v, want a handoff signals failure", err)
 	}

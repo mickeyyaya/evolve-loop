@@ -30,9 +30,9 @@ func TestResolveDispatchability_IsTheOneRuleForWhetherALaneMayTakeAnID(t *testin
 		"ready":                 {Dispatchable: true},
 		"ready-on-unfiled-dep":  {Dispatchable: true},
 		"never-filed":           {Dispatchable: true},
-		"blocked-by-pending":    {Reason: "deps unmet: needs dep-pending"},
-		"blocked-by-processing": {Reason: "deps unmet: needs dep-processing"},
-		"blocked-by-retry":      {Reason: "deps unmet: needs dep-retry"},
+		"blocked-by-pending":    {Reason: "deps unmet: needs dep-pending", Dep: "dep-pending"},
+		"blocked-by-processing": {Reason: "deps unmet: needs dep-processing", Dep: "dep-processing"},
+		"blocked-by-retry":      {Reason: "deps unmet: needs dep-retry", Dep: "dep-retry"},
 		"dep-processing":        {Reason: "consumed: processing cycle-9"},
 		"dep-retry":             {Reason: "consumed: retry"},
 		"dep-done":              {Reason: "consumed: processed cycle-9"},
@@ -55,7 +55,7 @@ func TestPendingDispatchability_NamesTheFirstUnmetDependency(t *testing.T) {
 	}{
 		{nil, Dispatchability{Dispatchable: true}},
 		{[]string{"dep-done", "never-filed"}, Dispatchability{Dispatchable: true}},
-		{[]string{"dep-done", "dep-retry", "dep-pending"}, Dispatchability{Reason: "deps unmet: needs dep-retry"}},
+		{[]string{"dep-done", "dep-retry", "dep-pending"}, Dispatchability{Reason: "deps unmet: needs dep-retry", Dep: "dep-retry"}},
 	}
 	for _, c := range cases {
 		if got := PendingDispatchability(opts, c.deps); got != c.want {
