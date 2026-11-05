@@ -34,6 +34,8 @@ case "$*" in
   "run list "*) reply runs.json ;;
   "run rerun "*) : > "$D/rerun"; exit 0 ;;
   "run view "*"--log-failed"*) reply log.txt ;;
+  "run view "*"--json jobs") reply jobs.json ;;
+  "run download "*) while [ $# -gt 0 ]; do if [ "$1" = "--dir" ]; then dest="$2"; fi; shift; done; mkdir -p "$dest" && cp "$D/testjson.json" "$dest/test-integration.json"; exit $? ;;
   "run view "*) if [ -f "$D/rerun" ] && [ -f "$D/run2.json" ]; then reply run2.json; fi; reply run.json ;;
 esac
 echo "fake gh: unexpected $*" >&2
@@ -48,8 +50,10 @@ type ciFakeGH struct {
 func newCIFakeGH(t *testing.T, replies map[string]string) ciFakeGH {
 	t.Helper()
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "artifacts.json"), []byte(`{"artifacts":[]}`), 0o644); err != nil {
-		t.Fatal(err)
+	for name, body := range map[string]string{"artifacts.json": `{"artifacts":[]}`, "jobs.json": `{"jobs":[]}`} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	for name, body := range replies {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {

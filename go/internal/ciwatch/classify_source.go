@@ -288,7 +288,7 @@ func (s ghClassifySource) withFailures(ctx context.Context, st RunStatus) (RunSt
 	} else {
 		st.FailingTests = parseFailingTests(log)
 	}
-	return st, nil
+	return s.withGateRows(ctx, st), nil
 }
 
 const unknownStep = "UNKNOWN STEP"

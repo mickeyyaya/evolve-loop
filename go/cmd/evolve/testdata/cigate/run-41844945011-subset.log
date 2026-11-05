@@ -1,0 +1,75 @@
+CI required	UNKNOWN STEP	﻿2026-11-04T14:16:08.1857271Z Current runner version: '2.338.2'
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.1875255Z ##[group]Runner Image Provisioner
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.1875804Z Hosted Compute Agent
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.1876327Z Version: 20261021.618
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.1876762Z Commit: 21505ad2541d5be6135ed84fc33697146cf75b8e
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.1877256Z Build Date: 2026-10-21T00:45:21Z
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.1877691Z Worker ID: {c2ffc8b3-1a01-4975-960d-41c5a986753d}
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.1878125Z Region: southcentralus
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.1878545Z Cloud: Azure
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.1878934Z ##[endgroup]
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.1879748Z ##[group]Operating System
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.1880151Z Ubuntu
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.1880492Z 24.04.5
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.1880902Z LTS
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.1881278Z ##[endgroup]
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.1881678Z ##[group]Runner Image
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.1882083Z Image: ubuntu-24.04
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.1882456Z Version: 20261025.353.1
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.1883526Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261025.353/images/ubuntu/Ubuntu2404-Readme.md
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.1884479Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261025.353
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.1885082Z ##[endgroup]
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.1885817Z ##[group]GITHUB_TOKEN Permissions
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.1887080Z Contents: read
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.1887447Z Metadata: read
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.1887862Z ##[endgroup]
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.1889203Z Secret source: Actions
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.1889847Z Cache mode: write
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.1890322Z Prepare workflow directory
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.2106253Z Prepare all required actions
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.2177260Z Complete job name: CI required
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3119650Z ##[group]Run if [[ "$ROUTE_RESULT" != success ]]; then
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3120403Z ^[[36;1mif [[ "$ROUTE_RESULT" != success ]]; then^[[0m
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3121095Z ^[[36;1m  echo "CI prerequisite did not succeed: $ROUTE_RESULT" >&2^[[0m
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3121858Z ^[[36;1m  exit 1^[[0m
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3122253Z ^[[36;1mfi^[[0m
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3122890Z ^[[36;1mcase "$DOCS_ONLY:$DOCS_REQUIRED:$VALIDATE_RESULT:$PLUGIN_RESULT:$ACS_RESULT" in^[[0m
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3124160Z ^[[36;1m  false:true:success:success:success|false:false:success:success:success|true:true:skipped::) ;;^[[0m
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3125585Z ^[[36;1m  *) echo "plugin and durable ACS validation did not match the route: $DOCS_ONLY:$DOCS_REQUIRED:$VALIDATE_RESULT:$PLUGIN_RESULT:$ACS_RESULT" >&2; exit 1 ;;^[[0m
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3126699Z ^[[36;1mesac^[[0m
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3127145Z ^[[36;1mcase "$DOCS_REQUIRED:$STE_LINT_RESULT" in^[[0m
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3127733Z ^[[36;1m  true:success|false:skipped) ;;^[[0m
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3128566Z ^[[36;1m  *) echo "STE lint did not match the route: $DOCS_REQUIRED:$STE_LINT_RESULT" >&2; exit 1 ;;^[[0m
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3129336Z ^[[36;1mesac^[[0m
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3129782Z ^[[36;1mcase "$INBOX_REQUIRED:$INBOX_RESULT" in^[[0m
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3130359Z ^[[36;1m  true:success|false:skipped) ;;^[[0m
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3131132Z ^[[36;1m  *) echo "inbox lint did not match the route: $INBOX_REQUIRED:$INBOX_RESULT" >&2; exit 1 ;;^[[0m
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3131909Z ^[[36;1mesac^[[0m
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3132722Z ^[[36;1mfor result in "$GO_REQUIRED:$GO_RESULT:$GO_SUITE_RESULT" "$LANDING_REQUIRED:$LANDING_RESULT:$LANDING_SUITE_RESULT"; do^[[0m
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3133851Z ^[[36;1m  case "$result" in^[[0m
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3134364Z ^[[36;1m    true:success:success|false:skipped:) ;;^[[0m
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3135096Z ^[[36;1m    *) echo "required CI work did not succeed: $result" >&2; exit 1 ;;^[[0m
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3135746Z ^[[36;1m  esac^[[0m
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3136131Z ^[[36;1mdone^[[0m
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3136778Z ^[[36;1mecho 'Every required suite succeeded; other suites were explicitly unselected.'^[[0m
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3417387Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3418265Z env:
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3418650Z   ROUTE_RESULT: success
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3419086Z   DOCS_ONLY: false
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3419472Z   DOCS_REQUIRED: false
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3420181Z   STE_LINT_RESULT: skipped
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3420610Z   VALIDATE_RESULT: success
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3421043Z   PLUGIN_RESULT: success
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3421467Z   ACS_RESULT: success
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3421865Z   GO_REQUIRED: true
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3422291Z   GO_RESULT: cancelled
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3422705Z   GO_SUITE_RESULT: cancelled
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3423310Z   LANDING_REQUIRED: false
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3423741Z   LANDING_RESULT: skipped
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3424174Z   LANDING_SUITE_RESULT: 
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3424602Z   INBOX_REQUIRED: false
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3425028Z   INBOX_RESULT: skipped
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3425441Z ##[endgroup]
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3585827Z required CI work did not succeed: true:cancelled:cancelled
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3596766Z ##[error]Process completed with exit code 1.
+CI required	UNKNOWN STEP	2026-11-04T14:16:08.3706448Z Cleaning up orphan processes

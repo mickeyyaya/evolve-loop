@@ -116,3 +116,34 @@ func TestFileBaseRedItems_NamesEachNewItemOnStderrAndReportsAnUnreadableInbox(t 
 		t.Error("an unreadable inbox must be reported")
 	}
 }
+
+func TestWriteClassifyReport_ADetailFollowsTheStepInTheThirdColumn(t *testing.T) {
+	t.Parallel()
+	rep := ciwatch.ClassifyReport{Failures: []ciwatch.ClassifiedFailure{{
+		FailingTest: ciwatch.FailingTest{Step: "make cover-changed", Detail: `step "s" failed; next: gh run view`, Jobs: []string{"j"}},
+		Evidence:    ciwatch.Evidence{Touched: ciwatch.FactUnknown, BaseRed: ciwatch.FactNo, RecurredOnMain: ciwatch.FactNo, RerunGreen: ciwatch.FactUnknown},
+		Label:       ciwatch.LabelUnknown, Rule: "default",
+	}}}
+	var text bytes.Buffer
+	if err := writeClassifyReport(&text, rep, false); err != nil {
+		t.Fatal(err)
+	}
+	want := "unknown\t-\tmake cover-changed: step \"s\" failed; next: gh run view\tdefault\tunknown\tno\tno\tunknown\n"
+	if !strings.Contains(text.String(), want) {
+		t.Errorf("report:\n%q\nwant it to hold\n%q", text.String(), want)
+	}
+}
+
+func TestWriteClassifyWarnings_NamesEachWarningOnStderrWithThePrefix(t *testing.T) {
+	t.Parallel()
+	var stderr bytes.Buffer
+	writeClassifyWarnings(&stderr, "evolve ci classify: ", ciwatch.ClassifyReport{Warnings: []string{"a", "b"}})
+	if want := "evolve ci classify: WARN: a\nevolve ci classify: WARN: b\n"; stderr.String() != want {
+		t.Errorf("stderr %q, want %q", stderr.String(), want)
+	}
+	stderr.Reset()
+	writeClassifyWarnings(&stderr, "p: ", ciwatch.ClassifyReport{})
+	if stderr.Len() != 0 {
+		t.Errorf("stderr %q, want silence", stderr.String())
+	}
+}

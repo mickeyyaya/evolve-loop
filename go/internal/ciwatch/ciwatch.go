@@ -37,6 +37,7 @@ type RunStatus struct {
 	Attempt      int
 	CreatedAt    time.Time
 	FailingTests []FailingTest
+	Warnings     []string
 }
 
 type Fetcher func(ctx context.Context, sha string) (RunStatus, error)
