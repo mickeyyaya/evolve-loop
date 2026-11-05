@@ -1,0 +1,1 @@
+{"schema_version": 1, "phase": "build", "reasons": ["resume review gate: phase \"build\" deliverable rejected after 2 correction(s): build handoff floor: 3 deterministic check failure(s) \u2014 fix these exactly before handoff:\n  the tests of the changed packages fail under -tags"]}
