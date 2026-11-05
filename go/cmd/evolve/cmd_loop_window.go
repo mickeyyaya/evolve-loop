@@ -193,7 +193,9 @@ func (b *loopBatchCoordinator) dispatchPool(iteration int, fleetConfig policy.Fl
 	)
 	switch {
 	case err != nil:
-		fmt.Fprintf(b.stderr, "[loop] WARN: fleet: pool %d dispatch failed, falling back to sequential: %v\n", iteration, err)
+		reason := fmt.Sprintf("fleet: pool %d dispatch failed, falling back to sequential: %v", iteration, err)
+		fmt.Fprintf(b.stderr, "[loop] WARN: %s\n", reason)
+		b.emitPoolPreflightFailure(iteration, reason, err)
 	case ran:
 		t := laneTally(results)
 		fmt.Fprintf(b.stderr, "[loop] pool %d: %d/%d lanes ok%s (%s, target=%d)\n",
@@ -207,6 +209,15 @@ func (b *loopBatchCoordinator) dispatchPool(iteration int, fleetConfig policy.Fl
 		fmt.Fprintf(b.stderr, "[loop] WARN: fleet: pool %d planned zero lanes (empty backlog), falling back to sequential\n", iteration)
 	}
 	return batchDecision{}, false
+}
+
+func (b *loopBatchCoordinator) emitPoolPreflightFailure(iteration int, reason string, err error) {
+	var pre *poolPreflightError
+	if !errors.As(err, &pre) {
+		return
+	}
+	emitLoopWave(b.deps.Signals, iteration, "loopBatchCoordinator.dispatchPool", loopwave.CodeWaveDispatchFailed, reason,
+		map[string]string{"path": "pool", "step": "preflight", "error": pre.err.Error()})
 }
 
 func (b *loopBatchCoordinator) waveRequest(iteration int, cfg policy.FleetConfig, waveBinary string) loopwave.DispatchRequest {

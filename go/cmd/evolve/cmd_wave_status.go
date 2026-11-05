@@ -13,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/heldproposal"
+	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wave"
@@ -102,6 +103,7 @@ func buildWaveStatus(env waveEnv, plane wavePlaneDirs, records []wave.Record) wa
 	cycles, loop, warnings := wave.ReadRunCycles(plane.root, cur.CycleFloor, 0)
 	report.Wave, report.RunID, report.PID = cur.Number, cur.RunID, cur.PID
 	report.Warnings = append(report.Warnings, warnings...)
+	report.Warnings = append(report.Warnings, poolPreflightWarnings(loop, cur.StartedAt)...)
 	var startWarning string
 	report.PIDAlive, startWarning = waveOwnsPID(env, cur)
 	if live, ok := wave.PoolLive(cur, nil, loop); ok && (report.PIDAlive || report.LoopLive) {
@@ -123,6 +125,20 @@ func buildWaveStatus(env waveEnv, plane wavePlaneDirs, records []wave.Record) wa
 		report.LastWave = &waveSummary{Wave: prev.Number, Outcome: prev.Outcome}
 	}
 	return report
+}
+
+func poolPreflightWarnings(loop []signalcenter.Event, since time.Time) []string {
+	var out []string
+	for _, sig := range loop {
+		if sig.Code != loopwave.CodeWaveDispatchFailed || sig.Fields["path"] != "pool" {
+			continue
+		}
+		if at, err := time.Parse(time.RFC3339Nano, sig.TS); err == nil && at.Before(since) {
+			continue
+		}
+		out = append(out, sig.Reason)
+	}
+	return out
 }
 
 func writeWaveStatusText(w io.Writer, r waveStatusReport) {

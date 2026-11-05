@@ -20,6 +20,17 @@ type poolSupplyFn func(held []fleet.Todo) ([]fleet.Todo, error)
 
 type poolRunFn func(ctx context.Context, backlog []fleet.Todo, resupply poolSupplyFn) []fleet.Result
 
+type poolPreflightError struct {
+	wave int
+	err  error
+}
+
+func (e *poolPreflightError) Error() string {
+	return fmt.Sprintf("pool %d: control-plane preflight: %v", e.wave, e.err)
+}
+
+func (e *poolPreflightError) Unwrap() error { return e.err }
+
 func rollingPool(fc policy.FleetConfig, launch fleet.LaunchFn) poolRunFn {
 	return func(ctx context.Context, backlog []fleet.Todo, _ poolSupplyFn) []fleet.Result {
 		return fleet.RunPool(ctx, fleet.PoolConfig{Target: fc.Count, Concurrency: fc.Concurrency}, backlog, launch, nil)
@@ -35,7 +46,7 @@ func planAndRunPool(ctx context.Context, fc policy.FleetConfig, preflight func()
 		return false, nil, nil
 	}
 	if err := preflight(); err != nil {
-		return false, nil, fmt.Errorf("pool %d: control-plane preflight: %w", waveIndex, err)
+		return false, nil, &poolPreflightError{wave: waveIndex, err: err}
 	}
 	depth := loopwave.PoolSupply(fc)
 	backlog, err := plan(depth)(ctx, waveIndex)
