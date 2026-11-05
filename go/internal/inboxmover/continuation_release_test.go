@@ -197,3 +197,38 @@ func TestResolveContinuationForScopeRecency(t *testing.T) {
 		})
 	}
 }
+
+func TestReleaseContinuationBindingFor_ADifferentCycleIsNotReleasedNorNoted(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	inbox := filepath.Join(root, ".evolve", "inbox")
+	itemPath := releaseFixtureItem(t, inbox, "scope-a")
+	releaseFixtureBind(t, root, "scope-a", continuation.Continuation{SnapshotSHA: "snap2100", Cycle: 2100})
+	opts := Options{ProjectRoot: root, Stderr: &bytes.Buffer{}}
+
+	_, released, err := ReleaseContinuationBindingFor(opts, ReleaseRequest{ScopeID: "scope-a", Cycle: 2092, Reason: "r", By: "unit"})
+
+	if err != nil || released {
+		t.Fatalf("release = %v, %v; want a mismatch to release nothing", released, err)
+	}
+	if !hasRegistryBinding(t, root, "scope-a") {
+		t.Error("the newer binding was deleted")
+	}
+	if body, _ := os.ReadFile(itemPath); strings.Contains(string(body), "released") {
+		t.Errorf("item = %s; want no release note for a binding that stayed", body)
+	}
+}
+
+func TestReleaseContinuationBindingFor_TheNamedCycleIsReleased(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	inbox := filepath.Join(root, ".evolve", "inbox")
+	releaseFixtureItem(t, inbox, "scope-a")
+	releaseFixtureBind(t, root, "scope-a", continuation.Continuation{SnapshotSHA: "snap2092", Cycle: 2092})
+
+	c, released, err := ReleaseContinuationBindingFor(Options{ProjectRoot: root, Stderr: &bytes.Buffer{}}, ReleaseRequest{ScopeID: "scope-a", Cycle: 2092, Reason: "r", By: "unit"})
+
+	if err != nil || !released || c.Cycle != 2092 || hasRegistryBinding(t, root, "scope-a") {
+		t.Fatalf("release = %+v, %v, %v; want cycle 2092 released", c, released, err)
+	}
+}

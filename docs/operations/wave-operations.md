@@ -52,6 +52,7 @@ The heal does not check for a dirty plane tree. The build uses the working tree,
 | 0 | `launched: true`, `recorded: true` | The wave runs. | Run `evolve wave watch`. |
 | 3 | `refused: "loop_live"` | A loop is live. | Wait, or stop it with `evolve loop-stop --wait`. |
 | 3 | `refused: "number_taken"` | `--number` is not more than the last wave. | Remove `--number`. |
+| 3 | `refused: "host_disk_low"` | The free space under `.evolve` is below the floor `preflight.min_free_gib`. The error names the free MiB and the floor. No step ran. | Run `evolve gc`, then run step 2 again. |
 | 2 | `launched: false`, `error` | A file read or write failed before the steps. | Fix the named file. |
 | 2 | `launched: true`, `recorded: false` | The loop runs, but the record save failed twice. The notes are consumed, and the old wave stays open. | Do not run `wave next` again. Fix `.evolve/waves/`; `wave status` shows no record for this wave. |
 | 10 | `error: "usage: …"` | A bad argument. | Fix the arguments. |

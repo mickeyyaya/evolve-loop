@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -176,7 +177,12 @@ func TestPausedPlan_PutsReadyPausesFirstAndKeepsTheirTriageTodo(t *testing.T) {
 	}
 	files := map[string][]string{"untriaged": {"u.go", "u.go", "t.go"}}
 
-	got := pausedPlan{paused: paused, now: now, itemFiles: func(id string) []string { return files[id] }}.order(triage)
+	got := pausedPlan{paused: paused, now: now, adoptable: adoptAll, itemFiles: func(p core.PausedScope) ([]string, error) {
+		if f, ok := files[p.Scope[0]]; ok {
+			return f, nil
+		}
+		return nil, errors.New("gone")
+	}, warn: io.Discard}.order(triage)
 
 	want := []fleet.Todo{
 		{ID: "granted", Files: []string{"a.go"}, Priority: 5, OutputContract: "pr", DependsOn: []string{"x"}},
@@ -195,7 +201,7 @@ func TestPausedPlan_AMultiTodoScopeLeadsWithTheFilesOfEachOfItsTriageTodos(t *te
 	triage := []fleet.Todo{{ID: "a", Files: []string{"a.go"}}, {ID: "other", Files: []string{"o.go"}}, {ID: "b", Files: []string{"b.go", "a.go"}}}
 	paused := []core.PausedScope{{Cycle: 9, Scope: []string{"a", "b"}, AutoMaxAttempts: 3}}
 
-	got := pausedPlan{paused: paused, now: time.Now(), itemFiles: func(string) []string { return nil }}.order(triage)
+	got := pausedPlan{paused: paused, now: time.Now(), adoptable: adoptAll, itemFiles: func(core.PausedScope) ([]string, error) { return nil, errors.New("gone") }, warn: io.Discard}.order(triage)
 
 	want := []fleet.Todo{{ID: "a,b", Files: []string{"a.go", "b.go"}}, {ID: "other", Files: []string{"o.go"}}}
 	if !reflect.DeepEqual(got, want) {
@@ -203,25 +209,25 @@ func TestPausedPlan_AMultiTodoScopeLeadsWithTheFilesOfEachOfItsTriageTodos(t *te
 	}
 }
 
-func TestInboxItemFiles_ReadsTheDeclaredFilesOfAPendingItem(t *testing.T) {
+func TestInboxItemFiles_ReadsTheDeclaredFilesAndReportsEachLostClaim(t *testing.T) {
 	t.Parallel()
 	evolveDir := t.TempDir()
 	writeE2File(t, filepath.Join(evolveDir, "inbox", "2026-11-03T00-00-00Z-held.json"), `{"id":"held","files":["go/x.go"]}`)
 	writeE2File(t, filepath.Join(evolveDir, "inbox", "2026-11-03T00-00-00Z-broken.json"), `{"id":"broken","files":`)
+	writeE2File(t, filepath.Join(evolveDir, "inbox", "2026-11-03T00-00-00Z-typed.json"), `{"id":"typed","files":5}`)
 	read := inboxItemFiles(evolveDir)
 
-	if got := read("held"); !reflect.DeepEqual(got, []string{"go/x.go"}) {
-		t.Errorf("files of held = %v", got)
+	if got, err := read(core.PausedScope{Cycle: 3, Scope: []string{"held"}}); err != nil || !reflect.DeepEqual(got, []string{"go/x.go"}) {
+		t.Errorf("files of held = %v err %v", got, err)
 	}
-	if got := read("missing"); got != nil {
-		t.Errorf("files of a missing item = %v, want none", got)
+	got, err := read(core.PausedScope{Cycle: 3, Scope: []string{"held", "missing", "broken", "typed"}})
+	if !reflect.DeepEqual(got, []string{"go/x.go"}) {
+		t.Errorf("files = %v, want the files that could be read", got)
 	}
-	if got := read("broken"); got != nil {
-		t.Errorf("files of an unreadable item = %v, want none", got)
-	}
-	writeE2File(t, filepath.Join(evolveDir, "inbox", "2026-11-03T00-00-00Z-typed.json"), `{"id":"typed","files":5}`)
-	if got := read("typed"); got != nil {
-		t.Errorf("files of an item that does not decode = %v, want none", got)
+	for _, id := range []string{"missing", "broken", "typed"} {
+		if err == nil || !strings.Contains(err.Error(), id) {
+			t.Errorf("err = %v, want it to name %s", err, id)
+		}
 	}
 }
 

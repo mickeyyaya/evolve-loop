@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
+	"github.com/mickeyyaya/evolve-loop/go/internal/quotareset"
 )
 
 var errNoCheckpoint = errors.New("checkpoint: the state has no checkpoint block")
@@ -60,12 +61,18 @@ func budgetSpent(cp Checkpoint) bool {
 
 func BudgetLeft(attempts, maxAttempts int) bool { return attempts < maxAttempts }
 
-func ResumeReady(attempts, maxAttempts int, resetAt string, now time.Time) bool {
+func ResumeReady(attempts, maxAttempts int, resetAt string, now time.Time) (bool, error) {
 	if !BudgetLeft(attempts, maxAttempts) {
-		return false
+		return false, nil
 	}
-	at, err := time.Parse(time.RFC3339, resetAt)
-	return err != nil || !at.After(now)
+	if resetAt == "" {
+		return true, nil
+	}
+	at, err := quotareset.ParseISO(resetAt)
+	if err != nil {
+		return true, fmt.Errorf("checkpoint: the resume order ignores an unreadable reset time: %w", err)
+	}
+	return !at.After(now), nil
 }
 
 func grantedBudget(cp Checkpoint) Checkpoint {

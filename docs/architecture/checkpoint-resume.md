@@ -80,8 +80,13 @@ The lane rule does not use the cross-launch staleness rule of the single resume 
 The pool then puts each ready paused scope at the head of the backlog (`pausedPlan.order` in `go/cmd/evolve/cmd_loop_pool_paused.go`):
 
 - A scope is ready when `checkpoint.ResumeReady` is true. Its budget is not spent (`checkpoint.BudgetLeft`, the rule of admission). Its known reset time is not in the future.
+- The checkpoint writes `quotaResetAt` in the layout `2006-01-02T15:04:05-0700`, for example `2026-11-04T08:53:30+0800`. The offset has no colon, so this value is not RFC3339. `quotareset.ParseISO` reads this layout and RFC3339. The writer and the parser share one layout constant. `ResumeReady` and the loop status line use this parser.
+- An unreadable reset time that is not empty does not stop the resume. `ResumeReady` reports the scope as ready and returns an error, and the pool writes a `[pool] WARN` line that names the cycle.
 - The reset time is an order hint only. A pause that waits for a known reset keeps its triage place. Admission (`RecordResume`) does not check the reset time, so a lane that draws that triage todo still resumes the cycle.
 - The lead todo is the triage todo of the scope, with its files, priority, dependencies and output contract. The pool serializes lanes on their files, so a resumed lane keeps its file claims. A scope that is not in the triage list takes the declared files of its inbox items.
+- The pool does not put a scope first when the lane cannot take it back. The pool asks the rule of `laneResume.adopt` (`scopeHold.adoptableBy`) for each paused scope. It asks also when a triage todo matches the scope. Each item of the scope must be in the inbox and not held by another cycle. One missing item skips the scope, and the pool writes a `[pool] WARN` line that names the cycle, the scope and the cause. The triage todos of a skipped scope keep their plain triage place.
+- An item that is in the inbox but has no readable file list stays in its scope. The pool then writes a `[pool] WARN` line that names the cycle and the item, and the lead todo has no file claim from that item.
+- An untriaged scope leads with only its ID and its files. Its dependencies and its output contract are not recorded yet.
 - The triage todos of the scope do not appear again.
 
 The lanes adopt the scopes through `laneResume.adopt`, and the cycles run at the same time. If the scan fails, the pool writes a warning and keeps the triage order.
