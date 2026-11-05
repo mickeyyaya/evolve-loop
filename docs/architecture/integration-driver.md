@@ -2,6 +2,9 @@
 
 > [ADR-0147](adr/0147-the-wave-orchestrator-owns-integration-and-decides-when-the-wave-reaches-main.md) · plan: [wave-integration-2026-10 §11](../plans/wave-integration-2026-10.md#11-amendment-of-2026-11-05-the-lane-side-gets-a-driver-i14) · research: [wave-integration-2026-10](../research/wave-integration-2026-10.md).
 > **Status:** Proposed (2026-11-05), a console proposal. The operator has not ruled on it.
+>
+> PR (b), the shadow scope, is built on the branch `feat/integration-driver-shadow`.
+> The redesign card of PR (a) changed the entries below, and the text states each change.
 > This file is the spec for the component I14, the integration driver, in its shadow scope. The package note [internal-integration](packages/internal-integration.md) holds the engine that the driver calls. Enforce is a later scope with its own card (§9).
 >
 > **Terms used throughout:**
@@ -132,9 +135,10 @@ This answers the question that the package note left open: one record file for e
 **Member identity.** A member is a cycle plus its patch ids.
 
 - The same patches keep their first owner, so a past verdict does not change.
-- Different patches are a new member of the current pool.
+- Different patches are a new member of the current pool while the member is pending.
+- Limit: a member that composed, conflicted or ended keeps its first patches. A redelivery under new patches later in the same pool is not composed. The driver records it as a failure, so the verdict reads not clean.
 - `Tick` and the verdict read members across all `integration-*.json`. The first record that holds a member owns it.
-- A resumed lane takes the current pool id. A lookup goes by commit, so that is safe. `landedByIdentity` uses `RecordForCommit`, which finds the record by commit and checks the cycle.
+- A resumed lane takes the current pool id. A lookup goes by commit, so that is safe. `landedByIdentity` uses `RecordForCommit`, which finds the record by commit and checks the cycle. `integration.ListRecords` is the one home of the records. It lists them and returns each read failure. `FindRecordByCommit`, `RecordForCommit` and the owner rule of `Tick` (`RecordSet.Owned`) are its projections.
 
 **Pool id.** The loop mints it with `core.AllocateCycleNumber` before launch, so it is unique and each lane sorts above it. One pool costs one cycle number. It reaches `execCycleLaunch` as a closure parameter, and then the cycle run as a CLI parameter. `CycleSpec` does not change.
 
@@ -152,7 +156,9 @@ A resumed lane takes the current pool id. Pool directories sort numerically.
 
 Shadow answers four questions: the order, the overlap, the conflict count and the landed fact. It uses a held base, so a lane that lands during the pool does not hide a conflict.
 
-- **The held base.** At pool start, `git fetch origin +refs/heads/main:refs/evolve/integration-main` writes a private ref. The SHA is the `ShadowBase` for the whole pool. No write ever touches `refs/remotes/origin/main`. A lane that lands does not move this base.
+- **The held base.** At pool start, `git fetch --refmap= origin +refs/heads/main:refs/evolve/integration-main` writes a private ref. The SHA is the `ShadowBase` for the whole pool.
+  - The empty `--refmap=` is required. Without it, git also updates `refs/remotes/origin/main` as a side effect of the fetch.
+  - No write ever touches `refs/remotes/origin/main`. A lane that lands does not move this base.
 - **The compose.** Each flush composes each new member onto the batch chain from `ShadowBase`, in `OrderDeliverables` order. So order, overlap and conflict are real, and a member that landed since is still composed.
 - **The landed fact.** `Landed` is separate. `Repo.IsAncestor(ctx, sha, privateRef)` answers it for each commit, with a refreshed private ref. `CheckLanded` stays for composed enforce commits only.
 - **The trap in ship.** The trap in `landedByIdentity` (`go/internal/phases/ship/postship.go:210`) is a separate item, because ship does not change here.
@@ -164,14 +170,26 @@ Shadow answers four questions: the order, the overlap, the conflict count and th
 
 ## 6. Entries
 
-1. **Input.** `Tick` lists every lane record with no terminal state across the wave directories. It uses the glob of `firstRecord` (`go/internal/integration/landed.go:185`). It skips `integration-console` and `integration-current`.
+1. **Input.** `Tick` lists every lane record with no terminal state across the wave directories. It reads them through `integration.ListRecords` (`go/internal/integration/recordset.go`). It skips `integration-console` and `integration-current`. A record that cannot be read comes back as a read failure, and the driver writes it once into `Failures`.
 2. **A held member.** A held member crosses pools. A record with the old schema or a bad file is `failed` once and blocks no other member.
 3. **One owner.** One goroutine owns every `Tick`. It serves a timer and a request channel. It recovers a panic into `_DRIVER_FAILED`. A failure never stops a lane at shadow.
-4. **Seam.** The loop mints the pool id only under `ShouldRunPool || ShouldRunWave`, after `resolveWaveBinary`. It starts the driver in `dispatchFleetIteration`, before the fork. The pool, wave and `repairMinWidth` routes all pass it.
+4. **Seam.** The loop mints the pool id only under `ShouldRunPool || ShouldRunWave`, after `resolveWaveBinary`.
+   - `runFork` starts the driver before the routes run. It holds the handle as a local, and no route receives it.
+   - The pool, wave and repair routes all run inside `runFork`.
+   - Pool 0 builds no run: it starts no goroutine, and its `finish` does nothing.
+   - The fetch of the held base ends before the lanes start, with a limit of 30 s. A failed fetch is recorded in `Failures` and is not fatal.
+   - After a failed fetch, the driver reads the last private ref, and then `refs/remotes/origin/main`, as a read-only base.
 5. **No id.** A lane with no pool id writes no record at shadow, and warns. At enforce, it fails at startup through the `RoutingErr` path. A sequential config mints no number and starts no driver. `shipIntegrationWave` goes away.
-6. **Wave end.** `evolve wave next` runs `--max-cycles 1`, so no boundary follows the wave. A pool ends when its fork returns. The wave-end request goes in one wrapper around the whole fork in `dispatchFleetIteration`.
-7. **The request.** The wrapper sends it before `fleetHaltDecision`. Its context survives a cancelled loop, and the limit is 60 s. A halt decision still returns through the wrapper. The process joins the goroutine before it returns.
-8. **After the limit.** Past the limit, the record lacks its wave-end decision, so the wave is `not clean`. The repair route writes `Ended`. `LastCycle` is written at wave end.
+6. **Wave end.** `evolve wave next` runs `--max-cycles 1`, so no boundary follows the wave. A pool ends when its fork returns.
+   - `runFork` runs the routes and returns a `forkOutcome` (route, results, repaired, wave config, pace). It holds `defer run.finish()`, so each return of the fork reaches the wave end.
+   - `settleFork` then runs `fleetHaltDecision`, `observeWorkSupply`, `applyEscalationBoundary` and the pace.
+   - So `Ended` is on disk before the final JSON of a halt.
+7. **The request.** `finish()` takes no argument. It sends the request before `fleetHaltDecision`.
+   - The goroutine holds one owner context, made with `context.WithoutCancel` of the loop context.
+   - `finish` cancels the owner context at the limit of 60 s, and then it always waits for the goroutine. So no goroutine and no git child outlives `finish`.
+   - Each tick derives from the owner context. A timer tick also follows the loop context through `context.AfterFunc`. The request tick does not.
+   - On a cancelled loop, `finish` prints one line first, because a second interrupt is ignored for up to about 65 s.
+8. **After the limit.** Past the limit, the record lacks its wave-end decision, so the wave is `not clean`. The repair route writes `Ended`. `LastCycle` is written at wave end. It is the highest cycle number that the allocator holds at that time (`State.HighestCycleNumber`).
 9. **Zero-ship.** At shadow, zero-ship uses `CountShips`, as today. Zero-ship at the next `prepareIteration` reads the record. At enforce, `core.CountWaveShips(stage, cycles, rec)` counts `merged` plus in-flight members, so an open batch is not zero.
 
 **The window port.** `integration.LandingFeed` is a small interface that `integration` declares. `*orchestrator.Window` satisfies it. A pool gets its feed, and the rolling pool gets a null feed, because it has no window. D21 says that the feed comes from `SHIP_INTEGRATION_EJECTED`. The fact is the same, and the driver knows it first, so the feed comes from the driver.
@@ -186,7 +204,7 @@ Shadow answers four questions: the order, the overlap, the conflict count and th
 
 - `--pool N` selects a pool. `--wave N` keeps the operator's wave number, resolved through `wave.Store` and the cycle range. A wave with several pools prints each one. `status` prints both numbers.
 - `wave.Record` has no ceiling, so the wave range comes from the next record.
-- `status` joins `wave.ReadRunCycles` with `cyclehealth.ClassifyOutcome`, over `[pool, LastCycle]`. It counts only `OutcomeShipped`.
+- `status` reads `wave.ReadRunRange` over `(pool, LastCycle]`. It counts the cycles with `Cycle.Shipped`. A range that cannot be read is a failed condition. A record with no `LastCycle` cannot be counted, so it is a failed condition too.
 - A sequential fallback cycle has no record by design, and it is not counted. `Integration` is nil only for a non-fleet lane.
 
 **The verdict.** Only `status` computes it.
@@ -267,8 +285,8 @@ PR (c) also settles these facts.
 
 | PR | Content |
 |---|---|
-| (a) | Names, the pool id through to the lane, the move of `landedByIdentity` to `FindRecordByCommit`, `IsAncestor` and the wave record type |
-| (b) | Epoch, private ref, `Driver`, `ShadowActor`, goroutine, the wave-end wrapper, I8 with the verdict. Enforce refuses to start |
+| (a) | Names, the pool id through to the lane, the move of `landedByIdentity` to `RecordForCommit`, `IsAncestor` and the wave record type |
+| (b) | Records home, epoch on `loopConfig`, private ref, `Driver`, `ShadowActor`, goroutine, `runFork` and `settleFork`, I8 with the verdict. Enforce refuses to start |
 | (c) | `EnforceActor`, lane batcher, gate adapters, early `Watch` and cancel, `Requeue`, bookkeeping flush, `syncToOrigin`, window feed, zero-ship, soak and the removal of `PrefixCheck` |
 
 The shadow scope builds from this document with no further card round. The review ran three rounds on the card.

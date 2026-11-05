@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -544,5 +543,5 @@ func TestRecordForCommit_RequiresTheCycleAndTheCommitOfTheSameRecord(t *testing.
 }
 
 func recordOfCycle(root string, cycle int) (DeliverableRecord, bool) {
-	return firstRecord(root, strconv.Itoa(cycle)+".json", func(r DeliverableRecord) bool { return r.Cycle == cycle })
+	return ListRecords(root).first(func(r DeliverableRecord) bool { return r.Cycle == cycle && !r.Console() })
 }

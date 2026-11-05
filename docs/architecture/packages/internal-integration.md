@@ -58,11 +58,17 @@ The package holds the pure parts of the integration of a wave. A fleet lane deli
 - **The order score (I1, decision D3)** is a pure function in `order.go`.
 - **The flush policy with the adaptive cap (I4, decisions D7 to D9)** is a pure function in `flush.go` and `cap.go`.
 - **The pool id (I14, PR (a)).** The loop mints one pool id for each pool with `core.AllocateCycleNumber`. The id names the record directory `integration-<pool>`. `CycleSpec` does not hold it. The cycle run receives it as `--pool N`.
-- **The record lookup across pools (I14).** `firstRecord` sorts the pool directories by number, so pool 999 comes before pool 1000. A named directory sorts after the numeric ones. `FindRecordByCommit` returns the record of the first owner. A resumed lane writes into its current pool, and the lookup still finds the record of an earlier pool.
+- **The record set (I14, PR (b)).** `ListRecords` is the one home of the lane records. It returns the records and each read failure.
+  - It sorts the pool directories by number, so pool 999 comes before pool 1000. A named directory sorts after the numeric ones.
+  - `FindRecordByCommit`, `RecordForCommit` and `RecordSet.Owned` are projections of it. `FindRecordByCommit` returns the record of the first owner.
+  - `MemberKey` names a member by its cycle and its patch ids. `Owned` gives each member to its first numeric pool.
 - **The ancestry check (I14).** `Repo.IsAncestor(ctx, sha, ref)` runs `git merge-base --is-ancestor`. Exit code 1 means false. Any other failure is an error, so a failed git call never reads as "not landed".
 - **The signal codes (I14).** `CodeMerged`, `CodeComposed` and `CodeFlushed` join `CodeEjected` in this package. The ship phase keeps the registry of the codes and uses these values.
 - **The wave record type (I14, PR (a)).** `WaveRecord` holds the pool, the epoch and the shadow base. It also holds the batches, the members, the decisions, the failures and the end mark. `IntegrationBatch` is one batch. `MemberState` holds a status and an independent `Landed` flag. `Validate` checks the branch name of each batch with `PoolBranch`, and it checks the epoch of the wave.
-- **The wave record file (I14).** `WriteWaveRecord` and `ReadWaveRecord` keep one file for each pool at `WaveRecordPath`. They share the atomic publish with the other records. No production code calls them yet. PR (b) adds the driver that uses them.
+- **The wave record file (I14).** `WriteWaveRecord` and `ReadWaveRecord` keep one file for each pool at `WaveRecordPath`. They share the atomic publish with the other records. `FileWaveStore` is the `WaveStore` that the driver uses.
+- **The epoch (I14, PR (b)).** `EpochHolder` claims the next number of `.evolve/integration-epoch` once, under a lock file. `Current` reads the file. The loop config holds one holder, so a chained batch keeps the number.
+- **The driver (I14, PR (b)).** `Driver.Tick` checks the stage, the epoch and the record, resumes once, admits the new members, decides the flush with `DecideFlush` and runs the actor. A stage with no actor fails with `SHIP_INTEGRATION_DRIVER_FAILED`, so enforce does not start. `Start` runs one goroutine that serves a timer and one wave-end request. `Run.Finish` cancels the owner context at its limit and always waits for the goroutine.
+- **The shadow actor (I14, PR (b)).** `ShadowActor` composes each member on the pool branch `integration/p<pool>-b<n>` from the held base. A conflict is `conflicted`, or `conflicted_base_ahead` when the lane base is not an ancestor of the chain base. It emits these shadow signals: `_COMPOSED`, `_EJECTED` with `shadow=true` and no brief. `Landed` comes from `IsAncestor` on `refs/evolve/integration-main`. `Resume` and `WaveEnd` delete the pool refs.
 
 ## Invariants
 
@@ -109,7 +115,7 @@ The package holds the pure parts of the integration of a wave. A fleet lane deli
 
 ## Limits
 
-- The lane side has no driver yet. The design of the driver, the wave record and the shadow measure is in [integration-driver](../integration-driver.md).
+- The driver runs at shadow only. The design of the driver, the wave record and the shadow measure is in [integration-driver](../integration-driver.md). Enforce has no actor and is PR (c).
 - The compose engine is built. `Train` composes with `Composer.Compose` at `shadow`. `PrefixCheck` has no production caller.
 - The batch PR and the PR train are built. The ejection brief to the lane (I3) and the integration record (I10) are not built yet.
 - The compose engine and the L1 prefix check (I2) are built. Nothing in production calls them yet.

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/internal/integration"
 	"io"
 	"path/filepath"
 	"time"
@@ -32,6 +33,10 @@ type loopBatchCoordinator struct {
 	now          func() time.Time
 	loadGraph    graphLoader
 	lastGraph    graphLoad
+
+	newDriver         func(pool int) (*integration.Driver, error)
+	driverFinishLimit time.Duration
+	driverTick        time.Duration
 }
 
 func (b *loopBatchCoordinator) run() int {

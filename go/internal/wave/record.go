@@ -112,3 +112,20 @@ func (s Store) WriteGoal(number int, text string) (string, error) {
 	}
 	return path, nil
 }
+
+type Bounds struct {
+	Floor   int
+	Ceiling int
+}
+
+func BoundsOf(records []Record, i int) Bounds {
+	b := Bounds{Floor: records[i].CycleFloor}
+	if i+1 < len(records) && records[i+1].CycleFloor > 0 {
+		b.Ceiling = records[i+1].CycleFloor
+	}
+	return b
+}
+
+func (b Bounds) Holds(id int) bool {
+	return id > b.Floor && (b.Ceiling == 0 || id <= b.Ceiling)
+}

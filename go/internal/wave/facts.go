@@ -49,22 +49,18 @@ type Cycle struct {
 	failAt       time.Time
 }
 
-type cycleWindow struct{ floor, ceiling int }
-
-func (w cycleWindow) holds(id int) bool { return id > w.floor && (w.ceiling == 0 || id <= w.ceiling) }
-
 func ReadCycles(root string, floor, ceiling int) ([]Cycle, []string) {
 	cycles, warnings, failures := readCycleRange(root, floor, ceiling)
 	return cycles, foldFailures(warnings, failures)
 }
 
 func readCycleRange(root string, floor, ceiling int) ([]Cycle, []string, []ReadFailure) {
-	w := cycleWindow{floor: floor, ceiling: ceiling}
+	w := Bounds{Floor: floor, Ceiling: ceiling}
 	evolveDir := paths.EvolveDirOf(root)
 	dossiers := map[int]*dossier.Dossier{}
 	committed, failures := dossier.ReadDirChecked(dossier.CyclesDir(root), floor+1, ceiling)
 	for _, d := range committed {
-		if w.holds(d.Cycle) {
+		if w.Holds(d.Cycle) {
 			dossiers[d.Cycle] = d
 		}
 	}
@@ -110,7 +106,7 @@ func foldFailures(warnings []string, failures []ReadFailure) []string {
 	return warnings
 }
 
-func collectIDs(dir string, name *regexp.Regexp, w cycleWindow, ids map[int]bool) error {
+func collectIDs(dir string, name *regexp.Regexp, w Bounds, ids map[int]bool) error {
 	entries, err := os.ReadDir(dir)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
@@ -120,7 +116,7 @@ func collectIDs(dir string, name *regexp.Regexp, w cycleWindow, ids map[int]bool
 		if m == nil {
 			continue
 		}
-		if id, err := strconv.Atoi(m[1]); err == nil && w.holds(id) {
+		if id, err := strconv.Atoi(m[1]); err == nil && w.Holds(id) {
 			ids[id] = true
 		}
 	}

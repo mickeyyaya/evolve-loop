@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	integrationUsage      = "usage: evolve integration watch --tip SHA\n       evolve integration record-pr --pr N (--reviewed | --class NAME)\n       evolve integration batch [--dry-run] [PR...]\n  watch: exit 0 = CI green, 1 = CI red, 2 = no run to watch or gh failed, 10 = usage\n  record-pr and batch: exit 0 = done, 1 = refused or a PR was ejected, 2 = git or gh failed, 10 = usage"
+	integrationUsage      = "usage: evolve integration watch --tip SHA\n       evolve integration status [--pool N] [--wave N] [--json]\n       evolve integration record-pr --pr N (--reviewed | --class NAME)\n       evolve integration batch [--dry-run] [PR...]\n  watch: exit 0 = CI green, 1 = CI red, 2 = no run to watch or gh failed, 10 = usage\n  status: exit 0 = clean, 1 = not clean or no evidence, 2 = unreadable, 10 = usage\n  record-pr and batch: exit 0 = done, 1 = refused or a PR was ejected, 2 = git or gh failed, 10 = usage"
 	integrationWatchUsage = "usage: evolve integration watch --tip SHA"
 	integrationPrefix     = "evolve integration: "
 )
@@ -34,6 +34,7 @@ var integrationVerbs = map[string]integrationVerb{
 	"watch":     watchVerb,
 	"batch":     batchVerb,
 	"record-pr": recordPRVerb,
+	"status":    statusVerb,
 }
 
 const registrationWait = 5 * time.Second
@@ -74,7 +75,7 @@ func pauseFor(d time.Duration) func(context.Context) error {
 
 func runIntegrationEnv(env integrationEnv, args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 || integrationVerbs[args[0]] == nil {
-		fmt.Fprintf(stderr, "%sname the sub-verb watch, record-pr or batch\n%s\n", integrationPrefix, integrationUsage)
+		fmt.Fprintf(stderr, "%sname the sub-verb watch, status, record-pr or batch\n%s\n", integrationPrefix, integrationUsage)
 		return exitUsage
 	}
 	return integrationVerbs[args[0]](env, args[1:], stdout, stderr)

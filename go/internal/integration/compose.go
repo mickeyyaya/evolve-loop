@@ -22,6 +22,7 @@ const (
 
 type Batch struct {
 	Wave   string
+	Pool   int
 	Index  int
 	Base   string
 	Branch string
@@ -97,6 +98,13 @@ func batchBranch(wave string, index int) string {
 
 func branchRef(branch string) string { return "refs/heads/" + branch }
 
+func (b Batch) branchName() string {
+	if b.Pool > 0 {
+		return PoolBranch(b.Pool, b.Index)
+	}
+	return batchBranch(b.Wave, b.Index)
+}
+
 func (b Batch) named() error {
 	if !waveName.MatchString(b.Wave) || b.Index < 1 {
 		return fmt.Errorf("integration: wave %q batch %d is not a batch name", b.Wave, b.Index)
@@ -108,7 +116,7 @@ func (b Batch) check() error {
 	if err := b.named(); err != nil {
 		return err
 	}
-	if b.Branch != batchBranch(b.Wave, b.Index) {
+	if b.Branch != b.branchName() {
 		return fmt.Errorf("integration: branch %q is not the branch of wave %s batch %d", b.Branch, b.Wave, b.Index)
 	}
 	return fullObjectID(b.Tip)
@@ -118,7 +126,7 @@ func (r Repo) StartBatch(ctx context.Context, b Batch) (Batch, error) {
 	if err := b.named(); err != nil {
 		return Batch{}, err
 	}
-	b.Branch, b.Tip = batchBranch(b.Wave, b.Index), b.Base
+	b.Branch, b.Tip = b.branchName(), b.Base
 	if _, err := r.Git(ctx, r.Dir, "", "update-ref", "--end-of-options", branchRef(b.Branch), b.Base, ""); err != nil {
 		return Batch{}, fmt.Errorf("integration: cut %s at %s: %w", b.Branch, b.Base, err)
 	}

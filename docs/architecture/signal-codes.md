@@ -461,6 +461,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `SHIP_HOLD_SHADOW` | at held_proposals.stage shadow, a lane landing that touches the fence or works a pipeline-kind item lands, and the ship records that enforce would hold it for the operator (ADR-0157); fields.cycle, tree, reasons |
 | `SHIP_INTEGRATION_COMPOSED` | a deliverable composed onto the integration branch and passed its L1 gates; fields.wave, fields.cycle and fields.batch name it |
 | `SHIP_INTEGRATION_DELIVERED` | a fleet lane delivered its record to the integration of the wave (kind ship.delivered); fields.wave, fields.cycle, fields.commits and fields.record name it, and at enforce the lane's ship stopped before main |
+| `SHIP_INTEGRATION_DRIVER_FAILED` | the integration driver failed a step; fields.step names the step and fields.error the error, and the driver also writes the failure into the wave record, so a lost signal cannot hide it |
 | `SHIP_INTEGRATION_EJECTED` | a deliverable went back to its lane; fields.cause names why (conflict, gate or proof), fields.paths the conflicted paths and fields.brief_file the file that holds the brief for the lane (the brief is too long for an event field) |
 | `SHIP_INTEGRATION_FLUSHED` | a batch PR opened; fields.trigger names the flush trigger and fields.pr the PR |
 | `SHIP_INTEGRATION_MERGED` | a batch PR merged into main by a fast-forward to the tested tip; fields.pr names the PR and fields.tip the tip |
