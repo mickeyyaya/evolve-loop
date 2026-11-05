@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/codeindex/gotypes"
 	"github.com/mickeyyaya/evolve-loop/go/internal/plane"
 	"github.com/mickeyyaya/evolve-loop/go/internal/subagent"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
@@ -38,13 +39,14 @@ var (
 )
 
 type codeIndexHost struct {
-	run  sysexec.RunFunc
-	env  []string
-	stat func(string) (os.FileInfo, error)
+	run          sysexec.RunFunc
+	env          []string
+	stat         func(string) (os.FileInfo, error)
+	buildGotypes func(ctx context.Context, moduleDir, out string) error
 }
 
 func defaultCodeIndexHost() codeIndexHost {
-	return codeIndexHost{run: sysexec.DefaultRunner, env: os.Environ(), stat: os.Stat}
+	return codeIndexHost{run: sysexec.DefaultRunner, env: os.Environ(), stat: os.Stat, buildGotypes: gotypes.Build}
 }
 
 type codeIndexMove struct {
@@ -53,6 +55,8 @@ type codeIndexMove struct {
 	To       string   `json:"to"`
 	Behind   int      `json:"behind"`
 	Rebuilt  []string `json:"rebuilt"`
+
+	Warnings []string `json:"-"`
 }
 
 func (h codeIndexHost) refresh(ctx context.Context, projectRoot string) (codeIndexMove, error) {
@@ -81,10 +85,21 @@ func (h codeIndexHost) refresh(ctx context.Context, projectRoot string) (codeInd
 		return codeIndexMove{}, fmt.Errorf("%w; clean the index worktree, then run evolve code refresh", err)
 	}
 	rebuilt, err := backends.Refresh(ctx)
-	if err != nil {
-		return codeIndexMove{}, err
+	moved := codeIndexMove{IndexDir: loc.indexDir, From: fresh.Head, To: fresh.Main, Behind: fresh.Behind, Rebuilt: append([]string{}, rebuilt...)}
+	if warning := h.buildGotypesIndex(ctx, loc.indexDir); warning != "" {
+		moved.Warnings = append(moved.Warnings, warning)
 	}
-	return codeIndexMove{IndexDir: loc.indexDir, From: fresh.Head, To: fresh.Main, Behind: fresh.Behind, Rebuilt: append([]string{}, rebuilt...)}, nil
+	return moved, err
+}
+
+func (h codeIndexHost) buildGotypesIndex(ctx context.Context, indexDir string) string {
+	if h.buildGotypes == nil {
+		return ""
+	}
+	if err := h.buildGotypes(ctx, filepath.Join(indexDir, "go"), gotypes.IndexPath(indexDir)); err != nil {
+		return fmt.Sprintf("WARN: the gotypes index is not rebuilt, the last good index stays: %s", leadingLine(err.Error()))
+	}
+	return ""
 }
 
 func (h codeIndexHost) checkIndexWorktree(ctx context.Context, indexDir string) error {
@@ -221,6 +236,10 @@ func codeRefreshVerb(args []string, stdout, stderr io.Writer, host codeIndexHost
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	moved, err := host.refresh(ctx, codeProjectRoot(*root))
+	out.warnings = moved.Warnings
+	for _, w := range moved.Warnings {
+		fmt.Fprintln(stderr, w)
+	}
 	if rc, kind := codeRefreshExit(err); rc != 0 {
 		return out.fail(rc, kind, fmt.Sprintf("evolve code refresh: %v", err))
 	}
@@ -228,4 +247,9 @@ func codeRefreshVerb(args []string, stdout, stderr io.Writer, host codeIndexHost
 		fmt.Fprintf(stdout, "code refresh: %s is at %s (%s), %d commit(s) after %s\n", moved.IndexDir, codeIndexMainRef, shortSHA(moved.To), moved.Behind, shortSHA(moved.From))
 	}
 	return out.ok(moved)
+}
+
+func leadingLine(text string) string {
+	first, _, _ := strings.Cut(strings.TrimSpace(text), "\n")
+	return strings.TrimSpace(first)
 }

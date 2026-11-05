@@ -426,7 +426,7 @@ func TestBuild_WithNoCheckoutAboveTheModuleThePathsAreRelativeToTheModule(t *tes
 	dir := writeModule(t, map[string]string{"go.mod": "module m\n\ngo 1.23\n", "m.go": "package m\n\nfunc F() int { return G() }\n\nfunc G() int { return 1 }\n"})
 	out := filepath.Join(t.TempDir(), "index.gob")
 
-	if err := gotypes.Build(dir, out); err != nil {
+	if err := gotypes.Build(context.Background(), dir, out); err != nil {
 		t.Fatalf("Build: %v", err)
 	}
 	hits, err := gotypes.New(out).Callers(context.Background(), "m.G", codeindex.DirectionIn)
@@ -440,14 +440,14 @@ func TestBuild_ARebuildReplacesTheIndex(t *testing.T) {
 	t.Parallel()
 	dir := writeModule(t, map[string]string{"go.mod": "module m\n\ngo 1.23\n", "m.go": "package m\n\nfunc F() int { return 1 }\n"})
 	out := filepath.Join(t.TempDir(), "index.gob")
-	if err := gotypes.Build(dir, out); err != nil {
+	if err := gotypes.Build(context.Background(), dir, out); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "m.go"), []byte("package m\n\nfunc H() int { return 1 }\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := gotypes.Build(dir, out); err != nil {
+	if err := gotypes.Build(context.Background(), dir, out); err != nil {
 		t.Fatal(err)
 	}
 	hits, err := gotypes.New(out).API(context.Background(), "m.go")
@@ -474,7 +474,7 @@ func TestBuild_FailsLoudly(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			err := gotypes.Build(tc.dir, tc.out)
+			err := gotypes.Build(context.Background(), tc.dir, tc.out)
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Errorf("Build = %v, want an error naming %q", err, tc.want)
 			}
@@ -505,5 +505,45 @@ func TestBuild_FailsLoudlyOnABadGoListAnswer(t *testing.T) {
 				t.Errorf("BuildWith = %v, want an error naming %q", err, tc.want)
 			}
 		})
+	}
+}
+
+func TestBuild_ACancelledContextIsAnErrorAndTheLastGoodIndexStays(t *testing.T) {
+	t.Parallel()
+	dir := writeModule(t, map[string]string{"go.mod": "module m\n\ngo 1.23\n", "m.go": "package m\n"})
+	out := filepath.Join(t.TempDir(), "index.gob")
+	if err := os.WriteFile(out, []byte("last good index"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := gotypes.Build(ctx, dir, out)
+
+	kept, readErr := os.ReadFile(out)
+	if !errors.Is(err, context.Canceled) || readErr != nil || string(kept) != "last good index" {
+		t.Errorf("Build = %v, index = %q, %v; want the context error and the last good index", err, kept, readErr)
+	}
+}
+
+func TestBuild_ADeadlineThatPassesAfterTheListStopsTheBuildAndWritesNothing(t *testing.T) {
+	t.Parallel()
+	dir := writeModule(t, map[string]string{"x.go": "package x\n\nfunc X() int { return 1 }\n"})
+	answer := `{"ImportPath":"x","Dir":"` + dir + `","GoFiles":["x.go"],"Module":{"Main":true}}`
+	out := filepath.Join(t.TempDir(), "i.gob")
+	ctx, cancel := context.WithCancel(context.Background())
+	listThenExpire := func(_ context.Context, _, _ string, _, _ []string, _ io.Reader, stdout, _ io.Writer) (int, error) {
+		_, _ = io.WriteString(stdout, answer)
+		cancel()
+		return 0, nil
+	}
+
+	err := gotypes.BuildWith(ctx, listThenExpire, nil, gotypes.EncodeGob, io.Discard, dir, out)
+
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("BuildWith = %v, want the context error: the type check must honour the deadline", err)
+	}
+	if _, statErr := os.Stat(out); statErr == nil {
+		t.Errorf("an expired build wrote %s", out)
 	}
 }

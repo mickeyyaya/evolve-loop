@@ -37,7 +37,7 @@ func runWithFixture(m *testing.M) int {
 		return 1
 	}
 	fixtureIndex = filepath.Join(tmp, "out", "index.gob")
-	if err := gotypes.Build(filepath.Join(repo, "go"), fixtureIndex); err != nil {
+	if err := gotypes.Build(context.Background(), filepath.Join(repo, "go"), fixtureIndex); err != nil {
 		fmt.Fprintln(os.Stderr, "build the fixture index:", err)
 	}
 	return m.Run()

@@ -124,6 +124,9 @@ func syncMainCodeIndex(root string, host codeIndexHost, timeout time.Duration, s
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	moved, err := host.refresh(ctx, root)
+	for _, w := range moved.Warnings {
+		fmt.Fprintln(stderr, w)
+	}
 	rc, _ := codeRefreshExit(err)
 	switch rc {
 	case 0:

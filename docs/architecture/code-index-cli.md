@@ -186,7 +186,8 @@ The index worktree is separate from every cycle worktree. The pipeline refreshes
 
 1. `evolve sync-main` runs `git checkout --detach origin/main` in the index worktree, after it merges `main`.
 2. Then it runs an incremental `trail build`. The build reads only the changed files and takes about 2 s (C1).
-3. A phase reads the index. A query takes about 0.1 s (C1). Each query also compares the index with `origin/main` and warns when the index is stale.
+3. Then it runs `gotypes.Build` on the `go` directory of the index worktree. The build writes `index.gob` in `<index_dir>-gotypes`, beside the index worktree and outside every git tree. A failed build prints one WARN line, and the last good `index.gob` stays.
+4. A phase reads the index. A query takes about 0.1 s (C1). Each query also compares the index with `origin/main` and warns when the index is stale.
 
 #### Findings of 2026-10-26 (K6)
 
@@ -234,7 +235,11 @@ The refresh is `codeIndexHost.refresh` in `go/cmd/evolve/cmd_code_refresh.go`. `
 7. Run `git rev-parse HEAD origin/main`. If the two commits differ, run `git rev-list --count HEAD..origin/main`.
 8. Run `git checkout --quiet --detach origin/main`. If a change of `main` conflicts with the edits of the index tool, the checkout fails. The message tells the operator to clean the index worktree.
 9. Call `Backends.Refresh`. It runs `Refresh` on each backend that implements `codeindex.Refresher`, and skips the others. The trail adapter runs `trail build -- <index_dir>`. The refresh never runs `trail init`.
-10. The whole refresh has a deadline of 5 minutes. At the deadline, `sysexec` sends SIGTERM to the child process and kills it after `WaitDelay` (5 s). The refresh then fails.
+10. Call `gotypes.Build` with the `go` directory of `index_dir`. The output is `<index_dir>-gotypes/index.gob`. This step runs after step 9, also when step 9 failed.
+    - A failed build prints one line that starts with `WARN` on stderr and adds it to `warnings` of the JSON envelope.
+    - The exit code stays the code of step 9.
+    - The last good `index.gob` stays, because `Build` writes the file only after a full build.
+11. The whole refresh has a deadline of 5 minutes. At the deadline, `sysexec` sends SIGTERM to the child process and kills it after `WaitDelay` (5 s). The refresh then fails.
 
 `sync-main` refreshes only when it synced the branch `main`. The sync of another branch does not move `origin/main`. When the refresh fails, the merge is already done, and the message says so. Fix the cause, run `evolve code refresh`, then run the boundary again without `--merge`.
 

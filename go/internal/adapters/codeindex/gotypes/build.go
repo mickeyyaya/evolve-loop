@@ -45,11 +45,14 @@ type buildEnv struct {
 	warn   io.Writer
 }
 
-func Build(moduleDir, out string) error {
-	return build(context.Background(), buildEnv{run: sysexec.DefaultRunner, env: os.Environ(), encode: encodeGob, warn: os.Stderr}, moduleDir, out)
+func Build(ctx context.Context, moduleDir, out string) error {
+	return build(ctx, buildEnv{run: sysexec.DefaultRunner, env: os.Environ(), encode: encodeGob, warn: os.Stderr}, moduleDir, out)
 }
 
 func build(ctx context.Context, be buildEnv, moduleDir, out string) error {
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("gotypes: %w", err)
+	}
 	dir, err := filepath.EvalSymlinks(moduleDir)
 	if err != nil {
 		return fmt.Errorf("gotypes: the module dir: %w", err)
@@ -64,6 +67,9 @@ func build(ctx context.Context, be buildEnv, moduleDir, out string) error {
 		l.listed[p.ImportPath] = p
 	}
 	for _, p := range listed {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("gotypes: %w", err)
+		}
 		l.checkListed(p)
 	}
 	for _, w := range l.warnings {
