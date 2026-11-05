@@ -32,7 +32,7 @@ func (e *Engine) BillingSnapshot(dir, label string) (string, error) {
 		CredTokenHash:        "absent",
 		AnthropicAPIKeyInEnv: "no",
 	}
-	if b, err := os.ReadFile(filepath.Join(e.doctorHome(), ".claude", ".credentials.json")); err == nil {
+	if b, err := os.ReadFile(ClaudeCredentialsPath(e.doctorHome())); err == nil {
 		snap.CredSize = int64(len(b))
 		snap.CredTokenHash = billingTokenHash(b)
 	}
