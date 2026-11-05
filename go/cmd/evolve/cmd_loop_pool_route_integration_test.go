@@ -46,7 +46,7 @@ func TestDispatchPool_TheMintedPoolReachesEveryLane(t *testing.T) {
 	f := newE2WindowFixture(t, e2TwoItems)
 	bin, out := recordingLaneBinary(t)
 
-	f.b.dispatchPool(0, e2PoolFleet, f.b.cycleLaunch(bin, 41))
+	f.b.settledPool(0, e2PoolFleet, f.b.cycleLaunch(bin, 41))
 
 	assertEveryLaneGotPool(t, out, 41)
 }
@@ -57,7 +57,7 @@ func TestRepairMinWidth_TheMintedPoolReachesTheRepairLane(t *testing.T) {
 	bin, out := recordingLaneBinary(t)
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage"}
 
-	f.b.repairMinWidth(0, fc, policy.FleetConfig{Count: 0, PlanSource: "triage"}, f.b.cycleLaunch(bin, 41), &fleet.StarvationTracker{})
+	f.b.settledRepair(0, fc, policy.FleetConfig{Count: 0, PlanSource: "triage"}, f.b.cycleLaunch(bin, 41), &fleet.StarvationTracker{})
 
 	assertEveryLaneGotPool(t, out, 41)
 }

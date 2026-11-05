@@ -40,8 +40,9 @@ func measureWaveRuns(plane wavePlaneDirs, records []wave.Record, current []wave.
 		rec, next, cycles := records[i], (*wave.Record)(nil), current
 		if i+1 < len(records) {
 			next = &records[i+1]
+			bounds := wave.BoundsOf(records, i)
 			var warn []string
-			cycles, warn = wave.ReadCycles(plane.root, rec.CycleFloor, next.CycleFloor)
+			cycles, warn = wave.ReadCycles(plane.root, bounds.Floor, bounds.Ceiling)
 			warnings = append(warnings, warn...)
 		} else if ended, ok := waveLogEnded(rec); ok && !live && rec.EndedAt == nil {
 			rec.EndedAt = &ended

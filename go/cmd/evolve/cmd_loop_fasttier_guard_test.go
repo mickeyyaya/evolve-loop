@@ -12,7 +12,7 @@ import (
 
 func TestFastTierCoordinatorsNeverReachTheRealModuleGraphLoader(t *testing.T) {
 	t.Parallel()
-	reaching := map[string]bool{"dispatchFleetIteration": true, "dispatchPool": true, "takeSupply": true, "cellAdmission": true, "orchestratorPool": true, "moduleGraph": true}
+	reaching := map[string]bool{"dispatchFleetIteration": true, "runFork": true, "dispatchPool": true, "settledPool": true, "settledRepair": true, "takeSupply": true, "cellAdmission": true, "orchestratorPool": true, "moduleGraph": true}
 	names, err := filepath.Glob("*_test.go")
 	if err != nil || len(names) == 0 {
 		t.Fatalf("glob = %v, %v, want the test files of the package", names, err)

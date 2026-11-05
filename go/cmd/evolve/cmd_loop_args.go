@@ -11,6 +11,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/goalhash"
+	"github.com/mickeyyaya/evolve-loop/go/internal/integration"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 )
@@ -313,6 +314,7 @@ func buildLoopConfig(lf *loopArgFlags, goalHash, goalText, strategy string, maxC
 		Relaunch:          lf.relaunch,
 		PerAgentCLI:       perAgentCLI,
 		PerAgentModel:     perAgentModel,
+		Epoch:             integration.NewEpochHolder(lf.evolveDir),
 	}
 }
 

@@ -8,7 +8,6 @@ import (
 	"io"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -188,28 +187,6 @@ func (r Repo) IsAncestor(ctx context.Context, sha, ref string) (bool, error) {
 		return false, nil
 	}
 	return false, fmt.Errorf("integration: is %s an ancestor of %s: %w", sha, ref, err)
-}
-
-func FindRecordByCommit(root, sha string) (DeliverableRecord, bool) {
-	return firstRecord(root, "*.json", func(r DeliverableRecord) bool { return r.HoldsCommit(sha) })
-}
-
-func RecordForCommit(root string, cycle int, sha string) (DeliverableRecord, bool) {
-	return firstRecord(root, "*.json", func(r DeliverableRecord) bool { return r.Cycle == cycle && r.HoldsCommit(sha) })
-}
-
-func firstRecord(root, name string, match func(DeliverableRecord) bool) (DeliverableRecord, bool) {
-	paths, err := filepath.Glob(filepath.Join(WaveDir(root, "*"), recordPrefix+name))
-	if err != nil {
-		return DeliverableRecord{}, false
-	}
-	slices.SortStableFunc(paths, compareWaveDirs)
-	for _, p := range paths {
-		if r, err := ReadRecord(p); err == nil && match(r) {
-			return r, true
-		}
-	}
-	return DeliverableRecord{}, false
 }
 
 func compareWaveDirs(a, b string) int {
