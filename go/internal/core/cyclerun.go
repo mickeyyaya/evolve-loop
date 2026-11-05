@@ -51,6 +51,7 @@ type cycleRun struct {
 
 	protectedRouteDiags []Diagnostic
 	predicatesAtBuild   map[string]string
+	predicateBaseFault  string
 	lastBlockerRefusal  string
 	spendLimitSeen      bool
 	spendLimitStopped   bool

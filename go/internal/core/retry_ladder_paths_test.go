@@ -207,8 +207,7 @@ func TestReviewResumedDeliverable_AsksTheLadderWhenItsCorrectionsAreSpent(t *tes
 			probe := newLadderProbe(0)
 			o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil), WithReviewer(probe), WithSignalCenter(center),
 				WithRetryConfig(policy.RetryConfig{ContractCorrectionRetries: 1}), WithWorkflowConfig(ladderWorkflow(tc.stage)))
-			_, err := o.reviewResumedDeliverable(context.Background(), root, 9, CycleState{CycleID: 9, WorkspacePath: t.TempDir()},
-				PhaseBuild, probe, PhaseRequest{}, PhaseResponse{Phase: "build", Verdict: VerdictPASS}, nil, func(_ Phase, r PhaseRequest) PhaseRequest { return r })
+			_, err := o.reviewResumedDeliverable(resumedDeliverable{ctx: context.Background(), projectRoot: root, cycle: 9, cs: CycleState{CycleID: 9, WorkspacePath: t.TempDir()}, phase: PhaseBuild, runner: probe, req: PhaseRequest{}, resp: PhaseResponse{Phase: "build", Verdict: VerdictPASS}, baseline: nil, count: func(_ Phase, r PhaseRequest) PhaseRequest { return r }, predicates: predicateBase{}})
 			if err == nil {
 				t.Fatalf("a deliverable that never passes must end rejected")
 			}

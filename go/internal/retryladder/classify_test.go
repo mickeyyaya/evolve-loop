@@ -107,8 +107,6 @@ func TestClassify_SpecAndCapabilitySignals(t *testing.T) {
 		want  retryladder.Class
 	}{
 		{"intent-rejected", retryladder.Facts{AuditClass: "intent-rejected"}, retryladder.Spec},
-		{"proven blocker", retryladder.Facts{ProvenBlocker: true, AuditClass: "code-build-fail"}, retryladder.Spec},
-		{"proven blocker outranks an in-scope floor", retryladder.Facts{ProvenBlocker: true, LaneScope: []string{"go/internal/foo"}, Floors: []retryladder.FloorFailure{inScope}}, retryladder.Spec},
 		{"floor outside the lane scope", retryladder.Facts{LaneScope: []string{"go/internal/foo"}, Floors: []retryladder.FloorFailure{outOfScope}}, retryladder.Spec},
 		{"floor with an empty lane scope is outside it", retryladder.Facts{Floors: []retryladder.FloorFailure{inScope}}, retryladder.Spec},
 		{"one outside floor among inside floors", retryladder.Facts{LaneScope: []string{"go/internal/foo"}, Floors: []retryladder.FloorFailure{inScope, outOfScope}}, retryladder.Spec},

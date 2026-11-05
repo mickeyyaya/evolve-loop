@@ -610,7 +610,11 @@ OuterLoop:
 			break OuterLoop
 		}
 		if next == PhaseBuild {
-			cr.predicatesAtBuild = cyclePredicateSources(cr.cs.ActiveWorktree, cr.cycle)
+			base, err := sealPredicateBase(cr.cs.WorkspacePath, cr.cs.ActiveWorktree, cr.cycle)
+			if err != nil {
+				return cr.result, err
+			}
+			cr.predicatesAtBuild = base
 			if err := sealBuildExplanationContext(req.ProjectRoot, cr.cs); err != nil {
 				return cr.result, fmt.Errorf("seal Build explanation context: %w", err)
 			}

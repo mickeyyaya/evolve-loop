@@ -85,8 +85,7 @@ func TestDispatchAttempt_AResumedCorrectionContinuesTheCount(t *testing.T) {
 	probe := &attemptProbe{escalationProbe: &escalationProbe{phase: "audit", threshold: neverDemotingThreshold, approveAfter: 2}}
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil), WithReviewer(probe))
 
-	if _, err := o.reviewResumedDeliverable(context.Background(), t.TempDir(), 9, CycleState{CycleID: 9, WorkspacePath: t.TempDir()},
-		PhaseAudit, probe, PhaseRequest{Attempt: 1}, PhaseResponse{Phase: "audit", Verdict: VerdictPASS}, nil, (&cycleRun{phaseDispatches: map[Phase]int{PhaseAudit: 1}}).countDispatch); err != nil {
+	if _, err := o.reviewResumedDeliverable(resumedDeliverable{ctx: context.Background(), projectRoot: t.TempDir(), cycle: 9, cs: CycleState{CycleID: 9, WorkspacePath: t.TempDir()}, phase: PhaseAudit, runner: probe, req: PhaseRequest{Attempt: 1}, resp: PhaseResponse{Phase: "audit", Verdict: VerdictPASS}, baseline: nil, count: (&cycleRun{phaseDispatches: map[Phase]int{PhaseAudit: 1}}).countDispatch, predicates: predicateBase{}}); err != nil {
 		t.Fatalf("reviewResumedDeliverable: %v", err)
 	}
 	if !slices.Equal(probe.attempts, []int{2, 3}) {
