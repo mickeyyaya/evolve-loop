@@ -88,7 +88,7 @@ Basis of the scores:
 
 **The choice is between C and D, and it waits for Q2.** A, B and E fail on the first criterion or on throughput. C leads D by 1 point of 35, and D leads if the exposure row counts twice, so the score does not decide. C costs less, and D meets the operator decision as written. Our proposal: C now, if the operator accepts a narrow token in the cell. Otherwise D.
 
-**What changes our mind:** L0 can show that the stores match at a failure, which refutes the split. A live proof that a seat with an empty directory still changes the stored login also rules out C and D as written.
+**What changes our mind:** L0 can show that the file does not move at a failure, which refutes the split. A live proof that a seat with an empty directory still changes the stored login also rules out C and D as written.
 
 ## 5. Decisions
 
@@ -107,7 +107,7 @@ The owner `console-manual` means that the console builds it, because each compon
 
 | Id | Component | Red test first | Owner |
 |---|---|---|---|
-| L0 | Measure. The operator runs the two commands of Q3 once. A read-only verb reports the store times, so no console reads a credential. | The verb prints the `mdat` and the file time from a fixture, and it prints no token. | operator, console-manual |
+| L0 | Measure. Q3 is done (F3.7). A read-only verb reports the store times across the next failure, so no console reads a credential. | The verb prints the `mdat` and the file time from a fixture, and it prints no token. | operator, console-manual |
 | L1 | Seat directory. The bridge creates it with the settings, plugins and trust that a seat needs, and no credential. | A seat started through the real launch path has `CLAUDE_CONFIG_DIR` set, and the directory has no `.credentials.json`. | console-manual |
 | L2 | Prove the isolation. A live seat with a token and an empty directory runs across a stored-login expiry. | The Keychain `mdat` and the file time do not change because of that seat. A stub test covers the launch shape. | console-manual |
 | L3 | Sandbox rule. Deny read and write of `~/.claude/.credentials.json` for a cell, on each OS. Test if a cell can read the secret of the Keychain item, and deny it if the profile can. | A contract row: a cell gets `Operation not permitted` on the file. A mutant that removes the deny fails the row. A row states the Keychain result, as a measured limit if no deny exists. | console-manual |
@@ -123,7 +123,7 @@ Each component has six rows: red proof, journey, preservation, wiring, mutation 
 
 ## 7. Order
 
-1. **L0.** It costs minutes and it can refute the research before any build.
+1. **L0.** The next failure tests the research at no build cost. The verb records which store moves first.
 2. **L5.** It lands first, because it makes each later failure read true, and each logout until then wastes hours.
 3. **The design card and architecture review of L1 to L4.** The operator's rule requires this before code.
 4. **L1 and L6, then L3 and L4.** The directory comes first, because each other part reads it.
@@ -159,5 +159,5 @@ Each component has six rows: red proof, journey, preservation, wiring, mutation 
 |---|---|---|
 | Q1 | Is a `setup-token` token right for unattended lanes on this subscription? The page names "CI pipelines, scripts". The research read no terms of service. | The operator confirms. This is not an engineering question. |
 | Q2 | On 2026-11-03 the operator told the console that no cell gets a credential, and that the pipeline holds it behind one source for each OS. The repo has no record of this. C breaks this as written, and D does not. Is a narrow token in the cell an accepted exception? | The operator decides. This question selects C or D. |
-| Q3 | Do the stores hold different logins? These commands print 8 characters of a hash, and no token. The operator runs them, because the console does not read credentials: `security find-generic-password -s "Claude Code-credentials" -w \| jq -r '.claudeAiOauth.refreshToken' \| shasum -a 256 \| cut -c1-8`, and `jq -r '.claudeAiOauth.refreshToken' ~/.claude/.credentials.json \| shasum -a 256 \| cut -c1-8`. | Different prefixes prove the split. |
+| Q3 | Do the stores hold different logins? | Answered on 2026-11-05 (F3.7): the Keychain holds a token, and the file holds an empty one. |
 | Q4 | Why the rise on 11-02, and what caused the console clusters of 10-17 to 10-20? | Open. The expiry in L0 is the first evidence. |
