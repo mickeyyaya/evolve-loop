@@ -72,11 +72,12 @@ undiagnosable. Its blast radius is every later cycle.
    (evidence, acceptance criteria). But a console/operator session does the
    fix immediately, in this sequence:
    1. an isolated worktree branch;
-   2. TDD red-first;
-   3. dual review (+ security review when the change is trust-kernel-adjacent);
-   4. a wiring proof;
-   5. the sanctioned commit-gate/ship;
-   6. a CI watch.
+   2. a design check (rule 6 below);
+   3. TDD red-first;
+   4. dual review (+ security review when the change is trust-kernel-adjacent);
+   5. a wiring proof;
+   6. the sanctioned commit-gate/ship;
+   7. a CI watch.
 
    *Evidence: cycles 999–1001 burned on the exact state defect that the queue had
    to fix. The console fix landed in hours (PR #345).*
@@ -99,6 +100,43 @@ undiagnosable. Its blast radius is every later cycle.
 
    *Evidence: the seven FAILs of batch-5 gave three complete,
    landable work items (PRs #350/#351/#352), with zero re-implementation.*
+5. **A pipeline blocker gets six test rows.**
+   - The operator rule (2026-11-04): "For any issue blocking the pipeline needs to be addressed immediately with complete test plan building around the issue to avoid the regression."
+   - The six rows are red proof, journey, preservation, wiring, mutation and signal.
+   - The wiring row has one test for each entry that reads the fact. A row that does not apply states why.
+   - The rows and the design card are in the [plan](../plans/pipeline-blockers-2026-11.md#the-six-rows) and in [ADR-0161](../architecture/adr/0161-a-pipeline-blocker-fix-meets-six-test-rows-and-a-signal-states-its-cause-and-next-step.md).
+   - The journey proof of a `fix:` commit is in [ADR-0159](../architecture/adr/0159-the-loop-keeps-its-integration-train-and-takes-six-practices-from-the-2026-harness-projects.md). This rule does not repeat it.
+
+   *Evidence: 7 fixes of wave 155 got 38 findings (11 CRITICAL) from the architecture review. The findings were wiring, mutation and signal faults ([research F1.14, F1.15](../research/pipeline-blockers-2026-11.md#13-what-the-blocked-reviews-show)).*
+6. **Design and architecture review come before the build.**
+   - The operator rule (2026-11-05): "Do the design and architecture review first before build the code", and "Also follow strictly on TDD".
+   - The author writes a design card of six fields: cause, home, entries, signal, rows and limits.
+   - An architecture review reads the card. The first test comes after the review passes.
+   - The card form is in [signal-accuracy](../architecture/signal-accuracy.md) and in the [plan](../plans/pipeline-blockers-2026-11.md#the-design-card).
+
+   *Evidence: 12 of 38 review findings were design faults that a card review finds before the build ([research F1.15](../research/pipeline-blockers-2026-11.md#13-what-the-blocked-reviews-show)).*
+7. **A signal states its cause, its evidence and a next step that works.**
+   - The operator rule (2026-11-05): "The signal needs to be accurate without any mistake, showing clear guidances for agent to debug".
+   - A signal states the operation, the item, the cause or "unknown", an evidence handle, the impact and a next step. It never states a cause that the program does not know.
+   - The writer of a failure sets its class from a host fact. No class comes from words in text.
+   - A test of a signal reads the whole text with equality. This rule refines §3.7 and does not replace it.
+   - The spec is [signal-accuracy](../architecture/signal-accuracy.md) §3 to §7.
+
+   *Evidence: a test name in a failure text gave `infra-error` to a gate block in cycle 2157. A logout near 01:00 on 2026-11-05 was followed by a stop reason of `quota-pause` at 56 percent usage. The code path is not traced ([incident](../incidents/2026-11-05-wave-155-false-signals-and-the-logout.md)).*
+8. **A task that is blocked more than three times goes to a redesign.**
+   - The operator rule (2026-11-05): "For those tasks been blocked over 3 times, we need to escalate it to redesign the solution from architecture perspective with ultrathink".
+   - The count is for each task, across its review rounds and its rebuilds.
+   - Past three blocks, the fix rounds stop. A redesign at the top tier finds what the findings share, and fixes that at its source.
+   - It writes a new design card, and the same review reads it before the build.
+   - The meeting of this rule and the [convergence ladder](../architecture/convergence-policy.md) is an open question for the operator (plan Q1).
+
+   *Evidence: B2, B3, B5 and B8 had two blocks each when this rule came ([research F1.14](../research/pipeline-blockers-2026-11.md#13-what-the-blocked-reviews-show)).*
+9. **The console writes no scratch script; a missing step becomes a tested verb.**
+   - The operator asked (2026-11-05): "Why do we have bash script?" and "Could we just build the debug cli in evolve loop for your use and cover with tests?"
+   - If no verb gives a fact, the console files an inbox item for a read-only verb (class A) after two manual steps.
+   - The three verbs that are known to be missing are in [signal-accuracy](../architecture/signal-accuracy.md) §9.
+
+   *Evidence: the audit of wave 155 used a JSON print of each review report and a line count of the loop log ([research F1.20](../research/pipeline-blockers-2026-11.md#14-what-the-rules-say-today)).*
 
 ## 2. Queue policy
 
@@ -143,7 +181,7 @@ undiagnosable. Its blast radius is every later cycle.
    - A comment removal needs no reviewer. The commit gate accepts a proof instead when
      every changed Go file is proven comment-only and every other file is Markdown under `docs/`.
      The commit then carries `Review-waived: comment-only` ([code comments](../conventions/code-comments.md)).
-   - **Convergence rule for review chains.** After every review check, the console runs `evolve convergence decide --input <rounds.json>` and follows the decision ([convergence policy](../architecture/convergence-policy.md)).
+   - **Convergence rule for review chains.** After every review check, the console runs `evolve convergence decide --input <rounds.json>` and follows the decision ([convergence policy](../architecture/convergence-policy.md)). For a pipeline blocker, §1.8 adds a count of blocks for each task.
    - *Mechanized: the docs floor (`internal/docsfloor`, ADR-0077) WARNs at the
      build handoff when an architecture-labeled change touches no `docs/` file.
      WARN, not block: "is there a doc at all" is mechanical, and "is this doc
