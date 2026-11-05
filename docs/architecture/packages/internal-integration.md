@@ -103,6 +103,7 @@ The package holds the pure parts of the integration of a wave. A fleet lane deli
 
 ## Limits
 
+- The lane side has no driver yet. The design of the driver, the wave record and the shadow measure is in [integration-driver](../integration-driver.md).
 - The compose engine is built. `Train` composes with `Composer.Compose` at `shadow`. `PrefixCheck` has no production caller.
 - The batch PR and the PR train are built. The ejection brief to the lane (I3) and the integration record (I10) are not built yet.
 - The compose engine and the L1 prefix check (I2) are built. Nothing in production calls them yet.
