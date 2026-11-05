@@ -293,3 +293,28 @@ func TestCompile_AnOrderedRuleWithoutItsPartnersFamilyKeepsTheStaticCheck(t *tes
 		t.Fatalf("a chain without claude cannot lead with claude: %+v", findings)
 	}
 }
+
+func TestHeadroom_AFamilyAtTheLimitMovesToTheTailAndTheRestKeepTheirPolicyOrder(t *testing.T) {
+	d := buildDecision(t, headroomRule(), cliroute.Host{
+		WeekUsed:  weekUsed(t, map[string]float64{"agy": 100, "agy-claude": 20, "claude": 20}),
+		LaneTimes: laneTimes(),
+	})
+	requireChain(t, d, "claude", "agy-claude", "agy")
+	d = buildDecision(t, headroomRule(), cliroute.Host{
+		WeekUsed:  weekUsed(t, map[string]float64{"agy": 20, "agy-claude": 100, "claude": 20}),
+		LaneTimes: laneTimes(),
+	})
+	requireChain(t, d, "claude", "agy", "agy-claude")
+}
+
+func TestHeadroom_AShorterLaneTimeToAPassBeatsAnEarlierPolicyPlace(t *testing.T) {
+	d := buildDecision(t, headroomRule(), cliroute.Host{
+		WeekUsed: weekUsed(t, map[string]float64{"agy": 10, "agy-claude": 10, "claude": 10}),
+		LaneTimes: laneTimes(
+			lane("agy", 10, 5, 50*time.Minute),
+			lane("agy-claude", 10, 5, 40*time.Minute),
+			lane("claude", 10, 5, 20*time.Minute),
+		),
+	})
+	requireChain(t, d, "claude", "agy-claude", "agy")
+}

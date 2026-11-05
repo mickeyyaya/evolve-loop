@@ -409,3 +409,70 @@ func TestScanShadowPrune_AnUnkeyableRunNamesItsCause(t *testing.T) {
 		t.Fatalf("got %q", s.degraded)
 	}
 }
+
+func TestVerdictStore_TheShipRunsNoPackageAtEnforceOnAnUnchangedKeyAndEveryPackageAtShadow(t *testing.T) {
+	t.Parallel()
+	repo := shadowFixture(t)
+	store := filepath.Join(t.TempDir(), shadowStoreDir)
+	if reds, err := floorPack(t, repo, store); err != nil || len(reds) != 0 {
+		t.Fatalf("a green floor: reds=%v err=%v", reds, err)
+	}
+
+	shadowCenter := signalcenter.New()
+	atShadow := scanOnce(t, repo, shipAt(store, shadowCenter, testLimits), shadowCenter)
+	if atShadow.err != nil {
+		t.Fatalf("a green tree ships green at shadow: %v\n%s", atShadow.err, atShadow.notes)
+	}
+	shadowSum := atShadow.summary(t)
+	if shadowSum["packages"] != "2" || shadowSum["skipped"] != "0" || shadowSum["stage"] != "shadow" {
+		t.Fatalf("shadow runs all 2 packages and skips none; got %v", shadowSum)
+	}
+	for _, pkg := range []string{userPackage, xonlyPackage} {
+		if !strings.Contains(atShadow.scanLog, "ok  \t"+pkg+"\t") {
+			t.Errorf("%s must run at shadow\n%s", pkg, atShadow.scanLog)
+		}
+	}
+
+	enforceCenter := signalcenter.New()
+	atEnforce := scanOnce(t, repo, shipAt(store, enforceCenter, enforceLimits), enforceCenter)
+	if atEnforce.err != nil {
+		t.Fatalf("a green tree ships green at enforce: %v\n%s", atEnforce.err, atEnforce.notes)
+	}
+	enforceSum := atEnforce.summary(t)
+	if enforceSum["packages"] != "2" || enforceSum["skipped"] != "2" || enforceSum["stage"] != "enforce" {
+		t.Fatalf("enforce on an unchanged key skips all 2 packages, so 0 run; got %v", enforceSum)
+	}
+	for _, pkg := range []string{userPackage, xonlyPackage} {
+		if strings.Contains(atEnforce.scanLog, "ok  \t"+pkg+"\t") {
+			t.Errorf("%s must not run at enforce on an unchanged key\n%s", pkg, atEnforce.scanLog)
+		}
+	}
+}
+
+func TestVerdictStore_AtEnforceAStoredFloorRedRunsAgainAndFailsTheShip(t *testing.T) {
+	t.Parallel()
+	repo := shadowFixture(t)
+	switchOn(t, repo)
+	store := filepath.Join(t.TempDir(), shadowStoreDir)
+	if reds, err := floorPack(t, repo, store); err == nil || len(reds) == 0 {
+		t.Fatalf("the floor names the red; reds=%v err=%v", reds, err)
+	}
+
+	center := signalcenter.New()
+	run := scanOnce(t, repo, shipAt(store, center, enforceLimits), center)
+	if run.err == nil {
+		t.Fatalf("a package the floor found red runs again at enforce and fails the ship\n%s", run.scanLog)
+	}
+	if !strings.Contains(run.scanLog, userPackage) {
+		t.Fatalf("the red package runs again at enforce\n%s", run.scanLog)
+	}
+	if strings.Contains(run.scanLog, "ok  \t"+userPackage+"\t") {
+		t.Fatalf("the red package must not pass\n%s", run.scanLog)
+	}
+	if strings.Contains(run.scanLog, "ok  \t"+xonlyPackage+"\t") {
+		t.Fatalf("the green package of the same key is skipped\n%s", run.scanLog)
+	}
+	if sum := run.summary(t); sum["skipped"] != "1" || sum["packages"] != "2" {
+		t.Fatalf("one package skipped, the red one runs; got %v", sum)
+	}
+}
