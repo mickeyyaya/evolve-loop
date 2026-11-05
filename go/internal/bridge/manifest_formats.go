@@ -67,7 +67,7 @@ func validateFormats(cli string, m Manifest) error {
 		validateTranscript(cli, m.Transcript),
 		validateContextWindow(cli, m.ContextWindow),
 		validateCapabilities(cli, m.Capabilities),
-		validateHomeReads(cli, m.HomeReads),
+		validateHomeReads(cli, m.Binary, m.HomeReads),
 	)
 }
 
@@ -108,21 +108,21 @@ func validateCapabilities(cli string, capabilities []string) error {
 	return nil
 }
 
-func validateHomeReads(cli string, reads []string) error {
+func validateHomeReads(cli, binary string, reads []string) error {
 	for _, r := range reads {
 		rel, ok := strings.CutPrefix(r, "~/")
 		if !ok || path.Clean(rel) == "." || slices.Contains(strings.Split(rel, "/"), "..") {
 			return fmt.Errorf("bridge:manifest: home_reads entry %q for cli=%s must start with ~/, name a path below it and carry no .. segment", r, cli)
 		}
-		if secret, overlaps := secretOverlap(strings.ToLower(path.Clean(rel))); overlaps {
+		if secret, overlaps := secretOverlap(binary, strings.ToLower(path.Clean(rel))); overlaps {
 			return fmt.Errorf("bridge:manifest: home_reads entry %q for cli=%s overlaps the secret path ~/%s; the sandbox denies each secret before it grants a read", r, cli, secret)
 		}
 	}
 	return nil
 }
 
-func secretOverlap(rel string) (string, bool) {
-	for _, secret := range homeSecrets {
+func secretOverlap(binary, rel string) (string, bool) {
+	for _, secret := range secretsFor(binary) {
 		if rel == secret || strings.HasPrefix(rel, secret+"/") || strings.HasPrefix(secret, rel+"/") {
 			return secret, true
 		}

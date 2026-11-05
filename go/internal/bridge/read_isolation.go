@@ -27,7 +27,39 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-var homeSecrets = []string{".ssh", ".aws", ".gnupg", ".netrc", ".config/gh", ".docker/config.json", ".kube"}
+type homeSecret struct {
+	rel, owner string
+}
+
+var homeSecrets = []homeSecret{
+	{rel: ".ssh"},
+	{rel: ".aws"},
+	{rel: ".gnupg"},
+	{rel: ".netrc"},
+	{rel: ".config/gh"},
+	{rel: ".docker/config.json"},
+	{rel: ".kube"},
+	{rel: ".git-credentials"},
+	{rel: ".config/git/credentials"},
+	{rel: ".config/gcloud"},
+	{rel: ".azure"},
+	{rel: ".npmrc"},
+	{rel: ".pypirc"},
+	{rel: ".cargo/credentials.toml"},
+	{rel: ".codex/auth.json", owner: "codex"},
+	{rel: ".gemini/oauth_creds.json", owner: "agy"},
+	{rel: ".gemini/mcp-oauth-tokens.json", owner: "agy"},
+}
+
+func secretsFor(binary string) []string {
+	var out []string
+	for _, s := range homeSecrets {
+		if s.owner == "" || s.owner != binary {
+			out = append(out, s.rel)
+		}
+	}
+	return out
+}
 
 const (
 	logShowPath    = "/usr/bin/log"
@@ -61,7 +93,7 @@ func (deps Deps) readIsolation(req SandboxWrapRequest, home string) sandbox.Read
 	}
 	ri.Grants, ri.ReportOnly = deps.indexGrants(req, ri.RunsDir)
 	ri.RawFiles = rawFilesOf(ri.Workspace)
-	ri.SecretDirs, ri.SecretFiles = secretsOf(home)
+	ri.SecretDirs, ri.SecretFiles = secretsOf(home, manifestBinary(req.CLI))
 	ri.PinnedFiles = []string{filepath.Join(ri.Workspace, committedset.LanePinFile)}
 	return ri
 }
@@ -117,11 +149,11 @@ func rawFilesOf(workspace string) []string {
 	return out
 }
 
-func secretsOf(home string) (dirs, files []string) {
+func secretsOf(home, binary string) (dirs, files []string) {
 	if home == "" {
 		return nil, nil
 	}
-	for _, rel := range homeSecrets {
+	for _, rel := range secretsFor(binary) {
 		path := canonicalOrSelf(filepath.Join(home, rel))
 		info, err := os.Stat(path)
 		switch {
