@@ -22,6 +22,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inputindex"
 	"github.com/mickeyyaya/evolve-loop/go/internal/isolation"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
@@ -246,6 +247,8 @@ var agentContract = []contractRow{
 		script: func(h contractHost) string {
 			return "cat " + filepath.Join(filepath.Dir(h.otherCycle), "cycle-9", "audit-report.md")
 		}},
+	{action: "read the seat token holder", want: contractDeny,
+		script: func(h contractHost) string { return "cat " + paths.SeatTokenPath(h.home) }},
 	{action: "isolation N8: read ~/.ssh", want: contractDeny, isolation: "N8",
 		script: func(contractHost) string { return `cat "$HOME/.ssh/id_fixture"` }},
 	{action: "the Claude OAuth login reads its Keychain item through the security service", want: contractAllow,
@@ -491,6 +494,7 @@ func (h *contractHost) withIsolationFixtures(t *testing.T) {
 		filepath.Join(runs, "cycle-9", "lane-scope.json"):         `{"todo_ids":["item-b"]}`,
 		filepath.Join(h.run, "lane-scope.json"):                   `{"todo_ids":["item-a"]}`,
 		filepath.Join(h.home, ".ssh", "id_fixture"):               "fixture secret of the cell home\n",
+		paths.SeatTokenPath(h.home):                               "fixture-seat-token\n",
 	} {
 		if err := os.MkdirAll(filepath.Dir(rel), 0o755); err != nil {
 			t.Fatal(err)
