@@ -126,6 +126,7 @@ undiagnosable. Its blast radius is every later cycle.
 8. **A task that is blocked more than three times goes to a redesign.**
    - The operator rule (2026-11-05): "For those tasks been blocked over 3 times, we need to escalate it to redesign the solution from architecture perspective with ultrathink".
    - The operator rule (2026-11-05): "It should be part of escalation path when pipeline blocked due to continues failed/errors".
+   - The operator rule (2026-11-06): "once we failed to 4th review, it should trigger the redesign". No seat can waive it.
    - Past three blocks, the fix rounds stop. A redesign at the top tier finds what the findings share, and fixes that at its source.
    - It writes a new design card, and the same review reads it before the build.
    - Console proposals (ADR-0126, Proposed): the count crosses cycles and resumes, pipeline failures add to it, and a second count past three goes to the operator.

@@ -1,6 +1,6 @@
 # Research: why the Claude Code login fails every 8 to 24 hours on this host
 
-- **Status:** complete, 2026-11-05. The cause is a strong hypothesis. Section 6 states what is not proven.
+- **Status:** complete, 2026-11-05, with section 7 added on 2026-11-06. The cause is a strong hypothesis. Section 6 states what is not proven.
 - **Plan:** [seat-login-isolation-2026-11](../plans/seat-login-isolation-2026-11.md).
 - **Related:** [llm-isolation](../architecture/llm-isolation.md), and the inbox item `sandboxed-seats-cannot-save-a-refreshed-login`.
 - **Method:**
@@ -27,7 +27,8 @@
 - [4. Outside evidence](#4-outside-evidence)
 - [5. The onset](#5-the-onset)
 - [6. What is not proven](#6-what-is-not-proven)
-- [7. Sources](#7-sources)
+- [7. What the vendor's policy says](#7-what-the-vendors-policy-says)
+- [8. Sources](#8-sources)
 
 ## 1. Request
 
@@ -146,9 +147,40 @@ The answer: the failures rise sharply on 2026-11-02, and the sandbox alone does 
 
 **A test that this host can run.** The login of 07:12 UTC on 11-05 can fail near 15:12 UTC if the token lasts 8 hours and lanes are busy. A failure then agrees with this research. No failure does not refute it, because the reports describe failures on some refreshes and not on each one.
 
-## 7. Sources
+## 7. What the vendor's policy says
 
-- [Claude Code authentication](https://code.claude.com/docs/en/authentication)
+The operator asked on 2026-11-06 for the right way, based on the policy of the LLM CLI. I read the pages below on that day. This section reports what they say. It is not legal advice.
+
+**F7.1** The authentication page names the token for this case. It says "For CI pipelines, scripts, or other environments where interactive browser login isn't available". The token lasts one year, and it needs a Pro, Max, Ultra, Team or Enterprise plan.
+
+**F7.2** The token has limits. "It can only make model requests", so it has no Remote Control and no claude.ai connectors. Bare mode does not read it.
+
+**F7.3** The page documents one configuration directory for each login. `CLAUDE_CONFIG_DIR` moves `.credentials.json`, and it keys the macOS Keychain entry to that directory. So a seat directory is a documented form, not a trick.
+
+**F7.4** The legal page says OAuth "is designed to support ordinary use of Claude Code and other native Anthropic applications". It allows "an end user" to sign in "to the unmodified Claude Code binary with their own Claude subscription".
+
+**F7.5** The legal page refuses two forms that are not this case. A third party cannot offer Claude.ai login in its own application. A developer cannot route requests through plan credentials "on behalf of their users".
+
+**F7.6** The consumer terms refuse automated access, with an exception. The refusal covers "a bot, script, or otherwise". The exception is "via an Anthropic API Key or where we otherwise explicitly permit it". F7.1 is the nearest explicit permission that I found. No page says that F7.1 is that exception.
+
+**F7.7** The legal page says that advertised limits "assume ordinary, individual usage". No page sets a limit on seats or on hours. TechCrunch reported in July 2025 that weekly limits target use "continuously in the background, 24/7". That report is secondary and old.
+
+**F7.8** No page I read names Claude Code run by a user's own loop or scheduler, as allowed or as refused. This is the gap. Only Anthropic can close it.
+
+**F7.9** An API key is the one path with no doubt in the terms (F7.6). The headless page says that `--bare` "will become the default for `-p` in a future release". Bare mode reads no OAuth login. The seats of this loop use a tmux REPL today. A deep probe uses `-p`. So this is a future risk for that probe first.
+
+**Implication:** a `setup-token` token on the operator's own subscription, with the unmodified binary, is the documented path that fits best (F7.1, F7.3, F7.4). The doubt is F7.8 with F7.7: a fleet of seats is less clearly "ordinary, individual usage" than one script.
+
+## 8. Sources
+
+- [Claude Code legal and compliance](https://code.claude.com/docs/en/legal-and-compliance), read 2026-11-06, no date on the page
+- [Anthropic consumer terms](https://www.anthropic.com/legal/consumer-terms), read 2026-11-06, effective Oct 8, 2025
+- [Claude Code headless mode](https://code.claude.com/docs/en/headless), read 2026-11-06
+- [Use Claude Code with your plan](https://support.claude.com/en/articles/11145838-using-claude-code-with-your-pro-or-max-plan), read 2026-11-06
+- [The Register, 20 Feb 2026](https://www.theregister.com/software/2026/02/20/anthropic-clarifies-ban-on-third-party-tool-access-to-claude/5014546), secondary
+- [TechCrunch, 28 Jul 2025](https://techcrunch.com/2025/07/28/anthropic-unveils-new-rate-limits-to-curb-claude-code-power-users/), secondary, fetched 2026-11-06 by the docs review
+
+- [Claude Code authentication](https://code.claude.com/docs/en/authentication), read again 2026-11-06
 - [Claude Code changelog](https://code.claude.com/docs/en/changelog), read through 2.1.301 in full, older versions in part
 - [anthropics/claude-code #104359](https://github.com/anthropics/claude-code/issues/104359)
 - [anthropics/claude-code #94464](https://github.com/anthropics/claude-code/issues/94464)

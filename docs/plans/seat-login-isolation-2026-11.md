@@ -1,6 +1,6 @@
 # Plan: A seat cannot end the login of the operator
 
-- **Status:** proposed, 2026-11-05. The operator selects the design through Q1 and Q2. The ADR and the spec follow that decision.
+- **Status:** decided. The operator answered "C" on 2026-11-05 (Q2), and said "follow the research best option and start to build the code" on 2026-11-06 (Q1). The ADR and the spec follow.
 - **Research:** [claude-login-split-2026-11](../research/claude-login-split-2026-11.md).
 - **Related:** [llm-isolation](../architecture/llm-isolation.md), [operating-policy](../operations/operating-policy.md).
 
@@ -86,7 +86,7 @@ Basis of the scores:
 - **D:** this is the only design that meets the operator decision of 2026-11-03 as written, because a cell holds no credential. It adds a service that each seat depends on. It needs the same empty seat directory as C, because F4.2 reports a renewal with `ANTHROPIC_BASE_URL` too.
 - **E:** this costs the throughput that the wave exists for, and it does not remove the fault.
 
-**The choice is between C and D, and it waits for Q2.** A, B and E fail on the first criterion or on throughput. C leads D by 1 point of 35, and D leads if the exposure row counts twice, so the score does not decide. C costs less, and D meets the operator decision as written. Our proposal: C now, if the operator accepts a narrow token in the cell. Otherwise D.
+**The operator chose C (Q2).** A, B and E fail on the first criterion or on throughput. C leads D by 1 point of 35, and D leads if the exposure row counts twice, so the score does not decide. C costs less, and D meets the operator decision as written. Our proposal: C now, if the operator accepts a narrow token in the cell. Otherwise D.
 
 **What changes our mind:** L0 can show that the file does not move at a failure, which refutes the split. A live proof that a seat with an empty directory still changes the stored login also rules out C and D as written.
 
@@ -157,7 +157,7 @@ Each component has six rows: red proof, journey, preservation, wiring, mutation 
 
 | Id | Question | Our proposal |
 |---|---|---|
-| Q1 | Is a `setup-token` token right for unattended lanes on this subscription? The page names "CI pipelines, scripts". The research read no terms of service. | The operator confirms. This is not an engineering question. |
-| Q2 | On 2026-11-03 the operator told the console that no cell gets a credential, and that the pipeline holds it behind one source for each OS. The repo has no record of this. C breaks this as written, and D does not. Is a narrow token in the cell an accepted exception? | The operator decides. This question selects C or D. |
+| Q1 | Is a `setup-token` token right for unattended lanes on this subscription? | Decided on 2026-11-06. The operator said: "follow the research best option and start to build the code". Research F7 names the token on the operator's own subscription as the documented path that fits best. Limit: no page names a user's own loop or a fleet of seats (F7.8), and only Anthropic can close that gap. An API key stays the one path with no doubt in the terms (F7.6). |
+| Q2 | On 2026-11-03 the operator told the console that no cell gets a credential, and that the pipeline holds it behind one source for each OS. The repo has no record of this. C breaks this as written, and D does not. Is a narrow token in the cell an accepted exception? | Decided on 2026-11-05. The operator answered "C". So a narrow token in the cell is an accepted exception to that rule. |
 | Q3 | Do the stores hold different logins? | Answered on 2026-11-05 (F3.7): the Keychain holds a token, and the file holds an empty one. |
 | Q4 | Why the rise on 11-02, and what caused the console clusters of 10-17 to 10-20? | Open. The expiry in L0 is the first evidence. |

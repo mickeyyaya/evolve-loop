@@ -220,7 +220,7 @@ Each component has 100% coverage on each changed function, a red-first test and 
 
 | Id | Question | Our proposal |
 |---|---|---|
-| Q1 | The operator said "blocked over 3 times". ADR-0126 stops a loop at round 3. How do the two meet? | Closed in part. The operator ordered the path: the redesign is "part of escalation path". The reading of `J_0` to `J_3` as four blocks is a console proposal, open for the operator to confirm. [ADR-0126](../architecture/adr/0126-every-iterative-loop-converges-or-escalates.md) decisions 12 to 17 hold the path. |
+| Q1 | The operator said "blocked over 3 times". ADR-0126 stops a loop at round 3. How do the two meet? | Closed. The operator ruled on 2026-11-06: "once we failed to 4th review, it should trigger the redesign". [ADR-0126](../architecture/adr/0126-every-iterative-loop-converges-or-escalates.md) decisions 12 to 17 hold the path. |
 | Q2 | What does a logged-out claude pane print? | Capture one real output as a fixture before B10 is built. I did not find it in the files that I read. |
 | Q3 | Why did the 6 protected files of 2026-09-14 and 15 ship (F1.8)? | Check the 4 commits before B4 is closed. |
 | Q4 | Which code wrote `quota-pause` for the logout (F1.12)? | Trace it in the design check of B10. |
