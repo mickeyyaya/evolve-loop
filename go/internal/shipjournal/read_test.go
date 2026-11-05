@@ -57,3 +57,20 @@ func TestRead_AnAbsentJournalIsEmptyAndAnUnreadableOneIsAnError(t *testing.T) {
 		t.Fatalf("a directory is unreadable and names its path, got %v", err)
 	}
 }
+
+func TestJournal_HoldsItsPathAndALineErrorForEachMalformedLine(t *testing.T) {
+	t.Parallel()
+	path := writeJournal(t, "not json\n")
+	var got Journal
+	got, err := Read(path)
+	if err != nil {
+		t.Fatalf("Read = %v", err)
+	}
+	if got.Path != path || len(got.Malformed) != 1 {
+		t.Fatalf("journal = %+v, want its path and one malformed line", got)
+	}
+	var first LineError = got.Malformed[0]
+	if first.Line != 1 || first.Err == nil {
+		t.Errorf("line error = %+v, want line 1 with its error", first)
+	}
+}

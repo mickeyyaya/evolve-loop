@@ -40,7 +40,7 @@ func gateReplies(t *testing.T, run string) map[string]string {
 	}
 	return map[string]string{
 		"run.json": ciRunDoc(id, "completed", "failure"), "compare.json": ciCompareDoc, "runs.json": "[]",
-		"log.txt":   gateFixture(t, "run-"+run+"-subset.log"),
+		"log.txt":   gateFixture(t, "run-"+run+"-subset.txt"),
 		"jobs.json": gateFixture(t, "run-"+run+"-jobs.json"),
 	}
 }
