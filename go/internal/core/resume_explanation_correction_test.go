@@ -142,17 +142,10 @@ func TestReviewResumedDeliverable_LeakRecoveryFailureStopsBeforeReview(t *testin
 	reviewer := &recordingReviewer{default_: ReviewResult{Approve: true}}
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	o.reviewer = reviewer
-	_, err := o.reviewResumedDeliverable(
-		context.Background(), root, 9,
-		CycleState{
-			CycleID: 9, RunID: "run-9", ActiveWorktree: blockedWorktree,
-			WorkspacePath: t.TempDir(), ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
-		},
-		PhaseBuild, &fakeRunner{name: string(PhaseBuild)},
-		PhaseRequest{}, PhaseResponse{Phase: string(PhaseBuild), Verdict: VerdictPASS},
-		map[string]bool{"blocked-worktree": true},
-		(&cycleRun{}).countDispatch,
-	)
+	_, err := o.reviewResumedDeliverable(resumedDeliverable{ctx: context.Background(), projectRoot: root, cycle: 9, cs: CycleState{
+		CycleID: 9, RunID: "run-9", ActiveWorktree: blockedWorktree,
+		WorkspacePath: t.TempDir(), ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
+	}, phase: PhaseBuild, runner: &fakeRunner{name: string(PhaseBuild)}, req: PhaseRequest{}, resp: PhaseResponse{Phase: string(PhaseBuild), Verdict: VerdictPASS}, baseline: map[string]bool{"blocked-worktree": true}, count: (&cycleRun{}).countDispatch, predicates: predicateBase{}})
 	if err == nil || !strings.Contains(err.Error(), "worktree-leak recovery failed") {
 		t.Fatalf("resume accepted failed leak recovery: %v", err)
 	}
@@ -179,12 +172,7 @@ func TestReviewResumedDeliverable_LargeBuildUsesScaledCorrectionBudget(t *testin
 		CompletedPhases:                 []string{string(PhaseTriage)},
 		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
 	}
-	_, err := o.reviewResumedDeliverable(
-		context.Background(), t.TempDir(), 9, cs, PhaseBuild, builder,
-		PhaseRequest{Workspace: workspace},
-		PhaseResponse{Phase: string(PhaseBuild), Verdict: VerdictPASS}, nil,
-		(&cycleRun{}).countDispatch,
-	)
+	_, err := o.reviewResumedDeliverable(resumedDeliverable{ctx: context.Background(), projectRoot: t.TempDir(), cycle: 9, cs: cs, phase: PhaseBuild, runner: builder, req: PhaseRequest{Workspace: workspace}, resp: PhaseResponse{Phase: string(PhaseBuild), Verdict: VerdictPASS}, baseline: nil, count: (&cycleRun{}).countDispatch, predicates: predicateBase{}})
 	if err != nil {
 		t.Fatalf("scaled resumed correction rejected: %v", err)
 	}

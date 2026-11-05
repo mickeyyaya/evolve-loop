@@ -121,7 +121,7 @@ func floorResidualBlock(rr ReviewResult) (phasecontract.FailureBlock, bool) {
 	return fb, len(kept) > 0
 }
 
-func (cr *cycleRun) floorResidualAuditFix(dr *dispatchResult, rr ReviewResult, phaseErr error) (loopAction, bool) {
+func (cr *cycleRun) floorResidualAuditFix(dr *dispatchResult, rr ReviewResult, phaseErr error, refused blockerStatement) (loopAction, bool) {
 	fb, ok := floorResidualBlock(rr)
 	if !ok {
 		return loopAbort, false
@@ -135,6 +135,7 @@ func (cr *cycleRun) floorResidualAuditFix(dr *dispatchResult, rr ReviewResult, p
 		return loopBreak, true
 	case res.Handled && !res.Escalate:
 		fmt.Fprintf(cr.o.errOut(), "[orchestrator] cycle %d: audit_fix %s on the build floor residuals; the build is delivered\n", cr.cycle, res.Reason)
+		cr.sendLastRefusal(PhaseBuild, refused, blockerStatement.delivered)
 		return loopNext, true
 	}
 	return loopAbort, false

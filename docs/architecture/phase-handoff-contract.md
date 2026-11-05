@@ -215,7 +215,7 @@ No exit means "the request is wrong", and an agent claim alone must not stop a l
 
 An agent can name a blocker in its ledger. The exit decision accepts it only when the proof holds. A claim without proof is `unmet`.
 
-A `blocked` check at stage `enforce` uses the exit of [blocker-exit.md](blocker-exit.md). The reviewer returns the revision in `ReviewResult.ProvenBlocker`, and `provenBlocker` ends the cycle with the `BLOCKER_ROUTE` diagnostic. The route needs exactly one committed item. Without one, the correction rounds continue. A resumed cycle uses the same route: `reviewResumedDeliverable` returns the blocker, and the resume loop ends the cycle as `blocked-needs-console`. The worktree stays, so the salvage snapshot stays.
+A `blocked` check at stage `enforce` uses the exit of [blocker-exit.md](blocker-exit.md). The reviewer returns the revision in `ReviewResult.ProvenBlocker`, and `provenBlocker` ends the cycle with the `BLOCKER_ROUTE` diagnostic. The route needs exactly one committed item. Without one, the cycle ends with no correction round, as the outcome table of [blocker-exit.md](blocker-exit.md) states. A resumed cycle uses the same route: `reviewResumedDeliverable` returns the blocker, and the resume loop ends the cycle as `blocked-needs-console`. The worktree stays, so the salvage snapshot stays.
 
 The corrections can run out on a build without a proven blocker. Then the build entry of the C1 record is a FAIL with the `BUILD_DELIVERABLE_REJECTED` diagnostic. The classifier reads that entry, not the retro entry after it, so the failure charges the item (2026-10-21).
 

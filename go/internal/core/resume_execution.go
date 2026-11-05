@@ -10,6 +10,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
 type resumeExecution struct {
@@ -82,6 +83,7 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 	shipRecoveries := 0
 	dispatches := map[Phase]int{}
 	maxIterations := o.phaseIterationLimit()
+	entryBase := keptPredicateBase
 	for safety := 0; safety < maxIterations; safety++ {
 		next, err := cursor.next(o, cs, req.ProjectRoot)
 		if err != nil {
@@ -91,10 +93,10 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 			cursor.finish()
 			break
 		}
-		if next == PhaseBuild {
-			if err := sealBuildExplanationContext(req.ProjectRoot, cs); err != nil {
-				return result, fmt.Errorf("resume seal Build explanation context: %w", err)
-			}
+		predicates, err := sealResumedBuildEntry(next, req.ProjectRoot, cs, cycle, entryBase)
+		entryBase = sealedPredicateBase
+		if err != nil {
+			return result, err
 		}
 
 		runner, ok := o.runners[next]
@@ -179,7 +181,7 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 			return result, ferr
 		}
 		o.normalizeBuildWorktree(ctx, next, cs, req.ProjectRoot)
-		resp, err = o.reviewResumedDeliverable(ctx, req.ProjectRoot, cycle, cs, next, runner, phaseReq, resp, phaseBaseline, dispatch.countDispatch)
+		resp, err = o.reviewResumedDeliverable(resumedDeliverable{ctx: ctx, projectRoot: req.ProjectRoot, cycle: cycle, cs: cs, phase: next, runner: runner, req: phaseReq, resp: resp, baseline: phaseBaseline, count: dispatch.countDispatch, predicates: predicates})
 		var blocked resumedBlocker
 		if errors.As(err, &blocked) {
 			result, phaseTimings = dispatch.endResumeOnBlocker(next, &dispatchResult{resp: resp, attemptCount: attempts, phaseReq: phaseReq}, blocked.diag, result, phaseTimings, &cursor)
@@ -189,9 +191,8 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 			pauseOnQuotaWall()
 			return result, err
 		}
-		var rejected resumedRejection
-		if errors.As(err, &rejected) {
-			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, rejectedOutcome(phaseOutcomeFrom(next, resp, attempts, err.Error(), cs.PhaseStartedAt)))
+		if ending, ok := resumedEndOutcome(err, next, resp, attempts, cs.PhaseStartedAt); ok {
+			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, ending)
 			o.recordFailureLearning(ctx, failureLearningRequest{
 				CycleRequest: req, Cycle: cycle, Failed: next, Err: err, Attempt: max(attempts, 1),
 				State: &state, CycleState: &cs, Context: ctxSnap, Env: envSnap, Result: &result, Timings: &phaseTimings,
@@ -309,4 +310,30 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 	}
 
 	return result, nil
+}
+
+func sealResumedBuildEntry(next Phase, projectRoot string, cs CycleState, cycle int, base func(CycleState, int) (predicateBase, error)) (predicateBase, error) {
+	if next != PhaseBuild {
+		return predicateBase{}, nil
+	}
+	if err := sealBuildExplanationContext(projectRoot, cs); err != nil {
+		return predicateBase{}, fmt.Errorf("resume seal Build explanation context: %w", err)
+	}
+	predicates, err := base(cs, cycle)
+	if err != nil {
+		return predicateBase{}, fmt.Errorf("resume seal predicate base: %w", err)
+	}
+	return predicates, nil
+}
+
+func resumedEndOutcome(err error, next Phase, resp PhaseResponse, attempts int, startedAt string) (recovery.PhaseOutcome, bool) {
+	var ended blockerEnd
+	if errors.As(err, &ended) {
+		return endedBlockerOutcome(next, resp, attempts, ended, startedAt), true
+	}
+	var rejected resumedRejection
+	if errors.As(err, &rejected) {
+		return rejectedOutcome(phaseOutcomeFrom(next, resp, attempts, err.Error(), startedAt)), true
+	}
+	return recovery.PhaseOutcome{}, false
 }

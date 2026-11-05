@@ -30,7 +30,7 @@
 | Keep the work | worktree and salvage snapshot after the ending | kept |
 | Read coverage correctly | a percent below the floor that prints as the floor | never |
 
-The order is the order of the table. The second goal outranks the first: a doubtful claim keeps the rounds.
+The order is the order of the table. The second goal outranks the first: a refused claim keeps the rounds. A claim that the host cannot judge ends the cycle.
 
 ## 2. The claim grammar
 
@@ -113,19 +113,34 @@ Then each floor failure must be explained. The prover cuts a failure into items.
 4. Each item names at least one non-test `.go` file, and each such file is the path of a proven claim.
 5. The text before the first item names no other file.
 
-`BlockerProof.Blocked()` is true only when at least one claim is proven and no refusal exists. One refused claim, or one unexplained failure, keeps the rounds.
+`BlockerProof.Blocked()` is true only when at least one claim is proven and no refusal exists. One refused claim, or one unexplained failure, is `Refused`.
+
+`provenBlocker` returns one `BlockerOutcome`, and `blockerRoundsDecision` is the only place that decides what the outcome does:
+
+| Outcome | Meaning | The rounds |
+|---|---|---|
+| `NoClaim` | The report declares no blocker. | Continue as for any rejection. |
+| `Routable` | Proven, with exactly one committed item. | End, and route the item to the console. |
+| `Unroutable` | Proven, with no single item to route. | End with no re-dispatch. |
+| `Incomplete` | The predicate base is missing or corrupt. | End with no re-dispatch. |
+| `Refused` | The claim is false, and the lane can act. | Continue, with the refusal in each directive. |
+
+Only `Refused` sends a correction with a claim on it. A directive that names a protected file cannot follow any other outcome.
 
 ```text
-rejection ──► claims in verdict? ──no──► correction round
+rejection ──► claims in verdict? ──no──► NoClaim ──► correction round
                    │yes
                    ▼
-            prove each claim ──any refusal──► signal ORCHESTRATOR_BLOCKER_REFUSED ──► correction round
+            predicate base readable? ──no──► Incomplete ──► cycle ends, no charge
+                   │yes
+                   ▼
+            prove each claim ──any refusal──► Refused ──► signal ORCHESTRATOR_BLOCKER_REFUSED ──► correction round
                    │all proven
                    ▼
-            one committed item? ──no──► signal ORCHESTRATOR_BLOCKER_REFUSED ──► correction round
+            one committed item? ──no──► Unroutable ──► signal ORCHESTRATOR_BLOCKER_REFUSED ──► cycle ends
                    │yes
                    ▼
-            ending: blocked-needs-console
+            Routable ──► ending: blocked-needs-console
 ```
 
 ## 4. The loop exit

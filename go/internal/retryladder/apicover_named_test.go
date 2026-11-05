@@ -14,7 +14,6 @@ func TestExportsAreNamed(t *testing.T) {
 		QuotaBench:         true,
 		TeardownError:      false,
 		AuditClass:         "code-build-fail",
-		ProvenBlocker:      false,
 		LaneScope:          []string{"go/internal/foo"},
 		Floors:             []retryladder.FloorFailure{{Path: "go/internal/foo/a.go", Protected: false}},
 		DeliverableMissing: false,

@@ -32,6 +32,10 @@ func (o *Orchestrator) reviewInputFor(cs CycleState, phase Phase, projectRoot st
 }
 
 func (cr *cycleRun) rejectAfterCorrections(next Phase, dr *dispatchResult, rr ReviewResult, corrections int) (loopAction, error) {
+	return cr.rejectRefused(next, dr, rr, corrections, blockerStatement{})
+}
+
+func (cr *cycleRun) rejectRefused(next Phase, dr *dispatchResult, rr ReviewResult, corrections int, refused blockerStatement) (loopAction, error) {
 	phaseErr := fmt.Errorf("review gate: phase %q deliverable rejected after %d correction(s): %s", next, corrections, rr.Reason)
 	if corrections == 0 {
 		phaseErr = fmt.Errorf("review gate: phase %q deliverable rejected: %s", next, rr.Reason)
@@ -42,10 +46,11 @@ func (cr *cycleRun) rejectAfterCorrections(next Phase, dr *dispatchResult, rr Re
 		return loopNext, nil
 	}
 	if next == PhaseBuild {
-		if act, handled := cr.floorResidualAuditFix(dr, rr, phaseErr); handled {
+		if act, handled := cr.floorResidualAuditFix(dr, rr, phaseErr, refused); handled {
 			return act, nil
 		}
 	}
+	cr.sendLastRefusal(next, refused, blockerStatement.lastRound)
 	cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, rejectedOutcome(phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error(), cr.cs.PhaseStartedAt)))
 	cr.recordFailureLearning(next, phaseErr, max(corrections, 1))
 	return loopAbort, wrapCycleLevelError(next, phaseErr)

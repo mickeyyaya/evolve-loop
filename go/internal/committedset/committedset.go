@@ -16,14 +16,27 @@ const LanePinFile = "lane-scope.json"
 const DecisionFile = "triage-decision.json"
 
 func Committed(workspace string) ([]string, bool) {
+	ids, source := CommittedWithSource(workspace)
+	return ids, source != SourceUnknown
+}
+
+type Source string
+
+const (
+	SourcePin      Source = "pin"
+	SourceDecision Source = "decision"
+	SourceUnknown  Source = "unknown"
+)
+
+func CommittedWithSource(workspace string) ([]string, Source) {
 	pin := LanePin(workspace)
 	topN, decided := DecisionTopN(workspace)
 	if len(pin) == 0 && !decided {
-		return nil, false
+		return nil, SourceUnknown
 	}
-	ids := pin
+	ids, source := pin, SourcePin
 	if len(ids) == 0 {
-		ids = topN
+		ids, source = topN, SourceDecision
 	}
 	deferred := Deferred(workspace)
 	out := make([]string, 0, len(ids))
@@ -32,7 +45,7 @@ func Committed(workspace string) ([]string, bool) {
 			out = append(out, id)
 		}
 	}
-	return out, true
+	return out, source
 }
 
 type LanePinDoc struct {
