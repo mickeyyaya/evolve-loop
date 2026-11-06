@@ -20,16 +20,18 @@ This digest has the facts that each agent must have when it starts. The full rul
 <!-- GENERATED:guidance-l0 BEGIN from guidance/rules by `evolve guidance build`; edit the registry, not this region -->
 ### Hard rules
 
+- Top law: a self-healing, AI-driven loop that relentlessly builds the best-quality features, and fixes any issue with logic, research and the best practical option.
+- Serve the top law, not a local metric. Finish inside each gate and limit, and report a conflict with the law.
 - Never mutate or run a live kill guard. Inject the signal sender, so that a test cannot kill a real process.
 - Never kill processes by a command pattern on the shared host. Kill only the process ids that you started.
-- No LLM starts or directs another LLM. A phase agent starts only through the native bridge of the pipeline. (enforced by `go/internal/guards/phase.go`)
+- No LLM in the pipeline starts or directs another. The console acts for the operator, and runs a seat only through evolve agent run. (enforced by `go/internal/guards/phase.go`)
 - Run the phases in the order Scout, Build, Audit, Ship. Never skip a phase, and never ignore a kernel-gate failure. (enforced by `go/internal/core/statemachine.go`)
 - Commit and push only through evolve ship. The ship gate denies a bare git commit and a bare git push. (enforced by `go/internal/guards/ship.go`)
 - The builder writes only inside the worktree that the runtime provisions. An agent never runs git worktree. (enforced by `go/internal/guards/role.go`)
 - Ship only when the EGPS verdict has a red count of zero. Never edit the hash-chained ledger by hand.
 - Never fabricate a cycle number, a test count or a verdict. Report only what a command printed.
 - Do all development on a branch in a worktree, never on main. Main is the integration branch only.
-- MANDATORY: code has no comments and no Go doc comments. Never write, ask for or test a comment. A reason goes to the package note. (enforced by `go/internal/commitgate/comments_added.go`)
+- MANDATORY: code has no comments, except tool-read lines and the one package doc that docgo requires. A reason goes to the package note. (enforced by `go/internal/commitgate/comments_added.go`)
 - Write each document through the docs-write skill. The new text passes evolve docs ste-lint --strict. (enforced by `go/internal/stelint`)
 - Reach each outside service through a CLI, never through MCP. Build a CLI when a service has none.
 - Put research, lessons and failed approaches under docs/. Never delete a document; archive it.

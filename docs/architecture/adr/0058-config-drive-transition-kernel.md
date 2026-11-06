@@ -1,5 +1,7 @@
 # ADR-0058: Config-drive the orchestrator transition kernel (verdict branch + phase-identity overrides)
 
+> **Note (2026-11-06, [ADR-0164](0164-all-decisions-serve-one-goal-and-one-amendment-resolves-their-conflicts.md)):** ADR-0060 supersedes sections 1 and 8 of this record.
+
 Status: Accepted
 Date: 2026-06-21
 Extends: ADR-0035 (unified phase descriptor), ADR-0038 (phase plugin system); realizes the governing phase-agnostic-flow law.

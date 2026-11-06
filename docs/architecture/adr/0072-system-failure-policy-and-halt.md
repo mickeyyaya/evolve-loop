@@ -1,5 +1,7 @@
 # ADR-0072 — System-Failure Policy: classify, justify, and halt-and-diagnose instead of retrying the pipeline
 
+> **Note (2026-11-06, [ADR-0164](0164-all-decisions-serve-one-goal-and-one-amendment-resolves-their-conflicts.md)):** ADR-0164 decision 9 proposes that the orchestrator writes a proposal and Go checks it. The operator-chosen model below stays in force until the operator confirms that. Decision 13 proposes that a halt names its cause and the condition to resume.
+
 - **Status:** Accepted (2026-07-17)
 - **Supersedes/refines:** the standing rule `never_stop_queue_inject_inbox` (adds a bounded exception for system-level failures); complements ADR-0064 (pipeline-integrity boundary), ADR-0070 (signal-center exhaustion), the `failureadapter` kernel.
 - **Deciders:** operator + session (post-mortem of the cycle 862→899 false-FAIL storm).

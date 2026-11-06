@@ -2,7 +2,7 @@
 id: docs-through-docs-write
 statement: "Write each document through the docs-write skill. The new text passes evolve docs ste-lint --strict."
 layer: L0
-order: 11
+order: 13
 audience: [all]
 enforced_by: [go/internal/stelint]
 source: "AGENTS.md invariant 11; memory feedback_docs_follow_docs_conventions, feedback_docs_write_skill_and_three_approaches and feedback_ste100_docs_and_replies"

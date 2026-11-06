@@ -2,7 +2,7 @@
 id: one-home-no-duplicates
 statement: "Never duplicate logic, settings or prose. Keep each in one home, and generate each copy from it."
 layer: L0
-order: 20
+order: 22
 audience: [all]
 enforced_by: []
 source: "memory feedback_never_duplicate_centralize_via_design_patterns"

@@ -2,7 +2,7 @@
 id: no-broad-pkill
 statement: "Never kill processes by a command pattern on the shared host. Kill only the process ids that you started."
 layer: L0
-order: 2
+order: 4
 audience: [all]
 enforced_by: []
 source: "memory feedback_no_broad_pkill_shared_host"

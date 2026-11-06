@@ -2,7 +2,7 @@
 id: cli-only-no-mcp
 statement: "Reach each outside service through a CLI, never through MCP. Build a CLI when a service has none."
 layer: L0
-order: 12
+order: 14
 audience: [all]
 enforced_by: []
 source: "AGENTS.md invariant 12; memory feedback_no_mcp_cli_only"

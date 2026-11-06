@@ -1,5 +1,7 @@
 # ADR-0080: Runtime/Console plane separation — the loop owns its checkout
 
+> **Note (2026-11-06, [ADR-0164](0164-all-decisions-serve-one-goal-and-one-amendment-resolves-their-conflicts.md)):** The hub on the host is `.repo.git`, under the project folder. The paths here are the first layout.
+
 - **Status**: Accepted — S1 executed 2026-07-28 (loop live from the runtime plane); S2-S4 landed the same day
 - **Implementation notes (deviations from the proposal, stated per Core Rule 3)**:
   - The bare-hub conversion is DEFERRED to a quiet window: the primary checkout stays the object host and console plane. Same-branch enforcement is preserved, inverted — the RUNTIME worktree holds `main`, the console parks on `console-plane` + feature branches, so git itself still refuses a console checkout of `main`. Functionally identical isolation; zero migration risk against 200+ registered historical lane worktrees.

@@ -3,7 +3,7 @@
 > [ADR-0147](adr/0147-the-wave-orchestrator-owns-integration-and-decides-when-the-wave-reaches-main.md) · plan: [wave-integration-2026-10 §11](../plans/wave-integration-2026-10.md#11-amendment-of-2026-11-05-the-lane-side-gets-a-driver-i14) · research: [wave-integration-2026-10](../research/wave-integration-2026-10.md).
 > **Status:** Proposed (2026-11-05), a console proposal. The operator has not ruled on it.
 >
-> PR (b), the shadow scope, is built on the branch `feat/integration-driver-shadow`.
+> PR (b), the shadow scope, landed as #1321 (`6ae4972c3`).
 > The redesign card of PR (a) changed the entries below, and the text states each change.
 > This file is the spec for the component I14, the integration driver, in its shadow scope. The package note [internal-integration](packages/internal-integration.md) holds the engine that the driver calls. Enforce is a later scope with its own card (§9).
 >

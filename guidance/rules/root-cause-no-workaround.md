@@ -2,7 +2,7 @@
 id: root-cause-no-workaround
 statement: "Fix the root cause through a redesign. Never apply a workaround that hides a failure."
 layer: L0
-order: 19
+order: 21
 audience: [all]
 enforced_by: []
 source: "memory feedback_no_workaround_root_cause_redesign"

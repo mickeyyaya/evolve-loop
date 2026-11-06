@@ -1,5 +1,7 @@
 # ADR-0025: Deterministic ACS suite-runner + standing red-team predicates
 
+> **Note (2026-11-06, [ADR-0164](0164-all-decisions-serve-one-goal-and-one-amendment-resolves-their-conflicts.md)):** A script path named here is absent at main. Read that path as history. The decision stays as its status says.
+
 > Status: **Accepted** (2026-05-27). Restores the host-side EGPS predicate-suite runner that v12's
 > flag-day deleted without a Go port, and adds a standing `acs/red-team/` suite that encodes past
 > gaming incidents as live predicates. Companion to `skills/adversarial-testing/SKILL.md` (Google

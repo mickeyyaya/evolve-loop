@@ -2,7 +2,7 @@
 id: dev-on-branches
 statement: "Do all development on a branch in a worktree, never on main. Main is the integration branch only."
 layer: L0
-order: 9
+order: 11
 audience: [all]
 enforced_by: []
 source: "memory feedback_dev_on_branches_never_main"
