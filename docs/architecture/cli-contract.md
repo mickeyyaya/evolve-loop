@@ -191,7 +191,6 @@ The column "Agent" of §5 gives the class of each core verb. These verbs are out
 | `doctor probe` | A | It finds one tool on `PATH` and reads its version. An LLM binary as the tool hits the exec deny of the cell (I-3). The full `doctor` stays `D` (F13). |
 | `auth store-times` | A | It prints the time of the credentials file and of the Keychain item of the Claude Code login. It only stats the file and reads no credential (seat-login-isolation L0). |
 | `release-preflight`, `release-consistency` | A | The merge gate runs these read-only verifiers (F14). |
-| `integration status` | A | It reads the wave records, the deliverable records and the cycle range of a pool, and it writes nothing. It prints the clean-wave verdict of the integration driver ([integration-driver.md](integration-driver.md) §7). |
 
 #### Findings
 
@@ -411,7 +410,8 @@ Limits:
 |---|---|---|---|---|---|---|
 | `status` | always | A | yes | yes | `evolve.status/1` | one report of loop, cycles, PRs and CI |
 | `loop status` | always | A | yes | yes | `evolve.loop.status/1` | fix §8 first |
-| `wave status` | always | A | yes | yes | `evolve.wave.status/1` | |
+| `wave status` | always | A | yes | yes | `evolve.wave.status/1` | `data.project_root` names the root that the verb read. An absent root or an absent `.evolve` exits 2 |
+| `integration status` | always | A | yes | yes | `evolve.integration.status/1` | the flag follows the sub-verb. Only this sub-verb of `integration` reads it, because the others write. An absent root exits 2. A root with no `.evolve` exits 1. `data.project_root` names the root that the verb read |
 | `wave supply` | always | A | yes | yes | `evolve.wave.supply/1` | |
 | `wave watch` | always | A | yes | yes | `evolve.wave.watch/1` | a stream; it waits on the `loop` and `cycle` channels and reads again every 5 s at most (E9) |
 | `inbox list`, `show`, `rank`, `lint`, `batches` | always | A | yes | yes | `evolve.inbox.<verb>/1` | `evolve inbox` takes `--project-root` for each verb (F4.8) |

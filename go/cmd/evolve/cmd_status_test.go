@@ -33,26 +33,6 @@ func TestPRCheckState_ClassifiesTheRollup(t *testing.T) {
 	}
 }
 
-func TestStatusSnapshotReadable_RefusesAMissingOrNonDirectoryEvolveDir(t *testing.T) {
-	t.Parallel()
-	ok := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(ok, ".evolve"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	notDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(notDir, ".evolve"), []byte("x"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := statusSnapshotReadable(ok); err != nil {
-		t.Errorf("a project with .evolve/ must be readable: %v", err)
-	}
-	for _, root := range []string{filepath.Join(t.TempDir(), "missing"), notDir} {
-		if err := statusSnapshotReadable(root); err == nil {
-			t.Errorf("%s must be unreadable", root)
-		}
-	}
-}
-
 func TestWaitForIdleLoop_PrintsTheRunPhaseOnlyWhenItChanges(t *testing.T) {
 	t.Parallel()
 	runs := t.TempDir()

@@ -535,7 +535,7 @@ func TestWaveStatus_TextAndNoRecord(t *testing.T) {
 	p.seedWave81()
 	full := h.run("status", "--project-root", p.root)
 
-	if empty != 0 || emptyOut != "wave: no wave is recorded\n" {
+	if empty != 0 || emptyOut != "wave: no wave is recorded under "+p.root+"\n" {
 		t.Errorf("no record: rc = %d stdout %q", empty, emptyOut)
 	}
 	for _, want := range []string{"wave:    81 run 20261008T080000Z", "loop:    live=false pid=0 alive=false", "cycle 1835: verdict WARN, shipped", "cycle 1836: phase scout"} {
