@@ -27,7 +27,7 @@ table{border-collapse:collapse;width:100%;font-size:.88em}td,th{border:1px solid
 <p class="meta">The measurement-first campaign: know what every phase of every loop spends before optimizing any of it.</p>
 
 <h2>How it works today</h2>
-<p>Every LLM launch flows through one chokepoint — <code>Engine.Launch</code> in <code>go/internal/bridge/engine.go</code> — where a <b>token resolver</b> extracts usage (input, output, cache-read, cache-write) from the driver transcript and appends a per-attempt record to <code>llm-calls.ndjson</code> in the cycle&rsquo;s run dir:</p>
+<p>Every LLM launch flows through one chokepoint — <code>Engine.Launch</code> in <code>go/internal/bridge</code> — where a <b>token resolver</b> extracts usage (input, output, cache-read, cache-write) from the driver transcript and appends a per-attempt record to <code>llm-calls.ndjson</code> in the cycle&rsquo;s run dir:</p>
 <div class="flow">
 <div class="node"><b>tmux transcript</b><small>claude/codex/agy session</small></div><div class="arrow">→</div>
 <div class="node"><b>TokenResolver</b><small>engine.go Launch hook</small></div><div class="arrow">→</div>
@@ -35,7 +35,7 @@ table{border-collapse:collapse;width:100%;font-size:.88em}td,th{border:1px solid
 <div class="node"><b>rollups</b><small>dossier · cache-hit ratio</small></div><div class="arrow">→</div>
 <div class="node"><b>evolve tokens report</b><small>per-phase totals</small></div>
 </div>
-<p>The canonical counts type is <code>cyclestate.TokenUsage</code>, wire-pinned by test so no writer can drift. Provenance rides every record (which transcript, which resolver), so the report can say <em>source=transcript</em> rather than guessed. Slices S1–S8 built this chain: transcript scanner → fidelity parsing → launch instrumentation → terminal projection → advisor/swarm attribution → dossier rollups → the report CLI → fleet-level shadow join.</p>
+<p>The canonical counts type is <code>cyclestate.TokenUsage</code>, wire-pinned by test so no writer can drift. Provenance rides every record (which transcript, which resolver), so the report can say <em>source=transcript</em> rather than guessed. Slices S1–S8 built this chain: transcript scanner → fidelity parsing → launch instrumentation → terminal projection → advisor/swarm attribution → dossier rollups → the report CLI → fleet-level shadow join. The per-attempt file name is the constant <code>Filename</code> in <code>go/internal/llmcalls/record.go</code>, and <code>go/internal/cyclespend</code> sums the spend of one cycle from it. The report verb lives in <code>go/cmd/evolve/cmd_tokens.go</code>.</p>
 
 <h2>How it got built — and the outage that almost hid it</h2>
 <table>
