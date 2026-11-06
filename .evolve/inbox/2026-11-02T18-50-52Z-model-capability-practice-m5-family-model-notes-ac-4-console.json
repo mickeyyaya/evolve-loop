@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Audit H1: every skill that the kernel preloads for a family dispatch is a protected surface; add `skills/model-notes-claude` and `skills/model-notes-agy` to the protected-surface manifest, route the family notes through `compiledDefaultOverlays` with the `Families` selector so the audit-F1 guard test covers them, and extend that guard test to the output of `ResolveOverlays`"
+  ],
+  "created_at": "2026-11-02T18:50:52Z",
+  "files": [
+    "go/internal/guards/integrity_surface.go",
+    "go/internal/guards/integrity_surface_overlay_skills_test.go"
+  ],
+  "fix": "Make the change that AC 4 needs on the protected path(s) go/internal/guards/integrity_surface.go, go/internal/guards/integrity_surface_overlay_skills_test.go, then prove the criterion with a test.",
+  "id": "model-capability-practice-m5-family-model-notes-ac-4-console",
+  "kind": "feature",
+  "origin": "cycle",
+  "priority_class": "performance",
+  "route": "console-manual",
+  "source": "cycle 2116, tdd test-report.md AC 4 (console-followup)",
+  "summary": "The TDD phase of cycle 2116 gave AC 4 of model-capability-practice-m5-family-model-notes the console-followup disposition. A lane builder can never change the paths it needs (go/internal/guards/integrity_surface.go, go/internal/guards/integrity_surface_overlay_skills_test.go). The lane part ships without it, so the console owns this part.",
+  "title": "Console part of model-capability-practice-m5-family-model-notes: AC 4, which needs a protected path changed",
+  "weight": 0.3
+}

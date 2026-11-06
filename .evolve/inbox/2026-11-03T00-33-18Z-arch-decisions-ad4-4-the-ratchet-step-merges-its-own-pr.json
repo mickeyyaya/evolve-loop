@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "Red test first: (1) Green: merge called, then regenerate. (2) Scan red: no merge, a WARN, tip replaced. (3) CI not green: no merge. (4) `shadow`: a \"would merge\" line and no merge call. (5) A fork PR is never merged..",
+    "100% statement coverage on each changed function; zero code comments.",
+    "The spec and package note of the changed package state the change in STE."
+  ],
+  "campaign": "architecture-decisions-2026-11",
+  "created_at": "2026-11-03T00:33:18Z",
+  "files": [
+    "go/cmd/evolve/cmd_boundary_ratchet.go",
+    "go/internal/policy"
+  ],
+  "fix": "The ratchet step merges its own PR when three gates pass. CI is green on the head. The base is an ancestor of `origin/main`. Both scans are clean. The step skips an unchanged force-push. The stage key is `boundary.ratchet_merge.stage`.",
+  "id": "arch-decisions-ad4-4-the-ratchet-step-merges-its-own-pr",
+  "intake_override": {
+    "reason": "console: boundary and policy",
+    "console_route": true
+  },
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "route": "console-manual",
+  "source": "operator decisions 2026-11-03; plan docs/plans/architecture-decisions-2026-11.md component AD4-4",
+  "summary": "Component AD4-4 of the 2026-11-03 architecture decisions plan. The ratchet step merges its own PR when three gates pass. CI is green on the head. The base is an ancestor of `origin/main`. Both scans are clean. The step skips an unchanged force-push. The stage key is `boundary.ratchet_merge.stage`. Stage: `shadow`, then `enforce` after 3 clean boundaries. Size: M. Route: console: boundary and policy. Plan: docs/plans/architecture-decisions-2026-11.md; research: docs/research/architecture-decisions-2026-11.md.",
+  "title": "AD4-4: The ratchet step merges its own PR when three gates pass",
+  "weight": 0.8
+}

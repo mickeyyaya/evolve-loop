@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "a version bump within one lineage makes no classifier call",
+    "a new lineage still calls the classifier",
+    "100% coverage on changed functions"
+  ],
+  "campaign": "docs/plans/model-currency-2026-10",
+  "created_at": "2026-11-02T19:17:44Z",
+  "deps": [],
+  "files": [
+    "go/internal/modelcatalog"
+  ],
+  "fix": "Key the classifier result by model lineage, so a new version of a known lineage reuses the prior tier pick, as plan C2 describes.",
+  "id": "model-currency-c2-lineage-keyed-reuse",
+  "kind": "feature",
+  "notes": "",
+  "origin": "console",
+  "priority_class": "performance",
+  "source": "console, 2026-11-03, plan audit of docs/plans (operator request: no task overlooked); plan docs/plans/model-currency-2026-10.md",
+  "summary": "The plan says C2 is not built; the C3 flip landed first, so each version bump still calls the classifier.",
+  "title": "Model currency C2: reuse the classifier result across a version bump of one lineage",
+  "weight": 0.45
+}

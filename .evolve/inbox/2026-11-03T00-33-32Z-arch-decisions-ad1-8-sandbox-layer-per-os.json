@@ -1,0 +1,30 @@
+{
+  "acceptance": [
+    "Red test first: Linux contract row for N8b and N8c.",
+    "100% statement coverage on each changed function; zero code comments.",
+    "The spec and package note of the changed package state the change in STE."
+  ],
+  "campaign": "architecture-decisions-2026-11",
+  "created_at": "2026-11-03T00:33:32Z",
+  "files": [
+    "go/internal/adapters/sandbox/read_isolation.go",
+    "docs/research"
+  ],
+  "fix": "Sandbox layer per OS. Write the AD1-3 tool view into the `bwrap` path (`BwrapPrefix`). State the Windows gap",
+  "id": "arch-decisions-ad1-8-sandbox-layer-per-os",
+  "intake_override": {
+    "reason": "console; a separate component of docs/plans/architecture-decisions-2026-11.md with its own files, test and stage; the overlap is the shared plan text",
+    "overlaps": [
+      "arch-decisions-ad1-5-a-separate-stage-for-the-secret",
+      "arch-decisions-ad1-7-the-credentialsource-interface-and"
+    ]
+  },
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "security",
+  "route": "console-manual",
+  "source": "operator decisions 2026-11-03; plan docs/plans/architecture-decisions-2026-11.md component AD1-8",
+  "summary": "Component AD1-8 of the 2026-11-03 architecture decisions plan. Sandbox layer per OS. Write the AD1-3 tool view into the `bwrap` path (`BwrapPrefix`). State the Windows gap Stage: none. Size: S. Route: console. Plan: docs/plans/architecture-decisions-2026-11.md; research: docs/research/architecture-decisions-2026-11.md.",
+  "title": "AD1-8: Sandbox layer per OS",
+  "weight": 0.8
+}

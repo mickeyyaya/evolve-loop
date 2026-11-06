@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "Red test first: `TestIsolateHostCredentials_ARealGhInATestSeesNoLogin`.",
+    "100% statement coverage on each changed function; zero code comments.",
+    "The spec and package note of the changed package state the change in STE."
+  ],
+  "campaign": "architecture-decisions-2026-11",
+  "created_at": "2026-11-03T00:33:09Z",
+  "files": [
+    "go/internal/gittest",
+    "go/cmd/evolve/main_test.go"
+  ],
+  "fix": "A hermetic helper `gittest.IsolateHostCredentials()` that sets the same values. Use it in each `TestMain` that runs git or gh. Replace the 15 hand-written `GIT_CONFIG_GLOBAL=/dev/null` lines",
+  "id": "arch-decisions-ad1-4-a-hermetic-helper-gittest",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "security",
+  "source": "operator decisions 2026-11-03; plan docs/plans/architecture-decisions-2026-11.md component AD1-4",
+  "summary": "Component AD1-4 of the 2026-11-03 architecture decisions plan. A hermetic helper `gittest.IsolateHostCredentials()` that sets the same values. Use it in each `TestMain` that runs git or gh. Replace the 15 hand-written `GIT_CONFIG_GLOBAL=/dev/null` lines Stage: none. Size: S to M. Route: lane: mechanical, test files only. The console checks that no protected file is in the list. Plan: docs/plans/architecture-decisions-2026-11.md; research: docs/research/architecture-decisions-2026-11.md.",
+  "title": "AD1-4: A hermetic helper gittest.IsolateHostCredentials() that sets the same values",
+  "weight": 0.8
+}
