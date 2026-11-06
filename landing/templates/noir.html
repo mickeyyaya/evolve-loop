@@ -13,7 +13,7 @@
 <style>
   :root{
     --bg:#09090a; --surface:#141416; --raised:#1c1c20;
-    --ink:#f4f4f5; --muted:#9a9aa2; --faint:#65656d;
+    --ink:#f4f4f5; --muted:#9a9aa2; --faint:#8e8e97;
     --line:rgba(255,255,255,.09); --line-strong:rgba(255,255,255,.16);
     --accent:#ff6a5f; --accent-ink:#ff8b82; --accent-soft:rgba(255,106,95,.13);
     --ok:#46d39a;
@@ -181,7 +181,7 @@
       <p class="sub" data-reveal data-d="1">{{.Site.Hero.Subhead}}</p>
       <div class="ctas" data-reveal data-d="2">
         <div class="install">
-          <code><span class="pfx">$</span>{{.Site.Hero.CTAPrimary.Command}}</code>
+          <code tabindex="0"><span class="pfx">$</span>{{.Site.Hero.CTAPrimary.Command}}</code>
           <button class="copy" data-copy="{{.Site.Hero.CTAPrimary.Command}}">Copy</button>
         </div>
         <a class="ghost" href="{{.Site.Hero.CTASecondary.Href}}">{{.Site.Hero.CTASecondary.Label}} →</a>
@@ -270,7 +270,7 @@
     <h2 class="serif" data-reveal>{{.Site.FinalCTA.Heading}}</h2>
     <p class="sub" data-reveal data-d="1">{{.Site.FinalCTA.Subhead}}</p>
     <div class="ctas" data-reveal data-d="2">
-      <div class="install"><code><span class="pfx">$</span>{{.Site.FinalCTA.Primary.Command}}</code><button class="copy" data-copy="{{.Site.FinalCTA.Primary.Command}}">Copy</button></div>
+      <div class="install"><code tabindex="0"><span class="pfx">$</span>{{.Site.FinalCTA.Primary.Command}}</code><button class="copy" data-copy="{{.Site.FinalCTA.Primary.Command}}">Copy</button></div>
       <a class="ghost" href="{{.Site.FinalCTA.Secondary.Href}}">{{.Site.FinalCTA.Secondary.Label}} →</a>
     </div>
   </div>

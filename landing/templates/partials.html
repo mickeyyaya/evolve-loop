@@ -1177,8 +1177,8 @@
   .gtl-row:last-child{border-bottom:0}
   .gtl-sw{flex:0 0 auto;width:38px;height:22px;border-radius:999px;border:1px solid var(--g-line2);background:transparent;position:relative;cursor:pointer;transition:background .25s,border-color .25s;padding:0}
   .gtl-sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--g-mut);transition:transform .25s,background .25s}
-  .gtl-sw[aria-pressed="true"]{background:var(--g-ok-soft);border-color:var(--g-ok)}
-  .gtl-sw[aria-pressed="true"]::after{transform:translateX(16px);background:var(--g-ok)}
+  .gtl-sw[aria-checked="true"]{background:var(--g-ok-soft);border-color:var(--g-ok)}
+  .gtl-sw[aria-checked="true"]::after{transform:translateX(16px);background:var(--g-ok)}
   .gtl-lbl{min-width:0}
   .gtl-lbl b{display:block;font-size:.82rem;font-weight:600;color:var(--g-ink);line-height:1.25}
   .gtl-lbl span{display:block;font-family:var(--g-mono);font-size:.6rem;color:var(--g-mut);margin-top:2px}
@@ -1206,7 +1206,7 @@
     <div class="gtl-checks">
       {{range .Site.GateLab.Checks}}
       <div class="gtl-row">
-        <button class="gtl-sw" type="button" role="switch" aria-pressed="{{if .On}}true{{else}}false{{end}}" data-key="{{.Key}}" data-role="{{.Role}}" aria-label="{{.Label}}"></button>
+        <button class="gtl-sw" type="button" role="switch" aria-checked="{{if .On}}true{{else}}false{{end}}" data-key="{{.Key}}" data-role="{{.Role}}" aria-label="{{.Label}}"></button>
         <div class="gtl-lbl"><b>{{.Label}}</b><span>{{.Evidence}}</span></div>
       </div>
       {{end}}
@@ -1244,7 +1244,7 @@
     // an OR. No check key is named here.
     var groups = {};
     switches.forEach(function (sw) {
-      var role = sw.dataset.role, on = sw.getAttribute('aria-pressed') === 'true';
+      var role = sw.dataset.role, on = sw.getAttribute('aria-checked') === 'true';
       (groups[role] = groups[role] || []).push({ on: on, label: sw.getAttribute('aria-label') });
     });
     return groups;
@@ -1286,7 +1286,7 @@
   function applyScenario(btn) {
     var on = (btn.dataset.checks || '').split(',');
     switches.forEach(function (sw) {
-      sw.setAttribute('aria-pressed', on.indexOf(sw.dataset.key) >= 0 ? 'true' : 'false');
+      sw.setAttribute('aria-checked', on.indexOf(sw.dataset.key) >= 0 ? 'true' : 'false');
     });
     scBtns.forEach(function (b) { b.classList.toggle('on', b === btn); });
     evaluate();
@@ -1295,7 +1295,7 @@
     sw.addEventListener('click', function () {
       userDriving = true; clearTimeout(autoTimer);
       scBtns.forEach(function (b) { b.classList.remove('on'); });
-      sw.setAttribute('aria-pressed', sw.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+      sw.setAttribute('aria-checked', sw.getAttribute('aria-checked') === 'true' ? 'false' : 'true');
       evaluate();
     });
   });
@@ -1362,7 +1362,7 @@
   <p class="rcl-sub">{{.Site.RecoveryLab.Sub}}</p>
   <script type="application/json" class="rcl-data">{{json .Site.RecoveryLab}}</script>
   <div class="rcl-grid">
-    <div class="rcl-events" role="tablist">
+    <div class="rcl-events" role="group" aria-label="Failure events">
       {{range $i, $e := .Site.RecoveryLab.Events}}<button class="rcl-ev{{if eq $i 0}} on{{end}}" type="button" data-idx="{{$i}}">{{$e.Label}}<span class="code">{{$e.Code}}</span></button>{{end}}
     </div>
     <div class="rcl-stage" aria-live="polite">
@@ -1448,7 +1448,7 @@
   .tri-vh b{color:var(--t-acc)}
   .tri-cmd{display:flex;align-items:center;gap:10px;border:1px solid var(--t-line2);border-radius:10px;background:color-mix(in srgb,var(--t-ink) 5%,var(--t-bg));padding:12px 13px}
   .tri-cmd code{font-family:var(--t-mono);font-size:.72rem;color:var(--t-ink);overflow-x:auto;white-space:nowrap;flex:1 1 auto;scrollbar-width:none}
-  .tri-copy{font-family:var(--t-mono);font-size:.62rem;letter-spacing:.06em;border:1px solid var(--t-acc);border-radius:7px;background:var(--t-acc);color:#fff;padding:7px 12px;cursor:pointer;flex:0 0 auto;transition:box-shadow .25s}
+  .tri-copy{font-family:var(--t-mono);font-size:.62rem;letter-spacing:.06em;border:1px solid var(--t-acc);border-radius:7px;background:var(--t-acc);color:#1a0a08;padding:7px 12px;cursor:pointer;flex:0 0 auto;transition:box-shadow .25s}
   .tri-copy:hover{box-shadow:0 0 14px var(--t-acc-soft)}
   .tri-copy.is-copied{background:var(--t-ok);border-color:var(--t-ok)}
   .tri-plat{font-family:var(--t-mono);font-size:.6rem;color:var(--t-mut);margin:10px 0 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -1479,7 +1479,7 @@
   <div class="tri-grid">
     <div class="tri-install">
       <p class="tri-vh"><span>Install <b>{{.Site.Product.Name}} {{.Site.Product.Version}}</b></span><span>{{.Site.TryIt.Platforms}}</span></p>
-      <div class="tri-cmd"><code>{{.Site.TryIt.Command}}</code><button class="tri-copy" type="button" data-copy="{{.Site.TryIt.Command}}">Copy</button></div>
+      <div class="tri-cmd"><code tabindex="0">{{.Site.TryIt.Command}}</code><button class="tri-copy" type="button" data-copy="{{.Site.TryIt.Command}}">Copy</button></div>
       <p class="tri-plat"><span class="ok">✓</span><span>{{.Site.TryIt.Verified}}</span></p>
       <div class="tri-next">
         <p>then, in your AI CLI</p>
@@ -1492,7 +1492,7 @@
     </div>
     <div class="tri-term" aria-label="what you will see after running the installer">
       <div class="tri-tbar"><i></i><i></i><i></i><span>what you'll see</span></div>
-      <pre class="tri-tout">{{range $i, $l := .Site.TryIt.Terminal}}{{if $i}}
+      <pre class="tri-tout" tabindex="0">{{range $i, $l := .Site.TryIt.Terminal}}{{if $i}}
 {{end}}{{$l}}{{end}}</pre>
     </div>
   </div>
