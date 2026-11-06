@@ -1,9 +1,9 @@
 # ADR-0143: admission holds only shared edits, and the ship gate owns API drift
 
-- **Status:** Accepted (2026-10-19). Stage `shadow` until the data of one wave meets D3 of the plan.
+- **Status:** Accepted (2026-10-19). Stage `enforce` since 2026-11-02, set by the operator in `.evolve/policy.json` (`fleet.orchestrator.admission`). The D3 measure of decision 5 is still open (see [wave-orchestrator §6](../wave-orchestrator.md#6-admission-by-cell)).
 - **Plan:** [wave-latency-2026-10](../../plans/wave-latency-2026-10.md). **Research:** [wave-latency-2026-10](../../research/wave-latency-2026-10.md).
 - **Relates to:**
-  - [ADR-0139](0139-a-wave-orchestrator-supplies-admits-and-backfills-every-lane.md): this ADR changes the conflict rule of its admission by cell.
+  - [ADR-0139](0139-a-wave-orchestrator-supplies-admits-and-backfills-every-lane.md): this ADR amends the conflict rule of its admission by cell.
   - [ADR-0105](0105-identity-preserving-fleet-rebase.md): the composed-tree gate of the rebase is the check that replaces the reach rule.
 - **Evidence:**
   - Waves 130 to 133 used 51% of their slot-hours (research F2.1).
@@ -23,7 +23,9 @@ The ship already checks for that failure. It rebases each lane onto main and run
 2. The reach check leaves admission. The composed-tree gate of the ship owns API drift between lanes.
 3. The ship-window lease usually makes the ships of two overlapping lanes run one at a time. When a lane cannot take the lease, it ships unleased, and its rebase and composed-tree gate still run.
 4. The change starts at stage `shadow`. The shadow records each candidate that the old rule holds and the new rule admits. The ship records each composed-gate failure between two such lanes.
-5. The stage moves to `enforce` after one wave if fewer than one in five such admissions fail the composed gate.
+5. The operator moves the stage to `enforce` after one wave if under 20% of such admissions fail the composed gate.
+
+> **Note (2026-11-06):** The flip to `enforce` on 2026-11-02 came from the operator, and not from the data condition of this decision. The W1b signals still measure the rate.
 
 ## Consequences
 

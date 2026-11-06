@@ -10,7 +10,7 @@
   `recent-outcomes.md` and `audit-report.md` by hand across ~100 files per cycle.
 - **Design spec:** [2026-09-02-ship-rate-harness-and-pipeline-dashboard-design.md](../../superpowers/specs/2026-09-02-ship-rate-harness-and-pipeline-dashboard-design.md).
 - **Pattern research:** [pipeline-dashboard-patterns-2026-09-02.md](../../research/pipeline-dashboard-patterns-2026-09-02.md) (~45 sources: Langfuse, Phoenix, OpenHands, SWE-agent inspector, Airflow, Buildkite, Sentry, Dozzle, ntfy).
-- **Related:** [ADR-0055](0055-cycle-dossier.md) (the committed dossier the trend is computed from), [ADR-0072](0072-system-failure-policy.md) (the failure vocabulary the panel renders), [ADR-0092](0092-audit-repair-loop.md) / [ADR-0093](0093-retry-envelope-and-terminal-retro.md) (the repair rounds the round history shows).
+- **Related:** [ADR-0055](0055-cycle-dossier.md) (the committed dossier the trend is computed from). [ADR-0072](0072-system-failure-policy-and-halt.md) (the failure vocabulary the panel renders), [ADR-0092](0092-audit-repair-loop.md) / [ADR-0093](0093-retry-envelope-and-terminal-retro.md) (the repair rounds the round history shows).
 
 ## Problem
 

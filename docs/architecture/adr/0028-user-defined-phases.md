@@ -1,5 +1,7 @@
 # ADR-0028: User-Definable Phases (the "Lego Pipeline")
 
+> **Note (2026-11-06):** Amended by [ADR-0124](0124-code-review-phase.md) (Proposed): a user phase may be pinned by `conditional_mandatory`, and may declare report grammars. Amended by [ADR-0125](0125-audit-publishes-its-evaluation-contract.md) (Proposed): a second pinned phase (`audit-plan`) and a second grammar (`audit-expectations`).
+
 > **Invariant: a phase is a Lego brick behind one uniform contract, and an operator adds one as pure data.** Drop `.evolve/phases/<name>/{phase.json, agent.md, profile.json}`; the engine runs it through the same `core.PhaseRunner` contract every built-in phase uses. The orchestrator advances as a pure driver that never names a phase. The `build → audit → ship` spine + "ship requires audit-PASS bound to the build tree" stay kernel-clamped — a user phase is **optional-only** and can never displace or satisfy the floor.
 
 - **Status:** Accepted — partially implemented. Data model, signal plane, and authoring CLI are SHIPPED (branch `feat/user-defined-phases`); the runtime execution integration is designed below and remains.

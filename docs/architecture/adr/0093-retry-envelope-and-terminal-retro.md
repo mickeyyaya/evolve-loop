@@ -1,5 +1,7 @@
 # ADR-0093 — Policy sets the retry envelope, an adjudicator chooses inside it, retro learns
 
+> **Note (2026-11-06):** Amended by [ADR-0124](0124-code-review-phase.md) (Proposed): the audit-repair machinery generalizes into one findings-driven repair keyed by judge. Amended by [ADR-0125](0125-audit-publishes-its-evaluation-contract.md) (Proposed): at enforce, the repair brief gains a criterion-keyed section.
+
 - **Status:** Accepted (2026-08-28). Supersedes the eligibility half of
   [ADR-0092](0092-audit-repair-loop.md); its counter, findings-injection and
   routed-path protections are retained.

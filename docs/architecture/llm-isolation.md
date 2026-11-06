@@ -1,6 +1,6 @@
 # LLM isolation: the pipeline is the only controller, and each agent runs in a cell
 
-> [ADR-0154](adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md) · [ADR-0155](adr/0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md) · [ADR-0156](adr/0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md) ·
+> [ADR-0154](adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md) · [ADR-0155](adr/0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md) · [ADR-0156](adr/0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md) · [ADR-0157](adr/0157-the-loop-works-its-own-code-a-narrow-fence-and-held-proposals.md) · [ADR-0163](adr/0163-a-seat-holds-a-narrow-token-in-its-own-directory-and-the-token-file-is-the-stage.md) ·
 > plan: [llm-isolation-2026-10](../plans/llm-isolation-2026-10.md). Research: [llm-isolation-2026-10](../research/llm-isolation-2026-10.md) (F1.0 to F1.12, F3.1 to F3.6, P2.1 to P2.7, P3.1 to P3.5, F4.1 to F5.6, P4.1 to P4.6, R1 to R19).
 > This file is the spec of record for the agent cell. It covers the environment, the launch path, the reads and writes and the outputs of a cell. It also covers the routing data that picks the family, and the proof that any family can fill the cell.
 >
@@ -1620,7 +1620,7 @@ Limits:
 
 | Tier | Surface | Who repairs | Review |
 |---|---|---|---|
-| T0 kernel | the ADR-0064 protected surfaces (`guards.IsProtectedSurface` in `go/internal/guards/integrity_surface.go`). Also the policy floors and stage keys, the gates and oracles, the ledger, the frozen checks, and this catalog with its budgets. | the operator; the loop only proposes | the operator |
+| T0 kernel | the ADR-0064 protected surfaces (`guards.IsProtectedSurface` in `go/internal/guards/integrity_surface.go`). The file list is the one of [ADR-0157](adr/0157-the-loop-works-its-own-code-a-narrow-fence-and-held-proposals.md). Also the policy floors and stage keys, the gates and oracles, the ledger, the frozen checks, and this catalog with its budgets. | the operator; the loop only proposes | the operator |
 | T1 pipeline code | the code of the loop outside T0: `go/internal/core`, `bridge`, `cliroute`, `gc` and the personas outside the protected surfaces | the loop, after `enforce` for T1 | an independent-family judge, a mutation gate on changed functions, a `shadow` or canary stage first |
 | T2 item code | the code that an ordinary item changes | the loop | the normal flow |
 

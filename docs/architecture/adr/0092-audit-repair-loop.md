@@ -16,7 +16,7 @@
   out-of-lane phase stub riding the shipping index; 1573 was rejected for a build report
   declaring zero changed files against a bound tree of 10. Each rejection paid a full
   cycle teardown to fix what a rebuild could have addressed in place.
-- **Related:** [ADR-0072](0072-system-failure-policy.md) — the floor this narrows in
+- **Related:** [ADR-0072](0072-system-failure-policy-and-halt.md) — the floor this narrows in
   exactly one place, and preserves everywhere else.
 - **Related:** [ADR-0076](0076-convergence-architecture.md) — the cross-cycle findings handoff whose
   reader (`readContinuationFindings`) this reuses rather than duplicating.

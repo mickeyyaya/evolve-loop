@@ -1,6 +1,7 @@
 # ADR-0161: A pipeline blocker fix meets six test rows, and a signal states its cause and next step
 
 - **Status:** Proposed (2026-11-05).
+- **Amended by:** [ADR-0126](0126-every-iterative-loop-converges-or-escalates.md) (Revision 3): decisions 9 and 10 become a rung of its escalation path, and ADR-0126 owns the count.
 - **Plan:** [pipeline-blockers-2026-11](../../plans/pipeline-blockers-2026-11.md). **Research:** [pipeline-blockers-2026-11](../../research/pipeline-blockers-2026-11.md). **Design:** [signal-accuracy](../signal-accuracy.md). **Incident:** [2026-11-05 wave 155](../../incidents/2026-11-05-wave-155-false-signals-and-the-logout.md).
 - **Relates to:**
   - [ADR-0162](0162-the-console-reads-through-a-tested-read-only-debug-family-and-writes-no-scratch-scripts.md): it owns the verb for one cycle, `evolve debug cycle N`.

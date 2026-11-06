@@ -1,8 +1,10 @@
 # ADR-0057: Merge-to-main gate + cadence advisor
 
+> **Note (2026-11-06, operator ruling, [ADR-0164](0164-all-decisions-serve-one-goal-and-one-amendment-resolves-their-conflicts.md)):** The train of ADR-0147 is the target path to main, so ADR-0147 supersedes this promoter.
+
 ## Status
 
-Proposed (2026-06-21). Shipping behind a `policy.json` rollout dial defaulting to
+Superseded by ADR-0147 (2026-11-06, operator). It was proposed on 2026-06-21, behind a `policy.json` rollout dial defaulting to
 **shadow** (behavior-neutral).
 
 ## Context

@@ -1,6 +1,7 @@
 # ADR-0159: The loop keeps its integration train and takes six practices from the 2026 harness projects
 
 - **Status:** Proposed (2026-11-04).
+- **Amends:** decision 3 of ADR-0147, the landed identity (integration plan D2). Each other decision of ADR-0147 stays.
 - **Plan:** [harness-practices-2026-11](../../plans/harness-practices-2026-11.md) and [§10 of the integration plan](../../plans/wave-integration-2026-10.md#10-amendment-of-2026-11-04-console-prs-enter-the-train). **Research:** [harness-practices-2026-11](../../research/harness-practices-2026-11.md). **Design:** [regression-proof-and-supervision](../regression-proof-and-supervision.md).
 - **Relates to:**
   - [ADR-0147](0147-the-wave-orchestrator-owns-integration-and-decides-when-the-wave-reaches-main.md): this ADR keeps its design and changes its landed identity.
@@ -60,7 +61,6 @@ The six practices are in decisions 2 and 3 (proof), 5 (liveness), 6 (refusal), 7
 - Uber's queue publishes a release and a single-host mode. Then we compare it again with the train.
 - The gate at `shadow` reports inconclusive for more than half of the fixes. Then the design of the red run changes.
 
-**Amends:** decision 3 of ADR-0147, the landed identity (integration plan D2). Each other decision of ADR-0147 stays.
 
 ## Rejected
 

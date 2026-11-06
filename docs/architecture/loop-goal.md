@@ -55,4 +55,24 @@ ADR-0164 records this map. The numbers 0109 and 0120 do not exist.
 |---|---|---|
 | What lands on `main` today? | A lane lands its own work. The console lands through `evolve integration batch`. | [wave-integration plan](../plans/wave-integration-2026-10.md), ADR-0164 decision 11 |
 | What is the target? | The wave orchestrator owns integration. Its driver runs at shadow, and the flip to enforce is the operator's. | ADR-0147, [integration-driver.md](integration-driver.md) |
-| Which records run at `enforce` and read Proposed? | ADR-0139, ADR-0151 and ADR-0154 (invariant I-2). | `runtime/.evolve/policy.json`, 2026-11-06 |
+| Which records run at `enforce`? | ADR-0139, ADR-0143, ADR-0151 and ADR-0154 (invariant I-2), all Accepted on 2026-11-06. | `.evolve/policy.json`, 2026-11-06 |
+
+## 6. What final means
+
+The operator accepted this definition on 2026-11-06. A set of documents is final when four things hold:
+
+1. The live topics had a full-text review.
+2. The decisions of the operator are recorded.
+3. New lines pass the STE lint, the link check and the back-link check.
+4. Each older record reads as history unless this map names it as live.
+
+| Set | Review on 2026-11-06 |
+|---|---|
+| The path to main, control, healing and quality | Full text |
+| Other ADRs | Status and decision digest only |
+| Other plans | Status and title only |
+| Research | Mostly not read |
+
+A full read of the rest stays open until the weekly usage resets on 2026-11-08.
+
+Two items stay open for the operator: V3b of the convergence plan, and the retry count of the inbox item ladder.

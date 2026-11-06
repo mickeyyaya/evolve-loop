@@ -1,5 +1,7 @@
 # ADR-0098 — the Task Contract block: acceptance verbatim and the predicate inventory, harness-owned, in the tdd, build and audit prompts
 
+> **Note (2026-11-06):** Amended by [ADR-0125](0125-audit-publishes-its-evaluation-contract.md) (Proposed): the acceptance items are indexed `G-ACCEPT.<task>.<n>`, and the contract is delivered to the `audit-plan` phase.
+
 - **Status:** Accepted (2026-09-03).
 - **Driving evidence:** the [ship-rate research](../../research/ship-rate-harness-reliability-2026-09-02.md)
   gaps G3/G4 — the acceptance criteria a cycle is graded against live on the inbox item, but

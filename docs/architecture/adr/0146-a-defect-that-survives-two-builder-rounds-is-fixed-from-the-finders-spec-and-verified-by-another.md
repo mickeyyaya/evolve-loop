@@ -1,5 +1,7 @@
 # ADR-0146: a defect that survives two builder rounds is fixed from the finder's spec and verified by another
 
+> **Note (2026-11-06, operator ruling, [ADR-0164](0164-all-decisions-serve-one-goal-and-one-amendment-resolves-their-conflicts.md)):** After a repair ladder fails, the redesign rung of ADR-0126 runs first. The operator gets the subject only on a second count past three. Audit repair keeps a budget of 2 rounds, as the code has, until the code changes.
+
 - **Status:** Accepted (2026-10-20). The operator chose design C.
 - **Plan:** [finder-fix-ownership-2026-10](../../plans/finder-fix-ownership-2026-10.md). **Research:** [finder-fix-ownership-2026-10](../../research/finder-fix-ownership-2026-10.md).
 - **Amends:** [ADR-0142](0142-a-capability-failure-climbs-one-bounded-retry-ladder.md): its third rung becomes a fix from the finder's spec.
@@ -24,7 +26,7 @@ The operator asked that the phase that finds a defect fix it after the owner fai
 7. When a deterministic check found the defect, the harness applies the spec's patch and runs the same check again.
 8. R2 is skipped when R1 repeats its fingerprint, or when no effort step or tier headroom exists. R3 replaces ADR-0142 item 5.
 9. After R3 the ladder stops, and the operator gets the dossier.
-10. Round count: R0 is the first build, and R1 to R3 are rounds 1 to 3 of ADR-0126. That makes four dispatches and three repair rounds, so "no round 4" holds. The cap of two repair rounds becomes three.
+10. Round count: R0 is the first build, and R1 to R3 are rounds 1 to 3 of ADR-0126. That makes four dispatches and three repair rounds, so "no round 4" holds. The cap of two repair rounds becomes three. The code keeps `MaxRetries: 2` until component F2 lands.
 
 ## Consequences
 

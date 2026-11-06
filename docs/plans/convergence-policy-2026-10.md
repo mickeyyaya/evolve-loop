@@ -97,7 +97,7 @@ The full design is in [convergence-policy.md](../architecture/convergence-policy
 - **Round 3, rung 2:** a fresh context or a re-plan; HIGH bar; MEDIUM and LOW deferred.
 - **Rung 3:** split, accept with limits (the audit adjudicates), or stop.
 - **Throughout:** the marginal-gain stop and keep-best.
-- **Signals:** 10 codes.
+- **Signals:** the codes of [convergence-policy §9](../architecture/convergence-policy.md#9-signals-module-convergence).
 
 ## 6. Components
 
@@ -116,7 +116,7 @@ Ordered by priority: the console adopts the policy first, then the pipeline loop
 | V5 | Audit repair calls `Decide` after each audit FAIL, in shadow first. It uses rung 1 (the judge effort raise), rung 2(a) (a fresh-context fixer through `composeRepairBrief`'s distilled form) and Stop. No deferrals. The envelope stays the budget's home. | `go/internal/core/audit_fail_decision.go`, `repair_brief.go`, `retry_tier_escalation.go` | ☐ Inbox item: `convergence-policy-v5-audit-repair-decide`. |
 | V6 | The code-review loop (ADR-0124 landing 2, Q3) is built on `Decide`. It uses U(n) as the mass and `max_fix_rounds` 3. It uses the amended §6.2 (policy-deferred rows; accept-with-limits rows to adjudication). | code-review plan Q3; `core/` | ☐ (amends Q3) Inbox item: `convergence-policy-v6-code-review-loop-decide`. |
 | V7 | The finding grammars gain `Kind:`, `Blocking:`, `Component:` and `Late:`: code-review (RL §4.1) and the audit's Criteria findings (ADR-0125). The falsification check runs before a blocking finding blocks. | `codereview/`, `qualityindex/`, personas | ☐ Inbox item: `convergence-policy-v7-finding-grammar-fields`. |
-| V8 | Signals (10 codes, registered, `signal-codes.md` regenerated). The `evolve convergence metrics` readout: rounds-to-land, deferred-then-closed share, falsification drop rate. | `core/signal.go`, `signalcenter/`, `cmd/evolve` | ☐ Inbox item: `convergence-policy-v8-signals-and-metrics`. |
+| V8 | Signals (the codes of spec §9, registered, `signal-codes.md` regenerated). The `evolve convergence metrics` readout: rounds-to-land, deferred-then-closed share, falsification drop rate. | `core/signal.go`, `signalcenter/`, `cmd/evolve` | ☐ Inbox item: `convergence-policy-v8-signals-and-metrics`. |
 | V9 | The flip: `workflow.convergence.stage = enforce` after 2 shadow waves, at a boundary | operator | ☐ Inbox item: `convergence-policy-v9-stage-enforce-flip`. |
 | V10 | **Cycle-wide convergence.** Every backward edge that a cycle takes is a round of loop `cycle`. `max_backward_edges` (default 3) ends the cycle with a Stop (continuation, work kept). Cross-loop oscillation (one failure fingerprint behind two backward edges) jumps to rung 3. The 32-iteration crash guard stays as a guard. Replay test: a cycle that goes audit → build → audit → retro → tdd stops at the 3rd backward edge, not at iteration 32. | `go/internal/core/` (`cyclerun.go`, `resume_execution.go`, the backward-edge sites), `policy/` | ☐ Inbox item: `convergence-policy-v10-cycle-backward-edges`. |
 | V11 | **Inbox-item convergence.** Each cycle try on an item is a round of loop `inbox-item`, with *N* = `TaskRetryCeiling`. Try 2 carries the findings and raises effort. Try 3 changes the strategy (a deep-tier fresh plan, a narrowed scope, or a split). After the final try, split the item, route it to the console, or quarantine it. Replay test: an item that fails two times with one fingerprint is never retried a third time the same way. | `go/internal/inboxmover/`, `core/` (the continuation brief), triage persona | ☐ Inbox item: `convergence-policy-v11-inbox-item-rounds`. |
@@ -152,7 +152,7 @@ Ordered by priority: the console adopts the policy first, then the pipeline loop
   - the headroom read (today: no headroom in any family; with V3b, Claude deep high → top xhigh);
   - `max_fix_rounds` enforcement.
 - **The L2 replay**, the acceptance test for the operator's example. L2's rounds 4–7 as `Input` (a fixture for each finding) must **land at round 3 through rung 2**. The final round raises the bar to HIGH, and its remaining 1 MEDIUM and 4 LOW are deferred (the INFO is filed). Concentration (0.636, then 0.647) fires at `J_3` with no strict finding left. It signals, and the redesign follow-up of the model check is filed. The fixture is built from the round tables in `cli-routing-table-2026-10.md` and the review reports.
-- **The audit-repair replay:** cycles 1595–1605 (ADR-0096's data). With audit repair's *N* = 2 (its envelope budget), round 2 is the final round. It shows the judge effort raise and the fresh-context fixer, and never a deferral of an audit finding.
+- **The audit-repair replay:** cycles 1595–1605 (ADR-0096's data). With audit repair's *N* = 2 (its envelope budget), round 2 is the final round. ADR-0146 raises *N* to 3 when F2 lands. It shows the judge effort raise and the fresh-context fixer, and never a deferral of an audit finding.
 - **Mutation:** at least 10 overlay mutants over `Decide`'s triggers, exits and keep-best, with 0 survivors. These are `J_0`-style quotas, allowed in the first review.
 - **Live, in shadow:** two waves of `CONVERGENCE_RUNG` data per loop, then the flip.
 
