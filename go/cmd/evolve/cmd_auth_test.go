@@ -264,13 +264,13 @@ func TestAuthStoreTimes_AUsageErrorExitsTen(t *testing.T) {
 func TestRunAuthAt_AHomeFailureExitsTwoAndAHelpCallNeedsNoLogin(t *testing.T) {
 	t.Parallel()
 	var out, errb bytes.Buffer
-	rc := runAuthAt(func() (string, error) { return "", errors.New("no home") }, []string{"store-times"}, &out, &errb)
+	rc := runAuthAt(func() (string, error) { return "", errors.New("no home") }, nil, []string{"store-times"}, &out, &errb)
 	if rc != exitIO || errb.String() != "evolve auth: read the home directory: no home\n" {
 		t.Fatalf("rc=%d err=%q", rc, errb.String())
 	}
 	out.Reset()
 	errb.Reset()
-	rc = runAuthAt(func() (string, error) { return t.TempDir(), nil }, []string{"--help"}, &out, &errb)
+	rc = runAuthAt(func() (string, error) { return t.TempDir(), nil }, nil, []string{"--help"}, &out, &errb)
 	if rc != 0 || out.String() != authUsage+"\n" {
 		t.Fatalf("rc=%d out=%q", rc, out.String())
 	}

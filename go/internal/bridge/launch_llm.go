@@ -70,6 +70,11 @@ func launchPane(ctx context.Context, purpose LaunchPurpose, driver Driver, cfg *
 	if err := deps.requireDispatchCredential(purpose, cfg.CLI); err != nil {
 		return ExitSafetyGate, err
 	}
+	if purpose == PurposeSmoke {
+		if rc, err := deps.resolveSeat(cfg); err != nil {
+			return rc, err
+		}
+	}
 	launchPurposeConfig(purpose, cfg)
 	return driver.Launch(ctx, cfg, deps)
 }

@@ -25,6 +25,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/proctree"
+	"github.com/mickeyyaya/evolve-loop/go/internal/seatlogin"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
@@ -85,6 +86,8 @@ type Deps struct {
 	onFatalPane           func(fatalPaneObservation)
 	onBootLoss            func(launchoutcome.BootLossCause)
 	onDispatchID          func(string)
+	onSeatLogin           func(string)
+	SeatLogin             seatlogin.Deps
 	onLaunchEffort        func(string)
 	onServedModel         func(string)
 	beforeClose           core.CloseCheck
@@ -120,6 +123,8 @@ type SandboxWrapRequest struct {
 	RepoRoot      string
 	WriteSubpaths []string
 	AllowNetwork  bool
+	HostIsolated  bool
+	SeatRoot      string
 }
 
 func defaultIfZero(val, def int) int {
@@ -215,6 +220,8 @@ type Config struct {
 	AllowNetwork         bool
 	codexConfigPath      string
 	DispatchID           string
+	Decision             seatlogin.Decision
+	SeatTokenFile        string
 }
 
 type Engine struct {
@@ -291,6 +298,9 @@ func launchArgs(req core.BridgeRequest, promptFile, stdoutLog, stderrLog string,
 	if req.RequireSandbox {
 		args = append(args, "--require-sandbox")
 	}
+	if req.SeatTokenFile != "" {
+		args = append(args, "--seat-token-file="+req.SeatTokenFile)
+	}
 	if req.Completion != "" {
 		args = append(args, "--completion="+string(req.Completion))
 	}
@@ -337,9 +347,9 @@ func (e *Engine) launchModel(ctx context.Context, req core.BridgeRequest) (core.
 	run := e.runAttempt(ctx, req, args)
 	resp := core.BridgeResponse{
 		ExitCode: run.code, Stderr: run.stderr, BootMS: run.bootMS,
-		DispatchID: run.dispatchID, PaneCapture: run.paneCapture, SessionRecoverable: e.freshSessionAllowed(ctx, run),
+		DispatchID: run.dispatchID, SeatLogin: run.seatLogin, PaneCapture: run.paneCapture, SessionRecoverable: e.freshSessionAllowed(ctx, run),
 	}
-	marks := append(sessionMarks(req.FreshSession, resp.SessionRecoverable), markBootLoss(run), markTry(run, req.Ladder))
+	marks := append(sessionMarks(req.FreshSession, resp.SessionRecoverable), markBootLoss(run), markTry(run, req.Ladder), markSeatLogin(run))
 	c := e.recordModelAttempt(req, model, run.code, run.start, run.end, run.dispatched, run.stderr, &resp, marks...)
 	e.reportFreshSession(c, req)
 	e.clearBootStrike(c, req.CLI, run.code)
@@ -390,6 +400,7 @@ type launchRun struct {
 	fatal       fatalPaneObservation
 	bootLoss    launchoutcome.BootLossCause
 	dispatchID  string
+	seatLogin   string
 	paneCapture string
 	effort      string
 	servedModel string
@@ -461,6 +472,7 @@ func (e *Engine) runScoped(ctx context.Context, args []string, env map[string]st
 		}
 	}
 	callDeps.onDispatchID = func(id string) { run.dispatchID = id }
+	callDeps.onSeatLogin = func(login string) { run.seatLogin = login }
 	callDeps.onPaneCapture = func(path string) { run.paneCapture = path }
 	callDeps.onLaunchEffort = func(effort string) { run.effort = effort }
 	callDeps.onServedModel = func(model string) { run.servedModel = model }

@@ -136,6 +136,7 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		AllowedTools:       prof.AllowedTools,
 		ExtraFlags:         raw.extra,
 		AnthropicBaseURL:   raw.anthropicBaseURL,
+		SeatTokenFile:      raw.seatTokenFile,
 		ArtifactTimeoutS:   artifactTimeoutS,
 	}
 	intent := launchIntentFor(&cfg, prof, e.deps.Efforts)
@@ -213,6 +214,7 @@ type rawLaunch struct {
 	cycle, worktree, projectRoot, agent, completion, effort                    string
 	permissionMode, sessionName, streamOutput, runID                           string
 	anthropicBaseURL, artifactTimeoutS, secondaryArtifacts, humanReason        string
+	seatTokenFile                                                              string
 	validateOnly, dryRun, requireFull, requireSandbox, allowBypass             bool
 	extra                                                                      []string
 }
@@ -305,6 +307,7 @@ func parseLaunchArgs(args []string, env map[string]string) (rawLaunch, error) {
 		"--agent": &r.agent, "--permission-mode": &r.permissionMode,
 		"--session-name": &r.sessionName, "--completion": &r.completion,
 		"--anthropic-base-url": &r.anthropicBaseURL,
+		"--seat-token-file":    &r.seatTokenFile,
 		"--artifact-timeout-s": &r.artifactTimeoutS,
 		"--human-input":        &r.humanReason,
 	}

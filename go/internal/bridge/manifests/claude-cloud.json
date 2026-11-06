@@ -2,6 +2,7 @@
   "schema_version": 1,
   "cli": "claude-cloud",
   "base": "claude-tmux",
+  "seat_login": "stored",
   "transport": "cloud",
   "default_tier": "full",
   "tier_dependencies": {

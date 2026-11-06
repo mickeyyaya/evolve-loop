@@ -134,6 +134,8 @@ func bootRCName(rc int) string {
 		return "ExitModelMismatch — the REPL booted a model outside the target's model family, or showed no readable model label"
 	case bridge.ExitBadFlags:
 		return "ExitBadFlags — unknown or non-tmux driver"
+	case bridge.ExitSeatTokenRefused:
+		return "ExitSeatTokenRefused — the seat token holder is bad, so no claude seat can start. Next: run evolve doctor seat"
 	case exitWorkspaceSetupFailed:
 		return "workspace setup failed (os.MkdirTemp)"
 	default:

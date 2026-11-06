@@ -18,16 +18,20 @@ import (
 )
 
 type Config struct {
-	TerminalPath  string
-	RepoRoot      string
-	HomeDir       string
-	ReadOnlyRepo  bool
-	AllowNetwork  bool
-	WritePaths    []string
-	DenyPaths     []string
-	DenyReadPaths []string
-	DenySockets   []string
-	DenyLiterals  []string
+	TerminalPath    string
+	RepoRoot        string
+	HomeDir         string
+	OmitStoredLogin bool
+	ReadOnlyRepo    bool
+	AllowNetwork    bool
+	WritePaths      []string
+	DenyPaths       []string
+	DenyWritePaths  []string
+	DenyReadPaths   []string
+	DenySockets     []string
+	DenyLiterals    []string
+	MaskFiles       []string
+	ReadOnlyFiles   []string
 
 	ExecDenyPaths   []string
 	ExecDenyRoots   []string
@@ -39,11 +43,11 @@ type Config struct {
 	ProtectedWriteEnforce  bool
 }
 
-func homeStateWriteDirs(home string) []string {
+func homeStateWriteDirs(home string, omitStoredLogin bool) []string {
 	if home == "" {
 		return nil
 	}
-	return []string{
+	dirs := []string{
 		filepath.Join(home, ".claude"),
 		filepath.Join(home, ".codex"),
 		filepath.Join(home, ".gemini"),
@@ -52,6 +56,10 @@ func homeStateWriteDirs(home string) []string {
 		filepath.Join(home, "Library/Caches"),
 		filepath.Join(home, "Library/Application Support"),
 	}
+	if omitStoredLogin {
+		return dirs[1:]
+	}
+	return dirs
 }
 
 type ProbeResult struct {
@@ -149,12 +157,18 @@ func GenerateSBPL(cfg Config) string {
 			fmt.Fprintf(&b, "(deny file-write* (subpath %q))\n", dp)
 		}
 	}
+	for _, dp := range cfg.DenyWritePaths {
+		if dp != "" {
+			fmt.Fprintf(&b, "(deny file-write* (subpath %q))\n", dp)
+		}
+	}
 	writeReadIsolation(&b, cfg.ReadIsolation)
 	for _, dp := range cfg.DenyReadPaths {
 		if dp != "" {
 			fmt.Fprintf(&b, "(deny file-read* (subpath %q))\n", dp)
 		}
 	}
+	writeFileRules(&b, cfg)
 	writeClosingRules(&b, cfg)
 	writeExecDenyRules(&b, cfg)
 	writeProtectedWriteRules(&b, cfg, true)
@@ -223,7 +237,7 @@ func writeReadGrants(b *strings.Builder, cfg Config) {
 }
 
 func writeWriteGrants(b *strings.Builder, cfg Config) {
-	for _, p := range homeStateWriteDirs(cfg.HomeDir) {
+	for _, p := range homeStateWriteDirs(cfg.HomeDir, cfg.OmitStoredLogin) {
 		fmt.Fprintf(b, "(allow file-write* (subpath %q))\n", p)
 	}
 	for _, wp := range cfg.WritePaths {
@@ -253,6 +267,34 @@ func writeTerminalRules(b *strings.Builder, pane string) {
 	}
 	fmt.Fprintf(b, "(allow file-read* file-write-data (literal \"/dev/tty\") (literal %q))\n", pane)
 	fmt.Fprintf(b, "(allow file-ioctl (require-all (require-any (literal \"/dev/tty\") (literal %q)) (require-any (ioctl-command TIOCGETA) (ioctl-command TIOCSETA) (ioctl-command TIOCSETAW) (ioctl-command TIOCSETAF) (ioctl-command TIOCGWINSZ))))\n", pane)
+}
+
+func writeFileRules(b *strings.Builder, cfg Config) {
+	for _, f := range cfg.MaskFiles {
+		if f != "" {
+			fmt.Fprintf(b, "(deny file-read* (literal %q))\n", f)
+		}
+	}
+	for _, f := range cfg.ReadOnlyFiles {
+		if f != "" {
+			fmt.Fprintf(b, "(deny file-write* (literal %q))\n", f)
+		}
+	}
+}
+
+func bwrapFileMasks(cfg Config) []string {
+	var out []string
+	for _, f := range cfg.MaskFiles {
+		if f != "" {
+			out = append(out, "--ro-bind", os.DevNull, f)
+		}
+	}
+	for _, f := range cfg.ReadOnlyFiles {
+		if f != "" {
+			out = append(out, "--ro-bind", f, f)
+		}
+	}
+	return out
 }
 
 func writeClosingRules(b *strings.Builder, cfg Config) {
@@ -291,7 +333,7 @@ func BwrapPrefix(cfg Config) []string {
 	if cfg.HomeDir != "" {
 		out = append(out, "--ro-bind", cfg.HomeDir, cfg.HomeDir)
 	}
-	for _, p := range homeStateWriteDirs(cfg.HomeDir) {
+	for _, p := range homeStateWriteDirs(cfg.HomeDir, cfg.OmitStoredLogin) {
 		out = append(out, "--bind-try", p, p)
 	}
 	for _, wp := range cfg.WritePaths {
@@ -336,6 +378,7 @@ func BwrapPrefix(cfg Config) []string {
 		out = append(out, "--unshare-net")
 	}
 	out = append(out, bwrapProtectedWriteMasks(cfg)...)
+	out = append(out, bwrapFileMasks(cfg)...)
 	return append(out, bwrapExecMasks(cfg)...)
 }
 

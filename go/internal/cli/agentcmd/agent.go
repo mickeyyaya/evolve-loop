@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cli/phasecmd"
@@ -26,13 +27,14 @@ const (
 
 const usage = `Usage: evolve agent <subcommand>
 
-  evolve agent run <profile> [--input FILE|-] [--file PATH]... [--worktree DIR [--writable PATH]...] [--json] [--keep] [--project-root P]
+  evolve agent run <profile> [--input FILE|-] [--file PATH]... [--worktree DIR [--writable PATH]...] [--json] [--keep] [--seat-token-file FILE] [--project-root P]
       Run one phase agent with no cycle, through the bridge. The input is stdin, or --input FILE.
       Each --file adds one fenced section. stdout carries the report.
       --json carries one envelope (report, verdict, driver, family, model, cost, tokens, launch record).
       Each run writes its launch record to .evolve/agent-runs/<run label>.json.
       evolve commit-gate run --reviewers run:<run label> attests it.
       --worktree runs the agent in a linked git worktree.
+      --seat-token-file FILE runs one seat isolated on the token in FILE (a regular file at mode 0600), with the holder untouched; the parameter wins over the holder, and --json names the login in seat_login.
       A writer needs --worktree and one --writable PATH for each file that it can change.
       A --writable PATH names a file, never a directory: the run refuses a directory.
       The pipeline restores each other file of the worktree after the run.
@@ -54,6 +56,7 @@ type Deps struct {
 	Now           func() time.Time
 	VerbSchema    func(path string) string
 	CloudSeat     func(cli string) bool
+	Abs           func(path string) (string, error)
 }
 
 func defaultBridge(projectRoot string, _ *signalcenter.Center) core.Bridge {
@@ -69,6 +72,9 @@ func defaultTreeState(ctx context.Context, dir string) (string, error) {
 type command struct{ deps Deps }
 
 func New(d Deps) func(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	if d.Abs == nil {
+		d.Abs = filepath.Abs
+	}
 	if d.InstallRouter == nil {
 		d.InstallRouter = func(string) error { return nil }
 	}
