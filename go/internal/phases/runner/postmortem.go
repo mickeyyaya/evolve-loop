@@ -92,6 +92,7 @@ var endsOutsideTheAgentSession = map[int]bool{
 	launchoutcome.ExitUnknownPrompt:    true,
 	launchoutcome.ExitRespondLoopGuard: true,
 	launchoutcome.ExitModelMismatch:    true,
+	launchoutcome.ExitSeatTokenRefused: true,
 	launchoutcome.ExitRequireFullUnmet: true,
 	launchoutcome.ExitMissingBinary:    true,
 }

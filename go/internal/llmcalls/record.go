@@ -83,6 +83,7 @@ type Record struct {
 	CauseCode          string                `json:"cause_code,omitempty"`
 	FreshSessionRetry  bool                  `json:"fresh_session_retry,omitempty"`
 	SessionRecoverable bool                  `json:"session_recoverable,omitempty"`
+	SeatLogin          string                `json:"seat_login,omitempty"`
 
 	FirstOutputMS     *int64 `json:"first_output_ms,omitempty"`
 	FirstOutputSource string `json:"first_output_source,omitempty"`

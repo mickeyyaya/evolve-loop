@@ -19,6 +19,7 @@ const (
 	ExitCmdTimeout       = 124
 	ExitMissingBinary    = 127
 	ExitModelMismatch    = 87
+	ExitSeatTokenRefused = 88
 )
 
 const ExitSignalDeath = -1
@@ -41,6 +42,7 @@ var exitClasses = []exitClass{
 	{code: ExitUnknownPrompt, name: "unknown_prompt", signal: CodeExitUnknownPrompt, causeCode: "unknown_prompt", sentinel: core.ErrTransientBridgeFailure},
 	{code: ExitRespondLoopGuard, name: "respond_loop_guard", signal: CodeExitRespondLoopGuard, causeCode: "respond_loop_guard", sentinel: core.ErrTransientBridgeFailure},
 	{code: ExitModelMismatch, name: "model_mismatch", signal: CodeExitModelMismatch, causeCode: "model_mismatch"},
+	{code: ExitSeatTokenRefused, name: "seat_token_refused", signal: CodeExitSeatTokenRefused, causeCode: "seat_token_refused"},
 	{code: ExitRequireFullUnmet, name: "required_tier_unavailable", signal: CodeExitRequiredTierUnavailable, causeCode: "required_tier_unavailable"},
 	{code: ExitCmdTimeout, name: "command_timeout", signal: CodeExitCommandTimeout, causeCode: "command_timeout", sentinel: core.ErrTransientBridgeFailure},
 	{code: ExitMissingBinary, name: "missing_binary", signal: CodeExitMissingBinary, causeCode: "missing_binary"},
