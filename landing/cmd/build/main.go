@@ -39,7 +39,7 @@ func config() buildsite.Config {
 	// the repo-root install.sh; build runs from landing/, so ../ reaches it).
 	rootFiles := []buildsite.RootFile{
 		{Src: "../install.sh", Dst: "install.sh"},
-		{Src: "shared/llms.txt", Dst: "llms.txt"},
+		{Src: "shared/llms.txt", Dst: "llms.txt", Expand: true},
 	}
 	for _, p := range explainPages {
 		rootFiles = append(rootFiles, buildsite.RootFile{

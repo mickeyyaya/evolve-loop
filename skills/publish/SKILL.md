@@ -27,6 +27,17 @@ The order is the order in `go/internal/releasepipeline/release_run.go`. The guid
 
 > Steps 1–8 are the **`gh`-free** pipeline binary. It cannot see GitHub CI — it ends with a `NOTE: GitHub CI is NOT verified by this pipeline` advisory. CI gating is **this skill's** job (next section); never treat a green pipeline as a green CI.
 
+## Site and README review (before the pipeline)
+
+`evolve release` moves the site version: `product.version` in `landing/shared/content.json` is the one home of that version, and the release commit deploys the site. A version bump cannot find a false sentence, so this skill adds a review. Run it when `landing/shared/content.json` exists, for each major or minor release. A patch can skip it.
+
+1. Read `git log <last tag>..HEAD` and the `CHANGELOG.md` text of the range. Run `evolve agent run docs-review` on `README.md`, `landing/shared/content.json`, `landing/shared/llms.txt` and the `docs/explain/*.html` pages that the range affects. Name those pages in the brief. Its budget does not cover every page, so state which pages it did not read.
+2. Ask three questions in the brief. Which claim is false at this tree? Which shipped feature does a reader need, and the pages do not state? Which number is out of date?
+3. Fix the findings through the normal commit path, and land them before the pipeline.
+4. Build the site and run the check in `landing/e2e/README.md`. Require exit 0.
+
+No code gate enforces this step yet (`release-content-review-gate`). **Report the result in the release summary: the pages reviewed, the findings fixed and the check count. If you skip the step, say so.**
+
 ## CI gating (this skill adds what the binary cannot)
 
 `evolve release` is self-contained and headless-safe, so it does **not** verify GitHub CI. This skill wraps the pipeline with two `gh`-based checks. If `gh` is unavailable, report "cannot verify CI — confirm manually" and stop; never silently skip.
@@ -60,6 +71,7 @@ gh release view --json assets -q '.assets[].name' | grep -q '\.tar\.gz$' \
   || echo "MISSING: no prebuilt binaries on the latest release — re-run: gh run rerun <release-run-id>"
 ```
 
+- **After the site deploys:** run the check in `landing/e2e/README.md` against the live URL, and report the count.
 - **All green + binaries present → done.** Report the run URLs + the published asset count (`gh release view --json assets -q '.assets | length'`).
 - **`required.yml` red → the release is published but its CI is red.** Do **not** auto-rollback a propagated release — **fix forward**: land the CI fix on `main`, then cut the next patch (`/evo:publish <x.y.z+1>`). Report the failing job + `gh run view --log-failed` excerpt.
 - **`release` red or binaries MISSING → the release shipped without prebuilt binaries** (the one-line installer keeps working via build-from-source, just slower). Fix forward: fix `.goreleaser.yml`/`release.yml`, then `gh run rerun <release-run-id>` if the tag is intact, else cut the next patch.

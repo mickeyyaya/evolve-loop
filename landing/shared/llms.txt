@@ -24,7 +24,7 @@ unless the change is trivial. The floor `ship ⇒ build ∧ audit ∧ (tdd ∨ t
 is compiled into the binary. A configuration cannot remove it. A document
 deliverable also waives the tdd conjunct.
 
-Current release: v23.1.0.
+Current release: {{version}}.
 
 ## Control
 
@@ -42,7 +42,7 @@ starts every LLM binary, and each child gets an allowlisted environment.
   only once.
 - It installs the /evo:* skills into each AI CLI that it finds. It needs no
   account and sends no telemetry. You can run it again safely.
-- Pin a version:            EVO_VERSION=v23.1.0 curl … | sh
+- Pin a version:            EVO_VERSION={{version}} curl … | sh
 - Keep the shell config:    EVO_NO_MODIFY_PATH=1 curl … | sh
 - Read the script first:    https://github.com/mickeyyaya/evolve-loop/blob/main/install.sh
 

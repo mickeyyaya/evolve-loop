@@ -105,3 +105,25 @@ func TestBuild_EachPageCarriesTheLinkPreviewOfTheHomeURL(t *testing.T) {
 		}
 	}
 }
+
+func TestBuild_AnExpandedRootFileGetsTheVersion(t *testing.T) {
+	cfg := homeConfig(t, "noir")
+	cfg.RootFiles = []RootFile{{Src: "../../shared/llms.txt", Dst: "llms.txt", Expand: true}, {Src: "../../shared/llms.txt", Dst: "raw.txt"}}
+	if _, err := Build(cfg); err != nil {
+		t.Fatal(err)
+	}
+	if body := readPage(t, cfg.OutDir, "llms.txt"); strings.Contains(body, "{{") || !strings.Contains(body, "Current release: v") {
+		t.Fatalf("llms.txt was not expanded: %.300s", body)
+	}
+	if body := readPage(t, cfg.OutDir, "raw.txt"); !strings.Contains(body, "{{version}}") {
+		t.Fatalf("a plain root file changed: %.300s", body)
+	}
+}
+
+func TestBuild_AnExpandedRootFileThatCannotBeReadFails(t *testing.T) {
+	cfg := homeConfig(t, "noir")
+	cfg.RootFiles = []RootFile{{Src: "absent.txt", Dst: "x.txt", Expand: true}}
+	if _, err := Build(cfg); err == nil || !strings.Contains(err.Error(), "absent.txt") {
+		t.Fatalf("err = %v", err)
+	}
+}

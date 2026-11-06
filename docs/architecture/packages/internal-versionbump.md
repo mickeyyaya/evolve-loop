@@ -17,6 +17,7 @@
 
 ## Invariants
 
+- `BumpSiteVersion` writes only `product.version` in `landing/shared/content.json`, as `v<target>`. An absent file, or a file with no such field, is skipped. See the [plan](../../plans/release-keeps-site-current-2026-11.md).
 - **Every write is atomic.** A write goes through a temp file and a rename (`atomicwrite.Bytes`). A partial bump leaves mismatched JSON files. The consistency check of the next release finds them.
 - **A write failure propagates.** The package never reports success after it. The `AtomicWriteError` tests pin this.
 - **A marker already at the target is a silent no-op.** Each per-file bump returns `(false, nil)` without a write. A missing skill file, README or heading is also a no-op for the `X.Y` markers.

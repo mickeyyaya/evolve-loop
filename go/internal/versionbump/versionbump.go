@@ -28,6 +28,7 @@ type Paths struct {
 	CodexPluginJSON string
 	SkillMD         string
 	ReadmeMD        string
+	SiteContentJSON string
 }
 
 func DefaultPaths(repoRoot string) Paths {
@@ -37,12 +38,13 @@ func DefaultPaths(repoRoot string) Paths {
 		CodexPluginJSON: filepath.Join(repoRoot, ".codex-plugin", "plugin.json"),
 		SkillMD:         filepath.Join(repoRoot, "skills", "loop", "SKILL.md"),
 		ReadmeMD:        filepath.Join(repoRoot, "README.md"),
+		SiteContentJSON: filepath.Join(repoRoot, "landing", "shared", "content.json"),
 	}
 }
 
 func (p Paths) Files() []string {
-	out := make([]string, 0, 5)
-	for _, f := range []string{p.PluginJSON, p.MarketplaceJSON, p.CodexPluginJSON, p.SkillMD, p.ReadmeMD} {
+	out := make([]string, 0, 6)
+	for _, f := range []string{p.PluginJSON, p.MarketplaceJSON, p.CodexPluginJSON, p.SkillMD, p.ReadmeMD, p.SiteContentJSON} {
 		if f != "" {
 			out = append(out, f)
 		}
@@ -94,6 +96,11 @@ func Run(paths Paths, target string, dryRun bool, now time.Time) (Result, error)
 		return res, err
 	} else if changed {
 		res.Modified = append(res.Modified, "README.md (history)")
+	}
+	if changed, err := BumpSiteVersion(paths.SiteContentJSON, target, dryRun); err != nil {
+		return res, err
+	} else if changed {
+		res.Modified = append(res.Modified, "landing/shared/content.json")
 	}
 	return res, nil
 }
@@ -283,6 +290,27 @@ func BumpReadmeHistory(path, version string, now time.Time, dryRun bool) (bool, 
 	)
 	updated := slices.Insert(lines, firstVRow, newRow)
 	return true, atomicwrite.Bytes(path, []byte(strings.Join(updated, "\n")))
+}
+
+var siteVersionRE = regexp.MustCompile(`("product"\s*:\s*\{[^{}]*?"version"\s*:\s*")(v[^"]*)(")`)
+
+func BumpSiteVersion(path, target string, dryRun bool) (bool, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("versionbump: read %s: %w", path, err)
+	}
+	m := siteVersionRE.FindSubmatch(data)
+	if m == nil || string(m[2]) == "v"+target {
+		return false, nil
+	}
+	if dryRun {
+		return true, nil
+	}
+	out := siteVersionRE.ReplaceAll(data, []byte("${1}v"+target+"${3}"))
+	return true, atomicwrite.Bytes(path, out)
 }
 
 func formatHistoryDate(t time.Time) string {
