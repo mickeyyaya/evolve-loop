@@ -50,5 +50,4 @@ Imagery is generated with Google's **Nano Banana** image models (`gemini-3-pro-i
 
 ## Status
 
-Preview deliverable on the `landing-page` branch (isolated worktree). Pick a winning version,
-then it gets final polish + a deploy on a follow-up.
+The site publishes one design, `noir`, at the root. The other templates stay in `templates/` as unpublished concepts. To publish one, add it to `config()` in `cmd/build/main.go`.

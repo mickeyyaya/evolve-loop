@@ -24,7 +24,14 @@ unless the change is trivial. The floor `ship ⇒ build ∧ audit ∧ (tdd ∨ t
 is compiled into the binary. A configuration cannot remove it. A document
 deliverable also waives the tdd conjunct.
 
-Current release: v22.27.0.
+Current release: v23.1.0.
+
+## Control
+
+A written constitution ranks every rule under one top law: a self-healing loop
+that keeps delivering the best quality features. It gives no power to cross a
+gate. No LLM in the pipeline starts or directs another. One bridge launch API
+starts every LLM binary, and each child gets an allowlisted environment.
 
 ## Install (one line, macOS and Linux, Windows through WSL2)
 
@@ -35,7 +42,7 @@ Current release: v22.27.0.
   only once.
 - It installs the /evo:* skills into each AI CLI that it finds. It needs no
   account and sends no telemetry. You can run it again safely.
-- Pin a version:            EVO_VERSION=v22.27.0 curl … | sh
+- Pin a version:            EVO_VERSION=v23.1.0 curl … | sh
 - Keep the shell config:    EVO_NO_MODIFY_PATH=1 curl … | sh
 - Read the script first:    https://github.com/mickeyyaya/evolve-loop/blob/main/install.sh
 
@@ -53,8 +60,9 @@ One `cli_routing` table in `.evolve/policy.json` decides every dispatch.
 In the table that builds Evolve Loop itself:
 
 - agy runs first, on Gemini 3.8 Flash High.
-- Deep and top seats run Claude Opus through agy (`agy-claude`), then Claude
-  Code.
+- Deep seats on an agy chain run Gemini 4 Argon first, and share by budget with
+  Claude.
+- Top seats run Claude Opus through agy (`agy-claude`), then Claude Code.
 - The integrity floor agents (auditor, adversarial review, tdd and the code
   reviewer) run on Claude Code only.
 
@@ -80,22 +88,28 @@ A failure is routed, not fatal:
   benches that CLI and sends the phase to the next CLI in the chain.
 - If only audit gates forced a FAIL, the build gets a bounded repair round.
 - If a binary was tampered with, the ship stops, and the pin repairs itself.
-- If the origin moved, the loop waits for `evolve sync-main` at the boundary.
+- If a peer moved main, the cycle goes back to audit on the new base.
+- If origin diverged, the push is rejected and the cycle seals as FAIL. The item
+  returns to the queue, and `evolve sync-main` reconciles by merge.
+- If a failure class repeats, a live incident is raised.
 
 A convergence policy is built to make every loop that repeats converge or
-escalate (ADR-0126). It runs in shadow now: no loop calls it yet. It changes
-the feedback, then the strategy, then the scope, and it never allows a fourth
-round.
+escalate (ADR-0126). It runs in shadow now: the audit repair loop calls it and records its decision,
+and the decision stops nothing yet. It changes the feedback, then the strategy,
+then the scope, and its design allows no fourth round.
 
 `evolve checkpoint save` saves uncommitted dev-worktree work as refs.
+`evolve wave next` runs the next wave, and `evolve wave status` reads it.
+`evolve agent run <name>` runs one read-only phase agent with no cycle.
+`evolve integration batch <pr>...` composes reviewed PRs and lands them together.
 
 ## Standards
 
 - Code explains itself: the commit gate refuses a commit that adds a comment.
 - Every code change is test-first, and mutation tests check the tests.
 - Every landing passes a review loop with a convergence rule.
-- The documentation moves to ASD-STE100 Simplified Technical English. 21 core
-  documents use it now, and its lint is in progress.
+- `evolve cover changed` refuses a changed function below 100% coverage.
+- New documentation must pass an ASD-STE100 Simplified Technical English lint.
 
 ## Links
 

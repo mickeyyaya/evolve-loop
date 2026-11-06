@@ -39,6 +39,7 @@ type Product struct {
 	License     string `json:"license"`
 	Repo        string `json:"repo"`
 	RepoURL     string `json:"repoUrl"`
+	SiteURL     string `json:"siteUrl"`
 }
 
 // CTA is a call to action — either a copyable command or a link.
