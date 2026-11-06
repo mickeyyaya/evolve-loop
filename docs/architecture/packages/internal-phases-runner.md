@@ -74,7 +74,7 @@
   - A rung that started work and failed with no proof is unproven, for example an exit 81 stall or a `pane_lost`. Then `WallKeeper` surfaces the first such rung and names every rung. Thus `core.isQuotaWall` does not pause the cycle.
   - This refines T2. A stall after a wall still defers when the stalled family reads `exhausted`.
   - Pinned by `TestRun_TheCycle1853WalkIsAQuotaPauseOnlyWithExhaustionEvidenceForThePaneLoss`. `TestRun_AnExhaustedWalkThatMetAWallSurfacesTheWall` now gives its stall rung exhaustion evidence.
-- **A failed walk names its CLIs** (`withWalk`). The runner wraps the error of a failed walk in `core.WalkError{CLIs}`. The text and the wrapped error do not change. The quota-pause checkpoint reads the CLIs. Pinned by `TestRun_AFailedWalkNamesEveryCLIItLaunchedForTheQuotaCheckpoint`.
+- **A failed walk carries its wall** (`withWalk`). The runner wraps the error of a failed walk in `core.WalkError{Wall}`. The wall has one row for each CLI that the walk met. The text and the wrapped error do not change. The quota-pause checkpoint reads the rows of the wall. Pinned by `TestRun_AFailedWalkNamesEveryCLIItLaunchedForTheQuotaCheckpoint`.
 - **One fence around the whole walk** (`dispatchPhaseAttempts`).
   - The worktree fence is taken once. It is restored before any result goes to reconciliation or classification.
   - The tier is passed as the model, and the bridge maps it per CLI.

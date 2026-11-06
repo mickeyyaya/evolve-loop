@@ -39,8 +39,8 @@ func TestReadCycles_ALaneSpansItsSignalsAndItsDossierPhases(t *testing.T) {
 	got, warnings := wave.ReadCycles(p.root, 10, 0)
 
 	want := []wave.Cycle{
-		{ID: 11, Phase: "retrospective", Verdict: "PASS", Shipped: true, Conflict: true, StartedAt: clock(5), EndedAt: clock(45)},
-		{ID: 12, Phase: "build", StartedAt: clock(20)},
+		{ID: 11, Phase: "retrospective", Verdict: "PASS", Shipped: true, Conflict: true, FailureSignals: 1, StartedAt: clock(5), EndedAt: clock(45)},
+		{ID: 12, Phase: "build", FailureSignals: 1, StartedAt: clock(20)},
 	}
 	if !reflect.DeepEqual(got, want) || len(warnings) != 0 {
 		t.Errorf("ReadCycles =\n%+v\nwant\n%+v\nwarnings %q", got, want, warnings)

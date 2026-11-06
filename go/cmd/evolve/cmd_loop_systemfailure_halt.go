@@ -22,7 +22,7 @@ func cycleRunExitCode(res cyclestate.CycleResult) int {
 }
 
 func haltOnSystemFailure(evolveDir, projectRoot string, cycle int, workspace string, sf *cyclestate.SystemFailureSignal, w io.Writer, signals *signalcenter.Center, rule loopHaltRule) int {
-	wrote := writePipelineEscalation(evolveDir, projectRoot, cycle, workspace, sf, w)
+	wrote := writeHaltEscalation(haltRequest{evolveDir: evolveDir, projectRoot: projectRoot, cycle: cycle, workspace: workspace, sf: sf, walls: rule.walls, stderr: w})
 	fields := make(map[string]string, len(rule.fields)+5)
 	maps.Copy(fields, rule.fields)
 	fields["category"], fields["level"] = sf.Category, sf.Level

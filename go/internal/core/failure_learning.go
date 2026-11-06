@@ -106,7 +106,7 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 		fl.CycleState.ShipFailReasons = []string{fl.Err.Error()}
 	}
 	if gate == gateQuotaDeferred {
-		fmt.Fprintf(o.errOut(), "[orchestrator] WARN failure-learning: the dispatch chain ended at a quota wall; skipping failure learning (DEFERRED, resumable)\n")
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN failure-learning: the dispatch chain ended at a wall; skipping failure learning (DEFERRED, resumable)\n")
 		return
 	}
 	summary, todoID, structured := o.recordFailedApproachState(fl)

@@ -159,6 +159,9 @@ func TestEmitLaneResumed_PublishesAnInfoEventWithTheResumeFacts(t *testing.T) {
 	if e.Code != CodeLaneResumed || e.Severity != signalcenter.SeverityInfo || e.Kind != signalcenter.KindLoopWave || e.Cycle != 2107 || e.Phase != "triage" || !reflect.DeepEqual(e.Fields, want) {
 		t.Errorf("event = %+v, want an INFO %s for cycle 2107 with fields %v", e, CodeLaneResumed, want)
 	}
+	if wantReason := "lane outcome-churn-revert-recovery resumes cycle 2107 at phase triage after a wall pause"; e.Reason != wantReason {
+		t.Errorf("reason = %q, want %q", e.Reason, wantReason)
+	}
 	if m, ok := signalcenter.IsRegistered(CodeLaneResumed); !ok || m != signalcenter.ModuleOrchestrator {
 		t.Errorf("IsRegistered(%s) = %q, %v; want the orchestrator module", CodeLaneResumed, m, ok)
 	}

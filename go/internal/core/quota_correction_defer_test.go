@@ -57,7 +57,7 @@ func TestRunCycle_WalledCorrectionRedispatch_DefersLikeAFirstDispatch(t *testing
 	if !errors.Is(err, ErrAllFamiliesExhausted) {
 		t.Fatalf("err = %v, want the exhaustion sentinel the loop defers on", err)
 	}
-	if msg := err.Error(); strings.Contains(msg, "every family in the fallback chain returned exit=85") || !strings.Contains(msg, "exit=85") || !strings.Contains(msg, "the dispatch ended on a quota wall") {
+	if msg := err.Error(); strings.Contains(msg, "every family in the fallback chain returned exit=85") || !strings.Contains(msg, "exit=85") || !strings.Contains(msg, "the dispatch ended at a wall") {
 		t.Fatalf("the pause names the walk that ended on the wall, never claims every family walled: %s", msg)
 	}
 	if hookCalls != 1 || hookPhase != string(PhaseBuild) {
@@ -238,7 +238,7 @@ func TestRunCycleFromPhase_AWalledResumedDispatchNamesItsWalk(t *testing.T) {
 func TestErrAllFamiliesExhausted_ClaimsOnlyThatTheDispatchEndedAtAWall(t *testing.T) {
 	t.Parallel()
 
-	if msg := ErrAllFamiliesExhausted.Error(); strings.Contains(msg, "all CLI families") || !strings.Contains(msg, "quota wall") {
+	if msg := ErrAllFamiliesExhausted.Error(); strings.Contains(msg, "all CLI families") || !strings.Contains(msg, "ended at a wall") {
 		t.Fatalf("the sentinel must not claim every family walled: %q", msg)
 	}
 }

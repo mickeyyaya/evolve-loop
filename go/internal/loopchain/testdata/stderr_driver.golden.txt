@@ -9,8 +9,8 @@
 [chain] stopping after 2 batch(es): chain_max_batches (inbox pending=3, cap=2)
 == quota_defer
 [chain] batch 1/5 starting — inbox pending=3, fleet lanes=1
-[chain] batch 1 hit the quota wall (cycle=7 wake-at={TS} source=probe) — DEFERRING, not relaunching
-[chain]   the checkpoint is intact; resume when quota resets: evolve loop --resume
+[chain] batch 1 ended at a wall: no cause was recorded for this pause (cycle=7 wake-at={TS} source=probe) — DEFERRING, not relaunching
+[chain]   the checkpoint is intact; next: evolve loop --resume.
 == batch_error
 [chain] batch 1/5 starting — inbox pending=3, fleet lanes=1
 [chain] batch 1 exited rc=2 — stopping the chain (chain_batch_error)
@@ -24,5 +24,5 @@
 == invalid_item_then_quota_defer_no_block
 [chain] skipping .evolve/inbox/typo-item.json — not a valid inbox item (no parseable object with an `id`); it is NOT counted as pending work
 [chain] batch 1/5 starting — inbox pending=1, fleet lanes=1
-[chain] batch 1 hit the quota wall (no checkpoint block on disk) — DEFERRING, not relaunching
-[chain]   the checkpoint is intact; resume when quota resets: evolve loop --resume
+[chain] batch 1 ended at a wall (no checkpoint block on disk, so no cause was recorded) — DEFERRING, not relaunching
+[chain]   the checkpoint is intact; next: evolve loop --resume.

@@ -130,7 +130,7 @@ func TestQuotaBoundaryCheckpointer_TheEarliestActiveBenchSetsTheWakeAt(t *testin
 		}
 	}
 	want := store.Active()["codex"].BenchedUntil
-	cs.QuotaWalkCLIs = []string{"agy-claude-tmux", "codex-tmux"}
+	cs.QuotaWall = quotaWallOf("agy-claude-tmux", "codex-tmux")
 
 	if err := core.QuotaBoundaryCheckpointer(cs, root, now); err != nil {
 		t.Fatalf("checkpointer: %v", err)
@@ -192,7 +192,7 @@ func withUsageReset(t *testing.T, fn func(projectRoot string, families []string,
 func TestQuotaBoundaryCheckpointer_AnUnknownResetIsNotAutoResumableAndNamesTheOperatorAction(t *testing.T) {
 	withUsageReset(t, nil)
 	root, cs := quotaCheckpointFixture(t)
-	cs.QuotaWalkCLIs = []string{"claude-tmux"}
+	cs.QuotaWall = quotaWallOf("claude-tmux")
 
 	if err := core.QuotaBoundaryCheckpointer(cs, root, time.Date(2026, 10, 9, 18, 42, 13, 0, time.Local)); err != nil {
 		t.Fatalf("checkpointer: %v", err)
@@ -235,7 +235,7 @@ func TestQuotaBoundaryCheckpointer_ABenchThatIsNoQuotaResetOfTheWalkIsNoEvidence
 		t.Run(tc.name, func(t *testing.T) {
 			withUsageReset(t, nil)
 			root, cs := quotaCheckpointFixture(t)
-			cs.QuotaWalkCLIs = []string{"claude-tmux"}
+			cs.QuotaWall = quotaWallOf("claude-tmux")
 			if err := tc.bench(root); err != nil {
 				t.Fatalf("seed bench: %v", err)
 			}
@@ -260,7 +260,7 @@ func TestQuotaBoundaryCheckpointer_TheUsageQuerySuppliesTheResetOfTheWalkedFamil
 		return reset, true
 	})
 	root, cs := quotaCheckpointFixture(t)
-	cs.QuotaWalkCLIs = []string{"claude-tmux", "agy-claude-tmux"}
+	cs.QuotaWall = quotaWallOf("claude-tmux", "agy-claude-tmux")
 
 	if err := core.QuotaBoundaryCheckpointer(cs, root, now); err != nil {
 		t.Fatalf("checkpointer: %v", err)
@@ -272,5 +272,55 @@ func TestQuotaBoundaryCheckpointer_TheUsageQuerySuppliesTheResetOfTheWalkedFamil
 	}
 	if strings.Join(asked, ",") != "claude,agy-claude" {
 		t.Errorf("usage query asked for %v, want the walked families claude,agy-claude", asked)
+	}
+}
+
+func quotaWallOf(clis ...string) []core.FamilyEnd {
+	var w core.Wall
+	for _, c := range clis {
+		w = w.Observe(core.FamilyEnd{CLI: c, Pattern: "rate_limit"})
+	}
+	return w.Ends
+}
+
+func TestQuotaBoundaryCheckpointer_StoresTheWallRowsForALaterReader(t *testing.T) {
+	root, cs := quotaCheckpointFixture(t)
+	now := time.Date(2026, 10, 9, 18, 42, 13, 0, time.Local)
+	cs.QuotaWall = []core.FamilyEnd{{CLI: "claude", Pattern: "auth_recheck"}, {CLI: "agy", Pattern: "rate_limit"}}
+
+	if err := core.QuotaBoundaryCheckpointer(cs, root, now); err != nil {
+		t.Fatalf("checkpointer: %v", err)
+	}
+
+	b, err := os.ReadFile(filepath.Join(root, ".evolve", "cycle-state.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var state struct {
+		Checkpoint struct {
+			QuotaWall []core.FamilyEnd `json:"quotaWall"`
+		} `json:"checkpoint"`
+	}
+	if err := json.Unmarshal(b, &state); err != nil {
+		t.Fatal(err)
+	}
+	if got := state.Checkpoint.QuotaWall; len(got) != 2 || got[0].Pattern != "auth_recheck" || got[1].CLI != "agy" {
+		t.Errorf("the checkpoint is the home of the fact for a later process: %+v", got)
+	}
+}
+
+func TestQuotaBoundaryCheckpointer_AnUnknownResetWithALoginRowNamesTheLoginNotQuota(t *testing.T) {
+	withUsageReset(t, nil)
+	root, cs := quotaCheckpointFixture(t)
+	cs.QuotaWall = core.Wall{}.Observe(core.FamilyEnd{CLI: "claude-tmux", Pattern: "auth_recheck"}).Ends
+
+	if err := core.QuotaBoundaryCheckpointer(cs, root, time.Date(2026, 10, 9, 18, 42, 13, 0, time.Local)); err != nil {
+		t.Fatalf("checkpointer: %v", err)
+	}
+
+	got := readPause(t, root)
+	want := "open claude and run /login. Then evolve loop --resume."
+	if got.OperatorAction != want || got.AutoResumeMaxAttempts != 0 {
+		t.Errorf("operator action=%q auto-resume=%d, want %q and no auto-resume", got.OperatorAction, got.AutoResumeMaxAttempts, want)
 	}
 }

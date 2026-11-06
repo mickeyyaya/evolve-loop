@@ -28,10 +28,15 @@ func (b *loopBatchCoordinator) observeSequentialCycle(cycle sequentialCycle, sta
 	}
 	fmt.Fprint(b.stderr, formatSignalReport(cycle.cycle, b.orch.SignalSummary()))
 	if pause, ok := detectQuotaPause(b.cfg.EvolveDir); ok {
-		fmt.Fprintln(b.stderr, quotaPauseLine(pause, time.Now()))
-		fmt.Fprintln(b.stderr, "[loop]   to auto-resume in-session: SKILL.md / /loop wrapper calls ScheduleWakeup until wake-at then /evo:loop --resume")
+		for _, line := range pause.report(time.Now()) {
+			fmt.Fprintln(b.stderr, line)
+		}
+		now := time.Now()
+		if !pause.Wall.AllLogin() && pause.timed(now) {
+			fmt.Fprintln(b.stderr, "[loop]   to auto-resume in-session: SKILL.md / /loop wrapper calls ScheduleWakeup until wake-at then /evo:loop --resume")
+		}
 		fmt.Fprintln(b.stderr, "[loop]   to resume manually: evolve loop --resume")
-		b.result.StopReason = "quota-pause"
+		b.result.StopReason = pause.stopReason(now)
 		b.result.emit(b.stdout)
 		return batchDecision{flow: batchReturn, exitCode: 5}
 	}

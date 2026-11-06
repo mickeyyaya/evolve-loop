@@ -35,6 +35,7 @@ func init() {
 type loopHaltRule struct {
 	code   signalcenter.Code
 	fields map[string]string
+	walls  haltWalls
 }
 
 var systemFailureRule = loopHaltRule{code: CodeLoopSystemFailureHalt}

@@ -34,6 +34,10 @@ func TestDiff(t *testing.T) {
 				{Kind: wave.EventSealed, Cycle: 7, Detail: "PASS"},
 				{Kind: wave.EventShipped, Cycle: 7},
 			}},
+		{"a login wall is its own event and never a quota pause",
+			wave.Snapshot{LoopLive: true, Cycles: []wave.Cycle{{ID: 7, Phase: "audit"}}},
+			wave.Snapshot{LoopLive: true, Cycles: []wave.Cycle{{ID: 7, Phase: "audit", LoginWalls: 1}}},
+			[]wave.Event{{Kind: wave.EventLoginRequired, Cycle: 7, Detail: "audit"}}},
 		{"a lane deadline stop with no verdict is a stop",
 			wave.Snapshot{LoopLive: true, Cycles: []wave.Cycle{building}},
 			wave.Snapshot{LoopLive: true, Cycles: []wave.Cycle{{ID: 7, Phase: "build", Termination: "stopped: lane deadline"}}},
@@ -74,6 +78,7 @@ func TestEvent_String(t *testing.T) {
 		{wave.Event{Kind: wave.EventSealed, Cycle: 7, Detail: "WARN"}, "cycle 7: sealed WARN"},
 		{wave.Event{Kind: wave.EventShipped, Cycle: 7}, "cycle 7: shipped"},
 		{wave.Event{Kind: wave.EventQuotaPaused, Cycle: 7, Detail: "scout"}, "cycle 7: quota-paused in scout"},
+		{wave.Event{Kind: wave.EventLoginRequired, Cycle: 7, Detail: "audit"}, "cycle 7: login-required in audit"},
 		{wave.Event{Kind: wave.EventLoopExit}, "loop: exit"},
 		{wave.Event{Kind: wave.EventStopped, Cycle: 7, Detail: "stopped: lane deadline"}, "cycle 7: stopped: lane deadline"},
 		{wave.Event{Kind: wave.EventWaveStarted, Detail: "83"}, "wave 83 started; watch follows it"},
@@ -88,8 +93,8 @@ func TestEvent_String(t *testing.T) {
 
 func TestEventKind_IsTheWatchJSONVocabulary(t *testing.T) {
 	t.Parallel()
-	kinds := []wave.EventKind{wave.EventPhase, wave.EventSealed, wave.EventShipped, wave.EventQuotaPaused, wave.EventLoopExit, wave.EventWaveStarted, wave.EventPool, wave.EventStopped}
-	want := []string{"phase", "sealed", "shipped", "quota-paused", "loop-exit", "wave-started", "pool", "stopped"}
+	kinds := []wave.EventKind{wave.EventPhase, wave.EventSealed, wave.EventShipped, wave.EventQuotaPaused, wave.EventLoginRequired, wave.EventLoopExit, wave.EventWaveStarted, wave.EventPool, wave.EventStopped}
+	want := []string{"phase", "sealed", "shipped", "quota-paused", "login-required", "loop-exit", "wave-started", "pool", "stopped"}
 	for i, k := range kinds {
 		if string(k) != want[i] {
 			t.Errorf("kind %d = %q, want %q: a watch consumer reads this text", i, k, want[i])

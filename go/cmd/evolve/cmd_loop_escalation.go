@@ -3,7 +3,10 @@ package main
 import (
 	"fmt"
 	"io"
+	"maps"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
@@ -32,7 +35,22 @@ type pipelineEscalationRecord struct {
 }
 
 func writePipelineEscalation(evolveDir, projectRoot string, cycle int, workspace string, sf *cyclestate.SystemFailureSignal, stderr io.Writer) pipelineEscalationRecord {
-	halt := haltRecord{cycle: cycle, workspace: workspace, sf: sf, now: time.Now().UTC()}
+	return writeHaltEscalation(haltRequest{evolveDir: evolveDir, projectRoot: projectRoot, cycle: cycle, workspace: workspace, sf: sf, stderr: stderr})
+}
+
+type haltRequest struct {
+	evolveDir   string
+	projectRoot string
+	cycle       int
+	workspace   string
+	sf          *cyclestate.SystemFailureSignal
+	walls       haltWalls
+	stderr      io.Writer
+}
+
+func writeHaltEscalation(req haltRequest) pipelineEscalationRecord {
+	evolveDir, projectRoot, stderr := req.evolveDir, req.projectRoot, req.stderr
+	halt := haltRecord{cycle: req.cycle, workspace: req.workspace, sf: req.sf, now: time.Now().UTC(), walls: req.walls}
 	story := halt.narrative()
 	escPath := filepath.Join(evolveDir, "pipeline-escalation.json")
 	if werr := atomicwrite.JSON(escPath, halt.dossier(story)); werr != nil {
@@ -51,6 +69,22 @@ type haltRecord struct {
 	workspace string
 	sf        *cyclestate.SystemFailureSignal
 	now       time.Time
+	walls     haltWalls
+}
+
+type haltWalls struct {
+	login   []int
+	counted int
+}
+
+func (w haltWalls) every() bool { return w.counted > 0 && len(w.login) == w.counted }
+
+func joinCycles(ids []int) string {
+	parts := make([]string, 0, len(ids))
+	for _, id := range ids {
+		parts = append(parts, strconv.Itoa(id))
+	}
+	return strings.Join(parts, ",")
 }
 
 type haltNarrative struct {
@@ -58,6 +92,31 @@ type haltNarrative struct {
 }
 
 func (h haltRecord) narrative() haltNarrative {
+	story := h.defectNarrative()
+	if h.sf.Category != "zero-ship" || len(h.walls.login) == 0 {
+		return story
+	}
+	cycles := joinCycles(h.walls.login)
+	if !h.walls.every() {
+		line := fmt.Sprintf(" Cycles %s ended at a login wall: read the LOGIN-REQUIRED line of each.", cycles)
+		story.nextAction += line
+		story.summary += line
+		return story
+	}
+	return haltNarrative{
+		nextAction: fmt.Sprintf("Log in to the CLI family that each LOGIN-REQUIRED line names (cycles %s; evolve dossier show %d), then resume: evolve loop --resume.", cycles, h.cycle),
+		reproHint:  fmt.Sprintf("Each counted cycle met a login wall: read the LOGIN-REQUIRED line of cycles %s. Evidence: %s.", cycles, h.sf.Evidence),
+		summary:    fmt.Sprintf("Zero-ship halt at cycle %d. Each counted cycle (%s) ended at a login wall. This is not a pipeline defect: time alone does not clear a login.", h.cycle, cycles),
+		rootCause:  fmt.Sprintf("A CLI family needs a login. Evidence: %s.", h.sf.Evidence),
+		fix:        "Log in to each CLI family that the LOGIN-REQUIRED lines name, then resume the loop. No code change is needed.",
+	}
+}
+
+func (h haltRecord) loginOnly() bool {
+	return h.sf.Category == "zero-ship" && h.walls.every()
+}
+
+func (h haltRecord) defectNarrative() haltNarrative {
 	sf := h.sf
 	if sf.Category == "verdict-incoherence" {
 		return haltNarrative{
@@ -91,26 +150,60 @@ func (h haltRecord) dossier(story haltNarrative) pipelineEscalation {
 	}
 }
 
+const (
+	weightPipelineDefect = 0.99
+	weightOperatorLogin  = 0.5
+	priorityP0           = "P0"
+	priorityP1           = "P1"
+	routeConsole         = "console"
+)
+
 func (h haltRecord) inboxItem(story haltNarrative) (string, map[string]any) {
+	if h.loginOnly() {
+		return h.loginItem(story)
+	}
 	itemID := fmt.Sprintf("pipeline-defect-%s-cycle%d", h.sf.Category, h.cycle)
-	return itemID, map[string]any{
-		"id":             itemID,
-		"created_at":     h.now.Format(time.RFC3339),
-		"weight":         0.99,
-		"title":          fmt.Sprintf("PIPELINE DEFECT (%s): the loop halted — %s", h.sf.Category, h.sf.Evidence),
-		"kind":           inboxbatch.KindPipelineRepair,
-		"priority":       "P0",
-		"priority_class": inboxbatch.ClassStability,
-		"origin":         inboxbatch.OriginCycle,
-		"injected_by":    escalationInjectedBy,
-		"summary":        story.summary,
-		"root_cause":     story.rootCause,
-		"fix":            story.fix,
+	return itemID, h.itemBase(itemID, story, map[string]any{
+		"weight":   weightPipelineDefect,
+		"title":    fmt.Sprintf("PIPELINE DEFECT (%s): the loop halted — %s", h.sf.Category, h.sf.Evidence),
+		"kind":     inboxbatch.KindPipelineRepair,
+		"priority": priorityP0,
 		"connects_to": []string{
 			"docs/architecture/adr/0072-system-failure-policy-and-halt.md",
 			filepath.Join(".evolve", "pipeline-escalation.json"),
 			h.workspace,
 		},
 		"notes": fmt.Sprintf("Auto-filed by the ADR-0072 halt at %s. Evidence: %s", h.now.Format(time.RFC3339), h.sf.Evidence),
+	})
+}
+
+func (h haltRecord) loginItem(story haltNarrative) (string, map[string]any) {
+	itemID := fmt.Sprintf("login-required-zero-ship-cycle%d", h.cycle)
+	return itemID, h.itemBase(itemID, story, map[string]any{
+		"weight":   weightOperatorLogin,
+		"title":    fmt.Sprintf("LOGIN REQUIRED: the loop halted — %s", h.sf.Evidence),
+		"kind":     inboxbatch.KindOperatorLogin,
+		"route":    routeConsole,
+		"priority": priorityP1,
+		"connects_to": []string{
+			filepath.Join(".evolve", "pipeline-escalation.json"),
+			h.workspace,
+		},
+		"notes": fmt.Sprintf("Auto-filed by the zero-ship halt at %s. Evidence: %s", h.now.Format(time.RFC3339), h.sf.Evidence),
+	})
+}
+
+func (h haltRecord) itemBase(id string, story haltNarrative, own map[string]any) map[string]any {
+	item := map[string]any{
+		"id":             id,
+		"created_at":     h.now.Format(time.RFC3339),
+		"priority_class": inboxbatch.ClassStability,
+		"origin":         inboxbatch.OriginCycle,
+		"injected_by":    escalationInjectedBy,
+		"summary":        story.summary,
+		"root_cause":     story.rootCause,
+		"fix":            story.fix,
 	}
+	maps.Copy(item, own)
+	return item
 }

@@ -149,7 +149,7 @@ func TestWallKeeper_ANonStartAfterTheWallStillSurfacesTheWall(t *testing.T) {
 
 	res, err := keeper.Surface(llmroute.TieredDispatchResult{Walled: true}, mismatch, errors.New("bridge: launch exit=87"))
 
-	if res.ExitCode != 85 || err == nil || !strings.Contains(err.Error(), "met a quota wall before its last rung failed") {
+	if res.ExitCode != 85 || err == nil || !strings.Contains(err.Error(), "met a wall before its last rung failed") {
 		t.Fatalf("res=%+v err=%v, want the wall: a non-start on the last rung is neutral", res, err)
 	}
 }
@@ -175,7 +175,7 @@ func TestWallKeeper_ABootTimeoutOnALostSessionAfterTheWallIsASystemFaultNotAQuot
 
 			res, err := keeper.Surface(llmroute.TieredDispatchResult{Walled: true}, lost, errors.New("bridge: launch exit=80"))
 
-			if res.ExitCode != 80 || err == nil || !strings.Contains(err.Error(), "is not a quota pause") {
+			if res.ExitCode != 80 || err == nil || !strings.Contains(err.Error(), "so the walk is not a pause") {
 				t.Fatalf("res=%+v err=%v, want the exit-80 system fault: a lost session is not a plain non-start", res, err)
 			}
 		})
@@ -190,7 +190,7 @@ func TestWallKeeper_APlainBootTimeoutAfterTheWallStillSurfacesTheWall(t *testing
 
 	res, err := keeper.Surface(llmroute.TieredDispatchResult{Walled: true}, boot, errors.New("bridge: launch exit=80"))
 
-	if res.ExitCode != 85 || err == nil || !strings.Contains(err.Error(), "met a quota wall before its last rung failed") {
+	if res.ExitCode != 85 || err == nil || !strings.Contains(err.Error(), "met a wall before its last rung failed") {
 		t.Fatalf("res=%+v err=%v, want the wall: a plain boot timeout is neutral", res, err)
 	}
 }
