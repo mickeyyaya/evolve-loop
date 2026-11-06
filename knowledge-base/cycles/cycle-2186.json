@@ -1,0 +1,260 @@
+{
+  "schema_version": 2,
+  "cycle": 2186,
+  "run_id": "01M6QCGG122GNWQJZZ2AWCQFJ2",
+  "goal": "Wave 157.\n\nWork the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree that it ships;\n- disposition its own defect ledger and the inherited ids;\n- record a terminal outcome on every exit;\n- never change a protected control-plane file with a tool;\n- leave no stale worktree.\n\nRouting:\n- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.\n- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.\n- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.\n\nCraft:\n- New and changed code has no comments. Names, types and tests give the intent.\n- Write each new document and each new log text in ASD-STE100.\n- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.\n- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.\n\nEvidence:\n- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.\n\nThe measure of this wave is the number of shipped cycles. Keep each cycle shipping.\n\nWave 156 facts (run 20261105T005830Z): 3 of 9 cycles shipped.\n- Cycle 2172: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=spine gate: next=ship blocked — a mandatory predecessor's handoff artifact is missing (clean absence, fail-closed; cycle-N class). Last phase: aborted. It did not ship.\n- Cycle 2173: final verdict PASS. It shipped.\n- Cycle 2174: no final verdict. Last phase: audit. It did not ship. Quota pauses: 1.\n- Cycle 2175: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=spine gate: next=ship blocked — a mandatory predecessor's handoff artifact is missing (clean absence, fail-closed; cycle-N class). Last phase: aborted. It did not ship.\n- Cycle 2176: final verdict PASS. It shipped.\n- Cycle 2177: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=spine gate: next=ship blocked — a mandatory predecessor's handoff artifact is missing (clean absence, fail-closed; cycle-N class). Last phase: aborted. It did not ship.\n- Cycle 2178: final verdict PASS. It shipped.\n- Cycle 2179: no final verdict. Last phase: audit. It did not ship. Quota pauses: 1.\n- Cycle 2180: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=spine gate: next=ship blocked — a mandatory predecessor's handoff artifact is missing (clean absence, fail-closed; cycle-N class). Last phase: aborted. It did not ship.\n- Pull requests merged at this boundary: none.\n\nEarlier waves:\n- Wave 153 (run 20261104T002909Z): 0 of 1 cycles shipped.\n- Wave 154 (run 20261104T032203Z): 0 of 9 cycles shipped.\n- Wave 155 (run 20261104T141300Z): 0 of 11 cycles shipped.",
+  "final_verdict": "PASS",
+  "commit_sha": "7a57fb3e3cf44e370d226056b4f17d5486fd45fc",
+  "tree_sha": "77f0d9613eb693119aeb3a000ab0715eafac1cdb",
+  "tasks": [
+    "agent-seat-health-states"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 98478,
+      "started_at": "2026-11-06T02:56:51Z",
+      "ended_at": "2026-11-06T02:58:31Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 12,
+        "output": 2648,
+        "cache_read": 360619,
+        "cache_write": 26555
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 30398,
+      "started_at": "2026-11-06T03:00:48Z",
+      "ended_at": "2026-11-06T03:01:20Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 8,
+        "output": 1314,
+        "cache_read": 286154,
+        "cache_write": 42894
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 341385,
+      "started_at": "2026-11-06T03:01:23Z",
+      "ended_at": "2026-11-06T03:07:07Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 56,
+        "output": 24078,
+        "cache_read": 2846219,
+        "cache_write": 99286
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 1737609,
+      "started_at": "2026-11-06T03:07:07Z",
+      "ended_at": "2026-11-06T03:51:13Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 64,
+        "output": 11734,
+        "cache_read": 2768912,
+        "cache_write": 67059
+      }
+    },
+    {
+      "name": "test-amplification",
+      "verdict": "PASS",
+      "duration_ms": 110433,
+      "started_at": "2026-11-06T03:52:48Z",
+      "ended_at": "2026-11-06T03:54:40Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 10,
+        "output": 3234,
+        "cache_read": 324301,
+        "cache_write": 49837
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "WARN",
+      "duration_ms": 1170911,
+      "started_at": "2026-11-06T03:54:40Z",
+      "ended_at": "2026-11-06T04:23:28Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 22,
+        "output": 32882,
+        "cache_read": 1322876,
+        "cache_write": 139619
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 1534211,
+      "started_at": "2026-11-06T04:25:42Z",
+      "ended_at": "2026-11-06T05:07:21Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 32,
+        "output": 4584,
+        "cache_read": 1223776,
+        "cache_write": 49782
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "WARN",
+      "duration_ms": 316585,
+      "started_at": "2026-11-06T05:07:57Z",
+      "ended_at": "2026-11-06T05:22:44Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 22,
+        "output": 20632,
+        "cache_read": 1165614,
+        "cache_write": 97984
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "FAIL",
+      "duration_ms": 933846,
+      "started_at": "2026-11-06T05:24:33Z",
+      "ended_at": "2026-11-06T05:58:23Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "WARN",
+      "duration_ms": 683674,
+      "started_at": "2026-11-06T05:58:23Z",
+      "ended_at": "2026-11-06T06:17:58Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 20,
+        "output": 28880,
+        "cache_read": 1042067,
+        "cache_write": 102213
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "PASS",
+      "duration_ms": 924783,
+      "started_at": "2026-11-06T06:18:37Z",
+      "ended_at": "2026-11-06T06:34:03Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "explanation_corrections": [
+    "docs/explain/builds/cycle-2186-01m6qcgg122gnwqjzz2awcqfj2.md:8 claims cycle 2172 failed on a missing handoff artifact; .evolve/runs/cycle-2172/retrospective-report.md:14 proves that no artifact was missing and that the spine gate read a stale round 1 verdict from handoff-auditor.json, so the line must state that cause. docs/explain/builds/cycle-2186-01m6qcgg122gnwqjzz2awcqfj2.md:8 otherwise matches go/internal/bridge/panestream/seathealth.go:39 and go/cmd/evolve/cmd_wave_status.go:100. Each material path has its own Changed Areas entry: docs/explain/builds/cycle-2186-01m6qcgg122gnwqjzz2awcqfj2.md:14 for go/internal/bridge/panestream/seathealth.go:39, docs/explain/builds/cycle-2186-01m6qcgg122gnwqjzz2awcqfj2.md:17 for go/cmd/evolve/cmd_bridge_sessions.go:42, docs/explain/builds/cycle-2186-01m6qcgg122gnwqjzz2awcqfj2.md:18 for go/cmd/evolve/cmd_wave_status_seat.go:25, docs/explain/builds/cycle-2186-01m6qcgg122gnwqjzz2awcqfj2.md:19 for go/cmd/evolve/cmd_wave_status.go:100, docs/explain/builds/cycle-2186-01m6qcgg122gnwqjzz2awcqfj2.md:20 for go/internal/panewatch/panewatch.go:28, docs/explain/builds/cycle-2186-01m6qcgg122gnwqjzz2awcqfj2.md:21 for go/internal/panewatch/tracker.go:23. The red claim of 9 of 13 in the Verification section matches test-report.md:44-66. The document hash matches the typed handoff (`shasum -a 256`). I did not reproduce the host whole-diff hash. The handoff state is `available`."
+  ],
+  "timing": {
+    "total_ms": 7882313,
+    "phase_count": 11,
+    "retried_count": 0,
+    "longest_phase": "build",
+    "longest_ms": 1737609,
+    "by_archetype_ms": {
+      "build": 3271820,
+      "control": 1858629,
+      "evaluate": 2281603,
+      "plan": 470261
+    },
+    "total_tokens": {
+      "input": 246,
+      "output": 129986,
+      "cache_read": 11340538,
+      "cache_write": 675229
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 96,
+        "output": 16318,
+        "cache_read": 3992688,
+        "cache_write": 116841
+      },
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "evaluate": {
+        "input": 74,
+        "output": 85628,
+        "cache_read": 3854858,
+        "cache_write": 389653
+      },
+      "plan": {
+        "input": 76,
+        "output": 28040,
+        "cache_read": 3492992,
+        "cache_write": 168735
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.9999783083779745,
+    "hot_phase_count": 9,
+    "hot_phases": [
+      "scout",
+      "triage",
+      "tdd",
+      "build",
+      "test-amplification",
+      "audit",
+      "build",
+      "audit",
+      "audit"
+    ]
+  },
+  "recalled_lessons": [
+    "inst-L1544b",
+    "cycle-1502-closure-citation-contract-never-reaches-the-auditor-it-grades",
+    "cycle-93-build-report-commit-sha-fabrication",
+    "cycle-1492-remedy-on-disk-in-four-places-reaches-no-agent-with-authority-to-apply-it",
+    "cycle-1496-a-retry-carries-the-items-spec-and-never-its-predecessors-lesson"
+  ]
+}
