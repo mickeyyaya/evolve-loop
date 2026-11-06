@@ -13,6 +13,8 @@ const (
 	CodeContextFillHigh       signalcenter.Code = "BRIDGE_CONTEXT_FILL_HIGH"
 	CodeTelemetryAppendFailed signalcenter.Code = "BRIDGE_TELEMETRY_APPEND_FAILED"
 	CodeTelemetryTripwire     signalcenter.Code = "BRIDGE_TELEMETRY_TRIPWIRE"
+	CodeTurnSumMismatch       signalcenter.Code = "BRIDGE_TURN_SUM_MISMATCH"
+	CodeTurnAppendFailed      signalcenter.Code = "BRIDGE_TURN_APPEND_FAILED"
 	CodeTokensRowUnattributed signalcenter.Code = "TOKENS_ROW_UNATTRIBUTED"
 
 	CodeBootStrikeClearFailed    signalcenter.Code = "BRIDGE_BOOT_STRIKE_CLEAR_FAILED"
@@ -37,6 +39,8 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeContextFillHigh, "an attempt's context fill crossed the configured warn threshold; the reason names the fill and the threshold")
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeTelemetryAppendFailed, "the per-attempt telemetry record could not be appended to the workspace ledger; fields name the path")
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeTelemetryTripwire, "a successful attempt ran past the tripwire threshold with no measurable token usage — telemetry blind spot, not a phase failure")
+	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeTurnSumMismatch, "the per-turn token counts of a call do not sum to the llm-calls row; the row is unchanged and the turn sidecar is kept for diagnosis; fields call_id, cli, agent")
+	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeTurnAppendFailed, "the per-turn lines of a call could not be appended to llm-turns.ndjson; the launch and the llm-calls row are unchanged (telemetry is fail-open); fields call_id, cli, agent")
 	signalcenter.RegisterCode(signalcenter.ModuleTokens, CodeTokensRowUnattributed, "a cycle workspace wrote an llm-calls row whose request carried no cycle number, so the row cannot be attributed to its cycle; emitted at the enforce stage only; fields call_id, cli, agent")
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeBootStrikeClearFailed, "the boot-strike store could not clear the driver's consecutive boot-timeout strike after a non-80 exit (the REPL booted); the strike count may stay stale and bench the driver early; fields step=clear_boot_strike, call_id, cli, agent")
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeBootStrikeRecordFailed, "the boot-strike store could not record the driver's boot-timeout strike after exit 80; the bench never escalates for this driver; the launch error still wraps the transient sentinel; fields step=record_boot_strike, call_id, cli, agent")

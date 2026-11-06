@@ -132,8 +132,35 @@ func (e *Engine) recordModelAttempt(
 		logContext.warn(CodeTelemetryAppendFailed,
 			fmt.Sprintf("attempt telemetry append failed: path=%s error=%v", llmcalls.Path(req.Workspace), err))
 	}
-	e.signalUnattributedRow(req, logContext, rec)
+	e.afterRowAppend(req, logContext, rec, result.Turns)
 	return logContext
+}
+
+func (e *Engine) afterRowAppend(req core.BridgeRequest, logContext attemptLogContext, rec llmcalls.Record, turns []tokenusage.Turn) {
+	e.signalUnattributedRow(req, logContext, rec)
+	writeTurnSidecar(req.Workspace, logContext, rec, turns)
+}
+
+func writeTurnSidecar(workspace string, logContext attemptLogContext, row llmcalls.Record, turns []tokenusage.Turn) {
+	if len(turns) == 0 {
+		return
+	}
+	lines := make([]llmcalls.Turn, len(turns))
+	var sum core.TokenUsage
+	for i, t := range turns {
+		lines[i] = llmcalls.Turn{Index: t.Index, TS: t.Timestamp, Tokens: t.Usage, PromptTokens: t.PromptTokens, Tools: t.Tools}
+		sum.Input += t.Usage.Input
+		sum.Output += t.Usage.Output
+		sum.CacheRead += t.Usage.CacheRead
+		sum.CacheWrite += t.Usage.CacheWrite
+	}
+	if sum != row.Tokens {
+		logContext.warn(CodeTurnSumMismatch,
+			fmt.Sprintf("turn sum differs from the llm-calls row: turns=%+v row=%+v", sum, row.Tokens))
+	}
+	if err := llmcalls.AppendTurns(workspace, row.CallID, lines); err != nil {
+		logContext.warn(CodeTurnAppendFailed, "turn sidecar append failed: "+err.Error())
+	}
 }
 
 func elapsedMillis(start, end time.Time) (millis *int64) {

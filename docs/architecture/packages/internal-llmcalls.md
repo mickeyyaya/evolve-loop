@@ -20,6 +20,7 @@
 - **Aggregate.** `Aggregate` builds a deterministic performance index and persists no second copy. A `Performance` group is one comparable model and outcome. Token volumes include every valid count. The output rate uses only complete measurements with a positive duration of the try. Legacy labels stay in `RequestedModel`.
 - **Try fields (ADR-0142 L0).** `Rung`, `FailureClass`, `Fingerprint`, `Effort`, `ServedModel`, `Context`, `LadderStage` and `LadderWould` are the try record of [retry-ladder §6](../retry-ladder.md#6-the-try-record). Each field is optional, so an old line decodes unchanged. `ServedModel` is the model that the CLI reports, never the tier alias of `Model`.
 - **Call id.** `NewCallID` makes an opaque id that is unique in the process, with no third-party UUID dependency. Random bytes prevent collisions across processes. The timestamp, the pid and a monotonic sequence keep it unique if the random source fails.
+- **Turn sidecar.** `AppendTurns` writes one line for each turn of a call to `llm-turns.ndjson`, keyed by the `call_id` of the row. A call with more than `MaxTurnLines` turns keeps the first turns and adds one line with a `truncated` count. The sidecar is telemetry. The row stays one line for each call. A write failure returns an error, and the caller turns it into a warning.
 
 ## Invariants
 

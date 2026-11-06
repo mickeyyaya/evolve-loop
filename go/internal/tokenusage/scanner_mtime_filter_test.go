@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -124,7 +125,7 @@ func TestScanConfigRoot_AnOtherwiseAttributableOldFileDoesNotChangeTheResult(t *
 	if without.Usage.Input != 70 {
 		t.Fatalf("baseline Usage.Input = %d, want 70", without.Usage.Input)
 	}
-	if with != without {
+	if !reflect.DeepEqual(with, without) {
 		t.Errorf("with old file = %+v, without = %+v, want equal", with, without)
 	}
 }

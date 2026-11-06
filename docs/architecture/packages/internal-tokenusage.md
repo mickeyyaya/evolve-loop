@@ -72,6 +72,8 @@
 - **`FillWarn` fires strictly above the threshold** and never on a negative reading. The message names the phase, because an unattributed fill WARN cannot be acted on. Pinned by `TestFillWarn_FiresOnlyStrictlyAboveThreshold`.
 - **Every anchor form stays listed.** Dropping one does not narrow attribution loudly: it silently degrades those launches to the scrollback tier, with input and `cache_read` at zero. `TestArtifactAnchors_MatchRenderedContract` renders the real phasecontract footer and tail and requires an anchor to match each, and the `go/acs/cycle1457` predicates pin the subagent format strings.
 - **Anchors match exactly**, label case and punctuation included. Hyphenated, lowercased and `key=value` lookalikes do not attribute, and neither does a prose citation of the path. Pinned by `TestAttributes_MarkerAnchored`.
+- **One turn per message or generation.** `Result.Turns` holds one `Turn` for each assistant message id of a claude transcript, in time order, and one for each agy generation row. The tool names of a turn come from all the in-window lines of its message id, in order, and a repeated tool_use line counts once. A malformed agy row is not a turn.
+- **Turns sum to the row.** The turns sum to `Usage`. Pinned by `TestTurns_ClaudeTurnSumEqualsTheRowUsage` and `TestTurns_Agy14ConversationGivesOneTurnPerGenerationSummingToTheRow`.
 
 ## Findings
 

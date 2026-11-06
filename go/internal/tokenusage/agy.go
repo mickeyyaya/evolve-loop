@@ -94,7 +94,9 @@ func addAgyConversation(r Result, root, id string, query SQLiteQuery) Result {
 			continue
 		}
 		r.Usage = cyclestate.TokenUsage{Input: r.Usage.Input + u.Input, Output: r.Usage.Output + u.Output, CacheRead: r.Usage.CacheRead + u.CacheRead}
-		if prompt := u.Input + u.CacheRead; prompt > r.PeakPromptTokens {
+		prompt := u.Input + u.CacheRead
+		r.Turns = append(r.Turns, Turn{Index: len(r.Turns) + 1, Usage: u, PromptTokens: prompt})
+		if prompt > r.PeakPromptTokens {
 			r.PeakPromptTokens, r.PeakUsage = prompt, u
 		}
 	}

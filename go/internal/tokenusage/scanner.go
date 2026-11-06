@@ -44,6 +44,7 @@ type Result struct {
 	PeakPromptTokens int
 	PeakUsage        cyclestate.TokenUsage
 	ServedModel      string
+	Turns            []Turn
 }
 
 type transcriptLine struct {
@@ -83,7 +84,7 @@ func ScanConfigRoot(root string, w Window) (Result, error) {
 		return Result{Source: SourceNone}, nil
 	}
 
-	perMsg := map[string]cyclestate.TokenUsage{}
+	perMsg := map[string]messageTurn{}
 	matched := false
 	warn := ""
 	var served servedReply
@@ -117,7 +118,7 @@ func ScanConfigRoot(root string, w Window) (Result, error) {
 	var total cyclestate.TokenUsage
 	peak := promptTokensUnmeasured
 	var peakUsage cyclestate.TokenUsage
-	for _, u := range perMsg {
+	for _, u := range messageUsages(perMsg) {
 		total.Input += u.Input
 		total.Output += u.Output
 		total.CacheRead += u.CacheRead
@@ -127,7 +128,7 @@ func ScanConfigRoot(root string, w Window) (Result, error) {
 			peakUsage = u
 		}
 	}
-	return Result{Usage: total, Source: SourceTranscript, PeakPromptTokens: peak, PeakUsage: peakUsage, Warn: warn, ServedModel: served.model}, nil
+	return Result{Usage: total, Source: SourceTranscript, PeakPromptTokens: peak, PeakUsage: peakUsage, Warn: warn, ServedModel: served.model, Turns: orderedTurns(perMsg)}, nil
 }
 
 const syntheticModel = "<synthetic>"
@@ -151,7 +152,7 @@ func latestServedReply(latest servedReply, lines []transcriptLine, w Window) ser
 	return latest
 }
 
-func recordAssistantUsage(perMsg map[string]cyclestate.TokenUsage, lines []transcriptLine, w Window) {
+func recordAssistantUsage(perMsg map[string]messageTurn, lines []transcriptLine, w Window) {
 	for _, ln := range lines {
 		if ln.Type != "assistant" || ln.Message.Usage == nil || ln.Message.ID == "" {
 			continue
@@ -160,12 +161,19 @@ func recordAssistantUsage(perMsg map[string]cyclestate.TokenUsage, lines []trans
 			continue
 		}
 		u := ln.Message.Usage
-		perMsg[ln.Message.ID] = cyclestate.TokenUsage{
+		prior, seen := perMsg[ln.Message.ID]
+		if !seen {
+			prior.seq = len(perMsg)
+		}
+		prior.usage = cyclestate.TokenUsage{
 			Input:      u.Input,
 			Output:     u.Output,
 			CacheRead:  u.CacheRead,
 			CacheWrite: u.CacheWrite,
 		}
+		prior.timestamp = ln.Timestamp
+		prior.addTools(toolUses(ln.Message.Content))
+		perMsg[ln.Message.ID] = prior
 	}
 }
 
