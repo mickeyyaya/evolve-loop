@@ -55,16 +55,16 @@ func TestRecordResume_ThreeAutoResumesCountToTheCapTheFourthIsRefusedAndAnOperat
 		t.Fatal(err)
 	}
 	pause := readBlock(t, path)
-	if pause.AutoResumeAttempts != DefaultAutoResumeAttempts || pause.OperatorAction != autoResumeSpentAction {
+	if pause.AutoResumeAttempts != DefaultAutoResumeAttempts || pause.OperatorAction != spentAction(pause) {
 		t.Fatalf("pause at the cap = %+v, want attempts=%d and the spent-budget operator action", pause, DefaultAutoResumeAttempts)
 	}
 
 	cp, admitted, err := RecordResume(path, true)
-	if err != nil || admitted || cp.AutoResumeAttempts != DefaultAutoResumeAttempts || cp.OperatorAction != autoResumeSpentAction {
+	if err != nil || admitted || cp.AutoResumeAttempts != DefaultAutoResumeAttempts || cp.OperatorAction != spentAction(cp) {
 		t.Fatalf("the fourth auto-resume = (%+v, %v, %v), want refused at the cap with the operator action", cp, admitted, err)
 	}
-	if !strings.Contains(autoResumeSpentAction, "evolve loop --resume") {
-		t.Errorf("operator action %q, want it to name the manual resume", autoResumeSpentAction)
+	if !strings.Contains(cp.OperatorAction, "evolve loop --resume") {
+		t.Errorf("operator action %q, want it to name the manual resume", cp.OperatorAction)
 	}
 
 	cp, admitted, err = RecordResume(path, false)

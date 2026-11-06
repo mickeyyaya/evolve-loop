@@ -121,6 +121,7 @@ undiagnosable. Its blast radius is every later cycle.
    - The writer of a failure sets its class from a host fact. No class comes from words in text.
    - A test of a signal reads the whole text with equality. This rule refines §3.7 and does not replace it.
    - The spec is [signal-accuracy](../architecture/signal-accuracy.md) §3 to §7.
+   - A text about a wall renders one clause for each family (`core.Wall.Clauses`). It never states a cause for the wall as a whole. A reader of a wall shows `core.WallNextStep`. A zero-ship halt in which each counted cycle ended at a login wall files a login item, not a pipeline repair.
 
    *Evidence: a test name in a failure text gave `infra-error` to a gate block in cycle 2157. A logout near 01:00 on 2026-11-05 was followed by a stop reason of `quota-pause` at 56 percent usage. The code path is not traced ([incident](../incidents/2026-11-05-wave-155-false-signals-and-the-logout.md)).*
 8. **A task that is blocked more than three times goes to a redesign.**

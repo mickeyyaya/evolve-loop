@@ -83,7 +83,7 @@ type CycleState struct {
 	ShipFailReasons                 []string       `json:"ship_fail_reasons,omitempty"`
 	FailedAt                        []FailedRecord `json:"failed_at,omitempty"`
 	BookkeepingRegradeAttempted     bool           `json:"bookkeeping_regrade_attempted,omitempty"`
-	QuotaWalkCLIs                   []string       `json:"quota_walk_clis,omitempty"`
+	QuotaWall                       []WallEnd      `json:"quota_wall,omitempty"`
 	Ladder                          *LadderState   `json:"ladder,omitempty"`
 }
 

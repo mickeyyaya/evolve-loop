@@ -15,6 +15,8 @@ const pipelineKindPrefix = "pipeline-"
 
 const KindPipelineRepair = pipelineKindPrefix + "repair"
 
+const KindOperatorLogin = "operator-login"
+
 func IsConsoleRoute(route string) bool {
 	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(route)), consoleRoutePrefix)
 }

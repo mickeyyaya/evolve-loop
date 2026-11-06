@@ -1,7 +1,7 @@
 package core
 
 type WalkError struct {
-	CLIs []string
+	Wall Wall
 	Err  error
 }
 

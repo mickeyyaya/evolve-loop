@@ -9,6 +9,18 @@ import (
 
 var todaysClaudeFloor = []string{"auditor", "adversarial-review", "tdd-engineer", "spec-verifier", "spec-verify", "code-reviewer"}
 
+func TestLoginCommand_ComesFromTheRoutingDataAndNamesNoInventedFamily(t *testing.T) {
+	if got, ok := LoginCommand("claude"); !ok || !strings.Contains(got, "/login") {
+		t.Fatalf("LoginCommand(claude) = %q, %v, want the /login step", got, ok)
+	}
+	if got, ok := LoginCommand("codex"); !ok || got != "run codex login" {
+		t.Fatalf("LoginCommand(codex) = %q, %v", got, ok)
+	}
+	if got, ok := LoginCommand("agy"); ok || got != "" {
+		t.Fatalf("LoginCommand(agy) = %q, %v, want no entry", got, ok)
+	}
+}
+
 func TestDefaultFloors_HoldTodaysClaudeFloorAsData(t *testing.T) {
 	floors := DefaultFloors()
 	if !reflect.DeepEqual(floors.Families(), []string{"claude"}) {

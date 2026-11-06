@@ -50,11 +50,12 @@ type Seat struct {
 }
 
 type routingDefaults struct {
-	Floors                   Floors          `json:"floors"`
-	Seats                    map[string]Seat `json:"seats"`
-	ClassifierFamilies       []string        `json:"classifier_families"`
-	UnmeasuredOrder          []string        `json:"unmeasured_order"`
-	UniversalFallbackExclude []string        `json:"universal_fallback_exclude"`
+	Floors                   Floors            `json:"floors"`
+	Seats                    map[string]Seat   `json:"seats"`
+	ClassifierFamilies       []string          `json:"classifier_families"`
+	UnmeasuredOrder          []string          `json:"unmeasured_order"`
+	UniversalFallbackExclude []string          `json:"universal_fallback_exclude"`
+	LoginCommands            map[string]string `json:"login_commands"`
 }
 
 //go:embed routing_defaults.json
@@ -84,6 +85,11 @@ func SeatDefault(name string) Seat { return compiledRoutingDefaults().Seats[name
 func ClassifierFamilies() []string { return slices.Clone(compiledRoutingDefaults().ClassifierFamilies) }
 
 func UnmeasuredOrder() []string { return slices.Clone(compiledRoutingDefaults().UnmeasuredOrder) }
+
+func LoginCommand(family string) (string, bool) {
+	c, ok := compiledRoutingDefaults().LoginCommands[family]
+	return c, ok
+}
 
 func defaultUniversalFallbackExclude() []string {
 	return slices.Clone(compiledRoutingDefaults().UniversalFallbackExclude)

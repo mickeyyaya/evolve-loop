@@ -14,6 +14,9 @@ type CycleResult struct {
 	Remediations       []string
 	SpineFailOpens     []SpineFailOpen
 	FailReasons        []string
+	QuotaWall          []WallEnd `json:"quota_wall,omitempty"`
+	WallPhase          string    `json:"wall_phase,omitempty"`
+	WallWriteErr       string    `json:"wall_write_err,omitempty"`
 }
 
 type SystemFailureSignal struct {

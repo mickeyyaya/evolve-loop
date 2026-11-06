@@ -44,9 +44,9 @@ func (k WallKeeper) Surface(walk llmroute.TieredDispatchResult, res core.BridgeR
 	}
 	rungs := strings.Join(k.rungs, " -> ")
 	if k.unprovenErr != nil {
-		return k.unproven, fmt.Errorf("%w; the dispatch walk %s met a quota wall, but rung %s failed with no evidence of exhaustion, so the walk is not a quota pause", k.unprovenErr, rungs, k.unprovenRung)
+		return k.unproven, fmt.Errorf("%w; the dispatch walk %s met a wall, but rung %s failed with no evidence of exhaustion, so the walk is not a pause", k.unprovenErr, rungs, k.unprovenRung)
 	}
-	return k.res, fmt.Errorf("%w; the dispatch walk %s met a quota wall before its last rung failed", k.err, rungs)
+	return k.res, fmt.Errorf("%w; the dispatch walk %s met a wall before its last rung failed", k.err, rungs)
 }
 
 func neverStartedWork(res core.BridgeResponse) bool {

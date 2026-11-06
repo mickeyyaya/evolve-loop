@@ -255,7 +255,7 @@ func TestCredentialWall_OnlyACredentialBenchIsAWall(t *testing.T) {
 	}
 	walled := credentialWall(store)
 
-	if action, ok := walled("codex"); !ok || !strings.Contains(action, "logged in again") {
+	if action, ok := walled("codex"); !ok || !strings.Contains(action, clihealth.LoginCommand("codex")) {
 		t.Errorf("codex has a credential bench: ok=%v action=%q", ok, action)
 	}
 	if _, ok := walled("agy"); ok {

@@ -230,10 +230,25 @@ QUOTA-PAUSE: cycle=N wake-at=ISO8601 source=X attempts=K/M resume-in=Ss
 QUOTA-PAUSE: cycle=N wake-at= source=unknown attempts=K/0 auto-resume=off: <operator action>
 ```
 
-This is the Claude Code subscription quota wall. The cycle ran far enough
-to hit the quota ceiling. Then a phase failed with empty stderr (the
-quota-likely signature). `subagent-run.sh` wrote a checkpoint and
+A wall is a point where every family of the dispatch chain ended. The marker
+shows the end of each family. A family can be on quota, can need a login, or can
+have ended on another cause. `subagent-run.sh` wrote a checkpoint and
 `cycle-state.json` carries the wake-at timestamp.
+
+A pause in which a family needs a login prints one more line:
+
+```
+LOGIN-REQUIRED: cycle=N <one clause for each family>. Next: <step for each family>. Then <resume command>.
+```
+
+Time alone does not clear a login. When a `LOGIN-REQUIRED:` line is present, do not
+call `ScheduleWakeup` for that family. Tell the operator to log in. A `QUOTA-PAUSE:`
+line with `resume-in=` can come with it. Then the quota family can still wait.
+
+A `WALL-PAUSE:` line means that no family has a quota or a login row. Read the
+clauses. Follow the marker field, not the name of the line. When the line has
+`resume-in=`, the wake time is known. Schedule the wake-up as for a `QUOTA-PAUSE:`
+line. When the line has no `resume-in=`, do not wait.
 
 **Auto-resume runs only when the marker has `resume-in=`.** A marker with
 `auto-resume=off` has no known reset time or no resume budget left: do not

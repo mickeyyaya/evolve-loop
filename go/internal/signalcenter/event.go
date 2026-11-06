@@ -118,6 +118,7 @@ const (
 	KindShipDelivered          Kind = "ship.delivered"
 	KindSystemFailure          Kind = "system.failure"
 	KindQuotaPaused            Kind = "quota.paused"
+	KindLoginRequired          Kind = "login.required"
 	KindBridgeWarning          Kind = "bridge.warning"
 	KindBridgeTripwire         Kind = "bridge.tripwire"
 	KindPaneLiveness           Kind = "pane.liveness"
@@ -163,7 +164,7 @@ const (
 var knownKinds = map[Kind]bool{
 	KindPhaseDispatched: true, KindPhaseOutcome: true, KindPhaseAborted: true, KindGateRejected: true,
 	KindGatePassed: true, KindGateCorrected: true, KindShipLanded: true, KindShipError: true, KindShipWarning: true, KindShipDelivered: true, KindSystemFailure: true,
-	KindQuotaPaused: true, KindBridgeWarning: true, KindBridgeTripwire: true, KindPaneLiveness: true,
+	KindQuotaPaused: true, KindLoginRequired: true, KindBridgeWarning: true, KindBridgeTripwire: true, KindPaneLiveness: true,
 	KindLedgerAppended: true, KindOutcomeWarning: true, KindFailureDiagWarning: true, KindCarryoverWarning: true, KindFailureLearningWarning: true, KindConfigWarning: true, KindAdvisorWarning: true, KindRunnerWarning: true, KindInboxWarning: true, KindAuditWarning: true, KindObserverWarning: true, KindCycleSealed: true, KindLoopWave: true, KindLoopHalt: true, KindLoopWarning: true,
 	KindLoopEscalation: true, KindLoopStarted: true, KindLoopExit: true, KindLoopLost: true, KindListenerPanicked: true, KindRegistryDrift: true, KindSinkDropped: true,
 	KindQualityReading: true, KindQualityBreach: true, KindQualityWarning: true, KindIsolationViolation: true, KindIsolationContext: true, KindIsolationRequest: true, KindIsolationRequestDecision: true, KindCLIQueueApplied: true, KindLadderDecision: true, KindSelfhealIncident: true, KindSelfhealDecision: true,
@@ -172,7 +173,7 @@ var knownKinds = map[Kind]bool{
 
 var terminalKinds = map[Kind]bool{
 	KindPhaseAborted: true, KindGateRejected: true, KindShipError: true,
-	KindSystemFailure: true, KindQuotaPaused: true, KindLoopHalt: true,
+	KindSystemFailure: true, KindQuotaPaused: true, KindLoginRequired: true, KindLoopHalt: true,
 }
 
 func (k Kind) Known() bool { return knownKinds[k] }
