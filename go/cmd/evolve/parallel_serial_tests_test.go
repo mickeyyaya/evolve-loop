@@ -1,6 +1,8 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestSeatTokenVerbs_ARefusedVerbEmitsNoSignal":                                                     "swaps the process signal sink",
+	"main.TestSeatTokenVerbs_EmitOneSignalWithTheVerbAndTheTimeAndNoToken":                                  "swaps the process signal sink",
 	"main.TestRunCycleRun_AFleetLaneWithAPoolWritesTheDeliverableRecordAtShipAndOneWithoutWritesNone":       "swaps seam wireOrchestratorDepsFn and sets env",
 	"main.TestRunCycleRun_PoolReachesTheWiringAsTheRoutingRunPool":                                          "swaps seam wireOrchestratorDepsFn",
 	"main.TestMain_ClearsInheritedCellMarkers":                                                              "reads the process environment",

@@ -16,4 +16,5 @@ const (
 	ExitCmdTimeout       = 124
 	ExitMissingBinary    = 127
 	ExitModelMismatch    = 87
+	ExitSeatTokenRefused = 88
 )

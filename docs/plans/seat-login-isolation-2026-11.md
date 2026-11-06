@@ -115,7 +115,7 @@ The owner `console-manual` means that the console builds it, because each compon
 | L4 | Token holder. `seatlogin.Resolve` reads the holder file once for each launch, and `evolve auth seat-token set` and `clear` write it. | A bad file refuses the launch with a named failure and the step `claude setup-token`. An absent file is the stored login, and this is a named limit. No token value is in a log, an argv or a signal. | console-manual |
 | L5 | Signal (B10). A login failure gets its own class, and never reads as quota. | The real text of `Login expired` and `OAuth token revoked` gives the class. A real quota wall keeps its class. Equality tests hold each text. | console-manual |
 | L6 | Readers. The usage probe, the transcript reader, gc and the post-mortem read the seat directory. | A seat in the new directory gives the same spend numbers and the same post-mortem as before. | console-manual |
-| L7 | Stage. One parameter seat first, with `--seat-token-file`. Then the holder file at a boundary, through `evolve auth seat-token set`. | A parameter seat gets the isolated shape and leaves the holder untouched. A bad holder refuses an isolated launch. | console-manual |
+| L7 | Stage. One parameter seat first, with `--seat-token-file`, before any `set`. Then the holder file at a boundary, through `evolve auth seat-token set`. | A parameter seat gets the isolated shape and leaves the holder untouched. A bad holder refuses an isolated launch. | console-manual |
 | L8 | Count by place. A read-only verb counts auth errors by place: console or seat. | The verb gives the counts of F2.3 from a fixture. | console-manual |
 
 ### The test rows
@@ -128,11 +128,15 @@ The order is the build split of the design card. Each pull request is safe alone
 
 1. **L5, as a precondition.** It makes each later failure read true. Its pattern gives the class of a refused token.
 2. **The denies and `paths`.** The holder deny is unconditional, and no token exists yet, so no live seat changes.
-3. **The readers (L6).** An empty extra root changes nothing.
-4. **`Resolve`, the seat directory, the token join and the parameter.** The holder is not read yet. The source scan of the seam lands here.
-5. **L2 on parameter seats.** Order of measurement: L3 measurement, a minted token, a bad-token fixture, a shadow seat, the grant list, then L1.
-6. **The holder read at launch and the verbs, in one pull request.** No verb can then arm a binary that lacks the rest.
+3. **`Resolve`, the seat directory, the token join and the parameter.** The seam of `Deps.SeatLogin` falls back to the real reader when it is empty. No source scan and no refusal for an empty seam exist. The spec states the cost: only package `bridge` hides the real home in tests.
+4. **The holder read at launch and the verbs, in the same pull request as step 3.** The spec requires this: the read and the verbs land together. No verb can arm a binary that lacks the read. A verb exists only in a binary that has the read, the seat directory and the parameter. The verbs do not yet have the readers.
+5. **The readers (L6).** They land after the pull request of steps 3 and 4 and before step 7. A seat of a token host writes its transcripts under the seat directory. Until the readers land, the post-mortem and the spend readers do not see them. Do not run `seat-token set` before the readers land. The transcript root on the record of each try lands with the readers.
+6. **L2 on parameter seats.** Order of measurement: L3 measurement, a minted token, a bad-token fixture, a shadow seat, the grant list, then L1.
 7. **`seat-token set` at a boundary.** This moves the fleet. `seat-token clear` is the rollback.
+
+**Proof for the merge of steps 3 and 4.** A parameter seat runs before any `set`. The parameter `--seat-token-file` is in the same binary as the verbs. It wins over the holder, and it leaves the holder untouched. So the operator runs L2 on one seat (step 6) while no holder exists, and the fleet stays on the stored login.
+
+Only after the readers land (step 5) does the operator run `set` (step 7). The boundary gate of `set` runs at the time of `set`, and a binary update cannot arm a host that has no holder. The named limit stays: a plane with an older binary has no read, and it keeps the stored login until it updates.
 
 Alongside: **L0** records which store moves first at the next failure. **L8** counts auth errors by place before and after step 7. The design card and its architecture review came before step 1.
 

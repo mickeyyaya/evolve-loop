@@ -148,7 +148,11 @@ func sortedEnvNames(env []string) []string {
 
 func (deps Deps) cellEnv(cfg *Config) ([]string, bool) {
 	deps = deps.withCellMarkers(cfg)
-	stage := deps.envStage()
+	seat := cfg.Decision.SeatToken != ""
+	stage := envStageEnforce
+	if !seat {
+		stage = deps.envStage()
+	}
 	if stage == envStageOff {
 		return driverEnv(deps, cfg.Realization.Env), false
 	}
@@ -158,7 +162,11 @@ func (deps Deps) cellEnv(cfg *Config) ([]string, bool) {
 	if stage != envStageEnforce {
 		return driverEnv(deps, cfg.Realization.Env), false
 	}
-	return hermeticEnv(parent, passthrough, cfg.Realization.Env, deps.Env), true
+	cliEnv := cfg.Realization.Env
+	if seat {
+		cliEnv = seatEnv(cliEnv, cfg.Decision)
+	}
+	return hermeticEnv(parent, passthrough, cliEnv, deps.Env), true
 }
 
 func (deps Deps) reportDroppedEnv(cfg *Config, stage string, names []string) {

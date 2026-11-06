@@ -61,7 +61,7 @@ F7.7 adds that advertised limits "assume ordinary, individual usage". A fleet of
 - The token has no claude.ai connectors and no Remote Control (research F7.2).
 - The token lasts one year, and a seat does not renew it. The operator must renew it.
 - A lost holder puts each later seat on the stored login. The record and a `doctor` warning make that visible. They do not prevent it.
-- The change touches the launch path, the sandbox profiles, the readers and the record. Test files that launch an isolated driver need one shared helper, up to 89 files.
+- The change touches the launch path, the sandbox profiles, the readers and the record.
 
 **Risks**
 - A seat that started before the move stays on the stored login until its process ends. The harm equals the risk of today for that time.

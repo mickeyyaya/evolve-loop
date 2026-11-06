@@ -98,7 +98,7 @@ func TestClassify_ExitOK_IsTheZeroOutcome(t *testing.T) {
 }
 
 func TestClassify_TableCoversEveryDeclaredExit(t *testing.T) {
-	want := []int{ExitSafetyGate, ExitCostLeak, ExitBadFlags, ExitREPLBootTimeout, ExitArtifactTimeout, ExitUnknownPrompt, ExitRespondLoopGuard, ExitModelMismatch, ExitRequireFullUnmet, ExitCmdTimeout, ExitMissingBinary, ExitSignalDeath}
+	want := []int{ExitSafetyGate, ExitCostLeak, ExitBadFlags, ExitREPLBootTimeout, ExitArtifactTimeout, ExitUnknownPrompt, ExitRespondLoopGuard, ExitModelMismatch, ExitSeatTokenRefused, ExitRequireFullUnmet, ExitCmdTimeout, ExitMissingBinary, ExitSignalDeath}
 	if len(exitClasses) != len(want) {
 		t.Fatalf("exitClasses has %d rows, want %d", len(exitClasses), len(want))
 	}
@@ -147,7 +147,7 @@ func TestClassify_TransientSet_IsExactly80_85_86_124(t *testing.T) {
 			t.Errorf("exit %d is transient: %+v", code, out)
 		}
 	}
-	for _, code := range []int{ExitSafetyGate, ExitCostLeak, ExitBadFlags, ExitModelMismatch, ExitRequireFullUnmet, ExitMissingBinary, 42} {
+	for _, code := range []int{ExitSafetyGate, ExitCostLeak, ExitBadFlags, ExitModelMismatch, ExitSeatTokenRefused, ExitRequireFullUnmet, ExitMissingBinary, 42} {
 		out := Classify(code, nil, "")
 		if out.Transient || errors.Is(out.Err, core.ErrTransientBridgeFailure) || errors.Is(out.Err, core.ErrArtifactTimeout) {
 			t.Errorf("exit %d is plain: %+v", code, out)

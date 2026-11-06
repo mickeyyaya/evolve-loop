@@ -101,4 +101,5 @@ var table = []Verb{
 	{Path: "reset-sha", Class: Denied},
 	{Path: "continuation adopt", Class: Denied},
 	{Path: "release", Class: Denied},
+	{Path: "auth seat-token", Class: Denied},
 }
