@@ -52,15 +52,10 @@ func config() buildsite.Config {
 		TemplateGlob: "templates/*.html",
 		AssetsDir:    "assets",
 		OutDir:       "dist",
-		Gallery:      "gallery",
 		Home:         "noir",
 		RootFiles:    rootFiles,
 		Versions: []buildsite.Version{
-			{Slug: "luminous", Title: "Luminous Minimal", Tagline: "Light, Apple-white, calm authority.", Template: "luminous"},
 			{Slug: "noir", Title: "Keynote Noir", Tagline: "Dark, cinematic spotlight.", Template: "noir"},
-			{Slug: "editorial", Title: "Editorial Serif", Tagline: "A warm, thoughtful manifesto.", Template: "editorial"},
-			{Slug: "blueprint", Title: "Technical Blueprint", Tagline: "Terminal-grid, engineer-native.", Template: "blueprint"},
-			{Slug: "aurora-glass", Title: "Aurora Glass", Tagline: "Liquid-glass, modern Apple.", Template: "aurora"},
 		},
 	}
 }

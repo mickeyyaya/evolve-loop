@@ -92,8 +92,8 @@ func TestContent_PipelineDemoLoads(t *testing.T) {
 	if len(d.Floor) == 0 {
 		t.Fatal("PipelineDemo.Floor must name the always-run phases")
 	}
-	if len(d.Cases) < 5 {
-		t.Fatalf("PipelineDemo.Cases = %d, want >= 5 looping goals", len(d.Cases))
+	if len(d.Cases) < 3 {
+		t.Fatalf("PipelineDemo.Cases = %d, want >= 3 looping goals", len(d.Cases))
 	}
 
 	floor := make(map[string]bool, len(d.Floor))

@@ -40,7 +40,7 @@ func TestBuild_TheRootServesTheHomeVersionAndNotTheDesignGallery(t *testing.T) {
 	if strings.Contains(root, "landing page concepts") || strings.Contains(root, "Five ways") {
 		t.Fatal("the root still serves the design gallery")
 	}
-	if !strings.Contains(root, "no diff to read") {
+	if !strings.Contains(root, "Who decides it ships") {
 		t.Fatal("the root does not serve the product page")
 	}
 	if !strings.Contains(root, `assets/noir/hero.png`) || strings.Contains(root, `../assets/noir`) {
