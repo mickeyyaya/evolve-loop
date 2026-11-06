@@ -157,10 +157,11 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) to start. A normal pull request is all t
 
 ## Version
 
-**Current (v23.1)** — the full release history is in [CHANGELOG.md](CHANGELOG.md). To cut a release, use `evolve release X.Y.Z`.
+**Current (v23.2)** — the full release history is in [CHANGELOG.md](CHANGELOG.md). To cut a release, use `evolve release X.Y.Z`.
 
 | Version | Date | Notes |
 |---|---|---|
+| v23.2 | Nov 7 | See the [23.2.0] section of CHANGELOG.md. |
 | v23.1 | Nov 7 | See the [23.1.0] section of CHANGELOG.md. |
 | v23.0 | Nov 2 | See the [23.0.0] section of CHANGELOG.md. |
 
