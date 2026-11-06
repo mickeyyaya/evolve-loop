@@ -362,3 +362,47 @@ func TestCanonicalOrSelf_KeepsAPathThatCannotBeResolved(t *testing.T) {
 		t.Fatalf("canonicalOrSelf = %q, want the path itself", got)
 	}
 }
+
+func TestReportReadViolations_TheSignalNamesTheReadingProcess(t *testing.T) {
+	t.Parallel()
+	center := signalcenter.New()
+	report := `{"eventMessage":"Sandbox: git-credential-osxkeychain(4417) allow file-read-data \/Users\/op\/.ssh\/id_ed25519\nevolve-cell=d9 rule=read.home.secret inv=I5"}` + "\n"
+	deps := Deps{Signals: center, ReadStage: "shadow", hostOS: "darwin",
+		SandboxReports: func(context.Context, string, time.Time) ([]byte, error) { return []byte(report), nil }}
+	deps.reportReadViolations(context.Background(), &Config{CLI: "claude", Agent: "build", Workspace: "/ws", Worktree: "/wt", DispatchID: "d9"}, time.Now())
+	got := readViolations(center)
+	if len(got) != 1 || got[0].Fields["process"] != "git-credential-osxkeychain" || got[0].Fields["pid"] != "4417" {
+		t.Fatalf("the signal must name the process and pid that read the secret: %+v", got)
+	}
+}
+
+func TestParseReadReports_ALineWithoutAProcessNameParsesWithEmptyProcessFields(t *testing.T) {
+	t.Parallel()
+	raw := `{"eventMessage":"Sandbox: allow file-read-data \/x\/.netrc\nevolve-cell=d rule=read.home.secret inv=I5"}` + "\n" +
+		`{"eventMessage":"Sandbox: (77) deny(1) file-read-data \/x\/.aws\nevolve-cell=d rule=read.home.secret inv=I5"}` + "\n"
+	got := parseReadReports([]byte(raw))
+	if len(got) != 2 || got[0].process != "" || got[0].pid != "" || got[0].target != "/x/.netrc" || got[1].process != "" || got[1].pid != "77" || !got[1].denied {
+		t.Fatalf("a report without a process name must parse with empty process fields: %+v", got)
+	}
+}
+
+func TestParseReadReports_TwoProcessesThatReadOneTargetGiveTwoReports(t *testing.T) {
+	t.Parallel()
+	raw := `{"eventMessage":"Sandbox: ssh(1) allow file-read-data \/x\/.ssh\/config\nevolve-cell=d rule=read.home.secret inv=I5"}` + "\n" +
+		`{"eventMessage":"Sandbox: ssh(2) allow file-read-data \/x\/.ssh\/config\nevolve-cell=d rule=read.home.secret inv=I5"}` + "\n" +
+		`{"eventMessage":"Sandbox: gh(3) allow file-read-data \/x\/.ssh\/config\nevolve-cell=d rule=read.home.secret inv=I5"}` + "\n"
+	got := parseReadReports([]byte(raw))
+	if len(got) != 2 || got[0].process != "ssh" || got[1].process != "gh" {
+		t.Fatalf("each process that reads a target must give one report: %+v", got)
+	}
+}
+
+func TestParseReadReports_OneTargetUnderTwoRulesGivesTwoReports(t *testing.T) {
+	t.Parallel()
+	raw := `{"eventMessage":"Sandbox: cat(1) allow file-read-data \/w\/stdout.log\nevolve-cell=d rule=read.raw.output inv=I4"}` + "\n" +
+		`{"eventMessage":"Sandbox: cat(1) deny(1) file-write-data \/w\/stdout.log\nevolve-cell=d rule=write.raw.output inv=I4"}` + "\n"
+	got := parseReadReports([]byte(raw))
+	if len(got) != 2 || got[0].rule != "read.raw.output" || got[1].rule != "write.raw.output" {
+		t.Fatalf("each rule on one target must give one report: %+v", got)
+	}
+}
