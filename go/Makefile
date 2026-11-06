@@ -172,6 +172,7 @@ test-integration: ## Full non-ACS runtime suite with integration, race, and cove
 
 test-integration-darwin: ## test-integration over the packages of go/.darwin-set only (the macOS CI job); fails when the set file is missing or names no package
 test-integration-darwin: INTEGRATION_SET = $(DARWIN_SET)
+test-integration-darwin: TEST_TIMEOUT = 30m
 test-integration-darwin: test-integration
 
 darwin-set: ## Write go/.darwin-set: the packages whose code or tests differ on macOS (build constraints, runtime.GOOS checks, sandbox-exec callers)
