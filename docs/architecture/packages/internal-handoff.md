@@ -23,6 +23,7 @@
   - `ScoutTriage` makes one ask per selected slug. It trims, drops blanks and repeated slugs.
   - `TriageTDD` reads the committed set and the inbox record of each committed id. It makes one ask per acceptance entry, with the inbox source and the verbatim text. It returns `ErrNoCommittedSet` or `ErrUnresolvedItem` when it cannot build the whole request.
   - `TriageTDDFromItems` is the pure part of `TriageTDD`: it takes loaded inbox items.
+  - `ForPair` takes a pair name and a `Site` (workspace, worktree, cycle and path resolver) and calls the builder of the pair. It is the one dispatch that the task contract block in `core` and `evolve handoff check` share. It returns `ErrNoRequestForPair` for a pair without a builder.
   - `TDDBuild` parses the `_test.go` files of an ACS cycle package and makes one ask per predicate. It returns `ErrNoPredicates` for a package without one.
 
 ## Exits

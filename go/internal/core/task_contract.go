@@ -15,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/handoff/request"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 	"github.com/mickeyyaya/evolve-loop/go/internal/solutioncheck"
@@ -65,6 +66,9 @@ func (o *Orchestrator) seedTaskContract(ctx context.Context, base map[string]str
 			lister = listACSPredicates
 		}
 		block += renderPredicates(lister(ctx, cs.ActiveWorktree, cs.CycleID))
+	}
+	if !DocumentCycle(cs.WorkspacePath) {
+		block += handoffRequestBlock(next, cs, o.contractPathResolver(paths, projectRoot))
 	}
 	out := make(map[string]string, len(base)+1)
 	for k, v := range base {
@@ -252,6 +256,15 @@ func deferralMarks(deferrals []triagedecision.AcceptanceDeferral) map[string]map
 		out[d.ID][d.Index] = d.Reason
 	}
 	return out
+}
+
+func (o *Orchestrator) contractPathResolver(paths map[string]string, projectRoot string) request.PathResolver {
+	return func(id string) string {
+		if path := paths[id]; path != "" {
+			return path
+		}
+		return o.itemPathFor(projectRoot, id)
+	}
 }
 
 func (o *Orchestrator) itemPathFor(projectRoot, id string) string {
