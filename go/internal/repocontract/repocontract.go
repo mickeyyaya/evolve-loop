@@ -60,6 +60,7 @@ var treeReadingSelections = []TestSelection{
 		"TestBridgeEngineRootsAreEnumerated",
 		"TestBridgeEngineRoots_EachWiresATokenResolver",
 		"TestCLIContract_AlwaysVerbsWriteNothing",
+		"TestCLIContract_AnAbsentRootIsNeverASilentSuccess",
 		"TestCLIContract_EachCoreVerbPrintsOneEnvelope",
 		"TestCLIContract_EachDebugCallIsSilentAndHasARoot",
 		"TestCLIContract_HarnessKillsEachMutantOfDossierShow",

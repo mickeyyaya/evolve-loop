@@ -1,6 +1,7 @@
 # Plan: the host lineage record decides what a cycle may do to the inbox queue
 
 - **Status:** proposed, 2026-11-05. PR 1 is built and in review on the branch `feat/one-trust-root-for-the-queue`. PR 2 to PR 4 are not built. No code of this design is on `main`.
+- **Operator ruling, 2026-11-06:** D10 and ADR-0126 decision 16 are one count. A charge is one block.
 - **Design:** [queue-trust-root](../architecture/queue-trust-root.md). **Decision:** [ADR-0160](../architecture/adr/0160-the-host-lineage-record-is-the-one-trust-root-for-what-a-cycle-may-do-to-the-queue.md). **Research:** [queue-trust-root-2026-11](../research/queue-trust-root-2026-11.md).
 - **Replaces:** the design of [PR #1290](https://github.com/mickeyyaya/evolve-loop/pull/1290). The terms of this plan (pin, host record, cell, breaker, brake) are defined in the design file.
 
@@ -134,7 +135,7 @@ Decisions D1 to D13 are the ids of the first draft of this plan. D14 to D18 come
 | D2 | Keep three readers | This is how the fault spread (F1.3) |
 | D3 | Let the file win | A forged file reaches the record (F1.5) |
 | D4 | Stay silent | The operator loses the evidence |
-| D5 | Trust the path alone | Cycle 2157 showed that a shell write passes the tool guard (draft plan; I did not verify this) |
+| D5 | Trust the path alone | Cycle 2157 showed that a shell write passes the tool guard (draft plan; not verified) |
 | D6 | Keep `CommittedIDsFor` | It reads `top_n` with no pin (F1.9) |
 | D7 | Route at the closeout | A closeout needs a record that a failure before build does not leave (F1.8) |
 | D8 | A check at each caller | This repeats the fault (F1.7) |
@@ -185,7 +186,7 @@ Each pull request starts from `origin/main`.
 - PR 3 (D9) closes the agent lists on the PASS path: `top_n`, the closes list and the superseded list.
 - Until PR 3 lands, a forged `top_n` can promote an item of another lane on a landed PASS. The Limits section of the design says this.
 
-The inbox item `promote-inbox-reads-agent-lists-outside-the-lane-pin` is named in the draft. I did not find it in this worktree, so I did not verify it.
+The inbox item `promote-inbox-reads-agent-lists-outside-the-lane-pin` is named in the draft. It is not in this worktree, so it is not verified.
 
 The earlier work is saved at `backups/session-2026-11-04/` (outside the repository), in `pr1290-round3-staged.patch` and `queue-authority-pr1-round2.patch`. A builder can port tests from them.
 

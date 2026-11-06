@@ -1,10 +1,10 @@
 # ADR-0164: All decisions serve one goal, and one amendment resolves their conflicts
 
-- **Status:** Proposed (2026-11-06). The operator asked for this amendment. Decisions 2 to 15 are the console's reading of that request, and the operator can overrule each one.
+- **Status:** Proposed (2026-11-06). The operator asked for this amendment. The operator confirmed decisions 4, 9, 10 and 15 on 2026-11-06. The other decisions are the console's reading, and the operator can overrule each one.
 - **Research:** [doc-contradictions-2026-11](../../research/doc-contradictions-2026-11.md).
 - **Spec of the goal:** [loop-goal.md](../loop-goal.md).
 - **History and evidence:** [decision-reconciliation-2026-11](../../history/decision-reconciliation-2026-11.md).
-- **Amends:** ADR-0001, ADR-0058, ADR-0072, ADR-0080, ADR-0096, ADR-0126, ADR-0139, ADR-0151 and ADR-0154. Each of those records holds a note that links here. Their earlier text stays unchanged.
+- **Amends:** ADR-0001, ADR-0058, ADR-0072, ADR-0080, ADR-0096, ADR-0126, ADR-0139, ADR-0151, ADR-0154 and ADR-0155. Each of those records holds a note that links here. Their earlier text stays unchanged.
 
 ## Context
 
@@ -26,15 +26,32 @@ The research found 10 contradictions, 2 more items that it withdrew or reclassif
 | 6 | A record that names an absent script gets a note. Its decision stays as its status says. | C4: 16 records | The note warns the reader without a judgment on the decision. |
 | 7 | The comment rule is: no comments, except what a tool reads and the one package doc that `go/acs/regression/docgo` requires. | C5: the digest refuses what a gate requires | The gate and the convention agree, and the digest was the one outlier. |
 | 8 | The live values win over an older record. `fleet.min_lanes` is 4, and the hub is `.repo.git`. | C6, C7 | The record now names the value that runs. |
-| 9 | Proposed: an LLM agent proposes, and deterministic Go disposes. Where ADR-0072 says that the orchestrator decides, it writes a proposal that Go checks. | C8. ADR-0072 line 38 records an operator-chosen model: "orchestrator decides, Go enforces floor". | This changes an operator-chosen model, so the operator must confirm it. Until then ADR-0072 stays in force. |
-| 10 | This ADR adds an exception: the rule on LLM control holds inside the pipeline. The console acts for the operator, outside the loop, and runs a seat only through `evolve agent run`. | C9. ADR-0154 line 10 names that bridge path, and it states no exemption. | The console wrote this exception about itself, so the operator must confirm it. |
-| 11 | Today a lane lands its own work, and the console lands through `evolve integration batch`. ADR-0147 is the target, and its driver runs at shadow. Later ADRs amend ADR-0057, ADR-0078, ADR-0128 and ADR-0134 as they state. | C10 | A reader gets one answer to "what lands today". |
+| 9 | An LLM agent proposes, and deterministic Go disposes (operator ruling, 2026-11-06). Where ADR-0072 says that the orchestrator decides, it writes a proposal that Go checks. | C8. ADR-0072 line 38 records an operator-chosen model: "orchestrator decides, Go enforces floor". | This changes an operator-chosen model, and the operator confirmed the change. |
+| 10 | This ADR adds an exception, and the operator confirmed it: the rule on LLM control holds inside the pipeline. The console acts for the operator, outside the loop, and runs a seat only through `evolve agent run`. | C9. ADR-0154 line 12 names that bridge path, and it states no exemption. | The console wrote this exception about itself, and the operator confirmed it. |
+| 11 | Today a lane lands its own work, and the console lands through `evolve integration batch`. ADR-0147 is the target, and its driver runs at shadow. ADR-0147 amends ADR-0078, ADR-0128 and ADR-0134 as they state. The operator ruled on 2026-11-06: the train of ADR-0147 is the target, and it supersedes the promoter of ADR-0057. | C10 | A reader gets one answer to "what lands today". |
 | 12 | A redesign rung starts with live research, and its card scores at least three options. This amends ADR-0126 decision 15. No code for it exists yet. | Goal: "logic and research to build the best practical options". The rung has no research step. | The goal names research, and the rung is the place where the loop changes its mind. |
 | 13 | A halt is a step of healing and not an end. The two zero-ship rule stays. Each halt names its cause and the condition to resume, and ADR-0155 owns the path back. | Goal: "relentless". ADR-0072 stops the loop. | The two rules agree when a halt has a way back. |
 | 14 | The goal heads the constitution of ADR-0155. Two L0 rules carry it to each agent, and [constitution.md](../constitution.md) holds the duties and the limits. | The operator: "all LLM agent need to know the ultimate goal we try to achieve to avoid only on the local optimization" | L0 is the one path that each agent loads when it starts, so the goal needs no new mechanism. |
 | 15 | The goal is the top law of the project. It ranks above each other rule, and [constitution.md](../constitution.md) states the ranks. A lower text that opposes it goes to the operator. | The operator: "This goal should be the top law that all agents need to follow as it's "constitution" for this project" | The ranks are the console's reading. An agent gets no power to cross a gate, because a self-graded exception is a local win. |
 
 The top law gives an agent no power to cross a limit. The operator asked for a stop to local optimization, and a skipped gate is one more local win.
+
+## The rulings of the operator, 2026-11-06
+
+The console listed ten recommendations. The operator answered: "Accept your recommendation".
+
+| # | Ruling | Code |
+|---|---|---|
+| 1 | After a repair ladder fails, the redesign rung of ADR-0126 runs first. The operator gets the subject on a second count past three. | Open: item `ladder-end-routes-to-the-redesign-rung` |
+| 2 | An LLM agent proposes, and deterministic Go decides. | Open: item `orchestrator-persona-only-proposes` |
+| 3 | The console exception stands, and `evolve agent run` is the only path. | No change |
+| 4 | The top law gives an agent no power to cross a gate. | No change |
+| 5 | A lane can work a protected path only as a held proposal. | Open: item `held-proposal-stage-at-enforce` |
+| 6 | The train of ADR-0147 is the target path to main. It supersedes the ADR-0057 promoter and the default flip of the queue. D32 to D37 are approved. | The flip to enforce stays a separate ruling |
+| 7 | Audit repair keeps 2 rounds until the code changes. | No change |
+| 8 | ADR-0160 rule 10 and ADR-0126 decision 16 are one count. | Open: item `one-count-of-charges` |
+| 9 | The commit gate has no round 4. A lane keeps its own budget under ADR-0124. | No change |
+| 10 | ADR-0139, ADR-0143, ADR-0151 and ADR-0154 are Accepted. | No change |
 
 ## Not resolved by this ADR
 

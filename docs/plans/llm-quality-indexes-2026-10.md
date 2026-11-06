@@ -1,6 +1,7 @@
 # Plan: turn software-quality concepts into measured indexes that the Signal Center publishes
 
 - **Status:** proposed, 2026-10-21.
+- **Amended by:** ADR-0158 (Accepted, 2026-10-27): the panel has 22 indexes; PQ5 is the cost for each shipped cycle.
 - **Design:** [llm-quality-indexes](../architecture/llm-quality-indexes.md). **Decision:** [ADR-0153](../architecture/adr/0153-quality-is-a-panel-of-separate-indexes-with-intervals-that-the-signal-center-publishes.md). **Research:** [llm-quality-indexes-2026-10](../research/llm-quality-indexes-2026-10.md).
 
 ## Table of contents

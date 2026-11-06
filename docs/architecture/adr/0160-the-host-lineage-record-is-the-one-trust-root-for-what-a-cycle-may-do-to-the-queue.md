@@ -1,5 +1,7 @@
 # ADR-0160: The host lineage record is the one trust root for what a cycle may do to the queue
 
+> **Note (2026-11-06, operator ruling, [ADR-0164](0164-all-decisions-serve-one-goal-and-one-amendment-resolves-their-conflicts.md)):** Rule 10 and ADR-0126 decision 16 are one count. A charge is one block.
+
 - **Status:** Proposed (2026-11-05).
 - **Plan:** [queue-authority-from-host-facts-2026-11](../../plans/queue-authority-from-host-facts-2026-11.md). **Research:** [queue-trust-root-2026-11](../../research/queue-trust-root-2026-11.md). **Design:** [queue-trust-root](../queue-trust-root.md).
 - **Amends:** the Item id row of [llm-isolation](../llm-isolation.md), which says that a new run replaces the record (rule 13).

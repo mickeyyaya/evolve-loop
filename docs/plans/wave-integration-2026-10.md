@@ -278,9 +278,9 @@ The console proposes the items below. The operator has not yet approved them.
 
 ### The lane side has no driver
 
-Only the console train (`evolve integration batch`) calls the engine. No production code calls `DecideFlush`, `PrefixCheck` or `WriteIntegrationRecord`. No production code emits `SHIP_INTEGRATION_COMPOSED`, `_FLUSHED`, `_MERGED`, `_REVERTED` or `_EJECTED`. `orchestrator.Oversight` has no production constructor, so `Window.CleanLanding` and `Window.Conflict` have no live caller.
+Before PR (b) (#1321): only the console train (`evolve integration batch`) called the engine. No production code called `DecideFlush`, `PrefixCheck` or `WriteIntegrationRecord`. No production code emitted `SHIP_INTEGRATION_COMPOSED`, `_FLUSHED`, `_MERGED`, `_REVERTED` or `_EJECTED`. `orchestrator.Oversight` had no production constructor, so `Window.CleanLanding` and `Window.Conflict` had no live caller. At HEAD, `go/internal/integration/driver.go` calls `DecideFlush`.
 
-So at enforce a lane ship stops before `main`, and at shadow nothing composes. "Two clean shadow waves" has no evidence today. The sequence of §6 never named the component that connects the engine to the lanes.
+Before PR (b) (#1321): at enforce a lane ship stopped before `main`, and at shadow nothing composed. "Two clean shadow waves" has no evidence today. The sequence of §6 never named the component that connects the engine to the lanes.
 
 ### New and amended decisions
 
@@ -293,7 +293,7 @@ So at enforce a lane ship stops before `main`, and at shadow nothing composes. "
 | D36 | I8 is `evolve integration status`, class A, read-only. It moves out of the `wave` family. | The record is the record of a pool, and the console train already sits under `integration`. | `evolve wave integration status`: the verb of D21 does not say which pool. |
 | D37 | Amends D19 and I10. The record is `WaveRecord`, one for each pool, and `IntegrationRecord` becomes its batch element. `.evolve/integration-epoch` is the lease epoch that D19 named. | D19 assumed a loop lease, and only lane leases exist (`wave-orchestrator.md` §8). A wave has many flushes, and one `IntegrationRecord` holds one batch. | Keep one record for each wave: a later flush replaces the earlier batch. |
 
-D32 to D37 are console proposals, and the operator has not ruled on them. D33 amends I7 and D13 only for a lane batch. The console train keeps its path. D35 amends D21. D37 amends D19 and I10: the fence, `Adopter` and `--force-with-lease` stay, and they take the epoch from the file.
+D32 to D37 are console proposals, and the operator approved them on 2026-11-06. D33 amends I7 and D13 only for a lane batch. The console train keeps its path. D35 amends D21. D37 amends D19 and I10: the fence, `Adopter` and `--force-with-lease` stay, and they take the epoch from the file.
 
 ### The amended order
 

@@ -70,11 +70,12 @@ type ghPR struct {
 }
 
 type statusReport struct {
-	Loop   dashboard.LoopStatus     `json:"loop"`
-	Cycles []dashboard.CycleSummary `json:"cycles"`
-	Streak statusStreak             `json:"streak"`
-	PRs    statusRemote             `json:"prs"`
-	CI     statusRemote             `json:"ci"`
+	ProjectRoot string                   `json:"project_root"`
+	Loop        dashboard.LoopStatus     `json:"loop"`
+	Cycles      []dashboard.CycleSummary `json:"cycles"`
+	Streak      statusStreak             `json:"streak"`
+	PRs         statusRemote             `json:"prs"`
+	CI          statusRemote             `json:"ci"`
 }
 
 var statusCollect = dashboard.Collect
@@ -102,9 +103,8 @@ func runStatus(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "evolve status: cwd: %v\n", err)
 		return 1
 	}
-	if err := statusSnapshotReadable(root); err != nil {
-		fmt.Fprintf(stderr, "evolve status: cannot read the snapshot: %v\n", err)
-		return 2
+	if rc := checkRootHasEvolve("status", root, stderr); rc != 0 {
+		return rc
 	}
 	report := buildStatusReport(root, time.Now())
 	if asJSON {
@@ -120,14 +120,31 @@ func runStatus(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	return 0
 }
 
-func statusSnapshotReadable(root string) error {
-	evolveDir := paths.EvolveDirOf(root)
-	info, err := os.Stat(evolveDir)
+type rootCheck struct{ op, root string }
+
+func (c rootCheck) refuse(err error, stderr io.Writer) int {
+	if err == nil {
+		return 0
+	}
+	fmt.Fprintf(stderr, "evolve %s: cannot read the project root %s: %v; pass --project-root with the project to read\n", c.op, c.root, err)
+	return exitIO
+}
+
+func checkRootDir(op, root string, stderr io.Writer) int {
+	return rootCheck{op, root}.refuse(directoryReadable(root), stderr)
+}
+
+func checkRootHasEvolve(op, root string, stderr io.Writer) int {
+	return rootCheck{op, root}.refuse(directoryReadable(paths.EvolveDirOf(root)), stderr)
+}
+
+func directoryReadable(dir string) error {
+	info, err := os.Stat(dir)
 	if err != nil {
 		return err
 	}
 	if !info.IsDir() {
-		return fmt.Errorf("%s is not a directory", evolveDir)
+		return fmt.Errorf("%s is not a directory", dir)
 	}
 	return nil
 }
@@ -141,8 +158,9 @@ func buildStatusReport(root string, now time.Time) statusReport {
 	ctx, cancel := context.WithTimeout(context.Background(), statusGHTimeout)
 	defer cancel()
 	return statusReport{
-		Loop:   snap.Loop,
-		Cycles: cycles,
+		ProjectRoot: root,
+		Loop:        snap.Loop,
+		Cycles:      cycles,
 		Streak: statusStreak{
 			ConsecutiveShipped: snap.Trend.ShipStreak,
 			LastZeroShipRun:    snap.Trend.LastZeroShipRun,

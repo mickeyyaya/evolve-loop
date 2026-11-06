@@ -1,5 +1,7 @@
 # ADR-0126: Every iterative loop converges or escalates: feedback, then strategy, then scope; land the best round; never a fourth
 
+> **Note (2026-11-06, operator ruling, [ADR-0164](0164-all-decisions-serve-one-goal-and-one-amendment-resolves-their-conflicts.md)):** Rule 10 of ADR-0160 and decision 16 are one count. A charge is one block. A failed ladder goes to the redesign rung first.
+
 > **Note (2026-11-06, [ADR-0164](0164-all-decisions-serve-one-goal-and-one-amendment-resolves-their-conflicts.md)):** Decision 15 gains a step: the redesign rung starts with live research, and its card scores at least three options. No code for this step exists yet.
 
 - **Status:** Proposed (2026-10-07), a console proposal from the operator's directives. It moves to Accepted as its components land ([plan](../../plans/convergence-policy-2026-10.md) §6).
@@ -146,3 +148,5 @@ Console proposals: the block definition, the host-held count, the restart, the t
   - `CONVERGENCE_NO_HEADROOM`
   - `CONVERGENCE_REDESIGN`
   - `CONVERGENCE_TO_OPERATOR`
+
+> **Note (2026-11-06):** The code also emits `CONVERGENCE_DISPUTED`. The one list of codes is [convergence-policy §9](../convergence-policy.md#9-signals-module-convergence).

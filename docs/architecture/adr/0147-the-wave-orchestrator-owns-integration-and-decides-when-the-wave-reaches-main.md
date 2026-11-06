@@ -1,7 +1,10 @@
 # ADR-0147: the wave orchestrator owns integration and decides when the wave reaches main
 
+> **Note (2026-11-06, operator ruling, [ADR-0164](0164-all-decisions-serve-one-goal-and-one-amendment-resolves-their-conflicts.md)):** The train of this record is the target path to main. Its status stays Proposed until the operator rules on the flip to `enforce`.
+
 - **Status:** Proposed (2026-10-20).
-- **Plan:** [wave-integration-2026-10](../../plans/wave-integration-2026-10.md). **Research:** [wave-integration-2026-10](../../research/wave-integration-2026-10.md). **Design:** [wave-orchestrator §15](../wave-orchestrator.md#15-integration).
+- **Plan:** [wave-integration-2026-10](../../plans/wave-integration-2026-10.md). **Research:** [wave-integration-2026-10](../../research/wave-integration-2026-10.md). **Design:** [wave-orchestrator §15](../wave-orchestrator.md#15-integration). **Driver spec:** [integration-driver](../integration-driver.md).
+- **Amended by (proposed):** [ADR-0159](0159-the-loop-keeps-its-integration-train-and-takes-six-practices-from-the-2026-harness-projects.md) (2026-11-04). Decision 3: the landed identity is the cycle trailer plus a patch-id with one line of context.
 - **Amends:**
   - [ADR-0139](0139-a-wave-orchestrator-supplies-admits-and-backfills-every-lane.md): the orchestrator now owns landing.
   - [ADR-0128](0128-landing-queue-tiered-reverification.md) and [ADR-0134](0134-fleet-landings-scale-through-content-keyed-verification-and-group-commit.md): their composition, overlap proof, tiers and conflict-graph order become parts of the integration engine. A lane no longer lands its own candidate.

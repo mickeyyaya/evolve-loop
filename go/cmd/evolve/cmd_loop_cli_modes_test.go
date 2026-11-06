@@ -76,16 +76,19 @@ func TestRunLoopStatus_IdlePlaneReportsNoHeartbeatAndWritesNothing(t *testing.T)
 	if rc := runLoop([]string{"status", "--json", "--project-root", root}, nil, &stdout, &stderr); rc != 0 {
 		t.Fatalf("--json rc=%d", rc)
 	}
-	var doc map[string]map[string]any
-	if err := json.Unmarshal(stdout.Bytes(), &doc); err != nil || doc["loop"]["running"] != false || len(doc) != 1 {
-		t.Errorf("--json must be {\"loop\": …} only (err=%v): %s", err, stdout.String())
+	var doc map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &doc); err != nil || len(doc) != 2 || doc["project_root"] != root {
+		t.Errorf("--json must be {\"project_root\": …, \"loop\": …} only (err=%v): %s", err, stdout.String())
+	}
+	if loop, _ := doc["loop"].(map[string]any); loop["running"] != false {
+		t.Errorf("--json loop = %v, want running=false", loop)
 	}
 }
 
 func TestRunLoopStatus_RefusalsUseTheirExitCodes(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	if rc := runLoop([]string{"status", "--project-root", filepath.Join(t.TempDir(), "absent")}, nil, &stdout, &stderr); rc != 2 || !strings.Contains(stderr.String(), "cannot read the snapshot") {
-		t.Errorf("a missing .evolve must exit 2 naming the snapshot: rc=%d\n%s", rc, stderr.String())
+	if rc := runLoop([]string{"status", "--project-root", filepath.Join(t.TempDir(), "absent")}, nil, &stdout, &stderr); rc != 2 || !strings.Contains(stderr.String(), "cannot read the project root") {
+		t.Errorf("a missing .evolve must exit 2 naming the project root: rc=%d\n%s", rc, stderr.String())
 	}
 	stderr.Reset()
 	if rc := runLoop([]string{"status", "--bogus"}, nil, &stdout, &stderr); rc != 10 {

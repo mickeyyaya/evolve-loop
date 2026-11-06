@@ -9,7 +9,7 @@
 >
 > **Terms used throughout:**
 > - **Driver:** `integration.Driver`. It composes the deliverables of one pool and writes the wave record.
-> - **Actor:** the strategy that does the work of one stage. `ShadowActor` and `EnforceActor` exist.
+> - **Actor:** the strategy that does the work of one stage. `ShadowActor` exists. `EnforceActor` is PR (c) and is not built.
 > - **Pool:** the set of lanes that one `dispatchFleetIteration` starts. Its id is the pool id.
 > - **Wave record:** the JSON file that holds the batches, the members, the decisions and the failures of one pool.
 > - **Member:** a cycle plus its patch ids.
@@ -47,9 +47,9 @@ This document states the design in its final form. The console proposes the new 
 
 ### Issue
 
-Only the console train (`evolve integration batch`) calls the engine. No production code calls `DecideFlush`, `PrefixCheck` or `WriteIntegrationRecord`. No production code emits `SHIP_INTEGRATION_COMPOSED`, `_FLUSHED`, `_MERGED`, `_REVERTED` or `_EJECTED`. `orchestrator.Oversight` has no production constructor, so `Window.CleanLanding` and `Window.Conflict` have no live caller.
+Before PR (b) (#1321): only the console train (`evolve integration batch`) called the engine. No production code called `DecideFlush`, `PrefixCheck` or `WriteIntegrationRecord`. No production code emitted `SHIP_INTEGRATION_COMPOSED`, `_FLUSHED`, `_MERGED`, `_REVERTED` or `_EJECTED`. `orchestrator.Oversight` had no production constructor, so `Window.CleanLanding` and `Window.Conflict` had no live caller. At HEAD, `go/internal/integration/driver.go` calls `DecideFlush`.
 
-*Implication:* at `enforce`, a lane ship writes its record and stops before `main`. Nothing lands it. At `shadow`, nothing composes, so "two clean shadow waves" has no evidence.
+*Implication:* at `enforce`, a lane ship writes its record and stops before `main`. Nothing lands it. At `shadow`, nothing composed, so "two clean shadow waves" has no evidence.
 
 ### Gap
 
@@ -200,7 +200,11 @@ Shadow answers four questions: the order, the overlap, the conflict count and th
 
 ## 7. The clean-wave verdict and the signals
 
-`evolve integration status [--pool N] [--wave N] [--json]` is class A and read-only. It sits in `integrationVerbs`. This is I8. It prints the batches, the members and their states, the order, the decisions, the failures, the counts and the verdict.
+`evolve integration status [--pool N] [--wave N] [--project-root P] [--json]` is class A and read-only. It sits in `integrationVerbs`. This is I8.
+
+It reads `--project-root` after the sub-verb, then `EVOLVE_PROJECT_ROOT`, then the working directory. The other sub-verbs use the working directory only, because they write. An absent root exits 2. A root with no `.evolve` exits 1 and says that no wave record exists under it. The JSON form is the envelope of [cli-contract.md](cli-contract.md), and `data.project_root` names the root that the verb read.
+
+It prints the batches, the members and their states, the order, the decisions, the failures, the counts and the verdict.
 
 - `--pool N` selects a pool. `--wave N` keeps the operator's wave number, resolved through `wave.Store` and the cycle range. A wave with several pools prints each one. `status` prints both numbers.
 - `wave.Record` has no ceiling, so the wave range comes from the next record.

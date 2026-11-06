@@ -1,6 +1,6 @@
 # Plan: A seat cannot end the login of the operator
 
-- **Status:** decided. The operator answered "C" on 2026-11-05 (Q2), and said "follow the research best option and start to build the code" on 2026-11-06 (Q1). The decision record and the spec are written. The first stage protocol failed four reviews, and the operator's rule "once we failed to 4th review, it should trigger the redesign" replaced it. The redesign is the token file as the stage.
+- **Status:** decided. The operator answered "C" on 2026-11-05 (Q2), and said "follow the research best option and start to build the code" on 2026-11-06 (Q1). The decision record and the spec are written. The first stage protocol failed four reviews, and the operator's rule "once we failed to 4th review, it should trigger the redesign" replaced it. The redesign is the token file as the stage. ADR-0163 reads Proposed until the operator moves it to Accepted.
 - **Decision:** [ADR-0163](../architecture/adr/0163-a-seat-holds-a-narrow-token-in-its-own-directory-and-the-token-file-is-the-stage.md). **Design:** [seat-login](../architecture/seat-login.md).
 - **Research:** [claude-login-split-2026-11](../research/claude-login-split-2026-11.md).
 - **Related:** [llm-isolation](../architecture/llm-isolation.md), [operating-policy](../operations/operating-policy.md).
@@ -87,7 +87,7 @@ Basis of the scores:
 - **D:** this is the only design that meets the operator decision of 2026-11-03 as written, because a cell holds no credential. It adds a service that each seat depends on. It needs the same empty seat directory as C, because F4.2 reports a renewal with `ANTHROPIC_BASE_URL` too.
 - **E:** this costs the throughput that the wave exists for, and it does not remove the fault.
 
-**The operator chose C (Q2).** A, B and E fail on the first criterion or on throughput. C leads D by 1 point of 35, and D leads if the exposure row counts twice, so the score does not decide. C costs less, and D meets the operator decision as written. Our proposal: C now, if the operator accepts a narrow token in the cell. Otherwise D.
+**The operator chose C (Q2).** A, B and E fail on the first criterion or on throughput. C leads D by 1 point of 35, and D leads if the exposure row counts twice, so the score does not decide. C costs less, and D meets the operator decision as written. Q2 settled it: the operator accepted a narrow token in the cell, so C stands.
 
 **What changes our mind:** L0 can show that the file does not move at a failure, which refutes the split. A live proof that a seat with an empty directory still changes the stored login also rules out C and D as written.
 
@@ -97,7 +97,7 @@ Basis of the scores:
 |---|---|---|
 | P1 | A seat never uses the stored login of the host. | F3.5, F4.2 |
 | P2 | Each `claude` seat runs with `CLAUDE_CONFIG_DIR` set to a pipeline directory that holds no login. | F3.6, F4.5 |
-| P3 | Proposal, open until Q2: a seat authenticates with one token from `claude setup-token`, or through the gateway of D. | F4.3, F4.5 |
+| P3 | A seat authenticates with one token from `claude setup-token` (ADR-0163 decision 2). Design D stays rejected. | F4.3, F4.5 |
 | P4 | The cell cannot write the stored login on each OS. It cannot read the file. L3 tests the Keychain read on macOS and states the result. | F3.2, F3.3 |
 | P5 | The console and the usage probe keep the stored login. They run outside the cell, so a Keychain write works. | F3.1 |
 | P6 | The manifest holds this as data. One parameter seat runs first, and the holder file moves the fleet at a boundary. | F3.6 |

@@ -1,5 +1,7 @@
 # ADR-0103: Component breakdown program — small units, one contract each
 
+> **Note (2026-11-06):** Amended by [ADR-0124](0124-code-review-phase.md) (Proposed), unit 09 (the defect ledger): entries gain the fields `source`, `round`, `severity` and `dimension`. The merge rule becomes `defectledger.Append`.
+
 - **Status:** Accepted (operator direction, 2026-09-13)
 - **Related:** [ADR-0101](0101-signal-center.md) (the Signal Center every unit reports through),
   [signal-center-design.md §12](../signal-center-design.md) (the decomposition order),

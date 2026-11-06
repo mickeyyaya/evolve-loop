@@ -21,7 +21,7 @@ const (
 	verdictNotClean   = "not clean"
 	verdictNoEvidence = "no evidence"
 
-	integrationStatusUsage = "usage: evolve integration status [--pool N] [--wave N] [--json]\n  exit 0 = clean, 1 = not clean or no evidence, 2 = a record or the wave store is unreadable, 10 = usage"
+	integrationStatusUsage = "usage: evolve integration status [--pool N] [--wave N] [--project-root P] [--json]\n  exit 0 = clean, 1 = not clean, no evidence or an unreadable record; 2 = an absent root, an unreadable wave store, or a wave number that the store does not know; 10 = usage"
 	statusOrderNote        = "order: by delivery time; rank, risk and deps not supplied"
 	statusEnforceNote      = "enforce: not ready (no enforce actor)"
 )
@@ -40,27 +40,29 @@ type integrationStatusMember struct {
 }
 
 type integrationStatusReport struct {
-	Pool       int                            `json:"pool"`
-	Wave       int                            `json:"wave,omitempty"`
-	Stage      string                         `json:"stage"`
-	Enforce    string                         `json:"enforce"`
-	Order      string                         `json:"order"`
-	Verdict    string                         `json:"verdict"`
-	Failed     []string                       `json:"failed,omitempty"`
-	Ended      bool                           `json:"ended"`
-	Epoch      uint64                         `json:"epoch,omitempty"`
-	ShadowBase string                         `json:"shadow_base,omitempty"`
-	LastCycle  int                            `json:"last_cycle,omitempty"`
-	Counts     map[string]int                 `json:"counts"`
-	Members    []integrationStatusMember      `json:"members"`
-	Batches    []integration.IntegrationBatch `json:"batches,omitempty"`
-	Decisions  []integration.FlushRecord      `json:"decisions,omitempty"`
-	Failures   []integration.DriverFailure    `json:"failures,omitempty"`
+	ProjectRoot string                         `json:"project_root"`
+	Pool        int                            `json:"pool"`
+	Wave        int                            `json:"wave,omitempty"`
+	Stage       string                         `json:"stage"`
+	Enforce     string                         `json:"enforce"`
+	Order       string                         `json:"order"`
+	Verdict     string                         `json:"verdict"`
+	Failed      []string                       `json:"failed,omitempty"`
+	Ended       bool                           `json:"ended"`
+	Epoch       uint64                         `json:"epoch,omitempty"`
+	ShadowBase  string                         `json:"shadow_base,omitempty"`
+	LastCycle   int                            `json:"last_cycle,omitempty"`
+	Counts      map[string]int                 `json:"counts"`
+	Members     []integrationStatusMember      `json:"members"`
+	Batches     []integration.IntegrationBatch `json:"batches,omitempty"`
+	Decisions   []integration.FlushRecord      `json:"decisions,omitempty"`
+	Failures    []integration.DriverFailure    `json:"failures,omitempty"`
 }
 
 type integrationStatusWaves struct {
-	Wave  int                       `json:"wave"`
-	Pools []integrationStatusReport `json:"pools"`
+	ProjectRoot string                    `json:"project_root"`
+	Wave        int                       `json:"wave"`
+	Pools       []integrationStatusReport `json:"pools"`
 }
 
 func composes(rec integration.WaveRecord) int {
@@ -224,33 +226,38 @@ func waveOfPool(root string, pool int) int {
 }
 
 func statusVerb(env integrationEnv, args []string, stdout, stderr io.Writer) int {
-	var pool, waveN string
+	var pool, waveN, rootFlag string
 	var asJSON bool
-	operands, err := cliFlags{bools: map[string]*bool{"--json": &asJSON}, values: map[string]*string{"--pool": &pool, "--wave": &waveN}}.parse(args)
+	operands, err := cliFlags{bools: map[string]*bool{"--json": &asJSON}, values: map[string]*string{"--pool": &pool, "--wave": &waveN, "--project-root": &rootFlag}}.parse(args)
 	poolN, waveNum, err := statusSelectors(operands, pool, waveN, err)
 	if err != nil {
 		fmt.Fprintf(stderr, "%s%v\n%s\n", integrationPrefix, err, integrationStatusUsage)
 		return exitUsage
 	}
-	store := integration.FileWaveStore{Root: env.Root}
+	root := paths.AbsoluteRoot("--project-root", chooseRoot(rootFlag, env.ProjectRootEnv, env.Root), nil)
+	if rc := checkRootDir("integration status", root, stderr); rc != 0 {
+		return rc
+	}
+	store := integration.FileWaveStore{Root: root}
 	if waveNum > 0 {
-		return statusOfWave(env.Root, store, waveNum, asJSON, stdout, stderr)
+		return statusOfWave(root, store, waveNum, asJSON, stdout, stderr)
 	}
 	if poolN == 0 {
 		pools := store.Pools()
 		if len(pools) == 0 {
-			fmt.Fprintf(stderr, "%sno wave record exists under %s\n", integrationPrefix, env.Root)
+			fmt.Fprintf(stderr, "%sno wave record exists under %s\n", integrationPrefix, root)
 			return exitRefused
 		}
 		poolN = pools[len(pools)-1]
 	}
-	rep := reportOf(env.Root, store, poolN)
+	rep := reportOf(root, store, poolN)
 	return printStatus(rep, asJSON, stdout, stderr)
 }
 
 func reportOf(root string, store integration.FileWaveStore, pool int) integrationStatusReport {
 	rep := buildIntegrationStatus(pool, stageOf(root), gatherEvidence(root, store, pool))
 	rep.Wave = waveOfPool(root, pool)
+	rep.ProjectRoot = root
 	return rep
 }
 
@@ -281,7 +288,7 @@ func statusOfWave(root string, store integration.FileWaveStore, number int, asJS
 		fmt.Fprintf(stderr, "%s%v\n", integrationPrefix, err)
 		return exitIO
 	}
-	set := integrationStatusWaves{Wave: number, Pools: []integrationStatusReport{}}
+	set := integrationStatusWaves{ProjectRoot: root, Wave: number, Pools: []integrationStatusReport{}}
 	for _, p := range store.Pools() {
 		if bounds.Holds(p) {
 			set.Pools = append(set.Pools, reportOf(root, store, p))
