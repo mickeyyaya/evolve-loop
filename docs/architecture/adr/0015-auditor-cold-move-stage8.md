@@ -40,7 +40,7 @@ Replace the removed section with a 3-line pointer:
 ```markdown
 ## Output
 
-Read [agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) section `output-template` for the full `workspace/audit-report.md` format and `Ledger Entry` JSON template.
+Read [agents/evolve-auditor-reference.md](../../../agents/evolve-auditor-reference.md) section `output-template` for the full `workspace/audit-report.md` format and `Ledger Entry` JSON template.
 ```
 
 ## Auditor-vs-Builder Divergences

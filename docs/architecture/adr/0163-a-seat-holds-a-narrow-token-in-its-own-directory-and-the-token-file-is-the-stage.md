@@ -29,7 +29,7 @@ The operator decided design C and the token. The rest of this record is a consol
 2. A seat authenticates with one `setup-token` token. The token reaches the seat only through the `0600` consume-once env file.
 3. The file `<home>/.evolve-seat/holder/token` is the only stage. If it holds a token, each isolated seat uses it.
 4. If the holder is absent, each seat runs as it does today. There is no stage record, no lock and no census.
-5. `seatlogin.Resolve` reads the holder once for each launch, at each door, and returns two facts: `HostIsolated` and `SeatToken`.
+5. `seatlogin.Resolve` reads the holder once for each launch, at each door, and returns a Decision: `HostIsolated`, `SeatToken`, `Dir` and `Refusal`.
 6. A manifest field, `seat_login: isolated|stored`, decides which family joins the token. A family with no field reads as stored.
 7. `evolve auth seat-token set` and `clear` move the stage with one atomic rename. They are Denied to an agent.
 8. Each verb refuses while a loop lane is live. The gate is a courtesy, not a safety property.

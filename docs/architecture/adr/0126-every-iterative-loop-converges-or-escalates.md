@@ -146,3 +146,5 @@ Console proposals: the block definition, the host-held count, the restart, the t
   - `CONVERGENCE_NO_HEADROOM`
   - `CONVERGENCE_REDESIGN`
   - `CONVERGENCE_TO_OPERATOR`
+
+> **Note (2026-11-06):** The code also emits `CONVERGENCE_DISPUTED`. The one list of codes is [convergence-policy §9](../convergence-policy.md#9-signals-module-convergence).

@@ -9,7 +9,7 @@
 >
 > **Terms used throughout:**
 > - **Driver:** `integration.Driver`. It composes the deliverables of one pool and writes the wave record.
-> - **Actor:** the strategy that does the work of one stage. `ShadowActor` and `EnforceActor` exist.
+> - **Actor:** the strategy that does the work of one stage. `ShadowActor` exists. `EnforceActor` is PR (c) and is not built.
 > - **Pool:** the set of lanes that one `dispatchFleetIteration` starts. Its id is the pool id.
 > - **Wave record:** the JSON file that holds the batches, the members, the decisions and the failures of one pool.
 > - **Member:** a cycle plus its patch ids.
@@ -47,9 +47,9 @@ This document states the design in its final form. The console proposes the new 
 
 ### Issue
 
-Only the console train (`evolve integration batch`) calls the engine. No production code calls `DecideFlush`, `PrefixCheck` or `WriteIntegrationRecord`. No production code emits `SHIP_INTEGRATION_COMPOSED`, `_FLUSHED`, `_MERGED`, `_REVERTED` or `_EJECTED`. `orchestrator.Oversight` has no production constructor, so `Window.CleanLanding` and `Window.Conflict` have no live caller.
+Before PR (b) (#1321): only the console train (`evolve integration batch`) called the engine. No production code called `DecideFlush`, `PrefixCheck` or `WriteIntegrationRecord`. No production code emitted `SHIP_INTEGRATION_COMPOSED`, `_FLUSHED`, `_MERGED`, `_REVERTED` or `_EJECTED`. `orchestrator.Oversight` had no production constructor, so `Window.CleanLanding` and `Window.Conflict` had no live caller. At HEAD, `go/internal/integration/driver.go` calls `DecideFlush`.
 
-*Implication:* at `enforce`, a lane ship writes its record and stops before `main`. Nothing lands it. At `shadow`, nothing composes, so "two clean shadow waves" has no evidence.
+*Implication:* at `enforce`, a lane ship writes its record and stops before `main`. Nothing lands it. At `shadow`, nothing composed, so "two clean shadow waves" has no evidence.
 
 ### Gap
 

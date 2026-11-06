@@ -48,13 +48,15 @@ For each phase, check in a real recent report (PASS, legacy-PASS, and incomplete
 
 ## Rollout
 
+> **Note (2026-11-06):** Not built. The as-built note below replaces this rollout. No code reads the environment variable named here. A rollout dial now lives in `policy.json` (ADR-0156).
+
 Per the repo's standard shadow → advisory → enforce discipline, and one phase at a time (build/scout/tdd first — already touched by `64b2d95`; then audit/intent/triage):
 
 1. **Shadow:** spec-driven classifier computes alongside the legacy regex; log on disagreement; legacy still authoritative. Golden tests land here.
 2. **Advisory:** spec-driven classifier authoritative; legacy regex retained as a fallback that WARNs on use.
 3. **Enforce:** legacy regex deleted; the tolerant allow-lists from `64b2d95` go with it.
 
-No env flag sprawl — reuse an existing rollout dial or a single `EVOLVE_VERDICT_SPEC_STAGE`. (See [[feedback_no_feature_flag_sprawl]].)
+No env flag sprawl — reuse an existing rollout dial or a single `EVOLVE_VERDICT_SPEC_STAGE`. (See the rule [no-feature-flags](../../../guidance/rules/no-feature-flags.md).)
 
 ## Consequences
 

@@ -390,10 +390,12 @@ None. On 2026-10-09 the operator decided OQ1, OQ3, OQ4 and OQ6 (§4, O10 to O13)
 
 ## 16. Status
 
+The reconcile item `landing-plans-reconcile-with-adr-0147` is in the quarantine since 2026-10-26. The rows that it decides have no live owner.
+
 | # | Status |
 |---|---|
-| Q0 | ◐ the dossier, ADR-0128, the spec and this plan are written in `dev/cl-landing-queue`, with the operator decisions of 2026-10-09 and review fix round 1; not staged |
-| Q1 | ☑ `internal/derived` and the rewire of the normalizer and the rebase. The nine named tests pass. Committed on branch `feat/landing-q1-derived`; it lands in the next boundary train. |
+| Q0 | ☑ merged; the dossier, ADR-0128, the spec and this plan are in main |
+| Q1 | ☑ `internal/derived` and the rewire of the normalizer and the rebase. The nine named tests pass. `internal/derived` is in main. |
 | Q3 | ☑ `internal/overlap`: `Prove`, the zones, the closure, the evidence digest and the `go list` adapter, at 100% coverage. Merged in the wave 89 train (#829). It is unwired. |
 | Q12 | ☑ the continuation lane reaches the identity proof; the route is Audit, not Ship (D53). Merged in the wave 89 train (#832). |
 | Q2 | ☐ not started. Admission by cell (O3 of ADR-0139) took the dispatch partition role. The reconcile item `landing-plans-reconcile-with-adr-0147` decides the final status. |

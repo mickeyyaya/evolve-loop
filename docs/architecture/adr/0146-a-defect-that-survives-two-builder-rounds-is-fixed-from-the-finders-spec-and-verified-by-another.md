@@ -24,7 +24,7 @@ The operator asked that the phase that finds a defect fix it after the owner fai
 7. When a deterministic check found the defect, the harness applies the spec's patch and runs the same check again.
 8. R2 is skipped when R1 repeats its fingerprint, or when no effort step or tier headroom exists. R3 replaces ADR-0142 item 5.
 9. After R3 the ladder stops, and the operator gets the dossier.
-10. Round count: R0 is the first build, and R1 to R3 are rounds 1 to 3 of ADR-0126. That makes four dispatches and three repair rounds, so "no round 4" holds. The cap of two repair rounds becomes three.
+10. Round count: R0 is the first build, and R1 to R3 are rounds 1 to 3 of ADR-0126. That makes four dispatches and three repair rounds, so "no round 4" holds. The cap of two repair rounds becomes three. The code keeps `MaxRetries: 2` until component F2 lands.
 
 ## Consequences
 

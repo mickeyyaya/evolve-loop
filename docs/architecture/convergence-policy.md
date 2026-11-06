@@ -270,6 +270,7 @@ A halt keeps its ceiling and still stops the loop. The item it files carries the
 1. The fix rounds stop. The best round stays preserved, and every open finding is filed.
 2. The subject leaves the lane queue and routes to the console, with a digest of all findings.
 3. A top-tier seat names what the findings share, from the architecture side.
+3a. The seat starts with live research on the failure class. The card scores at least three options (ADR-0164 decision 12).
 4. The seat writes a new design card (ADR-0161). No seat and no console can waive this rung.
 5. The architecture review reads the card before any code. Strict TDD follows the review.
 6. The count restarts when the redesign starts. Card blocks and code blocks both count.
@@ -303,7 +304,7 @@ These bind the **code-review judge and console delta checks**. The audit keeps i
 
 | Loop | Calls `Decide`? | Rungs it uses | Notes |
 |---|---|---|---|
-| Audit repair (ADR-0092/0093/0096) | yes. *N* = the try budget of the envelope (default 2). So round 2 is its final round. It combines the judge effort raise of rung 1 with the fresh-context fixer of rung 2(a). | rung 1 (the judge effort raise; no verify-only, since the audit keeps full rules), rung 2(a) (the fresh-context fixer), Stop | **No deferrals and no split or accept**: no deferral overrides the audit's FAIL. ADR-0096's raise stays at the first repair. The retry envelope stays the budget's home. |
+| Audit repair (ADR-0092/0093/0096) | yes. *N* = the try budget of the envelope (default 2). So round 2 is its final round. ADR-0146 raises *N* to 3 when F2 lands. It combines the judge effort raise of rung 1 with the fresh-context fixer of rung 2(a). | rung 1 (the judge effort raise; no verify-only, since the audit keeps full rules), rung 2(a) (the fresh-context fixer), Stop | **No deferrals and no split or accept**: no deferral overrides the audit's FAIL. ADR-0096's raise stays at the first repair. The retry envelope stays the budget's home. |
 | Code-review ↔ build (ADR-0124, landing 2, Q3) | yes | all | `max_fix_rounds` 3 equals `max_rounds` 4 of ADR-0124 (4 reviews, 3 fix builds), so the **budget is unchanged**. Mass is U(n). **Amends ADR-0124 §6.2:** a code-review row that the policy DEFERRED at rung 2 (MEDIUM/LOW, with a filed follow-up) no longer counts as strict OPEN. Accept-with-limits rows go to audit adjudication. |
 | Explanation re-author | yes | as audit repair | It inherits the envelope. |
 | Console lane | yes, through the verb | all, with split = unstage | The console follows the decision from the start. |

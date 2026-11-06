@@ -3,7 +3,7 @@
 - **Status:** Proposed (2026-10-07). Each decision moves to Accepted as its component lands; see the [plan](../../plans/code-review-phase-2026-10.md) §6.
   - **Morning, approved by the operator:** coverage, the loop, rollout and the audit's role.
   - **Afternoon, approved in plan mode:** the review-loop redesign. It supersedes the morning's one-fix-round loop and grade-only audit (plan §3, Q-D1 to Q-D4, D3 to D9).
-  - **Landing 1** (R0–R3 plus the stage switch R8a, held in shadow) is staged and amended by Q0–Q2 before its review.
+  - **Landing 1** (R0–R3, Q1, Q2 and the stage switch R8a, held in shadow) landed in #799 (train #801). Landing 2 (Q3–Q6) and the flip (R8b) are not started; see the plan §6.
 - **Design (the core logic):** [review-loop-and-quality-index.md](../review-loop-and-quality-index.md).
 - **Amended by:** [ADR-0125](0125-audit-publishes-its-evaluation-contract.md) (Proposed, 2026-10-07).
   - The quality index becomes the audit's full published standard (Part 2, gate criteria), and the dimension bars cite the criteria they cover.

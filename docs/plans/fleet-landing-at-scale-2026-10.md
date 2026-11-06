@@ -332,6 +332,8 @@ Each component is one lane, lands unwired first, and starts with its red tests. 
 
 ### 7.1 Status after ADR-0147
 
+The reconcile item `landing-plans-reconcile-with-adr-0147` is in the quarantine since 2026-10-26. The rows that it decides have no live owner.
+
 [ADR-0147](../architecture/adr/0147-the-wave-orchestrator-owns-integration-and-decides-when-the-wave-reaches-main.md) (proposed) amends ADR-0134 on 2026-10-20. The wave orchestrator owns integration, and a lane no longer lands its own candidate. The plan audit of 2026-10-27 marked each row that is not done. The item `landing-plans-reconcile-with-adr-0147` gives each row its final status.
 
 | Id | Status after ADR-0147 |

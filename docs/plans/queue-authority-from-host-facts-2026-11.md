@@ -134,7 +134,7 @@ Decisions D1 to D13 are the ids of the first draft of this plan. D14 to D18 come
 | D2 | Keep three readers | This is how the fault spread (F1.3) |
 | D3 | Let the file win | A forged file reaches the record (F1.5) |
 | D4 | Stay silent | The operator loses the evidence |
-| D5 | Trust the path alone | Cycle 2157 showed that a shell write passes the tool guard (draft plan; I did not verify this) |
+| D5 | Trust the path alone | Cycle 2157 showed that a shell write passes the tool guard (draft plan; not verified) |
 | D6 | Keep `CommittedIDsFor` | It reads `top_n` with no pin (F1.9) |
 | D7 | Route at the closeout | A closeout needs a record that a failure before build does not leave (F1.8) |
 | D8 | A check at each caller | This repeats the fault (F1.7) |
@@ -185,7 +185,7 @@ Each pull request starts from `origin/main`.
 - PR 3 (D9) closes the agent lists on the PASS path: `top_n`, the closes list and the superseded list.
 - Until PR 3 lands, a forged `top_n` can promote an item of another lane on a landed PASS. The Limits section of the design says this.
 
-The inbox item `promote-inbox-reads-agent-lists-outside-the-lane-pin` is named in the draft. I did not find it in this worktree, so I did not verify it.
+The inbox item `promote-inbox-reads-agent-lists-outside-the-lane-pin` is named in the draft. It is not in this worktree, so it is not verified.
 
 The earlier work is saved at `backups/session-2026-11-04/` (outside the repository), in `pr1290-round3-staged.patch` and `queue-authority-pr1-round2.patch`. A builder can port tests from them.
 

@@ -45,7 +45,7 @@ Two gaps cause this. The repair decision has no input that says "the lane cannot
 
 14. Each cycle has a spend limit of LLM minutes, fresh tokens, cache-read tokens and audit rounds.
 15. The orchestrator checks the spend limit at each phase boundary, from `llm-calls.ndjson`.
-16. At the limit, the cycle stops and hands off, as decision 5 says.
+16. At the limit, the cycle stops and hands off, as decision 5 says. At `enforce`, the stop acts only at a failed audit. A passing audit still ships.
 17. The lane deadline stays a hang guard. Its percentile counts only the times of shipped lanes.
 
 ### Cheap checks first
@@ -68,7 +68,7 @@ Two gaps cause this. The repair decision has no input that says "the lane cannot
 
 ## Policy keys
 
-The defaults live in `go/internal/policy`, because the checked-in `.evolve/policy.json` is on the fence (`integrity_surface.go:54`). Strict policy applies: each key has a typed reader with a range check. A value outside its range, or an unknown stage, refuses the load with the key name, as `validateRetryLadder` does (`go/internal/policy/workflow_retry_ladder.go:41`). Each key gets a test in `go/cmd/evolve/policy_readers_strict_test.go` and a row in [policy-config.md](../policy-config.md).
+The defaults live in `go/internal/policy`, because the checked-in `.evolve/policy.json` is on the fence (`integrity_surface.go:55`). Strict policy applies: each key has a typed reader with a range check. A value outside its range, or an unknown stage, refuses the load with the key name, as `validateRetryLadder` does (`go/internal/policy/workflow_retry_ladder.go:41`). Each key gets a test in `go/cmd/evolve/policy_readers_strict_test.go` and a row in [policy-config.md](../policy-config.md).
 
 | Key | Values | Default | Decisions |
 |---|---|---|---|

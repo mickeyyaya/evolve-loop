@@ -55,4 +55,4 @@ ADR-0164 records this map. The numbers 0109 and 0120 do not exist.
 |---|---|---|
 | What lands on `main` today? | A lane lands its own work. The console lands through `evolve integration batch`. | [wave-integration plan](../plans/wave-integration-2026-10.md), ADR-0164 decision 11 |
 | What is the target? | The wave orchestrator owns integration. Its driver runs at shadow, and the flip to enforce is the operator's. | ADR-0147, [integration-driver.md](integration-driver.md) |
-| Which records run at `enforce` and read Proposed? | ADR-0139, ADR-0151 and ADR-0154 (invariant I-2). | `runtime/.evolve/policy.json`, 2026-11-06 |
+| Which records run at `enforce` and read Proposed? | ADR-0139, ADR-0151 and ADR-0154 (invariant I-2). | `.evolve/policy.json`, 2026-11-06 |

@@ -1,6 +1,6 @@
 # Plan: the pipeline is the only controller, and each LLM agent runs in an isolated cell
 
-- **Status:** proposed, 2026-10-25. The operator approved §1 to §11 on 2026-10-25, and X1 is merged (§6.1). §12 is new, and the operator reviews it before its code.
+- **Status:** proposed, 2026-10-25. The operator approved §1 to §11 on 2026-10-25. The components are built or merged as §6.1 shows.
 - **Design:** [llm-isolation](../architecture/llm-isolation.md). **Decisions:** [ADR-0154](../architecture/adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md), for §11 [ADR-0155](../architecture/adr/0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md), and for §12 [ADR-0156](../architecture/adr/0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md). **CLI contract:** [cli-contract](../architecture/cli-contract.md). **Research:** [llm-isolation-2026-10](../research/llm-isolation-2026-10.md).
 
 ## Table of contents

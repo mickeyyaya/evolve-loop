@@ -4,7 +4,7 @@
 - **Research:** [doc-contradictions-2026-11](../../research/doc-contradictions-2026-11.md).
 - **Spec of the goal:** [loop-goal.md](../loop-goal.md).
 - **History and evidence:** [decision-reconciliation-2026-11](../../history/decision-reconciliation-2026-11.md).
-- **Amends:** ADR-0001, ADR-0058, ADR-0072, ADR-0080, ADR-0096, ADR-0126, ADR-0139, ADR-0151 and ADR-0154. Each of those records holds a note that links here. Their earlier text stays unchanged.
+- **Amends:** ADR-0001, ADR-0058, ADR-0072, ADR-0080, ADR-0096, ADR-0126, ADR-0139, ADR-0151, ADR-0154 and ADR-0155. Each of those records holds a note that links here. Their earlier text stays unchanged.
 
 ## Context
 
@@ -27,8 +27,8 @@ The research found 10 contradictions, 2 more items that it withdrew or reclassif
 | 7 | The comment rule is: no comments, except what a tool reads and the one package doc that `go/acs/regression/docgo` requires. | C5: the digest refuses what a gate requires | The gate and the convention agree, and the digest was the one outlier. |
 | 8 | The live values win over an older record. `fleet.min_lanes` is 4, and the hub is `.repo.git`. | C6, C7 | The record now names the value that runs. |
 | 9 | Proposed: an LLM agent proposes, and deterministic Go disposes. Where ADR-0072 says that the orchestrator decides, it writes a proposal that Go checks. | C8. ADR-0072 line 38 records an operator-chosen model: "orchestrator decides, Go enforces floor". | This changes an operator-chosen model, so the operator must confirm it. Until then ADR-0072 stays in force. |
-| 10 | This ADR adds an exception: the rule on LLM control holds inside the pipeline. The console acts for the operator, outside the loop, and runs a seat only through `evolve agent run`. | C9. ADR-0154 line 10 names that bridge path, and it states no exemption. | The console wrote this exception about itself, so the operator must confirm it. |
-| 11 | Today a lane lands its own work, and the console lands through `evolve integration batch`. ADR-0147 is the target, and its driver runs at shadow. Later ADRs amend ADR-0057, ADR-0078, ADR-0128 and ADR-0134 as they state. | C10 | A reader gets one answer to "what lands today". |
+| 10 | This ADR adds an exception: the rule on LLM control holds inside the pipeline. The console acts for the operator, outside the loop, and runs a seat only through `evolve agent run`. | C9. ADR-0154 line 12 names that bridge path, and it states no exemption. | The console wrote this exception about itself, so the operator must confirm it. |
+| 11 | Today a lane lands its own work, and the console lands through `evolve integration batch`. ADR-0147 is the target, and its driver runs at shadow. ADR-0147 amends ADR-0078, ADR-0128 and ADR-0134 as they state. ADR-0057 is not yet reconciled with ADR-0147; the operator decides (see the docs review of 2026-11-06). | C10 | A reader gets one answer to "what lands today". |
 | 12 | A redesign rung starts with live research, and its card scores at least three options. This amends ADR-0126 decision 15. No code for it exists yet. | Goal: "logic and research to build the best practical options". The rung has no research step. | The goal names research, and the rung is the place where the loop changes its mind. |
 | 13 | A halt is a step of healing and not an end. The two zero-ship rule stays. Each halt names its cause and the condition to resume, and ADR-0155 owns the path back. | Goal: "relentless". ADR-0072 stops the loop. | The two rules agree when a halt has a way back. |
 | 14 | The goal heads the constitution of ADR-0155. Two L0 rules carry it to each agent, and [constitution.md](../constitution.md) holds the duties and the limits. | The operator: "all LLM agent need to know the ultimate goal we try to achieve to avoid only on the local optimization" | L0 is the one path that each agent loads when it starts, so the goal needs no new mechanism. |

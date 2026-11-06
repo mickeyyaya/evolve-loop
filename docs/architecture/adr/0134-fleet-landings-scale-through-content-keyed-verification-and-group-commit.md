@@ -1,6 +1,6 @@
 # ADR-0134: Fleet landings scale through content-keyed verification, independent order and group commit
 
-- **Status:** Proposed (2026-10-13). Each decision moves to Accepted when its component leaves shadow ([plan](../../plans/fleet-landing-at-scale-2026-10.md) §8).
+- **Status:** Proposed (2026-10-13). Each decision becomes ready for Accepted when its component leaves shadow; the operator moves it (ADR-0164 decision 4) ([plan](../../plans/fleet-landing-at-scale-2026-10.md) §8).
 - **Plan:** [fleet-landing-at-scale-2026-10.md](../../plans/fleet-landing-at-scale-2026-10.md). **Research:** [fleet-landing-at-scale-2026-10.md](../../research/fleet-landing-at-scale-2026-10.md). **Design:** [fleet-landing-queue.md](../fleet-landing-queue.md), the spec of record, which the amended rules join when they land.
 - **Amends:** [ADR-0128](0128-landing-queue-tiered-reverification.md). D3 (strict FIFO) holds only between candidates with an edge. D10 (a review only at the head) becomes a review bound to the evidence digest. The head checks keys, and gates run before the head.
 - **Amended by (proposed):** [ADR-0147](0147-the-wave-orchestrator-owns-integration-and-decides-when-the-wave-reaches-main.md) (2026-10-20). The order by the conflict graph becomes one key of the integration order. The wave orchestrator flushes a batch as one PR instead of a group commit by a lane.

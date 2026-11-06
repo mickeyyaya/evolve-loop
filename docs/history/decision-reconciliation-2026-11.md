@@ -68,6 +68,7 @@ The commit that lands this record chains to that commit. The landing commit is t
 | 17 | The review said that the name in row G3 is absent. | `evolve code find Oversight` returns the type at `oversight.go:44`. | The console had asked about a wrong name, `NewOversight`, and the seat missed the type. Each side corrected one error. |
 | 18 | Read PR 1270. Its eight PRs were open and absent from `main`. | Four landed as PR 1328. Three were re-applied as PRs 1330, 1331 and 1332. | Earlier the console treated that batch as done. A check of each commit against `main` found the gap. PR 1070 is stale, and the boundary step writes a fresh list. |
 | 19 | Run `evolve wave status` with the binary from `main`. | Wave 156 reads 7 of 13, not 3 of 9. | The first figure came from the old plane binary. The cost line of the new report still reads 3 of 9, so the report holds two counts. An inbox item records it. |
+| 20 | The operator asked if each design, plan and ADR is reviewed and final. Measure, then run four full-text reviews on the live topics. | 7 HIGH and many MEDIUM. Most are stale status text. Some are errors in ADR-0164. | The first review read digests, so it missed them. Text corrections landed here, and the rest went to the operator. |
 
 ## 4. The actions
 

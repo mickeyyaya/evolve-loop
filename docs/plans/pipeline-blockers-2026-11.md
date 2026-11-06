@@ -162,6 +162,7 @@ The author writes the card before the first test. The architecture review reads 
 | Signal | The exact text of each new signal, with its six parts. |
 | Rows | The test of each of the six rows, or the reason that a row does not apply. |
 | Limits | What the fix does not do, and what a test cannot prove. |
+| Options | At least three options, each scored, with the research that supports the choice. |
 
 ### The starting point of each design check
 
@@ -221,7 +222,7 @@ Each component has 100% coverage on each changed function, a red-first test and 
 | Id | Question | Our proposal |
 |---|---|---|
 | Q1 | The operator said "blocked over 3 times". ADR-0126 stops a loop at round 3. How do the two meet? | Closed. The operator ruled on 2026-11-06: "once we failed to 4th review, it should trigger the redesign". [ADR-0126](../architecture/adr/0126-every-iterative-loop-converges-or-escalates.md) decisions 12 to 17 hold the path. |
-| Q2 | What does a logged-out claude pane print? | Capture one real output as a fixture before B10 is built. I did not find it in the files that I read. |
+| Q2 | What does a logged-out claude pane print? | Capture one real output as a fixture before B10 is built. It is not in the files that were read. |
 | Q3 | Why did the 6 protected files of 2026-09-14 and 15 ship (F1.8)? | Check the 4 commits before B4 is closed. |
 | Q4 | Which code wrote `quota-pause` for the logout (F1.12)? | Trace it in the design check of B10. |
 | Q5 | What proves that a PR was reviewed (B11)? | A record per commit that the gate wrote, joined over the commits of the PR. This is the proposal of the inbox item, and the design check decides. |

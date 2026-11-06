@@ -1,7 +1,7 @@
 # ADR-0104: The CLI/tier fallback chain is a property of the bridge handle, and every chain ends with every available CLI
 
 - **Status:** Accepted (operator direction, 2026-09-14: "the fallback needs to take effect across all LLM CLIs on all phase agents"; "our policy should try all the available LLM CLIs before giving up")
-- **Related:** [ADR-0097](0097-worktree-fence.md) (the read-only fence the retro holds around its own launch), [ADR-0103](0103-component-breakdown-program.md) (unit 11, the phase runner whose walk this generalises), [ADR-0101](0101-signal-center.md) (the Center the wrapped handle must keep forwarding)
+- **Related:** [ADR-0097](0097-read-only-phase-worktree-fence.md) (the read-only fence the retro holds around its own launch). [ADR-0103](0103-component-breakdown-program.md) (unit 11, the phase runner whose walk this generalises), [ADR-0101](0101-signal-center.md) (the Center the wrapped handle must keep forwarding)
 
 ## Context
 

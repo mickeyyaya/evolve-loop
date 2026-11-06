@@ -288,7 +288,7 @@ In 30 windows of 8 pending items, admission gives 58 lanes against 120. The caus
 - **A worked example.** Lane `core-todo` edits `go/internal/core/state.go`, and candidate `router-todo` edits `go/internal/router/router.go`. Core imports router, so the reach rule holds `router-todo` behind `core-todo`. The two todos edit no common package, so the shared-edit rule admits `router-todo`. At `shadow` the pool records `todo=router-todo held_by=core-todo reason="reach meets internal/router"` once, and `router-todo` waits. At `enforce`, `router-todo` launches.
 - **Why a second stage key.** `fleet.orchestrator.stage` is already `enforce`, and the pool runs only at that stage. The new rule needs its own shadow inside that pool, so it gets its own key (ADR-0143 decision 4).
 - **The measure that moves the stage (plan D3).** The shadow counts the candidates that the new rule frees. At `shadow` those candidates do not run beside their holder, so no composed-gate failure between such lanes can occur yet. The failure rate of D3 thus needs the ship-side record of plan D2. W1 does not build it. It is component W1b of the plan.
-- **The stage moves to `enforce` (2026-11-02).** The operator asked: "It should run with the full capabilities which is 4 lanes". In wave 150 the pool held 3 of 4 lanes for 88 minutes, with 62 ready items. The reach of one lane, `bridge-factory-f2-probe-through-driver`, held almost each ready item, and the shadow published each of them as an optimistic admission. The checked-in `.evolve/policy.json` now sets `fleet.orchestrator.admission` to `enforce`, and `TestTheCheckedInPolicy_EnforcesTheStagesTheOperatorMoved` pins it. The W1b signals (`LOOP_ORCH_ADMISSION_OPTIMISTIC`, `LOOP_ORCH_OPTIMISTIC_ADMISSION_FAILED`) measure the D3 rate, and a high rate sets the key back to `shadow`.
+- **The stage moves to `enforce` (2026-11-02).** The operator asked: "It should run with the full capabilities which is 4 lanes". In wave 150 the pool held 3 of 4 lanes for 88 minutes, with 62 ready items. The reach of one lane, `bridge-factory-f2-probe-through-driver`, held almost each ready item, and the shadow published each of them as an optimistic admission. The checked-in `.evolve/policy.json` now sets `fleet.orchestrator.admission` to `enforce`, and `TestTheCheckedInPolicy_EnforcesTheStagesTheOperatorMoved` pins it. The W1b signals (`LOOP_ORCH_ADMISSION_OPTIMISTIC`, `LOOP_ORCH_OPTIMISTIC_ADMISSION_FAILED`) measure the D3 rate, and a high rate is reported to the operator, who sets the key back to `shadow`.
 - **Pinned by** `TestAdmit_OptimisticAdmitsACandidateThatOnlyTheRunningLaneImports`, `TestAdmit_OptimisticStillHoldsTwoTodosThatEditOnePackage`, `TestAdmit_OptimisticKeepsTheHubRule`, `TestAdmit_ShadowRecordsEachAdmissionTheReachRuleHoldsWithItsHolder`, `TestAdmit_ShadowNamesThePackageWhereTheReachOfTheCandidateMeetsTheEditOfTheHolder` and the 500-round property `TestAdmit_OptimisticAdmitsExactlyTheTodosThatShareNoPackageAndAreNotBothHubs`. In `orchestrator`: `TestRecordShadow_TwoPassesOverOneHeldTodoPublishOnce`, `TestRecordShadow_TheTodoAndItsHolderAreTheKeyNotTheReason` and `TestCensus_AtEnforceACandidateThatOnlyMeetsARunningLaneReachIsAdmissible`. In `cmd/evolve`: `TestCellAdmission_AtEnforceACoreLaneDoesNotHoldARouterTodo`, `TestAdmissionShadow_AtTheEnforceAdmissionKeyTheSharedEditRuleCounts` and `TestSupplyWiring_TheCensusTakesTheAdmissionRuleOfTheKey`.
 
 ## 7. The rolling pool
@@ -313,7 +313,7 @@ The orchestrator runs `RunPool` as its scheduler, with three changes:
 
 `RunPool` takes the changes as hooks of `fleet.PoolConfig` (`Next`, `Prepare`, `Resupply`), so the scheduler stays one function. With no hook, it keeps the file rule. The in-flight list of admission is the list of running lanes, so a lane exit frees its cells at once. The module graph loads once for each run. If it does not load, the run admits by the file rule and the loop writes one WARN.
 
-A run ends when the supply is empty and no lane is in flight, or on an operator stop (`evolve loop-stop --wait`). The wave boundary work (merge, `gc`, the code-index refresh, `cli update`) runs at the end of a run, as it does now after a wave. The rule "merge only at the boundary" thus holds unchanged: a run is one boundary-to-boundary unit.
+A run ends when the supply is empty and no lane is in flight, or on an operator stop (`evolve loop-stop --wait`). The wave boundary work (merge, `gc`, the code-index refresh, `cli update`) runs at the end of a run, as it does now after a wave. The rule "merge only at the boundary" thus holds unchanged: a run is one boundary-to-boundary unit. Exception: at `fleet.integration.stage: enforce` the orchestrator fast-forwards `main` during a wave (§15, plan Q4, ADR-0147). Console PRs keep the boundary rule.
 
 A run has a length limit, `fleet.orchestrator.run_max_lanes`, in lanes launched. It keeps boundaries regular, so merges and binary refreshes still happen. Its default is `4 × fleet.count`.
 
@@ -599,7 +599,7 @@ All keys are under `.evolve/policy.json` `fleet`, decoded by `policy.FleetConfig
 | Key | Type | Default | Meaning |
 |---|---|---|---|
 | `count` | int | 4 (was 3) | the largest window |
-| `min_lanes` | int | 2 | the smallest window after sizing |
+| `min_lanes` | int | 1 (compiled); 4 in the checked-in policy | the smallest window after sizing |
 | `orchestrator.stage` | `shadow` \| `enforce` | `shadow` | §14 |
 | `orchestrator.admission` | `shadow` \| `enforce` | `shadow` | the admission rule (§6, ADR-0143). At `shadow` the reach rule decides, and the shared-edit rule is recorded. At `enforce` the shared-edit rule decides. |
 | `orchestrator.scan_k` | int | 32 | the admissible todos that admission scans for each free slot; at `enforce`, also the supply depth of the pool, `max(count, scan_k)` (§6) |
@@ -654,6 +654,8 @@ Each code goes into the Signal Center registry.
 The stage key is one key for the whole orchestrator (ADR-0139 decision 16). Each component lands in shadow first, so each part has a measure before it acts. One exception: `admission` stages the admission rule of ADR-0143 inside the pool, which runs only at `stage` `enforce` (§6).
 
 ## 15. Integration
+
+> **Amended by [integration-driver](integration-driver.md) (console proposal of 2026-11-05, not approved):** the lane side uses the verb `evolve integration status`, the branch `integration/p<pool>-b<n>`, and one `WaveRecord` for each pool. Where this section differs, the driver spec governs the lane side.
 
 > [ADR-0147](adr/0147-the-wave-orchestrator-owns-integration-and-decides-when-the-wave-reaches-main.md) (Proposed, 2026-10-20) · plan: [wave-integration-2026-10](../plans/wave-integration-2026-10.md) (D1 to D31; [the amendment](../plans/wave-integration-2026-10.md#10-amendment-of-2026-11-04-console-prs-enter-the-train) adds console PRs) · research: [wave-integration-2026-10](../research/wave-integration-2026-10.md) (F2.1 to F2.7, M1 to M16).
 
@@ -750,8 +752,8 @@ The merge window of the PR-latency plan (P2) waits for `enforce` (D15). At `enfo
 | Key | Type | Default | Meaning |
 |---|---|---|---|
 | `integration.stage` | `shadow` \| `enforce` | `shadow` | the stage above |
-| `integration.cap` | int | 4 | the largest batch; the adaptive cap stays between 1 and this value |
-| `integration.max_age_minutes` | int | 45 | the age of the oldest deliverable that flushes a batch |
+| `integration.cap` | int | proposed 4 (not read from policy.json) | the largest batch; the adaptive cap stays between 1 and this value |
+| `integration.max_age_minutes` | int | proposed 45 (not read from policy.json) | the age of the oldest deliverable that flushes a batch |
 
 The keys are under `.evolve/policy.json` `fleet`.
 

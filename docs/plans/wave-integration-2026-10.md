@@ -278,9 +278,9 @@ The console proposes the items below. The operator has not yet approved them.
 
 ### The lane side has no driver
 
-Only the console train (`evolve integration batch`) calls the engine. No production code calls `DecideFlush`, `PrefixCheck` or `WriteIntegrationRecord`. No production code emits `SHIP_INTEGRATION_COMPOSED`, `_FLUSHED`, `_MERGED`, `_REVERTED` or `_EJECTED`. `orchestrator.Oversight` has no production constructor, so `Window.CleanLanding` and `Window.Conflict` have no live caller.
+Before PR (b) (#1321): only the console train (`evolve integration batch`) called the engine. No production code called `DecideFlush`, `PrefixCheck` or `WriteIntegrationRecord`. No production code emitted `SHIP_INTEGRATION_COMPOSED`, `_FLUSHED`, `_MERGED`, `_REVERTED` or `_EJECTED`. `orchestrator.Oversight` had no production constructor, so `Window.CleanLanding` and `Window.Conflict` had no live caller. At HEAD, `go/internal/integration/driver.go` calls `DecideFlush`.
 
-So at enforce a lane ship stops before `main`, and at shadow nothing composes. "Two clean shadow waves" has no evidence today. The sequence of §6 never named the component that connects the engine to the lanes.
+Before PR (b) (#1321): at enforce a lane ship stopped before `main`, and at shadow nothing composed. "Two clean shadow waves" has no evidence today. The sequence of §6 never named the component that connects the engine to the lanes.
 
 ### New and amended decisions
 

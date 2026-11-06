@@ -2,12 +2,13 @@
 
 - **Status:** Proposed (2026-10-25). Amended on 2026-10-26 by the operator: I-15 gives each verb an agent class (rules 17 to 22). A cell reads its classes from one verb. The component is X17e, and the spec is [cli-contract.md](../cli-contract.md) §4.1 to §4.5.
 - **Plan:** [llm-isolation-2026-10](../../plans/llm-isolation-2026-10.md) §12. **Research:** [llm-isolation-2026-10](../../research/llm-isolation-2026-10.md) §6. **Design:** [cli-contract](../cli-contract.md) and [llm-isolation](../llm-isolation.md) Part III.
+- **Amends (narrow):** [ADR-0154](0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md) I-2, the marker names (rule 11).
 - **Relates to:**
   - [ADR-0154](0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md): the agent cell. I-16 closes the `EVOLVE_*` and `BRIDGE_*` hole in the I-2 allowlist.
   - [ADR-0155](0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md): a bypass flag is a way around the constitution. I-16 makes each bypass a visible parameter.
   - [ADR-0127](0127-push-only-event-channels.md): the event channels. The `events` verbs of plan E9 are verbs of this contract.
   - [ADR-0152](0152-one-phase-agent-runs-from-the-command-line-with-no-cycle-through-the-phase-runner.md): `evolve agent run` already has `--json`, `--project-root` and an exit-code list. Only its exit codes move to the shared table.
-  - ADR-0154 I-3, as #1126 amends it on 2026-10-26 (X4, not merged). An agent can run the subagents of its own harness. It asks for another phase agent through a dispatch request. Rules 17 to 22 give the same request path to each verb that changes shared state.
+  - ADR-0154 I-3, as #1126 amends it on 2026-10-26 (X4, merged). An agent can run the subagents of its own harness. It asks for another phase agent through a dispatch request. Rules 17 to 22 give the same request path to each verb that changes shared state.
 - **Evidence:**
   - 112 verbs, with no contract document and no shared exit-code table (research F4.1, F4.3).
   - `evolve loop status foo` starts a real loop (F4.4).
@@ -88,7 +89,7 @@ What changes our mind: a service can need a push channel, or a call faster than 
 | Keep the knobs in the environment, as twelve-factor does for deploy values | The environment reaches each LLM child (F5.5, P4.3). A knob changes the flow, so it is not a deploy value (P4.4). |
 | A deny list of bad environment names | A new name leaks until someone adds it (research §3, the same reason as I-2). |
 | Every verb available to mutate at all times | `pr merge`, `sync-main` and `cycle reset` refuse during a wave for a correct reason (F4.6). |
-| Amend ADR-0154 | It mixes the agent cell with the callers and settings of the pipeline. |
+| Amend ADR-0154 for the whole decision | It mixes the agent cell with the callers and settings of the pipeline. One narrow amendment stays: I-16 gives the one marker list that I-2 uses. |
 | Two agent classes, allow and deny (X17e) | An agent then has no way to ask for a justified change, and the operator asked for that way. |
 | A verb list in each persona or profile (X17e) | It is CLI text above the driver, which I-17 forbids, and it does not say why a verb is absent. |
 | A tool server for each family (X17e) | The house rule is CLI only ([cli-only-no-mcp.md](../../conventions/cli-only-no-mcp.md)). |
