@@ -1,5 +1,7 @@
 # ADR-0096 — Repair rounds escalate tier and effort, and carry the auditor's findings
 
+> **Note (2026-11-06, [ADR-0164](0164-all-decisions-serve-one-goal-and-one-amendment-resolves-their-conflicts.md)):** ADR-0093 supersedes the base of this record, ADR-0092. The rule on tier and effort stays.
+
 > **Changed 2026-10-08:** `Profile.effort_overrides` is retired. The effort of a tier now lives in `.evolve/policy.json` `cli_routing.tiers.<tier>.effort` ([opus55-effort-config-2026-10.md](../../plans/opus55-effort-config-2026-10.md)). An escalation to a tier takes that tier's effort.
 
 - **Status:** Accepted (2026-09-03). Extends [ADR-0092](0092-audit-repair-loop.md) (the

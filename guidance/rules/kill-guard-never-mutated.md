@@ -2,7 +2,7 @@
 id: kill-guard-never-mutated
 statement: "Never mutate or run a live kill guard. Inject the signal sender, so that a test cannot kill a real process."
 layer: L0
-order: 1
+order: 3
 audience: [all]
 enforced_by: []
 source: "memory feedback_never_mutate_live_kill_guards"

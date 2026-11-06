@@ -2,7 +2,7 @@
 id: verify-before-done
 statement: "Before you claim done, run the check and read its output. Report test counts as N/N PASS."
 layer: L0
-order: 17
+order: 19
 audience: [all]
 enforced_by: []
 source: "the instructions digest of AGENTS.md (X10); memory feedback_probe_before_unavailable"

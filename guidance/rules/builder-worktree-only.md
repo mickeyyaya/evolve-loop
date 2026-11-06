@@ -2,7 +2,7 @@
 id: builder-worktree-only
 statement: "The builder writes only inside the worktree that the runtime provisions. An agent never runs git worktree."
 layer: L0
-order: 6
+order: 8
 audience: [all]
 enforced_by: [go/internal/guards/role.go]
 source: "AGENTS.md invariant 4"

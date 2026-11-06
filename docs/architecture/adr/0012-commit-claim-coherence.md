@@ -1,5 +1,7 @@
 # ADR-0012: Commit-Claim Coherence — 5-Layer Reward-Hacking Defense System
 
+> **Note (2026-11-06, [ADR-0164](0164-all-decisions-serve-one-goal-and-one-amendment-resolves-their-conflicts.md)):** A script path named here is absent at main. Read that path as history. The decision stays as its status says.
+
 **Status:** Proposed
 **Date:** 2026-05-18
 **Cycles:** 70-72 (original observation), 75 (in-vivo reproduction)

@@ -2,7 +2,7 @@
 id: ship-needs-egps-verdict
 statement: "Ship only when the EGPS verdict has a red count of zero. Never edit the hash-chained ledger by hand."
 layer: L0
-order: 7
+order: 9
 audience: [all]
 enforced_by: []
 source: "AGENTS.md invariants 5 and 6"

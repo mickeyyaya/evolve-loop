@@ -1,5 +1,7 @@
 # ADR-0040: Skill Naming Normalization + Single-Source Skill Projection
 
+> **Note (2026-11-06, [ADR-0164](0164-all-decisions-serve-one-goal-and-one-amendment-resolves-their-conflicts.md)):** A script path named here is absent at main. Read that path as history. The decision stays as its status says.
+
 - Status: Accepted — **§1 "commands layer deleted" clause superseded by [ADR-0067](0067-command-surface-reintroduction.md)** (2026-06-29)
 - Date: 2026-06-07
 - Extends: ADR-0033 (verdict single source), ADR-0034/0035 (deliverable contracts), ADR-0038 (phase plugins)

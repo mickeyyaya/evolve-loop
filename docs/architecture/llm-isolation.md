@@ -10,7 +10,7 @@
 >
 > Component state on 2026-10-26 (the plan §6.1 has the full table):
 > - X1: merged in #1121. The conformance matrix of §14 and the module, kind, codes and channel of §15 are on `main`. The follow-up X1b (#1128) adds a fake `tmux` (`go/internal/faketmux`), so the rows M2 to M4 run a full cycle and are green.
-> - X2: merged in #1122 at stage `shadow` (the policy key `isolation.i2.stage`). The flip to `enforce` is an operator decision.
+> - X2: merged in #1122 at stage `shadow`. The policy key `isolation.i2.stage` reads `enforce` on 2026-11-06.
 > - X3: merged in #1127. The single launch API of §5.1 and its AST guard `TestOnlyTheBridgeStartsAnLLMBinary` are on `main`, and matrix row N2 is green.
 > - X4: merged in #1126, and the dispatch credential of I-3 merged in #1132. The request channel of §7.2.1 (item `isolation-dispatch-request-channel`) is built at stage `shadow`.
 > - X5: merged in #1133 at stage `shadow` (the policy key `isolation.i5.stage`).

@@ -1,5 +1,7 @@
 # ADR-0126: Every iterative loop converges or escalates: feedback, then strategy, then scope; land the best round; never a fourth
 
+> **Note (2026-11-06, [ADR-0164](0164-all-decisions-serve-one-goal-and-one-amendment-resolves-their-conflicts.md)):** Decision 15 gains a step: the redesign rung starts with live research, and its card scores at least three options. No code for this step exists yet.
+
 - **Status:** Proposed (2026-10-07), a console proposal from the operator's directives. It moves to Accepted as its components land ([plan](../../plans/convergence-policy-2026-10.md) §6).
   - **Revision 2** applies the doc review (C1, C2, H1–H5, M1, M2, L1–L3), the research refinements CR1–CR8, and the operator's headroom answer.
   - **Revision 3** (2026-11-05) adds decisions 12 to 17: one escalation path, with a redesign rung after the retries. No code for this revision exists yet.
