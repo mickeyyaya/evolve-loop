@@ -30,7 +30,6 @@ var contractAbsentRootOpen = map[string]string{
 	"routing explain":     "open: inbox item " + absentRootItem,
 	"clihealth list":      "open: inbox item " + absentRootItem,
 	"cloud list":          "open: inbox item " + absentRootItem,
-	"events watch":        "open: inbox item " + absentRootItem + "; the verb waits and does not return, so the test stops it after the wait",
 	"events kinds":        "the vocabulary is compiled into the binary; no root is read",
 	"agent capabilities":  "the verb prints a table compiled into the binary; no root is read",
 	"quality show":        "the show exits 0 on each reading and signals QUALITY_SOURCE_ABSENT, as contractNoNegative states",
@@ -74,11 +73,16 @@ func runOnAbsentRoot(t *testing.T, c contractCall) (int, string, bool) {
 	}
 }
 
+var contractAbsentRootWaits = map[string]string{
+	"events watch": "open: inbox item " + absentRootItem + "; the verb waits and cannot be stopped, so a run of it outlives the test and breaks the temporary directory cleanup",
+}
+
 func TestCLIContract_AnAbsentRootIsNeverASilentSuccess(t *testing.T) {
 	contractEnvironment(t)
 	for _, vc := range contractCases {
 		v, ok := lookupCoreVerb(vc.verb)
-		if !ok || v.class != availAlways {
+		_, waits := contractAbsentRootWaits[vc.verb]
+		if !ok || v.class != availAlways || waits {
 			continue
 		}
 		for _, c := range vc.calls {
@@ -96,6 +100,11 @@ func TestCLIContract_AnAbsentRootIsNeverASilentSuccess(t *testing.T) {
 					t.Errorf("%s exits %d on an absent root now; remove it from contractAbsentRootOpen (%s)", vc.verb, rc, reason)
 				}
 			})
+		}
+	}
+	for verb, reason := range contractAbsentRootWaits {
+		if v, ok := lookupCoreVerb(verb); !ok || !v.stream || reason == "" {
+			t.Errorf("%s: a row of contractAbsentRootWaits needs a reason and a stream verb", verb)
 		}
 	}
 	for verb, reason := range contractAbsentRootOpen {
