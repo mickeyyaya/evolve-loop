@@ -151,12 +151,7 @@ func TestReviewResumedDeliverable_WalledCorrection_ReturnsTheExhaustionSentinel(
 		CycleID: 9, RunID: "run-9", WorkspacePath: t.TempDir(),
 		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
 	}
-	_, err := o.reviewResumedDeliverable(
-		context.Background(), t.TempDir(), 9, cs, PhaseBuild,
-		&fakeRunner{name: string(PhaseBuild), failErr: wrapTransient(85), failUntil: 99},
-		PhaseRequest{Workspace: cs.WorkspacePath}, PhaseResponse{Phase: string(PhaseBuild), Verdict: VerdictPASS}, nil,
-		(&cycleRun{}).countDispatch,
-	)
+	_, err := o.reviewResumedDeliverable(resumedDeliverable{ctx: context.Background(), projectRoot: t.TempDir(), cycle: 9, cs: cs, phase: PhaseBuild, runner: &fakeRunner{name: string(PhaseBuild), failErr: wrapTransient(85), failUntil: 99}, req: PhaseRequest{Workspace: cs.WorkspacePath}, resp: PhaseResponse{Phase: string(PhaseBuild), Verdict: VerdictPASS}, baseline: nil, count: (&cycleRun{}).countDispatch, predicates: predicateBase{}})
 	if !errors.Is(err, ErrAllFamiliesExhausted) {
 		t.Fatalf("err = %v, want the exhaustion sentinel the resume path defers on", err)
 	}

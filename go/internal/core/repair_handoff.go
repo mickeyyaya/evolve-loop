@@ -14,6 +14,7 @@ import (
 
 const (
 	CodeRepairHandoff   signalcenter.Code = cyclestate.RepairHandoffSignal
+	CodeHandoffNoRoute  signalcenter.Code = "ORCHESTRATOR_HANDOFF_NO_ROUTE"
 	RepairHandoffFile                     = "repair-handoff.json"
 	RepairDecisionNone                    = cyclestate.RepairDecisionNone
 	RepairDecisionWould                   = cyclestate.RepairDecisionWould
@@ -24,6 +25,7 @@ const (
 
 func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleRepair, CodeRepairHandoff, "the fixability check found a hand-off finding before a repair round (ADR-0158); fields.stage is shadow or enforce, fields.decision is none, would_stop (shadow) or stop (enforce: the cycle seals handed-off with no repair round), fields.reason is handoff_blocker on a stop or a would_stop, fields.blockers, fields.handoff and fields.lane list the finding ids, fields.console_items the console items the findings name and fields.salvage the worktree of the cycle")
+	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeHandoffNoRoute, "a cycle sealed handed-off and the console route has no single committed item to name; the reason names the hand-off, the source of the committed set (the lane pin, the triage decision, or neither) and the console steps; the cycle still ends handed-off and no item routes")
 }
 
 type RepairCheck struct {
@@ -119,8 +121,14 @@ func (cr *cycleRun) sealHandedOff(result *CycleResult, timings []phaseTimingEntr
 		return false
 	}
 	result.TerminationReason = CycleTerminationHandedOff
-	item, ok := cr.consoleRouteItem(PhaseAudit)
-	if ok && len(timings) > 0 {
+	item, gap, ok := consoleRouteChoice(cr.cs.WorkspacePath)
+	if !ok {
+		text := gap.handoff(cr.cycle, strings.TrimPrefix(reason, repairHandoffReasonPrefix))
+		fmt.Fprintf(cr.o.errOut(), "[orchestrator] phase %s: %s\n", PhaseAudit, text)
+		cr.emitBlockerSignal(PhaseAudit, CodeHandoffNoRoute, signalcenter.SeverityWarn, text)
+		return true
+	}
+	if len(timings) > 0 {
 		last := &timings[len(timings)-1]
 		route := Diagnostic{Severity: cyclestate.SeverityError, Code: cyclestate.DiagCodeHandoffRoute, Subject: item, Message: "handed off: " + strings.TrimPrefix(reason, repairHandoffReasonPrefix)}
 		last.Diagnostics = append([]Diagnostic{route}, last.Diagnostics...)

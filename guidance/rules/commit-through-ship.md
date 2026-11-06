@@ -2,7 +2,7 @@
 id: commit-through-ship
 statement: "Commit and push only through evolve ship. The ship gate denies a bare git commit and a bare git push."
 layer: L0
-order: 5
+order: 7
 audience: [all]
 enforced_by: [go/internal/guards/ship.go]
 source: "AGENTS.md invariant 3"

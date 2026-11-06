@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "Red test first: `TestClosesInboxIDs_NoneIsAnExplicitEmptySet`, `TestRefsInboxIDs_...`.",
+    "100% statement coverage on each changed function; zero code comments.",
+    "The spec and package note of the changed package state the change in STE."
+  ],
+  "campaign": "architecture-decisions-2026-11",
+  "created_at": "2026-11-03T00:33:12Z",
+  "files": [
+    "go/internal/inboxmover/closesmarker.go"
+  ],
+  "fix": "The parser: `ClosesInboxIDs` accepts `none`. Add `RefsInboxIDs`",
+  "id": "arch-decisions-ad2-1-the-parser-closesinboxids-accepts",
+  "intake_override": {
+    "reason": "console: `inboxmover` is protected",
+    "console_route": true
+  },
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "source": "operator decisions 2026-11-03; plan docs/plans/architecture-decisions-2026-11.md component AD2-1",
+  "summary": "Component AD2-1 of the 2026-11-03 architecture decisions plan. The parser: `ClosesInboxIDs` accepts `none`. Add `RefsInboxIDs` Stage: none. Size: S. Route: console: `inboxmover` is protected. Plan: docs/plans/architecture-decisions-2026-11.md; research: docs/research/architecture-decisions-2026-11.md.",
+  "title": "AD2-1: The parser: ClosesInboxIDs accepts none",
+  "weight": 0.8
+}

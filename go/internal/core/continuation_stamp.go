@@ -87,10 +87,6 @@ func registerLaneScopeBinding(workspace, projectRoot string, m continuation.Cont
 		return
 	}
 	for _, id := range ls.TodoIDs {
-		id = strings.TrimSpace(id)
-		if id == "" {
-			continue
-		}
 		if err := continuation.WriteRegistryEntry(projectRoot, id, m); err != nil {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d continuation: lane-scope binding for %q not registered: %v\n", cycle, id, err)
 			continue

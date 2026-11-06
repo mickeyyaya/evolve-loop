@@ -87,6 +87,7 @@ func TestOptions_StructFields(t *testing.T) {
 		Files:        "notes.txt",
 		NoInstall:    true,
 		AttestDir:    "",
+		ReviewDir:    t.TempDir(),
 		Env:          nil,
 		Now:          func() time.Time { return time.Unix(0, 0).UTC() },
 		TestInstall:  "",

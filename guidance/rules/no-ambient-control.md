@@ -2,7 +2,7 @@
 id: no-ambient-control
 statement: "Read no control value from the environment. An operator setting lives in policy.json, and a bypass is a CLI parameter."
 layer: L0
-order: 14
+order: 16
 audience: [all]
 enforced_by: []
 source: "ADR-0156 I-16; memory feedback_cli_params_over_env_flags"

@@ -17,10 +17,10 @@ import (
 
 const (
 	codeIntegrationDelivered signalcenter.Code = "SHIP_INTEGRATION_DELIVERED"
-	codeIntegrationComposed  signalcenter.Code = "SHIP_INTEGRATION_COMPOSED"
+	codeIntegrationComposed                    = integration.CodeComposed
 	codeIntegrationEjected                     = integration.CodeEjected
-	codeIntegrationFlushed   signalcenter.Code = "SHIP_INTEGRATION_FLUSHED"
-	codeIntegrationMerged    signalcenter.Code = "SHIP_INTEGRATION_MERGED"
+	codeIntegrationFlushed                     = integration.CodeFlushed
+	codeIntegrationMerged                      = integration.CodeMerged
 	codeIntegrationReverted  signalcenter.Code = "SHIP_INTEGRATION_REVERTED"
 )
 
@@ -155,8 +155,8 @@ func landedByIdentity(ctx context.Context, opts *Options, sha string, refs ...st
 	if err != nil || !ok {
 		return false
 	}
-	rec, err := integration.ReadRecord(integration.RecordPath(opts.integrationDir(), cid))
-	if err != nil || !rec.HoldsCommit(sha) {
+	rec, found := integration.RecordForCommit(opts.ProjectRoot, cid, sha)
+	if !found {
 		return false
 	}
 	repo := integration.Repo{Dir: opts.ProjectRoot, Git: shipGit(opts)}

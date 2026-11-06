@@ -2,7 +2,7 @@
 id: zero-ship-halt
 statement: "Stop after two consecutive cycles that ship nothing, and find the root cause in the pipeline."
 layer: L0
-order: 16
+order: 18
 audience: [all]
 enforced_by: []
 source: "the instructions digest of AGENTS.md (X10); memory feedback_zero_ship_halt_and_gate_red_protocol; docs/operations/operating-policy.md §4.1"

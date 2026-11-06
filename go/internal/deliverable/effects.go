@@ -12,7 +12,7 @@ import (
 
 type effectCheck func(res *Result, roots phasecontract.Roots) error
 
-type effectPerform func(h *HostEffects, roots phasecontract.Roots) error
+type effectPerform func(h *HostEffects, c phasecontract.Contract, roots phasecontract.Roots) error
 
 type effect struct {
 	check   effectCheck
@@ -20,7 +20,7 @@ type effect struct {
 }
 
 var effects = map[string]effect{
-	phasecontract.EffectInboxClaim: {check: checkInboxClaim, perform: claimCommitted},
+	phasecontract.EffectInboxClaim: {check: checkRouteThenClaim, perform: routeThenClaim},
 }
 
 func verifyEffects(res *Result, c phasecontract.Contract, roots phasecontract.Roots) error {
@@ -61,10 +61,20 @@ func checkInboxClaim(res *Result, roots phasecontract.Roots) error {
 		switch loc.Cycle {
 		case roots.Cycle:
 		case 0:
-			res.add(CodeMissingEffect, fmt.Sprintf("declared effect inbox-claim not performed for committed item %q — the host's claim did not land and it is still pending at %s; `evolve inbox-mover claim %q %d` shows why (exit 3 = console-routed): defer or drop it", id, loc.Path, id, roots.Cycle))
+			res.add(CodeMissingEffect, pendingClaimMessage(roots, id))
 		default:
 			res.add(CodeMissingEffect, fmt.Sprintf("declared effect inbox-claim not performed for committed item %q — it is held by cycle-%d (%s); a committed item must be claimed by THIS cycle or not committed", id, loc.Cycle, loc.Path))
 		}
 	}
 	return nil
+}
+
+func pendingClaimMessage(roots phasecontract.Roots, id string) string {
+	if d := inboxmover.ResolveDispatchability(inboxmover.Options{InboxDir: inboxDir(roots)}, id); d.Dep != "" {
+		return fmt.Sprintf("review gate: committed item %q waits on the dependency %q, so the host did not claim it. Next: list %q under deferred in the triage decision.", id, d.Dep, id)
+	}
+	if roots.ClaimAttempted {
+		return fmt.Sprintf("review gate: the host tried to route and claim committed item %q, and neither landed. If the item can be claimed, an answer of deferred ends this cycle as FAIL. Next: %s", id, hostFaultNext(roots.Cycle))
+	}
+	return fmt.Sprintf("review gate: committed item %q is not claimed yet. The host claims it after this phase ends.", id)
 }

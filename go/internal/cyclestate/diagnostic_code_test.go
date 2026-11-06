@@ -64,6 +64,8 @@ func TestRefusalDisposition_TableBesideTheVocabulary(t *testing.T) {
 		{DiagCodeProtectedPredicateRoute, true, true, false},
 		{DiagCodeBlockerRoute, true, true, true},
 		{DiagCodeHandoffRoute, true, true, true},
+		{DiagCodeBlockerUnroutable, true, false, true},
+		{DiagCodeBlockerIncomplete, false, false, true},
 		{DiagCodeBuildRejected, true, false, false},
 		{DiagCodeTriageTopNEmpty, true, false, false},
 		{DiagCodeTriageCommitmentInvalid, false, false, false},

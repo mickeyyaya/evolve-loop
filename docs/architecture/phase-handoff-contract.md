@@ -138,8 +138,8 @@ B writes `.evolve/runs/cycle-N/handoff-<pair>.json` next to its report. The sche
 
 - `status` is one of `met`, `unmet`, `blocked` and `not_applicable`. A `not_applicable` entry must have a `note`.
 - `request_digest` binds the ledger to one request. A ledger for an old request does not count.
-- `output_digest` is the tree digest of the output, so the audit binding (`go/internal/phases/ship/audit.go:27`) and the ledger name the same tree.
-- `author` comes from the dispatch record, not from the agent, so an agent cannot write another identity.
+- `output_digest` is the tree digest of the output, so the audit binding (`go/internal/phases/ship/audit.go:27`) and the ledger name the same tree. `worktreeContentSHA` (`go/internal/core/phase_bindings.go`) computes it, and the pipeline writes it. An agent never writes it. A ledger with a different `output_digest` is stale when its `round` did not rise above the round that the pipeline stamped. The check outcome of that ledger is `invalid`, and the error names the stale digest.
+- `author` comes from the dispatch record, not from the agent, so an agent cannot write another identity. When no trustworthy record exists, the pipeline sets `author` to `{"cli":"unattributed"}`. `handoff.Validate` and the H8 check do not read `author`, so this value passes both.
 
 ## 5. The check
 
@@ -171,9 +171,35 @@ The check has two layers. The deterministic layer always runs first.
 
 **The pass condition:** each `required` ask is `met`, the deterministic layer resolved its evidence, and the judge (if any) agrees. A stated confidence never counts (research P2.10).
 
+### Where the block is rendered and the author is stamped (H9)
+
+`Orchestrator.seedTaskContract` (`go/internal/core/task_contract.go`) appends the request block to the task contract of the `tdd` and `build` phases. A document cycle has no block. The block comes from `request.TriageTDD` and `request.TDDBuild`, the builders that the check uses, so the request has one source. It shows the pair, `request_digest`, the path of the ledger and one line for each ask: `<id> [required] <text> (evidence: <kind>)`. When no request can be built, the block says `Handoff request: none for pair <pair>` and names the reason. The `triage` phase has no block, because its committed set does not exist until the phase ends.
+
+The persona of tdd and build writes the ledger. It raises `round` on each rewrite, and it never writes `author` or `output_digest`. The persona of triage has no directive yet, because the `scout-triage` pair has no request block.
+
+`core.HandoffReviewer` calls `stampHandoffAuthor` before the check, after the phase returns. The stamp sets `author` from the latest `llm-calls.ndjson` record of the phase and cycle. It uses `cli`, the served model, and the requested model as `tier`. It keeps every other key. The lookup of the author and the stamp of the digest are separate. An error of the call log never disables the digest.
+
+The same stamp sets `output_digest` to the current tree digest when the ledger has none. It writes the round of that stamp in the key `stamp`, which only the pipeline writes. A ledger with a different `output_digest` is stale (§5, H8). The exception is a `round` higher than the stamped round. Then the stamp writes the digest of the current tree again. So an edit in place of a stamped ledger does not loop on `invalid`.
+
+When no record matches, or the call log fails to read, the stamp sets `author` to `{"cli":"unattributed"}` and logs one WARN. It never keeps an `author` that the agent wrote. It writes nothing when the ledger is absent or is not a JSON object. The WARN names the cause. It writes no `output_digest` when the tree digest is empty (a cycle with no worktree). The reviewer computes the tree digest only for a phase that has a ledger pair.
+
+The pipeline reads and rewrites a ledger only when it is a plain regular file. `readHandoffLedger` refuses a symlink and a file with a second hard link (`inputindex.HardLinked`). It refuses a file that changed between the check and the open. It opens without a block, so a FIFO cannot stop the reviewer. On a refusal, the stamp and the H8 check record keep the file and log one WARN.
+
+`evolve handoff check` reads the ledger and the failures file through the same reader. It gives the outcome `error` and never prints the content of a linked file.
+
+This rule stops a secret leak. An agent can link its ledger to a secret file that the sandbox hides from it. Without the rule, the pipeline reads the file outside the sandbox and writes the secret into the workspace.
+
+`output_digest` proves the tree that the pipeline reviewed for that round. It does not prove that the claims of the agent were made against that tree. An agent that removes the key gets a fresh stamp for the current tree.
+
+The request block puts each ask text on one line, so a text from the inbox cannot add a line to the block.
+
+The block and the check build the request through one helper, `request.ForPair`. The block reads the item files that the upper half of the task contract read (`fleet_scope_paths` first). So the `request_digest` in the prompt equals the digest that the check rebuilds.
+
 ### Where the check runs (H8)
 
 `core.HandoffReviewer` (`go/internal/core/handoff_reviewer.go`) is a `core.DeliverableReviewer`. `go/cmd/evolve/cmd_cycle.go` puts it last in the reviewer chain of each cycle. At the end of the `tdd` phase it checks `triage-tdd`. At the end of the `build` phase it checks `tdd-build`. The other pairs have no check yet.
+
+The stamp of §4 runs before the check. When the ledger names a stale `output_digest`, the reviewer sets the outcome to `invalid`. It adds an error that names the stale digest. The stage rules below stay the same.
 
 The check is the same code as `evolve handoff check` (`evaluateHandoffAt` in `go/cmd/evolve/cmd_handoff.go`). The reviewer reads the ledger in the run directory of the cycle and the inbox of the project root. It reads the ACS predicates and the evidence in the worktree.
 
@@ -215,7 +241,7 @@ No exit means "the request is wrong", and an agent claim alone must not stop a l
 
 An agent can name a blocker in its ledger. The exit decision accepts it only when the proof holds. A claim without proof is `unmet`.
 
-A `blocked` check at stage `enforce` uses the exit of [blocker-exit.md](blocker-exit.md). The reviewer returns the revision in `ReviewResult.ProvenBlocker`, and `provenBlocker` ends the cycle with the `BLOCKER_ROUTE` diagnostic. The route needs exactly one committed item. Without one, the correction rounds continue. A resumed cycle uses the same route: `reviewResumedDeliverable` returns the blocker, and the resume loop ends the cycle as `blocked-needs-console`. The worktree stays, so the salvage snapshot stays.
+A `blocked` check at stage `enforce` uses the exit of [blocker-exit.md](blocker-exit.md). The reviewer returns the revision in `ReviewResult.ProvenBlocker`, and `provenBlocker` ends the cycle with the `BLOCKER_ROUTE` diagnostic. The route needs exactly one committed item. Without one, the cycle ends with no correction round, as the outcome table of [blocker-exit.md](blocker-exit.md) states. A resumed cycle uses the same route: `reviewResumedDeliverable` returns the blocker, and the resume loop ends the cycle as `blocked-needs-console`. The worktree stays, so the salvage snapshot stays.
 
 The corrections can run out on a build without a proven blocker. Then the build entry of the C1 record is a FAIL with the `BUILD_DELIVERABLE_REJECTED` diagnostic. The classifier reads that entry, not the retro entry after it, so the failure charges the item (2026-10-21).
 

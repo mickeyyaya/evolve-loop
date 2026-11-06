@@ -201,6 +201,7 @@ func classifyRedRuns(ctx context.Context, root string, red []redWorkflow, stdout
 		target := ciwatch.Target{Kind: ciwatch.TargetRun, Value: strconv.FormatInt(r.runID, 10)}
 		rep, err := ciwatch.ClassifyTarget(ctx, ciwatch.NewGHClassifySource(root, opts.ModulePath), target, opts)
 		if err == nil {
+			writeClassifyWarnings(stderr, ciWatchPrefix, rep)
 			err = writeClassifyReport(stdout, rep, false)
 		}
 		if err != nil {

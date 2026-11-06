@@ -29,13 +29,17 @@ func NewVerifierWithCatalogStage(cat phasespec.Catalog, phaseIO config.Stage) co
 }
 
 func RootsFor(in core.ReviewInput) phasecontract.Roots {
-	return phasecontract.Roots{
+	roots := phasecontract.Roots{
 		Workspace:                       in.Workspace,
 		Worktree:                        in.Worktree,
-		EvolveDir:                       paths.EvolveDirOf(in.ProjectRoot),
 		ExplanationDocumentationVersion: in.ExplanationDocumentationVersion,
 		Cycle:                           in.Cycle,
+		ClaimAttempted:                  true,
 	}
+	if in.ProjectRoot != "" {
+		roots.EvolveDir = paths.EvolveDirOf(in.ProjectRoot)
+	}
+	return roots
 }
 
 func (v *Verifier) VerifyDeliverable(_ context.Context, in core.ReviewInput) (core.ContractVerification, error) {

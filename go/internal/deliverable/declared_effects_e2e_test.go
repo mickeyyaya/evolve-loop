@@ -114,7 +114,7 @@ func hostEffects(t *testing.T) core.Option {
 	claim := func(inboxDir string, cycle int, ids []string) error {
 		return inboxmover.ClaimPending(inboxmover.Options{InboxDir: inboxDir, Stderr: io.Discard, Ledger: ledger.New(filepath.Dir(inboxDir))}, cycle, ids)
 	}
-	return core.WithHostEffects(NewHostEffects(effectCatalog(t), claim))
+	return core.WithHostEffects(NewHostEffects(effectCatalog(t), claim, nil))
 }
 
 func TestDeclaredEffects_HostClaim(t *testing.T) {
@@ -134,7 +134,7 @@ func TestDeclaredEffects_HostClaim(t *testing.T) {
 			t.Errorf("the cycle must reach ship exactly once, got %d", len(ship.requests))
 		}
 	})
-	t.Run("a console-routed commitment stays refused and the gate judges it", func(t *testing.T) {
+	t.Run("a console-routed commitment is routed by the host and the cycle ends as planned no-work", func(t *testing.T) {
 		root := gitRepoWithOneCommit(t)
 		inbox := filepath.Join(root, ".evolve", "inbox")
 		if err := os.MkdirAll(inbox, 0o755); err != nil {
@@ -146,14 +146,19 @@ func TestDeclaredEffects_HostClaim(t *testing.T) {
 		runners, triage := effectRunners(t, 0, true)
 		o := effectOrchestrator(t, root, runners, hostEffects(t))
 
-		if _, err := o.RunCycle(context.Background(), core.CycleRequest{ProjectRoot: root, GoalHash: "g", DisableWorkspaceGuard: true}); err == nil {
-			t.Fatal("a console-routed commitment must not pass the declared effect")
+		result, err := o.RunCycle(context.Background(), core.CycleRequest{ProjectRoot: root, GoalHash: "g", DisableWorkspaceGuard: true})
+
+		if err != nil {
+			t.Fatalf("a routed commitment is the console's work, not a gate failure: %v", err)
 		}
 		if _, err := os.Stat(filepath.Join(inbox, pendingItemFile)); err != nil {
-			t.Fatalf("the refused item must stay at the inbox root: %v", err)
+			t.Fatalf("the routed item must stay at the inbox root: %v", err)
 		}
-		if correctionNaming(triage.requests[1:], "inbox-claim") == 0 {
-			t.Fatalf("the refusal must surface as the gate's inbox-claim correction: %q", directives(triage.requests))
+		if len(triage.requests) != 1 || !core.IsTriageNoWorkResult(result) {
+			t.Fatalf("want planned no-work after one run, got %d run(s), verdict=%q termination=%q", len(triage.requests), result.FinalVerdict, result.TerminationReason)
+		}
+		if n := len(runners[core.PhaseBuild].(*stubPhase).requests); n != 0 {
+			t.Fatalf("a lane never builds a routed item: build ran %d time(s)", n)
 		}
 	})
 }
@@ -169,15 +174,15 @@ func TestDeclaredEffects_CommittedItemNotClaimed_IsCorrectedThenFails(t *testing
 	if err == nil {
 		t.Fatalf("a triage that committed to inbox item x without claiming it let the cycle continue — the 1623/1631 shape; triage ran %d time(s)", len(triage.requests))
 	}
-	if len(triage.requests) < 2 || correctionNaming(triage.requests[1:], "inbox-claim") == 0 || correctionNaming(triage.requests[1:], `"x"`) == 0 {
+	if len(triage.requests) < 2 || correctionNaming(triage.requests[1:], "[missing_effect]") == 0 || correctionNaming(triage.requests[1:], `"x"`) == 0 {
 		t.Fatalf("the ladder must re-dispatch triage with a directive naming the effect and the item; requests=%d directives=%q", len(triage.requests), directives(triage.requests))
 	}
 	if tdd := runners[core.PhaseTDD].(*stubPhase); len(tdd.requests) != 0 {
 		t.Errorf("tdd ran %d time(s) on an unclaimed commitment", len(tdd.requests))
 	}
 	outcome, detail := cyclehealth.ClassifyOutcome(findWorkspace(t, root))
-	if outcome != cyclehealth.OutcomeFailedExplained || !strings.Contains(detail, "inbox-claim") {
-		t.Fatalf("outcome=%q detail=%q; want FAILED_EXPLAINED naming inbox-claim", outcome, detail)
+	if outcome != cyclehealth.OutcomeFailedExplained || !strings.Contains(detail, "the host tried to route and claim committed item") {
+		t.Fatalf("outcome=%q detail=%q; want FAILED_EXPLAINED naming the failed host claim", outcome, detail)
 	}
 }
 
@@ -190,7 +195,7 @@ func TestDeclaredEffects_ClaimedCommitment_IsAccepted(t *testing.T) {
 	if _, err := o.RunCycle(context.Background(), core.CycleRequest{ProjectRoot: root, GoalHash: "g", DisableWorkspaceGuard: true}); err != nil {
 		t.Fatalf("a claimed commitment must be accepted: %v", err)
 	}
-	if len(triage.requests) != 2 || correctionNaming(triage.requests[1:], "inbox-claim") != 1 {
+	if len(triage.requests) != 2 || correctionNaming(triage.requests[1:], "[missing_effect]") != 1 {
 		t.Fatalf("triage ran %d time(s), want exactly 2 with the one correction naming inbox-claim: %q", len(triage.requests), directives(triage.requests))
 	}
 	if ship := runners[core.PhaseShip].(*stubPhase); len(ship.requests) != 1 {
@@ -207,7 +212,7 @@ func TestDeclaredEffects_EmptyCommitment_OwesNoClaim(t *testing.T) {
 
 		result, err := o.RunCycle(context.Background(), core.CycleRequest{ProjectRoot: root, GoalHash: "g", DisableWorkspaceGuard: true})
 
-		if err != nil || len(triage.requests) != 1 || correctionNaming(triage.requests, "inbox-claim") != 0 {
+		if err != nil || len(triage.requests) != 1 || correctionNaming(triage.requests, "[missing_effect]") != 0 {
 			t.Fatalf("an explicit empty commitment owes no claim: err=%v triage runs=%d directives=%q", err, len(triage.requests), directives(triage.requests))
 		}
 		if result.TerminationReason != "triage-empty-commitment-claimable-work" || result.FinalVerdict != core.VerdictFAIL {
@@ -224,7 +229,7 @@ func TestDeclaredEffects_EmptyCommitment_OwesNoClaim(t *testing.T) {
 
 		result, err := o.RunCycle(context.Background(), core.CycleRequest{ProjectRoot: root, GoalHash: "g", DisableWorkspaceGuard: true})
 
-		if err != nil || len(triage.requests) != 1 || correctionNaming(triage.requests, "inbox-claim") != 0 {
+		if err != nil || len(triage.requests) != 1 || correctionNaming(triage.requests, "[missing_effect]") != 0 {
 			t.Fatalf("an explicit empty commitment owes no claim: err=%v triage runs=%d directives=%q", err, len(triage.requests), directives(triage.requests))
 		}
 		if !core.IsTriageNoWorkResult(result) {

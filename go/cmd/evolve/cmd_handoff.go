@@ -273,13 +273,7 @@ func evaluateHandoffAt(site handoffSite, cycle int, pair string) handoffResult {
 }
 
 func buildHandoffRequest(site handoffSite, cycle int, pair string) (handoff.Request, error) {
-	switch pair {
-	case request.PairTDDBuild:
-		return request.TDDBuild(filepath.Join(site.tree, "go", "acs", fmt.Sprintf("cycle%d", cycle)))
-	case request.PairTriageTDD:
-		return request.TriageTDD(site.runDir, handoffInboxResolver(site.inboxRoot))
-	}
-	return handoff.Request{}, fmt.Errorf("no request for pair %s", pair)
+	return request.ForPair(pair, request.Site{Workspace: site.runDir, Worktree: site.tree, Cycle: cycle, Resolve: handoffInboxResolver(site.inboxRoot)})
 }
 
 func handoffInboxResolver(root string) request.PathResolver {
@@ -293,7 +287,7 @@ func handoffInboxResolver(root string) request.PathResolver {
 }
 
 func readHandoffLedger(path string) ([]byte, error) {
-	raw, err := os.ReadFile(path)
+	raw, err := core.ReadHandoffLedger(path)
 	if err == nil && handoff.IsCheckOnly(raw) {
 		return nil, fmt.Errorf("%s holds only the check record: %w", filepath.Base(path), fs.ErrNotExist)
 	}
@@ -301,7 +295,7 @@ func readHandoffLedger(path string) ([]byte, error) {
 }
 
 func readHandoffFailures(path string) ([]string, error) {
-	raw, err := os.ReadFile(path)
+	raw, err := core.ReadHandoffLedger(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}

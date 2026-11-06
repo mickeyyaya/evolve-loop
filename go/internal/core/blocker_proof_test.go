@@ -276,7 +276,7 @@ func TestBlockerProver_TheEvidenceMustBeCompleteAndUntouched(t *testing.T) {
 		"the lane added a predicate file": {func(c *BlockerCase) {
 			c.PredicatesNow = map[string]string{"predicates_test.go": cycle1950Predicates, "guard_test.go": "package cycle1950\n"}
 		}, "changed the predicates"},
-		"the diff could not be read":   {func(c *BlockerCase) { c.EvidenceFault = "git diff failed" }, "not complete"},
+		"the diff could not be read":   {func(c *BlockerCase) { c.EvidenceFault = "git diff failed" }, "could not be read"},
 		"no explainable failure kinds": {func(c *BlockerCase) { c.Explainable = nil }, "no failure kinds"},
 		"the lane removed test lines in the package": {func(c *BlockerCase) {
 			c.ShrunkTests = []string{"go/internal/core/blocker_breaker_test.go"}

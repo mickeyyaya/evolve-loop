@@ -61,6 +61,8 @@ var treeReadingSelections = []TestSelection{
 		"TestBridgeEngineRoots_EachWiresATokenResolver",
 		"TestCLIContract_AlwaysVerbsWriteNothing",
 		"TestCLIContract_EachCoreVerbPrintsOneEnvelope",
+		"TestCLIContract_EachDebugCallIsSilentAndHasARoot",
+		"TestCLIContract_HarnessKillsEachMutantOfDossierShow",
 		"TestCLIUpdateWiring_ABootTimeoutWithADrainedWindowIsAVerifiedQuotaCauseAndBenchesUntilTheReset",
 		"TestCLIUpdateWiring_ABootTimeoutWithHealthyUsageStaysABootTimeout",
 		"TestCLIUpdateWiring_ASmokeFailureWhileTheFamilyIsDrainedIsAVerifiedQuotaCause",
@@ -85,6 +87,8 @@ var treeReadingSelections = []TestSelection{
 		"TestComposedApicoverGate_WarningOnlyMissesNewUnnamedExport",
 		"TestConsoleSinkThresholdHasOneHome",
 		"TestEmitLoopWave_ProjectsToTheLeafProducerWithOneRegistrar",
+		"TestHandoffCheck_AFIFOFailuresFileDoesNotHangTheCheck",
+		"TestHandoffCheck_ALinkedLedgerIsRefusedAndItsTargetIsNeverEchoed",
 		"TestHandoffCheck_AnInvalidLedgerIsNamedAndExits1",
 		"TestHandoffCheck_AnUnreadableInputExits2",
 		"TestHandoffCheck_Cycle1946PrintsBlockedWithTheProtectedPath",
@@ -151,6 +155,7 @@ var treeReadingSelections = []TestSelection{
 	}},
 	{Package: "./internal/committedset", Tests: []string{
 		"TestDecisionBuckets_TheOneDeclarationOfTheDroppedAndSkipShippedWireTags",
+		"TestPinFileRefs_OnlyTheListedPlacesOutsideCommittedsetNameThePinFile",
 	}},
 	{Package: "./internal/coversplit", Tests: []string{
 		"TestEverySplitTestPackageHasItsCoverEntry",

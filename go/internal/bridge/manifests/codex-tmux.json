@@ -152,6 +152,7 @@
       "name": "auth_recheck",
       "regex": "Please log in|sign in to ChatGPT|Authentication required",
       "response_keys": null,
+      "tail_lines": 12,
       "policy": "escalate",
       "note": "Bridge cannot complete OAuth; escalate"
     },

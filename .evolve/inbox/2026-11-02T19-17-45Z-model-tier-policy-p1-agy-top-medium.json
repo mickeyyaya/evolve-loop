@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "agy-tmux.json top maps to Gemini 4 Argon (Medium)",
+    "the bridge manifest tests pin the new value",
+    "docs/plans/model-tier-policy-2026-10.md marks P1 done"
+  ],
+  "campaign": "docs/plans/model-tier-policy-2026-10",
+  "created_at": "2026-11-02T19:17:45Z",
+  "deps": [],
+  "files": [
+    "go/internal/bridge/manifests/agy-tmux.json"
+  ],
+  "fix": "Change the agy-tmux manifest top tier to Gemini 4 Argon (Medium) per the plan's P1, and update the manifest pin tests.",
+  "id": "model-tier-policy-p1-agy-top-medium",
+  "kind": "feature",
+  "notes": "manifest is protected bridge data",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "console, 2026-11-03, plan audit of docs/plans (operator request: no task overlooked); plan docs/plans/model-tier-policy-2026-10.md",
+  "summary": "go/internal/bridge/manifests/agy-tmux.json:185 still maps top to 'Gemini 4 Argon (High)'. P1 is first in the approved order (#914).",
+  "title": "Model tier P1: the agy top tier names Gemini 4 Argon (Medium)",
+  "weight": 0.5
+}

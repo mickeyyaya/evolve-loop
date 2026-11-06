@@ -175,7 +175,7 @@ func TestHandoffReviewer_AtEnforceTheRetryCorrectionListsTheUnmetAsksAndTheFaile
 	}
 }
 
-func TestHandoffReviewer_AProvenHandoffBlockerWithoutOneCommittedItemKeepsTheRounds(t *testing.T) {
+func TestHandoffReviewer_AProvenHandoffBlockerWithoutOneCommittedItemEndsWithNoCorrection(t *testing.T) {
 	t.Parallel()
 	root := writeClaimableInbox(t, 1)
 	runners := buildRunners(nil)
@@ -184,18 +184,15 @@ func TestHandoffReviewer_AProvenHandoffBlockerWithoutOneCommittedItemKeepsTheRou
 	runners[PhaseBuild] = build
 	script := &scriptedHandoffCheck{checks: []handoff.Check{{Outcome: "pass"}, {Outcome: "blocked", Blocked: []string{"a1"}}}}
 
-	res, _ := NewOrchestrator(&fakeStorage{state: State{LastCycleNumber: 9}}, &fakeLedger{}, runners,
+	res, err := NewOrchestrator(&fakeStorage{state: State{LastCycleNumber: 9}}, &fakeLedger{}, runners,
 		WithReviewer(NewHandoffReviewer(handoffStages("enforce"), script.check))).
 		RunCycle(context.Background(), CycleRequest{ProjectRoot: root, GoalHash: "goal"})
 
-	if res.TerminationReason == CycleTerminationBlockedNeedsConsole {
-		t.Errorf("result = %+v; the console route names exactly one item", res)
+	if err == nil || res.TerminationReason == CycleTerminationBlockedNeedsConsole {
+		t.Errorf("result = %+v err=%v; the console route names exactly one item, so the cycle ends unrouted", res, err)
 	}
-	if build.calls < 2 {
-		t.Fatalf("build dispatched %d times; a refused route keeps the correction rounds", build.calls)
-	}
-	if directive := build.requests[1].CorrectionDirective; !strings.Contains(directive, "a1") || !strings.Contains(directive, "tdd-build") {
-		t.Errorf("the correction after a refused route must name the blocked ask and the pair:\n%s", directive)
+	if build.calls != 1 {
+		t.Fatalf("build dispatched %d times; an unroutable blocker sends no correction", build.calls)
 	}
 }
 
@@ -351,16 +348,16 @@ func TestHandoffReviewer_AResumedPhaseEndsBlockedOnAProvenHandoffBlocker(t *test
 	}
 }
 
-func TestHandoffReviewer_AResumedRefusedRouteKeepsTheCorrectionRounds(t *testing.T) {
+func TestHandoffReviewer_AResumedUnroutableBlockerEndsWithNoCorrection(t *testing.T) {
 	t.Parallel()
 	twoCards := `{"top_n":[{"id":"claimable-lane-item"},{"id":"other-item"}]}`
-	res, _, tdd, _ := resumeAtTDDWithHandoff(t, twoCards, handoff.Check{Outcome: "blocked", Blocked: []string{"a1"}}, handoff.Check{Outcome: "pass"})
+	res, err, tdd, _ := resumeAtTDDWithHandoff(t, twoCards, handoff.Check{Outcome: "blocked", Blocked: []string{"a1"}}, handoff.Check{Outcome: "pass"})
 
-	if res.TerminationReason == CycleTerminationBlockedNeedsConsole {
-		t.Errorf("result = %+v; the console route names exactly one item", res)
+	if err == nil || res.TerminationReason == CycleTerminationBlockedNeedsConsole {
+		t.Errorf("result = %+v err=%v; the console route names exactly one item, so the cycle ends unrouted", res, err)
 	}
-	if tdd.calls != 2 {
-		t.Errorf("tdd dispatched %d times; a refused route spends a correction round", tdd.calls)
+	if tdd.calls != 1 {
+		t.Errorf("tdd dispatched %d times; an unroutable blocker sends no correction", tdd.calls)
 	}
 }
 

@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -173,23 +174,38 @@ func (r Repo) patchesAreOwn(ctx context.Context, rec DeliverableRecord) (bool, e
 	return true, nil
 }
 
-func FindRecord(root string, cycle int) (DeliverableRecord, bool) {
-	return firstRecord(root, strconv.Itoa(cycle)+".json", func(r DeliverableRecord) bool { return r.Cycle == cycle })
-}
-
-func FindRecordByCommit(root, sha string) (DeliverableRecord, bool) {
-	return firstRecord(root, "*.json", func(r DeliverableRecord) bool { return r.HoldsCommit(sha) })
-}
-
-func firstRecord(root, name string, match func(DeliverableRecord) bool) (DeliverableRecord, bool) {
-	paths, err := filepath.Glob(filepath.Join(WaveDir(root, "*"), recordPrefix+name))
-	if err != nil {
-		return DeliverableRecord{}, false
+func (r Repo) IsAncestor(ctx context.Context, sha, ref string) (bool, error) {
+	if err := fullObjectID(sha); err != nil {
+		return false, err
 	}
-	for _, p := range paths {
-		if r, err := ReadRecord(p); err == nil && match(r) {
-			return r, true
+	_, err := r.Git(ctx, r.Dir, "", "merge-base", "--is-ancestor", "--end-of-options", sha, ref)
+	if err == nil {
+		return true, nil
+	}
+	var ge *GitError
+	if errors.As(err, &ge) && ge.Code == 1 && ge.Err == nil {
+		return false, nil
+	}
+	return false, fmt.Errorf("integration: is %s an ancestor of %s: %w", sha, ref, err)
+}
+
+func compareWaveDirs(a, b string) int {
+	an, aok := poolNumber(a)
+	bn, bok := poolNumber(b)
+	switch {
+	case aok && bok && an != bn:
+		return cmp.Compare(an, bn)
+	case aok != bok:
+		if aok {
+			return -1
 		}
+		return 1
 	}
-	return DeliverableRecord{}, false
+	return cmp.Compare(a, b)
+}
+
+func poolNumber(recordPath string) (int, bool) {
+	name := strings.TrimPrefix(filepath.Base(filepath.Dir(recordPath)), wavePrefix)
+	n, err := strconv.Atoi(name)
+	return n, err == nil && n >= 0
 }

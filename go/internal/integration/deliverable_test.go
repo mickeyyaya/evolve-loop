@@ -163,7 +163,7 @@ func TestWaveDirIsWhereFindRecordLooks(t *testing.T) {
 	if got := WaveDir(root, "w9"); got != filepath.Join(root, ".evolve", "waves", "integration-w9") {
 		t.Fatalf("WaveDir = %s", got)
 	}
-	if r, ok := FindRecord(root, 42); !ok || r.Wave != "w7" {
+	if r, ok := recordOfCycle(root, 42); !ok || r.Wave != "w7" {
 		t.Fatalf("FindRecord did not see a record written under WaveDir: %+v %v", r, ok)
 	}
 }
@@ -321,7 +321,7 @@ func TestFindRecord_AnOldSchemaRecordReadsAsNoRecord(t *testing.T) {
 	if err := os.WriteFile(RecordPath(WaveDir(root, "w7"), 42), []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := FindRecord(root, 42); ok {
+	if _, ok := recordOfCycle(root, 42); ok {
 		t.Fatal("FindRecord returned a record of the old schema")
 	}
 }

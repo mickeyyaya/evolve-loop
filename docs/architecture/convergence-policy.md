@@ -7,6 +7,8 @@
 > - the doc review: C1, C2, H1–H5, M1, M2 and L1–L3, all applied;
 > - the research refinements CR1–CR8, and the operator's answer on headroom (top = Opus 5.5 at xhigh effort).
 >
+> **Revision 3** (2026-11-05) adds one escalation path, with a redesign rung after the retries (§3.3). No code for this revision exists yet.
+>
 > **Operator directives (2026-10-07):**
 > - *"It just retry for too many times."*
 > - *"Prioritize a convergence rule/solution using L2 with 7 rounds as the example issue that should converge earlier by escalating to top / deep model or other approaches to proceed with persuing the perfection with no output."* (verbatim)
@@ -190,13 +192,90 @@ A split or accept exempts the findings of its component from the ranking, but **
 3. **Stop.** In every other case:
    - the work is preserved (an ADR-0076 continuation for a cycle, or a staged lane for the console);
    - every open finding is filed (`CONVERGENCE_STOP`);
-   - the loop's existing ship rule decides the outcome. Audit repair FAILs, and code-review hands to the audit with `REVIEW_UNRESOLVED`.
+   - the loop's existing ship rule decides the outcome. Audit repair FAILs, and code-review hands to the audit with `REVIEW_UNRESOLVED`;
+   - past three blocks, the subject then takes the redesign rung (§3.3).
 
 #### 3.2 Adjudication (with headroom only)
 
 Before a rung-3 exit, one `Adjudicate` dispatch at the judge family's **top** (model, effort) is allowed to rule each remaining HIGH finding `CONFIRM` or `DOWNGRADE`.
 - This dispatch runs only when top differs from the judge's last (model, effort). Otherwise it is skipped, and `CONVERGENCE_NO_HEADROOM` is signalled.
 - When the two judges are the same model at different efforts, their errors are correlated (research F7). A disagreement between them is settled by **deterministic evidence** (a certificate or test), never by a third LLM opinion.
+
+#### 3.3 One escalation path: the redesign rung
+
+**Issue.** The operator gave two orders on 2026-11-05:
+- "review and update the adr related to the 3 retry on fixing the review CRITICAL and HIGH defects and trigger redesign as partner of ADR and pipeline flow."
+- "It should be part of escalation path when pipeline blocked due to continues failed/errors".
+
+**Gap.**
+- `Stop` ends a loop and files findings. The next try can repeat the same approach.
+- `Decision.Redesign` holds only a component list, and only `cmd_convergence.go` prints it.
+- The blocker breaker, the consecutive-FAIL breaker, the zero-ship halt and the task ceiling stop or quarantine. None of them starts a redesign.
+- ADR-0161 counted blocks beside this ladder, so one task had two rules.
+
+**Solution.** One path, one count.
+
+```mermaid
+flowchart TD
+    J["Judgment or failure event"] --> C{"Does it count?"}
+    C -- "quota or logout" --> E["Signal names its own step. No count."]
+    C -- "integrity" --> O["Operator, at once"]
+    C -- "hand-off finding" --> H["Console, at once (ADR-0158). No count."]
+    C -- "yes" --> B["Host adds one block"]
+    B --> L{"Blocks over three?"}
+    L -- "no" --> R["Retry on the ladder: feedback, then strategy"]
+    R --> J
+    L -- "yes" --> S{"Rung 3 scope exit fits?"}
+    S -- "split" --> P["The rest continues. The component, with its count, goes on."]
+    P --> F
+    S -- "accept" --> A["Accept with limits and a redesign follow-up"]
+    S -- "no" --> F{"First redesign of this subject?"}
+    F -- "yes" --> D["Redesign rung: leave the lane queue, new design card, architecture review, then code. Count restarts."]
+    D --> J
+    F -- "no" --> O
+```
+
+The rungs and the operator's words are above. The count, the failure classes, the restart and the limit of one redesign are console proposals (ADR-0126, Proposed).
+
+**The count.**
+- When each judgment holds a CRITICAL or HIGH defect, `J_0` is block 1 and `J_3` is block 4. So a full ladder has three retries, and its fourth block starts the redesign.
+- Only an open CRITICAL or HIGH defect makes a judgment a block. A round with only MEDIUM findings is a round, not a block, and it never starts a redesign.
+- A Stop with three blocks or fewer keeps §3.1, with no redesign.
+- A disputed row, a capability finding, a refuted late finding and a hand-off finding are not blocks (§3, §4, ADR-0158).
+- The count crosses rounds, rebuilds, cycles and resumes. The pipeline writes it on the host, and a seat cannot write it.
+- One event adds at most one block to a subject. A backward edge and a halt are not events of their own.
+
+**Failure events that count.**
+
+| Event | Subject | Count |
+|---|---|---|
+| Audit FAIL, or review block on a task | the task | one for each judgment |
+| A form or process failure with its recovery exhausted | the task | one for each exhausted recovery |
+| An exhausted ADR-0142 ladder, or its class `spec` at its limit | the task | one |
+| A failed cycle with a fingerprint | the task and the fingerprint | one on each |
+| A failure with no task | the fingerprint | one |
+| A host fault (class `infra`) | the fingerprint | one for each failed cycle, never on the task |
+| An unknown cause | the task, else the fingerprint | one, and the signal says "unknown" |
+| A zero-ship halt | the halt code | one for each halt |
+| The ADR-0142 class `halt` | none of its own | the halt row or the fingerprint row counts it |
+| A quota wall or a logout | none | none |
+| A hand-off finding | none | none: it goes to the console at once |
+| An integrity block | none | none: it goes to the operator at once |
+
+**The task ceiling** adds no block. An item at `TaskRetryCeiling` routes to the console with its count, in place of the quarantine, and later blocks add to that count.
+
+A halt keeps its ceiling and still stops the loop. The item it files carries the count and the rung. A recurrence after a merged fix adds to the same count. So a fingerprint with three failed fixes gets a redesign, not a fourth fix.
+
+**The redesign rung.**
+1. The fix rounds stop. The best round stays preserved, and every open finding is filed.
+2. The subject leaves the lane queue and routes to the console, with a digest of all findings.
+3. A top-tier seat names what the findings share, from the architecture side.
+4. The seat writes a new design card (ADR-0161). No seat and no console can waive this rung.
+5. The architecture review reads the card before any code. Strict TDD follows the review.
+6. The count restarts when the redesign starts. Card blocks and code blocks both count.
+7. A second count past three goes to the operator (`CONVERGENCE_TO_OPERATOR`).
+
+**What this does not change.** A CRITICAL still cannot land. An audit FAIL stays a FAIL. A redesign is never a route to a landing that skips a gate.
 
 ### 4. Rules for judges
 
@@ -259,6 +338,7 @@ Operator directive (2026-10-07): *"Convergence rule should also apply to evo loo
 
 - **One budget home per scope.** `max_backward_edges` is new config. The item ladder's *N* is `TaskRetryCeiling`, and ship recovery's is `maxRecoveryDepth`. The policy chooses rungs and never duplicates a budget.
 - **The fingerprint** is the existing failure fingerprint from the identical-fingerprint halt, so there is one vocabulary.
+- **The block count can come first.** An item at four blocks takes the redesign rung (§3.3) before its final try, and the rung replaces its quarantine.
 
 ### 7. Escalation headroom
 
@@ -289,11 +369,14 @@ Today's tier tables have **no** deep→top headroom in any family:
     "concentration_threshold": 0.6,
     "concentration_window": 2,
     "concentration_min_findings": 5,
-    "max_backward_edges": 3
+    "max_backward_edges": 3,
+    "max_blocks": 3,
+    "max_redesigns": 1
   }
 }
 ```
 
+- **`max_blocks` and `max_redesigns`** land with plan component R2. Strict decoding refuses them until then.
 - **Defaults and decoding:** compiled defaults live in `internal/policy`. Unknown keys are rejected, and unknown enum words warn and resolve to the default (§2.1 rule 10).
 - **`stage`:**
   - `shadow`: loops compute and signal the decision.
@@ -315,6 +398,8 @@ Today's tier tables have **no** deep→top headroom in any family:
 | `CONVERGENCE_STOP` | WARN | `loop`, `round`, `open`, `land_round` | rung 3 stop |
 | `CONVERGENCE_DISPUTED` | INFO | `loop`, `count`, `critical`, `adjudicator` | the decided round holds a DISPUTED row; `adjudicator` is `operator` for `console-lane`, else `audit`; the decision is unchanged |
 | `CONVERGENCE_NO_HEADROOM` | INFO | `loop`, `family`, `from`, `to` | a raise that changes no (model, effort) |
+| `CONVERGENCE_REDESIGN` | WARN | `subject`, `blocks`, `trigger`, `cause`, `evidence`, `next` | the subject takes the redesign rung (§3.3); `cause` can be `unknown` |
+| `CONVERGENCE_TO_OPERATOR` | ERROR | `subject`, `blocks`, `trigger`, `cause`, `evidence`, `next` | a count past three after one redesign (§3.3) |
 
 ### 10. Recovery rungs (only logic blocks)
 

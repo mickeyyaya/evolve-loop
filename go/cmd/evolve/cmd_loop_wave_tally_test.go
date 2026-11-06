@@ -26,7 +26,7 @@ func TestCompleteWave_ADeferredLaneIsCountedDeferredNotOk(t *testing.T) {
 		deps: orchDeps{Signals: c}, result: &loopResult{}, stdout: io.Discard, stderr: &stderr}
 	results := []fleet.Result{{Index: 0}, {Index: 1, ExitCode: fleet.ExitDeferred}, {Index: 2, ExitCode: 2}}
 
-	b.completeWave(65, policy.FleetConfig{Count: 3}, policy.FleetConfig{Count: 3}, results, 0, &fleet.StarvationTracker{})
+	b.settledWave(65, policy.FleetConfig{Count: 3}, policy.FleetConfig{Count: 3}, results, 0, &fleet.StarvationTracker{})
 
 	if !strings.Contains(stderr.String(), "[loop] wave 65: 1/3 lanes ok, 1 deferred\n") {
 		t.Errorf("the wave line must count the deferred lane apart from the ok and failed ones:\n%s", stderr.String())

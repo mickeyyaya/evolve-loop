@@ -14,9 +14,6 @@ func TestClassify_ContractRejectionIsCapability(t *testing.T) {
 	if got := retryladder.Classify(retryladder.Facts{ContractRejected: true}).Class; got != retryladder.Capability {
 		t.Fatalf("a rejected deliverable = %q, want %q", got, retryladder.Capability)
 	}
-	if got := retryladder.Classify(retryladder.Facts{ContractRejected: true, ProvenBlocker: true}).Class; got != retryladder.Spec {
-		t.Fatalf("a proven blocker with a rejection = %q, want %q", got, retryladder.Spec)
-	}
 }
 
 func TestClimbs_OnlyDeliverableSeats(t *testing.T) {

@@ -39,8 +39,12 @@ const replBootTimeoutExitCode = 80
 func IsBootTimeoutExitCode(exitCode int) bool { return exitCode == replBootTimeoutExitCode }
 
 func Benchable(pattern string) bool {
-	return pattern == "rate_limit" || pattern == ExhaustedPattern || pattern == QuotaExhaustedPattern || pattern == BootTimeoutPattern || pattern == CredentialPattern
+	return pattern == "rate_limit" || pattern == ExhaustedPattern || pattern == QuotaExhaustedPattern || pattern == BootTimeoutPattern || LoginPattern(pattern)
 }
+
+const OllamaLoginPattern = "auth_required"
+
+func LoginPattern(p string) bool { return p == CredentialPattern || p == OllamaLoginPattern }
 
 const QuotaExhaustedPattern = "quota_exhausted"
 
@@ -59,10 +63,10 @@ func QuotaPattern(pattern string) bool {
 const CredentialPattern = "auth_recheck"
 
 func OperatorAction(family, pattern string) string {
-	switch pattern {
-	case CredentialPattern:
+	switch {
+	case LoginPattern(pattern):
 		return fmt.Sprintf("operator: the %s CLI needs to be logged in again; the bench clears itself once a probe succeeds", family)
-	case ModelUnsupportedPattern:
+	case pattern == ModelUnsupportedPattern:
 		return fmt.Sprintf("operator: the account cannot run this %s model; re-pin the tier, or accept the fallback; the bench stops binding once the tier resolves to another model", family)
 	}
 	return ""
@@ -84,11 +88,11 @@ func CooldownForStrikes(strikes int) time.Duration {
 func NewBenchEntry(prev Entry, family, pattern, paneText string, now time.Time) Entry {
 	strikes := prev.Strikes + 1
 	until, parsed := time.Time{}, false
-	switch pattern {
-	case CredentialPattern:
-	case ModelUnsupportedPattern:
+	switch {
+	case LoginPattern(pattern):
+	case pattern == ModelUnsupportedPattern:
 		until, parsed = now.Add(MaxCooldown), true
-	case ExhaustedPattern:
+	case pattern == ExhaustedPattern:
 		until, parsed = parseHints(clockedHints, paneText, now)
 	default:
 		until, parsed = ParseResetHint(paneText, now)

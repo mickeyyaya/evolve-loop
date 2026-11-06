@@ -441,3 +441,27 @@ func TestAllocateCycleNumber_StartsAboveTheLeaseOfAnUnfinalizedLane(t *testing.T
 		t.Errorf("AllocateCycleNumber(last 1837, lease 1838) = %d, %v; want 1839", n, err)
 	}
 }
+
+func TestAllocateCycleNumber_LaneNumbersSortAboveAPoolIDAndNeverRepeatIt(t *testing.T) {
+	t.Parallel()
+
+	m := &memUpdater{st: State{LastCycleNumber: 9}}
+	pool, err := AllocateCycleNumber(context.Background(), m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[int]bool{pool: true}
+	for range 3 {
+		lane, err := AllocateCycleNumber(context.Background(), m)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if lane <= pool || seen[lane] {
+			t.Fatalf("lane number %d after pool id %d (seen %v)", lane, pool, seen)
+		}
+		seen[lane] = true
+	}
+	if got := m.st.HighestCycleNumber(); got != pool+3 {
+		t.Errorf("highest = %d, want %d: the burned pool id leaves no hole above it", got, pool+3)
+	}
+}

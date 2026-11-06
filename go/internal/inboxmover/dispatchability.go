@@ -12,6 +12,7 @@ import (
 type Dispatchability struct {
 	Dispatchable bool
 	Reason       string
+	Dep          string
 }
 
 func ResolveDispatchability(opts Options, taskID string) Dispatchability {
@@ -29,7 +30,7 @@ func ResolveDispatchability(opts Options, taskID string) Dispatchability {
 func PendingDispatchability(opts Options, deps []string) Dispatchability {
 	for _, dep := range deps {
 		if blocksDependents(ResolveDispatchState(opts, dep).State) {
-			return Dispatchability{Reason: "deps unmet: needs " + dep}
+			return Dispatchability{Reason: "deps unmet: needs " + dep, Dep: dep}
 		}
 	}
 	return Dispatchability{Dispatchable: true}

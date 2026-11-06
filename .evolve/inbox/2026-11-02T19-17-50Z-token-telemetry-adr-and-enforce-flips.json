@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "ADR merged",
+    "operator decision recorded"
+  ],
+  "campaign": "docs/plans/token-telemetry-2026-10",
+  "created_at": "2026-11-02T19:17:50Z",
+  "deps": [
+    "tokens-report-from-llm-calls"
+  ],
+  "files": [
+    "docs/architecture/adr"
+  ],
+  "fix": "After one shadow wave with T1 and T7, write the ADR and give the operator the flip evidence for T1, T9, T7 and T4.",
+  "id": "token-telemetry-adr-and-enforce-flips",
+  "intake_override": {
+    "reason": "operator decision or console research from the 2026-11-03 plan audit; a lane cannot decide it",
+    "console_route": true
+  },
+  "kind": "docs",
+  "notes": "operator decision",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "route": "console-manual",
+  "source": "console, 2026-11-03, plan audit of docs/plans (operator request: no task overlooked); plan docs/plans/token-telemetry-2026-10.md",
+  "summary": "Plan sections 8 and 13 Q5; blocked until T7 lands.",
+  "title": "Token telemetry: write the ADR for D1-D10 and propose the enforce flips after a shadow wave of T1 and T7",
+  "weight": 0.3
+}

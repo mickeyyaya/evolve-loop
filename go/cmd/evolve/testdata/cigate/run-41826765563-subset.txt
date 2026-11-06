@@ -1,0 +1,287 @@
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:16:11.3324672Z --- FAIL: TestPersonaStopCriterionDedupe_CombinedLineCountReduced
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:16:16.8192644Z     --- FAIL: TestF
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:16:16.8196868Z FAIL	p
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:20.1813201Z --- FAIL: TestC1946_001_CoreStatementCoverageIsFull (197.14s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:20.1856763Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1946	197.400s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:20.2871557Z --- FAIL: TestC1950_001_CoreLeaseBreakerCarryforwardBatchReachesFullCoverage (1.19s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:20.2876896Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1950	1.471s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:20.3022739Z --- FAIL: TestC1946_001_CoreStatementCoverageIsFull (197.14s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:20.3034482Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1946	197.400s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:20.4446931Z --- FAIL: TestC1950_001_CoreLeaseBreakerCarryforwardBatchReachesFullCoverage (1.19s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:20.4514552Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1950	1.471s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:23.8823671Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:24.4199259Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:24.4207912Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:24.4849800Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:24.4859444Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:24.6330438Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:25.3794875Z --- FAIL: TestC1761_009_OnlyTargetPackagesTouched (0.02s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:25.3801041Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle10	0.239s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:25.7156169Z --- FAIL: TestC1761_009_OnlyTargetPackagesTouched (0.02s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:25.7159092Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle10	0.239s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:26.0031344Z --- FAIL: TestC1761_009_OnlyTargetPackagesTouched (0.02s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:26.0032977Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle10	0.239s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:26.0376565Z --- FAIL: TestC1761_009_OnlyTargetPackagesTouched (0.02s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:26.0378322Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle10	0.239s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:26.1954250Z --- FAIL: TestC1761_009_OnlyTargetPackagesTouched (0.02s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:26.2026191Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle10	0.239s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:26.2888891Z --- FAIL: TestC1761_009_OnlyTargetPackagesTouched (0.02s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:26.2890664Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle10	0.239s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:39.3696714Z --- FAIL: TestC1946_001_CoreStatementCoverageIsFull (197.14s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:39.3699102Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1946	197.400s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:39.4447505Z --- FAIL: TestA (0.01s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:39.4447697Z FAIL	github.com/x/y	1.203s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:39.4450257Z FAIL	github.com/x/y	1.203s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:39.4526137Z --- FAIL: TestA (0.01s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:39.4526316Z FAIL	github.com/x/y	112.345s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:39.4528642Z FAIL	github.com/x/y	112.345s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:39.9963607Z --- FAIL: TestA (0.10s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:39.9964227Z FAIL	github.com/x/y	1.200s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:39.9965280Z --- FAIL: TestA (0.11s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:39.9965866Z FAIL	github.com/x/y	1.237s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:56.7854771Z --- FAIL: TestC1946_001_CoreStatementCoverageIsFull (197.14s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:17:56.7860196Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1946	197.400s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3462824Z github.com/mickeyyaya/evolve-loop/go/pkg/acsassert/go_tests.go:65:				goTestRunner					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3463104Z github.com/mickeyyaya/evolve-loop/go/pkg/acsassert/go_tests.go:69:				buildFlags					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3463417Z github.com/mickeyyaya/evolve-loop/go/pkg/acsassert/go_tests.go:80:				resolveImportPath				100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3463707Z github.com/mickeyyaya/evolve-loop/go/pkg/acsassert/go_tests.go:96:				newGoTestRun					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3464008Z github.com/mickeyyaya/evolve-loop/go/pkg/acsassert/go_tests.go:110:				validateGoTests					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3464287Z github.com/mickeyyaya/evolve-loop/go/pkg/acsassert/go_tests.go:138:				consume						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3464780Z github.com/mickeyyaya/evolve-loop/go/pkg/acsassert/go_tests.go:172:				packageEvent					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3465119Z github.com/mickeyyaya/evolve-loop/go/pkg/acsassert/go_tests.go:195:				exactNames					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3465451Z github.com/mickeyyaya/evolve-loop/go/pkg/acsassert/go_tests.go:206:				unlistedExactNames				100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3465760Z github.com/mickeyyaya/evolve-loop/go/pkg/acsassert/predicate_kit.go:13:				ModuleDir					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3466060Z github.com/mickeyyaya/evolve-loop/go/pkg/acsassert/predicate_kit.go:37:				OutputTail					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3466376Z github.com/mickeyyaya/evolve-loop/go/pkg/acsassert/predicate_kit.go:48:				FuncCoverage					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3466679Z github.com/mickeyyaya/evolve-loop/go/pkg/acsassert/predicate_kit.go:70:				WalkModule					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3466963Z github.com/mickeyyaya/evolve-loop/go/pkg/naminguard/naminguard.go:36:				isRegex						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3467275Z github.com/mickeyyaya/evolve-loop/go/pkg/naminguard/naminguard.go:38:				grepMatchArgs					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3467562Z github.com/mickeyyaya/evolve-loop/go/pkg/naminguard/naminguard.go:45:				apply						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3467842Z github.com/mickeyyaya/evolve-loop/go/pkg/naminguard/naminguard.go:69:				String						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3468120Z github.com/mickeyyaya/evolve-loop/go/pkg/naminguard/naminguard.go:73:				Load						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3468406Z github.com/mickeyyaya/evolve-loop/go/pkg/naminguard/naminguard.go:88:				Validate					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3468731Z github.com/mickeyyaya/evolve-loop/go/pkg/naminguard/naminguard.go:115:				excludePathspecs				100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3469018Z github.com/mickeyyaya/evolve-loop/go/pkg/naminguard/naminguard.go:139:				Scan						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3469361Z github.com/mickeyyaya/evolve-loop/go/pkg/naminguard/naminguard.go:171:				parseGrepOutput					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3469642Z github.com/mickeyyaya/evolve-loop/go/pkg/naminguard/naminguard.go:200:				Fix						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3469950Z github.com/mickeyyaya/evolve-loop/go/pkg/naminguard/naminguard.go:238:				rewriteFile					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3470378Z github.com/mickeyyaya/evolve-loop/go/pkg/naminguard/naminguard.go:257:				writeFilePreservingMode				57.9%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3470653Z github.com/mickeyyaya/evolve-loop/go/pkg/phaseproto/serve.go:16:				ServeStdio					96.2%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3471017Z github.com/mickeyyaya/evolve-loop/go/pkg/phaseproto/subprocess_runner.go:31:			NewSubprocessRunner				100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3471377Z github.com/mickeyyaya/evolve-loop/go/pkg/phaseproto/subprocess_runner.go:35:			Name						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3471807Z github.com/mickeyyaya/evolve-loop/go/pkg/phaseproto/subprocess_runner.go:37:			buildCmd					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3472154Z github.com/mickeyyaya/evolve-loop/go/pkg/phaseproto/subprocess_runner.go:43:			Run						92.9%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3472519Z github.com/mickeyyaya/evolve-loop/go/pkg/phaseproto/subprocess_runner.go:99:			readOneEnvelopeLine				87.5%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3472890Z github.com/mickeyyaya/evolve-loop/go/pkg/phaseproto/subprocess_runner.go:112:			defaultCorrelationID				100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3473161Z github.com/mickeyyaya/evolve-loop/go/pkg/phaseproto/wire.go:37:					Error						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3473417Z github.com/mickeyyaya/evolve-loop/go/pkg/phaseproto/wire.go:44:					Is						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3473703Z github.com/mickeyyaya/evolve-loop/go/pkg/phaseproto/wire.go:52:					EncodeRequest					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3474001Z github.com/mickeyyaya/evolve-loop/go/pkg/phaseproto/wire.go:65:					EncodeResponse					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3474285Z github.com/mickeyyaya/evolve-loop/go/pkg/phaseproto/wire.go:78:					EncodeError					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3474566Z github.com/mickeyyaya/evolve-loop/go/pkg/phaseproto/wire.go:87:					DecodeRequest					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3474929Z github.com/mickeyyaya/evolve-loop/go/pkg/phaseproto/wire.go:101:				DecodeResponse					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3475205Z github.com/mickeyyaya/evolve-loop/go/pkg/phaseproto/wire.go:115:				Validate					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3475516Z github.com/mickeyyaya/evolve-loop/go/pkg/version/version.go:18:					Get						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3475782Z github.com/mickeyyaya/evolve-loop/go/pkg/version/version.go:22:					Commit						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3476067Z github.com/mickeyyaya/evolve-loop/go/pkg/version/version.go:26:					composeCommit					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3476353Z github.com/mickeyyaya/evolve-loop/go/pkg/version/version.go:40:					composeVersion					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3476639Z github.com/mickeyyaya/evolve-loop/go/pkg/version/version.go:59:					formatVersion					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3476905Z github.com/mickeyyaya/evolve-loop/go/pkg/version/version.go:73:					shortSHA					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3477184Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/assert.go:18:				RequireNoErr					40.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3477457Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/assert.go:29:				RequireErr					66.7%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3477759Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/assert.go:37:				RequireErrContains				0.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3478024Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/assert.go:49:				MustWrite					66.7%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3478288Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/assert.go:61:				MustRead					80.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3478577Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/assert.go:71:				WantFileContains				66.7%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3478856Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/assert.go:82:				FilePresent					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3479160Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/builders.go:14:				NewLedgerEntry					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3479441Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/builders.go:22:				WithCycle					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3479706Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/builders.go:23:				WithRole					0.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3479974Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/builders.go:24:				WithKind					0.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3480332Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/builders.go:25:				WithExitCode					0.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3480609Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/builders.go:26:				WithGitHEAD					0.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3480893Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/builders.go:29:				WithEntrySeq					0.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3481169Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/clock.go:24:					FixedClock					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3481486Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/cmd_runner.go:71:				Run						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3481925Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/cmd_runner.go:119:				recordAndResolve				100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3482213Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/cmd_runner.go:135:				CallKeys					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3482492Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/cmd_runner.go:154:				execKey						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3482759Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/fakes.go:61:					ReadState					80.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3483031Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/fakes.go:70:					WriteState					85.7%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3483313Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/fakes.go:81:					ReadCycleState					80.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3483607Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/fakes.go:90:					WriteCycleState					90.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3483881Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/fakes.go:107:				cloneState					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3484177Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/fakes.go:114:				cloneCycleState					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3484461Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/fakes.go:122:				cloneFailures					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3484731Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/fakes.go:130:				AcquireLock					95.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3485062Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/fakes.go:170:				Append						83.3%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3485379Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/fakes.go:180:				Verify						0.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3485627Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/fakes.go:186:				Iter						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3485879Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/fakes.go:198:				Next						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3486137Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/fakes.go:207:				Close						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3486386Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/fakes.go:223:				Name						0.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3486633Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/fakes.go:225:				Run						68.8%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3486918Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/fakes.go:257:				BuildRunners					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3487177Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/fakes.go:278:				Launch						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3487434Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/fakes.go:294:				Probe						0.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3487704Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/logger.go:21:				String						83.3%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3487965Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/logger.go:62:				Logger						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3488239Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/logger.go:69:				newLogger					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3488506Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/logger.go:76:				SetLevel					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3488760Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/logger.go:84:				Debug						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3489014Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/logger.go:85:				Info						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3489267Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/logger.go:86:				Warn						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3489559Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/logger.go:87:				Error						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3489814Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/logger.go:89:				log						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3490145Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/logger.go:106:				Flush						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3490438Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/logger.go:120:				flushOnFailure					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3490705Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/stress.go:23:				StressN						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3490974Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/workspace.go:28:				Path						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3491304Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/workspace.go:33:				CycleDir					80.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3491574Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/workspace.go:43:				Write						71.4%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3491988Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/workspace.go:68:				NewWorkspace					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3492273Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/workspace.go:75:				WithState					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3492586Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/workspace.go:81:				WithCycleState					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3492870Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/workspace.go:87:				WithFiles					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3493170Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/workspace.go:98:				WithCycleFiles					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3493459Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/workspace.go:115:				WithGitInit					0.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3493731Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/workspace.go:121:				Build						85.7%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3494010Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/workspace.go:154:				writeJSON					66.7%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3494287Z github.com/mickeyyaya/evolve-loop/go/test/fixtures/workspace.go:165:				gitInit						0.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3494644Z github.com/mickeyyaya/evolve-loop/go/test/structure/binary.go:15:				ExecImporters					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3494932Z github.com/mickeyyaya/evolve-loop/go/test/structure/binary.go:19:				runsAProcess					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3495273Z github.com/mickeyyaya/evolve-loop/go/test/structure/binary.go:25:				LiteralFiles					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3495554Z github.com/mickeyyaya/evolve-loop/go/test/structure/binary.go:29:				filesWhere					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3495845Z github.com/mickeyyaya/evolve-loop/go/test/structure/binary.go:47:				hasLiteralWith					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3496148Z github.com/mickeyyaya/evolve-loop/go/test/structure/binary.go:51:				hasLiteralEqual					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3496425Z github.com/mickeyyaya/evolve-loop/go/test/structure/binary.go:55:				hasLiteral					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3496701Z github.com/mickeyyaya/evolve-loop/go/test/structure/limits.go:22:				CheckLimits					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3496993Z github.com/mickeyyaya/evolve-loop/go/test/structure/limits.go:50:				checkFunctions					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3497266Z github.com/mickeyyaya/evolve-loop/go/test/structure/limits.go:68:				nesting						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3497539Z github.com/mickeyyaya/evolve-loop/go/test/structure/limits.go:88:				childBody					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3497827Z github.com/mickeyyaya/evolve-loop/go/test/structure/mcp.go:13:					MCPConfigFiles					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3498108Z github.com/mickeyyaya/evolve-loop/go/test/structure/mcp.go:23:					MCPRegistrars					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3498389Z github.com/mickeyyaya/evolve-loop/go/test/structure/sources.go:14:				SourceFiles					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3498690Z github.com/mickeyyaya/evolve-loop/go/test/structure/sources.go:38:				SelectorUses					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3498973Z github.com/mickeyyaya/evolve-loop/go/test/structure/sources.go:58:				importName					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3499250Z github.com/mickeyyaya/evolve-loop/go/test/structure/sources.go:71:				isMemberOf					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3499575Z github.com/mickeyyaya/evolve-loop/go/test/structure/thirdparty.go:18:				RequiredModules					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3499887Z github.com/mickeyyaya/evolve-loop/go/test/structure/thirdparty.go:38:				appendDirect					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3500295Z github.com/mickeyyaya/evolve-loop/go/test/structure/thirdparty.go:45:				ThirdPartyViolations				100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3500582Z github.com/mickeyyaya/evolve-loop/go/test/structure/thirdparty.go:74:				skipDir						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3500897Z github.com/mickeyyaya/evolve-loop/go/test/structure/thirdparty.go:82:				fileViolations					100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3501235Z github.com/mickeyyaya/evolve-loop/go/test/structure/thirdparty.go:105:				homeOf						100.0%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3501364Z total:												(statements)					97.8%
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3548554Z ##[group]Run base="$COVER_BASE"
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3548708Z ^[[36;1mbase="$COVER_BASE"^[[0m
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3548928Z ^[[36;1mif [ -z "$base" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then^[[0m
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3549045Z ^[[36;1m  base=$(git rev-parse HEAD~1)^[[0m
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3549129Z ^[[36;1mfi^[[0m
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3549254Z ^[[36;1mecho "cover-changed base: $base"^[[0m
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3549406Z ^[[36;1mmake cover-changed COVER_CHANGED_BASE="$base"^[[0m
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3568596Z shell: /usr/bin/bash -e {0}
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3568686Z env:
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3568840Z   COVER_BASE: 0065fd52e74c5e29bea82e25f6b9c5f308aeda4a
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3568934Z ##[endgroup]
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3632141Z cover-changed base: 0065fd52e74c5e29bea82e25f6b9c5f308aeda4a
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:53.3679323Z go run ./cmd/evolve cover changed --base 0065fd52e74c5e29bea82e25f6b9c5f308aeda4a --root .
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:54.4865236Z cover changed: REFUSED internal/policy/fleet.go:22 internal/policy.RetryPolicy.UnmarshalJSON 91.7% (11/12)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:54.4866302Z cover changed: 232 changed, 231 full, 1 refused, 51 exempt
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:54.4937925Z exit status 1
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:54.5029266Z make: *** [Makefile:235: cover-changed] Error 1
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:54.5038928Z ##[error]Process completed with exit code 2.
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:54.5128873Z ##[group]Run actions/upload-artifact@v4
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:54.5129311Z with:
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:54.5129545Z   name: coverage-ubuntu-latest-go1.23
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:54.5130192Z   path: go/coverage.txt
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	go/apicover-report.txt
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	go/test-integration.json
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	go/test-e2e.json
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	go/test-rusage.ndjson
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	go/runner-samples.ndjson
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:54.5130849Z   if-no-files-found: warn
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:54.5131115Z   compression-level: 6
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:54.5131350Z   overwrite: false
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:54.5131582Z   include-hidden-files: false
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:54.5132157Z ##[endgroup]
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:54.6919750Z (node:176772) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:54.6921489Z (Use `node --trace-deprecation ...` to show where the warning was created)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:54.6974734Z Multiple search paths detected. Calculating the least common ancestor of all paths
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:54.6978964Z The least common ancestor is /home/runner/work/evolve-loop/evolve-loop/go. This will be the root directory of the artifact
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:54.6980366Z With the provided path, there will be 4 files uploaded
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:54.6986187Z Artifact name is valid!
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:54.6987430Z Root directory input is valid!
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:55.0654386Z Beginning upload of artifact content to blob storage
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:56.1380537Z (node:176772) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:57.0253217Z Uploaded bytes 8388608
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:57.1261168Z Uploaded bytes 9643139
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:57.1891433Z Finished uploading artifact content to blob storage!
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:57.1892749Z SHA256 digest of uploaded artifact zip is 77b16561bab4cb253ddb4c91f952c403ee999232379bc2c1cb489699b69ca96c
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:57.1894274Z Finalizing artifact upload
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:57.6837856Z Artifact coverage-ubuntu-latest-go1.23.zip successfully finalized. Artifact ID 13322025188
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:57.6839105Z Artifact coverage-ubuntu-latest-go1.23 has been successfully uploaded! Final size is 9643139 bytes. Artifact ID is 13322025188
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:57.6845681Z Artifact download URL: https://github.com/mickeyyaya/evolve-loop/actions/runs/41826765563/artifacts/13322025188
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:57.7132471Z Post job cleanup.
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:57.8015364Z [command]/usr/bin/git version
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:57.8062736Z git version 2.56.0
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:57.8102922Z Temporarily overriding HOME='/home/runner/work/_temp/c0beeff2-b1dc-42ad-94e7-39927adba1a0' before making global git config changes
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:57.8104314Z Adding repository directory to the temporary git global config as a safe directory
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:57.8108518Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/evolve-loop/evolve-loop
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:57.8150611Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:57.8214864Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:57.8533578Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:57.8562017Z http.https://github.com/.extraheader
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:57.8575423Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:57.8625632Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:57.8928623Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:57.8978579Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:57.9455610Z Evaluate and set job outputs
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:57.9460416Z Set output 'result'
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:57.9462777Z Cleaning up orphan processes
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:57.9837351Z Terminate orphan process: pid (4429) (hostsampler)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-11-04T12:22:57.9952947Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-go@v5, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+CI required	Require every selected suite to succeed	﻿2026-11-04T12:24:03.6376681Z ##[group]Run if [[ "$ROUTE_RESULT" != success ]]; then
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6377590Z ^[[36;1mif [[ "$ROUTE_RESULT" != success ]]; then^[[0m
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6378370Z ^[[36;1m  echo "CI prerequisite did not succeed: $ROUTE_RESULT" >&2^[[0m
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6379186Z ^[[36;1m  exit 1^[[0m
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6379634Z ^[[36;1mfi^[[0m
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6380342Z ^[[36;1mcase "$DOCS_ONLY:$DOCS_REQUIRED:$VALIDATE_RESULT:$PLUGIN_RESULT:$ACS_RESULT" in^[[0m
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6381520Z ^[[36;1m  false:true:success:success:success|false:false:success:success:success|true:true:skipped::) ;;^[[0m
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6383059Z ^[[36;1m  *) echo "plugin and durable ACS validation did not match the route: $DOCS_ONLY:$DOCS_REQUIRED:$VALIDATE_RESULT:$PLUGIN_RESULT:$ACS_RESULT" >&2; exit 1 ;;^[[0m
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6384238Z ^[[36;1mesac^[[0m
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6384751Z ^[[36;1mcase "$DOCS_REQUIRED:$STE_LINT_RESULT" in^[[0m
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6385396Z ^[[36;1m  true:success|false:skipped) ;;^[[0m
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6386733Z ^[[36;1m  *) echo "STE lint did not match the route: $DOCS_REQUIRED:$STE_LINT_RESULT" >&2; exit 1 ;;^[[0m
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6387647Z ^[[36;1mesac^[[0m
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6388139Z ^[[36;1mcase "$INBOX_REQUIRED:$INBOX_RESULT" in^[[0m
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6388772Z ^[[36;1m  true:success|false:skipped) ;;^[[0m
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6389690Z ^[[36;1m  *) echo "inbox lint did not match the route: $INBOX_REQUIRED:$INBOX_RESULT" >&2; exit 1 ;;^[[0m
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6390514Z ^[[36;1mesac^[[0m
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6391426Z ^[[36;1mfor result in "$GO_REQUIRED:$GO_RESULT:$GO_SUITE_RESULT" "$LANDING_REQUIRED:$LANDING_RESULT:$LANDING_SUITE_RESULT"; do^[[0m
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6392432Z ^[[36;1m  case "$result" in^[[0m
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6392990Z ^[[36;1m    true:success:success|false:skipped:) ;;^[[0m
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6393765Z ^[[36;1m    *) echo "required CI work did not succeed: $result" >&2; exit 1 ;;^[[0m
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6394474Z ^[[36;1m  esac^[[0m
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6394904Z ^[[36;1mdone^[[0m
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6395959Z ^[[36;1mecho 'Every required suite succeeded; other suites were explicitly unselected.'^[[0m
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6873042Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6874708Z env:
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6875804Z   ROUTE_RESULT: success
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6876697Z   DOCS_ONLY: false
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6877541Z   DOCS_REQUIRED: true
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6878866Z   STE_LINT_RESULT: success
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6879803Z   VALIDATE_RESULT: success
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6880784Z   PLUGIN_RESULT: success
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6881680Z   ACS_RESULT: success
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6882455Z   GO_REQUIRED: true
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6883217Z   GO_RESULT: failure
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6883988Z   GO_SUITE_RESULT: failure
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6884847Z   LANDING_REQUIRED: true
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6885961Z   LANDING_RESULT: success
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6886848Z   LANDING_SUITE_RESULT: success
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6887722Z   INBOX_REQUIRED: false
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6888554Z   INBOX_RESULT: skipped
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.6889376Z ##[endgroup]
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.7076411Z required CI work did not succeed: true:failure:failure
+CI required	Require every selected suite to succeed	2026-11-04T12:24:03.7102651Z ##[error]Process completed with exit code 1.

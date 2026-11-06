@@ -278,12 +278,13 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 	if verdict != core.VerdictPASS {
 		return verdict, diags, string(core.PhaseTDD)
 	}
+	diags = append(diags, routedCommittedDiagnostics(req, h.forbidden)...)
 	trimmed := strings.TrimSpace(artifact)
 	body, hasSection := topNSectionBody(trimmed)
 	if hasSection && !listItemRE.MatchString(body) {
 		signals, err := router.Digest(req.Workspace, []string{string(core.PhaseTriage)})
 		if err == nil && signals.HasEmptyTriageCommitment() {
-			return core.VerdictPASS, nil, string(core.PhaseTDD)
+			return core.VerdictPASS, diags, string(core.PhaseTDD)
 		}
 	}
 	if !hasSection || !listItemRE.MatchString(body) {
@@ -293,18 +294,11 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 			Code:     cyclestate.DiagCodeTriageTopNEmpty,
 		}}, string(core.PhaseTDD)
 	}
-	if cards := protectedTopNCards(body, h.forbidden); len(cards) > 0 {
-		if err := routeProtectedCards(filepath.Join(req.Workspace, "triage-decision.json"), cards, boundItems(req.Workspace)); err != nil {
-			return core.VerdictFAIL, []core.Diagnostic{{
-				Severity: cyclestate.SeverityError,
-				Message: fmt.Sprintf("top_n card %q names protected surface %q and its console route could not be recorded: %v",
-					cards[0].ID, cards[0].Path, err),
-				Code:    cyclestate.DiagCodeTriageProtectedSurface,
-				Subject: cards[0].ID,
-			}}, string(core.PhaseTDD)
-		}
-		diags = append(diags, routedCardDiagnostics(cards)...)
+	cardDiags, fail := routeTopNCards(req.Workspace, body, h.forbidden)
+	if fail != nil {
+		return core.VerdictFAIL, []core.Diagnostic{*fail}, string(core.PhaseTDD)
 	}
+	diags = append(diags, cardDiags...)
 	unifiedDiags, err := processUnifiedCommitment(req)
 	if err != nil {
 		return core.VerdictFAIL, []core.Diagnostic{{
@@ -314,6 +308,23 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 		}}, string(core.PhaseTDD)
 	}
 	return core.VerdictPASS, append(diags, unifiedDiags...), string(core.PhaseTDD)
+}
+
+func routeTopNCards(workspace, body string, forbidden func(string) bool) ([]core.Diagnostic, *core.Diagnostic) {
+	cards := protectedTopNCards(body, forbidden)
+	if len(cards) == 0 {
+		return nil, nil
+	}
+	if err := routeProtectedCards(filepath.Join(workspace, "triage-decision.json"), cards, boundItems(workspace)); err != nil {
+		return nil, &core.Diagnostic{
+			Severity: cyclestate.SeverityError,
+			Message: fmt.Sprintf("top_n card %q names protected surface %q and its console route could not be recorded: %v",
+				cards[0].ID, cards[0].Path, err),
+			Code:    cyclestate.DiagCodeTriageProtectedSurface,
+			Subject: cards[0].ID,
+		}
+	}
+	return routedCardDiagnostics(cards), nil
 }
 
 func topNSectionBody(trimmed string) (body string, ok bool) {

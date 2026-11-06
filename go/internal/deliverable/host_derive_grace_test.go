@@ -19,7 +19,7 @@ func TestHostEffects_WaitsOutTheAgentsWriteInFlight(t *testing.T) {
 	t.Cleanup(func() { graceSleep = saved })
 	var calls []claimCall
 
-	err := NewHostEffects(derivingCatalog(t), recordingClaimer(&calls)).Perform(context.Background(), in)
+	err := NewHostEffects(derivingCatalog(t), recordingClaimer(&calls), nil).Perform(context.Background(), in)
 
 	if err != nil {
 		t.Fatalf("Perform: %v", err)
@@ -43,7 +43,7 @@ func TestHostEffects_DeclinesWhenTheDecisionIsPresentButUnreadable(t *testing.T)
 	t.Cleanup(func() { _ = os.Chmod(decision, 0o644) })
 	var calls []claimCall
 
-	err := NewHostEffects(derivingCatalog(t), recordingClaimer(&calls)).Perform(context.Background(), in)
+	err := NewHostEffects(derivingCatalog(t), recordingClaimer(&calls), nil).Perform(context.Background(), in)
 
 	if err == nil || !strings.Contains(err.Error(), "derive triage-decision.json") || !strings.Contains(err.Error(), "permission denied") {
 		t.Fatalf("want a loud decline naming the read fault, got %v", err)

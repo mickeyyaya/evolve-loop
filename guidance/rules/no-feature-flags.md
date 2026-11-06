@@ -2,7 +2,7 @@
 id: no-feature-flags
 statement: "Add no feature flag. Select each behavior through configuration data and a design pattern."
 layer: L0
-order: 15
+order: 17
 audience: [all]
 enforced_by: []
 source: "memory feedback_no_feature_flags_use_design_patterns and feedback_no_feature_flag_sprawl"

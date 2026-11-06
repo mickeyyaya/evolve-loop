@@ -1,5 +1,7 @@
 # ADR-0030: Phase-Observer Auto-Spawn in `evolve loop`
 
+> **Note (2026-11-06, [ADR-0164](0164-all-decisions-serve-one-goal-and-one-amendment-resolves-their-conflicts.md)):** A script path named here is absent at main. Read that path as history. The decision stays as its status says.
+
 **Status:** Accepted (auto-spawn shipped) | **Date:** 2026-05-28 | **PR:** _pending (cycle-122 remediation, commit 4)_ | **Supersedes:** N/A | **Builds on:** [ADR-0029 CLI Fallback Chain](./0029-cli-fallback-chain-and-per-agent-overrides.md), [ADR-0027 commit-as-evidence](./0027-commit-as-evidence.md)
 
 > **Implementation correction (2026-06-23, ADR-0062 / T1.4).** The auto-spawn

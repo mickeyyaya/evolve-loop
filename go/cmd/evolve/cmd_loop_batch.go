@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/internal/integration"
 	"io"
 	"path/filepath"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
@@ -28,8 +30,13 @@ type loopBatchCoordinator struct {
 	preWave      func(iteration int) (batchDecision, bool)
 	leases       map[string]*orchestrator.Leases
 	zeroShip     zeroShipTally
+	now          func() time.Time
 	loadGraph    graphLoader
 	lastGraph    graphLoad
+
+	newDriver         func(pool int) (*integration.Driver, error)
+	driverFinishLimit time.Duration
+	driverTick        time.Duration
 }
 
 func (b *loopBatchCoordinator) run() int {
@@ -69,6 +76,7 @@ func (b *loopBatchCoordinator) run() int {
 	stallCfg := loadGoalStallConfig(cfg.EvolveDir)
 
 	batchStartCycle, _ := readBatchWindowFloor(context.Background(), deps.Storage)
+	b.zeroShip.from = b.clock()
 	sequentialState := sequentialBatchState{
 		dispPolicy:          dispPolicy,
 		threshold:           threshold,

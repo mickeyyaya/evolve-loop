@@ -1,5 +1,7 @@
 # ADR-6: Profile `adapter_overrides` — Per-Adapter Tool and Flag Policy
 
+> **Note (2026-11-06, [ADR-0164](0164-all-decisions-serve-one-goal-and-one-amendment-resolves-their-conflicts.md)):** A script path named here is absent at main. Read that path as history. The decision stays as its status says.
+
 **Status:** Accepted  
 **Date:** 2026-05-15  
 **Cycle:** 54  

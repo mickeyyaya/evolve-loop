@@ -140,6 +140,7 @@
       "name": "auth_recheck",
       "regex": "Please log in|Authentication required|Login expired",
       "response_keys": null,
+      "tail_lines": 12,
       "policy": "escalate"
     },
     {

@@ -46,7 +46,7 @@ func contractLadderAsk(phase Phase, origin, worktree string, rr ReviewResult) la
 		failures = append(failures, rr.Remediation)
 	}
 	return ladderAsk{phase: phase, origin: origin, worktree: worktree, failures: failures,
-		facts: retryladder.Facts{ContractRejected: true, ProvenBlocker: rr.ProvenBlocker != "", Reason: rr.Reason}}
+		facts: retryladder.Facts{ContractRejected: true, Reason: rr.Reason}}
 }
 
 func (cr *cycleRun) askLadder(ask ladderAsk, req PhaseRequest) (PhaseRequest, bool) {

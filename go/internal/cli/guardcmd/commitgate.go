@@ -35,26 +35,18 @@ func RunCommitGate(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return commitgate.ExitBadArgs
 	}
 
-	runner := sysexec.DefaultRunner
-	root := *projectRoot
-	if root == "" {
-		out, err := sysexec.Output(context.Background(), runner, "", "git", "rev-parse", "--show-toplevel")
-		if err != nil {
-			fmt.Fprintln(stderr, "[commit-gate] not in a git repo")
-			return commitgate.ExitGitFatal
-		}
-		root = out
-	}
-
-	opts := commitgate.Options{
-		RepoRoot:  root,
+	opts, ok := withReviewStore(commitgate.Options{
+		RepoRoot:  *projectRoot,
 		Reviewers: *reviewers,
 		Files:     *files,
 		NoInstall: *noInstall,
 		AttestDir: os.Getenv("CG_ATTEST_DIR"),
 		Env:       os.Environ(),
-		Runner:    runner,
+		Runner:    sysexec.DefaultRunner,
 		Now:       time.Now,
+	}, stderr)
+	if !ok {
+		return commitgate.ExitGitFatal
 	}
 
 	res := opts.Run(context.Background())
@@ -65,4 +57,29 @@ func RunCommitGate(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "%s\n", res.Attestation.TreeStateSHA)
 	}
 	return res.ExitCode
+}
+
+func withReviewStore(opts commitgate.Options, stderr io.Writer) (commitgate.Options, bool) {
+	root, ok := gateRoot(opts.RepoRoot, opts.Runner, stderr)
+	if !ok {
+		return commitgate.Options{}, false
+	}
+	reviewDir, err := commitgate.ReviewStoreDir(context.Background(), opts.Runner, root)
+	if err != nil {
+		fmt.Fprintf(stderr, "[commit-gate] cannot resolve the review store: %v\n", err)
+		return commitgate.Options{}, false
+	}
+	opts.RepoRoot, opts.ReviewDir = root, reviewDir
+	return opts, true
+}
+
+func gateRoot(flagRoot string, runner commitgate.Runner, stderr io.Writer) (string, bool) {
+	if flagRoot != "" {
+		return flagRoot, true
+	}
+	out, err := sysexec.Output(context.Background(), runner, "", "git", "rev-parse", "--show-toplevel")
+	if err != nil {
+		fmt.Fprintln(stderr, "[commit-gate] not in a git repo")
+	}
+	return out, err == nil
 }

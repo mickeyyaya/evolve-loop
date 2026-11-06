@@ -8,14 +8,14 @@ import (
 	"sort"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclefacts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 const (
-	failureDecisionFile = "failure-decision.json"
-	dispositionFile     = "disposition.json"
-	auditFailReasonFile = "audit-fail-reason.json"
+	failureDecisionFile = cyclefacts.DecisionFile
+	dispositionFile     = cyclefacts.DispositionFile
 	failureDigestFile   = "failure-digest.json"
 )
 
@@ -23,30 +23,6 @@ var (
 	auditReportName = phasecontract.ArtifactFilename(string(core.PhaseAudit))
 	buildReportName = phasecontract.ArtifactFilename(string(core.PhaseBuild))
 )
-
-type failureDecision struct {
-	Category string `json:"category"`
-	Level    string `json:"level"`
-	Action   string `json:"action"`
-	FixType  string `json:"fix_type"`
-}
-
-type disposition struct {
-	Fingerprint string `json:"fingerprint"`
-	Legitimacy  string `json:"legitimacy"`
-	Urgency     string `json:"urgency"`
-	RootCause   struct {
-		Layer   string `json:"layer"`
-		Summary string `json:"summary"`
-	} `json:"root_cause"`
-	Salvage struct {
-		Pointer string `json:"pointer"`
-	} `json:"salvage"`
-}
-
-type auditFailReason struct {
-	Reasons []string `json:"reasons"`
-}
 
 type failureDigest struct {
 	Fingerprint string `json:"fingerprint"`
@@ -61,13 +37,11 @@ func readFailure(ws string, d *dossier.Dossier) (*Failure, []string) {
 		f.Fingerprint, f.PreClass, f.GateReasons = d.Failure.Fingerprint, d.Failure.PreClass, d.Failure.Reasons
 		found = true
 	}
-	var fd failureDecision
-	if readJSONWarn(filepath.Join(ws, failureDecisionFile), &fd, &warnings) {
+	if fd, ok := settle(ws, cyclefacts.ReadDecision(ws), &warnings); ok {
 		f.Category, f.Level, f.Action, f.FixType = fd.Category, fd.Level, fd.Action, fd.FixType
 		found = true
 	}
-	var dp disposition
-	if readJSONWarn(filepath.Join(ws, dispositionFile), &dp, &warnings) {
+	if dp, ok := settle(ws, cyclefacts.ReadDisposition(ws), &warnings); ok {
 		f.Legitimacy, f.Urgency = dp.Legitimacy, dp.Urgency
 		f.Layer, f.RootCause, f.Salvage = dp.RootCause.Layer, dp.RootCause.Summary, dp.Salvage.Pointer
 		if f.Fingerprint == "" {
@@ -75,8 +49,7 @@ func readFailure(ws string, d *dossier.Dossier) (*Failure, []string) {
 		}
 		found = true
 	}
-	var ar auditFailReason
-	if readJSONWarn(filepath.Join(ws, auditFailReasonFile), &ar, &warnings) && len(ar.Reasons) > 0 {
+	if ar, ok := settle(ws, cyclefacts.ReadFailReason(ws), &warnings); ok && len(ar.Reasons) > 0 {
 		f.GateReasons = ar.Reasons
 		found = true
 	}
@@ -102,6 +75,13 @@ func readFailure(ws string, d *dossier.Dossier) (*Failure, []string) {
 		return nil, warnings
 	}
 	return f, warnings
+}
+
+func settle[T any](ws string, r cyclefacts.Read[T], warnings *[]string) (T, bool) {
+	if r.Err != nil {
+		*warnings = append(*warnings, fmt.Sprintf("%s: %v", filepath.Base(ws), r.Err))
+	}
+	return r.Value, r.State == cyclefacts.StatePresent
 }
 
 func readAuditRounds(ws string) ([]AuditRound, []string) {

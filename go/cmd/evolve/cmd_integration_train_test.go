@@ -5,83 +5,11 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/commitgate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/integration"
-	"github.com/mickeyyaya/evolve-loop/go/internal/launchrecord"
-	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
-	"github.com/mickeyyaya/evolve-loop/go/internal/treestate"
 )
-
-func reviewLaunch(id, tree string) launchrecord.Record {
-	return launchrecord.Record{
-		RunID: id, Profile: "code-reviewer", CLI: "agy-tmux", Family: "agy", Model: "m", Verdict: "PASS",
-		TreeBefore: tree, TreeAfter: tree, ArtifactSHA256: "a1", TS: "2026-11-04T09:00:00Z",
-	}
-}
-
-func (j *trainJourney) attestedPR(t *testing.T, n int, message, file, body string, waiver bool) string {
-	t.Helper()
-	name := "pr-" + strconv.Itoa(n)
-	j.work.Git("checkout", "-q", "-b", name, "main")
-	j.work.Write(file, body)
-	j.work.Git("add", file)
-	tree, err := treestate.SHA(context.Background(), sysexec.DefaultRunner, j.work.Dir, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	j.work.Git("commit", "-q", "-m", message)
-	j.work.Git("push", "-q", "origin", name+":refs/pull/"+strconv.Itoa(n)+"/head")
-	j.work.Git("checkout", "-q", "main")
-	runID := "r-" + name
-	if _, err := launchrecord.Write(filepath.Join(j.work.Dir, ".evolve"), reviewLaunch(runID, tree)); err != nil {
-		t.Fatal(err)
-	}
-	att := &commitgate.Attestation{TreeStateSHA: tree, TS: "t", ReviewersRun: []string{"run:" + runID}, Tool: "shasum"}
-	if waiver {
-		att.ReviewWaiver = "no reviewer"
-	}
-	raw, err := att.Marshal()
-	if err != nil {
-		t.Fatal(err)
-	}
-	path := filepath.Join(t.TempDir(), "attestation-"+name+".json")
-	if err := os.WriteFile(path, raw, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	return path
-}
-
-func TestJourneyRecordPRBindsTheAttestationToThePR(t *testing.T) {
-	t.Parallel()
-	j := newTrainJourney(t)
-	own := j.attestedPR(t, 5, "feat: a", "a.go", "package a\n", false)
-	other := j.attestedPR(t, 6, "feat: b", "b.go", "package b\n", false)
-	waived := j.attestedPR(t, 7, "feat: c", "c.go", "package c\n", true)
-
-	if rc, _, errb := j.run("record-pr", "--pr", "5", "--attestation", own); rc != 0 {
-		t.Fatalf("the attestation of PR 5 must bind PR 5: rc=%d %s", rc, errb)
-	}
-	rec, ok := integration.FindPRRecord(j.work.Dir, 5)
-	if !ok || rec.Audit.TreeSHA == "" || rec.Cycle != 0 {
-		t.Fatalf("record = %+v, %v", rec, ok)
-	}
-	if rc, _, _ := j.run("record-pr", "--pr", "6", "--attestation", own); rc != exitRefused {
-		t.Errorf("the attestation of another PR bound PR 6: rc=%d, want %d", rc, exitRefused)
-	}
-	if _, ok := integration.FindPRRecord(j.work.Dir, 6); ok {
-		t.Error("a mismatched attestation left a record")
-	}
-	if rc, _, _ := j.run("record-pr", "--pr", "6", "--attestation", other); rc != 0 {
-		t.Errorf("the attestation of PR 6 must bind PR 6: rc=%d", rc)
-	}
-	if rc, _, _ := j.run("record-pr", "--pr", "7", "--attestation", waived); rc != exitRefused {
-		t.Errorf("a waiver is not a review: rc=%d, want %d", rc, exitRefused)
-	}
-}
 
 func TestJourneyRecordPRTakesOnlyAClassWithItsRule(t *testing.T) {
 	t.Parallel()

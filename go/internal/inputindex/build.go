@@ -117,7 +117,7 @@ func newEntry(root string, s source) (Entry, bool, error) {
 }
 
 func plainFile(root, path string, info fs.FileInfo) bool {
-	if hardLinked(info) {
+	if HardLinked(info) {
 		return false
 	}
 	canonicalRoot, rootErr := filepath.EvalSymlinks(root)
@@ -126,7 +126,7 @@ func plainFile(root, path string, info fs.FileInfo) bool {
 	return rootErr == nil && err == nil && real == filepath.Join(canonicalRoot, rel)
 }
 
-func hardLinked(info fs.FileInfo) bool {
+func HardLinked(info fs.FileInfo) bool {
 	st, ok := info.Sys().(*syscall.Stat_t)
 	return ok && st.Nlink > 1
 }

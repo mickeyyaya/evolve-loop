@@ -16,23 +16,36 @@ const LanePinFile = "lane-scope.json"
 const DecisionFile = "triage-decision.json"
 
 func Committed(workspace string) ([]string, bool) {
+	ids, source := CommittedWithSource(workspace)
+	return ids, source != SourceUnknown
+}
+
+type Source string
+
+const (
+	SourcePin      Source = "pin"
+	SourceDecision Source = "decision"
+	SourceUnknown  Source = "unknown"
+)
+
+func CommittedWithSource(workspace string) ([]string, Source) {
 	pin := LanePin(workspace)
 	topN, decided := DecisionTopN(workspace)
 	if len(pin) == 0 && !decided {
-		return nil, false
+		return nil, SourceUnknown
 	}
-	ids := pin
+	ids, source := pin, SourcePin
 	if len(ids) == 0 {
-		ids = topN
+		ids, source = topN, SourceDecision
 	}
-	deferred := Deferred(workspace)
+	released := append(Deferred(workspace), RoutedIDs(workspace)...)
 	out := make([]string, 0, len(ids))
 	for _, id := range ids {
-		if !contains(deferred, id) {
+		if !contains(released, id) {
 			out = append(out, id)
 		}
 	}
-	return out, true
+	return out, source
 }
 
 type LanePinDoc struct {
@@ -41,11 +54,11 @@ type LanePinDoc struct {
 }
 
 func LanePin(workspace string) []string {
-	var pin LanePinDoc
-	if !readJSON(workspace, LanePinFile, &pin) {
+	doc, _ := LaneDoc(workspace)
+	if len(doc.TodoIDs) == 0 {
 		return nil
 	}
-	return nonBlank(pin.TodoIDs)
+	return doc.TodoIDs
 }
 
 func DecisionTopN(workspace string) (ids []string, decided bool) {
@@ -78,6 +91,20 @@ func Deferred(workspace string) []string {
 	out := make([]string, 0, len(decision.Deferred))
 	for _, t := range decision.Deferred {
 		if id := strings.TrimSpace(t.ID); id != "" {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+func ShippedIDs(workspace string) []string {
+	var decision SkipShippedBucket
+	if !readJSON(workspace, DecisionFile, &decision) {
+		return nil
+	}
+	var out []string
+	for _, e := range decision.SkipShipped {
+		if id := strings.TrimSpace(e.TaskID); id != "" {
 			out = append(out, id)
 		}
 	}

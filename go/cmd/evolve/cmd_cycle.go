@@ -181,6 +181,7 @@ var cycleRunAbsoluteRoot = paths.AbsoluteRoot
 type cycleRunFlags struct {
 	projectRoot, goalHash, goalText, evolveDir, sandboxOff string
 	simulate, bypassPolicy                                 bool
+	pool                                                   int
 }
 
 func parseCycleRunFlags(args []string, stderr io.Writer) (cycleRunFlags, bool) {
@@ -194,6 +195,7 @@ func parseCycleRunFlags(args []string, stderr io.Writer) (cycleRunFlags, bool) {
 	fs.BoolVar(&f.simulate, "simulate", false, "no-LLM walk: every phase returns PASS without calling out (for parity-audit harness)")
 	fs.BoolVar(&f.bypassPolicy, "bypass-policy", false, "use --bypass-policy to bypass policy.json pin enforcement for every phase this run (operator escape hatch)")
 	fs.StringVar(&f.sandboxOff, "sandbox-off", "", sandboxOffUsage)
+	fs.IntVar(&f.pool, "pool", 0, "pool id that the loop minted for this fleet lane; names the integration record directory")
 	args = stripRemovedBudgetFlags(args, func(m string) {
 		fmt.Fprintf(stderr, "evolve cycle run: WARN: %s\n", m)
 	})
@@ -202,6 +204,10 @@ func parseCycleRunFlags(args []string, stderr io.Writer) (cycleRunFlags, bool) {
 	}
 	if f.goalHash == "" {
 		fmt.Fprintln(stderr, "evolve cycle run: --goal-hash is required")
+		return f, false
+	}
+	if f.pool < 0 {
+		fmt.Fprintf(stderr, "evolve cycle run: --pool %d is negative\n", f.pool)
 		return f, false
 	}
 	return f, true
@@ -335,7 +341,7 @@ func wireCycleRun(f cycleRunFlags, projectRoot, evolveDir string, stderr io.Writ
 		return wireSimulateOrchestrator(projectRoot, evolveDir, stderr)
 	}
 	gcOrphanSessions("cycle-start", stderr)
-	return wireOrchestratorDepsFn(projectRoot, evolveDir, stderr, routingRun{bypass: f.bypassPolicy, env: filterEvolveEnv(os.Environ()), sandboxOff: f.sandboxOff})
+	return wireOrchestratorDepsFn(projectRoot, evolveDir, stderr, routingRun{bypass: f.bypassPolicy, env: filterEvolveEnv(os.Environ()), sandboxOff: f.sandboxOff, pool: f.pool})
 }
 
 func filterEvolveEnv(environ []string) map[string]string {
@@ -388,14 +394,16 @@ type rootLedger interface {
 	inboxmover.LedgerAppender
 }
 
-func newRootSignalCenter(projectRoot, evolveDir string, console io.Writer) *signalcenter.Center {
-	signals := signalcenter.New(signalcenter.WithPID(os.Getpid()))
+func newRootSignalCenter(projectRoot, evolveDir string, console io.Writer, opts ...signalcenter.Option) *signalcenter.Center {
+	signals := signalcenter.New(append([]signalcenter.Option{signalcenter.WithPID(os.Getpid())}, opts...)...)
 	signals.Subscribe(listenWhen(cycleStamped, signals.NDJSONSink(func(cycle int) string {
 		return filepath.Join(core.RunWorkspacePath(projectRoot, cycle), signalcenter.StreamFileName)
 	})))
-	signals.Subscribe(listenWhen(legacyProjectRecord, signals.NDJSONSink(func(int) string {
+	projectStream := signals.NDJSONSink(func(int) string {
 		return filepath.Join(evolveDir, signalcenter.StreamFileName)
-	})))
+	})
+	signals.Subscribe(listenWhen(legacyProjectRecord, projectStream))
+	signals.Subscribe(listenWhen(laneResumed, projectStream))
 	signals.Subscribe(signalcenter.ConsoleSink(console))
 	return signals
 }
@@ -409,6 +417,8 @@ func listenWhen(keep func(signalcenter.Event) bool, l signalcenter.Listener) sig
 }
 
 func cycleStamped(e signalcenter.Event) bool { return e.Cycle != 0 }
+
+func laneResumed(e signalcenter.Event) bool { return e.Code == core.CodeLaneResumed }
 
 var legacyProjectKinds = map[signalcenter.Kind]bool{
 	signalcenter.KindPhaseDispatched: true, signalcenter.KindPhaseOutcome: true, signalcenter.KindPhaseAborted: true,
@@ -471,7 +481,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	newLiveReaction(evolveDir, pol.HealingLiveReaction(), console).arm(signals)
 	swCfg := swarmrunner.Config{Stage: pol.SwarmConfig().Stage, PortBase: pol.SwarmConfig().PortBase, WorktreeBase: pol.WorktreeBase()}
 	gatesCfg := pol.GatesConfig()
-	shipIntegration, integrationErr := shipIntegrationOf(pol, fleetLaneFromEnv(), fleetLaneScope())
+	shipIntegration, integrationErr := shipIntegrationOf(pol, fleetLaneFromEnv(), fleetLaneScope(), run.pool, console)
 	if integrationErr != nil {
 		return orchDeps{Signals: signals, CloseSignals: closeSignals, RoutingErr: integrationErr}
 	}
@@ -597,7 +607,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	opts = append(opts, core.WithWorktreeBase(pol.WorktreeBase()))
 
 	opts = append(opts, compositionOptions()...)
-	hostEffects = deliverable.NewHostEffects(catalog, hostInboxClaimer(ld, signals, forbidden))
+	hostEffects = newHostEffects(catalog, ld, signals, forbidden)
 	opts = append(opts, core.WithHostEffects(hostEffects), core.WithLaneMenu(laneMenuOf(forbidden, wfCfg.Repair.Fixability)))
 	opts = append(opts, core.WithProtectedSurface(protectedMembership))
 	opts = append(opts, core.WithRepairFixability(repairFixability(protectedMembership, os.Stderr)), auditFixRung(auditFixSite{root: projectRoot, pol: pol, cfg: cfg, route: auditfixports.RouterRoute(cliRouter.Resolve, projectRoot), agent: runAgentCommand, stderr: os.Stderr}))
@@ -661,6 +671,10 @@ func hostContinuationShedder(signals *signalcenter.Center) func(string, int, con
 	return func(root string, cycle int, declined continuation.Continuation) ([]string, error) {
 		return inboxmover.ShedDeclinedContinuation(inboxmover.Options{ProjectRoot: root, Stderr: os.Stderr, Signals: signals}, cycle, declined)
 	}
+}
+
+func newHostEffects(catalog phasespec.Catalog, ld inboxmover.LedgerAppender, signals *signalcenter.Center, forbidden func(string) bool) *deliverable.HostEffects {
+	return deliverable.NewHostEffects(catalog, hostInboxClaimer(ld, signals, forbidden), forbidden)
 }
 
 func hostInboxClaimer(ld inboxmover.LedgerAppender, signals *signalcenter.Center, forbidden func(string) bool) deliverable.Claimer {

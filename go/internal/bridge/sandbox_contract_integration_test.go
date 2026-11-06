@@ -22,6 +22,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inputindex"
 	"github.com/mickeyyaya/evolve-loop/go/internal/isolation"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
@@ -205,6 +206,32 @@ var agentContract = []contractRow{
 		script: func(h contractHost) string {
 			return `echo '{"cycle":9,"item_ids":["item-a"]}' > ` + h.root + "/.evolve/lineage/cycle-9.json"
 		}},
+	{action: "B5: append a ship to .evolve/ship-journal.jsonl", want: contractDeny,
+		script: func(h contractHost) string {
+			return `echo '{"cycle":9,"class":"cycle","sha":"forged"}' >> ` + h.root + "/.evolve/ship-journal.jsonl"
+		}},
+	{action: "B5: write a landing record in .evolve/landing/", want: contractDeny,
+		script: func(h contractHost) string {
+			return `echo '{"cycle":9,"status":"complete","commit_sha":"forged"}' > ` + h.root + "/.evolve/landing/cycle-9.json"
+		}},
+	{action: "B5: write a deliverable record in .evolve/waves/", want: contractDeny,
+		script: func(h contractHost) string {
+			return `echo '{"cycle":9}' > ` + h.root + "/.evolve/waves/integration-current/deliverable-9.json"
+		}},
+	{action: "overwrite the existing lineage record of the own cycle", want: contractDeny,
+		script: func(h contractHost) string {
+			return `echo '{"cycle":7,"item_ids":["item-b","item-c"]}' > ` + h.root + "/.evolve/lineage/cycle-7.json"
+		},
+		check: func(t *testing.T, h contractHost, _ string) {
+			record, ok := inputindex.ReadRecord(h.root, 7)
+			if !ok || len(record.ItemIDs) != 1 || record.ItemIDs[0] != "item-a" {
+				t.Fatalf("the record of cycle 7 must keep [item-a] after the denied write, got %+v %v", record, ok)
+			}
+		}},
+	{action: "write a file in the own workspace", want: contractAllow,
+		script: func(h contractHost) string {
+			return "echo kept > " + h.run + "/notes.txt && cat " + h.run + "/notes.txt"
+		}},
 	{action: "rewrite the lane-scope.json of the own workspace", want: contractDeny,
 		script: func(h contractHost) string { return `echo '{"todo_ids":["item-b"]}' > ` + h.run + "/lane-scope.json" }},
 	{action: "a retry opens its predecessor's retrospective through inputs/index.json", want: contractAllow,
@@ -220,6 +247,8 @@ var agentContract = []contractRow{
 		script: func(h contractHost) string {
 			return "cat " + filepath.Join(filepath.Dir(h.otherCycle), "cycle-9", "audit-report.md")
 		}},
+	{action: "read the seat token holder", want: contractDeny,
+		script: func(h contractHost) string { return "cat " + paths.SeatTokenPath(h.home) }},
 	{action: "isolation N8: read ~/.ssh", want: contractDeny, isolation: "N8",
 		script: func(contractHost) string { return `cat "$HOME/.ssh/id_fixture"` }},
 	{action: "the Claude OAuth login reads its Keychain item through the security service", want: contractAllow,
@@ -443,7 +472,7 @@ func (h *contractHost) withProject(t *testing.T) {
 	h.otherCycle = filepath.Join(h.root, ".evolve", "runs", "cycle-8")
 	h.events = filepath.Join(h.root, ".evolve", "events")
 	h.resumeWitness = filepath.Join(h.root, ".evolve", "resume-witness")
-	for _, dir := range []string{h.run, h.otherCycle, h.events, h.resumeWitness, inputindex.AccessDir(h.root)} {
+	for _, dir := range []string{h.run, h.otherCycle, h.events, h.resumeWitness, inputindex.AccessDir(h.root), filepath.Join(h.root, ".evolve", "landing"), filepath.Join(h.root, ".evolve", "waves", "integration-current")} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -465,6 +494,7 @@ func (h *contractHost) withIsolationFixtures(t *testing.T) {
 		filepath.Join(runs, "cycle-9", "lane-scope.json"):         `{"todo_ids":["item-b"]}`,
 		filepath.Join(h.run, "lane-scope.json"):                   `{"todo_ids":["item-a"]}`,
 		filepath.Join(h.home, ".ssh", "id_fixture"):               "fixture secret of the cell home\n",
+		paths.SeatTokenPath(h.home):                               "fixture-seat-token\n",
 	} {
 		if err := os.MkdirAll(filepath.Dir(rel), 0o755); err != nil {
 			t.Fatal(err)

@@ -20,16 +20,18 @@ This digest has the facts that each agent must have when it starts. The full rul
 <!-- GENERATED:guidance-l0 BEGIN from guidance/rules by `evolve guidance build`; edit the registry, not this region -->
 ### Hard rules
 
+- Top law: a self-healing, AI-driven loop that relentlessly builds the best-quality features, and fixes any issue with logic, research and the best practical option.
+- Serve the top law, not a local metric. Finish inside each gate and limit, and report a conflict with the law.
 - Never mutate or run a live kill guard. Inject the signal sender, so that a test cannot kill a real process.
 - Never kill processes by a command pattern on the shared host. Kill only the process ids that you started.
-- No LLM starts or directs another LLM. A phase agent starts only through the native bridge of the pipeline. (enforced by `go/internal/guards/phase.go`)
+- No LLM in the pipeline starts or directs another. The console acts for the operator, and runs a seat only through evolve agent run. (enforced by `go/internal/guards/phase.go`)
 - Run the phases in the order Scout, Build, Audit, Ship. Never skip a phase, and never ignore a kernel-gate failure. (enforced by `go/internal/core/statemachine.go`)
 - Commit and push only through evolve ship. The ship gate denies a bare git commit and a bare git push. (enforced by `go/internal/guards/ship.go`)
 - The builder writes only inside the worktree that the runtime provisions. An agent never runs git worktree. (enforced by `go/internal/guards/role.go`)
 - Ship only when the EGPS verdict has a red count of zero. Never edit the hash-chained ledger by hand.
 - Never fabricate a cycle number, a test count or a verdict. Report only what a command printed.
 - Do all development on a branch in a worktree, never on main. Main is the integration branch only.
-- MANDATORY: code has no comments and no Go doc comments. Never write, ask for or test a comment. A reason goes to the package note. (enforced by `go/internal/commitgate/comments_added.go`)
+- MANDATORY: code has no comments, except tool-read lines and the one package doc that docgo requires. A reason goes to the package note. (enforced by `go/internal/commitgate/comments_added.go`)
 - Write each document through the docs-write skill. The new text passes evolve docs ste-lint --strict. (enforced by `go/internal/stelint`)
 - Reach each outside service through a CLI, never through MCP. Build a CLI when a service has none.
 - Put research, lessons and failed approaches under docs/. Never delete a document; archive it.
@@ -48,7 +50,7 @@ The full rule set is in [guidance/index.md](guidance/index.md). Run `evolve guid
 
 - **Status reports** give the cycles that ran, the ships (for example 2/2) and the open PR numbers. They also give the failed CI jobs with their class, and the next action.
 - **Bypass mode** means "do not ask the user". It does not mean "skip integrity checks". Run the full pipeline every cycle, and follow the failure-adapter verdicts verbatim.
-- **Pre-commit review fleet:** code-simplifier, then architecture-reviewer and code-reviewer in parallel, then fix the findings, then commit. `evolve agent run <name>` runs each reviewer on any family. The console runs each review and each build through `evolve agent run`, and attests a review run with `--reviewers run:<run label>`. Fix each CRITICAL finding of architecture-reviewer before the commit. A diff of only `.md` files gets the `docs-review` skill and `--reviewers docs-review`; the code reviewers do not satisfy the gate. Only a proven comment removal needs no reviewer.
+- **Pre-commit review fleet:** code-simplifier, then architecture-reviewer and code-reviewer in parallel, then fix the findings, then commit. `evolve agent run <name>` runs each reviewer on any family. The console runs each review and each build through `evolve agent run`, and attests a review run with `--reviewers run:<run label>`. Fix each CRITICAL finding of architecture-reviewer before the commit. A diff of only `.md` files gets the `docs-review` review, run with `evolve agent run docs-review`, and `--reviewers run:<run label>`; the code reviewers do not satisfy the gate. Only a proven comment removal needs no reviewer.
 - **Verify before you claim done.** Probe a CLI with `evolve doctor probe <tool>` before you call it unavailable. Read the real exports of a module before you call it. Report test counts: `N/N PASS, no regression`.
 - **CI failures:** classify each red with `evolve ci classify` before a retry. When a gate reports RED, verify the logic of the gate before you assume that the code is broken.
 - **Go:** run `gofmt -l .`, `go vet` and `go test -count=1` from `go/`. `-count=1` is required, because the test cache does not see the files that tests read through `..`.

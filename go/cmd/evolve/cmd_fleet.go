@@ -147,14 +147,31 @@ func laneGoalHash(specGoalHash, fallback string) string {
 	return fallback
 }
 
+type cycleLaunch struct {
+	Bin      string
+	Simulate bool
+	Root     string
+	GoalHash string
+	GoalText string
+	Stdout   io.Writer
+	Stderr   io.Writer
+	Pool     int
+}
+
 func execCycleLaunch(binPath string, simulate bool, projectRoot, goalHash, goalText string, stdout, stderr io.Writer) fleet.LaunchFn {
+	return cycleLaunch{Bin: binPath, Simulate: simulate, Root: projectRoot, GoalHash: goalHash, GoalText: goalText, Stdout: stdout, Stderr: stderr}.LaunchFn()
+}
+
+func (l cycleLaunch) LaunchFn() fleet.LaunchFn {
 	var logMu sync.Mutex
 	return func(ctx context.Context, spec fleet.CycleSpec) (int, error) {
 		prefix := "[" + cycleLogTag(spec) + "] "
-		ow := &prefixLineWriter{w: stdout, prefix: prefix, mu: &logMu}
-		ew := &prefixLineWriter{w: stderr, prefix: prefix, mu: &logMu}
+		ow := &prefixLineWriter{w: l.Stdout, prefix: prefix, mu: &logMu}
+		ew := &prefixLineWriter{w: l.Stderr, prefix: prefix, mu: &logMu}
 		defer func() { ow.Flush(); ew.Flush() }()
-		cmd := sysexec.Command(ctx, binPath, cycleRunArgs(laneGoalHash(spec.GoalHash, goalHash), spec.OutputContract, goalText, simulate, projectRoot)...)
+		lane := l
+		lane.GoalHash = laneGoalHash(spec.GoalHash, l.GoalHash)
+		cmd := sysexec.Command(ctx, l.Bin, cycleRunPoolArgs(lane, spec.OutputContract)...)
 		cmd.Env = append(os.Environ(), envPairs(spec.Env)...)
 		cmd.Stdout = ow
 		cmd.Stderr = ew

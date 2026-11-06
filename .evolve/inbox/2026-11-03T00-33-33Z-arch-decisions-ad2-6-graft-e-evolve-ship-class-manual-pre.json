@@ -1,0 +1,33 @@
+{
+  "acceptance": [
+    "Red test first: `TestShipManual_WritesTheTrailerOfTheBranchItem`.",
+    "100% statement coverage on each changed function; zero code comments.",
+    "The spec and package note of the changed package state the change in STE."
+  ],
+  "campaign": "architecture-decisions-2026-11",
+  "created_at": "2026-11-03T00:33:33Z",
+  "deps": [
+    "arch-decisions-ad2-1-the-parser-closesinboxids-accepts"
+  ],
+  "files": [
+    "go/cmd/evolve"
+  ],
+  "fix": "Graft E: `evolve ship --class manual` pre-fills the trailer from the item of the branch",
+  "id": "arch-decisions-ad2-6-graft-e-evolve-ship-class-manual-pre",
+  "intake_override": {
+    "reason": "console: ship path; a separate component of docs/plans/architecture-decisions-2026-11.md with its own files, test and stage; the overlap is the shared plan text",
+    "overlaps": [
+      "arch-decisions-ad2-4-a-ci-step-in-required-yml-for-all",
+      "arch-decisions-ad2-9-graft-d-an-on-demand-llm-curator"
+    ],
+    "console_route": true
+  },
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "source": "operator decisions 2026-11-03; plan docs/plans/architecture-decisions-2026-11.md component AD2-6",
+  "summary": "Component AD2-6 of the 2026-11-03 architecture decisions plan. Graft E: `evolve ship --class manual` pre-fills the trailer from the item of the branch Stage: none. Size: M. Route: console: ship path. Plan: docs/plans/architecture-decisions-2026-11.md; research: docs/research/architecture-decisions-2026-11.md.",
+  "title": "AD2-6: Graft E: evolve ship --class manual pre-fills the trailer from the item of the branch",
+  "weight": 0.8
+}

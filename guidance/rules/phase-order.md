@@ -2,7 +2,7 @@
 id: phase-order
 statement: "Run the phases in the order Scout, Build, Audit, Ship. Never skip a phase, and never ignore a kernel-gate failure."
 layer: L0
-order: 4
+order: 6
 audience: [all]
 enforced_by: [go/internal/core/statemachine.go]
 source: "AGENTS.md invariant 1"

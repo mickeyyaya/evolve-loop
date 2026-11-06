@@ -2,7 +2,7 @@
 id: never-fabricate-results
 statement: "Never fabricate a cycle number, a test count or a verdict. Report only what a command printed."
 layer: L0
-order: 8
+order: 10
 audience: [all]
 enforced_by: []
 source: "the instructions digest of AGENTS.md (X10)"

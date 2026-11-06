@@ -7,16 +7,18 @@ Each row is one active rule of the registry. Open the body of a rule when your t
 
 | Id | Summary | Audience | Families | Triggers | Enforced by |
 |---|---|---|---|---|---|
+| [the-ultimate-goal](rules/the-ultimate-goal.md) | Top law: a self-healing, AI-driven loop that relentlessly builds the best-quality features, and fixes any issue with logic, research and the best practical option. | all | all | — | — |
+| [serve-the-goal-not-the-metric](rules/serve-the-goal-not-the-metric.md) | Serve the top law, not a local metric. Finish inside each gate and limit, and report a conflict with the law. | all | all | — | — |
 | [kill-guard-never-mutated](rules/kill-guard-never-mutated.md) | Never mutate or run a live kill guard. Inject the signal sender, so that a test cannot kill a real process. | all | all | — | — |
 | [no-broad-pkill](rules/no-broad-pkill.md) | Never kill processes by a command pattern on the shared host. Kill only the process ids that you started. | all | all | — | — |
-| [pipeline-only-controller](rules/pipeline-only-controller.md) | No LLM starts or directs another LLM. A phase agent starts only through the native bridge of the pipeline. | all | all | — | `go/internal/guards/phase.go` |
+| [pipeline-only-controller](rules/pipeline-only-controller.md) | No LLM in the pipeline starts or directs another. The console acts for the operator, and runs a seat only through evolve agent run. | all | all | — | `go/internal/guards/phase.go` |
 | [phase-order](rules/phase-order.md) | Run the phases in the order Scout, Build, Audit, Ship. Never skip a phase, and never ignore a kernel-gate failure. | all | all | — | `go/internal/core/statemachine.go` |
 | [commit-through-ship](rules/commit-through-ship.md) | Commit and push only through evolve ship. The ship gate denies a bare git commit and a bare git push. | all | all | — | `go/internal/guards/ship.go` |
 | [builder-worktree-only](rules/builder-worktree-only.md) | The builder writes only inside the worktree that the runtime provisions. An agent never runs git worktree. | all | all | — | `go/internal/guards/role.go` |
 | [ship-needs-egps-verdict](rules/ship-needs-egps-verdict.md) | Ship only when the EGPS verdict has a red count of zero. Never edit the hash-chained ledger by hand. | all | all | — | — |
 | [never-fabricate-results](rules/never-fabricate-results.md) | Never fabricate a cycle number, a test count or a verdict. Report only what a command printed. | all | all | — | — |
 | [dev-on-branches](rules/dev-on-branches.md) | Do all development on a branch in a worktree, never on main. Main is the integration branch only. | all | all | — | — |
-| [code-zero-comments](rules/code-zero-comments.md) | MANDATORY: code has no comments and no Go doc comments. Never write, ask for or test a comment. A reason goes to the package note. | all | all | — | `go/internal/commitgate/comments_added.go` |
+| [code-zero-comments](rules/code-zero-comments.md) | MANDATORY: code has no comments, except tool-read lines and the one package doc that docgo requires. A reason goes to the package note. | all | all | — | `go/internal/commitgate/comments_added.go` |
 | [docs-through-docs-write](rules/docs-through-docs-write.md) | Write each document through the docs-write skill. The new text passes evolve docs ste-lint --strict. | all | all | — | `go/internal/stelint` |
 | [cli-only-no-mcp](rules/cli-only-no-mcp.md) | Reach each outside service through a CLI, never through MCP. Build a CLI when a service has none. | all | all | — | — |
 | [findings-go-to-docs](rules/findings-go-to-docs.md) | Put research, lessons and failed approaches under docs/. Never delete a document; archive it. | all | all | — | — |

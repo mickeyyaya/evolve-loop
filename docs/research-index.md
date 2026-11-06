@@ -571,6 +571,20 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [research/claude-code-changelog-2.1.316-review.md](research/claude-code-changelog-2.1.316-review.md) | Research: the Claude Code changelog for version 2.1.316 read as untrusted data. No persona changes under ADR-0133 before the M2 baseline. |
 
+## 2026-11-03 — architecture decisions D1 to D4
+
+| Document | What it records |
+|---|---|
+| [research/architecture-decisions-2026-11.md](research/architecture-decisions-2026-11.md) | Research: four decision studies with findings, scored options and winners. Cell secret isolation, inbox staleness, four design-only items, and tree binding for ledgers and generated PRs. |
+| [plans/architecture-decisions-2026-11.md](plans/architecture-decisions-2026-11.md) | Plan: the operator picks of 2026-11-03 as components AD1-1 to AD4-5. It gives the build order, the proving tests, the route of each and the Windows sandbox open item. |
+
+## 2026-11-03 — review routing: which change class gets which review seats
+
+| Document | What it records |
+|---|---|
+| [research/review-routing-2026-11.md](research/review-routing-2026-11.md) | Research: the commit gate checks two seat names, passes WARN with open HIGH, and keeps no review record on main. Option A wins: one protected registry for the gate, CI and the lanes. |
+| [plans/review-routing-2026-11.md](plans/review-routing-2026-11.md) | Plan: the change-class matrix (C0 to C13) and the components S0 to S11 with stage, test and route. |
+
 ## 2026-11-04 — agent harness practice in 2026 and what the loop takes from it
 
 | Document | What it records |
@@ -579,5 +593,56 @@ approaches / decision / results / retro) — lives at
 | [plans/harness-practices-2026-11.md](plans/harness-practices-2026-11.md) | Plan: keep the integration train and build nine components, led by a mechanical regression proof, with the console train in the integration plan. |
 | [architecture/adr/0159-the-loop-keeps-its-integration-train-and-takes-six-practices-from-the-2026-harness-projects.md](architecture/adr/0159-the-loop-keeps-its-integration-train-and-takes-six-practices-from-the-2026-harness-projects.md) | Decision: no outside system replaces ADR-0147, and six practices close the failures of this period. |
 | [architecture/regression-proof-and-supervision.md](architecture/regression-proof-and-supervision.md) | Spec of record: the regression proof gate, the journey registry, derived liveness and the terminal refusal. |
+
+## One trust root for the inbox queue (2026-11-05)
+
+[Plan](plans/queue-authority-from-host-facts-2026-11.md) and [ADR-0160](architecture/adr/0160-the-host-lineage-record-is-the-one-trust-root-for-what-a-cycle-may-do-to-the-queue.md). After five blocked rounds, the design moves authority from a file that a cell can write to the host lineage record. One reader serves about 30 sites, a typed reason keeps agent text out of each route, and the mover refuses at the sink.
+
+## 2026-11-05 — the queue trust root: the host record decides what a cycle may do to the inbox queue (ADR-0160)
+
+| Document | What it records |
+|---|---|
+| [research/queue-trust-root-2026-11.md](research/queue-trust-root-2026-11.md) | Research: six blocked review rounds, the agent-writable files that give authority over the queue, and the faults that the review of PR 1 found. It adds outside work and one stated gap. Findings F1.1 to F1.14, P2.1 to P2.7, refinements R1 to R11. |
+| [plans/queue-authority-from-host-facts-2026-11.md](plans/queue-authority-from-host-facts-2026-11.md) | Plan: six designs with scores, and the winner, one trust root. Decisions D1 to D18 and components K1 to B2 with red tests. It corrects an old claim: PR 1 closes the pin file, and PR 3 closes the PASS path. |
+| [architecture/adr/0160-the-host-lineage-record-is-the-one-trust-root-for-what-a-cycle-may-do-to-the-queue.md](architecture/adr/0160-the-host-lineage-record-is-the-one-trust-root-for-what-a-cycle-may-do-to-the-queue.md) | Decision (Proposed): the host record is the only source of which items a cycle owns. It has one reader, a typed route reason, a mover refusal and a brake. |
+| [architecture/queue-trust-root.md](architecture/queue-trust-root.md) | Spec of record: the host record, its one reader and guard, and the drift signal. It also covers the write boundary, the typed route reason, the mover refusal and the breaker. |
+
+## 2026-11-05 — pipeline blockers of wave 155: design check, six test rows and accurate signals
+
+| Document | What it records |
+|---|---|
+| [research/pipeline-blockers-2026-11.md](research/pipeline-blockers-2026-11.md) | Research: the eleven blockers of wave 155, the 38 review findings of seven blocked fixes, and outside practice on error signals. |
+| [plans/pipeline-blockers-2026-11.md](plans/pipeline-blockers-2026-11.md) | Plan: a design card, six test rows, a signal contract, a redesign past three blocks and two debug verbs. |
+| [architecture/adr/0161-a-pipeline-blocker-fix-meets-six-test-rows-and-a-signal-states-its-cause-and-next-step.md](architecture/adr/0161-a-pipeline-blocker-fix-meets-six-test-rows-and-a-signal-states-its-cause-and-next-step.md) | Decision: thirteen rules for the fix of a pipeline blocker and for the content of a signal. |
+| [architecture/signal-accuracy.md](architecture/signal-accuracy.md) | Spec of record: the six parts of a signal, the source of a class, the one-reader rule, the logout cause and the debug verbs. |
+| [incidents/2026-11-05-wave-155-false-signals-and-the-logout.md](incidents/2026-11-05-wave-155-false-signals-and-the-logout.md) | Incident: false counts and classes, a logout read as quota, and seven blocked fixes. |
+
+## 2026-11-05 — a read-only debug CLI for the console and for agents
+
+| Document | What it records |
+|---|---|
+| [research/debug-cli-2026-11.md](research/debug-cli-2026-11.md) | Research: why scratch scripts fail, what four architecture rounds found in the code, and current practice for an agent-facing CLI. |
+| [plans/debug-cli-2026-11.md](plans/debug-cli-2026-11.md) | Plan: a family that composes the owners, nine decisions and thirteen test-first components. |
+| [architecture/adr/0162-the-console-reads-through-a-tested-read-only-debug-family-and-writes-no-scratch-scripts.md](architecture/adr/0162-the-console-reads-through-a-tested-read-only-debug-family-and-writes-no-scratch-scripts.md) | Decision: the console reads through tested read-only verbs and writes no scratch script. |
+| [architecture/debug-cli.md](architecture/debug-cli.md) | Spec of record: the verbs, exit codes, items, source kinds, cycle states, the rule for `next` and the read-only proof. |
+
+## 2026-11-05 — why the Claude Code login fails, and how a seat stops ending it
+
+| Document | What it records |
+|---|---|
+| [research/claude-login-split-2026-11.md](research/claude-login-split-2026-11.md) | Research: 264 auth errors in 7 clusters since 11-02, and an older console pattern. A sandboxed seat cannot write the Keychain. |
+| [plans/seat-login-isolation-2026-11.md](plans/seat-login-isolation-2026-11.md) | Plan: five scored designs. A seat loses its path to the stored login. The operator chose design C. |
+| [architecture/seat-login.md](architecture/seat-login.md) | Spec: the token file is the stage, `Resolve` at each door, the seat directory, the denies and the test rows. |
+| [architecture/adr/0163-a-seat-holds-a-narrow-token-in-its-own-directory-and-the-token-file-is-the-stage.md](architecture/adr/0163-a-seat-holds-a-narrow-token-in-its-own-directory-and-the-token-file-is-the-stage.md) | ADR-0163: a seat holds a narrow token in its own directory. Rejected: a stage record, a gateway, API keys. |
+
+## 2026-11-06 — contradictions in the design documents, and gaps to the code
+
+| Document | What it records |
+|---|---|
+| [research/doc-contradictions-2026-11.md](research/doc-contradictions-2026-11.md) | Research: 10 contradictions, 7 code gaps and 7 practice checks. Three scored options. The winner is a decision registry with a conformance check. |
+| [architecture/constitution.md](architecture/constitution.md) | Spec: the ultimate goal, local optimization, the duties and the limits of each agent. |
+| [architecture/loop-goal.md](architecture/loop-goal.md) | Spec: each ADR and plan mapped to a part of the goal. |
+| [architecture/adr/0164-all-decisions-serve-one-goal-and-one-amendment-resolves-their-conflicts.md](architecture/adr/0164-all-decisions-serve-one-goal-and-one-amendment-resolves-their-conflicts.md) | ADR-0164: one goal, 14 decisions that resolve the conflicts. Rejected: edit in place, one sweep. |
+| [history/decision-reconciliation-2026-11.md](history/decision-reconciliation-2026-11.md) | History: the progress of the reasoning, the actions, the errors and the hashes that pin the evidence. |
 
 <!-- GENERATED:research-index END -->

@@ -2,7 +2,7 @@
 id: findings-go-to-docs
 statement: "Put research, lessons and failed approaches under docs/. Never delete a document; archive it."
 layer: L0
-order: 13
+order: 15
 audience: [all]
 enforced_by: []
 source: "AGENTS.md invariant 9; memory feedback_doc_stewardship_policy and feedback_docs_are_the_primary_asset"

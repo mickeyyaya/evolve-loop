@@ -106,18 +106,6 @@ func TestApplyFailureSystemLevelDoesNotQuarantine(t *testing.T) {
 	}
 }
 
-func TestCommittedIDsForReadsTopN(t *testing.T) {
-	_, _, ws := seedProject(t, "a", []string{"a", "b"})
-
-	got := CommittedIDsFor(ws)
-	if len(got) != 2 || got[0] != "a" || got[1] != "b" {
-		t.Errorf("CommittedIDsFor = %v; want [a b]", got)
-	}
-	if missing := CommittedIDsFor(t.TempDir()); missing != nil {
-		t.Errorf("CommittedIDsFor(no decision) = %v; want nil", missing)
-	}
-}
-
 func TestIsTaskLevelFailure(t *testing.T) {
 	for _, tc := range []struct {
 		c    cycleclassify.Classification

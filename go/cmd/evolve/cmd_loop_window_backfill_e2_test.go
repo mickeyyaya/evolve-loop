@@ -53,7 +53,7 @@ func TestDispatchPool_RunsTheRollingPoolAndContinues(t *testing.T) {
 	f := newE2WindowFixture(t, e2TwoItems)
 	bin := fakeCycleBinary(t, "exit 0\n")
 
-	d, done := f.b.dispatchPool(0, e2PoolFleet, bin)
+	d, done := f.b.settledPool(0, e2PoolFleet, f.b.cycleLaunch(bin, 0))
 	f.b.deps.Signals.Flush()
 
 	if !done || d.flow != batchNextIteration {
@@ -69,7 +69,7 @@ func TestDispatchPool_ASystemFailureLaneHaltsTheBatch(t *testing.T) {
 	f := newE2WindowFixture(t, e2TwoItems)
 	bin := fakeCycleBinary(t, "exit 4\n")
 
-	d, done := f.b.dispatchPool(3, e2PoolFleet, bin)
+	d, done := f.b.settledPool(3, e2PoolFleet, f.b.cycleLaunch(bin, 0))
 	f.b.deps.Signals.Flush()
 
 	if !done || d.flow != batchReturn || d.exitCode != systemFailureHaltExitCode {
@@ -86,7 +86,7 @@ func TestDispatchPool_FallsBackToSequential(t *testing.T) {
 		f := newE2WindowFixture(t, nil)
 		f.b.deps.Storage = &fixtures.FakeStorage{State: core.State{LastCycleNumber: 7}}
 		writeE2File(t, filepath.Join(cycleWorkspace(f.root, 7), "triage-decision.json"), `{"top_n":[]}`)
-		d, done := f.b.dispatchPool(1, e2PoolFleet, "/nonexistent-binary")
+		d, done := f.b.settledPool(1, e2PoolFleet, f.b.cycleLaunch("/nonexistent-binary", 0))
 		if done || d.flow != batchProceed || !strings.Contains(f.console.String(), "[loop] WARN: fleet: pool 1 planned zero lanes (empty backlog), falling back to sequential") {
 			t.Fatalf("done=%v decision=%+v console:\n%s", done, d, f.console.String())
 		}
@@ -94,7 +94,7 @@ func TestDispatchPool_FallsBackToSequential(t *testing.T) {
 	t.Run("an unverifiable control plane", func(t *testing.T) {
 		f := newE2WindowFixture(t, e2TwoItems)
 		f.b.cfg.ProjectRoot = t.TempDir()
-		d, done := f.b.dispatchPool(2, e2PoolFleet, "/nonexistent-binary")
+		d, done := f.b.settledPool(2, e2PoolFleet, f.b.cycleLaunch("/nonexistent-binary", 0))
 		if done || d.flow != batchProceed || !strings.Contains(f.console.String(), "[loop] WARN: fleet: pool 2 dispatch failed, falling back to sequential: pool 2: control-plane preflight:") {
 			t.Fatalf("done=%v decision=%+v console:\n%s", done, d, f.console.String())
 		}
@@ -132,7 +132,7 @@ func TestRepairMinWidth_ARepairedLaneEndsTheIteration(t *testing.T) {
 	bin := fakeCycleBinary(t, "exit 0\n")
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage"}
 
-	d := f.b.repairMinWidth(0, fc, policy.FleetConfig{Count: 0, PlanSource: "triage"}, bin, &fleet.StarvationTracker{})
+	d := f.b.settledRepair(0, fc, policy.FleetConfig{Count: 0, PlanSource: "triage"}, f.b.cycleLaunch(bin, 0), &fleet.StarvationTracker{})
 	f.b.deps.Signals.Flush()
 
 	if d.flow != batchNextIteration || !strings.Contains(f.console.String(), "min-width repair dispatched") {
@@ -144,7 +144,7 @@ func TestCompleteWave_ASystemFailureLaneHaltsBeforeTheBoundary(t *testing.T) {
 	t.Parallel()
 	f := newE2WindowFixture(t, nil)
 
-	d := f.b.completeWave(4, policy.FleetConfig{Count: 2}, policy.FleetConfig{Count: 2}, []fleet.Result{{Index: 0}, {Index: 1, ExitCode: systemFailureHaltExitCode}}, 0, &fleet.StarvationTracker{})
+	d := f.b.settledWave(4, policy.FleetConfig{Count: 2}, policy.FleetConfig{Count: 2}, []fleet.Result{{Index: 0}, {Index: 1, ExitCode: systemFailureHaltExitCode}}, 0, &fleet.StarvationTracker{})
 	f.b.deps.Signals.Flush()
 
 	if d.flow != batchReturn || d.exitCode != systemFailureHaltExitCode || f.b.result.StopReason != "system_failure_halt" {
@@ -276,7 +276,7 @@ func TestDispatchPool_AtEnforceTheOrchestratorRunsTheLanesAndPublishesEachTransi
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage", Scheduling: "wave",
 		Orchestrator: policy.OrchestratorConfig{Stage: "enforce", ScanK: 32, HubMinImporters: 120, DeadlineFloorMinutes: 60, StallMinutes: 20, RunMaxLanes: 8, WindowStart: 2, WindowMin: 2}}
 
-	d, done := f.b.dispatchPool(0, fc, bin)
+	d, done := f.b.settledPool(0, fc, f.b.cycleLaunch(bin, 0))
 	f.b.deps.Signals.Flush()
 
 	if !done || d.flow != batchNextIteration {
@@ -308,7 +308,7 @@ func TestDispatchPool_AtEnforceThePoolIsSuppliedPastTheFleetCount(t *testing.T) 
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage", Scheduling: "wave",
 		Orchestrator: policy.OrchestratorConfig{Stage: "enforce", ScanK: 32, HubMinImporters: 120, DeadlineFloorMinutes: 60, StallMinutes: 20, RunMaxLanes: 8}}
 
-	d, done := f.b.dispatchPool(0, fc, bin)
+	d, done := f.b.settledPool(0, fc, f.b.cycleLaunch(bin, 0))
 	f.b.deps.Signals.Flush()
 
 	if !done || d.flow != batchNextIteration {
@@ -326,7 +326,7 @@ func TestDispatchPool_AtEnforceTheWindowFromThePolicyGatesTheRun(t *testing.T) {
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage", Scheduling: "wave",
 		Orchestrator: policy.OrchestratorConfig{Stage: "enforce", ScanK: 32, HubMinImporters: 120, DeadlineFloorMinutes: 60, StallMinutes: 20, RunMaxLanes: 8, WindowStart: 1, WindowMin: 1}}
 
-	d, done := f.b.dispatchPool(0, fc, bin)
+	d, done := f.b.settledPool(0, fc, f.b.cycleLaunch(bin, 0))
 	f.b.deps.Signals.Flush()
 
 	if !done || d.flow != batchNextIteration {
@@ -360,7 +360,7 @@ func TestDispatchPool_AtShadowTheLoopBuildsNoWindow(t *testing.T) {
 	fc := e2PoolFleet
 	fc.Orchestrator = policy.OrchestratorConfig{Stage: "shadow", ScanK: 32, HubMinImporters: 120, DeadlineFloorMinutes: 60, StallMinutes: 20, RunMaxLanes: 8, WindowStart: 1, WindowMin: 1}
 
-	d, done := f.b.dispatchPool(0, fc, bin)
+	d, done := f.b.settledPool(0, fc, f.b.cycleLaunch(bin, 0))
 	f.b.deps.Signals.Flush()
 
 	if !done || d.flow != batchNextIteration {

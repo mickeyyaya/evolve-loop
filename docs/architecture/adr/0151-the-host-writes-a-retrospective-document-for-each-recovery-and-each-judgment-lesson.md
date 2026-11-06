@@ -1,5 +1,7 @@
 # ADR-0151: the host writes a retrospective document for each recovery and each judgment lesson
 
+> **Note (2026-11-06, [ADR-0164](0164-all-decisions-serve-one-goal-and-one-amendment-resolves-their-conflicts.md)):** This record runs at stage `enforce` (`retrospectives.stage`) and reads Proposed. Only the operator moves it to Accepted.
+
 - **Status:** Proposed (2026-10-21). The code of stage `shadow` is in the same PR. The merge of that PR accepts this ADR. The move to `enforce` is an operator decision.
 - **Plan:** [recovery-retrospective-2026-10.md](../../plans/recovery-retrospective-2026-10.md). **Research:** [recovery-retrospective-2026-10.md](../../research/recovery-retrospective-2026-10.md). **Design:** [recovery-retrospective.md](../recovery-retrospective.md). **Package note:** [internal-recoveryretro.md](../packages/internal-recoveryretro.md).
 - **Relates to:**

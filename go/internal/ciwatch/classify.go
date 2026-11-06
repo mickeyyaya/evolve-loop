@@ -39,6 +39,9 @@ type FailingTest struct {
 	Test    string   `json:"test"`
 	Step    string   `json:"step,omitempty"`
 	Jobs    []string `json:"jobs"`
+	Detail  string   `json:"detail,omitempty"`
+	JobID   int64    `json:"job_id,omitempty"`
+	Attempt int      `json:"attempt,omitempty"`
 }
 
 type classifyRule struct {
@@ -109,6 +112,7 @@ type ClassifyReport struct {
 	BaseSHA    string              `json:"base_sha"`
 	Failures   []ClassifiedFailure `json:"failures"`
 	RetrySafe  bool                `json:"retry_safe"`
+	Warnings   []string            `json:"warnings,omitempty"`
 }
 
 var ErrRunNotCompleted = errors.New("ciwatch: run not completed")
@@ -142,11 +146,13 @@ func ClassifyTarget(ctx context.Context, src ClassifySource, t Target, opts Clas
 		return Evidence{Touched: touchedFact(f, ch, opts), BaseRed: facts.base(key), RecurredOnMain: facts.main(key), RerunGreen: facts.rerun(key)}
 	})
 	rep.RetrySafe = retrySafe(rep.Failures)
+	rep.Warnings = slices.Concat(ch.Run.Warnings, facts.warnings)
 	return rep, nil
 }
 
 type factSet struct {
 	base, main, rerun func(key string) Fact
+	warnings          []string
 }
 
 func gatherFacts(ctx context.Context, src ClassifySource, ch Change, opts ClassifyOptions) (factSet, error) {
@@ -157,13 +163,18 @@ func gatherFacts(ctx context.Context, src ClassifySource, ch Change, opts Classi
 			return facts, err
 		}
 		facts.base = redOnRun(baseRun)
+		facts.warnings = append(facts.warnings, baseRun.Warnings...)
 	}
 	if !ch.Run.CreatedAt.IsZero() && opts.MainWindow > 0 {
 		runs, err := src.MainRunsBefore(ctx, ch.Run.CreatedAt, opts.MainWindow)
 		if err != nil {
 			return facts, err
 		}
-		facts.main = recurredOn(eligibleMainRuns(runs, ch))
+		eligible := eligibleMainRuns(runs, ch)
+		facts.main = recurredOn(eligible)
+		for _, r := range eligible {
+			facts.warnings = append(facts.warnings, r.Warnings...)
+		}
 	}
 	if opts.Rerun {
 		newer, err := src.RerunFailed(ctx, ch.Run.RunID, ch.Run.Attempt, opts.RerunTimeout, opts.Poll)
@@ -171,6 +182,7 @@ func gatherFacts(ctx context.Context, src ClassifySource, ch Change, opts Classi
 			return facts, err
 		}
 		facts.rerun = greenOnRerun(newer, ch.Run.Attempt)
+		facts.warnings = append(facts.warnings, newer.Warnings...)
 	}
 	return facts, nil
 }

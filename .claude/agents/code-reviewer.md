@@ -68,10 +68,7 @@ Put the most severe first, and consolidate the findings. Then:
 | MAJOR    | n |
 | MINOR    | n |
 
-```
-## Verdict
-Verdict: PASS | WARN | FAIL
-```
+End the report with the heading `## Verdict` and one line `Verdict: PASS`, `Verdict: WARN` or `Verdict: FAIL`. Write the report as plain Markdown, never inside a code fence: the run reads the verdict line only outside a fence.
 
 FAIL (block the commit) on CRITICAL; WARN on MAJOR only; PASS otherwise. No codebase
 summaries, no restatement of the diff, and no padding.

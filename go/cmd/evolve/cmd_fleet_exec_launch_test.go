@@ -106,3 +106,19 @@ func TestExecCycleLaunch_CancelTerminatesTheChild(t *testing.T) {
 		t.Errorf("stdout=%q, want the child to receive SIGTERM (a graceful stop), not SIGKILL", stdout.String())
 	}
 }
+
+func TestExecPoolCycleLaunch_PassesThePoolToTheChildAndAFleetLaunchPassesNone(t *testing.T) {
+	t.Parallel()
+	bin := fakeCycleBinary(t, "echo \"$*\"\n")
+	var withPool, without bytes.Buffer
+	pooled := cycleLaunch{Bin: bin, GoalHash: "h", Stdout: &withPool, Stderr: &bytes.Buffer{}, Pool: 41}.LaunchFn()
+	if _, err := pooled(context.Background(), fleet.CycleSpec{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := execCycleLaunch(bin, false, "", "h", "", &without, &bytes.Buffer{})(context.Background(), fleet.CycleSpec{}); err != nil {
+		t.Fatal(err)
+	}
+	if withPool.String() != "[] cycle run --goal-hash h --pool 41\n" || without.String() != "[] cycle run --goal-hash h\n" {
+		t.Errorf("with pool %q, without %q", withPool.String(), without.String())
+	}
+}

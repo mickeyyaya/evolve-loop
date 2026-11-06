@@ -206,12 +206,12 @@ func TestFindRecord_FindsByCycleAcrossWaves(t *testing.T) {
 	root := t.TempDir()
 	writeRecordFor(t, root, "w1", 7, "aaa")
 	writeRecordFor(t, root, "w2", 8, "bbb")
-	r, ok := FindRecord(root, 8)
+	r, ok := recordOfCycle(root, 8)
 	if !ok || r.Wave != "w2" || r.Commits[0].SHA != "bbb" {
-		t.Fatalf("FindRecord(8) = %+v, %v", r, ok)
+		t.Fatalf("recordOfCycle(8) = %+v, %v", r, ok)
 	}
-	if _, ok := FindRecord(root, 9); ok {
-		t.Error("FindRecord(9) found a record that does not exist")
+	if _, ok := recordOfCycle(root, 9); ok {
+		t.Error("recordOfCycle(9) found a record that does not exist")
 	}
 }
 
@@ -226,11 +226,11 @@ func TestFindRecord_SkipsAnUnreadableRecordAndABadPattern(t *testing.T) {
 		t.Fatal(err)
 	}
 	writeRecordFor(t, root, "w1", 7, "aaa")
-	r, ok := FindRecord(root, 7)
+	r, ok := recordOfCycle(root, 7)
 	if !ok || r.Wave != "w1" {
-		t.Fatalf("FindRecord(7) = %+v, %v, want the readable record", r, ok)
+		t.Fatalf("recordOfCycle(7) = %+v, %v, want the readable record", r, ok)
 	}
-	if _, ok := FindRecord("[", 7); ok {
+	if _, ok := recordOfCycle("[", 7); ok {
 		t.Error("a malformed root pattern must find nothing")
 	}
 }
@@ -413,4 +413,135 @@ func TestFindLanded_ConsumesEachLandedCommitOnce(t *testing.T) {
 	if !FindLanded(append(one, one...), rec) {
 		t.Fatal("two commits did not satisfy two entries")
 	}
+}
+
+func TestIsAncestor_TrueWhenTheCommitIsOnTheRef(t *testing.T) {
+	t.Parallel()
+	c := composeLane(t, "compose: the lane work")
+	got, err := Repo{Dir: c.repo.Dir, Git: SysGit()}.IsAncestor(context.Background(), c.base, "HEAD")
+	if err != nil || !got {
+		t.Fatalf("IsAncestor(base, HEAD) = %v, %v, want true, nil", got, err)
+	}
+}
+
+func TestIsAncestor_FalseWhenTheCommitIsNotOnTheRef(t *testing.T) {
+	t.Parallel()
+	c := composeLane(t, "compose: the lane work")
+	got, err := Repo{Dir: c.repo.Dir, Git: SysGit()}.IsAncestor(context.Background(), c.lane, c.base)
+	if err != nil || got {
+		t.Fatalf("IsAncestor(lane, base) = %v, %v, want false, nil", got, err)
+	}
+}
+
+func TestIsAncestor_AGitFailureIsAnErrorNotFalse(t *testing.T) {
+	t.Parallel()
+	c := composeLane(t, "compose: the lane work")
+	repo := Repo{Dir: c.repo.Dir, Git: SysGit()}
+	for _, ref := range []string{"refs/heads/absent", "--output=x"} {
+		if got, err := repo.IsAncestor(context.Background(), c.base, ref); err == nil || got {
+			t.Errorf("IsAncestor(base, %q) = %v, %v, want false and an error", ref, got, err)
+		}
+	}
+	if got, err := repo.IsAncestor(context.Background(), "abc", "HEAD"); err == nil || got {
+		t.Errorf("IsAncestor(abc, HEAD) = %v, %v, want false and an error for a short id", got, err)
+	}
+}
+
+func TestIsAncestor_ExitOneIsFalseAndOtherCodesAreErrors(t *testing.T) {
+	t.Parallel()
+	sha := strings.Repeat("a", 40)
+	for _, tc := range []struct {
+		name    string
+		err     error
+		want    bool
+		wantErr bool
+	}{
+		{"exit 0", nil, true, false},
+		{"exit 1", &GitError{Code: 1}, false, false},
+		{"exit 128", &GitError{Code: 128}, false, true},
+		{"exit 1 with an error", &GitError{Code: 1, Err: errors.New("boom")}, false, true},
+		{"not a git error", errors.New("spawn"), false, true},
+	} {
+		repo := Repo{Git: func(context.Context, string, string, ...string) (string, error) { return "", tc.err }}
+		got, err := repo.IsAncestor(context.Background(), sha, "HEAD")
+		if got != tc.want || (err != nil) != tc.wantErr {
+			t.Errorf("%s: IsAncestor = %v, %v, want %v, error %v", tc.name, got, err, tc.want, tc.wantErr)
+		}
+	}
+}
+
+func TestFirstRecord_PoolDirectoriesSortNumericallyNotLexically(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeRecordFor(t, root, "1000", 7, "later")
+	writeRecordFor(t, root, "999", 7, "earlier")
+	writeRecordFor(t, root, "console", 7, "named")
+	r, ok := recordOfCycle(root, 7)
+	if !ok || r.Wave != "999" || r.Commits[0].SHA != "earlier" {
+		t.Fatalf("recordOfCycle(7) = %+v, %v, want the record of pool 999", r, ok)
+	}
+	byCommit, ok := FindRecordByCommit(root, "later")
+	if !ok || byCommit.Wave != "1000" {
+		t.Fatalf("FindRecordByCommit(later) = %+v, %v, want pool 1000", byCommit, ok)
+	}
+}
+
+func TestFirstRecord_NamedWaveDirectoriesFollowTheNumericOnes(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeRecordFor(t, root, "current", 7, "named")
+	writeRecordFor(t, root, "5", 7, "pool")
+	if r, ok := recordOfCycle(root, 7); !ok || r.Wave != "5" {
+		t.Fatalf("recordOfCycle(7) = %+v, %v, want pool 5 before current", r, ok)
+	}
+}
+
+func TestCompareWaveDirs_NumericPoolsFirstInNumericOrderThenNamesInTextOrder(t *testing.T) {
+	t.Parallel()
+	dir := func(name string) string { return filepath.Join("w", "integration-"+name, "deliverable-1.json") }
+	for _, tc := range []struct {
+		a, b string
+		want int
+	}{
+		{"999", "1000", -1},
+		{"1000", "999", 1},
+		{"5", "current", -1},
+		{"current", "5", 1},
+		{"console", "current", -1},
+		{"05", "5", -1},
+		{"7", "7", 0},
+	} {
+		if got := compareWaveDirs(dir(tc.a), dir(tc.b)); got != tc.want {
+			t.Errorf("compareWaveDirs(%s, %s) = %d, want %d", tc.a, tc.b, got, tc.want)
+		}
+	}
+}
+
+func TestRecordForCommit_RequiresTheCycleAndTheCommitOfTheSameRecord(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeRecordFor(t, root, "5", 7, "oldcommit")
+	writeRecordFor(t, root, "9", 7, "newcommit")
+	writeRecordFor(t, root, "3", 8, "othercycle")
+	for _, tc := range []struct {
+		name     string
+		cycle    int
+		sha      string
+		wantWave string
+		want     bool
+	}{
+		{"later pool of the cycle", 7, "newcommit", "9", true},
+		{"earlier pool of the cycle", 7, "oldcommit", "5", true},
+		{"commit of another cycle", 7, "othercycle", "", false},
+		{"unknown commit", 7, "nope", "", false},
+	} {
+		r, ok := RecordForCommit(root, tc.cycle, tc.sha)
+		if ok != tc.want || r.Wave != tc.wantWave {
+			t.Errorf("%s: RecordForCommit(%d, %q) = wave %q, %v, want %q, %v", tc.name, tc.cycle, tc.sha, r.Wave, ok, tc.wantWave, tc.want)
+		}
+	}
+}
+
+func recordOfCycle(root string, cycle int) (DeliverableRecord, bool) {
+	return ListRecords(root).first(func(r DeliverableRecord) bool { return r.Cycle == cycle && !r.Console() })
 }

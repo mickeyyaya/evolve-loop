@@ -61,7 +61,7 @@ Injections during an active cycle are deferred to the next cycle by design — T
 An item is consumed by the ship that closes it, not by a later bookkeeping act.
 Two sources feed the committed set that `promoteInbox` moves to `processed/`:
 
-1. **Triage** — `top_n[]` + `skip_shipped[]` (or the `lane-scope.json` pin on a
+1. **Triage** — `top_n[]` + `skip_shipped[]` (or the pin, the host record first, on a
    continuation/lane cycle that carries no triage decision).
 2. **The Builder's marker** — a line-anchored `Closes-Inbox: <id>` (comma lists
    allowed, ids deduped) in `build-report.md`. Parsed by

@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "Red test first: `TestReportReadViolations_TheSignalNamesTheReadingProcess`.",
+    "100% statement coverage on each changed function; zero code comments.",
+    "The spec and package note of the changed package state the change in STE."
+  ],
+  "campaign": "architecture-decisions-2026-11",
+  "created_at": "2026-11-03T00:33:07Z",
+  "files": [
+    "go/internal/bridge/read_isolation.go"
+  ],
+  "fix": "Keep the process name in each read report and signal",
+  "id": "arch-decisions-ad1-1-keep-the-process-name-in-each-read",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "security",
+  "route": "console-manual",
+  "source": "operator decisions 2026-11-03; plan docs/plans/architecture-decisions-2026-11.md component AD1-1",
+  "summary": "Component AD1-1 of the 2026-11-03 architecture decisions plan. Keep the process name in each read report and signal Stage: none. Size: S. Route: console: bridge is protected. Plan: docs/plans/architecture-decisions-2026-11.md; research: docs/research/architecture-decisions-2026-11.md.",
+  "title": "AD1-1: Keep the process name in each read report and signal",
+  "weight": 0.8
+}

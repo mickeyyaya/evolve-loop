@@ -50,7 +50,7 @@ func TestHostEffects_ClaimsExactlyWhatTheCheckOwes(t *testing.T) {
 			var calls []claimCall
 			in := triageInput(t, "/project", tc.pin, tc.decision)
 			in.Phase = tc.phase
-			if err := NewHostEffects(effectCatalog(t), recordingClaimer(&calls)).Perform(context.Background(), in); err != nil {
+			if err := NewHostEffects(effectCatalog(t), recordingClaimer(&calls), nil).Perform(context.Background(), in); err != nil {
 				t.Fatalf("Perform: %v", err)
 			}
 			if tc.want == nil {
@@ -76,7 +76,7 @@ func TestHostEffects_TheDeclarationIsConfig(t *testing.T) {
 		t.Fatal(warnings)
 	}
 	var calls []claimCall
-	var effects core.HostEffects = NewHostEffects(cat, recordingClaimer(&calls))
+	var effects core.HostEffects = NewHostEffects(cat, recordingClaimer(&calls), nil)
 	in := triageInput(t, "/project", "", `{"top_n":[{"id":"a"}]}`)
 	if err := effects.Perform(context.Background(), in); err != nil || len(calls) != 0 {
 		t.Fatalf("triage without the declaration: err=%v claims=%+v", err, calls)
@@ -91,7 +91,7 @@ func TestHostEffects_WithoutACycleIsAnError(t *testing.T) {
 	var calls []claimCall
 	in := triageInput(t, "/project", "", `{"top_n":[{"id":"a"}]}`)
 	in.Cycle = 0
-	if err := NewHostEffects(effectCatalog(t), recordingClaimer(&calls)).Perform(context.Background(), in); err == nil || len(calls) != 0 {
+	if err := NewHostEffects(effectCatalog(t), recordingClaimer(&calls), nil).Perform(context.Background(), in); err == nil || len(calls) != 0 {
 		t.Fatalf("a claim without the cycle must fail loudly and claim nothing: err=%v claims=%+v", err, calls)
 	}
 }
@@ -107,7 +107,7 @@ func TestEffects_EveryEntryIsVerified(t *testing.T) {
 func TestHostEffects_WithoutAProjectRootIsAnError(t *testing.T) {
 	var calls []claimCall
 	in := triageInput(t, "", "", `{"top_n":[{"id":"a"}]}`)
-	if err := NewHostEffects(effectCatalog(t), recordingClaimer(&calls)).Perform(context.Background(), in); err == nil || len(calls) != 0 {
+	if err := NewHostEffects(effectCatalog(t), recordingClaimer(&calls), nil).Perform(context.Background(), in); err == nil || len(calls) != 0 {
 		t.Fatalf("a claim with no project root must fail loudly and claim nothing: err=%v claims=%+v", err, calls)
 	}
 }

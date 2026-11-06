@@ -132,37 +132,6 @@ func (b *loopBatchCoordinator) interruptReturn(iteration int, when string) batch
 	return batchDecision{flow: batchReturn, exitCode: 130}
 }
 
-func (b *loopBatchCoordinator) dispatchFleetIteration(
-	iteration int,
-	fleetConfig policy.FleetConfig,
-	waveBinary string,
-	starvation *fleet.StarvationTracker,
-) batchDecision {
-	if decision, halt := b.diskSpaceHalt(iteration); halt {
-		return decision
-	}
-	b.takeSupply(iteration, fleetConfig)
-	if loopwave.ShouldRunPool(fleetConfig) {
-		if decision, done := b.dispatchPool(iteration, fleetConfig, waveBinary); done {
-			return decision
-		}
-	}
-	if !shouldRunWave(fleetConfig) {
-		return batchDecision{flow: batchProceed}
-	}
-	waveConfig, pace := budgetAwareWaveConfig(b.ctx, fleetConfig, b.cfg.ProjectRoot, b.cfg.EvolveDir, b.deps.Storage, b.stderr)
-	recordWaveSized(b.deps.Signals, iteration, fleetConfig.Count, waveConfig.Count)
-	out, err := b.wave().Dispatch(b.ctx, b.waveRequest(iteration, waveConfig, waveBinary))
-	switch {
-	case err != nil:
-		return batchDecision{flow: batchProceed}
-	case out.Ran:
-		return b.completeWave(iteration, fleetConfig, waveConfig, out.Results, pace, starvation)
-	default:
-		return b.repairMinWidth(iteration, fleetConfig, waveConfig, waveBinary, starvation)
-	}
-}
-
 func (b *loopBatchCoordinator) diskSpaceHalt(iteration int) (batchDecision, bool) {
 	pol := policy.LoadOrDefaults(filepath.Join(b.cfg.EvolveDir, "policy.json"), b.stderr)
 	check := looppreflight.CheckDiskSpace(b.cfg.EvolveDir, pol.PreflightConfig().MinFreeBytes(), looppreflight.DiskFreeBytes)
@@ -177,8 +146,8 @@ func (b *loopBatchCoordinator) diskSpaceHalt(iteration int) (batchDecision, bool
 	return batchDecision{flow: batchReturn, exitCode: systemFailureHaltExitCode}, true
 }
 
-func (b *loopBatchCoordinator) dispatchPool(iteration int, fleetConfig policy.FleetConfig, waveBinary string) (batchDecision, bool) {
-	poolLaunch := execCycleLaunch(waveBinary, false, b.cfg.ProjectRoot, b.cfg.GoalHash, b.cfg.GoalText, b.stdout, b.stderr)
+func (b *loopBatchCoordinator) dispatchPool(iteration int, fleetConfig policy.FleetConfig, launch cycleLaunch) forkOutcome {
+	poolLaunch := launch.LaunchFn()
 	run, mode := rollingPool(fleetConfig, poolLaunch), "rolling"
 	if fleetConfig.Orchestrator.Stage == orchestrator.StageEnforce {
 		run, mode = b.orchestratedRun(fleetConfig, poolLaunch, iteration), "orchestrator"
@@ -197,18 +166,11 @@ func (b *loopBatchCoordinator) dispatchPool(iteration int, fleetConfig policy.Fl
 		fmt.Fprintf(b.stderr, "[loop] WARN: %s\n", reason)
 		b.emitPoolPreflightFailure(iteration, reason, err)
 	case ran:
-		t := laneTally(results)
-		fmt.Fprintf(b.stderr, "[loop] pool %d: %d/%d lanes ok%s (%s, target=%d)\n",
-			iteration, t.OK, t.Total(), t.DeferredSuffix(), mode, fleetConfig.Count)
-		if decision := b.fleetHaltDecision("pool", iteration, results); decision.flow == batchReturn {
-			return decision, true
-		}
-		applyEscalationBoundary(b.cfg.EvolveDir, iteration, b.stderr, b.deps.Signals)
-		return batchDecision{flow: batchNextIteration}, true
+		return forkOutcome{route: routePool, mode: mode, results: results}
 	default:
 		fmt.Fprintf(b.stderr, "[loop] WARN: fleet: pool %d planned zero lanes (empty backlog), falling back to sequential\n", iteration)
 	}
-	return batchDecision{}, false
+	return forkOutcome{}
 }
 
 func (b *loopBatchCoordinator) emitPoolPreflightFailure(iteration int, reason string, err error) {
@@ -220,37 +182,20 @@ func (b *loopBatchCoordinator) emitPoolPreflightFailure(iteration int, reason st
 		map[string]string{"path": "pool", "step": "preflight", "error": pre.err.Error()})
 }
 
-func (b *loopBatchCoordinator) waveRequest(iteration int, cfg policy.FleetConfig, waveBinary string) loopwave.DispatchRequest {
+func (b *loopBatchCoordinator) waveRequest(iteration int, cfg policy.FleetConfig, launch cycleLaunch) loopwave.DispatchRequest {
 	return loopwave.DispatchRequest{
 		Config:    cfg,
 		Wave:      iteration,
 		Preflight: productionWavePreflight(b.cfg.ProjectRoot),
 		Plan:      b.wave().PlanFn(cfg.Count),
-		Launcher:  b.wave().Launcher(iteration, cfg.Concurrency, b.shadowLease(cfg.Orchestrator, execCycleLaunch(waveBinary, false, b.cfg.ProjectRoot, b.cfg.GoalHash, b.cfg.GoalText, b.stdout, b.stderr))),
+		Launcher:  b.wave().Launcher(iteration, cfg.Concurrency, b.shadowLease(cfg.Orchestrator, launch.LaunchFn())),
 		Routed:    b.wave().RoutedResolver(),
 	}
 }
 
-func (b *loopBatchCoordinator) completeWave(iteration int, fleetConfig, waveConfig policy.FleetConfig, results []fleet.Result, pace time.Duration, starvation *fleet.StarvationTracker) batchDecision {
-	summary, fields := loopwave.WaveSummary(iteration, laneTally(results))
-	fmt.Fprintf(b.stderr, "[loop] %s\n", summary)
-	emitLoopWave(b.deps.Signals, iteration, "loopBatchCoordinator.completeWave", "", summary, fields)
-	if decision := b.fleetHaltDecision("wave", iteration, results); decision.flow == batchReturn {
-		return decision
-	}
-	b.observeWorkSupply(iteration, fleetConfig, waveConfig, len(results), starvation)
-	applyEscalationBoundary(b.cfg.EvolveDir, iteration, b.stderr, b.deps.Signals)
-	paceBeforeNextWave(b.ctx, pace, b.stderr)
-	return batchDecision{flow: batchNextIteration}
-}
-
-func (b *loopBatchCoordinator) repairMinWidth(iteration int, fleetConfig, waveConfig policy.FleetConfig, waveBinary string, starvation *fleet.StarvationTracker) batchDecision {
-	repaired := b.wave().RepairMinWidth(b.ctx, fleetConfig, waveConfig, b.waveRequest(iteration, fleetConfig, waveBinary))
-	b.observeWorkSupply(iteration, fleetConfig, waveConfig, repairedLanes(repaired), starvation)
-	if repaired {
-		return batchDecision{flow: batchNextIteration}
-	}
-	return batchDecision{flow: batchProceed}
+func (b *loopBatchCoordinator) repairMinWidth(iteration int, fleetConfig, waveConfig policy.FleetConfig, launch cycleLaunch) forkOutcome {
+	repaired := b.wave().RepairMinWidth(b.ctx, fleetConfig, waveConfig, b.waveRequest(iteration, fleetConfig, launch))
+	return forkOutcome{route: routeRepair, repaired: repaired, waveConfig: waveConfig}
 }
 
 func (b *loopBatchCoordinator) observeWorkSupply(iteration int, fleetConfig, waveConfig policy.FleetConfig, realized int, starvation *fleet.StarvationTracker) {

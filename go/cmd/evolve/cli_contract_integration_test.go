@@ -42,6 +42,7 @@ type contractCall struct {
 	stdin  string
 	want   int
 	unheld bool
+	silent bool
 	run    func(t *testing.T, vars map[string]string) func(args []string, stdout, stderr io.Writer) int
 }
 

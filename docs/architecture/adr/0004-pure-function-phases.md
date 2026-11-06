@@ -1,5 +1,7 @@
 # ADR-0004: Pure-Function Phases via phase-registry.json
 
+> **Note (2026-11-06, [ADR-0164](0164-all-decisions-serve-one-goal-and-one-amendment-resolves-their-conflicts.md)):** A script path named here is absent at main. Read that path as history. The decision stays as its status says.
+
 **Status**: Accepted  
 **Date**: 2026-05-15  
 **Cycle**: 55 (Slice B, Cycle 1 of 4)  

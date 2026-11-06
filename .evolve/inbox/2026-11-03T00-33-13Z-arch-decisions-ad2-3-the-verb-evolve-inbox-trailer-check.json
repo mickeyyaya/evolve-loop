@@ -1,0 +1,30 @@
+{
+  "acceptance": [
+    "Red test first: `TestCmd_InboxTrailerCheck_RefusesARangeWithNoTrailer`, `..._RefusesAnIdThatIsNotOpen`, `..._AcceptsNone`.",
+    "100% statement coverage on each changed function; zero code comments.",
+    "The spec and package note of the changed package state the change in STE."
+  ],
+  "campaign": "architecture-decisions-2026-11",
+  "created_at": "2026-11-03T00:33:13Z",
+  "deps": [
+    "arch-decisions-ad2-1-the-parser-closesinboxids-accepts"
+  ],
+  "files": [
+    "go/cmd/evolve",
+    "go/internal/policy"
+  ],
+  "fix": "The verb `evolve inbox trailer-check --range`, the key `inbox.curator.trailer.stage`, the CLI contract row, the package note",
+  "id": "arch-decisions-ad2-3-the-verb-evolve-inbox-trailer-check",
+  "intake_override": {
+    "reason": "console: policy key",
+    "console_route": true
+  },
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "source": "operator decisions 2026-11-03; plan docs/plans/architecture-decisions-2026-11.md component AD2-3",
+  "summary": "Component AD2-3 of the 2026-11-03 architecture decisions plan. The verb `evolve inbox trailer-check --range`, the key `inbox.curator.trailer.stage`, the CLI contract row, the package note Stage: `shadow`. Size: M. Route: console: policy key. Plan: docs/plans/architecture-decisions-2026-11.md; research: docs/research/architecture-decisions-2026-11.md.",
+  "title": "AD2-3: The verb evolve inbox trailer-check --range, the key inbox.curator.trailer.stage, the CLI contract row, the package note",
+  "weight": 0.8
+}

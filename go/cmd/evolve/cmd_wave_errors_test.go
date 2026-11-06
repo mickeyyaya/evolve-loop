@@ -261,7 +261,7 @@ func TestWaveStatus_TextShowsOmittedCyclesLastWaveWarningsAndPauses(t *testing.T
 	rc := h.run("status", "--project-root", p.root)
 
 	out := h.stdout.String()
-	for _, want := range []string{"  (3 older cycle(s) not shown)\n", "cycle 22: phase scout, quota pauses 1\n", "last:    wave 1: o1\n", "WARN:    cycle-23: cycle-state.json"} {
+	for _, want := range []string{"  (3 older cycle(s) not shown)\n", "cycle 22: phase scout, quota pauses 1\n", "last:    wave 1: o1\n", "WARN:    " + filepath.Join(p.root, ".evolve", "runs", "cycle-23", "cycle-state.json") + ": "} {
 		if rc != 0 || !strings.Contains(out, want) {
 			t.Errorf("rc = %d; stdout lacks %q:\n%s", rc, want, out)
 		}
@@ -284,7 +284,7 @@ func TestWaveWatch_ErrorsAndWarnings(t *testing.T) {
 
 		rc := h.run("watch", "--project-root", p.root)
 
-		if rc != exitIO || !strings.Contains(h.stderr.String(), "parse wave record") || strings.Count(h.stderr.String(), "WARN: cycle-1") != 1 {
+		if rc != exitIO || !strings.Contains(h.stderr.String(), "parse wave record") || strings.Count(h.stderr.String(), "WARN: "+filepath.Join(p.root, ".evolve", "runs", "cycle-1", "cycle-state.json")) != 1 {
 			t.Errorf("rc = %d stderr %q; want %d, the record error, and the cycle-1 warning once", rc, h.stderr.String(), exitIO)
 		}
 	})

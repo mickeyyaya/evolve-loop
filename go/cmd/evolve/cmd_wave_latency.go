@@ -81,18 +81,16 @@ func (r latencyRequest) scope(records []wave.Record) (latencyScope, error) {
 	if r.wave != 0 && rec.Number != r.wave {
 		return latencyScope{}, fmt.Errorf("wave %d is not recorded", r.wave)
 	}
-	s := latencyScope{wave: rec.Number, pid: rec.PID, floor: rec.CycleFloor, from: rec.StartedAt}
+	bounds := wave.BoundsOf(records, idx)
+	s := latencyScope{wave: rec.Number, pid: rec.PID, floor: bounds.Floor, ceiling: bounds.Ceiling, from: rec.StartedAt}
 	if rec.EndedAt != nil {
 		s.to = *rec.EndedAt
-	}
-	if idx+1 < len(records) && records[idx+1].CycleFloor > rec.CycleFloor {
-		s.ceiling = records[idx+1].CycleFloor
 	}
 	return s, nil
 }
 
 func (s latencyScope) holds(id int) bool {
-	return id > s.floor && (s.ceiling == 0 || id <= s.ceiling)
+	return wave.Bounds{Floor: s.floor, Ceiling: s.ceiling}.Holds(id)
 }
 
 func runWaveLatency(env waveEnv, args []string, stdout, stderr io.Writer) int {

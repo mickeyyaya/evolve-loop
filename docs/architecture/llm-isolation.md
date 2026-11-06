@@ -10,7 +10,7 @@
 >
 > Component state on 2026-10-26 (the plan §6.1 has the full table):
 > - X1: merged in #1121. The conformance matrix of §14 and the module, kind, codes and channel of §15 are on `main`. The follow-up X1b (#1128) adds a fake `tmux` (`go/internal/faketmux`), so the rows M2 to M4 run a full cycle and are green.
-> - X2: merged in #1122 at stage `shadow` (the policy key `isolation.i2.stage`). The flip to `enforce` is an operator decision.
+> - X2: merged in #1122 at stage `shadow`. The policy key `isolation.i2.stage` reads `enforce` on 2026-11-06.
 > - X3: merged in #1127. The single launch API of §5.1 and its AST guard `TestOnlyTheBridgeStartsAnLLMBinary` are on `main`, and matrix row N2 is green.
 > - X4: merged in #1126, and the dispatch credential of I-3 merged in #1132. The request channel of §7.2.1 (item `isolation-dispatch-request-channel`) is built at stage `shadow`.
 > - X5: merged in #1133 at stage `shadow` (the policy key `isolation.i5.stage`).
@@ -698,7 +698,7 @@ The index never lists `*-stdout.log`, `*-final-pane.txt`, a transcript or a pane
 
 Lineage is the set of cycles that a retry or a recovery can read. The pipeline computes it from its own records, never from agent text.
 
-1. A cycle is in the lineage if its `lane-scope.json` `todo_ids` holds the inbox item id of this cycle.
+1. A cycle is in the lineage if its record in `.evolve/lineage/` holds the inbox item id of this cycle.
 2. A cycle is in the lineage if the continuation chain (ADR-0076) links it to this cycle.
 3. The lineage has a cap: the last `isolation.lineage_max` cycles (proposed policy key, default 5).
 4. A lesson YAML under `.evolve/instincts/lessons/` is in the lineage if it names a lineage cycle or the item id.
@@ -772,8 +772,8 @@ The cell opens the retrospective of cycle 6. Cycle 9 built `item-b`. A read of t
 |---|---|
 | Builder | package `inputindex` ([internal-inputindex](packages/internal-inputindex.md)). `Build` reads only pipeline records. |
 | Writer | `writeInputIndex` (`go/internal/core/input_index.go`). `cycleRun.dispatch` calls it before the first try of each phase. A failure prints `WARN input index for <phase>`, and the cell gets no index grants. |
-| Item id | the fleet scope of the orchestrator (`fleet_scope` of the cycle context). The first dispatch of a run writes it to `.evolve/lineage/cycle-N.json` before the index (`inputindex.WriteRecord`). Each later dispatch of the same run id reads that record (`inputindex.ReadRecord`), and a new run of the cycle number replaces it. No cell can write `.evolve/lineage/`, because the repo is read-only for a cell. With no item id, the index has no lineage and a note. |
-| Lineage | each cycle whose record in `.evolve/lineage/` holds an item id of the cycle. Also the cycle of the continuation registry entry of each item id (`continuation.ReadRegistryEntry`). The cap is the last `isolation.lineage_max` cycles, default 5. The `lane-scope.json` of a workspace is never read, because a cell can write its workspace (review of #1133, HIGH-1). |
+| Item id | the fleet scope of the orchestrator (`fleet_scope` of the cycle context). The first dispatch of a run writes it to `.evolve/lineage/cycle-N.json` before the index (`inputindex.WriteRecord`). Each later dispatch of the same run id reads that record (`inputindex.ReadRecord`). A new run of the cycle number keeps the item ids and the goal hash of the record, and it takes the new run id. No cell can write `.evolve/lineage/`, because the repo is read-only for a cell. With no item id, the index has no lineage and a note. |
+| Lineage | each cycle whose record in `.evolve/lineage/` holds an item id of the cycle. Also the cycle of the continuation registry entry of each item id (`continuation.ReadRegistryEntry`). The cap is the last `isolation.lineage_max` cycles, default 5. The lineage readers never read the `lane-scope.json` of a workspace, because a cell can write its workspace (review of #1133, HIGH-1). Each other reader of the pin calls `committedset.LanePin`, which reads the record of the cycle first ([ADR-0160](adr/0160-the-host-lineage-record-is-the-one-trust-root-for-what-a-cycle-may-do-to-the-queue.md)). A differing file raises `ISOLATION_LANE_PIN_FORGED` one time for each cycle. |
 | Format | as §8.3, with two changes. `item_ids` is a list, because a lane scope can hold more than one id. `attempt` is the number of lineage cycles before the cap, plus 1. |
 | Lineage entries | For each lineage cycle: `retrospective-report.md`, `failure-digest.json`, `carryover-todos.json`, `audit-report.md`, `retrospectives/*.md` (ADR-0151) and `failure-lesson*.yaml`. Also each lesson under `.evolve/instincts/lessons/` that names an item id or the `cycle-N` of a lineage cycle. |
 | Raw output | `inputindex.IsRawOutput`: a path under `.bridge/`, or a name that ends in `-stdout.log`, `-stderr.log`, `-stdout.clean.txt`, `-final-pane.txt`, `-final-scrollback.txt` or `-pane-watch.json`. The index lists none. |
@@ -816,7 +816,7 @@ Known differences from the design:
 - Linux has no report. At `shadow` the `bwrap` prefix adds nothing, and no signal comes.
 - On Linux, `bwrap` masks the raw files that exist at the launch. A raw log that the bridge makes later is not masked. The SBPL rule matches by name, so macOS has no such gap. The item `isolation-home-transcripts-before-i4-enforce` tracks the Linux gap too.
 - A grant is kept only when its real path is inside `.evolve/runs/` and is not raw output. A lesson under `.evolve/instincts/lessons/` gets no grant, because the repo grant already covers it.
-- The kernel can merge repeated reports, so the reader sees each rule and target once. The unified log can lag the end of the cell, so the reader waits for a fence report first ([cell-context-index.md](cell-context-index.md) §8). The fence makes a lost report unlikely, but it does not prove its absence. A failed read prints `WARN isolation read reports`.
+- The kernel can merge repeated reports, so the reader sees each rule, target and process name once. Each signal names the process and its id from the report line. A report line without a process name still gives a signal, with empty `process` and `pid` fields. The unified log can lag the end of the cell, so the reader waits for a fence report first ([cell-context-index.md](cell-context-index.md) §8). The fence makes a lost report unlikely, but it does not prove its absence. A failed read prints `WARN isolation read reports`.
 - Only the phases of a cycle get an index. A flow seat (advisor, judge, router) and an `evolve agent run` launch get no index, so at `enforce` they read only their own workspace inside `.evolve/runs/`.
 - The `message` class and the `context` class of §8.1 have no entries yet. Component CX4 of [cell-context-index.md](cell-context-index.md) adds them. The inbox item file and `lane-scope.json` stay readable, because the repo grant covers `.evolve/inbox/` and the workspace grant covers `lane-scope.json`.
 - An `evolve` verb that the agent runs inside the cell and that reads other run directories is a violation at `shadow`. The `shadow` signals must show none before the flip to `enforce`.
@@ -1274,6 +1274,8 @@ Each value is a string, and a signal keeps at most 12 keys (`go/internal/signalc
 | `target` | `.evolve/runs/cycle-1990/audit-report.md` | the path, the binary or the variable name; never a variable value |
 | `rule` | `read.runs.unrelated` | the id of the sandbox rule or the check |
 | `source` | `sbpl-report` | `sbpl-report`, `launcher`, `router`, `parser` or `gate` |
+| `process` | `ssh` | the name of the process that made the read; `sbpl-report` only. It is empty when the report has no name |
+| `pid` | `4417` | the process id of that process; `sbpl-report` only. It is empty when the report has no id |
 
 ### 15.3 Streams and channels
 

@@ -9,12 +9,12 @@ The package holds the pure parts of the integration of a wave. A fleet lane deli
 ## Design
 
 - **The deliverable record (I0, decision D2).** `DeliverableRecord` holds the cycle, its commits with the patch-id of each, and the `base_sha`. It also holds the audit binding, the scope, the deps, the inbox rank and the risk class. `Validate` refuses a record with a missing field. `WriteRecord` and `ReadRecord` keep one JSON file for each cycle in `WaveDir`, at `RecordPath`. `ReadRecord` also refuses a record that does not validate.
-- **The record schema (I0).** The schema is `evolve.deliverable/2`. A record of schema `evolve.deliverable/1` holds a patch-id of the default context width. `ReadRecord` refuses it. `FindRecord` and `FindRecordByCommit` skip a refused record without a signal, so the cycle reads as not delivered. The ancestry check answers first, and the cycle must be delivered again for the record path.
-- **The wave directory (I0).** `WaveDir` is the one home of the directory layout `.evolve/waves/integration-<wave>/`. The ship phase writes into it, and `FindRecord` reads from it.
+- **The record schema (I0).** The schema is `evolve.deliverable/2`. A record of schema `evolve.deliverable/1` holds a patch-id of the default context width. `ReadRecord` refuses it. `FindRecordByCommit` skips a refused record without a signal, so the cycle reads as not delivered. The ancestry check answers first, and the cycle must be delivered again for the record path.
+- **The wave directory (I0).** `WaveDir` is the one home of the directory layout `.evolve/waves/integration-<wave>/`. The ship phase writes into it, and `FindRecordByCommit` reads from it.
 - **The ordering view (I0).** `DeliverableRecord.Deliverable` maps a record to the `Deliverable` of the order score and the flush policy.
 - **The landed identity (I0).** A cycle is the cycle trailer (`CycleTrailer`) plus the patch-id of each of its commits, not a SHA. A compose gives each commit a new SHA, so an ancestry check alone misses a composed cycle. `HasCycleTrailer` reads the trailer of one commit message.
 - **The repository port (I0).** `Repo` holds the directory and the `GitFunc` of one repository. `Repo.PatchID` gives the stable patch-id of a commit. It reads the diff with one context line (`-U1`). `git patch-id` ignores hunk line numbers, so the identity is the file name, the changed lines and one neighbor line on each side. A peer edit two lines away does not change it, and a peer edit next to a changed line is a merge conflict.
-- **The landed check (I0).** `FindLanded` is a pure check: each commit of the record must match its own commit that carries the trailer. A landed commit satisfies one entry only. The trailer decides first, and the patch-id checks the recorded change. `Repo.LandedOnRef` gives the commits from `base_sha` to a ref to `FindLanded`. `FindRecord` finds the record of a cycle, and `FindRecordByCommit` finds the record that holds a commit SHA.
+- **The landed check (I0).** `FindLanded` is a pure check: each commit of the record must match its own commit that carries the trailer. A landed commit satisfies one entry only. The trailer decides first, and the patch-id checks the recorded change. `Repo.LandedOnRef` gives the commits from `base_sha` to a ref to `FindLanded`. `FindRecordByCommit` finds the record that holds a commit SHA.
 - **The batch (I2, decision D4).** `Batch` names one integration branch, `integration/w<wave>-b<index>`, with its base and its tip. `Repo.StartBatch` cuts the branch at the base with `git update-ref`. It does not check out a branch and it does not touch the work tree. The empty old value makes git refuse a branch that exists.
 - **The compose engine (I2, decisions D4, D5 and D14).** `Composer` holds the repository, the stage, the gate and the overlap facts. `Composer.Compose` applies each commit of a record, in order, onto the batch tip. It uses `git merge-tree --write-tree` with the parent of the commit as the merge base, and then `git commit-tree`, so the compose needs no work tree. The compose passes `--attr-source=<tip>` to git, so the attributes of the tip decide a `merge=union` file in a bare clone too. Each step makes a commit with the batch tip as its parent, so the last step gives one commit for the cycle.
 - **The composed message (I2).** The subject is `evolve-cycle <N>: integrate`. The trailers are `Evolve-Cycle`, `Evolve-Artifact-SHA256` (the audit artifact) and `Evolve-Audit-Tree` (the tree that the audit saw). `evidence.KeyAuditTree` is the new key, and `evidence.Trailer.AuditTree` holds its value. So `evidence.Trailer.Build` writes the three trailers, and `evidence.Parse` reads them back. The trailer format has one home.
@@ -57,6 +57,18 @@ The package holds the pure parts of the integration of a wave. A fleet lane deli
 - **The fence push (I10).** The fence always moves the remote branch, with a lease on the remote tip that `Adopt` read. When the branch is not on `origin`, the lease says that the branch must not exist, so the fence creates it. So the lease of an older holder fails. `PublishBranch` of an older holder fails too. The adopted record holds the fence commit as its tip.
 - **The order score (I1, decision D3)** is a pure function in `order.go`.
 - **The flush policy with the adaptive cap (I4, decisions D7 to D9)** is a pure function in `flush.go` and `cap.go`.
+- **The pool id (I14, PR (a)).** The loop mints one pool id for each pool with `core.AllocateCycleNumber`. The id names the record directory `integration-<pool>`. `CycleSpec` does not hold it. The cycle run receives it as `--pool N`.
+- **The record set (I14, PR (b)).** `ListRecords` is the one home of the lane records. It returns the records and each read failure.
+  - It sorts the pool directories by number, so pool 999 comes before pool 1000. A named directory sorts after the numeric ones.
+  - `FindRecordByCommit`, `RecordForCommit` and `RecordSet.Owned` are projections of it. `FindRecordByCommit` returns the record of the first owner.
+  - `MemberKey` names a member by its cycle and its patch ids. `Owned` gives each member to its first numeric pool.
+- **The ancestry check (I14).** `Repo.IsAncestor(ctx, sha, ref)` runs `git merge-base --is-ancestor`. Exit code 1 means false. Any other failure is an error, so a failed git call never reads as "not landed".
+- **The signal codes (I14).** `CodeMerged`, `CodeComposed` and `CodeFlushed` join `CodeEjected` in this package. The ship phase keeps the registry of the codes and uses these values.
+- **The wave record type (I14, PR (a)).** `WaveRecord` holds the pool, the epoch and the shadow base. It also holds the batches, the members, the decisions, the failures and the end mark. `IntegrationBatch` is one batch. `MemberState` holds a status and an independent `Landed` flag. `Validate` checks the branch name of each batch with `PoolBranch`, and it checks the epoch of the wave.
+- **The wave record file (I14).** `WriteWaveRecord` and `ReadWaveRecord` keep one file for each pool at `WaveRecordPath`. They share the atomic publish with the other records. `FileWaveStore` is the `WaveStore` that the driver uses.
+- **The epoch (I14, PR (b)).** `EpochHolder` claims the next number of `.evolve/integration-epoch` once, under a lock file. `Current` reads the file. The loop config holds one holder, so a chained batch keeps the number.
+- **The driver (I14, PR (b)).** `Driver.Tick` checks the stage, the epoch and the record, resumes once, admits the new members, decides the flush with `DecideFlush` and runs the actor. A stage with no actor fails with `SHIP_INTEGRATION_DRIVER_FAILED`, so enforce does not start. `Start` runs one goroutine that serves a timer and one wave-end request. `Run.Finish` cancels the owner context at its limit and always waits for the goroutine.
+- **The shadow actor (I14, PR (b)).** `ShadowActor` composes each member on the pool branch `integration/p<pool>-b<n>` from the held base. A conflict is `conflicted`, or `conflicted_base_ahead` when the lane base is not an ancestor of the chain base. It emits these shadow signals: `_COMPOSED`, `_EJECTED` with `shadow=true` and no brief. `Landed` comes from `IsAncestor` on `refs/evolve/integration-main`. `Resume` and `WaveEnd` delete the pool refs.
 
 ## Invariants
 
@@ -103,6 +115,7 @@ The package holds the pure parts of the integration of a wave. A fleet lane deli
 
 ## Limits
 
+- The driver runs at shadow only. The design of the driver, the wave record and the shadow measure is in [integration-driver](../integration-driver.md). Enforce has no actor and is PR (c).
 - The compose engine is built. `Train` composes with `Composer.Compose` at `shadow`. `PrefixCheck` has no production caller.
 - The batch PR and the PR train are built. The ejection brief to the lane (I3) and the integration record (I10) are not built yet.
 - The compose engine and the L1 prefix check (I2) are built. Nothing in production calls them yet.
@@ -144,7 +157,9 @@ The package holds the pure parts of the integration of a wave. A fleet lane deli
 
 A lane record has a cycle number and a trailer. A console PR record has the source console-pr, a PR number and no cycle number. DeliverableRecord.Ref gives the number of either kind, and Label gives its name for a message.
 
-The review binding of a console PR covers the change of the PR. Train.Record gives the binder the evidence: the commits, the changed paths and the digest of the diff. AttestedBinding accepts an attestation only when its tree equals that digest. ClassBinding accepts a class only when the rule of the class covers the paths. The caller owns the attestation schema and the closed list of classes, because this package cannot import the commit gate. That package imports this one through core.
+The review binding of a console PR covers the change of the PR. Train.Record gives the binder the evidence: the commits, the changed paths and the digest of the diff. AttestedBinding accepts a review record only when its tree equals that digest. ClassBinding accepts a class only when the rule of the class covers the paths.
+
+The commit gate writes the review record, and it holds a copy of each launch record that it names. A review record of a docs-only change needs a run of the docs review, and the plain name does not satisfy the check. The class `docs-review` checks only the paths, and it proves no run. The caller owns the record schema and the closed list of classes, because this package cannot import the commit gate. That package imports this one through core.
 
 Train plans and lands the ready PRs. Plan does three things and pushes nothing:
 
