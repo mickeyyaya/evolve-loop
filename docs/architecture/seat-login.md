@@ -130,13 +130,17 @@ A flag in the environment or in a package variable gives each caller its own ans
 - The manifest holds the data: `seat_login: isolated|stored`. `claude-tmux` and `claude-p` are `isolated`.
 - `claude-cloud` is `stored` until L3 measures it, because the token has no claude.ai connectors (research F7.2). A row holds this.
 - A manifest with no field reads as `stored`. A codex launch with a bad holder starts with no refusal, no token and the stored-login deny present.
-- `Deps.SeatLogin` is the seam. It sits beside `EnvStage`. An empty seam refuses a launch whose manifest is `isolated`, in each binary, with a pinned text.
+- `Deps.SeatLogin` is the seam. It sits beside `EnvStage`. An empty seam falls back to the real reader, `seatlogin.OS`. No production root sets the seam, and the code has no refusal for an empty seam.
 - The refusal uses a new exit class, `seat_token_refused`. It has no transient sentinel, so `loopAbort` stays as it is.
 - A `looppreflight` check refuses a bad holder at loop start. `evolve doctor` and `looppreflight` warn on "seat root present, holder absent".
 
-**The seam is wired by a scan.** A source scan covers each non-test `bridge.Deps{` and `gobridge.Deps{` literal. It also covers each unqualified `Deps{` literal inside package `bridge`. Each literal must set the seam, or the test must name it as a site that reaches no door. So a new literal fails the row.
+**The seam has a fallback, not a scan.** An empty `Deps.SeatLogin` uses `seatlogin.OS`, which reads the real home. In production this is correct, so the build has no source scan of the `Deps{` literals and no refusal for an empty seam. A refusal turns a concern of tests into a failure mode of production in up to 89 test files.
 
-Known roots that set the seam:
+The cost of the fallback: a test that launches a claude driver with an empty seam reads the real home. Only package `bridge` hides it. It uses a test default that reports the seat directory of the real home as absent. A test in another package, such as `cmd/evolve` or `acs`, reads the real home. On a host that holds a token, such a test can isolate or refuse.
+
+The sample that supports the fallback passes under a temp home with no holder, a bad holder and a good holder. It holds the packages `./internal/adapters/bridge` and `./internal/subagent/...`, and a subset of `cmd/evolve` (`Bridge|AgentRun|Recipe|CLIHealth|ModelsLive`). The sample is not the whole repository.
+
+Roots that can set the seam in a later change:
 
 | Root | File |
 |---|---|
@@ -150,7 +154,7 @@ Known roots that set the seam:
 | `execAdapterDeps` | `subagent/bridgeadapter.go` |
 | `RunRecipe` | `cmd_bridge.go` |
 
-The implementer finds the exact literal of each root and classifies the rest. Test files that launch an isolated driver with an empty seam change through one shared helper. The count is up to 89 files.
+This section replaces the proposal of the design card (finding F4 and the review item H-1 of revision 4). The card proposed a refusal and a scan. This build does not have them.
 
 ## 4. The seat directory and what a seat sees
 
@@ -267,11 +271,12 @@ The holder cannot report its own history. A lost holder puts each later seat on 
 
 ### Solution
 
-- Each `claude` launch writes `seat_login: isolated|stored` and its transcript root on the record of each try. The home is `llmcalls.Record`, through its `marks` seam. The record never holds the token.
+- Each `claude` launch writes `seat_login: isolated|stored` on the record of each try. The transcript root is not on the record in this build. It lands with the readers. The home is `llmcalls.Record`, through its `marks` seam. The record never holds the token.
 - The field leaves `launchSwept` through an observer, like `observeDispatchID`. It also goes on `core.BridgeResponse`, because the post-mortem reader and the login wall read it.
 - A plane that runs a binary without this design writes no field. That reads as `stored`.
 - A smoke writes no record. Its reader looks in both roots.
-- Readers look in both roots. They take the root from the record of each try.
+- Readers look in both roots. The readers land in a later pull request, after the verbs and before `seat-token set`. Until then, each seat of a token host writes its transcripts under the seat directory. The post-mortem and the spend readers do not see them.
+- Do not run `evolve auth seat-token set` before the readers land.
 - L8 counts auth errors by place with this field. L2 uses it as its detector: any `stored` launch in the window means no result.
 - L2 adds a runbook line: the console is closed, and no doctor or probe runs in the window. The L0 `mdat` is sampled at both ends.
 
@@ -297,17 +302,17 @@ bridge: the seat token at <path> was refused: <status>. Next: run claude setup-t
 
 - The third text is not claimed until a fixture exists. One parameter seat runs with a deliberately bad token in a scratch directory. The pane is captured as the fixture. The pattern of L5 then matches that real text.
 - The next step of a login wall names the holder when the seat is isolated. That function is a proposal of the login signal card, which L5 builds. `Decision` reaches the wall through a new field on `core.BridgeResponse`.
-- One more text exists for each of these states: unreadable file, empty home, the live-lane refusal, an `off` stage, an empty seam, a failed wrap. The build pins each text whole.
+- One more text exists for each of these states: unreadable file, empty home, the live-lane refusal, an `off` stage, a failed wrap. The build pins each text whole.
 - The verbs `set` and `clear` emit one signal each, with the verb name and the time.
 
 ## 10. The test rows
 
 1. **Red proof.** A real launch today has no `CLAUDE_CONFIG_DIR`, and the cell can read the holder path.
-2. **Journey.** A stub seat runs through `evolve agent run` with a planted token in a temp home. The env holds the token. The directory is set. The transcript root is the seat root. The post-mortem reads it.
+2. **Journey.** A stub seat runs through `evolve agent run` with a planted token in a temp home. The env holds the token. The directory is set. The transcript root is the seat root. The post-mortem reads it in the pull request of the readers.
 3. **Preservation.** A host with no token gives a launch shape that is byte-equal to today, except the holder deny.
 
    The holder read and the verbs land in one pull request, so no verb can arm a binary that lacks the read.
-4. **Wiring.** One test for each entry. The source scan of the seam (section 3). A test that no launch reads the holder twice. A test that each caller of `driver.Launch` holds a resolved `Decision`.
+4. **Wiring.** One test for each entry. A test that no launch reads the holder twice. A test that each caller of `driver.Launch` holds a resolved `Decision`.
 5. **Mutation.** Remove the deny. Fall back to the stored login on a bad file. Remove the empty-file check. Each mutant must fail a row.
 6. **Signal.** Equality of each text. A canary token runs through the real launch, and a scan covers each output of the launch.
 7. **Live, L2.** A seat runs across an expiry of the stored login, on this host, with a real token. The behaviour of the CLI can change, so it runs after each boundary update of the CLI.
@@ -333,7 +338,7 @@ Rows for the cases of this design:
 | No agent runs `seat-token set` or `clear` | `agentclass/table.go`, class Denied | Proposed |
 | A cell cannot read the holder | `DenyReadPaths` on `holder/`, unconditional | Proposed |
 | A seat directory holds no credential | A test on the provisioned directory | Proposed |
-| A new `Deps{` literal sets the seam | The source scan of row 4 | Proposed |
+| A new `Deps{` literal sets the seam | Not built. The fallback to `seatlogin.OS` makes the scan unneeded in production. | Dropped |
 | Each text is pinned | The equality tests of row 6 | Proposed |
 | The token appears in no output | The canary scan of row 6 | Proposed |
 | Each user key has a decision | The closed table test of section 4 | Proposed |

@@ -150,6 +150,20 @@ func TestCanaryAModelMismatchKeepsTheBench(t *testing.T) {
 	}
 }
 
+func TestCanaryARefusedSeatKeepsTheBench(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	benchExpired(t, root, "agy-claude", 1)
+	var out bytes.Buffer
+	runCLIHealthCanary(context.Background(), root, func(driver string) (int, string, string) {
+		return bridge.ExitSeatTokenRefused, "", ""
+	}, &out)
+	benches, _ := clihealth.NewStore(root, nil).Load()
+	if _, kept := benches["agy-claude"]; !kept || !strings.Contains(out.String(), "bench kept") {
+		t.Fatalf("benches %v, log %q: a refused seat proves nothing about the quota wall", benches, out.String())
+	}
+}
+
 func TestCanaryAWallBesideAModelMismatchRebenchesWithAStrike(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

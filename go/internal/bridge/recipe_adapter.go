@@ -229,6 +229,9 @@ func CaptureHelp(ctx context.Context, cfg *Config, deps Deps, cli string) (strin
 
 func RunRecipe(ctx context.Context, cfg *Config, deps Deps, cli, recipeName string, params map[string]string) (recipe.Result, error) {
 	deps = deps.withDefaults()
+	if err := deps.recipeSeatRefusal(cfg); err != nil {
+		return recipe.Result{}, err
+	}
 	r, err := recipe.LoadRecipe(recipeName)
 	if err != nil {
 		return recipe.Result{}, err
