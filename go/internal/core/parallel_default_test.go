@@ -234,6 +234,8 @@ var serialRequiredTests = map[string]string{
 	"core.TestRunCycle_MixedExitCodes_NoDefer":                                                      swapsQuotaBoundaryCheckpointer,
 	"core.TestRunCycle_WalledCorrectionRedispatch_DefersLikeAFirstDispatch":                         swapsQuotaBoundaryCheckpointer,
 	"core.TestRunCycle_WalledRemediationRerun_DefersLikeAFirstDispatch":                             swapsQuotaBoundaryCheckpointer,
+	"core.TestRunCycle_TheWallSpansTheDispatchesOfAPhase":                                           swapsQuotaBoundaryCheckpointer,
+	"core.TestRunCycle_APausedResultCarriesTheWallAndTheCheckpointWriteError":                       swapsQuotaBoundaryCheckpointer,
 	"core.TestAdvisorStderrAndStream_HappyPathAreSilent":                                            swapsStderr,
 	"core.TestCoreFacades_ProjectTheLeaf":                                                           swapsStderr,
 	"core.TestPhaseAdvisor_SeesTheSignalCenterAppliedThroughTheOption":                              swapsStderr,

@@ -17,13 +17,13 @@ func TestBenchable_ACredentialWallBenchesTheFamily(t *testing.T) {
 
 func TestOperatorAction_NamesTheFixForACredentialWallOnly(t *testing.T) {
 	got := OperatorAction("claude", CredentialPattern)
-	for _, want := range []string{"claude", "logged in", "operator"} {
+	for _, want := range []string{LoginCommand("claude"), "operator"} {
 		if !strings.Contains(got, want) {
-			t.Fatalf("OperatorAction(claude, %s) = %q, want it to name the family, the login and the operator", CredentialPattern, got)
+			t.Fatalf("OperatorAction(claude, %s) = %q, want it to hold %q", CredentialPattern, got, want)
 		}
 	}
-	if strings.Contains(got, "/login") || strings.Contains(got, " login") {
-		t.Fatalf("OperatorAction must not name a login command; the families differ (agy trusts a directory, ollama signs in): %q", got)
+	if got := OperatorAction("agy", CredentialPattern); !strings.Contains(got, "log in to agy") {
+		t.Fatalf("a family with no login command falls back to the neutral step: %q", got)
 	}
 	for _, pattern := range []string{"rate_limit", ExhaustedPattern, BootTimeoutPattern, ""} {
 		if got := OperatorAction("codex", pattern); got != "" {

@@ -143,3 +143,10 @@ func TestConsoleRouted_PipelineKindHonorsOperatorLaneOverrideOnly(t *testing.T) 
 		t.Errorf("reason must say the override was ignored, got %q", reason)
 	}
 }
+
+func TestKindOperatorLogin_IsNotAPipelineKind(t *testing.T) {
+	t.Parallel()
+	if KindOperatorLogin != "operator-login" || strings.HasPrefix(KindOperatorLogin, pipelineKindPrefix) {
+		t.Errorf("KindOperatorLogin = %q, want the operator kind that no pipeline reader owns", KindOperatorLogin)
+	}
+}

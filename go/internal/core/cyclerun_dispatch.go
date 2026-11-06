@@ -103,6 +103,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 	maxAttempts := cr.retryConfig.PhaseMaxAttempts
 	var attemptCount int
 	var attemptExits []int
+	var walled Wall
 	retryHooks := cr.mainDispatchRetryOpts()
 	for attempt := 1; ; attempt++ {
 		attemptCount = attempt
@@ -128,9 +129,10 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 		}
 		if err != nil {
 			attemptExits = append(attemptExits, quotaExit(err))
+			walled = walled.Merge(walkedWall(err))
 			if attempt >= maxAttempts || !IsInfraTeardownError(err) {
 				if retryHooks.quotaExhausted(attemptExits) {
-					return dispatchResult{}, loopAbort, cr.pauseForQuota(next, resp, attempt, err)
+					return dispatchResult{}, loopAbort, cr.pauseForQuota(next, resp, attempt, withMergedWall(err, walled))
 				}
 				if backfilled, ok := retryHooks.backfill(next, err, attempt, maxAttempts); ok {
 					resp = backfilled
@@ -156,6 +158,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 				cr.o.writePhaseFailureDiag(cr.cs.WorkspacePath, string(next), cr.cycle, err, attempt)
 				cr.o.adviseOnUnclassifiedFailure(cr.ctx, cr.cycle, cr.cs.WorkspacePath, cr.req.ProjectRoot, next, err, cr.envSnap)
 				cr.recordFailureLearning(next, phaseErr, attempt)
+				cr.noteLoginWall(next, walled)
 				return dispatchResult{}, loopAbort, wrapCycleLevelError(next, phaseErr)
 			}
 			fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN phase %s attempt %d/%d hit a transient bridge error or timeout; relaunching (self-heal)\n", next, attempt, maxAttempts)

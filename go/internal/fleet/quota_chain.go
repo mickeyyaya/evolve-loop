@@ -37,8 +37,8 @@ func ChainAwareBenches(benched map[string]string, chains [][]string, info io.Wri
 	}
 	for _, key := range keys {
 		if _, costs := costed[key]; !costs {
-			fmt.Fprintf(info, "[loop] INFO: fleet: quota bench on CLI family %q (%s) costs no lane: %s\n",
-				key, benched[key], fallbackOf(benchFamily(key), chains, down))
+			fmt.Fprintf(info, "[loop] INFO: fleet: %s on CLI family %q (%s) costs no lane: %s\n",
+				benchLabel(benched[key]), key, benched[key], fallbackOf(benchFamily(key), chains, down))
 		}
 	}
 	return costed

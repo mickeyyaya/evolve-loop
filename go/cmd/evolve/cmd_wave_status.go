@@ -223,6 +223,9 @@ func waveCycleText(c wave.Cycle) string {
 	if c.QuotaPauses > 0 {
 		text += fmt.Sprintf(", quota pauses %d", c.QuotaPauses)
 	}
+	if c.LoginWalls > 0 {
+		text += fmt.Sprintf(", login walls %d", c.LoginWalls)
+	}
 	return text
 }
 

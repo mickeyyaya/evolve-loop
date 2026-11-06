@@ -58,7 +58,7 @@ var additiveCycleStateKeys = []string{
 	"ship_recovery_code",
 	"ship_recovery_conflicts",
 	"audit_decline_reason",
-	"quota_walk_clis",
+	"quota_wall",
 	"failure_decision_untrusted",
 	"predicate_repair_brief",
 	"predicate_reroutes",

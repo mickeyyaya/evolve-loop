@@ -39,7 +39,8 @@ func (b *BaseRunner) dispatchPhaseAttempts(
 
 	var bres core.BridgeResponse
 	var bridgeErr error
-	var attemptLog, skills, walked []string
+	var attemptLog, skills []string
+	var walked core.Wall
 	var wall bridgechain.WallKeeper
 	base := b.baseRequest(req, prep, resolved)
 	postmortems := postmortemScope{req: req, phase: phase, artifactPath: prep.artifactPath, cfg: overlayPolicy.AttemptPostmortemConfig()}
@@ -55,17 +56,21 @@ func (b *BaseRunner) dispatchPhaseAttempts(
 			log.Diag().Warnf("[runner] WARN events producer phase=%s cli=%s: %v (cost/classification degraded)\n", phase, candidateCLI, err)
 		}
 		attemptLog = append(attemptLog, fmt.Sprintf("%s@%s=%d", candidateCLI, tier, bres.ExitCode))
-		walked = append(walked, candidateCLI)
+		end := core.FamilyEnd{CLI: candidateCLI, Pattern: bres.CauseCode}
+		if walked.Admits(end) {
+			end.Evidence, end.ResetAt = bridgechain.AttemptEvidence(bridgechain.EscalationFor(attempt, start), bres.CauseCode, start)
+		}
+		walked = walked.Observe(end)
 		if bridgeErr != nil && bres.ExitCode == 85 {
 			b.maybeBenchOnEscalation(bridgechain.EscalationFor(attempt, start))
 		}
 		return llmroute.TieringExit(bres.ExitCode, bres.CauseCode), bridgeErr
 	}, func(from, to string) {
-		log.Diag().Infof("[runner] phase=%s tier step-down: %s → %s (CLI chain exhausted at quota)\n", phase, from, to)
+		log.Diag().Infof("[runner] phase=%s tier step-down: %s → %s (CLI chain exhausted at a wall)\n", phase, from, to)
 	})
 	if wall.Surfaces(tieredRes, bres) {
 		bres, bridgeErr = wall.Surface(tieredRes, bres, bridgeErr)
-		log.Diag().Infof("[runner] phase=%s dispatch chain exhausted after a quota wall: surfacing exit %d: %v\n", phase, bres.ExitCode, bridgeErr)
+		log.Diag().Infof("[runner] phase=%s dispatch chain exhausted after a wall: surfacing exit %d: %v\n", phase, bres.ExitCode, bridgeErr)
 	}
 	if unlaunched := bridgechain.Unlaunched(tieredRes, plan); unlaunched != nil {
 		bridgeErr = unlaunched
@@ -166,9 +171,9 @@ func withCause(err error, cause string) error {
 	return core.LaunchCause{Cause: cause, Err: err}
 }
 
-func withWalk(err error, walked []string) error {
-	if err == nil || len(walked) == 0 {
+func withWalk(err error, walked core.Wall) error {
+	if err == nil || len(walked.Ends) == 0 {
 		return err
 	}
-	return core.WalkError{CLIs: walked, Err: err}
+	return core.WalkError{Wall: walked, Err: err}
 }

@@ -411,10 +411,100 @@ func TestRun_AFailedWalkNamesEveryCLIItLaunchedForTheQuotaCheckpoint(t *testing.
 	_, err := r.Run(context.Background(), core.PhaseRequest{ProjectRoot: root, Workspace: t.TempDir()})
 
 	var walk core.WalkError
-	if !errors.As(err, &walk) || strings.Join(walk.CLIs, ",") != "agy-claude-tmux,claude-tmux" {
-		t.Fatalf("err=%v walk=%v, want a WalkError naming agy-claude-tmux,claude-tmux", err, walk.CLIs)
+	if !errors.As(err, &walk) || strings.Join(walk.Wall.Families(), ",") != "agy-claude,claude" {
+		t.Fatalf("err=%v walk=%v, want a WalkError naming agy-claude,claude", err, walk.Wall.Families())
 	}
 	if bridgeExitOf(err) != "exit=85" {
 		t.Errorf("first exit in err=%q, want exit=85: a non-start before the wall leaves the wall as the verdict", bridgeExitOf(err))
+	}
+}
+
+func TestRun_AWallRowCarriesItsOwnEvidenceAndParsedReset(t *testing.T) {
+	hooks := &fakeHooks{phase: "build", agent: "evolve-builder", model: "deep", prompt: "x"}
+	sb := &scriptedBridge{
+		responses: map[string]scriptedResp{
+			"agy-claude-tmux": {resp: core.BridgeResponse{ExitCode: 85, CauseCode: "rate_limit"}, err: errors.New("bridge: launch exit=85")},
+			"claude-tmux":     {resp: core.BridgeResponse{ExitCode: 85, CauseCode: "rate_limit"}, err: errors.New("bridge: launch exit=85")},
+		},
+	}
+	root := writeFallbackProfile(t, "evolve-builder", "agy-claude-tmux", []string{"claude-tmux"})
+	ws := t.TempDir()
+	report := fmt.Sprintf(`{"captured_at":%q,"cli":"agy-claude-tmux","pattern_name":"rate_limit","pane_tail":"resets at 9:00pm"}`, time.Now().Add(time.Hour).Format(time.RFC3339))
+	if err := os.WriteFile(filepath.Join(ws, "escalation-report.json"), []byte(report), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r := New(Options{Hooks: hooks, Bridge: sb, Prompts: fakePromptsFS("evolve-builder", "x")})
+
+	_, err := r.Run(context.Background(), core.PhaseRequest{ProjectRoot: root, Workspace: ws})
+
+	var walk core.WalkError
+	if !errors.As(err, &walk) || len(walk.Wall.Ends) != 2 {
+		t.Fatalf("err=%v, want a two-row WalkError", err)
+	}
+	agy, claude := walk.Wall.Ends[0], walk.Wall.Ends[1]
+	if agy.Evidence == "" || agy.ResetAt.IsZero() {
+		t.Errorf("agy row=%+v, want evidence and a parsed reset from its own report", agy)
+	}
+	if claude.Evidence != "" || !claude.ResetAt.IsZero() {
+		t.Errorf("claude row=%+v, want none: the report is agy's", claude)
+	}
+}
+
+func TestRun_ARowHoldsThePatternOfItsAttempt(t *testing.T) {
+	hooks := &fakeHooks{phase: "build", agent: "evolve-builder", model: "deep", prompt: "x"}
+	sb := &scriptedBridge{
+		responses: map[string]scriptedResp{
+			"agy-claude-tmux": {resp: core.BridgeResponse{ExitCode: 85, CauseCode: "rate_limit"}, err: errors.New("bridge: launch exit=85")},
+			"claude-tmux":     {resp: core.BridgeResponse{ExitCode: 85, CauseCode: "auth_recheck"}, err: errors.New("bridge: launch exit=85")},
+		},
+	}
+	root := writeFallbackProfile(t, "evolve-builder", "agy-claude-tmux", []string{"claude-tmux"})
+	r := New(Options{Hooks: hooks, Bridge: sb, Prompts: fakePromptsFS("evolve-builder", "x")})
+
+	_, err := r.Run(context.Background(), core.PhaseRequest{ProjectRoot: root, Workspace: t.TempDir()})
+
+	var walk core.WalkError
+	if !errors.As(err, &walk) || len(walk.Wall.Ends) != 2 {
+		t.Fatalf("err=%v, want a two-row WalkError", err)
+	}
+	if got := walk.Wall.Ends[0].Pattern; got != "rate_limit" {
+		t.Errorf("agy row pattern=%q, want rate_limit", got)
+	}
+	if got := walk.Wall.Ends[1].Pattern; got != "auth_recheck" {
+		t.Errorf("claude row pattern=%q, want auth_recheck: an empty pattern reads as no recorded cause", got)
+	}
+	if !walk.Wall.HasLogin() || walk.Wall.StopReason() != "login-required" {
+		t.Errorf("wall=%+v, want the login named: a login must never read as unknown", walk.Wall)
+	}
+}
+
+func TestRun_ALowerAttemptCopiesNoEvidence(t *testing.T) {
+	hooks := &fakeHooks{phase: "build", agent: "evolve-builder", model: "deep", prompt: "x"}
+	sb := &scriptedBridge{
+		responses: map[string]scriptedResp{
+			"claude-tmux": {resp: core.BridgeResponse{ExitCode: 85, CauseCode: "auth_recheck"}, err: errors.New("bridge: launch exit=85")},
+			"claude":      {resp: core.BridgeResponse{ExitCode: 85, CauseCode: "rate_limit"}, err: errors.New("bridge: launch exit=85")},
+		},
+	}
+	root := writeFallbackProfile(t, "evolve-builder", "claude-tmux", []string{"claude"})
+	ws := t.TempDir()
+	report := fmt.Sprintf(`{"captured_at":%q,"cli":"claude","pattern_name":"rate_limit","pane_tail":"resets at 9:00pm"}`, time.Now().Add(time.Hour).Format(time.RFC3339))
+	if err := os.WriteFile(filepath.Join(ws, "escalation-report.json"), []byte(report), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r := New(Options{Hooks: hooks, Bridge: sb, Prompts: fakePromptsFS("evolve-builder", "x")})
+
+	_, err := r.Run(context.Background(), core.PhaseRequest{ProjectRoot: root, Workspace: ws})
+
+	var walk core.WalkError
+	if !errors.As(err, &walk) || !walk.Wall.HasLogin() {
+		t.Fatalf("err=%v, want a WalkError that holds the login", err)
+	}
+	copies, _ := filepath.Glob(filepath.Join(ws, "escalation-claude*.json"))
+	if len(copies) != 0 {
+		t.Errorf("copied evidence %v, want none: a report is copied only when the row of its attempt wins", copies)
+	}
+	if got := walk.Wall.Ends[0]; got.Evidence != "" || !got.ResetAt.IsZero() {
+		t.Errorf("row=%+v, want the login row with no quota evidence", got)
 	}
 }

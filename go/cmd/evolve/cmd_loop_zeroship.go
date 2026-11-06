@@ -15,7 +15,17 @@ import (
 
 type zeroShipWave struct {
 	cycles []int
+	logins []int
 	ships  int
+}
+
+func haltWallsOf(waves []zeroShipWave) haltWalls {
+	var out haltWalls
+	for _, w := range waves {
+		out.login = append(out.login, w.logins...)
+		out.counted += len(w.cycles)
+	}
+	return out
 }
 
 type zeroShipTally struct {
@@ -52,11 +62,15 @@ func (b *loopBatchCoordinator) zeroShipHalt(batchStartCycle int) (rc int, halted
 		return 0, false
 	}
 	ids := make([]int, 0, len(read.Cycles))
+	var logins []int
 	for _, c := range read.Cycles {
 		ids = append(ids, c.ID)
+		if c.LoginWalls > 0 && c.FailureSignals == 0 {
+			logins = append(logins, c.ID)
+		}
 	}
 	t.floor = max(t.floor, ids[len(ids)-1])
-	t.waves = append(t.waves, zeroShipWave{cycles: ids, ships: len(read.Ships)})
+	t.waves = append(t.waves, zeroShipWave{cycles: ids, logins: logins, ships: len(read.Ships)})
 	return b.evaluateZeroShip(pol)
 }
 
@@ -76,7 +90,8 @@ func (b *loopBatchCoordinator) evaluateZeroShip(pol policy.Policy) (rc int, halt
 		return 0, false
 	}
 	var named []string
-	for _, w := range b.zeroShip.waves[len(b.zeroShip.waves)-v.Count:] {
+	counted := b.zeroShip.waves[len(b.zeroShip.waves)-v.Count:]
+	for _, w := range counted {
 		for _, id := range w.cycles {
 			named = append(named, strconv.Itoa(id))
 		}
@@ -90,7 +105,7 @@ func (b *loopBatchCoordinator) evaluateZeroShip(pol policy.Policy) (rc int, halt
 		Halt:     true,
 	}
 	workspace := filepath.Join(b.cfg.EvolveDir, "runs", "cycle-"+strconv.Itoa(latest))
-	rule := loopHaltRule{code: CodeLoopZeroShipHalt, fields: map[string]string{"rule": v.Rule, "waves": strconv.Itoa(v.Count)}}
+	rule := loopHaltRule{code: CodeLoopZeroShipHalt, fields: map[string]string{"rule": v.Rule, "waves": strconv.Itoa(v.Count)}, walls: haltWallsOf(counted)}
 	return haltOnSystemFailure(b.cfg.EvolveDir, b.cfg.ProjectRoot, latest, workspace, sf, b.stderr, b.deps.Signals, rule), true
 }
 

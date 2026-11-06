@@ -174,6 +174,7 @@ func TestRunLoop_QuotaPause_Rc5(t *testing.T) {
 			"enabled":      true,
 			"reason":       "quota-likely",
 			"quotaResetAt": "2026-05-23T20:00:00Z",
+			"quotaWall":    []map[string]any{{"cli": "agy", "pattern": "rate_limit"}},
 		},
 	}
 	b, _ := json.Marshal(cs)
@@ -274,3 +275,47 @@ func TestRunLoop_DeprecatedCostEnvVarsInert(t *testing.T) {
 }
 
 var _ = fmt.Sprintf("placeholder")
+
+func TestRunLoop_WallPause_Rc5_StopReasonAndWakeHintFollowTheWall(t *testing.T) {
+	cases := []struct {
+		name        string
+		wall        []map[string]any
+		stop        string
+		wantWakeMsg bool
+		noResetTime bool
+	}{
+		{"a login row", []map[string]any{{"cli": "claude", "pattern": "auth_recheck"}}, "login-required", false, false},
+		{"a login row beside a quota row", []map[string]any{{"cli": "claude", "pattern": "auth_recheck"}, {"cli": "agy", "pattern": "rate_limit"}}, "login-required", true, false},
+		{"a quota row", []map[string]any{{"cli": "agy", "pattern": "rate_limit"}}, "quota-pause", true, false},
+		{"a quota row with no wake time", []map[string]any{{"cli": "agy", "pattern": "rate_limit"}}, "quota-pause", false, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			projectRoot := t.TempDir()
+			evolveDir := filepath.Join(projectRoot, ".evolve")
+			if err := os.MkdirAll(evolveDir, 0o755); err != nil {
+				t.Fatalf("mkdir: %v", err)
+			}
+			writeDispatchPolicy(t, evolveDir, "off")
+			defer installStubDeps(t, &fixtures.FakeStorage{}, newFakeLedger())()
+			cs := map[string]any{"cycle_id": float64(1), "checkpoint": map[string]any{
+				"enabled": true, "reason": "quota-likely", "quotaResetAt": "2026-05-23T20:00:00Z", "quotaWall": tc.wall,
+			}}
+			if tc.noResetTime {
+				delete(cs["checkpoint"].(map[string]any), "quotaResetAt")
+			}
+			b, _ := json.Marshal(cs)
+			_ = os.WriteFile(filepath.Join(evolveDir, "cycle-state.json"), b, 0o644)
+
+			var stdout, stderr bytes.Buffer
+			rc := runLoop([]string{"--project-root", projectRoot, "--evolve-dir", evolveDir, "--goal-text", "x", "--cycles", "1"}, nil, &stdout, &stderr)
+
+			if rc != 5 || !strings.Contains(stdout.String(), `"stop_reason": "`+tc.stop+`"`) {
+				t.Errorf("rc=%d stdout=%q, want rc 5 and stop reason %q", rc, stdout.String(), tc.stop)
+			}
+			if got := strings.Contains(stderr.String(), "ScheduleWakeup"); got != tc.wantWakeMsg {
+				t.Errorf("ScheduleWakeup hint=%v, want %v: time alone does not clear a login; stderr=%q", got, tc.wantWakeMsg, stderr.String())
+			}
+		})
+	}
+}

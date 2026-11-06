@@ -10,12 +10,11 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/quotareset"
 )
 
 var errNoCheckpoint = errors.New("checkpoint: the state has no checkpoint block")
-
-const autoResumeSpentAction = "the auto-resume budget is spent: check the usage of the walled CLIs, then run `evolve loop --resume` by hand"
 
 func RecordResume(path string, auto bool) (Checkpoint, bool, error) {
 	var cp Checkpoint
@@ -99,9 +98,14 @@ func nextResume(cp Checkpoint, auto bool) (Checkpoint, bool) {
 func withAutoResumeBudget(cp Checkpoint, attempts int) Checkpoint {
 	cp.AutoResumeAttempts = attempts
 	if attempts >= cp.AutoResumeMaxAttempts {
-		cp.OperatorAction = cmp.Or(cp.OperatorAction, autoResumeSpentAction)
+		cp.OperatorAction = cmp.Or(cp.OperatorAction, spentAction(cp))
 	}
 	return cp
+}
+
+func spentAction(cp Checkpoint) string {
+	wall := core.Wall{Ends: cp.QuotaWall}
+	return "the auto-resume budget is spent: " + wall.Clauses() + ". Next: " + core.WallNextStep(wall, cp.WorkspacePath)
 }
 
 func carriedAttempts(path string) (int, error) {

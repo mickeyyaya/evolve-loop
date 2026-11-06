@@ -47,7 +47,7 @@ func fleetLaneScope() []string {
 
 func laneClaimReleaser(projectRoot string, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) func(int) error {
 	return func(cycle int) error {
-		return releaseDeferredLaneClaims(projectRoot, cycle, laneQuotaDeferredReason, stderr, lifecycle, signals)
+		return releaseDeferredLaneClaims(projectRoot, cycle, laneWallDeferredReason, stderr, lifecycle, signals)
 	}
 }
 

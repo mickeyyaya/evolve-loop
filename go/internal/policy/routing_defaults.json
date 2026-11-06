@@ -16,5 +16,9 @@
   },
   "classifier_families": ["codex", "claude", "agy"],
   "unmeasured_order": ["claude", "agy", "agy-claude"],
-  "universal_fallback_exclude": ["agy"]
+  "universal_fallback_exclude": ["agy"],
+  "login_commands": {
+    "claude": "open claude and run /login",
+    "codex": "run codex login"
+  }
 }

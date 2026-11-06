@@ -14,7 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseblock"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/quotareset"
@@ -52,6 +51,8 @@ type Checkpoint struct {
 	AutoResumeAttempts    int                 `json:"autoResumeAttempts"`
 	AutoResumeMaxAttempts int                 `json:"autoResumeMaxAttempts"`
 	OperatorAction        string              `json:"operatorAction,omitempty"`
+	WorkspacePath         string              `json:"workspacePath,omitempty"`
+	QuotaWall             []core.FamilyEnd    `json:"quotaWall,omitempty"`
 	PhaseIntegrity        []phaseblock.Digest `json:"phaseIntegrity,omitempty"`
 }
 
@@ -73,6 +74,7 @@ func Compose(cs core.CycleState, reason Reason, cost float64, gitHead string, no
 		CostAtCheckpoint:      cost,
 		AutoResumeAttempts:    0,
 		AutoResumeMaxAttempts: DefaultAutoResumeAttempts,
+		WorkspacePath:         cs.WorkspacePath,
 	}
 }
 
@@ -198,7 +200,8 @@ var UsageReset func(projectRoot string, families []string, now time.Time) (time.
 
 func withQuotaReset(cp Checkpoint, cs core.CycleState, projectRoot string, now time.Time) Checkpoint {
 	qr := policy.LoadOrDefaults(filepath.Join(projectRoot, ".evolve", "policy.json"), os.Stderr).QuotaResetConfig()
-	families := walkedFamilies(cs.QuotaWalkCLIs)
+	cp.QuotaWall = cs.QuotaWall
+	families := core.Wall{Ends: cs.QuotaWall}.Families()
 	res, err := computeQuotaReset(cs.WorkspacePath, quotareset.Options{
 		Now:          func() time.Time { return now },
 		ResetAt:      qr.ResetAt,
@@ -213,6 +216,9 @@ func withQuotaReset(cp Checkpoint, cs core.CycleState, projectRoot string, now t
 		cp.QuotaResetSource = res.Source
 		cp.AutoResumeMaxAttempts = 0
 		cp.OperatorAction = unknownResetAction
+		if wall := (core.Wall{Ends: cs.QuotaWall}); wall.HasLogin() || (len(wall.Ends) > 0 && !wall.HasQuota()) {
+			cp.OperatorAction = core.WallNextStep(wall, cs.WorkspacePath)
+		}
 	default:
 		cp.QuotaResetAt = res.ISO
 		cp.QuotaResetSource = res.Source
@@ -224,16 +230,6 @@ const (
 	unknownResetSource = "unknown"
 	unknownResetAction = "no quota reset time is known: check the usage of the walled CLIs, then run `evolve loop --resume` by hand"
 )
-
-func walkedFamilies(clis []string) []string {
-	families := make([]string, 0, len(clis))
-	for _, cli := range clis {
-		if family := llmroute.Family(cli); !slices.Contains(families, family) {
-			families = append(families, family)
-		}
-	}
-	return families
-}
 
 func earliestQuotaReset(projectRoot string, now time.Time, families []string) time.Time {
 	var earliest time.Time

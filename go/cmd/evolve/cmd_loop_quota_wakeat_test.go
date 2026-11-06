@@ -34,7 +34,7 @@ func TestDetectQuotaPause_EmitsNonEmptyWakeAtAndSource(t *testing.T) {
 	if _, err := clihealth.NewStore(projectRoot, func() time.Time { return now }).BenchWallUntil("claude", clihealth.Wall{Pattern: "exhausted", Reset: now.Add(3 * time.Hour)}); err != nil {
 		t.Fatalf("bench a walled family: %v", err)
 	}
-	cs := core.CycleState{CycleID: 656, Phase: "build", WorkspacePath: workspace, QuotaWalkCLIs: []string{"claude-tmux"}}
+	cs := core.CycleState{CycleID: 656, Phase: "build", WorkspacePath: workspace, QuotaWall: core.Wall{}.Observe(core.FamilyEnd{CLI: "claude-tmux", Pattern: "rate_limit"}).Ends}
 	if err := core.QuotaBoundaryCheckpointer(cs, projectRoot, now); err != nil {
 		t.Fatalf("quota-boundary checkpointer: %v", err)
 	}

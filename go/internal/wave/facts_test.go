@@ -181,3 +181,31 @@ func TestReadCycles_ASealedTerminationReasonIsKeptAndShownInTheFacts(t *testing.
 		t.Errorf("a route is counted as a FAIL and named, never hidden:\n%s", line)
 	}
 }
+
+func TestReadCycles_CountsOneLoginWallForEachLoginRequiredSignal(t *testing.T) {
+	t.Parallel()
+	p := newPlane(t)
+	p.write(".evolve/runs/cycle-5/cycle-state.json", `{"cycle_id":5,"phase":"audit"}`)
+	p.write(".evolve/runs/cycle-5/signals.ndjson",
+		signalLine("quota.paused", "audit", `"phase":"audit"`)+signalLine("login.required", "audit", `"phase":"audit"`))
+
+	got, _ := wave.ReadCycles(p.root, 4, 9)
+
+	if len(got) != 1 || got[0].LoginWalls != 1 || got[0].QuotaPauses != 1 {
+		t.Errorf("one wall counts in both, and each count is true: %+v", got)
+	}
+}
+
+func TestReadCycles_CountsOneFailureSignalForEachGateRejectedSignal(t *testing.T) {
+	t.Parallel()
+	p := newPlane(t)
+	p.write(".evolve/runs/cycle-5/cycle-state.json", `{"cycle_id":5,"phase":"audit"}`)
+	p.write(".evolve/runs/cycle-5/signals.ndjson",
+		signalLine("login.required", "audit", `"phase":"audit"`)+signalLine("gate.rejected", "audit", `"gate":"audit"`)+signalLine("gate.rejected", "audit", `"gate":"ship"`))
+
+	got, _ := wave.ReadCycles(p.root, 4, 9)
+
+	if len(got) != 1 || got[0].LoginWalls != 1 || got[0].FailureSignals != 2 {
+		t.Errorf("a rejection is a host fact beside the login: %+v", got)
+	}
+}
