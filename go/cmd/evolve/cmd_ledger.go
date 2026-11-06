@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strconv"
 
@@ -66,6 +67,9 @@ func runLedgerVerify(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "[ledger] cwd: %v\n", err)
 			return cliExitIO
 		}
+		if rc := checkRootHasEvolve("ledger verify", root, stderr); rc != 0 {
+			return rc
+		}
 		evolveDir = paths.EvolveDirOf(root)
 	}
 	l := ledger.New(evolveDir)
@@ -80,6 +84,9 @@ func runLedgerVerify(args []string, stdout, stderr io.Writer) int {
 	}
 	result := ledgerVerifyResult{Ledger: filepath.Join(evolveDir, "ledger.jsonl"), Deep: deep, Scope: scope,
 		AnchorSeq: verified.AnchorSeq, AnchorLineSHA: verified.AnchorLineSHA, FromSealedSegment: verified.FromSealedSegment, VerifiedFrom: verifiedFrom(verified)}
+	if _, err := os.Stat(result.Ledger); errors.Is(err, os.ErrNotExist) {
+		result.VerifiedFrom = "no ledger file exists; nothing was verified"
+	}
 	if asJSON {
 		return printVerbJSON("ledger verify", result, stdout, stderr)
 	}

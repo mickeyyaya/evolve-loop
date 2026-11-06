@@ -31,6 +31,9 @@ func runInboxList(root string, args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, inboxUsage("list"))
 		return 10
 	}
+	if rc := checkRootHasEvolve("inbox list", root, stderr); rc != 0 {
+		return rc
+	}
 	inbox, err := loadPendingInbox(root, "list", stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "inbox list: %v\n", err)

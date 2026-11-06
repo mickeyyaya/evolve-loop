@@ -200,7 +200,11 @@ Shadow answers four questions: the order, the overlap, the conflict count and th
 
 ## 7. The clean-wave verdict and the signals
 
-`evolve integration status [--pool N] [--wave N] [--json]` is class A and read-only. It sits in `integrationVerbs`. This is I8. It prints the batches, the members and their states, the order, the decisions, the failures, the counts and the verdict.
+`evolve integration status [--pool N] [--wave N] [--project-root P] [--json]` is class A and read-only. It sits in `integrationVerbs`. This is I8.
+
+It reads `--project-root` after the sub-verb, then `EVOLVE_PROJECT_ROOT`, then the working directory. The other sub-verbs use the working directory only, because they write. An absent root exits 2. A root with no `.evolve` exits 1 and says that no wave record exists under it. The JSON form is the envelope of [cli-contract.md](cli-contract.md), and `data.project_root` names the root that the verb read.
+
+It prints the batches, the members and their states, the order, the decisions, the failures, the counts and the verdict.
 
 - `--pool N` selects a pool. `--wave N` keeps the operator's wave number, resolved through `wave.Store` and the cycle range. A wave with several pools prints each one. `status` prints both numbers.
 - `wave.Record` has no ceiling, so the wave range comes from the next record.

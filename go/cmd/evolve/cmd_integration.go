@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"io"
@@ -12,7 +13,7 @@ import (
 )
 
 const (
-	integrationUsage      = "usage: evolve integration watch --tip SHA\n       evolve integration status [--pool N] [--wave N] [--json]\n       evolve integration record-pr --pr N (--reviewed | --class NAME)\n       evolve integration batch [--dry-run] [PR...]\n  watch: exit 0 = CI green, 1 = CI red, 2 = no run to watch or gh failed, 10 = usage\n  status: exit 0 = clean, 1 = not clean or no evidence, 2 = unreadable, 10 = usage\n  record-pr and batch: exit 0 = done, 1 = refused or a PR was ejected, 2 = git or gh failed, 10 = usage"
+	integrationUsage      = "usage: evolve integration watch --tip SHA\n       evolve integration status [--pool N] [--wave N] [--project-root P] [--json]\n       evolve integration record-pr --pr N (--reviewed | --class NAME)\n       evolve integration batch [--dry-run] [PR...]\n  watch: exit 0 = CI green, 1 = CI red, 2 = no run to watch or gh failed, 10 = usage\n  status: exit 0 = clean, 1 = not clean, no evidence or an unreadable record; 2 = an absent root, an unreadable wave store, or a wave number that the store does not know; 10 = usage\n  record-pr and batch: exit 0 = done, 1 = refused or a PR was ejected, 2 = git or gh failed, 10 = usage"
 	integrationWatchUsage = "usage: evolve integration watch --tip SHA"
 	integrationPrefix     = "evolve integration: "
 )
@@ -20,10 +21,11 @@ const (
 var integrationTip = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 type integrationEnv struct {
-	Gh   integration.GhFunc
-	Git  integration.GitFunc
-	Root string
-	Wave string
+	Gh             integration.GhFunc
+	Git            integration.GitFunc
+	Root           string
+	ProjectRootEnv string
+	Wave           string
 
 	Settle func(ctx context.Context) error
 }
@@ -35,6 +37,10 @@ var integrationVerbs = map[string]integrationVerb{
 	"batch":     batchVerb,
 	"record-pr": recordPRVerb,
 	"status":    statusVerb,
+}
+
+func chooseRoot(flag, envValue, fallback string) string {
+	return cmp.Or(flag, envValue, fallback)
 }
 
 const registrationWait = 5 * time.Second
@@ -54,11 +60,12 @@ func runIntegrationAt(getwd func() (string, error), args []string, stdout, stder
 
 func productionIntegrationEnv(root string, now time.Time) integrationEnv {
 	return integrationEnv{
-		Gh:     integration.SysGh(),
-		Git:    integration.SysGit(),
-		Root:   root,
-		Wave:   "pr" + now.UTC().Format("20060102t150405"),
-		Settle: pauseFor(registrationWait),
+		Gh:             integration.SysGh(),
+		Git:            integration.SysGit(),
+		Root:           root,
+		ProjectRootEnv: os.Getenv("EVOLVE_PROJECT_ROOT"),
+		Wave:           "pr" + now.UTC().Format("20060102t150405"),
+		Settle:         pauseFor(registrationWait),
 	}
 }
 

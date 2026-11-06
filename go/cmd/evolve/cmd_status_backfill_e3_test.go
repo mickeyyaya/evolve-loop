@@ -187,7 +187,7 @@ func TestRunStatus_RefusesBadInvocations(t *testing.T) {
 	}{
 		{"unknown flag", []string{"--nope"}, func(*testing.T) string { return "" }, cliExitUsage, "flag provided but not defined"},
 		{"positional", []string{"extra"}, func(*testing.T) string { return "" }, cliExitUsage, `evolve status: unexpected argument "extra"`},
-		{"no .evolve", nil, func(t *testing.T) string { return t.TempDir() }, 2, "evolve status: cannot read the snapshot: "},
+		{"no .evolve", nil, func(t *testing.T) string { return t.TempDir() }, 2, "evolve status: cannot read the project root "},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

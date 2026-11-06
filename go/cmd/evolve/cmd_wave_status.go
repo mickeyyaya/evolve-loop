@@ -26,6 +26,7 @@ type waveSummary struct {
 }
 
 type waveStatusReport struct {
+	ProjectRoot   string                `json:"project_root"`
 	Wave          int                   `json:"wave"`
 	RunID         string                `json:"run_id"`
 	PID           int                   `json:"pid"`
@@ -55,12 +56,22 @@ func parseWaveReadArgs(args []string) (projectRoot string, asJSON bool, err erro
 	return projectRoot, asJSON, err
 }
 
-func readWaveRecords(env waveEnv, args []string, stderr io.Writer) (wavePlaneDirs, []wave.Record, bool, int) {
-	projectRoot, asJSON, err := parseWaveReadArgs(args)
+type waveRead struct {
+	op   string
+	args []string
+}
+
+func readWaveRecords(env waveEnv, read waveRead, stderr io.Writer) (wavePlaneDirs, []wave.Record, bool, int) {
+	projectRoot, asJSON, err := parseWaveReadArgs(read.args)
 	if err != nil {
 		return wavePlaneDirs{}, nil, false, waveUsageError(stderr, err)
 	}
 	plane, err := resolveWavePlane(env, projectRoot, stderr)
+	if err == nil {
+		if rc := checkRootHasEvolve(read.op, plane.root, stderr); rc != 0 {
+			return plane, nil, asJSON, rc
+		}
+	}
 	var records []wave.Record
 	if err == nil {
 		records, err = plane.store.Records()
@@ -73,12 +84,12 @@ func readWaveRecords(env waveEnv, args []string, stderr io.Writer) (wavePlaneDir
 }
 
 func runWaveStatus(env waveEnv, args []string, stdout, stderr io.Writer) int {
-	plane, records, asJSON, rc := readWaveRecords(env, args, stderr)
+	plane, records, asJSON, rc := readWaveRecords(env, waveRead{"wave status", args}, stderr)
 	if rc != 0 {
 		return rc
 	}
 	if len(records) == 0 && !asJSON {
-		fmt.Fprintln(stdout, "wave: no wave is recorded")
+		fmt.Fprintf(stdout, "wave: no wave is recorded under %s\n", plane.root)
 		return 0
 	}
 	report := buildWaveStatus(env, plane, records)
@@ -90,7 +101,7 @@ func runWaveStatus(env waveEnv, args []string, stdout, stderr io.Writer) int {
 }
 
 func buildWaveStatus(env waveEnv, plane wavePlaneDirs, records []wave.Record) waveStatusReport {
-	report := waveStatusReport{Cycles: []wave.Cycle{}, Runs: []waveRunMeasures{}, LoopLive: len(waveLiveRuns(plane.evolveDir, env.now())) > 0}
+	report := waveStatusReport{ProjectRoot: plane.root, Cycles: []wave.Cycle{}, Runs: []waveRunMeasures{}, LoopLive: len(waveLiveRuns(plane.evolveDir, env.now())) > 0}
 	if notes, err := plane.store.Notes(); err == nil {
 		report.NotesQueued = len(notes)
 	}
@@ -226,7 +237,7 @@ func waveVerdictText(c wave.Cycle) string {
 }
 
 func runWaveWatch(env waveEnv, args []string, stdout, stderr io.Writer) int {
-	plane, records, asJSON, rc := readWaveRecords(env, args, stderr)
+	plane, records, asJSON, rc := readWaveRecords(env, waveRead{"wave watch", args}, stderr)
 	if rc != 0 {
 		return rc
 	}

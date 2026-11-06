@@ -10,6 +10,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/dashboard"
 )
 
+type loopStatusJSON struct {
+	ProjectRoot string               `json:"project_root"`
+	Loop        dashboard.LoopStatus `json:"loop"`
+}
+
 func loopStatusArgs(args []string) ([]string, bool) {
 	fs := flag.NewFlagSet("evolve loop", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
@@ -41,15 +46,14 @@ func runLoopStatus(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "evolve loop status: cwd: %v\n", err)
 		return 1
 	}
-	if err := statusSnapshotReadable(root); err != nil {
-		fmt.Fprintf(stderr, "evolve loop status: cannot read the snapshot: %v\n", err)
-		return 2
+	if rc := checkRootHasEvolve("loop status", root, stderr); rc != 0 {
+		return rc
 	}
 	loop := dashboard.Collect(root, time.Now()).Loop
 	if asJSON {
 		enc := json.NewEncoder(stdout)
 		enc.SetIndent("", "  ")
-		if err := enc.Encode(map[string]dashboard.LoopStatus{"loop": loop}); err != nil {
+		if err := enc.Encode(loopStatusJSON{ProjectRoot: root, Loop: loop}); err != nil {
 			fmt.Fprintf(stderr, "evolve loop status: encode: %v\n", err)
 			return 1
 		}

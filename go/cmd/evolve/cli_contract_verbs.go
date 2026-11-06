@@ -60,6 +60,7 @@ var coreVerbs = []coreVerb{
 	{path: "status", class: availAlways},
 	{path: "loop status", class: availAlways},
 	{path: "wave status", class: availAlways},
+	{path: "integration status", class: availAlways},
 	{path: "wave supply", class: availAlways},
 	{path: "wave watch", class: availAlways, stream: true},
 	{path: "inbox list", class: availAlways},
