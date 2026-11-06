@@ -223,6 +223,9 @@ func launchSwept(ctx context.Context, driver Driver, cfg *Config, deps Deps) (in
 	if err := deps.requireDispatchCredential("phase", cfg.CLI); err != nil {
 		return ExitSafetyGate, err
 	}
+	if rc, err := deps.resolveSeat(cfg); err != nil {
+		return rc, err
+	}
 	cfg.DispatchID = mintDispatchID(cfg, os.Getpid())
 	observeDispatchID(deps, cfg.DispatchID)
 	home, _ := os.UserHomeDir()

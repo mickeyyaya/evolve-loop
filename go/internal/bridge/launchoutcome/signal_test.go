@@ -30,7 +30,7 @@ func TestOutcomeSignal_IsTheTableColumnAndFollowsTheNamingRule(t *testing.T) {
 	for code, want := range map[int]signalcenter.Code{
 		ExitSafetyGate: CodeExitSafetyGate, ExitCostLeak: CodeExitCostLeak, ExitBadFlags: CodeExitBadFlags,
 		ExitREPLBootTimeout: CodeExitREPLBootTimeout, ExitArtifactTimeout: CodeExitArtifactTimeout,
-		ExitUnknownPrompt: CodeExitUnknownPrompt, ExitRespondLoopGuard: CodeExitRespondLoopGuard, ExitModelMismatch: CodeExitModelMismatch,
+		ExitUnknownPrompt: CodeExitUnknownPrompt, ExitRespondLoopGuard: CodeExitRespondLoopGuard, ExitModelMismatch: CodeExitModelMismatch, ExitSeatTokenRefused: CodeExitSeatTokenRefused,
 		ExitRequireFullUnmet: CodeExitRequiredTierUnavailable, ExitCmdTimeout: CodeExitCommandTimeout,
 		ExitMissingBinary: CodeExitMissingBinary, ExitSignalDeath: CodeExitSignalDeath, 42: CodeExitDriverError,
 	} {
@@ -52,8 +52,8 @@ func TestOutcomeSignal_IsTheTableColumnAndFollowsTheNamingRule(t *testing.T) {
 			}
 		}
 	}
-	if registered != 13 {
-		t.Errorf("BRIDGE_EXIT_ codes registered = %d, want 13", registered)
+	if registered != 14 {
+		t.Errorf("BRIDGE_EXIT_ codes registered = %d, want 14", registered)
 	}
 }
 

@@ -50,6 +50,9 @@ func reportDoctorBootResult(driver string, sandbox, asJSON bool, rc int, scrollb
 	case bridge.ExitBadFlags:
 		fmt.Fprintf(stderr, "[doctor] boot: %q is not a known *-tmux driver\n", driver)
 		return exitUsage
+	case bridge.ExitSeatTokenRefused:
+		fmt.Fprintf(stderr, "[doctor] BOOT REFUSED: %s rc=%d (sandbox=%v) — the seat token holder refused the launch; run evolve doctor seat for the reason\n", driver, rc, sandbox)
+		return exitFail
 	case bridge.ExitModelMismatch:
 		fmt.Fprintf(stderr, "[doctor] BOOT WRONG MODEL: %s rc=%d (sandbox=%v) — the REPL booted a model outside the target's model family, or showed no readable model label\n", driver, rc, sandbox)
 		if tail := bridge.ScrollbackTail(scrollback, 6); tail != "" {

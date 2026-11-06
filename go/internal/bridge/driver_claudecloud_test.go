@@ -605,7 +605,7 @@ func TestClaudeCloudManifest_InheritsOnlyTheKeysTheSeatServes(t *testing.T) {
 	allowed := []string{
 		"schema_version", "cli", "binary", "probe_unsandboxed_reason", "install_roots", "env_passthrough", "model_family",
 		"capabilities", "home_reads", "context_window", "binary_min_version", "transport", "default_tier", "tier_dependencies",
-		"default_args", "interactive_prompts", "note", "cloud_launch",
+		"default_args", "interactive_prompts", "note", "cloud_launch", "seat_login",
 	}
 	for key := range resolved {
 		if !slices.Contains(allowed, key) {

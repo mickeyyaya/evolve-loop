@@ -15,11 +15,12 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 const (
-	authUsage          = "usage: evolve auth store-times [--json]\n  store-times: print the time of the credentials file and of the Keychain item of the Claude Code login; it reads no credential\n  exit 0 = printed, 2 = home directory unreadable, 10 = usage"
+	authUsage          = "usage: evolve auth store-times [--json]\n       evolve auth seat-token set --project-root <root>   (the token comes on stdin only; do not set it before the readers PR lands, because the post-mortem and the spend readers do not see the transcripts of a seat until then)\n       evolve auth seat-token clear --project-root <root>\n  store-times: print the time of the credentials file and of the Keychain item of the Claude Code login; it reads no credential\n  seat-token set: read the token of claude setup-token on stdin and write it to the holder at mode 0600; each claude seat then runs isolated on it; seat-token clear: remove it, and each claude seat uses the stored login; both refuse while a loop lane is live\n  run set in your own terminal, never paste a token into a chat or an agent session; a ! command in a session lands in the transcript\n  exit 0 = done, 2 = home directory unreadable or write failed, 3 = refused (a lane is live), 10 = usage, 11 = the value is not a seat token"
 	authPrefix         = "evolve auth: "
 	authStoreTimesName = "store-times"
 	authSchema         = "evolve.auth.store-times/1"
@@ -45,6 +46,9 @@ type authEnv struct {
 	Stat     func(string) (fs.FileInfo, error)
 	Keychain keychainTimeFunc
 	GOOS     string
+	Stdin    io.Reader
+	Live     func(string) []runlease.LiveRun
+	Now      func() time.Time
 }
 
 type authStore struct {
@@ -135,6 +139,9 @@ func runAuthEnv(env authEnv, args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, authUsage)
 		return 0
 	}
+	if len(args) > 0 && args[0] == authSeatTokenName {
+		return runSeatToken(env, args[1:], stdout, stderr)
+	}
 	if len(args) == 0 || args[0] != authStoreTimesName {
 		fmt.Fprintf(stderr, "%sname the sub-verb %s\n%s\n", authPrefix, authStoreTimesName, authUsage)
 		return exitUsage
@@ -173,18 +180,22 @@ func productionAuthEnv(home string) authEnv {
 		Stat:     os.Stat,
 		Keychain: newKeychainTime(sysexec.DefaultRunner, authKeychainWait),
 		GOOS:     runtime.GOOS,
+		Live:     liveRunsOf,
+		Now:      time.Now,
 	}
 }
 
-func runAuthAt(getHome func() (string, error), args []string, stdout, stderr io.Writer) int {
+func runAuthAt(getHome func() (string, error), stdin io.Reader, args []string, stdout, stderr io.Writer) int {
 	home, err := getHome()
 	if err != nil {
 		fmt.Fprintf(stderr, "%sread the home directory: %v\n", authPrefix, err)
 		return exitIO
 	}
-	return runAuthEnv(productionAuthEnv(home), args, stdout, stderr)
+	env := productionAuthEnv(home)
+	env.Stdin = stdin
+	return runAuthEnv(env, args, stdout, stderr)
 }
 
-func runAuth(args []string, _ io.Reader, stdout, stderr io.Writer) int {
-	return runAuthAt(os.UserHomeDir, args, stdout, stderr)
+func runAuth(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	return runAuthAt(os.UserHomeDir, stdin, args, stdout, stderr)
 }
