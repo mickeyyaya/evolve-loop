@@ -8,14 +8,15 @@ import (
 type EventKind string
 
 const (
-	EventPhase       EventKind = "phase"
-	EventSealed      EventKind = "sealed"
-	EventShipped     EventKind = "shipped"
-	EventQuotaPaused EventKind = "quota-paused"
-	EventLoopExit    EventKind = "loop-exit"
-	EventWaveStarted EventKind = "wave-started"
-	EventPool        EventKind = "pool"
-	EventStopped     EventKind = "stopped"
+	EventPhase         EventKind = "phase"
+	EventSealed        EventKind = "sealed"
+	EventShipped       EventKind = "shipped"
+	EventQuotaPaused   EventKind = "quota-paused"
+	EventLoginRequired EventKind = "login-required"
+	EventLoopExit      EventKind = "loop-exit"
+	EventWaveStarted   EventKind = "wave-started"
+	EventPool          EventKind = "pool"
+	EventStopped       EventKind = "stopped"
 )
 
 type Snapshot struct {
@@ -39,6 +40,8 @@ func (e Event) String() string {
 		return fmt.Sprintf("cycle %d: shipped", e.Cycle)
 	case EventQuotaPaused:
 		return fmt.Sprintf("cycle %d: quota-paused in %s", e.Cycle, e.Detail)
+	case EventLoginRequired:
+		return fmt.Sprintf("cycle %d: login-required in %s", e.Cycle, e.Detail)
 	case EventPool:
 		return e.Detail
 	case EventStopped:
@@ -72,6 +75,9 @@ func cycleEvents(old, c Cycle) []Event {
 	}
 	if c.QuotaPauses > old.QuotaPauses {
 		events = append(events, Event{Kind: EventQuotaPaused, Cycle: c.ID, Detail: c.Phase})
+	}
+	if c.LoginWalls > old.LoginWalls {
+		events = append(events, Event{Kind: EventLoginRequired, Cycle: c.ID, Detail: c.Phase})
 	}
 	if c.Verdict == "" && c.Termination != "" && c.Termination != old.Termination {
 		events = append(events, Event{Kind: EventStopped, Cycle: c.ID, Detail: c.Termination})

@@ -14,6 +14,9 @@ type QuotaPause struct {
 	Cycle  int
 	WakeAt string
 	Source string
+
+	Clauses  string
+	NextStep string
 }
 
 type DriverDeps struct {
@@ -125,13 +128,15 @@ func (d *Driver) runBatch(n, pending int, res *Result) (stop bool) {
 
 func (d *Driver) quotaDefer(batch int) {
 	fields := map[string]string{"batch": strconv.Itoa(batch), "cycle": "", "wake_at": "", "source": ""}
+	next := "evolve loop --resume."
 	if qp, ok := d.deps.QuotaPause(); ok {
 		fields["cycle"], fields["wake_at"], fields["source"] = strconv.Itoa(qp.Cycle), qp.WakeAt, qp.Source
-		d.warn(CodeChainQuotaDefer, fmt.Sprintf("batch %d hit the quota wall (cycle=%d wake-at=%s source=%s) — DEFERRING, not relaunching", batch, qp.Cycle, qp.WakeAt, qp.Source), fields)
+		d.warn(CodeChainQuotaDefer, fmt.Sprintf("batch %d ended at a wall: %s (cycle=%d wake-at=%s source=%s) — DEFERRING, not relaunching", batch, qp.Clauses, qp.Cycle, qp.WakeAt, qp.Source), fields)
+		next = qp.NextStep
 	} else {
-		d.warn(CodeChainQuotaDefer, fmt.Sprintf("batch %d hit the quota wall (no checkpoint block on disk) — DEFERRING, not relaunching", batch), fields)
+		d.warn(CodeChainQuotaDefer, fmt.Sprintf("batch %d ended at a wall (no checkpoint block on disk, so no cause was recorded) — DEFERRING, not relaunching", batch), fields)
 	}
-	fmt.Fprintln(d.stderr, "[chain]   the checkpoint is intact; resume when quota resets: evolve loop --resume")
+	fmt.Fprintf(d.stderr, "[chain]   the checkpoint is intact; next: %s\n", next)
 }
 
 func (d *Driver) warn(code signalcenter.Code, reason string, fields map[string]string) {

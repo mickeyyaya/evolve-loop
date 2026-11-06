@@ -182,8 +182,7 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 		}
 		o.normalizeBuildWorktree(ctx, next, cs, req.ProjectRoot)
 		resp, err = o.reviewResumedDeliverable(resumedDeliverable{ctx: ctx, projectRoot: req.ProjectRoot, cycle: cycle, cs: cs, phase: next, runner: runner, req: phaseReq, resp: resp, baseline: phaseBaseline, count: dispatch.countDispatch, predicates: predicates})
-		var blocked resumedBlocker
-		if errors.As(err, &blocked) {
+		if blocked := (resumedBlocker{}); errors.As(err, &blocked) {
 			result, phaseTimings = dispatch.endResumeOnBlocker(next, &dispatchResult{resp: resp, attemptCount: attempts, phaseReq: phaseReq}, blocked.diag, result, phaseTimings, &cursor)
 			break
 		}
@@ -191,6 +190,7 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 			pauseOnQuotaWall()
 			return result, err
 		}
+		dispatch.noteLoginWall(next, walkedWall(err))
 		if ending, ok := resumedEndOutcome(err, next, resp, attempts, cs.PhaseStartedAt); ok {
 			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, ending)
 			o.recordFailureLearning(ctx, failureLearningRequest{

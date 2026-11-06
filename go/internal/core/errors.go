@@ -17,7 +17,7 @@ var (
 
 	ErrAgentDocMissing = errors.New("core: agent persona doc missing")
 
-	ErrAllFamiliesExhausted = errors.New("core: the dispatch chain ended at a quota wall (exit=85)")
+	ErrAllFamiliesExhausted = errors.New("core: the dispatch chain ended at a wall (exit=85)")
 
 	ErrPhaseInvalid = errors.New("core: invalid phase")
 

@@ -1,6 +1,9 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestCycleRunJourney_ALogoutThroughTheRealEntryEndsWithTheLoginSignal":                             "swaps seam wireOrchestratorDepsFn and sets env",
+	"main.TestCycleRunJourney_ARealQuotaWallThroughTheSamePathKeepsItsClass":                                "swaps seam wireOrchestratorDepsFn and sets env",
+	"main.TestCycleRunJourney_AFleetLaneWithAQuotaFamilyAndALoggedOutFamilyReleasesItsClaimAndNamesBoth":    "swaps seam wireOrchestratorDepsFn and sets env",
 	"main.TestRunCycleRun_AFleetLaneWithAPoolWritesTheDeliverableRecordAtShipAndOneWithoutWritesNone":       "swaps seam wireOrchestratorDepsFn and sets env",
 	"main.TestRunCycleRun_PoolReachesTheWiringAsTheRoutingRunPool":                                          "swaps seam wireOrchestratorDepsFn",
 	"main.TestMain_ClearsInheritedCellMarkers":                                                              "reads the process environment",
@@ -508,6 +511,10 @@ var serialTests = map[string]string{
 	"main.TestZeroShipHalt_AWaveWithNoCycleAddsNoEntryAndAnEventOfAnEarlierRunDoesNotCount":                                "stubs the process refresh through a helper",
 	"main.TestZeroShipHalt_TheFloorNeverMovesBackwardAfterAWaveOfOnlyAnOlderResumedCycle":                                  "stubs the process refresh through a helper",
 	"main.TestZeroShipHalt_AFailedShipSourceAddsNoEntryAndMovesNeitherTheWindowNorTheFloor":                                "stubs the process refresh through a helper",
+	"main.TestZeroShipHalt_ALoginWallBesideAnotherFailureKeepsTheDefectItemAndNamesTheLoginCycle":                          "stubs the process refresh through a helper",
+	"main.TestZeroShipHalt_ALoginCycleThatAlsoRejectedIsARealDefectAndNotALoginItem":                                       "stubs the process refresh through a helper",
+	"main.TestZeroShipHalt_ALoginBesideAnyOtherFailureIsARealDefectAndNotALoginItem":                                       "stubs the process refresh through a helper",
+	"main.TestZeroShipHalt_WavesOfOnlyLoginWallsFileALoginItemAndNotAPipelineRepair":                                       "stubs the process refresh through a helper",
 	"main.TestZeroShipHalt_AnUnreadableCycleFileWarnsAndTheWaveIsStillCounted":                                             "stubs the process refresh through a helper",
 	"main.TestZeroShipHalt_AShipAtToBelongsToTheNextWindowAndAShipAtFromToThisOne":                                         "stubs the process refresh through a helper",
 	"main.TestZeroShipHalt_APlantedShippedFlagWithNoJournalEntryCountsNothing":                                             "stubs the process refresh through a helper",
@@ -740,6 +747,7 @@ var serialTests = map[string]string{
 	"main.TestRunLoop_PolicyVerify_RejectsNullTriageCommitment":                                                            "swaps seam wireOrchestratorDepsFn",
 	"main.TestRunLoop_PreflightHalt_AbortsBeforeCycle":                                                                     "swaps seam wireOrchestratorDepsFn",
 	"main.TestRunLoop_QuotaPause_Rc5":                                                                                      "swaps seam wireOrchestratorDepsFn",
+	"main.TestRunLoop_WallPause_Rc5_StopReasonAndWakeHintFollowTheWall":                                                    "swaps seam wireOrchestratorDepsFn",
 	"main.TestRunLoop_ResetErrorLogged":                                                                                    "swaps seam wireOrchestratorDepsFn",
 	"main.TestRunLoop_ResetErrorPathsKeepBasePrefixes":                                                                     "swaps seam wireOrchestratorDepsFn",
 	"main.TestRunLoop_ResetPrunesAtStart":                                                                                  "swaps seam wireOrchestratorDepsFn",

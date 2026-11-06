@@ -53,7 +53,7 @@ func TestQuotaBoundaryCheckpointer_AnUnreadableBudgetSpendsItLoudly(t *testing.T
 		t.Fatalf("err=%v, want the wrapped parse error", err)
 	}
 	pause := readBlock(t, path)
-	if pause.AutoResumeAttempts != pause.AutoResumeMaxAttempts || pause.OperatorAction != autoResumeSpentAction {
+	if pause.AutoResumeAttempts != pause.AutoResumeMaxAttempts || pause.OperatorAction != spentAction(pause) {
 		t.Fatalf("pause=%+v, want the budget spent with the operator action", pause)
 	}
 	if _, admitted, err := RecordResume(path, true); err != nil || admitted {

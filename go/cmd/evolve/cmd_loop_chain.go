@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseintegrity"
@@ -139,13 +140,15 @@ func wiredChain(cfg loopConfig, cc policy.ChainConfig, stdin io.Reader, stdout, 
 		Refresh:     func(batch int) bool { return wiredRefresher(cfg, stderr, signals).Refresh(context.Background(), batch) },
 		LastRefresh: func() (*chainBoundaryRefreshLogEntry, error) { return lastChainBoundaryRefreshLogEntry(cfg.EvolveDir) },
 		FleetWidth:  func() int { return loadFleetConfig(cfg.EvolveDir, stderr, signals).Count },
-		QuotaPause: func() (loopchain.QuotaPause, bool) {
-			qp, ok := detectQuotaPause(cfg.EvolveDir)
-			return loopchain.QuotaPause{Cycle: qp.Cycle, WakeAt: qp.WakeAt, Source: qp.Source}, ok
-		},
+		QuotaPause:  func() (loopchain.QuotaPause, bool) { return chainQuotaPause(cfg.EvolveDir) },
 	}
 	return loopchain.NewDriver(loopchain.Roots{ProjectRoot: cfg.ProjectRoot, EvolveDir: cfg.EvolveDir}, cc, deps, stderr,
 		loopchain.WithSignals(func() *signalcenter.Center { return signals }))
+}
+
+func chainQuotaPause(evolveDir string) (loopchain.QuotaPause, bool) {
+	qp, ok := detectQuotaPause(evolveDir)
+	return loopchain.QuotaPause{Cycle: qp.Cycle, WakeAt: qp.WakeAt, Source: qp.Source, Clauses: qp.clauses(), NextStep: core.WallNextStep(qp.Wall, qp.Workspace)}, ok
 }
 
 func runLoopChain(cfg loopConfig, cc policy.ChainConfig, stdin io.Reader, stdout, stderr io.Writer) (exit int) {

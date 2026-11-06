@@ -11,6 +11,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 	"github.com/mickeyyaya/evolve-loop/go/internal/log"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 type Entry struct {
@@ -65,11 +66,18 @@ const CredentialPattern = "auth_recheck"
 func OperatorAction(family, pattern string) string {
 	switch {
 	case LoginPattern(pattern):
-		return fmt.Sprintf("operator: the %s CLI needs to be logged in again; the bench clears itself once a probe succeeds", family)
+		return fmt.Sprintf("operator: %s; the bench clears itself once a probe succeeds", LoginCommand(family))
 	case pattern == ModelUnsupportedPattern:
 		return fmt.Sprintf("operator: the account cannot run this %s model; re-pin the tier, or accept the fallback; the bench stops binding once the tier resolves to another model", family)
 	}
 	return ""
+}
+
+func LoginCommand(family string) string {
+	if c, ok := policy.LoginCommand(family); ok {
+		return c
+	}
+	return "log in to " + family
 }
 
 const ExhaustedPattern = "exhausted"

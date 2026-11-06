@@ -53,7 +53,9 @@ func (b *loopBatchCoordinator) dispatchSequentialCycle() (sequentialCycle, batch
 func (b *loopBatchCoordinator) handleCycleError(result core.CycleResult, cycleErr error) batchDecision {
 	fmt.Fprintf(b.stderr, "evolve loop: cycle %d: %v\n", result.Cycle, cycleErr)
 	if errors.Is(cycleErr, core.ErrAllFamiliesExhausted) {
-		b.result.emitQuotaPause(b.cfg, result.Cycle, b.stdout, b.stderr)
+		b.result.emitQuotaPause(b.cfg, result, b.stdout, b.stderr)
+		paused, _ := pausedFromCheckpoint(result, b.cfg.EvolveDir)
+		wallPause{result: paused, projectRoot: b.cfg.ProjectRoot, impact: sequentialImpact(b.cfg.ProjectRoot, result.Cycle), origin: "handleCycleError"}.emit(b.deps.Signals)
 		return batchDecision{flow: batchReturn, exitCode: 5}
 	}
 	var cycleFailure *core.ErrCycleLevelFailure

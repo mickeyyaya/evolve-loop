@@ -42,7 +42,7 @@ var autofilers = []autofiler{
 	{"fail-learning floor", nil, inboxbatch.ClassCorrectness, inboxbatch.OriginRetro, remediationItem},
 	{"triage-cap demotion", []string{"internal/triagecap.autoFileDemotionDefect"}, inboxbatch.ClassCorrectness, inboxbatch.OriginCycle, demotionItem},
 	{"goal-stall escalation", []string{"cmd/evolve.writeTo"}, inboxbatch.ClassStability, inboxbatch.OriginCycle, goalStallInboxItem},
-	{"ADR-0072 halt writer", []string{"cmd/evolve.writePipelineEscalation"}, inboxbatch.ClassStability, inboxbatch.OriginCycle, haltItem},
+	{"ADR-0072 halt writer", []string{"cmd/evolve.writeHaltEscalation"}, inboxbatch.ClassStability, inboxbatch.OriginCycle, haltItem},
 	{"unexplained-outcome classifier", []string{"cmd/evolve.fileUnexplainedOutcomeDefect"}, inboxbatch.ClassDebuggability, inboxbatch.OriginCycle, unexplainedOutcomeItem},
 }
 

@@ -17,7 +17,7 @@ func TestIsQuotaWall_AnUndeliveredPromptIsNoWall(t *testing.T) {
 		"a bare exit 85 stays a wall":        {raw, true},
 		"a rate limit is a wall":             {LaunchCause{Cause: "rate_limit", Err: raw}, true},
 		"an undelivered prompt is not":       {LaunchCause{Cause: "unknown_prompt", Err: raw}, false},
-		"a walk around the cause keeps it":   {WalkError{CLIs: []string{"agy-tmux"}, Err: LaunchCause{Cause: "unknown_prompt", Err: raw}}, false},
+		"a walk around the cause keeps it":   {WalkError{Wall: Wall{}.Observe(FamilyEnd{CLI: "agy-tmux"}), Err: LaunchCause{Cause: "unknown_prompt", Err: raw}}, false},
 		"another exit is never a quota wall": {LaunchCause{Cause: "rate_limit", Err: errors.New("bridge: launch exit=81: x")}, false},
 	} {
 		if got := isQuotaWall(tc.err); got != tc.wall {

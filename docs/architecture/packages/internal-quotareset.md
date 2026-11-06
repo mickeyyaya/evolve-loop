@@ -29,7 +29,7 @@ The options have no other fields (2026-10-09: the dead `Env` seam and `HoursFn` 
 
 ### The quota-pause checkpoint (`internal/checkpoint`, `withQuotaReset`)
 
-- **The walked families.** `pauseForQuota` copies the CLIs of the failed walk (`core.WalkError`, from the runner) to `CycleState.QuotaWalkCLIs`. `walkedFamilies` maps them with `llmroute.Family`.
+- **The walked families.** `pauseForQuota` copies the wall of the failed phase to `CycleState.QuotaWall` and to the `quotaWall` field of the checkpoint. The wall is a `core.Wall` with one row for each family, from `core.WalkError`. `core.Wall.Families` gives the walked families. A login row is a family that is not on quota, so it gives no reset time.
 - **The bench evidence.** `earliestQuotaReset` takes the earliest active bench of a walked family whose reason is a quota wall (`clihealth.QuotaPattern`: `rate_limit`, `exhausted`, `quota_exhausted`, `usage_probe`). A credential bench, a boot-timeout strike, a lapsed bench and a bench of another family do not count.
 - **The usage query.** `checkpoint.UsageReset` is a hook. `cmd/evolve` sets it to `productionUsageReset`, which asks the usage screen of each walked family. A family is back when its last exhausted window resets, and the first family back sets the wake time.
 - **An unknown reset.** The checkpoint has no wake time, `autoResumeMaxAttempts` is 0, and `operatorAction` says to resume by hand.

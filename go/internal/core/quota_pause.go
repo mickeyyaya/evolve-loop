@@ -8,11 +8,16 @@ import (
 )
 
 func (cr *cycleRun) pauseForQuota(next Phase, resp PhaseResponse, attempt int, cause error) error {
-	phaseErr := fmt.Errorf("phase %s: %w: the dispatch ended on a quota wall across %d attempts (%v); checkpoint written — resume with `evolve loop --resume` after quota reset", next, ErrAllFamiliesExhausted, attempt, cause)
-	cr.emitQuotaPaused(next, phaseErr)
-	cr.cs.QuotaWalkCLIs = walkedCLIs(cause)
+	wall := walkedWall(cause)
+	phaseErr := fmt.Errorf("phase %s: %w: the dispatch ended at a wall across %d attempts (%v): %s; checkpoint written, next: %s", next, ErrAllFamiliesExhausted, attempt, cause, wall.Clauses(), WallNextStep(wall, cr.cs.WorkspacePath))
+	if wall.CountsAsQuotaPause() {
+		cr.emitQuotaPaused(next, phaseErr, wall)
+	}
+	cr.cs.QuotaWall = wall.Ends
+	cr.result.QuotaWall, cr.result.WallPhase = wall.Ends, string(next)
 	if QuotaBoundaryCheckpointer != nil {
 		if cperr := QuotaBoundaryCheckpointer(cr.cs, cr.req.ProjectRoot, cr.o.now()); cperr != nil {
+			cr.result.WallWriteErr = cperr.Error()
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN quota-boundary checkpoint write failed: %v (defer still recorded; resume may re-run completed phases)\n", cperr)
 		}
 	}
@@ -32,10 +37,26 @@ func (cr *cycleRun) pauseForQuota(next Phase, resp PhaseResponse, attempt int, c
 	return wrapCycleLevelError(next, phaseErr)
 }
 
-func walkedCLIs(cause error) []string {
+func walkedWall(cause error) Wall {
 	var walk WalkError
 	if !errors.As(cause, &walk) {
-		return nil
+		return Wall{}
 	}
-	return walk.CLIs
+	return walk.Wall
+}
+
+func withMergedWall(err error, wall Wall) error {
+	if err == nil || len(wall.Ends) == 0 {
+		return err
+	}
+	return WalkError{Wall: wall, Err: err}
+}
+
+func (cr *cycleRun) noteLoginWall(phase Phase, wall Wall) {
+	if !wall.HasLogin() {
+		return
+	}
+	e := WallReport{Cycle: cr.cycle, Phase: string(phase), Wall: wall, Workspace: cr.cs.WorkspacePath}.FailEvent("cycleRun.noteLoginWall")
+	e.RunID = cr.cs.RunID
+	cr.o.signals.Emit(e)
 }

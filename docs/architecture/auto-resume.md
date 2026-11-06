@@ -103,6 +103,20 @@ line, and exits with `DISPATCH_RC=5`:
 QUOTA-PAUSE: cycle=N wake-at=2026-05-15T05:20:00+0800 source=parsed attempts=0/3
 ```
 
+When a family of the wall needs a login, the loop also prints a
+`LOGIN-REQUIRED:` line. The line holds one clause for each family and the next
+step. The stop reason is `login-required` when any family needs a login. It is
+`quota-pause` when each family is on quota, and `wall-unknown` in each other
+case. A checkpoint that an older version wrote has no `quotaWall` field. Its
+clause says `no cause was recorded for this pause`.
+
+```
+LOGIN-REQUIRED: cycle=N claude needs a login; agy is on quota until 2026-11-06T21:00+08:00. Next: open claude and run /login, or wait for agy at 2026-11-06T21:00+08:00. Then evolve loop --resume.
+```
+
+Time alone does not clear a login. The auto-resume budget does not apply to a
+login row.
+
 `DISPATCH_RC=5` is the v10.6.0 addition to the dispatcher exit-code table
 (0/1/2/3/4 were in use; 5 was free).
 

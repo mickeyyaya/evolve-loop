@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/landing"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shipjournal"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -404,5 +405,127 @@ func TestZeroShipHalt_ABadIntegrationStageWarnsAndTheCountUsesTheShadowRule(t *t
 	}
 	if want := []int{1}; !reflect.DeepEqual(h.entries(), want) {
 		t.Errorf("entries %v, want %v: the shadow rule counts the landed cycle", h.entries(), want)
+	}
+}
+
+func (h *zwHarness) login(id int, at time.Time) {
+	h.t.Helper()
+	c := newRootSignalCenter(h.root, h.evolveDir, io.Discard, signalcenter.WithClock(func() time.Time { return at }))
+	wall := core.Wall{Ends: []core.FamilyEnd{{CLI: "claude", Pattern: "auth_recheck"}}}
+	c.Emit(core.WallReport{Cycle: id, Phase: "audit", Wall: wall, Workspace: filepath.Join(h.evolveDir, "runs", "cycle-"+strconv.Itoa(id))}.PauseEvent("claims released", "test"))
+}
+
+func (h *zwHarness) haltItem(id string) map[string]any {
+	h.t.Helper()
+	raw, err := os.ReadFile(filepath.Join(h.root, ".evolve", "inbox", id+".json"))
+	if err != nil {
+		h.t.Fatalf("inbox item %s: %v", id, err)
+	}
+	var item map[string]any
+	if err := json.Unmarshal(raw, &item); err != nil {
+		h.t.Fatal(err)
+	}
+	return item
+}
+
+func TestZeroShipHalt_WavesOfOnlyLoginWallsFileALoginItemAndNotAPipelineRepair(t *testing.T) {
+	h := newZW(t)
+	h.wantNoHalt(1)
+	h.cycle(13)
+	h.login(13, h.at(30))
+	h.wantNoHalt(60)
+	h.cycle(14)
+	h.login(14, h.at(90))
+	_, halted := h.boundary(120)
+
+	if !halted {
+		t.Fatalf("entries %v, want the halt\n%s", h.entries(), h.stderr.String())
+	}
+	item := h.haltItem("login-required-zero-ship-cycle14")
+	if item["kind"] != "operator-login" || item["priority"] != "P1" {
+		t.Errorf("item = %+v", item)
+	}
+}
+
+func TestZeroShipHalt_ALoginWallBesideAnotherFailureKeepsTheDefectItemAndNamesTheLoginCycle(t *testing.T) {
+	h := newZW(t)
+	h.wantNoHalt(1)
+	h.cycle(13)
+	h.login(13, h.at(30))
+	h.wantNoHalt(60)
+	h.cycle(14)
+	_, halted := h.boundary(120)
+
+	if !halted {
+		t.Fatalf("entries %v, want the halt\n%s", h.entries(), h.stderr.String())
+	}
+	item := h.haltItem("pipeline-defect-zero-ship-cycle14")
+	if item["kind"] != "pipeline-repair" || !strings.Contains(item["summary"].(string), "Cycles 13 ended at a login wall") {
+		t.Errorf("item = %+v", item)
+	}
+}
+
+func (h *zwHarness) reject(id int, at time.Time) {
+	h.t.Helper()
+	c := newRootSignalCenter(h.root, h.evolveDir, io.Discard, signalcenter.WithClock(func() time.Time { return at }))
+	c.Emit(signalcenter.Event{Cycle: id, Phase: "audit", Module: signalcenter.ModuleBridge, Origin: "test", Kind: signalcenter.KindGateRejected, Severity: signalcenter.SeverityWarn, Reason: "audit rejected the build"})
+}
+
+func TestZeroShipHalt_ALoginCycleThatAlsoRejectedIsARealDefectAndNotALoginItem(t *testing.T) {
+	h := newZW(t)
+	h.wantNoHalt(1)
+	h.cycle(13)
+	h.login(13, h.at(30))
+	h.reject(13, h.at(31))
+	h.wantNoHalt(60)
+	h.cycle(14)
+	h.login(14, h.at(90))
+	h.reject(14, h.at(91))
+	_, halted := h.boundary(120)
+
+	if !halted {
+		t.Fatalf("entries %v, want the halt\n%s", h.entries(), h.stderr.String())
+	}
+	item := h.haltItem("pipeline-defect-zero-ship-cycle14")
+	if item["kind"] != "pipeline-repair" {
+		t.Errorf("item = %+v, want the pipeline repair: a rejected audit is a real failure that a login must not hide", item)
+	}
+}
+
+func TestZeroShipHalt_ALoginBesideAnyOtherFailureIsARealDefectAndNotALoginItem(t *testing.T) {
+	cases := map[string][]signalcenter.Event{
+		"failed audit outcome": {{Phase: "audit", Module: signalcenter.ModuleOrchestrator, Origin: "test", Kind: signalcenter.KindPhaseOutcome, Severity: signalcenter.SeverityInfo, Reason: "audit FAIL", Fields: map[string]string{"verdict": "FAIL"}}},
+		"ship error":           {{Phase: "ship", Module: signalcenter.ModuleOrchestrator, Origin: "test", Kind: signalcenter.KindShipError, Severity: signalcenter.SeverityWarn, Reason: "ship failed"}},
+		"system failure":       {{Phase: "build", Module: signalcenter.ModuleOrchestrator, Origin: "test", Kind: signalcenter.KindSystemFailure, Severity: signalcenter.SeverityWarn, Reason: "system failed"}},
+		"aborted audit with a failed seal": {
+			{Phase: "audit", Module: signalcenter.ModuleOrchestrator, Origin: "test", Kind: signalcenter.KindPhaseAborted, Severity: signalcenter.SeverityWarn, Fields: map[string]string{"verdict": "FAIL"}},
+			{Module: signalcenter.ModuleOrchestrator, Origin: "test", Kind: signalcenter.KindCycleSealed, Severity: signalcenter.SeverityInfo, Fields: map[string]string{cyclestate.SealedVerdictField: "FAIL"}},
+		},
+	}
+	for name, events := range cases {
+		t.Run(name, func(t *testing.T) {
+			h := newZW(t)
+			fire := func(id int, at time.Time) {
+				c := newRootSignalCenter(h.root, h.evolveDir, io.Discard, signalcenter.WithClock(func() time.Time { return at }))
+				for _, e := range events {
+					e.Cycle = id
+					c.Emit(e)
+				}
+			}
+			h.wantNoHalt(1)
+			h.cycle(13)
+			h.login(13, h.at(30))
+			fire(13, h.at(31))
+			h.wantNoHalt(60)
+			h.cycle(14)
+			h.login(14, h.at(90))
+			fire(14, h.at(91))
+			if _, halted := h.boundary(120); !halted {
+				t.Fatalf("entries %v, want the halt\n%s", h.entries(), h.stderr.String())
+			}
+			if item := h.haltItem("pipeline-defect-zero-ship-cycle14"); item["kind"] != "pipeline-repair" {
+				t.Errorf("item = %+v, want the pipeline repair", item)
+			}
+		})
 	}
 }

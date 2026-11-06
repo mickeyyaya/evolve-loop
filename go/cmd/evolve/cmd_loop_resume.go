@@ -57,7 +57,9 @@ func runResumeBatch(
 		return 130
 	}
 	if errors.Is(err, core.ErrAllFamiliesExhausted) {
-		lr.emitQuotaPause(cfg, result.Cycle, stdout, stderr)
+		lr.emitQuotaPause(cfg, result, stdout, stderr)
+		paused, _ := pausedFromCheckpoint(result, cfg.EvolveDir)
+		wallPause{result: paused, projectRoot: cfg.ProjectRoot, impact: sequentialImpact(cfg.ProjectRoot, result.Cycle), origin: "runResumeBatch"}.emit(signals)
 		return 5
 	}
 	closeout := result
@@ -87,6 +89,15 @@ func runResumeBatch(
 
 var recordResume = checkpoint.RecordResume
 
+func refusedResumeLines(cycle int, cp checkpoint.Checkpoint, projectRoot string, now time.Time) []string {
+	qp := quotaPauseOf(cycle, cp)
+	qp.Workspace = cycleWorkspace(projectRoot, cycle)
+	if !qp.Wall.HasLogin() && !qp.Wall.HasQuota() && qp.OperatorAction != "" {
+		return []string{fmt.Sprintf("WALL-PAUSE: cycle=%d attempts=%d/%d auto-resume=off: %s", cycle, qp.Attempts, qp.MaxAttempts, qp.OperatorAction)}
+	}
+	return qp.report(now)
+}
+
 func admitResume(cfg loopConfig, rp *core.ResumePoint, lr *loopResult, stdout, stderr io.Writer) bool {
 	cp, admitted, err := recordResume(rp.StatePath, cfg.AutoResume)
 	switch {
@@ -96,7 +107,9 @@ func admitResume(cfg loopConfig, rp *core.ResumePoint, lr *loopResult, stdout, s
 		lr.emitFatal(stdout, stderr, cfg, rp.CycleID)
 		return false
 	case !admitted:
-		fmt.Fprintln(stderr, quotaPauseLine(quotaPauseOf(rp.CycleID, cp), time.Now()))
+		for _, line := range refusedResumeLines(rp.CycleID, cp, cfg.ProjectRoot, time.Now()) {
+			fmt.Fprintln(stderr, line)
+		}
 		lr.StopReason = "auto-resume-refused"
 		lr.emit(stdout)
 		return false

@@ -254,6 +254,10 @@ type quotaPause struct {
 	Attempts       int
 	MaxAttempts    int
 	OperatorAction string
+	Wall           core.Wall
+	Phase          string
+	Workspace      string
+	WallErr        string
 }
 
 const (
@@ -280,6 +284,7 @@ func quotaPauseOf(cycle int, cp checkpoint.Checkpoint) quotaPause {
 		Attempts:       cp.AutoResumeAttempts,
 		MaxAttempts:    cp.AutoResumeMaxAttempts,
 		OperatorAction: cp.OperatorAction,
+		Wall:           core.Wall{Ends: cp.QuotaWall},
 	}
 }
 
@@ -336,8 +341,17 @@ func quotaPauseFromCheckpoint(blob, cp map[string]any) quotaPause {
 	if v, ok := cp["autoResumeMaxAttempts"].(float64); ok {
 		qp.MaxAttempts = int(v)
 	}
+	qp.Phase, _ = cp["resumeFromPhase"].(string)
+	qp.Workspace, _ = blob["workspace_path"].(string)
 	if v, ok := cp["operatorAction"].(string); ok {
 		qp.OperatorAction = v
+	}
+	raw, err := json.Marshal(cp["quotaWall"])
+	if err == nil {
+		err = json.Unmarshal(raw, &qp.Wall.Ends)
+	}
+	if err != nil {
+		qp.Wall, qp.WallErr = core.Wall{}, err.Error()
 	}
 	return qp
 }
@@ -358,13 +372,68 @@ func dirExists(path string) bool {
 	return info.IsDir()
 }
 
-func (lr *loopResult) emitQuotaPause(cfg loopConfig, cycle int, stdout, stderr io.Writer) {
-	if qp, ok := detectQuotaPause(cfg.EvolveDir); ok {
-		fmt.Fprintf(stderr, "%s (all CLI families exhausted mid-cycle)\n", quotaPauseLine(qp, time.Now()))
-	} else {
-		fmt.Fprintf(stderr, "QUOTA-PAUSE: cycle=%d (all CLI families exhausted mid-cycle; checkpoint block missing — resume re-runs from last boundary)\n", cycle)
+func (qp quotaPause) clauses() string {
+	if qp.WallErr != "" {
+		return "the recorded cause could not be read: " + qp.WallErr
 	}
-	fmt.Fprintln(stderr, "[loop]   resume when quota resets: evolve loop --resume")
-	lr.StopReason = "quota-pause"
+	return qp.Wall.Clauses()
+}
+
+func (qp quotaPause) timed(now time.Time) bool {
+	_, ok := qp.resumeDelay(now)
+	return ok
+}
+
+func (qp quotaPause) stopReason(now time.Time) string {
+	return qp.Wall.StopReasonFor(qp.timed(now))
+}
+
+func (qp quotaPause) wallPauseLine(next string, now time.Time) string {
+	delay, ok := qp.resumeDelay(now)
+	if !ok {
+		return fmt.Sprintf("WALL-PAUSE: cycle=%d %s. Next: %s", qp.Cycle, qp.clauses(), next)
+	}
+	return fmt.Sprintf("WALL-PAUSE: cycle=%d wake-at=%s source=%s attempts=%d/%d resume-in=%ds %s. Next: %s",
+		qp.Cycle, qp.WakeAt, qp.Source, qp.Attempts, qp.MaxAttempts, int(delay.Seconds()), qp.clauses(), next)
+}
+
+func (qp quotaPause) report(now time.Time) []string {
+	next := core.WallNextStep(qp.Wall, qp.Workspace)
+	switch {
+	case qp.Wall.HasLogin():
+		lines := []string{fmt.Sprintf("LOGIN-REQUIRED: cycle=%d %s. Next: %s", qp.Cycle, qp.Wall.Clauses(), next)}
+		if qp.Wall.HasQuota() {
+			lines = append(lines, quotaPauseLine(qp, now))
+		}
+		return lines
+	case qp.Wall.HasQuota(), len(qp.Wall.Ends) == 0 && qp.WakeAt != "" && qp.WallErr == "":
+		return []string{fmt.Sprintf("%s (%s)", quotaPauseLine(qp, now), qp.clauses()), "[loop]   next: " + next}
+	}
+	return []string{qp.wallPauseLine(next, now)}
+}
+
+func (lr *loopResult) emitQuotaPause(cfg loopConfig, result core.CycleResult, stdout, stderr io.Writer) {
+	now := time.Now()
+	qp, onDisk := detectQuotaPause(cfg.EvolveDir)
+	switch {
+	case len(result.QuotaWall) > 0 && result.WallWriteErr != "":
+		qp = quotaPause{Cycle: result.Cycle, Wall: core.Wall{Ends: result.QuotaWall}, Phase: result.WallPhase}
+		fmt.Fprintf(stderr, "WALL-PAUSE: cycle=%d the checkpoint write failed: %s; resume re-runs from the last boundary\n", result.Cycle, result.WallWriteErr)
+	case len(result.QuotaWall) > 0:
+		qp.Wall, qp.WallErr, qp.Phase = core.Wall{Ends: result.QuotaWall}, "", result.WallPhase
+		if qp.Cycle == 0 {
+			qp.Cycle = result.Cycle
+		}
+	case !onDisk:
+		qp = quotaPause{Cycle: result.Cycle}
+		fmt.Fprintf(stderr, "WALL-PAUSE: cycle=%d no checkpoint block is on disk, so no cause was recorded; resume re-runs from the last boundary: evolve loop --resume\n", result.Cycle)
+		lr.StopReason = qp.stopReason(now)
+		lr.emit(stdout)
+		return
+	}
+	for _, line := range qp.report(now) {
+		fmt.Fprintln(stderr, line)
+	}
+	lr.StopReason = qp.stopReason(now)
 	lr.emit(stdout)
 }

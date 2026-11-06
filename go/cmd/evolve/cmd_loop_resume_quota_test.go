@@ -25,7 +25,7 @@ type resumedQuotaRunner struct{}
 
 func (resumedQuotaRunner) Name() string { return "audit" }
 func (resumedQuotaRunner) Run(context.Context, core.PhaseRequest) (core.PhaseResponse, error) {
-	return core.PhaseResponse{}, fmt.Errorf("bridge: launch exit=85: %w", core.ErrTransientBridgeFailure)
+	return core.PhaseResponse{}, core.WalkError{Wall: core.Wall{Ends: []core.FamilyEnd{quotaEnd}}, Err: fmt.Errorf("bridge: launch exit=85: %w", core.ErrTransientBridgeFailure)}
 }
 
 func TestRunLoop_ResumeQuotaPauseReturnsFiveAndPreservesCheckpoint(t *testing.T) {
@@ -41,7 +41,7 @@ func TestRunLoop_ResumeQuotaPauseReturnsFiveAndPreservesCheckpoint(t *testing.T)
 	}
 	st := storage.New(evolveDir)
 	ctx := context.Background()
-	cs := core.CycleState{CycleID: 7, RunID: "original-run", Phase: "audit", WorkspacePath: ws}
+	cs := core.CycleState{CycleID: 7, RunID: "original-run", Phase: "audit", WorkspacePath: ws, QuotaWall: []core.FamilyEnd{quotaEnd}}
 	if err := st.WriteState(ctx, core.State{LastCycleNumber: 7}); err != nil {
 		t.Fatal(err)
 	}

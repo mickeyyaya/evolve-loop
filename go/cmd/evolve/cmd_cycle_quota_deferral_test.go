@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
@@ -15,11 +16,12 @@ import (
 func TestCycleRunQuotaExit_AFleetLaneReleasesItsClaimWithTheQuotaDeferralNote(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
+	writeWallCheckpoint(t, filepath.Join(root, ".evolve"), 2104, quotaEnd)
 	claim, pending := claimedInboxItem(t, root, 2104, "deferred-fleet-lane-releases-its-claim")
 	lifecycle := newFakeLedger()
 	var stdout, stderr bytes.Buffer
 
-	code := cycleRunQuotaExit(2104, root, filepath.Join(root, ".evolve"), true, &stdout, &stderr, lifecycle, nil)
+	code := cycleRunQuotaExit(core.CycleResult{Cycle: 2104}, root, filepath.Join(root, ".evolve"), true, &stdout, &stderr, lifecycle, nil)
 
 	if code != fleet.ExitDeferred {
 		t.Errorf("exit = %d, want fleet.ExitDeferred=%d", code, fleet.ExitDeferred)
@@ -34,8 +36,8 @@ func TestCycleRunQuotaExit_AFleetLaneReleasesItsClaimWithTheQuotaDeferralNote(t 
 	if strings.Contains(string(body), "failure_count") {
 		t.Errorf("a quota deferral charged the task: %s", body)
 	}
-	if !lifecycleNotes(lifecycle, laneQuotaDeferredReason) {
-		t.Errorf("no lifecycle record names the quota deferral %q: %+v", laneQuotaDeferredReason, lifecycle.lifecycle)
+	if !lifecycleNotes(lifecycle, laneWallDeferredReason) {
+		t.Errorf("no lifecycle record names the quota deferral %q: %+v", laneWallDeferredReason, lifecycle.lifecycle)
 	}
 	if !strings.Contains(stderr.String(), "claims are pending again") {
 		t.Errorf("stderr does not tell the operator the lane needs no resume: %q", stderr.String())
@@ -54,7 +56,7 @@ func TestCycleRunQuotaExit_ANonFleetCycleKeepsItsClaimForResume(t *testing.T) {
 	claim, pending := claimedInboxItem(t, root, 2105, "sequential-resume-keeps-claim")
 	var stdout, stderr bytes.Buffer
 
-	code := cycleRunQuotaExit(2105, root, filepath.Join(root, ".evolve"), false, &stdout, &stderr, newFakeLedger(), nil)
+	code := cycleRunQuotaExit(core.CycleResult{Cycle: 2105}, root, filepath.Join(root, ".evolve"), false, &stdout, &stderr, newFakeLedger(), nil)
 
 	if code != fleet.ExitDeferred {
 		t.Errorf("exit = %d, want fleet.ExitDeferred=%d", code, fleet.ExitDeferred)
@@ -86,7 +88,7 @@ func TestCycleRunQuotaExit_AReleaseErrorIsReportedAndTheLaneStillDefers(t *testi
 	t.Cleanup(func() { _ = os.Chmod(processing, 0o755) })
 	var stdout, stderr bytes.Buffer
 
-	code := cycleRunQuotaExit(2106, root, filepath.Join(root, ".evolve"), true, &stdout, &stderr, newFakeLedger(), nil)
+	code := cycleRunQuotaExit(core.CycleResult{Cycle: 2106}, root, filepath.Join(root, ".evolve"), true, &stdout, &stderr, newFakeLedger(), nil)
 
 	if code != fleet.ExitDeferred {
 		t.Errorf("exit = %d, want fleet.ExitDeferred=%d", code, fleet.ExitDeferred)
@@ -111,7 +113,7 @@ func TestCycleRunRoot_AFleetLaneOnAQuotaWallReleasesItsClaim(t *testing.T) {
 	if _, err := os.Stat(pending); err != nil {
 		t.Errorf("the walled fleet lane's item is not pending again: %v", err)
 	}
-	if !lifecycleNotes(fake, laneQuotaDeferredReason) {
+	if !lifecycleNotes(fake, laneWallDeferredReason) {
 		t.Errorf("no lifecycle record names the quota deferral: %+v", fake.lifecycle)
 	}
 }
@@ -133,7 +135,7 @@ func TestCycleRunRoot_ACycleRunOutsideAFleetKeepsItsClaimOnAQuotaWall(t *testing
 			if _, err := os.Stat(pending); !errors.Is(err, os.ErrNotExist) {
 				t.Errorf("a manual cycle run put its item back in the queue: %v", err)
 			}
-			if lifecycleNotes(fake, laneQuotaDeferredReason) {
+			if lifecycleNotes(fake, laneWallDeferredReason) {
 				t.Errorf("a manual cycle run wrote a quota-deferral release: %+v", fake.lifecycle)
 			}
 		})
@@ -147,4 +149,41 @@ func lifecycleNotes(l *fakeLedgerNoAppend, reason string) bool {
 		}
 	}
 	return false
+}
+
+func writeCorruptWallCheckpoint(t *testing.T, evolveDir string) {
+	t.Helper()
+	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	raw := `{"cycle_id":9,"checkpoint":{"enabled":true,"reason":"quota-likely","quotaWall":"garbage"}}`
+	if err := os.WriteFile(filepath.Join(evolveDir, "cycle-state.json"), []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCycleRunQuotaExit_AFleetLaneNamesACorruptWallFieldAndNotNoRecord(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	evolveDir := filepath.Join(root, ".evolve")
+	writeCorruptWallCheckpoint(t, evolveDir)
+	var stdout, stderr bytes.Buffer
+
+	cycleRunQuotaExit(core.CycleResult{Cycle: 9}, root, evolveDir, true, &stdout, &stderr, newFakeLedger(), nil)
+
+	if strings.Contains(stderr.String(), "no cause was recorded") || !strings.Contains(stderr.String(), "the recorded cause could not be read") {
+		t.Errorf("a corrupt wall field must read as unreadable, not as no record: %s", stderr.String())
+	}
+}
+
+func TestChainQuotaPause_NamesACorruptWallFieldAndNotNoRecord(t *testing.T) {
+	t.Parallel()
+	evolveDir := filepath.Join(t.TempDir(), ".evolve")
+	writeCorruptWallCheckpoint(t, evolveDir)
+
+	got, _ := chainQuotaPause(evolveDir)
+
+	if !strings.HasPrefix(got.Clauses, "the recorded cause could not be read") {
+		t.Errorf("clauses = %q, want the decode error named", got.Clauses)
+	}
 }

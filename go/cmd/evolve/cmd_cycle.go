@@ -254,7 +254,7 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 		release: laneClaimReleaser(projectRoot, stderr, lifecycleLedger, signals), signals: signals, stderr: stderr}
 	result, err := lane.run(context.Background(), orch, f.request(projectRoot, os.Environ()))
 	if errors.Is(err, core.ErrAllFamiliesExhausted) {
-		return cycleRunQuotaExit(result.Cycle, projectRoot, evolveDir, fleetLaneFromEnv(), stdout, stderr, lifecycleLedger, signals)
+		return cycleRunQuotaExit(result, projectRoot, evolveDir, fleetLaneFromEnv(), stdout, stderr, lifecycleLedger, signals)
 	}
 	if err != nil {
 		return cycleRunErrorExit(err, result.Cycle, projectRoot, evolveDir, stderr, lifecycleLedger, signals)

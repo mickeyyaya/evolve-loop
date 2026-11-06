@@ -146,3 +146,5 @@ func ParseISO(s string) (time.Time, error) {
 func (r Result) Format() string {
 	return fmt.Sprintf("%s\nsource=%s\n", r.ISO, r.Source)
 }
+
+func ParseHint(hint string, now time.Time) (time.Time, bool) { return parseHint(hint, now) }

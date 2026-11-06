@@ -161,3 +161,12 @@ func TestFacts_OutcomeCountsTheReadShipsAndNeverTheFlags(t *testing.T) {
 		t.Errorf("Outcome = %q, want 0 when no ship list was given: the flags of cycles 12 and 13 are forgeable", got)
 	}
 }
+
+func TestFacts_SectionNamesTheLoginWallsOfACycle(t *testing.T) {
+	t.Parallel()
+	f := wave.Facts{Wave: 81, RunID: "r", Cycles: []wave.Cycle{{ID: 1836, Phase: "audit", LoginWalls: 2}}}
+
+	if got := f.Section(); !strings.Contains(got, "Login walls: 2.") {
+		t.Errorf("Section() = %q, want the login wall count", got)
+	}
+}

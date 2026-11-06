@@ -259,3 +259,14 @@ func TestCompute_EmptyHintFile(t *testing.T) {
 		t.Errorf("empty hint should fall through to default, got %q", r.Source)
 	}
 }
+
+func TestParseHint_ReadsAResetClockAndRefusesText(t *testing.T) {
+	t.Parallel()
+	got, ok := ParseHint("resets at 9:00pm", refNow)
+	if !ok || got.Hour() != 21 || got.Minute() != 0 {
+		t.Errorf("ParseHint = %v %v, want 21:00", got, ok)
+	}
+	if _, ok := ParseHint("no hint here", refNow); ok {
+		t.Error("ParseHint accepted text without a reset")
+	}
+}

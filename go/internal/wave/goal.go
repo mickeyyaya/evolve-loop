@@ -57,6 +57,9 @@ func cycleLine(c Cycle) string {
 	if c.QuotaPauses > 0 {
 		parts = append(parts, fmt.Sprintf("Quota pauses: %d.", c.QuotaPauses))
 	}
+	if c.LoginWalls > 0 {
+		parts = append(parts, fmt.Sprintf("Login walls: %d.", c.LoginWalls))
+	}
 	return strings.Join(parts, " ")
 }
 

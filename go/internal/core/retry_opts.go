@@ -96,6 +96,7 @@ func (cr *cycleRun) retryPhaseRunner(phase Phase, req PhaseRequest, opts retryOp
 	var resp PhaseResponse
 	var err error
 	var attemptExits []int
+	var walled Wall
 	for attempt := 1; ; attempt++ {
 		req = cr.countDispatch(phase, req)
 		obsCancel := cr.o.observer.Start(cr.ctx, string(phase), req)
@@ -108,9 +109,10 @@ func (cr *cycleRun) retryPhaseRunner(phase Phase, req PhaseRequest, opts retryOp
 		}
 		if err != nil {
 			attemptExits = append(attemptExits, quotaExit(err))
+			walled = walled.Merge(walkedWall(err))
 			if attempt >= maxAttempts || !IsInfraTeardownError(err) {
 				if opts.quotaExhausted != nil && opts.quotaExhausted(attemptExits) {
-					return resp, attempt, fmt.Errorf("phase %s: %w", phase, quotaWall{err})
+					return resp, attempt, fmt.Errorf("phase %s: %w", phase, quotaWall{withMergedWall(err, walled)})
 				}
 				if opts.backfill != nil {
 					if backfilled, ok := opts.backfill(phase, err, attempt, maxAttempts); ok {
@@ -124,6 +126,7 @@ func (cr *cycleRun) retryPhaseRunner(phase Phase, req PhaseRequest, opts retryOp
 				if opts.postShipObserverSkip != nil && opts.postShipObserverSkip(phase) {
 					return cr.recordPhaseSkip(phase, err, "post_ship_observer_skip", "best-effort observer failed after Ship; skipping"), attempt, nil
 				}
+				cr.noteLoginWall(phase, walled)
 				return resp, attempt, err
 			}
 		} else if attempt >= maxAttempts {

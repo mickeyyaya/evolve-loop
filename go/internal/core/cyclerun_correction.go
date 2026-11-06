@@ -185,6 +185,7 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 				}
 				recordCorrection(interaction.ResultDispatchFailed)
 				phaseErr := fmt.Errorf("phase %q correction %d dispatch failed: %w", next, corr, rerr)
+				cr.noteLoginWall(next, walkedWall(rerr))
 				cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error(), cr.cs.PhaseStartedAt))
 				cr.recordFailureLearning(next, phaseErr, corr)
 				return loopAbort, wrapCycleLevelError(next, phaseErr)

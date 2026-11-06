@@ -137,3 +137,22 @@ func TestChainAwareBenches_Edges(t *testing.T) {
 		})
 	}
 }
+
+func TestQuotaAwareCount_ALoginBenchIsNamedALoginBench(t *testing.T) {
+	t.Parallel()
+	var log strings.Builder
+	benched := map[string]string{"claude": "auth_recheck"}
+
+	got := QuotaAwareCount(3, benched, 2, &log)
+
+	want := `[loop] WARN: fleet: login bench on CLI family "claude" (auth_recheck): wave count 3 -> 2 (min 2)`
+	if got != 2 || !strings.Contains(log.String(), want) || strings.Contains(log.String(), "quota") {
+		t.Errorf("count=%d log=%q, want %q and no word quota", got, log.String(), want)
+	}
+	var info strings.Builder
+	ChainAwareBenches(benched, [][]string{{"claude", "agy"}}, &info)
+	wantInfo := `[loop] INFO: fleet: login bench on CLI family "claude" (auth_recheck) costs no lane: a lane walks to "agy"`
+	if !strings.Contains(info.String(), wantInfo) {
+		t.Errorf("info=%q, want %q", info.String(), wantInfo)
+	}
+}

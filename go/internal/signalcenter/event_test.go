@@ -57,10 +57,10 @@ func TestKind_ClosedSetAndTerminal(t *testing.T) {
 	t.Parallel()
 	terminal := map[Kind]bool{
 		KindPhaseAborted: true, KindGateRejected: true, KindShipError: true, KindSystemFailure: true,
-		KindQuotaPaused: true, KindLoopHalt: true,
+		KindQuotaPaused: true, KindLoginRequired: true, KindLoopHalt: true,
 	}
 	all := []Kind{KindPhaseDispatched, KindPhaseOutcome, KindPhaseAborted, KindGateRejected, KindGateCorrected,
-		KindShipLanded, KindShipError, KindShipWarning, KindShipDelivered, KindLoopWarning, KindAdvisorWarning, KindRunnerWarning, KindInboxWarning, KindAuditWarning, KindSystemFailure, KindQuotaPaused, KindBridgeWarning, KindBridgeTripwire,
+		KindShipLanded, KindShipError, KindShipWarning, KindShipDelivered, KindLoopWarning, KindAdvisorWarning, KindRunnerWarning, KindInboxWarning, KindAuditWarning, KindSystemFailure, KindQuotaPaused, KindLoginRequired, KindBridgeWarning, KindBridgeTripwire,
 		KindPaneLiveness, KindLedgerAppended, KindOutcomeWarning, KindFailureDiagWarning, KindCarryoverWarning, KindFailureLearningWarning, KindConfigWarning, KindObserverWarning, KindGatePassed, KindCycleSealed, KindLoopWave, KindLoopHalt, KindLoopEscalation,
 		KindLoopStarted, KindLoopExit, KindLoopLost, KindListenerPanicked, KindRegistryDrift, KindSinkDropped,
 		KindQualityReading, KindQualityBreach, KindQualityWarning, KindIsolationViolation, KindIsolationContext, KindIsolationRequest, KindIsolationRequestDecision, KindCLIQueueApplied, KindLadderDecision, KindSelfhealIncident, KindSelfhealDecision, KindControlBypass}
@@ -310,5 +310,12 @@ func TestCutRunes_KeepsAPrefixOrNothing(t *testing.T) {
 	}
 	if got := cutRunes("ab", 600); got != "" {
 		t.Errorf("nothing left to keep becomes empty, never a lone ellipsis (the loop's stop): %q", got)
+	}
+}
+
+func TestKindLoginRequired_IsKnownAndTerminal(t *testing.T) {
+	t.Parallel()
+	if KindLoginRequired != "login.required" || !KindLoginRequired.Known() || !KindLoginRequired.Terminal() {
+		t.Errorf("login.required must be a known terminal kind: %q known=%v terminal=%v", KindLoginRequired, KindLoginRequired.Known(), KindLoginRequired.Terminal())
 	}
 }

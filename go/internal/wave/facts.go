@@ -30,23 +30,25 @@ var (
 )
 
 type Cycle struct {
-	ID           int                `json:"id"`
-	Todo         string             `json:"todo,omitempty"`
-	Phase        string             `json:"phase,omitempty"`
-	Verdict      string             `json:"verdict,omitempty"`
-	Termination  string             `json:"termination,omitempty"`
-	Shipped      bool               `json:"shipped"`
-	Resumed      bool               `json:"resumed,omitempty"`
-	QuotaPauses  int                `json:"quota_pauses"`
-	Conflict     bool               `json:"conflict,omitempty"`
-	Spend        cyclespend.Spend   `json:"spend"`
-	LLMVerdict   cyclespend.Verdict `json:"llm_verdict"`
-	HandoffWould int                `json:"handoff_would_stops,omitempty"`
-	HandoffStop  string             `json:"handoff_stop,omitempty"`
-	SpendLimit   string             `json:"spend_limit,omitempty"`
-	StartedAt    time.Time          `json:"-"`
-	EndedAt      time.Time          `json:"-"`
-	failAt       time.Time
+	ID             int                `json:"id"`
+	Todo           string             `json:"todo,omitempty"`
+	Phase          string             `json:"phase,omitempty"`
+	Verdict        string             `json:"verdict,omitempty"`
+	Termination    string             `json:"termination,omitempty"`
+	Shipped        bool               `json:"shipped"`
+	Resumed        bool               `json:"resumed,omitempty"`
+	QuotaPauses    int                `json:"quota_pauses"`
+	LoginWalls     int                `json:"login_walls,omitempty"`
+	FailureSignals int                `json:"failure_signals,omitempty"`
+	Conflict       bool               `json:"conflict,omitempty"`
+	Spend          cyclespend.Spend   `json:"spend"`
+	LLMVerdict     cyclespend.Verdict `json:"llm_verdict"`
+	HandoffWould   int                `json:"handoff_would_stops,omitempty"`
+	HandoffStop    string             `json:"handoff_stop,omitempty"`
+	SpendLimit     string             `json:"spend_limit,omitempty"`
+	StartedAt      time.Time          `json:"-"`
+	EndedAt        time.Time          `json:"-"`
+	failAt         time.Time
 }
 
 func ReadCycles(root string, floor, ceiling int) ([]Cycle, []string) {
@@ -237,10 +239,15 @@ func applySignals(c *Cycle, path string) ([]string, error) {
 			}
 		case signalcenter.KindQuotaPaused:
 			c.QuotaPauses++
+		case signalcenter.KindLoginRequired:
+			c.LoginWalls++
 		case signalcenter.KindShipError:
 			c.Conflict = c.Conflict || shiperr.IsLandingConflict(e.Code)
 		}
 		applyStopSignals(c, e)
+		if failsCycle(e) {
+			c.FailureSignals++
+		}
 		if blocksCycle(e) {
 			c.failAt = earliest(c.failAt, eventTime(e))
 		}
@@ -253,6 +260,14 @@ func applySignals(c *Cycle, path string) ([]string, error) {
 
 func blocksCycle(e signalcenter.Event) bool {
 	return e.Kind == signalcenter.KindGateRejected || (e.Kind == signalcenter.KindPhaseOutcome && e.Fields["verdict"] == "FAIL")
+}
+
+func failsCycle(e signalcenter.Event) bool {
+	return blocksCycle(e) || e.Kind == signalcenter.KindShipError || e.Kind == signalcenter.KindSystemFailure || sealedFail(e)
+}
+
+func sealedFail(e signalcenter.Event) bool {
+	return e.Kind == signalcenter.KindCycleSealed && e.Fields[cyclestate.SealedVerdictField] == "FAIL"
 }
 
 func applyStopSignals(c *Cycle, e signalcenter.Event) {

@@ -397,23 +397,23 @@ func TestDriver_QuotaDeferIsAWarnWithTheCheckpointFields(t *testing.T) {
 	f := newChainFixture(t, 3)
 	f.deps.Batch = func() int { f.batches++; return 5 }
 	f.deps.QuotaPause = func() (QuotaPause, bool) {
-		return QuotaPause{Cycle: 7, WakeAt: "2026-09-14T18:00:00Z", Source: "probe"}, true
+		return QuotaPause{Cycle: 7, WakeAt: "2026-09-14T18:00:00Z", Source: "probe", Clauses: "claude needs a login", NextStep: "open claude and run /login. Then evolve loop --resume."}, true
 	}
 	r := f.run(5)
 	ev := f.sig.only(t, CodeChainQuotaDefer)
 	if r.StopReason != StopQuotaDefer || r.Exit != 5 || f.batches != 1 || resultJSON(t, r) != golden(t, "chain_result_quota_defer.golden.json") ||
-		ev.Kind != signalcenter.KindLoopWarning || ev.Severity != signalcenter.SeverityWarn || ev.Reason != "batch 1 hit the quota wall (cycle=7 wake-at=2026-09-14T18:00:00Z source=probe) — DEFERRING, not relaunching" ||
+		ev.Kind != signalcenter.KindLoopWarning || ev.Severity != signalcenter.SeverityWarn || ev.Reason != "batch 1 ended at a wall: claude needs a login (cycle=7 wake-at=2026-09-14T18:00:00Z source=probe) — DEFERRING, not relaunching" ||
 		ev.Fields["batch"] != "1" || ev.Fields["cycle"] != "7" || ev.Fields["wake_at"] != "2026-09-14T18:00:00Z" || ev.Fields["source"] != "probe" {
 		t.Errorf("rc=5 is a loop.warning WARN with the checkpoint fields: %+v %+v", r, ev)
 	}
-	want := "[chain] batch 1/5 starting — inbox pending=3, fleet lanes=1\n[chain]   the checkpoint is intact; resume when quota resets: evolve loop --resume\n"
+	want := "[chain] batch 1/5 starting — inbox pending=3, fleet lanes=1\n[chain]   the checkpoint is intact; next: open claude and run /login. Then evolve loop --resume.\n"
 	if f.stderr.String() != want {
 		t.Errorf("the hint stays a line: %q", f.stderr.String())
 	}
 	f = newChainFixture(t, 3)
 	f.deps.Batch = func() int { f.batches++; return 5 }
 	f.run(5)
-	if ev := f.sig.only(t, CodeChainQuotaDefer); ev.Reason != "batch 1 hit the quota wall (no checkpoint block on disk) — DEFERRING, not relaunching" || ev.Fields["cycle"] != "" || ev.Fields["batch"] != "1" {
+	if ev := f.sig.only(t, CodeChainQuotaDefer); ev.Reason != "batch 1 ended at a wall (no checkpoint block on disk, so no cause was recorded) — DEFERRING, not relaunching" || ev.Fields["cycle"] != "" || ev.Fields["batch"] != "1" {
 		t.Errorf("no block: the fields are empty: %+v", ev)
 	}
 }
