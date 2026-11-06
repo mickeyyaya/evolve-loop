@@ -33,13 +33,13 @@ table{border-collapse:collapse;width:100%;font-size:.88em}td,th{border:1px solid
 <div class="node"><b>run workspace</b><small>seeded at cycle start</small></div><div class="arrow">→</div>
 <div class="node"><b>scout + triage prompts</b><small>recent_outcomes block</small></div>
 </div>
-<p>At cycle start, a digest of the last N cycles — what shipped, what failed, what keeps recurring — is written into the run workspace (best-effort: a digest failure warns, never blocks). At the <em>enforce</em> stage the digest is injected into scout and triage prompts, positioned after the stable prompt prefix so LLM caching stays warm. Planning now sees history.</p>
+<p>At cycle start, a digest of the last N cycles — what shipped, what failed, what keeps recurring — is written into the run workspace (best-effort: a digest failure warns, never blocks). The cycle run sets the context key <code>recent_outcomes</code> (<code>go/internal/core/cyclerun_chronicle.go</code>), and triage reads it (<code>go/internal/phases/triage/triage.go</code>). The stage that gates injection into scout and triage prompts is not re-verified here; the 2026-07 text said the digest is injected at <em>enforce</em>, after the stable prompt prefix, positioned after the stable prompt prefix so LLM caching stays warm. Planning now sees history.</p>
 
 <h2>Why it exists, and how it got built</h2>
 <p>The canonical meta-defect of this repo: retrospectives kept writing precise diagnoses — "7th occurrence of this pattern" — into lesson files that no planning phase ever read. Signals were captured and then rotted. The chronicle campaign is the delivery mechanism:</p>
 <table>
 <tr><th>Cycle(s)</th><th>Slice</th><th>Story</th></tr>
-<tr><td>698 → 702 <span class="chip pass">PASS</span></td><td>s2 digest writer (<code>recurrence/digest.go</code>)</td><td>The crash orphan: the Jul-11 power loss killed cycle 698 mid-scan; the recovered fleet re-picked the task and landed it in its first healthy wave</td></tr>
+<tr><td>698 → 702 <span class="chip pass">PASS</span></td><td>s2 digest writer (<code>go/internal/recurrence/digest.go</code>, <code>WriteDigest</code>)</td><td>The crash orphan: the Jul-11 power loss killed cycle 698 mid-scan; the recovered fleet re-picked the task and landed it in its first healthy wave</td></tr>
 <tr><td>725 <span class="chip pass">PASS</span></td><td>s3 prompt wiring (cyclerun seeding, scout/triage injection)</td><td>A digest nobody reads changes nothing — this slice makes it planning input</td></tr>
 <tr><td>queued</td><td>s6 escalation boundary · s7 historian · recurrence ledger</td><td>Repeated patterns should escalate weights automatically — the fleet-lane-provisioning-split FAIL ×4 is the standing test case</td></tr>
 </table>
