@@ -16,6 +16,7 @@ const (
 	CodeExitSignalDeath             signalcenter.Code = "BRIDGE_EXIT_SIGNAL_DEATH"
 	CodeExitDriverError             signalcenter.Code = "BRIDGE_EXIT_DRIVER_ERROR"
 	CodeExitModelMismatch           signalcenter.Code = "BRIDGE_EXIT_MODEL_MISMATCH"
+	CodeExitSeatTokenRefused        signalcenter.Code = "BRIDGE_EXIT_SEAT_TOKEN_REFUSED"
 )
 
 func init() {
@@ -28,6 +29,7 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeExitUnknownPrompt, "the auto-responder escalated on an interactive prompt and wrote the escalation report, or a checkpoint corroborated a quota wall (exit 85); transient — one code whatever the pattern, which rides cause_code (rate_limit, model_unsupported, …; unknown_prompt for a prompt nobody recognised)"+common)
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeExitRespondLoopGuard, "the auto-respond loop guard tripped (exit 86); transient"+common)
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeExitModelMismatch, "a tmux REPL booted a model outside the dispatched target's model_family, or showed no readable model label, before the prompt was delivered (exit 87); plain failure that walks the chain to the next CLI; the exit benches nothing by itself, while the usage-evidence decorator's query can bench an exhausted family — BRIDGE_DISPATCH_MODEL_MISMATCH carries the expected and observed families"+common)
+	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeExitSeatTokenRefused, "a claude seat refused to start because the seat token (the holder or the --seat-token-file) is empty, unreadable, not mode 0600, not a seat token, or the seat cannot be confined (exit 88); plain failure, no retry and no family fallback can fix the token; the reason is the pinned text and never holds the token"+common)
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeExitRequiredTierUnavailable, "--require-full was set and the full model tier is unavailable (exit 99); plain failure"+common)
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeExitCommandTimeout, "the driver was killed by a command-level timeout (exit 124, the gnu timeout convention); transient — infra weather, the sibling of 81"+common)
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeExitMissingBinary, "a required external binary is missing (exit 127); deliberately plain — an absent CLI is an environment defect, and the family fallback sees the raw 127"+common)

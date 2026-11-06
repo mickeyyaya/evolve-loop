@@ -63,6 +63,8 @@ func runCLIHealthCanary(ctx context.Context, projectRoot string, probe liveProbe
 			}
 		case rc == bridge.ExitModelMismatch:
 			fmt.Fprintf(stderr, "[loop] cli-health canary: %s booted a model outside its family (exit %d) — bench kept until a probe reaches the family's own model\n", family, rc)
+		case rc == bridge.ExitSeatTokenRefused:
+			fmt.Fprintf(stderr, "[loop] cli-health canary: %s probe refused by the seat token holder (exit %d) — bench kept until a probe reaches the family; run evolve doctor seat\n", family, rc)
 		default:
 			_ = store.Clear(family)
 			fmt.Fprintf(stderr, "[loop] cli-health canary: %s probe failed rc=%d (not a wall) — bench cleared; normal dispatch machinery owns this failure class\n",

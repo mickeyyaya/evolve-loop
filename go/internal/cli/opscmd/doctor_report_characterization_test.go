@@ -82,6 +82,8 @@ func TestDoctorCharacterization_BootReport(t *testing.T) {
 		{"failed empty pane json", false, true, bridge.ExitREPLBootTimeout, "", 1,
 			"{\n  \"driver\": \"claude-tmux\",\n  \"sandbox\": false,\n  \"exit_code\": 80,\n  \"booted\": false\n}\n",
 			"[doctor] BOOT FAILED: claude-tmux rc=80 (sandbox=false)\n"},
+		{"seat token refused", false, false, bridge.ExitSeatTokenRefused, pane, 1, "",
+			"[doctor] BOOT REFUSED: claude-tmux rc=88 (sandbox=false) — the seat token holder refused the launch; run evolve doctor seat for the reason\n"},
 		{"wrong model", false, false, bridge.ExitModelMismatch, pane, 1, "",
 			"[doctor] BOOT WRONG MODEL: claude-tmux rc=87 (sandbox=false) — the REPL booted a model outside the target's model family, or showed no readable model label\n[doctor] final pane:\n" + paneLines(15, 20) + "\n"},
 	}

@@ -73,6 +73,7 @@
 ./internal/redteamcheck
 ./internal/releaseconsistency
 ./internal/runlease
+./internal/seatlogin
 ./internal/selfsha
 ./internal/sessionrecord
 ./internal/setup

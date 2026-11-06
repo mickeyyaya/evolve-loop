@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -27,6 +28,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/specrunner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/reportdoc"
+	"github.com/mickeyyaya/evolve-loop/go/internal/seatlogin"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/subagent"
 )
@@ -56,6 +58,7 @@ type Envelope struct {
 	Worktree     string                   `json:"worktree,omitempty"`
 	Workspace    string                   `json:"workspace,omitempty"`
 	Cloud        *cloudlaunch.Session     `json:"cloud,omitempty"`
+	SeatLogin    string                   `json:"seat_login,omitempty"`
 	Error        string                   `json:"error,omitempty"`
 }
 
@@ -68,6 +71,8 @@ type runOptions struct {
 	asJSON   bool
 	keep     bool
 	root     string
+
+	seatTokenFile string
 }
 
 type standaloneRun struct {
@@ -78,6 +83,8 @@ type standaloneRun struct {
 	input     string
 	worktree  string
 	writable  []string
+
+	seatTokenFile string
 }
 
 type launchOutcome struct {
@@ -92,6 +99,7 @@ type launchOutcome struct {
 	findings   reportdoc.SeverityCounts
 	writer     bool
 	cloudSeat  bool
+	seatLogin  string
 	treeBefore string
 	treeAfter  string
 }
@@ -101,11 +109,17 @@ type launchSpy struct {
 	signals *signalcenter.Center
 	cli     string
 	model   string
+
+	seatTokenFile string
+	seatLogin     string
 }
 
 func (s *launchSpy) Launch(ctx context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
 	s.cli, s.model = req.CLI, req.Model
-	return s.Bridge.Launch(ctx, req)
+	req.SeatTokenFile = s.seatTokenFile
+	resp, err := s.Bridge.Launch(ctx, req)
+	s.seatLogin = resp.SeatLogin
+	return resp, err
 }
 
 func (s *launchSpy) Signals() *signalcenter.Center { return s.signals }
@@ -124,6 +138,7 @@ func parseRun(args []string, stderr io.Writer) (runOptions, error) {
 	fs.Var(&o.writable, "writable", "let a writer change PATH of the worktree (repeatable)")
 	fs.BoolVar(&o.asJSON, "json", false, "print one JSON envelope instead of the report")
 	fs.BoolVar(&o.keep, "keep", false, "keep the run workspace")
+	fs.StringVar(&o.seatTokenFile, "seat-token-file", "", "run this one seat isolated on the token in FILE (mode 0600); the holder stays untouched")
 	fs.StringVar(&o.root, "project-root", "", "project root (default EVOLVE_PROJECT_ROOT or cwd)")
 	if err := fs.Parse(args[1:]); err != nil {
 		return o, refusal{exitUsage, err.Error()}
@@ -143,6 +158,16 @@ func (c command) prepare(args []string, stdin io.Reader, stderr io.Writer) (runO
 		return o, standaloneRun{}, refusal{exitRefused, "refused inside a phase: a phase agent must not start another agent run"}
 	}
 	r := standaloneRun{root: projectRoot(o.root), worktree: o.worktree, writable: o.writable}
+	if strings.Contains(o.seatTokenFile, seatlogin.TokenPrefix) {
+		return o, r, refusal{exitUsage, "--seat-token-file: the value looks like a token, not a path. Write the token to a file at mode 0600, and give the path of that file."}
+	}
+	if o.seatTokenFile != "" {
+		abs, absErr := c.deps.Abs(o.seatTokenFile)
+		if absErr != nil {
+			return o, r, refusal{exitUsage, fmt.Sprintf("--seat-token-file: %v", absErr)}
+		}
+		r.seatTokenFile = abs
+	}
 	if r.spec, err = admit(o, r.root); err != nil {
 		return o, r, err
 	}
@@ -206,12 +231,13 @@ func importLLMCalls(r standaloneRun) (llmcalls.ImportResult, error) {
 }
 
 func (c command) launch(ctx context.Context, r standaloneRun, signals *signalcenter.Center, stderr io.Writer) launchOutcome {
-	spy := &launchSpy{Bridge: c.deps.Bridge(r.root, signals), signals: signals}
+	spy := &launchSpy{Bridge: c.deps.Bridge(r.root, signals), signals: signals, seatTokenFile: r.seatTokenFile}
 	out := launchOutcome{treeBefore: c.treeState(ctx, r.treeDir(), stderr)}
 	out.resp, out.runErr = phasecmd.NewSpecRunner(r.spec, r.root, spy).Run(ctx, r.request())
 	out.treeAfter = c.treeState(context.WithoutCancel(ctx), r.treeDir(), stderr)
 	out.report, out.hasReport = readReport(r)
 	out.cli, out.model, out.family = spy.cli, spy.model, llmroute.Family(spy.cli)
+	out.seatLogin = spy.seatLogin
 	out.writer = len(r.writable) > 0
 	out.cloudSeat = c.deps.CloudSeat(out.cli)
 	switch {
@@ -369,7 +395,7 @@ func emit(o runOptions, r standaloneRun, out launchOutcome, recordPath string, f
 		Profile: r.spec.Name, RunLabel: r.label, Verdict: resp.Verdict, Findings: out.findings, Report: out.report,
 		Model: out.launchedModel(), ModelSource: resp.ModelSource, CostUSD: resp.CostUSD, Tokens: resp.Tokens,
 		DurationMS: resp.DurationMS, Diagnostics: resp.Diagnostics,
-		CLI: out.cli, Family: out.family, LaunchRecord: recordPath, Worktree: r.worktree, Cloud: out.cloudSession(),
+		CLI: out.cli, Family: out.family, LaunchRecord: recordPath, Worktree: r.worktree, Cloud: out.cloudSession(), SeatLogin: out.seatLogin,
 	}
 	if o.keep {
 		env.Workspace = r.workspace

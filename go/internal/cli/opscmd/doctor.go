@@ -11,7 +11,7 @@ import (
 
 func RunDoctor(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
-		fmt.Fprintln(stderr, "evolve doctor: missing subcommand (try: probe <tool> | boot <driver> | live <driver> | plane [root] | versions [--latest] [--json])")
+		fmt.Fprintln(stderr, "evolve doctor: missing subcommand (try: probe <tool> | boot <driver> | live <driver> | plane [root] | seat | versions [--latest] [--json])")
 		return exitUsage
 	}
 	switch args[0] {
@@ -23,6 +23,8 @@ func RunDoctor(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return runDoctorLive(args[1:], stdout, stderr)
 	case "plane":
 		return runDoctorPlane(args[1:], stdout, stderr)
+	case "seat":
+		return runDoctorSeat(stdout, stderr)
 	case "versions":
 		return runDoctorVersions(args[1:], stdout, stderr)
 	default:

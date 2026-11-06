@@ -20,6 +20,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/preflight"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+	"github.com/mickeyyaya/evolve-loop/go/internal/seatlogin"
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
 
@@ -111,6 +112,8 @@ type Options struct {
 
 	LatestRelease func(bin string) (string, error)
 	ReleaseLag    ReleaseLagConfig
+
+	SeatInspect func() seatlogin.Health
 }
 
 type resolved struct {
@@ -152,6 +155,8 @@ type resolved struct {
 
 	latestRelease func(string) (string, error)
 	releaseLag    ReleaseLagConfig
+
+	seatInspect func() seatlogin.Health
 
 	routing *routingOnce
 }
@@ -197,6 +202,7 @@ func resolve(opts Options) (resolved, error) {
 		mcpConfig:            defaultMCPConfigPort(opts.MCPConfig),
 		latestRelease:        opts.LatestRelease,
 		releaseLag:           defaultReleaseLagConfig(opts.ReleaseLag),
+		seatInspect:          opts.SeatInspect,
 		routing:              onceRouting(opts.Routing),
 	}
 	if o.stderr == nil {
@@ -335,6 +341,7 @@ func Run(opts Options) (Result, error) {
 		checkReleaseLag(o),
 		checkOverlayTierSelectors(o),
 		checkCLIRouting(o),
+		checkSeatLogin(o),
 	}
 	r := finalize(checks, o.now())
 	r.CLIVersions = o.versionInventory()
