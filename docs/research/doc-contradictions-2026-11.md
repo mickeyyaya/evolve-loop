@@ -44,7 +44,7 @@ Environment reads are also not measured. `evolve code callers os.Getenv` returne
 | C9 | The rule on LLM control differs from the console. | The digest: "No LLM starts or directs another LLM". ADR-0154 line 10 names `evolve agent run` as the path of the console seat. The console is a Claude Code session, and it briefs and runs seats. | The hard rule has an unstated exception. |
 | C10 | Five designs describe the path to `main`. | ADR-0057, ADR-0078, ADR-0128, ADR-0134 and ADR-0147, with ADR-0159. Each amendment link exists, but all the newest are Proposed. | The answer to "what lands today" needs code reads. |
 | C11 | Withdrawn. The title of ADR-0126 and its counts looked different. | ADR-0126 decision 14: `J_0` is block 1 and `J_3` is block 4, so they are one count. | None. |
-| C12 | The commit path differs from the practice. | The digest and `skills/commit/SKILL.md` name `evolve ship`. The console used a bare commit after the gate. This is a deviation, not a document conflict. | Section 4, row G5. |
+| C12 | The commit path differs from the practice. | The digest and `skills/commit/SKILL.md` name `evolve ship`. The console used a bare commit after the gate. This is a deviation, not a document conflict. | Closed by the operator on 2026-11-06: the console uses `evolve ship`. |
 
 ## 4. Gaps between the documents and the code
 
@@ -54,7 +54,7 @@ Environment reads are also not measured. `evolve code callers os.Getenv` returne
 | G2 | The verdict has more than one grammar. ADR-0033 asks for a single source. | `agentcmd.reportVerdict` uses `statedVerdict` (`go/internal/cli/agentcmd/verdict.go:42`, `:47`). `dashboard.reportVerdict` uses the sentinel, then `parseVerdict` (`go/internal/dashboard/failure.go:133`). On 2026-11-06, run `agent-code-reviewer-20261105T233200Z-ea1f` wrote a fenced `Verdict: PASS` with no finding. It read as FAIL, and the commit gate denied it. The same report had a nonstandard severity table, so the fence is the likely cause and not a proven one. | Real fault. Inbox item `review-verdict-in-a-code-fence-reads-as-fail` |
 | G3 | A documented control has no production constructor, by an earlier trace. | The type is `Oversight` (`go/internal/orchestrator/oversight.go:44`). `docs/operations/wave-operations.md:117` says that the window grows only when the oversight loop reports. The filed item holds the trace, and this research did not repeat it. | Open. Filed item `oversight-has-no-production-constructor` |
 | G4 | The local gates do not predict CI, and the eject signal does not name the gate. | One PR was ejected on `cover changed`, then on `apicover`, then on a table conflict. The first two came from a console floor that skipped `internal/bridge`. The brief read: "the CI of the batch is red". ADR-0161 asks a signal for a cause and a next step. | Real fault, and a console error |
-| G5 | The ship guard does not hold for the console. | `go/internal/guards/ship.go:19` matches `git commit` and `git push` in a Bash command. This session ran both directly on 2026-11-06, and neither was denied. A script wrapper hides them from that match. The cause of the direct pass is not traced. | Open. The operator decides the rule |
+| G5 | The ship guard does not hold for the console. | `go/internal/guards/ship.go:19` matches `git commit` and `git push` in a Bash command. This session ran both directly on 2026-11-06, and neither was denied. A script wrapper hides them from that match. The cause of the direct pass is not traced. | Closed by the operator on 2026-11-06. The console now uses `evolve ship`. The match on a command string stays as it is. |
 | G6 | Specs lag a landing. | `integration-driver.md` still says that PR (b) "is built on the branch", and that PR landed as 6ae4972c3. Its status reads "The operator has not ruled on it". | Status |
 | G7 | A code path of a plan can be stale, but the rate is low. | Paths absent at `origin/main`: plans 1 of 114, research 8 of 299, ADRs 3 of 189 (first path of each line). | Healthy |
 
@@ -72,7 +72,7 @@ The web sources below are mostly practitioner notes and vendor pages. The OpenAI
 | P6 | Batch a merge queue, and bisect a failed batch. | [Trunk](https://docs.trunk.io/merge-queue/batching), [Mergify](https://mergify.com/learn/merge-queue/batching) | The train batches. This research did not test a multi-PR failure. | Unknown |
 | P7 | Keep a constitution, and sync its templates on update. | [Spec Kit guide](https://codemyspec.com/blog/github-spec-kit-guide) | ADR-0145 designs one rule home, and it is Proposed. | Partly |
 
-**The factory measure.** Wave 156 shipped 3 of 9 cycles, with 2.89 audit rounds for each cycle and 3.93 M fresh tokens for each shipped cycle (`evolve wave status`, 2026-11-06). One failed cycle wasted 184.5 minutes. These numbers are from one wave, so they show a level and not a trend.
+**The factory measure.** The outcome line of `evolve wave status` for wave 156 reads 7 of 13 cycles shipped. The cost line of the same report reads 3 of 9, and an older binary read 3 of 9 on both. It gives 2.89 audit rounds for each cycle and 3.93 M fresh tokens for each shipped cycle. So one report holds two counts. One wave shows a level and not a trend.
 
 ## 6. Three options
 
@@ -107,7 +107,7 @@ An existing ratchet shape starts it as a baseline, so that old records need no r
 | 1 | From A | [ADR-0164](../architecture/adr/0164-all-decisions-serve-one-goal-and-one-amendment-resolves-their-conflicts.md) closes C1 to C10 and G6 through notes on the older records. |
 | 2 | B | Build the registry, the check and the current-decisions page behind a baseline. |
 | 3 | B | Link each `enforce` stage to its record, which closes G1. |
-| 4 | Operator | Rule on C12 (G5) and on the rank of `feature`. Overrule any decision of ADR-0164. |
+| 4 | Operator | Rule on the rank of `feature`, and on decisions 9 and 10 of ADR-0164. |
 | 5 | From C | After the weekly usage resets, one seat reads one topic at each boundary and reads each research and plan body in that topic. A verifier checks each finding. This covers the gap of section 2. |
 
 G2, G3 and G4 are code faults, and they follow the normal blocker path. P4 needs its own design.

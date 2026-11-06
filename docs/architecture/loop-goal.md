@@ -47,7 +47,7 @@ ADR-0164 records this map. The numbers 0109 and 0120 do not exist.
 - **Research is the thinnest part.** Six records serve it, and three of them (ADR-0010, ADR-0011, ADR-0017) limit the turns or the searches of a phase. No record asked for research at a repair. ADR-0164 decision 12 starts to close this at the redesign rung.
 - **Heal is designed, and its authority is not yet Accepted.** ADR-0155, ADR-0157 and ADR-0126 read Proposed.
 - **The rank can starve features.** Of 58 ready items on 2026-11-06, 29 have kind `feature` and 4 have class `feature`. The operator decides if the rank changes.
-- **Shipping is low.** Wave 156 shipped 3 of 9 cycles. One wave shows a level and not a trend.
+- **Shipping is moderate.** Wave 156 shipped 7 of 13 cycles. One wave shows a level and not a trend.
 
 ## 5. What runs today
 
