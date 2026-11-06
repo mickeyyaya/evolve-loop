@@ -42,6 +42,7 @@ type waveStatusReport struct {
 	Warnings      []string              `json:"warnings,omitempty"`
 	Held          []heldproposal.Record `json:"held,omitempty"`
 	Benched       []clihealth.Entry     `json:"benched,omitempty"`
+	Seats         []waveSeat            `json:"seats"`
 }
 
 func parseWaveReadArgs(args []string) (projectRoot string, asJSON bool, err error) {
@@ -95,6 +96,9 @@ func buildWaveStatus(env waveEnv, plane wavePlaneDirs, records []wave.Record) wa
 		report.NotesQueued = len(notes)
 	}
 	report.Held, report.Warnings = heldForOperator(plane.evolveDir, report.Warnings)
+	var seatWarnings []string
+	report.Seats, seatWarnings = collectWaveSeats(plane.evolveDir, env.now())
+	report.Warnings = append(report.Warnings, seatWarnings...)
 	report.Benched = activeBenches(clihealth.NewStore(plane.root, env.now))
 	if len(records) == 0 {
 		return report
@@ -163,6 +167,7 @@ func writeWaveStatusText(w io.Writer, r waveStatusReport) {
 	for _, b := range r.Benched {
 		fmt.Fprintf(w, "benched: %s %s until %s\n", b.Key(), b.Reason, b.BenchedUntil.Format(time.RFC3339))
 	}
+	writeWaveSeatsText(w, r.Seats)
 	for _, h := range r.Held {
 		fmt.Fprintf(w, "held:    cycle %d held for operator (tree %s): evolve landing approve|reject --cycle %d --tree %s\n", h.Cycle, h.Tree, h.Cycle, h.Tree)
 	}

@@ -25,6 +25,7 @@ type Snapshot struct {
 	Agent        string    `json:"agent"`
 	Cycle        int       `json:"cycle"`
 	RunID        string    `json:"run_id,omitempty"`
+	StartedAt    time.Time `json:"started_at,omitempty"`
 	Model        string    `json:"model,omitempty"`
 	ModelLabel   string    `json:"model_label,omitempty"`
 	Busy         bool      `json:"busy"`

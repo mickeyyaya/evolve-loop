@@ -205,7 +205,16 @@ A pane that waits for an answer reads `busy-stagnant` or a stall. An operator re
 | `zombie` | The session is gone, and the run is open |
 | `idle` | The deliverable exists |
 
-This is a read-only view. It kills nothing. The host sentinel reads the same states.
+The function `ClassifySeat` in `internal/bridge/panestream` names the state from six facts. The rules apply in this order:
+
+1. A deliverable file that is not older than the start of the pane watch gives `idle`. A deliverable of an earlier round does not count.
+2. A missing session with an open run gives `zombie`. A missing session with a closed run gives `idle`.
+3. A pane at its prompt gives `blocked`.
+4. A busy pane with no output for more than the stall window (10 minutes) gives `stalled`. Other busy panes give `working`.
+
+`wave status` lists the sessions of each seat socket with the `list-sessions` seam. It shows a seat only for a run with a live lease. A socket with no tmux server lists no sessions, so the last session of a socket that died gives `zombie`. Any other list failure never gives `zombie`: the session counts as alive, and `wave status` prints a warning with the socket and the cause.
+
+This is a read-only view. It starts no server, seat or agent, and it sends no key. It runs only the tmux `list-sessions` client. It kills nothing. The host sentinel reads the same states.
 
 ## Guards
 

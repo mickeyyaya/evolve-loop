@@ -51,6 +51,11 @@
 - **apicover anchors in tests.** Some test files hold `var _ … = …` blocks only so `apicover -enforce` finds each exported type and method named in a test AST. The files are `livenesscenter_apicover_test.go` and the conformance blocks in `liveness_conformance_test.go`, `liveness_exhaustion_test.go` and `livenesscenter_exhaustion_test.go`.
 - **The zero `LivenessState` means "not set".** The reviewer pauses on it. It is not a fifth state.
 
+
+### Seat health
+
+`SeatHealth` names the five states of a seat: working, blocked, stalled, zombie and idle. `ClassifySeat` is a pure function of `SeatFacts`. It reads no file and no process. `wave status` builds the facts and prints the state. The rules are in [regression-proof-and-supervision.md](../regression-proof-and-supervision.md) section 9.
+
 ## Invariants
 
 - **Standard library only.** `ansiRE` duplicates `bridge/tmux.go`'s pattern so the package never imports `bridge`.

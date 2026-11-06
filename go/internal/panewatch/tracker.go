@@ -20,6 +20,9 @@ func NewTracker(identity Snapshot) *Tracker {
 
 func (t *Tracker) Observe(f Frame, now time.Time) (Snapshot, bool) {
 	next := t.last
+	if next.StartedAt.IsZero() {
+		next.StartedAt = now
+	}
 	next.Busy, next.TokenLine, next.ModelLabel = f.Busy, f.TokenLine, f.ModelLabel
 	progressed := !t.primed || f.Hash != t.last.ProgressHash
 	if progressed {

@@ -38,8 +38,19 @@ type bridgeSessionRow struct {
 var bridgeSessionsTmux = func(ctx context.Context, socket string) (string, error) {
 	cctx, cancel := context.WithTimeout(ctx, bridgeSessionsTmuxTimeout)
 	defer cancel()
-	out, err := sysexec.Command(cctx, "tmux", "-L", socket, "list-sessions", "-F", "#{session_name}\t#{window_activity}").Output()
+	var stderr strings.Builder
+	cmd := sysexec.Command(cctx, "tmux", "-L", socket, "list-sessions", "-F", "#{session_name} #{window_activity}")
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if reason := strings.TrimSpace(stderr.String()); err != nil && reason != "" {
+		return string(out), fmt.Errorf("%w: %s", err, reason)
+	}
 	return string(out), err
+}
+
+func tmuxServerGone(err error) bool {
+	msg := err.Error()
+	return strings.Contains(msg, "no server running") || strings.Contains(msg, "No such file or directory")
 }
 
 var bridgeLiveSockets = liveLoopSockets
@@ -146,20 +157,28 @@ type sessionActivity struct {
 	drawn       map[string]time.Time
 	socketOf    map[string]string
 	unreachable map[string]bool
+	serverGone  map[string]bool
+	cause       map[string]error
 }
 
 func socketActivity(sockets []string, stderr io.Writer) sessionActivity {
-	act := sessionActivity{drawn: map[string]time.Time{}, socketOf: map[string]string{}, unreachable: map[string]bool{}}
+	act := sessionActivity{drawn: map[string]time.Time{}, socketOf: map[string]string{}, unreachable: map[string]bool{}, serverGone: map[string]bool{}, cause: map[string]error{}}
 	for _, socket := range sockets {
 		out, err := bridgeSessionsTmux(context.Background(), socket)
 		if err != nil {
 			act.unreachable[socket] = true
+			act.serverGone[socket] = tmuxServerGone(err)
+			act.cause[socket] = err
 			fmt.Fprintf(stderr, "evolve bridge sessions: WARN tmux socket %s unreachable: %v\n", socket, err)
 			continue
 		}
 		for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
-			name, ts, ok := strings.Cut(line, "\t")
-			if secs, err := strconv.ParseInt(strings.TrimSpace(ts), 10, 64); ok && err == nil {
+			cut := strings.LastIndexAny(line, " \t")
+			if cut < 0 {
+				continue
+			}
+			name, ts := line[:cut], line[cut+1:]
+			if secs, err := strconv.ParseInt(strings.TrimSpace(ts), 10, 64); err == nil {
 				act.drawn[name], act.socketOf[name] = time.Unix(secs, 0), socket
 			}
 		}
