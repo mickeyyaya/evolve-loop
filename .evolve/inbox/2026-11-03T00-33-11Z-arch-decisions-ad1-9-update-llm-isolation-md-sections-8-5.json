@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "Red test first: `evolve docs ste-lint --strict`, docs-review.",
+    "100% statement coverage on each changed function; zero code comments.",
+    "The spec and package note of the changed package state the change in STE."
+  ],
+  "campaign": "architecture-decisions-2026-11",
+  "created_at": "2026-11-03T00:33:11Z",
+  "files": [
+    "docs/plans/architecture-decisions-2026-11.md"
+  ],
+  "fix": "Update `llm-isolation.md` (sections 8.5 and 9, the I-5 row of section 16) and the hermetic test rule in the test conventions",
+  "id": "arch-decisions-ad1-9-update-llm-isolation-md-sections-8-5",
+  "intake_override": {
+    "reason": "console",
+    "console_route": true
+  },
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "security",
+  "route": "console-manual",
+  "source": "operator decisions 2026-11-03; plan docs/plans/architecture-decisions-2026-11.md component AD1-9",
+  "summary": "Component AD1-9 of the 2026-11-03 architecture decisions plan. Update `llm-isolation.md` (sections 8.5 and 9, the I-5 row of section 16) and the hermetic test rule in the test conventions Stage: none. Size: S. Route: console. Plan: docs/plans/architecture-decisions-2026-11.md; research: docs/research/architecture-decisions-2026-11.md.",
+  "title": "AD1-9: Update llm-isolation.md (sections 8.5 and 9, the I-5 row of section 16) and the hermetic test rule in the test conventions",
+  "weight": 0.8
+}

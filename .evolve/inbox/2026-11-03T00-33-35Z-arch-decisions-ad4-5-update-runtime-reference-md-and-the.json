@@ -1,0 +1,33 @@
+{
+  "acceptance": [
+    "Red test first: docs-review.",
+    "100% statement coverage on each changed function; zero code comments.",
+    "The spec and package note of the changed package state the change in STE."
+  ],
+  "campaign": "architecture-decisions-2026-11",
+  "created_at": "2026-11-03T00:33:35Z",
+  "deps": [
+    "arch-decisions-ad4-4-the-ratchet-step-merges-its-own-pr"
+  ],
+  "files": [
+    "docs/plans/architecture-decisions-2026-11.md"
+  ],
+  "fix": "Update `runtime-reference.md` and the `internal-sizeratchet.md` package note. Promote to `enforce`",
+  "id": "arch-decisions-ad4-5-update-runtime-reference-md-and-the",
+  "intake_override": {
+    "reason": "console; a separate component of docs/plans/architecture-decisions-2026-11.md with its own files, test and stage; the overlap is the shared plan text",
+    "overlaps": [
+      "arch-decisions-ad1-9-update-llm-isolation-md-sections-8-5",
+      "arch-decisions-ad1-10-queued-next-e-the-home-allowlist"
+    ],
+    "console_route": true
+  },
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "route": "console-manual",
+  "source": "operator decisions 2026-11-03; plan docs/plans/architecture-decisions-2026-11.md component AD4-5",
+  "summary": "Component AD4-5 of the 2026-11-03 architecture decisions plan. Update `runtime-reference.md` and the `internal-sizeratchet.md` package note. Promote to `enforce` Stage: `enforce`. Size: XS. Route: console. Plan: docs/plans/architecture-decisions-2026-11.md; research: docs/research/architecture-decisions-2026-11.md.",
+  "title": "AD4-5: Update runtime-reference.md and the internal-sizeratchet.md package note",
+  "weight": 0.8
+}

@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "failure-dossier.json names each postmortem file of the cycle"
+  ],
+  "campaign": "docs/plans/attempt-postmortem-2026-10",
+  "created_at": "2026-11-02T19:17:39Z",
+  "deps": [],
+  "files": [
+    "go/internal/dossier"
+  ],
+  "fix": "Add the postmortem record paths to failure-dossier.json.",
+  "id": "attempt-postmortem-w2-dossier-paths",
+  "kind": "feature",
+  "notes": "",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "source": "console, 2026-11-03, plan audit of docs/plans (operator request: no task overlooked); plan docs/plans/attempt-postmortem-2026-10.md",
+  "summary": "Plan W2 is open (optional); go/internal/dossier holds no postmortem ref.",
+  "title": "Attempt postmortem W2: the failure dossier records the postmortem paths",
+  "weight": 0.2
+}

@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "Red test first: table test with the four pinned pairs.",
+    "100% statement coverage on each changed function; zero code comments.",
+    "The spec and package note of the changed package state the change in STE."
+  ],
+  "campaign": "architecture-decisions-2026-11",
+  "created_at": "2026-11-03T00:33:17Z",
+  "files": [
+    "go/internal/core/failure_digest.go"
+  ],
+  "fix": "Fold `cycle=N`, `cycle-N-<ulid>` suffixes and finding counts in `normalizeReasonForFingerprint`. Pin 2071/2072 and 2049/2051 as must-merge. Pin 2054/2093 and 2073/2089 as must-not-merge",
+  "id": "arch-decisions-ad3-1-fold-cycle-n-cycle-n-ulid-suffixes",
+  "intake_override": {
+    "reason": "console: `internal/core` is protected",
+    "console_route": true
+  },
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "source": "operator decisions 2026-11-03; plan docs/plans/architecture-decisions-2026-11.md component AD3-1",
+  "summary": "Component AD3-1 of the 2026-11-03 architecture decisions plan. Fold `cycle=N`, `cycle-N-<ulid>` suffixes and finding counts in `normalizeReasonForFingerprint`. Pin 2071/2072 and 2049/2051 as must-merge. Pin 2054/2093 and 2073/2089 as must-not-merge Stage: none. Size: XS. Route: console: `internal/core` is protected. Plan: docs/plans/architecture-decisions-2026-11.md; research: docs/research/architecture-decisions-2026-11.md.",
+  "title": "AD3-1: Fold cycle=N, cycle-N-<ulid> suffixes and finding counts in normalizeReasonForFingerprint",
+  "weight": 0.8
+}

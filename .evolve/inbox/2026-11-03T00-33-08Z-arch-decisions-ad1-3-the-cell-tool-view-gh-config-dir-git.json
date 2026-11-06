@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "Red test first: `TestAgentSandboxContract_N8b_ACellGhCallSaysNotLoggedInAndReadsNoHostConfig`, `..._N8c_ACellGitHasNoCredentialHelper`.",
+    "100% statement coverage on each changed function; zero code comments.",
+    "The spec and package note of the changed package state the change in STE."
+  ],
+  "campaign": "architecture-decisions-2026-11",
+  "created_at": "2026-11-03T00:33:08Z",
+  "files": [
+    "go/internal/bridge"
+  ],
+  "fix": "The cell tool view: `GH_CONFIG_DIR`, `GIT_CONFIG_NOSYSTEM`, `GIT_CONFIG_GLOBAL`, `GIT_TERMINAL_PROMPT`, `GIT_SSH_COMMAND` as data in `cfg.Realization.Env`. The bridge writes `<ws>/.cell/gitconfig`",
+  "id": "arch-decisions-ad1-3-the-cell-tool-view-gh-config-dir-git",
+  "intake_override": {
+    "reason": "console: bridge is protected",
+    "console_route": true
+  },
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "security",
+  "route": "console-manual",
+  "source": "operator decisions 2026-11-03; plan docs/plans/architecture-decisions-2026-11.md component AD1-3",
+  "summary": "Component AD1-3 of the 2026-11-03 architecture decisions plan. The cell tool view: `GH_CONFIG_DIR`, `GIT_CONFIG_NOSYSTEM`, `GIT_CONFIG_GLOBAL`, `GIT_TERMINAL_PROMPT`, `GIT_SSH_COMMAND` as data in `cfg.Realization.Env`. The bridge writes `<ws>/.cell/gitconfig` Stage: follows `isolation.i2.stage`. Size: M. Route: console: bridge is protected. Plan: docs/plans/architecture-decisions-2026-11.md; research: docs/research/architecture-decisions-2026-11.md.",
+  "title": "AD1-3: The cell tool view: GH_CONFIG_DIR, GIT_CONFIG_NOSYSTEM, GIT_CONFIG_GLOBAL, GIT_TERMINAL_PROMPT, GIT_SSH_COMMAND as data in cfg.Realization.Env",
+  "weight": 0.8
+}

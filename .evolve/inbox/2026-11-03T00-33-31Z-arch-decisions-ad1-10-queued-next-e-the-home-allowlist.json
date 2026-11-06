@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "Red test first: `TestGenerateSBPL_EnforceDeniesHomeAndGrantsEachHomeRead`.",
+    "100% statement coverage on each changed function; zero code comments.",
+    "The spec and package note of the changed package state the change in STE."
+  ],
+  "campaign": "architecture-decisions-2026-11",
+  "created_at": "2026-11-03T00:33:31Z",
+  "deps": [
+    "arch-decisions-ad1-5-a-separate-stage-for-the-secret"
+  ],
+  "files": [
+    "docs/plans/architecture-decisions-2026-11.md"
+  ],
+  "fix": "Queued next: E, the `$HOME` allowlist from `home_reads`. Measure in `shadow`, then enforce",
+  "id": "arch-decisions-ad1-10-queued-next-e-the-home-allowlist",
+  "intake_override": {
+    "reason": "console; a separate component of docs/plans/architecture-decisions-2026-11.md with its own files, test and stage; the overlap is the shared plan text",
+    "console_route": true
+  },
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "security",
+  "route": "console-manual",
+  "source": "operator decisions 2026-11-03; plan docs/plans/architecture-decisions-2026-11.md component AD1-10",
+  "summary": "Component AD1-10 of the 2026-11-03 architecture decisions plan. Queued next: E, the `$HOME` allowlist from `home_reads`. Measure in `shadow`, then enforce Stage: `shadow` then `enforce`. Size: L. Route: console. Plan: docs/plans/architecture-decisions-2026-11.md; research: docs/research/architecture-decisions-2026-11.md.",
+  "title": "AD1-10: Queued next: E, the $HOME allowlist from home_reads",
+  "weight": 0.8
+}
