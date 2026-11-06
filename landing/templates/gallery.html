@@ -51,7 +51,7 @@
 <main class="wrap">
   <div class="grid">
     {{range $i, $v := .Versions}}
-    <a class="card" href="{{$v.Slug}}/index.html">
+    <a class="card" href="{{$.Root}}{{$v.Slug}}/index.html">
       <div class="thumb" style="background-image:url('{{$.Assets}}/{{$v.Slug}}/hero.png')"></div>
       <div class="body">
         <div class="n">0{{inc $i}}</div>

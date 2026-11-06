@@ -7,7 +7,8 @@
     "oneBreath": "Your AI writes the code. A second AI reviews it. A dependable process, not an opinion, decides if it ships.",
     "license": "Apache-2.0",
     "repo": "github.com/mickeyyaya/evolve-loop",
-    "repoUrl": "https://github.com/mickeyyaya/evolve-loop"
+    "repoUrl": "https://github.com/mickeyyaya/evolve-loop",
+    "siteUrl": "https://mickeyyaya.github.io/evolve-loop/"
   },
   "hero": {
     "headlineLead": "Ship the code your agent wrote — ",

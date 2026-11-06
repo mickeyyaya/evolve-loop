@@ -1498,3 +1498,14 @@
   </div>
 </section>
 {{end}}
+
+{{define "social"}}<link rel="canonical" href="{{.Site.Product.SiteURL}}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="{{.Site.Product.Name}}">
+<meta property="og:title" content="{{.Site.Product.Name}} — {{.Site.Product.MentalModel}}">
+<meta property="og:description" content="{{.Site.Product.OneBreath}}">
+<meta property="og:url" content="{{.Site.Product.SiteURL}}">
+<meta property="og:image" content="{{.Site.Product.SiteURL}}assets/noir/hero.png">
+<meta property="og:image:width" content="1376">
+<meta property="og:image:height" content="768">
+<meta name="twitter:card" content="summary_large_image">{{end}}

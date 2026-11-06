@@ -53,6 +53,7 @@ func config() buildsite.Config {
 		AssetsDir:    "assets",
 		OutDir:       "dist",
 		Gallery:      "gallery",
+		Home:         "noir",
 		RootFiles:    rootFiles,
 		Versions: []buildsite.Version{
 			{Slug: "luminous", Title: "Luminous Minimal", Tagline: "Light, Apple-white, calm authority.", Template: "luminous"},
