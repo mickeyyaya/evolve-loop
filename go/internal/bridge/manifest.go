@@ -103,7 +103,13 @@ type Manifest struct {
 	HomeReads               []string                 `json:"home_reads,omitempty"`
 	ContextWindow           int                      `json:"context_window,omitempty"`
 	CloudLaunch             *CloudLaunchSpec         `json:"cloud_launch,omitempty"`
+	SeatLogin               string                   `json:"seat_login,omitempty"`
 }
+
+const (
+	SeatLoginIsolated = "isolated"
+	SeatLoginStored   = "stored"
+)
 
 type ControlSpec struct {
 	Send            string                 `json:"send"`
@@ -174,16 +180,11 @@ func parseManifestWithStderr(cli string, data []byte, stderr io.Writer) (Manifes
 	if m.ProbeBootRetries < 0 {
 		return Manifest{}, fmt.Errorf("bridge:manifest: probe_boot_retries for cli=%s is %d; it counts retries, so it cannot be negative", cli, m.ProbeBootRetries)
 	}
-	for key, value := range m.DefaultEnv {
-		if !isShellIdentifier(key) {
-			return Manifest{}, fmt.Errorf("bridge:manifest: default_env key %q for cli=%s is not a shell identifier", key, cli)
-		}
-		if isReservedEnvKey(key) {
-			return Manifest{}, fmt.Errorf("bridge:manifest: default_env key %q for cli=%s is reserved: the loop's, the bridge's and the credential variables are not a manifest's to set", key, cli)
-		}
-		if hasControlByte(value) {
-			return Manifest{}, fmt.Errorf("bridge:manifest: default_env value for %q (cli=%s) carries a control byte; it is typed into a pane", key, cli)
-		}
+	if err := validateDefaultEnv(cli, m.DefaultEnv); err != nil {
+		return Manifest{}, err
+	}
+	if m.SeatLogin != "" && m.SeatLogin != SeatLoginIsolated && m.SeatLogin != SeatLoginStored {
+		return Manifest{}, fmt.Errorf("bridge:manifest: seat_login %q for cli=%s is not %s or %s", m.SeatLogin, cli, SeatLoginIsolated, SeatLoginStored)
 	}
 	if err := validateEnvPassthrough(cli, m.EnvPassthrough); err != nil {
 		return Manifest{}, err
@@ -211,6 +212,21 @@ func parseManifestWithStderr(cli string, data []byte, stderr io.Writer) (Manifes
 		}
 	}
 	return m, nil
+}
+
+func validateDefaultEnv(cli string, env map[string]string) error {
+	for key, value := range env {
+		if !isShellIdentifier(key) {
+			return fmt.Errorf("bridge:manifest: default_env key %q for cli=%s is not a shell identifier", key, cli)
+		}
+		if isReservedEnvKey(key) {
+			return fmt.Errorf("bridge:manifest: default_env key %q for cli=%s is reserved: the loop's, the bridge's and the credential variables are not a manifest's to set", key, cli)
+		}
+		if hasControlByte(value) {
+			return fmt.Errorf("bridge:manifest: default_env value for %q (cli=%s) carries a control byte; it is typed into a pane", key, cli)
+		}
+	}
+	return nil
 }
 
 func validateMCPConfigFiles(cli string, entries []string) error {

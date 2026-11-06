@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -11,7 +12,48 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/sandbox"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/seatlogin"
 )
+
+func TestApplySeatGrants_ASymlinkedSeatRootDeniesBothSpellings(t *testing.T) {
+	t.Parallel()
+	realHome, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(t.TempDir(), "home")
+	if err := os.Symlink(realHome, link); err != nil {
+		t.Fatal(err)
+	}
+	spelled := filepath.Join(link, ".evolve-seat")
+	resolved := filepath.Join(realHome, ".evolve-seat")
+	if err := os.MkdirAll(resolved, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	got := applySeatGrants(sandbox.Config{}, SandboxWrapRequest{SeatRoot: spelled}, nil)
+	if !slices.Contains(got.DenyLiterals, spelled) || !slices.Contains(got.DenyLiterals, resolved) {
+		t.Fatalf("DenyLiterals=%v, want %s and %s", got.DenyLiterals, spelled, resolved)
+	}
+}
+
+func TestLaunch_AParameterSeatOnAHostWithNoHolderNamesClearAndNotSet(t *testing.T) {
+	home := seatHome(t)
+	param := filepath.Join(t.TempDir(), "tok")
+	if err := os.WriteFile(param, []byte(seatCanaryToken), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	d := &seatStubDriver{}
+	if rc, err := launchSwept(context.Background(), d, &Config{CLI: "claude-tmux", Agent: "scout", SeatTokenFile: param}, d.deps()); rc != ExitOK || err != nil {
+		t.Fatalf("rc=%d err=%v", rc, err)
+	}
+	got := seatlogin.Inspect(home, seatlogin.OS())
+	if got.State != seatlogin.StateOrphan {
+		t.Fatalf("state=%v: %s", got.State, got.Message)
+	}
+	if !strings.Contains(got.Message, "seat-token clear") || strings.Contains(got.Message, "seat-token set") {
+		t.Fatalf("the next step must name clear and not set: %s", got.Message)
+	}
+}
 
 func seatHolderLaunch(t *testing.T, cli, readStage string) string {
 	t.Helper()

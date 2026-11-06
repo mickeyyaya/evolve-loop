@@ -3,6 +3,8 @@ package main
 var serialTests = map[string]string{
 	"main.TestStatusVerb_ARelativeRootFromTheFlagOrTheVariableIsPrintedAbsolute":                            "changes the process working directory",
 	"main.TestCLIContract_AnAbsentRootIsNeverASilentSuccess":                                                "sets the process environment through contractEnvironment",
+	"main.TestSeatTokenVerbs_ARefusedVerbEmitsNoSignal":                                                     "swaps the process signal sink",
+	"main.TestSeatTokenVerbs_EmitOneSignalWithTheVerbAndTheTimeAndNoToken":                                  "swaps the process signal sink",
 	"main.TestRunCycleRun_AFleetLaneWithAPoolWritesTheDeliverableRecordAtShipAndOneWithoutWritesNone":       "swaps seam wireOrchestratorDepsFn and sets env",
 	"main.TestRunCycleRun_PoolReachesTheWiringAsTheRoutingRunPool":                                          "swaps seam wireOrchestratorDepsFn",
 	"main.TestMain_ClearsInheritedCellMarkers":                                                              "reads the process environment",

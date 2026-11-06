@@ -424,3 +424,14 @@ func capabilityDiagnosis(probe ProbeResult) string {
 	return fmt.Sprintf("the sandbox cannot apply on this runner: binary=%s probe=%q apply error=%v output=%q SBPL=%q",
 		probe.BinaryPath, probe.Reason, err, strings.TrimSpace(string(out)), sbpl)
 }
+
+func TestGenerateSBPL_DenyWritePathsAreSBPLOnly(t *testing.T) {
+	t.Parallel()
+	cfg := Config{RepoRoot: "/repo", WritePaths: []string{"/seat"}, DenyWritePaths: []string{"/seat/holder"}}
+	if !strings.Contains(GenerateSBPL(cfg), `(deny file-write* (subpath "/seat/holder"))`) {
+		t.Fatal("no write deny in the profile")
+	}
+	if strings.Contains(strings.Join(BwrapPrefix(cfg), " "), "/seat/holder") {
+		t.Fatal("a write-only deny reached bwrap")
+	}
+}

@@ -60,14 +60,19 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 			return nil, false
 		}
 		cfg := sandbox.Config{
-			TerminalPath:  req.TerminalPath,
-			RepoRoot:      req.RepoRoot,
-			HomeDir:       home,
-			ReadOnlyRepo:  true,
-			WritePaths:    sandboxWritePaths(req),
-			AllowNetwork:  req.AllowNetwork,
-			DenyPaths:     req.DenyPaths,
-			DenyReadPaths: req.DenyReadPaths,
+			TerminalPath:    req.TerminalPath,
+			RepoRoot:        req.RepoRoot,
+			HomeDir:         home,
+			ReadOnlyRepo:    true,
+			WritePaths:      sandboxWritePaths(req),
+			AllowNetwork:    req.AllowNetwork,
+			DenyPaths:       req.DenyPaths,
+			DenyReadPaths:   req.DenyReadPaths,
+			OmitStoredLogin: req.HostIsolated,
+		}
+		if req.HostIsolated {
+			cfg.DenyReadPaths = append(cfg.DenyReadPaths, storedLoginDeny(home)...)
+			cfg.MaskFiles = existingFiles(filepath.Join(home, storedLoginJSON))
 		}
 		cred := deps.dispatchCredentialDeny(deps.execStage())
 		deps.warnCredentialCoversCell(cred.write, req)
@@ -95,6 +100,7 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 		}
 		cfg.WritePaths = append(cfg.WritePaths, grants...)
 		cfg.WritePaths = append(cfg.WritePaths, gitWrites...)
+		cfg = applySeatGrants(cfg, req, holders)
 		cfg.DenyPaths = append(append([]string{}, cfg.DenyPaths...), gitDenies...)
 		paths := append([]string{cfg.RepoRoot}, cfg.WritePaths...)
 		for i, path := range paths {
@@ -119,10 +125,26 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 			}
 			return nil, false
 		}
-		cfg.DenySockets, cfg.DenyLiterals = sockets, append(append([]string{socketDir}, sockets...), cred.literals...)
+		cfg.DenySockets = sockets
+		cfg.DenyLiterals = append(append(append(slices.Clone(cfg.DenyLiterals), socketDir), sockets...), cred.literals...)
 
 		return osSandboxPrefix(probe.OS, deps, req, cfg)
 	}
+}
+
+func applySeatGrants(cfg sandbox.Config, req SandboxWrapRequest, holders []string) sandbox.Config {
+	if req.SeatRoot == "" {
+		return cfg
+	}
+	real := canonicalOrSelf(req.SeatRoot)
+	cfg.WritePaths = append(slices.Clone(cfg.WritePaths), req.SeatRoot)
+	cfg.ReadOnlyFiles = existingFiles(seatFrozenFiles(real)...)
+	cfg.DenyWritePaths = append(slices.Clone(cfg.DenyWritePaths), holders...)
+	cfg.DenyLiterals = append(slices.Clone(cfg.DenyLiterals), req.SeatRoot)
+	if real != req.SeatRoot {
+		cfg.DenyLiterals = append(cfg.DenyLiterals, real)
+	}
+	return cfg
 }
 
 func osSandboxPrefix(goos string, deps Deps, req SandboxWrapRequest, cfg sandbox.Config) ([]string, bool) {
@@ -214,6 +236,8 @@ func sandboxPrefixForLaunch(deps Deps, cfg *Config, terminalPath string) ([]stri
 		DenyPaths:     cfg.DenyPaths,
 		DenyReadPaths: cfg.DenyReadPaths,
 		WriteSubpaths: cfg.SandboxWriteSubpaths,
+		HostIsolated:  cfg.Decision.HostIsolated,
+		SeatRoot:      cfg.Decision.Dir,
 	})
 }
 
@@ -291,4 +315,28 @@ func sandboxRequiredButUnavailable(deps Deps, cfg *Config, wrapped bool) bool {
 		fmt.Fprintf(deps.Stderr, "[bridge] sandbox requirement unsatisfied: %s\n", reason)
 	}
 	return true
+}
+
+func storedLoginDeny(home string) []string {
+	dir := filepath.Join(home, ".claude")
+	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+		return nil
+	}
+	return []string{dir}
+}
+
+const storedLoginJSON = ".claude.json"
+
+func seatFrozenFiles(seatRoot string) []string {
+	return []string{filepath.Join(seatRoot, storedLoginJSON), filepath.Join(seatRoot, seatSettingsName)}
+}
+
+func existingFiles(candidates ...string) []string {
+	var out []string
+	for _, f := range candidates {
+		if info, err := os.Stat(f); err == nil && info.Mode().IsRegular() {
+			out = append(out, f)
+		}
+	}
+	return out
 }

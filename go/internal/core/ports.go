@@ -205,6 +205,7 @@ type BridgeRequest struct {
 	FreshSession        bool               `json:"fresh_session,omitempty"`
 	BudgetScale         float64            `json:"budget_scale,omitempty"`
 	RequireSandbox      bool               `json:"require_sandbox,omitempty"`
+	SeatTokenFile       string             `json:"seat_token_file,omitempty"`
 	Env                 map[string]string  `json:"env,omitempty"`
 	ExtraFlags          []string           `json:"extra_flags,omitempty"`
 	PermissionMode      string             `json:"permission_mode,omitempty"`
@@ -229,6 +230,7 @@ type BridgeResponse struct {
 	UsageExhausted     bool       `json:"usage_exhausted,omitempty"`
 	CauseCode          string     `json:"cause_code,omitempty"`
 	DispatchID         string     `json:"dispatch_id,omitempty"`
+	SeatLogin          string     `json:"seat_login,omitempty"`
 	PaneCapture        string     `json:"pane_capture,omitempty"`
 	SessionRecoverable bool       `json:"session_recoverable,omitempty"`
 }

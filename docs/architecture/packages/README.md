@@ -272,6 +272,7 @@ Each Go package directory has one page. The page holds what the code cannot say:
 | `internal/detectnested` | detects a nested Claude Code parent from its environment beacons | [internal-detectnested.md](internal-detectnested.md) |
 | `internal/dag` | deterministic dependency leveling shared by the wave planner and the merge train | [internal-dag.md](internal-dag.md) |
 | `internal/phaseorder` | the pipeline phase order from the registry, with a hardcoded fallback | [internal-phaseorder.md](internal-phaseorder.md) |
+| `internal/seatlogin` | decides how a claude seat logs in, from the seat token holder | [internal-seatlogin.md](internal-seatlogin.md) |
 | `internal/selfsha` | the sha256 of a file or of the running executable | [internal-selfsha.md](internal-selfsha.md) |
 | `internal/auditledger` | the one reader of auditor rows in `.evolve/ledger.jsonl` | [internal-auditledger.md](internal-auditledger.md) |
 | `internal/auditcalibration` | a calibration report of auditor narratives against ship-gate outcomes | [internal-auditcalibration.md](internal-auditcalibration.md) |
