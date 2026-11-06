@@ -22,9 +22,6 @@ Start the report with a `## Findings` heading.
 Give each finding in the form of step 4 of the skill, the most severe first.
 Then give the counts line of the skill, and then:
 
-```
-## Verdict
-Verdict: PASS | FAIL
-```
+End the report with the heading `## Verdict` and one line `Verdict: PASS` or `Verdict: FAIL`. Write the report as plain Markdown, never inside a code fence: the run reads the verdict line only outside a fence.
 
 FAIL only on a HIGH finding.

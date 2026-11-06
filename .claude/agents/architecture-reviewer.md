@@ -266,10 +266,9 @@ with the reason — or "None"]
 [if the author could make only one change before merge, which and why —
 or "None: merge as is"]
 
-### Verdict
-Verdict: PASS | WARN | FAIL
-### Recommendation: MERGE | FIX_THEN_MERGE | REDESIGN
 ```
+
+End the report with the heading `### Verdict`, one line `Verdict: PASS`, `Verdict: WARN` or `Verdict: FAIL`, and the heading `### Recommendation: MERGE`, `FIX_THEN_MERGE` or `REDESIGN`. Write the report as plain Markdown, never inside a code fence: the run reads the verdict line only outside a fence.
 
 Rules: every failed check in the three-book audit is at least one HIGH finding.
 An unpinned change or a missing regression test is CRITICAL.

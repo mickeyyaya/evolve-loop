@@ -25,7 +25,16 @@ var (
 	ErrNoCommittedSet = errors.New("no committed set")
 	ErrUnresolvedItem = errors.New("committed item has no readable inbox record")
 	ErrNoPredicates   = errors.New("no predicate found")
+
+	ErrNoRequestForPair = errors.New("no request for pair")
 )
+
+type Site struct {
+	Workspace string
+	Worktree  string
+	Cycle     int
+	Resolve   PathResolver
+}
 
 type PathResolver func(id string) string
 
@@ -61,6 +70,16 @@ func TriageTDD(workspace string, resolve PathResolver) (handoff.Request, error) 
 		items = append(items, item)
 	}
 	return TriageTDDFromItems(items), nil
+}
+
+func ForPair(pair string, site Site) (handoff.Request, error) {
+	switch pair {
+	case PairTriageTDD:
+		return TriageTDD(site.Workspace, site.Resolve)
+	case PairTDDBuild:
+		return TDDBuild(filepath.Join(site.Worktree, "go", "acs", fmt.Sprintf("cycle%d", site.Cycle)))
+	}
+	return handoff.Request{}, fmt.Errorf("%w %s", ErrNoRequestForPair, pair)
 }
 
 func TriageTDDFromItems(items []inboxbatch.Item) handoff.Request {

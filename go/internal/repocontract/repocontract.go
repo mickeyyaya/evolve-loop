@@ -87,6 +87,8 @@ var treeReadingSelections = []TestSelection{
 		"TestComposedApicoverGate_WarningOnlyMissesNewUnnamedExport",
 		"TestConsoleSinkThresholdHasOneHome",
 		"TestEmitLoopWave_ProjectsToTheLeafProducerWithOneRegistrar",
+		"TestHandoffCheck_AFIFOFailuresFileDoesNotHangTheCheck",
+		"TestHandoffCheck_ALinkedLedgerIsRefusedAndItsTargetIsNeverEchoed",
 		"TestHandoffCheck_AnInvalidLedgerIsNamedAndExits1",
 		"TestHandoffCheck_AnUnreadableInputExits2",
 		"TestHandoffCheck_Cycle1946PrintsBlockedWithTheProtectedPath",
