@@ -41,6 +41,9 @@ The commit that lands this record chains to that commit. The landing commit is t
 | 5 | "Make the amendment to resolve the confliction and record all the history with reasoning and actions and activities, the goal is to show the progress of reasoning and secure the chain of evidence" |
 | 6 | "Build the constitution based on the goal I give that all LLM agent need to know the ultimate goal we try to achieve to avoid only on the local optimization" |
 | 7 | "This goal should be the top law that all agents need to follow as it's "constitution" for this project" |
+| 8 | "From this moment forward, you are authorized to utilize the evolve ship with all necessary permissions." |
+| 9 | "Check if we still need them, if yes, try to ship and merge to main", about the open integration PRs. |
+| 10 | "Move the brake to 90% usage" |
 
 ## 3. The progress of the reasoning
 
@@ -54,7 +57,7 @@ The commit that lands this record chains to that commit. The landing commit is t
 | 6 | Score three options. | B wins at 20, against 15 and 14. | The scores are a judgment. Step 1 of the winner takes the fast fix of A, and step 5 takes the reach of C. |
 | 7 | Map each ADR and plan to the goal (request 3). | [loop-goal.md](../architecture/loop-goal.md). | The review question changes from "do they conflict" to "do they serve one goal". Research is the thinnest part. |
 | 8 | Read ADR-0126 again. | Decision 14 already unifies the counts. | C11 is withdrawn as a conflict. The first reading took the title alone. |
-| 9 | Read `skills/commit/SKILL.md` and the `evolve ship` usage. | The sanctioned path is `evolve ship --class manual`. | C12 is not a document conflict. It is a deviation by the console. An amendment must not bless it, so it stays open. |
+| 9 | Read `skills/commit/SKILL.md` and the `evolve ship` usage. | The sanctioned path is `evolve ship --class manual`. | C12 is not a document conflict. It is a deviation by the console. An amendment must not bless it, so it stayed open until the operator ruled (request 8). |
 | 10 | Write ADR-0164 and the notes. | Section 4. | The old text stays, and a note links to the amendment. |
 | 11 | Build the constitution (request 6). Read `docs/architecture/guidance-layers.md` for the path that each agent loads. | [constitution.md](../architecture/constitution.md), two L0 rules. | A new loader needs code, and the operator said docs first. L0 already reaches each CLI file. The rules state a limit, because "serve the goal" can read as a license to skip a gate. |
 | 12 | Fit the rule budget. `evolve guidance check` refused two statements of 33 and 34 words. | Each statement is now at most 25 words. | Words that left a statement moved to its reason text, so no fact was lost. |
@@ -63,6 +66,8 @@ The commit that lands this record chains to that commit. The landing commit is t
 | 15 | Run the docs review, run `agent-docs-review-20261106T001125Z-204c`, on `claude-tmux` after the two agy routes exited 85. | FAIL: 1 HIGH, 5 MEDIUM, 3 LOW. It verified each tree hash and the map of 161 ADRs and 59 plans. | Three findings changed the reasoning. The limit on the law was absent from the digest, so it moved into a rule. Decisions 9 and 10 were stated as facts, and they now ask the operator. The body of the comment rule still said the old rule. |
 | 16 | The same seat quoted the two first rules that it loaded. | Both lines match. | One claude seat carries the law. No agy, codex or ollama seat was tested, so the proof for those is the text in their files. |
 | 17 | The review said that the name in row G3 is absent. | `evolve code find Oversight` returns the type at `oversight.go:44`. | The console had asked about a wrong name, `NewOversight`, and the seat missed the type. Each side corrected one error. |
+| 18 | Read PR 1270. Its eight PRs were open and absent from `main`. | Four landed as PR 1328. Three were re-applied as PRs 1330, 1331 and 1332. | Earlier the console treated that batch as done. A check of each commit against `main` found the gap. PR 1070 is stale, and the boundary step writes a fresh list. |
+| 19 | Run `evolve wave status` with the binary from `main`. | Wave 156 reads 7 of 13, not 3 of 9. | The first figure came from the old plane binary. The cost line of the new report still reads 3 of 9, so the report holds two counts. An inbox item records it. |
 
 ## 4. The actions
 
@@ -89,8 +94,9 @@ The chain must hold these too.
 | A chained command closed PR 1313 in the same step that read a failed review. | The PR closed before its replacement was ready. | Replaced by PR 1319. Read a result before acting on it. |
 | The review helper ran with no seats. | The commit gate refused, and nothing changed. | Checked the tree and the remote, then ran it with seats. |
 | `git rebase --abort` ran during a conflict fix. | The resolution was lost. | Redone with `git rebase --continue`. |
-| Commits used a bare `git commit` and `git push` after the gate. | Item C12. The skill names `evolve ship --class manual`. | Open. The operator decides. |
+| Commits used a bare `git commit` and `git push` after the gate. | Item C12. The skill names `evolve ship --class manual`. | Closed: the operator authorized `evolve ship`. The output of the first such commit read `shipped manual at 715c614d4`. |
 | The first summary of a review counted quoted numbers as findings (1 CRITICAL, 4 HIGH). | The report held one HIGH. | Read the report body. |
+| A rename of a test helper to satisfy a detector broke the build. The console had read only the last line of a test run. | The floor ran 40 minutes on a broken tree. | Reverted, and the two tests joined the list that the detector names. |
 | The research cited a wrong symbol, two wrong lines and a count of 12 that held two withdrawn items. | The docs review found them. | Corrected before the landing. |
 
 ## 6. Related landings in the same period

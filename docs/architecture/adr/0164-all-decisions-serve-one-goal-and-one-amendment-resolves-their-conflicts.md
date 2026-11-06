@@ -40,12 +40,15 @@ The top law gives an agent no power to cross a limit. The operator asked for a s
 
 | Id | Item | Why it stays open |
 |---|---|---|
-| C12, G5 | `evolve ship --class manual` is the sanctioned commit path of `skills/commit/SKILL.md`, and the console used a bare `git commit` and `git push` after the gate. | A rule changed to fit the practice hides a deviation. The rule stays, and the operator decides. |
 | Priority | The policy ranks `feature` fifth of eight classes and `security` last. Of 58 ready items, 29 have kind `feature` and 4 have class `feature`. | This changes what the loop builds. The operator decides. |
 | P4 | Holdout scenarios | It needs a design of its own. |
 | G2, G3, G4 | Verdict grammar, the oversight constructor, the eject signal | These are code faults. They follow the blocker path after this PR. |
 
 C11 needs no change: ADR-0126 decision 14 states that `J_0` is block 1 and `J_3` is block 4, so the counts are one count.
+
+## Closed after this ADR
+
+C12 and G5 are closed. The operator, on 2026-11-06: "From this moment forward, you are authorized to utilize the evolve ship with all necessary permissions." The console now commits through `evolve ship --class manual`, and the ledger records that reason. The rule stays as written.
 
 ## Rejected options
 
