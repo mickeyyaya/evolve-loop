@@ -1,43 +1,57 @@
 # Contributing to Evolve Loop
 
-Thanks for your interest in contributing! This guide covers how to add agents, modify phases, or fix bugs.
+Thank you for your interest. You do not need to learn the whole pipeline to help. A normal pull request or a good issue is enough.
 
-## Getting Started
+## Good places to start
+
+| You have | You can |
+|---|---|
+| 10 minutes | Star the repository, or fix a broken link or a wrong sentence in the docs. |
+| 1 hour | Run `/evo:loop --cycles 1` on your own repository, and open an issue that tells us what it caught and what it missed. |
+| An afternoon | Fix a flaky test from the [open issues](https://github.com/mickeyyaya/evolve-loop/issues), or take a [good first issue](https://github.com/mickeyyaya/evolve-loop/labels/good%20first%20issue). |
+| A few days | Add a CLI family through a manifest in `go/internal/bridge/manifests/`, or help the Linux sandbox (bubblewrap) express the Git metadata writes of a linked worktree. |
+
+**A way to game the pipeline is the most valuable report.** Tell us the cycle number, the relevant reports, what you expected and what shipped.
+
+## Getting started
+
+You need Go, git and tmux. To run a full cycle, you also need one supported LLM CLI.
 
 ```bash
 git clone https://github.com/mickeyyaya/evolve-loop.git
-cd evolve-loop
-evolve install
+cd evolve-loop/go
+go test -count=1 ./internal/...
 ```
 
-## Contribution Types
+Use `-count=1`, because the test cache does not see the files that tests read through `..`. A full run of `./cmd/evolve` takes many minutes, so run the packages that you change.
 
-### 1. Agents
+## The rules that CI enforces
 
-Agent definitions live in `agents/` as Markdown files with YAML frontmatter. See `docs/writing-agents.md` for the full guide.
+CI checks these rules, so it helps to know them before you start:
 
-Current agents: Scout, Builder, Auditor, Orchestrator. (The Operator in `agents/evolve-operator.md` is a post-cycle health monitor, not one of the four pipeline agents.)
+- **Tests first.** A bug fix has a test that fails without the fix.
+- **Coverage.** `evolve cover changed` refuses a changed function below 100% coverage.
+- **No comments in code.** The commit gate refuses an added comment, except a line that a tool reads and the one package doc. Names, types and tests give the intent.
+- **Plain English in docs.** `evolve docs ste-lint` checks new documentation text against the house rules for ASD-STE100 Simplified Technical English.
+- **No feature flags, and no control values from the environment.** A setting lives in `.evolve/policy.json`.
 
-### 2. Phases
+If a rule stops you, open the pull request anyway and say so. A maintainer can help.
 
-Phase instructions live in `skills/loop/phases.md`. When modifying:
-- Update the architecture diagram in `SKILL.md`
-- Update `memory-protocol.md` if adding new workspace files
-- Update the agent table in `SKILL.md`
+## Contribution types
 
-### 3. Eval System
+### Agents
 
-Eval definitions and the eval runner live in `skills/loop/eval-runner.md`.
-- Eval definitions are created by the Scout agent at runtime
-- The eval runner is orchestrator-executed (not a separate agent)
-- Max 3 retry attempts before failure
+Agent definitions live in `agents/` as Markdown files with YAML frontmatter.
 
-### 4. Bug Fixes
+### Phases
 
-- Reference the issue number in your PR
-- Test with at least one `/evo:loop --cycles 1` run on a sample project
+The phase instructions live in `skills/loop/phases.md`. When you change a phase, also update the architecture diagram in `skills/loop/SKILL.md`. If you add a workspace file, update `skills/loop/memory-protocol.md`.
 
-### 5. Research notes & design references
+### Evals
+
+The eval runner lives in `skills/loop/eval-runner.md`. The scout agent writes the eval definitions at runtime.
+
+### Research notes & design references
 
 evolve-loop maintains two content surfaces:
 
@@ -56,13 +70,14 @@ Cross-references count even if the doc isn't loaded into every cycle's context �
 
 **For agents writing research citations during cycles:** the Knowledge Stewardship Rule (AGENTS.md §9) requires that every learned/applied/verified citation be persisted — runtime references to `docs/research/`, archival dossiers to `knowledge-base/research/` — if not already present. Scout adds the entry; Builder cross-references it from build-report.md; Auditor verifies it exists.
 
-## Pull Request Process
+## Pull request process
 
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feat/my-contribution`
-3. Make your changes
-4. Test by running `evolve install` and executing `/evo:loop 1` on a test project
-5. Submit a PR with summary, phase impact, and test results
+1. Fork the repository, and create a feature branch.
+2. Make your change, with a test if it changes code.
+3. Run the tests of the packages that you changed.
+4. Open a pull request. Give a summary, the phases that it touches and your test results.
+
+You do not need to run `evolve ship` or the commit gate. Those are for the maintainers and the loop. A maintainer reviews your pull request and lands it at a wave boundary, so a merge can take some time.
 
 ## Code of Conduct
 
