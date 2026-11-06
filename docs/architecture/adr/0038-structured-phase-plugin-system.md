@@ -1,5 +1,7 @@
 # ADR-0038: Structured Phase Plugin System — Index, Multi-Root Discovery, Conversational Registration
 
+> **Note (2026-11-06):** Amended by [ADR-0124](0124-code-review-phase.md) (Proposed): a user phase may be pinned by `conditional_mandatory`, and may declare report grammars. Amended by [ADR-0125](0125-audit-publishes-its-evaluation-contract.md) (Proposed): a second pinned phase (`audit-plan`) and a second grammar (`audit-expectations`).
+
 - Status: Accepted
 - Date: 2026-06-05
 - Extends: ADR-0035 (spec-derived deliverable contracts), ADR-0034 (unified deliverable contract), ADR-0024 (dynamic phase routing / PhaseAdvisor)

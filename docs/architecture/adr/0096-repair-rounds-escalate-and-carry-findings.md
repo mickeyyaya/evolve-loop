@@ -1,6 +1,10 @@
 # ADR-0096 — Repair rounds escalate tier and effort, and carry the auditor's findings
 
+> **Note (2026-11-06):** Amended by [ADR-0124](0124-code-review-phase.md) (Proposed): the audit-repair machinery generalizes into one findings-driven repair keyed by judge. Amended by [ADR-0125](0125-audit-publishes-its-evaluation-contract.md) (Proposed): at enforce, the repair brief gains a criterion-keyed section.
+
 > **Note (2026-11-06, [ADR-0164](0164-all-decisions-serve-one-goal-and-one-amendment-resolves-their-conflicts.md)):** ADR-0093 supersedes the base of this record, ADR-0092. The rule on tier and effort stays.
+
+> **Note (2026-11-06, [ADR-0126](0126-every-iterative-loop-converges-or-escalates.md)):** The first-repair tier raise stays as rung 0 of the shared ladder. ADR-0126 adds a judge effort raise and a fresh-context fixer at the final round.
 
 > **Changed 2026-10-08:** `Profile.effort_overrides` is retired. The effort of a tier now lives in `.evolve/policy.json` `cli_routing.tiers.<tier>.effort` ([opus55-effort-config-2026-10.md](../../plans/opus55-effort-config-2026-10.md)). An escalation to a tier takes that tier's effort.
 

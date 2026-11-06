@@ -390,25 +390,27 @@ None. On 2026-10-09 the operator decided OQ1, OQ3, OQ4 and OQ6 (§4, O10 to O13)
 
 ## 16. Status
 
+The operator ruled on 2026-11-06: the train of ADR-0147 is the target. So the rows that the quarantined item `landing-plans-reconcile-with-adr-0147` held read as superseded.
+
 | # | Status |
 |---|---|
-| Q0 | ◐ the dossier, ADR-0128, the spec and this plan are written in `dev/cl-landing-queue`, with the operator decisions of 2026-10-09 and review fix round 1; not staged |
-| Q1 | ☑ `internal/derived` and the rewire of the normalizer and the rebase. The nine named tests pass. Committed on branch `feat/landing-q1-derived`; it lands in the next boundary train. |
+| Q0 | ☑ merged; the dossier, ADR-0128, the spec and this plan are in main |
+| Q1 | ☑ `internal/derived` and the rewire of the normalizer and the rebase. The nine named tests pass. `internal/derived` is in main. |
 | Q3 | ☑ `internal/overlap`: `Prove`, the zones, the closure, the evidence digest and the `go list` adapter, at 100% coverage. Merged in the wave 89 train (#829). It is unwired. |
 | Q12 | ☑ the continuation lane reaches the identity proof; the route is Audit, not Ship (D53). Merged in the wave 89 train (#832). |
 | Q2 | ☐ not started. Admission by cell (O3 of ADR-0139) took the dispatch partition role. The reconcile item `landing-plans-reconcile-with-adr-0147` decides the final status. |
-| Q4 | ☐ not started. Absorbed into the compose engine I2 of ADR-0147 (item `wave-integration-i2-compose-engine`). Superseded by ADR-0147 (proposed), see item `landing-plans-reconcile-with-adr-0147`. |
+| Q4 | ☐ not started. Absorbed into the compose engine I2 of ADR-0147 (item `wave-integration-i2-compose-engine`). Superseded by ADR-0147 (proposed), operator ruling of 2026-11-06. |
 | Q5 | ☐ not started. The affected set of the batch test I3b of ADR-0147 needs the test selection. The reconcile item `landing-plans-reconcile-with-adr-0147` decides the final status. |
-| Q6 | ☐ not started. Superseded by ADR-0147 (proposed), see item `landing-plans-reconcile-with-adr-0147`: the integration engine orders the deliverables, and a lane no longer queues to land. |
-| Q7 | ☐ not started. Absorbed into the batch test I3b of ADR-0147 (item `wave-integration-i3b-batch-test`). Superseded by ADR-0147 (proposed), see item `landing-plans-reconcile-with-adr-0147`. |
+| Q6 | ☐ not started. Superseded by ADR-0147 (proposed), operator ruling of 2026-11-06: the integration engine orders the deliverables, and a lane no longer queues to land. |
+| Q7 | ☐ not started. Absorbed into the batch test I3b of ADR-0147 (item `wave-integration-i3b-batch-test`). Superseded by ADR-0147 (proposed), operator ruling of 2026-11-06. |
 | Q8 | ☐ not started. The identity of ADR-0147 is the cycle trailer plus the patch-id (item `wave-integration-i0-deliverable-record`). The reconcile item `landing-plans-reconcile-with-adr-0147` decides the final status. |
 | Q9 | ☐ not started. The reconcile item `landing-plans-reconcile-with-adr-0147` decides the final status. |
 | Q10 | ☐ not started. The reconcile item `landing-plans-reconcile-with-adr-0147` decides the final status. |
 | Q11 | ☐ not started. The codes of ADR-0147 are `SHIP_INTEGRATION_*` (item `wave-integration-i0-deliverable-record`). The reconcile item `landing-plans-reconcile-with-adr-0147` decides the final status. |
-| Q13 | ☐ not started. Superseded by ADR-0147 (proposed), see item `landing-plans-reconcile-with-adr-0147`: the shadow stage of the integration engine replaces it. |
-| Q14 | ☐ not started. Superseded by ADR-0147 (proposed), see item `landing-plans-reconcile-with-adr-0147`: at enforce, a fleet lane does not land. |
-| Q15 | ☐ not started. Superseded by ADR-0147 (proposed), see item `landing-plans-reconcile-with-adr-0147`: no lane waits in a queue to land. |
-| Q16 | ☐ not started. Superseded by ADR-0147 (proposed), see item `landing-plans-reconcile-with-adr-0147`. |
-| Q17 | ☐ not started. Superseded by ADR-0147 (proposed), see item `landing-plans-reconcile-with-adr-0147`: `evolve wave integration status` (item `wave-integration-i8-status-verb`) replaces the queue verbs. |
+| Q13 | ☐ not started. Superseded by ADR-0147 (proposed), operator ruling of 2026-11-06: the shadow stage of the integration engine replaces it. |
+| Q14 | ☐ not started. Superseded by ADR-0147 (proposed), operator ruling of 2026-11-06: at enforce, a fleet lane does not land. |
+| Q15 | ☐ not started. Superseded by ADR-0147 (proposed), operator ruling of 2026-11-06: no lane waits in a queue to land. |
+| Q16 | ☐ not started. Superseded by ADR-0147 (proposed), operator ruling of 2026-11-06. |
+| Q17 | ☐ not started. Superseded by ADR-0147 (proposed), operator ruling of 2026-11-06: `evolve wave integration status` (item `wave-integration-i8-status-verb`) replaces the queue verbs. |
 | Q18 | ☐ not started. The reconcile item `landing-plans-reconcile-with-adr-0147` decides the final status. |
-| Q19 | ☐ not started. Superseded by ADR-0147 (proposed), see item `landing-plans-reconcile-with-adr-0147`: the flip of `fleet.integration.stage` (item `wave-integration-i9-enforce-flip`) retires the per-lane landing. |
+| Q19 | ☐ not started. Superseded by ADR-0147 (proposed), operator ruling of 2026-11-06: the flip of `fleet.integration.stage` (item `wave-integration-i9-enforce-flip`) retires the per-lane landing. |

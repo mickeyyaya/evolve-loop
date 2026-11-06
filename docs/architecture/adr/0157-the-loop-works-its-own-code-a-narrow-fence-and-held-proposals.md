@@ -3,11 +3,12 @@
 - **Status:** Proposed (2026-10-27). It amends [ADR-0155](0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md) decisions 6 and 15.
 - **Amended by:** [ADR-0158](0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md) (Accepted, 2026-10-27). When a cycle works a held proposal, a fence path in a finding is not a hand-off finding. An `audit_fix` patch on that path joins the held proposal (decisions 8 to 10).
 - **Plan:** [narrow-fence-2026-10](../../plans/narrow-fence-2026-10.md). **Research:** [narrow-fence-2026-10](../../research/narrow-fence-2026-10.md). **Design:** [narrow-fence-and-held-proposals](../narrow-fence-and-held-proposals.md).
+- **Amends:**
+  - [ADR-0064](0064-pipeline-integrity-boundary.md): the first fence. Its pre-refactor fragments stay.
 - **Relates to:**
   - [ADR-0155](0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md): its T0 kernel becomes the file list below. A T0 change is now a held proposal, not a console-only change.
   - [ADR-0154](0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md): the sandbox files and the dispatch credential keep I-1, I-3, I-4 and I-7.
   - [ADR-0139](0139-a-wave-orchestrator-supplies-admits-and-backfills-every-lane.md): the supply census and the admission judge the fence through `IsProtectedScope`.
-  - [ADR-0064](0064-pipeline-integrity-boundary.md): the first fence. Its pre-refactor fragments stay.
 - **Evidence:**
   - 1 item of 258 is admissible, and 76 items fall on the fence (F1.1, F1.2).
   - Whole-package entries of ADR-0103 fence code that holds no gate (F1.4).

@@ -1,7 +1,9 @@
 # ADR-0078 — `fleet.landing`: the single-writer prefix-queue landing composer
 
+> **Note (2026-11-06, operator ruling, [ADR-0164](0164-all-decisions-serve-one-goal-and-one-amendment-resolves-their-conflicts.md)):** The train of ADR-0147 is the target. It supersedes the default flip of the queue. Until the enforce flip, a lane still lands its own work.
+
 - **Status:** Accepted (cycle-1144) — backfill of an already-landed surface
-- **Amended by:** [ADR-0128](0128-landing-queue-tiered-reverification.md) (Proposed, 2026-10-09). No production code calls the composer today. ADR-0128 makes the queue durable, with a driver, the tiers T1 to T4 and a stage dial. After the enforce soak, `prefix-queue` becomes the default.
+- **Amended by:** [ADR-0128](0128-landing-queue-tiered-reverification.md) (Proposed, 2026-10-09). No production code calls the composer today. ADR-0128 makes the queue durable, with a driver, the tiers T1 to T4 and a stage dial. After the enforce soak, `prefix-queue` becomes the default. ADR-0147 (Proposed) may supersede the default flip; see plan concurrent-cycle-landing §16.
 - **Relates to:** ADR-0057 (merge-to-main gate), ADR-0072 (system-failure floor),
   ADR-0077 (documentation floor for architecture-labeled changes), the
   `fleet.scheduling` dial (`wave` / `pool`)

@@ -164,7 +164,7 @@ The owner lock thus exists before any client can read the record. A client never
 
 **The wait.**
 
-- A candidate that is not the head blocks in `flock` on the owner lock of the candidate just ahead of it. That is the nearest candidate ahead that is neither terminal nor `parked`. This is a kernel wait with no poll ([ADR-0127](adr/0127-push-only-event-channels.md)).
+- A candidate that is not the head blocks in `flock` on the owner lock of the candidate just ahead of it. That is the nearest candidate ahead that is neither terminal nor `parked`. This is a kernel wait with no poll ([ADR-0127](adr/0127-push-only-event-channels.md)). (Amended by ADR-0134 decisions 8 and 9; not yet built.)
 - When `flock` returns, the waiter releases that lock at once. Then it reads the queue under the queue lock. A waiter never keeps the lock of another owner.
 - A liveness check takes the lock with `LOCK_NB`. If it gets the lock, it releases it at once, and the owner is dead.
 - So a waiter wakes only when the candidate just ahead is terminal or parked, or when its owner dies.
@@ -232,7 +232,7 @@ After the resume, the cycle resume (`evolve loop --resume`) re-attaches each par
 9. A `parked` candidate is outside the order. When its cycle re-attaches it, it rejoins the order at its old ticket (§3).
 
 - **Iffy.** A candidate is `iffy` when `L` touches the global zone (§7.3) or a path of the protected surface (`guards.ProtectedSurfaceManifest`). This is the solo slot of ADR-0078 (research F6.7).
-- **No order change.** A candidate never lands before a candidate ahead of it. An order change needs every path of the speculation tree verified (research F6.4), and at width 3 the gain is small.
+- **No order change.** A candidate never lands before a candidate ahead of it. An order change needs every path of the speculation tree verified (research F6.4), and at width 3 the gain is small. (Amended by ADR-0134 decisions 8 and 9; not yet built.)
 
 ### 5. Composition
 
@@ -798,7 +798,7 @@ The stages:
 
 ### 19. What this does not do
 
-- **No order change.** A candidate never lands before a candidate ahead of it (§4).
+- **No order change.** A candidate never lands before a candidate ahead of it (§4). (Amended by ADR-0134 decisions 8 and 9; not yet built.)
 - **No LLM on a prefix that has not landed** (§4).
 - **No LLM conflict resolution in the queue.** A genuine conflict goes to the debugger route.
 - **No queue for the other writers of `main`.** Dossier closeouts, inbox stamps and console merges still move `main`, and the queue composes again.

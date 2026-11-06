@@ -1,8 +1,8 @@
 # ADR-0154: The pipeline is the only controller, and each agent is an isolated, replaceable worker
 
-> **Note (2026-11-06, [ADR-0164](0164-all-decisions-serve-one-goal-and-one-amendment-resolves-their-conflicts.md)):** Invariant I-2 runs at stage `enforce`, and this record reads Proposed. Only the operator moves it to Accepted. The console acts for the operator outside the loop, and it runs a seat only through `evolve agent run`.
+> **Note (2026-11-06, [ADR-0164](0164-all-decisions-serve-one-goal-and-one-amendment-resolves-their-conflicts.md)):** Invariant I-2 runs at stage `enforce`. The console acts for the operator outside the loop, and it runs a seat only through `evolve agent run`.
 
-- **Status:** Proposed (2026-10-25). Amended by [ADR-0156](0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md) (2026-10-25): the "pipeline markers" of I-2 are one named list (I-16). Amended on 2026-10-25 by the operator: rules 20 to 24 add I-17 (component X19). Amended on 2026-10-26 by the operator: I-3 allows the own subagents of a CLI and adds a dispatch request ([llm-isolation.md](../llm-isolation.md) §7.2).
+- **Status:** Accepted (2026-11-06, operator). First proposed (2026-10-25). Amended by [ADR-0156](0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md) (2026-10-25): the "pipeline markers" of I-2 are one named list (I-16). Amended on 2026-10-25 by the operator: rules 20 to 24 add I-17 (component X19). Amended on 2026-10-26 by the operator: I-3 allows the own subagents of a CLI and adds a dispatch request ([llm-isolation.md](../llm-isolation.md) §7.2).
 - **Plan:** [llm-isolation-2026-10](../../plans/llm-isolation-2026-10.md). **Research:** [llm-isolation-2026-10](../../research/llm-isolation-2026-10.md). **Design:** [llm-isolation](../llm-isolation.md).
 - **Relates to:**
   - [ADR-0064](0064-pipeline-integrity-boundary.md): the protected control plane. This ADR adds the agent side of the same boundary.

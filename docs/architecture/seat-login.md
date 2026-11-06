@@ -2,7 +2,7 @@
 
 **Status:** proposed, 2026-11-06. Each new name in this file is a proposal until its pull request lands: `seatlogin.Resolve`, `Decision`, `paths.SeatRoot`, `evolve auth seat-token`, `--seat-token-file`, `seat_login` and `seat_token_refused`. The file names the existing code that each part changes.
 
-> [ADR-0163](adr/0163-a-seat-holds-a-narrow-token-in-its-own-directory-and-the-token-file-is-the-stage.md) · plan: [seat-login-isolation-2026-11](../plans/seat-login-isolation-2026-11.md) · research: [claude-login-split-2026-11](../research/claude-login-split-2026-11.md).
+> [ADR-0163](adr/0163-a-seat-holds-a-narrow-token-in-its-own-directory-and-the-token-file-is-the-stage.md) · plan: [seat-login-isolation-2026-11](../plans/seat-login-isolation-2026-11.md) · research: [claude-login-split-2026-11](../research/claude-login-split-2026-11.md) · base: [llm-isolation](llm-isolation.md).
 > This file is the spec of record for the login of a `claude` seat. It covers the token file, the read at each door, the seat directory, the grants, the denies, the record, the signals and the test rows. The plan holds the goals and the order. The ADR holds the rejected options.
 >
 > **Terms used throughout:**

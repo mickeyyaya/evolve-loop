@@ -1,8 +1,9 @@
 # ADR-0139: A wave orchestrator supplies, admits and backfills every lane
 
-> **Note (2026-11-06, [ADR-0164](0164-all-decisions-serve-one-goal-and-one-amendment-resolves-their-conflicts.md)):** The live value of `fleet.min_lanes` is 4. This record runs at stage `enforce` and reads Proposed. Only the operator moves it to Accepted.
+> **Note (2026-11-06, [ADR-0164](0164-all-decisions-serve-one-goal-and-one-amendment-resolves-their-conflicts.md)):** The live value of `fleet.min_lanes` is 4. This record runs at stage `enforce`.
 
-- **Status:** Proposed (2026-10-17).
+- **Status:** Accepted (2026-11-06, operator). First proposed (2026-10-17).
+- **Amended by:** [ADR-0143](0143-admission-holds-only-shared-edits-and-the-ship-gate-owns-api-drift.md) (2026-10-19). Decisions 6 and 7: admission holds a candidate only when it edits a package that a running lane edits, or when both are hubs. The reach rule left admission.
 - **Plan:** [wave-orchestrator-2026-10](../../plans/wave-orchestrator-2026-10.md). **Research:** [wave-orchestrator-2026-10](../../research/wave-orchestrator-2026-10.md). **Design:** [wave-orchestrator](../wave-orchestrator.md).
 - **Amended by (proposed):** [ADR-0147](0147-the-wave-orchestrator-owns-integration-and-decides-when-the-wave-reaches-main.md) (2026-10-20). The orchestrator also owns integration: the order, the compose, the test and the push of the deliverables. Integration has its own stage key, `fleet.integration.stage`.
 - **Relates to:**

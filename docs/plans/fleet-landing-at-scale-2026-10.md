@@ -332,6 +332,8 @@ Each component is one lane, lands unwired first, and starts with its red tests. 
 
 ### 7.1 Status after ADR-0147
 
+The operator ruled on 2026-11-06: the train of ADR-0147 is the target. So the rows that the quarantined item `landing-plans-reconcile-with-adr-0147` held read as superseded.
+
 [ADR-0147](../architecture/adr/0147-the-wave-orchestrator-owns-integration-and-decides-when-the-wave-reaches-main.md) (proposed) amends ADR-0134 on 2026-10-20. The wave orchestrator owns integration, and a lane no longer lands its own candidate. The plan audit of 2026-10-27 marked each row that is not done. The item `landing-plans-reconcile-with-adr-0147` gives each row its final status.
 
 | Id | Status after ADR-0147 |
@@ -340,10 +342,10 @@ Each component is one lane, lands unwired first, and starts with its red tests. 
 | S2 | Open. The reconcile item decides the final status. The shards change the scan, not the owner of the landing. |
 | S6 | Open. The reconcile item decides the final status. The batch test I3b of ADR-0147 can use the verdict store. |
 | S7, S8 | Open. The reconcile item decides the final status. They change the test time of `cmd/evolve`, not the owner of the landing. |
-| S9 | Superseded by ADR-0147 (proposed), see item `landing-plans-reconcile-with-adr-0147`: the prefix check I3 verifies each deliverable on the integration tip. |
-| S10 | Superseded by ADR-0147 (proposed), see item `landing-plans-reconcile-with-adr-0147`: the order score I1 (item `wave-integration-i1-order-score`) uses the conflict graph. |
-| S11 | Superseded by ADR-0147 (proposed), see item `landing-plans-reconcile-with-adr-0147`: the batch PR I5 (item `wave-integration-i5-batch-pr`) lands a batch with one push. |
-| S12 | Superseded by ADR-0147 (proposed), see item `landing-plans-reconcile-with-adr-0147`. |
+| S9 | Superseded by ADR-0147 (proposed), operator ruling of 2026-11-06: the prefix check I3 verifies each deliverable on the integration tip. |
+| S10 | Superseded by ADR-0147 (proposed), operator ruling of 2026-11-06: the order score I1 (item `wave-integration-i1-order-score`) uses the conflict graph. |
+| S11 | Superseded by ADR-0147 (proposed), operator ruling of 2026-11-06: the batch PR I5 (item `wave-integration-i5-batch-pr`) lands a batch with one push. |
+| S12 | Superseded by ADR-0147 (proposed), operator ruling of 2026-11-06. |
 | S13 | Open. The reconcile item decides the final status. |
 | S15 | Open. The reconcile item decides the final status. Q3 of the wave-integration plan sets the base of a new lane to `main`. |
 | S16, S17 | Open. The reconcile item decides the final status. |
