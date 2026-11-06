@@ -38,7 +38,7 @@ Outside work agrees on the principle. An action needs authority from a trusted s
 7. A host write into a workspace refuses a symlink. The record is read-only on disk.
 8. A route takes a typed reason that host values build. Agent text never reaches a route reason.
 9. The mover refuses an act of a cycle on an item outside its record.
-10. A failure before build charges the item, except host faults. A brake stops mass parking.
+10. A failure before build charges the item one block, as in ADR-0126 decision 16. A host fault charges none. A brake stops mass parking.
 11. A guard fails on any reference to the pin file name outside a short list.
 12. PR 1 closes the pin file. PR 3 closes the agent lists on the PASS path.
 13. A new run of a cycle keeps the ids of its record.

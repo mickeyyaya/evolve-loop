@@ -377,7 +377,7 @@ func TestApplyCycleOutcome_FailDrain_BumpsOnlyCommittedIDsAlreadyInProcessing(t 
 	}
 	committed, _ := os.ReadFile(filepath.Join(inbox, "c.json"))
 	uncommitted, _ := os.ReadFile(filepath.Join(inbox, "u.json"))
-	if string(committed) != `{"failure_count":1,"id":"c","last_failure_reason":"cycle-failure-release"}` {
+	if string(committed) != `{"failure_count":1,"id":"c","last_failure_cycle":12,"last_failure_reason":"cycle-failure-release"}` {
 		t.Errorf("the committed id is bumped: %s", committed)
 	}
 	if string(uncommitted) != `{"id":"u"}` {

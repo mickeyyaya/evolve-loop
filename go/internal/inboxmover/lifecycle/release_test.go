@@ -55,7 +55,7 @@ func TestMover_Release_QuarantineAtCeiling_ReplaysG2(t *testing.T) {
 		t.Fatalf("res = %+v, err = %v", res, err)
 	}
 	item, _ := os.ReadFile(filepath.Join(inbox, "quarantine", "task-a.json"))
-	if string(item) != `{"failure_count":2,"id":"task-a","last_failure_reason":"cycle-release","title":"A","zeta":true}` {
+	if string(item) != `{"failure_count":2,"id":"task-a","last_failure_cycle":5,"last_failure_reason":"cycle-release","title":"A","zeta":true}` {
 		t.Errorf("quarantined bytes: %s", item)
 	}
 	if b := readJSON(t, filepath.Join(inbox, "task-b.json")); string(b["failure_count"]) != "" {

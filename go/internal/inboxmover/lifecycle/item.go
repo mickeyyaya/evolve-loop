@@ -149,6 +149,7 @@ func readFailureFieldsAt(path string) (failureFields, bool) {
 
 type failureRecord struct {
 	reason, class, fingerprint string
+	cycle                      int
 }
 
 func BumpFailureCount(path, reason string) (int, error) {
@@ -161,7 +162,13 @@ func bumpWith(path string, rec failureRecord, shedAt func(count int) bool) (int,
 		if raw, ok := item[inboxbatch.FailureCountField]; ok {
 			_ = json.Unmarshal(raw, &count)
 		}
+		if rec.cycle > 0 && chargedCycle(item) == rec.cycle {
+			return
+		}
 		count++
+		if rec.cycle > 0 {
+			item[inboxbatch.LastFailureCycleField] = json.RawMessage(strconv.Itoa(rec.cycle))
+		}
 		item[inboxbatch.FailureCountField] = json.RawMessage(strconv.Itoa(count))
 		stampText(item, inboxbatch.LastFailureReasonField, rec.reason)
 		stampOrClear(item, inboxbatch.LastFailureClassField, rec.class)
@@ -174,6 +181,14 @@ func bumpWith(path string, rec failureRecord, shedAt func(count int) bool) (int,
 		return 0, err
 	}
 	return count, nil
+}
+
+func chargedCycle(item map[string]json.RawMessage) int {
+	var cycle int
+	if raw, ok := item[inboxbatch.LastFailureCycleField]; ok {
+		_ = json.Unmarshal(raw, &cycle)
+	}
+	return cycle
 }
 
 func stampText(item map[string]json.RawMessage, key, value string) {
