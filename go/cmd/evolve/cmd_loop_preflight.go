@@ -13,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+	"github.com/mickeyyaya/evolve-loop/go/internal/seatlogin"
 )
 
 var runLoopPreflightFn = defaultLoopPreflight
@@ -33,6 +34,7 @@ func loopPreflightOptions(cfg loopConfig, stderr io.Writer) looppreflight.Option
 			Threshold: pol.PreflightConfig().ReleaseLagThreshold,
 			CacheTTL:  pol.PreflightConfig().ReleaseCheckTTL,
 		},
+		SeatInspect:   seatInspectFn,
 		Routing:       func() (looppreflight.Routing, error) { return preflightRouting(cfg.ProjectRoot) },
 		SandboxMode:   cfg.sandboxMode,
 		UsageEvidence: evidenceSummary(usageEvidenceFn(cfg.ProjectRoot, cfg.EvolveDir, stderr)),
@@ -126,4 +128,9 @@ func preflightRouting(projectRoot string) (looppreflight.Routing, error) {
 		}
 		return router, findings, nil
 	}, profiles.NewFromDir(routingProfilesDir(projectRoot)).List)
+}
+
+func seatInspectFn() seatlogin.Health {
+	home, _ := os.UserHomeDir()
+	return seatlogin.Inspect(home, seatlogin.OS())
 }
