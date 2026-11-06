@@ -13,19 +13,19 @@ import (
 func TestConfig(t *testing.T) {
 	cfg := config()
 
-	if len(cfg.Versions) != 5 {
-		t.Fatalf("config(): got %d versions, want 5", len(cfg.Versions))
+	if len(cfg.Versions) != 1 {
+		t.Fatalf("config(): got %d versions, want 1", len(cfg.Versions))
 	}
 
-	wantSlugs := []string{"luminous", "noir", "editorial", "blueprint", "aurora-glass"}
+	wantSlugs := []string{"noir"}
 	for i, want := range wantSlugs {
 		if got := cfg.Versions[i].Slug; got != want {
 			t.Errorf("config(): version[%d].Slug = %q, want %q", i, got, want)
 		}
 	}
 
-	if cfg.Gallery != "gallery" {
-		t.Errorf("config(): Gallery = %q, want %q", cfg.Gallery, "gallery")
+	if cfg.Home != "noir" || cfg.Gallery != "" {
+		t.Errorf("config(): Home = %q and Gallery = %q, want the one design at the root", cfg.Home, cfg.Gallery)
 	}
 	if cfg.ContentPath == "" {
 		t.Error("config(): ContentPath is empty, want a path set")

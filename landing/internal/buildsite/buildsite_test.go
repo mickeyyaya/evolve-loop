@@ -37,7 +37,7 @@ func TestBuild_RendersPagesAndCopiesAssets(t *testing.T) {
 	}
 
 	page := readFile(t, filepath.Join(out, "mini", "index.html"))
-	if !strings.Contains(page, "Ship the code your agent wrote") {
+	if !strings.Contains(page, "Who decides it ships") {
 		t.Errorf("page missing real headline, got: %s", page)
 	}
 	if !strings.Contains(page, `src="../assets/mini/hero.png"`) {

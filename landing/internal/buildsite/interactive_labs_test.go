@@ -27,8 +27,31 @@ var styleTemplates = []string{
 	"../../templates/editorial.html",
 	"../../templates/aurora.html",
 	"../../templates/luminous.html",
-	"../../templates/noir.html",
 	"../../templates/blueprint.html",
+}
+
+func TestThePublishedPage_PutsTheInstallBeforeTheDemosAndHasNoDeadScript(t *testing.T) {
+	src, err := os.ReadFile("../../templates/noir.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := string(src)
+	install := strings.Index(page, `{{template "tryit" .}}`)
+	gate := strings.Index(page, `{{template "gatelab" .}}`)
+	demo := strings.Index(page, `{{template "pipelinedemo" .}}`)
+	if install < 0 || gate < install || demo < install {
+		t.Fatalf("install at %d, gate lab at %d, demo at %d: the install must come first", install, gate, demo)
+	}
+	for _, pair := range [][2]string{{"gatelab", "gatelabjs"}, {"recoverylab", "recoverylabjs"}, {"tryit", "copyjs"}} {
+		if !strings.Contains(page, `{{template "`+pair[0]+`" .}}`) || !strings.Contains(page, `{{template "`+pair[1]+`"}}`) {
+			t.Errorf("the page needs both %s and %s", pair[0], pair[1])
+		}
+	}
+	for _, pair := range [][2]string{{"inboxlab", "inboxlabjs"}, {"concurrency", "concurrencyjs"}} {
+		if strings.Contains(page, `{{template "`+pair[1]+`"}}`) != strings.Contains(page, `{{template "`+pair[0]+`" .}}`) {
+			t.Errorf("%s and its script %s must come together", pair[0], pair[1])
+		}
+	}
 }
 
 func TestPartials_DefineAllLabs(t *testing.T) {

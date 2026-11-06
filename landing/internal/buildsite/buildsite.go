@@ -6,9 +6,11 @@ package buildsite
 import (
 	"bytes"
 	"fmt"
+	"html/template"
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"evolve-loop-landing/internal/content"
 	"evolve-loop-landing/internal/render"
@@ -36,6 +38,7 @@ type Config struct {
 	AssetsDir    string
 	OutDir       string
 	Gallery      string     // gallery template name (optional)
+	Home         string     // slug of the version that the root serves; the gallery then moves to concepts/ (optional)
 	RootFiles    []RootFile // static files copied to the dist root (optional)
 	Versions     []Version
 }
@@ -46,6 +49,7 @@ type pageData struct {
 	Version  Version
 	Versions []Version
 	Assets   string // relative path from the page to its assets folder
+	Root     string // relative path from the page to the site root
 }
 
 // Build renders all pages and returns the paths it wrote.
@@ -77,16 +81,26 @@ func Build(cfg Config) ([]string, error) {
 		written = append(written, path)
 	}
 
+	if cfg.Home != "" {
+		path, err := writeHome(tmpl, site, cfg)
+		if err != nil {
+			return nil, err
+		}
+		written = append(written, path)
+	}
+
 	if cfg.Gallery != "" {
+		galleryDir, root := galleryPlace(cfg)
 		html, err := exec(tmpl, cfg.Gallery, pageData{
 			Site:     site,
 			Versions: cfg.Versions,
-			Assets:   "assets",
+			Assets:   root + "assets",
+			Root:     root,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("render gallery: %w", err)
 		}
-		path := filepath.Join(cfg.OutDir, "index.html")
+		path := filepath.Join(galleryDir, "index.html")
 		if err := writeFile(path, html); err != nil {
 			return nil, err
 		}
@@ -107,6 +121,32 @@ func Build(cfg Config) ([]string, error) {
 		written = append(written, dst)
 	}
 	return written, nil
+}
+
+func galleryPlace(cfg Config) (dir, root string) {
+	if cfg.Home == "" {
+		return cfg.OutDir, ""
+	}
+	return filepath.Join(cfg.OutDir, "concepts"), "../"
+}
+
+func writeHome(tmpl *template.Template, site *content.Site, cfg Config) (string, error) {
+	i := slices.IndexFunc(cfg.Versions, func(v Version) bool { return v.Slug == cfg.Home })
+	if i < 0 {
+		return "", fmt.Errorf("home %q names no version", cfg.Home)
+	}
+	home := cfg.Versions[i]
+	html, err := exec(tmpl, home.Template, pageData{
+		Site:     site,
+		Version:  home,
+		Versions: cfg.Versions,
+		Assets:   "assets/" + home.Slug,
+	})
+	if err != nil {
+		return "", fmt.Errorf("render home %q: %w", home.Slug, err)
+	}
+	path := filepath.Join(cfg.OutDir, "index.html")
+	return path, writeFile(path, html)
 }
 
 func exec(tmpl interface {

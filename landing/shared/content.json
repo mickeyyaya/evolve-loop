@@ -2,17 +2,18 @@
   "_comment": "SINGLE SOURCE OF TRUTH for all 5 landing-page versions. Facts/copy live here once; each bespoke page draws from this. Update numbers HERE only.",
   "product": {
     "name": "Evolve Loop",
-    "version": "v22.27.0",
+    "version": "v23.1.0",
     "mentalModel": "CI/CD for AI-written code",
     "oneBreath": "Your AI writes the code. A second AI reviews it. A dependable process, not an opinion, decides if it ships.",
     "license": "Apache-2.0",
     "repo": "github.com/mickeyyaya/evolve-loop",
-    "repoUrl": "https://github.com/mickeyyaya/evolve-loop"
+    "repoUrl": "https://github.com/mickeyyaya/evolve-loop",
+    "siteUrl": "https://mickeyyaya.github.io/evolve-loop/"
   },
   "hero": {
-    "headlineLead": "Ship the code your agent wrote — ",
-    "headlineEmphasis": "no diff to read.",
-    "subhead": "Evolve Loop puts your AI coder in a structured pipeline that repairs itself. The pipeline plans the work, and an independent reviewer challenges it. Only safe changes merge, and each run makes the next run better. A code change ships only after a test failed first, unless the change is trivial.",
+    "headlineLead": "Your AI wrote the code. ",
+    "headlineEmphasis": "Who decides it ships?",
+    "subhead": "Evolve Loop runs your AI coder through a pipeline that repairs itself. A test fails first, a different model tries to refute the work, and deterministic gates decide if it merges. A failed cycle never reaches main, and it leaves a lesson.",
     "ctaPrimary": {
       "label": "Get started",
       "command": "curl -fsSL https://mickeyyaya.github.io/evolve-loop/install.sh | sh"
@@ -35,7 +36,7 @@
   },
   "proofBar": [
     {
-      "value": "1,830+",
+      "value": "2,200+",
       "label": "autonomous cycles run"
     },
     {
@@ -103,7 +104,7 @@
   "pipelineDemo": {
     "kicker": "AI-composed pipeline",
     "heading": "The model composes its own pipeline.",
-    "sub": "Give it a goal. The advisor runs the mandated phases, picks from the common phases and writes new phases when the goal needs them. Then one routing table gives each phase that uses a model its CLI and model. agy runs first, on Gemini 3.8 Flash High. At the deep and top tiers, Claude Opus runs through agy first and through Claude Code second. Nothing here is pre-scripted.",
+    "sub": "Give it a goal. The advisor runs the mandated phases, picks from the common phases and writes new phases when the goal needs them. Then one routing table gives each phase that uses a model its CLI and model. agy runs first, on Gemini 3.8 Flash High. Deep seats on an agy chain run Gemini 4 Argon first, and they share by budget with Claude. Top seats run Claude Opus through agy first and through Claude Code second. Nothing here is pre-scripted. The rows below show typical choices.",
     "floor": [
       "Build",
       "Audit",
@@ -207,82 +208,6 @@
             "cli": "Gemini",
             "model": "Gemini-3.8-Flash-High",
             "why": "PASS → keep the canvas game-loop pattern as a memo"
-          }
-        ]
-      },
-      {
-        "goal": "Rename `usr` → `currentUser` in the auth module",
-        "scope": "mechanical rename",
-        "phases": [
-          {
-            "phase": "Intent",
-            "use": false,
-            "why": "the goal is exact: nothing to clarify"
-          },
-          {
-            "phase": "Scout",
-            "use": true,
-            "cli": "Gemini",
-            "model": "Gemini-3.8-Flash-High",
-            "why": "find every reference, so the rename is complete"
-          },
-          {
-            "phase": "Triage",
-            "use": false,
-            "why": "one mechanical change: nothing to defer"
-          },
-          {
-            "phase": "Plan-Review",
-            "use": false,
-            "why": "a pure rename: no design surface"
-          },
-          {
-            "phase": "TDD",
-            "use": false,
-            "why": "a trivial change: the current tests pin the behavior"
-          },
-          {
-            "phase": "Build",
-            "use": true,
-            "cli": "Gemini",
-            "model": "Gemini-3.8-Flash-High",
-            "why": "fundamental: apply it; the compiler finds the rest"
-          },
-          {
-            "phase": "Code-Review",
-            "use": true,
-            "cli": "Claude",
-            "model": "Opus",
-            "why": "shadow: a code change, so the review runs"
-          },
-          {
-            "phase": "Audit",
-            "use": true,
-            "cli": "Claude",
-            "model": "Opus",
-            "why": "fundamental: a second family runs the suite and proves that nothing moved"
-          },
-          {
-            "phase": "Benchmark",
-            "use": false,
-            "why": "the same runtime behavior"
-          },
-          {
-            "phase": "Security",
-            "use": false,
-            "why": "no security surface"
-          },
-          {
-            "phase": "Ship",
-            "use": true,
-            "cli": "host",
-            "model": "no model",
-            "why": "fundamental: host code makes the gated commit and push"
-          },
-          {
-            "phase": "Learn",
-            "use": false,
-            "why": "trivial: no lesson to keep"
           }
         ]
       },
@@ -469,168 +394,6 @@
             "why": "PASS → keep the auth and webhook pattern as a memo"
           }
         ]
-      },
-      {
-        "goal": "Update the README install section for the new installer",
-        "scope": "docs",
-        "phases": [
-          {
-            "phase": "Intent",
-            "use": false,
-            "why": "a doc change: the scope is obvious"
-          },
-          {
-            "phase": "Scout",
-            "use": false,
-            "why": "the change is the prose: no code to map"
-          },
-          {
-            "phase": "Triage",
-            "use": false,
-            "why": "one doc edit"
-          },
-          {
-            "phase": "Plan-Review",
-            "use": false,
-            "why": "prose, not architecture"
-          },
-          {
-            "phase": "TDD",
-            "use": false,
-            "why": "a document deliverable: the floor waives tdd"
-          },
-          {
-            "phase": "Build",
-            "use": true,
-            "cli": "Gemini",
-            "model": "Gemini-3.8-Flash-High",
-            "why": "fundamental: rewrite the section; check that the command runs"
-          },
-          {
-            "phase": "Code-Review",
-            "use": false,
-            "why": "a document: the code review runs only on code"
-          },
-          {
-            "phase": "Audit",
-            "use": true,
-            "cli": "Claude",
-            "model": "Opus",
-            "why": "fundamental: doc lint and link check"
-          },
-          {
-            "phase": "Benchmark",
-            "use": false,
-            "why": "no runtime path"
-          },
-          {
-            "phase": "Security",
-            "use": false,
-            "why": "no security surface"
-          },
-          {
-            "phase": "Ship",
-            "use": true,
-            "cli": "host",
-            "model": "no model",
-            "why": "fundamental: host code makes the gated commit and push"
-          },
-          {
-            "phase": "Learn",
-            "use": false,
-            "why": "no lesson for the code"
-          }
-        ]
-      },
-      {
-        "goal": "Speed up the dashboard query that times out on big tenants",
-        "scope": "performance",
-        "phases": [
-          {
-            "phase": "Intent",
-            "use": false,
-            "why": "the target is measurable: make it fast"
-          },
-          {
-            "phase": "Scout",
-            "use": true,
-            "cli": "Gemini",
-            "model": "Gemini-3.8-Flash-High",
-            "why": "profile the slow path: find the N+1 query or the absent index"
-          },
-          {
-            "phase": "Triage",
-            "use": false,
-            "why": "one hotspot"
-          },
-          {
-            "phase": "Plan-Review",
-            "use": false,
-            "why": "no behavior change, only speed"
-          },
-          {
-            "phase": "TDD",
-            "use": true,
-            "cli": "Claude",
-            "model": "Sonnet",
-            "why": "characterization tests: the output must not change"
-          },
-          {
-            "phase": "Build",
-            "use": true,
-            "cli": "Gemini",
-            "model": "Gemini-3.8-Flash-High",
-            "why": "fundamental: add the index or batch the query"
-          },
-          {
-            "phase": "Code-Review",
-            "use": true,
-            "cli": "Claude",
-            "model": "Opus",
-            "why": "shadow: the performance dimension leads"
-          },
-          {
-            "phase": "Audit",
-            "use": true,
-            "cli": "Claude",
-            "model": "Opus",
-            "why": "fundamental: a different family checks that the outputs are identical"
-          },
-          {
-            "phase": "Query-Plan-Diff",
-            "use": true,
-            "mint": true,
-            "cli": "Gemini",
-            "model": "Gemini-3.8-Flash-High",
-            "why": "the advisor writes a phase to diff the SQL plan, before and after"
-          },
-          {
-            "phase": "Benchmark",
-            "use": true,
-            "cli": "Gemini",
-            "model": "Gemini-3.8-Flash-High",
-            "why": "measure before and after: prove the speedup and guard it"
-          },
-          {
-            "phase": "Security",
-            "use": false,
-            "why": "the same query shape: no new exposure"
-          },
-          {
-            "phase": "Ship",
-            "use": true,
-            "cli": "host",
-            "model": "no model",
-            "why": "fundamental: host code commits when the benchmark clears"
-          },
-          {
-            "phase": "Learn",
-            "use": true,
-            "cli": "Gemini",
-            "model": "Gemini-3.8-Flash-High",
-            "why": "PASS → keep the index fix as a memo"
-          }
-        ]
       }
     ]
   },
@@ -640,24 +403,19 @@
   },
   "pillars": [
     {
-      "title": "AI-driven, end to end",
-      "claim": "It designs the work. It does not only type it.",
-      "proof": "The pipeline decides what to build, how to approach it and what is risky. It applies real judgment at every step, not one prompt into the dark."
-    },
-    {
-      "title": "A pipeline that adapts",
-      "claim": "Structure that changes shape for the task.",
-      "proof": "Every change follows the same clear pipeline, but the pipeline flexes. A one-line fix skips the ceremony, and a risky feature gets more review. The pipeline is structured enough to trust and dynamic enough to stay fast."
-    },
-    {
-      "title": "Agile by nature",
-      "claim": "Plan, build, review, reflect: every cycle.",
-      "proof": "Each cycle runs like a sprint: scope the work, build it, review it, ship it, then learn. The scope stays bounded, so nothing sprawls and the progress compounds."
-    },
-    {
       "title": "Self-repair",
       "claim": "A failure does not stop it. A failure teaches it.",
-      "proof": "When something breaks, the pipeline catches it, recovers and turns the failure into a permanent rule. If only audit gates forced a FAIL, the build gets a bounded repair round. At each wave boundary, the loop updates Claude Code and agy and smoke-tests them before dispatch. When fixes land on main, the loop rebuilds and restarts itself at the next boot."
+      "proof": "When something breaks, the pipeline catches it, recovers and turns the failure into a permanent rule. Every retry asks one retry ladder, and a small prescribed audit finding gets a patch that a fresh seat reviews. Failures with one root cause share a class fingerprint, so a repeat raises a live incident. An orchestrator agent can propose one checked action per incident, and Go code decides: this part is in shadow now. At each wave boundary, the loop updates Claude Code and agy and smoke-tests them before dispatch. When fixes land on main, the loop rebuilds and restarts itself at the next boot."
+    },
+    {
+      "title": "One top law",
+      "claim": "Every agent serves the goal, not a local metric.",
+      "proof": "A written constitution ranks the project's rules under one goal: a self-healing loop that keeps delivering the best quality features. An agent that sees a green gate treats it as evidence, not as the goal. It reports each limit of its work. The top law gives no power to cross a gate, and only the operator changes it."
+    },
+    {
+      "title": "The pipeline is the only controller",
+      "claim": "Agents are isolated workers. Code carries the flow.",
+      "proof": "No LLM in the pipeline starts or directs another. One bridge launch API starts every LLM binary, each child gets an allowlisted environment, and a phase cell cannot exec an LLM binary. The sandbox holds the protected write rule for every family. Each cell reads an artifact index with exact read grants. Some of these checks still run in shadow, and the environment rule runs at enforce."
     },
     {
       "title": "An independent second mind",
@@ -667,17 +425,12 @@
     {
       "title": "Any model. No lock-in.",
       "claim": "One routing table sends each phase to the right model.",
-      "proof": "One cli_routing table in .evolve/policy.json decides every dispatch, and evolve cli-routing is its only writer. In the table that builds Evolve Loop, agy runs first, on Gemini 3.8 Flash High. Deep and top seats run Claude Opus through agy, then through Claude Code. The auditor, the tdd engineer and the code reviewer run on Claude Code only. Codex and local models through Ollama are also routable."
-    },
-    {
-      "title": "Loops that converge",
-      "claim": "Built so that every loop that repeats converges or escalates.",
-      "proof": "One convergence policy is built to decide the next step of every loop that repeats (ADR-0126). It runs in shadow now: no loop calls it yet. First it changes the feedback, then the strategy, then the scope. A fourth round never occurs, and a CRITICAL finding is never deferred."
+      "proof": "One cli_routing table in .evolve/policy.json decides every dispatch, and evolve cli-routing is its only writer. In the table that builds Evolve Loop, agy runs first, on Gemini 3.8 Flash High. Deep seats on an agy chain run Gemini 4 Argon first. Top seats run Claude Opus through agy, then through Claude Code. The auditor, the tdd engineer and the code reviewer run on Claude Code only, and that floor is data in the same table. A quota wall benches only the model group that hit it. Codex and local models through Ollama are also routable."
     },
     {
       "title": "Standards, enforced",
       "claim": "The bar is in the tools, not in a style guide.",
-      "proof": "Code explains itself: the commit gate refuses a commit that adds a comment. Every code change is test-first, and mutation tests check the tests. Every landing passes a review loop with a convergence rule. The documentation moves to ASD-STE100 Simplified Technical English: 21 core documents use it now, and its lint is in progress."
+      "proof": "Code explains itself: the commit gate refuses a commit that adds a comment. Every code change is test-first, and mutation tests check the tests. evolve cover changed refuses a changed function below 100% coverage. Every landing passes a review loop with a convergence rule. New documentation must pass an ASD-STE100 Simplified Technical English lint, and the build floor sends a failing document back. Quality readers publish the ship rate and the code shape, with intervals, through the Signal Center."
     }
   ],
   "comparison": {
@@ -710,6 +463,11 @@
         "Converge or escalate, never a fourth round (in shadow)"
       ],
       [
+        "Who controls the flow",
+        "The agent that writes the code",
+        "Go code: no LLM starts or directs another"
+      ],
+      [
         "Memory",
         "Forgets between runs",
         "Compounds: each run teaches the next"
@@ -740,63 +498,45 @@
       },
       {
         "n": "2",
-        "label": "Steer the approach",
-        "command": "/evo:loop harden",
-        "note": "A strategy (harden · repair · innovate · balanced) changes the scope and the strictness. The phase spine stays the same, and the posture changes."
-      },
-      {
-        "n": "3",
-        "label": "Bound the cycles",
-        "command": "/evo:loop --cycles 3 \"add dark mode\"",
-        "note": "--cycles N is a hard contract: exactly N cycles, with no early stop."
-      },
-      {
-        "n": "4",
         "label": "Stack the levers",
         "command": "/evo:loop --cycles 3 harden \"tighten input validation\"",
         "note": "Compose them: a strategy, a hard cycle bound and a goal in one command. This is the full-control end of the range."
       },
       {
-        "n": "5",
+        "n": "3",
         "label": "Resume",
         "command": "/evo:loop --resume",
         "note": "It continues a run from its last checkpoint, with the worktree and the state intact. No work is lost."
       },
       {
-        "n": "6",
-        "label": "Save work in progress",
-        "command": "evolve checkpoint save --all",
-        "note": "It saves the uncommitted work of each dev worktree as a ref under refs/checkpoints. It does not change the branch, the index or the working tree. evolve checkpoint restore puts the work into a new or clean worktree."
-      },
-      {
-        "n": "7",
+        "n": "4",
         "label": "Queue a backlog",
         "command": "evolve inbox add --file fix-flaky-auth-test.json",
         "note": "evolve inbox add is the one way to file an item. The loop takes items in the order of a computed rank: weight, priority class, the items that it unblocks, recurrence, age and goal. The verbs show, list, edit, verify and withdraw curate an item, and each verb validates its change."
       },
       {
-        "n": "8",
-        "label": "Route the work",
-        "command": "evolve inbox route-console <id> <reason> <cycle>",
-        "note": "It marks an item as operator-owned (route: console-manual). After that, every lane's claim refuses the item. evolve inbox route-lane reverses a false positive. Routing is plumbing, not a prompt."
-      },
-      {
-        "n": "9",
+        "n": "5",
         "label": "Explain the routing",
         "command": "evolve cli-routing explain builder",
         "note": "It prints the CLI chain of an agent from the one routing table. The verbs init, set, unset and migrate of evolve cli-routing are the only writers of the table."
       },
       {
-        "n": "10",
+        "n": "6",
         "label": "Go wide",
-        "command": "policy.json → \"fleet\": {\"count\": 3}",
-        "note": "Parallel lanes, each in its own git worktree. Quota pressure shrinks the width, but never below one isolated lane and never onto your main tree."
+        "command": "policy.json → \"fleet\": {\"count\": 4}",
+        "note": "Parallel lanes in a rolling pool, each in its own git worktree. Quota pressure shrinks the width, but never below one isolated lane and never onto your main tree."
       },
       {
-        "n": "11",
+        "n": "7",
+        "label": "Run a wave",
+        "command": "evolve wave next",
+        "note": "One verb runs the next wave: the boundary, a goal made from the facts of the last wave, the launch and a wave record. evolve wave status reads the state, and evolve wave stop brakes it at the next boundary."
+      },
+      {
+        "n": "8",
         "label": "Publish",
-        "command": "evolve release 22.27.0",
-        "note": "A release pipeline that repairs itself: preflight gates, the changelog, an atomic version bump and a CI-verified publish. If the remote suite fails, the release demotes itself, so \"latest\" never points at a broken build."
+        "command": "evolve release 23.1.0",
+        "note": "A release pipeline that repairs itself: preflight gates, the changelog, an atomic version bump, a rebuilt binary and a marketplace poll. A failed poll or verify rolls the release back. CI on the release commit runs after that, and evolve ci watch --tag reads it. A red result gets a fix forward."
       }
     ],
     "setup": {
@@ -888,7 +628,7 @@
       "evolve-install: checksum verified",
       "evolve-install: detected AI CLI(s): claude agy",
       "Installation complete!",
-      "evolve-install: installed: evolve 22.27.0 → ~/.local/bin/evolve",
+      "evolve-install: installed: evolve 23.1.0 → ~/.local/bin/evolve",
       "evolve-install: installed binary fingerprint (SHA256): <the 64-character SHA256 of your binary>",
       "evolve-install: done. Next: evolve doctor    then    /evo:loop --cycles 3 \"your goal\""
     ],
@@ -916,7 +656,7 @@
         "href": "https://github.com/mickeyyaya/evolve-loop/releases/latest"
       }
     ],
-    "noAccount": "Pin a version: EVO_VERSION=v22.27.0 … | sh · opt out of PATH edits: EVO_NO_MODIFY_PATH=1"
+    "noAccount": "Pin a version: EVO_VERSION=v23.1.0 … | sh · opt out of PATH edits: EVO_NO_MODIFY_PATH=1"
   },
   "inboxLab": {
     "kicker": "Continuous development",
@@ -1088,18 +828,6 @@
         "outcome": "A failed cycle feeds the queue. It does not stop the queue."
       },
       {
-        "label": "Gate forced FAIL over a PASS",
-        "code": "code-audit-fail",
-        "verdict": "RETRY",
-        "steps": [
-          "The auditor writes PASS, but a deterministic gate (for example, skills-drift) forces FAIL",
-          "One table gives each gate a failure class and a one-step remedy",
-          "The build gets a bounded repair round, with the remedy first in its brief (2 retries at most)",
-          "A FAIL from a static gate cannot halt the loop because of the prose in a retro"
-        ],
-        "outcome": "A FAIL that only gates forced gets a repair, not a halt."
-      },
-      {
         "label": "Provider quota exhausted",
         "code": "rc=85",
         "verdict": "RETRY",
@@ -1110,30 +838,6 @@
           "The chain of the routing table sends the phase to the next CLI, and the phase completes there"
         ],
         "outcome": "The provider is benched. The loop is not."
-      },
-      {
-        "label": "agy-claude booted the wrong model",
-        "code": "rc=87",
-        "verdict": "RETRY",
-        "steps": [
-          "Before the prompt, agy-claude waits up to 10 s for a claude-family label in the footer",
-          "No claude-family label shows, so the launch stops with exit 87",
-          "Exit 87 is a walk trigger: the seat moves to Claude Code",
-          "The deep phase completes on Claude Opus"
-        ],
-        "outcome": "The model family that runs is the family that the table asked for."
-      },
-      {
-        "label": "REPL boot timeout",
-        "code": "rc=80",
-        "verdict": "RETRY",
-        "steps": [
-          "The liveness probe sees no pane output before the deadline",
-          "The bridge records a boot strike against this CLI",
-          "A relaunch with backoff; repeated strikes bench the CLI",
-          "The phase completes on the retry"
-        ],
-        "outcome": "A transient boot failure costs seconds, not cycles."
       },
       {
         "label": "Ship binary tampered",
@@ -1152,30 +856,30 @@
         "code": "GIT_PUSH_REJECTED",
         "verdict": "RETRY",
         "steps": [
-          "Ship detects the diverged origin",
-          "The cycle work stays safe on its lane branch",
-          "At the batch boundary, sync-main reconciles: merge only, nothing forced",
-          "The next ship fast-forwards"
+          "A peer moved main: the cycle goes back to audit on the new base, because a ship never rebases or forces",
+          "Origin itself diverged: the push is rejected and the cycle seals as FAIL",
+          "The item returns to the queue, and the worktree stays for salvage",
+          "evolve sync-main reconciles by merge, and the next ship fast-forwards"
         ],
-        "outcome": "A divergence becomes a boundary chore, not a lost cycle."
+        "outcome": "A divergence can cost a cycle. It never lands unaudited work, and the item runs again."
       },
       {
-        "label": "No phase artifact",
-        "code": "ArtifactTimeout",
-        "verdict": "PROCEED",
+        "label": "The same failure repeats",
+        "code": "class fingerprint",
+        "verdict": "BLOCK",
         "steps": [
-          "Runner: no report artifact before the deadline",
-          "A transient bridge error? One retry",
-          "Still absent: the runner backfills the report from the session transcript",
-          "The audit verifies the backfilled artifact again before anything ships"
+          "Each sealed FAIL runs the incident detector at once",
+          "Failures with one root cause share a class fingerprint, so recurrence counts them",
+          "A repeating pipeline-code class raises a live incident",
+          "The console floor trips, and the pipeline fix comes before more cycles"
         ],
-        "outcome": "Recovered evidence is audited evidence."
+        "outcome": "Repeated failures become one incident, not many retries."
       }
     ],
     "proof": "This is not hypothetical. An experiment with a new model once put several regressions into one run. None of them reached a human: the pipeline's own reviews caught each one and recovered. Within two days, the pipeline turned each one into a permanent safeguard. Runs can fail, and failures become fixes that stay."
   },
   "finalCta": {
-    "heading": "Let the loop read the diffs you did not write.",
+    "heading": "Let a second model and hard gates judge the code you did not write.",
     "subhead": "Open source. Apache-2.0. Works with Antigravity, Claude Code, Codex and Ollama.",
     "primary": {
       "label": "Get started",
