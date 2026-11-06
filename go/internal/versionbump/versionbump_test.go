@@ -68,6 +68,7 @@ func TestDefaultPaths(t *testing.T) {
 		"/repo/.codex-plugin/plugin.json",
 		"/repo/skills/loop/SKILL.md",
 		"/repo/README.md",
+		"/repo/landing/shared/content.json",
 	}
 	got := p.Files()
 	if len(got) != len(want) {

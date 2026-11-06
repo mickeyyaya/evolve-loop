@@ -535,7 +535,7 @@
       {
         "n": "8",
         "label": "Publish",
-        "command": "evolve release 23.1.0",
+        "command": "evolve release {{semver}}",
         "note": "A release pipeline that repairs itself: preflight gates, the changelog, an atomic version bump, a rebuilt binary and a marketplace poll. A failed poll or verify rolls the release back. CI on the release commit runs after that, and evolve ci watch --tag reads it. A red result gets a fix forward."
       }
     ],
@@ -628,7 +628,7 @@
       "evolve-install: checksum verified",
       "evolve-install: detected AI CLI(s): claude agy",
       "Installation complete!",
-      "evolve-install: installed: evolve 23.1.0 → ~/.local/bin/evolve",
+      "evolve-install: installed: evolve {{semver}} → ~/.local/bin/evolve",
       "evolve-install: installed binary fingerprint (SHA256): <the 64-character SHA256 of your binary>",
       "evolve-install: done. Next: evolve doctor    then    /evo:loop --cycles 3 \"your goal\""
     ],
@@ -656,7 +656,7 @@
         "href": "https://github.com/mickeyyaya/evolve-loop/releases/latest"
       }
     ],
-    "noAccount": "Pin a version: EVO_VERSION=v23.1.0 … | sh · opt out of PATH edits: EVO_NO_MODIFY_PATH=1"
+    "noAccount": "Pin a version: EVO_VERSION={{version}} … | sh · opt out of PATH edits: EVO_NO_MODIFY_PATH=1"
   },
   "inboxLab": {
     "kicker": "Continuous development",

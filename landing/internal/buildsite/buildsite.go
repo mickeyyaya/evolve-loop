@@ -27,8 +27,9 @@ type Version struct {
 // RootFile is a static file copied verbatim into the dist root, e.g. the
 // install.sh installer served at https://<pages>/install.sh.
 type RootFile struct {
-	Src string // path relative to the build working dir (landing/)
-	Dst string // path relative to OutDir
+	Src    string // path relative to the build working dir (landing/)
+	Dst    string // path relative to OutDir
+	Expand bool   // fill the version tokens of the file
 }
 
 // Config controls a build.
@@ -115,7 +116,7 @@ func Build(cfg Config) ([]string, error) {
 
 	for _, rf := range cfg.RootFiles {
 		dst := filepath.Join(cfg.OutDir, rf.Dst)
-		if err := copyFile(rf.Src, dst); err != nil {
+		if err := writeRootFile(rf, dst, site.Product.Version); err != nil {
 			return nil, fmt.Errorf("copy root file %s: %w", rf.Src, err)
 		}
 		written = append(written, dst)
@@ -194,6 +195,17 @@ func copyDir(src, dst string) error {
 		}
 		return copyFile(path, target)
 	})
+}
+
+func writeRootFile(rf RootFile, dst, version string) error {
+	if !rf.Expand {
+		return copyFile(rf.Src, dst)
+	}
+	data, err := os.ReadFile(rf.Src)
+	if err != nil {
+		return err
+	}
+	return writeFile(dst, []byte(content.Expand(string(data), version)))
 }
 
 func copyFile(src, dst string) error {

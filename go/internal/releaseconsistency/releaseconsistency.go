@@ -3,6 +3,7 @@
 package releaseconsistency
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -132,6 +133,8 @@ func buildChecks(opts Options, target, majorMinor string) []checkSpec {
 			func() Check {
 				return checkJSONVersionIfPresent(opts.ProjectRoot, ".codex-plugin/plugin.json", "codex plugin.json version (generated mirror)", target)
 			}},
+		{siteContentPath, "site product.version",
+			func() Check { return checkSiteVersion(opts.ProjectRoot, target) }},
 		{"skills/loop/SKILL.md", "SKILL.md heading (major.minor)",
 			func() Check { return checkSkillHeading(opts.ProjectRoot, majorMinor) }},
 		{"README.md", "README.md current version table",
@@ -147,7 +150,7 @@ func buildChecks(opts Options, target, majorMinor string) []checkSpec {
 	}
 }
 
-const contentMarkerStart = 5
+const contentMarkerStart = 6
 
 func runChecks(logw io.Writer, checks []checkSpec) ([]Check, int) {
 	var results []Check
@@ -225,6 +228,36 @@ func checkSkillHeading(repoRoot, majorMinor string) Check {
 		}
 	}
 	c.Status = "NO_MATCH"
+	return c
+}
+
+const siteContentPath = "landing/shared/content.json"
+
+func checkSiteVersion(repoRoot, target string) Check {
+	c := Check{File: siteContentPath, Description: "site product.version", Expected: "v" + target}
+	body, err := os.ReadFile(filepath.Join(repoRoot, siteContentPath))
+	if errors.Is(err, os.ErrNotExist) {
+		return Check{File: siteContentPath, Description: c.Description, Status: "OK", Found: "absent (skipped)"}
+	}
+	var site struct {
+		Product struct {
+			Version string `json:"version"`
+		} `json:"product"`
+	}
+	if err != nil || json.Unmarshal(body, &site) != nil {
+		c.Status = "NO_MATCH"
+		return c
+	}
+	if site.Product.Version == "" {
+		c.Status, c.Found = "OK", "no product.version (skipped)"
+		return c
+	}
+	c.Found = site.Product.Version
+	if c.Found != c.Expected {
+		c.Status = "MISMATCH"
+		return c
+	}
+	c.Status = "OK"
 	return c
 }
 

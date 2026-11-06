@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 )
 
 // Site is the whole content model. Field order mirrors the page narrative arc.
@@ -318,14 +319,26 @@ type Footer struct {
 	Grounding string `json:"grounding"`
 }
 
+func Expand(text, version string) string {
+	return strings.NewReplacer("{{version}}", version, "{{semver}}", strings.TrimPrefix(version, "v")).Replace(text)
+}
+
 // Load reads, parses, and validates the content file, failing loudly at each step.
 func Load(path string) (*Site, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read content %q: %w", path, err)
 	}
+	var probe struct {
+		Product struct {
+			Version string `json:"version"`
+		} `json:"product"`
+	}
+	if err := json.Unmarshal(data, &probe); err != nil {
+		return nil, fmt.Errorf("parse content %q: %w", path, err)
+	}
 	var site Site
-	if err := json.Unmarshal(data, &site); err != nil {
+	if err := json.Unmarshal([]byte(Expand(string(data), probe.Product.Version)), &site); err != nil {
 		return nil, fmt.Errorf("parse content %q: %w", path, err)
 	}
 	if err := site.Validate(); err != nil {

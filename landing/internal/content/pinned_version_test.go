@@ -23,7 +23,7 @@ func TestPinnedVersionCopiesMatchProductVersion(t *testing.T) {
 		{"tryIt.noAccount", site.TryIt.NoAccount},
 		{"tryIt.terminal", strings.Join(site.TryIt.Terminal, "\n")},
 		{"examples release command", releaseCommand(t, site)},
-		{"llms.txt", string(llms)},
+		{"llms.txt", Expand(string(llms), site.Product.Version)},
 	}
 	for _, c := range copies {
 		found := versionToken.FindAllString(c.text, -1)

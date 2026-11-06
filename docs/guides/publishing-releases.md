@@ -116,7 +116,7 @@ If the tag is correct, run `evolve release-promote vX.Y.Z --rerun`. It runs the 
 | 0 | Full dry-run preflight (only with `--require-preflight`) | the full dry-run harness | exit 1; abort before any change |
 | 1 | Pre-flight | `evolve release-preflight` | exit 1; abort before any change |
 | 2 | Auto-changelog | `evolve changelog-gen` (from the previous tag to `HEAD`) | exit 1; abort |
-| 3 | Version bump | `evolve version-bump` (the 6 version markers, with the README history row) | exit 1; abort |
+| 3 | Version bump | `evolve version-bump` (the 6 version markers, with the README history row, and the site version in `landing/shared/content.json`) | exit 1; abort |
 | 4 | Binary rebuild | `go build` of `go/evolve` with the version stamp | exit 1; abort |
 | 5 | Consistency check | `evolve release-consistency <version>` | exit 1; abort (no commits yet — the bumped files stay in the working tree, and the operator can examine them) |
 | 6 | Atomic ship | `evolve ship --class release` | exit 2; abort (nothing pushed) |
@@ -201,6 +201,12 @@ evolve marketplace-poll 22.28.0 --max-wait-s 60
 ```
 
 Use this command when you examine the question "is my installed plugin out of date?". It polls the marketplace checkout and compares it with an expected version.
+
+## The site and the README
+
+The site has one home for its version: `product.version` in `landing/shared/content.json`. The other copies write `{{version}}` (`v1.2.3`) or `{{semver}}` (`1.2.3`), and the site build fills them. `evolve version-bump` changes that one field, and `evolve release-consistency` checks it. The release commit changes `landing/**`, so `landing-pages` deploys the site.
+
+A version bump cannot find a false sentence. So `/evo:publish` runs a content review before the pipeline, and then the browser check in `landing/e2e/`. See [the plan](../plans/release-keeps-site-current-2026-11.md). No code gate enforces the review yet, so a person or an agent can skip it. The release summary states if it ran.
 
 ## CHANGELOG entry format
 
