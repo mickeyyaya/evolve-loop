@@ -57,7 +57,7 @@ The strongest proof that we can give is that this repository runs on its own pip
 | | |
 |---|---|
 | Autonomous cycles run on this repository | **2,200+** |
-| Tagged versions | **288** |
+| Tagged versions | **280+** |
 | Architecture decisions on record, with their reasons | **160+** |
 | Coverage that `evolve cover changed` requires of a changed function | **100%** |
 
@@ -128,7 +128,7 @@ A written [constitution](docs/architecture/constitution.md) ranks every rule of 
 
 - It depends on the quota of your LLM CLI subscriptions. A long run can hit a limit.
 - Some parts run in shadow, so they record a decision and do not act on it yet. These include the code-review phase, the convergence policy and the self-healing orchestrator.
-- A sandboxed Claude Code seat can end your stored login. A fix is in review: [#1345](https://github.com/mickeyyaya/evolve-loop/pull/1345), [#1343](https://github.com/mickeyyaya/evolve-loop/pull/1343).
+- A sandboxed Claude Code seat can end your stored login. A logout now reads as a login wall and not as quota. A seat token fix is on main, and it stays off until `evolve auth seat-token set`. Do not turn it on yet: the transcript readers that it needs are not built.
 - The runtime needs tmux and a Unix shell.
 - **Linux is less complete than macOS.** The bubblewrap sandbox refuses the launches that require a linked-worktree profile, so some phases cannot run under a mandatory sandbox on Linux.
 

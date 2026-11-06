@@ -87,6 +87,8 @@ A failure is routed, not fatal:
 - If a provider has no quota, a usage query records the evidence. The loop
   benches that CLI and sends the phase to the next CLI in the chain.
 - If only audit gates forced a FAIL, the build gets a bounded repair round.
+- If a CLI is logged out, the loop stops with a LOGIN-REQUIRED: reason that names
+  the family and the login step. It does not read as quota.
 - If a binary was tampered with, the ship stops, and the pin repairs itself.
 - If a peer moved main, the cycle goes back to audit on the new base.
 - If origin diverged, the push is rejected and the cycle seals as FAIL. The item

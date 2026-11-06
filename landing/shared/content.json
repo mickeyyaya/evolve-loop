@@ -840,6 +840,18 @@
         "outcome": "The provider is benched. The loop is not."
       },
       {
+        "label": "Provider logged out",
+        "code": "login.required",
+        "verdict": "BLOCK",
+        "steps": [
+          "The chain ends on a login wall, not a quota wall",
+          "The stop reason names the family and the login step (LOGIN-REQUIRED:)",
+          "The loop stops: a reset time cannot help, so it does not wait for one",
+          "After you log in, evolve loop --resume continues"
+        ],
+        "outcome": "A logged-out seat does not read as quota, so you know what to do."
+      },
+      {
         "label": "Ship binary tampered",
         "code": "SELF_SHA_TAMPERED",
         "verdict": "BLOCK",
