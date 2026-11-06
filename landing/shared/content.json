@@ -2,7 +2,7 @@
   "_comment": "SINGLE SOURCE OF TRUTH for all 5 landing-page versions. Facts/copy live here once; each bespoke page draws from this. Update numbers HERE only.",
   "product": {
     "name": "Evolve Loop",
-    "version": "v22.27.0",
+    "version": "v23.1.0",
     "mentalModel": "CI/CD for AI-written code",
     "oneBreath": "Your AI writes the code. A second AI reviews it. A dependable process, not an opinion, decides if it ships.",
     "license": "Apache-2.0",
@@ -35,7 +35,7 @@
   },
   "proofBar": [
     {
-      "value": "1,830+",
+      "value": "2,200+",
       "label": "autonomous cycles run"
     },
     {
@@ -103,7 +103,7 @@
   "pipelineDemo": {
     "kicker": "AI-composed pipeline",
     "heading": "The model composes its own pipeline.",
-    "sub": "Give it a goal. The advisor runs the mandated phases, picks from the common phases and writes new phases when the goal needs them. Then one routing table gives each phase that uses a model its CLI and model. agy runs first, on Gemini 3.8 Flash High. At the deep and top tiers, Claude Opus runs through agy first and through Claude Code second. Nothing here is pre-scripted.",
+    "sub": "Give it a goal. The advisor runs the mandated phases, picks from the common phases and writes new phases when the goal needs them. Then one routing table gives each phase that uses a model its CLI and model. agy runs first, on Gemini 3.8 Flash High. Deep seats on an agy chain run Gemini 4 Argon first, and they share by budget with Claude. Top seats run Claude Opus through agy first and through Claude Code second. Nothing here is pre-scripted. The rows below show typical choices.",
     "floor": [
       "Build",
       "Audit",
@@ -657,7 +657,17 @@
     {
       "title": "Self-repair",
       "claim": "A failure does not stop it. A failure teaches it.",
-      "proof": "When something breaks, the pipeline catches it, recovers and turns the failure into a permanent rule. If only audit gates forced a FAIL, the build gets a bounded repair round. At each wave boundary, the loop updates Claude Code and agy and smoke-tests them before dispatch. When fixes land on main, the loop rebuilds and restarts itself at the next boot."
+      "proof": "When something breaks, the pipeline catches it, recovers and turns the failure into a permanent rule. Every retry asks one retry ladder, and a small prescribed audit finding gets a patch that a fresh seat reviews. Failures with one root cause share a class fingerprint, so a repeat raises a live incident. An orchestrator agent can propose one checked action per incident, and Go code decides: this part is in shadow now. At each wave boundary, the loop updates Claude Code and agy and smoke-tests them before dispatch. When fixes land on main, the loop rebuilds and restarts itself at the next boot."
+    },
+    {
+      "title": "One top law",
+      "claim": "Every agent serves the goal, not a local metric.",
+      "proof": "A written constitution ranks the project's rules under one goal: a self-healing loop that keeps delivering the best quality features. An agent that sees a green gate treats it as evidence, not as the goal. It reports each limit of its work. The top law gives no power to cross a gate, and only the operator changes it."
+    },
+    {
+      "title": "The pipeline is the only controller",
+      "claim": "Agents are isolated workers. Code carries the flow.",
+      "proof": "No LLM in the pipeline starts or directs another. One bridge launch API starts every LLM binary, each child gets an allowlisted environment, and a phase cell cannot exec an LLM binary. The sandbox holds the protected write rule for every family. Each cell reads an artifact index with exact read grants. Some of these checks still run in shadow, and the environment rule runs at enforce."
     },
     {
       "title": "An independent second mind",
@@ -667,17 +677,17 @@
     {
       "title": "Any model. No lock-in.",
       "claim": "One routing table sends each phase to the right model.",
-      "proof": "One cli_routing table in .evolve/policy.json decides every dispatch, and evolve cli-routing is its only writer. In the table that builds Evolve Loop, agy runs first, on Gemini 3.8 Flash High. Deep and top seats run Claude Opus through agy, then through Claude Code. The auditor, the tdd engineer and the code reviewer run on Claude Code only. Codex and local models through Ollama are also routable."
+      "proof": "One cli_routing table in .evolve/policy.json decides every dispatch, and evolve cli-routing is its only writer. In the table that builds Evolve Loop, agy runs first, on Gemini 3.8 Flash High. Deep seats on an agy chain run Gemini 4 Argon first. Top seats run Claude Opus through agy, then through Claude Code. The auditor, the tdd engineer and the code reviewer run on Claude Code only, and that floor is data in the same table. A quota wall benches only the model group that hit it. Codex and local models through Ollama are also routable."
     },
     {
       "title": "Loops that converge",
       "claim": "Built so that every loop that repeats converges or escalates.",
-      "proof": "One convergence policy is built to decide the next step of every loop that repeats (ADR-0126). It runs in shadow now: no loop calls it yet. First it changes the feedback, then the strategy, then the scope. A fourth round never occurs, and a CRITICAL finding is never deferred."
+      "proof": "One convergence policy is built to decide the next step of every loop that repeats (ADR-0126). It runs in shadow now: the audit repair loop calls it and records its decision, and the decision stops nothing yet. First it changes the feedback, then the strategy, then the scope. Its design allows no fourth round and never defers a CRITICAL finding. A cycle also has a spend limit of LLM minutes, tokens and audit rounds."
     },
     {
       "title": "Standards, enforced",
       "claim": "The bar is in the tools, not in a style guide.",
-      "proof": "Code explains itself: the commit gate refuses a commit that adds a comment. Every code change is test-first, and mutation tests check the tests. Every landing passes a review loop with a convergence rule. The documentation moves to ASD-STE100 Simplified Technical English: 21 core documents use it now, and its lint is in progress."
+      "proof": "Code explains itself: the commit gate refuses a commit that adds a comment. Every code change is test-first, and mutation tests check the tests. evolve cover changed refuses a changed function below 100% coverage. Every landing passes a review loop with a convergence rule. New documentation must pass an ASD-STE100 Simplified Technical English lint, and the build floor sends a failing document back. Quality readers publish the ship rate and the code shape, with intervals, through the Signal Center."
     }
   ],
   "comparison": {
@@ -708,6 +718,11 @@
         "Repeated rounds",
         "Retry until the budget is gone",
         "Converge or escalate, never a fourth round (in shadow)"
+      ],
+      [
+        "Who controls the flow",
+        "The agent that writes the code",
+        "Go code: no LLM starts or directs another"
       ],
       [
         "Memory",
@@ -789,14 +804,38 @@
       {
         "n": "10",
         "label": "Go wide",
-        "command": "policy.json → \"fleet\": {\"count\": 3}",
-        "note": "Parallel lanes, each in its own git worktree. Quota pressure shrinks the width, but never below one isolated lane and never onto your main tree."
+        "command": "policy.json → \"fleet\": {\"count\": 4}",
+        "note": "Parallel lanes in a rolling pool, each in its own git worktree. Quota pressure shrinks the width, but never below one isolated lane and never onto your main tree."
       },
       {
         "n": "11",
+        "label": "Run a wave",
+        "command": "evolve wave next",
+        "note": "One verb runs the next wave: the boundary, a goal made from the facts of the last wave, the launch and a wave record. evolve wave status reads the state, and evolve wave stop brakes it at the next boundary."
+      },
+      {
+        "n": "12",
+        "label": "Watch by event",
+        "command": "evolve events watch --channel errors --since new",
+        "note": "Each root publishes its signals to event channels. A watcher wakes on an event, so nothing polls. evolve ci classify reads a red CI run from evidence."
+      },
+      {
+        "n": "13",
+        "label": "Run one agent",
+        "command": "evolve agent run code-reviewer --input brief.md",
+        "note": "It runs one read-only phase agent with no cycle, through the same bridge and sandbox as the loop. Any family that the table allows can fill the seat."
+      },
+      {
+        "n": "14",
+        "label": "Land a batch",
+        "command": "evolve integration batch 101 102",
+        "note": "It composes reviewed PRs into one tree, runs each deliverable's checks on that tree and lands them together. An ejected PR gets a brief that names why."
+      },
+      {
+        "n": "15",
         "label": "Publish",
-        "command": "evolve release 22.27.0",
-        "note": "A release pipeline that repairs itself: preflight gates, the changelog, an atomic version bump and a CI-verified publish. If the remote suite fails, the release demotes itself, so \"latest\" never points at a broken build."
+        "command": "evolve release 23.1.0",
+        "note": "A release pipeline that repairs itself: preflight gates, the changelog, an atomic version bump, a rebuilt binary and a marketplace poll. A failed poll or verify rolls the release back. CI on the release commit runs after that, and evolve ci watch --tag reads it. A red result gets a fix forward."
       }
     ],
     "setup": {
@@ -888,7 +927,7 @@
       "evolve-install: checksum verified",
       "evolve-install: detected AI CLI(s): claude agy",
       "Installation complete!",
-      "evolve-install: installed: evolve 22.27.0 → ~/.local/bin/evolve",
+      "evolve-install: installed: evolve 23.1.0 → ~/.local/bin/evolve",
       "evolve-install: installed binary fingerprint (SHA256): <the 64-character SHA256 of your binary>",
       "evolve-install: done. Next: evolve doctor    then    /evo:loop --cycles 3 \"your goal\""
     ],
@@ -916,7 +955,7 @@
         "href": "https://github.com/mickeyyaya/evolve-loop/releases/latest"
       }
     ],
-    "noAccount": "Pin a version: EVO_VERSION=v22.27.0 … | sh · opt out of PATH edits: EVO_NO_MODIFY_PATH=1"
+    "noAccount": "Pin a version: EVO_VERSION=v23.1.0 … | sh · opt out of PATH edits: EVO_NO_MODIFY_PATH=1"
   },
   "inboxLab": {
     "kicker": "Continuous development",
@@ -1152,12 +1191,24 @@
         "code": "GIT_PUSH_REJECTED",
         "verdict": "RETRY",
         "steps": [
-          "Ship detects the diverged origin",
-          "The cycle work stays safe on its lane branch",
-          "At the batch boundary, sync-main reconciles: merge only, nothing forced",
-          "The next ship fast-forwards"
+          "A peer moved main: the cycle goes back to audit on the new base, because a ship never rebases or forces",
+          "Origin itself diverged: the push is rejected and the cycle seals as FAIL",
+          "The item returns to the queue, and the worktree stays for salvage",
+          "evolve sync-main reconciles by merge, and the next ship fast-forwards"
         ],
-        "outcome": "A divergence becomes a boundary chore, not a lost cycle."
+        "outcome": "A divergence can cost a cycle. It never lands unaudited work, and the item runs again."
+      },
+      {
+        "label": "The same failure repeats",
+        "code": "class fingerprint",
+        "verdict": "BLOCK",
+        "steps": [
+          "Each sealed FAIL runs the incident detector at once",
+          "Failures with one root cause share a class fingerprint, so recurrence counts them",
+          "A repeating pipeline-code class raises a live incident",
+          "The console floor trips, and the pipeline fix comes before more cycles"
+        ],
+        "outcome": "Repeated failures become one incident, not many retries."
       },
       {
         "label": "No phase artifact",
