@@ -138,3 +138,9 @@ func TestConsumedRecord_NamedExports(t *testing.T) {
 		t.Errorf("ConsumedRecord fields mismatch: %#v", typed)
 	}
 }
+
+func TestFindConsumedRecord_NamedExport(t *testing.T) {
+	if _, err := FindConsumedRecord(t.TempDir(), "none"); err != ErrNotFound {
+		t.Errorf("FindConsumedRecord on an empty inbox = %v, want ErrNotFound", err)
+	}
+}
