@@ -2,7 +2,7 @@
   "_comment": "SINGLE SOURCE OF TRUTH for all 5 landing-page versions. Facts/copy live here once; each bespoke page draws from this. Update numbers HERE only.",
   "product": {
     "name": "Evolve Loop",
-    "version": "v23.2.0",
+    "version": "v23.2.1",
     "mentalModel": "CI/CD for AI-written code",
     "oneBreath": "Your AI writes the code. A second AI reviews it. A dependable process, not an opinion, decides if it ships.",
     "license": "Apache-2.0",
