@@ -140,11 +140,12 @@ func (agg *aggregator) report() *Report {
 }
 
 type MarkdownOptions struct {
-	Title        string
-	Top          int
-	ThresholdPkg float64
-	ThresholdTst float64
-	Budget       float64
+	Title         string
+	Top           int
+	ThresholdPkg  float64
+	ThresholdTst  float64
+	Budget        float64
+	TimeoutMargin float64
 }
 
 func (rep *Report) Markdown(o MarkdownOptions) string {
@@ -152,6 +153,7 @@ func (rep *Report) Markdown(o MarkdownOptions) string {
 	fmt.Fprintf(&b, "# %s\n\n", o.Title)
 	rep.writeOverBudget(&b, o)
 	rep.writeOverview(&b, o)
+	rep.writeTimeoutMargin(&b, o)
 	rep.writeSlowPackages(&b, o)
 	rep.writeSlowestTests(&b, o)
 	rep.writeOverThresholdCount(&b, o)
@@ -252,4 +254,35 @@ func (rep *Report) writeOverThresholdCount(b *strings.Builder, o MarkdownOptions
 func shortPkg(pkg string) string {
 	const prefix = "github.com/mickeyyaya/evolve-loop/go/"
 	return strings.TrimPrefix(pkg, prefix)
+}
+
+const lowMarginPercent = 20
+
+func (rep *Report) writeTimeoutMargin(b *strings.Builder, o MarkdownOptions) {
+	if o.TimeoutMargin <= 0 {
+		return
+	}
+	fmt.Fprintf(b, "## Margin against the go test timeout\n\n")
+	b.WriteString("| Package | Wall (s) | Timeout (s) | Margin (s) | Margin (%) | Flag |\n|---|--:|--:|--:|--:|---|\n")
+	rows := 0
+	for _, p := range rep.Packages {
+		if p.Status != "" {
+			margin := o.TimeoutMargin - p.Wall
+			flag := ""
+			if margin*100 < o.TimeoutMargin*lowMarginPercent {
+				flag = "LOW"
+			}
+			fmt.Fprintf(b, "| %s | %.2f | %.2f | %.2f | %.1f | %s |\n", shortPkg(p.Pkg), p.Wall, o.TimeoutMargin, margin, margin/o.TimeoutMargin*100, flag)
+			rows++
+			break
+		}
+	}
+	for _, name := range rep.Incomplete {
+		fmt.Fprintf(b, "| %s | | %.2f | | | no terminal summary |\n", shortPkg(name), o.TimeoutMargin)
+		rows++
+	}
+	if rows == 0 {
+		b.WriteString("| _(none)_ | | | | | |\n")
+	}
+	b.WriteString("\n")
 }

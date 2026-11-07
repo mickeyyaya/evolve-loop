@@ -48,7 +48,7 @@ export GORACE := $(strip $(GORACE) atexit_sleep_ms=0)
 .PHONY: build test test-component test-integration test-e2e test-acs-durable test-all \
         test-latency test-budget cover apicover lint tidy clean help dist dist-clean \
         cover-strict cover-changed apicover-enforce apicover-check \
-        test-integration-darwin cover-changed-darwin cover-strict-darwin darwin-set \
+        test-integration-darwin print-test-timeout-darwin cover-changed-darwin cover-strict-darwin darwin-set \
         dist-darwin-amd64 dist-darwin-arm64 dist-linux-amd64 dist-linux-arm64 \
         dist-darwin-universal dist-checksums
 
@@ -117,6 +117,7 @@ test-component: ## Component tier: several internal packages wired against temp 
 TEST_TIMEOUT ?= 20m
 INTEGRATION_SET ?=
 DARWIN_SET := .darwin-set
+DARWIN_TEST_TIMEOUT := 30m
 TEST_JSON ?=
 TEST_RUSAGE ?=
 RUSAGE_EXEC = $(if $(strip $(TEST_RUSAGE)),-exec $(abspath $(BIN_DIR))/testrusage,)
@@ -172,8 +173,11 @@ test-integration: ## Full non-ACS runtime suite with integration, race, and cove
 
 test-integration-darwin: ## test-integration over the packages of go/.darwin-set only (the macOS CI job); fails when the set file is missing or names no package
 test-integration-darwin: INTEGRATION_SET = $(DARWIN_SET)
-test-integration-darwin: TEST_TIMEOUT = 30m
+test-integration-darwin: TEST_TIMEOUT = $(DARWIN_TEST_TIMEOUT)
 test-integration-darwin: test-integration
+
+print-test-timeout-darwin: ## Print the go test -timeout that test-integration-darwin applies (the macOS CI margin report reads it)
+	@echo $(DARWIN_TEST_TIMEOUT)
 
 darwin-set: ## Write go/.darwin-set: the packages whose code or tests differ on macOS (build constraints, runtime.GOOS checks, sandbox-exec callers)
 	@$(GO) run ./cmd/darwinset > $(DARWIN_SET).tmp && mv $(DARWIN_SET).tmp $(DARWIN_SET) || { rm -f $(DARWIN_SET).tmp; exit 1; }

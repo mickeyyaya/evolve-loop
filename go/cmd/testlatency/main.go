@@ -41,6 +41,10 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "testlatency: %v\n", err)
 		return 2
 	}
+	margin, ok := parseTimeoutMargin(o.timeoutMargin, stderr)
+	if !ok {
+		return 2
+	}
 	ratchet, timeout, ok := loadGate(o.ratchetPath, o.testTimeout, stderr)
 	if !ok {
 		return 2
@@ -51,11 +55,12 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 1
 	}
 	fmt.Fprint(stdout, rep.Markdown(MarkdownOptions{
-		Title:        o.title,
-		Top:          o.top,
-		ThresholdPkg: o.thrPkg,
-		ThresholdTst: o.thrTest,
-		Budget:       limit.Seconds(),
+		Title:         o.title,
+		Top:           o.top,
+		ThresholdPkg:  o.thrPkg,
+		ThresholdTst:  o.thrTest,
+		Budget:        limit.Seconds(),
+		TimeoutMargin: margin.Seconds(),
 	}))
 	overBudget := enforce && len(rep.OverBudget(limit.Seconds())) > 0
 	gateFailed := ratchet.gate(stdout, stderr, rep, timeout) && !o.reportOnly
@@ -80,17 +85,18 @@ func resolveBudget(wallBudget string, pkgBudget, failOver bool, budget time.Dura
 }
 
 type options struct {
-	title       string
-	top         int
-	thrPkg      float64
-	thrTest     float64
-	budget      time.Duration
-	failOver    bool
-	pkgBudget   bool
-	ratchetPath string
-	testTimeout string
-	reportOnly  bool
-	render      bool
+	title         string
+	top           int
+	thrPkg        float64
+	thrTest       float64
+	budget        time.Duration
+	failOver      bool
+	pkgBudget     bool
+	ratchetPath   string
+	testTimeout   string
+	reportOnly    bool
+	render        bool
+	timeoutMargin string
 }
 
 func parseOptions(args []string, stderr io.Writer) (options, bool) {
@@ -107,8 +113,21 @@ func parseOptions(args []string, stderr io.Writer) (options, bool) {
 	fs.StringVar(&o.testTimeout, "test-timeout", "20m", "the go test timeout that caps every package limit")
 	fs.BoolVar(&o.reportOnly, "ratchet-report-only", false, "print each package above its ratchet limit but exit 0 for a breach; an unreadable ratchet or stream still fails")
 	fs.BoolVar(&o.render, "render", false, "write the Output field of each event to stdout (the plain go test text) and exit 0")
+	fs.StringVar(&o.timeoutMargin, "timeout-margin", "", "add a section with the margin of the slowest package against this go test timeout (for example 30m); LOW under 20%")
 	if err := fs.Parse(args); err != nil {
 		return options{}, false
 	}
 	return o, true
+}
+
+func parseTimeoutMargin(value string, stderr io.Writer) (time.Duration, bool) {
+	if value == "" {
+		return 0, true
+	}
+	d, err := time.ParseDuration(value)
+	if err != nil || d <= 0 {
+		fmt.Fprintf(stderr, "testlatency: -timeout-margin %q: want a positive duration such as 30m\n", value)
+		return 0, false
+	}
+	return d, true
 }
