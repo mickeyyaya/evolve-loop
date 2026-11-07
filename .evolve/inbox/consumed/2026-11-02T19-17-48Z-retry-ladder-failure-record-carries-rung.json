@@ -1,0 +1,37 @@
+{
+  "acceptance": [
+    "a failed item records its rung",
+    "D10 reads the record",
+    "100% coverage on changed functions"
+  ],
+  "campaign": "docs/plans/retry-ladder-2026-10",
+  "consumed": {
+    "at": "2026-11-07T11:59:23Z",
+    "cycle": "",
+    "via": "ship"
+  },
+  "continuation": {
+    "base_sha": "23d09f7c638b71e7c9906fcf6b0f76ff387c4570",
+    "branch": "cycle-cd3ae73e-2146",
+    "cycle": 2146,
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2146/audit-fail-reason.json",
+    "snapshot_sha": "e63c5ece062cb8b479cdf03426ba1648ed8d17f9",
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2146"
+  },
+  "created_at": "2026-11-02T19:17:48Z",
+  "deps": [],
+  "files": [
+    "go/internal/retryladder",
+    "go/internal/inboxmover"
+  ],
+  "fix": "Write the rung into the item failure record and let the D10 check read it.",
+  "id": "retry-ladder-failure-record-carries-rung",
+  "kind": "feature",
+  "notes": "must land before the L8 enforce flip",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "console, 2026-11-03, plan audit of docs/plans (operator request: no task overlooked); plan docs/plans/retry-ladder-2026-10.md",
+  "summary": "Plan section 5 'two gaps stay open': the item failure record has no rung, so the D10 'at R1 or higher' check cannot run.",
+  "title": "Retry ladder gap 1: an item failure record carries the rung it failed at",
+  "weight": 0.45
+}

@@ -21,6 +21,7 @@ type Policy struct {
 	RoutedIDs    map[string]bool
 	FailureClass string
 	Fingerprint  string
+	FailureRung  string
 }
 
 func (m *Mover) ReleaseFromQuarantine(taskID string) (PromoteResult, error) {
@@ -43,6 +44,7 @@ func (m *Mover) ReleaseFromQuarantine(taskID string) (PromoteResult, error) {
 		delete(item, inboxbatch.LastFailureReasonField)
 		delete(item, inboxbatch.LastFailureClassField)
 		delete(item, inboxbatch.LastFailureFingerprintField)
+		delete(item, inboxbatch.LastFailureRungField)
 	}); rerr != nil {
 		m.warn(fault{code: CodeItemRewriteFailed, origin: "Mover.ReleaseFromQuarantine", legacy: "WARN: ",
 			reason: fmt.Sprintf("quarantine-release: failure_count reset failed for '%s' (%v) — released with its stale count", taskID, rerr),

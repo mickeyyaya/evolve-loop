@@ -21,12 +21,12 @@ func TestMover_Release_ChargesTheItemWithTheFailureRecord(t *testing.T) {
 func TestBumpWith_AFailureWithoutAClassClearsTheOlderRecord(t *testing.T) {
 	inbox := newInbox(t)
 	item := filepath.Join(inbox, "a.json")
-	writeItem(t, item, `{"id":"a","failure_count":1,"last_failure_class":"capability","last_failure_fingerprint":"codes:old"}`)
+	writeItem(t, item, `{"id":"a","failure_count":1,"last_failure_class":"capability","last_failure_fingerprint":"codes:old","last_failure_rung":"R2"}`)
 	if n, err := bumpWith(item, failureRecord{reason: "r"}, nil); err != nil || n != 2 {
 		t.Fatalf("n = %d, err = %v", n, err)
 	}
 	doc := readJSON(t, item)
-	for _, k := range []string{"last_failure_class", "last_failure_fingerprint"} {
+	for _, k := range []string{"last_failure_class", "last_failure_fingerprint", "last_failure_rung"} {
 		if _, kept := doc[k]; kept {
 			t.Errorf("the record describes the latest failure only, but %s stayed: %v", k, doc)
 		}
@@ -35,16 +35,40 @@ func TestBumpWith_AFailureWithoutAClassClearsTheOlderRecord(t *testing.T) {
 
 func TestMover_ReleaseFromQuarantine_ClearsTheFailureRecord(t *testing.T) {
 	inbox := newInbox(t)
-	writeItem(t, filepath.Join(inbox, "quarantine", "q.json"), `{"id":"q","failure_count":2,"last_failure_reason":"r","last_failure_class":"spec","last_failure_fingerprint":"text:abc"}`)
+	writeItem(t, filepath.Join(inbox, "quarantine", "q.json"), `{"id":"q","failure_count":2,"last_failure_reason":"r","last_failure_class":"spec","last_failure_fingerprint":"text:abc","last_failure_rung":"R1"}`)
 	m := New(inbox, nil)
 	res, err := m.ReleaseFromQuarantine("q")
 	if err != nil {
 		t.Fatalf("ReleaseFromQuarantine: %v", err)
 	}
 	doc := readJSON(t, res.DestPath)
-	for _, k := range []string{"last_failure_reason", "last_failure_class", "last_failure_fingerprint"} {
+	for _, k := range []string{"last_failure_reason", "last_failure_class", "last_failure_fingerprint", "last_failure_rung"} {
 		if _, kept := doc[k]; kept {
 			t.Errorf("a released item starts with a clean failure record, but %s stayed: %v", k, doc)
+		}
+	}
+}
+
+func TestBumpWith_StampsTheRungOfTheFailedTry(t *testing.T) {
+	inbox := newInbox(t)
+	item := filepath.Join(inbox, "a.json")
+	writeItem(t, item, `{"id":"a"}`)
+	if _, err := bumpWith(item, failureRecord{reason: "r", rung: "R1"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := string(readJSON(t, item)["last_failure_rung"]); got != `"R1"` {
+		t.Errorf("last_failure_rung = %s", got)
+	}
+}
+
+func TestMover_ReadLastFailureRung_ReadsPendingAndClaimedOnly(t *testing.T) {
+	inbox := newInbox(t)
+	writeItem(t, filepath.Join(inbox, "a.json"), `{"id":"a","last_failure_rung":"R2"}`)
+	writeItem(t, filepath.Join(inbox, "quarantine", "q.json"), `{"id":"q","last_failure_rung":"R1"}`)
+	m := New(inbox, nil)
+	for id, want := range map[string]string{"a": "R2", "q": "", "ghost": ""} {
+		if got := m.ReadLastFailureRung(id); got != want {
+			t.Errorf("ReadLastFailureRung(%s) = %q, want %q", id, got, want)
 		}
 	}
 }

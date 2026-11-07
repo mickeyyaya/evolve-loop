@@ -50,6 +50,7 @@ const (
 	LastFailureReasonField       = "last_failure_reason"
 	LastFailureClassField        = "last_failure_class"
 	LastFailureFingerprintField  = "last_failure_fingerprint"
+	LastFailureRungField         = "last_failure_rung"
 	LastFailureCycleField        = "last_failure_cycle"
 	ContinuationField            = "continuation"
 	ReleasedContinuationsField   = "released_continuations"
@@ -93,6 +94,7 @@ var fieldRoles = map[string]FieldRole{
 	LastFailureReasonField:      loopStamp,
 	LastFailureClassField:       loopStamp,
 	LastFailureFingerprintField: loopStamp,
+	LastFailureRungField:        loopStamp,
 	LastFailureCycleField:       loopStamp,
 	ContinuationField:           loopStamp,
 	ReleasedContinuationsField:  loopStamp,

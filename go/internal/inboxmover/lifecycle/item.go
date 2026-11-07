@@ -111,9 +111,15 @@ func (m *Mover) ReadLastFailureClass(taskID string) string {
 	return rec.LastFailureClass
 }
 
+func (m *Mover) ReadLastFailureRung(taskID string) string {
+	rec, _ := m.readFailureFields(taskID)
+	return rec.LastFailureRung
+}
+
 type failureFields struct {
 	FailureCount     int    `json:"failure_count"`
 	LastFailureClass string `json:"last_failure_class"`
+	LastFailureRung  string `json:"last_failure_rung"`
 }
 
 func (m *Mover) readFailureFields(taskID string) (failureFields, bool) {
@@ -148,8 +154,8 @@ func readFailureFieldsAt(path string) (failureFields, bool) {
 }
 
 type failureRecord struct {
-	reason, class, fingerprint string
-	cycle                      int
+	reason, class, fingerprint, rung string
+	cycle                            int
 }
 
 func BumpFailureCount(path, reason string) (int, error) {
@@ -173,6 +179,7 @@ func bumpWith(path string, rec failureRecord, shedAt func(count int) bool) (int,
 		stampText(item, inboxbatch.LastFailureReasonField, rec.reason)
 		stampOrClear(item, inboxbatch.LastFailureClassField, rec.class)
 		stampOrClear(item, inboxbatch.LastFailureFingerprintField, rec.fingerprint)
+		stampOrClear(item, inboxbatch.LastFailureRungField, rec.rung)
 		if shedAt != nil && shedAt(count) {
 			delete(item, inboxbatch.ContinuationField)
 		}

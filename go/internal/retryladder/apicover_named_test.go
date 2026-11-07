@@ -8,6 +8,20 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/retryladder"
 )
 
+func TestParseRungAcceptsOnlyTheFourRungs(t *testing.T) {
+	for _, in := range []string{"R0", "R1", "R2", "R3"} {
+		got, ok := retryladder.ParseRung(in)
+		if !ok || string(got) != in {
+			t.Errorf("ParseRung(%q) = %q, %v", in, got, ok)
+		}
+	}
+	for _, in := range []string{"", "R4", "r1", " R1", "audit_fix"} {
+		if got, ok := retryladder.ParseRung(in); ok || got != "" {
+			t.Errorf("ParseRung(%q) = %q, %v, want rejection", in, got, ok)
+		}
+	}
+}
+
 func TestExportsAreNamed(t *testing.T) {
 	facts := retryladder.Facts{
 		ExitCode:           85,

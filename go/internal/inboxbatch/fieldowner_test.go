@@ -12,7 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
-var loopStampKeys = []string{"consumed", "continuation", "failure_count", "git_sha", "last_failure_class", "last_failure_cycle", "last_failure_fingerprint", "last_failure_reason", "protected_files", "released_continuations",
+var loopStampKeys = []string{"consumed", "continuation", "failure_count", "git_sha", "last_failure_class", "last_failure_cycle", "last_failure_fingerprint", "last_failure_reason", "last_failure_rung", "protected_files", "released_continuations",
 	"retired_cycle", "retired_reason", "route", "routed_at", "routed_cycle", "routed_reason", "unbacked"}
 
 var operatorStampKeys = []string{"intake_override", "premise_verified_at", "premise_verified_evidence", "premise_verified_sha"}
@@ -145,6 +145,7 @@ func TestStampFieldConstants_SpellTheKeysTheInboxHolds(t *testing.T) {
 		{inboxbatch.LastFailureClassField, "last_failure_class"},
 		{inboxbatch.LastFailureCycleField, "last_failure_cycle"},
 		{inboxbatch.LastFailureFingerprintField, "last_failure_fingerprint"},
+		{inboxbatch.LastFailureRungField, "last_failure_rung"},
 		{inboxbatch.ContinuationField, "continuation"},
 		{inboxbatch.ReleasedContinuationsField, "released_continuations"},
 		{inboxbatch.ConsumedField, "consumed"},

@@ -34,6 +34,7 @@ type FailureInputs struct {
 	Reason          string
 	FailureClass    retryladder.Class
 	Fingerprint     string
+	FailureRung     string
 	Protected       func(string) bool
 	Stderr          io.Writer
 	Ledger          inboxmover.LedgerAppender
@@ -81,6 +82,7 @@ func ApplyFailure(in FailureInputs) (inboxmover.OutcomeResult, error) {
 		RoutedIDs:    routedIDs,
 		FailureClass: string(in.FailureClass),
 		Fingerprint:  in.Fingerprint,
+		FailureRung:  in.FailureRung,
 	})
 	if err != nil {
 		return res, fmt.Errorf("apply cycle %d failure outcome: %w", in.Cycle, err)
@@ -133,6 +135,7 @@ func FailureInputsFor(projectRoot, evolveDir, workspace string, cycle int, stder
 		Reason:          "cycle-failure-release",
 		FailureClass:    failureClassOf(cls),
 		Fingerprint:     retryladder.Fingerprint(firstFailureReason(workspace)),
+		FailureRung:     recordedRung(workspace),
 		Stderr:          stderr,
 		PriorityClasses: pol.InboxPriorityConfig().ClassOrder,
 	}
@@ -140,6 +143,22 @@ func FailureInputsFor(projectRoot, evolveDir, workspace string, cycle int, stder
 		in.Refusal, in.RefusalDetail, in.RefusalSubject = cls.Marker, cls.Detail, cls.Subject
 	}
 	return in
+}
+
+func recordedRung(workspace string) string {
+	body, err := os.ReadFile(filepath.Join(workspace, "cycle-state.json"))
+	if err != nil {
+		return ""
+	}
+	var st cyclestate.CycleState
+	if json.Unmarshal(body, &st) != nil || st.Ladder == nil {
+		return ""
+	}
+	rung, valid := retryladder.ParseRung(st.Ladder.Rung)
+	if !valid {
+		return ""
+	}
+	return string(rung)
 }
 
 func IsTaskLevelFailure(c cycleclassify.Classification) bool {

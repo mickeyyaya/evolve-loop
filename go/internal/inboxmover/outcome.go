@@ -24,6 +24,7 @@ type CycleOutcome struct {
 	RoutedIDs    []string
 	FailureClass string
 	Fingerprint  string
+	FailureRung  string
 }
 
 type OutcomeResult struct {
@@ -73,15 +74,7 @@ func ApplyCycleOutcome(opts Options, oc CycleOutcome) (OutcomeResult, error) {
 	}
 
 	ClaimLaneScope(opts, oc.Cycle, committed)
-	rr, err := releaseCycleProcessing(opts, oc.Cycle, oc.Reason, &quarantinePolicy{
-		Ceiling:      oc.Ceiling,
-		SystemLevel:  oc.SystemLevel,
-		Routed:       oc.Routed,
-		RoutedIDs:    idSet(oc.RoutedIDs),
-		Committed:    idSet(committed),
-		FailureClass: oc.FailureClass,
-		Fingerprint:  oc.Fingerprint,
-	})
+	rr, err := releaseCycleProcessing(opts, oc.Cycle, oc.Reason, failurePolicy(oc, committed))
 	for _, p := range rr.Paths {
 		if strings.Contains(p, filepath.Join(opts.InboxDir, "quarantine")+string(filepath.Separator)) {
 			res.Quarantined = append(res.Quarantined, p)
@@ -93,6 +86,19 @@ func ApplyCycleOutcome(opts Options, oc CycleOutcome) (OutcomeResult, error) {
 		return res, fmt.Errorf("apply-cycle-outcome: failure drain: %w", err)
 	}
 	return res, nil
+}
+
+func failurePolicy(oc CycleOutcome, committed []string) *quarantinePolicy {
+	return &quarantinePolicy{
+		Ceiling:      oc.Ceiling,
+		SystemLevel:  oc.SystemLevel,
+		Routed:       oc.Routed,
+		RoutedIDs:    idSet(oc.RoutedIDs),
+		Committed:    idSet(committed),
+		FailureClass: oc.FailureClass,
+		Fingerprint:  oc.Fingerprint,
+		FailureRung:  oc.FailureRung,
+	}
 }
 
 func ClaimLaneScope(opts Options, cycle int, ids []string) []string {

@@ -18,6 +18,14 @@ const (
 	R3 Rung = "R3"
 )
 
+func ParseRung(s string) (Rung, bool) {
+	switch r := Rung(s); r {
+	case R0, R1, R2, R3:
+		return r, true
+	}
+	return "", false
+}
+
 type Action string
 
 const (

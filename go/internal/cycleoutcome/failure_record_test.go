@@ -147,3 +147,29 @@ func TestFirstFailureReason_FailsOpenToEmpty(t *testing.T) {
 		t.Errorf("bad json: %q", got)
 	}
 }
+
+func TestRecordedRungKeepsOnlyAKnownLadderRung(t *testing.T) {
+	cases := map[string]struct {
+		state string
+		want  string
+	}{
+		"known rung":      {`{"ladder":{"rung":"R2"}}`, "R2"},
+		"unknown rung":    {`{"ladder":{"rung":"R9"}}`, ""},
+		"no ladder":       {`{"cycle_id":1}`, ""},
+		"unparseable":     {`{`, ""},
+		"no state at all": {"", ""},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			ws := t.TempDir()
+			if tc.state != "" {
+				if err := os.WriteFile(filepath.Join(ws, "cycle-state.json"), []byte(tc.state), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if got := recordedRung(ws); got != tc.want {
+				t.Errorf("recordedRung = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
