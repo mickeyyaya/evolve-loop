@@ -240,6 +240,7 @@ func (r gcRun) project(projectRoot string) int {
 		func(s gcRun) bool { return s.runDirs(evolveDir, gcPol) },
 		func(s gcRun) bool { return s.goCache(gcPol) },
 		func(s gcRun) bool { return s.pipelineTemp(gcPol.TempTTLHours) },
+		func(s gcRun) bool { return s.seatSessions(gcPol, opts.WorktreeBase) },
 		func(s gcRun) bool { return s.testCache(evolveDir, gcPol) },
 		func(s gcRun) bool { return s.claimDirs(projectRoot) },
 	}
@@ -397,6 +398,26 @@ func (r gcRun) pipelineTemp(ttlHours int) bool {
 	r.summary("%d stale pipeline temp artifact(s) would be removed (%s unused > %dh in %s)", "removed %d stale pipeline temp artifact(s) (%s unused > %dh in %s)", rep.Entries, gcSize(rep.Bytes), ttlHours, dir)
 	for _, e := range rep.Errors {
 		fmt.Fprintf(r.stderr, "evolve gc: temp error: %s\n", e)
+	}
+	return len(rep.Errors) > 0
+}
+
+func (r gcRun) seatSessions(pol gc.Policy, worktreeBase string) bool {
+	if pol.TempTTLHours <= 0 {
+		fmt.Fprintf(r.stdout, "evolve gc: seat session sweep off (gc.temp_ttl_hours unset)\n")
+		return false
+	}
+	root := pol.SeatSessionRoot
+	if root == "" {
+		root = gc.DefaultSeatSessionRoot()
+	}
+	if resolved, err := filepath.EvalSymlinks(worktreeBase); err == nil {
+		worktreeBase = resolved
+	}
+	rep := gc.ReapSeatSessions(root, worktreeBase, time.Now().Add(-time.Duration(pol.TempTTLHours)*time.Hour), r.removeAll)
+	r.summary("%d stale seat session folder(s) would be removed (%s unused > %dh in %s)", "removed %d stale seat session folder(s) (%s unused > %dh in %s)", rep.Entries, gcSize(rep.Bytes), pol.TempTTLHours, root)
+	for _, e := range rep.Errors {
+		fmt.Fprintf(r.stderr, "evolve gc: seat session error: %s\n", e)
 	}
 	return len(rep.Errors) > 0
 }

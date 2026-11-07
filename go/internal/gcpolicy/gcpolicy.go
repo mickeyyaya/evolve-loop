@@ -15,6 +15,7 @@ type Policy struct {
 	GoCacheMaxGB    int        `json:"go_cache_max_gb,omitempty"`
 	CacheTrimFreeGB int        `json:"cache_trim_free_gb,omitempty"`
 	TempTTLHours    int        `json:"temp_ttl_hours,omitempty"`
+	SeatSessionRoot string     `json:"seat_session_root,omitempty"`
 
 	TestCacheTTLDays int `json:"testcache_ttl_days,omitempty"`
 	TestCacheMaxMB   int `json:"testcache_max_mb,omitempty"`
