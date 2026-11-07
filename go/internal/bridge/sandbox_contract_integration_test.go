@@ -67,7 +67,7 @@ rm -rf $d`
 var agentContract = []contractRow{
 	{action: "start a private tmux server (-L) and run a window on its own pty", want: contractAllow,
 		script: func(h contractHost) string {
-			return "d=" + h.scratch + "/own; mkdir -p $d && export TMUX_TMPDIR=$d && tmux -L mine -f /dev/null new-session -d 'tty > " + h.scratch + "/window.tty; tmux -L mine wait-for -S ran' && tmux -L mine wait-for ran && cat " + h.scratch + "/window.tty; s=$?; tmux -L mine kill-server 2>/dev/null; exit $s"
+			return "d=" + h.scratch + "/own; mkdir -p $d && export TMUX_TMPDIR=$d && tmux -L mine -f /dev/null start-server \\; set -g default-shell /bin/sh \\; set -s exit-empty off \\; new-session -d -s keep && { tmux -L mine has-session -t keep || { echo 'the private tmux server never became ready'; exit 1; }; } && tmux -L mine new-window -d 'tty > " + h.scratch + "/window.tty; tmux -L mine wait-for -S ran' && tmux -L mine wait-for ran && cat " + h.scratch + "/window.tty; s=$?; tmux -L mine kill-server 2>/dev/null; exit $s"
 		},
 		check: func(t *testing.T, h contractHost, out string) {
 			if !strings.HasPrefix(out, "/dev/ttys") || out == h.ownTTY || out == h.peerTTY {
