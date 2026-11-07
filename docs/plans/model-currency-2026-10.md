@@ -171,7 +171,7 @@ With the switch set, `agy update` at a boundary is the only loop path that moves
   - a 10-minute updater (`updaterTimeout`, now a hard bound through the process group);
   - a 4-minute smoke after the update.
 
-  That is about 18 minutes per family. The 22 minutes of the review counted the probe and the found-change smoke both; since W2, a found change replaces the probe. With claude and agy, the worst case is about 36 minutes at one boundary. When nothing changed and both probes answer, it is seconds. L2 removes the probe. A budget for each boundary is not built.
+  That is about 18 minutes per family. The 22 minutes of the review counted the probe and the found-change smoke both; since W2, a found change replaces the probe. With claude and agy, the worst case is about 36 minutes at one boundary. When nothing changed and both probes answer, it is seconds. L2 removes the probe. C5 built the budget: `DefaultBoundaryBudget` (20 minutes, `go/internal/cliupdate/cliupdate.go:31`) cuts a stalled family to `skipped`, and no later family starts.
 - The non-interactive behavior of `agy update` is not verified on a live host, because no real updater ran in this change. If it prompts, it reads EOF on its closed stdin. Then the family reports `update-failed` with a passing smoke, which is a WARN, not a halt.
 - `claude update` on a claude that brew installed and pinned can refuse. That is an `update-failed` WARN at each boundary, until the operator unpins the family or holds it as above.
 - The exact value parsing of `AGY_CLI_DISABLE_AUTO_UPDATE` is not read. The binary shows only the name and "disabled via environment variable". Thus the value is `1`, which is true for a non-empty check and for a boolean parse. It is also not known if the explicit `agy update` obeys it. The boundary runs `agy update` from the environment of the loop, which does not set it.
@@ -232,9 +232,9 @@ The event is still emitted. The module prefix of the registry makes the event `B
 - the mismatch tests of `usageevidence`;
 - the seat guards of cmd/evolve, which turn red when the rule is removed.
 
-**What remains of C5.**
+**What C5 built after the first slice.**
 
-1. **Model, not family.** The slice compares the model family. A label with the right family passes, also when its model is not the catalog pick for the tier. Examples: Sonnet for an Opus dispatch, or an older version. Currency needs a comparison of the label with the catalog model for the tier of the dispatch.
-2. **Other targets.** `agy-tmux` (Gemini seats) declares no rule. `claude-tmux` has no footer label: its check reads the `message.model` of the transcript, which is not built.
+1. **Model, not family.** A launch whose served model differs from the catalog pick emits the mismatch signal (`go/internal/bridge/served_model.go:30`, `go/internal/bridge/launch_model_verification.go:154`).
+2. **Other targets.** `agy-tmux` declares a Gemini rule (`go/internal/bridge/manifests/agy-tmux.json`). `claude-tmux` reads the `message.model` of the transcript (`go/internal/tokenusage/scanner.go:131`).
 3. **The floor.** A floor seat routes to agy-claude only after L1c judges the floor by model family. The guard for that day is in place.
 

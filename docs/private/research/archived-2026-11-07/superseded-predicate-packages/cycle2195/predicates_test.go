@@ -1,0 +1,64 @@
+//go:build acs
+
+package cycle2195
+
+import (
+	"path/filepath"
+	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+)
+
+func goTests(t *testing.T, pkg, pattern string, names ...string) {
+	t.Helper()
+	acsassert.GoTests(t, acsassert.GoTestSpec{
+		Dir:     filepath.Join(acsassert.RepoRoot(t), "go"),
+		Package: pkg,
+		Pattern: pattern,
+		Names:   names,
+	})
+}
+
+func TestC2195_001_ALaunchWhoseServedModelDiffersFromTheCatalogPickEmitsTheMismatchSignalAndAPickedModelEmitsNothing(t *testing.T) {
+	goTests(t, "./internal/bridge",
+		"^(TestLaunchModelVerification_AgyClaudeBootingAnotherClaudeModelFailsOverWithTheMismatchSignal|TestLaunchModelVerification_AgyClaudeBootingAnOlderVersionOfThePickedModelIsAMismatch|TestLaunchModelVerification_ThePickedModelAtAnotherEffortStillVerifies|TestLaunchModelVerification_AgyTmuxBootingAnotherGeminiModelIsAMismatch|TestServedModel_AClaudeTmuxTranscriptModelOfAnotherTierEmitsTheMismatchSignal|TestServedModel_AClaudeTmuxTranscriptModelOfThePickedTierEmitsNothing)$",
+		"TestLaunchModelVerification_AgyClaudeBootingAnotherClaudeModelFailsOverWithTheMismatchSignal",
+		"TestLaunchModelVerification_AgyClaudeBootingAnOlderVersionOfThePickedModelIsAMismatch",
+		"TestLaunchModelVerification_ThePickedModelAtAnotherEffortStillVerifies",
+		"TestLaunchModelVerification_AgyTmuxBootingAnotherGeminiModelIsAMismatch",
+		"TestServedModel_AClaudeTmuxTranscriptModelOfAnotherTierEmitsTheMismatchSignal",
+		"TestServedModel_AClaudeTmuxTranscriptModelOfThePickedTierEmitsNothing")
+}
+
+func TestC2195_002_ClaudeTmuxReadsMessageModelFromTheTranscriptThroughTheEngineLaunchPath(t *testing.T) {
+	goTests(t, "./internal/tokenusage",
+		"^(TestScanConfigRoot_ServedModelIsTheLatestRealAssistantModelInTheWindow|TestScanConfigRoot_ATranscriptWithNoModelFieldReportsNoServedModel)$",
+		"TestScanConfigRoot_ServedModelIsTheLatestRealAssistantModelInTheWindow",
+		"TestScanConfigRoot_ATranscriptWithNoModelFieldReportsNoServedModel")
+	goTests(t, "./internal/bridge",
+		"^(TestServedModel_AClaudeTmuxTranscriptModelOfAnotherTierEmitsTheMismatchSignal|TestServedModel_AClaudeTmuxWithNoTranscriptModelEmitsNothing|TestServedModel_AClaudeTmuxFullIdPickServedByAnOlderVersionEmitsTheMismatchSignal|TestServedModel_AClaudeTmuxFullIdPickServedByItselfEmitsNothing)$",
+		"TestServedModel_AClaudeTmuxTranscriptModelOfAnotherTierEmitsTheMismatchSignal",
+		"TestServedModel_AClaudeTmuxWithNoTranscriptModelEmitsNothing",
+		"TestServedModel_AClaudeTmuxFullIdPickServedByAnOlderVersionEmitsTheMismatchSignal",
+		"TestServedModel_AClaudeTmuxFullIdPickServedByItselfEmitsNothing")
+}
+
+func TestC2195_003_AgyTmuxDeclaresTheGeminiRuleAndItsDriverRunsItBeforeThePrompt(t *testing.T) {
+	goTests(t, "./internal/bridge",
+		"^(TestLaunchModelCheckFor_AgyTmuxDeclaresTheGeminiRule|TestLaunchModelVerification_AgyTmuxBootingClaudeFailsOverWithTheMismatchSignal|TestLaunchModelVerification_AgyTmuxBootingItsPickedGeminiDeliversThePrompt|TestVerifiesLaunchModel_IsTheTargetDriversOwnCheck|TestEveryManifestDeclaringALaunchModelRuleIsDrivenByAVerifier)$",
+		"TestLaunchModelCheckFor_AgyTmuxDeclaresTheGeminiRule",
+		"TestLaunchModelVerification_AgyTmuxBootingClaudeFailsOverWithTheMismatchSignal",
+		"TestLaunchModelVerification_AgyTmuxBootingItsPickedGeminiDeliversThePrompt",
+		"TestVerifiesLaunchModel_IsTheTargetDriversOwnCheck",
+		"TestEveryManifestDeclaringALaunchModelRuleIsDrivenByAVerifier")
+}
+
+func TestC2195_004_TheBoundaryUpdateStallIsCutAtTheBudgetToASkipAndNoLaterFamilyStarts(t *testing.T) {
+	goTests(t, "./internal/cliupdate",
+		"^(TestDefaultBoundaryBudget_AdmitsOneFullFamilyAndCutsTheTwoFamilyWorstCase|TestUpdate_AStalledFamilyIsCutAtTheBudgetAndNoLaterFamilyStarts|TestUpdate_ABudgetCutAfterTheUpdaterIsNeverASmokeFailure|TestUpdate_ANonPositiveBudgetIsTheDefaultDeadlineNotAnExpiredOne|TestUpdate_ACancelledBoundaryStaysAnInterruptAndNamesNoBudget)$",
+		"TestDefaultBoundaryBudget_AdmitsOneFullFamilyAndCutsTheTwoFamilyWorstCase",
+		"TestUpdate_AStalledFamilyIsCutAtTheBudgetAndNoLaterFamilyStarts",
+		"TestUpdate_ABudgetCutAfterTheUpdaterIsNeverASmokeFailure",
+		"TestUpdate_ANonPositiveBudgetIsTheDefaultDeadlineNotAnExpiredOne",
+		"TestUpdate_ACancelledBoundaryStaysAnInterruptAndNamesNoBudget")
+}
