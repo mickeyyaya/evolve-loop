@@ -17,9 +17,7 @@ func CaptureModelPicker(ctx context.Context, cfg *Config, deps Deps, cli string)
 	if derr != nil {
 		return "", derr
 	}
-	if cfg.SessionName == "" {
-		defer func() { _ = killSessionSwept(context.Background(), deps, drv.session) }()
-	}
+	defer reapEphemeralSession(cfg, drv.deps, drv.session)
 	if serr := drv.EnsureSession(ctx); serr != nil {
 		return "", fmt.Errorf("recipe: ensure session: %w", serr)
 	}

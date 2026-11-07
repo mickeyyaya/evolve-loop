@@ -22,10 +22,6 @@ type sleepClock struct{ sleep func(time.Duration) }
 
 func (c sleepClock) Sleep(d time.Duration) { c.sleep(d) }
 
-func shellSingleQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
-}
-
 type recipeSessionDriver struct {
 	cfg        *Config
 	deps       Deps
@@ -63,10 +59,8 @@ func (d *recipeSessionDriver) EnsureSession(ctx context.Context) error {
 		fmt.Fprintf(d.deps.Stderr, "[recipe] WARN session registry append failed: %v (session %s will not be registry-reapable)\n", err, d.session)
 	}
 	d.deps.Sleep(time.Second)
-	_ = d.deps.Tmux.SendKeys(ctx, d.session, "cd "+shellSingleQuote(d.workingDir), true)
-	_ = d.deps.Tmux.SendKeys(ctx, d.session, paneTmuxDetachLine, true)
-	for _, line := range append(exportLines(d.cfg.Realization.Env), exportLines(d.deps.cellMarkers(d.cfg))...) {
-		_ = d.deps.Tmux.SendKeys(ctx, d.session, line, true)
+	if err := primePaneShell(ctx, d.deps, d.cfg, d.session, d.workingDir); err != nil {
+		return fmt.Errorf("prime pane shell: %w", err)
 	}
 	d.deps.Sleep(time.Second)
 	_ = d.deps.Tmux.SendKeys(ctx, d.session, d.launchCmd, true)
@@ -145,6 +139,14 @@ func newRecipeDriver(cfg *Config, deps Deps, cli string) (*recipeSessionDriver, 
 		workingDir, _ = os.Getwd()
 		fmt.Fprintf(deps.Stderr, "[recipe] WARN no worktree designated — falling back to process cwd %s (single-driver mode only; fleet mode refuses this)\n", workingDir)
 	}
+	if cfg.DispatchID == "" {
+		cfg.DispatchID = mintDispatchID(cfg, os.Getpid())
+		observeDispatchID(deps, cfg.DispatchID)
+	}
+	if deps.sweep == nil {
+		home, _ := os.UserHomeDir()
+		deps.sweep = newDispatchSweep(cfg.DispatchID, cfg.ProjectRoot, cfg.Worktree, home, time.Now())
+	}
 	drv := &recipeSessionDriver{
 		cfg:        cfg,
 		deps:       deps,
@@ -190,7 +192,7 @@ func captureUntil(ctx context.Context, cfg *Config, deps Deps, cli, command stri
 	if err != nil {
 		return "", err
 	}
-	defer reapEphemeralSession(cfg, deps, drv.session)
+	defer reapEphemeralSession(cfg, drv.deps, drv.session)
 	if err := drv.EnsureSession(ctx); err != nil {
 		return "", fmt.Errorf("recipe: ensure session: %w", err)
 	}
@@ -217,6 +219,10 @@ func captureUntil(ctx context.Context, cfg *Config, deps Deps, cli, command stri
 func reapEphemeralSession(cfg *Config, deps Deps, session string) {
 	if cfg.SessionName != "" {
 		return
+	}
+	deps = deps.withProcessDefaults()
+	if deps.sweep != nil {
+		defer deps.sweep.finish(context.Background(), deps)
 	}
 	if err := killSessionSwept(context.Background(), deps, session); err != nil {
 		fmt.Fprintf(deps.Stderr, "[recipe] WARN session %s not reaped: %v\n", session, err)
