@@ -33,6 +33,7 @@
 - **A skipped step is not a completed one.** Dry-run steps are journaled `skipped-dry-run` and never appended to `StepsCompleted` (`TestRun_DryRun_StepLedgerExact`).
 - **`defaultReleaseVerify` requires an absolute `repoRoot`,** because it executes `<repoRoot>/go/evolve`; a relative root would make that execution depend on the working directory (`TestDefaultReleaseVerify_RelativeRepoRoot`).
 - **Verify reads and tags the release commit, not `HEAD`** (`TestDefaultReleaseVerify_ReadsAndTagsTheReleaseCommitNotHEAD`).
+- **The content-review bypass is journaled before preflight.** `Options.SkipContentReview` (the `--skip-content-review <reason>` parameter of `evolve release`) writes the step `content-review-bypass` with the reason as its note, then hands the reason to preflight. An empty reason is refused at the parse, so no bypass step exists for it (`TestOptions_SkipContentReviewJournalsItsReasonBeforePreflight`).
 
 ## Findings
 

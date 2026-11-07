@@ -40,17 +40,18 @@ type Steps struct {
 }
 
 type Options struct {
-	Target           string
-	RepoRoot         string
-	DryRun           bool
-	NoRollback       bool
-	SkipTests        bool
-	StrictPass       bool
-	RequirePreflight bool
-	MaxPollWait      time.Duration
-	FromTag          string
-	JournalDir       string
-	Stderr           io.Writer
+	Target            string
+	RepoRoot          string
+	DryRun            bool
+	NoRollback        bool
+	SkipTests         bool
+	StrictPass        bool
+	SkipContentReview string
+	RequirePreflight  bool
+	MaxPollWait       time.Duration
+	FromTag           string
+	JournalDir        string
+	Stderr            io.Writer
 
 	Now   func() time.Time
 	Steps Steps

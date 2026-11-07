@@ -15,13 +15,18 @@ import (
 )
 
 func runPreflightLib(repoRoot, target string, dryRun, skipTests, strictPass bool) error {
+	return runPreflightWithReviewBypass(repoRoot, target, dryRun, skipTests, strictPass, "")
+}
+
+func runPreflightWithReviewBypass(repoRoot, target string, dryRun, skipTests, strictPass bool, skipContentReview string) error {
 	_, err := releasepreflight.Run(releasepreflight.Options{
-		Target:     target,
-		RepoRoot:   repoRoot,
-		DryRun:     dryRun,
-		SkipTests:  skipTests,
-		StrictPass: strictPass,
-		Stderr:     os.Stderr,
+		Target:            target,
+		RepoRoot:          repoRoot,
+		DryRun:            dryRun,
+		SkipTests:         skipTests,
+		StrictPass:        strictPass,
+		SkipContentReview: skipContentReview,
+		Stderr:            os.Stderr,
 	})
 	return err
 }

@@ -23,6 +23,8 @@ type resolved struct {
 	allowRedCI bool
 	requireCI  bool
 
+	skipContentReview string
+
 	now              func() time.Time
 	gitClean         func(string) (bool, error)
 	currentBranch    func(string) (string, error)
@@ -39,24 +41,25 @@ func resolve(opts Options) (resolved, error) {
 		return resolved{}, fmt.Errorf("%w: RepoRoot required", ErrCheckFailed)
 	}
 	r := resolved{
-		target:           opts.Target,
-		repoRoot:         opts.RepoRoot,
-		pluginJSONPath:   opts.PluginJSONPath,
-		ledgerPath:       opts.LedgerPath,
-		dryRun:           opts.DryRun,
-		skipTests:        opts.SkipTests,
-		strictPass:       opts.StrictPass,
-		allowRedCI:       opts.AllowRedCI,
-		requireCI:        opts.RequireCI,
-		now:              opts.Now,
-		gitClean:         opts.GitClean,
-		currentBranch:    opts.CurrentBranch,
-		gateRunner:       opts.GateTestRunner,
-		nameGuard:        opts.NameGuard,
-		simulationRunner: opts.SimulationRunner,
-		ciConclusion:     opts.CIConclusion,
-		headSHA:          opts.HeadSHA,
-		wipCommits:       opts.WIPCommits,
+		target:            opts.Target,
+		repoRoot:          opts.RepoRoot,
+		pluginJSONPath:    opts.PluginJSONPath,
+		ledgerPath:        opts.LedgerPath,
+		dryRun:            opts.DryRun,
+		skipTests:         opts.SkipTests,
+		strictPass:        opts.StrictPass,
+		allowRedCI:        opts.AllowRedCI,
+		requireCI:         opts.RequireCI,
+		skipContentReview: opts.SkipContentReview,
+		now:               opts.Now,
+		gitClean:          opts.GitClean,
+		currentBranch:     opts.CurrentBranch,
+		gateRunner:        opts.GateTestRunner,
+		nameGuard:         opts.NameGuard,
+		simulationRunner:  opts.SimulationRunner,
+		ciConclusion:      opts.CIConclusion,
+		headSHA:           opts.HeadSHA,
+		wipCommits:        opts.WIPCommits,
 	}
 	r.applyDefaults()
 	return r, nil

@@ -45,6 +45,8 @@ type Options struct {
 	AllowRedCI bool
 	RequireCI  bool
 
+	SkipContentReview string
+
 	Now              func() time.Time
 	GitClean         func(repoRoot string) (bool, error)
 	CurrentBranch    func(repoRoot string) (string, error)
@@ -270,6 +272,9 @@ func Run(opts Options) (Result, error) {
 			return p.res, err
 		}
 		p.res.StepsPassed++
+	}
+	if err := p.gateContentReview(); err != nil {
+		return p.res, err
 	}
 	if err := p.gateNoWIPCommits(); err != nil {
 		return p.res, err

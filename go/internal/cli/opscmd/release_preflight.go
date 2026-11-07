@@ -14,6 +14,7 @@ func printReleasePreflightUsage(stdout io.Writer) {
 	fmt.Fprintln(stdout, "5-step gate: clean tree | branch attached | semver bump | recent audit PASS | gate-tests green.")
 	fmt.Fprintln(stdout, "Plus the no-WIP gate: no commit subject since the last tag may start with WIP, fixup!, squash! or amend!.")
 	fmt.Fprintln(stdout, "Plus the release-commit CI hard-gate: the remote go CI run for HEAD must be conclusion=success.")
+	fmt.Fprintln(stdout, "Plus the content-review gate: a minor or major release needs a committed docs/operations/release-content-review.json that names a PASS run of the docs-review seat after the previous tag.")
 	fmt.Fprintln(stdout, "  --strict-pass   reject WARN verdicts (treat WARN as FAIL)")
 	fmt.Fprintln(stdout, "  --allow-red-ci  explicit override: proceed on a non-green release-commit CI (logged loudly)")
 	fmt.Fprintln(stdout, "  --require-ci    fail when no remote CI verdict is visible (advisory without the flag)")

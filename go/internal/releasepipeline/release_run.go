@@ -79,8 +79,9 @@ func resolveSteps(opts Options) Steps {
 	steps := applyDefaultSteps(opts.Steps)
 	if opts.Steps.Preflight == nil {
 		strictPass := opts.StrictPass
+		skipContentReview := opts.SkipContentReview
 		steps.Preflight = func(repoRoot, target string, dryRun, skipTests bool) error {
-			return runPreflightLib(repoRoot, target, dryRun, skipTests, strictPass)
+			return runPreflightWithReviewBypass(repoRoot, target, dryRun, skipTests, strictPass, skipContentReview)
 		}
 	}
 	return steps
@@ -101,7 +102,11 @@ func (r *releaseRun) skipPrePublishStep(journalName string) error {
 }
 
 func (r *releaseRun) recordStep(stageErr error, journalName, status string) error {
-	if err := appendStep(r.journal, r.journalPath, journalName, status, "", r.now()); err != nil {
+	return r.recordStepNote(stageErr, journalName, status, "")
+}
+
+func (r *releaseRun) recordStepNote(stageErr error, journalName, status, note string) error {
+	if err := appendStep(r.journal, r.journalPath, journalName, status, note, r.now()); err != nil {
 		return fmt.Errorf("%w: %s: %v", stageErr, journalName, err)
 	}
 	return nil
@@ -115,6 +120,13 @@ func (r *releaseRun) prePublish() error {
 		if err := r.runPrePublishStep("full-dry-run-preflight", "full-dry-run preflight", func() error {
 			return r.steps.FullDryRunPreflight(o.RepoRoot, o.Target)
 		}); err != nil {
+			return err
+		}
+	}
+
+	if o.SkipContentReview != "" {
+		r.logf("step: content-review-bypass — reason: %s", o.SkipContentReview)
+		if err := r.recordStepNote(ErrPrePublishFailed, "content-review-bypass", "ok", o.SkipContentReview); err != nil {
 			return err
 		}
 	}

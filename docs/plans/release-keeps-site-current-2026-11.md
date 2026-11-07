@@ -82,7 +82,11 @@ The `docs-review` seat has a budget of about 20 tool calls, and it reviews a cha
 
 The console then runs the browser check in `landing/e2e/` on the built site. After the deploy, it runs the same check on the live URL. The check proves which build it tests, because a server from an earlier run gave a false result on 2026-11-07.
 
-### 4.3 The gate (deferred)
+### 4.3 The gate (built in cycle 2210)
+
+The gate is `gateContentReview` in `internal/releasepreflight/content_review.go`. The `Head` field of `launchrecord.Record` stays a console follow-up. The gate binds the run to the release through the run `ts` and the previous tag instead.
+
+Requirements from the two reviews, which the gate meets:
 
 Requirements for a later design, from the two reviews:
 

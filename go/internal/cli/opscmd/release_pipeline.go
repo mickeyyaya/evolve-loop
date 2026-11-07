@@ -6,6 +6,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"io"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/releasepipeline"
@@ -20,17 +21,19 @@ func printReleasePipelineUsage(stdout io.Writer) {
 	fmt.Fprintln(stdout, "  --require-preflight     run full-dry-run.sh harness before any step")
 	fmt.Fprintln(stdout, "  --max-poll-wait-s N     marketplace propagation deadline (default 300)")
 	fmt.Fprintln(stdout, "  --from-tag <tag>        changelog range start (default: previous tag)")
+	fmt.Fprintln(stdout, "  --skip-content-review <reason>  bypass the minor-release content review gate; the reason goes to the release journal")
 }
 
 type releasePipelineFlags struct {
-	target           string
-	dryRun           bool
-	noRollback       bool
-	skipTests        bool
-	strictPass       bool
-	requirePreflight bool
-	maxPollWaitS     int
-	fromTag          string
+	target            string
+	dryRun            bool
+	noRollback        bool
+	skipTests         bool
+	strictPass        bool
+	requirePreflight  bool
+	maxPollWaitS      int
+	fromTag           string
+	skipContentReview string
 }
 
 func releasePipelineFlagCase(f *releasePipelineFlags, a string, args []string, i *int, stderr io.Writer) (handled, ok bool) {
@@ -64,6 +67,13 @@ func releasePipelineFlagCase(f *releasePipelineFlags, a string, args []string, i
 			return true, false
 		}
 		f.fromTag = args[*i]
+	case a == "--skip-content-review":
+		*i++
+		if *i >= len(args) || strings.TrimSpace(args[*i]) == "" {
+			fmt.Fprintln(stderr, "[release-pipeline] --skip-content-review needs a non-empty reason")
+			return true, false
+		}
+		f.skipContentReview = strings.TrimSpace(args[*i])
 	case len(a) >= 2 && a[:2] == "--":
 		fmt.Fprintf(stderr, "[release-pipeline] unknown flag: %s\n", a)
 		return true, false
@@ -131,16 +141,17 @@ func RunReleasePipeline(args []string, _ io.Reader, stdout, stderr io.Writer) in
 
 	repoRoot := cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT")
 	opts := releasepipeline.Options{
-		Target:           f.target,
-		RepoRoot:         repoRoot,
-		DryRun:           f.dryRun,
-		NoRollback:       f.noRollback,
-		SkipTests:        f.skipTests,
-		StrictPass:       f.strictPass,
-		RequirePreflight: f.requirePreflight,
-		MaxPollWait:      time.Duration(f.maxPollWaitS) * time.Second,
-		FromTag:          f.fromTag,
-		Stderr:           stderr,
+		Target:            f.target,
+		RepoRoot:          repoRoot,
+		DryRun:            f.dryRun,
+		NoRollback:        f.noRollback,
+		SkipTests:         f.skipTests,
+		StrictPass:        f.strictPass,
+		RequirePreflight:  f.requirePreflight,
+		MaxPollWait:       time.Duration(f.maxPollWaitS) * time.Second,
+		FromTag:           f.fromTag,
+		SkipContentReview: f.skipContentReview,
+		Stderr:            stderr,
 	}
 	_, err := releasepipeline.Run(opts)
 	return releasePipelineExitCode(err, stderr)
