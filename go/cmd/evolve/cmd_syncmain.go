@@ -39,12 +39,10 @@ func runSyncMain(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return string(out), err
 	}
 
-	if ws := liveLeaseWorkspace(absRoot); ws != "" {
-		if lease, ok := runlease.LiveOwner(ws, time.Now()); ok {
-			fmt.Fprintf(stderr, "evolve sync-main: refused — a run lease is live (pid %d, heartbeat fresh); another evolve loop owns this tree.\n", lease.OwnerPID)
-			fmt.Fprintln(stderr, "evolve sync-main:   • let it finish, or `evolve loop --resume` to attach, then retry.")
-			return cliExitRefused
-		}
+	if lease, ok := liveRunLease(absRoot, time.Now()); ok {
+		fmt.Fprintf(stderr, "evolve sync-main: refused — a run lease is live (pid %d, heartbeat fresh); another evolve loop owns this tree.\n", lease.OwnerPID)
+		fmt.Fprintln(stderr, "evolve sync-main:   • let it finish, or `evolve loop --resume` to attach, then retry.")
+		return cliExitRefused
 	}
 
 	stamps, code := refuseDirtBeyondInboxStamps(absRoot, stderr)
@@ -175,6 +173,18 @@ func mergeOrigin(git func(...string) (string, error), branch string, stderr io.W
 	fmt.Fprintf(stderr, "evolve sync-main: refused — merging origin/%s conflicts with local history (aborted cleanly, tree unchanged).\n", branch)
 	fmt.Fprintln(stderr, "evolve sync-main:   • resolve manually, or re-audit the local commit on the new base.")
 	return 1
+}
+
+func liveRunLease(root string, now time.Time) (runlease.Lease, bool) {
+	if ws := liveLeaseWorkspace(root); ws != "" {
+		if lease, ok := runlease.LiveOwner(ws, now); ok {
+			return lease, true
+		}
+	}
+	if live := runlease.LiveRuns(filepath.Join(root, ".evolve", "runs"), now); len(live) > 0 {
+		return live[0].Lease, true
+	}
+	return runlease.Lease{}, false
 }
 
 func liveLeaseWorkspace(root string) string {
