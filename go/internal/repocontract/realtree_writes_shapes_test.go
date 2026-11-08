@@ -194,14 +194,14 @@ func TestParseTestPackages_KeepsAnExternalTestPackageApartFromItsPackage(t *test
 			t.Fatal(err)
 		}
 	}
-	fset, byPackage, err := parseTestPackages(root, slices.Sorted(maps.Keys(files)))
+	scan, err := scanTestTree(root, slices.Sorted(maps.Keys(files)))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !newTreeWriteScan(byPackage[packageKey("p", "p")]).returnsTheRealTree("repoRoot") {
+	if scan.RootHelpers != 1 {
 		t.Error("package p's repoRoot climbs to the real tree")
 	}
-	if got := newTreeWriteScan(byPackage[packageKey("p", "p_test")]).findings(fset); len(got) != 0 {
-		t.Errorf("p_test's own repoRoot returns its argument, a temp dir; the scan used p's repoRoot instead and flagged %v", got)
+	if len(scan.Writers) != 0 {
+		t.Errorf("p_test's own repoRoot returns its argument, a temp dir; the scan used p's repoRoot instead and flagged %v", scan.Writers)
 	}
 }

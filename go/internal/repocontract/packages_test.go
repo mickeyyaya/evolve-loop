@@ -3,30 +3,18 @@ package repocontract
 import (
 	"fmt"
 	"go/ast"
-	"go/parser"
 	"go/token"
 	"maps"
 	"path"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 	"testing"
 	"unicode"
-
-	"github.com/mickeyyaya/evolve-loop/go/internal/rawgitratchet"
 )
 
 func TestPackages_HoldEveryTestThatReadsTheWholeTree(t *testing.T) {
-	root, err := filepath.Abs("../..")
-	if err != nil {
-		t.Fatal(err)
-	}
-	files, _, err := rawgitratchet.BoundTestFiles(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	reading := treeReadingTests(t, root, files)
+	reading := sharedTreeScan(t).Reading
 	readers := slices.Sorted(maps.Keys(reading))
 	for _, want := range []string{"internal/repocontract", "internal/sizeratchet", "internal/policy", "internal/acssuite", "internal/guards"} {
 		if !slices.Contains(readers, want) {
@@ -70,28 +58,6 @@ func packProblems(reading map[string][]string, pack []string, selections []TestS
 		}
 	}
 	return problems
-}
-
-func treeReadingTests(t *testing.T, root string, files []string) map[string][]string {
-	t.Helper()
-	byDir := map[string][]*ast.File{}
-	for _, rel := range files {
-		if strings.HasPrefix(rel, "acs/") {
-			continue
-		}
-		file, err := parser.ParseFile(token.NewFileSet(), filepath.Join(root, filepath.FromSlash(rel)), nil, parser.SkipObjectResolution)
-		if err != nil {
-			t.Fatal(err)
-		}
-		byDir[path.Dir(rel)] = append(byDir[path.Dir(rel)], file)
-	}
-	reading := map[string][]string{}
-	for dir, parsed := range byDir {
-		if tests, reads := readingTestsOf(parsed, dir); reads {
-			reading[dir] = tests
-		}
-	}
-	return reading
 }
 
 type declUnit struct {

@@ -3,45 +3,20 @@ package repocontract
 import (
 	"fmt"
 	"go/ast"
-	"go/parser"
 	"go/token"
-	"maps"
-	"path"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
-
-	"github.com/mickeyyaya/evolve-loop/go/internal/rawgitratchet"
 )
 
 func TestNoTestWritesIntoTheRealTree(t *testing.T) {
-	root, err := filepath.Abs("../..")
-	if err != nil {
-		t.Fatal(err)
-	}
-	files, _, err := rawgitratchet.BoundTestFiles(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fset, byPackage, err := parseTestPackages(root, files)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var writers []string
-	rootHelpers := 0
-	for _, key := range slices.Sorted(maps.Keys(byPackage)) {
-		scan := newTreeWriteScan(byPackage[key])
-		rootHelpers += scan.rootHelpers()
-		for _, finding := range scan.findings(fset) {
-			writers = append(writers, relativeTo(root, finding))
-		}
-	}
-	if rootHelpers == 0 {
+	scan := sharedTreeScan(t)
+	if scan.RootHelpers == 0 {
 		t.Fatal("the scan found no test helper that returns the real tree, though many tests locate it; the scan has gone blind, so its clean result proves nothing")
 	}
-	if len(writers) > 0 {
-		t.Errorf("%d test writes land in the real tree. A lane runs its tests in its own worktree while the build floor reads that worktree, so each write is a material path nobody explained; write under t.TempDir() or a gittest fixture, copying the real tracked files in when the real set matters. A name that ever holds the real root is treated as the root everywhere in its function; rename the temp-dir variable:\n  %s", len(writers), strings.Join(writers, "\n  "))
+	if len(scan.Writers) > 0 {
+		t.Errorf("%d test writes land in the real tree. A lane runs its tests in its own worktree while the build floor reads that worktree, so each write is a material path nobody explained; write under t.TempDir() or a gittest fixture, copying the real tracked files in when the real set matters. A name that ever holds the real root is treated as the root everywhere in its function; rename the temp-dir variable:\n  %s", len(scan.Writers), strings.Join(scan.Writers, "\n  "))
 	}
 }
 
@@ -90,20 +65,6 @@ var openWriteFlags = []string{"O_CREATE", "O_WRONLY", "O_RDWR", "O_APPEND", "O_T
 var passPathThrough = []string{
 	"filepath.Abs", "filepath.Clean", "filepath.Dir", "filepath.EvalSymlinks", "filepath.FromSlash", "filepath.ToSlash",
 	"path.Clean", "path.Dir", "strings.TrimSpace", "strings.TrimSuffix", "strings.TrimRight", "bytes.TrimSpace",
-}
-
-func parseTestPackages(root string, files []string) (*token.FileSet, map[string][]*ast.File, error) {
-	fset := token.NewFileSet()
-	byPackage := map[string][]*ast.File{}
-	for _, rel := range files {
-		file, err := parser.ParseFile(fset, filepath.Join(root, filepath.FromSlash(rel)), nil, parser.SkipObjectResolution)
-		if err != nil {
-			return nil, nil, err
-		}
-		key := packageKey(path.Dir(rel), file.Name.Name)
-		byPackage[key] = append(byPackage[key], file)
-	}
-	return fset, byPackage, nil
 }
 
 func packageKey(dir, name string) string {
