@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 )
 
 func artifactTimeoutErr() error {
@@ -15,6 +16,7 @@ func artifactTimeoutErr() error {
 }
 
 func TestRun_OptionalPhase_ArtifactTimeout_DegradesToWarn(t *testing.T) {
+	t.Cleanup(deliverable.SetReadGraceWindowForTest(2 * time.Millisecond))
 	hooks := &fakeHooks{phase: "build-planner", agent: "evolve-build-planner", model: "opus", prompt: "x"}
 	fb := &fakeBridge{err: artifactTimeoutErr()}
 	r := New(Options{
@@ -60,6 +62,7 @@ func TestRun_OptionalPhase_OtherBridgeError_StillFails(t *testing.T) {
 }
 
 func TestRun_MandatoryPhase_ArtifactTimeout_StillFails(t *testing.T) {
+	t.Cleanup(deliverable.SetReadGraceWindowForTest(2 * time.Millisecond))
 	hooks := &fakeHooks{phase: "build", agent: "evolve-builder", model: "sonnet", prompt: "x"}
 	fb := &fakeBridge{err: artifactTimeoutErr()}
 	r := New(Options{

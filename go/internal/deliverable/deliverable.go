@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
@@ -118,14 +119,28 @@ func verifyPrimary(phase string, c phasecontract.Contract, roots phasecontract.R
 }
 
 const (
-	readGraceWindow = 500 * time.Millisecond
-	readGracePoll   = 20 * time.Millisecond
+	defaultReadGraceWindow = 500 * time.Millisecond
+	readGracePoll          = 20 * time.Millisecond
 )
 
-var graceSleep = time.Sleep
+var (
+	readGraceWindow atomic.Int64
+	graceSleep      = time.Sleep
+)
+
+func init() {
+	readGraceWindow.Store(int64(defaultReadGraceWindow))
+}
+
+func SetReadGraceWindowForTest(d time.Duration) func() {
+	prev := time.Duration(readGraceWindow.Swap(int64(d)))
+	return func() {
+		readGraceWindow.Store(int64(prev))
+	}
+}
 
 func readDeliverableWithGrace(path string) (content string, exists bool, err error) {
-	deadline := time.Now().Add(readGraceWindow)
+	deadline := time.Now().Add(time.Duration(readGraceWindow.Load()))
 	for {
 		data, rerr := os.ReadFile(path)
 		switch {
@@ -134,10 +149,11 @@ func readDeliverableWithGrace(path string) (content string, exists bool, err err
 		case rerr != nil && !os.IsNotExist(rerr):
 			return "", false, rerr
 		}
-		if !time.Now().Before(deadline) {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
 			return string(data), rerr == nil, nil
 		}
-		graceSleep(readGracePoll)
+		graceSleep(min(readGracePoll, remaining))
 	}
 }
 

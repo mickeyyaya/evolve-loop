@@ -93,3 +93,24 @@ func TestReadDeliverableWithGrace_NonAbsenceIOFailsImmediatelyAsInfra(t *testing
 		t.Fatalf("infra faults never clear on their own — the grace budget must not be spent on them (got %d sleeps)", *calls)
 	}
 }
+
+func TestReadDeliverableWithGrace_SetReadGraceWindowForTest(t *testing.T) {
+	short := 5 * time.Millisecond
+	restore := SetReadGraceWindowForTest(short)
+	if got := time.Duration(readGraceWindow.Load()); got != short {
+		t.Fatalf("got %v, want %v", got, short)
+	}
+	start := time.Now()
+	_, exists, err := readDeliverableWithGrace(filepath.Join(t.TempDir(), "missing.md"))
+	elapsed := time.Since(start)
+	if err != nil || exists {
+		t.Fatalf("got (%v, %v), want (false, nil)", exists, err)
+	}
+	if elapsed >= 50*time.Millisecond {
+		t.Fatalf("took %v, want under 50ms", elapsed)
+	}
+	restore()
+	if got := time.Duration(readGraceWindow.Load()); got != defaultReadGraceWindow {
+		t.Fatalf("got %v, want %v", got, defaultReadGraceWindow)
+	}
+}
