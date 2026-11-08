@@ -248,6 +248,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `LADDER_AUDIT_FIX` | the audit_fix rule ran after an audit FAIL or on the residual findings of the build handoff floor after the last build correction; fields.source is audit or build_floor, fields.audit_fix is would (shadow), chosen (enforce) or decline, fields.audit_fix_rule names the rule that decided, and the other fields give its data: the findings, the prescriptions, the estimated files, lines, production code lines and tokens, and if a rung handler is registered |
 | `LADDER_DECISION` | the retry ladder chose the rung of the next try of a phase (ADR-0142); fields.stage is shadow (recorded, the dispatch does not change) or enforce, fields.origin the retry path, fields.rung the rung before, fields.next the chosen rung, fields.action raise, retry or stop, fields.class and fields.fingerprint the classified failure, fields.tier and fields.effort the target |
 | `LADDER_NO_HEADROOM` | no family of the chain has headroom at the next tier, so the ladder holds at R1 or stops; fields.rung is the rung before |
+| `LADDER_REDESIGN` | the ladder ended (R3 failed, or a spec stop) and routed the subject to the redesign rung of ADR-0126 once (ADR-0164 ruling 1); fields.fingerprint names the failed check, fields.origin the retry path; a second end of the ladder goes to the operator with no second redesign |
 | `LADDER_STOP_SPEC` | two tiers failed on the same check, so the ladder reclassified the failure as spec and stopped; fields.fingerprint names the check |
 
 ### ledger

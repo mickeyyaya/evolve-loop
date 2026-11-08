@@ -225,3 +225,125 @@ func TestLadderCodes_AreRegisteredUnderTheLadderModule(t *testing.T) {
 		}
 	}
 }
+
+const redesignCode signalcenter.Code = "LADDER_REDESIGN"
+
+func redesignRun(t *testing.T, stage, priorJSON string) (*cycleRun, *[]signalcenter.Event) {
+	t.Helper()
+	center, events := captureSignals()
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil), WithWorkflowConfig(ladderWorkflow(stage)), WithSignalCenter(center))
+	cr := &cycleRun{o: o, cs: CycleState{CycleID: 2211}, req: CycleRequest{ProjectRoot: t.TempDir()}}
+	if priorJSON != "" {
+		prior := &LadderState{}
+		if err := json.Unmarshal([]byte(priorJSON), prior); err != nil {
+			t.Fatal(err)
+		}
+		cr.cs.Ladder = prior
+	}
+	return cr, events
+}
+
+func redesignMark(t *testing.T, st *LadderState) string {
+	t.Helper()
+	raw, err := json.Marshal(st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fields map[string]any
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		t.Fatal(err)
+	}
+	mark, _ := fields["redesign"].(string)
+	return mark
+}
+
+func capabilityAsk() ladderAsk {
+	return contractLadderAsk(PhaseBuild, originContractCorrection, "", ReviewResult{Reason: ladderFloorReason})
+}
+
+func TestAskLadder_TheCodeOfTheRedesignRouteIsRegisteredUnderTheLadderModule(t *testing.T) {
+	t.Parallel()
+	if m, ok := signalcenter.IsRegistered(redesignCode); !ok || m != signalcenter.ModuleLadder {
+		t.Fatalf("%s registered=%v module=%q, want the ladder module", redesignCode, ok, m)
+	}
+}
+
+func TestAskLadder_TheEndOfTheLadderRoutesToTheRedesign(t *testing.T) {
+	t.Parallel()
+	fingerprint := retryladder.Classify(capabilityAsk().facts).Fingerprint
+	for _, tc := range []struct {
+		name, stage, prior string
+	}{
+		{"enforce at R3 with a new fingerprint", policy.RetryLadderEnforce, `{"rung":"R3"}`},
+		{"shadow at R3 with a new fingerprint", policy.RetryLadderShadow, `{"rung":"R3"}`},
+		{"enforce at R3 with a repeated fingerprint", policy.RetryLadderEnforce, `{"rung":"R3","fingerprints":["` + fingerprint + `"]}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cr, events := redesignRun(t, tc.stage, tc.prior)
+			got, raised := cr.askLadder(capabilityAsk(), PhaseRequest{})
+			if raised {
+				t.Fatalf("the end of the ladder raised another try: %+v", got.Ladder)
+			}
+			routes := eventsWithCode(*events, redesignCode)
+			if len(routes) != 1 {
+				t.Fatalf("the end of the ladder emitted %d %s events, want 1: %+v", len(routes), redesignCode, *events)
+			}
+			if routes[0].Module != signalcenter.ModuleLadder || routes[0].Fields["fingerprint"] != fingerprint || routes[0].Fields["origin"] != originContractCorrection {
+				t.Fatalf("the redesign route = %+v, want the ladder module with the fingerprint and the origin", routes[0])
+			}
+			if redesignMark(t, cr.cs.Ladder) == "" {
+				t.Fatalf("the ladder state has no redesign mark: %+v", cr.cs.Ladder)
+			}
+		})
+	}
+}
+
+func TestAskLadder_ASpecStopRoutesToTheRedesign(t *testing.T) {
+	t.Parallel()
+	cr, events := redesignRun(t, policy.RetryLadderEnforce, "")
+	ask := ladderAsk{phase: PhaseBuild, origin: originAuditRepair, facts: retryladder.Facts{AuditClass: "intent-malformed", Reason: "intent is malformed"}}
+	if _, raised := cr.askLadder(ask, PhaseRequest{}); raised {
+		t.Fatalf("a spec failure raised another try")
+	}
+	if n := len(eventsWithCode(*events, redesignCode)); n != 1 {
+		t.Fatalf("a spec stop emitted %d %s events, want 1", n, redesignCode)
+	}
+}
+
+func TestAskLadder_ASecondEndOfTheLadderGoesToTheOperatorWithNoSecondRedesign(t *testing.T) {
+	t.Parallel()
+	cr, events := redesignRun(t, policy.RetryLadderEnforce, `{"rung":"R3","redesign":"already"}`)
+	if _, raised := cr.askLadder(capabilityAsk(), PhaseRequest{}); raised {
+		t.Fatalf("the second end of the ladder raised another try")
+	}
+	if n := len(eventsWithCode(*events, redesignCode)); n != 0 {
+		t.Fatalf("a second end of the ladder emitted %d %s events, want 0", n, redesignCode)
+	}
+	if redesignMark(t, cr.cs.Ladder) != "already" {
+		t.Fatalf("the second end of the ladder changed the redesign mark: %+v", cr.cs.Ladder)
+	}
+}
+
+func TestAskLadder_NoRedesignRouteBeforeTheEndOfTheLadder(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, prior string
+		ask         ladderAsk
+	}{
+		{"a capability failure at R0 with no state", "", capabilityAsk()},
+		{"a capability failure at R1", `{"rung":"R1"}`, capabilityAsk()},
+		{"an infra failure at R3", `{"rung":"R3"}`, ladderAsk{phase: PhaseBuild, origin: "test", facts: retryladder.Facts{ExitCode: 124, Reason: "command timed out"}}},
+		{"a halt exit at R3", `{"rung":"R3"}`, ladderAsk{phase: PhaseBuild, origin: "test", facts: retryladder.Facts{ExitCode: 2, Reason: "safety gate"}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cr, events := redesignRun(t, policy.RetryLadderEnforce, tc.prior)
+			cr.askLadder(tc.ask, PhaseRequest{})
+			if n := len(eventsWithCode(*events, redesignCode)); n != 0 {
+				t.Fatalf("%s emitted %d %s events, want 0: %+v", tc.name, n, redesignCode, *events)
+			}
+			if cr.cs.Ladder == nil || redesignMark(t, cr.cs.Ladder) != "" {
+				t.Fatalf("%s marked a redesign: %+v", tc.name, cr.cs.Ladder)
+			}
+		})
+	}
+}

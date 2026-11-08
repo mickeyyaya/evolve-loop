@@ -95,6 +95,7 @@ type LadderState struct {
 	History      []string `json:"history,omitempty"`
 	RepairRound  int      `json:"repair_round,omitempty"`
 	AuditFix     string   `json:"audit_fix,omitempty"`
+	Redesign     string   `json:"redesign,omitempty"`
 }
 
 func (s State) HighestCycleNumber() int {

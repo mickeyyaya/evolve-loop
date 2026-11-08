@@ -17,6 +17,7 @@ const (
 	CodeLadderStopSpec   signalcenter.Code = retryladder.SignalStopSpec
 	CodeLadderNoHeadroom signalcenter.Code = retryladder.SignalNoHeadroom
 	CodeLadderAuditFix   signalcenter.Code = "LADDER_AUDIT_FIX"
+	CodeLadderRedesign   signalcenter.Code = "LADDER_REDESIGN"
 
 	originContractCorrection = "cycleRun.reviewWithCorrections"
 	originResumedCorrection  = "Orchestrator.reviewResumedDeliverable"
@@ -25,6 +26,7 @@ const (
 )
 
 func init() {
+	signalcenter.RegisterCode(signalcenter.ModuleLadder, CodeLadderRedesign, "the ladder ended (R3 failed, or a spec stop) and routed the subject to the redesign rung of ADR-0126 once (ADR-0164 ruling 1); fields.fingerprint names the failed check, fields.origin the retry path; a second end of the ladder goes to the operator with no second redesign")
 	signalcenter.RegisterCode(signalcenter.ModuleLadder, CodeLadderDecision, "the retry ladder chose the rung of the next try of a phase (ADR-0142); fields.stage is shadow (recorded, the dispatch does not change) or enforce, fields.origin the retry path, fields.rung the rung before, fields.next the chosen rung, fields.action raise, retry or stop, fields.class and fields.fingerprint the classified failure, fields.tier and fields.effort the target")
 	signalcenter.RegisterCode(signalcenter.ModuleLadder, CodeLadderStopSpec, "two tiers failed on the same check, so the ladder reclassified the failure as spec and stopped; fields.fingerprint names the check")
 	signalcenter.RegisterCode(signalcenter.ModuleLadder, CodeLadderAuditFix, "the audit_fix rule ran after an audit FAIL or on the residual findings of the build handoff floor after the last build correction; fields.source is audit or build_floor, fields.audit_fix is would (shadow), chosen (enforce) or decline, fields.audit_fix_rule names the rule that decided, and the other fields give its data: the findings, the prescriptions, the estimated files, lines, production code lines and tokens, and if a rung handler is registered")
@@ -64,6 +66,7 @@ func (cr *cycleRun) askLadder(ask ladderAsk, req PhaseRequest) (PhaseRequest, bo
 	})
 	cr.cs.Ladder = nextLadderState(prior, d, verdict)
 	cr.o.emitLadderDecision(cr.cs, ask, prior.Rung, d, verdict)
+	cr.routeToRedesign(ask, prior, d, verdict)
 	cfg := cr.o.workflowConfig.RetryLadder
 	try := retryladder.Try{FailureClass: verdict.Class, Fingerprint: verdict.Fingerprint, Would: d.Rung}
 	if !cfg.Enforced() {
@@ -83,9 +86,30 @@ func (cr *cycleRun) askLadder(ask ladderAsk, req PhaseRequest) (PhaseRequest, bo
 	return req, true
 }
 
+func endsTheLadder(prior *LadderState, d retryladder.Decision) bool {
+	if d.Action != retryladder.ActionStop {
+		return false
+	}
+	return d.Class == retryladder.Spec || (d.Class == retryladder.Capability && prior.Rung == string(retryladder.R3))
+}
+
+func (cr *cycleRun) routeToRedesign(ask ladderAsk, prior *LadderState, d retryladder.Decision, v retryladder.Verdict) {
+	if !endsTheLadder(prior, d) || prior.Redesign != "" {
+		return
+	}
+	cr.cs.Ladder.Redesign = cmp.Or(v.Fingerprint, string(d.Class))
+	cr.o.signals.Emit(signalcenter.Event{
+		Cycle: cr.cs.CycleID, RunID: cr.o.signalRunID(), Phase: string(ask.phase),
+		Module: signalcenter.ModuleLadder, Origin: ask.origin, Kind: signalcenter.KindLadderDecision,
+		Severity: signalcenter.SeverityWarn, Code: CodeLadderRedesign,
+		Reason: fmt.Sprintf("retry ladder for %s: %s ended the ladder at %s, so the subject goes to the redesign rung", ask.phase, d.Class, prior.Rung),
+		Fields: map[string]string{"fingerprint": v.Fingerprint, "origin": ask.origin, "class": string(d.Class), "rung": prior.Rung},
+	})
+}
+
 func nextLadderState(prior *LadderState, d retryladder.Decision, v retryladder.Verdict) *LadderState {
 	next := &LadderState{
-		Rung: prior.Rung, Tier: prior.Tier, Effort: prior.Effort, RepairRound: prior.RepairRound, AuditFix: prior.AuditFix,
+		Rung: prior.Rung, Tier: prior.Tier, Effort: prior.Effort, RepairRound: prior.RepairRound, AuditFix: prior.AuditFix, Redesign: prior.Redesign,
 		Fingerprints: append(slices.Clone(prior.Fingerprints), v.Fingerprint),
 		History:      append(slices.Clone(prior.History), fmt.Sprintf("%s %s %s", prior.Rung, v.Class, v.Fingerprint)),
 	}
