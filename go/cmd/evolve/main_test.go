@@ -17,6 +17,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
 	"github.com/mickeyyaya/evolve-loop/go/internal/practicewatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/tmuxtest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/usageevidence"
 )
 
@@ -86,7 +87,7 @@ func TestMain(m *testing.M) {
 	defaultDispatchGate = dispatchGate{open: func() (dispatchcred.Store, error) {
 		return dispatchcred.Store{Dir: filepath.Join(usageDir, "dispatch")}, nil
 	}}
-	code := m.Run()
+	code := tmuxtest.Main(m)
 	if err := os.RemoveAll(codexHome); err != nil {
 		fmt.Fprintf(os.Stderr, "TestMain: remove %s: %v\n", codexHome, err)
 	}

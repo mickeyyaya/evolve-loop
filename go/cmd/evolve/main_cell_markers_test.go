@@ -4,11 +4,18 @@ import (
 	"os"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
 func TestMain_ClearsInheritedCellMarkers(t *testing.T) {
 	for _, name := range ipcenv.CellMarkers() {
+		if name == ipcenv.TmuxSocketKey {
+			if value := os.Getenv(name); value != bridge.DeriveTestSocket(os.Getpid()) {
+				t.Errorf("TestMain left the inherited cell marker %s=%q; a CLI test then runs as a phase agent", name, value)
+			}
+			continue
+		}
 		if value, set := os.LookupEnv(name); set {
 			t.Errorf("TestMain left the inherited cell marker %s=%q; a CLI test then runs as a phase agent", name, value)
 		}
