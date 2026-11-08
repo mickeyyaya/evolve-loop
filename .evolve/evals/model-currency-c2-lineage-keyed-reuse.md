@@ -15,6 +15,9 @@ score_cap:
   - criterion: "Every function of modelquery/query.go is at 100% coverage"
     max_if_missing: 4
     evidence: "cd go && go test -tags acs -count=1 -run TestC2147_005 ./acs/cycle2147"
+  - criterion: "Chained bumps in one lineage make no classifier call, only the CLI with a new lineage classifies, and an unsound or absent prior never carries"
+    max_if_missing: 4
+    evidence: "cd go && go test -tags acs -count=1 -run 'TestC2223_001|TestC2223_002|TestC2223_003|TestC2223_004' ./acs/cycle2223"
 ---
 
 # Eval: Model currency C2, lineage-keyed classifier reuse
@@ -34,3 +37,4 @@ score_cap:
 | invalidation-kept | Policy change or an underived prior hash classifies across a bump (audit round 1 H1) | 3/10 | `go test -run TestC2147_006\|TestC2147_007 ./acs/cycle2147` |
 | carry-kept | Unchanged non-default policy still carries | 4/10 | `go test -run TestC2147_008 ./acs/cycle2147` |
 | full-coverage | query.go functions at 100% | 4/10 | `go test -tags acs -run TestC2147_005 ./acs/cycle2147` |
+| chained-bumps | Chained bumps carry, a new lineage classifies once, unsound prior never carries (cycle 2223) | 4/10 | `go test -tags acs -run 'TestC2223_001\|TestC2223_002\|TestC2223_003\|TestC2223_004' ./acs/cycle2223` |
