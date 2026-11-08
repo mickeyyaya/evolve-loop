@@ -43,7 +43,7 @@ func runGC(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if !ok {
 		return code
 	}
-	plan := gcPlan{root: root, only: *only, dryRun: *dryRun, asJSON: *asJSON}
+	plan := gcPlan{root: root, only: *only, dryRun: *dryRun, asJSON: *asJSON, liveRuns: liveRunDirs(root, stderr)}
 	if *dryRun {
 		return plan.run(stdout, stderr)
 	}
@@ -52,7 +52,6 @@ func runGC(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return rc
 	}
 	defer release()
-	plan.liveRuns = liveRunDirs(root, stderr)
 	return plan.run(stdout, stderr)
 }
 
