@@ -349,11 +349,20 @@ func TestRealTmux_NewSessionInBindsPaneCwd(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = itTmuxCtl.KillSession(ctx, session) })
 
-	out, err := exec.Command("tmux", TmuxSocketArgs("display-message", "-p", "-t", session, "#{pane_current_path}")...).Output()
-	if err != nil {
-		t.Fatalf("display-message: %v", err)
+	deadline := time.Now().Add(5 * time.Second)
+	got := ""
+	for {
+		out, err := exec.Command("tmux", TmuxSocketArgs("display-message", "-p", "-t", session, "#{pane_current_path}")...).Output()
+		if err != nil {
+			t.Fatalf("display-message: %v", err)
+		}
+		got = strings.TrimSpace(string(out))
+		if got == canonical || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(25 * time.Millisecond)
 	}
-	if got := strings.TrimSpace(string(out)); got != canonical {
+	if got != canonical {
 		t.Errorf("pane_current_path=%q, want %q — new-session -c did not bind the cwd at birth", got, canonical)
 	}
 }
