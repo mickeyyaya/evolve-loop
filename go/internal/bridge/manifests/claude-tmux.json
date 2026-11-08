@@ -151,6 +151,9 @@
             "family": "claude",
             "per_model": true
           }
+        },
+        "model_match": {
+          "Opus": "(?i)opus"
         }
       }
     },

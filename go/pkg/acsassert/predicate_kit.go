@@ -10,6 +10,8 @@ import (
 	"strings"
 )
 
+var absPath = filepath.Abs
+
 func ModuleDir(start string) (string, error) {
 	if start == "" {
 		return "", errors.New("acsassert.ModuleDir: start is empty")
@@ -22,6 +24,11 @@ func ModuleDir(start string) (string, error) {
 	if !info.IsDir() {
 		dir = filepath.Dir(start)
 	}
+	abs, err := absPath(dir)
+	if err != nil {
+		return "", fmt.Errorf("acsassert.ModuleDir: %w", err)
+	}
+	dir = abs
 	for {
 		if mod, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil && !mod.IsDir() {
 			return dir, nil

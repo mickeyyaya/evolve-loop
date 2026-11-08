@@ -845,6 +845,7 @@ var serialTests = map[string]string{
 	"main.TestRunPreWaveProbes_AFailedProbeBenchesNothingAndLogsOneWarn":                                                   "sets env and swaps seam preWaveUsagePaneFn",
 	"main.TestRunPreWaveProbes_AFakeProbeThatReadsAgyExhaustedBenchesAgyBeforeTheWaveAdmitsALane":                          "sets env and swaps seam preWaveUsagePaneFn",
 	"main.TestRunPreWaveProbes_TheUsageEvidenceTimeoutBoundsAProbeThatNeverAnswers":                                        "sets env and swaps seam preWaveUsagePaneFn",
+	"main.TestRunPreWaveProbes_ProbesAnExpiredModelBenchBeforeTheWaveAdmitsALane":                                          "sets env and swaps seam preWaveModelLiveProbeFn",
 	"main.TestRunUsageProbe_DisabledByPolicyDoesNotLookForFamilies":                                                        "sets env through a helper",
 	"main.TestRunUsageProbe_NoInstalledFamilyProbesNothing":                                                                "sets env through a helper",
 	"main.TestRunUsageProbe_ProbesEveryInstalledFamilyAndBenchesNoneWithoutAUsageControl":                                  "sets env through a helper",

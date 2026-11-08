@@ -1,6 +1,7 @@
 package acsassert
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -271,5 +272,20 @@ func TestWalkModule_ReportsADirectoryItCannotRead(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "locked") {
 		t.Errorf("error %q does not name the unreadable directory", err)
+	}
+}
+
+func TestModuleDir_ReportsAFailureToMakeTheStartAbsolute(t *testing.T) {
+	prev := absPath
+	absPath = func(string) (string, error) { return "", errors.New("getwd failed") }
+	t.Cleanup(func() { absPath = prev })
+
+	got, err := ModuleDir(t.TempDir())
+
+	if err == nil || !strings.Contains(err.Error(), "getwd failed") {
+		t.Fatalf("ModuleDir error = %v, want the absolute-path failure", err)
+	}
+	if got != "" {
+		t.Errorf("ModuleDir returned %q beside the error", got)
 	}
 }

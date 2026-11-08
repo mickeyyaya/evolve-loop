@@ -18,7 +18,9 @@ import (
 )
 
 func runPreWaveProbes(ctx context.Context, projectRoot, evolveDir string, signals *signalcenter.Center, stderr io.Writer) error {
-	runCLIHealthCanary(ctx, projectRoot, defaultLiveProbe(ctx, projectRoot, bridge.Deps{Stderr: stderr, Signals: signals}), stderr)
+	deps := bridge.Deps{Stderr: stderr, Signals: signals}
+	runCLIHealthCanary(ctx, projectRoot, defaultLiveProbe(ctx, projectRoot, deps), stderr)
+	runCLIHealthModelCanary(ctx, projectRoot, preWaveModelLiveProbeFn(ctx, projectRoot, deps), stderr)
 	runUsageProbe(ctx, projectRoot, evolveDir, signals, stderr)
 	recordLaneTimes(evolveDir, stderr)
 	return ctx.Err()

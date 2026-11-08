@@ -30,6 +30,7 @@ type WindowSpec struct {
 	ResetRegex         string                 `json:"reset_regex,omitempty"`
 	ExhaustedAtUsedPct float64                `json:"exhausted_at_used_pct,omitempty"`
 	Scopes             map[string]ScopeTarget `json:"scopes,omitempty"`
+	ModelMatch         map[string]string      `json:"model_match,omitempty"`
 }
 
 type WindowLabel struct {
@@ -53,6 +54,7 @@ type UsageWindow struct {
 	Family      string     `json:"family,omitempty"`
 	Model       string     `json:"model,omitempty"`
 	Exhausted   bool       `json:"exhausted"`
+	Unmapped    bool       `json:"unmapped,omitempty"`
 }
 
 type labelPattern struct {
@@ -125,6 +127,9 @@ func (s WindowSpec) compile() (windowPatterns, error) {
 		return windowPatterns{}, err
 	}
 	p.labels = labels
+	if err := s.checkModelMatch(); err != nil {
+		return windowPatterns{}, err
+	}
 	return p, s.checkScopes()
 }
 
@@ -161,6 +166,27 @@ func compileLabels(labels []WindowLabel) ([]labelPattern, error) {
 		out = append(out, labelPattern{re: re, kind: label.Kind, scope: label.Scope})
 	}
 	return out, nil
+}
+
+func (s WindowSpec) ModelMatches(word, model string) bool {
+	pattern, ok := s.ModelMatch[word]
+	if !ok || model == "" {
+		return false
+	}
+	re, err := regexp.Compile(pattern)
+	return err == nil && re.MatchString(model)
+}
+
+func (s WindowSpec) checkModelMatch() error {
+	for word, pattern := range s.ModelMatch {
+		if pattern == "" {
+			return fmt.Errorf("model_match: %q has an empty regex", word)
+		}
+		if _, err := regexp.Compile(pattern); err != nil {
+			return fmt.Errorf("model_match: %q: %w", word, err)
+		}
+	}
+	return nil
 }
 
 func (s WindowSpec) checkScopes() error {

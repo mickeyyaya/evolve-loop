@@ -141,7 +141,11 @@ func ApplyCLIHealthBench(projectRoot, phase string, plan llmroute.Plan, now func
 	if now == nil {
 		now = time.Now
 	}
-	active := clihealth.NewStore(projectRoot, now).Active()
+	store := clihealth.NewStore(projectRoot, now)
+	return applyModelBench(store.ActiveModels(), phase, applyFamilyBench(store.Active(), phase, plan, now, logf), now, logf)
+}
+
+func applyFamilyBench(active map[string]clihealth.Entry, phase string, plan llmroute.Plan, now func() time.Time, logf Logf) llmroute.Plan {
 	if len(active) == 0 {
 		return plan
 	}
@@ -172,6 +176,33 @@ func ApplyCLIHealthBench(projectRoot, phase string, plan llmroute.Plan, now func
 	return out
 }
 
+func applyModelBench(models map[string]clihealth.Entry, phase string, plan llmroute.Plan, now func() time.Time, logf Logf) llmroute.Plan {
+	demoted := map[string]time.Time{}
+	var summary []string
+	tier := planTier(plan)
+	for _, e := range models {
+		for _, cli := range plan.Candidates {
+			if llmroute.Family(cli) == e.Family && bridge.UsageModelMatches(cli, e.Model, seatModel(cli, tier)) {
+				demoted[cli] = e.BenchedAt
+				summary = append(summary, fmt.Sprintf("%s/%s until %s (%s)", e.Family, e.Model, benchEnd(e.BenchedUntil, now()), e.Reason))
+			}
+		}
+	}
+	out := llmroute.ApplyDriverBench(plan, demoted)
+	if !slices.Equal(plan.Candidates, out.Candidates) {
+		sort.Strings(summary)
+		logf("phase=%s cli-health model-bench reordered chain: %v -> %v (model-benched: %v)\n", phase, plan.Candidates, out.Candidates, summary)
+	}
+	return out
+}
+
+func planTier(plan llmroute.Plan) string {
+	if len(plan.Tiers) > 0 {
+		return plan.Tiers[0]
+	}
+	return plan.Model
+}
+
 func benchFamily(benched map[string]time.Time, e clihealth.Entry) {
 	if prev, ok := benched[e.Family]; !ok || e.BenchedAt.Before(prev) {
 		benched[e.Family] = e.BenchedAt
@@ -179,10 +210,7 @@ func benchFamily(benched map[string]time.Time, e clihealth.Entry) {
 }
 
 func scopeCoversSeat(e clihealth.Entry, plan llmroute.Plan) bool {
-	tier := plan.Model
-	if len(plan.Tiers) > 0 {
-		tier = plan.Tiers[0]
-	}
+	tier := planTier(plan)
 	for _, cli := range plan.Candidates {
 		if llmroute.Family(cli) != e.Family {
 			continue

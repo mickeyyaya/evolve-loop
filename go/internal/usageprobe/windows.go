@@ -137,6 +137,8 @@ func (p *Prober) judgeWindows(probed string, windows []quotastate.UsageWindow) {
 		case !w.Exhausted:
 		case w.Family == "":
 			fmt.Fprintf(p.Log, "[usage-probe] WARN %s: the %s window is exhausted but its manifest maps it to no routing family, so nothing is benched: %s\n", probed, w.Scope, w.Evidence())
+		case !w.ExhaustsFamily() && w.Unmapped:
+			fmt.Fprintf(p.Log, "[usage-probe] WARN %s: the %s model's window is exhausted (%s) but the manifest model_match maps %q to no model, so nothing is benched\n", probed, w.Model, w.Evidence(), w.Model)
 		case !w.ExhaustsFamily():
 			fmt.Fprintf(p.Log, "[usage-probe] WARN %s: the %s model's window is exhausted (%s); the %s family is not benched, only that model\n", probed, w.Model, w.Evidence(), w.Family)
 			walls = withWall(walls, w)

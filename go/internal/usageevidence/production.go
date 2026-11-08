@@ -50,7 +50,13 @@ func binaryOf(driver string) string {
 }
 
 func ReadWindowsNow(family, pane string) []quotastate.UsageWindow {
-	return bridge.UsageWindows(family, pane, time.Now())
+	windows := bridge.UsageWindows(family, pane, time.Now())
+	for i, w := range windows {
+		if w.Model != "" && !bridge.UsageModelMapped(family, w.Model) {
+			windows[i].Unmapped = true
+		}
+	}
+	return windows
 }
 
 func UsagePane(factory *bridge.ControllerFactory) func(ctx context.Context, family string) (string, error) {

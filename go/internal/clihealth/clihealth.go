@@ -259,6 +259,10 @@ func (s *Store) Clear(family string) error {
 	})
 }
 
+func (s *Store) ClearModel(family, model string) error {
+	return s.Clear(Entry{Family: family, Model: model}.Key())
+}
+
 func (s *Store) ClearBootStrike(driver string) error {
 	return s.withLock(func() error {
 		benches, _ := s.Load()
@@ -315,6 +319,10 @@ func (s *Store) ActiveModels() map[string]Entry {
 
 func (s *Store) Expired() map[string]Entry {
 	return s.filter(func(e Entry) bool { return e.Model == "" && !s.now().Before(e.BenchedUntil) })
+}
+
+func (s *Store) ExpiredModels() map[string]Entry {
+	return s.filter(func(e Entry) bool { return e.Model != "" && !s.now().Before(e.BenchedUntil) })
 }
 
 func (s *Store) filter(keep func(Entry) bool) map[string]Entry {
