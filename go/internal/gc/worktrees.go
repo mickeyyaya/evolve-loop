@@ -16,6 +16,8 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
+	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
@@ -220,7 +222,11 @@ func PlanWorktrees(o WorktreeOptions) (WorktreeManifest, error) {
 	if err != nil {
 		return WorktreeManifest{}, err
 	}
-	items, pool, seenBranch, err := o.scanWorktrees(porcelain, merged)
+	held, err := o.laneHolds()
+	if err != nil {
+		return WorktreeManifest{}, err
+	}
+	items, pool, seenBranch, err := o.scanWorktrees(porcelain, merged, held)
 	if err != nil {
 		return WorktreeManifest{}, err
 	}
@@ -300,7 +306,7 @@ type eligible struct {
 	mtime                    time.Time
 }
 
-func (o WorktreeOptions) scanWorktrees(porcelain string, merged *mergedSet) ([]WorktreeItem, []eligible, map[string]bool, error) {
+func (o WorktreeOptions) scanWorktrees(porcelain string, merged *mergedSet, held laneHolds) ([]WorktreeItem, []eligible, map[string]bool, error) {
 	minAge := time.Duration(o.Policy.MinAgeMinutes) * time.Minute
 	now := o.now()
 
@@ -331,7 +337,7 @@ func (o WorktreeOptions) scanWorktrees(porcelain string, merged *mergedSet) ([]W
 			return nil, nil, nil, err
 		}
 		if dirty || l == landingNone {
-			items = append(items, o.keptOrSalvaged(path, e.branch, dirty))
+			items = append(items, o.keptOrSalvaged(path, e.branch, dirty, held))
 			continue
 		}
 		if c, ok := eligibleAfterGrace(path, e.branch, now, minAge); ok {
@@ -345,15 +351,63 @@ func (o WorktreeOptions) scanWorktrees(porcelain string, merged *mergedSet) ([]W
 	return items, pool, seenBranch, nil
 }
 
-func (o WorktreeOptions) keptOrSalvaged(path, branch string, dirty bool) WorktreeItem {
-	if age, ok := o.finishedFor(path); ok && o.pastSalvageAge(age) {
-		return WorktreeItem{Path: path, Branch: branch, Action: WorktreeActionSalvageRemove,
-			Reason: fmt.Sprintf("cycle closed out %s ago — uncommitted state salvaged to operator-salvage, branch kept", age.Round(time.Hour))}
+func (o WorktreeOptions) keptOrSalvaged(path, branch string, dirty bool, held laneHolds) WorktreeItem {
+	if reason, ok := o.salvageReason(path, branch, held); ok {
+		return WorktreeItem{Path: path, Branch: branch, Action: WorktreeActionSalvageRemove, Reason: reason}
 	}
 	if dirty {
 		return WorktreeItem{Path: path, Branch: branch, Action: WorktreeActionFlagDirty, Reason: "dirty worktree — preserved for manual review"}
 	}
 	return WorktreeItem{Path: path, Branch: branch, Action: WorktreeActionFlagUnmerged, Reason: "branch not merged into HEAD"}
+}
+
+type laneHolds struct {
+	pausedCycles  map[int]bool
+	boundBranches map[string]bool
+}
+
+func (o WorktreeOptions) laneHolds() (laneHolds, error) {
+	paused, err := core.PausedLaneScopes(o.ProjectRoot, o.EvolveDir, core.ResumeOptions{})
+	if err != nil {
+		return laneHolds{}, fmt.Errorf("gc: read paused lanes: %w", err)
+	}
+	bound, err := continuation.ListRegistryEntries(o.ProjectRoot)
+	if err != nil {
+		return laneHolds{}, fmt.Errorf("gc: read continuation registry: %w", err)
+	}
+	held := laneHolds{pausedCycles: map[int]bool{}, boundBranches: map[string]bool{}}
+	for _, p := range paused {
+		held.pausedCycles[p.Cycle] = true
+	}
+	for _, c := range bound {
+		held.boundBranches[c.Branch] = true
+	}
+	return held, nil
+}
+
+func (h laneHolds) holds(path, branch string) bool {
+	if n, ok := LeafCycleNumber(filepath.Base(path)); ok && h.pausedCycles[n] {
+		return true
+	}
+	return h.boundBranches[branch]
+}
+
+func (o WorktreeOptions) salvageReason(path, branch string, held laneHolds) (string, bool) {
+	if age, ok := o.finishedFor(path); ok && o.pastSalvageAge(age) {
+		return fmt.Sprintf("cycle closed out %s ago — uncommitted state salvaged to operator-salvage, branch kept", age.Round(time.Hour)), true
+	}
+	if held.holds(path, branch) {
+		return "", false
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return "", false
+	}
+	age := o.now().Sub(info.ModTime())
+	if !o.pastSalvageAge(age) {
+		return "", false
+	}
+	return fmt.Sprintf("lane ended %s ago (not live, not paused, no continuation) — uncommitted state salvaged to operator-salvage, branch kept", age.Round(time.Hour)), true
 }
 
 func (o WorktreeOptions) pastSalvageAge(age time.Duration) bool {

@@ -17,7 +17,7 @@ func TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property(t *testing.T) {
 		n := rapid.IntRange(1, 10).Draw(rt, "n")
 		type want struct {
 			merged, dirty, live, closed bool
-			closedAgo                   time.Duration
+			closedAgo, age              time.Duration
 		}
 		expect := map[string]want{}
 
@@ -38,7 +38,7 @@ func TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property(t *testing.T) {
 			if closed {
 				closeOutCycle(t, e.projectRoot, 900+i, e.now.Add(-closedAgo))
 			}
-			expect[path] = want{merged: merged, dirty: dirty, live: live, closed: closed, closedAgo: closedAgo}
+			expect[path] = want{merged: merged, dirty: dirty, live: live, closed: closed, closedAgo: closedAgo, age: age}
 		}
 		o := e.opts()
 		o.Policy.SalvageAfterHours = rapid.IntRange(0, 48).Draw(rt, "salvage-after-hours")
@@ -52,8 +52,10 @@ func TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property(t *testing.T) {
 		for _, it := range m.Items {
 			if it.Action == WorktreeActionSalvageRemove {
 				w := expect[it.Path]
-				if w.live || !w.closed || o.Policy.SalvageAfterHours == 0 || w.closedAgo < time.Duration(o.Policy.SalvageAfterHours)*time.Hour {
-					rt.Fatalf("salvage-remove of %s outside a finished, policy-aged, dead tree: %+v policy=%dh", it.Path, w, o.Policy.SalvageAfterHours)
+				policy := time.Duration(o.Policy.SalvageAfterHours) * time.Hour
+				pastAge := (w.closed && w.closedAgo >= policy) || w.age >= policy
+				if w.live || o.Policy.SalvageAfterHours == 0 || !pastAge {
+					rt.Fatalf("salvage-remove of %s outside an ended, policy-aged, dead tree: %+v policy=%dh", it.Path, w, o.Policy.SalvageAfterHours)
 				}
 			}
 			if it.Action == WorktreeActionRemove || it.Action == WorktreeActionDeleteBranch {

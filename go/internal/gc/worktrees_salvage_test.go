@@ -46,8 +46,8 @@ func TestPlanWorktrees_AFinishedDirtyOrUnmergedTreePastTheSalvageAgeIsSalvageRem
 	e := newWorktreesTestEnv(t)
 	unmerged := e.addWorktree("cycle-cd3ae73e-1677", "cycle-cd3ae73e-1677", 48*time.Hour, false, false)
 	dirty := e.addWorktree("cycle-cd3ae73e-1686", "cycle-cd3ae73e-1686", 48*time.Hour, true, true)
-	young := e.addWorktree("cycle-cd3ae73e-1761", "cycle-cd3ae73e-1761", 48*time.Hour, false, false)
-	open := e.addWorktree("cycle-cd3ae73e-1762", "cycle-cd3ae73e-1762", 48*time.Hour, true, false)
+	young := e.addWorktree("cycle-cd3ae73e-1761", "cycle-cd3ae73e-1761", 2*time.Hour, false, false)
+	open := e.addWorktree("cycle-cd3ae73e-1762", "cycle-cd3ae73e-1762", 2*time.Hour, true, false)
 	leased := e.addWorktree("cycle-cd3ae73e-1699", "cycle-cd3ae73e-1699", 48*time.Hour, true, false)
 	for _, c := range []int{1677, 1686, 1699} {
 		closeOutCycle(t, e.projectRoot, c, e.now.Add(-30*time.Hour))
