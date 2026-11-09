@@ -167,3 +167,27 @@ func TestRunGC_AnEmptySeatSessionRootPolicyNamesTheDefaultRootInTheReport(t *tes
 		t.Errorf("the default root is not named:\n%s", stdout.String())
 	}
 }
+
+func TestRunGC_AnUnreadableSeatDirectoryProjectsIsReportedOnStderr(t *testing.T) {
+	e := newSeatSessionEnv(t)
+	telemetryDir := filepath.Join("/tmp", fmt.Sprintf("evtelemetry-%d", os.Getpid()))
+	t.Setenv("TEST_TELEMETRY_DIR", telemetryDir)
+	t.Cleanup(func() { _ = os.RemoveAll(telemetryDir) })
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	seatRoot := filepath.Join(home, ".evolve-seat")
+	if err := os.MkdirAll(seatRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	projects := filepath.Join(seatRoot, "projects")
+	if err := os.WriteFile(projects, []byte("not-a-dir"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	runGC([]string{"--project-root", e.projectRoot}, nil, &stdout, &stderr)
+
+	if !strings.Contains(stderr.String(), "evolve gc: seat directory error: ") {
+		t.Errorf("the unreadable seat directory projects is not reported on stderr:\nstderr=%s", stderr.String())
+	}
+}

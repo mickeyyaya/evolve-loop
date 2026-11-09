@@ -130,3 +130,49 @@ func TestReapSeatSessions_AFolderWithAnUnreadableEntryIsKept(t *testing.T) {
 		t.Errorf("report = %+v", rep)
 	}
 }
+
+func TestReapSeatDirectory_RemovesOnlyTheStaleFolderOfARemovedWorktreeUnderProjects(t *testing.T) {
+	seatRoot, base := t.TempDir(), filepath.Join(t.TempDir(), "wt")
+	projects := filepath.Join(seatRoot, "projects")
+	if err := os.MkdirAll(filepath.Join(base, "live"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	gone := seatDir(t, projects, SeatSessionFolderName(filepath.Join(base, "gone")), 4096, 72*time.Hour)
+	live := seatDir(t, projects, SeatSessionFolderName(filepath.Join(base, "live")), 10, 72*time.Hour)
+
+	rep := ReapSeatDirectory(seatRoot, base, time.Now().Add(-time.Hour), os.RemoveAll)
+
+	if rep.Entries != 1 || rep.Bytes < 4096 || len(rep.Errors) != 0 {
+		t.Errorf("report = %+v", rep)
+	}
+	if _, err := os.Stat(gone); !os.IsNotExist(err) {
+		t.Errorf("the removed worktree folder survived: %v", err)
+	}
+	if _, err := os.Stat(live); err != nil {
+		t.Errorf("live folder was removed: %v", err)
+	}
+}
+
+func TestReapSeatDirectory_AnEmptyRootOrMissingProjectsReportsZero(t *testing.T) {
+	base := filepath.Join(t.TempDir(), "wt")
+	repEmpty := ReapSeatDirectory("", base, time.Now(), os.RemoveAll)
+	if repEmpty.Entries != 0 || len(repEmpty.Errors) != 0 {
+		t.Errorf("report empty = %+v", repEmpty)
+	}
+	repMissing := ReapSeatDirectory(t.TempDir(), base, time.Now(), os.RemoveAll)
+	if repMissing.Entries != 0 || len(repMissing.Errors) != 0 {
+		t.Errorf("report missing = %+v", repMissing)
+	}
+}
+
+func TestReapSeatDirectory_AnUnreadableProjectsIsReported(t *testing.T) {
+	seatRoot, base := t.TempDir(), filepath.Join(t.TempDir(), "wt")
+	file := filepath.Join(seatRoot, "projects")
+	if err := os.WriteFile(file, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rep := ReapSeatDirectory(seatRoot, base, time.Now(), os.RemoveAll)
+	if len(rep.Errors) != 1 {
+		t.Errorf("report = %+v", rep)
+	}
+}

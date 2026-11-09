@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"io"
+	"io/fs"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/seatlogin"
 )
 
 func TestCLIHealthCanaryProbe_LaunchesCodexWithItsStartupUpdateCheckOff(t *testing.T) {
@@ -39,7 +41,7 @@ func TestDefaultLiveProbe_TheCanaryLaunchesTheCLIsOwnDefaultModelAndNeverAChosen
 		t.Run(driver, func(t *testing.T) {
 			t.Parallel()
 			pane := &bridge.FakeTmuxController{CaptureFrames: slices.Repeat([]string{"starting"}, 256)}
-			deps := bridge.Deps{Tmux: pane, Sleep: func(time.Duration) {}, LookupEnv: func(string) (string, bool) { return "", false }, Stderr: io.Discard}
+			deps := bridge.Deps{Tmux: pane, Sleep: func(time.Duration) {}, LookupEnv: func(string) (string, bool) { return "", false }, Stderr: io.Discard, SeatLogin: seatlogin.Deps{Stat: func(string) (fs.FileInfo, error) { return nil, fs.ErrNotExist }, ReadFile: func(string) ([]byte, error) { return nil, fs.ErrNotExist }}}
 
 			defaultLiveProbe(context.Background(), t.TempDir(), deps)(driver)
 

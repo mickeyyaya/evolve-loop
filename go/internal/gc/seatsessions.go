@@ -21,13 +21,33 @@ func DefaultSeatSessionRoot() string {
 }
 
 func ReapSeatSessions(root, worktreeBase string, cutoff time.Time, removeAll func(string) error) TempReapReport {
-	var rep TempReapReport
-	entries, err := os.ReadDir(root)
+	rep, err := reapWorktreeFolders(root, worktreeBase, cutoff, removeAll)
 	if err != nil {
-		if !os.IsNotExist(err) {
-			rep.Errors = append(rep.Errors, fmt.Sprintf("read seat session root %s: %v", root, err))
+		rep.Errors = append(rep.Errors, fmt.Sprintf("read seat session root %s: %v", root, err))
+	}
+	return rep
+}
+
+func ReapSeatDirectory(seatRoot, worktreeBase string, cutoff time.Time, removeAll func(string) error) TempReapReport {
+	if seatRoot == "" {
+		return TempReapReport{}
+	}
+	projects := filepath.Join(seatRoot, "projects")
+	rep, err := reapWorktreeFolders(projects, worktreeBase, cutoff, removeAll)
+	if err != nil {
+		rep.Errors = append(rep.Errors, fmt.Sprintf("read seat directory projects %s: %v", projects, err))
+	}
+	return rep
+}
+
+func reapWorktreeFolders(dir, worktreeBase string, cutoff time.Time, removeAll func(string) error) (TempReapReport, error) {
+	var rep TempReapReport
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return rep, nil
 		}
-		return rep
+		return rep, err
 	}
 	prefix := SeatSessionFolderName(worktreeBase) + "-"
 	live := liveWorktreeFolderNames(worktreeBase)
@@ -39,7 +59,7 @@ func ReapSeatSessions(root, worktreeBase string, cutoff time.Time, removeAll fun
 		if !ok || ownedByLiveWorktree(rest, live) {
 			continue
 		}
-		p := filepath.Join(root, e.Name())
+		p := filepath.Join(dir, e.Name())
 		if hasEntryNotBefore(p, cutoff) {
 			continue
 		}
@@ -51,7 +71,7 @@ func ReapSeatSessions(root, worktreeBase string, cutoff time.Time, removeAll fun
 		rep.Entries++
 		rep.Bytes += size
 	}
-	return rep
+	return rep, nil
 }
 
 func liveWorktreeFolderNames(base string) []string {

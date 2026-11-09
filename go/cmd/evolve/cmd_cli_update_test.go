@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -18,6 +19,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliupdate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
+	"github.com/mickeyyaya/evolve-loop/go/internal/seatlogin"
 	"github.com/mickeyyaya/evolve-loop/go/internal/usageprobe"
 )
 
@@ -351,7 +353,7 @@ func TestCLIUpdateWiring_TheProbeAndTheSmokeLaunchTheDispatchTierNotTheCLIsOwnDe
 			t.Run(seam+"/"+family, func(t *testing.T) {
 				t.Parallel()
 				pane := &bridge.FakeTmuxController{CaptureFrames: slices.Repeat([]string{"starting"}, 256)}
-				deps := bridge.Deps{Tmux: pane, Sleep: func(time.Duration) {}, LookupEnv: func(string) (string, bool) { return "", false }, Stderr: io.Discard}
+				deps := bridge.Deps{Tmux: pane, Sleep: func(time.Duration) {}, LookupEnv: func(string) (string, bool) { return "", false }, Stderr: io.Discard, SeatLogin: seatlogin.Deps{Stat: func(string) (fs.FileInfo, error) { return nil, fs.ErrNotExist }, ReadFile: func(string) ([]byte, error) { return nil, fs.ErrNotExist }}}
 
 				_ = seamOf(cliUpdateWiringWith(t.TempDir(), deps, io.Discard).seams)(context.Background(), family)
 
