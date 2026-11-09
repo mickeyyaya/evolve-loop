@@ -1,0 +1,110 @@
+# Cycle 2242 Dossier
+
+**Goal:** Wave 162.
+
+Work the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.
+
+Every cycle must:
+- commit to a claimed inbox item (an empty top_n must not run the spine);
+- bind its audit to the changes tree that it ships;
+- disposition its own defect ledger and the inherited ids;
+- record a terminal outcome on every exit;
+- never change a protected control-plane file with a tool;
+- leave no stale worktree.
+
+Routing:
+- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.
+- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.
+- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.
+
+Craft:
+- New and changed code has no comments. Names, types and tests give the intent.
+- Write each new document and each new log text in ASD-STE100.
+- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.
+- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.
+
+Evidence:
+- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.
+
+The measure of this wave is the number of shipped cycles. Keep each cycle shipping.
+
+Wave 161 facts (run 20261108T161932Z): 9 of 14 cycles shipped.
+- Cycle 2216: final verdict PASS. It shipped. Quota pauses: 1.
+- Cycle 2219: final verdict PASS. It shipped. Quota pauses: 1.
+- Cycle 2220: final verdict FAIL. Last phase: end. It did not ship. Quota pauses: 1.
+- Cycle 2223: final verdict PASS. It shipped. Quota pauses: 1.
+- Cycle 2225: final verdict PASS. It shipped.
+- Cycle 2226: no final verdict. Last phase: audit. It did not ship. Login walls: 1.
+- Cycle 2227: final verdict PASS. It shipped.
+- Cycle 2228: final verdict PASS. It shipped.
+- Cycle 2229: final verdict PASS. It shipped.
+- Cycle 2230: final verdict PASS. It shipped.
+- Cycle 2231: no final verdict. Last phase: audit. It did not ship. Login walls: 1.
+- Cycle 2232: no final verdict. Last phase: audit. It did not ship. Login walls: 1.
+- Cycle 2233: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.
+- Cycle 2234: final verdict PASS. It shipped.
+- Pull requests merged at this boundary: none.
+
+Operator notes for wave 162:
+- Seat token set; claude seats run isolated on it (fix for the 8-24 h logout). Main CI fixed (#1373). gc plan #1380 queued as gc-legacy-gap-x1..x11. Cycles 2226 and 2170 stopped on operator request; 2232 lost its lane checkpoint to a console stop and restarts from its item.
+
+Earlier waves:
+- Wave 158 (run 20261106T093235Z): 2 of 8 cycles shipped.
+- Wave 159 (run 20261106T154410Z): 0 of 4 cycles shipped.
+- Wave 160 (run 20261107T090007Z): 9 of 16 cycles shipped.
+**Final verdict:** FAIL
+**Run ID:** 01M6ZQV3J0244NDDRMPMNS192G
+**Committed:** `finder-fix-ownership-f5-deterministic-fast-path`
+
+## Phases
+
+| Phase | Archetype | Verdict | Duration | Key Findings |
+|-------|-----------|---------|----------|--------------|
+| scout | plan | PASS | 6m14s |  |
+| triage | plan | PASS | 4m51s |  |
+| tdd | plan | PASS | 4m6s |  |
+| build | build | PASS | 24m40s |  |
+| audit | evaluate | PASS | 15m49s |  |
+| build | build | PASS | 54m13s |  |
+| audit | evaluate | PASS | 1m24s |  |
+| ship | control | FAIL | 6m55s |  |
+| debugger | control | PASS | 52s |  |
+| build | build | PASS | 45m11s |  |
+| audit | evaluate | PASS | 11m40s |  |
+| ship | control | FAIL | 22m6s |  |
+| build | build | PASS | 26m57s |  |
+| audit | evaluate | PASS | 3m58s |  |
+| ship | control | FAIL | 20m41s |  |
+| build | build | PASS | 30m27s |  |
+| audit | evaluate | PASS | 4m7s |  |
+| ship | control | FAIL | 6m30s |  |
+| build | build | FAIL | 16m2s |  |
+| retro | control | PASS | 1m52s |  |
+
+## Timing
+
+**Total:** 5h8m33s across 20 phases (0 retried) · **Longest:** build 54m13s
+
+| Archetype | Wall-clock |
+|-----------|------------|
+| build | 3h17m30s |
+| control | 58m55s |
+| evaluate | 36m58s |
+| plan | 15m11s |
+
+## Defects
+
+- **audit-fail** (HIGH): cycle did not pass audit; see audit-report.md + acs-verdict.json — fix: address the audit findings recorded for this cycle
+
+
+## Failure
+
+**Fingerprint:** `build|gate-block|c4ad81808ac5` · **Class:** gate-block
+
+- review gate: phase "build" deliverable rejected after 2 correction(s): build handoff floor: 1 deterministic check failure(s) — fix these exactly before handoff: protected control-plane path changed:
+
+
+## Carryover
+
+- **address-audit-findings** (high): resolve the audit findings that failed cycle 2242
+
