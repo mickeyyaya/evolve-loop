@@ -88,6 +88,7 @@ Proofs:
 - `TestAgentSandboxContract` (integration, real `sandbox-exec`), the window row: the agent starts a private server, and its window runs on its own pty. A write to the host pane's tty fails. This row replaces `TestGenerateSBPL_TheAgentWindowGetsItsOwnTerminalAndNoOtherPane`.
 - `TestAgentSandboxContract`, the two incident rows: the exact probe, with `TMUX` unset as the boot does, gets its own server. With `TMUX` still set to the run server, the probe reaches no server. In both rows the run server keeps its sessions. These rows replace `TestGenerateSBPL_TheCycle1853ProbeGetsItsOwnServerAndLeavesTheRunServerAlive`.
 - `TestPaneParity_ReportsTheCycle1853TriggerWhenThePtyRulesAreRemoved` (integration): the pane-parity harness runs `./internal/swarm` on the host and in a real sandboxed pane. With the pty rules removed from the profile, it reports `TestExecTmuxKill_NeverKillsASessionWhoseNameExtendsTheTarget` as host=pass and pane=fail. This is the cycle-1853 trigger, found by a gate and not by an agent.
+  - **Update 2026-11-09.** Cycle 2216 gave `./internal/swarm` a `TestMain` that runs `tmuxtest.Main`. Without the pty rules, its orphan guard cannot open a tmux window, so the package fails before its tests run. The test now expects the report `./internal/swarm (package): host=pass pane=fail`.
 - Live: `go test ./internal/swarm` in `sandbox-exec` with the generated profile fails before the fix at `kill_exact_test.go:37` and passes after it.
 
 ### The follow-up (lane sandbox contract, 2026-10-10)

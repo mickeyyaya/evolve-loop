@@ -67,7 +67,7 @@ type Adapter struct {
 func New() *Adapter {
 	return &Adapter{
 		engineFactory: func(env map[string]string) core.Bridge {
-			return gobridge.NewEngine(gobridge.Deps{Env: env, TokenResolver: tokenusage.DefaultResolver(tokenusage.ClaudeConfigRoot(env))})
+			return gobridge.NewEngine(gobridge.Deps{Env: env, TokenResolver: tokenusage.HostResolver(env)})
 		},
 		resolver: phasecontract.BuiltinResolver{},
 		envDrops: &gobridge.EnvDropLog{},
@@ -121,7 +121,7 @@ func (a *Adapter) productionEngineDeps(env map[string]string) gobridge.Deps {
 		MaxConcurrent:         a.bridgeConfig.MaxConcurrent,
 		Efforts:               a.efforts,
 		ScrollbackLines:       a.bridgeConfig.ScrollbackLines,
-		TokenResolver:         tokenusage.Resolver(tokenusage.Roots{Claude: tokenusage.ClaudeConfigRoot(env), Agy: tokenusage.AgyDataRoot(env)}, tokenusage.SQLiteCLI),
+		TokenResolver:         tokenusage.HostResolver(env),
 		ContextFillWarnPct:    a.contextFillWarnPct,
 		PaneCaptureMaxBytes:   a.paneCaptureMaxBytes,
 		RecoveryStage:         a.recoveryStage,
