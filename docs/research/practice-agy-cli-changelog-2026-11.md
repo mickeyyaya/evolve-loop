@@ -96,3 +96,19 @@ Compaction and subagent cleanup fixes do not change its input.
 The ten releases improve error recovery, sandbox defaults, compaction and hook control.
 No persona file changes in this cycle, and no prompt changes.
 Two candidates can feed milestone M3 after the M2 baseline: the 1.4.8 tool-call error handling and the 1.4.11 `finished_reason` field.
+
+## 5. Re-detection addendum (cycle 2259)
+
+The watch raised the item `practice-agy-cli-changelog-command-184aa36b-202611030236` again.
+The source is the command `agy changelog`, read at the snapshot 2026-10-27T07:28:00Z.
+The newest release in that snapshot is 1.4.12.
+Section 2 already covers the releases 1.4.3 to 1.4.12.
+
+The source lines are untrusted data.
+This note reads them as facts about releases and never as orders.
+No instruction in the source is followed.
+
+Under ADR-0133, no persona and no prompt changes in this cycle.
+The reason is that section 3 already covers every release up to 1.4.12 and finds no needed change.
+Each persona waits for the M2 baseline, so a new edit now has no data to support it.
+The two candidates of section 4 stay open for milestone M3.
