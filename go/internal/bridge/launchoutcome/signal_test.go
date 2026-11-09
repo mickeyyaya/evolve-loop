@@ -52,8 +52,8 @@ func TestOutcomeSignal_IsTheTableColumnAndFollowsTheNamingRule(t *testing.T) {
 			}
 		}
 	}
-	if registered != 14 {
-		t.Errorf("BRIDGE_EXIT_ codes registered = %d, want 14", registered)
+	if registered != 15 {
+		t.Errorf("BRIDGE_EXIT_ codes registered = %d, want 15", registered)
 	}
 }
 
@@ -66,4 +66,13 @@ func TestOutcomeSignal_81_IsOneCodeRegardlessOfSubCause(t *testing.T) {
 	if CauseCode(ExitArtifactTimeout, "[bridge] artifact-timeout: cause=submit_wedged phase=x\n") != "submit_wedged" {
 		t.Error("the sub-cause rides the cause code, not the signal code")
 	}
+}
+
+func TestOutcomeSignal_85_AQuotaWallProjectsOntoTheQuotaCodeAndIsRegistered(t *testing.T) {
+	stderr := "[auto-respond] escalation report written (pattern=rate_limit reason=escalate)\n"
+	out := Classify(ExitUnknownPrompt, nil, stderr)
+	if out.Signal != CodeExitQuotaWall || out.ExitCode != ExitUnknownPrompt || out.CauseCode != "rate_limit" {
+		t.Errorf("a quota wall at exit 85 projects onto %s with the exit and cause intact: %+v", CodeExitQuotaWall, out)
+	}
+	assertRegisteredBridgeCode(t, CodeExitQuotaWall)
 }

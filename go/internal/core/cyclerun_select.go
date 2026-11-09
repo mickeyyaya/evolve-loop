@@ -17,6 +17,27 @@ func (cr *cycleRun) recordSpineFailOpen(next Phase, missingArtifact, reason stri
 	})
 }
 
+func (cr *cycleRun) stopBeforeRouting(next Phase) (Phase, loopAction, error) {
+	switch cr.current {
+	case PhaseStart:
+		if err := cr.pauseAtRouterWall(next); err != nil {
+			return "", loopAbort, err
+		}
+	case PhaseTriage:
+		terminal := cr.o.triageTermination(cr.req.ProjectRoot, cr.cs.WorkspacePath, cr.cs.CycleID, cr.cs.CompletedPhases, cr.lastVerdict)
+		if terminal.stop {
+			cr.result.TerminationReason = terminal.reason
+			return PhaseEnd, loopBreak, nil
+		}
+	case PhaseTDD:
+		if cr.routeProtectedPredicates() {
+			cr.result.TerminationReason = CycleTerminationTddProtectedRoute
+			return PhaseEnd, loopBreak, nil
+		}
+	}
+	return "", loopNext, nil
+}
+
 func (cr *cycleRun) selectNext() (Phase, loopAction, error) {
 	var next Phase
 	fromSchedule := false
@@ -37,17 +58,8 @@ func (cr *cycleRun) selectNext() (Phase, loopAction, error) {
 		next = n
 	}
 
-	if cr.current == PhaseTriage {
-		terminal := cr.o.triageTermination(cr.req.ProjectRoot, cr.cs.WorkspacePath, cr.cs.CycleID, cr.cs.CompletedPhases, cr.lastVerdict)
-		if terminal.stop {
-			cr.result.TerminationReason = terminal.reason
-			return PhaseEnd, loopBreak, nil
-		}
-	}
-
-	if cr.current == PhaseTDD && cr.routeProtectedPredicates() {
-		cr.result.TerminationReason = CycleTerminationTddProtectedRoute
-		return PhaseEnd, loopBreak, nil
+	if end, act, err := cr.stopBeforeRouting(next); act != loopNext {
+		return end, act, err
 	}
 
 	if cr.o.cfg.Stage != config.StageOff {
