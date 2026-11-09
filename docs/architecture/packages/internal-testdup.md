@@ -11,11 +11,16 @@
 - `Copies` is the sum of (sites - 1) of each group of equal bodies.
 - `Scan` skips `vendor`, `testdata`, hidden and underscore directories.
 - An `acs/<dir>` directory is read only when it is newer than the baseline date. The age comes from the commit of its files. A fresh checkout makes each mtime new. An untracked directory uses the newest mtime.
+- A directory with a change against `HEAD` (`git diff --name-only HEAD`) is new. The ship gate runs before the landing commit, while the change is only staged. This rule makes the gate count the same directories as main counts after the landing ([incident 2026-11-09](../../incidents/2026-11-09-duplicate-ratchet-misses-staged-predicates.md)).
+- `GroupsUnder` keeps each group with a site under one directory. The TDD handoff floor of `internal/core` uses it for `acs/cycle<N>`.
 - `go/.test-dup-baseline` holds `count=` and `date=`.
 - `Check` fails when the count is above the baseline.
 - `Check` also fails when the count is below the baseline. A lowered count must lower the baseline in the same commit.
 
 ## Invariants
 
-- The structure test `TestTestDuplicates_TheCountOfCopiesEqualsTheBaseline` in `internal/repocontract` is the only production-path caller.
+- Two production-path callers use the package:
+  - the structure test `TestTestDuplicates_TheCountOfCopiesEqualsTheBaseline` in `internal/repocontract`;
+  - the TDD handoff floor `tddPredicateFloor` in `internal/core`.
 - A change that removes a copy lowers `count=` in `go/.test-dup-baseline` in the same commit.
+- `acs/cycle2250` holds two copies, `write` and `onDisk`, that landed through the staged-predicate escape. No later phase can change that directory. The repair removed two copies in `cmd/evolve`, so the count stays at the baseline 334.

@@ -467,3 +467,63 @@ func TestScan_DatesAnAcsCycleDirectoryByItsCommitNotByTheMtimeOfAFreshCheckout(t
 		t.Errorf("Copies = %d, want 1: acs/cycle9 was committed after the baseline date", withNewDir.Copies)
 	}
 }
+
+func TestScan_ScansAStagedAcsCycleDirectoryThatNoCommitHolds(t *testing.T) {
+	repo := gittest.Fixture(t)
+	repo.Write("internal/a/a_test.go", source(helperSource, "a", "makeFile"))
+	t.Setenv("GIT_AUTHOR_DATE", "2020-01-01T00:00:00Z")
+	t.Setenv("GIT_COMMITTER_DATE", "2020-01-01T00:00:00Z")
+	repo.Git("add", "-A")
+	repo.Git("commit", "-q", "-m", "base")
+	repo.Write("acs/cycle9/predicates_test.go", source(helperSource, "cycle9", "makeFile"))
+	ageTree(t, filepath.Join(repo.Dir, "acs"), justNow)
+	repo.Git("add", "-A")
+
+	report, err := Scan(repo.Dir, baselineDay)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Copies != 1 {
+		t.Errorf("Copies = %d, want 1: acs/cycle9 is staged for the landing commit, so it is the change under review, not history; groups = %v", report.Copies, report.Groups)
+	}
+}
+
+func TestGroupsUnder_KeepsOnlyTheGroupsWithASiteInTheDirectory(t *testing.T) {
+	inside := Group{Body: "a", Sites: []string{"acs/cycle9/predicates_test.go:write", "cmd/evolve/x_test.go:writeX"}}
+	sibling := Group{Body: "b", Sites: []string{"acs/cycle90/predicates_test.go:has", "internal/a/a_test.go:has"}}
+	elsewhere := Group{Body: "c", Sites: []string{"internal/a/a_test.go:read", "internal/b/b_test.go:read"}}
+	report := Report{Copies: 3, Groups: []Group{inside, sibling, elsewhere}}
+
+	for _, dir := range []string{"acs/cycle9", "acs/cycle9/"} {
+		got := GroupsUnder(report, dir)
+
+		if len(got) != 1 || got[0].Body != "a" {
+			t.Errorf("GroupsUnder(%q) = %v, want only the group with a site under acs/cycle9, not the one under acs/cycle90", dir, got)
+		}
+	}
+	if got := GroupsUnder(report, "acs/cycle7"); len(got) != 0 {
+		t.Errorf("GroupsUnder(acs/cycle7) = %v, want none", got)
+	}
+}
+
+func TestScan_ScansAnOldAcsDirectoryWithAChangeThatNoCommitHoldsYet(t *testing.T) {
+	repo := gittest.Fixture(t)
+	repo.Write("internal/a/a_test.go", source(helperSource, "a", "makeFile"))
+	repo.Write("acs/regression/old_test.go", source(otherHelperSource, "regression", "readBack"))
+	t.Setenv("GIT_AUTHOR_DATE", "2020-01-01T00:00:00Z")
+	t.Setenv("GIT_COMMITTER_DATE", "2020-01-01T00:00:00Z")
+	repo.Git("add", "-A")
+	repo.Git("commit", "-q", "-m", "old")
+	repo.Write("acs/regression/new_test.go", source(helperSource, "regression", "makeFile"))
+	repo.Git("add", "-A")
+
+	report, err := Scan(repo.Dir, baselineDay)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Copies != 1 {
+		t.Errorf("Copies = %d, want 1: the landing commit makes acs/regression new on main, so the gate before it must scan it too; groups = %v", report.Copies, report.Groups)
+	}
+}

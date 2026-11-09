@@ -16,9 +16,9 @@ func declaredSetupProject(t *testing.T) (policyPath string, before []byte) {
 	evolveDir := filepath.Join(project, ".evolve")
 	t.Setenv("EVOLVE_PROJECT_ROOT", project)
 	t.Setenv("EVOLVE_PLUGIN_ROOT", project)
-	setupWrite(t, filepath.Join(evolveDir, "profiles", "scout.json"), `{"name":"scout","cli":"codex-tmux","model_tier_default":"balanced","allowed_clis":["all"]}`)
+	writeE2File(t, filepath.Join(evolveDir, "profiles", "scout.json"), `{"name":"scout","cli":"codex-tmux","model_tier_default":"balanced","allowed_clis":["all"]}`)
 	policyPath = filepath.Join(evolveDir, "policy.json")
-	setupWrite(t, policyPath, declaredProjectPolicy)
+	writeE2File(t, policyPath, declaredProjectPolicy)
 	before, err := os.ReadFile(policyPath)
 	if err != nil {
 		t.Fatal(err)
@@ -83,7 +83,7 @@ func TestRunSetupDetect_TheHumanReportOfAPinsProjectNamesNoTable(t *testing.T) {
 	project := t.TempDir()
 	t.Setenv("EVOLVE_PROJECT_ROOT", project)
 	t.Setenv("EVOLVE_PLUGIN_ROOT", project)
-	setupWrite(t, filepath.Join(project, ".evolve", "policy.json"), `{"pins": {}}`)
+	writeE2File(t, filepath.Join(project, ".evolve", "policy.json"), `{"pins": {}}`)
 	var out, errb bytes.Buffer
 
 	rc := runSetup([]string{"detect"}, nil, &out, &errb)
