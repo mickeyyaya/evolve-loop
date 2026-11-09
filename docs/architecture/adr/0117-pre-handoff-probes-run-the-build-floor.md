@@ -1,5 +1,7 @@
 # ADR-0117 — The builder's pre-handoff probes run the build handoff floor itself
 
+> **Note (2026-11-10, [ADR-0165](0165-every-gate-is-a-typed-unit-with-a-conformance-contract.md)):** The rule of this record holds for each phase, not for build only. The TDD self-check kept the hole that this record closed for build. Its rendered command passes no `--worktree`, and the host does not run its checks.
+
 - **Status:** Accepted (2026-10-01). Console landing on branch `fix/pre-handoff-probes-run-the-floor`, revised the same day after the architecture review (FIX_THEN_MERGE: the floor's file protected, one resume projection, the unused floor constructors removed, one state read and one probe). Consumes inbox `pre-handoff-probes-run-the-build-floor`.
 - **Amends** [ADR-0076](0076-convergence-architecture.md) slice B (`evolve selfcheck build` ran "the floor's exact checks") and [ADR-0034](0034-unified-deliverable-contract.md) (`evolve phase verify` shares the host gate's verifier): both probes now also run the build handoff floor, with the floor's own inputs.
 - **Related:** [the build handoff floor](../packages/internal-core.md) (`internal/core`); [the composition root](../packages/cmd-evolve.md); [`evolve phase verify`](../packages/internal-cli-phasecmd.md); retrospectives of cycles 1763, 1764 and 1788 (lessons `inst-L1763a`, `inst-L1764b`, `inst-L1788b`).
