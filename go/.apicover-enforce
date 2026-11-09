@@ -872,3 +872,4 @@
 ./internal/closesinbox
 ./internal/cyclefacts
 ./internal/testdup
+./internal/logcompress
