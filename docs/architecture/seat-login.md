@@ -176,8 +176,10 @@ A bare empty directory drops the settings, the plugins and the trust that a seat
 
 **What a seat sees.** The seat directory starts from the real launch shape, not from empty.
 
-- A closed table decides each user key of the settings. A test fails on a key with no decision. `skipDangerousModePermissionPrompt` is in the table.
+- A closed table decides each user key of the settings. A test fails on a key with no decision. `skipDangerousModePermissionPrompt` is in the table, and the user value is never carried.
 - `autoMemoryEnabled` is `false`.
+- `skipDangerousModePermissionPrompt` is `true`, set by the bridge. Each claude seat launches in bypass mode. A seat with no acknowledgement stops at the confirmation, and its default answer exits the CLI. The value grants nothing that the launch flag does not grant. Found by the live smoke of 2026-11-09.
+- The seat state `.claude.json` gets `hasCompletedOnboarding: true`, merged into the keys that Claude Code wrote. Else each seat stops at the first-run onboarding. A state that already holds the key is not written again. A state that is not JSON refuses the launch and stays as it is.
 - A measurement of the plugins decides which plugins the seat sees. The measurement comes before the grant list.
 
 ## 5. The carrier of the token
