@@ -15,6 +15,7 @@ type FingerprintInput struct {
 	Candidates []string
 	Policy     FreshnessPolicy
 	Tiers      []string
+	Pins       map[string]string
 }
 
 func Fingerprint(in FingerprintInput) string {
@@ -36,5 +37,9 @@ func Fingerprint(in FingerprintInput) string {
 	writeField(strconv.FormatBool(in.Policy.PreferAlias))
 	writeList(in.Policy.AliasIDs)
 	writeList(in.Tiers)
+	if len(in.Pins) > 0 {
+		writeField("pins")
+		writeList(pinPairs(in.Pins))
+	}
 	return "sha256:" + hex.EncodeToString(h.Sum(nil))
 }

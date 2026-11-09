@@ -116,7 +116,7 @@ func TestTierModelsFor(t *testing.T) {
 		}
 	}
 	claude := tierModelsFor("claude")
-	if claude["fast"] != "haiku" || claude["balanced"] != "sonnet" || claude["deep"] != "opus" {
+	if claude["fast"] != "haiku" || claude["balanced"] != "sonnet" || claude["deep"] != "fable" {
 		t.Errorf("claude identity broken: %+v", claude)
 	}
 }

@@ -109,7 +109,7 @@ var treeReadingSelections = []TestSelection{
 		"TestHandoff_VerbsWriteNothingAndRepeatTheSameAnswer",
 		"TestInboxCenterlessRootsArePinned",
 		"TestLoopPreflightOptions_AFailedBootIsExplainedByTheUsageEvidence",
-		"TestNewUsageProber_AnExhaustedFableWeekBenchesNoModelThroughTheProductionProber",
+		"TestNewUsageProber_AnExhaustedFableWeekBenchesClaudeFableThroughTheProductionProber",
 		"TestNewUsageProber_ReadsEachCLIsWindowsThroughItsManifestAndBenchesTheRightFamily",
 		"TestNilSignalBridgeRootsAreExplicit",
 		"TestNilSignalCenterRootsArePinned",
