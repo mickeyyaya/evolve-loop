@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -197,7 +198,7 @@ func TestRunAndCheck_ReportAnInstructionFileDrift(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !containsString(drift, "GEMINI.md") {
+	if !slices.Contains(drift, "GEMINI.md") {
 		t.Fatalf("Check = %v, want GEMINI.md", drift)
 	}
 	var out, errBuf bytes.Buffer
@@ -224,15 +225,6 @@ func TestRunAndCheck_FailOnAnInstructionRenderError(t *testing.T) {
 	if code := Run(root, false, &out, &errBuf); code != 1 {
 		t.Fatalf("check exit = %d, want 1", code)
 	}
-}
-
-func containsString(list []string, want string) bool {
-	for _, s := range list {
-		if s == want {
-			return true
-		}
-	}
-	return false
 }
 
 func TestCheck_AnUnlistableSkillsDirectoryIsAnError(t *testing.T) {

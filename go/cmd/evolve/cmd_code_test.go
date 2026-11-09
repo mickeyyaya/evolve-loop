@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -306,18 +307,9 @@ func TestBuildCodeBackends_PolicyPathsThatAreAbsoluteNeedNoHub(t *testing.T) {
 	if err != nil || rec.name != "/abs/trail" || rec.args[len(rec.args)-1] != "/abs/index" {
 		t.Errorf("err=%v name=%q args=%v", err, rec.name, rec.args)
 	}
-	if !containsString(rec.env, "PATH=/usr/bin") {
+	if !slices.Contains(rec.env, "PATH=/usr/bin") {
 		t.Errorf("env = %v, want the given base environment", rec.env)
 	}
-}
-
-func containsString(list []string, want string) bool {
-	for _, s := range list {
-		if s == want {
-			return true
-		}
-	}
-	return false
 }
 
 func TestBuildCodeBackends_TheDefaultsResolveAgainstTheHubRoot(t *testing.T) {

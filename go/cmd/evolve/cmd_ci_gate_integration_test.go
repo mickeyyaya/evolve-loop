@@ -180,21 +180,12 @@ func TestRunCIClassify_AFailedAcsStepKeepsItsTestRowsAndTheGoJobGetsItsGateRow(t
 
 	rep := classifyJSON(t, out)
 	acs := rowsOf(rep, func(f ciwatch.FailingTest) bool {
-		return f.Test != "" && slicesHas(f.Jobs, "plugin and durable ACS / acs-durable")
+		return f.Test != "" && slices.Contains(f.Jobs, "plugin and durable ACS / acs-durable")
 	})
 	gate := rowsOf(rep, func(f ciwatch.FailingTest) bool { return f.Step == "make apicover-check" })
 	if len(acs) != 2 || len(gate) != 1 || !strings.HasSuffix(gate[0].Detail, "tail -n 2000 (the end of the job log)") || errOut != "" {
 		t.Errorf("acs rows %+v, gate rows %+v, stderr %q; want 2 acs test rows and 1 apicover gate row with bound 2000", acs, gate, errOut)
 	}
-}
-
-func slicesHas(list []string, want string) bool {
-	for _, s := range list {
-		if s == want {
-			return true
-		}
-	}
-	return false
 }
 
 func TestRunCIClassify_AGateRowTakesOnlyItsOwnJobOutOfARowThatTwoJobsShare(t *testing.T) {
@@ -205,10 +196,10 @@ func TestRunCIClassify_AGateRowTakesOnlyItsOwnJobOutOfARowThatTwoJobsShare(t *te
 	out, errOut, _ := gateClassify(t, "41473319266", renameMacStep, "--json")
 
 	rep := classifyJSON(t, out)
-	shared := rowsOf(rep, func(f ciwatch.FailingTest) bool { return f.Step == "" && slicesHas(f.Jobs, jobDarwinName) })
+	shared := rowsOf(rep, func(f ciwatch.FailingTest) bool { return f.Step == "" && slices.Contains(f.Jobs, jobDarwinName) })
 	gate := rowsOf(rep, func(f ciwatch.FailingTest) bool { return f.Step == "make cover-changed" })
 	ubuntuLeft := rowsOf(rep, func(f ciwatch.FailingTest) bool {
-		return f.Step != "make cover-changed" && slicesHas(f.Jobs, gateUbuntuJob)
+		return f.Step != "make cover-changed" && slices.Contains(f.Jobs, gateUbuntuJob)
 	})
 	if len(shared) == 0 || len(gate) != 1 || len(gate[0].Jobs) != 1 || len(ubuntuLeft) != 0 || errOut != "" {
 		t.Errorf("rows kept by the darwin job %d, gate rows %+v, rows left on the ubuntu job %+v, stderr %q", len(shared), gate, ubuntuLeft, errOut)

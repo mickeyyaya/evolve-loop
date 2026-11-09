@@ -448,13 +448,6 @@ func TestComposePrompt_NoLeadingDashes(t *testing.T) {
 	}
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 func TestGenerateToken_LengthAndAlphabet(t *testing.T) {
 	r := newRunner(t, &fakeBridge{}, &fakeLedger{}, time.Now())
 	tok, err := r.generateToken()

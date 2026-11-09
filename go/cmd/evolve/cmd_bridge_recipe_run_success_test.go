@@ -15,6 +15,7 @@ func TestRunBridgeRecipeRun_ACompletedRecipeExitsZeroWithItsResult(t *testing.T)
 	bin := t.TempDir()
 	fakeclitest.Install(t, filepath.Join(bin, "tmux"), "#!/bin/sh\ncase \"$*\" in *capture-pane*) printf '\\342\\235\\257 \\n' ;; esac\nexit 0\n")
 	t.Setenv("PATH", bin)
+	t.Setenv("HOME", t.TempDir())
 	t.Setenv("EVOLVE_PROJECT_ROOT", t.TempDir())
 	ws := t.TempDir()
 	var stdout, stderr bytes.Buffer

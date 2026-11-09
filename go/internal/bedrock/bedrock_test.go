@@ -172,10 +172,3 @@ func fileExists(p string) bool {
 	_, err := exec.Command("test", "-f", p).CombinedOutput()
 	return err == nil
 }
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
