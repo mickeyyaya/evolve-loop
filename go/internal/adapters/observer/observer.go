@@ -19,9 +19,10 @@ import (
 )
 
 const (
-	DefaultPollS  = 5 * time.Second
-	DefaultStallS = 600 * time.Second
-	DefaultNudgeS = 300 * time.Second
+	DefaultPollS       = 5 * time.Second
+	DefaultStallS      = 600 * time.Second
+	DefaultShellStallS = 3600 * time.Second
+	DefaultNudgeS      = 300 * time.Second
 
 	observerEventsSuffix = observerengine.EventsSuffix
 
@@ -46,10 +47,12 @@ type Event struct {
 	Source   string `json:"source,omitempty"`
 	Session  string `json:"session,omitempty"`
 	Busy     bool   `json:"busy,omitempty"`
+	Shells   int    `json:"shells,omitempty"`
 }
 
 type Config struct {
 	StallS       time.Duration
+	ShellStallS  time.Duration
 	PollS        time.Duration
 	Cycle        int
 	Phase        string
@@ -76,6 +79,9 @@ type Observer struct {
 func New(cfg Config, sink io.Writer) *Observer {
 	if cfg.StallS == 0 {
 		cfg.StallS = DefaultStallS
+	}
+	if cfg.ShellStallS == 0 {
+		cfg.ShellStallS = DefaultShellStallS
 	}
 	if cfg.PollS == 0 {
 		cfg.PollS = DefaultPollS
@@ -122,8 +128,8 @@ func (st *watchState) progressed(now time.Time) {
 	st.stallEmitted = false
 }
 
-func (o *Observer) stallDue(st *watchState) bool {
-	return !st.stallEmitted && o.nowFunc().Sub(st.lastGrowth) >= o.cfg.StallS
+func (o *Observer) stallDue(st *watchState, limit time.Duration) bool {
+	return !st.stallEmitted && o.nowFunc().Sub(st.lastGrowth) >= limit
 }
 
 func (o *Observer) poll(st *watchState) {
@@ -152,15 +158,23 @@ func (o *Observer) pollPane(st *watchState, snap panewatch.Snapshot) {
 		st.progressed(o.nowFunc())
 		return
 	}
-	if !o.stallDue(st) {
+	limit := o.cfg.StallS
+	if snap.Shells > 0 && o.cfg.ShellStallS > limit {
+		limit = o.cfg.ShellStallS
+	}
+	if !o.stallDue(st, limit) {
 		return
 	}
 	state := "idle at its prompt"
 	if snap.Busy {
 		state = "busy"
 	}
+	reason := fmt.Sprintf("pane %s showed no new transcript for %s (%s)", snap.Session, limit, state)
+	if snap.Shells > 0 {
+		reason = fmt.Sprintf("pane %s showed no new transcript for %s (%s) while it waits on %d running shell(s)", snap.Session, limit, state, snap.Shells)
+	}
 	o.emitEvent(Event{Type: eventStallNoProgress, Severity: "incident", Source: sourcePane, Session: snap.Session, Busy: snap.Busy,
-		Reason: fmt.Sprintf("pane %s showed no new transcript for %s (%s)", snap.Session, o.cfg.StallS, state)})
+		Shells: snap.Shells, Reason: reason})
 	st.stallEmitted = true
 }
 
@@ -175,7 +189,7 @@ func (o *Observer) pollOutput(st *watchState) {
 		st.progressed(o.nowFunc())
 		return
 	}
-	if !o.stallDue(st) {
+	if !o.stallDue(st, o.cfg.StallS) {
 		return
 	}
 	if o.cfg.LivenessProbe != nil && o.cfg.LivenessProbe() {

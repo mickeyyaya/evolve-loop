@@ -16,9 +16,10 @@ import (
 const originStallSignal = "phaseStallSignal"
 
 type phaseWatch struct {
-	req   core.PhaseRequest
-	phase string
-	stall time.Duration
+	req        core.PhaseRequest
+	phase      string
+	stall      time.Duration
+	shellStall time.Duration
 }
 
 func (a *CoreAdapter) phaseStallSignal(ctx context.Context, w phaseWatch) func(Event) {
@@ -26,6 +27,10 @@ func (a *CoreAdapter) phaseStallSignal(ctx context.Context, w phaseWatch) func(E
 	return func(e Event) {
 		if e.Type != eventStallNoProgress && e.Type != eventStallNoOutput {
 			return
+		}
+		stall := w.stall
+		if e.Shells > 0 && w.shellStall > stall {
+			stall = w.shellStall
 		}
 		kind := signalcenter.KindObserverWarning
 		if e.Source == sourcePane {
@@ -36,7 +41,8 @@ func (a *CoreAdapter) phaseStallSignal(ctx context.Context, w phaseWatch) func(E
 			Kind: kind, Code: bridge.CodePhaseStalled, Severity: signalcenter.SeverityWarn, Reason: e.Reason,
 			Fields: map[string]string{
 				"source": e.Source, "session": e.Session, "busy": strconv.FormatBool(e.Busy),
-				"stall_s": strconv.FormatFloat(w.stall.Seconds(), 'f', -1, 64),
+				"stall_s": strconv.FormatFloat(stall.Seconds(), 'f', -1, 64),
+				"shells":  strconv.Itoa(e.Shells),
 			},
 		})
 		if a.UsageEvidence != nil && ctx.Err() == nil && e.Source == sourcePane {

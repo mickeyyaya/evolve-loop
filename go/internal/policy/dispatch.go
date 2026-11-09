@@ -48,6 +48,7 @@ type ObserverPolicy struct {
 	Autospawn        *bool  `json:"autospawn,omitempty"`
 	PollS            *int   `json:"poll_s,omitempty"`
 	StallS           *int   `json:"stall_s,omitempty"`
+	ShellStallS      *int   `json:"shell_stall_s,omitempty"`
 	NudgeS           *int   `json:"nudge_s,omitempty"`
 	NudgeBody        string `json:"nudge_body,omitempty"`
 	EOFGraceS        int    `json:"eof_grace_s,omitempty"`
@@ -58,12 +59,13 @@ type ObserverPolicy struct {
 }
 
 func (p Policy) ObserverConfig() ObserverPolicy {
-	autospawn, pollS, stallS, nudgeS := true, 5, 600, 300
+	autospawn, pollS, stallS, shellStallS, nudgeS := true, 5, 600, 3600, 300
 	watchdogPollS, watchdogWarnPct, watchdogGraceS := 15, 75, 10
 	out := ObserverPolicy{
 		Autospawn:       &autospawn,
 		PollS:           &pollS,
 		StallS:          &stallS,
+		ShellStallS:     &shellStallS,
 		NudgeS:          &nudgeS,
 		WatchdogPollS:   &watchdogPollS,
 		WatchdogWarnPct: &watchdogWarnPct,
@@ -81,6 +83,9 @@ func (p Policy) ObserverConfig() ObserverPolicy {
 	}
 	if o.StallS != nil {
 		out.StallS = o.StallS
+	}
+	if o.ShellStallS != nil {
+		out.ShellStallS = o.ShellStallS
 	}
 	if o.NudgeS != nil {
 		out.NudgeS = o.NudgeS

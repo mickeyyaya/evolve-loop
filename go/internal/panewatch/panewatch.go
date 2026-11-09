@@ -32,6 +32,7 @@ type Snapshot struct {
 	ProgressHash string    `json:"progress_hash"`
 	ProgressAt   time.Time `json:"progress_at"`
 	TokenLine    string    `json:"token_line,omitempty"`
+	Shells       int       `json:"shells,omitempty"`
 	UpdatedAt    time.Time `json:"updated_at"`
 	WriterPID    int       `json:"writer_pid"`
 }

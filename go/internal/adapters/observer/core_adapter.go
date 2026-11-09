@@ -75,6 +75,7 @@ func (a *CoreAdapter) Start(ctx context.Context, phase string, req core.PhaseReq
 	resolved := policy.Policy{Observer: &a.Config}.ObserverConfig()
 	cfg := Config{
 		StallS:        time.Duration(*resolved.StallS) * time.Second,
+		ShellStallS:   time.Duration(*resolved.ShellStallS) * time.Second,
 		PollS:         time.Duration(*resolved.PollS) * time.Second,
 		Cycle:         req.Cycle,
 		Phase:         phase,
@@ -82,12 +83,10 @@ func (a *CoreAdapter) Start(ctx context.Context, phase string, req core.PhaseReq
 		StdoutLog:     p.Stdout,
 		WorkspaceDir:  req.Workspace,
 		LivenessProbe: newProcessCPUProbe(core.BridgePIDFile(p.Stdout), nil),
-		PaneWatch: func() (panewatch.Snapshot, bool, error) {
-			return panewatch.ReadLive(req.Workspace, phase, runlease.PIDAlive)
-		},
+		PaneWatch:     livePaneWatch(req.Workspace, phase),
 	}
 	watchCtx, cancel := context.WithCancel(ctx)
-	cfg.OnEvent = a.phaseStallSignal(watchCtx, phaseWatch{req: req, phase: phase, stall: cfg.StallS})
+	cfg.OnEvent = a.phaseStallSignal(watchCtx, phaseWatch{req: req, phase: phase, stall: cfg.StallS, shellStall: cfg.ShellStallS})
 	obs := New(cfg, sink)
 
 	var wg sync.WaitGroup
@@ -178,4 +177,10 @@ func (a *CoreAdapter) phaseCLI(req core.PhaseRequest, phase string) string {
 		return v
 	}
 	return policy.SeatDefault(policy.SeatObserver).CLI
+}
+
+func livePaneWatch(workspace, phase string) func() (panewatch.Snapshot, bool, error) {
+	return func() (panewatch.Snapshot, bool, error) {
+		return panewatch.ReadLive(workspace, phase, runlease.PIDAlive)
+	}
 }

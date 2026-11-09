@@ -7,6 +7,7 @@ type Frame struct {
 	Busy       bool
 	TokenLine  string
 	ModelLabel string
+	Shells     int
 }
 
 type Tracker struct {
@@ -23,7 +24,7 @@ func (t *Tracker) Observe(f Frame, now time.Time) (Snapshot, bool) {
 	if next.StartedAt.IsZero() {
 		next.StartedAt = now
 	}
-	next.Busy, next.TokenLine, next.ModelLabel = f.Busy, f.TokenLine, f.ModelLabel
+	next.Busy, next.TokenLine, next.ModelLabel, next.Shells = f.Busy, f.TokenLine, f.ModelLabel, f.Shells
 	progressed := !t.primed || f.Hash != t.last.ProgressHash
 	if progressed {
 		next.ProgressHash, next.ProgressAt = f.Hash, now
