@@ -40,7 +40,7 @@ func TestLocateTranscript_PicksTheSessionInsideTheDispatchWindowWhenTwoShareAnch
 		t.Run(tc.name, func(t *testing.T) {
 			w := base
 			w.Start, w.End = mustParse(t, tc.start), mustParse(t, tc.end)
-			if got := LocateTranscript(root, w); got != tc.want {
+			if got := LocateTranscript([]string{root}, w); got != tc.want {
 				t.Fatalf("LocateTranscript = %q, want %q", got, tc.want)
 			}
 		})
@@ -54,23 +54,23 @@ func TestLocateTranscript_FallsBackToTheCwdAndNeedsAStampInTheWindow(t *testing.
 	writeTranscript(t, dir, "b.jsonl", `{"type":"user","cwd":"/wt/b","message":{"content":"x"}}`+"\n"+`{"type":"assistant","cwd":"/wt/b","timestamp":"not a time"}`+"\n")
 	start, end := mustParse(t, "2026-10-09T09:59:00Z"), mustParse(t, "2026-10-09T10:01:00Z")
 
-	if got := LocateTranscript(root, Window{Worktree: "/wt/a", Start: start, End: end}); got != byCwd {
+	if got := LocateTranscript([]string{root}, Window{Worktree: "/wt/a", Start: start, End: end}); got != byCwd {
 		t.Fatalf("by cwd = %q, want %q", got, byCwd)
 	}
-	if got := LocateTranscript(root, Window{Worktree: "/wt/b", Start: start, End: end}); got != "" {
+	if got := LocateTranscript([]string{root}, Window{Worktree: "/wt/b", Start: start, End: end}); got != "" {
 		t.Fatalf("a session with no stamp in the window = %q, want none", got)
 	}
-	if got := LocateTranscript(filepath.Join(root, "absent"), Window{Worktree: "/wt/a", Start: start, End: end}); got != "" {
+	if got := LocateTranscript([]string{filepath.Join(root, "absent")}, Window{Worktree: "/wt/a", Start: start, End: end}); got != "" {
 		t.Fatalf("a root with no projects = %q, want none", got)
 	}
-	if got := LocateTranscript(root, Window{Worktree: "/wt/a", Start: start.Add(2 * time.Minute), End: end.Add(time.Hour)}); got != "" {
+	if got := LocateTranscript([]string{root}, Window{Worktree: "/wt/a", Start: start.Add(2 * time.Minute), End: end.Add(time.Hour)}); got != "" {
 		t.Fatalf("a window after the session = %q, want none", got)
 	}
 	unchanged := mustParse(t, "2026-10-09T09:00:00Z")
 	if err := os.Chtimes(byCwd, unchanged, unchanged); err != nil {
 		t.Fatal(err)
 	}
-	if got := LocateTranscript(root, Window{Worktree: "/wt/a", Start: start, End: end}); got != "" {
+	if got := LocateTranscript([]string{root}, Window{Worktree: "/wt/a", Start: start, End: end}); got != "" {
 		t.Fatalf("a file unchanged since the window start = %q, want it not read", got)
 	}
 }
@@ -106,10 +106,10 @@ func TestLocateTranscriptAndTranscriptCollector_AnEmptyRootNeverReadsTheWorkingD
 	chdirForTest(t, cwd)
 	writeTranscript(t, filepath.Join(cwd, "projects", "p"), "s.jsonl", sessionBody("/wt/a", "2026-10-09T10:00:00Z", "2026-10-09T10:00:05Z"))
 	w := Window{Worktree: "/wt/a", Start: mustParse(t, "2026-10-09T09:59:00Z"), End: mustParse(t, "2026-10-09T10:01:00Z")}
-	if got := LocateTranscript(".", w); got == "" {
+	if got := LocateTranscript([]string{"."}, w); got == "" {
 		t.Fatal("control: the relative root must find the session, or the test proves nothing")
 	}
-	if got := LocateTranscript("", w); got != "" {
+	if got := LocateTranscript([]string{""}, w); got != "" {
 		t.Fatalf("LocateTranscript(\"\") = %q, want none", got)
 	}
 	if res := TranscriptCollector(".", w)(); res.Source != SourceTranscript {
@@ -131,7 +131,7 @@ func TestLocateTranscript_SkipsASymlinkedTranscript(t *testing.T) {
 		t.Fatal(err)
 	}
 	w := Window{Worktree: "/wt/a", Start: mustParse(t, "2026-10-09T09:59:00Z"), End: mustParse(t, "2026-10-09T10:01:00Z")}
-	if got := LocateTranscript(root, w); got != "" {
+	if got := LocateTranscript([]string{root}, w); got != "" {
 		t.Fatalf("LocateTranscript = %q, want the symlink skipped", got)
 	}
 }

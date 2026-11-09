@@ -275,8 +275,9 @@ The holder cannot report its own history. A lost holder puts each later seat on 
 - The field leaves `launchSwept` through an observer, like `observeDispatchID`. It also goes on `core.BridgeResponse`, because the post-mortem reader and the login wall read it.
 - A plane that runs a binary without this design writes no field. That reads as `stored`.
 - A smoke writes no record. Its reader looks in both roots.
-- Readers look in both roots. The readers land in a later pull request, after the verbs and before `seat-token set`. Until then, each seat of a token host writes its transcripts under the seat directory. The post-mortem and the spend readers do not see them.
-- Do not run `evolve auth seat-token set` before the readers land.
+- Readers look in both roots. `tokenusage.ClaudeTranscriptRoots` is the one home of the list: the stored root (`CLAUDE_CONFIG_DIR` or `~/.claude`) and the seat root (`~/.evolve-seat`). The spend reader (`tokenusage.HostResolver`), the post-mortem of a phase (`runner.locateTranscript`) and `evolve postmortem` (`findSessionTranscript`) read through it. The match is by worktree and time window, so a read of both roots does not give one seat the transcript of another.
+- The record of a try does not carry the transcript root. Each reader looks in both roots, so no reader needs it.
+- gc and the usage probe do not read transcripts. The probe runs on the stored login (section 7).
 - L8 counts auth errors by place with this field. L2 uses it as its detector: any `stored` launch in the window means no result.
 - L2 adds a runbook line: the console is closed, and no doctor or probe runs in the window. The L0 `mdat` is sampled at both ends.
 

@@ -140,7 +140,7 @@ func (b *BaseRunner) locateTranscript(s postmortemScope, w launchWindow, format 
 	if !attemptpostmortem.KnownTranscriptFormat(format) {
 		return ""
 	}
-	return tokenusage.LocateTranscript(tokenusage.ClaudeConfigRoot(s.req.Env), tokenusage.Window{
+	return tokenusage.LocateTranscript(tokenusage.ClaudeTranscriptRoots(s.req.Env), tokenusage.Window{
 		Worktree: s.req.Worktree, ArtifactPath: s.artifactPath, Driver: w.cli, Start: w.start, End: w.end,
 	})
 }

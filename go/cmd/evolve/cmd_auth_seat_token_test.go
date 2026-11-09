@@ -503,7 +503,7 @@ func TestSeatTokenSet_APositionalOrFlagTokenIsNeverEchoed(t *testing.T) {
 
 func TestSeatTokenUsage_SaysTheTokenComesOnStdinInYourOwnTerminal(t *testing.T) {
 	t.Parallel()
-	for _, want := range []string{"on stdin", "do not set it before the readers PR lands", "in your own terminal", "never paste a token into a chat or an agent session", "a ! command in a session lands in the transcript"} {
+	for _, want := range []string{"on stdin", "the post-mortem and the spend readers read the transcripts of a seat under the seat root", "in your own terminal", "never paste a token into a chat or an agent session", "a ! command in a session lands in the transcript"} {
 		if !strings.Contains(authUsage, want) {
 			t.Errorf("usage lacks %q", want)
 		}

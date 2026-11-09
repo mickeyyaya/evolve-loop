@@ -120,7 +120,7 @@ func Detect(ctx context.Context, o DetectOptions) DetectReport {
 	doctorFn := o.Doctor
 	if doctorFn == nil {
 		doctorFn = func(ctx context.Context) bridge.DoctorReport {
-			rep, _ := bridge.NewEngine(bridge.Deps{TokenResolver: tokenusage.DefaultResolver(tokenusage.ClaudeConfigRoot(nil))}).Doctor(ctx, "", false)
+			rep, _ := bridge.NewEngine(bridge.Deps{TokenResolver: tokenusage.HostResolver(nil)}).Doctor(ctx, "", false)
 			return rep
 		}
 	}

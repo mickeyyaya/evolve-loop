@@ -27,7 +27,7 @@ import (
 const routingDiscoveryTimeout = 30 * time.Second
 
 var routingDoctor = func(ctx context.Context) gobridge.DoctorReport {
-	rep, _ := gobridge.NewEngine(gobridge.Deps{TokenResolver: tokenusage.DefaultResolver(tokenusage.ClaudeConfigRoot(nil))}).Doctor(ctx, "", false)
+	rep, _ := gobridge.NewEngine(gobridge.Deps{TokenResolver: tokenusage.HostResolver(nil)}).Doctor(ctx, "", false)
 	return rep
 }
 

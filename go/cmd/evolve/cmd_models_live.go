@@ -170,7 +170,7 @@ func (d bridgePromptDispatcher) launcher() func(context.Context, core.BridgeRequ
 	if d.launch != nil {
 		return d.launch
 	}
-	return bridge.NewEngine(bridge.Deps{TokenResolver: tokenusage.DefaultResolver(tokenusage.ClaudeConfigRoot(nil))}).Launch
+	return bridge.NewEngine(bridge.Deps{TokenResolver: tokenusage.HostResolver(nil)}).Launch
 }
 
 func (d bridgePromptDispatcher) request(cli, prompt string) core.BridgeRequest {

@@ -179,7 +179,7 @@ func reportDoctorLiveResult(o liveOutcome, stdout, stderr io.Writer) int {
 }
 
 func runDoctorLive(args []string, stdout, stderr io.Writer) int {
-	return runDoctorLiveWith(args, stdout, bridge.Deps{Stderr: stderr, TokenResolver: tokenusage.DefaultResolver(tokenusage.ClaudeConfigRoot(nil))})
+	return runDoctorLiveWith(args, stdout, bridge.Deps{Stderr: stderr, TokenResolver: tokenusage.HostResolver(nil)})
 }
 
 func runDoctorLiveWith(args []string, stdout io.Writer, deps bridge.Deps) int {

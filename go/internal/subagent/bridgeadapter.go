@@ -25,12 +25,11 @@ func driverExists(cli string) bool {
 }
 
 func execAdapterDeps(env map[string]string) gobridge.Deps {
-	configRoot := tokenusage.ClaudeConfigRoot(env)
 	pol := projectPolicy(env)
 	recoveryStage, fatalPaneStage := pol.BridgeRecoveryStages()
 	return gobridge.Deps{
 		Env:            env,
-		TokenResolver:  tokenusage.DefaultResolver(configRoot),
+		TokenResolver:  tokenusage.HostResolver(env),
 		RecoveryStage:  recoveryStage,
 		FatalPaneStage: fatalPaneStage,
 		Efforts:        pol.Efforts(),
