@@ -33,5 +33,6 @@ func (o *Orchestrator) laneItem(projectRoot, id string) router.LaneItem {
 		Kind:            item.Kind,
 		DeliverableKind: resolveDeliverableKind(item.DeliverableKind, projectDomainDefault(projectRoot)),
 		Acceptance:      item.Acceptance,
+		Files:           item.Files,
 	}
 }

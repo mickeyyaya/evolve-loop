@@ -26,6 +26,7 @@ type registryConfig struct {
 	MaxOptionalInsertions *int                           `json:"max_optional_insertions"`
 	GoalRecipes           map[string][]string            `json:"goal_recipes"`
 	DeliverableKinds      map[string]DeliverableKindSpec `json:"deliverable_kinds"`
+	DeepBuildRisk         map[string][]string            `json:"deep_build_risk"`
 	Workflow              registryWorkflow               `json:"workflow"`
 }
 
@@ -64,6 +65,7 @@ func (l *Loader) readRegistry(path string, ws *[]Warning) (registryDoc, bool) {
 func applyRegistry(cfg *RoutingConfig, doc registryDoc, ws *[]Warning) {
 	applyRegistryDials(cfg, doc.Config, ws)
 	applyDeliverableKinds(cfg, doc.Config.DeliverableKinds, ws)
+	applyDeepBuildRisk(cfg, doc.Config.DeepBuildRisk)
 	applyConditional(cfg, doc.Config.ConditionalMandatory, ws)
 	applyPhases(cfg, doc.Phases, ws)
 }

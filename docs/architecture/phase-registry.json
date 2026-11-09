@@ -6,6 +6,12 @@
     "dynamic_routing": "advisory",
     "routing_mode": "llm",
     "model_routing": "auto",
+    "deep_build_risk": {
+      "protected-surface": ["internal/guards/", "internal/commitgate/", "ship gate", "protected path", "phase-registry.json", ".evolve/profiles/"],
+      "concurrency": ["mutex", "data race", "race condition", "goroutine", "deadlock", "waitgroup", "internal/fleet/"],
+      "security": ["path traversal", "credential", "secret", "redact", "injection", "internal/sandbox"],
+      "kernel": ["state machine", "statemachine", "ledger", "orchestrator", "internal/core/"]
+    },
     "mandatory_phases": [
       "scout",
       "triage",

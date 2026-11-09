@@ -85,6 +85,7 @@ func ReplayPlanFromResponse(raw string, in router.RouteInput, floor []string) (*
 	if err != nil {
 		return nil, nil, err
 	}
+	applyDeepBuildRisk(in, parsed.Plan)
 	clamped, clamps := router.ClampPlanToFloorWith(in, parsed.Plan, floor, in.IntentRequired)
 	return clamped, clamps, nil
 }

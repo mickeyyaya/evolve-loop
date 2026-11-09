@@ -203,5 +203,6 @@ func (a *Advisor) plan(in router.RouteInput, d decision) (*router.PhasePlan, err
 	for _, r := range parsed.RejectedMints {
 		a.warn(in, d, CodeMintRejected, r.Reason, map[string]string{"step": stepMint, "minted_phase": r.Phase})
 	}
+	applyDeepBuildRisk(in, parsed.Plan)
 	return parsed.Plan, nil
 }

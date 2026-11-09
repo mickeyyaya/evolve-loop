@@ -52,4 +52,5 @@ type RoutingConfig struct {
 	ReconDigest                 bool
 	RePlanMaxDepth              int
 	CompactPrompts              bool
+	DeepBuildRisk               map[string][]string `json:",omitempty"`
 }

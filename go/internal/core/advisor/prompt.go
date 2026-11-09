@@ -74,12 +74,12 @@ func buildPlanPrompt(in router.RouteInput, d decision) string {
 
 	WriteCatalogWithOnDemand(&b, in.Catalog, in.OnDemandPhases)
 
-	writePlanResponseSchema(&b)
+	writePlanResponseSchema(&b, in.Cfg.DeepBuildRisk)
 	writeDecisionFile(&b, in, d)
 	return b.String()
 }
 
-func writePlanResponseSchema(b *strings.Builder) {
+func writePlanResponseSchema(b *strings.Builder, classes map[string][]string) {
 	b.WriteString("\n## Optionally MINT a new phase\n")
 	b.WriteString("If an objective signal calls for work no existing phase covers, you MAY add an entry for a brand-new phase ")
 	b.WriteString("by attaching a \"mint\" block. Give it a kebab-case phase name, an inline persona prompt, and a TIER ")
@@ -94,7 +94,7 @@ func writePlanResponseSchema(b *strings.Builder) {
 	b.WriteString("Never name a CLI or a model: the routing data picks the driver.\n")
 
 	b.WriteString("\n## Operator model-tier policy (apply when proposing a tier)\n")
-	b.WriteString("- deep: judgment-heavy phases — build, tdd, audit, architecture/design, adversarial review.\n")
+	b.WriteString(deepTierPolicyLine(classes))
 	b.WriteString("- balanced: review/scan/triage-class phases — the safe default for anything not covered below.\n")
 	b.WriteString("- fast: ONLY mechanical phases (doc-sync, changelog-sync, locale-format-check, close-checklist) — NEVER for a phase that writes source, renders a verdict, or scopes work. When in doubt, propose HIGHER.\n")
 	b.WriteString("- Judgment phases usually carry a min=balanced envelope above — don't fight the clamp with a low-tier proposal.\n")
@@ -121,7 +121,7 @@ func (a *Advisor) composePlanPrompt(in router.RouteInput, d decision, artifactFi
 		router.RenderReconDigest(&b, a.gatherRecon(in, d))
 	}
 	WriteCatalogWithOnDemand(&b, in.Catalog, in.OnDemandPhases)
-	writePlanResponseSchema(&b)
+	writePlanResponseSchema(&b, in.Cfg.DeepBuildRisk)
 	path := filepath.Join(in.Workspace, artifactFile)
 	writeArtifactAnchor(&b, path)
 	fmt.Fprintf(&b, "Now write your whole-cycle plan as a strict JSON array to %s (no prose, no fence).\n", path)
@@ -138,4 +138,12 @@ func (a *Advisor) gatherRecon(in router.RouteInput, d decision) router.ReconDige
 		}
 	}
 	return router.BuildReconDigest(files, in.GoalText, in.Signals.Scout.BacklogSize, len(in.CarryoverTodos))
+}
+
+func deepTierPolicyLine(classes map[string][]string) string {
+	if len(classes) == 0 {
+		return "- deep: judgment-heavy phases — build, tdd, audit, architecture/design, adversarial review.\n"
+	}
+	return "- deep: judgment-heavy phases — tdd, audit, architecture/design, adversarial review; a build is deep only when its work matches a risk class (" +
+		riskClassNames(classes) + "), and the kernel sets the build tier from those classes.\n"
 }

@@ -524,6 +524,7 @@ type LaneItem struct {
 	Kind            string
 	DeliverableKind string
 	Acceptance      []string
+	Files           []string
 	Unresolved      string
 }
 
