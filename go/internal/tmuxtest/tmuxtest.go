@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -23,9 +24,37 @@ const (
 )
 
 var (
-	setenv = os.Setenv
-	fdDir  = "/dev/fd"
+	setenv       = os.Setenv
+	fdDir        = "/dev/fd"
+	serverPIDsMu sync.Mutex
+	serverPIDs   = map[string]int{}
 )
+
+func recordServerPID(socket string, pid int) {
+	serverPIDsMu.Lock()
+	defer serverPIDsMu.Unlock()
+	serverPIDs[socket] = pid
+}
+
+func lookupServerPID(socket string) int {
+	serverPIDsMu.Lock()
+	defer serverPIDsMu.Unlock()
+	return serverPIDs[socket]
+}
+
+func deleteServerPID(socket string) {
+	serverPIDsMu.Lock()
+	defer serverPIDsMu.Unlock()
+	delete(serverPIDs, socket)
+}
+
+func readServerPID(socket string) (int, error) {
+	out, err := sysexec.Command(context.Background(), "tmux", "-L", socket, "display-message", "-p", "#{pid}").Output()
+	if err != nil {
+		return 0, err
+	}
+	return strconv.Atoi(strings.TrimSpace(string(out)))
+}
 
 func Main(m interface{ Run() int }) int {
 	socket := bridge.DeriveTestSocket(os.Getpid())
@@ -61,22 +90,37 @@ func StartServer(socket string) error {
 	if err := StopServer(socket); err != nil {
 		return err
 	}
-	out, err := sysexec.Command(context.Background(), "tmux", bridge.TmuxSocketArgs(
+	out, err := sysexec.Command(context.Background(), "tmux", "-L", socket,
 		"-f", os.DevNull, "start-server", ";",
 		"set-option", "-s", "exit-empty", "off", ";",
 		"set-option", "-g", "default-shell", paneShell, ";",
 		"set-option", "-g", "default-command", "exec "+paneShell,
-	)...).CombinedOutput()
+	).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("start the tmux server on socket %s: %w: %s", socket, err, out)
+	}
+	if pid, perr := readServerPID(socket); perr == nil {
+		recordServerPID(socket, pid)
 	}
 	return nil
 }
 
 func StopServer(socket string) error {
+	if socket == "" {
+		return fmt.Errorf("refusing kill-server with an empty socket name")
+	}
+	serverPid := lookupServerPID(socket)
+	deleteServerPID(socket)
 	ctx, cancel := context.WithTimeout(context.Background(), serverStopTimeout)
 	defer cancel()
-	return swarm.ExecKillServer(ctx, socket)
+	err := swarm.ExecKillServer(ctx, socket)
+	if serverPid > 1 && syscall.Kill(serverPid, 0) == nil {
+		_ = syscall.Kill(serverPid, syscall.SIGTERM)
+		for i := 0; i < 50 && syscall.Kill(serverPid, 0) == nil; i++ {
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+	return err
 }
 
 func closeInheritedOnExec() error {
@@ -97,12 +141,17 @@ func closeInheritedOnExec() error {
 }
 
 func startOrphanGuard(socket string, owner int) error {
+	serverPid := lookupServerPID(socket)
 	dir, name := shellQuote(bridge.TmuxSocketDir()), shellQuote(socket)
-	watch := fmt.Sprintf(`while kill -0 %d 2>/dev/null; do sleep 1; done; for s in %s/%s-*; do [ -S "$s" ] && tmux -S "$s" kill-server; done; exec tmux -L %s kill-server`,
-		owner, dir, name, name)
-	out, err := sysexec.Command(context.Background(), "tmux", bridge.TmuxSocketArgs(
+	killCmd := fmt.Sprintf("exec tmux -L %s kill-server", name)
+	if serverPid > 1 {
+		killCmd = fmt.Sprintf("tmux -L %s kill-server 2>/dev/null; kill -TERM %d 2>/dev/null; sleep 1; kill -9 %d 2>/dev/null", name, serverPid, serverPid)
+	}
+	watch := fmt.Sprintf(`while kill -0 %d 2>/dev/null; do sleep 1; done; for s in %s/%s-*; do [ -S "$s" ] && tmux -S "$s" kill-server; done; %s`,
+		owner, dir, name, killCmd)
+	out, err := sysexec.Command(context.Background(), "tmux", "-L", socket,
 		"new-session", "-d", "-s", guardSession, watch,
-	)...).CombinedOutput()
+	).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("start the orphan guard on socket %s: %w: %s", socket, err, out)
 	}

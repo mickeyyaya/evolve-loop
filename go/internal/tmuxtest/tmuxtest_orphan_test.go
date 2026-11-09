@@ -62,6 +62,68 @@ func TestStartOrphanGuard_TheServersOfTheOwnerStopSoonAfterItDies(t *testing.T) 
 	}
 }
 
+func TestReadServerPID_FailsOnNonexistentSocket(t *testing.T) {
+	if _, err := readServerPID("nonexistent-test-socket"); err == nil {
+		t.Fatal("readServerPID must fail on a nonexistent socket")
+	}
+}
+
+func TestStopServer_StopsServerWhenSocketDirectoryRemoved(t *testing.T) {
+	socketDir := privateSocketDir(t)
+	socket := bridge.DeriveTestSocket(os.Getpid())
+	if err := StartServer(socket); err != nil {
+		t.Fatal(err)
+	}
+	pid := lookupServerPID(socket)
+	if pid <= 1 || syscall.Kill(pid, 0) != nil {
+		t.Fatalf("expected live server pid > 1, got %d", pid)
+	}
+	if err := os.RemoveAll(socketDir); err != nil {
+		t.Fatal(err)
+	}
+	if err := StopServer(socket); err != nil {
+		t.Fatalf("StopServer: %v", err)
+	}
+	if syscall.Kill(pid, 0) == nil {
+		t.Fatalf("server pid %d is still alive after StopServer with removed socket dir", pid)
+	}
+}
+
+func TestStartOrphanGuard_StopsServerWhenSocketDirectoryRemoved(t *testing.T) {
+	socketDir := privateSocketDir(t)
+	socket := bridge.DeriveTestSocket(os.Getpid())
+	owner := exec.Command("sleep", "60")
+	if err := owner.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = owner.Process.Kill(); _, _ = owner.Process.Wait() })
+	if err := StartServer(socket); err != nil {
+		t.Fatal(err)
+	}
+	pid := lookupServerPID(socket)
+	if pid <= 1 || syscall.Kill(pid, 0) != nil {
+		t.Fatalf("expected live server pid > 1, got %d", pid)
+	}
+	t.Cleanup(func() { _ = StopServer(socket) })
+	if err := startOrphanGuard(socket, owner.Process.Pid); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(socketDir); err != nil {
+		t.Fatal(err)
+	}
+	if err := owner.Process.Kill(); err != nil {
+		t.Fatal(err)
+	}
+	_, _ = owner.Process.Wait()
+	deadline := time.Now().Add(10 * time.Second)
+	for syscall.Kill(pid, 0) == nil {
+		if time.Now().After(deadline) {
+			t.Fatalf("server pid %d outlived owner by 10s with removed socket dir", pid)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
 func TestStartOrphanGuard_AGuardThatCannotStartIsAnError(t *testing.T) {
 	bin := t.TempDir()
 	fakeclitest.Install(t, filepath.Join(bin, "tmux"), "#!/bin/sh\necho refused >&2\nexit 1\n")

@@ -66,7 +66,7 @@ func scanTestPackages(t *testing.T, root string) map[string]testPackageUse {
 		if err != nil {
 			return err
 		}
-		if d.IsDir() && d.Name() == "testdata" {
+		if d.IsDir() && (d.Name() == "testdata" || d.Name() == "acs") {
 			return filepath.SkipDir
 		}
 		if d.IsDir() || !strings.HasSuffix(path, "_test.go") {

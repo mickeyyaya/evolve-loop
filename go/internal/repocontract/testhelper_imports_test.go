@@ -25,7 +25,7 @@ func productionImporters(root string, forbidden []string) ([]string, error) {
 		}
 		name := d.Name()
 		if d.IsDir() {
-			if path != root && (name == "testdata" || name == "vendor" || strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_")) {
+			if path != root && (name == "testdata" || name == "vendor" || name == "acs" || strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_")) {
 				return filepath.SkipDir
 			}
 			return nil
