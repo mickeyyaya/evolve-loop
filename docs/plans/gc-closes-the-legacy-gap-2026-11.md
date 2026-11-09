@@ -57,6 +57,9 @@ The console had cleaned the hub by hand. It removed 261 worktrees and 998 local 
 **F8** The 157 items that the workspace sweep "flagged for manual review" go to no verb, no report and no inbox item. The same flags repeat on each run.
 *Implication:* a flag without an owner is a keep without an end.
 
+**F10** The loop runs gc only at the batch start and the batch end (`go/cmd/evolve/cmd_loop_prebatch.go:59`, `go/cmd/evolve/cmd_loop_batch.go:128`). The batch end follows the wave. That hook runs the run directories, the ledger seal and the lanes, and only plans the dev worktrees (`go/cmd/evolve/cmd_loop_outcome.go:74-103`). It does not stop orphan processes, trim the Go cache or sweep a branch. No gc step runs when one cycle ends.
+*Implication:* on 2026-11-09, 781 orphan processes and 54.67 GB of Go cache waited for a manual `evolve gc`.
+
 **F9** The manual cleanup kept 14 worktrees and lost no work. It saved a verified bundle of 2,907 refs and a patch with an untracked archive for each of the 94 dirty trees first. Then it kept only the core trees, the paused cycles, the trees of open pull requests and the trees with a live process.
 *Implication:* a proof of recovery makes a removal reversible, so the gate needs only the live reasons.
 
@@ -106,10 +109,12 @@ Each decision keeps the invariants of [internal-gc](../architecture/packages/int
 | D5 | A detached tree is free of unique work when its head is an ancestor of `origin/main` or equals the `headRefOid` of a pull request. Else D1 saves the head in the bundle, and the idle rule applies. | F4 | Keep each detached tree: 21 trees stay without a reason. |
 | D6 | A lane has ended when four facts hold. `isLive` is false, and `core.PausedLaneScopes` does not hold the cycle. `continuation-registry.json` does not bind its branch. The tree is older than `salvage_after_hours`. A close-out dossier is not needed. | F5; review R1.1 | "Below the oldest unsealed cycle": a quota-paused cycle holds no lease, and "sealed" has two meanings in the code. |
 | D7 | Seven live reasons keep an item. They are a plane tree, a live process, a live run directory, a paused lane and a continuation binding. The last two are an open pull request at the tip, and activity within `archive_after_days`. A merged and clean item skips the activity rule, as `landedEarly` does today. | F1, F9; review R1.2 | Activity alone: 54 trees with merged work stay 14 days. |
-| D8 | The batch hook (`runGCHook`) sweeps only `cycle-*` lanes and `cycle-*` branches. Only an operator `evolve gc` sweeps other local branches. The remote sweep also runs there only. | review R1.2 | One sweep for all: the hook must never touch the branch of a developer (`internal-gc.md` invariants). |
-| D9 | The invariant "an unmerged branch is never deleted" changes to "a branch is deleted only after D2, and only when it is ended (D6) or landed (D4)". `internal-gc.md` gets an "Amended by" line that links this plan. | review R1.2, docs review | A silent change: the spec of record then contradicts the code. |
-| D10 | The remote sweep deletes a remote branch only when its pull request is merged and its `headRefOid` equals the remote tip. The compiled stage is `shadow`. It deletes through the API, never through `git push`. | F7; review R1.4 | A closed pull request: its commits can exist only on the remote. Always on: other people see a remote delete. |
+| D8 | The cycle-end step of D12 sweeps only the items of its own cycle. The sweep of other local branches and the remote sweep run in an operator `evolve gc`, and at the wave end when `gc.wave_end.scope` is `full` (D13). | review R1.2 | One sweep for all: the hook must never touch the branch of a developer (`internal-gc.md` invariants). |
+| D9 | Two invariants of `internal-gc.md` change. "An unmerged branch is never deleted" becomes "a branch is deleted only after D2, and only when it is ended (D6) or landed (D4)". The batch hook invariant becomes "the hook touches a dev worktree or a non-`cycle-*` branch only at `gc.wave_end.scope: full`, under D2 and D7". `internal-gc.md` gets an "Amended by" line that links this plan. | review R1.2, R3.2, docs review | A silent change: the spec of record then contradicts the code. |
+| D10 | The remote sweep fetches first, then puts each remote tip in the verified bundle of D2. It deletes a remote branch that is landed (D4). It also deletes a branch that no D7 reason keeps, with activity measured from the commit time of the remote tip. It skips a branch that a repository ruleset protects. It deletes through the API, never through `git push`. The operator set the stage to `enforce` on 2026-11-09. | F7; review R1.4, R3.1; operator 2026-11-09 | A delete with no bundle: the commits of a closed pull request can exist only on the remote. |
 | D11 | Each flag that repeats on two runs goes into the gc report with a count, and once into the inbox. | F8 | A silent flag: F8 shows that nobody acts on it. |
+| D12 | When cycle N seals, gc runs for cycle N only. It runs when N is not paused, has no continuation binding and has no live process of its run. It stops the orphan processes whose `cwd` is in the lane of N. It saves and verifies (D1, D2), then releases the lane and the `cycle-N` branch. It does not wait for `salvage_after_hours`, `MinAgeMinutes` or `KeepRecent`. The seal proves the end. | F10; review R3.3; operator 2026-11-09 | Wave end only: a long wave keeps each finished lane until the end. The D6 age rule: it is for a lane with no seal, and a seal is a stronger proof. |
+| D13 | At the wave end, the loop runs each sweep of `evolve gc`, with the same rules. The policy key `gc.wave_end.scope` selects `lanes` or `full`. This repository sets `full`. | F10; operator 2026-11-09 | Operator runs only: on 2026-11-09 the debt grew until a manual run. |
 
 **Round 1 findings and their fixes.**
 
@@ -120,6 +125,12 @@ Each decision keeps the invariants of [internal-gc](../architecture/packages/int
 - R1.5 (HIGH, a third store) → D1.
 - The docs review on F3 → F3 now names three cases.
 
+**Findings on the amendment of 2026-11-09 and their fixes.**
+
+- R3.1 (CRITICAL, X8 and the risk row did not match D10) → D10, X8 and the risk row now agree.
+- R3.2 (CRITICAL, the hook scope at `full`) → D9, X6 and X9 name `gc.wave_end.scope`.
+- R3.3 (CRITICAL, the cycle-end step and the D6 age rule) → D12 and X10 state the exact cycle-end rule.
+
 ## 6. Components
 
 | Id | Component | Red test first | Owner |
@@ -129,10 +140,12 @@ Each decision keeps the invariants of [internal-gc](../architecture/packages/int
 | X3 | The rebuildable list gets `.evolve/` and `.commit-gate/` at any depth | a tree that holds only `.commit-gate/attestation.json` passes the gate; a tree with `.env` or a nested repository stays | console |
 | X4 | The detached rule of D5 and the live rule of D7 for dev trees | a detached tree on a merged head is released; a detached tree with a unique head is saved first | console |
 | X5 | The ended rule of D6 for lanes | the dirty lane of an old cycle with no run directory is saved and removed; a paused lane and a continuation lane stay | console |
-| X6 | The branch sweep: `cycle-*` in the hook, other local branches in the operator run only | the hook never deletes `feat/x`; the operator run deletes it when it is ended or landed, after D2 | console |
+| X6 | The branch sweep. At the batch start, at a cycle end and at `gc.wave_end.scope: lanes`, it sweeps only `cycle-*` branches. At `full` and in an operator `evolve gc`, it also sweeps other local branches under D2 and D7 | at `lanes` the hook never deletes `feat/x`. At `full` it deletes `feat/x` when it is ended or landed, after D2. An open pull request keeps it | console |
 | X7 | The flag owner of D11 | a flag that repeats on two runs files one item, not two | console |
-| X8 | The remote sweep of D10, at `shadow` | at `shadow` it only reports; at `enforce` it deletes only a merged branch whose tip matches | console |
-| X9 | `internal-gc.md` gets the amended invariant and the new rules, with a link to this plan | the docs check finds the "Amended by" line | console |
+| X8 | The remote sweep of D10, at `enforce` for this repository | a failed bundle verify keeps the remote branch. `enforce` deletes a landed branch, and an idle branch that no D7 reason keeps. A ruleset branch and a branch with an open pull request stay | console |
+| X9 | `internal-gc.md` gets the two amended invariants of D9 and the new rules, with a link to this plan | the docs check finds the "Amended by" line, and the hook invariant names `gc.wave_end.scope` | console |
+| X10 | The cycle-end step of D12, called where the cycle seals | a sealed cycle with a dirty lane and an orphan process is cleaned at once. A cycle that seals into a pause or a continuation keeps its lane and branch. A live lane of another cycle is not touched | console |
+| X11 | The wave-end run of D13, with `gc.wave_end.scope` in the policy | at `full`, the batch-end hook runs each sweep of `evolve gc`; at `lanes`, it runs the sweeps of today | console |
 
 Each component lands as one pull request with the composed floor and 100% coverage of each changed function.
 
@@ -143,7 +156,8 @@ Each component lands as one pull request with the composed floor and 100% covera
 3. X4 and X5, the worktree rules.
 4. X6, the local branch sweep, with X9 in the same pull request.
 5. X7, so the remaining flags have an owner.
-6. X8 last, because it is the only sweep that other people can see.
+6. X10 and X11, so the sweeps run without an operator.
+7. X8 last, because it is the only sweep that other people can see.
 
 ## 8. Verification
 
@@ -162,9 +176,9 @@ Each component lands as one pull request with the composed floor and 100% covera
 | `gh` is down | X2 falls back to the git evidence of today and says so in the report. The remote sweep and the early archive do not run. |
 | A paused cycle looks ended | D6 reads `core.PausedLaneScopes`, the run directory and the continuation registry. The property test covers each case. |
 | A rebuildable pattern hides real work | D3 adds only the two directories that evolve writes. A nested repository and any other ignored file still keep the tree. |
-| A remote branch of another person | D10: a merged pull request with a matching tip only, at `enforce` only, and only in an operator run. |
+| A remote branch of another person | D10: the bundle comes first, an open pull request or recent activity keeps the branch, and a ruleset branch is skipped. The deleted list goes into the gc report. |
 
 ## 10. Open questions
 
-- **Q1.** Does the operator want X8 at `enforce` for this repository after one `shadow` wave? The manual cleanup left 606 remote branches, because the permission system refused a mass delete.
+- **Q1, answered 2026-11-09.** The operator said: "Clean up the remote branches also, make sure gc will do the same to include them, gc should be invoked after the cycle / wave is completed". D10 is at `enforce`, and D12 and D13 add the invocation points. The console deleted the remote branches by hand on that day, after the bundle.
 - **Q2.** How long does gc keep a bundle? This plan proposes the salvage TTL of the policy.
