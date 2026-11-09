@@ -121,7 +121,7 @@ func TestPaneParity_ReportsTheCycle1853TriggerWhenThePtyRulesAreRemoved(t *testi
 	host := runOnHost(t, swarm)
 	pane := runInPane(t, probe, swarm, withoutOwnPtyRules)
 	diffs := paneOnlyFailures(swarm.pkg, host.results, pane.report.results)
-	want := "./internal/swarm TestExecTmuxKill_NeverKillsASessionWhoseNameExtendsTheTarget: host=pass pane=fail"
+	want := "./internal/swarm (package): host=pass pane=fail"
 	if !slices.Contains(diffs, want) {
 		t.Fatalf("without the R1 pty rules the harness must report %q, got:\n%s", want, strings.Join(diffs, "\n"))
 	}
