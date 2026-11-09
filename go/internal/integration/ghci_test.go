@@ -33,8 +33,8 @@ func (s *ghScript) run(_ context.Context, _ string, args ...string) (string, int
 }
 
 func has(args []string, words ...string) bool {
-	for i := range args {
-		if len(args)-i >= len(words) && slices.Equal(args[i:i+len(words)], words) {
+	for i := 0; i <= len(args)-len(words); i++ {
+		if slices.Equal(args[i:i+len(words)], words) {
 			return true
 		}
 	}

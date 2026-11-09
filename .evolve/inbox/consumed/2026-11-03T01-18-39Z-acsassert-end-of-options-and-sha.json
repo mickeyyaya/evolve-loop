@@ -4,6 +4,11 @@
     "Red test first: a SHA argument 'HEAD;rm' is refused before git runs.",
     "100% statement coverage on each changed function; zero code comments."
   ],
+  "consumed": {
+    "at": "2026-11-09T09:24:39Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "created_at": "2026-11-03T01:18:39Z",
   "files": [
     "go/pkg/acsassert"

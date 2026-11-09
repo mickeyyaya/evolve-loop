@@ -290,3 +290,30 @@ func CountInGoFunc(path, funcName string, variants ...string) (int, error) {
 	}
 	return 0, fmt.Errorf("acsassert: function %q not found in %s", funcName, path)
 }
+
+var (
+	ErrInvalidSHA = errors.New("acsassert: invalid SHA")
+	shaRegexp     = regexp.MustCompile(`^[0-9a-fA-F]{7,64}$`)
+)
+
+func ValidateSHA(sha string) error {
+	if !shaRegexp.MatchString(sha) {
+		return fmt.Errorf("%w: %q", ErrInvalidSHA, sha)
+	}
+	return nil
+}
+
+func GitRefOutput(dir, ref string, args ...string) (string, string, int, error) {
+	cmdArgs := make([]string, 0, len(args)+4)
+	cmdArgs = append(cmdArgs, "-C", dir)
+	cmdArgs = append(cmdArgs, args...)
+	cmdArgs = append(cmdArgs, "--end-of-options", ref)
+	return SubprocessOutput("git", cmdArgs...)
+}
+
+func GitSHAOutput(dir, sha string, args ...string) (string, string, int, error) {
+	if err := ValidateSHA(sha); err != nil {
+		return "", "", -1, err
+	}
+	return GitRefOutput(dir, sha, args...)
+}

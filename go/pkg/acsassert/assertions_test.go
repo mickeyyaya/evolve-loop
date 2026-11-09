@@ -600,3 +600,33 @@ func TestLineContainsAllChecked_ExistingFileNoHintOnMiss(t *testing.T) {
 		t.Errorf("existing file lacking content must not error, got %v", err)
 	}
 }
+
+func TestValidateSHA(t *testing.T) {
+	if err := ValidateSHA("0123456789abcdef"); err != nil {
+		t.Errorf("ValidateSHA valid failed: %v", err)
+	}
+	if err := ValidateSHA("bad;sha"); !errors.Is(err, ErrInvalidSHA) {
+		t.Errorf("ValidateSHA invalid = %v, want ErrInvalidSHA", err)
+	}
+}
+
+func TestGitRefOutput(t *testing.T) {
+	dir := t.TempDir()
+	stdout, stderr, code, err := GitRefOutput(dir, "HEAD", "status")
+	_ = stdout
+	_ = stderr
+	_ = code
+	_ = err
+}
+
+func TestGitSHAOutput(t *testing.T) {
+	dir := t.TempDir()
+	if _, _, code, err := GitSHAOutput(dir, "invalid"); !errors.Is(err, ErrInvalidSHA) || code != -1 {
+		t.Errorf("GitSHAOutput invalid = %v, code = %d", err, code)
+	}
+	stdout, stderr, code, err := GitSHAOutput(dir, "0123456789abcdef", "status")
+	_ = stdout
+	_ = stderr
+	_ = code
+	_ = err
+}

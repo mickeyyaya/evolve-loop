@@ -14,6 +14,9 @@
 - **Source parsing ignores comments.** `CountInGoFunc` parses with `parser.ParseFile(..., 0)`. No comment is read or kept as a node, and nothing in the package parses comments.
 - **`RepoRoot` skips outside a git work tree.** Predicate suites then run cleanly on bare exports, with no false failures.
 - **`GoTests` judges the events of `go test -json`.** For each name in `Names`, it requires one `run` event and then one `pass` event. A pattern made of `^Name$` and `^(A|B)$` terms, joined by `|`, names exact tests, and `Names` must list each one. The spec is [acs-predicate-quality-gate.md](../acs-predicate-quality-gate.md#structured-go-test-evidence-acsassertgotests-2026-09-28).
+- **`GitRefOutput` and `GitSHAOutput` place `--end-of-options` before the ref.** Both helpers pass `--end-of-options` to Git before the ref or SHA argument. This ensures that Git reads a dash-prefixed ref as a revision, not as an option. `GitSHAOutput` calls `ValidateSHA` first and spawns no process on bad input.
+- **`ValidateSHA` checks hexadecimal length and characters.** It accepts only 7 to 64 hexadecimal characters. It rejects shell separators, spaces, and newlines before Git runs.
+
 
 ## Invariants
 
