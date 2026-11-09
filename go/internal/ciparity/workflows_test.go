@@ -12,14 +12,32 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type workflowContract struct {
-	On map[string]struct {
-		Paths          []string
-		PathsIgnore    []string `yaml:"paths-ignore"`
-		Branches       []string
-		BranchesIgnore []string `yaml:"branches-ignore"`
-		Outputs        map[string]struct{ Value string }
+type workflowTrigger struct {
+	Paths          []string
+	PathsIgnore    []string `yaml:"paths-ignore"`
+	Branches       []string
+	BranchesIgnore []string `yaml:"branches-ignore"`
+	Outputs        map[string]struct{ Value string }
+	Crons          []string `yaml:"-"`
+}
+
+func (w *workflowTrigger) UnmarshalYAML(n *yaml.Node) error {
+	if n.Kind == yaml.SequenceNode {
+		var entries []struct{ Cron string }
+		if err := n.Decode(&entries); err != nil {
+			return err
+		}
+		for _, e := range entries {
+			w.Crons = append(w.Crons, e.Cron)
+		}
+		return nil
 	}
+	type plain workflowTrigger
+	return n.Decode((*plain)(w))
+}
+
+type workflowContract struct {
+	On          map[string]workflowTrigger
 	Permissions map[string]string
 	Concurrency struct {
 		Group            string

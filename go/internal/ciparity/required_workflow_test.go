@@ -9,7 +9,7 @@ import (
 func TestRequiredWorkflow_AlwaysReportsAndCannotSkipDependencies(t *testing.T) {
 	t.Parallel()
 	w := readWorkflowContract(t, RequiredWorkflow)
-	for _, event := range []string{"push", "pull_request", "workflow_dispatch"} {
+	for _, event := range []string{"push", "pull_request", "workflow_dispatch", "schedule"} {
 		on, ok := w.On[event]
 		if !ok || len(on.Paths) != 0 || len(on.PathsIgnore) != 0 {
 			t.Errorf("%s must exist without path filters", event)
@@ -132,6 +132,7 @@ func TestRequiredWorkflow_ConcurrencyCancelsOnlySupersededPullRequestRuns(t *tes
 		"${{ github.workflow }}-",
 		"github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number)",
 		"github.event_name == 'workflow_dispatch' && format('dispatch-{0}', github.run_id)",
+		"github.event_name == 'schedule' && format('schedule-{0}', github.run_id)",
 		"|| github.ref }}",
 	} {
 		if !strings.Contains(c.Group, want) {

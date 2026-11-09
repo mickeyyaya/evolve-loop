@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -130,6 +131,18 @@ func TestParse_ReadsASmallTableAndMatchesStarAcrossSlashes(t *testing.T) {
 	}
 	if got := r.Classify([]string{"docs/a.txt"}); got.Class != Boundary {
 		t.Fatalf("docs/a.txt = %+v, want boundary", got)
+	}
+}
+
+var scheduleArm = regexp.MustCompile(`(?m)^\s*[a-z_|]*schedule[a-z_|]*\) route true true false false true ;;$`)
+
+func TestParse_TheLiveRoutingAcceptsAScheduledRunAsAFullRun(t *testing.T) {
+	body := requiredWorkflow(t)
+	if !scheduleArm.Match(body) {
+		t.Fatal("required.yml has no case arm that routes the schedule event like a manual run")
+	}
+	if _, err := Parse(body); err != nil {
+		t.Fatalf("Parse(required.yml) refuses the schedule arm: %v", err)
 	}
 }
 

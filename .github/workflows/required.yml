@@ -6,12 +6,14 @@ on:
     branches: [main, go-rewrite-phase-1]
   pull_request:
   workflow_dispatch:
+  schedule:
+    - cron: '17 4 * * *'
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.event_name == 'workflow_dispatch' && format('dispatch-{0}', github.run_id) || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.event_name == 'workflow_dispatch' && format('dispatch-{0}', github.run_id) || github.event_name == 'schedule' && format('schedule-{0}', github.run_id) || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -40,7 +42,7 @@ jobs:
             exit
           }
           case "$EVENT_NAME" in
-            workflow_dispatch) route true true false false true ;;
+            workflow_dispatch|schedule) route true true false false true ;;
             push|pull_request) ;;
             *) echo "unsupported CI event: $EVENT_NAME" >&2; exit 1 ;;
           esac

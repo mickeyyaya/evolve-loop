@@ -58,7 +58,7 @@ var (
 		`exit`,
 		`}`,
 		`case "$EVENT_NAME" in`,
-		`workflow_dispatch) route true true false false true ;;`,
+		`workflow_dispatch|schedule) route true true false false true ;;`,
 		`push|pull_request) ;;`,
 		`*) echo "unsupported CI event: $EVENT_NAME" >&2; exit 1 ;;`,
 		`esac`,

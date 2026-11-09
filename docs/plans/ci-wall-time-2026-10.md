@@ -427,6 +427,16 @@ On 2026-10-26 the console asked why main did not catch the reds of PR #1138. The
 |---|---|---|---|
 | C17 | D27 in `.github/workflows/go.yml` | `TestGoWorkflow_EveryJobHasABoundedTimeout` fails when a `go.yml` job has no `timeout-minutes` or a value above 90 | The test pins the range 1 to 90, not the values 60 and 15. It cannot find the cause of the hang in F9.3. The log of that job is not available while the job runs. |
 
+### Decision D28
+
+| Id | Decision | Because (findings) | Rejected options and why |
+|---|---|---|---|
+| D28 | `required.yml` runs once a day on a `schedule` trigger (04:17 UTC). The `changes` job routes a `schedule` run like a manual run, so every suite runs. The group of a scheduled run is `<workflow>-schedule-<run id>`, so no push cancels it and it cancels nothing. The inbox item is `ci-main-daily-full-run`. | F9.3 | A scheduled run in the push group: a newer push replaces it, and main again has no finished full run. Cancel in progress for `schedule`: a push-triggered run can then end a daily run. |
+
+| Id | Built as | Red test | What the build records |
+|---|---|---|---|
+| C18 | D28 in `.github/workflows/required.yml` | `TestRequiredWorkflow_RunsTheFullGraphOnceADayOnTheDefaultBranch`, `TestCIConcurrency_ScheduleGroupsByRunIDAndNeverCancels` and `TestRequiredRouting_ScheduleSelectsEverySuiteWhateverTheDiff` | The tests read the cron and the group expression. They cannot run the GitHub scheduler. |
+
 ## 6e. Inbox items for the open components (2026-10-27)
 
 The plan audit of 2026-10-27 found eight open components with no inbox item and no PR. Each one now has an item, so the loop can take it.

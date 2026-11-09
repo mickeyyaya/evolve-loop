@@ -124,6 +124,7 @@ func ciEvents() []ciEvent {
 		{name: "pull_request", prNum: 42, ref: "refs/pull/42/merge", runID: 1001, wantCI: true},
 		{name: "push", ref: "refs/heads/main", runID: 1002},
 		{name: "workflow_dispatch", ref: "refs/heads/feature", runID: 1003},
+		{name: "schedule", ref: "refs/heads/main", runID: 1004},
 	}
 }
 
@@ -180,11 +181,27 @@ func TestCIConcurrency_DispatchGroupsByRunID(t *testing.T) {
 	}
 }
 
+func TestCIConcurrency_ScheduleGroupsByRunIDAndNeverCancels(t *testing.T) {
+	t.Parallel()
+	e := eventByName(t, "schedule")
+	group, cancel := evaluateConcurrency(t, RequiredWorkflow, e)
+	if want := "CI required-schedule-1004"; group != want {
+		t.Errorf("schedule group = %q, want %q", group, want)
+	}
+	if cancel != "false" {
+		t.Errorf("schedule cancel-in-progress = %q, want false", cancel)
+	}
+	pushGroup, _ := evaluateConcurrency(t, RequiredWorkflow, eventByName(t, "push"))
+	if group == pushGroup {
+		t.Errorf("a scheduled run shares the push group %q, so a push could cancel or queue behind it", group)
+	}
+}
+
 func TestCIConcurrency_RequiredAndGoWorkflowsAreEvaluatedForEveryEvent(t *testing.T) {
 	t.Parallel()
 	events := ciEvents()
-	if len(events) != 3 || events[0].name != "pull_request" || events[1].name != "push" || events[2].name != "workflow_dispatch" {
-		t.Fatalf("events = %+v, want pull_request, push and workflow_dispatch", events)
+	if len(events) != 4 || events[0].name != "pull_request" || events[1].name != "push" || events[2].name != "workflow_dispatch" || events[3].name != "schedule" {
+		t.Fatalf("events = %+v, want pull_request, push, workflow_dispatch and schedule", events)
 	}
 	for _, e := range events {
 		group, cancel := evaluateConcurrency(t, RequiredWorkflow, e)
@@ -217,8 +234,10 @@ func TestCIConcurrency_DistinctPullRequestsRefsAndRunsNeverShareAGroup(t *testin
 	record("push release", ciEvent{name: "push", ref: "refs/heads/release", runID: 4})
 	record("workflow_dispatch run 5", ciEvent{name: "workflow_dispatch", ref: "refs/heads/main", runID: 5})
 	record("workflow_dispatch run 6", ciEvent{name: "workflow_dispatch", ref: "refs/heads/main", runID: 6})
-	if len(seen) != 6 {
-		t.Errorf("recorded %d distinct groups, want 6", len(seen))
+	record("schedule run 7", ciEvent{name: "schedule", ref: "refs/heads/main", runID: 7})
+	record("schedule run 8", ciEvent{name: "schedule", ref: "refs/heads/main", runID: 8})
+	if len(seen) != 8 {
+		t.Errorf("recorded %d distinct groups, want 8", len(seen))
 	}
 }
 

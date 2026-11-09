@@ -190,6 +190,7 @@ func TestRequiredRouting_MissingEvidenceCannotBecomeDocumentationSkip(t *testing
 		{"manual", "workflow_dispatch", "", head, true},
 		{"initial_push", "push", strings.Repeat("0", 40), head, true},
 		{"empty_diff", "push", head, head, true},
+		{"scheduled", "schedule", "", head, true},
 		{"missing_base", "pull_request", "", head, false},
 		{"invalid_base", "push", "--output=bad", head, false},
 		{"unknown_base", "push", strings.Repeat("f", 40), head, false},
@@ -412,4 +413,52 @@ func routingGit(t *testing.T, dir string, args ...string) string {
 		t.Fatalf("git fixture: %v\n%s", err, out)
 	}
 	return strings.TrimSpace(string(out))
+}
+
+func TestRequiredRouting_ScheduleSelectsEverySuiteWhateverTheDiff(t *testing.T) {
+	t.Parallel()
+	step := workflowStep(t, RequiredWorkflow, "changes", "paths")
+	dir, base := routingRepo(t)
+	routingFile(t, dir, "docs/reports/review.md")
+	docsHead := routingCommit(t, dir)
+	want := routeText(true, true, false, false, true)
+	for _, tc := range []struct{ name, base, head string }{
+		{"no_before_sha", "", docsHead},
+		{"zero_before_sha", strings.Repeat("0", 40), docsHead},
+		{"docs_only_diff", base, docsHead},
+		{"empty_diff", docsHead, docsHead},
+		{"unknown_before_sha", strings.Repeat("f", 40), docsHead},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := routingOutput(t, dir, step.Run, "schedule", tc.base, tc.head)
+			if err != nil {
+				t.Fatalf("a scheduled run must route without diff evidence: %v\n%s", err, got)
+			}
+			if got != want {
+				t.Fatalf("route = %q, want every suite selected %q", got, want)
+			}
+		})
+	}
+}
+
+func TestRequiredRouting_ScheduleRoutesLikeAManualRun(t *testing.T) {
+	t.Parallel()
+	step := workflowStep(t, RequiredWorkflow, "changes", "paths")
+	dir, head := routingRepo(t)
+	manual, err := routingOutput(t, dir, step.Run, "workflow_dispatch", "", head)
+	if err != nil {
+		t.Fatalf("manual routing failed: %v\n%s", err, manual)
+	}
+	scheduled, err := routingOutput(t, dir, step.Run, "schedule", "", head)
+	if err != nil {
+		t.Fatalf("scheduled routing failed: %v\n%s", err, scheduled)
+	}
+	if scheduled != manual {
+		t.Fatalf("schedule route = %q, manual route = %q", scheduled, manual)
+	}
+	for _, line := range []string{"go=true", "landing=true", "inbox=true", "docs_only=false", "docs=false"} {
+		if !strings.Contains(scheduled, line+"\n") {
+			t.Errorf("scheduled route %q lacks %q", scheduled, line)
+		}
+	}
 }
