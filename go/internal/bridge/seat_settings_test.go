@@ -99,7 +99,7 @@ func TestSeatSettings_CarriesOnlyTheCarriedKeysAndForcesAutoMemoryOff(t *testing
 		keys = append(keys, k)
 	}
 	slices.Sort(keys)
-	if !slices.Equal(keys, []string{"autoMemoryEnabled", "model", "theme"}) || got["autoMemoryEnabled"] != false || got["model"] != "opus" {
+	if !slices.Equal(keys, []string{"autoMemoryEnabled", "model", "skipDangerousModePermissionPrompt", "theme"}) || got["autoMemoryEnabled"] != false || got["model"] != "opus" || got[seatBypassAckKey] != true {
 		t.Fatalf("got %v", got)
 	}
 	info, _ := os.Stat(filepath.Join(dir, "settings.json"))
@@ -119,7 +119,7 @@ func TestSeatSettings_AMissingOrBadUserFileStillGivesTheMemoryOffFile(t *testing
 		if err := provisionSeatSettings(home, dir); err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
-		if got := readSeatSettings(t, dir); len(got) != 1 || got["autoMemoryEnabled"] != false {
+		if got := readSeatSettings(t, dir); len(got) != 2 || got["autoMemoryEnabled"] != false || got[seatBypassAckKey] != true {
 			t.Fatalf("%s: got %v", name, got)
 		}
 	}
