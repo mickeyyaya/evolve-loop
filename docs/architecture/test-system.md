@@ -279,7 +279,9 @@ Many lanes add files to one package at the same time. A new top-level name in a 
 4. A structure test fails when the count is above the baseline.
 5. A change that lowers the count must lower the baseline in the same commit.
 
-The ratchet scans the runtime test files. Old cycle directories under `acs/` are history. The ratchet scans an `acs/` directory only when it is newer than the baseline date.
+The ratchet scans the runtime test files. Old cycle directories under `acs/` are history. The ratchet scans an `acs/` directory only when it is newer than the baseline date. It also scans a directory with a change that no commit holds yet.
+
+The ratchet catches a copy in the predicate directory of a cycle at the TDD handoff, not at ship. No phase after TDD can change `go/acs/cycle<N>/`. The TDD handoff floor names each group of equal bodies with a site there. It sends the handoff back to TDD ([incident 2026-11-09](../incidents/2026-11-09-duplicate-ratchet-misses-staged-predicates.md)).
 
 ### 6.5 Predicate helpers
 

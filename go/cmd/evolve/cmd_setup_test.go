@@ -9,16 +9,6 @@ import (
 	"testing"
 )
 
-func setupWrite(t *testing.T, path, body string) {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestRunSetup_Dispatch(t *testing.T) {
 	t.Parallel()
 	var out, errb bytes.Buffer
@@ -69,14 +59,14 @@ func TestRunSetup_DetectPinsAndComplete(t *testing.T) {
 	t.Setenv("EVOLVE_PROJECT_ROOT", project)
 	t.Setenv("EVOLVE_PLUGIN_ROOT", project)
 
-	setupWrite(t, filepath.Join(evolveDir, "profiles", "auditor.json"), `{
+	writeE2File(t, filepath.Join(evolveDir, "profiles", "auditor.json"), `{
 	  "cli":"codex-tmux","model_tier_default":"sonnet",
 	  "model_tier_envelope":{"min":"deep","default":"deep","max":"deep"},
 	  "cross_family_with":"builder","allowed_clis":["all"]
 	}`)
 	policyPath := filepath.Join(evolveDir, "policy.json")
 
-	setupWrite(t, policyPath, `{"pins":{"auditor":{"cli":"codex","model":"opus"}}}`)
+	writeE2File(t, policyPath, `{"pins":{"auditor":{"cli":"codex","model":"opus"}}}`)
 	a := phaseFromDetectJSON(t, "auditor")
 	if a.Source != "policy-pin" || a.CurrentCLI != "codex" || a.CurrentTier != "opus" {
 		t.Fatalf("clean pin: got %+v", a)
@@ -85,7 +75,7 @@ func TestRunSetup_DetectPinsAndComplete(t *testing.T) {
 		t.Fatalf("clean pin should have no violation, got %q", a.PinViolation)
 	}
 
-	setupWrite(t, policyPath, `{"pins":{"auditor":{"cli":"codex","model":"balanced"}}}`)
+	writeE2File(t, policyPath, `{"pins":{"auditor":{"cli":"codex","model":"balanced"}}}`)
 	a = phaseFromDetectJSON(t, "auditor")
 	if a.PinViolation == "" {
 		t.Fatalf("below-envelope pin should report a violation, got %+v", a)
@@ -168,18 +158,18 @@ func TestRunSetup_ApplyWritesPolicy(t *testing.T) {
 	evolveDir := filepath.Join(project, ".evolve")
 	t.Setenv("EVOLVE_PROJECT_ROOT", project)
 	t.Setenv("EVOLVE_PLUGIN_ROOT", project)
-	setupWrite(t, filepath.Join(evolveDir, "profiles", "builder.json"), `{
+	writeE2File(t, filepath.Join(evolveDir, "profiles", "builder.json"), `{
 	  "cli":"agy-tmux","model_tier_default":"sonnet",
 	  "model_tier_envelope":{"min":"balanced","default":"balanced","max":"deep"},
 	  "cross_family_with":"auditor","allowed_clis":["claude","agy"]
 	}`)
-	setupWrite(t, filepath.Join(evolveDir, "profiles", "auditor.json"), `{
+	writeE2File(t, filepath.Join(evolveDir, "profiles", "auditor.json"), `{
 	  "cli":"codex-tmux","model_tier_default":"sonnet",
 	  "model_tier_envelope":{"min":"deep","default":"deep","max":"deep"},
 	  "cross_family_with":"builder","allowed_clis":["all"]
 	}`)
 	policyPath := filepath.Join(evolveDir, "policy.json")
-	setupWrite(t, policyPath, `{"version":1,"floor":[{"id":"dossier-closeout"}]}`)
+	writeE2File(t, policyPath, `{"version":1,"floor":[{"id":"dossier-closeout"}]}`)
 
 	var out, errb bytes.Buffer
 	rc := runSetup([]string{"apply", "--preset", "recommended"}, nil, &out, &errb)
@@ -235,14 +225,14 @@ func TestMaybePrintSetupNudge(t *testing.T) {
 		t.Errorf("fresh repo should nudge, got %q", w.String())
 	}
 
-	setupWrite(t, filepath.Join(evolveDir, "state.json"), `{"setupCompletedAt":"2026-01-01T00:00:00Z","setupVersion":1}`)
+	writeE2File(t, filepath.Join(evolveDir, "state.json"), `{"setupCompletedAt":"2026-01-01T00:00:00Z","setupVersion":1}`)
 	w.Reset()
 	maybePrintSetupNudge(&w, evolveDir)
 	if w.Len() != 0 {
 		t.Errorf("onboarded repo should be silent, got %q", w.String())
 	}
 
-	setupWrite(t, filepath.Join(evolveDir, "state.json"), `{"lastCycleNumber":3}`)
+	writeE2File(t, filepath.Join(evolveDir, "state.json"), `{"lastCycleNumber":3}`)
 	w.Reset()
 	maybePrintSetupNudge(&w, evolveDir)
 	if !strings.Contains(w.String(), "First run") {

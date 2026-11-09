@@ -13,7 +13,7 @@ import (
 func TestRunSetupApply_DryRunPrintsTheMergeAndWritesNothing(t *testing.T) {
 	root := e3IsolatedCLIHost(t, e3FakeOllama)
 	policyPath := filepath.Join(root, ".evolve", "policy.json")
-	setupWrite(t, policyPath, `{"version":1,"floor":[{"id":"dossier-closeout"}]}`)
+	writeE2File(t, policyPath, `{"version":1,"floor":[{"id":"dossier-closeout"}]}`)
 	var out, errb bytes.Buffer
 
 	code := runSetup([]string{"apply", "--preset", "economy", "--dry-run", "--project-root", root}, nil, &out, &errb)
