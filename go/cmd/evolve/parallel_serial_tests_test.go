@@ -976,4 +976,10 @@ var serialTests = map[string]string{
 	"main.TestWaveStatus_SeatHealth_AHealthyListingRaisesNoWarning":                                                        "swaps seams bridgeSessionsTmux and bridgeLiveSockets",
 	"main.TestWaveStatus_SeatHealth_ARealTmuxSessionReadsBlockedUnderACLocale":                                             "swaps seams bridgeSessionsTmux and bridgeLiveSockets",
 	"main.TestBridgeSessions_ARealTmuxSessionListsAsUnwatchedUnderACLocale":                                                "swaps seams bridgeSessionsTmux and bridgeLiveSockets",
+	"main.TestBranchSweep_HookNeverDeletesANonCycleBranch":                                                                 "swaps seams gcInjectedReapers and gcInjectedProcessHost",
+	"main.TestBranchSweep_OperatorDryRunPlansTheDeletesAndMutatesNothing":                                                  "swaps seams gcInjectedReapers and gcInjectedProcessHost",
+	"main.TestBranchSweep_OperatorRunDeletesALandedBranchAfterAVerifiedBundle":                                             "swaps seams gcInjectedReapers and gcInjectedProcessHost",
+	"main.TestBranchSweep_OperatorRunDeletesAnEndedBranchAfterAVerifiedBundle":                                             "swaps seams gcInjectedReapers and gcInjectedProcessHost",
+	"main.TestBranchSweep_OperatorRunKeepsABranchWhenItsBundleCannotBeWritten":                                             "swaps seams gcInjectedReapers and gcInjectedProcessHost",
+	"main.TestBranchSweep_OperatorRunKeepsAFreshUnlandedBranchAndMain":                                                     "swaps seams gcInjectedReapers and gcInjectedProcessHost",
 }

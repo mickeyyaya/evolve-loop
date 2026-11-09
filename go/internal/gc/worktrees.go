@@ -38,6 +38,7 @@ type WorktreeItem struct {
 	Head   string         `json:"head,omitempty"`
 	Action WorktreeAction `json:"action"`
 	Reason string         `json:"reason,omitempty"`
+	Bundle bool           `json:"bundle,omitempty"`
 }
 
 type WorktreeManifest struct {
@@ -49,6 +50,8 @@ type WorktreeOptions struct {
 	WorktreeBase string
 	EvolveDir    string
 	Policy       WorktreesPolicy
+	BranchScope  BranchScope
+	EndedAfter   time.Duration
 	Now          func() time.Time
 	Exec         sysexec.RunFunc
 	PidAlive     func(int) bool
@@ -229,6 +232,12 @@ func PlanWorktrees(o WorktreeOptions) (WorktreeManifest, error) {
 		return WorktreeManifest{}, err
 	}
 	items = append(items, orphans...)
+
+	others, err := o.otherBranchItems(merged, porcelain)
+	if err != nil {
+		return WorktreeManifest{}, err
+	}
+	items = append(items, others...)
 
 	sortWorktreeItems(items)
 	return WorktreeManifest{Items: items}, nil
@@ -527,7 +536,7 @@ func (o WorktreeOptions) deleteBranches(items []WorktreeItem, refused map[string
 		if it.Path != "" && refused[it.Path] {
 			continue
 		}
-		if err := o.deleteBranch(it); err != nil {
+		if err := o.deleteOne(it); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -552,14 +561,8 @@ func (o WorktreeOptions) deleteBranch(it WorktreeItem) error {
 }
 
 func (o WorktreeOptions) deleteSquashed(it WorktreeItem) error {
-	porcelain, err := o.git(o.ProjectRoot, "worktree", "list", "--porcelain")
-	if err != nil {
+	if err := o.refuseCheckedOut(it.Branch); err != nil {
 		return err
-	}
-	for _, e := range parseWorktreePorcelain(porcelain) {
-		if e.branch == it.Branch {
-			return fmt.Errorf("gc: refuse to delete %s: worktree %s has it checked out", it.Branch, e.path)
-		}
 	}
 	res, err := branchLandedBySquash(context.Background(), gitexec.Git{Dir: o.ProjectRoot, Exec: o.Exec}, "HEAD", it.Branch)
 	if err != nil {
@@ -603,4 +606,17 @@ func (o WorktreeOptions) gitCapture(dir string, env []string, args ...string) (s
 	var out, errOut strings.Builder
 	code, err = o.Exec(context.Background(), "git", dir, args, env, nil, &out, &errOut)
 	return out.String(), errOut.String(), code, err
+}
+
+func (o WorktreeOptions) refuseCheckedOut(branch string) error {
+	porcelain, err := o.git(o.ProjectRoot, "worktree", "list", "--porcelain")
+	if err != nil {
+		return err
+	}
+	for _, e := range parseWorktreePorcelain(porcelain) {
+		if e.branch == branch {
+			return fmt.Errorf("gc: refuse to delete %s: worktree %s has it checked out", branch, e.path)
+		}
+	}
+	return nil
 }
