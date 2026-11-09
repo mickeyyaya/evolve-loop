@@ -215,6 +215,91 @@ func TestGhCIWaitsForTheRunToRegisterAndGivesUp(t *testing.T) {
 	}
 }
 
+func TestGhCIWatchWaitsWhileRunInProgress(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name        string
+		views       []string
+		settle      func(*int, context.CancelFunc) func(context.Context) error
+		cancel      bool
+		wantErr     bool
+		wantTimeout bool
+		want        Verdict
+		settles     int
+	}{
+		{
+			name:  "in progress then green",
+			views: []string{recordedRunViewActive, recordedRunViewActive, recordedRunViewOK},
+			settle: func(n *int, _ context.CancelFunc) func(context.Context) error {
+				return func(context.Context) error { *n++; return nil }
+			},
+			want:    Green,
+			settles: 2,
+		},
+		{
+			name:  "in progress settle fails",
+			views: []string{recordedRunViewActive},
+			settle: func(n *int, _ context.CancelFunc) func(context.Context) error {
+				return func(context.Context) error { *n++; return errors.New("boom") }
+			},
+			wantErr:     true,
+			wantTimeout: true,
+			settles:     1,
+		},
+		{
+			name:   "in progress canceled during settle",
+			views:  []string{recordedRunViewActive, recordedRunViewActive},
+			cancel: true,
+			settle: func(n *int, cancel context.CancelFunc) func(context.Context) error {
+				return func(context.Context) error {
+					*n++
+					cancel()
+					return nil
+				}
+			},
+			wantErr:     true,
+			wantTimeout: true,
+			settles:     1,
+		},
+		{
+			name:  "in progress reaches watchTries limit",
+			views: []string{recordedRunViewActive},
+			settle: func(n *int, _ context.CancelFunc) func(context.Context) error {
+				return func(context.Context) error { *n++; return nil }
+			},
+			wantErr:     true,
+			wantTimeout: true,
+			settles:     watchTries - 1,
+		},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			settles, viewIdx := 0, 0
+			s := &ghScript{reply: func(args []string) (string, int, error) {
+				if has(args, "run", "view") {
+					resp := c.views[viewIdx]
+					if viewIdx+1 < len(c.views) {
+						viewIdx++
+					}
+					return resp, 0, nil
+				}
+				return okReply("7")(args)
+			}}
+			ci := newGhCI(t, s)
+			ci.Settle = c.settle(&settles, cancel)
+			v, err := ci.Watch(ctx, PR{Tip: sha('a')})
+			if (err != nil) != c.wantErr || v != c.want || settles != c.settles {
+				t.Fatalf("Watch = %q, %v, settles %d; want %q, fail=%v, settles=%d", v, err, settles, c.want, c.wantErr, c.settles)
+			}
+			if c.wantTimeout && !errors.Is(err, ErrRunTimeout) {
+				t.Errorf("err %v does not wrap ErrRunTimeout", err)
+			}
+		})
+	}
+}
+
 func TestGhCIRerunReRunsTheFailedJobs(t *testing.T) {
 	t.Parallel()
 	s := &ghScript{reply: okReply("55")}

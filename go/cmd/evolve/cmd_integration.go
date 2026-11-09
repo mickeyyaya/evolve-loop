@@ -107,11 +107,11 @@ func watchVerb(env integrationEnv, args []string, stdout, stderr io.Writer) int 
 		fmt.Fprintf(stderr, "%s%v\n%s\n", integrationPrefix, err, integrationUsage)
 		return exitUsage
 	}
-	return watchIntegrationTip(gh, tip, stdout, stderr)
+	return watchIntegrationTip(gh, env.Settle, tip, stdout, stderr)
 }
 
-func watchIntegrationTip(gh integration.GhFunc, tip string, stdout, stderr io.Writer) int {
-	verdict, err := integration.GhCI{Gh: gh}.Watch(context.Background(), integration.PR{Tip: tip})
+func watchIntegrationTip(gh integration.GhFunc, settle func(context.Context) error, tip string, stdout, stderr io.Writer) int {
+	verdict, err := integration.GhCI{Gh: gh, Settle: settle}.Watch(context.Background(), integration.PR{Tip: tip})
 	if err != nil {
 		fmt.Fprintf(stderr, "%s%v\n", integrationPrefix, err)
 		return exitIO

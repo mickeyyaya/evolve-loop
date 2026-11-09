@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -21,13 +22,18 @@ const (
 	redExitCode = 1
 
 	registerTries   = 5
+	watchTries      = 720
 	readyLimit      = 100
+	statusCompleted = "completed"
 	conclusionGreen = "success"
 	conclusionRed   = "failure"
 	batchHeadPrefix = "integration/"
 )
 
-var prURL = regexp.MustCompile(`/pull/([0-9]+)\s*$`)
+var (
+	ErrRunTimeout = errors.New("integration: CI run timed out")
+	prURL         = regexp.MustCompile(`/pull/([0-9]+)\s*$`)
+)
 
 func SysGh() GhFunc {
 	return func(ctx context.Context, dir string, args ...string) (string, int, error) {
@@ -138,19 +144,34 @@ func (c GhCI) Watch(ctx context.Context, pr PR) (Verdict, error) {
 }
 
 func (c GhCI) verdict(ctx context.Context, id string) (Verdict, error) {
-	var run struct {
-		Conclusion string `json:"conclusion"`
+	for attempt := 1; ; attempt++ {
+		if ctx.Err() != nil {
+			return "", fmt.Errorf("integration: run %s wait canceled: %w", id, errors.Join(ctx.Err(), ErrRunTimeout))
+		}
+		var run struct {
+			Conclusion string `json:"conclusion"`
+			Status     string `json:"status"`
+		}
+		if err := c.decode(ctx, &run, "run", "view", id, "--json", "conclusion,status"); err != nil {
+			return "", err
+		}
+		if run.Status != "" && run.Status != statusCompleted {
+			if c.Settle == nil || attempt >= watchTries {
+				return "", fmt.Errorf("integration: run %s is %s: %w", id, run.Status, ErrRunTimeout)
+			}
+			if err := c.Settle(ctx); err != nil {
+				return "", fmt.Errorf("integration: run %s wait: %w", id, errors.Join(err, ErrRunTimeout))
+			}
+			continue
+		}
+		switch run.Conclusion {
+		case conclusionGreen:
+			return Green, nil
+		case conclusionRed:
+			return Red, nil
+		}
+		return "", fmt.Errorf("integration: run %s ended with the conclusion %q, which is neither green nor red", id, run.Conclusion)
 	}
-	if err := c.decode(ctx, &run, "run", "view", id, "--json", "conclusion"); err != nil {
-		return "", err
-	}
-	switch run.Conclusion {
-	case conclusionGreen:
-		return Green, nil
-	case conclusionRed:
-		return Red, nil
-	}
-	return "", fmt.Errorf("integration: run %s ended with the conclusion %q, which is neither green nor red", id, run.Conclusion)
 }
 
 func (c GhCI) Rerun(ctx context.Context, pr PR) error {

@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acsrunner"
@@ -87,6 +88,9 @@ func TestConsoleTrainExportsAreNamedByAnExecutedAssertion(t *testing.T) {
 	var host PRHost = &fakeHost{ready: []int{9}}
 	if ready, err := host.Ready(context.Background()); err != nil || len(ready) != 1 || ready[0] != 9 {
 		t.Errorf("PRHost.Ready = %v, %v", ready, err)
+	}
+	if ErrRunTimeout == nil || !strings.Contains(ErrRunTimeout.Error(), "timed out") {
+		t.Errorf("ErrRunTimeout = %v, want timed out", ErrRunTimeout)
 	}
 }
 
