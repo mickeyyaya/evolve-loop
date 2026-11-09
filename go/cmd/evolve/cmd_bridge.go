@@ -74,7 +74,7 @@ var bridgeReadOnlyViews = map[string]func([]string, io.Writer, io.Writer) int{
 }
 
 func bridgeLaunchDeps(getwd func() (string, error), stderr io.Writer) bridge.Deps {
-	deps := bridge.Deps{TokenResolver: tokenusage.DefaultResolver(tokenusage.ClaudeConfigRoot(nil))}
+	deps := bridge.Deps{TokenResolver: tokenusage.HostResolver(nil)}
 	root, err := routingProjectRoot("", getwd)
 	if err != nil {
 		fmt.Fprintf(stderr, "[bridge] WARN %v; the policy opt-ins stay off\n", err)
@@ -111,7 +111,7 @@ func runBridge(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if sub == "launch" {
 		return bridge.NewEngine(bridgeLaunchDeps(os.Getwd, stderr)).LaunchArgs(context.Background(), rest, envMap(), stdout, stderr)
 	}
-	eng := bridge.NewEngine(bridge.Deps{TokenResolver: tokenusage.DefaultResolver(tokenusage.ClaudeConfigRoot(nil))})
+	eng := bridge.NewEngine(bridge.Deps{TokenResolver: tokenusage.HostResolver(nil)})
 
 	switch sub {
 	case "probe":

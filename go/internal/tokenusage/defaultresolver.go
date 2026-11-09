@@ -7,12 +7,16 @@ import (
 )
 
 type Roots struct {
-	Claude string
+	Claude []string
 	Agy    string
 }
 
 func DefaultResolver(configRoot string) func(Window) (Result, error) {
-	return Resolver(Roots{Claude: configRoot, Agy: AgyDataRoot(nil)}, SQLiteCLI)
+	return Resolver(Roots{Claude: []string{configRoot}, Agy: AgyDataRoot(nil)}, SQLiteCLI)
+}
+
+func HostResolver(env map[string]string) func(Window) (Result, error) {
+	return Resolver(Roots{Claude: ClaudeTranscriptRoots(env), Agy: AgyDataRoot(env)}, SQLiteCLI)
 }
 
 func Resolver(roots Roots, query SQLiteQuery) func(Window) (Result, error) {
@@ -39,7 +43,11 @@ type formatChain func(roots Roots, query SQLiteQuery, w Window) []Collector
 
 var collectorFormats = map[string]formatChain{
 	FormatClaudeJSONL: func(roots Roots, _ SQLiteQuery, w Window) []Collector {
-		return []Collector{TranscriptCollector(roots.Claude, w), EventsResultCollector(w.EventsLogPath), ScrollbackPeakCollector(w.Scrollback)}
+		collectors := make([]Collector, 0, len(roots.Claude)+2)
+		for _, root := range roots.Claude {
+			collectors = append(collectors, TranscriptCollector(root, w))
+		}
+		return append(collectors, EventsResultCollector(w.EventsLogPath), ScrollbackPeakCollector(w.Scrollback))
 	},
 	FormatAgyConversation: func(roots Roots, query SQLiteQuery, w Window) []Collector {
 		return append([]Collector{AgyConversationCollector(roots.Agy, w, query)}, genericChain(w)...)

@@ -15,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/attemptpostmortem"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
 const (
@@ -293,16 +294,24 @@ func (r collectRequest) withTrace(path string, trace attemptpostmortem.Trace) at
 }
 
 func findSessionTranscript(home, session string) (string, error) {
-	projects := filepath.Join(home, ".claude", "projects")
-	entries, err := os.ReadDir(projects)
-	if err != nil {
-		return "", fmt.Errorf("no transcript for session %s: %w", session, err)
-	}
-	for _, e := range entries {
-		path := filepath.Join(projects, e.Name(), session+".jsonl")
-		if _, err := os.Stat(path); err == nil {
+	var searched []string
+	for _, root := range tokenusage.ClaudeTranscriptRoots(map[string]string{"HOME": home}) {
+		projects := filepath.Join(root, "projects")
+		searched = append(searched, projects)
+		if path := sessionUnder(projects, session); path != "" {
 			return path, nil
 		}
 	}
-	return "", fmt.Errorf("no transcript for session %s under %s", session, projects)
+	return "", fmt.Errorf("no transcript for session %s under %s", session, strings.Join(searched, " or "))
+}
+
+func sessionUnder(projects, session string) string {
+	entries, _ := os.ReadDir(projects)
+	for _, e := range entries {
+		path := filepath.Join(projects, e.Name(), session+".jsonl")
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+	return ""
 }

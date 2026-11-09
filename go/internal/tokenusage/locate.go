@@ -3,14 +3,29 @@ package tokenusage
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 )
 
-func LocateTranscript(root string, w Window) string {
-	best, bestAt := "", time.Time{}
+type locatedTranscript struct {
+	path string
+	at   time.Time
+}
+
+func LocateTranscript(roots []string, w Window) string {
+	var best locatedTranscript
+	for _, root := range roots {
+		best = locateIn(root, w, best)
+	}
+	return best.path
+}
+
+func locateIn(root string, w Window, best locatedTranscript) locatedTranscript {
 	if root == "" {
-		return ""
+		return best
 	}
 	_ = filepath.WalkDir(filepath.Join(root, "projects"), func(path string, d os.DirEntry, walkErr error) error {
 		if walkErr != nil || !d.Type().IsRegular() || !strings.HasSuffix(path, ".jsonl") || unchangedSince(d, w.Start) {
@@ -20,12 +35,22 @@ func LocateTranscript(root string, w Window) string {
 		if !attributes(lines, w) {
 			return nil
 		}
-		if at, ok := latestStampWithin(lines, w); ok && at.After(bestAt) {
-			best, bestAt = path, at
+		if at, ok := latestStampWithin(lines, w); ok && at.After(best.at) {
+			best = locatedTranscript{path: path, at: at}
 		}
 		return nil
 	})
 	return best
+}
+
+func ClaudeTranscriptRoots(env map[string]string) []string {
+	var roots []string
+	for _, root := range []string{ClaudeConfigRoot(env), paths.SeatRoot(envOrProcess(env, "HOME"))} {
+		if root != "" && !slices.Contains(roots, root) {
+			roots = append(roots, root)
+		}
+	}
+	return roots
 }
 
 func latestStampWithin(lines []transcriptLine, w Window) (time.Time, bool) {
