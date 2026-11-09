@@ -31,6 +31,7 @@ type AdvisorSkillRejection struct {
 type OverlayRule struct {
 	Phases       []string           `json:"phases,omitempty"`
 	CLIs         []string           `json:"clis,omitempty"`
+	Families     []string           `json:"families,omitempty"`
 	Models       []string           `json:"models,omitempty"`
 	Tiers        []string           `json:"tiers,omitempty"`
 	When         []config.Condition `json:"when,omitempty"`
@@ -211,6 +212,7 @@ func (r OverlayRule) matches(d OverlayDispatch) bool {
 	return (d.WritesSource || !r.WritesSource) &&
 		matchDim(r.Phases, d.Phase) &&
 		matchDim(r.CLIs, d.CLI) &&
+		matchFamily(r.Families, d.CLI) &&
 		matchDim(r.Models, d.Model) &&
 		matchTier(r.Tiers, d.Tier) &&
 		matchPaths(r.Paths, d.ScopePaths) &&
@@ -238,6 +240,22 @@ func matchWhen(when []config.Condition, signals map[string]string) bool {
 		}
 	}
 	return true
+}
+
+func matchFamily(families []string, cli string) bool {
+	if len(families) == 0 {
+		return true
+	}
+	family, _, _ := strings.Cut(cli, "-")
+	if family == "" {
+		return false
+	}
+	for _, f := range families {
+		if f == family {
+			return true
+		}
+	}
+	return false
 }
 
 func matchTier(selectors []string, tier string) bool {
