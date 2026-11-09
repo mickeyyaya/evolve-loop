@@ -83,22 +83,12 @@ func (r handoffReplay) bindCycle(t *testing.T) {
 
 func (r handoffReplay) write(t *testing.T, rel, body string) {
 	t.Helper()
-	writeReplayFile(t, filepath.Join(r.worktree, filepath.FromSlash(rel)), body)
+	writeE2File(t, filepath.Join(r.worktree, filepath.FromSlash(rel)), body)
 }
 
 func (r handoffReplay) writeWorkspace(t *testing.T, rel, body string) {
 	t.Helper()
-	writeReplayFile(t, filepath.Join(r.workspace, filepath.FromSlash(rel)), body)
-}
-
-func writeReplayFile(t *testing.T, path, body string) {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeE2File(t, filepath.Join(r.workspace, filepath.FromSlash(rel)), body)
 }
 
 func (r handoffReplay) documentPath(t *testing.T) string {

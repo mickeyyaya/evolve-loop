@@ -12,6 +12,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -97,6 +98,9 @@ func loadAcsAges(root string, since time.Time) acsAges {
 		if committed >= since.Unix() {
 			ages.touched[acsDir(line)] = true
 		}
+	}
+	for _, name := range gitLines(root, "diff", "--relative", "--name-only", "HEAD", "--", "acs") {
+		ages.touched[acsDir(name)] = true
 	}
 	return ages
 }
@@ -196,6 +200,17 @@ func buildReport(bodies map[string][]string) Report {
 	}
 	sort.Slice(report.Groups, func(i, j int) bool { return report.Groups[i].Sites[0] < report.Groups[j].Sites[0] })
 	return report
+}
+
+func GroupsUnder(report Report, dir string) []Group {
+	prefix := strings.TrimSuffix(dir, "/") + "/"
+	var out []Group
+	for _, g := range report.Groups {
+		if slices.ContainsFunc(g.Sites, func(site string) bool { return strings.HasPrefix(site, prefix) }) {
+			out = append(out, g)
+		}
+	}
+	return out
 }
 
 func Check(report Report, baseline Baseline) error {

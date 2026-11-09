@@ -45,7 +45,7 @@ func TestRunSetup_AMalformedPresetOverrideRefusesRecommendAndApply(t *testing.T)
 	for _, args := range [][]string{{"recommend"}, {"apply", "--preset", "recommended"}} {
 		t.Run(args[0], func(t *testing.T) {
 			root := t.TempDir()
-			setupWrite(t, filepath.Join(root, ".evolve", "setup-presets.json"), "{not json")
+			writeE2File(t, filepath.Join(root, ".evolve", "setup-presets.json"), "{not json")
 			var out, errb bytes.Buffer
 
 			code := runSetup(append(args, "--project-root", root), nil, &out, &errb)

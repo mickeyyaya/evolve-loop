@@ -438,7 +438,7 @@ func WithDirectivesProvider(fn func(ctx context.Context, cycle int) directives.S
 func WithReviewer(r DeliverableReviewer) Option {
 	return func(o *Orchestrator) {
 		if r != nil {
-			o.reviewer = withMandatoryExplanationReviewer(r)
+			o.reviewer = withMandatoryReviewers(r)
 		}
 	}
 }
@@ -488,7 +488,7 @@ func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunn
 		workflowConfig:             policy.Policy{}.WorkflowConfig(),
 		chronicle:                  policy.Policy{}.ChronicleConfig(),
 		failurePolicy:              policy.DefaultSystemFailurePolicy(),
-		reviewer:                   withMandatoryExplanationReviewer(noopReviewer{}),
+		reviewer:                   withMandatoryReviewers(noopReviewer{}),
 		explanationContractVersion: explanationdocs.CurrentContractVersion,
 		observer:                   noopObserver{},
 	}
