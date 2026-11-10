@@ -41,7 +41,7 @@ func coverChangedFailures(ctx context.Context, in ReviewInput, paths []string) [
 	}
 	switch status {
 	case coverStatusTestsFailed:
-		lines := in.coverRedLines(ctx, out, []string{"-tags", strings.Join(covchanged.DefaultTags, ",")})
+		lines := in.coverRedLines(ctx, out, tagFlags(covchanged.DefaultTags))
 		return coverChangedReport(coverChangedResult(stage, coverChangedTestsFailedHeadline, lines))
 	case coverStatusPlumbingError:
 		fmt.Fprintf(os.Stderr, "[build-floor] WARN cover-changed could not make a coverage profile (%s); `make -C go cover-changed` and CI still judge coverage\n", out)

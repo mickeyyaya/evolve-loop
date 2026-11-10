@@ -247,6 +247,19 @@ These rules held in comments before the comment-zero change. Tests pin the ones 
 - `importerBackstopTimeout` bounds the run so the ship phase ends. A timeout exits with no test-level failure and classes as infra. `importerBackstopRetryMaxTargets` caps the pack size that is worth a second full run.
 - `repoContractGateRoot` fails closed with `CodeWorktreeResolve` for an unresolvable typed worktree. The gate then never tests the project root in the lane's place and reports a false green.
 
+### Base-red attribution
+
+- `base_red.go` judges a red of the fixed scanner pack against the lane base. The pack name is `scannerPackName`. No other pack is judged.
+- `Phase.runRepoContractGate` puts the `Options` and the resolved lane base into the context with `withBaseRed`. `contractVerdict` reads them where the pack returns a red.
+- The judge runs after the red stands. The importer backstop has an alone re-run. The scanner pack has none, so its first red goes to the judge.
+- The lane base is the `baseRef` of `repoContractGateRoot`. That is `Options.WorktreeBaseSHA`, or `HEAD` when the lane has no worktree.
+- `redsOf` maps each `packFailure` to a `baseattr.Key`. A failure with an empty `Test` makes the `Reds` `Unnamed`, so the lane is blamed.
+- The verdict has three outcomes. `Blamed` gives `CodeRepoContractGate`, as before. `MainGreen` gives `CodeGitFleetRebaseNeeded`. Any other all-base-red verdict gives `CodeMainRedPark`.
+- Both new errors carry the keys, the base and `main` in the debug map. Until G4b, `CodeMainRedPark` routes as a plain failure.
+- An attribution error writes a WARN to the pack log and blames the lane. It never excuses the lane.
+- `SHIP_BASE_RED_REBASE` and `SHIP_BASE_RED_MAIN_RED` register under the ship module. Each has the fields `keys`, `base`, `main` and `took`.
+- The attributor runs git from the project root, so each base checkout is under the project scratch path. A malformed policy file gets a line in the pack log. `Options.baseRun` replaces the `go test` runner in tests.
+
 ### Scan shadow
 
 - The shadow changes no verdict, no exit code and no order. It adds a tap on the event stream, three calls in the gate and records in the store. A test pins the notes, the order and the error text against a run with the shadow off (`TestScanShadow_ChangesNoVerdict`).

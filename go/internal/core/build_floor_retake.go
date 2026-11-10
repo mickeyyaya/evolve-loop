@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"slices"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
@@ -149,8 +148,6 @@ func (in ReviewInput) emitFloorRetake(label string, tests []string, shape floorR
 	})
 }
 
-const trailingUnpackagedFail = "\nFAIL\t-\n"
-
 func goTestFailureLines(output string) (lines, tests []string) {
 	for _, ln := range strings.Split(output, "\n") {
 		ln = strings.TrimSpace(ln)
@@ -160,12 +157,7 @@ func goTestFailureLines(output string) (lines, tests []string) {
 			lines = append(lines, ln)
 		}
 	}
-	for _, k := range baseattr.ParseGoTest(output + trailingUnpackagedFail).Keys {
-		if !slices.Contains(tests, k.Test) {
-			tests = append(tests, k.Test)
-		}
-	}
-	return lines, tests
+	return lines, baseattr.FailedTests(output)
 }
 
 func coverRetakeResult(first, out string, status int) (string, int) {

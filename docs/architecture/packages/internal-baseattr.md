@@ -12,7 +12,15 @@
 - When `BaseRed` is not empty, `Attribute` reruns those keys on the `main` ref. It skips that run when `main` is the base.
 - `RunAt` adds the worktree under `Scratch` through `gitexec`, runs the `Runner` in the Go module, and removes the worktree in a `defer`.
 - `GoTestRunner` runs `go test` through the `sysexec` seam with the environment of the caller. The remaining deadline of the context becomes the `-timeout` flag.
+- `FailedTests` gives the top-level name of each `--- FAIL:` line, once and in order. It is the display projection of the parser. It needs no package line.
+- `Names` joins a key list as `package.Test` names. The build floor and the ship gate use it for each signal and each message.
+- `New` builds an `Attributor` and sets `MainRef` to `DefaultMainRef` and `Scratch` to `DefaultScratch`. The build floor and the ship gate both build through it.
 - `Verdict.Blamed` is true when `LaneOnly` is not empty or `Unjudged` is set. `Verdict.MainGreen` is true when the base is red and `main` is read and green.
+
+## Callers
+
+- The build floor calls `Attribute` through `ReviewInput.laneReds`.
+- The ship gate calls `Attribute` through `attributeContractRed` in `phases/ship/base_red.go`. It passes no `Serialize` hook, because the pack runs outside the ship window.
 
 ## Invariants
 

@@ -2,6 +2,7 @@ package baseattr
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -36,4 +37,16 @@ func ParseGoTest(out string) Reds {
 func topLevel(name string) string {
 	top, _, _ := strings.Cut(name, "/")
 	return top
+}
+
+func FailedTests(out string) []string {
+	var names []string
+	for _, line := range strings.Split(out, "\n") {
+		if m := failedTest.FindStringSubmatch(line); m != nil {
+			if name := topLevel(m[1]); !slices.Contains(names, name) {
+				names = append(names, name)
+			}
+		}
+	}
+	return names
 }

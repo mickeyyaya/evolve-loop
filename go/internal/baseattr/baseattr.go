@@ -6,6 +6,7 @@ import (
 	"context"
 	"regexp"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
@@ -43,6 +44,15 @@ type Attributor struct {
 	Serialize func(context.Context) func()
 }
 
+const (
+	DefaultMainRef = "main"
+	DefaultScratch = ".evolve/ephemeral/base-red"
+)
+
+func New(git gitexec.Git, run Runner, timeout time.Duration, serialize func(context.Context) func()) Attributor {
+	return Attributor{Git: git, Run: run, MainRef: DefaultMainRef, Scratch: DefaultScratch, Timeout: timeout, Serialize: serialize}
+}
+
 var namedTest = regexp.MustCompile(`^(.+?)\.((?:Test|Benchmark|Example|Fuzz)[^/]*)(?:/.*)?$`)
 
 func KeysOf(names []string) Reds {
@@ -75,4 +85,12 @@ func (v Verdict) Blamed() bool {
 
 func (v Verdict) MainGreen() bool {
 	return len(v.BaseRed) > 0 && v.Main != "" && len(v.MainRed) == 0
+}
+
+func Names(keys []Key) string {
+	names := make([]string, len(keys))
+	for i, k := range keys {
+		names[i] = k.Package + "." + k.Test
+	}
+	return strings.Join(names, ", ")
 }

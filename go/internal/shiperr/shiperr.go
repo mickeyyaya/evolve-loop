@@ -76,6 +76,7 @@ const (
 	CodeGitFFMergeDiverged     ShipErrorCode = "GIT_FF_MERGE_DIVERGED"
 	CodeGitFleetRebaseNeeded   ShipErrorCode = "GIT_FLEET_REBASE_NEEDED"
 	CodeGitFleetRebaseConflict ShipErrorCode = "GIT_FLEET_REBASE_CONFLICT"
+	CodeMainRedPark            ShipErrorCode = "MAIN_RED_PARK"
 	CodeGitPushRejected        ShipErrorCode = "GIT_PUSH_REJECTED"
 	CodeCommitPrefixGate       ShipErrorCode = "COMMIT_PREFIX_GATE"
 	CodeManifestGate           ShipErrorCode = "MANIFEST_GATE"

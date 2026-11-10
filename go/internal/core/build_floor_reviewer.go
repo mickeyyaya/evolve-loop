@@ -293,11 +293,16 @@ const (
 
 var coverLockWait = verifylock.MaxWait
 
+func tagFlags(tags []string) []string {
+	if len(tags) == 0 {
+		return nil
+	}
+	return []string{"-tags", strings.Join(tags, ",")}
+}
+
 func coverTestArgs(profile string, pkgs, tags []string) []string {
 	args := []string{"test", "-count=1", "-timeout", addedtests.PackageTimeout}
-	if len(tags) > 0 {
-		args = append(args, "-tags", strings.Join(tags, ","))
-	}
+	args = append(args, tagFlags(tags)...)
 	return lanebudget.Args(append(append(args, "-coverprofile", profile), pkgs...))
 }
 

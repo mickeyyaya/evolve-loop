@@ -1472,6 +1472,10 @@ A red that the base shows too does not reject the lane. The floor writes a NOTE 
 A lane-only red still rejects. The rejection lists the base-red keys as information.
 
 An attribution that cannot run blames the lane as before. The floor writes a WARN and emits `BUILD_BASE_RED_UNJUDGED`.
+
 `FailOpen` wraps a `FloorJudge` and keeps the WARN for a judge error.
-When the base and `main` are both red, `OpenMainRedStop` receives the verdict. Nothing sets that hook yet.
+When the base and `main` are both red, the injected field `ReviewInput.MainRedStop` receives the verdict. Nothing sets that field yet.
+
+`ReviewInput.attributor` builds the `Attributor` through `baseattr.New`. The main ref and the scratch path have one home there.
+`tagFlags` gives the `-tags` flag list. `coverTestArgs` and the cover-changed floor both use it.
 Design: [gate-contract.md](../gate-contract.md), section 7, and the G4 page that it links.

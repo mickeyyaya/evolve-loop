@@ -1,6 +1,12 @@
 package baseattr
 
-import "testing"
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+)
 
 func TestReds_AttributableNeedsNamedKeysOnly(t *testing.T) {
 	t.Parallel()
@@ -42,5 +48,34 @@ func TestVerdict_BlamedAndMainGreen(t *testing.T) {
 		if got := tc.v.MainGreen(); got != tc.mgrn {
 			t.Errorf("%s: MainGreen = %v, want %v", tc.name, got, tc.mgrn)
 		}
+	}
+}
+
+func TestNew_SetsTheMainRefAndTheScratchDefaults(t *testing.T) {
+	t.Parallel()
+	released := false
+	run := func(context.Context, string, Reds) ([]Key, error) { return nil, nil }
+	git := gitexec.Default(t.TempDir())
+	a := New(git, run, 3*time.Second, func(context.Context) func() { return func() { released = true } })
+	if a.MainRef != "main" || a.Scratch != ".evolve/ephemeral/base-red" {
+		t.Errorf("defaults = %q %q, want main and .evolve/ephemeral/base-red", a.MainRef, a.Scratch)
+	}
+	if a.Git.Dir != git.Dir || a.Run == nil || a.Timeout != 3*time.Second {
+		t.Errorf("New dropped an input: %+v", a)
+	}
+	a.Serialize(context.Background())()
+	if !released {
+		t.Error("New dropped the serialize hook")
+	}
+}
+
+func TestNames_JoinsEachKeyAsPackageDotTest(t *testing.T) {
+	t.Parallel()
+	got := Names([]Key{{Package: "m/a", Test: "TestOne"}, {Package: "m/b", Test: "TestTwo"}})
+	if want := "m/a.TestOne, m/b.TestTwo"; got != want {
+		t.Errorf("Names = %q, want %q", got, want)
+	}
+	if got := Names(nil); got != "" {
+		t.Errorf("Names(nil) = %q, want the empty string", got)
 	}
 }

@@ -50,6 +50,9 @@ var serialTests = map[string]string{
 	"ship.TestRunNative_RepoContractGateReceivesRunWorkspace":                     seamRepoContract,
 	"ship.TestRunRepoContractPack_NamesRedsOnlyForTheGatesRealRed":                seamRepoContract,
 	"ship.TestRunRepoContractPack_RunsTheGatesOwnPackAndNamesItsReds":             seamRepoContract,
+	"ship.TestShipGate_BaseRedWithGreenMainAsksForTheFleetRebase":                 seamRepoContract,
+	"ship.TestShipGate_BaseRedWithRedMainParks":                                   seamRepoContract,
+	"ship.TestReplay_20261109":                                                    seamRepoContract,
 	"ship.TestRunRepoContractTestsAlone_EveryPackageGreenIsGreen":                 seamGoTestJSON,
 	"ship.TestRunRepoContractTestsAlone_KeepsTheUnprovenAndTheStillRed":           seamGoTestJSON,
 }

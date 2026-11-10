@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
@@ -100,6 +101,8 @@ type Options struct {
 	repairAttempted map[core.ShipErrorCode]bool
 
 	shipLock func(path string) (release func(), err error)
+
+	baseRun baseattr.Runner
 
 	Signals *signalcenter.Center
 

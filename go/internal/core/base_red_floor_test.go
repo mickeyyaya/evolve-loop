@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -292,5 +293,26 @@ func TestReportAttributed_TheSignalCarriesTheMainRedKeysAndTheDuration(t *testin
 		if fields[name] != value {
 			t.Errorf("field %s = %q, want %q", name, fields[name], value)
 		}
+	}
+}
+
+func TestTagFlags_OneHomeForTheCoverTagFlags(t *testing.T) {
+	t.Parallel()
+	if got := tagFlags(nil); got != nil {
+		t.Errorf("no tags gives no flags; got %v", got)
+	}
+	if got := tagFlags([]string{"integration", "acs"}); strings.Join(got, " ") != "-tags integration,acs" {
+		t.Errorf("tagFlags = %v", got)
+	}
+	if got := coverTestArgs("/p", []string{"./a"}, []string{"integration"}); !slices.Contains(got, "integration") {
+		t.Errorf("coverTestArgs does not use the shared flags: %v", got)
+	}
+}
+
+func TestReviewInputAttributor_UsesTheBaseattrDefaults(t *testing.T) {
+	t.Parallel()
+	a := ReviewInput{ProjectRoot: t.TempDir(), Stderr: &injectedStderr{}}.attributor()
+	if a.MainRef != baseattr.DefaultMainRef || a.Scratch != baseattr.DefaultScratch {
+		t.Errorf("core builds its own defaults: %q %q", a.MainRef, a.Scratch)
 	}
 }

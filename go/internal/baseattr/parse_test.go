@@ -49,3 +49,22 @@ func TestKeysOf_ANameWithNoTestIsUnnamed(t *testing.T) {
 		t.Error("an empty list is attributable")
 	}
 }
+
+func TestFailedTests_NamesEachTopLevelFailOnceInOrder(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		out  string
+		want []string
+	}{
+		{"no output", "", nil},
+		{"a pass", "ok  \texample.com/m/a\t0.01s\n", nil},
+		{"subtests fold into the parent once", "    --- FAIL: TestX/sub (0.00s)\n--- FAIL: TestX (0.00s)\n--- FAIL: TestY (0.00s)\n", []string{"TestX", "TestY"}},
+		{"a pending test with no package line still counts", "--- FAIL: TestZ (0.00s)\npanic: boom\n", []string{"TestZ"}},
+		{"an empty name is skipped", "--- FAIL: \n", nil},
+	} {
+		if got := FailedTests(tc.out); !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("%s: FailedTests = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
