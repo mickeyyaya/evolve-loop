@@ -163,3 +163,20 @@ func TestFreshnessFromManifests_ManifestDataNotGoConditionals(t *testing.T) {
 		t.Error("zero policy must be the enumerating default")
 	}
 }
+
+func TestPinsFromManifests_ManifestDataNotGoConditionals(t *testing.T) {
+	t.Parallel()
+	got := pinsFromManifests([]string{"claude", "codex", "ollama", "no-such-cli"})
+	if got["claude"]["deep"] != "fable" || got["claude"]["top"] != "fable" {
+		t.Errorf("claude pins = %v, want deep and top on fable", got["claude"])
+	}
+	if _, ok := got["codex"]; ok {
+		t.Error("codex declares no pin and must carry no entry")
+	}
+	if _, ok := got["ollama"]; ok {
+		t.Error("ollama (no manifest) must carry no entry")
+	}
+	if _, ok := got["no-such-cli"]; ok {
+		t.Error("a CLI that does not resolve must carry no entry")
+	}
+}

@@ -41,7 +41,7 @@ func publishPendingDossiers(projectRoot string, warn io.Writer) {
 		return
 	}
 	defer release()
-	publishPendingRetrospectives(projectRoot, warn)
+	_ = publishPendingRetrospectives(projectRoot, warn)
 	res, err := dossier.PublishPending(projectRoot, warn)
 	if err != nil {
 		fmt.Fprintf(warn, "[dossier] WARN: pending dossiers: %v — they stay pending\n", err)

@@ -27,7 +27,7 @@ func parseCodexPicker(pane string) []string {
 
 var (
 	claudeRowRE    = regexp.MustCompile(`^[^\w]*\d+\.`)
-	claudeFamilyRE = regexp.MustCompile(`(?i)\b(opus|sonnet|haiku)\b`)
+	claudeFamilyRE = regexp.MustCompile(`(?i)\b(fable|opus|sonnet|haiku)\b`)
 )
 
 func parseClaudePicker(pane string) []string {
