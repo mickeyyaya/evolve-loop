@@ -338,3 +338,42 @@ func TestRunAt_ACancelledCallerStillRemovesTheWorktree(t *testing.T) {
 		t.Errorf("%d worktrees left after a cancelled caller, want 1", got)
 	}
 }
+
+func TestRunIn_RunsTheKeysInTheGivenTreeWithNoCheckout(t *testing.T) {
+	t.Parallel()
+	r := gittest.Fixture(t)
+	commitFiles(t, r, "m", map[string]string{"go/go.mod": "module x\n"})
+	s := &script{steps: [][]Key{{kA}}}
+	a := attributorOn(t, r, s.run)
+	got, err := a.RunIn(context.Background(), r.Dir, Reds{Keys: []Key{kA, kB}})
+	if err != nil || !reflect.DeepEqual(got, []Key{kA}) {
+		t.Fatalf("RunIn = %v, %v", got, err)
+	}
+	if s.dirs[0] != filepath.Join(r.Dir, "go") || worktreeCount(r) != 1 {
+		t.Errorf("ran in %q with %d worktrees, want the module of the given tree and no checkout", s.dirs[0], worktreeCount(r))
+	}
+}
+
+func TestRunAt_ARunErrorNamesTheRevisionAndTheLimit(t *testing.T) {
+	t.Parallel()
+	r, base, _ := twoCommits(t)
+	s := &script{err: errors.New("the go tool is gone")}
+	a := attributorOn(t, r, s.run)
+	a.Timeout = 3 * time.Minute
+	_, err := a.RunAt(context.Background(), base, Reds{Keys: []Key{kA}})
+	if err == nil || !strings.Contains(err.Error(), "run at "+base+" (limit 3m0s)") || !strings.Contains(err.Error(), "the go tool is gone") {
+		t.Errorf("err = %v, want the revision, the limit and the cause", err)
+	}
+}
+
+func TestRunIn_ARunErrorNamesTheTreeAndTheLimit(t *testing.T) {
+	t.Parallel()
+	r := gittest.Fixture(t)
+	s := &script{err: errors.New("the go tool is gone")}
+	a := attributorOn(t, r, s.run)
+	a.Timeout = 3 * time.Minute
+	_, err := a.RunIn(context.Background(), r.Dir, Reds{Keys: []Key{kA}})
+	if err == nil || !strings.Contains(err.Error(), "run at "+r.Dir+" (limit 3m0s)") || !strings.Contains(err.Error(), "the go tool is gone") {
+		t.Errorf("err = %v, want the tree, the limit and the cause", err)
+	}
+}

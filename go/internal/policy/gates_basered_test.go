@@ -23,3 +23,31 @@ func TestPolicy_BaseRedRerunSecondsOverrideAndIgnoreANonPositiveValue(t *testing
 		}
 	}
 }
+
+func TestPolicy_MainRedStopIsShadowUntilThePolicyNamesAStage(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct {
+		p    Policy
+		want string
+	}{
+		"no gates block":       {Policy{}, "shadow"},
+		"an empty gates block": {Policy{Gates: &GatesPolicy{}}, "shadow"},
+		"the policy enforces":  {Policy{Gates: &GatesPolicy{MainRedStop: "enforce"}}, "enforce"},
+	} {
+		if got := tc.p.GatesConfig().MainRedStop; got != tc.want {
+			t.Errorf("%s: MainRedStop = %q, want %q", name, got, tc.want)
+		}
+	}
+}
+
+func TestGatesConfig_MainRedStopEnforcedOnlyAtTheEnforceStage(t *testing.T) {
+	t.Parallel()
+	for stage, want := range map[string]bool{"enforce": true, "shadow": false, "": false, "off": false} {
+		if got := (GatesConfig{MainRedStop: stage}).MainRedStopEnforced(); got != want {
+			t.Errorf("stage %q: MainRedStopEnforced = %v, want %v", stage, got, want)
+		}
+	}
+	if (Policy{}).GatesConfig().MainRedStopEnforced() {
+		t.Error("the default stage enforces the stop, want shadow")
+	}
+}

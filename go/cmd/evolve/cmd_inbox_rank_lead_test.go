@@ -27,7 +27,7 @@ func TestRank_TheFixItemLeadsWhileTheStopHolds(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, ".evolve", "recurrence-ledger.json"), []byte(ledger), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := core.OpenMainRedStop(root, redOnMain, 7); err != nil {
+	if _, err := core.OpenMainRedStop(root, redOnMain); err != nil {
 		t.Fatal(err)
 	}
 

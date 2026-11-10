@@ -255,10 +255,43 @@ These rules held in comments before the comment-zero change. Tests pin the ones 
 - The lane base is the `baseRef` of `repoContractGateRoot`. That is `Options.WorktreeBaseSHA`, or `HEAD` when the lane has no worktree.
 - `redsOf` maps each `packFailure` to a `baseattr.Key`. A failure with an empty `Test` makes the `Reds` `Unnamed`, so the lane is blamed.
 - The verdict has three outcomes. `Blamed` gives `CodeRepoContractGate`, as before. `MainGreen` gives `CodeGitFleetRebaseNeeded`. Any other all-base-red verdict gives `CodeMainRedPark`.
-- Both new errors carry the keys, the base and `main` in the debug map. Until G4b, `CodeMainRedPark` routes as a plain failure.
+- Both new errors carry the keys, the base and `main` in the debug map. The orchestrator parks a lane on `CodeMainRedPark` (see [internal-core.md](internal-core.md)).
 - An attribution error writes a WARN to the pack log and blames the lane. It never excuses the lane.
 - `SHIP_BASE_RED_REBASE` and `SHIP_BASE_RED_MAIN_RED` register under the ship module. Each has the fields `keys`, `base`, `main` and `took`.
 - The attributor runs git from the project root, so each base checkout is under the project scratch path. A malformed policy file gets a line in the pack log. `Options.baseRun` replaces the `go test` runner in tests.
+
+### Main-red stop check and release
+
+The file is `main_red_stop.go`. The design is in [gate-contract-g4-base-red-attribution.md](../gate-contract-g4-base-red-attribution.md), sections 7.5 and 7.6.
+
+- `runNative` calls `checkMainRedStop` after the repo-contract gate and before the stages. A resumed ship does not run the check.
+- A red of the repo-contract gate refuses the lane first, so the stop check judges only a lane that the gate passed.
+- The check reads the record through `mainstop.Read`. A record that cannot be read gets one WARN line and holds no lane.
+- A stop that does not hold starts no git call and no test run.
+- `repoContractGateRoot` gives the landing tree and the lane base. An error of that call is the error of the check.
+- `stopCheck.resolved` resolves the lane base and the `main` ref through `Attributor.Resolve`. A ref that cannot be resolved gets a WARN line and an empty value.
+- `stopCheck.proof` runs the keys of the stop in the landing tree through `Attributor.RunIn`. The run has the `-tags` list of `covchanged.DefaultTags`, as the floor has.
+- The proof runs only when the lane base is the `main` tip. A run that fails gets a WARN line and proves no fix.
+- `Proof.Green` holds each key of the stop that is not red in the lane.
+- `stopCheck.admit` gives the proof to `Stop.Admit`. The check returns the green keys of a fix, and `runNative` gives them to the release.
+- `stopCheck` holds the stop, the `main` commit and the stage, so each method reads them from one place.
+- `gates.main_red_stop` is the stage, and the check reads it from `policy.json`. The default is `shadow`.
+- At `enforce`, a lane that is not on the `main` tip gets `CodeGitFleetRebaseNeeded`. A lane that turns no key green gets `CodeMainRedPark`, and the orchestrator parks it.
+- The park error names the `main` commit of the stop, so a park on a newer `main` does not move the stop.
+- At `shadow`, each such lane lands. The check emits `GATE_REPO_MAIN_RED_STOP_WOULD_REFUSE` with the fields `keys`, `base`, `main`, `admission` and `fix_item`.
+- `stopRelease` holds the options and the WARN writer of each release.
+- `stopRelease.landedFix` runs after the stages. It releases only when the ship has exit code `ExitOK` and a commit.
+- `stopRelease.greenOnMain` runs in `attributeContractRed`. It releases each base-red key that the rerun on `main` found green. A verdict with no `main` commit releases nothing.
+- `stopRelease.release` is the one release. It calls `Stop.Released` in one `mainstop.Update`. It writes nothing when no stop holds.
+- A release also occurs at `shadow`, because a stop that holds leads the rank and parks lanes at each stage.
+- When no key stays, `consumeFixItem` moves the fix item to `processed` through `inboxmover.ReconcileSuperseded`. An item that `inboxmover.Locate` does not find stays where it is.
+- The mover gets the signal center of ship, so a move that fails also emits `INBOX_PROMOTE_MOVE_FAILED`.
+- The release then emits `GATE_REPO_MAIN_RED_STOP_RELEASED` with the fields `main`, `fix_item`, `released_by`, `parked` and `fix_item_error`.
+- The signal is a warning when the fix item did not move. The stop stays released.
+- A release error after a landed ship is one WARN line in the logs of the result. It never fails the ship.
+- The release time and `deliveredAt` share `Options.clock`, which is in `native.go` with `Options.evolveDir`.
+- Limit: after a release the fix item is in `processed`. A stop that opens again on the same `main` commit gets no new fix item.
+- Pinned by `TestShipStop_AFixLandsAndReleasesTheStop` and `TestShipStop_ANonFixParksAtEnforceAndLandsAtShadow`, and by the other `TestShipStop_*`, `TestReleaseLandedFix_*`, `TestReleaseMainRedStop_*` and `TestAttributeContractRed_*` tests.
 
 ### Scan shadow
 

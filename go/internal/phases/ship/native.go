@@ -197,6 +197,18 @@ func (o *Options) applyDefaults() {
 	}
 }
 
+func (o *Options) evolveDir() string {
+	return filepath.Join(o.ProjectRoot, ".evolve")
+}
+
+func (o *Options) clock() time.Time {
+	now := defaultNow
+	if o.NowFn != nil {
+		now = o.NowFn
+	}
+	return time.Unix(now().Unix, 0).UTC()
+}
+
 func runStages(ctx context.Context, opts *Options, res RunResult) (RunResult, error) {
 	if err := verifyNativeExplanation(ctx, opts); err != nil {
 		return finalize(ctx, opts, &res, shipErr(

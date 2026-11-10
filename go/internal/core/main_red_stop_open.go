@@ -38,11 +38,11 @@ type mainRedFixItem struct {
 	Source        string   `json:"source"`
 }
 
-func OpenMainRedStop(projectRoot string, v baseattr.Verdict, cycle int) (bool, error) {
-	return mainRedStopOpener{now: time.Now}.open(projectRoot, v, cycle)
+func OpenMainRedStop(projectRoot string, v baseattr.Verdict) (bool, error) {
+	return mainRedStopOpener{now: time.Now}.open(projectRoot, v)
 }
 
-func (o mainRedStopOpener) open(projectRoot string, v baseattr.Verdict, _ int) (bool, error) {
+func (o mainRedStopOpener) open(projectRoot string, v baseattr.Verdict) (bool, error) {
 	evolveDir := filepath.Join(projectRoot, ".evolve")
 	opened := false
 	stop, err := mainstop.Update(evolveDir, func(s mainstop.Stop, _ bool) (mainstop.Stop, error) {
@@ -100,7 +100,7 @@ func (s stopOpening) through(sink MainRedSink, signals *signalcenter.Center) err
 	if len(s.verdict.MainRed) == 0 {
 		return nil
 	}
-	opened, err := sink(s.projectRoot, s.verdict, s.cycle)
+	opened, err := sink(s.projectRoot, s.verdict)
 	if opened {
 		signals.Emit(s.openedEvent(err))
 	}

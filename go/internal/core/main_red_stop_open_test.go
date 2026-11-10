@@ -60,7 +60,7 @@ func TestOpenMainRedStop_TheFirstCallWritesTheStopAndFilesOneFixItem(t *testing.
 	t.Parallel()
 	root := t.TempDir()
 
-	opened, err := fixedOpener().open(root, threeRedOnMain, 7)
+	opened, err := fixedOpener().open(root, threeRedOnMain)
 
 	if !opened || err != nil {
 		t.Fatalf("opened = %v err = %v, want the first call to open the stop", opened, err)
@@ -97,20 +97,23 @@ func TestOpenMainRedStop_TheFirstCallWritesTheStopAndFilesOneFixItem(t *testing.
 	if got := strings.Join(item.Files, ","); got != "example.com/m/pkg/a,example.com/m/pkg/b" {
 		t.Errorf("files = %q, want each key package once", got)
 	}
-	if len(item.Acceptance) == 0 || !strings.Contains(item.Acceptance[0], "TestThree") {
-		t.Errorf("acceptance = %q, want each key named green on main", item.Acceptance)
+	if len(item.Acceptance) != 2 || !strings.Contains(item.Acceptance[0], "TestThree") || !strings.Contains(item.Acceptance[1], "regression test") {
+		t.Errorf("acceptance = %q, want each key named green on main, then a regression test", item.Acceptance)
+	}
+	if !strings.Contains(item.Title, stop.MainSHA) || stop.MainSHA == "" {
+		t.Errorf("title = %q, want the main commit %q", item.Title, stop.MainSHA)
 	}
 }
 
 func TestOpenMainRedStop_ASecondCallOnAHeldStopOpensNothingAndFilesNoSecondItem(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	if _, err := OpenMainRedStop(root, threeRedOnMain, 7); err != nil {
+	if _, err := OpenMainRedStop(root, threeRedOnMain); err != nil {
 		t.Fatal(err)
 	}
 	later := baseattr.Verdict{Main: "fedcba9876543210", MainRed: []baseattr.Key{{Package: "example.com/m/pkg/c", Test: "TestFour"}}}
 
-	opened, err := OpenMainRedStop(root, later, 8)
+	opened, err := OpenMainRedStop(root, later)
 
 	if opened || err != nil {
 		t.Fatalf("opened = %v err = %v, want a held stop to stay the same stop", opened, err)
@@ -127,7 +130,7 @@ func TestOpenMainRedStop_ASecondCallOnAHeldStopOpensNothingAndFilesNoSecondItem(
 func TestOpenMainRedStop_AReleasedStopOpensAgainOnTheNextRedMain(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	if _, err := OpenMainRedStop(root, threeRedOnMain, 7); err != nil {
+	if _, err := OpenMainRedStop(root, threeRedOnMain); err != nil {
 		t.Fatal(err)
 	}
 	released, err := mainstop.Update(filepath.Join(root, ".evolve"), func(s mainstop.Stop, _ bool) (mainstop.Stop, error) {
@@ -137,7 +140,7 @@ func TestOpenMainRedStop_AReleasedStopOpensAgainOnTheNextRedMain(t *testing.T) {
 		t.Fatalf("released = %+v err = %v, want a stop that does not hold", released, err)
 	}
 
-	opened, err := OpenMainRedStop(root, dupRedOnMain, 9)
+	opened, err := OpenMainRedStop(root, dupRedOnMain)
 
 	if !opened || err != nil {
 		t.Errorf("opened = %v err = %v, want a red main after a release to open a stop", opened, err)
@@ -147,7 +150,7 @@ func TestOpenMainRedStop_AReleasedStopOpensAgainOnTheNextRedMain(t *testing.T) {
 func TestOpenMainRedStop_AFixItemThatWasLostIsFiledAgainOnTheNextCall(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	if _, err := OpenMainRedStop(root, threeRedOnMain, 7); err != nil {
+	if _, err := OpenMainRedStop(root, threeRedOnMain); err != nil {
 		t.Fatal(err)
 	}
 	for _, path := range pendingFixItems(t, root) {
@@ -156,7 +159,7 @@ func TestOpenMainRedStop_AFixItemThatWasLostIsFiledAgainOnTheNextCall(t *testing
 		}
 	}
 
-	opened, err := OpenMainRedStop(root, threeRedOnMain, 8)
+	opened, err := OpenMainRedStop(root, threeRedOnMain)
 
 	if opened || err != nil || len(pendingFixItems(t, root)) != 1 {
 		t.Errorf("opened = %v err = %v items = %v, want the held stop to get its fix item back", opened, err, pendingFixItems(t, root))
@@ -169,7 +172,7 @@ func TestOpenMainRedStop_AStopOrAnInboxThatCannotBeWrittenIsAnError(t *testing.T
 	if err := os.WriteFile(filepath.Join(blocked, ".evolve"), []byte("a file"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if opened, err := OpenMainRedStop(blocked, threeRedOnMain, 7); opened || err == nil || !strings.Contains(err.Error(), "write the stop") {
+	if opened, err := OpenMainRedStop(blocked, threeRedOnMain); opened || err == nil || !strings.Contains(err.Error(), "write the stop") {
 		t.Errorf("opened = %v err = %v, want an unwritable stop to be an error", opened, err)
 	}
 
@@ -184,11 +187,11 @@ func TestOpenMainRedStop_AStopOrAnInboxThatCannotBeWrittenIsAnError(t *testing.T
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chmod(readOnly, 0o755) })
-	if opened, err := OpenMainRedStop(filepath.Dir(readOnly), threeRedOnMain, 7); opened || err == nil || !strings.Contains(err.Error(), "write the stop") {
+	if opened, err := OpenMainRedStop(filepath.Dir(readOnly), threeRedOnMain); opened || err == nil || !strings.Contains(err.Error(), "write the stop") {
 		t.Errorf("opened = %v err = %v, want a stop whose write fails after the lock to be not opened", opened, err)
 	}
 
-	opened, err := OpenMainRedStop(inboxThatIsAFile(t), threeRedOnMain, 7)
+	opened, err := OpenMainRedStop(inboxThatIsAFile(t), threeRedOnMain)
 	if !opened || err == nil || !strings.Contains(err.Error(), "fix-main-red-01234567") {
 		t.Errorf("opened = %v err = %v, want the stop open and the lost fix item named", opened, err)
 	}
@@ -198,16 +201,15 @@ func TestStopOpening_AStopThatOpensEmitsOneSignalWithTheKeysAndTheFixItem(t *tes
 	t.Parallel()
 	center, events := captureSignals()
 	var root string
-	var cycle int
-	sink := func(r string, _ baseattr.Verdict, c int) (bool, error) { root, cycle = r, c; return true, nil }
+	sink := func(r string, _ baseattr.Verdict) (bool, error) { root = r; return true, nil }
 
 	err := stopOpening{projectRoot: "/repo", runID: "run-7", phase: "build", origin: "test", cycle: 7, verdict: dupRedOnMain}.through(sink, center)
 
-	if err != nil || root != "/repo" || cycle != 7 || len(*events) != 1 {
-		t.Fatalf("err = %v root = %q cycle = %d events = %+v, want one signal", err, root, cycle, *events)
+	if err != nil || root != "/repo" || len(*events) != 1 {
+		t.Fatalf("err = %v root = %q events = %+v, want one signal", err, root, *events)
 	}
 	e := (*events)[0]
-	if e.Code != CodeMainRedStopOpened || e.Module != signalcenter.ModuleGateRepo || e.Severity != signalcenter.SeverityWarn || e.Cycle != 7 || e.RunID != "run-7" || e.Phase != "build" {
+	if e.Code != CodeMainRedStopOpened || e.Module != signalcenter.ModuleGateRepo || e.Severity != signalcenter.SeverityWarn || e.Kind != signalcenter.KindLoopWarning || e.Cycle != 7 || e.RunID != "run-7" || e.Phase != "build" {
 		t.Errorf("signal = %+v, want a gate.repo warning of cycle 7", e)
 	}
 	if e.Fields["keys"] != "internal/dup.TestCount" || e.Fields["main"] != "9a2bbe0e1c0ffee" || e.Fields["fix_item"] != "fix-main-red-9a2bbe0e" || e.Fields["fix_item_error"] != "" || !strings.Contains(e.Reason, "next:") {
@@ -219,7 +221,7 @@ func TestStopOpening_AStopThatOpensWithNoFixItemIsAnIncidentThatNamesTheCause(t 
 	t.Parallel()
 	center, events := captureSignals()
 	failed := errors.New("inbox is read-only")
-	sink := func(string, baseattr.Verdict, int) (bool, error) { return true, failed }
+	sink := func(string, baseattr.Verdict) (bool, error) { return true, failed }
 
 	err := stopOpening{verdict: dupRedOnMain}.through(sink, center)
 
@@ -237,7 +239,7 @@ func TestStopOpening_AHeldStopOrAGreenMainEmitsNothing(t *testing.T) {
 	center, events := captureSignals()
 	failed := errors.New("record locked")
 	calls := 0
-	held := func(string, baseattr.Verdict, int) (bool, error) { calls++; return false, failed }
+	held := func(string, baseattr.Verdict) (bool, error) { calls++; return false, failed }
 
 	if err := (stopOpening{verdict: dupRedOnMain}).through(held, center); !errors.Is(err, failed) || calls != 1 {
 		t.Errorf("err = %v calls = %d, want the error of the sink", err, calls)
@@ -253,7 +255,7 @@ func TestStopOpening_AHeldStopOrAGreenMainEmitsNothing(t *testing.T) {
 func TestOpenMainRedStop_TheBuildFloorSignalsTheOpeningWithItsRunAndTheBuildPhase(t *testing.T) {
 	t.Parallel()
 	center, events := captureSignals()
-	sink := func(string, baseattr.Verdict, int) (bool, error) { return true, nil }
+	sink := func(string, baseattr.Verdict) (bool, error) { return true, nil }
 
 	ReviewInput{RunID: "run-9", Cycle: 9, Signals: center, MainRedStop: sink}.openMainRedStop(dupRedOnMain)
 
@@ -270,7 +272,7 @@ func TestMainRedSink_TheInputHookWinsAndTheRealOpenerIsTheDefault(t *testing.T) 
 	center, _ := captureSignals()
 	byDefault, byInput := t.TempDir(), t.TempDir()
 	calls := 0
-	own := func(string, baseattr.Verdict, int) (bool, error) { calls++; return false, nil }
+	own := func(string, baseattr.Verdict) (bool, error) { calls++; return false, nil }
 
 	ReviewInput{ProjectRoot: byDefault, Signals: center}.openMainRedStop(dupRedOnMain)
 	ReviewInput{ProjectRoot: byInput, Signals: center, MainRedStop: own}.openMainRedStop(dupRedOnMain)
@@ -318,5 +320,28 @@ func TestParkOnMainRed_AFixItemThatCannotBeFiledMakesTheParkAnIncident(t *testin
 	}
 	if events[1].Severity != signalcenter.SeverityIncident || !strings.Contains(events[1].Fields["stop_error"], "fix-main-red-9a2bbe0e") {
 		t.Errorf("park = %+v, want an incident that names the fix item that was not filed", events[1])
+	}
+}
+
+func TestOpenMainRedStop_AFixItemThatIsConsumedIsFiledAgainWhileTheStopHolds(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	if _, err := OpenMainRedStop(root, threeRedOnMain); err != nil {
+		t.Fatal(err)
+	}
+	consumed := filepath.Join(root, ".evolve", "inbox", "consumed", "cycle-3")
+	if err := os.MkdirAll(consumed, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range pendingFixItems(t, root) {
+		if err := os.Rename(path, filepath.Join(consumed, filepath.Base(path))); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	opened, err := OpenMainRedStop(root, threeRedOnMain)
+
+	if opened || err != nil || len(pendingFixItems(t, root)) != 1 {
+		t.Errorf("opened = %v err = %v items = %v, want a stop that holds to get a fix item again after a lane consumed the first", opened, err, pendingFixItems(t, root))
 	}
 }

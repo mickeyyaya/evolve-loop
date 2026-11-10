@@ -77,6 +77,8 @@ type GatesPolicy struct {
 
 	BaseRedRerunSeconds int `json:"base_red_rerun_seconds,omitempty"`
 
+	MainRedStop string `json:"main_red_stop,omitempty"`
+
 	PhaseIO string `json:"phase_io,omitempty"`
 }
 
@@ -96,6 +98,8 @@ type GatesConfig struct {
 
 	BaseRedRerun time.Duration
 
+	MainRedStop string
+
 	PhaseIO string
 }
 
@@ -114,6 +118,7 @@ func (p Policy) GatesConfig() GatesConfig {
 		ScanCacheMaxMB:         defaultScanCacheMaxMB,
 		ScanCacheBudgetSeconds: defaultScanCacheBudgetSeconds,
 		BaseRedRerun:           defaultBaseRedRerunSeconds * time.Second,
+		MainRedStop:            "shadow",
 	}
 	if p.Gates == nil {
 		return c
@@ -144,6 +149,7 @@ func (p Policy) GatesConfig() GatesConfig {
 	}
 	c.applyScanCache(p.Gates)
 	c.applyBaseRedRerun(p.Gates)
+	c.applyMainRedStop(p.Gates)
 	c.PhaseIO = p.Gates.PhaseIO
 	return c
 }
@@ -157,6 +163,16 @@ func (c *GatesConfig) applyScanCache(g *GatesPolicy) {
 	}
 	if g.ScanCacheBudgetSeconds > 0 {
 		c.ScanCacheBudgetSeconds = g.ScanCacheBudgetSeconds
+	}
+}
+
+func (c GatesConfig) MainRedStopEnforced() bool {
+	return c.MainRedStop == failClosedStage
+}
+
+func (c *GatesConfig) applyMainRedStop(g *GatesPolicy) {
+	if g.MainRedStop != "" {
+		c.MainRedStop = g.MainRedStop
 	}
 }
 

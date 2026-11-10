@@ -12,6 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/apicover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
+	"github.com/mickeyyaya/evolve-loop/go/internal/covchanged"
 	"github.com/mickeyyaya/evolve-loop/go/internal/coversplit"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchevents"
 	"github.com/mickeyyaya/evolve-loop/go/internal/docsfloor"
@@ -293,16 +294,9 @@ const (
 
 var coverLockWait = verifylock.MaxWait
 
-func tagFlags(tags []string) []string {
-	if len(tags) == 0 {
-		return nil
-	}
-	return []string{"-tags", strings.Join(tags, ",")}
-}
-
 func coverTestArgs(profile string, pkgs, tags []string) []string {
 	args := []string{"test", "-count=1", "-timeout", addedtests.PackageTimeout}
-	args = append(args, tagFlags(tags)...)
+	args = append(args, covchanged.TagFlags(tags)...)
 	return lanebudget.Args(append(append(args, "-coverprofile", profile), pkgs...))
 }
 

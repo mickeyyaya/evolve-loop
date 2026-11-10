@@ -54,6 +54,7 @@ func contractVerdict(ctx context.Context, out io.Writer, name string, o packOutc
 func attributeContractRed(ctx context.Context, g baseRedGate, out io.Writer, o packOutcome) error {
 	v, err := baseRedAttributor(g.opts, out).Attribute(ctx, g.base, redsOf(o))
 	if err == nil {
+		stopRelease{opts: g.opts, warn: out}.greenOnMain(v)
 		return baseRedError(g.opts, v)
 	}
 	fmt.Fprintf(out, "[ship] WARN repo-contract scanner pack: the red could not be rerun on the lane base (%v), so the lane is blamed\n", err)
@@ -76,7 +77,14 @@ func redsOf(o packOutcome) baseattr.Reds {
 }
 
 func baseRedAttributor(opts *Options, warn io.Writer) baseattr.Attributor {
-	gates := policy.LoadOrDefaults(filepath.Join(opts.ProjectRoot, ".evolve", "policy.json"), warn).GatesConfig()
+	return attributorOf(opts, shipGates(opts, warn))
+}
+
+func shipGates(opts *Options, warn io.Writer) policy.GatesConfig {
+	return policy.LoadOrDefaults(filepath.Join(opts.evolveDir(), "policy.json"), warn).GatesConfig()
+}
+
+func attributorOf(opts *Options, gates policy.GatesConfig) baseattr.Attributor {
 	return baseattr.New(gitexec.Git{Dir: opts.ProjectRoot, Exec: opts.Runner}, baseRedRunner(opts), gates.BaseRedRerun, nil)
 }
 

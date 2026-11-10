@@ -126,7 +126,12 @@ func (p *Phase) runNative(ctx context.Context, req core.PhaseRequest, msg string
 		if gerr := p.runRepoContractGate(ctx, req, &opts); gerr != nil {
 			return core.PhaseResponse{}, gerr
 		}
+		green, serr := checkMainRedStop(ctx, &opts, opts.Stderr)
+		if serr != nil {
+			return core.PhaseResponse{}, fmt.Errorf("ship main-red stop: %w", serr)
+		}
 		res, err = runStages(ctx, &opts, res)
+		res = stopRelease{opts: &opts, warn: opts.Stderr}.landedFix(green, res, err)
 	}
 	resp, rerr := respond(req, res, err)
 	resp.DurationMS = p.nowFn().Sub(start).Milliseconds()

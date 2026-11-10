@@ -35,7 +35,7 @@ func (a Attributor) serialize(ctx context.Context) func() {
 }
 
 func (a Attributor) judge(ctx context.Context, base string, r Reds) (Verdict, error) {
-	sha, err := a.resolve(ctx, base)
+	sha, err := a.Resolve(ctx, base)
 	if err != nil {
 		return Verdict{}, fmt.Errorf("baseattr: resolve base %q: %w", base, err)
 	}
@@ -64,7 +64,7 @@ func partition(asked, baseRed []Key) Verdict {
 }
 
 func (a Attributor) onMain(ctx context.Context, v Verdict, flags []string) (Verdict, error) {
-	main, err := a.resolve(ctx, a.MainRef)
+	main, err := a.Resolve(ctx, a.MainRef)
 	if err != nil {
 		return v, nil
 	}
@@ -77,7 +77,7 @@ func (a Attributor) onMain(ctx context.Context, v Verdict, flags []string) (Verd
 	return v, err
 }
 
-func (a Attributor) resolve(ctx context.Context, rev string) (string, error) {
+func (a Attributor) Resolve(ctx context.Context, rev string) (string, error) {
 	return a.Git.Output(ctx, "rev-parse", "--verify", "--end-of-options", rev+"^{commit}")
 }
 
@@ -87,13 +87,30 @@ func (a Attributor) RunAt(ctx context.Context, rev string, r Reds) (red []Key, e
 		return nil, err
 	}
 	defer func() { err = errors.Join(err, a.dispose(ctx, dir)) }()
+	red, err = a.runIn(ctx, dir, r)
+	return red, runFailure(rev, a.Timeout, err)
+}
+
+func (a Attributor) RunIn(ctx context.Context, tree string, r Reds) ([]Key, error) {
+	red, err := a.runIn(ctx, tree, r)
+	return red, runFailure(tree, a.Timeout, err)
+}
+
+func (a Attributor) runIn(ctx context.Context, tree string, r Reds) ([]Key, error) {
 	runCtx, cancel := a.runContext(ctx)
 	defer cancel()
-	red, err = a.Run(runCtx, moduleDir(dir), r)
+	red, err := a.Run(runCtx, moduleDir(tree), r)
 	if err != nil {
-		return nil, fmt.Errorf("baseattr: run at %s (limit %s): %w", rev, a.Timeout, err)
+		return nil, err
 	}
 	return red, nil
+}
+
+func runFailure(name string, limit time.Duration, err error) error {
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("baseattr: run at %s (limit %s): %w", name, limit, err)
 }
 
 func (a Attributor) runContext(ctx context.Context) (context.Context, context.CancelFunc) {

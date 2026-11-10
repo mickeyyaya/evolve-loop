@@ -27,7 +27,7 @@ func init() {
 
 type FloorJudge func(ctx context.Context, in ReviewInput) ([]string, error)
 
-type MainRedSink func(projectRoot string, v baseattr.Verdict, cycle int) (opened bool, err error)
+type MainRedSink func(projectRoot string, v baseattr.Verdict) (opened bool, err error)
 
 func FailOpen(name string, judge FloorJudge) BuildFloorCheckFn {
 	return func(ctx context.Context, in ReviewInput) []string {

@@ -133,22 +133,21 @@ func TestFloor_AMainRedBaseRedOpensTheStopThroughTheHook(t *testing.T) {
 	f := newBaseRedFixture(t, "TestA")
 	f.in.Cycle = 7
 	var got baseattr.Verdict
-	var cycle int
-	f.in.MainRedStop = func(_ string, v baseattr.Verdict, c int) (bool, error) {
-		got, cycle = v, c
+	f.in.MainRedStop = func(_ string, v baseattr.Verdict) (bool, error) {
+		got = v
 		return false, errors.New("record locked")
 	}
 
 	res := repoContractReview(t, f, packRedNames("TestA")...)
 
-	if !res.Approve || len(got.MainRed) != 1 || cycle != 7 {
-		t.Fatalf("a main-red base-red reaches the hook; approve=%v verdict=%+v cycle=%d", res.Approve, got, cycle)
+	if !res.Approve || len(got.MainRed) != 1 {
+		t.Fatalf("a main-red base-red reaches the hook; approve=%v verdict=%+v", res.Approve, got)
 	}
 	if !strings.Contains(f.stderr.String(), "record locked") {
 		t.Fatalf("a hook error is a WARN, never a rejection; stderr=%q", f.stderr.String())
 	}
 	called := false
-	f.in.MainRedStop = func(string, baseattr.Verdict, int) (bool, error) { called = true; return false, nil }
+	f.in.MainRedStop = func(string, baseattr.Verdict) (bool, error) { called = true; return false, nil }
 	f.in.openMainRedStop(baseattr.Verdict{BaseRed: got.BaseRed, Main: "abc"})
 	if called {
 		t.Fatalf("a green main opens no stop")
@@ -299,14 +298,8 @@ func TestReportAttributed_TheSignalCarriesTheMainRedKeysAndTheDuration(t *testin
 	}
 }
 
-func TestTagFlags_OneHomeForTheCoverTagFlags(t *testing.T) {
+func TestCoverTestArgs_UsesTheSharedTagFlags(t *testing.T) {
 	t.Parallel()
-	if got := tagFlags(nil); got != nil {
-		t.Errorf("no tags gives no flags; got %v", got)
-	}
-	if got := tagFlags([]string{"integration", "acs"}); strings.Join(got, " ") != "-tags integration,acs" {
-		t.Errorf("tagFlags = %v", got)
-	}
 	if got := coverTestArgs("/p", []string{"./a"}, []string{"integration"}); !slices.Contains(got, "integration") {
 		t.Errorf("coverTestArgs does not use the shared flags: %v", got)
 	}

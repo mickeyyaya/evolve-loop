@@ -1505,7 +1505,10 @@ When the base and `main` are both red, the build floor opens the main-red stop. 
 - `TestOpenMainRedStop_TheBuildFloorSignalsTheOpeningWithItsRunAndTheBuildPhase` and `TestMainRedSink_TheInputHookWinsAndTheRealOpenerIsTheDefault` pin the build floor.
 
 `ReviewInput.attributor` builds the `Attributor` through `baseattr.New`. The main ref and the scratch path have one home there.
-`tagFlags` gives the `-tags` flag list. `coverTestArgs` and the cover-changed floor both use it.
+`covchanged.TagFlags` gives the `-tags` flag list. `coverTestArgs`, the cover-changed floor and the ship stop check use it.
+
+The codes `GATE_REPO_MAIN_RED_STOP_WOULD_REFUSE` and `GATE_REPO_MAIN_RED_STOP_RELEASED` register in `main_red_park.go`. Ship emits them (see [internal-phases-ship.md](internal-phases-ship.md)).
+`MainRedSink` takes the project root and the verdict. It has no cycle parameter, because no opener reads one.
 Design: [gate-contract.md](../gate-contract.md), section 7, and the G4 page that it links.
 
 ## The park of a lane on a red main

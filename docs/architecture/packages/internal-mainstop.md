@@ -32,6 +32,7 @@
 ## Invariants
 
 - The package imports `baseattr`, `adapters/flock`, `atomicwrite` and the standard library. It imports no pipeline package.
+- Ship is the one caller of `Admit` and `Released` (`phases/ship/main_red_stop.go`). `core` is the one caller of `Opened` and `WithParked`.
 - The package emits no signal and reads no policy. The caller owns the stage, the bound and each signal.
 - The path is on the protected surface as a gate guarantee. A lane cannot edit it.
 - The record is an `authority` input in [gate-input-inventory.md](../gate-input-inventory.md). No profile grants it.

@@ -17,12 +17,14 @@
 - `Verdict.Debug` gives the debug pairs of a ship error: the `BaseRed` names, the `MainRed` names, the base and `main`. `VerdictOfDebug` reads them back.
 - `ParseNames` is the inverse of `Names`. The debug names and the delimiter have this one home, so ship and the orchestrator cannot disagree.
 - `New` builds an `Attributor` and sets `MainRef` to `DefaultMainRef` and `Scratch` to `DefaultScratch`. The build floor and the ship gate both build through it.
+- `Resolve` gives the commit of a revision. `RunIn` runs the keys in a tree that exists, and adds no worktree. `RunAt` and `RunIn` share one run with one time limit. `runFailure` names the revision or the tree, and the limit, in the error of each.
 - `Verdict.Blamed` is true when `LaneOnly` is not empty or `Unjudged` is set. `Verdict.MainGreen` is true when the base is red and `main` is read and green.
 
 ## Callers
 
 - The build floor calls `Attribute` through `ReviewInput.laneReds`.
 - The ship gate calls `Attribute` through `attributeContractRed` in `phases/ship/base_red.go`. It passes no `Serialize` hook, because the pack runs outside the ship window.
+- The ship stop check calls `Resolve` and `RunIn` through `checkMainRedStop` in `phases/ship/main_red_stop.go`. It runs the keys of the stop in the landing tree.
 
 ## Invariants
 

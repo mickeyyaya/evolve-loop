@@ -101,6 +101,7 @@ func TestInboxCenterlessRootsArePinned(t *testing.T) {
 		"cmd/evolve/cmd_loop_signal_stop.go":     "the claim survey of the fleet signal-stop message (resume-after-a-fleet-signal-stop) — read-only, it names the stopped lanes and moves no file",
 		"cmd/evolve/cmd_supply_wiring.go":        "the supply census of `evolve wave supply` and of each loop iteration (ADR-0139 O6) — it scans and ranks the inbox and never moves a file, so the mover has nothing to emit",
 		"internal/phases/ship/postship.go":       "the PASS closeout inside `evolve ship` (ship.Options carries no Center) — 06-F1",
+		"internal/phases/ship/main_red_stop.go":  "the move of the fix item of a released main-red stop (ADR-0165 G4b) — WIRED (Signals: opts.Signals); listed because its literal names the field",
 		"internal/cycleoutcome/cycleoutcome.go":  "the FAIL closeout — WIRED (Signals: in.Signals); listed because its literal is the one that names the field",
 		"internal/cycleoutcome/nowork.go":        "the planned-no-work closeout (F30) — WIRED (Signals: in.Signals); listed for the same reason",
 		"cmd/evolve/cmd_inbox_curator_apply.go":  "the reroute of `evolve inbox curate --apply` — WIRED (Signals: r.signals, the inbox root Center); listed because its literal names the field",

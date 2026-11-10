@@ -246,3 +246,13 @@ func TestWorkspaceCheck_RefusesAProfileOlderThanAChangedFile(t *testing.T) {
 		t.Errorf("Check = %+v, %v; want an error naming p/a.go and the make target", v, err)
 	}
 }
+
+func TestTagFlags_OneHomeForTheGoTagFlags(t *testing.T) {
+	t.Parallel()
+	if got := TagFlags(nil); got != nil {
+		t.Errorf("no tags gives no flags; got %v", got)
+	}
+	if got := TagFlags([]string{"integration", "acs"}); strings.Join(got, " ") != "-tags integration,acs" {
+		t.Errorf("TagFlags = %v", got)
+	}
+}
