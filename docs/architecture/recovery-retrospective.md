@@ -132,11 +132,11 @@ At `shadow`, `recoveryretro.WriteShadow` writes the pairs into `<workspace>/retr
 
 ## 6. The enforce stage
 
-Step 1 is built. Steps 2 to 5 are a design here, not code (plan C4 to C6).
+Steps 1 to 3 are built (plan C4). Steps 4 and 5 are a design here, not code (plan C5 and C6).
 
-1. The key `retrospectives.stage` takes `off`, `shadow` or `enforce` (`policy.RetrospectivesConfig`). The compiled default stays `shadow`. The checked-in policy sets `enforce` since 2026-10-27, by the operator decision. At `off`, the closeout writes no document. Until steps 2 to 5 are built, `enforce` writes into the workspace, as `shadow` does.
-2. At `enforce`, the closeout writes the pairs into `.evolve/retrospectives-pending/`.
-3. The boundary publish commits the pending pairs into `docs/retrospectives/` with the dossiers. The publish is create-only: it never replaces a document that is on `main`.
+1. The key `retrospectives.stage` takes `off`, `shadow` or `enforce` (`policy.RetrospectivesConfig`). The compiled default stays `shadow`. The checked-in policy sets `enforce` since 2026-10-27, by the operator decision. At `off`, the closeout writes no document.
+2. At `enforce`, the closeout writes the pairs into `.evolve/retrospectives-pending/` through `recoveryretro.WriteInto`, and writes nothing into the workspace. A write failure prints one WARN line, and the closeout goes on.
+3. The boundary publish commits the pending pairs into `docs/retrospectives/` with the dossiers. The publish is create-only: it never replaces a document that is on `main`. `recoveryretro.PublishPending` commits each complete pair, and drops the pending copy of a pair whose document is in `docs/`. A half pair stays pending with a WARN line. A publish failure is a WARN line, and the boundary goes on.
 4. After the publish, a judgment todo whose `docs/retrospectives/<id>.md` is in the published tree leaves the carryover log through `carryover.Retire`. The check repeats at each closeout, so a failed publish keeps the todo.
 5. `docs/retrospectives/` joins the default recall roots.
 
@@ -161,6 +161,13 @@ Step 1 is built. Steps 2 to 5 are a design here, not code (plan C4 to C6).
 | The shadow stage writes only into the workspace | `TestWriteShadow_APassAfterFailuresWritesTheRecoveryPairInTheWorkspaceOnly`, `TestRunCycle_TheCloseoutWritesTheShadowRetrospectiveIntoTheWorkspace` | built |
 | A write failure never stops the closeout | `TestWriteShadow_AWriteFailureIsReturned`, `TestWriteShadowRetrospectives_AFailureIsAWarnLineOnly` | built |
 | The stage key is policy data, and `off` writes no document | `TestRetrospectivesConfig_ShadowsUntilThePolicySaysOtherwise`, `TestRunCycle_RetrospectivesStageOffWritesNoRetrospective` | built |
+| At `enforce`, the pair goes into the pending dir and not into the workspace | `TestRunCycle_RetrospectivesStageEnforceWritesThePairIntoThePendingDirNotTheWorkspace` | built |
+| At `shadow`, the pending dir stays absent | `TestRunCycle_RetrospectivesStageShadowLeavesThePendingDirAbsent` | built |
+| An enforce write failure is a WARN line and the closeout succeeds | `TestRunCycle_AnEnforceWriteFailureIsAWarnLineAndTheCloseoutStillSucceeds` | built |
+| The publish commits the pair and clears the pending copy | `TestPublishPending_CommitsThePairAndClearsThePendingCopy` | built |
+| A document in `docs/` is kept and the pending pair is dropped | `TestPublishPending_ADocumentInDocsIsKeptAndThePendingPairIsDropped` | built |
+| The boundary publish reaches the pending pairs | `TestPublishPendingDossiers_PublishesTheRetrospectivesBesideTheDossiers`, `TestPublishDossierPairs_PublishesThePendingRetrospectives` | built |
+| A retrospective publish failure is a WARN line and the boundary goes on | `TestPublishPendingDossiers_ARetrospectivePublishFailureIsAWarnAndTheBoundaryGoesOn` | built |
 | A judgment todo leaves the log only with its document on `main` | the C5 tests | planned |
 
 ## 8. Limits

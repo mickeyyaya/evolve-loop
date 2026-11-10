@@ -66,3 +66,68 @@ func TestJudgmentLesson_HoldsTheCycleAndThePhaseOfItsID(t *testing.T) {
 		t.Fatalf("JudgmentLessons = %+v, want %+v", got, want)
 	}
 }
+
+func TestPendingDir_IsUnderTheEvolveDirectory(t *testing.T) {
+	if got, want := PendingDir("/p"), filepath.Join("/p", ".evolve", "retrospectives-pending"); got != want {
+		t.Fatalf("PendingDir = %q, want %q", got, want)
+	}
+}
+
+func TestWriteInto_WritesThePairIntoTheNamedDirectory(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "named")
+
+	written, err := WriteInto(dir, t.TempDir(), t.TempDir(), 7, []cyclestate.CarryoverTodo{judgmentTodo()})
+
+	if err != nil || len(written) != 2 || filepath.Dir(written[0]) != dir {
+		t.Fatalf("WriteInto = %v, %v; want one pair in %s", written, err, dir)
+	}
+}
+
+func TestPublishPending_WithNoPendingDirectoryPublishesNothing(t *testing.T) {
+	var log strings.Builder
+
+	published, err := PublishPending(t.TempDir(), &log)
+
+	if err != nil || len(published) != 0 || log.Len() != 0 {
+		t.Fatalf("PublishPending = %v, %v, %q; want nothing", published, err, log.String())
+	}
+}
+
+func TestPublishPending_AGitAddFailureKeepsThePairPendingAndRemovesTheCopy(t *testing.T) {
+	root := t.TempDir()
+	dir := PendingDir(root)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, ext := range []string{".md", ".yaml"} {
+		if err := os.WriteFile(filepath.Join(dir, "cycle-1-x"+ext), []byte("x\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	published, err := PublishPending(root, &strings.Builder{})
+
+	if err == nil || len(published) != 0 {
+		t.Fatalf("PublishPending = %v, %v; want an error outside a git tree", published, err)
+	}
+	if _, serr := os.Stat(filepath.Join(root, DocsHome, "cycle-1-x.md")); serr == nil {
+		t.Error("the failed publish left a document in docs")
+	}
+	if _, serr := os.Stat(filepath.Join(dir, "cycle-1-x.md")); serr != nil {
+		t.Errorf("the failed publish dropped the pending pair: %v", serr)
+	}
+}
+
+func TestPublishPending_AnUnreadablePendingPathIsAnError(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(PendingDir(root), []byte("a file"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := PublishPending(root, &strings.Builder{}); err == nil {
+		t.Fatal("PublishPending of a file at the pending path returned no error")
+	}
+}
