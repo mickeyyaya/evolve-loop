@@ -166,7 +166,7 @@ func TestC2225_004_AFableModelBenchPastItsResetDemotesNothing(t *testing.T) {
 	}
 }
 
-func TestC2225_005_AScopeWordTheManifestDoesNotMapBenchesNothingAndKeepsTheWarn(t *testing.T) {
+func TestC2225_005_AScopeWordNoTierLaunchesBenchesNothingAndKeepsTheWarn(t *testing.T) {
 	run := probeClaudeThroughTheProductionReader(t, usageScreen("Opus", 100, "5h"))
 
 	for _, tier := range []string{"fast", "balanced", "deep", "top"} {
@@ -294,7 +294,7 @@ func TestC2225_011_NoGoSourceOutsideTestsHoldsAScopeWordToModelTable(t *testing.
 			t.Fatalf("RED: read %s: %v", rel, readErr)
 		}
 		body := string(raw)
-		for _, banned := range []string{`"(?i)fable"`, `"Fable":`, `"Opus":`} {
+		for _, banned := range []string{`"(?i)fable"`, `"(?i)opus"`, `"Fable":`, `"Opus":`} {
 			if strings.Contains(body, banned) {
 				t.Errorf("RED: %s holds %s: the scope-word map belongs in the manifest", rel, banned)
 			}
