@@ -223,3 +223,15 @@ This work is plan component G7, so G1 builds G7 and the G7 item retires.
 - `go/.test-dup-baseline` stays lane-writable in G1. A lane can still change it, and review is the only check until G6.
 - A lane cannot add an allowance to `offenders.json` or `baseline.json` after G1. A lane that needs one sends a held proposal, and the console lands it.
 - After G1, the gate packages are protected. G2, G3 and G6 change them, so the console builds those parts or a held proposal carries them.
+
+## 7. The designs of G2, G3 and G4
+
+Each component has its own page, because one page for all three is too large to review.
+
+| Component | Page | Decisions of ADR-0165 | Build order |
+|---|---|---|---|
+| G4, base-red attribution and the main-red stop | [gate-contract-g4-base-red-attribution.md](gate-contract-g4-base-red-attribution.md) | 10 to 14 | first, in three parts: G4a, G4b, G4c |
+| G2, the call-graph hermeticity guard | [gate-contract-g2-hermetic-guard.md](gate-contract-g2-hermetic-guard.md) | 3 and 4 | second, in seven commits |
+| G3, the three-state parity harness | [gate-contract-g3-three-state-parity.md](gate-contract-g3-three-state-parity.md) | 2 and 5 | third, in six pull requests: G3a to G3f |
+
+Each page ends with its open questions for the operator. A build starts only after the review of its page passes.
