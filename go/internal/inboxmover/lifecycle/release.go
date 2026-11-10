@@ -7,10 +7,25 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
+
+const maxFindingsBytes = 4096
+
+func cutAtRune(s string, limit int) string {
+	if len(s) <= limit {
+		return s
+	}
+	cut := limit
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut]
+}
 
 type drained struct {
 	src, dest, base, taskID string
@@ -83,7 +98,17 @@ func (m *Mover) parkAtCeiling(d drained, reason string, cycle int, q *Policy) (b
 	if q == nil || q.SystemLevel || q.Routed || q.RoutedIDs[d.taskID] || (q.Committed != nil && !q.Committed[d.taskID]) {
 		return false, ""
 	}
-	count, bumpErr := bumpWith(d.src, failureRecord{reason: reason, class: q.FailureClass, fingerprint: q.Fingerprint, rung: q.FailureRung, cycle: cycle}, func(n int) bool { return ShouldQuarantine(n, q.Ceiling, q.SystemLevel) })
+	findings := strings.Join(q.Reasons, "\n")
+	findings = cutAtRune(findings, maxFindingsBytes)
+	count, bumpErr := bumpWith(d.src, failureRecord{
+		reason:      reason,
+		class:       q.FailureClass,
+		fingerprint: q.Fingerprint,
+		rung:        q.FailureRung,
+		findings:    findings,
+		cycle:       cycle,
+		ceiling:     q.Ceiling,
+	}, func(n int) bool { return ShouldQuarantine(n, q.Ceiling, q.SystemLevel) })
 	if bumpErr != nil {
 		m.warn(fault{code: CodeItemRewriteFailed, origin: "Mover.Release", cycle: cycle, legacy: "WARN: ",
 			reason: fmt.Sprintf("release-cycle: failure_count bump failed for %s (%v) — quarantine skipped, releasing to inbox root", d.base, bumpErr),
@@ -92,6 +117,11 @@ func (m *Mover) parkAtCeiling(d drained, reason string, cycle int, q *Policy) (b
 	}
 	if !ShouldQuarantine(count, q.Ceiling, q.SystemLevel) {
 		return false, ""
+	}
+	if q.OnCeiling == "console" {
+		if _, rErr := m.RouteConsole(d.taskID, fmt.Sprintf("task-level failure #%d >= ceiling %d", count, q.Ceiling), cycle); rErr == nil {
+			return false, ""
+		}
 	}
 	pr, pErr := m.Promote(d.taskID, "quarantine", PromoteOpts{Cycle: strconv.Itoa(cycle)})
 	fields := map[string]string{"task_id": d.taskID, "failure_count": strconv.Itoa(count), "ceiling": strconv.Itoa(q.Ceiling), "step": "quarantine"}

@@ -40,6 +40,7 @@ func TestAPI_EveryExportIsNamed(t *testing.T) {
 		_ func(*Mover, string) (int, bool)                                   = (*Mover).ReadFailureCount
 		_ func(*Mover, string) string                                        = (*Mover).ReadLastFailureClass
 		_ func(*Mover, string) string                                        = (*Mover).ReadLastFailureRung
+		_ func(int, int) Round                                               = PlanRound
 		_ func(string, string) (Location, error)                             = Locate
 		_ func(string, string) (string, error)                               = FindFileByTaskID
 		_ func(int, int, bool) bool                                          = ShouldQuarantine
@@ -88,7 +89,8 @@ func TestAPI_EveryExportIsNamed(t *testing.T) {
 	p := Policy{Ceiling: 2, SystemLevel: false, Committed: map[string]bool{"a": true}}
 	loc := Location{Path: "p", Cycle: 1}
 	cr, pr, rr, po := ClaimResult{SrcPath: "s", DestPath: "d"}, PromoteResult{NoOp: true}, RecoverResult{Recovered: 1, Paths: []string{"x"}}, PromoteOpts{Cycle: "1", CommitSHA: "s"}
-	if p.Ceiling != 2 || loc.Cycle != 1 || cr.SrcPath != "s" || !pr.NoOp || rr.Recovered != 1 || po.Cycle != "1" {
+	round := Round{Try: 1, CarryFindings: true, RaiseEffort: true, ChangeStrategy: true}
+	if p.Ceiling != 2 || loc.Cycle != 1 || cr.SrcPath != "s" || !pr.NoOp || rr.Recovered != 1 || po.Cycle != "1" || round.Try != 1 || !round.CarryFindings || !round.RaiseEffort || !round.ChangeStrategy || round.Plan() != "fresh-deep-plan" {
 		t.Error("the value objects carry their fields")
 	}
 }

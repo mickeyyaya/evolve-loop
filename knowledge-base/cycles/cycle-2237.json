@@ -1,0 +1,226 @@
+{
+  "schema_version": 2,
+  "cycle": 2237,
+  "run_id": "01M6ZCY4KD3P8VBSRTMNZFJ6BP",
+  "goal": "Wave 162.\n\nWork the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree that it ships;\n- disposition its own defect ledger and the inherited ids;\n- record a terminal outcome on every exit;\n- never change a protected control-plane file with a tool;\n- leave no stale worktree.\n\nRouting:\n- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.\n- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.\n- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.\n\nCraft:\n- New and changed code has no comments. Names, types and tests give the intent.\n- Write each new document and each new log text in ASD-STE100.\n- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.\n- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.\n\nEvidence:\n- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.\n\nThe measure of this wave is the number of shipped cycles. Keep each cycle shipping.\n\nWave 161 facts (run 20261108T161932Z): 9 of 14 cycles shipped.\n- Cycle 2216: final verdict PASS. It shipped. Quota pauses: 1.\n- Cycle 2219: final verdict PASS. It shipped. Quota pauses: 1.\n- Cycle 2220: final verdict FAIL. Last phase: end. It did not ship. Quota pauses: 1.\n- Cycle 2223: final verdict PASS. It shipped. Quota pauses: 1.\n- Cycle 2225: final verdict PASS. It shipped.\n- Cycle 2226: no final verdict. Last phase: audit. It did not ship. Login walls: 1.\n- Cycle 2227: final verdict PASS. It shipped.\n- Cycle 2228: final verdict PASS. It shipped.\n- Cycle 2229: final verdict PASS. It shipped.\n- Cycle 2230: final verdict PASS. It shipped.\n- Cycle 2231: no final verdict. Last phase: audit. It did not ship. Login walls: 1.\n- Cycle 2232: no final verdict. Last phase: audit. It did not ship. Login walls: 1.\n- Cycle 2233: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.\n- Cycle 2234: final verdict PASS. It shipped.\n- Pull requests merged at this boundary: none.\n\nOperator notes for wave 162:\n- Seat token set; claude seats run isolated on it (fix for the 8-24 h logout). Main CI fixed (#1373). gc plan #1380 queued as gc-legacy-gap-x1..x11. Cycles 2226 and 2170 stopped on operator request; 2232 lost its lane checkpoint to a console stop and restarts from its item.\n\nEarlier waves:\n- Wave 158 (run 20261106T093235Z): 2 of 8 cycles shipped.\n- Wave 159 (run 20261106T154410Z): 0 of 4 cycles shipped.\n- Wave 160 (run 20261107T090007Z): 9 of 16 cycles shipped.",
+  "final_verdict": "PASS",
+  "commit_sha": "9f0434cc0a4f87bf4609d8abfde5b80497b383d3",
+  "tree_sha": "f7c0ad42a55a7761568f23cf0c12a92fcf38d445",
+  "tasks": [
+    "tmuxtest-servers-outlive-their-test-binary"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 622165,
+      "started_at": "2026-11-09T05:37:27Z",
+      "ended_at": "2026-11-09T05:47:50Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 263663,
+        "output": 49585,
+        "cache_read": 7033585,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 316873,
+      "started_at": "2026-11-09T05:48:18Z",
+      "ended_at": "2026-11-09T05:53:37Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 165189,
+        "output": 10745,
+        "cache_read": 3100877,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 208345,
+      "started_at": "2026-11-09T05:53:37Z",
+      "ended_at": "2026-11-09T05:57:07Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 34,
+        "output": 21204,
+        "cache_read": 1482167,
+        "cache_write": 76673
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 1013924,
+      "started_at": "2026-11-09T05:57:07Z",
+      "ended_at": "2026-11-09T06:24:07Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 373681,
+        "output": 75055,
+        "cache_read": 15843782,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 183462,
+      "started_at": "2026-11-09T06:24:43Z",
+      "ended_at": "2026-11-09T06:30:19Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 28,
+        "output": 10223,
+        "cache_read": 1036382,
+        "cache_write": 57307
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 740154,
+      "started_at": "2026-11-09T06:30:45Z",
+      "ended_at": "2026-11-09T06:44:01Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 264372,
+        "output": 23427,
+        "cache_read": 3389265,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 121763,
+      "started_at": "2026-11-09T06:44:21Z",
+      "ended_at": "2026-11-09T06:47:36Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 14,
+        "output": 5033,
+        "cache_read": 468735,
+        "cache_write": 49484
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "FAIL",
+      "duration_ms": 271958,
+      "started_at": "2026-11-09T06:47:57Z",
+      "ended_at": "2026-11-09T07:02:49Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "PASS",
+      "duration_ms": 287816,
+      "started_at": "2026-11-09T07:02:49Z",
+      "ended_at": "2026-11-09T07:07:38Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "explanation_corrections": [
+    "docs/explain/builds/cycle-2237-01m6zcy4kd3p8vbsrtmnzfj6bp.md:14 describes go/internal/tmuxtest/tmuxtest.go but omits that StartServer (go/internal/tmuxtest/tmuxtest.go:93) and startOrphanGuard (go/internal/tmuxtest/tmuxtest.go:153) now address the socket given as a parameter with `-L socket` instead of the env-derived `bridge.TmuxSocketArgs`. The document's SHA256 matches the handoff (shasum output). Summary (line 8), Rationale (line 11), Verification and Limitations are otherwise accurate against go/internal/tmuxtest/tmuxtest.go:50-57 and go/internal/tmuxtest/tmuxtest.go:108-157."
+  ],
+  "timing": {
+    "total_ms": 3766460,
+    "phase_count": 9,
+    "retried_count": 0,
+    "longest_phase": "build",
+    "longest_ms": 1013924,
+    "by_archetype_ms": {
+      "build": 1754078,
+      "control": 559774,
+      "evaluate": 305225,
+      "plan": 1147383
+    },
+    "total_tokens": {
+      "input": 1066981,
+      "output": 195272,
+      "cache_read": 32354793,
+      "cache_write": 183464
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 638053,
+        "output": 98482,
+        "cache_read": 19233047,
+        "cache_write": 0
+      },
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "evaluate": {
+        "input": 42,
+        "output": 15256,
+        "cache_read": 1505117,
+        "cache_write": 106791
+      },
+      "plan": {
+        "input": 428886,
+        "output": 81534,
+        "cache_read": 11616629,
+        "cache_write": 76673
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.9680752733233131,
+    "hot_phase_count": 7,
+    "hot_phases": [
+      "scout",
+      "triage",
+      "tdd",
+      "build",
+      "audit",
+      "build",
+      "audit"
+    ]
+  },
+  "recalled_lessons": [
+    "cycle-1502-closure-citation-contract-never-reaches-the-auditor-it-grades",
+    "cycle-1492-remedy-on-disk-in-four-places-reaches-no-agent-with-authority-to-apply-it",
+    "inst-L1549b",
+    "cycle-93-build-report-commit-sha-fabrication",
+    "inst-L1544b"
+  ]
+}

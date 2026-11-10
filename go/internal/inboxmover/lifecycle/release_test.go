@@ -55,7 +55,7 @@ func TestMover_Release_QuarantineAtCeiling_ReplaysG2(t *testing.T) {
 		t.Fatalf("res = %+v, err = %v", res, err)
 	}
 	item, _ := os.ReadFile(filepath.Join(inbox, "quarantine", "task-a.json"))
-	if string(item) != `{"failure_count":2,"id":"task-a","last_failure_cycle":5,"last_failure_reason":"cycle-release","title":"A","zeta":true}` {
+	if string(item) != "{\n  \"failure_count\": 2,\n  \"id\": \"task-a\",\n  \"last_failure_cycle\": 5,\n  \"last_failure_reason\": \"cycle-release\",\n  \"title\": \"A\",\n  \"zeta\": true\n}\n" {
 		t.Errorf("quarantined bytes: %s", item)
 	}
 	if b := readJSON(t, filepath.Join(inbox, "task-b.json")); string(b["failure_count"]) != "" {
@@ -306,7 +306,7 @@ func TestMover_Release_StampsFromTheManifest(t *testing.T) {
 	if _, err := m.Release(8, "", nil); err != nil {
 		t.Fatal(err)
 	}
-	if doc := readJSON(t, filepath.Join(inbox, "t.json")); !strings.Contains(string(doc["continuation"]), `"snapshot_sha":"abc123"`) {
+	if doc := readJSON(t, filepath.Join(inbox, "t.json")); !strings.Contains(string(doc["continuation"]), `"snapshot_sha": "abc123"`) {
 		t.Errorf("stamped: %s", doc["continuation"])
 	}
 	if _, err := m.Release(9, "", nil); err != nil {

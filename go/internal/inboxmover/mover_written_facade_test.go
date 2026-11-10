@@ -21,7 +21,7 @@ func TestUpdateItemJSON_RewritesAnItemThroughTheFacade(t *testing.T) {
 
 	err := UpdateItemJSON(path, func(item map[string]json.RawMessage) { item["route"] = json.RawMessage(`"console-manual"`) })
 
-	if got, _ := os.ReadFile(path); err != nil || string(got) != `{"id":"x","route":"console-manual"}` {
+	if got, _ := os.ReadFile(path); err != nil || string(got) != "{\n  \"id\": \"x\",\n  \"route\": \"console-manual\"\n}\n" {
 		t.Errorf("UpdateItemJSON = %v, file %s; want the route written as the mover writes items", err, got)
 	}
 }

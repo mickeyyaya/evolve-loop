@@ -27,6 +27,10 @@ type document struct {
 }
 
 func WriteShadow(projectRoot, workspace string, cycle int, todos []cyclestate.CarryoverTodo) ([]string, error) {
+	return WriteInto(filepath.Join(workspace, DirName), projectRoot, workspace, cycle, todos)
+}
+
+func WriteInto(dir, projectRoot, workspace string, cycle int, todos []cyclestate.CarryoverTodo) ([]string, error) {
 	if strings.TrimSpace(workspace) == "" {
 		return nil, errors.New("recoveryretro: the workspace path is empty")
 	}
@@ -34,7 +38,6 @@ func WriteShadow(projectRoot, workspace string, cycle int, todos []cyclestate.Ca
 	if len(docs) == 0 {
 		return nil, err
 	}
-	dir := filepath.Join(workspace, DirName)
 	if mkErr := os.MkdirAll(dir, 0o755); mkErr != nil {
 		return nil, errors.Join(err, fmt.Errorf("recoveryretro: make %s: %w", dir, mkErr))
 	}

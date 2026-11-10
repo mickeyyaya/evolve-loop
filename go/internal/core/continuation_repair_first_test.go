@@ -11,7 +11,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 )
 
+const priorAttemptFindings = `{"schema_version":1,"phase":"audit","reasons":["EGPS red_count=1"]}`
+
 func adoptWithPriorVerdict(t *testing.T, cycle int, verdict string) PhaseRequest {
+	t.Helper()
+	return adoptWithFindings(t, cycle, verdict, priorAttemptFindings)
+}
+
+func adoptWithFindings(t *testing.T, cycle int, verdict, findings string) PhaseRequest {
 	t.Helper()
 	root, wt := initContinuationRepo(t, cycle)
 	m := stampedContinuation(t, root, wt, cycle)
@@ -24,7 +31,7 @@ func adoptWithPriorVerdict(t *testing.T, cycle int, verdict string) PhaseRequest
 	}
 	gitOut(t, root, "add", "go")
 	gitOut(t, root, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-m", "land a regression predicate")
-	if err := os.WriteFile(m.FindingsPath, []byte(`{"schema_version":1,"phase":"audit","reasons":["EGPS red_count=1"]}`), 0o644); err != nil {
+	if err := os.WriteFile(m.FindingsPath, []byte(findings), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if verdict != "" {

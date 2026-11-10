@@ -1,7 +1,6 @@
 package lifecycle
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -206,16 +205,13 @@ func checkNewIdentity(item inboxbatch.Item, filed map[string]bool) error {
 }
 
 func publishNewItem(path string, fields map[string]json.RawMessage) error {
-	var body bytes.Buffer
-	enc := json.NewEncoder(&body)
-	enc.SetEscapeHTML(false)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(fields); err != nil {
+	body, err := marshalFiled(fields)
+	if err != nil {
 		return fmt.Errorf("file: encode %s: %w", path, err)
 	}
 	tmp := fmt.Sprintf("%s.tmp.%d", path, os.Getpid())
 	defer func() { _ = os.Remove(tmp) }()
-	if err := os.WriteFile(tmp, body.Bytes(), 0o644); err != nil {
+	if err := os.WriteFile(tmp, body, 0o644); err != nil {
 		return fmt.Errorf("file: write %s: %w", tmp, err)
 	}
 	if err := os.Link(tmp, path); err != nil {

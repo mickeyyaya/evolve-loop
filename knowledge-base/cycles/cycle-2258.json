@@ -1,0 +1,209 @@
+{
+  "schema_version": 2,
+  "cycle": 2258,
+  "run_id": "01M715M7XQ3M3ATCXQBSN57V1P",
+  "goal": "Wave 163.\n\nWork the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree that it ships;\n- disposition its own defect ledger and the inherited ids;\n- record a terminal outcome on every exit;\n- never change a protected control-plane file with a tool;\n- leave no stale worktree.\n\nRouting:\n- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.\n- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.\n- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.\n\nCraft:\n- New and changed code has no comments. Names, types and tests give the intent.\n- Write each new document and each new log text in ASD-STE100.\n- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.\n- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.\n\nEvidence:\n- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.\n\nThe measure of this wave is the number of shipped cycles. Keep each cycle shipping.\n\nWave 162 facts (run 20261109T053101Z): 11 of 16 cycles shipped.\n- Cycle 2231: final verdict PASS. It shipped. Login walls: 1.\n- Cycle 2236: final verdict PASS. It shipped.\n- Cycle 2237: final verdict PASS. It shipped.\n- Cycle 2238: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) teardown=review_pause: … claude-tmux@balanced=81 -\u003e agy-claude-tmux@balanced=85 met a wall, but rung agy-tmux@balanced failed with no evidence of exhaustion, so the walk is not a pause. Last phase: aborted. It did not ship.\n- Cycle 2239: final verdict PASS. It shipped.\n- Cycle 2240: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…tDuplicates_TheCountOfCopiesEqualsTheBaseline — pushing would red main; land the green fix or use an explicit t.Skip for an intentionally red-first reproducer. Last phase: aborted. It did not ship.\n- Cycle 2241: final verdict PASS. It shipped.\n- Cycle 2242: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…t does not need the path. If the task cannot be completed without changing it, still restore it and record that in build-report.md — the item is console work.. Last phase: aborted. It did not ship.\n- Cycle 2243: final verdict PASS. It shipped.\n- Cycle 2244: final verdict PASS. It shipped.\n- Cycle 2245: final verdict PASS. It shipped.\n- Cycle 2246: final verdict FAIL. Last phase: retro. It did not ship.\n- Cycle 2247: final verdict PASS. It shipped.\n- Cycle 2248: final verdict PASS. It shipped.\n- Cycle 2249: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…tDuplicates_TheCountOfCopiesEqualsTheBaseline — pushing would red main; land the green fix or use an explicit t.Skip for an intentionally red-first reproducer. Last phase: aborted. It did not ship.\n- Cycle 2250: final verdict PASS. It shipped.\n- Pull requests merged at this boundary: none.\n\nEarlier waves:\n- Wave 159 (run 20261106T154410Z): 0 of 4 cycles shipped.\n- Wave 160 (run 20261107T090007Z): 9 of 16 cycles shipped.\n- Wave 161 (run 20261108T161932Z): 9 of 14 cycles shipped.",
+  "final_verdict": "PASS",
+  "commit_sha": "82dff1afa210209c7c30c37b3f15649997e1cbb5",
+  "tree_sha": "a0cb12d56f4c76d547202a513eec33ccbfaf64f1",
+  "tasks": [
+    "practice-agy-cli-changelog-page-a64d2284-202611040037"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 47154,
+      "started_at": "2026-11-09T22:07:59Z",
+      "ended_at": "2026-11-09T22:08:48Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 12,
+        "output": 2435,
+        "cache_read": 253145,
+        "cache_write": 23106
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 27172,
+      "started_at": "2026-11-09T22:09:14Z",
+      "ended_at": "2026-11-09T22:09:44Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 10,
+        "output": 1256,
+        "cache_read": 325375,
+        "cache_write": 39689
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 184991,
+      "started_at": "2026-11-09T22:09:44Z",
+      "ended_at": "2026-11-09T22:12:51Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 44,
+        "output": 23178,
+        "cache_read": 2037864,
+        "cache_write": 86739
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 1346224,
+      "started_at": "2026-11-09T22:12:51Z",
+      "ended_at": "2026-11-09T22:46:57Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 32,
+        "output": 5626,
+        "cache_read": 997749,
+        "cache_write": 48493
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 56377,
+      "started_at": "2026-11-09T22:46:58Z",
+      "ended_at": "2026-11-09T22:47:56Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 14,
+        "output": 3746,
+        "cache_read": 499604,
+        "cache_write": 52625
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 300471,
+      "started_at": "2026-11-09T22:47:56Z",
+      "ended_at": "2026-11-09T22:53:58Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 16,
+        "output": 3137,
+        "cache_read": 532790,
+        "cache_write": 42585
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 132361,
+      "started_at": "2026-11-09T22:54:34Z",
+      "ended_at": "2026-11-09T22:58:33Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 28,
+        "output": 8330,
+        "cache_read": 904989,
+        "cache_write": 50604
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "PASS",
+      "duration_ms": 74894,
+      "started_at": "2026-11-09T22:59:10Z",
+      "ended_at": "2026-11-09T23:00:31Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "timing": {
+    "total_ms": 2169644,
+    "phase_count": 8,
+    "retried_count": 0,
+    "longest_phase": "build",
+    "longest_ms": 1346224,
+    "by_archetype_ms": {
+      "build": 1646695,
+      "control": 74894,
+      "evaluate": 132361,
+      "plan": 315694
+    },
+    "total_tokens": {
+      "input": 156,
+      "output": 47708,
+      "cache_read": 5551516,
+      "cache_write": 343841
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 48,
+        "output": 8763,
+        "cache_read": 1530539,
+        "cache_write": 91078
+      },
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "evaluate": {
+        "input": 28,
+        "output": 8330,
+        "cache_read": 904989,
+        "cache_write": 50604
+      },
+      "plan": {
+        "input": 80,
+        "output": 30615,
+        "cache_read": 3115988,
+        "cache_write": 202159
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.9999719003572257,
+    "hot_phase_count": 7,
+    "hot_phases": [
+      "scout",
+      "triage",
+      "tdd",
+      "build",
+      "tdd",
+      "build",
+      "audit"
+    ]
+  },
+  "recalled_lessons": [
+    "cycle-1502-closure-citation-contract-never-reaches-the-auditor-it-grades",
+    "cycle-93-build-report-commit-sha-fabrication",
+    "inst-L1544b",
+    "inst-L1549b",
+    "cycle-1448-minted-phase-persona-evaporates-when-its-phase-json-lands"
+  ]
+}

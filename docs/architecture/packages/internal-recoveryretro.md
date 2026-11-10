@@ -1,6 +1,6 @@
 # internal/recoveryretro
 
-> Spec: [recovery-retrospective.md](../recovery-retrospective.md). Decision: [ADR-0151](../adr/0151-the-host-writes-a-retrospective-document-for-each-recovery-and-each-judgment-lesson.md). Plan: [recovery-retrospective-2026-10](../../plans/recovery-retrospective-2026-10.md) (C1 to C3).
+> Spec: [recovery-retrospective.md](../recovery-retrospective.md). Decision: [ADR-0151](../adr/0151-the-host-writes-a-retrospective-document-for-each-recovery-and-each-judgment-lesson.md). Plan: [recovery-retrospective-2026-10](../../plans/recovery-retrospective-2026-10.md) (C1 to C4).
 
 ## Purpose
 
@@ -21,9 +21,13 @@
 - **A safe recall digest.** The action of the lesson YAML has no period, so `research.Lesson.Digest` keeps the document name. The pattern holds the slug of the item.
 - **The rungs come from the call log.** `laddersAbove` reads `llm-calls.ndjson` of the workspace and keeps each `<phase> <rung>` above `R0`, once. An absent log gives no rung. An unreadable log is an error, and the recovery pair is not written, because its rung line can not be true.
 
+- **Two homes, one writer.** `WriteInto` writes a pair into the directory it receives. `WriteShadow` passes `<workspace>/retrospectives`. At `enforce` the closeout passes `PendingDir` (`.evolve/retrospectives-pending`), so the closeout never touches `docs/retrospectives`.
+- **The boundary publishes.** `PublishPending` commits each pair of the pending directory into `docs/retrospectives` with one commit for each pair, and removes the pending copy. A half pair and a link at a pending path stay pending with a WARN line. A pair with a file already in `docs/retrospectives` is dropped from the pending directory and is never replaced (create-only). A commit failure removes the written files, unstages them and leaves the pair pending.
+
 ## Callers
 
-- `core.cycleRun.writeShadowRetrospectives` (`go/internal/core/retrospective_shadow.go`), from `completeCycle` after the dossier write. It reads `retrospectives.stage` from the policy and writes no document at `off`. It prints one WARN line on an error.
+- `core.cycleRun.writeShadowRetrospectives` (`go/internal/core/retrospective_shadow.go`), from `completeCycle` after the dossier write. It reads `retrospectives.stage` from the policy and writes no document at `off`. At `shadow` it calls `WriteShadow`; at `enforce` it calls `WriteInto` with `PendingDir`. It prints one WARN line on an error.
+- `publishPendingRetrospectives` (`go/cmd/evolve/cmd_loop_dossiers.go`), from `publishPendingDossiers` (the boundary after the lanes) and from `publishDossierPairs` (`evolve dossier publish`). It calls `PublishPending` under the dossier publish lock and prints a WARN line on an error.
 
 ## Tests
 

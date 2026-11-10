@@ -15,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/plane"
+	"github.com/mickeyyaya/evolve-loop/go/internal/recoveryretro"
 )
 
 var dossierPublishLock = func(projectRoot string) (func(), error) {
@@ -28,7 +29,7 @@ func runLanesThenPublish(ctx context.Context, sup *fleet.Supervisor, specs []fle
 }
 
 func publishPendingDossiers(projectRoot string, warn io.Writer) {
-	if !hasPendingDossiers(projectRoot, warn) {
+	if !hasPendingDossiers(projectRoot, warn) && !hasPendingRetrospectives(projectRoot, warn) {
 		return
 	}
 	release, hold, err := holdDossierPublish(projectRoot, dossierPublishLock)
@@ -40,6 +41,7 @@ func publishPendingDossiers(projectRoot string, warn io.Writer) {
 		return
 	}
 	defer release()
+	_ = publishPendingRetrospectives(projectRoot, warn)
 	res, err := dossier.PublishPending(projectRoot, warn)
 	if err != nil {
 		fmt.Fprintf(warn, "[dossier] WARN: pending dossiers: %v — they stay pending\n", err)
@@ -48,6 +50,25 @@ func publishPendingDossiers(projectRoot string, warn io.Writer) {
 	if len(res.Published) > 0 || len(res.Skipped) > 0 || len(res.Failed) > 0 {
 		fmt.Fprintf(warn, "[dossier] pending dossiers: published cycles %v; half pairs %v; refused or failed %d\n", res.Published, res.Skipped, len(res.Failed))
 	}
+}
+
+func hasPendingRetrospectives(projectRoot string, warn io.Writer) bool {
+	entries, err := os.ReadDir(recoveryretro.PendingDir(projectRoot))
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		fmt.Fprintf(warn, "[retrospective-publish] WARN: pending retrospectives: cannot check: %v — nothing is published this pass\n", err)
+	}
+	return len(entries) > 0
+}
+
+func publishPendingRetrospectives(projectRoot string, warn io.Writer) error {
+	published, err := recoveryretro.PublishPending(projectRoot, warn)
+	if err != nil {
+		fmt.Fprintf(warn, "[retrospective-publish] WARN: pending retrospectives: %v — they stay pending\n", err)
+	}
+	if len(published) > 0 {
+		fmt.Fprintf(warn, "[retrospective-publish] published retrospectives %v\n", published)
+	}
+	return err
 }
 
 func holdDossierPublish(projectRoot string, lock func(string) (func(), error)) (release func(), hold string, err error) {

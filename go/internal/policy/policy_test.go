@@ -83,6 +83,8 @@ func TestTierRank(t *testing.T) {
 		{"haiku", 1},
 		{"sonnet", 2},
 		{"opus", 3},
+		{"fable", 3},
+		{"claude-fable-5-2", 3},
 		{"  FAST  ", 1},
 		{"Balanced", 2},
 		{"DEEP", 3},

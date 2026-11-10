@@ -302,3 +302,19 @@ func TestCreate_TheRecordPathAppearsOnlyWithItsWholeBody(t *testing.T) {
 		t.Fatalf("record = %+v, want record 1", got)
 	}
 }
+
+func TestIsFileName_AcceptsExactlyTheNamesPathBuilds(t *testing.T) {
+	for _, phase := range []string{"build", "tdd-engineer", "Audit_2"} {
+		name := filepath.Base(Path("ws", phase, 3))
+		if !IsFileName(name) {
+			t.Errorf("IsFileName(%q) = false, want true for a name Path builds", name)
+		}
+	}
+	for _, name := range []string{"", "postmortem.json", "build-postmortem.json", "build-attempt-x-postmortem.json",
+		"-attempt-1-postmortem.json", "bad phase-attempt-1-postmortem.json", "build-attempt-1-postmortem.json.tmp",
+		"build-attempt-1-postmortem.md", "dir/build-attempt-1-postmortem.json"} {
+		if IsFileName(name) {
+			t.Errorf("IsFileName(%q) = true, want false", name)
+		}
+	}
+}

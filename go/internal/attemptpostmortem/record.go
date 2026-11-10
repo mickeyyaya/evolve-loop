@@ -246,3 +246,7 @@ func readRecord(path string) (Record, error) {
 	}
 	return r, nil
 }
+
+var fileName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]*-attempt-[0-9]+-postmortem\.json$`)
+
+func IsFileName(name string) bool { return fileName.MatchString(name) }

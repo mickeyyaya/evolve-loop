@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
@@ -136,7 +138,34 @@ func readContinuationFindings(path string, warn io.Writer) string {
 	if json.Unmarshal(body, &a) == nil && len(a.Reasons) > 0 {
 		return renderFailReasons(a.Phase, a.Reasons)
 	}
-	return truncateFindings(strings.TrimSpace(string(body)))
+	return truncateFindings(strings.TrimSpace(stripControl(string(body), keepLineBreaks)))
+}
+
+func keepLineBreaks(r rune) rune {
+	if r == '\n' || r == '\t' {
+		return r
+	}
+	return -1
+}
+
+func flattenToSpace(r rune) rune {
+	if r == '\n' || r == '\r' || r == '\t' || r == '\u2028' || r == '\u2029' {
+		return ' '
+	}
+	return -1
+}
+
+func stripControl(s string, whenControl func(rune) rune) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || r == '\u2028' || r == '\u2029' {
+			return whenControl(r)
+		}
+		return r
+	}, s)
+}
+
+func singleLine(s string) string {
+	return strings.TrimSpace(stripControl(s, flattenToSpace))
 }
 
 const CtxKeyContinuationRepairFirst = "continuation_repair_first"
@@ -153,7 +182,11 @@ func continuationRepairFirst(c *continuation.Continuation, worktree string, warn
 }
 
 func renderFailReasons(phase string, reasons []string) string {
-	return truncateFindings("failed phase: " + phase + "\n- " + strings.Join(reasons, "\n- "))
+	lines := make([]string, len(reasons))
+	for i, r := range reasons {
+		lines[i] = singleLine(r)
+	}
+	return truncateFindings("failed phase: " + singleLine(phase) + "\n- " + strings.Join(lines, "\n- "))
 }
 
 func truncateFindings(s string) string {
@@ -167,6 +200,9 @@ func truncateFindings(s string) string {
 func lastLineBreakWithin(s string, budget int) int {
 	if i := strings.LastIndexByte(s[:budget], '\n'); i > 0 {
 		return i
+	}
+	for budget > 0 && !utf8.RuneStart(s[budget]) {
+		budget--
 	}
 	return budget
 }
@@ -217,14 +253,21 @@ func (cr *cycleRun) adoptContinuationAfterTriage() error {
 		return fmt.Errorf("continuation workspace manifest copy: %w", err)
 	}
 	SeedDispositionSkeleton(cr.cs.WorkspacePath, cr.req.ProjectRoot, c.Cycle)
+	cr.serveContinuationContext(c, wt)
+	fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d ADOPTED continuation: worktree re-seeded from cycle-%d snapshot %s (base %s)\n", cr.cycle, c.Cycle, c.SnapshotSHA[:12], base)
+	return nil
+}
+
+func (cr *cycleRun) serveContinuationContext(c *continuation.Continuation, wt string) {
 	if findings := readContinuationFindings(c.FindingsPath, cr.o.errOut()); findings != "" {
 		cr.ctxSnap["continuation_findings"] = findings
 	}
 	if first := continuationRepairFirst(c, wt, cr.o.errOut()); first != "" {
 		cr.ctxSnap[CtxKeyContinuationRepairFirst] = first
 	}
-	fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d ADOPTED continuation: worktree re-seeded from cycle-%d snapshot %s (base %s)\n", cr.cycle, c.Cycle, c.SnapshotSHA[:12], base)
-	return nil
+	if line := continuationAncestry(cr.ctx, gitexec.Git{Dir: cr.req.ProjectRoot, Exec: gitRunner}, cr.cs.WorkspacePath); line != "" {
+		cr.ctxSnap[CtxKeyContinuationAncestry] = line
+	}
 }
 
 func (o *Orchestrator) shedDeclinedPointer(projectRoot string, cycle int, declined continuation.Continuation) {
