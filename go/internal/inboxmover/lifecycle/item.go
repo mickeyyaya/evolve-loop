@@ -117,9 +117,10 @@ func (m *Mover) ReadLastFailureRung(taskID string) string {
 }
 
 type failureFields struct {
-	FailureCount     int    `json:"failure_count"`
-	LastFailureClass string `json:"last_failure_class"`
-	LastFailureRung  string `json:"last_failure_rung"`
+	FailureCount           int    `json:"failure_count"`
+	LastFailureClass       string `json:"last_failure_class"`
+	LastFailureFingerprint string `json:"last_failure_fingerprint"`
+	LastFailureRung        string `json:"last_failure_rung"`
 }
 
 func (m *Mover) readFailureFields(taskID string) (failureFields, bool) {
@@ -154,8 +155,8 @@ func readFailureFieldsAt(path string) (failureFields, bool) {
 }
 
 type failureRecord struct {
-	reason, class, fingerprint, rung string
-	cycle                            int
+	reason, class, fingerprint, rung, findings string
+	cycle, ceiling                             int
 }
 
 func BumpFailureCount(path, reason string) (int, error) {
@@ -180,8 +181,16 @@ func bumpWith(path string, rec failureRecord, shedAt func(count int) bool) (int,
 		stampOrClear(item, inboxbatch.LastFailureClassField, rec.class)
 		stampOrClear(item, inboxbatch.LastFailureFingerprintField, rec.fingerprint)
 		stampOrClear(item, inboxbatch.LastFailureRungField, rec.rung)
+		stampOrClear(item, inboxbatch.LastFailureFindingsField, rec.findings)
 		if shedAt != nil && shedAt(count) {
 			delete(item, inboxbatch.ContinuationField)
+			delete(item, inboxbatch.RetryPlanField)
+			return
+		}
+		if rec.fingerprint != "" || rec.findings != "" {
+			stampText(item, inboxbatch.RetryPlanField, PlanRound(count, rec.ceiling).Plan())
+		} else {
+			delete(item, inboxbatch.RetryPlanField)
 		}
 	})
 	if err != nil {
