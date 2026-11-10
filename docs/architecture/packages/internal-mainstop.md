@@ -13,6 +13,8 @@
 - `WithParked` keeps one row for each cycle, in cycle order. A second park of a cycle replaces its row.
 - `Admit` gives `AdmitNoStop` when the stop does not hold. It gives `RefuseRebase` when the proof base is not the `main` tip, or when the tip is empty.
 - `Admit` gives `AdmitFix` when the proof has a green stop key and no lane-only red. Each other proof gives `RefuseNotAFix`.
+- `Proven` builds the proof of one run of the stop keys. `Green` holds each key of the stop that the run did not find red.
+- `Admission.String` gives the word of each admission: `no-stop`, `fix`, `rebase` and `not-a-fix`. Each signal and each refusal uses these words.
 - `Released` drops the green keys. With no key left, it sets `ReleasedAt` and `ReleasedBy`. It does not change a stop that does not hold.
 - `Resumes` is true when the stop does not hold, or when the given `main` tip is known and is not `MainSHA`. The pool reads it to resume the parked lanes.
 - `Overdue` is true when a stop that holds is older than a positive bound. `Escalate` records only the first escalation time.
@@ -33,7 +35,8 @@
 ## Invariants
 
 - The package imports `baseattr`, `adapters/flock`, `atomicwrite` and the standard library. It imports no pipeline package.
-- Ship is the one caller of `Admit` and `Released` (`phases/ship/main_red_stop.go`). `core` is the one caller of `Opened` and `WithParked`. The pool plan of `cmd/evolve` is the one caller of `Resumes`.
+- Ship (`phases/ship/main_red_stop.go`) and `selfheal.StopHold` are the two callers of `Admit`. `selfheal.StopRelease` is the one caller of `Released`.
+- `core` is the one caller of `Opened` and `WithParked`. The pool plan of `cmd/evolve` is the one caller of `Resumes`.
 - `selfheal.StopBound` is the one caller of `Overdue` and `Escalate`, and it calls them in one `Update`.
 - The package emits no signal and reads no policy. The caller owns the stage, the bound and each signal.
 - The path is on the protected surface as a gate guarantee. A lane cannot edit it.

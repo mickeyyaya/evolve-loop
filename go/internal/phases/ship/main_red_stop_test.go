@@ -188,8 +188,8 @@ func TestShipStop_ANonFixParksAtEnforceAndLandsAtShadow(t *testing.T) {
 		got := l.emitted(core.CodeMainRedStopWouldRefuse)
 		if len(got) != 1 || got[0].Cycle != 1 || got[0].RunID != "test-run" || got[0].Phase != phaseName || got[0].Module != signalcenter.ModuleGateRepo ||
 			got[0].Kind != signalcenter.KindShipWarning || got[0].Severity != signalcenter.SeverityWarn ||
-			got[0].Fields["admission"] != "not-a-fix" || got[0].Fields["keys"] != redPkg+"."+redTest || got[0].Fields["base"] != l.base || got[0].Fields["main"] != held.MainSHA || got[0].Fields["fix_item"] != held.FixItem ||
-			!strings.Contains(got[0].Reason, "not-a-fix") {
+			got[0].Fields["admission"] != "not-a-fix" || got[0].Fields["keys"] != redPkg+"."+redTest || got[0].Fields["base"] != l.base || got[0].Fields["main"] != held.MainSHA || got[0].Fields["fix_item"] != held.FixItem || got[0].Fields["landing"] != "the lane" ||
+			!strings.Contains(got[0].Reason, "the lane lands") || !strings.Contains(got[0].Reason, "not-a-fix") {
 			t.Errorf("signals = %+v, want one warn GATE_REPO_MAIN_RED_STOP_WOULD_REFUSE with the admission not-a-fix", got)
 		}
 		if !l.stop(t).Holds() || len(l.emitted(core.CodeMainRedStopReleased)) != 0 || !l.fixItemPending(t, held.FixItem) {

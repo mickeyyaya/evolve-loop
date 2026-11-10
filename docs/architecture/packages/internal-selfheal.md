@@ -174,10 +174,49 @@ The file is `main_red_bound.go`. The design is in [gate-contract-g4-base-red-att
 - `core` cannot import this package, so the open of a stop runs no bound check. Each lane that meets a stop reaches one of the two callers.
 - Pinned by the `TestStopBound_*` tests, with 100% of the statements of the file.
 
+## The release of the main-red stop
+
+The file is `main_red_release.go`. The design is in [gate-contract-g4-base-red-attribution.md](../gate-contract-g4-base-red-attribution.md), section 13.
+
+- `ReadStop` reads the record and tells if the stop holds. A record that cannot be read gets one WARN line and does not hold.
+- `StopRelease.Keys` is the one release of a stop. Ship and the train call it, so the two landing paths have one rule.
+- The caller gives the directory, the time, the base event, the emit function and the consume function of the fix item.
+- A release with no green key writes nothing. A release when no stop holds writes nothing and is no error.
+- The release calls `Stop.Released` in one `mainstop.Update`, so the lock of the stop record makes the decision.
+- A stop that has a red key after the release stays open. No signal goes out and the fix item stays.
+- When no key stays, the release calls the consume function with the fix item of the stop.
+- The release then emits `GATE_REPO_MAIN_RED_STOP_RELEASED` one time: module `gate.repo`, kind `gate.corrected`, severity info.
+- The fields are `main`, `fix_item`, `released_by`, `parked` and `fix_item_error`. The caller owns the cycle, the run, the phase and the origin of the event.
+- A fix item that did not move makes the signal a warning, and `Keys` returns that error. The stop stays released.
+- The package imports no inbox package. The caller injects the move, so the package changes no inbox item itself.
+- Built deviation from the design: `Keys` returns only the error, because no caller reads the stop after the release.
+- Pinned by `TestReadStop_OnlyAReadableStopThatHoldsHolds` and the `TestStopRelease_*` tests, with 100% of the statements of the file.
+
+## The hold of a landing on a red main
+
+The file is `main_red_hold.go`. The design is in the same section 13.
+
+- `StopHold` decides if one landing of the train can go onto `main` while a stop holds. The caller gives the directory, the stage, the base event, the emit function, the WARN writer and the key run.
+- `KeyRun` runs one `baseattr.Reds` on one revision and gives the keys that are red. `StopHold` gives it `core.StopProofReds`, so the run has the tags of the floor. The package starts no test itself.
+- `Red` judges a landing whose own CI is red. Its proof has no green key, so `Stop.Admit` gives `not-a-fix`.
+- `Admit` judges a batch before `main` moves. It runs the keys of the stop on the batch tip and builds the proof with `Stop.Proven`.
+- A key run that fails gets one WARN line, and the batch is not a proven fix.
+- The proof base is the head of `main` that the caller read. A head that is empty gets the admission `rebase`.
+- A fix gives its green keys to the caller, and the caller releases them after `main` moves.
+- At `enforce`, each other landing gets `ErrMainRedHold`. The error names the landing, the admission, the keys, the `main` commit and the fix item, and it gives the remedy.
+- At `shadow`, each such landing goes on. One holder emits one `GATE_REPO_MAIN_RED_STOP_WOULD_REFUSE` event, for its first such landing.
+- `StopRefusal` is the one builder of that event. Ship gives it the landing `the lane`, and the hold gives it the batch. The caller gives the identity of the event.
+- The field `main` is the head that the caller read for the admission `rebase`. For `not-a-fix` it is the commit of the stop. The refusal text of `enforce` names the commit of the stop.
+- The event has module `gate.repo`, kind `ship.warning` and severity warning. The fields are `keys`, `base`, `main`, `admission`, `fix_item` and `landing`.
+- No stop that holds means no key run, no event and no error.
+- The train is the caller, and its wiring is in `cmd/evolve`. Until that wiring lands, no production path reaches `StopHold`.
+- Pinned by the `TestStopHold_*` tests, with 100% of the statements of the file.
+
 ## Invariants
 
-- The package never acts, with one exception. It writes only its own records, the decision ledger and the evidence workspaces. It changes no inbox item, no policy and no git ref.
-- The exception is `StopBound.Check`. It sets the `escalated_at` field of `main-red-stop.json` through `mainstop.Update`, and it changes no other field of that record.
+- The package never acts, with two exceptions. It writes only its own records, the decision ledger and the evidence workspaces. It changes no inbox item, no policy and no git ref.
+- The first exception is `StopBound.Check`. It sets the `escalated_at` field of `main-red-stop.json` through `mainstop.Update`, and it changes no other field of that record.
+- The second exception is `StopRelease.Keys`. It drops the green keys of `main-red-stop.json` through `Stop.Released`, in one `mainstop.Update`.
 - The incident records, the package, the verb file `cmd_selfheal.go` and the stage key are protected surfaces (`guards.ProtectedSurfaceManifest`). The verb file is protected because it chooses the evidence and builds the verifier. `cmd_selfheal_live.go` is protected too, because it opens incidents and engages the loop brake. `cmd_selfheal_propose.go` is protected for the same reason, and the proposal records are under the protected directory. `TestNoAgentProfileCanWriteTheIncidentRecords` checks that no agent profile has a write grant over `.evolve/incidents/`.
 - Each rule is a pure function. Only the loaders read files, and only the verb starts `gh`.
 - The loader of the ship journal (`sources.go`) calls `shipjournal.Read`. The package has no second parser of `ship-journal.jsonl`. `readJSONL` stays for the decision ledger only.

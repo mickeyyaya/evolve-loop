@@ -2,29 +2,18 @@ package ship
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
-	"path/filepath"
 	"slices"
-	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/covchanged"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/mainstop"
 	"github.com/mickeyyaya/evolve-loop/go/internal/selfheal"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
-
-const (
-	admissionRebase  = "rebase"
-	admissionNotAFix = "not-a-fix"
-)
-
-var errNoStopHolds = errors.New("no main-red stop holds")
 
 type stopCheck struct {
 	opts     *Options
@@ -36,12 +25,8 @@ type stopCheck struct {
 }
 
 func checkMainRedStop(ctx context.Context, opts *Options, warn io.Writer) ([]baseattr.Key, error) {
-	stop, _, err := mainstop.Read(opts.evolveDir())
-	if err != nil {
-		fmt.Fprintf(warn, "[ship] WARN main-red stop: the record could not be read (%v), so the stop does not hold the lane\n", err)
-		return nil, nil
-	}
-	if !stop.Holds() {
+	stop, holds := selfheal.ReadStop(opts.evolveDir(), warn)
+	if !holds {
 		return nil, nil
 	}
 	tree, baseRef, err := repoContractGateRoot(opts)
@@ -71,12 +56,12 @@ func (c stopCheck) proof(ctx context.Context, tree, base string) mainstop.Proof 
 	if base == "" || base != c.main {
 		return mainstop.Proof{Base: base}
 	}
-	red, err := c.attr.RunIn(ctx, tree, baseattr.Reds{Keys: c.stop.Keys, Flags: covchanged.TagFlags(covchanged.DefaultTags)})
+	red, err := c.attr.RunIn(ctx, tree, core.StopProofReds(c.stop.Keys))
 	if err != nil {
 		fmt.Fprintf(c.warn, "[ship] WARN main-red stop: the keys of the stop could not be run in the lane (%v), so the lane is not a proven fix\n", err)
 		return mainstop.Proof{Base: base}
 	}
-	return mainstop.Proof{Base: base, Green: keysNotIn(c.stop.Keys, red)}
+	return c.stop.Proven(base, red)
 }
 
 func keysNotIn(keys, drop []baseattr.Key) []baseattr.Key {
@@ -88,46 +73,36 @@ func (c stopCheck) admit(proof mainstop.Proof) ([]baseattr.Key, error) {
 	if admission == mainstop.AdmitFix {
 		return proof.Green, nil
 	}
-	refusal := c.refusal(proof, admission)
+	refused := selfheal.StopRefusal{Landing: "the lane", Head: c.main, Base: proof.Base, Admission: admission}
 	if !c.enforced {
-		c.wouldRefuse(refusal)
+		base := signalcenter.Event{Cycle: c.opts.CycleID, RunID: c.opts.RunID, Phase: phaseName, Origin: "checkMainRedStop"}
+		c.opts.Signals.Emit(refused.WouldRefuse(base, c.stop))
 		return nil, nil
 	}
+	refusal := c.refusal(refused)
 	return nil, baseRedShipError(refusal.code, refusal.class, refusal.verdict, refusal.message)
 }
 
 type stopRefusal struct {
-	admission string
-	code      shiperr.ShipErrorCode
-	class     shiperr.ShipErrorClass
-	verdict   baseattr.Verdict
-	message   string
+	code    shiperr.ShipErrorCode
+	class   shiperr.ShipErrorClass
+	verdict baseattr.Verdict
+	message string
 }
 
-func (c stopCheck) refusal(proof mainstop.Proof, admission mainstop.Admission) stopRefusal {
-	if admission == mainstop.RefuseRebase {
+func (c stopCheck) refusal(r selfheal.StopRefusal) stopRefusal {
+	if r.Admission == mainstop.RefuseRebase {
 		return stopRefusal{
-			admission: admissionRebase, code: shiperr.CodeGitFleetRebaseNeeded, class: shiperr.ShipClassTransient,
-			verdict: baseattr.Verdict{BaseRed: c.stop.Keys, Base: proof.Base, Main: c.main},
+			code: shiperr.CodeGitFleetRebaseNeeded, class: shiperr.ShipClassTransient,
+			verdict: baseattr.Verdict{BaseRed: c.stop.Keys, Base: r.Base, Main: r.Main(c.stop)},
 			message: "main is red and a stop holds, and the lane is not on the main tip; rebase the lane onto main and verify again",
 		}
 	}
 	return stopRefusal{
-		admission: admissionNotAFix, code: shiperr.CodeMainRedPark, class: shiperr.ShipClassPrecondition,
-		verdict: baseattr.Verdict{BaseRed: c.stop.Keys, MainRed: c.stop.Keys, Base: proof.Base, Main: c.stop.MainSHA},
+		code: shiperr.CodeMainRedPark, class: shiperr.ShipClassPrecondition,
+		verdict: baseattr.Verdict{BaseRed: c.stop.Keys, MainRed: c.stop.Keys, Base: r.Base, Main: r.Main(c.stop)},
 		message: "main is red and a stop holds, and the lane turns no key of the stop green; the lane waits for a green main",
 	}
-}
-
-func (c stopCheck) wouldRefuse(r stopRefusal) {
-	keys := baseattr.Names(c.stop.Keys)
-	c.opts.Signals.Emit(signalcenter.Event{
-		Cycle: c.opts.CycleID, RunID: c.opts.RunID, Phase: phaseName,
-		Module: signalcenter.ModuleGateRepo, Origin: "checkMainRedStop", Kind: signalcenter.KindShipWarning,
-		Severity: signalcenter.SeverityWarn, Code: core.CodeMainRedStopWouldRefuse,
-		Reason: "main-red stop (shadow): the lane lands, and enforce refuses it (" + r.admission + ") while " + keys + " is red on main",
-		Fields: map[string]string{"keys": keys, "base": r.verdict.Base, "main": r.verdict.Main, "admission": r.admission, "fix_item": c.stop.FixItem},
-	})
 }
 
 type stopRelease struct {
@@ -156,56 +131,14 @@ func (r stopRelease) greenOnMain(v baseattr.Verdict) {
 }
 
 func (r stopRelease) release(green []baseattr.Key, by string) error {
-	if len(green) == 0 {
-		return nil
-	}
-	next, err := mainstop.Update(r.opts.evolveDir(), releaseInStop(green, by, r.opts.clock()))
-	if errors.Is(err, errNoStopHolds) {
-		return nil
-	}
-	if err != nil || next.Holds() {
-		return err
-	}
-	itemErr := r.consumeFixItem(next.FixItem)
-	r.emitReleased(next, itemErr)
-	return itemErr
-}
-
-func releaseInStop(green []baseattr.Key, by string, now time.Time) func(mainstop.Stop, bool) (mainstop.Stop, error) {
-	return func(s mainstop.Stop, _ bool) (mainstop.Stop, error) {
-		if !s.Holds() {
-			return s, errNoStopHolds
-		}
-		return s.Released(green, by, now), nil
-	}
+	return selfheal.StopRelease{
+		EvolveDir: r.opts.evolveDir(), Now: r.opts.clock(), Emit: r.opts.Signals.Emit,
+		Event:   signalcenter.Event{Cycle: r.opts.CycleID, RunID: r.opts.RunID, Phase: phaseName, Origin: "stopRelease.release"},
+		Consume: r.consumeFixItem,
+	}.Keys(green, by)
 }
 
 func (r stopRelease) consumeFixItem(id string) error {
-	_, err := inboxmover.Locate(filepath.Join(r.opts.evolveDir(), "inbox"), id)
-	if errors.Is(err, inboxmover.ErrNotFound) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("fix item %s: %w", id, err)
-	}
 	mover := inboxmover.Options{ProjectRoot: r.opts.ProjectRoot, Stderr: r.warn, Signals: r.opts.Signals}
-	if _, err := inboxmover.ReconcileSuperseded(mover, []string{id}, inboxmover.StateProcessed, inboxmover.PromoteOpts{Cycle: fmt.Sprint(r.opts.CycleID)}); err != nil {
-		return fmt.Errorf("fix item %s: %w", id, err)
-	}
-	return nil
-}
-
-func (r stopRelease) emitReleased(stop mainstop.Stop, itemErr error) {
-	e := signalcenter.Event{
-		Cycle: r.opts.CycleID, RunID: r.opts.RunID, Phase: phaseName,
-		Module: signalcenter.ModuleGateRepo, Origin: "stopRelease.release", Kind: signalcenter.KindGateCorrected,
-		Severity: signalcenter.SeverityInfo, Code: core.CodeMainRedStopReleased,
-		Reason: "main-red stop released by " + stop.ReleasedBy + ": each key is green, and the parked lanes resume in the next pool fill",
-		Fields: map[string]string{"main": stop.MainSHA, "fix_item": stop.FixItem, "released_by": stop.ReleasedBy, "parked": stop.ParkedCycles(), "fix_item_error": ""},
-	}
-	if itemErr != nil {
-		e.Severity = signalcenter.SeverityWarn
-		e.Fields["fix_item_error"] = itemErr.Error()
-	}
-	r.opts.Signals.Emit(e)
+	return inboxmover.ConsumeFixItem(mover, id, inboxmover.PromoteOpts{Cycle: fmt.Sprint(r.opts.CycleID)})
 }

@@ -228,3 +228,37 @@ func TestStop_ResumesParkedLanesWhenItEndsOrMainMoves(t *testing.T) {
 		}
 	}
 }
+
+func TestStop_ProvenHasAsGreenOnlyTheKeysOfTheStopThatAreNotRed(t *testing.T) {
+	t.Parallel()
+	stop := openStop(dupKey, sizeKey)
+	cases := []struct {
+		name string
+		red  []baseattr.Key
+		want []baseattr.Key
+	}{
+		{"each key red", []baseattr.Key{dupKey, sizeKey}, nil},
+		{"one key red", []baseattr.Key{sizeKey}, []baseattr.Key{dupKey}},
+		{"a red that is not a key of the stop", []baseattr.Key{otherKey}, []baseattr.Key{dupKey, sizeKey}},
+		{"no red", nil, []baseattr.Key{dupKey, sizeKey}},
+	}
+	for _, c := range cases {
+		proof := stop.Proven("tip", c.red)
+		if proof.Base != "tip" || !slices.Equal(proof.Green, c.want) || len(proof.LaneOnly) != 0 {
+			t.Errorf("%s: Proven = %+v, want base tip and green %v", c.name, proof, c.want)
+		}
+	}
+	if !slices.Equal(stop.Keys, []baseattr.Key{dupKey, sizeKey}) {
+		t.Errorf("Proven changed the keys of the stop: %v", stop.Keys)
+	}
+}
+
+func TestAdmission_HasAWordForEachRefusal(t *testing.T) {
+	t.Parallel()
+	want := map[Admission]string{AdmitNoStop: "no-stop", AdmitFix: "fix", RefuseRebase: "rebase", RefuseNotAFix: "not-a-fix"}
+	for a, word := range want {
+		if a.String() != word {
+			t.Errorf("Admission(%d) = %q, want %q", a, a.String(), word)
+		}
+	}
+}

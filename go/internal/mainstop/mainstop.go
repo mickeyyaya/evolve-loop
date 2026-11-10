@@ -97,12 +97,24 @@ func (s Stop) Admit(mainSHA string, p Proof) Admission {
 	return RefuseNotAFix
 }
 
+func (a Admission) String() string {
+	return [...]string{"no-stop", "fix", "rebase", "not-a-fix"}[a]
+}
+
+func (s Stop) Proven(base string, red []baseattr.Key) Proof {
+	return Proof{Base: base, Green: without(s.Keys, red)}
+}
+
+func without(keys, drop []baseattr.Key) []baseattr.Key {
+	return slices.DeleteFunc(slices.Clone(keys), func(k baseattr.Key) bool { return slices.Contains(drop, k) })
+}
+
 func (s Stop) Released(green []baseattr.Key, by string, now time.Time) Stop {
 	if !s.Holds() {
 		return s
 	}
 	next := s
-	next.Keys = slices.DeleteFunc(slices.Clone(s.Keys), func(k baseattr.Key) bool { return slices.Contains(green, k) })
+	next.Keys = without(s.Keys, green)
 	if len(next.Keys) == 0 {
 		next.ReleasedAt = &now
 		next.ReleasedBy = by
