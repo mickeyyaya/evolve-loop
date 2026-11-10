@@ -222,10 +222,10 @@ func TestServedModel_AClaudeTmuxTranscriptModelOfAnotherTierEmitsTheMismatchSign
 func TestServedModel_AClaudeTmuxTranscriptModelOfThePickedTierEmitsNothing(t *testing.T) {
 	injectCatalogDir(t, t.TempDir())
 
-	got := launchClaudeTmuxServedBy(t, "deep", "claude-opus-5-5").mismatches()
+	got := launchClaudeTmuxServedBy(t, "deep", "claude-fable-5-2").mismatches()
 
 	if len(got) != 0 {
-		t.Fatalf("an opus dispatch served by claude-opus-5-5 emitted %+v", got)
+		t.Fatalf("a fable dispatch served by claude-fable-5-2 emitted %+v", got)
 	}
 }
 
