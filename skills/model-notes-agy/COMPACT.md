@@ -6,3 +6,4 @@ These notes load only into a dispatch whose CLI is `agy` or `agy-tmux`.
 - Name the exact output format that the deliverable needs, with one example.
 - Give one instruction for each step, and avoid long chains of nested conditions.
 - Run a check command and read its output before you claim done.
+- Start the deliverable skeleton yourself, as a response prefix, when the format is strict.
