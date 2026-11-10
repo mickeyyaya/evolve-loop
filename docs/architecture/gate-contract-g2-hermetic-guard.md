@@ -52,7 +52,7 @@ The build-floor git reads, measured one level into the helper packages:
 | `core/ste_floor.go:111,118` | `cat-file -e base:path`, `diff -U0 base -- path` | `ReadAtBase`, `DiffAgainstBase` |
 | `covchanged/workspace.go:32,35` | `rev-parse base`, `merge-base base HEAD` | the base check of `repostate`; the fork point is `Base` |
 | `covchanged/workspace.go:98,106` | `diff -U0 --relative base`, `ls-files --others` | `DiffAgainstBase`, `Untracked` |
-| `covchanged/workspace.go:129-140` | `ModTime` of each source against the profile | none: the floor reader has no freshness check (7.8) |
+| `covchanged/workspace.go:133-142` | `ModTime` of each source against the profile | none: the floor reader has no freshness check (7.8) |
 | `changedpkgs/changedfiles.go:22,35` | `diff --name-status base`, `ls-files --others` | `ChangedSince` |
 | `explanationdocs/gitio.go:42,46,251,390`, `rebind.go:216` | names and contents against the base | `ChangedSince`, `ReadAtBase` |
 | `core/phase_bindings_selfcheck.go:35-42`, through `floorPaths` (`base_red_floor.go:44-52`) | `diff base --name-only`, `ls-files --others` | `ChangedSince` |
@@ -61,7 +61,7 @@ The build-floor git reads, measured one level into the helper packages:
 | `core/build_floor_reviewer.go:385`, `core/phase_bindings_selfcheck.go:99,110` | `go test` with a built argument slice | `gotool.Test` (7.8) |
 | `core/build_floor_reviewer.go:216`, `changedpkgs/importerclosure.go:98` | `go list` | `gotool.List` (7.8) |
 | `core/build_floor_reviewer.go:310` | `go tool cover -func` on the profile | none: `covchanged.FuncPercents` reads the profile in process (7.8) |
-| `phases/ship/scanshadow_tree.go:36,90`, `scanshadow_enforce.go:42` | the verdict recorder of the pack: `ls-files`, `go env -json` and `go list` | none: the entry runs the pack with no recorder (7.8) |
+| `phases/ship/scanshadow_tree.go:36,90`, `scanshadow_enforce.go:42`, `repocontract.go:208,236,520,538`, `scanshadow.go:95` | the verdict recorder of the pack (`ls-files`, `go env -json`, `go list`) and the runner sites that call it | none: the runner names an interface, and the entry puts no recorder in the context (7.8) |
 | `explanationdocs/gitio.go:178,262`, `rebind.go:132,176`, `core/lost_landing_floor.go:76-96` | `HEAD`, ancestry and a second commit | none: question 1 of 7.14 |
 
 ### 7.2 A measured prototype
@@ -140,9 +140,10 @@ Each step of a chain holds its edge kind: `call`, `value`, `live-type` or `init`
 - The allowed list is closed, and only `gotool` uses it. It holds two rows: `go list` and `go test`. Test 42 judges `gotool` against it.
 - So `sh -c`, `env git`, `/usr/bin/git`, `find -newer`, `go run` and `go tool` are refused. A `go test` call that a gate writes itself is refused also.
 - The child process of a `gotool.Test` call is outside the static reach (7.13).
-- Each exec entry names its program parameter by name, not by index. The load fails when the loaded signature lacks it.
+- Each exec entry names its program parameter by name, not by index. `Refusals` returns an error when the loaded signature lacks it.
 - A reference to an exec entry without a call passes. Each call of the `sysexec.RunFunc` value that holds it is judged at its site.
 - A read or a write of `Path` or `Args` is refused, because a slice alias of `Args` can change the program. A use of another field of `exec.Cmd`, such as `Dir` or `Env`, passes.
+- `go/build.Import` and the method `go/build.Context.Import` are exec entries, because each one starts `go list`. Each has an empty `Param`, so each call is refused. `ImportDir` and `MatchFile` start no process, and they pass.
 - The inert list names each `sysexec` function that starts no process. It holds `WithEnv` and the new function `CancelKillsTheProcessGroup` (7.8).
 - `os.Stat` is allowed, because existence and size are not mtime. `testdup` keeps its root check.
 - A skip list that names `.git` is refused also. Commit 5 changes `changedpkgs/direct_importers.go:88` to the dot-prefix rule of `Scan`. No allow list is added.
@@ -280,7 +281,7 @@ func RootOf(fn any) (Root, error)
 func Load(ctx context.Context, loader goload.Loader, src Source) (Graph, error)
 func Refusals(g Graph, rules Rules) ([]Refusal, error)
 func Audit(g Graph, pkg string, rules Rules) []Refusal
-func ToolchainAudit(g Graph, pkg string, rules Rules) []Refusal
+func ToolchainAudit(g Graph, pkg string, rules Rules) ([]Refusal, error)
 ```
 
 `Graph` keeps its roots, so `Refusals` cannot judge a second list. `Audit` judges each body of one package against the rules, and test 9 calls it for `repostate`. `ToolchainAudit` judges `gotool` by the five rules of 7.8, and test 42 calls it.
@@ -444,7 +445,7 @@ G3a retires the real-tree call of the `testdup` entry, because `RealTree` refuse
 
 **The floors.** Each read of the floor table becomes the named `repostate` call. `floorBase` returns the recorded base or the empty string, never `HEAD`. An empty base fails the `repostate` base check. The floor then reports "did not judge" with the cause "the run has no recorded worktree base".
 
-**The floor entries.** An entry `Run` gives the reds of the lane tree, and it reaches no `baseattr`. `ReviewInput` gets a ruler, which is a strategy with two implementations. The lane ruler blames the lane for each red, and `floorEntryInput` sets it. The base-red ruler holds the rerun of G4, and only the build-floor reviewer sets it. The entry never names the type of the base-red ruler, so rule 3 does not reach its methods.
+**The floor entries.** An entry `Run` gives the reds of the lane tree, and it reaches no `baseattr`. `ReviewInput` gets a ruler, which is a strategy with two implementations. The lane ruler blames the lane for each red, and `floorEntryInput` sets it. The base-red ruler holds the rerun of G4, and only the build-floor reviewer sets it. The entry never names the type of the base-red ruler, so walk rule 3 of 7.4 does not reach its methods.
 
 The rerun methods of `ReviewInput` move to the base-red ruler type. They are `attributor`, `baseRunner`, `laneReds`, `reportAttributed`, `openMainRedStop`, `mainRedSink` and `reportUnjudged` (`core/base_red_floor.go:71,82,89,182,195,202,209`, from G4). `rule`, `laneFailures` and `coverRedLines` stay, and they only call the ruler. Rule 3 reaches each method of `ReviewInput`, so no git reader stays on it. The zero value of the ruler field is the lane ruler, so the five other sites that build a `ReviewInput` do not change. Test 44 pins both facts.
 
@@ -458,13 +459,17 @@ A plain decorator on the judge does not fit. Each of the three judges calls the 
 4. The package imports only the stdlib and `sysexec`.
 5. No body other than `command` uses the field `Path` or `Args` of `exec.Cmd`.
 
-`Rules.Toolchain` names `command` in `Name` and its verb parameter in `Verb`. The load fails when the loaded `gotool` lacks that function or that parameter.
+`Rules.Toolchain` names `command` in `Name` and its verb parameter in `Verb`. `ToolchainAudit` returns an error when the loaded `gotool` lacks that function or that parameter.
 
 The verb is thus a constant in two bodies of one package, not at each gate site. The first design read it at each gate site, and each real site builds its arguments in a slice.
 
 **The function coverage.** `scopedCoverFunc` no longer starts `go tool cover`. It parses the profile with `ParseProfile` and calls `FuncPercents`, which reads each profiled source file and counts with `Func.count` (`covchanged/measure.go:150`). The unexported function `coverEntries` of `core` makes one `apicover.CoverEntry` from each `Func`, with the module path before the file. The floor gives the entries to `apicover.Run` in `Config.Cover`. `FuncPercents` rounds each percent to one decimal, as `go tool cover` prints it.
 
-**The verdict recorder.** `ship.RunRepoContractPack` reaches a recorder (`scanshadow.go:115-132`) that runs `ls-files`, `go env -json` and `go list`, and it is not a judge. `ship.RunPlainRepoContractPack` has the same signature and reaches no recorder, and the entry `Run` calls it. The recorder becomes a decorator of the plain function, and it chooses the package list before it calls that function. The ship phase and the build-floor reviewer call the decorator outside each entry `Run`. No reached body calls it, so the allowed list stays at two rows.
+**The verdict recorder.** `ship.RunRepoContractPack` reaches a recorder (`scanshadow.go:115-132`) that runs `ls-files`, `go env -json` and `go list`, and it is not a judge. The recorder travels in the context, and the runner calls it (`repocontract.go:208,236,520,538`). The pack gets an unexported interface `packRecorder` with the methods `prune`, `observe` and `active`.
+
+The new function `packRecorderFrom` reads the context, and it gives a Null Object when the context holds no recorder. `runGoTestJSON`, `runGoTestJSONArgs` and `runClassifiedPackRetrying` name only the interface. The entry never names the type `scanShadow`, so walk rule 3 of 7.4 does not reach its methods.
+
+`ship.RunPlainRepoContractPack` is a new function with the signature of `RunRepoContractPack`. It puts no recorder in the context, and the entry `Run` calls it. `RunRepoContractPack` stays as the composition root that calls `floorRecorderFor`, `begin` and `note`, and `cmd/evolve/cmd_cycle_config.go:51` keeps it. The ship phase keeps `scanShadowFor`, `scanShadowFrom` and `runRepoContractSteps`, and no entry reaches them. So no reached body names the recorder, and the allowed list stays at two rows.
 
 **The process group.** The process-group pair of `repocontract_cmd_unix.go` and `repocontract_cmd_other.go` moves to `sysexec` as `CancelKillsTheProcessGroup`, with no change of its body. Walk rule 5 of 7.4 never walks `sysexec`. The build verifies that no other reached package holds an excluded file, and it records the list.
 
@@ -497,7 +502,7 @@ The verb is thus a constant in two bodies of one package, not at each gate site.
 | 3 | a call through a method value, a `sysexec.RunFunc` parameter and a package `var` initializer is refused | same | a walk of calls only |
 | 4 | a method of a live type that `sort.Sort` reaches is refused | same | no live-type rule |
 | 5 | `filepath.Join(root, ".gi"+"t", "HEAD")` is refused; `".gitignore"` is not | same | a literal-only scan |
-| 6 | `sysexec.Output` with `go` and `list` in a gate package is refused, and the same call through the fixture `gotool.List` passes. `go run`, `sh -c`, `env git`, a variable program and an unlisted `sysexec` function are refused. A call of `sysexec.WithEnv` or of `sysexec.CancelKillsTheProcessGroup` passes. | same | a git-only rule, or a pass for a gate site |
+| 6 | `sysexec.Output` with `go` and `list` in a gate package is refused, and the same call through the fixture `gotool.List` passes. `go run`, `sh -c`, `env git`, a variable program and an unlisted `sysexec` function are refused. A call of `sysexec.WithEnv` or of `sysexec.CancelKillsTheProcessGroup` passes. A call of `build.Import` is refused. | same | a git-only rule, or a pass for a gate site |
 | 7 | the same `git log` call passes in a fixture `repostate` and is refused in its sibling package | same | no exemption, or an exemption by name prefix |
 | 8 | `RootOf` refuses a closure. A failed `go list`, a type error and an undeclared root are each an error with no refusal list. | `RootOf`, `Load` with a fake runner | a closure root; a failed load that passes |
 | 9 | `repostate` itself has no `mtime` or `git-dir` refusal and no `GitWords` constant (`HEAD`, `log`, `reflog`, `rev-list`, `merge-base`, `%ct`, `--since`). It imports only the stdlib and `sysexec`. | `Audit` on the real package | an mtime read or `HEAD` in `repostate`; a helper import |
@@ -521,9 +526,9 @@ The verb is thus a constant in two bodies of one package, not at each gate site.
 | 27 | `gatecontract.Input` holds no function, interface or channel type at any depth | the real type through `go/types` | an input that carries code |
 | 28 | a reached package with a file behind a build tag, and one with a function that has no body, are each class `exec` | a fixture | a body that the load does not see |
 | 29 | a generic function with a `git` call is refused through its instance | same | a walk that skips an instance |
-| 30 | an exec entry whose named parameter is missing from the loaded signature is a load error | `Load` with changed rules | an index that points at the wrong parameter |
+| 30 | an exec entry whose named parameter is missing from the loaded signature is an error of `Refusals` | `Refusals` with changed rules | an index that points at the wrong parameter |
 | 31 | a root in the real tree that reaches a `gitexec` reader gives class `git` | `Load`, `Refusals` with `Contract()` on the real module | a contract that fits only the fixtures |
-| 32 | `debug.ReadBuildInfo` gives `history`; `fs.FormatFileInfo` gives `mtime`. A write to `exec.Cmd.Path`, a slice alias of `exec.Cmd.Args` and a literal `exec.Cmd` each give `exec`. A write to `exec.Cmd.Dir` passes. | a fixture | the short entry list |
+| 32 | `debug.ReadBuildInfo` gives `history`; `fs.FormatFileInfo` gives `mtime`. A write to `exec.Cmd.Path`, a slice alias of `exec.Cmd.Args` and a literal `exec.Cmd` each give `exec`. A `new(exec.Cmd)` and a read of `Path` each give `exec`. A write to `exec.Cmd.Dir` passes. | a fixture | the short entry list |
 | 33 | a third-party package body with a `git` call is refused | a fixture with a vendored module | a walk of module bodies only |
 | 34 | `repostate`: `Ignored` with exit 1 gives an empty map; a real git error gives the arguments, the exit code and the stderr text | `gittest.Fixture` | an error that hides its cause |
 | 35 | `repostate`: `ReadAtBase` gives `fs.ErrNotExist` for a missing path and an error that names a missing base | same | one error for both |
@@ -536,12 +541,12 @@ The verb is thus a constant in two bodies of one package, not at each gate site.
 | 42 | the real `gotool` has no refusal | `ToolchainAudit` on the real package | a third verb; a second exec site; a helper import |
 | 43 | `List` and `Test` give the words `go list` and `go test` before `Args`, with `Dir` and `Env` of the call | `List`, `Test` | a verb that is missing or wrong |
 | 44 | the build-floor reviewer path sets the base-red ruler; a zero `ReviewInput` rules with the lane ruler and reaches no `baseattr` | `core` on a `gittest.Fixture` | a reviewer that loses the rerun; an entry that keeps it |
-| 45 | A fixture `gotool` is refused for each case: a variable verb, the verb `run`, a second exec call, `command` as a value. More cases: a `command` whose program is `git`, a helper import, a write to `Args` after `command`, an mtime read. A fixture with no `command` is a load error. | `ToolchainAudit` on a fixture | an audit that reads the program only |
+| 45 | A fixture `gotool` is refused for each case: a variable verb, the verb `run`, a second exec call, `command` as a value. More cases: a `command` whose program is `git`, a helper import, a write to `Args` after `command`, an mtime read. A fixture with no `command` is an error of the audit. | `ToolchainAudit` on a fixture | an audit that reads the program only |
 | 46 | The percents of a fixture profile are equal to a recorded `go tool cover -func` result. A function with no statement has a case. A missing source file is an error. | `FuncPercents` | a count that differs from the tool; a missing file that passes |
 | 47 | The entries of a fixture profile are equal to the entries that `ParseCoverFunc` reads from the recorded tool result. A `Config` with `Cover` and `CoverPath` is an error. | `scopedCoverFunc` of `core` on a fixture module | a path with no module path; a floor that starts `go tool` |
 | 48 | a floor with no recorded base reports "did not judge" with the cause "the run has no recorded worktree base" | a floor of `core` with an empty `WorktreeBaseSHA` on a `gittest.Fixture` | a pass; a read of `HEAD` (`comment_floor.go:103-108`) |
 | 49 | the floor reader accepts a profile that is older than a source; the command for an earlier profile refuses it | `covchanged`: the plain reader and the command | a freshness check in the floor; a command that lost the check |
-| 50 | the entry `Run` of `repo-contract-floor` writes no verdict store; the ship path writes one | the registry `Run` and the ship phase on a fixture | an entry that records |
+| 50 | the entry `Run` of `repo-contract-floor` writes no verdict store; the ship path writes one. The reviewer path still skips a package that is green on the same key. `Refusals` refuses a fixture pack whose runner names its recorder type. | the registry `Run`, the ship phase and `Refusals` on a fixture | an entry that records |
 | 51 | each of the four argument builders gives the two budget flags and no verb word | the builders with a fleet width set | flags that the dropped verb loses (`lanebudget.go:35-48`) |
 
 Tests 1 to 7, 24 to 26, 28 to 30, 32, 33, 41 and 45 use a fixture module that declares the real module path. The fixture has a stub `internal/sysexec`, a stub `internal/repostate` and a stub `internal/gotool`. Each of these tests calls `Contract()`, so the tests pin the real rule data. Only test 30 changes one exec entry of the result. Tests 27 and 31 read the real tree. The seven names that `TestC2231_001` pins stay in `testdup`.
@@ -555,12 +560,12 @@ Tests 1 to 7, 24 to 26, 28 to 30, 32, 33, 41 and 45 use a fixture module that de
 | 2b | `gotool` with `List` and `Test`; `covchanged.FuncPercents`; the manifest row `/go/internal/gotool/` | — | Low: the percent of a function differs from `go tool cover` | tests 43, 46 |
 | 3 | `gatehermetic` with `Contract`; the manifest row `/go/internal/gatehermetic/` | 2, 2b | Medium: a false refusal through a live type | tests 1-9, 24-33, 41, 42, 45 |
 | 4 | `testdup` on `repostate`; the new baseline count; the TDD floor; the real-tree test. The `cycle2231` predicates `002`, `003` and `004` go to the superseded-predicate archive with a reason. | 1, 3 | High: the count changes | tests 15-18, 37, 38 |
-| 5 | The floor reads of 7.1 move to `repostate`; `floorBase` loses `HEAD`; `commentaudit.ReadAtBase` moves; `changedpkgs` gets the dot-prefix rule. Each floor entry gets a named run function and the lane ruler, and the rerun methods move to the base-red ruler. `covchanged` gets the plain profile reader and `FuncPercents` feeds the floor. Each `go` site of 7.1 calls `gotool`, and the process-group pair moves to `sysexec`. The message records the refusals of the real registry by edge kind. | 1, 2b, 4 | High: a floor that skips with no base | the floor suites; tests 39, 40, 44, 47-51 |
+| 5 | The floor reads of 7.1 move to `repostate`; `floorBase` loses `HEAD`; `commentaudit.ReadAtBase` moves; `changedpkgs` gets the dot-prefix rule. Each floor entry gets a named run function and the lane ruler, and the rerun methods move to the base-red ruler. `covchanged` gets the plain profile reader and `FuncPercents` feeds the floor. Each `go` site of 7.1 calls `gotool`, and the process-group pair moves to `sysexec`. The pack gets `packRecorder` and `RunPlainRepoContractPack`; the four builders call `lanebudget.TestFlags`; `apicover.Config` gets `Cover` and the error for both fields. The message records the refusals of the real registry by edge kind. | 1, 2b, 4 | High: a floor that skips with no base | the floor suites; tests 39, 40, 44, 47-51 |
 | 6 | the guard on the real registry: test 10 and its `TreeReadingTests` row | 3, 4, 5 | Medium: a refusal that commits 4 and 5 did not remove | tests 10, 11 |
 | 7 | `phasecoherence`: `treegate.go`, `seed_phasecoherence.go`, the fixtures; two `baseline.json` rows go | 1, 6 | Medium: an import cycle through `prompts` | tests 19, 21 |
 | 8 | `fleet`: `zonegate.go`, `seed_fleet.go`, the module fixtures | 6 | Medium: about fifteen tests move | tests 20, 21 |
 
-Commit 4 lowers `count` to the new measure, because it now leaves out each `acs/` site. It can only go down. The commit message gives the old and the new value. Test 10 goes in after commit 5, because the three floor entries are closures until then, and rule 1 refuses a closure.
+Commit 4 lowers `count` to the new measure, because it now leaves out each `acs/` site. It can only go down. The commit message gives the old and the new value. Test 10 goes in after commit 5, because the three floor entries are closures until then, and walk rule 1 of 7.4 refuses a closure.
 
 ### 7.12 How the files stay protected
 
@@ -590,10 +595,10 @@ The test files of the guard are in `gateregistry` and `gatehermetic`, both on th
 - The child process of a `gotool.Test` call is outside the static reach. A test that the child runs can read git. G3 parity controls that child, because it runs the entry in three states.
 - The guard does not judge the `Args` of a `gotool` call. A flag such as `-exec` can start a program in the child. Review checks each argument builder.
 - The guard does not judge the `Env` of a `gotool` call. `GOFLAGS` can start a program in the toolchain, and `PATH` selects the `go` program. Review checks each site.
-- `go/build`, `go/importer` and `net/http/cgi` can start a process in a stdlib body that rule 5 does not walk. This fact is ASSUMED from the stdlib documents, and commit 3 probes it.
+- `go/build.Import` starts `go list` from `GOROOT`. A probe on go1.27.2 VERIFIED this fact, and 7.5 holds the entry. `go/importer` and `net/http/cgi` can start a process in a stdlib body that walk rule 5 of 7.4 does not walk. This second fact is ASSUMED from the stdlib documents, and commit 3 probes it.
 - A `.git` path that a body makes at run time from parts that are not constants is not seen. Review checks it.
 - `Fresh` is empty when `HEAD` is not the lane base, because no `acs/` directory then changes against `Base`. The `acs/` ratchet is thus lane-side only until G3 names the base of a main-side run.
-- One load sees one build configuration, which is that of the host with `CGO_ENABLED=0`. Rule 8 refuses a package that has more than one.
+- One load sees one build configuration, which is that of the host with `CGO_ENABLED=0`. Walk rule 8 of 7.4 refuses a package that has more than one.
 
 ### 7.14 Open questions for the operator
 
@@ -602,6 +607,6 @@ The design reviews of 2026-11-10 gave a recommendation for each question. The op
 The operator approved the toolchain boundary on 2026-11-11. Three review rounds refused the first `exec` rule, which read a constant verb at each gate site. The commit `c2cc026c3` holds the revision after rounds 1 and 2, and round 3 refused that revision.
 
 1. **Checks that read history.** `lost_landing_floor.go:76-96`, `explanationdocs/gitio.go:178,262` and `rebind.go:132,176` read `HEAD` or ancestry by design: they witness a landing. Recommended: these are landing witnesses, not lane-tree gates. They stay out of the registry. One typed list in one home names them, and the guard test reads that list. Commit 5 proves that no floor entry reaches them.
-2. **The mtime freshness of `covchanged`** (`workspace.go:129-140`). The review closed this question, and 7.8 holds the result. The floor measures in the same run and takes a plain reader. The check of an older profile leaves `Workspace`. A SHA-256 of each source is an option only if Go code in the tree writes the profile. This fact is ASSUMED.
+2. **The mtime freshness of `covchanged`** (`workspace.go:133-142`). The review closed this question, and 7.8 holds the result. The floor measures in the same run and takes a plain reader. The check of an older profile leaves `Workspace`. A SHA-256 of each source is an option only if Go code in the tree writes the profile. This fact is ASSUMED.
 3. **The `fleet` key.** Its judges read no git, so section 6.5 gives the wrong reason for G2. Recommended: keep it in G2 as the last commit, with no change of the preflight. The commit also corrects the reason in section 6.5. The other choice is to move it to G3 with the other 13 keys.
 4. **The base-red rerun in a floor entry.** G4 put the rerun inside the entry `Run`. The rerun runs git by design: it adds a worktree of the base. Recommended: the entry gives the raw reds, and only the build-floor reviewer reruns (7.8). The other choice needs an exemption for `baseattr` in `Contract()`.
