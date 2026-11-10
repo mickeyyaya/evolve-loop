@@ -395,7 +395,7 @@ Tests 13, 16, 24 and 27 go through the real entry points of the pipeline: the sh
 | G3c | `repocontract.Readers` moves to a non-test file. `TestRepoContract_PeakHeapUnder400MB` joins `TreeReadingTests()`; `UnregisteredTests()` and its measured ceiling. The small patterns: `rawgitratchet`, `sizeratchet`, `testmainexit`, `inboxrank`, `policy`, `routingtest`. The commit that moves a test changes each reference to its name, such as `TestRatchet_NoNewRawGitFixtures`. Tests 9, 10. | G3b | Low | tests 1, 9 |
 | G3d | `repocontract` (seven), `acssuite`, `evalqualitycheck`, `ipcenv` | G3c | Medium: `sharedTreeScan` parses once for two scanners (`stream_parse_test.go`) | tests 1, 9 |
 | G3e | `guards` (15) | G3d | Medium: the helpers of `guards` take `t` | tests 1, 9 |
-| G3f | `phasespec` and `profiles`; test 8 | G3e | High: about 41 judges. Split in two if the diff passes 1500 lines | test 8 |
+| G3f | `phasespec` and `profiles`; test 8. `repocontract.Packages()` and `repoContractPackages` go. | G3e | High: about 41 judges. Split in two if the diff passes 1500 lines | test 8 |
 
 - Each PR lowers the literal list of G1 test 2 by the patterns it covers. G3f leaves it empty.
 - A judge that measures the scanner, not the tree, is not a gate. `TestRepoContract_PeakHeapUnder400MB` is one. G3c moves it to `TreeReadingTests()` before it measures the ceiling, so the ceiling never rises.
@@ -436,7 +436,7 @@ After G3, a lane cannot change a judge, a fixture, a stage or the base step. The
 | O3 | Ship judges with the binary's gate code. Accept? | Yes, for the reason in 8.14. |
 | O4 | Split G3 into six inbox sub-items G3a to G3f? | Yes, one item for each PR, so each gets its own red proof and review. |
 | O5 | A new plan item for the 141 named tests? | Yes, after G6. It starts with the tests of `cmd/evolve`, about 87. |
-| O6 | The three phase floors get no parity fixture, and test 1 holds them in an exempt list. Accept? | Yes. One floor fixture costs six `go test` runs, and the base-red rule of G4 already judges the floors against the base. |
+| O6 | The three phase floors get no parity fixture, and test 1 holds them in an exempt list. Accept? | Yes. One floor fixture costs six `go test` runs, and the base-red rule of G4 already judges the floors against the base. The operator accepted this on 2026-11-11. |
 
 ### 8.16 ASSUMED facts (from G2, not yet in the tree)
 
