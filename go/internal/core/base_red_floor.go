@@ -1,0 +1,206 @@
+package core
+
+import (
+	"cmp"
+	"context"
+	"fmt"
+	"path/filepath"
+	"slices"
+	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
+)
+
+const (
+	CodeBuildBaseRedAttributed signalcenter.Code = "BUILD_BASE_RED_ATTRIBUTED"
+	CodeBuildBaseRedUnjudged   signalcenter.Code = "BUILD_BASE_RED_UNJUDGED"
+)
+
+const baseRedScratch = ".evolve/ephemeral/base-red"
+
+func init() {
+	signalcenter.RegisterCode(signalcenter.ModuleBuild, CodeBuildBaseRedAttributed, "a build floor red was rerun on the lane base and every red test is red there too, so the floor does not refuse the lane; fields.keys (package.Test of each base-red test), main_red (the keys that are red on main too), took")
+	signalcenter.RegisterCode(signalcenter.ModuleBuild, CodeBuildBaseRedUnjudged, "a build floor red could not be rerun on the lane base, so the lane is blamed as before; fields.keys (package.Test of each red test), cause")
+}
+
+type FloorJudge func(ctx context.Context, in ReviewInput) ([]string, error)
+
+type MainRedSink func(projectRoot string, v baseattr.Verdict, cycle int) error
+
+func FailOpen(name string, judge FloorJudge) BuildFloorCheckFn {
+	return func(ctx context.Context, in ReviewInput) []string {
+		lines, err := judge(ctx, in)
+		if err != nil {
+			fmt.Fprintf(in.errOut(), "[build-floor] WARN %s %v\n", name, err)
+			return nil
+		}
+		return lines
+	}
+}
+
+func UnitTestFloorJudge(ctx context.Context, in ReviewInput) ([]string, error) {
+	return changedPackageFloorChecks(ctx, in, changedFloorPaths(ctx, in)), nil
+}
+
+func CoverChangedFloorJudge(ctx context.Context, in ReviewInput) ([]string, error) {
+	return coverChangedFailures(ctx, in, changedFloorPaths(ctx, in)), nil
+}
+
+func (in ReviewInput) attributor() baseattr.Attributor {
+	root := cmp.Or(in.ProjectRoot, in.Worktree)
+	gates := policy.LoadOrDefaults(filepath.Join(root, ".evolve", "policy.json"), in.errOut()).GatesConfig()
+	return baseattr.Attributor{
+		Git:       gitexec.Git{Dir: root, Exec: gitRunner},
+		Run:       in.baseRunner(),
+		MainRef:   "main",
+		Scratch:   baseRedScratch,
+		Timeout:   gates.BaseRedRerun,
+		Serialize: func(context.Context) func() { return in.acquireFloorRetakeLock() },
+	}
+}
+
+func (in ReviewInput) baseRunner() baseattr.Runner {
+	if in.baseRun != nil {
+		return in.baseRun
+	}
+	return baseattr.GoTestRunner(ipcenv.GoTestEnv())
+}
+
+func (in ReviewInput) laneReds(ctx context.Context, reds baseattr.Reds) (baseattr.Reds, error) {
+	v, err := in.attributor().Attribute(ctx, floorBase(in), reds)
+	switch {
+	case err != nil:
+		in.reportUnjudged(reds, err)
+		return reds, err
+	case v.Blamed():
+		return baseattr.Reds{Keys: v.LaneOnly, Unnamed: reds.Unnamed || len(v.LaneOnly) == 0, Flags: reds.Flags}, nil
+	}
+	in.reportAttributed(v)
+	return baseattr.Reds{}, nil
+}
+
+type ruling struct {
+	lane  baseattr.Reds
+	info  []baseattr.Key
+	cause error
+}
+
+func (in ReviewInput) rule(ctx context.Context, reds baseattr.Reds) ruling {
+	lane, err := in.laneReds(ctx, reds)
+	var info []baseattr.Key
+	for _, k := range reds.Keys {
+		if !slices.Contains(lane.Keys, k) {
+			info = append(info, k)
+		}
+	}
+	return ruling{lane: lane, info: info, cause: err}
+}
+
+func (r ruling) clear() bool {
+	return !r.lane.Unnamed && len(r.lane.Keys) == 0
+}
+
+func (r ruling) notes() []string {
+	var out []string
+	if r.cause != nil {
+		out = append(out, fmt.Sprintf("base-red attribution could not run (%v), so the lane is blamed for each red", r.cause))
+	}
+	if len(r.info) > 0 {
+		out = append(out, "information: red on the base too, not refused: "+keyNames(r.info))
+	}
+	return out
+}
+
+func (r ruling) of(reds baseattr.Reds) ruling {
+	if !reds.Attributable() {
+		return ruling{lane: baseattr.Reds{Keys: reds.Keys, Unnamed: true}}
+	}
+	part := ruling{info: r.info, cause: r.cause}
+	for _, k := range reds.Keys {
+		if slices.Contains(r.lane.Keys, k) {
+			part.lane.Keys = append(part.lane.Keys, k)
+		}
+	}
+	return part
+}
+
+func (in ReviewInput) laneFailures(ctx context.Context, fails []selfCheckFailure) []selfCheckFailure {
+	parsed := make([]baseattr.Reds, len(fails))
+	var asked baseattr.Reds
+	for i, f := range fails {
+		parsed[i] = baseattr.ParseGoTest(f.Output)
+		if parsed[i].Attributable() {
+			asked.Keys = append(asked.Keys, parsed[i].Keys...)
+		}
+	}
+	var all ruling
+	if asked.Attributable() {
+		all = in.rule(ctx, asked)
+	}
+	var kept []selfCheckFailure
+	for i, f := range fails {
+		part := all.of(parsed[i])
+		if part.clear() {
+			continue
+		}
+		f.Output = strings.Join(append([]string{f.Output}, part.notes()...), "\n")
+		kept = append(kept, f)
+	}
+	return kept
+}
+
+func (in ReviewInput) coverRedLines(ctx context.Context, out string, flags []string) []string {
+	reds := baseattr.ParseGoTest(out)
+	reds.Flags = flags
+	r := in.rule(ctx, reds)
+	if r.clear() {
+		return nil
+	}
+	return append([]string{floorFailureDiagnostic(out)}, r.notes()...)
+}
+
+func keyNames(keys []baseattr.Key) string {
+	names := make([]string, len(keys))
+	for i, k := range keys {
+		names[i] = k.Package + "." + k.Test
+	}
+	return strings.Join(names, ", ")
+}
+
+func (in ReviewInput) reportAttributed(v baseattr.Verdict) {
+	keys := keyNames(v.BaseRed)
+	reason := fmt.Sprintf("build floor: each red test is red on the base %s too, so the floor does not refuse it: %s (attributed in %s)", v.Base, keys, v.Took)
+	fmt.Fprintf(in.errOut(), "[build-floor] NOTE %s\n", reason)
+	in.Signals.Emit(signalcenter.Event{
+		Cycle: in.Cycle, RunID: in.RunID, Phase: string(PhaseBuild),
+		Module: signalcenter.ModuleBuild, Origin: "ReviewInput.reportAttributed", Kind: signalcenter.KindGateCorrected,
+		Severity: signalcenter.SeverityInfo, Code: CodeBuildBaseRedAttributed, Reason: reason,
+		Fields: map[string]string{"keys": keys, "main_red": keyNames(v.MainRed), "took": v.Took.String()},
+	})
+	in.openMainRedStop(v)
+}
+
+func (in ReviewInput) openMainRedStop(v baseattr.Verdict) {
+	if len(v.MainRed) == 0 || in.MainRedStop == nil {
+		return
+	}
+	if err := in.MainRedStop(in.ProjectRoot, v, in.Cycle); err != nil {
+		fmt.Fprintf(in.errOut(), "[build-floor] WARN the main-red stop was not recorded: %v\n", err)
+	}
+}
+
+func (in ReviewInput) reportUnjudged(reds baseattr.Reds, cause error) {
+	keys := keyNames(reds.Keys)
+	reason := fmt.Sprintf("build floor: the red test(s) %s could not be rerun on the base (%v), so the lane is blamed", keys, cause)
+	fmt.Fprintf(in.errOut(), "[build-floor] WARN %s\n", reason)
+	in.Signals.Emit(signalcenter.Event{
+		Cycle: in.Cycle, RunID: in.RunID, Phase: string(PhaseBuild),
+		Module: signalcenter.ModuleBuild, Origin: "ReviewInput.reportUnjudged", Kind: signalcenter.KindGateRejected,
+		Severity: signalcenter.SeverityWarn, Code: CodeBuildBaseRedUnjudged, Reason: reason,
+		Fields: map[string]string{"keys": keys, "cause": cause.Error()},
+	})
+}

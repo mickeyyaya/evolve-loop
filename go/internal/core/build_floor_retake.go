@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
+	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -148,20 +149,20 @@ func (in ReviewInput) emitFloorRetake(label string, tests []string, shape floorR
 	})
 }
 
+const trailingUnpackagedFail = "\nFAIL\t-\n"
+
 func goTestFailureLines(output string) (lines, tests []string) {
 	for _, ln := range strings.Split(output, "\n") {
 		ln = strings.TrimSpace(ln)
-		if name, ok := strings.CutPrefix(ln, "--- FAIL: "); ok {
+		if strings.HasPrefix(ln, "--- FAIL: ") {
 			lines = append(lines, ln)
-			top, _, _ := strings.Cut(name, " ")
-			top, _, _ = strings.Cut(top, "/")
-			if top != "" && !slices.Contains(tests, top) {
-				tests = append(tests, top)
-			}
-			continue
+		} else if f := strings.Fields(ln); len(f) >= 2 && f[0] == "FAIL" {
+			lines = append(lines, ln)
 		}
-		if f := strings.Fields(ln); len(f) >= 2 && f[0] == "FAIL" {
-			lines = append(lines, ln)
+	}
+	for _, k := range baseattr.ParseGoTest(output + trailingUnpackagedFail).Keys {
+		if !slices.Contains(tests, k.Test) {
+			tests = append(tests, k.Test)
 		}
 	}
 	return lines, tests

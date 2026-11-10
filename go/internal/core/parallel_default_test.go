@@ -54,6 +54,7 @@ const (
 )
 
 var serialRequiredTests = map[string]string{
+	"core.TestUnitAndCoverFloors_SubtractOnlyKeysRedOnTheBase":                                      swapsBuildSelfCheckRunner,
 	"core.TestShipJourney_AFailedContinueAfterAResolveKeepsTheAuditedCommit":                        swapsGitOnPath,
 	"core.TestShipJourney_AFailedStageReadIsNotTheLaneDeletingTheItem":                              swapsGitOnPath,
 	"core.TestReauditCycle_MovedBaseRebasesAuditsAndRecordsTheBinding":                              swapsReauditRebase,

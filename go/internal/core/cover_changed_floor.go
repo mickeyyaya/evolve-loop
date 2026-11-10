@@ -41,7 +41,8 @@ func coverChangedFailures(ctx context.Context, in ReviewInput, paths []string) [
 	}
 	switch status {
 	case coverStatusTestsFailed:
-		return coverChangedReport(coverChangedResult(stage, coverChangedTestsFailedHeadline, []string{floorFailureDiagnostic(out)}))
+		lines := in.coverRedLines(ctx, out, []string{"-tags", strings.Join(covchanged.DefaultTags, ",")})
+		return coverChangedReport(coverChangedResult(stage, coverChangedTestsFailedHeadline, lines))
 	case coverStatusPlumbingError:
 		fmt.Fprintf(os.Stderr, "[build-floor] WARN cover-changed could not make a coverage profile (%s); `make -C go cover-changed` and CI still judge coverage\n", out)
 		return coverChangedReport(coverChangedResult(stage, coverChangedTestsFailedHeadline, unitRunFailures(ctx, in, moduleDir, pkgs)))
@@ -57,7 +58,7 @@ func unitRunFailures(ctx context.Context, in ReviewInput, moduleDir string, pkgs
 		return buildSelfCheckRunner(ctx, moduleDir, pkg)
 	})
 	var details []string
-	for _, f := range fails {
+	for _, f := range in.laneFailures(ctx, fails) {
 		details = append(details, floorFailureDiagnostic(f.Output))
 	}
 	return details

@@ -1462,3 +1462,16 @@ Rules for these seams:
 - A test that proves concurrent dispatch uses a barrier, not a sleep. In `TestDispatchEvaluateBatch_Concurrent`, each runner waits at a `rendezvous` until all batch members arrive. A serial dispatch fails because a runner stops its wait and records a miss. A sleep with a peak counter failed on a slow CI runner when the second runner started late.
 
 For the related rule on test isolation, see [driver tests must be environment-hermetic](../../conventions/hermetic-driver-tests.md).
+
+## Base-red attribution in the build floor
+
+The repo-contract, unit-test and cover-changed checks judge a red test against the lane base before they reject the lane.
+`ReviewInput.laneReds` calls `baseattr.Attributor`. It reruns only the red test keys in a detached checkout of the base.
+A red that the base shows too does not reject the lane. The floor writes a NOTE and emits `BUILD_BASE_RED_ATTRIBUTED`.
+
+A lane-only red still rejects. The rejection lists the base-red keys as information.
+
+An attribution that cannot run blames the lane as before. The floor writes a WARN and emits `BUILD_BASE_RED_UNJUDGED`.
+`FailOpen` wraps a `FloorJudge` and keeps the WARN for a judge error.
+When the base and `main` are both red, `OpenMainRedStop` receives the verdict. Nothing sets that hook yet.
+Design: [gate-contract.md](../gate-contract.md), section 7, and the G4 page that it links.

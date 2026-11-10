@@ -133,6 +133,7 @@ func changedPackageFloorChecks(ctx context.Context, in ReviewInput, paths []stri
 	fails := in.retakeSelfCheckFailures(runBuildSelfCheck(ctx, moduleDir, plain, buildSelfCheckRunner), func(pkg string) (string, bool) {
 		return buildSelfCheckRunner(ctx, moduleDir, pkg)
 	})
+	fails = in.laneFailures(ctx, fails)
 	namingFails := apicoverNamingFailures(ctx, in, moduleDir, enforced, paths)
 	removeBuildSelfCheckArtifact(in.Worktree)
 	if len(fails) > 0 {
