@@ -16,6 +16,7 @@
 - `Released` drops the green keys. With no key left, it sets `ReleasedAt` and `ReleasedBy`. It does not change a stop that does not hold.
 - `Overdue` is true when a stop that holds is older than a positive bound. `Escalate` records only the first escalation time.
 - `Cause` names the keys, `MainSHA`, `OpenedAt` and the parked cycles. `ResumeCondition` gives the condition that ends the stop.
+- `ParkedCycles` gives the parked cycle numbers in order, for a signal field. It is empty when no cycle is parked.
 - `FixItemID` is `fix-main-red-` and the first 8 characters of the `main` commit.
 
 ## The record

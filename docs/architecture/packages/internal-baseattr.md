@@ -14,6 +14,8 @@
 - `GoTestRunner` runs `go test` through the `sysexec` seam with the environment of the caller. The remaining deadline of the context becomes the `-timeout` flag.
 - `FailedTests` gives the top-level name of each `--- FAIL:` line, once and in order. It is the display projection of the parser. It needs no package line.
 - `Names` joins a key list as `package.Test` names. The build floor and the ship gate use it for each signal and each message.
+- `Verdict.Debug` gives the debug pairs of a ship error: the `BaseRed` names, the `MainRed` names, the base and `main`. `VerdictOfDebug` reads them back.
+- `ParseNames` is the inverse of `Names`. The debug names and the delimiter have this one home, so ship and the orchestrator cannot disagree.
 - `New` builds an `Attributor` and sets `MainRef` to `DefaultMainRef` and `Scratch` to `DefaultScratch`. The build floor and the ship gate both build through it.
 - `Verdict.Blamed` is true when `LaneOnly` is not empty or `Unjudged` is set. `Verdict.MainGreen` is true when the base is red and `main` is read and green.
 

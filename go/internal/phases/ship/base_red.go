@@ -102,8 +102,7 @@ func baseRedError(opts *Options, v baseattr.Verdict) error {
 }
 
 func baseRedShipError(code shiperr.ShipErrorCode, class shiperr.ShipErrorClass, v baseattr.Verdict, message string) error {
-	keys := baseattr.Names(v.BaseRed)
-	return shiperr.NewShipError(code, class, shiperr.StageAtomicShip, message+": "+keys, "keys", keys, "base", v.Base, "main", v.Main)
+	return shiperr.NewShipError(code, class, shiperr.StageAtomicShip, message+": "+baseattr.Names(v.BaseRed), v.Debug()...)
 }
 
 func emitBaseRed(opts *Options, code signalcenter.Code, kind signalcenter.Kind, sev signalcenter.Severity, v baseattr.Verdict) {

@@ -125,13 +125,17 @@ func (s Stop) Escalate(now time.Time) Stop {
 
 func (s Stop) Cause() string {
 	return fmt.Sprintf("main is red at %s since %s: %s; parked cycles: %s",
-		s.MainSHA, s.OpenedAt.UTC().Format(time.RFC3339), baseattr.Names(s.Keys), s.parkedCycles())
+		s.MainSHA, s.OpenedAt.UTC().Format(time.RFC3339), baseattr.Names(s.Keys), s.parkedText())
 }
 
-func (s Stop) parkedCycles() string {
+func (s Stop) parkedText() string {
 	if len(s.Parked) == 0 {
 		return "none"
 	}
+	return s.ParkedCycles()
+}
+
+func (s Stop) ParkedCycles() string {
 	cycles := make([]string, len(s.Parked))
 	for i, p := range s.Parked {
 		cycles[i] = fmt.Sprint(p.Cycle)

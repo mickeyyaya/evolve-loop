@@ -285,3 +285,18 @@ func TestBaseRedAttributor_TakesTheRerunLimitFromThePolicy(t *testing.T) {
 		t.Errorf("the rerun limit is the policy value 77s; got %s", got)
 	}
 }
+
+func TestBaseRedError_TheParkCarriesOnlyTheKeysThatAreRedOnMain(t *testing.T) {
+	t.Parallel()
+	l := newBaseRedLane(t)
+	greenOnMain := baseattr.Key{Package: "example.com/m/other", Test: "TestGreenOnMain"}
+	sent := baseattr.Verdict{BaseRed: []baseattr.Key{greenOnMain, redKey}, MainRed: []baseattr.Key{redKey}, Base: l.base, Main: "9a2bbe0e1c0ffee"}
+
+	err := baseRedError(l.options(nil), sent)
+
+	se := wantShipErr(t, err, shiperr.CodeMainRedPark, core.ShipClassPrecondition, redTest)
+	got := baseattr.VerdictOfDebug(se.Debug)
+	if len(got.MainRed) != 1 || got.MainRed[0] != redKey || len(got.BaseRed) != 2 || got.Main != sent.Main || got.Base != sent.Base {
+		t.Errorf("the park error carries %+v, want the one main-red key apart from the two base-red keys", got)
+	}
+}

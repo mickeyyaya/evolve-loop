@@ -1489,3 +1489,23 @@ When the base and `main` are both red, the injected field `ReviewInput.MainRedSt
 `ReviewInput.attributor` builds the `Attributor` through `baseattr.New`. The main ref and the scratch path have one home there.
 `tagFlags` gives the `-tags` flag list. `coverTestArgs` and the cover-changed floor both use it.
 Design: [gate-contract.md](../gate-contract.md), section 7, and the G4 page that it links.
+
+## The park of a lane on a red main
+
+The file is `main_red_park.go`. The design is in [gate-contract-g4-base-red-attribution.md](../gate-contract-g4-base-red-attribution.md), section 7.4.
+
+- Ship returns the code `MAIN_RED_PARK` when the red tests of the lane are red on its base and on `main`. `recoverShipErrorRoute` sends that error to `parkOnMainRed` before the budget check, so a park occurs at each recovery depth.
+- `parkOnMainRed` does three steps. It writes a checkpoint with the reason `MainRedReason` through `MainRedBoundaryCheckpointer`. It opens or refreshes the stop in `main-red-stop.json` and adds the parked cycle. It emits `GATE_REPO_MAIN_RED_PARKED`.
+- The signal is a warning when the two writes pass. It is an incident when one write fails, because the cycle cannot resume from such a park. The signal gives the cause, the evidence and the next step.
+- `baseattr.VerdictOfDebug` reads the verdict from the debug values of the ship error. The stop gets only the `MainRed` keys, so a key that is green on `main` never enters the stop.
+- When ship did not judge `main`, the verdict has no `MainRed` key. The park then opens no stop. It adds the parked row and keeps the checkpoint, and the signal says that ship did not judge `main`.
+- The cycle then ends with the ship error, and `errors.Is` finds `ErrMainRedParked` in it. `isParked` is true for that error and for `ErrAllFamiliesExhausted`.
+- A parked cycle gets no failure lesson, no failure digest and no abnormal epilogue. The interrupt checkpoint does not replace its checkpoint. Thus the lane is not blamed, and its phase stays resumable.
+- `failureLearningGate` gives `gateParkDeferred` for each parked error.
+- `laneParked` accepts the reasons `quota-likely` and `main-red`. `PausedScope.Reason` gives the reason to the caller, and `resumableReasons` holds `main-red`.
+- The signal code has the prefix `GATE_REPO_`, because the registry refuses a code without the prefix of its module.
+- Pinned by `TestRecoverShipError_MainRedParkWritesAMainRedCheckpointAndAStopRow`, `TestRecoverShipError_ASecondParkRefreshesTheStopAndKeepsItsOpenTime` `TestRecoverShipError_AParkOnAnUnjudgedMainOpensNoStopAndStaysResumable` and the `TestParkOnMainRed_*` tests.
+- `parkOnMainRed` takes the cycle from the cycle state, so the stop row and the checkpoint name one cycle. The caller reads the verdict from the ship error.
+- `TestRunCycle_AFirstShipThatParksOnARedMainIsNotAFailedCycle` pins the park of the first ship of a cycle. `TestParkOnMainRed_TwoFailedWritesGiveAOneLineIncident` pins the one-line cause of two failed writes.
+- `TestResumeExecution_AShipThatParksOnARedMainIsNotAFailedCycle` pins the park of a resumed ship. `TestIsResumableReason_AMainRedParkIsResumable` pins the reason.
+- Limits: the exit code of a parked cycle and the release of its claims are the work of `cmd/evolve`. Until the pool reads the stop, a parked lane resumes in the next fill and parks again.

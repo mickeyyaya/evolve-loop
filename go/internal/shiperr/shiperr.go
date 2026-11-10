@@ -137,6 +137,12 @@ func (e *ShipError) DebugString() string {
 	return b.String()
 }
 
+var ErrMainRedParked = errors.New("shiperr: ship parked the lane on a red main")
+
+func (e *ShipError) Is(target error) bool {
+	return target == ErrMainRedParked && e != nil && e.Code == CodeMainRedPark
+}
+
 func AsShipError(err error) (*ShipError, bool) {
 	var se *ShipError
 	if errors.As(err, &se) {

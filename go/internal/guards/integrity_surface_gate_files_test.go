@@ -67,6 +67,7 @@ var protectedGateFiles = []struct {
 	{"go/internal/phases/audit/ciparity.go", GateGuarantee},
 	{"go/internal/subagent/run.go", LedgerGuarantee},
 	{"go/internal/core/ship_recovery.go", GateGuarantee},
+	{"go/internal/core/main_red_park.go", GateGuarantee},
 	{"go/internal/core/resume_execution.go", AuditVerdictGuarantee},
 	{"go/internal/core/resume_bootstrap.go", AuditVerdictGuarantee},
 	{"go/internal/core/ports.go", SandboxGuarantee},

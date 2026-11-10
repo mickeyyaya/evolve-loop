@@ -185,6 +185,12 @@ func TestStop_CauseNamesTheKeysTheTipTheOpenTimeAndTheParkedCycles(t *testing.T)
 			t.Errorf("Cause = %q, want it to hold %q", cause, want)
 		}
 	}
+	if got := stop.ParkedCycles(); got != "" {
+		t.Errorf("ParkedCycles of a stop with no parked cycle = %q, want the empty string", got)
+	}
+	if got := stop.WithParked(Parked{Cycle: 2249}).WithParked(Parked{Cycle: 2242}).ParkedCycles(); got != "2242, 2249" {
+		t.Errorf("ParkedCycles = %q, want the cycles in order", got)
+	}
 	if resume := stop.ResumeCondition(); !strings.Contains(resume, "green on main") || !strings.Contains(resume, "next pool fill") {
 		t.Errorf("ResumeCondition = %q, want the green keys and the pool fill", resume)
 	}

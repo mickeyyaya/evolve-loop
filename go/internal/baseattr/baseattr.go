@@ -92,5 +92,5 @@ func Names(keys []Key) string {
 	for i, k := range keys {
 		names[i] = k.Package + "." + k.Test
 	}
-	return strings.Join(names, ", ")
+	return strings.Join(names, nameDelim)
 }

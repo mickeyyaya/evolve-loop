@@ -55,7 +55,7 @@ func shipsOrWarn(evolveDir string, opts ResumeOptions) map[int]time.Time {
 }
 
 func laneResumable(last perRunState, ships map[int]time.Time, projectRoot string, opts ResumeOptions) (*ResumePoint, bool) {
-	if _, shipped := ships[last.cycle]; shipped || !laneQuotaPaused(last) {
+	if _, shipped := ships[last.cycle]; shipped || !laneParked(last) {
 		return nil, false
 	}
 	rp, err := loadResumeStateFrom(last.path, projectRoot, opts)
@@ -66,8 +66,8 @@ func laneResumable(last perRunState, ships map[int]time.Time, projectRoot string
 	return rp, true
 }
 
-func laneQuotaPaused(st perRunState) bool {
-	return st.enabled && st.reason == laneQuotaReason && !st.leased && !IsTerminalPhase(st.phase)
+func laneParked(st perRunState) bool {
+	return st.enabled && (st.reason == laneQuotaReason || st.reason == MainRedReason) && !st.leased && !IsTerminalPhase(st.phase)
 }
 
 func normalizedIDs(raw []string) []string {
