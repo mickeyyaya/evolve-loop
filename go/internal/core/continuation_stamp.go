@@ -217,14 +217,21 @@ func (cr *cycleRun) adoptContinuationAfterTriage() error {
 		return fmt.Errorf("continuation workspace manifest copy: %w", err)
 	}
 	SeedDispositionSkeleton(cr.cs.WorkspacePath, cr.req.ProjectRoot, c.Cycle)
+	cr.serveContinuationContext(c, wt)
+	fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d ADOPTED continuation: worktree re-seeded from cycle-%d snapshot %s (base %s)\n", cr.cycle, c.Cycle, c.SnapshotSHA[:12], base)
+	return nil
+}
+
+func (cr *cycleRun) serveContinuationContext(c *continuation.Continuation, wt string) {
 	if findings := readContinuationFindings(c.FindingsPath, cr.o.errOut()); findings != "" {
 		cr.ctxSnap["continuation_findings"] = findings
 	}
 	if first := continuationRepairFirst(c, wt, cr.o.errOut()); first != "" {
 		cr.ctxSnap[CtxKeyContinuationRepairFirst] = first
 	}
-	fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d ADOPTED continuation: worktree re-seeded from cycle-%d snapshot %s (base %s)\n", cr.cycle, c.Cycle, c.SnapshotSHA[:12], base)
-	return nil
+	if line := continuationAncestry(cr.ctx, gitexec.Git{Dir: cr.req.ProjectRoot, Exec: gitRunner}, cr.cs.WorkspacePath); line != "" {
+		cr.ctxSnap[CtxKeyContinuationAncestry] = line
+	}
 }
 
 func (o *Orchestrator) shedDeclinedPointer(projectRoot string, cycle int, declined continuation.Continuation) {
