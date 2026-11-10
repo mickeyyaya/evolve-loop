@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -39,8 +40,9 @@ func mainRedParkError() *core.ShipError {
 	})
 }
 
-func seedParkedLane(t *testing.T, root string, cycle string) core.CycleState {
+func seedParkedLane(t *testing.T, root string, cycleID int) core.CycleState {
 	t.Helper()
+	cycle := strconv.Itoa(cycleID)
 	workspace := filepath.Join(root, ".evolve", "runs", "cycle-"+cycle)
 	worktree := filepath.Join(root, "worktree")
 	for _, dir := range []string{workspace, worktree} {
@@ -58,13 +60,13 @@ func seedParkedLane(t *testing.T, root string, cycle string) core.CycleState {
 		}
 	}
 	t.Setenv(ipcenv.CycleStateFileKey, statePath)
-	return core.CycleState{CycleID: 2249, RunID: "run-2249", Phase: "ship", WorkspacePath: workspace, ActiveWorktree: worktree}
+	return core.CycleState{CycleID: cycleID, RunID: "run-" + cycle, Phase: "ship", WorkspacePath: workspace, ActiveWorktree: worktree}
 }
 
 func TestRecoverShipError_MainRedParkWritesAMainRedCheckpointAndAStopRow(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
-	cs := seedParkedLane(t, root, "2249")
+	cs := seedParkedLane(t, root, 2249)
 	center := signalcenter.New()
 	var events []signalcenter.Event
 	center.Subscribe(func(e signalcenter.Event) { events = append(events, e) })
@@ -118,7 +120,7 @@ func TestRecoverShipError_MainRedParkWritesAMainRedCheckpointAndAStopRow(t *test
 func TestRecoverShipError_ASecondParkRefreshesTheStopAndKeepsItsOpenTime(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
-	cs := seedParkedLane(t, root, "2249")
+	cs := seedParkedLane(t, root, 2249)
 	o := core.NewOrchestrator(&recStorage{}, &fakeLedger{}, newRunners(nil))
 	o.RecoverFromShipErrorForTest(context.Background(), root, 2249, &cs, mainRedParkError(), 0, 1)
 	first, _, err := mainstop.Read(evolveDir)
@@ -142,7 +144,7 @@ func TestRecoverShipError_ASecondParkRefreshesTheStopAndKeepsItsOpenTime(t *test
 func TestRecoverShipError_AParkOnAnUnjudgedMainOpensNoStopAndStaysResumable(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
-	cs := seedParkedLane(t, root, "2249")
+	cs := seedParkedLane(t, root, 2249)
 	center := signalcenter.New()
 	var parked []signalcenter.Event
 	center.Subscribe(func(e signalcenter.Event) {

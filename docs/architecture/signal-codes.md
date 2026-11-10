@@ -113,6 +113,8 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 
 | Code | Meaning |
 |---|---|
+| `BUILD_BASE_RED_ATTRIBUTED` | a build floor red was rerun on the lane base and every red test is red there too, so the floor does not refuse the lane; fields.keys (package.Test of each base-red test), main_red (the keys that are red on main too), took |
+| `BUILD_BASE_RED_UNJUDGED` | a build floor red could not be rerun on the lane base, so the lane is blamed as before; fields.keys (package.Test of each red test), cause |
 | `BUILD_FLOOR_CONVERGING` | a build floor rejection after a correction held fewer findings than the one before, or the same number of other findings, so the build got one further correction inside the policy bound retry.floor_convergence_rounds; fields.before and after (the finding counts), round (the further correction in use), bound (the policy limit) |
 | `BUILD_FLOOR_RETAKE_GREEN` | a build floor test run was RED once and GREEN on its one serialized retake under the integration-tier lock, so the build goes on; fields.pkg (the package or the run), tests (the failed top-level test names of the first run; evolve ci classify also keys a failure on its package and top-level test), retake=green |
 | `BUILD_FLOOR_RETAKE_RED` | a build floor test run was RED and its one serialized retake under the integration-tier lock was RED again, so the floor fails; fields.pkg (the package or the run), tests (the failed top-level test names of the retake; evolve ci classify also keys a failure on its package and top-level test), retake=red |
@@ -190,6 +192,12 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `GATE_CONTRACT_SALVAGED` | a sole recoverable bad_verdict was repaired on disk and re-verified clean; the phase advanced on the repaired artifact |
 | `GATE_CONTRACT_VERIFIED` | the phase's declared deliverables were found in place (fields name the artifact, its size, the agent-owed files and the effects verified) and the phase advanced |
 | `GATE_CONTRACT_WOULD_BLOCK` | the deliverable violated its contract but the stage (shadow/advisory, or the report-size gate's) lets the phase advance; the reason is what enforce would have refused |
+
+### gate.repo
+
+| Code | Meaning |
+|---|---|
+| `GATE_REPO_MAIN_RED_PARKED` | ship found the red tests of the lane red on its base and on main, so the orchestrator parked the cycle and did not blame the lane (ADR-0165 G4); the cycle has a main-red checkpoint and a row in main-red-stop.json, and it resumes when main is green; fields.keys (package.Test of each key of the stop), main, fix_item, parked (the parked cycles), checkpoint_error and stop_error (each empty when its write passed; a write that failed makes the signal an incident, because the cycle cannot resume from the park) |
 
 ### healing
 
@@ -275,7 +283,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `LOOP_CHAIN_BATCH_ERROR` | a chained batch exited with a non-continuable rc (not 0/3/5) and the chain stopped, propagating rc; the batch's own signals name the failure (an rc=2 batch may have emitted none); fields.batch, rc, stop_reason=chain_batch_error |
 | `LOOP_CHAIN_INBOX_ITEM_INVALID` | a root-level .evolve/inbox/*.json did not parse as an inbox item (no object with a non-empty id) and is NOT counted as pending work — usually a real todo lost to a typo; fields.batch, name, path |
 | `LOOP_CHAIN_INBOX_UNREADABLE` | the chain could not read .evolve/inbox (a read error other than not-exist) and stopped rather than loop blind; fields.batch, path, error, stop_reason=chain_inbox_unreadable, exit=2 |
-| `LOOP_CHAIN_QUOTA_DEFER` | a chained batch exited with the resumable rc=5 quota-pause code; the chain defers instead of relaunching into the wall (resume with evolve loop --resume); fields.batch, cycle, wake_at, source are the checkpoint block's (empty when no block is on disk) |
+| `LOOP_CHAIN_QUOTA_DEFER` | a chained batch exited with the resumable rc=5 pause code; the chain defers and does not relaunch into the wall or the red main (resume with evolve loop --resume); fields.pause names the pause (a wall | a main-red park); fields.batch, cycle, wake_at, source are the checkpoint block's (empty when no block is on disk) |
 | `LOOP_ESCALATION_BOUNDARY` | the escalation boundary staged inbox items (bumped/filed/planned) or refused a staged autofile intent that names no priority_class after a cycle; fields carry the counts (refused among them, each refused id also printed as a WARN line) and the stage |
 | `LOOP_FLEET_LANE_HALT` | a fleet lane exited with the system-failure halt code; the lane's own LOOP_SYSTEM_FAILURE_HALT names the failure and the escalation it filed |
 | `LOOP_FLEET_POLICY_INVALID` | the loop could not load .evolve/policy.json at batch start (unreadable, malformed, or a key the strict schema rejects such as a misspelt fleet.orchestrator field), so the fleet config fell back to its defaults and the loop runs sequential (count 1) until the file is fixed; the reason carries the load error; fields.path |
@@ -440,6 +448,8 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `SHIP_AUDIT_BINDING_VERDICT_FAIL` | verify-class: the bound audit verdict is FAIL |
 | `SHIP_AUDIT_BINDING_VERDICT_WARN_STRICT` | verify-class: the bound audit verdict is WARN under strict audit |
 | `SHIP_BACKSTOP_FLAKE` | the importer backstop named red tests that were green when their packages re-ran by themselves, without the pack's concurrent load; the ship proceeded on that evidence — recurrence is a hygiene item, not proof of a timing window |
+| `SHIP_BASE_RED_MAIN_RED` | the scanner pack was red, every red test is red on the lane base and on main (or main could not be judged), so ship parks the lane instead of blaming it; fields.keys (package.Test of each base-red test), base, main (empty when unjudged), took |
+| `SHIP_BASE_RED_REBASE` | the scanner pack was red, every red test is red on the lane base too and green on main, so ship asks for the fleet rebase instead of blaming the lane; fields.keys (package.Test of each base-red test), base, main, took |
 | `SHIP_CARRY_NOT_REPROVEN` | an identical-rebase carry record named the bound audit but ship could not re-prove it; the reason names the failed check (record, ledger chain, ancestry, tree bytes or patch-id) and the change is audited again; fields.carry_cycle |
 | `SHIP_COMMITTED_DOC_DELETED` | atomic-ship: the landing deletes a path under docs/ or knowledge-base/ that the target branch holds; a rename into docs/, or within knowledge-base/, ships |
 | `SHIP_COMMIT_GATE_MALFORMED` | verify-class: the commit-gate attestation cannot be parsed |
@@ -480,6 +490,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `SHIP_LANDING_MAIN_ADVANCE_FAILED` | after the push landed, the fast-forward of the plane main to the pushed commit failed; origin holds the commit, and the ship continues; the next landing fast-forwards main to origin under the ship lock when the ship journal holds each commit between them; fields.step=integrate, branch, commit, git_rc, git_err |
 | `SHIP_LANDING_PUSH_REPAIR_DECLINED` | the inline repair after a rejected push declined at the named probe (fetch, origin_ref, head, push_retry, or transport_retry after the bounded backoff); the original transient GIT_PUSH_REJECTED returns with repair_attempted/repair_outcome=declined; fields.step=push, branch, probe |
 | `SHIP_LANDING_RESUME_FETCH_FAILED` | the git fetch of origin before a landing resume failed; the resume decides on the last known origin ref, and its push reports an outage; fields.step=resume, branch, git_rc, git_err |
+| `SHIP_MAIN_RED_PARK` | atomic-ship: the lane's red tests are red on its base and on main too, so the lane is not blamed and ship parks it until main is green (precondition, ADR-0165 G4) |
 | `SHIP_MANIFEST_GATE` | atomic-ship: a staged path was declared by no build/TDD report (cross-lane leak guard) |
 | `SHIP_MANUAL_DECLINED` | verify-class: the operator declined the manual ship |
 | `SHIP_MANUAL_NOT_TTY` | verify-class: a manual ship needs an interactive confirmation (or the audited --auto-confirm=<reason> parameter) |

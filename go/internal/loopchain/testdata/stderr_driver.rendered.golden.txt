@@ -9,7 +9,7 @@
 [chain] stopping after 2 batch(es): chain_max_batches (inbox pending=3, cap=2)
 == quota_defer
 [chain] batch 1/5 starting — inbox pending=3, fleet lanes=1
-[loop] loop.warning WARN LOOP_CHAIN_QUOTA_DEFER seq=2 origin=Driver.Run — batch 1 ended at a wall: no cause was recorded for this pause (cycle=7 wake-at={TS} source=probe) — DEFERRING, not relaunching batch=1 cycle=7 source=probe wake_at={TS}
+[loop] loop.warning WARN LOOP_CHAIN_QUOTA_DEFER seq=2 origin=Driver.Run — batch 1 ended at a wall: no cause was recorded for this pause (cycle=7 wake-at={TS} source=probe) — DEFERRING, not relaunching batch=1 cycle=7 pause=a wall source=probe wake_at={TS}
 [chain]   the checkpoint is intact; next: evolve loop --resume.
 == batch_error
 [chain] batch 1/5 starting — inbox pending=3, fleet lanes=1
@@ -24,5 +24,5 @@
 == invalid_item_then_quota_defer_no_block
 [loop] loop.warning WARN LOOP_CHAIN_INBOX_ITEM_INVALID seq=2 origin=Driver.Run — skipping .evolve/inbox/typo-item.json — not a valid inbox item (no parseable object with an `id`); it is NOT counted as pending work batch=1 name=typo-item.json path={EVOLVE_DIR}/inbox/typo-item.json
 [chain] batch 1/5 starting — inbox pending=1, fleet lanes=1
-[loop] loop.warning WARN LOOP_CHAIN_QUOTA_DEFER seq=3 origin=Driver.Run — batch 1 ended at a wall (no checkpoint block on disk, so no cause was recorded) — DEFERRING, not relaunching batch=1 cycle= source= wake_at=
+[loop] loop.warning WARN LOOP_CHAIN_QUOTA_DEFER seq=3 origin=Driver.Run — batch 1 ended in a pause (no checkpoint block on disk, so no cause was recorded) — DEFERRING, not relaunching batch=1 cycle= pause= source= wake_at=
 [chain]   the checkpoint is intact; next: evolve loop --resume.

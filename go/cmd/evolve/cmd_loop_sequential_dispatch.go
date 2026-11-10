@@ -10,6 +10,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cycleclassify"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
+	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 )
 
 type sequentialCycle struct {
@@ -56,7 +57,10 @@ func (b *loopBatchCoordinator) handleCycleError(result core.CycleResult, cycleEr
 		b.result.emitQuotaPause(b.cfg, result, b.stdout, b.stderr)
 		paused, _ := pausedFromCheckpoint(result, b.cfg.EvolveDir)
 		wallPause{result: paused, projectRoot: b.cfg.ProjectRoot, impact: sequentialImpact(b.cfg.ProjectRoot, result.Cycle), origin: "handleCycleError"}.emit(b.deps.Signals)
-		return batchDecision{flow: batchReturn, exitCode: 5}
+		return batchDecision{flow: batchReturn, exitCode: fleet.ExitDeferred}
+	}
+	if errors.Is(cycleErr, core.ErrMainRedParked) {
+		return batchDecision{flow: batchReturn, exitCode: b.result.emitMainRedPark("evolve loop", result.Cycle, b.stdout, b.stderr)}
 	}
 	var cycleFailure *core.ErrCycleLevelFailure
 	if !errors.As(cycleErr, &cycleFailure) {

@@ -1504,7 +1504,7 @@ The file is `main_red_park.go`. The design is in [gate-contract-g4-base-red-attr
 - `failureLearningGate` gives `gateParkDeferred` for each parked error.
 - `laneParked` accepts the reasons `quota-likely` and `main-red`. `PausedScope.Reason` gives the reason to the caller, and `resumableReasons` holds `main-red`.
 - The signal code has the prefix `GATE_REPO_`, because the registry refuses a code without the prefix of its module.
-- Pinned by `TestRecoverShipError_MainRedParkWritesAMainRedCheckpointAndAStopRow`, `TestRecoverShipError_ASecondParkRefreshesTheStopAndKeepsItsOpenTime` `TestRecoverShipError_AParkOnAnUnjudgedMainOpensNoStopAndStaysResumable` and the `TestParkOnMainRed_*` tests.
+- Pinned by `TestRecoverShipError_MainRedParkWritesAMainRedCheckpointAndAStopRow`, `TestRecoverShipError_ASecondParkRefreshesTheStopAndKeepsItsOpenTime`, `TestRecoverShipError_AParkOnAnUnjudgedMainOpensNoStopAndStaysResumable` and the `TestParkOnMainRed_*` tests.
 - `parkOnMainRed` takes the cycle from the cycle state, so the stop row and the checkpoint name one cycle. The caller reads the verdict from the ship error.
 - `TestRunCycle_AFirstShipThatParksOnARedMainIsNotAFailedCycle` pins the park of the first ship of a cycle. `TestParkOnMainRed_TwoFailedWritesGiveAOneLineIncident` pins the one-line cause of two failed writes.
 - `TestResumeExecution_AShipThatParksOnARedMainIsNotAFailedCycle` pins the park of a resumed ship. `TestIsResumableReason_AMainRedParkIsResumable` pins the reason.

@@ -9,6 +9,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/checkpoint"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -56,11 +57,8 @@ func runResumeBatch(
 		emitSignalStop(stdout, stderr, lr, result.Cycle)
 		return 130
 	}
-	if errors.Is(err, core.ErrAllFamiliesExhausted) {
-		lr.emitQuotaPause(cfg, result, stdout, stderr)
-		paused, _ := pausedFromCheckpoint(result, cfg.EvolveDir)
-		wallPause{result: paused, projectRoot: cfg.ProjectRoot, impact: sequentialImpact(cfg.ProjectRoot, result.Cycle), origin: "runResumeBatch"}.emit(signals)
-		return 5
+	if code, parked := lr.resumeParkExit(err, cfg, result, signals, stdout, stderr); parked {
+		return code
 	}
 	closeout := result
 	if err != nil {
@@ -85,6 +83,19 @@ func runResumeBatch(
 	finalizeCompletedCycle(cfg, stderr)
 	lr.emit(stdout)
 	return 0
+}
+
+func (lr *loopResult) resumeParkExit(err error, cfg loopConfig, result core.CycleResult, signals *signalcenter.Center, stdout, stderr io.Writer) (int, bool) {
+	switch {
+	case errors.Is(err, core.ErrAllFamiliesExhausted):
+		lr.emitQuotaPause(cfg, result, stdout, stderr)
+		paused, _ := pausedFromCheckpoint(result, cfg.EvolveDir)
+		wallPause{result: paused, projectRoot: cfg.ProjectRoot, impact: sequentialImpact(cfg.ProjectRoot, result.Cycle), origin: "runResumeBatch"}.emit(signals)
+		return fleet.ExitDeferred, true
+	case errors.Is(err, core.ErrMainRedParked):
+		return lr.emitMainRedPark("evolve loop: resume", result.Cycle, stdout, stderr), true
+	}
+	return 0, false
 }
 
 var recordResume = checkpoint.RecordResume

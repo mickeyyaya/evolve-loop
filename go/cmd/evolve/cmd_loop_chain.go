@@ -147,8 +147,20 @@ func wiredChain(cfg loopConfig, cc policy.ChainConfig, stdin io.Reader, stdout, 
 }
 
 func chainQuotaPause(evolveDir string) (loopchain.QuotaPause, bool) {
+	if park, ok := chainMainRedPark(evolveDir); ok {
+		return park, true
+	}
 	qp, ok := detectQuotaPause(evolveDir)
-	return loopchain.QuotaPause{Cycle: qp.Cycle, WakeAt: qp.WakeAt, Source: qp.Source, Clauses: qp.clauses(), NextStep: core.WallNextStep(qp.Wall, qp.Workspace)}, ok
+	return loopchain.QuotaPause{Kind: loopchain.PauseWall, Cycle: qp.Cycle, WakeAt: qp.WakeAt, Source: qp.Source, Clauses: qp.clauses(), NextStep: core.WallNextStep(qp.Wall, qp.Workspace)}, ok
+}
+
+func chainMainRedPark(evolveDir string) (loopchain.QuotaPause, bool) {
+	blob, cp, ok := loadActiveCheckpoint(evolveDir, core.MainRedReason)
+	if !ok {
+		return loopchain.QuotaPause{}, false
+	}
+	return loopchain.QuotaPause{Kind: loopchain.PauseMainRedPark, Cycle: quotaPauseFromCheckpoint(blob, cp).Cycle, Source: core.MainRedReason,
+		Clauses: "the cycle is parked at ship and its lane is not blamed", NextStep: "evolve loop --resume, when main is green."}, true
 }
 
 func runLoopChain(cfg loopConfig, cc policy.ChainConfig, stdin io.Reader, stdout, stderr io.Writer) (exit int) {

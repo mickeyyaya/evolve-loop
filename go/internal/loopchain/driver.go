@@ -10,7 +10,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
+const (
+	PauseWall        = "a wall"
+	PauseMainRedPark = "a main-red park"
+)
+
 type QuotaPause struct {
+	Kind   string
 	Cycle  int
 	WakeAt string
 	Source string
@@ -127,14 +133,14 @@ func (d *Driver) runBatch(n, pending int, res *Result) (stop bool) {
 }
 
 func (d *Driver) quotaDefer(batch int) {
-	fields := map[string]string{"batch": strconv.Itoa(batch), "cycle": "", "wake_at": "", "source": ""}
+	fields := map[string]string{"batch": strconv.Itoa(batch), "pause": "", "cycle": "", "wake_at": "", "source": ""}
 	next := "evolve loop --resume."
 	if qp, ok := d.deps.QuotaPause(); ok {
-		fields["cycle"], fields["wake_at"], fields["source"] = strconv.Itoa(qp.Cycle), qp.WakeAt, qp.Source
-		d.warn(CodeChainQuotaDefer, fmt.Sprintf("batch %d ended at a wall: %s (cycle=%d wake-at=%s source=%s) — DEFERRING, not relaunching", batch, qp.Clauses, qp.Cycle, qp.WakeAt, qp.Source), fields)
+		fields["pause"], fields["cycle"], fields["wake_at"], fields["source"] = qp.Kind, strconv.Itoa(qp.Cycle), qp.WakeAt, qp.Source
+		d.warn(CodeChainQuotaDefer, fmt.Sprintf("batch %d ended at %s: %s (cycle=%d wake-at=%s source=%s) — DEFERRING, not relaunching", batch, qp.Kind, qp.Clauses, qp.Cycle, qp.WakeAt, qp.Source), fields)
 		next = qp.NextStep
 	} else {
-		d.warn(CodeChainQuotaDefer, fmt.Sprintf("batch %d ended at a wall (no checkpoint block on disk, so no cause was recorded) — DEFERRING, not relaunching", batch), fields)
+		d.warn(CodeChainQuotaDefer, fmt.Sprintf("batch %d ended in a pause (no checkpoint block on disk, so no cause was recorded) — DEFERRING, not relaunching", batch), fields)
 	}
 	fmt.Fprintf(d.stderr, "[chain]   the checkpoint is intact; next: %s\n", next)
 }

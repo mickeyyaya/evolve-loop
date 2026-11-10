@@ -297,6 +297,10 @@ func quotaPauseLine(qp quotaPause, now time.Time) string {
 }
 
 func loadActiveQuotaLikelyCheckpoint(evolveDir string) (blob, checkpoint map[string]any, ok bool) {
+	return loadActiveCheckpoint(evolveDir, "quota-likely")
+}
+
+func loadActiveCheckpoint(evolveDir, want string) (blob, checkpoint map[string]any, ok bool) {
 	path := core.ResolveCycleStatePath(evolveDir)
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -314,7 +318,7 @@ func loadActiveQuotaLikelyCheckpoint(evolveDir string) (blob, checkpoint map[str
 		return nil, nil, false
 	}
 	reason, _ := cp["reason"].(string)
-	if reason != "quota-likely" {
+	if reason != want {
 		return nil, nil, false
 	}
 	return blob, cp, true
