@@ -102,7 +102,7 @@ func (g *Gates) coverageProfile(ctx context.Context, req Request, dir string, to
 	covPath := filepath.Join(binDir, "ciparity-cover.txt")
 	scratch = append(scratch, covPath)
 	testArgs := ciparity.CoverageTestArgs(covPath, touched)
-	run := scrubbedRun(lanebudget.Runner(g.run))
+	run := sysexec.WithEnv(lanebudget.Runner(g.run), TierEnv())
 	if _, err := sysexec.Output(ctx, run, dir, "go", testArgs...); err != nil {
 		return fail(stepCoverRun, fmt.Errorf("apicover gate: scoped coverage run: %w", err), "go "+strings.Join(testArgs, " "))
 	}

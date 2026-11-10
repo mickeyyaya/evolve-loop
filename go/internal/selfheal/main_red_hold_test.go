@@ -30,7 +30,7 @@ func (r *keyRun) run(_ context.Context, rev string, reds baseattr.Reds) ([]basea
 func (f *boundFixture) holder(enforced bool, run *keyRun, warn *strings.Builder) *StopHold {
 	return &StopHold{
 		EvolveDir: f.evolveDir, Enforced: enforced, Warn: warn, Run: KeyRun(run.run),
-		Event: signalcenter.Event{Origin: "integration batch"},
+		Event: signalcenter.Event{Origin: "evolve.integrationBatch"},
 		Emit:  func(e signalcenter.Event) { f.events = append(f.events, e) },
 	}
 }
@@ -134,7 +134,7 @@ func TestStopHold_ShadowRecordsOneWouldRefuseForEachHolder(t *testing.T) {
 		t.Fatalf("%d events, want one for the holder: %+v", len(f.events), f.events)
 	}
 	e := f.events[0]
-	if e.Origin != "integration batch" || e.Module != signalcenter.ModuleGateRepo || e.Kind != signalcenter.KindShipWarning || e.Severity != signalcenter.SeverityWarn || e.Code != core.CodeMainRedStopWouldRefuse {
+	if e.Origin != "evolve.integrationBatch" || e.Module != signalcenter.ModuleGateRepo || e.Kind != signalcenter.KindShipWarning || e.Severity != signalcenter.SeverityWarn || e.Code != core.CodeMainRedStopWouldRefuse {
 		t.Errorf("event = %+v, want a warn would-refuse of gate.repo with the origin of the caller", e)
 	}
 	want := map[string]string{"keys": baseattr.Names([]baseattr.Key{boundKey}), "base": boundMain, "main": boundMain, "admission": "not-a-fix", "fix_item": boundFixItem, "landing": "batch pull request 12"}

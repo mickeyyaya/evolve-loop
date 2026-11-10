@@ -42,6 +42,8 @@
 - The namespace rule needs no second list: every key lives under `EVOLVE_`, so a key added tomorrow is scrubbed the day it is added (`TestScrub_CoversEveryIPCKey`). Only the key is inspected (`TestScrub_DropsEveryEvolveKeyAndKeepsTheToolchain`).
 - The width is read from the request environment and falls back to solo on garbage (`TestShipRecovery_ContentionBudgetScalesWithFleetWidth`). That `fleetWidthFromEnv` never reads `os.Getenv` has no test, so that half is unpinned.
 - Each constant's value is the wire contract (`TestIpcenv_ConstValues`, `TestTmuxSocketKey_IsTheBridgeSocketChannel`).
+- Each production function that starts `go test` builds its env from `GoTestEnv` or `ciparity.CIEnv`, or it has a reasoned exemption (`TestGoTestSpawners_EveryProductionSpawnerUsesTheNamedProjection`). The pin accepts a projection in the function body, or in a function that the body calls directly.
+- `baseattr.GoTestRunner` gets its env from its caller, so its spawner has an exemption. A second pin holds each production caller to a named projection as the argument (`TestBaseRunnerCallers_EveryProductionCallerPassesANamedProjection`, ADR-0165 G4c).
 
 ## Findings
 

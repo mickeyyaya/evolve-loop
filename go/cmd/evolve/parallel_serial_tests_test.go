@@ -436,6 +436,7 @@ var serialTests = map[string]string{
 	"main.TestMoveProfileEfforts_AKeyStripFailureNamesTheProfile":                                           "swaps seam stripRetiredKeys",
 	"main.TestNewRoleSignalCenter_AnUnwritableEventsDirectoryNeverFailsTheRootAndWarnsOnce":                 "swaps seam attachRootEventsFn",
 	"main.TestNewRoleSignalCenter_PublishesUnderItsRoleAndTheCloserDrainsTheQueues":                         "swaps seam attachRootEventsFn",
+	"main.TestEmitIntegrationSignal_SendsTheEventThroughACenterOfTheIntegrationRole":                        "swaps seam attachRootEventsFn",
 	"main.TestParseRoutingWriteFlags_AFlaggedRootNeverReadsTheWorkingDirectory":                             "sets env through a helper",
 	"main.TestParseRoutingWriteFlags_AnUnreadableWorkingDirectoryRefuses":                                   "sets env through a helper",
 	"main.TestPhaseVerifyBuild_BoundDocsFloorReportsAtTheHostsSeverity":                                     "sets env through a helper",

@@ -940,3 +940,9 @@ This section holds the durable reasons that the strip removed from the group 4 f
   - The id reaches the lanes through the value type `cycleLaunch` as the parameter `--pool N` of `evolve cycle run`. `execCycleLaunch` passes no pool, and so do the `fleet` and `soak` launches. `routingRun.pool` carries the value to `shipIntegrationOf`.
   - A fleet lane with no pool id warns once at `shadow` and writes no record. At `enforce`, it fails at startup through `RoutingErr`. A failed mint warns, and the lanes of the pool run without an id.
   - Pinned by `TestMintPoolID_APoolOrWaveRouteMintsOneNumberAndASequentialRouteMintsNone` and `TestRunCycleRun_AnEnforceFleetLaneWithNoPoolStopsAtStartup`.
+- **The main-red stop of the train (`cmd_integration_stop.go`, ADR-0165 G4c).** The design is [gate-contract-g4-base-red-attribution.md §13](../gate-contract-g4-base-red-attribution.md). `integrationEnv.train` is the only constructor of the train, and it puts `integration.StopGate` on the CI port and on the main port.
+  - The stop is state of the project root, and git runs in the working directory. Thus `batch` resolves the root as `status` does, and `integrationEnv.projectRoot` is the one home of that order.
+  - `Emit` and `KeyRun` are factories that take the project root. The key run is built only when a stop holds, so a batch with no stop reads no attribution policy.
+  - Each event goes through a signal center of the role `integration`. The origin is `evolve.integrationBatch`, because the center refuses an origin that has a space.
+  - A release that fails after `main` moved is a warning. The batch is on `main`, so the exit code stays 0, and the next ship or batch releases the stop.
+  - Pinned by the `TestStopJourney_*` tests and `TestIntegrationTrainIsBuiltOnlyBehindTheStopGate`.

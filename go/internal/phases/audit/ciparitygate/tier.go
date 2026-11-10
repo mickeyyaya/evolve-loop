@@ -56,7 +56,7 @@ func (g *Gates) IntegrationTier(req Request) ([]string, error) {
 		return nil, nil
 	}
 	args := tierArgs(pkgs)
-	scrubbed := scrubbedRun(lanebudget.Runner(g.run))
+	scrubbed := sysexec.WithEnv(lanebudget.Runner(g.run), TierEnv())
 	first := runAttempt(ctx, scrubbed, dir, args)
 	if first.err != nil {
 		wrapped := fmt.Errorf("integration-tier gate could not run: %w", first.err)
