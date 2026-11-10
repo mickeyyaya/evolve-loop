@@ -99,7 +99,7 @@ func TestStampLandingRestore_PutsThePreparedStampBack(t *testing.T) {
 
 	stampLanding{root: repo, stdout: &bytes.Buffer{}, stderr: &errb}.restore(plan)
 
-	if errb.Len() != 0 || !strings.Contains(smRead(t, item), `"route":"console-manual"`) {
+	if errb.Len() != 0 || !strings.Contains(smRead(t, item), `"route": "console-manual"`) {
 		t.Fatalf("stderr %q item %s", errb.String(), smRead(t, item))
 	}
 }

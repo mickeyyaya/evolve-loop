@@ -1,6 +1,7 @@
 package lifecycle
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -250,7 +251,7 @@ func rewriteItemJSON(path string, admit func(body []byte) error, rewrite func(it
 	if err := rewrite(item); err != nil {
 		return err
 	}
-	out, err := json.Marshal(item)
+	out, err := marshalFiled(item)
 	if err != nil {
 		return err
 	}
@@ -259,6 +260,17 @@ func rewriteItemJSON(path string, admit func(body []byte) error, rewrite func(it
 		return err
 	}
 	return commitTmp(tmp, path)
+}
+
+func marshalFiled(item map[string]json.RawMessage) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(item); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 func commitTmp(tmp, path string) error {

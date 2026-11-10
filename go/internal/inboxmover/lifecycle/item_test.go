@@ -98,28 +98,28 @@ func TestBumpWith_ShedsContinuationOnlyAtCeiling_OneRename(t *testing.T) {
 	if err != nil || n != 1 {
 		t.Fatalf("n = %d, err = %v (a non-numeric count reads as 0)", n, err)
 	}
-	if body, _ := os.ReadFile(item); string(body) != `{"continuation":{"cycle":1},"failure_count":1,"id":"a","last_failure_reason":"r1"}` {
+	if body, _ := os.ReadFile(item); string(body) != "{\n  \"continuation\": {\n    \"cycle\": 1\n  },\n  \"failure_count\": 1,\n  \"id\": \"a\",\n  \"last_failure_reason\": \"r1\"\n}\n" {
 		t.Errorf("below the ceiling: %s", body)
 	}
 	n, err = bumpWith(item, failureRecord{reason: "r2"}, func(c int) bool { return c >= 2 })
 	if err != nil || n != 2 {
 		t.Fatalf("n = %d, err = %v", n, err)
 	}
-	if body, _ := os.ReadFile(item); string(body) != `{"failure_count":2,"id":"a","last_failure_reason":"r2"}` {
+	if body, _ := os.ReadFile(item); string(body) != "{\n  \"failure_count\": 2,\n  \"id\": \"a\",\n  \"last_failure_reason\": \"r2\"\n}\n" {
 		t.Errorf("at the ceiling the continuation is shed in the SAME bytes: %s", body)
 	}
 	writeItem(t, item, `{"id":"a","continuation":{"cycle":1}}`)
 	if n, err := BumpFailureCount(item, ""); err != nil || n != 1 {
 		t.Fatalf("n = %d, err = %v", n, err)
 	}
-	if body, _ := os.ReadFile(item); string(body) != `{"continuation":{"cycle":1},"failure_count":1,"id":"a"}` {
+	if body, _ := os.ReadFile(item); string(body) != "{\n  \"continuation\": {\n    \"cycle\": 1\n  },\n  \"failure_count\": 1,\n  \"id\": \"a\"\n}\n" {
 		t.Errorf("BumpFailureCount never sheds and an empty reason stamps nothing: %s", body)
 	}
 	mkdirAll(t, tmpPathOf(item))
 	if _, err := BumpFailureCount(item, "x"); err == nil {
 		t.Error("a directory at the tmp path is the rewrite's error")
 	}
-	if body, _ := os.ReadFile(item); string(body) != `{"continuation":{"cycle":1},"failure_count":1,"id":"a"}` {
+	if body, _ := os.ReadFile(item); string(body) != "{\n  \"continuation\": {\n    \"cycle\": 1\n  },\n  \"failure_count\": 1,\n  \"id\": \"a\"\n}\n" {
 		t.Errorf("the item is untouched on a failed rewrite: %s", body)
 	}
 	if _, err := BumpFailureCount(filepath.Join(inbox, "missing.json"), "x"); err == nil {
@@ -145,8 +145,8 @@ func TestUpdateItemJSON_ErrorArmsAndCommitTmp(t *testing.T) {
 	if err := UpdateItemJSON(item, func(m map[string]json.RawMessage) { m["b"] = json.RawMessage(`true`) }); err != nil {
 		t.Fatal(err)
 	}
-	if body, _ := os.ReadFile(item); string(body) != `{"b":true,"id":"a"}` {
-		t.Errorf("sorted keys, no indent: %s", body)
+	if body, _ := os.ReadFile(item); string(body) != "{\n  \"b\": true,\n  \"id\": \"a\"\n}\n" {
+		t.Errorf("sorted keys, two-space indent: %s", body)
 	}
 	tmp := filepath.Join(inbox, "x.tmp")
 	writeItem(t, tmp, "x")

@@ -145,7 +145,7 @@ func TestOptionsMover_RetireHookAndRunWorkspace(t *testing.T) {
 	if _, err := ReleaseCycleProcessing(Options{ProjectRoot: root}, 91); err != nil {
 		t.Fatal(err)
 	}
-	if raw, _ := os.ReadFile(filepath.Join(root, ".evolve", "inbox", "task-a.json")); !strings.Contains(string(raw), `"snapshot_sha":"abc123"`) {
+	if raw, _ := os.ReadFile(filepath.Join(root, ".evolve", "inbox", "task-a.json")); !strings.Contains(string(raw), `"snapshot_sha": "abc123"`) {
 		t.Errorf("the drain stamps from <root>/.evolve/runs/cycle-N: %s", raw)
 	}
 }
@@ -377,7 +377,7 @@ func TestApplyCycleOutcome_FailDrain_BumpsOnlyCommittedIDsAlreadyInProcessing(t 
 	}
 	committed, _ := os.ReadFile(filepath.Join(inbox, "c.json"))
 	uncommitted, _ := os.ReadFile(filepath.Join(inbox, "u.json"))
-	if string(committed) != `{"failure_count":1,"id":"c","last_failure_cycle":12,"last_failure_reason":"cycle-failure-release"}` {
+	if string(committed) != "{\n  \"failure_count\": 1,\n  \"id\": \"c\",\n  \"last_failure_cycle\": 12,\n  \"last_failure_reason\": \"cycle-failure-release\"\n}\n" {
 		t.Errorf("the committed id is bumped: %s", committed)
 	}
 	if string(uncommitted) != `{"id":"u"}` {

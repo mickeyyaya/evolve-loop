@@ -301,7 +301,7 @@ func TestSyncMainAtWaveBoundary_DiscardsInboxStampsOriginSupersededAndFastForwar
 		}
 	}
 	for rel, want := range map[string]string{item: `{"id":"routed","route":"console-manual","weight":0.5}`, untouched: `{"id":"untouched.json","route":"console-manual"}`} {
-		if got, _ := os.ReadFile(filepath.Join(runtime, rel)); string(got) != want {
+		if got, _ := os.ReadFile(filepath.Join(runtime, rel)); strings.Join(strings.Fields(string(got)), "") != want {
 			t.Errorf("%s = %s, want %s: origin's edit with the loop's route replayed, and the untouched stamp kept", rel, got, want)
 		}
 	}
@@ -389,7 +389,7 @@ func TestSyncMainAtWaveBoundary_WarnsAndKeepsTheStampsWhenTheyCannotBePrepared(t
 	if !strings.Contains(warn.String(), "the loop's inbox stamps stay as they are") {
 		t.Errorf("warn = %q, want the failed preparation named", warn.String())
 	}
-	if got, _ := os.ReadFile(filepath.Join(runtime, item)); string(got) != stamped {
+	if got, _ := os.ReadFile(filepath.Join(runtime, item)); strings.Join(strings.Fields(string(got)), "") != stamped {
 		t.Errorf("%s = %s, want the loop's stamp kept after a failed preparation", item, got)
 	}
 }
