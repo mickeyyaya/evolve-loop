@@ -41,7 +41,28 @@ func RealizeFor(cli string, intent LaunchIntent) Realization {
 	if err != nil {
 		return Realization{}
 	}
-	return Realize(m, intent)
+	return Realize(adoptFamilyEffort(m), intent)
+}
+
+func adoptFamilyEffort(m Manifest) Manifest {
+	if _, own := m.Params["effort"]; own || m.ModelTierMapFrom == "" {
+		return m
+	}
+	family, err := loadManifestRaw(m.ModelTierMapFrom)
+	if err != nil {
+		return m
+	}
+	effort, ok := family.Params["effort"]
+	if !ok {
+		return m
+	}
+	params := maps.Clone(m.Params)
+	if params == nil {
+		params = map[string]ParamSpec{}
+	}
+	params["effort"] = effort
+	m.Params = params
+	return m
 }
 
 func Realize(m Manifest, intent LaunchIntent) Realization {
@@ -112,24 +133,20 @@ func dedupeLaunchFlags(in []string) []string {
 	}
 	seen := make(map[string]struct{}, len(in))
 	out := make([]string, 0, len(in))
-	for i := 0; i < len(in); i++ {
-		tok := in[i]
-		unit, paired := tok, false
-		if strings.HasPrefix(tok, "-") && i+1 < len(in) && in[i+1] != "" && !strings.HasPrefix(in[i+1], "-") {
-			unit, paired = tok+flagValueKeySeparator+in[i+1], true
-		}
-		if _, dup := seen[unit]; dup {
-			if paired {
-				i++
+	for i := 0; i < len(in); {
+		end := i + 1
+		if strings.HasPrefix(in[i], "-") {
+			for end < len(in) && in[end] != "" && !strings.HasPrefix(in[end], "-") {
+				end++
 			}
-			continue
 		}
-		seen[unit] = struct{}{}
-		out = append(out, tok)
-		if paired {
-			out = append(out, in[i+1])
-			i++
+		group := in[i:end]
+		key := strings.Join(group, flagValueKeySeparator)
+		if _, dup := seen[key]; !dup {
+			seen[key] = struct{}{}
+			out = append(out, group...)
 		}
+		i = end
 	}
 	return out
 }
