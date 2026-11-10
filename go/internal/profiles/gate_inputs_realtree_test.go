@@ -31,6 +31,7 @@ var pinnedAuthority = []string{
 	".evolve/failure-digests",
 	"{worktree_path}/go/internal/sizeratchet/offenders.json",
 	"{worktree_path}/go/internal/rawgitratchet/baseline.json",
+	".evolve/main-red-stop.json",
 }
 
 var pinnedOpenSeams = []string{

@@ -13,8 +13,8 @@ import (
 )
 
 type Key struct {
-	Package string
-	Test    string
+	Package string `json:"package"`
+	Test    string `json:"test"`
 }
 
 type Reds struct {

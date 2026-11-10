@@ -160,6 +160,7 @@ var protectedGateFiles = []struct {
 	{"go/internal/sizeratchet/", GateGuarantee},
 	{"go/internal/rawgitratchet/", GateGuarantee},
 	{"go/internal/baseattr/", GateGuarantee},
+	{"go/internal/mainstop/", GateGuarantee},
 	{"go/internal/core/base_red_floor.go", GateGuarantee},
 	{"go/internal/core/repo_contract_floor.go", GateGuarantee},
 	{"go/internal/repocontract/repocontract.go", GateGuarantee},

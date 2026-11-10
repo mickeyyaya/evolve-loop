@@ -235,6 +235,7 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/sizeratchet/", Class: GateGuarantee, Rationale: "the function-size ratchet and its offender list: a lane that could edit them could add its own allowance (ADR-0165)"},
 	{Fragment: "/go/internal/rawgitratchet/", Class: GateGuarantee, Rationale: "the raw git fixture ratchet and its baseline: a lane that could edit them could add its own allowance (ADR-0165)"},
 	{Fragment: "/go/internal/baseattr/", Class: GateGuarantee, Rationale: "the base-red attribution: its parser, its detached-checkout rerun and its verdict decide whether a red test blames the lane (ADR-0165 G4)"},
+	{Fragment: "/go/internal/mainstop/", Class: GateGuarantee, Rationale: "the main-red stop: its record and its admission rule decide whether a landing may go onto a red main (ADR-0165 G4)"},
 	{Fragment: "/go/internal/core/base_red_floor.go", Class: GateGuarantee, Rationale: "the build floor's base-red judgment: it decides whether a red test blames the lane or its base, and whether the floor rejects (ADR-0165 G4)"},
 	{Fragment: "/go/internal/core/repo_contract_floor.go", Class: GateGuarantee, Rationale: "the build floor's run of the repo-contract pack and the rule that turns its reds into a rejection (ADR-0165 G4)"},
 	{Fragment: "/go/internal/repocontract/repocontract.go", Class: GateGuarantee, Rationale: "the pack list and the by-name tree-reading tests that the ship gate runs: a lane that could edit it could drop a judge from the gate (ADR-0165)"},

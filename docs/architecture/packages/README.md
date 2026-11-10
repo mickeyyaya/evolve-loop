@@ -28,6 +28,7 @@ Each Go package directory has one page. The page holds what the code cannot say:
 | `internal/gatecontract` | the types of a gate entry and the words of the gate contract (ADR-0165, G1) | [internal-gatecontract.md](internal-gatecontract.md) |
 | `internal/gateregistry` | the registry of the gates and the debt set of the patterns that have no entry yet (ADR-0165, G1) | [internal-gateregistry.md](internal-gateregistry.md) |
 | `internal/baseattr` | the judge of a red test: it reruns the red keys on the lane base and on `main` (ADR-0165, G4a) | [internal-baseattr.md](internal-baseattr.md) |
+| `internal/mainstop` | the record of a red `main` and the pure transitions of its stop: open, park, admit, release and escalate (ADR-0165, G4b) | [internal-mainstop.md](internal-mainstop.md) |
 | `internal/recurrence` | the recurrence ledger over lesson patterns, its escalation policy, and the snapshot read and item counts the inbox rank uses | [internal-recurrence.md](internal-recurrence.md) |
 | `internal/cycleoutcome` | the closeout seam for a cycle that did not ship: the failure lifecycle of the committed ids and the planned no-work hand-over | [internal-cycleoutcome.md](internal-cycleoutcome.md) |
 | `internal/bypass` | the audit of a bypass parameter: the reason and cell check, and one ledger entry and one `CONTROL_BYPASS_USED` signal for each use (X18d) | [internal-bypass.md](internal-bypass.md) |
