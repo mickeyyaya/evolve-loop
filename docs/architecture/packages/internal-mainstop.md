@@ -14,6 +14,7 @@
 - `Admit` gives `AdmitNoStop` when the stop does not hold. It gives `RefuseRebase` when the proof base is not the `main` tip, or when the tip is empty.
 - `Admit` gives `AdmitFix` when the proof has a green stop key and no lane-only red. Each other proof gives `RefuseNotAFix`.
 - `Released` drops the green keys. With no key left, it sets `ReleasedAt` and `ReleasedBy`. It does not change a stop that does not hold.
+- `Resumes` is true when the stop does not hold, or when the given `main` tip is known and is not `MainSHA`. The pool reads it to resume the parked lanes.
 - `Overdue` is true when a stop that holds is older than a positive bound. `Escalate` records only the first escalation time.
 - `Cause` names the keys, `MainSHA`, `OpenedAt` and the parked cycles. `ResumeCondition` gives the condition that ends the stop.
 - `ParkedCycles` gives the parked cycle numbers in order, for a signal field. It is empty when no cycle is parked.
@@ -32,7 +33,7 @@
 ## Invariants
 
 - The package imports `baseattr`, `adapters/flock`, `atomicwrite` and the standard library. It imports no pipeline package.
-- Ship is the one caller of `Admit` and `Released` (`phases/ship/main_red_stop.go`). `core` is the one caller of `Opened` and `WithParked`.
+- Ship is the one caller of `Admit` and `Released` (`phases/ship/main_red_stop.go`). `core` is the one caller of `Opened` and `WithParked`. The pool plan of `cmd/evolve` is the one caller of `Resumes`.
 - The package emits no signal and reads no policy. The caller owns the stage, the bound and each signal.
 - The path is on the protected surface as a gate guarantee. A lane cannot edit it.
 - The record is an `authority` input in [gate-input-inventory.md](../gate-input-inventory.md). No profile grants it.

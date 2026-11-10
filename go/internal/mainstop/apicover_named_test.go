@@ -17,7 +17,7 @@ func TestAPICover_NamesEveryExportedSymbol(t *testing.T) {
 	var s Stop
 	now := time.Time{}
 	s = s.Opened(baseattr.Verdict{}, FixItemID(""), now).WithParked(Parked{}).Released(nil, "", now).Escalate(now)
-	if s.Holds() || s.Overdue(now, 0) || s.Admit("", Proof{}) != AdmitNoStop || s.Cause() == "" || s.ParkedCycles() != "0" || s.ResumeCondition() == "" {
+	if s.Holds() || s.Overdue(now, 0) || !s.Resumes("") || s.Admit("", Proof{}) != AdmitNoStop || s.Cause() == "" || s.ParkedCycles() != "0" || s.ResumeCondition() == "" {
 		t.Errorf("a stop with no key = %+v, want no hold, no admission refusal, a cause and a resume condition", s)
 	}
 	if AdmitFix == RefuseRebase || RefuseRebase == RefuseNotAFix || Schema == "" || Path("") == "" {

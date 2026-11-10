@@ -110,6 +110,10 @@ func (s Stop) Released(green []baseattr.Key, by string, now time.Time) Stop {
 	return next
 }
 
+func (s Stop) Resumes(mainSHA string) bool {
+	return !s.Holds() || (mainSHA != "" && mainSHA != s.MainSHA)
+}
+
 func (s Stop) Overdue(now time.Time, bound time.Duration) bool {
 	return s.Holds() && bound > 0 && now.Sub(s.OpenedAt) > bound
 }

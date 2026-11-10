@@ -205,3 +205,26 @@ func TestFixItemID_UsesTheFirstEightOfTheCommit(t *testing.T) {
 		t.Errorf("FixItemID of a short commit = %q", got)
 	}
 }
+
+func TestStop_ResumesParkedLanesWhenItEndsOrMainMoves(t *testing.T) {
+	t.Parallel()
+	stop := openStop(dupKey)
+	cases := []struct {
+		name string
+		stop Stop
+		main string
+		want bool
+	}{
+		{"the stop holds on the main tip", stop, mainSHA, false},
+		{"the main tip is unknown", stop, "", false},
+		{"main moved", stop, nextSHA, true},
+		{"released", stop.Released([]baseattr.Key{dupKey}, "x", opened), mainSHA, true},
+		{"released and the main tip is unknown", stop.Released([]baseattr.Key{dupKey}, "x", opened), "", true},
+		{"no stop", Stop{}, mainSHA, true},
+	}
+	for _, c := range cases {
+		if got := c.stop.Resumes(c.main); got != c.want {
+			t.Errorf("%s: Resumes = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
