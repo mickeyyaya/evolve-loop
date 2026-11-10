@@ -46,8 +46,8 @@ func TestClassify_EscalationPatternRidesTheCause(t *testing.T) {
 			if out.CauseCode != tc.cause {
 				t.Errorf("cause_code = %q, want %q", out.CauseCode, tc.cause)
 			}
-			if out.Signal != CodeExitUnknownPrompt || !out.Transient {
-				t.Errorf("the exit class must not change: signal %q transient %v", out.Signal, out.Transient)
+			if wasQuota := tc.cause == "rate_limit"; wasQuota == (out.Signal == CodeExitUnknownPrompt) || !out.Transient {
+				t.Errorf("a quota wall leaves the unknown-prompt signal and any other cause keeps it: signal %q transient %v", out.Signal, out.Transient)
 			}
 			if tc.line != "" && !strings.Contains(out.Err.Error(), tc.line) {
 				t.Errorf("the launch error must name the escalation: %q", out.Err)

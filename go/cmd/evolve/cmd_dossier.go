@@ -144,12 +144,16 @@ func sweepDossierPairs(g gitexec.Git, stdout, stderr io.Writer) int {
 }
 
 func publishDossierPairs(projectRoot string, stdout, stderr io.Writer) int {
+	retroErr := publishPendingRetrospectives(projectRoot, stderr)
 	res, err := dossier.PublishPending(projectRoot, stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "dossier publish: %v\n", err)
 		return 2
 	}
 	fmt.Fprintf(stdout, "dossier publish: published cycles %v\n", res.Published)
+	if retroErr != nil {
+		return 2
+	}
 	if len(res.Failed) > 0 {
 		fmt.Fprintf(stderr, "dossier publish: %d pending pairs were refused or failed and stay pending\n", len(res.Failed))
 		return 2

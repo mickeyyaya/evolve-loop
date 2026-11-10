@@ -27,6 +27,7 @@ type FailureInputs struct {
 	Workspace       string
 	Cycle           int
 	Ceiling         int
+	OnCeiling       string
 	SystemLevel     bool
 	Refusal         string
 	RefusalDetail   string
@@ -41,6 +42,7 @@ type FailureInputs struct {
 	Signals         *signalcenter.Center
 	Defer           core.RecordedDefer
 	PriorityClasses []string
+	Reasons         []string
 }
 
 func (in FailureInputs) WithLedger(l inboxmover.LedgerAppender) FailureInputs {
@@ -77,12 +79,14 @@ func ApplyFailure(in FailureInputs) (inboxmover.OutcomeResult, error) {
 		CommittedIDs: committed,
 		Reason:       in.Reason,
 		Ceiling:      in.Ceiling,
+		OnCeiling:    in.OnCeiling,
 		SystemLevel:  in.SystemLevel,
 		Routed:       routed,
 		RoutedIDs:    routedIDs,
 		FailureClass: string(in.FailureClass),
 		Fingerprint:  in.Fingerprint,
 		FailureRung:  in.FailureRung,
+		Reasons:      in.Reasons,
 	})
 	if err != nil {
 		return res, fmt.Errorf("apply cycle %d failure outcome: %w", in.Cycle, err)
@@ -131,6 +135,7 @@ func FailureInputsFor(projectRoot, evolveDir, workspace string, cycle int, stder
 		Workspace:       workspace,
 		Cycle:           cycle,
 		Ceiling:         failPol.Thresholds.TaskRetryCeiling,
+		OnCeiling:       failPol.OnTaskRetryCeiling,
 		SystemLevel:     !IsTaskLevelResult(cls),
 		Reason:          "cycle-failure-release",
 		FailureClass:    failureClassOf(cls),
@@ -138,6 +143,7 @@ func FailureInputsFor(projectRoot, evolveDir, workspace string, cycle int, stder
 		FailureRung:     recordedRung(workspace),
 		Stderr:          stderr,
 		PriorityClasses: pol.InboxPriorityConfig().ClassOrder,
+		Reasons:         failureReasons(workspace),
 	}
 	if cls.Class == cycleclassify.ClassPhaseRefusal {
 		in.Refusal, in.RefusalDetail, in.RefusalSubject = cls.Marker, cls.Detail, cls.Subject
@@ -186,17 +192,25 @@ func ladderClassOf(c failurelog.Classification) retryladder.Class {
 }
 
 func firstFailureReason(workspace string) string {
+	reasons := failureReasons(workspace)
+	if len(reasons) == 0 {
+		return ""
+	}
+	return reasons[0]
+}
+
+func failureReasons(workspace string) []string {
 	body, err := os.ReadFile(filepath.Join(workspace, "audit-fail-reason.json"))
 	if err != nil {
-		return ""
+		return nil
 	}
 	var doc struct {
 		Reasons []string `json:"reasons"`
 	}
-	if json.Unmarshal(body, &doc) != nil || len(doc.Reasons) == 0 {
-		return ""
+	if json.Unmarshal(body, &doc) != nil {
+		return nil
 	}
-	return doc.Reasons[0]
+	return doc.Reasons
 }
 
 func failedCommitted(workspace string) []string {

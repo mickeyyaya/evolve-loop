@@ -130,8 +130,8 @@ func TestLaunchArgs_Codex_ModelMap(t *testing.T) {
 			if !fr.argvContainsPair("-m", tc.codexModel) {
 				t.Fatalf("codex argv should map %s → -m %s; calls=%+v", tc.tier, tc.codexModel, fr.calls)
 			}
-			if !fr.argvContainsPair("-c", "model_reasoning_effort=high") {
-				t.Fatalf("codex argv must carry -c model_reasoning_effort=high; calls=%+v", fr.calls)
+			if len(fr.calls) != 1 || len(effortValues(fr.calls[0].args)) != 1 {
+				t.Fatalf("codex argv must carry exactly one %s override; calls=%+v", reasoningEffortKey, fr.calls)
 			}
 			var effortTokens int
 			for _, call := range fr.calls {

@@ -44,6 +44,8 @@ var serialTests = map[string]string{
 	"main.TestLanding_ListShowsEachHeldCycle":                                                               "swaps seam landingCredential",
 	"main.TestLanding_TheOperatorApprovesTheHeldTree":                                                       "swaps seam landingCredential",
 	"main.TestLanding_TheOperatorRejectsTheHeldTree":                                                        "swaps seam landingCredential",
+	"main.TestPublishPendingDossiers_ARetrospectivePublishFailureIsAWarnAndTheBoundaryGoesOn":               "sets PATH through gittest.FaultOn",
+	"main.TestPublishDossierPairs_ARetrospectivePublishFailureReturnsTwo":                                   "sets PATH through gittest.FaultOn",
 	"main.TestCmd_InboxCurate_AFailedCommitOfTheAppliedProposalsExitsIO":                                    "sets PATH through gittest.FaultOn",
 	"main.TestCmd_InboxCurate_AFailedStageOfTheAppliedProposalsExitsIO":                                     "sets PATH through gittest.FaultOn",
 	"main.TestCmd_InboxCurate_AGitFaultOnTheRangeKeepsTheCursor":                                            "sets PATH through gittest.FaultOn",

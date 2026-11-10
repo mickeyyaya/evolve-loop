@@ -31,6 +31,8 @@ The bridge keys pane reading by the binary of the manifest, not the driver name.
 
 Since 2026-10-08, the resolved effort replaces the variant suffix of the agy-claude model at launch (`params.effort.channel: model_variant`). The map: low `(Low)`, medium `(Medium)`, high, xhigh and max `(High)`.
 
+The codex family table in `codex-tmux.json` is the one home of the codex effort policy. The headless `codex` manifest adopts it. Each tier emits two `-c` overrides: `model_reasoning_effort` and `plan_mode_reasoning_effort`. A launch with no resolved effort emits neither, and codex uses its own default.
+
 ## Plugin / skill install flows
 
 **claude-tmux** — the operator's ECC example, exactly:

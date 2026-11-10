@@ -23,13 +23,13 @@ func TestMover_Release_ContinuationStampRedactsHostPaths(t *testing.T) {
 	}
 	for _, name := range []string{"t.json", "kept.json"} {
 		stamp := string(readJSON(t, filepath.Join(inbox, name))["continuation"])
-		if !strings.Contains(stamp, `"snapshot_sha":"abc123"`) {
+		if !strings.Contains(stamp, `"snapshot_sha": "abc123"`) {
 			t.Fatalf("%s: stamp missing its snapshot, nothing to redact: %s", name, stamp)
 		}
 		if strings.Contains(stamp, home) {
 			t.Errorf("%s: stamp leaks the operator home path into the shared inbox: %s", name, stamp)
 		}
-		if !strings.Contains(stamp, `"worktree":"~/wt/cycle-8"`) || !strings.Contains(stamp, `"findings_path":"~/findings.md"`) {
+		if !strings.Contains(stamp, `"worktree": "~/wt/cycle-8"`) || !strings.Contains(stamp, `"findings_path": "~/findings.md"`) {
 			t.Errorf("%s: host paths are not tilde-redacted: %s", name, stamp)
 		}
 	}

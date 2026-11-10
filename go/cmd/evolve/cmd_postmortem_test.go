@@ -33,7 +33,7 @@ func newPostmortemFixture(t *testing.T) postmortemFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dir := filepath.Join(f.home, ".claude", "projects", "-runtime--evolve-worktrees-cycle-cd3ae73e-1853")
+	dir := filepath.Join(paths.SeatRoot(f.home), "projects", "-runtime--evolve-worktrees-cycle-cd3ae73e-1853")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
