@@ -1,9 +1,14 @@
 package audit
 
 import (
+	"cmp"
+	"context"
+	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/audit/ciparitygate"
@@ -17,10 +22,23 @@ var integrationTierTimeout = ciparitygate.DefaultTimeouts().TierAttempt
 
 type ciParity struct{ signals func() *signalcenter.Center }
 
-func (c ciParity) wiredGates() *ciparitygate.Gates {
+var baseRedRunner = func() baseattr.Runner { return baseattr.GoTestRunner(ciparitygate.TierEnv()) }
+
+func (c ciParity) wiredGates(req core.PhaseRequest) *ciparitygate.Gates {
 	t := ciparitygate.DefaultTimeouts()
 	t.TierAttempt = integrationTierTimeout
-	return ciparitygate.New(runCmd, changedPackagesForAudit, ciparitygate.WithTimeouts(t), ciparitygate.WithSignals(c.signals))
+	opts := []ciparitygate.Option{ciparitygate.WithTimeouts(t), ciparitygate.WithSignals(c.signals)}
+	if req.WorktreeBaseSHA != "" {
+		opts = append(opts, ciparitygate.WithAttribution(baseRedAttribution(req)))
+	}
+	return ciparitygate.New(runCmd, changedPackagesForAudit, opts...)
+}
+
+func baseRedAttribution(req core.PhaseRequest) ciparitygate.Attribution {
+	return func(ctx context.Context, r baseattr.Reds) (baseattr.Verdict, error) {
+		root := cmp.Or(req.ProjectRoot, req.Worktree)
+		return core.BaseRedAttributor(root, baseRedRunner(), os.Stderr).Attribute(ctx, req.WorktreeBaseSHA, r)
+	}
 }
 
 func requestOf(req core.PhaseRequest) ciparitygate.Request {
@@ -28,23 +46,28 @@ func requestOf(req core.PhaseRequest) ciparitygate.Request {
 }
 
 func (c ciParity) goVet(req core.PhaseRequest) ([]string, error) {
-	return c.wiredGates().GoVet(requestOf(req))
+	return c.wiredGates(req).GoVet(requestOf(req))
 }
 
 func (c ciParity) acsDurable(req core.PhaseRequest) ([]string, error) {
-	return c.wiredGates().ACSDurable(requestOf(req))
+	return c.wiredGates(req).ACSDurable(requestOf(req))
 }
 
 func (c ciParity) integrationTier(req core.PhaseRequest) ([]string, error) {
-	return c.wiredGates().IntegrationTier(requestOf(req))
+	offenders, err := c.wiredGates(req).IntegrationTier(requestOf(req))
+	var notice ciparitygate.BaseRed
+	if errors.As(err, &notice) {
+		return nil, gateWarning(notice)
+	}
+	return offenders, err
 }
 
 func (c ciParity) apicoverEnforce(req core.PhaseRequest) ([]string, error) {
-	return c.wiredGates().ApicoverEnforce(requestOf(req))
+	return c.wiredGates(req).ApicoverEnforce(requestOf(req))
 }
 
 func (c ciParity) apicoverGraduation(req core.PhaseRequest) ([]string, error) {
-	return c.wiredGates().ApicoverGraduation(requestOf(req))
+	return c.wiredGates(req).ApicoverGraduation(requestOf(req))
 }
 
 func (c ciParity) wire(cfg *Config) {

@@ -1504,7 +1504,15 @@ When the base and `main` are both red, the build floor opens the main-red stop. 
 - Tests of the opener: the five `TestOpenMainRedStop_*` tests that call it, and the three `TestStopOpening_*` tests.
 - `TestOpenMainRedStop_TheBuildFloorSignalsTheOpeningWithItsRunAndTheBuildPhase` and `TestMainRedSink_TheInputHookWinsAndTheRealOpenerIsTheDefault` pin the build floor.
 
-`ReviewInput.attributor` builds the `Attributor` through `baseattr.New`. The main ref and the scratch path have one home there.
+`BaseRedAttributor` builds the `Attributor` through `baseattr.New`. The main ref and the scratch path have one home there.
+It reads the rerun budget `gates.base_red_rerun_seconds` from the policy of its root.
+It returns an attributor with no serialize hook, and it writes a policy warning to the writer of the caller.
+`ReviewInput.attributor` sets the tier lock as the serialize hook of the returned value.
+The audit tier sets no hook, because the tier holds that lock already (see [internal-phases-audit-ciparitygate.md](internal-phases-audit-ciparitygate.md)).
+
+`TestBaseRedAttributor_ACallerWithNoSerializeHookGetsThePolicyLimitAndItsOwnRunner` pins the second caller.
+`TestBaseRedAttributor_AMalformedPolicyWarnsOnTheWriterOfTheCaller` pins the writer.
+
 `covchanged.TagFlags` gives the `-tags` flag list. `coverTestArgs`, the cover-changed floor and the ship stop check use it.
 
 The codes `GATE_REPO_MAIN_RED_STOP_WOULD_REFUSE` and `GATE_REPO_MAIN_RED_STOP_RELEASED` register in `main_red_park.go`. Ship emits them (see [internal-phases-ship.md](internal-phases-ship.md)).

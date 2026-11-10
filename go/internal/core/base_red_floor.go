@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"io"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -68,9 +69,14 @@ func CoverChangedFloorJudge(ctx context.Context, in ReviewInput) ([]string, erro
 }
 
 func (in ReviewInput) attributor() baseattr.Attributor {
-	root := cmp.Or(in.ProjectRoot, in.Worktree)
-	gates := policy.LoadOrDefaults(filepath.Join(root, ".evolve", "policy.json"), in.errOut()).GatesConfig()
-	return baseattr.New(gitexec.Git{Dir: root, Exec: gitRunner}, in.baseRunner(), gates.BaseRedRerun, func(context.Context) func() { return in.acquireFloorRetakeLock() })
+	a := BaseRedAttributor(cmp.Or(in.ProjectRoot, in.Worktree), in.baseRunner(), in.errOut())
+	a.Serialize = func(context.Context) func() { return in.acquireFloorRetakeLock() }
+	return a
+}
+
+func BaseRedAttributor(root string, run baseattr.Runner, warn io.Writer) baseattr.Attributor {
+	gates := policy.LoadOrDefaults(filepath.Join(root, ".evolve", "policy.json"), warn).GatesConfig()
+	return baseattr.New(gitexec.Git{Dir: root, Exec: gitRunner}, run, gates.BaseRedRerun, nil)
 }
 
 func (in ReviewInput) baseRunner() baseattr.Runner {

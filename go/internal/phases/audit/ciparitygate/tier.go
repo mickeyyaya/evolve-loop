@@ -99,7 +99,7 @@ func (g *Gates) retake(req Request, dir string, args []string, run sysexec.RunFu
 	retakeCtx, retakeCancel := context.WithTimeout(context.Background(), g.timeouts.TierAttempt)
 	second := runAttempt(retakeCtx, run, dir, args)
 	retakeCancel()
-	release()
+	defer release()
 	if second.err == nil {
 		g.logAttempt(req, log, 2, " (serialized retake"+lockNote+")", second)
 	}
@@ -114,6 +114,11 @@ func (g *Gates) retake(req Request, dir string, args []string, run sysexec.RunFu
 	}
 	if d.err != nil {
 		return nil, d.err
+	}
+	if d.cause == causeRetakeRed {
+		if notice := g.attributeToBase(req, second, log.writtenPath); notice != nil {
+			return nil, notice
+		}
 	}
 	return g.failed(gateTier, req, d.cause, d.offenders, "log", log.writtenPath), nil
 }

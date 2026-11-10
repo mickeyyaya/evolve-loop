@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
@@ -169,6 +170,33 @@ func TestReviewInputAttributor_TakesItsRerunLimitFromThePolicy(t *testing.T) {
 	}
 	if a := (ReviewInput{Worktree: "/w"}).attributor(); a.Git.Dir != "/w" || a.Serialize == nil || a.Run == nil {
 		t.Errorf("without a project root the worktree is the git seam: %+v", a)
+	}
+}
+
+func TestBaseRedAttributor_ACallerWithNoSerializeHookGetsThePolicyLimitAndItsOwnRunner(t *testing.T) {
+	t.Parallel()
+	root := floorRoot(t, `{"gates":{"base_red_rerun_seconds":40}}`)
+	ran := false
+	run := func(context.Context, string, baseattr.Reds) ([]baseattr.Key, error) { ran = true; return nil, nil }
+
+	a := BaseRedAttributor(root, run, &injectedStderr{})
+
+	if a.Timeout != 40*time.Second || a.Git.Dir != root || a.Serialize != nil {
+		t.Fatalf("attributor = %+v, want the 40 s of the policy, git in %s and no serialize hook", a, root)
+	}
+	if _, err := a.Run(context.Background(), root, baseattr.Reds{}); err != nil || !ran {
+		t.Errorf("the attributor runs another runner than the one of the caller (ran=%v err=%v)", ran, err)
+	}
+}
+
+func TestBaseRedAttributor_AMalformedPolicyWarnsOnTheWriterOfTheCaller(t *testing.T) {
+	t.Parallel()
+	var warn bytes.Buffer
+
+	a := BaseRedAttributor(floorRoot(t, "{"), nil, &warn)
+
+	if !strings.Contains(warn.String(), "[policy] WARN") || a.Timeout != 300*time.Second {
+		t.Errorf("warn = %q with limit %v, want the policy warning on the writer of the caller and the default of 300 s", warn.String(), a.Timeout)
 	}
 }
 
