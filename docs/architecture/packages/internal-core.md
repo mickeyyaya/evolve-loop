@@ -1474,6 +1474,16 @@ A lane-only red still rejects. The rejection lists the base-red keys as informat
 An attribution that cannot run blames the lane as before. The floor writes a WARN and emits `BUILD_BASE_RED_UNJUDGED`.
 
 `FailOpen` wraps a `FloorJudge` and keeps the WARN for a judge error.
+
+`DefaultBuildFloorChecks` computes the changed paths once and passes them to the unit-test and cover-changed check functions.
+`UnitTestFloorJudge` and `CoverChangedFloorJudge` read the paths themselves through `floorPaths`, then call the same check functions.
+
+`floorPaths` reads the paths with `worktreePathsSince`. A failed `git diff` or `git ls-files` is an error, so a failed read never looks like an empty change.
+`changedWorktreePathsSince` keeps its old result: it drops the error and returns the paths that git gave.
+
+`FloorEntryRun` makes a registry run function from a `FloorJudge`. It sets `Worktree` and `ProjectRoot` to `Root`, and `WorktreeBaseSHA` to `Base`.
+Each line of the judge is one red. A judge error, or an unreadable root, is an error and never a red or a pass.
+
 When the base and `main` are both red, the injected field `ReviewInput.MainRedStop` receives the verdict. Nothing sets that field yet.
 
 `ReviewInput.attributor` builds the `Attributor` through `baseattr.New`. The main ref and the scratch path have one home there.

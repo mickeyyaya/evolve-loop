@@ -8,7 +8,7 @@ import (
 )
 
 func Entries() []gatecontract.Entry {
-	return []gatecontract.Entry{testdupEntry(), sizeratchetEntry(), rawgitratchetEntry()}
+	return append([]gatecontract.Entry{testdupEntry(), sizeratchetEntry(), rawgitratchetEntry()}, floorEntries()...)
 }
 
 func Unregistered() []string {

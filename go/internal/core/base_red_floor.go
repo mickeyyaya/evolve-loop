@@ -40,12 +40,31 @@ func FailOpen(name string, judge FloorJudge) BuildFloorCheckFn {
 	}
 }
 
+func floorPaths(ctx context.Context, in ReviewInput) ([]string, error) {
+	if in.Worktree == "" {
+		return nil, nil
+	}
+	paths, err := worktreePathsSince(ctx, in.Worktree, floorBase(in))
+	if err != nil {
+		return nil, fmt.Errorf("the changed paths of %s cannot be read: %w", in.Worktree, err)
+	}
+	return paths, nil
+}
+
 func UnitTestFloorJudge(ctx context.Context, in ReviewInput) ([]string, error) {
-	return changedPackageFloorChecks(ctx, in, changedFloorPaths(ctx, in)), nil
+	paths, err := floorPaths(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	return changedPackageFloorChecks(ctx, in, paths), nil
 }
 
 func CoverChangedFloorJudge(ctx context.Context, in ReviewInput) ([]string, error) {
-	return coverChangedFailures(ctx, in, changedFloorPaths(ctx, in)), nil
+	paths, err := floorPaths(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	return coverChangedFailures(ctx, in, paths), nil
 }
 
 func (in ReviewInput) attributor() baseattr.Attributor {
