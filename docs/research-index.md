@@ -301,6 +301,7 @@ approaches / decision / results / retro) — lives at
 | [research/practice-agy-cli-changelog-2026-11.md](research/practice-agy-cli-changelog-2026-11.md) | Research: the agy changelog updates for versions 1.4.3 through 1.4.12 read as data. No persona changes before the M2 baseline. |
 | [research/practice-agy-cli-changelog-page-2026-11.md](research/practice-agy-cli-changelog-page-2026-11.md) | Research: the agy changelog page releases v2.28.2 through v2.27.0 read as data. They belong to the desktop app tab, not the CLI. No persona changes before the M2 baseline. |
 | [research/agy-cli-changelog-2026-11.md](research/agy-cli-changelog-2026-11.md) | Research: the agy CLI changelog tab lines on Voice mode, Remote Agents, ACP and v1.4.12 and v1.4.11 read as data. No persona changes before the M2 baseline. |
+| [research/practice-gemini-prompting-guide-2026-11.md](research/practice-gemini-prompting-guide-2026-11.md) | Research: the Gemini prompting guide read as data after the snapshot of 2026-10-14. The item shows only two words. No persona changes before the M2 baseline. |
 
 ## 2026-10-13 — fleet landing at scale: 200 concurrent lanes (ADR-0134)
 
@@ -651,5 +652,11 @@ approaches / decision / results / retro) — lives at
 | Document | What it records |
 |---|---|
 | [plans/gc-closes-the-legacy-gap-2026-11.md](plans/gc-closes-the-legacy-gap-2026-11.md) | Plan: a dry run kept each of 217 dev worktrees. A manual cleanup then removed 261 worktrees and 998 branches. gc saves a proof of recovery first, and then keeps only the live items. |
+
+## 2026-11-10 — rules that the Gemini prompting guide note cites
+
+| Document | What it records |
+|---|---|
+| [plans/model-capability-practice-2026-10.md](plans/model-capability-practice-2026-10.md) | Plan: rule D7 (one persona per diet), rule D8 (four measures over 10 cycles before and after) and milestones M2 and M3. The Gemini note of 2026-11 ties its verdict to these rules. |
 
 <!-- GENERATED:research-index END -->
