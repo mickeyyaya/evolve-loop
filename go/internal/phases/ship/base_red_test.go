@@ -207,7 +207,7 @@ func TestReplay_20261109(t *testing.T) {
 	res := floor.Review(context.Background(), core.ReviewInput{
 		Phase: string(core.PhaseBuild), Cycle: 2242, Worktree: lane2242.wt, ProjectRoot: l.repo, WorktreeBaseSHA: lane2242.base,
 		Stderr: io.Discard, Signals: lane2242.signals,
-		MainRedStop: func(_ string, v baseattr.Verdict, _ int) error { opened = append(opened, v); return nil },
+		MainRedStop: func(_ string, v baseattr.Verdict, _ int) (bool, error) { opened = append(opened, v); return true, nil },
 	})
 	if !res.Approve || res.Retry {
 		t.Fatalf("step 3: the build floor approves lane 2242 on a red base; got %+v", res)

@@ -198,6 +198,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | Code | Meaning |
 |---|---|
 | `GATE_REPO_MAIN_RED_PARKED` | ship found the red tests of the lane red on its base and on main, so the orchestrator parked the cycle and did not blame the lane (ADR-0165 G4); the cycle has a main-red checkpoint and a row in main-red-stop.json, and it resumes when main is green; fields.keys (package.Test of each key of the stop), main, fix_item, parked (the parked cycles), checkpoint_error and stop_error (each empty when its write passed; a write that failed makes the signal an incident, because the cycle cannot resume from the park) |
+| `GATE_REPO_MAIN_RED_STOP_OPENED` | a build floor or ship found tests that are red on main, and no stop held, so the stop opened (ADR-0165 G4); main-red-stop.json has the keys and the fix item is in the inbox, where it leads the rank while the stop holds; fields.keys (package.Test of each key that is red on main), main, fix_item, fix_item_error (empty when the item is in the inbox; an item that was not filed makes the signal an incident) |
 
 ### healing
 

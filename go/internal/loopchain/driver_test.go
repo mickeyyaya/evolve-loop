@@ -418,6 +418,25 @@ func TestDriver_QuotaDeferIsAWarnWithTheCheckpointFields(t *testing.T) {
 	}
 }
 
+func TestDriver_AMainRedParkDefersWithItsOwnPauseKind(t *testing.T) {
+	f := newChainFixture(t, 3)
+	f.deps.Batch = func() int { f.batches++; return 5 }
+	f.deps.QuotaPause = func() (QuotaPause, bool) {
+		return QuotaPause{Kind: PauseMainRedPark, Cycle: 7, Source: "main-red", Clauses: "the cycle is parked at ship", NextStep: "fix main. Then evolve loop --resume."}, true
+	}
+
+	r := f.run(5)
+
+	ev := f.sig.only(t, CodeChainQuotaDefer)
+	if r.StopReason != StopQuotaDefer || r.Exit != 5 || f.batches != 1 || ev.Fields["pause"] != PauseMainRedPark || ev.Fields["source"] != "main-red" ||
+		ev.Reason != "batch 1 ended at a main-red park: the cycle is parked at ship (cycle=7 wake-at= source=main-red) — DEFERRING, not relaunching" {
+		t.Errorf("a main-red park is a deferral that names its pause: %+v %+v", r, ev)
+	}
+	if !strings.Contains(f.stderr.String(), "next: fix main. Then evolve loop --resume.") {
+		t.Errorf("the next step of the park is printed: %q", f.stderr.String())
+	}
+}
+
 func TestDriver_InvalidInboxItemIsNamedBeforeTheStopAndNotCounted(t *testing.T) {
 	f := newChainFixture(t, 1)
 	if err := os.WriteFile(filepath.Join(f.evolveDir, "inbox", "typo-item.json"), nil, 0o644); err != nil {

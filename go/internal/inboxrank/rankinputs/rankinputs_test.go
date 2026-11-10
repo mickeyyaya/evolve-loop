@@ -7,7 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxrank/rankinputs"
+	"github.com/mickeyyaya/evolve-loop/go/internal/mainstop"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
@@ -62,5 +64,42 @@ func TestLoad_AMalformedLedgerCountsNothingAndSaysSo(t *testing.T) {
 	}
 	if len(in.Recurrence) != 0 {
 		t.Errorf("no counts: %v", in.Recurrence)
+	}
+}
+
+func TestLoad_TheFixItemOfAHeldStopLeadsAndAReleasedStopLeadsNothing(t *testing.T) {
+	evolveDir := t.TempDir()
+	open := func(s mainstop.Stop, _ bool) (mainstop.Stop, error) {
+		v := baseattr.Verdict{MainRed: []baseattr.Key{{Package: "example.com/m/pkg", Test: "TestRed"}}, Main: "9a2bbe0e11"}
+		return s.Opened(v, mainstop.FixItemID(v.Main), loadNow), nil
+	}
+	if _, err := mainstop.Update(evolveDir, open); err != nil {
+		t.Fatal(err)
+	}
+	in, warnings := rankinputs.Load(evolveDir, loadNow)
+	if len(warnings) != 0 || !reflect.DeepEqual(in.Lead, []string{"fix-main-red-9a2bbe0e"}) {
+		t.Fatalf("a held stop: lead = %v warnings = %v, want its fix item alone", in.Lead, warnings)
+	}
+	release := func(s mainstop.Stop, _ bool) (mainstop.Stop, error) {
+		return s.Released(s.Keys, "landing", loadNow), nil
+	}
+	if _, err := mainstop.Update(evolveDir, release); err != nil {
+		t.Fatal(err)
+	}
+	if in, warnings := rankinputs.Load(evolveDir, loadNow); len(warnings) != 0 || len(in.Lead) != 0 {
+		t.Fatalf("a released stop: lead = %v warnings = %v, want none", in.Lead, warnings)
+	}
+}
+
+func TestLoad_AMalformedStopLeadsNothingAndSaysSoAndTheLedgerIsStillRead(t *testing.T) {
+	evolveDir := t.TempDir()
+	fixtures.MustWrite(t, mainstop.Path(evolveDir), `{not json`)
+	fixtures.MustWrite(t, filepath.Join(evolveDir, "recurrence-ledger.json"), `{"entries":{"p":{"pattern":"p","count":3,"fix_item_id":"fix-p"}}}`)
+	in, warnings := rankinputs.Load(evolveDir, loadNow)
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "main-red stop unreadable") || !strings.HasSuffix(warnings[0], "no item leads the rank") {
+		t.Fatalf("warnings = %v", warnings)
+	}
+	if len(in.Lead) != 0 || in.Recurrence["fix-p"] != 3 {
+		t.Errorf("lead = %v recurrence = %v, want no lead and the ledger counts", in.Lead, in.Recurrence)
 	}
 }

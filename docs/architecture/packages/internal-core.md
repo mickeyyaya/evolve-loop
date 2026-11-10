@@ -1484,7 +1484,25 @@ An attribution that cannot run blames the lane as before. The floor writes a WAR
 `FloorEntryRun` makes a registry run function from a `FloorJudge`. It sets `Worktree` and `ProjectRoot` to `Root`, and `WorktreeBaseSHA` to `Base`.
 Each line of the judge is one red. A judge error, or an unreadable root, is an error and never a red or a pass.
 
-When the base and `main` are both red, the injected field `ReviewInput.MainRedStop` receives the verdict. Nothing sets that field yet.
+When the base and `main` are both red, the build floor opens the main-red stop. The file is `main_red_stop_open.go`.
+
+- `OpenMainRedStop` is the one opener. `core` owns it, because `core` imports `mainstop` and `inboxfile` directly.
+- `mainRedSink` gives the injected field `ReviewInput.MainRedStop`, or `OpenMainRedStop` when the field is nil. Only tests set the field.
+- The opener starts or refreshes the stop through one `mainstop.Update`. It returns `opened` as true only when no stop held before the call.
+- A stop that was released does not hold, so the next red `main` opens a stop again.
+- The opener then files the fix item through `inboxfile.Mint` on each call. An item that is pending is not filed again, and a lost item is filed again.
+- A stop that cannot be written is the error `main-red stop: write the stop`, and `opened` is false.
+- A mint error is the error `main-red stop: file the fix item <id>`. The stop stays written, and `opened` keeps its value.
+- The fix item has the id of the stop, weight 1.0, priority `critical`, class `correctness` and source `main-red-stop`.
+- Its kind is `fix`, as the base-red item of `ciwatch` has. A kind with the prefix `pipeline-` goes to the console list, and then no lane can build the fix.
+- Its `files` field holds the import path of each key package, one time each. Its acceptance names each key and a regression test.
+- `stopOpening.through` calls the sink and emits `GATE_REPO_MAIN_RED_STOP_OPENED` when `opened` is true. The signal gives the keys, the `main` commit and the fix item.
+- The signal is a warning when the fix item is in the inbox. It is an incident with the field `fix_item_error` when the stop opened and the item was not filed.
+- A verdict with no `MainRed` key calls no sink and emits nothing. A stop that held before the call emits nothing.
+- A sink error on the build floor is one WARN line. The floor result does not change, because the ship check owns the stop.
+- The signal of the build floor has the run, the cycle and the phase `build`.
+- Tests of the opener: the five `TestOpenMainRedStop_*` tests that call it, and the three `TestStopOpening_*` tests.
+- `TestOpenMainRedStop_TheBuildFloorSignalsTheOpeningWithItsRunAndTheBuildPhase` and `TestMainRedSink_TheInputHookWinsAndTheRealOpenerIsTheDefault` pin the build floor.
 
 `ReviewInput.attributor` builds the `Attributor` through `baseattr.New`. The main ref and the scratch path have one home there.
 `tagFlags` gives the `-tags` flag list. `coverTestArgs` and the cover-changed floor both use it.
@@ -1508,4 +1526,8 @@ The file is `main_red_park.go`. The design is in [gate-contract-g4-base-red-attr
 - `parkOnMainRed` takes the cycle from the cycle state, so the stop row and the checkpoint name one cycle. The caller reads the verdict from the ship error.
 - `TestRunCycle_AFirstShipThatParksOnARedMainIsNotAFailedCycle` pins the park of the first ship of a cycle. `TestParkOnMainRed_TwoFailedWritesGiveAOneLineIncident` pins the one-line cause of two failed writes.
 - `TestResumeExecution_AShipThatParksOnARedMainIsNotAFailedCycle` pins the park of a resumed ship. `TestIsResumableReason_AMainRedParkIsResumable` pins the reason.
+- The park opens the stop through the opener of `main_red_stop_open.go` before it adds the parked row. Thus the first park files the fix item and emits the opened signal with the phase `ship`.
+- `parkInStop` only adds the parked row. The opener is the one home of the write that starts or refreshes a stop.
+- An error of the opener joins the error of the row write, so a park with no fix item is an incident.
+- `TestParkOnMainRed_OpensTheStopAndFilesTheFixItemBeforeItAddsTheParkedRow` and `TestParkOnMainRed_AFixItemThatCannotBeFiledMakesTheParkAnIncident` pin the two rules.
 - Limits: the exit code of a parked cycle and the release of its claims are the work of `cmd/evolve`. Until the pool reads the stop, a parked lane resumes in the next fill and parks again.

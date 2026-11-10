@@ -221,6 +221,7 @@ var serialTests = map[string]string{
 	"main.TestCmd_InboxRank_ReadsTheClassOrderFromThePolicy":                                                "sets env through a helper",
 	"main.TestCmd_InboxRank_RefusesABadRequest":                                                             "sets env through a helper",
 	"main.TestCmd_InboxRank_TableShowsRankScoreBreakdownIDAndTitle":                                         "sets env through a helper",
+	"main.TestRank_TheFixItemLeadsWhileTheStopHolds":                                                        "sets env through a helper",
 	"main.TestCmd_InboxReleaseKeep_RefusesALiveHolderANonSubsetAndBadUsage":                                 "sets env through a helper",
 	"main.TestCmd_InboxReleaseKeep_ResolvesAConflictWithTheChosenCopy":                                      "sets env through a helper",
 	"main.TestCmd_InboxReleaseStale_AConflictExitsOneAndNamesTheClaim":                                      "sets env through a helper",

@@ -134,7 +134,10 @@ func TestFloor_AMainRedBaseRedOpensTheStopThroughTheHook(t *testing.T) {
 	f.in.Cycle = 7
 	var got baseattr.Verdict
 	var cycle int
-	f.in.MainRedStop = func(_ string, v baseattr.Verdict, c int) error { got, cycle = v, c; return errors.New("record locked") }
+	f.in.MainRedStop = func(_ string, v baseattr.Verdict, c int) (bool, error) {
+		got, cycle = v, c
+		return false, errors.New("record locked")
+	}
 
 	res := repoContractReview(t, f, packRedNames("TestA")...)
 
@@ -145,7 +148,7 @@ func TestFloor_AMainRedBaseRedOpensTheStopThroughTheHook(t *testing.T) {
 		t.Fatalf("a hook error is a WARN, never a rejection; stderr=%q", f.stderr.String())
 	}
 	called := false
-	f.in.MainRedStop = func(string, baseattr.Verdict, int) error { called = true; return nil }
+	f.in.MainRedStop = func(string, baseattr.Verdict, int) (bool, error) { called = true; return false, nil }
 	f.in.openMainRedStop(baseattr.Verdict{BaseRed: got.BaseRed, Main: "abc"})
 	if called {
 		t.Fatalf("a green main opens no stop")

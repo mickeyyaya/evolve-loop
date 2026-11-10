@@ -296,8 +296,8 @@ func quotaPauseLine(qp quotaPause, now time.Time) string {
 	return head + " auto-resume=off: " + cmp.Or(qp.OperatorAction, "the auto-resume budget is spent or the wake time is unreadable; run `evolve loop --resume` by hand")
 }
 
-func loadActiveQuotaLikelyCheckpoint(evolveDir string) (blob, checkpoint map[string]any, ok bool) {
-	return loadActiveCheckpoint(evolveDir, "quota-likely")
+func loadActiveQuotaLikelyCheckpoint(evolveDir string) (blob, active map[string]any, ok bool) {
+	return loadActiveCheckpoint(evolveDir, string(checkpoint.ReasonQuotaLikely))
 }
 
 func loadActiveCheckpoint(evolveDir, want string) (blob, checkpoint map[string]any, ok bool) {

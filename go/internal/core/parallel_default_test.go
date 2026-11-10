@@ -57,6 +57,8 @@ const (
 var serialRequiredTests = map[string]string{
 	"core.TestCheckpointInterruptedPhase_AMainRedParkKeepsItsCheckpoint":                            swapsResumeBoundaryCheckpointer,
 	"core.TestParkOnMainRed_AFailedCheckpointIsAnIncidentAndTheStopRowIsStillWritten":               swapsMainRedCheckpointer,
+	"core.TestParkOnMainRed_OpensTheStopAndFilesTheFixItemBeforeItAddsTheParkedRow":                 swapsMainRedCheckpointer,
+	"core.TestParkOnMainRed_AFixItemThatCannotBeFiledMakesTheParkAnIncident":                        swapsMainRedCheckpointer,
 	"core.TestParkOnMainRed_AFailedStopWriteIsAnIncident":                                           swapsMainRedCheckpointer,
 	"core.TestParkOnMainRed_AWholeParkIsAWarningAndPrintsNothing":                                   swapsMainRedCheckpointer,
 	"core.TestParkOnMainRed_TwoFailedWritesGiveAOneLineIncident":                                    swapsMainRedCheckpointer,

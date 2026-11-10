@@ -36,10 +36,17 @@ func parkWith(t *testing.T, root string) (signalcenter.Event, string) {
 	var stderr bytes.Buffer
 	o := NewOrchestrator(&fakeStorage{state: State{}}, &fakeLedger{}, buildRunners(nil), WithSignalCenter(center), WithStderr(&stderr))
 	o.parkOnMainRed(root, CycleState{CycleID: 2249, RunID: "run-2249", WorkspacePath: t.TempDir()}, baseattr.VerdictOfDebug(parkError().Debug))
-	if len(*events) != 1 || (*events)[0].Code != CodeMainRedParked {
-		t.Fatalf("signals = %+v, want one GATE_REPO_MAIN_RED_PARKED", *events)
+	parks := 0
+	for _, e := range *events {
+		if e.Code == CodeMainRedParked {
+			parks++
+		}
 	}
-	return (*events)[0], stderr.String()
+	last := (*events)[len(*events)-1]
+	if parks != 1 || last.Code != CodeMainRedParked {
+		t.Fatalf("signals = %+v, want one GATE_REPO_MAIN_RED_PARKED as the last signal", *events)
+	}
+	return last, stderr.String()
 }
 
 func TestParkOnMainRed_AFailedCheckpointIsAnIncidentAndTheStopRowIsStillWritten(t *testing.T) {

@@ -27,7 +27,7 @@ func init() {
 
 type FloorJudge func(ctx context.Context, in ReviewInput) ([]string, error)
 
-type MainRedSink func(projectRoot string, v baseattr.Verdict, cycle int) error
+type MainRedSink func(projectRoot string, v baseattr.Verdict, cycle int) (opened bool, err error)
 
 func FailOpen(name string, judge FloorJudge) BuildFloorCheckFn {
 	return func(ctx context.Context, in ReviewInput) []string {
@@ -187,12 +187,17 @@ func (in ReviewInput) reportAttributed(v baseattr.Verdict) {
 }
 
 func (in ReviewInput) openMainRedStop(v baseattr.Verdict) {
-	if len(v.MainRed) == 0 || in.MainRedStop == nil {
-		return
-	}
-	if err := in.MainRedStop(in.ProjectRoot, v, in.Cycle); err != nil {
+	opening := stopOpening{projectRoot: in.ProjectRoot, verdict: v, cycle: in.Cycle, runID: in.RunID, phase: string(PhaseBuild), origin: "ReviewInput.openMainRedStop"}
+	if err := opening.through(in.mainRedSink(), in.Signals); err != nil {
 		fmt.Fprintf(in.errOut(), "[build-floor] WARN the main-red stop was not recorded: %v\n", err)
 	}
+}
+
+func (in ReviewInput) mainRedSink() MainRedSink {
+	if in.MainRedStop != nil {
+		return in.MainRedStop
+	}
+	return OpenMainRedStop
 }
 
 func (in ReviewInput) reportUnjudged(reds baseattr.Reds, cause error) {
