@@ -103,6 +103,7 @@ Not in G4:
 - `core`, `ship` and `ciparitygate` never import `gateregistry`. `gateregistry` imports them, as G1 allows.
 - The fix item and the incident are written from `cmd/evolve`, which already imports `inboxfile` and `selfheal`. `core` gets them through one injected hook, as with `QuotaBoundaryCheckpointer`.
 - No feature flag. The settings are policy data in `gates` (section 6.4).
+- Section 13 adds `integration/stopgate.go` and two files in `selfheal` for the train. `integration` gets no new import.
 
 ## 6. Types and signatures
 
@@ -251,6 +252,8 @@ func checkMainRedStop(ctx context.Context, opts *Options, stage string) error
 func releaseMainRedStop(opts *Options, landed string, green []baseattr.Key) error
 ```
 
+Section 13.3 amends this block: the release moves to `selfheal.StopRelease.Keys`, and ship calls it.
+
 ```go
 package ciparitygate
 
@@ -376,6 +379,8 @@ The signal codes register in `signalcenter` under module `gate.repo`, except the
 
 ## 8. Tests
 
+The tests of the train are in section 13.5, with their own numbers.
+
 Each test is red without the change. "Real entry" marks a test that runs the pipeline entry with a `gittest` repository.
 
 | # | Test | Entry point | Red case |
@@ -421,6 +426,7 @@ New `GateGuarantee` rows in `guards/integrity_surface.go`, in the commit that ad
 - `/go/internal/core/repo_contract_floor.go` and `/go/internal/core/base_red_floor.go` (the new adapter file);
 - `/go/internal/core/main_red_park.go` and `/go/internal/phases/ship/base_red.go`;
 - `/go/internal/inboxrank/rankinputs/` (the lead list decides what runs first).
+- `/go/internal/integration/stopgate.go`, `/go/internal/selfheal/main_red_hold.go` and `/go/internal/selfheal/main_red_release.go` (section 13).
 
 Already protected: `build_floor_reviewer.go`, `cover_changed_floor.go`, `ciparitygate/`, `ship_recovery.go`, `ship.go`, and `phases/ship/repocontract.go` after G1.
 
@@ -457,7 +463,7 @@ G4 is too large for one pull request. Three parts, each green and useful alone.
 **G4c: audit and the train.**
 
 1. `WithAttribution` in `ciparitygate`. Test 9.
-2. The train: wrap `integration.Main` so a CI-green batch during a stop releases it. A red batch during a stop parks the batch, with no split. This needs a test of `Merger.Land` with a fake CI.
+2. The train: during a stop at `enforce`, only a batch that turns a key green lands. It releases that key. Section 13 is the detail design.
 
 Limits after G4:
 
@@ -484,3 +490,208 @@ Limits after G4:
 1. **Start the stop at `enforce`, against decision 15?** Recommended: no. Start at `shadow` for one wave, read `MAIN_RED_STOP_WOULD_REFUSE`, then move it.
 2. **Does a parked cycle count toward "two cycles that ship nothing"?** Recommended: no. Count `main-red` parks separately, as the quota pause is.
 3. **May the stop's escalation propose `revert-last-landing` on its own?** Recommended: keep the ADR-0155 stage. The proposal stays a proposal at `shadow`.
+
+## 13. The train and the stop (detail of G4c step 2)
+
+Section 10 names step 2 in one line. This section is the design that the build follows.
+
+The rule of this section is ADR-0165 decision 13: while `main` is red, a landing path lands only a fix. `mainstop.Stop.Admit` is the one home of that rule. Ship calls it today. The train calls it too, with the same proof.
+
+### 13.1 Current state
+
+- `Merger.Land` reads the batch CI through the `CI` interface and moves `main` through the `Main` interface (`integration/batchpr.go`).
+- A red batch splits, and each single record that stays red is ejected with a CI comment on its pull request.
+- The train does not read the stop. On a red `main`, each record of a batch is red and gets the blame.
+- Only ship releases the stop (`stopRelease.release` in `phases/ship/main_red_stop.go`). A fix that lands through the train leaves the stop open.
+- `inboxmover` imports `integration`, so `integration` cannot import the mover of the fix item.
+- A batch of documents only runs no Go job (`.github/workflows/required.yml`). Its green CI is no proof for a Go test.
+
+### 13.2 Options
+
+| Option | Change | Result |
+|---|---|---|
+| A. Hook fields in `Merger` | `Merger` gets two new fields, and `land` gets two new branches | Rejected. `land` is at its size limit, and each caller of `Merger` learns about the stop. |
+| B. A check in `Train.Land` before the merger | One read of the stop before the batch | Rejected. The train cannot know before the CI run that a batch is the fix. |
+| C. Decorators of `Main` and `CI` | A `StopGate` value wraps the two interfaces. `Merger` does not change. | Chosen. The merger stays closed to change. |
+
+Option C has a cost. `Watch` runs more than one time for a red batch, so the value behind the gate must keep state for the shadow event. The two decorators share no call order in the type. The cost is accepted, because the state has one home (`StopHold`) and test 9 of 13.5 pins it.
+
+### 13.3 Types
+
+In `internal/integration` (new file `stopgate.go`):
+
+```go
+type StopGate struct {
+	Red   func(pr PR) error
+	Admit func(ctx context.Context, main, tip string) (landed func(), err error)
+}
+
+func (g StopGate) Main(inner Main) Main
+func (g StopGate) CI(inner CI) CI
+```
+
+- The decorator of `CI` calls `Red` after a red `Watch`. An error of `Red` is the error of `Watch`.
+- The decorator of `Main` calls `Admit` before the inner `FastForward`, with the head of `main` and the tip of the batch.
+  - An error of `Admit` is the error of `FastForward`, and `main` does not move.
+  - The decorator calls `landed` only when the inner `FastForward` returns nil.
+- `landed` returns no error, because the landing is complete when it runs. The function behind it writes each failure as a warning (see 13.4).
+- `integration` gets no new import and no new error value.
+
+In `internal/selfheal`, next to `StopBound` (new files `main_red_hold.go` and `main_red_release.go`):
+
+```go
+var ErrMainRedHold = errors.New("main is red and a stop holds")
+
+func ReadStop(evolveDir string, warn io.Writer) (stop mainstop.Stop, holds bool)
+
+type KeyRun func(ctx context.Context, rev string, keys []baseattr.Key) (red []baseattr.Key, err error)
+
+type StopHold struct {
+	EvolveDir string
+	Enforced  bool
+	Event     signalcenter.Event
+	Emit      func(signalcenter.Event)
+	Warn      io.Writer
+	Run       KeyRun
+}
+
+func (h *StopHold) Red(landing string) error
+func (h *StopHold) Admit(ctx context.Context, main, tip string) (green []baseattr.Key, err error)
+
+type StopRelease struct {
+	EvolveDir string
+	Now       time.Time
+	Event     signalcenter.Event
+	Emit      func(signalcenter.Event)
+	Consume   func(fixItem string) error
+}
+
+func (r StopRelease) Keys(green []baseattr.Key, by string) (mainstop.Stop, error)
+```
+
+- `ReadStop` is the one home of the read with its fail-open rule. A record that cannot be read gives a warning on `warn` and the result "no stop that holds".
+- Ship calls `ReadStop` in `checkMainRedStop`. Ship does not build a `StopHold`, and it keeps its own lane event with the admission of the lane.
+- `StopHold` is the admission of a batch. Its two methods end in one private decision, which calls `mainstop.Stop.Admit` with a proof.
+  - `Admit` reads the stop through `ReadStop`. With no stop that holds, it returns nil and runs no key.
+  - `Admit` runs the keys of the stop on the tip through `Run`. The proof is `mainstop.Proof{Base: main, Green: <each key that is not red>}`.
+  - A key run that fails gives a warning and a proof with no green key.
+  - `Red` is the same decision with a proof that has no green key, because a red batch proves no key.
+  - Each refusal of `mainstop.Stop.Admit` gives the same hold, so the base of that proof does not change the result.
+- The decision has three results.
+  - `AdmitFix`: `Admit` returns the green keys.
+  - A refusal at `enforce`: an error that wraps `ErrMainRedHold`. The text names the landing, the keys and the remedy.
+  - A refusal at `shadow`: nil, and one `MAIN_RED_STOP_WOULD_REFUSE` event for each `StopHold` value. The value remembers that it emitted.
+- `StopRelease.Keys` is the one home of the release: the record update, the call of `Consume` and `MAIN_RED_STOP_RELEASED`. Ship calls it.
+- The release has no stage. It updates the record at `shadow` and at `enforce`, as the release of ship does (section 6.4).
+- `Event` is the base event of the caller: the cycle, the run, the phase and the origin. Ship gives the values that its tests assert today. The train gives the origin `integration batch`.
+- `Now` is a value, as in `StopBound`. It is the start time of the command, so `ReleasedAt` can be earlier than the release by the CI time. No reader needs more.
+- `Consume` is one call of the new function `inboxmover.ConsumeFixItem(opts, id, promote)`. This function holds the sequence that ship has today: locate the item, accept a missing item, move it to `processed`.
+
+In `internal/core`, next to `BaseRedAttributor`:
+
+- `StopProofReds(keys)` returns the `baseattr.Reds` of a stop proof: the keys and the tag flags.
+- It is the one home of those flags. `stopCheck.proof` of ship and the default `KeyRun` of the train both call it.
+
+In `cmd/evolve` (the composition root):
+
+- `integrationEnv` gets three fields: `Emit` (the signal sink), `Now` (the clock) and `KeyRun` (the key run).
+- `productionIntegrationEnv` sets each of the three.
+- The default `KeyRun` is `core.BaseRedAttributor(root, run, warn).RunAt` with `core.StopProofReds(keys)`. It runs the keys on a detached tree of the tip.
+- `train()` becomes `train(warn io.Writer)`. The two callers (`batchVerb` and `recordPR`) pass their stderr.
+- The stop record and the policy file are in the project root, not in the working directory. Ship and the pool write and read them there.
+  - The project root is `chooseRoot(flag, env.ProjectRootEnv, env.Root)`, the resolution of the `status` verb. The `batch` verb gets the `--project-root` parameter.
+  - `env.Root` stays the directory of the git commands.
+- `train` reads the stage from the policy file of the project root (`GatesConfig.MainRedStopEnforced`), as ship does.
+- The wiring test reads the inner ports before the wrap. `integrationEnv.ports()` returns the bare `GhCI` and `GitMain`, and `train` wraps them.
+  - `TestIntegrationProductionEnvSetsEveryPort` keeps its assertion of `Gh` and `Settle` on the result of `ports()`.
+- `train` builds one `StopHold` and one `StopRelease`, and wraps `CI` and `Main` with one `StopGate`.
+  - The `Admit` closure calls `StopHold.Admit`. Its `landed` function calls `StopRelease.Keys` with the green keys and `"batch main <tip>"`.
+- `refusalExit` gets a second arm, after the arm of `*integration.Refusal`: `errors.Is(err, selfheal.ErrMainRedHold)` gives the refused code.
+  - The two arms give the same code, so the new arm cannot change the result of the first one.
+
+### 13.4 Behavior
+
+| Batch CI | Stop | Keys on the batch tip | Stage | Result |
+|---|---|---|---|---|
+| green | none | not run | each | The batch lands, as today. |
+| green | holds | one or more green | each | The batch lands. Then each green key is released. |
+| green | holds | each one red | `enforce` | `FastForward` returns the hold error. `main` does not move. Each record stays for the next batch. |
+| green | holds | each one red | `shadow` | The batch lands. One `MAIN_RED_STOP_WOULD_REFUSE` event for the run of the command. |
+| red | none | not run | each | The batch splits, as today. |
+| red | holds | not run | `enforce` | `Watch` returns the hold error. No rerun, no split, no ejection, no comment. Each record stays for the next batch. |
+| red | holds | not run | `shadow` | The batch splits, as today. The same one event for the run of the command. |
+
+- A green batch CI is not the proof of a fix. The proof is the run of the keys on the tip of the batch, before `main` moves.
+- The train and ship thus have one admission rule. The green batch CI is the "no gate red" half of decision 13.
+- A batch of documents only does not land during a stop at `enforce`. The keys stay red on its tip.
+- A `main` that moved gives no fast-forward, and thus no key run and no release.
+- The hold error of a red batch comes from the first red `Watch`, before a rerun.
+- A release that fails does not fail the landing. The closure writes `[integration] WARN main-red stop release: <error>` to stderr, as ship does. The stop then holds until a later release.
+- A key run that fails proves no fix. Stderr has the warning, and the batch gets the refusal of its stage.
+- A stop record that cannot be read does not hold the batch. The batch lands or splits as today, and stderr has the warning.
+- The hold error names the keys and the remedy. The remedy is one batch that has each fix and no other change, or ship.
+- `evolve integration batch` exits with the refused code for `ErrMainRedHold`, not with the I/O code.
+- The decorator of `CI` passes `Open` and `Rerun` to the inner value with no change. The decorator of `Main` passes `Head`.
+
+### 13.5 Tests
+
+1. `Merger.Land`, fake CI green, `StopGate.Main`: `Admit` runs before the inner `FastForward`.
+   - `Admit` gets the head and the tip.
+   - `landed` runs one time, after the fast-forward.
+2. `Merger.Land`, the fast-forward fails: zero `landed` calls.
+   - `main` moved: zero `Admit` calls.
+3. `Merger.Land`, fake CI green, `Admit` returns the hold error: the error is `ErrMainRedHold`.
+   - The inner `FastForward` has zero calls.
+4. `Merger.Land`, fake CI red, `Red` returns the hold error: the error is `ErrMainRedHold`.
+   - The run has zero `Eject` calls and zero `Rerun` calls, and the outcome has no ejected record.
+5. `Merger.Land`, fake CI red, `Red` returns nil: the batch splits as before.
+6. `selfheal.StopHold`, one table for `Admit` and `Red`.
+   - No stop: nil, and the key run does not start.
+   - One green key: the green keys, at each stage.
+   - Each key red, or a key run that fails: the hold error at `enforce`, and nil with one event at `shadow`.
+   - Two refusals of one value at `shadow`: one event.
+7. Ship: the release tests of G4b pass through `StopRelease.Keys` with no change of their assertions.
+8. `evolve integration batch` through the real command, stage `enforce`, a stop on disk, red CI: the refused exit code.
+   - The record of the pull request is kept, and the stop holds.
+   - Stderr names the keys of the stop and the remedy.
+9. The same command at stage `shadow` with two red records: the split result of today.
+   - The run emits exactly one `MAIN_RED_STOP_WOULD_REFUSE` event.
+10. The same command with green CI and keys that are green on the tip.
+    - `main` moves, and the stop record is released.
+    - The fix item is in `processed`.
+11. The same command at `enforce` with green CI, and keys that stay red on the tip.
+    - The batch has documents only.
+    - The exit code is the refused code, and `main` does not move.
+    - The stop holds, and the fix item stays in the inbox.
+12. The same command and batch at `shadow`: `main` moves, the stop holds, and the run emits one event.
+13. The same command at `enforce` with a stop record that cannot be parsed, and red CI: the batch splits.
+    - Stderr has the warning of the read.
+14. The same command with a fix batch and a release that fails: the batch lands.
+    - The exit code is that of a landing.
+    - Stderr has the release warning, and the stop holds.
+15. The decorators: `Open`, `Rerun` and `Head` reach the inner value with the same arguments and results.
+16. `inboxmover.ConsumeFixItem`: an open item moves to `processed`, and a missing item is not an error.
+17. Wiring: `TestIntegrationProductionEnvSetsEveryPort` also requires `Emit`, `Now` and `KeyRun`.
+18. The default `KeyRun` on a `gittest` repository with an injected `baseattr.Runner`.
+    - The runner gets the tree of the given revision and the flags of `core.StopProofReds`.
+19. `core.StopProofReds`: the ship proof test and test 18 fail when the flags of one caller change.
+20. Guard: a production `integration.Train` value is built only in `integrationEnv.train`.
+    - The `Main` and the `CI` of that value are the decorators of `StopGate`.
+    - The test puts a hold error behind the gate and gets it from `FastForward` and from a red `Watch`.
+21. The real command from a linked worktree. The stop and stage `enforce` are in the project root.
+    - With `--project-root`, and with the environment value, the exit code is the refused code.
+    - Red case: with the working directory as the root, the batch lands.
+
+The numbers of this list are local to section 13. Section 8 has the tests of the other steps.
+
+Each test is proven red without its production line. The command tests give a fake `KeyRun` through `integrationEnv`.
+
+### 13.6 Limits
+
+- The key run costs one rerun budget at most before each landing during a stop. This is an estimate from the policy value, not a measurement.
+- A batch that holds the fix and a red change is held at `enforce`. The remedy is a batch of the fix alone.
+- A stop can hold the keys of two causes. A pull request that fixes one cause stays red in the batch CI, and the train holds it.
+  - Ship admits such a partial fix, because ship subtracts the base reds. The remedy is one batch with each fix, or ship.
+- A `main` that moves during the key run fails the push. The next run of the command composes the batch again.
+- With no `--project-root` and no environment value, the project root is the working directory. A command from a linked worktree then reads no stop.
+- The hold does not close the pull request of the batch on the host. This is the same as each other error path of `Watch`.
