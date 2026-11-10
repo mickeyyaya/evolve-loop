@@ -148,10 +148,12 @@ The three gates block a landing today, so they keep `enforce`. Decision 15 appli
 | Name | Files | Read step (an error means "did not judge") | Judge step (an error is a red) |
 |---|---|---|---|
 | `testdup-ratchet` | `go/internal/testdup/` | read the baseline file, `testdup.ParseBaseline`, `testdup.Scan` | `testdup.Check` |
-| `size-ratchet` | `go/internal/sizeratchet/` | `sizeratchet.Walk`, `sizeratchet.LoadOffenders` | `sizeratchet.Check` |
-| `raw-git-ratchet` | `go/internal/rawgitratchet/` | `rawgitratchet.BoundTestFiles`, `rawgitratchet.Sites`, `rawgitratchet.LoadBaseline` | `rawgitratchet.Check` |
+| `size-ratchet` | `go/internal/sizeratchet/` | `sizeratchet.Load` | `sizeratchet.Check` |
+| `raw-git-ratchet` | `go/internal/rawgitratchet/` | `rawgitratchet.Load` | `rawgitratchet.Check` |
 
 No seed run function calls a `Scan` that returns one error for both steps. The note of `BoundTestFiles` goes to `Notes`.
+
+Each `Load` is the one read step of its package. The `Scan` of the package calls `Load` and then `Check`, so the command and the registry read the same inputs. The baseline of `testdup` has one path, `testdup.BaselineRelPath`. The trust class words are constants of `gatecontract`. `guards.ClassOf` gives the guarantee class of a path, and each test that checks a class calls it.
 
 | Name | Owners | Inputs (class) |
 |---|---|---|
@@ -212,6 +214,8 @@ G1 adds these `GateGuarantee` rows to the manifest of ADR-0157, as decision 16 r
 A lane cannot write a row, so a lane cannot change a stage, a judge or the pack list. The console changes them only from a held proposal or an operator decision. A console diff is not held by the protected-path floor, so tests 2 and 4 hold it. Those tests refuse a larger debt set and an enforced gate at `shadow` from each writer.
 
 G1 also changes `go/internal/profiles/gate_inputs_realtree_test.go`, which is a protected file. The change is the new rule for a protected worktree path, the new pinned open seam, and the class list from `gatecontract.TrustClasses()`.
+
+`guards` imports `profiles` through `core`, so that in-package test file cannot import `guards`. The rule is thus the function `writableAuthority`, which takes the protected-surface check as a parameter. The authority test moves to `go/internal/profiles/gate_inputs_protected_realtree_test.go` in the external package `profiles_test`, and it passes `guards.IsProtectedSurface`. G1 adds a `GuardGuarantee` row for that file. The rule applies to the `authority` rows only, because no other row needs it.
 
 This work is plan component G7, so G1 builds G7 and the G7 item retires.
 

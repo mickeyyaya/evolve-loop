@@ -71,6 +71,10 @@ The test reads each row of this table. Column 2 holds one path in backticks. Col
 | Lost-landing floor (`core/lost_landing_floor.go`) | `.evolve/runs/cycle-*/ship-binding.json` | harness | verified | `git rev-parse` and `git merge-base --is-ancestor` check the commit. |
 | Ship inbox consumption (`consumeCommittedItems`) | `.evolve/runs/cycle-*/acs-verdict.json` | harness | verified | `verifyClass` checks the receipt earlier in the same ship. |
 | Coherence and router digests (`coherence.ReadCycleVerdicts`, `router/digest.go`) | `.evolve/runs/cycle-*/acs-verdict.json` | harness | advisory | They steer logs and the routing digest, not a gate. |
+| Registered scanner gates (`gateregistry`: `testdup-ratchet`, `size-ratchet`, `raw-git-ratchet`) | `{worktree_path}/go` | builder | subject | Each gate judges the Go tree of the lane. See [gate-contract.md](gate-contract.md) section 6.4. |
+| Test-duplicate ratchet (`testdup-ratchet`, `gateregistry/seed_testdup.go`) | `{worktree_path}/go/.test-dup-baseline` | builder | open-seam | The gate reads the count and the date as fact, and no profile denies the file. Follow-up: G6 of the [gate-contract plan](../plans/gate-contract-2026-11.md). |
+| Function-size ratchet (`size-ratchet`, `gateregistry/seed_sizeratchet.go`) | `{worktree_path}/go/internal/sizeratchet/offenders.json` | repository | authority | The path is on the protected surface, so a lane cannot write it. |
+| Raw git fixture ratchet (`raw-git-ratchet`, `gateregistry/seed_rawgitratchet.go`) | `{worktree_path}/go/internal/rawgitratchet/baseline.json` | repository | authority | The path is on the protected surface, so a lane cannot write it. |
 
 ## Decisions
 

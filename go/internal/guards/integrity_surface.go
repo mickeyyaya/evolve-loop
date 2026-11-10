@@ -94,6 +94,7 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/core/floor_lists_regression_test.go", Class: GateGuarantee, Rationale: "the floor list regression refusal's own pins"},
 	{Fragment: "/go/internal/core/cover_changed_floor.go", Class: GateGuarantee, Rationale: "the build floor's cover-changed and cover-strict checks, which read the merged floor lists"},
 	{Fragment: "/go/internal/profiles/gate_inputs_realtree_test.go", Class: GuardGuarantee, Rationale: "the write-scope regression test over docs/architecture/gate-input-inventory.md, with the pinned authority rows and open seams; a cycle that relabelled a row or a pin would silence it"},
+	{Fragment: "/go/internal/profiles/gate_inputs_protected_realtree_test.go", Class: GuardGuarantee, Rationale: "the authority test of the gate input inventory, which passes the protected-surface manifest to the write-scope rule; a cycle that passed another predicate would call each worktree path protected"},
 	{Fragment: "/go/internal/core/ste_floor.go", Class: GateGuarantee, Rationale: "the build floor's STE check: at docs_floor.ste_stage enforce it sends a doc whose added lines fail the lint back to the build; a cycle that weakened it could land the doc CI refuses"},
 	{Fragment: "/go/internal/stelint/added.go", Class: GateGuarantee, Rationale: "the one added-line scope of the STE lint, shared by the build floor and evolve docs ste-lint --added (the CI job)"},
 	{Fragment: "/go/internal/core/build_explanation_floor_test.go", Class: GateGuarantee, Rationale: "composition tripwire proving optional reviewers cannot replace the explanation floor"},
@@ -228,6 +229,13 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/heldproposal/", Class: GateGuarantee, Rationale: "the held-proposal decision, the hold record and the operator approval (ADR-0157): a lane that could edit it could approve its own change"},
 	{Fragment: "/go/internal/phases/ship/held_proposal_gate.go", Class: GateGuarantee, Rationale: "the landing check that holds a protected or pipeline-kind lane change until the operator approves its tree (ADR-0157)"},
 	{Fragment: "/go/cmd/evolve/cmd_landing.go", Class: GateGuarantee, Rationale: "evolve landing approve and reject: the only writer of an operator approval (ADR-0157)"},
+	{Fragment: "/go/internal/gatecontract/", Class: GateGuarantee, Rationale: "the types and the trust class words of the gate contract: a lane that could edit them could redefine what a gate entry is (ADR-0165)"},
+	{Fragment: "/go/internal/gateregistry/", Class: GateGuarantee, Rationale: "the gate registry and its debt set, and the tests that hold them: a lane that could edit them could move a gate to shadow or grow the debt set (ADR-0165)"},
+	{Fragment: "/go/internal/testdup/", Class: GateGuarantee, Rationale: "the test-duplicate ratchet: its scan, its check and its baseline parser decide whether a landing may add a copy (ADR-0165)"},
+	{Fragment: "/go/internal/sizeratchet/", Class: GateGuarantee, Rationale: "the function-size ratchet and its offender list: a lane that could edit them could add its own allowance (ADR-0165)"},
+	{Fragment: "/go/internal/rawgitratchet/", Class: GateGuarantee, Rationale: "the raw git fixture ratchet and its baseline: a lane that could edit them could add its own allowance (ADR-0165)"},
+	{Fragment: "/go/internal/repocontract/repocontract.go", Class: GateGuarantee, Rationale: "the pack list and the by-name tree-reading tests that the ship gate runs: a lane that could edit it could drop a judge from the gate (ADR-0165)"},
+	{Fragment: "/go/internal/phases/ship/repocontract.go", Class: GateGuarantee, Rationale: "the ship gate's run of the pack: it selects the tests that judge a landing (ADR-0165)"},
 	{Fragment: "/go/internal/policy/held_proposals.go", Class: PolicyGuarantee, Rationale: "the held_proposals.stage key and its fail-closed read (ADR-0157)"},
 	{Fragment: "/go/internal/adapters/ledger/", Class: LedgerGuarantee, Rationale: "the hash-chained ledger: the append, the seal, the anchor and the rebaseline (ADR-0157)"},
 	{Fragment: "/go/internal/ledgerverify/", Class: LedgerGuarantee, Rationale: "the verifier of the ledger hash chain (ADR-0157)"},
@@ -270,6 +278,17 @@ func matchesManifest(path string, keep func(ProtectedSurfaceEntry) bool) bool {
 		}
 	}
 	return false
+}
+
+func ClassOf(path string) GuaranteeClass {
+	p, _ := normalizeSurfacePath(path)
+	best := ProtectedSurfaceEntry{}
+	for _, e := range ProtectedSurfaceManifest {
+		if strings.Contains(p+"/", e.Fragment) && len(e.Fragment) > len(best.Fragment) {
+			best = e
+		}
+	}
+	return best.Class
 }
 
 func IsProtectedScope(path string) bool {
