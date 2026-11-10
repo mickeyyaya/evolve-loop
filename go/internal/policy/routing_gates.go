@@ -75,6 +75,8 @@ type GatesPolicy struct {
 	ScanCacheMaxMB         int    `json:"scan_cache_max_mb,omitempty"`
 	ScanCacheBudgetSeconds int    `json:"scan_cache_budget_seconds,omitempty"`
 
+	BaseRedRerunSeconds int `json:"base_red_rerun_seconds,omitempty"`
+
 	PhaseIO string `json:"phase_io,omitempty"`
 }
 
@@ -91,6 +93,8 @@ type GatesConfig struct {
 
 	ScanCacheMaxMB         int
 	ScanCacheBudgetSeconds int
+
+	BaseRedRerun time.Duration
 
 	PhaseIO string
 }
@@ -109,6 +113,7 @@ func (p Policy) GatesConfig() GatesConfig {
 
 		ScanCacheMaxMB:         defaultScanCacheMaxMB,
 		ScanCacheBudgetSeconds: defaultScanCacheBudgetSeconds,
+		BaseRedRerun:           defaultBaseRedRerunSeconds * time.Second,
 	}
 	if p.Gates == nil {
 		return c
@@ -138,6 +143,7 @@ func (p Policy) GatesConfig() GatesConfig {
 		c.RepoContractGate = p.Gates.RepoContractGate
 	}
 	c.applyScanCache(p.Gates)
+	c.applyBaseRedRerun(p.Gates)
 	c.PhaseIO = p.Gates.PhaseIO
 	return c
 }
@@ -154,9 +160,16 @@ func (c *GatesConfig) applyScanCache(g *GatesPolicy) {
 	}
 }
 
+func (c *GatesConfig) applyBaseRedRerun(g *GatesPolicy) {
+	if g.BaseRedRerunSeconds > 0 {
+		c.BaseRedRerun = time.Duration(g.BaseRedRerunSeconds) * time.Second
+	}
+}
+
 const (
 	defaultScanCacheMaxMB         = 2048
 	defaultScanCacheBudgetSeconds = 60
+	defaultBaseRedRerunSeconds    = 300
 )
 
 type ScanCacheConfig struct {

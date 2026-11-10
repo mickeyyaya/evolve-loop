@@ -68,6 +68,7 @@ func TestGatesConfig_EveryGateStageIsOverridable(t *testing.T) {
 	want := GatesConfig{
 		ContractGate: "a", EvalGate: "b", TriageCapGate: "c", ReviewGate: "d", ReportSizeGate: "e",
 		TopNGate: "f", ManifestGate: "g", RepoContractGate: "h", ScanCacheGate: "i", ScanCacheMaxMB: 1, ScanCacheBudgetSeconds: 2,
+		BaseRedRerun: 300 * time.Second,
 	}
 	if got != want {
 		t.Fatalf("every dial an operator sets must win over its default;\n got %+v\nwant %+v", got, want)

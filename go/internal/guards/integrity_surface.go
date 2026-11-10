@@ -234,6 +234,7 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/testdup/", Class: GateGuarantee, Rationale: "the test-duplicate ratchet: its scan, its check and its baseline parser decide whether a landing may add a copy (ADR-0165)"},
 	{Fragment: "/go/internal/sizeratchet/", Class: GateGuarantee, Rationale: "the function-size ratchet and its offender list: a lane that could edit them could add its own allowance (ADR-0165)"},
 	{Fragment: "/go/internal/rawgitratchet/", Class: GateGuarantee, Rationale: "the raw git fixture ratchet and its baseline: a lane that could edit them could add its own allowance (ADR-0165)"},
+	{Fragment: "/go/internal/baseattr/", Class: GateGuarantee, Rationale: "the base-red attribution: its parser, its detached-checkout rerun and its verdict decide whether a red test blames the lane (ADR-0165 G4)"},
 	{Fragment: "/go/internal/repocontract/repocontract.go", Class: GateGuarantee, Rationale: "the pack list and the by-name tree-reading tests that the ship gate runs: a lane that could edit it could drop a judge from the gate (ADR-0165)"},
 	{Fragment: "/go/internal/phases/ship/repocontract.go", Class: GateGuarantee, Rationale: "the ship gate's run of the pack: it selects the tests that judge a landing (ADR-0165)"},
 	{Fragment: "/go/internal/policy/held_proposals.go", Class: PolicyGuarantee, Rationale: "the held_proposals.stage key and its fail-closed read (ADR-0157)"},
