@@ -1,4 +1,3 @@
-
 ## 2026-11-10 — agy changelog command 1.5.4 note
 
 | Document | What it records |
