@@ -102,10 +102,10 @@ Not in G3:
 | `cmd/evolve` | the composition root and the `gate check` verb | `gateregistry`, `gaterun`, `ship` |
 
 - Only `cmd/evolve` and `gatetest` import `gateregistry` in a non-test file. A test pins that list.
-- `ship.Config` gets the entries and the debt patterns from `cmd/evolve/cmd_cycle_config.go`. `core` gets a function value, as it gets `repoContractPack` today (`cmd_cycle_config.go:51`).
+- `ship.Config` gets the entries and the debt patterns from `withRegistryGates` at the composition site `cmd/evolve/cmd_cycle.go:523` (8.5). `core` gets a function value, as it gets `repoContractPack` today (`cmd_cycle_config.go:51`).
 - The real-tree run of each entry is one table test in the external test package `gateregistry_test`. Each gate package keeps its fixture tests only.
 - No other test file imports `gatetest`, and test 11 pins it. An in-package test of a package that `gateregistry` imports is an import cycle.
-- `integration` never imports the registry, because `guards` imports `integration`. Its `Gate` type takes no base (`compose.go:32`), so G3 does not wire the train (8.14).
+- `integration` never imports the registry, because `core` imports `integration` (`core/lost_landing_floor.go`) and the registry imports `core`. Its `Gate` type takes no base (`compose.go:32`), so G3 does not wire the train (8.14).
 - `gatetest` joins `testOnlyHelpers()` (`go/internal/repocontract/testhelper_imports_test.go:15`). Production code cannot import it.
 - G3 adds no setting. `Stage` is registry data on the protected surface, not policy. The whole-gate switch stays the policy value that `repocontract.GateOn` reads.
 
@@ -246,6 +246,7 @@ func TestImporters(root string, forbidden []string) ([]string, error)
 package gateregistry
 
 func PackSelection() (gates []gatecontract.Entry, pack []string)
+func PackInputFor(projectRoot, root, base string) ship.PackInput
 func RepoContractPack(ctx context.Context, projectRoot, root, base string) (reds []string, diagnostic string, err error)
 ```
 
@@ -259,7 +260,7 @@ Each name below is new in G3, or it changes its shape:
 - The verb `evolve gate check` is new. Its file is `cmd/evolve/cmd_gate.go`, and its function is `runGate(args []string, _ io.Reader, stdout, stderr io.Writer) int`. That is the shape of `runRatchet` (`cmd_ratchet.go:28`). Its flags are `--base`, which is required, and the root flag of `ratchet check`.
 - `ratchet check` loses the `ratchetScans` map (`cmd_ratchet.go:18`). It selects the registry entries by name and judges each one with `gaterun.Judge`. It reads the entries from `gateEntries`, a package variable of `cmd/evolve` that a test can replace, as `repoContractPack` is (`cmd_cycle_config.go:51`).
 
-**One home for the pack input.** `PackSelection` returns the `scanner` selection of `Entries()` and the patterns of `Unregistered()`. `RepoContractPack` builds one `PackInput` from `PackSelection` and calls `ship.RunRepoContractPack`. The entry at `seed_floors.go:23` uses it, and `cmd_cycle_config.go:51` sets `repoContractPack` to it. The composition root fills `ship.Config.Gates` and `Pack` from `PackSelection`. So the registered floor, the production floor and the ship gate judge the same set, and test 26 pins it.
+**One home for the pack input.** `PackSelection` returns the `scanner` selection of `Entries()` and the patterns of `Unregistered()`. `PackInputFor` is a pure function that builds the one `PackInput` from `PackSelection`; `RepoContractPack` calls `ship.RunRepoContractPack` with it. The entry at `seed_floors.go:23` uses it, and `cmd_cycle_config.go:51` sets `repoContractPack` to it. The function `withRegistryGates(cfg ship.Config) ship.Config` of `cmd/evolve` fills `Gates` and `Pack` from `PackSelection`, and `cmd_cycle.go:523` calls it. So the registered floor, the production floor and the ship gate judge the same set; tests 26 and 29 pin it.
 
 **The phase-floor entries.** The three floors stay in the registry with the kind `phase-floor` and the scope `diff`. The build-floor reviewer runs them, as it does today. Ship and `gate check` never select them, so the ship gate does not run the pack inside itself.
 
@@ -321,7 +322,7 @@ The state `redated` isolates the date, as `rebased` isolates `Base`. A date read
 
 ### 8.9 The 141 named tree-reading tests
 
-G3 keeps them as `go test` selections. The count 141 and the estimate for `cmd/evolve` are measures of design review round 1 at `ce4189a2c`; the contract page holds the older count 139.
+G3 keeps them as `go test` selections. The count 141 and the estimate for `cmd/evolve` are measures of design review round 1 at `ce4189a2c`. The contract page holds the older count 139, and G3a corrects it to 141.
 
 `gateregistry.UnregisteredTests()` returns `repocontract.TreeReadingTests()`. A `gateregistry` test holds the count at a literal ceiling. G3c measures the count and records the ceiling, and a migration lowers it in the same commit. The pack detector refuses a reading test that no selection names, so the set cannot grow. A later plan item moves them; `cmd/evolve` holds about 87 of them, and `package main` cannot be imported.
 
@@ -338,7 +339,9 @@ A migrated test leaves its package, and the table test of `gateregistry` judges 
 | The build floor runs the same function with the lane base | a red | as at ship | a floor red with the entry name | the builder fixes it before handoff |
 | — | an empty base | an old `run.json` | a floor WARN; ship judges again | none |
 | `evolve gate check` | exit 1 | an `enforce` red | one line for each red | fix main through the G4 path |
-| — | exit 2 | an error, or a `--base` that is not a commit id | the error | fix the workflow or the input |
+| — | exit 0 and one line | a `shadow` red or a `shadow` error | the line | no block; the operator reads it before a stage move |
+| — | exit 2 | an `enforce` error, or a `--base` that is not a commit id | the error | fix the workflow or the input |
+| Ship, the gate is on | `Gates` and `Pack` are both empty | a `Phase` from a zero `Config` | `shiperr.CodeRepoContractInfra` "no judge selected" | fix the composition; never a pass |
 | `Parity` | a problem of 8.7 | the gate reads an undeclared state | the two runs side by side | make the gate hermetic (G2), or fix the fixture |
 
 ## Blueprint
@@ -359,10 +362,10 @@ A migrated test leaves its package, and the table test of `gateregistry` judges 
 | 10 | `TestUnregisteredTests_CountIsTheCeiling` | `UnregisteredTests()` | a selection above the ceiling; a migration that leaves the count |
 | 11 | `TestRegistryImporters_AreTheRootAndTheHarness` | `repocontract.Importers` and `repocontract.TestImporters` | `core` or `integration` imports `gateregistry`; a test file outside `gateregistry_test` imports `gatetest` |
 | 12 | `TestJudge_ADiffEntryWithNoBaseDidNotJudge` | `gaterun.Judge` | a red or a pass for an empty base |
-| 13 | `TestShipGate_AShadowRedLogsAndAnEnforceRedBlocks` | `Phase.runRepoContractGate` on a `gittest` worktree with four fake entries: a `shadow` red, an `enforce` red, one that records `Input.Base`, and an `enforce` error | a gate that ignores `Stage`; an empty `Base` on the lane path; an entry error that does not give `CodeRepoContractInfra` with the entry name |
+| 13 | `TestShipGate_AShadowRedLogsAndAnEnforceRedBlocks` | `Phase.runRepoContractGate` on a `gittest` worktree with five fake entries. They are a `shadow` red, a `shadow` error, an `enforce` red, an `enforce` error, and one that records `Input.Base` | a gate that ignores `Stage`. A ship that blocks on the `shadow` error, or that emits no `SHIP_GATE_SHADOW` signal for it. An empty `Base` on the lane path. An `enforce` entry error that does not give `CodeRepoContractInfra` with the entry name |
 | 14 | `TestShipGate_TheRootPathPassesACommitIDNeverHEAD` | `repoContractGateRoot` | the `"HEAD"` literal |
 | 15 | `TestRepoContractFloor_PassesTheLaneBase` | `core.RepoContractFloorChecks` | a floor that drops `WorktreeBaseSHA` |
-| 16 | `TestGateCheck_RefusesARefNameAndExitsOneOnAnEnforceRed` | `evolve gate check` through `runGate` on a fixture repository with the real registry, and with a fake entry error through `gateEntries` | a verb that accepts `HEAD`; an entry error that does not exit 2 |
+| 16 | `TestGateCheck_RefusesARefNameAndExitsOneOnAnEnforceRed` | `evolve gate check` through `runGate` on a fixture repository with the real registry, and with a fake `shadow` red and a fake `shadow` error through `gateEntries` | a verb that accepts `HEAD`; a `shadow` red or error that does not exit 0 |
 | 17 | `TestGoWorkflow_EveryBaseComesFromTheGateBaseStep` | a parse of `go.yml` | a second base computation; no `gate check` step |
 | 18 | `TestGitAt_SetsTheAuthorAndCommitterDate` | `gittest.(*Repo).GitAt` | a commit at the host time |
 | 19 | `TestRealTree_RefusesADiffEntry` | `gatetest.RealTree` | a `diff` judge in `go test` |
@@ -372,9 +375,12 @@ A migrated test leaves its package, and the table test of `gateregistry` judges 
 | 23 | `TestRepoContractPack_AShadowRedIsNotAFloorRed` | `ship.RunRepoContractPack` with a `shadow` fake, an `enforce` fake and a `diff` fake | a floor that blocks on the shadow red; a `diff` entry with an empty `PackInput.Base` that gives a red and no error |
 | 24 | `TestRatchetCheck_JudgesThroughTheRegistry` | `runRatchet` with a fake red entry in `gateEntries` | the old combined `Scan` path |
 | 25 | `TestParity_ANoteThatHoldsRootGivesNoProblem` | `Parity` on a fake entry that puts `Root` in a note | a false "differs" problem for `cloned` |
-| 26 | `TestRepoContractPack_GivesThePackTheRegistrySelection` | `gateregistry.RepoContractPack` with a recording pack function | a `PackInput` with no `Gates`; a `Pack` that differs from `Unregistered()` |
+| 26 | `TestRepoContractPack_GivesThePackTheRegistrySelection` | `gateregistry.PackInputFor`, and the value of `repoContractPack` in `cmd/evolve` | a `PackInput` with no `Gates`; a `Pack` that differs from `Unregistered()`; a dropped `Base`; a `repoContractPack` that is not `gateregistry.RepoContractPack` |
 | 27 | `TestRepoContractFloor_AnEmptyBaseIsAWarnNotARed` | `core.RepoContractFloorChecks` with an empty `WorktreeBaseSHA` | a floor that gives a red, or no line, for the "did not judge" error |
-| 28 | `TestGateCheck_AnEntryErrorExitsTwo` | `runGate` with a fake entry error in `gateEntries` | a verb that exits 0 or 1 when an entry did not judge |
+| 28 | `TestGateCheck_AnEntryErrorExitsTwo` | `runGate` with a fake `enforce` entry error in `gateEntries` | a verb that exits 0 or 1 when an entry did not judge |
+| 29 | `TestShipConfig_GetsTheRegistrySelection` | `withRegistryGates` in `cmd/evolve` with an empty `ship.Config` | a `ship.Config` with no `Gates`; a `Pack` that differs from `PackSelection()` |
+| 30 | `TestRepoContractGate_AnEmptySelectionIsNotAPass` | the ship gate with a `Phase` from a zero `Config` and the gate on | a gate that passes when `Gates` and `Pack` are both empty |
+| 31 | `TestResult_SplitsEachStageAndOutcome` | `gaterun` with six fake outcomes: a pass, a red and an error for each of `enforce` and `shadow` | a `Blocking` that holds more than the `enforce` red. An `Undecided` that holds more than the `enforce` error. A `Shadowed` that drops a `shadow` red or error |
 
 Test 20 has one instance for each moved judge, in G3c to G3f. Tests 9, 11, 17, 21 and 22 and the table test read the real tree. Each one joins the `./internal/gateregistry` selection of `TreeReadingTests()` in its own PR, before G3c records the ceiling.
 
@@ -384,8 +390,8 @@ Tests 13, 16, 24 and 27 go through the real entry points of the pipeline: the sh
 
 | PR | Steps | Depends on | Risk | Verifiable by |
 |---|---|---|---|---|
-| G3a | `gittest.GitAt`; `Scope` and `Scopes()`; `gaterun`; `gatetest`. The fixtures of the three scanner entries, with `new-acs-copy` and `tdd-untracked-acs`, and the exempt list of the three phase floors. The table test replaces the three G1 real-tree files (`rawgitratchet/gate_realtree_test.go`, `sizeratchet/gate_realtree_test.go`, `repocontract/testdup_gate_realtree_test.go`). Tests 1-7, 12, 18, 19, 21, 22, 25. | G1, G2 | Medium: a seed fails parity because G2 left a git read | tests 1-7 |
-| G3b | `ship.Config.Gates` and `Pack`. Ship runs `enforce` and `shadow` in process, and the go-test pack is `Pack`. The base column of 8.8, `PackInput`, and `RepoContractPackFn` gets `base`; `repocontract.Importers` and `TestImporters` move to a non-test file; `gateregistry.PackSelection` and `RepoContractPack`. `evolve gate check`, and `ratchet check` judges through `gaterun`. The `gate-base` step in `go.yml`. Tests 11, 13-17, 23, 24, 26-28. | G3a | High: ship time and heap. Measure against the pack time that `scanShadow` records | tests 13-16 |
+| G3a | `gittest.GitAt`; `Scope` and `Scopes()`; `gaterun`; `gatetest`. The fixtures of the three scanner entries, with `new-acs-copy` and `tdd-untracked-acs`, and the exempt list of the three phase floors. The table test replaces the three G1 real-tree files (`rawgitratchet/gate_realtree_test.go`, `sizeratchet/gate_realtree_test.go`, `repocontract/testdup_gate_realtree_test.go`). Tests 1-7, 12, 18, 19, 21, 22, 25, 31. | G1, G2 | Medium: a seed fails parity because G2 left a git read | tests 1-7 |
+| G3b | `ship.Config.Gates` and `Pack`. Ship runs `enforce` and `shadow` in process, and the go-test pack is `Pack`. The base column of 8.8, `PackInput`, and `RepoContractPackFn` gets `base`; `repocontract.Importers` and `TestImporters` move to a non-test file; `gateregistry.PackSelection`, `PackInputFor` and `RepoContractPack`. `evolve gate check`, and `ratchet check` judges through `gaterun`; the `gate-base` step in `go.yml`. `ship` stops reading `repocontract.Packages()`, and G3b deletes that function and `repoContractPackages`. Tests 11, 13-17, 23, 24, 26-30. | G3a | High: ship time and heap. Measure against the pack time that `scanShadow` records | tests 13-16 |
 | G3c | `repocontract.Readers` moves to a non-test file. `TestRepoContract_PeakHeapUnder400MB` joins `TreeReadingTests()`; `UnregisteredTests()` and its measured ceiling. The small patterns: `rawgitratchet`, `sizeratchet`, `testmainexit`, `inboxrank`, `policy`, `routingtest`. The commit that moves a test changes each reference to its name, such as `TestRatchet_NoNewRawGitFixtures`. Tests 9, 10. | G3b | Low | tests 1, 9 |
 | G3d | `repocontract` (seven), `acssuite`, `evalqualitycheck`, `ipcenv` | G3c | Medium: `sharedTreeScan` parses once for two scanners (`stream_parse_test.go`) | tests 1, 9 |
 | G3e | `guards` (15) | G3d | Medium: the helpers of `guards` take `t` | tests 1, 9 |
