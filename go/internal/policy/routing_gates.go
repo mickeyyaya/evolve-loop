@@ -79,6 +79,8 @@ type GatesPolicy struct {
 
 	MainRedStop string `json:"main_red_stop,omitempty"`
 
+	MainRedStopBoundMinutes int `json:"main_red_stop_bound_minutes,omitempty"`
+
 	PhaseIO string `json:"phase_io,omitempty"`
 }
 
@@ -100,26 +102,32 @@ type GatesConfig struct {
 
 	MainRedStop string
 
+	MainRedStopBound time.Duration
+
 	PhaseIO string
 }
 
-func (p Policy) GatesConfig() GatesConfig {
-	c := GatesConfig{
-		ContractGate:     "enforce",
-		EvalGate:         "enforce",
-		TriageCapGate:    "enforce",
-		ReviewGate:       "off",
-		ReportSizeGate:   "shadow",
-		TopNGate:         "enforce",
-		ManifestGate:     "shadow",
-		RepoContractGate: "enforce",
-		ScanCacheGate:    "shadow",
-
+func defaultGatesConfig() GatesConfig {
+	return GatesConfig{
+		ContractGate:           "enforce",
+		EvalGate:               "enforce",
+		TriageCapGate:          "enforce",
+		ReviewGate:             "off",
+		ReportSizeGate:         "shadow",
+		TopNGate:               "enforce",
+		ManifestGate:           "shadow",
+		RepoContractGate:       "enforce",
+		ScanCacheGate:          "shadow",
 		ScanCacheMaxMB:         defaultScanCacheMaxMB,
 		ScanCacheBudgetSeconds: defaultScanCacheBudgetSeconds,
 		BaseRedRerun:           defaultBaseRedRerunSeconds * time.Second,
 		MainRedStop:            "shadow",
+		MainRedStopBound:       defaultMainRedStopBoundMinutes * time.Minute,
 	}
+}
+
+func (p Policy) GatesConfig() GatesConfig {
+	c := defaultGatesConfig()
 	if p.Gates == nil {
 		return c
 	}
@@ -174,6 +182,9 @@ func (c *GatesConfig) applyMainRedStop(g *GatesPolicy) {
 	if g.MainRedStop != "" {
 		c.MainRedStop = g.MainRedStop
 	}
+	if g.MainRedStopBoundMinutes > 0 {
+		c.MainRedStopBound = time.Duration(g.MainRedStopBoundMinutes) * time.Minute
+	}
 }
 
 func (c *GatesConfig) applyBaseRedRerun(g *GatesPolicy) {
@@ -183,9 +194,10 @@ func (c *GatesConfig) applyBaseRedRerun(g *GatesPolicy) {
 }
 
 const (
-	defaultScanCacheMaxMB         = 2048
-	defaultScanCacheBudgetSeconds = 60
-	defaultBaseRedRerunSeconds    = 300
+	defaultScanCacheMaxMB          = 2048
+	defaultScanCacheBudgetSeconds  = 60
+	defaultBaseRedRerunSeconds     = 300
+	defaultMainRedStopBoundMinutes = 120
 )
 
 type ScanCacheConfig struct {

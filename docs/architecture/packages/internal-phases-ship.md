@@ -276,6 +276,9 @@ The file is `main_red_stop.go`. The design is in [gate-contract-g4-base-red-attr
 - `stopCheck.admit` gives the proof to `Stop.Admit`. The check returns the green keys of a fix, and `runNative` gives them to the release.
 - `stopCheck` holds the stop, the `main` commit and the stage, so each method reads them from one place.
 - `gates.main_red_stop` is the stage, and the check reads it from `policy.json`. The default is `shadow`.
+- While a stop holds, the check runs `selfheal.StopBound.Check` with `gates.main_red_stop_bound_minutes` and `Options.clock`. The default bound is 120 minutes.
+- A stop past its bound escalates one time: one `main-red` incident and one `GATE_REPO_MAIN_RED_STOP_ESCALATED` signal (see [internal-selfheal.md](internal-selfheal.md)).
+- An escalation that fails is one WARN line. The stop check then goes on, so the bound never changes an admission.
 - At `enforce`, a lane that is not on the `main` tip gets `CodeGitFleetRebaseNeeded`. A lane that turns no key green gets `CodeMainRedPark`, and the orchestrator parks it.
 - The park error names the `main` commit of the stop, so a park on a newer `main` does not move the stop.
 - At `shadow`, each such lane lands. The check emits `GATE_REPO_MAIN_RED_STOP_WOULD_REFUSE` with the fields `keys`, `base`, `main`, `admission` and `fix_item`.
@@ -292,6 +295,7 @@ The file is `main_red_stop.go`. The design is in [gate-contract-g4-base-red-attr
 - The release time and `deliveredAt` share `Options.clock`, which is in `native.go` with `Options.evolveDir`.
 - Limit: after a release the fix item is in `processed`. A stop that opens again on the same `main` commit gets no new fix item.
 - Pinned by `TestShipStop_AFixLandsAndReleasesTheStop` and `TestShipStop_ANonFixParksAtEnforceAndLandsAtShadow`, and by the other `TestShipStop_*`, `TestReleaseLandedFix_*`, `TestReleaseMainRedStop_*` and `TestAttributeContractRed_*` tests.
+- `TestReplay_20261109` replays steps 1 to 5 of the incident of 2026-11-09 with the real stop record. Step 6, the pool order, is `TestPool_ParkedLanesResumeTogetherWhenTheStopReleases` in `cmd/evolve`.
 
 ### Scan shadow
 

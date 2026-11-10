@@ -10,6 +10,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 type poolPlanFn func(ctx context.Context, waveIndex int) ([]fleet.Todo, error)
@@ -60,8 +61,16 @@ func planAndRunPool(ctx context.Context, fc policy.FleetConfig, preflight func()
 	return true, run(ctx, backlog, resupply), nil
 }
 
-func productionPoolPlanFn(cfg loopConfig, storage core.Storage, count int, stderr io.Writer) poolPlanFn {
-	wavePlan := productionWavePlanFn(cfg, storage, count, stderr)
+type poolPlanner struct {
+	cfg     loopConfig
+	storage core.Storage
+	stderr  io.Writer
+	signals *signalcenter.Center
+}
+
+func (pp poolPlanner) plan(count int) poolPlanFn {
+	cfg, stderr := pp.cfg, pp.stderr
+	wavePlan := productionWavePlanFn(cfg, pp.storage, count, stderr)
 	return func(ctx context.Context, waveIndex int) ([]fleet.Todo, error) {
 		decisionJSON, cardPackages, err := wavePlan(ctx, waveIndex)
 		if err != nil {
@@ -72,7 +81,8 @@ func productionPoolPlanFn(cfg loopConfig, storage core.Storage, count int, stder
 		if perr != nil {
 			fmt.Fprintf(stderr, "[pool] WARN: the scan for paused lane cycles failed (%v); the plan keeps the triage order\n", perr)
 		}
-		return pausedPlan{paused: paused, now: time.Now(), adoptable: inboxAdoptable(cfg.EvolveDir, laneForbidden(cfg.ProjectRoot, stderr)), itemFiles: inboxItemFiles(cfg.EvolveDir), warn: stderr,
-			parkedResume: parkedLanes{cfg: cfg, warn: stderr}.resume(ctx, paused)}.order(todos), err
+		now := time.Now()
+		return pausedPlan{paused: paused, now: now, adoptable: inboxAdoptable(cfg.EvolveDir, laneForbidden(cfg.ProjectRoot, stderr)), itemFiles: inboxItemFiles(cfg.EvolveDir), warn: stderr,
+			parkedResume: parkedLanes{cfg: cfg, warn: stderr, now: now, emit: pp.signals.Emit}.resume(ctx, paused)}.order(todos), err
 	}
 }

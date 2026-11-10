@@ -14,6 +14,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/covchanged"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/mainstop"
+	"github.com/mickeyyaya/evolve-loop/go/internal/selfheal"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -48,6 +49,10 @@ func checkMainRedStop(ctx context.Context, opts *Options, warn io.Writer) ([]bas
 		return nil, err
 	}
 	gates := shipGates(opts, warn)
+	bound := selfheal.StopBound{EvolveDir: opts.evolveDir(), Bound: gates.MainRedStopBound, Now: opts.clock(), Emit: opts.Signals.Emit}
+	if err := bound.Check(); err != nil {
+		fmt.Fprintf(warn, "[ship] WARN main-red stop: %v\n", err)
+	}
 	c := stopCheck{opts: opts, warn: warn, attr: attributorOf(opts, gates), stop: stop, enforced: gates.MainRedStopEnforced()}
 	c.main = c.resolved(ctx, c.attr.MainRef)
 	return c.admit(c.proof(ctx, tree, c.resolved(ctx, baseRef)))

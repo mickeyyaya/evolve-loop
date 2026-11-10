@@ -17,6 +17,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover/lifecycle"
 	"github.com/mickeyyaya/evolve-loop/go/internal/mainstop"
+	"github.com/mickeyyaya/evolve-loop/go/internal/selfheal"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -673,5 +674,89 @@ func TestReleaseLandedFix_TheReleaseNamesTheCycleOfTheShip(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(l.repo, ".evolve", "inbox", "processed", "cycle-7")); err != nil {
 		t.Errorf("the fix item is not in processed/cycle-7: %v", err)
+	}
+}
+
+func (l *baseRedLane) checkedAt(t *testing.T, after time.Duration) checkedStop {
+	t.Helper()
+	opts := l.options((&scriptedBase{answers: [][]baseattr.Key{{redKey}}}).run)
+	at := time.Now().Add(after)
+	opts.NowFn = func() Now { return Now{Unix: at.Unix()} }
+	return stopCheckOf(t, opts)
+}
+
+func (l *baseRedLane) incidents(t *testing.T) []selfheal.Incident {
+	t.Helper()
+	incidents, err := selfheal.LoadIncidents(selfheal.Dir(filepath.Join(l.repo, ".evolve")))
+	if err != nil {
+		t.Fatalf("load the incidents: %v", err)
+	}
+	return incidents
+}
+
+func TestShipStop_AStopPastThePolicyBoundEscalatesOneTime(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name          string
+		policy        string
+		after         time.Duration
+		wantEscalated bool
+	}{
+		{name: "past the default bound of 120 minutes", after: 3 * time.Hour, wantEscalated: true},
+		{name: "inside the default bound", after: time.Hour},
+		{name: "inside a longer bound of the policy", policy: `{"gates":{"main_red_stop_bound_minutes":600}}`, after: 3 * time.Hour},
+		{name: "past a shorter bound of the policy", policy: `{"gates":{"main_red_stop_bound_minutes":30}}`, after: time.Hour, wantEscalated: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			l := newBaseRedLane(t)
+			if tc.policy != "" {
+				mustWrite(t, filepath.Join(l.repo, ".evolve", "policy.json"), tc.policy)
+			}
+			held := l.holdStop(t, redKey)
+
+			first := l.checkedAt(t, tc.after)
+			second := l.checkedAt(t, tc.after+time.Minute)
+
+			if first.err != nil || second.err != nil || strings.Contains(first.log+second.log, "WARN main-red stop:") {
+				t.Fatalf("errs %v, %v, log %q; the bound check holds no lane and warns of nothing", first.err, second.err, first.log+second.log)
+			}
+			want := 0
+			if tc.wantEscalated {
+				want = 1
+			}
+			got, incidents := l.emitted(core.CodeMainRedStopEscalated), l.incidents(t)
+			if len(got) != want || len(incidents) != want || (l.stop(t).Escalated != nil) != tc.wantEscalated {
+				t.Fatalf("%d signals, %d incidents, escalated_at %v; want %d escalation in two checks", len(got), len(incidents), l.stop(t).Escalated, want)
+			}
+			if !tc.wantEscalated {
+				return
+			}
+			if !strings.Contains(incidents[0].Summary, held.Cause()) || !strings.Contains(incidents[0].Summary, held.ResumeCondition()) {
+				t.Errorf("summary = %q, want the cause and the resume condition", incidents[0].Summary)
+			}
+			if got[0].Fields["incident"] != incidents[0].ID || got[0].Fields["main"] != held.MainSHA || got[0].Severity != signalcenter.SeverityIncident {
+				t.Errorf("signal = %+v, want the incident %s of the stop on %s", got[0], incidents[0].ID, held.MainSHA)
+			}
+		})
+	}
+}
+
+func TestShipStop_AnEscalationThatFailsIsAWarningAndTheCheckGoesOn(t *testing.T) {
+	t.Parallel()
+	l := newBaseRedLane(t)
+	l.enforceStop(t)
+	l.holdStop(t, redKey)
+	mustWrite(t, selfheal.Dir(filepath.Join(l.repo, ".evolve")), "a file, not a directory")
+
+	c := l.checkedAt(t, 3*time.Hour)
+
+	if !strings.Contains(c.log, "[ship] WARN main-red stop: the escalation of the stop past its bound") {
+		t.Errorf("log = %q, want the warning of the failed escalation", c.log)
+	}
+	wantShipErr(t, c.err, shiperr.CodeMainRedPark, core.ShipClassPrecondition, redPkg+"."+redTest)
+	if l.stop(t).Escalated != nil || len(l.emitted(core.CodeMainRedStopEscalated)) != 0 {
+		t.Error("a failed escalation marked the stop or emitted the signal")
 	}
 }

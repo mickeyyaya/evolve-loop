@@ -51,3 +51,22 @@ func TestGatesConfig_MainRedStopEnforcedOnlyAtTheEnforceStage(t *testing.T) {
 		t.Error("the default stage enforces the stop, want shadow")
 	}
 }
+
+func TestPolicy_MainRedStopDefaults(t *testing.T) {
+	t.Parallel()
+	for name, p := range map[string]Policy{"no gates block": {}, "an empty gates block": {Gates: &GatesPolicy{}}} {
+		got := p.GatesConfig()
+		if got.MainRedStop != "shadow" || got.MainRedStopBound != 120*time.Minute || got.BaseRedRerun != 300*time.Second {
+			t.Errorf("%s: stage %q, bound %v, rerun %v; want shadow, 2h0m0s, 5m0s", name, got.MainRedStop, got.MainRedStopBound, got.BaseRedRerun)
+		}
+	}
+}
+
+func TestPolicy_MainRedStopBoundMinutesOverrideAndIgnoreANonPositiveValue(t *testing.T) {
+	t.Parallel()
+	for minutes, want := range map[int]time.Duration{45: 45 * time.Minute, 0: 120 * time.Minute, -5: 120 * time.Minute} {
+		if got := (Policy{Gates: &GatesPolicy{MainRedStopBoundMinutes: minutes}}).GatesConfig().MainRedStopBound; got != want {
+			t.Errorf("MainRedStopBoundMinutes %d: MainRedStopBound = %v, want %v", minutes, got, want)
+		}
+	}
+}

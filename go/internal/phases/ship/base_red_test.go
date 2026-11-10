@@ -207,7 +207,10 @@ func TestReplay_20261109(t *testing.T) {
 	res := floor.Review(context.Background(), core.ReviewInput{
 		Phase: string(core.PhaseBuild), Cycle: 2242, Worktree: lane2242.wt, ProjectRoot: l.repo, WorktreeBaseSHA: lane2242.base,
 		Stderr: io.Discard, Signals: lane2242.signals,
-		MainRedStop: func(_ string, v baseattr.Verdict) (bool, error) { opened = append(opened, v); return true, nil },
+		MainRedStop: func(root string, v baseattr.Verdict) (bool, error) {
+			opened = append(opened, v)
+			return core.OpenMainRedStop(root, v)
+		},
 	})
 	if !res.Approve || res.Retry {
 		t.Fatalf("step 3: the build floor approves lane 2242 on a red base; got %+v", res)
@@ -219,6 +222,23 @@ func TestReplay_20261109(t *testing.T) {
 	swapRepoContractTest(t, redPack(redPkg+"."+redTest))
 	lane2249 := l.laneOn(t, "cycle-2249")
 	wantShipErr(t, lane2249.ship(t), shiperr.CodeMainRedPark, core.ShipClassPrecondition, redPkg+"."+redTest)
+
+	held := l.stop(t)
+	if !held.Holds() || held.MainSHA != lane2249.base {
+		t.Fatalf("step 4: the stop holds on M2 %s while lane 2249 is parked; got %+v", lane2249.base, held)
+	}
+	fix := l.laneOn(t, "cycle-2250-fix")
+	fix.fixInLane(t)
+	fix.landable(t)
+	fix.enforceStop(t)
+	swapRepoContractTest(t, greenPack())
+	if err := fix.ship(t); err != nil {
+		t.Fatalf("step 5: the fix lane on M2 lands at enforce; got %v", err)
+	}
+	released := l.stop(t)
+	if released.Holds() || released.ReleasedBy != "cycle 1 "+fix.mainTip(t) || fix.mainTip(t) == lane2249.base || len(fix.emitted(core.CodeMainRedStopReleased)) != 1 {
+		t.Fatalf("step 5: the landed fix releases the stop; got %+v with main at %s", released, fix.mainTip(t))
+	}
 }
 
 func redNamedPack(names ...string) core.RepoContractPackFn {

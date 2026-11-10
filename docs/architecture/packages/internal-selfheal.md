@@ -155,9 +155,29 @@ The live reaction runs the detection on each `cycle.sealed` event with `final_ve
 - **A fault is a warning.** A corrupt record or an incident store that does not load is a warning on the console of the cycle. The seal of the cycle does not change.
 - Pinned by `TestLiveIncident_TheThirdSealOfTheFloorClassEmitsOneIncidentAtShadow`, `TestLiveIncident_EnforceWritesTheBrakeOnce`, `TestLiveIncident_ATaskCodeOrPassingSealEmitsNothing` and `TestWireOrchestratorDeps_ArmsTheLiveIncidentReaction`.
 
+## The bound of the main-red stop
+
+The file is `main_red_bound.go`. The design is in [gate-contract-g4-base-red-attribution.md](../gate-contract-g4-base-red-attribution.md), section 7.6.
+
+- `StopBound.Check` escalates a main-red stop that holds for longer than its bound. The caller gives the directory, the bound, the time and the emit function.
+- The check runs in one `mainstop.Update`, so the lock of the stop record makes the decision.
+- A stop is due when it holds, has no `escalated_at` and is older than the bound. A bound of zero escalates nothing.
+- For a due stop, the check first records one `main-red` observation of `main` through `UpdateIncidents` and `DetectLive`.
+- The summary of the incident is `Stop.Cause`, then `; to resume: `, then `Stop.ResumeCondition`.
+- The evidence id is `main-red-stop:` and the `main` commit of the stop.
+- The fingerprint is `main-red:main`, as for the CI detector. Thus an open incident of that detector gets the new source, and no second incident opens.
+- The check then sets `escalated_at` through `Stop.Escalate`. An incident that cannot be written leaves the stop as it was, so the next check tries again.
+- After the write, the check emits `GATE_REPO_MAIN_RED_STOP_ESCALATED` one time: module `gate.repo`, kind `loop.escalation`, severity incident.
+- The fields are `keys`, `main`, `fix_item`, `parked`, `opened_at`, `bound` and `incident`.
+- The check emits no `HEALING_INCIDENT_OPENED` event. The escalation signal carries the incident id.
+- Two callers exist: the ship stop check and the pool fill of `cmd/evolve`. No new loop reads the bound.
+- `core` cannot import this package, so the open of a stop runs no bound check. Each lane that meets a stop reaches one of the two callers.
+- Pinned by the `TestStopBound_*` tests, with 100% of the statements of the file.
+
 ## Invariants
 
-- The package never acts. It writes only its own records, the decision ledger and the evidence workspaces. It changes no inbox item, no policy and no git ref.
+- The package never acts, with one exception. It writes only its own records, the decision ledger and the evidence workspaces. It changes no inbox item, no policy and no git ref.
+- The exception is `StopBound.Check`. It sets the `escalated_at` field of `main-red-stop.json` through `mainstop.Update`, and it changes no other field of that record.
 - The incident records, the package, the verb file `cmd_selfheal.go` and the stage key are protected surfaces (`guards.ProtectedSurfaceManifest`). The verb file is protected because it chooses the evidence and builds the verifier. `cmd_selfheal_live.go` is protected too, because it opens incidents and engages the loop brake. `cmd_selfheal_propose.go` is protected for the same reason, and the proposal records are under the protected directory. `TestNoAgentProfileCanWriteTheIncidentRecords` checks that no agent profile has a write grant over `.evolve/incidents/`.
 - Each rule is a pure function. Only the loaders read files, and only the verb starts `gh`.
 - The loader of the ship journal (`sources.go`) calls `shipjournal.Read`. The package has no second parser of `ship-journal.jsonl`. `readJSONL` stays for the decision ledger only.

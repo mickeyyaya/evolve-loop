@@ -243,7 +243,7 @@ func TestProductionPoolPlanFn_AGrantedPausedLaneLeadsTheRealBacklogWithItsFiles(
 		writeE2File(t, filepath.Join(evolveDir, "inbox", name), body)
 	}
 	seedPausedRun(t, root, 41, 0, 3, "gamma")
-	plan := productionPoolPlanFn(loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, &erroringReadStorage{}, 2, &bytes.Buffer{})
+	plan := poolPlanner{cfg: loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, storage: &erroringReadStorage{}, stderr: &bytes.Buffer{}}.plan(2)
 
 	todos, err := plan(context.Background(), 0)
 
@@ -265,7 +265,7 @@ func TestProductionPoolPlanFn_AFailedPausedScanWarnsAndKeepsTheTriageOrder(t *te
 	writeE2File(t, filepath.Join(evolveDir, "inbox", "2026-11-03T00-00-01Z-beta.json"), `{"id":"beta","weight":0.8,"files":["b.go"]}`)
 	writeE2File(t, filepath.Join(evolveDir, "runs"), "not a directory")
 	var stderr bytes.Buffer
-	plan := productionPoolPlanFn(loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, &erroringReadStorage{}, 2, &stderr)
+	plan := poolPlanner{cfg: loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, storage: &erroringReadStorage{}, stderr: &stderr}.plan(2)
 
 	todos, err := plan(context.Background(), 0)
 
