@@ -61,7 +61,8 @@ The build-floor git reads, measured one level into the helper packages:
 | `core/build_floor_reviewer.go:385`, `core/phase_bindings_selfcheck.go:99,110` | `go test` with a built argument slice | `gotool.Test` (7.8) |
 | `core/build_floor_reviewer.go:216`, `changedpkgs/importerclosure.go:98` | `go list` | `gotool.List` (7.8) |
 | `core/build_floor_reviewer.go:310` | `go tool cover -func` on the profile | none: `covchanged.FuncPercents` reads the profile in process (7.8) |
-| `phases/ship/scanshadow_tree.go:36,90`, `scanshadow_enforce.go:42`, `repocontract.go:208,236,520,538`, `scanshadow.go:95` | the verdict recorder of the pack (`ls-files`, `go env -json`, `go list`) and the runner sites that call it | none: the runner names an interface, and the entry puts no recorder in the context (7.8) |
+| `phases/ship/scanshadow_tree.go:36,90`, `scanshadow_enforce.go:42`, `repocontract.go:208,236,443,520,538`, `scanshadow.go:95` | the verdict recorder of the pack (`ls-files`, `go env -json`, `go list`) and the runner sites that call it | none: the runner names an interface, and the entry puts the Null Object in the context (7.8) |
+| `core/identity_carry_forward.go:14`, `phases/ship/repair.go:30` | initializers that store a function that runs git (`git patch-id --stable` at `composition_carryforward.go:208-209`; `git show` at `repair.go:129`) | none: walk rule 4 of 7.4 reaches the function only through a read in a reached body |
 | `explanationdocs/gitio.go:178,262`, `rebind.go:132,176`, `core/lost_landing_floor.go:76-96` | `HEAD`, ancestry and a second commit | none: question 1 of 7.14 |
 
 ### 7.2 A measured prototype
@@ -117,7 +118,8 @@ Weights: correctness of the static reach 0.35, fit with the tree 0.25, blast rad
 1. A root is the named function of an entry `Run`. A closure is refused, because its static identity is not stable. Each registered `Run` is thus a named function whose body names its judge.
 2. From a reached function body, each `*types.Func` that the body uses is reached, as a call or as a value. A generic function is reached through `Origin()`.
 3. Each module named type that a reached body mentions is live. The structure of a live type is live also: each field, embedded field, element and type argument. Each method of a live type is reached. This covers interface calls and stdlib callbacks such as `sort.Sort` and `json.Marshal`, with no CHA.
-4. When a package holds a reached function, variable or constant, its package-level initializers and its `init` functions are reached.
+4. When a package holds a reached function, variable or constant, each of its `init` functions is reached. Each call that a package-level initializer makes is reached also.
+   - A function value that an initializer stores in a package variable is reached only when a reached body reads that variable. The initializer `var x = f` calls nothing, and rule 7 judges each read of `x`.
 5. A stdlib body is never walked. A `sysexec` body is never walked: each `sysexec` call is judged at its site. A third-party body is walked like a module body.
 6. A boundary body is never walked and never judged. The boundary packages are `repostate` and `gotool`. A separate test judges each one and its imports (tests 9 and 42).
 7. Rule 7 covers each package variable that holds a function, interface or channel type at any depth. A reached body reads such a variable only when no statement assigns it. Each other read is class `inject`.
@@ -143,7 +145,7 @@ Each step of a chain holds its edge kind: `call`, `value`, `live-type` or `init`
 - Each exec entry names its program parameter by name, not by index. `Refusals` returns an error when the loaded signature lacks it.
 - A reference to an exec entry without a call passes. Each call of the `sysexec.RunFunc` value that holds it is judged at its site.
 - A read or a write of `Path` or `Args` is refused, because a slice alias of `Args` can change the program. A use of another field of `exec.Cmd`, such as `Dir` or `Env`, passes.
-- `go/build.Import` and the method `go/build.Context.Import` are exec entries, because each one starts `go list`. Each has an empty `Param`, so each call is refused. `ImportDir` and `MatchFile` start no process, and they pass.
+- `go/build.Import` and the method `go/build.Context.Import` are exec entries, because each one starts `go list`. An entry of a method gives the receiver type and the method in `Name`, for example `Context.Import`. An empty `Param` means that each call is class `exec`. `ImportDir` and `MatchFile` start no process, and they pass.
 - The inert list names each `sysexec` function that starts no process. It holds `WithEnv` and the new function `CancelKillsTheProcessGroup` (7.8).
 - `os.Stat` is allowed, because existence and size are not mtime. `testdup` keeps its root check.
 - A skip list that names `.git` is refused also. Commit 5 changes `changedpkgs/direct_importers.go:88` to the dot-prefix rule of `Scan`. No allow list is added.
@@ -414,7 +416,7 @@ The body of each floor run function names its judge. For example, `runRepoContra
    - Failure: a root that the loaded program does not declare. Cause: a renamed run function. Evidence: the root. Next step: an error.
 3. `Refusals` walks breadth first from each root with the rules of 7.4. It keeps a parent map, and it judges each reached body against 7.5.
 4. Each refusal gives `Root`, `Class`, the site `file:line:col` and the chain from the root. Each step has its edge kind.
-5. Commit 5 runs the guard on the real registry before its other changes. Its message records each refusal by edge kind. If many come through a `live-type` edge, the rule becomes narrower. A method is then reached only when a reached body converts its type to an interface. No allow list is added.
+5. Commit 5 runs the guard on the real registry before its other changes. Its message records each refusal by edge kind. If many come through a `live-type` edge, the rule becomes narrower. A method is then reached only when a reached body converts its type to an interface. An `init` edge has its own remedy, and its `init` function moves to a function that the composition root calls. No allow list is added.
 
 **`repostate`.**
 
@@ -465,11 +467,11 @@ The verb is thus a constant in two bodies of one package, not at each gate site.
 
 **The function coverage.** `scopedCoverFunc` no longer starts `go tool cover`. It parses the profile with `ParseProfile` and calls `FuncPercents`, which reads each profiled source file and counts with `Func.count` (`covchanged/measure.go:150`). The unexported function `coverEntries` of `core` makes one `apicover.CoverEntry` from each `Func`, with the module path before the file. The floor gives the entries to `apicover.Run` in `Config.Cover`. `FuncPercents` rounds each percent to one decimal, as `go tool cover` prints it.
 
-**The verdict recorder.** `ship.RunRepoContractPack` reaches a recorder (`scanshadow.go:115-132`) that runs `ls-files`, `go env -json` and `go list`, and it is not a judge. The recorder travels in the context, and the runner calls it (`repocontract.go:208,236,520,538`). The pack gets an unexported interface `packRecorder` with the methods `prune`, `observe` and `active`.
+**The verdict recorder.** `ship.RunRepoContractPack` reaches a recorder (`scanshadow.go:115-132`) that runs `ls-files`, `go env -json` and `go list`, and it is not a judge. The recorder travels in the context, and the runner calls it (`repocontract.go:208,236,443,520,538`). The pack gets an unexported interface `packRecorder` with the methods `prune`, `observe` and `active`.
 
-The new function `packRecorderFrom` reads the context, and it gives a Null Object when the context holds no recorder. `runGoTestJSON`, `runGoTestJSONArgs` and `runClassifiedPackRetrying` name only the interface. The entry never names the type `scanShadow`, so walk rule 3 of 7.4 does not reach its methods.
+The new function `packRecorderFrom` reads the context. It gives a Null Object when the context holds no recorder, and also when it holds a nil recorder. `scanShadowFor` and `floorRecorderFor` can return a nil `*scanShadow`, and `ship.go:146` puts it in the context. The method `active` replaces the nil check of `repocontract.go:236`. `runGoTestJSON`, `runGoTestJSONArgs` and `runClassifiedPackRetrying` name only the interface. The entry never names the type `scanShadow`, so walk rule 3 of 7.4 does not reach its methods.
 
-`ship.RunPlainRepoContractPack` is a new function with the signature of `RunRepoContractPack`. It puts no recorder in the context, and the entry `Run` calls it. `RunRepoContractPack` stays as the composition root that calls `floorRecorderFor`, `begin` and `note`, and `cmd/evolve/cmd_cycle_config.go:51` keeps it. The ship phase keeps `scanShadowFor`, `scanShadowFrom` and `runRepoContractSteps`, and no entry reaches them. So no reached body names the recorder, and the allowed list stays at two rows.
+`ship.RunPlainRepoContractPack` is a new function with the signature of `RunRepoContractPack`. It puts the Null Object in the context, so it hides each recorder that the context of its caller holds. The entry `Run` calls it. `RunRepoContractPack` stays as the composition root that calls `floorRecorderFor`, `begin` and `note`, and `cmd/evolve/cmd_cycle_config.go:51` keeps it. The ship phase keeps `scanShadowFor`, `scanShadowFrom` and `runRepoContractSteps`, and no entry reaches them. So no reached body names the recorder, and the allowed list stays at two rows.
 
 **The process group.** The process-group pair of `repocontract_cmd_unix.go` and `repocontract_cmd_other.go` moves to `sysexec` as `CancelKillsTheProcessGroup`, with no change of its body. Walk rule 5 of 7.4 never walks `sysexec`. The build verifies that no other reached package holds an excluded file, and it records the list.
 
@@ -521,7 +523,7 @@ The new function `packRecorderFrom` reads the context, and it gives a Null Objec
 | 22 | `gotypes`: its whole suite is unchanged on `goload` | the existing suite | a changed index |
 | 23 | `rawgitratchet`: `BoundTestFiles` holds an untracked `_test.go` file and drops an ignored one | `BoundTestFiles` on a `gittest.Fixture` | the index-only list |
 | 24 | a method of a field type of a live type, which `json.Marshal` reaches, is refused | `Load`, `Refusals` on a fixture | a live set of named expressions only |
-| 25 | a read of a package-level variable makes the `init` function of its package reached, and its `git` call is refused | same | initializers that follow only a reached function |
+| 25 | a read of a package-level variable makes the `init` function of its package reached, and its `git` call is refused. A `git` function that an initializer stores in a variable that no reached body reads passes. The same variable with a reached read is refused. | same | initializers that follow only a reached function |
 | 26 | a read of a function variable that a second function assigns is class `inject`; the same variable with no assignment passes. A map variable that an `init` fills with a function is `inject` also. | same | a seam that carries a git reader past the walk |
 | 27 | `gatecontract.Input` holds no function, interface or channel type at any depth | the real type through `go/types` | an input that carries code |
 | 28 | a reached package with a file behind a build tag, and one with a function that has no body, are each class `exec` | a fixture | a body that the load does not see |
@@ -546,7 +548,7 @@ The new function `packRecorderFrom` reads the context, and it gives a Null Objec
 | 47 | The entries of a fixture profile are equal to the entries that `ParseCoverFunc` reads from the recorded tool result. A `Config` with `Cover` and `CoverPath` is an error. | `scopedCoverFunc` of `core` on a fixture module | a path with no module path; a floor that starts `go tool` |
 | 48 | a floor with no recorded base reports "did not judge" with the cause "the run has no recorded worktree base" | a floor of `core` with an empty `WorktreeBaseSHA` on a `gittest.Fixture` | a pass; a read of `HEAD` (`comment_floor.go:103-108`) |
 | 49 | the floor reader accepts a profile that is older than a source; the command for an earlier profile refuses it | `covchanged`: the plain reader and the command | a freshness check in the floor; a command that lost the check |
-| 50 | the entry `Run` of `repo-contract-floor` writes no verdict store; the ship path writes one. The reviewer path still skips a package that is green on the same key. `Refusals` refuses a fixture pack whose runner names its recorder type. | the registry `Run`, the ship phase and `Refusals` on a fixture | an entry that records |
+| 50 | the entry `Run` of `repo-contract-floor` writes no verdict store; the ship path writes one. The reviewer path still records a green package. The ship path at stage `enforce` still skips a package that is green on the same key. The entry `Run` with a context that holds a recorder writes no verdict store. `Refusals` refuses a fixture pack whose runner names its recorder type. | the registry `Run`, the ship phase and `Refusals` on a fixture | an entry that records |
 | 51 | each of the four argument builders gives the two budget flags and no verb word | the builders with a fleet width set | flags that the dropped verb loses (`lanebudget.go:35-48`) |
 
 Tests 1 to 7, 24 to 26, 28 to 30, 32, 33, 41 and 45 use a fixture module that declares the real module path. The fixture has a stub `internal/sysexec`, a stub `internal/repostate` and a stub `internal/gotool`. Each of these tests calls `Contract()`, so the tests pin the real rule data. Only test 30 changes one exec entry of the result. Tests 27 and 31 read the real tree. The seven names that `TestC2231_001` pins stay in `testdup`.
@@ -564,6 +566,8 @@ Tests 1 to 7, 24 to 26, 28 to 30, 32, 33, 41 and 45 use a fixture module that de
 | 6 | the guard on the real registry: test 10 and its `TreeReadingTests` row | 3, 4, 5 | Medium: a refusal that commits 4 and 5 did not remove | tests 10, 11 |
 | 7 | `phasecoherence`: `treegate.go`, `seed_phasecoherence.go`, the fixtures; two `baseline.json` rows go | 1, 6 | Medium: an import cycle through `prompts` | tests 19, 21 |
 | 8 | `fleet`: `zonegate.go`, `seed_fleet.go`, the module fixtures | 6 | Medium: about fifteen tests move | tests 20, 21 |
+
+The operator decided on 2026-11-11 that commits 2, 2b and 3 come first, before this page passes its review. The walker of commit 3 is then a measuring tool. It runs on the real registry, and its refusal list replaces the hand-made rows of the 7.1 table. Commits 1 and 4-8 wait for a passing review of the page with the measured table.
 
 Commit 4 lowers `count` to the new measure, because it now leaves out each `acs/` site. It can only go down. The commit message gives the old and the new value. Test 10 goes in after commit 5, because the three floor entries are closures until then, and walk rule 1 of 7.4 refuses a closure.
 
@@ -605,6 +609,8 @@ The test files of the guard are in `gateregistry` and `gatehermetic`, both on th
 The design reviews of 2026-11-10 gave a recommendation for each question. The operator has not ruled on questions 1 and 3. The design holds the recommendation of questions 2 and 4.
 
 The operator approved the toolchain boundary on 2026-11-11. Three review rounds refused the first `exec` rule, which read a constant verb at each gate site. The commit `c2cc026c3` holds the revision after rounds 1 and 2, and round 3 refused that revision.
+
+Round 3 of the redesign (run `agent-architecture-reviewer-20261110T230401Z-cbc5`) found that walk rule 4 reached git through package initializers. On 2026-11-11 the operator ruled: walk rule 4 becomes narrower, as the review prescribed, and the walker comes first as a measuring tool (7.11).
 
 1. **Checks that read history.** `lost_landing_floor.go:76-96`, `explanationdocs/gitio.go:178,262` and `rebind.go:132,176` read `HEAD` or ancestry by design: they witness a landing. Recommended: these are landing witnesses, not lane-tree gates. They stay out of the registry. One typed list in one home names them, and the guard test reads that list. Commit 5 proves that no floor entry reaches them.
 2. **The mtime freshness of `covchanged`** (`workspace.go:133-142`). The review closed this question, and 7.8 holds the result. The floor measures in the same run and takes a plain reader. The check of an older profile leaves `Workspace`. A SHA-256 of each source is an option only if Go code in the tree writes the profile. This fact is ASSUMED.
