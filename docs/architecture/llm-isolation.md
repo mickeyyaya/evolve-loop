@@ -905,6 +905,50 @@ Known differences from the design:
   - Outside a cell, during a cycle, the hook denies a call whose `subagent_type` names a phase persona. A phase persona is `evolve-*`, with or without a plugin prefix. Thus the console or an operator session cannot act as a phase. A generic subagent passes.
   - The marker is advisory, because an agent can set or unset it. That is acceptable, because the hook is defence in depth. The cell boundary (sandbox, exec deny, dispatch credential) is the limit.
 
+
+### 9.2 Git asks no credential helper in a cell, and the secret files deny at shadow (2026-11-11, design)
+
+On 2026-11-11 two `console-builder` cells read `~/.config/gh/config.yml` and `~/.config/gh/hosts.yml`. The bridge reported `ISOLATION_I5_VIOLATION` with `process=gh`, `rule=read.home.secret` and `action=logged`. The second brief forbade `gh`, so the agent did not choose it.
+
+The cause is in the host setup. The git credential helper of the host for `https://github.com` is `gh auth git-credential`. Thus each git remote operation in a cell starts `gh`, and `gh` gives the token to git. Since gh 2.24 the token is in the system keychain by default, so a file deny alone does not stop it.
+
+**S1. Git and gh find no credential.** The key set of `gittest.IsolateHostCredentials` (`internal/gittest/credentials.go`) moves to one production home, `ipcenv.CredentialIsolation(ghConfigDir)`. It returns a typed set with two parts:
+
+- `Set`: `GIT_CONFIG_GLOBAL=/dev/null`, `GIT_CONFIG_NOSYSTEM=1`, `GIT_TERMINAL_PROMPT=0`, `GIT_SSH_COMMAND=ssh -o BatchMode=yes`, and `GH_CONFIG_DIR` at an empty dir of the workspace.
+- `Set` also keeps the commit identity, because the builder commits in its worktree, and the git evidence of completion waits for that commit. The bridge reads `user.name` and `user.email` of the host git config outside the cell, at launch. It sets `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME` and `GIT_COMMITTER_EMAIL` from them. An identity is not a credential.
+- `Unset`: `GH_TOKEN` and `GITHUB_TOKEN`.
+
+`gittest` projects it with `os.Setenv` and `os.Unsetenv`. `Deps.cellEnv` applies it at each env stage and for a seat dispatch, through each carrier of the env of a cell:
+
+- `hermeticEnv` merges `Set` into its set, so it overrides the parent, and leaves out each `Unset` key.
+- `driverEnv` appends `Set` last and filters each `Unset` key out of the parent env.
+- `primePaneShell` writes an `export` line for each `Set` key and an `unset` line for each `Unset` key, after the cell markers.
+
+The set stays outside the marker registry (`ipcenv.CellMarkers()`), because `allowedEnvName` passes the parent value of each marker name. Git then starts no helper, and `gh` has no token and no host. This closes the observed path at its source, because a cell must not reach a remote.
+
+**S2. The secret files deny at shadow.** `ReadIsolation` gets the method `secretsDenied()`, which is true when the read stage is `shadow` or `enforce`. The SBPL writer and the `bwrap` writer both read it. The secret entries of `homeSecrets` deny at `shadow`, and the run, raw-output and inputs rules stay behind `Enforce`. `bwrap` masks only an entry that exists, because a mount needs its target, and the list adds `.git-credentials` and `.config/git/credentials`.
+
+**S3. Limits that stay.** The review rounds of this section found more paths to a credential. Each one needs more than a path list, so a later item holds them:
+
+- A copy of a keychain helper keeps its code identity. The claude CLI uses `/usr/bin/security` for its own login, so an exec deny of it breaks the CLI.
+- A rename in a writable parent or a planted symlink moves a secret out of a denied path.
+- The login files of the other model families are not in the list.
+
+The inbox item `cell-credential-isolation-beyond-the-git-helper` holds these, with the review runs.
+
+**S4. The signal.** A denied read emits `ISOLATION_I5_VIOLATION` with `action=refused`.
+
+**S5. The edits of this page.** The "Stage source" row of section 9 says that the secret entries deny at `shadow`. The "Shadow signal" row says that a secret read is refused, not reported.
+
+The tests:
+
+- `TestCredentialIsolation_IsTheOneSet`: `gittest.IsolateHostCredentials` and `cellEnv` project the same `Set` and `Unset` parts.
+- `TestCellEnv_IsolatesHostCredentialsOnEachCarrier`: the parent holds `GH_TOKEN=x` and a credential helper config. The test covers the env stages `off`, `shadow` and `enforce`, a seat dispatch, a headless launch and a tmux pane. On each, a `Set` key has its value, and an `Unset` key is absent or empty.
+- `TestCellEnv_KeepsTheCommitIdentity`: with `GIT_CONFIG_GLOBAL=/dev/null`, a `git commit` in a cell worktree succeeds and gets the identity of the host config, on each carrier.
+- The real proof: a cell at `shadow` runs `git ls-remote https://github.com/<repo>` with a helper stub that writes a marker. The stub does not start, and the marker does not appear.
+- `TestReadIsolation_ShadowDeniesTheSecretClass` (SBPL) and `TestSandboxWrap_ShadowMasksTheSecretClassOnLinux` (`bwrap`, with an absent entry that gets no mask). At `shadow` the run and raw rules still only report.
+- The contract test `TestAgentSandboxContract_ShadowReportsTheExecAndLetsItRun` (`bridge/sandbox_contract_integration_test.go:340`) keeps its exec half: the stub `claude` still runs at `shadow`. Its read half changes: the unrelated cycle and the raw log still read, and `$HOME/.ssh/id_fixture` is refused.
+
 ## 10. Routing data
 
 ### Issue
