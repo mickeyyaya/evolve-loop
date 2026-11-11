@@ -161,6 +161,7 @@ var protectedGateFiles = []struct {
 	{"go/cmd/evolve/cmd_landing.go", GateGuarantee},
 	{"go/internal/gatecontract/", GateGuarantee},
 	{"go/internal/gateregistry/", GateGuarantee},
+	{"go/internal/gatehermetic/", GateGuarantee},
 	{"go/internal/testdup/", GateGuarantee},
 	{"go/internal/sizeratchet/", GateGuarantee},
 	{"go/internal/rawgitratchet/", GateGuarantee},

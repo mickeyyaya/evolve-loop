@@ -267,6 +267,7 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/phases/ship/gate_classifier_gate.go", Class: GateGuarantee, Rationale: "the ship check that refuses a cycle diff the gate classifier flags (ADR-0155, llm-isolation.md §20.3)"},
 	{Fragment: "/go/internal/core/gate_classifier_floor.go", Class: GateGuarantee, Rationale: "the build floor check that fails a build the gate classifier flags (ADR-0155, llm-isolation.md §20.3)"},
 	{Fragment: "/go/internal/goload/", Class: GateGuarantee, Rationale: "the go list and go/types loader that the call-graph hermeticity guard trusts: a lane that changed it could hide a package or a body from the guard (ADR-0165 G2)"},
+	{Fragment: "/go/internal/gatehermetic/", Class: GateGuarantee, Rationale: "the call-graph hermeticity guard: its contract table, its walk rules and its toolchain audit decide which gate reaches git, a process, a file clock or history, so a lane that changed them could let a gate read what the lane controls (ADR-0165 G2)"},
 	{Fragment: "/go/internal/gotool/", Class: GateGuarantee, Rationale: "the one place where a gate starts the Go toolchain: a lane that changed it could add a verb that runs a program from a gate (ADR-0165 G2)"},
 }
 
