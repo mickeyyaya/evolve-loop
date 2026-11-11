@@ -314,10 +314,11 @@ func (r gcRun) worktrees(opts gc.WorktreeOptions) bool {
 	}
 	planned, flagged := gcWorktreeCounts(manifest)
 	r.summary("%d workspace item(s) would be reaped (%d flagged for manual review)", "applying workspace sweep — %d item(s) (%d flagged for manual review)", planned, flagged)
+	counts, tallyFailed := r.flagCounts(opts, manifest)
 	for _, it := range manifest.Items {
 		switch it.Action {
 		case gc.WorktreeActionFlagDirty, gc.WorktreeActionFlagUnmerged:
-			fmt.Fprintf(r.stdout, "  %s %s (%s)\n", strings.ToUpper(string(it.Action)), gcWorktreeItemLabel(it), it.Reason)
+			fmt.Fprintf(r.stdout, "  %s %s (%s)%s\n", strings.ToUpper(string(it.Action)), gcWorktreeItemLabel(it), it.Reason, gcFlagCountSuffix(counts, it))
 		default:
 			fmt.Fprintf(r.stdout, "  WOULD-%s %s (%s)\n", strings.ToUpper(string(it.Action)), gcWorktreeItemLabel(it), it.Reason)
 		}
@@ -325,11 +326,42 @@ func (r gcRun) worktrees(opts gc.WorktreeOptions) bool {
 	if r.dryRun {
 		return false
 	}
+	tallyFailed = r.fileRepeatedFlags(opts, manifest, counts) || tallyFailed
 	if err := gc.ApplyWorktrees(opts, manifest); err != nil {
 		fmt.Fprintf(r.stderr, "evolve gc: workspace sweep partial: %v\n", err)
 	}
 	fmt.Fprintf(r.stdout, "evolve gc: workspace sweep applied\n")
-	return false
+	return tallyFailed
+}
+
+func (r gcRun) flagCounts(opts gc.WorktreeOptions, manifest gc.WorktreeManifest) (map[string]int, bool) {
+	if r.dryRun {
+		return nil, false
+	}
+	counts, err := gc.CountFlags(opts.EvolveDir, manifest.Items)
+	if err != nil {
+		fmt.Fprintf(r.stderr, "evolve gc: flag tally failed: %v\n", err)
+		return nil, true
+	}
+	return counts, false
+}
+
+func (r gcRun) fileRepeatedFlags(opts gc.WorktreeOptions, manifest gc.WorktreeManifest, counts map[string]int) bool {
+	filed, err := gc.FileRepeatedFlags(filepath.Join(opts.EvolveDir, "inbox"), manifest.Items, counts, time.Now)
+	for _, path := range filed {
+		fmt.Fprintf(r.stdout, "  filed inbox item %s\n", path)
+	}
+	if err != nil {
+		fmt.Fprintf(r.stderr, "evolve gc: flag filing failed: %v\n", err)
+	}
+	return err != nil
+}
+
+func gcFlagCountSuffix(counts map[string]int, it gc.WorktreeItem) string {
+	if n, ok := counts[gc.FlagKey(it)]; ok {
+		return fmt.Sprintf(" count=%d", n)
+	}
+	return ""
 }
 
 func (r gcRun) runDirs(evolveDir string, pol gc.Policy) bool {

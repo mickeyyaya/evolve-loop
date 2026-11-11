@@ -2,7 +2,7 @@
 
 > Plan of record for the run-dir and worktree sweeps: [workspace-hygiene-2026-07.md](../../plans/workspace-hygiene-2026-07.md) (slices S1–S5). Why the config lives in the `internal/gcpolicy` leaf: [ADR-0077](../adr/0077-docs-floor-for-architecture-changes.md) and the cycle-1141 note in `gcpolicy.go`. The operator procedure and the policy knobs: [runtime-reference.md, "Operator commands (release resources)"](../../operations/runtime-reference.md). The disk-full incident behind the cache and temp sweeps: [2026-09-28](../../incidents/2026-09-28-the-disk-filled-and-two-lanes-failed-for-it.md).
 
-> Amended by: [gc closes the legacy gap](../../plans/gc-closes-the-legacy-gap-2026-11.md) (D2, D4, D6, D7, D9).
+> Amended by: [gc closes the legacy gap](../../plans/gc-closes-the-legacy-gap-2026-11.md) (D2, D4, D6, D7, D9, D11).
 
 ## Purpose
 
@@ -137,6 +137,7 @@ Three files grew without a bound, because the retention engine covered only the 
   - It matches the lanes and the branches of the sealed cycle number only. The lane of another cycle is never touched.
   - Pinned by `TestSweepSealedCycle_*` and, through the three callers, by `TestDispatchSequentialCycle_*SealedCycle*`, `TestRunResumeBatch_AResumedCycleThatSeals*` and `TestRunCycleRun_*FleetLane*`.
 - **A failed listing mutates nothing.** An unreadable cache or temp dir, or a failed `lsof`, is reported as an error and no entry is touched (`TestTrimGoCache_AMissingCacheIsReportedNotIgnored`, `TestReapFinishedCycleOrphans_AFailedListingSignalsNothingAndIsReported`).
+- **A flag has an owner after its second run.** `evolve gc` counts each flag in `.evolve/gc-flag-tally.json` and prints `count=N`. At the second run it files one inbox item through `inboxfile.Mint` (`flagtally.go`, D11). A dry run neither counts nor files.
 
 ## Follow-ups
 
