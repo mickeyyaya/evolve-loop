@@ -76,6 +76,17 @@ func TestParseClaudePicker(t *testing.T) {
 	assertIDs(t, got, wantModelFamilies)
 }
 
+func TestParseClaudePicker_AFableRowIsNotOffered(t *testing.T) {
+	pane := strings.Join([]string{
+		" Select model",
+		" ❯ 1. Default (recommended)  Fable 5.2 · Most capable",
+		"   2. Opus                   Opus 5.5",
+		"   3. Sonnet                 Sonnet 5.5",
+		"   4. Haiku                  Haiku 5.5",
+	}, "\n")
+	assertIDs(t, parseClaudePicker(pane), []string{"opus", "sonnet", "haiku"})
+}
+
 func TestParsersIgnoreChromeAndEmpty(t *testing.T) {
 	if got := parseCodexPicker("just the banner\nno picker here"); len(got) != 0 {
 		t.Fatalf("codex parser should return nothing for non-picker pane, got %v", got)
