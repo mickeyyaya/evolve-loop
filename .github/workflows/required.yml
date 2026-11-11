@@ -104,6 +104,23 @@ jobs:
     if: needs.changes.outputs.go == 'true'
     uses: ./.github/workflows/go.yml
 
+  golangci-lint:
+    name: golangci-lint
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+      - name: Install the pinned golangci-lint
+        run: go install "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v$(cat go/.golangci-version)"
+      - name: Lint
+        working-directory: go
+        run: golangci-lint run
+
   landing:
     needs: changes
     if: needs.changes.outputs.landing == 'true'
@@ -169,7 +186,7 @@ jobs:
 
   required:
     name: CI required
-    needs: [changes, validate, go, landing, inbox, ste-lint]
+    needs: [changes, validate, go, golangci-lint, landing, inbox, ste-lint]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
@@ -186,6 +203,7 @@ jobs:
           GO_REQUIRED: ${{ needs.changes.outputs.go }}
           GO_RESULT: ${{ needs.go.result }}
           GO_SUITE_RESULT: ${{ needs.go.outputs.suite_result }}
+          LINT_RESULT: ${{ needs.golangci-lint.result }}
           LANDING_REQUIRED: ${{ needs.changes.outputs.landing }}
           LANDING_RESULT: ${{ needs.landing.result }}
           LANDING_SUITE_RESULT: ${{ needs.landing.outputs.suite_result }}
@@ -208,6 +226,10 @@ jobs:
           case "$INBOX_REQUIRED:$INBOX_RESULT" in
             true:success|false:skipped) ;;
             *) echo "inbox lint did not match the route: $INBOX_REQUIRED:$INBOX_RESULT" >&2; exit 1 ;;
+          esac
+          case "$GO_REQUIRED:$LINT_RESULT" in
+            true:success|false:skipped) ;;
+            *) echo "golangci-lint did not match the route: $GO_REQUIRED:$LINT_RESULT" >&2; exit 1 ;;
           esac
           for result in "$GO_REQUIRED:$GO_RESULT:$GO_SUITE_RESULT" "$LANDING_REQUIRED:$LANDING_RESULT:$LANDING_SUITE_RESULT"; do
             case "$result" in

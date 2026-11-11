@@ -149,35 +149,35 @@ func WriteSummary(w io.Writer, res *Result, entries []AllowlistEntry) error {
 	if len(entries) > 0 {
 		sb.WriteString("#### Configured Allowlist Entries\n\n")
 		for _, e := range entries {
-			sb.WriteString(fmt.Sprintf("- **%s**: %s (expires: %s)\n", e.ID, e.Reason, e.Expires))
+			fmt.Fprintf(&sb, "- **%s**: %s (expires: %s)\n", e.ID, e.Reason, e.Expires)
 		}
 		sb.WriteString("\n")
 	}
 	if len(res.WaivedFindings) > 0 {
 		sb.WriteString("#### Waived Vulnerabilities\n\n")
 		for _, w := range res.WaivedFindings {
-			sb.WriteString(fmt.Sprintf("- **%s**: %s (expires: %s)\n", w.ID, w.Reason, w.Expires))
+			fmt.Fprintf(&sb, "- **%s**: %s (expires: %s)\n", w.ID, w.Reason, w.Expires)
 		}
 		sb.WriteString("\n")
 	}
 	if len(res.UnlistedFindings) > 0 {
 		sb.WriteString("#### Unlisted Vulnerabilities\n\n")
 		for _, u := range res.UnlistedFindings {
-			sb.WriteString(fmt.Sprintf("- **%s**: unlisted vulnerability detected\n", u))
+			fmt.Fprintf(&sb, "- **%s**: unlisted vulnerability detected\n", u)
 		}
 		sb.WriteString("\n")
 	}
 	if len(res.ExpiredEntries) > 0 {
 		sb.WriteString("#### Expired Allowlist Entries\n\n")
 		for _, e := range res.ExpiredEntries {
-			sb.WriteString(fmt.Sprintf("- **%s**: expired on %s\n", e.ID, e.Expires))
+			fmt.Fprintf(&sb, "- **%s**: expired on %s\n", e.ID, e.Expires)
 		}
 		sb.WriteString("\n")
 	}
 	if len(res.InvalidEntries) > 0 {
 		sb.WriteString("#### Invalid Allowlist Entries\n\n")
 		for _, inv := range res.InvalidEntries {
-			sb.WriteString(fmt.Sprintf("- %s\n", inv))
+			fmt.Fprintf(&sb, "- %s\n", inv)
 		}
 		sb.WriteString("\n")
 	}
@@ -196,6 +196,6 @@ func AppendStepSummary(path string, res *Result, entries []AllowlistEntry) error
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	return WriteSummary(f, res, entries)
 }

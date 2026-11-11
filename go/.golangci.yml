@@ -1,7 +1,6 @@
-# golangci-lint config (v2). Tunes the LOCAL commit-gate-runner's lint pass —
-# CI does not run golangci (.github/workflows/go.yml enforces go vet + gofmt +
-# tests only; golangci is "optional in the runner"). So this file only affects
-# the local gate, never CI or the live loop.
+# golangci-lint config (v2), the one config of the local commit gate and the
+# CI lint job (.github/workflows/required.yml). The version lives in
+# .golangci-version.
 #
 # Posture: keep the standard bug-catching linters on PRODUCTION code; quiet the
 # two pre-existing noise sources that are conventional to ignore:
