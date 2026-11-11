@@ -128,6 +128,14 @@ Three files grew without a bound, because the retention engine covered only the 
 - **A log that a live loop writes is never planned.** Pinned by `TestPlan_LogCatalogNeverPlansALogThatALiveLoopWrites` and `TestPlan_LogCatalogKeepsALogWhoseWriterPIDFileCannotBeRead`.
 - **The current loop log is never planned.** The target of `.evolve/logs/current` is skipped before the TTL and the cap. Pinned by `TestPlan_LogCatalogNeverPlansTheCurrentRunDir`, with a 4 MB log over a 1 MB cap and a 1-day TTL. `TestPlan_LogCatalogNeverPlansForeignFilesOrSymlinks` pins that `guards.log`, a non-log file and every symlink stay.
 - **A fresh heartbeat with a dead owner is not liveness.** A lease whose named owner pid is dead is collectable even inside the heartbeat window: that window is the crashed owner's 2 to 6 minutes. Pinned by `TestPlanWorktrees_DeadPidFreshLeaseCollected`.
+- **A cycle that seals is cleaned at once, for that cycle only.** Plan: [gc closes the legacy gap](../../plans/gc-closes-the-legacy-gap-2026-11.md) (D12, X10).
+  - `SweepSealedCycle` runs where a cycle ends: `dispatchSequentialCycle`, `runResumeBatch` and `runCycleRun` (the path of a fleet lane) call `sweepSealedCycleGC`. It acts only at `gc.mode: enforce`. `runCycleRun` calls it after the inbox closeout and not on an error, quota or system-failure exit.
+  - It does not wait for `salvage_after_hours`, `MinAgeMinutes` or `KeepRecent`. The seal proves the end, so the stale `active_worktree` pointers of the sealed run do not hold the lane.
+  - Three holds stop it: a resumable checkpoint (per-run state or the plane marker), a continuation bound to the cycle, and a live run lease. A hold reports `Held` and touches nothing.
+  - The order has five steps. Stop the orphan processes whose `cwd` is in the lane. Bundle an unmerged branch and verify the bundle. Save the uncommitted state. Remove the lane. Delete the branch.
+  - A failed step keeps the lane and the branch.
+  - It matches the lanes and the branches of the sealed cycle number only. The lane of another cycle is never touched.
+  - Pinned by `TestSweepSealedCycle_*` and, through the three callers, by `TestDispatchSequentialCycle_*SealedCycle*`, `TestRunResumeBatch_AResumedCycleThatSeals*` and `TestRunCycleRun_*FleetLane*`.
 - **A failed listing mutates nothing.** An unreadable cache or temp dir, or a failed `lsof`, is reported as an error and no entry is touched (`TestTrimGoCache_AMissingCacheIsReportedNotIgnored`, `TestReapFinishedCycleOrphans_AFailedListingSignalsNothingAndIsReported`).
 
 ## Follow-ups

@@ -72,6 +72,18 @@ func (lr *loopResult) emit(w io.Writer) {
 var gcHookFn = runGCHook
 
 func runGCHook(cfg loopConfig, workspace string, stderr io.Writer) {
+	gcPol, mode, ok := loopGCMode(cfg, stderr)
+	if !ok {
+		return
+	}
+
+	runRunDirGC(cfg, workspace, mode, gcPol, stderr)
+	sealLedgerGC(cfg, ledgerSealMode(mode, gcPol), gcPol.LedgerSealKeep(), stderr)
+	runWorktreeGC(cfg, workspace, mode, gcPol, stderr)
+	runDevWorktreeGC(cfg, workspace, gcPol, stderr)
+}
+
+func loopGCMode(cfg loopConfig, stderr io.Writer) (gc.Policy, string, bool) {
 	pol, err := policy.Load(filepath.Join(cfg.EvolveDir, "policy.json"))
 	if err != nil {
 		fmt.Fprintf(stderr, "[gc] WARN: policy load failed: %v; using zero-value gc policy\n", err)
@@ -86,17 +98,12 @@ func runGCHook(cfg loopConfig, workspace string, stderr io.Writer) {
 	}
 	switch mode {
 	case "off":
-		return
+		return gcPol, mode, false
 	case "shadow", "enforce":
-	default:
-		fmt.Fprintf(stderr, "[gc] WARN: invalid gc.mode=%q (want off|shadow|enforce); skipping\n", mode)
-		return
+		return gcPol, mode, true
 	}
-
-	runRunDirGC(cfg, workspace, mode, gcPol, stderr)
-	sealLedgerGC(cfg, ledgerSealMode(mode, gcPol), gcPol.LedgerSealKeep(), stderr)
-	runWorktreeGC(cfg, workspace, mode, gcPol, stderr)
-	runDevWorktreeGC(cfg, workspace, gcPol, stderr)
+	fmt.Fprintf(stderr, "[gc] WARN: invalid gc.mode=%q (want off|shadow|enforce); skipping\n", mode)
+	return gcPol, mode, false
 }
 
 func runRunDirGC(cfg loopConfig, workspace, mode string, gcPol gc.Policy, stderr io.Writer) {

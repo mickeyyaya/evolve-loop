@@ -101,6 +101,10 @@ func (o WorktreeOptions) deleteBundled(it WorktreeItem) error {
 	if err := o.bundleBranch(it); err != nil {
 		return fmt.Errorf("gc: refuse to delete %s: bundle failed, branch kept: %w", it.Branch, err)
 	}
+	return o.dropRef(it)
+}
+
+func (o WorktreeOptions) dropRef(it WorktreeItem) error {
 	if _, err := o.git(o.ProjectRoot, "update-ref", "-d", "refs/heads/"+it.Branch, it.Head); err != nil {
 		return err
 	}

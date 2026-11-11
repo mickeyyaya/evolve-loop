@@ -267,6 +267,7 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	if applied, err := closeoutCycleOutcome(result, projectRoot, evolveDir, stderr, lifecycleLedger, signals); err != nil {
 		fmt.Fprintf(stderr, "evolve cycle run: WARN: could not apply cycle %d %s to the inbox: %v\n", result.Cycle, applied, err)
 	}
+	sweepSealedCycleGC(loopConfig{ProjectRoot: projectRoot, EvolveDir: evolveDir}, result.Cycle, stderr)
 	return cycleRunExitCode(result)
 }
 
