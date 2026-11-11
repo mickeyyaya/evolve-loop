@@ -54,6 +54,23 @@ func GrantOperatorResume(path string) (Checkpoint, bool, error) {
 	return cp, granted, nil
 }
 
+func RetireCheckpoint(path string) (Checkpoint, error) {
+	var cp Checkpoint
+	err := flock.WithPathLock(path, func() error {
+		existing, err := readBlockAt(path)
+		if err != nil {
+			return err
+		}
+		cp = existing
+		cp.Enabled, cp.Reason, cp.OperatorAction, cp.QuotaResetAt = false, ReasonRetired, "", ""
+		return applyWithHooks(defaultHooks(), path, cp)
+	})
+	if err != nil {
+		return Checkpoint{}, err
+	}
+	return cp, nil
+}
+
 func budgetSpent(cp Checkpoint) bool {
 	return cp.Enabled && cp.Reason == ReasonQuotaLikely && !BudgetLeft(cp.AutoResumeAttempts, cp.AutoResumeMaxAttempts)
 }

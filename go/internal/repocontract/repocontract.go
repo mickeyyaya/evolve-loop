@@ -53,6 +53,7 @@ func TreeReadingTests() []TestSelection {
 
 var treeReadingSelections = []TestSelection{
 	{Package: "./cmd/evolve", Tests: []string{
+		"TestAmpCycleRetireRejectsBadInputWithoutChangingState",
 		"TestApicoverSubcommand_ByteParityWithStandalone",
 		"TestBootCLIUpdate_ASmokeFailureWhileTheFamilyIsDrainedWarnsAndDoesNotHalt",
 		"TestBootCLIUpdate_ASmokeFailureWithHealthyUsageStillHaltsTheLoop",
