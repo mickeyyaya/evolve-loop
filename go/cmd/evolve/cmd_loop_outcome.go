@@ -216,6 +216,7 @@ func devWorktreeGCOptions(projectRoot, evolveDir string, pol gc.Policy) (gc.DevO
 		Exec:        sysexec.DefaultRunner,
 		OpenPRs:     ghOpenPRUpdates,
 		PRHeads:     ghPullRequestHeads,
+		MergedPRs:   ghMergedPullRequestTips,
 	}, nil
 }
 

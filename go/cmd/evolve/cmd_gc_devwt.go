@@ -189,6 +189,25 @@ func ghPullRequestHeads(ctx context.Context, dir string) (map[string]bool, error
 	return heads, nil
 }
 
+func ghMergedPullRequestTips(ctx context.Context, dir string) (map[string][]string, error) {
+	if _, err := exec.LookPath("gh"); err != nil {
+		return nil, fmt.Errorf("%w: %v", gc.ErrPRLookupUnavailable, err)
+	}
+	ctx, cancel := context.WithTimeout(ctx, devGHTimeout)
+	defer cancel()
+	prs, err := gc.GhRemoteAPI{Exec: sysexec.DefaultRunner, Dir: dir}.PullRequests(ctx)
+	if err != nil {
+		return nil, err
+	}
+	tips := map[string][]string{}
+	for _, pr := range prs {
+		if pr.State == "MERGED" && pr.HeadRefOid != "" {
+			tips[pr.Branch] = append(tips[pr.Branch], pr.HeadRefOid)
+		}
+	}
+	return tips, nil
+}
+
 func ghStderr(err error) string {
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {

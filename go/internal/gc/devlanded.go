@@ -2,6 +2,7 @@ package gc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -49,4 +50,21 @@ func hasOwnWork(ctx context.Context, tree gitexec.Git, head string) (bool, error
 		return false, nil
 	}
 	return lines[len(lines)-1] != head, nil
+}
+
+func (s *devSweep) mergedTips(ctx context.Context) map[string][]string {
+	if s.mergedRead || s.o.MergedPRs == nil {
+		return s.merged
+	}
+	s.mergedRead = true
+	tips, err := s.o.MergedPRs(ctx, s.o.ProjectRoot)
+	switch {
+	case errors.Is(err, ErrPRLookupUnavailable):
+		s.notes = append(s.notes, "gh is unavailable: the merged pull request source was skipped, so landed rests on git evidence")
+	case err != nil:
+		s.notes = append(s.notes, "the merged pull request source failed, so landed rests on git evidence: "+err.Error())
+	default:
+		s.merged = tips
+	}
+	return s.merged
 }

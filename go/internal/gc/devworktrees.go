@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -48,6 +49,8 @@ type DevManifest struct {
 
 type OpenPRLookup func(ctx context.Context, dir string) (map[string][]time.Time, error)
 
+type MergedPRLookup func(ctx context.Context, dir string) (map[string][]string, error)
+
 type DevSaveFunc func(ctx context.Context, w wtcheckpoint.Worktree) (wtcheckpoint.SaveResult, error)
 
 type DevOptions struct {
@@ -59,6 +62,7 @@ type DevOptions struct {
 	Exec        sysexec.RunFunc
 	Processes   func(ctx context.Context) ([]Process, error)
 	OpenPRs     OpenPRLookup
+	MergedPRs   MergedPRLookup
 	PRHeads     func(ctx context.Context, dir string) (map[string]bool, error)
 	Save        DevSaveFunc
 	Deferred    func(path string)
@@ -108,6 +112,8 @@ type devSweep struct {
 	detached   map[string]detachedFree
 	heads      map[string]bool
 	headsRead  bool
+	merged     map[string][]string
+	mergedRead bool
 }
 
 func newDevSweep(ctx context.Context, o DevOptions) (*devSweep, string, error) {
@@ -399,6 +405,9 @@ func (s *devSweep) landed(ctx context.Context, it DevItem) (string, error) {
 	case err != nil:
 		return "", err
 	case merged:
+		return landedInMain, nil
+	}
+	if slices.Contains(s.mergedTips(ctx)[it.Branch], it.Head) {
 		return landedInMain, nil
 	}
 	res, err := branchLandedBySquash(ctx, s.store, plane.OriginMainRef, it.Branch)
