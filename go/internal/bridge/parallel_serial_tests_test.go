@@ -57,8 +57,6 @@ var serialTests = map[string]string{
 	"bridge.TestLaunchModelVerification_AgyTmuxBootingAnotherGeminiModelIsAMismatch":                            "swaps seam modelCatalogDirFn",
 	"bridge.TestLaunchModelVerification_AgyTmuxBootingClaudeFailsOverWithTheMismatchSignal":                     "swaps seam modelCatalogDirFn",
 	"bridge.TestLaunchModelVerification_AgyTmuxBootingItsPickedGeminiDeliversThePrompt":                         "swaps seam modelCatalogDirFn",
-	"bridge.TestLoadManifest_ACatalogFromBeforeThePinDoesNotChangeThePin":                                       "swaps seam modelCatalogDirFn",
-	"bridge.TestLoadManifest_AnOlderLiveCatalogThatOffersThePinnedModelLaunchesThePin":                          "swaps seam modelCatalogDirFn",
 	"bridge.TestLaunchModelVerification_ThePickedModelAtAnotherEffortStillVerifies":                             "swaps seam modelCatalogDirFn",
 	"bridge.TestAgyTierModelsPinnedToVerifiedNames":                                                             "swaps seam modelCatalogDirFn",
 	"bridge.TestNewSessionEnv_ReturnsOnlyAfterThePaneHasRemovedItsFile":                                         "sets env through a helper",

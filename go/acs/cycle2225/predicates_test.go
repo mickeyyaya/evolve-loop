@@ -110,26 +110,26 @@ func runNamedTests(t *testing.T, pkg string, names []string) {
 	}
 }
 
-func TestC2225_001_AnExhaustedFableWeekBenchesClaudeFableUntilItsResetAndNotTheFamily(t *testing.T) {
-	run := probeClaude(t, usageScreen("Fable", 100, "5h"))
+func TestC2225_001_AnExhaustedOpusWeekBenchesClaudeOpusUntilItsResetAndNotTheFamily(t *testing.T) {
+	run := probeClaude(t, usageScreen("Opus", 100, "5h"))
 
 	store := clihealth.NewStore(run.root, clock)
-	bench, ok := store.ActiveModels()[clihealth.Entry{Family: "claude", Model: "Fable"}.Key()]
+	bench, ok := store.ActiveModels()[clihealth.Entry{Family: "claude", Model: "Opus"}.Key()]
 	if !ok {
-		t.Fatalf("RED: the Fable week did not bench claude/Fable: %v\n%s", store.ActiveModels(), run.log)
+		t.Fatalf("RED: the Opus week did not bench claude/Opus: %v\n%s", store.ActiveModels(), run.log)
 	}
 	if lo, hi := now.Add(5*time.Hour), now.Add(5*time.Hour+10*time.Minute); !bench.BenchedUntil.After(lo) || bench.BenchedUntil.After(hi) {
-		t.Errorf("RED: benched until %v, want the Fable week's 5h reset", bench.BenchedUntil)
+		t.Errorf("RED: benched until %v, want the Opus week's 5h reset", bench.BenchedUntil)
 	}
 	if len(store.Active()) != 0 {
 		t.Errorf("RED: the claude family bench changed: %v", store.Active())
 	}
 }
 
-func TestC2225_002_AFableWeekBelowTheCapBenchesNothingAndAnAllModelsCapBenchesTheFamilyOnly(t *testing.T) {
-	below := clihealth.NewStore(probeClaude(t, usageScreen("Fable", 60, "5h")).root, clock)
+func TestC2225_002_AnOpusWeekBelowTheCapBenchesNothingAndAnAllModelsCapBenchesTheFamilyOnly(t *testing.T) {
+	below := clihealth.NewStore(probeClaude(t, usageScreen("Opus", 60, "5h")).root, clock)
 	if len(below.ActiveModels()) != 0 || len(below.Active()) != 0 {
-		t.Errorf("RED: a Fable week at 60%% benched something: models=%v families=%v", below.ActiveModels(), below.Active())
+		t.Errorf("RED: an Opus week at 60%% benched something: models=%v families=%v", below.ActiveModels(), below.Active())
 	}
 
 	capped := clihealth.NewStore(probeClaude(t, allModelsExhaustedScreen()).root, clock)
@@ -141,8 +141,8 @@ func TestC2225_002_AFableWeekBelowTheCapBenchesNothingAndAnAllModelsCapBenchesTh
 	}
 }
 
-func TestC2225_003_AFableModelBenchDemotesClaudeOnDeepAndKeepsItFirstOnBalancedAndFast(t *testing.T) {
-	run := probeClaude(t, usageScreen("Fable", 100, "5h"))
+func TestC2225_003_AnOpusModelBenchDemotesClaudeOnDeepAndKeepsItFirstOnBalancedAndFast(t *testing.T) {
+	run := probeClaude(t, usageScreen("Opus", 100, "5h"))
 
 	deep := bridgechain.ApplyCLIHealthBench(run.root, "audit", claudeChain("deep"), clock, nil)
 	if want := []string{"agy-claude-tmux", "codex-tmux", "claude-tmux"}; !slices.Equal(deep.Candidates, want) {
@@ -151,38 +151,38 @@ func TestC2225_003_AFableModelBenchDemotesClaudeOnDeepAndKeepsItFirstOnBalancedA
 	for _, tier := range []string{"balanced", "fast"} {
 		out := bridgechain.ApplyCLIHealthBench(run.root, "audit", claudeChain(tier), clock, nil)
 		if want := []string{"claude-tmux", "agy-claude-tmux", "codex-tmux"}; !slices.Equal(out.Candidates, want) {
-			t.Errorf("RED: %s chain = %v, want %v: only the tiers that resolve to Fable are demoted", tier, out.Candidates, want)
+			t.Errorf("RED: %s chain = %v, want %v: only the tiers that resolve to Opus are demoted", tier, out.Candidates, want)
 		}
 	}
 }
 
-func TestC2225_004_AFableModelBenchPastItsResetDemotesNothing(t *testing.T) {
-	run := probeClaude(t, usageScreen("Fable", 100, "5h"))
+func TestC2225_004_AnOpusModelBenchPastItsResetDemotesNothing(t *testing.T) {
+	run := probeClaude(t, usageScreen("Opus", 100, "5h"))
 	later := func() time.Time { return now.Add(6 * time.Hour) }
 
 	out := bridgechain.ApplyCLIHealthBench(run.root, "audit", claudeChain("deep"), later, nil)
 	if want := []string{"claude-tmux", "agy-claude-tmux", "codex-tmux"}; !slices.Equal(out.Candidates, want) {
-		t.Errorf("RED: deep chain = %v after the Fable reset, want %v", out.Candidates, want)
+		t.Errorf("RED: deep chain = %v after the Opus reset, want %v", out.Candidates, want)
 	}
 }
 
-func TestC2225_005_AScopeWordNoTierLaunchesBenchesNothingAndKeepsTheWarn(t *testing.T) {
-	run := probeClaudeThroughTheProductionReader(t, usageScreen("Opus", 100, "5h"))
+func TestC2225_005_AScopeWordTheManifestDoesNotMapBenchesNothingAndKeepsTheWarn(t *testing.T) {
+	run := probeClaudeThroughTheProductionReader(t, usageScreen("Fable", 100, "5h"))
 
 	for _, tier := range []string{"fast", "balanced", "deep", "top"} {
 		out := bridgechain.ApplyCLIHealthBench(run.root, "audit", claudeChain(tier), time.Now, nil)
 		if want := []string{"claude-tmux", "agy-claude-tmux", "codex-tmux"}; !slices.Equal(out.Candidates, want) {
-			t.Errorf("RED: %s chain = %v, want %v: no tier launches an Opus model", tier, out.Candidates, want)
+			t.Errorf("RED: %s chain = %v, want %v: model_match maps no Fable", tier, out.Candidates, want)
 		}
 	}
-	if !strings.Contains(run.log, "WARN") || !strings.Contains(run.log, "Opus") {
+	if !strings.Contains(run.log, "WARN") || !strings.Contains(run.log, "Fable") {
 		t.Errorf("RED: the unmapped drained window lost its WARN:\n%s", run.log)
 	}
 	store := clihealth.NewStore(run.root, nil)
 	if len(store.Active()) != 0 || len(store.ActiveModels()) != 0 {
 		t.Errorf("RED: an unmapped word benched: families=%v models=%v", store.Active(), store.ActiveModels())
 	}
-	if strings.Contains(run.log, "benched claude/Opus") {
+	if strings.Contains(run.log, "benched claude/Fable") {
 		t.Errorf("RED: the log claims a bench for an unmapped word:\n%s", run.log)
 	}
 }
@@ -200,17 +200,17 @@ func explainThroughTheEvidencePath(t *testing.T, scope string) (*clihealth.Store
 }
 
 func TestC2225_006_TheEvidencePathBenchesAMappedWordAndKeepsTheWarnForAnUnmappedOne(t *testing.T) {
-	unmapped, unmappedLog := explainThroughTheEvidencePath(t, "Opus")
+	unmapped, unmappedLog := explainThroughTheEvidencePath(t, "Fable")
 	if len(unmapped.ActiveModels()) != 0 || len(unmapped.Active()) != 0 {
 		t.Errorf("RED: the evidence path benched an unmapped word: models=%v families=%v\n%s", unmapped.ActiveModels(), unmapped.Active(), unmappedLog)
 	}
-	if !strings.Contains(unmappedLog, "WARN") || !strings.Contains(unmappedLog, "Opus") {
+	if !strings.Contains(unmappedLog, "WARN") || !strings.Contains(unmappedLog, "Fable") {
 		t.Errorf("RED: the unmapped drained window lost its WARN:\n%s", unmappedLog)
 	}
 
-	mapped, mappedLog := explainThroughTheEvidencePath(t, "Fable")
-	if _, ok := mapped.ActiveModels()[clihealth.Entry{Family: "claude", Model: "Fable"}.Key()]; !ok {
-		t.Errorf("RED: the mapped Fable week did not bench claude/Fable through the evidence path: %v\n%s", mapped.ActiveModels(), mappedLog)
+	mapped, mappedLog := explainThroughTheEvidencePath(t, "Opus")
+	if _, ok := mapped.ActiveModels()[clihealth.Entry{Family: "claude", Model: "Opus"}.Key()]; !ok {
+		t.Errorf("RED: the mapped Opus week did not bench claude/Opus through the evidence path: %v\n%s", mapped.ActiveModels(), mappedLog)
 	}
 	if len(mapped.Active()) != 0 {
 		t.Errorf("RED: the claude family bench changed: %v", mapped.Active())
@@ -219,8 +219,8 @@ func TestC2225_006_TheEvidencePathBenchesAMappedWordAndKeepsTheWarnForAnUnmapped
 
 func TestC2225_007_TheProductionUsageProberBenchesAMappedWordAndNoUnmappedOne(t *testing.T) {
 	runNamedTests(t, "./cmd/evolve", []string{
-		"TestNewUsageProber_AnExhaustedOpusWeekBenchesNoModelThroughTheProductionProber",
-		"TestNewUsageProber_AnExhaustedFableWeekBenchesClaudeFableThroughTheProductionProber",
+		"TestNewUsageProber_AnExhaustedFableWeekBenchesNoModelThroughTheProductionProber",
+		"TestNewUsageProber_AnExhaustedOpusWeekBenchesClaudeOpusThroughTheProductionProber",
 	})
 }
 
@@ -250,24 +250,24 @@ func TestC2225_010_TheScopeWordToModelMapIsManifestDataAndDecidesAlone(t *testin
 	if !ok || usage.Windows == nil {
 		t.Fatal("RED: claude-tmux declares no usage windows")
 	}
-	if !usage.Windows.ModelMatches("Fable", "fable") || !usage.Windows.ModelMatches("Fable", "claude-fable-5-5") {
-		t.Errorf("RED: the manifest model_match does not map Fable to Fable models: %v", usage.Windows.ModelMatch)
+	if !usage.Windows.ModelMatches("Opus", "opus") || !usage.Windows.ModelMatches("Opus", "claude-opus-5-5") {
+		t.Errorf("RED: the manifest model_match does not map Opus to Opus models: %v", usage.Windows.ModelMatch)
 	}
-	if usage.Windows.ModelMatches("Fable", "sonnet") || usage.Windows.ModelMatches("Opus", "fable") {
+	if usage.Windows.ModelMatches("Opus", "sonnet") || usage.Windows.ModelMatches("Fable", "opus") {
 		t.Errorf("RED: the manifest model_match over-matches: %v", usage.Windows.ModelMatch)
 	}
-	if model, mapped := bridge.UsageModelFor("claude-tmux", "Fable"); !mapped || !strings.Contains(strings.ToLower(model), "fable") {
-		t.Errorf("RED: UsageModelFor(claude-tmux, Fable) = %q, %v; want the manifest's Fable tier model", model, mapped)
+	if model, mapped := bridge.UsageModelFor("claude-tmux", "Opus"); !mapped || !strings.Contains(strings.ToLower(model), "opus") {
+		t.Errorf("RED: UsageModelFor(claude-tmux, Opus) = %q, %v; want the manifest's Opus tier model", model, mapped)
 	}
-	if _, mapped := bridge.UsageModelFor("claude-tmux", "Opus"); mapped {
-		t.Error("RED: UsageModelFor maps Opus though no tier launches an Opus model")
+	if _, mapped := bridge.UsageModelFor("claude-tmux", "Fable"); mapped {
+		t.Error("RED: UsageModelFor maps Fable though the manifest declares no such word")
 	}
 
-	spec := quotastate.WindowSpec{ValueRegex: `(?P<pct>\d+)%`, ValueDirection: quotastate.DirectionUsed, ModelMatch: map[string]string{"Opus": "(?i)sonnet"}}
-	if !spec.ModelMatches("Opus", "claude-sonnet-5-5") || spec.ModelMatches("Fable", "claude-fable-5-5") {
+	spec := quotastate.WindowSpec{ValueRegex: `(?P<pct>\d+)%`, ValueDirection: quotastate.DirectionUsed, ModelMatch: map[string]string{"Fable": "(?i)sonnet"}}
+	if !spec.ModelMatches("Fable", "claude-sonnet-5-5") || spec.ModelMatches("Opus", "claude-opus-5-5") {
 		t.Error("RED: a map declared as data must alone decide which word matches which model")
 	}
-	spec.ModelMatch = map[string]string{"Fable": "("}
+	spec.ModelMatch = map[string]string{"Opus": "("}
 	if err := spec.Validate(); err == nil {
 		t.Error("RED: an uncompilable model_match regex passed validation")
 	}
@@ -294,7 +294,7 @@ func TestC2225_011_NoGoSourceOutsideTestsHoldsAScopeWordToModelTable(t *testing.
 			t.Fatalf("RED: read %s: %v", rel, readErr)
 		}
 		body := string(raw)
-		for _, banned := range []string{`"(?i)fable"`, `"(?i)opus"`, `"Fable":`, `"Opus":`} {
+		for _, banned := range []string{`"(?i)opus"`, `"Opus":`, `"Fable":`} {
 			if strings.Contains(body, banned) {
 				t.Errorf("RED: %s holds %s: the scope-word map belongs in the manifest", rel, banned)
 			}
@@ -307,21 +307,21 @@ func TestC2225_012_TheUnmappedRuleHasOneMechanismTheReadersFlagAndNoProberSeam(t
 		t.Error("RED: usageprobe.Prober still carries a ModelMapped seam beside the reader's Unmapped flag: two mechanisms decide one rule")
 	}
 
-	unmappedOpus := usageprobe.Prober{
+	unmappedFable := usageprobe.Prober{
 		Families: []string{"claude"},
-		Probe:    func(context.Context, string) (string, error) { return usageScreen("Opus", 100, "5h"), nil },
+		Probe:    func(context.Context, string) (string, error) { return usageScreen("Fable", 100, "5h"), nil },
 		Classify: func(string, string) bool { return false },
 		Windows:  usageevidence.ReadWindowsNow,
 	}
 	var log bytes.Buffer
-	unmappedOpus.Log = &log
-	unmappedOpus.Store = clihealth.NewStore(t.TempDir(), nil)
-	unmappedOpus.Run(context.Background())
-	if len(unmappedOpus.Store.ActiveModels()) != 0 || len(unmappedOpus.Store.Active()) != 0 {
-		t.Errorf("RED: the reader's flag alone must keep an unmapped word unbenched: %v %v\n%s", unmappedOpus.Store.ActiveModels(), unmappedOpus.Store.Active(), log.String())
+	unmappedFable.Log = &log
+	unmappedFable.Store = clihealth.NewStore(t.TempDir(), nil)
+	unmappedFable.Run(context.Background())
+	if len(unmappedFable.Store.ActiveModels()) != 0 || len(unmappedFable.Store.Active()) != 0 {
+		t.Errorf("RED: the reader's flag alone must keep an unmapped word unbenched: %v %v\n%s", unmappedFable.Store.ActiveModels(), unmappedFable.Store.Active(), log.String())
 	}
 
-	flagged := quotastate.UsageWindow{Family: "claude", Scope: "Current week (Opus)", Model: "Opus", Exhausted: true, Unmapped: true}
+	flagged := quotastate.UsageWindow{Family: "claude", Scope: "Current week (Fable)", Model: "Fable", Exhausted: true, Unmapped: true}
 	var flagLog bytes.Buffer
 	byFlag := usageprobe.Prober{
 		Families: []string{"claude"},

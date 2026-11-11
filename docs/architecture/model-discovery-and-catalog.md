@@ -102,7 +102,6 @@ Separately, tier assignment was a live LLM call with no stability check. A docum
 - **`LineageKey` / `GroupByLineage`** (`lineage.go`): version-free identity — id lowercased, the SAME version token that `NewestInLineage` compares removed, separator runs collapsed. Same key ⇔ mutually substitutable. Different keys are different capability classes and are NEVER substituted (`gemini-pro-(high)` ≠ `gemini-flash-(medium)`; `gpt` ≠ `gpt-mini`).
 - **`FreshnessPolicy.Freshest` / `PromoteLatest`** (`latest.go`): promotion upgrades each classified tier model to the freshest member of *its own* bucket. The classifier keeps 100% of the qualitative decision, and Go keeps 100% of the numeric one. `NewestInLineage` is composed, not modified.
 - **Per-CLI freshness is manifest DATA, not Go conditionals** (`bridge.ModelFreshness`, `claude-tmux.json` `model_freshness`): claude declares `prefer: "alias"` (verified 2026-07-27: `--model opus` → `canonicalModel claude-opus-5`). Every other manifest omits the block and gets the zero value (newest concrete version). The composition root maps it to `FreshnessPolicy` (`freshnessFromManifests`), and `modelquery` never imports `bridge`.
-- **A tier pin is manifest data too** (`model_tier_pins`, 2026-11-10): claude pins `deep` and `top` to the `fable` alias of its `model_tier_map`. The composition root maps the pins with `pinsFromManifests`. A pinned tier takes its model when the CLI offers it, and the classifier decides each other tier.
 
 | CLI | Freshness rule | Why |
 |---|---|---|

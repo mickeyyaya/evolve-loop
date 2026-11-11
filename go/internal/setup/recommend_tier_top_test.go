@@ -36,9 +36,9 @@ func TestRecommend_MaxQualityBiasesToTop(t *testing.T) {
 
 func TestTierModelsFor_TopResolvesToModelNotTierName(t *testing.T) {
 	claude := tierModelsFor("claude")
-	if claude["top"] != "fable" {
-		t.Errorf(`tierModelsFor("claude")["top"] = %q, want "fable" — a family whose manifest declares the tier must resolve a real model id, `+
-			`not the tier NAME (claude-tmux.json declares "top": "fable"; echoing "top" here is the value that reaches `+
+	if claude["top"] != "opus" {
+		t.Errorf(`tierModelsFor("claude")["top"] = %q, want "opus" — a family whose manifest declares the tier must resolve a real model id, `+
+			`not the tier NAME (claude-tmux.json declares "top": "opus"; echoing "top" here is the value that reaches `+
 			`Catalog.Lookup as "resolvable" and the CLI as --model top)`, claude["top"])
 	}
 
