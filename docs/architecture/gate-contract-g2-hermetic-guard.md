@@ -65,6 +65,27 @@ The build-floor git reads, measured one level into the helper packages:
 | `core/identity_carry_forward.go:14`, `phases/ship/repair.go:30` | initializers that store a function that runs git (`git patch-id --stable` at `composition_carryforward.go:208-209`; `git show` at `repair.go:129`) | none: walk rule 4 of 7.4 reaches the function only through a read in a reached body |
 | `explanationdocs/gitio.go:178,262`, `rebind.go:132,176`, `core/lost_landing_floor.go:76-96` | `HEAD`, ancestry and a second commit | none: question 1 of 7.14 |
 
+### 7.1a The measured reach (2026-11-11)
+
+The walker of commit 3 (`bde90438e`, go1.27.2) measured the real registry on 2026-11-11. The operator ruled that this measurement replaces the hand-made rows of 7.1 as the work list of commit 5. Section 7.15 holds each site.
+
+- The three ratchet roots load. `size-ratchet` and `raw-git-ratchet` have no refusal. `testdup-ratchet` has three: the git call at `testdup.go:120` and two mtime reads at `testdup.go:136-137`, as in the prototype of 7.2.
+- The three floor entries are closures, so walk rule 1 refuses each root. Commit 5 gives each one a named run function.
+- Four named functions stand for the floors: `core.UnitTestFloorJudge`, `core.CoverChangedFloorJudge`, `core.FloorEntryRun` and `ship.RunRepoContractPack`. They give 84 refusals in 66 rows. The rows hold 62 sites, because four sites come through two first edges.
+
+| First edge of the chain | `exec` | `git` | `git-dir` | `inject` | `mtime` |
+|---|---|---|---|---|---|
+| `call` or `value` only | 10 | 2 | 1 | 0 | 2 |
+| `init` | 8 | 18 | 0 | 12 | 9 |
+| `live-type` | 2 | 0 | 0 | 0 | 2 |
+
+- A `call` row is a floor read. Commit 5 moves it behind `repostate` or `gotool`.
+- An `init` row is a package initializer that a floor reaches. Step 5 of 7.8 moves it into a function that the composition root calls.
+- A `live-type` row is a method of a type that a reached body converts to an interface.
+- The history witnesses of question 1 of 7.14 (`explanationdocs/gitio.go`, `rebind.go`) appear only through the `init` edge `ship.init#6` from P. The `init` remedy of commit 5 cuts that path, so the answer to question 1 stands.
+
+The first measurement gave 94 refusals, most through `live-type` edges. Step 5 of 7.8 then made walk rule 3 narrower: a method is reached only through a call or a conversion to an interface. The later fixes of the review found three more true sites.
+
 ### 7.2 A measured prototype
 
 A stdlib prototype (`go list -deps -json` plus `go/types`, stdlib bodies skipped) ran on the host with go1.27.2:
@@ -569,6 +590,15 @@ Tests 1 to 7, 24 to 26, 28 to 30, 32, 33, 41 and 45 use a fixture module that de
 
 The operator decided on 2026-11-11 that commits 2, 2b and 3 come first, before this page passes its review. The walker of commit 3 is then a measuring tool. It runs on the real registry, and its refusal list replaces the hand-made rows of the 7.1 table. Commits 1 and 4-8 wait for a passing review of the page with the measured table.
 
+Commits 2, 2b and 3 are built (`6efa93625`, `bde90438e`). They differ from this page as follows:
+
+- `goload` has a streaming seam, `Loader.Walk`, that visits each module package right after its check. `Load` is built on it, so the `Program` of 7.7 stays. The code index keeps its memory bound: about 700 MB, not about 1.4 GB.
+- The exec facts of the standard library are derived from the import graph, not listed by hand. A call into a std package whose import closure holds `os/exec` is class `exec`, except a closed inert list. A drift test pins the set.
+- `Graph` keys each function by `types.Func.FullName()`, because a third-party package is type-checked again.
+- Walk rule 3 is narrower, as step 5 of 7.8 gives: a method is reached through a call or a conversion to an interface.
+
+Three review rounds of commit 3 each found new false passes. On 2026-11-11 the operator ruled that commit 3 lands as a measuring tool. Its package note lists the three open false passes. The inbox item `g2-walker-fails-closed-before-enforcement` makes the walk fail closed at its source, and commit 6 waits for it.
+
 Commit 4 lowers `count` to the new measure, because it now leaves out each `acs/` site. It can only go down. The commit message gives the old and the new value. Test 10 goes in after commit 5, because the three floor entries are closures until then, and walk rule 1 of 7.4 refuses a closure.
 
 ### 7.12 How the files stay protected
@@ -616,3 +646,76 @@ Round 3 of the redesign (run `agent-architecture-reviewer-20261110T230401Z-cbc5`
 2. **The mtime freshness of `covchanged`** (`workspace.go:133-142`). The review closed this question, and 7.8 holds the result. The floor measures in the same run and takes a plain reader. The check of an older profile leaves `Workspace`. A SHA-256 of each source is an option only if Go code in the tree writes the profile. This fact is ASSUMED.
 3. **The `fleet` key.** Its judges read no git, so section 6.5 gives the wrong reason for G2. Recommended: keep it in G2 as the last commit, with no change of the preflight. The commit also corrects the reason in section 6.5. The other choice is to move it to G3 with the other 13 keys.
 4. **The base-red rerun in a floor entry.** G4 put the rerun inside the entry `Run`. The rerun runs git by design: it adds a worktree of the base. Recommended: the entry gives the raw reds, and only the build-floor reviewer reruns (7.8). The other choice needs an exemption for `baseattr` in `Contract()`.
+
+### 7.15 The measured sites (2026-11-11)
+
+Each row is one site, class and first edge that the walker of commit 3 refuses from a stand-in root. Four sites have two rows. The roots are U (`core.UnitTestFloorJudge`), C (`core.CoverChangedFloorJudge`), F (`core.FloorEntryRun`) and P (`ship.RunRepoContractPack`).
+
+| Site | Class | First edge | Roots |
+|---|---|---|---|
+| `internal/baseattr/runner.go:21:32` | exec | call | U,C |
+| `internal/core/build_floor_reviewer.go:216:9` | exec | call | U,C |
+| `internal/core/build_floor_reviewer.go:310:10` | exec | call | U |
+| `internal/core/build_floor_reviewer.go:385:9` | exec | call | U,C |
+| `internal/core/phase_bindings_selfcheck.go:110:9` | exec | call | U,C |
+| `internal/core/phase_bindings_selfcheck.go:99:9` | exec | call | U |
+| `internal/lanebudget/lanebudget.go:66:10` | exec | call | U,C |
+| `internal/phases/ship/repocontract_cmd_other.go:1:1` | exec | call | P |
+| `internal/phases/ship/repocontract.go:221:9` | exec | call | P |
+| `internal/phases/ship/scanshadow_tree.go:90:14` | exec | call | P |
+| `internal/gitexec/gitexec.go:32:9` | git | call | U,C |
+| `internal/phases/ship/scanshadow_tree.go:36:14` | git | call | P |
+| `internal/plane/plane.go:19:39` | git-dir | call | U,C |
+| `internal/covchanged/workspace.go:140:11` | mtime | call | C |
+| `internal/covchanged/workspace.go:87:42` | mtime | call | C |
+| `internal/baseattr/runner.go:21:32` | exec | init | P |
+| `internal/changedpkgs/importerclosure.go:98:14` | exec | init | P |
+| `internal/gitexec/scratchindex.go:26:10` | exec | init | P |
+| `internal/lanebudget/lanebudget.go:66:10` | exec | init | P |
+| `internal/phases/ship/runner.go:32:9` | exec | init | P |
+| `internal/phases/ship/runner.go:36:9` | exec | init | P |
+| `internal/reportdoc/open_nofollow_other.go:1:1` | exec | init | U,C,F |
+| `internal/runlease/pidalive_other.go:1:1` | exec | init | P |
+| `internal/adapters/ledger/composition.go:111:9` | git | init | P |
+| `internal/commitprefixgate/exec.go:11:9` | git | init | P |
+| `internal/explanationdocs/explanationdocs.go:216:17` | git | init | P |
+| `internal/explanationdocs/explanationdocs.go:224:26` | git | init | P |
+| `internal/explanationdocs/gitio.go:178:15` | git | init | P |
+| `internal/explanationdocs/gitio.go:251:14` | git | init | P |
+| `internal/explanationdocs/gitio.go:262:14` | git | init | P |
+| `internal/explanationdocs/gitio.go:390:14` | git | init | P |
+| `internal/explanationdocs/gitio.go:42:15` | git | init | P |
+| `internal/explanationdocs/gitio.go:46:20` | git | init | P |
+| `internal/explanationdocs/rebind.go:132:9` | git | init | P |
+| `internal/explanationdocs/rebind.go:176:9` | git | init | P |
+| `internal/gitexec/gitexec.go:32:9` | git | init | P |
+| `internal/gitexec/gitexec.go:36:9` | git | init | U,C,F,P |
+| `internal/integration/landed.go:33:16` | git | init | P |
+| `internal/phases/ship/landing_intent.go:467:15` | git | init | P |
+| `internal/treefence/fence.go:374:9` | git | init | P |
+| `internal/treestate/treestate.go:19:19` | git | init | P |
+| `internal/adapters/ledger/ledger.go:154:15` | inject | init | P |
+| `internal/adapters/ledger/ledger.go:161:12` | inject | init | P |
+| `internal/adapters/ledger/ledger.go:165:15` | inject | init | P |
+| `internal/adapters/ledger/ledger.go:166:7` | inject | init | P |
+| `internal/adapters/ledger/ledger.go:169:12` | inject | init | P |
+| `internal/adapters/ledger/ledger.go:176:12` | inject | init | P |
+| `internal/adapters/ledger/ledger.go:242:15` | inject | init | P |
+| `internal/adapters/ledger/ledger.go:390:15` | inject | init | P |
+| `internal/adapters/ledger/rebaseline.go:57:15` | inject | init | P |
+| `internal/adapters/ledger/seal.go:186:18` | inject | init | P |
+| `internal/phases/registry/registry.go:28:18` | inject | init | P |
+| `internal/phases/registry/registry.go:31:2` | inject | init | P |
+| `internal/explanationdocs/gitio.go:224:114` | mtime | init | P |
+| `internal/explanationdocs/gitio.go:224:92` | mtime | init | P |
+| `internal/explanationdocs/gitio.go:471:113` | mtime | init | P |
+| `internal/explanationdocs/gitio.go:471:91` | mtime | init | P |
+| `internal/gitexec/scratchindex.go:83:30` | mtime | init | P |
+| `internal/gitexec/scratchindex.go:83:46` | mtime | init | P |
+| `internal/phasecontract/flow_decision.go:217:10` | mtime | init | U,C,F,P |
+| `internal/phasecontract/flow_decision.go:219:9` | mtime | init | U,C,F,P |
+| `internal/phases/ship/audit.go:116:32` | mtime | init | P |
+| `internal/phases/ship/scanshadow_enforce.go:42:17` | exec | live-type | P |
+| `internal/reportdoc/open_nofollow_other.go:1:1` | exec | live-type | P |
+| `internal/testverdict/store.go:80:49` | mtime | live-type | P |
+| `internal/testverdict/trim.go:75:76` | mtime | live-type | P |
