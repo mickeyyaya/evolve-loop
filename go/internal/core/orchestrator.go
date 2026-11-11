@@ -568,6 +568,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (_ CycleR
 	cr.benchedCLIs = plan.benchedCLIs
 	cr.clampedPlan = plan.clampedPlan
 	cr.directivesSet = plan.directivesSet
+	cr.routerWall = plan.routerWall
 
 	defer func() {
 		if len(cr.phaseTimings) > 0 {

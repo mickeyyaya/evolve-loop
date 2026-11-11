@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -31,24 +30,19 @@ func TestBridgeLauncher_AFailedLaunchWithACauseCodeCarriesTheWall(t *testing.T) 
 	}
 }
 
-func TestPauseAtRouterWall_AnUnreadableOrNonQuotaArtifactDoesNotPause(t *testing.T) {
+func TestPauseAtRouterWall_AWallWithNoQuotaRowDoesNotPause(t *testing.T) {
 	t.Parallel()
-	for name, body := range map[string]string{"corrupt": "{not json", "no-quota": `{"ends":[]}`} {
-		body := body
+	for name, wall := range map[string]Wall{
+		"no wall":    {},
+		"logged out": Wall{}.Observe(FamilyEnd{CLI: "agy-tmux", Pattern: "login_required"}),
+	} {
+		wall := wall
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			ws := t.TempDir()
-			path := filepath.Join(ws, routerQuotaWallFile)
-			if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
-				t.Fatal(err)
-			}
-			cr := &cycleRun{cs: CycleState{WorkspacePath: ws}}
+			cr := &cycleRun{routerWall: wall}
 
 			if err := cr.pauseAtRouterWall(PhaseScout); err != nil {
 				t.Fatalf("err=%v, want no pause", err)
-			}
-			if _, serr := os.Stat(path); !errors.Is(serr, os.ErrNotExist) {
-				t.Fatalf("artifact still present: %v", serr)
 			}
 		})
 	}
