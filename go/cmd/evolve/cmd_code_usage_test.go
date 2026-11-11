@@ -254,7 +254,7 @@ func TestCodeUsage_MergesThePerUserFileAndEveryCycleWorkspaceByPhaseAndCommand(t
 	t.Parallel()
 	rc, stdout, stderr := runUsage(seedUsageLog(t))
 
-	want := "PHASE\tCOMMAND\tCALLS\tHITS\tFAILURES\nbuilder\tcallers\t1\t4\t0\nscout\tfind\t3\t11\t1\n"
+	want := "PHASE\tCOMMAND\tBACKEND\tCALLS\tHITS\tFAILURES\nbuilder\tcallers\tunknown\t1\t4\t0\nscout\tfind\tunknown\t3\t11\t1\n"
 	if rc != 0 || stdout != want || stderr != "" {
 		t.Errorf("rc=%d stdout=%q stderr=%q", rc, stdout, stderr)
 	}
@@ -264,7 +264,7 @@ func TestCodeUsage_SinceDropsOlderRecords(t *testing.T) {
 	t.Parallel()
 	rc, stdout, _ := runUsage(seedUsageLog(t), "--since", "24h")
 
-	want := "PHASE\tCOMMAND\tCALLS\tHITS\tFAILURES\nbuilder\tcallers\t1\t4\t0\nscout\tfind\t2\t2\t1\n"
+	want := "PHASE\tCOMMAND\tBACKEND\tCALLS\tHITS\tFAILURES\nbuilder\tcallers\tunknown\t1\t4\t0\nscout\tfind\tunknown\t2\t2\t1\n"
 	if rc != 0 || stdout != want {
 		t.Errorf("rc=%d stdout=%q", rc, stdout)
 	}
@@ -293,7 +293,7 @@ func TestCodeUsage_AMissingLogGivesAnEmptyJSONListAndAHeaderOnlyTable(t *testing
 	_, jsonOut, _ := runUsage(f, "--json")
 	_, tableOut, _ := runUsage(f)
 
-	if strings.TrimSpace(jsonOut) != "[]" || tableOut != "PHASE\tCOMMAND\tCALLS\tHITS\tFAILURES\n" {
+	if strings.TrimSpace(jsonOut) != "[]" || tableOut != "PHASE\tCOMMAND\tBACKEND\tCALLS\tHITS\tFAILURES\n" {
 		t.Errorf("json=%q table=%q", jsonOut, tableOut)
 	}
 }
@@ -306,7 +306,7 @@ func TestCodeUsage_AnEmptyPhaseShowsAsNone(t *testing.T) {
 
 	_, stdout, _ := runUsage(f)
 
-	if !strings.Contains(stdout, "\n(none)\tmap\t1\t0\t0\n") {
+	if !strings.Contains(stdout, "\n(none)\tmap\tunknown\t1\t0\t0\n") {
 		t.Errorf("stdout = %q", stdout)
 	}
 }

@@ -8,12 +8,12 @@
 
 ## Design
 
-- **One record for each call.** `Record` holds the time, the command and the argument length. It also holds the exit code, the hit count and the duration. The last fields are the phase, the cycle, the CLI family and the working directory. It never holds the argument. The argument can hold code.
+- **One record for each call.** `Record` holds the time, the command and the argument length. It also holds the exit code, the hit count and the duration. The last fields are the phase, the cycle, the CLI family, the working directory and the backend that answered the call. It never holds the argument. The argument can hold code.
 - **Whole lines only.** `Append` encodes the record, adds a newline and writes it with one `write` call on a file that it opens with `O_APPEND`. A reader never sees a part of a line. Two calls at the same time never mix their lines.
 - **The caller owns the failure.** `Append` returns the error. The command prints one line on stderr and keeps its exit code and output.
 - **Identity from the environment.** `Identity` reads the phase and the cycle from `EVOLVE_DISPATCH_ID` and the CLI family from `EVOLVE_CLI`. It takes a lookup function, so a test needs no process environment.
 - **A tolerant reader.** `Read` returns the records at or after a start time. A missing file gives an empty result. A line that does not parse is skipped and counted.
-- **A summary.** `Summarize` counts the calls, the hits and the failures for each phase and command, in sorted order.
+- **A summary.** `Summarize` counts the calls, the hits and the failures for each phase, command and backend, in sorted order. A record from before the field has an empty backend. It reads without error and shows as `unknown`.
 
 ## Invariants
 

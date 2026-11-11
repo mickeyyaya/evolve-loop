@@ -108,7 +108,8 @@ func codeVerb(ctx context.Context, args []string, stdout, stderr io.Writer, buil
 	if check.refused != "" {
 		return out.fail(codeExitStale, "stale", check.refused), call
 	}
-	hits, err := idx.backends.Search(ctx, inv.request)
+	hits, served, err := idx.backends.SearchServed(ctx, inv.request)
+	call.backend = served
 	if err != nil {
 		rc, kind, message := codeErrorOutcome(inv.request, err)
 		return out.fail(rc, kind, message), call

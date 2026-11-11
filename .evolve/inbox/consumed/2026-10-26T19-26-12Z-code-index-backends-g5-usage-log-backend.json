@@ -4,13 +4,18 @@
     "evolve code usage groups the records by backend",
     "An old record with no backend field still reads"
   ],
+  "consumed": {
+    "at": "2026-11-11T09:01:43Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "continuation": {
-    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2282",
-    "branch": "cycle-cd3ae73e-2282",
-    "snapshot_sha": "8d8645edaf637a5a1f4003a67616c8445daebc14",
     "base_sha": "67a8d49f6e51f8d7b1d26e44d71d883df4e848da",
+    "branch": "cycle-cd3ae73e-2282",
+    "cycle": 2282,
     "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2282/audit-fail-reason.json",
-    "cycle": 2282
+    "snapshot_sha": "8d8645edaf637a5a1f4003a67616c8445daebc14",
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2282"
   },
   "created_at": "2026-10-26T19:26:11Z",
   "deps": [],

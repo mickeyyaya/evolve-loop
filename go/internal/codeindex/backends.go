@@ -35,11 +35,17 @@ func (b Backends) For(q Query) (Backend, error) {
 }
 
 func (b Backends) Search(ctx context.Context, req Request) ([]Hit, error) {
+	hits, _, err := b.SearchServed(ctx, req)
+	return hits, err
+}
+
+func (b Backends) SearchServed(ctx context.Context, req Request) (hits []Hit, served string, err error) {
 	backend, err := b.For(req.Query)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return Dispatch(ctx, backend, req)
+	hits, err = Dispatch(ctx, backend, req)
+	return hits, backend.Name(), err
 }
 
 func unsupported(q Query) error {
