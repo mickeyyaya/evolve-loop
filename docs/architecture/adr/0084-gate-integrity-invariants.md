@@ -1,5 +1,7 @@
 # ADR-0084 — Gate integrity invariants: tracked-state scanning, single-sourced contracts, persisted evidence
 
+> **Note (2026-11-10, [ADR-0165](0165-every-gate-is-a-typed-unit-with-a-conformance-contract.md)):** I1 grows from "what git tracks" to each fact that a gate reads from git. A registered gate reads git facts only through `internal/repostate`, and a structure test refuses a direct git call or an mtime read. The duplicate ratchet broke I1 and turned main red on 2026-11-09.
+
 - **Status:** Accepted (operator-directed, 2026-08-10)
 - **Driving incident:** [2026-08-09 zero-ship batch](../../incidents/2026-08-09-zero-ship-batch.md) — 10 cycles / 0 ships, ADR-0072 pipeline-blocker halt on fingerprint `ship|gate-block|cd49274beab2`.
 - **Related:** ADR-0072 (system-failure policy), ADR-0074 (disposition contract), #421–#426.

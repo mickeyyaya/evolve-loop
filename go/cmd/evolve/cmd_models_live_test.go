@@ -51,28 +51,18 @@ func TestPickClassifierCLI(t *testing.T) {
 		ready []string
 		want  []string
 	}{
-		{"preference order, skipping a CLI with no headless classifier driver", []string{"agy", "ollama", "codex"}, []string{"codex", "agy"}},
-		{"claude leads when codex is not ready", []string{"agy", "claude"}, []string{"claude", "agy"}},
-		{"every preferred ready CLI is in the chain", []string{"agy", "claude", "codex"}, []string{"codex", "claude", "agy"}},
+		{"preference order, skipping a CLI with no classifier driver", []string{"agy", "ollama", "codex"}, []string{"codex-tmux", "agy-tmux"}},
+		{"claude leads when codex is not ready", []string{"agy", "claude"}, []string{"claude-tmux", "agy-tmux"}},
+		{"every preferred ready CLI is in the chain", []string{"agy", "claude", "codex"}, []string{"codex-tmux", "claude-tmux", "agy-tmux"}},
 		{"ollama alone yields no classifier", []string{"ollama"}, []string{}},
 		{"empty when none ready", nil, []string{}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := pickClassifierCLI(tt.ready, legacyClassifierPreference(t), ""); !reflect.DeepEqual(got, tt.want) {
+			if got := pickClassifierCLI(tt.ready, legacyClassifierPreference(t)); !reflect.DeepEqual(got, tt.want) {
 				t.Fatalf("pickClassifierCLI(%v) = %v, want %v", tt.ready, got, tt.want)
 			}
 		})
-	}
-}
-
-func TestPickClassifierCLIEnvOverride(t *testing.T) {
-	t.Parallel()
-	if got := pickClassifierCLI([]string{"codex", "agy"}, legacyClassifierPreference(t), "agy"); !reflect.DeepEqual(got, []string{"agy", "codex"}) {
-		t.Fatalf("a ready override leads the chain, got %v", got)
-	}
-	if got := pickClassifierCLI([]string{"codex", "agy"}, legacyClassifierPreference(t), "gemini"); !reflect.DeepEqual(got, []string{"codex", "agy"}) {
-		t.Fatalf("a non-ready override is ignored, got %v", got)
 	}
 }
 
@@ -94,14 +84,14 @@ func (l offeringLister) List(_ context.Context, cli string) ([]string, error) { 
 func TestTierClassifier_FirstPreferredCLIFailsTheNextClassifiesLive(t *testing.T) {
 	t.Parallel()
 	script := &classifierScript{
-		errs:    map[string]error{"codex": errors.New("bridgePromptDispatcher: launch codex: bridge: launch exit=1")},
-		replies: map[string]string{"claude": `{"fast":"Gemini 3.8 Flash (Low)","balanced":"Gemini 3.8 Flash (High)","deep":"Gemini 3.1 Pro (High)","top":"Gemini 3.1 Pro (High)"}`},
+		errs:    map[string]error{"codex-tmux": errors.New("bridgePromptDispatcher: launch codex-tmux: bridge: launch exit=1")},
+		replies: map[string]string{"claude-tmux": `{"fast":"Gemini 3.8 Flash (Low)","balanced":"Gemini 3.8 Flash (High)","deep":"Gemini 3.1 Pro (High)","top":"Gemini 3.1 Pro (High)"}`},
 	}
 	var log bytes.Buffer
 	cat, err := modelquery.Refresh(context.Background(), modelquery.RefreshDeps{
 		CLIs:       []string{"agy"},
 		Lister:     offeringLister{"agy": {"Gemini 3.8 Flash (Low)", "Gemini 3.8 Flash (High)", "Gemini 3.7 Flash (High)", "Gemini 3.1 Pro (High)"}},
-		Classifier: tierClassifier([]string{"agy", "claude", "codex"}, legacyClassifierPreference(t), script, &log),
+		Classifier: modelquery.ChainClassifier{CLIs: pickClassifierCLI([]string{"agy", "claude", "codex"}, legacyClassifierPreference(t)), Dispatcher: script, Log: &log},
 		Fallback:   map[string]map[string]string{"agy": {"balanced": "Gemini 3.7 Flash (High)"}},
 		Now:        stageNow,
 	})
@@ -112,10 +102,10 @@ func TestTierClassifier_FirstPreferredCLIFailsTheNextClassifiesLive(t *testing.T
 		t.Fatalf("agy balanced = (%q,%v) source=%q reason=%q, want live Gemini 3.8 Flash (High)",
 			m, ok, cat.CLIs["agy"].Source, cat.CLIs["agy"].FallbackReason)
 	}
-	if !reflect.DeepEqual(script.clis, []string{"codex", "claude"}) {
+	if !reflect.DeepEqual(script.clis, []string{"codex-tmux", "claude-tmux"}) {
 		t.Errorf("classifier launches = %v, want codex then claude", script.clis)
 	}
-	if !strings.Contains(log.String(), "cli=codex") {
+	if !strings.Contains(log.String(), "cli=codex-tmux") {
 		t.Errorf("the codex classifier failure must be logged, got %q", log.String())
 	}
 }
@@ -123,16 +113,16 @@ func TestTierClassifier_FirstPreferredCLIFailsTheNextClassifiesLive(t *testing.T
 func TestBridgePromptDispatcher_NamesTheArtifactTheBridgeReadsTheReplyFrom(t *testing.T) {
 	t.Parallel()
 	d := bridgePromptDispatcher{workspace: t.TempDir(), projectRoot: t.TempDir()}
-	for cli, driver := range map[string]string{"claude": "claude-p", "agy": "agy", "codex": "codex"} {
-		req := d.request(cli, "PROMPT")
+	for _, driver := range []string{"claude-p", "claude-tmux", "agy", "codex-tmux"} {
+		req := d.request(driver, "PROMPT")
 		if req.CLI != driver {
-			t.Errorf("%s launches driver %q, want %q", cli, req.CLI, driver)
+			t.Errorf("%s launches driver %q, want %q", driver, req.CLI, driver)
 		}
 		if req.Completion != core.CompletionArtifact || req.ArtifactPath == "" {
-			t.Fatalf("%s: completion %q artifact %q, want the artifact contract with a path", cli, req.Completion, req.ArtifactPath)
+			t.Fatalf("%s: completion %q artifact %q, want the artifact contract with a path", driver, req.Completion, req.ArtifactPath)
 		}
 		if !strings.HasPrefix(req.Prompt, "PROMPT") || !strings.Contains(req.Prompt, req.ArtifactPath) {
-			t.Errorf("%s: the prompt never names the artifact the bridge reads the reply from, so a CLI that only prints its answer returns empty: %q", cli, req.Prompt)
+			t.Errorf("%s: the prompt never names the artifact the bridge reads the reply from, so a CLI that only prints its answer returns empty: %q", driver, req.Prompt)
 		}
 	}
 }
@@ -145,7 +135,7 @@ func TestBridgePromptDispatcher_ALinkThatWritesNothingNeverReadsTheLastLinksRepl
 		workspace:   t.TempDir(),
 		projectRoot: t.TempDir(),
 		launch: func(_ context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
-			if req.CLI == "codex" {
+			if req.CLI == "codex-tmux" {
 				if err := os.WriteFile(req.ArtifactPath, []byte(staleReply), 0o644); err != nil {
 					t.Fatal(err)
 				}
@@ -158,19 +148,19 @@ func TestBridgePromptDispatcher_ALinkThatWritesNothingNeverReadsTheLastLinksRepl
 	cat, err := modelquery.Refresh(context.Background(), modelquery.RefreshDeps{
 		CLIs:       []string{"agy"},
 		Lister:     offeringLister{"agy": {"Gemini 3.8 Flash (Low)", "Gemini 3.8 Flash (High)"}},
-		Classifier: tierClassifier([]string{"codex", "claude"}, legacyClassifierPreference(t), d, io.Discard),
+		Classifier: modelquery.ChainClassifier{CLIs: pickClassifierCLI([]string{"codex", "claude"}, legacyClassifierPreference(t)), Dispatcher: d, Log: io.Discard},
 		Fallback:   map[string]map[string]string{"agy": {"balanced": "Gemini 3.8 Flash (High)"}},
 		Now:        stageNow,
 	})
 	if err != nil {
 		t.Fatalf("Refresh: %v", err)
 	}
-	if read["claude-p"] != "" {
-		t.Errorf("claude wrote nothing yet its reply was %q, the previous link's", read["claude-p"])
+	if read["claude-tmux"] != "" {
+		t.Errorf("claude wrote nothing yet its reply was %q, the previous link's", read["claude-tmux"])
 	}
 	reason := cat.CLIs["agy"].FallbackReason
-	claudePart := reason[strings.Index(reason, "classifier claude:"):]
-	if !strings.HasPrefix(claudePart, "classifier claude: no JSON object in reply") || strings.Contains(claudePart, "Imaginary") {
+	claudePart := reason[strings.Index(reason, "classifier claude-tmux:"):]
+	if !strings.HasPrefix(claudePart, "classifier claude-tmux: no JSON object in reply") || strings.Contains(claudePart, "Imaginary") {
 		t.Errorf("claude's fallback reason must be its own empty reply, not codex's: %q", reason)
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/channel"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
@@ -17,12 +18,16 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 const (
-	cellEnvOrigin   = "Deps.cellEnv"
-	envStageEnforce = "enforce"
-	envStageOff     = "off"
+	cellEnvOrigin     = "Deps.cellEnv"
+	envStageEnforce   = "enforce"
+	envStageOff       = "off"
+	ghConfigDirName   = "gh-config"
+	cellGitConfigName = "gitconfig"
+	hostGitTimeout    = 5 * time.Second
 )
 
 var baseEnvNames = []string{"PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "TERM", "TMPDIR", "TMP", "TEMP", "TZ"}
@@ -71,7 +76,7 @@ func allowedEnvName(passthrough []string) func(string) bool {
 	}
 }
 
-func hermeticEnv(parent, passthrough []string, cliEnv, pipeline map[string]string) []string {
+func hermeticEnv(parent, passthrough []string, cliEnv, pipeline map[string]string, creds ipcenv.CredentialSet) []string {
 	set := maps.Clone(cliEnv)
 	if set == nil {
 		set = map[string]string{}
@@ -82,10 +87,14 @@ func hermeticEnv(parent, passthrough []string, cliEnv, pipeline map[string]strin
 			set[k] = v
 		}
 	}
+	for _, k := range creds.Unset {
+		delete(set, k)
+	}
+	maps.Copy(set, creds.Set)
 	allowed := allowedEnvName(passthrough)
 	env := ipcenv.Keep(parent, func(name string) bool {
 		_, overridden := set[name]
-		return allowed(name) && !overridden
+		return allowed(name) && !overridden && !slices.Contains(creds.Unset, name)
 	})
 	for _, k := range slices.Sorted(maps.Keys(set)) {
 		if isShellIdentifier(k) {
@@ -153,20 +162,75 @@ func (deps Deps) cellEnv(cfg *Config) ([]string, bool) {
 	if !seat {
 		stage = deps.envStage()
 	}
+	creds := deps.credentialSet(cfg)
 	if stage == envStageOff {
-		return driverEnv(deps, cfg.Realization.Env), false
+		return isolatedDriverEnv(deps, cfg.Realization.Env, creds), false
 	}
 	parent := os.Environ()
 	passthrough := deps.envPassthrough(cfg)
 	deps.reportDroppedEnv(cfg, stage, droppedEnvNames(parent, passthrough))
 	if stage != envStageEnforce {
-		return driverEnv(deps, cfg.Realization.Env), false
+		return isolatedDriverEnv(deps, cfg.Realization.Env, creds), false
 	}
 	cliEnv := cfg.Realization.Env
 	if seat {
 		cliEnv = seatEnv(cliEnv, cfg.Decision)
 	}
-	return hermeticEnv(parent, passthrough, cliEnv, deps.Env), true
+	return hermeticEnv(parent, passthrough, cliEnv, deps.Env, creds), true
+}
+
+func (deps Deps) credentialSet(cfg *Config) ipcenv.CredentialSet {
+	if cfg.credentials != nil {
+		return *cfg.credentials
+	}
+	ghDir, gitConfig := os.DevNull, os.DevNull
+	if cfg.Workspace != "" {
+		ghDir = filepath.Join(cfg.Workspace, ghConfigDirName)
+		if err := os.MkdirAll(ghDir, 0o700); err != nil {
+			deps.warn("gh config dir %s: %v", ghDir, err)
+		}
+		gitConfig = deps.writeCellGitConfig(filepath.Join(cfg.Workspace, cellGitConfigName))
+	}
+	creds := ipcenv.CredentialIsolation(ghDir, gitConfig)
+	cfg.credentials = &creds
+	return creds
+}
+
+func (deps Deps) writeCellGitConfig(path string) string {
+	body := ipcenv.GitIdentityConfig(deps.hostGitConfig("user.name"), deps.hostGitConfig("user.email"))
+	if body == "" {
+		return os.DevNull
+	}
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		deps.warn("git config %s: %v", path, err)
+		return os.DevNull
+	}
+	return path
+}
+
+func (deps Deps) warn(format string, args ...any) {
+	if deps.Stderr != nil {
+		fmt.Fprintf(deps.Stderr, "[bridge] WARN "+format+"\n", args...)
+	}
+}
+
+func (deps Deps) hostGitConfig(key string) string {
+	if deps.HostGitConfig == nil {
+		return readHostGitConfig(key)
+	}
+	return deps.HostGitConfig(key)
+}
+
+func readHostGitConfig(key string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), hostGitTimeout)
+	defer cancel()
+	cmd := sysexec.Command(ctx, "git", "config", "--get", key)
+	cmd.Env = os.Environ()
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }
 
 func (deps Deps) reportDroppedEnv(cfg *Config, stage string, names []string) {

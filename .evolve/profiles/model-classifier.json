@@ -1,0 +1,75 @@
+{
+  "name": "model-classifier",
+  "role": "model-classifier",
+  "cli": "agy-claude-tmux",
+  "cli_fallback": [
+    "claude-tmux"
+  ],
+  "model_tier_default": "balanced",
+  "allowed_tools": [
+    "Write(.evolve/ephemeral/model-classifier/*/model-classifier-artifact.txt)",
+    "Edit(.evolve/ephemeral/model-classifier/*/model-classifier-artifact.txt)"
+  ],
+  "disallowed_tools": [
+    "Bash",
+    "WebFetch",
+    "WebSearch",
+    "Task",
+    "NotebookEdit",
+    "Edit(skills/**)",
+    "Edit(agents/**)",
+    "Edit(scripts/**)",
+    "Edit(.claude-plugin/**)",
+    "Edit(.evolve/state.json)",
+    "Edit(.evolve/ledger.jsonl)",
+    "Edit(.evolve/profiles/**)",
+    "Write(skills/**)",
+    "Write(agents/**)",
+    "Write(scripts/**)",
+    "Write(.claude-plugin/**)",
+    "Write(.evolve/state.json)",
+    "Write(.evolve/ledger.jsonl)",
+    "Write(.evolve/profiles/**)"
+  ],
+  "add_dir": [
+    "."
+  ],
+  "max_budget_usd": 0.25,
+  "max_turns": 4,
+  "turn_budget_hint": 2,
+  "challenge_token_required": false,
+  "settings_scope": "project",
+  "extra_flags_by_cli": {
+    "claude-tmux": [
+      "--strict-mcp-config",
+      "--exclude-dynamic-system-prompt-sections",
+      "--disable-slash-commands"
+    ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "write_subpaths": [
+      ".evolve/ephemeral/model-classifier"
+    ],
+    "read_only_repo": true,
+    "deny_subpaths": [
+      ".git",
+      "skills",
+      "agents",
+      "scripts",
+      ".claude-plugin",
+      ".evolve/state.json",
+      ".evolve/ledger.jsonl",
+      ".evolve/profiles"
+    ],
+    "allow_network": false
+  },
+  "parallel_eligible": false,
+  "model_tier_envelope": {
+    "min": "balanced",
+    "default": "balanced",
+    "max": "balanced"
+  },
+  "_note": "The model classifier reads untrusted model ids that a CLI listed, and it writes one JSON artifact. Its job is containment: the deny list holds under --dangerously-skip-permissions for the drivers with a tool-list channel, and the sandbox is the only containment for the others. See docs/architecture/model-discovery-and-catalog.md.",
+  "generated_from": "hand-authored"
+}

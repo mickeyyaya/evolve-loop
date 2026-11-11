@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strings"
 )
 
@@ -39,6 +38,15 @@ func (ri ReadIsolation) inputsDir() string {
 	return filepath.Join(ri.Workspace, "inputs")
 }
 
+func (ri ReadIsolation) secretsDenied() bool {
+	return ri.Workspace != ""
+}
+
+func (ri ReadIsolation) guardSecret(b *strings.Builder, filter string) {
+	message := fmt.Sprintf("%s%s rule=%s inv=I5", CellMessagePrefix, ri.Tag, RuleHomeSecret)
+	fmt.Fprintf(b, "(deny file-read-data %s (with message %q))\n", filter, message)
+}
+
 func (ri ReadIsolation) guard(b *strings.Builder, op, filter, rule, invariant string) {
 	message := fmt.Sprintf("%s%s rule=%s inv=%s", CellMessagePrefix, ri.Tag, rule, invariant)
 	if ri.Enforce {
@@ -58,10 +66,10 @@ func writeReadIsolation(b *strings.Builder, ri ReadIsolation) {
 		ri.guard(b, "file-read-data", fmt.Sprintf("(subpath %q)", ri.RunsDir), RuleRunsUnrelated, "I5")
 	}
 	for _, d := range ri.SecretDirs {
-		ri.guard(b, "file-read-data", fmt.Sprintf("(subpath %q)", d), RuleHomeSecret, "I5")
+		ri.guardSecret(b, fmt.Sprintf("(subpath %q)", d))
 	}
 	for _, f := range ri.SecretFiles {
-		ri.guard(b, "file-read-data", fmt.Sprintf("(literal %q)", f), RuleHomeSecret, "I5")
+		ri.guardSecret(b, fmt.Sprintf("(literal %q)", f))
 	}
 	fmt.Fprintf(b, "(allow file-read* file-read-data (subpath %q))\n", ri.Workspace)
 	writeGrantReports(b, ri.Grants, grantMessage)
@@ -101,9 +109,36 @@ func rawSuffixPattern(suffixes []string) string {
 }
 
 func bwrapReadIsolation(ri ReadIsolation) []string {
-	if !ri.Enforce || ri.Workspace == "" {
+	if ri.Workspace == "" {
 		return nil
 	}
+	var out []string
+	if ri.Enforce {
+		out = append(out, bwrapRunsAndRaw(ri)...)
+	}
+	if ri.secretsDenied() {
+		for _, f := range ri.SecretFiles {
+			if pathExists(f) {
+				out = append(out, "--ro-bind", os.DevNull, f)
+			}
+		}
+		for _, d := range ri.SecretDirs {
+			if pathExists(d) {
+				out = append(out, "--tmpfs", d)
+			}
+		}
+	}
+	if ri.Enforce {
+		for _, f := range append([]string{ri.inputsDir()}, ri.PinnedFiles...) {
+			if f != "" {
+				out = append(out, "--ro-bind-try", f, f)
+			}
+		}
+	}
+	return out
+}
+
+func bwrapRunsAndRaw(ri ReadIsolation) []string {
 	var out []string
 	if ri.RunsDir != "" {
 		out = append(out, "--tmpfs", ri.RunsDir, "--bind", ri.Workspace, ri.Workspace)
@@ -113,16 +148,16 @@ func bwrapReadIsolation(ri ReadIsolation) []string {
 			out = append(out, "--ro-bind-try", g, g)
 		}
 	}
-	for _, f := range slices.Concat(ri.RawFiles, ri.SecretFiles) {
+	for _, f := range ri.RawFiles {
 		out = append(out, "--ro-bind", os.DevNull, f)
 	}
-	for _, d := range slices.Concat(ri.RawDirs, ri.SecretDirs) {
+	for _, d := range ri.RawDirs {
 		out = append(out, "--tmpfs", d)
 	}
-	for _, f := range append([]string{ri.inputsDir()}, ri.PinnedFiles...) {
-		if f != "" {
-			out = append(out, "--ro-bind-try", f, f)
-		}
-	}
 	return out
+}
+
+func pathExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }

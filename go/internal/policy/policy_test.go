@@ -89,6 +89,9 @@ func TestTierRank(t *testing.T) {
 		{"claude-haiku-4-5", 1},
 		{"claude-sonnet-4-6", 2},
 		{"claude-opus-4-8", 3},
+		{"fable", 3},
+		{"FABLE", 3},
+		{"claude-fable-5-2", 3},
 		{"gpt-5.5", 0},
 		{"", 0},
 	}
