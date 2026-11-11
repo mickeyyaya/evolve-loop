@@ -137,6 +137,11 @@ func primePaneShell(ctx context.Context, deps Deps, cfg *Config, session, workin
 	}
 	lines := append([]string{dispatchTagLine(cfg.DispatchID)}, exportLines(cfg.Realization.Env)...)
 	lines = append(lines, exportLines(deps.cellMarkers(cfg))...)
+	creds := deps.credentialSet(cfg)
+	lines = append(lines, exportLines(creds.Set)...)
+	for _, k := range creds.Unset {
+		lines = append(lines, "unset "+k)
+	}
 	for _, line := range lines {
 		_ = deps.Tmux.SendKeys(ctx, session, line, true)
 	}

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/agentclass"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
 func resolveBinary(deps Deps, defaultName string) string {
@@ -19,14 +20,25 @@ func resolveBinary(deps Deps, defaultName string) string {
 }
 
 func driverEnv(deps Deps, cliEnv map[string]string) []string {
-	env := slices.DeleteFunc(os.Environ(), isDispatchTag)
+	return isolatedDriverEnv(deps, cliEnv, ipcenv.CredentialSet{})
+}
+
+func isolatedDriverEnv(deps Deps, cliEnv map[string]string, creds ipcenv.CredentialSet) []string {
+	env := slices.DeleteFunc(os.Environ(), func(kv string) bool {
+		name, _, _ := strings.Cut(kv, "=")
+		return isDispatchTag(kv) || slices.Contains(creds.Unset, name)
+	})
 	for _, k := range slices.Sorted(maps.Keys(cliEnv)) {
-		env = append(env, k+"="+cliEnv[k])
+		if !slices.Contains(creds.Unset, k) {
+			env = append(env, k+"="+cliEnv[k])
+		}
 	}
 	for k, v := range deps.Env {
-		env = append(env, k+"="+v)
+		if !slices.Contains(creds.Unset, k) {
+			env = append(env, k+"="+v)
+		}
 	}
-	return env
+	return append(env, creds.Env()...)
 }
 
 func exportLines(env map[string]string) []string {

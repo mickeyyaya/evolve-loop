@@ -344,10 +344,14 @@ func TestAgentSandboxContract_ShadowReportsTheExecAndLetsItRun(t *testing.T) {
 		t.Fatalf("shadow must let the exec run: err=%v out=%q", err, out)
 	}
 	out, err = h.agent(t, contractRow{script: func(h contractHost) string {
-		return "cat " + filepath.Join(filepath.Dir(h.otherCycle), "cycle-9", "audit-report.md") + " " + h.run + "/.bridge/scout-stdout.log $HOME/.ssh/id_fixture"
+		return "cat " + filepath.Join(filepath.Dir(h.otherCycle), "cycle-9", "audit-report.md") + " " + h.run + "/.bridge/scout-stdout.log"
 	}})
-	if err != nil || !strings.Contains(out, "audit of an unrelated item") || !strings.Contains(out, "fixture secret") {
-		t.Fatalf("shadow must let each guarded read run and only report it: err=%v out=%q", err, out)
+	if err != nil || !strings.Contains(out, "audit of an unrelated item") {
+		t.Fatalf("shadow must let each run and raw read run and only report it: err=%v out=%q", err, out)
+	}
+	out, err = h.agent(t, contractRow{script: func(h contractHost) string { return "cat $HOME/.ssh/id_fixture" }})
+	if err == nil || strings.Contains(out, "fixture secret") {
+		t.Fatalf("shadow must refuse the read of a home secret: err=%v out=%q", err, out)
 	}
 }
 

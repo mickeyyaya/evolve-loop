@@ -2,7 +2,11 @@ package gittest
 
 import (
 	"fmt"
+	"maps"
 	"os"
+	"slices"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
 var (
@@ -22,15 +26,8 @@ func IsolateHostCredentials() (func() error, error) {
 		return nil, fmt.Errorf("isolate host credentials: %w", err)
 	}
 
-	keys := []string{
-		"GH_CONFIG_DIR",
-		"GIT_CONFIG_GLOBAL",
-		"GIT_CONFIG_NOSYSTEM",
-		"GIT_TERMINAL_PROMPT",
-		"GIT_SSH_COMMAND",
-		"GH_TOKEN",
-		"GITHUB_TOKEN",
-	}
+	creds := ipcenv.CredentialIsolation(dir, os.DevNull)
+	keys := append(slices.Sorted(maps.Keys(creds.Set)), creds.Unset...)
 
 	backups := make([]envBackup, len(keys))
 	for i, key := range keys {
@@ -38,13 +35,12 @@ func IsolateHostCredentials() (func() error, error) {
 		backups[i] = envBackup{key: key, val: val, set: set}
 	}
 
-	_ = os.Setenv("GH_CONFIG_DIR", dir)
-	_ = os.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
-	_ = os.Setenv("GIT_CONFIG_NOSYSTEM", "1")
-	_ = os.Setenv("GIT_TERMINAL_PROMPT", "0")
-	_ = os.Setenv("GIT_SSH_COMMAND", "ssh -o BatchMode=yes")
-	_ = os.Unsetenv("GH_TOKEN")
-	_ = os.Unsetenv("GITHUB_TOKEN")
+	for k, v := range creds.Set {
+		_ = os.Setenv(k, v)
+	}
+	for _, k := range creds.Unset {
+		_ = os.Unsetenv(k)
+	}
 
 	restore := func() error {
 		for _, b := range backups {
