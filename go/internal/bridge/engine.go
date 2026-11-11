@@ -21,6 +21,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchcred"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmcalls"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -76,6 +77,7 @@ type Deps struct {
 	Reviewer              StopReviewer
 	SandboxWrap           SandboxWrapper
 	SandboxReports        func(ctx context.Context, tag string, since time.Time) ([]byte, error)
+	HostGitConfig         func(key string) string
 	SandboxFence          func(ctx context.Context, tag string) error
 	ReportFenceDeadline   time.Duration
 	BootTimeoutStore      *clihealth.Store
@@ -222,6 +224,7 @@ type Config struct {
 	DispatchID           string
 	Decision             seatlogin.Decision
 	SeatTokenFile        string
+	credentials          *ipcenv.CredentialSet
 }
 
 type Engine struct {

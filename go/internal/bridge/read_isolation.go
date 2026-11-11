@@ -27,7 +27,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-var homeSecrets = []string{".ssh", ".aws", ".gnupg", ".netrc", ".config/gh", ".docker/config.json", ".kube"}
+var homeSecrets = []string{".ssh", ".aws", ".gnupg", ".netrc", ".config/gh", ".docker/config.json", ".kube", ".git-credentials", ".config/git/credentials"}
 
 const (
 	logShowPath    = "/usr/bin/log"

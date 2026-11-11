@@ -181,7 +181,7 @@ func TestHermeticEnv_IsTheAllowlistThePassthroughTheManifestAndThePipeline(t *te
 		"TERM=xterm", "TMPDIR=/t", "TMP=/t", "TEMP=/t", "TZ=UTC", "EVOLVE_CYCLE_STATE_FILE=/c.json", "EVOLVE_BYPASS_SHIP_GATE=1", ipcenv.DispatchIDKey + "=stale",
 		"HTTPS_PROXY=http://p", "CLAUDECODE=1", "GEMINI_API_KEY=k", "LC_BAD-NAME=x", "TMUX=/tmp/s",
 	}
-	got := hermeticEnv(parent, []string{"HTTPS_PROXY"}, map[string]string{"B_DEFAULT": "2", "A_DEFAULT": "1"}, map[string]string{"EVOLVE_PROJECT_ROOT": "/repo"})
+	got := hermeticEnv(parent, []string{"HTTPS_PROXY"}, map[string]string{"B_DEFAULT": "2", "A_DEFAULT": "1"}, map[string]string{"EVOLVE_PROJECT_ROOT": "/repo"}, ipcenv.CredentialSet{})
 	want := []string{
 		"PATH=/usr/bin", "HOME=/h", "USER=u", "LOGNAME=u", "SHELL=/bin/zsh", "LANG=en_US.UTF-8", "LC_ALL=C", "LC_CTYPE=UTF-8",
 		"TERM=xterm", "TMPDIR=/t", "TMP=/t", "TEMP=/t", "TZ=UTC", "EVOLVE_CYCLE_STATE_FILE=/c.json", "HTTPS_PROXY=http://p",
@@ -259,6 +259,7 @@ func TestHermeticEnv_EachNameOnceAndOnlyShellIdentifiers(t *testing.T) {
 		nil,
 		map[string]string{"PATH": "/manifest/bin", "X;rm -rf ~": "1"},
 		map[string]string{"EVOLVE_PROJECT_ROOT": "/repo", "$(touch pwned)": "1", "PATH": "/pipeline/bin"},
+		ipcenv.CredentialSet{},
 	)
 	want := []string{"HOME=/h", "EVOLVE_PROJECT_ROOT=/repo", "PATH=/manifest/bin"}
 	if !slices.Equal(got, want) {
@@ -271,5 +272,21 @@ func TestHermeticEnv_EachNameOnceAndOnlyShellIdentifiers(t *testing.T) {
 	defer os.RemoveAll(filepath.Dir(file))
 	if body, _ := os.ReadFile(file); strings.Contains(string(body), "rm -rf ~") {
 		t.Fatalf("a non-identifier name must never reach the pane script: %q", body)
+	}
+}
+
+func TestHermeticEnv_TheCredentialSetOverridesTheParentAndTheUnsetKeysNeverPass(t *testing.T) {
+	t.Parallel()
+	creds := ipcenv.CredentialSet{Set: map[string]string{"GIT_CONFIG_GLOBAL": "/dev/null", "GH_CONFIG_DIR": "/ws/gh"}, Unset: []string{"GH_TOKEN"}}
+	got := hermeticEnv(
+		[]string{"PATH=/usr/bin", "GIT_CONFIG_GLOBAL=/host", "GH_TOKEN=x"},
+		[]string{"GIT_CONFIG_GLOBAL", "GH_TOKEN"},
+		map[string]string{"GH_CONFIG_DIR": "/manifest"},
+		nil,
+		creds,
+	)
+	want := []string{"PATH=/usr/bin", "GH_CONFIG_DIR=/ws/gh", "GIT_CONFIG_GLOBAL=/dev/null"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("hermeticEnv =\n  %q\nwant\n  %q", got, want)
 	}
 }
