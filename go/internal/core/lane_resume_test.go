@@ -90,7 +90,7 @@ func TestFindLaneResume_StartsFreshWhenNoPausedLastAttemptIsResumable(t *testing
 		{"a checkpoint older than the age bound", "item-a", []laneRun{{cycle: 5, scope: []string{"item-a"}, phase: "build", reason: laneQuotaReason, enabled: true, worktree: worktree, age: 24 * 365 * time.Hour}}, "cycle 5 checkpoint is not resumable"},
 		{"no run of the todo", "item-a", []laneRun{quotaPausedRun(5, worktree, "item-b")}, ""},
 		{"a fresh attempt after the pause", "item-a", []laneRun{quotaPausedRun(5, worktree, "item-a"), {cycle: 6, scope: []string{"item-a"}, phase: "scout"}}, ""},
-		{"a pause for another reason", "item-a", []laneRun{{cycle: 5, scope: []string{"item-a"}, phase: "build", reason: "operator-requested", enabled: true, worktree: worktree}}, ""},
+		{"a pause for another reason", "item-a", []laneRun{{cycle: 5, scope: []string{"item-a"}, phase: "build", reason: "batch-cap-near", enabled: true, worktree: worktree}}, ""},
 		{"a disabled checkpoint", "item-a", []laneRun{{cycle: 5, scope: []string{"item-a"}, phase: "build", reason: laneQuotaReason, worktree: worktree}}, ""},
 		{"a completed cycle", "item-a", []laneRun{{cycle: 5, scope: []string{"item-a"}, phase: "end", reason: laneQuotaReason, enabled: true, worktree: worktree}}, ""},
 		{"an aborted cycle", "item-a", []laneRun{{cycle: 5, scope: []string{"item-a"}, phase: "aborted", reason: laneQuotaReason, enabled: true, worktree: worktree}}, ""},

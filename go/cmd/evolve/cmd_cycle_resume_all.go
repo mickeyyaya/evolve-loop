@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/checkpoint"
@@ -25,11 +26,18 @@ type cycleResumeAllResult struct {
 
 var cycleGrantResume = checkpoint.GrantOperatorResume
 
-func runCycleResumeAll(root string, dryRun, asJSON bool, stdout, stderr io.Writer) int {
+func runCycleResumeAll(root string, only int, dryRun, asJSON bool, stdout, stderr io.Writer) int {
 	paused, err := core.PausedLaneScopes(root, paths.EvolveDirOf(root), core.ResumeOptions{Log: stderr})
 	if err != nil {
 		fmt.Fprintf(stderr, "cycle resume --all: cannot list the paused cycles: %v\n", err)
 		return cliExitIO
+	}
+	if only > 0 {
+		paused = slices.DeleteFunc(paused, func(p core.PausedScope) bool { return p.Cycle != only })
+		if len(paused) == 0 {
+			fmt.Fprintf(stderr, "cycle resume --grant: cycle %d is not a paused cycle; nothing granted\n", only)
+			return cliExitInput
+		}
 	}
 	result := cycleResumeAllResult{DryRun: dryRun, Cycles: []cycleResumeGrant{}}
 	rc := cliExitOK
