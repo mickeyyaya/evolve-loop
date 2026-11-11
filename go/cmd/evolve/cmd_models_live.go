@@ -148,6 +148,8 @@ func (c bridgeModelCapturer) CaptureModelPicker(ctx context.Context, cli string)
 	return bridge.CaptureModelPicker(ctx, cfg, c.deps, driver)
 }
 
+const classifierProfileFile = "model-classifier.json"
+
 type bridgePromptDispatcher struct {
 	workspace   string
 	projectRoot string
@@ -174,14 +176,10 @@ func (d bridgePromptDispatcher) launcher() func(context.Context, core.BridgeRequ
 }
 
 func (d bridgePromptDispatcher) request(cli, prompt string) core.BridgeRequest {
-	driver := cli
-	if cli == "claude" {
-		driver = "claude-p"
-	}
 	artifact := filepath.Join(d.workspace, "model-classifier-artifact.txt")
 	return core.BridgeRequest{
-		CLI:          driver,
-		Profile:      filepath.Join(d.projectRoot, ".evolve", "profiles", "router.json"),
+		CLI:          cli,
+		Profile:      filepath.Join(d.projectRoot, ".evolve", "profiles", classifierProfileFile),
 		Prompt:       prompt + fmt.Sprintf("\n\nWrite that JSON object, and nothing else, to the file %s, then reply with the same JSON.\n", artifact),
 		Workspace:    d.workspace,
 		ProjectRoot:  d.projectRoot,
@@ -201,7 +199,7 @@ func liveRefresh(ctx context.Context, rep setup.DetectReport, projectRoot, evolv
 		return modelcatalog.Catalog{}, fmt.Errorf("no ready CLIs to query (run: evolve setup detect)")
 	}
 
-	scratch, err := os.MkdirTemp("", "evolve-models-probe-*")
+	scratch, err := classifierScratch(projectRoot)
 	if err != nil {
 		return modelcatalog.Catalog{}, fmt.Errorf("liveRefresh: scratch workspace: %w", err)
 	}
@@ -210,7 +208,7 @@ func liveRefresh(ctx context.Context, rep setup.DetectReport, projectRoot, evolv
 		_ = os.RemoveAll(scratch)
 	}()
 
-	preference, err := classifierPreference(projectRoot)
+	chain, err := classifierChain(projectRoot, readyCLIs, log)
 	if err != nil {
 		return modelcatalog.Catalog{}, err
 	}
@@ -218,7 +216,7 @@ func liveRefresh(ctx context.Context, rep setup.DetectReport, projectRoot, evolv
 	return modelquery.Refresh(ctx, modelquery.RefreshDeps{
 		CLIs:            readyCLIs,
 		Lister:          modelquery.DefaultRouter(bridgeModelCapturer{workspace: scratch}),
-		Classifier:      tierClassifier(readyCLIs, preference, dispatcher, log),
+		Classifier:      modelquery.ChainClassifier{CLIs: chain, Dispatcher: dispatcher, Log: log},
 		Fallback:        fallback,
 		AllowedFamilies: policyAllowedFamilies(projectRoot),
 		EffortListers:   modelquery.DefaultEffortListers(),
@@ -262,30 +260,40 @@ func policyAllowedFamilies(projectRoot string) map[string][]string {
 	return policy.LoadOrDefaults(filepath.Join(projectRoot, ".evolve", "policy.json"), os.Stderr).CatalogConfig().AllowedFamilies
 }
 
-func tierClassifier(ready, preference []string, dispatcher modelquery.PromptDispatcher, log io.Writer) modelquery.ChainClassifier {
-	return modelquery.ChainClassifier{CLIs: pickClassifierCLI(ready, preference, ""), Dispatcher: dispatcher, Log: log}
+func classifierChain(projectRoot string, ready []string, log io.Writer) ([]string, error) {
+	drivers, err := classifierPreference(projectRoot, routingHost(log, time.Now))
+	if err != nil {
+		return nil, err
+	}
+	return pickClassifierCLI(ready, drivers), nil
 }
 
-func classifierPreference(projectRoot string) ([]string, error) {
-	router, _, err := loadCLIRouter(projectRoot, cliroute.Host{})
+func classifierPreference(projectRoot string, host cliroute.Host) ([]string, error) {
+	router, _, err := loadCLIRouter(projectRoot, host)
 	if err != nil {
 		return nil, fmt.Errorf("liveRefresh: the CLI routing table refuses to route the model classifier: %w", err)
 	}
-	return classifierFamilies(router)
+	return classifierDrivers(router, projectRoot)
 }
 
-func classifierFamilies(router *cliroute.Router) ([]string, error) {
-	d, err := router.Resolve(cliroute.Request{Agent: cliroute.ClassifierAgent, Launch: cliroute.LaunchClassifier})
+func classifierDrivers(router *cliroute.Router, projectRoot string) ([]string, error) {
+	d, err := router.Resolve(cliroute.Request{Agent: cliroute.ClassifierAgent, Launch: cliroute.LaunchClassifier, ProjectRoot: projectRoot})
 	if err != nil {
 		return nil, fmt.Errorf("liveRefresh: no route for the model classifier: %w", err)
 	}
-	var families []string
-	for _, cli := range d.Plan.Candidates {
-		if fam := llmroute.Family(cli); !slices.Contains(families, fam) {
-			families = append(families, fam)
-		}
+	return slices.Clone(d.Plan.Candidates), nil
+}
+
+func classifierScratchParent(projectRoot string) string {
+	return filepath.Join(projectRoot, ".evolve", "ephemeral", "model-classifier")
+}
+
+func classifierScratch(projectRoot string) (string, error) {
+	parent := classifierScratchParent(projectRoot)
+	if err := os.MkdirAll(parent, 0o755); err != nil {
+		return "", err
 	}
-	return families, nil
+	return os.MkdirTemp(parent, "probe-")
 }
 
 func salvageProbeDiagnostics(scratch, evolveDir, tag string, now func() time.Time, log io.Writer) {
@@ -364,21 +372,16 @@ func freshnessFromManifests(clis []string) map[string]modelquery.FreshnessPolicy
 	return out
 }
 
-func pickClassifierCLI(ready, preference []string, overrideCLI string) []string {
-	remaining := make(map[string]bool, len(ready))
+func pickClassifierCLI(ready, drivers []string) []string {
+	readyFamily := make(map[string]bool, len(ready))
 	for _, r := range ready {
-		remaining[r] = true
+		readyFamily[r] = true
 	}
-	order := make([]string, 0, len(ready))
-	take := func(cli string) {
-		if remaining[cli] {
-			order = append(order, cli)
-			delete(remaining, cli)
+	order := make([]string, 0, len(drivers))
+	for _, driver := range drivers {
+		if readyFamily[llmroute.Family(driver)] {
+			order = append(order, driver)
 		}
-	}
-	take(overrideCLI)
-	for _, cli := range preference {
-		take(cli)
 	}
 	return order
 }

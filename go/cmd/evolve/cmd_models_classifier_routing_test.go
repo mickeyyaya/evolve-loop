@@ -23,28 +23,28 @@ func classifierRouter(t *testing.T, pol policy.Policy) *cliroute.Router {
 
 func legacyClassifierPreference(t *testing.T) []string {
 	t.Helper()
-	families, err := classifierFamilies(classifierRouter(t, policy.Policy{}))
+	drivers, err := classifierDrivers(classifierRouter(t, policy.Policy{}), t.TempDir())
 	if err != nil {
-		t.Fatalf("classifierFamilies: %v", err)
+		t.Fatalf("classifierDrivers: %v", err)
 	}
-	return families
+	return drivers
 }
 
 func TestClassifierOrder_TheLegacyProjectionKeepsTodaysOrder(t *testing.T) {
 	t.Parallel()
-	if got := legacyClassifierPreference(t); !reflect.DeepEqual(got, []string{"codex", "claude", "agy"}) {
-		t.Fatalf("with no cli_routing block the classifier order stays codex > claude > agy: %v", got)
+	if got := legacyClassifierPreference(t); !reflect.DeepEqual(got, []string{"codex-tmux", "claude-tmux", "agy-tmux"}) {
+		t.Fatalf("with no cli_routing block the classifier order stays codex-tmux > claude-tmux > agy-tmux: %v", got)
 	}
 }
 
 func TestClassifierOrder_ComesFromTheRoutingTable(t *testing.T) {
 	t.Parallel()
 	block := policy.CLIRouting{CLIs: []string{"agy", "claude"}, Default: []string{"agy", "claude"}}
-	families, err := classifierFamilies(classifierRouter(t, policy.Policy{CLIRouting: &block}))
+	drivers, err := classifierDrivers(classifierRouter(t, policy.Policy{CLIRouting: &block}), t.TempDir())
 	if err != nil {
-		t.Fatalf("classifierFamilies: %v", err)
+		t.Fatalf("classifierDrivers: %v", err)
 	}
-	if got := pickClassifierCLI([]string{"codex", "claude", "agy"}, families, ""); !reflect.DeepEqual(got, []string{"agy", "claude"}) {
+	if got := pickClassifierCLI([]string{"codex", "claude", "agy"}, drivers); !reflect.DeepEqual(got, []string{"agy-tmux", "claude-tmux"}) {
 		t.Fatalf("a table with clis [agy, claude] never launches codex to classify: %v", got)
 	}
 }
@@ -59,7 +59,7 @@ func TestClassifierPreference_ARefusedTableFailsTheRefresh(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), []byte(`{"cli_routing":{"clis":["agy"],"default":["agy"]}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := classifierPreference(root); err == nil {
+	if _, err := classifierPreference(root, cliroute.Host{}); err == nil {
 		t.Fatal("a table without claude cannot classify; the refresh fails loudly instead of falling back to the old order")
 	}
 }
