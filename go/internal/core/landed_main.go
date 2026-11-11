@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/recoveryretro"
 )
 
-var boundaryOwnedPrefixes = []string{"knowledge-base/cycles/", ".evolve/inbox/"}
+var boundaryOwnedPrefixes = []string{"knowledge-base/cycles/", ".evolve/inbox/", recoveryretro.DocsHome + "/"}
 
 func originMainRef(ctx context.Context, git gitFn, dir string) (string, bool) {
 	if url, code, err := git(ctx, dir, "config", "--get", "remote.origin.url"); err != nil || code != 0 || strings.TrimSpace(url) == "" {

@@ -487,7 +487,7 @@ Every phase without write permission (registry `writes_source=false`: audit, adv
 
 > **Proven lane base (2026-10-21).** A local `main` that is ahead of origin is a lane base only when origin holds each ahead commit, or a boundary step wrote it.
 >
-> - A boundary commit changes only `knowledge-base/cycles/` or `.evolve/inbox/`. A merge counts when origin holds each of its other parents, as for `evolve sync-main`.
+> - A boundary commit changes only `knowledge-base/cycles/`, `.evolve/inbox/` or `docs/retrospectives/` (a recovery retrospective). A merge counts when origin holds each of its other parents, as for `evolve sync-main`.
 > - Any other ahead commit stops the lane base and the fleet rebase. The WARN or error names the commit and cites cycle 1830. The lane defers, and repeated deferrals halt the batch.
 > - To clear it, land the commit through a reviewed PR, or remove it from the plane `main`. Then run `evolve sync-main`.
 

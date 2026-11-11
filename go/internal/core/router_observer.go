@@ -2,10 +2,9 @@ package core
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
@@ -14,50 +13,37 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-const (
-	routerAgentLabel    = "router"
-	routerQuotaWallFile = "router-quota-wall.json"
-)
+const routerAgentLabel = "router"
 
 func (o *Orchestrator) observedPlan(ctx context.Context, cs CycleState, cycle int, in router.RouteInput) (*router.PhasePlan, error) {
 	defer o.observeRouter(ctx, cs, cycle)()
-	wallPath := filepath.Join(cs.WorkspacePath, routerQuotaWallFile)
-	os.Remove(wallPath)
-	plan, err := o.planner.Plan(in)
-	if wall := walkedWall(err); err != nil && wall.HasQuota() {
-		if data, merr := json.Marshal(wall); merr == nil {
-			writeArtifactAtomically(wallPath, data)
-		}
-	}
-	return plan, err
+	return o.planner.Plan(in)
 }
 
 func (cr *cycleRun) pauseAtRouterWall(next Phase) error {
-	wallPath := filepath.Join(cr.cs.WorkspacePath, routerQuotaWallFile)
-	data, err := os.ReadFile(wallPath)
-	if err != nil {
+	if !cr.routerWall.HasQuota() {
 		return nil
 	}
-	os.Remove(wallPath)
-	var wall Wall
-	if json.Unmarshal(data, &wall) != nil || !wall.HasQuota() {
-		return nil
-	}
-	cr.benchQuotaFamilies(wall)
-	cause := WalkError{Wall: wall, Err: errors.New("router plan ended at a usage-limit wall")}
-	return cr.pauseForQuota(next, PhaseResponse{Phase: string(next)}, 1, cause)
+	benchErr := cr.benchQuotaFamilies(cr.routerWall)
+	cause := WalkError{Wall: cr.routerWall, Err: errors.New("router plan ended at a usage-limit wall")}
+	return errors.Join(cr.pauseForQuota(next, PhaseResponse{Phase: string(next)}, 1, cause), benchErr)
 }
 
-func (cr *cycleRun) benchQuotaFamilies(wall Wall) {
+func (cr *cycleRun) benchQuotaFamilies(wall Wall) error {
 	if !policy.LoadOrDefaults(filepath.Join(cr.req.ProjectRoot, ".evolve", "policy.json"), io.Discard).CLIHealthConfig().On() {
-		return
+		return nil
 	}
 	store := clihealth.NewStore(cr.req.ProjectRoot, cr.o.now)
+	var errs error
 	for _, end := range wall.Ends {
-		if clihealth.QuotaPattern(end.Pattern) {
-			store.BenchWall(llmroute.Family(end.CLI), end.Pattern, "")
+		if !clihealth.QuotaPattern(end.Pattern) {
+			continue
+		}
+		if _, err := store.BenchWall(llmroute.Family(end.CLI), end.Pattern, ""); err != nil {
+			errs = errors.Join(errs, fmt.Errorf("bench %s at the router quota wall: %w", end.CLI, err))
 		}
 	}
+	return errs
 }
 
 func (cr *cycleRun) observedRePlan(planner rePlanner, in router.RouteInput) (*router.PhasePlan, error) {
