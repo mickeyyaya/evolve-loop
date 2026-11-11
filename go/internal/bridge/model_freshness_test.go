@@ -11,7 +11,7 @@ func TestModelFreshness_ClaudeDeclaresAlias(t *testing.T) {
 	if m.ModelFreshness.Prefer != "alias" {
 		t.Errorf("Prefer = %q, want alias", m.ModelFreshness.Prefer)
 	}
-	wantAliases := map[string]bool{"fable": false, "opus": false, "sonnet": false, "haiku": false}
+	wantAliases := map[string]bool{"opus": false, "sonnet": false, "haiku": false}
 	for _, id := range m.ModelFreshness.AliasIDs {
 		if _, known := wantAliases[id]; known {
 			wantAliases[id] = true
@@ -22,9 +22,13 @@ func TestModelFreshness_ClaudeDeclaresAlias(t *testing.T) {
 			t.Errorf("AliasIDs missing %q (got %v)", id, m.ModelFreshness.AliasIDs)
 		}
 	}
-	for tier, model := range m.ModelTierMap {
-		if _, alias := wantAliases[model]; !alias {
-			t.Errorf("tier %s holds %q, which is no alias; a cached concrete id would freeze the version", tier, model)
+	tierModels := make(map[string]bool, len(m.ModelTierMap))
+	for _, model := range m.ModelTierMap {
+		tierModels[model] = true
+	}
+	for _, id := range m.ModelFreshness.AliasIDs {
+		if !tierModels[id] {
+			t.Errorf("alias %q is not a model_tier_map value — declaration drifted from the tier map", id)
 		}
 	}
 }

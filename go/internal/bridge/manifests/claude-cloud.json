@@ -22,7 +22,6 @@
   "mcp_config_files": null,
   "default_env": null,
   "model_tier_map": null,
-  "model_tier_pins": null,
   "model_freshness": null,
   "params": null,
   "controls": null,

@@ -41,22 +41,17 @@
   "model_tier_map": {
     "fast": "haiku",
     "balanced": "sonnet",
-    "deep": "fable",
-    "top": "fable"
+    "deep": "opus",
+    "top": "opus"
   },
-  "model_tier_pins": [
-    "deep",
-    "top"
-  ],
   "model_freshness": {
     "prefer": "alias",
     "alias_ids": [
-      "fable",
       "opus",
       "sonnet",
       "haiku"
     ],
-    "note": "claude resolves the bare family alias to that family's newest release at LAUNCH (verified 2026-07-27: --model opus -> canonicalModel claude-opus-5). The alias is strictly fresher than any concrete id the catalog could cache; caching opus-4.6 would FREEZE the version. fable joined the aliases on 2026-11-10 (claude 2.1.321 --help lists the fable alias); model_tier_pins holds deep and top on it."
+    "note": "claude resolves the bare family alias to that family's newest release at LAUNCH (verified 2026-07-27: --model opus -> canonicalModel claude-opus-5). The alias is strictly fresher than any concrete id the catalog could cache; caching opus-4.6 would FREEZE the version."
   },
   "params": {
     "permission": {
@@ -158,7 +153,6 @@
           }
         },
         "model_match": {
-          "Fable": "(?i)fable",
           "Opus": "(?i)opus"
         }
       }

@@ -43,30 +43,30 @@ func explainClaudeThroughNew(t *testing.T, pane string) (root, log string) {
 	return root, buf.String()
 }
 
-func TestNew_AnExhaustedOpusWeekBenchesNoModelThroughTheEvidencePath(t *testing.T) {
-	root, log := explainClaudeThroughNew(t, claudeWeekPane("Opus"))
+func TestNew_AnExhaustedFableWeekBenchesNoModelThroughTheEvidencePath(t *testing.T) {
+	root, log := explainClaudeThroughNew(t, claudeWeekPane("Fable"))
 
 	store := clihealth.NewStore(root, nil)
 	if models := store.ActiveModels(); len(models) != 0 {
-		t.Errorf("ActiveModels() = %v; no tier launches opus, so the evidence path benches nothing\n%s", models, log)
+		t.Errorf("ActiveModels() = %v; model_match maps no Fable, so the evidence path benches nothing\n%s", models, log)
 	}
 	if active := store.Active(); len(active) != 0 {
 		t.Errorf("Active() = %v; an unmapped model word never benches the family", active)
 	}
-	if !strings.Contains(log, "WARN") || !strings.Contains(log, "Opus") {
+	if !strings.Contains(log, "WARN") || !strings.Contains(log, "Fable") {
 		t.Errorf("the unmapped drained window lost its WARN:\n%s", log)
 	}
-	if strings.Contains(log, "benched claude/Opus") {
+	if strings.Contains(log, "benched claude/Fable") {
 		t.Errorf("the log claims a bench that was never written:\n%s", log)
 	}
 }
 
-func TestNew_AnExhaustedFableWeekStillBenchesClaudeFableThroughTheEvidencePath(t *testing.T) {
-	root, log := explainClaudeThroughNew(t, claudeWeekPane("Fable"))
+func TestNew_AnExhaustedOpusWeekStillBenchesClaudeOpusThroughTheEvidencePath(t *testing.T) {
+	root, log := explainClaudeThroughNew(t, claudeWeekPane("Opus"))
 
 	store := clihealth.NewStore(root, nil)
-	if _, ok := store.ActiveModels()[clihealth.Entry{Family: "claude", Model: "Fable"}.Key()]; !ok {
-		t.Errorf("ActiveModels() = %v; the mapped Fable week must bench claude/Fable\n%s", store.ActiveModels(), log)
+	if _, ok := store.ActiveModels()[clihealth.Entry{Family: "claude", Model: "Opus"}.Key()]; !ok {
+		t.Errorf("ActiveModels() = %v; the mapped Opus week must bench claude/Opus\n%s", store.ActiveModels(), log)
 	}
 	if len(store.Active()) != 0 {
 		t.Errorf("Active() = %v; the family stays unbenched", store.Active())
@@ -92,26 +92,26 @@ func bareProberOverTheSharedReader(t *testing.T, pane string) (root, log string)
 }
 
 func TestReadWindowsNow_AnUnmappedScopeWordBenchesNoModelWithoutAnyOptionalSeam(t *testing.T) {
-	root, log := bareProberOverTheSharedReader(t, claudeWeekPane("Opus"))
+	root, log := bareProberOverTheSharedReader(t, claudeWeekPane("Fable"))
 
 	if models := clihealth.NewStore(root, nil).ActiveModels(); len(models) != 0 {
 		t.Errorf("ActiveModels() = %v; a Prober that only reads windows through the shared reader must not bench an unmapped word\n%s", models, log)
 	}
-	if !strings.Contains(log, "WARN") || !strings.Contains(log, "Opus") {
+	if !strings.Contains(log, "WARN") || !strings.Contains(log, "Fable") {
 		t.Errorf("the unmapped drained window lost its WARN:\n%s", log)
 	}
 }
 
 func TestReadWindowsNow_AMappedScopeWordStillBenchesItsModelWithoutAnyOptionalSeam(t *testing.T) {
-	root, log := bareProberOverTheSharedReader(t, claudeWeekPane("Fable"))
+	root, log := bareProberOverTheSharedReader(t, claudeWeekPane("Opus"))
 
-	if _, ok := clihealth.NewStore(root, nil).ActiveModels()[clihealth.Entry{Family: "claude", Model: "Fable"}.Key()]; !ok {
-		t.Errorf("the mapped Fable week must bench claude/Fable through the shared reader alone\n%s", log)
+	if _, ok := clihealth.NewStore(root, nil).ActiveModels()[clihealth.Entry{Family: "claude", Model: "Opus"}.Key()]; !ok {
+		t.Errorf("the mapped Opus week must bench claude/Opus through the shared reader alone\n%s", log)
 	}
 }
 
 func TestReadWindowsNow_ReadsTheSameModelMapTheCanaryAndTheRouterUse(t *testing.T) {
-	for _, word := range []string{"Fable", "Opus", "Sonnet", "Haiku"} {
+	for _, word := range []string{"Opus", "Fable", "Sonnet", "Haiku"} {
 		_, mapped := bridge.UsageModelFor("claude-tmux", word)
 		windows := ReadWindowsNow("claude", claudeWeekPane(word))
 		var exhausted int

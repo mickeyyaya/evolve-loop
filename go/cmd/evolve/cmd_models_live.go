@@ -224,7 +224,6 @@ func liveRefresh(ctx context.Context, rep setup.DetectReport, projectRoot, evolv
 		EffortListers:   modelquery.DefaultEffortListers(),
 		Prior:           prior,
 		Freshness:       freshnessFromManifests(readyCLIs),
-		Pins:            pinsFromManifests(readyCLIs),
 		Now:             time.Now,
 		Log:             log,
 	})
@@ -360,20 +359,6 @@ func freshnessFromManifests(clis []string) map[string]modelquery.FreshnessPolicy
 		}
 		if r.Manifest.ModelFreshness.Prefer == "alias" {
 			out[cli] = modelquery.FreshnessPolicy{PreferAlias: true, AliasIDs: r.Manifest.ModelFreshness.AliasIDs}
-		}
-	}
-	return out
-}
-
-func pinsFromManifests(clis []string) map[string]map[string]string {
-	out := make(map[string]map[string]string, len(clis))
-	for _, cli := range clis {
-		r, err := bridge.Resolve(driverSet, cli)
-		if err != nil {
-			continue
-		}
-		if pins := r.Manifest.TierPins(); len(pins) > 0 {
-			out[cli] = pins
 		}
 	}
 	return out

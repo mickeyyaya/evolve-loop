@@ -168,7 +168,7 @@ func TierRank(s string) int {
 		return 1
 	case "balanced", "sonnet":
 		return 2
-	case "deep", "opus", "fable":
+	case "deep", "opus":
 		return 3
 	case "top":
 		return 4
@@ -179,7 +179,7 @@ func TierRank(s string) int {
 		return 1
 	case strings.Contains(l, "sonnet"):
 		return 2
-	case strings.Contains(l, "opus"), strings.Contains(l, "fable"):
+	case strings.Contains(l, "opus"):
 		return 3
 	}
 	return 0
