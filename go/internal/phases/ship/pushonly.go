@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/landing"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shipjournal"
@@ -66,8 +67,10 @@ func runPushOnly(ctx context.Context, opts *Options, res *RunResult) error {
 		return fmt.Errorf("ship --push-only: resolve branch: %w", err)
 	}
 	branch := strings.TrimSpace(branchOut)
-	_, _ = opts.run(ctx, "git", []string{"fetch", "origin", branch}, opts.Stdout, opts.Stderr)
-	aheadOut, err := captureGitOutput(ctx, opts, "rev-list", "origin/"+branch+"..HEAD")
+	if err := fetchPushOnlyRefs(ctx, opts, branch); err != nil {
+		return err
+	}
+	aheadOut, err := captureGitOutput(ctx, opts, pushOnlyAheadArgs(branch)...)
 	if err != nil {
 		return fmt.Errorf("ship --push-only: no origin/%s to compare against: %w", branch, err)
 	}
@@ -97,6 +100,38 @@ func runPushOnly(ctx context.Context, opts *Options, res *RunResult) error {
 		}
 	}
 	return nil
+}
+
+func pushOnlyBranches(branch string) []string {
+	if branch == gitexec.MainBranch {
+		return []string{branch}
+	}
+	return []string{gitexec.MainBranch, branch}
+}
+
+func fetchPushOnlyRefs(ctx context.Context, opts *Options, branch string) error {
+	args := []string{"fetch", gitexec.Remote}
+	for _, b := range pushOnlyBranches(branch) {
+		args = append(args, "+refs/heads/"+b+":refs/remotes/"+gitexec.Remote+"/"+b)
+	}
+	exit, err := opts.run(ctx, "git", args, opts.Stdout, opts.Stderr)
+	if err != nil {
+		return fmt.Errorf("ship --push-only: REFUSED — git %s did not run (%w); the ahead set needs fresh remote refs, so nothing was pushed",
+			strings.Join(args, " "), err)
+	}
+	if exit != 0 {
+		return fmt.Errorf("ship --push-only: REFUSED — git %s exited %d; the ahead set needs fresh remote refs, so nothing was pushed",
+			strings.Join(args, " "), exit)
+	}
+	return nil
+}
+
+func pushOnlyAheadArgs(branch string) []string {
+	args := []string{"rev-list", "HEAD"}
+	for _, b := range pushOnlyBranches(branch) {
+		args = append(args, "^"+gitexec.Remote+"/"+b)
+	}
+	return args
 }
 
 func isSyncMainMerge(ctx context.Context, opts *Options, sha, branch string) bool {
