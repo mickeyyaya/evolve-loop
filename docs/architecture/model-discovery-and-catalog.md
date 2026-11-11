@@ -63,6 +63,46 @@ With no `cli_routing` block, the legacy projection returns codex > claude > agy.
 
 Pinned by `TestClassifierOrder_TheLegacyProjectionKeepsTodaysOrder`, `TestClassifierOrder_ComesFromTheRoutingTable` and `TestClassifierPreference_ARefusedTableFailsTheRefresh` (`cmd/evolve/cmd_models_classifier_routing_test.go`).
 
+**The classifier launches the drivers of its route with its own profile (2026-11-11, design).** Since 2026-11-10, each live refresh of claude falls back to the detect map. A live refresh into a scratch `--evolve-dir` gives the same three failures:
+
+- `agy` exits 3. On 2026-11-11 the host benched agy for usage (`evolve wave status`: `agy usage_probe until 2026-11-12T09:39`), but the chain still launches agy first. `classifierPreference` builds its router with an empty `cliroute.Host`, and the request has no `ProjectRoot`. With no `Host.Bench`, the plan has no bench demotion.
+- `agy-claude` gets `no driver for cli=agy-claude`. `bridgePromptDispatcher.request` maps a family to a driver with one literal: `claude` to `claude-p`. No other family has a map.
+- `claude-p` exits 0 and writes no artifact, so the reply is empty. The dispatcher gives the router profile (`.evolve/profiles/router.json`). Its `allowed_tools` permit `Write` only on `.evolve/runs/cycle-*/routing-*.json`, so `claude -p` cannot write `model-classifier-artifact.txt`.
+
+Before 2026-11-10, agy answered first, and the headless agy driver passes no tool list. Thus the second and third defects stayed hidden.
+
+The design has four parts:
+
+1. `classifierPreference` builds its router with the host of `cli-routing explain` (`routingHost`), and the request carries `ProjectRoot`. The plan then puts a benched driver last.
+2. The chain holds the driver names of that plan (`Plan.Candidates`), in plan order. It keeps a driver only when its family (`llmroute.Family`) is ready. `classifierDrivers` replaces `classifierFamilies`.
+3. `bridgePromptDispatcher` launches the driver name that it gets, and the literal `claude` to `claude-p` goes. `pickClassifierCLI` and its `overrideCLI` take driver names.
+4. The classifier gets its own profile, `.evolve/profiles/model-classifier.json`, so its identity is not the router.
+
+Part 3 removes the last family literal from this flow (invariant I-6 of [llm-isolation](llm-isolation.md)). Part 2 reads each family through `llmroute.Family`, which reads the driver registry, not a literal. The router profile does not change.
+
+The job of the profile is containment, not a grant. A REPL driver launches with `--dangerously-skip-permissions`. Under that mode an allow list only approves tools in advance, and each tool that is not denied is available. The classifier prompt holds model ids that a CLI listed, so it is untrusted input to that session. Thus the profile holds three things:
+
+- `disallowed_tools`: `Bash`, `WebFetch`, `WebSearch`, `Task` and `NotebookEdit`. A deny list holds also under the bypass mode.
+- `allowed_tools`: `Write` and `Edit` of `.evolve/ephemeral/model-classifier/*/model-classifier-artifact.txt`. This grant is for a headless driver that does not bypass permissions.
+- A sandbox whose write scope is the workspace of the run.
+
+`realizeToolList` (`realizer.go:100-105`) gives the deny list only to a driver whose manifest has a tool-list channel. Today only `claude-tmux` and `claude-p` have one. For the agy and codex drivers, the sandbox is the only containment.
+
+The scratch workspace moves from `os.MkdirTemp("", …)` to `.evolve/ephemeral/model-classifier/<id>/` under the project. A relative rule resolves against the project, so the grant matches the artifact. The reviewer profiles use the same form (`Write(.evolve/ephemeral/agent-runs/*/…)`). The name differs from `<evolveDir>/models-probe`, which keeps the salvaged diagnostics after the run. The run removes its workspace.
+
+A REPL driver such as `claude-tmux` is slower than `claude -p`. The refresh reuses a prior tier map when the offering is the same, so the classifier runs only when the offering changes.
+
+The legacy projection (no `cli_routing` block) already gives driver names. The three tests of the classifier order change from family names to driver names. The paragraph above then names drivers also.
+
+The tests:
+
+- `TestClassifierDrivers_ABenchedDriverGoesLast`: the test injects a `Host` whose `Bench` demotes one driver by its driver key, through the constructor that `liveRefresh` calls. That driver goes last. The test fails on the code of today. A family bench moves each driver of the family, so the fixture names its key.
+- `TestClassifierDrivers_AnUnreadyFamilyDropsOut`: a driver whose family is not ready leaves the chain.
+- `TestClassifierDispatch_EachDriverOfTheChainIsRegistered`: each driver of the chain resolves in the bridge registry. Today `agy-claude` does not resolve.
+- `TestModelClassifierProfile_DeniesBashAndTheWeb`: the profile denies each tool of its deny list, and the dispatcher names it. The test also pins which drivers realize the deny list.
+- `TestModelClassifierProfile_GrantMatchesTheArtifactOfTheWorkspace`: the grant matches the artifact path of a request. An artifact under `$TMPDIR` does not match, so the case fails on the code of today.
+- The live proof: `evolve models refresh --evolve-dir <scratch>` gives claude a `live` entry. A fake launch cannot prove the tool list of a real CLI, so the change records this run.
+
 ### Provenance — the trust rule
 
 `source: "live"` (queried from the CLI) is **dispatch-authoritative**; `source: "detect"` (derived from the static manifest) is informational only. `DispatchModel(cli, tier)` returns `ok=false` for anything non-live (`catalog.go:64-74`), so a detect-only or empty catalog leaves dispatch **byte-identical** to the pre-catalog manifest. Live-refresh failures degrade per-CLI to the detect fallback (marked `detect`, hence non-authoritative) rather than poisoning the cache. The fallback records why: `fallback_reason` is the live failure (`list models: …`, `CLI offered no models`, `no models in allowed families …`, `classify models: …`), written into the catalog entry and shown by `evolve models refresh` and `evolve models list`.
