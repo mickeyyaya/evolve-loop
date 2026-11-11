@@ -51,7 +51,7 @@ var protectedGateFiles = []struct {
 	{"go/internal/core/reviewer.go", GateGuarantee},
 	{"go/internal/core/tdd_predicate_floor.go", GateGuarantee},
 	{"go/internal/testdup/testdup.go", GateGuarantee},
-	{"go/internal/repocontract/testdup_ratchet_test.go", GateGuarantee},
+	{"go/internal/repocontract/testdup_gate_realtree_test.go", GateGuarantee},
 	{"go/internal/core/orchestrator.go", AuditVerdictGuarantee},
 	{"go/internal/core/cyclerun.go", AuditVerdictGuarantee},
 	{"go/internal/core/cyclerun_dispatch.go", AuditVerdictGuarantee},

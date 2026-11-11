@@ -120,6 +120,10 @@ func changedCodeLines(added []int, code map[int]bool) []int {
 }
 
 func funcsTouched(fset *token.FileSet, file *ast.File, rel string, touched changes, blocks []Block) []Func {
+	return funcsOf(fset, file, rel, blocks, touched.inside)
+}
+
+func funcsOf(fset *token.FileSet, file *ast.File, rel string, blocks []Block, keep func(startLine, endLine int) bool) []Func {
 	var out []Func
 	for _, decl := range file.Decls {
 		fd, ok := decl.(*ast.FuncDecl)
@@ -127,7 +131,7 @@ func funcsTouched(fset *token.FileSet, file *ast.File, rel string, touched chang
 			continue
 		}
 		start, end := fset.Position(fd.Pos()), fset.Position(fd.End())
-		if !touched.inside(start.Line, end.Line) {
+		if !keep(start.Line, end.Line) {
 			continue
 		}
 		name := funcName(fd)

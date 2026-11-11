@@ -22,6 +22,7 @@ The build floor profiles only the changed packages that build a file under `Defa
 - **"No profile" is a refusal.** A changed function with no block is not at 100%. A function with zero statements and a block is at 100%.
 - **A stale profile stops the check.** The file reader refuses a changed file that is newer than the profile, and names `make -C go test-integration`.
 - **One module-path reader.** `ModulePath` is exported. `internal/coverstrict` calls it, and `ParseProfile` is its one profile parser (`evolve cover strict`, plan T2).
+- **`FuncPercents` reads a profile in process.** It parses each profiled source file, and it gives the statements, the covered statements and the line of each function. `Func.CoverPercent` formats `100*covered/statements` with one decimal, so a tie rounds as the tool does (`TestFuncPercents_ATieRoundsAsGoToolCoverDoes`). It gives 0.0 for a function with no statement, as `go tool cover -func` prints (`TestFuncPercents_EqualTheRecordedGoToolCoverResult`). One function, `funcsOf`, walks the declarations for both `FuncPercents` and the changed-function measure. The floor then needs no `go tool` process (ADR-0165 G2, commit 2b).
 - **One home for the tag flags.** `TagFlags` gives the `-tags` flag list of a tag set, and nil for no tag. The build floor and the ship stop check call it.
 - **The key.** `<module dir>.<Name>` or `<module dir>.<Receiver>.<Name>`, the same form as the size ratchet. The receiver forms `*T`, `T[K]` and `T[K, V]` all give `T`.
 
