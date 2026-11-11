@@ -9,12 +9,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxfile"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 const StatusCompleted = "completed"
@@ -48,6 +50,8 @@ type Options struct {
 	InboxDir     string
 	NoEscalation bool
 	WorkspaceDir string
+	Workflow     string
+	Signals      *signalcenter.Center
 	Fetch        Fetcher
 	Timeout      time.Duration
 	Poll         time.Duration
@@ -81,6 +85,7 @@ func Watch(ctx context.Context, opts Options) (dossier.CIWatchRecord, error) {
 		FailingTest: st.FailingTest,
 		CheckedAt:   opts.Now().UTC().Format(time.RFC3339),
 	}
+	opts.Signals.Emit(completedEvent(opts, st))
 	if opts.WorkspaceDir != "" {
 		if err := writeVerdict(opts.WorkspaceDir, rec); err != nil {
 			return rec, err
@@ -92,6 +97,22 @@ func Watch(ctx context.Context, opts Options) (dossier.CIWatchRecord, error) {
 		}
 	}
 	return rec, nil
+}
+
+func completedEvent(opts Options, st RunStatus) signalcenter.Event {
+	e := signalcenter.Event{
+		Cycle: opts.Cycle, Module: signalcenter.ModuleCI, Origin: "Watch", Kind: signalcenter.KindCICompleted,
+		Severity: signalcenter.SeverityInfo,
+		Reason:   fmt.Sprintf("CI run for %s completed with conclusion %q", shortCommit(opts.SHA), st.Conclusion),
+		Fields: map[string]string{
+			"sha": opts.SHA, "conclusion": st.Conclusion, "workflow": opts.Workflow,
+			"run_id": strconv.FormatInt(st.RunID, 10), "run_url": st.RunURL,
+		},
+	}
+	if st.Conclusion != ConclusionSuccess {
+		e.Severity, e.Code = signalcenter.SeverityWarn, signalcenter.CodeCIRunRed
+	}
+	return e
 }
 
 func resolveWatchDefaults(opts Options) Options {

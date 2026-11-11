@@ -138,7 +138,9 @@ func releaseHeld(opts Options, taskID string, loc Location, holder Holder, reaso
 	if err != nil {
 		return ClaimRelease{}, err
 	}
-	return ClaimRelease{ID: taskID, Cycle: loc.Cycle, Outcome: claimOutcome(res), Path: res.Path, Holder: holder, ParkedPath: res.ParkedPath}, nil
+	rel := ClaimRelease{ID: taskID, Cycle: loc.Cycle, Outcome: claimOutcome(res), Path: res.Path, Holder: holder, ParkedPath: res.ParkedPath}
+	opts.emitReleased(rel, reason)
+	return rel, nil
 }
 
 func claimOutcome(res lifecycle.ClaimReleaseResult) ClaimOutcome {

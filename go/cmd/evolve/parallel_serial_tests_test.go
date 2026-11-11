@@ -1,6 +1,15 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestRunCIWatch_AFailedRunLookupExitsIOAndNamesTheWorkflow":                                                  "swaps seam attachRootEventsFn and sets PATH",
+	"main.TestRunCIWatch_AWorkingDirectoryFaultExitsIOWhenNoRootIsGiven":                                              "swaps seam processGetwd",
+	"main.TestCIWatchVerb_ARedRunReachesTheErrorsChannelWithItsCode":                                                  "swaps seam attachRootEventsFn",
+	"main.TestCIWatchVerb_ATagWatchPublishesOneEventForEachReleaseWorkflow":                                           "swaps seam attachRootEventsFn",
+	"main.TestCIWatchVerb_PublishesCICompletedForEachWatchedWorkflow":                                                 "swaps seam attachRootEventsFn",
+	"main.TestWaveNext_ADryRunAndAFailedBoundaryEmitNothing":                                                          "swaps seam attachRootEventsFn",
+	"main.TestWaveNext_EmitsWaveEndedForTheWaveItCloses":                                                              "swaps seam attachRootEventsFn",
+	"main.TestWaveNext_EmitsWaveStarted":                                                                              "swaps seam attachRootEventsFn",
+	"main.TestWaveNext_TheFirstWaveEndsNothing":                                                                       "swaps seam attachRootEventsFn",
 	"main.TestRunCycleRun_ASealedFleetLaneCycleHasItsDirtyLaneBranchAndOrphanCleanedAtOnce":                           "sets env through a helper",
 	"main.TestRunCycleRun_TheGCModeGovernsTheSealedFleetLaneSweep":                                                    "sets env through a helper",
 	"main.TestRunCycleRun_TheLiveLaneOfAnotherCycleIsNotTouchedWhenAFleetLaneCycleSeals":                              "sets env through a helper",

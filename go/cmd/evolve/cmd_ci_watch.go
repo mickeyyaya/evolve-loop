@@ -118,11 +118,14 @@ func runCIWatch(args []string, stdout, stderr io.Writer) int {
 		return exitIO
 	}
 	ctx := context.Background()
+	signals, closeSignals := newRoleSignalCenter("ci", root, paths.EvolveDirOf(root), stderr)
+	defer closeSignals()
 	opts, err := ciWatchOptions(ctx, root, a)
 	if err != nil {
 		fmt.Fprintf(stderr, "%s%v\n", ciWatchPrefix, err)
 		return exitIO
 	}
+	opts.Signals = signals
 	red, err := watchWorkflows(ctx, root, a.watchedWorkflows(), opts, stdout)
 	if err != nil {
 		fmt.Fprintf(stderr, "%s%v\n", ciWatchPrefix, err)
@@ -173,6 +176,7 @@ func watchWorkflows(ctx context.Context, root string, workflows []string, opts c
 	var red []redWorkflow
 	for _, w := range workflows {
 		var runID int64
+		opts.Workflow = w
 		fetch := ciwatch.NewGHWorkflowFetcher(root, w)
 		opts.Fetch = func(ctx context.Context, sha string) (ciwatch.RunStatus, error) {
 			st, err := fetch(ctx, sha)

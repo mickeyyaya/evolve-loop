@@ -40,5 +40,9 @@ func ClaimDispatchable(opts Options, taskID, cycle string) (ClaimResult, error) 
 			return ClaimResult{}, fmt.Errorf("%w: %s: %s", ErrWaitingOnDependency, taskID, d.Reason)
 		}
 	}
-	return Claim(opts, taskID, cycle)
+	res, err := Claim(opts, taskID, cycle)
+	if err == nil {
+		opts.emitClaimed(taskID, cycle)
+	}
+	return res, err
 }

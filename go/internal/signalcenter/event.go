@@ -79,13 +79,14 @@ const (
 	ModuleCycle           Module = "cycle"
 	ModuleTokens          Module = "tokens"
 	ModuleConvergence     Module = "convergence"
+	ModuleCI              Module = "ci"
 )
 
 var knownModules = map[Module]bool{
 	ModuleOrchestrator: true, ModuleAdvisor: true, ModuleRunner: true, ModuleBridge: true, ModuleLiveness: true,
 	ModuleShip: true, ModuleAudit: true, ModuleTriage: true, ModuleScout: true, ModuleBuild: true, ModuleTDD: true,
 	ModuleGateContract: true, ModuleGateEval: true, ModuleGateRepo: true, ModuleInbox: true, ModuleConfig: true,
-	ModuleLoop: true, ModuleWatchdog: true, ModuleObserver: true, ModuleDashboard: true, ModuleLedger: true, ModuleOutcome: true, ModuleFailureDiag: true, ModuleCarryover: true, ModuleFailureLearning: true, ModuleSignalCenter: true, ModuleReview: true, ModuleQuality: true, ModuleIsolation: true, ModuleCLI: true, ModuleLadder: true, ModuleHealing: true, ModuleControl: true, ModuleRepair: true, ModuleCycle: true, ModuleTokens: true, ModuleConvergence: true,
+	ModuleLoop: true, ModuleWatchdog: true, ModuleObserver: true, ModuleDashboard: true, ModuleLedger: true, ModuleOutcome: true, ModuleFailureDiag: true, ModuleCarryover: true, ModuleFailureLearning: true, ModuleSignalCenter: true, ModuleReview: true, ModuleQuality: true, ModuleIsolation: true, ModuleCLI: true, ModuleLadder: true, ModuleHealing: true, ModuleControl: true, ModuleRepair: true, ModuleCycle: true, ModuleTokens: true, ModuleConvergence: true, ModuleCI: true,
 }
 
 func (m Module) Known() bool { return knownModules[m] }
@@ -154,6 +155,11 @@ const (
 	KindSelfhealIncident       Kind = "selfheal.incident"
 	KindSelfhealDecision       Kind = "selfheal.decision"
 	KindControlBypass          Kind = "control.bypass"
+	KindWaveStarted            Kind = "wave.started"
+	KindWaveEnded              Kind = "wave.ended"
+	KindInboxClaimed           Kind = "inbox.claimed"
+	KindInboxReleased          Kind = "inbox.released"
+	KindCICompleted            Kind = "ci.completed"
 )
 
 const (
@@ -168,7 +174,7 @@ var knownKinds = map[Kind]bool{
 	KindLedgerAppended: true, KindOutcomeWarning: true, KindFailureDiagWarning: true, KindCarryoverWarning: true, KindFailureLearningWarning: true, KindConfigWarning: true, KindAdvisorWarning: true, KindRunnerWarning: true, KindInboxWarning: true, KindAuditWarning: true, KindObserverWarning: true, KindCycleSealed: true, KindLoopWave: true, KindLoopHalt: true, KindLoopWarning: true,
 	KindLoopEscalation: true, KindLoopStarted: true, KindLoopExit: true, KindLoopLost: true, KindListenerPanicked: true, KindRegistryDrift: true, KindSinkDropped: true,
 	KindQualityReading: true, KindQualityBreach: true, KindQualityWarning: true, KindIsolationViolation: true, KindIsolationContext: true, KindIsolationRequest: true, KindIsolationRequestDecision: true, KindCLIQueueApplied: true, KindLadderDecision: true, KindSelfhealIncident: true, KindSelfhealDecision: true,
-	KindControlBypass: true,
+	KindControlBypass: true, KindWaveStarted: true, KindWaveEnded: true, KindInboxClaimed: true, KindInboxReleased: true, KindCICompleted: true,
 }
 
 var terminalKinds = map[Kind]bool{
@@ -192,6 +198,8 @@ func Kinds() []Kind {
 type Code string
 
 const CodeLoopLost Code = "LOOP_LOST"
+
+const CodeCIRunRed Code = "CI_RUN_RED"
 
 var codeRE = regexp.MustCompile(`^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$`)
 

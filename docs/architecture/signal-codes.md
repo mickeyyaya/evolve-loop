@@ -127,6 +127,12 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `CARRYOVER_WORKSPACE_MALFORMED` | a cycle-workspace carryover document is not its documented JSON shape; the file is skipped whole, never aborting the cycle — a persona defect for the memo or audit owner; the reason carries the decode error |
 | `CARRYOVER_WORKSPACE_READ_FAILED` | a cycle-workspace carryover document (carryover-todos.json or defect-ledger.json) exists but could not be read (not absence: permissions, a directory at the path); nothing is merged, the closeout proceeds; fields name the document and path |
 
+### ci
+
+| Code | Meaning |
+|---|---|
+| `CI_RUN_RED` | a watched CI run completed with a conclusion other than success; fields.sha, workflow, conclusion, run_id and run_url name the run |
+
 ### cli
 
 | Code | Meaning |

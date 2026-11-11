@@ -31,7 +31,11 @@ func TestClaimPending_ClaimsOnlyWhatIsPendingAtTheRoot(t *testing.T) {
 
 	c := signalcenter.New()
 	var codes []signalcenter.Code
-	c.Subscribe(func(e signalcenter.Event) { codes = append(codes, e.Code) })
+	c.Subscribe(func(e signalcenter.Event) {
+		if e.Kind == signalcenter.KindInboxWarning {
+			codes = append(codes, e.Code)
+		}
+	})
 	opts := Options{ProjectRoot: root, Stderr: io.Discard, Signals: c}
 
 	if err := ClaimPending(opts, 7, []string{"pending", "pending", "mine", "sibling", "scout-originated", "operator-owned"}); err != nil {

@@ -31,7 +31,7 @@ func TestModule_ClosedSet(t *testing.T) {
 	t.Parallel()
 	for _, m := range []Module{ModuleOrchestrator, ModuleAdvisor, ModuleRunner, ModuleBridge, ModuleLiveness, ModuleShip,
 		ModuleAudit, ModuleTriage, ModuleScout, ModuleBuild, ModuleTDD, ModuleGateContract, ModuleGateEval, ModuleGateRepo,
-		ModuleInbox, ModuleConfig, ModuleLoop, ModuleWatchdog, ModuleObserver, ModuleDashboard, ModuleLedger, ModuleOutcome, ModuleFailureDiag, ModuleCarryover, ModuleFailureLearning, ModuleSignalCenter, ModuleReview, ModuleQuality, ModuleIsolation, ModuleCLI, ModuleLadder, ModuleHealing, ModuleControl, ModuleRepair, ModuleCycle, ModuleTokens, ModuleConvergence} {
+		ModuleInbox, ModuleConfig, ModuleLoop, ModuleWatchdog, ModuleObserver, ModuleDashboard, ModuleLedger, ModuleOutcome, ModuleFailureDiag, ModuleCarryover, ModuleFailureLearning, ModuleSignalCenter, ModuleReview, ModuleQuality, ModuleIsolation, ModuleCLI, ModuleLadder, ModuleHealing, ModuleControl, ModuleRepair, ModuleCycle, ModuleTokens, ModuleConvergence, ModuleCI} {
 		if !m.Known() {
 			t.Errorf("%q must be in the closed module set", m)
 		}
@@ -39,8 +39,8 @@ func TestModule_ClosedSet(t *testing.T) {
 	if Module("").Known() || Module("Orchestrator").Known() || Module("core").Known() {
 		t.Error("empty, differently-cased and undeclared modules are unknown")
 	}
-	if got := Modules(); len(got) != 37 || !sortedModules(got) {
-		t.Errorf("Modules() must list the 37 declared modules sorted, got %v", got)
+	if got := Modules(); len(got) != 38 || !sortedModules(got) {
+		t.Errorf("Modules() must list the 38 declared modules sorted, got %v", got)
 	}
 }
 
@@ -63,7 +63,7 @@ func TestKind_ClosedSetAndTerminal(t *testing.T) {
 		KindShipLanded, KindShipError, KindShipWarning, KindShipDelivered, KindLoopWarning, KindAdvisorWarning, KindRunnerWarning, KindInboxWarning, KindAuditWarning, KindSystemFailure, KindQuotaPaused, KindLoginRequired, KindBridgeWarning, KindBridgeTripwire,
 		KindPaneLiveness, KindLedgerAppended, KindOutcomeWarning, KindFailureDiagWarning, KindCarryoverWarning, KindFailureLearningWarning, KindConfigWarning, KindObserverWarning, KindGatePassed, KindCycleSealed, KindLoopWave, KindLoopHalt, KindLoopEscalation,
 		KindLoopStarted, KindLoopExit, KindLoopLost, KindListenerPanicked, KindRegistryDrift, KindSinkDropped,
-		KindQualityReading, KindQualityBreach, KindQualityWarning, KindIsolationViolation, KindIsolationContext, KindIsolationRequest, KindIsolationRequestDecision, KindCLIQueueApplied, KindLadderDecision, KindSelfhealIncident, KindSelfhealDecision, KindControlBypass}
+		KindQualityReading, KindQualityBreach, KindQualityWarning, KindIsolationViolation, KindIsolationContext, KindIsolationRequest, KindIsolationRequestDecision, KindCLIQueueApplied, KindLadderDecision, KindSelfhealIncident, KindSelfhealDecision, KindControlBypass, KindWaveStarted, KindWaveEnded, KindInboxClaimed, KindInboxReleased, KindCICompleted}
 	for _, k := range all {
 		if !k.Known() {
 			t.Errorf("%q must be known", k)

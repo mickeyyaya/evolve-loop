@@ -42,6 +42,7 @@ func init() {
 		RegisterCode(ModuleSignalCenter, c, doc)
 	}
 	RegisterCode(ModuleLoop, CodeLoopLost, "a reader saw a loop process end without its loop.exit event; a reader makes this record and no log holds it; fields.pid, run_id, exit (crash or unknown) and historical (true when the loop was gone before the reader looked)")
+	RegisterCode(ModuleCI, CodeCIRunRed, "a watched CI run completed with a conclusion other than success; fields.sha, workflow, conclusion, run_id and run_url name the run")
 }
 
 func RegisterCode(m Module, c Code, doc string) { codes.register(m, c, doc) }

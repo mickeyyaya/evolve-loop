@@ -250,7 +250,7 @@ func TestRunCIWatch_AFailedJobAPIReadAddsTheWarningOnStderrAndTheGateRowOtherwis
 	if !strings.Contains(failedErr, "evolve ci watch: WARN: run 41826765563: the job API was not read") || strings.Contains(failedOut, "failed; the message was not read") {
 		t.Errorf("failed read: stdout %q stderr %q, want the warning and no gate row", failedOut, failedErr)
 	}
-	if strings.Contains(okErr, "WARN") || !strings.Contains(okOut, "make cover-changed: step \""+gateCoverStep+"\" failed; the message was not read; next: gh run view --job "+gateUbuntuJobID+" --attempt 1 --log-failed | tail -n 200") {
+	if strings.Contains(okErr, ciWatchPrefix+"WARN") || !strings.Contains(okOut, "make cover-changed: step \""+gateCoverStep+"\" failed; the message was not read; next: gh run view --job "+gateUbuntuJobID+" --attempt 1 --log-failed | tail -n 200") {
 		t.Errorf("read ok: stdout %q stderr %q, want the gate row and no warning", okOut, okErr)
 	}
 }

@@ -115,7 +115,11 @@ func TestLaneResume_ALaneWhoseTodoPausedOnQuotaResumesThatCycleAtItsPhase(t *tes
 	p := seedPausedLane(t, "item-a", 2107)
 	signals := signalcenter.New()
 	var events []signalcenter.Event
-	signals.Subscribe(func(e signalcenter.Event) { events = append(events, e) })
+	signals.Subscribe(func(e signalcenter.Event) {
+		if e.Kind == signalcenter.KindLoopWave {
+			events = append(events, e)
+		}
+	})
 	var stderr bytes.Buffer
 	var got startedCycle
 	req := laneRequest()

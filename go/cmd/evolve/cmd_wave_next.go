@@ -14,7 +14,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/goalhash"
 	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wave"
 )
 
@@ -30,6 +32,7 @@ type waveNextArgs struct {
 	boundary     boundaryArgs
 	raw          []string
 	notes        []string
+	signals      *signalcenter.Center
 	number       int
 	dryRun, json bool
 }
@@ -105,6 +108,10 @@ func waveStepDetail(rc int, tail []string) string {
 func runWaveNext(env waveEnv, args []string, stdout, stderr io.Writer) int {
 	e := waveNextEnvelope{Steps: []waveStepResult{}, Warnings: []string{}}
 	a, err := parseWaveNextArgs(args)
+	root, eventsErr := waveEventRoot(env, a, err, stderr)
+	signals, closeSignals := newRoleSignalCenter("wave", root, paths.EvolveDirOf(root), eventsErr)
+	defer closeSignals()
+	a.signals = signals
 	var rc int
 	if err != nil {
 		e.Error = "usage: " + err.Error()
@@ -123,6 +130,24 @@ func runWaveNext(env waveEnv, args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "wave: launched wave %d: run %s, pid %d, goal %d bytes\n", e.Wave, e.RunID, e.PID, e.GoalBytes)
 	}
 	return rc
+}
+
+func waveEventRoot(env waveEnv, a waveNextArgs, parseErr error, stderr io.Writer) (string, io.Writer) {
+	if parseErr != nil || a.dryRun {
+		return "", io.Discard
+	}
+	root, err := env.resolveRoot(a.boundary.projectRoot, io.Discard)
+	if err != nil {
+		return "", io.Discard
+	}
+	return root, stderr
+}
+
+func waveEvent(kind signalcenter.Kind, reason string, fields map[string]string) signalcenter.Event {
+	return signalcenter.Event{
+		Module: signalcenter.ModuleLoop, Origin: "recordWave", Kind: kind, Severity: signalcenter.SeverityInfo,
+		Reason: reason, Fields: fields,
+	}
 }
 
 func waveNext(env waveEnv, a waveNextArgs, e *waveNextEnvelope, stdout, stderr io.Writer) int {
@@ -311,6 +336,9 @@ func recordWave(env waveEnv, plan *wavePlan) (int, error) {
 	if err != nil {
 		plan.warnings = append(plan.warnings, err.Error())
 	}
+	plan.args.signals.Emit(waveEvent(signalcenter.KindWaveStarted, fmt.Sprintf("wave %d launched as run %s", plan.number, runID), map[string]string{
+		"wave": strconv.Itoa(plan.number), "run_id": runID, "pid": strconv.Itoa(pid),
+	}))
 	head, err := env.mainHead(plan.plane.root)
 	if err != nil {
 		plan.warnings = append(plan.warnings, fmt.Sprintf("read the main SHA: %v", err))
@@ -358,7 +386,13 @@ func closeLastWave(env waveEnv, plan *wavePlan) error {
 		ended = env.now()
 	}
 	closed.EndedAt, closed.Outcome = &ended, plan.facts.Outcome()
-	return env.saveRecord(plan.plane.store, closed)
+	err := env.saveRecord(plan.plane.store, closed)
+	if err == nil {
+		plan.args.signals.Emit(waveEvent(signalcenter.KindWaveEnded, fmt.Sprintf("wave %d ended: %s", closed.Number, closed.Outcome), map[string]string{
+			"wave": strconv.Itoa(closed.Number), "run_id": closed.RunID, "outcome": closed.Outcome,
+		}))
+	}
+	return err
 }
 
 func waveLogEnded(r wave.Record) (time.Time, bool) {
