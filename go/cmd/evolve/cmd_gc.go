@@ -143,6 +143,7 @@ type gcRun struct {
 	remove         func(string) error
 	removeAll      func(string) error
 	abs            func(string) (string, error)
+	exec           sysexec.RunFunc
 	liveRuns       []string
 }
 
@@ -150,7 +151,7 @@ func newGCRun(ctx context.Context, dryRun bool, stdout, stderr io.Writer) gcRun 
 	r := gcRun{ctx: ctx, dryRun: dryRun, stdout: stdout, stderr: stderr,
 		reapers: gcReapers{sessions: swarm.ExecReapOrphans, sockets: swarm.ExecReapOrphanSockets},
 		kill:    func(pid int) error { return syscall.Kill(pid, syscall.SIGTERM) },
-		remove:  os.Remove, removeAll: os.RemoveAll, abs: filepath.Abs}
+		remove:  os.Remove, removeAll: os.RemoveAll, abs: filepath.Abs, exec: sysexec.DefaultRunner}
 	if gcInjectedReapers != nil {
 		r.reapers = *gcInjectedReapers
 	}
@@ -256,6 +257,7 @@ func (r gcRun) project(projectRoot string) int {
 	for _, run := range steps {
 		failed = r.step(run) || failed
 	}
+	failed = r.remoteSweep(projectRoot, evolveDir, gcPol) || failed
 	if !r.dryRun && freeErr == nil {
 		r.reportDiskFree(projectRoot, before)
 	}

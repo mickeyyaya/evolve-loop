@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — the remote branch sweep of `evolve gc` (gc X8, 2026-11-11)
+
+- **The sweep.** `evolve gc` reads the pull requests through `gh`. At `gc.remote_sweep.stage: shadow` (the default) it only reports the remote branches that the enforce stage deletes. At `enforce` it deletes a remote branch only when a merged pull request has the same head as the remote tip.
+- **The order.** The sweep fetches the tip, saves it in a verified bundle under `operator-salvage`, then deletes through the API. A failed verify, an open pull request, a ruleset, a failed lookup or a moved tip keeps the branch. A dry run never deletes.
+- Plan: [gc-closes-the-legacy-gap-2026-11.md](docs/plans/gc-closes-the-legacy-gap-2026-11.md) (D10, X8). Docs: [internal-gc](docs/architecture/packages/internal-gc.md).
+
 ## Added — the console instruction for an overlap refusal of `evolve inbox add` (P6, 2026-11-11)
 
 - **The instruction.** `skills/loop/SKILL.md` tells the console to ask the operator when `evolve inbox add` ends with exit 3. The console shows the ids, and names three options: extend, withdraw, or `--allow-overlap --reason`.
