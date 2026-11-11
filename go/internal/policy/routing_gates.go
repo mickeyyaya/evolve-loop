@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"fmt"
 	"maps"
 	"path/filepath"
 	"time"
@@ -82,6 +83,37 @@ type GatesPolicy struct {
 	MainRedStopBoundMinutes int `json:"main_red_stop_bound_minutes,omitempty"`
 
 	PhaseIO string `json:"phase_io,omitempty"`
+
+	Hermetic *HermeticPolicy `json:"hermetic,omitempty"`
+}
+
+const (
+	HermeticOff     = "off"
+	HermeticShadow  = "shadow"
+	HermeticEnforce = "enforce"
+)
+
+type HermeticModeValue string
+
+type HermeticPolicy struct {
+	Mode HermeticModeValue `json:"mode,omitempty"`
+}
+
+func (m *HermeticModeValue) UnmarshalText(raw []byte) error {
+	switch v := string(raw); v {
+	case "", HermeticOff, HermeticShadow, HermeticEnforce:
+		*m = HermeticModeValue(v)
+		return nil
+	default:
+		return fmt.Errorf("gates.hermetic: mode %q is not \"off\", \"shadow\" or \"enforce\"", v)
+	}
+}
+
+func (p Policy) HermeticMode() string {
+	if p.Gates == nil || p.Gates.Hermetic == nil || p.Gates.Hermetic.Mode == "" {
+		return HermeticShadow
+	}
+	return string(p.Gates.Hermetic.Mode)
 }
 
 type GatesConfig struct {

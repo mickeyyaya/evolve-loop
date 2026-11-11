@@ -25,6 +25,20 @@
 - At `enforce`, `bwrapReadIsolation` mounts a `tmpfs` on `RunsDir` and binds the own workspace again. It binds each grant read-only (`--ro-bind-try`) and masks each raw file and secret file with `/dev/null`. It mounts a `tmpfs` on each raw and secret directory, and binds `<ws>/inputs` read-only. At `shadow` it adds nothing, because `bwrap` has no report.
 - `Config.ProtectedWriteSubpaths`, `Config.ProtectedWritePrefixes` and `Config.ProtectedWriteEnforce` hold the protected write rule of I-7 ([llm-isolation.md](../llm-isolation.md) §9.1). At `enforce`, `writeProtectedWriteRules` denies each write with `subpath` or `prefix`, after every write grant. When `ProtectedWriteEnforce` is false, the same match allows the write and reports it. At `enforce`, `bwrapProtectedWriteMasks` binds each protected path that exists read-only, before the exec masks. A prefix gets a bind for each file in its directory that starts with it.
 - The signal rule `(allow signal (target same-sandbox))` under `(deny default)`, and `--unshare-pid` for `bwrap`, keep a `kill(-1)` of a cell inside the cell. `TestSandboxContract_KillMinusOneFromACellReachesNoHostProcess` pins both and runs no signal.
+- `Config.ExecDenyAll` writes `(deny process-exec (require-not (require-all (signing-identifier "com.apple.sandbox-exec") (process-attribute is-platform-binary))))` after the exec grant. So `sandbox-exec` can start the child, and the child can start nothing. An ad-hoc signature can claim the identifier, but not the platform attribute. With `ExecDenyAll`, `BwrapPrefix` binds only `Config.ExecBinary` and `Config.ExecLibraries` in place of `/usr`, `/bin`, `/lib`, `/lib64` and `/etc`.
+- `GateProfile` (`gate_profile.go`) writes the SBPL of the gate child (7.16 of [gate-contract-g2-hermetic-guard](../gate-contract-g2-hermetic-guard.md)). The order is:
+  1. the default deny;
+  2. the system read set (`/usr/lib`, `/System/Library`, the dyld shared cache);
+  3. the grants (the lane root, the `evolve` binary and the node of its directory, `policy.json`, the scratch dir);
+  4. the deny of each `.git` entry and of each secret of `$HOME`;
+  5. the exec deny and the network deny.
+
+   A later rule wins, so no grant readmits `.git`. `GitEntries` names the `.git` entry of the lane, its git dir and the common dir, each with its kind. A directory gets a `subpath` deny and a file gets a `literal` deny. A relative `gitdir:` resolves against the lane. `GitEntries` reads the files and starts no process.
+- With `GateConfig.Report` set, the profile changes only the verb of each deny: each deny becomes an `allow` with a report and the message `evolve-cell=<tag> rule=<gate.default|gate.git|gate.exec|gate.secret|gate.network> inv=I0`. Each grant stays in its place and wins as at enforce. So a report names an operation that enforce refuses, and enforce refuses no operation without a report.
+- Report mode also tags the reads of two canary files in the scratch dir (`CanaryStart`, `CanaryEnd`, rule `gate.canary`). The child reads them, so their reports prove that the reports of the child reached the log.
+- `HomeSecrets` is the one list of the secrets of `$HOME`. The gate profile and the bridge read it.
+- `GateBwrapPrefix` builds the Linux form on `BwrapPrefix` with `ExecDenyAll`. It binds the lane read-only and the scratch dir writable. After all binds, it masks a `.git` file with `/dev/null` and a `.git` directory with a `tmpfs`. `ParseLibraries` reads the paths of `ldd` output.
+- `reports.go` holds the report reader that the bridge and `gaterun` share: `Reports` (the `log show` query), `ParseReports`, `ReportSource.Cell` (the fence loop), `WriteFence` and `Fenced`. A `Report` holds the operation, so a caller can name it. `ParseReports` keeps at most `ReportCap` reports of each rule, so the reports of one rule cannot hide the report of another.
 - `getenv` is injected. The detection is tested with a map, and it reads the bridge's request-local env chain in production.
 
 ## Invariants

@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/sandbox"
 	"github.com/mickeyyaya/evolve-loop/go/internal/attemptpostmortem"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
@@ -122,7 +123,7 @@ func validateHomeReads(cli string, reads []string) error {
 }
 
 func secretOverlap(rel string) (string, bool) {
-	for _, secret := range homeSecrets {
+	for _, secret := range sandbox.HomeSecrets {
 		if rel == secret || strings.HasPrefix(rel, secret+"/") || strings.HasPrefix(secret, rel+"/") {
 			return secret, true
 		}

@@ -1,11 +1,8 @@
 package bridge
 
 import (
-	"bufio"
-	"bytes"
 	"cmp"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -24,20 +21,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/isolation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
-	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-var homeSecrets = []string{".ssh", ".aws", ".gnupg", ".netrc", ".config/gh", ".docker/config.json", ".kube"}
-
 const (
-	logShowPath    = "/usr/bin/log"
-	readReportCap  = 20
-	logShowTimeout = 10 * time.Second
-
-	sandboxExecPath     = "/usr/bin/sandbox-exec"
-	ruleCellFence       = "cell.fence"
-	reportFenceDeadline = 60 * time.Second
-	reportPollInterval  = time.Second
+	logShowPath     = sandbox.LogShowPath
+	sandboxExecPath = sandbox.SandboxExecPath
 )
 
 func (deps Deps) readStage() string {
@@ -121,7 +109,7 @@ func secretsOf(home string) (dirs, files []string) {
 	if home == "" {
 		return nil, nil
 	}
-	for _, rel := range homeSecrets {
+	for _, rel := range sandbox.HomeSecrets {
 		path := canonicalOrSelf(filepath.Join(home, rel))
 		info, err := os.Stat(path)
 		switch {
@@ -135,41 +123,7 @@ func secretsOf(home string) (dirs, files []string) {
 	return dirs, files
 }
 
-type readReport struct {
-	denied                  bool
-	target, rule, invariant string
-	process, pid            string
-}
-
 var cellTag = regexp.MustCompile(`^[A-Za-z0-9._:/-]+$`)
-
-var readReportLine = regexp.MustCompile(`^Sandbox: (?:([^\n]*?)\((\d+)\) )?(allow|deny)(?:\(\d+\))? \S+ ([^\n]+)\n` + regexp.QuoteMeta(sandbox.CellMessagePrefix) + `\S+ rule=(\S+) inv=(I\d+)`)
-
-func parseReadReports(raw []byte) []readReport {
-	var out []readReport
-	seen := map[string]bool{}
-	scanner := bufio.NewScanner(bytes.NewReader(raw))
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-	for scanner.Scan() && len(out) < readReportCap {
-		var event struct {
-			EventMessage string `json:"eventMessage"`
-		}
-		if json.Unmarshal(scanner.Bytes(), &event) != nil {
-			continue
-		}
-		m := readReportLine.FindStringSubmatch(event.EventMessage)
-		if m == nil {
-			continue
-		}
-		key := m[5] + "\x00" + m[4] + "\x00" + m[1]
-		if seen[key] {
-			continue
-		}
-		seen[key] = true
-		out = append(out, readReport{denied: m[3] == "deny", target: m[4], rule: m[5], invariant: m[6], process: m[1], pid: m[2]})
-	}
-	return out
-}
 
 func (deps Deps) reportReadViolations(ctx context.Context, cfg *Config, since time.Time) {
 	stage := deps.readStage()
@@ -183,7 +137,7 @@ func (deps Deps) reportReadViolations(ctx context.Context, cfg *Config, since ti
 		deps.recordContextAccess(cfg, nil, inputindex.AccessSourceNone)
 		return
 	}
-	for _, r := range parseReadReports(raw) {
+	for _, r := range sandbox.ParseReports(raw) {
 		deps.emitReadViolation(cfg, stage, r)
 	}
 	source := inputindex.AccessSourceNone
@@ -200,54 +154,14 @@ func (deps Deps) warnReports(format string, args ...any) {
 }
 
 func (deps Deps) cellReports(parent context.Context, tag string, since time.Time) ([]byte, bool, error) {
-	ctx := context.WithoutCancel(parent)
-	if deps.SandboxFence == nil {
-		raw, err := deps.SandboxReports(ctx, tag, since)
-		return raw, true, err
-	}
-	if err := deps.SandboxFence(ctx, tag); err != nil {
-		deps.warnReports("write the fence: %v", err)
-		raw, err := deps.SandboxReports(ctx, tag, since)
-		return raw, false, err
-	}
-	start, deadline := deps.Now(), cmp.Or(deps.ReportFenceDeadline, reportFenceDeadline)
-	for {
-		raw, err := deps.SandboxReports(ctx, tag, since)
-		if err != nil || fenced(raw, tag) {
-			return raw, true, err
-		}
-		if elapsed := deps.Now().Sub(start); elapsed >= deadline || parent.Err() != nil {
-			deps.warnReports("no fence of the cell after %s; its reads count as unmeasured", elapsed.Round(time.Second))
-			return raw, false, nil
-		}
-		deps.Sleep(reportPollInterval)
-	}
-}
-
-func fenced(raw []byte, tag string) bool {
-	want := fenceMessage(tag)
-	for _, line := range bytes.Split(raw, []byte("\n")) {
-		var event struct {
-			EventMessage string `json:"eventMessage"`
-		}
-		if json.Unmarshal(line, &event) == nil && strings.Contains(event.EventMessage, want) {
-			return true
-		}
-	}
-	return false
-}
-
-func fenceMessage(tag string) string {
-	return sandbox.CellMessagePrefix + tag + " rule=" + ruleCellFence
+	return sandbox.ReportSource{
+		Reports: deps.SandboxReports, Fence: deps.SandboxFence, Now: deps.Now, Sleep: deps.Sleep,
+		Deadline: deps.ReportFenceDeadline, Warn: deps.warnReports,
+	}.Cell(parent, tag, since)
 }
 
 func sandboxFence(binary string) func(context.Context, string) error {
-	return func(ctx context.Context, tag string) error {
-		ctx, cancel := context.WithTimeout(ctx, logShowTimeout)
-		defer cancel()
-		profile := fmt.Sprintf(`(version 1)(allow default)(allow file-read-data (literal "/dev/null") (with report) (with message %q))`, fenceMessage(tag))
-		return sysexec.Command(ctx, binary, "-p", profile, "/bin/cat", "/dev/null").Run()
-	}
+	return func(ctx context.Context, tag string) error { return sandbox.WriteFence(ctx, binary, tag) }
 }
 
 func (deps Deps) readReportsApply(cfg *Config) bool {
@@ -268,30 +182,27 @@ func relToProject(root, target string) string {
 	return filepath.ToSlash(rel)
 }
 
-func (deps Deps) emitReadViolation(cfg *Config, stage string, r readReport) {
+func (deps Deps) emitReadViolation(cfg *Config, stage string, r sandbox.Report) {
 	id := configIdentity(cfg)
 	action := "logged"
-	if r.denied {
+	if r.Denied {
 		action = "refused"
 	}
-	target := relToProject(cfg.ProjectRoot, r.target)
-	n, _ := strconv.Atoi(strings.TrimPrefix(r.invariant, "I"))
+	target := relToProject(cfg.ProjectRoot, r.Target)
+	n, _ := strconv.Atoi(strings.TrimPrefix(r.Invariant, "I"))
 	deps.Signals.Emit(signalcenter.Event{
 		Cycle: id.cycle, RunID: id.runID, Phase: id.phase, Module: signalcenter.ModuleIsolation, Origin: "bridge.reportReadViolations",
 		Kind: signalcenter.KindIsolationViolation, Severity: signalcenter.SeverityWarn, Code: isolation.ViolationCode(n),
 		Reason: "the cell " + cfg.Agent + " read " + target + " outside its grants",
 		Fields: map[string]string{
-			"invariant": r.invariant, "stage": stage, "action": action, "cell": cfg.Agent, "family": cfg.CLI,
-			"target": target, "rule": r.rule, "source": "sbpl-report", "process": r.process, "pid": r.pid,
+			"invariant": r.Invariant, "stage": stage, "action": action, "cell": cfg.Agent, "family": cfg.CLI,
+			"target": target, "rule": r.Rule, "source": "sbpl-report", "process": r.Process, "pid": r.PID,
 		},
 	})
 }
 
 func logShowReports(binary string) func(context.Context, string, time.Time) ([]byte, error) {
 	return func(ctx context.Context, tag string, since time.Time) ([]byte, error) {
-		ctx, cancel := context.WithTimeout(ctx, logShowTimeout)
-		defer cancel()
-		predicate := fmt.Sprintf(`sender == "Sandbox" AND eventMessage CONTAINS "%s%s "`, sandbox.CellMessagePrefix, tag)
-		return sysexec.Command(ctx, binary, "show", "--style", "ndjson", "--start", since.Local().Format(time.DateTime), "--predicate", predicate).Output()
+		return sandbox.Reports(ctx, binary, tag, since)
 	}
 }

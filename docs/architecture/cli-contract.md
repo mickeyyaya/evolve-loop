@@ -455,7 +455,7 @@ Limits:
 
 `inbox curate` is not a core verb yet. It has no `--json`. Without a flag it is read-only. `--event` publishes signals, and `--apply` refuses with exit 1 while a run lease is live. [inbox-curator.md](inbox-curator.md) is its specification.
 
-Verbs outside this table are tools for the operator or for the pipeline itself. A caller must not depend on them. Examples are `inbox-mover`, `fanout-dispatch`, `serve-phase` and `phase-watchdog`.
+Verbs outside this table are tools for the operator or for the pipeline itself. A caller must not depend on them. Examples are `inbox-mover`, `fanout-dispatch`, `serve-phase`, `phase-watchdog` and `gate run`.
 
 ## 6. Verbs to add
 

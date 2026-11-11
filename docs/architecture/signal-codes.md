@@ -196,6 +196,13 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `GATE_CONTRACT_VERIFIED` | the phase's declared deliverables were found in place (fields name the artifact, its size, the agent-owed files and the effects verified) and the phase advanced |
 | `GATE_CONTRACT_WOULD_BLOCK` | the deliverable violated its contract but the stage (shadow/advisory, or the report-size gate's) lets the phase advance; the reason is what enforce would have refused |
 
+### gate.hermetic
+
+| Code | Meaning |
+|---|---|
+| `GATE_HERMETIC_NO_EVIDENCE` | a hermetic gate run at shadow gave no complete evidence: on Linux bwrap cannot report a denied operation; on macOS the sandbox reports could not be read, the fence of the run did not show, or a canary report of the child is missing because the sandbox dropped its reports (ADR-0165 G2, 7.16); fields.entry and cause; move the host to enforce to measure |
+| `GATE_HERMETIC_VIOLATION` | a gate entry did an operation that the hermetic gate profile denies (ADR-0165 G2, 7.16): a read of a .git entry, a process exec, a network call, a read of a secret, or any other operation outside the grants; emitted at shadow only, where the sandbox reports the operation and lets it run, because enforce refuses it with no report; fields.entry, operation (the sandbox operation), path, rule (gate.git, gate.exec, gate.secret, gate.network or gate.default), mode (shadow), action (logged), process and pid |
+
 ### gate.repo
 
 | Code | Meaning |

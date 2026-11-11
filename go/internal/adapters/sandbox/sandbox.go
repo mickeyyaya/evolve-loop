@@ -36,6 +36,9 @@ type Config struct {
 	ExecDenyPaths   []string
 	ExecDenyRoots   []string
 	ExecDenyEnforce bool
+	ExecDenyAll     bool
+	ExecBinary      string
+	ExecLibraries   []string
 
 	ReadIsolation          ReadIsolation
 	ProtectedWriteSubpaths []string
@@ -178,6 +181,9 @@ func GenerateSBPL(cfg Config) string {
 const sandboxExecPath = "/usr/bin/sandbox-exec"
 
 func writeExecDenyRules(b *strings.Builder, cfg Config) {
+	if cfg.ExecDenyAll {
+		fmt.Fprintf(b, "(deny process-exec %s)\n", execAllowNone)
+	}
 	if len(cfg.ExecDenyPaths)+len(cfg.ExecDenyRoots) == 0 {
 		return
 	}
@@ -327,9 +333,7 @@ func BwrapPrefix(cfg Config) []string {
 		"--dev", "/dev",
 		"--tmpfs", "/tmp",
 	}
-	for _, p := range []string{"/usr", "/bin", "/lib", "/lib64", "/etc"} {
-		out = append(out, "--ro-bind", p, p)
-	}
+	out = append(out, bwrapSystemBinds(cfg)...)
 	if cfg.HomeDir != "" {
 		out = append(out, "--ro-bind", cfg.HomeDir, cfg.HomeDir)
 	}
@@ -380,6 +384,22 @@ func BwrapPrefix(cfg Config) []string {
 	out = append(out, bwrapProtectedWriteMasks(cfg)...)
 	out = append(out, bwrapFileMasks(cfg)...)
 	return append(out, bwrapExecMasks(cfg)...)
+}
+
+func bwrapSystemBinds(cfg Config) []string {
+	var out []string
+	if !cfg.ExecDenyAll {
+		for _, p := range []string{"/usr", "/bin", "/lib", "/lib64", "/etc"} {
+			out = append(out, "--ro-bind", p, p)
+		}
+		return out
+	}
+	for _, p := range append([]string{cfg.ExecBinary}, cfg.ExecLibraries...) {
+		if p != "" {
+			out = append(out, "--ro-bind", p, p)
+		}
+	}
+	return out
 }
 
 func bwrapExecMasks(cfg Config) []string {

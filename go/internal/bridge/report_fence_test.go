@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/sandbox"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inputindex"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
@@ -180,7 +181,7 @@ func TestReportReadViolations_AReadErrorWhileItWaitsForTheFenceIsLoud(t *testing
 func TestFenced_FindsOnlyTheFenceOfTheTagInTheEventMessages(t *testing.T) {
 	t.Parallel()
 	raw := []byte(fenceReport("other") + "not json\n" + grantReport("d1", "/x"))
-	if fenced(raw, "d1") || !fenced(raw, "other") || !fenced([]byte(fenceReport("d1")), "d1") {
+	if sandbox.Fenced(raw, "d1") || !sandbox.Fenced(raw, "other") || !sandbox.Fenced([]byte(fenceReport("d1")), "d1") {
 		t.Fatal("a fence counts only for its own tag")
 	}
 }

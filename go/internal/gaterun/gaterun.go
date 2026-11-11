@@ -9,8 +9,11 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/sandbox"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gatecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
@@ -19,8 +22,9 @@ type Prefix func(*exec.Cmd) *exec.Cmd
 
 type Options struct {
 	Command func(ctx context.Context, entry string) *exec.Cmd
-	Prefix  Prefix
 	Ports   gatecontract.Ports
+
+	Strategy Strategy
 
 	ScratchParent string
 }
@@ -35,14 +39,19 @@ func Run(ctx context.Context, entry gatecontract.Entry, input gatecontract.Input
 	if opts.Command == nil {
 		return gatecontract.Verdict{}, fmt.Errorf("gate %s: no command to start the child", entry.Name)
 	}
-	scratch, err := os.MkdirTemp(opts.ScratchParent, "gaterun-")
+	scratch, err := newScratch(opts.ScratchParent, canaries)
 	if err != nil {
 		return gatecontract.Verdict{}, fmt.Errorf("gate %s: %w", entry.Name, err)
 	}
 	defer func() { _ = os.RemoveAll(scratch) }()
+	target := Target{Entry: entry.Name, Lane: input.Root, Scratch: scratch}
+	var prefix Prefix
+	if opts.Strategy != nil {
+		prefix = opts.Strategy.Prefix(target)
+	}
 	cmd := opts.Command(ctx, entry.Name)
-	if opts.Prefix != nil {
-		cmd = opts.Prefix(cmd)
+	if prefix != nil {
+		cmd = prefix(cmd)
 	}
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -54,6 +63,7 @@ func Run(ctx context.Context, entry gatecontract.Entry, input gatecontract.Input
 	}
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
+	started := time.Now()
 	if err := cmd.Start(); err != nil {
 		return gatecontract.Verdict{}, fmt.Errorf("gate %s: start the child: %w", entry.Name, err)
 	}
@@ -63,6 +73,9 @@ func Run(ctx context.Context, entry gatecontract.Entry, input gatecontract.Input
 		_ = cmd.Process.Kill()
 	}
 	waitErr := cmd.Wait()
+	if finisher, ok := opts.Strategy.(Finisher); ok {
+		finisher.Finish(ctx, target, started)
+	}
 	switch {
 	case converseErr != nil:
 		return gatecontract.Verdict{}, childError(entry.Name, converseErr, &stderr)
@@ -107,7 +120,13 @@ func converse(ctx context.Context, broker Broker, input gatecontract.Input, r *b
 }
 
 func Serve(ctx context.Context, entry gatecontract.Entry, stdin io.Reader, stdout io.Writer) error {
+	return serveWith(ctx, entry, stdin, stdout, readCanary)
+}
+
+func serveWith(ctx context.Context, entry gatecontract.Entry, stdin io.Reader, stdout io.Writer, canary func(name string)) error {
+	canary(sandbox.CanaryStart)
 	verdict, err := serve(ctx, entry, bufio.NewReader(stdin), stdout)
+	canary(sandbox.CanaryEnd)
 	if err != nil {
 		_ = WriteFrame(stdout, Frame{Kind: KindError, Message: err.Error()})
 		return err
@@ -124,4 +143,24 @@ func serve(ctx context.Context, entry gatecontract.Entry, r *bufio.Reader, w io.
 		return gatecontract.Verdict{}, fmt.Errorf("expected an input frame, got a %s frame", frame.Kind)
 	}
 	return entry.Run(ctx, *frame.Input, clientPorts(r, w))
+}
+
+var canaries = []string{sandbox.CanaryStart, sandbox.CanaryEnd}
+
+func newScratch(parent string, names []string) (string, error) {
+	scratch, err := os.MkdirTemp(parent, "gaterun-")
+	if err != nil {
+		return "", err
+	}
+	for _, name := range names {
+		if err := os.WriteFile(filepath.Join(scratch, name), nil, 0o600); err != nil {
+			_ = os.RemoveAll(scratch)
+			return "", fmt.Errorf("place the canary %s: %w", name, err)
+		}
+	}
+	return scratch, nil
+}
+
+func readCanary(name string) {
+	_, _ = os.ReadFile(filepath.Join(os.TempDir(), name))
 }

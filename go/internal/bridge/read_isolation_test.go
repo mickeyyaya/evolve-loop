@@ -260,11 +260,11 @@ func TestReportReadViolations_WarnsWhenTheReportsCannotBeRead(t *testing.T) {
 func TestParseReadReports_CapsTheViolationsOfOneCell(t *testing.T) {
 	t.Parallel()
 	var b strings.Builder
-	for i := range readReportCap + 5 {
+	for i := range sandbox.ReportCap + 5 {
 		b.WriteString(`{"eventMessage":"Sandbox: cat(1) allow file-read-data /x/` + strings.Repeat("a", i+1) + `\nevolve-cell=d rule=read.home.secret inv=I5"}` + "\n")
 	}
-	if got := parseReadReports([]byte(b.String())); len(got) != readReportCap {
-		t.Fatalf("parsed %d reports, want the cap %d", len(got), readReportCap)
+	if got := sandbox.ParseReports([]byte(b.String())); len(got) != sandbox.ReportCap {
+		t.Fatalf("parsed %d reports, want the cap %d", len(got), sandbox.ReportCap)
 	}
 }
 
@@ -380,8 +380,8 @@ func TestParseReadReports_ALineWithoutAProcessNameParsesWithEmptyProcessFields(t
 	t.Parallel()
 	raw := `{"eventMessage":"Sandbox: allow file-read-data \/x\/.netrc\nevolve-cell=d rule=read.home.secret inv=I5"}` + "\n" +
 		`{"eventMessage":"Sandbox: (77) deny(1) file-read-data \/x\/.aws\nevolve-cell=d rule=read.home.secret inv=I5"}` + "\n"
-	got := parseReadReports([]byte(raw))
-	if len(got) != 2 || got[0].process != "" || got[0].pid != "" || got[0].target != "/x/.netrc" || got[1].process != "" || got[1].pid != "77" || !got[1].denied {
+	got := sandbox.ParseReports([]byte(raw))
+	if len(got) != 2 || got[0].Process != "" || got[0].PID != "" || got[0].Target != "/x/.netrc" || got[1].Process != "" || got[1].PID != "77" || !got[1].Denied {
 		t.Fatalf("a report without a process name must parse with empty process fields: %+v", got)
 	}
 }
@@ -391,8 +391,8 @@ func TestParseReadReports_TwoProcessesThatReadOneTargetGiveTwoReports(t *testing
 	raw := `{"eventMessage":"Sandbox: ssh(1) allow file-read-data \/x\/.ssh\/config\nevolve-cell=d rule=read.home.secret inv=I5"}` + "\n" +
 		`{"eventMessage":"Sandbox: ssh(2) allow file-read-data \/x\/.ssh\/config\nevolve-cell=d rule=read.home.secret inv=I5"}` + "\n" +
 		`{"eventMessage":"Sandbox: gh(3) allow file-read-data \/x\/.ssh\/config\nevolve-cell=d rule=read.home.secret inv=I5"}` + "\n"
-	got := parseReadReports([]byte(raw))
-	if len(got) != 2 || got[0].process != "ssh" || got[1].process != "gh" {
+	got := sandbox.ParseReports([]byte(raw))
+	if len(got) != 2 || got[0].Process != "ssh" || got[1].Process != "gh" {
 		t.Fatalf("each process that reads a target must give one report: %+v", got)
 	}
 }
@@ -401,8 +401,8 @@ func TestParseReadReports_OneTargetUnderTwoRulesGivesTwoReports(t *testing.T) {
 	t.Parallel()
 	raw := `{"eventMessage":"Sandbox: cat(1) allow file-read-data \/w\/stdout.log\nevolve-cell=d rule=read.raw.output inv=I4"}` + "\n" +
 		`{"eventMessage":"Sandbox: cat(1) deny(1) file-write-data \/w\/stdout.log\nevolve-cell=d rule=write.raw.output inv=I4"}` + "\n"
-	got := parseReadReports([]byte(raw))
-	if len(got) != 2 || got[0].rule != "read.raw.output" || got[1].rule != "write.raw.output" {
+	got := sandbox.ParseReports([]byte(raw))
+	if len(got) != 2 || got[0].Rule != "read.raw.output" || got[1].Rule != "write.raw.output" {
 		t.Fatalf("each rule on one target must give one report: %+v", got)
 	}
 }

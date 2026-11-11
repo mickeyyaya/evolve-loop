@@ -9,11 +9,14 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/sandbox"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gatecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
@@ -78,7 +81,7 @@ func TestRun_ThePrefixWrapsTheCommandAndANilPrefixLeavesItAlone(t *testing.T) {
 	marker := Prefix(func(cmd *exec.Cmd) *exec.Cmd {
 		return sysexec.Command(context.Background(), "sh", append([]string{"-c", `echo wrapped-by-prefix >&2; exec "$@"`, "sh"}, cmd.Args...)...)
 	})
-	opts := Options{Command: shellCommand("read l; echo not-a-frame"), Prefix: marker}
+	opts := Options{Command: shellCommand("read l; echo not-a-frame"), Strategy: prefixStrategy(marker)}
 	if _, err := Run(context.Background(), gatecontract.Entry{Name: "x"}, gatecontract.Input{}, opts); err == nil || !strings.Contains(err.Error(), "wrapped-by-prefix") {
 		t.Errorf("Run with a prefix = %v, want the stderr of the wrapper", err)
 	}
@@ -259,5 +262,83 @@ func TestRun_AScratchParentThatCannotHoldTheScratchDirIsAnError(t *testing.T) {
 	_, err := Run(context.Background(), gatecontract.Entry{Name: "x"}, gatecontract.Input{}, Options{Command: helperCommand, ScratchParent: "/no/such/parent"})
 	if err == nil {
 		t.Error("Run = nil, want an error")
+	}
+}
+
+func TestNewScratch_ACanaryThatCannotBePlacedIsAnErrorAndLeavesNoDir(t *testing.T) {
+	t.Parallel()
+	parent := t.TempDir()
+	if _, err := newScratch(parent, []string{"no-such-dir/canary"}); err == nil || !strings.Contains(err.Error(), "canary") {
+		t.Errorf("newScratch = %v, want a canary error", err)
+	}
+	if left, _ := os.ReadDir(parent); len(left) != 0 {
+		t.Errorf("the failed scratch dir must be removed: %v", left)
+	}
+}
+
+func TestServeWith_ReadsTheStartCanaryBeforeTheEntryAndTheEndCanaryAfterIt(t *testing.T) {
+	t.Parallel()
+	for name, entryErr := range map[string]error{"pass": nil, "error": errors.New("boom")} {
+		var order []string
+		entry := gatecontract.Entry{Name: "x", Run: func(context.Context, gatecontract.Input, gatecontract.Ports) (gatecontract.Verdict, error) {
+			order = append(order, "entry")
+			return gatecontract.Verdict{}, entryErr
+		}}
+		var in bytes.Buffer
+		if err := WriteFrame(&in, Frame{Kind: KindInput, Input: &gatecontract.Input{Root: "/r"}}); err != nil {
+			t.Fatal(err)
+		}
+		_ = serveWith(context.Background(), entry, &in, io.Discard, func(canary string) { order = append(order, canary) })
+		if want := []string{sandbox.CanaryStart, "entry", sandbox.CanaryEnd}; !slices.Equal(order, want) {
+			t.Errorf("%s: order = %v, want %v: the two canary reports bracket the reports of the entry", name, order, want)
+		}
+	}
+}
+
+func TestServe_OpensBothCanariesOfTheTempDirAroundTheEntry(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("TMPDIR", dir)
+	for _, name := range []string{sandbox.CanaryStart, sandbox.CanaryEnd} {
+		if err := syscall.Mkfifo(filepath.Join(dir, name), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var in bytes.Buffer
+	if err := WriteFrame(&in, Frame{Kind: KindInput, Input: &gatecontract.Input{}}); err != nil {
+		t.Fatal(err)
+	}
+	ran := make(chan struct{})
+	entry := gatecontract.Entry{Name: "x", Run: func(context.Context, gatecontract.Input, gatecontract.Ports) (gatecontract.Verdict, error) {
+		close(ran)
+		return gatecontract.Verdict{}, nil
+	}}
+	done := make(chan error, 1)
+	go func() { done <- Serve(context.Background(), entry, &in, io.Discard) }()
+	openWriter(t, filepath.Join(dir, sandbox.CanaryStart))
+	<-ran
+	openWriter(t, filepath.Join(dir, sandbox.CanaryEnd))
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Errorf("Serve = %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Serve did not return after both canaries closed")
+	}
+}
+
+func openWriter(t *testing.T, fifo string) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		w, err := os.OpenFile(fifo, os.O_WRONLY|syscall.O_NONBLOCK, 0)
+		if err == nil {
+			_ = w.Close()
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("Serve never opened %s: the write end of a FIFO opens only when a reader holds it", fifo)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }
