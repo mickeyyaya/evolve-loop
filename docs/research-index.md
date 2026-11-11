@@ -690,4 +690,10 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [research/claude-code-changelog-2-1-322.md](research/claude-code-changelog-2-1-322.md) | Note on the Claude Code changelog for item 4de759d9, read as data. It covers the Fable 5.2 default model, Vertex fast mode and the sandbox, permission and Edit fixes. No persona and no model note changes. |
 
+## 2026-11-11 — the third Gemini prompting guide review
+
+| Document | What it records |
+|---|---|
+| [research/practice-gemini-prompting-guide-parameters-2026-11.md](research/practice-gemini-prompting-guide-parameters-2026-11.md) | Note on the Gemini guide for item 297686f7. No core persona changes, and the agy notes stay unchanged. |
+
 <!-- GENERATED:research-index END -->
