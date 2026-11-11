@@ -597,7 +597,9 @@ Commits 2, 2b and 3 are built (`6efa93625`, `bde90438e`). They differ from this 
 - `Graph` keys each function by `types.Func.FullName()`, because a third-party package is type-checked again.
 - Walk rule 3 is narrower, as step 5 of 7.8 gives: a method is reached through a call or a conversion to an interface.
 
-Three review rounds of commit 3 each found new false passes. On 2026-11-11 the operator ruled that commit 3 lands as a measuring tool. Its package note lists the three open false passes. The inbox item `g2-walker-fails-closed-before-enforcement` makes the walk fail closed at its source, and commit 6 waits for it.
+Three review rounds of commit 3 each found new false passes. On 2026-11-11 the operator ruled that commit 3 lands as a measuring tool. Its package note lists the three open false passes.
+
+Amended by 7.16 (2026-11-11): the operator ruled for a run-time sandbox. Commit 6 leaves the plan, and the inbox item `g2-walker-fails-closed-before-enforcement` closes with it. The rows of this table give the scope of each commit, and R7 of 7.16 gives the order. Commits 7 and 8 depend on R7 step 2 in place of commit 6.
 
 Commit 4 lowers `count` to the new measure, because it now leaves out each `acs/` site. It can only go down. The commit message gives the old and the new value. Test 10 goes in after commit 5, because the three floor entries are closures until then, and walk rule 1 of 7.4 refuses a closure.
 
@@ -605,6 +607,7 @@ Commit 4 lowers `count` to the new measure, because it now leaves out each `acs/
 
 G2 adds these `GateGuarantee` rows to `guards.ProtectedSurfaceManifest`:
 
+- `/go/internal/gaterun/`: the runner, the broker and the gate profile of 7.16. Added by 7.16.
 - `/go/internal/repostate/`: each gate trusts its tree, so a lane that changes it can show a gate another tree.
 - `/go/internal/gatehermetic/` and `/go/internal/goload/`: the guard and the loader that it trusts.
 - `/go/internal/gotool/`: the one place where a gate starts the Go toolchain, so a lane that changes it can add a verb.
@@ -719,3 +722,52 @@ Each row is one site, class and first edge that the walker of commit 3 refuses f
 | `internal/reportdoc/open_nofollow_other.go:1:1` | exec | live-type | P |
 | `internal/testverdict/store.go:80:49` | mtime | live-type | P |
 | `internal/testverdict/trim.go:75:76` | mtime | live-type | P |
+
+### 7.16 The gate runs in a sandbox (2026-11-11, operator ruling, design)
+
+Six review rounds of the static walk found new false passes, each one a Go shape that no rule named. A walk of the syntax must list each implicit conversion and each dynamic call, and Go has more of them than a list holds. On 2026-11-11 the operator ruled: the gate is hermetic at run time, and the walker of commit 3 stays a measuring tool.
+
+**R1. One runner.** `gateregistry.Entries()` has no production caller yet. The new package `gaterun` is the one way to run an entry. `gaterun.Run(ctx, entry, input)` starts `evolve gate run --entry <name>` as a child process, and the child calls `entry.Run`.
+
+**R2. The broker.** The child starts no process. Each git fact and each toolchain run goes through the parent:
+
+- `gatecontract` owns two interfaces, `Lane` (the reads of `repostate`) and `Toolchain` (`gotool.List` and `gotool.Test`), and the value `Ports{Lane, Toolchain}`. `Run` becomes `func(context.Context, Input, Ports) (Verdict, error)`. `Input` stays pure data, so test 27 and the `input` frame stay true, and `gatecontract` imports neither boundary.
+- In the parent, `Ports` holds the real `repostate` and `gotool`. In the child, it holds broker clients whose calls are requests on the frame channel of R6. No package variable changes, so no `inject` site is added.
+- The parent serves each request with the real `repostate` and `gotool`, outside the sandbox, and sends the result back.
+- Thus `repostate` and `gotool` stay the two boundaries of 7.4 rule 6, and the parent runs them as today. The tests of the lane run in the parent, so a test that runs `git init` in a temp dir works.
+- The parent serves only the functions of the two boundaries. A request for another function is an error.
+
+**R3. The sandbox of the child.** The child runs under the sandbox writer of `adapters/sandbox`, with a gate profile:
+
+- Process exec is denied, except the first exec of the child by `sandbox-exec` itself. `adapters/sandbox.Config` gets the field `ExecDenyAll`. SBPL then writes `(deny process-exec (require-not (signing-identifier "com.apple.sandbox-exec")))`, so `sandbox-exec` can start the child. `bwrap` binds only the `evolve` binary and its libraries, so no other program exists in the root.
+- The child reads the minimum system set of its OS first. On macOS that is `/usr/lib`, `/System/Library` and the dyld shared cache. On Linux it is the libraries of the `evolve` binary. Then it reads the lane root, the `evolve` binary and `policy.json`.
+- A deny of each `.git` entry comes after all these grants. The entries are the `.git` file of the lane, the git dir that it names and the common dir. Thus no grant readmits `.git`.
+- The secret files of the row "Read of secrets in `$HOME`" of section 9 of `llm-isolation.md` are denied, and the network is denied.
+- The child writes only to a scratch dir of the run.
+
+**R4. The mode.** The policy key `gates.hermetic.mode` holds `off`, `shadow` or `enforce`. Its name differs from `Entry.Stage`, which is the stage of the verdict of an entry.
+
+- At `shadow` on macOS, the profile reports each denied operation and lets it run. The runner reads the reports of the run from the system log. The query and the parser of those reports (`bridge.Deps.cellReports`, `parseReadReports`) move to one exported home in `adapters/sandbox`, next to the profile writer. `bridge` and `gaterun` both call it. It emits `GATE_HERMETIC_VIOLATION` with the entry, the operation and the path.
+- At `shadow` on Linux, `bwrap` cannot report. The same child runs through the same frames with no `bwrap` prefix, and the runner emits one `GATE_HERMETIC_NO_EVIDENCE` per run. Only the sandbox prefix varies, as a strategy of the profile. Linux moves to `enforce` with macOS.
+- At `enforce` a denied operation fails, and the entry gives a `Verdict` of error.
+
+**R5. What the sandbox does not hold.** The `mtime` class is a `stat`, which the sandbox cannot deny without breaking the read of the lane. The `inject` class is a property of code, not of a run. The walker of commit 3 measures both, and 7.15 lists their sites as refactor work.
+
+**R6. The frames.** The child and the parent exchange JSON lines on stdin and stdout. Each frame has a `kind`: `input`, `request`, `response`, `verdict` or `error`. An `error` frame, an exit that is not zero or a stream that ends with no `verdict` is a `Verdict` of error, never a pass. The parent keeps the stderr of the child for the signal.
+
+**R7. The order of the work.** The 7.11 rows change:
+
+1. `gaterun`, the broker, the frames, the gate profile and the mode at `shadow`.
+2. Each registered entry runs through `gaterun`. A wave at `shadow` on macOS gives the real `GATE_HERMETIC_VIOLATION` list.
+3. Commit 5 moves the reads of that list behind `repostate` and `gotool`. The 7.15 list of the walker guides it.
+4. The mode moves to `enforce` after a wave with no violation.
+
+Commit 6 (test 10 on the static walk) leaves the plan. The walker stays a measuring tool.
+
+The tests:
+
+- A fixture entry that runs `git log` itself is refused at `enforce` and reported at `shadow` on macOS, with the entry and the path. On Linux at `enforce` the exec fails.
+- A fixture entry that reads `<lane>/.git/HEAD` or the common dir is refused, although the lane root is granted.
+- A fixture entry that calls `repostate` and `gotool.Test` through the broker passes at `enforce`. The fixture module has a test that runs `git init` in a temp dir, and it passes.
+- A request for a function outside the two boundaries is an error.
+- An `error` frame, an exit that is not zero and a missing `verdict` each give a `Verdict` of error.
