@@ -104,3 +104,13 @@ func TestPatchAppliedDistinguishesLandedUnlandedAndMissing(t *testing.T) {
 		t.Error("missing patch file must be an error, not a verdict")
 	}
 }
+
+func TestRemoteMain_IsTheMainBranchOfTheRemote(t *testing.T) {
+	t.Parallel()
+	if gitexec.Remote != "origin" || gitexec.MainBranch != "main" {
+		t.Fatalf("Remote=%q MainBranch=%q, want origin and main", gitexec.Remote, gitexec.MainBranch)
+	}
+	if want := gitexec.Remote + "/" + gitexec.MainBranch; gitexec.RemoteMain != want {
+		t.Fatalf("RemoteMain=%q, want %q: the remote-tracking ref of a refspec must equal the ref that rev-list excludes", gitexec.RemoteMain, want)
+	}
+}
