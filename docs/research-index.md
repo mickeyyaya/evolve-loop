@@ -717,4 +717,10 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [research/practice-claude-model-release-notes-security-posture-2f02c519-2026-11.md](research/practice-claude-model-release-notes-security-posture-2f02c519-2026-11.md) | Note on the Claude model release notes for item 2f02c519, read as data. It covers the Compliance API security posture lines and the Managed Agents research preview. No persona and no notes file changes. |
 
+## 2026-11-12 — agy changelog command 1.5.5 note
+
+| Document | What it records |
+|---|---|
+| [research/practice-agy-cli-changelog-command-1-5-5-2026-11.md](research/practice-agy-cli-changelog-command-1-5-5-2026-11.md) | Note on the agy command release 1.5.5 for item 104dfdd9, read as data. The /swarm preview stays unused. No persona changes. |
+
 <!-- GENERATED:research-index END -->
