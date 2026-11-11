@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
-	"sort"
 	"strings"
 )
 
@@ -49,23 +49,35 @@ func unsupported(q Query) error {
 type Factory func() (Backend, error)
 
 func New(names []string, factories map[string]Factory) (Backends, error) {
+	built, err := Resolve(names, factories)
+	if err != nil {
+		return Backends{}, err
+	}
+	return NewBackends(built...), nil
+}
+
+func Resolve(names []string, factories map[string]Factory) ([]Backend, error) {
 	if len(names) == 0 {
-		return Backends{}, fmt.Errorf("codeindex: no backend named")
+		return nil, fmt.Errorf("codeindex: no backend named")
 	}
 	built := make([]Backend, 0, len(names))
 	seen := map[string]bool{}
 	for _, name := range names {
 		if seen[name] {
-			return Backends{}, fmt.Errorf("codeindex: duplicate backend %q", name)
+			return nil, fmt.Errorf("codeindex: duplicate backend %q", name)
 		}
 		seen[name] = true
 		backend, err := build(name, factories)
 		if err != nil {
-			return Backends{}, err
+			return nil, err
 		}
 		built = append(built, backend)
 	}
-	return NewBackends(built...), nil
+	return built, nil
+}
+
+func KnownBackends(factories map[string]Factory) []string {
+	return slices.Sorted(maps.Keys(factories))
 }
 
 func build(name string, factories map[string]Factory) (Backend, error) {
@@ -81,12 +93,7 @@ func build(name string, factories map[string]Factory) (Backend, error) {
 }
 
 func knownNames(factories map[string]Factory) string {
-	names := make([]string, 0, len(factories))
-	for name := range factories {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	return strings.Join(names, ", ")
+	return strings.Join(KnownBackends(factories), ", ")
 }
 
 func (b Backends) Refresh(ctx context.Context) ([]string, error) {

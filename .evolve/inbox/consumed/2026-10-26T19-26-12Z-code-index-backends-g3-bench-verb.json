@@ -5,13 +5,18 @@
     "The output table has precision, recall, p50, p95, bytes and failures for each backend, and the host load average",
     "A run on the real index gives gotypes a callers precision and recall of at least 0.95 for qualified names. If not, the plan records the measured values"
   ],
+  "consumed": {
+    "at": "2026-11-11T08:12:24Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "continuation": {
-    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2281",
-    "branch": "cycle-cd3ae73e-2281",
-    "snapshot_sha": "f31c9f4cf1b8e070bee59d50a96ba26969d17eb3",
     "base_sha": "67a8d49f6e51f8d7b1d26e44d71d883df4e848da",
+    "branch": "cycle-cd3ae73e-2281",
+    "cycle": 2281,
     "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2281/audit-fail-reason.json",
-    "cycle": 2281
+    "snapshot_sha": "f31c9f4cf1b8e070bee59d50a96ba26969d17eb3",
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2281"
   },
   "created_at": "2026-10-26T19:26:11Z",
   "deps": [],
