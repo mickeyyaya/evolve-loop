@@ -666,4 +666,28 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [research/practice-agy-cli-changelog-page-v2300-2026-11.md](research/practice-agy-cli-changelog-page-v2300-2026-11.md) | Note on the agy page releases v2.30.0, v2.29.1 and v2.29.0 for item 1b0c9251, read as data. They belong to the App panel. No persona changes. |
 
+## 2026-11-10 — agy changelog command 1.5.4 note
+
+| Document | What it records |
+|---|---|
+| [research/practice-agy-cli-changelog-command-1-5-4-2026-11.md](research/practice-agy-cli-changelog-command-1-5-4-2026-11.md) | Note on the agy command releases 1.5.4 and 1.5.3 for item 5a49deca, read as data. They are CLI product changes. No persona changes. |
+
+## 2026-11-10 — Claude model release notes, Fable 5.2 and Mythos 5.2
+
+| Document | What it records |
+|---|---|
+| [research/practice-claude-model-release-notes-fable-5-2-2026-11.md](research/practice-claude-model-release-notes-fable-5-2-2026-11.md) | Note on the Claude model release notes for item 9cd2c891, read as data. It covers the thinking prefix check of Fable 5.2 and Mythos 5.2. One notes bullet changes. No persona changes. |
+
+## 2026-11-10 — Claude prompting guide, Fable 5.2 and Mythos 5.2 effort
+
+| Document | What it records |
+|---|---|
+| [research/practice-claude-prompting-guide-effort-2026-11.md](research/practice-claude-prompting-guide-effort-2026-11.md) | Note on the Claude prompting guide for item bc673fd8, read as data. It covers effort and thinking on Fable 5.2 and Mythos 5.2. One notes bullet changes. No persona changes. |
+
+## 2026-11-10 — Claude Code changelog, releases 2.1.321 and 2.1.322
+
+| Document | What it records |
+|---|---|
+| [research/claude-code-changelog-2-1-322.md](research/claude-code-changelog-2-1-322.md) | Note on the Claude Code changelog for item 4de759d9, read as data. It covers the Fable 5.2 default model, Vertex fast mode and the sandbox, permission and Edit fixes. No persona and no model note changes. |
+
 <!-- GENERATED:research-index END -->

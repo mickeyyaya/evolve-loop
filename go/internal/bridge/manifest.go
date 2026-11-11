@@ -86,7 +86,6 @@ type Manifest struct {
 	Stub                    bool                     `json:"stub"`
 	ModelTierMap            map[string]string        `json:"model_tier_map,omitempty"`
 	ModelTierMapFrom        string                   `json:"model_tier_map_from,omitempty"`
-	ModelTierPins           []string                 `json:"model_tier_pins,omitempty"`
 	ChatGPTSafeModels       []string                 `json:"chatgpt_safe_models,omitempty"`
 	ChatGPTDefaultModel     string                   `json:"chatgpt_default_model,omitempty"`
 	ModelFreshness          ModelFreshness           `json:"model_freshness,omitempty"`
@@ -105,8 +104,6 @@ type Manifest struct {
 	ContextWindow           int                      `json:"context_window,omitempty"`
 	CloudLaunch             *CloudLaunchSpec         `json:"cloud_launch,omitempty"`
 	SeatLogin               string                   `json:"seat_login,omitempty"`
-
-	tierPins map[string]string
 }
 
 const (
@@ -136,7 +133,6 @@ func LoadManifest(cli string) (Manifest, error) {
 	if err != nil {
 		return Manifest{}, err
 	}
-	m.tierPins = declaredTierPins(m)
 	return overlayManifestCatalog(m), nil
 }
 

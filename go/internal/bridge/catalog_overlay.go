@@ -86,6 +86,6 @@ func applyCatalogTierMap(m Manifest, cat modelcatalog.Catalog) Manifest {
 	if merged == nil {
 		return m
 	}
-	m.ModelTierMap, _ = modelcatalog.PinTiers(merged, m.tierPins, cat.CLIs[base].Available)
+	m.ModelTierMap = merged
 	return m
 }

@@ -25,8 +25,6 @@
 - `KeepLivePicks` keeps the prior `live` entry of a CLI whose fresh entry is not `live`. A failed live list thus never moves a family from a live pick to its detect map. It returns the names that it kept, in order. The inputs are not mutated.
 - `CanonicalTiers` drops non-canonical keys from a snapshot. The catalog never holds a tier that dispatch cannot request. `high` is an input alias of `deep` in the bridge, not a tier of its own.
 - `CandidatesHash` fingerprints the decision inputs of the refresh. The next refresh skips the classifier call when the fingerprint matches. An absent hash never matches, so a pre-existing catalog classifies once and then stabilizes.
-- `PinTiers` is the one home of the tier pin rule. It moves a pinned tier to its model only when the offered list has that model. It reports each other pin as `tier=model` in tier order. It returns a new map, and with no pin it returns the map of the caller. The refresh (`modelquery`) and the launch overlay (`bridge`) call it. Pinned by `TestPinTiers_AnOfferedPinMovesItsTierAndAnUnofferedPinIsReported`, `TestPinTiers_NoPinReturnsTheTiersOfTheCaller` and `TestPinPairs_GivesEachPinAsTierEqualsModelInTierOrder`.
-- `PinPairs` is the one home of the `tier=model` form. The WARN line of an unmet pin and the fingerprint of `modelquery` read it.
 - `RefreshDegradedEvent(origin, cli, reason)` builds the Signal Center `config.warning` event with the code `CONFIG_CATALOG_REFRESH_DEGRADED`. The package registers the code for the config module. The cycle-start and loop-boot refresher emits one event for each family that `KeepLivePicks` kept. The event fields are `cli` and `fallback_reason`.
 
 ## Why the store writes the way it does

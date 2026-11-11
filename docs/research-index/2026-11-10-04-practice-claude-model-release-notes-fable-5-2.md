@@ -1,4 +1,3 @@
-
 ## 2026-11-10 — Claude model release notes, Fable 5.2 and Mythos 5.2
 
 | Document | What it records |

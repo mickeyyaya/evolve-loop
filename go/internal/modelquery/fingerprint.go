@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
-
-	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
 )
 
 const decisionVersion = "v2"
@@ -17,7 +15,6 @@ type FingerprintInput struct {
 	Candidates []string
 	Policy     FreshnessPolicy
 	Tiers      []string
-	Pins       map[string]string
 }
 
 func Fingerprint(in FingerprintInput) string {
@@ -39,9 +36,5 @@ func Fingerprint(in FingerprintInput) string {
 	writeField(strconv.FormatBool(in.Policy.PreferAlias))
 	writeList(in.Policy.AliasIDs)
 	writeList(in.Tiers)
-	if len(in.Pins) > 0 {
-		writeField("pins")
-		writeList(modelcatalog.PinPairs(in.Pins))
-	}
 	return "sha256:" + hex.EncodeToString(h.Sum(nil))
 }
