@@ -63,3 +63,18 @@ func TestCheckpointResumable_IsTheRuleLoopResumeApplies(t *testing.T) {
 		t.Errorf("an absent state with default options: err = %v, want ErrNoCheckpoint", err)
 	}
 }
+
+func TestResumableReasons_ListsEveryReasonIsResumableReasonAccepts(t *testing.T) {
+	t.Parallel()
+
+	got := ResumableReasons()
+	want := []string{"batch-cap-near", "operator-requested", "quota-likely", "stall-inactivity"}
+	if len(got) != len(want) {
+		t.Fatalf("ResumableReasons() = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("ResumableReasons()[%d] = %q, want %q", i, got[i], want[i])
+		}
+	}
+}

@@ -567,6 +567,17 @@ func stringsFromAny(v any) []string {
 
 func IsResumableReason(reason string) bool { return resumableReasons[reason] }
 
+func ResumableReasons() []string {
+	out := make([]string, 0, len(resumableReasons))
+	for reason, resumable := range resumableReasons {
+		if resumable {
+			out = append(out, reason)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
 func CheckpointResumable(statePath, projectRoot string, opts ResumeOptions) (*ResumePoint, error) {
 	return loadResumeStateFrom(statePath, projectRoot, opts.withDefaults().withMaxAge(filepath.Join(projectRoot, ".evolve")))
 }
