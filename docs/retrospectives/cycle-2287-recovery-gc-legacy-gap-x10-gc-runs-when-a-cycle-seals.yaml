@@ -1,0 +1,11 @@
+- id: "cycle-2287-recovery-gc-legacy-gap-x10-gc-runs-when-a-cycle-seals"
+  pattern: "recovery of gc-legacy-gap-x10-gc-runs-when-a-cycle-seals"
+  description: "The item `gc-legacy-gap-x10-gc-runs-when-a-cycle-seals` failed in 3 tries with the classes `infra-error`, `unknown` and `verdict-fail`. Cycle 2287 shipped it. Before a new try of a similar item, read the difference above."
+  source: "docs/retrospectives/cycle-2287-recovery-gc-legacy-gap-x10-gc-runs-when-a-cycle-seals.md"
+  type: "recovery"
+  category: "retrospective"
+  preventiveAction: "Before a new try of a similar item, read the retrospective cycle-2287-recovery-gc-legacy-gap-x10-gc-runs-when-a-cycle-seals in docs/retrospectives"
+  confidence: 0.8
+  failureContext:
+    failedStep: ""
+    errorCategory: "infra-error unknown verdict-fail"
