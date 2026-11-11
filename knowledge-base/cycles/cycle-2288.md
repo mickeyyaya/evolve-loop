@@ -1,0 +1,85 @@
+# Cycle 2288 Dossier
+
+**Goal:** Wave 165.
+
+Work the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.
+
+Every cycle must:
+- commit to a claimed inbox item (an empty top_n must not run the spine);
+- bind its audit to the changes tree that it ships;
+- disposition its own defect ledger and the inherited ids;
+- record a terminal outcome on every exit;
+- never change a protected control-plane file with a tool;
+- leave no stale worktree.
+
+Routing:
+- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.
+- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.
+- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.
+
+Craft:
+- New and changed code has no comments. Names, types and tests give the intent.
+- Write each new document and each new log text in ASD-STE100.
+- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.
+- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.
+
+Evidence:
+- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.
+
+The measure of this wave is the number of shipped cycles. Keep each cycle shipping.
+
+Wave 164 facts (run 20261110T083435Z): 8 of 16 cycles shipped.
+- Cycle 2269: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.
+- Cycle 2270: final verdict PASS. It shipped.
+- Cycle 2271: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…s FAIL github.com/mickeyyaya/evolve-loop/go/cmd/evolve 266.302s ok   github.com/mickeyyaya/evolve-loop/go/internal/gc 48.940s coverage: 99.8% of statements FAIL. Last phase: aborted. It did not ship.
+- Cycle 2272: final verdict PASS. It shipped.
+- Cycle 2273: final verdict FAIL. Termination: triage-empty-commitment-claimable-work. Last phase: triage. It did not ship.
+- Cycle 2274: final verdict PASS. It shipped.
+- Cycle 2275: final verdict PASS. It shipped.
+- Cycle 2276: final verdict PASS. It shipped.
+- Cycle 2277: final verdict PASS. It shipped.
+- Cycle 2278: final verdict PASS. It shipped.
+- Cycle 2279: final verdict PASS. It shipped.
+- Cycle 2280: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…s FAIL github.com/mickeyyaya/evolve-loop/go/cmd/evolve 320.166s ok   github.com/mickeyyaya/evolve-loop/go/internal/gc 60.063s coverage: 99.8% of statements FAIL. Last phase: aborted. It did not ship.
+- Cycle 2281: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…s/codeindex/gotypes 0.870s coverage: 100.0% of statements ok   github.com/mickeyyaya/evolve-loop/go/internal/codeindex 0.271s coverage: 96.6% of statements FAIL. Last phase: aborted. It did not ship.
+- Cycle 2282: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…m/mickeyyaya/evolve-loop/go/cmd/evolve 288.207s ok   github.com/mickeyyaya/evolve-loop/go/internal/codeindex/usagelog 0.258s coverage: 100.0% of statements FAIL. Last phase: aborted. It did not ship.
+- Cycle 2283: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…loop/go/internal/gc 42.308s coverage: 99.8% of statements ok   github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy 0.351s coverage: 100.0% of statements FAIL. Last phase: aborted. It did not ship.
+- Cycle 2284: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…github.com/mickeyyaya/evolve-loop/go/cmd/evolve 289.485s ok   github.com/mickeyyaya/evolve-loop/go/internal/checkpoint 4.058s coverage: 93.9% of statements FAIL. Last phase: aborted. It did not ship.
+- Pull requests merged at this boundary: none.
+
+Earlier waves:
+- Wave 161 (run 20261108T161932Z): 9 of 14 cycles shipped.
+- Wave 162 (run 20261109T053101Z): 11 of 16 cycles shipped.
+- Wave 163 (run 20261109T204337Z): 14 of 16 cycles shipped.
+**Final verdict:** PASS
+**Run ID:** 01M74473R05F9A60QCF342ZDKB
+**Commit:** 4ea0406bf9817b7c99036124e689a2b838d529fc
+**Committed:** `inbox-prioritization-p6-intake-docs`
+
+## Phases
+
+| Phase | Archetype | Verdict | Duration | Key Findings |
+|-------|-----------|---------|----------|--------------|
+| scout | plan | PASS | 50s |  |
+| triage | plan | PASS | 31s |  |
+| tdd | plan | PASS | 2m4s |  |
+| build | build | PASS | 2m59s |  |
+| docs-review | evaluate | PASS | 33s |  |
+| audit | evaluate | WARN | 3m54s |  |
+| build | build | PASS | 1m14s |  |
+| audit | evaluate | WARN | 1m15s |  |
+| ship | control | FAIL | 42s |  |
+| audit | evaluate | WARN | 12m14s |  |
+| ship | control | FAIL | 50s |  |
+| ship | control | PASS | 1m11s |  |
+
+## Timing
+
+**Total:** 28m17s across 12 phases (0 retried) · **Longest:** audit 12m14s
+
+| Archetype | Wall-clock |
+|-----------|------------|
+| build | 4m12s |
+| control | 2m43s |
+| evaluate | 17m56s |
+| plan | 3m26s |
