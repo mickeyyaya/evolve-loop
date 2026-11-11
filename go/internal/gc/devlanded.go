@@ -12,6 +12,9 @@ const landedInMain = "is in main"
 
 func (s *devSweep) landedEarly(ctx context.Context, it *DevItem) (bool, error) {
 	tree := gitexec.Git{Dir: it.Path, Exec: s.o.Exec}
+	if it.Branch == "" {
+		return s.detachedLandedEarly(ctx, tree, it)
+	}
 	own, err := hasOwnWork(ctx, tree, it.Head)
 	if err != nil || !own {
 		return false, err
@@ -29,6 +32,11 @@ func (s *devSweep) landedEarly(ctx context.Context, it *DevItem) (bool, error) {
 		return false, err
 	}
 	return len(prs[it.Branch]) == 0, nil
+}
+
+func (s *devSweep) detachedLandedEarly(ctx context.Context, tree gitexec.Git, it *DevItem) (bool, error) {
+	dirty, err := tree.DirtyPaths(ctx)
+	return s.detached[it.Path].merged && len(dirty) == 0, err
 }
 
 func hasOwnWork(ctx context.Context, tree gitexec.Git, head string) (bool, error) {

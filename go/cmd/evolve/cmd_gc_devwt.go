@@ -170,6 +170,25 @@ func ghOpenPRUpdates(ctx context.Context, dir string) (map[string][]time.Time, e
 	return parseOpenPRUpdates(out)
 }
 
+func ghPullRequestHeads(ctx context.Context, dir string) (map[string]bool, error) {
+	if _, err := exec.LookPath("gh"); err != nil {
+		return nil, fmt.Errorf("%w: %v", gc.ErrPRLookupUnavailable, err)
+	}
+	ctx, cancel := context.WithTimeout(ctx, devGHTimeout)
+	defer cancel()
+	prs, err := gc.GhRemoteAPI{Exec: sysexec.DefaultRunner, Dir: dir}.PullRequests(ctx)
+	if err != nil {
+		return nil, err
+	}
+	heads := map[string]bool{}
+	for _, pr := range prs {
+		if pr.HeadRefOid != "" {
+			heads[pr.HeadRefOid] = true
+		}
+	}
+	return heads, nil
+}
+
 func ghStderr(err error) string {
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {

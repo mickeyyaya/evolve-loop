@@ -33,6 +33,7 @@ type DevItem struct {
 	Action   DevAction `json:"action"`
 	IdleDays float64   `json:"idle_days"`
 	Dirty    bool      `json:"dirty,omitempty"`
+	Unique   bool      `json:"unique,omitempty"`
 	Failed   bool      `json:"failed,omitempty"`
 	Skipped  bool      `json:"skipped,omitempty"`
 	Reason   string    `json:"reason"`
@@ -58,6 +59,7 @@ type DevOptions struct {
 	Exec        sysexec.RunFunc
 	Processes   func(ctx context.Context) ([]Process, error)
 	OpenPRs     OpenPRLookup
+	PRHeads     func(ctx context.Context, dir string) (map[string]bool, error)
 	Save        DevSaveFunc
 	Deferred    func(path string)
 }
@@ -103,6 +105,9 @@ type devSweep struct {
 	prsSkipped bool
 	strictPR   bool
 	early      map[string]bool
+	detached   map[string]detachedFree
+	heads      map[string]bool
+	headsRead  bool
 }
 
 func newDevSweep(ctx context.Context, o DevOptions) (*devSweep, string, error) {
@@ -145,6 +150,11 @@ func PlanDevWorktrees(ctx context.Context, o DevOptions) (DevManifest, error) {
 
 func overBudgetManifest() DevManifest {
 	return DevManifest{Skipped: "the time budget ran out before the sweep could list the dev worktrees and the processes inside them; nothing is archived this run", OverBudget: true}
+}
+
+type detachedFree struct {
+	why    string
+	merged bool
 }
 
 type devGate func(ctx context.Context, it *DevItem) (string, error)
@@ -222,11 +232,43 @@ func (s *devSweep) gateOccupied(_ context.Context, it *DevItem) (string, error) 
 	return "", nil
 }
 
-func (s *devSweep) gateBranch(_ context.Context, it *DevItem) (string, error) {
-	if it.Branch == "" {
-		return "detached HEAD; no branch keeps its commits", nil
+func (s *devSweep) gateBranch(ctx context.Context, it *DevItem) (string, error) {
+	if it.Branch != "" {
+		return "", nil
+	}
+	merged, err := s.ancestorOfMain(ctx, it.Head)
+	switch {
+	case err != nil:
+		return "", err
+	case merged:
+		s.markDetached(it.Path, detachedFree{why: "its head " + landedInMain, merged: true})
+	case s.prHeads(ctx)[it.Head]:
+		s.markDetached(it.Path, detachedFree{why: "its head is a pull request head"})
+	default:
+		it.Unique = true
 	}
 	return "", nil
+}
+
+func (s *devSweep) markDetached(path string, free detachedFree) {
+	if s.detached == nil {
+		s.detached = map[string]detachedFree{}
+	}
+	s.detached[path] = free
+}
+
+func (s *devSweep) prHeads(ctx context.Context) map[string]bool {
+	if s.headsRead || s.o.PRHeads == nil {
+		return s.heads
+	}
+	s.headsRead = true
+	heads, err := s.o.PRHeads(ctx, s.o.ProjectRoot)
+	if err != nil {
+		s.notes = append(s.notes, "pull request heads unavailable, so a detached head counts as unique: "+err.Error())
+		return nil
+	}
+	s.heads = heads
+	return heads
 }
 
 func (s *devSweep) gateIdle(ctx context.Context, it *DevItem) (string, error) {
@@ -252,6 +294,9 @@ func (s *devSweep) gateIdle(ctx context.Context, it *DevItem) (string, error) {
 }
 
 func (s *devSweep) gateOpenPR(ctx context.Context, it *DevItem) (string, error) {
+	if it.Branch == "" {
+		return "", nil
+	}
 	prs, err := s.openPRs(ctx)
 	if err != nil {
 		return "", err
@@ -299,7 +344,7 @@ func (s *devSweep) finish(ctx context.Context, tree gitexec.Git, it DevItem) Dev
 	}
 	landed := ""
 	if err == nil {
-		landed, err = s.landed(ctx, it)
+		landed, err = s.landedOrDetached(ctx, it)
 	}
 	if err != nil && ctx.Err() != nil {
 		it.Skipped, it.Reason = true, "not judged: the time budget ran out: "+err.Error()
@@ -315,9 +360,14 @@ func (s *devSweep) finish(ctx context.Context, tree gitexec.Git, it DevItem) Dev
 }
 
 func archiveReason(it DevItem, landed string, limit time.Duration, early bool) string {
-	reason := fmt.Sprintf("idle %.1f days (limit %d); branch %s %s and stays", it.IdleDays, int(limit.Hours()/24), it.Branch, landed)
+	days := int(limit.Hours() / 24)
+	subject, tail := "branch "+it.Branch, " and stays"
+	if it.Branch == "" {
+		subject, tail = "detached head", ""
+	}
+	reason := fmt.Sprintf("idle %.1f days (limit %d); %s %s%s", it.IdleDays, days, subject, landed, tail)
 	if early {
-		reason = fmt.Sprintf("landed early: branch %s %s, the tree is clean and no pull request is open (idle %.1f days, limit %d skipped)", it.Branch, landed, it.IdleDays, int(limit.Hours()/24))
+		reason = fmt.Sprintf("landed early: %s %s, the tree is clean and no pull request is open (idle %.1f days, limit %d skipped)", subject, landed, it.IdleDays, days)
 	}
 	if it.Dirty {
 		reason += "; uncommitted work is saved as a checkpoint first"
@@ -325,12 +375,30 @@ func archiveReason(it DevItem, landed string, limit time.Duration, early bool) s
 	return reason
 }
 
+func (s *devSweep) ancestorOfMain(ctx context.Context, head string) (bool, error) {
+	_, stderr, code, err := s.store.Capture(ctx, "merge-base", "--is-ancestor", head, plane.OriginMainRef)
+	if err != nil || code > 1 {
+		return false, fmt.Errorf("git merge-base --is-ancestor exit %d err=%v: %s", code, err, strings.TrimSpace(stderr))
+	}
+	return code == 0, nil
+}
+
+func (s *devSweep) landedOrDetached(ctx context.Context, it DevItem) (string, error) {
+	if it.Branch != "" {
+		return s.landed(ctx, it)
+	}
+	if free, ok := s.detached[it.Path]; ok {
+		return "is free of unique work: " + free.why, nil
+	}
+	return "is unique: no branch, main or pull request holds it, so a save comes first", nil
+}
+
 func (s *devSweep) landed(ctx context.Context, it DevItem) (string, error) {
-	_, stderr, code, err := s.store.Capture(ctx, "merge-base", "--is-ancestor", it.Head, plane.OriginMainRef)
+	merged, err := s.ancestorOfMain(ctx, it.Head)
 	switch {
-	case err != nil || code > 1:
-		return "", fmt.Errorf("git merge-base --is-ancestor exit %d err=%v: %s", code, err, strings.TrimSpace(stderr))
-	case code == 0:
+	case err != nil:
+		return "", err
+	case merged:
 		return landedInMain, nil
 	}
 	res, err := branchLandedBySquash(ctx, s.store, plane.OriginMainRef, it.Branch)

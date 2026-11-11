@@ -335,6 +335,8 @@ var serialTests = map[string]string{
 	"main.TestDefaultLoopPreflight_AHarnessFaultIsASyntheticHalt":                                                     "changes the working directory through a helper",
 	"main.TestDevWorktreeGCOptions_AnUnreadableCallerDirectoryFailsClosed":                                            "swaps seam processGetwd",
 	"main.TestDevWorktreeGCOptions_CarriesThePolicyTheCallerAndTheRealSeams":                                          "swaps seam processGetwd",
+	"main.TestDevWorktreeGCOptions_TheWiredPullRequestHeadLookupReadsTheHeadsFromGh":                                  "sets the process PATH through t.Setenv",
+	"main.TestDevWorktreeGCOptions_TheWiredPullRequestHeadLookupSurfacesAFailingGh":                                   "sets the process PATH through t.Setenv",
 	"main.TestDispatchLogTTLDays_ACatalogWithoutTheDispatchCategoryFallsBackToTheLogsTTL":                             "swaps seam dispatchLogCatalog",
 	"main.TestDispatch_LoopRoutesToRunLoop":                                                                           "dispatches a command that writes env",
 	"main.TestDocsSteLint_AddedExitsTwoWhenTheDiffIsRefused":                                                          "swaps seam steParseDiff",

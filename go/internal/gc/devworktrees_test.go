@@ -193,16 +193,6 @@ func TestPlanDevWorktrees_ARealProcessInsideATreeKeepsItAndEndsWhenTheProcessEnd
 	}
 }
 
-func TestPlanDevWorktrees_ADetachedTreeIsKept(t *testing.T) {
-	e := newDevEnv(t)
-	dir := filepath.Join(e.root, "dev", "detached")
-	e.store.Git("worktree", "add", "-q", "--detach", dir, "main")
-	it := devItemFor(t, e.plan(e.options(idleOffset)), dir)
-	if it.Action != DevActionKeep || !strings.Contains(it.Reason, "detached HEAD") {
-		t.Fatalf("detached tree = %+v, want kept because no branch holds its commits", it)
-	}
-}
-
 func TestPlanDevWorktrees_OpenPullRequestsKeepATreeOnlyWhileTheyAreFresh(t *testing.T) {
 	e := newDevEnv(t)
 	recent := e.addDev("pr-recent")
