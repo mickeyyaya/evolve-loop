@@ -169,3 +169,19 @@ func TestRunCodeCommand_RoutesTheBenchVerb(t *testing.T) {
 		t.Errorf("rc=%d stderr=%q, want the bench usage exit", rc, stderr.String())
 	}
 }
+
+type failingStdout struct{}
+
+func (failingStdout) Write([]byte) (int, error) { return 0, io.ErrClosedPipe }
+
+func TestCodeBench_AStdoutThatCannotBeWrittenFailsTheRun(t *testing.T) {
+	t.Parallel()
+	root, _ := benchProject(t, benchLibSource)
+	var stderr bytes.Buffer
+
+	rc := codeBenchVerb([]string{"--backends", "gotypes", "--project-root", root, "--symbols", "5"}, failingStdout{}, &stderr, benchHost("{ 2.50 1.00 1.00 }"))
+
+	if rc != codeExitFailed || !strings.Contains(stderr.String(), "evolve code bench:") {
+		t.Errorf("rc=%d stderr=%q, want codeExitFailed and the named write error", rc, stderr.String())
+	}
+}

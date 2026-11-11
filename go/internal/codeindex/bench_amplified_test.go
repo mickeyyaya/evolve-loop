@@ -1,7 +1,9 @@
 package codeindex_test
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"sort"
 	"strings"
 	"testing"
@@ -142,5 +144,36 @@ func TestAmp_GrepCheck_MissingRootErrors(t *testing.T) {
 	err := codeindex.GrepCheck(t.TempDir()+"/absent", codeindex.BenchSymbol{Name: "X", DefFile: "x.go", DefLine: 1, Sites: []codeindex.TruthSite{{File: "y.go", Line: 3, Func: "F"}}, GrepFiles: []string{"y.go"}})
 	if err == nil {
 		t.Fatal("want error for missing root")
+	}
+}
+
+type loadLineFailingWriter struct{ buf bytes.Buffer }
+
+func (w *loadLineFailingWriter) Write(p []byte) (int, error) {
+	if strings.Contains(string(p), "host load") {
+		return 0, errBenchWrite
+	}
+	return w.buf.Write(p)
+}
+
+type failingBenchWriter struct{}
+
+func (failingBenchWriter) Write([]byte) (int, error) { return 0, errBenchWrite }
+
+var errBenchWrite = errors.New("disk full")
+
+func TestBenchReportWriteTable_ReturnsTheFlushErrorAndTheLoadLineError(t *testing.T) {
+	t.Parallel()
+	report := codeindex.BenchReport{LoadAvg: 1}
+
+	if err := report.WriteTable(failingBenchWriter{}); !errors.Is(err, errBenchWrite) {
+		t.Errorf("flush err=%v, want %v", err, errBenchWrite)
+	}
+	if err := report.WriteTable(&loadLineFailingWriter{}); !errors.Is(err, errBenchWrite) {
+		t.Errorf("load line err=%v, want %v", err, errBenchWrite)
+	}
+	var ok bytes.Buffer
+	if err := report.WriteTable(&ok); err != nil || !strings.Contains(ok.String(), "host load average: 1.00") {
+		t.Errorf("working writer err=%v out=%q", err, ok.String())
 	}
 }

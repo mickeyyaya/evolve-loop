@@ -353,10 +353,10 @@ func TestBranchSweep_ApplyKeepsTheHistoricalDeleteOfASquashLandedBranch(t *testi
 		}
 	})
 	t.Run("squash check no longer passes", func(t *testing.T) {
-		e, tip := setup(t)
+		e, _ := setup(t)
 		e.repo.Git("switch", "-q", "cycle-sq")
 		commitRepoFile(t, e.repo, "after.txt", "after\n")
-		tip = e.repo.Git("rev-parse", "HEAD")
+		tip := e.repo.Git("rev-parse", "HEAD")
 		e.repo.Git("switch", "-q", "main")
 		err := ApplyWorktrees(e.opts, manifest(tip))
 		if err == nil || !strings.Contains(err.Error(), "no longer passes") {

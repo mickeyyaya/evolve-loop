@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"slices"
 	"strconv"
 	"strings"
@@ -174,7 +175,12 @@ func medianInt(values []int) int {
 
 func (r BenchReport) Table() string {
 	var b strings.Builder
-	w := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
+	_ = r.WriteTable(&b)
+	return b.String()
+}
+
+func (r BenchReport) WriteTable(out io.Writer) error {
+	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "backend\tquery\tprecision\trecall\tp50\tp95\tbytes\tfailures\ttp\tfp\tfn")
 	for _, row := range r.Rows {
 		fmt.Fprintf(w, "%s\t%s\t%.2f\t%.2f\t%s\t%s\t%d\t%d\t%d\t%d\t%d\n",
@@ -182,7 +188,9 @@ func (r BenchReport) Table() string {
 			row.P50.Round(time.Microsecond), row.P95.Round(time.Microsecond),
 			row.MedianBytes, row.Failures, row.TP, row.FP, row.FN)
 	}
-	w.Flush()
-	fmt.Fprintf(&b, "host load average: %.2f\n", r.LoadAvg)
-	return b.String()
+	if err := w.Flush(); err != nil {
+		return err
+	}
+	_, err := fmt.Fprintf(out, "host load average: %.2f\n", r.LoadAvg)
+	return err
 }

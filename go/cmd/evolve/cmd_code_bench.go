@@ -57,21 +57,28 @@ func codeBenchVerb(args []string, stdout, stderr io.Writer, host codeIndexHost) 
 		fmt.Fprintln(stderr, message)
 		return rc
 	}
-	report, err := codeindex.RunBench(ctx, codeindex.BenchRun{
+	report, err := runCodeBench(ctx, host, loc, measured, pool, *symbols, *rounds)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve code bench: %v\n", err)
+		return codeExitFailed
+	}
+	if err := report.WriteTable(stdout); err != nil {
+		fmt.Fprintf(stderr, "evolve code bench: %v\n", err)
+		return codeExitFailed
+	}
+	return 0
+}
+
+func runCodeBench(ctx context.Context, host codeIndexHost, loc codeIndexLocation, measured []codeindex.Backend, pool []codeindex.BenchSymbol, symbols, rounds int) (codeindex.BenchReport, error) {
+	return codeindex.RunBench(ctx, codeindex.BenchRun{
 		Backends:    measured,
-		Symbols:     codeindex.SampleSymbols(pool, *symbols, codeBenchProbes()),
-		Rounds:      *rounds,
+		Symbols:     codeindex.SampleSymbols(pool, symbols, codeBenchProbes()),
+		Rounds:      rounds,
 		Now:         time.Now,
 		LoadAvg:     func() float64 { return hostLoadAverage(ctx, host, os.ReadFile) },
 		Root:        loc.indexDir,
 		GrepSymbols: codeBenchGrepSymbols,
 	})
-	if err != nil {
-		fmt.Fprintf(stderr, "evolve code bench: %v\n", err)
-		return codeExitFailed
-	}
-	fmt.Fprint(stdout, report.Table())
-	return 0
 }
 
 func codeBenchNames(flagValue string, factories map[string]codeindex.Factory) []string {

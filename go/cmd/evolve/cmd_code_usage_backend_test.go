@@ -11,6 +11,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/codeindex"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codeindex/codeindextest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codeindex/usagelog"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
 func gotypesAndTrail(index map[codeindex.Request][]codeindex.Hit) []codeindex.Backend {
@@ -219,7 +220,7 @@ func countTrailMapCalls(t *testing.T, root string) int {
 }
 
 func TestRunCodeCommandBackend_ARealCallLogsTheBackendTheRouteUsed(t *testing.T) {
-	t.Parallel()
+	t.Setenv(ipcenv.DispatchIDKey, "")
 	root := codePolicyRoot(t, map[string]string{"trail_bin": strconvQuote(filepath.Join(t.TempDir(), "no-trail"))})
 	before := countTrailMapCalls(t, root)
 
