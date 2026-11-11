@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — the console instruction for an overlap refusal of `evolve inbox add` (P6, 2026-11-11)
+
+- **The instruction.** `skills/loop/SKILL.md` tells the console to ask the operator when `evolve inbox add` ends with exit 3. The console shows the ids, and names three options: extend, withdraw, or `--allow-overlap --reason`.
+- Docs: [internal-inboxrank](docs/architecture/packages/internal-inboxrank.md), [internal-inboxbatch](docs/architecture/packages/internal-inboxbatch.md).
+
 ## Added — the `claude-cloud` bridge seat starts a Claude Code cloud session (2026-11-03)
 
 - **The driver.** `claude-cloud` is a bridge driver with the manifest `claude-cloud.json` (`base: claude-tmux`). It runs `claude --cloud "<task>"` in a private tmux pane. It reads the session line and the view line, then ends only its own session. The outcome is `launched`; the deliverable is a later pull request of the cloud session.

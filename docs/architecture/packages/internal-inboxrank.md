@@ -33,6 +33,10 @@ Each consumer loads its `Inputs` through `rankinputs.Load(evolveDir, now)`, and 
 - **Unknown classes are named, not hidden.** `ClassWarnings` lists every item whose `priority_class` the order lacks, with `inboxbatch.CheckPriorityClass`'s message, the same rule `evolve inbox add` refuses with. The item still ranks, below every known class.
 - **Every autofiled item carries a class** (since the plan's P2 prerequisite, 2026-10-06). P1 found eight production autofilers writing pending items without `priority_class`, which under P2 would have scored a class feature of 0 and sunk below mid-weight items. Each now stamps the class of the finding it files (correctness for a red CI run, a demoted contract gate, a fail-learning defect and a suspect triage-cap gate; stability for fleet starvation, a goal stall and an ADR-0072 halt; debuggability for an unexplained outcome), and cmd/evolve's `TestInboxWriters_EveryAutofiledItemCarriesAKnownClass` holds them to the checked-in `class_order`, with a source scan that reds on any unenrolled production write into `.evolve/inbox/` (ADR-0121 amendment; [the plan](../../plans/inbox-prioritization-2026-10.md)).
 
+## The add-time intake
+
+An item records its origin: `operator`, `console`, `cycle` or `retro`. `evolve inbox add` stamps `console` by default. The rank does not read the origin; the add-time intake does ([internal-inboxcurator.md](internal-inboxcurator.md)). When `evolve inbox add` finds an overlap with an open item, it ends with exit 3 and prints the ids. The console then asks the operator. The operator can extend the open item, withdraw the new item, or file it with `--allow-overlap --reason`.
+
 ## Invariants
 
 - **The contributions add up to the score, exactly.** Each contribution is `float64(value × weight)`: the explicit conversion forbids the compiler from fusing the product into the following addition (Go may emit a fused multiply-add on arm64), so the score is the plain sum of the rounded contributions on every architecture. Pinned by `TestScore_ContributionsAddUpToTheScore` and, through the verb, `TestCmd_InboxRank_ExplainContributionsAddUpToTheScore`.

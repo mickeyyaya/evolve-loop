@@ -220,6 +220,10 @@ Use `evolve wave` to run and watch the next wave. Do not write a goal script, an
 
 For one cycle in the foreground, use `evolve cycle run --goal-text "<goal>"`. To resume a paused cycle, use `evolve loop --resume`.
 
+## A refused `evolve inbox add` (2026-10-27)
+
+When `evolve inbox add` ends with exit 3, an open item overlaps the new one. The command prints the ids of the open items and the similarity. Do not retry at once. Ask the operator. Show the ids, and name three options: extend the open item, withdraw the new item, or file it with `--allow-overlap --reason "<why both are needed>"`. The command records the reason in the item, so the audit can read it. File the item with `--allow-overlap` only after the operator gives a reason.
+
 ## Quota Handling & Auto-Resume (v10.6.0+)
 
 When the dispatcher exits with `DISPATCH_RC=5` it emits a structured marker
