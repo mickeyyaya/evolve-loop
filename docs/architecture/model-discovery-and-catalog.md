@@ -43,7 +43,6 @@ Validation drops hallucinated models (the answer must be in the offered list) an
 
 **The classifier is a chain (2026-10-05).** `ChainClassifier` (`chain.go`) holds every ready CLI in the order that `pickClassifierCLI` gives. It runs a `CLIClassifier` on each in turn. The order comes from `cmd/evolve/cmd_models_live.go`:
 
-- A ready `overrideCLI` comes first.
 - Then come the ready members of the classifier's family order from the CLI routing table, described below.
 - With no `cli_routing` block, that order is codex > claude > agy. These are the CLIs that `bridgePromptDispatcher` has a headless driver for. ollama has none, so it never classifies.
 
@@ -57,9 +56,9 @@ The request of the dispatcher (`bridgePromptDispatcher.request`) now appends `Wr
 
 codex still overwrites the artifact with its last message, which the prompt asks to be the same JSON. That codex path is unverified live here, because the codex of this operator has no subscription. The resolution of the classifier CLI through the CLI routing table (`internal/cliroute`, ADR-0119) instead of the `classifierCLIPreference` literal was filed as an inbox follow-up.
 
-**The classifier order comes from the routing table (2026-10-06, L1b of the CLI routing table, [ADR-0119](adr/0119-one-routing-table-one-resolver.md)).** That follow-up is done. `liveRefresh` compiles the table (`classifierPreference` → `loadCLIRouter`). `classifierFamilies` asks the router for `Resolve{Agent: "model-classifier", Launch: LaunchClassifier}` and keeps each candidate's family once, in chain order. `pickClassifierCLI` then takes the ready CLIs in that order.
+**The classifier order comes from the routing table (2026-10-06, L1b of the CLI routing table, [ADR-0119](adr/0119-one-routing-table-one-resolver.md)).** That follow-up is done. `liveRefresh` compiles the table (`classifierPreference` → `loadCLIRouter`). `classifierDrivers` asks the router for `Resolve{Agent: "model-classifier", Launch: LaunchClassifier}` and returns the driver of each candidate, in plan order. `pickClassifierCLI` then keeps each driver whose family is ready.
 
-With no `cli_routing` block, the legacy projection returns codex > claude > agy. This is the order that the deleted `classifierCLIPreference` literal held. With a declared table, the classifier routes like any other agent. A table whose `clis` are `[agy, claude]` therefore never launches codex to classify. A table that refuses to compile fails the live refresh loudly instead of a fall back to the old order.
+With no `cli_routing` block, the legacy projection returns the drivers codex-tmux > claude-tmux > agy-tmux. This is the order that the deleted `classifierCLIPreference` literal held. With a declared table, the classifier routes like any other agent. A table whose `clis` are `[agy, claude]` therefore never launches codex to classify, and the chain is `agy-tmux`, `claude-tmux`. A table that refuses to compile fails the live refresh loudly instead of a fall back to the old order.
 
 Pinned by `TestClassifierOrder_TheLegacyProjectionKeepsTodaysOrder`, `TestClassifierOrder_ComesFromTheRoutingTable` and `TestClassifierPreference_ARefusedTableFailsTheRefresh` (`cmd/evolve/cmd_models_classifier_routing_test.go`).
 
@@ -75,7 +74,7 @@ The design has four parts:
 
 1. `classifierPreference` builds its router with the host of `cli-routing explain` (`routingHost`), and the request carries `ProjectRoot`. The plan then puts a benched driver last.
 2. The chain holds the driver names of that plan (`Plan.Candidates`), in plan order. It keeps a driver only when its family (`llmroute.Family`) is ready. `classifierDrivers` replaces `classifierFamilies`.
-3. `bridgePromptDispatcher` launches the driver name that it gets, and the literal `claude` to `claude-p` goes. `pickClassifierCLI` and its `overrideCLI` take driver names.
+3. `bridgePromptDispatcher` launches the driver name that it gets, and the literal `claude` to `claude-p` goes. `pickClassifierCLI` takes driver names.
 4. The classifier gets its own profile, `.evolve/profiles/model-classifier.json`, so its identity is not the router.
 
 Part 3 removes the last family literal from this flow (invariant I-6 of [llm-isolation](llm-isolation.md)). Part 2 reads each family through `llmroute.Family`, which reads the driver registry, not a literal. The router profile does not change.
@@ -92,7 +91,7 @@ The scratch workspace moves from `os.MkdirTemp("", …)` to `.evolve/ephemeral/m
 
 A REPL driver such as `claude-tmux` is slower than `claude -p`. The refresh reuses a prior tier map when the offering is the same, so the classifier runs only when the offering changes.
 
-The legacy projection (no `cli_routing` block) already gives driver names. The three tests of the classifier order change from family names to driver names. The paragraph above then names drivers also.
+The legacy projection (no `cli_routing` block) already gives driver names. The three tests of the classifier order change from family names to driver names, and the paragraph above names drivers also.
 
 The tests:
 
