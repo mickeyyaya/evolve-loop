@@ -34,7 +34,7 @@ func TestRatchet_NoNewRawGitFixtures(t *testing.T) {
 		if e.Name != "raw-git-ratchet" {
 			continue
 		}
-		verdict, err := e.Run(context.Background(), gatecontract.Input{Root: root})
+		verdict, err := e.Run(context.Background(), gatecontract.Input{Root: root}, gatecontract.Ports{})
 		for _, note := range verdict.Notes {
 			t.Log(note)
 		}

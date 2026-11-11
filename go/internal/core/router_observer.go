@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -22,11 +24,11 @@ const (
 func (o *Orchestrator) observedPlan(ctx context.Context, cs CycleState, cycle int, in router.RouteInput) (*router.PhasePlan, error) {
 	defer o.observeRouter(ctx, cs, cycle)()
 	wallPath := filepath.Join(cs.WorkspacePath, routerQuotaWallFile)
-	os.Remove(wallPath)
+	removeRouterWall(os.Stderr, wallPath)
 	plan, err := o.planner.Plan(in)
 	if wall := walkedWall(err); err != nil && wall.HasQuota() {
 		if data, merr := json.Marshal(wall); merr == nil {
-			writeArtifactAtomically(wallPath, data)
+			writeRouterWall(os.Stderr, wallPath, data)
 		}
 	}
 	return plan, err
@@ -38,7 +40,7 @@ func (cr *cycleRun) pauseAtRouterWall(next Phase) error {
 	if err != nil {
 		return nil
 	}
-	os.Remove(wallPath)
+	removeRouterWall(os.Stderr, wallPath)
 	var wall Wall
 	if json.Unmarshal(data, &wall) != nil || !wall.HasQuota() {
 		return nil
@@ -55,8 +57,26 @@ func (cr *cycleRun) benchQuotaFamilies(wall Wall) {
 	store := clihealth.NewStore(cr.req.ProjectRoot, cr.o.now)
 	for _, end := range wall.Ends {
 		if clihealth.QuotaPattern(end.Pattern) {
-			store.BenchWall(llmroute.Family(end.CLI), end.Pattern, "")
+			benchFamily(os.Stderr, store, end)
 		}
+	}
+}
+
+func benchFamily(w io.Writer, store *clihealth.Store, end FamilyEnd) {
+	if _, err := store.BenchWall(llmroute.Family(end.CLI), end.Pattern, ""); err != nil {
+		fmt.Fprintf(w, "[router] WARN bench %s at its usage wall: %v\n", end.CLI, err)
+	}
+}
+
+func removeRouterWall(w io.Writer, path string) {
+	if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		fmt.Fprintf(w, "[router] WARN remove the quota wall %s: %v\n", path, err)
+	}
+}
+
+func writeRouterWall(w io.Writer, path string, data []byte) {
+	if err := writeArtifactAtomically(path, data); err != nil {
+		fmt.Fprintf(w, "[router] WARN write the quota wall %s: %v\n", path, err)
 	}
 }
 

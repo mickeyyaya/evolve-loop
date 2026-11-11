@@ -162,6 +162,7 @@ var protectedGateFiles = []struct {
 	{"go/internal/gatecontract/", GateGuarantee},
 	{"go/internal/gateregistry/", GateGuarantee},
 	{"go/internal/gatehermetic/", GateGuarantee},
+	{"go/internal/gaterun/", GateGuarantee},
 	{"go/internal/testdup/", GateGuarantee},
 	{"go/internal/sizeratchet/", GateGuarantee},
 	{"go/internal/rawgitratchet/", GateGuarantee},

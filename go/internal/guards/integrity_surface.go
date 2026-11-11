@@ -269,6 +269,7 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/goload/", Class: GateGuarantee, Rationale: "the go list and go/types loader that the call-graph hermeticity guard trusts: a lane that changed it could hide a package or a body from the guard (ADR-0165 G2)"},
 	{Fragment: "/go/internal/gatehermetic/", Class: GateGuarantee, Rationale: "the call-graph hermeticity guard: its contract table, its walk rules and its toolchain audit decide which gate reaches git, a process, a file clock or history, so a lane that changed them could let a gate read what the lane controls (ADR-0165 G2)"},
 	{Fragment: "/go/internal/gotool/", Class: GateGuarantee, Rationale: "the one place where a gate starts the Go toolchain: a lane that changed it could add a verb that runs a program from a gate (ADR-0165 G2)"},
+	{Fragment: "/go/internal/gaterun/", Class: GateGuarantee, Rationale: "the runner, the broker and the gate profile of G2 7.16: they decide what a gate child may read and which request the parent serves, so a lane that changed them could widen what a gate sees (ADR-0165 G2)"},
 }
 
 func IsProtectedSurface(path string) bool {

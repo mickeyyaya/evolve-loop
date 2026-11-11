@@ -8,8 +8,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gatecontract"
 )
 
-func FloorEntryRun(judge FloorJudge) func(context.Context, gatecontract.Input) (gatecontract.Verdict, error) {
-	return func(ctx context.Context, in gatecontract.Input) (gatecontract.Verdict, error) {
+func FloorEntryRun(judge FloorJudge) func(context.Context, gatecontract.Input, gatecontract.Ports) (gatecontract.Verdict, error) {
+	return func(ctx context.Context, in gatecontract.Input, _ gatecontract.Ports) (gatecontract.Verdict, error) {
 		if err := readableRoot(in.Root); err != nil {
 			return gatecontract.Verdict{}, err
 		}

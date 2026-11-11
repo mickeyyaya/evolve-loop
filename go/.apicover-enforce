@@ -873,3 +873,10 @@
 ./internal/cyclefacts
 ./internal/testdup
 ./internal/logcompress
+# gate contract (ADR-0165 G1, G2): the registry contract, the walker, its loader, the toolchain boundary, the runner and broker, and the shared test module writer.
+./internal/gatecontract
+./internal/gatehermetic
+./internal/goload
+./internal/gotool
+./internal/gaterun
+./internal/gomodtest

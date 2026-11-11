@@ -30,6 +30,34 @@ type Input struct {
 	Base string
 }
 
+type Call struct {
+	Dir  string
+	Env  []string
+	Args []string
+}
+
+type Output struct {
+	Stdout   []byte
+	Stderr   []byte
+	ExitCode int
+}
+
+type Lane interface {
+	TrackedFiles(root, relDir string) ([]string, error)
+	TrackedTree(root, relDir string) ([]string, error)
+	TrackedSet(root, relDir, ext string) (map[string]bool, error)
+}
+
+type Toolchain interface {
+	List(ctx context.Context, call Call) (Output, error)
+	Test(ctx context.Context, call Call) (Output, error)
+}
+
+type Ports struct {
+	Lane      Lane
+	Toolchain Toolchain
+}
+
 type Verdict struct {
 	Reds  []string
 	Notes []string
@@ -53,7 +81,7 @@ type Entry struct {
 	Owners []Owner
 	Inputs []Declared
 	Stage  string
-	Run    func(context.Context, Input) (Verdict, error)
+	Run    func(context.Context, Input, Ports) (Verdict, error)
 }
 
 func TrustClasses() []string { return slices.Clone(trustClasses) }

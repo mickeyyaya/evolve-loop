@@ -23,7 +23,7 @@ func rawgitratchetEntry() gatecontract.Entry {
 	}
 }
 
-func runRawgitratchet(_ context.Context, in gatecontract.Input) (gatecontract.Verdict, error) {
+func runRawgitratchet(_ context.Context, in gatecontract.Input, _ gatecontract.Ports) (gatecontract.Verdict, error) {
 	sites, baseline, note, err := rawgitratchet.Load(filepath.Join(in.Root, "go"))
 	if err != nil {
 		return gatecontract.Verdict{}, err

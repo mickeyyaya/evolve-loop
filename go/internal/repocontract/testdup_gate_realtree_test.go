@@ -34,7 +34,7 @@ func TestTestDuplicates_TheCountOfCopiesEqualsTheBaseline(t *testing.T) {
 		if e.Name != "testdup-ratchet" {
 			continue
 		}
-		verdict, err := e.Run(context.Background(), gatecontract.Input{Root: root})
+		verdict, err := e.Run(context.Background(), gatecontract.Input{Root: root}, gatecontract.Ports{})
 		if err != nil {
 			t.Fatal(err)
 		}

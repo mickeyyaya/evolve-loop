@@ -9,6 +9,8 @@ import (
 
 const sx = `"` + sysexecPath + `"`
 
+const initEdge = "init"
+
 func gatesFile(imports, body string) map[string]string {
 	return map[string]string{"internal/gates/gates.go": "package gates\n\nimport (\n" + imports + "\n)\n\n" + body}
 }
@@ -110,7 +112,7 @@ func ViaInitializer() int { return cachepkg.Cached }
 	if got := edges(by["ViaMethodValue"][0]); !slices.Equal(got, []string{"", "value"}) {
 		t.Errorf("method value edges = %v", got)
 	}
-	if got := edges(by["ViaInitializer"][0]); !slices.Equal(got, []string{"", "init", "call"}) {
+	if got := edges(by["ViaInitializer"][0]); !slices.Equal(got, []string{"", initEdge, "call"}) {
 		t.Errorf("initializer edges = %v", got)
 	}
 }
@@ -283,7 +285,7 @@ func ReadsStored() func() { return stored.Hook }
 
 	by := byRoot(refuseFixture(t, files, rootsOf("ReadsInit", "NoRead", "ReadsStored")...))
 
-	if len(by["ReadsInit"]) != 1 || !slices.Equal(edges(by["ReadsInit"][0]), []string{"", "init"}) {
+	if len(by["ReadsInit"]) != 1 || !slices.Equal(edges(by["ReadsInit"][0]), []string{"", initEdge}) {
 		t.Errorf("ReadsInit = %+v", by["ReadsInit"])
 	}
 	if len(by["NoRead"]) != 0 {

@@ -3,10 +3,10 @@ package goload_test
 import (
 	"context"
 	"errors"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gomodtest"
 	"go/token"
 	"io"
 	"os"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -15,21 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/goload"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
-
-func module(t *testing.T, files map[string]string) string {
-	t.Helper()
-	dir := t.TempDir()
-	for name, body := range files {
-		path := filepath.Join(dir, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	return dir
-}
 
 func replying(stdout string, code int, err error) sysexec.RunFunc {
 	return func(_ context.Context, _, _ string, _, _ []string, _ io.Reader, out, _ io.Writer) (int, error) {
@@ -42,7 +27,7 @@ var real = goload.Loader{Run: sysexec.DefaultRunner}
 
 func TestLoad_TypeChecksAModuleAndOrdersDependenciesFirst(t *testing.T) {
 	t.Parallel()
-	dir := module(t, map[string]string{
+	dir := gomodtest.WriteModule(t, map[string]string{
 		"go.mod":      "module m\n\ngo 1.23\n",
 		"a/a.go":      "package a\n\nimport \"strings\"\n\nfunc A() int { return len(strings.ToUpper(\"a\")) }\n",
 		"b/b.go":      "package b\n\nimport \"m/a\"\n\nfunc B() int { return a.A() }\n",
@@ -73,7 +58,7 @@ func TestLoad_TypeChecksAModuleAndOrdersDependenciesFirst(t *testing.T) {
 
 func TestLoadWithTests_ListsTheTestVariants(t *testing.T) {
 	t.Parallel()
-	dir := module(t, map[string]string{
+	dir := gomodtest.WriteModule(t, map[string]string{
 		"go.mod":      "module m\n\ngo 1.23\n",
 		"b/b.go":      "package b\n\nfunc B() int { return 1 }\n",
 		"b/b_test.go": "package b\n\nimport \"testing\"\n\nfunc TestB(t *testing.T) { _ = B() }\n",
@@ -96,7 +81,7 @@ func TestLoadWithTests_ListsTheTestVariants(t *testing.T) {
 
 func TestLoad_FakesTheCgoImport(t *testing.T) {
 	t.Parallel()
-	dir := module(t, map[string]string{"x.go": "package x\n\nimport \"C\"\n\nvar _ = C.int(0)\n"})
+	dir := gomodtest.WriteModule(t, map[string]string{"x.go": "package x\n\nimport \"C\"\n\nvar _ = C.int(0)\n"})
 	answer := `{"ImportPath":"x","Dir":"` + dir + `","GoFiles":["x.go"],"Module":{"Main":true}}`
 
 	prog, err := goload.Loader{Run: replying(answer, 0, nil)}.Load(context.Background(), goload.Request{Dir: dir})
@@ -118,7 +103,7 @@ func TestLoad_ALoaderWithNoRunnerIsAnError(t *testing.T) {
 
 func walkModule(t *testing.T) (string, goload.Request) {
 	t.Helper()
-	dir := module(t, map[string]string{
+	dir := gomodtest.WriteModule(t, map[string]string{
 		"go.mod": "module m\n\ngo 1.23\n",
 		"a/a.go": "package a\n\nfunc A() int { return 1 }\n",
 		"b/b.go": "package b\n\nimport \"m/a\"\n\nfunc B() int { return a.A() }\n",
@@ -176,7 +161,7 @@ func TestWalk_AListFailureIsReturnedBeforeAnyVisit(t *testing.T) {
 
 func TestLoad_ReportsATypeErrorAndAParseErrorOnTheModulePackage(t *testing.T) {
 	t.Parallel()
-	dir := module(t, map[string]string{
+	dir := gomodtest.WriteModule(t, map[string]string{
 		"go.mod": "module m\n\ngo 1.23\n",
 		"x/x.go": "package x\n\nvar V int = \"s\"\n",
 		"x/y.go": "package x\n\nfunc (\n",
@@ -218,7 +203,7 @@ func TestLoad_FailsLoudly(t *testing.T) {
 
 func TestLoad_AnImportThatGoListDidNotListIsATypeError(t *testing.T) {
 	t.Parallel()
-	dir := module(t, map[string]string{"x.go": "package x\n\nimport _ \"missing\"\n"})
+	dir := gomodtest.WriteModule(t, map[string]string{"x.go": "package x\n\nimport _ \"missing\"\n"})
 	answer := `{"ImportPath":"x","Dir":"` + dir + `","GoFiles":["x.go"],"Module":{"Main":true}}`
 
 	prog, err := goload.Loader{Run: replying(answer, 0, nil)}.Load(context.Background(), goload.Request{Dir: dir})
@@ -230,7 +215,7 @@ func TestLoad_AnImportThatGoListDidNotListIsATypeError(t *testing.T) {
 
 func TestLoad_ResolvesUnsafeAndTheImportMap(t *testing.T) {
 	t.Parallel()
-	dir := module(t, map[string]string{
+	dir := gomodtest.WriteModule(t, map[string]string{
 		"x.go": "package x\n\nimport (\n\t\"unsafe\"\n\t\"alias\"\n)\n\nvar _ = unsafe.Sizeof(0)\nvar _ = real.V\n",
 		"r.go": "package real\n\nvar V = 1\n",
 	})
@@ -278,7 +263,7 @@ func TestLoad_PassesTheEnvironmentAndCgoOff(t *testing.T) {
 
 func TestWalk_AVisitErrorInsideAnImportStopsTheLaterImports(t *testing.T) {
 	t.Parallel()
-	dir := module(t, map[string]string{
+	dir := gomodtest.WriteModule(t, map[string]string{
 		"b.go": "package b\n\nimport (\n\t_ \"a\"\n\t_ \"d\"\n)\n",
 		"a.go": "package a\n",
 		"d.go": "package d\n",

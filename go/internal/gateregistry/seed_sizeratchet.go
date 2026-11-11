@@ -23,7 +23,7 @@ func sizeratchetEntry() gatecontract.Entry {
 	}
 }
 
-func runSizeratchet(_ context.Context, in gatecontract.Input) (gatecontract.Verdict, error) {
+func runSizeratchet(_ context.Context, in gatecontract.Input, _ gatecontract.Ports) (gatecontract.Verdict, error) {
 	spans, offenders, err := sizeratchet.Load(filepath.Join(in.Root, "go"))
 	if err != nil {
 		return gatecontract.Verdict{}, err

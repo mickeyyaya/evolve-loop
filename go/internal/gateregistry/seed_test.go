@@ -16,7 +16,7 @@ func runSeed(t *testing.T, name string, baseline map[string]map[string]string) (
 	root := fixture.root(t)
 	lay(t, root, fixture.tree())
 	lay(t, root, baseline[name])
-	return entryNamed(t, name).Run(context.Background(), gatecontract.Input{Root: root})
+	return entryNamed(t, name).Run(context.Background(), gatecontract.Input{Root: root}, gatecontract.Ports{})
 }
 
 func TestSeeds_ATreeAboveItsBaselineIsARedAndNotAnError(t *testing.T) {
@@ -85,7 +85,7 @@ func TestSeeds_ARootThatDoesNotExistIsAnErrorAndNotAVerdict(t *testing.T) {
 	t.Parallel()
 	missing := t.TempDir() + "/absent"
 	for _, e := range Entries() {
-		if verdict, err := e.Run(context.Background(), gatecontract.Input{Root: missing}); err == nil || len(verdict.Reds) != 0 {
+		if verdict, err := e.Run(context.Background(), gatecontract.Input{Root: missing}, gatecontract.Ports{}); err == nil || len(verdict.Reds) != 0 {
 			t.Errorf("%s: Run over a missing root = %+v, %v, want an error and no red", e.Name, verdict, err)
 		}
 	}
@@ -101,7 +101,7 @@ func TestTestdupRatchet_AnAcsDirectoryCommittedBeforeTheBaselineDateIsNotCounted
 	repo.Git("add", "-A")
 	repo.Git("commit", "-m", "old acs")
 	lay(t, repo.Dir, map[string]string{"go/" + testdup.BaselineRelPath: "count=0\ndate=2999-01-01\n"})
-	verdict, err := entryNamed(t, "testdup-ratchet").Run(context.Background(), gatecontract.Input{Root: repo.Dir})
+	verdict, err := entryNamed(t, "testdup-ratchet").Run(context.Background(), gatecontract.Input{Root: repo.Dir}, gatecontract.Ports{})
 	if err != nil || len(verdict.Reds) != 0 {
 		t.Errorf("Run = %+v, %v, want no red: the copies are in an acs directory older than the baseline date", verdict, err)
 	}
@@ -142,7 +142,7 @@ func TestSeeds_ASourceFileThatDoesNotParseIsAnErrorAndNotARed(t *testing.T) {
 			root := fixture.root(t)
 			lay(t, root, greenFiles[name])
 			lay(t, root, map[string]string{"go/p/broken_test.go": "package p\n\nfunc ("})
-			verdict, err := entryNamed(t, name).Run(context.Background(), gatecontract.Input{Root: root})
+			verdict, err := entryNamed(t, name).Run(context.Background(), gatecontract.Input{Root: root}, gatecontract.Ports{})
 			if err == nil || len(verdict.Reds) != 0 {
 				t.Errorf("Run = %+v, %v, want an error and no red", verdict, err)
 			}

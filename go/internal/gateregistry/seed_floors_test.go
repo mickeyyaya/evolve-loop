@@ -79,11 +79,11 @@ func TestRegistry_FloorEntriesJudgeAFixtureAndReportAFailedReadAsAnError(t *test
 			run := entryNamed(t, want.name).Run
 			root, base := floorRepo(t)
 			lay(t, root, map[string]string{"go/internal/policy/lane_test.go": floorRedTest})
-			verdict, err := run(context.Background(), gatecontract.Input{Root: root, Base: base})
+			verdict, err := run(context.Background(), gatecontract.Input{Root: root, Base: base}, gatecontract.Ports{})
 			if err != nil || !redsHold(verdict.Reds, want.mark) {
 				t.Errorf("Run over a lane with a failing test = %+v, %v, want a red that holds %q and no error", verdict, err, want.mark)
 			}
-			if _, err := run(context.Background(), gatecontract.Input{Root: root + "/absent", Base: base}); err == nil {
+			if _, err := run(context.Background(), gatecontract.Input{Root: root + "/absent", Base: base}, gatecontract.Ports{}); err == nil {
 				t.Errorf("Run over a missing tree = nil error, want an error")
 			}
 		})
@@ -94,7 +94,7 @@ func TestRegistry_FloorEntriesGiveAGreenLaneNoLaneRed(t *testing.T) {
 	for _, want := range floorWants {
 		t.Run(want.name, func(t *testing.T) {
 			root, base := floorRepo(t)
-			verdict, err := entryNamed(t, want.name).Run(context.Background(), gatecontract.Input{Root: root, Base: base})
+			verdict, err := entryNamed(t, want.name).Run(context.Background(), gatecontract.Input{Root: root, Base: base}, gatecontract.Ports{})
 			if err != nil || redsHold(verdict.Reds, want.mark) || redsHold(verdict.Reds, laneKey) {
 				t.Errorf("Run over an unchanged tree = %+v, %v, want no lane red and no error", verdict, err)
 			}
@@ -107,10 +107,10 @@ func TestRegistry_FloorEntriesReportAnUnreadableBaseAsAnErrorAndAGreenLaneAsNoRe
 		t.Run(want.name, func(t *testing.T) {
 			run := entryNamed(t, want.name).Run
 			root, base := floorRepo(t)
-			if verdict, err := run(context.Background(), gatecontract.Input{Root: root, Base: strings.Repeat("0", 40)}); err == nil || len(verdict.Reds) != 0 {
+			if verdict, err := run(context.Background(), gatecontract.Input{Root: root, Base: strings.Repeat("0", 40)}, gatecontract.Ports{}); err == nil || len(verdict.Reds) != 0 {
 				t.Errorf("Run with an unknown base = %+v, %v, want an error and no red", verdict, err)
 			}
-			if verdict, err := run(context.Background(), gatecontract.Input{Root: root, Base: base}); err != nil || len(verdict.Reds) != 0 {
+			if verdict, err := run(context.Background(), gatecontract.Input{Root: root, Base: base}, gatecontract.Ports{}); err != nil || len(verdict.Reds) != 0 {
 				t.Errorf("Run over an unchanged tree = %+v, %v, want no red and no error", verdict, err)
 			}
 		})

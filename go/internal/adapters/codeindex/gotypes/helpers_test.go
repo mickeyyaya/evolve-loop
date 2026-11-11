@@ -3,6 +3,7 @@ package gotypes_test
 import (
 	"context"
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gomodtest"
 	"io"
 	"io/fs"
 	"os"
@@ -13,6 +14,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/codeindex"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
+
+var writeModule = gomodtest.WriteModule
 
 var fixtureIndex string
 
@@ -63,21 +66,6 @@ func copyTree(src, dst string) error {
 
 func fixtureBackend() gotypes.Backend {
 	return gotypes.New(fixtureIndex)
-}
-
-func writeModule(t *testing.T, files map[string]string) string {
-	t.Helper()
-	dir := t.TempDir()
-	for name, body := range files {
-		path := filepath.Join(dir, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	return dir
 }
 
 func callers(t *testing.T, symbol string, dir codeindex.Direction) []codeindex.Hit {

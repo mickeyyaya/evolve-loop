@@ -20,7 +20,7 @@ func TestFloorEntryRun_BuildsTheReviewInputFromTheRootAndTheBase(t *testing.T) {
 		return nil, nil
 	})
 	root := t.TempDir()
-	if _, err := run(context.Background(), gatecontract.Input{Root: root, Base: "abc"}); err != nil {
+	if _, err := run(context.Background(), gatecontract.Input{Root: root, Base: "abc"}, gatecontract.Ports{}); err != nil {
 		t.Fatal(err)
 	}
 	if got.Worktree != root || got.ProjectRoot != root || got.WorktreeBaseSHA != "abc" {
@@ -31,7 +31,7 @@ func TestFloorEntryRun_BuildsTheReviewInputFromTheRootAndTheBase(t *testing.T) {
 func TestFloorEntryRun_EachJudgeLineIsOneRed(t *testing.T) {
 	t.Parallel()
 	run := FloorEntryRun(func(context.Context, ReviewInput) ([]string, error) { return []string{"one", "two\nmore"}, nil })
-	verdict, err := run(context.Background(), gatecontract.Input{Root: t.TempDir()})
+	verdict, err := run(context.Background(), gatecontract.Input{Root: t.TempDir()}, gatecontract.Ports{})
 	if err != nil || len(verdict.Reds) != 2 || verdict.Reds[1] != "two\nmore" {
 		t.Errorf("Run = %+v, %v, want the two judge lines as two reds and no error", verdict, err)
 	}
@@ -41,7 +41,7 @@ func TestFloorEntryRun_AJudgeErrorIsAnErrorAndNeitherAPassNorARed(t *testing.T) 
 	t.Parallel()
 	cause := errors.New("no read")
 	run := FloorEntryRun(func(context.Context, ReviewInput) ([]string, error) { return []string{"red"}, cause })
-	verdict, err := run(context.Background(), gatecontract.Input{Root: t.TempDir()})
+	verdict, err := run(context.Background(), gatecontract.Input{Root: t.TempDir()}, gatecontract.Ports{})
 	if !errors.Is(err, cause) || len(verdict.Reds) != 0 {
 		t.Errorf("Run = %+v, %v, want the judge error and an empty verdict", verdict, err)
 	}
@@ -56,7 +56,7 @@ func TestFloorEntryRun_AnUnreadableRootIsAnErrorAndTheJudgeNeverRuns(t *testing.
 	ran := false
 	run := FloorEntryRun(func(context.Context, ReviewInput) ([]string, error) { ran = true; return nil, nil })
 	for name, root := range map[string]string{"missing": file + "-absent", "a file": file} {
-		if _, err := run(context.Background(), gatecontract.Input{Root: root}); err == nil {
+		if _, err := run(context.Background(), gatecontract.Input{Root: root}, gatecontract.Ports{}); err == nil {
 			t.Errorf("%s: Run = nil error, want an error", name)
 		}
 	}

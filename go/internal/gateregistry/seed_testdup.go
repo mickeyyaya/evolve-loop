@@ -28,7 +28,7 @@ func testdupEntry() gatecontract.Entry {
 	}
 }
 
-func runTestdup(_ context.Context, in gatecontract.Input) (gatecontract.Verdict, error) {
+func runTestdup(_ context.Context, in gatecontract.Input, _ gatecontract.Ports) (gatecontract.Verdict, error) {
 	module := filepath.Join(in.Root, "go")
 	raw, err := os.ReadFile(filepath.Join(module, testdup.BaselineRelPath))
 	if err != nil {
