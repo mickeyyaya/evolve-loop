@@ -41,6 +41,7 @@ func (b *loopBatchCoordinator) dispatchSequentialCycle() (sequentialCycle, batch
 		return sequentialCycle{}, b.handleCycleError(result, err)
 	}
 	lastAfter, _ := readLastCycleNumber(context.Background(), b.deps.Storage)
+	sweepSealedCycleGC(b.cfg, result.Cycle, b.stderr)
 	return sequentialCycle{
 		result:     result,
 		lastBefore: lastBefore,

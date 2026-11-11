@@ -10,6 +10,8 @@ import (
 
 const laneQuotaReason = "quota-likely"
 
+const laneStoppedReason = "operator-requested"
+
 func ScopeIDs(scope string) []string {
 	return normalizedIDs(strings.Split(scope, ","))
 }
@@ -67,7 +69,7 @@ func laneResumable(last perRunState, ships map[int]time.Time, projectRoot string
 }
 
 func laneQuotaPaused(st perRunState) bool {
-	return st.enabled && st.reason == laneQuotaReason && !st.leased && !IsTerminalPhase(st.phase)
+	return st.enabled && (st.reason == laneQuotaReason || st.reason == laneStoppedReason) && !st.leased && !IsTerminalPhase(st.phase)
 }
 
 func normalizedIDs(raw []string) []string {

@@ -406,3 +406,34 @@ func TestParseReadReports_OneTargetUnderTwoRulesGivesTwoReports(t *testing.T) {
 		t.Fatalf("each rule on one target must give one report: %+v", got)
 	}
 }
+
+func TestSecretsOf_ListsTheGitCredentialFilesThatExist(t *testing.T) {
+	t.Parallel()
+	home := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(home, ".config", "git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFixtureFile(t, filepath.Join(home, ".git-credentials"), "https://u:p@github.com")
+	writeFixtureFile(t, filepath.Join(home, ".config", "git", "credentials"), "https://u:p@github.com")
+	dirs, files := secretsOf(home)
+	want := []string{canonicalOrSelf(filepath.Join(home, ".git-credentials")), canonicalOrSelf(filepath.Join(home, ".config", "git", "credentials"))}
+	if len(dirs) != 0 || !slices.Equal(files, want) {
+		t.Fatalf("dirs %v files %v, want the two git credential files %v", dirs, files, want)
+	}
+	if dirs, files := secretsOf(t.TempDir()); len(dirs)+len(files) != 0 {
+		t.Fatalf("an absent entry is not listed: %v %v", dirs, files)
+	}
+}
+
+func TestReportReadViolations_ADeniedSecretReadIsAnI5ViolationRefused(t *testing.T) {
+	t.Parallel()
+	center := signalcenter.New()
+	report := `{"eventMessage":"Sandbox: gh(4417) deny(1) file-read-data \/Users\/op\/.config\/gh\/hosts.yml\nevolve-cell=d9 rule=read.home.secret inv=I5"}` + "\n"
+	deps := Deps{Signals: center, ReadStage: "shadow", hostOS: "darwin",
+		SandboxReports: func(context.Context, string, time.Time) ([]byte, error) { return []byte(report), nil }}
+	deps.reportReadViolations(context.Background(), &Config{CLI: "claude", Agent: "build", Workspace: "/ws", Worktree: "/wt", DispatchID: "d9"}, time.Now())
+	got := readViolations(center)
+	if len(got) != 1 || got[0].Code != isolation.ViolationCode(5) || got[0].Fields["action"] != "refused" || got[0].Fields["rule"] != "read.home.secret" || got[0].Fields["stage"] != "shadow" {
+		t.Fatalf("a denied secret read at shadow must be an I5 violation with action=refused: %+v", got)
+	}
+}

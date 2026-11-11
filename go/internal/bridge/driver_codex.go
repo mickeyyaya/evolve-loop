@@ -56,7 +56,7 @@ func (codexDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, err
 		fmt.Fprintf(deps.Stderr, "[codex] WARN: unrecognized model '%s' — omitting -m\n", resolved)
 	}
 	if !argsContainEffort(cfg.Realization.LaunchFlags) && !argsContainEffort(cfg.ExtraFlags) {
-		args = append(args, "-c", "model_reasoning_effort=high")
+		fmt.Fprintln(deps.Stderr, "[codex] no reasoning effort resolved — codex uses its own default")
 	}
 	args = append(args, cfg.Realization.LaunchFlags...)
 	args = append(args, cfg.ExtraFlags...)
@@ -100,7 +100,7 @@ func init() { Register(codexDriver{}) }
 
 func argsContainEffort(args []string) bool {
 	for _, a := range args {
-		if strings.Contains(a, "model_reasoning_effort=") {
+		if strings.HasPrefix(a, "model_reasoning_effort=") {
 			return true
 		}
 	}

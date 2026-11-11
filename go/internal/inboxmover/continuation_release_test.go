@@ -80,7 +80,7 @@ func TestReleaseContinuationBinding(t *testing.T) {
 				t.Errorf("released_continuations[] in %s does not preserve %q — pointer loss on release\n%s", itemPath, want, raw)
 			}
 		}
-		for _, want := range []string{`"released_by":"unit-test-authority"`, `"released_at":`} {
+		for _, want := range []string{`"released_by": "unit-test-authority"`, `"released_at": `} {
 			if !strings.Contains(string(raw), want) {
 				t.Errorf("released_continuations[] in %s carries no %s — the release record does not answer who/when\n%s", itemPath, want, raw)
 			}

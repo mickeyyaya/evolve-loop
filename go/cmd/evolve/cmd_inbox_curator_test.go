@@ -285,7 +285,7 @@ func TestCmd_InboxCurate_AGateFileItemOnTheLaneRouteIsReroutedToTheConsoleAtTheB
 	rc, stdout, stderr := f.curate(t, "", "--apply")
 
 	raw, err := os.ReadFile(filepath.Join(f.root, ".evolve", "inbox", "2026-10-02T00-00-00Z-gate-item.json"))
-	if rc != 0 || err != nil || !strings.Contains(string(raw), `"route":"console-manual"`) || !strings.Contains(stdout, "reroute gate-item -> console (routing, applied)") {
+	if rc != 0 || err != nil || !strings.Contains(string(raw), `"route": "console-manual"`) || !strings.Contains(stdout, "reroute gate-item -> console (routing, applied)") {
 		t.Errorf("rc = %d stdout = %q stderr = %q item = %s, want the item rerouted to the console", rc, stdout, stderr, raw)
 	}
 }

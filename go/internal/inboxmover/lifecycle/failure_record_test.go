@@ -2,6 +2,7 @@ package lifecycle
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -9,12 +10,15 @@ func TestMover_Release_ChargesTheItemWithTheFailureRecord(t *testing.T) {
 	inbox := newInbox(t)
 	writeItem(t, procPath(inbox, 8, "task-r.json"), `{"id":"task-r","failure_count":1}`)
 	m := New(inbox, nil)
-	if res, err := m.Release(8, "cycle-failure-release", &Policy{Ceiling: 3, FailureClass: "capability", Fingerprint: "codes:floor"}); err != nil || res.Recovered != 1 {
+	if res, err := m.Release(8, "cycle-failure-release", &Policy{Ceiling: 3, FailureClass: "capability", Fingerprint: "codes:floor", Reasons: []string{strings.Repeat("a", 5000)}}); err != nil || res.Recovered != 1 {
 		t.Fatalf("res = %+v, err = %v", res, err)
 	}
 	doc := readJSON(t, filepath.Join(inbox, "task-r.json"))
 	if string(doc["failure_count"]) != "2" || string(doc["last_failure_class"]) != `"capability"` || string(doc["last_failure_fingerprint"]) != `"codes:floor"` {
 		t.Errorf("the charge keeps the class and the fingerprint of the failure: %v", doc)
+	}
+	if string(doc["retry_plan"]) != `"fresh-deep-plan"` {
+		t.Errorf("retry_plan = %s, want fresh-deep-plan", doc["retry_plan"])
 	}
 }
 
@@ -70,5 +74,19 @@ func TestMover_ReadLastFailureRung_ReadsPendingAndClaimedOnly(t *testing.T) {
 		if got := m.ReadLastFailureRung(id); got != want {
 			t.Errorf("ReadLastFailureRung(%s) = %q, want %q", id, got, want)
 		}
+	}
+}
+
+func TestMover_Release_OnCeilingConsole(t *testing.T) {
+	inbox := newInbox(t)
+	writeItem(t, procPath(inbox, 9, "task-con.json"), `{"id":"task-con"}`)
+	m := New(inbox, nil)
+	res, err := m.Release(9, "cycle-failure-release", &Policy{Ceiling: 1, OnCeiling: "console"})
+	if err != nil || res.Recovered != 1 {
+		t.Fatalf("res = %+v, err = %v", res, err)
+	}
+	doc := readJSON(t, filepath.Join(inbox, "task-con.json"))
+	if string(doc["route"]) != `"console-manual"` {
+		t.Errorf("route = %s, want console-manual", doc["route"])
 	}
 }

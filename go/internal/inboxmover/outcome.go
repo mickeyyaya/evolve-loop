@@ -19,12 +19,14 @@ type CycleOutcome struct {
 	CommitSHA    string
 	Reason       string
 	Ceiling      int
+	OnCeiling    string
 	SystemLevel  bool
 	Routed       bool
 	RoutedIDs    []string
 	FailureClass string
 	Fingerprint  string
 	FailureRung  string
+	Reasons      []string
 }
 
 type OutcomeResult struct {
@@ -91,6 +93,7 @@ func ApplyCycleOutcome(opts Options, oc CycleOutcome) (OutcomeResult, error) {
 func failurePolicy(oc CycleOutcome, committed []string) *quarantinePolicy {
 	return &quarantinePolicy{
 		Ceiling:      oc.Ceiling,
+		OnCeiling:    oc.OnCeiling,
 		SystemLevel:  oc.SystemLevel,
 		Routed:       oc.Routed,
 		RoutedIDs:    idSet(oc.RoutedIDs),
@@ -98,6 +101,7 @@ func failurePolicy(oc CycleOutcome, committed []string) *quarantinePolicy {
 		FailureClass: oc.FailureClass,
 		Fingerprint:  oc.Fingerprint,
 		FailureRung:  oc.FailureRung,
+		Reasons:      oc.Reasons,
 	}
 }
 

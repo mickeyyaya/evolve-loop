@@ -100,3 +100,24 @@ func TestResumeReady_IsTheBudgetRuleOfAdmissionPlusAPassedReset(t *testing.T) {
 		}
 	}
 }
+
+func TestRetireCheckpoint_DisablesTheResumeAndKeepsTheRest(t *testing.T) {
+	t.Parallel()
+	path := writeState(t, t.TempDir(), `{"cycle_id":21,"phase":"build","checkpoint":{"enabled":true,"reason":"quota-likely","resumeFromPhase":"build","autoResumeAttempts":1,"autoResumeMaxAttempts":3,"operatorAction":"wait"}}`)
+
+	cp, err := RetireCheckpoint(path)
+
+	if err != nil || cp.Enabled || cp.Reason != ReasonRetired || !cp.Reason.IsValid() || cp.OperatorAction != "" || cp.ResumeFromPhase != "build" {
+		t.Fatalf("retire = %+v err %v, want disabled, reason %s, resume phase kept", cp, err, ReasonRetired)
+	}
+	if _, _, err := GrantOperatorResume(path); err != nil {
+		t.Fatalf("grant after the retire: %v", err)
+	}
+	after, err := readBlockAt(path)
+	if err != nil || after.Enabled || after.Reason != ReasonRetired {
+		t.Errorf("block after retire and grant = %+v err %v, want still retired", after, err)
+	}
+	if _, err := RetireCheckpoint(path + ".absent"); err == nil {
+		t.Errorf("retire of a missing state returned nil error")
+	}
+}

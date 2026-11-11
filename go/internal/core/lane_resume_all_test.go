@@ -72,7 +72,7 @@ func TestPausedLaneScopes_SkipsEveryCycleThatALaneCannotResume(t *testing.T) {
 		{"an ended cycle", laneRun{cycle: 5, scope: []string{"x"}, phase: "end", reason: laneQuotaReason, enabled: true, worktree: worktree}, false},
 		{"an aborted cycle", laneRun{cycle: 5, scope: []string{"x"}, phase: "aborted", reason: laneQuotaReason, enabled: true, worktree: worktree}, false},
 		{"a stale cycle", laneRun{cycle: 5, scope: []string{"x"}, phase: "build", reason: laneQuotaReason, enabled: true, worktree: worktree, age: 24 * 365 * time.Hour}, false},
-		{"a non-quota cycle", laneRun{cycle: 5, scope: []string{"x"}, phase: "build", reason: "operator-requested", enabled: true, worktree: worktree}, false},
+		{"a non-quota cycle", laneRun{cycle: 5, scope: []string{"x"}, phase: "build", reason: "batch-cap-near", enabled: true, worktree: worktree}, false},
 		{"a shipped cycle", quotaPausedRun(5, worktree, "x"), true},
 		{"a removed worktree", quotaPausedRun(5, filepath.Join(worktree, "gone"), "x"), false},
 		{"a cycle without a lane scope", quotaPausedRun(5, worktree), false},

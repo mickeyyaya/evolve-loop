@@ -15,8 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-const resumeMainRef = "origin/main"
-
 func (o ResumeOptions) withMaxAge(evolveDir string) ResumeOptions {
 	if o.MaxAge > 0 {
 		return o
@@ -43,9 +41,9 @@ func warnMainMoved(projectRoot, base string, opts ResumeOptions) {
 	ahead, err := opts.MainAhead(projectRoot, base)
 	switch {
 	case err != nil:
-		fmt.Fprintf(opts.Log, "[resume] WARN: could not compare the base %s with %s (%v); the checkpoint is kept\n", base, resumeMainRef, err)
+		fmt.Fprintf(opts.Log, "[resume] WARN: could not compare the base %s with %s (%v); the checkpoint is kept\n", base, gitexec.RemoteMain, err)
 	case ahead > 0:
-		fmt.Fprintf(opts.Log, "[resume] WARN: %s is %d commit(s) past the base %s; resuming, and ship rebases the cycle onto main before it lands\n", resumeMainRef, ahead, base)
+		fmt.Fprintf(opts.Log, "[resume] WARN: %s is %d commit(s) past the base %s; resuming, and ship rebases the cycle onto main before it lands\n", gitexec.RemoteMain, ahead, base)
 	}
 }
 
@@ -64,12 +62,12 @@ func staleHint(statePath string) string {
 }
 
 func defaultMainAhead(projectRoot, base string) (int, error) {
-	out, stderr, code, err := gitexec.Git{Dir: projectRoot, Exec: gitRunner}.Capture(context.Background(), "rev-list", "--count", base+".."+resumeMainRef)
+	out, stderr, code, err := gitexec.Git{Dir: projectRoot, Exec: gitRunner}.Capture(context.Background(), "rev-list", "--count", base+".."+gitexec.RemoteMain)
 	if err != nil {
 		return 0, err
 	}
 	if code != 0 {
-		return 0, fmt.Errorf("git rev-list %s..%s: rc=%d: %s", base, resumeMainRef, code, strings.TrimSpace(stderr))
+		return 0, fmt.Errorf("git rev-list %s..%s: rc=%d: %s", base, gitexec.RemoteMain, code, strings.TrimSpace(stderr))
 	}
 	return strconv.Atoi(strings.TrimSpace(out))
 }

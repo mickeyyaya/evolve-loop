@@ -383,3 +383,109 @@ func TestReadAll_CountsMalformedLinesOfEveryFileAndReturnsReadErrors(t *testing.
 		t.Error("want an error when the runs dir cannot be listed")
 	}
 }
+
+func TestBackend_ARecordWithABackendRoundTripsThroughAppendAndRead(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "log.ndjson")
+	rec := sample("scout", "find", 2, 0, t0)
+	rec.Backend = "trail"
+
+	if err := Append(path, rec, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	got, skipped, err := Read(path, time.Time{})
+	if err != nil || skipped != 0 || len(got) != 1 || got[0] != rec {
+		t.Errorf("Read = %+v skipped=%d err=%v; want %+v", got, skipped, err, rec)
+	}
+	raw, _ := os.ReadFile(path)
+	if !strings.Contains(string(raw), `"backend":"trail"`) {
+		t.Errorf("line = %q, want the backend key", raw)
+	}
+}
+
+func TestBackend_ALegacyRecordWithNoBackendFieldStillReads(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "log.ndjson")
+	legacy := `{"ts":"2026-10-17T09:00:00Z","command":"callers","arg_len":7,"exit":0,"hits":4,"duration_ms":12,"phase":"scout","cycle":3,"cli":"claude","cwd":"/w"}` + "\n"
+	if err := os.WriteFile(path, []byte(legacy), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, skipped, err := Read(path, time.Time{})
+
+	if err != nil || skipped != 0 || len(got) != 1 || got[0].Backend != "" || got[0].Command != "callers" || got[0].Hits != 4 {
+		t.Errorf("Read = %+v skipped=%d err=%v; want one legacy record with an empty backend", got, skipped, err)
+	}
+}
+
+func TestBackend_ALegacyRecordAndABackendRecordShareOneFile(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "log.ndjson")
+	legacy := `{"ts":"2026-10-17T09:00:00Z","command":"find","hits":1}` + "\n"
+	if err := os.WriteFile(path, []byte(legacy), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	rec := sample("scout", "find", 2, 0, t0)
+	rec.Backend = "trail"
+	if err := Append(path, rec, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	got, skipped, err := Read(path, time.Time{})
+
+	if err != nil || skipped != 0 || len(got) != 2 || got[0].Backend != "" || got[1].Backend != "trail" {
+		t.Errorf("Read = %+v skipped=%d err=%v", got, skipped, err)
+	}
+}
+
+func TestBackend_SummarizeGroupsByBackendWithinAPhaseAndCommand(t *testing.T) {
+	t.Parallel()
+	withBackend := func(backend string, hits, exit int) Record {
+		rec := sample("scout", "find", hits, exit, t0)
+		rec.Backend = backend
+		return rec
+	}
+	records := []Record{
+		withBackend("trail", 2, 0),
+		withBackend("gotypes", 5, 0),
+		withBackend("trail", 0, 1),
+		withBackend("", 3, 0),
+	}
+
+	rows := Summarize(records)
+
+	want := []Row{
+		{Phase: "scout", Command: "find", Backend: "", Calls: 1, Hits: 3},
+		{Phase: "scout", Command: "find", Backend: "gotypes", Calls: 1, Hits: 5},
+		{Phase: "scout", Command: "find", Backend: "trail", Calls: 2, Hits: 2, Failures: 1},
+	}
+	if len(rows) != len(want) {
+		t.Fatalf("rows = %+v, want %+v", rows, want)
+	}
+	for i := range want {
+		if rows[i] != want[i] {
+			t.Errorf("row %d = %+v, want %+v", i, rows[i], want[i])
+		}
+	}
+}
+
+func TestBackend_SummarizeKeepsPhaseThenCommandThenBackendOrder(t *testing.T) {
+	t.Parallel()
+	at := func(phase, command, backend string) Record {
+		rec := sample(phase, command, 1, 0, t0)
+		rec.Backend = backend
+		return rec
+	}
+
+	rows := Summarize([]Record{at("scout", "find", "trail"), at("builder", "find", "trail"), at("scout", "callers", "gotypes"), at("builder", "find", "gotypes")})
+
+	var order []string
+	for _, row := range rows {
+		order = append(order, row.Phase+"/"+row.Command+"/"+row.Backend)
+	}
+	want := "builder/find/gotypes builder/find/trail scout/callers/gotypes scout/find/trail"
+	if got := strings.Join(order, " "); got != want {
+		t.Errorf("order = %q, want %q", got, want)
+	}
+}

@@ -143,6 +143,7 @@ type gcRun struct {
 	remove         func(string) error
 	removeAll      func(string) error
 	abs            func(string) (string, error)
+	exec           sysexec.RunFunc
 	liveRuns       []string
 }
 
@@ -150,7 +151,7 @@ func newGCRun(ctx context.Context, dryRun bool, stdout, stderr io.Writer) gcRun 
 	r := gcRun{ctx: ctx, dryRun: dryRun, stdout: stdout, stderr: stderr,
 		reapers: gcReapers{sessions: swarm.ExecReapOrphans, sockets: swarm.ExecReapOrphanSockets},
 		kill:    func(pid int) error { return syscall.Kill(pid, syscall.SIGTERM) },
-		remove:  os.Remove, removeAll: os.RemoveAll, abs: filepath.Abs}
+		remove:  os.Remove, removeAll: os.RemoveAll, abs: filepath.Abs, exec: sysexec.DefaultRunner}
 	if gcInjectedReapers != nil {
 		r.reapers = *gcInjectedReapers
 	}
@@ -256,6 +257,7 @@ func (r gcRun) project(projectRoot string) int {
 	for _, run := range steps {
 		failed = r.step(run) || failed
 	}
+	failed = r.remoteSweep(projectRoot, evolveDir, gcPol) || failed
 	if !r.dryRun && freeErr == nil {
 		r.reportDiskFree(projectRoot, before)
 	}
@@ -314,10 +316,11 @@ func (r gcRun) worktrees(opts gc.WorktreeOptions) bool {
 	}
 	planned, flagged := gcWorktreeCounts(manifest)
 	r.summary("%d workspace item(s) would be reaped (%d flagged for manual review)", "applying workspace sweep — %d item(s) (%d flagged for manual review)", planned, flagged)
+	counts, tallyFailed := r.flagCounts(opts, manifest)
 	for _, it := range manifest.Items {
 		switch it.Action {
 		case gc.WorktreeActionFlagDirty, gc.WorktreeActionFlagUnmerged:
-			fmt.Fprintf(r.stdout, "  %s %s (%s)\n", strings.ToUpper(string(it.Action)), gcWorktreeItemLabel(it), it.Reason)
+			fmt.Fprintf(r.stdout, "  %s %s (%s)%s\n", strings.ToUpper(string(it.Action)), gcWorktreeItemLabel(it), it.Reason, gcFlagCountSuffix(counts, it))
 		default:
 			fmt.Fprintf(r.stdout, "  WOULD-%s %s (%s)\n", strings.ToUpper(string(it.Action)), gcWorktreeItemLabel(it), it.Reason)
 		}
@@ -325,11 +328,42 @@ func (r gcRun) worktrees(opts gc.WorktreeOptions) bool {
 	if r.dryRun {
 		return false
 	}
+	tallyFailed = r.fileRepeatedFlags(opts, manifest, counts) || tallyFailed
 	if err := gc.ApplyWorktrees(opts, manifest); err != nil {
 		fmt.Fprintf(r.stderr, "evolve gc: workspace sweep partial: %v\n", err)
 	}
 	fmt.Fprintf(r.stdout, "evolve gc: workspace sweep applied\n")
-	return false
+	return tallyFailed
+}
+
+func (r gcRun) flagCounts(opts gc.WorktreeOptions, manifest gc.WorktreeManifest) (map[string]int, bool) {
+	if r.dryRun {
+		return nil, false
+	}
+	counts, err := gc.CountFlags(opts.EvolveDir, manifest.Items)
+	if err != nil {
+		fmt.Fprintf(r.stderr, "evolve gc: flag tally failed: %v\n", err)
+		return nil, true
+	}
+	return counts, false
+}
+
+func (r gcRun) fileRepeatedFlags(opts gc.WorktreeOptions, manifest gc.WorktreeManifest, counts map[string]int) bool {
+	filed, err := gc.FileRepeatedFlags(filepath.Join(opts.EvolveDir, "inbox"), manifest.Items, counts, time.Now)
+	for _, path := range filed {
+		fmt.Fprintf(r.stdout, "  filed inbox item %s\n", path)
+	}
+	if err != nil {
+		fmt.Fprintf(r.stderr, "evolve gc: flag filing failed: %v\n", err)
+	}
+	return err != nil
+}
+
+func gcFlagCountSuffix(counts map[string]int, it gc.WorktreeItem) string {
+	if n, ok := counts[gc.FlagKey(it)]; ok {
+		return fmt.Sprintf(" count=%d", n)
+	}
+	return ""
 }
 
 func (r gcRun) runDirs(evolveDir string, pol gc.Policy) bool {

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -144,7 +145,7 @@ func TestBridgePromptDispatcher_ALaunchFailureNamesTheDriver(t *testing.T) {
 		},
 	}
 
-	reply, err := d.DispatchPrompt(context.Background(), "claude", "PROMPT")
+	reply, err := d.DispatchPrompt(context.Background(), "claude-p", "PROMPT")
 
 	if !errors.Is(err, boom) || !strings.Contains(err.Error(), "launch claude-p") {
 		t.Fatalf("err = %v, want the wrapped launch error naming driver claude-p", err)
@@ -270,38 +271,38 @@ func TestPolicyAllowedFamilies(t *testing.T) {
 
 func TestClassifierPreference_NoTableUsesTheLegacyOrder(t *testing.T) {
 	t.Parallel()
-	got, err := classifierPreference(t.TempDir())
+	got, err := classifierPreference(t.TempDir(), cliroute.Host{})
 	if err != nil {
 		t.Fatalf("classifierPreference: %v", err)
 	}
-	if !reflect.DeepEqual(got, []string{"codex", "claude", "agy"}) {
-		t.Errorf("got %v, want the legacy codex > claude > agy", got)
+	if !reflect.DeepEqual(got, []string{"codex-tmux", "claude-tmux", "agy-tmux"}) {
+		t.Errorf("got %v, want the legacy codex-tmux > claude-tmux > agy-tmux", got)
 	}
 }
 
-func TestClassifierFamilies_ATableWithNoDefaultRefusesTheClassifier(t *testing.T) {
+func TestClassifierDrivers_ATableWithNoDefaultRefusesTheClassifier(t *testing.T) {
 	t.Parallel()
 	block := policy.CLIRouting{CLIs: []string{"agy", "claude"}, Work: map[string][]string{"build": {"agy", "claude"}}}
 
-	families, err := classifierFamilies(classifierRouter(t, policy.Policy{CLIRouting: &block}))
+	drivers, err := classifierDrivers(classifierRouter(t, policy.Policy{CLIRouting: &block}), "")
 
 	if err == nil || !strings.Contains(err.Error(), "no route for the model classifier") {
 		t.Fatalf("err = %v, want the no-route refusal", err)
 	}
-	if families != nil {
-		t.Errorf("families = %v, want nil on a refusal", families)
+	if drivers != nil {
+		t.Errorf("drivers = %v, want nil on a refusal", drivers)
 	}
 }
 
-func TestClassifierFamilies_DedupesDriversOfOneFamily(t *testing.T) {
+func TestClassifierDrivers_TheRouterLaunchesADuplicatedDriverOnce(t *testing.T) {
 	t.Parallel()
 	block := policy.CLIRouting{CLIs: []string{"claude", "agy"}, Default: []string{"claude", "agy", "claude"}}
-	families, err := classifierFamilies(classifierRouter(t, policy.Policy{CLIRouting: &block}))
+	drivers, err := classifierDrivers(classifierRouter(t, policy.Policy{CLIRouting: &block}), "")
 	if err != nil {
-		t.Fatalf("classifierFamilies: %v", err)
+		t.Fatalf("classifierDrivers: %v", err)
 	}
-	if !reflect.DeepEqual(families, []string{"claude", "agy"}) {
-		t.Errorf("families = %v, want claude, agy once each", families)
+	if !reflect.DeepEqual(drivers, []string{"claude-tmux", "agy-tmux"}) {
+		t.Errorf("drivers = %v, want claude-tmux, agy-tmux once each from the router", drivers)
 	}
 }
 
@@ -326,9 +327,13 @@ func TestLiveRefresh_NoReadyCLIIsAnError(t *testing.T) {
 }
 
 func TestLiveRefresh_AnUncreatableScratchDirIsAnError(t *testing.T) {
-	t.Setenv("TMPDIR", filepath.Join(t.TempDir(), "missing", "tmp"))
+	t.Parallel()
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, ".evolve"), []byte("blocker"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
-	_, err := liveRefresh(context.Background(), e3ReadyReport("ollama"), t.TempDir(), "", modelcatalog.Catalog{}, io.Discard)
+	_, err := liveRefresh(context.Background(), e3ReadyReport("ollama"), root, "", modelcatalog.Catalog{}, io.Discard)
 
 	if err == nil || !strings.HasPrefix(err.Error(), "liveRefresh: scratch workspace: ") {
 		t.Fatalf("err = %v, want the scratch workspace error", err)

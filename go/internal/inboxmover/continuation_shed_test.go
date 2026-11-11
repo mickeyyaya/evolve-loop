@@ -191,7 +191,7 @@ func TestShedDeclinedContinuation_RedactsTheHomeInThePreservedPointer(t *testing
 		t.Fatal(err)
 	}
 
-	if released := string(itemFields(t, filepath.Join(claim, "homed.json"))["released_continuations"]); !strings.Contains(released, `"worktree":"~/worktrees/cycle-2004"`) {
+	if released := string(itemFields(t, filepath.Join(claim, "homed.json"))["released_continuations"]); !strings.Contains(released, `"worktree": "~/worktrees/cycle-2004"`) {
 		t.Errorf("the preserved pointer must carry ~, never the host home: %s", released)
 	}
 }
@@ -214,7 +214,7 @@ func TestReleaseContinuationBinding_AnEmptyReleasedSnapshotKeepsTheLiveBlock(t *
 		t.Fatal(err)
 	}
 
-	if fields := itemFields(t, item); !strings.Contains(string(fields["continuation"]), `"cycle":7`) {
+	if fields := itemFields(t, item); !strings.Contains(string(fields["continuation"]), `"cycle": 7`) {
 		t.Errorf("a release with no snapshot names no live block: %s", fields["continuation"])
 	}
 }

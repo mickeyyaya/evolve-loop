@@ -76,9 +76,10 @@ func TestRepoPersonaProfilePairing(t *testing.T) {
 		"swarm-planner": "swarm is EVOLVE_SWARM_STAGE=shadow; MUST be paired before swarm promotion (plan task CF.2)",
 	}
 	profileOnly := map[string]string{
-		"evaluator":   "persona projected from skills/evaluator",
-		"inspirer":    "persona projected from skills/inspirer",
-		"tool-policy": "shared tool-policy fragment, not an agent",
+		"evaluator":        "persona projected from skills/evaluator",
+		"inspirer":         "persona projected from skills/inspirer",
+		"model-classifier": "the classifier prompt is built in Go (modelquery buildClassifyPrompt); the profile holds only the containment of the seat",
+		"tool-policy":      "shared tool-policy fragment, not an agent",
 	}
 
 	agentEntries, err := os.ReadDir(filepath.Join(root, "agents"))

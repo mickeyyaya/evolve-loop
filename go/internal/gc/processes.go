@@ -26,7 +26,12 @@ func ReapFinishedCycleOrphans(ctx context.Context, o WorktreeOptions, kill func(
 		rep.Errors = append(rep.Errors, err.Error())
 		return rep
 	}
-	for _, p := range o.FinishedCycleOrphans(procs) {
+	return reapProcesses(o.FinishedCycleOrphans(procs), kill)
+}
+
+func reapProcesses(procs []Process, kill func(pid int) error) ProcessReapReport {
+	var rep ProcessReapReport
+	for _, p := range procs {
 		if err := kill(p.Pid); err != nil {
 			rep.Errors = append(rep.Errors, fmt.Sprintf("signal pid %d (cwd %s): %v", p.Pid, p.Cwd, err))
 			continue

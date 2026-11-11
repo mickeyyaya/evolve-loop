@@ -163,7 +163,7 @@ func TestMoverReleaseClaim_RestampsTheItemFromTheClaimingCycleManifest(t *testin
 		t.Fatal(err)
 	}
 
-	if doc := readJSON(t, filepath.Join(inbox, "retro.json")); !strings.Contains(string(doc["continuation"]), `"snapshot_sha":"new2008"`) {
+	if doc := readJSON(t, filepath.Join(inbox, "retro.json")); !strings.Contains(string(doc["continuation"]), `"snapshot_sha": "new2008"`) {
 		t.Errorf("a deadline-stopped lane's newer snapshot must replace the adopted older one: %s", doc["continuation"])
 	}
 	if doc := readJSON(t, filepath.Join(inbox, "plain.json")); !strings.Contains(string(doc["continuation"]), `"snapshot_sha":"old2004"`) {

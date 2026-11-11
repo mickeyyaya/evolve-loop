@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	codeUsage = "usage: evolve code callers <symbol> [--direction in|out] | api <file> | find <query> | map [dir]  [--project-root P] [--json] | refresh [--project-root P] [--json] | usage [--since D] [--json]"
+	codeUsage = "usage: evolve code callers <symbol> [--direction in|out] | api <file> | find <query> | map [dir]  [--project-root P] [--json] | refresh [--project-root P] [--json] | bench [--backends a,b] [--symbols N] [--rounds N] [--project-root P] | usage [--since D] [--json]"
 
 	codeExitNotFound    = 1
 	codeExitAbsent      = 2
@@ -71,6 +71,9 @@ func runCodeCommand(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) > 0 && args[0] == codeUsageVerbName {
 		return codeUsageVerb(args[1:], stdout, stderr, codeUsageCacheDir, codeProjectRoot(""))
 	}
+	if len(args) > 0 && args[0] == codeBenchVerbName {
+		return codeBenchVerb(args[1:], stdout, stderr, defaultCodeIndexHost())
+	}
 	if len(args) > 0 && args[0] == codeRefreshVerbName {
 		return codeRefreshVerb(args[1:], stdout, stderr, defaultCodeIndexHost(), os.Getenv, codeIndexRefreshTimeout)
 	}
@@ -105,7 +108,8 @@ func codeVerb(ctx context.Context, args []string, stdout, stderr io.Writer, buil
 	if check.refused != "" {
 		return out.fail(codeExitStale, "stale", check.refused), call
 	}
-	hits, err := idx.backends.Search(ctx, inv.request)
+	hits, served, err := idx.backends.SearchServed(ctx, inv.request)
+	call.backend = served
 	if err != nil {
 		rc, kind, message := codeErrorOutcome(inv.request, err)
 		return out.fail(rc, kind, message), call
@@ -295,7 +299,11 @@ func loadCodeIndexLocation(projectRoot string) (codeIndexLocation, error) {
 }
 
 func newCodeBackends(loc codeIndexLocation, run sysexec.RunFunc, env []string) (codeindex.Backends, error) {
-	factories := map[string]codeindex.Factory{
+	return codeindex.New(loc.backends, codeBackendFactories(loc, run, env))
+}
+
+func codeBackendFactories(loc codeIndexLocation, run sysexec.RunFunc, env []string) map[string]codeindex.Factory {
+	return map[string]codeindex.Factory{
 		"gotypes": func() (codeindex.Backend, error) {
 			return gotypes.New(gotypes.IndexPath(loc.indexDir)), nil
 		},
@@ -303,7 +311,6 @@ func newCodeBackends(loc codeIndexLocation, run sysexec.RunFunc, env []string) (
 			return trail.New(trail.Config{Bin: loc.trailBin, IndexDir: loc.indexDir, Env: env, Run: run}), nil
 		},
 	}
-	return codeindex.New(loc.backends, factories)
 }
 
 func resolveCodeIndexPaths(projectRoot string, cfg policy.CodeIndexSettings) (indexDir, trailBin string, err error) {

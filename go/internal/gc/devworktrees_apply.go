@@ -69,12 +69,14 @@ func (s *devSweep) archiveOne(ctx context.Context, planned DevItem, known map[st
 	defer cancel()
 	rec := DevArchiveRecord{Path: wt.Dir, Branch: fresh.Branch, Head: fresh.Head, IdleDays: fresh.IdleDays, ArchivedAt: s.now}
 	removal := []string{"worktree", "remove"}
-	if fresh.Dirty {
-		ref, err := s.saveVerified(ctx, wt)
+	if fresh.Dirty || fresh.Unique {
+		ref, err := s.saveVerified(ctx, wt, fresh.Unique)
 		if err != nil {
 			return DevArchiveRecord{}, err
 		}
 		rec.Checkpoint = ref
+	}
+	if fresh.Dirty {
 		removal = append(removal, "--force")
 	}
 	if err := s.store.Run(ctx, append(removal, filepath.Clean(wt.Dir))...); err != nil {
@@ -86,7 +88,7 @@ func (s *devSweep) archiveOne(ctx context.Context, planned DevItem, known map[st
 	return rec, nil
 }
 
-func (s *devSweep) saveVerified(ctx context.Context, wt wtcheckpoint.Worktree) (string, error) {
+func (s *devSweep) saveVerified(ctx context.Context, wt wtcheckpoint.Worktree, pinHead bool) (string, error) {
 	tree := gitexec.Git{Dir: wt.Dir, Exec: s.o.Exec}
 	before, err := tree.DirtyPaths(ctx)
 	if err != nil {
@@ -106,6 +108,13 @@ func (s *devSweep) saveVerified(ctx context.Context, wt wtcheckpoint.Worktree) (
 	}
 	if !slices.Equal(before, after) || again.Ref != saved.Ref {
 		return "", fmt.Errorf("gc: refuse %s: the tree changed while its checkpoint was saved, so it is kept and not archived", wt.Dir)
+	}
+	if saved.Ref == "" && pinHead {
+		pinned, err := wtcheckpoint.PinHead(ctx, wt, wtcheckpoint.SaveOptions{Label: devArchiveLabel, Now: s.o.Now})
+		if err != nil {
+			return "", fmt.Errorf("gc: refuse %s: its head could not be pinned, so the tree stays: %w", wt.Dir, err)
+		}
+		return pinned.Ref, nil
 	}
 	return saved.Ref, nil
 }

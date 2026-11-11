@@ -585,17 +585,20 @@ func TestRunRepoContractGate_AnUnresolvableLandingTreeStopsTheGate(t *testing.T)
 func TestRunPushOnly_AnUnreadableBranchOrOriginStopsBeforeAnyPush(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name    string
-		failing argvMatch
-		wantErr string
+		name     string
+		failing  argvMatch
+		wantErr  string
+		spawnErr error
 	}{
 		{name: "the branch is unreadable", failing: argvIs("rev-parse", "--abbrev-ref", "HEAD"), wantErr: "ship --push-only: resolve branch: "},
-		{name: "origin has no such branch", failing: argvIs("rev-list", "origin/main..HEAD"), wantErr: "ship --push-only: no origin/main to compare against: "},
+		{name: "origin has no such branch", failing: argvIs("rev-list", "HEAD", "^origin/main"), wantErr: "ship --push-only: no origin/main to compare against: "},
+		{name: "the fetch of the remote refs fails", failing: argvIs("fetch", "origin", "+refs/heads/main:refs/remotes/origin/main"), wantErr: "ship --push-only: REFUSED — git fetch origin +refs/heads/main:refs/remotes/origin/main exited 128"},
+		{name: "the fetch of the remote refs cannot start", failing: argvIs("fetch", "origin", "+refs/heads/main:refs/remotes/origin/main"), spawnErr: errors.New("spawn: no git"), wantErr: "ship --push-only: REFUSED — git fetch origin +refs/heads/main:refs/remotes/origin/main did not run (spawn: no git)"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			branch := &gitFault{when: argvIs("rev-parse", "--abbrev-ref", "HEAD"), stdout: "main\n"}
-			fault := &gitFault{when: tc.failing, exit: 128, next: branch.runner()}
+			fault := &gitFault{when: tc.failing, exit: 128, err: tc.spawnErr, next: branch.runner()}
 			opts := &Options{ProjectRoot: t.TempDir(), PushOnly: true, Runner: fault.runner()}
 			res := &RunResult{}
 

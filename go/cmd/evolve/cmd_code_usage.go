@@ -14,15 +14,17 @@ import (
 )
 
 const (
-	codeUsageVerbName = "usage"
-	codeUsageNoPhase  = "(none)"
+	codeUsageVerbName  = "usage"
+	codeUsageNoPhase   = "(none)"
+	codeUsageNoBackend = "unknown"
 )
 
 type codeCall struct {
-	verb   string
-	root   string
-	argLen int
-	hits   int
+	verb    string
+	root    string
+	argLen  int
+	hits    int
+	backend string
 }
 
 type codeUsageSink struct {
@@ -41,7 +43,7 @@ func codeVerbLogged(ctx context.Context, args []string, stdout, stderr io.Writer
 	cwd, _ := os.Getwd()
 	rec := usagelog.Record{
 		TS: started, Command: call.verb, ArgLen: call.argLen, Exit: rc, Hits: call.hits,
-		DurationMS: time.Since(started).Milliseconds(), Phase: phase, Cycle: cycle, CLI: cli, Cwd: cwd,
+		DurationMS: time.Since(started).Milliseconds(), Phase: phase, Cycle: cycle, CLI: cli, Cwd: cwd, Backend: call.backend,
 	}
 	if err := appendCodeUsage(sink, cmp.Or(call.root, sink.rootOf()), rec); err != nil {
 		fmt.Fprintf(stderr, "evolve code: usage log: %v\n", err)
@@ -95,12 +97,12 @@ func printCodeUsage(rows []usagelog.Row, asJSON bool, stdout io.Writer) {
 		_ = json.NewEncoder(stdout).Encode(rows)
 		return
 	}
-	fmt.Fprintln(stdout, "PHASE\tCOMMAND\tCALLS\tHITS\tFAILURES")
+	fmt.Fprintln(stdout, "PHASE\tCOMMAND\tBACKEND\tCALLS\tHITS\tFAILURES")
 	for _, row := range rows {
 		phase := row.Phase
 		if phase == "" {
 			phase = codeUsageNoPhase
 		}
-		fmt.Fprintf(stdout, "%s\t%s\t%d\t%d\t%d\n", phase, row.Command, row.Calls, row.Hits, row.Failures)
+		fmt.Fprintf(stdout, "%s\t%s\t%s\t%d\t%d\t%d\n", phase, row.Command, cmp.Or(row.Backend, codeUsageNoBackend), row.Calls, row.Hits, row.Failures)
 	}
 }

@@ -143,6 +143,7 @@ The path classes come from the CI router of `.github/workflows/required.yml`. A 
 
 - Open each PR from `origin/main`. Do not stack a PR on another open PR: a squash merge rewrites the commits of the first PR, so the stacked PR conflicts.
 - After a rebase onto `origin/main`, run `evolve pr refresh`. It writes `docs/architecture/signal-codes.md`, `go/.darwin-set` and the generated region of `docs/research-index.md` again, and commits only those files. In a merge or a rebase that stopped on a conflict, it stages the files, and you continue the merge or the rebase.
+- After a merge of `origin/main`, push the branch with `evolve ship --class manual --push-only`. It leaves out each commit that `origin/main` holds, and it checks each other commit.
 - Do not merge a generated file by hand.
 
 ### The on-demand boundary
@@ -204,7 +205,8 @@ The console opens many PRs by hand. Each PR waits for a merge. The train puts th
 - **Landing.** `Merger.Land` opens one batch PR, watches the CI and moves `main` with one fast-forward (plan decision D11). A red batch is split as in plan decision D10. A run that has not started yet is not an error. The command waits for the run to register, up to five tries. Then it stops with an error.
 - **Red and gh errors.** The command reads the verdict from the conclusion of the run. The conclusion `failure` is red. A run that was cancelled, a run that is not finished, and any error of `gh` stop the batch with an error. They never brief a PR.
 - **Landed PRs.** A PR that is on `main` does not land again. A rerun after a failed close closes the PR and does not move `main`. A record is spent when its PR closes.
-- **Landed identity.** The command composes each commit of a console PR as one commit on `main`, in order. Each composed commit has the `Source-PR` line. A PR is landed when each of its commits has a composed commit with the same patch-id. The patch-id is read with zero lines of context. A peer PR in the same file does not change the result.
+- **Landed identity.** The command composes each commit of a console PR as its own commit on `main`, in order. Each composed commit has the `Source-PR` line. A PR is landed when each of its commits has a composed commit with the same patch-id. The patch-id is read with zero lines of context. A peer PR in the same file does not change the result.
+- **Many commits.** The train does not squash a PR. A PR of two commits lands as two commits on `main`, in order. A PR of N commits lands as N commits. Each landed commit has the `Source-PR` line.
 - **Landed check error.** If git fails during the landed check, the command stops with an error. It lands nothing.
 - **Exit code.** The command exits with 1 when it ejects a PR. This holds for an ejection at the plan, at the landing and on a red CI. It also holds when a PR head moved after the landing. The error names each PR. The command prints a line when the CI was red once and green on the rerun.
 - **Member PRs.** The command never pushes to the branch of a member PR. After a green landing, each landed PR closes with a comment that links the batch PR.

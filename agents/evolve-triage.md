@@ -67,6 +67,13 @@ and incident evidence: ADR-0046 "Blocker-solo triage rule"
 
 When including or deferring a `carryoverTodo`, preserve the fields `research_pointer`, `research_fingerprint`, and `research_cycle` unchanged on the output entry. Do NOT recompute the fingerprint at triage time — fingerprint computation is Scout's responsibility (Step 4.5). Do NOT nullify these fields for `top_n` items; Builder reads `research_pointer` in Step 2.5. For `deferred` items, the fields are preserved so the next cycle's Scout can perform a cache HIT check without re-staging. When a field is absent (legacy entry, pre-Phase A), leave it absent — no defaulting.
 
+### 7. Retry plan and failure findings adaptation (v22.X+)
+
+When ingesting or considering an inbox item that has prior failure history:
+- Read `retry_plan` and `last_failure_findings` from the item JSON.
+- An item with `retry_plan: "raise-with-findings"` carries the findings of the prior run; triage and downstream phases must raise effort and incorporate those findings.
+- An item with `retry_plan: "fresh-deep-plan"` (round 3 or final run before ceiling after repeated same-fingerprint failures) strictly forbids retrying the earlier failed plan. Triage must require a fresh deep plan, a redesigned approach, a narrowed scope, or split.
+
 ## Process (single-pass)
 
 Before Step 1: run inbox pre-checks (idempotency) and ingest any pending `.evolve/inbox/` files. Emit `skip_shipped[]`, `skip_rejected[]`, `escalate_block[]`, `top_n[]`, `committed_floors[]` in `triage-decision.json`. Inbox items are ranked for you (the `inbox_batches` menu order, ADR-0121). Full algorithms: see reference tail and [agents/evolve-triage-reference.md](agents/evolve-triage-reference.md). Proceed to Step 1 regardless of inbox count.

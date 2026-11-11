@@ -31,10 +31,11 @@ func runCycleResume(args []string, stdout, stderr io.Writer) int {
 	projectRoot := fs.String("project-root", "", "project root (default: $EVOLVE_PROJECT_ROOT or cwd)")
 	cycle := fs.Int("cycle", 0, "resume only if the paused cycle is this one")
 	all := fs.Bool("all", false, "grant an auto-resume to every paused cycle and start nothing")
+	grant := fs.Bool("grant", false, "grant an auto-resume to the cycle named by --cycle and start nothing")
 	dryRun := fs.Bool("dry-run", false, "name the paused cycle and start nothing")
 	asJSON := fs.Bool("json", false, "print the result as JSON")
-	if err := fs.Parse(args); err != nil || fs.NArg() > 0 || *cycle < 0 || (*all && *cycle > 0) {
-		fmt.Fprintln(stderr, "usage: evolve cycle resume [--cycle N | --all] [--dry-run] [--json] [--project-root P]")
+	if err := fs.Parse(args); err != nil || fs.NArg() > 0 || *cycle < 0 || (*all && *cycle > 0) || (*grant && (*all || *cycle == 0)) {
+		fmt.Fprintln(stderr, "usage: evolve cycle resume [--cycle N [--grant] | --all] [--dry-run] [--json] [--project-root P]")
 		return cliExitUsage
 	}
 	root, err := loopStopRoot(*projectRoot, stderr)
@@ -42,8 +43,8 @@ func runCycleResume(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "cycle resume: cwd: %v\n", err)
 		return cliExitIO
 	}
-	if *all {
-		return runCycleResumeAll(root, *dryRun, *asJSON, stdout, stderr)
+	if *all || *grant {
+		return runCycleResumeAll(root, *cycle, *dryRun, *asJSON, stdout, stderr)
 	}
 	rp, rc := pausedCycleOf(root, *cycle, stderr)
 	if rc != cliExitOK {

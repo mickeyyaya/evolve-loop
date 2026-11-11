@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/attemptpostmortem"
 	"github.com/mickeyyaya/evolve-loop/go/internal/auditledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/coherence"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
@@ -39,6 +40,7 @@ type failureDossier struct {
 	BuildDeclared   *auditDeclared `json:"build_declared,omitempty"`
 	NonProgress     nonProgress    `json:"non_progress"`
 	Evidence        string         `json:"evidence,omitempty"`
+	Postmortems     []string       `json:"postmortems,omitempty"`
 }
 
 func buildFailureDossier(cs CycleState, finalVerdict string, fp policy.SystemFailurePolicy) *failureDossier {
@@ -52,6 +54,7 @@ func buildFailureDossier(cs CycleState, finalVerdict string, fp policy.SystemFai
 			SameClassStreak:          sameClassStreak(cs.FailedAt),
 			RepeatCount:              len(cs.FailedAt),
 		},
+		Postmortems: postmortemFiles(cs.WorkspacePath),
 	}
 
 	audit, acs, auditRan := coherence.ReadCycleVerdicts(cs.WorkspacePath)
@@ -81,6 +84,20 @@ func buildFailureDossier(cs CycleState, finalVerdict string, fp policy.SystemFai
 			strings.Join(d.AuditDeclared.Defects, " | ")
 	}
 	return d
+}
+
+func postmortemFiles(workspace string) []string {
+	entries, err := os.ReadDir(workspace)
+	if err != nil {
+		return nil
+	}
+	var names []string
+	for _, e := range entries {
+		if e.Type().IsRegular() && attemptpostmortem.IsFileName(e.Name()) {
+			names = append(names, e.Name())
+		}
+	}
+	return names
 }
 
 func (o *Orchestrator) failureDossier(cs CycleState, finalVerdict string) *failureDossier {

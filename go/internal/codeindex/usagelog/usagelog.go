@@ -39,11 +39,13 @@ type Record struct {
 	Cycle      int       `json:"cycle"`
 	CLI        string    `json:"cli"`
 	Cwd        string    `json:"cwd"`
+	Backend    string    `json:"backend,omitempty"`
 }
 
 type Row struct {
 	Phase    string `json:"phase"`
 	Command  string `json:"command"`
+	Backend  string `json:"backend"`
 	Calls    int    `json:"calls"`
 	Hits     int    `json:"hits"`
 	Failures int    `json:"failures"`
@@ -168,13 +170,13 @@ func workspaceLogs(projectRoot string) ([]string, error) {
 }
 
 func Summarize(records []Record) []Row {
-	type key struct{ phase, command string }
+	type key struct{ phase, command, backend string }
 	byKey := map[key]*Row{}
 	for _, rec := range records {
-		k := key{rec.Phase, rec.Command}
+		k := key{rec.Phase, rec.Command, rec.Backend}
 		row, ok := byKey[k]
 		if !ok {
-			row = &Row{Phase: rec.Phase, Command: rec.Command}
+			row = &Row{Phase: rec.Phase, Command: rec.Command, Backend: rec.Backend}
 			byKey[k] = row
 		}
 		row.Calls++
@@ -191,7 +193,10 @@ func Summarize(records []Record) []Row {
 		if rows[i].Phase != rows[j].Phase {
 			return rows[i].Phase < rows[j].Phase
 		}
-		return rows[i].Command < rows[j].Command
+		if rows[i].Command != rows[j].Command {
+			return rows[i].Command < rows[j].Command
+		}
+		return rows[i].Backend < rows[j].Backend
 	})
 	return rows
 }

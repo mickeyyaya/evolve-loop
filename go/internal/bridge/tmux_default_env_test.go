@@ -54,8 +54,12 @@ func TestTmuxBoot_ACLIWithoutDefaultEnvExportsNothingExtra(t *testing.T) {
 	fx := newFixture(t, "codex-tmux", "")
 	tmux := &fakeTmux{}
 	runTmuxCLI(t, fx, "codex-tmux", tmux, nil, "--allow-bypass", "--worktree="+t.TempDir())
+	allowed := []string{"EVOLVE_PROJECT_ROOT", ipcenv.DispatchIDKey, ipcenv.DispatchDepthKey, ipcenv.PhaseKey}
+	for k := range ipcenv.CredentialIsolation("dir", "cfg").Set {
+		allowed = append(allowed, k)
+	}
 	for _, k := range tmux.sentKeys {
-		if strings.HasPrefix(k, "export ") && !slices.ContainsFunc([]string{"EVOLVE_PROJECT_ROOT", ipcenv.DispatchIDKey, ipcenv.DispatchDepthKey, ipcenv.PhaseKey}, func(name string) bool { return strings.HasPrefix(k, "export "+name+"=") }) {
+		if strings.HasPrefix(k, "export ") && !slices.ContainsFunc(allowed, func(name string) bool { return strings.HasPrefix(k, "export "+name+"=") }) {
 			t.Fatalf("codex-tmux declares no default_env, yet the pane received %q", k)
 		}
 	}

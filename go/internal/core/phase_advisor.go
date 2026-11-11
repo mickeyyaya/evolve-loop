@@ -104,6 +104,9 @@ type bridgeLauncher struct{ b Bridge }
 
 func (l bridgeLauncher) Launch(ctx context.Context, req advisor.LaunchRequest) (advisor.LaunchResponse, error) {
 	resp, err := LaunchWithFreshSession(ctx, l.b, bridgeRequestOf(req))
+	if err != nil && resp.CauseCode != "" {
+		err = WalkError{Wall: Wall{}.Observe(FamilyEnd{CLI: req.CLI, Pattern: resp.CauseCode}), Err: err}
+	}
 	return launchResponseOf(resp), err
 }
 

@@ -23,6 +23,9 @@ func Classify(code int, ctxErr error, stderr string) Outcome {
 	}
 	row := classOf(code)
 	out := Outcome{ExitCode: code, CauseCode: causeCodeOf(row, stderr), CtxCancelled: ctxErr != nil, Signal: row.signal}
+	if row.code == ExitUnknownPrompt && quotaCauses[out.CauseCode] {
+		out.Signal = CodeExitQuotaWall
+	}
 	msg := fmt.Sprintf("bridge: launch exit=%d", code)
 	if cause := causeLine(code, stderr); cause != "" {
 		msg += ": " + cause
@@ -39,6 +42,8 @@ func Classify(code int, ctxErr error, stderr string) Outcome {
 	out.Err = fmt.Errorf("%s: %w", msg, sentinel)
 	return out
 }
+
+var quotaCauses = map[string]bool{"rate_limit": true, "exhausted": true}
 
 func causeLine(code int, stderr string) string {
 	cause := firstDiagnosticLine(stderr)

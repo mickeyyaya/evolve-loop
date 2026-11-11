@@ -28,6 +28,7 @@ type Policy struct {
 	Logs         LogsPolicy         `json:"logs,omitempty"`
 	Worktrees    WorktreesPolicy    `json:"worktrees,omitempty"`
 	DevWorktrees DevWorktreesPolicy `json:"dev_worktrees,omitempty"`
+	RemoteSweep  RemoteSweepPolicy  `json:"remote_sweep,omitempty"`
 }
 
 type RunsPolicy struct {
@@ -136,4 +137,20 @@ func (d DevWorktreesPolicy) ArchiveAfter() time.Duration {
 		days = defaultDevArchiveAfterDays
 	}
 	return time.Duration(days) * 24 * time.Hour
+}
+
+const (
+	remoteStageShadow  = "shadow"
+	remoteStageEnforce = "enforce"
+)
+
+type RemoteSweepPolicy struct {
+	Stage string `json:"stage,omitempty"`
+}
+
+func (p Policy) RemoteStage() string {
+	if p.RemoteSweep.Stage == remoteStageEnforce {
+		return remoteStageEnforce
+	}
+	return remoteStageShadow
 }

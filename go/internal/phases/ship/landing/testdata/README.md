@@ -21,3 +21,7 @@ these files. Never regenerate silently: a missing golden fails the pin.
 ## Amendment (2026-10-20, the continuation release after the landing)
 
 - Changed by hand in `push_direct` and `push_pushonly`: each row whose push succeeds has one more argv at the end, `-c core.quotePath=false diff-tree -r --no-commit-id --name-only --diff-filter=A <commit>^ <commit> -- .evolve/inbox/consumed [capture]`. It is the read that finds the consumed items of the landed commit, so the landing releases their continuation bindings (`releaseLandedBindings` in `consume.go`). The other argv, the logs, the streams and the Debug keys are as captured.
+
+## Amendment (2026-11-11, push-only accepts a PR branch that merged main)
+
+- Changed by hand in `push_pushonly`: in each row, `fetch origin main [streams]` became `fetch origin +refs/heads/main:refs/remotes/origin/main [streams]`, and `rev-list origin/main..HEAD [capture]` became `rev-list HEAD ^origin/main [capture]`. Push-only fetches its refs with an explicit refspec, and it leaves out each commit that `origin/main` holds (`internal-phases-ship.md`). The fixture branch is `main`, so the row has one refspec and one exclusion. The logs, the streams, the results and the Debug keys are as captured.

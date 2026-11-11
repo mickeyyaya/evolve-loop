@@ -1,6 +1,7 @@
 package lifecycle
 
 import (
+	"bytes"
 	"encoding/json"
 	"maps"
 	"os"
@@ -31,7 +32,7 @@ func TestIsMoverWritten_IsTheLoopStampsOnly(t *testing.T) {
 func keysChanged(before, after map[string]json.RawMessage) []string {
 	var changed []string
 	for _, key := range slices.Sorted(maps.Keys(after)) {
-		if string(before[key]) != string(after[key]) {
+		if compactJSON(before[key]) != compactJSON(after[key]) {
 			changed = append(changed, key)
 		}
 	}
@@ -104,4 +105,12 @@ func TestFieldOwners_AnUnbackedRecordCarriesOnlyLoopStamps(t *testing.T) {
 			t.Errorf("RetireUnbacked writes %q, which the table does not own as a loop stamp", key)
 		}
 	}
+}
+
+func compactJSON(raw json.RawMessage) string {
+	var buf bytes.Buffer
+	if err := json.Compact(&buf, raw); err != nil {
+		return string(raw)
+	}
+	return buf.String()
 }

@@ -98,7 +98,7 @@ A guard refuses an action or pins a rule. A lane that weakens a guard escapes th
 - `go/internal/inboxmover/lifecycle/route.go`
 - `go/internal/inboxmover/lifecycle/edit.go`
 
-### Ship and commit gates (`ship-or-commit-gate`, 44 entries)
+### Ship and commit gates (`ship-or-commit-gate`, 47 entries)
 
 These files decide if a change may commit, land or pass the build floor. They include the landing, the floors and the overlap proof.
 
@@ -141,6 +141,9 @@ These files decide if a change may commit, land or pass the build floor. They in
 - `go/internal/core/solution_floor.go`
 - `go/internal/phases/ship/native_explanation_gate.go`
 - `go/internal/core/build_handoff_floor.go`
+- `go/internal/core/tdd_predicate_floor.go`
+- `go/internal/testdup/`
+- `go/internal/repocontract/testdup_ratchet_test.go`
 - `go/internal/core/phase_bindings_selfcheck.go`
 - `go/internal/core/blocker_proof.go`
 - `go/internal/core/build_blocker_exit.go`

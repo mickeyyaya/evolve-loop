@@ -191,15 +191,13 @@ func (o WorktreeOptions) isLive(path string) bool {
 			}
 		}
 	}
-	if n, ok := LeafCycleNumber(filepath.Base(path)); ok {
-		runDir := filepath.Join(o.EvolveDir, "runs", fmt.Sprintf("cycle-%d", n))
-		if l, present, err := runlease.Read(runDir); err == nil && present {
-			if runlease.OwnerLive(l, o.now(), o.LeaseTTL, o.PidAlive) {
-				return true
-			}
-		}
-	}
-	return false
+	n, ok := LeafCycleNumber(filepath.Base(path))
+	return ok && o.runLive(n)
+}
+
+func (o WorktreeOptions) runLive(cycle int) bool {
+	l, present, err := runlease.Read(filepath.Join(o.EvolveDir, "runs", fmt.Sprintf("cycle-%d", cycle)))
+	return err == nil && present && runlease.OwnerLive(l, o.now(), o.LeaseTTL, o.PidAlive)
 }
 
 func (o WorktreeOptions) isDirty(path string) (bool, error) {

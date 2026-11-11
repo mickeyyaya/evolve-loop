@@ -339,3 +339,41 @@ func TestCycleResumeAll_AFailedGrantIsPrintedAsNotGranted(t *testing.T) {
 		t.Fatalf("grantWord = %q", got)
 	}
 }
+
+func TestCycleResumeGrant_GrantsOnlyTheNamedCycle(t *testing.T) {
+	t.Parallel()
+	root := newLoopStatusRoot(t)
+	named := seedPausedRun(t, root, 3, 0, 0, "item-a")
+	other := seedPausedRun(t, root, 4, 0, 0, "item-b")
+	var stdout, stderr bytes.Buffer
+
+	rc := runCycle([]string{"resume", "--cycle", "3", "--grant", "--project-root", root}, nil, &stdout, &stderr)
+
+	if rc != cliExitOK {
+		t.Fatalf("rc = %d stderr = %s", rc, stderr.String())
+	}
+	if _, admitted, err := checkpoint.RecordResume(named, true); err != nil || !admitted {
+		t.Errorf("named cycle after the grant = (admitted %v, err %v), want admitted", admitted, err)
+	}
+	if _, admitted, err := checkpoint.RecordResume(other, true); err != nil || admitted {
+		t.Errorf("unnamed cycle after the grant = (admitted %v, err %v), want refused", admitted, err)
+	}
+	if strings.Contains(stdout.String(), "cycle 4") {
+		t.Errorf("stdout = %q, want no line for the unnamed cycle", stdout.String())
+	}
+}
+
+func TestCycleResumeGrant_RefusesACycleThatIsNotPaused(t *testing.T) {
+	t.Parallel()
+	root := newLoopStatusRoot(t)
+	path := seedPausedRun(t, root, 3, 0, 0, "item-a")
+	before, _ := os.ReadFile(path)
+	var stdout, stderr bytes.Buffer
+
+	rc := runCycle([]string{"resume", "--cycle", "99", "--grant", "--project-root", root}, nil, &stdout, &stderr)
+
+	after, _ := os.ReadFile(path)
+	if rc != cliExitInput || !bytes.Equal(before, after) || !strings.Contains(stderr.String(), "cycle 99 is not a paused cycle") {
+		t.Errorf("rc = %d stderr = %q changed = %v, want exit %d, the refusal and no change", rc, stderr.String(), !bytes.Equal(before, after), cliExitInput)
+	}
+}

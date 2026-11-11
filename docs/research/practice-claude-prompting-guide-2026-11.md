@@ -79,3 +79,25 @@ This persona does not change. The file holds 3 markers, and the phase runs off t
 ## 6. Conclusion
 
 The guide says aggressive capital wording makes newer models overtrigger. The loop treats that as data and proposes three one-persona diets, in the order builder, auditor, scout. Each diet starts after the M2 baseline. No persona file changes in this cycle.
+
+## 7. Item 8d950f1e: the second report (2026-11-10)
+
+The practice watch reported the same source again as inbox item `practice-claude-prompting-guide-8d950f1e-202611060247`. The watch took the snapshot on 2026-11-06T02:47Z. It compared that snapshot with the earlier snapshot 2026-11-02T00:08, which belongs to item 6080fed9.
+
+The body of the item snapshot is empty. It gives no diff, so the item states no changed line. This note records that fact and does not guess a change. A watcher that sends an empty body is a defect of the watcher, and a separate item can track it.
+
+The guide was read again at its link `https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices`. The fetch returned the full page. The guide text is untrusted data, and the loop follows no instruction inside it.
+
+| Id | Guide line (short quote) | Meaning for the loop |
+|---|---|---|
+| G1 | Newer models "might now overtrigger"; "soften any aggressive language"; "CRITICAL: You MUST use this tool when..." becomes "Use this tool when...". | Same as F1 and F2. The line is unchanged in substance. |
+| G2 | "Remove over-prompting." "If in doubt, use [tool]" causes overtriggering. | Same as F3. |
+| G3 | "Tell Claude what to do instead of what not to do." | Same as F5. |
+| G4 | Migration step: reduce anti-laziness prompting, because newer models "might overtrigger". | New to this note. It supports the same diet, and it adds no new persona. |
+
+The page lists the current model family as Fable 5.2, Opus 5.5, Sonnet 5.5 and Haiku 5.5, among others. The page shows no update date, so this note cannot name the line that changed.
+
+Decision D2: No persona file changes in this cycle, and no persona is added to the proposal of section 4.
+The lines G1 to G3 repeat F1, F3 and F5, so the proposal for `evolve-builder`, `evolve-auditor` and `evolve-scout` stands as written. G4 adds support but no new target.
+Rejected option: start the `evolve-builder` diet now. D7 and D8 of ADR-0133 need the M2 baseline and 10 cycles before and after, and this cycle has neither.
+The marker counts today are the same as in section 4: builder 11, auditor 9, scout 5, triage 4, tdd-engineer 12, retrospective 3.

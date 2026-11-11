@@ -239,3 +239,31 @@ func TestCacheTrimFreeBytes_AnUnsetOrNonPositiveFloorIsOff(t *testing.T) {
 		}
 	}
 }
+
+func TestRemoteStage_OnlyTheExactWordEnforceEnforces(t *testing.T) {
+	cases := map[string]string{
+		`{}`:                                   "shadow",
+		`{"remote_sweep":{}}`:                  "shadow",
+		`{"remote_sweep":{"stage":"enforce"}}`: "enforce",
+		`{"remote_sweep":{"stage":"Enforce"}}`: "shadow",
+		`{"remote_sweep":{"stage":"on"}}`:      "shadow",
+		`{"remote_sweep":null}`:                "shadow",
+	}
+	for doc, want := range cases {
+		var p gcpolicy.Policy
+		if err := json.Unmarshal([]byte(doc), &p); err != nil {
+			t.Fatalf("unmarshal %s: %v", doc, err)
+		}
+		if got := p.RemoteStage(); got != want {
+			t.Errorf("%s: RemoteStage() = %q, want %q", doc, got, want)
+		}
+	}
+}
+
+func TestRemoteSweepPolicy_StageRoundTripsThroughItsPolicyKey(t *testing.T) {
+	p := gcpolicy.Policy{RemoteSweep: gcpolicy.RemoteSweepPolicy{Stage: "enforce"}}
+	out, err := json.Marshal(p)
+	if err != nil || !strings.Contains(string(out), `"remote_sweep":{"stage":"enforce"}`) {
+		t.Fatalf("marshal = %s (err %v), want the remote_sweep key", out, err)
+	}
+}

@@ -26,8 +26,8 @@ type SaveResult struct {
 func Save(ctx context.Context, w Worktree, o SaveOptions) (SaveResult, error) {
 	s := saver{tree: checkpointIsolatedGit(w.Dir), name: w.Name, opts: o}
 	res := SaveResult{Worktree: w.Name, Dir: w.Dir}
-	if _, _, code, err := s.tree.Capture(ctx, "check-ref-format", refPrefix+w.Name+"/"+stampLayout); err != nil || code != 0 {
-		return res, fmt.Errorf("wtcheckpoint: refused: worktree name %q cannot name a ref under %s", w.Name, refPrefix)
+	if err := s.checkName(ctx); err != nil {
+		return res, err
 	}
 	head, err := s.tree.HEAD(ctx)
 	if err != nil {
@@ -59,6 +59,32 @@ func Save(ctx context.Context, w Worktree, o SaveOptions) (SaveResult, error) {
 	res.Status = StatusSaved
 	res.Pruned, err = pruneWorktree(ctx, s.tree, w.Name, o.Keep)
 	return res, err
+}
+
+func PinHead(ctx context.Context, w Worktree, o SaveOptions) (SaveResult, error) {
+	s := saver{tree: checkpointIsolatedGit(w.Dir), name: w.Name, opts: o}
+	res := SaveResult{Worktree: w.Name, Dir: w.Dir}
+	if err := s.checkName(ctx); err != nil {
+		return res, err
+	}
+	out, err := s.tree.Output(ctx, "rev-parse", "HEAD", "HEAD^{tree}")
+	if err != nil {
+		return res, err
+	}
+	head, headTree, _ := strings.Cut(out, "\n")
+	if res.Ref, err = s.record(ctx, head, trees{staged: headTree, full: headTree}); err != nil {
+		return res, err
+	}
+	res.Status = StatusSaved
+	res.Pruned, err = pruneWorktree(ctx, s.tree, w.Name, o.Keep)
+	return res, err
+}
+
+func (s saver) checkName(ctx context.Context) error {
+	if _, _, code, err := s.tree.Capture(ctx, "check-ref-format", refPrefix+s.name+"/"+stampLayout); err != nil || code != 0 {
+		return fmt.Errorf("wtcheckpoint: refused: worktree name %q cannot name a ref under %s", s.name, refPrefix)
+	}
+	return nil
 }
 
 type saver struct {

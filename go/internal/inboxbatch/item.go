@@ -38,6 +38,8 @@ type Item struct {
 	Continuation      *continuation.Continuation `json:"continuation,omitempty"`
 	Acceptance        []string                   `json:"acceptance,omitempty"`
 	DeliverableKind   string                     `json:"deliverable_kind,omitempty"`
+	RetryPlan         json.RawMessage            `json:"retry_plan,omitempty"`
+	FailureFindings   json.RawMessage            `json:"last_failure_findings,omitempty"`
 	CreatedAt         string                     `json:"created_at,omitempty"`
 	PremiseVerifiedAt json.RawMessage            `json:"premise_verified_at,omitempty"`
 	Path              string                     `json:"-"`

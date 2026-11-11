@@ -136,8 +136,8 @@ Not abstracted:
 
 | Phase | Lane | Content | Depends on | Status |
 |---|---|---|---|---|
-| H1 | cl-log-retention | K1, K3, K4, K5, K6, K7, the catalog and the gc catalog rule | — | Staged, in review |
-| H2 | cl-proc-hygiene | K8, K9, K10, K11 | — | H2 lane |
+| H1 | cl-log-retention | K1, K3, K4, K5, K6, K7, the catalog and the gc catalog rule | — | Merged in commit 8a0662ed3 (PR #817) |
+| H2 | cl-proc-hygiene | K8, K9, K10, K11 | — | Merged in commit 2e5af9988 (PR #817) |
 | H3 | cl-log-records | K2: selection keys, slog fan-out | H1 | Not started. Item `logging-hygiene-h3-selection-keys` |
 | H4 | cl-log-reader | K12, K13, `log_access` in shadow | H3 | Not started. Item `logging-hygiene-h4-logs-reader` |
 | H5 | later | Enforce `log_access`; STE for Go strings (plan row S10) | H4 | Not started. Operator decision item `logging-hygiene-h5-enforce-log-access`; S10 is tracked in the STE plan |

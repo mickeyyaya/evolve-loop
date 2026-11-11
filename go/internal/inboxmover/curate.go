@@ -38,15 +38,13 @@ func VerifyPremise(opts Options, taskID, evidence string) (string, error) {
 	return withMover(opts, func(m *lifecycle.Mover) (string, error) { return m.VerifyPremise(taskID, evidence) })
 }
 
-const verifiedMainRef = "origin/main"
-
 func originMainHead(root string) (string, error) {
-	out, stderr, code, err := gitexec.Default(root).Capture(context.Background(), "rev-parse", "--verify", "--quiet", verifiedMainRef+"^{commit}")
+	out, stderr, code, err := gitexec.Default(root).Capture(context.Background(), "rev-parse", "--verify", "--quiet", gitexec.RemoteMain+"^{commit}")
 	switch {
 	case err != nil:
-		return "", fmt.Errorf("git rev-parse %s: %w", verifiedMainRef, err)
+		return "", fmt.Errorf("git rev-parse %s: %w", gitexec.RemoteMain, err)
 	case code != 0:
-		return "", fmt.Errorf("git rev-parse %s exit=%d: %s", verifiedMainRef, code, strings.TrimSpace(stderr))
+		return "", fmt.Errorf("git rev-parse %s exit=%d: %s", gitexec.RemoteMain, code, strings.TrimSpace(stderr))
 	}
 	return strings.TrimSpace(out), nil
 }

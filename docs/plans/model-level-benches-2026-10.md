@@ -1,6 +1,6 @@
 # Model-level benches: bench (family, model), not only the family (design note, 2026-10-06)
 
-> Status: **proposed; not built.** Filed as a follow-up of the usage-window reader ([internal-usageprobe](../architecture/packages/internal-usageprobe.md)). Inbox item: `model-level-benches-from-per-model-usage-windows`.
+> Status: **steps 1 and 2 landed in commits 83e7ca5aa and c63b9bd24; steps 3 to 5 pending.** Filed as a follow-up of the usage-window reader ([internal-usageprobe](../architecture/packages/internal-usageprobe.md)). Inbox item: `model-level-benches-from-per-model-usage-windows`.
 
 ## The gap
 

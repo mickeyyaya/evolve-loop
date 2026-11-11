@@ -1,6 +1,8 @@
 package sandbox
 
 import (
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -71,8 +73,55 @@ func TestGenerateSBPL_ShadowReportsEachGuardedReadAndDeniesNone(t *testing.T) {
 			t.Fatalf("shadow must report %s:\n%s", want, sbpl)
 		}
 	}
-	if strings.Contains(sbpl, "(deny file-read-data") || strings.Contains(sbpl, "(deny file-write* (subpath \"/repo/.evolve/runs/cycle-7/inputs\")") {
-		t.Fatalf("shadow must deny no guarded read:\n%s", sbpl)
+	if strings.Contains(sbpl, "(deny file-read-data (subpath \"/repo/.evolve/runs") || strings.Contains(sbpl, "(deny file-write* (subpath \"/repo/.evolve/runs/cycle-7/inputs\")") {
+		t.Fatalf("shadow must deny no run, raw or inputs rule:\n%s", sbpl)
+	}
+}
+
+func TestReadIsolation_ShadowDeniesTheSecretClass(t *testing.T) {
+	shadow := GenerateSBPL(readIsolationConfig(false))
+	for _, want := range []string{
+		`(deny file-read-data (subpath "/home/u/.ssh") (with message "evolve-cell=d42 rule=read.home.secret inv=I5"))`,
+		`(deny file-read-data (literal "/home/u/.netrc") (with message "evolve-cell=d42 rule=read.home.secret inv=I5"))`,
+	} {
+		if !strings.Contains(shadow, want) {
+			t.Fatalf("shadow must deny %s:\n%s", want, shadow)
+		}
+	}
+	if strings.Contains(shadow, `(deny file-read-data (subpath "/repo/.evolve/runs")`) {
+		t.Fatalf("the runs rule stays report-only at shadow:\n%s", shadow)
+	}
+	if !(ReadIsolation{Workspace: "/w"}).secretsDenied() || (ReadIsolation{}).secretsDenied() {
+		t.Fatal("secretsDenied is true exactly when the cell has read isolation")
+	}
+}
+
+func TestSandboxWrap_ShadowMasksTheSecretClassOnLinux(t *testing.T) {
+	dir := t.TempDir()
+	ssh, netrc := filepath.Join(dir, ".ssh"), filepath.Join(dir, ".netrc")
+	absent := filepath.Join(dir, ".git-credentials")
+	if err := os.Mkdir(ssh, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(netrc, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, enforce := range []bool{false, true} {
+		cfg := readIsolationConfig(enforce)
+		cfg.ReadIsolation.SecretDirs = []string{ssh}
+		cfg.ReadIsolation.SecretFiles = []string{netrc, absent}
+		joined := strings.Join(BwrapPrefix(cfg), " ")
+		for _, want := range []string{"--tmpfs " + ssh, "--ro-bind /dev/null " + netrc} {
+			if !strings.Contains(joined, want) {
+				t.Fatalf("enforce=%v must emit %q:\n%s", enforce, want, joined)
+			}
+		}
+		if strings.Contains(joined, absent) {
+			t.Fatalf("enforce=%v: an absent entry gets no mask:\n%s", enforce, joined)
+		}
+		if got := strings.Contains(joined, "--tmpfs /repo/.evolve/runs "); got != enforce {
+			t.Fatalf("enforce=%v: the runs mask is Enforce-only, got %v:\n%s", enforce, got, joined)
+		}
 	}
 }
 
@@ -94,7 +143,17 @@ func TestGenerateSBPL_NoWorkspaceOrNoRunsDirLeavesOutTheirRules(t *testing.T) {
 }
 
 func TestBwrapPrefix_EnforceHidesOtherRunsAndRebindsTheOwnWorkspaceAndTheIndex(t *testing.T) {
-	argv := BwrapPrefix(readIsolationConfig(true))
+	home := t.TempDir()
+	ssh, netrc := filepath.Join(home, ".ssh"), filepath.Join(home, ".netrc")
+	if err := os.Mkdir(ssh, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(netrc, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := readIsolationConfig(true)
+	cfg.ReadIsolation.SecretDirs, cfg.ReadIsolation.SecretFiles = []string{ssh}, []string{netrc}
+	argv := BwrapPrefix(cfg)
 	joined := strings.Join(argv, " ")
 	for _, want := range []string{
 		"--tmpfs /repo/.evolve/runs --bind /repo/.evolve/runs/cycle-7 /repo/.evolve/runs/cycle-7",
@@ -102,8 +161,8 @@ func TestBwrapPrefix_EnforceHidesOtherRunsAndRebindsTheOwnWorkspaceAndTheIndex(t
 		"--ro-bind /dev/null /repo/.evolve/runs/cycle-7/scout-stdout.log",
 		"--tmpfs /repo/.evolve/runs/cycle-7/.bridge",
 		"--ro-bind-try /repo/.evolve/runs/cycle-7/inputs /repo/.evolve/runs/cycle-7/inputs",
-		"--tmpfs /home/u/.ssh",
-		"--ro-bind /dev/null /home/u/.netrc",
+		"--tmpfs " + ssh,
+		"--ro-bind /dev/null " + netrc,
 		"--ro-bind-try /repo/.evolve/runs/cycle-7/lane-scope.json /repo/.evolve/runs/cycle-7/lane-scope.json",
 	} {
 		if !strings.Contains(joined, want) {

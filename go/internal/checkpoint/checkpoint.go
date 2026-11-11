@@ -27,11 +27,12 @@ const (
 	ReasonOperatorRequest Reason = "operator-requested"
 	ReasonStallInactivity Reason = "stall-inactivity"
 	ReasonPhaseComplete   Reason = "phase-complete"
+	ReasonRetired         Reason = "retired"
 )
 
 func (r Reason) IsValid() bool {
 	switch r {
-	case ReasonQuotaLikely, ReasonBatchCapNear, ReasonOperatorRequest, ReasonStallInactivity, ReasonPhaseComplete:
+	case ReasonQuotaLikely, ReasonBatchCapNear, ReasonOperatorRequest, ReasonStallInactivity, ReasonPhaseComplete, ReasonRetired:
 		return true
 	}
 	return false

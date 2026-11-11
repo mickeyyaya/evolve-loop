@@ -63,7 +63,7 @@ import (
 
 func runCycle(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
-		fmt.Fprintln(stderr, "evolve cycle: missing subcommand (try: run | resume | reset | timing | models)")
+		fmt.Fprintln(stderr, "evolve cycle: missing subcommand (try: run | resume | reset | retire | timing | models)")
 		return 10
 	}
 	switch args[0] {
@@ -73,6 +73,8 @@ func runCycle(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return runCycleReset(args[1:], stdout, stderr)
 	case "resume":
 		return runCycleResume(args[1:], stdout, stderr)
+	case "retire":
+		return runCycleRetire(args[1:], stdout, stderr)
 	case "timing":
 		return runCycleTiming(args[1:], stdout, stderr)
 	case "models":
@@ -267,6 +269,7 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	if applied, err := closeoutCycleOutcome(result, projectRoot, evolveDir, stderr, lifecycleLedger, signals); err != nil {
 		fmt.Fprintf(stderr, "evolve cycle run: WARN: could not apply cycle %d %s to the inbox: %v\n", result.Cycle, applied, err)
 	}
+	sweepSealedCycleGC(loopConfig{ProjectRoot: projectRoot, EvolveDir: evolveDir}, result.Cycle, stderr)
 	return cycleRunExitCode(result)
 }
 

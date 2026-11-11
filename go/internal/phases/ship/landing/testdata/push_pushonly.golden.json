@@ -6,8 +6,8 @@
       "argv": [
         "diff --cached --quiet [streams]",
         "rev-parse --abbrev-ref HEAD [capture]",
-        "fetch origin main [streams]",
-        "rev-list origin/main..HEAD [capture]",
+        "fetch origin +refs/heads/main:refs/remotes/origin/main [streams]",
+        "rev-list HEAD ^origin/main [capture]",
         "push origin main [streams]",
         "rev-parse HEAD [capture]",
         "-c core.quotePath=false diff-tree -r --no-commit-id --name-only --diff-filter=A a1b2c3d4e5f60718293a4b5c6d7e8f9012345678^ a1b2c3d4e5f60718293a4b5c6d7e8f9012345678 -- .evolve/inbox/consumed [capture]"
@@ -25,8 +25,8 @@
       "argv": [
         "diff --cached --quiet [streams]",
         "rev-parse --abbrev-ref HEAD [capture]",
-        "fetch origin main [streams]",
-        "rev-list origin/main..HEAD [capture]",
+        "fetch origin +refs/heads/main:refs/remotes/origin/main [streams]",
+        "rev-list HEAD ^origin/main [capture]",
         "push origin main [streams]",
         "fetch origin main [discard]"
       ],
@@ -55,8 +55,8 @@
       "argv": [
         "diff --cached --quiet [streams]",
         "rev-parse --abbrev-ref HEAD [capture]",
-        "fetch origin main [streams]",
-        "rev-list origin/main..HEAD [capture]",
+        "fetch origin +refs/heads/main:refs/remotes/origin/main [streams]",
+        "rev-list HEAD ^origin/main [capture]",
         "push origin main [streams]",
         "fetch origin main [discard]"
       ],
@@ -85,8 +85,8 @@
       "argv": [
         "diff --cached --quiet [streams]",
         "rev-parse --abbrev-ref HEAD [capture]",
-        "fetch origin main [streams]",
-        "rev-list origin/main..HEAD [capture]",
+        "fetch origin +refs/heads/main:refs/remotes/origin/main [streams]",
+        "rev-list HEAD ^origin/main [capture]",
         "push origin main [streams]",
         "fetch origin main [discard]",
         "rev-parse origin/main [capture]"
@@ -116,8 +116,8 @@
       "argv": [
         "diff --cached --quiet [streams]",
         "rev-parse --abbrev-ref HEAD [capture]",
-        "fetch origin main [streams]",
-        "rev-list origin/main..HEAD [capture]",
+        "fetch origin +refs/heads/main:refs/remotes/origin/main [streams]",
+        "rev-list HEAD ^origin/main [capture]",
         "push origin main [streams]",
         "fetch origin main [discard]",
         "rev-parse origin/main [capture]",
@@ -142,8 +142,8 @@
       "argv": [
         "diff --cached --quiet [streams]",
         "rev-parse --abbrev-ref HEAD [capture]",
-        "fetch origin main [streams]",
-        "rev-list origin/main..HEAD [capture]",
+        "fetch origin +refs/heads/main:refs/remotes/origin/main [streams]",
+        "rev-list HEAD ^origin/main [capture]",
         "push origin main [streams]",
         "fetch origin main [discard]",
         "rev-parse origin/main [capture]",
@@ -166,8 +166,8 @@
       "argv": [
         "diff --cached --quiet [streams]",
         "rev-parse --abbrev-ref HEAD [capture]",
-        "fetch origin main [streams]",
-        "rev-list origin/main..HEAD [capture]",
+        "fetch origin +refs/heads/main:refs/remotes/origin/main [streams]",
+        "rev-list HEAD ^origin/main [capture]",
         "push origin main [streams]",
         "fetch origin main [discard]",
         "rev-parse origin/main [capture]",
@@ -192,8 +192,8 @@
       "argv": [
         "diff --cached --quiet [streams]",
         "rev-parse --abbrev-ref HEAD [capture]",
-        "fetch origin main [streams]",
-        "rev-list origin/main..HEAD [capture]",
+        "fetch origin +refs/heads/main:refs/remotes/origin/main [streams]",
+        "rev-list HEAD ^origin/main [capture]",
         "push origin main [streams]",
         "fetch origin main [discard]",
         "rev-parse origin/main [capture]",
@@ -226,8 +226,8 @@
       "argv": [
         "diff --cached --quiet [streams]",
         "rev-parse --abbrev-ref HEAD [capture]",
-        "fetch origin main [streams]",
-        "rev-list origin/main..HEAD [capture]",
+        "fetch origin +refs/heads/main:refs/remotes/origin/main [streams]",
+        "rev-list HEAD ^origin/main [capture]",
         "push origin main [streams]",
         "fetch origin main [discard]",
         "rev-parse origin/main [capture]",
@@ -259,8 +259,8 @@
       "argv": [
         "diff --cached --quiet [streams]",
         "rev-parse --abbrev-ref HEAD [capture]",
-        "fetch origin main [streams]",
-        "rev-list origin/main..HEAD [capture]",
+        "fetch origin +refs/heads/main:refs/remotes/origin/main [streams]",
+        "rev-list HEAD ^origin/main [capture]",
         "push origin main [streams]"
       ],
       "logs": null,
@@ -284,8 +284,8 @@
       "argv": [
         "diff --cached --quiet [streams]",
         "rev-parse --abbrev-ref HEAD [capture]",
-        "fetch origin main [streams]",
-        "rev-list origin/main..HEAD [capture]",
+        "fetch origin +refs/heads/main:refs/remotes/origin/main [streams]",
+        "rev-list HEAD ^origin/main [capture]",
         "push origin main [streams]"
       ],
       "logs": null,

@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
 const (
@@ -253,5 +255,44 @@ func TestIsolateHostCredentials_AFailedRemovalIsReportedAndTheEnvironmentIsStill
 	}
 	if v, ok := os.LookupEnv("GH_CONFIG_DIR"); ok {
 		t.Errorf("GH_CONFIG_DIR = %q after a failed removal, want it unset", v)
+	}
+}
+
+func TestCredentialIsolation_IsTheOneSet(t *testing.T) {
+	restore, err := IsolateHostCredentials()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = restore() })
+	want := ipcenv.CredentialIsolation(os.Getenv("GH_CONFIG_DIR"), os.DevNull)
+	for k, v := range want.Set {
+		if got := os.Getenv(k); got != v {
+			t.Errorf("%s = %q, want %q from ipcenv.CredentialIsolation", k, got, v)
+		}
+	}
+	for _, k := range want.Unset {
+		if v, ok := os.LookupEnv(k); ok {
+			t.Errorf("%s is set (%q), want it unset", k, v)
+		}
+	}
+}
+
+func TestIsolateHostCredentials_AFixtureKeepsItsRepoLocalIdentity(t *testing.T) {
+	restore, err := IsolateHostCredentials()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = restore() })
+	for _, k := range []string{"GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL"} {
+		if v, ok := os.LookupEnv(k); ok {
+			t.Errorf("%s = %q beats the repo-local identity", k, v)
+		}
+	}
+	r := Fixture(t)
+	r.Write("f", "x")
+	r.Git("add", "f")
+	r.Git("commit", "-q", "-m", "work")
+	if got := r.Git("log", "-1", "--format=%an <%ae>|%cn <%ce>"); got != "gittest <gittest@example.com>|gittest <gittest@example.com>" {
+		t.Errorf("identity = %q, want the repo-local one", got)
 	}
 }

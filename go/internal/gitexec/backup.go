@@ -8,7 +8,11 @@ import (
 	"strings"
 )
 
-const defaultRemoteMain = "origin/main"
+const (
+	Remote     = "origin"
+	MainBranch = "main"
+	RemoteMain = Remote + "/" + MainBranch
+)
 
 type HeadPlace int
 
@@ -53,7 +57,7 @@ func (g Git) ClassifyHead(ctx context.Context, sha string) (HeadPlace, error) {
 	if code != 0 {
 		return HeadOnlyInBundle, nil
 	}
-	_, stderr, code, err := g.Capture(ctx, "merge-base", "--is-ancestor", sha, defaultRemoteMain)
+	_, stderr, code, err := g.Capture(ctx, "merge-base", "--is-ancestor", sha, RemoteMain)
 	if err != nil {
 		return HeadOnlyInBundle, fmt.Errorf("gitexec: merge-base %s: %w", sha, err)
 	}
@@ -62,7 +66,7 @@ func (g Git) ClassifyHead(ctx context.Context, sha string) (HeadPlace, error) {
 		return HeadInMain, nil
 	case 1:
 	default:
-		return HeadOnlyInBundle, fmt.Errorf("gitexec: merge-base --is-ancestor %s %s exit=%d: %s", sha, defaultRemoteMain, code, strings.TrimSpace(stderr))
+		return HeadOnlyInBundle, fmt.Errorf("gitexec: merge-base --is-ancestor %s %s exit=%d: %s", sha, RemoteMain, code, strings.TrimSpace(stderr))
 	}
 	out, err := g.Output(ctx, "branch", "-r", "--contains", sha)
 	if err != nil {
@@ -83,8 +87,8 @@ func (g Git) PatchApplied(ctx context.Context, patchPath string) (bool, error) {
 	}
 	defer func() { _ = os.RemoveAll(scratch) }()
 	onMain := Git{Dir: g.Dir, Exec: isolate(g.Exec, "GIT_INDEX_FILE="+filepath.Join(scratch, "index"))}
-	if err := onMain.Run(ctx, "read-tree", defaultRemoteMain); err != nil {
-		return false, fmt.Errorf("gitexec: read-tree %s: %w", defaultRemoteMain, err)
+	if err := onMain.Run(ctx, "read-tree", RemoteMain); err != nil {
+		return false, fmt.Errorf("gitexec: read-tree %s: %w", RemoteMain, err)
 	}
 	_, stderr, code, err := onMain.Capture(ctx, "apply", "--check", "--reverse", "--cached", patchPath)
 	if err != nil {
@@ -96,5 +100,5 @@ func (g Git) PatchApplied(ctx context.Context, patchPath string) (bool, error) {
 	case 1:
 		return false, nil
 	}
-	return false, fmt.Errorf("gitexec: apply --check --reverse --cached %s against %s exit=%d: %s", patchPath, defaultRemoteMain, code, strings.TrimSpace(stderr))
+	return false, fmt.Errorf("gitexec: apply --check --reverse --cached %s against %s exit=%d: %s", patchPath, RemoteMain, code, strings.TrimSpace(stderr))
 }

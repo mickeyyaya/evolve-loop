@@ -69,22 +69,27 @@ func runResumeBatch(
 	if applied, cerr := closeoutCycleOutcome(closeout, cfg.ProjectRoot, cfg.EvolveDir, stderr, lifecycle, signals); cerr != nil {
 		fmt.Fprintf(stderr, "evolve loop: resume: WARN: could not apply cycle %d %s to the inbox: %v\n", result.Cycle, applied, cerr)
 	}
-	if err != nil {
-		lr.StopReason = "error"
-		fmt.Fprintf(stderr, "evolve loop: resume cycle %d: %v\n", result.Cycle, err)
-	} else if result.FinalVerdict == core.VerdictFAIL {
-		lr.StopReason = "fail"
-	} else {
-		lr.StopReason = "resumed_complete"
-	}
+	lr.StopReason = resumeStopReason(result, err, stderr)
 	if lr.StopReason == "error" || lr.StopReason == "fail" {
 		lr.emitFatal(stdout, stderr, cfg, result.Cycle)
 		return 2
 	}
 
+	sweepSealedCycleGC(cfg, result.Cycle, stderr)
 	finalizeCompletedCycle(cfg, stderr)
 	lr.emit(stdout)
 	return 0
+}
+
+func resumeStopReason(result core.CycleResult, err error, stderr io.Writer) string {
+	switch {
+	case err != nil:
+		fmt.Fprintf(stderr, "evolve loop: resume cycle %d: %v\n", result.Cycle, err)
+		return "error"
+	case result.FinalVerdict == core.VerdictFAIL:
+		return "fail"
+	}
+	return "resumed_complete"
 }
 
 var recordResume = checkpoint.RecordResume
