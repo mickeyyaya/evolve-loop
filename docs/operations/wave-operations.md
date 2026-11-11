@@ -143,6 +143,7 @@ The path classes come from the CI router of `.github/workflows/required.yml`. A 
 
 - Open each PR from `origin/main`. Do not stack a PR on another open PR: a squash merge rewrites the commits of the first PR, so the stacked PR conflicts.
 - After a rebase onto `origin/main`, run `evolve pr refresh`. It writes `docs/architecture/signal-codes.md`, `go/.darwin-set` and the generated region of `docs/research-index.md` again, and commits only those files. In a merge or a rebase that stopped on a conflict, it stages the files, and you continue the merge or the rebase.
+- After a merge of `origin/main`, push the branch with `evolve ship --class manual --push-only`. It leaves out each commit that `origin/main` holds, and it checks each other commit.
 - Do not merge a generated file by hand.
 
 ### The on-demand boundary

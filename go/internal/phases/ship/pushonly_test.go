@@ -131,6 +131,138 @@ func TestPushOnly_SyncMainMergeCountsAsProvenance(t *testing.T) {
 	}
 }
 
+func initPRBranchBehindMain(t *testing.T) (string, func(dir string, args ...string) string, string) {
+	t.Helper()
+	root, run := initPushOnlyRepo(t)
+	run(root, "checkout", "-b", "feat")
+	if err := os.WriteFile(filepath.Join(root, "feat.txt"), []byte("feature\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run(root, "add", "feat.txt")
+	run(root, "commit", "-m", "shipped PR commit")
+	if err := appendShipJournal(root, shipjournal.Entry{SHA: run(root, "rev-parse", "HEAD"), Class: string(ClassManual)}); err != nil {
+		t.Fatal(err)
+	}
+	run(root, "push", "-u", "origin", "feat")
+	clone := gittest.Clone(t, run(root, "remote", "get-url", "origin")).Dir
+	if err := os.WriteFile(filepath.Join(clone, "main.txt"), []byte("landed by the train\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run(clone, "add", "main.txt")
+	run(clone, "commit", "-m", "evolve-pr 1: integrate")
+	run(clone, "push", "origin", "main")
+	return root, run, run(clone, "rev-parse", "HEAD")
+}
+
+func TestPushOnly_APRBranchThatMergedMainPushes(t *testing.T) {
+	t.Parallel()
+	root, run, mainSHA := initPRBranchBehindMain(t)
+	run(root, "fetch", "origin", "main")
+	run(root, "merge", "--no-edit", "origin/main")
+
+	res, err := pushOnlyRun(t, root)
+	if err != nil {
+		t.Fatalf("push-only refused a PR branch whose only new ahead commits are on origin/main: %v\nlogs:\n%s", err, strings.Join(res.Logs, "\n"))
+	}
+	head := run(root, "rev-parse", "HEAD")
+	if remote := run(root, "ls-remote", "origin", "feat"); !strings.Contains(remote, head) {
+		t.Fatalf("the merged PR branch was not pushed; remote=%s want %s", remote, head)
+	}
+	run(root, "fetch", "origin", "feat")
+	run(root, "merge-base", "--is-ancestor", mainSHA, "origin/feat")
+}
+
+func TestPushOnly_AnUnjournaledCommitBesideAMainMergeStillRefuses(t *testing.T) {
+	t.Parallel()
+	root, run, _ := initPRBranchBehindMain(t)
+	run(root, "fetch", "origin", "main")
+	run(root, "merge", "--no-edit", "origin/main")
+	if err := os.WriteFile(filepath.Join(root, "feat.txt"), []byte("hand\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run(root, "commit", "-am", "hand-made commit after the merge")
+	sha := run(root, "rev-parse", "HEAD")
+
+	_, err := pushOnlyRun(t, root)
+	if err == nil || !strings.Contains(err.Error(), sha[:12]) {
+		t.Fatalf("push-only must refuse the hand-made commit by name, got %v", err)
+	}
+	if remote := run(root, "ls-remote", "origin", "feat"); strings.Contains(remote, sha) {
+		t.Error("the hand-made commit reached origin despite the refusal")
+	}
+}
+
+func TestPushOnly_AMovedOriginMainDoesNotExcludeACommit(t *testing.T) {
+	t.Parallel()
+	root, run, _ := initPRBranchBehindMain(t)
+	run(root, "fetch", "origin", "main")
+	run(root, "merge", "--no-edit", "origin/main")
+	if err := os.WriteFile(filepath.Join(root, "feat.txt"), []byte("smuggled\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run(root, "commit", "-am", "smuggled commit")
+	sha := run(root, "rev-parse", "HEAD")
+	run(root, "config", "remote.origin.fetch", "+refs/heads/feat:refs/remotes/origin/feat")
+	run(root, "update-ref", "refs/remotes/origin/main", sha)
+
+	_, err := pushOnlyRun(t, root)
+	if err == nil || !strings.Contains(err.Error(), sha[:12]) {
+		t.Fatalf("a locally moved origin/main excluded a commit from the check, got %v", err)
+	}
+}
+
+func TestPushOnly_AMovedOriginBranchDoesNotExcludeACommit(t *testing.T) {
+	t.Parallel()
+	root, run, _ := initPRBranchBehindMain(t)
+	run(root, "fetch", "origin", "main")
+	run(root, "merge", "--no-edit", "origin/main")
+	if err := os.WriteFile(filepath.Join(root, "feat.txt"), []byte("smuggled\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run(root, "commit", "-am", "smuggled commit")
+	sha := run(root, "rev-parse", "HEAD")
+	run(root, "config", "remote.origin.fetch", "+refs/heads/main:refs/remotes/origin/main")
+	run(root, "update-ref", "refs/remotes/origin/feat", sha)
+
+	_, err := pushOnlyRun(t, root)
+	if err == nil || !strings.Contains(err.Error(), sha[:12]) {
+		t.Fatalf("a locally moved origin/feat excluded a commit from the check, got %v", err)
+	}
+}
+
+func TestPushOnly_ACommitOriginBranchAlreadyHoldsStaysOutOfTheAheadSet(t *testing.T) {
+	t.Parallel()
+	root, run, _ := initPRBranchBehindMain(t)
+	if err := os.WriteFile(filepath.Join(root, "feat.txt"), []byte("pushed earlier\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run(root, "commit", "-am", "pushed before the journal")
+	run(root, "push", "origin", "feat")
+	run(root, "fetch", "origin", "main")
+	run(root, "merge", "--no-edit", "origin/main")
+
+	if res, err := pushOnlyRun(t, root); err != nil {
+		t.Fatalf("push-only re-checked a commit that origin/feat already holds: %v\nlogs:\n%s", err, strings.Join(res.Logs, "\n"))
+	}
+}
+
+func TestPushOnly_AFailedFetchOfMainRefusesWithNoPush(t *testing.T) {
+	t.Parallel()
+	root, run, _ := initPRBranchBehindMain(t)
+	run(root, "fetch", "origin", "main")
+	run(root, "merge", "--no-edit", "origin/main")
+	head := run(root, "rev-parse", "HEAD")
+	remoteURL := run(root, "remote", "get-url", "origin")
+	run(remoteURL, "update-ref", "-d", "refs/heads/main")
+
+	if _, err := pushOnlyRun(t, root); err == nil || !strings.Contains(err.Error(), "REFUSED — git fetch origin") {
+		t.Fatalf("push-only must refuse on the failed fetch of origin/main, got %v", err)
+	}
+	if remote := run(root, "ls-remote", "origin", "feat"); strings.Contains(remote, head) {
+		t.Error("the branch reached origin although the fetch of origin/main failed")
+	}
+}
+
 func TestPushOnly_LocalOnlyMergeRefuses(t *testing.T) {
 	t.Parallel()
 	root, run := initPushOnlyRepo(t)

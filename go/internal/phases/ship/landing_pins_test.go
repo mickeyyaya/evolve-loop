@@ -207,7 +207,7 @@ var pushSites = []pushSiteDriver{
 		opts.PushOnly = true
 		mustWrite(t, shipJournalPath(opts.ProjectRoot), `{"sha":"`+pinHead+`","class":"cycle","ts":"2026-09-14T00:00:00Z"}`+"\n")
 		r.on("rev-parse --abbrev-ref HEAD", scriptedCall{stdout: pinBranch + "\n"})
-		r.on("rev-list origin/"+pinBranch+"..HEAD", scriptedCall{stdout: pinHead + "\n"})
+		r.on("rev-list HEAD ^origin/"+pinBranch, scriptedCall{stdout: pinHead + "\n"})
 		return runPushOnly(context.Background(), opts, res)
 	}},
 }
