@@ -65,6 +65,7 @@ type cycleRun struct {
 	preCycleHEAD   string
 	benchedCLIs    []router.BenchedCLI
 	clampedPlan    *router.PhasePlan
+	routerWall     Wall
 	directivesSet  directives.Set
 	retryConfig    policy.RetryConfig
 	workflowConfig policy.WorkflowConfig
@@ -343,6 +344,7 @@ type cyclePlan struct {
 	benchedCLIs   []router.BenchedCLI
 	clampedPlan   *router.PhasePlan
 	directivesSet directives.Set
+	routerWall    Wall
 }
 
 func (o *Orchestrator) advisorPlanInput(ctx context.Context, current string, signals router.RoutingSignals, req CycleRequest, state State, cs CycleState, cycle int, env map[string]string, benchedCLIs []router.BenchedCLI) router.RouteInput {
@@ -465,9 +467,11 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 
 	benchedCLIs := benchedCLIsForRouting(req.ProjectRoot)
 	var clampedPlan *router.PhasePlan
+	var routerWall Wall
 	if o.cfg.Stage >= config.StageAdvisory && o.cfg.Mode == config.ModeDynamicLLM && o.planner != nil {
 		planIn := o.advisorPlanInput(ctx, string(PhaseStart), router.RoutingSignals{}, req, state, cs, cycle, envSnap, benchedCLIs)
 		if raw, perr := o.observedPlan(ctx, cs, cycle, planIn); perr != nil {
+			routerWall = walkedWall(perr)
 			fmt.Fprintf(o.errOut(), "[orchestrator] WARN phase advisor Plan failed (degrading to static spine): %v\n", perr)
 		} else if raw != nil {
 			o.recordPlanRejections(ctx, cycle, cs, router.ValidatePlan(planIn, raw))
@@ -493,6 +497,7 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 		benchedCLIs:   benchedCLIs,
 		clampedPlan:   clampedPlan,
 		directivesSet: directivesSet,
+		routerWall:    routerWall,
 	}
 }
 
