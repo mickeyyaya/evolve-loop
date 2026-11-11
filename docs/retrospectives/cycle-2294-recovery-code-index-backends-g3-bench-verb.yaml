@@ -1,0 +1,11 @@
+- id: "cycle-2294-recovery-code-index-backends-g3-bench-verb"
+  pattern: "recovery of code-index-backends-g3-bench-verb"
+  description: "The item `code-index-backends-g3-bench-verb` failed in 2 tries with the classes `gate-block`. Cycle 2294 shipped it. Before a new try of a similar item, read the difference above."
+  source: "docs/retrospectives/cycle-2294-recovery-code-index-backends-g3-bench-verb.md"
+  type: "recovery"
+  category: "retrospective"
+  preventiveAction: "Before a new try of a similar item, read the retrospective cycle-2294-recovery-code-index-backends-g3-bench-verb in docs/retrospectives"
+  confidence: 0.8
+  failureContext:
+    failedStep: ""
+    errorCategory: "gate-block"
