@@ -98,10 +98,10 @@
           "--setting-sources",
           "project",
           "--settings",
-          "{\"skipDangerousModePermissionPrompt\":true}"
+          "{\"skipDangerousModePermissionPrompt\":true,\"prStatusFooterEnabled\":false}"
         ]
       },
-      "note": "project scope drops the user settings; --settings re-declares only the bypass acceptance (docs/architecture/packages/internal-bridge.md)"
+      "note": "project scope drops the user settings; --settings re-declares the bypass acceptance and turns the PR status footer off so a cell does not poll gh (docs/architecture/packages/internal-bridge.md)"
     },
     "session_mode": {
       "channel": "controller"
