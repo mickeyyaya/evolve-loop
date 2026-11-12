@@ -164,7 +164,17 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 
 | Code | Meaning |
 |---|---|
+| `CONVERGENCE_ACCEPTED_LIMITS` | a component landed with its limits accepted; fields.component is the component and fields.certificate its fail-safe certificate |
+| `CONVERGENCE_CONCENTRATION` | open findings gathered in one component; fields.component, share, prev_share and window give the concentration over the window of rounds |
+| `CONVERGENCE_DEFERRED` | findings were deferred to follow-ups; fields.count is the number deferred and fields.followups the follow-ups to open |
+| `CONVERGENCE_DISPUTED` | findings are disputed; fields.count and critical count them and fields.adjudicator names who decides |
+| `CONVERGENCE_FILED` | findings were filed instead of fixed; fields.late, capability and info count the late, capability and info findings |
+| `CONVERGENCE_NO_HEADROOM` | the model tier of a role has no higher tier to raise to; fields.role, family, from (the current tier) and to (the next tier, or none) |
+| `CONVERGENCE_NO_PROGRESS` | a fix round did not lower the open-finding mass at the blocking bar; fields.round, mass_prev, mass and bar give the comparison |
+| `CONVERGENCE_REPAIR_DAMAGE` | a fix round broke more than it repaired; fields.round, damage (findings the round introduced) and repairs (findings it closed) |
 | `CONVERGENCE_RUNG` | the convergence policy decided the next rung of the audit-repair loop after an audit FAIL; fields.stage is shadow (recorded, the repair flow does not change) or enforce (a Stop ends the repair), fields.loop, fields.round, fields.action, fields.rung and fields.blocking_bar give the decision, fields.fresh_context is true when the next fixer starts without the failed context |
+| `CONVERGENCE_SPLIT` | the decision split a component out of the loop; fields.component is the component and fields.followup the follow-up that carries it |
+| `CONVERGENCE_STOP` | the decision stopped the loop; fields.round, open (findings still open) and land_round (the round the policy planned to land) |
 
 ### cycle
 

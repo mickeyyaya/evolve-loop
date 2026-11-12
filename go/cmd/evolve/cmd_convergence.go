@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	convergenceUsage     = "usage: evolve convergence decide --input <rounds.json> [--json]"
+	convergenceUsage     = "usage: evolve convergence decide --input <rounds.json> [--json] | evolve convergence metrics [--json] <rounds.json>..."
 	exitConvergenceBad   = 10
 	exitConvergenceRead  = 2
 	exitConvergenceWrite = 1
@@ -30,6 +30,9 @@ type convergenceRequest struct {
 }
 
 func runConvergence(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+	if len(args) > 0 && args[0] == "metrics" {
+		return runConvergenceMetrics(args[1:], stdout, stderr)
+	}
 	if len(args) == 0 || args[0] != "decide" {
 		fmt.Fprintln(stderr, "evolve convergence: "+convergenceUsage)
 		return exitConvergenceBad
@@ -128,11 +131,15 @@ func tierTables(families ...string) (convergence.HeadroomTable, error) {
 }
 
 func encodeConvergenceDecision(d convergence.Decision, stdout, stderr io.Writer) int {
+	return encodeConvergenceJSON("decide", d, stdout, stderr)
+}
+
+func encodeConvergenceJSON(verb string, v any, stdout, stderr io.Writer) int {
 	enc := json.NewEncoder(stdout)
 	enc.SetEscapeHTML(false)
 	enc.SetIndent("", " ")
-	if err := enc.Encode(d); err != nil {
-		fmt.Fprintf(stderr, "convergence decide: encode: %v\n", err)
+	if err := enc.Encode(v); err != nil {
+		fmt.Fprintf(stderr, "convergence %s: encode: %v\n", verb, err)
 		return exitConvergenceWrite
 	}
 	return 0
