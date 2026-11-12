@@ -127,7 +127,7 @@ func TestScopeHold_AdoptableByTakesAPendingItemAndHeldByDoesNot(t *testing.T) {
 
 func poolPlanFor(t *testing.T, root, evolveDir string, stderr *bytes.Buffer) []fleet.Todo {
 	t.Helper()
-	plan := productionPoolPlanFn(loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, &erroringReadStorage{}, 2, stderr)
+	plan := poolPlanner{cfg: loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, storage: &erroringReadStorage{}, stderr: stderr}.plan(2)
 	todos, err := plan(context.Background(), 0)
 	if err != nil {
 		t.Fatal(err)

@@ -94,6 +94,7 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/core/floor_lists_regression_test.go", Class: GateGuarantee, Rationale: "the floor list regression refusal's own pins"},
 	{Fragment: "/go/internal/core/cover_changed_floor.go", Class: GateGuarantee, Rationale: "the build floor's cover-changed and cover-strict checks, which read the merged floor lists"},
 	{Fragment: "/go/internal/profiles/gate_inputs_realtree_test.go", Class: GuardGuarantee, Rationale: "the write-scope regression test over docs/architecture/gate-input-inventory.md, with the pinned authority rows and open seams; a cycle that relabelled a row or a pin would silence it"},
+	{Fragment: "/go/internal/profiles/gate_inputs_protected_realtree_test.go", Class: GuardGuarantee, Rationale: "the authority test of the gate input inventory, which passes the protected-surface manifest to the write-scope rule; a cycle that passed another predicate would call each worktree path protected"},
 	{Fragment: "/go/internal/core/ste_floor.go", Class: GateGuarantee, Rationale: "the build floor's STE check: at docs_floor.ste_stage enforce it sends a doc whose added lines fail the lint back to the build; a cycle that weakened it could land the doc CI refuses"},
 	{Fragment: "/go/internal/stelint/added.go", Class: GateGuarantee, Rationale: "the one added-line scope of the STE lint, shared by the build floor and evolve docs ste-lint --added (the CI job)"},
 	{Fragment: "/go/internal/core/build_explanation_floor_test.go", Class: GateGuarantee, Rationale: "composition tripwire proving optional reviewers cannot replace the explanation floor"},
@@ -121,6 +122,8 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/triagedecision/", Class: GateGuarantee, Rationale: "ADR-0106 H1: the one reader of the triage report the host derives the decision from before any judge — a lane that could edit it could commit itself to less than its pin"},
 	{Fragment: "/go/internal/recoveryguard/", Class: GuardGuarantee, Rationale: "ADR-0106 F2: the kernel fence around a recovery dispatch — the only backstop against an agent that may rewrite deliverables"},
 	{Fragment: "/go/internal/core/ship_recovery.go", Class: GateGuarantee, Rationale: "rebase recovery must invalidate stale explanation and route through Build"},
+	{Fragment: "/go/internal/core/main_red_park.go", Class: GateGuarantee, Rationale: "the park of a lane on a red main must write its checkpoint and its stop row, or a lane is blamed for main"},
+	{Fragment: "/go/internal/integration/stopgate.go", Class: GateGuarantee, Rationale: "the stop gate of the train must ask the main-red stop before main moves, or a batch lands onto a red main"},
 	{Fragment: "/go/internal/derived/", Class: GateGuarantee, Rationale: "ADR-0128 Q1: the derived-output catalog decides which rebase conflicts the protected recovery regenerates instead of sending to the debugger — a lane that could edit it could auto-resolve its own genuine conflict"},
 	{Fragment: "/go/internal/core/resume_execution.go", Class: AuditVerdictGuarantee, Rationale: "resume sealing, projection, and post-Build refresh call sites (resumeExecution.run); carved out of resume.go by #549"},
 	{Fragment: "/go/internal/core/resume_bootstrap.go", Class: AuditVerdictGuarantee, Rationale: "resume rebase-split recovery and explanation identity check (explanationdocs.RecoverRebaseSplit, requireResumeExplanationIdentity); carved out of resume.go by #549"},
@@ -178,7 +181,7 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/core/build_handoff_floor.go", Class: GateGuarantee, Rationale: "build handoff floor: mandatory half, names walker, review-input projection (ADR-0117)"},
 	{Fragment: "/go/internal/core/tdd_predicate_floor.go", Class: GateGuarantee, Rationale: "the mandatory TDD handoff floor that sends a helper copy in go/acs/cycle<N>/ back to TDD; a lane that weakens it lets a frozen copy reach ship and red main (incident 2026-11-09)"},
 	{Fragment: "/go/internal/testdup/", Class: GateGuarantee, Rationale: "the duplicate ratchet's scanner and its acs age rule; a lane that changes what it scans changes the gate that grades every lane (incident 2026-11-09)"},
-	{Fragment: "/go/internal/repocontract/testdup_ratchet_test.go", Class: GateGuarantee, Rationale: "the whole-tree structure test that applies the duplicate ratchet at ship and in CI"},
+	{Fragment: "/go/internal/repocontract/testdup_gate_realtree_test.go", Class: GateGuarantee, Rationale: "the whole-tree structure test that applies the duplicate ratchet at ship and in CI"},
 	{Fragment: "/go/internal/core/phase_bindings_selfcheck.go", Class: GateGuarantee, Rationale: "the build floor's go-test runners and their argvs (unit, tagged added-test): a lane must not move the deadline of the floor that grades it (inst-L1763b; cycles 1787/1791/1792/1798 timed out at a 120s literal here)"},
 	{Fragment: "/go/internal/core/blocker_proof.go", Class: GateGuarantee, Rationale: "the blocker prover: the deterministic proof that a phase's gate failures need a protected path or come from two conflicting cycle predicates; a lane that weakens it escapes a real FAIL into a console route"},
 	{Fragment: "/go/internal/core/build_blocker_exit.go", Class: GateGuarantee, Rationale: "the build floor's proven-blocker exit: which floor failures a blocker can explain and the blocked-needs-console ending"},
@@ -231,6 +234,17 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/heldproposal/", Class: GateGuarantee, Rationale: "the held-proposal decision, the hold record and the operator approval (ADR-0157): a lane that could edit it could approve its own change"},
 	{Fragment: "/go/internal/phases/ship/held_proposal_gate.go", Class: GateGuarantee, Rationale: "the landing check that holds a protected or pipeline-kind lane change until the operator approves its tree (ADR-0157)"},
 	{Fragment: "/go/cmd/evolve/cmd_landing.go", Class: GateGuarantee, Rationale: "evolve landing approve and reject: the only writer of an operator approval (ADR-0157)"},
+	{Fragment: "/go/internal/gatecontract/", Class: GateGuarantee, Rationale: "the types and the trust class words of the gate contract: a lane that could edit them could redefine what a gate entry is (ADR-0165)"},
+	{Fragment: "/go/internal/gateregistry/", Class: GateGuarantee, Rationale: "the gate registry and its debt set, and the tests that hold them: a lane that could edit them could move a gate to shadow or grow the debt set (ADR-0165)"},
+	{Fragment: "/go/internal/sizeratchet/", Class: GateGuarantee, Rationale: "the function-size ratchet and its offender list: a lane that could edit them could add its own allowance (ADR-0165)"},
+	{Fragment: "/go/internal/rawgitratchet/", Class: GateGuarantee, Rationale: "the raw git fixture ratchet and its baseline: a lane that could edit them could add its own allowance (ADR-0165)"},
+	{Fragment: "/go/internal/baseattr/", Class: GateGuarantee, Rationale: "the base-red attribution: its parser, its detached-checkout rerun and its verdict decide whether a red test blames the lane (ADR-0165 G4)"},
+	{Fragment: "/go/internal/mainstop/", Class: GateGuarantee, Rationale: "the main-red stop: its record and its admission rule decide whether a landing may go onto a red main (ADR-0165 G4)"},
+	{Fragment: "/go/internal/core/base_red_floor.go", Class: GateGuarantee, Rationale: "the build floor's base-red judgment: it decides whether a red test blames the lane or its base, and whether the floor rejects (ADR-0165 G4)"},
+	{Fragment: "/go/internal/core/repo_contract_floor.go", Class: GateGuarantee, Rationale: "the build floor's run of the repo-contract pack and the rule that turns its reds into a rejection (ADR-0165 G4)"},
+	{Fragment: "/go/internal/repocontract/repocontract.go", Class: GateGuarantee, Rationale: "the pack list and the by-name tree-reading tests that the ship gate runs: a lane that could edit it could drop a judge from the gate (ADR-0165)"},
+	{Fragment: "/go/internal/phases/ship/base_red.go", Class: GateGuarantee, Rationale: "the ship gate's base-red attribution: it decides whether a red pack blames the lane, asks for the fleet rebase, or parks the lane on a red main (ADR-0165 G4)"},
+	{Fragment: "/go/internal/phases/ship/repocontract.go", Class: GateGuarantee, Rationale: "the ship gate's run of the pack: it selects the tests that judge a landing (ADR-0165)"},
 	{Fragment: "/go/internal/policy/held_proposals.go", Class: PolicyGuarantee, Rationale: "the held_proposals.stage key and its fail-closed read (ADR-0157)"},
 	{Fragment: "/go/internal/adapters/ledger/", Class: LedgerGuarantee, Rationale: "the hash-chained ledger: the append, the seal, the anchor and the rebaseline (ADR-0157)"},
 	{Fragment: "/go/internal/ledgerverify/", Class: LedgerGuarantee, Rationale: "the verifier of the ledger hash chain (ADR-0157)"},
@@ -273,6 +287,17 @@ func matchesManifest(path string, keep func(ProtectedSurfaceEntry) bool) bool {
 		}
 	}
 	return false
+}
+
+func ClassOf(path string) GuaranteeClass {
+	p, _ := normalizeSurfacePath(path)
+	best := ProtectedSurfaceEntry{}
+	for _, e := range ProtectedSurfaceManifest {
+		if strings.Contains(p+"/", e.Fragment) && len(e.Fragment) > len(best.Fragment) {
+			best = e
+		}
+	}
+	return best.Class
 }
 
 func IsProtectedScope(path string) bool {

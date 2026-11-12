@@ -17,11 +17,12 @@ import (
 )
 
 type pausedPlan struct {
-	paused    []core.PausedScope
-	now       time.Time
-	adoptable func(p core.PausedScope) error
-	itemFiles func(p core.PausedScope) ([]string, error)
-	warn      io.Writer
+	paused       []core.PausedScope
+	now          time.Time
+	adoptable    func(p core.PausedScope) error
+	itemFiles    func(p core.PausedScope) ([]string, error)
+	warn         io.Writer
+	parkedResume bool
 }
 
 func (pp pausedPlan) order(triage []fleet.Todo) []fleet.Todo {
@@ -39,6 +40,9 @@ func (pp pausedPlan) order(triage []fleet.Todo) []fleet.Todo {
 }
 
 func (pp pausedPlan) ready(p core.PausedScope) bool {
+	if mainRedParked(p) && !pp.parkedResume {
+		return false
+	}
 	ready, err := checkpoint.ResumeReady(p.AutoAttempts, p.AutoMaxAttempts, p.QuotaResetAt, pp.now)
 	if err != nil {
 		pp.warnf("[pool] WARN: paused cycle %d: %v\n", p.Cycle, err)

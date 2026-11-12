@@ -11,6 +11,7 @@ import (
 func TestBoundaryCheckpointers_RecordTheCycleBaseAsGitHead(t *testing.T) {
 	writers := map[string]func(core.CycleState, string, time.Time) error{
 		"quota-likely":       core.QuotaBoundaryCheckpointer,
+		"main-red":           core.MainRedBoundaryCheckpointer,
 		"operator-requested": core.ResumeBoundaryCheckpointer,
 		"phase-complete":     core.PhaseBoundaryCheckpointer,
 	}

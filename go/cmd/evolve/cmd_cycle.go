@@ -258,6 +258,9 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	if errors.Is(err, core.ErrAllFamiliesExhausted) {
 		return cycleRunQuotaExit(result, projectRoot, evolveDir, fleetLaneFromEnv(), stdout, stderr, lifecycleLedger, signals)
 	}
+	if errors.Is(err, core.ErrMainRedParked) {
+		return cycleRunMainRedExit(result.Cycle, projectRoot, fleetLaneFromEnv(), stdout, stderr, lifecycleLedger, signals)
+	}
 	if err != nil {
 		return cycleRunErrorExit(err, result.Cycle, projectRoot, evolveDir, stderr, lifecycleLedger, signals)
 	}

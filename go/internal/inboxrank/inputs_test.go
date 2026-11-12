@@ -78,3 +78,26 @@ func TestLabels_ShowEachRankedItemsScoreAndTopFactor(t *testing.T) {
 		t.Errorf("an item the rank never saw says so: %q", got)
 	}
 }
+
+func TestInputs_LeadIDsComeFirstInTheGivenOrderAndTheScoresDoNotChange(t *testing.T) {
+	ready := []inboxbatch.Item{item("high", weight(0.9)), item("mid", weight(0.5)), item("fix-a", weight(0.1)), item("fix-b", weight(0.2))}
+	plain := inboxrank.Inputs{Config: defaults(), Now: rankNow}
+	lead := inboxrank.Inputs{Config: defaults(), Now: rankNow, Lead: []string{"fix-a", "absent", "fix-b"}}
+
+	got, base := lead.Order(ready, ready), plain.Order(ready, ready)
+
+	if want := []string{"fix-a", "fix-b", "high", "mid"}; !reflect.DeepEqual(ids(got), want) {
+		t.Fatalf("the order with a lead = %v, want %v", ids(got), want)
+	}
+	if want := []string{"high", "mid", "fix-b", "fix-a"}; !reflect.DeepEqual(ids(base), want) || base[0].Rank != 1 {
+		t.Fatalf("the order with no lead = %v, want the score order %v", ids(base), want)
+	}
+	for i, r := range got {
+		if r.Rank != i+1 {
+			t.Errorf("rank of %s = %d, want %d", r.Item.ID, r.Rank, i+1)
+		}
+		if scored := base[slicesIndex(base, r.Item.ID)].Breakdown; !reflect.DeepEqual(r.Breakdown, scored) {
+			t.Errorf("a lead is data, not a score change: %s has %+v, want %+v", r.Item.ID, r.Breakdown, scored)
+		}
+	}
+}

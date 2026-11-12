@@ -81,7 +81,7 @@ const (
 	gateLearn learningGate = iota
 	gateIncomplete
 	gateCanceled
-	gateQuotaDeferred
+	gateParkDeferred
 )
 
 func failureLearningGate(ctx context.Context, fl failureLearningRequest) learningGate {
@@ -91,8 +91,8 @@ func failureLearningGate(ctx context.Context, fl failureLearningRequest) learnin
 	if ctx.Err() != nil {
 		return gateCanceled
 	}
-	if errors.Is(fl.Err, ErrAllFamiliesExhausted) {
-		return gateQuotaDeferred
+	if isParked(fl.Err) {
+		return gateParkDeferred
 	}
 	return gateLearn
 }
@@ -105,8 +105,8 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 	if fl.Failed == PhaseShip {
 		fl.CycleState.ShipFailReasons = []string{fl.Err.Error()}
 	}
-	if gate == gateQuotaDeferred {
-		fmt.Fprintf(o.errOut(), "[orchestrator] WARN failure-learning: the dispatch chain ended at a wall; skipping failure learning (DEFERRED, resumable)\n")
+	if gate == gateParkDeferred {
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN failure-learning: %s; skipping failure learning (DEFERRED, resumable)\n", parkCause(fl.Err))
 		return
 	}
 	summary, todoID, structured := o.recordFailedApproachState(fl)
