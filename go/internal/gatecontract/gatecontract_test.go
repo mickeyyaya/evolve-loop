@@ -39,3 +39,12 @@ func TestLists_ReturnACopyThatACallerCannotMutate(t *testing.T) {
 		}
 	}
 }
+
+func TestClassConstants_SpellTheWordsOfTheInventory(t *testing.T) {
+	t.Parallel()
+	for got, want := range map[string]string{ClassAuthority: "authority", ClassVerified: "verified", ClassSubject: "subject", ClassAdvisory: "advisory", ClassOpenSeam: "open-seam"} {
+		if got != want || !slices.Contains(TrustClasses(), got) {
+			t.Errorf("class constant %q, want %q and a member of TrustClasses()", got, want)
+		}
+	}
+}
