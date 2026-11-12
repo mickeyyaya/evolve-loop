@@ -21,6 +21,8 @@ var devRebuildableIgnored = map[string]string{
 	"node_modules/":        "restored by the package manager from the lock file",
 	".gocache/":            "a Go build cache kept inside the tree",
 	".gomodcache/":         "a Go module cache kept inside the tree",
+	".evolve/":             "pipeline output that the next cycle rebuilds",
+	".commit-gate/":        "commit gate attestations that the next gate run writes",
 }
 
 func rebuildableIgnored(entry string) bool {
