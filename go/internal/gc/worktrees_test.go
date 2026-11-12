@@ -28,8 +28,11 @@ type scriptedGit struct {
 	backlogBranches []string
 	dirtyDirs       map[string]bool
 
-	calls []string
+	bundleRef string
+	calls     []string
 }
+
+const scriptedTip = "0123456789abcdef0123456789abcdef01234567"
 
 func newScriptedGit() *scriptedGit {
 	return &scriptedGit{mergedBranches: map[string]bool{}, dirtyDirs: map[string]bool{}}
@@ -60,6 +63,17 @@ func (g *scriptedGit) run(_ context.Context, name, dir string, args, _ []string,
 				io.WriteString(stdout, "  "+b+"\n")
 			}
 		}
+	case "rev-parse":
+		io.WriteString(stdout, scriptedTip+"\n")
+	case "bundle":
+		g.mu.Lock()
+		if args[1] == "create" {
+			g.bundleRef = args[3]
+		}
+		if args[1] == "list-heads" {
+			io.WriteString(stdout, scriptedTip+" "+g.bundleRef+"\n")
+		}
+		g.mu.Unlock()
 	case "status":
 		if g.dirtyDirs[dir] {
 			io.WriteString(stdout, " M some-file.go\n")

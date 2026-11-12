@@ -74,7 +74,7 @@ func TestSalvageWorktreeBackfillF1_EachStepFailureAbortsWithItsOwnReason(t *test
 }
 
 func TestSalvageWorktreeBackfillF1_ACleanTreeLeavesOnlyItsHeadRecord(t *testing.T) {
-	o, evolve := salvageOptsF1(t, map[string]gitReplyF1{"rev-parse": {out: " " + salvageShaF1 + " \n"}})
+	o, evolve := salvageOptsF1(t, map[string]gitReplyF1{"rev-parse": {out: " " + salvageShaF1 + " \n"}, "bundle": {out: salvageShaF1 + " refs/heads/cycle-b-9\n"}})
 	wt := t.TempDir()
 	if err := o.salvageWorktree(wt, "cycle-b-9"); err != nil {
 		t.Fatal(err)
@@ -93,7 +93,7 @@ func TestSalvageWorktreeBackfillF1_ACleanTreeLeavesOnlyItsHeadRecord(t *testing.
 func TestSalvageRemoveWorktreesBackfillF1(t *testing.T) {
 	t.Run("a removal git refuses is reported and the tree does not count as removed", func(t *testing.T) {
 		boom := errors.New("worktree locked")
-		o, _ := salvageOptsF1(t, map[string]gitReplyF1{"rev-parse": {out: salvageShaF1}, "worktree": {err: boom}})
+		o, _ := salvageOptsF1(t, map[string]gitReplyF1{"rev-parse": {out: salvageShaF1}, "bundle": {out: salvageShaF1 + " refs/heads/b\n"}, "worktree": {err: boom}})
 		wt := t.TempDir()
 		did, errs := o.salvageRemoveWorktrees([]WorktreeItem{{Path: wt, Branch: "b", Action: WorktreeActionSalvageRemove}}, nil)
 		if did || len(errs) != 1 || !errors.Is(errs[0], boom) {

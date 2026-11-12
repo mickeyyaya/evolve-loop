@@ -118,19 +118,8 @@ func (o WorktreeOptions) bundleBranch(it WorktreeItem) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("create bundle dir: %w", err)
 	}
-	file := filepath.Join(dir, salvageBundleFile)
-	if _, err := o.git(o.ProjectRoot, "bundle", "create", file, "refs/heads/"+it.Branch); err != nil {
+	if err := bundleVerified(o.git, o.ProjectRoot, filepath.Join(dir, salvageBundleFile), "refs/heads/"+it.Branch, it.Head); err != nil {
 		return err
-	}
-	if _, err := o.git(o.ProjectRoot, "bundle", "verify", file); err != nil {
-		return err
-	}
-	heads, err := o.git(o.ProjectRoot, "bundle", "list-heads", file)
-	if err != nil {
-		return err
-	}
-	if !strings.Contains(heads, it.Head+" refs/heads/"+it.Branch) {
-		return fmt.Errorf("bundle %s does not hold %s@%s", file, it.Branch, it.Head)
 	}
 	return os.WriteFile(filepath.Join(dir, salvageHeadFile), []byte(it.Head+" "+it.Branch+"\n"), 0o644)
 }

@@ -37,19 +37,26 @@ func (o WorktreeOptions) salvageRemoveWorktrees(items []WorktreeItem, refused ma
 	return did, errs
 }
 
+type gitRun func(dir string, args ...string) (string, error)
+
 func (o WorktreeOptions) salvageWorktree(path, branch string) error {
-	dir := filepath.Join(OperatorSalvageDir(o.EvolveDir), filepath.Base(path))
+	return writeSalvageLeaf(o.git, o.EvolveDir, path, branch)
+}
+
+func writeSalvageLeaf(git gitRun, evolveDir, path, branch string) error {
+	dir := filepath.Join(OperatorSalvageDir(evolveDir), filepath.Base(path))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("create salvage dir: %w", err)
 	}
-	head, err := o.git(path, "rev-parse", "HEAD")
+	head, err := git(path, "rev-parse", "HEAD")
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(dir, salvageHeadFile), []byte(strings.TrimSpace(head)+" "+branch+"\n"), 0o644); err != nil {
+	tip := strings.TrimSpace(head)
+	if err := os.WriteFile(filepath.Join(dir, salvageHeadFile), []byte(tip+" "+branch+"\n"), 0o644); err != nil {
 		return fmt.Errorf("write salvage HEAD: %w", err)
 	}
-	patch, err := o.git(path, "diff", "HEAD", "--binary")
+	patch, err := git(path, "diff", "HEAD", "--binary")
 	if err != nil {
 		return err
 	}
@@ -58,11 +65,38 @@ func (o WorktreeOptions) salvageWorktree(path, branch string) error {
 			return fmt.Errorf("write salvage patch: %w", err)
 		}
 	}
-	untracked, err := o.git(path, "ls-files", "--others", "--exclude-standard", "-z")
+	untracked, err := git(path, "ls-files", "--others", "--exclude-standard", "-z")
 	if err != nil {
 		return err
 	}
-	return archiveUntracked(path, untracked, filepath.Join(dir, salvageUntrackedFile))
+	if err := archiveUntracked(path, untracked, filepath.Join(dir, salvageUntrackedFile)); err != nil {
+		return err
+	}
+	return bundleVerified(git, path, filepath.Join(dir, salvageBundleFile), salvageRef(branch), tip)
+}
+
+func salvageRef(branch string) string {
+	if branch == "" {
+		return "HEAD"
+	}
+	return "refs/heads/" + branch
+}
+
+func bundleVerified(git gitRun, dir, file, ref, tip string) error {
+	if _, err := git(dir, "bundle", "create", file, ref); err != nil {
+		return err
+	}
+	if _, err := git(dir, "bundle", "verify", file); err != nil {
+		return err
+	}
+	heads, err := git(dir, "bundle", "list-heads", file)
+	if err != nil {
+		return err
+	}
+	if !strings.Contains(heads, tip+" "+ref) {
+		return fmt.Errorf("bundle %s does not hold %s@%s", file, ref, tip)
+	}
+	return nil
 }
 
 func archiveUntracked(root, nulList, dest string) (err error) {

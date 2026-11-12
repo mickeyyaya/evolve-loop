@@ -192,11 +192,12 @@ func TestApplyDevWorktrees_AManifestWriteFailureStillReportsTheRecord(t *testing
 	dir := e.addDev("unrecorded")
 	o := e.options(idleOffset)
 	m := e.plan(o)
-	blocker := filepath.Join(t.TempDir(), "file")
-	if err := os.WriteFile(blocker, nil, 0o644); err != nil {
+	if err := os.MkdirAll(o.EvolveDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	o.EvolveDir = blocker
+	if err := os.WriteFile(filepath.Join(o.EvolveDir, "archive"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	recs, err := e.apply(o, m)
 	if err == nil || !strings.Contains(err.Error(), "was archived but its record was not written") {

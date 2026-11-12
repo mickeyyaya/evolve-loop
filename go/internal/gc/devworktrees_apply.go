@@ -68,6 +68,12 @@ func (s *devSweep) archiveOne(ctx context.Context, planned DevItem, known map[st
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), devArchiveTimeout)
 	defer cancel()
 	rec := DevArchiveRecord{Path: wt.Dir, Branch: fresh.Branch, Head: fresh.Head, IdleDays: fresh.IdleDays, ArchivedAt: s.now}
+	git := func(dir string, args ...string) (string, error) {
+		return gitexec.Git{Dir: dir, Exec: s.o.Exec}.Output(ctx, args...)
+	}
+	if err := writeSalvageLeaf(git, s.o.EvolveDir, wt.Dir, fresh.Branch); err != nil {
+		return DevArchiveRecord{}, fmt.Errorf("gc: refuse %s: salvage failed, tree and branch kept: %w", wt.Dir, err)
+	}
 	removal := []string{"worktree", "remove"}
 	if fresh.Dirty || fresh.Unique {
 		ref, err := s.saveVerified(ctx, wt, fresh.Unique)
