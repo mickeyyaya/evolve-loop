@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "A journey test: a PR committed through the commit gate reaches record-pr and integration batch through the real verbs",
+    "A PR with an unreviewed commit is refused, and the text names the commit and the next step"
+  ],
+  "created_at": "2026-11-05T00:17:40Z",
+  "files": [
+    "go/internal/integration/consolepr.go",
+    "go/cmd/evolve/cmd_integration.go",
+    "go/internal/commitgate/review_runs.go"
+  ],
+  "fix": "Design first, then review, then TDD. Decide what proves that a PR was reviewed: for example, a record per commit that the gate wrote, joined over the commits of the PR. Then make record-pr read it.",
+  "id": "train-record-pr-has-no-reachable-attestation",
+  "kind": "pipeline-integrity",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "summary": "evolve integration record-pr accepts an attestation only when its tree equals the digest of the whole diff of the PR (AttestedBinding, consolepr.go). The commit gate writes an attestation for the staged tree of one commit. On 2026-11-05 no flow was found that gives a matching file for #1282 to #1285, so batch seven used the manual method. So the train that lands console PRs cannot yet land a normally reviewed console PR.",
+  "title": "The console train must accept a PR that passed the commit gate",
+  "weight": 0.95
+}

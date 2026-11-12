@@ -1,0 +1,33 @@
+{
+  "acceptance": [
+    "Main holds the behaviour that PR #1265 described, proven by a test through the real entry point that is red without the change, or this item is consumed with the evidence that main already holds it"
+  ],
+  "created_at": "2026-11-12T02:10:00Z",
+  "deps": [],
+  "files": [
+    ".evolve/policy.json",
+    "docs/architecture/llm-isolation.md",
+    "docs/architecture/packages/internal-adapters-sandbox.md",
+    "docs/architecture/packages/internal-bridge.md",
+    "docs/architecture/packages/internal-policy.md",
+    "go/internal/adapters/sandbox/read_isolation.go"
+  ],
+  "fix": "Read branch claude/cloud-build-evolve-loop-wzoxbg as a reference (diff it against its merge base with origin/main). First check whether main already holds the behaviour; if so, consume this item with that evidence. Otherwise rebuild the change on current main with tests, not by a cherry-pick.",
+  "id": "rebuild-pr-1265-cloud-build-evolve-loop-wzoxbg",
+  "intake_override": {
+    "reason": "each item rebuilds a distinct closed PR; the shared paths are common homes, not the same change",
+    "overlaps": [
+      "rebuild-pr-1261-ad1-6-secret-list",
+      "rebuild-pr-1258-ad4-4-ratchet-merge",
+      "rebuild-pr-1264-ad1-7-credsource",
+      "rebuild-pr-1251-ad1-2-pr-status-footer"
+    ]
+  },
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "feature",
+  "source": "console, 2026-11-12, stale PR triage (operator decision: close and file items). PR #1265 closed unmerged; branch claude/cloud-build-evolve-loop-wzoxbg kept as reference",
+  "summary": "PR #1265 (claude/cloud-build-evolve-loop-wzoxbg) was built in the cloud window on 2026-11-03/04 and fell 400+ commits behind main. It was closed unmerged. Its description: ## Summary - Plan component **AD1-5** (architecture-decisions-2026-11, section D1). Inbox item `arch-decisions-ad1-5-a-separate-stage-for-the-secret`. - A new policy key, `isolation.i5_secret.stage`, is read by `policy.IsolationSecretStage`. The bridge (`Deps.SecretStage` / `Deps.secretStage`) uses it to set `sandbox.ReadIsolation.SecretEnforce`. - When `Enforce || SecretEnforce` is true (`secretsDenied`, applied through `secretScope`), the sandbox denies the home secrets in SBPL and masks them in bwrap (`bwrapSecretMasks`). The runs and raw-output rules stay report-only. - The checked-in value is `shadow`. The operator changes it to `enforce` after one wave with 0 `read.home.secret` signals",
+  "title": "Rebuild on current main: give the I-5 home secret rules their own stage (AD1-5)",
+  "weight": 0.5
+}

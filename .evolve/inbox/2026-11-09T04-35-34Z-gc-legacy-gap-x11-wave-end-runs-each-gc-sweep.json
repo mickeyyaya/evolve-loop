@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "Red test first: at full the batch-end hook runs each sweep of evolve gc; at lanes it runs the sweeps of today.",
+    "100% coverage of each changed function, and the composed floor passes.",
+    "The decision ids of the plan that the component builds are named in the pull request."
+  ],
+  "created_at": "2026-11-09T04:35:34Z",
+  "files": [
+    "go/cmd/evolve/cmd_loop_outcome.go",
+    "go/internal/policy",
+    ".evolve/policy.json"
+  ],
+  "fix": "Build the component as section 6 of the plan states (decisions D12 and D13). Red test first: at full the batch-end hook runs each sweep of evolve gc; at lanes it runs the sweeps of today.",
+  "id": "gc-legacy-gap-x11-wave-end-runs-each-gc-sweep",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "Component of docs/plans/gc-closes-the-legacy-gap-2026-11.md, added after the operator decided on 2026-11-09: \"gc should be invoked after the cycle / wave is completed\". On 2026-11-09, 781 orphan processes and 54.67 GB of Go cache waited for a manual evolve gc, because the batch hook skips those sweeps and no gc step runs at a cycle end.",
+  "title": "gc X11: at the wave end, the batch-end hook runs each sweep of evolve gc when gc.wave_end.scope is full, and this repository sets full",
+  "weight": 0.7
+}

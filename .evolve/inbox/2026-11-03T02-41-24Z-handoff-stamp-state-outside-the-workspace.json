@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "Red test first: an agent-written `stamp` with a lower round does not earn a fresh digest.",
+    "Red test first: a forged llm-calls record appended after the bridge record does not change the stamped author.",
+    "100% statement coverage on each changed function; zero code comments.",
+    "Must land before H10 or H12 gates on author, tier or the stamp."
+  ],
+  "created_at": "2026-11-03T02:41:24Z",
+  "files": [
+    "go/internal/core/handoff_persona.go",
+    "go/internal/core/handoff_reviewer.go"
+  ],
+  "fix": "Keep the stamped round and the dispatch identity in pipeline state outside the agent workspace (for example the cycle state or a pipeline-owned run file outside the cell's write grant), and always overwrite the ledger `stamp` from that state. Read the author from the bridge record by its call id, not the last line of an agent-writable log.",
+  "id": "handoff-stamp-state-outside-the-workspace",
+  "intake_override": {
+    "reason": "protected internal/core change found by the D5 adversarial seat; must precede H10/H12",
+    "console_route": true
+  },
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "source": "adversarial review of PR #1246 (agent-adversarial-review-20261103T022510Z-f724), 2026-11-03, A2 and A3 LOW",
+  "summary": "H9 keeps the stamped round in the ledger key `stamp`. An agent can write that key (or raise `round`) and get a fresh output_digest for stale claims. dispatchAuthor takes the last matching record of llm-calls.ndjson in the workspace, so a process that the agent detached can append a forged record after the bridge record. Neither is a gate input today (handoff.Validate and the H8 check read neither author nor stamp), so both are LOW; they become HIGH when H10 or H12 gates on author, tier or the stamp.",
+  "title": "The handoff stamp round and the author lookup use pipeline state that the agent cannot write",
+  "weight": 0.5
+}

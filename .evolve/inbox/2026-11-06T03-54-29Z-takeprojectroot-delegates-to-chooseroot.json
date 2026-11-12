@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "A test through the real entry is red without the fix.",
+    "The enforcing map of the contract test loses the row, when the item names one."
+  ],
+  "created_at": "2026-11-06T03:54:29Z",
+  "files": [
+    "go/cmd/evolve/cmd_inbox_claims.go"
+  ],
+  "fix": "takeProjectRoot and loopStopRoot delegate to chooseRoot",
+  "id": "takeprojectroot-delegates-to-chooseroot",
+  "kind": "refactor",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "summary": "The order flag, env, cwd has more than one home: chooseRoot, takeProjectRoot and loopStopRoot.",
+  "title": "takeProjectRoot and loopStopRoot delegate to chooseRoot",
+  "weight": 0.4
+}

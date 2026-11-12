@@ -1,0 +1,28 @@
+{
+  "acceptance": [
+    "A gate that passes -toolexec or -exec through gotool.Test is refused, and the test is red without the fix",
+    "A gate that sets GOFLAGS or GOENV through gotool.Call.Env is refused",
+    "The G2 design page states the rule"
+  ],
+  "created_at": "2026-11-11T04:56:58Z",
+  "deps": [],
+  "files": [
+    "go/internal/gotool/",
+    "go/internal/gatehermetic/",
+    "docs/architecture/gate-contract-g2-hermetic-guard.md"
+  ],
+  "fix": "Design first: either an argument allowlist inside gotool (the flags each verb may take, as data), or judge the Call literal at each call site in the walker. Record the choice in docs/architecture/gate-contract-g2-hermetic-guard.md.",
+  "id": "gotool-call-args-and-env-are-free",
+  "intake_override": {
+    "reason": "gotool and gatehermetic are protected gate surfaces of the G2 build the console owns",
+    "console_route": true
+  },
+  "kind": "hardening",
+  "origin": "console",
+  "priority_class": "security",
+  "route": "console-manual",
+  "source": "console, 2026-11-11, G2 commit 3 adversarial review",
+  "summary": "The G2 walker (ADR-0165) judges only the verb of a gotool call (go list, go test). The adversarial review of commit 3 (agent-adversarial-review-20261111T045158Z-726c, F8) found that the Args and Env of gotool.Call are not judged at the call sites of gotool.List and gotool.Test, so a gate can pass -exec, -toolexec, -json overrides or a GOFLAGS environment through the boundary.",
+  "title": "gotool.Call Args and Env are free, so a gate can pass any go flag or environment",
+  "weight": 0.5
+}

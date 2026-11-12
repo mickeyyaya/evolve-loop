@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "A test through the real entry shows one signal for an unmeasured cell, red without the fix.",
+    "N16 passes alone on the host, or the row names the host fault as its cause."
+  ],
+  "created_at": "2026-11-06T07:40:04Z",
+  "files": [
+    "go/internal/bridge/read_isolation.go"
+  ],
+  "fix": "Prove the cause. Emit a Signal Center event when a cell reads as unmeasured. Stop calling N16 a load flake.",
+  "id": "sandbox-reports-stopped-on-the-host",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "On 2026-11-06, contract row N16 passed alone at about 06:25 and failed alone from about 09:45, also on clean main and at low load: no fence of the cell after 1m0s. A direct probe: sandbox-exec denies the read (Operation not permitted), so enforcement holds. Its report does not appear in log show or log stream, with or without a message. Other processes still report as sender Sandbox. Host up 24 days; no OS update since 2026-10-16. Root cause not proven. It may be host state, and a reboot tests that. While it lasts, stage shadow of I-4 and I-5 reads count as unmeasured, a lane that touches the contract test fails the ship repo-contract gate (cycle 2191), and the warning goes to stderr with no Signal Center event, so the loop log shows nothing.",
+  "title": "Sandbox read reports stopped reaching the unified log, so read isolation is unmeasured",
+  "weight": 0.9
+}

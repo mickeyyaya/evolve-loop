@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "A journey lands a stack whose commits each passed the gate",
+    "A stack with one unreviewed commit is refused, and the text names that commit"
+  ],
+  "created_at": "2026-11-05T17:33:03Z",
+  "files": [
+    "go/internal/integration/consolepr.go",
+    "go/internal/integration/train.go"
+  ],
+  "fix": "Design first. Decide whether a chain of per-commit records covers a whole change when each commit's base is the previous commit, and what a rebase with hand-resolved conflicts needs.",
+  "id": "train-refuses-a-stacked-pr-with-per-commit-reviews",
+  "intake_override": {
+    "reason": "found during the merging component work, 2026-11-05",
+    "console_route": true
+  },
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "summary": "On 2026-11-06 evolve integration record-pr --reviewed refused PR 1306: no review record for its whole change. Each of its three commits passed its seats. A seat over the 293 KB whole diff is costly and likely to stall, so the PR went by the manual batch path.",
+  "title": "The console train needs one review of a whole PR, so a reviewed stack cannot ride it",
+  "weight": 0.6
+}

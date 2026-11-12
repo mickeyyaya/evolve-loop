@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "A loop run with --max-cycles 1 ends with Ended in the wave record",
+    "status reads not clean for each route to a false clean, each in its own test",
+    "At shadow refs/remotes/origin/main stays where it was and nothing is pushed"
+  ],
+  "created_at": "2026-11-05T17:33:02Z",
+  "files": [
+    "go/internal/integration/driver.go",
+    "go/cmd/evolve/cmd_loop_window.go",
+    "go/cmd/evolve/cmd_integration.go"
+  ],
+  "fix": "Build from docs/architecture/integration-driver.md. Strict TDD. Enforce stays refused until PR (c).",
+  "id": "wave-integration-i14-driver-pr-b",
+  "intake_override": {
+    "reason": "found during the merging component work, 2026-11-05",
+    "console_route": true
+  },
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "summary": "Nothing drives a lane delivery through the compose engine, so no shadow evidence exists for I9. PR (a) gave each pool an id. PR (b) adds the epoch, the private base ref, Driver, ShadowActor, the wave-end wrapper and evolve integration status.",
+  "title": "I14 PR (b): the integration driver at shadow, with status and the clean-wave verdict",
+  "weight": 0.95
+}

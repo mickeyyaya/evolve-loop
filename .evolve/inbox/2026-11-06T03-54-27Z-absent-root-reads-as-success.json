@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "A test through the real entry is red without the fix.",
+    "The enforcing map of the contract test loses the row, when the item names one."
+  ],
+  "created_at": "2026-11-06T03:54:27Z",
+  "files": [
+    "go/cmd/evolve/cli_contract_absent_root_integration_test.go"
+  ],
+  "fix": "Core read verbs exit 0 on an absent root",
+  "id": "absent-root-reads-as-success",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "summary": "wave supply, inbox rank, inbox lint, inbox batches, signals tail, events channels, events watch, dossier verify, cli-routing check, cli-routing explain, routing explain, clihealth list and cloud list read an absent root as success. contractAbsentRootOpen lists them, and a fixed verb must leave that map. See design-card-status-reachable.",
+  "title": "Core read verbs exit 0 on an absent root",
+  "weight": 0.4
+}

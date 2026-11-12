@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "A guard fails when a test in the package ends with runner.DefaultRouter different from its start value, or the variable no longer exists.",
+    "The whole cmd/evolve package passes in a shuffled order."
+  ],
+  "created_at": "2026-11-06T12:41:35Z",
+  "files": [
+    "go/internal/phases/runner/routing.go",
+    "go/cmd/evolve/cmd_cycle.go",
+    "go/cmd/evolve/cli_routing_root.go"
+  ],
+  "fix": "Find each test that leaves the variable set and restore it, or pass the router through the wiring so that no process-wide variable exists.",
+  "id": "default-router-global-leaks-between-tests",
+  "kind": "hardening",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "runner.DefaultRouter is a process-wide variable. A test that reaches cmd_cycle.go:498 or cli_routing_root.go:156 without a cleanup leaves it set, so a later test routes on the wrong table. The login journey test failed only in the whole package run for this reason.",
+  "title": "A test in cmd/evolve leaves runner.DefaultRouter set for later tests",
+  "weight": 0.5
+}

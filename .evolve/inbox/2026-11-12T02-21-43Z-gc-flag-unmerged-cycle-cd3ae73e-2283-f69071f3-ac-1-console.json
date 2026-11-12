@@ -1,0 +1,16 @@
+{
+  "acceptance": [
+    "The next evolve gc run no longer flags cycle-cd3ae73e-2283."
+  ],
+  "created_at": "2026-11-12T02:21:43Z",
+  "fix": "Make the change that AC 1 needs on the protected path(s) git branch refs/heads/cycle-cd3ae73e-2283 and its worktree .evolve/worktrees/cycle-cd3ae73e-2283 (git ref state, no tracked file; guards.IsProtectedScope), then prove the criterion with a test.",
+  "id": "gc-flag-unmerged-cycle-cd3ae73e-2283-f69071f3-ac-1-console",
+  "kind": "task",
+  "origin": "cycle",
+  "priority_class": "hygiene",
+  "route": "console-manual",
+  "source": "cycle 2332, tdd test-report.md AC 1 (console-followup)",
+  "summary": "The TDD phase of cycle 2332 gave AC 1 of gc-flag-unmerged-cycle-cd3ae73e-2283-f69071f3 the console-followup disposition. A lane builder can never change the paths it needs (git branch refs/heads/cycle-cd3ae73e-2283 and its worktree .evolve/worktrees/cycle-cd3ae73e-2283 (git ref state, no tracked file; guards.IsProtectedScope)). The lane part ships without it, so the console owns this part.",
+  "title": "Console part of gc-flag-unmerged-cycle-cd3ae73e-2283-f69071f3: AC 1, which needs a protected path changed",
+  "weight": 0.3
+}

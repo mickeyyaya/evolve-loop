@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "Red-first: with three quota-paused per-run checkpoints with budget 0, evolve cycle resume --all grants each, and laneResume admits each.",
+    "The pool plan puts the paused scopes first and removes a duplicate triage todo of the same scope.",
+    "A paused cycle with a spent budget after the grant still starts a fresh cycle (no loop).",
+    "docs/architecture/checkpoint-resume.md, docs/operations/wave-operations.md and the package notes name the verb and the order; 100% coverage on each changed function; zero code comments."
+  ],
+  "created_at": "2026-11-03T12:54:10Z",
+  "files": [
+    "go/cmd/evolve/cmd_cycle_resume.go",
+    "go/cmd/evolve/cmd_loop_pool.go",
+    "go/internal/checkpoint/autoresume.go",
+    "go/internal/core/lane_resume.go"
+  ],
+  "fix": "Add evolve cycle resume --all: it lists every resumable quota-paused cycle (newest attempt per scope, the same refusal rules as LoadResumeState) and grants an operator resume to each under the checkpoint lock (attempts 0, the default budget, operator action cleared); it runs no cycle. The pool plan puts the scopes of admitted paused cycles at the head of the backlog, ahead of the triage todos, without duplicates, so the lanes adopt them through the existing laneResume path concurrently up to the fleet width.",
+  "id": "concurrent-resume-of-every-paused-cycle",
+  "intake_override": {
+    "reason": "operator request 2026-11-03; changes the checkpoint auto-resume budget rule and the pool order of the pipeline",
+    "console_route": true
+  },
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "source": "operator 2026-11-03: 'resume should take place for all cycles concurrently ... It must be able to support any cycle to resume'. Wave 151 ended with cycles 2137, 2138, 2139 and 2141 quota-paused after a Claude logout.",
+  "summary": "Two gaps stop a concurrent resume. (1) A pause with an unknown reset time gets autoResumeMaxAttempts 0 (checkpoint.go quota reset), so RecordResume(auto) refuses each lane, and only the one-cycle operator verb evolve cycle resume (newest paused cycle, foreground) can run them, one at a time. (2) The pool takes lane scopes by inbox rank only, so a paused scope is not put first; when the budget refuses, the lane starts a fresh cycle and the scout-to-audit work of the paused cycle is lost.",
+  "title": "Resume every paused cycle concurrently: an operator grant for all, and resume-first lanes",
+  "weight": 0.9
+}

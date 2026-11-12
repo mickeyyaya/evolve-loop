@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "A test lands a peer during the re-verify of a cycle, and the cycle still ships when its rebase is clean.",
+    "A rebase with a real conflict still goes back to audit.",
+    "A wave reports the number of re-audits that a ship race caused."
+  ],
+  "created_at": "2026-11-07T15:13:19Z",
+  "files": [
+    "go/internal/phases/ship/gitops.go"
+  ],
+  "fix": "Let a ship that loses the race rebase and re-verify the merged tree without a full re-audit when the rebase is clean and the change set is the same, or hold a short landing slot for a cycle after its audit.",
+  "id": "ship-race-starves-a-slow-cycle",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "In wave 160, cycle 2211 hit GIT_FLEET_REBASE_NEEDED 5 times. Each loss sent it back to audit, and a peer landed during each re-audit. It sealed FAIL after 160.5 LLM minutes, 123.8 of them waste. The wave had 4 conflicts in 7 landings. GitHub issue #515 tracks the same race.",
+  "title": "A cycle that loses the ship race re-audits, loses again, and fails after 5 tries",
+  "weight": 0.8
+}

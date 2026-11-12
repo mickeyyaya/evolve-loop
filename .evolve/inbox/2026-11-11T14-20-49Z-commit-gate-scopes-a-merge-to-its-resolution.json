@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "A merge of main that resolves one docs file passes with the docs-review capability alone, and the test is red without the fix",
+    "A merge whose MERGE_HEAD is not origin/main is refused",
+    "A file that differs from both parents needs its capability"
+  ],
+  "created_at": "2026-11-11T14:20:49Z",
+  "deps": [],
+  "files": [
+    "go/internal/commitgate/"
+  ],
+  "fix": "When MERGE_HEAD exists, compute the reviewed set as the files whose staged content differs from both parents (the resolution), and bind the attestation to the staged tree as before. Refuse when MERGE_HEAD is not on origin/main.",
+  "id": "commit-gate-scopes-a-merge-to-its-resolution",
+  "kind": "hardening",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "source": "console, 2026-11-11; merge of main into PR 1390 and PR 1397",
+  "summary": "When the console merges main into a PR branch, the gate reads the whole staged tree. It asks for the simplify and review capabilities because main brought Go and eval files, though main already reviewed them. On 2026-11-11 the merge into PR 1390 resolved only docs/research-index.md, and the gate refused the docs-review attestation (no review waiver: .evolve/evals/... neither Go nor Markdown under docs/). --files did not narrow the detection.",
+  "title": "The commit gate scopes the review of a main merge to its resolved files",
+  "weight": 0.4
+}

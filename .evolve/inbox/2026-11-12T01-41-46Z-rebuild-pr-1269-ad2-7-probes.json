@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Main holds the behaviour that PR #1269 described, proven by a test through the real entry point that is red without the change, or this item is consumed with the evidence that main already holds it"
+  ],
+  "created_at": "2026-11-12T02:10:00Z",
+  "deps": [],
+  "files": [
+    "agents/evolve-triage-reference.md",
+    "docs/architecture/inbox-curator.md",
+    "docs/architecture/packages/internal-inboxbatch.md",
+    "docs/architecture/packages/internal-inboxcurator.md",
+    "docs/architecture/signal-codes.md",
+    "go/cmd/evolve/cmd_inbox_add.go"
+  ],
+  "fix": "Read branch cloud/ad2-7-probes as a reference (diff it against its merge base with origin/main). First check whether main already holds the behaviour; if so, consume this item with that evidence. Otherwise rebuild the change on current main with tests, not by a cherry-pick.",
+  "id": "rebuild-pr-1269-ad2-7-probes",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "feature",
+  "source": "console, 2026-11-12, stale PR triage (operator decision: close and file items). PR #1269 closed unmerged; branch cloud/ad2-7-probes kept as reference",
+  "summary": "PR #1269 (cloud/ad2-7-probes) was built in the cloud window on 2026-11-03/04 and fell 400+ commits behind main. It was closed unmerged. Its description: ## Summary - An inbox item can declare an optional `probes` list. Each probe is `{kind, target, value}`, and the four kinds are `test_exists <TestName>`, `symbol_exists <pkg.Name | dir/pkg.Name>`, `text_absent <path> <text>` and `policy_value <key> <value>`. Go checks each probe on the repository tree through `fs.FS` (`inboxcurator.RepoTree`). No LLM is involved. - **Intake** (`evolve inbox add`, `inboxcurator.Admit`) refuses (exit 1) when: - a probe is malformed; - every probe already passes on the tree (`ErrAlreadyDone`, the work is done); - the item has probes but none of its declared paths exists on the tree. - **The boundary sweep** (`SweepProbes`, run at the `Curate` backstop) makes tw",
+  "title": "Rebuild on current main: typed probes on new inbox items (AD2-7, graft B)",
+  "weight": 0.5
+}

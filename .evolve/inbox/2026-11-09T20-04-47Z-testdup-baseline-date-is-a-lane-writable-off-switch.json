@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "A baseline date in the future fails the ratchet with a message that names the date",
+    "A lane diff that moves the date forward is refused",
+    "Lowering count in the same commit as a removed copy still passes"
+  ],
+  "created_at": "2026-11-09T20:04:47Z",
+  "files": [
+    "go/internal/testdup/testdup.go",
+    "go/.test-dup-baseline",
+    "go/internal/guards/integrity_surface.go"
+  ],
+  "fix": "Treat the date as gate configuration, not lane data: reject a date later than today in ParseBaseline or Check, and refuse a diff that moves the date forward; or move the date to a protected file and leave only count lane-writable. Fold into the content-keyed baseline design of testdup-equal-count-conflicts-across-lanes if that lands first.",
+  "id": "testdup-baseline-date-is-a-lane-writable-off-switch",
+  "kind": "fix",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "console, 2026-11-10, adversarial review of the protection follow-up (incident 2026-11-09)",
+  "summary": "go/.test-dup-baseline is unprotected so lanes can lower count. Its date field selects which acs/ directories testdup.Scan reads (isOld, go/internal/testdup/testdup.go). A lane that writes date=2099-01-01 makes every acs directory old: the TDD handoff floor finds no copy and the ship ratchet skips acs, and the equal-count rule lets the lane lower count in the same commit. Found by adversarial review of the protection follow-up (MEDIUM, residual).",
+  "title": "The duplicate ratchet's baseline date is lane-writable and can switch off the acs scope",
+  "weight": 0.6
+}

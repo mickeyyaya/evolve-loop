@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "The files field of the fix item holds one repo path for each key package",
+    "A regression test fails before the fix and passes after it"
+  ],
+  "created_at": "2026-11-10T11:01:20Z",
+  "files": [
+    "go/internal/core/main_red_stop_open.go"
+  ],
+  "fix": "Convert each key package to its repo path (go/<path below the module>) in keyPackages of go/internal/core/main_red_stop_open.go. Keep one home for the conversion; reuse an existing module-path helper if one exists.",
+  "id": "main-red-fix-item-files-as-repo-paths",
+  "intake_override": {
+    "reason": "the file to change is not on main until PR #1395 lands, so a lane cannot build it",
+    "console_route": true
+  },
+  "kind": "fix",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "source": "architecture review g4b3 round 1, MEDIUM-1",
+  "summary": "core.OpenMainRedStop (ADR-0165 G4b, PR #1395) files the fix item of a red main. Its files field holds the import path of each key package. Protected-path globs and the overlap check read repo paths, so the field matches nothing. The item is console-routed because go/internal/core is a protected path and the opener is not on main until #1395 lands.",
+  "title": "The fix item of a red main names repo paths in files, not import paths",
+  "weight": 0.5
+}

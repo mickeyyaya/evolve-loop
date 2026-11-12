@@ -1,0 +1,17 @@
+{
+  "acceptance": [
+    "The next evolve gc run no longer flags cycle-cd3ae73e-2283."
+  ],
+  "created_at": "2026-11-11T16:29:59Z",
+  "fix": "Land the work through evolve ship, or retire the branch or tree on purpose. Then the flag leaves the gc report.",
+  "id": "gc-flag-unmerged-cycle-cd3ae73e-2283-f69071f3",
+  "kind": "task",
+  "priority_class": "hygiene",
+  "route": "console-manual",
+  "routed_at": "2026-11-12T02:28:01Z",
+  "routed_cycle": 2332,
+  "routed_reason": "cycle 2332 ended by a defer-or-quarantine decision: category intent-malformed, fix_type reintent",
+  "summary": "evolve gc flagged cycle-cd3ae73e-2283 (branch not merged into HEAD) on 2 runs and keeps it: gc never removes a flagged item.",
+  "title": "gc flag flag-unmerged: cycle-cd3ae73e-2283",
+  "weight": 0.3
+}

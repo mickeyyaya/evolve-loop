@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "A journey test: a usage reading at the limit stops the loop at its next boundary with no console present",
+    "A new seat of evolve agent run past the limit is refused, and the text names the limit, the reading and the reset",
+    "An unreadable reading does not read as under the limit"
+  ],
+  "created_at": "2026-11-05T12:23:00Z",
+  "files": [
+    "go/cmd/evolve/cmd_loop_stop.go",
+    "go/cmd/evolve/cli_usage_probe.go"
+  ],
+  "fix": "Design first. A policy key with the hold percentage. The loop reads usage at each boundary and brakes itself. It also stops new seats of evolve agent run past the limit, with text that names the limit, the reading and the reset time. An unreadable reading warns loudly and has a stated behaviour.",
+  "id": "usage-brake-as-policy",
+  "intake_override": {
+    "reason": "changes the loop brake and the seat launch, and the operator sets the limit",
+    "console_route": true
+  },
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "summary": "On 2026-11-05 the operator said to stop all activities at 85% weekly usage. The policy has no key for this, and no code stops the loop on usage. The hold is a console habit, with a background check that the console started by hand. If the console session ends or logs out, the loop keeps spending past the limit. The check has no verb, so it is a shell loop, and the operator has ruled out scratch scripts.",
+  "title": "The pipeline has no usage brake, so an operator limit depends on the console being awake",
+  "weight": 0.7
+}

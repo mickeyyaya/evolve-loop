@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "Main holds the behaviour that PR #1254 described, proven by a test through the real entry point that is red without the change, or this item is consumed with the evidence that main already holds it"
+  ],
+  "created_at": "2026-11-12T02:10:00Z",
+  "deps": [],
+  "files": [
+    ".github/workflows/ci.yml",
+    "docs/architecture/acs-predicate-quality-gate.md",
+    "go/Makefile",
+    "go/cmd/evolve/cmd_floor.go"
+  ],
+  "fix": "Read branch cloud/acs-compile as a reference (diff it against its merge base with origin/main). First check whether main already holds the behaviour; if so, consume this item with that evidence. Otherwise rebuild the change on current main with tests, not by a cherry-pick.",
+  "id": "rebuild-pr-1254-acs-compile",
+  "kind": "fix",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "console, 2026-11-12, stale PR triage (operator decision: close and file items). PR #1254 closed unmerged; branch cloud/acs-compile kept as reference",
+  "summary": "PR #1254 (cloud/acs-compile) was built in the cloud window on 2026-11-03/04 and fell 400+ commits behind main. It was closed unmerged. Its description: ## Summary - Migrates the 10 frozen acs predicate packages that no longer compiled on `main` to the current internal APIs. Each predicate keeps its assertion. Every subject still exists, so no package is archived. - Adds `make vet-acs` (`go vet -tags acs ./acs/...`) as the step \"Compile every acs package\" in the `acs-durable` job of `ci.yml`. `required.yml` calls that job as `validate`, and the `CI required` aggregator already requires its `acs_result`. A future API change that breaks a frozen predicate now fails its own PR. - The `acs-durable` tier of `evolve floor` runs the same target. A new row in `floorCIParity` pins the floor command to the CI step. - `docs/architecture/acs-predicate-q",
+  "title": "Rebuild on current main: every acs package compiles again, and CI compiles them on each PR",
+  "weight": 0.5
+}

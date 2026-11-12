@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "A logged-out stub chain over two waves starts at most its first lanes and ends login-required with no zero-ship halt",
+    "After a login, paused lanes resume at their paused phases with no new cycle"
+  ],
+  "created_at": "2026-11-05T19:18:48Z",
+  "files": [
+    "go/cmd/evolve/cmd_loop_window.go",
+    "go/cmd/evolve/cmd_cycle_lane_resume.go",
+    "go/internal/clihealth/clihealth.go"
+  ],
+  "fix": "Design first. The login signal card cut this from its scope.",
+  "id": "login-wall-stops-the-pipeline",
+  "intake_override": {
+    "reason": "split from the login signal card, 2026-11-06",
+    "console_route": true
+  },
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "summary": "After a logout, lanes exit 5, a resumed lane walks the chain again, and after three auto-resumes a lane starts a fresh cycle. The only brake is ZeroShipHalt. A review of 2026-11-06 traced this in scratchpad/mc/signal-card1.json answer 4 and signal-card2.json C-1 to C-3. A stop needs a new query beside the batch coordinator, a live smoke before it decides, and a typed outcome from laneResume.adopt.",
+  "title": "A login wall does not stop the pipeline, so lanes re-walk it until zero-ship halts",
+  "weight": 0.6
+}

@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "gc files no item for a branch whose net diff against HEAD is empty, proven through the real gc entry point",
+    "Every item that gc files about a branch is not lane-admissible in evolve wave supply"
+  ],
+  "created_at": "2026-11-12T02:40:00Z",
+  "deps": [],
+  "files": [
+    "go/internal/gc/worktrees.go",
+    "go/internal/gc"
+  ],
+  "fix": "Design first. (1) gc treats a branch as landed when its net content is already in HEAD (go/internal/gc/worktrees.go landingNoNet), so it files no item. (2) Each gc item about a branch carries the console route with the ref-state reason, because a lane cannot change ref state. A test through gc's real entry point pins both and is red without the change.",
+  "id": "gc-branch-items-are-ref-state-work-and-landed-content-is-landed",
+  "kind": "pipeline-repair",
+  "origin": "console",
+  "priority_class": "stability",
+  "source": "console, 2026-11-12, triage of cycle 2332 (wave 166, sealed FAIL intent-rejected)",
+  "summary": "The wave 166 boundary gc filed 13 gc-flag-unmerged-cycle-cd3ae73e-* items, 11 of them lane-eligible. Cycle 2332 claimed gc-flag-unmerged-cycle-cd3ae73e-2283; its audit failed it correctly: the acceptance is git ref state, and only a land or a console branch delete changes it. Each such item costs one lane cycle and a FAIL. The audit also found that HEAD already holds most of that branch's content.",
+  "title": "gc files no lane work for an unmerged branch whose content main already holds, and routes the rest to the console",
+  "weight": 0.8
+}

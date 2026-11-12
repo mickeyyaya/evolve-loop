@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "The current testdup fails the harness before G2 and passes after",
+    "A gate that diffs against HEAD fails",
+    "A TDD-floor fixture with an untracked acs/cycle\u003cN\u003e/ holding a copied helper is rejected in all three states"
+  ],
+  "consumed": {
+    "at": "2026-11-09T22:26:50Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "re-filed with deps on G1 and G2 so no lane builds it before the registry exists"
+  },
+  "created_at": "2026-11-09T22:26:02Z",
+  "files": [
+    "go/internal/repocontract/"
+  ],
+  "fix": "Run each registry entry on one fixture unstaged, staged and committed with one Base; the three verdicts must match. Diff-scoped gates diff against Base. Name the Base of a main-side run (CI, train). Depends on G1 and G2. Design review before build.",
+  "id": "gate-contract-g3-parity-harness",
+  "kind": "test",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "console, 2026-11-10, ADR-0165 plan component",
+  "summary": "Component G3 of docs/plans/gate-contract-2026-11.md (ADR-0165 decisions 2, 5). The duplicate ratchet gave ok for a staged tree and 336 copies for its commit.",
+  "title": "Gate contract G3: a three-state parity harness for each registered gate",
+  "weight": 0.6
+}

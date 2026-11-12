@@ -1,0 +1,14 @@
+{
+  "action": "recurring failure tdd|infra-error|class-661d9ef3252d (1 occurrences)",
+  "evidence_pointer": "advisory raise: queue -\u003e console",
+  "files": null,
+  "id": "failure-class-661d9ef3252d",
+  "injected_at": "2026-11-12T02:54:01Z",
+  "injected_by": "retro-preventive-actions-autofiler",
+  "kind": "pipeline-repair",
+  "origin": "retro",
+  "priority": "HIGH",
+  "priority_class": "correctness",
+  "recurrence": 1,
+  "weight": 0.75
+}

@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "A journey test through the production pool plan: a paused scope whose item is console-manual starts no lane, and the warning names both",
+    "The test is red without the fix"
+  ],
+  "created_at": "2026-11-04T14:34:16Z",
+  "files": [
+    "go/cmd/evolve/cmd_loop_pool_paused.go"
+  ],
+  "fix": "Apply the one route rule to the paused scopes in pausedPlan.order, and write a warning that names the cycle and the item. Fix on the branch of PR 1283, which changes this file.",
+  "id": "paused-plan-starts-a-console-routed-item",
+  "kind": "pipeline-integrity",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "summary": "Cycle 2161 ran on host-sentinel-inside-the-loop, which has route console-manual. waves/supply.json classed the item console_route one second before the launch. productionPoolPlanFn filters triage todos through consoleRoutedResolver, but pausedPlan.order adds each ready paused scope to the head of the plan with no route check.",
+  "title": "The pool plan must apply the console route to a paused scope",
+  "weight": 0.8
+}

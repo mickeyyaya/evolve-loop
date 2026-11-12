@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "A TDD handoff with a narrative comment in go/acs/cycle<N>/ is rejected with retry by the orchestrator's reviewer chain",
+    "`evolve phase verify tdd --workspace <ws>` without --worktree runs the worktree checks on the cycle's active worktree",
+    "The checks have one implementation that the host and the self-check both call"
+  ],
+  "created_at": "2026-11-09T19:15:47Z",
+  "files": [
+    "go/internal/core/tdd_predicate_floor.go",
+    "go/internal/cli/phasecmd/phase_verify.go",
+    "go/internal/core/comment_floor.go"
+  ],
+  "fix": "Move both checks into the host TDD handoff floor (go/internal/core/tdd_predicate_floor.go, tddPredicateFloor) so the host enforces them, and bind the worktree from run.json in phase verify tdd so the self-check runs the same checks. One home for each check.",
+  "id": "tdd-self-check-worktree-checks-never-run",
+  "kind": "fix",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "console, 2026-11-10, architecture review of the duplicate ratchet incident",
+  "summary": "go/internal/phasecontract/render.go:118-120 renders `evolve phase verify tdd --workspace <dir>` with no --worktree. verifyDeliverable (go/internal/cli/phasecmd/phase_verify.go:117-128) returns before withFrozenPinViolations and withTddCommentViolations when the worktree is empty, and withCycleState does not bind it from run.json for tdd. The host chain (cmd/evolve/cmd_cycle.go reviewers, deliverable.VerifyWithStage) never calls these checks either. So a narrative comment or an unreachable frozen pin in go/acs/cycle<N>/ passes TDD, and no later phase can change those files. Found by the architecture review of docs/incidents/2026-11-09-duplicate-ratchet-misses-staged-predicates.md (R2, R3).",
+  "title": "The TDD worktree checks never run: no --worktree in the self-check, and no host call",
+  "weight": 0.6
+}
