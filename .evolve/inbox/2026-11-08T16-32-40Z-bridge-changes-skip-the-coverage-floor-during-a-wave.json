@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "A test changes a bridge function under a simulated live loop, leaves a new branch uncovered, and the floor refuses the handoff at stage enforce.",
+    "The requireTmux tests still do not run at the floor under a live loop.",
+    "The floor names each changed bridge function that it could not measure, instead of a silent skip."
+  ],
+  "created_at": "2026-11-08T16:32:40Z",
+  "files": [
+    "go/internal/core/cover_changed_floor.go",
+    "go/internal/core/build_floor_reviewer.go"
+  ],
+  "fix": "At the floor under a live loop, run the internal/bridge tests that need no real tmux (skip only the requireTmux tier), write a profile, and run cover changed on it. A function that only a requireTmux test covers is reported as not measured at the floor, not as a pass.",
+  "id": "bridge-changes-skip-the-coverage-floor-during-a-wave",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "Cycle 2218 added an error return to recipeSessionDriver.EnsureSession with no test. The build floor note in the wave 160 loop.log says that ./internal/bridge is env-exclusive and does not run at the floor under a live loop, because its requireTmux tests time out under load. cover changed thus had no profile for the package and did not refuse. The cycle shipped to main, and main CI turned red at 08b0d2d76 (EnsureSession 96.8%). PR #1371 added the missing test. CI is the first coverage check for every bridge change during a wave, and it runs after the change is on main.",
+  "title": "A lane that changes internal/bridge ships with no coverage check, because the floor skips the package during a live wave",
+  "weight": 0.7
+}

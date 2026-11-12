@@ -1,0 +1,30 @@
+{
+  "acceptance": [
+    "Main holds the behaviour that PR #1290 described, proven by a test through the real entry point that is red without the change, or this item is consumed with the evidence that main already holds it"
+  ],
+  "created_at": "2026-11-12T02:10:00Z",
+  "deps": [],
+  "files": [
+    "docs/architecture/packages/internal-cycleoutcome.md",
+    "docs/architecture/packages/internal-inboxmover-lifecycle.md",
+    "docs/architecture/signal-codes.md",
+    "go/internal/committedset/committedset.go",
+    "go/internal/cycleoutcome/cycleoutcome.go",
+    "go/internal/cycleoutcome/prebuild.go"
+  ],
+  "fix": "Read branch claude/poison-item-breaker-uo33pe as a reference (diff it against its merge base with origin/main). First check whether main already holds the behaviour; if so, consume this item with that evidence. Otherwise rebuild the change on current main with tests, not by a cherry-pick.",
+  "id": "rebuild-pr-1290-poison-item-breaker-uo33pe",
+  "intake_override": {
+    "reason": "each item rebuilds a distinct closed PR; the shared paths are common homes, not the same change",
+    "overlaps": [
+      "rebuild-pr-1269-ad2-7-probes"
+    ]
+  },
+  "kind": "fix",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "console, 2026-11-12, stale PR triage (operator decision: close and file items). PR #1290 closed unmerged; branch claude/poison-item-breaker-uo33pe kept as reference",
+  "summary": "PR #1290 (claude/poison-item-breaker-uo33pe) was built in the cloud window on 2026-11-03/04 and fell 400+ commits behind main. It was closed unmerged. Its description: ## Summary - **Per-item pre-build breaker.** The drain added to `failure_count` only on a task-level failure. A system-level failure before build (for example `TRIAGE_COMMITMENT_INVALID`) never reached the quarantine ceiling, so every wave claimed the item again. Now the drain records each failing cycle in `prebuild_failure_cycles` on the charged item. At the policy value `prebuild_failure_ceiling` (default 2), it parks the item in the existing `quarantine/` and emits the inbox.warning `INBOX_ITEM_PREBUILD_BREAKER`, which names the item, the cycles and the ceiling. Only a recorded build entry (`PastBuild`) clears the record, so the count is consecutive. A cycle with no phase record, or an in",
+  "title": "Rebuild on current main: park an item that fails before build in consecutive cycles",
+  "weight": 0.5
+}

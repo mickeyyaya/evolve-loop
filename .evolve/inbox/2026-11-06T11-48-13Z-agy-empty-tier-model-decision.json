@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "The document and the code state one fact.",
+    "A test is red without the fix."
+  ],
+  "created_at": "2026-11-06T11:48:13Z",
+  "files": [
+    "go/internal/bridge/agy_every_launch_model_test.go"
+  ],
+  "fix": "Decide if an empty tier passes --model",
+  "id": "agy-empty-tier-model-decision",
+  "intake_override": {
+    "reason": "console audit of agy, 2026-11-06",
+    "console_route": true
+  },
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "summary": "The plan says each launch passes --model. TestAgyEveryLaunch_AnEmptyTierKeepsTheCLIsOwnDefaultModel pins the opposite.",
+  "title": "Decide if an empty tier passes --model",
+  "weight": 0.5
+}

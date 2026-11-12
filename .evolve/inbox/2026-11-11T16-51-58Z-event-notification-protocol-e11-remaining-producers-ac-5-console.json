@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "each new and changed function has 100% coverage"
+  ],
+  "created_at": "2026-11-11T16:51:58Z",
+  "files": [
+    "go/internal/inboxmover/lifecycle/lifecycle.go"
+  ],
+  "fix": "Make the change that AC 5 needs on the protected path(s) go/internal/inboxmover/lifecycle/lifecycle.go, go/internal/signalcenter/event.go, go/internal/signalcenter/registry.go, go/internal/ciwatch/ciwatch.go, then prove the criterion with a test.",
+  "id": "event-notification-protocol-e11-remaining-producers-ac-5-console",
+  "kind": "feature",
+  "origin": "cycle",
+  "priority_class": "feature",
+  "route": "console-manual",
+  "source": "cycle 2321, tdd test-report.md AC 5 (console-followup)",
+  "summary": "The TDD phase of cycle 2321 gave AC 5 of event-notification-protocol-e11-remaining-producers the console-followup disposition. A lane builder can never change the paths it needs (go/internal/inboxmover/lifecycle/lifecycle.go, go/internal/signalcenter/event.go, go/internal/signalcenter/registry.go, go/internal/ciwatch/ciwatch.go). The lane part ships without it, so the console owns this part.",
+  "title": "Console part of event-notification-protocol-e11-remaining-producers: AC 5, which needs a protected path changed",
+  "weight": 0.4
+}

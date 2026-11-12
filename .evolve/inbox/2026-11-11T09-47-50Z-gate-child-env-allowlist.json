@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "A variable that the allowlist does not name never reaches the gate child, proven by a test through gaterun.Run",
+    "The host integration tests of gaterun still pass at shadow and enforce"
+  ],
+  "created_at": "2026-11-11T09:47:50Z",
+  "deps": [],
+  "files": [
+    "go/internal/gaterun/",
+    "docs/architecture/packages/internal-gaterun.md"
+  ],
+  "fix": "Build the child env from an allowlist (PATH, HOME, LANG, TMPDIR and the Go variables the entry needs), reuse the ipcenv allowlist pattern, and pin it with a test that a parent variable such as GH_TOKEN never reaches the child.",
+  "id": "gate-child-env-allowlist",
+  "kind": "security",
+  "origin": "console",
+  "priority_class": "security",
+  "route": "console-manual",
+  "routed_at": "2026-11-11T10:44:26Z",
+  "routed_cycle": 2301,
+  "routed_reason": "lane triage (cycle 2301) dropped: stale: go/internal/gaterun/ absent at HEAD; package only on unmerged branches (a27e69f7f, 5cb97b63a)",
+  "source": "console, 2026-11-11; review agent-adversarial-review-20261111T092721Z-42b9 F10",
+  "summary": "gaterun wrap keeps os.Environ of the parent for the gate child. At shadow the network is open with a report, so an entry can send a token from the environment out before the report is read.",
+  "title": "The hermetic gate child gets an allowlisted environment, not the full parent environment",
+  "weight": 0.5
+}

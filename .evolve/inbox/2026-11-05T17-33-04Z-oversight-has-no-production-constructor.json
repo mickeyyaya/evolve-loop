@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "A wiring test proves the loop constructs and runs Oversight, or the docs state that it does not run",
+    "A clean landing moves the window in a journey test"
+  ],
+  "created_at": "2026-11-05T17:33:04Z",
+  "files": [
+    "go/internal/orchestrator/oversight.go",
+    "go/cmd/evolve/cmd_loop_orchestrator.go"
+  ],
+  "fix": "Design first. Waking it switches on stall, brief and pause actions, so stage them. Correct docs/architecture/wave-orchestrator.md either way.",
+  "id": "oversight-has-no-production-constructor",
+  "intake_override": {
+    "reason": "found during the merging component work, 2026-11-05",
+    "console_route": true
+  },
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "summary": "No production code constructs orchestrator.Oversight. Window.CleanLanding and Window.Conflict have no live caller, so at fleet.orchestrator.stage enforce the window stays at its start. Its stall, brief and pause actions also never run, although docs describe them as built.",
+  "title": "orchestrator.Oversight never runs, so the adaptive window never moves",
+  "weight": 0.7
+}

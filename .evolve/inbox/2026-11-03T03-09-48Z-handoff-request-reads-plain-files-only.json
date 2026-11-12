@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "Red test first: a FIFO _test.go in go/acs/cycle<N> does not hang seedTaskContract.",
+    "Red test first: a symlinked _test.go to a hidden file adds none of its bytes to the build prompt.",
+    "Red test first: a ledger larger than the cap is refused.",
+    "100% statement coverage on each changed function; zero code comments."
+  ],
+  "created_at": "2026-11-03T03:09:48Z",
+  "files": [
+    "go/internal/handoff/request/request.go",
+    "go/internal/core/handoff_reviewer.go"
+  ],
+  "fix": "Read each ACS file in request.TDDBuild through the plain-file reader (core.ReadHandoffLedger, or move it to a shared leaf package so request can use it without a cycle), refusing a symlink, a hard link, a FIFO or a swapped file. Add a size cap to the reader. File the go test -list note leak as its own check if it is not covered.",
+  "id": "handoff-request-reads-plain-files-only",
+  "intake_override": {
+    "reason": "protected handoff and core reader change found by the D5 adversarial seat",
+    "console_route": true
+  },
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "security",
+  "route": "console-manual",
+  "source": "adversarial review of PR #1246 (agent-adversarial-review-20261103T030322Z-0c94), 2026-11-03, D1 and D2 MEDIUM, D3 LOW",
+  "summary": "request.TDDBuild parses the _test.go files of go/acs/cycle<N> in the worktree to list the predicates for the build prompt. A FIFO there hangs seedTaskContract before the build phase with no timeout (D1). A symlinked _test.go sends the first token of a hidden file into the build prompt (D2; the go test -list note path had the same leak before H9). core.ReadHandoffLedger reads with io.ReadAll and no size cap (D3).",
+  "title": "The tdd-build request reads ACS test files through the plain-file reader, and the ledger read has a size cap",
+  "weight": 0.7
+}

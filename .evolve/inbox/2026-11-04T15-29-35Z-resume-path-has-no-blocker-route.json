@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "A journey test through the resume path: a builder that declares the prescribed blocker on a protected path routes the item to the console, with no further correction",
+    "The test is red without the fix"
+  ],
+  "created_at": "2026-11-04T15:29:35Z",
+  "files": [
+    "go/internal/core/resume.go",
+    "go/internal/core/cyclerun_correction.go",
+    "go/internal/core/floor_blocker_notes.go"
+  ],
+  "fix": "One blocker rule for the fresh path and the resume path, so a proven claim routes the item to the console and stops the corrections.",
+  "id": "resume-path-has-no-blocker-route",
+  "kind": "pipeline-integrity",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "summary": "In cycle 2157 the builder declared BLOCKER protected-path in the exact form that floor_blocker_notes.go prescribes. The fresh path proves such a claim at cyclerun_correction.go:40. The resume path calls resumedBlockerRoute at resume.go:417, which reads only review.ProvenBlocker, and only the handoff reviewer sets it. So the claim was neither proven nor refused, and the floor told the builder to fix the file twice more. The builder then wrote the protected file through Bash.",
+  "title": "The resume path must route a proven protected-path blocker",
+  "weight": 0.85
+}

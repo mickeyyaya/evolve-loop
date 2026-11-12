@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "A test: a builder cell writes a protected path through a shell command and does not revert it, and the cycle cannot ship that change",
+    "The result is stated in docs/architecture/llm-isolation.md"
+  ],
+  "created_at": "2026-11-04T15:29:37Z",
+  "files": [
+    "go/internal/bridge/sandbox_paths.go",
+    "go/internal/guards/role.go",
+    "go/internal/guards/integrity_surface.go"
+  ],
+  "fix": "Find which layer owns this guarantee for each CLI family. Write the test that proves it. If no layer holds, close the gap in the sandbox write rules or the ship gate.",
+  "id": "protected-path-write-through-bash-prove-the-gates-hold",
+  "kind": "pipeline-integrity",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "summary": "In cycle 2157 attempt 3 a builder changed go/internal/core/resume_execution.go through a python heredoc in Bash. The write succeeded, although the role guard denies Edit on that path. The builder saw this, reverted the write, and reported it. Nothing landed. Whether a later gate or the OS sandbox stops such a write when the builder does not revert it is not proven.",
+  "title": "Prove that a protected file written through Bash cannot land",
+  "weight": 0.85
+}

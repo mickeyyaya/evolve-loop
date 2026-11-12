@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Red-first: the routing of cloud-builder starts at claude-cloud with no policy.json edit.",
+    "A guard test: the rendered prompt of cloud-builder holds no rule that forbids commit or push.",
+    "Red-first: a fallback from the cloud seat to a local seat is refused or gets a usable scope.",
+    "100% coverage on each changed function; zero code comments; runtime-reference names the profile."
+  ],
+  "created_at": "2026-11-04T00:59:12Z",
+  "files": [
+    "agents",
+    "go/internal/profiles",
+    ".evolve/profiles"
+  ],
+  "fix": "Add a profile cloud-builder with cli claude-cloud first and the policy order as fallback, and a persona whose deliverable is one pull request. Keep the local build rules that still apply. A fallback to a local seat must get a writable scope that can hold the work, or refuse.",
+  "id": "cloud-seat-has-its-own-builder-profile",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "console 2026-11-04: launching through console-builder on claude-cloud needed a temporary policy.json rule. The wave preflight saw that uncommitted control-plane file and fell back to sequential, so wave 153 ran one serial cycle. The console-builder persona also says 'never commit or push', which contradicts the pull request that a cloud seat must deliver.",
+  "summary": "Two defects of the cloud seat: selecting it edits a control-plane file, and its persona forbids its deliverable.",
+  "title": "A cloud-builder profile and persona, so a cloud launch needs no policy edit and its persona asks for a pull request",
+  "weight": 0.8
+}

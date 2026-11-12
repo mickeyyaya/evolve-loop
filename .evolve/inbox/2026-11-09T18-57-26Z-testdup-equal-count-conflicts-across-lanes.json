@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "Two fixture lanes that each remove one copy merge to a green main without a conflict on go/.test-dup-baseline",
+    "A new copy still fails the ratchet",
+    "go/acs/cycle2231 predicates stay green, or a documented retire step replaces the ones the design changes"
+  ],
+  "created_at": "2026-11-09T18:57:26Z",
+  "files": [
+    "go/internal/testdup/",
+    "go/.test-dup-baseline",
+    "go/internal/repocontract/testdup_ratchet_test.go"
+  ],
+  "fix": "Design first: compare the options (a) count at most the baseline, and a boundary tighten step lowers the baseline, as the size ratchet does; (b) a per-change rule that judges only the copies a change adds against its base. Keep the frozen predicates of go/acs/cycle2231 green, because they pin the equal-count rule (TestC2231_003).",
+  "id": "testdup-equal-count-conflicts-across-lanes",
+  "kind": "test",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "source": "console, 2026-11-10, incident 2026-11-09 duplicate ratchet",
+  "summary": "Check in go/internal/testdup fails when the count is below the baseline, so a lane that removes a copy must lower go/.test-dup-baseline in the same commit. Two lanes in one wave that each remove one copy both write the same line: the second rebase conflicts, or the merged tree is one below the baseline and red. See docs/incidents/2026-11-09-duplicate-ratchet-misses-staged-predicates.md (Limits).",
+  "title": "The duplicate ratchet's equal-count rule makes concurrent lanes that each remove a copy conflict on go/.test-dup-baseline",
+  "weight": 0.4
+}

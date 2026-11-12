@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "The three round-3 probes each give a refusal, and each test is red on the current walker",
+    "The design page states the fail-closed model and its review passed",
+    "Commit 6 (test 10) does not start before this item is closed"
+  ],
+  "created_at": "2026-11-11T05:40:14Z",
+  "deps": [],
+  "files": [
+    "go/internal/gatehermetic/",
+    "go/internal/goload/",
+    "docs/architecture/gate-contract-g2-hermetic-guard.md"
+  ],
+  "fix": "Design pass first, then architecture and adversarial review: load the whole module (not the import closure) so every write is seen; refuse the boxing of any type from an exec-reaching std package and of os/exec types; treat any reached function value that flows anywhere other than a call or the named sysexec.RunFunc as reached. Record the model in docs/architecture/gate-contract-g2-hermetic-guard.md 7.4 and 7.5.",
+  "id": "g2-walker-fails-closed-before-enforcement",
+  "kind": "pipeline-integrity",
+  "origin": "console",
+  "priority_class": "security",
+  "route": "console",
+  "source": "console, 2026-11-11, operator ruling after the third failed review round of G2 commit 3",
+  "summary": "The operator ruled on 2026-11-11 that gatehermetic (G2 commit 3, ADR-0165) lands as a measuring tool after three review rounds each found new false passes. Three are open (internal-gatehermetic.md, Known false passes): a boxed exec-reaching std type such as cgi.Handler behind http.Handler; a function value inside a composite-literal initializer argument; a write to a code-holding package var from a package outside the load closure. The pattern is structural: the walk passes each Go shape that no rule names.",
+  "title": "Make the G2 walker fail closed at its source before commit 6 enforces it",
+  "weight": 0.8
+}

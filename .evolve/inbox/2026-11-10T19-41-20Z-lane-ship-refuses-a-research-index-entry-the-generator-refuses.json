@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "A CUJ test through the real ship entry point: a lane tree with an entry that starts with a blank line is refused, and the refusal names the entry file",
+    "The same test is red without the fix",
+    "A lane tree with a valid new entry and a stale docs/research-index.md is either refused or regenerated, and the spec states which",
+    "The package note of internal/researchindex names the gate"
+  ],
+  "created_at": "2026-11-10T19:41:20Z",
+  "files": [
+    "go/internal/researchindex/researchindex.go",
+    "go/internal/phases/ship/ship.go",
+    "docs/architecture/packages/internal-researchindex.md"
+  ],
+  "fix": "Run researchindex.Check on the staged lane tree before the lane ships, as a gate of the lane (a registry entry of the gate contract, or the existing ship-side derived-file check), so a lane that adds or changes a file of docs/research-index/ is refused with the entry name. Keep the strict heading rule of readEntries. Design review before the build.",
+  "id": "lane-ship-refuses-a-research-index-entry-the-generator-refuses",
+  "kind": "fix",
+  "origin": "console",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "source": "wave 164 cycles 2271, 2280, 2281 failure dossiers",
+  "summary": "Cycles 2275 and 2276 landed two entries of docs/research-index/ with a blank first line. researchindex.readEntries refuses such an entry, so evolve docs index generate failed on main 67a8d49f6 and TestPRRefresh_TheRealGeneratorsOfACloneCommitOnlyTheStaleIndex was red for each lane that changes go/cmd/evolve. Cycles 2271, 2280 and 2281 sealed FAIL on it (class recurrence 6; the same test also failed cycles 2111, 2113 and 2121). No gate of the lane ran the entry check on the staged tree. PR #1398 repairs the data only.",
+  "title": "A lane cannot land a research-index entry that the generator refuses",
+  "weight": 0.9
+}

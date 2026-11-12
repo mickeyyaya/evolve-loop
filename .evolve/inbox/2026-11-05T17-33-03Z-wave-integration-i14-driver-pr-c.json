@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "A journey with a fake CI and a bare origin lands one member by fast-forward and requeues a conflict with its brief",
+    "No second lane starts on a delivered item",
+    "evolve loop --resume of a lane checkpoint cannot land on main at enforce"
+  ],
+  "created_at": "2026-11-05T17:33:03Z",
+  "files": [
+    "go/internal/integration/driver.go",
+    "go/internal/phases/ship/postship.go",
+    "go/cmd/evolve/cmd_loop_wavesync.go"
+  ],
+  "fix": "Write a design card and pass architecture review before any code.",
+  "id": "wave-integration-i14-driver-pr-c",
+  "intake_override": {
+    "reason": "found during the merging component work, 2026-11-05",
+    "console_route": true
+  },
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "summary": "At enforce a lane stops before main and nothing lands it. PR (c) holds EnforceActor and absorbs I7, I8 feeds and I11. Open inputs are in docs/architecture/integration-driver.md section 9: the delivered inbox state, promotion through post-ship, the brief field, the mid-wave sync, local commits after a merge, and evolve loop --resume of a lane checkpoint.",
+  "title": "I14 PR (c): the enforce actor of the integration driver, after its own design card",
+  "weight": 0.9
+}

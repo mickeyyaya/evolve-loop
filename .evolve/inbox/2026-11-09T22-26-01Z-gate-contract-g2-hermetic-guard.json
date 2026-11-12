@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "The current testdup fails the guard, and passes after its migration",
+    "A fixture gate whose helper package runs git log fails",
+    "A gate on the tracked set judges a staged new file that Base does not hold"
+  ],
+  "created_at": "2026-11-09T22:26:01Z",
+  "files": [
+    "go/internal/testdup/testdup.go",
+    "go/internal/repostate/"
+  ],
+  "fix": "A structure test walks the static call graph from each registered run function and refuses git calls, .git reads and mtime reads outside internal/repostate. repostate reads the lane tree (index plus untracked non-ignored files) and Base, never HEAD, history, dates or mtimes. Migrate testdup (drop Date, since, loadAcsAges, the HEAD diff and the mtime walk) and the listed git readers. Depends on G1. Design review before build.",
+  "id": "gate-contract-g2-hermetic-guard",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "console, 2026-11-10, ADR-0165 plan component",
+  "summary": "Component G2 of docs/plans/gate-contract-2026-11.md (ADR-0165 decisions 3, 4; research F1.2, F1.3). testdup at b33d6492b mixes the index with commit dates, mtimes and a HEAD diff. The core floors, fleet/preflight.go and four phasecoherence _test.go scanners call git outside repostate.",
+  "title": "Gate contract G2: a call-graph hermeticity guard, and testdup reads only the lane tree and the base",
+  "weight": 0.7
+}

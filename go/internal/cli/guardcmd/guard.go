@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
@@ -18,6 +19,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
+
+var Names = []string{"ship", "phase", "role", "docdelete", "chain", "triage-floors"}
 
 var guardLogTag = map[string]string{
 	"ship":      "ship-gate",
@@ -263,7 +266,7 @@ func buildGuard(name, evolveDir string, bypass bool) (core.Guard, error) {
 	case "chain":
 		return guards.NewChain(ledger.New(evolveDir)), nil
 	default:
-		return nil, fmt.Errorf("unknown guard %q (known: ship phase role docdelete chain triage-floors)", name)
+		return nil, fmt.Errorf("unknown guard %q (known: %s)", name, strings.Join(Names, " "))
 	}
 }
 

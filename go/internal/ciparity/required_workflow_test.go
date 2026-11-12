@@ -38,7 +38,7 @@ func TestRequiredWorkflow_AlwaysReportsAndCannotSkipDependencies(t *testing.T) {
 		t.Fatal(err)
 	}
 	slices.Sort(needs)
-	if !slices.Equal(needs, []string{"changes", "go", "inbox", "landing", "ste-lint", "validate"}) {
+	if !slices.Equal(needs, []string{"changes", "go", "golangci-lint", "inbox", "landing", "ste-lint", "validate"}) {
 		t.Fatalf("required result dependencies = %v", needs)
 	}
 	for id, source := range map[string]string{"go": "go.yml", "validate": "ci.yml", "landing": "landing-validation.yml"} {
@@ -93,6 +93,31 @@ func TestRequiredWorkflow_SteLintJobRunsOnlyTheLintOnTheAddedText(t *testing.T) 
 		if strings.Contains(script, banned) {
 			t.Errorf("a docs-only job may not run test code: %q", banned)
 		}
+	}
+}
+
+func TestRequiredWorkflow_LintJobRunsThePinnedGolangciLintOnTheGoRoute(t *testing.T) {
+	t.Parallel()
+	job := readWorkflowContract(t, RequiredWorkflow).Jobs["golangci-lint"]
+	if job.If != "needs.changes.outputs.go == 'true'" || job.Needs.Value != "changes" || job.ContinueOnError != "" || job.Uses != "" {
+		t.Fatalf("golangci-lint must run on the go route of the changes job: %+v", job)
+	}
+	var setupGo, pinned, lint bool
+	for _, step := range job.Steps {
+		switch {
+		case strings.HasPrefix(step.Uses, "actions/setup-go@"):
+			setupGo = step.With["go-version-file"] == "go/go.mod"
+		case strings.Contains(step.Run, "golangci-lint@v$(cat go/.golangci-version)"):
+			pinned = true
+		case step.Run == "golangci-lint run":
+			lint = step.WorkingDirectory == "go"
+		}
+		if step.ContinueOnError != "" || step.If != "" {
+			t.Errorf("golangci-lint step %q may not be skipped or ignore its failure", step.Name)
+		}
+	}
+	if !setupGo || !pinned || !lint {
+		t.Errorf("golangci-lint needs the module Go version (%v), the pinned version (%v) and a run from go/ (%v)", setupGo, pinned, lint)
 	}
 }
 

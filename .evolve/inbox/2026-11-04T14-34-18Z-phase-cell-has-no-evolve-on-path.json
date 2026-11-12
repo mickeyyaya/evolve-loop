@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "A test proves that each command a correction names runs inside a cell environment"
+  ],
+  "created_at": "2026-11-04T14:34:18Z",
+  "files": [
+    "go/internal/deliverable/effects.go",
+    "go/internal/bridge/read_isolation.go"
+  ],
+  "fix": "Find why the cell has no evolve on PATH, against the environment allowlist of ADR-0154. Either the correction names a path that the cell can run, or the host runs the verifier and hands the result to the cell.",
+  "id": "phase-cell-has-no-evolve-on-path",
+  "kind": "pipeline-integrity",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "summary": "In cycle 2161 the triage cell got command not found: evolve, exit 127, for the commands in the correction text. The agent then stated that no effect was owed, with no verifier output.",
+  "title": "A correction must name a verifier that the phase cell can run",
+  "weight": 0.8
+}

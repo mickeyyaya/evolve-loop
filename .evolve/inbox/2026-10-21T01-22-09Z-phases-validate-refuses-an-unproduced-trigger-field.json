@@ -14,7 +14,9 @@
   "id": "phases-validate-refuses-an-unproduced-trigger-field",
   "kind": "bug",
   "priority_class": "stability",
-  "route": "console-manual",
+  "route": "lane",
+  "routed_at": "2026-11-12T03:09:06Z",
+  "routed_reason": "console 2026-11-12: inbox curate proposes it; a buildable kind with named files and no protected surface",
   "summary": "Filed from the independent review of PR #1105 (M4, 2026-10-21). PR #1105 added phasespec.UnproducedTriggerFields but wires it only into the CI test TestTheCheckedInRegistry_EveryTriggerFieldHasAProducer. evolve phases validate and evolve phases create still accept a user phase whose insert trigger reads a field that no phase produces, which the item insert-when-fields-need-a-producer asked to refuse with the phase and field named.",
   "title": "evolve phases validate and create must refuse a trigger field that no phase produces",
   "weight": 0.5

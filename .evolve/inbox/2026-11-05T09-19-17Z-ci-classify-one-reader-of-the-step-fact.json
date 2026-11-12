@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "A nested fixture line in a passed test step never prints as a failure, in any job",
+    "Each failureKey of an existing row is unchanged",
+    "A table row that a workflow rename makes false fails a test"
+  ],
+  "created_at": "2026-11-05T09:19:17Z",
+  "files": [
+    "go/internal/ciwatch/classify_source.go",
+    "go/internal/ciparity/gatesteps.go"
+  ],
+  "fix": "Design first. One table of each step in the four workflows, and one reader. Delete p.makes, p.steps and p.jobs. Keep each failure key, or an open inbox item gets a duplicate.",
+  "id": "ci-classify-one-reader-of-the-step-fact",
+  "intake_override": {
+    "reason": "changes the CI classifier that the console reads at each red",
+    "console_route": true
+  },
+  "kind": "refactor",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "summary": "Row 5a reads the failed step of the five coverage gates from the job API. Each other job keeps the text parser, so a nested fixture line can still print as a false test row in a job that failed elsewhere. A gate red on the base also gives pre-existing, also for a refusal in a touched file, because the key is the gate and not the item. The 8 findings of revision 2 of the row 5 design card state what this end state must handle: the job display names of four workflows, test steps outside go.yml, failure keys of make steps, a cancelled step, a job with no failed step, the 55 MB log. The card is in backups/session-2026-11-04/design-card-row5.md.",
+  "title": "ci classify keeps a second reader of the failed step, for each job that is not one of the five coverage gates",
+  "weight": 0.5
+}

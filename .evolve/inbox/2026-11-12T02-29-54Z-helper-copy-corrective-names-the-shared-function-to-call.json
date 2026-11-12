@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "For a copy between two acs/cycle-N predicate packages whose body calls acsassert.RepoRoot, the corrective text names acsassert.RepoRoot, proven through the real tdd handoff floor"
+  ],
+  "created_at": "2026-11-12T02:45:00Z",
+  "deps": [],
+  "files": [
+    "go/internal/repocontract",
+    "go/internal/core"
+  ],
+  "fix": "When the copied body calls an exported pkg/acsassert function, the corrective names that function and says to inline the call (for example: use filepath.Join(acsassert.RepoRoot(t), \"go\") directly). It drops 'the existing helper' when that helper is in another cycle's predicate package, because no lane can import it.",
+  "id": "helper-copy-corrective-names-the-shared-function-to-call",
+  "kind": "pipeline-repair",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "source": "console, 2026-11-12, triage of cycle 2331 (wave 166, sealed FAIL at the tdd handoff floor)",
+  "summary": "Cycle 2331's tdd wrote acs/cycle2331 moduleDir, a copy of acs/cycle2320 goDir (filepath.Join(acsassert.RepoRoot(t), \"go\")). The tdd handoff floor rejected it with 'call pkg/acsassert or the existing helper instead of a copy'. A helper in another cycle's _test package cannot be imported, so the only fix is the shared call, but the message does not name it. The agent did not fix it within its one correction, and the cycle failed.",
+  "title": "The helper-copy floor names the pkg/acsassert function that a copied predicate helper calls",
+  "weight": 0.5
+}

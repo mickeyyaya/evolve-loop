@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Contract-bearing sections provably untouched (never-compress list in policy; regression test)."
+  ],
+  "created_at": "2026-11-09T13:04:05Z",
+  "files": [
+    ".evolve/policy.json"
+  ],
+  "fix": "Make the change that AC 2 needs on the protected path(s) .evolve/policy.json (the `log_compression.never_compress` list), then prove the criterion with a test.",
+  "id": "artifact-log-compression-ac-2-console",
+  "kind": "feature",
+  "origin": "cycle",
+  "priority_class": "feature",
+  "route": "console-manual",
+  "source": "cycle 2248, tdd test-report.md AC 2 (console-followup)",
+  "summary": "The TDD phase of cycle 2248 gave AC 2 of artifact-log-compression the console-followup disposition. A lane builder can never change the paths it needs (.evolve/policy.json (the `log_compression.never_compress` list)). The lane part ships without it, so the console owns this part.",
+  "title": "Console part of artifact-log-compression: AC 2, which needs a protected path changed",
+  "weight": 0.45
+}

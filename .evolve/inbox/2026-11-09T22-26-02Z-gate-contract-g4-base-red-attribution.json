@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "A fixture lane on a red base with a green main rebases and is not blamed",
+    "A fixture lane on a red base with a red main parks with its continuation and the loop emits main-red",
+    "A fix lands while the stop holds and the stop then releases",
+    "Past the bound the stop escalates with its cause and resume condition"
+  ],
+  "created_at": "2026-11-09T22:26:02Z",
+  "files": [
+    "go/internal/phases/ship/repocontract.go",
+    "go/internal/core/build_floor_reviewer.go"
+  ],
+  "fix": "When a gate rejects a lane (build floor repo-contract checks, audit CI-parity, ship), rerun the red tests on the lane base. Red on base and green main: rebase the lane onto main and rerun. Red on base and red main: park the lane with its continuation and signal main-red. While main is red, both landing paths land only a fix (turns a red gate green, none red). A policy bound (default 120 minutes) escalates through ADR-0155. Design review before build.",
+  "id": "gate-contract-g4-base-red-attribution",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "console, 2026-11-10, ADR-0165 plan component",
+  "summary": "Component G4 of docs/plans/gate-contract-2026-11.md (ADR-0165 decisions 10-14; spec section 4). On 2026-11-09 cycles 2240, 2242 and 2249 failed on a red that their base held, 513 LLM minutes; 333 of them at the build floor of 2242. Main was red for hours with no loop signal.",
+  "title": "Gate contract G4: base-red attribution at build, audit and ship, and a main-red stop",
+  "weight": 0.9
+}

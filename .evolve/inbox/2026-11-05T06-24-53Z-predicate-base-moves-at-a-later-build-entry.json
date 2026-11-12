@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "A journey test: a predicate edit by a lane in an earlier Build does not support a later blocker claim",
+    "A TDD dispatch that legitimately adds a predicate still moves the base"
+  ],
+  "created_at": "2026-11-05T06:24:53Z",
+  "files": [
+    "go/internal/core/predicate_snapshot.go",
+    "go/internal/core/blocker_proof.go"
+  ],
+  "fix": "Design first. Decide if only a TDD dispatch may move the base.",
+  "id": "predicate-base-moves-at-a-later-build-entry",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "summary": "Review of the B3 design card, 2026-11-05. For a resume from an earlier phase or a re-entry to Build, the seal takes the current tree as the base. A probe: resume at Scout, a predicate edited before the resume, no snapshot, gives blocked-needs-console after 1 dispatch. verifyPredicateConflictClaim reads guard bodies from that base, so a lane edit in an earlier Build can support a later conflict claim (traced, not probed). The fresh path has this shape today.",
+  "title": "A later Build entry seals the tree of that entry as the predicate base, so an earlier edit becomes the base",
+  "weight": 0.5
+}

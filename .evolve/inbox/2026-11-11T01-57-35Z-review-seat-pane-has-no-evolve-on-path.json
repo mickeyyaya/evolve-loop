@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "A test of the agent run launch environment finds the evolve binary directory on PATH, and the test is red without the fix",
+    "A live evolve agent run code-reviewer seat runs evolve code find and reports its output"
+  ],
+  "created_at": "2026-11-11T01:57:35Z",
+  "deps": [],
+  "files": [
+    "go/internal/agentcmd/",
+    "go/internal/bridge/driver_common.go"
+  ],
+  "fix": "Put the runtime evolve binary on the PATH of each agent run seat through the hermetic environment allowlist (manifest data), not through the inherited environment.",
+  "id": "review-seat-pane-has-no-evolve-on-path",
+  "kind": "bug",
+  "notes": "Evidence: the review JSON reports under the console scratchpad; for example agent-architecture-reviewer-20261110T234659Z-718d says 'The evolve binary is not on the PATH of this pane'.",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "routed_at": "2026-11-11T02:20:51Z",
+  "routed_cycle": 2291,
+  "routed_reason": "lane triage (cycle 2291) dropped: protected-surface: go/internal/bridge/hermetic_env.go",
+  "source": "console, 2026-11-11",
+  "summary": "27 review reports of evolve agent run (architecture-reviewer, code-reviewer, docs-review) say that the evolve binary is not on the PATH of the pane, so evolve agent capabilities and evolve code do not run inside the seat. The reviewers fall back to grep and skip the evolve checks that the persona names.",
+  "title": "Review seats run without evolve on the PATH of their pane",
+  "weight": 0.5
+}
