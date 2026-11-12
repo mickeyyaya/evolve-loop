@@ -124,7 +124,8 @@
     "min_lanes": 4,
     "orchestrator": {
       "stage": "enforce",
-      "admission": "enforce"
+      "admission": "enforce",
+      "run_max_lanes": 4
     }
   },
   "floor": [
