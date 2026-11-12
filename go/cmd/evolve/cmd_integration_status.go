@@ -234,8 +234,8 @@ func statusVerb(env integrationEnv, args []string, stdout, stderr io.Writer) int
 		fmt.Fprintf(stderr, "%s%v\n%s\n", integrationPrefix, err, integrationStatusUsage)
 		return exitUsage
 	}
-	root := paths.AbsoluteRoot("--project-root", chooseRoot(rootFlag, env.ProjectRootEnv, env.Root), nil)
-	if rc := checkRootDir("integration status", root, stderr); rc != 0 {
+	root, rc := env.projectRoot("integration status", rootFlag, stderr)
+	if rc != 0 {
 		return rc
 	}
 	store := integration.FileWaveStore{Root: root}

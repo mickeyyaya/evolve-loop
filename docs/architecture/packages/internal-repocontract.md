@@ -76,3 +76,9 @@ A test that runs the pack and compares `git status --porcelain --ignored` before
 - **A root carried in a struct field**, and a root passed through a function in another package.
 - **A relative path**, whether a literal such as `os.WriteFile("out.json", …)` or `filepath.Abs(".")`, which lands in the package directory: the scan treats relative paths as unknown, because a test may have changed its working directory first.
 - **A symlink alias.** A temp directory holding a symlink to the real tree, such as the temp worktree whose `go/` links to the real module in `core`'s regeneration test, is a temp path to the scan; a write through the link lands in the real tree. That test writes only `docs/architecture/control-flags.md` under the temp root, never under the link.
+
+## Gate contract
+
+- `Packages()` is the union of the pack patterns that a registry entry covers and the debt set `gateregistry.Unregistered()`. See [internal-gateregistry.md](internal-gateregistry.md) and [gate-contract.md](../gate-contract.md) section 6.5.
+- `TreeReadingTests()` names the two `gateregistry` tests that read the real tree. The pack stays at 15 patterns.
+- `repocontract.go` and `phases/ship/repocontract.go` are on the protected surface. They select the tests that the ship gate runs.

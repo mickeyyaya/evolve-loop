@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -24,7 +23,7 @@ func (cr *cycleRun) checkpointInterruptedPhase(cause error) {
 	if cr.ctx.Err() == nil || cr.cycleCompletedNormally || ResumeBoundaryCheckpointer == nil {
 		return
 	}
-	if errors.Is(cause, ErrAllFamiliesExhausted) {
+	if isParked(cause) {
 		return
 	}
 	if err := ResumeBoundaryCheckpointer(cr.cs, cr.req.ProjectRoot, cr.o.now()); err != nil {
@@ -33,7 +32,7 @@ func (cr *cycleRun) checkpointInterruptedPhase(cause error) {
 }
 
 func (cr *cycleRun) abnormalEpilogue(cause error) {
-	if cr.cycleCompletedNormally || errors.Is(cause, ErrAllFamiliesExhausted) {
+	if cr.cycleCompletedNormally || isParked(cause) {
 		return
 	}
 	if cr.ctx != nil && cr.ctx.Err() != nil {

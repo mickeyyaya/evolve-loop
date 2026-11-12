@@ -68,7 +68,10 @@ func (a *auditClassification) applyCIGate(
 		return
 	}
 	offenders, err := check(a.req)
+	var notice gateWarning
 	switch {
+	case errors.As(err, &notice):
+		a.warn(name + ": " + notice.Error())
 	case err != nil:
 		a.warn(fmt.Sprintf("%s skipped (could not run): %s", name, err.Error()))
 	case len(offenders) > 0:

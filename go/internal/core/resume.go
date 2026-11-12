@@ -93,6 +93,7 @@ func (e noPerRunCandidates) summary() string {
 
 var resumableReasons = map[string]bool{
 	laneQuotaReason:      true,
+	MainRedReason:        true,
 	"batch-cap-near":     true,
 	"operator-requested": true,
 	"stall-inactivity":   true,

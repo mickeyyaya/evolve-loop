@@ -61,7 +61,7 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 	r.closeout = timingOwner
 	defer o.releaseShipWindow()
 	defer func() {
-		if completed || errors.Is(retErr, ErrAllFamiliesExhausted) || ctx.Err() != nil {
+		if completed || isParked(retErr) || ctx.Err() != nil {
 			return
 		}
 		result.FinalVerdict = VerdictFAIL

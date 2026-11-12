@@ -21,7 +21,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-const minStatements = 2
+const (
+	minStatements   = 2
+	BaselineRelPath = ".test-dup-baseline"
+)
 
 type Group struct {
 	Body  string
@@ -222,7 +225,7 @@ func Check(report Report, baseline Baseline) error {
 		}
 		return fmt.Errorf("testdup: %d copies of equal helper bodies, above the baseline %d; use the standard library or one shared helper instead of a new copy:\n%s", report.Copies, baseline.Count, strings.Join(sites, "\n"))
 	case report.Copies < baseline.Count:
-		return fmt.Errorf("testdup: %d copies, below the baseline %d; lower go/.test-dup-baseline to %d in the same commit", report.Copies, baseline.Count, report.Copies)
+		return fmt.Errorf("testdup: %d copies, below the baseline %d; lower go/%s to %d in the same commit", report.Copies, baseline.Count, BaselineRelPath, report.Copies)
 	}
 	return nil
 }
