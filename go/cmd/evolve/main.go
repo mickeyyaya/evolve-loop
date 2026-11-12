@@ -21,7 +21,7 @@ Commands:
   uninstall  Remove the manually-installed agents + loop skill from
               ~/.claude ( uninstall [--ci] ); --ci is a dry-run
   guard      Run a trust-kernel guard ( guard <name> [--evolve-dir DIR] )
-              Guards: ship | phase | role | docdelete | quota | chain
+              Guards: ship | phase | role | docdelete | chain | triage-floors
   ledger     Verify or tail the ledger ( ledger verify | ledger tail [--n N] )
   dossier    Read, verify, and audit cycle dossiers
               ( dossier verify | dossier retro-mislabel [--project-root P] [--json] )
