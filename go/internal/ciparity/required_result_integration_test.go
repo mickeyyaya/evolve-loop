@@ -19,6 +19,7 @@ func TestRequiredResult_RejectsMissingOrUnsuccessfulWork(t *testing.T) {
 		"GO_REQUIRED": "${{ needs.changes.outputs.go }}", "GO_RESULT": "${{ needs.go.result }}",
 		"LANDING_REQUIRED": "${{ needs.changes.outputs.landing }}", "LANDING_RESULT": "${{ needs.landing.result }}",
 		"INBOX_REQUIRED": "${{ needs.changes.outputs.inbox }}", "INBOX_RESULT": "${{ needs.inbox.result }}",
+		"LINT_RESULT": "${{ needs.golangci-lint.result }}",
 	}
 	for key, want := range bindings {
 		if step.Env[key] != want {
@@ -58,9 +59,12 @@ func TestRequiredResult_RejectsMissingOrUnsuccessfulWork(t *testing.T) {
 		{"inbox_unselected_but_failed", map[string]string{"INBOX_RESULT": "failure"}, false},
 		{"inbox_unselected_but_cancelled", map[string]string{"INBOX_RESULT": "cancelled"}, false},
 		{"inbox_route_unknown", map[string]string{"INBOX_REQUIRED": "TRUE", "INBOX_RESULT": "success"}, false},
+		{"lint_ran_without_the_go_route", map[string]string{"GO_REQUIRED": "false", "GO_RESULT": "skipped", "GO_SUITE_RESULT": "", "LINT_RESULT": "success"}, false},
+		{"lint_unselected_but_failed", map[string]string{"GO_REQUIRED": "false", "GO_RESULT": "skipped", "GO_SUITE_RESULT": "", "LINT_RESULT": "failure"}, false},
+		{"lint_unselected_but_cancelled", map[string]string{"GO_REQUIRED": "false", "GO_RESULT": "skipped", "GO_SUITE_RESULT": "", "LINT_RESULT": "cancelled"}, false},
 		{"route_failed_docs_outputs", map[string]string{"ROUTE_RESULT": "failure", "GO_REQUIRED": "false", "GO_RESULT": "skipped", "GO_SUITE_RESULT": "", "LANDING_REQUIRED": "false", "LANDING_RESULT": "skipped", "LANDING_SUITE_RESULT": ""}, false},
 	}
-	for _, dependency := range []string{"ROUTE_RESULT", "VALIDATE_RESULT", "GO_RESULT", "LANDING_RESULT", "PLUGIN_RESULT", "ACS_RESULT", "GO_SUITE_RESULT", "LANDING_SUITE_RESULT", "STE_LINT_RESULT", "DOCS_ONLY", "DOCS_REQUIRED"} {
+	for _, dependency := range []string{"ROUTE_RESULT", "VALIDATE_RESULT", "GO_RESULT", "LANDING_RESULT", "PLUGIN_RESULT", "ACS_RESULT", "GO_SUITE_RESULT", "LANDING_SUITE_RESULT", "STE_LINT_RESULT", "LINT_RESULT", "DOCS_ONLY", "DOCS_REQUIRED"} {
 		for _, result := range []string{"failure", "cancelled", "skipped", "", "neutral", "pending"} {
 			if dependency == "STE_LINT_RESULT" && result == "skipped" {
 				continue
@@ -78,16 +82,30 @@ func TestRequiredResult_RejectsMissingOrUnsuccessfulWork(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			env := map[string]string{"INBOX_REQUIRED": "false", "INBOX_RESULT": "skipped", "DOCS_ONLY": "false", "DOCS_REQUIRED": "false", "STE_LINT_RESULT": "skipped", "ROUTE_RESULT": "success", "VALIDATE_RESULT": "success", "GO_REQUIRED": "true", "GO_RESULT": "success", "LANDING_REQUIRED": "true", "LANDING_RESULT": "success", "PLUGIN_RESULT": "success", "ACS_RESULT": "success", "GO_SUITE_RESULT": "success", "LANDING_SUITE_RESULT": "success"}
-			for key, value := range tc.set {
-				env[key] = value
-			}
-			out, err := runWorkflowShell(t, t.TempDir(), step.Run, env)
+			out, err := runWorkflowShell(t, t.TempDir(), step.Run, requiredResultEnv(tc.set))
 			if (err == nil) != tc.pass {
 				t.Fatalf("pass=%v want %v; %v\n%s", err == nil, tc.pass, err, out)
 			}
 		})
 	}
+}
+
+func requiredResultEnv(set map[string]string) map[string]string {
+	env := map[string]string{"INBOX_REQUIRED": "false", "INBOX_RESULT": "skipped", "DOCS_ONLY": "false", "DOCS_REQUIRED": "false", "STE_LINT_RESULT": "skipped", "ROUTE_RESULT": "success", "VALIDATE_RESULT": "success", "GO_REQUIRED": "true", "GO_RESULT": "success", "LANDING_REQUIRED": "true", "LANDING_RESULT": "success", "PLUGIN_RESULT": "success", "ACS_RESULT": "success", "GO_SUITE_RESULT": "success", "LANDING_SUITE_RESULT": "success"}
+	for key, value := range set {
+		env[key] = value
+	}
+	if _, isSet := set["LINT_RESULT"]; !isSet {
+		env["LINT_RESULT"] = lintResultOnRoute(env["GO_REQUIRED"])
+	}
+	return env
+}
+
+func lintResultOnRoute(goRequired string) string {
+	if goRequired == "true" {
+		return "success"
+	}
+	return "skipped"
 }
 
 func docsOnlyResult(set map[string]string) map[string]string {
