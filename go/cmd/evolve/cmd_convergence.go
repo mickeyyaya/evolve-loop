@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	convergenceUsage     = "usage: evolve convergence decide --input <rounds.json> [--json] | evolve convergence metrics [--json] <rounds.json>..."
+	convergenceUsage     = "usage: evolve convergence decide --input <rounds.json> [--json] | evolve convergence metrics [--json] <rounds.json> [<rounds.json>...]"
 	exitConvergenceBad   = 10
 	exitConvergenceRead  = 2
 	exitConvergenceWrite = 1
