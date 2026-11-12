@@ -15,6 +15,13 @@ import (
 
 var DefaultTags = []string{"integration"}
 
+func TagFlags(tags []string) []string {
+	if len(tags) == 0 {
+		return nil
+	}
+	return []string{"-tags", strings.Join(tags, ",")}
+}
+
 type Options struct {
 	Base     string
 	Profile  string

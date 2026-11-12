@@ -468,7 +468,7 @@ func runFixedPack(ctx context.Context, out packLog, gate, root, baseRef, workspa
 		repoContractTestTimeout,
 		strings.Join(repoContractPackages, " "), moduleDir, baseRef)
 	fmt.Fprintf(out, "[ship] repo-contract tree-reading tests by name: go %s\n", strings.Join(repoContractSelectionArgs(repoContractSelections), " "))
-	return runClassifiedPack(ctx, out, workspace, "scanner pack", func() packOutcome {
+	return runClassifiedPack(ctx, out, workspace, scannerPackName, func() packOutcome {
 		return repoContractTestFn(ctx, moduleDir, out)
 	})
 }
@@ -526,7 +526,7 @@ func runClassifiedPackRetrying(ctx context.Context, out io.Writer, workspace, na
 		if cleared {
 			return nil
 		}
-		return contractRed(name, verdict)
+		return contractVerdict(ctx, out, name, verdict)
 	}
 	if !retry {
 		return shiperr.NewShipError(shiperr.CodeRepoContractInfra, shiperr.ShipClassPrecondition, shiperr.StageAtomicShip,
@@ -544,7 +544,7 @@ func runClassifiedPackRetrying(ctx context.Context, out io.Writer, workspace, na
 		}
 		return nil
 	case second.realRed():
-		return contractRed(name, second)
+		return contractVerdict(ctx, out, name, second)
 	}
 	return shiperr.NewShipError(shiperr.CodeRepoContractInfra, shiperr.ShipClassPrecondition, shiperr.StageAtomicShip,
 		fmt.Sprintf("repo-contract %s exited nonzero TWICE with no test-level failure (attempt 1: %v; attempt 2: %v) — INFRA fault, not a contract violation; safe to re-dispatch. Scanner output: %s",
@@ -596,7 +596,7 @@ func clearedAlone(out io.Writer, name string, first packOutcome, alone *aloneRer
 func contractRed(packName string, o packOutcome) error {
 	detail := packName
 	switch packName {
-	case "scanner pack":
+	case scannerPackName:
 		detail = "fixed scanner pack (" + strings.Join(repoContractSuiteNames(), ", ") + ")"
 	case "importer backstop":
 		detail = "importer backstop (the packages that import what this ship changes)"

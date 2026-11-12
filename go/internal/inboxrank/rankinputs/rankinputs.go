@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxrank"
+	"github.com/mickeyyaya/evolve-loop/go/internal/mainstop"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recurrence"
@@ -21,6 +22,13 @@ func Load(evolveDir string, now time.Time) (inboxrank.Inputs, []string) {
 		warnings = append(warnings, fmt.Sprintf("policy unreadable (%v); ranking with the compiled inbox_priority default", err))
 	}
 	in := inboxrank.Inputs{Config: pol.InboxPriorityConfig(), Now: now}
+	stop, _, err := mainstop.Read(evolveDir)
+	if err != nil {
+		warnings = append(warnings, fmt.Sprintf("main-red stop unreadable (%v); no item leads the rank", err))
+	}
+	if stop.Holds() {
+		in.Lead = []string{stop.FixItem}
+	}
 	ledger, err := recurrence.ReadSnapshot(filepath.Join(evolveDir, ledgerFile))
 	if err != nil {
 		return in, append(warnings, fmt.Sprintf("recurrence ledger unreadable (%v); the recurrence factor is 0 for every item", err))

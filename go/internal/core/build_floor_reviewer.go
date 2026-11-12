@@ -12,6 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/apicover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
+	"github.com/mickeyyaya/evolve-loop/go/internal/covchanged"
 	"github.com/mickeyyaya/evolve-loop/go/internal/coversplit"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchevents"
 	"github.com/mickeyyaya/evolve-loop/go/internal/docsfloor"
@@ -133,6 +134,7 @@ func changedPackageFloorChecks(ctx context.Context, in ReviewInput, paths []stri
 	fails := in.retakeSelfCheckFailures(runBuildSelfCheck(ctx, moduleDir, plain, buildSelfCheckRunner), func(pkg string) (string, bool) {
 		return buildSelfCheckRunner(ctx, moduleDir, pkg)
 	})
+	fails = in.laneFailures(ctx, fails)
 	namingFails := apicoverNamingFailures(ctx, in, moduleDir, enforced, paths)
 	removeBuildSelfCheckArtifact(in.Worktree)
 	if len(fails) > 0 {
@@ -294,9 +296,7 @@ var coverLockWait = verifylock.MaxWait
 
 func coverTestArgs(profile string, pkgs, tags []string) []string {
 	args := []string{"test", "-count=1", "-timeout", addedtests.PackageTimeout}
-	if len(tags) > 0 {
-		args = append(args, "-tags", strings.Join(tags, ","))
-	}
+	args = append(args, covchanged.TagFlags(tags)...)
 	return lanebudget.Args(append(append(args, "-coverprofile", profile), pkgs...))
 }
 
