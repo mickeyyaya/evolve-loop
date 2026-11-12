@@ -1,6 +1,7 @@
 package testdup
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -17,7 +18,7 @@ func TestAPICover_NamesEveryExportedSymbol(t *testing.T) {
 	}
 	var group Group
 	report = Report{Copies: report.Copies, Groups: append(report.Groups, group)}
-	if err := Check(report, baseline); err == nil {
-		t.Error("Check passed at 0 copies against a baseline of 1")
+	if err := Check(report, baseline); err == nil || !strings.Contains(err.Error(), "lower go/"+BaselineRelPath+" to 0") {
+		t.Errorf("Check at 0 copies against a baseline of 1 = %v, want an error that names go/%s", err, BaselineRelPath)
 	}
 }

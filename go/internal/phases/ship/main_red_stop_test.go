@@ -16,6 +16,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxfile"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover/lifecycle"
+	evolog "github.com/mickeyyaya/evolve-loop/go/internal/log"
 	"github.com/mickeyyaya/evolve-loop/go/internal/mainstop"
 	"github.com/mickeyyaya/evolve-loop/go/internal/selfheal"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
@@ -448,7 +449,7 @@ func TestReleaseMainRedStop_AFixItemThatCannotMoveMakesTheReleaseAWarning(t *tes
 				t.Fatalf("err = %v, holds = %v, want the stop released and an error that names the fix item", err, l.stop(t).Holds())
 			}
 			got := l.emitted(core.CodeMainRedStopReleased)
-			if len(got) != 1 || got[0].Severity != signalcenter.SeverityWarn || got[0].Fields["fix_item_error"] != err.Error() {
+			if len(got) != 1 || got[0].Severity != signalcenter.SeverityWarn || got[0].Fields["fix_item_error"] != evolog.SanitizeField(err.Error()) {
 				t.Errorf("signals = %+v, want one warn release with fix_item_error", got)
 			}
 			if moved := len(l.emitted(lifecycle.CodePromoteMoveFailed)); moved != c.moveSignals {
