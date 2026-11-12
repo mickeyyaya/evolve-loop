@@ -68,7 +68,7 @@ func TestResumableReasons_ListsEveryReasonIsResumableReasonAccepts(t *testing.T)
 	t.Parallel()
 
 	got := ResumableReasons()
-	want := []string{"batch-cap-near", "operator-requested", "quota-likely", "stall-inactivity"}
+	want := []string{"batch-cap-near", "main-red", "operator-requested", "quota-likely", "stall-inactivity"}
 	if len(got) != len(want) {
 		t.Fatalf("ResumableReasons() = %v, want %v", got, want)
 	}

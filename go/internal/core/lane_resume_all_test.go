@@ -32,9 +32,9 @@ func TestPausedLaneScopes_ListsEachQuotaPausedScopeSortedByCycle(t *testing.T) {
 	}
 
 	want := []PausedScope{
-		{Cycle: 7, Scope: []string{"item-a"}, Phase: "build", StatePath: pathA, AutoMaxAttempts: 3},
-		{Cycle: 9, Scope: []string{"item-c", "item-d"}, Phase: "build", StatePath: pathC, AutoMaxAttempts: 3},
-		{Cycle: 12, Scope: []string{"item-b"}, Phase: "build", StatePath: pathB, AutoMaxAttempts: 3},
+		{Cycle: 7, Scope: []string{"item-a"}, Phase: "build", StatePath: pathA, AutoMaxAttempts: 3, Reason: laneQuotaReason},
+		{Cycle: 9, Scope: []string{"item-c", "item-d"}, Phase: "build", StatePath: pathC, AutoMaxAttempts: 3, Reason: laneQuotaReason},
+		{Cycle: 12, Scope: []string{"item-b"}, Phase: "build", StatePath: pathB, AutoMaxAttempts: 3, Reason: laneQuotaReason},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("PausedLaneScopes = %+v, want %+v", got, want)
@@ -54,7 +54,7 @@ func TestPausedLaneScopes_KeepsOnlyTheNewestAttemptOfEachScope(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := []PausedScope{{Cycle: 6, Scope: []string{"item-a"}, Phase: "build", StatePath: path, AutoMaxAttempts: 3}}
+	want := []PausedScope{{Cycle: 6, Scope: []string{"item-a"}, Phase: "build", StatePath: path, AutoMaxAttempts: 3, Reason: laneQuotaReason}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("PausedLaneScopes = %+v, want %+v", got, want)
 	}

@@ -21,7 +21,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-const minStatements = 2
+const (
+	minStatements   = 2
+	BaselineRelPath = ".test-dup-baseline"
+)
 
 type Group struct {
 	Body  string

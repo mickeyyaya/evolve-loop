@@ -15,6 +15,7 @@ type PausedScope struct {
 	AutoAttempts    int
 	AutoMaxAttempts int
 	QuotaResetAt    string
+	Reason          string
 }
 
 func PausedLaneScopes(projectRoot, evolveDir string, opts ResumeOptions) ([]PausedScope, error) {
@@ -31,7 +32,7 @@ func PausedLaneScopes(projectRoot, evolveDir string, opts ResumeOptions) ([]Paus
 	for key, last := range newestPerScope(states) {
 		if rp, ok := laneResumable(last, ships, projectRoot, opts); ok {
 			paused = append(paused, PausedScope{Cycle: rp.CycleID, Scope: strings.Split(key, ","), Phase: rp.Phase, StatePath: rp.StatePath,
-				AutoAttempts: rp.AutoAttempts, AutoMaxAttempts: rp.AutoMaxAttempts, QuotaResetAt: rp.QuotaResetAt})
+				AutoAttempts: rp.AutoAttempts, AutoMaxAttempts: rp.AutoMaxAttempts, QuotaResetAt: rp.QuotaResetAt, Reason: rp.Reason})
 		}
 	}
 	slices.SortFunc(paused, func(a, b PausedScope) int { return a.Cycle - b.Cycle })

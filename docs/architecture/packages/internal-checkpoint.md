@@ -6,7 +6,9 @@
 
 ## Design
 
-- **Reasons.** A checkpoint carries one reason. Four are escalation reasons: quota-likely, batch-cap-near, operator-requested and stall-inactivity. The fifth, phase-complete, is the lowest priority, and it marks each phase boundary.
+- **Reasons.** A checkpoint carries one reason. Five are escalation reasons: quota-likely, batch-cap-near, operator-requested, stall-inactivity and main-red. The sixth, phase-complete, is the lowest priority, and it marks each phase boundary.
+- **One list.** `reasons` is the one list of the valid reasons. `IsValid` and the refusal text of `ComposeChecked` read it. Pinned by `TestComposeChecked_TheRefusalNamesEachValidReason`.
+- **The main-red reason.** `ReasonMainRed` is `core.MainRedReason`, so the reason has one home. `init` sets `core.MainRedBoundaryCheckpointer`, which writes the checkpoint of a cycle that ship parked on a red `main`. Pinned by `TestMainRedCheckpointer_WritesAnEscalationCheckpointThatAPhaseBoundaryKeeps`.
 - **Compose is pure.** `Compose` builds the block without I/O. `ComposeChecked` validates the reason, for callers whose reason comes from outside. `ComposeWithIntegrity` also carries the recorded integrity chain, so a phase-complete write does not drop it. `Compose` alone stays integrity-free for back-compat.
 - **Escalation is not overwritten.** The phase-boundary hook never replaces an escalation checkpoint. The escalation survives until its consumer reads it.
 - **One lock for the file.** `ApplyToStateFile` and `RecordPhaseIntegrity` run under `flock.WithPathLock` on the cycle-state file. This is the same lock that `storage.WriteCycleState` takes, so a phase write and a checkpoint write cannot revert each other. The escalation check is lock-free, and the caller must hold the lock before calling it. Otherwise the check and the write straddle the lock, and a peer's escalation can be lost.

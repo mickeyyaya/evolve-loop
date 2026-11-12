@@ -377,6 +377,7 @@ func TestRecordFailureLearning_GateOrderIsNilCtxCarrierQuota(t *testing.T) {
 		{"nil result: nothing recorded, no carrier", context.Background(), exhausted, true, nil, 0, ""},
 		{"canceled ctx beats the carrier and the quota line", canceled(), twice, false, nil, 0, ""},
 		{"quota: carrier written, nothing recorded, the DEFERRED line", context.Background(), twice, false, []string{twice.Error()}, 0, "skipping failure learning (DEFERRED, resumable)"},
+		{"main-red park: carrier written, nothing recorded, the park line", context.Background(), fmt.Errorf("phase ship: %w", parkError()), false, []string{fmt.Errorf("phase ship: %w", parkError()).Error()}, 0, "ship parked the lane on a red main; skipping failure learning (DEFERRED, resumable)"},
 		{"ordinary ship error: carrier written and recorded", context.Background(), errors.New("ship: push refused"), false, []string{"ship: push refused"}, 1, ""},
 	}
 	for _, tc := range cases {
@@ -498,7 +499,8 @@ func TestFailureLearningGate_IsPureAndOrdered(t *testing.T) {
 		{"nil Result", context.Background(), func(fl *failureLearningRequest) { fl.Result = nil }, gateIncomplete},
 		{"nil Timings", context.Background(), func(fl *failureLearningRequest) { fl.Timings = nil }, gateIncomplete},
 		{"canceled ctx beats the quota sentinel", canceled, func(fl *failureLearningRequest) { fl.Err = exhausted }, gateCanceled},
-		{"wrapped quota sentinel", context.Background(), func(fl *failureLearningRequest) { fl.Err = exhausted }, gateQuotaDeferred},
+		{"wrapped quota sentinel", context.Background(), func(fl *failureLearningRequest) { fl.Err = exhausted }, gateParkDeferred},
+		{"a main-red park", context.Background(), func(fl *failureLearningRequest) { fl.Err = fmt.Errorf("phase ship: %w", parkError()) }, gateParkDeferred},
 		{"doc missing learns", context.Background(), func(fl *failureLearningRequest) { fl.Err = fmt.Errorf("x: %w", ErrAgentDocMissing) }, gateLearn},
 		{"a plain error learns", context.Background(), func(*failureLearningRequest) {}, gateLearn},
 	}

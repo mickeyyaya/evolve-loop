@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"slices"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
+	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -151,20 +151,13 @@ func (in ReviewInput) emitFloorRetake(label string, tests []string, shape floorR
 func goTestFailureLines(output string) (lines, tests []string) {
 	for _, ln := range strings.Split(output, "\n") {
 		ln = strings.TrimSpace(ln)
-		if name, ok := strings.CutPrefix(ln, "--- FAIL: "); ok {
+		if strings.HasPrefix(ln, "--- FAIL: ") {
 			lines = append(lines, ln)
-			top, _, _ := strings.Cut(name, " ")
-			top, _, _ = strings.Cut(top, "/")
-			if top != "" && !slices.Contains(tests, top) {
-				tests = append(tests, top)
-			}
-			continue
-		}
-		if f := strings.Fields(ln); len(f) >= 2 && f[0] == "FAIL" {
+		} else if f := strings.Fields(ln); len(f) >= 2 && f[0] == "FAIL" {
 			lines = append(lines, ln)
 		}
 	}
-	return lines, tests
+	return lines, baseattr.FailedTests(output)
 }
 
 func coverRetakeResult(first, out string, status int) (string, int) {
