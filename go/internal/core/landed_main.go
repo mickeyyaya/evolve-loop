@@ -59,11 +59,11 @@ func provenAhead(ctx context.Context, git gitFn, dir, remote, sha string, parent
 		return false, fmt.Errorf("diff-tree %s: rc=%d: %v", sha, code, err)
 	}
 	paths := strings.Split(strings.TrimRight(out, "\x00"), "\x00")
-	return !slices.ContainsFunc(paths, notBoundaryOwned), nil
+	return !slices.ContainsFunc(paths, func(path string) bool { return !BoundaryOwned(path) }), nil
 }
 
-func notBoundaryOwned(path string) bool {
-	return !slices.ContainsFunc(boundaryOwnedPrefixes, func(prefix string) bool { return strings.HasPrefix(path, prefix) })
+func BoundaryOwned(path string) bool {
+	return slices.ContainsFunc(boundaryOwnedPrefixes, func(prefix string) bool { return strings.HasPrefix(path, prefix) })
 }
 
 func shortSHAs(shas []string) string {

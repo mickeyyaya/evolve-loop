@@ -219,3 +219,9 @@ func TestCommitmentAccessors_NamedAndExercised(t *testing.T) {
 		t.Error("a nil receiver must report no commitment, not panic")
 	}
 }
+
+func TestHome_Named(t *testing.T) {
+	if Home != "knowledge-base/cycles" {
+		t.Errorf("Home = %q, want knowledge-base/cycles", Home)
+	}
+}

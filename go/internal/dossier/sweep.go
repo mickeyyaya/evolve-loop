@@ -14,7 +14,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
-const dossierDir = "knowledge-base/cycles"
+const (
+	Home       = "knowledge-base/cycles"
+	dossierDir = Home
+)
 
 var orphanPair = regexp.MustCompile(`(^|/)cycle-(\d+)\.(json|md)$`)
 
