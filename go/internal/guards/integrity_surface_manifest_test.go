@@ -281,3 +281,14 @@ func TestProtectedSurfaceManifest_CoversTheDiagnosisSchemaAndTheProposeVerb(t *t
 		}
 	}
 }
+
+func TestProtectedSurfaceManifest_EachFragmentHasOneRow(t *testing.T) {
+	t.Parallel()
+	seen := map[string]int{}
+	for i, e := range ProtectedSurfaceManifest {
+		if first, dup := seen[e.Fragment]; dup {
+			t.Errorf("fragment %q has rows %d and %d; one fragment has one row, so its class and rationale have one home", e.Fragment, first, i)
+		}
+		seen[e.Fragment] = i
+	}
+}

@@ -78,6 +78,7 @@ type Gates struct {
 	now        func() time.Time
 	sleep      func(time.Duration)
 	signals    func() *signalcenter.Center
+	attribute  Attribution
 }
 
 type Option func(*Gates)

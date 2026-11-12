@@ -24,5 +24,5 @@
 == invalid_item_then_quota_defer_no_block
 [chain] skipping .evolve/inbox/typo-item.json — not a valid inbox item (no parseable object with an `id`); it is NOT counted as pending work
 [chain] batch 1/5 starting — inbox pending=1, fleet lanes=1
-[chain] batch 1 ended at a wall (no checkpoint block on disk, so no cause was recorded) — DEFERRING, not relaunching
+[chain] batch 1 ended in a pause (no checkpoint block on disk, so no cause was recorded) — DEFERRING, not relaunching
 [chain]   the checkpoint is intact; next: evolve loop --resume.

@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -25,6 +26,8 @@ type ReviewInput struct {
 	Stderr         io.Writer
 	Signals        *signalcenter.Center
 	residuals      *floorResidualLog
+	baseRun        baseattr.Runner
+	MainRedStop    MainRedSink
 }
 
 func (in ReviewInput) errOut() io.Writer {

@@ -38,6 +38,7 @@ const (
 	swapsRandRead                   = "test swaps package variable randRead"
 	swapsResumeBoundaryCheckpointer = "test swaps package variable ResumeBoundaryCheckpointer"
 	swapsGitRunner                  = "test swaps package variable gitRunner"
+	swapsMainRedCheckpointer        = "test swaps package variable MainRedBoundaryCheckpointer"
 	swapsIdentityPatchID            = "test swaps package variable identityPatchID"
 	swapsNextCorrection             = "test swaps package variable nextCorrection"
 	swapsOsArgs                     = "test swaps os.Args"
@@ -54,6 +55,19 @@ const (
 )
 
 var serialRequiredTests = map[string]string{
+	"core.TestCheckpointInterruptedPhase_AMainRedParkKeepsItsCheckpoint":                            swapsResumeBoundaryCheckpointer,
+	"core.TestParkOnMainRed_AFailedCheckpointIsAnIncidentAndTheStopRowIsStillWritten":               swapsMainRedCheckpointer,
+	"core.TestParkOnMainRed_OpensTheStopAndFilesTheFixItemBeforeItAddsTheParkedRow":                 swapsMainRedCheckpointer,
+	"core.TestParkOnMainRed_AFixItemThatCannotBeFiledMakesTheParkAnIncident":                        swapsMainRedCheckpointer,
+	"core.TestParkOnMainRed_AFailedStopWriteIsAnIncident":                                           swapsMainRedCheckpointer,
+	"core.TestParkOnMainRed_AWholeParkIsAWarningAndPrintsNothing":                                   swapsMainRedCheckpointer,
+	"core.TestParkOnMainRed_TwoFailedWritesGiveAOneLineIncident":                                    swapsMainRedCheckpointer,
+	"core.TestRunCycle_AFirstShipThatParksOnARedMainIsNotAFailedCycle":                              swapsMainRedCheckpointer,
+	"core.TestResumeExecution_AShipThatParksOnARedMainIsNotAFailedCycle":                            swapsMainRedCheckpointer,
+	"core_test.TestRecoverShipError_AParkOnAnUnjudgedMainOpensNoStopAndStaysResumable":              setsEnv,
+	"core_test.TestRecoverShipError_ASecondParkRefreshesTheStopAndKeepsItsOpenTime":                 setsEnv,
+	"core_test.TestRecoverShipError_MainRedParkWritesAMainRedCheckpointAndAStopRow":                 setsEnv,
+	"core.TestUnitAndCoverFloors_SubtractOnlyKeysRedOnTheBase":                                      swapsBuildSelfCheckRunner,
 	"core.TestShipJourney_AFailedContinueAfterAResolveKeepsTheAuditedCommit":                        swapsGitOnPath,
 	"core.TestShipJourney_AFailedStageReadIsNotTheLaneDeletingTheItem":                              swapsGitOnPath,
 	"core.TestReauditCycle_MovedBaseRebasesAuditsAndRecordsTheBinding":                              swapsReauditRebase,

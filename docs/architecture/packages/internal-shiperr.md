@@ -20,6 +20,7 @@
 - Each wire string is exact, because ledger entries and the debugger key off it. Pinned by `TestVocabularyWireStrings`.
 - The codes that a router must tell apart do not collapse into one value. Pinned by `TestCodeRepoContractInfra_Vocab`, `TestCodeRepoContractGate_Vocab`, `TestCodeManifestGate_DistinctFromEntireVocabulary` and `TestManifestGateCode_WireStringAndDistinctness`.
 - A `ShipError` survives wrapping and renders one stable line. Pinned by `TestAsShipError` and `TestNewShipError_Error`.
+- `ErrMainRedParked` is the sentinel of a parked lane. `ShipError.Is` matches it only for the code `MAIN_RED_PARK`, so `errors.Is` finds a park through each wrap. Pinned by `TestShipError_OnlyTheParkCodeIsErrMainRedParked`.
 - An odd debug key is kept with an empty value. Pinned by `TestNewShipError_OddKV`.
 - The debug string is deterministic. Pinned by `TestDebugString_Sorted`.
 - Every declared code has a signal doc, and every declared class has a severity row. Pinned by `signalcodes_test.go`.

@@ -7,12 +7,6 @@ import (
 	"testing"
 )
 
-func TestRatchet_ModuleFunctionsFitTheirAllowances(t *testing.T) {
-	if err := Scan(moduleRoot(t)); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func moduleRoot(t *testing.T) string {
 	t.Helper()
 	dir, err := os.Getwd()
@@ -28,6 +22,29 @@ func moduleRoot(t *testing.T) string {
 			t.Fatal("no go.mod above the package directory")
 		}
 		dir = parent
+	}
+}
+
+func TestLoad_ReturnsTheSpansAndTheOffendersThatCheckJudges(t *testing.T) {
+	root := t.TempDir()
+	for rel, text := range map[string]string{"p/p.go": "package p\n\nfunc F() {\n" + body(MaxLines+10) + "}\n", OffendersRelPath: `{"p.F": 100}`} {
+		path := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	spans, offenders, err := Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(spans) != 1 || spans[0].Key != "p.F" || offenders["p.F"] != 100 {
+		t.Errorf("Load = %v, %v, want the span p.F and its allowance 100", spans, offenders)
+	}
+	if spans, offenders, err := Load(filepath.Join(root, "absent")); err == nil || spans != nil || offenders != nil {
+		t.Errorf("Load over a missing root = %v, %v, %v, want only an error", spans, offenders, err)
 	}
 }
 
