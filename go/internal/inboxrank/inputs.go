@@ -13,11 +13,27 @@ type Inputs struct {
 	Config     policy.InboxPriorityConfig
 	Now        time.Time
 	Recurrence map[string]int
+	Lead       []string
 }
 
 func (in Inputs) Order(items, queue []inboxbatch.Item) []Ranked {
 	counts := func(it inboxbatch.Item) int { return in.Recurrence[it.ID] }
-	return Order(items, in.Config, Context{Now: in.Now, Queue: queue, Recurrence: counts})
+	return led(Order(items, in.Config, Context{Now: in.Now, Queue: queue, Recurrence: counts}), in.Lead)
+}
+
+func led(ranked []Ranked, lead []string) []Ranked {
+	place := func(r Ranked) int {
+		if at := slices.Index(lead, r.Item.ID); at >= 0 {
+			return at
+		}
+		return len(lead)
+	}
+	ordered := slices.Clone(ranked)
+	slices.SortStableFunc(ordered, func(a, b Ranked) int { return place(a) - place(b) })
+	for i := range ordered {
+		ordered[i].Rank = i + 1
+	}
+	return ordered
 }
 
 func (b Breakdown) topFactor() Factor {

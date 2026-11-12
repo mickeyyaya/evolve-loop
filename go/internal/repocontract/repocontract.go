@@ -176,6 +176,10 @@ var treeReadingSelections = []TestSelection{
 	{Package: "./internal/cycleoutcome", Tests: []string{
 		"TestLaneScopeProjection_SingleWireShapeDeclaration",
 	}},
+	{Package: "./internal/gateregistry", Tests: []string{
+		"TestEntries_EachHasItsFieldsAndAKnownPhase",
+		"TestEntries_EachInputIsAnInventoryRowWithTheSameClass",
+	}},
 	{Package: "./internal/inboxbatch", Tests: []string{
 		"TestNoProductionCodeCallsLoadDir",
 	}},

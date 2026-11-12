@@ -1,6 +1,7 @@
 package profiles
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -9,14 +10,14 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gatecontract"
 )
 
 const (
 	worktreeGrant  = "{worktree_path}"
 	workspaceGrant = ".evolve/runs/cycle-*"
 )
-
-var gateTrustClasses = map[string]bool{"authority": true, "verified": true, "subject": true, "advisory": true, "open-seam": true}
 
 var unlaunchedProfiles = map[string]bool{"orchestrator": true}
 
@@ -28,10 +29,14 @@ var pinnedAuthority = []string{
 	".evolve/profiles",
 	".evolve/policy.json",
 	".evolve/failure-digests",
+	"{worktree_path}/go/internal/sizeratchet/offenders.json",
+	"{worktree_path}/go/internal/rawgitratchet/baseline.json",
+	".evolve/main-red-stop.json",
 }
 
 var pinnedOpenSeams = []string{
 	"{worktree_path}/go/acs/",
+	"{worktree_path}/go/.test-dup-baseline",
 }
 
 type gateInput struct {
@@ -138,19 +143,58 @@ func realGateInventory(t *testing.T) []gateInput {
 		t.Fatalf("the inventory has %d rows: the table did not parse", len(rows))
 	}
 	for _, r := range rows {
-		if r.path == "" || !gateTrustClasses[r.trust] {
+		if r.path == "" || !slices.Contains(gatecontract.TrustClasses(), r.trust) {
 			t.Fatalf("row %q: want one backticked input path and a trust class, got path %q trust %q", r.gate, r.path, r.trust)
 		}
 	}
 	return rows
 }
 
-func TestGateInputInventory_NoAgentWritableInputIsAuthority(t *testing.T) {
-	sandboxes := realSandboxes(t)
-	for _, r := range realGateInventory(t) {
-		if writers := agentWritable(sandboxes, r.path); r.trust == "authority" && len(writers) > 0 {
-			t.Errorf("%s reads %s as authority, but profiles %v can write it: verify the input or deny the write", r.gate, r.path, writers)
+func writableAuthority(sandboxes map[string]SandboxConfig, rows []gateInput, protected func(rel string) bool) []string {
+	var findings []string
+	for _, r := range rows {
+		if r.trust != gatecontract.ClassAuthority {
+			continue
 		}
+		if rel, ok := strings.CutPrefix(r.path, worktreeGrant+"/"); ok && protected(rel) {
+			continue
+		}
+		if writers := agentWritable(sandboxes, r.path); len(writers) > 0 {
+			findings = append(findings, fmt.Sprintf("%s reads %s as authority, but profiles %v can write it", r.gate, r.path, writers))
+		}
+	}
+	return findings
+}
+
+func RealWritableAuthority(t *testing.T, protected func(rel string) bool) []string {
+	t.Helper()
+	return writableAuthority(realSandboxes(t), realGateInventory(t), protected)
+}
+
+func TestWritableAuthority_AProtectedWorktreePathIsNotAgentWritable(t *testing.T) {
+	t.Parallel()
+	sandboxes := map[string]SandboxConfig{"builder": {WriteSubpaths: []string{worktreeGrant, workspaceGrant}, DenySubpaths: []string{".evolve/ledger.jsonl"}}}
+	rows := []gateInput{
+		{"guarded", "{worktree_path}/go/internal/sizeratchet/offenders.json", "authority"},
+		{"bare", "{worktree_path}/go/.cover-strict", "authority"},
+		{"denied", ".evolve/ledger.jsonl", "authority"},
+		{"workspace", ".evolve/runs/cycle-*/acs-verdict.json", "authority"},
+		{"subject", "{worktree_path}/go", "subject"},
+	}
+	var asked []string
+	protected := func(rel string) bool {
+		asked = append(asked, rel)
+		return strings.HasPrefix(rel, "go/internal/sizeratchet/")
+	}
+	want := []string{
+		"bare reads {worktree_path}/go/.cover-strict as authority, but profiles [builder] can write it",
+		"workspace reads .evolve/runs/cycle-*/acs-verdict.json as authority, but profiles [builder] can write it",
+	}
+	if got := writableAuthority(sandboxes, rows, protected); !reflect.DeepEqual(got, want) {
+		t.Errorf("findings = %q, want %q", got, want)
+	}
+	if wantAsked := []string{"go/internal/sizeratchet/offenders.json", "go/.cover-strict"}; !reflect.DeepEqual(asked, wantAsked) {
+		t.Errorf("protected was asked %q, want %q: only an authority path in the worktree goes to the manifest, without the grant prefix", asked, wantAsked)
 	}
 }
 
@@ -158,7 +202,7 @@ func TestGateInputInventory_TheOpenSeamsArePinned(t *testing.T) {
 	sandboxes := realSandboxes(t)
 	var seams []string
 	for _, r := range realGateInventory(t) {
-		if r.trust != "open-seam" {
+		if r.trust != gatecontract.ClassOpenSeam {
 			continue
 		}
 		seams = append(seams, r.path)
@@ -215,7 +259,7 @@ func TestParseGateInventory_ReadsOnlyTheInventoryTable(t *testing.T) {
 func TestGateInputInventory_TheAuthorityRowsArePinned(t *testing.T) {
 	var authority []string
 	for _, r := range realGateInventory(t) {
-		if r.trust == "authority" {
+		if r.trust == gatecontract.ClassAuthority {
 			authority = append(authority, r.path)
 		}
 	}

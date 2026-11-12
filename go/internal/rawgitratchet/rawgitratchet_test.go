@@ -7,31 +7,26 @@ import (
 	"testing"
 )
 
-func moduleRoot(t *testing.T) string {
-	t.Helper()
-	dir, err := os.Getwd()
+func TestLoad_ReturnsTheSitesTheBaselineAndTheFallbackNote(t *testing.T) {
+	root := t.TempDir()
+	for rel, text := range map[string]string{"p/raw_test.go": "package p\n\nimport \"os/exec\"\n\nfunc raw() { exec.Command(\"git\", \"init\").Run() }\n", BaselineRelPath: `{"p/raw_test.go": 1}`} {
+		path := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	sites, baseline, note, err := Load(root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			return dir
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			t.Fatal("no go.mod above the working directory")
-		}
-		dir = parent
+	if sites["p/raw_test.go"] != 1 || baseline["p/raw_test.go"] != 1 || !strings.Contains(note, "git cannot list tracked files") {
+		t.Errorf("Load = %v, %v, %q, want one site, its baseline row and the fallback note", sites, baseline, note)
 	}
-}
-
-func TestRatchet_NoNewRawGitFixtures(t *testing.T) {
-	note, err := Scan(moduleRoot(t))
-	if note != "" {
-		t.Log(note)
-	}
-	if err != nil {
-		t.Error(err)
+	if sites, _, _, err := Load(filepath.Join(root, "absent")); err == nil || sites != nil {
+		t.Errorf("Load over a missing root = %v, %v, want only an error", sites, err)
 	}
 }
 

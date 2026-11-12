@@ -75,6 +75,12 @@ type GatesPolicy struct {
 	ScanCacheMaxMB         int    `json:"scan_cache_max_mb,omitempty"`
 	ScanCacheBudgetSeconds int    `json:"scan_cache_budget_seconds,omitempty"`
 
+	BaseRedRerunSeconds int `json:"base_red_rerun_seconds,omitempty"`
+
+	MainRedStop string `json:"main_red_stop,omitempty"`
+
+	MainRedStopBoundMinutes int `json:"main_red_stop_bound_minutes,omitempty"`
+
 	PhaseIO string `json:"phase_io,omitempty"`
 }
 
@@ -92,24 +98,36 @@ type GatesConfig struct {
 	ScanCacheMaxMB         int
 	ScanCacheBudgetSeconds int
 
+	BaseRedRerun time.Duration
+
+	MainRedStop string
+
+	MainRedStopBound time.Duration
+
 	PhaseIO string
 }
 
-func (p Policy) GatesConfig() GatesConfig {
-	c := GatesConfig{
-		ContractGate:     "enforce",
-		EvalGate:         "enforce",
-		TriageCapGate:    "enforce",
-		ReviewGate:       "off",
-		ReportSizeGate:   "shadow",
-		TopNGate:         "enforce",
-		ManifestGate:     "shadow",
-		RepoContractGate: "enforce",
-		ScanCacheGate:    "shadow",
-
+func defaultGatesConfig() GatesConfig {
+	return GatesConfig{
+		ContractGate:           "enforce",
+		EvalGate:               "enforce",
+		TriageCapGate:          "enforce",
+		ReviewGate:             "off",
+		ReportSizeGate:         "shadow",
+		TopNGate:               "enforce",
+		ManifestGate:           "shadow",
+		RepoContractGate:       "enforce",
+		ScanCacheGate:          "shadow",
 		ScanCacheMaxMB:         defaultScanCacheMaxMB,
 		ScanCacheBudgetSeconds: defaultScanCacheBudgetSeconds,
+		BaseRedRerun:           defaultBaseRedRerunSeconds * time.Second,
+		MainRedStop:            "shadow",
+		MainRedStopBound:       defaultMainRedStopBoundMinutes * time.Minute,
 	}
+}
+
+func (p Policy) GatesConfig() GatesConfig {
+	c := defaultGatesConfig()
 	if p.Gates == nil {
 		return c
 	}
@@ -138,6 +156,8 @@ func (p Policy) GatesConfig() GatesConfig {
 		c.RepoContractGate = p.Gates.RepoContractGate
 	}
 	c.applyScanCache(p.Gates)
+	c.applyBaseRedRerun(p.Gates)
+	c.applyMainRedStop(p.Gates)
 	c.PhaseIO = p.Gates.PhaseIO
 	return c
 }
@@ -154,9 +174,30 @@ func (c *GatesConfig) applyScanCache(g *GatesPolicy) {
 	}
 }
 
+func (c GatesConfig) MainRedStopEnforced() bool {
+	return c.MainRedStop == failClosedStage
+}
+
+func (c *GatesConfig) applyMainRedStop(g *GatesPolicy) {
+	if g.MainRedStop != "" {
+		c.MainRedStop = g.MainRedStop
+	}
+	if g.MainRedStopBoundMinutes > 0 {
+		c.MainRedStopBound = time.Duration(g.MainRedStopBoundMinutes) * time.Minute
+	}
+}
+
+func (c *GatesConfig) applyBaseRedRerun(g *GatesPolicy) {
+	if g.BaseRedRerunSeconds > 0 {
+		c.BaseRedRerun = time.Duration(g.BaseRedRerunSeconds) * time.Second
+	}
+}
+
 const (
-	defaultScanCacheMaxMB         = 2048
-	defaultScanCacheBudgetSeconds = 60
+	defaultScanCacheMaxMB          = 2048
+	defaultScanCacheBudgetSeconds  = 60
+	defaultBaseRedRerunSeconds     = 300
+	defaultMainRedStopBoundMinutes = 120
 )
 
 type ScanCacheConfig struct {

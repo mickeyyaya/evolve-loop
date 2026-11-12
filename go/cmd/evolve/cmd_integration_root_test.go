@@ -129,7 +129,7 @@ func TestStatusVerb_ARootWithNoEvolveDirectoryStaysARefusalThatNamesTheRoot(t *t
 	}
 }
 
-func TestIntegration_TheFlagIsReadAfterTheSubVerbAndOnlyByStatus(t *testing.T) {
+func TestIntegration_TheFlagIsReadAfterTheSubVerbAndOnlyByStatusAndBatch(t *testing.T) {
 	t.Parallel()
 	r := newStatusRig(t)
 	r.writePool(t, 5, nil)
@@ -140,20 +140,19 @@ func TestIntegration_TheFlagIsReadAfterTheSubVerbAndOnlyByStatus(t *testing.T) {
 	}
 	for _, args := range [][]string{
 		{"record-pr", "--project-root", r.root, "--pr", "5", "--reviewed"},
-		{"batch", "--project-root", r.root},
 		{"watch", "--project-root", r.root, "--tip", strings.Repeat("a", 40)},
 	} {
 		out.Reset()
 		errb.Reset()
 		if rc := runIntegrationEnv(env, args, &out, &errb); rc != exitUsage {
-			t.Errorf("%v = %d, want usage: only status reads the flag", args, rc)
+			t.Errorf("%v = %d, want usage: only status and batch read the flag", args, rc)
 		}
 	}
 }
 
 func TestBatch_GhAndGitRunInTheWorkingDirectoryWithTheVariableSet(t *testing.T) {
 	t.Parallel()
-	cwd, other := t.TempDir(), filepath.Join(t.TempDir(), "other")
+	cwd, other := t.TempDir(), t.TempDir()
 	var dirs []string
 	env := integrationEnv{Root: cwd, Wave: "w", ProjectRootEnv: other,
 		Gh: func(_ context.Context, dir string, _ ...string) (string, int, error) {

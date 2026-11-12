@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/derived"
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
@@ -22,18 +23,15 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot str
 }
 
 func (o *Orchestrator) recoverShipErrorRoute(ctx context.Context, projectRoot string, cycle int, cs *CycleState, se *ShipError, depth, fleetWidth int) (Phase, bool) {
-	o.recordShipError(ctx, cycle, *cs, se)
-	o.persistShipErrorWitness(projectRoot, *cs, se)
+	if o.witnessShipErrorParks(ctx, projectRoot, cycle, *cs, se) {
+		return "", false
+	}
 	budget := shipRecoveryBudget(se.Code, fleetWidth)
 	if depth >= budget {
 		fmt.Fprintf(o.errOut(), "[orchestrator] ship recovery exhausted after %d attempt(s) (%s/%s, budget %d, fleet width %d); aborting\n", depth, se.Code, se.Class, budget, fleetWidth)
 		return "", false
 	}
-	if isContentionShipCode(se.Code) {
-		pause := contentionBackoff(depth)
-		fmt.Fprintf(o.errOut(), "[orchestrator] contention backoff %s before ship recovery attempt %d/%d (%s)\n", pause, depth+1, budget, se.Code)
-		backoffSleep(pause)
-	}
+	o.backoffOnContention(se.Code, depth, budget)
 	recoverCode, recoverClass := se.Code, se.Class
 	if se.Code == CodeGitFleetRebaseNeeded {
 		predictedConflict := false
@@ -77,6 +75,25 @@ func (o *Orchestrator) recoverShipErrorRoute(ctx context.Context, projectRoot st
 		}
 	}
 	return o.routeShipRecovery(se, recoverCode, recoverClass)
+}
+
+func (o *Orchestrator) witnessShipErrorParks(ctx context.Context, projectRoot string, cycle int, cs CycleState, se *ShipError) bool {
+	o.recordShipError(ctx, cycle, cs, se)
+	o.persistShipErrorWitness(projectRoot, cs, se)
+	if !errors.Is(se, ErrMainRedParked) {
+		return false
+	}
+	o.parkOnMainRed(projectRoot, cs, baseattr.VerdictOfDebug(se.Debug))
+	return true
+}
+
+func (o *Orchestrator) backoffOnContention(code ShipErrorCode, depth, budget int) {
+	if !isContentionShipCode(code) {
+		return
+	}
+	pause := contentionBackoff(depth)
+	fmt.Fprintf(o.errOut(), "[orchestrator] contention backoff %s before ship recovery attempt %d/%d (%s)\n", pause, depth+1, budget, code)
+	backoffSleep(pause)
 }
 
 func recoveryReasonCode(code string, conflicts []string) string {
