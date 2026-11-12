@@ -156,7 +156,9 @@ func (b *loopBatchCoordinator) dispatchPool(iteration int, fleetConfig policy.Fl
 		b.ctx,
 		fleetConfig,
 		productionWavePreflight(b.cfg.ProjectRoot),
-		func(depth int) poolPlanFn { return productionPoolPlanFn(b.cfg, b.deps.Storage, depth, b.stderr) },
+		func(depth int) poolPlanFn {
+			return poolPlanner{cfg: b.cfg, storage: b.deps.Storage, stderr: b.stderr, signals: b.deps.Signals}.plan(depth)
+		},
 		run,
 		iteration,
 	)

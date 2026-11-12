@@ -23,14 +23,15 @@ var skippedTreeDirs = []string{"acs", "testdata", "vendor", "bin", ".git"}
 
 var exemptSpawners = map[string]string{
 	"internal/core/ship_recovery.go:worktreeGenerator":               "runs the worktree's own evolve source with go run; WorktreeEvolveInvocation owns that env",
+	"internal/baseattr/runner.go:goTestRunner":                       "receives the env of its caller; the base runner pin holds each caller of baseattr.GoTestRunner to a named projection",
 	"internal/gotooltest/cache.go:ExecRunner":                        "runs go build only; the Cache composes every argv from build",
 	"internal/acssuite/acssuite.go:defaultGoExec":                    "receives the env predicateEnv built, operator keys and suite exports included; predicateEnv sits on a protected control-plane path (ADR-0064) and moves to ipcenv.GoTestEnv as console work",
 	"internal/commitgate/lanes.go:laneGo":                            "protected control-plane path (ADR-0064): a lane cannot edit it; console work routes its go test through sysexec.WithEnv(ipcenv.GoTestEnv())",
 	"internal/core/build_floor_reviewer.go:runCoverPass":             "protected control-plane path (ADR-0064): console work swaps ipcenv.Scrub(os.Environ()) for ipcenv.GoTestEnv()",
 	"internal/core/phase_bindings_selfcheck.go:realGoUnitTest":       "protected control-plane path (ADR-0064): console work swaps ipcenv.Scrub(os.Environ()) for ipcenv.GoTestEnv()",
 	"internal/core/phase_bindings_selfcheck.go:realGoUnitTestTagged": "protected control-plane path (ADR-0064): console work swaps ipcenv.Scrub(os.Environ()) for ipcenv.GoTestEnv()",
-	"internal/phases/audit/ciparitygate/command.go:ACSDurable":       "protected control-plane path (ADR-0064): console work wraps its runner in scrubbedRun like the other gates",
-	"internal/phases/audit/ciparitygate/tier.go:runAttempt":          "runs the runner IntegrationTier wrapped once in scrubbedRun, so both attempts carry one captured ciparity.CIEnv",
+	"internal/phases/audit/ciparitygate/command.go:ACSDurable":       "protected control-plane path (ADR-0064): console work wraps its runner in sysexec.WithEnv with TierEnv like the other gates",
+	"internal/phases/audit/ciparitygate/tier.go:runAttempt":          "runs the runner IntegrationTier wrapped once in sysexec.WithEnv with TierEnv, so both attempts carry one captured ciparity.CIEnv",
 }
 
 type parsedFile struct {
@@ -602,5 +603,104 @@ func TestGoTestSpawners_EveryProductionSpawnerUsesTheNamedProjection(t *testing.
 	}
 	for _, violation := range spawnerViolations(parseTree(t, root)) {
 		t.Error(violation)
+	}
+}
+
+func isBaseRunnerCall(call *ast.CallExpr, pkg string) bool {
+	qual := qualifier(call)
+	return calleeName(call) == "GoTestRunner" && (qual == "baseattr" || (qual == "" && pkg == "baseattr"))
+}
+
+func passesProjection(call *ast.CallExpr, pkg string, projectors map[string]bool) bool {
+	if len(call.Args) != 1 {
+		return false
+	}
+	env, ok := call.Args[0].(*ast.CallExpr)
+	return ok && (isProjectionCall(env, pkg) || projectors[calleeName(env)])
+}
+
+func baseRunnerCalls(files []parsedFile) (calls, violations []string) {
+	projectors := projectionFuncs(files)
+	for _, f := range files {
+		ast.Inspect(f.file, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok || !isBaseRunnerCall(call, f.pkg) {
+				return true
+			}
+			site := f.path + ":" + strconv.Itoa(f.fset.Position(call.Pos()).Line)
+			calls = append(calls, site)
+			if !passesProjection(call, f.pkg, projectors) {
+				violations = append(violations, site+" calls baseattr.GoTestRunner with an env that is not ipcenv.GoTestEnv, ciparity.CIEnv or a function that projects through one")
+			}
+			return true
+		})
+	}
+	slices.Sort(calls)
+	slices.Sort(violations)
+	return calls, violations
+}
+
+const plantedBaseRunnerImports = plantedFixture + `
+import ("os"; "github.com/mickeyyaya/evolve-loop/go/internal/baseattr"; "github.com/mickeyyaya/evolve-loop/go/internal/ipcenv")
+`
+
+func TestBaseRunnerCallers_ACallerThatPassesAnyOtherEnvIsFlagged(t *testing.T) {
+	cases := map[string]string{
+		"passes no env":                                 `var plant = baseattr.GoTestRunner(nil)`,
+		"passes the ambient env":                        `var plant = baseattr.GoTestRunner(os.Environ())`,
+		"passes a variable":                             `func plant(env []string) baseattr.Runner { return baseattr.GoTestRunner(env) }`,
+		"passes a scrub that is not a named projection": `var plant = baseattr.GoTestRunner(ipcenv.Scrub(os.Environ()))`,
+	}
+	for name, src := range cases {
+		t.Run(name, func(t *testing.T) {
+			calls, got := baseRunnerCalls(parseSources(t, map[string]string{"internal/planted/planted.go": plantedBaseRunnerImports + src}))
+			if len(calls) != 1 || len(got) != 1 {
+				t.Fatalf("a planted caller that %s gave calls %q and violations %q, want one call and one violation", name, calls, got)
+			}
+		})
+	}
+}
+
+func TestBaseRunnerCallers_ACallerThatPassesANamedProjectionIsAccepted(t *testing.T) {
+	cases := map[string]map[string]string{
+		"ipcenv.GoTestEnv": {"internal/planted/a.go": plantedBaseRunnerImports + `var plant = baseattr.GoTestRunner(ipcenv.GoTestEnv())`},
+		"a function that projects": {
+			"internal/planted/a.go": plantedFixture + `
+func TierEnv() []string { return ciparity.CIEnv(os.Environ()) }`,
+			"internal/planted/b.go": plantedBaseRunnerImports + `var plant = baseattr.GoTestRunner(planted.TierEnv())`,
+		},
+	}
+	for name, sources := range cases {
+		t.Run(name, func(t *testing.T) {
+			calls, got := baseRunnerCalls(parseSources(t, sources))
+			if len(calls) != 1 || len(got) != 0 {
+				t.Fatalf("%s gave calls %q and violations %q, want one call and no violation", name, calls, got)
+			}
+		})
+	}
+}
+
+func TestBaseRunnerCallers_EveryProductionCallerPassesANamedProjection(t *testing.T) {
+	root, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	calls, violations := baseRunnerCalls(parseTree(t, root))
+	for _, violation := range violations {
+		t.Error(violation)
+	}
+	seen := map[string]bool{}
+	for _, site := range calls {
+		seen[site[:strings.LastIndex(site, ":")]] = true
+	}
+	for _, path := range []string{
+		"cmd/evolve/cmd_integration.go",
+		"internal/core/base_red_floor.go",
+		"internal/phases/audit/ciparity.go",
+		"internal/phases/ship/base_red.go",
+	} {
+		if !seen[path] {
+			t.Errorf("the scan does not see the base runner call in %s; its env would go unchecked", path)
+		}
 	}
 }

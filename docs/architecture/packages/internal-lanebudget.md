@@ -12,7 +12,7 @@
 - **`Current()`** reads `EVOLVE_FLEET_WIDTH` (`ipcenv.FleetWidthKey`) from the environment of this process and the CPU count from `runtime.NumCPU`. Each lane is a separate process (`execCycleLaunch` in `cmd/evolve/cmd_fleet.go`), so the width that it reads is its own. An absent or garbage width gives 0.
 - **`Args(args)`** adds `-p N` and `-parallel N` after the `test` word of a `go test` argv. It keeps a `-p` or `-parallel` that the caller already set. It does not change an argv that does not start with `test`, and it does not write into the array of the caller.
 - **`Env(env)`** adds `GOMAXPROCS=N` at the end of the child environment, so it wins over an inherited value. A nil `env` means "inherit", as in `exec.Cmd`, so `Env(nil)` starts from `os.Environ()`. Give it the environment after `ipcenv.Scrub`: the scrub removes the `EVOLVE_` keys but keeps `GOMAXPROCS`.
-- **`Runner(run)`** wraps a `sysexec.RunFunc`. It applies `Args` and `Env` to each `go test` call and passes every other call through. Put it inside a wrapper that replaces the environment (`ciparitygate.scrubbedRun`), so that the replaced environment still gets `GOMAXPROCS`.
+- **`Runner(run)`** wraps a `sysexec.RunFunc`. It applies `Args` and `Env` to each `go test` call and passes every other call through. Put it inside a wrapper that replaces the environment (`sysexec.WithEnv` with `ciparitygate.TierEnv()`), so that the replaced environment still gets `GOMAXPROCS`.
 - **Why all three values.** `-p` bounds the packages that run at the same time, and `-parallel` bounds the parallel tests in one binary. They multiply. Only `GOMAXPROCS` bounds the compiler, the linker and the CPU use inside each test binary.
 
 ## The call sites

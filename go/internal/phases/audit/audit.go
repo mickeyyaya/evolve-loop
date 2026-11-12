@@ -248,7 +248,7 @@ type Phase struct {
 }
 
 func (p *Phase) SignalsWired() bool {
-	return ciParity{signals: p.signals}.wiredGates().SignalsWired()
+	return ciParity{signals: p.signals}.wiredGates(core.PhaseRequest{}).SignalsWired()
 }
 
 func New(c Config) *Phase {

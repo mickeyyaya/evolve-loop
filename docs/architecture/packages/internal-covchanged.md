@@ -22,6 +22,7 @@ The build floor profiles only the changed packages that build a file under `Defa
 - **"No profile" is a refusal.** A changed function with no block is not at 100%. A function with zero statements and a block is at 100%.
 - **A stale profile stops the check.** The file reader refuses a changed file that is newer than the profile, and names `make -C go test-integration`.
 - **One module-path reader.** `ModulePath` is exported. `internal/coverstrict` calls it, and `ParseProfile` is its one profile parser (`evolve cover strict`, plan T2).
+- **One home for the tag flags.** `TagFlags` gives the `-tags` flag list of a tag set, and nil for no tag. The build floor and the ship stop check call it.
 - **The key.** `<module dir>.<Name>` or `<module dir>.<Receiver>.<Name>`, the same form as the size ratchet. The receiver forms `*T`, `T[K]` and `T[K, V]` all give `T`.
 
 ## Invariants

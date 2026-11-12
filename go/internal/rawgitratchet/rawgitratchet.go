@@ -208,7 +208,7 @@ func Check(sites, baseline map[string]int) error {
 const BaselineRelPath = "internal/rawgitratchet/baseline.json"
 
 func Scan(root string) (note string, err error) {
-	sites, baseline, note, err := load(root)
+	sites, baseline, note, err := Load(root)
 	if err != nil {
 		return note, err
 	}
@@ -216,14 +216,14 @@ func Scan(root string) (note string, err error) {
 }
 
 func TightenModule(root string) (changes []string, encoded []byte, err error) {
-	sites, baseline, _, err := load(root)
+	sites, baseline, _, err := Load(root)
 	if err != nil {
 		return nil, nil, err
 	}
 	return sizeratchet.TightenEncoded(sites, baseline, 0)
 }
 
-func load(root string) (sites, baseline map[string]int, note string, err error) {
+func Load(root string) (sites, baseline map[string]int, note string, err error) {
 	files, note, err := BoundTestFiles(root)
 	if err != nil {
 		return nil, nil, note, err

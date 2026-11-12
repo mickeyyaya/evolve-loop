@@ -20,7 +20,7 @@ func TestProductionPoolPlanFn_APausedScopeOfAConsoleRoutedItemLeadsNoLane(t *tes
 	seedPoolInbox(t, evolveDir, map[string]string{"2026-11-03T00-00-02Z-gamma.json": routedGammaItem})
 	seedPausedRun(t, root, 41, 0, 3, "gamma")
 	var stderr bytes.Buffer
-	plan := productionPoolPlanFn(loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, &erroringReadStorage{}, 2, &stderr)
+	plan := poolPlanner{cfg: loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, storage: &erroringReadStorage{}, stderr: &stderr}.plan(2)
 
 	todos, err := plan(context.Background(), 0)
 
@@ -49,7 +49,7 @@ func TestProductionPoolPlanFn_AClaimedConsoleRoutedItemOfAPausedScopeLeadsNoLane
 	}
 	writeE2File(t, loc.Path, routedGammaItem)
 	var stderr bytes.Buffer
-	plan := productionPoolPlanFn(loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, &erroringReadStorage{}, 2, &stderr)
+	plan := poolPlanner{cfg: loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, storage: &erroringReadStorage{}, stderr: &stderr}.plan(2)
 
 	todos, perr := plan(context.Background(), 0)
 
