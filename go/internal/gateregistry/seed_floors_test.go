@@ -2,12 +2,14 @@ package gateregistry
 
 import (
 	"context"
+	"path"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gatecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/repocontract"
 )
 
 const laneKey = "internal/policy.TestLaneBreaks"
@@ -56,9 +58,26 @@ const floorGreenTest = "package policy\n\nimport \"testing\"\n\nfunc TestValue(t
 
 const floorRedTest = "package policy\n\nimport \"testing\"\n\nfunc TestLaneBreaks(t *testing.T) {\n\tt.Fatal(\"lane red\")\n}\n"
 
+func packStubs() map[string]string {
+	dirs := make([]string, 0, len(repocontract.Packages()))
+	for _, pattern := range repocontract.Packages() {
+		dirs = append(dirs, strings.TrimSuffix(pattern, "/..."))
+	}
+	for _, selection := range repocontract.TreeReadingTests() {
+		dirs = append(dirs, selection.Package)
+	}
+	stubs := map[string]string{}
+	for _, dir := range dirs {
+		rel := strings.TrimPrefix(dir, "./")
+		stubs["go/"+rel+"/doc.go"] = "package " + path.Base(rel) + "\n"
+	}
+	return stubs
+}
+
 func floorRepo(t *testing.T) (root, base string) {
 	t.Helper()
 	repo := gittest.Fixture(t)
+	lay(t, repo.Dir, packStubs())
 	lay(t, repo.Dir, map[string]string{
 		"go/go.mod":                         floorModule,
 		"go/internal/policy/policy.go":      floorSource,

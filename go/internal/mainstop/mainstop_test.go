@@ -262,3 +262,20 @@ func TestAdmission_HasAWordForEachRefusal(t *testing.T) {
 		}
 	}
 }
+
+func TestWithout_DropsTheGivenKeysAndLeavesItsInputAsItWas(t *testing.T) {
+	t.Parallel()
+	keys := []baseattr.Key{dupKey, sizeKey, otherKey}
+
+	got := Without(keys, []baseattr.Key{sizeKey, {Package: "internal/absent", Test: "TestAbsent"}})
+
+	if want := []baseattr.Key{dupKey, otherKey}; !slices.Equal(got, want) {
+		t.Errorf("Without = %v, want %v", got, want)
+	}
+	if want := []baseattr.Key{dupKey, sizeKey, otherKey}; !slices.Equal(keys, want) {
+		t.Errorf("the input became %v, want it unchanged at %v", keys, want)
+	}
+	if got := Without(keys, nil); !slices.Equal(got, keys) {
+		t.Errorf("Without(keys, nil) = %v, want every key", got)
+	}
+}
