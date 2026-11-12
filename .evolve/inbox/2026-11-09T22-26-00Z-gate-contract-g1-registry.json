@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "A repo-contract pack package with no registry entry fails a test",
+    "A lane diff that moves a stage from enforce to shadow fails",
+    "The registry file is on guards.ProtectedSurfaceManifest"
+  ],
+  "created_at": "2026-11-09T22:26:00Z",
+  "files": [
+    "go/internal/guards/integrity_surface.go"
+  ],
+  "fix": "Add a Go table of gate entries (name, kind, owners by artifact pattern, inputs with their trust class from gate-input-inventory.md, stage, run func(ctx, GateInput{Root, Base})). Seed it with the repo-contract pack, testdup and the phase floors. Put the registry file on the protected surface in the same commit. Design review before build.",
+  "id": "gate-contract-g1-registry",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "console, 2026-11-10, ADR-0165 plan component",
+  "summary": "Component G1 of docs/plans/gate-contract-2026-11.md (ADR-0165 decisions 1, 2, 15, 16; spec docs/architecture/gate-contract.md section 2). The pipeline has no type for a gate, so each lesson of ADR-0084 and ADR-0117 fixed one gate only.",
+  "title": "Gate contract G1: a protected gate registry with a run function for each gate",
+  "weight": 0.7
+}

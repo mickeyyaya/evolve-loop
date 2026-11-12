@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "A journey test: a writer seat that creates a file outside its writable list ends with a verdict that is not PASS, and the signal names the path and the next step",
+    "A seat's input states its writable paths, or a directory grant for new files exists, with a test that a new file in that directory survives",
+    "An existing file outside the grant is still restored"
+  ],
+  "created_at": "2026-11-05T06:11:51Z",
+  "files": [
+    "go/internal/core/worktree_fence.go",
+    "go/internal/cli/agentcmd/run.go"
+  ],
+  "fix": "Design first. Two facts need a home. (1) The verdict of a writer seat must reflect the tree that remains: a fence removal of a path that the seat created is not PASS, and the signal names each path and the next step. (2) A brief needs a way to allow new files in a named directory without allowing edits to existing files there, or the seat must be told its writable list in its input, so that it can choose a permitted name or stop.",
+  "id": "builder-fence-erases-new-files-and-the-seat-says-pass",
+  "intake_override": {
+    "reason": "changes the worktree fence and the verdict of a writer seat, which the console-builder path depends on",
+    "console_route": true
+  },
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "summary": "On 2026-11-05 a console-builder seat for B11 slice 1 created 4 new files whose names were not on its --writable list. The worktree fence removed them at the end of the dispatch, and logged a WARN. The run verdict stayed PASS, and the report said 212/212 tests pass. The tree that remained did not compile (commitgate.go: o.writeReviewRecord undefined). A caller that reads the verdict is told that broken work passed. The seat cannot know a new-file name in advance, and --writable refuses a directory, so this happens whenever a brief does not name each new file exactly.",
+  "title": "A build seat's new files are erased by the fence, and the seat still reports PASS",
+  "weight": 0.8
+}

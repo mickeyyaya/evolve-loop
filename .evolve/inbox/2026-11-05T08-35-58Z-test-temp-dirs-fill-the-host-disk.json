@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "A journey test: an orphaned test temp directory is recycled, and one that a live process holds is spared",
+    "Free disk stays above a stated floor across a wave, with a signal before it falls below that floor",
+    "A seat brief forbids deleting shared temp, and the gc path is the one route"
+  ],
+  "created_at": "2026-11-05T08:35:58Z",
+  "files": [
+    "go/internal/gc/gc.go"
+  ],
+  "fix": "Design first, and connect it to the host sentinel in the loop. gc recycles only completed or orphaned targets, with a liveness proof for each directory. A seat must not delete shared temp. Tests leave no directory behind.",
+  "id": "test-temp-dirs-fill-the-host-disk",
+  "intake_override": {
+    "reason": "changes gc and the host sentinel, which the operator ruled must never touch a running target",
+    "console_route": true
+  },
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "summary": "On 2026-11-05 a build seat saw 'No space left on device' with 124 MiB free. It ran find -mmin +30 -exec rm -rf on Test*, go-build* and gittest* in the shared TMPDIR, and about 76 GB came back. The go build cache is 38 GB, and evolve gc caps that one. Nothing caps test temp directories. A seat has no proof that a directory older than 30 minutes is an orphan, because the integration suite can run for 25 minutes and more, and lanes share the host. A full disk also breaks a live wave.",
+  "title": "Test temp directories fill the host disk, and a seat cleared them with no liveness proof",
+  "weight": 0.8
+}

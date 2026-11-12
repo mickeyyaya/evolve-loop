@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "A test through the real entry is red without the fix.",
+    "The record and the code agree."
+  ],
+  "created_at": "2026-11-06T07:03:49Z",
+  "files": [
+    "go/internal/guards/role.go"
+  ],
+  "fix": "A held proposal on a protected path never lands by itself",
+  "id": "held-proposal-stage-at-enforce",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "Operator ruling 2026-11-06, ADR-0164 ruling 5. ADR-0157 keys are absent from policy.json. Check guards/role.go at enforce against the ruling.",
+  "title": "A held proposal on a protected path never lands by itself",
+  "weight": 0.6
+}

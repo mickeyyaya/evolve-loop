@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "Red test first: a build seed with an empty ActiveWorktree names no asks from the process cwd.",
+    "Red test first: a stale ledger whose check failed keeps the failure in the record.",
+    "100% statement coverage on each changed function; zero code comments; STE lint 0."
+  ],
+  "created_at": "2026-11-03T03:41:33Z",
+  "files": [
+    "go/internal/core/handoff_persona.go",
+    "go/internal/core/handoff_reviewer.go",
+    "docs/architecture/phase-handoff-contract.md"
+  ],
+  "fix": "(1) Return the 'none for pair' block when the build pair has no worktree. (2) Keep the original outcome: overwrite only a pass, or add the original outcome to Errors. (3) Align the wording with the code until the stamp moves out of the workspace.",
+  "id": "handoff-h9-review-minors",
+  "intake_override": {
+    "reason": "protected agent-run or core change found in console review",
+    "console_route": true
+  },
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "source": "code review of PR #1246 (agent-code-reviewer-20261103T032918Z-18e8), 2026-11-03, three MINOR",
+  "summary": "(1) handoffRequestBlock passes cs.ActiveWorktree to request.ForPair; when it is empty, TDDBuild reads go/acs/cycleN relative to the process cwd and can name asks from the wrong tree. (2) staleOutputCheck replaces any non-pass outcome (for example a real fail) with invalid, so the original outcome is lost. (3) The spec and the core package note say only the pipeline writes `stamp`, but an agent can write it (see handoff-stamp-state-outside-the-workspace).",
+  "title": "H9 minors: no tdd-build block without a worktree, the original check outcome is kept beside the stale error, and the stamp wording",
+  "weight": 0.5
+}

@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "The help line names each guard of the dispatcher and no other, and a test compares the two."
+  ],
+  "consumed": {
+    "at": "2026-11-12T07:57:50Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Landed in PR #1413 (acd03fcbd train, f4637e373): guardcmd.Names is the one list; help and the unknown-guard error derive from it; tests pin both."
+  },
+  "created_at": "2026-11-06T17:13:37Z",
+  "files": [
+    "go/internal/cli/guardcmd/guard.go"
+  ],
+  "fix": "Build the help line from the guard table, so that the two cannot differ.",
+  "id": "evolve-help-lists-a-retired-quota-guard",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "route": "console-manual",
+  "routed_at": "2026-11-06T17:20:46Z",
+  "routed_cycle": 2206,
+  "routed_reason": "reserved as a public good first issue for outside contributors",
+  "summary": "The top-level help says Guards: ship | phase | role | docdelete | quota | chain. `evolve guard quota` answers: unknown guard, known: ship phase role docdelete chain triage-floors.",
+  "title": "evolve help lists a quota guard that the dispatcher no longer has",
+  "weight": 0.3
+}

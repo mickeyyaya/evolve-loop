@@ -1,0 +1,14 @@
+{
+  "action": "recurring failure build|infra-error|class-a98f6ebafaba (1 occurrences)",
+  "evidence_pointer": "advisory raise: queue -\u003e console",
+  "files": null,
+  "id": "failure-class-a98f6ebafaba",
+  "injected_at": "2026-11-04T08:40:16Z",
+  "injected_by": "retro-preventive-actions-autofiler",
+  "kind": "pipeline-repair",
+  "origin": "retro",
+  "priority": "HIGH",
+  "priority_class": "correctness",
+  "recurrence": 1,
+  "weight": 0.75
+}

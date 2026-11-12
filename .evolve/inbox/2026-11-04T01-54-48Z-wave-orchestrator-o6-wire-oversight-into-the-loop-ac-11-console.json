@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Audit M1: the launcher guard files are covered by the protected-surface manifest, under file names that state what they are"
+  ],
+  "created_at": "2026-11-04T01:54:48Z",
+  "files": [
+    "go/internal/guards/integrity_surface.go",
+    "go/internal/guards/integrity_surface_gate_files_test.go"
+  ],
+  "fix": "Make the change that AC 11 needs on the protected path(s) go/internal/guards/integrity_surface.go, go/internal/guards/integrity_surface_gate_files_test.go, then prove the criterion with a test.",
+  "id": "wave-orchestrator-o6-wire-oversight-into-the-loop-ac-11-console",
+  "kind": "feature",
+  "origin": "cycle",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "source": "cycle 2151, tdd test-report.md AC 11 (console-followup)",
+  "summary": "The TDD phase of cycle 2151 gave AC 11 of wave-orchestrator-o6-wire-oversight-into-the-loop the console-followup disposition. A lane builder can never change the paths it needs (go/internal/guards/integrity_surface.go, go/internal/guards/integrity_surface_gate_files_test.go). The lane part ships without it, so the console owns this part.",
+  "title": "Console part of wave-orchestrator-o6-wire-oversight-into-the-loop: AC 11, which needs a protected path changed",
+  "weight": 0.6
+}

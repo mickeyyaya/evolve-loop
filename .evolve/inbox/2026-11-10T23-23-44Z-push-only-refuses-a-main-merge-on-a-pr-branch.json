@@ -1,0 +1,30 @@
+{
+  "acceptance": [
+    "In a fixture repository, a branch that merges origin/main after evolve pr refresh is pushed by evolve ship --push-only, and the test is red without the fix",
+    "An ahead commit that is not on origin/main and not in the ship journal is still refused",
+    "A merge commit with no parent on the origin branch is still refused",
+    "docs/operations/wave-operations.md names the verb that pushes the branch after the merge"
+  ],
+  "created_at": "2026-11-10T23:23:44Z",
+  "deps": [],
+  "files": [
+    "go/internal/phases/ship/pushonly.go",
+    "go/internal/phases/ship/pushonly_test.go",
+    "docs/operations/wave-operations.md"
+  ],
+  "fix": "Design first, with an architecture review and a security review. One candidate: runPushOnly counts as ahead only the commits that origin/main does not hold, because a commit on origin/main already landed through the train. The provenance rule for each other commit stays.",
+  "id": "push-only-refuses-a-main-merge-on-a-pr-branch",
+  "intake_override": {
+    "reason": "the fix changes the provenance rule of the ship gate, which a lane cannot review for itself; the console holds the blocked branch",
+    "console_route": true
+  },
+  "kind": "bug",
+  "notes": "Evidence 2026-11-11, worktree dev/cl-g4c, merge 324279b5d of origin/main 710b617a8 into PR 1397: ship --push-only --dry-run refused 63 ahead commits, all from main. A plain manual ship reports no staged changes. No sanctioned verb pushes the merge, so a PR that conflicts in a generated file cannot follow the documented refresh path.",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "source": "console, 2026-11-11, wave 164 boundary",
+  "summary": "The operations guide says to merge origin/main, run evolve pr refresh and continue the merge. The ship gate then has no verb that pushes the result: push-only reads rev-list origin/<branch>..HEAD, which holds each main commit, and the ship journal of the worktree has none of them.",
+  "title": "ship --push-only refuses a branch that merged origin/main, so a refreshed PR cannot be pushed",
+  "weight": 0.7
+}

@@ -1,0 +1,14 @@
+{
+  "action": "recurring failure ship|infra-error|class-6a25b87de35c (1 occurrences)",
+  "evidence_pointer": "advisory raise: queue -\u003e console",
+  "files": null,
+  "id": "failure-class-6a25b87de35c",
+  "injected_at": "2026-11-06T08:41:24Z",
+  "injected_by": "retro-preventive-actions-autofiler",
+  "kind": "pipeline-repair",
+  "origin": "retro",
+  "priority": "HIGH",
+  "priority_class": "correctness",
+  "recurrence": 1,
+  "weight": 0.75
+}

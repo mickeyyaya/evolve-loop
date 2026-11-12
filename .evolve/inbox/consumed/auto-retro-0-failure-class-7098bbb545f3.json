@@ -1,0 +1,20 @@
+{
+  "action": "recurring failure build|gate-block|class-7098bbb545f3 (1 occurrences)",
+  "consumed": {
+    "at": "2026-11-02T23:22:53Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Console stale audit 2026-11-03: OBSOLETE, an autofiled advisory with no title, files or evidence, seen once; nothing to act on."
+  },
+  "evidence_pointer": "advisory raise: queue -\u003e console",
+  "files": null,
+  "id": "failure-class-7098bbb545f3",
+  "injected_at": "2026-11-02T15:12:13Z",
+  "injected_by": "retro-preventive-actions-autofiler",
+  "kind": "pipeline-repair",
+  "origin": "retro",
+  "priority": "HIGH",
+  "priority_class": "correctness",
+  "recurrence": 1,
+  "weight": 0.75
+}

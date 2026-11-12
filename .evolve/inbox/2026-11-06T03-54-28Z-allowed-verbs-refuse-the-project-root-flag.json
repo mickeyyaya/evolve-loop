@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "A test through the real entry is red without the fix.",
+    "The enforcing map of the contract test loses the row, when the item names one."
+  ],
+  "created_at": "2026-11-06T03:54:28Z",
+  "files": [
+    "go/internal/agentclass/table.go"
+  ],
+  "fix": "Give each Allowed verb that refuses --project-root one reason",
+  "id": "allowed-verbs-refuse-the-project-root-flag",
+  "kind": "task",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "summary": "17 Allowed verbs refuse the flag. Each needs one reason, checked against its code. --help is not a safe probe, and a guard must never run.",
+  "title": "Give each Allowed verb that refuses --project-root one reason",
+  "weight": 0.4
+}

@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "A contract test states what a seat can do to the host login, and it fails if that changes",
+    "A wave runs across more than 24 hours with no logout and no auth error in a seat",
+    "The console login is not invalidated by a seat"
+  ],
+  "created_at": "2026-11-05T07:27:07Z",
+  "files": [
+    "go/internal/adapters/sandbox/sandbox.go",
+    "go/internal/bridge/driver_common.go"
+  ],
+  "fix": "Design first, and the operator decides. See the options in the session report: a long-lived token from claude setup-token for seats, or a Keychain write grant for cells. The operator's decision D1 (no-credential cells) applies to both.",
+  "id": "sandboxed-seats-cannot-save-a-refreshed-login",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "summary": "The operator must log in again every 8 to 24 hours, and each logout stops all lanes and voids reviews. Measured on 2026-11-05: 7 failure clusters since 11-02, 273 auth errors. Most clusters start with 'OAuth token revoked', then 'Login expired' for some minutes. A probe from a real sandboxed seat: security add-generic-password fails with Operation not permitted, a read of the Keychain item metadata works, and a write under ~/.claude works. The SBPL grants no write to ~/Library/Keychains (homeStateWriteDirs). The Keychain item was last written at 07:12:37Z, the login, and ~/.claude/.credentials.json at 07:05:24Z, 5 seconds after the first revocation at 07:05:19Z in a seat, so the two stores differ. Hypothesis, not proven: a seat refreshes the token, the server rotates it, the seat cannot save it to the Keychain and writes the file, and each other process then holds a dead token. No log shows a seat refreshing. Public reports also describe a rotation race between concurrent sessions, with no confirmation from Anthropic.",
+  "title": "A sandboxed claude seat cannot write the Keychain, and the login expires for the whole host",
+  "weight": 0.95
+}

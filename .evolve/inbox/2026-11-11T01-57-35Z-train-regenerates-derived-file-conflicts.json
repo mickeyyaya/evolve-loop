@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "A train merge whose only conflict is docs/research-index.md lands the PR with the regenerated index, and the test is red without the fix",
+    "A conflict in a hand-written file still ejects the PR with the conflict brief",
+    "docs/operations/wave-operations.md says that the train regenerates derived files"
+  ],
+  "created_at": "2026-11-11T01:57:35Z",
+  "deps": [],
+  "files": [
+    "go/internal/derived/conflict.go",
+    "go/internal/integration/",
+    "docs/operations/wave-operations.md"
+  ],
+  "fix": "When a train merge stops only on derived files (the set that evolve pr refresh writes), run the same generators, stage the result and continue. Eject only when a hand-written file conflicts.",
+  "id": "train-regenerates-derived-file-conflicts",
+  "kind": "bug",
+  "notes": "Evidence: integration batch 1386 1387 rc=1, both ejected with conflict docs/research-index.md.",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "console, 2026-11-11, wave 164 boundary",
+  "summary": "On 2026-11-10 integration batch 1386 1387 ejected both PRs on a conflict in docs/research-index.md, a generated file. derived.IsDerivedConflict (go/internal/derived/conflict.go:7) has no production caller, so the train never runs the generators that evolve pr refresh runs.",
+  "title": "The integration train ejects a PR on a conflict in a derived file instead of regenerating it",
+  "weight": 0.6
+}

@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "A journey test: a lane pinned on a console-routed item ends as planned no-work, not FAIL",
+    "The rejection text names only answers that pass"
+  ],
+  "created_at": "2026-11-04T14:34:17Z",
+  "files": [
+    "go/internal/committedset/committedset.go",
+    "go/internal/deliverable/effects.go"
+  ],
+  "fix": "The answer for a pinned item that the claim floor refuses for its route ends the cycle as planned no-work. The gate reads the route as a host fact. Correct the rejection text.",
+  "id": "triage-gate-refuses-the-answer-for-a-routed-pin",
+  "kind": "pipeline-integrity",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "summary": "In cycle 2161 the triage prompt told the agent to answer a routed item with escalate_block, and the inbox-claim gate rejected this twice with missing_effect. committedset.Committed uses the lane pin in place of top_n and subtracts only deferred. The rejection text says defer or drop it, but a dropped answer fails too. A correction could not change what the gate read.",
+  "title": "The triage gate must accept the prescribed answer for a routed lane pin",
+  "weight": 0.8
+}

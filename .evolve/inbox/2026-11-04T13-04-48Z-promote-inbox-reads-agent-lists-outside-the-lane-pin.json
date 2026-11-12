@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "A journey test: a lane whose decision and build report name an item that another lane holds ships its change, and the other item stays in place",
+    "A WARN names each refused id"
+  ],
+  "created_at": "2026-11-04T13:04:48Z",
+  "files": [
+    "go/internal/phases/ship/postship.go",
+    "go/internal/inboxmover/lifecycle/release.go",
+    "go/internal/phases/triage/triagedecision/derive.go"
+  ],
+  "fix": "Take the set of items to promote from the items this cycle held, a host fact, as PR #1290 does for the failure path. Reject and warn on any listed id outside that set.",
+  "id": "promote-inbox-reads-agent-lists-outside-the-lane-pin",
+  "kind": "pipeline-integrity",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "summary": "promoteInbox promotes to processed from three agent-written lists: top_n and skip_shipped, superseded, and closes-inbox lines of build-report.md. Promote finds an item through Locate, so it can take an item that another lane holds. Found by the adversarial seat on PR #1290 round 2, as F2. It is older than that PR.",
+  "title": "A shipped lane must not retire inbox items outside its scope",
+  "weight": 0.7
+}

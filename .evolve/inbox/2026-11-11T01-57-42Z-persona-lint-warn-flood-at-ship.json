@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "evolve ship prints no persona-lint WARN line",
+    "A persona with an undeclared allowed tool fails the persona lint test"
+  ],
+  "created_at": "2026-11-11T01:57:42Z",
+  "deps": [],
+  "files": [
+    "agents/",
+    ".evolve/profiles/"
+  ],
+  "fix": "Declare the allowed tools in each persona, or remove a tool that the persona does not use, until persona-lint prints no WARN. Then make a new mismatch fail the persona lint test.",
+  "id": "persona-lint-warn-flood-at-ship",
+  "kind": "maintenance",
+  "notes": "Evidence: 51 persona-lint lines in each of two manual ships on 2026-11-11.",
+  "origin": "console",
+  "priority_class": "hygiene",
+  "source": "console, 2026-11-11",
+  "summary": "evolve ship prints 51 persona-lint WARN lines on each run (for example accessibility-audit: allowed tool Bash is undeclared in persona). The flood hides the ship lines that matter, and nobody acts on the warnings.",
+  "title": "Each ship prints 51 persona-lint WARN lines for undeclared persona tools",
+  "weight": 0.3
+}

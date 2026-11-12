@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "A lane that changes only .github/workflows/required.yml runs go/internal/ciparity in its floor, proven by a test through the real floor entry point that is red without the change",
+    "A guard fails when a test package reads a repo data file that no registry row names"
+  ],
+  "created_at": "2026-11-12T02:00:00Z",
+  "deps": [],
+  "files": [
+    "go/internal/changedpkgs",
+    "go/internal/core",
+    ".github/workflows/required.yml",
+    "go/internal/ciparity"
+  ],
+  "fix": "Design first (docs-write, then an architecture review). Candidate: one registry that maps a path glob to the test packages that read it (for example .github/workflows/* to internal/ciparity), derived where possible from the os.ReadFile and embed sites of each test package, and checked by a guard so that a new reader cannot skip its row. The lane floor and the ship gate run the packages that the changed paths select.",
+  "id": "lane-floor-selects-the-tests-that-read-a-changed-data-file",
+  "kind": "pipeline-integrity",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "source": "console, 2026-11-12, pipeline health investigation: main red since cf5215daf (cycle 2324), fixed by PR #1412",
+  "summary": "Cycle 2324 changed .github/workflows/required.yml and shipped. Its floor ran only the tests of the Go packages it changed. internal/ciparity reads required.yml as data, so no step selected it, and main went red for 6 CI runs while 5 more lane ships landed on it. The same gap holds for each test that reads a data file: workflow YAML, policy.json, manifests, docs indexes.",
+  "title": "The lane floor selects the test packages that read a changed non-Go file",
+  "weight": 0.9
+}

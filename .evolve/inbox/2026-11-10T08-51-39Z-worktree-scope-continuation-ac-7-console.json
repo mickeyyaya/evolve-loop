@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "The scout phase sees the ancestry line when a continuation manifest exists"
+  ],
+  "created_at": "2026-11-10T08:51:39Z",
+  "files": [
+    "go/internal/core/cyclerun.go",
+    "go/internal/core/orchestrator.go"
+  ],
+  "fix": "Make the change that AC 7 needs on the protected path(s) go/internal/core/orchestrator.go, go/internal/core/cyclerun.go, then prove the criterion with a test.",
+  "id": "worktree-scope-continuation-ac-7-console",
+  "kind": "sweep",
+  "origin": "cycle",
+  "priority_class": "hygiene",
+  "route": "console-manual",
+  "source": "cycle 2270, tdd test-report.md AC 7 (console-followup)",
+  "summary": "The TDD phase of cycle 2270 gave AC 7 of worktree-scope-continuation the console-followup disposition. A lane builder can never change the paths it needs (go/internal/core/orchestrator.go, go/internal/core/cyclerun.go). The lane part ships without it, so the console owns this part.",
+  "title": "Console part of worktree-scope-continuation: AC 7, which needs a protected path changed",
+  "weight": 0.56
+}

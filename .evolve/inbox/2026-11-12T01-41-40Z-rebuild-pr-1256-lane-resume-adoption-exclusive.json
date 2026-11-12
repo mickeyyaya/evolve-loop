@@ -1,0 +1,30 @@
+{
+  "acceptance": [
+    "Main holds the behaviour that PR #1256 described, proven by a test through the real entry point that is red without the change, or this item is consumed with the evidence that main already holds it"
+  ],
+  "created_at": "2026-11-12T02:10:00Z",
+  "deps": [],
+  "files": [
+    "docs/architecture/checkpoint-resume.md",
+    "docs/architecture/packages/internal-checkpoint.md",
+    "docs/architecture/packages/internal-core.md",
+    "go/cmd/evolve/cmd_cycle.go",
+    "go/cmd/evolve/cmd_cycle_lane_resume.go",
+    "go/internal/checkpoint/autoresume.go"
+  ],
+  "fix": "Read branch cloud/lane-resume-adoption-exclusive as a reference (diff it against its merge base with origin/main). First check whether main already holds the behaviour; if so, consume this item with that evidence. Otherwise rebuild the change on current main with tests, not by a cherry-pick.",
+  "id": "rebuild-pr-1256-lane-resume-adoption-exclusive",
+  "intake_override": {
+    "reason": "each item rebuilds a distinct closed PR; the shared paths are common homes, not the same change",
+    "overlaps": [
+      "rebuild-pr-1252-ad3-1-fingerprint-folds"
+    ]
+  },
+  "kind": "fix",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "console, 2026-11-12, stale PR triage (operator decision: close and file items). PR #1256 closed unmerged; branch cloud/lane-resume-adoption-exclusive kept as reference",
+  "summary": "PR #1256 (cloud/lane-resume-adoption-exclusive) was built in the cloud window on 2026-11-03/04 and fell 400+ commits behind main. It was closed unmerged. Its description: ## Summary Closes inbox item `lane-resume-adoption-exclusive`. - **F1, exclusive adoption.** `checkpoint.RecordLaneResume` counts the auto-resume and then calls `core.TakeResumeLease` on the workspace of the paused cycle. Both steps run under the same `flock.WithPathLock` that `RecordResume` uses. If a fresh run lease exists, the call refuses with `*core.ResumeHeldError`, which names the holder's run ID, PID and heartbeat. The refusal spends no attempt, and the lane starts a fresh cycle. A spent budget takes no lease. `evolve cycle run` now wires the lane to `RecordLaneResume`. `evolve loop --resume` keeps `RecordResume`. - **F2, the lock decision needs a lane identity.** `RunCycleFromPhase`",
+  "title": "Rebuild on current main: a paused cycle is adopted by one lane only",
+  "weight": 0.5
+}

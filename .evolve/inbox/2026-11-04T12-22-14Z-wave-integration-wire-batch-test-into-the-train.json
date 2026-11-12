@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "A train batch runs BatchTest.Check before it opens the batch PR, through the real entry point",
+    "A journey test proves a batch whose two members pass alone and fail together ejects the later member with the cause in its brief",
+    "A host kill does not eject a member",
+    "A tree that lands after an L2 ejection meets the repo-contract pack, cover-changed, cover-strict, build, vet and gofmt before L3, and a test proves it with a member that fails only gofmt on the combined tree"
+  ],
+  "created_at": "2026-11-04T12:22:14Z",
+  "files": [
+    "go/internal/integration/batchtest.go",
+    "go/internal/integration/train.go",
+    "go/cmd/evolve/cmd_integration_batch.go",
+    "go/internal/acsrunner/runner.go"
+  ],
+  "fix": "Build the three adapters of BatchTest, call Check from the train before the batch PR opens, move the branch to the tested tip, and return a typed result from acsrunner that separates a host failure from a build failure. Add the rest of the L2 row as PackageTest seams: the repo-contract pack, cover-changed, cover-strict, build, vet and gofmt. This pack is the answer for a tree that lands after an L2 ejection: L2 is a superset of the L1 gates, so no gate rerun is needed.",
+  "id": "wave-integration-wire-batch-test-into-the-train",
+  "kind": "pipeline-integrity",
+  "notes": "BatchTest.Check has no production caller. The console train lands a batch on CI alone. Owner of the work that older text gave to I5: the three adapters (package test, predicate run, verdict store), the branch move with the tested tip refusal, the output limit, and the separation of a host failure from a build failure, which needs a typed result from acsrunner. Found by the architecture seat on the I3b rework, 2026-11-04.",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "summary": "BatchTest.Check has no production caller. The console train lands a batch on CI alone. Owner of the work that older text gave to I5: the three adapters (package test, predicate run, verdict store), the branch move with the tested tip refusal, the output limit, and the separation of a host failure from a build failure, which needs a typed result from acsrunner. Found by the architecture seat on the I3b rework, 2026-11-04.",
+  "title": "Wire the batch test L2 into the console train",
+  "weight": 0.7
+}
