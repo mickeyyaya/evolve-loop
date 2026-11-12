@@ -57,7 +57,7 @@ func TestNew_SetsTheMainRefAndTheScratchDefaults(t *testing.T) {
 	run := func(context.Context, string, Reds) ([]Key, error) { return nil, nil }
 	git := gitexec.Default(t.TempDir())
 	a := New(git, run, 3*time.Second, func(context.Context) func() { return func() { released = true } })
-	if a.MainRef != "main" || a.Scratch != ".evolve/ephemeral/base-red" {
+	if a.MainRef != "main" || a.Scratch != DefaultScratch || DefaultScratch != ".evolve/ephemeral/base-red" {
 		t.Errorf("defaults = %q %q, want main and .evolve/ephemeral/base-red", a.MainRef, a.Scratch)
 	}
 	if a.Git.Dir != git.Dir || a.Run == nil || a.Timeout != 3*time.Second {

@@ -377,3 +377,17 @@ func TestRunIn_ARunErrorNamesTheTreeAndTheLimit(t *testing.T) {
 		t.Errorf("err = %v, want the tree, the limit and the cause", err)
 	}
 }
+
+func TestResolve_NamesTheCommitOfARevAndRefusesAnUnknownRev(t *testing.T) {
+	t.Parallel()
+	r, base, tip := twoCommits(t)
+	a := attributorOn(t, r, (&script{}).run)
+	for rev, want := range map[string]string{base: base, tip: tip, "HEAD": tip, "HEAD~1": base} {
+		if got, err := a.Resolve(context.Background(), rev); err != nil || got != want {
+			t.Errorf("Resolve(%q) = %q, %v, want %q", rev, got, err, want)
+		}
+	}
+	if got, err := a.Resolve(context.Background(), "no-such-ref"); err == nil {
+		t.Errorf("Resolve of an unknown rev = %q, nil error, want an error", got)
+	}
+}
