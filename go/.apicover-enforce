@@ -873,3 +873,7 @@
 ./internal/cyclefacts
 ./internal/testdup
 ./internal/logcompress
+./internal/baseattr
+./internal/gatecontract
+./internal/gateregistry
+./internal/mainstop
