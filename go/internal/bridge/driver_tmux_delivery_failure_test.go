@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -232,7 +233,7 @@ func TestTmuxREPL_ParkedPaneWithOnlyStaleArtifact_StillFastFails(t *testing.T) {
 	if rerr != nil {
 		t.Fatal(rerr)
 	}
-	base := &FakeTmuxController{CaptureFrames: []string{"❯", "❯ parked", "❯ parked", "❯ parked", "❯ parked", "❯ parked", "❯ parked"}}
+	base := &FakeTmuxController{CaptureFrames: append([]string{"❯"}, slices.Repeat([]string{"❯ parked"}, submitVerifyMaxResends+3)...)}
 	tm := &parkedNeverDeliveringTmux{FakeTmuxController: base, parkedText: firstNonEmptyLine(string(promptBody))}
 	deps := fixtureDeps(tm)
 	deps.CaptureBaseline = captureArtifactBaseline
