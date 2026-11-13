@@ -47,7 +47,7 @@ The build floor fails the build with this flag. If the flag reaches ship, ship r
   | `added-skip` | an existing `_test.go` file gets a `.Skip(`, `.Skipf(` or `.SkipNow(` call that the diff does not also remove |
   | `changed-threshold` | a removed and an added line set one name to two different numbers. The name has `threshold`, `budget`, `floor`, `halt`, `ratchet` or `coverage`. |
   | `stage-off-enforce` | a removed line sets a stage key to `enforce`, and an added line sets the same key to `shadow` or `off` |
-  | `frozen-check` | a file under `go/acs/` changes or goes, and it is not under `go/acs/cycle<N>/` of the shipping cycle |
+  | `frozen-check` | a file under `go/acs/` changes or goes, and it is not under `go/acs/cycle<N>/` of the shipping cycle. `FrozenForLane` is its path part, and lane routing reads it. |
   | `healing-constitution` | the constitution predicate is true for a changed or untracked path |
 
   The patterns `changed-threshold` and `stage-off-enforce` skip a `_test.go` file, because a test fixture sets these values freely.

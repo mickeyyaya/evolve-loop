@@ -8,16 +8,17 @@ Links: [ADR-0074](../adr/0074-typed-signal-contracts-routing-authority.md) (rout
 
 ## Design
 
-- **Two sources, one predicate (Specification pattern).** A path is forbidden in one of two cases. In the first case, `guards.IsProtectedScope` judges it protected: it equals a fragment of the compiled manifest or lies inside one. In the second case, the **enforced** sandbox of the build profile denies it (`profiles.SandboxConfig.Denies` over `sandbox.deny_subpaths`). `anyOf` composes the two.
+- **Three sources, one predicate (Specification pattern).** A path is forbidden in one of three cases. In the first case, `guards.IsProtectedScope` judges it protected: it equals a fragment of the compiled manifest or lies inside one. In the second case, `gateclass.FrozenForLane` puts it under `go/acs/`, by the path part of the `frozen-check` enforcer, so routing and the enforcer read one rule. In the third case, the **enforced** sandbox of the build profile denies it (`profiles.SandboxConfig.Denies` over `sandbox.deny_subpaths`). `anyOf` composes the three.
+  - The fallback of `LazyForbidden` composes the first two.
 - **A directory that only holds a fragment is lane work.** `go/internal/core` holds 44 fragments and `go/cmd/evolve` holds 3, and both stay lane work ([ADR-0139](../adr/0139-a-wave-orchestrator-supplies-admits-and-backfills-every-lane.md) decision 5). The four guards stop a lane at each protected file. Only `evolve inbox split` judges a directory by containment (`guards.TouchesProtectedSurface`).
-- **Routing follows what is enforced.** `Denies` reads the same `deny_subpaths` list that the bridge turns into OS sandbox rules (`internal/bridge/launch.go`), and only when `sandbox.enabled` is true, since that is the only case where the bridge enforces it. A profile with no sandbox block adds nothing. `Denies` compares cleaned path text; the bridge also resolves symlinks, so a symlinked spelling can differ.
+- **Routing follows what is enforced.** `Denies` reads the same `deny_subpaths` list that the bridge turns into OS sandbox rules (`internal/bridge/launch.go`), and only when `sandbox.enabled` is true. In no other case does the bridge enforce it. A profile with no sandbox block adds nothing. `Denies` compares cleaned path text; the bridge also resolves symlinks, so a symlinked spelling can differ.
 - **The build profile is the writer, on purpose.** Only `tdd` and `build` have `writes_source: true`, and `build` writes the item's declared files.
-  - Adding the TDD profile's denials would be wrong. It also denies `agents/` and `skills/`, which is routine builder work, so every persona and skill item would go to the console.
-  - Using only paths both profiles deny would repeat the incident: TDD can write `.evolve/evals`, which the builder cannot.
+  - Do not add the TDD profile's denials. It also denies `agents/` and `skills/`, which is routine builder work, so every persona and skill item will go to the console.
+  - Do not use only the paths that both profiles deny. That repeats the incident: TDD can write `.evolve/evals`, which the builder cannot.
   - The runner loads `<ProjectRoot>/.evolve/profiles/<trim(AgentPromptName)>.json` (`runner/preparation.go`), the same file routing reads. `build.ProfileName` names it once.
 - **The lazy predicate.** `LazyForbidden(projectRoot, writerProfile, emit)` is the predicate that each routing root uses.
   - It loads the profile on the first routing question (`sync.Once`), so a root that never routes stays silent.
-  - A profile that does not load leaves protected surface only (`guards.IsProtectedScope`). A fail-closed predicate forbids everything and stops the queue. A builder profile that does not load already fails the build itself.
+  - A profile that does not load leaves protected surface (`guards.IsProtectedScope`) and frozen checks (`gateclass.FrozenForLane`) only. A fail-closed predicate forbids everything and stops the queue. A builder profile that does not load already fails the build itself.
   - The fallback emits one registered signal, `INBOX_ROUTING_FALLBACK` (module `inbox`, kind `inbox.warning`, WARN). Its fields name the profile and the project root, and its reason is the load error.
 - **Composition roots.** In `cmd/evolve`, `laneForbidden(root, warn)` renders the signal on a writer through `signalcenter.ConsoleSink`. `laneForbiddenTo(root, emit)` sends it to a Signal Center.
   - The cycle root and the simulate root pass their Center (`signals.Emit`). Thus the fallback reaches the cycle's `signals.ndjson`, and the console sink prints it.
@@ -39,6 +40,7 @@ Links: [ADR-0074](../adr/0074-typed-signal-contracts-routing-authority.md) (rout
 - A root whose only item declares a protected file offers no lane work. Pinned by `TestLaneMenuOf_TheProductionPredicateWithholdsARootThatHoldsOnlyAProtectedFileItem`. With `TestRunCycle_EmptyTriageOverWorkTheLaneMenuWithholdsIsPlannedNoWork` in `core`, the cycle then ends as planned no-work, not as a claim failure.
 - Triage's breaker refuses a `top_n` card that names a lane-forbidden path, whatever the card's source. Pinned by `TestTriageClassify_RefusesATopNCardNamingAPathTheLanePredicateForbids`.
 - `Denies` matches a denied subpath or anything under it on path-segment boundaries (`.evolve/profilesX` is not `.evolve/profiles`), after `path.Clean`. A directory spelling (`dir/`) that contains a denied subpath is also denied. Pinned by `TestSandboxConfig_DeniesPathsUnderADeniedSubpath`.
+- A path under `go/acs/` routes its item to the console. A lane edit of an existing file there fails with `HEALING_I10_VIOLATION` (cycles 2343 and 2348). Routing cannot tell a new file from an edit, so it also sends an item with a new file there to the console. That is the safe direction. Pinned by `TestTriage_FrozenCheckFixSurfaceRoutesToConsole`, `TestForbidden_FrozenCheckPathsAreForbiddenAndNeighboursAreNot`, `TestLazyForbidden_TheFallbackStillForbidsFrozenChecks` and, in `gateclass`, `TestFrozenForLane_IsThePathPartOfTheFrozenCheckEnforcer`.
 
 ## Known gaps
 
@@ -47,4 +49,4 @@ Links: [ADR-0074](../adr/0074-typed-signal-contracts-routing-authority.md) (rout
 ## Findings
 
 - Cycles 1696 and 1699 both failed at the build floor on item `chronicle-s7a-historian-shadow`. It declared `.evolve/profiles/historian.json (new)`, which the builder's sandbox denies. See [the incident](../../incidents/2026-09-26-lane-sent-work-its-sandbox-denies.md).
-- Measured on the live queue on 2026-09-26 with `evolve inbox batches --json`, before and after the fix: 146 → 147 console-routed items, no item leaving the console. The one new item, `skill-allowlist-for-skill-using-phases`, declares `.evolve/profiles/bug-reproduction.json` and `adversarial-review.json`. Both are builder-denied, so it was a second latent item no lane could finish.
+- Measured on the live queue on 2026-09-26 with `evolve inbox batches --json`, before and after the fix: 146 → 147 console-routed items, no item leaving the console. The one new item, `skill-allowlist-for-skill-using-phases`, declares `.evolve/profiles/bug-reproduction.json` and `adversarial-review.json`. Both are builder-denied, so it was a second latent item that no lane can finish.

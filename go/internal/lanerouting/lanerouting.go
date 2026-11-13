@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gateclass"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
@@ -23,7 +24,7 @@ func Forbidden(projectRoot, writerProfile string) (func(string) bool, error) {
 	if prof.Sandbox != nil && prof.Sandbox.Enabled {
 		sandbox = *prof.Sandbox
 	}
-	return anyOf(guards.IsProtectedScope, sandbox.Denies), nil
+	return anyOf(guards.IsProtectedScope, gateclass.FrozenForLane, sandbox.Denies), nil
 }
 
 func anyOf(preds ...func(string) bool) func(string) bool {

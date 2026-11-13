@@ -2,6 +2,7 @@ package gateclass
 
 import (
 	"errors"
+	"path"
 	"reflect"
 	"slices"
 	"strings"
@@ -280,5 +281,25 @@ func TestGateClassifier_AContractTestMovedInItsDirectoryIsNoRemoval(t *testing.T
 
 	if got := Classify(Input{Diff: diff}); len(got) != 0 {
 		t.Fatalf("Classify = %+v, want no flag for a contract test moved inside its directory", got)
+	}
+}
+
+func TestFrozenForLane_IsThePathPartOfTheFrozenCheckEnforcer(t *testing.T) {
+	for p, want := range map[string]bool{
+		"go/acs/cycle463/predicates_test.go":   true,
+		"./go/acs/cycle463/predicates_test.go": true,
+		"go/acs/redteam/x_test.go":             true,
+		"go/acs/regression/r_test.go":          true,
+		"go/acs":                               true,
+		"go/acsx/a.go":                         false,
+		"docs/go/acs/cycle12/x.md":             false,
+		"go/internal/fleet/fleet.go":           false,
+	} {
+		if got := FrozenForLane(p); got != want {
+			t.Errorf("FrozenForLane(%q) = %v, want %v", p, got, want)
+		}
+		if got := (fileDiff{path: path.Clean(p)}).changesFrozenCheck(2349); got != want {
+			t.Errorf("changesFrozenCheck(%q, 2349) = %v, want %v: routing and the enforcer disagree", p, got, want)
+		}
 	}
 }
