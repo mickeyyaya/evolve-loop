@@ -55,13 +55,6 @@ func wireAt(c *signalcenter.Center, dir string, console *bytes.Buffer, at time.T
 	wireExpectedSignalsWith(c, expectedWiring{evolveDir: dir, console: console, now: func() time.Time { return at }})
 }
 
-func policyFile(t *testing.T, dir, body string) {
-	t.Helper()
-	if err := os.WriteFile(filepath.Join(dir, "policy.json"), []byte(body), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestWireExpectedSignals_AStartFromAnotherProcessWarnsOnTheNextTickAndOnlyOnce(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -69,7 +62,7 @@ func TestWireExpectedSignals_AStartFromAnotherProcessWarnsOnTheNextTickAndOnlyOn
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	policyFile(t, dir, `{"expected_signal":{"wave_seconds":3600}}`)
+	u13WritePolicy(t, dir, `{"expected_signal":{"wave_seconds":3600}}`)
 	waveCenter, closeWave := newRoleSignalCenter("wave", root, dir, io.Discard)
 	waveCenter.Emit(waveEvent(signalcenter.KindWaveStarted, "wave 1 launched", map[string]string{"wave": "1", "run_id": "r1"}))
 	closeWave()
@@ -104,7 +97,7 @@ func TestWireExpectedSignals_ATickPollsTheStreamForStartsThatArrivedAfterBoot(t 
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	policyFile(t, dir, `{"expected_signal":{"wave_seconds":3600}}`)
+	u13WritePolicy(t, dir, `{"expected_signal":{"wave_seconds":3600}}`)
 	loop := signalcenter.New()
 	warns := warnsOf(loop)
 	var console bytes.Buffer
@@ -150,7 +143,7 @@ func TestWireExpectedSignals_AnUnreadableStreamWarnsAndKeepsListening(t *testing
 func TestWireExpectedSignals_ABadPolicyWarnsAndTheDefaultsApply(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	policyFile(t, dir, `{"expected_signal":{"phase_seconds":-1}}`)
+	u13WritePolicy(t, dir, `{"expected_signal":{"phase_seconds":-1}}`)
 	writeStream(t, dir, oldWaveStart())
 	c := signalcenter.New()
 	warns := warnsOf(c)
@@ -164,7 +157,7 @@ func TestWireExpectedSignals_ABadPolicyWarnsAndTheDefaultsApply(t *testing.T) {
 func TestWireExpectedSignals_ThePolicyDeadlineGovernsTheWarning(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	policyFile(t, dir, `{"expected_signal":{"wave_seconds":999999999}}`)
+	u13WritePolicy(t, dir, `{"expected_signal":{"wave_seconds":999999999}}`)
 	writeStream(t, dir, oldWaveStart())
 	c := signalcenter.New()
 	warns := warnsOf(c)
@@ -234,7 +227,7 @@ func TestRootSignalCenter_APairEventOfACycleReachesTheProjectStreamOnce(t *testi
 func TestWireExpectedSignals_OnlyALoopTickPollsTheStream(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	policyFile(t, dir, `{"expected_signal":{"wave_seconds":3600}}`)
+	u13WritePolicy(t, dir, `{"expected_signal":{"wave_seconds":3600}}`)
 	c := signalcenter.New()
 	warns := warnsOf(c)
 	wireExpectedSignals(c, dir, &bytes.Buffer{})
