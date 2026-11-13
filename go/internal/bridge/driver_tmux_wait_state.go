@@ -33,6 +33,7 @@ type replWaitState struct {
 	submitWedged            bool
 	nudgeEvent              *interaction.Event
 	nudgeAt                 time.Time
+	resendWindowS           int
 	detectorErrorLogged     bool
 	inboxDrainWarned        bool
 	terminalDetectorErrored bool
@@ -131,4 +132,10 @@ func (s *replWaitState) recordNudgeOutcome(recorder *interaction.Recorder, now f
 		Result:    result,
 		LatencyMS: now().Sub(s.nudgeAt).Milliseconds(),
 	})
+}
+
+func (s *replWaitState) takeResendWindowS() int {
+	n := s.resendWindowS
+	s.resendWindowS = 0
+	return n
 }

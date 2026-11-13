@@ -51,7 +51,7 @@ func (w replWaiter) wait() (replWaitResult, int) {
 		return state.result, code
 	}
 	ar.transientDwellEnabled = true
-	for elapsed := 0; ; elapsed += 2 {
+	for elapsed := 0; ; elapsed += 2 + state.takeResendWindowS() {
 		w.pace()
 		state.waitedS = elapsed
 		if err := ctx.Err(); err != nil {

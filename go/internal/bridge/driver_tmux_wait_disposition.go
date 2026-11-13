@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 )
@@ -116,6 +117,7 @@ func (w replWaiter) deliverArtifactNudge(state *replWaitState, elapsed int) chec
 		Payload: nudgeMsg,
 	}
 	state.nudgeAt = w.deps.Now()
+	state.resendWindowS = int(outcome.Waited / time.Second)
 	state.intervalStartS = elapsed
 	state.attempt++
 	return checkpointContinueWaiting

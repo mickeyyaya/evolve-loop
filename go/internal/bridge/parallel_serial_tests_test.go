@@ -1,6 +1,9 @@
 package bridge
 
 var serialTests = map[string]string{
+	"bridge.TestVerifySubmitted_CancelDuringBackoffEndsTheWaitWithinOnePoll":                                    "swaps the package-level submitVerifyBackoff",
+	"bridge.TestVerifySubmitted_CancelDuringFourthBackoffStopsFurtherSendKeys":                                  "swaps the package-level submitVerifyBackoff",
+	"bridge.TestVerifySubmitted_CancelAlreadyPendingWhenTheWaitStartsSendsNothingMore":                          "swaps the package-level submitVerifyBackoff",
 	"bridge.TestLaunch_AParameterSeatOnAHostWithNoHolderNamesClearAndNotSet":                                    "sets HOME for the seat launch",
 	"bridge.TestSeatHolder_ALiveSeatCanWriteItsOwnDirectory":                                                    "sets HOME for the live sandbox",
 	"bridge.TestSeatHolder_ALiveSeatCannotReadOrChangeTheHolder":                                                "sets HOME for the live sandbox",

@@ -58,6 +58,21 @@ func pendingAtInputLine(pane, marker string, echoes []string) bool {
 type submitVerifyOutcome struct {
 	Resends int
 	Result  string
+	Waited  time.Duration
+}
+
+func sleepUnlessCancelled(ctx context.Context, deps Deps, d time.Duration) bool {
+	done := make(chan struct{})
+	go func() {
+		deps.Sleep(d)
+		close(done)
+	}()
+	select {
+	case <-done:
+		return ctx.Err() == nil
+	case <-ctx.Done():
+		return false
+	}
 }
 
 func verifySubmitted(ctx context.Context, deps Deps, lp tmuxLaunch, pfx, site, pane string, echoes ...string) submitVerifyOutcome {
@@ -72,11 +87,15 @@ func verifySubmitted(ctx context.Context, deps Deps, lp tmuxLaunch, pfx, site, p
 		return submitVerifyOutcome{Result: interaction.ResultNotVerified}
 	}
 	resends := 0
+	var waited time.Duration
 	for pendingAtInputLine(pane, lp.inputLineMarker, echoes) {
+		if ctx.Err() != nil {
+			return submitVerifyOutcome{Resends: resends, Result: interaction.ResultNotVerified, Waited: waited}
+		}
 		if resends >= submitVerifyMaxResends {
 			fmt.Fprintf(deps.Stderr, "%s submit-verify: %s STILL unsubmitted after %d re-send(s) — giving up; pane looks wedged\n",
 				pfx, site, resends)
-			return submitVerifyOutcome{Resends: resends, Result: interaction.ResultSubmitWedged}
+			return submitVerifyOutcome{Resends: resends, Result: interaction.ResultSubmitWedged, Waited: waited}
 		}
 		fmt.Fprintf(deps.Stderr, "%s submit-verify: %s still parked at the `%s` input line — re-sending Enter (%d/%d)\n",
 			pfx, site, lp.inputLineMarker, resends+1, submitVerifyMaxResends)
@@ -85,18 +104,22 @@ func verifySubmitted(ctx context.Context, deps Deps, lp tmuxLaunch, pfx, site, p
 			return submitVerifyOutcome{Resends: resends, Result: interaction.ResultNotVerified}
 		}
 		resends++
-		deps.Sleep(submitVerifyBackoff[resends-1])
+		step := submitVerifyBackoff[resends-1]
+		if !sleepUnlessCancelled(ctx, deps, step) {
+			return submitVerifyOutcome{Resends: resends, Result: interaction.ResultNotVerified, Waited: waited}
+		}
+		waited += step
 		next, err := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
 		if err != nil {
 			fmt.Fprintf(deps.Stderr, "%s submit-verify: %s capture failed after re-send %d/%d — "+
 				"stopping verification, input-line state unknown: %v\n",
 				pfx, site, resends, submitVerifyMaxResends, err)
-			return submitVerifyOutcome{Resends: resends, Result: interaction.ResultNotVerified}
+			return submitVerifyOutcome{Resends: resends, Result: interaction.ResultNotVerified, Waited: waited}
 		}
 		pane = next
 	}
 	if resends > 0 {
-		return submitVerifyOutcome{Resends: resends, Result: interaction.ResultSubmittedAfterResend}
+		return submitVerifyOutcome{Resends: resends, Result: interaction.ResultSubmittedAfterResend, Waited: waited}
 	}
 	return submitVerifyOutcome{Result: interaction.ResultSubmitVerified}
 }
