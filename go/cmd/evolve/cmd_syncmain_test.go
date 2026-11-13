@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -16,9 +17,24 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
+func smMaintenanceOff() []string {
+	var args []string
+	for _, pair := range gittest.MaintenanceConfig() {
+		args = append(args, "-c", pair[0]+"="+pair[1])
+	}
+	return args
+}
+
+func smWithCloneOptOut(args []string) []string {
+	if len(args) == 0 || args[0] != "clone" {
+		return args
+	}
+	return slices.Concat(args[:1], smMaintenanceOff(), args[1:])
+}
+
 func smGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("git", args...)
+	cmd := exec.Command("git", smWithCloneOptOut(args)...)
 	cmd.Dir = dir
 	cmd.Env = smFilteredEnv()
 	out, err := cmd.CombinedOutput()
@@ -30,7 +46,7 @@ func smGit(t *testing.T, dir string, args ...string) string {
 
 func smGitAllowFail(t *testing.T, dir string, args ...string) (string, error) {
 	t.Helper()
-	cmd := exec.Command("git", args...)
+	cmd := exec.Command("git", smWithCloneOptOut(args)...)
 	cmd.Dir = dir
 	cmd.Env = smFilteredEnv()
 	out, err := cmd.CombinedOutput()
@@ -55,6 +71,9 @@ func smInitRepo(t *testing.T, dir string) {
 		r.Git("config", "user.email", "ci@example.com")
 		r.Git("config", "user.name", "ci")
 		r.Git("config", "commit.gpgsign", "false")
+		for _, pair := range gittest.MaintenanceConfig() {
+			r.Git("config", pair[0], pair[1])
+		}
 		return nil
 	})
 	if err := os.CopyFS(dir, os.DirFS(tpl.Dir)); err != nil {
@@ -82,6 +101,9 @@ func smInitRepoWithRemote(t *testing.T) (string, string) {
 		r.Git("-C", repo, "config", "user.email", "ci@example.com")
 		r.Git("-C", repo, "config", "user.name", "ci")
 		r.Git("-C", repo, "config", "commit.gpgsign", "false")
+		for _, pair := range gittest.MaintenanceConfig() {
+			r.Git("-C", repo, "config", pair[0], pair[1])
+		}
 		return os.RemoveAll(filepath.Join(r.Dir, ".git"))
 	})
 	bare := filepath.Join(tpl.Dir, "origin.git")

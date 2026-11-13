@@ -170,6 +170,18 @@ The #1132 hang is not in the table, because its first cause is a defect of that 
 
 *Implication:* a test that is not about the deadline must not depend on it. Give the tests of truncation a long deadline, and keep the short deadline only in the test that proves the deadline.
 
+### F4.9 `TestChannelE2E_RealFixtures_ClaudeSpan`: the poll order of F4.1
+
+- Run: one red in a full `go test ./...` run on 2026-10-17. It passed alone. No CI run id is on record.
+- Cause: the test drives the `phasestream.Normalizer` of F4.1. The fake driver writes the pane text to `build-pane.live` and then the marker `idle_reached` to `build-breadcrumbs.live` in one tick (`go/internal/bridge/channel_e2e_load_test.go:65-67`). Before #1006, `classifyNewLines` read stdout and then stderr. A loaded host can run both writes between the two reads. The classifier then saw the marker first, and the answer span closed too early. This is synthesis: the red predates #1006 and has the same window as F4.1.
+- Fix: none new. #1006 (merged 2026-10-20) reads stderr first (`go/internal/phasestream/normalizer.go:102-117`), and `go/internal/phasestream/normalizer_order_test.go` pins the order. Cycle 2339 added no code for this test. It ran 50 times beside a CPU load with 0 failures, and no failure came back in 30 plain runs and 100 `-race -cpu 1` runs.
+
+### F4.10 `TestSyncMain_TheLoopsInboxStampsNeverBlockTheSync`: the git maintenance child of F4.5
+
+- Run: one red in a full `go test ./...` run on 2026-10-17. It passed alone. No CI run id is on record.
+- Cause: the fixture built a work repository and a console clone without `maintenance.auto=false` and `gc.auto=0`. The sync and the test run `git commit`, `fetch`, `merge` and `push` in both. Each command can start a detached maintenance child. That child writes into `.git` while `t.TempDir()` removes it. This is synthesis: it is the class of F4.5, and a check showed the two keys missing.
+- Fix: `smInitRepoWithRemote` and `smInitRepo` set both keys in the work repository, and `smGit` clones with both keys through `clone -c`. `TestSyncMainFixture_` tests in `go/cmd/evolve/cmd_syncmain_hermetic_test.go` pin this.
+
 ## 5. Reds that are not flakes
 
 ### F5.1 `acs/cycle10` `TestC10_001_DeadFlagsAbsentFromRegistry`: a real defect on `main`
