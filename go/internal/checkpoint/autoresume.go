@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
@@ -17,6 +18,14 @@ import (
 var errNoCheckpoint = errors.New("checkpoint: the state has no checkpoint block")
 
 func RecordResume(path string, auto bool) (Checkpoint, bool, error) {
+	return recordResume(path, auto, func() error { return nil })
+}
+
+func RecordLaneResume(path string, auto bool) (Checkpoint, bool, error) {
+	return recordResume(path, auto, func() error { return core.TakeResumeLease(filepath.Dir(path), time.Now()) })
+}
+
+func recordResume(path string, auto bool, take func() error) (Checkpoint, bool, error) {
 	var cp Checkpoint
 	admitted := false
 	err := flock.WithPathLock(path, func() error {
@@ -25,6 +34,11 @@ func RecordResume(path string, auto bool) (Checkpoint, bool, error) {
 			return err
 		}
 		cp, admitted = nextResume(existing, auto)
+		if admitted {
+			if err := take(); err != nil {
+				return err
+			}
+		}
 		return applyWithHooks(defaultHooks(), path, cp)
 	})
 	if err != nil {

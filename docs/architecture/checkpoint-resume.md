@@ -45,7 +45,14 @@ The lane flow now has three steps:
 Before the lane runs the cycle, it does these steps in this order:
 
 1. It makes sure that each todo of the scope is pending or already held by the paused cycle. This check changes nothing, so a refusal here spends no auto-resume.
-2. It records one auto-resume through `checkpoint.RecordResume`. This call is the only budget rule. It refuses the resume when the auto-resume budget of the checkpoint is spent. Thus a family that stays walled cannot loop the lane.
+2. It records one auto-resume through `checkpoint.RecordLaneResume`.
+   - This call is the only budget rule. It refuses the resume when the auto-resume budget is spent.
+   - Thus a family that stays walled cannot loop the lane.
+   - After the call admits the try, it takes the resume lease of the paused workspace (`core.TakeResumeLease`) under the same path lock.
+   - If a fresh run lease exists, the call returns `*core.ResumeHeldError`. The error has the run ID, the PID and the heartbeat of the holder.
+   - This refusal spends no try, and the lane starts a fresh cycle.
+   - A spent budget takes no lease.
+   - `evolve loop --resume` keeps `checkpoint.RecordResume`, which takes no lease.
 3. It claims the todos back for the paused cycle through the claimer of the cycle (`hostInboxClaimer`). It then makes sure that the paused cycle holds each todo. If a todo is still not held, it releases each claim of the paused cycle through `releaseDeferredLaneClaims`. Thus no todo stays claimed by a cycle that does not run.
 4. It removes the wave goal from the request, so the checkpoint goal stays the goal of the cycle.
 5. It publishes `ORCHESTRATOR_LANE_RESUMED` with the scope, the phase and the auto-resume count.

@@ -57,7 +57,14 @@ func (l laneResume) run(ctx context.Context, orch cycleStarter, req core.CycleRe
 		return orch.RunCycle(ctx, req)
 	}
 	defer core.ActivateResumeStatePath(rp, l.evolveDir)()
+	defer l.unlease(rp)
 	return orch.RunCycleFromPhase(ctx, resumedRequest(req), rp)
+}
+
+func (l laneResume) unlease(rp *core.ResumePoint) {
+	if err := core.ReleaseResumeLease(filepath.Dir(rp.StatePath)); err != nil {
+		fmt.Fprintf(l.stderr, "evolve cycle run: WARN: cycle %d: cannot release the admission lease: %v\n", rp.CycleID, err)
+	}
 }
 
 func resumedRequest(req core.CycleRequest) core.CycleRequest {
@@ -87,6 +94,7 @@ func (l laneResume) adopt() *core.ResumePoint {
 	}
 	if err := l.reclaim(rp.CycleID); err != nil {
 		fmt.Fprintf(l.stderr, "evolve cycle run: lane %s: cycle %d cannot take its todo back (%v); the lane starts a fresh cycle\n", name, rp.CycleID, err)
+		l.unlease(rp)
 		return nil
 	}
 	l.binding().settle(rp.CycleID)
