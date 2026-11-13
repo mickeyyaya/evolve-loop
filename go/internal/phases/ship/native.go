@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
@@ -100,6 +101,8 @@ type Options struct {
 	repairAttempted map[core.ShipErrorCode]bool
 
 	shipLock func(path string) (release func(), err error)
+
+	baseRun baseattr.Runner
 
 	Signals *signalcenter.Center
 
@@ -192,6 +195,18 @@ func (o *Options) applyDefaults() {
 	if o.NowFn == nil {
 		o.NowFn = defaultNow
 	}
+}
+
+func (o *Options) evolveDir() string {
+	return filepath.Join(o.ProjectRoot, ".evolve")
+}
+
+func (o *Options) clock() time.Time {
+	now := defaultNow
+	if o.NowFn != nil {
+		now = o.NowFn
+	}
+	return time.Unix(now().Unix, 0).UTC()
 }
 
 func runStages(ctx context.Context, opts *Options, res RunResult) (RunResult, error) {

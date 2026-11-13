@@ -76,6 +76,7 @@ const (
 	CodeGitFFMergeDiverged     ShipErrorCode = "GIT_FF_MERGE_DIVERGED"
 	CodeGitFleetRebaseNeeded   ShipErrorCode = "GIT_FLEET_REBASE_NEEDED"
 	CodeGitFleetRebaseConflict ShipErrorCode = "GIT_FLEET_REBASE_CONFLICT"
+	CodeMainRedPark            ShipErrorCode = "MAIN_RED_PARK"
 	CodeGitPushRejected        ShipErrorCode = "GIT_PUSH_REJECTED"
 	CodeCommitPrefixGate       ShipErrorCode = "COMMIT_PREFIX_GATE"
 	CodeManifestGate           ShipErrorCode = "MANIFEST_GATE"
@@ -134,6 +135,12 @@ func (e *ShipError) DebugString() string {
 		fmt.Fprintf(&b, "%s=%s", k, e.Debug[k])
 	}
 	return b.String()
+}
+
+var ErrMainRedParked = errors.New("shiperr: ship parked the lane on a red main")
+
+func (e *ShipError) Is(target error) bool {
+	return target == ErrMainRedParked && e != nil && e.Code == CodeMainRedPark
 }
 
 func AsShipError(err error) (*ShipError, bool) {

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
@@ -28,14 +29,21 @@ const (
 	ReasonStallInactivity Reason = "stall-inactivity"
 	ReasonPhaseComplete   Reason = "phase-complete"
 	ReasonRetired         Reason = "retired"
+	ReasonMainRed         Reason = core.MainRedReason
 )
 
+var reasons = []Reason{ReasonQuotaLikely, ReasonBatchCapNear, ReasonOperatorRequest, ReasonStallInactivity, ReasonPhaseComplete, ReasonRetired, ReasonMainRed}
+
 func (r Reason) IsValid() bool {
-	switch r {
-	case ReasonQuotaLikely, ReasonBatchCapNear, ReasonOperatorRequest, ReasonStallInactivity, ReasonPhaseComplete, ReasonRetired:
-		return true
+	return slices.Contains(reasons, r)
+}
+
+func reasonNames() string {
+	names := make([]string, len(reasons))
+	for i, r := range reasons {
+		names[i] = string(r)
 	}
-	return false
+	return strings.Join(names, " | ")
 }
 
 type Checkpoint struct {
@@ -87,7 +95,7 @@ func ComposeWithIntegrity(cs core.CycleState, reason Reason, cost float64, gitHe
 
 func ComposeChecked(cs core.CycleState, reason Reason, cost float64, gitHead string, now time.Time) (Checkpoint, error) {
 	if !reason.IsValid() {
-		return Checkpoint{}, fmt.Errorf("checkpoint: invalid reason %q (want quota-likely | batch-cap-near | operator-requested | stall-inactivity | phase-complete)", reason)
+		return Checkpoint{}, fmt.Errorf("checkpoint: invalid reason %q (want %s)", reason, reasonNames())
 	}
 	return Compose(cs, reason, cost, gitHead, now), nil
 }
@@ -162,6 +170,12 @@ func init() {
 			cp := ComposeWithIntegrity(cs, ReasonOperatorRequest, 0, cycleBase(cs), now, readExistingIntegrity(path))
 			cp.AutoResumeAttempts = attempts
 			return applyWithHooks(defaultHooks(), path, cp)
+		})
+	}
+	core.MainRedBoundaryCheckpointer = func(cs core.CycleState, projectRoot string, now time.Time) error {
+		path := core.ResolveCycleStatePath(filepath.Join(projectRoot, ".evolve"))
+		return flock.WithPathLock(path, func() error {
+			return applyWithHooks(defaultHooks(), path, ComposeWithIntegrity(cs, ReasonMainRed, 0, cycleBase(cs), now, readExistingIntegrity(path)))
 		})
 	}
 	core.QuotaBoundaryCheckpointer = func(cs core.CycleState, projectRoot string, now time.Time) error {

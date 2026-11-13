@@ -589,16 +589,16 @@ func (r StopRelease) Keys(green []baseattr.Key, by string) (mainstop.Stop, error
 - `Now` is a value, as in `StopBound`. It is the start time of the command, so `ReleasedAt` can be earlier than the release by the CI time. No reader needs more.
 - `Consume` is one call of the new function `inboxmover.ConsumeFixItem(opts, id, promote)`. This function holds the sequence that ship has today: locate the item, accept a missing item, move it to `processed`.
 
-In `internal/core`, next to `BaseRedAttributor`:
+In `internal/mainstop`, next to the `Stop` record:
 
-- `StopProofReds(keys)` returns the `baseattr.Reds` of a stop proof: the keys and the tag flags.
+- `ProofReds(keys)` returns the `baseattr.Reds` of a stop proof: the keys and the tag flags.
 - It is the one home of those flags. `stopCheck.proof` of ship and the default `KeyRun` of the train both call it.
 
 In `cmd/evolve` (the composition root):
 
 - `integrationEnv` gets three fields: `Emit` (the signal sink), `Now` (the clock) and `KeyRun` (the key run).
 - `productionIntegrationEnv` sets each of the three.
-- The default `KeyRun` is `core.BaseRedAttributor(root, run, warn).RunAt` with `core.StopProofReds(keys)`. It runs the keys on a detached tree of the tip.
+- The default `KeyRun` is `core.BaseRedAttributor(root, run, warn).RunAt` with `mainstop.ProofReds(keys)`. It runs the keys on a detached tree of the tip.
 - `train()` becomes `train(warn io.Writer)`. The two callers (`batchVerb` and `recordPR`) pass their stderr.
 - The stop record and the policy file are in the project root, not in the working directory. Ship and the pool write and read them there.
   - The project root is `chooseRoot(flag, env.ProjectRootEnv, env.Root)`, the resolution of the `status` verb. The `batch` verb gets the `--project-root` parameter.
@@ -675,8 +675,8 @@ In `cmd/evolve` (the composition root):
 16. `inboxmover.ConsumeFixItem`: an open item moves to `processed`, and a missing item is not an error.
 17. Wiring: `TestIntegrationProductionEnvSetsEveryPort` also requires `Emit`, `Now` and `KeyRun`.
 18. The default `KeyRun` on a `gittest` repository with an injected `baseattr.Runner`.
-    - The runner gets the tree of the given revision and the flags of `core.StopProofReds`.
-19. `core.StopProofReds`: the ship proof test and test 18 fail when the flags of one caller change.
+    - The runner gets the tree of the given revision and the flags of `mainstop.ProofReds`.
+19. `mainstop.ProofReds`: the ship proof test and test 18 fail when the flags of one caller change.
 20. Guard: a production `integration.Train` value is built only in `integrationEnv.train`.
     - The `Main` and the `CI` of that value are the decorators of `StopGate`.
     - The test puts a hold error behind the gate and gets it from `FastForward` and from a red `Watch`.

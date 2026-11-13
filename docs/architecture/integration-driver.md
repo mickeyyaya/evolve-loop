@@ -202,7 +202,9 @@ Shadow answers four questions: the order, the overlap, the conflict count and th
 
 `evolve integration status [--pool N] [--wave N] [--project-root P] [--json]` is class A and read-only. It sits in `integrationVerbs`. This is I8.
 
-It reads `--project-root` after the sub-verb, then `EVOLVE_PROJECT_ROOT`, then the working directory. The other sub-verbs use the working directory only, because they write. An absent root exits 2. A root with no `.evolve` exits 1 and says that no wave record exists under it. The JSON form is the envelope of [cli-contract.md](cli-contract.md), and `data.project_root` names the root that the verb read.
+It reads `--project-root` after the sub-verb, then `EVOLVE_PROJECT_ROOT`, then the working directory. `batch` reads the root in the same order, but only for the main-red stop of that root. Its git and `gh` commands run in the working directory. `watch` and `record-pr` use the working directory only.
+
+An absent root exits 2. A root with no `.evolve` exits 1 and says that no wave record exists under it. The JSON form is the envelope of [cli-contract.md](cli-contract.md), and `data.project_root` names the root that the verb read.
 
 It prints the batches, the members and their states, the order, the decisions, the failures, the counts and the verdict.
 

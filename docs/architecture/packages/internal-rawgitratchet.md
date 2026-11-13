@@ -23,3 +23,9 @@
 - **Directories named `vendor` or `testdata`, or starting with `.` or `_`, are never bound.** Pinned by `TestBoundTestFiles_BindsTrackedOnly`.
 - **The list is a ceiling.** Unlisted and grown files each fail by name, and shrunk and migrated files pass. Pinned by `TestCheck_TheBaselineIsACeiling`.
 - **Two lanes that shrink sites in different packages rebase identically**, and one boundary tighten then lowers both entries. Pinned by `TestTightenModule_TwoLanesThatShrinkSitesInDifferentPackagesRebaseIdentically` and `TestTightenModule_EachStageFailureIsReturned`.
+
+## Gate contract
+
+- The registry entry `raw-git-ratchet` in [internal-gateregistry.md](internal-gateregistry.md) runs this package. [gate-contract.md](../gate-contract.md) section 6.4 has the design.
+- `TestRatchet_NoNewRawGitFixtures` calls that run function from the external test package `rawgitratchet_test`. The fallback note of `BoundTestFiles` goes to `Notes`.
+- The package and `baseline.json` are on the protected surface. A lane cannot add an allowance. It sends a held proposal.

@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	submitVerifyMaxResends   = 3
+	submitVerifyMaxResends   = 6
 	submitVerifyEchoRunes    = 40
 	submitVerifyMinEchoRunes = 8
 	submitVerifySettle       = 500 * time.Millisecond
@@ -139,4 +139,4 @@ func recordSubmitVerify(rec *interaction.Recorder, phase string, cycle int, site
 	})
 }
 
-var submitVerifyBackoff = [submitVerifyMaxResends]time.Duration{submitVerifySettle, 3 * submitVerifySettle, 5 * submitVerifySettle}
+var submitVerifyBackoff = [submitVerifyMaxResends]time.Duration{submitVerifySettle, 3 * submitVerifySettle, 5 * submitVerifySettle, 10 * submitVerifySettle, 20 * submitVerifySettle, 30 * submitVerifySettle}

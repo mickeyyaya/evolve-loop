@@ -1467,3 +1467,85 @@ Rules for these seams:
 - A test that proves concurrent dispatch uses a barrier, not a sleep. In `TestDispatchEvaluateBatch_Concurrent`, each runner waits at a `rendezvous` until all batch members arrive. A serial dispatch fails because a runner stops its wait and records a miss. A sleep with a peak counter failed on a slow CI runner when the second runner started late.
 
 For the related rule on test isolation, see [driver tests must be environment-hermetic](../../conventions/hermetic-driver-tests.md).
+
+## Base-red attribution in the build floor
+
+The repo-contract, unit-test and cover-changed checks judge a red test against the lane base before they reject the lane.
+`ReviewInput.laneReds` calls `baseattr.Attributor`. It reruns only the red test keys in a detached checkout of the base.
+A red that the base shows too does not reject the lane. The floor writes a NOTE and emits `BUILD_BASE_RED_ATTRIBUTED`.
+
+A lane-only red still rejects. The rejection lists the base-red keys as information.
+
+An attribution that cannot run blames the lane as before. The floor writes a WARN and emits `BUILD_BASE_RED_UNJUDGED`.
+
+`FailOpen` wraps a `FloorJudge` and keeps the WARN for a judge error.
+
+`DefaultBuildFloorChecks` computes the changed paths once and passes them to the unit-test and cover-changed check functions.
+`UnitTestFloorJudge` and `CoverChangedFloorJudge` read the paths themselves through `floorPaths`, then call the same check functions.
+
+`floorPaths` reads the paths with `worktreePathsSince`. A failed `git diff` or `git ls-files` is an error, so a failed read never looks like an empty change.
+`changedWorktreePathsSince` keeps its old result: it drops the error and returns the paths that git gave.
+
+`FloorEntryRun` makes a registry run function from a `FloorJudge`. It sets `Worktree` and `ProjectRoot` to `Root`, and `WorktreeBaseSHA` to `Base`.
+Each line of the judge is one red. A judge error, or an unreadable root, is an error and never a red or a pass.
+
+When the base and `main` are both red, the build floor opens the main-red stop. The file is `main_red_stop_open.go`.
+
+- `OpenMainRedStop` is the one opener. `core` owns it, because `core` imports `mainstop` and `inboxfile` directly.
+- `mainRedSink` gives the injected field `ReviewInput.MainRedStop`, or `OpenMainRedStop` when the field is nil. Only tests set the field.
+- The opener starts or refreshes the stop through one `mainstop.Update`. It returns `opened` as true only when no stop held before the call.
+- A stop that was released does not hold, so the next red `main` opens a stop again.
+- The opener then files the fix item through `inboxfile.Mint` on each call. An item that is pending is not filed again, and a lost item is filed again.
+- A stop that cannot be written is the error `main-red stop: write the stop`, and `opened` is false.
+- A mint error is the error `main-red stop: file the fix item <id>`. The stop stays written, and `opened` keeps its value.
+- The fix item has the id of the stop, weight 1.0, priority `critical`, class `correctness` and source `main-red-stop`.
+- Its kind is `fix`, as the base-red item of `ciwatch` has. A kind with the prefix `pipeline-` goes to the console list, and then no lane can build the fix.
+- Its `files` field holds the import path of each key package, one time each. Its acceptance names each key and a regression test.
+- `stopOpening.through` calls the sink and emits `GATE_REPO_MAIN_RED_STOP_OPENED` when `opened` is true. The signal gives the keys, the `main` commit and the fix item.
+- The signal is a warning when the fix item is in the inbox. It is an incident with the field `fix_item_error` when the stop opened and the item was not filed.
+- A verdict with no `MainRed` key calls no sink and emits nothing. A stop that held before the call emits nothing.
+- A sink error on the build floor is one WARN line. The floor result does not change, because the ship check owns the stop.
+- The signal of the build floor has the run, the cycle and the phase `build`.
+- Tests of the opener: the five `TestOpenMainRedStop_*` tests that call it, and the three `TestStopOpening_*` tests.
+- `TestOpenMainRedStop_TheBuildFloorSignalsTheOpeningWithItsRunAndTheBuildPhase` and `TestMainRedSink_TheInputHookWinsAndTheRealOpenerIsTheDefault` pin the build floor.
+
+`BaseRedAttributor` builds the `Attributor` through `baseattr.New`. The main ref and the scratch path have one home there.
+It reads the rerun budget `gates.base_red_rerun_seconds` from the policy of its root.
+It returns an attributor with no serialize hook, and it writes a policy warning to the writer of the caller.
+`ReviewInput.attributor` sets the tier lock as the serialize hook of the returned value.
+The audit tier sets no hook, because the tier holds that lock already (see [internal-phases-audit-ciparitygate.md](internal-phases-audit-ciparitygate.md)).
+
+`TestBaseRedAttributor_ACallerWithNoSerializeHookGetsThePolicyLimitAndItsOwnRunner` pins the second caller.
+`TestBaseRedAttributor_AMalformedPolicyWarnsOnTheWriterOfTheCaller` pins the writer.
+
+`covchanged.TagFlags` gives the `-tags` flag list. `coverTestArgs`, the cover-changed floor and the ship stop check use it.
+
+`main_red_park.go` registers only the two codes that `core` emits: `GATE_REPO_MAIN_RED_PARKED` and `GATE_REPO_MAIN_RED_STOP_OPENED`.
+The package `selfheal` builds each event of `GATE_REPO_MAIN_RED_STOP_WOULD_REFUSE`, `GATE_REPO_MAIN_RED_STOP_RELEASED` and `GATE_REPO_MAIN_RED_STOP_ESCALATED`, so it registers the three codes (see [internal-selfheal.md](internal-selfheal.md)).
+`mainstop.ProofReds` gives the `-tags` list of each proof run of a stop (see [internal-mainstop.md](internal-mainstop.md)).
+`MainRedSink` takes the project root and the verdict. It has no cycle parameter, because no opener reads one.
+Design: [gate-contract.md](../gate-contract.md), section 7, and the G4 page that it links.
+
+## The park of a lane on a red main
+
+The file is `main_red_park.go`. The design is in [gate-contract-g4-base-red-attribution.md](../gate-contract-g4-base-red-attribution.md), section 7.4.
+
+- Ship returns the code `MAIN_RED_PARK` when the red tests of the lane are red on its base and on `main`. `recoverShipErrorRoute` sends that error to `parkOnMainRed` before the budget check, so a park occurs at each recovery depth.
+- `parkOnMainRed` does three steps. It writes a checkpoint with the reason `MainRedReason` through `MainRedBoundaryCheckpointer`. It opens or refreshes the stop in `main-red-stop.json` and adds the parked cycle. It emits `GATE_REPO_MAIN_RED_PARKED`.
+- The signal is a warning when the two writes pass. It is an incident when one write fails, because the cycle cannot resume from such a park. The signal gives the cause, the evidence and the next step.
+- `baseattr.VerdictOfDebug` reads the verdict from the debug values of the ship error. The stop gets only the `MainRed` keys, so a key that is green on `main` never enters the stop.
+- When ship did not judge `main`, the verdict has no `MainRed` key. The park then opens no stop. It adds the parked row and keeps the checkpoint, and the signal says that ship did not judge `main`.
+- The cycle then ends with the ship error, and `errors.Is` finds `ErrMainRedParked` in it. `isParked` is true for that error and for `ErrAllFamiliesExhausted`.
+- A parked cycle gets no failure lesson, no failure digest and no abnormal epilogue. The interrupt checkpoint does not replace its checkpoint. Thus the lane is not blamed, and its phase stays resumable.
+- `failureLearningGate` gives `gateParkDeferred` for each parked error.
+- `laneParked` accepts the reasons `quota-likely` and `main-red`. `PausedScope.Reason` gives the reason to the caller, and `resumableReasons` holds `main-red`.
+- The signal code has the prefix `GATE_REPO_`, because the registry refuses a code without the prefix of its module.
+- Pinned by `TestRecoverShipError_MainRedParkWritesAMainRedCheckpointAndAStopRow`, `TestRecoverShipError_ASecondParkRefreshesTheStopAndKeepsItsOpenTime`, `TestRecoverShipError_AParkOnAnUnjudgedMainOpensNoStopAndStaysResumable` and the `TestParkOnMainRed_*` tests.
+- `parkOnMainRed` takes the cycle from the cycle state, so the stop row and the checkpoint name one cycle. The caller reads the verdict from the ship error.
+- `TestRunCycle_AFirstShipThatParksOnARedMainIsNotAFailedCycle` pins the park of the first ship of a cycle. `TestParkOnMainRed_TwoFailedWritesGiveAOneLineIncident` pins the one-line cause of two failed writes.
+- `TestResumeExecution_AShipThatParksOnARedMainIsNotAFailedCycle` pins the park of a resumed ship. `TestIsResumableReason_AMainRedParkIsResumable` pins the reason.
+- The park opens the stop through the opener of `main_red_stop_open.go` before it adds the parked row. Thus the first park files the fix item and emits the opened signal with the phase `ship`.
+- `parkInStop` only adds the parked row. The opener is the one home of the write that starts or refreshes a stop.
+- An error of the opener joins the error of the row write, so a park with no fix item is an incident.
+- `TestParkOnMainRed_OpensTheStopAndFilesTheFixItemBeforeItAddsTheParkedRow` and `TestParkOnMainRed_AFixItemThatCannotBeFiledMakesTheParkAnIncident` pin the two rules.
+- Limits: the exit code of a parked cycle and the release of its claims are the work of `cmd/evolve`. The pool reads the stop before it resumes a parked lane. `parkedLanes.resume` in `cmd/evolve` resumes the lanes only when `mainstop.Stop.Resumes` holds for the tip of `main`.

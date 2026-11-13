@@ -20,7 +20,14 @@
 ## Invariants
 
 - Two production-path callers use the package:
-  - the structure test `TestTestDuplicates_TheCountOfCopiesEqualsTheBaseline` in `internal/repocontract`;
+  - the structure test `TestTestDuplicates_TheCountOfCopiesEqualsTheBaseline` in `internal/repocontract`, which calls the run function of the registry entry;
   - the TDD handoff floor `tddPredicateFloor` in `internal/core`.
 - A change that removes a copy lowers `count=` in `go/.test-dup-baseline` in the same commit.
 - `acs/cycle2250` holds two copies, `write` and `onDisk`, that landed through the staged-predicate escape. No later phase can change that directory. The repair removed two copies in `cmd/evolve`, so the count stays at the baseline 334.
+
+## Gate contract
+
+- The registry entry `testdup-ratchet` in [internal-gateregistry.md](internal-gateregistry.md) runs this package. [gate-contract.md](../gate-contract.md) section 6.4 has the design.
+- The structure test `TestTestDuplicates_TheCountOfCopiesEqualsTheBaseline` calls that run function from an external test package of `internal/repocontract`.
+- The package is on the protected surface. A lane cannot write it.
+- `go/.test-dup-baseline` is outside the package. It is an open seam until G6.

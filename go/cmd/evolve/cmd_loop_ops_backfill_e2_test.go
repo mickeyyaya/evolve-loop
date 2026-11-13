@@ -113,7 +113,7 @@ func TestProductionPoolPlanFn_ReadsTheSeededInboxAsTodos(t *testing.T) {
 	} {
 		writeE2File(t, filepath.Join(inbox, name), body)
 	}
-	plan := productionPoolPlanFn(loopConfig{ProjectRoot: dir, EvolveDir: dir}, &erroringReadStorage{}, 2, &bytes.Buffer{})
+	plan := poolPlanner{cfg: loopConfig{ProjectRoot: dir, EvolveDir: dir}, storage: &erroringReadStorage{}, stderr: &bytes.Buffer{}}.plan(2)
 
 	todos, err := plan(context.Background(), 0)
 
@@ -134,7 +134,7 @@ func TestProductionPoolPlanFn_APlanFailureIsReturned(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	writeE2File(t, filepath.Join(evolveDir, "inbox"), "not a dir")
-	plan := productionPoolPlanFn(loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, &erroringReadStorage{}, 2, &bytes.Buffer{})
+	plan := poolPlanner{cfg: loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, storage: &erroringReadStorage{}, stderr: &bytes.Buffer{}}.plan(2)
 
 	todos, err := plan(context.Background(), 0)
 

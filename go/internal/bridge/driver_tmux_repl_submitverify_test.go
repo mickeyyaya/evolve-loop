@@ -11,8 +11,6 @@ import (
 
 const submitVerifyStderrMarker = "submit-verify"
 
-const maxSubmitVerifyResends = 3
-
 func unsubmittedPane(text string) string {
 	return "● earlier scrollback\n\n" + tmuxPromptMarkerDefault + " " + text
 }
@@ -192,9 +190,9 @@ func TestTmuxREPL_NudgeUnsubmitted_ResendBounded(t *testing.T) {
 	if n < 1 {
 		t.Errorf("unsubmitted nudge must be re-sent at least once; got %d", n)
 	}
-	if n > maxSubmitVerifyResends {
+	if n > submitVerifyMaxResends {
 		t.Errorf("re-sends = %d, want <= %d (bounded); an unbounded re-send loop hammers the pane",
-			n, maxSubmitVerifyResends)
+			n, submitVerifyMaxResends)
 	}
 }
 

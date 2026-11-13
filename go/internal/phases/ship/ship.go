@@ -126,7 +126,12 @@ func (p *Phase) runNative(ctx context.Context, req core.PhaseRequest, msg string
 		if gerr := p.runRepoContractGate(ctx, req, &opts); gerr != nil {
 			return core.PhaseResponse{}, gerr
 		}
+		green, serr := checkMainRedStop(ctx, &opts, opts.Stderr)
+		if serr != nil {
+			return core.PhaseResponse{}, fmt.Errorf("ship main-red stop: %w", serr)
+		}
 		res, err = runStages(ctx, &opts, res)
+		res = stopRelease{opts: &opts, warn: opts.Stderr}.landedFix(green, res, err)
 	}
 	resp, rerr := respond(req, res, err)
 	resp.DurationMS = p.nowFn().Sub(start).Milliseconds()
@@ -138,7 +143,7 @@ func (p *Phase) runRepoContractGate(ctx context.Context, req core.PhaseRequest, 
 	if err != nil {
 		return fmt.Errorf("ship repo-contract gate: %w", err)
 	}
-	ctx = withScanShadow(ctx, p.scanShadowFor(req))
+	ctx = withBaseRed(withScanShadow(ctx, p.scanShadowFor(req)), opts, baseRef)
 	if err := runRepoContractGateAt(ctx, p.repoContractGate, gateRoot, baseRef, req.Workspace, os.Stderr, backstopFlakeSignal(p.signals, req.Cycle)); err != nil {
 		return fmt.Errorf("ship repo-contract gate: %w", err)
 	}

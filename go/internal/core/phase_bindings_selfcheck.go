@@ -28,14 +28,25 @@ var buildSelfCheckRunner = realGoUnitTest
 var buildSelfCheckTaggedRunner = realGoUnitTestTagged
 
 func changedWorktreePathsSince(ctx context.Context, worktree, baseSHA string, diffFlags ...string) []string {
-	var out []string
-	if diff, code, err := gitCapture(ctx, worktree, append([]string{"diff", baseSHA, "--name-only", "-z"}, diffFlags...)...); err == nil && code == 0 {
-		out = append(out, nulSeparated(diff)...)
-	}
-	if oth, code, err := gitCapture(ctx, worktree, "ls-files", "--others", "--exclude-standard", "-z"); err == nil && code == 0 {
-		out = append(out, nulSeparated(oth)...)
-	}
+	out, _ := worktreePathsSince(ctx, worktree, baseSHA, diffFlags...)
 	return out
+}
+
+func worktreePathsSince(ctx context.Context, worktree, baseSHA string, diffFlags ...string) ([]string, error) {
+	var out []string
+	var errs []error
+	for _, args := range [][]string{
+		append([]string{"diff", baseSHA, "--name-only", "-z"}, diffFlags...),
+		{"ls-files", "--others", "--exclude-standard", "-z"},
+	} {
+		text, code, err := gitCapture(ctx, worktree, args...)
+		if err != nil || code != 0 {
+			errs = append(errs, fmt.Errorf("git %s: exit %d, %v", args[0], code, err))
+			continue
+		}
+		out = append(out, nulSeparated(text)...)
+	}
+	return out, errors.Join(errs...)
 }
 
 func nulSeparated(out string) []string {

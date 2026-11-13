@@ -3,6 +3,7 @@ package bridge
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -61,7 +62,7 @@ func TestTmuxREPL_PromptSubmitWedged_ShortCircuitsSilenceBudget(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), artifactTimeoutMarker+"cause=submit_wedged") ||
 		!strings.Contains(stderr.String(), "phase=build") ||
-		!strings.Contains(stderr.String(), "reason=\"prompt submit_wedged (resends=3)\"") {
+		!strings.Contains(stderr.String(), fmt.Sprintf("reason=\"prompt submit_wedged (resends=%d)\"", submitVerifyMaxResends)) {
 		t.Fatalf("early timeout must preserve the classified submit_wedged cause in the artifact-timeout marker; stderr=%s", stderr.String())
 	}
 }

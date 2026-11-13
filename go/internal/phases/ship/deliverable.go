@@ -117,11 +117,7 @@ func (s *worktreeShip) buildDeliverable(commit string) (integration.DeliverableR
 }
 
 func (s *worktreeShip) deliveredAt() time.Time {
-	now := defaultNow
-	if s.opts.NowFn != nil {
-		now = s.opts.NowFn
-	}
-	return time.Unix(now().Unix, 0).UTC()
+	return s.opts.clock()
 }
 
 func shipGit(opts *Options) integration.GitFunc {

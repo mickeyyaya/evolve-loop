@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 	"testing"
 )
 
@@ -45,13 +44,14 @@ var protectedGateFiles = []struct {
 	{"go/internal/core/floor_lists_regression_test.go", GateGuarantee},
 	{"go/internal/core/cover_changed_floor.go", GateGuarantee},
 	{"go/internal/profiles/gate_inputs_realtree_test.go", GuardGuarantee},
+	{"go/internal/profiles/gate_inputs_protected_realtree_test.go", GuardGuarantee},
 	{"go/internal/core/ste_floor.go", GateGuarantee},
 	{"go/internal/stelint/added.go", GateGuarantee},
 	{"go/internal/core/build_explanation_floor_test.go", GateGuarantee},
 	{"go/internal/core/reviewer.go", GateGuarantee},
 	{"go/internal/core/tdd_predicate_floor.go", GateGuarantee},
 	{"go/internal/testdup/testdup.go", GateGuarantee},
-	{"go/internal/repocontract/testdup_ratchet_test.go", GateGuarantee},
+	{"go/internal/repocontract/testdup_gate_realtree_test.go", GateGuarantee},
 	{"go/internal/core/orchestrator.go", AuditVerdictGuarantee},
 	{"go/internal/core/cyclerun.go", AuditVerdictGuarantee},
 	{"go/internal/core/cyclerun_dispatch.go", AuditVerdictGuarantee},
@@ -70,6 +70,8 @@ var protectedGateFiles = []struct {
 	{"go/internal/phases/audit/ciparity.go", GateGuarantee},
 	{"go/internal/subagent/run.go", LedgerGuarantee},
 	{"go/internal/core/ship_recovery.go", GateGuarantee},
+	{"go/internal/core/main_red_park.go", GateGuarantee},
+	{"go/internal/integration/stopgate.go", GateGuarantee},
 	{"go/internal/core/resume_execution.go", AuditVerdictGuarantee},
 	{"go/internal/core/resume_bootstrap.go", AuditVerdictGuarantee},
 	{"go/internal/core/ports.go", SandboxGuarantee},
@@ -157,6 +159,18 @@ var protectedGateFiles = []struct {
 	{"go/internal/inboxmover/lifecycle/edit.go", GuardGuarantee},
 	{"go/internal/phases/ship/held_proposal_gate.go", GateGuarantee},
 	{"go/cmd/evolve/cmd_landing.go", GateGuarantee},
+	{"go/internal/gatecontract/", GateGuarantee},
+	{"go/internal/gateregistry/", GateGuarantee},
+	{"go/internal/testdup/", GateGuarantee},
+	{"go/internal/sizeratchet/", GateGuarantee},
+	{"go/internal/rawgitratchet/", GateGuarantee},
+	{"go/internal/baseattr/", GateGuarantee},
+	{"go/internal/mainstop/", GateGuarantee},
+	{"go/internal/core/base_red_floor.go", GateGuarantee},
+	{"go/internal/core/repo_contract_floor.go", GateGuarantee},
+	{"go/internal/repocontract/repocontract.go", GateGuarantee},
+	{"go/internal/phases/ship/base_red.go", GateGuarantee},
+	{"go/internal/phases/ship/repocontract.go", GateGuarantee},
 	{"go/internal/policy/held_proposals.go", PolicyGuarantee},
 }
 
@@ -186,7 +200,7 @@ func TestProtectedGateFiles_EachKeepsItsEntryAndItsClass(t *testing.T) {
 		if !IsProtectedSurface(f.path) {
 			t.Errorf("gate file %s lost its protected-surface entry; it enforces a %s guarantee (ADR-0157)", f.path, f.class)
 		}
-		if got := classOf(f.path); got != f.class {
+		if got := ClassOf(f.path); got != f.class {
 			t.Errorf("gate file %s has class %q, want %q", f.path, got, f.class)
 		}
 	}
@@ -228,13 +242,14 @@ func TestNarrowFence_FreedFilesAreLaneWork(t *testing.T) {
 	}
 }
 
-func classOf(path string) GuaranteeClass {
-	p, _ := normalizeSurfacePath(path)
-	best := ProtectedSurfaceEntry{}
-	for _, e := range ProtectedSurfaceManifest {
-		if strings.Contains(p+"/", e.Fragment) && len(e.Fragment) > len(best.Fragment) {
-			best = e
-		}
+func TestClassOf_TheLongestFragmentNamesTheClassAndAnUnlistedPathHasNone(t *testing.T) {
+	if got := ClassOf("go/internal/guards/integrity_surface.go"); got != ManifestGuarantee {
+		t.Errorf("ClassOf(the manifest file) = %q, want %q from its own row and not from a shorter row", got, ManifestGuarantee)
 	}
-	return best.Class
+	if got := ClassOf("GO/internal/gateclass/"); got != GateGuarantee {
+		t.Errorf("ClassOf(a directory in another case) = %q, want %q", got, GateGuarantee)
+	}
+	if got := ClassOf("docs/readme.md"); got != "" {
+		t.Errorf("ClassOf(an unlisted path) = %q, want no class", got)
+	}
 }
