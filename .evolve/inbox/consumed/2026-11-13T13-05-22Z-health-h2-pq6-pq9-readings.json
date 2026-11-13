@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "TestCalendarThroughput_CountsDeliveriesForEachDay on the F2.1 fixture",
+    "The spec update of H6 for this component passes evolve docs ste-lint --strict; 100% coverage on each changed function"
+  ],
+  "consumed": {
+    "at": "2026-11-13T19:16:15Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "shipped in PR #1438 (merged to main 2026-11-13 through the integration train)"
+  },
+  "created_at": "2026-11-13T13:05:22Z",
+  "files": [
+    "go/internal/pipelinerates"
+  ],
+  "fix": "Build H2 test-first per the plan; red test first, then the code, then the H6 spec update.",
+  "id": "health-h2-pq6-pq9-readings",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "Calendar throughput, slot utilization, idle-cause share and gate share, per plan section 5.1 (D1). Plan: docs/plans/pipeline-health-indexes-2026-11.md.",
+  "title": "H2: PQ6 to PQ9 readings in pipelinerates",
+  "weight": 0.7
+}

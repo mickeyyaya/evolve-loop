@@ -15,6 +15,8 @@ const pipelineKindPrefix = "pipeline-"
 
 const KindPipelineRepair = pipelineKindPrefix + "repair"
 
+const KindRefState = "ref-state"
+
 const KindOperatorLogin = "operator-login"
 
 func IsConsoleRoute(route string) bool {
@@ -27,7 +29,7 @@ func ConsoleRouted(it Item, isProtected func(string) bool) (bool, string) {
 		return true, "route:" + route
 	}
 	surface := protectedDerivation(it, isProtected)
-	derived, reason := pipelineKindDerivation(it)
+	derived, reason := consoleKindDerivation(it)
 	if !derived {
 		derived, reason = surface.routed, surface.reason
 	}
@@ -52,12 +54,15 @@ type surfaceDerivation struct {
 	reason          string
 }
 
-func pipelineKindDerivation(it Item) (bool, string) {
+func consoleKindDerivation(it Item) (bool, string) {
 	kind := strings.ToLower(strings.TrimSpace(it.Kind))
-	if !strings.HasPrefix(kind, pipelineKindPrefix) {
-		return false, ""
+	switch {
+	case strings.HasPrefix(kind, pipelineKindPrefix):
+		return true, "kind:" + kind + " (pipeline-integrity work is console-owned)"
+	case kind == KindRefState:
+		return true, "kind:" + kind + " (git ref state only the console can change)"
 	}
-	return true, "kind:" + kind + " (pipeline-integrity work is console-owned)"
+	return false, ""
 }
 
 func protectedDerivation(it Item, isProtected func(string) bool) surfaceDerivation {

@@ -59,7 +59,7 @@ func (o *Orchestrator) observeSignal(e signalcenter.Event) {
 func (o *Orchestrator) emitPhaseDispatched(cycle int, runID string, phase Phase) {
 	o.signals.Emit(signalcenter.Event{
 		Cycle: cycle, RunID: runID, Phase: string(phase),
-		Module: signalcenter.ModuleOrchestrator, Origin: "Orchestrator.emitPhaseDispatched",
+		Module: signalcenter.ModuleOrchestrator, Origin: signalcenter.OriginPhaseDispatched,
 		Kind: signalcenter.KindPhaseDispatched, Severity: signalcenter.SeverityInfo,
 		Reason: string(phase) + " dispatched",
 	})
@@ -68,7 +68,7 @@ func (o *Orchestrator) emitPhaseDispatched(cycle int, runID string, phase Phase)
 func (o *Orchestrator) emitPhaseOutcome(cycle int, out recovery.PhaseOutcome) {
 	e := signalcenter.Event{
 		Cycle: cycle, RunID: o.signalRunID(), Phase: out.Phase, Attempt: out.AttemptCount,
-		Module: signalcenter.ModuleOrchestrator, Origin: "Orchestrator.recordPhaseOutcome",
+		Module: signalcenter.ModuleOrchestrator, Origin: signalcenter.OriginPhaseOutcome,
 		Kind: signalcenter.KindPhaseOutcome, Severity: signalcenter.SeverityInfo,
 		Reason: out.Phase + " " + verdictReason(out.Verdict, out.Diagnostics),
 		Fields: map[string]string{

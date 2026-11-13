@@ -18,7 +18,9 @@
   "kind": "feature",
   "origin": "console",
   "priority_class": "stability",
-  "route": "console-manual",
+  "route": "lane",
+  "routed_at": "2026-11-13T19:15:34Z",
+  "routed_reason": "operator 2026-11-13: the item touches no protected file and its console route had no reason; a lane can build it",
   "summary": "On 2026-11-05 the operator said to stop all activities at 85% weekly usage. The policy has no key for this, and no code stops the loop on usage. The hold is a console habit, with a background check that the console started by hand. If the console session ends or logs out, the loop keeps spending past the limit. The check has no verb, so it is a shell loop, and the operator has ruled out scratch scripts.",
   "title": "The pipeline has no usage brake, so an operator limit depends on the console being awake",
   "weight": 0.7

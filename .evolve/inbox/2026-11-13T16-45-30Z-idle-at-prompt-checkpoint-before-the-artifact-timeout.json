@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "Journey, red first: a fake pane idle at its prompt with no deliverable gets the nudge after the grace, not after ArtifactTimeoutS.",
+    "A busy pane with no deliverable still waits the full interval.",
+    "A pane that writes the deliverable inside the grace completes with no nudge.",
+    "Docs: the bridge package note and interaction-protocol.md change in STE; 100% coverage on each changed function; zero code comments."
+  ],
+  "created_at": "2026-11-13T16:45:30Z",
+  "files": [
+    "go/internal/bridge/driver_tmux_wait_state.go",
+    "go/internal/bridge/driver_tmux_wait_checkpoint.go"
+  ],
+  "fix": "When the liveness center reports the pane idle at its prompt (not busy) for a policy-set grace (for example 180 s) and the completion detector is not ready, run the checkpoint disposition at once (the existing one-shot nudge) and not at the end of the interval. A busy pane keeps the full interval. The grace lives in policy.json, not in code.",
+  "id": "idle-at-prompt-checkpoint-before-the-artifact-timeout",
+  "kind": "pipeline-repair",
+  "origin": "console",
+  "priority_class": "performance",
+  "route": "console-manual",
+  "summary": "Each stop-review checkpoint waits the full interval cfg.ArtifactTimeoutS (default tmuxArtifactTimeoutS, 1200 s; go/internal/bridge/driver_tmux_wait_state.go newReplWaitState) even when the liveness center already reports the pane idle at its prompt (LIVENESS_PHASE_STALLED '... (idle at its prompt)' after 10 min). Cycles 2200-2355 hold 17 idle nudges; 12 ended with artifact_appeared, mostly 0-1 min after the nudge, so each cost about 20 minutes of lane time with the agent done and waiting. Cycle 2352 audit: report written 11:23Z, first checkpoint 11:42Z.",
+  "title": "A pane that is idle at its prompt with no deliverable gets its checkpoint before the full artifact timeout",
+  "weight": 0.8
+}

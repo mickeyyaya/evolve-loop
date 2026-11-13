@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
@@ -301,5 +303,88 @@ func TestFleetHaltDecision_ALaneHaltCodeIsALoopHaltIncident(t *testing.T) {
 	}
 	if b.fleetHaltDecision("wave", 4, []fleet.Result{{ExitCode: 0}}).flow != batchProceed || len(*got) != 1 {
 		t.Errorf("no halt code, no halt, no signal: %+v", *got)
+	}
+}
+
+func tickKinds(got []signalcenter.Event) int {
+	n := 0
+	for _, e := range got {
+		if e.Kind == signalcenter.KindLoopTick {
+			n++
+		}
+	}
+	return n
+}
+
+func TestEmitLoopTicks_EmitsOneInfoTickForEachTickOfTheInjectedTicker(t *testing.T) {
+	t.Parallel()
+	c := signalcenter.New()
+	seen := make(chan signalcenter.Event, 4)
+	c.Subscribe(func(e signalcenter.Event) { seen <- e })
+	ticks := make(chan time.Time)
+	stop := emitLoopTicks(c, ticks)
+	ticks <- time.Unix(0, 0)
+	ticks <- time.Unix(60, 0)
+	for i := 0; i < 2; i++ {
+		e := <-seen
+		if e.Module != signalcenter.ModuleLoop || e.Kind != signalcenter.KindLoopTick || e.Severity != signalcenter.SeverityInfo || e.Origin != "emitLoopTicks" {
+			t.Errorf("tick %d = %+v", i, e)
+		}
+	}
+	stop()
+	stop()
+	select {
+	case ticks <- time.Unix(120, 0):
+		t.Error("a stopped emitter must not read the ticker")
+	default:
+	}
+}
+
+func TestAnnounceLoopWith_RunsTheTickerUntilTheLoopExits(t *testing.T) {
+	t.Parallel()
+	ticks := make(chan time.Time)
+	stopped := false
+	ticker := func() (<-chan time.Time, func()) { return ticks, func() { stopped = true } }
+	c, got, _ := recordingLoopSignals()
+	finish := announceLoopWith(c, io.Discard, announceDeps{procStartOf: func(int) (string, error) { return "start", nil }, ticker: ticker})
+	ticks <- time.Unix(0, 0)
+	exit := 0
+	finish(&exit)
+	if tickKinds(*got) != 1 || !stopped {
+		t.Errorf("one tick before the exit and a stopped ticker: ticks=%d stopped=%v", tickKinds(*got), stopped)
+	}
+}
+
+func TestAnnounceLoopWith_TheTickerRunsAlsoWhenTheStartTimeIsUnreadable(t *testing.T) {
+	t.Parallel()
+	stopped := false
+	ticker := func() (<-chan time.Time, func()) { return make(chan time.Time), func() { stopped = true } }
+	finish := announceLoopWith(signalcenter.New(), io.Discard, announceDeps{procStartOf: func(int) (string, error) { return "", errors.New("sysctl refused") }, ticker: ticker})
+	exit := 0
+	finish(&exit)
+	if !stopped {
+		t.Error("the ticker must stop when the loop exits")
+	}
+}
+
+func TestLoopTicker_AsksTheInjectedConstructorForOneMinute(t *testing.T) {
+	t.Parallel()
+	var asked time.Duration
+	ch, stop := loopTickerFor(func(d time.Duration) *time.Ticker {
+		asked = d
+		return time.NewTicker(time.Hour)
+	})()
+	defer stop()
+	if ch == nil || asked != time.Minute {
+		t.Errorf("the ticker was built with %v, want 1m", asked)
+	}
+}
+
+func TestLoopTicker_TheDefaultTickerRunsAndStops(t *testing.T) {
+	t.Parallel()
+	ch, stop := defaultLoopTicker()
+	stop()
+	if ch == nil {
+		t.Error("the default ticker has a channel")
 	}
 }

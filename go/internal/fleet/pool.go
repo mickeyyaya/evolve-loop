@@ -41,6 +41,8 @@ type PoolTransition struct {
 	Live    int
 	Target  int
 	Pending int
+	Capped  bool
+	Stopped bool
 }
 
 type pool struct {
@@ -130,7 +132,7 @@ func (p *pool) resupply() bool {
 
 func (p *pool) emit(kind PoolTransitionKind, todo string) {
 	if p.onTransition != nil {
-		p.onTransition(PoolTransition{Kind: kind, Todo: todo, Live: len(p.running), Target: p.cfg.Target, Pending: len(p.pending)})
+		p.onTransition(PoolTransition{Kind: kind, Todo: todo, Live: len(p.running), Target: p.cfg.Target, Pending: len(p.pending), Capped: p.capped(), Stopped: p.stopped()})
 	}
 }
 
@@ -184,11 +186,16 @@ func (p *pool) held(refused bool) {
 	p.emit(PoolHeld, "")
 }
 
+func (p *pool) capped() bool {
+	return p.cfg.MaxLaunches > 0 && p.launches >= p.cfg.MaxLaunches
+}
+
+func (p *pool) stopped() bool {
+	return p.cfg.Halted != nil && p.cfg.Halted()
+}
+
 func (p *pool) open() bool {
-	if p.cfg.MaxLaunches > 0 && p.launches >= p.cfg.MaxLaunches {
-		return false
-	}
-	return p.cfg.Halted == nil || !p.cfg.Halted()
+	return !p.capped() && !p.stopped()
 }
 
 func (p *pool) next(initial bool) int {

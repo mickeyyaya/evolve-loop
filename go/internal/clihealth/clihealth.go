@@ -115,6 +115,10 @@ func NewBenchEntry(prev Entry, family, pattern, paneText string, now time.Time) 
 	}
 }
 
+func (e Entry) BlocksDispatch() bool {
+	return e.Reason != BootTimeoutPattern && e.Scope == ""
+}
+
 func (e Entry) Key() string {
 	if e.Model != "" {
 		return e.Family + "\x00" + e.Model

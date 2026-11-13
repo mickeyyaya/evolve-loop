@@ -265,9 +265,14 @@ func (f fileDiff) stagesOffEnforce() []Flag {
 	return out
 }
 
+func FrozenForLane(p string) bool {
+	clean := path.Clean(p)
+	return clean == "go/acs" || strings.HasPrefix(clean, "go/acs/")
+}
+
 func (f fileDiff) changesFrozenCheck(cycle int) bool {
 	own := "go/acs/cycle" + strconv.Itoa(cycle) + "/"
-	return !f.created && strings.HasPrefix(f.path, "go/acs/") && (cycle <= 0 || !strings.HasPrefix(f.path, own))
+	return !f.created && FrozenForLane(f.path) && (cycle <= 0 || !strings.HasPrefix(f.path, own))
 }
 
 func diffArgs(base string) []string {

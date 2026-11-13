@@ -17,7 +17,9 @@
   "kind": "bug",
   "origin": "console",
   "priority_class": "stability",
-  "route": "console-manual",
+  "route": "lane",
+  "routed_at": "2026-11-13T19:15:34Z",
+  "routed_reason": "operator 2026-11-13: the item touches no protected file and its console route had no reason; a lane can build it",
   "summary": "On 2026-11-05 a build seat saw 'No space left on device' with 124 MiB free. It ran find -mmin +30 -exec rm -rf on Test*, go-build* and gittest* in the shared TMPDIR, and about 76 GB came back. The go build cache is 38 GB, and evolve gc caps that one. Nothing caps test temp directories. A seat has no proof that a directory older than 30 minutes is an orphan, because the integration suite can run for 25 minutes and more, and lanes share the host. A full disk also breaks a live wave.",
   "title": "Test temp directories fill the host disk, and a seat cleared them with no liveness proof",
   "weight": 0.8

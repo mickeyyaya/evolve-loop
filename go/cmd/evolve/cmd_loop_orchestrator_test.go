@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/admission"
+	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
@@ -221,5 +222,37 @@ func TestLaneWindow_TheSizedCountIsTheSmallerOfTheFleetCountAndTheConcurrencyCap
 				t.Errorf("console = %q, want the line to end with %q", console.String(), tc.wantLine)
 			}
 		})
+	}
+}
+
+func TestOrchestratorPool_BenchedFollowsTheActiveBenchesOfTheProject(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	b, _ := iscsCoordinator(root, root, nil)
+	p := b.orchestratorPool(policy.FleetConfig{Count: 2, Orchestrator: enforceOrchestrator}, nil, 1)
+	if p.Benched == nil {
+		t.Fatal("pool Benched = nil, want the bench state of the project")
+	}
+	if p.Benched() {
+		t.Error("Benched() = true with no bench on file")
+	}
+	store := clihealth.NewStore(root, nil)
+	if _, err := store.BenchScopedWall("agy", "usage_probe", "rate_limit", ""); err != nil {
+		t.Fatal(err)
+	}
+	if p.Benched() {
+		t.Error("Benched() = true with only a usage_probe bench, which does not block dispatch")
+	}
+	if _, err := store.BenchWallUntil("codex", clihealth.Wall{Pattern: clihealth.BootTimeoutPattern, Reset: time.Now().Add(time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	if p.Benched() {
+		t.Error("Benched() = true with only a boot-timeout bench, which reorders the chain and does not block dispatch")
+	}
+	if _, err := store.BenchWallUntil("agy", clihealth.Wall{Pattern: "rate_limit", Reset: time.Now().Add(time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	if !p.Benched() {
+		t.Error("Benched() = false with an active bench on file")
 	}
 }

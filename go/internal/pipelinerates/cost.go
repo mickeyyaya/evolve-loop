@@ -35,8 +35,16 @@ func CostPerShip(cycles []Cycle) []qualitypanel.Reading {
 	return out
 }
 
+var costBase = censusBase{index: costIndex, source: runsSource, origin: "pipelinerates.CostPerShip"}
+
 func census(window string, v float64, n int) qualitypanel.Reading {
-	return qualitypanel.Reading{Index: costIndex, Interval: qualitypanel.Interval{Value: v, Lo: v, Hi: v}, Method: qualitypanel.MethodCensus, N: n, Window: window, Source: runsSource, Origin: "pipelinerates.CostPerShip"}
+	return costBase.reading(window, v, n)
+}
+
+type censusBase struct{ index, source, origin string }
+
+func (b censusBase) reading(window string, v float64, n int) qualitypanel.Reading {
+	return qualitypanel.Reading{Index: b.index, Interval: qualitypanel.Interval{Value: v, Lo: v, Hi: v}, Method: qualitypanel.MethodCensus, N: n, Window: window, Source: b.source, Origin: b.origin}
 }
 
 type handoffs struct{ would, stops, false, spendWould, spendStops int }

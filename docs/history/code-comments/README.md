@@ -628,6 +628,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/phasestream` | 20 | [internal-phasestream.md](internal-phasestream.md) |
 | `internal/phasetiming` | 9 | [internal-phasetiming.md](internal-phasetiming.md) |
 | `internal/phasewatchdog` | 1 | [internal-phasewatchdog.md](internal-phasewatchdog.md) |
+| `internal/pipelinerates` | 1 | [internal-pipelinerates.md](internal-pipelinerates.md) |
 | `internal/plane` | 6 | [internal-plane.md](internal-plane.md) |
 | `internal/policy` | 92 | [internal-policy.md](internal-policy.md) |
 | `internal/practicewatch` | 1 | [internal-practicewatch.md](internal-practicewatch.md) |

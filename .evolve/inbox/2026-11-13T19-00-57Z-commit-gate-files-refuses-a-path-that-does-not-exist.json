@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Red first: --files 'a.go,b.go' with both files staged is refused (or split), never a silent PASS.",
+    "A path that is neither present nor a staged deletion is refused and named.",
+    "Docs: the commitgate package note changes in STE; 100% coverage on each changed function; zero code comments."
+  ],
+  "created_at": "2026-11-13T19:00:57Z",
+  "files": [
+    "go/internal/cli/guardcmd/commitgate.go"
+  ],
+  "fix": "Validate --files at the boundary: each named path must exist in the worktree or be a staged deletion; otherwise refuse with exit 10 and name the path. Accept commas as a separator too, or refuse a comma with a hint.",
+  "id": "commit-gate-files-refuses-a-path-that-does-not-exist",
+  "kind": "fix",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "2026-11-13: the console passed a comma-separated list to `evolve commit-gate run --files` (go/internal/cli/guardcmd/commitgate.go:30 documents a whitespace-separated list). The whole string became one path. For a short list the binary guard and the added-comment checks (go/internal/commitgate/comments_added.go) looked at a file that does not exist and passed; the gate printed PASS for F1 (PR 1440) and the first PR 1437 binding. For a 27-file list the stat failed with 'file name too long' (exit 2). A check that inspects nothing must not pass.",
+  "title": "commit-gate --files refuses a path that does not exist instead of checking nothing",
+  "weight": 0.8
+}

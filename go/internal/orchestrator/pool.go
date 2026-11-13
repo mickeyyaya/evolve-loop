@@ -45,6 +45,7 @@ type Pool struct {
 	Resupply    func(held []fleet.Todo) []fleet.Todo
 	Holders     *ReachHolders
 	FamilyHolds *FamilyHolds
+	Benched     func() bool
 }
 
 var transitionCodes = map[fleet.PoolTransitionKind]signalcenter.Code{
@@ -120,11 +121,20 @@ func (p Pool) transition(t fleet.PoolTransition) {
 		fields["todo"] = t.Todo
 		reason += " " + t.Todo
 	}
-	p.Publish.emit("Pool.Run", transitionCodes[t.Kind], signalcenter.SeverityInfo, reason, fields)
+	idleOrHeld := t.Kind == fleet.PoolIdle || t.Kind == fleet.PoolHeld
+	var cause IdleCause
+	if idleOrHeld {
+		cause = p.idleCause(t)
+	}
+	if t.Kind == fleet.PoolIdle {
+		p.Publish.emitIdle(CodePoolIdle, reason, fields, cause)
+	} else {
+		p.Publish.emit("Pool.Run", transitionCodes[t.Kind], signalcenter.SeverityInfo, reason, fields)
+	}
 	if t.Kind == fleet.PoolLaunched || t.Kind == fleet.PoolBackfilled {
 		p.FamilyHolds.forget(t.Todo)
 	}
-	if (t.Kind == fleet.PoolIdle || t.Kind == fleet.PoolHeld) && p.MinLanes > 0 && t.Live < p.MinLanes && (p.Halted == nil || !p.Halted()) {
+	if idleOrHeld && p.MinLanes > 0 && t.Live < p.MinLanes && (p.Halted == nil || !p.Halted()) {
 		uFields := map[string]string{
 			"live":      strconv.Itoa(t.Live),
 			"target":    strconv.Itoa(t.Target),
@@ -135,7 +145,7 @@ func (p Pool) transition(t fleet.PoolTransition) {
 			uFields["family_held"] = held
 		}
 		uReason := fmt.Sprintf("pool underfilled: %d of %d lanes live, min_lanes %d", t.Live, t.Target, p.MinLanes)
-		p.Publish.emit("Pool.Run", CodePoolUnderfilled, signalcenter.SeverityWarn, uReason, uFields)
+		p.Publish.emitIdle(CodePoolUnderfilled, uReason, uFields, cause)
 	}
 }
 

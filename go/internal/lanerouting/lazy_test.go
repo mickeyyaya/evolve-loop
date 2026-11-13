@@ -1,6 +1,7 @@
 package lanerouting
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -53,5 +54,13 @@ func TestLazyForbidden_ARootThatNeverRoutesEmitsNothing(t *testing.T) {
 func TestCodeRoutingFallback_IsRegisteredToTheInboxModule(t *testing.T) {
 	if m, ok := signalcenter.IsRegistered(CodeRoutingFallback); !ok || m != signalcenter.ModuleInbox {
 		t.Fatalf("%s is not registered to the inbox module (module=%q)", CodeRoutingFallback, m)
+	}
+}
+
+func TestLazyForbidden_TheFallbackReasonNamesTheFallbackScope(t *testing.T) {
+	var got recorded
+	LazyForbidden(t.TempDir(), "writer", got.listen)("go/internal/fleet/fleet.go")
+	if len(got.events) != 1 || !strings.HasSuffix(got.events[0].Reason, "; routing judges "+fallbackScope+" only") {
+		t.Fatalf("fallback events = %+v, want one reason ending in the fallback scope", got.events)
 	}
 }

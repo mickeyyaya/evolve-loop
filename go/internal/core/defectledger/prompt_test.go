@@ -108,3 +108,51 @@ func TestPromptBlock_GoldenDegrades_AndInfoOnlyOnReadFaults(t *testing.T) {
 		t.Fatalf("no OPEN rows: %q", block)
 	}
 }
+
+func TestDispositionsRequired_TrueOnlyWithAnOpenAncestorRow_AndNeverEmits(t *testing.T) {
+	root, ws, ancestorWS := promptFixture(t)
+	req := Request{Cycle: 1431, Workspace: ws, ProjectRoot: root}
+	l, got := observed(scopeOf(), resolveNever)
+	if !l.DispositionsRequired(req) {
+		t.Fatal("an ancestor with open rows requires dispositions")
+	}
+	for _, r := range []Request{{Workspace: "", ProjectRoot: root}, {Workspace: ws, ProjectRoot: ""}} {
+		if l.DispositionsRequired(r) {
+			t.Fatalf("guard: %+v", r)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(ancestorWS, LedgerFile), []byte(`{"origin_cycle":1425,"entries":[{"id":"x","text":"t","status":"FIXED"}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if l.DispositionsRequired(req) {
+		t.Fatal("only settled rows require nothing")
+	}
+	if err := os.Remove(filepath.Join(ancestorWS, LedgerFile)); err != nil {
+		t.Fatal(err)
+	}
+	if l.DispositionsRequired(req) {
+		t.Fatal("an absent ledger requires nothing")
+	}
+	if err := os.WriteFile(filepath.Join(ancestorWS, LedgerFile), []byte("garbage"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if l.DispositionsRequired(req) {
+		t.Fatal("an unreadable ledger requires nothing here; Reconcile blocks it")
+	}
+	if err := os.WriteFile(filepath.Join(ws, "continuation-manifest.json"), []byte("{"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if l.DispositionsRequired(req) {
+		t.Fatal("a corrupt manifest with no registry requires nothing")
+	}
+	fresh := filepath.Join(root, ".evolve", "runs", "cycle-1432")
+	if err := os.MkdirAll(fresh, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if l.DispositionsRequired(Request{Cycle: 1432, Workspace: fresh, ProjectRoot: root}) {
+		t.Fatal("a non-continuation requires nothing")
+	}
+	if len(*got) != 0 {
+		t.Fatalf("the query never emits: %v", codesOf(*got))
+	}
+}

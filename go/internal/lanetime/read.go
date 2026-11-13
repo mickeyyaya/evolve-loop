@@ -33,6 +33,7 @@ type signalLine struct {
 		Verdict string `json:"verdict"`
 		Live    string `json:"live"`
 		Target  string `json:"target"`
+		Cause   string `json:"cause"`
 	} `json:"fields"`
 }
 
@@ -165,6 +166,8 @@ type Sample struct {
 	Live   int
 	Target int
 	PID    int
+	Code   string
+	Cause  string
 }
 
 func ReadSamples(path string) ([]Sample, int, error) {
@@ -180,7 +183,14 @@ func ReadSamples(path string) ([]Sample, int, error) {
 			bad++
 			return
 		}
-		samples = append(samples, Sample{At: l.TS, Live: live, Target: target, PID: l.PID})
+		samples = append(samples, Sample{At: l.TS, Live: live, Target: target, PID: l.PID, Code: l.Code, Cause: causeOf(l)})
 	})
 	return samples, malformed + bad, err
+}
+
+func causeOf(l signalLine) string {
+	if l.Fields.Cause == "" && idleCodes[l.Code] {
+		return unknownCause
+	}
+	return l.Fields.Cause
 }

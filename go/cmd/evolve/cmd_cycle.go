@@ -410,6 +410,7 @@ func newRootSignalCenter(projectRoot, evolveDir string, console io.Writer, opts 
 		return filepath.Join(evolveDir, signalcenter.StreamFileName)
 	})
 	signals.Subscribe(listenWhen(legacyProjectRecord, projectStream))
+	signals.Subscribe(listenWhen(pairProjectRecord, projectStream))
 	signals.Subscribe(listenWhen(laneResumed, projectStream))
 	signals.Subscribe(signalcenter.ConsoleSink(console))
 	return signals
@@ -441,14 +442,23 @@ var legacyProjectKinds = map[signalcenter.Kind]bool{
 	signalcenter.KindListenerPanicked: true, signalcenter.KindRegistryDrift: true, signalcenter.KindSinkDropped: true,
 }
 
+var expectedProjectKinds = signalcenter.ExpectedKinds()
+
 func legacyProjectRecord(e signalcenter.Event) bool {
 	return e.Cycle == 0 && legacyProjectKinds[e.Kind]
+}
+
+func pairProjectRecord(e signalcenter.Event) bool {
+	return expectedProjectKinds[e.Kind] && !legacyProjectRecord(e)
 }
 
 var attachRootEventsFn = rootwire.Attach
 
 func newRoleSignalCenter(role, projectRoot, evolveDir string, console io.Writer) (*signalcenter.Center, func()) {
 	signals := newRootSignalCenter(projectRoot, evolveDir, console)
+	if role == roleLoop {
+		wireExpectedSignals(signals, evolveDir, console)
+	}
 	return signals, attachRootEventsFn(signals, role, evolveDir, console)
 }
 

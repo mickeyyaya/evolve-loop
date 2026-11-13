@@ -251,7 +251,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `INBOX_RELEASE_DOUBLE_MOVE` | the cycle drain found the item's basename already at the inbox root (a concurrent release landed it first); the root copy is never clobbered, the processing copy stays and is not counted; fields.step=release_cycle, task_id, base |
 | `INBOX_RELEASE_MOVE_FAILED` | an item could not be renamed back to the inbox root — by the cycle drain (fields.step=release_cycle, origin Mover.Release) or by orphan recovery (fields.step=recover_orphans, origin Mover.RecoverOrphans); the item stays in processing/cycle-N/ and the walk continues; fields.task_id, base, err |
 | `INBOX_ROUTE_NOT_FOUND` | the FAIL closeout could not find the item it was told to route (fields.task_id, inbox_dir, step=locate) — or found it held by another cycle's claim (fields.held_by_cycle) — the refusal is NOT recorded on it and it WILL be re-picked; neither processing/cycle-*/ nor the inbox root holds the id |
-| `INBOX_ROUTING_FALLBACK` | the lane-routing predicate could not load the build profile (fields.profile, fields.project_root; the reason is the load error), so routing judges protected surface only and a sandbox-denied item can reach a lane; emitted once per predicate, on its first routing question |
+| `INBOX_ROUTING_FALLBACK` | the lane-routing predicate could not load the build profile (fields.profile, fields.project_root; the reason is the load error), so routing judges protected surface and frozen checks only and a sandbox-denied item can reach a lane; emitted once per predicate, on its first routing question |
 
 ### isolation
 
@@ -328,9 +328,9 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `LOOP_ORCH_OPTIMISTIC_ADMISSION_FAILED` | a lane that only the optimistic rule admitted (ADR-0143 W1b) hit a composed-tree gate failure or a fleet rebase conflict; published once for each lane, at its first such failure, which names the gate; the D3 rate counts a failure only when the admission of the same todo is in the wave, so it stays in [0,1]; WARN; fields.todo, held_by, gate (the failed composed-tree gates, or rebase) |
 | `LOOP_ORCH_OVERSIGHT_ACTION` | the oversight loop (ADR-0139 O6) mapped one event of the cycle, ship, errors or loop channel to an action on its own lanes: record_verdict, free_cells, count_clean_landing, count_conflict, backfill, resize or stop_admission; at stage shadow the action is recorded and changes nothing (applied false), at stage enforce it is applied (applied true); INFO; fields.actions, lane, cycle, event, stage, applied, and verdict or target for the actions that have one |
 | `LOOP_ORCH_POOL_HELD` | a fill round of the orchestrator pool stopped below its width because admission refused every pending todo while a lane was in flight; it fires once per change of the live and pending counts, at the start of a wave and after each round; INFO; fields.live, target |
-| `LOOP_ORCH_POOL_IDLE` | a slot of the orchestrator pool stays free after a lane exit: no pending todo is admissible, the supply is empty, the operator stop is engaged or the run reached fleet.orchestrator.run_max_lanes; INFO; fields.live, target |
+| `LOOP_ORCH_POOL_IDLE` | a slot of the orchestrator pool stays free after a lane exit: no pending todo is admissible, the supply is empty, the operator stop is engaged or the run reached fleet.orchestrator.run_max_lanes; INFO; fields.live, target, cause (family_held, run_cap, supply_empty, admission_refused, bench or operator_stop; each event has one) |
 | `LOOP_ORCH_POOL_RESUPPLIED` | a slot of the orchestrator pool stayed free after a lane exit, so the pool ran the plan source again and added a ready todo that the run did not hold; one event for each added todo; INFO; fields.todo, live, target |
-| `LOOP_ORCH_POOL_UNDERFILLED` | the orchestrator pool had an idle or a held transition while fewer lanes than fleet.min_lanes were in flight and the pool was not stopped; WARN; fields.live, target, min_lanes, ready, and family_held when admission holds a todo behind a lane of its id family (each "<todo> (family:<token>, behind <lane>)"), so the hold does not read as a supply failure |
+| `LOOP_ORCH_POOL_UNDERFILLED` | the orchestrator pool had an idle or a held transition while fewer lanes than fleet.min_lanes were in flight and the pool was not stopped; WARN; fields.live, target, min_lanes, ready, cause (family_held, run_cap, supply_empty, admission_refused, bench or operator_stop; each event has one), and family_held when admission holds a todo behind a lane of its id family (each "<todo> (family:<token>, behind <lane>)"), so the hold does not read as a supply failure |
 | `LOOP_ORCH_SUPPLY` | the supply census (ADR-0139 O6, spec section 4) before a plan: the count of the inbox items in each class (admissible, waiting_cell, waiting_deps, console_route, console_kind, console_protected), the window, and the first console items with the reason of the routing authority; the full record is .evolve/waves/supply.json; INFO; fields are the six class names, window and console |
 | `LOOP_ORCH_SUPPLY_SHORT` | the supply census found fewer admissible items than the window, so the lanes of the plan cannot all be filled; the cause of each refusal is in the supply record and in evolve wave supply; INFO; fields are the six class names and window |
 | `LOOP_ORCH_WINDOW` | the adaptive window of the orchestrator pool (ADR-0139 O8) changed size: it grows by 1 for each clean landing, halves on each landing conflict (never under fleet.orchestrator.window.min) and follows the sized count; published once for each change; INFO; fields.old, new, sized, cause (clean_landing, conflict or resize); the loop builds the window inside the enforce pool only, so nothing publishes at stage shadow; that pool admits a lane only while the lanes in flight number fewer than new |
@@ -417,6 +417,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `QUALITY_PQ1_BREACH` | the whole 95% interval of PQ1 (ship rate) is on the bad side of its threshold at stage report or gate (ADR-0153) |
 | `QUALITY_PQ2_BREACH` | the whole 95% interval of PQ2 (pass^k per phase) is on the bad side of its threshold at stage report or gate (ADR-0153) |
 | `QUALITY_PQ4_BREACH` | the whole 95% interval of PQ4 (deadline rate) is on the bad side of its threshold at stage report or gate (ADR-0153) |
+| `QUALITY_PQ8_BREACH` | the whole 95% interval of PQ8 (idle-cause share) is on the bad side of its threshold at stage report or gate (ADR-0153) |
 | `QUALITY_SOURCE_ABSENT` | a declared source of a quality index does not exist; fields.index and fields.source name it (ADR-0153) |
 | `QUALITY_SOURCE_UNREADABLE` | a source of a quality index exists but does not parse; fields.source names it, the reason holds the error (ADR-0153) |
 | `QUALITY_TQ1_BREACH` | the whole 95% interval of TQ1 (mutation efficacy on changed functions) is on the bad side of its threshold at stage report or gate (ADR-0153) |
@@ -529,6 +530,12 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `SHIP_UNKNOWN` | an unclassified ship failure |
 | `SHIP_WINDOW_LEASE_BROKEN` | a ship broke the ship-window lease of a live holder whose heartbeat passed the TTL, so two lanes can overlap in the window; fields.owner_pid and fields.heartbeat_at name the broken holder |
 | `SHIP_WORKTREE_RESOLVE` | atomic-ship: the cycle worktree could not be resolved |
+
+### signal
+
+| Code | Meaning |
+|---|---|
+| `SIGNAL_EXPECTED_ABSENT` | a stage emitted its start signal and its end signal did not follow before the deadline from policy; fields.pair names the pair, start_kind and end_kind the two kinds, started the start time, deadline_seconds the limit and key the open start |
 
 ### signalcenter
 

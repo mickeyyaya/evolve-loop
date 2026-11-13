@@ -32,7 +32,7 @@ An index here is a measured reading with an interval, not a score. The loop has 
 |---|---|---|
 | Code | Is the code easy for an agent to change safely? | CQ1 to CQ5 |
 | Tests | Do the tests catch a wrong change? | TQ1 to TQ4 |
-| Pipeline | Does the loop turn items into ships, how consistently, and at what cost? | PQ1 to PQ5 |
+| Pipeline | Does the loop turn items into ships, how consistently, at what cost, and how much each day? | PQ1 to PQ9 |
 | Judges | Do the auditors and reviewers find real defects? | JQ1 to JQ4 |
 | Outcomes | What happened on `main` after the ship? | OQ1 to OQ4 |
 
@@ -56,6 +56,10 @@ An index here is a measured reading with an interval, not a score. The loop has 
 | PQ3 | Comparison noise floor | percentage points | on request | report | MDE 24 points at 66 cycles per arm |
 | PQ4 | Deadline and system-fail rate | % of cycles | wave | report | deadline 16.7% [12.0, 22.7]; system-fail 4.8% [2.6, 8.9] |
 | PQ5 | Cost for each shipped cycle | LLM minutes for each shipped cycle | wave | report | 101.2 (cycles 2029 to 2036, added 2026-10-27) |
+| PQ6 | Calendar throughput | deliveries for each day | wave | report | 11-09 to 11-11: 18, 14, 22 (added 2026-11-13) |
+| PQ7 | Slot utilization | % of capacity slot-hours | wave | shadow | waves 151 to 163: 93.6% (added 2026-11-13) |
+| PQ8 | Idle-cause share | % of idle slot-hours for each cause | wave | shadow | no data (needs the typed `cause` of component H1) |
+| PQ9 | Gate share | % of lane time | wave | report | waves 151 to 160: 8% to 15% (added 2026-11-13) |
 | JQ1 | Seeded-defect recall | % of seeded defects found | corpus run | shadow | no data (Q8) |
 | JQ2 | False-PASS rate | % of PASS ships | report | shadow | no data (Q7) |
 | JQ3 | Independent-review escalation | % of reviewed PRs | wave | report | 41.8% [32.6, 51.7], n = 98 |
@@ -631,6 +635,63 @@ The Signal Center does not compute an index, choose a threshold, change a stage 
 The unit of a PQ5 reading depends on its window suffix. The suffix is the contract: a reader must group PQ5 by index and suffix, not by index alone.
 
 **Limit.** `pipelinerates` puts a cycle into the last wave whose `cycle_floor` is at or below its id. `evolve wave status` starts a wave after its floor (`go/internal/wave/facts.go:49`). Thus PQ5 and the `cost:` line of `wave status` can count a different set of cycles. The same rule applies to PQ1 and PQ4, and its own item fixes it with their baselines.
+
+### PQ6 Calendar throughput
+
+**Why the standard metric is not enough.** A rate for each wall hour inside a wave does not see the time between waves. On 2026-11-12 the rate inside the waves stayed the same. The deliveries for each day fell from 18, 14 and 22 to 4 and 5.
+
+| Field | Value |
+|---|---|
+| Question | How many deliveries does the loop land for each calendar day? |
+| Formula | Deliveries ÷ calendar days. A delivery is a shipped cycle. The day is the day of the ship time in the local zone. |
+| Unit | deliveries for each day |
+| Window | one reading for each of the last 7 days (`day:YYYY-MM-DD`), the day of the run included |
+| Source | `.evolve/runs/cycle-N/signals.ndjson` (`ship.landed` time); `run.json` file time when the stream has no `ship.landed` |
+| Interval | none; a census of one day |
+| Stage and threshold | `report`. Trend only. No threshold and no breach. |
+| Good and bad | Read it next to PQ1 and PQ8. Console downtime lowers it, and the loop is not at fault then. |
+| Game and counter | Small items ship fast. Read PQ6 with PQ1 and the inbox rank. |
+
+### PQ7 Slot utilization
+
+**What it measures.** The live slot-hours divided by the capacity slot-hours of one wave. `evolve wave latency` uses the same source (`go/internal/lanetime`).
+
+| Field | Value |
+|---|---|
+| Formula | live slot-hours ÷ capacity slot-hours |
+| Unit | % |
+| Window | one reading for each of the last 10 waves (`wave:N`) |
+| Source | `LOOP_ORCH_*` samples of `.evolve/signals.ndjson` for the pid of the wave |
+| Stage and threshold | `shadow`. No threshold yet. The control chart is component H3. A wave with no sample has `n` 0 and the panel shows `no_data`. |
+| Game and counter | Long lanes keep slots busy. Read PQ7 next to PQ6. |
+
+### PQ8 Idle-cause share
+
+**What it measures.** The share of the idle slot-hours of one wave that each cause holds.
+
+| Field | Value |
+|---|---|
+| Formula | idle slot-hours of one cause ÷ all idle slot-hours of the wave. Idle slot-hours are the free slots (`target` − `live`) times the time to the next sample. |
+| Unit | % for each cause |
+| Window | one reading for each cause of each of the last 10 waves (`wave:N/cause:C`) |
+| Source | the `cause` field of `LOOP_ORCH_POOL_IDLE` and `LOOP_ORCH_POOL_UNDERFILLED` in `.evolve/signals.ndjson`, read by `go/internal/lanetime` (`IdleUse`) on the same samples as PQ7. An event with no `cause` counts as `unknown`. A wave whose idle slot-hours are 0 or less gives no reading. The registry holds the threshold, and `qualitypanel.Judge` decides the breach. |
+| Stage and threshold | `shadow`. Breach when one cause holds more than 50%. A share of exactly 50% is not a breach. |
+| Game and counter | A cause hidden as another. One reader computes the cause. |
+
+### PQ9 Gate share
+
+**What it measures.** The gate time divided by the lane time of one wave. The gate time is the sum of `gate_total` over the phases in the `wave latency` record.
+
+| Field | Value |
+|---|---|
+| Formula | gate time ÷ lane time |
+| Unit | % |
+| Window | one reading for each of the last 10 waves (`wave:N`) |
+| Source | `.evolve/runs/cycle-N/signals.ndjson` and `llm-calls.ndjson`, through `go/internal/lanetime` |
+| Stage and threshold | `report`. No threshold until 5 waves are at `report`. |
+| Game and counter | Fewer gates. The kernel fixes the gates. |
+
+PQ6 to PQ9 are census readings. `go/internal/pipelinerates` computes them (`CalendarThroughput`, `SlotUtilization`, `IdleCauseShare`, `GateShare`).
 
 ## 9. Judge indexes
 

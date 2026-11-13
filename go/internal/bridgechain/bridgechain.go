@@ -155,7 +155,7 @@ func applyFamilyBench(active map[string]clihealth.Entry, phase string, plan llmr
 		switch {
 		case e.Reason == clihealth.BootTimeoutPattern:
 			bootDrivers[key] = e.BenchedAt
-		case e.Scope == "" || scopeCoversSeat(e, plan):
+		case e.BlocksDispatch() || scopeCoversSeat(e, plan):
 			benchFamily(familyBenched, e)
 		}
 	}

@@ -163,9 +163,7 @@ func buildWaveLatency(plane wavePlaneDirs, scope latencyScope) (waveLatencyRepor
 	if scope.wave == 0 {
 		from, to = lanetime.SpanOf(in)
 	}
-	if scope.pid > 0 {
-		samples, from = lanetime.ForPID(samples, scope.pid), time.Time{}
-	}
+	samples, from, to = lanetime.WaveSamples(samples, scope.pid, from, to)
 	report.Slots = lanetime.SlotUse(samples, from, to)
 	return report, nil
 }

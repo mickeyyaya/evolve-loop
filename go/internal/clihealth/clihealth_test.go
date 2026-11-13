@@ -248,3 +248,21 @@ func TestParseResetHintBasics(t *testing.T) {
 		t.Error("garbage must not parse")
 	}
 }
+
+func TestEntryBlocksDispatch(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		e    Entry
+		want bool
+	}{
+		{"unscoped family bench", Entry{Family: "codex", Reason: "rate_limit"}, true},
+		{"scoped bench", Entry{Family: "agy", Scope: "usage_probe", Reason: "rate_limit"}, false},
+		{"boot timeout driver bench", Entry{Family: "codex", Reason: BootTimeoutPattern}, false},
+	}
+	for _, tc := range tests {
+		if got := tc.e.BlocksDispatch(); got != tc.want {
+			t.Errorf("%s: BlocksDispatch = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}

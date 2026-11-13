@@ -148,6 +148,7 @@ Three files grew without a bound, because the retention engine covered only the 
   - Pinned by `TestSweepSealedCycle_*` and, through the three callers, by `TestDispatchSequentialCycle_*SealedCycle*`, `TestRunResumeBatch_AResumedCycleThatSeals*` and `TestRunCycleRun_*FleetLane*`.
 - **A failed listing mutates nothing.** An unreadable cache or temp dir, or a failed `lsof`, is reported as an error and no entry is touched (`TestTrimGoCache_AMissingCacheIsReportedNotIgnored`, `TestReapFinishedCycleOrphans_AFailedListingSignalsNothingAndIsReported`).
 - **A flag has an owner after its second run.** `evolve gc` counts each flag in `.evolve/gc-flag-tally.json` and prints `count=N`. At the second run it files one inbox item through `inboxfile.Mint` (`flagtally.go`, D11). A dry run neither counts nor files.
+- **A flag item is console work.** The item has kind `ref-state`, which `inboxbatch` routes to the console. Its origin is `cycle`, like the other loop autofilers, and the inbox writers contract test enrolls the filer. A lane cannot change git ref state, so no lane claims the item. A branch whose net content HEAD already holds is not flagged: `landingNoNet` files a delete-branch item (`TestPlanWorktrees_AnOrphanBranchWhoseNetContentHeadHoldsIsDeletedNotFlagged`).
 
 ## Follow-ups
 

@@ -3,19 +3,22 @@ package lanerouting
 import (
 	"sync"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gateclass"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 const CodeRoutingFallback signalcenter.Code = "INBOX_ROUTING_FALLBACK"
 
+const fallbackScope = "protected surface and frozen checks"
+
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleInbox, CodeRoutingFallback, "the lane-routing predicate could not load the build profile (fields.profile, fields.project_root; the reason is the load error), so routing judges protected surface only and a sandbox-denied item can reach a lane; emitted once per predicate, on its first routing question")
+	signalcenter.RegisterCode(signalcenter.ModuleInbox, CodeRoutingFallback, "the lane-routing predicate could not load the build profile (fields.profile, fields.project_root; the reason is the load error), so routing judges "+fallbackScope+" only and a sandbox-denied item can reach a lane; emitted once per predicate, on its first routing question")
 }
 
 func LazyForbidden(projectRoot, writerProfile string, emit signalcenter.Listener) func(string) bool {
 	var once sync.Once
-	judge := guards.IsProtectedScope
+	judge := anyOf(guards.IsProtectedScope, gateclass.FrozenForLane)
 	return func(path string) bool {
 		once.Do(func() {
 			forbidden, err := Forbidden(projectRoot, writerProfile)
@@ -36,7 +39,7 @@ func fallbackEvent(projectRoot, writerProfile string, err error) signalcenter.Ev
 		Kind:     signalcenter.KindInboxWarning,
 		Code:     CodeRoutingFallback,
 		Severity: signalcenter.SeverityWarn,
-		Reason:   err.Error() + "; routing judges protected surface only",
+		Reason:   err.Error() + "; routing judges " + fallbackScope + " only",
 		Fields:   map[string]string{"profile": writerProfile, "project_root": projectRoot},
 	}
 }

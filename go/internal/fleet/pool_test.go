@@ -309,3 +309,46 @@ func TestRunPool_NilLaunch_FailsEveryLaneWithErrNoLaunch(t *testing.T) {
 		t.Errorf("RunPool(empty backlog, nil launcher) = %+v, want no results", empty)
 	}
 }
+
+func TestRunPool_TransitionsCarryTheCapAndTheStopTheFleetReads(t *testing.T) {
+	tests := []struct {
+		name        string
+		cfg         PoolConfig
+		wantCapped  bool
+		wantStopped bool
+	}{
+		{"free", PoolConfig{Target: 1}, false, false},
+		{"capped", PoolConfig{Target: 1, MaxLaunches: 1}, true, false},
+		{"stopped", PoolConfig{Target: 1, Halted: func() bool { return true }}, false, true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var mu sync.Mutex
+			var idles []PoolTransition
+			launch := func(_ context.Context, _ CycleSpec) (int, error) { return 0, nil }
+			onTr := func(tr PoolTransition) {
+				mu.Lock()
+				defer mu.Unlock()
+				if tr.Kind == PoolIdle {
+					idles = append(idles, tr)
+				}
+			}
+			cfg := tc.cfg
+			if tc.name == "stopped" {
+				n := 0
+				cfg.Halted = func() bool { n++; return n > 2 }
+			}
+			RunPool(context.Background(), cfg, []Todo{{ID: "a"}, {ID: "b"}}, launch, onTr)
+			mu.Lock()
+			defer mu.Unlock()
+			if len(idles) == 0 {
+				t.Fatal("no idle transition")
+			}
+			for _, tr := range idles {
+				if tr.Capped != tc.wantCapped || tr.Stopped != tc.wantStopped {
+					t.Errorf("idle = %+v, want Capped %v Stopped %v", tr, tc.wantCapped, tc.wantStopped)
+				}
+			}
+		})
+	}
+}
