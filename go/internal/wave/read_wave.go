@@ -8,6 +8,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/landing"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -20,6 +21,7 @@ type WaveWindow struct {
 type WaveRead struct {
 	Cycles       []Cycle
 	Ships        []int
+	Landed       []int
 	Loop         []signalcenter.Event
 	Warnings     []string
 	Failures     []ReadFailure
@@ -52,11 +54,30 @@ func ReadWave(root string, w WaveWindow) WaveRead {
 		failures = append(append(failures, dossierFailures...), bad...)
 	}
 	sort.Slice(cycles, func(i, j int) bool { return cycles[i].ID < cycles[j].ID })
+	landed, failures := markShipped(evolveDir, cycles, ships, failures)
 	for i := range cycles {
 		cycles[i].Resumed = cycles[i].ID <= w.Floor
 	}
 	loop, _, _ := readLoopStream(root)
-	return WaveRead{Cycles: ApplyLaneDeadlines(cycles, loop), Ships: ships, Loop: loop, Warnings: warnings, Failures: failures, ShipFailures: shipFailures}
+	return WaveRead{Cycles: ApplyLaneDeadlines(cycles, loop), Ships: ships, Landed: landed, Loop: loop, Warnings: warnings, Failures: failures, ShipFailures: shipFailures}
+}
+
+func markShipped(evolveDir string, cycles []Cycle, ships []int, failures []ReadFailure) ([]int, []ReadFailure) {
+	inWindow := map[int]bool{}
+	for _, id := range ships {
+		inWindow[id] = true
+	}
+	landed := []int{}
+	for i := range cycles {
+		path := landing.IntentPath(evolveDir, cycles[i].ID)
+		intent, found, err := landing.ReadIntent(path)
+		failures = appendFailure(failures, path, err)
+		cycles[i].Shipped = inWindow[cycles[i].ID] || (found && intent.Status == landing.IntentComplete)
+		if cycles[i].Shipped {
+			landed = append(landed, cycles[i].ID)
+		}
+	}
+	return landed, failures
 }
 
 func dossierOf(root string, id int) (*dossier.Dossier, []ReadFailure) {

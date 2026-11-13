@@ -279,3 +279,17 @@ func TestRunFrom_TheRecordStartOrTheEarlierLogRunID(t *testing.T) {
 		t.Errorf("RunFrom = %v, want the earlier run id time", got)
 	}
 }
+
+func TestReadWave_LandedAddsALateLandingAndIgnoresAShippedFlag(t *testing.T) {
+	t.Parallel()
+	p := newPlane(t)
+	p.write(".evolve/runs/cycle-11/run.json", `{"cycle_id":11,"phase":"ship"}`)
+	p.write(".evolve/runs/cycle-12/run.json", `{"cycle_id":12,"phase":"build","shipped":true}`)
+	p.write(".evolve/landing/cycle-11.json", `{"cycle":11,"commit_sha":"late","status":"complete","completed_at":"2030-01-01T00:00:00Z"}`)
+
+	got := wave.ReadWave(p.root, shadowWindow(10))
+
+	if len(got.Ships) != 0 || !reflect.DeepEqual(got.Landed, []int{11}) {
+		t.Fatalf("ships %v, landed %v; want none and [11]", got.Ships, got.Landed)
+	}
+}

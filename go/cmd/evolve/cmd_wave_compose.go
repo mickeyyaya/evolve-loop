@@ -105,7 +105,7 @@ func lastWaveFacts(env waveEnv, plan *wavePlan, last wave.Record) wave.Facts {
 		b, _ := strconv.Atoi(y)
 		return a - b
 	})
-	return wave.Facts{Wave: last.Number, RunID: last.RunID, Cycles: read.Cycles, Ships: read.Ships, MergedPRs: slices.Compact(prs)}
+	return wave.Facts{Wave: last.Number, RunID: last.RunID, Cycles: read.Cycles, Ships: read.Landed, MergedPRs: slices.Compact(prs)}
 }
 
 func waveBoundaryArgs(env waveEnv, plan wavePlan, cfg policy.WaveConfig) boundaryArgs {

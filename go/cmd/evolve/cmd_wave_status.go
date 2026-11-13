@@ -128,7 +128,7 @@ func buildWaveStatus(env waveEnv, plane wavePlaneDirs, records []wave.Record) wa
 	if startWarning != "" {
 		report.Warnings = append(report.Warnings, startWarning)
 	}
-	report.Outcome = wave.Facts{Cycles: cycles, Ships: read.Ships}.Outcome()
+	report.Outcome = wave.Facts{Cycles: cycles, Ships: read.Landed}.Outcome()
 	runs, measureWarnings := measureWaveRuns(plane, records, cyclesAboveFloor(cycles, cur.CycleFloor), loop, report.PIDAlive || report.LoopLive, env.now())
 	report.Runs, report.Measures = runs, runs[len(runs)-1].Measures
 	report.Warnings = append(report.Warnings, measureWarnings...)
