@@ -8,7 +8,8 @@ import (
 )
 
 type WorktreeFence struct {
-	Writable []string `json:"writable,omitempty"`
+	Writable     []string `json:"writable,omitempty"`
+	WritableDirs []string `json:"writable_dirs,omitempty"`
 }
 
 func FenceFor(writesSource bool, writable []string) *WorktreeFence {
@@ -23,6 +24,17 @@ func (f *WorktreeFence) WritablePaths() []string {
 		return nil
 	}
 	return f.Writable
+}
+
+func (f *WorktreeFence) WritableDirPaths() []string {
+	if f == nil {
+		return nil
+	}
+	return f.WritableDirs
+}
+
+func GrantFence(writable, dirs []string) *WorktreeFence {
+	return &WorktreeFence{Writable: slices.Clone(writable), WritableDirs: slices.Clone(dirs)}
 }
 
 func PhaseWritesSource(p Phase, cat phasespec.Catalog) bool {

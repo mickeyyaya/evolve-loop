@@ -27,7 +27,7 @@ const (
 
 const usage = `Usage: evolve agent <subcommand>
 
-  evolve agent run <profile> [--input FILE|-] [--file PATH]... [--worktree DIR [--writable PATH]...] [--json] [--keep] [--seat-token-file FILE] [--project-root P]
+  evolve agent run <profile> [--input FILE|-] [--file PATH]... [--worktree DIR [--writable PATH]... [--writable-dir DIR]...] [--json] [--keep] [--seat-token-file FILE] [--project-root P]
       Run one phase agent with no cycle, through the bridge. The input is stdin, or --input FILE.
       Each --file adds one fenced section. stdout carries the report.
       --json carries one envelope (report, verdict, driver, family, model, cost, tokens, launch record).
@@ -37,7 +37,9 @@ const usage = `Usage: evolve agent <subcommand>
       --seat-token-file FILE runs one seat isolated on the token in FILE (a regular file at mode 0600), with the holder untouched; the parameter wins over the holder, and --json names the login in seat_login.
       A writer needs --worktree and one --writable PATH for each file that it can change.
       A --writable PATH names a file, never a directory: the run refuses a directory.
+      A --writable-dir DIR lets the writer create new files under DIR; an existing file of DIR still needs --writable.
       The pipeline restores each other file of the worktree after the run.
+      A new file outside every grant is removed, and the run reports an error that names the path and the grant to add.
       A review report that lists a CRITICAL or HIGH finding, or states FAIL, gives the verdict FAIL.
       Exit 0 PASS/WARN/SKIPPED, 1 FAIL, 3 refused, 21 dispatch error, 10 usage, 11 input.
   evolve agent list [--json] [--project-root P]

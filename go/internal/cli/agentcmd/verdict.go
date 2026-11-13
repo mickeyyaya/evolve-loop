@@ -111,3 +111,11 @@ func (out launchOutcome) withLaunchVerdict() launchOutcome {
 	out.resp.Diagnostics = []core.Diagnostic{{Severity: "info", Message: fmt.Sprintf("cloud session %s %s: the deliverable is a later pull request, so the review contract of the profile does not apply", session.ID, session.Outcome)}}
 	return out
 }
+
+func (out launchOutcome) withFenceVerdict() launchOutcome {
+	if out.resp.Verdict != core.VerdictPASS || !slices.ContainsFunc(out.resp.Diagnostics, func(d core.Diagnostic) bool { return d.Severity == "error" }) {
+		return out
+	}
+	out.verdict, out.resp.Verdict = core.VerdictFAIL, core.VerdictFAIL
+	return out
+}

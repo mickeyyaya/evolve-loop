@@ -25,6 +25,7 @@ type Snapshot struct {
 	Tree     string
 	mode     snapshotMode
 	writable map[string]bool
+	dirs     []string
 	index    indexState
 }
 
@@ -54,6 +55,7 @@ func TakeStaged(ctx context.Context, worktree string, pathspec []string) (Snapsh
 
 type Result struct {
 	Restored []string
+	Created  []string
 	Kept     []string
 	after    string
 }
@@ -116,7 +118,7 @@ func (s Snapshot) indexDrift(ctx context.Context) ([]string, error) {
 	var drift []string
 	for _, state := range []indexState{s.index, current} {
 		for rel := range state {
-			if !s.writable[rel] && !slices.Equal(s.index[rel], current[rel]) {
+			if !s.writable[rel] && !s.grantsNew(rel, s.index[rel]) && !slices.Equal(s.index[rel], current[rel]) {
 				drift = append(drift, rel)
 			}
 		}
@@ -155,7 +157,7 @@ func (s Snapshot) restoreWorkingCopy(ctx context.Context) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	added, keptAdded := s.partition(added)
+	added, keptAdded := s.partitionAdded(added)
 	changed, keptChanged := s.partition(changed)
 	var errs []error
 	for _, rel := range added {
@@ -173,7 +175,8 @@ func (s Snapshot) restoreWorkingCopy(ctx context.Context) (Result, error) {
 	sort.Strings(restored)
 	kept := append(keptAdded, keptChanged...)
 	sort.Strings(kept)
-	return Result{Restored: restored, Kept: kept, after: after}, errors.Join(errs...)
+	sort.Strings(added)
+	return Result{Restored: restored, Created: added, Kept: kept, after: after}, errors.Join(errs...)
 }
 
 func (s Snapshot) Differing(ctx context.Context, base Snapshot) ([]string, error) {
@@ -200,6 +203,25 @@ func (s Snapshot) partition(paths []string) (fenced, kept []string) {
 	return fenced, kept
 }
 
+func (s Snapshot) partitionAdded(paths []string) (fenced, kept []string) {
+	for _, rel := range paths {
+		if s.writable[rel] || s.inGrantedDir(rel) {
+			kept = append(kept, rel)
+		} else {
+			fenced = append(fenced, rel)
+		}
+	}
+	return fenced, kept
+}
+
+func (s Snapshot) inGrantedDir(rel string) bool {
+	return slices.ContainsFunc(s.dirs, func(dir string) bool { return strings.HasPrefix(rel, dir+"/") })
+}
+
+func (s Snapshot) grantsNew(rel string, indexed []string) bool {
+	return len(indexed) == 0 && s.inGrantedDir(rel)
+}
+
 func (s Snapshot) verify(ctx context.Context) error {
 	if err := s.verifyTree(ctx); err != nil {
 		return err
@@ -223,10 +245,10 @@ func (s Snapshot) verifyTree(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	for _, rel := range append(added, changed...) {
-		if !s.writable[rel] {
-			return fmt.Errorf("treefence: restored content differs from dispatch snapshot")
-		}
+	fencedAdded, _ := s.partitionAdded(added)
+	fencedChanged, _ := s.partition(changed)
+	if len(fencedAdded)+len(fencedChanged) > 0 {
+		return fmt.Errorf("treefence: restored content differs from dispatch snapshot")
 	}
 	return nil
 }
@@ -398,6 +420,24 @@ func (f *Fence) WithWorkspace(workspace string) *Fence {
 	return f
 }
 
+func (f *Fence) WithWritableDirs(dirs ...string) *Fence {
+	if f == nil || f.snap == nil {
+		return f
+	}
+	f.snap.dirs = cleanDirs(dirs)
+	return f
+}
+
+func cleanDirs(dirs []string) []string {
+	var out []string
+	for _, dir := range dirs {
+		if dir = strings.Trim(filepath.ToSlash(filepath.Clean(dir)), "/"); dir != "" && dir != "." {
+			out = append(out, dir)
+		}
+	}
+	return out
+}
+
 func Begin(ctx context.Context, worktree string, readOnly bool, writable ...string) *Fence {
 	if !readOnly || worktree == "" {
 		return &Fence{}
@@ -444,7 +484,9 @@ const patchFileName = "fence-reverted.patch"
 type Outcome struct {
 	Verified     bool
 	Restored     []string
+	Created      []string
 	Kept         []string
+	Writer       bool
 	TakeErr      error
 	RestoreErr   error
 	RetakenAfter error
@@ -467,7 +509,8 @@ func (f *Fence) End(ctx context.Context) Outcome {
 	if err == nil {
 		err = f.snap.verify(ctx)
 	}
-	out := Outcome{Verified: err == nil, Restored: res.Restored, Kept: res.Kept, RestoreErr: err, RetakenAfter: f.retakenAfter, workspace: f.workspace}
+	writer := len(f.snap.writable) > 0 || len(f.snap.dirs) > 0
+	out := Outcome{Verified: err == nil, Restored: res.Restored, Created: res.Created, Kept: res.Kept, Writer: writer, RestoreErr: err, RetakenAfter: f.retakenAfter, workspace: f.workspace}
 	if len(res.Restored) > 0 && f.workspace != "" && res.after != "" {
 		out.savePatch(ctx, f.snap.Worktree, f.snap.Tree, res.after, res.Restored)
 	}
@@ -495,6 +538,13 @@ func (o *Outcome) savePatch(ctx context.Context, worktree, tree, after string, p
 
 const listMax = 12
 
+func listed(paths []string) []string {
+	if len(paths) <= listMax {
+		return paths
+	}
+	return append(slices.Clone(paths[:listMax]), fmt.Sprintf("… +%d more", len(paths)-listMax))
+}
+
 func (o Outcome) Diagnostics(phase string) []cyclestate.Diagnostic {
 	if o.TakeErr != nil {
 		return []cyclestate.Diagnostic{{Severity: "warning", Message: fmt.Sprintf(
@@ -520,6 +570,11 @@ func (o Outcome) Diagnostics(phase string) []cyclestate.Diagnostic {
 			msg += fmt.Sprintf(" (could not save %s: %v)", filepath.Join(o.workspace, patchFileName), o.patchErr)
 		}
 		out = append(out, cyclestate.Diagnostic{Severity: "warning", Message: msg})
+	}
+	if o.Writer && len(o.Created) > 0 {
+		out = append(out, cyclestate.Diagnostic{Severity: "error", Message: fmt.Sprintf(
+			"worktree fence: writer phase %s created %d file(s) outside its grant and the fence removed them: %s; next step: grant each path with --writable PATH, or grant a directory for new files with --writable-dir DIR, then run the seat again",
+			phase, len(o.Created), strings.Join(listed(o.Created), ", "))})
 	}
 	if len(o.Kept) > 0 {
 		out = append(out, cyclestate.Diagnostic{Severity: "warning", Message: fmt.Sprintf(

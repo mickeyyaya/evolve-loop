@@ -64,8 +64,8 @@ func admit(o runOptions, root string) (phasespec.PhaseSpec, error) {
 	if writesSource(spec, cat, root) {
 		return spec, admitWriter(spec, root, o)
 	}
-	if len(o.writable) > 0 {
-		return spec, refusal{exitUsage, fmt.Sprintf("%s is read-only: --writable is only for a profile that writes source", name)}
+	if len(o.writable) > 0 || len(o.writableDirs) > 0 {
+		return spec, refusal{exitUsage, fmt.Sprintf("%s is read-only: --writable and --writable-dir are only for a profile that writes source", name)}
 	}
 	return spec, nil
 }
@@ -74,8 +74,8 @@ func admitWriter(spec phasespec.PhaseSpec, root string, o runOptions) error {
 	if !worktreeWriter(spec, root) {
 		return refusal{exitRefused, fmt.Sprintf("%s writes source: it declares writes_source, or its profile sandbox can write outside the run workspace; a standalone writer needs a sandbox that writes only %s and the run workspace and denies %s", spec.Name, worktreeGrant, strings.Join(writerDenies, " and "))}
 	}
-	if o.worktree == "" || len(o.writable) == 0 {
-		return refusal{exitUsage, fmt.Sprintf("%s writes source: give --worktree DIR (a linked git worktree) and one --writable PATH for each file that it can change", spec.Name)}
+	if o.worktree == "" || len(o.writable)+len(o.writableDirs) == 0 {
+		return refusal{exitUsage, fmt.Sprintf("%s writes source: give --worktree DIR (a linked git worktree), one --writable PATH for each file that it can change, and --writable-dir DIR for each directory that it can add new files to", spec.Name)}
 	}
 	for _, rel := range o.writable {
 		if !filepath.IsLocal(rel) || filepath.Clean(rel) != rel {
@@ -83,6 +83,14 @@ func admitWriter(spec phasespec.PhaseSpec, root string, o runOptions) error {
 		}
 		if info, err := os.Stat(filepath.Join(o.worktree, rel)); err == nil && info.IsDir() {
 			return refusal{exitUsage, fmt.Sprintf("--writable %q is a directory: name each file that the writer can change", rel)}
+		}
+	}
+	for _, rel := range o.writableDirs {
+		if !filepath.IsLocal(rel) || filepath.Clean(rel) != rel {
+			return refusal{exitUsage, fmt.Sprintf("--writable-dir %q is not a clean path inside the worktree", rel)}
+		}
+		if info, err := os.Stat(filepath.Join(o.worktree, rel)); err == nil && !info.IsDir() {
+			return refusal{exitUsage, fmt.Sprintf("--writable-dir %q is a file: name it with --writable", rel)}
 		}
 	}
 	return nil

@@ -63,26 +63,28 @@ type Envelope struct {
 }
 
 type runOptions struct {
-	profile  string
-	input    string
-	files    fileList
-	worktree string
-	writable fileList
-	asJSON   bool
-	keep     bool
-	root     string
+	profile      string
+	input        string
+	files        fileList
+	worktree     string
+	writable     fileList
+	writableDirs fileList
+	asJSON       bool
+	keep         bool
+	root         string
 
 	seatTokenFile string
 }
 
 type standaloneRun struct {
-	spec      phasespec.PhaseSpec
-	root      string
-	label     string
-	workspace string
-	input     string
-	worktree  string
-	writable  []string
+	spec         phasespec.PhaseSpec
+	root         string
+	label        string
+	workspace    string
+	input        string
+	worktree     string
+	writable     []string
+	writableDirs []string
 
 	seatTokenFile string
 }
@@ -136,6 +138,7 @@ func parseRun(args []string, stderr io.Writer) (runOptions, error) {
 	fs.Var(&o.files, "file", "attach PATH as one fenced section (repeatable)")
 	fs.StringVar(&o.worktree, "worktree", "", "run the agent in the linked git worktree DIR")
 	fs.Var(&o.writable, "writable", "let a writer change PATH of the worktree (repeatable)")
+	fs.Var(&o.writableDirs, "writable-dir", "let a writer create new files under DIR of the worktree (repeatable)")
 	fs.BoolVar(&o.asJSON, "json", false, "print one JSON envelope instead of the report")
 	fs.BoolVar(&o.keep, "keep", false, "keep the run workspace")
 	fs.StringVar(&o.seatTokenFile, "seat-token-file", "", "run this one seat isolated on the token in FILE (mode 0600); the holder stays untouched")
@@ -157,7 +160,7 @@ func (c command) prepare(args []string, stdin io.Reader, stderr io.Writer) (runO
 	if subagent.ReadDispatchDepth(c.deps.Getenv) > 0 {
 		return o, standaloneRun{}, refusal{exitRefused, "refused inside a phase: a phase agent must not start another agent run"}
 	}
-	r := standaloneRun{root: projectRoot(o.root), worktree: o.worktree, writable: o.writable}
+	r := standaloneRun{root: projectRoot(o.root), worktree: o.worktree, writable: o.writable, writableDirs: o.writableDirs}
 	if strings.Contains(o.seatTokenFile, seatlogin.TokenPrefix) {
 		return o, r, refusal{exitUsage, "--seat-token-file: the value looks like a token, not a path. Write the token to a file at mode 0600, and give the path of that file."}
 	}
@@ -238,7 +241,7 @@ func (c command) launch(ctx context.Context, r standaloneRun, signals *signalcen
 	out.report, out.hasReport = readReport(r)
 	out.cli, out.model, out.family = spy.cli, spy.model, llmroute.Family(spy.cli)
 	out.seatLogin = spy.seatLogin
-	out.writer = len(r.writable) > 0
+	out.writer = len(r.writable) > 0 || len(r.writableDirs) > 0
 	out.cloudSeat = c.deps.CloudSeat(out.cli)
 	switch {
 	case out.runErr != nil:
@@ -247,7 +250,7 @@ func (c command) launch(ctx context.Context, r standaloneRun, signals *signalcen
 	default:
 		out = out.withReportVerdict(r, signals)
 	}
-	return out
+	return out.withFenceVerdict()
 }
 
 func (c command) treeState(ctx context.Context, dir string, stderr io.Writer) string {
@@ -318,12 +321,19 @@ func removeWorkspace(workspace string, stderr io.Writer) {
 	}
 }
 
+func fenceFor(r standaloneRun) *core.WorktreeFence {
+	if r.worktree == "" {
+		return core.FenceFor(true, nil)
+	}
+	return core.GrantFence(r.writable, r.writableDirs)
+}
+
 func (r standaloneRun) request() core.PhaseRequest {
 	return core.PhaseRequest{
 		ProjectRoot: r.root,
 		Workspace:   r.workspace,
 		Worktree:    r.worktree,
-		Fence:       core.FenceFor(r.worktree == "", r.writable),
+		Fence:       fenceFor(r),
 		RunID:       r.label,
 		Context:     map[string]string{specrunner.AgentInputKey: r.input},
 	}

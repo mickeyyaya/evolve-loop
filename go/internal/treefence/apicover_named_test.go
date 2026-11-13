@@ -71,3 +71,45 @@ func TestAPICoverNamedExports(t *testing.T) {
 		t.Fatal("a staged snapshot must not restore a worktree")
 	}
 }
+
+func TestAPICoverNamedGrantExports(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	dir := initRepo(t)
+	fence := Begin(ctx, dir, true, "src/mat.go").WithWritableDirs("src/gen", "src/gen/")
+	write(t, dir, "src/gen/new.go", "new\n")
+	write(t, dir, "src/stray.go", "stray\n")
+
+	var out Outcome = fence.End(ctx)
+
+	diags := out.Diagnostics("build")
+	var errs []string
+	for _, d := range diags {
+		if d.Severity == "error" {
+			errs = append(errs, d.Message)
+		}
+	}
+	if !out.Writer || !out.Verified || len(out.Created) != 1 || out.Created[0] != "src/stray.go" || len(out.Kept) != 1 || out.Kept[0] != "src/gen/new.go" {
+		t.Fatalf("outcome %+v", out)
+	}
+	if len(errs) != 1 || !strings.Contains(errs[0], "src/stray.go") || !strings.Contains(errs[0], "--writable") || strings.Contains(errs[0], "src/gen/new.go") {
+		t.Fatalf("error diagnostics %v", errs)
+	}
+	if (*Fence)(nil).WithWritableDirs("x") != nil {
+		t.Fatal("a nil fence stays nil")
+	}
+}
+
+func TestOutcomeDiagnosticsListsAtMostTheCapOfCreatedPaths(t *testing.T) {
+	t.Parallel()
+	created := make([]string, 0, 14)
+	for i := 0; i < 14; i++ {
+		created = append(created, "src/f"+string(rune('a'+i))+".go")
+	}
+
+	diags := (Outcome{Writer: true, Created: created}).Diagnostics("build")
+
+	if len(diags) != 1 || diags[0].Severity != "error" || !strings.Contains(diags[0].Message, "+2 more") || strings.Contains(diags[0].Message, "src/fm.go") {
+		t.Fatalf("diagnostics %+v", diags)
+	}
+}
