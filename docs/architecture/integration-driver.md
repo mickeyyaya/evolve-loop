@@ -250,7 +250,7 @@ Each row is a red test first.
 
 ## 9. Enforce: the open inputs
 
-The driver refuses `enforce` until PR (c) lands. PR (c) gets its own card and its own review before its code. These inputs bind that card.
+The driver refuses `enforce` until PR (c) lands. PR (c) gets its own card and its own review before its code. These inputs bind that card. The card is [integration-driver-enforce](integration-driver-enforce.md).
 
 | Id | Input |
 |---|---|
