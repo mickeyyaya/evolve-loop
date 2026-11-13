@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/mainstop"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -134,7 +133,7 @@ func TestStopHold_ShadowRecordsOneWouldRefuseForEachHolder(t *testing.T) {
 		t.Fatalf("%d events, want one for the holder: %+v", len(f.events), f.events)
 	}
 	e := f.events[0]
-	if e.Origin != "evolve.integrationBatch" || e.Module != signalcenter.ModuleGateRepo || e.Kind != signalcenter.KindShipWarning || e.Severity != signalcenter.SeverityWarn || e.Code != core.CodeMainRedStopWouldRefuse {
+	if e.Origin != "evolve.integrationBatch" || e.Module != signalcenter.ModuleGateRepo || e.Kind != signalcenter.KindShipWarning || e.Severity != signalcenter.SeverityWarn || e.Code != CodeMainRedStopWouldRefuse {
 		t.Errorf("event = %+v, want a warn would-refuse of gate.repo with the origin of the caller", e)
 	}
 	want := map[string]string{"keys": baseattr.Names([]baseattr.Key{boundKey}), "base": boundMain, "main": boundMain, "admission": "not-a-fix", "fix_item": boundFixItem, "landing": "batch pull request 12"}

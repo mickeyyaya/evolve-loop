@@ -7,7 +7,6 @@ import (
 	"io"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/mainstop"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -48,7 +47,7 @@ func (h *StopHold) Admit(ctx context.Context, main, tip string) ([]baseattr.Key,
 		return nil, nil
 	}
 	proof := mainstop.Proof{Base: main}
-	red, err := h.Run(ctx, tip, core.StopProofReds(stop.Keys))
+	red, err := h.Run(ctx, tip, mainstop.ProofReds(stop.Keys))
 	if err == nil {
 		proof = stop.Proven(main, red)
 	} else {
@@ -90,7 +89,7 @@ func (r StopRefusal) Main(stop mainstop.Stop) string {
 func (r StopRefusal) WouldRefuse(base signalcenter.Event, stop mainstop.Stop) signalcenter.Event {
 	keys := baseattr.Names(stop.Keys)
 	e := base
-	e.Module, e.Kind, e.Code = signalcenter.ModuleGateRepo, signalcenter.KindShipWarning, core.CodeMainRedStopWouldRefuse
+	e.Module, e.Kind, e.Code = signalcenter.ModuleGateRepo, signalcenter.KindShipWarning, CodeMainRedStopWouldRefuse
 	e.Severity = signalcenter.SeverityWarn
 	e.Reason = "main-red stop (shadow): " + r.Landing + " lands, and enforce refuses it (" + r.Admission.String() + ") while " + keys + " is red on main"
 	e.Fields = map[string]string{"keys": keys, "base": r.Base, "main": r.Main(stop), "admission": r.Admission.String(), "fix_item": stop.FixItem, "landing": r.Landing}

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/mainstop"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -101,7 +100,7 @@ func TestStopBound_AStopPastItsBoundEscalatesOneTime(t *testing.T) {
 		t.Fatalf("%d signals, want one: %+v", len(f.events), f.events)
 	}
 	e := f.events[0]
-	if e.Code != core.CodeMainRedStopEscalated || e.Kind != signalcenter.KindLoopEscalation || e.Module != signalcenter.ModuleGateRepo ||
+	if e.Code != CodeMainRedStopEscalated || e.Kind != signalcenter.KindLoopEscalation || e.Module != signalcenter.ModuleGateRepo ||
 		e.Severity != signalcenter.SeverityIncident || e.Origin != "selfheal.StopBound" ||
 		e.Cycle != 0 || e.Reason != "main-red stop past its bound of 2h0m0s: "+inc.Summary {
 		t.Errorf("signal = %+v, want one incident GATE_REPO_MAIN_RED_STOP_ESCALATED with the bound, the cause and the resume condition", e)

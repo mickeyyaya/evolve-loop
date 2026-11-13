@@ -7,7 +7,6 @@ import (
 	"slices"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/mainstop"
 	"github.com/mickeyyaya/evolve-loop/go/internal/selfheal"
@@ -56,7 +55,7 @@ func (c stopCheck) proof(ctx context.Context, tree, base string) mainstop.Proof 
 	if base == "" || base != c.main {
 		return mainstop.Proof{Base: base}
 	}
-	red, err := c.attr.RunIn(ctx, tree, core.StopProofReds(c.stop.Keys))
+	red, err := c.attr.RunIn(ctx, tree, mainstop.ProofReds(c.stop.Keys))
 	if err != nil {
 		fmt.Fprintf(c.warn, "[ship] WARN main-red stop: the keys of the stop could not be run in the lane (%v), so the lane is not a proven fix\n", err)
 		return mainstop.Proof{Base: base}

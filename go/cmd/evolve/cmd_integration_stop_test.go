@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/integration"
 	"github.com/mickeyyaya/evolve-loop/go/internal/mainstop"
@@ -180,7 +179,7 @@ func TestStopJourney_ShadowSplitsTwoRedPullRequestsAndRecordsOneEvent(t *testing
 		t.Fatalf("%d events, want one would-refuse: %+v", len(s.events), s.events)
 	}
 	e := s.events[0]
-	if e.root != s.root || e.event.Code != core.CodeMainRedStopWouldRefuse || e.event.Origin != batchEventOrigin || !strings.HasPrefix(e.event.Fields["landing"], "batch pull request ") {
+	if e.root != s.root || e.event.Code != selfheal.CodeMainRedStopWouldRefuse || e.event.Origin != batchEventOrigin || !strings.HasPrefix(e.event.Fields["landing"], "batch pull request ") {
 		t.Errorf("event = %+v, want one would-refuse of the batch in the project root", e)
 	}
 }
@@ -198,7 +197,7 @@ func TestStopJourney_AFixBatchLandsReleasesTheStopAndClosesTheFixItem(t *testing
 	if rc != 0 || tip == before {
 		t.Fatalf("rc=%d err=%q, want a landing that moves main", rc, errb)
 	}
-	wantRun := s.root + " " + tip + " " + baseattr.Names([]baseattr.Key{stopJourneyKey}) + " " + strings.Join(core.StopProofReds(nil).Flags, " ")
+	wantRun := s.root + " " + tip + " " + baseattr.Names([]baseattr.Key{stopJourneyKey}) + " " + strings.Join(mainstop.ProofReds(nil).Flags, " ")
 	if !slices.Equal(s.runs, []string{wantRun}) {
 		t.Errorf("key runs = %v, want %q", s.runs, wantRun)
 	}
@@ -209,10 +208,10 @@ func TestStopJourney_AFixBatchLandsReleasesTheStopAndClosesTheFixItem(t *testing
 	if s.fixItemOpen() || !inboxProcessed(t, filepath.Join(s.evolveDir(), "inbox"), s.fixItem) {
 		t.Error("the fix item is not in processed")
 	}
-	if want := "key run " + tip + "\n[inbox-mover] promoted: " + s.fixItem + ".json → processed/\nsignal " + string(core.CodeMainRedStopReleased) + "\n"; errb != want {
+	if want := "key run " + tip + "\n[inbox-mover] promoted: " + s.fixItem + ".json → processed/\nsignal " + string(selfheal.CodeMainRedStopReleased) + "\n"; errb != want {
 		t.Errorf("stderr = %q, want the key run, the mover and the signal on the stderr of the command: %q", errb, want)
 	}
-	if len(s.events) != 1 || s.events[0].root != s.root || s.events[0].event.Code != core.CodeMainRedStopReleased || s.events[0].event.Origin != batchEventOrigin || s.events[0].event.Severity != signalcenter.SeverityInfo {
+	if len(s.events) != 1 || s.events[0].root != s.root || s.events[0].event.Code != selfheal.CodeMainRedStopReleased || s.events[0].event.Origin != batchEventOrigin || s.events[0].event.Severity != signalcenter.SeverityInfo {
 		t.Errorf("events = %+v, want one info release of the batch in the project root", s.events)
 	}
 }
@@ -239,7 +238,7 @@ func TestStopJourney_AGreenBatchThatFixesNoKeyIsHeldAtEnforceAndLandsAtShadow(t 
 			if held && (!strings.Contains(errb, "(not-a-fix)") || !strings.Contains(errb, "is held") || len(s.events) != 0) {
 				t.Errorf("stderr %q events %v, want the hold and no event", errb, s.events)
 			}
-			if !held && !slices.Equal(s.codes(), []signalcenter.Code{core.CodeMainRedStopWouldRefuse}) {
+			if !held && !slices.Equal(s.codes(), []signalcenter.Code{selfheal.CodeMainRedStopWouldRefuse}) {
 				t.Errorf("codes = %v, want one would-refuse", s.codes())
 			}
 		})
@@ -416,7 +415,7 @@ func TestAttributedKeyRun_RunsTheKeysInTheTreeOfTheRevision(t *testing.T) {
 		seen, got = string(raw), reds
 		return []baseattr.Key{stopJourneyKey}, err
 	}
-	want := core.StopProofReds([]baseattr.Key{stopJourneyKey})
+	want := mainstop.ProofReds([]baseattr.Key{stopJourneyKey})
 
 	red, err := attributedKeyRun(runner)(repo.Dir, io.Discard)(context.Background(), first, want)
 
@@ -475,7 +474,7 @@ func TestEmitIntegrationSignal_SendsTheEventThroughACenterOfTheIntegrationRole(t
 
 	emitIntegrationSignal(root, io.Discard, signalcenter.Event{
 		Module: signalcenter.ModuleGateRepo, Kind: signalcenter.KindShipWarning, Severity: signalcenter.SeverityWarn,
-		Code: core.CodeMainRedStopWouldRefuse, Origin: batchEventOrigin, Reason: "a batch",
+		Code: selfheal.CodeMainRedStopWouldRefuse, Origin: batchEventOrigin, Reason: "a batch",
 	})
 
 	mu.Lock()
@@ -483,7 +482,7 @@ func TestEmitIntegrationSignal_SendsTheEventThroughACenterOfTheIntegrationRole(t
 	if !slices.Equal(roles, []string{"integration"}) || !slices.Equal(dirs, []string{paths.EvolveDirOf(root)}) || closed != 1 {
 		t.Fatalf("roles=%v dirs=%v closed=%d, want one center of the integration role on the project root, closed one time", roles, dirs, closed)
 	}
-	if len(events) != 1 || events[0].Code != core.CodeMainRedStopWouldRefuse || events[0].Origin != "evolve.integrationBatch" {
+	if len(events) != 1 || events[0].Code != selfheal.CodeMainRedStopWouldRefuse || events[0].Origin != "evolve.integrationBatch" {
 		t.Errorf("events = %+v, want the one event of the batch", events)
 	}
 }

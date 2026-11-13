@@ -278,7 +278,7 @@ The file is `main_red_stop.go`. The design is in [gate-contract-g4-base-red-attr
 - A stop that does not hold starts no git call and no test run.
 - `repoContractGateRoot` gives the landing tree and the lane base. An error of that call is the error of the check.
 - `stopCheck.resolved` resolves the lane base and the `main` ref through `Attributor.Resolve`. A ref that cannot be resolved gets a WARN line and an empty value.
-- `stopCheck.proof` runs the keys of the stop in the landing tree through `Attributor.RunIn`. `core.StopProofReds` gives the run the `-tags` list of the floor.
+- `stopCheck.proof` runs the keys of the stop in the landing tree through `Attributor.RunIn`. `mainstop.ProofReds` gives the run the `-tags` list of the floor.
 - The proof runs only when the lane base is the `main` tip. A run that fails gets a WARN line and proves no fix.
 - `Stop.Proven` builds the proof. `Proof.Green` holds each key of the stop that is not red in the lane.
 - `stopCheck.admit` gives the proof to `Stop.Admit`. The check returns the green keys of a fix, and `runNative` gives them to the release.

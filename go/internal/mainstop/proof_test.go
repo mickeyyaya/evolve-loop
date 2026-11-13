@@ -1,4 +1,4 @@
-package core
+package mainstop
 
 import (
 	"slices"
@@ -7,11 +7,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
 )
 
-func TestStopProofReds_AsksForEachKeyWithTheTagsOfTheFloor(t *testing.T) {
+func TestProofReds_AsksForEachKeyWithTheTagsOfTheFloor(t *testing.T) {
 	t.Parallel()
 	keys := []baseattr.Key{{Package: "example.com/m/a", Test: "TestA"}, {Package: "example.com/m/b", Test: "TestB"}}
 
-	reds := StopProofReds(keys)
+	reds := ProofReds(keys)
 
 	if !slices.Equal(reds.Keys, keys) {
 		t.Errorf("keys = %v, want %v", reds.Keys, keys)

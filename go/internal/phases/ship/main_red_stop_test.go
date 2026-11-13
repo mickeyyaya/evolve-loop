@@ -129,7 +129,7 @@ func TestShipStop_AFixLandsAndReleasesTheStop(t *testing.T) {
 	if time.Since(*stop.ReleasedAt) > time.Hour || stop.ReleasedAt.Nanosecond() != 0 {
 		t.Errorf("released_at = %v, want the ship clock at whole seconds", stop.ReleasedAt)
 	}
-	got := l.emitted(core.CodeMainRedStopReleased)
+	got := l.emitted(selfheal.CodeMainRedStopReleased)
 	if len(got) != 1 || got[0].Cycle != 1 || got[0].RunID != "test-run" || got[0].Phase != phaseName || got[0].Module != signalcenter.ModuleGateRepo ||
 		got[0].Kind != signalcenter.KindGateCorrected || got[0].Severity != signalcenter.SeverityInfo ||
 		got[0].Fields["main"] != l.base || got[0].Fields["fix_item"] != held.FixItem || got[0].Fields["released_by"] != "cycle 1 "+landed || got[0].Fields["fix_item_error"] != "" {
@@ -141,7 +141,7 @@ func TestShipStop_AFixLandsAndReleasesTheStop(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(l.repo, ".evolve", "inbox", "processed", "cycle-1")); err != nil {
 		t.Errorf("the fix item is not in processed/cycle-1: %v", err)
 	}
-	if refused := l.emitted(core.CodeMainRedStopWouldRefuse); len(refused) != 0 {
+	if refused := l.emitted(selfheal.CodeMainRedStopWouldRefuse); len(refused) != 0 {
 		t.Errorf("a fix got %d would-refuse signals", len(refused))
 	}
 }
@@ -169,7 +169,7 @@ func TestShipStop_ANonFixParksAtEnforceAndLandsAtShadow(t *testing.T) {
 		if l.mainTip(t) != l.base || !l.stop(t).Holds() {
 			t.Errorf("main = %s (base %s), stop holds = %v; a parked lane lands nothing and releases nothing", l.mainTip(t), l.base, l.stop(t).Holds())
 		}
-		if n := len(l.emitted(core.CodeMainRedStopWouldRefuse)) + len(l.emitted(core.CodeMainRedStopReleased)); n != 0 {
+		if n := len(l.emitted(selfheal.CodeMainRedStopWouldRefuse)) + len(l.emitted(selfheal.CodeMainRedStopReleased)); n != 0 {
 			t.Errorf("an enforced refusal emitted %d shadow or release signals", n)
 		}
 	})
@@ -186,14 +186,14 @@ func TestShipStop_ANonFixParksAtEnforceAndLandsAtShadow(t *testing.T) {
 		if l.mainTip(t) == l.base {
 			t.Error("the lane did not land at shadow")
 		}
-		got := l.emitted(core.CodeMainRedStopWouldRefuse)
+		got := l.emitted(selfheal.CodeMainRedStopWouldRefuse)
 		if len(got) != 1 || got[0].Cycle != 1 || got[0].RunID != "test-run" || got[0].Phase != phaseName || got[0].Module != signalcenter.ModuleGateRepo ||
 			got[0].Kind != signalcenter.KindShipWarning || got[0].Severity != signalcenter.SeverityWarn ||
 			got[0].Fields["admission"] != "not-a-fix" || got[0].Fields["keys"] != redPkg+"."+redTest || got[0].Fields["base"] != l.base || got[0].Fields["main"] != held.MainSHA || got[0].Fields["fix_item"] != held.FixItem || got[0].Fields["landing"] != "the lane" ||
 			!strings.Contains(got[0].Reason, "the lane lands") || !strings.Contains(got[0].Reason, "not-a-fix") {
 			t.Errorf("signals = %+v, want one warn GATE_REPO_MAIN_RED_STOP_WOULD_REFUSE with the admission not-a-fix", got)
 		}
-		if !l.stop(t).Holds() || len(l.emitted(core.CodeMainRedStopReleased)) != 0 || !l.fixItemPending(t, held.FixItem) {
+		if !l.stop(t).Holds() || len(l.emitted(selfheal.CodeMainRedStopReleased)) != 0 || !l.fixItemPending(t, held.FixItem) {
 			t.Error("a lane that is not a fix released the stop or consumed the fix item")
 		}
 	})
@@ -220,7 +220,7 @@ func TestShipStop_ALaneThatIsNotOnTheMainTipIsAskedToRebase(t *testing.T) {
 	if run.calls != 0 {
 		t.Errorf("the proof ran %d times for a lane that is not on the main tip, want 0", run.calls)
 	}
-	got := l.emitted(core.CodeMainRedStopWouldRefuse)
+	got := l.emitted(selfheal.CodeMainRedStopWouldRefuse)
 	if shadowErr != nil || len(got) != 1 || got[0].Fields["admission"] != "rebase" || got[0].Fields["main"] != l.mainTip(t) || got[0].Fields["base"] != l.base {
 		t.Errorf("shadow err = %v, signals = %+v, want one would-refuse with the admission rebase", shadowErr, got)
 	}
@@ -256,7 +256,7 @@ func TestShipStop_TheProofRunsTheKeysOfTheStopInTheLaneWithTheFloorTags(t *testi
 	res := stopRelease{opts: opts, warn: opts.Stderr}.landedFix(checked.green, RunResult{CommitSHA: "abc1234"}, nil)
 
 	stop := l.stop(t)
-	if len(res.Logs) != 0 || !stop.Holds() || !slices.Equal(stop.Keys, []baseattr.Key{otherKey}) || len(l.emitted(core.CodeMainRedStopReleased)) != 0 {
+	if len(res.Logs) != 0 || !stop.Holds() || !slices.Equal(stop.Keys, []baseattr.Key{otherKey}) || len(l.emitted(selfheal.CodeMainRedStopReleased)) != 0 {
 		t.Errorf("logs = %v, stop = %+v; a fix of one key keeps the stop on the other key and signals no release", res.Logs, stop)
 	}
 }
@@ -413,8 +413,8 @@ func TestReleaseMainRedStop_AStopThatDoesNotHoldIsNotWrittenOrSignalled(t *testi
 	if err := (stopRelease{opts: opts, warn: os.Stderr}).release([]baseattr.Key{redKey}, "main def"); err != nil {
 		t.Fatal(err)
 	}
-	if again := l.stop(t); again.ReleasedBy != "main abc" || len(l.emitted(core.CodeMainRedStopReleased)) != 1 {
-		t.Errorf("a second release changed the record to %+v or signalled again (%d signals)", again, len(l.emitted(core.CodeMainRedStopReleased)))
+	if again := l.stop(t); again.ReleasedBy != "main abc" || len(l.emitted(selfheal.CodeMainRedStopReleased)) != 1 {
+		t.Errorf("a second release changed the record to %+v or signalled again (%d signals)", again, len(l.emitted(selfheal.CodeMainRedStopReleased)))
 	}
 }
 
@@ -448,7 +448,7 @@ func TestReleaseMainRedStop_AFixItemThatCannotMoveMakesTheReleaseAWarning(t *tes
 			if err == nil || !strings.Contains(err.Error(), "fix item "+held.FixItem) || l.stop(t).Holds() {
 				t.Fatalf("err = %v, holds = %v, want the stop released and an error that names the fix item", err, l.stop(t).Holds())
 			}
-			got := l.emitted(core.CodeMainRedStopReleased)
+			got := l.emitted(selfheal.CodeMainRedStopReleased)
 			if len(got) != 1 || got[0].Severity != signalcenter.SeverityWarn || got[0].Fields["fix_item_error"] != evolog.SanitizeField(err.Error()) {
 				t.Errorf("signals = %+v, want one warn release with fix_item_error", got)
 			}
@@ -486,7 +486,7 @@ func TestReleaseMainRedStop_AFixItemThatIsConsumedAlreadyStaysWhereItIs(t *testi
 	if _, err := os.Stat(filepath.Join(consumed, item)); err != nil {
 		t.Errorf("the consumed fix item moved: %v", err)
 	}
-	got := l.emitted(core.CodeMainRedStopReleased)
+	got := l.emitted(selfheal.CodeMainRedStopReleased)
 	if len(got) != 1 || got[0].Severity != signalcenter.SeverityInfo || got[0].Fields["parked"] != "7, 9" || !strings.Contains(got[0].Reason, "main abc") {
 		t.Errorf("signals = %+v, want one info release that names the parked cycles 7, 9", got)
 	}
@@ -506,8 +506,8 @@ func TestAttributeContractRed_KeysThatAreGreenOnMainReleaseTheStop(t *testing.T)
 	if stop.Holds() || stop.ReleasedBy != "main "+l.mainTip(t) || strings.Contains(log, "WARN") {
 		t.Errorf("stop = %+v, log = %q, want a release by the main tip %s", stop, log, l.mainTip(t))
 	}
-	if l.fixItemPending(t, held.FixItem) || len(l.emitted(core.CodeMainRedStopReleased)) != 1 {
-		t.Errorf("fix item pending = %v, release signals = %d, want the item consumed and one signal", l.fixItemPending(t, held.FixItem), len(l.emitted(core.CodeMainRedStopReleased)))
+	if l.fixItemPending(t, held.FixItem) || len(l.emitted(selfheal.CodeMainRedStopReleased)) != 1 {
+		t.Errorf("fix item pending = %v, release signals = %d, want the item consumed and one signal", l.fixItemPending(t, held.FixItem), len(l.emitted(selfheal.CodeMainRedStopReleased)))
 	}
 }
 
@@ -597,7 +597,7 @@ func TestAttributeContractRed_KeysThatAreRedOnMainKeepTheStop(t *testing.T) {
 	err, _ := attributed(t, l.options(run.run), redPack(redPkg+"."+redTest))
 
 	wantShipErr(t, err, shiperr.CodeMainRedPark, core.ShipClassPrecondition, "")
-	if !l.stop(t).Holds() || len(l.emitted(core.CodeMainRedStopReleased)) != 0 {
+	if !l.stop(t).Holds() || len(l.emitted(selfheal.CodeMainRedStopReleased)) != 0 {
 		t.Error("a key that is red on main released the stop")
 	}
 }
@@ -654,7 +654,7 @@ func TestShipStop_AShadowRefusalOnANewerMainNamesTheMainOfTheStop(t *testing.T) 
 
 	err, _ := stopChecked(t, opts)
 
-	got := l.emitted(core.CodeMainRedStopWouldRefuse)
+	got := l.emitted(selfheal.CodeMainRedStopWouldRefuse)
 	if err != nil || l.base == held.MainSHA || len(got) != 1 || got[0].Cycle != 7 || got[0].RunID != "run-7" || got[0].Fields["main"] != held.MainSHA || got[0].Fields["base"] != l.base || got[0].Fields["admission"] != "not-a-fix" {
 		t.Errorf("err = %v, signals = %+v, want one would-refuse of cycle 7 and run-7 with the main %s of the stop and the lane base %s", err, got, held.MainSHA, l.base)
 	}
@@ -669,7 +669,7 @@ func TestReleaseLandedFix_TheReleaseNamesTheCycleOfTheShip(t *testing.T) {
 
 	res := (stopRelease{opts: opts, warn: opts.Stderr}).landedFix([]baseattr.Key{redKey}, RunResult{CommitSHA: "abc1234"}, nil)
 
-	got := l.emitted(core.CodeMainRedStopReleased)
+	got := l.emitted(selfheal.CodeMainRedStopReleased)
 	if len(res.Logs) != 0 || l.stop(t).ReleasedBy != "cycle 7 abc1234" || len(got) != 1 || got[0].Cycle != 7 || got[0].RunID != "run-7" {
 		t.Errorf("logs = %v, stop = %+v, signals = %+v, want a release by cycle 7 of run-7", res.Logs, l.stop(t), got)
 	}
@@ -727,7 +727,7 @@ func TestShipStop_AStopPastThePolicyBoundEscalatesOneTime(t *testing.T) {
 			if tc.wantEscalated {
 				want = 1
 			}
-			got, incidents := l.emitted(core.CodeMainRedStopEscalated), l.incidents(t)
+			got, incidents := l.emitted(selfheal.CodeMainRedStopEscalated), l.incidents(t)
 			if len(got) != want || len(incidents) != want || (l.stop(t).Escalated != nil) != tc.wantEscalated {
 				t.Fatalf("%d signals, %d incidents, escalated_at %v; want %d escalation in two checks", len(got), len(incidents), l.stop(t).Escalated, want)
 			}
@@ -757,7 +757,7 @@ func TestShipStop_AnEscalationThatFailsIsAWarningAndTheCheckGoesOn(t *testing.T)
 		t.Errorf("log = %q, want the warning of the failed escalation", c.log)
 	}
 	wantShipErr(t, c.err, shiperr.CodeMainRedPark, core.ShipClassPrecondition, redPkg+"."+redTest)
-	if l.stop(t).Escalated != nil || len(l.emitted(core.CodeMainRedStopEscalated)) != 0 {
+	if l.stop(t).Escalated != nil || len(l.emitted(selfheal.CodeMainRedStopEscalated)) != 0 {
 		t.Error("a failed escalation marked the stop or emitted the signal")
 	}
 }

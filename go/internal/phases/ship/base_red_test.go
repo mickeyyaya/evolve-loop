@@ -12,6 +12,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/selfheal"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -236,7 +237,7 @@ func TestReplay_20261109(t *testing.T) {
 		t.Fatalf("step 5: the fix lane on M2 lands at enforce; got %v", err)
 	}
 	released := l.stop(t)
-	if released.Holds() || released.ReleasedBy != "cycle 1 "+fix.mainTip(t) || fix.mainTip(t) == lane2249.base || len(fix.emitted(core.CodeMainRedStopReleased)) != 1 {
+	if released.Holds() || released.ReleasedBy != "cycle 1 "+fix.mainTip(t) || fix.mainTip(t) == lane2249.base || len(fix.emitted(selfheal.CodeMainRedStopReleased)) != 1 {
 		t.Fatalf("step 5: the landed fix releases the stop; got %+v with main at %s", released, fix.mainTip(t))
 	}
 }
