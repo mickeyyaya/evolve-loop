@@ -15,7 +15,7 @@ const (
 )
 
 var defaultInboxKinds = []string{
-	"bug", "docs", "feature", "fix", "hardening", "maintenance", "pipeline-integrity", "pipeline-repair",
+	"bug", "docs", "feature", "fix", "hardening", "maintenance", "pipeline-integrity", "pipeline-repair", "ref-state",
 	"refactor", "research", "security", "sweep", "task", "techdebt", "test",
 }
 

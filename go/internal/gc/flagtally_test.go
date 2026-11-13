@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 var (
@@ -190,5 +191,62 @@ func TestFileRepeatedFlags_ReportsFilingError(t *testing.T) {
 	filed, err := FileRepeatedFlags(filepath.Join(blocker, "inbox"), []WorktreeItem{flagBranchItem}, counts, fixedNow)
 	if err == nil || !strings.Contains(err.Error(), "file flag") || len(filed) != 0 {
 		t.Errorf("filed=%v err=%v", filed, err)
+	}
+}
+
+func TestFileRepeatedFlags_FiledFlagItemsAreConsoleRoutedAndNeverLaneAdmissible(t *testing.T) {
+	inbox := filepath.Join(t.TempDir(), "inbox")
+	items := []WorktreeItem{flagBranchItem, flagTreeItem}
+	counts := map[string]int{FlagKey(flagBranchItem): FlagRepeatThreshold, FlagKey(flagTreeItem): FlagRepeatThreshold}
+	filed, err := FileRepeatedFlags(inbox, items, counts, fixedNow)
+	if err != nil || len(filed) != 2 {
+		t.Fatalf("filed %v, err=%v, want two items", filed, err)
+	}
+	for _, path := range filed {
+		it, _, err := inboxbatch.LoadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		lane, console, reasons := inboxbatch.PartitionConsole([]inboxbatch.Item{it}, nil)
+		if len(lane) != 0 || len(console) != 1 {
+			t.Fatalf("%s is lane-admissible: lane=%v console=%v", it.ID, lane, console)
+		}
+		if !strings.Contains(reasons[0], "kind:ref-state (git ref state only the console can change)") {
+			t.Errorf("reason = %q", reasons[0])
+		}
+	}
+}
+
+func TestPlanWorktrees_AnOrphanBranchWhoseNetContentHeadHoldsIsDeletedNotFlagged(t *testing.T) {
+	r := newSquashRepo(t)
+	r.Git("switch", "-q", "-c", "cycle-landed-1")
+	commitRepoFile(t, r, "a.txt", "a\n")
+	squashMerge(r, "cycle-landed-1")
+	commitRepoFile(t, r, "later.txt", "later\n")
+	r.Git("switch", "-q", "-c", "cycle-open-2", "HEAD~1")
+	commitRepoFile(t, r, "unlanded.txt", "x\n")
+	r.Git("switch", "-q", "main")
+
+	opts := WorktreeOptions{
+		ProjectRoot:  r.Dir,
+		WorktreeBase: filepath.Join(r.Dir, ".evolve", "worktrees"),
+		EvolveDir:    filepath.Join(r.Dir, ".evolve"),
+		Now:          func() time.Time { return time.Now() },
+		Exec:         sysexec.DefaultRunner,
+		LeaseTTL:     10 * time.Minute,
+	}
+	m, err := PlanWorktrees(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actions := map[string]WorktreeAction{}
+	for _, it := range m.Items {
+		actions[it.Branch] = it.Action
+	}
+	if actions["cycle-landed-1"] != WorktreeActionDeleteBranch {
+		t.Errorf("landed branch action = %q, want delete-branch (items %+v)", actions["cycle-landed-1"], m.Items)
+	}
+	if actions["cycle-open-2"] != WorktreeActionFlagUnmerged {
+		t.Errorf("unlanded branch action = %q, want flag-unmerged", actions["cycle-open-2"])
 	}
 }

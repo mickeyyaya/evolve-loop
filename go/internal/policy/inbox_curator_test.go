@@ -14,7 +14,7 @@ func TestInboxCuratorConfig_AnAbsentBlockIsTheShadowDefault(t *testing.T) {
 
 	want := policy.InboxCuratorConfig{
 		Stage: "shadow", OverlapRefuse: 0.5, OverlapWarn: 0.3, ConsumeMinShare: 0.5,
-		Kinds: []string{"bug", "docs", "feature", "fix", "hardening", "maintenance", "pipeline-integrity", "pipeline-repair", "refactor", "research", "security", "sweep", "task", "techdebt", "test"},
+		Kinds: []string{"bug", "docs", "feature", "fix", "hardening", "maintenance", "pipeline-integrity", "pipeline-repair", "ref-state", "refactor", "research", "security", "sweep", "task", "techdebt", "test"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("InboxCuratorConfig() = %+v, want %+v", got, want)
