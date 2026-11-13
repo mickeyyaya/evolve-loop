@@ -119,9 +119,9 @@
     "stage": "enforce"
   },
   "fleet": {
-    "count": 8,
+    "count": 4,
     "plan_source": "triage",
-    "min_lanes": 8,
+    "min_lanes": 4,
     "orchestrator": {
       "stage": "enforce",
       "admission": "enforce"
