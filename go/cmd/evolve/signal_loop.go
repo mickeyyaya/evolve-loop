@@ -5,6 +5,8 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"sync"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/proctree"
@@ -78,18 +80,71 @@ func (c loopConfig) beforeReExec(flush func()) func() {
 	return c.retire
 }
 
+const loopTickInterval = time.Minute
+
+func loopTickerFor(newTicker func(time.Duration) *time.Ticker) func() (<-chan time.Time, func()) {
+	return func() (<-chan time.Time, func()) {
+		t := newTicker(loopTickInterval)
+		return t.C, t.Stop
+	}
+}
+
+func defaultLoopTicker() (<-chan time.Time, func()) {
+	return loopTickerFor(time.NewTicker)()
+}
+
+type announceDeps struct {
+	procStartOf func(int) (string, error)
+	ticker      func() (<-chan time.Time, func())
+}
+
+func emitLoopTicks(signals *signalcenter.Center, ticks <-chan time.Time) (stop func()) {
+	done := make(chan struct{})
+	exited := make(chan struct{})
+	go func() {
+		defer close(exited)
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticks:
+				signals.Emit(signalcenter.Event{
+					Module: signalcenter.ModuleLoop, Origin: "emitLoopTicks", Kind: signalcenter.KindLoopTick,
+					Severity: signalcenter.SeverityInfo, Reason: "the loop is running",
+				})
+			}
+		}
+	}()
+	var once sync.Once
+	return func() {
+		once.Do(func() { close(done) })
+		<-exited
+	}
+}
+
 func announceLoop(signals *signalcenter.Center, stderr io.Writer) func(exit *int) {
+	return announceLoopWith(signals, stderr, announceDeps{procStartOf: loopProcStartFn, ticker: defaultLoopTicker})
+}
+
+func announceLoopWith(signals *signalcenter.Center, stderr io.Writer, deps announceDeps) func(exit *int) {
+	ticks, stopTicker := deps.ticker()
+	stopTicks := emitLoopTicks(signals, ticks)
+	stopAll := func() {
+		stopTicks()
+		stopTicker()
+	}
 	pid := os.Getpid()
-	procStart, err := loopProcStartFn(pid)
+	procStart, err := deps.procStartOf(pid)
 	if err != nil {
 		fmt.Fprintf(stderr, "[loop] WARN: no loop.started event: the start time of pid %d is unreadable (%v), so a watcher cannot tell that this loop died\n", pid, err)
-		return func(*int) {}
+		return func(*int) { stopAll() }
 	}
 	signals.Emit(signalcenter.Event{
 		Module: signalcenter.ModuleLoop, Origin: "announceLoop", Kind: signalcenter.KindLoopStarted,
 		Severity: signalcenter.SeverityInfo, Reason: "the loop process started", Fields: map[string]string{"proc_start": procStart},
 	})
 	return func(exit *int) {
+		stopAll()
 		if crash := recover(); crash != nil {
 			panic(crash)
 		}

@@ -83,4 +83,5 @@ type Policy struct {
 	Quality            *QualityPanelPolicy       `json:"quality,omitempty"`
 	Isolation          *IsolationPolicy          `json:"isolation,omitempty"`
 	Healing            *HealingPolicy            `json:"healing,omitempty"`
+	ExpectedSignal     *ExpectedSignalPolicy     `json:"expected_signal,omitempty"`
 }

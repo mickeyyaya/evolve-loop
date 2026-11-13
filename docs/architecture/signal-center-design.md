@@ -237,6 +237,7 @@ raises it to WARN — never dropped. *(review 21: `advisor` and `config` added t
 | `loop.wave` / `loop.halt` / `loop.escalation` | batch-level events (today's `dispatchevents`). `loop.wave` carries `fields.wave` on every event. It is INFO for the summary of the coordinator. It is WARN with a code for the conditions of the wave engine (`LOOP_MIN_WIDTH_REPAIR`, `LOOP_WAVE_DISPATCH_FAILED`, `LOOP_WAVE_EMPTY_PLAN`, `LOOP_WAVE_ALL_LANES_STALE`; unit 13). `loop.halt` also carries the two non-zero-exit stops of the chain (`LOOP_CHAIN_INBOX_UNREADABLE`, `LOOP_CHAIN_BATCH_ERROR`) | INFO or WARN / INCIDENT / WARN | / ✓ / |
 | `loop.started` / `loop.exit` / `loop.lost` | the life of a loop process (ADR-0127 E11). `announceLoop` emits `loop.started` with `fields.proc_start` and `loop.exit` with `fields.exit`. A re-exec of the loop emits a new `loop.started` with the same `proc_start`, and only the last image emits `loop.exit`. A reader makes `loop.lost` with the code `LOOP_LOST`, and no log holds it. | INFO / INFO / INCIDENT | |
 | `loop.warning` | a batch- or chain-boundary degradation with no wave index (unit 13). The cases are a boundary binary refresh that degraded to the current binary (`LOOP_BOUNDARY_REFRESH_SKIPPED` with `fields.step`, `LOOP_BOUNDARY_REFRESH_AUDIT_FAILED`). Others are an invalid inbox item (`LOOP_CHAIN_INBOX_ITEM_INVALID`) and a quota defer (`LOOP_CHAIN_QUOTA_DEFER`). The written rule: wave-indexed → `loop.wave`; other non-terminal → `loop.warning`; a chain stop with a non-zero exit → `loop.halt` | WARN | |
+| `loop.tick` / `signal.expected_absent` | `loop.tick` is the clock of the loop: it emits one each minute, and the expected-signal listener polls the project stream on it. `signal.expected_absent` is the WARN with the code `SIGNAL_EXPECTED_ABSENT`. The expected-signal listener emits it when a start signal has no end signal at its deadline (§8.1) | INFO / WARN | |
 | `signalcenter.listener_panicked` / `signalcenter.sink_dropped` | self-reports: a panicking listener was dropped / the NDJSON sink failed to write (count in `fields.dropped`) | INCIDENT / WARN | |
 
 Note on `inbox.warning`: since 2026-09-14 (docs/incidents/2026-09-14-triage-refusal-poison-loop.md) the kind also covers the per-item breaker of the FAIL closeout.
@@ -468,6 +469,22 @@ func (o *Orchestrator) SignalSummary() signalcenter.Summary // a snapshot of the
 - The summary of the orchestrator is what "closely monitor the loop execution" means in code. At any
   point, `SignalSummary()` says how many WARN/INCIDENT signals the current cycle has raised. It also gives the
   code and reason of the last INCIDENT.
+
+### 8.1 Expected signals
+
+A stage that stops in silence emits nothing. The expected-signal listener finds this case.
+
+- An `ExpectedPair` names a start kind, a set of end kinds (`Ends`) and a deadline key. A pair with no deadline is off. Its `Key` function projects an event to the join key of the pair, so each pair joins on its own fields. Its `StartWhen` filters the starts.
+- One stream is the input: `<evolveDir>/signals.ndjson`. Each process writes it through its own role Center. The lane, the wave command and the ship command write there each event of a start kind or an end kind of `DefaultExpectedPairs`. The cycle of the event does not matter. They write `signal.expected_absent` there too. `ExpectedKinds` derives this set from the pairs, so there is one home.
+- The other processes have other Centers, so the loop does not subscribe the listener to its own Center. The loop reads the stream. `Poll(path)` reads the new bytes from the saved offset with `ReadStream` and tracks each event. Then it expires the due starts. It emits `signal.expected_absent` (WARN, `SIGNAL_EXPECTED_ABSENT`) through the Center. The Center persists that event to the same stream.
+- At boot the loop calls `Poll` from offset 0. After that, a small handler on `loop.tick` calls `Poll` once a minute. The ticker belongs to the loop and stops when the loop exits. A missing stream is a clean start.
+- An end signal closes its start. An absent warning in the stream closes its start too, so a restart does not repeat a warning. The key of a start is the pair name and the `Key` of the pair. The listener has an injected clock, because the Center gives a listener no clock. A start warns when the clock minus the start time is at least the limit.
+- The wave pair keys on `run_id`, so waves stay apart.
+- The phase pair keys on the cycle and the phase, not the run id, so the dispatch and the outcome of the orchestrator always match. It opens only on the dispatch of the orchestrator for a cycle (origin `Orchestrator.emitPhaseDispatched`, cycle not 0). It ends only on the closing outcome of the orchestrator (origin `Orchestrator.recordPhaseOutcome`), as `phase.outcome` or `phase.aborted`. The reason: other stages emit `phase.outcome` while the phase runs, for example the build self-check, and `emitPhaseOutcome` rewrites the kind of an aborted phase. The two origins are constants in `signalcenter`, and the orchestrator emits with them. The warning carries the cycle of its start.
+- There is no ship pair. In production `ship.landed` comes before `cycle.sealed`, so no event precedes a landing that can serve as its start. The phase pair already covers a hung ship phase.
+- The deadlines come from the `expected_signal` block of `policy.json` (`policy-config.md`). The compiled defaults apply to each key that the block omits.
+- The listener never decides a verdict, a state change or a halt. The first pairs are `wave.started` to `wave.ended`, and `phase.dispatched` to `phase.outcome` or `phase.aborted`. The pairs lane launch, first heartbeat, bench and catalog refresh wait for their start and end kinds.
+- Tests: `TestExpectedSignal_PollWarnsOnceAtTheDeadlineWithTheStartsCycle`, `TestExpectedSignal_TwoBootsOverOneStreamWarnExactlyOnce` and `TestWireExpectedSignals_AStartFromAnotherProcessWarnsOnTheNextTickAndOnlyOnce`.
 
 ## 9. Logging: one line format
 
