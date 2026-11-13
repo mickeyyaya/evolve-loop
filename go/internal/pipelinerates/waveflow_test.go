@@ -177,6 +177,18 @@ func TestLoadWaveFlows_AMissingOrchestrationStreamLeavesThePhaseReadingsAndNames
 	}
 }
 
+func TestFlowSet_WithSamplesGivesThePhaseFlowsTogetherWithTheSamplesError(t *testing.T) {
+	t.Parallel()
+	boom := errors.New("stream unreadable")
+	set := FlowSet{Flows: []WaveFlow{{Wave: 7}}, SamplesErr: boom}
+
+	flows, err := set.WithSamples()
+
+	if len(flows) != 1 || flows[0].Wave != 7 || !errors.Is(err, boom) {
+		t.Errorf("WithSamples = %v, %v; want wave 7 with the samples error", flows, err)
+	}
+}
+
 func TestLoadWaveFlows_ACycleOnTheFloorOfTheNextWaveBelongsToTheWaveBeforeIt(t *testing.T) {
 	t.Parallel()
 	root := flowFixture(t)
