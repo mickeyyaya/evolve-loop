@@ -109,6 +109,30 @@ func TestVerifySubmitted_BacksOffBetweenResends(t *testing.T) {
 	}
 }
 
+func TestVerifySubmitted_OutwaitsALateEnterUnderBootLoad(t *testing.T) {
+	t.Parallel()
+	parked := parkedPane("[Pasted text #1 +291 lines]")
+	tm := &fakeTmux{paneSeq: []string{parked, parked, parked, parked, parked, "● working\n\n" + tmuxPromptMarkerDefault + " "}}
+	var stderr bytes.Buffer
+	var sleeps []time.Duration
+	deps := recordingSleepDeps(tm, &stderr, &sleeps)
+	lp := tmuxLaunch{session: "s", name: "claude-tmux", inputLineMarker: tmuxPromptMarkerDefault}
+	out := verifySubmitted(context.Background(), deps, lp, "[t]", "prompt", parked, tmuxPastePlaceholderEcho)
+	if out.Result != interaction.ResultSubmittedAfterResend || out.Resends != 6 {
+		t.Fatalf("an Enter that lands only on the 6th re-send is a late submission, not a wedge: %+v\n%s", out, stderr.String())
+	}
+	var waited time.Duration
+	for i, d := range sleeps {
+		if i > 0 && d <= sleeps[i-1] {
+			t.Errorf("each re-send waits longer than the last: %v", sleeps)
+		}
+		waited += d
+	}
+	if len(sleeps) != 6 || waited < 30*time.Second {
+		t.Errorf("six re-sends wait at least 30 s in total under boot load, got %d sleeps, %v: %v", len(sleeps), waited, sleeps)
+	}
+}
+
 type countingTmux struct {
 	fakeTmux
 	captures int
