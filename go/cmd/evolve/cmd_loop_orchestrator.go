@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/admission"
+	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
@@ -62,6 +63,15 @@ func (b *loopBatchCoordinator) poolHalted() bool {
 	return b.ctx.Err() != nil || loopchain.BrakeEngaged(b.cfg.EvolveDir)
 }
 
+func (b *loopBatchCoordinator) dispatchBenched() bool {
+	for _, e := range clihealth.NewStore(b.cfg.ProjectRoot, nil).Active() {
+		if e.BlocksDispatch() {
+			return true
+		}
+	}
+	return false
+}
+
 func (b *loopBatchCoordinator) orchestratorPool(fc policy.FleetConfig, launch fleet.LaunchFn, iteration int) orchestrator.Pool {
 	holders, families := orchestrator.NewReachHolders(), orchestrator.NewFamilyHolds()
 	return orchestrator.Pool{
@@ -78,6 +88,7 @@ func (b *loopBatchCoordinator) orchestratorPool(fc policy.FleetConfig, launch fl
 		Locate:      laneLocator(b.cfg.ProjectRoot),
 		Publish:     b.deps.Signals.Emit,
 		Halted:      b.poolHalted,
+		Benched:     b.dispatchBenched,
 		Stage:       fc.Orchestrator.Stage,
 		Window:      b.laneWindow(fc),
 	}
