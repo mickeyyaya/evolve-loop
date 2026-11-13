@@ -27,6 +27,7 @@ The package also builds the prompt block that tells a continuation which ids it 
 - **Overflow is recorded.** Past `MaxEntries`, the ledger keeps one synthetic OPEN row and reports `AUDIT_LEDGER_OVERFLOW`. A cap that erased defects is the laundering primitive.
 - **Dispositions tolerate shape, not claim.** A disposition's `evidence` is a string or an array of strings. An object, a number or a bool is rejected. A silent degrade to empty evidence is the gate's cheapest bypass.
 - **The prompt is context, not enforcement.** `PromptBlock` degrades to empty, with one INFO, on a read fault. The gate blocks the same fault loudly at classify time.
+- **`DispositionsRequired` and `PromptBlock` share one resolver.** `inheritedOpen` finds the open rows of the ancestor ledger, from the manifest or the lane registry. `DispositionsRequired` is true when it finds one or more. The audit declares `defect-dispositions.json` as a secondary artifact only then, so the prompt and the wait gate cannot disagree. The query never emits a signal. `hasOwedRow` and `StandingOwed` also count a row with no source, for the grade and the lane resume.
 - **The schema example is shared.** `DispositionsSchemaExample` matches, byte for byte, the example in the auditor persona and in the continuation ledger doc. The audit package's `defect_ledger_doc_example_test.go` keeps the three in sync.
 - **Rune caps.** Ledger text is cut with the suffix `…[truncated]` and no leading space. This is the fourth rune-cap rule. It differs from the three rules in `carryover` on the same input.
 
