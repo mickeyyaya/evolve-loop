@@ -58,7 +58,10 @@ func TestUnderfill_AnIdleTransitionBelowMinLanesWarnsOnceWithTheFacts(t *testing
 				return
 			}
 			w := warns[0]
-			want := map[string]string{"live": strconv.Itoa(tc.tr.Live), "target": strconv.Itoa(tc.tr.Target), "min_lanes": strconv.Itoa(tc.minLanes), "ready": strconv.Itoa(tc.tr.Pending)}
+			want := map[string]string{"live": strconv.Itoa(tc.tr.Live), "target": strconv.Itoa(tc.tr.Target), "min_lanes": strconv.Itoa(tc.minLanes), "ready": strconv.Itoa(tc.tr.Pending), "cause": string(CauseSupplyEmpty)}
+			if tc.tr.Pending > 0 {
+				want["cause"] = string(CauseAdmissionRefused)
+			}
 			if w.Severity != signalcenter.SeverityWarn || w.Kind != signalcenter.KindLoopWave || w.Module != signalcenter.ModuleLoop || !reflect.DeepEqual(w.Fields, want) {
 				t.Errorf("event = %+v, want a loop.wave WARN with fields %v", w, want)
 			}
