@@ -5,6 +5,11 @@
     "A follow-up item for each fix is filed.",
     "The ratchet hard fail is restored (remove -ratchet-report-only) once a fix or a noise-robust judgment lands."
   ],
+  "consumed": {
+    "at": "2026-11-13T21:26:06Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "created_at": "2026-11-01T13:18:30Z",
   "deps": [],
   "files": [
@@ -15,8 +20,8 @@
   "fix": "Compare the CI artifacts of runs 40526866678, 40563673621, 40576371034, 40582532714 and 40611567029 (test-integration.json, test-rusage.ndjson, runner-samples.ndjson per OS): per test and per package wall vs CPU, which tests swing most, what they wait on (real tmux, git processes, sandbox-exec, sleeps, timeouts), and whether the swing follows runner load or specific components. Report the components ranked by their share of the variance, with evidence, and propose the fix and a ratchet judgment that holds on noisy runners. Then restore the hard fail.",
   "id": "ci-wall-variance-deep-dive",
   "intake_override": {
-    "reason": "CI gate investigation; console",
-    "console_route": true
+    "console_route": true,
+    "reason": "CI gate investigation; console"
   },
   "kind": "research",
   "notes": "Console route: CI gate and test system. Runs as a cloud agent per the operator.",

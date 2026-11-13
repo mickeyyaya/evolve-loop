@@ -65,10 +65,10 @@ jobs:
           if [ -s test-integration.json ]; then
             go run ./cmd/testlatency -budget 180s -title "Package wall time under race and integration" < test-integration.json >> "$GITHUB_STEP_SUMMARY" || echo "::warning::package wall budget report failed"
           fi
-      - name: package wall ratchet (report only until inbox item ci-wall-variance-deep-dive restores the hard fail)
+      - name: package wall ratchet (hard fail on speed-adjusted CPU and the go test timeout)
         run: |
           if [ -s test-integration.json ]; then
-            go run ./cmd/testlatency -ratchet .test-latency.json -ratchet-report-only -title "Package wall ratchet" < test-integration.json >> "$GITHUB_STEP_SUMMARY"
+            go run ./cmd/testlatency -ratchet .test-latency.json -rusage test-rusage.ndjson -title "Package wall ratchet" < test-integration.json >> "$GITHUB_STEP_SUMMARY"
           fi
       - name: e2e tier (no race; live sub-tier self-skips without live flag)
         # `evolve_test_phases` is added alongside `e2e` so the serve-phase
@@ -201,10 +201,10 @@ jobs:
           if [ -s test-integration.json ]; then
             go run ./cmd/testlatency -timeout-margin "$(make -s print-test-timeout-darwin)" -title "Margin against the go test timeout" < test-integration.json >> "$GITHUB_STEP_SUMMARY" || echo "::warning::timeout margin report failed"
           fi
-      - name: package wall ratchet (report only until inbox item ci-wall-variance-deep-dive restores the hard fail)
+      - name: package wall ratchet (hard fail on speed-adjusted CPU and the go test timeout)
         run: |
           if [ -s test-integration.json ]; then
-            go run ./cmd/testlatency -ratchet .test-latency.json -ratchet-report-only -title "Package wall ratchet" < test-integration.json >> "$GITHUB_STEP_SUMMARY"
+            go run ./cmd/testlatency -ratchet .test-latency.json -rusage test-rusage.ndjson -title "Package wall ratchet" < test-integration.json >> "$GITHUB_STEP_SUMMARY"
           fi
       - name: e2e tier (no race; live sub-tier self-skips without live flag)
         env:

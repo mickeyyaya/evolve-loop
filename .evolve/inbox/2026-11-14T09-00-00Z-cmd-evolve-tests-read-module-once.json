@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Red test first: a guard fails when a cmd/evolve test file walks the module without the shared loader.",
+    "TestInboxWriters_EveryAutofiledItemCarriesAKnownClass and TestUnobservedLedgerRootsArePinned run under 5 s on macOS.",
+    "Docs in STE."
+  ],
+  "created_at": "2026-11-14T09:00:00Z",
+  "deps": [],
+  "files": [
+    "go/cmd/evolve"
+  ],
+  "fix": "Add one sync.OnceValue loader for the file list, the bytes and the ASTs, and move the 23 scanning test files onto it.",
+  "id": "cmd-evolve-tests-read-module-once",
+  "kind": "pipeline-repair",
+  "notes": "Console route: CI gate and test system. Fix R6 of docs/research/ci-wall-variance-2026-11.md.",
+  "origin": "console",
+  "priority": "P2",
+  "priority_class": "stability",
+  "route": "console",
+  "source": "cycle 2360, research docs/research/ci-wall-variance-2026-11.md section 6.1, inbox item ci-wall-variance-deep-dive",
+  "summary": "36 scan sites in 23 test files each read the whole module again, 3 s to 37 s each on a loaded host.",
+  "title": "The cmd/evolve tests read and parse the Go module once for each test binary and share the result",
+  "weight": 0.7
+}

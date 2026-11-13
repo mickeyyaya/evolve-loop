@@ -25,33 +25,51 @@ func writeRatchetFile(t *testing.T, body string) string {
 	return path
 }
 
+func emptyRusage(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "rusage.ndjson")
+	if err := os.WriteFile(path, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
 func runWith(stream string, args ...string) (int, string, string) {
 	var out, errOut bytes.Buffer
 	code := run(args, strings.NewReader(stream), &out, &errOut)
 	return code, out.String(), errOut.String()
 }
 
-func TestRatchet_FailsOnlyAboveTwiceClassCeilingCappedByTimeout(t *testing.T) {
+func TestRatchet_FailsOnlyAboveTheGoTestTimeout(t *testing.T) {
 	path := writeRatchetFile(t, `{"packages":{"p":{"class":"small","p90":10}}}`)
 	cases := []struct {
 		wall    float64
 		timeout string
 		want    int
 	}{
-		{119, "20m", 0},
-		{121, "20m", 1},
+		{1199, "20m", 0},
+		{1201, "20m", 1},
 		{100, "90s", 1},
+		{89, "90s", 0},
 	}
 	for _, c := range cases {
-		code, _, errOut := runWith(wallStream("p", c.wall), "-ratchet", path, "-test-timeout", c.timeout)
+		code, _, errOut := runWith(wallStream("p", c.wall), "-ratchet", path, "-rusage", emptyRusage(t), "-test-timeout", c.timeout)
 		if code != c.want {
 			t.Errorf("wall %v timeout %s: exit %d, want %d\n%s", c.wall, c.timeout, code, c.want, errOut)
 		}
 	}
 }
 
+func TestRatchet_NeedsRusage(t *testing.T) {
+	path := writeRatchetFile(t, `{"packages":{"p":{"class":"small","p90":10}}}`)
+	code, _, errOut := runWith(wallStream("p", 1), "-ratchet", path)
+	if code != 2 || !strings.Contains(errOut, "-rusage") {
+		t.Errorf("exit %d stderr %q, want 2 naming -rusage", code, errOut)
+	}
+}
+
 func TestRatchet_UnreadableFileExitsTwoNamingIt(t *testing.T) {
-	code, _, errOut := runWith(wallStream("p", 1), "-ratchet", filepath.Join(t.TempDir(), "absent.json"))
+	code, _, errOut := runWith(wallStream("p", 1), "-ratchet", filepath.Join(t.TempDir(), "absent.json"), "-rusage", emptyRusage(t))
 	if code != 2 || !strings.Contains(errOut, "absent.json") {
 		t.Errorf("exit %d stderr %q, want 2 naming absent.json", code, errOut)
 	}
@@ -59,7 +77,7 @@ func TestRatchet_UnreadableFileExitsTwoNamingIt(t *testing.T) {
 
 func TestRatchet_WarnsOnlyPastBothMargins(t *testing.T) {
 	path := writeRatchetFile(t, `{"packages":{"slow":{"class":"large","p90":100},"near":{"class":"large","p90":100}}}`)
-	code, out, _ := runWith(wallStream("slow", 151)+wallStream("near", 140), "-ratchet", path)
+	code, out, _ := runWith(wallStream("slow", 151)+wallStream("near", 140), "-ratchet", path, "-rusage", emptyRusage(t))
 	if code != 0 {
 		t.Fatalf("exit %d, want 0", code)
 	}
@@ -78,7 +96,7 @@ func TestTighten_LowersNeverRaises(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := rf.Packages["fast"]; got != (record{Class: "medium", P90: 40}) {
+	if got := rf.Packages["fast"]; got.Class != "medium" || got.P90 != 40 {
 		t.Errorf("fast = %+v, want p90 lowered to 40", got)
 	}
 	if got := rf.Packages["slow"]; got.P90 != 30 {
@@ -109,15 +127,16 @@ func TestLoadRatchet_RejectsMalformedRecords(t *testing.T) {
 }
 
 func TestRatchet_UnknownPackageIsCappedByTimeoutOnly(t *testing.T) {
-	rf := &ratchetFile{Packages: map[string]record{}}
-	if got := rf.limit("example.com/mod/other", 90); got != 90 {
-		t.Errorf("limit = %v, want the timeout 90", got)
+	path := writeRatchetFile(t, `{"packages":{}}`)
+	code, _, errOut := runWith(wallStream("example.com/mod/other", 100), "-ratchet", path, "-rusage", emptyRusage(t), "-test-timeout", "90s")
+	if code != 1 || !strings.Contains(errOut, "example.com/mod/other") {
+		t.Errorf("exit %d stderr %q, want 1 naming example.com/mod/other", code, errOut)
 	}
 }
 
 func TestRatchet_NoRegressionPrintsNone(t *testing.T) {
 	path := writeRatchetFile(t, `{"packages":{"p":{"class":"small","p90":10}}}`)
-	_, out, _ := runWith(wallStream("p", 11), "-ratchet", path)
+	_, out, _ := runWith(wallStream("p", 11), "-ratchet", path, "-rusage", emptyRusage(t))
 	if !strings.Contains(out, warnHeading+"\n\n_(none)_") {
 		t.Errorf("want the none marker under the warning heading:\n%s", out)
 	}
@@ -125,7 +144,7 @@ func TestRatchet_NoRegressionPrintsNone(t *testing.T) {
 
 func TestRatchet_BadTimeoutExitsTwo(t *testing.T) {
 	path := writeRatchetFile(t, `{"packages":{"p":{"class":"small","p90":10}}}`)
-	code, _, errOut := runWith(wallStream("p", 1), "-ratchet", path, "-test-timeout", "soon")
+	code, _, errOut := runWith(wallStream("p", 1), "-ratchet", path, "-rusage", emptyRusage(t), "-test-timeout", "soon")
 	if code != 2 || !strings.Contains(errOut, "-test-timeout") {
 		t.Errorf("exit %d stderr %q, want 2 naming -test-timeout", code, errOut)
 	}
@@ -177,23 +196,5 @@ func TestTighten_SaveFailureExitsTwo(t *testing.T) {
 func TestResolveBudget_RejectsABadWallBudget(t *testing.T) {
 	if _, _, err := resolveBudget("bogus", true, false, 0); err == nil {
 		t.Error("want an error for an unparsable package wall budget")
-	}
-}
-
-func TestRatchet_ReportOnlyPrintsTheBreachAndExitsZero(t *testing.T) {
-	path := writeRatchetFile(t, `{"packages":{"p":{"class":"small","p90":10}}}`)
-	code, out, errOut := runWith(wallStream("p", 121), "-ratchet", path, "-ratchet-report-only")
-	if code != 0 {
-		t.Fatalf("a breach in report-only mode exits %d, want 0\n%s", code, errOut)
-	}
-	if !strings.Contains(out+errOut, "p ran 121") {
-		t.Errorf("report-only mode must still name the package above its limit; got stdout %q stderr %q", out, errOut)
-	}
-}
-
-func TestRatchet_ReportOnlyStillFailsOnAnUnreadableRatchet(t *testing.T) {
-	code, _, errOut := runWith(wallStream("p", 1), "-ratchet", filepath.Join(t.TempDir(), "absent.json"), "-ratchet-report-only")
-	if code != 2 || !strings.Contains(errOut, "absent.json") {
-		t.Errorf("exit %d stderr %q, want 2 naming absent.json", code, errOut)
 	}
 }

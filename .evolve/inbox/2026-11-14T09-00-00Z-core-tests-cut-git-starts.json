@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Red test first: a guard counts the git starts of the core test binary and fails above the recorded count.",
+    "Core system_s divided by user_s on macOS falls below 1.2.",
+    "Docs in STE."
+  ],
+  "created_at": "2026-11-14T09:00:00Z",
+  "deps": [],
+  "files": [
+    "go/internal/core"
+  ],
+  "fix": "Move git-backed fixtures onto gittest templates and drop the git calls that a fake repository can answer.",
+  "id": "core-tests-cut-git-starts",
+  "kind": "pipeline-repair",
+  "notes": "Console route: CI gate and test system. Fix R8 of docs/research/ci-wall-variance-2026-11.md.",
+  "origin": "console",
+  "priority": "P2",
+  "priority_class": "stability",
+  "route": "console",
+  "source": "cycle 2360, research docs/research/ci-wall-variance-2026-11.md section 6.1, inbox item ci-wall-variance-deep-dive",
+  "summary": "internal/core system_s is 1.76 times user_s on macOS, and 86 of 591 test files start git; PR #1225 cut ship N by 22% the same way.",
+  "title": "The internal/core tests start fewer git processes, as PR #1225 did for ship",
+  "weight": 0.65
+}

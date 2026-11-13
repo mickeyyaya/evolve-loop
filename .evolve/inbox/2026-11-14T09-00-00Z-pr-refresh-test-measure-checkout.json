@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "The research doc or the test log names the share of the checkout and of the generators in the 61 s to 156 s.",
+    "The test reuses a gittest template fixture, or runs fewer generators, and runs under 20 s on macOS.",
+    "Docs in STE."
+  ],
+  "created_at": "2026-11-14T09:00:00Z",
+  "deps": [],
+  "files": [
+    "go/cmd/evolve/cmd_pr_refresh_integration_test.go",
+    "go/internal/gittest"
+  ],
+  "fix": "Time the clone, the checkout and each generator; then reuse a template fixture or cut generators.",
+  "id": "pr-refresh-test-measure-checkout",
+  "kind": "pipeline-repair",
+  "notes": "Console route: CI gate and test system. Fix R7 of docs/research/ci-wall-variance-2026-11.md.",
+  "origin": "console",
+  "priority": "P3",
+  "priority_class": "stability",
+  "route": "console",
+  "source": "cycle 2360, research docs/research/ci-wall-variance-2026-11.md section 6.1, inbox item ci-wall-variance-deep-dive",
+  "summary": "TestPRRefresh_TheRealGeneratorsOfACloneCommitOnlyTheStaleIndex took 61.1 s and 156.2 s on the macOS pair; the split between checkout and generators is not measured.",
+  "title": "TestPRRefresh measures the checkout and the generators apart, then reuses one fixture",
+  "weight": 0.55
+}

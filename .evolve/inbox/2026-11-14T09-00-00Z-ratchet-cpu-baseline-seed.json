@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "Red test first: the committed go/.test-latency.json holds a cpu value for linux and darwin on every package with 2 s or more of CPU.",
+    "The seed comes from the test-rusage.ndjson artifact of a clean main run, named in the commit, and the testlatency tighten verb lowers it afterwards.",
+    "The gate judges at least 3 reference packages on the darwin set."
+  ],
+  "created_at": "2026-11-14T09:00:00Z",
+  "deps": [],
+  "files": [
+    "go/.test-latency.json",
+    ".github/workflows/go.yml"
+  ],
+  "fix": "Download test-rusage.ndjson of run 40582532714 or a newer clean main run for each OS, run testlatency tighten with -rusage on each, and commit the file. Add a CI step on main that runs tighten with -rusage.",
+  "id": "ratchet-cpu-baseline-seed",
+  "kind": "pipeline-repair",
+  "notes": "Console route: CI gate and test system. Fix R10 of docs/research/ci-wall-variance-2026-11.md.",
+  "origin": "console",
+  "priority": "P1",
+  "priority_class": "stability",
+  "route": "console",
+  "source": "cycle 2360, research docs/research/ci-wall-variance-2026-11.md section 6.1, inbox item ci-wall-variance-deep-dive",
+  "summary": "The CPU judgment fails nothing until the file holds cpu baselines: go/.test-latency.json has none, and the build agent had no access to the CI artifacts.",
+  "title": "The CPU baselines of both OSes are seeded in go/.test-latency.json from one clean main run",
+  "weight": 0.85
+}

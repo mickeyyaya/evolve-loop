@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -16,11 +17,12 @@ const (
 	warnHeading = "## Packages above their recorded p90"
 )
 
-var classCeilings = map[string]float64{"small": 60, "medium": 300, "large": 600}
+var recordClasses = map[string]bool{"small": true, "medium": true, "large": true}
 
 type record struct {
-	Class string  `json:"class"`
-	P90   float64 `json:"p90"`
+	Class string             `json:"class"`
+	P90   float64            `json:"p90"`
+	CPU   map[string]float64 `json:"cpu,omitempty"`
 }
 
 type ratchetFile struct {
@@ -37,7 +39,7 @@ func loadRatchet(path string) (*ratchetFile, error) {
 		return nil, fmt.Errorf("ratchet %s: %w", path, err)
 	}
 	for name, rec := range rf.Packages {
-		if _, ok := classCeilings[rec.Class]; !ok {
+		if !recordClasses[rec.Class] {
 			return nil, fmt.Errorf("ratchet %s: package %s has unknown class %q", path, name, rec.Class)
 		}
 		if rec.P90 <= 0 {
@@ -47,19 +49,11 @@ func loadRatchet(path string) (*ratchetFile, error) {
 	return &rf, nil
 }
 
-func (rf *ratchetFile) limit(pkg string, timeout float64) float64 {
-	rec, ok := rf.Packages[shortPkg(pkg)]
-	if !ok {
-		return timeout
-	}
-	return min(2*classCeilings[rec.Class], timeout)
-}
-
-func (rf *ratchetFile) failures(rep *Report, timeout float64) []string {
+func timeoutFailures(rep *Report, timeout float64) []string {
 	var out []string
 	for _, p := range rep.Packages {
-		if limit := rf.limit(p.Pkg, timeout); p.Wall > limit {
-			out = append(out, fmt.Sprintf("%s ran %.2fs, above its limit of %.2fs", shortPkg(p.Pkg), p.Wall, limit))
+		if p.Wall > timeout {
+			out = append(out, fmt.Sprintf("%s ran %.2fs, above the go test timeout of %.2fs", shortPkg(p.Pkg), p.Wall, timeout))
 		}
 	}
 	return out
@@ -89,7 +83,7 @@ func (rf *ratchetFile) writeWarnings(w io.Writer, rep *Report) {
 	}
 }
 
-func (rf *ratchetFile) tighten(rep *Report) bool {
+func (rf *ratchetFile) tighten(rep *Report, usage map[string]float64, goos string) bool {
 	changed := false
 	for _, p := range rep.Packages {
 		name := shortPkg(p.Pkg)
@@ -99,6 +93,21 @@ func (rf *ratchetFile) tighten(rep *Report) bool {
 			rf.Packages[name] = rec
 			changed = true
 		}
+	}
+	for name, cpu := range usage {
+		rec, ok := rf.Packages[name]
+		if !ok || cpu <= 0 {
+			continue
+		}
+		if base, seeded := rec.CPU[goos]; seeded && cpu >= base {
+			continue
+		}
+		if rec.CPU == nil {
+			rec.CPU = map[string]float64{}
+		}
+		rec.CPU[goos] = cpu
+		rf.Packages[name] = rec
+		changed = true
 	}
 	return changed
 }
@@ -118,6 +127,7 @@ func (rf *ratchetFile) save(path string) error {
 func runTighten(args []string, stdin io.Reader, stderr io.Writer) int {
 	fs := newFlagSet("testlatency tighten", stderr)
 	path := fs.String("ratchet", "", "path of the ratchet file to lower")
+	rusagePath := fs.String("rusage", "", "test-rusage.ndjson whose package CPU lowers or seeds the baseline of this OS")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -130,12 +140,19 @@ func runTighten(args []string, stdin io.Reader, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "testlatency: %v\n", err)
 		return 2
 	}
+	var usage map[string]float64
+	if *rusagePath != "" {
+		if usage, err = loadRusage(*rusagePath); err != nil {
+			fmt.Fprintf(stderr, "testlatency: %v\n", err)
+			return 2
+		}
+	}
 	rep, err := Parse(stdin)
 	if err != nil {
 		fmt.Fprintf(stderr, "testlatency: %v\n", err)
 		return 1
 	}
-	if rf.tighten(rep) {
+	if rf.tighten(rep, usage, runtime.GOOS) {
 		if err := rf.save(*path); err != nil {
 			fmt.Fprintf(stderr, "testlatency: %v\n", err)
 			return 2
@@ -144,29 +161,43 @@ func runTighten(args []string, stdin io.Reader, stderr io.Writer) int {
 	return 0
 }
 
-func loadGate(path, rawTimeout string, stderr io.Writer) (*ratchetFile, float64, bool) {
-	if path == "" {
-		return nil, 0, true
-	}
-	timeout, err := parseTimeout(rawTimeout)
-	if err != nil {
-		fmt.Fprintf(stderr, "testlatency: %v\n", err)
-		return nil, 0, false
-	}
-	rf, err := loadRatchet(path)
-	if err != nil {
-		fmt.Fprintf(stderr, "testlatency: %v\n", err)
-		return nil, 0, false
-	}
-	return rf, timeout, true
+type ratchetGate struct {
+	rf      *ratchetFile
+	timeout float64
+	usage   map[string]float64
 }
 
-func (rf *ratchetFile) gate(stdout, stderr io.Writer, rep *Report, timeout float64) bool {
-	if rf == nil {
+func loadGate(path, rawTimeout, rusagePath string, stderr io.Writer) (*ratchetGate, bool) {
+	if path == "" {
+		return nil, true
+	}
+	timeout, err := parseTimeout(rawTimeout)
+	if err == nil && rusagePath == "" {
+		err = fmt.Errorf("-ratchet needs -rusage")
+	}
+	var rf *ratchetFile
+	if err == nil {
+		rf, err = loadRatchet(path)
+	}
+	var usage map[string]float64
+	if err == nil {
+		usage, err = loadRusage(rusagePath)
+	}
+	if err != nil {
+		fmt.Fprintf(stderr, "testlatency: %v\n", err)
+		return nil, false
+	}
+	return &ratchetGate{rf: rf, timeout: timeout, usage: usage}, true
+}
+
+func (g *ratchetGate) failed(stdout, stderr io.Writer, rep *Report) bool {
+	if g == nil {
 		return false
 	}
-	rf.writeWarnings(stdout, rep)
-	failures := rf.failures(rep, timeout)
+	g.rf.writeWarnings(stdout, rep)
+	verdicts := g.rf.judgeCPU(g.usage, runtime.GOOS)
+	writeCPUSection(stdout, verdicts)
+	failures := append(timeoutFailures(rep, g.timeout), cpuFailures(verdicts)...)
 	if len(failures) > 0 {
 		fmt.Fprint(stderr, sortedFailures(failures))
 	}

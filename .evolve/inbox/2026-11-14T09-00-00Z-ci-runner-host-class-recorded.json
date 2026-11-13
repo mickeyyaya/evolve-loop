@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "Red test first: the sampler header holds hw.ncpu and hw.memsize on macOS and nproc on Linux.",
+    "The job summary prints the host class beside the package wall report.",
+    "Docs in STE."
+  ],
+  "created_at": "2026-11-14T09:00:00Z",
+  "deps": [],
+  "files": [
+    "go/cmd/hostsampler",
+    ".github/workflows/go.yml"
+  ],
+  "fix": "hostsampler writes the CPU count and the memory size once at start, and the CI summary step prints them.",
+  "id": "ci-runner-host-class-recorded",
+  "kind": "pipeline-repair",
+  "notes": "Console route: CI gate and test system. Fix R2 of docs/research/ci-wall-variance-2026-11.md.",
+  "origin": "console",
+  "priority": "P2",
+  "priority_class": "stability",
+  "route": "console",
+  "source": "cycle 2360, research docs/research/ci-wall-variance-2026-11.md section 6.1, inbox item ci-wall-variance-deep-dive",
+  "summary": "The macOS host class (3 cores or 5 cores) is 41% of the bridge wall variance, yet no log prints the core count; the class is an inference from concurrency and memory.",
+  "title": "The runner sampler records the host class, so a report shows 3 cores or 5 cores for each macOS job",
+  "weight": 0.7
+}

@@ -45,7 +45,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if !ok {
 		return 2
 	}
-	ratchet, timeout, ok := loadGate(o.ratchetPath, o.testTimeout, stderr)
+	gate, ok := loadGate(o.ratchetPath, o.testTimeout, o.rusagePath, stderr)
 	if !ok {
 		return 2
 	}
@@ -63,7 +63,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		TimeoutMargin: margin.Seconds(),
 	}))
 	overBudget := enforce && len(rep.OverBudget(limit.Seconds())) > 0
-	gateFailed := ratchet.gate(stdout, stderr, rep, timeout) && !o.reportOnly
+	gateFailed := gate.failed(stdout, stderr, rep)
 	if overBudget || gateFailed {
 		return 1
 	}
@@ -94,7 +94,7 @@ type options struct {
 	pkgBudget     bool
 	ratchetPath   string
 	testTimeout   string
-	reportOnly    bool
+	rusagePath    string
 	render        bool
 	timeoutMargin string
 }
@@ -109,9 +109,9 @@ func parseOptions(args []string, stderr io.Writer) (options, bool) {
 	fs.DurationVar(&o.budget, "budget", 0, "lead the report with the packages whose wall time exceeds this (for example 180s)")
 	fs.BoolVar(&o.failOver, "fail-over-budget", false, "exit 1 when a package is over --budget")
 	fs.BoolVar(&o.pkgBudget, "package-budget", false, "apply addedtests.PackageWallBudget and exit 1 when a package exceeds it")
-	fs.StringVar(&o.ratchetPath, "ratchet", "", "gate packages against this ratchet file: exit 1 above min(2 x class ceiling, -test-timeout)")
+	fs.StringVar(&o.ratchetPath, "ratchet", "", "gate packages against this ratchet file: exit 1 for a package above its CPU baseline after the speed index, or above -test-timeout")
+	fs.StringVar(&o.rusagePath, "rusage", "", "test-rusage.ndjson that -ratchet reads the package CPU from")
 	fs.StringVar(&o.testTimeout, "test-timeout", "20m", "the go test timeout that caps every package limit")
-	fs.BoolVar(&o.reportOnly, "ratchet-report-only", false, "print each package above its ratchet limit but exit 0 for a breach; an unreadable ratchet or stream still fails")
 	fs.BoolVar(&o.render, "render", false, "write the Output field of each event to stdout (the plain go test text) and exit 0")
 	fs.StringVar(&o.timeoutMargin, "timeout-margin", "", "add a section with the margin of the slowest package against this go test timeout (for example 30m); LOW under 20%")
 	if err := fs.Parse(args); err != nil {

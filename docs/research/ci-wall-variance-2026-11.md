@@ -1,6 +1,6 @@
 # CI wall variance: why the package wall time of the same tests changes by 2.3 times (research, 2026-11)
 
-- **Status:** complete, 2026-11-01.
+- **Status:** complete, 2026-11-01. Section 5.1 (the share of each component) and the hard ratchet were added on 2026-11-14, cycle 2360.
 - **Inbox item:** `ci-wall-variance-deep-dive`.
 - **Related:** [ci-wall-time-2026-10](ci-wall-time-2026-10.md), [wave-latency-2026-10](wave-latency-2026-10.md).
 - **Method:** the CI artifacts of five runs, code reads with `path:line`, and live web searches on 2026-11-01 (section 4.3).
@@ -28,7 +28,7 @@
 
 The operator asked on 2026-11-01: "Remove the wall time to investigate why, deep dive. Find which phase or component is causing the flaky result."
 
-The package wall ratchet in `.github/workflows/go.yml` is report-only for this investigation. This document finds the cause of the wall variance. It also gives a ratchet judgment that holds on a noisy runner.
+The package wall ratchet in `.github/workflows/go.yml` was report-only for this investigation. This document finds the cause of the wall variance. It also gives a ratchet judgment that holds on a noisy runner. Cycle 2360 implemented that judgment, and both CI ratchet steps fail a regression again (section 6.3).
 
 ## 2. Scope
 
@@ -213,7 +213,43 @@ The result does not depend on the choice of the baseline run:
 
 ## 5. Causes ranked
 
-The rank is by the size of the wall effect in the evidence. This research does not compute a share for each cause.
+### 5.1 The share of each component in the wall variance
+
+The table ranks the components of the wall variance of `internal/bridge` on macOS across the five runs. Bridge is the package of the incident: 331 s and 748 s on the same code.
+
+Method (synthesis, from the values of section 4):
+
+1. Take the log of the bridge wall of each run (604 s, 314 s, 656 s, 331 s, 748 s). Subtract the mean.
+2. Split each value into four parts. Wall scales with CPU time, so each part is a log factor.
+3. The CPU speed part is the log of S for macOS (F4.4). The regression part is the log of the defect increase (1.48 and 1.52) in runs 40526866678 and 40576371034.
+4. The host class part is the mean of what remains for the 3-core runs and for the 5-core runs. The last part is the rest.
+5. The share of a part is its covariance with the wall, divided by the variance of the wall. The four shares sum to 100%.
+
+| Rank | Component | Share | Waits on | Evidence |
+|---|---|---|---|---|
+| 1 | The macOS host class: 3 cores or 5 cores | 41.3% | CPU slots: `go test -p` sets the number of binaries that run at the same time, so a 3-core host gives each package 0.75 core | The slow runs 40526866678, 40576371034 and 40611567029 ran on 3 cores. `TestAgentSandboxContract_TheHostHoldsTheCredentialThatTheCellCannotRead` took 41.7 s and 97.9 s (F4.1, F4.2) |
+| 2 | A real regression: the quadratic parse | 28.9% | CPU: the parse of the driver names | `TestDriverNames_AreBuiltOnlyByResolve` took 298 s and 390 s in runs 40526866678 and 40576371034. PR #1223 fixed it (F4.6) |
+| 3 | The CPU speed of the host | 27.7% | CPU: one CPU second of work costs 0.90 to 1.46 CPU seconds, by the host | S of run 40611567029 is 1.46. `TestSelfMatchGuard_ThePrefilterGivesTheExhaustiveVerdictForEveryRule` took 14.1 s and 35.0 s (F4.4) |
+| 4 | The waits of the tests themselves | 2.1% | process starts (`sandbox-exec`, real tmux, `go build`, git), the real 60 s deadline of the `log show` poll, and disk I/O | `TestTryRecord_AnR1TryStartsANewSessionAndRecordsTheDecision` took 2.5 s, 63.3 s, 121.7 s, 4.6 s and 3.6 s. `TestPaneParity_RealTmuxPackagesPassInTheSandboxedPaneAsOnTheHost` took 30.8 s and 55.8 s (F4.8, section 4.4) |
+
+*Implication:* the host, not a test, makes the swing. Rank 1 and rank 3 are 69.0% of the variance. A fix of the tests alone cannot remove them. A CPU judgment that divides by S removes rank 3. A fixed schedule removes most of rank 1 (R3).
+
+Rank 4 is small because the tests that wait on the clock or on a process start are few. They can still add 60 s to 120 s to one run. Two of the five runs had such a wait. The share of rank 4 is the part of the spread that they explain. It is not the size of one wait.
+
+Cross-check: the same split on two packages with no regression gives a similar order.
+
+| Package | Host class | CPU speed | Regression | The rest |
+|---|---|---|---|---|
+| `cmd/evolve` (walls 489 s, 307 s, 484 s, 339 s, 781 s) | 53.3% | 43.5% | 0.0% | 3.2% |
+| `internal/core` (walls 298 s, 233 s, 497 s, 266 s, 544 s) | 46.0% | 39.6% | 0.0% | 14.4% |
+
+The rest of core is 14.4%. Core has `system_s` at 1.76 times `user_s` on macOS (F4.7), so its rest is mainly process starts: 86 of 591 test files start git.
+
+Limits of the split: the sample has five runs, and wall scales with CPU time in this model. The split gives an order of the components, not exact numbers.
+
+### 5.2 Causes by the size of the wall effect
+
+The rank of this table is by the size of the wall effect in the evidence.
 
 | Rank | Cause | Evidence | Size |
 |---|---|---|---|
@@ -228,21 +264,22 @@ No single phase or component causes the macOS swing of PR #1226. The bridge, `cm
 
 ## 6. Recommendations
 
-The items of this section are proposals. The inbox item `ratchet-speed-adjusted-cpu` holds the decision on section 6.2, and the inbox items `bridge-test-engine-fakes-sandbox-fence`, `cmd-evolve-tests-read-module-once` and `ci-runner-host-class-recorded` hold R4, R6 and R2.
+Each fix has a filed inbox item in the column Follow-up. The inbox item `ratchet-speed-adjusted-cpu` holds the decision on section 6.2. Cycle 2360 implemented it (section 6.3).
 
 ### 6.1 Fixes for each component, ranked by the variance that they remove
 
-| Id | Fix | Variance removed | Evidence |
-|---|---|---|---|
-| R1 | Gate on N, not on wall (section 6.2). Keep the wall as a report and as the `TEST_TIMEOUT` cap. | All of ranks 1 and 2 from the verdict | F4.5, section 4.5 |
-| R2 | Record the host class in `runner-samples.ndjson`: `hw.ncpu` and `hw.memsize` on macOS, `nproc` on Linux. Keep one baseline series for each OS and class. | Makes rank 1 visible in each report | F4.1, P4.3 |
-| R3 | Make the macOS schedule equal on both classes: run the darwin set with a fixed `-p 3`, or pin the job to the XLarge label. The XLarge label costs money. | Most of rank 1 in the wall report | F4.2 |
-| R4 | In bridge unit tests, inject fakes for `SandboxReports` and `SandboxFence` in `newTestEngine` (`go/internal/bridge/launch_test.go:121`). Keep the real `log show` only in the sandbox integration tests. | Rank 5: up to 120 s in one test; fewer `log show` starts | F4.8 |
-| R5 | Build `./cmd/evolve` once for each bridge test binary, for example with `sync.OnceValue`. Today three tests build it (`sandbox_contract_integration_test.go:278`, `:340`, `:630`). Each build puts the dispatch folder of its test into the binary with `-X …dispatchcred.root` (`:491-493`). Thus a shared build needs one shared dispatch root, or a root that the binary gets at run time. | A part of rank 4 in bridge | section 4.4 |
-| R6 | In `cmd/evolve`, read the module once for each test binary and share the file list, the bytes and the ASTs. Today 23 test files walk or parse it again. | Rank 6 | section 4.4 |
-| R7 | In `TestPRRefresh_*`, first measure the checkout and the generators apart. `gittest.Clone` (`go/internal/gittest/fixture.go:73`) clones a local path, so git ignores `--depth 1` and hardlinks the objects. Then reuse a `gittest.FromTemplate` fixture, or run fewer generators. | A part of 61 s to 156 s of serial time in `cmd/evolve` | section 4.4 |
-| R8 | Cut the git process starts of core, as PR #1225 did for ship. | A part of rank 4; ship N fell 22% | F4.7, F4.9 |
-| R9 | Give the macOS ship row its own record, or class it `medium`. | Removes the ship failure of every macOS run | F4.10 |
+| Id | Fix | Variance removed | Evidence | Follow-up |
+|---|---|---|---|---|
+| R1 | Gate on N, not on wall (section 6.2). Keep the wall as a report and as the `TEST_TIMEOUT` cap. | All of ranks 1 and 2 from the verdict | F4.5, section 4.5 | `ratchet-speed-adjusted-cpu`, done in cycle 2360 |
+| R2 | Record the host class in `runner-samples.ndjson`: `hw.ncpu` and `hw.memsize` on macOS, `nproc` on Linux. Keep one baseline series for each OS and class. | Makes rank 1 visible in each report | F4.1, P4.3 | `ci-runner-host-class-recorded` |
+| R3 | Make the macOS schedule equal on both classes: run the darwin set with a fixed `-p 3`, or pin the job to the XLarge label. The XLarge label costs money. | Most of rank 1 in the wall report | F4.2 | `ci-macos-fixed-parallelism` |
+| R4 | In bridge unit tests, inject fakes for `SandboxReports` and `SandboxFence` in `newTestEngine` (`go/internal/bridge/launch_test.go:121`). Keep the real `log show` only in the sandbox integration tests. | Rank 5: up to 120 s in one test; fewer `log show` starts | F4.8 | `bridge-test-engine-fakes-sandbox-fence` |
+| R5 | Build `./cmd/evolve` once for each bridge test binary, for example with `sync.OnceValue`. Today three tests build it (`sandbox_contract_integration_test.go:278`, `:340`, `:630`). Each build puts the dispatch folder of its test into the binary with `-X …dispatchcred.root` (`:491-493`). Thus a shared build needs one shared dispatch root, or a root that the binary gets at run time. | A part of rank 4 in bridge | section 4.4 | `bridge-tests-build-evolve-once` |
+| R6 | In `cmd/evolve`, read the module once for each test binary and share the file list, the bytes and the ASTs. Today 23 test files walk or parse it again. | Rank 6 | section 4.4 | `cmd-evolve-tests-read-module-once` |
+| R7 | In `TestPRRefresh_*`, first measure the checkout and the generators apart. `gittest.Clone` (`go/internal/gittest/fixture.go:73`) clones a local path, so git ignores `--depth 1` and hardlinks the objects. Then reuse a `gittest.FromTemplate` fixture, or run fewer generators. | A part of 61 s to 156 s of serial time in `cmd/evolve` | section 4.4 | `pr-refresh-test-measure-checkout` |
+| R8 | Cut the git process starts of core, as PR #1225 did for ship. | A part of rank 4; ship N fell 22% | F4.7, F4.9 | `core-tests-cut-git-starts` |
+| R9 | Give the macOS ship row its own record, or class it `medium`. | Removes the ship failure of every macOS run | F4.10 | `ratchet-speed-adjusted-cpu`, closed: the CPU judgment drops the class wall limits |
+| R10 | Seed the CPU baselines of both OSes from one clean main run. The gate fails nothing until the file has them. | The gate bites | section 6.3 | `ratchet-cpu-baseline-seed` |
 
 ### 6.2 The proposed ratchet judgment
 
@@ -265,6 +302,18 @@ The reasons for the numbers:
 - The 15 s floor stops the noise of small packages, as the current `warnMargin` of 30 s does.
 
 What changes this decision: a clean run on a new host class with N above 1.35× for a large package. Then record that class as its own series (R2). Do not raise the ratio first.
+
+### 6.3 What cycle 2360 implemented
+
+- `testlatency -ratchet <file> -rusage <ndjson>` reads the package CPU of each test binary. A missing `-rusage` gives exit 2.
+- The ratchet file has an optional `cpu` map for each package, keyed by the OS name. A baseline of another OS never gates the host.
+- The command computes S as the median ratio of the other reference packages. A package fails when N is above 1.35 times its baseline and 15 s over it.
+- A package with fewer than 3 other reference packages is reported only. The wall of a package must stay under the `go test` timeout.
+- `testlatency tighten -rusage <ndjson>` lowers a baseline, or seeds a missing one. It never raises a baseline and never adds a package.
+- Both ratchet steps of `.github/workflows/go.yml` pass `-rusage`. Neither step passes `-ratchet-report-only`, and the flag is gone from the tool.
+- A PR that adds real work to a package raises its baseline in the same PR. The reviewers see the raise in the diff of `go/.test-latency.json`. A raise without that change fails by design.
+
+The committed file has no `cpu` value yet, because the artifacts of the runs were not available to the build. Thus the gate judges nothing until R10 seeds the baselines. Until then, the wall check against the `go test` timeout is the only hard fail.
 
 ## 7. Limits
 
