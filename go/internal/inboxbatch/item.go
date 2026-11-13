@@ -99,7 +99,8 @@ func (it Item) DeclaredSurface() bool {
 }
 
 func (it Item) HasDeclaredSurface() bool {
-	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(it.Kind)), pipelineKindPrefix) || it.DeclaredSurface()
+	owned, _ := consoleKindDerivation(it)
+	return owned || it.DeclaredSurface()
 }
 
 func (it Item) ProtectedBasenames(isProtectedBasename func(string) bool) []string {

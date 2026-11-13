@@ -150,3 +150,30 @@ func TestKindOperatorLogin_IsNotAPipelineKind(t *testing.T) {
 		t.Errorf("KindOperatorLogin = %q, want the operator kind that no pipeline reader owns", KindOperatorLogin)
 	}
 }
+
+func TestConsoleRouted_RefStateKindRoutesToTheConsoleWithNoProtectedFiles(t *testing.T) {
+	t.Parallel()
+	routed, reason := ConsoleRouted(Item{ID: "x", Kind: " Ref-State "}, nil)
+	if !routed || reason != "kind:ref-state (git ref state only the console can change)" {
+		t.Fatalf("routed=%v reason=%q", routed, reason)
+	}
+	if routed, _ := ConsoleRouted(Item{ID: "y", Kind: "task"}, nil); routed {
+		t.Fatal("a task kind must stay lane-routable")
+	}
+	routed, reason = ConsoleRouted(Item{ID: "z", Kind: KindRefState, Route: RouteLaneValue, InjectedBy: "agent"}, nil)
+	if !routed || !strings.Contains(reason, "route:lane ignored") {
+		t.Fatalf("an agent-autofiled ref-state item cannot go back to a lane: routed=%v reason=%q", routed, reason)
+	}
+}
+
+func TestItem_AConsoleOwnedKindIsADeclaredSurfaceForEveryOwnedKind(t *testing.T) {
+	t.Parallel()
+	for _, kind := range []string{"pipeline-repair", KindRefState} {
+		if !(Item{Kind: kind}).HasDeclaredSurface() {
+			t.Errorf("kind %q with no files: HasDeclaredSurface() = false, want true like every console-owned kind", kind)
+		}
+	}
+	if (Item{Kind: "task"}).HasDeclaredSurface() {
+		t.Error("kind task with no files declares no surface")
+	}
+}

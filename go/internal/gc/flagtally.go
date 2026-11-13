@@ -104,7 +104,8 @@ func flagItemJSON(it WorktreeItem, count int) []byte {
 	raw, _ := json.Marshal(map[string]any{
 		"id":             flagItemID(it),
 		"title":          fmt.Sprintf("gc flag %s: %s", it.Action, subject),
-		"kind":           "task",
+		"kind":           inboxbatch.KindRefState,
+		"origin":         inboxbatch.OriginCycle,
 		"priority_class": inboxbatch.ClassHygiene,
 		"weight":         flagItemWeight,
 		"summary":        fmt.Sprintf("evolve gc flagged %s (%s) on %d runs and keeps it: gc never removes a flagged item.", subject, it.Reason, count),

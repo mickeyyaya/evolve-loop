@@ -18,6 +18,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispositionrouter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -44,6 +45,7 @@ var autofilers = []autofiler{
 	{"goal-stall escalation", []string{"cmd/evolve.writeTo"}, inboxbatch.ClassStability, inboxbatch.OriginCycle, goalStallInboxItem},
 	{"ADR-0072 halt writer", []string{"cmd/evolve.writeHaltEscalation"}, inboxbatch.ClassStability, inboxbatch.OriginCycle, haltItem},
 	{"unexplained-outcome classifier", []string{"cmd/evolve.fileUnexplainedOutcomeDefect"}, inboxbatch.ClassDebuggability, inboxbatch.OriginCycle, unexplainedOutcomeItem},
+	{"gc repeated-flag filer", nil, inboxbatch.ClassHygiene, inboxbatch.OriginCycle, gcFlagItem},
 }
 
 const movesOrRewritesAnExistingItem = "moves or rewrites an item that is already filed, so the item keeps the class it was filed with"
@@ -95,9 +97,8 @@ func TestInboxWriters_EveryAutofiledItemDeclaresSurface(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			item := autofilers[at].build(t)
-			pipelineKind := strings.HasPrefix(strings.ToLower(strings.TrimSpace(item.Kind)), "pipeline-")
-			if !pipelineKind && !item.DeclaredSurface() {
-				t.Errorf("filed item %q declares no surface: kind %q is not pipeline-* and files %q has no path-shaped token", item.ID, item.Kind, item.Files)
+			if !item.HasDeclaredSurface() {
+				t.Errorf("filed item %q declares no surface: kind %q is not console-owned and files %q has no path-shaped token", item.ID, item.Kind, item.Files)
 			}
 		})
 	}
@@ -359,4 +360,15 @@ func TestEnrollmentProblems_NameAnUnenrolledWriterAndAStaleEnrollment(t *testing
 	if !strings.Contains(problems, stale+" is enrolled as an autofiler but the scan no longer finds it") {
 		t.Errorf("a stale enrollment must be named: %s", problems)
 	}
+}
+
+func gcFlagItem(t *testing.T) inboxbatch.Item {
+	t.Helper()
+	inbox := t.TempDir()
+	flag := gc.WorktreeItem{Branch: "cycle-cd3ae73e-2283", Action: gc.WorktreeActionFlagUnmerged, Reason: "unmerged orphan branch (no worktree)"}
+	counts := map[string]int{gc.FlagKey(flag): gc.FlagRepeatThreshold}
+	if _, err := gc.FileRepeatedFlags(inbox, []gc.WorktreeItem{flag}, counts, autofilerClock); err != nil {
+		t.Fatal(err)
+	}
+	return onlyItemIn(t, inbox)
 }
