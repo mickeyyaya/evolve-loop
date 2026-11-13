@@ -3,6 +3,7 @@ package pipelinerates
 import (
 	"errors"
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -58,12 +59,7 @@ func TestGateShare_GivesGateTimeOverLaneTimeForEachWave(t *testing.T) {
 
 func writeLines(t *testing.T, path string, lines ...string) {
 	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	fixtures.MustWrite(t, path, strings.Join(lines, "\n")+"\n")
 }
 
 type orchEvent struct {
