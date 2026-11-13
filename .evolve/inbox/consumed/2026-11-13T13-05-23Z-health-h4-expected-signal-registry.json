@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "TestExpectedSignal_AbsentEndEmitsAWarnAtTheDeadline with an injected clock, and TestExpectedSignal_RebuildsOpenStartsAfterARestart",
+    "The spec update of H6 for this component passes evolve docs ste-lint --strict; 100% coverage on each changed function"
+  ],
+  "consumed": {
+    "at": "2026-11-13T19:16:15Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "shipped in PR #1437 (merged to main 2026-11-13 through the integration train)"
+  },
+  "created_at": "2026-11-13T13:05:23Z",
+  "files": [
+    "go/internal/signalcenter"
+  ],
+  "fix": "Build H4 test-first per the plan; red test first, then the code, then the H6 spec update.",
+  "id": "health-h4-expected-signal-registry",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "Registry of start/end/deadline pairs (plan 6.1); one Center listener emits SIGNAL_EXPECTED_ABSENT; loop.tick each minute; rebuild open starts from signals.ndjson at boot (D3, D4). Plan: docs/plans/pipeline-health-indexes-2026-11.md.",
+  "title": "H4: expected-signal registry and listener",
+  "weight": 0.7
+}

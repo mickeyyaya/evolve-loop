@@ -18,7 +18,9 @@
   "kind": "bug",
   "origin": "console",
   "priority_class": "correctness",
-  "route": "console-manual",
+  "route": "lane",
+  "routed_at": "2026-11-13T19:15:34Z",
+  "routed_reason": "operator 2026-11-13: the item touches no protected file and its console route had no reason; a lane can build it",
   "summary": "On 2026-11-05 a console-builder seat for B11 slice 1 created 4 new files whose names were not on its --writable list. The worktree fence removed them at the end of the dispatch, and logged a WARN. The run verdict stayed PASS, and the report said 212/212 tests pass. The tree that remained did not compile (commitgate.go: o.writeReviewRecord undefined). A caller that reads the verdict is told that broken work passed. The seat cannot know a new-file name in advance, and --writable refuses a directory, so this happens whenever a brief does not name each new file exactly.",
   "title": "A build seat's new files are erased by the fence, and the seat still reports PASS",
   "weight": 0.8

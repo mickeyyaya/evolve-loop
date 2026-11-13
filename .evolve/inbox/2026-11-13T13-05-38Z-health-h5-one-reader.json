@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "TestWaveStatus_AndQualityReportShowTheSameThroughput",
+    "The spec update of H6 for this component passes evolve docs ste-lint --strict; 100% coverage on each changed function"
+  ],
+  "created_at": "2026-11-13T13:05:38Z",
+  "files": [
+    "go/cmd/evolve/cmd_quality.go",
+    "go/internal/pipelinerates"
+  ],
+  "fix": "Build H5 test-first per the plan; red test first, then the code, then the H6 spec update.",
+  "id": "health-h5-one-reader",
+  "intake_override": {
+    "reason": "separate component of the plan with its own red test; H3 needs H2 readings, H5 is the shared reader",
+    "overlaps": [
+      "health-h2-pq6-pq9-readings",
+      "health-h3-pq7-xmr-chart"
+    ]
+  },
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "evolve quality report --scope wave and evolve wave status read PQ6 to PQ9 from one function and print the top idle cause and top fail class (D6). Plan: docs/plans/pipeline-health-indexes-2026-11.md.",
+  "title": "H5: one reader for wave status and the quality report",
+  "weight": 0.7
+}

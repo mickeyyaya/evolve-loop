@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Red first: the run record of a report without the required heading names that heading, and the deliverable file is kept beside the record.",
+    "The seat prompt carries the required headings that phase.json declares (a test over the composed prompt).",
+    "Docs: the runner package note changes in STE; 100% coverage on each changed function; zero code comments."
+  ],
+  "created_at": "2026-11-13T19:00:57Z",
+  "files": [
+    "go/internal/phases/runner/dispatch.go",
+    "go/internal/cli/agentcmd/run.go"
+  ],
+  "fix": "Make the section contract hold by construction: the runner composes the deliverable skeleton (the required headings) into the seat prompt from phase.json require_sections, and the verification failure names each missing heading in the run record and keeps the failing deliverable next to the record. Red test: a seat report with '## Result' and no '## Simplifications' records the missing heading and keeps the file.",
+  "id": "simplifier-seat-fails-its-section-check-on-a-clean-report",
+  "kind": "fix",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "2026-11-13, worktree dev/cl-f3 (F3 idle grace): four code-simplifier runs in a row (agent-code-simplifier-20261113T182343Z-bb70, T183054Z-96f4, T183742Z-dcc1, T184754Z-09f6, T185428Z-e722) found nothing to change, but the runner downgraded each to FAIL with RUNNER_DELIVERABLE_UNVERIFIED codes=missing_section. .evolve/phases/code-simplifier/phase.json require_sections is [\"Simplifications\"]; the model wrote headings such as '## Result', '## Checked', '## Notes', and in one run ignored a brief that named the exact headings. The commit gate needs a simplifier PASS bound to the staged tree, so a clean change cannot ship. The run record (.evolve/agent-runs/*.json) does not say which section was missing, and without --keep the deliverable is deleted, so the failure cannot be inspected.",
+  "title": "The code-simplifier seat records FAIL (missing_section) when its report says no change is needed",
+  "weight": 0.8
+}

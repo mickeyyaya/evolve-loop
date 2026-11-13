@@ -19,7 +19,9 @@
   "kind": "feature",
   "origin": "console",
   "priority_class": "correctness",
-  "route": "console-manual",
+  "route": "lane",
+  "routed_at": "2026-11-13T19:15:34Z",
+  "routed_reason": "operator 2026-11-13: the item touches no protected file and its console route had no reason; a lane can build it",
   "summary": "At enforce a lane stops before main and nothing lands it. PR (c) holds EnforceActor and absorbs I7, I8 feeds and I11. Open inputs are in docs/architecture/integration-driver.md section 9: the delivered inbox state, promotion through post-ship, the brief field, the mid-wave sync, local commits after a merge, and evolve loop --resume of a lane checkpoint.",
   "title": "I14 PR (c): the enforce actor of the integration driver, after its own design card",
   "weight": 0.9
