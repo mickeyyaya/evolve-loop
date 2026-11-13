@@ -2,6 +2,14 @@
   "acceptance": [
     "Main holds the behaviour that PR #1254 described, proven by a test through the real entry point that is red without the change, or this item is consumed with the evidence that main already holds it"
   ],
+  "continuation": {
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2349",
+    "branch": "cycle-cd3ae73e-2349",
+    "snapshot_sha": "17405fd03121ca8fd9e503bb4e9e1019a0658503",
+    "base_sha": "59d9e50ba5e7d38bc03b345e8d5c71c499b7f91b",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2349/audit-fail-reason.json",
+    "cycle": 2349
+  },
   "created_at": "2026-11-12T02:10:00Z",
   "deps": [],
   "files": [

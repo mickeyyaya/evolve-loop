@@ -2,18 +2,35 @@
   "acceptance": [
     "go test -tags acs ./acs/cycle463/ finishes under 300 s on the console host"
   ],
+  "continuation": {
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2348",
+    "branch": "cycle-cd3ae73e-2348",
+    "snapshot_sha": "170c73b9a7121cc550c48cdfa4939ce4db3e4b28",
+    "base_sha": "59d9e50ba5e7d38bc03b345e8d5c71c499b7f91b",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2348/audit-fail-reason.json",
+    "cycle": 2348
+  },
   "created_at": "2026-10-26T09:00:01Z",
   "deps": [],
+  "failure_count": 1,
   "files": [
     "go/acs/cycle463/"
   ],
   "fix": "Scope the wrapped run to the packages the predicate names, or give the package an explicit -timeout in the acs runner.",
   "id": "acs-cycle463-runtime-margin",
   "kind": "test",
+  "last_failure_class": "capability",
+  "last_failure_cycle": 2348,
+  "last_failure_findings": "review gate: phase \"build\" deliverable rejected after 1 correction(s): build handoff floor: 1 deterministic check failure(s) — fix these exactly before handoff:\n  ./acs/cycle2348 (-tags acs): unit tests FAIL\n--- FAIL: TestC2348_001_FullRaceSuiteRunsOncePerPackage (0.55s)\n--- FAIL: TestC2348_002_VetRunsOncePerPackage (0.54s)\nFAIL\tgithub.com/mickeyyaya/evolve-loop/go/acs/cycle2348\t2.185s\n…t once\n    predicates_test.go:178: go vet of github.com/mickeyyaya/evolve-loop/go/internal/core runs 3 times; the cycle463 suite must vet it once\nFAIL\nFAIL\tgithub.com/mickeyyaya/evolve-loop/go/acs/cycle2348\t2.185s\nFAIL\n",
+  "last_failure_fingerprint": "text:657e2daabfca",
+  "last_failure_reason": "cycle-failure-release",
+  "last_failure_rung": "R2",
   "priority_class": "stability",
-  "route": "lane",
-  "routed_at": "2026-11-12T03:09:06Z",
-  "routed_reason": "console 2026-11-12: inbox curate proposes it; a buildable kind with named files and no protected surface",
+  "retry_plan": "fresh-deep-plan",
+  "route": "console-manual",
+  "routed_at": "2026-11-13T09:43:38Z",
+  "routed_cycle": 2348,
+  "routed_reason": "acceptance needs an edit to the frozen-check file go/acs/cycle463/predicates_test.go; HEALING_I10 refuses it in a lane (cycle 2348)",
   "source": "console, 2026-10-26, review of PR #1131",
   "summary": "The suite wraps a whole-tree vet and race run. On main it took about 533 s; under host load it hits the 600 s default timeout (seen 2026-10-26 during the review of #1131). It predates X8.",
   "title": "acs/cycle463 runs about 530 to 550 s against the 600 s go test default timeout",
