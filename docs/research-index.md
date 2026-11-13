@@ -723,4 +723,10 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [research/practice-agy-cli-changelog-command-1-5-5-2026-11.md](research/practice-agy-cli-changelog-command-1-5-5-2026-11.md) | Note on the agy command release 1.5.5 for item 104dfdd9, read as data. The /swarm preview stays unused. No persona changes. |
 
+## 2026-11-13 — pipeline health indexes in the Signal Center
+
+| Document | What it records |
+|---|---|
+| [plans/pipeline-health-indexes-2026-11.md](plans/pipeline-health-indexes-2026-11.md) | Why delivery fell on 2026-11-12, and the plan for PQ6 to PQ9, a typed idle cause and an expected-signal registry in the Signal Center. |
+
 <!-- GENERATED:research-index END -->
