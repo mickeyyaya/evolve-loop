@@ -147,3 +147,48 @@ func TestForbidden_ADirectoryThatOnlyHoldsProtectedSurfaceStaysLaneWork(t *testi
 		}
 	}
 }
+
+func TestTriage_FrozenCheckFixSurfaceRoutesToConsole(t *testing.T) {
+	root := t.TempDir()
+	writeProfile(t, root, "writer")
+	forbidden, err := Forbidden(root, "writer")
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := inboxbatch.Item{ID: "acs-cycle463-runtime-margin", Files: []string{"go/acs/cycle463/predicates_test.go"}}
+	dispatchable, console, _ := inboxbatch.PartitionConsole([]inboxbatch.Item{item}, forbidden)
+	if len(dispatchable) != 0 || len(console) != 1 {
+		t.Fatalf("dispatchable=%d console=%d, want the frozen-check item console-routed", len(dispatchable), len(console))
+	}
+}
+
+func TestForbidden_FrozenCheckPathsAreForbiddenAndNeighboursAreNot(t *testing.T) {
+	root := t.TempDir()
+	writeProfile(t, root, "writer")
+	forbidden, err := Forbidden(root, "writer")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for path, want := range map[string]bool{
+		"go/acs/cycle463/predicates_test.go": true,
+		"go/acs/cycle12":                     true,
+		"go/acs/cycle12/":                    true,
+		"go/acs/redteam/x_test.go":           true,
+		"./go/acs/cycle463/p_test.go":        true,
+		"docs/go/acs/cycle12/x.md":           false,
+		"go/acsx/a.go":                       false,
+		"go/internal/fleet/fleet.go":         false,
+	} {
+		if got := forbidden(path); got != want {
+			t.Errorf("forbidden(%q) = %v, want %v", path, got, want)
+		}
+	}
+}
+
+func TestLazyForbidden_TheFallbackStillForbidsFrozenChecks(t *testing.T) {
+	var got recorded
+	forbidden := LazyForbidden(t.TempDir(), "writer", got.listen)
+	if !forbidden("go/acs/cycle463/predicates_test.go") || forbidden("go/internal/fleet/fleet.go") {
+		t.Fatal("the fallback judges protected surface and frozen checks")
+	}
+}
