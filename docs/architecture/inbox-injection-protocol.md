@@ -66,6 +66,8 @@ Two sources feed the committed set that `promoteInbox` moves to `processed/`:
 2. **The Builder's marker** — a line-anchored `Closes-Inbox: <id>` (comma lists
    allowed, ids deduped) in `build-report.md`. Parsed by
    `inboxmover.ClosesInboxIDs`; wired in `internal/phases/ship/postship.go`.
+   `Closes-Inbox: none` declares an empty set, and `none` is never an id.
+   `inboxmover.RefsInboxIDs` reads `Refs-Inbox:` for partial work and closes nothing.
 
 The two are **unioned**, so its own landing still consumes an item that nobody named at dispatch.
 Before this, consumption was a separate act from landing, and it was always possible to forget it. #453 landed `schema-aligned-salvage-layer` without
