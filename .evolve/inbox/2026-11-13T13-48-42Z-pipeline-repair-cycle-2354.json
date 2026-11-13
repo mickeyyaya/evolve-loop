@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "The defect that the retrospective of cycle 2354 classified is repaired, and a test pins the repair"
+  ],
+  "created_at": "2026-11-13T13:48:42Z",
+  "fix": "Read the failure-decision.json and the retrospective of cycle 2354, repair the pipeline, then consume this item so the waiting items can run.",
+  "id": "pipeline-repair-cycle-2354",
+  "kind": "fix",
+  "origin": "cycle",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "routed_at": "2026-11-13T13:48:42Z",
+  "routed_cycle": 2354,
+  "routed_reason": "cycle 2354 ended by a defer-or-quarantine decision: category intent-malformed, fix_type pipeline-repair",
+  "summary": "cycle 2354 ended by a defer-or-quarantine decision: category intent-malformed, fix_type pipeline-repair. The items gc-flag-unmerged-cycle-cd3ae73e-2334-cfef9184 wait on this item.",
+  "title": "Repair the pipeline defect that ended cycle 2354",
+  "weight": 0.8
+}

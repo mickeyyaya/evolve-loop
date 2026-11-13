@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "TestPool_UnderfilledEventNamesTheRunCapCause: a pool at run_max_lanes emits cause=run_cap; a repo test refuses an emit with no cause",
+    "The spec update of H6 for this component passes evolve docs ste-lint --strict; 100% coverage on each changed function"
+  ],
+  "consumed": {
+    "at": "2026-11-13T19:16:15Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "shipped in PR #1436 (merged to main 2026-11-13 through the integration train)"
+  },
+  "created_at": "2026-11-13T13:05:21Z",
+  "files": [
+    "go/internal/orchestrator/pool.go",
+    "go/internal/orchestrator/orchestrator.go"
+  ],
+  "fix": "Build H1 test-first per the plan; red test first, then the code, then the H6 spec update.",
+  "id": "health-h1-typed-idle-cause",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "Add a typed cause (family_held, run_cap, supply_empty, admission_refused, bench, operator_stop) to LOOP_ORCH_POOL_UNDERFILLED and LOOP_ORCH_POOL_IDLE (D2). Plan: docs/plans/pipeline-health-indexes-2026-11.md.",
+  "title": "H1: typed idle cause on the two pool codes",
+  "weight": 0.7
+}

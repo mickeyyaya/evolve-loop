@@ -17,7 +17,9 @@
   "kind": "bug",
   "origin": "console",
   "priority_class": "correctness",
-  "route": "console-manual",
+  "route": "lane",
+  "routed_at": "2026-11-13T19:15:34Z",
+  "routed_reason": "operator 2026-11-13: the item touches no protected file and its console route had no reason; a lane can build it",
   "summary": "No production code constructs orchestrator.Oversight. Window.CleanLanding and Window.Conflict have no live caller, so at fleet.orchestrator.stage enforce the window stays at its start. Its stall, brief and pause actions also never run, although docs describe them as built.",
   "title": "orchestrator.Oversight never runs, so the adaptive window never moves",
   "weight": 0.7

@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "TestTriage_FrozenCheckFixSurfaceRoutesToConsole on the item of cycle 2348 is red without the fix and green with it",
+    "The spec update of H6 for this component passes evolve docs ste-lint --strict; 100% coverage on each changed function"
+  ],
+  "consumed": {
+    "at": "2026-11-13T19:16:15Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "shipped in PR #1435 (merged to main 2026-11-13 through the integration train)"
+  },
+  "created_at": "2026-11-13T13:05:23Z",
+  "files": [
+    "go/internal/triagedecision",
+    "go/internal/triagecap"
+  ],
+  "fix": "Build H7 test-first per the plan; red test first, then the code, then the H6 spec update.",
+  "id": "health-h7-frozen-check-routing",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "Items whose fix edits go/acs/cycle*/predicates_test.go fail each lane (cycles 2343, 2348). Triage must route them to the console (D7). Plan: docs/plans/pipeline-health-indexes-2026-11.md.",
+  "title": "H7: triage routes a fix of a frozen check to the console",
+  "weight": 0.7
+}
