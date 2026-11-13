@@ -10,9 +10,18 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 )
 
-func (l *Ledger) PromptBlock(req Request) string {
+type inheritance struct {
+	cont        continuation.Continuation
+	open        []Entry
+	manifestErr error
+	fallback    string
+	ledgerFault *readFault
+}
+
+func (l *Ledger) inheritedOpen(req Request) inheritance {
+	var in inheritance
 	if req.Workspace == "" || req.ProjectRoot == "" {
-		return ""
+		return in
 	}
 	cont, isCont, err := continuation.ReadManifest(req.Workspace)
 	if err != nil || !isCont {
@@ -21,34 +30,51 @@ func (l *Ledger) PromptBlock(req Request) string {
 			cont, isCont = reg, true
 		}
 		if err != nil {
-			fallback := "none"
+			in.manifestErr = err
+			in.fallback = "none"
 			if has {
-				fallback = "registry"
+				in.fallback = "registry"
 			}
-			l.emit("Ledger.PromptBlock", req, CodePromptDegraded, "defect ledger: continuation manifest is unreadable while composing the audit prompt ("+err.Error()+"); fallback: "+fallback,
-				map[string]string{"step": "prompt", "blocked": "false", "reason": "manifest", "fallback": fallback, "path": filepath.Join(req.Workspace, continuation.ManifestName)})
 		}
 	}
 	if !isCont {
-		return ""
+		return in
 	}
-	ancestorWS := paths.RunWorkspace(req.ProjectRoot, cont.Cycle)
-	doc, hasLedger, fault := read(ancestorWS)
+	in.cont = cont
+	doc, hasLedger, fault := read(paths.RunWorkspace(req.ProjectRoot, cont.Cycle))
 	if fault != nil {
-		l.emit("Ledger.PromptBlock", req, CodePromptDegraded, "defect ledger: ancestor cycle-"+strconv.Itoa(cont.Cycle)+" ledger is unreadable while composing the audit prompt ("+fault.Error()+")",
-			map[string]string{"step": "prompt", "blocked": "false", "reason": "ledger", "op": fault.op, "ancestor_cycle": strconv.Itoa(cont.Cycle), "path": filepath.Join(ancestorWS, LedgerFile)})
+		in.ledgerFault = fault
+		return in
+	}
+	if hasLedger {
+		in.open = doc.OpenEntries()
+	}
+	return in
+}
+
+func (l *Ledger) DispositionsRequired(req Request) bool {
+	return len(l.inheritedOpen(req).open) > 0
+}
+
+func (l *Ledger) PromptBlock(req Request) string {
+	in := l.inheritedOpen(req)
+	if in.manifestErr != nil {
+		l.emit("Ledger.PromptBlock", req, CodePromptDegraded, "defect ledger: continuation manifest is unreadable while composing the audit prompt ("+in.manifestErr.Error()+"); fallback: "+in.fallback,
+			map[string]string{"step": "prompt", "blocked": "false", "reason": "manifest", "fallback": in.fallback, "path": filepath.Join(req.Workspace, continuation.ManifestName)})
+	}
+	if in.ledgerFault != nil {
+		ancestorWS := paths.RunWorkspace(req.ProjectRoot, in.cont.Cycle)
+		l.emit("Ledger.PromptBlock", req, CodePromptDegraded, "defect ledger: ancestor cycle-"+strconv.Itoa(in.cont.Cycle)+" ledger is unreadable while composing the audit prompt ("+in.ledgerFault.Error()+")",
+			map[string]string{"step": "prompt", "blocked": "false", "reason": "ledger", "op": in.ledgerFault.op, "ancestor_cycle": strconv.Itoa(in.cont.Cycle), "path": filepath.Join(ancestorWS, LedgerFile)})
 		return ""
 	}
-	if !hasLedger {
-		return ""
-	}
-	rows := promptRows(doc.OpenEntries())
+	rows := promptRows(in.open)
 	if rows == "" {
 		return ""
 	}
 	return fmt.Sprintf("\n## Inherited defect dispositions (MANDATORY)\n"+
 		"This cycle continues cycle-%d. Write <workspace>/%s BEFORE emitting your verdict, one entry per id below — status FIXED (evidence: a bare resolving cite) or DEFERRED (a non-empty reason). Ids are copied verbatim, never renumbered.\n%s",
-		cont.Cycle, DispositionsFile, rows)
+		in.cont.Cycle, DispositionsFile, rows)
 }
 
 func promptRows(open []Entry) string {

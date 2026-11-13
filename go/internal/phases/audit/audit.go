@@ -21,7 +21,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
-	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/defectledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
@@ -56,8 +55,8 @@ type hooks struct {
 func (hooks) PhaseName() string       { return string(core.PhaseAudit) }
 func (hooks) AgentPromptName() string { return "evolve-auditor" }
 
-func (hooks) SecondaryArtifacts(req core.PhaseRequest) []string {
-	if _, err := os.Stat(filepath.Join(req.Workspace, continuation.ManifestName)); err != nil {
+func (h hooks) SecondaryArtifacts(req core.PhaseRequest) []string {
+	if !h.defectLedger().DispositionsRequired(ledgerRequest(req)) {
 		return nil
 	}
 	return []string{filepath.Join(req.Workspace, defectDispositionFile)}

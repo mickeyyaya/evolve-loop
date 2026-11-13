@@ -136,7 +136,7 @@ type Event struct {
     Kind       string // "nudge" | "auto_respond" | "salvage" | "kernel_answer" | "correction_redispatch"
     Phase      string
     Cycle      int
-    Trigger    string // "idle_no_artifact" | "contract_reject" | "unknown_prompt" | ...
+    Trigger    string // "idle_no_artifact" | "idle_missing_secondary" | "contract_reject" | "unknown_prompt" | ...
     Rung       string // ladder rung that produced this event ("salvage"|"live_fix"|"redispatch"|"") —
                       // load-bearing for §10(d)'s rung-distribution acceptance metric
     DecisionID string // correlates all rungs of ONE correction decision — lets §10(a) count

@@ -71,6 +71,13 @@ func idleNudgeFor(cfg *Config, base dispatchBaseline) idleNudge {
 				trigger: "idle_unrewritten_deliverable",
 			}
 		}
+		if missing := firstMissingSecondary(cfg.SecondaryArtifacts); missing != "" {
+			return idleNudge{
+				msg:     fmt.Sprintf("The deliverable at %s is written, but the phase also needs %s. Please write it to complete the phase.", path, missing),
+				label:   "idle with a missing secondary artifact",
+				trigger: "idle_missing_secondary",
+			}
+		}
 	}
 	return idleNudge{
 		msg:     fmt.Sprintf("Please write the deliverable to %s to complete the phase.", cfg.Artifact),

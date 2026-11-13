@@ -216,7 +216,11 @@ func (d *artifactDetector) poll(ctx context.Context) (bool, completionEvidence, 
 }
 
 func (d *artifactDetector) missingSecondary() string {
-	for _, p := range d.cfg.SecondaryArtifacts {
+	return firstMissingSecondary(d.cfg.SecondaryArtifacts)
+}
+
+func firstMissingSecondary(paths []string) string {
+	for _, p := range paths {
 		if fi, err := os.Stat(p); err != nil || fi.Size() == 0 {
 			return p
 		}

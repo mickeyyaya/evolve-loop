@@ -140,3 +140,47 @@ func TestTmuxREPL_IdleNudge_AnAgentThatReChecksAndAppendsCompletes(t *testing.T)
 		t.Fatalf("an agent that re-checks and appends completes the phase: exit=%d stderr=%q", code, stderr)
 	}
 }
+
+func TestIdleNudgeFor_NamesAMissingSecondaryWhenThePrimaryIsWritten(t *testing.T) {
+	t.Parallel()
+	ws := t.TempDir()
+	report := filepath.Join(ws, "audit-report.md")
+	secondary := filepath.Join(ws, "defect-dispositions.json")
+	cfg := &Config{Artifact: report, Workspace: ws, SecondaryArtifacts: []string{secondary}}
+	base := captureArtifactBaseline(cfg)
+	if err := os.WriteFile(report, []byte("# Audit\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	n := idleNudgeFor(cfg, base)
+	if n.trigger != "idle_missing_secondary" || n.label != "idle with a missing secondary artifact" || !strings.Contains(n.msg, secondary) || !strings.Contains(n.msg, report) {
+		t.Fatalf("a written primary with a missing secondary names the secondary: %+v", n)
+	}
+	if err := os.WriteFile(secondary, []byte("[]"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if n := idleNudgeFor(cfg, base); n.trigger != "idle_no_artifact" {
+		t.Fatalf("with every secondary present the plain reminder stays: %+v", n)
+	}
+}
+
+func TestFirstMissingSecondary_ReportsAnAbsentOrEmptyFile(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	present := filepath.Join(dir, "a.json")
+	empty := filepath.Join(dir, "b.json")
+	absent := filepath.Join(dir, "c.json")
+	if err := os.WriteFile(present, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(empty, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for paths, want := range map[string]string{present: "", empty: empty, absent: absent} {
+		if got := firstMissingSecondary([]string{present, paths}); got != want {
+			t.Errorf("firstMissingSecondary(%s) = %q, want %q", paths, got, want)
+		}
+	}
+	if got := firstMissingSecondary(nil); got != "" {
+		t.Errorf("no secondaries: %q", got)
+	}
+}
