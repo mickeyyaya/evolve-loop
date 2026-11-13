@@ -3,6 +3,14 @@
     "`go test -tags acs -count=1 ./acs/cycle25/` passes on main",
     "The check fails when routing.go stops reading prep.profile.InteractivePolicy (mutation checked), or the PR names the runner unit test that pins it"
   ],
+  "continuation": {
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2337",
+    "branch": "cycle-cd3ae73e-2337",
+    "snapshot_sha": "c37feaac69ce8e744695a9403a3facce49210d6f",
+    "base_sha": "bfe264ce90f1d94db25aa86326476a79bf06e391",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2337/audit-fail-reason.json",
+    "cycle": 2337
+  },
   "created_at": "2026-10-26T09:30:00Z",
   "deps": [],
   "files": [
