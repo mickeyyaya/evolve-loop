@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"sync"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/codeshape"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
@@ -32,6 +34,7 @@ type qualityEnv struct {
 var qualityScopes = map[string][]qualityReader{"wave": waveQualityReaders(), "tree": treeQualityReaders(), "judges": nil, "replay": nil}
 
 func waveQualityReaders() []qualityReader {
+	flows := newFlowCache(pipelinerates.LoadWaveFlows)
 	return []qualityReader{
 		pipelineReader("PQ1", func(cs []pipelinerates.Cycle, _ string) ([]qualitypanel.Reading, error) {
 			return pipelinerates.ShipRate(cs), nil
@@ -51,7 +54,62 @@ func waveQualityReaders() []qualityReader {
 		pipelineReader("PQ5", func(cs []pipelinerates.Cycle, _ string) ([]qualitypanel.Reading, error) {
 			return pipelinerates.CostPerShip(cs), nil
 		}),
+		pipelineReader("PQ6", func(cs []pipelinerates.Cycle, _ string) ([]qualitypanel.Reading, error) {
+			return pipelinerates.CalendarThroughput(cs, time.Now()), nil
+		}),
+		flowReader("PQ7", flows.withSamples, pipelinerates.SlotUtilization),
+		flowReader("PQ8", flows.withSamples, pipelinerates.IdleCauseShare),
+		flowReader("PQ9", flows.phases, pipelinerates.GateShare),
 	}
+}
+
+type flowCache struct {
+	load   func(root string) (pipelinerates.FlowSet, error)
+	mu     sync.Mutex
+	loaded map[string]flowLoad
+}
+
+type flowLoad struct {
+	set pipelinerates.FlowSet
+	err error
+}
+
+func newFlowCache(load func(root string) (pipelinerates.FlowSet, error)) *flowCache {
+	return &flowCache{load: load, loaded: map[string]flowLoad{}}
+}
+
+func (c *flowCache) get(root string) (pipelinerates.FlowSet, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	l, ok := c.loaded[root]
+	if !ok {
+		l.set, l.err = c.load(root)
+		c.loaded[root] = l
+	}
+	return l.set, l.err
+}
+
+func (c *flowCache) phases(root string) ([]pipelinerates.WaveFlow, error) {
+	set, err := c.get(root)
+	return set.Flows, err
+}
+
+func (c *flowCache) withSamples(root string) ([]pipelinerates.WaveFlow, error) {
+	set, err := c.get(root)
+	if err != nil {
+		return nil, err
+	}
+	return set.WithSamples()
+}
+
+func flowReader(index string, flows func(root string) ([]pipelinerates.WaveFlow, error), read func([]pipelinerates.WaveFlow) []qualitypanel.Reading) qualityReader {
+	return qualityReader{index: index, read: func(root string) ([]qualitypanel.Reading, error) {
+		loaded, err := flows(root)
+		if err != nil {
+			return nil, err
+		}
+		return read(loaded), nil
+	}}
 }
 
 func treeQualityReaders() []qualityReader {

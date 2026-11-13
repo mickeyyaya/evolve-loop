@@ -21,6 +21,7 @@ import (
 type Cycle struct {
 	ID, Wave     int
 	Shipped      bool
+	ShippedAt    time.Time
 	Sealed       bool
 	LaneDeadline bool
 	SystemFail   bool
@@ -140,7 +141,13 @@ func readCycle(dir string, id, w int) (Cycle, error) {
 	if len(triage.TopN) > 0 {
 		c.Item = triage.TopN[0].ID
 	}
-	return withSignals(c, filepath.Join(dir, signalcenter.StreamFileName))
+	c, err := withSignals(c, filepath.Join(dir, signalcenter.StreamFileName))
+	if err == nil && c.Shipped && c.ShippedAt.IsZero() {
+		if info, statErr := os.Stat(filepath.Join(dir, "run.json")); statErr == nil {
+			c.ShippedAt = info.ModTime()
+		}
+	}
+	return c, err
 }
 
 func readSpend(dir string) cyclespend.Spend {
@@ -160,6 +167,9 @@ func withSignals(c Cycle, path string) (Cycle, error) {
 		switch e.Kind {
 		case signalcenter.KindShipLanded:
 			c.Shipped = true
+			if c.ShippedAt.IsZero() {
+				c.ShippedAt, _ = time.Parse(time.RFC3339Nano, e.TS)
+			}
 		case signalcenter.KindCycleSealed:
 			c.Sealed = true
 			c.LaneDeadline = c.LaneDeadline || strings.Contains(e.Fields["termination_reason"], "lane deadline")

@@ -32,17 +32,10 @@ func SlotUse(samples []Sample, from, to time.Time) Slots {
 	if len(in) == 0 {
 		return Slots{}
 	}
-	end := to
-	if end.IsZero() {
-		end = in[len(in)-1].At
-	}
+	end := windowEnd(in, to)
 	var used, capacity float64
 	for i, s := range in {
-		next := end
-		if i+1 < len(in) {
-			next = in[i+1].At
-		}
-		hours := next.Sub(s.At).Hours()
+		hours := holdHours(in, i, end)
 		used += float64(s.Live) * hours
 		capacity += float64(s.Target) * hours
 	}
@@ -61,4 +54,26 @@ func ForPID(samples []Sample, pid int) []Sample {
 		}
 	}
 	return own
+}
+
+func WaveSamples(samples []Sample, pid int, from, to time.Time) ([]Sample, time.Time, time.Time) {
+	if pid > 0 {
+		return ForPID(samples, pid), time.Time{}, to
+	}
+	return samples, from, to
+}
+
+func windowEnd(in []Sample, to time.Time) time.Time {
+	if to.IsZero() {
+		return in[len(in)-1].At
+	}
+	return to
+}
+
+func holdHours(in []Sample, i int, end time.Time) float64 {
+	next := end
+	if i+1 < len(in) {
+		next = in[i+1].At
+	}
+	return next.Sub(in[i].At).Hours()
 }

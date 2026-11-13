@@ -15,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/events/channel"
 	"github.com/mickeyyaya/evolve-loop/go/internal/events/rootwire"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/pipelinerates"
 	"github.com/mickeyyaya/evolve-loop/go/internal/qualitypanel"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -346,5 +347,105 @@ func TestTreeQualityReaders_AFailedShipDiffWarnsAndAddsNoEmptyReading(t *testing
 	}
 	if !strings.Contains(stdout, "3 reading(s)") || unreadable != 1 {
 		t.Errorf("stdout %q, CQ4 unreadable warnings %d; want CQ3, CQ4 tree and CQ5 and one warning for the failed git show", stdout, unreadable)
+	}
+}
+
+func TestWaveQualityReaders_RegisterPQ6ToPQ9AndReadTheirFlowSources(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	for rel, body := range map[string]string{
+		".evolve/waves/wave-1.json":           `{"number":1,"cycle_floor":0,"pid":5,"started_at":"2026-11-13T10:00:00Z","ended_at":"2026-11-13T12:00:00Z"}`,
+		".evolve/runs/cycle-1/run.json":       `{"shipped":true}`,
+		".evolve/runs/cycle-1/signals.ndjson": `{"ts":"2026-11-13T10:00:00Z","phase":"build","kind":"phase.dispatched"}` + "\n" + `{"ts":"2026-11-13T11:00:00Z","phase":"build","kind":"phase.outcome","fields":{"verdict":"PASS"}}` + "\n",
+		".evolve/signals.ndjson":              `{"ts":"2026-11-13T10:00:00Z","code":"LOOP_ORCH_POOL_UNDERFILLED","pid":5,"fields":{"live":"1","target":"2","cause":"run_cap"}}` + "\n",
+	} {
+		p := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	seen := map[string]int{}
+	for _, r := range waveQualityReaders() {
+		if r.index < "PQ6" || r.index > "PQ9" {
+			continue
+		}
+		readings, err := r.read(root)
+		if err != nil || len(readings) == 0 {
+			t.Fatalf("reader %s: %d readings, %v", r.index, len(readings), err)
+		}
+		for _, reading := range readings {
+			if reading.Index != r.index {
+				t.Errorf("reader %s gave a %s reading", r.index, reading.Index)
+			}
+		}
+		seen[r.index]++
+	}
+	for _, index := range []string{"PQ6", "PQ7", "PQ8", "PQ9"} {
+		if seen[index] != 1 {
+			t.Errorf("%s is registered %d times, want once", index, seen[index])
+		}
+	}
+}
+
+func TestFlowCache_LoadsOnceForEachRootAndSharesTheResult(t *testing.T) {
+	t.Parallel()
+	calls := 0
+	cache := newFlowCache(func(root string) (pipelinerates.FlowSet, error) {
+		calls++
+		return pipelinerates.FlowSet{Flows: []pipelinerates.WaveFlow{{Wave: 1}}}, nil
+	})
+
+	for range 3 {
+		if _, err := cache.withSamples("a"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	flows, err := cache.phases("a")
+	_, _ = cache.phases("b")
+
+	if err != nil || len(flows) != 1 || calls != 2 {
+		t.Errorf("flows %v, err %v, loads %d; want one load for each of the 2 roots", flows, err, calls)
+	}
+}
+
+func TestFlowCache_ALoadErrorReachesBothViews(t *testing.T) {
+	t.Parallel()
+	boom := errors.New("boom")
+	cache := newFlowCache(func(string) (pipelinerates.FlowSet, error) { return pipelinerates.FlowSet{}, boom })
+
+	_, a := cache.withSamples("r")
+	_, b := cache.phases("r")
+
+	if !errors.Is(a, boom) || !errors.Is(b, boom) {
+		t.Errorf("errors %v, %v; want both to be the load error", a, b)
+	}
+}
+
+func TestWaveQualityReaders_AMissingOrchestrationStreamFailsPQ7AndPQ8ButNotPQ9(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	for rel, body := range map[string]string{
+		".evolve/waves/wave-1.json":           `{"number":1,"cycle_floor":0,"started_at":"2026-11-13T10:00:00Z","ended_at":"2026-11-13T12:00:00Z"}`,
+		".evolve/runs/cycle-1/signals.ndjson": `{"ts":"2026-11-13T10:00:00Z","phase":"build","kind":"phase.dispatched"}` + "\n" + `{"ts":"2026-11-13T11:00:00Z","phase":"build","kind":"phase.outcome","fields":{"verdict":"PASS"}}` + "\n",
+	} {
+		p := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got := map[string]error{}
+	for _, r := range waveQualityReaders() {
+		if r.index == "PQ7" || r.index == "PQ8" || r.index == "PQ9" {
+			_, got[r.index] = r.read(root)
+		}
+	}
+	if !errors.Is(got["PQ7"], fs.ErrNotExist) || !errors.Is(got["PQ8"], fs.ErrNotExist) || got["PQ9"] != nil {
+		t.Errorf("errors = %v, want PQ7 and PQ8 source-absent and PQ9 read", got)
 	}
 }
