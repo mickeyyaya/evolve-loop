@@ -18,7 +18,7 @@ func TestRetakeFloorRun_TheRerunHoldsTheTierLock(t *testing.T) {
 	root := t.TempDir()
 	var heldDuring bool
 
-	ReviewInput{ProjectRoot: root, Stderr: &strings.Builder{}}.retakeFloorRun("./q", retakeRedOutput, func() (string, bool) {
+	ReviewInput{ProjectRoot: root, Stderr: &strings.Builder{}}.retakeFloorRun("./q", retakeRedOutput, []string{"./q"}, func() (string, bool) {
 		release, held, err := flock.TryLock(ciparity.TierLockPath(root))
 		if err == nil && !held {
 			release()
@@ -41,7 +41,7 @@ func TestRetakeFloorRun_TheLockLivesUnderTheProjectRootNotTheLane(t *testing.T) 
 	t.Parallel()
 	root, worktree := t.TempDir(), t.TempDir()
 
-	ReviewInput{ProjectRoot: root, Worktree: worktree, Stderr: &strings.Builder{}}.retakeFloorRun("./q", retakeRedOutput, func() (string, bool) { return "ok", true })
+	ReviewInput{ProjectRoot: root, Worktree: worktree, Stderr: &strings.Builder{}}.retakeFloorRun("./q", retakeRedOutput, []string{"./q"}, func() (string, bool) { return "ok", true })
 
 	if _, err := os.Stat(ciparity.TierLockPath(root)); err != nil {
 		t.Errorf("the lock file is not under the project root: %v", err)
