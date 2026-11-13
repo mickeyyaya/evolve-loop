@@ -9,11 +9,13 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/integration"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
 const (
-	integrationUsage      = "usage: evolve integration watch --tip SHA\n       evolve integration status [--pool N] [--wave N] [--project-root P] [--json]\n       evolve integration record-pr --pr N (--reviewed | --class NAME)\n       evolve integration batch [--dry-run] [PR...]\n  watch: exit 0 = CI green, 1 = CI red, 2 = no run to watch or gh failed, 10 = usage\n  status: exit 0 = clean, 1 = not clean, no evidence or an unreadable record; 2 = an absent root, an unreadable wave store, or a wave number that the store does not know; 10 = usage\n  record-pr and batch: exit 0 = done, 1 = refused or a PR was ejected, 2 = git or gh failed, 10 = usage"
+	integrationUsage      = "usage: evolve integration watch --tip SHA\n       evolve integration status [--pool N] [--wave N] [--project-root P] [--json]\n       evolve integration record-pr --pr N (--reviewed | --class NAME)\n       evolve integration batch [--dry-run] [--project-root P] [PR...]\n  watch: exit 0 = CI green, 1 = CI red, 2 = no run to watch or gh failed, 10 = usage\n  status: exit 0 = clean, 1 = not clean, no evidence or an unreadable record; 2 = an absent root, an unreadable wave store, or a wave number that the store does not know; 10 = usage\n  record-pr and batch: exit 0 = done, 1 = refused, a PR was ejected or a main-red stop holds the batch, 2 = git or gh failed or an absent root, 10 = usage"
 	integrationWatchUsage = "usage: evolve integration watch --tip SHA"
 	integrationPrefix     = "evolve integration: "
 )
@@ -26,8 +28,11 @@ type integrationEnv struct {
 	Root           string
 	ProjectRootEnv string
 	Wave           string
+	Now            time.Time
 
 	Settle func(ctx context.Context) error
+	Emit   stopEmit
+	KeyRun stopKeyRun
 }
 
 type integrationVerb func(env integrationEnv, args []string, stdout, stderr io.Writer) int
@@ -65,7 +70,10 @@ func productionIntegrationEnv(root string, now time.Time) integrationEnv {
 		Root:           root,
 		ProjectRootEnv: os.Getenv("EVOLVE_PROJECT_ROOT"),
 		Wave:           "pr" + now.UTC().Format("20060102t150405"),
+		Now:            now,
 		Settle:         pauseFor(registrationWait),
+		Emit:           emitIntegrationSignal,
+		KeyRun:         attributedKeyRun(baseattr.GoTestRunner(ipcenv.GoTestEnv())),
 	}
 }
 

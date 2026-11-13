@@ -38,7 +38,7 @@ func (tddPredicateFloor) Review(_ context.Context, in ReviewInput) ReviewResult 
 }
 
 func tddHelperCopyFailures(moduleDir string, cycle int) ([]string, error) {
-	raw, err := os.ReadFile(filepath.Join(moduleDir, ".test-dup-baseline"))
+	raw, err := os.ReadFile(filepath.Join(moduleDir, testdup.BaselineRelPath))
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}

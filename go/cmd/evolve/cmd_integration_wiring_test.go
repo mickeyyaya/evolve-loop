@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -21,12 +22,18 @@ func TestIntegrationProductionEnvSetsEveryPort(t *testing.T) {
 	if env.Gh == nil || env.Git == nil || env.Settle == nil || env.Root != "/repo" || env.Wave != "pr20261104t054112" {
 		t.Fatalf("env = %+v, want gh, git, settle, root and a wave named by the clock", env)
 	}
-	train := env.train()
+	if env.Emit == nil || env.KeyRun == nil || !env.Now.Equal(time.Date(2026, 11, 4, 5, 41, 12, 0, time.UTC)) {
+		t.Errorf("env = %+v, want the signal emitter, the key run and the clock of the main-red stop", env)
+	}
+	train := env.train("/repo", io.Discard)
 	if train.CI == nil || train.Main == nil || train.Host == nil || train.Inbox == nil || train.Root != "/repo" || train.Wave != env.Wave || train.Composer.Stage != policy.FleetIntegrationShadow {
 		t.Errorf("train = %+v, want every port set from the env", train)
 	}
-	if ci, ok := train.CI.(integration.GhCI); !ok || ci.Gh == nil || ci.Settle == nil {
-		t.Errorf("CI = %#v, want a GhCI with gh and the registration wait", train.CI)
+	if ci := env.ports().CI; ci.Gh == nil || ci.Settle == nil || ci.Repo.Dir != "/repo" {
+		t.Errorf("CI = %#v, want a GhCI with gh and the registration wait", ci)
+	}
+	if host, ok := train.Host.(integration.GhHost); !ok || host.CI.Gh == nil {
+		t.Errorf("Host = %#v, want a GhHost on the bare CI", train.Host)
 	}
 }
 

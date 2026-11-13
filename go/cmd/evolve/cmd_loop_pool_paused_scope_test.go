@@ -97,7 +97,7 @@ func TestProductionPoolPlanFn_AnUnreadableResetTimeWarnsOnTheStderrOfThePool(t *
 	seedPoolInbox(t, evolveDir, map[string]string{"2026-11-03T00-00-02Z-gamma.json": `{"id":"gamma","weight":0.1,"files":["go/internal/gamma/c.go"]}`})
 	setResetAt(t, seedPausedRun(t, root, 41, 0, 3, "gamma"), "soon")
 	var stderr bytes.Buffer
-	plan := productionPoolPlanFn(loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, &erroringReadStorage{}, 2, &stderr)
+	plan := poolPlanner{cfg: loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, storage: &erroringReadStorage{}, stderr: &stderr}.plan(2)
 
 	todos, err := plan(context.Background(), 0)
 
@@ -113,7 +113,7 @@ func TestProductionPoolPlanFn_APartlyGonePausedScopeIsSkippedWithAWarning(t *tes
 	seedPoolInbox(t, evolveDir, map[string]string{"2026-11-03T00-00-02Z-gamma.json": `{"id":"gamma","weight":0.1,"files":["go/internal/gamma/c.go"]}`})
 	seedPausedRun(t, root, 41, 0, 3, "gamma", "gone")
 	var stderr bytes.Buffer
-	plan := productionPoolPlanFn(loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, &erroringReadStorage{}, 2, &stderr)
+	plan := poolPlanner{cfg: loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, storage: &erroringReadStorage{}, stderr: &stderr}.plan(2)
 
 	todos, err := plan(context.Background(), 0)
 
@@ -133,7 +133,7 @@ func TestProductionPoolPlanFn_APausedScopeWithATypedFilesItemStillLeads(t *testi
 	evolveDir := filepath.Join(root, ".evolve")
 	seedPoolInbox(t, evolveDir, map[string]string{"2026-11-03T00-00-02Z-typed.json": `{"id":"typed","weight":0.1,"files":5}`})
 	seedPausedRun(t, root, 41, 0, 3, "typed")
-	plan := productionPoolPlanFn(loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, &erroringReadStorage{}, 2, &bytes.Buffer{})
+	plan := poolPlanner{cfg: loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, storage: &erroringReadStorage{}, stderr: &bytes.Buffer{}}.plan(2)
 
 	todos, err := plan(context.Background(), 0)
 

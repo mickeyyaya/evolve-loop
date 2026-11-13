@@ -85,3 +85,5 @@ func NewShipError(code ShipErrorCode, class ShipErrorClass, stage ShipStage, mes
 }
 
 func AsShipError(err error) (*ShipError, bool) { return shiperr.AsShipError(err) }
+
+var ErrMainRedParked = shiperr.ErrMainRedParked

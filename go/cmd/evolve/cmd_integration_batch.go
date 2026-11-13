@@ -19,11 +19,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/integration"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/selfheal"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 const (
-	integrationBatchUsage  = "usage: evolve integration batch [--dry-run] [PR...]"
+	integrationBatchUsage  = "usage: evolve integration batch [--dry-run] [--project-root P] [PR...]"
 	integrationRecordUsage = "usage: evolve integration record-pr --pr N (--reviewed | --class NAME)"
 	inboxDir               = ".evolve/inbox/"
 )
@@ -32,14 +33,25 @@ var reviewClasses = map[string]func(paths []string) bool{
 	"docs-review": docsOnlyData,
 }
 
-func (e integrationEnv) train() integration.Train {
+type batchPorts struct {
+	Repo integration.Repo
+	CI   integration.GhCI
+	Main integration.GitMain
+}
+
+func (e integrationEnv) ports() batchPorts {
 	repo := integration.Repo{Dir: e.Root, Git: e.Git}
-	ci := integration.GhCI{Repo: repo, Gh: e.Gh, Settle: e.Settle}
+	return batchPorts{Repo: repo, CI: integration.GhCI{Repo: repo, Gh: e.Gh, Settle: e.Settle}, Main: integration.GitMain{Repo: repo}}
+}
+
+func (e integrationEnv) train(projectRoot string, warn io.Writer) integration.Train {
+	p := e.ports()
+	gate := e.stopGate(projectRoot, warn)
 	return integration.Train{
-		Composer: integration.Composer{Repo: repo, Stage: policy.FleetIntegrationShadow},
-		CI:       ci,
-		Main:     integration.GitMain{Repo: repo},
-		Host:     integration.GhHost{CI: ci},
+		Composer: integration.Composer{Repo: p.Repo, Stage: policy.FleetIntegrationShadow},
+		CI:       gate.CI(p.CI),
+		Main:     gate.Main(p.Main),
+		Host:     integration.GhHost{CI: p.CI},
 		Inbox:    inboxCloser(e.Root),
 		Root:     e.Root,
 		Wave:     e.Wave,
@@ -49,6 +61,12 @@ func (e integrationEnv) train() integration.Train {
 func inboxCloser(root string) integration.InboxFunc {
 	return func(_ context.Context, ids []string) ([]string, error) {
 		return inboxmover.ReconcileSuperseded(inboxmover.Options{ProjectRoot: root}, ids, "processed", inboxmover.PromoteOpts{})
+	}
+}
+
+func fixItemCloser(root string, warn io.Writer) func(id string) error {
+	return func(id string) error {
+		return inboxmover.ConsumeFixItem(inboxmover.Options{ProjectRoot: root, Stderr: warn}, id, inboxmover.PromoteOpts{})
 	}
 }
 
@@ -69,7 +87,8 @@ func usageFail(stderr io.Writer, err error, usage string) int {
 
 func batchVerb(env integrationEnv, args []string, stdout, stderr io.Writer) int {
 	var dry, help bool
-	operands, err := cliFlags{bools: map[string]*bool{"--dry-run": &dry, "--help": &help}}.parse(args)
+	var rootFlag string
+	operands, err := cliFlags{bools: map[string]*bool{"--dry-run": &dry, "--help": &help}, values: map[string]*string{"--project-root": &rootFlag}}.parse(args)
 	if help && err == nil {
 		fmt.Fprintln(stdout, integrationBatchUsage)
 		return 0
@@ -86,7 +105,11 @@ func batchVerb(env integrationEnv, args []string, stdout, stderr io.Writer) int 
 	if err != nil {
 		return usageFail(stderr, err, integrationBatchUsage)
 	}
-	return runBatch(env.train(), batchRequest{prs: prs, dry: dry}, cliIO{stdout, stderr})
+	root, rc := env.projectRoot("integration batch", rootFlag, stderr)
+	if rc != 0 {
+		return rc
+	}
+	return runBatch(env.train(root, stderr), batchRequest{prs: prs, dry: dry}, cliIO{stdout, stderr})
 }
 
 type batchRequest struct {
@@ -150,7 +173,7 @@ func printLanding(w io.Writer, out integration.Outcome) {
 
 func refusalExit(err error) int {
 	var refusal *integration.Refusal
-	if errors.As(err, &refusal) {
+	if errors.As(err, &refusal) || errors.Is(err, selfheal.ErrMainRedHold) {
 		return exitRefused
 	}
 	return exitIO
@@ -202,7 +225,7 @@ func recordPRVerb(env integrationEnv, args []string, stdout, stderr io.Writer) i
 		}
 		bind = reviewedBinder(store)
 	}
-	return recordPR(env.train(), recordRequest{pr: n, bind: bind}, c)
+	return recordPR(env.train(env.Root, stderr), recordRequest{pr: n, bind: bind}, c)
 }
 
 func reviewedBinder(store string) integration.Binder {

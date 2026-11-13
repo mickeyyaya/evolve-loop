@@ -38,3 +38,9 @@
   - **Wired at the boundary (2026-10-20).** The boundary step `ratchet-tighten` (`go/cmd/evolve/cmd_boundary_ratchet.go`) runs `TightenModule` and `Scan` in a temporary worktree of `origin/main`. It commits only `offenders.json` on a branch `chore/ratchet-tighten-<date>` and opens a pull request, or updates the open one. The pull request merges at a wave boundary. A failure warns and does not stop the boundary. The rejected options are in [runtime-reference.md](../../operations/runtime-reference.md) (`evolve ratchet tighten`).
   - **The raw-git half (2026-10-21).** `rawgitratchet/baseline.json` had the same shared-file shape, and `rawgitratchet.Check` was exact-match. Now one tighten over a `map[string]int` serves both lists, with a floor for each list. `TightenCounts` and `TightenEncoded` take the floor: `MaxLines` here and zero sites for the raw-git list. `Tighten` and `TightenModule` call them.
     - The boundary step commits both lists in one pull request ([internal-rawgitratchet.md](internal-rawgitratchet.md)). Pinned by `TestTightenCounts_KeepsOnlyCountsAboveTheFloorAtTheirLowerValue` and `TestTightenEncoded_NamesEachChangeAndEncodesTheTightList`.
+
+## Gate contract
+
+- The registry entry `size-ratchet` in [internal-gateregistry.md](internal-gateregistry.md) runs this package. [gate-contract.md](../gate-contract.md) section 6.4 has the design.
+- `TestRatchet_ModuleFunctionsFitTheirAllowances` calls that run function from the external test package `sizeratchet_test`.
+- The package and `offenders.json` are on the protected surface. A lane cannot add an allowance. It sends a held proposal.

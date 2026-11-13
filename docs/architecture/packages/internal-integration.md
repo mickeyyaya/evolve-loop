@@ -172,3 +172,19 @@ Land does these steps, and it never changes a member branch:
 - It opens one batch PR and moves main with one fast-forward.
 - It closes the inbox items that the landed commits name.
 - It closes each landed PR with a link to the batch, and it spends the record.
+
+## The stop gate of the train
+
+The file is `stopgate.go`. The design is in [gate-contract-g4-base-red-attribution.md](../gate-contract-g4-base-red-attribution.md), section 13.
+
+- `StopGate` puts two questions about a red `main` into the ports of the train. The train code does not change.
+- `StopGate.CI` wraps a `CI` port. When the inner `Watch` gives a red verdict and no error, the wrapper asks `Red` for the PR.
+- An error of `Red` is the error of `Watch`, with the red verdict. A green verdict and a watch error pass with no question.
+- `StopGate.Main` wraps a `Main` port. `FastForward` first reads the head of `main`, then asks `Admit` with the head and the tip.
+- An error of the head read or of `Admit` stops the landing, and `main` does not move.
+- `Admit` gives a function for the landing. The wrapper calls it only after the inner `FastForward` moved `main`.
+- An error of the inner `FastForward` is the error of the wrapper, and the function does not run.
+- This package imports no stop package. The caller gives the two functions, so the rule of the stop stays in `selfheal` and `mainstop`.
+- The file is on the protected surface as a gate guarantee.
+- The wiring of the two functions is in `cmd/evolve`. `integrationEnv.train` builds each production train behind the `StopGate` that `integrationEnv.stopGate` makes.
+- Pinned by the `TestStopGate_*` tests, with 100% of the statements of the file.
