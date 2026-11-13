@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/mainstop"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -73,7 +72,7 @@ func causeAndResume(s mainstop.Stop) string {
 func (b StopBound) event(s mainstop.Stop, incident string) signalcenter.Event {
 	return signalcenter.Event{
 		Module: signalcenter.ModuleGateRepo, Origin: "selfheal.StopBound", Kind: signalcenter.KindLoopEscalation,
-		Severity: signalcenter.SeverityIncident, Code: core.CodeMainRedStopEscalated,
+		Severity: signalcenter.SeverityIncident, Code: CodeMainRedStopEscalated,
 		Reason: "main-red stop past its bound of " + b.Bound.String() + ": " + causeAndResume(s),
 		Fields: map[string]string{
 			"keys": baseattr.Names(s.Keys), "main": s.MainSHA, "fix_item": s.FixItem, "parked": s.ParkedCycles(),

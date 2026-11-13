@@ -1520,11 +1520,9 @@ The audit tier sets no hook, because the tier holds that lock already (see [inte
 
 `covchanged.TagFlags` gives the `-tags` flag list. `coverTestArgs`, the cover-changed floor and the ship stop check use it.
 
-The codes `GATE_REPO_MAIN_RED_STOP_WOULD_REFUSE` and `GATE_REPO_MAIN_RED_STOP_RELEASED` register in `main_red_park.go`. The package `selfheal` builds each event of the two codes (see [internal-selfheal.md](internal-selfheal.md)). `selfheal.StopRefusal` is the one builder of the first code, for ship and for the train.
-`StopProofReds` gives the keys of a stop and the `-tags` list of `covchanged.DefaultTags` as one `baseattr.Reds`. Thus each proof run of a stop has the tags of the floor.
-`TestStopProofReds_AsksForEachKeyWithTheTagsOfTheFloor` pins it.
-
-The code `GATE_REPO_MAIN_RED_STOP_ESCALATED` registers in the same file. `selfheal.StopBound` emits it, because `core` cannot import `selfheal` (see [internal-selfheal.md](internal-selfheal.md)).
+`main_red_park.go` registers only the two codes that `core` emits: `GATE_REPO_MAIN_RED_PARKED` and `GATE_REPO_MAIN_RED_STOP_OPENED`.
+The package `selfheal` builds each event of `GATE_REPO_MAIN_RED_STOP_WOULD_REFUSE`, `GATE_REPO_MAIN_RED_STOP_RELEASED` and `GATE_REPO_MAIN_RED_STOP_ESCALATED`, so it registers the three codes (see [internal-selfheal.md](internal-selfheal.md)).
+`mainstop.ProofReds` gives the `-tags` list of each proof run of a stop (see [internal-mainstop.md](internal-mainstop.md)).
 `MainRedSink` takes the project root and the verdict. It has no cycle parameter, because no opener reads one.
 Design: [gate-contract.md](../gate-contract.md), section 7, and the G4 page that it links.
 

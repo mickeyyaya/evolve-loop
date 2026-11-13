@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/mainstop"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -103,7 +102,7 @@ func TestStopRelease_TheLastGreenKeyReleasesConsumesAndEmitsOneTime(t *testing.T
 	if e.Cycle != 7 || e.RunID != "run-7" || e.Phase != "ship" || e.Origin != "the caller" {
 		t.Errorf("event = %+v, want the cycle, run, phase and origin of the caller", e)
 	}
-	if e.Module != signalcenter.ModuleGateRepo || e.Kind != signalcenter.KindGateCorrected || e.Severity != signalcenter.SeverityInfo || e.Code != core.CodeMainRedStopReleased {
+	if e.Module != signalcenter.ModuleGateRepo || e.Kind != signalcenter.KindGateCorrected || e.Severity != signalcenter.SeverityInfo || e.Code != CodeMainRedStopReleased {
 		t.Errorf("event = %+v, want an info gate.corrected release of gate.repo", e)
 	}
 	if !strings.Contains(e.Reason, "released by batch main abc") {

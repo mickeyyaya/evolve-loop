@@ -197,7 +197,8 @@ The file is `main_red_release.go`. The design is in [gate-contract-g4-base-red-a
 The file is `main_red_hold.go`. The design is in the same section 13.
 
 - `StopHold` decides if one landing of the train can go onto `main` while a stop holds. The caller gives the directory, the stage, the base event, the emit function, the WARN writer and the key run.
-- `KeyRun` runs one `baseattr.Reds` on one revision and gives the keys that are red. `StopHold` gives it `core.StopProofReds`, so the run has the tags of the floor. The package starts no test itself.
+- `KeyRun` runs one `baseattr.Reds` on one revision and gives the keys that are red. `StopHold` gives it `mainstop.ProofReds`, so the run has the tags of the floor. The package starts no test itself.
+- `main_red_codes.go` registers `GATE_REPO_MAIN_RED_STOP_WOULD_REFUSE`, `GATE_REPO_MAIN_RED_STOP_RELEASED` and `GATE_REPO_MAIN_RED_STOP_ESCALATED`. This package builds each event of the three codes, so the codes are in this package. `TestMainRedStopCodes_AreRegisteredUnderTheRepoGate` pins the module of each code.
 - `Red` judges a landing whose own CI is red. Its proof has no green key, so `Stop.Admit` gives `not-a-fix`.
 - `Admit` judges a batch before `main` moves. It runs the keys of the stop on the batch tip and builds the proof with `Stop.Proven`.
 - A key run that fails gets one WARN line, and the batch is not a proven fix.

@@ -26,7 +26,7 @@ func newBoundPool(t *testing.T, openedBefore time.Duration) *boundPool {
 	t.Helper()
 	b := &boundPool{parkedPool: newParkedPool(t), center: signalcenter.New()}
 	b.center.Subscribe(func(e signalcenter.Event) {
-		if e.Code == core.CodeMainRedStopEscalated {
+		if e.Code == selfheal.CodeMainRedStopEscalated {
 			b.events = append(b.events, e)
 		}
 	})

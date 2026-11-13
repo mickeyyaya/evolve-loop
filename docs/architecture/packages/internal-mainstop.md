@@ -21,6 +21,7 @@
 - `Cause` names the keys, `MainSHA`, `OpenedAt` and the parked cycles. `ResumeCondition` gives the condition that ends the stop.
 - `ParkedCycles` gives the parked cycle numbers in order, for a signal field. It is empty when no cycle is parked.
 - `FixItemID` is `fix-main-red-` and the first 8 characters of the `main` commit.
+- `ProofReds` gives the keys of a stop and the `-tags` list of `covchanged.DefaultTags` as one `baseattr.Reds`. Thus each proof run of a stop has the tags of the floor. The stop check of ship and the default `KeyRun` of the train both call it. `TestProofReds_AsksForEachKeyWithTheTagsOfTheFloor` pins it.
 
 ## The record
 
@@ -34,7 +35,7 @@
 
 ## Invariants
 
-- The package imports `baseattr`, `adapters/flock`, `atomicwrite` and the standard library. It imports no pipeline package.
+- The package imports `baseattr`, `covchanged`, `adapters/flock`, `atomicwrite` and the standard library. It imports no pipeline package.
 - Ship (`phases/ship/main_red_stop.go`) and `selfheal.StopHold` are the two callers of `Admit`. `selfheal.StopRelease` is the one caller of `Released`.
 - `core` is the one caller of `Opened` and `WithParked`. The pool plan of `cmd/evolve` is the one caller of `Resumes`.
 - `selfheal.StopBound` is the one caller of `Overdue` and `Escalate`, and it calls them in one `Update`.

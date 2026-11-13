@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/mainstop"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -54,7 +53,7 @@ func (r StopRelease) Keys(green []baseattr.Key, by string) error {
 
 func (r StopRelease) released(stop mainstop.Stop, itemErr error) signalcenter.Event {
 	e := r.Event
-	e.Module, e.Kind, e.Code = signalcenter.ModuleGateRepo, signalcenter.KindGateCorrected, core.CodeMainRedStopReleased
+	e.Module, e.Kind, e.Code = signalcenter.ModuleGateRepo, signalcenter.KindGateCorrected, CodeMainRedStopReleased
 	e.Severity = signalcenter.SeverityInfo
 	e.Reason = "main-red stop released by " + stop.ReleasedBy + ": each key is green, and the parked lanes resume in the next pool fill"
 	e.Fields = map[string]string{"main": stop.MainSHA, "fix_item": stop.FixItem, "released_by": stop.ReleasedBy, "parked": stop.ParkedCycles(), "fix_item_error": ""}
