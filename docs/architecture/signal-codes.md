@@ -530,6 +530,12 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `SHIP_WINDOW_LEASE_BROKEN` | a ship broke the ship-window lease of a live holder whose heartbeat passed the TTL, so two lanes can overlap in the window; fields.owner_pid and fields.heartbeat_at name the broken holder |
 | `SHIP_WORKTREE_RESOLVE` | atomic-ship: the cycle worktree could not be resolved |
 
+### signal
+
+| Code | Meaning |
+|---|---|
+| `SIGNAL_EXPECTED_ABSENT` | a stage emitted its start signal and its end signal did not follow before the deadline from policy; fields.pair names the pair, start_kind and end_kind the two kinds, started the start time, deadline_seconds the limit and key the open start |
+
 ### signalcenter
 
 | Code | Meaning |

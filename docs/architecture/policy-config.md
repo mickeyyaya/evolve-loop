@@ -364,6 +364,17 @@ The block sets how long a continuation binding lives (2026-10-27). `evolve gc` r
 
 Why: on 2026-10-27 the registry held 101 bindings, and 89 of them came from cycles before 1900 (the oldest from cycle 1127). Each kept its worktree out of `evolve worktree cleanup --stale`.
 
+## Expected signals (`expected_signal`)
+
+The loop warns when a stage emits its start signal and its end signal does not follow. The design is in [signal-center-design.md](signal-center-design.md) section 8.1.
+
+| Key | Meaning | Default | Refused |
+|---|---|---|---|
+| `wave_seconds` | the limit between `wave.started` and `wave.ended` | 57600 | below 0, or not a number |
+| `phase_seconds` | the limit between `phase.dispatched` and `phase.outcome` or `phase.aborted` | 5400 | below 0, or not a number |
+
+A key that is 0 or absent keeps its default. The block refuses each other key.
+
 ## Context-fill telemetry (`context_fill`)
 
 The token telemetry of every launch carries a derived **fill reading**. It is the prompt-side

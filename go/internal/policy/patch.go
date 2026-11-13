@@ -49,6 +49,9 @@ func Parse(raw []byte) (Policy, error) {
 	if err := p.Healing.validate(); err != nil {
 		return Policy{}, fmt.Errorf("healing.%w", err)
 	}
+	if err := p.ExpectedSignal.validate(); err != nil {
+		return Policy{}, fmt.Errorf("expected_signal: %w", err)
+	}
 	return p, nil
 }
 

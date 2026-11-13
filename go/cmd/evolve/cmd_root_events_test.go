@@ -94,7 +94,7 @@ func TestRootSignalCenter_CycleZeroEventsNeverReachTheCycleSink(t *testing.T) {
 	signals := newRootSignalCenter(root, evolveDir, io.Discard)
 
 	signals.Emit(rootEvent(signalcenter.ModuleLoop, signalcenter.KindLoopWave, 0))
-	signals.Emit(rootEvent(signalcenter.ModuleOrchestrator, signalcenter.KindCycleSealed, 7))
+	signals.Emit(rootEvent(signalcenter.ModuleOrchestrator, signalcenter.KindGatePassed, 7))
 	signals.Flush()
 
 	if _, err := os.Stat(core.RunWorkspacePath(root, 0)); !errors.Is(err, fs.ErrNotExist) {
@@ -106,11 +106,11 @@ func TestRootSignalCenter_CycleZeroEventsNeverReachTheCycleSink(t *testing.T) {
 		}
 	}
 	cycleRecord, err := os.ReadFile(filepath.Join(core.RunWorkspacePath(root, 7), signalcenter.StreamFileName))
-	if err != nil || strings.Contains(string(cycleRecord), `"kind":"loop.wave"`) || !strings.Contains(string(cycleRecord), `"kind":"cycle.sealed"`) {
+	if err != nil || strings.Contains(string(cycleRecord), `"kind":"loop.wave"`) || !strings.Contains(string(cycleRecord), `"kind":"gate.passed"`) {
 		t.Errorf("cycle 7 record = %q, %v, want only its own event", cycleRecord, err)
 	}
 	projectRecord, err := os.ReadFile(filepath.Join(evolveDir, signalcenter.StreamFileName))
-	if err != nil || !strings.Contains(string(projectRecord), `"kind":"loop.wave"`) || strings.Contains(string(projectRecord), `"kind":"cycle.sealed"`) {
+	if err != nil || !strings.Contains(string(projectRecord), `"kind":"loop.wave"`) || strings.Contains(string(projectRecord), `"kind":"gate.passed"`) {
 		t.Errorf("project record = %q, %v, want the cycle-less event only: the project file stays until the channels replace it", projectRecord, err)
 	}
 }
