@@ -46,7 +46,7 @@ func TestCancelKillsTheProcessGroup_CancelReapsTheGrandchildToo(t *testing.T) {
 	}
 	var exitErr *exec.ExitError
 	if !errors.As(waitErr, &exitErr) || exitErr.Sys().(syscall.WaitStatus).Signal() != syscall.SIGKILL {
-		t.Errorf("Wait = %v (state %v, %v after cancel), want the child killed by SIGKILL", waitErr, cmd.ProcessState, elapsed)
+		t.Errorf("want the child killed by SIGKILL: %s", describeWaitResult(waitErr, cmd.ProcessState, elapsed))
 	}
 	deadline := time.Now().Add(3 * time.Second)
 	for syscall.Kill(grandchild, 0) == nil && time.Now().Before(deadline) {

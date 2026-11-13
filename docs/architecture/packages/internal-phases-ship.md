@@ -391,3 +391,11 @@ The file is `main_red_stop.go`. The design is in [gate-contract-g4-base-red-attr
 - Go counts the coverage of a package only in its own test binary. So `go/.cover-split` lists `shiptest` as a split of this package. Each coverage run then runs `shiptest` with `-coverpkg` and joins its profile ([internal-coversplit.md](internal-coversplit.md)).
 - Measured on 2026-10-28 with `GOMAXPROCS=3 go test -race -count=1 -tags integration`: before the split, this package ran 71.7 s at 99.0% (3033 of 3065 statements). After the split, this package runs 50.4 s and 51.2 s in two runs, and `shiptest` runs 20.7 s. The joined profile gives 99.0% (3033 of 3065).
 - `TestShip_CommitMessage_TypedVsMap` stays here, because the predicate of cycle 1748 runs it in this package.
+
+### Process-group cancel test
+
+- Cause: on macOS, `cmd.Wait` once returned `context canceled` with a success exit status after the cancel. The test message then named only the error, so the exit status, the signal and the timing were unknown. The cause is not proven. The failure message now comes from `describeWaitResult`, which names the exit status, the signal and the elapsed time. The next red names its own cause.
+- Cancel still kills the whole process group: `syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)` in `cancelKillsTheProcessGroup` is unchanged. The test still checks that the grandchild is gone.
+- `TestDescribeWaitResult_NamesExitStatusSignalAndElapsed` pins the message with a fake process state. The cases are a kill, a clean exit, a non-zero exit, a missing state and a state without a wait status.
+- Run: macOS arm64 (Darwin), `-race -count=200` of `^TestCancelKillsTheProcessGroup_` with the `integration` tag, under parallel load (four busy `yes` processes, and the two tests in parallel). The test binary came from `go test -c -race` and ran with `-test.count=200`.
+- Result: 200/200 PASS, 7.7 s wall time, 2026-11-13. The flake did not reproduce in this run, so the 200 runs do not prove the cause.
