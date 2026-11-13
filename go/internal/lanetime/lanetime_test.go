@@ -162,7 +162,8 @@ func TestReadSamples_KeepsOnlyOrchestrationEventsWithALiveField(t *testing.T) {
 	if err != nil || malformed != 0 {
 		t.Fatalf("err = %v malformed = %d", err, malformed)
 	}
-	want := []Sample{{At: at("10:00"), Live: 1, Target: 4}, {At: at("10:30"), Live: 3, Target: 4}, {At: at("11:00"), Live: 2, Target: 4}, {At: at("11:30"), Live: 0, Target: 4}}
+	idle := "LOOP_ORCH_POOL_IDLE"
+	want := []Sample{{At: at("10:00"), Live: 1, Target: 4, Code: idle, Cause: "unknown"}, {At: at("10:30"), Live: 3, Target: 4, Code: idle, Cause: "unknown"}, {At: at("11:00"), Live: 2, Target: 4, Code: idle, Cause: "unknown"}, {At: at("11:30"), Live: 0, Target: 4, Code: idle, Cause: "unknown"}}
 	if !reflect.DeepEqual(samples, want) {
 		t.Errorf("samples = %+v, want %+v", samples, want)
 	}
@@ -483,5 +484,29 @@ func TestLaneTimeToPass_ACycleWithABuildCallButNoClosedSpanIsLeftOut(t *testing.
 	c := Cycle{ID: 1, Calls: []Call{{Phase: "build", CLI: "claude-tmux", Start: at("10:00"), End: at("10:05")}}}
 	if got := LaneTimeToPass([]Cycle{c}, DefaultBuilds); len(got) != 0 {
 		t.Errorf("families = %+v, want none: a cycle without a lane time says nothing", got)
+	}
+}
+
+func TestWaveSamples_APIDKeepsItsSamplesAndClearsFrom(t *testing.T) {
+	t.Parallel()
+	from, to := novAt(10), novAt(12)
+	samples := []Sample{{PID: 7, At: novAt(9)}, {PID: 8, At: novAt(11)}}
+
+	own, gotFrom, gotTo := WaveSamples(samples, 7, from, to)
+
+	if len(own) != 1 || own[0].PID != 7 || !gotFrom.IsZero() || !gotTo.Equal(to) {
+		t.Errorf("WaveSamples = %v %v %v, want the pid sample before from, a zero from and the same to", own, gotFrom, gotTo)
+	}
+}
+
+func TestWaveSamples_NoPIDKeepsAllSamplesAndTheWindow(t *testing.T) {
+	t.Parallel()
+	from, to := novAt(10), novAt(12)
+	samples := []Sample{{PID: 7}, {PID: 8}}
+
+	own, gotFrom, gotTo := WaveSamples(samples, 0, from, to)
+
+	if len(own) != 2 || !gotFrom.Equal(from) || !gotTo.Equal(to) {
+		t.Errorf("WaveSamples = %v %v %v, want every sample and the window", own, gotFrom, gotTo)
 	}
 }

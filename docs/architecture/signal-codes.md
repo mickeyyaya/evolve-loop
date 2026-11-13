@@ -417,6 +417,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `QUALITY_PQ1_BREACH` | the whole 95% interval of PQ1 (ship rate) is on the bad side of its threshold at stage report or gate (ADR-0153) |
 | `QUALITY_PQ2_BREACH` | the whole 95% interval of PQ2 (pass^k per phase) is on the bad side of its threshold at stage report or gate (ADR-0153) |
 | `QUALITY_PQ4_BREACH` | the whole 95% interval of PQ4 (deadline rate) is on the bad side of its threshold at stage report or gate (ADR-0153) |
+| `QUALITY_PQ8_BREACH` | the whole 95% interval of PQ8 (idle-cause share) is on the bad side of its threshold at stage report or gate (ADR-0153) |
 | `QUALITY_SOURCE_ABSENT` | a declared source of a quality index does not exist; fields.index and fields.source name it (ADR-0153) |
 | `QUALITY_SOURCE_UNREADABLE` | a source of a quality index exists but does not parse; fields.source names it, the reason holds the error (ADR-0153) |
 | `QUALITY_TQ1_BREACH` | the whole 95% interval of TQ1 (mutation efficacy on changed functions) is on the bad side of its threshold at stage report or gate (ADR-0153) |

@@ -6,14 +6,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-func TestIndexes_TwentyTwoIdsAndTheBaselineOnesStartAtReport(t *testing.T) {
+func TestIndexes_TwentySixIdsAndTheBaselineOnesStartAtReport(t *testing.T) {
 	t.Parallel()
-	report := map[string]bool{"CQ1": true, "CQ2": true, "PQ1": true, "PQ3": true, "PQ4": true, "PQ5": true, "JQ3": true, "JQ4": true, "OQ2": true, "OQ3": true}
+	report := map[string]bool{"CQ1": true, "CQ2": true, "PQ1": true, "PQ3": true, "PQ4": true, "PQ5": true, "PQ6": true, "PQ9": true, "JQ3": true, "JQ4": true, "OQ2": true, "OQ3": true}
 
 	all := Indexes()
 
-	if len(all) != 22 {
-		t.Fatalf("indexes = %d, want the 22 of spec §1", len(all))
+	if len(all) != 26 {
+		t.Fatalf("indexes = %d, want the 22 of spec §1 and PQ6 to PQ9", len(all))
 	}
 	for _, ix := range all {
 		want := StageShadow
@@ -30,7 +30,7 @@ func TestIndexes_TwentyTwoIdsAndTheBaselineOnesStartAtReport(t *testing.T) {
 	}
 }
 
-func TestBreachCode_NineteenRegisteredAndNoneForPQ3OrJQ4(t *testing.T) {
+func TestBreachCode_TwentyRegisteredAndNoneForPQ3OrJQ4(t *testing.T) {
 	t.Parallel()
 	registered := 0
 	for _, ix := range Indexes() {
@@ -42,8 +42,8 @@ func TestBreachCode_NineteenRegisteredAndNoneForPQ3OrJQ4(t *testing.T) {
 			t.Errorf("%s: code registered=%v, breachable=%v", ix.ID, ok, ix.Breachable)
 		}
 	}
-	if registered != 19 {
-		t.Errorf("breach codes = %d, want 19", registered)
+	if registered != 20 {
+		t.Errorf("breach codes = %d, want 20", registered)
 	}
 	for _, c := range []signalcenter.Code{CodeSourceAbsent, CodeSourceUnreadable, CodeVacuousDenominator} {
 		if m, ok := signalcenter.IsRegistered(c); !ok || m != signalcenter.ModuleQuality {

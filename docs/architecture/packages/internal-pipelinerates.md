@@ -4,7 +4,7 @@
 
 ## Purpose
 
-`internal/pipelinerates` reads the wave records and the cycle records and computes five indexes. They are PQ1 (ship rate), PQ3 (the comparison noise floor) and PQ4 (the deadline and system-fail rates). The other two are PQ5 (the cost for each shipped cycle) and CQ2 (Go packages per ship). It hands each reading to [internal/qualitypanel](internal-qualitypanel.md), which turns it into Signal Center events.
+`internal/pipelinerates` reads the wave records and the cycle records and computes nine indexes. They are PQ1 (ship rate), PQ3 (the comparison noise floor) and PQ4 (the deadline and system-fail rates). Four more are PQ5 (the cost for each shipped cycle), PQ6 (calendar throughput), PQ7 (slot utilization) and PQ8 (idle-cause share). The last two are PQ9 (gate share) and CQ2 (Go packages per ship). It hands each reading to [internal/qualitypanel](internal-qualitypanel.md), which turns it into Signal Center events.
 
 ## Design
 
@@ -24,6 +24,24 @@
   | `/false-stops` | the cycles with a `would_stop` of either check that shipped |
 
   A window with no ship has `n` 0, so the panel publishes `no_data`, not a cost of 0 (`TestCostPerShip_AWaveWithNoShipHasNoDataNotAZeroCost`). PQ1 is the convergence rate of ADR-0158: shipped cycles divided by started cycles.
+- **The flow readings (PQ6 to PQ9).** Plan: [pipeline-health-indexes-2026-11](../../plans/pipeline-health-indexes-2026-11.md), component H2.
+  - `LoadCycles` also reads the ship time of each cycle (`ShippedAt`). It is the time of `ship.landed`. If the stream has no such signal, it is the file time of `run.json`.
+  - `CalendarThroughput` gives one census reading for each of the last 7 days. A day with no delivery gives 0.
+  - `LoadWaveFlows` reads the last 10 wave records. For each wave it reads the slot use (`SlotUse`), the idle slot-hours of each cause (`IdleUse`) and the phase report of `internal/lanetime`.
+  - It reads the `LOOP_ORCH_*` samples of `.evolve/signals.ndjson` one time with `lanetime.ReadSamples`. For each wave it selects the samples one time with `lanetime.WaveSamples`, the same function that `evolve wave latency` calls. It uses the pid of the wave, or the wave time when the record has no pid. `SlotUse` and `IdleUse` get the same set.
+  - A cycle belongs to the wave that `wave.Bounds.Holds` names. Its id is above the floor of the wave. It is at or below the floor of the next wave. A cycle equal to the floor of wave N+1 belongs to wave N. `evolve wave latency` uses the same rule, so PQ7 and PQ9 equal it.
+  - Limit: PQ1, PQ4 and PQ5 still use `waveOf`, which puts a cycle on the floor of wave N+1 into wave N+1. So the rule splits between PQ1, PQ4 and PQ5 (`waveOf`) and PQ7, PQ8 and PQ9 (`wave.Bounds`). Inbox item `pipelinerates-pq1-pq4-pq5-use-wave-bounds` moves PQ1, PQ4 and PQ5 to `wave.Bounds`.
+  - A missing `.evolve/signals.ndjson` is kept as `FlowSet.SamplesErr`. PQ7 and PQ8 give a source-absent warning, and PQ9 still reads.
+  - The report loads the flows one time and gives them to PQ7, PQ8 and PQ9.
+
+  | Function | Index | Value | Status |
+  |---|---|---|---|
+  | `CalendarThroughput` | PQ6 | deliveries for each day | none |
+  | `SlotUtilization` | PQ7 | live slot-hours ÷ capacity slot-hours | none; `n` 0 when the wave has no sample |
+  | `IdleCauseShare` | PQ8 | idle slot-hours of a cause ÷ all idle slot-hours | none; the registry threshold 0.50 and `qualitypanel.Judge` decide the breach |
+  | `GateShare` | PQ9 | gate time ÷ lane time | none; `n` 0 when the wave has no lane time |
+
+  An idle event with no `cause` field counts as the cause `unknown`. A wave whose idle slot-hours total 0 or less gives no PQ8 reading.
 - **Windows.** `Windows` gives the latest wave, the last 10 waves, and all waves when they reach past the last 10.
 - **Packages per ship.** `PackagesPerShip` runs `git show --numstat` on the `ship-binding.json` commit of each ship. The command uses `-z`, `--no-renames` and `--diff-merges=first-parent`, so a merge ship and a path with a space count right. A commit that git cannot resolve is left out and named in the error; the collector publishes the other readings and one `quality.warning`. It counts the distinct directories of the `.go` paths outside `.evolve/`.
 - **The CQ2 interval.** The median carries a cluster bootstrap by wave (2,000 resamples, fixed seed). A wave with no ship gives a `no_data` reading.

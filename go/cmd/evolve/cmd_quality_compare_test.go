@@ -52,8 +52,8 @@ func TestQualityReport_TheWaveScopeReadsShipRateDeadlineRateAndPackages(t *testi
 
 	rc, stdout := runQualityReport(t, env, root)
 
-	if rc != 0 || !strings.Contains(stdout, "30 reading(s)") || !strings.Contains(stdout, "6 warning(s)") {
-		t.Fatalf("rc %d stdout %q, want 30 readings (PQ1 x2, PQ4 x4, CQ2 x2, CQ1 tree and wave, PQ5 x20) and six no-data warnings: wave 2 shipped nothing (CQ2 and three PQ5 costs) and the fixture tree has no function", rc, stdout)
+	if rc != 0 || !strings.Contains(stdout, "39 reading(s)") || !strings.Contains(stdout, "10 warning(s)") {
+		t.Fatalf("rc %d stdout %q, want 39 readings (PQ1 x2, PQ4 x4, CQ2 x2, CQ1 tree and wave, PQ5 x20, PQ6 x7, PQ9 x2) and ten warnings: wave 2 shipped nothing (CQ2 and three PQ5 costs), the fixture tree has no function, PQ9 reads two waves with no lane time, and PQ7 and PQ8 find no orchestration stream", rc, stdout)
 	}
 	byWindow := map[string]map[string]string{}
 	for _, e := range channelEvents(t, root, "quality.reading") {
@@ -83,16 +83,16 @@ func TestWaveQualityReaders_AMissingWaveRecordIsASourceAbsentWarning(t *testing.
 
 	rc, stdout := runQualityReport(t, env, root)
 
-	if rc != 0 || !strings.Contains(stdout, "0 reading(s), 0 breach(es), 6 warning(s)") {
-		t.Errorf("rc %d stdout %q, want six warnings and exit 0", rc, stdout)
+	if rc != 0 || !strings.Contains(stdout, "0 reading(s), 0 breach(es), 10 warning(s)") {
+		t.Errorf("rc %d stdout %q, want ten warnings and exit 0", rc, stdout)
 	}
 	for _, e := range channelEvents(t, root, "quality.breach") {
 		if e.Code != "QUALITY_SOURCE_ABSENT" || !(strings.HasSuffix(e.Fields["source"], filepath.Join(".evolve", "waves")) || strings.HasSuffix(e.Fields["source"], "go")) {
 			t.Errorf("warning %+v, want QUALITY_SOURCE_ABSENT naming .evolve/waves or the go tree", e)
 		}
 	}
-	if got := len(qualityScopes["wave"]); got != 6 {
-		t.Errorf("the production wave scope has %d readers, want PQ1, PQ4, CQ2, the two CQ1 readers and PQ5", got)
+	if got := len(qualityScopes["wave"]); got != 10 {
+		t.Errorf("the production wave scope has %d readers, want PQ1, PQ4, CQ2, the two CQ1 readers, PQ5 and PQ6 to PQ9", got)
 	}
 }
 

@@ -21,6 +21,8 @@ The package is a leaf. It imports the standard library only, and it must not imp
 | Measure | Function | Source | Rule |
 |---|---|---|---|
 | Slot use | `SlotUse(samples, from, to)` | `LOOP_ORCH_*` signals with `fields.live` and `fields.target` (`ReadSamples`) | Each sample holds until the next one. The last sample holds until `to`, or it ends the window when `to` is zero. Average live lanes is the used slot-hours over the window hours. |
+| Wave samples | `WaveSamples(samples, pid, from, to)` | the samples of a wave and its time window | A wave with a pid gets the samples of that pid and a cleared `from`. A wave with no pid keeps all samples and the window. It returns the samples, `from` and `to`. `evolve wave latency` and `internal/pipelinerates` both call it. |
+| Idle slot-hours for each cause | `IdleUse(samples, from, to)` | `LOOP_ORCH_POOL_IDLE` and `LOOP_ORCH_POOL_UNDERFILLED` samples. `Sample` carries `Code` and `Cause` (`fields.cause`). | The same window and the same hold rule as `SlotUse`. A sample adds `target` − `live` free slots times its hold hours to its cause. An idle event with no cause counts as `unknown`. A zero-length or negative span adds nothing, and no span goes past `to`. |
 | Lane time by phase, model and host split, gate time | `Phases(cycles)` | `signals.ndjson` and `llm-calls.ndjson` of each run dir (`ReadCycles`) | A span opens at the first `phase.dispatched` of a phase. The next `phase.outcome` or `phase.aborted` of that phase closes it. The share is the span time over the total lane time. The gaps between spans are one row. |
 | Lane time to a PASS per CLI family | `LaneTimeToPass(cycles, last)` | the same run dirs | See the next section. |
 
