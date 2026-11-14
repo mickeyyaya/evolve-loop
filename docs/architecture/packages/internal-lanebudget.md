@@ -29,11 +29,18 @@
 | `phases/audit/ciparitygate/command.go` (acs-durable) and `apicover.go` | `Runner` |
 | `ciparity/ciparity.go` (`CoverageTestArgs`) | `Args` |
 | `commitgate/lanes.go` (the Go lane) | `Runner`, through `Options.budgeted` |
+| `cmd/evolve/cmd_composition_wiring.go` (`composedGateRun.gate`) | `Env`: the `make` target runs `go test` for the build, test, acs and apicover gates |
 
 `releasepreflight/releasepreflight.go` is exempt: it runs only on the console, before a release. `gotooltest/cache.go` runs `go build`, not `go test`, and only from test code, which already runs under the budget of its parent.
+
+The composed-tree gates give `GOMAXPROCS` to `make`. The go command takes its default `-p` from `GOMAXPROCS`, and `-test.parallel` follows the same value. So the suite of a gate stays in the lane share. This deviates from `CIEnv` on purpose, and it moves the gate closer to CI, because the GitHub runners have 2 to 4 CPUs. The console `make build` calls in `cmd_wave.go` and `cmd_loop_boot_refresh.go` are exempt. They run on the console, never in a lane.
+
+The console measured the cost on 2026-11-14, on a host with 14 CPUs and a live wave. The race suite of `make test` took 984 s at `GOMAXPROCS=3`. Its slowest package, `cmd/evolve`, took 568 s, near the default timeout of 10 minutes for one test binary. So the `test` target passes `-timeout $(TEST_TIMEOUT)` (20 minutes) to `go test`.
 
 ## Invariants
 
 - The formula and the two "no lane" answers: `TestProcs_DividesTheHostAmongTheLanes`, `TestCurrent_ReadsTheFleetWidthOfThisProcess`.
 - A console run gets no flag and no `GOMAXPROCS`: `TestArgs_AConsoleRunIsUnchanged`, `TestEnv_AConsoleRunIsUnchanged`.
+- A composed gate gets `GOMAXPROCS` in a lane and no limit on the console: `TestRunComposedGates_ALaneGateGetsItsCPUShare`, `TestRunComposedGates_AConsoleGateGetsNoCPULimit`.
+- Each function under `go/internal` or `go/cmd` that runs `make` calls `lanebudget.Env`, or its file is in `laneBudgetMakeExempt` with a reason: `TestEveryMakeRunGoesThroughTheLaneBudget`. The guard finds any call that has the literal `"make"` as its first or second argument.
 - Each non-test file under `go/internal` or `go/cmd` that builds a `go test` argv imports this package: `TestEveryGoTestArgvGoesThroughTheLaneBudget` in `go/test/structure`. The test finds a `[]string{"test", …}` literal and a call with the arguments `"go", "test"`. It does not prove that each argv in the file goes through the budget, only that the file uses it. Each site has its own test that runs it in a lane.

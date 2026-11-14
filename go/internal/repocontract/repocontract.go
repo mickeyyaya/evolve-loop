@@ -221,6 +221,7 @@ var treeReadingSelections = []TestSelection{
 	}},
 	{Package: "./test/structure", Tests: []string{
 		"TestEveryGoTestArgvGoesThroughTheLaneBudget",
+		"TestEveryMakeRunGoesThroughTheLaneBudget",
 		"TestEveryPhaseRequestWithAWorktreeTakesTheFenceFromTheOneProjection",
 		"TestEveryThirdPartyImportHasExactlyOneHome",
 		"TestNoPollTimerInTheEventChannelSources",
