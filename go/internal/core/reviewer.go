@@ -26,6 +26,7 @@ type ReviewInput struct {
 	Stderr         io.Writer
 	Signals        *signalcenter.Center
 	residuals      *floorResidualLog
+	added          floorAdded
 	baseRun        baseattr.Runner
 	MainRedStop    MainRedSink
 }

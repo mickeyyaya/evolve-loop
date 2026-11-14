@@ -36,7 +36,7 @@ func TestChangedPackageFloorChecks_RunsAddedTagGatedPackagesUnderTheirTags(t *te
 	}
 	t.Cleanup(func() { buildSelfCheckRunner = prev; buildSelfCheckTaggedRunner = prevTagged })
 	in := ReviewInput{Phase: string(PhaseBuild), Worktree: wt, ProjectRoot: wt, WorktreeBaseSHA: base}
-	out := changedPackageFloorChecks(context.Background(), in, changedFloorPaths(context.Background(), in))
+	out := changedPackageFloorChecks(context.Background(), in.withFloorAdded(), changedFloorPaths(context.Background(), in))
 	if gotPkg != "./acs/cycle9" || strings.Join(gotTags, ",") != "acs" {
 		t.Fatalf("the added acs package must run under its tags at the floor; ran pkg=%q tags=%v", gotPkg, gotTags)
 	}

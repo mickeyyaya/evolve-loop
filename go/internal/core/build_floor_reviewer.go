@@ -10,7 +10,6 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/addedtests"
 	"github.com/mickeyyaya/evolve-loop/go/internal/apicover"
-	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 	"github.com/mickeyyaya/evolve-loop/go/internal/covchanged"
 	"github.com/mickeyyaya/evolve-loop/go/internal/coversplit"
@@ -27,6 +26,7 @@ import (
 type BuildFloorCheckFn func(ctx context.Context, in ReviewInput) []string
 
 func DefaultBuildFloorChecks(ctx context.Context, in ReviewInput) []string {
+	in = in.withFloorAdded()
 	out := RemovalClaimFailures(ctx, in)
 	out = append(out, PlaceholderTokenFailures(ctx, in)...)
 	paths := changedFloorPaths(ctx, in)
@@ -158,23 +158,8 @@ func floorLinesFor(fails, taggedFails []selfCheckFailure, namingFails []string) 
 }
 
 func addedTaggedTestFailures(ctx context.Context, in ReviewInput, moduleDir string) []selfCheckFailure {
-	if in.Worktree == "" || in.WorktreeBaseSHA == "" {
-		return nil
-	}
-	files, ok := changedpkgs.ChangedFilesChecked(in.Worktree, in.WorktreeBaseSHA)
-	if !ok {
-		return nil
-	}
-	groups, excluded, err := addedtests.Groups(in.Worktree, files)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "[build-floor] WARN: added-test grouping failed (%v) — tag-gated added packages not run at the floor; the ship backstop still stands\n", err)
-		return nil
-	}
-	for _, p := range excluded {
-		fmt.Fprintf(os.Stderr, "[build-floor] EXCLUDED %s (requires_tmux or another build constraint unavailable on this host)\n", p)
-	}
 	var fails []selfCheckFailure
-	for _, g := range groups {
+	for _, g := range in.added.groups {
 		if len(g.Tags) == 0 {
 			continue
 		}
@@ -182,7 +167,7 @@ func addedTaggedTestFailures(ctx context.Context, in ReviewInput, moduleDir stri
 			run := func() (string, bool) { return buildSelfCheckTaggedRunner(ctx, moduleDir, pkg, g.Tags) }
 			label := pkg + " (-tags " + strings.Join(g.Tags, ",") + ")"
 			if out, ok := run(); !ok {
-				if out, ok = in.retakeFloorRun(label, out, run); !ok {
+				if out, ok = in.retakeFloorRun(label, out, []string{pkg}, run); !ok {
 					fails = append(fails, selfCheckFailure{Pkg: label, Output: out})
 				}
 			}
@@ -194,6 +179,9 @@ func addedTaggedTestFailures(ctx context.Context, in ReviewInput, moduleDir stri
 const floorFailureDiagnosticMax = 400
 
 func floorFailureDiagnostic(output string) string {
+	if correction, rest := splitCorrection(output); correction != "" {
+		return joinCorrection(correction, floorFailureDiagnostic(rest))
+	}
 	if len(output) <= floorFailureDiagnosticMax {
 		return output
 	}
@@ -261,11 +249,7 @@ func apicoverNamingFailures(ctx context.Context, in ReviewInput, moduleDir strin
 	}
 	switch status {
 	case coverStatusTestsFailed:
-		head := testOut
-		if len(head) > 600 {
-			head = head[:600] + "…"
-		}
-		return []string{fmt.Sprintf("enforced package tests FAIL (coverage run doubles as their selfcheck):\n%s", head)}
+		return []string{fmt.Sprintf("enforced package tests FAIL (coverage run doubles as their selfcheck):\n%s", capKeepingCorrection(testOut, 600))}
 	case coverStatusPlumbingError:
 		fmt.Fprintf(os.Stderr, "[build-floor] WARN: scoped coverage generation failed (%s) — apicover naming check skipped this handoff; audit/CI gates stay armed\n", testOut)
 		return nil
@@ -363,11 +347,14 @@ func (p coverPlan) run(ctx context.Context) (string, int) {
 
 func (p coverPlan) retake(ctx context.Context, in ReviewInput, first string) (string, int) {
 	status := coverStatusTestsFailed
-	out, _ := in.retakeFloorOutcome(p.label, first, func() (string, floorRetakeOutcome) {
+	out, outcome := in.retakeFloorOutcome(p.label, first, p.pkgs, func() (string, floorRetakeOutcome) {
 		var out string
 		out, status = p.run(ctx)
 		return out, coverRetakeOutcome(status)
 	})
+	if outcome == floorRetakeNewTestRed {
+		return out, coverStatusTestsFailed
+	}
 	return coverRetakeResult(first, out, status)
 }
 

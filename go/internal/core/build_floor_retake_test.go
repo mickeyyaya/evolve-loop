@@ -121,7 +121,7 @@ func TestAddedTaggedTestFailures_AOneOffRedIsRetaken(t *testing.T) {
 	}
 	t.Cleanup(func() { buildSelfCheckTaggedRunner = prev })
 
-	if got := addedTaggedTestFailures(context.Background(), in, filepath.Join(in.Worktree, "go")); len(got) != 0 || runs != 2 {
+	if got := addedTaggedTestFailures(context.Background(), in.withFloorAdded(), filepath.Join(in.Worktree, "go")); len(got) != 0 || runs != 2 {
 		t.Fatalf("failures = %v after %d run(s), want none after one retake", got, runs)
 	}
 	if events := retakeEvents(signals); len(events) != 1 || events[0].Fields["pkg"] != "./acs/cycle9 (-tags acs)" {
@@ -181,7 +181,7 @@ func TestRetakeFloorRun_AnUnavailableLockRunsTheRetakeUnserialized(t *testing.T)
 		var stderr strings.Builder
 		in := ReviewInput{ProjectRoot: root, Stderr: &stderr}
 
-		out, ok := in.retakeFloorRun("./q", retakeRedOutput, func() (string, bool) { return "ok", true })
+		out, ok := in.retakeFloorRun("./q", retakeRedOutput, []string{"./q"}, func() (string, bool) { return "ok", true })
 
 		if !ok || out != "ok" || !strings.Contains(stderr.String(), "the retake runs unserialized") {
 			t.Errorf("root %q: (%q, %v), stderr %q, want the retake run with a WARN", root, out, ok, stderr.String())
@@ -267,14 +267,14 @@ func TestRetakeFloorRun_WaitsOnTheLockFileOfTheAuditRetake(t *testing.T) {
 	}
 	var stderr strings.Builder
 
-	_, ok := ReviewInput{ProjectRoot: root, Stderr: &stderr}.retakeFloorRun("./q", retakeRedOutput, func() (string, bool) { return "ok", true })
+	_, ok := ReviewInput{ProjectRoot: root, Stderr: &stderr}.retakeFloorRun("./q", retakeRedOutput, []string{"./q"}, func() (string, bool) { return "ok", true })
 	release()
 
 	if !ok || !strings.Contains(stderr.String(), "lock deadline passed") {
 		t.Fatalf("stderr = %q, want the retake to wait on the audit's lock file and then run unserialized", stderr.String())
 	}
 	worktree := t.TempDir()
-	ReviewInput{Worktree: worktree, Stderr: &stderr}.retakeFloorRun("./q", retakeRedOutput, func() (string, bool) { return "ok", true })
+	ReviewInput{Worktree: worktree, Stderr: &stderr}.retakeFloorRun("./q", retakeRedOutput, []string{"./q"}, func() (string, bool) { return "ok", true })
 	if _, err := os.Stat(ciparity.TierLockPath(worktree)); err != nil {
 		t.Errorf("without a project root the lock must live under the worktree: %v", err)
 	}

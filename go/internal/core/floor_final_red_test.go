@@ -63,7 +63,7 @@ func TestAddedTaggedTestFailures_NeverRunsAnEnvExclusivePackage(t *testing.T) {
 	}
 	t.Cleanup(func() { buildSelfCheckTaggedRunner = prev })
 
-	got := addedTaggedTestFailures(context.Background(), in, filepath.Join(in.Worktree, "go"))
+	got := addedTaggedTestFailures(context.Background(), in.withFloorAdded(), filepath.Join(in.Worktree, "go"))
 
 	if len(got) != 0 || len(ran) != 0 {
 		t.Fatalf("failures = %v, runs = %v, want the env-exclusive internal/bridge left to its backstop", got, ran)

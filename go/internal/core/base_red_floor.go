@@ -57,7 +57,7 @@ func UnitTestFloorJudge(ctx context.Context, in ReviewInput) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return changedPackageFloorChecks(ctx, in, paths), nil
+	return changedPackageFloorChecks(ctx, in.withFloorAdded(), paths), nil
 }
 
 func CoverChangedFloorJudge(ctx context.Context, in ReviewInput) ([]string, error) {
@@ -65,7 +65,7 @@ func CoverChangedFloorJudge(ctx context.Context, in ReviewInput) ([]string, erro
 	if err != nil {
 		return nil, err
 	}
-	return coverChangedFailures(ctx, in, paths), nil
+	return coverChangedFailures(ctx, in.withFloorAdded(), paths), nil
 }
 
 func (in ReviewInput) attributor() baseattr.Attributor {
