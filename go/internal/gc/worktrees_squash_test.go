@@ -253,3 +253,26 @@ func TestPlanWorktrees_AFailingBranchListSurfaces(t *testing.T) {
 		t.Fatal("PlanWorktrees = nil, want the git branch --list failure")
 	}
 }
+
+func TestPlanWorktrees_ANoNetBranchWithCommitsAheadIsNeitherFlaggedNorDeleted(t *testing.T) {
+	e := newCycleSquashEnv(t)
+
+	e.repo.Git("switch", "-q", "-c", "cycle-empty-954")
+	e.repo.Git("commit", "-q", "--allow-empty", "-m", "empty")
+	e.repo.Git("switch", "-q", "main")
+
+	wtDir := filepath.Join(e.repo.Dir, ".evolve", "worktrees", "cycle-reverted-955")
+	e.repo.Git("worktree", "add", "-q", "-b", "cycle-reverted-955", wtDir)
+	e.repo.Write(filepath.Join(".evolve", "worktrees", "cycle-reverted-955", "r.txt"), "r\n")
+	e.repo.Git("-C", wtDir, "add", "r.txt")
+	e.repo.Git("-C", wtDir, "commit", "-qm", "add r")
+	e.repo.Git("-C", wtDir, "revert", "--no-edit", "HEAD")
+
+	m, err := PlanWorktrees(e.options())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(m.Items) != 0 {
+		t.Fatalf("PlanWorktrees = %+v, want no flag or delete item for no-net branches with commits ahead", m.Items)
+	}
+}

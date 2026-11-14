@@ -260,6 +260,7 @@ type mergedSet struct {
 	o         WorktreeOptions
 	ancestors map[string]bool
 	memo      map[string]landing
+	noNet     map[string]bool
 }
 
 func (o WorktreeOptions) mergedBranches() (*mergedSet, error) {
@@ -267,7 +268,7 @@ func (o WorktreeOptions) mergedBranches() (*mergedSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	set := &mergedSet{o: o, ancestors: map[string]bool{}, memo: map[string]landing{}}
+	set := &mergedSet{o: o, ancestors: map[string]bool{}, memo: map[string]landing{}, noNet: map[string]bool{}}
 	for _, b := range parseBranchList(mergedOut) {
 		set.ancestors[b] = true
 	}
@@ -287,7 +288,14 @@ func (m *mergedSet) landing(branch string) (landing, error) {
 	}
 	l := res.landing()
 	m.memo[branch] = l
+	if res.NoNet && m.noNet != nil {
+		m.noNet[branch] = true
+	}
 	return l, nil
+}
+
+func (m *mergedSet) isNoNet(branch string) bool {
+	return m.noNet[branch]
 }
 
 func (m *mergedSet) squashHead(branch string, l landing) (string, error) {
@@ -335,6 +343,9 @@ func (o WorktreeOptions) scanWorktrees(porcelain string, merged *mergedSet, held
 			return nil, nil, nil, err
 		}
 		if dirty || l == landingNone {
+			if !dirty && merged.isNoNet(e.branch) {
+				continue
+			}
 			items = append(items, o.keptOrSalvaged(path, e.branch, dirty, held))
 			continue
 		}
@@ -487,7 +498,9 @@ func (o WorktreeOptions) orphanBranchItems(merged *mergedSet, seenBranch map[str
 		case landingNoNet:
 			items = append(items, WorktreeItem{Branch: b, Head: head, Action: WorktreeActionDeleteBranch, Reason: "orphan branch with no net changes and no commits ahead (no worktree)"})
 		default:
-			items = append(items, WorktreeItem{Branch: b, Action: WorktreeActionFlagUnmerged, Reason: "unmerged orphan branch (no worktree)"})
+			if !merged.isNoNet(b) {
+				items = append(items, WorktreeItem{Branch: b, Action: WorktreeActionFlagUnmerged, Reason: "unmerged orphan branch (no worktree)"})
+			}
 		}
 	}
 	return items, nil
