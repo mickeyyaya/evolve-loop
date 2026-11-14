@@ -25,6 +25,7 @@ const (
 	TriggerLanding Trigger = "landing"
 	TriggerSweep   Trigger = "sweep"
 	TriggerRouting Trigger = "routing"
+	TriggerHistory Trigger = "history"
 )
 
 type Proposal struct {
@@ -113,7 +114,7 @@ func matchOne(c Change, it inboxbatch.Item, hasTest func(string) bool, minShare 
 		p.Reason, p.Deterministic = "the change consumed this item; the root copy is stale", true
 		return p, true
 	}
-	if slices.Contains(c.Closes, it.ID) {
+	if closedBy(c, it) {
 		p.Reason, p.Deterministic = "the change declares Closes-Inbox for this item", true
 		return p, true
 	}
@@ -134,6 +135,10 @@ func matchOne(c Change, it inboxbatch.Item, hasTest func(string) bool, minShare 
 		return Proposal{}, false
 	}
 	return p, true
+}
+
+func closedBy(c Change, it inboxbatch.Item) bool {
+	return slices.Contains(c.Closes, it.ID) && !c.When.Before(it.FiledAt())
 }
 
 func consumedBy(c Change, it inboxbatch.Item) bool {

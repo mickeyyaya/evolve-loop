@@ -17,6 +17,7 @@ func init() {
 type Inputs struct {
 	Open        []inboxbatch.Item
 	Changes     []Change
+	History     []Change
 	HasTest     func(string) bool
 	IsProtected func(string) bool
 	Thresholds  Thresholds
@@ -35,6 +36,7 @@ func Curate(in Inputs) []Proposal {
 		out = append(out, Reroutes(in.Open, in.IsProtected)...)
 	}
 	if in.Backstop {
+		out = append(out, ClosedOnMain(in.History, in.Open)...)
 		out = append(out, Sweep(in.Open, in.HasTest, in.MinShare)...)
 		out = append(out, Duplicates(in.Open, in.Thresholds)...)
 	}
