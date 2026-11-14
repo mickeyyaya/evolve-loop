@@ -1,0 +1,34 @@
+{
+  "acceptance": [
+    "Journey, red first: a lane changes its inbox item, the plane stamps the same file on main, and the ship rebase lands the lane with both changes kept.",
+    "A conflict on any non-inbox path still fails as today.",
+    "A conflict on the inbox file of another item still fails as today.",
+    "The audit binding of the code tree holds after the resolve.",
+    "The failure digest names the class ship-rebase-conflict, not unknown.",
+    "Docs: the ship section in STE; 100% coverage on each changed function; zero code comments."
+  ],
+  "consumed": {
+    "at": "2026-11-14T07:33:58Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "lane triage recorded it as shipped (lane triage (cycle 2162) skip_shipped: git_sha b3a409a72e35ff30d6c6724be3bbfd14faf3c597)"
+  },
+  "created_at": "2026-11-04T06:20:00Z",
+  "files": [
+    "go/internal/phases/ship",
+    "go/internal/inboxmover"
+  ],
+  "fix": "When a fleet rebase conflicts only on inbox bookkeeping files of the cycle, resolve them mechanically by a stated rule: keep main's stamps and the cycle's consumption. Any other path keeps today's behavior. The code tree is not touched. Emit a signal that names the paths.",
+  "id": "ship-rebase-resolves-the-cycles-own-inbox-stamp",
+  "kind": "fix",
+  "origin": "console",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "routed_at": "2026-11-04T15:34:32Z",
+  "routed_cycle": 2162,
+  "routed_reason": "lane triage (cycle 2162) skip_shipped: git_sha b3a409a72e35ff30d6c6724be3bbfd14faf3c597",
+  "source": "Wave 154, 2026-11-04. Cycle 2144 (O6) had commit f995309d7 ready. ORCHESTRATOR_FLEET_REBASE_CONFLICT named only .evolve/inbox/...o6...json: the lane changes its own item, and the plane commits chore(inbox) stamps to the same file (718267964). The bookkeeping batch of ADR-0147 D12 removes this race at enforce, and lanes stay at shadow until then. Failure digest class is unknown.",
+  "summary": "Cycle 2144 passed three audit rounds, and its landing failed only on a conflict with a plane stamp of its own inbox file.",
+  "title": "A ship rebase conflict on the cycle's own inbox file resolves without an LLM",
+  "weight": 0.92
+}
