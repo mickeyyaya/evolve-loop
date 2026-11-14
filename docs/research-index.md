@@ -729,4 +729,10 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [plans/pipeline-health-indexes-2026-11.md](plans/pipeline-health-indexes-2026-11.md) | Why delivery fell on 2026-11-12, and the plan for PQ6 to PQ9, a typed idle cause and an expected-signal registry in the Signal Center. |
 
+## 2026-11-14 — agy changelog page /run-workflow note
+
+| Document | What it records |
+|---|---|
+| [research/practice-agy-cli-changelog-page-run-workflow-2026-11.md](research/practice-agy-cli-changelog-page-run-workflow-2026-11.md) | Note on the agy page lines /run-workflow, 1.5.8 and rewind for item 16ea3cc9, read as data. The command stays unused. No persona changes. |
+
 <!-- GENERATED:research-index END -->
