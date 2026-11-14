@@ -15,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/auditledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/verdictcache"
@@ -75,7 +76,7 @@ func (r composedGateRun) gate(ctx context.Context, gate, target string) ciparity
 	tail := newTailWriter(64 * 1024)
 	cmd := sysexec.Command(ctx, "make", "-C", "go", target)
 	cmd.Dir = r.worktree
-	cmd.Env = ciparity.CIEnv(os.Environ())
+	cmd.Env = lanebudget.Env(ciparity.CIEnv(os.Environ()))
 	cmd.Stdout, cmd.Stderr = tail, tail
 	err := cmd.Run()
 	if err == nil {

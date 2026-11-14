@@ -188,3 +188,114 @@ func TestGoTestArgvSites_AnAbsentDirectoryOrABadFileIsAnError(t *testing.T) {
 		t.Errorf("goTestArgvSites = %v, %v, want an error for an absent directory and for a bad file", absent, bad)
 	}
 }
+
+var laneBudgetMakeExempt = map[string]string{
+	filepath.Join("cmd", "evolve", "cmd_wave.go"):              "runs make build on the console before a wave starts, never in a lane",
+	filepath.Join("cmd", "evolve", "cmd_loop_boot_refresh.go"): "runs make build on the console at loop boot, never in a lane",
+}
+
+func makeSites(root string, dirs []string, exempt map[string]string) ([]string, error) {
+	files, err := SourceFiles(root, dirs...)
+	if err != nil {
+		return nil, err
+	}
+	var sites []string
+	for _, rel := range files {
+		if _, ok := exempt[rel]; ok {
+			continue
+		}
+		file, fset, err := parseSource(root, rel)
+		if err != nil {
+			return nil, err
+		}
+		if lines := makeLines(fset, file, true); len(lines) > 0 {
+			sites = append(sites, rel+":"+strings.Join(lines, ","))
+		}
+	}
+	return sites, nil
+}
+
+func makeLines(fset *token.FileSet, file *ast.File, unroutedOnly bool) []string {
+	pkg := importName(file, laneBudgetImport)
+	var lines []string
+	for _, decl := range file.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok {
+			continue
+		}
+		routed := pkg != "" && callsLaneBudget(fn, pkg, "Env")
+		ast.Inspect(fn, func(n ast.Node) bool {
+			if call, ok := n.(*ast.CallExpr); ok && runsMake(call) && (!unroutedOnly || !routed) {
+				lines = append(lines, strconv.Itoa(fset.Position(call.Pos()).Line))
+			}
+			return true
+		})
+	}
+	return lines
+}
+
+func runsMake(call *ast.CallExpr) bool {
+	for i := 0; i < len(call.Args) && i < 2; i++ {
+		if isStringLit(call.Args[i], "make") {
+			return true
+		}
+	}
+	return false
+}
+
+func TestEveryMakeRunGoesThroughTheLaneBudget(t *testing.T) {
+	t.Parallel()
+	root := filepath.Join("..", "..")
+	sites, err := makeSites(root, []string{"internal", "cmd"}, laneBudgetMakeExempt)
+	if err != nil {
+		t.Fatalf("makeSites = %v", err)
+	}
+	if len(sites) > 0 {
+		t.Errorf("%d file(s) run make without lanebudget.Env in the same function; a make recipe runs go test and a lane must bound it:\n%s", len(sites), strings.Join(sites, "\n"))
+	}
+	for rel := range laneBudgetMakeExempt {
+		file, fset, err := parseSource(root, rel)
+		if err != nil || len(makeLines(fset, file, false)) == 0 {
+			t.Errorf("exempt file %s = %v, want a file that still runs make; drop the stale exemption", rel, err)
+		}
+	}
+}
+
+func TestMakeSites_FindsAMakeRunWithoutTheLaneEnvInTheSameFunction(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{
+		"internal/a/a.go":      "package a\nimport \"os/exec\"\nfunc F(target string) { _ = exec.Command(\"make\", \"-C\", \"go\", target) }\n",
+		"internal/b/b.go":      "package b\nfunc F(ctx int, target string) { _ = Command(ctx, \"make\", \"-C\", \"go\", target) }\nfunc Command(int, ...string) int { return 0 }\n",
+		"internal/c/c.go":      "package c\nimport \"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget\"\nfunc F(target string) { _ = lanebudget.Env(nil); _ = run(\"make\", target) }\nfunc run(...string) int { return 0 }\n",
+		"internal/d/d.go":      "package d\nimport \"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget\"\nfunc F() { _ = lanebudget.Env(nil) }\nfunc G(target string) { _ = run(\"make\", target) }\nfunc run(...string) int { return 0 }\n",
+		"internal/e/e.go":      "package e\nvar Kinds = []string{\"make\"}\nfunc F() string { return \"make\" }\n",
+		"internal/f/f.go":      "package f\nimport \"os/exec\"\nfunc F() { _ = exec.Command(\"make\") }\n",
+		"internal/g/g_test.go": "package g\nimport \"os/exec\"\nfunc F() { _ = exec.Command(\"make\") }\n",
+		"internal/h/h.go":      "package h\nvar X = 1\n",
+	})
+
+	sites, err := makeSites(root, []string{"internal"}, map[string]string{filepath.Join("internal", "f", "f.go"): "fixture"})
+
+	want := []string{
+		filepath.Join("internal", "a", "a.go") + ":3",
+		filepath.Join("internal", "b", "b.go") + ":2",
+		filepath.Join("internal", "d", "d.go") + ":4",
+	}
+	if err != nil || !slices.Equal(sites, want) {
+		t.Errorf("makeSites = %q, %v, want %q", sites, err, want)
+	}
+}
+
+func TestMakeSites_AnAbsentDirectoryOrABadFileIsAnError(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{"internal/bad.go": "package"})
+
+	_, absent := makeSites(root, []string{"internal/gone"}, nil)
+	_, bad := makeSites(root, []string{"internal"}, nil)
+
+	if absent == nil || bad == nil {
+		t.Errorf("makeSites = %v, %v, want an error for an absent directory and for a bad file", absent, bad)
+	}
+}
