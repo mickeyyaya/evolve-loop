@@ -233,6 +233,7 @@ func (r gcRun) project(projectRoot string) int {
 	opts := worktreeGCOptions(projectRoot, evolveDir, gcPol.Worktrees, r.stdout)
 	opts.BranchScope = gc.BranchScopeAll
 	opts.EndedAfter = gcPol.DevWorktrees.ArchiveAfter()
+	r.diskSignals(projectRoot, gcPol)
 	before, freeErr := looppreflight.DiskFreeBytes(projectRoot)
 	ageOf := continuationAge{maxAge: pol.ContinuationConfig().MaxAgeCycles, loaded: loaded}
 	steps := []func(gcRun) bool{
@@ -430,8 +431,11 @@ func (r gcRun) pipelineTemp(ttlHours int) bool {
 		return false
 	}
 	dir := os.TempDir()
-	rep := gc.ReapPipelineTemp(dir, time.Now().Add(-time.Duration(ttlHours)*time.Hour), r.removeAll)
+	rep := gc.ReapPipelineTemp(dir, time.Now().Add(-time.Duration(ttlHours)*time.Hour), r.removeAll, gc.SparingHeld(gc.LiveHolderProbe(r.ctx, r.exec)))
 	r.summary("%d stale pipeline temp artifact(s) would be removed (%s unused > %dh in %s)", "removed %d stale pipeline temp artifact(s) (%s unused > %dh in %s)", rep.Entries, gcSize(rep.Bytes), ttlHours, dir)
+	if rep.Held > 0 {
+		fmt.Fprintf(r.stdout, "evolve gc: %d stale pipeline temp artifact(s) spared: a live process holds them\n", rep.Held)
+	}
 	for _, e := range rep.Errors {
 		fmt.Fprintf(r.stderr, "evolve gc: temp error: %s\n", e)
 	}

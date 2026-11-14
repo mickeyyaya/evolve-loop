@@ -15,6 +15,8 @@ type Policy struct {
 	GoCacheMaxGB    int        `json:"go_cache_max_gb,omitempty"`
 	CacheTrimFreeGB int        `json:"cache_trim_free_gb,omitempty"`
 	TempTTLHours    int        `json:"temp_ttl_hours,omitempty"`
+	DiskFloorGB     int        `json:"disk_floor_gb,omitempty"`
+	DiskWarnGB      int        `json:"disk_warn_gb,omitempty"`
 	SeatSessionRoot string     `json:"seat_session_root,omitempty"`
 
 	TestCacheTTLDays int `json:"testcache_ttl_days,omitempty"`
@@ -77,6 +79,24 @@ func (p Policy) CacheTrimFreeBytes() uint64 {
 		return 0
 	}
 	return uint64(p.CacheTrimFreeGB) * uint64(bytesPerGB)
+}
+
+const defaultDiskFloorGB = 10
+
+func (p Policy) DiskFloorBytes() uint64 {
+	gb := p.DiskFloorGB
+	if gb <= 0 {
+		gb = defaultDiskFloorGB
+	}
+	return uint64(gb) * uint64(bytesPerGB)
+}
+
+func (p Policy) DiskWarnBytes() uint64 {
+	floor := p.DiskFloorBytes()
+	if p.DiskWarnGB <= 0 {
+		return 2 * floor
+	}
+	return max(floor, uint64(p.DiskWarnGB)*uint64(bytesPerGB))
 }
 
 const (

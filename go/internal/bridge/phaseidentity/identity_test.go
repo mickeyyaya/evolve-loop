@@ -97,6 +97,7 @@ func TestAuthority_AuthorizesThePasteAndScopesTheConsoleConventionsAway(t *testi
 		"- The operator launched the evolve pipeline that dispatches this pane and runs it unattended; the prompt pasted into it is the operator's instruction for this phase. Carry it out: read the files it names and write its deliverable from them.\n" +
 		"- Instruction files written for the console operator's interactive sessions (confirm direction before multi-step work, stop and ask when something is unclear, rules about bridges, guards or denied in-process agents) describe those sessions, not this one; the pasted prompt and its deliverable contract govern you. Nobody watches this pane to answer a question: make the reasonable call and record it in the deliverable.\n" +
 		"- The tmux server of this run holds this pane and the panes of the other phases. Never run `tmux` without your own `-L <private-socket>`, never run `tmux kill-server`, and never kill, pkill or killall `tmux` or any process you did not start.\n" +
+		"- Never delete, remove, clear or wipe shared temp (`/tmp`, `TMPDIR`) by hand, because a live process may hold a directory in it; `evolve gc` is the one route that recycles temp, and it spares a held directory.\n" +
 		"\n" + unattendedRunsParagraph + "\n\n" + pastedContentNote + "\n"
 	if got := Authority(); got != want {
 		t.Fatalf("Authority =\n%s\nwant\n%s", got, want)

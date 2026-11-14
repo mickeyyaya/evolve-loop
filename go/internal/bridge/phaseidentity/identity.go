@@ -62,6 +62,7 @@ func Authority() string {
 		"- The tmux server of this run holds this pane and the panes of the other phases. " +
 		"Never run `tmux` without your own `-L <private-socket>`, never run `tmux kill-server`, " +
 		"and never kill, pkill or killall `tmux` or any process you did not start.\n" +
+		"- Never delete, remove, clear or wipe shared temp (`/tmp`, `TMPDIR`) by hand, because a live process may hold a directory in it; `evolve gc` is the one route that recycles temp, and it spares a held directory.\n" +
 		"\n" + unattendedRunsParagraph + "\n\n" + pastedContentNote + "\n"
 }
 

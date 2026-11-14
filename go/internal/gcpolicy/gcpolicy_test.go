@@ -267,3 +267,22 @@ func TestRemoteSweepPolicy_StageRoundTripsThroughItsPolicyKey(t *testing.T) {
 		t.Fatalf("marshal = %s (err %v), want the remote_sweep key", out, err)
 	}
 }
+
+func TestDiskFloorAndWarn_DefaultToTenAndTwentyGBAndDecodeFromTheirKeys(t *testing.T) {
+	if got := (gcpolicy.Policy{}).DiskFloorBytes(); got != 10e9 {
+		t.Errorf("default DiskFloorBytes = %d, want 10e9", got)
+	}
+	if got := (gcpolicy.Policy{}).DiskWarnBytes(); got != 20e9 {
+		t.Errorf("default DiskWarnBytes = %d, want 20e9", got)
+	}
+	var p gcpolicy.Policy
+	if err := json.Unmarshal([]byte(`{"disk_floor_gb":5,"disk_warn_gb":8}`), &p); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if p.DiskFloorGB != 5 || p.DiskWarnGB != 8 || p.DiskFloorBytes() != 5e9 || p.DiskWarnBytes() != 8e9 {
+		t.Errorf("decoded floor=%d warn=%d (%d, %d bytes), want 5 and 8", p.DiskFloorGB, p.DiskWarnGB, p.DiskFloorBytes(), p.DiskWarnBytes())
+	}
+	if got := (gcpolicy.Policy{DiskFloorGB: 30, DiskWarnGB: 4}).DiskWarnBytes(); got != 30e9 {
+		t.Errorf("a warn level under the floor = %d, want the floor 30e9", got)
+	}
+}

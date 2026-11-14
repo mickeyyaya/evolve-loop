@@ -1021,4 +1021,5 @@ var serialTests = map[string]string{
 	"main.TestBranchSweep_OperatorRunDeletesAnEndedBranchAfterAVerifiedBundle":                                             "swaps seams gcInjectedReapers and gcInjectedProcessHost",
 	"main.TestBranchSweep_OperatorRunKeepsABranchWhenItsBundleCannotBeWritten":                                             "swaps seams gcInjectedReapers and gcInjectedProcessHost",
 	"main.TestBranchSweep_OperatorRunKeepsAFreshUnlandedBranchAndMain":                                                     "swaps seams gcInjectedReapers and gcInjectedProcessHost",
+	"main.TestDiskSignals_NameTheBreachedLevelAndStateTheFloor":                                                            "swaps seam gcDiskFreeBytes",
 }

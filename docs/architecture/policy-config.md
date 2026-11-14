@@ -364,6 +364,17 @@ The block sets how long a continuation binding lives (2026-10-27). `evolve gc` r
 
 Why: on 2026-10-27 the registry held 101 bindings, and 89 of them came from cycles before 1900 (the oldest from cycle 1127). Each kept its worktree out of `evolve worktree cleanup --stale`.
 
+## Free disk floor (`gc.disk_floor_gb`, `gc.disk_warn_gb`)
+
+`evolve gc` states the free-disk floor on each run and warns before and after the floor is crossed (2026-11-14). It reads the free space of `os.TempDir()` and of the project root. A signal never replaces the sweep: the sweep runs in each case. The loader decodes both keys strictly.
+
+| Key | Meaning | Default |
+|---|---|---|
+| `gc.disk_floor_gb` | whole GB of free disk. Under it, `evolve gc` writes a `WARN` line that names `gc.disk_floor_gb` to stderr. | 10 |
+| `gc.disk_warn_gb` | whole GB of free disk. Under it and over the floor, `evolve gc` writes a `WARN` line that names `gc.disk_warn_gb`. A value under the floor counts as the floor. | twice the floor |
+
+Why: test temp directories (`Test*`, `gittest*`) filled the host disk because no sweep matched them and a seat cleared shared temp by hand ([internal-gc.md](packages/internal-gc.md)).
+
 ## Expected signals (`expected_signal`)
 
 The loop warns when a stage emits its start signal and its end signal does not follow. The design is in [signal-center-design.md](signal-center-design.md) section 8.1.

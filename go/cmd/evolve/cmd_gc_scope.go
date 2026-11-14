@@ -16,6 +16,7 @@ func (r gcRun) cacheScope(projectRoot string) int {
 	if !ok {
 		return 1
 	}
+	r.diskSignals(projectRoot, pol)
 	if r.diskFreeAboveTrim(projectRoot, pol) {
 		return 0
 	}
