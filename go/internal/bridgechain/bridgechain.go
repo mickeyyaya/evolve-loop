@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/launchoutcome"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -101,7 +102,7 @@ func (w *Walking) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 				req.Agent, n+1, cli, tier, attempts[n-1], last.ExitCode)
 		}
 		start := w.now()
-		last, lastErr = core.LaunchWithFreshSession(ctx, w.inner, attempt)
+		last, lastErr = w.launchWithTransientRetry(ctx, req, attempt, plan, cli, tier, len(attempts), &start)
 		keeper.Observe(cli+"@"+tier, last, lastErr)
 		attempts = append(attempts, fmt.Sprintf("%s@%s=%d", cli, tier, last.ExitCode))
 		if last.ExitCode == exitQuota && w.bench != nil {
@@ -344,4 +345,72 @@ func operatorSuffix(entry clihealth.Entry) string {
 		return " — " + entry.OperatorAction
 	}
 	return ""
+}
+
+func (w *Walking) launchWithTransientRetry(ctx context.Context, req, attempt core.BridgeRequest, plan llmroute.Plan, cli, tier string, priorAttempts int, start *time.Time) (core.BridgeResponse, error) {
+	last, lastErr := core.LaunchWithFreshSession(ctx, w.inner, attempt)
+	if shouldRetryPrimaryTransient(req.ProjectRoot, plan, cli, tier, priorAttempts, last, lastErr, w.now) && ctx.Err() == nil {
+		w.logf("[bridge-chain] agent=%s retrying primary cli=%s tier=%s in fresh session (cause=%s; remaining candidates benched)\n",
+			req.Agent, cli, tier, last.CauseCode)
+		fresh := attempt
+		fresh.FreshSession = true
+		*start = w.now()
+		return w.inner.Launch(ctx, fresh)
+	}
+	return last, lastErr
+}
+
+func shouldRetryPrimaryTransient(projectRoot string, plan llmroute.Plan, cli, tier string, priorAttempts int, resp core.BridgeResponse, err error, now func() time.Time) bool {
+	if err == nil || priorAttempts != 0 || len(plan.Candidates) < 2 || cli != plan.Candidates[0] {
+		return false
+	}
+	if !isTransientLaunchCause(resp.CauseCode) {
+		return false
+	}
+	return allRemainingBenched(projectRoot, plan, tier, plan.Candidates[1:], now)
+}
+
+func isTransientLaunchCause(cause string) bool {
+	switch launchoutcome.TimeoutCause(cause) {
+	case launchoutcome.TimeoutSubmitWedged, launchoutcome.TimeoutTransientUpstream:
+		return true
+	default:
+		return false
+	}
+}
+
+func allRemainingBenched(projectRoot string, plan llmroute.Plan, tier string, remaining []string, now func() time.Time) bool {
+	if projectRoot == "" || len(remaining) == 0 || !CLIHealthOn(projectRoot) {
+		return false
+	}
+	store := clihealth.NewStore(projectRoot, now)
+	active := store.Active()
+	models := store.ActiveModels()
+	for _, cli := range remaining {
+		if !candidateIsBenched(cli, tier, plan, active, models) {
+			return false
+		}
+	}
+	return true
+}
+
+func candidateIsBenched(cli, tier string, plan llmroute.Plan, active, models map[string]clihealth.Entry) bool {
+	fam := llmroute.Family(cli)
+	for _, e := range active {
+		if e.Reason == clihealth.BootTimeoutPattern {
+			if e.Family == cli || e.Key() == cli {
+				return true
+			}
+			continue
+		}
+		if e.Family == fam && (e.BlocksDispatch() || scopeCoversSeat(e, plan)) {
+			return true
+		}
+	}
+	for _, e := range models {
+		if e.Family == fam && bridge.UsageModelMatches(cli, e.Model, seatModel(cli, tier)) {
+			return true
+		}
+	}
+	return false
 }

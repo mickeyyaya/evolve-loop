@@ -44,6 +44,7 @@
   Then the log line names the fix (`credential_wall_test.go`).
 
 - **A worktree launch never reaches a CLI without tool use.** `DefaultPlanResolver` sets `Request.NeedsTools` when `BridgeRequest.Worktree` is set, so the router drops a toolless CLI from the plan. A chain with no tool-capable CLI fails the launch and names the dropped CLIs. The inner bridge sees no call. Pinned by `TestDefaultPlanResolver_AWorktreeLaunchDropsACLIWithoutToolUseWhoeverNamedIt` and `TestWalking_AWorktreeLaunchWithNoToolCapableCLIFailsLoudlyAndLaunchesNothing`. The decision is in [internal-cliroute.md](internal-cliroute.md).
+- **Transient primary failure with benched fallbacks.** A primary CLI can fail with `submit_wedged` or `transient_upstream`. If all fallbacks are benched, `Walking.Launch` retries the primary once in a fresh session. If the retry fails, or if the cause is not transient, the walk continues in bench order.
 
 ## Findings
 
