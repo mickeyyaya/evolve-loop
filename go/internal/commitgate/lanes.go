@@ -1,8 +1,10 @@
 package commitgate
 
 import (
+	"cmp"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,7 +13,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 var nodeExts = []string{".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"}
@@ -32,17 +36,42 @@ func (o Options) lintBudget() time.Duration {
 	return defaultLintBudget
 }
 
-func (o Options) runGolangciLint(ctx context.Context, mod string, pkgs []string, res *Result) bool {
+func LintPackages(ctx context.Context, moduleDir string, pkgs []string) (findings string, err error) {
+	return Options{Runner: lanebudget.Runner(sysexec.DefaultRunner)}.lintPackages(ctx, moduleDir, pkgs)
+}
+
+func (o Options) lintPackages(ctx context.Context, moduleDir string, pkgs []string) (string, error) {
 	budget := o.lintBudget()
 	lintCtx, cancel := context.WithTimeout(ctx, budget)
 	defer cancel()
-	out, ok := o.runCmd(lintCtx, mod, "golangci-lint", append([]string{"run", "--allow-serial-runners"}, pkgs...)...)
-	if errors.Is(lintCtx.Err(), context.DeadlineExceeded) {
-		res.log("golangci-lint waited %s for another run's lock or its own lint, and was stopped\n%s", budget, out)
-		return false
+	stdout, stderr, code, err := sysexec.Capture(lintCtx, o.Runner, moduleDir, "golangci-lint", append([]string{"run", "--allow-serial-runners"}, pkgs...)...)
+	out := strings.TrimSpace(stdout + "\n" + stderr)
+	switch {
+	case errors.Is(lintCtx.Err(), context.DeadlineExceeded):
+		return out, fmt.Errorf("%w (budget %s)", core.ErrLintLockWait, budget)
+	case errors.Is(err, exec.ErrNotFound):
+		return out, fmt.Errorf("%w: %v", core.ErrLintToolMissing, err)
+	case err != nil:
+		return out, fmt.Errorf("golangci-lint did not run: %w", err)
+	case code == 1:
+		return cmp.Or(out, "golangci-lint exited 1 and printed nothing"), nil
+	case code != 0:
+		return out, fmt.Errorf("golangci-lint failed with exit %d", code)
 	}
-	if !ok {
-		res.log("golangci-lint failed\n%s", out)
+	return "", nil
+}
+
+func (o Options) runGolangciLint(ctx context.Context, mod string, pkgs []string, res *Result) bool {
+	findings, err := o.lintPackages(ctx, mod, pkgs)
+	switch {
+	case errors.Is(err, core.ErrLintLockWait):
+		res.log("golangci-lint waited %s for another run's lock or its own lint, and was stopped\n%s", o.lintBudget(), findings)
+		return false
+	case err != nil:
+		res.log("golangci-lint failed\n%s\n%v", findings, err)
+		return false
+	case findings != "":
+		res.log("golangci-lint failed\n%s", findings)
 		return false
 	}
 	return true

@@ -26,6 +26,7 @@ type Entry struct {
 	Name     string
 	Outputs  []Output
 	Inputs   []string
+	InputExt string
 	GoInputs GoInputSet
 	Generate []string
 	Check    []string
@@ -62,6 +63,8 @@ func Catalog() []Entry {
 		{
 			Name:     "darwin-set",
 			Outputs:  []Output{{Pattern: "go/.darwin-set", Marker: darwinSetMarker}},
+			Inputs:   []string{"go/"},
+			InputExt: ".go",
 			Generate: []string{"ci", "darwin-set", "generate"},
 			Check:    []string{"ci", "darwin-set", "check"},
 		},
@@ -134,7 +137,7 @@ func (e Entry) touchesInput(paths []string, dirs GoInputDirs) bool {
 
 func (e Entry) isInput(p string, goDirs []string) bool {
 	for _, in := range e.Inputs {
-		if p == in || (strings.HasSuffix(in, "/") && strings.HasPrefix(p, in)) {
+		if p == in || (strings.HasSuffix(in, "/") && strings.HasPrefix(p, in) && e.hasInputExt(p)) {
 			return true
 		}
 	}
@@ -145,6 +148,10 @@ func (e Entry) isInput(p string, goDirs []string) bool {
 		}
 	}
 	return false
+}
+
+func (e Entry) hasInputExt(p string) bool {
+	return e.InputExt == "" || path.Ext(p) == e.InputExt
 }
 
 func (e Entry) touchesOutput(paths []string) bool {

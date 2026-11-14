@@ -200,8 +200,8 @@ func TestNormalizeDerivedProjections_ChecksAStaleEntryWithTheWorktreeGenerator(t
 	}{
 		{"a path input", "skills/build/SKILL.md", "lane skill\n", "skills check"},
 		{"a hand-edited output with no input", "docs/research-index.md", "| [research/a.md](research/a.md) | a row with no entry |\n", "docs index check"},
-		{"a package in the skillcheck closure", "go/internal/skillcheck/s.go", "package skillcheck\n\nvar X = 1\n", "skills check"},
-		{"a closure that go list cannot read falls back to the path inputs", "go/internal/skillcheck/s.go", "package skillcheck\n\nimport _ \"fakeevolve/nope\"\n", ""},
+		{"a package in the skillcheck closure", "go/internal/skillcheck/s.go", "package skillcheck\n\nvar X = 1\n", "ci darwin-set check;skills check"},
+		{"a closure that go list cannot read falls back to the path inputs", "go/internal/skillcheck/s.go", "package skillcheck\n\nimport _ \"fakeevolve/nope\"\n", "ci darwin-set check"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
