@@ -14,7 +14,9 @@
   "kind": "pipeline-integrity",
   "origin": "console",
   "priority_class": "correctness",
-  "route": "console-manual",
+  "route": "lane",
+  "routed_at": "2026-11-14T07:33:58Z",
+  "routed_reason": "operator 2026-11-14: fill the 8 lanes; plan wave-orchestrator O2a: a pipeline-kind item whose files are not protected is an ordinary code fix",
   "summary": "promoteInbox promotes to processed from three agent-written lists: top_n and skip_shipped, superseded, and closes-inbox lines of build-report.md. Promote finds an item through Locate, so it can take an item that another lane holds. Found by the adversarial seat on PR #1290 round 2, as F2. It is older than that PR.",
   "title": "A shipped lane must not retire inbox items outside its scope",
   "weight": 0.7
