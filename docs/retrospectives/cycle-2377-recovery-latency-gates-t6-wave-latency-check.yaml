@@ -1,0 +1,11 @@
+- id: "cycle-2377-recovery-latency-gates-t6-wave-latency-check"
+  pattern: "recovery of latency-gates-t6-wave-latency-check"
+  description: "The item `latency-gates-t6-wave-latency-check` failed in 3 tries with the classes `gate-block` and `unknown`. Cycle 2377 shipped it. Before a new try of a similar item, read the difference above."
+  source: "docs/retrospectives/cycle-2377-recovery-latency-gates-t6-wave-latency-check.md"
+  type: "recovery"
+  category: "retrospective"
+  preventiveAction: "Before a new try of a similar item, read the retrospective cycle-2377-recovery-latency-gates-t6-wave-latency-check in docs/retrospectives"
+  confidence: 0.8
+  failureContext:
+    failedStep: ""
+    errorCategory: "gate-block unknown"
