@@ -94,7 +94,10 @@ func TestOptions_StructFields(t *testing.T) {
 		ForceMissing: "",
 	}
 	o.lookPath = func(string) (string, error) { return "/usr/bin/shasum", nil }
-	o.Runner = func(_ context.Context, name, _ string, args, _ []string, _ io.Reader, _, _ io.Writer) (int, error) {
+	o.Runner = func(_ context.Context, name, _ string, args, _ []string, _ io.Reader, stdout, _ io.Writer) (int, error) {
+		if len(args) > 1 && args[1] == "--name-only" && stdout != nil {
+			_, _ = io.WriteString(stdout, "notes.txt\x00")
+		}
 		return 0, nil
 	}
 	res := o.Run(context.Background())
