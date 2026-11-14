@@ -125,9 +125,6 @@
     "orchestrator": {
       "stage": "enforce",
       "admission": "enforce"
-    },
-    "integration": {
-      "stage": "enforce"
     }
   },
   "floor": [
