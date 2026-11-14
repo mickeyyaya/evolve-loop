@@ -5,6 +5,14 @@
     "The spec and package note of the changed package state the change in STE."
   ],
   "campaign": "architecture-decisions-2026-11",
+  "continuation": {
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2363",
+    "branch": "cycle-cd3ae73e-2363",
+    "snapshot_sha": "de9be59e8653d50c45d39262d09cf5ef9be18083",
+    "base_sha": "7165d047d7649bb53b41228513d0fc270d766f68",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2363/audit-fail-reason.json",
+    "cycle": 2363
+  },
   "created_at": "2026-11-03T00:33:15Z",
   "files": [
     "go/internal/inboxbatch"

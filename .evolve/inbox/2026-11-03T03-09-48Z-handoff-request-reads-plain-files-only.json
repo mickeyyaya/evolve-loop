@@ -5,6 +5,14 @@
     "Red test first: a ledger larger than the cap is refused.",
     "100% statement coverage on each changed function; zero code comments."
   ],
+  "continuation": {
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2368",
+    "branch": "cycle-cd3ae73e-2368",
+    "snapshot_sha": "9fbadfdb051f96f5d4b463e8cbd0d018d8d640a8",
+    "base_sha": "7165d047d7649bb53b41228513d0fc270d766f68",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2368/audit-fail-reason.json",
+    "cycle": 2368
+  },
   "created_at": "2026-11-03T03:09:48Z",
   "files": [
     "go/internal/handoff/request/request.go",

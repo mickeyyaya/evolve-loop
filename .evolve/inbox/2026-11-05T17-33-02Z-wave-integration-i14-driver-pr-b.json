@@ -19,9 +19,10 @@
   "kind": "feature",
   "origin": "console",
   "priority_class": "correctness",
-  "route": "lane",
-  "routed_at": "2026-11-13T19:15:34Z",
-  "routed_reason": "operator 2026-11-13: the item touches no protected file and its console route had no reason; a lane can build it",
+  "route": "console-manual",
+  "routed_at": "2026-11-13T19:51:46Z",
+  "routed_cycle": 2359,
+  "routed_reason": "lane triage (cycle 2359) dropped: already-shipped: 6ae4972c3",
   "summary": "Nothing drives a lane delivery through the compose engine, so no shadow evidence exists for I9. PR (a) gave each pool an id. PR (b) adds the epoch, the private base ref, Driver, ShadowActor, the wave-end wrapper and evolve integration status.",
   "title": "I14 PR (b): the integration driver at shadow, with status and the clean-wave verdict",
   "weight": 0.95
