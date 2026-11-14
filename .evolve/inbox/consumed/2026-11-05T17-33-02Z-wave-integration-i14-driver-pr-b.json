@@ -4,6 +4,12 @@
     "status reads not clean for each route to a false clean, each in its own test",
     "At shadow refs/remotes/origin/main stays where it was and nothing is pushed"
   ],
+  "consumed": {
+    "at": "2026-11-14T07:33:58Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "lane triage recorded it as shipped (operator 2026-11-13: the item touches no protected file and its console route had no reason; a lane can build it)"
+  },
   "created_at": "2026-11-05T17:33:02Z",
   "files": [
     "go/internal/integration/driver.go",
