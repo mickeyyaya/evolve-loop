@@ -170,10 +170,10 @@ func TestFires_CrossStalenessNeedsBothSides(t *testing.T) {
 		lane, peer, conflicted []string
 		want                   []string
 	}{
-		{"input on one side only", []string{registry}, []string{unrelated}, nil, nil},
+		{"input on one side only", []string{registry}, []string{unrelated}, nil, []string{"darwin-set"}},
 		{"input against output", []string{registry}, []string{flagsDoc}, nil, []string{"flag-index"}},
 		{"output against input", []string{flagsDoc}, []string{registry}, nil, []string{"flag-index"}},
-		{"input on both sides", []string{registry}, []string{"go/internal/flagregistry/other.go"}, nil, []string{"flag-index"}},
+		{"input on both sides", []string{registry}, []string{"go/internal/flagregistry/other.go"}, nil, []string{"flag-index", "darwin-set"}},
 		{"outputs on both sides", []string{flagsDoc}, []string{flagsDoc}, nil, nil},
 		{"a conflict on an output", []string{unrelated}, nil, []string{"commands/build.md"}, []string{"skill-projections"}},
 		{"a go input set on one side", []string{"go/internal/core/signal.go"}, []string{"docs/architecture/signal-codes.md"}, nil, []string{"signal-codes"}},
@@ -221,15 +221,19 @@ func TestStale_AnInputOrAHandEditedOutputMakesItsEntryStale(t *testing.T) {
 		changed []string
 		want    []string
 	}{
-		{"a registry file", []string{"go/internal/flagregistry/registry_table.go"}, []string{"flag-index"}},
+		{"a registry file", []string{"go/internal/flagregistry/registry_table.go"}, []string{"flag-index", "darwin-set"}},
 		{"an exact input file", []string{".claude-plugin/plugin.json"}, []string{"skill-projections"}},
-		{"a package in the skillcheck closure", []string{"go/internal/phasespec/catalog.go"}, []string{"skill-projections"}},
-		{"a code registrar", []string{"go/internal/core/signal.go"}, []string{"signal-codes"}},
+		{"a package in the skillcheck closure", []string{"go/internal/phasespec/catalog.go"}, []string{"darwin-set", "skill-projections"}},
+		{"a code registrar", []string{"go/internal/core/signal.go"}, []string{"signal-codes", "darwin-set"}},
 		{"a research-index entry", []string{"docs/research-index/2026-10-21-a.md"}, []string{"research-index"}},
-		{"a file that only shares a prefix", []string{".claude-plugin/plugin.json.bak", "go/internal/phasespecx/a.go"}, nil},
+		{"a file that only shares a prefix", []string{".claude-plugin/plugin.json.bak", "go/internal/phasespecx/a.go"}, []string{"darwin-set"}},
 		{"an output alone", []string{flagsDoc}, []string{"flag-index"}},
 		{"a hand-edited research index with no entry", []string{"docs/research-index.md", "docs/research/a.md"}, []string{"research-index"}},
 		{"a skill body outside its generated region", []string{"skills/build/SKILL.md"}, []string{"skill-projections"}},
+		{"a new command package selects the darwin set", []string{"go/cmd/testlatency/main.go"}, []string{"darwin-set"}},
+		{"a test file in a package selects the darwin set", []string{"go/internal/x/x_test.go"}, []string{"darwin-set"}},
+		{"a go file outside go/ does not select the darwin set", []string{"scripts/tool.go"}, nil},
+		{"a non-go file under go/ does not select the darwin set", []string{"go/internal/x/testdata/a.txt"}, nil},
 		{"nothing", nil, nil},
 	}
 	for _, c := range cases {

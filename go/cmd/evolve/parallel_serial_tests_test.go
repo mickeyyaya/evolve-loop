@@ -493,6 +493,7 @@ var serialTests = map[string]string{
 	"main.TestProbeWaveQuota_AFamilyWithoutAUsageControlIsOmitted":                                                         "sets env through a helper",
 	"main.TestProbeWaveQuota_NoInstalledFamilyReturnsNil":                                                                  "sets env through a helper",
 	"main.TestProductionBuildFloorChecks_CorrectsARedRepoContractPackByTheTestsName":                                       "swaps seam repoContractPack",
+	"main.TestProductionBuildFloorChecks_CorrectsALintFindingByFileAndLine":                                                "swaps seam lintPackages",
 	"main.TestProductionBuildFloorChecks_RefusesAProtectedFileThroughTheRealManifest":                                      "swaps seam repoContractPack",
 	"main.TestProductionBuildFloorChecks_ReportsAScopeDeltaThroughTheComposedFloor":                                        "swaps seam repoContractPack",
 	"main.TestProductionBuildFloorChecks_TheComposedFloorRunsTheGateClassifier":                                            "swaps seam repoContractPack",
