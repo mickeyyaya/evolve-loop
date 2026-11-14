@@ -185,7 +185,7 @@ func TestDefaultSandboxWrap_NestedClaudeAuto_DoesNotWrap(t *testing.T) {
 	deps := Deps{SandboxMode: config.SandboxModeAuto, Env: map[string]string{
 		"CLAUDE_CODE_ENTRYPOINT": "cli",
 	}}
-	wrap := defaultSandboxWrap(deps)
+	wrap := defaultSandboxWrapWithProbe(deps, fakeProbe("linux", true))
 	prefix, ok := wrap(SandboxWrapRequest{Phase: "build", Worktree: "/wt", Workspace: "/ws", RepoRoot: "/r"})
 	if ok || prefix != nil {
 		t.Errorf("nested-claude+auto must skip wrap; got (%v, %v)", prefix, ok)
