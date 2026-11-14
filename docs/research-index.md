@@ -735,4 +735,10 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [research/practice-agy-cli-changelog-page-run-workflow-2026-11.md](research/practice-agy-cli-changelog-page-run-workflow-2026-11.md) | Note on the agy page lines /run-workflow, 1.5.8 and rewind for item 16ea3cc9, read as data. The command stays unused. No persona changes. |
 
+## 2026-11-14 — Claude release notes, Managed Agents note
+
+| Document | What it records |
+|---|---|
+| [research/practice-claude-model-release-notes-managed-agents-2026-11.md](research/practice-claude-model-release-notes-managed-agents-2026-11.md) | Note on the Claude release-note lines about Managed Agents webhooks and filters for item 18278f9c, read as data. The pipeline does not use that service. No persona changes. |
+
 <!-- GENERATED:research-index END -->
