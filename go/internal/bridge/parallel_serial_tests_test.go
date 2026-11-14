@@ -91,6 +91,7 @@ var serialTests = map[string]string{
 	"bridge.TestAgyClaudeTmux_IsARegisteredTmuxTargetThatDrivesTheAgyBinaryAsAgyTmuxDoes":     "swaps seam modelCatalogDirFn",
 	"bridge.TestAgyClaudeTmux_LaunchesWithWhateverEnvironmentAgyTmuxDeclares":                 "swaps seam bridgeManifestDirFn, modelCatalogDirFn",
 	"bridge.TestAgyClaudeTmux_TierMapRunsSonnetForFastAndBalancedAndOpusForDeepAndTop":        "swaps seam modelCatalogDirFn",
+	"bridge.TestAgyBoot_ReadsTheModelBehindTheModePrefixOfAgy159":                             "swaps seam modelCatalogDirFn",
 	"bridge.TestAgyEveryLaunch_AnEmptyTierKeepsTheCLIsOwnDefaultModel":                        "swaps seam modelCatalogDirFn",
 	"bridge.TestAgyEveryLaunch_DoctorProbeCarriesTheManifestFastModel":                        "swaps seam modelCatalogDirFn",
 	"bridge.TestAgyEveryLaunch_FallbackModelComesFromTheManifestMap":                          "swaps seam modelCatalogDirFn",

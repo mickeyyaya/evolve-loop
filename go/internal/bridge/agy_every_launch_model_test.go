@@ -47,6 +47,12 @@ func modelFlagValue(t *testing.T, flags []string) string {
 
 func bootAgyTmuxFromEngineIntent(t *testing.T, cfgModel string) string {
 	t.Helper()
+	line, _ := bootAgyTmuxOver(t, cfgModel, slices.Repeat([]string{agyFooterGeminiFlash}, 12))
+	return line
+}
+
+func bootAgyTmuxOver(t *testing.T, cfgModel string, frames []string) (string, int) {
+	t.Helper()
 	cfg := &Config{CLI: "agy-tmux", Model: cfgModel}
 	cfg.Realization = RealizeFor(cfg.CLI, launchIntentFor(cfg, Profile{}, policy.EffortTable{}))
 	d, ok := LookupDriver("agy-tmux")
@@ -56,16 +62,17 @@ func bootAgyTmuxFromEngineIntent(t *testing.T, cfgModel string) string {
 	ws := t.TempDir()
 	cfg.Workspace, cfg.Worktree, cfg.ProjectRoot = ws, ws, ws
 	cfg.Agent, cfg.AllowBypass, cfg.BootOnly = "agy-every-launch-probe", true, true
-	tm := &FakeTmuxController{CaptureFrames: slices.Repeat([]string{agyFooterGeminiFlash}, 12)}
+	tm := &FakeTmuxController{CaptureFrames: frames}
 	deps := Deps{
 		Tmux: tm, Sleep: func(time.Duration) {}, Stderr: new(strings.Builder),
 		LookupEnv: mapLookup(map[string]string{"EVOLVE_PHASE_RECOVERY": "off"}),
 	}.withDefaults()
-	if rc, err := d.Launch(context.Background(), cfg, deps); err != nil || rc == ExitBadFlags {
+	rc, err := d.Launch(context.Background(), cfg, deps)
+	if err != nil || rc == ExitBadFlags {
 		t.Fatalf("agy-tmux Launch = (%d, %v), want a launch that reaches the pane", rc, err)
 	}
 	line, _ := launchLineFor(t, tm.SentKeys, "agy")
-	return line
+	return line, rc
 }
 
 func TestAgyEveryLaunch_NoTierRealizesTheManifestFastModel(t *testing.T) {
@@ -159,5 +166,14 @@ func TestAgyEveryLaunch_DoctorProbeCarriesTheManifestFastModel(t *testing.T) {
 	args := prober.DeepProbeArgs(m)
 	if got, want := modelFlagValue(t, args), m.ModelTierMap["fast"]; got != want {
 		t.Errorf("agy -p probe --model %q, want the manifest fast model %q", got, want)
+	}
+}
+
+const agyFooterModePrefix = "┃ Our daily driver for rapid coding and dependable agentic execution!\n┃ esc to dismiss\n? for shortcuts                                        auto · Gemini 3.8 Flash · high"
+
+func TestAgyBoot_ReadsTheModelBehindTheModePrefixOfAgy159(t *testing.T) {
+	injectCatalogDir(t, t.TempDir())
+	if _, rc := bootAgyTmuxOver(t, "", slices.Repeat([]string{agyFooterModePrefix}, 12)); rc == ExitModelMismatch {
+		t.Errorf("agy 1.5.9 footer %q: Launch rc = %d, want the gemini label read through the mode prefix", agyFooterModePrefix, rc)
 	}
 }
