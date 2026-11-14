@@ -7,6 +7,7 @@
 ## Design
 
 - **`Sample` fields.** `ts`, `cpu_busy_pct`, `runqueue`, `mem_used_mb`, `swap_used_mb` and `disk_busy_pct`. A field that the host cannot give, or that a tool failed to give in this tick, is absent, not zero.
+- **Host header.** Line 1 records `{"host":{"os":"<GOOS>","cpus":<int>,"mem_bytes":<uint>}}` once before the sample loop. On macOS, `sysctl -n hw.ncpu` gives `cpus` and `sysctl -n hw.memsize` gives `mem_bytes`. On Linux, `nproc` gives `cpus` and `/proc/meminfo` `MemTotal` times 1024 gives `mem_bytes`.
 - **Linux sources.** `/proc/stat` gives the CPU ticks and `procs_running`. `/proc/meminfo` gives the memory: used is `MemTotal` minus `MemAvailable`, and swap is `SwapTotal` minus `SwapFree`. `/proc/diskstats` gives `io_ticks` of the whole disks `sd*`, `vd*`, `xvd*`, `nvme*n*` and `mmcblk*`. The parsers take text and `readLinux` takes the root directory, so tests use a fixture directory.
 - **macOS sources.** No cgo. `source_darwin.go` runs `vm_stat` (used is active plus wired plus compressor pages) and `sysctl -n vm.swapusage`, through `sysexec.Command`. Each tool has a deadline of 800 ms, which is shorter than the default interval.
 - **macOS parsers and gaps.** The parsers in `macos.go` take text, and their tests use real output in `testdata/`. macOS has no `cpu_busy_pct`, no `runqueue` and no `disk_busy_pct`. The design names `host_statistics` for the CPU, and that Mach call needs cgo. The design names no other CPU source for macOS, so the field is absent.

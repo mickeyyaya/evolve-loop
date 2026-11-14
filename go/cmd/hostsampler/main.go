@@ -26,6 +26,7 @@ type reader func() (Counters, error)
 
 var (
 	exitProcess = os.Exit
+	probeHost   = readHost
 	openOut     = func(path string) (io.WriteCloser, error) {
 		return os.OpenFile(path, modeAppendCreate, recordPermissions)
 	}
@@ -81,6 +82,11 @@ func run(args []string, stderr io.Writer, read reader, stop <-chan os.Signal) in
 func sampleLoop(sink io.Writer, stderr io.Writer, read reader, stop <-chan os.Signal, interval, duration time.Duration) int {
 	prev, err := read()
 	if err != nil {
+		fmt.Fprintf(stderr, "hostsampler: %v\n", err)
+		return exitFailure
+	}
+	header, _ := json.Marshal(HostRecord{Host: probeHost()})
+	if _, err := sink.Write(append(header, '\n')); err != nil {
 		fmt.Fprintf(stderr, "hostsampler: %v\n", err)
 		return exitFailure
 	}

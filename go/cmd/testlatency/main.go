@@ -61,6 +61,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		ThresholdTst:  o.thrTest,
 		Budget:        limit.Seconds(),
 		TimeoutMargin: margin.Seconds(),
+		HasSamples:    o.samplesPath != "",
+		HostClass:     readHostClass(o.samplesPath),
 	}))
 	overBudget := enforce && len(rep.OverBudget(limit.Seconds())) > 0
 	gateFailed := gate.failed(stdout, stderr, rep)
@@ -97,6 +99,7 @@ type options struct {
 	rusagePath    string
 	render        bool
 	timeoutMargin string
+	samplesPath   string
 }
 
 func parseOptions(args []string, stderr io.Writer) (options, bool) {
@@ -114,6 +117,7 @@ func parseOptions(args []string, stderr io.Writer) (options, bool) {
 	fs.StringVar(&o.testTimeout, "test-timeout", "20m", "the go test timeout that caps every package limit")
 	fs.BoolVar(&o.render, "render", false, "write the Output field of each event to stdout (the plain go test text) and exit 0")
 	fs.StringVar(&o.timeoutMargin, "timeout-margin", "", "add a section with the margin of the slowest package against this go test timeout (for example 30m); LOW under 20%")
+	fs.StringVar(&o.samplesPath, "samples", "", "runner-samples.ndjson to read the host class from")
 	if err := fs.Parse(args); err != nil {
 		return options{}, false
 	}

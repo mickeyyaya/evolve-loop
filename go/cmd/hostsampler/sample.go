@@ -24,6 +24,16 @@ type Counters struct {
 	DiskCount   int
 }
 
+type HostInfo struct {
+	OS       string `json:"os"`
+	CPUs     int    `json:"cpus"`
+	MemBytes uint64 `json:"mem_bytes"`
+}
+
+type HostRecord struct {
+	Host HostInfo `json:"host"`
+}
+
 type Sample struct {
 	Timestamp   string   `json:"ts"`
 	CPUBusyPct  *float64 `json:"cpu_busy_pct,omitempty"`

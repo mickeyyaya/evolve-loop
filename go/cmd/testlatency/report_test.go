@@ -2,6 +2,8 @@ package main
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -171,5 +173,50 @@ func TestMarkdown_TopCap_TruncatesSlowestTable(t *testing.T) {
 	}
 	if strings.Contains(md, "| TestFast |") {
 		t.Errorf("Top=1 must truncate TestFast from the slowest-tests table; got:\n%s", md)
+	}
+}
+
+func TestMarkdown_HostClassFromSamples(t *testing.T) {
+	rep := &Report{Packages: []pkgStat{{Pkg: "x/p", Wall: 1.0, Status: "pass"}}}
+	withHost := rep.Markdown(MarkdownOptions{
+		Title:      "T",
+		HasSamples: true,
+		HostClass:  &HostClass{OS: "darwin", CPUs: 5, MemBytes: 17179869184},
+	})
+	if !strings.Contains(withHost, "Host class: **darwin, 5 CPUs, 16384 MB RAM**") {
+		t.Errorf("missing host class line:\n%s", withHost)
+	}
+	missing := rep.Markdown(MarkdownOptions{Title: "T", HasSamples: true})
+	if !strings.Contains(missing, "Host class: **not recorded**") {
+		t.Errorf("missing not recorded line:\n%s", missing)
+	}
+	omitted := rep.Markdown(MarkdownOptions{Title: "T"})
+	if strings.Contains(omitted, "Host class") {
+		t.Errorf("unexpected host class line:\n%s", omitted)
+	}
+}
+
+func TestReadHostClass_FindsHeaderAndHandlesMissingOrEmpty(t *testing.T) {
+	if got := readHostClass(""); got != nil {
+		t.Fatalf("empty path: got %+v", got)
+	}
+	dir := t.TempDir()
+	if got := readHostClass(filepath.Join(dir, "absent.ndjson")); got != nil {
+		t.Fatalf("missing file: got %+v", got)
+	}
+	withHeader := filepath.Join(dir, "with-header.ndjson")
+	if err := os.WriteFile(withHeader, []byte("\n{\"ts\":\"2026-11-14T10:00:01Z\"}\n{\"host\":{\"os\":\"darwin\",\"cpus\":3,\"mem_bytes\":7516192768}}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got := readHostClass(withHeader)
+	if got == nil || got.OS != "darwin" || got.CPUs != 3 || got.MemBytes != 7516192768 {
+		t.Fatalf("withHeader: got %+v", got)
+	}
+	noHeader := filepath.Join(dir, "no-header.ndjson")
+	if err := os.WriteFile(noHeader, []byte("{\"ts\":\"2026-11-14T10:00:01Z\"}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := readHostClass(noHeader); got != nil {
+		t.Fatalf("noHeader: got %+v", got)
 	}
 }

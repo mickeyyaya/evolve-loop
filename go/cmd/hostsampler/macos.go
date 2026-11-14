@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -47,6 +48,21 @@ func readMacOS(run func(string, ...string) ([]byte, error), now func() time.Time
 	c.MemUsedMB, c.HasMem = readTool(run, parseVMStat, "vm_stat")
 	c.SwapUsedMB, c.HasSwap = readTool(run, parseSwapUsage, "sysctl", "-n", "vm.swapusage")
 	return c
+}
+
+func readMacOSHost(run func(string, ...string) ([]byte, error)) HostInfo {
+	h := HostInfo{OS: runtime.GOOS}
+	if out, err := run("sysctl", "-n", "hw.ncpu"); err == nil {
+		if n, err := strconv.Atoi(strings.TrimSpace(string(out))); err == nil && n > 0 {
+			h.CPUs = n
+		}
+	}
+	if out, err := run("sysctl", "-n", "hw.memsize"); err == nil {
+		if m, err := strconv.ParseUint(strings.TrimSpace(string(out)), 10, 64); err == nil && m > 0 {
+			h.MemBytes = m
+		}
+	}
+	return h
 }
 
 func parseVMStat(text string) (float64, error) {

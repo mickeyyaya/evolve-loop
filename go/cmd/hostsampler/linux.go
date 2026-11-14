@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -54,6 +55,35 @@ func readLinux(root string, now func() time.Time) (Counters, error) {
 		At: now(), HasCPU: true, CPUBusy: busy, CPUTotal: total, HasRunQueue: true, RunQueue: running,
 		HasMem: true, MemUsedMB: mem, HasSwap: true, SwapUsedMB: swap, DiskTicksMs: ticks, DiskCount: disks,
 	}, nil
+}
+
+func readLinuxHost(root string, run func(string, ...string) ([]byte, error)) HostInfo {
+	h := HostInfo{OS: runtime.GOOS}
+	if out, err := run("nproc"); err == nil {
+		if n, err := strconv.Atoi(strings.TrimSpace(string(out))); err == nil && n > 0 {
+			h.CPUs = n
+		}
+	}
+	if meminfo, err := os.ReadFile(filepath.Join(root, "meminfo")); err == nil {
+		if memBytes, err := parseMemTotalBytes(string(meminfo)); err == nil {
+			h.MemBytes = memBytes
+		}
+	}
+	return h
+}
+
+func parseMemTotalBytes(text string) (uint64, error) {
+	for _, line := range strings.Split(text, "\n") {
+		f := strings.Fields(line)
+		if len(f) >= 2 && f[0] == "MemTotal:" {
+			kb, err := strconv.ParseUint(f[1], 10, 64)
+			if err != nil {
+				return 0, err
+			}
+			return kb * 1024, nil
+		}
+	}
+	return 0, fmt.Errorf("/proc/meminfo MemTotal: %w", errMissingField)
 }
 
 func parseStat(text string) (busy, total uint64, running int, err error) {

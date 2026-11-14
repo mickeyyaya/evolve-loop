@@ -18,6 +18,7 @@
 - **Report sections.** Optimization targets (packages over the wall threshold) with the columns Package, Wall, Tests, Σall tests, Serial Σ, Parallel max, Floor, Dominant, Slowest test and Slowest.
 - **Table columns.** The Σall tests column sums every top-level test. The Serial Σ column sums only the tests without `pause`.
 - **Package budget.** `--budget` leads the report with the packages over a wall time. `--fail-over-budget` then exits 1. `-package-budget` sets both from `addedtests.PackageWallBudget`. `make test-budget` runs it on the fast suite.
+- **Host class.** `-samples <file>` reads the `host` header from `runner-samples.ndjson` and prints the host class in the overview. A missing or headerless file prints `not recorded` and keeps exit 0.
 - **Duration ratchet.** `-ratchet <file> -rusage <ndjson>` reads `go/.test-latency.json` and the package CPU of `test-rusage.ndjson`. The command exits 1 for a package above its CPU baseline after the speed index, or with a wall above `-test-timeout`. The default of `-test-timeout` is `20m`, the `TEST_TIMEOUT` of the Makefile. A missing `-rusage`, or a ratchet file or rusage file that is missing or malformed, gives exit 2 and names the file.
 - **CPU judgment.** The file has a `cpu` map for each package, keyed by the OS name. A baseline of another OS never gates the host.
   - The package CPU is `user_s + system_s`. A reference package has a baseline of 2 s or more.

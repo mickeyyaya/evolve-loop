@@ -29,8 +29,19 @@ func readSamples(t *testing.T, path string) []Sample {
 		t.Fatal(err)
 	}
 	var out []Sample
-	for _, line := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
+	for i, line := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
 		if line == "" {
+			continue
+		}
+		if i == 0 {
+			var hr HostRecord
+			if err := json.Unmarshal([]byte(line), &hr); err != nil {
+				t.Fatalf("expected host header on line 1, got %q: %v", line, err)
+			}
+			var info HostInfo = hr.Host
+			if info.OS == "" {
+				t.Fatalf("expected host header OS on line 1, got %q", line)
+			}
 			continue
 		}
 		var s Sample
@@ -118,21 +129,36 @@ func TestRun_TickReadFailureIsReportedAndSamplingContinues(t *testing.T) {
 	}
 }
 
-type brokenSink struct{ writeErr, closeErr error }
+type brokenSink struct {
+	writeErr, closeErr error
+	failOn             int
+	writes             int
+}
 
-func (b brokenSink) Write(p []byte) (int, error) { return len(p), b.writeErr }
-func (b brokenSink) Close() error                { return b.closeErr }
+func (b *brokenSink) Write(p []byte) (int, error) {
+	b.writes++
+	if b.writeErr != nil && (b.failOn == 0 || b.writes >= b.failOn) {
+		return len(p), b.writeErr
+	}
+	return len(p), nil
+}
+func (b *brokenSink) Close() error { return b.closeErr }
 
 func TestRun_WriteAndCloseFailuresExit1(t *testing.T) {
 	old := openOut
 	t.Cleanup(func() { openOut = old })
-	openOut = func(string) (io.WriteCloser, error) { return brokenSink{writeErr: errors.New("disk full")}, nil }
-	var se bytes.Buffer
-	if code := run([]string{"-out", "x", "-interval", "5ms", "-duration", "50ms"}, &se, fakeReader(), nil); code != 1 || !strings.Contains(se.String(), "disk full") {
-		t.Fatalf("write: code=%d stderr=%q", code, se.String())
+	for _, failOn := range []int{1, 2} {
+		n := failOn
+		openOut = func(string) (io.WriteCloser, error) {
+			return &brokenSink{writeErr: errors.New("disk full"), failOn: n}, nil
+		}
+		var se bytes.Buffer
+		if code := run([]string{"-out", "x", "-interval", "5ms", "-duration", "50ms"}, &se, fakeReader(), nil); code != 1 || !strings.Contains(se.String(), "disk full") {
+			t.Fatalf("write failOn=%d: code=%d stderr=%q", failOn, code, se.String())
+		}
 	}
-	openOut = func(string) (io.WriteCloser, error) { return brokenSink{closeErr: errors.New("close failed")}, nil }
-	se.Reset()
+	openOut = func(string) (io.WriteCloser, error) { return &brokenSink{closeErr: errors.New("close failed")}, nil }
+	var se bytes.Buffer
 	if code := run([]string{"-out", "x", "-interval", "5ms", "-duration", "30ms"}, &se, fakeReader(), nil); code != 1 || !strings.Contains(se.String(), "close failed") {
 		t.Fatalf("close: code=%d stderr=%q", code, se.String())
 	}

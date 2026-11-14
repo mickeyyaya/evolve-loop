@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -97,5 +98,32 @@ func TestParseDiskstats_SkipsShortLinesPartitionsAndVirtualDevices(t *testing.T)
 	}
 	if ticks != 1000+7+3+5 || count != 5 {
 		t.Fatalf("ticks=%d count=%d", ticks, count)
+	}
+}
+
+func TestReadLinuxHost_ReadsNprocAndMemTotal(t *testing.T) {
+	root := writeProc(t, map[string]string{"meminfo": fixtureMeminfo})
+	run := func(name string, args ...string) ([]byte, error) {
+		if name == "nproc" {
+			return []byte("4\n"), nil
+		}
+		return nil, errors.New("unexpected")
+	}
+	got := readLinuxHost(root, run)
+	if got.CPUs != 4 || got.MemBytes != 16384000*1024 || got.OS == "" {
+		t.Fatalf("got %+v", got)
+	}
+}
+
+func TestReadLinuxHost_IgnoresFailedProbes(t *testing.T) {
+	for _, meminfo := range []string{"no total here\n", "MemTotal: abc kB\n"} {
+		root := writeProc(t, map[string]string{"meminfo": meminfo})
+		run := func(name string, args ...string) ([]byte, error) {
+			return nil, errors.New("no nproc")
+		}
+		got := readLinuxHost(root, run)
+		if got.CPUs != 0 || got.MemBytes != 0 {
+			t.Fatalf("%q: got %+v", meminfo, got)
+		}
 	}
 }

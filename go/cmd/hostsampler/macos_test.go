@@ -143,3 +143,31 @@ func TestToolTimeout_IsShorterThanDefaultInterval(t *testing.T) {
 		t.Fatalf("toolTimeout=%v", toolTimeout)
 	}
 }
+
+func TestReadMacOSHost_ReadsNCPUAndMemsize(t *testing.T) {
+	run := func(name string, args ...string) ([]byte, error) {
+		if name == "sysctl" && len(args) == 2 && args[0] == "-n" {
+			switch args[1] {
+			case "hw.ncpu":
+				return []byte("5\n"), nil
+			case "hw.memsize":
+				return []byte("17179869184\n"), nil
+			}
+		}
+		return nil, errors.New("unexpected")
+	}
+	got := readMacOSHost(run)
+	if got.CPUs != 5 || got.MemBytes != 17179869184 || got.OS == "" {
+		t.Fatalf("got %+v", got)
+	}
+}
+
+func TestReadMacOSHost_IgnoresFailedOrMalformedProbes(t *testing.T) {
+	run := func(name string, args ...string) ([]byte, error) {
+		return []byte("bad"), nil
+	}
+	got := readMacOSHost(run)
+	if got.CPUs != 0 || got.MemBytes != 0 {
+		t.Fatalf("got %+v", got)
+	}
+}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"sort"
 	"strings"
 )
@@ -139,6 +140,37 @@ func (agg *aggregator) report() *Report {
 	return rep
 }
 
+type HostClass struct {
+	OS       string `json:"os"`
+	CPUs     int    `json:"cpus"`
+	MemBytes uint64 `json:"mem_bytes"`
+}
+
+func readHostClass(path string) *HostClass {
+	if path == "" {
+		return nil
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" {
+			continue
+		}
+		var rec struct {
+			Host *HostClass `json:"host"`
+		}
+		if err := json.Unmarshal([]byte(line), &rec); err == nil && rec.Host != nil && (rec.Host.CPUs > 0 || rec.Host.MemBytes > 0 || rec.Host.OS != "") {
+			return rec.Host
+		}
+	}
+	return nil
+}
+
 type MarkdownOptions struct {
 	Title         string
 	Top           int
@@ -146,6 +178,8 @@ type MarkdownOptions struct {
 	ThresholdTst  float64
 	Budget        float64
 	TimeoutMargin float64
+	HasSamples    bool
+	HostClass     *HostClass
 }
 
 func (rep *Report) Markdown(o MarkdownOptions) string {
@@ -172,7 +206,15 @@ func (rep *Report) writeOverview(b *strings.Builder, o MarkdownOptions) {
 	fmt.Fprintf(b, "- Packages: **%d**\n", len(rep.Packages))
 	fmt.Fprintf(b, "- Top-level tests: **%d**\n", totalTests)
 	fmt.Fprintf(b, "- Aggregate package wall time: **%.1fs** (sum of parallel-aware per-package times)\n", aggWall)
-	fmt.Fprintf(b, "- Fully-serial upper bound (Σ test elapsed): **%.1fs**\n\n", aggSerial)
+	fmt.Fprintf(b, "- Fully-serial upper bound (Σ test elapsed): **%.1fs**\n", aggSerial)
+	if o.HasSamples {
+		if o.HostClass != nil && o.HostClass.CPUs > 0 {
+			fmt.Fprintf(b, "- Host class: **%s, %d CPUs, %d MB RAM**\n", o.HostClass.OS, o.HostClass.CPUs, o.HostClass.MemBytes/(1<<20))
+		} else {
+			b.WriteString("- Host class: **not recorded**\n")
+		}
+	}
+	b.WriteString("\n")
 
 	if len(rep.Incomplete) > 0 {
 		fmt.Fprintf(b, "> ⚠ **%d package(s) had no terminal summary** (truncated stream / panic / timeout) — their wall time is missing and they are NOT counted above: %s\n\n",
