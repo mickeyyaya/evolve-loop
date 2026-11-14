@@ -42,6 +42,7 @@ type Change struct {
 	Commit string
 	Paths  []string
 	Text   string
+	Closes []string
 	Tests  []string
 	When   time.Time
 }
@@ -110,6 +111,10 @@ func matchOne(c Change, it inboxbatch.Item, hasTest func(string) bool, minShare 
 	p := Proposal{Kind: ProposeConsume, ID: it.ID, Path: it.Path, Trigger: TriggerLanding, Evidence: []string{"commit " + c.Commit}}
 	if consumedBy(c, it) {
 		p.Reason, p.Deterministic = "the change consumed this item; the root copy is stale", true
+		return p, true
+	}
+	if slices.Contains(c.Closes, it.ID) {
+		p.Reason, p.Deterministic = "the change declares Closes-Inbox for this item", true
 		return p, true
 	}
 	touched := touchedSurface(it, c.Paths)

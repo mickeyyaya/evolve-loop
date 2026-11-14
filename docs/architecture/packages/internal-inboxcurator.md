@@ -41,7 +41,7 @@ The package has four parts:
   - a test file of the change defines at least one of the named tests (`Change.Tests`);
   - the change is not older than the filing of the item (`Change.When`).
 
-  A change that consumed a file with the same name as the item (`.evolve/inbox/consumed/<file>`) gives a deterministic proposal for the root copy. A change text that names the id gives a judgment proposal.
+  A change that consumed a file with the same name as the item (`.evolve/inbox/consumed/<file>`) gives a deterministic proposal for the root copy. A change text that names the id gives a judgment proposal. An id in `Change.Closes` that equals the id of an open item gives a deterministic proposal.
 - **`Sweep(open, hasTest, minShare)`** proposes `consume` for each item when at least `minShare` of its named tests exist on the tree. It is never deterministic, because a test can predate the item.
 - **`Reroutes(open, isProtected)`** proposes:
   - a deterministic reroute to the console for an item on `route: lane` whose surface `inboxbatch.ConsoleRouted` sends to the console;
@@ -49,7 +49,9 @@ The package has four parts:
 - **`TouchesRouting(paths)`** is true for `.evolve/policy.json`, `.evolve/profiles/` and `go/internal/guards/integrity_surface.go`.
 - **`Duplicates(open, thresholds)`** proposes a judgment `merge` of a newer item into the most similar older open item at or above the refuse threshold.
 - **`Curate(inputs)`** runs the landing match for each change. It adds the route check when a change touches routing, or at the backstop. The backstop also runs the sweep and the duplicate check. One proposal per kind and item is kept, and a deterministic one replaces a judgment one.
-- **`IndexTests(goDir)`** reads every `_test.go` file outside `testdata` and `vendor`. A project with no `go/` tree has no tests, so the boundary step still runs there. **`Landed(git, from, to)`** and **`Commit(git, sha)`** read the paths, the time and the text of commits through `git log --first-parent -m --name-only`, with `core.quotepath=false`. They read the tests that each touched test file defines with `git grep` at the commit. A revision that is not a hex commit id is refused with `ErrBadRevision`, so a wire record or a cursor cannot pass a git option.
+- **`IndexTests(goDir)`** reads every `_test.go` file outside `testdata` and `vendor`. A project with no `go/` tree has no tests, so the boundary step still runs there.
+- **`Landed(git, from, to)`** and **`Commit(git, sha)`** read the paths, the time and the text of commits through `git log --first-parent -m --name-only`, with `core.quotepath=false`. They read the tests that each touched test file defines with `git grep` at the commit. A revision that is not a hex commit id is refused with `ErrBadRevision`, so a wire record or a cursor cannot pass a git option.
+- **`Change.Closes`** holds the `Closes-Inbox` ids of the commit body. For a merge commit it holds the ids of the bodies of the merged branch, which `git rev-list --no-merges` reads. The value `none` and each `Refs-Inbox` id are not in it.
 
 **The verb** (`go/cmd/evolve/cmd_inbox_curator*.go`) has four modes:
 

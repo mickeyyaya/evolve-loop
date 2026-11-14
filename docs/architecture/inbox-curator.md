@@ -87,6 +87,7 @@ evolve inbox curate --follow --project-root <plane>
 
 - It reads the `ship` channel through `internal/events/reader`. The kernel wake makes it wait, so it never polls.
 - For each `ship.landed` record it reads the commit with `git log` and runs the landing match (D5).
+- A merge commit hides the `Closes-Inbox` trailer of its branch commits. The curator reads the bodies of the merged branch of a merge commit (`git rev-list --no-merges <first parent>..<merge>`) and puts the ids in `Change.Closes`. An ordinary commit gives the ids of its own body. A `Closes-Inbox` id of an open item is a deterministic consume. `none` and `Refs-Inbox` give nothing.
 - It publishes each proposal and applies none, because a lane is live during a wave.
 - `evolve inbox curate --event` takes one wire record on stdin. It is the entry point for the exec subscriptions of [event-channels.md §10](event-channels.md#10-delivery), which have no `evolve events` verb yet.
 - The loop does not supervise the follower. When no follower runs, the boundary backstop (section 4) sees the landing.

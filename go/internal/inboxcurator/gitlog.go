@@ -9,13 +9,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/closesinbox"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
 const (
 	recordSep = "\x1e"
 	fieldSep  = "\x1f"
-	logFormat = "--format=" + recordSep + "%H" + fieldSep + "%cI" + fieldSep + "%B" + fieldSep
+	logFormat = "--format=" + recordSep + "%H" + fieldSep + "%P" + fieldSep + "%cI" + fieldSep + "%B" + fieldSep
 )
 
 var revisionRE = regexp.MustCompile(`^[0-9a-f]{7,64}$`)
@@ -55,15 +56,29 @@ func readLog(ctx context.Context, git gitexec.Git, rev ...string) ([]Change, err
 	}
 	var changes []Change
 	for _, record := range strings.Split(out, recordSep)[1:] {
-		parts := strings.SplitN(record, fieldSep, 4)
-		when, _ := time.Parse(time.RFC3339, parts[1])
-		c := Change{Commit: parts[0], When: when, Text: strings.TrimSpace(parts[2]), Paths: pathLines(parts[3])}
+		parts := strings.SplitN(record, fieldSep, 5)
+		when, _ := time.Parse(time.RFC3339, parts[2])
+		c := Change{Commit: parts[0], When: when, Text: strings.TrimSpace(parts[3]), Paths: pathLines(parts[4])}
+		if c.Closes, err = closesOf(ctx, git, c, strings.Fields(parts[1])); err != nil {
+			return nil, err
+		}
 		if c.Tests, err = definedTests(ctx, git, c); err != nil {
 			return nil, err
 		}
 		changes = append(changes, c)
 	}
 	return changes, nil
+}
+
+func closesOf(ctx context.Context, git gitexec.Git, c Change, parents []string) ([]string, error) {
+	if len(parents) < 2 {
+		return closesinbox.IDs([]byte(c.Text)), nil
+	}
+	out, err := git.Output(ctx, "rev-list", "--no-merges", "--format=%B", parents[0]+".."+c.Commit)
+	if err != nil {
+		return nil, fmt.Errorf("inboxcurator: read the merged branch of commit %s: %w", c.Commit, err)
+	}
+	return closesinbox.IDs([]byte(out)), nil
 }
 
 func definedTests(ctx context.Context, git gitexec.Git, c Change) ([]string, error) {
