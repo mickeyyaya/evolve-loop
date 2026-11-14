@@ -1,6 +1,8 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestPrepareIteration_ABrakeStopRecordsALoopHaltSignalWithTheStopReason":                                     "swaps seams chainBoundaryAheadFn and chainRunningCommitFn",
+	"main.TestLoopHaltKind_IsAProjectStreamKindSoTheLatencyCheckCanReadTheBrakeAndTheStopReason":                      "TDD-owned test that does not call t.Parallel",
 	"main.TestRunCIWatch_AFailedRunLookupExitsIOAndNamesTheWorkflow":                                                  "swaps seam attachRootEventsFn and sets PATH",
 	"main.TestRunCIWatch_AWorkingDirectoryFaultExitsIOWhenNoRootIsGiven":                                              "swaps seam processGetwd",
 	"main.TestCIWatchVerb_ARedRunReachesTheErrorsChannelWithItsCode":                                                  "swaps seam attachRootEventsFn",

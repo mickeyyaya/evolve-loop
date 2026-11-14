@@ -29,7 +29,7 @@ const (
 	waveUsage           = `usage: evolve wave next [--max-cycles N] [--merge n,...] [--note TEXT]... [--number N] [--dry-run] [--json] [--project-root P]
        evolve wave status [--json] [--project-root P]
        evolve wave supply [--json] [--project-root P]
-       evolve wave latency [--wave N | --cycles A-B] [--json] [--project-root P]
+       evolve wave latency [--wave N | --cycles A-B | --check] [--json] [--project-root P]
        evolve wave watch [--json] [--project-root P]
        evolve wave note add TEXT | list [--json] | clear [--project-root P]
        evolve wave stop [--wait D] [--json] [--project-root P]

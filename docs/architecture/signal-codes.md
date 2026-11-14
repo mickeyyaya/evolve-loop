@@ -283,6 +283,12 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `LADDER_REDESIGN` | the ladder ended (R3 failed, or a spec stop) and routed the subject to the redesign rung of ADR-0126 once (ADR-0164 ruling 1); fields.fingerprint names the failed check, fields.origin the retry path; a second end of the ladder goes to the operator with no second redesign |
 | `LADDER_STOP_SPEC` | two tiers failed on the same check, so the ladder reclassified the failure as spec and stopped; fields.fingerprint names the check |
 
+### latency
+
+| Code | Meaning |
+|---|---|
+| `LATENCY_BUDGET_EXCEEDED` | two waves in a row breached a bound of the wave latency check; fields.waves lists them, fields.reasons names the breached rules and fields.item the inbox item filed |
+
 ### ledger
 
 | Code | Meaning |

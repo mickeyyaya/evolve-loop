@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — the wave latency check (latency gates T6, 2026-11-14)
+
+- **The check.** `evolve wave latency --check` judges each recorded wave. A wave breaches on one of two rules. The first: the average live lanes is below `wave_latency.min_live_share` (default 0.8) while the ready supply is not short. The second: the host gate share is above `wave_latency.max_gate_share` (default 0.25). A wave with a quota pause, a loop `stop_reason` or an operator brake is left out.
+- **The alarm.** Two breaching waves in a row emit `LATENCY_BUDGET_EXCEEDED` (WARN) and file one inbox item. A rerun files no second item. The operator brake stop now records a `loop.halt` signal with its `stop_reason`.
+- Plan: [latency-gates-2026-10.md](docs/plans/latency-gates-2026-10.md) (§4.3, T6). Docs: [internal-lanetime](docs/architecture/packages/internal-lanetime.md).
+
 ## Added — the remote branch sweep of `evolve gc` (gc X8, 2026-11-11)
 
 - **The sweep.** `evolve gc` reads the pull requests through `gh`. At `gc.remote_sweep.stage: shadow` (the default) it only reports the remote branches that the enforce stage deletes. At `enforce` it deletes a remote branch only when a merged pull request has the same head as the remote tip.

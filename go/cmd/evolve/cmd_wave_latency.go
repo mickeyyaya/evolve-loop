@@ -95,13 +95,16 @@ func (s latencyScope) holds(id int) bool {
 
 func runWaveLatency(env waveEnv, args []string, stdout, stderr io.Writer) int {
 	var projectRoot, waveFlag, cyclesFlag string
-	var asJSON bool
+	var asJSON, check bool
 	operands, err := cliFlags{
-		bools:  map[string]*bool{"--json": &asJSON},
+		bools:  map[string]*bool{"--json": &asJSON, "--check": &check},
 		values: map[string]*string{"--project-root": &projectRoot, "--wave": &waveFlag, "--cycles": &cyclesFlag},
 	}.parse(args)
 	if err == nil && len(operands) > 0 {
 		err = fmt.Errorf("unexpected argument %q", operands[0])
+	}
+	if err == nil && check && (waveFlag != "" || cyclesFlag != "") {
+		err = errors.New("--check reads every recorded wave and excludes --wave and --cycles")
 	}
 	var req latencyRequest
 	if err == nil {
@@ -111,6 +114,9 @@ func runWaveLatency(env waveEnv, args []string, stdout, stderr io.Writer) int {
 		return waveUsageError(stderr, err)
 	}
 	plane, err := resolveWavePlane(env, projectRoot, stderr)
+	if err == nil && check {
+		return runWaveLatencyCheck(env, plane, asJSON, stdout, stderr)
+	}
 	var records []wave.Record
 	if err == nil && req.from == 0 {
 		records, err = plane.store.Records()

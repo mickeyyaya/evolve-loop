@@ -84,4 +84,5 @@ type Policy struct {
 	Isolation          *IsolationPolicy          `json:"isolation,omitempty"`
 	Healing            *HealingPolicy            `json:"healing,omitempty"`
 	ExpectedSignal     *ExpectedSignalPolicy     `json:"expected_signal,omitempty"`
+	WaveLatency        *WaveLatencyPolicy        `json:"wave_latency,omitempty"`
 }

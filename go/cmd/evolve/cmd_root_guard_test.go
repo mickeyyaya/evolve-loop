@@ -115,6 +115,7 @@ func TestRootSignalCenter_EveryRootSubscribesThePublisher(t *testing.T) {
 			"cmd/evolve/cmd_selfheal.go:newSelfhealCenter",
 			"cmd/evolve/cmd_ship.go:shipRootSignals",
 			"cmd/evolve/cmd_subagent.go:runSubagentRun",
+			"cmd/evolve/cmd_wave_latency_check.go:fileLatencyBreach",
 			"cmd/evolve/cmd_wave_next.go:runWaveNext",
 			"cmd/evolve/dispatch_gate.go:emitDispatchViolation",
 		},

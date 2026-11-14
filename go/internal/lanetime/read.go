@@ -30,10 +30,11 @@ type signalLine struct {
 	PID    int       `json:"pid"`
 	Code   string    `json:"code"`
 	Fields struct {
-		Verdict string `json:"verdict"`
-		Live    string `json:"live"`
-		Target  string `json:"target"`
-		Cause   string `json:"cause"`
+		Verdict    string `json:"verdict"`
+		Live       string `json:"live"`
+		Target     string `json:"target"`
+		Cause      string `json:"cause"`
+		StopReason string `json:"stop_reason"`
 	} `json:"fields"`
 }
 
@@ -68,9 +69,13 @@ type spanBuilder struct {
 	open     map[string]time.Time
 	spans    []Span
 	unpaired int
+	paused   bool
 }
 
 func (b *spanBuilder) add(l signalLine) {
+	if l.Code == CodeQuotaPaused {
+		b.paused = true
+	}
 	switch l.Kind {
 	case "phase.dispatched":
 		if _, held := b.open[l.Phase]; !held {
@@ -96,7 +101,7 @@ func readCycle(dir string, id int) (Cycle, int, error) {
 	if err != nil {
 		return Cycle{}, 0, err
 	}
-	cycle := Cycle{ID: id, Spans: b.spans, Unpaired: b.unpaired, Open: len(b.open)}
+	cycle := Cycle{ID: id, Spans: b.spans, Unpaired: b.unpaired, Open: len(b.open), Paused: b.paused}
 	bad, err := forEachLine(filepath.Join(dir, callsFile), func(l callLine) {
 		cycle.Calls = append(cycle.Calls, Call{Phase: l.Phase, CLI: l.CLI, Start: l.StartedAt, End: l.EndedAt})
 	})
@@ -170,10 +175,18 @@ type Sample struct {
 	Cause  string
 }
 
-func ReadSamples(path string) ([]Sample, int, error) {
-	var samples []Sample
+type Stream struct {
+	Samples []Sample
+	Marks   []Mark
+}
+
+func ReadStream(path string) (Stream, int, error) {
+	var stream Stream
 	bad := 0
 	malformed, err := forEachLine(path, func(l signalLine) {
+		if l.Code == CodeQuotaPaused || l.Code == CodeSupplyShort || l.Kind == kindLoopHalt {
+			stream.Marks = append(stream.Marks, Mark{At: l.TS, PID: l.PID, Code: l.Code, Kind: l.Kind, StopReason: l.Fields.StopReason})
+		}
 		if !strings.HasPrefix(l.Code, "LOOP_ORCH_") || l.Fields.Live == "" {
 			return
 		}
@@ -183,9 +196,14 @@ func ReadSamples(path string) ([]Sample, int, error) {
 			bad++
 			return
 		}
-		samples = append(samples, Sample{At: l.TS, Live: live, Target: target, PID: l.PID, Code: l.Code, Cause: causeOf(l)})
+		stream.Samples = append(stream.Samples, Sample{At: l.TS, Live: live, Target: target, PID: l.PID, Code: l.Code, Cause: causeOf(l)})
 	})
-	return samples, malformed + bad, err
+	return stream, malformed + bad, err
+}
+
+func ReadSamples(path string) ([]Sample, int, error) {
+	stream, bad, err := ReadStream(path)
+	return stream.Samples, bad, err
 }
 
 func causeOf(l signalLine) string {

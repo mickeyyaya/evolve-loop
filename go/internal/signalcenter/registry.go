@@ -56,6 +56,7 @@ func init() {
 		RegisterCode(ModuleConvergence, c, doc)
 	}
 	RegisterCode(ModuleLoop, CodeLoopLost, "a reader saw a loop process end without its loop.exit event; a reader makes this record and no log holds it; fields.pid, run_id, exit (crash or unknown) and historical (true when the loop was gone before the reader looked)")
+	RegisterCode(ModuleLatency, CodeLatencyBudgetExceeded, "two waves in a row breached a bound of the wave latency check; fields.waves lists them, fields.reasons names the breached rules and fields.item the inbox item filed")
 	RegisterCode(ModuleCI, CodeCIRunRed, "a watched CI run completed with a conclusion other than success; fields.sha, workflow, conclusion, run_id and run_url name the run")
 }
 

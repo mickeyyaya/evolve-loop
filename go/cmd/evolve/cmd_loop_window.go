@@ -106,6 +106,7 @@ func (b *loopBatchCoordinator) maybeRefreshChainBoundaryAtWave(iteration int) bo
 func (b *loopBatchCoordinator) brakeStop(iteration int) batchDecision {
 	fmt.Fprintf(b.stderr, "[loop] operator brake %s is engaged — stopping before cycle %d; release it with: evolve loop-stop --release\n", paths.LoopStopPath(b.cfg.EvolveDir), iteration+1)
 	b.result.StopReason = loopOperatorBrakeStop
+	emitLoopHalt(b.deps.Signals, 0, "loopBatchCoordinator.brakeStop", CodeLoopHalt, "operator brake engaged", map[string]string{"stop_reason": loopOperatorBrakeStop})
 	return batchDecision{flow: batchStopIterations}
 }
 

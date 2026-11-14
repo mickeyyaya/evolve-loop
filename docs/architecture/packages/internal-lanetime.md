@@ -57,6 +57,22 @@ The consumer (W4, 2026-10-19): at each wave boundary, `runPreWaveProbes` in `cmd
 - The family measure covers the history that gc keeps, not the history as of the wave that `--wave` names.
 - The leaf rule is tested as stdlib only. The package therefore keeps its own copy of the signal names and the shapes of the two ndjson files.
 
+## The wave check
+
+`Check(WaveInput, Bounds) Verdict` judges one wave for `evolve wave latency --check`. The status is `ok`, `breach` or `left_out`.
+
+| Rule | Source | Result |
+|---|---|---|
+| The wave has no end. | `WaveInput.End` | Left out: the wave is still open. |
+| A quota pause. | The signal `ORCHESTRATOR_QUOTA_PAUSED` in the project stream (`ReadStream`) or in a run dir (`Cycle.Paused`). | Left out. |
+| A loop stop. | A `loop.halt` signal with a `stop_reason`. The brake carries `loop_operator_brake`. | Left out, with a reason that names the stop or the brake. |
+| Live lanes. | `SlotUse` utilization below `Bounds.MinLiveShare`. A `LOOP_ORCH_SUPPLY_SHORT` signal of the wave skips the rule. | Breach. |
+| Host gate share. | The host time over the span time of `Phases`, above `Bounds.MaxGateShare`. A share equal to the bound passes. | Breach. |
+
+A signal belongs to a wave when its pid is the pid of the wave or its time lies in the wave window. A wave with no sample and no span is left out.
+
+`BreachRun(verdicts)` returns the trailing breaches. A left-out wave neither counts nor ends the run. `BreachRunToAlarm` (2) breaches in a row raise the alarm. The package reads no policy: the command passes the two bounds from `wave_latency.min_live_share` and `wave_latency.max_gate_share` of `policy.json`.
+
 ## Tests
 
 The fixture `testdata/evolve` holds five run dirs and one orchestration file with round times. The expected values are computed by hand:

@@ -276,7 +276,7 @@ func TestWaveLatency_WarnsAboutMalformedOrchestrationLines(t *testing.T) {
 func TestWave_ASubVerbIsRequiredAndLatencyIsListedInTheUsage(t *testing.T) {
 	t.Parallel()
 	h := newWaveHarness()
-	if rc := h.run(); rc != exitUsage || !strings.Contains(h.stderr.String(), "a sub-verb is required") || !strings.Contains(h.stderr.String(), "evolve wave latency [--wave N | --cycles A-B]") {
+	if rc := h.run(); rc != exitUsage || !strings.Contains(h.stderr.String(), "a sub-verb is required") || !strings.Contains(h.stderr.String(), "evolve wave latency [--wave N | --cycles A-B | --check]") {
 		t.Errorf("rc = %d stderr %q, want exitUsage naming the missing sub-verb and the latency usage", rc, h.stderr.String())
 	}
 }
@@ -309,5 +309,16 @@ func TestWaveLatency_ANextRecordWithoutACycleFloorLeavesTheCeilingOpen(t *testin
 	s, err := latencyRequest{wave: 1}.scope(recs)
 	if err != nil || s.ceiling != 0 {
 		t.Errorf("scope = %+v err = %v, want an open ceiling", s, err)
+	}
+}
+
+func TestWaveLatency_CheckExcludesTheWaveAndCyclesFlags(t *testing.T) {
+	t.Parallel()
+	for _, flag := range [][]string{{"--wave", "1"}, {"--cycles", "1-2"}} {
+		var stdout, stderr strings.Builder
+		args := append([]string{"latency", "--check"}, flag...)
+		if code := runWaveWith(defaultWaveEnv(), args, &stdout, &stderr); code == 0 {
+			t.Errorf("%v: exit 0, want a usage error", args)
+		}
 	}
 }

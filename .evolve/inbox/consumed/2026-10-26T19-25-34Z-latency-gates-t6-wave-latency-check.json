@@ -5,13 +5,18 @@
     "Two waves in a row that breach emit LATENCY_BUDGET_EXCEEDED (WARN) and file one item",
     "The bounds come from policy, not from code"
   ],
+  "consumed": {
+    "at": "2026-11-14T11:02:16Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "continuation": {
-    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2362",
-    "branch": "cycle-cd3ae73e-2362",
-    "snapshot_sha": "3fd4d178204a8d63422c022a5927f7f0b0564d2d",
     "base_sha": "7165d047d7649bb53b41228513d0fc270d766f68",
+    "branch": "cycle-cd3ae73e-2362",
+    "cycle": 2362,
     "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2362/audit-fail-reason.json",
-    "cycle": 2362
+    "snapshot_sha": "3fd4d178204a8d63422c022a5927f7f0b0564d2d",
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2362"
   },
   "created_at": "2026-10-26T19:25:33Z",
   "deps": [
@@ -33,15 +38,15 @@
   "priority_class": "performance",
   "released_continuations": [
     {
-      "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2109",
-      "branch": "cycle-cd3ae73e-2109",
-      "snapshot_sha": "05a52178368a7cd378605ccd5f3153525ebc153b",
       "base_sha": "d81eb9540fbe0ddef32072bcf1f896be3e49409e",
-      "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2109/audit-fail-reason.json",
+      "branch": "cycle-cd3ae73e-2109",
       "cycle": 2109,
-      "released_at": "2026-11-04T00:19:59Z",
+      "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2109/audit-fail-reason.json",
       "reason": "operator-release",
-      "released_by": "operator via -operator"
+      "released_at": "2026-11-04T00:19:59Z",
+      "released_by": "operator via -operator",
+      "snapshot_sha": "05a52178368a7cd378605ccd5f3153525ebc153b",
+      "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2109"
     }
   ],
   "route": "lane",

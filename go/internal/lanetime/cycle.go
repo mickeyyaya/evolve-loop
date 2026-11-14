@@ -25,6 +25,7 @@ type Cycle struct {
 	Calls    []Call
 	Unpaired int
 	Open     int
+	Paused   bool
 }
 
 func (c Cycle) bounds() (time.Time, time.Time) {
