@@ -18,7 +18,9 @@
   "notes": "BatchTest.Check has no production caller. The console train lands a batch on CI alone. Owner of the work that older text gave to I5: the three adapters (package test, predicate run, verdict store), the branch move with the tested tip refusal, the output limit, and the separation of a host failure from a build failure, which needs a typed result from acsrunner. Found by the architecture seat on the I3b rework, 2026-11-04.",
   "origin": "console",
   "priority_class": "correctness",
-  "route": "console-manual",
+  "route": "lane",
+  "routed_at": "2026-11-14T07:33:58Z",
+  "routed_reason": "operator 2026-11-14: fill the 8 lanes; plan wave-orchestrator O2a: a pipeline-kind item whose files are not protected is an ordinary code fix",
   "summary": "BatchTest.Check has no production caller. The console train lands a batch on CI alone. Owner of the work that older text gave to I5: the three adapters (package test, predicate run, verdict store), the branch move with the tested tip refusal, the output limit, and the separation of a host failure from a build failure, which needs a typed result from acsrunner. Found by the architecture seat on the I3b rework, 2026-11-04.",
   "title": "Wire the batch test L2 into the console train",
   "weight": 0.7
