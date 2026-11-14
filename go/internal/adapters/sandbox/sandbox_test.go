@@ -340,6 +340,9 @@ func TestExec_LinuxBwrap(t *testing.T) {
 	if !pr.Available {
 		t.Skip("bwrap not available")
 	}
+	if pr.CapabilityChecked && !pr.Capable {
+		t.Skipf("bwrap is installed but cannot sandbox on this host: %s", pr.Reason)
+	}
 	s := New(canonicalConfig())
 	err := s.Exec(context.Background(), []string{"/bin/true"}, nil, nil, nil)
 	if err != nil {
