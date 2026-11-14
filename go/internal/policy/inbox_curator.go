@@ -23,12 +23,17 @@ type InboxPolicy struct {
 	Curator *InboxCuratorPolicy `json:"curator,omitempty"`
 }
 
+type InboxTrailerPolicy struct {
+	Stage string `json:"stage,omitempty"`
+}
+
 type InboxCuratorPolicy struct {
-	Stage           string   `json:"stage,omitempty"`
-	OverlapRefuse   *float64 `json:"overlap_refuse,omitempty"`
-	OverlapWarn     *float64 `json:"overlap_warn,omitempty"`
-	ConsumeMinShare *float64 `json:"consume_min_share,omitempty"`
-	Kinds           []string `json:"kinds,omitempty"`
+	Stage           string              `json:"stage,omitempty"`
+	OverlapRefuse   *float64            `json:"overlap_refuse,omitempty"`
+	OverlapWarn     *float64            `json:"overlap_warn,omitempty"`
+	ConsumeMinShare *float64            `json:"consume_min_share,omitempty"`
+	Kinds           []string            `json:"kinds,omitempty"`
+	Trailer         *InboxTrailerPolicy `json:"trailer,omitempty"`
 }
 
 type InboxCuratorConfig struct {
@@ -61,6 +66,8 @@ func (b InboxCuratorPolicy) validate() error {
 	switch {
 	case b.Stage != "" && b.Stage != inboxCuratorShadow && b.Stage != inboxCuratorEnforce:
 		return fmt.Errorf("stage %q is not %q or %q", b.Stage, inboxCuratorShadow, inboxCuratorEnforce)
+	case b.Trailer != nil && b.Trailer.Stage != "" && b.Trailer.Stage != inboxCuratorShadow && b.Trailer.Stage != inboxCuratorEnforce:
+		return fmt.Errorf("trailer.stage %q is not %q or %q", b.Trailer.Stage, inboxCuratorShadow, inboxCuratorEnforce)
 	case refuse <= 0 || refuse > 1:
 		return fmt.Errorf("overlap_refuse must be in (0, 1], got %v", refuse)
 	case warn < 0 || warn > refuse:
@@ -92,4 +99,11 @@ func (p Policy) InboxCuratorConfig() InboxCuratorConfig {
 	c.OverlapWarn = valueOr(b.OverlapWarn, min(c.OverlapWarn, c.OverlapRefuse))
 	c.ConsumeMinShare = valueOr(b.ConsumeMinShare, c.ConsumeMinShare)
 	return c
+}
+
+func (p Policy) InboxTrailerStage() string {
+	if p.Inbox != nil && p.Inbox.Curator != nil && p.Inbox.Curator.Trailer != nil && p.Inbox.Curator.Trailer.Stage != "" {
+		return p.Inbox.Curator.Trailer.Stage
+	}
+	return inboxCuratorShadow
 }

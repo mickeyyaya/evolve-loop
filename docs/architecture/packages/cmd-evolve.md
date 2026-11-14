@@ -957,3 +957,6 @@ This section holds the durable reasons that the strip removed from the group 4 f
   - Each event goes through a signal center of the role `integration`. The origin is `evolve.integrationBatch`, because the center refuses an origin that has a space.
   - A release that fails after `main` moved is a warning. The batch is on `main`, so the exit code stays 0, and the next ship or batch releases the stop.
   - Pinned by the `TestStopJourney_*` tests and `TestIntegrationTrainIsBuiltOnlyBehindTheStopGate`.
+- **`evolve inbox trailer-check` (`cmd_inbox_trailercheck.go`).** `runInboxTrailerCheck` reads commit messages across `--range` with `git log` and checks each `Closes-Inbox` and `Refs-Inbox` id through `closesinbox` and `inboxmover.ResolveDispatchState`.
+  - A range passes when at least one trailer exists and every named id is `pending` or `processing`.
+  - `policy.LoadOrDefaults` sets the stage (`shadow` by default, `enforce` exits 1 on violations). Pinned by `cmd_inbox_trailercheck_test.go`.

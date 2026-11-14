@@ -455,6 +455,8 @@ Limits:
 
 `inbox curate` is not a core verb yet. It has no `--json`. Without a flag it is read-only. `--event` publishes signals, and `--apply` refuses with exit 1 while a run lease is live. [inbox-curator.md](inbox-curator.md) is its specification.
 
+`inbox trailer-check` is not in the core agent-class table yet (`go/internal/agentclass/table.go` is console-owned, so a cell gets class `D`). It takes `--range <rev-range>` and optional `--json` (`evolve.inbox.trailer-check/1`), and reads `inbox.curator.trailer.stage` (`shadow` by default, `enforce` exits 1 on violations).
+
 Verbs outside this table are tools for the operator or for the pipeline itself. A caller must not depend on them. Examples are `inbox-mover`, `fanout-dispatch`, `serve-phase` and `phase-watchdog`.
 
 ## 6. Verbs to add

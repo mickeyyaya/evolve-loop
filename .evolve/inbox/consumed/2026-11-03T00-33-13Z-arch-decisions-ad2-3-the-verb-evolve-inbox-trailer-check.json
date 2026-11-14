@@ -5,6 +5,11 @@
     "The spec and package note of the changed package state the change in STE."
   ],
   "campaign": "architecture-decisions-2026-11",
+  "consumed": {
+    "at": "2026-11-14T23:59:22Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "created_at": "2026-11-03T00:33:13Z",
   "deps": [
     "arch-decisions-ad2-1-the-parser-closesinboxids-accepts"
@@ -16,8 +21,8 @@
   "fix": "The verb `evolve inbox trailer-check --range`, the key `inbox.curator.trailer.stage`, the CLI contract row, the package note",
   "id": "arch-decisions-ad2-3-the-verb-evolve-inbox-trailer-check",
   "intake_override": {
-    "reason": "console: policy key",
-    "console_route": true
+    "console_route": true,
+    "reason": "console: policy key"
   },
   "kind": "feature",
   "origin": "console",

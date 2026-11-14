@@ -49,6 +49,7 @@ func inboxVerbs() []inboxVerb {
 		{"curate", "curate [--json] [--apply | --event] [--project-root P]   (--event reads one ship.landed wire record from stdin)", runInboxCurate},
 		{"quarantine", "quarantine list [--json] | quarantine release <id>", runInboxQuarantine},
 		{"ack-fingerprint", "ack-fingerprint <item-path>", withoutStdin(runInboxAckFingerprint)},
+		{"trailer-check", "trailer-check --range <rev-range> [--json] [--project-root P]", withoutStdin(runInboxTrailerCheck)},
 	}
 }
 
