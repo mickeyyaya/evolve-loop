@@ -3,6 +3,11 @@
     "A journey test: a lane whose decision and build report name an item that another lane holds ships its change, and the other item stays in place",
     "A WARN names each refused id"
   ],
+  "consumed": {
+    "at": "2026-11-14T19:51:28Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "created_at": "2026-11-04T13:04:48Z",
   "files": [
     "go/internal/phases/ship/postship.go",

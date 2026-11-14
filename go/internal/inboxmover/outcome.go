@@ -44,35 +44,7 @@ func ApplyCycleOutcome(opts Options, oc CycleOutcome) (OutcomeResult, error) {
 	committed := dedupeIDs(oc.CommittedIDs)
 
 	if oc.Passed {
-		cycleStr := strconv.Itoa(oc.Cycle)
-		var errs []error
-		var notMoved []string
-		for _, id := range committed {
-			pr, err := Promote(opts, id, "processed", PromoteOpts{Cycle: cycleStr, CommitSHA: oc.CommitSHA})
-			if err != nil {
-				errs = append(errs, fmt.Errorf("promote %q: %w", id, err))
-				continue
-			}
-			if pr.NoOp {
-				notMoved = append(notMoved, id)
-				continue
-			}
-			res.Promoted = append(res.Promoted, id)
-		}
-		retired, err := RetireUnbacked(opts, oc.Cycle, StateProcessed, shipUnbackedReason, oc.CommitSHA, notMoved)
-		res.RetiredUnbacked = retired
-		if err != nil {
-			errs = append(errs, err)
-		}
-		rr, err := releaseCycleProcessing(opts, oc.Cycle, oc.Reason, nil)
-		res.Released = rr.Paths
-		if err != nil {
-			errs = append(errs, fmt.Errorf("residual drain: %w", err))
-		}
-		if len(errs) > 0 {
-			return res, fmt.Errorf("apply-cycle-outcome: %w", errors.Join(errs...))
-		}
-		return res, nil
+		return applyPassedOutcome(opts, oc, committed)
 	}
 
 	ClaimLaneScope(opts, oc.Cycle, committed)
@@ -88,6 +60,67 @@ func ApplyCycleOutcome(opts Options, oc CycleOutcome) (OutcomeResult, error) {
 		return res, fmt.Errorf("apply-cycle-outcome: failure drain: %w", err)
 	}
 	return res, nil
+}
+
+func applyPassedOutcome(opts Options, oc CycleOutcome, committed []string) (OutcomeResult, error) {
+	res := OutcomeResult{}
+	cycleStr := strconv.Itoa(oc.Cycle)
+	var errs []error
+	var notMoved []string
+	for _, id := range committed {
+		if oc.Cycle > 0 {
+			if loc, lerr := lifecycle.Locate(opts.InboxDir, id); lerr == nil && loc.Cycle != 0 && loc.Cycle != oc.Cycle {
+				opts.logf("WARN: ", "apply-cycle-outcome: refused %q for cycle %d (held by cycle %d)", id, oc.Cycle, loc.Cycle)
+				continue
+			}
+		}
+		pr, err := Promote(opts, id, "processed", PromoteOpts{Cycle: cycleStr, CommitSHA: oc.CommitSHA})
+		if err != nil {
+			errs = append(errs, fmt.Errorf("promote %q: %w", id, err))
+			continue
+		}
+		if pr.NoOp {
+			notMoved = append(notMoved, id)
+			continue
+		}
+		res.Promoted = append(res.Promoted, id)
+	}
+	retired, err := RetireUnbacked(opts, oc.Cycle, StateProcessed, shipUnbackedReason, oc.CommitSHA, notMoved)
+	res.RetiredUnbacked = retired
+	if err != nil {
+		errs = append(errs, err)
+	}
+	rr, err := releaseCycleProcessing(opts, oc.Cycle, oc.Reason, nil)
+	res.Released = rr.Paths
+	if err != nil {
+		errs = append(errs, fmt.Errorf("residual drain: %w", err))
+	}
+	if len(errs) > 0 {
+		return res, fmt.Errorf("apply-cycle-outcome: %w", errors.Join(errs...))
+	}
+	return res, nil
+}
+
+func FilterPromotionScope(opts Options, cid int, pinIDs, ids []string) (allowed, warnings []string) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	opts.resolveOpts()
+	pinned := len(pinIDs) > 0
+	pinSet := idSet(pinIDs)
+	for _, id := range ids {
+		loc, err := lifecycle.Locate(opts.InboxDir, id)
+		if err == nil && loc.Cycle != 0 && loc.Cycle != cid {
+			warnings = append(warnings, fmt.Sprintf("refused inbox promotion of %q for cycle %d: held by cycle %d", id, cid, loc.Cycle))
+			continue
+		}
+		if pinned && !pinSet[id] && (err != nil || loc.Cycle != cid) {
+			warnings = append(warnings, fmt.Sprintf("refused inbox promotion of %q for cycle %d: outside lane-scope pin", id, cid))
+			continue
+		}
+		allowed = append(allowed, id)
+	}
+	return allowed, warnings
 }
 
 func failurePolicy(oc CycleOutcome, committed []string) *quarantinePolicy {

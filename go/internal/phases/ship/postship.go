@@ -155,16 +155,7 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 			res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: promotion skipped: unlanded — commit %s is not an ancestor of HEAD or origin; inbox items for cycle %d left in processing/ for re-triage", commitShort, cid))
 		} else {
 			res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: promoted: landed — commit %s verified in durable history for cycle %d", commitShort, cid))
-			committedIDs = committedInboxIDs(cycleDir, body, workspaceACSVerdict(cycleDir) == "PASS")
-			if retired, rErr := inboxmover.ReconcileSuperseded(mvOpts, inboxmover.SupersededInboxIDs(body), "processed", inboxmover.PromoteOpts{
-				Cycle:     fmt.Sprintf("%d", cid),
-				CommitSHA: commitShort,
-			}); rErr != nil {
-				res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: superseded reconcile for cycle %d: %v", cid, rErr))
-			} else if len(retired) > 0 {
-				res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: retired %d superseded inbox item(s) for cycle %d: %v", len(retired), cid, retired))
-			}
-			retireCommittedCarryover(opts, res, cid, committedIDs)
+			committedIDs = promoteLandedCycle(opts, mvOpts, res, cycleDir, cid, commitShort, body)
 		}
 	}
 
@@ -191,6 +182,25 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 		res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: inbox lifecycle drain complete for cycle %d", cid))
 	}
 	return nil
+}
+
+func promoteLandedCycle(opts *Options, mvOpts inboxmover.Options, res *RunResult, cycleDir string, cid int, commitShort string, body []byte) []string {
+	pinIDs := cycleoutcome.LaneScopeIDs(cycleDir)
+	committedIDs, committedRefusals := inboxmover.FilterPromotionScope(mvOpts, cid, pinIDs, committedInboxIDs(cycleDir, body, workspaceACSVerdict(cycleDir) == "PASS"))
+	supersededIDs, supersededRefusals := inboxmover.FilterPromotionScope(mvOpts, cid, pinIDs, inboxmover.SupersededInboxIDs(body))
+	for _, w := range append(committedRefusals, supersededRefusals...) {
+		res.Logs = append(res.Logs, "[ship] WARN: "+w)
+	}
+	if retired, rErr := inboxmover.ReconcileSuperseded(mvOpts, supersededIDs, "processed", inboxmover.PromoteOpts{
+		Cycle:     fmt.Sprintf("%d", cid),
+		CommitSHA: commitShort,
+	}); rErr != nil {
+		res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: superseded reconcile for cycle %d: %v", cid, rErr))
+	} else if len(retired) > 0 {
+		res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: retired %d superseded inbox item(s) for cycle %d: %v", len(retired), cid, retired))
+	}
+	retireCommittedCarryover(opts, res, cid, committedIDs)
+	return committedIDs
 }
 
 func isLanded(ctx context.Context, opts *Options, sha string) bool {
