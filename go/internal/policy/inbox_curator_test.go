@@ -71,13 +71,13 @@ func TestInboxCuratorPolicy_RefusesAnInvalidValueNamingTheBlock(t *testing.T) {
 	}
 }
 
-func TestInboxCuratorConfig_TheCheckedInPolicyNamesTheShadowStage(t *testing.T) {
+func TestInboxCuratorConfig_TheCheckedInPolicyNamesTheEnforceStage(t *testing.T) {
 	p, err := policy.Load(filepath.Join("..", "..", "..", ".evolve", "policy.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := p.InboxCuratorConfig(); p.Inbox == nil || p.Inbox.Curator == nil || got.Stage != "shadow" {
-		t.Fatalf("the checked-in policy must name inbox.curator with stage shadow, got %+v", got)
+	if got := p.InboxCuratorConfig(); p.Inbox == nil || p.Inbox.Curator == nil || got.Stage != "enforce" {
+		t.Fatalf("the checked-in policy must name inbox.curator with stage enforce (operator 2026-11-14: deterministic proposals apply), got %+v", got)
 	}
 }
 

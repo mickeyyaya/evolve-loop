@@ -5,6 +5,12 @@
     "A merge commit with no parent on the origin branch is still refused",
     "docs/operations/wave-operations.md names the verb that pushes the branch after the merge"
   ],
+  "consumed": {
+    "at": "2026-11-14T07:33:58Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "lane triage recorded it as shipped (operator 2026-11-13: the item touches no protected file and its console route had no reason; a lane can build it)"
+  },
   "created_at": "2026-11-10T23:23:44Z",
   "deps": [],
   "files": [
@@ -27,7 +33,7 @@
   "routed_cycle": 2366,
   "routed_reason": "lane triage (cycle 2366) dropped: already-shipped: af2269af5",
   "source": "console, 2026-11-11, wave 164 boundary",
-  "summary": "The operations guide says to merge origin/main, run evolve pr refresh and continue the merge. The ship gate then has no verb that pushes the result: push-only reads rev-list origin/<branch>..HEAD, which holds each main commit, and the ship journal of the worktree has none of them.",
+  "summary": "The operations guide says to merge origin/main, run evolve pr refresh and continue the merge. The ship gate then has no verb that pushes the result: push-only reads rev-list origin/\u003cbranch\u003e..HEAD, which holds each main commit, and the ship journal of the worktree has none of them.",
   "title": "ship --push-only refuses a branch that merged origin/main, so a refreshed PR cannot be pushed",
   "weight": 0.7
 }
