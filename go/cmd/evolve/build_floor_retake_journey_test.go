@@ -19,15 +19,17 @@ const (
 
 func flakyBuild(t *testing.T, failures int) (handoffReplay, string) {
 	t.Helper()
-	r := newHandoffReplay(t, 2151, nil)
-	r.writeRunState(t, 0)
 	counter := filepath.Join(t.TempDir(), "runs")
 	test := fmt.Sprintf("package flaky\n\nimport (\n\t\"os\"\n\t\"testing\"\n)\n\nfunc TestTmuxBootUnderLoad(t *testing.T) {\n\tb, _ := os.ReadFile(%q)\n\t_ = os.WriteFile(%q, append(b, 'x'), 0o644)\n\tif len(b) < %d {\n\t\tt.Fatal(\"session boot timed out\")\n\t}\n\tif Boot() != 1 {\n\t\tt.Fatal(\"Boot\")\n\t}\n}\n", counter, counter, failures)
-	r.commitBuild(t, map[string]string{
-		journeyPkg:  "package flaky\n\nfunc Boot() int { return 1 }\n",
+	r := newHandoffReplay(t, 2151, map[string]string{
+		journeyPkg:  "package flaky\n\nfunc Boot() int { return 2 - 1 }\n",
 		journeyTest: test,
 	})
-	r.writeWorkspace(t, "build-report.md", "# Build Report — cycle 2151\n\n## Changes\n- `"+journeyPkg+"`\n- `"+journeyTest+"`\n")
+	r.writeRunState(t, 0)
+	r.commitBuild(t, map[string]string{
+		journeyPkg: "package flaky\n\nfunc Boot() int { return 1 }\n",
+	})
+	r.writeWorkspace(t, "build-report.md", "# Build Report — cycle 2151\n\n## Changes\n- `"+journeyPkg+"`\n")
 	return r, counter
 }
 
