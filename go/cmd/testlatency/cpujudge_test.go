@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -138,5 +139,119 @@ func TestCPUSection_NamesAFailureAndCountsWhenNothingFailed(t *testing.T) {
 func TestLoadRusage_ReportsAReadError(t *testing.T) {
 	if _, err := loadRusage(t.TempDir()); err == nil {
 		t.Error("loadRusage read a directory without an error")
+	}
+}
+
+func TestJudgeCPU_ReplaysResearchRuns(t *testing.T) {
+	base := map[string]float64{
+		"internal/bridge":   390,
+		"internal/core":     60,
+		"internal/phases":   40,
+		"internal/subagent": 30,
+		"internal/guards":   20,
+	}
+	rf := baselines("darwin", base)
+	cases := []struct {
+		name     string
+		usage    map[string]float64
+		wantFail []string
+	}{
+		{
+			name: "run 40582532714 baseline",
+			usage: map[string]float64{
+				"internal/bridge":   390,
+				"internal/core":     60,
+				"internal/phases":   40,
+				"internal/subagent": 30,
+				"internal/guards":   20,
+			},
+		},
+		{
+			name: "run 40611567029 slow host S=1.46",
+			usage: map[string]float64{
+				"internal/bridge":   385 * 1.46,
+				"internal/core":     60 * 1.46,
+				"internal/phases":   40 * 1.46,
+				"internal/subagent": 30 * 1.46,
+				"internal/guards":   20 * 1.46,
+			},
+		},
+		{
+			name: "run 40526866678 bridge defect 1.48x",
+			usage: map[string]float64{
+				"internal/bridge":   390 * 1.48,
+				"internal/core":     60,
+				"internal/phases":   40,
+				"internal/subagent": 30,
+				"internal/guards":   20,
+			},
+			wantFail: []string{"internal/bridge"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			failures := cpuFailures(rf.judgeCPU(tc.usage, "darwin"))
+			if len(failures) != len(tc.wantFail) {
+				t.Fatalf("failures = %v, want %v", failures, tc.wantFail)
+			}
+			for i, want := range tc.wantFail {
+				if !strings.Contains(failures[i], want) {
+					t.Errorf("failure[%d] = %q, want %q", i, failures[i], want)
+				}
+			}
+		})
+	}
+}
+
+func TestRun_PRBaselineRaisePassesAndUnraisedFails(t *testing.T) {
+	dir := t.TempDir()
+	rusagePath := filepath.Join(dir, "rusage.ndjson")
+	var rusageLines strings.Builder
+	for _, rec := range []rusageRecord{
+		{Package: "github.com/mickeyyaya/evolve-loop/go/internal/core", UserS: 140, SystemS: 20},
+		{Package: "github.com/mickeyyaya/evolve-loop/go/internal/r0", UserS: 18, SystemS: 2},
+		{Package: "github.com/mickeyyaya/evolve-loop/go/internal/r1", UserS: 18, SystemS: 2},
+		{Package: "github.com/mickeyyaya/evolve-loop/go/internal/r2", UserS: 18, SystemS: 2},
+	} {
+		b, err := json.Marshal(rec)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rusageLines.Write(b)
+		rusageLines.WriteByte('\n')
+	}
+	if err := os.WriteFile(rusagePath, []byte(rusageLines.String()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stream := `{"Package":"github.com/mickeyyaya/evolve-loop/go/internal/core","Action":"pass","Elapsed":0.1}` + "\n"
+
+	unraised, err := json.Marshal(baselines(runtime.GOOS, map[string]float64{
+		"internal/core": 100,
+		"internal/r0":   20,
+		"internal/r1":   20,
+		"internal/r2":   20,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	unraisedPath := writeRatchetFile(t, string(unraised))
+	code, _, errOut := runWith(stream, "-ratchet", unraisedPath, "-rusage", rusagePath)
+	if code != 1 || !strings.Contains(errOut, "internal/core") {
+		t.Errorf("unraised: exit %d stderr %q, want 1 naming internal/core", code, errOut)
+	}
+
+	raised, err := json.Marshal(baselines(runtime.GOOS, map[string]float64{
+		"internal/core": 160,
+		"internal/r0":   20,
+		"internal/r1":   20,
+		"internal/r2":   20,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	raisedPath := writeRatchetFile(t, string(raised))
+	code, _, errOut = runWith(stream, "-ratchet", raisedPath, "-rusage", rusagePath)
+	if code != 0 {
+		t.Errorf("raised: exit %d stderr %q, want 0", code, errOut)
 	}
 }

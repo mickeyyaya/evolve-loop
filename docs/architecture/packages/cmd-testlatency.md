@@ -23,6 +23,8 @@
   - The package CPU is `user_s + system_s`. A reference package has a baseline of 2 s or more.
   - The speed index S of a package is the median ratio of run CPU to baseline over the other reference packages.
   - A package fails when its CPU divided by S is above 1.35 times its baseline and more than 15 s over it.
+  - A PR that adds work must raise the package `cpu` baseline in `go/.test-latency.json` in the same PR.
+  - A PR without that baseline raise fails the gate.
   - A package with fewer than 3 other reference packages appears in the section `## Package CPU against the recorded baseline` as reported only. It never fails.
   - The `class` field stays in the file and must be a known class. It no longer sets a wall limit.
   - Research: [ci-wall-variance-2026-11](../../research/ci-wall-variance-2026-11.md).
