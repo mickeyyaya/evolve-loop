@@ -184,8 +184,8 @@
   "model_label_regex": "^(?P<footer>esc to cancel|\\? for shortcuts)?\\s{2,}(?:(?:auto|plan|ask|default)\\s*·\\s*)?(?P<model>[[:alnum:]][^·()]*?(?:\\s*·\\s*[^·\\s]+|\\s*\\([^)]+\\)))(?:\\s*·\\s*[^·]*?)*\\s*$",
   "stub": false,
   "model_tier_map": {
-    "fast": "Gemini 3.8 Flash (Low)",
-    "balanced": "Gemini 3.8 Flash (High)",
+    "fast": "Gemini 4 Hydrogen (Medium)",
+    "balanced": "Gemini 4 Hydrogen (High)",
     "deep": "Gemini 4 Argon (Medium)",
     "top": "Gemini 4 Argon (Medium)"
   },

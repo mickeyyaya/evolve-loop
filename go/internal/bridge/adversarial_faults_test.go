@@ -29,7 +29,7 @@ func adversarialFaultCases() []adversarialFaultCase {
 	}{
 		{"claude", "claude-tmux", tmuxPromptMarkerDefault},
 		{"codex", "codex-tmux", "›"},
-		{"agy", "agy-tmux", agyFooterGeminiFlash},
+		{"agy", "agy-tmux", agyFooterGeminiFast},
 	}
 	var out []adversarialFaultCase
 	for _, f := range families {
