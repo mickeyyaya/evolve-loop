@@ -18,6 +18,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/auditfixports"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridgechain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/checkpoint"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cli/phasecmd"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
@@ -372,7 +373,13 @@ func agentRunSignals(projectRoot string, console io.Writer) (*signalcenter.Cente
 }
 
 func agentRunBridge(projectRoot string, signals *signalcenter.Center) core.Bridge {
-	return bridge.NewDefault(projectRoot, signals)
+	catalog, err := phasecmd.LoadCatalog(projectRoot)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[agent-run] WARN %v (the seat prompt carries no section contract)\n", err)
+	}
+	br := bridge.NewDefault(projectRoot, signals)
+	br.SetContractResolver(phasecontract.NewCatalogResolver(catalog.Get))
+	return br
 }
 
 type orchDeps struct {

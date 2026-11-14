@@ -167,16 +167,16 @@ func (a *Adapter) SetFatalPaneStage(stage string) {
 	a.fatalPaneStage = stage
 }
 
-func (a *Adapter) Launch(ctx context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
+func (a *Adapter) ComposePrompt(req core.BridgeRequest) (core.BridgeRequest, error) {
 	if err := validate(req); err != nil {
-		return core.BridgeResponse{}, err
+		return core.BridgeRequest{}, err
 	}
 	inproc := req
 	contractID := req.Agent
 	if req.Contract != "" {
 		contractID = req.Contract
 		if _, ok := a.contractResolver().Resolve(contractID); !ok {
-			return core.BridgeResponse{}, fmt.Errorf("bridge: deliverable contract %q not registered", contractID)
+			return core.BridgeRequest{}, fmt.Errorf("bridge: deliverable contract %q not registered", contractID)
 		}
 	}
 	body := a.injectContract(req.Prompt, contractID, req.ArtifactPath, req.Workspace)
@@ -185,16 +185,24 @@ func (a *Adapter) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 	withSkills := injectSkillOverlays(withRules, req)
 	withDirectives := injectOperatorDirectives(withSkills, req.OperatorDirectives)
 	inproc.Prompt = injectCorrectionPrefix(withDirectives, req.CorrectionDirective)
+	return inproc, nil
+}
 
+func (a *Adapter) Launch(ctx context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
+	inproc, err := a.ComposePrompt(req)
+	if err != nil {
+		return core.BridgeResponse{}, err
+	}
 	if a.onStopReview != nil {
-		cycle := req.Cycle
-		cb := a.onStopReview
-		onSR := func(phase, action, reason string) { cb(cycle, phase, action, reason) }
 		deps := a.productionEngineDeps(req.Env)
-		deps.OnStopReview = onSR
+		deps.OnStopReview = stopReviewFor(req.Cycle, a.onStopReview)
 		return gobridge.NewEngine(deps).Launch(ctx, inproc)
 	}
 	return a.engineFactory(req.Env).Launch(ctx, inproc)
+}
+
+func stopReviewFor(cycle int, cb func(cycle int, phase, action, reason string)) func(phase, action, reason string) {
+	return func(phase, action, reason string) { cb(cycle, phase, action, reason) }
 }
 
 func (a *Adapter) Probe(ctx context.Context) (core.BridgeProbe, error) {

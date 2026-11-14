@@ -1,12 +1,15 @@
 package launchrecord
 
 import (
+	"encoding/json"
 	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cloudlaunch"
 )
@@ -35,7 +38,7 @@ func TestWriteThenRead_ReturnsTheSameRecord(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Read = %v", err)
 	}
-	if got != want {
+	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Read = %+v, want %+v", got, want)
 	}
 }
@@ -121,7 +124,7 @@ func TestWrite_RefusesToReplaceARecord(t *testing.T) {
 	if _, err := Write(dir, second); !errors.Is(err, fs.ErrExist) {
 		t.Errorf("a second Write = %v, want fs.ErrExist", err)
 	}
-	if got, _ := Read(dir, first.RunID); got != first {
+	if got, _ := Read(dir, first.RunID); !reflect.DeepEqual(got, first) {
 		t.Errorf("the record changed to %+v", got)
 	}
 }
@@ -201,5 +204,169 @@ func TestList_FailsOnABadRecordOrAnUnreadableDirectory(t *testing.T) {
 	}
 	if _, err := List(file); err == nil {
 		t.Error("List of a file in place of the directory = nil error, want a failure")
+	}
+}
+
+func TestDeliverablePath_SitsNextToTheRecordAndRefusesABadRunID(t *testing.T) {
+	got, err := DeliverablePath("/e", "run-1")
+	if err != nil || got != filepath.Join("/e", Subdir, "run-1.deliverable.md") {
+		t.Fatalf("DeliverablePath = %q, %v", got, err)
+	}
+	if _, err := DeliverablePath("/e", "../x"); err == nil {
+		t.Error("a run id with a separator must be refused")
+	}
+	if err := KeepDeliverable("/e", "../x", "b", 1); err == nil {
+		t.Error("KeepDeliverable must refuse a bad run id")
+	}
+}
+
+func TestKeepDeliverable_WritesAtomicallyAndKeepsTheNewestAndNeverTouchesRecords(t *testing.T) {
+	dir := t.TempDir()
+	sub := filepath.Join(dir, Subdir)
+	if err := os.MkdirAll(filepath.Join(sub, "dir.deliverable.md"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	base := time.Now().Add(-time.Hour)
+	for i, name := range []string{"a.deliverable.md", "b.deliverable.md", "c.deliverable.md", "c.json"} {
+		path := filepath.Join(sub, name)
+		if err := os.WriteFile(path, []byte(name), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		at := base.Add(time.Duration(i) * time.Minute)
+		if err := os.Chtimes(path, at, at); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := KeepDeliverable(dir, "new", "body", 2); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := os.ReadFile(filepath.Join(sub, "new.deliverable.md"))
+	if err != nil || string(got) != "body" {
+		t.Fatalf("kept = %q, %v", got, err)
+	}
+	for name, want := range map[string]bool{"a.deliverable.md": false, "b.deliverable.md": false, "c.deliverable.md": true, "c.json": true} {
+		if _, err := os.Stat(filepath.Join(sub, name)); (err == nil) != want {
+			t.Errorf("%s present = %v, want %v", name, err == nil, want)
+		}
+	}
+	if left, _ := filepath.Glob(filepath.Join(sub, "*.tmp")); len(left) != 0 {
+		t.Errorf("temp files left: %v", left)
+	}
+}
+
+func TestKeepDeliverable_TiesBreakOnNameAndFailuresAreReported(t *testing.T) {
+	dir := t.TempDir()
+	sub := filepath.Join(dir, Subdir)
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	at := time.Now().Add(-time.Hour)
+	for _, name := range []string{"a.deliverable.md", "b.deliverable.md"} {
+		path := filepath.Join(sub, name)
+		if err := os.WriteFile(path, []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(path, at, at); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := KeepDeliverable(dir, "n", "b", 2); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(sub, "a.deliverable.md")); err == nil {
+		t.Error("the lower name of an equal pair must be pruned first")
+	}
+
+	blocked := t.TempDir()
+	if err := os.WriteFile(filepath.Join(blocked, Subdir), []byte("f"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := KeepDeliverable(blocked, "n", "b", 1); err == nil {
+		t.Error("a blocked directory must be reported")
+	}
+
+	ro := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(ro, Subdir), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(filepath.Join(ro, Subdir), 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(filepath.Join(ro, Subdir), 0o755) })
+	if err := KeepDeliverable(ro, "n", "b", 1); err == nil {
+		t.Error("an unwritable directory must be reported")
+	}
+}
+
+func TestPruneDeliverables_ReportsAMissingDirectory(t *testing.T) {
+	if err := pruneDeliverables(filepath.Join(t.TempDir(), "none"), 1); err == nil {
+		t.Error("a missing directory must be reported")
+	}
+}
+
+func TestPruneDeliverables_ReportsAStaleFileThatCannotBeRemoved(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"a.deliverable.md", "b.deliverable.md"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Chmod(dir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+
+	err := pruneDeliverables(dir, 1)
+
+	if err == nil {
+		t.Error("a stale file that cannot be removed must be reported")
+	}
+	if left, _ := filepath.Glob(filepath.Join(dir, "*.deliverable.md")); len(left) != 2 {
+		t.Fatalf("the fixture must keep both files, got %v", left)
+	}
+}
+
+type brokenEntry struct{ fs.DirEntry }
+
+func (brokenEntry) Name() string               { return "x.deliverable.md" }
+func (brokenEntry) IsDir() bool                { return false }
+func (brokenEntry) Info() (fs.FileInfo, error) { return nil, errors.New("gone") }
+
+func TestStaleDeliverables_ReportsAnEntryThatCannotBeStatted(t *testing.T) {
+	if _, err := staleDeliverables([]fs.DirEntry{brokenEntry{}}, 1); err == nil {
+		t.Error("an entry without info must be reported")
+	}
+}
+
+func TestKeepDeliverable_ARenameThatFailsIsReportedAndLeavesNoStagingFile(t *testing.T) {
+	dir := t.TempDir()
+	sub := filepath.Join(dir, Subdir)
+	if err := os.MkdirAll(filepath.Join(sub, "n.deliverable.md"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := KeepDeliverable(dir, "n", "b", 1); err == nil {
+		t.Fatal("a rename onto a directory must be reported")
+	}
+	if _, err := os.Stat(filepath.Join(sub, "n.deliverable.md.tmp")); err == nil {
+		t.Error("the staging file must be removed")
+	}
+}
+
+func TestViolation_RoundTripsInARecordAndIsOmittedWhenEmpty(t *testing.T) {
+	dir := t.TempDir()
+	rec := sample()
+	rec.Violations = []Violation{{Code: "missing_section", Message: `required section "## Simplifications" is missing`}}
+	if _, err := Write(dir, rec); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Read(dir, rec.RunID)
+	if err != nil || !reflect.DeepEqual(got.Violations, rec.Violations) {
+		t.Fatalf("Violations = %+v, %v; want %+v", got.Violations, err, rec.Violations)
+	}
+	raw, _ := json.Marshal(sample())
+	if strings.Contains(string(raw), "violations") {
+		t.Errorf("an empty Violations must be omitted: %s", raw)
 	}
 }
