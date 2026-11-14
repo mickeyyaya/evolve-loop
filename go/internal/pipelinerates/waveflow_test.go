@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/lanetime"
+	"github.com/mickeyyaya/evolve-loop/go/internal/qualitypanel"
 )
 
 func TestSlotUtilization_GivesLiveSlotHoursOverCapacityForEachWave(t *testing.T) {
@@ -255,5 +256,28 @@ func TestLoadWaveFlows_APIDWaveCountsNoSampleAfterItsEndInEitherIndex(t *testing
 	one := set.Flows[0]
 	if err != nil || one.IdleHours["run_cap"] != 2 || len(one.IdleHours) != 1 || one.Slots.Window != 2*time.Hour {
 		t.Errorf("wave 1 = %+v, %v; want both indexes to cut at the wave end", one, err)
+	}
+}
+
+func TestSlotUtilization_MarksEachWaveAgainstTheChartOfTheWavesBeforeIt(t *testing.T) {
+	t.Parallel()
+	utilization := map[int]float64{151: 0.98, 152: 0.92, 154: 0.97, 155: 0.97, 156: 0.94, 157: 0.98, 158: 0.97, 159: 0.90, 160: 0.97, 161: 0.96, 162: 0.84, 163: 0.82, 164: 0.49}
+	var flows []WaveFlow
+	for _, w := range []int{151, 152, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164} {
+		flows = append(flows, WaveFlow{Wave: w, Slots: lanetime.Slots{Window: time.Hour, Utilization: utilization[w]}})
+	}
+	flows = append(flows[:2:2], append([]WaveFlow{{Wave: 153}}, flows[2:]...)...)
+	flows = append(flows, WaveFlow{Wave: 169})
+
+	readings := SlotUtilization(flows)
+
+	marks := map[string]string{}
+	for _, r := range readings {
+		marks[r.Window] = r.Extra[qualitypanel.XmRRule1Field]
+	}
+	for window, want := range map[string]string{"wave:151": "", "wave:152": "", "wave:153": "", "wave:154": "in_control", "wave:161": "in_control", "wave:162": "outside", "wave:163": "outside", "wave:164": "outside", "wave:169": ""} {
+		if marks[window] != want {
+			t.Errorf("%s mark = %q, want %q (all marks: %v)", window, marks[window], want, marks)
+		}
 	}
 }

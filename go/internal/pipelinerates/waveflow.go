@@ -85,8 +85,16 @@ func flowOf(records []waverec.Record, i int, cycles []lanetime.Cycle, samples []
 
 func SlotUtilization(flows []WaveFlow) []qualitypanel.Reading {
 	var out []qualitypanel.Reading
+	var baseline []float64
 	for _, f := range flows {
-		out = append(out, utilizationBase.reading(waveWindow(f.Wave), f.Slots.Utilization, boolInt(f.Slots.Window > 0)))
+		r := utilizationBase.reading(waveWindow(f.Wave), f.Slots.Utilization, boolInt(f.Slots.Window > 0))
+		if chart, ok := qualitypanel.NewXmRChart(baseline); ok && r.N > 0 {
+			r.Extra = map[string]string{qualitypanel.XmRRule1Field: chart.Rule1(f.Slots.Utilization)}
+		}
+		if r.N > 0 {
+			baseline = append(baseline, f.Slots.Utilization)
+		}
+		out = append(out, r)
 	}
 	return out
 }
