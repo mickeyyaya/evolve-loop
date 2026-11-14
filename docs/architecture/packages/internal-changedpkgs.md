@@ -38,6 +38,8 @@
   - Pinned by `TestImporterClosure_RouterRoutingtest`, `TestImporterClosure_ExcludesNonImporters`, `TestImporterClosure_Transitive` and `TestImporterClosure_TestOnlyImporter`.
 - **Output is sorted and deduped.** The corpus lands in an agent prompt, where a reordered set churns the prompt cache and blurs token measurement; gates compare and cache sets. `sortedDedup` never mutates its input. Pinned by `TestDirectImporters_DeterministicSortedAndDeduped` and `TestImporterClosure_SortedDedupedAndModuleRoot`.
 - **The corpus derivers have production callers.** A deriver reached only from tests injects nothing. `TestCoveringTests_ReachableFromProduction` and `TestDirectImporters_ReachableFromProduction` parse the module for a non-test caller outside `acs`.
+- **`GateScope` never runs less than it can prove.** An unreadable diff, an unreadable import graph or a module-root file returns `Full`, and the runner then runs the whole module. A diff with no Go package returns an empty scope, and the runner skips the scoped gates. Pinned by `TestGateScope_UnderivableChangeFallsBackToTheFullSet`, `TestGateScope_ModuleRootChangeFallsBackToTheFullSet` and `TestGateScope_ChangeOutsideGoRunsNothing`. See [composed-gate-scope.md](../composed-gate-scope.md).
+- **`acs` packages stay out of the scope.** The ACS gate runs them with tags. Pinned by `TestGateScope_ACSPackagesNeverEnterTheScope`.
 
 ## Findings
 
@@ -47,3 +49,4 @@
 - **cycle-1253** (from the cycle-1250 miss): `ImporterClosure`. See ADR-0082.
 - **cycles 1255 and 1267**: `CoveringTests`, then `DirectImporters` for the half it could not see. See the micro-phase catalog.
 - **2026-09-14 ship-gate incident**: the working-tree seed, the test-import hop and `Closure.Testable`. See the incident record.
+- **cycle-2375**: `GateScope` and `Scope.Enforced` scope the composed-tree test and apicover gates. See ADR-0166.

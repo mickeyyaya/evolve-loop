@@ -13,6 +13,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/auditledger"
+	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget"
@@ -52,16 +53,58 @@ var composedGateTargets = map[string]string{
 	"apicover": "apicover-enforce",
 }
 
+type composedGateScope struct {
+	variable string
+	packages func(scope changedpkgs.Scope, worktree string) ([]string, bool)
+}
+
+var composedGateScopes = map[string]composedGateScope{
+	"test":     {variable: "FAST_PKGS", packages: scopedTestPackages},
+	"apicover": {variable: "APICOVER_PKGS", packages: scopedEnforcedPackages},
+}
+
+func scopedTestPackages(scope changedpkgs.Scope, _ string) ([]string, bool) {
+	return scope.Packages, true
+}
+
+func scopedEnforcedPackages(scope changedpkgs.Scope, worktree string) ([]string, bool) {
+	raw, err := os.ReadFile(filepath.Join(worktree, "go", ".apicover-enforce"))
+	if err != nil {
+		return nil, false
+	}
+	var entries []string
+	for _, line := range strings.Split(string(raw), "\n") {
+		if line = strings.TrimSpace(line); line != "" && !strings.HasPrefix(line, "#") {
+			entries = append(entries, line)
+		}
+	}
+	return scope.Enforced(entries), true
+}
+
+func gateOverride(gate string, scope changedpkgs.Scope, worktree string) (override string, skip bool) {
+	spec, scoped := composedGateScopes[gate]
+	if !scoped || scope.Full {
+		return "", false
+	}
+	pkgs, ok := spec.packages(scope, worktree)
+	if !ok {
+		return "", false
+	}
+	if len(pkgs) == 0 {
+		return "", true
+	}
+	return spec.variable + "=" + strings.Join(pkgs, " "), false
+}
+
 func composedGatesTo(log io.Writer) func(ctx context.Context, worktree string) map[string]ciparity.GateOutcome {
 	return func(ctx context.Context, worktree string) map[string]ciparity.GateOutcome {
 		run := composedGateRun{log: log, worktree: worktree}
+		scope := changedpkgs.GateScope(worktree, "main")
 		results := make(map[string]ciparity.GateOutcome, len(ciparity.RequiredComposedGates))
 		for _, gate := range ciparity.RequiredComposedGates {
-			target, ok := composedGateTargets[gate]
-			if !ok {
-				continue
+			if target, ok := composedGateTargets[gate]; ok {
+				results[gate] = run.scoped(ctx, gate, target, scope)
 			}
-			results[gate] = run.gate(ctx, gate, target)
 		}
 		return results
 	}
@@ -72,9 +115,22 @@ type composedGateRun struct {
 	worktree string
 }
 
-func (r composedGateRun) gate(ctx context.Context, gate, target string) ciparity.GateOutcome {
+func (r composedGateRun) scoped(ctx context.Context, gate, target string, scope changedpkgs.Scope) ciparity.GateOutcome {
+	override, skip := gateOverride(gate, scope, r.worktree)
+	if skip {
+		fmt.Fprintf(r.log, "[orchestrator] composed-tree gate %s skipped: no package of the change needs it\n", gate)
+		return ciparity.GateOutcome{Status: "pass"}
+	}
+	return r.gate(ctx, gate, target, override)
+}
+
+func (r composedGateRun) gate(ctx context.Context, gate, target, override string) ciparity.GateOutcome {
 	tail := newTailWriter(64 * 1024)
-	cmd := sysexec.Command(ctx, "make", "-C", "go", target)
+	args := []string{"-C", "go", target}
+	if override != "" {
+		args = append(args, override)
+	}
+	cmd := sysexec.Command(ctx, "make", args...)
 	cmd.Dir = r.worktree
 	cmd.Env = lanebudget.Env(ciparity.CIEnv(os.Environ()))
 	cmd.Stdout, cmd.Stderr = tail, tail
