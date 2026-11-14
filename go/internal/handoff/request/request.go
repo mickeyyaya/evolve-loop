@@ -13,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"github.com/mickeyyaya/evolve-loop/go/internal/handoff"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
+	"github.com/mickeyyaya/evolve-loop/go/internal/plainfile"
 )
 
 const (
@@ -102,6 +103,8 @@ func TriageTDDFromItems(items []inboxbatch.Item) handoff.Request {
 	return req
 }
 
+const maxTestFileBytes = 4 << 20
+
 func TDDBuild(dir string) (handoff.Request, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -111,11 +114,18 @@ func TDDBuild(dir string) (handoff.Request, error) {
 	req := handoff.Request{Pair: PairTDDBuild}
 	fset := token.NewFileSet()
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), "_test.go") {
+		if !strings.HasSuffix(entry.Name(), "_test.go") {
 			continue
 		}
 		file := filepath.Join(dir, entry.Name())
-		parsed, err := parser.ParseFile(fset, file, nil, 0)
+		source, err := plainfile.Read(file, maxTestFileBytes)
+		if errors.Is(err, plainfile.ErrNotPlain) {
+			continue
+		}
+		if err != nil {
+			return handoff.Request{}, err
+		}
+		parsed, err := parser.ParseFile(fset, file, source, 0)
 		if err != nil {
 			return handoff.Request{}, err
 		}

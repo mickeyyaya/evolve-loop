@@ -877,3 +877,4 @@
 ./internal/gatecontract
 ./internal/gateregistry
 ./internal/mainstop
+./internal/plainfile

@@ -5,19 +5,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
-	"syscall"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/handoff"
 	"github.com/mickeyyaya/evolve-loop/go/internal/handoff/request"
-	"github.com/mickeyyaya/evolve-loop/go/internal/inputindex"
+	"github.com/mickeyyaya/evolve-loop/go/internal/plainfile"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
@@ -31,33 +28,14 @@ type HandoffReviewer struct {
 
 var errHandoffLedgerNotObject = errors.New("the ledger is not a JSON object, so it is kept as written")
 
-var errHandoffLedgerNotRegular = errors.New("the ledger is not a regular file, so the pipeline neither reads nor rewrites it")
+var errHandoffLedgerNotRegular = plainfile.ErrNotPlain
+
+const maxHandoffLedgerBytes = 4 << 20
+
+var errHandoffLedgerTooLarge = plainfile.ErrTooLarge
 
 func ReadHandoffLedger(path string) ([]byte, error) {
-	return readHandoffLedgerWith(path, openLedgerWithoutBlocking)
-}
-
-func openLedgerWithoutBlocking(path string) (*os.File, error) {
-	return os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK, 0)
-}
-
-func readHandoffLedgerWith(path string, open func(string) (*os.File, error)) ([]byte, error) {
-	before, err := os.Lstat(path)
-	if err != nil {
-		return nil, err
-	}
-	if !before.Mode().IsRegular() || inputindex.HardLinked(before) {
-		return nil, errHandoffLedgerNotRegular
-	}
-	f, err := open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = f.Close() }()
-	if after, err := f.Stat(); err != nil || !os.SameFile(before, after) {
-		return nil, errHandoffLedgerNotRegular
-	}
-	return io.ReadAll(f)
+	return plainfile.Read(path, maxHandoffLedgerBytes)
 }
 
 var handoffPairEndingAt = map[string]string{

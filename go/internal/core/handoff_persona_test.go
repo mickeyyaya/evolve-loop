@@ -16,6 +16,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/handoff"
 	"github.com/mickeyyaya/evolve-loop/go/internal/handoff/request"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmcalls"
+	"github.com/mickeyyaya/evolve-loop/go/internal/plainfile"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
@@ -642,12 +643,12 @@ func TestReadHandoffLedger_RefusesAFileSwappedAfterTheCheckAndReportsAnOpenError
 		}
 	}
 	swapped := func(string) (*os.File, error) { return os.Open(other) }
-	if _, err := readHandoffLedgerWith(ledger, swapped); !errors.Is(err, errHandoffLedgerNotRegular) {
+	if _, err := plainfile.ReadWith(ledger, maxHandoffLedgerBytes, swapped); !errors.Is(err, errHandoffLedgerNotRegular) {
 		t.Errorf("a swapped file = %v, want errHandoffLedgerNotRegular", err)
 	}
 	openErr := errors.New("open denied")
 	failing := func(string) (*os.File, error) { return nil, openErr }
-	if _, err := readHandoffLedgerWith(ledger, failing); !errors.Is(err, openErr) {
+	if _, err := plainfile.ReadWith(ledger, maxHandoffLedgerBytes, failing); !errors.Is(err, openErr) {
 		t.Errorf("an open error = %v, want it returned", err)
 	}
 	if raw, err := ReadHandoffLedger(ledger); err != nil || string(raw) != `{}` {
@@ -706,7 +707,7 @@ func TestOpenLedgerWithoutBlocking_AFIFOReturnsAtOnce(t *testing.T) {
 	}
 	done := make(chan error, 1)
 	go func() {
-		f, err := openLedgerWithoutBlocking(fifo)
+		f, err := plainfile.Open(fifo)
 		if err == nil {
 			f.Close()
 		}
