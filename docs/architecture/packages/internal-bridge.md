@@ -506,6 +506,8 @@ The spec is [llm-isolation.md](../llm-isolation.md) §5.2. The `claude-cloud` dr
   - The session names are not the cause. Each test has its own socket, and the tests of this file run in series.
   - The guard `TestIntegrationTests_EveryOwnSocketStartsItsOwnServer` parses each test file that needs the `integration` tag. It fails when a function sets `TmuxSocketEnv` to a socket and calls no server starter of `ownServerStarters`. `TestOwnSocketsWithoutServer_FindsOnlyASocketWithNoStarter` pins the detector.
   - A timeout panic skips the stop. Then the orphan guard of `tmuxtest.Main` stops each `evolve-bridge-t<pid>-*` server ([internal-tmuxtest.md](internal-tmuxtest.md)).
+  - At a normal end, `tmuxtest.Main` stops each `evolve-bridge-t<pid>-*` server of the process and removes its socket file.
+  - If the guard cannot run, `evolve gc` stops the `evolve-bridge-t<pid>` server and the `-own` server of a dead pid. It never stops the server of a live pid.
 - A test process never shares a tmux server. The package's `TestMain` is `tmuxtest.Main` ([internal-tmuxtest.md](internal-tmuxtest.md)). It selects `DeriveTestSocket(os.Getpid())` (`evolve-bridge-t<pid>`). It starts that server with no user config, `exit-empty off` and `/bin/sh` as the pane shell. It stops only that server, at exit or through its orphan guard about 1 s after the binary dies.
 
   Before this change, each test process on the host shared the default `evolve-bridge` server. Thus the panes got the environment of the process that started the server. One leaked session kept a server alive for six days. The panes also started the login shell of the operator, whose profile waits on a host-wide lock. Two floors at once made the boot of the fake REPL longer than the scaled budget of the tests.

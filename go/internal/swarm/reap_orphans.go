@@ -108,7 +108,7 @@ func ExecReapOrphans(ctx context.Context) OrphanReapReport {
 	return ReapOrphanSessions(ctx, ExecListBridgeSessions, ExecPidAlive, ExecTmuxKill)
 }
 
-var ownerPidSocketRE = regexp.MustCompile(`^evolve-bridge-[pt](\d+)$`)
+var ownerPidSocketRE = regexp.MustCompile(`^evolve-bridge-[pt](\d+)(?:-own)?$`)
 
 type OrphanSocketReport struct {
 	Killed      []string

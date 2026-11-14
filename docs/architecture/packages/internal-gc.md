@@ -164,3 +164,7 @@ Three files grew without a bound, because the retention engine covered only the 
 
 - **2026-09-29, the sweep that saw nothing.** 87 finished trees, 79 dead sockets, 14 orphaned CPU loops, 60 GB of Go cache and 56 GB of temp artifacts were all outside what `evolve gc` could see: the stale `run.json` pointer made every tree live, `kill-server` left the socket files behind, and nothing looked at processes, the cache or the temp dir. The mutation sweep over the new decision points killed 13 of 13 mutants after two gaps it found were closed: the `cycle-` prefix guard, and the failed-salvage path.
 - **Cycle 1762.** The auditor reproduced a flake under load with `hw.ncpu` busy loops and never stopped them. They ran for 47 minutes at a load average of 118 and starved the cycle's own host predicate run, which then failed with "produced no execution results". The process sweep is the release; the auditor's hygiene is its own inbox item.
+
+## Servers of a dead test process
+
+`evolve gc` runs `swarm.ExecReapOrphanSockets`. The reaper lists each socket that matches `evolve-bridge-t<pid>` or `evolve-bridge-t<pid>-own`. It stops the server and removes the socket file when `<pid>` is dead. It keeps the socket when `<pid>` is alive. A dry run stops nothing. The `-own` name was invisible to the reaper before 2026-11-14, so a test process that ended left its `-own` socket for good.

@@ -3,9 +3,11 @@ package tmuxtest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -79,11 +81,23 @@ func Main(m interface{ Run() int }) int {
 		return 1
 	}
 	code := m.Run()
-	if err := StopServer(socket); err != nil {
+	if err := stopFamily(socket); err != nil {
 		fmt.Fprintf(os.Stderr, "tmuxtest: %v\n", err)
 		return max(code, 1)
 	}
 	return code
+}
+
+func stopFamily(socket string) error {
+	errs := []error{StopServer(socket)}
+	own, err := filepath.Glob(filepath.Join(bridge.TmuxSocketDir(), socket+"-*"))
+	errs = append(errs, err)
+	for _, path := range own {
+		ctx, cancel := context.WithTimeout(context.Background(), serverStopTimeout)
+		errs = append(errs, swarm.ExecKillServer(ctx, filepath.Base(path)))
+		cancel()
+	}
+	return errors.Join(errs...)
 }
 
 func StartServer(socket string) error {
@@ -145,9 +159,9 @@ func startOrphanGuard(socket string, owner int) error {
 	dir, name := shellQuote(bridge.TmuxSocketDir()), shellQuote(socket)
 	killCmd := fmt.Sprintf("exec tmux -L %s kill-server", name)
 	if serverPid > 1 {
-		killCmd = fmt.Sprintf("tmux -L %s kill-server 2>/dev/null; kill -TERM %d 2>/dev/null; sleep 1; kill -9 %d 2>/dev/null", name, serverPid, serverPid)
+		killCmd = fmt.Sprintf("rm -f %s/%s; kill -TERM %d 2>/dev/null; sleep 1; kill -9 %d 2>/dev/null", dir, name, serverPid, serverPid)
 	}
-	watch := fmt.Sprintf(`while kill -0 %d 2>/dev/null; do sleep 1; done; for s in %s/%s-*; do [ -S "$s" ] && tmux -S "$s" kill-server; done; %s`,
+	watch := fmt.Sprintf(`while kill -0 %d 2>/dev/null; do sleep 1; done; for s in %s/%s-*; do [ -S "$s" ] && tmux -S "$s" kill-server; rm -f "$s"; done; %s`,
 		owner, dir, name, killCmd)
 	out, err := sysexec.Command(context.Background(), "tmux", "-L", socket,
 		"new-session", "-d", "-s", guardSession, watch,

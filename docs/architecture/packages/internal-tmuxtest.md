@@ -18,7 +18,7 @@ func TestMain(m *testing.M) { os.Exit(tmuxtest.Main(m)) }
 2. It marks each inherited descriptor above 2 close-on-exec (`closeInheritedOnExec`). It reads the list from `/dev/fd` (the `fdDir` seam). A list that it cannot read stops the run with exit 1. Thus no child of the test binary keeps a pipe that the caller of `go test` reads.
 3. If tmux is on `PATH`, it stops a server that is already on that socket. A dead process with a recycled pid can leave such a server. Then it starts the server in one tmux call:
    `-f /dev/null start-server`, `set-option -s exit-empty off`, `set-option -g default-shell /bin/sh`, `set-option -g default-command "exec /bin/sh"`.
-4. It starts the orphan guard (`startOrphanGuard`), the session `tmuxtest-orphan-guard`. The guard waits with `kill -0 <pid>` each second. About 1 s after the test binary dies, the guard stops each `<socket>-*` server in the socket directory. Then it stops its own server.
+4. It starts the orphan guard (`startOrphanGuard`), the session `tmuxtest-orphan-guard`. The guard waits with `kill -0 <pid>` each second. About 1 s after the test binary dies, the guard stops each `<socket>-*` server in the socket directory. It removes each socket file, because tmux leaves the file after a signal stops the server. Then it stops its own server.
    - Thus it also stops the `ownTmuxServer` servers of `internal/bridge`, which tests start on sockets of their own.
    - The guard does not stop `evolve-bridge-t1234` for pid 123, because that socket has no `-` after the pid.
    - A guard that cannot start stops the server, and the run ends with exit 1.
