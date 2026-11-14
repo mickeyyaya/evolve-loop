@@ -29,6 +29,7 @@ type qualityReader struct {
 type qualityEnv struct {
 	scopes    map[string][]qualityReader
 	newCenter func(root, evolveDir string, console io.Writer) (*signalcenter.Center, func())
+	view      func(root string) (pipelinerates.WaveView, error)
 }
 
 var qualityScopes = map[string][]qualityReader{"wave": waveQualityReaders(), "tree": treeQualityReaders(), "judges": nil, "replay": nil}
@@ -154,7 +155,11 @@ func pipelineReader(index string, read func([]pipelinerates.Cycle, string) ([]qu
 }
 
 func runQuality(args []string, _ io.Reader, stdout, stderr io.Writer) int {
-	return runQualityWith(qualityEnv{scopes: qualityScopes, newCenter: newQualityCenter}, args, stdout, stderr)
+	return runQualityWith(qualityEnv{scopes: qualityScopes, newCenter: newQualityCenter, view: liveWaveView}, args, stdout, stderr)
+}
+
+func liveWaveView(root string) (pipelinerates.WaveView, error) {
+	return pipelinerates.ReadWaveView(root, time.Now())
 }
 
 func newQualityCenter(root, evolveDir string, console io.Writer) (*signalcenter.Center, func()) {
@@ -181,10 +186,19 @@ func runQualityWith(env qualityEnv, args []string, stdout, stderr io.Writer) int
 	center, closeCenter := env.newCenter(a.root, paths.EvolveDirOf(a.root), stderr)
 	defer closeCenter()
 	t := collectQuality(center.Emit, a.root, readers)
+	result := t.result(a.scope)
+	if a.scope == "wave" && env.view != nil {
+		if v, err := env.view(a.root); err == nil {
+			result.WaveView = &v
+		}
+	}
 	if a.json {
-		return printVerbJSON("quality report", t.result(a.scope), stdout, stderr)
+		return printVerbJSON("quality report", result, stdout, stderr)
 	}
 	fmt.Fprintf(stdout, "quality report: scope %s: %d reading(s), %d breach(es), %d warning(s)\n", a.scope, t.readings, t.breaches, t.warnings)
+	if result.WaveView != nil {
+		fmt.Fprintln(stdout, result.WaveView.Line())
+	}
 	return 0
 }
 
@@ -198,6 +212,8 @@ type qualityReportResult struct {
 	Readings int    `json:"readings"`
 	Breaches int    `json:"breaches"`
 	Warnings int    `json:"warnings"`
+
+	WaveView *pipelinerates.WaveView `json:"wave_view,omitempty"`
 }
 
 func parseQualityArgs(verb string, args []string, scopes map[string][]qualityReader) (qualityReportArgs, error) {

@@ -15,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/heldproposal"
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
+	"github.com/mickeyyaya/evolve-loop/go/internal/pipelinerates"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wavemeasure"
@@ -26,24 +27,25 @@ type waveSummary struct {
 }
 
 type waveStatusReport struct {
-	ProjectRoot   string                `json:"project_root"`
-	Wave          int                   `json:"wave"`
-	RunID         string                `json:"run_id"`
-	PID           int                   `json:"pid"`
-	PIDAlive      bool                  `json:"pid_alive"`
-	LoopLive      bool                  `json:"loop_live"`
-	PoolLive      *int                  `json:"pool_live,omitempty"`
-	Outcome       string                `json:"outcome"`
-	Cycles        []wave.Cycle          `json:"cycles"`
-	CyclesOmitted int                   `json:"cycles_omitted,omitempty"`
-	LastWave      *waveSummary          `json:"last_wave,omitempty"`
-	NotesQueued   int                   `json:"notes_queued"`
-	Measures      wavemeasure.Measures  `json:"measures"`
-	Runs          []waveRunMeasures     `json:"runs"`
-	Warnings      []string              `json:"warnings,omitempty"`
-	Held          []heldproposal.Record `json:"held,omitempty"`
-	Benched       []clihealth.Entry     `json:"benched,omitempty"`
-	Seats         []waveSeat            `json:"seats"`
+	ProjectRoot   string                  `json:"project_root"`
+	Wave          int                     `json:"wave"`
+	RunID         string                  `json:"run_id"`
+	PID           int                     `json:"pid"`
+	PIDAlive      bool                    `json:"pid_alive"`
+	LoopLive      bool                    `json:"loop_live"`
+	PoolLive      *int                    `json:"pool_live,omitempty"`
+	Outcome       string                  `json:"outcome"`
+	Cycles        []wave.Cycle            `json:"cycles"`
+	CyclesOmitted int                     `json:"cycles_omitted,omitempty"`
+	LastWave      *waveSummary            `json:"last_wave,omitempty"`
+	NotesQueued   int                     `json:"notes_queued"`
+	Measures      wavemeasure.Measures    `json:"measures"`
+	Runs          []waveRunMeasures       `json:"runs"`
+	Warnings      []string                `json:"warnings,omitempty"`
+	Held          []heldproposal.Record   `json:"held,omitempty"`
+	Benched       []clihealth.Entry       `json:"benched,omitempty"`
+	Seats         []waveSeat              `json:"seats"`
+	Health        *pipelinerates.WaveView `json:"health,omitempty"`
 }
 
 func parseWaveReadArgs(args []string) (projectRoot string, asJSON bool, err error) {
@@ -132,6 +134,7 @@ func buildWaveStatus(env waveEnv, plane wavePlaneDirs, records []wave.Record) wa
 	runs, measureWarnings := measureWaveRuns(plane, records, cyclesAboveFloor(cycles, cur.CycleFloor), loop, report.PIDAlive || report.LoopLive, env.now())
 	report.Runs, report.Measures = runs, runs[len(runs)-1].Measures
 	report.Warnings = append(report.Warnings, measureWarnings...)
+	report.Health, report.Warnings = waveHealth(plane.root, env.now(), report.Warnings)
 	if over := len(cycles) - waveStatusMaxCycles; over > 0 {
 		cycles, report.CyclesOmitted = cycles[over:], over
 	}
@@ -141,6 +144,17 @@ func buildWaveStatus(env waveEnv, plane wavePlaneDirs, records []wave.Record) wa
 		report.LastWave = &waveSummary{Wave: prev.Number, Outcome: prev.Outcome}
 	}
 	return report
+}
+
+func waveHealth(root string, now time.Time, warnings []string) (*pipelinerates.WaveView, []string) {
+	view, err := pipelinerates.ReadWaveView(root, now)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return nil, warnings
+	case err != nil:
+		return nil, append(warnings, "wave health: "+err.Error())
+	}
+	return &view, warnings
 }
 
 func poolPreflightWarnings(loop []signalcenter.Event, since time.Time) []string {
@@ -165,6 +179,9 @@ func writeWaveStatusText(w io.Writer, r waveStatusReport) {
 	}
 	fmt.Fprintf(w, "outcome: %s\n", r.Outcome)
 	writeWaveMeasuresText(w, r.Measures)
+	if r.Health != nil {
+		fmt.Fprintln(w, r.Health.Line())
+	}
 	if r.CyclesOmitted > 0 {
 		fmt.Fprintf(w, "  (%d older cycle(s) not shown)\n", r.CyclesOmitted)
 	}

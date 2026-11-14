@@ -3,7 +3,9 @@ package sandbox
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -340,10 +342,19 @@ func TestExec_LinuxBwrap(t *testing.T) {
 	if !pr.Available {
 		t.Skip("bwrap not available")
 	}
-	s := New(canonicalConfig())
-	err := s.Exec(context.Background(), []string{"/bin/true"}, nil, nil, nil)
+	if pr.CapabilityChecked && !pr.Capable {
+		t.Skipf("bwrap is installed but cannot sandbox on this host: %s", pr.Reason)
+	}
+	repo, home := t.TempDir(), t.TempDir()
+	runs := filepath.Join(repo, ".evolve", "runs")
+	if err := os.MkdirAll(runs, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	s := New(Config{RepoRoot: repo, HomeDir: home, AllowNetwork: true, WritePaths: []string{runs}})
+	var stderr strings.Builder
+	err := s.Exec(context.Background(), []string{"/bin/true"}, nil, nil, &stderr)
 	if err != nil {
-		t.Errorf("Exec /bin/true under bwrap: %v", err)
+		t.Errorf("Exec /bin/true under bwrap: %v (stderr: %s)", err, stderr.String())
 	}
 }
 

@@ -662,7 +662,7 @@ The unit of a PQ5 reading depends on its window suffix. The suffix is the contra
 | Unit | % |
 | Window | one reading for each of the last 10 waves (`wave:N`) |
 | Source | `LOOP_ORCH_*` samples of `.evolve/signals.ndjson` for the pid of the wave |
-| Stage and threshold | `shadow`. No threshold yet. The control chart is component H3. A wave with no sample has `n` 0 and the panel shows `no_data`. |
+| Stage and threshold | `shadow`. Rule 1 of D5: an individuals (XmR) chart marks one wave outside 3 sigma, with the field `xmr_rule1`. The chart of each wave uses the earlier waves of the loaded window, and it needs two of them. On the waves of the plan, waves 162 to 164 are outside: the drop starts at wave 162. The mark never breaches at `shadow`. A wave with no sample has `n` 0 and the panel shows `no_data`. |
 | Game and counter | Long lanes keep slots busy. Read PQ7 next to PQ6. |
 
 ### PQ8 Idle-cause share

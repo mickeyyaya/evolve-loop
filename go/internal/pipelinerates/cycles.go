@@ -14,6 +14,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclespend"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/retryladder"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -30,6 +31,7 @@ type Cycle struct {
 	HandoffWould int
 	HandedOff    bool
 	SpendLimit   string
+	FailClasses  map[string]int
 }
 
 func (c Cycle) DeadlineEnd() bool { return !c.Sealed || c.LaneDeadline }
@@ -178,12 +180,25 @@ func withSignals(c Cycle, path string) (Cycle, error) {
 		if e.Code == cyclespend.SignalCode {
 			c.SpendLimit = e.Fields[cyclespend.FieldDecision]
 		}
+		c.FailClasses = withFailClass(c.FailClasses, e)
 		if string(e.Code) == cyclestate.RepairHandoffSignal {
 			c.HandoffWould += boolInt(e.Fields[cyclestate.RepairDecisionField] == cyclestate.RepairDecisionWould)
 			c.HandedOff = c.HandedOff || e.Fields[cyclestate.RepairDecisionField] == cyclestate.RepairDecisionStop
 		}
 	}
 	return c, nil
+}
+
+func withFailClass(classes map[string]int, e signalcenter.Event) map[string]int {
+	class := e.Fields["class"]
+	if string(e.Code) != retryladder.SignalDecision || class == "" {
+		return classes
+	}
+	if classes == nil {
+		classes = map[string]int{}
+	}
+	classes[class]++
+	return classes
 }
 
 func boolInt(b bool) int {

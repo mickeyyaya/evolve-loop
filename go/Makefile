@@ -107,7 +107,7 @@ dist-clean: ## Remove cross-compiled artifacts
 test: ## FAST layer: co-located unit/functional/component tests, race on (excludes acs/, integration, e2e); a treewalk guard fails the run on any file or empty directory the tests leave in go/
 	@base=$$(mktemp) || exit 1; \
 	$(GO) run ./cmd/evolve treewalk snapshot --root . --out "$$base" || exit 1; \
-	$(GO) test -race -count=1 -cover $(FAST_PKGS); status=$$?; \
+	$(GO) test -race -count=1 -cover -timeout $(TEST_TIMEOUT) $(FAST_PKGS); status=$$?; \
 	$(GO) run ./cmd/evolve treewalk check --root . --baseline "$$base" || status=1; \
 	rm -f "$$base"; exit $$status
 

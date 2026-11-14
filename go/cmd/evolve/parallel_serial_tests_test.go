@@ -326,6 +326,8 @@ var serialTests = map[string]string{
 	"main.TestCompose_ShipWithOverride_Proceeds":                                                                      "assigns runner.DefaultRouter",
 	"main.TestCompose_ShipWithoutOverride_Exit2":                                                                      "assigns runner.DefaultRouter",
 	"main.TestCompose_UnknownPhase_Exit10":                                                                            "assigns runner.DefaultRouter",
+	"main.TestRunComposedGates_AConsoleGateGetsNoCPULimit":                                                            "sets env EVOLVE_FLEET_WIDTH and GOMAXPROCS",
+	"main.TestRunComposedGates_ALaneGateGetsItsCPUShare":                                                              "sets env EVOLVE_FLEET_WIDTH and GOMAXPROCS",
 	"main.TestComposedGatesTo_AnUnmappedRequiredGateIsLeftAbsent":                                                     "swaps seam composedGateTargets",
 	"main.TestCoverChanged_AVerdictItCannotWriteExitsIO":                                                              "swaps seam coverChangedRunner",
 	"main.TestCoverChanged_ExitCodesSeparateUsageFromIO":                                                              "swaps seam coverChangedRunner",
@@ -1022,4 +1024,6 @@ var serialTests = map[string]string{
 	"main.TestBranchSweep_OperatorRunKeepsABranchWhenItsBundleCannotBeWritten":                                             "swaps seams gcInjectedReapers and gcInjectedProcessHost",
 	"main.TestBranchSweep_OperatorRunKeepsAFreshUnlandedBranchAndMain":                                                     "swaps seams gcInjectedReapers and gcInjectedProcessHost",
 	"main.TestDiskSignals_NameTheBreachedLevelAndStateTheFloor":                                                            "swaps seam gcDiskFreeBytes",
+	"main.TestDiskSignals_ATempDirThatIsTheProjectRootIsCheckedOnce":                                                       "swaps seam gcDiskFreeBytes",
+	"main.TestCacheScope_AnUnresolvableRootAndAFailedCacheStepEachExitOne":                                                 "swaps seam gcDiskFreeBytes and sets env GOCACHE",
 }

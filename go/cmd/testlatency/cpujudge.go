@@ -28,7 +28,7 @@ func loadRusage(path string) (map[string]float64, error) {
 	if err != nil {
 		return nil, fmt.Errorf("rusage %s: %w", path, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	cpu := map[string]float64{}
 	sc := bufio.NewScanner(f)
 	sc.Buffer(nil, 16*1024*1024)

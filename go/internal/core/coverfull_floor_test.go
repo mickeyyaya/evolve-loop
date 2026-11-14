@@ -42,7 +42,7 @@ func TestAddedTaggedTestFailures_UnusableDiffAndBadConstraintAndExcludedFile(t *
 	in := ReviewInput{Worktree: repo, WorktreeBaseSHA: base}
 
 	writeFileAt(t, filepath.Join(repo, "go", "pkg", "bad_test.go"), "//go:build (\n\npackage pkg\n")
-	if got := addedTaggedTestFailures(ctx, in, filepath.Join(repo, "go")); got != nil {
+	if got := addedTaggedTestFailures(ctx, in.withFloorAdded(), filepath.Join(repo, "go")); got != nil {
 		t.Fatalf("grouping failure must be non-fatal, got %v", got)
 	}
 	if err := os.Remove(filepath.Join(repo, "go", "pkg", "bad_test.go")); err != nil {
@@ -50,7 +50,7 @@ func TestAddedTaggedTestFailures_UnusableDiffAndBadConstraintAndExcludedFile(t *
 	}
 
 	writeFileAt(t, filepath.Join(repo, "go", "pkg", "win_test.go"), "//go:build requires_tmux\n\npackage pkg\n")
-	if got := addedTaggedTestFailures(ctx, in, filepath.Join(repo, "go")); len(got) != 0 {
+	if got := addedTaggedTestFailures(ctx, in.withFloorAdded(), filepath.Join(repo, "go")); len(got) != 0 {
 		t.Fatalf("excluded file must not fail the floor, got %v", got)
 	}
 }

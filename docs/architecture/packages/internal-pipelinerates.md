@@ -42,6 +42,12 @@
   | `GateShare` | PQ9 | gate time ÷ lane time | none; `n` 0 when the wave has no lane time |
 
   An idle event with no `cause` field counts as the cause `unknown`. A wave whose idle slot-hours total 0 or less gives no PQ8 reading.
+- **The wave view.** `ReadWaveView` gives the PQ6 to PQ9 numbers of the latest wave. It calls `LoadWaveFlows`, `LoadCycles`, `CalendarThroughput`, `SlotUtilization`, `IdleCauseShare` and `GateShare`. It adds no second computation. `evolve quality report --scope wave` and `evolve wave status` both read the numbers through it, so the two verbs cannot disagree.
+  - PQ6 is the mean of the 7 day readings. PQ7 and PQ9 are the readings of the latest wave.
+  - `TopIdleCause` is the cause with the largest PQ8 share. It is empty when the wave has no idle slot-hours.
+  - `TopFailClass` is the most frequent `class` of the `LADDER_DECISION` signals in the unshipped cycles of the wave. A tie goes to the first name in sort order. It is empty when no such signal exists.
+  - `Line` gives the one text line of both verbs.
+- **The view reads each fact once.** `LoadCycles` folds the `class` of each `LADDER_DECISION` event into `Cycle.FailClasses`. The view reads no stream of its own. It reads the flows through `FlowSet.WithSamples`, so an absent sample store is an error, as in the panel. A reading with no count shows as `n/a`, not as `0.000`.
 - **Windows.** `Windows` gives the latest wave, the last 10 waves, and all waves when they reach past the last 10.
 - **Packages per ship.** `PackagesPerShip` runs `git show --numstat` on the `ship-binding.json` commit of each ship. The command uses `-z`, `--no-renames` and `--diff-merges=first-parent`, so a merge ship and a path with a space count right. A commit that git cannot resolve is left out and named in the error; the collector publishes the other readings and one `quality.warning`. It counts the distinct directories of the `.go` paths outside `.evolve/`.
 - **The CQ2 interval.** The median carries a cluster bootstrap by wave (2,000 resamples, fixed seed). A wave with no ship gives a `no_data` reading.

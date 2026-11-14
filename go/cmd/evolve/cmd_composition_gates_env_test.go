@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -32,6 +33,42 @@ func TestRunComposedGates_RunsInTheCIEnvAndNamesAFailingGate(t *testing.T) {
 	}
 	if results["apicover"].Status != "fail" || !strings.Contains(results["apicover"].Tail, "TestExportedThingIsCovered") || !strings.Contains(log.String(), "apicover") || !strings.Contains(log.String(), worktree) {
 		t.Errorf("results = %v log = %q; a failing gate names itself in the log and carries its own output in its outcome", results, log.String())
+	}
+}
+
+func composedGateProbeEnv(t *testing.T, width string) string {
+	t.Helper()
+	worktree := t.TempDir()
+	probe := filepath.Join(t.TempDir(), "gomaxprocs")
+	rule := "\t@echo \"set=$${GOMAXPROCS+yes} value=$$GOMAXPROCS\" > " + probe + "\n"
+	makefile := "build:\n" + rule + "test:\n\t@true\ntest-acs-durable:\n\t@true\napicover-enforce:\n\t@true\n"
+	if err := os.MkdirAll(filepath.Join(worktree, "go"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(worktree, "go", "Makefile"), []byte(makefile), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("EVOLVE_FLEET_WIDTH", width)
+	t.Setenv("GOMAXPROCS", "")
+	composedGatesTo(&bytes.Buffer{})(context.Background(), worktree)
+	raw, err := os.ReadFile(probe)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.TrimSpace(string(raw))
+}
+
+func TestRunComposedGates_ALaneGateGetsItsCPUShare(t *testing.T) {
+	want := fmt.Sprintf("set=yes value=%d", max(1, runtime.NumCPU()/4))
+
+	if got := composedGateProbeEnv(t, "4"); got != want {
+		t.Errorf("composed gate env = %q, want %q; a gate make must run go test inside the lane CPU budget", got, want)
+	}
+}
+
+func TestRunComposedGates_AConsoleGateGetsNoCPULimit(t *testing.T) {
+	if got := composedGateProbeEnv(t, ""); got != "set= value=" {
+		t.Errorf("composed gate env = %q, want no GOMAXPROCS outside a lane", got)
 	}
 }
 
