@@ -181,7 +181,7 @@
   ],
   "busy_line_regex": "^\\s*([⣾⣽⣻⢿⡿⣟⣯⣷])\\s+\\S",
   "token_line_regex": "(?m)^\\s*▸\\s*Thought for [^,\\n]*,\\s*(?P<count>[0-9][0-9,]*(?:\\.[0-9]+)?)(?P<scale>k?)\\s+tokens",
-  "model_label_regex": "^(?P<footer>esc to cancel|\\? for shortcuts)?\\s{2,}(?P<model>[[:alnum:]][^·()]*?(?:\\s*·\\s*[^·\\s]+|\\s*\\([^)]+\\)))(?:\\s*·\\s*[^·]*?)*\\s*$",
+  "model_label_regex": "^(?P<footer>esc to cancel|\\? for shortcuts)?\\s{2,}(?:(?:auto|plan|ask|default)\\s*·\\s*)?(?P<model>[[:alnum:]][^·()]*?(?:\\s*·\\s*[^·\\s]+|\\s*\\([^)]+\\)))(?:\\s*·\\s*[^·]*?)*\\s*$",
   "stub": false,
   "model_tier_map": {
     "fast": "Gemini 3.8 Flash (Low)",
