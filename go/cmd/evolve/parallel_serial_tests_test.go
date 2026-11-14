@@ -1022,4 +1022,6 @@ var serialTests = map[string]string{
 	"main.TestBranchSweep_OperatorRunKeepsABranchWhenItsBundleCannotBeWritten":                                             "swaps seams gcInjectedReapers and gcInjectedProcessHost",
 	"main.TestBranchSweep_OperatorRunKeepsAFreshUnlandedBranchAndMain":                                                     "swaps seams gcInjectedReapers and gcInjectedProcessHost",
 	"main.TestDiskSignals_NameTheBreachedLevelAndStateTheFloor":                                                            "swaps seam gcDiskFreeBytes",
+	"main.TestDiskSignals_ATempDirThatIsTheProjectRootIsCheckedOnce":                                                       "swaps seam gcDiskFreeBytes",
+	"main.TestCacheScope_AnUnresolvableRootAndAFailedCacheStepEachExitOne":                                                 "swaps seam gcDiskFreeBytes and sets env GOCACHE",
 }

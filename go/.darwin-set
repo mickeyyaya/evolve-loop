@@ -5,6 +5,7 @@
 # the file is stale.
 ./cmd/evolve
 ./cmd/hostsampler
+./cmd/testlatency
 ./cmd/testrusage
 ./internal/adapters/sandbox
 ./internal/bedrock

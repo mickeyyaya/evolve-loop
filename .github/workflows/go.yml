@@ -204,7 +204,7 @@ jobs:
       - name: package wall ratchet (hard fail on speed-adjusted CPU and the go test timeout)
         run: |
           if [ -s test-integration.json ]; then
-            go run ./cmd/testlatency -ratchet .test-latency.json -rusage test-rusage.ndjson -title "Package wall ratchet" < test-integration.json >> "$GITHUB_STEP_SUMMARY"
+            go run ./cmd/testlatency -ratchet .test-latency.json -rusage test-rusage.ndjson -test-timeout "$(make -s print-test-timeout-darwin)" -title "Package wall ratchet" < test-integration.json >> "$GITHUB_STEP_SUMMARY"
           fi
       - name: e2e tier (no race; live sub-tier self-skips without live flag)
         env:
