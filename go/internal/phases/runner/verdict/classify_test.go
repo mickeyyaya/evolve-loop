@@ -3,6 +3,7 @@ package verdict
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -99,5 +100,24 @@ func TestWriteCleanStdout_NilFilterSkips_ErrorIsACodeNeverAnError(t *testing.T) 
 	}
 	if got := codesOf(*both.events); len(got) != 2 || got[0] != CodeStdoutFilterFailed || got[1] != CodeReconciled {
 		t.Errorf("stream order on a reconciled teardown with a failing filter: %v", got)
+	}
+}
+
+func TestClassify_UnverifiedDeliverable_CarriesTheViolationsOnTheResponse(t *testing.T) {
+	h := newHarness(t, probe{codes: []string{deliverable.CodeMissingSection, deliverable.CodeBadVerdict}})
+	h.writeReport(t, "audit", "partial")
+	resp, err := h.e.Judge(context.Background(), h.dispatch("audit", nil), classifyAs(core.VerdictPASS, "ship"))
+	want := []core.ContractViolation{
+		{Code: deliverable.CodeMissingSection, Message: "violation " + deliverable.CodeMissingSection},
+		{Code: deliverable.CodeBadVerdict, Message: "violation " + deliverable.CodeBadVerdict},
+	}
+	if err != nil || !reflect.DeepEqual(resp.ContractViolations, want) {
+		t.Fatalf("ContractViolations = %+v (%v), want %+v", resp.ContractViolations, err, want)
+	}
+	clean := newHarness(t, probe{okFrom: 1})
+	clean.writeReport(t, "audit", "ok")
+	resp, err = clean.e.Judge(context.Background(), clean.dispatch("audit", nil), classifyAs(core.VerdictPASS, "ship"))
+	if err != nil || len(resp.ContractViolations) != 0 {
+		t.Errorf("a verified deliverable carries no violation: %+v (%v)", resp.ContractViolations, err)
 	}
 }
