@@ -116,6 +116,11 @@ type TaskAssignment struct {
 	Effort string `json:"effort,omitempty"`
 }
 
+type ContractViolation struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
 type PhaseResponse struct {
 	Phase        string       `json:"phase"`
 	Verdict      string       `json:"verdict"`
@@ -126,6 +131,8 @@ type PhaseResponse struct {
 	DurationMS   int64        `json:"duration_ms"`
 	BootMS       int64        `json:"boot_ms,omitempty"`
 	Diagnostics  []Diagnostic `json:"diagnostics,omitempty"`
+
+	ContractViolations []ContractViolation `json:"contract_violations,omitempty"`
 
 	Signals map[string]any `json:"signals,omitempty"`
 

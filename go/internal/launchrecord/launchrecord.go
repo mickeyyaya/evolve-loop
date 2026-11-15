@@ -1,6 +1,7 @@
 package launchrecord
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -30,6 +31,80 @@ type Record struct {
 	Worktree       string               `json:"worktree,omitempty"`
 	TS             string               `json:"ts"`
 	Cloud          *cloudlaunch.Session `json:"cloud,omitempty"`
+	Violations     []Violation          `json:"violations,omitempty"`
+}
+
+type Violation struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+const deliverableSuffix = ".deliverable.md"
+
+func DeliverablePath(evolveDir, runID string) (string, error) {
+	path, err := Path(evolveDir, runID)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSuffix(path, ".json") + deliverableSuffix, nil
+}
+
+func KeepDeliverable(evolveDir, runID, body string, keep int) error {
+	path, err := DeliverablePath(evolveDir, runID)
+	if err != nil {
+		return err
+	}
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("launch record %s: %w", runID, err)
+	}
+	staging := path + ".tmp"
+	if err := os.WriteFile(staging, []byte(body), 0o644); err != nil {
+		return fmt.Errorf("launch record %s: %w", runID, err)
+	}
+	if err := os.Rename(staging, path); err != nil {
+		return errors.Join(fmt.Errorf("launch record %s: %w", runID, err), os.Remove(staging))
+	}
+	return pruneDeliverables(dir, keep)
+}
+
+func pruneDeliverables(dir string, keep int) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return fmt.Errorf("launch records: %w", err)
+	}
+	stale, err := staleDeliverables(entries, keep)
+	var errs []error
+	for _, name := range stale {
+		errs = append(errs, os.Remove(filepath.Join(dir, name)))
+	}
+	return errors.Join(append(errs, err)...)
+}
+
+func staleDeliverables(entries []fs.DirEntry, keep int) ([]string, error) {
+	type kept struct {
+		name string
+		at   int64
+	}
+	var files []kept
+	for _, e := range entries {
+		if !strings.HasSuffix(e.Name(), deliverableSuffix) || e.IsDir() {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil {
+			return nil, fmt.Errorf("launch records: %w", err)
+		}
+		files = append(files, kept{e.Name(), info.ModTime().UnixNano()})
+	}
+	slices.SortFunc(files, func(a, b kept) int {
+		return cmp.Or(cmp.Compare(b.at, a.at), strings.Compare(b.name, a.name))
+	})
+	var stale []string
+	for _, f := range files[min(keep, len(files)):] {
+		stale = append(stale, f.name)
+	}
+	return stale, nil
 }
 
 func (r Record) BoundTo(treeStateSHA string) bool {

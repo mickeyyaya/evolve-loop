@@ -25,6 +25,7 @@ func (e *Engine) classify(ctx context.Context, d Dispatch, r reconciliation, cla
 	diags = append(diags, violationDiagnostics(src.violations)...)
 	resp := responseBase(d)
 	resp.Verdict, resp.NextPhase, resp.Diagnostics = verdict, nextPhase, diags
+	resp.ContractViolations = src.violations
 	resp.ModelSource, resp.ResolvedModel = d.ModelSource, d.ResolvedModel
 	if r.reconciled {
 		e.reconcileTrail(&resp, d, r, verdict)
