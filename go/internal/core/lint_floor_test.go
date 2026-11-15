@@ -23,6 +23,8 @@ type fakeLint struct {
 	err      error
 }
 
+var _ LintFn = (&fakeLint{}).run
+
 func (f *fakeLint) run(_ context.Context, moduleDir string, pkgs []string) (string, error) {
 	f.calls = append(f.calls, lintCall{moduleDir, pkgs})
 	return f.findings, f.err
