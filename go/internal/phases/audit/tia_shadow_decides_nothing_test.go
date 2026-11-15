@@ -30,7 +30,7 @@ func auditGateOutcome(t *testing.T, stage string, cycle int) gateOutcome {
 
 func gateOutcomeOf(t *testing.T, root, ws, stage string, cycle int) gateOutcome {
 	t.Helper()
-	if err := generateACSVerdict(core.PhaseRequest{Worktree: root, ProjectRoot: root, Workspace: ws, Cycle: cycle}); err != nil {
+	if err := generateACSVerdictWith(core.PhaseRequest{Worktree: root, ProjectRoot: root, Workspace: ws, Cycle: cycle}, nil); err != nil {
 		t.Fatalf("generateACSVerdict (stage %q): %v", stage, err)
 	}
 	entries, err := os.ReadDir(ws)
@@ -122,7 +122,7 @@ func TestEmitTIADecision_AnEmptyDecisionWritesNoArtifact(t *testing.T) {
 	tiaCompute = func(string, string, string, []string) regressiontia.Decision { return regressiontia.Decision{} }
 	root, ws := tiaFixture(t, "shadow", 4252)
 
-	emitTIADecision(core.PhaseRequest{Worktree: root, ProjectRoot: root, Workspace: ws, Cycle: 4252}, root)
+	emitTIADecision(core.PhaseRequest{Worktree: root, ProjectRoot: root, Workspace: ws, Cycle: 4252}, root, nil)
 
 	if _, err := os.Stat(filepath.Join(ws, regressiontia.ArtifactName)); !os.IsNotExist(err) {
 		t.Errorf("an empty decision must write no %s (stat err %v)", regressiontia.ArtifactName, err)

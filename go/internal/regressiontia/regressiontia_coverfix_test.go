@@ -27,7 +27,7 @@ func withResolveDepsCoverfixListing(t *testing.T, listing string) {
 }
 
 func TestResolveDepsCoverfix_EmptyInputsYieldNil(t *testing.T) {
-	if got := resolveDeps("", []string{"./acs/regression/a"}); got != nil {
+	if got := skippableDeps(listCorpusDeps("", []string{"./acs/regression/a"})); got != nil {
 		t.Fatalf("empty moduleDir must yield nil, got %v", got)
 	}
 }
@@ -43,7 +43,7 @@ func TestResolveDepsCoverfix_DerivesSortedDedupedPatternsAndDropsUnderivable(t *
 		"",
 	}, "\n")
 	withResolveDepsCoverfixListing(t, listing)
-	got := resolveDeps(t.TempDir(), []string{"./acs/regression/derivable", "./acs/regression/hatch", "./acs/regression/plain"})
+	got := skippableDeps(listCorpusDeps(t.TempDir(), []string{"./acs/regression/derivable", "./acs/regression/hatch", "./acs/regression/plain"}))
 	want := map[string][]string{
 		"./acs/regression/derivable": {"./internal/bar/...", "./internal/foo/..."},
 	}
@@ -54,7 +54,7 @@ func TestResolveDepsCoverfix_DerivesSortedDedupedPatternsAndDropsUnderivable(t *
 
 func TestResolveDepsCoverfix_NothingDerivableYieldsNil(t *testing.T) {
 	withResolveDepsCoverfixListing(t, "example.com/x/acs/regression/hatch|os\nexample.com/x/acs/regression/plain|fmt\n")
-	if got := resolveDeps(t.TempDir(), []string{"./acs/regression/hatch", "./acs/regression/plain"}); got != nil {
+	if got := skippableDeps(listCorpusDeps(t.TempDir(), []string{"./acs/regression/hatch", "./acs/regression/plain"})); got != nil {
 		t.Fatalf("no derivable package must yield nil, got %v", got)
 	}
 }

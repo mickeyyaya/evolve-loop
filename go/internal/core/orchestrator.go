@@ -621,13 +621,11 @@ OuterLoop:
 			}
 		}
 
-		if cr.o.cfg.ParallelEvaluate == config.StageEnforce {
-			if batch := cr.evaluateBatchAt(next); len(batch) >= 2 {
-				if bact, berr := cr.dispatchEvaluateBatch(batch); bact == loopAbort {
-					return cr.result, berr
-				}
-				continue
+		if batch := cr.parallelEvaluateBatch(next); len(batch) >= 2 {
+			if bact, berr := cr.dispatchEvaluateBatch(batch); bact == loopAbort {
+				return cr.result, berr
 			}
+			continue
 		}
 
 		dr, act, derr := cr.dispatch(next)
