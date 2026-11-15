@@ -1029,4 +1029,11 @@ var serialTests = map[string]string{
 	"main.TestDiskSignals_NameTheBreachedLevelAndStateTheFloor":                                                            "swaps seam gcDiskFreeBytes",
 	"main.TestDiskSignals_ATempDirThatIsTheProjectRootIsCheckedOnce":                                                       "swaps seam gcDiskFreeBytes",
 	"main.TestCacheScope_AnUnresolvableRootAndAFailedCacheStepEachExitOne":                                                 "swaps seam gcDiskFreeBytes and sets env GOCACHE",
+	"main.TestBootCLIUpdate_AFamilyThatFailsItsSmokeIsBenchedAndTheWaveStarts":                                             "swaps seam cliUpdateWiringFn",
+	"main.TestBootCLIUpdate_AFamilyThatNoRouteCanDoWithoutHaltsTheLoop":                                                    "swaps seam cliUpdateWiringFn",
+	"main.TestBootCLIUpdate_ASmokeFailureWithNoRoutingTableStillHaltsTheLoop":                                              "swaps seam cliUpdateWiringFn",
+	"main.TestBootCLIUpdate_TheRoutesSkipAFamilyBenchedBySmoke":                                                            "swaps seam cliUpdateWiringFn",
+	"main.TestBootGateHalts_ABenchedSmokeFailureLetsTheReadinessGateRun":                                                   "swaps seams cliUpdateWiringFn and bootPreflightFn",
+	"main.TestUpdateCLIsAtBoundary_AFamilyThatFailsItsSmokeIsBenchedAndTheNextWaveRuns":                                    "swaps seam cliUpdateWiringFn",
+	"main.TestUpdateCLIsAtBoundary_EveryRoutedFamilyFailingItsSmokeHaltsTheNextWave":                                       "swaps seam cliUpdateWiringFn",
 }

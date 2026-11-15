@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliupdate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/practicewatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -49,6 +51,65 @@ func haltOnCLISmokeFailure(signals *signalcenter.Center, origin string, failed [
 		map[string]string{"stop_reason": cliUpdateSmokeHalt, "families": strings.Join(families, ","), "versions": strings.Join(versions, ",")})
 }
 
+func emitCLISmokeBenched(signals *signalcenter.Center, origin string, res cliupdate.Result) {
+	signals.Emit(signalcenter.Event{
+		Module:   signalcenter.ModuleLoop,
+		Origin:   origin,
+		Kind:     signalcenter.KindLoopWarning,
+		Severity: signalcenter.SeverityIncident,
+		Reason:   fmt.Sprintf("boundary CLI update smoke failed for %s (%s): %s; family benched, loop continues on fallback", res.Family, res.NewVersion, res.Detail),
+		Fields:   map[string]string{"family": res.Family, "version": res.NewVersion, "stage": "smoke", "detail": res.Detail},
+	})
+}
+
+func chainHasRunnable(chain []string, blocked map[string]bool) bool {
+	for _, fam := range chain {
+		if !blocked[fam] {
+			return true
+		}
+	}
+	return false
+}
+
+func allChainsRunnable(chains [][]string, blocked map[string]bool) bool {
+	for _, chain := range chains {
+		if !chainHasRunnable(chain, blocked) {
+			return false
+		}
+	}
+	return true
+}
+
+func smokeBypassable(deps orchDeps, projectRoot string, failed []cliupdate.Result) bool {
+	if deps.Router == nil {
+		return false
+	}
+	p := deps.Router.Policy()
+	chains := cliroute.FamilyChains(p.CLIRouting)
+	for fam := range p.Floors() {
+		chains = append(chains, []string{fam})
+	}
+	blocked := benchedFamilies(projectRoot)
+	for _, res := range failed {
+		blocked[res.Family] = true
+	}
+	return allChainsRunnable(chains, blocked)
+}
+
+func handleCLISmokeFailures(cfg loopConfig, deps orchDeps, origin string, failed []cliupdate.Result, lr *loopResult, stdout, stderr io.Writer) bool {
+	if !smokeBypassable(deps, cfg.ProjectRoot, failed) {
+		haltOnCLISmokeFailure(deps.Signals, origin, failed, lr)
+		lr.emitFatal(stdout, stderr, cfg, 0)
+		return true
+	}
+	store := clihealth.NewStore(cfg.ProjectRoot, nil)
+	for _, res := range failed {
+		_, _ = store.BenchWall(res.Family, clihealth.SmokeFailedPattern, res.Detail)
+		emitCLISmokeBenched(deps.Signals, origin, res)
+	}
+	return false
+}
+
 func bootCLIUpdateHalts(ctx context.Context, cfg loopConfig, deps orchDeps, lr *loopResult, stdout, stderr io.Writer) bool {
 	if cfg.HandedOff {
 		return false
@@ -57,9 +118,7 @@ func bootCLIUpdateHalts(ctx context.Context, cfg loopConfig, deps orchDeps, lr *
 	if len(failed) == 0 || ctx.Err() != nil {
 		return false
 	}
-	haltOnCLISmokeFailure(deps.Signals, "prepareFreshBatch", failed, lr)
-	lr.emitFatal(stdout, stderr, cfg, 0)
-	return true
+	return handleCLISmokeFailures(cfg, deps, "prepareFreshBatch", failed, lr, stdout, stderr)
 }
 
 func (b *loopBatchCoordinator) updateCLIsAtBoundary(iteration int) (batchDecision, bool) {
@@ -73,9 +132,10 @@ func (b *loopBatchCoordinator) updateCLIsAtBoundary(iteration int) (batchDecisio
 	if len(failed) == 0 {
 		return batchDecision{}, false
 	}
-	haltOnCLISmokeFailure(b.deps.Signals, "loopBatchCoordinator.updateCLIsAtBoundary", failed, b.result)
-	b.result.emitFatal(b.stdout, b.stderr, b.cfg, 0)
-	return batchDecision{flow: batchReturn, exitCode: 2}, true
+	if handleCLISmokeFailures(b.cfg, b.deps, "loopBatchCoordinator.updateCLIsAtBoundary", failed, b.result, b.stdout, b.stderr) {
+		return batchDecision{flow: batchReturn, exitCode: 2}, true
+	}
+	return batchDecision{}, false
 }
 
 var practiceWatchAtBoundary = watchPracticeAtBoundary

@@ -78,3 +78,9 @@ The success paths and their `source` field:
 - Pinned by `TestClearAuthBench_ASuccessClearsEveryAuthBenchOfTheFamilyAndSignalsEach`, `TestClearAuthBench_QuotaBenchesStayAndNothingIsWritten`, `TestLiveSmokeTest_ASuccessfulProbeClearsTheAuthBenchOfItsFamily`, `TestLiveSmokeTest_AWalledProbeKeepsTheAuthBench`, `TestEngineLaunch_ASuccessfulLaunchClearsTheAuthBenchAndAFailedOneKeepsIt`, `TestProber_AUsageReadWithWindowsClearsTheAuthBench`, `TestBootSmokeTest_ABootOnlySuccessKeepsTheAuthBench`, `TestClearAuthBench_NoProjectRootNeverClearsTheStoreOfTheWorkingDirectory` and `TestCLIUpdateWiring_AfterASuccessfulLiveProbeTheCredentialWallNoLongerSkipsTheFamily`.
 - Limit: no success clears a quota bench before its reset. The usage probe does not yet clear a quota bench when the windows show headroom.
 - Limit: the usage probe selects families by the family key of `Active`. It skips a family that has a family-wide quota bench and a scoped auth bench. Only a launch or a smoke pane clears that auth bench.
+
+## A smoke failure benches the family (2026-11-15)
+
+- `SmokeFailedPattern` (`smoke_failed`) marks a CLI family that failed its boundary update smoke test.
+- When another routed family can run every chain and floor, the boot and boundary bench the failed family. They emit `LOOP_CLI_UPDATE_SMOKE_BENCHED` and continue.
+- When no fallback family can cover a required chain or floor, the loop halts as before.

@@ -33,6 +33,8 @@ const (
 
 const BootTimeoutPattern = "repl_boot_timeout"
 
+const SmokeFailedPattern = "smoke_failed"
+
 const DefaultBootBenchThreshold = 2
 
 const replBootTimeoutExitCode = 80
@@ -40,7 +42,7 @@ const replBootTimeoutExitCode = 80
 func IsBootTimeoutExitCode(exitCode int) bool { return exitCode == replBootTimeoutExitCode }
 
 func Benchable(pattern string) bool {
-	return pattern == "rate_limit" || pattern == ExhaustedPattern || pattern == QuotaExhaustedPattern || pattern == BootTimeoutPattern || LoginPattern(pattern)
+	return pattern == "rate_limit" || pattern == ExhaustedPattern || pattern == QuotaExhaustedPattern || pattern == BootTimeoutPattern || pattern == SmokeFailedPattern || LoginPattern(pattern)
 }
 
 const OllamaLoginPattern = "auth_required"
