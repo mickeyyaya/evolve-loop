@@ -95,7 +95,7 @@ func TestAgentRun_EachRunWritesABridgeLaunchRecordThatNamesTheDriverFamilyModelA
 		Model: env.Model, Verdict: core.VerdictPASS, TreeBefore: "tree-1", TreeAfter: "tree-1",
 		ArtifactSHA256: rec.ArtifactSHA256, TS: "2026-10-21T09:30:00Z",
 	}
-	if rec != want || rec.ArtifactSHA256 == "" {
+	if !reflect.DeepEqual(rec, want) || rec.ArtifactSHA256 == "" {
 		t.Errorf("record = %+v, want %+v with a report hash", rec, want)
 	}
 	if launched.CLI == "" || env.CLI != launched.CLI || env.Family == "" {
@@ -386,7 +386,7 @@ func TestAgentRun_ALabelWhoseLaunchRecordExistsIsNotReusedAndDispatchesNothing(t
 	if code != exitDispatch || !strings.Contains(stderr.String(), "is taken") || len(fb.requests) != 0 {
 		t.Errorf("exit %d stderr %q launches %d, want 21, a taken label and no dispatch", code, stderr.String(), len(fb.requests))
 	}
-	if rec := readRecord(t, root, label); rec != earlier {
+	if rec := readRecord(t, root, label); !reflect.DeepEqual(rec, earlier) {
 		t.Errorf("the earlier record changed to %+v", rec)
 	}
 }
