@@ -765,4 +765,10 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [research/practice-agy-cli-changelog-command-cefc57a2-2026-11.md](research/practice-agy-cli-changelog-command-cefc57a2-2026-11.md) | Note on `agy changelog` snapshot `2026-11-14T05:48:36Z` (`1.5.9` `.mp4`, `1.4.4` `/diff`, MCP `root_conversation_id`, Auto mode sandbox) for item `cefc57a2`, read as untrusted data. MCP stays unused. No persona changes. |
 
+## 2026-11-15 — Claude release notes snapshot 2026-11-13T19:47:32Z note
+
+| Document | What it records |
+|---|---|
+| [research/practice-claude-model-release-notes-c433b054-202611.md](research/practice-claude-model-release-notes-c433b054-202611.md) | Note on Claude release notes snapshot `2026-11-13T19:47:32Z` (empty added-line excerpt and November 12 self-hosted Managed Agents) for item `c433b054`, read as untrusted data. `skills/model-notes-claude/COMPACT.md` and all personas stay unchanged. |
+
 <!-- GENERATED:research-index END -->
