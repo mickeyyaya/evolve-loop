@@ -759,4 +759,10 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [research/practice-agy-cli-changelog-command-1-5-9-2026-11.md](research/practice-agy-cli-changelog-command-1-5-9-2026-11.md) | Note on `agy changelog` release `1.5.9` (`run_workflow`, `pluginControls`, Auto mode, `/resume`, `.mp4`, fixes) for item `a5725609`, read as untrusted data. `run_workflow` stays unused. No persona changes. |
 
+## 2026-11-15 — pipeline health readings at the start of wave 174
+
+| Document | What it records |
+|---|---|
+| [research/pipeline-health-readings/2026-11-15/readings.md](research/pipeline-health-readings/2026-11-15/readings.md) | PQ, CQ, lane-use and idle-cause readings of waves 172 to 174, the shadow projected stops, and five questions for a later study. The raw JSON of the quality, latency and status verbs is in the same folder. |
+
 <!-- GENERATED:research-index END -->
