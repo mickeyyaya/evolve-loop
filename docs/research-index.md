@@ -753,4 +753,10 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [research/practice-agy-cli-changelog-page-v2-32-0-2026-11.md](research/practice-agy-cli-changelog-page-v2-32-0-2026-11.md) | Note on the agy page lines v2.32.0 Dynamic Workflows, themes, Gemini 4 Hydrogen, and CLI 1.5.8 for item f276c375, read as data. Dynamic Workflows stays unused. No persona changes. |
 
+## 2026-11-15 — agy changelog command v1.5.9 note
+
+| Document | What it records |
+|---|---|
+| [research/practice-agy-cli-changelog-command-1-5-9-2026-11.md](research/practice-agy-cli-changelog-command-1-5-9-2026-11.md) | Note on `agy changelog` release `1.5.9` (`run_workflow`, `pluginControls`, Auto mode, `/resume`, `.mp4`, fixes) for item `a5725609`, read as untrusted data. `run_workflow` stays unused. No persona changes. |
+
 <!-- GENERATED:research-index END -->
