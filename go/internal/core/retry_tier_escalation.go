@@ -30,29 +30,54 @@ func (o *Orchestrator) clampedRaise(projectRoot string, phase Phase, currentTier
 	return tier, true
 }
 
-func (cr *cycleRun) escalatedBuildTier(currentTier string) (string, bool) {
-	threshold := cr.o.failurePolicy.Thresholds.BuildDeepEscalateAtFailures
-	if cr.o.failureCountFor == nil || threshold <= 0 {
-		return "", false
+func composeBuildTier(ladderTarget, floorTier string) string {
+	if policy.TierRank(floorTier) > policy.TierRank(ladderTarget) {
+		return floorTier
 	}
-	maxCount := 0
-	ids := cr.escalationScopeIDs()
+	return ladderTarget
+}
+
+func (cr *cycleRun) buildFloor(ids []string) (tier string, maxCount, threshold int) {
+	threshold = cr.o.failurePolicy.Thresholds.BuildDeepEscalateAtFailures
+	if cr.o.failureCountFor == nil || threshold <= 0 {
+		return "", 0, threshold
+	}
 	for _, id := range ids {
-		if n := cr.o.failureCountFor(id); n > maxCount {
-			maxCount = n
-		}
+		maxCount = max(maxCount, cr.o.failureCountFor(id))
 	}
 	if maxCount < threshold {
+		return "", maxCount, threshold
+	}
+	return retryEscalationTier, maxCount, threshold
+}
+
+func (cr *cycleRun) ladderTarget(ids []string) string {
+	class := worstScopedClass(cr.o.failureClassFor, ids)
+	if class == "" {
+		return ""
+	}
+	d, verdict := cr.nextItemDecision(class)
+	cr.recordStartRung(d, verdict)
+	if d.Action == retryladder.ActionRaise && cr.o.workflowConfig.RetryLadder.Enforced() {
+		return d.Target.Tier
+	}
+	return ""
+}
+
+func (cr *cycleRun) escalatedBuildTier(currentTier string) (string, bool) {
+	ids := cr.escalationScopeIDs()
+	floorTier, maxCount, threshold := cr.buildFloor(ids)
+	want := composeBuildTier(cr.ladderTarget(ids), floorTier)
+	if want == "" {
 		return "", false
 	}
-	if cr.nextItemStartRung(ids) == retryladder.R0 && cr.o.workflowConfig.RetryLadder.Enforced() {
-		return "", false
-	}
-	tier, raised := cr.o.clampedRaise(cr.req.ProjectRoot, PhaseBuild, currentTier, retryEscalationTier)
+	tier, raised := cr.o.clampedRaise(cr.req.ProjectRoot, PhaseBuild, currentTier, want)
 	if !raised {
 		return "", false
 	}
-	fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d: retry tier escalation — scoped item failure_count=%d >= %d, build dispatched at %q (ADR-0076 D deterministic floor; envelope-clamped)\n", cr.cycle, maxCount, threshold, tier)
+	if floorTier != "" {
+		fmt.Fprintf(cr.o.errOut(), "[orchestrator] cycle %d: retry tier escalation — scoped item failure_count=%d >= %d, build dispatched at %q (ADR-0076 D deterministic floor; envelope-clamped)\n", cr.cycle, maxCount, threshold, tier)
+	}
 	return tier, true
 }
 
