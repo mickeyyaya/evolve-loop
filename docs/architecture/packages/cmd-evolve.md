@@ -960,3 +960,4 @@ This section holds the durable reasons that the strip removed from the group 4 f
 - **`evolve inbox trailer-check` (`cmd_inbox_trailercheck.go`).** `runInboxTrailerCheck` reads commit messages across `--range` with `git log` and checks each `Closes-Inbox` and `Refs-Inbox` id through `closesinbox` and `inboxmover.ResolveDispatchState`.
   - A range passes when at least one trailer exists and every named id is `pending` or `processing`.
   - `policy.LoadOrDefaults` sets the stage (`shadow` by default, `enforce` exits 1 on violations). Pinned by `cmd_inbox_trailercheck_test.go`.
+- `wireOrchestratorDeps` sets `ship.Config.MainCI` to `mainCIFetcher(projectRoot)` (`ciwatch.NewGHClassifySource(root, module).LatestRunOn`, module path read from `go/go.mod`), so the ship phase reads the CI of `main`; it also sets `ship.Config.StepRun` to `ship.GateStepRunner(sysexec.DefaultRunner)`, so a lane can prove a step key.

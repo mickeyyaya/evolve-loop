@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/ciwatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
@@ -29,6 +30,8 @@ type Config struct {
 	RepoContractGate string
 	Signals          *signalcenter.Center
 	Integration      *Integration
+	MainCI           ciwatch.Fetcher
+	StepRun          StepRunner
 }
 
 type Phase struct {
@@ -40,6 +43,8 @@ type Phase struct {
 	repoContractGate string
 	signals          *signalcenter.Center
 	integration      *Integration
+	mainCI           ciwatch.Fetcher
+	stepRun          StepRunner
 }
 
 func New(c Config) *Phase {
@@ -47,12 +52,16 @@ func New(c Config) *Phase {
 	if nowFn == nil {
 		nowFn = time.Now
 	}
-	return &Phase{runner: c.Runner, nowFn: nowFn, sleep: c.Sleep, phaseIO: c.PhaseIO, manifestGate: c.ManifestGate, repoContractGate: c.RepoContractGate, signals: c.Signals, integration: c.Integration}
+	return &Phase{runner: c.Runner, nowFn: nowFn, sleep: c.Sleep, phaseIO: c.PhaseIO, manifestGate: c.ManifestGate, repoContractGate: c.RepoContractGate, signals: c.Signals, integration: c.Integration, mainCI: c.MainCI, stepRun: c.StepRun}
 }
 
 func (p *Phase) Name() string { return phaseName }
 
 func (p *Phase) signalsWired() bool { return p.signals != nil }
+
+func (p *Phase) MainCIWired() bool { return p.mainCI != nil }
+
+func (p *Phase) StepRunWired() bool { return p.stepRun != nil }
 
 func defaultCommitMessage(req core.PhaseRequest) string {
 	if core.DocumentCycle(req.Workspace) {
@@ -116,6 +125,8 @@ func (p *Phase) shipOptions(req core.PhaseRequest, msg string) Options {
 		Sleep:                           p.sleep,
 		Signals:                         p.signals,
 		Integration:                     p.integration,
+		mainCI:                          p.mainCI,
+		stepRun:                         p.stepRun,
 	}
 }
 
