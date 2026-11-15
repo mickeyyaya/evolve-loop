@@ -20,19 +20,7 @@ func Parse(raw []byte) (Policy, error) {
 	if err := p.Fleet.validateWindowStart(); err != nil {
 		return Policy{}, fmt.Errorf("fleet.orchestrator: %w", err)
 	}
-	if err := p.Workflow.validateRetryLadder(); err != nil {
-		return Policy{}, err
-	}
-	if err := p.Workflow.validateRepair(); err != nil {
-		return Policy{}, err
-	}
-	if err := p.Workflow.validateCycleSpend(); err != nil {
-		return Policy{}, err
-	}
-	if err := p.Workflow.validateBuilderSelfCheck(); err != nil {
-		return Policy{}, err
-	}
-	if err := p.Workflow.validateSupersede(); err != nil {
+	if err := p.Workflow.validate(); err != nil {
 		return Policy{}, err
 	}
 	if p.Isolation != nil {
@@ -42,6 +30,9 @@ func Parse(raw []byte) (Policy, error) {
 		if err := p.Isolation.DispatchRequests.validate(); err != nil {
 			return Policy{}, fmt.Errorf("isolation.dispatch_requests: %w", err)
 		}
+	}
+	if err := p.Catalog.validate(); err != nil {
+		return Policy{}, err
 	}
 	if err := p.Overlays.validatePaths(); err != nil {
 		return Policy{}, err
@@ -53,6 +44,15 @@ func Parse(raw []byte) (Policy, error) {
 		return Policy{}, fmt.Errorf("expected_signal: %w", err)
 	}
 	return p, nil
+}
+
+func (w *WorkflowPolicy) validate() error {
+	for _, check := range []func() error{w.validateRetryLadder, w.validateRepair, w.validateCycleSpend, w.validateBuilderSelfCheck, w.validateSupersede} {
+		if err := check(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 var patchBlocksMarshalIndent = json.MarshalIndent

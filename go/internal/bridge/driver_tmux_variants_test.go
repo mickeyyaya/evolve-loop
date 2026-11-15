@@ -138,7 +138,7 @@ func TestAgyTmux_HappyPath(t *testing.T) {
 	if err := os.WriteFile(fx.artifact, []byte("DONE\n"), 0o644); err != nil {
 		t.Fatalf("seed artifact: %v", err)
 	}
-	tmux := &fakeTmux{paneSeq: []string{agyFooterGeminiFlash}}
+	tmux := &fakeTmux{paneSeq: []string{agyFooterGeminiFast}}
 	code, stderr := runTmuxCLI(t, fx, "agy-tmux", tmux, nil, "--allow-bypass")
 	if code != ExitOK {
 		t.Fatalf("exit = %d, want ExitOK; stderr=%q", code, stderr)
