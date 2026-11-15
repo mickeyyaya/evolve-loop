@@ -124,7 +124,11 @@
     "min_lanes": 8,
     "orchestrator": {
       "stage": "enforce",
-      "admission": "enforce"
+      "admission": "enforce",
+      "window": {
+        "start": 8,
+        "min": 4
+      }
     }
   },
   "floor": [
