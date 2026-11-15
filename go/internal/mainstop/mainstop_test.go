@@ -279,3 +279,27 @@ func TestWithout_DropsTheGivenKeysAndLeavesItsInputAsItWas(t *testing.T) {
 		t.Errorf("Without(keys, nil) = %v, want every key", got)
 	}
 }
+
+func TestProven_GreensOnlyTheTestKeysItRan(t *testing.T) {
+	t.Parallel()
+	step := baseattr.StepKey("golangci-lint: Lint")
+	s := Stop{Keys: []baseattr.Key{dupKey, step}}
+
+	proof := s.Proven("base", nil)
+
+	if !slices.Equal(proof.Green, []baseattr.Key{dupKey}) {
+		t.Errorf("green = %v, want only the test key: a run of go test proves no step", proof.Green)
+	}
+	if got := s.StepKeys(); !slices.Equal(got, []baseattr.Key{step}) {
+		t.Errorf("StepKeys = %v, want %v", got, step)
+	}
+}
+
+func TestProofReds_LeavesOutStepKeys(t *testing.T) {
+	t.Parallel()
+	reds := ProofReds([]baseattr.Key{dupKey, baseattr.StepKey("lint")})
+
+	if !slices.Equal(reds.Keys, []baseattr.Key{dupKey}) {
+		t.Errorf("keys = %v, want only the test key", reds.Keys)
+	}
+}

@@ -961,3 +961,5 @@ This section holds the durable reasons that the strip removed from the group 4 f
   - A range passes when at least one trailer exists and every named id is `pending` or `processing`.
   - `policy.LoadOrDefaults` sets the stage (`shadow` by default, `enforce` exits 1 on violations). Pinned by `cmd_inbox_trailercheck_test.go`.
 - **Shared module scan (`module_scan_loader_test.go`).** `sharedModuleFiles` walks the Go module once for each test binary through `sync.OnceValues`. `moduleSourceFile.AST` parses each Go file once on first demand. `TestModuleScanGuard` fails when another test file in `cmd/evolve` walks the module directly.
+- `wireOrchestratorDeps` sets `ship.Config.MainCI` to `mainCIFetcher(projectRoot)`. That is `ciwatch.NewGHClassifySource(root, module).LatestRunOn`, with the module path read from `go/go.mod`. So the ship phase reads the CI of `main`.
+- It also sets `ship.Config.StepRun` to `ship.GateStepRunner(sysexec.DefaultRunner)`, so a lane can prove a step key.

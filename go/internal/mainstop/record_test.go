@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
 )
@@ -67,12 +68,12 @@ func TestUpdate_AFailedWriteIsAnErrorAndGivesTheStopOnDisk(t *testing.T) {
 func TestRead_RefusesARecordOfAnotherSchema(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	record := `{"schema":"main-red-stop/v2","keys":[{"package":"internal/dup","test":"TestCount"}]}`
+	record := `{"schema":"main-red-stop/v3","keys":[{"package":"internal/dup","test":"TestCount"}]}`
 	if err := os.WriteFile(Path(dir), []byte(record), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if stop, found, err := Read(dir); err == nil || found || stop.Holds() || !strings.Contains(err.Error(), "main-red-stop/v2") {
-		t.Errorf("Read of a v2 record = %+v, %v, %v, want an error that names the schema", stop, found, err)
+	if stop, found, err := Read(dir); err == nil || found || stop.Holds() || !strings.Contains(err.Error(), "main-red-stop/v3") {
+		t.Errorf("Read of a v3 record = %+v, %v, %v, want an error that names the schema", stop, found, err)
 	}
 }
 
@@ -154,5 +155,37 @@ func TestUpdate_ConcurrentUpdatesLoseNoKey(t *testing.T) {
 	stop, _, err := Read(dir)
 	if err != nil || len(stop.Keys) != len(keys) {
 		t.Errorf("after %d concurrent updates the stop has %d keys, %v", len(keys), len(stop.Keys), err)
+	}
+}
+
+func TestRead_MigratesAV1RecordToV2(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	record := `{"schema":"main-red-stop/v1","keys":[{"package":"internal/dup","test":"TestCount"}],"main_sha":"abc"}`
+	if err := os.WriteFile(Path(dir), []byte(record), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	stop, found, err := Read(dir)
+
+	if err != nil || !found || stop.Schema != Schema || Schema != "main-red-stop/v2" || !slices.Equal(stop.Keys, []baseattr.Key{dupKey}) || stop.MainSHA != "abc" {
+		t.Errorf("Read of a v1 record = %+v, %v, %v, want the same keys under schema v2", stop, found, err)
+	}
+}
+
+func TestUpdate_WritesAStepKeyWithItsStepField(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	step := baseattr.StepKey("golangci-lint: Lint")
+
+	if _, err := Update(dir, func(s Stop, _ bool) (Stop, error) {
+		return s.Opened(baseattr.Verdict{MainRed: []baseattr.Key{step}, Main: "abc"}, "fix", time.Now()), nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	raw, _ := os.ReadFile(Path(dir))
+	if stop, _, err := Read(dir); err != nil || !slices.Equal(stop.Keys, []baseattr.Key{step}) || !strings.Contains(string(raw), `"step": "golangci-lint: Lint"`) {
+		t.Errorf("record = %s, err = %v, want the step field", raw, err)
 	}
 }
