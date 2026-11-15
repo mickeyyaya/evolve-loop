@@ -152,7 +152,7 @@ func runMismatchProbe(t *testing.T) probeRun {
 	var events []string
 	host := &hostTable{tables: [][]proctree.Process{paneProcesses()}, events: &events}
 	snap := &paneTreeProbe{treeDir: proctree.TreeDir(cfg.ProjectRoot)}
-	frames := slices.Repeat([]string{agyFooterGeminiFlash}, 400)
+	frames := slices.Repeat([]string{agyFooterGeminiFast}, 400)
 	fake := &FakeTmuxController{CaptureFrames: frames}
 	tx := &mismatchProbeTmux{FakeTmuxController: fake, pids: []int{probeShellPid}, snap: snap}
 	snap.keys = func() []string { return fake.SentKeys }

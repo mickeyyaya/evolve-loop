@@ -213,18 +213,36 @@ func liveRefresh(ctx context.Context, rep setup.DetectReport, projectRoot, evolv
 		return modelcatalog.Catalog{}, err
 	}
 	dispatcher := bridgePromptDispatcher{workspace: scratch, projectRoot: projectRoot}
-	return modelquery.Refresh(ctx, modelquery.RefreshDeps{
-		CLIs:            readyCLIs,
-		Lister:          modelquery.DefaultRouter(bridgeModelCapturer{workspace: scratch}),
-		Classifier:      modelquery.ChainClassifier{CLIs: chain, Dispatcher: dispatcher, Log: log},
-		Fallback:        fallback,
-		AllowedFamilies: policyAllowedFamilies(projectRoot),
+	lister := modelquery.DefaultRouter(bridgeModelCapturer{workspace: scratch})
+	classifier := modelquery.ChainClassifier{CLIs: chain, Dispatcher: dispatcher, Log: log}
+	return modelquery.Refresh(ctx, liveRefreshDeps(liveRefreshInput{ProjectRoot: projectRoot, CLIs: readyCLIs, Fallback: fallback, Prior: prior, Lister: lister, Classifier: classifier, Log: log}))
+}
+
+type liveRefreshInput struct {
+	ProjectRoot string
+	CLIs        []string
+	Fallback    map[string]map[string]string
+	Prior       modelcatalog.Catalog
+	Lister      modelquery.Lister
+	Classifier  modelquery.Classifier
+	Log         io.Writer
+}
+
+func liveRefreshDeps(in liveRefreshInput) modelquery.RefreshDeps {
+	catalog := policyCatalog(in.ProjectRoot)
+	return modelquery.RefreshDeps{
+		CLIs:            in.CLIs,
+		Lister:          in.Lister,
+		Classifier:      in.Classifier,
+		Fallback:        in.Fallback,
+		AllowedFamilies: catalog.AllowedFamilies,
+		TierPins:        catalog.TierPins,
 		EffortListers:   modelquery.DefaultEffortListers(),
-		Prior:           prior,
-		Freshness:       freshnessFromManifests(readyCLIs),
+		Prior:           in.Prior,
+		Freshness:       freshnessFromManifests(in.CLIs),
 		Now:             time.Now,
-		Log:             log,
-	})
+		Log:             in.Log,
+	}
 }
 
 func liveRefreshRoots(projectRoot, evolveDir string) (string, string, error) {
@@ -256,8 +274,12 @@ func readyCLIsWithDetectMaps(rep setup.DetectReport) ([]string, map[string]map[s
 	return ready, detectMaps
 }
 
+func policyCatalog(projectRoot string) policy.CatalogPolicy {
+	return policy.LoadOrDefaults(filepath.Join(projectRoot, ".evolve", "policy.json"), os.Stderr).CatalogConfig()
+}
+
 func policyAllowedFamilies(projectRoot string) map[string][]string {
-	return policy.LoadOrDefaults(filepath.Join(projectRoot, ".evolve", "policy.json"), os.Stderr).CatalogConfig().AllowedFamilies
+	return policyCatalog(projectRoot).AllowedFamilies
 }
 
 func classifierChain(projectRoot string, ready []string, log io.Writer) ([]string, error) {

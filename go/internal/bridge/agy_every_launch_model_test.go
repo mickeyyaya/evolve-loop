@@ -47,7 +47,7 @@ func modelFlagValue(t *testing.T, flags []string) string {
 
 func bootAgyTmuxFromEngineIntent(t *testing.T, cfgModel string) string {
 	t.Helper()
-	line, _ := bootAgyTmuxOver(t, cfgModel, slices.Repeat([]string{agyFooterGeminiFlash}, 12))
+	line, _ := bootAgyTmuxOver(t, cfgModel, slices.Repeat([]string{agyFooterGeminiFast}, 12))
 	return line
 }
 
@@ -169,7 +169,7 @@ func TestAgyEveryLaunch_DoctorProbeCarriesTheManifestFastModel(t *testing.T) {
 	}
 }
 
-const agyFooterModePrefix = "┃ Our daily driver for rapid coding and dependable agentic execution!\n┃ esc to dismiss\n? for shortcuts                                        auto · Gemini 3.8 Flash · high"
+const agyFooterModePrefix = "┃ Our daily driver for rapid coding and dependable agentic execution!\n┃ esc to dismiss\n? for shortcuts                                        auto · Gemini 4 Hydrogen · medium"
 
 func TestAgyBoot_ReadsTheModelBehindTheModePrefixOfAgy159(t *testing.T) {
 	injectCatalogDir(t, t.TempDir())
