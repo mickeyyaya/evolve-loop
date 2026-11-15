@@ -35,3 +35,16 @@ func asFleetRebase(se *ShipError, why string) *ShipError {
 		Debug:   debug,
 	}
 }
+
+func asMovedHead(se *ShipError) *ShipError {
+	debug := make(map[string]string, len(se.Debug)+1)
+	maps.Copy(debug, se.Debug)
+	debug[shiperr.OriginalCodeKey] = string(se.Code)
+	return &ShipError{
+		Code:    CodeAuditBindingHeadMoved,
+		Class:   ShipClassPrecondition,
+		Stage:   se.Stage,
+		Message: se.Message,
+		Debug:   debug,
+	}
+}

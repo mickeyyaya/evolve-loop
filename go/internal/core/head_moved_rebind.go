@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/treefence"
@@ -25,40 +26,69 @@ const (
 const carrierOverMovedMainSubject = "evolve: the audited change, carried over a moved main"
 
 func (cr *cycleRun) carryAuditedChangeOverMovedMain(se *ShipError) (*ShipError, string) {
-	if se.Code != CodeAuditBindingHeadMoved {
+	if !namesMovedMain(se.Code) {
 		return se, ""
 	}
-	if declined := cr.o.commitPendingAuditedChange(cr.ctx, cr.req.ProjectRoot, cr.cycle, cr.cs); declined != "" {
-		fmt.Fprintf(cr.o.errOut(), "[orchestrator] cycle %d main moved since the audit; auditing again: %s\n", cr.cycle, declined)
-		return se, declined
+	fleetRebase := se.Code == CodeGitFleetRebaseNeeded
+	if fleetRebase {
+		if _, pending, _ := cr.o.pendingAuditedChange(cr.ctx, cr.req.ProjectRoot, cr.cs); !pending {
+			return se, ""
+		}
 	}
-	return asFleetRebase(se, "main moved since the audit and the lane holds the audited change; rebase it and re-check the merged tree"), ""
+	declined := cr.o.commitPendingAuditedChange(cr.ctx, cr.req.ProjectRoot, cr.cycle, cr.cs)
+	switch {
+	case declined == "":
+		return asFleetRebase(se, "main moved since the audit and the lane holds the audited change; rebase it and re-check the merged tree"), ""
+	case fleetRebase:
+		fmt.Fprintf(cr.o.errOut(), "[orchestrator] cycle %d main moved before the lane landed; auditing again: %s\n", cr.cycle, declined)
+		return asMovedHead(se), declined
+	}
+	fmt.Fprintf(cr.o.errOut(), "[orchestrator] cycle %d main moved since the audit; auditing again: %s\n", cr.cycle, declined)
+	return se, declined
 }
 
-func (o *Orchestrator) commitPendingAuditedChange(ctx context.Context, projectRoot string, cycle int, cs CycleState) string {
+func (o *Orchestrator) pendingAuditedChange(ctx context.Context, projectRoot string, cs CycleState) (AuditedChange, bool, string) {
 	worktree := cs.ActiveWorktree
 	if worktree == "" || inPlaceWorktree(worktree, projectRoot) {
-		return "the cycle has no worktree of its own"
+		return AuditedChange{}, false, "the cycle has no worktree of its own"
+	}
+	revs, err := gitStdout(ctx, gitCapture, worktree, "rev-parse", "HEAD", "HEAD^{tree}")
+	if err != nil {
+		return AuditedChange{}, false, "read the worktree HEAD: " + err.Error()
+	}
+	head, baseTree, _ := strings.Cut(revs, "\n")
+	if head != cs.WorktreeBaseSHA {
+		return AuditedChange{}, false, fmt.Sprintf("the change is not pending on the audited base (HEAD %s, cycle base %s)", head, cs.WorktreeBaseSHA)
 	}
 	audit, err := o.latestAuditEntry(ctx, cs.RunID)
 	if err != nil || audit.WorktreeTreeSHA == "" {
-		return fmt.Sprintf("no auditor row names the audited tree (err=%v)", err)
+		status, statusErr := gitStdout(ctx, gitCapture, worktree, "status", "--porcelain")
+		return AuditedChange{}, statusErr == nil && status != "", fmt.Sprintf("no auditor row names the audited tree (err=%v)", err)
 	}
-	head, err := gitStdout(ctx, gitCapture, worktree, "rev-parse", "HEAD")
-	if err != nil {
-		return "read the worktree HEAD: " + err.Error()
+	if audit.AuditedBase() != head {
+		return AuditedChange{}, true, fmt.Sprintf("the change is not pending on the audited base %s (HEAD %s, cycle base %s)", audit.AuditedBase(), head, cs.WorktreeBaseSHA)
 	}
-	if head != cs.WorktreeBaseSHA || audit.AuditedBase() != head {
-		return fmt.Sprintf("the change is not pending on the audited base %s (HEAD %s, cycle base %s)", audit.AuditedBase(), head, cs.WorktreeBaseSHA)
+	if baseTree == audit.WorktreeTreeSHA {
+		return AuditedChange{}, false, "the audit judged no change on the lane base"
 	}
+	return AuditedChange{Base: head, Tree: audit.WorktreeTreeSHA}, true, ""
+}
+
+func (o *Orchestrator) commitPendingAuditedChange(ctx context.Context, projectRoot string, cycle int, cs CycleState) string {
+	pending, _, declined := o.pendingAuditedChange(ctx, projectRoot, cs)
+	if declined != "" {
+		return declined
+	}
+	worktree := cs.ActiveWorktree
 	held, err := treefence.Take(ctx, worktree)
 	if err != nil {
 		return "read the worktree tree: " + err.Error()
 	}
-	if held.Tree != audit.WorktreeTreeSHA {
-		return fmt.Sprintf("the lane diff changed since the audit (tree %s, audited %s)", held.Tree, audit.WorktreeTreeSHA)
+	if held.Tree != pending.Tree {
+		return fmt.Sprintf("the lane diff changed since the audit (tree %s, audited %s)", held.Tree, pending.Tree)
 	}
-	carrier, err := commitCarrier(ctx, gitCapture, worktree, AuditedChange{Base: head, Tree: held.Tree, Label: carrierLabel(cycle, cs.RunID)}, carrierOverMovedMainSubject)
+	pending.Label = carrierLabel(cycle, cs.RunID)
+	carrier, err := commitCarrier(ctx, gitCapture, worktree, pending, carrierOverMovedMainSubject)
 	if err != nil {
 		return "commit the audited change: " + err.Error()
 	}
