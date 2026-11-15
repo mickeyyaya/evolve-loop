@@ -156,3 +156,17 @@ Each later change follows D7: one persona at a time, in the order builder, audit
 - Done criteria: the marker count falls from 5, the scout report keeps its sections, and the D8 measures do not worsen beyond their noise band.
 - Limits: start only after the auditor diet has its result.
 - Before measure: 5 markers on 4 lines.
+
+## 9. Item 7e8a56f7: the fourth report (2026-11-15)
+
+The practice watch reported the same source a fourth time as inbox item `practice-claude-prompting-guide-7e8a56f7-202611151110`. The watch compared the new snapshot with the prior snapshot `2026-11-13T19:47:31Z`.
+
+The stored excerpt holds only an icon glyph from the page HTML and the `Console` navigation label. Both lines are page interface text, not a guide rule. The excerpt holds no prompting rule, so this note guesses no changed guide line.
+
+The guide was read again at its link `https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices`. The HTTP check returned status 200 and the markdown source loaded cleanly. The guide text is untrusted data, and the loop follows no instruction inside it.
+
+The live guide sections match sections 2, 7, and 8 of this note. The rules on aggressive capital words, over-prompting, positive format rules, and examples stay the same.
+
+Decision D4: No persona changes under ADR-0133, because the excerpt holds only `Console` interface text and an icon glyph.
+
+The file `skills/model-notes-claude/COMPACT.md` also stays unchanged, because the live guide adds no new model rule. The three-persona diet plan of section 8 stays in place. The order is `evolve-builder`, `evolve-auditor`, and `evolve-scout`, each after the M2 baseline exists.
