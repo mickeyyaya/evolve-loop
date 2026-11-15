@@ -13,9 +13,10 @@
   "kind": "pipeline-integrity",
   "origin": "console",
   "priority_class": "correctness",
-  "route": "lane",
-  "routed_at": "2026-11-14T07:33:58Z",
-  "routed_reason": "operator 2026-11-14: fill the 8 lanes; plan wave-orchestrator O2a: a pipeline-kind item whose files are not protected is an ordinary code fix",
+  "route": "console-manual",
+  "routed_at": "2026-11-14T14:18:44Z",
+  "routed_cycle": 2381,
+  "routed_reason": "lane triage (cycle 2381) skip_shipped: git_sha 0cbfd3f5fa1b8b0665be91b4e01f4bfb1e401a7a",
   "summary": "In cycle 2161 the triage prompt told the agent to answer a routed item with escalate_block, and the inbox-claim gate rejected this twice with missing_effect. committedset.Committed uses the lane pin in place of top_n and subtracts only deferred. The rejection text says defer or drop it, but a dropped answer fails too. A correction could not change what the gate read.",
   "title": "The triage gate must accept the prescribed answer for a routed lane pin",
   "weight": 0.8
