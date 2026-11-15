@@ -29,6 +29,12 @@ const (
 type Group struct {
 	Body  string
 	Sites []string
+	Wraps []string
+}
+
+type bodyEntry struct {
+	sites []string
+	wraps []string
 }
 
 type Report struct {
@@ -45,7 +51,7 @@ func Scan(root string, since time.Time) (Report, error) {
 	if _, err := os.Stat(root); err != nil {
 		return Report{}, err
 	}
-	bodies := map[string][]string{}
+	bodies := map[string]*bodyEntry{}
 	ages := loadAcsAges(root, since)
 	fsys := os.DirFS(root)
 	walk := func(rel string, d fs.DirEntry, err error) error {
@@ -141,7 +147,7 @@ func (a acsAges) isOld(rel string) bool {
 	return newest.Before(a.since)
 }
 
-func collect(fsys fs.FS, rel string, bodies map[string][]string) error {
+func collect(fsys fs.FS, rel string, bodies map[string]*bodyEntry) error {
 	src, err := fs.ReadFile(fsys, rel)
 	if err != nil {
 		return err
@@ -157,9 +163,30 @@ func collect(fsys fs.FS, rel string, bodies map[string][]string) error {
 			continue
 		}
 		key := normalize(fset, src, fn.Body)
-		bodies[key] = append(bodies[key], rel+":"+fn.Name.Name)
+		entry := bodies[key]
+		if entry == nil {
+			entry = &bodyEntry{wraps: kitCalls(fn.Body)}
+			bodies[key] = entry
+		}
+		entry.sites = append(entry.sites, rel+":"+fn.Name.Name)
 	}
 	return nil
+}
+
+func kitCalls(body *ast.BlockStmt) []string {
+	var names []string
+	ast.Inspect(body, func(n ast.Node) bool {
+		sel, ok := n.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+		if pkg, ok := sel.X.(*ast.Ident); ok && pkg.Name == "acsassert" {
+			names = append(names, sel.Sel.Name)
+		}
+		return true
+	})
+	sort.Strings(names)
+	return slices.Compact(names)
 }
 
 func isTestEntry(name string) bool {
@@ -191,15 +218,16 @@ func normalize(fset *token.FileSet, src []byte, body *ast.BlockStmt) string {
 	}
 }
 
-func buildReport(bodies map[string][]string) Report {
+func buildReport(bodies map[string]*bodyEntry) Report {
 	var report Report
-	for body, sites := range bodies {
+	for body, entry := range bodies {
+		sites := entry.sites
 		if len(sites) < 2 {
 			continue
 		}
 		sort.Strings(sites)
 		report.Copies += len(sites) - 1
-		report.Groups = append(report.Groups, Group{Body: body, Sites: sites})
+		report.Groups = append(report.Groups, Group{Body: body, Sites: sites, Wraps: entry.wraps})
 	}
 	sort.Slice(report.Groups, func(i, j int) bool { return report.Groups[i].Sites[0] < report.Groups[j].Sites[0] })
 	return report
