@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
 const (
@@ -27,8 +28,7 @@ const (
 	RequirementOperator         = "operator-approval"
 	RequirementAdversarialAudit = "adversarial-audit: a family other than the builder, at the deep tier"
 
-	pipelineKindPrefix = "pipeline-"
-	recordPrefix       = "cycle-"
+	recordPrefix = "cycle-"
 )
 
 var (
@@ -37,7 +37,7 @@ var (
 )
 
 type Inputs struct {
-	Kinds     []string
+	Items     []inboxbatch.Item
 	Changed   []string
 	Protected func(path string) bool
 }
@@ -49,9 +49,9 @@ type Decision struct {
 
 func Decide(in Inputs) Decision {
 	var reasons []string
-	for _, kind := range in.Kinds {
-		if k := strings.ToLower(strings.TrimSpace(kind)); strings.HasPrefix(k, pipelineKindPrefix) {
-			reasons = append(reasons, "kind:"+k)
+	for _, it := range in.Items {
+		if routed, why := inboxbatch.ConsoleRouted(it, in.Protected); routed {
+			reasons = append(reasons, "routed:"+why)
 		}
 	}
 	for _, path := range in.Changed {
