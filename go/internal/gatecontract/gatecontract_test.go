@@ -13,9 +13,9 @@ func TestTrustClasses_AreTheFiveWordsOfTheInventory(t *testing.T) {
 	}
 }
 
-func TestKinds_AreScannerPhaseFloorAndShipCheck(t *testing.T) {
+func TestKinds_AreScannerPhaseFloorShipCheckAndStageFeature(t *testing.T) {
 	t.Parallel()
-	want := []string{"scanner", "phase-floor", "ship-check"}
+	want := []string{"scanner", "phase-floor", "ship-check", "stage-feature"}
 	if got := Kinds(); !slices.Equal(got, want) {
 		t.Errorf("Kinds() = %v, want %v", got, want)
 	}

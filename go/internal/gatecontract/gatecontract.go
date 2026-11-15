@@ -7,21 +7,22 @@ import (
 )
 
 const (
-	KindScanner    = "scanner"
-	KindPhaseFloor = "phase-floor"
-	KindShipCheck  = "ship-check"
-	StageShadow    = "shadow"
-	StageEnforce   = "enforce"
-	ClassAuthority = "authority"
-	ClassVerified  = "verified"
-	ClassSubject   = "subject"
-	ClassAdvisory  = "advisory"
-	ClassOpenSeam  = "open-seam"
+	KindScanner      = "scanner"
+	KindPhaseFloor   = "phase-floor"
+	KindShipCheck    = "ship-check"
+	KindStageFeature = "stage-feature"
+	StageShadow      = "shadow"
+	StageEnforce     = "enforce"
+	ClassAuthority   = "authority"
+	ClassVerified    = "verified"
+	ClassSubject     = "subject"
+	ClassAdvisory    = "advisory"
+	ClassOpenSeam    = "open-seam"
 )
 
 var (
 	trustClasses = []string{ClassAuthority, ClassVerified, ClassSubject, ClassAdvisory, ClassOpenSeam}
-	kinds        = []string{KindScanner, KindPhaseFloor, KindShipCheck}
+	kinds        = []string{KindScanner, KindPhaseFloor, KindShipCheck, KindStageFeature}
 	stages       = []string{StageShadow, StageEnforce}
 )
 
@@ -53,6 +54,7 @@ type Entry struct {
 	Owners []Owner
 	Inputs []Declared
 	Stage  string
+	Shadow *Shadow
 	Run    func(context.Context, Input) (Verdict, error)
 }
 
