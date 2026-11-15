@@ -58,6 +58,9 @@ func init() {
 	RegisterCode(ModuleLoop, CodeLoopLost, "a reader saw a loop process end without its loop.exit event; a reader makes this record and no log holds it; fields.pid, run_id, exit (crash or unknown) and historical (true when the loop was gone before the reader looked)")
 	RegisterCode(ModuleLatency, CodeLatencyBudgetExceeded, "two waves in a row breached a bound of the wave latency check; fields.waves lists them, fields.reasons names the breached rules and fields.item the inbox item filed")
 	RegisterCode(ModuleCI, CodeCIRunRed, "a watched CI run completed with a conclusion other than success; fields.sha, workflow, conclusion, run_id and run_url name the run")
+	RegisterCode(ModuleAudit, CodeAuditCascadeShadow, "at audit_cascade.stage shadow, the audit records whether enforce would escalate this cycle's audit; fields.would_escalate (true or false) and fields.changed_files (the count of changed files)")
+	RegisterCode(ModuleTIA, CodeTIAShadow, "at regression_tia.stage shadow or enforce, the audit records which regression predicates the change would skip; fields.would_skip_count, fields.selected (the count of predicates that run) and fields.write_error when the decision file could not be written (severity WARN then)")
+	RegisterCode(ModuleParallelEval, CodeParallelEvaluateShadow, "at parallel_evaluate.stage shadow, the orchestrator computed the evaluate batch that enforce would run in parallel and dispatched it serially; fields.batch lists the phases in batch order")
 }
 
 func RegisterCode(m Module, c Code, doc string) { codes.register(m, c, doc) }

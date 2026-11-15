@@ -210,6 +210,9 @@ var treeReadingSelections = []TestSelection{
 	{Package: "./internal/reachabilityprobe", Tests: []string{
 		"TestBuildImportGraph_Named",
 	}},
+	{Package: "./internal/regressiontia", Tests: []string{
+		"TestRegressionCorpus_CountsThePurePredicates",
+	}},
 	{Package: "./internal/subagent", Tests: []string{
 		"TestSubagentRun_OneConstructionSite",
 	}},

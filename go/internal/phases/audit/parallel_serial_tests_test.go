@@ -1,6 +1,11 @@
 package audit
 
 var serialTests = map[string]string{
+	"audit.TestProductionPath_BothShadowSignalsReachTheCenter":                                     "swaps seams tiaCompute, runCmd",
+	"audit.TestEmitTIADecision_EmitsSignal":                                                        "swaps seam tiaCompute",
+	"audit.TestEmitTIADecision_NilEmitterIsInert":                                                  "swaps seam tiaCompute",
+	"audit.TestEmitTIADecision_OffEmitsNoSignal":                                                   "swaps seam tiaCompute",
+	"audit.TestEmitTIADecision_WriteErrorIsNotDropped":                                             "swaps seam tiaCompute",
 	"audit.TestEmitTIADecision_AnEmptyDecisionWritesNoArtifact":                                    "swaps seam tiaCompute",
 	"audit.TestGenerateACSVerdict_AShadowDecisionThatWouldSkipTheCorpusStillRunsIt":                "swaps seam tiaCompute",
 	"audit.TestApicoverEnforceChangedDefault_CleanGitTree_StaysNoOp":                               "sets env through a helper",

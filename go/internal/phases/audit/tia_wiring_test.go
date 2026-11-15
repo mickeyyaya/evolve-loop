@@ -44,9 +44,9 @@ func TestGenerateACSVerdict_ShadowStageEmitsTIADecision(t *testing.T) {
 	t.Parallel()
 	root, ws := tiaFixture(t, "shadow", 4242)
 
-	if err := generateACSVerdict(core.PhaseRequest{
+	if err := generateACSVerdictWith(core.PhaseRequest{
 		Worktree: root, ProjectRoot: root, Workspace: ws, Cycle: 4242,
-	}); err != nil {
+	}, nil); err != nil {
 		t.Fatalf("generateACSVerdict: %v", err)
 	}
 
@@ -72,9 +72,9 @@ func TestGenerateACSVerdict_OffStageEmitsNothing(t *testing.T) {
 	for _, stage := range []string{"", "off"} {
 		root, ws := tiaFixture(t, stage, 4243)
 
-		if err := generateACSVerdict(core.PhaseRequest{
+		if err := generateACSVerdictWith(core.PhaseRequest{
 			Worktree: root, ProjectRoot: root, Workspace: ws, Cycle: 4243,
-		}); err != nil {
+		}, nil); err != nil {
 			t.Fatalf("generateACSVerdict (stage=%q): %v", stage, err)
 		}
 
@@ -89,9 +89,9 @@ func TestGenerateACSVerdict_ShadowEmissionNeverFailsTheAudit(t *testing.T) {
 	root, ws := tiaFixture(t, "shadow", 4244)
 	missing := filepath.Join(ws, "does", "not", "exist")
 
-	if err := generateACSVerdict(core.PhaseRequest{
+	if err := generateACSVerdictWith(core.PhaseRequest{
 		Worktree: root, ProjectRoot: root, Workspace: missing, Cycle: 4244,
-	}); err != nil {
+	}, nil); err != nil {
 		t.Fatalf("generateACSVerdict returned %v — an unwritable shadow-evidence sink must not fail the audit phase; observability may never gate the gate", err)
 	}
 }

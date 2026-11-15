@@ -80,5 +80,5 @@ func (a *auditClassification) finalize() {
 		}
 	}
 	recordChainShadow(a.artifact, a.req, a.narrative, a.verdict, a.overrodeBy)
-	a.diagnostics = append(a.diagnostics, recordCascadeShadow(a.req, a.verdict)...)
+	a.diagnostics = append(a.diagnostics, recordCascadeShadow(a.hooks.signals, a.req, a.verdict)...)
 }
