@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -40,15 +41,6 @@ func seedCarryoverState(t *testing.T, root, committedID string) {
 	})
 }
 
-func hasID(ids []string, want string) bool {
-	for _, id := range ids {
-		if id == want {
-			return true
-		}
-	}
-	return false
-}
-
 func TestPromoteInbox_LandedPassRetiresCommittedCarryover(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -66,10 +58,10 @@ func TestPromoteInbox_LandedPassRetiresCommittedCarryover(t *testing.T) {
 	}
 
 	ids := readCarryoverIDs(t, root)
-	if hasID(ids, id) {
+	if slices.Contains(ids, id) {
 		t.Errorf("committed id %q still in state.json:carryoverTodos after a landed PASS closeout (ids=%v) — the retirement seam is not wired into the production PASS path", id, ids)
 	}
-	if !hasID(ids, "still-open-item") {
+	if !slices.Contains(ids, "still-open-item") {
 		t.Errorf("retirement removed an UNCOMMITTED carryover entry (ids=%v) — only committed/fingerprint-matched ids may retire", ids)
 	}
 }
@@ -90,7 +82,7 @@ func TestPromoteInbox_UnlandedPassKeepsCarryover(t *testing.T) {
 		t.Fatalf("promoteInbox: %v", err)
 	}
 
-	if ids := readCarryoverIDs(t, root); !hasID(ids, id) {
+	if ids := readCarryoverIDs(t, root); !slices.Contains(ids, id) {
 		t.Errorf("unlanded ship retired carryover id %q (ids=%v) — retirement must ride the same landing gate as promotion", id, ids)
 	}
 }
