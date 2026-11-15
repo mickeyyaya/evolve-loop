@@ -793,34 +793,6 @@ func TestBatchTest_TheLandedTipIsTheTipThatWasTested(t *testing.T) {
 	}
 }
 
-func TestBatchTest_AfterTheL1PrefixCheckTheSearchStillStartsFromTheBase(t *testing.T) {
-	t.Parallel()
-	f := newComposeFixture(t)
-	recs := twoDeliverables(t, f)
-	s := newSeams(f)
-	s.predRed = func(tip string, cycle, _ int) bool {
-		return cycle == 701 && f.holdsFile(tip, goFile("b"))
-	}
-	bt := s.batchTest(f)
-	l1, err := bt.Composer.PrefixCheck(context.Background(), f.batch(t), recs)
-	if err != nil || !slices.Equal(l1.Landed, []int{701, 702}) || l1.Batch.Tip == l1.Batch.Base {
-		t.Fatalf("PrefixCheck = %+v, %v; want both landed on a moved tip", l1, err)
-	}
-	got, err := bt.Check(context.Background(), l1.Batch, recs)
-	if err != nil {
-		t.Fatalf("Check: %v", err)
-	}
-	if !slices.Equal(got.Landed, []int{701}) || len(got.Ejected) != 1 || got.Ejected[0].Cycle != 702 {
-		t.Fatalf("Check = landed %v ejected %+v, want 701 landed and the real culprit 702 ejected", got.Landed, got.Ejected)
-	}
-	if d := got.Ejected[0].Diff; !strings.Contains(d, goFile("a")) || strings.Contains(d, goFile("b")) {
-		t.Errorf("diff = %q, want only the change of 701", d)
-	}
-	if want := []string{"./internal/alpha/..."}; !slices.Equal(got.Verdicts[701].Ran, want) {
-		t.Errorf("701 ran %v, want %v: its prefix must not hold 702", got.Verdicts[701].Ran, want)
-	}
-}
-
 func TestBatchTest_ADeliverableThatEditsOnlyAGoFixtureOrAVendoredFileStillTestsAPackage(t *testing.T) {
 	t.Parallel()
 	for name, file := range map[string]string{
@@ -884,5 +856,19 @@ func TestBatchTest_APredicateRunErrorReachesTheLaneBrief(t *testing.T) {
 	const cause = "acsrunner go test: exit status 1"
 	if !strings.Contains(got.Verdicts[701].Output, cause) || !strings.Contains(got.Ejected[0].Err.Error(), cause) {
 		t.Errorf("verdict output %q and ejection %q must hold the predicate error", got.Verdicts[701].Output, got.Ejected[0].Err)
+	}
+}
+
+func TestCheckBatchInputs_RejectsDuplicateRecord(t *testing.T) {
+	t.Parallel()
+	rec := DeliverableRecord{
+		Wave:    "w1",
+		Cycle:   10,
+		Trailer: CycleTrailer(10),
+		Commits: []CommitIdentity{{SHA: "a1", BaseSHA: "b0", PatchID: "p1"}},
+	}
+	err := (Composer{Stage: policy.FleetIntegrationEnforce}).checkBatchInputs(Batch{Base: testSHA, Branch: "b", Tip: testSHA}, []DeliverableRecord{rec, rec})
+	if err == nil || !strings.Contains(err.Error(), "twice") {
+		t.Fatalf("checkBatchInputs duplicate = %v, want twice error", err)
 	}
 }

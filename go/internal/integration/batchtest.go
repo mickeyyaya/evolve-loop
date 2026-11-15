@@ -83,7 +83,7 @@ func (t BatchTest) Check(ctx context.Context, b Batch, recs []DeliverableRecord)
 	}
 	t.Composer.Stage = policy.FleetIntegrationShadow
 	b.Tip = b.Base
-	if err := t.Composer.checkPrefix(b, recs); err != nil || len(recs) == 0 {
+	if err := t.Composer.checkBatchInputs(b, recs); err != nil || len(recs) == 0 {
 		return BatchResult{}, err
 	}
 	run := &batchRun{ctx: ctx, t: t, cur: b, res: BatchResult{Verdicts: map[int]LayerVerdict{}, Tip: b.Base}}
@@ -94,6 +94,19 @@ func (t BatchTest) Check(ctx context.Context, b Batch, recs []DeliverableRecord)
 	}
 	run.res.Flaky = slices.Compact(slices.Sorted(slices.Values(run.flaky)))
 	return run.res, nil
+}
+
+func (c Composer) checkBatchInputs(b Batch, recs []DeliverableRecord) error {
+	errs := []error{c.ready(b)}
+	seen := map[string]bool{}
+	for _, rec := range recs {
+		if seen[rec.id()] {
+			errs = append(errs, fmt.Errorf("integration: %s is in the batch twice", rec.Label()))
+		}
+		seen[rec.id()] = true
+		errs = append(errs, checkComposable(rec))
+	}
+	return errors.Join(errs...)
 }
 
 func (t BatchTest) seams() error {

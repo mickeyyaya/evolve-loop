@@ -62,26 +62,7 @@ type ShadowActor struct {
 }
 
 func (a ShadowActor) Resume(ctx context.Context, rec WaveRecord) (WaveRecord, error) {
-	return rec, a.dropStale(ctx, rec.Pool)
-}
-
-func (a ShadowActor) dropStale(ctx context.Context, pool int) error {
-	out, err := a.Composer.Repo.Git(ctx, a.Composer.Repo.Dir, "", "for-each-ref", "--format=%(refname)", branchRef("integration/p"+strconv.Itoa(pool)+"-*"))
-	if err != nil {
-		return fmt.Errorf("integration: list the stale refs of pool %d: %w", pool, err)
-	}
-	var errs []error
-	for _, ref := range strings.Fields(out) {
-		errs = append(errs, a.deleteRef(ctx, ref))
-	}
-	return errors.Join(errs...)
-}
-
-func (a ShadowActor) deleteRef(ctx context.Context, ref string) error {
-	if _, err := a.Composer.Repo.Git(ctx, a.Composer.Repo.Dir, "", "update-ref", "-d", "--end-of-options", ref); err != nil {
-		return fmt.Errorf("integration: delete %s: %w", ref, err)
-	}
-	return nil
+	return rec, dropPoolRefs(ctx, a.Composer.Repo, rec.Pool)
 }
 
 func (a ShadowActor) Flush(ctx context.Context, b PendingBatch) (FlushResult, error) {
@@ -208,7 +189,7 @@ func (a ShadowActor) WaveEnd(ctx context.Context, rec WaveRecord) (WaveRecord, e
 	}
 	var dropErrs []error
 	for _, b := range rec.Batches {
-		dropErrs = append(dropErrs, a.deleteRef(ctx, branchRef(b.Branch)))
+		dropErrs = append(dropErrs, deleteBranchRef(ctx, a.Composer.Repo, branchRef(b.Branch)))
 	}
 	out.Failures = append(slices.Clone(out.Failures), failures...)
 	return out, errors.Join(dropErrs...)

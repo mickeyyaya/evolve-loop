@@ -518,6 +518,10 @@ func (d *Driver) fail(err error) {
 
 func (d *Driver) emit(ev signalcenter.Event) { emitEvent(d.Publish, driverOrigin, ev) }
 
-func StageActors(shadow Actor) map[string]Actor {
-	return map[string]Actor{policy.FleetIntegrationShadow: shadow}
+func StageActors(shadow, enforce Actor) map[string]Actor {
+	actors := map[string]Actor{policy.FleetIntegrationShadow: shadow}
+	if enforce != nil {
+		actors[policy.FleetIntegrationEnforce] = enforce
+	}
+	return actors
 }

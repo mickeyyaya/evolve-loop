@@ -63,7 +63,7 @@ func (r *crashRig) driver(visible int, cap int) (*Driver, *EpochHolder) {
 	return &Driver{
 		Pool: 135, Holder: claimed, ShadowBase: r.f.base,
 		Stage:   func() (string, error) { return policy.FleetIntegrationShadow, nil },
-		Actors:  StageActors(actor),
+		Actors:  StageActors(actor, nil),
 		Epoch:   holder,
 		Store:   writeGate{WaveStore: r.store, fail: &r.failW},
 		Records: records,

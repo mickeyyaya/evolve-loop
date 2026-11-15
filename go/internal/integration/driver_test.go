@@ -568,7 +568,7 @@ func TestFileWaveStore_RoundTripsAndReadsAnAbsentRecordAsNotFound(t *testing.T) 
 
 func TestStageActors_NamesOnlyTheShadowStage(t *testing.T) {
 	t.Parallel()
-	got := StageActors(&fakeActor{})
+	got := StageActors(&fakeActor{}, nil)
 	if _, ok := got[policy.FleetIntegrationShadow]; !ok || len(got) != 1 {
 		t.Fatalf("actors = %v", got)
 	}

@@ -195,20 +195,35 @@ func (r DeliverableRecord) path(dir string) string {
 	return RecordPath(dir, r.Cycle)
 }
 
-var marshalRecord = json.MarshalIndent
+type WritePolicy int
+
+const (
+	ReplaceExisting WritePolicy = iota
+	WriteOnce
+)
+
+var (
+	marshalRecord   = json.MarshalIndent
+	ErrRecordExists = errors.New("integration: deliverable record already exists")
+)
 
 func WriteRecord(dir string, r DeliverableRecord) (string, error) {
+	return WriteRecordWith(dir, r, ReplaceExisting)
+}
+
+func WriteRecordWith(dir string, r DeliverableRecord, policy WritePolicy) (string, error) {
 	r.Schema = RecordSchema
 	if err := r.Validate(); err != nil {
 		return "", err
 	}
-	return recordFile{Path: r.path(dir), Kind: "deliverable record", Prefix: recordPrefix}.publish(r)
+	return recordFile{Path: r.path(dir), Kind: "deliverable record", Prefix: recordPrefix, Policy: policy}.publish(r)
 }
 
 type recordFile struct {
 	Path   string
 	Kind   string
 	Prefix string
+	Policy WritePolicy
 }
 
 func (f recordFile) publish(v any) (string, error) {
@@ -222,6 +237,17 @@ func (f recordFile) publish(v any) (string, error) {
 	tmp, err := stageRecord(filepath.Dir(f.Path), f.Prefix, append(raw, '\n'))
 	if err != nil {
 		return "", fmt.Errorf("integration: write %s: %w", f.Kind, err)
+	}
+	if f.Policy == WriteOnce {
+		err := os.Link(tmp, f.Path)
+		_ = os.Remove(tmp)
+		if errors.Is(err, os.ErrExist) {
+			return "", fmt.Errorf("%w: %s", ErrRecordExists, f.Path)
+		}
+		if err != nil {
+			return "", fmt.Errorf("integration: publish %s: %w", f.Kind, err)
+		}
+		return f.Path, nil
 	}
 	if err := os.Rename(tmp, f.Path); err != nil {
 		_ = os.Remove(tmp)

@@ -155,7 +155,7 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 			res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: promotion skipped: unlanded — commit %s is not an ancestor of HEAD or origin; inbox items for cycle %d left in processing/ for re-triage", commitShort, cid))
 		} else {
 			res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: promoted: landed — commit %s verified in durable history for cycle %d", commitShort, cid))
-			committedIDs = promoteLandedCycle(opts, mvOpts, res, cycleDir, cid, commitShort, body)
+			committedIDs = PromoteLanded(opts, mvOpts, res, cycleDir, cid, commitShort, body)
 		}
 	}
 
@@ -184,7 +184,7 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 	return nil
 }
 
-func promoteLandedCycle(opts *Options, mvOpts inboxmover.Options, res *RunResult, cycleDir string, cid int, commitShort string, body []byte) []string {
+func PromoteLanded(opts *Options, mvOpts inboxmover.Options, res *RunResult, cycleDir string, cid int, commitShort string, body []byte) []string {
 	pinIDs := cycleoutcome.LaneScopeIDs(cycleDir)
 	committedIDs, committedRefusals := inboxmover.FilterPromotionScope(mvOpts, cid, pinIDs, committedInboxIDs(cycleDir, body, workspaceACSVerdict(cycleDir) == "PASS"))
 	supersededIDs, supersededRefusals := inboxmover.FilterPromotionScope(mvOpts, cid, pinIDs, inboxmover.SupersededInboxIDs(body))

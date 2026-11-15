@@ -4,8 +4,11 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
 func TestAdvanceLastCycleNumber_AdvancesAndPreservesSiblings(t *testing.T) {
@@ -162,6 +165,20 @@ func writeFile(t *testing.T, path, content string) {
 	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("write %s: %v", path, err)
+	}
+}
+
+func TestPromoteLanded_RespectsCommittedAndClosesInbox(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	cycleDir := filepath.Join(root, ".evolve", "runs", "cycle-9")
+	writeFile(t, filepath.Join(cycleDir, "build-report.md"), "Closes-Inbox: marker-1\n")
+	opts := &Options{ProjectRoot: root}
+	mvOpts := inboxmover.Options{ProjectRoot: root}
+	res := &RunResult{}
+	got := PromoteLanded(opts, mvOpts, res, cycleDir, 9, "abc12345", nil)
+	if !slices.Equal(got, []string{"marker-1"}) {
+		t.Fatalf("PromoteLanded = %v, want [marker-1]", got)
 	}
 }
 

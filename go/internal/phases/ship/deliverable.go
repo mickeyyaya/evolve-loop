@@ -85,7 +85,11 @@ func (s *worktreeShip) writeDeliverable(commit string) (integration.DeliverableR
 	if err != nil {
 		return rec, "", err
 	}
-	path, err := integration.WriteRecord(s.opts.integrationDir(), rec)
+	writePolicy := integration.ReplaceExisting
+	if s.opts.deliverEnforced() {
+		writePolicy = integration.WriteOnce
+	}
+	path, err := integration.WriteRecordWith(s.opts.integrationDir(), rec, writePolicy)
 	return rec, path, err
 }
 
