@@ -51,6 +51,8 @@ The operator's design is event-driven: the review runs on events and never polls
 | D6 | A policy or protected-manifest change runs the route check. A `route: lane` item with a protected surface gets a deterministic reroute to the console. A console route that no fact explains gets a reroute proposal to a lane for the operator. | — | Apply the lane reroute: an operator chose the console route, and only the operator can undo that choice. |
 | D7 | The boundary step runs every check over every open item, as a backstop. | F3 | A poll timer: the operator forbids it. |
 | D8 | A `merge`, a sweep `consume` and a lane `reroute` are judgment proposals. They are published for the operator and the orchestrator (item X13). The curator never applies them. | — | Apply them: they need judgment, and no LLM edits the inbox. |
+| D9 | An item can declare typed probes: facts that are true when its work is done. The kinds are `test-exists`, `path-exists` and `path-absent`. `evolve inbox add` refuses an item when every probe already passes, because the work is done (`Tree.ProbesPass`, `ErrProbesPass`). No override lifts this refusal. | The stale-item audit of 2026-11: merged work kept its rank in the top 12 of the inbox. | A warning only: the operator files such an item by mistake, and the warning does not stop it. |
+| D10 | The boundary sweep proposes a deterministic `consume` when every probe of an item passes. It proposes a judgment `quarantine` when every declared path of a probed item is gone. The curator never applies a `quarantine`. | A probe is a fact that Go can check. A gone path does not prove that the work is done. | Apply the `quarantine`: the item can still describe work for a new path. |
 
 ## The design
 

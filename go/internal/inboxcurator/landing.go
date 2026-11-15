@@ -17,6 +17,8 @@ const (
 	ProposeConsume ProposalKind = "consume"
 	ProposeReroute ProposalKind = "reroute"
 	ProposeMerge   ProposalKind = "merge"
+
+	ProposeQuarantine ProposalKind = "quarantine"
 )
 
 type Trigger string
@@ -169,10 +171,14 @@ func namesItem(text, id string) bool {
 	return slices.Contains(idTokenRE.FindAllString(strings.ToLower(text), -1), id)
 }
 
-func Sweep(open []inboxbatch.Item, hasTest func(string) bool, minShare float64) []Proposal {
+func Sweep(open []inboxbatch.Item, tree Tree, minShare float64) []Proposal {
 	var out []Proposal
 	for _, it := range open {
-		ev := judgeTests(it, hasTest)
+		if p, ok := sweepProbes(it, tree); ok {
+			out = append(out, p)
+			continue
+		}
+		ev := judgeTests(it, tree.HasTest)
 		if len(ev.found) == 0 || ev.share() < minShare {
 			continue
 		}
@@ -182,4 +188,29 @@ func Sweep(open []inboxbatch.Item, hasTest func(string) bool, minShare float64) 
 		})
 	}
 	return out
+}
+
+func sweepProbes(it inboxbatch.Item, tree Tree) (Proposal, bool) {
+	if len(it.Probes) == 0 {
+		return Proposal{}, false
+	}
+	p := Proposal{ID: it.ID, Path: it.Path, Trigger: TriggerSweep}
+	if tree.ProbesPass(it) {
+		p.Kind, p.Deterministic = ProposeConsume, true
+		p.Reason = "every probe of the item passes on the tree; the work is done"
+		for _, probe := range it.Probes {
+			p.Evidence = append(p.Evidence, "probe passes: "+probe.Kind+" "+probe.Arg)
+		}
+		return p, true
+	}
+	paths := it.DeclaredPaths()
+	if len(paths) == 0 || slices.ContainsFunc(paths, tree.PathExists) {
+		return Proposal{}, false
+	}
+	p.Kind = ProposeQuarantine
+	p.Reason = "every declared path of the item is gone from the tree; the operator judges whether the item still applies"
+	for _, path := range paths {
+		p.Evidence = append(p.Evidence, "path gone: "+path)
+	}
+	return p, true
 }

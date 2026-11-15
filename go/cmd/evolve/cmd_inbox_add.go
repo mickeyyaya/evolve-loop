@@ -154,7 +154,12 @@ func admitInboxItem(raw []byte, req inboxAddRequest, cfg policy.InboxCuratorConf
 		}
 		fmt.Fprintf(stderr, "inbox add: WARN the overlap check skips a file: %s\n", w.String())
 	}
-	rules := inboxcurator.Rules{Kinds: cfg.Kinds, IsProtected: opts.IsProtectedPath,
+	tree, err := probeTree(opts.ProjectRoot, item)
+	if err != nil {
+		fmt.Fprintf(stderr, "inbox add: the probe check: %v\n", err)
+		return 2
+	}
+	rules := inboxcurator.Rules{Kinds: cfg.Kinds, IsProtected: opts.IsProtectedPath, Tree: tree,
 		Thresholds: inboxcurator.Thresholds{Refuse: cfg.OverlapRefuse, Warn: cfg.OverlapWarn}}
 	adm, err := inboxcurator.Admit(item, open, rules, inboxcurator.Override{Reason: req.reason, AllowOverlap: req.allowOverlap})
 	reportOverlaps(item.ID, adm.Warned, "WARN ", stderr)
@@ -165,6 +170,16 @@ func admitInboxItem(raw []byte, req inboxAddRequest, cfg policy.InboxCuratorConf
 		opts.IntakeRecord, _ = json.Marshal(adm.Record)
 	}
 	return 0
+}
+
+func probeTree(root string, item inboxbatch.Item) (inboxcurator.Tree, error) {
+	tree := inboxcurator.Tree{PathExists: pathExistsUnder(root)}
+	if len(item.Probes) == 0 {
+		return tree, nil
+	}
+	tests, err := inboxcurator.IndexTests(filepath.Join(root, "go"))
+	tree.HasTest = func(name string) bool { return tests[name] }
+	return tree, err
 }
 
 func intakeExitCode(id string, err error, stderr io.Writer) int {

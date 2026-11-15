@@ -284,3 +284,19 @@ func TestCmd_InboxAdd_ALoadNoticeOfAReadableItemIsNotASkippedFile(t *testing.T) 
 		t.Errorf("rc = %d stderr = %q, want a filing with no skipped-file WARN for a duplicate-id notice", rc, stderr)
 	}
 }
+
+func TestCmd_InboxAdd_AnUnreadableTestFileFailsTheProbeCheck(t *testing.T) {
+	root := emptyInboxRoot(t)
+	if err := os.MkdirAll(filepath.Join(root, "go"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(root, "nowhere"), filepath.Join(root, "go", "x_test.go")); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("EVOLVE_PROJECT_ROOT", root)
+	body := strings.Replace(poolItem, `"title":`, `"probes":[{"kind":"test-exists","arg":"TestNothing"}],"title":`, 1)
+
+	if rc, _, stderr := addItem(t, body); rc != 2 || !strings.Contains(stderr, "probe check") {
+		t.Errorf("rc = %d stderr = %q, want 2 naming the probe check", rc, stderr)
+	}
+}

@@ -5,13 +5,18 @@
     "The spec and package note of the changed package state the change in STE."
   ],
   "campaign": "architecture-decisions-2026-11",
+  "consumed": {
+    "at": "2026-11-15T05:49:54Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "continuation": {
-    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2363",
-    "branch": "cycle-cd3ae73e-2363",
-    "snapshot_sha": "de9be59e8653d50c45d39262d09cf5ef9be18083",
     "base_sha": "7165d047d7649bb53b41228513d0fc270d766f68",
+    "branch": "cycle-cd3ae73e-2363",
+    "cycle": 2363,
     "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2363/audit-fail-reason.json",
-    "cycle": 2363
+    "snapshot_sha": "de9be59e8653d50c45d39262d09cf5ef9be18083",
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2363"
   },
   "created_at": "2026-11-03T00:33:15Z",
   "files": [
@@ -20,12 +25,24 @@
   "fix": "Graft B: typed `probes` on new items. Intake refuses an item whose probes already pass. A sweep consumes when all probes pass and quarantines when every declared path is gone",
   "id": "arch-decisions-ad2-7-graft-b-typed-probes-on-new-items",
   "intake_override": {
-    "reason": "console",
-    "console_route": true
+    "console_route": true,
+    "reason": "console"
   },
   "kind": "feature",
   "origin": "console",
   "priority_class": "correctness",
+  "released_continuations": [
+    {
+      "base_sha": "7165d047d7649bb53b41228513d0fc270d766f68",
+      "branch": "cycle-cd3ae73e-2363",
+      "cycle": 2363,
+      "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2363/audit-fail-reason.json",
+      "reason": "ship-consume-",
+      "released_at": "2026-11-15T05:49:54Z",
+      "snapshot_sha": "de9be59e8653d50c45d39262d09cf5ef9be18083",
+      "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2363"
+    }
+  ],
   "route": "lane",
   "routed_at": "2026-11-13T19:15:34Z",
   "routed_reason": "operator 2026-11-13: the item touches no protected file and its console route had no reason; a lane can build it",

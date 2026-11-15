@@ -20,6 +20,8 @@ The package has four parts:
   - The `kind` is not in the policy's `inbox.curator.kinds`.
   - The `files` list declares no repository path, so the item has no fix surface.
   - A `files` entry is an absolute path, or a path that leaves the repository through `..`.
+- **Probes.** `CheckIntake` also refuses a probe of an unknown kind, a probe with no argument, and a path probe that is absolute or leaves the repository.
+- **`Tree`** holds `HasTest` and `PathExists`. `Tree.ProbesPass(item) is true when the item has at least one probe and every probe passes. `Admit` refuses such an item with `ErrProbesPass` inside `ErrIntake`, before the overlap judgement. The refusal names each probe. No override lifts it.
 - **`UnderivedConsoleRoute(item, isProtected)`** is true when the item names a console route and no fact explains that route. A fact is a protected fix surface or a `pipeline-*` kind (`inboxbatch.ConsoleRouted`). Such an item never reaches a lane. `evolve inbox add` refuses it unless the operator gives `--reason`.
 - **`SharedSurface(a, b)`** lists the declared paths that two items share. Two paths are shared when they are equal, or when one is a directory that holds the other. A sibling directory with a common prefix is not shared.
 - **`Similarity(a, b)`** is the Jaccard index of the token sets of the title and the acceptance criteria. A token is a lowercase run of letters, digits and `_`. The measure drops tokens shorter than three characters and a short list of stop words. The value is 0 when neither item has a token.
@@ -34,7 +36,7 @@ The package has four parts:
 
 ## The curator (2026-10-27)
 
-- **`Proposal`** is one typed change to one open item. `Kind` is `consume`, `reroute` or `merge` (`ProposalKind`). `Trigger` is `landing`, `sweep` or `routing`. `Deterministic` is true only when Go verified the fact behind it. `Proposal.Event(stage, applied)` is the `INBOX_CURATOR_PROPOSAL` signal of the module `inbox`.
+- **`Proposal`** is one typed change to one open item. `Kind` is `consume`, `reroute`, `merge` or `quarantine` (`ProposalKind`). `Trigger` is `landing`, `sweep` or `routing`. `Deterministic` is true only when Go verified the fact behind it. `Proposal.Event(stage, applied)` is the `INBOX_CURATOR_PROPOSAL` signal of the module `inbox`.
 - **`NamedTests(item)`** lists the `Test…`, `Benchmark…` and `Fuzz…` names in the acceptance, and says if every criterion names one.
 - **`MatchLanding(change, open, hasTest, minShare)`** proposes `consume` for an item when the `Change` touched its fix surface and at least `minShare` of its named tests exist. The proposal is deterministic only when all of these are true:
   - every criterion names a test, and every named test exists;
@@ -42,7 +44,7 @@ The package has four parts:
   - the change is not older than the filing of the item (`Change.When`).
 
   A change that consumed a file with the same name as the item (`.evolve/inbox/consumed/<file>`) gives a deterministic proposal for the root copy. A change text that names the id gives a judgment proposal. An id in `Change.Closes` that equals the id of an open item gives a deterministic proposal.
-- **`Sweep(open, hasTest, minShare)`** proposes `consume` for each item when at least `minShare` of its named tests exist on the tree. It is never deterministic, because a test can predate the item.
+- **`Sweep(open, tree, minShare)`** first judges the probes of an item. When every probe passes, it proposes a deterministic `consume`, and no other proposal. When an item has probes and every declared path is gone, it proposes a judgment `quarantine`. For all other items it proposes `consume` when at least `minShare` of the named tests exist on the tree. That `consume` is never deterministic, because a test can predate the item.
 - **`Reroutes(open, isProtected)`** proposes:
   - a deterministic reroute to the console for an item on `route: lane` whose surface `inboxbatch.ConsoleRouted` sends to the console;
   - a judgment reroute to a lane for a console route that no fact explains and no `routed_reason` records. `evolve inbox route-console <id> <reason> 0` records a reason, so the operator declines the proposal with it.

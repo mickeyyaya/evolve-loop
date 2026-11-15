@@ -103,7 +103,7 @@ func TestSweep_ProposesEveryItemWhoseNamedTestsExistAndNeverAppliesOne(t *testin
 	fresh := item("fresh", "x", []string{"go/a.go"}, "TestNotYetWritten passes")
 	all := testsIn("TestOrchestrator_AFreeSlotTakesTheNextAdmissibleTodoAtOnce", "TestLease_ALanePastItsDeadlineStops")
 
-	got := Sweep([]inboxbatch.Item{stale, fresh}, all, 0.5)
+	got := Sweep([]inboxbatch.Item{stale, fresh}, Tree{HasTest: all}, 0.5)
 
 	if len(got) != 1 || got[0].ID != "rolling-pool" || got[0].Deterministic || got[0].Trigger != TriggerSweep {
 		t.Fatalf("Sweep = %+v, want one proposal for rolling-pool that is not deterministic", got)

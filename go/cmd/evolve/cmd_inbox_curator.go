@@ -160,9 +160,17 @@ func (r *curatorRun) curate(changes []inboxcurator.Change, backstop bool) (curat
 	in := inboxcurator.Inputs{
 		Open: open, Changes: changes, IsProtected: laneForbidden(r.req.root, r.stderr), Backstop: backstop,
 		HasTest:    func(name string) bool { return tests[name] || definedByAChange(changes, name) },
+		PathExists: pathExistsUnder(r.req.root),
 		Thresholds: inboxcurator.Thresholds{Refuse: r.cfg.OverlapRefuse, Warn: r.cfg.OverlapWarn}, MinShare: r.cfg.ConsumeMinShare,
 	}
 	return r.settle(inboxcurator.Curate(in), in.IsProtected), nil
+}
+
+func pathExistsUnder(root string) func(string) bool {
+	return func(rel string) bool {
+		_, err := os.Stat(filepath.Join(root, rel))
+		return err == nil
+	}
 }
 
 func definedByAChange(changes []inboxcurator.Change, name string) bool {

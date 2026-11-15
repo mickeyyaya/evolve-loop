@@ -352,3 +352,27 @@ func TestRunPool_TransitionsCarryTheCapAndTheStopTheFleetReads(t *testing.T) {
 		})
 	}
 }
+
+func TestPool_AFreeSlotTakesTheNextTodo(t *testing.T) {
+	backlog := []Todo{
+		{ID: "A", Files: []string{"a.go"}},
+		{ID: "B", Files: []string{"b.go"}},
+	}
+	var mu sync.Mutex
+	var order []string
+	launch := func(_ context.Context, spec CycleSpec) (int, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		order = append(order, scopeID(spec))
+		return 0, nil
+	}
+	results := RunPool(context.Background(), PoolConfig{Target: 1}, backlog, launch, nil)
+	if len(results) != 2 {
+		t.Fatalf("results = %d, want 2", len(results))
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(order) != 2 || order[0] != "A" || order[1] != "B" {
+		t.Fatalf("dispatch order = %v, want [A B]", order)
+	}
+}

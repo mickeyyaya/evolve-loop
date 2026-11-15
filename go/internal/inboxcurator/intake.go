@@ -11,6 +11,8 @@ import (
 
 var ErrIntake = errors.New("inbox intake refused the item")
 
+var ErrProbesPass = errors.New("every probe of the item already passes, so the work is done")
+
 func CheckIntake(it inboxbatch.Item, kinds []string) error {
 	if err := inboxbatch.CheckOrigin(it.Origin); err != nil {
 		return fmt.Errorf("%w: %w", ErrIntake, err)
@@ -18,7 +20,26 @@ func CheckIntake(it inboxbatch.Item, kinds []string) error {
 	if !slices.Contains(kinds, it.Kind) {
 		return fmt.Errorf("%w: kind %q is not one of the policy's inbox.curator.kinds: %s", ErrIntake, it.Kind, strings.Join(kinds, ", "))
 	}
-	return checkSurface(it)
+	if err := checkSurface(it); err != nil {
+		return err
+	}
+	return checkProbes(it)
+}
+
+func checkProbes(it inboxbatch.Item) error {
+	for _, p := range it.Probes {
+		if !slices.Contains(inboxbatch.ProbeKinds(), p.Kind) {
+			return fmt.Errorf("%w: probe kind %q is not one of: %s", ErrIntake, p.Kind, strings.Join(inboxbatch.ProbeKinds(), ", "))
+		}
+		arg := strings.TrimSpace(p.Arg)
+		if arg == "" {
+			return fmt.Errorf("%w: probe of kind %q has no argument", ErrIntake, p.Kind)
+		}
+		if p.Kind != inboxbatch.ProbeTestExists && (strings.HasPrefix(arg, "/") || slices.Contains(strings.Split(arg, "/"), "..")) {
+			return fmt.Errorf("%w: probe path %q is absolute or leaves the repository", ErrIntake, p.Arg)
+		}
+	}
+	return nil
 }
 
 func checkSurface(it inboxbatch.Item) error {
@@ -54,6 +75,7 @@ type Rules struct {
 	Kinds       []string
 	Thresholds  Thresholds
 	IsProtected func(string) bool
+	Tree        Tree
 }
 
 type Override struct {
@@ -95,6 +117,9 @@ func Admit(it inboxbatch.Item, open []inboxbatch.Item, r Rules, o Override) (Adm
 	if err := CheckIntake(it, r.Kinds); err != nil {
 		return Admission{}, err
 	}
+	if r.Tree.ProbesPass(it) {
+		return Admission{}, fmt.Errorf("%w: %w: %s", ErrIntake, ErrProbesPass, passingProbes(it.Probes))
+	}
 	record := Record{Reason: o.Reason}
 	if UnderivedConsoleRoute(it, r.IsProtected) {
 		if o.Reason == "" {
@@ -115,4 +140,12 @@ func Admit(it inboxbatch.Item, open []inboxbatch.Item, r Rules, o Override) (Adm
 		adm.Record = &record
 	}
 	return adm, nil
+}
+
+func passingProbes(probes []inboxbatch.Probe) string {
+	parts := make([]string, len(probes))
+	for i, p := range probes {
+		parts[i] = p.Kind + " " + p.Arg
+	}
+	return strings.Join(parts, "; ")
 }

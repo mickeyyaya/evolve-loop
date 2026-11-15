@@ -11,13 +11,14 @@ import (
 const CodeProposal signalcenter.Code = "INBOX_CURATOR_PROPOSAL"
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleInbox, CodeProposal, "the inbox curator proposes a change to one open item: consume it, reroute it or merge it (fields.kind, id, target, trigger, deterministic, stage, applied, evidence); the curator applies a deterministic proposal only in the enforce stage at the wave boundary, and a judgment proposal waits for the operator or the orchestrator")
+	signalcenter.RegisterCode(signalcenter.ModuleInbox, CodeProposal, "the inbox curator proposes a change to one open item: consume it, reroute it, merge it or quarantine it (fields.kind, id, target, trigger, deterministic, stage, applied, evidence); the curator applies a deterministic proposal only in the enforce stage at the wave boundary, and a judgment proposal waits for the operator or the orchestrator")
 }
 
 type Inputs struct {
 	Open        []inboxbatch.Item
 	Changes     []Change
 	HasTest     func(string) bool
+	PathExists  func(string) bool
 	IsProtected func(string) bool
 	Thresholds  Thresholds
 	MinShare    float64
@@ -35,7 +36,7 @@ func Curate(in Inputs) []Proposal {
 		out = append(out, Reroutes(in.Open, in.IsProtected)...)
 	}
 	if in.Backstop {
-		out = append(out, Sweep(in.Open, in.HasTest, in.MinShare)...)
+		out = append(out, Sweep(in.Open, Tree{HasTest: in.HasTest, PathExists: in.PathExists}, in.MinShare)...)
 		out = append(out, Duplicates(in.Open, in.Thresholds)...)
 	}
 	return firstPerItem(out)

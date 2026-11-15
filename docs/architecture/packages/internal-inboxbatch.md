@@ -110,6 +110,8 @@
 - **An absent lifecycle directory is an empty list.** `CycleDirs` returns nil rather than an error: no item ever reached that state.
 - **Unified commitment members are homogeneous.** Members must be known items, distinct, and each carry evidence. They must share one campaign (unscoped counts as its own value) and one deliverable kind (empty means `code`). Pinned by `TestUnifiedCommitment_RejectsMixedCampaignMembership`.
 - **A rule's edges need only span.** Union-find needs connectivity, not the clique, so a rule may return a chain of edges over its group.
+- **Probes are typed.** `Item.Probes` lists `Probe` values with a `Kind` and an `Arg`. `ProbeKinds()` returns a copy of the three kinds: `test-exists`, `path-exists` and `path-absent`. A probe is a fact that is true when the work of the item is done.
+- **The probe check lives elsewhere.** The package only holds the type. The `inboxcurator` package checks the probes against the tree. Pinned by `TestProbeKinds_ListsTheThreeTypedKinds` and `TestItem_DecodesTypedProbesAsKindAndArgument`.
 
 ## Findings
 
