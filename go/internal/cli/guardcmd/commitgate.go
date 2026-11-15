@@ -14,7 +14,7 @@ import (
 
 func RunCommitGate(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "evolve commit-gate: usage: commit-gate run --reviewers \"<csv>\" [--files \"p1 p2\"] [--no-install] [--project-root P]")
+		fmt.Fprintf(stderr, "evolve commit-gate: usage: commit-gate run --reviewers \"<csv>\" [--files <%s>] [--no-install] [--project-root P]\n", commitgate.FilesFormat)
 		return commitgate.ExitBadArgs
 	}
 	sub, rest := args[0], args[1:]
@@ -27,7 +27,7 @@ func RunCommitGate(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	var (
 		reviewers   = fs.String("reviewers", "", "CSV of reviewers that ran (simplify + one review capability)")
-		files       = fs.String("files", "", "override change detection: whitespace-separated path list")
+		files       = fs.String("files", "", "override change detection: "+commitgate.FilesFormat+" from the change")
 		noInstall   = fs.Bool("no-install", false, "do not auto-install missing tools (hard-fail instead)")
 		projectRoot = fs.String("project-root", "", "git working tree root (default: git rev-parse --show-toplevel)")
 	)

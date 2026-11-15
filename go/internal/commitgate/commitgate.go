@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -25,6 +26,8 @@ const (
 )
 
 const AttestDirName = ".commit-gate"
+
+const FilesFormat = "whitespace-separated list of paths"
 
 type Runner = sysexec.RunFunc
 
@@ -150,6 +153,9 @@ func (o Options) reviewDecision(ctx context.Context, langs []string, res *Result
 func (o Options) changedFiles(ctx context.Context, res *Result) ([]string, int) {
 	var raw string
 	if strings.TrimSpace(o.Files) != "" {
+		if code := o.refuseUnlistedFiles(ctx, strings.Fields(o.Files), res); code != ExitPass {
+			return nil, code
+		}
 		raw = strings.Join(strings.Fields(o.Files), "\n")
 	} else {
 		out, _, code, err := sysexec.Capture(ctx, o.Runner, o.RepoRoot, "git", "diff", "--name-only", "HEAD")
@@ -170,6 +176,27 @@ func (o Options) changedFiles(ctx context.Context, res *Result) ([]string, int) 
 		return nil, ExitFail
 	}
 	return files, ExitPass
+}
+
+func (o Options) refuseUnlistedFiles(ctx context.Context, files []string, res *Result) int {
+	listed, err := o.changeListing(ctx)
+	if err != nil {
+		res.log("%v", err)
+		return ExitGitFatal
+	}
+	code := ExitPass
+	for _, path := range files {
+		if slices.Contains(listed, path) {
+			continue
+		}
+		code = ExitBadArgs
+		if strings.Contains(path, ",") {
+			res.log("--files path %q is not in the change: --files takes a %s", path, FilesFormat)
+			continue
+		}
+		res.log("--files path %q is not in the change", path)
+	}
+	return code
 }
 
 func detectLangs(files []string) []string {
