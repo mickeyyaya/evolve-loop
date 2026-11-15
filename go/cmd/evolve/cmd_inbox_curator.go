@@ -13,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/events/channel"
 	"github.com/mickeyyaya/evolve-loop/go/internal/events/reader"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxcurator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -158,7 +159,7 @@ func (r *curatorRun) curate(changes []inboxcurator.Change, backstop bool) (curat
 		return curateReport{}, err
 	}
 	in := inboxcurator.Inputs{
-		Open: open, Changes: changes, IsProtected: laneForbidden(r.req.root, r.stderr), Backstop: backstop,
+		Open: open, Changes: changes, History: r.history(open, backstop), IsProtected: laneForbidden(r.req.root, r.stderr), Backstop: backstop,
 		HasTest:    func(name string) bool { return tests[name] || definedByAChange(changes, name) },
 		PathExists: pathExistsUnder(r.req.root),
 		Thresholds: inboxcurator.Thresholds{Refuse: r.cfg.OverlapRefuse, Warn: r.cfg.OverlapWarn}, MinShare: r.cfg.ConsumeMinShare,
@@ -171,6 +172,19 @@ func pathExistsUnder(root string) func(string) bool {
 		_, err := os.Stat(filepath.Join(root, rel))
 		return err == nil
 	}
+}
+
+func (r *curatorRun) history(open []inboxbatch.Item, backstop bool) []inboxcurator.Change {
+	floor, ok := inboxcurator.HistoryFloor(open)
+	if !backstop || !ok {
+		return nil
+	}
+	history, err := inboxcurator.ClosedHistory(r.ctx(), r.git, floor)
+	if err != nil {
+		fmt.Fprintf(r.stderr, "inbox curate: WARN %v; the history of Closes-Inbox is skipped\n", err)
+		return nil
+	}
+	return history
 }
 
 func definedByAChange(changes []inboxcurator.Change, name string) bool {
