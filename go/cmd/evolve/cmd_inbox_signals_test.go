@@ -112,37 +112,14 @@ func TestInboxCenterlessRootsArePinned(t *testing.T) {
 	literalRE := regexp.MustCompile(`inboxmover\.Options\{`)
 	moduleRoot := filepath.Join("..", "..")
 	seen := map[string]bool{}
-	err := filepath.WalkDir(moduleRoot, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
+	for _, f := range sharedModuleFiles(t) {
+		if len(literalRE.FindAll(f.Src, -1)) == 0 {
+			continue
 		}
-		name := entry.Name()
-		if entry.IsDir() {
-			if name == "vendor" || name == "bin" || strings.HasPrefix(name, ".") && path != moduleRoot {
-				return filepath.SkipDir
-			}
-			return nil
+		seen[f.Rel] = true
+		if _, ok := allowed[f.Rel]; !ok {
+			t.Errorf("%s builds an inboxmover.Options literal — thread the root's Center (Signals:) or pin it here with a reason", f.Rel)
 		}
-		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
-			return nil
-		}
-		src, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		if len(literalRE.FindAll(src, -1)) == 0 {
-			return nil
-		}
-		rel, _ := filepath.Rel(moduleRoot, path)
-		rel = filepath.ToSlash(rel)
-		seen[rel] = true
-		if _, ok := allowed[rel]; !ok {
-			t.Errorf("%s builds an inboxmover.Options literal — thread the root's Center (Signals:) or pin it here with a reason", rel)
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
 	}
 	for rel := range allowed {
 		if !seen[rel] {
@@ -186,36 +163,14 @@ func TestInboxCenterlessRootsArePinned(t *testing.T) {
 	}
 }
 
-func nonTestConstructionsOf(t *testing.T, moduleRoot, re string) []string {
+func nonTestConstructionsOf(t *testing.T, _ string, re string) []string {
 	t.Helper()
 	callRE := regexp.MustCompile(re)
 	var files []string
-	err := filepath.WalkDir(moduleRoot, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
+	for _, f := range sharedModuleFiles(t) {
+		if callRE.Match(f.Src) {
+			files = append(files, f.Rel)
 		}
-		name := entry.Name()
-		if entry.IsDir() {
-			if name == "vendor" || name == "bin" || strings.HasPrefix(name, ".") && path != moduleRoot {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
-			return nil
-		}
-		src, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		if callRE.Match(src) {
-			rel, _ := filepath.Rel(moduleRoot, path)
-			files = append(files, filepath.ToSlash(rel))
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
 	}
 	return files
 }

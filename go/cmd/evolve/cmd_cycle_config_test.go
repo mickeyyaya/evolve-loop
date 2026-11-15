@@ -17,35 +17,14 @@ import (
 
 func nonTestSourcesMatching(t *testing.T, re *regexp.Regexp) []string {
 	t.Helper()
-	moduleRoot := filepath.Join("..", "..")
 	var hits []string
-	err := filepath.WalkDir(moduleRoot, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
+	for _, f := range sharedModuleFiles(t) {
+		if strings.HasPrefix(f.Rel, "internal/config/") {
+			continue
 		}
-		name := entry.Name()
-		if entry.IsDir() {
-			if name == "vendor" || name == "bin" || name == "testdata" || strings.HasPrefix(name, ".") && path != moduleRoot {
-				return filepath.SkipDir
-			}
-			return nil
+		if re.Match(f.Src) {
+			hits = append(hits, f.Rel)
 		}
-		rel, _ := filepath.Rel(moduleRoot, path)
-		rel = filepath.ToSlash(rel)
-		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") || strings.HasPrefix(rel, "internal/config/") {
-			return nil
-		}
-		src, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		if re.Match(src) {
-			hits = append(hits, rel)
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
 	}
 	return hits
 }

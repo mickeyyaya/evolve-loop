@@ -2,9 +2,7 @@ package main
 
 import (
 	"go/ast"
-	"go/parser"
 	"go/token"
-	"io/fs"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -44,44 +42,22 @@ func inboxWriteSites(t *testing.T, moduleDir string) []string {
 	return slices.Compact(sites)
 }
 
-func scanProductionPackages(t *testing.T, moduleDir string) map[string]*scannedPackage {
+func scanProductionPackages(t *testing.T, dir string) map[string]*scannedPackage {
 	t.Helper()
 	packages := map[string]*scannedPackage{}
-	err := filepath.WalkDir(moduleDir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+	for _, f := range sourceFilesInDir(t, dir) {
+		if strings.HasPrefix(f.Rel, "acs/") {
+			continue
 		}
-		if d.IsDir() {
-			return skipNonProductionDir(path, moduleDir, d.Name())
-		}
-		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-			return nil
-		}
-		return addScannedFile(packages, moduleDir, path)
-	})
-	if err != nil {
-		t.Fatal(err)
+		addScannedFile(t, packages, f)
 	}
 	return packages
 }
 
-func skipNonProductionDir(path, moduleDir, name string) error {
-	if path != moduleDir && (name == "testdata" || name == "vendor" || name == "acs" || strings.HasPrefix(name, ".")) {
-		return filepath.SkipDir
-	}
-	return nil
-}
-
-func addScannedFile(packages map[string]*scannedPackage, moduleDir, path string) error {
-	file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
-	if err != nil {
-		return err
-	}
-	rel, err := filepath.Rel(moduleDir, filepath.Dir(path))
-	if err != nil {
-		return err
-	}
-	dir := filepath.ToSlash(rel)
+func addScannedFile(t *testing.T, packages map[string]*scannedPackage, f *moduleSourceFile) {
+	t.Helper()
+	file := f.AST(t)
+	dir := f.Dir
 	if packages[dir] == nil {
 		packages[dir] = &scannedPackage{funcs: map[string][]scannedFunc{}, inboxNames: map[string]bool{}, returnsInbox: map[string]bool{}, writerHelper: map[string]bool{}}
 	}
@@ -96,7 +72,6 @@ func addScannedFile(packages map[string]*scannedPackage, moduleDir, path string)
 			packages[dir].addInboxNames(d)
 		}
 	}
-	return nil
 }
 
 func (p *scannedPackage) addInboxNames(d *ast.GenDecl) {

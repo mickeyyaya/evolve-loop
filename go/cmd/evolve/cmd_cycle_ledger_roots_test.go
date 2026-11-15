@@ -1,8 +1,6 @@
 package main
 
 import (
-	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -25,36 +23,13 @@ func TestUnobservedLedgerRootsArePinned(t *testing.T) {
 		"internal/inboxmover/inboxmover.go": {1, "the mover's fallback when no Ledger is injected — still reached by the ship phase's post-ship mover and the operator inbox commands until S4b threads the root's"},
 	}
 	callRE := regexp.MustCompile(`\bledger\.New\(`)
-	moduleRoot := filepath.Join("..", "..")
 	seen := map[string]int{}
-	err := filepath.WalkDir(moduleRoot, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		name := entry.Name()
-		if entry.IsDir() {
-			if name == "vendor" || name == "bin" || strings.HasPrefix(name, ".") && path != moduleRoot {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
-			return nil
-		}
-		src, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		calls := len(callRE.FindAll(src, -1))
+	for _, f := range sharedModuleFiles(t) {
+		calls := len(callRE.FindAll(f.Src, -1))
 		if calls == 0 {
-			return nil
+			continue
 		}
-		rel, _ := filepath.Rel(moduleRoot, path)
-		seen[filepath.ToSlash(rel)] = calls - strings.Count(string(src), "ledger.WithSignals(")
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
+		seen[f.Rel] = calls - strings.Count(string(f.Src), "ledger.WithSignals(")
 	}
 	for file, unobserved := range seen {
 		if want := pinned[file].unobserved; unobserved != want {

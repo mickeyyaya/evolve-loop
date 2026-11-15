@@ -17,38 +17,15 @@ import (
 func TestObserverAdapterConstructionsAreWired(t *testing.T) {
 	t.Parallel()
 	callRE := regexp.MustCompile(`\bobserver\.NewCoreAdapter\(`)
-	moduleRoot := filepath.Join("..", "..")
 	var unwired []string
 	constructions := 0
-	err := filepath.WalkDir(moduleRoot, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		name := entry.Name()
-		if entry.IsDir() {
-			if name == "vendor" || name == "bin" || strings.HasPrefix(name, ".") && path != moduleRoot {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
-			return nil
-		}
-		src, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		calls := len(callRE.FindAll(src, -1))
+	for _, f := range sharedModuleFiles(t) {
+		calls := len(callRE.FindAll(f.Src, -1))
 		constructions += calls
-		if calls == 0 || strings.Count(string(src), ".Signals = ") >= calls {
-			return nil
+		if calls == 0 || strings.Count(string(f.Src), ".Signals = ") >= calls {
+			continue
 		}
-		rel, _ := filepath.Rel(moduleRoot, path)
-		unwired = append(unwired, filepath.ToSlash(rel))
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
+		unwired = append(unwired, f.Rel)
 	}
 	if constructions == 0 {
 		t.Fatal("the production root constructs the live observer adapter (cmd_cycle.go)")

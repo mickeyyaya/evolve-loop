@@ -104,37 +104,14 @@ func TestLoopSignalOrigins_NameDeclaredFunctions(t *testing.T) {
 
 func nonTestSourcesMentioningU13(t *testing.T, needle, allowed string) []string {
 	t.Helper()
-	moduleRoot, err := filepath.Abs(filepath.Join("..", ".."))
-	if err != nil {
-		t.Fatal(err)
-	}
 	var offenders []string
-	walk := func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
+	for _, f := range sharedModuleFiles(t) {
+		if strings.HasPrefix(f.Rel, "internal/loopwave/") || strings.HasPrefix(f.Rel, "internal/loopchain/") {
+			continue
 		}
-		rel, _ := filepath.Rel(moduleRoot, path)
-		rel = filepath.ToSlash(rel)
-		if entry.IsDir() {
-			if entry.Name() == "vendor" || entry.Name() == "bin" || entry.Name() == "testdata" || (strings.HasPrefix(entry.Name(), ".") && path != moduleRoot) {
-				return filepath.SkipDir
-			}
-			return nil
+		if strings.Contains(string(f.Src), needle) && f.Rel != allowed {
+			offenders = append(offenders, f.Rel)
 		}
-		if !strings.HasSuffix(rel, ".go") || strings.HasSuffix(rel, "_test.go") || strings.HasPrefix(rel, "internal/loopwave/") || strings.HasPrefix(rel, "internal/loopchain/") {
-			return nil
-		}
-		body, rerr := os.ReadFile(path)
-		if rerr != nil {
-			return rerr
-		}
-		if strings.Contains(string(body), needle) && rel != allowed {
-			offenders = append(offenders, rel)
-		}
-		return nil
-	}
-	if err := filepath.WalkDir(moduleRoot, walk); err != nil {
-		t.Fatal(err)
 	}
 	return offenders
 }
@@ -351,20 +328,14 @@ func TestEmitLoopWave_ProjectsToTheLeafProducerWithOneRegistrar(t *testing.T) {
 	if CodeLoopMinWidthRepair != loopwave.CodeMinWidthRepair {
 		t.Error("CodeLoopMinWidthRepair projects the leaf's code")
 	}
-	moduleRoot, _ := filepath.Abs(filepath.Join("..", ".."))
 	registrars := 0
-	_ = filepath.WalkDir(moduleRoot, func(path string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-			return nil
-		}
-		body, _ := os.ReadFile(path)
-		for _, line := range strings.Split(string(body), "\n") {
+	for _, f := range sharedModuleFiles(t) {
+		for _, line := range strings.Split(string(f.Src), "\n") {
 			if strings.Contains(line, "RegisterCode(") && strings.Contains(line, "CodeMinWidthRepair") {
 				registrars++
 			}
 		}
-		return nil
-	})
+	}
 	if registrars != 1 {
 		t.Errorf("LOOP_MIN_WIDTH_REPAIR has %d registrars, want exactly 1 (the leaf)", registrars)
 	}

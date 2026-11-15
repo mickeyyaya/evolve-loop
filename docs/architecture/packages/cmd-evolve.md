@@ -960,3 +960,4 @@ This section holds the durable reasons that the strip removed from the group 4 f
 - **`evolve inbox trailer-check` (`cmd_inbox_trailercheck.go`).** `runInboxTrailerCheck` reads commit messages across `--range` with `git log` and checks each `Closes-Inbox` and `Refs-Inbox` id through `closesinbox` and `inboxmover.ResolveDispatchState`.
   - A range passes when at least one trailer exists and every named id is `pending` or `processing`.
   - `policy.LoadOrDefaults` sets the stage (`shadow` by default, `enforce` exits 1 on violations). Pinned by `cmd_inbox_trailercheck_test.go`.
+- **Shared module scan (`module_scan_loader_test.go`).** `sharedModuleFiles` walks the Go module once for each test binary through `sync.OnceValues`. `moduleSourceFile.AST` parses each Go file once on first demand. `TestModuleScanGuard` fails when another test file in `cmd/evolve` walks the module directly.

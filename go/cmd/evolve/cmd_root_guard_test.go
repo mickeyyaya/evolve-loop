@@ -4,9 +4,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"io/fs"
 	"maps"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -17,32 +15,9 @@ import (
 
 func parsedModuleSources(t *testing.T) map[string]*ast.File {
 	t.Helper()
-	moduleRoot := filepath.Join("..", "..")
 	files := map[string]*ast.File{}
-	err := filepath.WalkDir(moduleRoot, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		name := entry.Name()
-		if entry.IsDir() {
-			if name == "vendor" || name == "bin" || name == "testdata" || strings.HasPrefix(name, ".") && path != moduleRoot {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
-			return nil
-		}
-		file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
-		if err != nil {
-			return err
-		}
-		rel, _ := filepath.Rel(moduleRoot, path)
-		files[filepath.ToSlash(rel)] = file
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
+	for _, f := range sharedModuleFiles(t) {
+		files[f.Rel] = f.AST(t)
 	}
 	return files
 }

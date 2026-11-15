@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -64,45 +63,22 @@ func TestNilSignalCenterRootsArePinned(t *testing.T) {
 		"internal/routingtest/engine.go": true,
 	}
 	callRE := regexp.MustCompile(`\bcore\.NewOrchestrator\(`)
-	moduleRoot := filepath.Join("..", "..")
 	var unwired []string
-	err := filepath.WalkDir(moduleRoot, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		name := entry.Name()
-		if entry.IsDir() {
-			if name == "vendor" || name == "bin" || strings.HasPrefix(name, ".") && path != moduleRoot {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
-			return nil
-		}
-		src, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		calls := len(callRE.FindAll(src, -1))
+	for _, f := range sharedModuleFiles(t) {
+		calls := len(callRE.FindAll(f.Src, -1))
 		if calls == 0 {
-			return nil
+			continue
 		}
-		wired, err := countCallExprs(src, "WithSignalCenter")
+		wired, err := countCallExprs(f.Src, "WithSignalCenter")
 		if err != nil {
-			return fmt.Errorf("%s: %w", path, err)
+			t.Fatalf("%s: %v", f.Path, err)
 		}
 		if wired >= calls {
-			return nil
+			continue
 		}
-		rel, _ := filepath.Rel(moduleRoot, path)
-		if !allowed[filepath.ToSlash(rel)] {
-			unwired = append(unwired, filepath.ToSlash(rel))
+		if !allowed[f.Rel] {
+			unwired = append(unwired, f.Rel)
 		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
 	}
 	if len(unwired) != 0 {
 		t.Errorf("orchestrator built without a Signal Center outside the pinned nil roots: %v", unwired)
@@ -185,42 +161,19 @@ func TestWireOrchestratorDeps_SignalCenterReachesTheBridge(t *testing.T) {
 func TestNilSignalBridgeRootsAreExplicit(t *testing.T) {
 	t.Parallel()
 	callRE := regexp.MustCompile(`bridge\.NewDefault\(\s*([^,)]+)\s*,\s*([^)]+)\)`)
-	moduleRoot := filepath.Join("..", "..")
-	err := filepath.WalkDir(moduleRoot, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		name := entry.Name()
-		if entry.IsDir() {
-			if name == "vendor" || name == "bin" || strings.HasPrefix(name, ".") && path != moduleRoot {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
-			return nil
-		}
-		src, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		rel, _ := filepath.Rel(moduleRoot, path)
-		for _, m := range callRE.FindAllStringSubmatch(string(src), -1) {
+	for _, f := range sharedModuleFiles(t) {
+		for _, m := range callRE.FindAllStringSubmatch(string(f.Src), -1) {
 			second := strings.TrimSuffix(strings.TrimSpace(m[2]), ",")
-			if filepath.ToSlash(rel) == "cmd/evolve/cmd_cycle.go" {
+			if f.Rel == "cmd/evolve/cmd_cycle.go" {
 				if second == "nil" {
-					t.Errorf("%s: the production root must pass its Signal Center, not nil", rel)
+					t.Errorf("%s: the production root must pass its Signal Center, not nil", f.Rel)
 				}
 				continue
 			}
 			if second != "nil" {
-				t.Errorf("%s: a non-root bridge.NewDefault must pass an explicit nil (Center-less registry default), got %q", rel, second)
+				t.Errorf("%s: a non-root bridge.NewDefault must pass an explicit nil (Center-less registry default), got %q", f.Rel, second)
 			}
 		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
 	}
 }
 
@@ -335,32 +288,10 @@ func TestConsoleSinkThresholdHasOneHome(t *testing.T) {
 	const home = "internal/signalcenter/sinks.go"
 	moduleRoot := filepath.Join("..", "..")
 	var respelled []string
-	err := filepath.WalkDir(moduleRoot, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
+	for _, f := range sharedModuleFiles(t) {
+		if f.Rel != home && strings.Contains(string(f.Src), "StderrSink(") {
+			respelled = append(respelled, f.Rel)
 		}
-		name := entry.Name()
-		if entry.IsDir() {
-			if name == "vendor" || name == "bin" || strings.HasPrefix(name, ".") && path != moduleRoot {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
-			return nil
-		}
-		src, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		rel, _ := filepath.Rel(moduleRoot, path)
-		if rel = filepath.ToSlash(rel); rel != home && strings.Contains(string(src), "StderrSink(") {
-			respelled = append(respelled, rel)
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
 	}
 	if len(respelled) != 0 {
 		t.Errorf("the console threshold is spelled outside signalcenter.ConsoleSink: %v", respelled)

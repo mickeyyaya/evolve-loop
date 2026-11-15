@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"go/ast"
-	"go/parser"
-	"go/token"
 	"io"
 	"os"
 	"path/filepath"
@@ -37,20 +35,14 @@ var depsForwarders = map[string]string{
 	"internal/subagent/bridgeadapter.go": "newAdapterBridge forwards the Deps that execAdapterDepsWith builds",
 }
 
-func bridgeNewEngineCalls(t *testing.T, path string) int {
+func bridgeNewEngineCalls(t *testing.T, f *ast.File) int {
 	t.Helper()
 	calls := 0
-	forEachBridgeNewEngine(t, path, func(*ast.CallExpr, ast.Decl) { calls++ })
+	forEachBridgeNewEngine(f, func(*ast.CallExpr, ast.Decl) { calls++ })
 	return calls
 }
 
-func forEachBridgeNewEngine(t *testing.T, path string, visit func(*ast.CallExpr, ast.Decl)) {
-	t.Helper()
-	fset := token.NewFileSet()
-	f, err := parser.ParseFile(fset, path, nil, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
+func forEachBridgeNewEngine(f *ast.File, visit func(*ast.CallExpr, ast.Decl)) {
 	alias := ""
 	for _, imp := range f.Imports {
 		if strings.Trim(imp.Path.Value, `"`) != bridgeImportPath {
@@ -82,10 +74,17 @@ func forEachBridgeNewEngine(t *testing.T, path string, visit func(*ast.CallExpr,
 
 func TestBridgeEngineRoots_EachWiresATokenResolver(t *testing.T) {
 	t.Parallel()
-	moduleRoot := filepath.Join("..", "..")
+	byRel := map[string]*moduleSourceFile{}
+	for _, f := range sharedModuleFiles(t) {
+		byRel[f.Rel] = f
+	}
 	for rel := range bridgeEngineRoots {
 		_, forwards := depsForwarders[rel]
-		forEachBridgeNewEngine(t, filepath.Join(moduleRoot, rel), func(call *ast.CallExpr, decl ast.Decl) {
+		f, ok := byRel[rel]
+		if !ok {
+			t.Fatalf("missing module file %s", rel)
+		}
+		forEachBridgeNewEngine(f.AST(t), func(call *ast.CallExpr, decl ast.Decl) {
 			if !forwards && (len(call.Args) != 1 || !depsWireTokens(call.Args[0], decl)) {
 				t.Errorf("%s: a NewEngine call builds Deps without a TokenResolver, so its launches record no token usage and the build WARNs BRIDGE_TOKEN_RESOLVER_MISSING", rel)
 			}
@@ -137,30 +136,11 @@ func setsNonNil(lit *ast.CompositeLit, key string) bool {
 
 func TestBridgeEngineRootsAreEnumerated(t *testing.T) {
 	t.Parallel()
-	moduleRoot := filepath.Join("..", "..")
 	found := map[string]int{}
-	err := filepath.WalkDir(moduleRoot, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
+	for _, f := range sharedModuleFiles(t) {
+		if n := bridgeNewEngineCalls(t, f.AST(t)); n > 0 {
+			found[f.Rel] = n
 		}
-		name := entry.Name()
-		if entry.IsDir() {
-			if name == "vendor" || name == "bin" || name == "testdata" || strings.HasPrefix(name, ".") && path != moduleRoot {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
-			return nil
-		}
-		if n := bridgeNewEngineCalls(t, path); n > 0 {
-			rel, _ := filepath.Rel(moduleRoot, path)
-			found[filepath.ToSlash(rel)] = n
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
 	}
 	for rel, n := range found {
 		want, ok := bridgeEngineRoots[rel]

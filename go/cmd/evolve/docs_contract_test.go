@@ -110,27 +110,13 @@ func findRepoRoot(t *testing.T) string {
 func collectEnvVarsFromCode(t *testing.T, goRoot string) map[string]bool {
 	t.Helper()
 	out := map[string]bool{}
-	err := filepath.Walk(goRoot, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
-			return nil
+	for _, f := range sourceFilesInDir(t, goRoot) {
+		if strings.HasPrefix(f.Rel, "acs/") || strings.Contains(f.Rel, "/acs/") || strings.HasPrefix(f.Rel, "archive/") || strings.Contains(f.Rel, "/archive/") {
+			continue
 		}
-		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-			return nil
-		}
-		if strings.Contains(path, "/acs/") || strings.Contains(path, "/archive/") {
-			return nil
-		}
-		b, err := os.ReadFile(path)
-		if err != nil {
-			return nil
-		}
-		for _, m := range envVarRE.FindAll(b, -1) {
+		for _, m := range envVarRE.FindAll(f.Src, -1) {
 			out[string(m)] = true
 		}
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("walk %s: %v", goRoot, err)
 	}
 	return out
 }
