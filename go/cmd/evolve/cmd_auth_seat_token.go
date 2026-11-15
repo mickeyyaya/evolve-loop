@@ -123,7 +123,7 @@ func (c seatTokenCall) clear(path string) int {
 }
 
 func (c seatTokenCall) signal() {
-	signals, closeSignals := newRoleSignalCenter(roleAuth, c.root, paths.EvolveDirOf(c.root), c.err)
+	signals, closeSignals := newRoleSignalCenterWithAttach(roleAuth, c.root, paths.EvolveDirOf(c.root), c.err, c.env.Attach)
 	defer closeSignals()
 	signals.Emit(signalcenter.Event{Module: signalcenter.ModuleCLI, Origin: "evolve.seatToken", Kind: signalcenter.KindConfigWarning,
 		Severity: signalcenter.SeverityInfo, Code: codeSeatTokenMoved,

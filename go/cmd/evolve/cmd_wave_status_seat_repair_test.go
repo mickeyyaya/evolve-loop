@@ -21,6 +21,8 @@ type seatStatusDoc struct {
 func (r *seatRig) statusDoc(t *testing.T) seatStatusDoc {
 	t.Helper()
 	h := newWaveHarness()
+	d := r.deps()
+	h.seatDeps = &d
 	if rc := h.run("status", "--json", "--project-root", r.plane.root); rc != 0 {
 		t.Fatalf("wave status exit %d; stderr=%s", rc, h.stderr.String())
 	}
@@ -56,6 +58,7 @@ func (r *seatRig) deliverAt(t *testing.T, writtenAt time.Time) {
 }
 
 func TestWaveStatus_SeatHealth_ADeliverableOfAnEarlierRoundNeverHidesTheStateOfThisRound(t *testing.T) {
+	t.Parallel()
 	dispatchBegan := waveTestClock.Add(-15 * time.Minute)
 	earlierRound := dispatchBegan.Add(-30 * time.Minute)
 	cases := []struct {
@@ -84,6 +87,7 @@ func TestWaveStatus_SeatHealth_ADeliverableOfAnEarlierRoundNeverHidesTheStateOfT
 }
 
 func TestWaveStatus_SeatHealth_ADeliverableWrittenByThisRoundReadsIdle(t *testing.T) {
+	t.Parallel()
 	dispatchBegan := waveTestClock.Add(-15 * time.Minute)
 	for name, alive := range map[string]bool{"a listed session": true, "a gone session": false} {
 		t.Run(name, func(t *testing.T) {
@@ -101,6 +105,7 @@ func TestWaveStatus_SeatHealth_ADeliverableWrittenByThisRoundReadsIdle(t *testin
 }
 
 func TestWaveStatus_SeatHealth_AListFailureThatIsNotAGoneServerWarnsTheOperatorAndKeepsTheSeat(t *testing.T) {
+	t.Parallel()
 	rig := newSeatRig(t)
 	rig.openRun(t)
 	rig.pane(t, false, 20*time.Second)
@@ -124,6 +129,7 @@ func TestWaveStatus_SeatHealth_AListFailureThatIsNotAGoneServerWarnsTheOperatorA
 }
 
 func TestWaveStatus_SeatHealth_AGoneServerIsAZombieNotAWarning(t *testing.T) {
+	t.Parallel()
 	rig := newSeatRig(t)
 	rig.openRun(t)
 	rig.pane(t, true, 20*time.Second)
@@ -140,6 +146,7 @@ func TestWaveStatus_SeatHealth_AGoneServerIsAZombieNotAWarning(t *testing.T) {
 }
 
 func TestWaveStatus_SeatHealth_AHealthyListingRaisesNoWarning(t *testing.T) {
+	t.Parallel()
 	rig := newSeatRig(t)
 	rig.openRun(t)
 	rig.pane(t, false, 20*time.Second)

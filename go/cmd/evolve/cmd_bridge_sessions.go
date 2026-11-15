@@ -74,7 +74,25 @@ func liveLoopSockets() []string {
 	return live
 }
 
+type bridgeSessionsDeps struct {
+	tmux        func(context.Context, string) (string, error)
+	liveSockets func() []string
+	now         func() time.Time
+}
+
+func defaultBridgeSessionsDeps() bridgeSessionsDeps {
+	return bridgeSessionsDeps{
+		tmux:        bridgeSessionsTmux,
+		liveSockets: bridgeLiveSockets,
+		now:         bridgeSessionsNow,
+	}
+}
+
 func runBridgeSessions(args []string, stdout, stderr io.Writer) int {
+	return runBridgeSessionsWithDeps(args, stdout, stderr, defaultBridgeSessionsDeps())
+}
+
+func runBridgeSessionsWithDeps(args []string, stdout, stderr io.Writer, deps bridgeSessionsDeps) int {
 	root, asJSON := envOrCwd("EVOLVE_PROJECT_ROOT"), false
 	for _, a := range args {
 		switch {
@@ -90,7 +108,7 @@ func runBridgeSessions(args []string, stdout, stderr io.Writer) int {
 			return 10
 		}
 	}
-	rows := collectBridgeSessions(root, bridgeSessionsNow(), stderr)
+	rows := collectBridgeSessionsWithDeps(root, deps, stderr)
 	if asJSON {
 		return writeSessionsJSON(rows, stdout, stderr)
 	}
@@ -98,9 +116,10 @@ func runBridgeSessions(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-func collectBridgeSessions(root string, now time.Time, stderr io.Writer) []bridgeSessionRow {
+func collectBridgeSessionsWithDeps(root string, deps bridgeSessionsDeps, stderr io.Writer) []bridgeSessionRow {
+	now := deps.now()
 	snaps := liveSnapshots(root, now, stderr)
-	activity := socketActivity(socketsOf(snaps), stderr)
+	activity := socketActivity(socketsOf(snaps, deps.liveSockets), stderr, deps.tmux)
 	rows := make([]bridgeSessionRow, 0, len(snaps))
 	watched := map[string]bool{}
 	for _, s := range snaps {
@@ -133,10 +152,10 @@ func liveWriters(snaps []panewatch.Snapshot) []panewatch.Snapshot {
 	return live
 }
 
-func socketsOf(snaps []panewatch.Snapshot) []string {
+func socketsOf(snaps []panewatch.Snapshot, liveSockets func() []string) []string {
 	seen := map[string]bool{}
 	var sockets []string
-	for _, s := range append(snapshotSockets(snaps), bridgeLiveSockets()...) {
+	for _, s := range append(snapshotSockets(snaps), liveSockets()...) {
 		if s != "" && !seen[s] {
 			seen[s] = true
 			sockets = append(sockets, s)
@@ -161,10 +180,10 @@ type sessionActivity struct {
 	cause       map[string]error
 }
 
-func socketActivity(sockets []string, stderr io.Writer) sessionActivity {
+func socketActivity(sockets []string, stderr io.Writer, tmux func(context.Context, string) (string, error)) sessionActivity {
 	act := sessionActivity{drawn: map[string]time.Time{}, socketOf: map[string]string{}, unreachable: map[string]bool{}, serverGone: map[string]bool{}, cause: map[string]error{}}
 	for _, socket := range sockets {
-		out, err := bridgeSessionsTmux(context.Background(), socket)
+		out, err := tmux(context.Background(), socket)
 		if err != nil {
 			act.unreachable[socket] = true
 			act.serverGone[socket] = tmuxServerGone(err)

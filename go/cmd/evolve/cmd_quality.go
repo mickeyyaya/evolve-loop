@@ -162,8 +162,12 @@ func liveWaveView(root string) (pipelinerates.WaveView, error) {
 	return pipelinerates.ReadWaveView(root, time.Now())
 }
 
+func newQualityCenterWithAttach(root, evolveDir string, console io.Writer, attach rootEventsAttacher) (*signalcenter.Center, func()) {
+	return newRoleSignalCenterWithAttach("quality", root, evolveDir, console, attach)
+}
+
 func newQualityCenter(root, evolveDir string, console io.Writer) (*signalcenter.Center, func()) {
-	return newRoleSignalCenter("quality", root, evolveDir, console)
+	return newQualityCenterWithAttach(root, evolveDir, console, nil)
 }
 
 func runQualityWith(env qualityEnv, args []string, stdout, stderr io.Writer) int {

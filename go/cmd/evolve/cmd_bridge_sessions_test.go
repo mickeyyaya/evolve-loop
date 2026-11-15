@@ -57,19 +57,23 @@ func fakeSessionsTmux(lines map[string]string) func(context.Context, string) (st
 	}
 }
 
-func withSessionsSeams(t *testing.T, tmux func(context.Context, string) (string, error), sockets []string) {
-	t.Helper()
-	prevTmux, prevSockets, prevNow := bridgeSessionsTmux, bridgeLiveSockets, bridgeSessionsNow
-	bridgeSessionsTmux = tmux
-	bridgeLiveSockets = func() []string { return sockets }
-	bridgeSessionsNow = func() time.Time { return sessionsNow }
-	t.Cleanup(func() { bridgeSessionsTmux, bridgeLiveSockets, bridgeSessionsNow = prevTmux, prevSockets, prevNow })
+func sessionsDeps(tmux func(context.Context, string) (string, error), sockets []string) bridgeSessionsDeps {
+	return bridgeSessionsDeps{
+		tmux:        tmux,
+		liveSockets: func() []string { return sockets },
+		now:         func() time.Time { return sessionsNow },
+	}
 }
 
 func runSessionsJSON(t *testing.T, root string) ([]bridgeSessionRow, string) {
 	t.Helper()
+	return runSessionsJSONWithDeps(t, root, defaultBridgeSessionsDeps())
+}
+
+func runSessionsJSONWithDeps(t *testing.T, root string, deps bridgeSessionsDeps) ([]bridgeSessionRow, string) {
+	t.Helper()
 	var stdout, stderr bytes.Buffer
-	if code := runBridge([]string{"sessions", "--json", "--project-root=" + root}, nil, &stdout, &stderr); code != 0 {
+	if code := runBridgeSessionsWithDeps([]string{"--json", "--project-root=" + root}, &stdout, &stderr, deps); code != 0 {
 		t.Fatalf("bridge sessions exit %d; stderr:\n%s", code, stderr.String())
 	}
 	var rows []bridgeSessionRow
@@ -80,14 +84,15 @@ func runSessionsJSON(t *testing.T, root string) ([]bridgeSessionRow, string) {
 }
 
 func TestBridgeSessions_ListsEachLivePaneWithItsLiveness(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	snap := routerSnapshot()
 	liveRunWithSnapshot(t, root, 1806, snap)
 	probe := "evolve-recipe-c0-usage-probe-pid4242-n4-1791262829"
-	withSessionsSeams(t, fakeSessionsTmux(map[string]string{sessionsTestSocket: fmt.Sprintf("%s\t%d\n%s\t%d\n",
+	deps := sessionsDeps(fakeSessionsTmux(map[string]string{sessionsTestSocket: fmt.Sprintf("%s\t%d\n%s\t%d\n",
 		snap.Session, sessionsNow.Add(-3*time.Second).Unix(), probe, sessionsNow.Add(-50*time.Minute).Unix())}), nil)
 
-	rows, _ := runSessionsJSON(t, root)
+	rows, _ := runSessionsJSONWithDeps(t, root, deps)
 	if len(rows) != 2 {
 		t.Fatalf("rows = %+v, want the router pane and the unwatched probe", rows)
 	}
@@ -104,22 +109,24 @@ func TestBridgeSessions_ListsEachLivePaneWithItsLiveness(t *testing.T) {
 }
 
 func TestBridgeSessions_ASnapshotWhoseSessionIsGoneReadsGone(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	liveRunWithSnapshot(t, root, 1806, routerSnapshot())
-	withSessionsSeams(t, fakeSessionsTmux(map[string]string{sessionsTestSocket: ""}), nil)
+	deps := sessionsDeps(fakeSessionsTmux(map[string]string{sessionsTestSocket: ""}), nil)
 
-	rows, _ := runSessionsJSON(t, root)
+	rows, _ := runSessionsJSONWithDeps(t, root, deps)
 	if len(rows) != 1 || rows[0].State != "gone" || rows[0].DrawnAgeS != -1 {
 		t.Errorf("rows = %+v, want the router row marked gone with no drawn age", rows)
 	}
 }
 
 func TestBridgeSessions_AnUnreachableSocketWarnsAndKeepsTheSnapshotState(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	liveRunWithSnapshot(t, root, 1806, routerSnapshot())
-	withSessionsSeams(t, fakeSessionsTmux(nil), nil)
+	deps := sessionsDeps(fakeSessionsTmux(nil), nil)
 
-	rows, stderr := runSessionsJSON(t, root)
+	rows, stderr := runSessionsJSONWithDeps(t, root, deps)
 	if len(rows) != 1 || rows[0].State != "busy" || rows[0].DrawnAgeS != -1 {
 		t.Errorf("rows = %+v, want the snapshot's busy state with an unknown drawn age", rows)
 	}
@@ -129,20 +136,22 @@ func TestBridgeSessions_AnUnreachableSocketWarnsAndKeepsTheSnapshotState(t *test
 }
 
 func TestBridgeSessions_LiveLoopSocketsShowUnwatchedSessions(t *testing.T) {
-	withSessionsSeams(t, fakeSessionsTmux(map[string]string{"evolve-bridge-p77": fmt.Sprintf("evolve-recipe-c0-usage-probe-pid77-n5-1\t%d\n", sessionsNow.Unix())}),
+	t.Parallel()
+	deps := sessionsDeps(fakeSessionsTmux(map[string]string{"evolve-bridge-p77": fmt.Sprintf("evolve-recipe-c0-usage-probe-pid77-n5-1\t%d\n", sessionsNow.Unix())}),
 		[]string{"evolve-bridge-p77"})
-	rows, _ := runSessionsJSON(t, t.TempDir())
+	rows, _ := runSessionsJSONWithDeps(t, t.TempDir(), deps)
 	if len(rows) != 1 || rows[0].State != "unwatched" || rows[0].Phase != "-" {
 		t.Errorf("rows = %+v, want the live loop socket's probe session listed as unwatched", rows)
 	}
 }
 
 func TestBridgeSessions_TableNamesEveryColumn(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	liveRunWithSnapshot(t, root, 1806, routerSnapshot())
-	withSessionsSeams(t, fakeSessionsTmux(map[string]string{sessionsTestSocket: routerSnapshot().Session + "\t" + fmt.Sprint(sessionsNow.Unix())}), nil)
+	deps := sessionsDeps(fakeSessionsTmux(map[string]string{sessionsTestSocket: routerSnapshot().Session + "\t" + fmt.Sprint(sessionsNow.Unix())}), nil)
 	var stdout, stderr bytes.Buffer
-	if code := runBridge([]string{"sessions", "--project-root=" + root}, nil, &stdout, &stderr); code != 0 {
+	if code := runBridgeSessionsWithDeps([]string{"--project-root=" + root}, &stdout, &stderr, deps); code != 0 {
 		t.Fatalf("exit %d: %s", code, stderr.String())
 	}
 	out := stdout.String()
@@ -154,9 +163,10 @@ func TestBridgeSessions_TableNamesEveryColumn(t *testing.T) {
 }
 
 func TestBridgeSessions_EmptyProjectSaysSo(t *testing.T) {
-	withSessionsSeams(t, fakeSessionsTmux(nil), nil)
+	t.Parallel()
+	deps := sessionsDeps(fakeSessionsTmux(nil), nil)
 	var stdout, stderr bytes.Buffer
-	if code := runBridge([]string{"sessions", "--project-root=" + t.TempDir()}, nil, &stdout, &stderr); code != 0 {
+	if code := runBridgeSessionsWithDeps([]string{"--project-root=" + t.TempDir()}, &stdout, &stderr, deps); code != 0 {
 		t.Fatalf("exit %d", code)
 	}
 	if !strings.Contains(stdout.String(), "no live bridge sessions") {
@@ -173,13 +183,14 @@ func TestBridgeSessions_BadFlagIsAUsageError(t *testing.T) {
 }
 
 func TestBridgeSessions_WritesNothing(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	liveRunWithSnapshot(t, root, 1806, routerSnapshot())
-	withSessionsSeams(t, fakeSessionsTmux(map[string]string{sessionsTestSocket: routerSnapshot().Session + "\t1"}), nil)
+	deps := sessionsDeps(fakeSessionsTmux(map[string]string{sessionsTestSocket: routerSnapshot().Session + "\t1"}), nil)
 	before := treeDigest(t, root)
-	runSessionsJSON(t, root)
+	runSessionsJSONWithDeps(t, root, deps)
 	var stdout, stderr bytes.Buffer
-	runBridge([]string{"sessions", "--project-root=" + root}, nil, &stdout, &stderr)
+	runBridgeSessionsWithDeps([]string{"--project-root=" + root}, &stdout, &stderr, deps)
 	if after := treeDigest(t, root); after != before {
 		t.Error("evolve bridge sessions changed the project tree; it must be read-only while a wave runs")
 	}
@@ -206,6 +217,7 @@ func treeDigest(t *testing.T, root string) string {
 }
 
 func TestBridgeSessions_ADeadWritersSnapshotIsNotListedAsLive(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	snap := routerSnapshot()
 	cmd := exec.Command("true")
@@ -214,9 +226,9 @@ func TestBridgeSessions_ADeadWritersSnapshotIsNotListedAsLive(t *testing.T) {
 	}
 	snap.WriterPID = cmd.Process.Pid
 	liveRunWithSnapshot(t, root, 1806, snap)
-	withSessionsSeams(t, fakeSessionsTmux(map[string]string{sessionsTestSocket: ""}), nil)
+	deps := sessionsDeps(fakeSessionsTmux(map[string]string{sessionsTestSocket: ""}), nil)
 
-	rows, _ := runSessionsJSON(t, root)
+	rows, _ := runSessionsJSONWithDeps(t, root, deps)
 	if len(rows) != 0 {
 		t.Errorf("rows = %+v, want none: a snapshot whose writer died is not a live pane", rows)
 	}

@@ -17,6 +17,7 @@ import (
 )
 
 func TestWaveStatus_SeatHealth_ADeadSessionTheLastOneOnItsSocketReadsZombie(t *testing.T) {
+	t.Parallel()
 	serverGone := map[string]error{
 		"no server running":     errors.New("no server running on /private/tmp/tmux-501/" + seatSocket),
 		"socket file is absent": errors.New("error connecting to /private/tmp/tmux-501/" + seatSocket + " (No such file or directory)"),
@@ -34,6 +35,7 @@ func TestWaveStatus_SeatHealth_ADeadSessionTheLastOneOnItsSocketReadsZombie(t *t
 }
 
 func TestWaveStatus_SeatHealth_AListFailureThatIsNotAGoneServerNeverReadsZombie(t *testing.T) {
+	t.Parallel()
 	unreachable := map[string]error{
 		"list timed out":     errors.New("signal: killed: context deadline exceeded"),
 		"tmux is not at all": errors.New(`exec: "tmux": executable file not found in $PATH`),
@@ -62,9 +64,8 @@ func newRealTmuxSeat(t *testing.T) *realTmuxSeat {
 	if _, err := exec.LookPath("tmux"); err != nil {
 		t.Skip("tmux is not installed; the real-tmux journey cannot run")
 	}
-	realLister := bridgeSessionsTmux
 	rig := newSeatRig(t)
-	bridgeSessionsTmux = realLister
+	rig.tmuxFn = bridgeSessionsTmux
 	seat := &realTmuxSeat{
 		rig:     rig,
 		socket:  fmt.Sprintf("evolve-seat-journey-%d-%d", os.Getpid(), time.Now().UnixNano()),

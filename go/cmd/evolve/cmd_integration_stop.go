@@ -30,10 +30,14 @@ func attributedKeyRun(run baseattr.Runner) stopKeyRun {
 	}
 }
 
-func emitIntegrationSignal(projectRoot string, console io.Writer, e signalcenter.Event) {
-	signals, closeSignals := newRoleSignalCenter(roleIntegration, projectRoot, paths.EvolveDirOf(projectRoot), console)
+func emitIntegrationSignalWithAttach(projectRoot string, console io.Writer, e signalcenter.Event, attach rootEventsAttacher) {
+	signals, closeSignals := newRoleSignalCenterWithAttach(roleIntegration, projectRoot, paths.EvolveDirOf(projectRoot), console, attach)
 	defer closeSignals()
 	signals.Emit(e)
+}
+
+func emitIntegrationSignal(projectRoot string, console io.Writer, e signalcenter.Event) {
+	emitIntegrationSignalWithAttach(projectRoot, console, e, nil)
 }
 
 func (e integrationEnv) projectRoot(op, flag string, stderr io.Writer) (string, int) {

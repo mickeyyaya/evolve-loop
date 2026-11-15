@@ -72,10 +72,15 @@ func TestRootSignalCenter_EveryRootSubscribesThePublisher(t *testing.T) {
 			"cmd/evolve/cmd_cycle.go:newRootSignalCenter",
 			"internal/cli/phasecmd/phase_observer.go:observerSignalCenter",
 		},
-		"newRootSignalCenter": {"cmd/evolve/cmd_cycle.go:newRoleSignalCenter"},
+		"newRootSignalCenter": {"cmd/evolve/cmd_cycle.go:newRoleSignalCenterWithAttach"},
+		"newRoleSignalCenterWithAttach": {
+			"cmd/evolve/cmd_auth_seat_token.go:signal",
+			"cmd/evolve/cmd_cycle.go:newRoleSignalCenter",
+			"cmd/evolve/cmd_integration_stop.go:emitIntegrationSignalWithAttach",
+			"cmd/evolve/cmd_quality.go:newQualityCenterWithAttach",
+		},
 		"newRoleSignalCenter": {
 			"cmd/evolve/cli_queue.go:applyQueue",
-			"cmd/evolve/cmd_auth_seat_token.go:signal",
 			"cmd/evolve/cmd_bridge.go:recordBridgeBypass",
 			"cmd/evolve/cmd_ci_watch.go:runCIWatch",
 			"cmd/evolve/cmd_cycle.go:agentRunSignals",
@@ -83,10 +88,8 @@ func TestRootSignalCenter_EveryRootSubscribesThePublisher(t *testing.T) {
 			"cmd/evolve/cmd_cycle_retire.go:runCycleRetire",
 			"cmd/evolve/cmd_cycle_simulate.go:wireSimulateOrchestrator",
 			"cmd/evolve/cmd_inbox_curator.go:runInboxCurate",
-			"cmd/evolve/cmd_integration_stop.go:emitIntegrationSignal",
 			"cmd/evolve/cmd_loop_chain.go:maybeRefreshChainBoundary",
 			"cmd/evolve/cmd_loop_chain.go:runLoopChain",
-			"cmd/evolve/cmd_quality.go:newQualityCenter",
 			"cmd/evolve/cmd_selfheal.go:newSelfhealCenter",
 			"cmd/evolve/cmd_ship.go:shipRootSignals",
 			"cmd/evolve/cmd_subagent.go:runSubagentRun",
@@ -94,11 +97,11 @@ func TestRootSignalCenter_EveryRootSubscribesThePublisher(t *testing.T) {
 			"cmd/evolve/cmd_wave_next.go:runWaveNext",
 			"cmd/evolve/dispatch_gate.go:emitDispatchViolation",
 		},
-		"attachRootEventsFn": {"cmd/evolve/cmd_cycle.go:newRoleSignalCenter"},
+		"attachRootEventsFn": {"cmd/evolve/cmd_cycle.go:newRoleSignalCenterWithAttach"},
 		"rootwire.Attach":    {"internal/cli/phasecmd/phase_observer.go:observerSignalCenter"},
 	}
 
-	got := callSitesOf(files, "signalcenter.New", "newRootSignalCenter", "newRoleSignalCenter", "attachRootEventsFn", "rootwire.Attach")
+	got := callSitesOf(files, "signalcenter.New", "newRootSignalCenter", "newRoleSignalCenter", "newRoleSignalCenterWithAttach", "attachRootEventsFn", "rootwire.Attach")
 
 	for callee, sites := range want {
 		if !slices.Equal(got[callee], sites) {

@@ -110,7 +110,11 @@ func buildWaveStatus(env waveEnv, plane wavePlaneDirs, records []wave.Record) wa
 	}
 	report.Held, report.Warnings = heldForOperator(plane.evolveDir, report.Warnings)
 	var seatWarnings []string
-	report.Seats, seatWarnings = collectWaveSeats(plane.evolveDir, env.now())
+	if env.seatDeps != nil {
+		report.Seats, seatWarnings = collectWaveSeatsWithDeps(plane.evolveDir, env.now(), *env.seatDeps)
+	} else {
+		report.Seats, seatWarnings = collectWaveSeats(plane.evolveDir, env.now())
+	}
 	report.Warnings = append(report.Warnings, seatWarnings...)
 	report.Benched = activeBenches(clihealth.NewStore(plane.root, env.now))
 	if len(records) == 0 {

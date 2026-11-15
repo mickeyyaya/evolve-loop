@@ -23,13 +23,17 @@ type waveSeat struct {
 }
 
 func collectWaveSeats(evolveDir string, now time.Time) ([]waveSeat, []string) {
+	return collectWaveSeatsWithDeps(evolveDir, now, defaultBridgeSessionsDeps())
+}
+
+func collectWaveSeatsWithDeps(evolveDir string, now time.Time, deps bridgeSessionsDeps) ([]waveSeat, []string) {
 	seats, warnings := []waveSeat{}, []string(nil)
 	for _, run := range waveLiveRuns(evolveDir, now) {
 		snaps, err := panewatch.ReadAll(run.Dir)
 		if err != nil {
 			warnings = append(warnings, fmt.Sprintf("seat health %s: %v", run.Dir, err))
 		}
-		alive, listWarnings := waveSessionsAlive(snaps)
+		alive, listWarnings := waveSessionsAlive(snaps, deps)
 		warnings = appendNew(warnings, listWarnings...)
 		for _, s := range snaps {
 			facts := panestream.SeatFacts{
@@ -46,9 +50,9 @@ func collectWaveSeats(evolveDir string, now time.Time) ([]waveSeat, []string) {
 	return seats, warnings
 }
 
-func waveSessionsAlive(snaps []panewatch.Snapshot) (func(panewatch.Snapshot) bool, []string) {
+func waveSessionsAlive(snaps []panewatch.Snapshot, deps bridgeSessionsDeps) (func(panewatch.Snapshot) bool, []string) {
 	sockets := socketsOfSnapshots(snaps)
-	act := socketActivity(sockets, io.Discard)
+	act := socketActivity(sockets, io.Discard, deps.tmux)
 	var warnings []string
 	for _, socket := range sockets {
 		if act.unreachable[socket] && !act.serverGone[socket] {

@@ -49,6 +49,7 @@ type authEnv struct {
 	Stdin    io.Reader
 	Live     func(string) []runlease.LiveRun
 	Now      func() time.Time
+	Attach   rootEventsAttacher
 }
 
 type authStore struct {

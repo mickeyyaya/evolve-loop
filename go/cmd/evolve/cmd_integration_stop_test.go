@@ -452,13 +452,12 @@ func TestAttributedKeyRun_ReadsTheRerunBudgetOfTheProjectRoot(t *testing.T) {
 }
 
 func TestEmitIntegrationSignal_SendsTheEventThroughACenterOfTheIntegrationRole(t *testing.T) {
+	t.Parallel()
 	var mu sync.Mutex
 	var events []signalcenter.Event
 	var roles, dirs []string
 	closed := 0
-	prev := attachRootEventsFn
-	t.Cleanup(func() { attachRootEventsFn = prev })
-	attachRootEventsFn = func(c *signalcenter.Center, role, evolveDir string, _ io.Writer) func() {
+	attach := func(c *signalcenter.Center, role, evolveDir string, _ io.Writer) func() {
 		roles, dirs = append(roles, role), append(dirs, evolveDir)
 		c.Subscribe(func(e signalcenter.Event) {
 			mu.Lock()
@@ -472,10 +471,10 @@ func TestEmitIntegrationSignal_SendsTheEventThroughACenterOfTheIntegrationRole(t
 	}
 	root := t.TempDir()
 
-	emitIntegrationSignal(root, io.Discard, signalcenter.Event{
+	emitIntegrationSignalWithAttach(root, io.Discard, signalcenter.Event{
 		Module: signalcenter.ModuleGateRepo, Kind: signalcenter.KindShipWarning, Severity: signalcenter.SeverityWarn,
 		Code: selfheal.CodeMainRedStopWouldRefuse, Origin: batchEventOrigin, Reason: "a batch",
-	})
+	}, attach)
 
 	mu.Lock()
 	defer mu.Unlock()
@@ -484,6 +483,19 @@ func TestEmitIntegrationSignal_SendsTheEventThroughACenterOfTheIntegrationRole(t
 	}
 	if len(events) != 1 || events[0].Code != selfheal.CodeMainRedStopWouldRefuse || events[0].Origin != "evolve.integrationBatch" {
 		t.Errorf("events = %+v, want the one event of the batch", events)
+	}
+}
+
+func TestEmitIntegrationSignal_EmitsWithDefaultAttachment(t *testing.T) {
+	t.Parallel()
+	var console bytes.Buffer
+	emitIntegrationSignal(t.TempDir(), &console, signalcenter.Event{
+		Module: signalcenter.ModuleGateRepo, Kind: signalcenter.KindShipWarning, Severity: signalcenter.SeverityWarn,
+		Code: selfheal.CodeMainRedStopWouldRefuse, Origin: batchEventOrigin, Reason: "a batch",
+	})
+	got := console.String()
+	if !strings.Contains(got, string(selfheal.CodeMainRedStopWouldRefuse)) || !strings.Contains(got, "origin="+batchEventOrigin) {
+		t.Errorf("console = %q, want %q and origin=%s", got, selfheal.CodeMainRedStopWouldRefuse, batchEventOrigin)
 	}
 }
 

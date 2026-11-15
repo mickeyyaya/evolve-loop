@@ -24,10 +24,10 @@ const (
 
 const routerAgent = "router"
 
-func routerDecision(r *cliroute.Router, projectRoot string) (cliroute.Decision, error) {
+func routerDecision(r *cliroute.Router, projectRoot string, env []string) (cliroute.Decision, error) {
 	return r.Resolve(cliroute.Request{
 		Agent: routerAgent, Launch: cliroute.LaunchAdvisor, ProjectRoot: projectRoot,
-		DefaultModel: policy.SeatDefault(policy.SeatRouter).Model, Env: filterEvolveEnv(os.Environ()),
+		DefaultModel: policy.SeatDefault(policy.SeatRouter).Model, Env: filterEvolveEnv(env),
 	})
 }
 
@@ -51,7 +51,11 @@ type routerDispatch struct {
 }
 
 func resolveRouterDispatchHealthy(r *cliroute.Router, projectRoot string, dt routerDecisionType, benched map[string]bool) (routerDispatch, error) {
-	d, err := routerDecision(r, projectRoot)
+	return resolveRouterDispatchHealthyWithEnv(r, projectRoot, dt, benched, os.Environ())
+}
+
+func resolveRouterDispatchHealthyWithEnv(r *cliroute.Router, projectRoot string, dt routerDecisionType, benched map[string]bool, env []string) (routerDispatch, error) {
+	d, err := routerDecision(r, projectRoot, env)
 	if err != nil {
 		return routerDispatch{}, err
 	}

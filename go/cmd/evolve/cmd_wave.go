@@ -56,6 +56,7 @@ type waveEnv struct {
 	refreshBinary func(loopConfig, io.Writer) bootBinaryRefreshResult
 	openEvents    func(evolveDir string) (eventSource, error)
 	diskFree      func(path string) (uint64, error)
+	seatDeps      *bridgeSessionsDeps
 }
 
 type wavePlaneDirs struct {

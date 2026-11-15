@@ -60,13 +60,10 @@ func (r seatTokenRig) run(t *testing.T, args ...string) (int, string, string) {
 
 func (r seatTokenRig) tokenPath() string { return paths.SeatTokenPath(r.home) }
 
-func captureAuthEvents(t *testing.T) func() []signalcenter.Event {
-	t.Helper()
+func captureAuthEvents(r *seatTokenRig) func() []signalcenter.Event {
 	var mu sync.Mutex
 	var events []signalcenter.Event
-	prev := attachRootEventsFn
-	t.Cleanup(func() { attachRootEventsFn = prev })
-	attachRootEventsFn = func(c *signalcenter.Center, role, _ string, _ io.Writer) func() {
+	r.env.Attach = func(c *signalcenter.Center, role, _ string, _ io.Writer) func() {
 		if role == roleAuth {
 			c.Subscribe(func(e signalcenter.Event) {
 				mu.Lock()
@@ -285,8 +282,9 @@ func TestSeatTokenClear_ARemoveFailureExitsTwo(t *testing.T) {
 }
 
 func TestSeatTokenVerbs_EmitOneSignalWithTheVerbAndTheTimeAndNoToken(t *testing.T) {
-	events := captureAuthEvents(t)
+	t.Parallel()
 	r := newSeatTokenRig(t, seatCanary)
+	events := captureAuthEvents(&r)
 	r.run(t, "seat-token", "set", "--project-root", r.root)
 	r.run(t, "seat-token", "clear", "--project-root", r.root)
 	got := events()
@@ -305,8 +303,9 @@ func TestSeatTokenVerbs_EmitOneSignalWithTheVerbAndTheTimeAndNoToken(t *testing.
 }
 
 func TestSeatTokenVerbs_ARefusedVerbEmitsNoSignal(t *testing.T) {
-	events := captureAuthEvents(t)
+	t.Parallel()
 	r := newSeatTokenRig(t, "bad")
+	events := captureAuthEvents(&r)
 	r.run(t, "seat-token", "set", "--project-root", r.root)
 	r.env.Live = func(string) []runlease.LiveRun { return liveLane() }
 	r.run(t, "seat-token", "clear", "--project-root", r.root)

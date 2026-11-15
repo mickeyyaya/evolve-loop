@@ -66,10 +66,10 @@ func rootEvent(module signalcenter.Module, kind signalcenter.Kind, cycle int) si
 }
 
 func TestNewRoleSignalCenter_PublishesUnderItsRoleAndTheCloserDrainsTheQueues(t *testing.T) {
-	useRealRootEvents(t)
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
-	signals, closeSignals := newRoleSignalCenter(roleSubagent, root, evolveDir, io.Discard)
+	signals, closeSignals := newRoleSignalCenterWithAttach(roleSubagent, root, evolveDir, io.Discard, rootwire.Attach)
 
 	signals.Emit(rootEvent(signalcenter.ModuleOrchestrator, signalcenter.KindCycleSealed, 7))
 	signals.Emit(rootEvent(signalcenter.ModuleLedger, signalcenter.KindLedgerAppended, 7))
@@ -207,7 +207,7 @@ func normalizedLines(t *testing.T, path string) []signalcenter.Event {
 }
 
 func TestRootSignalCenter_ThePublisherLeavesTheCycleRecordUnchanged(t *testing.T) {
-	useRealRootEvents(t)
+	t.Parallel()
 	emitAll := func(c *signalcenter.Center) {
 		c.Emit(rootEvent(signalcenter.ModuleLoop, signalcenter.KindLoopWave, 0))
 		c.Emit(rootEvent(signalcenter.ModuleOrchestrator, signalcenter.KindPhaseOutcome, 4))
@@ -217,7 +217,7 @@ func TestRootSignalCenter_ThePublisherLeavesTheCycleRecordUnchanged(t *testing.T
 	}
 	plainRoot, publishedRoot := t.TempDir(), t.TempDir()
 	plain := newRootSignalCenter(plainRoot, filepath.Join(plainRoot, ".evolve"), io.Discard)
-	published, closeSignals := newRoleSignalCenter(roleCycle, publishedRoot, filepath.Join(publishedRoot, ".evolve"), io.Discard)
+	published, closeSignals := newRoleSignalCenterWithAttach(roleCycle, publishedRoot, filepath.Join(publishedRoot, ".evolve"), io.Discard, rootwire.Attach)
 
 	emitAll(plain)
 	plain.Flush()
@@ -236,7 +236,7 @@ func TestRootSignalCenter_ThePublisherLeavesTheCycleRecordUnchanged(t *testing.T
 }
 
 func TestNewRoleSignalCenter_AnUnwritableEventsDirectoryNeverFailsTheRootAndWarnsOnce(t *testing.T) {
-	useRealRootEvents(t)
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
@@ -246,7 +246,7 @@ func TestNewRoleSignalCenter_AnUnwritableEventsDirectoryNeverFailsTheRootAndWarn
 		t.Fatal(err)
 	}
 	var console bytes.Buffer
-	signals, closeSignals := newRoleSignalCenter(roleCycle, root, evolveDir, &console)
+	signals, closeSignals := newRoleSignalCenterWithAttach(roleCycle, root, evolveDir, &console, rootwire.Attach)
 
 	signals.Emit(rootEvent(signalcenter.ModuleOrchestrator, signalcenter.KindCycleSealed, 7))
 	closeSignals()

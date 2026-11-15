@@ -461,12 +461,21 @@ func pairProjectRecord(e signalcenter.Event) bool {
 
 var attachRootEventsFn = rootwire.Attach
 
-func newRoleSignalCenter(role, projectRoot, evolveDir string, console io.Writer) (*signalcenter.Center, func()) {
+type rootEventsAttacher func(c *signalcenter.Center, role, evolveDir string, console io.Writer) func()
+
+func newRoleSignalCenterWithAttach(role, projectRoot, evolveDir string, console io.Writer, attach rootEventsAttacher) (*signalcenter.Center, func()) {
 	signals := newRootSignalCenter(projectRoot, evolveDir, console)
 	if role == roleLoop {
 		wireExpectedSignals(signals, evolveDir, console)
 	}
-	return signals, attachRootEventsFn(signals, role, evolveDir, console)
+	if attach == nil {
+		return signals, attachRootEventsFn(signals, role, evolveDir, console)
+	}
+	return signals, attach(signals, role, evolveDir, console)
+}
+
+func newRoleSignalCenter(role, projectRoot, evolveDir string, console io.Writer) (*signalcenter.Center, func()) {
+	return newRoleSignalCenterWithAttach(role, projectRoot, evolveDir, console, nil)
 }
 
 func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run routingRun) orchDeps {

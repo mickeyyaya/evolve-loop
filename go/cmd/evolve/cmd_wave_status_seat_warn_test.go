@@ -8,13 +8,14 @@ import (
 )
 
 func TestWaveStatus_SeatHealth_AnUnreadablePaneWatchFileWarnsAndShowsNoSeat(t *testing.T) {
+	t.Parallel()
 	rig := newSeatRig(t)
 	rig.openRun(t)
 	if err := os.WriteFile(filepath.Join(rig.runDir, "tdd-pane-watch.json"), []byte("{not json"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	seats, warnings := collectWaveSeats(filepath.Join(rig.plane.root, ".evolve"), waveTestClock)
+	seats, warnings := collectWaveSeatsWithDeps(filepath.Join(rig.plane.root, ".evolve"), waveTestClock, rig.deps())
 
 	if len(seats) != 0 {
 		t.Errorf("seats = %+v, want none for an unreadable snapshot", seats)

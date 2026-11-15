@@ -127,6 +127,7 @@ type waveHarness struct {
 	refresh   func(loopConfig, io.Writer) bootBinaryRefreshResult
 	refreshed []loopConfig
 	diskFree  func(string) (uint64, error)
+	seatDeps  *bridgeSessionsDeps
 	stdout    bytes.Buffer
 	stderr    bytes.Buffer
 }
@@ -173,6 +174,7 @@ func (h *waveHarness) env(root string) waveEnv {
 			return []string{"812"}, h.prsErr
 		},
 		loadGraph: h.graph,
+		seatDeps:  h.seatDeps,
 		refreshBinary: func(cfg loopConfig, w io.Writer) bootBinaryRefreshResult {
 			h.refreshed = append(h.refreshed, cfg)
 			if h.refresh != nil {

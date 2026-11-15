@@ -32,27 +32,21 @@ var advisorDecisions = []struct {
 }
 
 func TestLegacyAdvisorDispatch_MatchesTheGolden(t *testing.T) {
-	t.Setenv("EVOLVE_CLI", "")
-	t.Setenv("EVOLVE_ROUTER_CLI", "")
+	t.Parallel()
 	profileDir, _ := cliroutetest.TrackedProfiles(t)
 	var records []cliroutetest.Record
 	for _, v := range cliroutetest.Variants() {
-		for key, val := range v.EnvFor() {
-			t.Setenv(key, val)
-		}
+		env := mapToEnv(v.EnvFor())
 		root := v.ProjectRoot(t, nil)
 		pol := v.Policy(t, root)
 		for _, bench := range advisorBenchSets {
 			for _, d := range advisorDecisions {
-				cli, model, ok := legacyAdvisorDispatch(t, filepath.Dir(profileDir), root, pol, d.dt, bench.families)
+				cli, model, ok := legacyAdvisorDispatch(t, filepath.Dir(profileDir), root, pol, d.dt, bench.families, env)
 				records = append(records, cliroutetest.Record{
 					Resolver: "advisor", Variant: v.Name + "/" + bench.name, Agent: "router", Phase: d.name,
 					Candidates: []string{cli}, Model: model, Healthy: &ok,
 				})
 			}
-		}
-		for key := range v.EnvFor() {
-			t.Setenv(key, "")
 		}
 	}
 	cliroutetest.AssertGoldenAt(t, cliroutetest.AdvisorGoldenPath(t), records, *updateAdvisorGolden)

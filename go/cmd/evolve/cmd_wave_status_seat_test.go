@@ -35,6 +35,7 @@ type seatRig struct {
 	tmux     []string
 	tmuxErr  error
 	sessions []string
+	tmuxFn   func(context.Context, string) (string, error)
 }
 
 func newSeatRig(t *testing.T) *seatRig {
@@ -49,17 +50,22 @@ func newSeatRig(t *testing.T) *seatRig {
 	if err := os.MkdirAll(rig.runDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	prevTmux, prevSockets := bridgeSessionsTmux, bridgeLiveSockets
-	bridgeSessionsTmux = func(_ context.Context, socket string) (string, error) {
+	rig.tmuxFn = func(_ context.Context, socket string) (string, error) {
 		rig.tmux = append(rig.tmux, socket)
 		if rig.tmuxErr != nil {
 			return "", rig.tmuxErr
 		}
 		return strings.Join(rig.sessions, "\n") + "\n", nil
 	}
-	bridgeLiveSockets = func() []string { return nil }
-	t.Cleanup(func() { bridgeSessionsTmux, bridgeLiveSockets = prevTmux, prevSockets })
 	return rig
+}
+
+func (r *seatRig) deps() bridgeSessionsDeps {
+	return bridgeSessionsDeps{
+		tmux:        r.tmuxFn,
+		liveSockets: func() []string { return nil },
+		now:         func() time.Time { return waveTestClock },
+	}
 }
 
 func (r *seatRig) openRun(t *testing.T) {
@@ -94,6 +100,8 @@ func (r *seatRig) deliver(t *testing.T) {
 func (r *seatRig) statusJSON(t *testing.T) []seatRowJSON {
 	t.Helper()
 	h := newWaveHarness()
+	d := r.deps()
+	h.seatDeps = &d
 	if rc := h.run("status", "--json", "--project-root", r.plane.root); rc != 0 {
 		t.Fatalf("wave status exit %d; stderr=%s", rc, h.stderr.String())
 	}
@@ -109,6 +117,8 @@ func (r *seatRig) statusJSON(t *testing.T) []seatRowJSON {
 func (r *seatRig) statusText(t *testing.T) string {
 	t.Helper()
 	h := newWaveHarness()
+	d := r.deps()
+	h.seatDeps = &d
 	if rc := h.run("status", "--project-root", r.plane.root); rc != 0 {
 		t.Fatalf("wave status exit %d; stderr=%s", rc, h.stderr.String())
 	}
@@ -135,6 +145,7 @@ func seatLine(text, state string) bool {
 }
 
 func TestWaveStatus_SeatHealth_APaneAtItsPromptWithNoDeliverableReadsBlocked(t *testing.T) {
+	t.Parallel()
 	rig := newSeatRig(t)
 	rig.openRun(t)
 	rig.pane(t, false, 20*time.Second)
@@ -147,6 +158,7 @@ func TestWaveStatus_SeatHealth_APaneAtItsPromptWithNoDeliverableReadsBlocked(t *
 }
 
 func TestWaveStatus_SeatHealth_ADeadSessionWithAnOpenRunReadsZombie(t *testing.T) {
+	t.Parallel()
 	rig := newSeatRig(t)
 	rig.openRun(t)
 	rig.pane(t, true, 20*time.Second)
@@ -158,6 +170,7 @@ func TestWaveStatus_SeatHealth_ADeadSessionWithAnOpenRunReadsZombie(t *testing.T
 }
 
 func TestWaveStatus_SeatHealth_ADeliverableMakesTheSeatIdleEvenAtItsPrompt(t *testing.T) {
+	t.Parallel()
 	rig := newSeatRig(t)
 	rig.openRun(t)
 	rig.pane(t, false, 20*time.Second)
@@ -168,6 +181,7 @@ func TestWaveStatus_SeatHealth_ADeliverableMakesTheSeatIdleEvenAtItsPrompt(t *te
 }
 
 func TestWaveStatus_SeatHealth_ADeliverableOutranksADeadSession(t *testing.T) {
+	t.Parallel()
 	rig := newSeatRig(t)
 	rig.openRun(t)
 	rig.pane(t, false, 20*time.Second)
@@ -177,6 +191,7 @@ func TestWaveStatus_SeatHealth_ADeliverableOutranksADeadSession(t *testing.T) {
 }
 
 func TestWaveStatus_SeatHealth_ABusyPaneWithFreshOutputReadsWorking(t *testing.T) {
+	t.Parallel()
 	rig := newSeatRig(t)
 	rig.openRun(t)
 	rig.pane(t, true, 5*time.Second)
@@ -186,6 +201,7 @@ func TestWaveStatus_SeatHealth_ABusyPaneWithFreshOutputReadsWorking(t *testing.T
 }
 
 func TestWaveStatus_SeatHealth_ABusyPaneSilentForHoursReadsStalled(t *testing.T) {
+	t.Parallel()
 	rig := newSeatRig(t)
 	rig.openRun(t)
 	rig.pane(t, true, 3*time.Hour)
@@ -195,6 +211,7 @@ func TestWaveStatus_SeatHealth_ABusyPaneSilentForHoursReadsStalled(t *testing.T)
 }
 
 func TestWaveStatus_SeatHealth_AnUnreachableSocketNeverReadsZombie(t *testing.T) {
+	t.Parallel()
 	rig := newSeatRig(t)
 	rig.openRun(t)
 	rig.pane(t, false, 20*time.Second)
@@ -204,6 +221,7 @@ func TestWaveStatus_SeatHealth_AnUnreachableSocketNeverReadsZombie(t *testing.T)
 }
 
 func TestWaveStatus_SeatHealth_AClosedRunShowsNoSeat(t *testing.T) {
+	t.Parallel()
 	rig := newSeatRig(t)
 	rig.pane(t, false, 20*time.Second)
 
@@ -216,6 +234,7 @@ func TestWaveStatus_SeatHealth_AClosedRunShowsNoSeat(t *testing.T) {
 }
 
 func TestWaveStatus_SeatHealth_TheViewReadsTmuxThroughTheListSeamAndChangesNothing(t *testing.T) {
+	t.Parallel()
 	rig := newSeatRig(t)
 	rig.openRun(t)
 	rig.pane(t, false, 20*time.Second)

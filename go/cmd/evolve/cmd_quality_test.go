@@ -205,16 +205,15 @@ func TestQualityReport_IsVisibleInSignalsTailByKind(t *testing.T) {
 }
 
 func TestNewQualityCenter_AttachesThePublisherUnderTheQualityRole(t *testing.T) {
+	t.Parallel()
 	root := qualityProject(t, "")
 	var roles []string
-	prevAttach := attachRootEventsFn
-	t.Cleanup(func() { attachRootEventsFn = prevAttach })
-	attachRootEventsFn = func(c *signalcenter.Center, role, _ string, _ io.Writer) func() {
+	attach := func(c *signalcenter.Center, role, _ string, _ io.Writer) func() {
 		roles = append(roles, role)
 		return c.Flush
 	}
 
-	center, closeCenter := newQualityCenter(root, paths.EvolveDirOf(root), io.Discard)
+	center, closeCenter := newQualityCenterWithAttach(root, paths.EvolveDirOf(root), io.Discard, attach)
 	center.Emit(qualitypanel.Events(qualitypanel.Reading{Index: "OQ3", Method: qualitypanel.MethodWilson95, N: 695, Interval: qualitypanel.Wilson(0, 695)}, qualitypanel.StageReport)[0])
 	closeCenter()
 
