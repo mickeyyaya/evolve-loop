@@ -8,9 +8,26 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"testing"
 )
 
 var absPath = filepath.Abs
+
+var TestingForms = map[string]string{"ModuleDir": "GoModuleDir"}
+
+func GoModuleDir(tb testing.TB) string {
+	tb.Helper()
+	return moduleDirFrom(tb, ".")
+}
+
+func moduleDirFrom(tb testing.TB, start string) string {
+	tb.Helper()
+	dir, err := ModuleDir(start)
+	if err != nil {
+		tb.Fatalf("%v", err)
+	}
+	return dir
+}
 
 func ModuleDir(start string) (string, error) {
 	if start == "" {
