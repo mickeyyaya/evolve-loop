@@ -88,3 +88,16 @@ func TestVerdict_Recognised(t *testing.T) {
 		}
 	}
 }
+
+func TestContractViolation_RidesOnThePhaseResponseAndIsOmittedWhenEmpty(t *testing.T) {
+	t.Parallel()
+	resp := PhaseResponse{Phase: "p", ContractViolations: []ContractViolation{{Code: "missing_section", Message: "m"}}}
+	raw, err := json.Marshal(resp)
+	if err != nil || !strings.Contains(string(raw), `"contract_violations":[{"code":"missing_section","message":"m"}]`) {
+		t.Fatalf("marshal = %s, %v", raw, err)
+	}
+	raw, _ = json.Marshal(PhaseResponse{Phase: "p"})
+	if strings.Contains(string(raw), "contract_violations") {
+		t.Errorf("an empty list must be omitted: %s", raw)
+	}
+}

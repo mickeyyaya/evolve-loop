@@ -25,4 +25,5 @@
 - A record that saw a change of the tree binds to no tree (`TestBoundTo_HoldsOnlyWhenTheTreeDidNotChangeAndMatches`).
 - A renamed record does not attest another run (`TestRead_ARecordOfAnotherRunIDFails`).
 - A record is never replaced (`TestWrite_RefusesToReplaceARecord`).
+- A record can hold `Violations`, the contract violations of a failed verification. A failing deliverable is kept next to the record by `KeepDeliverable`, and the call keeps only the newest files (`TestKeepDeliverable_WritesAtomicallyAndKeepsTheNewestAndNeverTouchesRecords`).
 - No cell can write a record: the review profiles write only their run workspace, and the build seat denies `.evolve/agent-runs`. The guard is `confinedToWorktree` in `internal/cli/agentcmd`.

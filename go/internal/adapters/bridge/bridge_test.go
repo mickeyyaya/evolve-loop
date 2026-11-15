@@ -292,3 +292,27 @@ func TestLaunch_BootTimeoutStoreWired(t *testing.T) {
 		t.Error("expected concrete engine to be non-nil")
 	}
 }
+
+func TestAdapter_ComposePrompt_ReturnsTheLaunchPromptAndRefusesAnInvalidRequest(t *testing.T) {
+	req := core.BridgeRequest{
+		CLI: "claude-tmux", Profile: "/p", Prompt: "PERSONA-BODY",
+		Workspace: t.TempDir(), ArtifactPath: "/abs/build-report.md", Agent: "build",
+	}
+	fe := &fakeEngine{}
+	a := withEngine(fe)
+
+	composed, err := a.ComposePrompt(req)
+	if err != nil {
+		t.Fatalf("ComposePrompt: %v", err)
+	}
+	if _, err := a.Launch(context.Background(), req); err != nil {
+		t.Fatal(err)
+	}
+	if composed.Prompt != fe.gotReq.Prompt || !strings.Contains(composed.Prompt, "PERSONA-BODY") {
+		t.Errorf("ComposePrompt must return the prompt that Launch dispatches")
+	}
+	req.ArtifactPath = ""
+	if _, err := a.ComposePrompt(req); err == nil {
+		t.Error("an invalid request must be refused")
+	}
+}

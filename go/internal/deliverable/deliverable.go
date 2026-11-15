@@ -13,15 +13,13 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/reportdoc"
 )
 
-type Violation struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
-}
+type Violation = core.ContractViolation
 
 type Result struct {
 	OK           bool        `json:"ok"`

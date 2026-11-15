@@ -576,25 +576,7 @@ func isRunningExecutable(path string) bool {
 }
 
 func discardBinaryChurn(ctx context.Context, opts *Options, dir string) error {
-	binPath := opts.ShipBinaryPath
-	if binPath == "" {
-		if execPath, err := osExecutable(); err == nil {
-			binPath = execPath
-		}
-	}
-	var relBin string
-	if binPath != "" {
-		if rel, err := filepath.Rel(opts.ProjectRoot, binPath); err == nil && !strings.HasPrefix(rel, "..") {
-			relBin = filepath.ToSlash(rel)
-		}
-	}
-
-	pathsToDiscard := []string{"go/evolve"}
-	if relBin != "" && relBin != "go/evolve" {
-		pathsToDiscard = append(pathsToDiscard, relBin)
-	}
-
-	for _, p := range pathsToDiscard {
+	for _, p := range binaryChurnPaths(opts) {
 		absPath := filepath.Join(dir, p)
 		if _, err := os.Stat(absPath); os.IsNotExist(err) {
 			continue
@@ -615,4 +597,25 @@ func discardBinaryChurn(ctx context.Context, opts *Options, dir string) error {
 		}
 	}
 	return nil
+}
+
+func binaryChurnPaths(opts *Options) []string {
+	binPath := opts.ShipBinaryPath
+	if binPath == "" {
+		if execPath, err := osExecutable(); err == nil {
+			binPath = execPath
+		}
+	}
+	var relBin string
+	if binPath != "" {
+		if rel, err := filepath.Rel(opts.ProjectRoot, binPath); err == nil && !strings.HasPrefix(rel, "..") {
+			relBin = filepath.ToSlash(rel)
+		}
+	}
+
+	pathsToDiscard := []string{"go/evolve"}
+	if relBin != "" && relBin != "go/evolve" {
+		pathsToDiscard = append(pathsToDiscard, relBin)
+	}
+	return pathsToDiscard
 }

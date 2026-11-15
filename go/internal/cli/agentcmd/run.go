@@ -38,6 +38,8 @@ const (
 	ledgerKind  = "agent_run"
 	ledgerSrc   = "evolve agent run"
 	runsSubpath = "ephemeral/agent-runs"
+
+	keptDeliverables = 20
 )
 
 type Envelope struct {
@@ -204,10 +206,19 @@ func (c command) run(args []string, stdin io.Reader, stdout, stderr io.Writer) i
 	defer stop()
 	out := c.launch(ctx, r, signals, stderr)
 	keepLLMCalls(r, stderr)
+	if out.resp.Verdict == core.VerdictFAIL && out.hasReport {
+		keepFailedDeliverable(r, out.report, stderr)
+	}
 	recordPath, recordErr := writeLaunchRecord(r, out, now)
 	recordErr = errors.Join(appendLedger(r, out, now), recordErr)
 	emit(o, r, out, recordPath, errors.Join(out.runErr, recordErr), stdout)
 	return finish(out.resp, out.runErr, recordErr, stderr)
+}
+
+func keepFailedDeliverable(r standaloneRun, body string, stderr io.Writer) {
+	if err := launchrecord.KeepDeliverable(paths.EvolveDirOf(r.root), r.label, body, keptDeliverables); err != nil {
+		fmt.Fprintf(stderr, "evolve agent run: keep the failing deliverable of %s: %v\n", r.label, err)
+	}
 }
 
 func keepLLMCalls(r standaloneRun, stderr io.Writer) {
@@ -387,6 +398,7 @@ func writeLaunchRecord(r standaloneRun, out launchOutcome, now time.Time) (strin
 		RunID: r.label, Profile: r.spec.Name, CLI: out.cli, Family: out.family, Model: out.launchedModel(),
 		Verdict: out.verdict, WritesSource: out.writer, TreeBefore: out.treeBefore, TreeAfter: out.treeAfter, ArtifactSHA256: out.reportSHA(),
 		Worktree: r.worktree, TS: now.UTC().Format(time.RFC3339), Cloud: out.cloudSession(),
+		Violations: recordViolations(out.resp.ContractViolations),
 	}
 	path, err := launchrecord.Write(paths.EvolveDirOf(r.root), rec)
 	if err != nil {
@@ -435,4 +447,12 @@ func finish(resp core.PhaseResponse, runErr, recordErr error, stderr io.Writer) 
 		return exitDispatch
 	}
 	return exitCode(resp, runErr)
+}
+
+func recordViolations(vs []core.ContractViolation) []launchrecord.Violation {
+	var out []launchrecord.Violation
+	for _, v := range vs {
+		out = append(out, launchrecord.Violation{Code: v.Code, Message: v.Message})
+	}
+	return out
 }

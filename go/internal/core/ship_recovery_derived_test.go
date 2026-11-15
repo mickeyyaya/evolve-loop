@@ -629,7 +629,7 @@ func TestRegenStaleProjections_RegeneratesAndStages(t *testing.T) {
 	var regened, staged []string
 	regen := func(_ context.Context, _, entry string) error { regened = append(regened, entry); return nil }
 	stage := func(_ context.Context, _, entry string) error { staged = append(staged, entry); return nil }
-	stale := derived.Stale([]string{"go/internal/flagregistry/registry_table.go", "go/internal/core/foo.go"}, nil)
+	stale := derived.Stale([]string{"go/internal/flagregistry/registry.json", "docs/other.md"}, nil)
 
 	done := regenStaleProjections(context.Background(), "/wt", stale, regen, stage)
 
