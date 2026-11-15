@@ -1,0 +1,180 @@
+{
+  "schema_version": 2,
+  "cycle": 2394,
+  "run_id": "01M7EDRAVT0EH73Y2J37H0JSEC",
+  "goal": "Wave 173.\n\nWork the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree that it ships;\n- disposition its own defect ledger and the inherited ids;\n- record a terminal outcome on every exit;\n- never change a protected control-plane file with a tool;\n- leave no stale worktree.\n\nRouting:\n- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.\n- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.\n- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.\n\nCraft:\n- New and changed code has no comments. Names, types and tests give the intent.\n- Write each new document and each new log text in ASD-STE100.\n- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.\n- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.\n\nEvidence:\n- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.\n\nThe measure of this wave is the number of shipped cycles. Keep each cycle shipping.\n\nWave 172 facts (run 20261114T064820Z): 4 of 4 cycles shipped.\n- Cycle 2374: final verdict PASS. It shipped.\n- Cycle 2375: final verdict PASS. It shipped.\n- Cycle 2376: final verdict PASS. It shipped.\n- Cycle 2377: final verdict PASS. It shipped.\n- Pull requests merged at this boundary: none.\n\nEarlier waves:\n- Wave 169 (run 20261113T084906Z): 1 of 4 cycles shipped.\n- Wave 170 (run 20261113T094348Z): 1 of 4 cycles shipped.\n- Wave 171 (run 20261113T194212Z): 9 of 16 cycles shipped.",
+  "final_verdict": "FAIL",
+  "tasks": [
+    "arch-decisions-ad2-9-graft-d-an-on-demand-llm-curator"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 131381,
+      "started_at": "2026-11-15T01:40:09Z",
+      "ended_at": "2026-11-15T01:42:23Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 93242,
+        "output": 9808,
+        "cache_read": 602307,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 62834,
+      "started_at": "2026-11-15T01:42:51Z",
+      "ended_at": "2026-11-15T01:43:56Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 65971,
+        "output": 3758,
+        "cache_read": 170823,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 40327,
+      "started_at": "2026-11-15T01:43:56Z",
+      "ended_at": "2026-11-15T01:53:44Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 12,
+        "output": 1964,
+        "cache_read": 400477,
+        "cache_write": 37827
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "FAIL",
+      "duration_ms": 1786015,
+      "started_at": "2026-11-15T01:53:44Z",
+      "ended_at": "2026-11-15T04:14:44Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 331704,
+        "output": 10006,
+        "cache_read": 728230,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "PASS",
+      "duration_ms": 130247,
+      "started_at": "2026-11-15T04:14:44Z",
+      "ended_at": "2026-11-15T04:16:54Z",
+      "archetype": "control",
+      "model_source": "profile",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 34,
+        "output": 11667,
+        "cache_read": 1355243,
+        "cache_write": 100672
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "build|gate-block|cda2b2eeccaa",
+    "pre_class": "gate-block",
+    "reasons": [
+      "review gate: phase \"build\" deliverable rejected after 2 correction(s): build handoff floor: 2 deterministic check failure(s) — fix these exactly before handoff: ./acs/cycle2394 (-tags acs): unit tes"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 2394",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase retro"
+    }
+  ],
+  "timing": {
+    "total_ms": 2150804,
+    "phase_count": 5,
+    "retried_count": 0,
+    "longest_phase": "build",
+    "longest_ms": 1786015,
+    "by_archetype_ms": {
+      "build": 1786015,
+      "control": 130247,
+      "plan": 234542
+    },
+    "total_tokens": {
+      "input": 490963,
+      "output": 37203,
+      "cache_read": 3257080,
+      "cache_write": 138499
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 331704,
+        "output": 10006,
+        "cache_read": 728230,
+        "cache_write": 0
+      },
+      "control": {
+        "input": 34,
+        "output": 11667,
+        "cache_read": 1355243,
+        "cache_write": 100672
+      },
+      "plan": {
+        "input": 159225,
+        "output": 15530,
+        "cache_read": 1173607,
+        "cache_write": 37827
+      }
+    },
+    "wasted_tokens": {
+      "input": 331704,
+      "output": 10006,
+      "cache_read": 728230,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.8690081730652504,
+    "hot_phase_count": 5,
+    "hot_phases": [
+      "scout",
+      "triage",
+      "tdd",
+      "build",
+      "retro"
+    ]
+  },
+  "recalled_lessons": [
+    "cycle-1502-closure-citation-contract-never-reaches-the-auditor-it-grades",
+    "cycle-1492-remedy-on-disk-in-four-places-reaches-no-agent-with-authority-to-apply-it",
+    "inst-L1549b",
+    "cycle-93-build-report-commit-sha-fabrication",
+    "cycle-1448-minted-phase-persona-evaporates-when-its-phase-json-lands"
+  ]
+}
