@@ -22,6 +22,8 @@ To fix a refused file, read the key path in the error. Then correct its
 spelling against the schema below, or remove the key. An older release
 ignored such a key, so the key had no effect before.
 
+Each `stage` key obeys the rules of [shadow-stage-contract](shadow-stage-contract.md) before it flips to `enforce`.
+
 The loop refuses to start on a refused file, because the `cli-routing` preflight
 check halts. A best-effort reader that runs mid-wave prints one
 `[policy] WARN` line (`policy.LoadOrDefaults`). It then uses the compiled
