@@ -2,6 +2,12 @@ package acsassert
 
 import (
 	"errors"
+	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"go/types"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -287,5 +293,104 @@ func TestModuleDir_ReportsAFailureToMakeTheStartAbsolute(t *testing.T) {
 	}
 	if got != "" {
 		t.Errorf("ModuleDir returned %q beside the error", got)
+	}
+}
+
+type recordingTB struct {
+	testing.TB
+	fatals []string
+}
+
+func (r *recordingTB) Helper() {}
+
+func (r *recordingTB) Fatalf(format string, args ...any) {
+	r.fatals = append(r.fatals, fmt.Sprintf(format, args...))
+}
+
+func TestGoModuleDir_ReturnsTheDirectoryThatHoldsGoMod(t *testing.T) {
+	t.Parallel()
+	dir := GoModuleDir(t)
+	if _, err := os.Stat(filepath.Join(dir, "go.mod")); err != nil {
+		t.Fatalf("GoModuleDir = %q holds no go.mod: %v", dir, err)
+	}
+}
+
+func TestModuleDirFrom_FailsTheTBWhenNoGoModExists(t *testing.T) {
+	t.Parallel()
+	fake := &recordingTB{}
+	moduleDirFrom(fake, t.TempDir())
+	if len(fake.fatals) != 1 || !strings.Contains(fake.fatals[0], "no go.mod") {
+		t.Fatalf("Fatalf calls = %q, want one that names the missing go.mod", fake.fatals)
+	}
+}
+
+func TestModuleDirFrom_ReturnsTheDirWithoutFailingTheTB(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeTree(t, root, "go.mod")
+	fake := &recordingTB{}
+	if got := moduleDirFrom(fake, root); got != root || len(fake.fatals) != 0 {
+		t.Fatalf("moduleDirFrom = %q with fatals %q, want %q and none", got, fake.fatals, root)
+	}
+}
+
+func kitPackageFuncs(t *testing.T, file string) map[string]*ast.FuncDecl {
+	t.Helper()
+	fset := token.NewFileSet()
+	pkgs, err := parser.ParseDir(fset, ".", func(fi fs.FileInfo) bool {
+		return !strings.HasSuffix(fi.Name(), "_test.go") && (file == "" || fi.Name() == file)
+	}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	funcs := map[string]*ast.FuncDecl{}
+	for _, pkg := range pkgs {
+		for _, f := range pkg.Files {
+			for _, decl := range f.Decls {
+				if fn, ok := decl.(*ast.FuncDecl); ok && fn.Recv == nil && fn.Name.IsExported() {
+					funcs[fn.Name.Name] = fn
+				}
+			}
+		}
+	}
+	return funcs
+}
+
+func TestTestingForms_EachKeyIsAKitFunctionAndEachValueATestingForm(t *testing.T) {
+	t.Parallel()
+	funcs := kitPackageFuncs(t, "")
+	if len(TestingForms) == 0 {
+		t.Fatal("TestingForms is empty")
+	}
+	for name, form := range TestingForms {
+		if _, ok := funcs[name]; !ok {
+			t.Errorf("TestingForms key %q is no exported function of the package", name)
+		}
+		fn, ok := funcs[form]
+		if !ok {
+			t.Errorf("TestingForms value %q is no exported function of the package", form)
+			continue
+		}
+		params := fn.Type.Params.List
+		if len(params) == 0 || !strings.Contains(types.ExprString(params[0].Type), "testing.") {
+			t.Errorf("TestingForms value %q does not take a testing.T or testing.TB first", form)
+		}
+	}
+}
+
+func TestPredicateKitTable_ListsEachExportedKitFunction(t *testing.T) {
+	t.Parallel()
+	raw, err := os.ReadFile(filepath.Join(GoModuleDir(t), "acs", "README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, section, ok := strings.Cut(string(raw), "### Predicate kit")
+	if !ok {
+		t.Fatal("go/acs/README.md has no Predicate kit section")
+	}
+	for name := range kitPackageFuncs(t, "predicate_kit.go") {
+		if !strings.Contains(section, "| `"+name+"` |") {
+			t.Errorf("go/acs/README.md §Predicate kit table omits %s", name)
+		}
 	}
 }

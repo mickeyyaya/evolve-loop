@@ -3,6 +3,7 @@ package testdup
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -525,5 +526,53 @@ func TestScan_ScansAnOldAcsDirectoryWithAChangeThatNoCommitHoldsYet(t *testing.T
 	}
 	if report.Copies != 1 {
 		t.Errorf("Copies = %d, want 1: the landing commit makes acs/regression new on main, so the gate before it must scan it too; groups = %v", report.Copies, report.Groups)
+	}
+}
+
+const wrapperSource = `package %s
+
+import (
+	"testing"
+
+	"example.com/m/pkg/acsassert"
+)
+
+func %s(t *testing.T) string {
+	t.Helper()
+	dir, err := acsassert.ModuleDir(".")
+	if err != nil {
+		t.Fatal(acsassert.OutputTail(err.Error(), 1))
+	}
+	_ = acsassert.ModuleDir
+	return dir
+}
+`
+
+func TestScan_ARepeatedBodyNamesTheKitFunctionsItWraps(t *testing.T) {
+	root := t.TempDir()
+	plant(t, root, map[string]string{
+		"internal/a/a_test.go": source(wrapperSource, "a", "moduleDir"),
+		"internal/b/b_test.go": source(wrapperSource, "b", "goDir"),
+		"internal/c/c_test.go": source(helperSource, "c", "plain"),
+		"internal/d/d_test.go": source(helperSource, "d", "plain"),
+	})
+
+	report, err := Scan(root, baselineDay)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Groups) != 2 {
+		t.Fatalf("Groups = %d, want 2", len(report.Groups))
+	}
+	byFirst := map[string][]string{}
+	for _, g := range report.Groups {
+		byFirst[g.Sites[0]] = g.Wraps
+	}
+	if got := byFirst["internal/a/a_test.go:moduleDir"]; !slices.Equal(got, []string{"ModuleDir", "OutputTail"}) {
+		t.Errorf("wrapper Wraps = %q, want [ModuleDir OutputTail] (sorted, deduplicated)", got)
+	}
+	if got := byFirst["internal/c/c_test.go:plain"]; len(got) != 0 {
+		t.Errorf("plain helper Wraps = %q, want none", got)
 	}
 }
