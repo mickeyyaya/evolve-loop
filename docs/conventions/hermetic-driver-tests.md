@@ -14,6 +14,19 @@ A test whose purpose is to exercise an env branch opts **in**. It uses an explic
 `Deps.Env` entry (`lookupEnv` reads it first) or its own `Deps.LookupEnv`.
 It never inherits the values that the parent process exports.
 
+### Host credentials
+
+A test binary that runs `git` or `gh` must call `gittest.IsolateHostCredentials()` in `TestMain`.
+It must call the returned `restore` function after `m.Run`.
+A test must not add a hand-written `GIT_CONFIG_GLOBAL` line.
+
+`gittest.IsolateHostCredentials()` applies the one set from `ipcenv.CredentialIsolation` ([llm-isolation.md](../architecture/llm-isolation.md#92-git-asks-no-credential-helper-in-a-cell-and-the-secret-files-deny-at-shadow-2026-11-11-as-built)):
+
+| Action | Keys and values |
+|---|---|
+| Set | `GIT_CONFIG_GLOBAL` (`os.DevNull`), `GIT_CONFIG_NOSYSTEM=1`, `GIT_TERMINAL_PROMPT=0`, `GIT_SSH_COMMAND`, `GH_CONFIG_DIR` (empty temp dir) |
+| Unset | `GH_TOKEN`, `GITHUB_TOKEN` |
+
 ## Why
 
 `lookupEnv` (`driver_common.go`) resolves `Deps.Env` → `Deps.LookupEnv` →

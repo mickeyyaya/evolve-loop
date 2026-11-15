@@ -781,7 +781,8 @@ The cell opens the retrospective of cycle 6. Cycle 9 built `item-b`. A read of t
 | Pinned files | `<ws>/lane-scope.json` gets a write deny (`write.pipeline.file`), as a second guard after the record. |
 | Read grants | `Deps.readIsolation` (`go/internal/bridge/read_isolation.go`) gives the sandbox the real path of each indexed path and of the index. |
 | Stage source | the policy key `isolation.i5.stage`, read by `policy.IsolationReadStage`. An explicit `Deps.ReadStage` wins. The default is `shadow`. One stage covers the I-4 and the I-5 rules. The secret entries of the home directory deny at `shadow` and at `enforce`; the run, raw-output and inputs rules deny only at `enforce` (§9.2). |
-| Shadow signal | each guarded rule carries `(with message "evolve-cell=<dispatch id> rule=<rule> inv=<I4\|I5>")`. After the launch, `Deps.reportReadViolations` reads the reports of the dispatch id with `/usr/bin/log show`. It emits one `ISOLATION_I4_VIOLATION` or `ISOLATION_I5_VIOLATION` for each rule and target, at most 20 for each cell. `action` is `logged` for a reported allow and `refused` for a deny. A read of a secret entry is refused, not reported, at `shadow` and at `enforce`. |
+| Tool view | `ipcenv.CredentialIsolation` isolates git and `gh` credentials in each cell env (§9.2). |
+| Shadow signal | each guarded rule carries `(with message "evolve-cell=<dispatch id> rule=<rule> inv=<I4\|I5>")`. After the launch, `Deps.reportReadViolations` reads the reports of the dispatch id with `/usr/bin/log show`. It emits one `ISOLATION_I4_VIOLATION` or `ISOLATION_I5_VIOLATION` for each rule and target, at most 20 for each cell. Each signal includes `process` and `pid` from the report line. `action` is `logged` for a reported allow and `refused` for a deny. A denied `read.home.secret` read is `refused`, not reported, at `shadow` and at `enforce`. |
 | Handoff asks | each `handoff-*.json` is a `deliverable` of kind `handoff-asks`. The correction of the handoff reviewer names the `handoff-asks` entry of the index. |
 | Personas | `agents/agent-templates.md` §"The input index", and the builder, auditor, tdd-engineer, build-planner and retrospective personas open index entries, not fixed workspace paths. |
 
@@ -836,7 +837,7 @@ The sandbox today generates SBPL for `sandbox-exec` and an argv for `bwrap` from
 | Read of other files under `.evolve/runs/` | deny | `(deny file-read-data (subpath ".evolve/runs"))` before the literal grants | `--tmpfs .evolve/runs` | I-5 | built at `shadow` (X5) |
 | Read of raw output (`*-stdout.log`, `*-final-pane.txt`; the CLI transcripts in `$HOME` stay open, §8.5 and §11.1) | deny | `(deny file-read-data (require-all (subpath ".evolve/runs") (regex #"(-stdout\.log\|...)$")))` and a deny of `<ws>/.bridge/`, after the grants | `--ro-bind /dev/null <file>` for each raw file of the workspace, `--tmpfs <ws>/.bridge` | I-4 | built at `shadow` (X5); the logs stay in the workspace |
 | Read of the CLI's own config in `$HOME` | allow | `(allow file-read* (subpath "~/.<cli dir>"))` from manifest `home_reads` | `--ro-bind` | I-5 | allowed (all of `$HOME`) |
-| Read of secrets in `$HOME` | deny | `(deny file-read-data ...)` for `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.netrc`, `~/.config/gh`, `~/.docker/config.json`, `~/.kube`, and the dirs of the other families | `--tmpfs <dir>`, `--ro-bind /dev/null <file>` | I-5 | built at `shadow` for the listed secrets (X5); not the dirs of the other families |
+| Read of secrets in `$HOME` | deny | `(deny file-read-data ...)` for `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.netrc`, `~/.config/gh`, `~/.docker/config.json`, `~/.kube`, `~/.git-credentials`, `~/.config/git/credentials`, and the dirs of the other families | `--tmpfs <dir>`, `--ro-bind /dev/null <file>` | I-5 | built at `shadow` for the listed secrets (X5); not the dirs of the other families |
 | Read of the rest of `$HOME` | deny at `enforce` | no grant | not bound | I-5 | allowed |
 | Write of the worktree and the own run dir | allow | as today (`go/internal/bridge/sandbox_paths.go:161-201`) | as today | I-7 | allowed |
 | Write of another cycle, `.evolve/events/`, `.evolve/resume-witness/` | deny | as today | as today | I-7 | denied |
@@ -906,7 +907,9 @@ Known differences from the design:
   - The marker is advisory, because an agent can set or unset it. That is acceptable, because the hook is defence in depth. The cell boundary (sandbox, exec deny, dispatch credential) is the limit.
 
 
-### 9.2 Git asks no credential helper in a cell, and the secret files deny at shadow (2026-11-11, design)
+### 9.2 Git asks no credential helper in a cell, and the secret files deny at shadow (2026-11-11, as built)
+
+See [internal-ipcenv.md](packages/internal-ipcenv.md) and [internal-gittest.md](packages/internal-gittest.md) for the credential isolation packages.
 
 On 2026-11-11 two `console-builder` cells read `~/.config/gh/config.yml` and `~/.config/gh/hosts.yml`. The bridge reported `ISOLATION_I5_VIOLATION` with `process=gh`, `rule=read.home.secret` and `action=logged`. The second brief forbade `gh`, so the agent did not choose it.
 
@@ -929,7 +932,7 @@ The global scope loses to a repo-local identity. Thus a `gittest.Fixture` keeps 
 - `driverEnv` filters each `Unset` key out of the parent, the manifest env and `Deps.Env`, and appends `Set` last.
 - `primePaneShell` writes an `export` line for each `Set` key and an `unset` line for each `Unset` key, after the cell markers.
 
-The set stays outside the marker registry (`ipcenv.CellMarkers()`), because `allowedEnvName` passes the parent value of each marker name. The set closes the observed path: git starts no credential helper, so no `gh auth git-credential` runs. A cell must not reach a remote.
+The set stays outside the marker registry (`ipcenv.CellMarkers()`), because `allowedEnvName` passes the parent value of each marker name. The set closes the observed path: git starts no credential helper, so no `gh auth git-credential` runs. A cell must not reach a remote. The `claude-tmux.json` manifest sets `prStatusFooterEnabled` to `false` in `--settings` so the footer runs no `gh` check.
 
 What `GH_CONFIG_DIR` does: it points `gh` at an empty dir, so `gh` reads no `hosts.yml` or `config.yml` of the host. What it does not do: it does not stop the keychain read. With `GH_TOKEN` unset and an empty `GH_CONFIG_DIR`, `gh auth token` still prints a token from the keyring, because `gh` falls back to the item `gh:github.com`. The set does not claim that `gh` finds no credential.
 
@@ -1370,7 +1373,7 @@ X1 registers the `isolation.violation` kind, the nine codes (`go/internal/isolat
 | `ISOLATION_I2_VIOLATION` | The allowlist dropped a variable that the launcher had. | Read `target`: is it a variable that the CLI needs? | If yes, add it to `env_passthrough` of the manifest. If no, ignore it. |
 | `ISOLATION_I3_VIOLATION` | An agent tried to start an LLM or an `evolve` dispatch. | Read the persona and the prompt of the cell. | Remove the instruction that asks for it. A repeat is a prompt injection signal: read the inputs of the cell. |
 | `ISOLATION_I4_VIOLATION` | An agent tried to read raw output or write its inputs. | Read `target`. | Change the persona to open the index entry. |
-| `ISOLATION_I5_VIOLATION` | An agent tried to read outside its index, worktree or CLI files. | Check if `target` is a lesson that the lineage missed. | If the lineage missed it, fix the lineage rule. If not, the deny is right. |
+| `ISOLATION_I5_VIOLATION` | An agent tried to read outside its index, worktree or CLI files. | Read `process`, `pid`, `rule`, and `target`; check if `rule` is `read.home.secret` or if lineage missed `target`. | For a git or `gh` `read.home.secret`, check `ipcenv.CredentialIsolation`. For a missed lineage file, fix the lineage rule. |
 | `ISOLATION_I6_VIOLATION` | A launch used a compiled family default. | Run `evolve cli-routing explain <agent>`. | Add the agent to the routing data. |
 | `ISOLATION_I7_VIOLATION` | The gate or the fence stopped a write that no hook stopped. | Read the family of the cell. | Nothing to fix in the cell; the neutral guard worked. File an item if the agent repeats it. |
 | `ISOLATION_I8_VIOLATION` | A flow seat had no valid decision file, and the parser used stdout. | Read the decision file and the schema error. | Fix the persona of the seat, or the schema. |
