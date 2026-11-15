@@ -14,7 +14,8 @@ func TestInboxCuratorConfig_AnAbsentBlockIsTheShadowDefault(t *testing.T) {
 
 	want := policy.InboxCuratorConfig{
 		Stage: "shadow", OverlapRefuse: 0.5, OverlapWarn: 0.3, ConsumeMinShare: 0.5,
-		Kinds: []string{"bug", "docs", "feature", "fix", "hardening", "maintenance", "pipeline-integrity", "pipeline-repair", "ref-state", "refactor", "research", "security", "sweep", "task", "techdebt", "test"},
+		Kinds:                 []string{"bug", "docs", "feature", "fix", "hardening", "maintenance", "pipeline-integrity", "pipeline-repair", "ref-state", "refactor", "research", "security", "sweep", "task", "techdebt", "test"},
+		RerouteBuildableKinds: []string{"bug", "fix", "hardening", "pipeline-repair", "refactor", "security", "techdebt", "test"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("InboxCuratorConfig() = %+v, want %+v", got, want)
@@ -26,7 +27,8 @@ func TestInboxCuratorConfig_AnAbsentBlockIsTheShadowDefault(t *testing.T) {
 
 func TestInboxCuratorConfig_EveryNamedValueOverridesTheDefault(t *testing.T) {
 	p, err := loadPolicyText(t, `{"inbox": {"curator": {
-		"stage": "enforce", "overlap_refuse": 0.7, "overlap_warn": 0.2, "consume_min_share": 1, "kinds": ["bug", "feature"]
+		"stage": "enforce", "overlap_refuse": 0.7, "overlap_warn": 0.2, "consume_min_share": 1, "kinds": ["bug", "feature"],
+		"reroute_buildable_kinds": ["bug"]
 	}}}`)
 	if err != nil {
 		t.Fatal(err)
@@ -34,7 +36,7 @@ func TestInboxCuratorConfig_EveryNamedValueOverridesTheDefault(t *testing.T) {
 
 	got := p.InboxCuratorConfig()
 
-	want := policy.InboxCuratorConfig{Stage: "enforce", OverlapRefuse: 0.7, OverlapWarn: 0.2, ConsumeMinShare: 1, Kinds: []string{"bug", "feature"}}
+	want := policy.InboxCuratorConfig{Stage: "enforce", OverlapRefuse: 0.7, OverlapWarn: 0.2, ConsumeMinShare: 1, Kinds: []string{"bug", "feature"}, RerouteBuildableKinds: []string{"bug"}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("InboxCuratorConfig() = %+v, want %+v", got, want)
 	}
@@ -52,17 +54,19 @@ func TestInboxCuratorConfig_AnEmptyInboxBlockKeepsTheDefault(t *testing.T) {
 
 func TestInboxCuratorPolicy_RefusesAnInvalidValueNamingTheBlock(t *testing.T) {
 	for name, tc := range map[string]struct{ body, why string }{
-		"an unknown stage":          {`{"stage": "off"}`, `stage "off"`},
-		"a refuse threshold over 1": {`{"overlap_refuse": 1.5}`, "overlap_refuse"},
-		"a zero refuse threshold":   {`{"overlap_refuse": 0}`, "overlap_refuse"},
-		"a negative warn threshold": {`{"overlap_warn": -0.1}`, "overlap_warn"},
-		"warn above refuse":         {`{"overlap_refuse": 0.4, "overlap_warn": 0.6}`, "overlap_warn"},
-		"warn above default refuse": {`{"overlap_warn": 0.6}`, "overlap_warn"},
-		"a zero consume share":      {`{"consume_min_share": 0}`, "consume_min_share"},
-		"an empty kind list":        {`{"kinds": []}`, "kinds"},
-		"a kind listed twice":       {`{"kinds": ["bug", "bug"]}`, "kinds"},
-		"an unknown key":            {`{"stagee": "shadow"}`, "stagee"},
-		"a stage of the wrong type": {`{"stage": 3}`, "stage"},
+		"an unknown stage":              {`{"stage": "off"}`, `stage "off"`},
+		"a refuse threshold over 1":     {`{"overlap_refuse": 1.5}`, "overlap_refuse"},
+		"a zero refuse threshold":       {`{"overlap_refuse": 0}`, "overlap_refuse"},
+		"a negative warn threshold":     {`{"overlap_warn": -0.1}`, "overlap_warn"},
+		"warn above refuse":             {`{"overlap_refuse": 0.4, "overlap_warn": 0.6}`, "overlap_warn"},
+		"warn above default refuse":     {`{"overlap_warn": 0.6}`, "overlap_warn"},
+		"a zero consume share":          {`{"consume_min_share": 0}`, "consume_min_share"},
+		"an empty kind list":            {`{"kinds": []}`, "kinds"},
+		"a kind listed twice":           {`{"kinds": ["bug", "bug"]}`, "kinds"},
+		"an empty buildable kind list":  {`{"reroute_buildable_kinds": []}`, "reroute_buildable_kinds"},
+		"a buildable kind listed twice": {`{"reroute_buildable_kinds": ["bug", "bug"]}`, "reroute_buildable_kinds"},
+		"an unknown key":                {`{"stagee": "shadow"}`, "stagee"},
+		"a stage of the wrong type":     {`{"stage": 3}`, "stage"},
 	} {
 		_, err := loadPolicyText(t, `{"inbox": {"curator": `+tc.body+`}}`)
 		if err == nil || !strings.Contains(err.Error(), "inbox.curator") || !strings.Contains(err.Error(), tc.why) {

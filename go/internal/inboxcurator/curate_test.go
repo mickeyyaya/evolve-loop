@@ -10,7 +10,7 @@ import (
 func TestCurate_ALandingRunsTheMatchAndARoutingChangeRunsTheRerouteCheck(t *testing.T) {
 	gate := func(p string) bool { return p == "go/internal/guards/ship.go" }
 	onLane := inboxbatch.Item{ID: "gate", Kind: "feature", Route: inboxbatch.RouteLaneValue, Files: []string{"go/internal/guards/ship.go"}}
-	in := Inputs{Open: []inboxbatch.Item{poolOpenItem(), onLane}, IsProtected: gate, MinShare: 0.5, Thresholds: Thresholds{Refuse: 0.5},
+	in := Inputs{Open: []inboxbatch.Item{poolOpenItem(), onLane}, IsProtected: gate, RerouteBuildableKinds: []string{"bug"}, MinShare: 0.5, Thresholds: Thresholds{Refuse: 0.5},
 		HasTest: testsIn("TestOrchestrator_AFreeSlotTakesTheNextAdmissibleTodoAtOnce", "TestLease_ALanePastItsDeadlineStops")}
 
 	in.Changes = []Change{{Commit: "c1", Paths: []string{"go/internal/fleet/pool.go"}}}

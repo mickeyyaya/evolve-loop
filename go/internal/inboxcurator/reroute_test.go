@@ -11,11 +11,14 @@ import (
 func TestReroutes_AGateFileItemOnTheLaneRouteIsADeterministicRerouteToTheConsole(t *testing.T) {
 	gate := func(p string) bool { return p == "go/internal/guards/ship.go" }
 	onLane := inboxbatch.Item{ID: "gate", Kind: "feature", Route: inboxbatch.RouteLaneValue, Files: []string{"go/internal/guards/ship.go"}}
-	underived := inboxbatch.Item{ID: "plain", Kind: "feature", Route: "console-manual", Files: []string{"go/internal/fleet/pool.go"}}
+	underived := inboxbatch.Item{ID: "plain", Kind: "bug", Route: "console-manual", Files: []string{"go/internal/fleet/pool.go"}}
 	derived := inboxbatch.Item{ID: "pipe", Kind: "pipeline-repair", Route: "console", Files: []string{"go/internal/fleet/pool.go"}}
 	fine := inboxbatch.Item{ID: "lane", Kind: "feature", Route: inboxbatch.RouteLaneValue, Files: []string{"go/internal/fleet/pool.go"}}
 
-	got := Reroutes([]inboxbatch.Item{onLane, underived, derived, fine}, gate)
+	got := Reroutes([]inboxbatch.Item{onLane, underived, derived, fine}, RerouteOptions{
+		IsProtected:    gate,
+		BuildableKinds: []string{"bug"},
+	})
 
 	if len(got) != 2 {
 		t.Fatalf("Reroutes = %+v, want two proposals", got)
@@ -58,9 +61,35 @@ func TestDuplicates_ProposesAMergeOfTheNewerItemIntoTheOlderForTheOperator(t *te
 }
 
 func TestReroutes_AConsoleRouteWithARecordedReasonIsExplained(t *testing.T) {
-	declined := inboxbatch.Item{ID: "kept", Kind: "feature", Route: "console-manual", RoutedReason: json.RawMessage(`"the operator keeps it"`), Files: []string{"go/internal/fleet/pool.go"}}
+	declined := inboxbatch.Item{ID: "kept", Kind: "bug", Route: "console-manual", RoutedReason: json.RawMessage(`"the operator keeps it"`), Files: []string{"go/internal/fleet/pool.go"}}
 
-	if got := Reroutes([]inboxbatch.Item{declined}, func(string) bool { return false }); len(got) != 0 {
+	if got := Reroutes([]inboxbatch.Item{declined}, RerouteOptions{
+		IsProtected:    func(string) bool { return false },
+		BuildableKinds: []string{"bug"},
+	}); len(got) != 0 {
 		t.Errorf("Reroutes = %+v, want none: route-console recorded the reason", got)
+	}
+}
+
+func TestReroutes_GatesLaneRerouteOnBuildableKindNamedFilesAndNoOpenPR(t *testing.T) {
+	buildable := []string{"bug", "fix"}
+	items := []inboxbatch.Item{
+		{ID: "buildable-bug", Kind: "bug", Route: "console-manual", Files: []string{"go/internal/fleet/pool.go"}},
+		{ID: "unbuildable-research", Kind: "research", Route: "console-manual", Files: []string{"go/internal/fleet/pool.go"}},
+		{ID: "unbuildable-decision", Kind: "decision", Route: "console-manual", Files: []string{"go/internal/fleet/pool.go"}},
+		{ID: "unbuildable-task", Kind: "task", Route: "console-manual", Files: []string{"go/internal/fleet/pool.go"}},
+		{ID: "no-files", Kind: "bug", Route: "console-manual"},
+		{ID: "prose-files", Kind: "bug", Route: "console-manual", Files: []string{"none yet"}},
+		{ID: "has-open-pr", Kind: "fix", Route: "console-manual", Files: []string{"go/internal/fleet/pool.go"}},
+	}
+
+	got := Reroutes(items, RerouteOptions{
+		IsProtected:    func(string) bool { return false },
+		BuildableKinds: buildable,
+		HasOpenPR:      func(id string) bool { return id == "has-open-pr" },
+	})
+
+	if len(got) != 1 || got[0].ID != "buildable-bug" || got[0].Target != RouteLaneTarget {
+		t.Fatalf("Reroutes = %+v, want only buildable-bug rerouted to lane", got)
 	}
 }

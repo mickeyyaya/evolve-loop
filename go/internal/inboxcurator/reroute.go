@@ -28,15 +28,21 @@ func TouchesRouting(paths []string) bool {
 	return false
 }
 
-func Reroutes(open []inboxbatch.Item, isProtected func(string) bool) []Proposal {
+type RerouteOptions struct {
+	IsProtected    func(string) bool
+	BuildableKinds []string
+	HasOpenPR      func(string) bool
+}
+
+func Reroutes(open []inboxbatch.Item, opts RerouteOptions) []Proposal {
 	var out []Proposal
 	for _, it := range open {
 		p := Proposal{Kind: ProposeReroute, ID: it.ID, Path: it.Path, Trigger: TriggerRouting}
-		switch routed, why := inboxbatch.ConsoleRouted(it, isProtected); {
+		switch routed, why := inboxbatch.ConsoleRouted(it, opts.IsProtected); {
 		case strings.EqualFold(strings.TrimSpace(it.Route), inboxbatch.RouteLaneValue) && routed:
 			p.Target, p.Deterministic, p.Reason = RouteConsoleTarget, true, "the item names route lane, but "+why
 			p.Evidence = []string{why}
-		case UnderivedConsoleRoute(it, isProtected) && !recordsAReason(it.RoutedReason):
+		case canRerouteToLane(it, opts):
 			p.Target, p.Reason = RouteLaneTarget, "route "+it.Route+" holds the item on the console, and no protected fix surface and no pipeline kind explain it"
 			p.Evidence = []string{"route " + it.Route}
 		default:
@@ -45,6 +51,19 @@ func Reroutes(open []inboxbatch.Item, isProtected func(string) bool) []Proposal 
 		out = append(out, p)
 	}
 	return out
+}
+
+func canRerouteToLane(it inboxbatch.Item, opts RerouteOptions) bool {
+	if !UnderivedConsoleRoute(it, opts.IsProtected) || recordsAReason(it.RoutedReason) {
+		return false
+	}
+	if !slices.Contains(opts.BuildableKinds, strings.ToLower(strings.TrimSpace(it.Kind))) {
+		return false
+	}
+	if len(it.DeclaredPaths()) == 0 {
+		return false
+	}
+	return opts.HasOpenPR == nil || !opts.HasOpenPR(it.ID)
 }
 
 func recordsAReason(raw json.RawMessage) bool {

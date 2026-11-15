@@ -3,13 +3,18 @@
     "A research, decision or task item routed console-manual gets no lane reroute proposal",
     "An item with no named files gets no lane reroute proposal"
   ],
+  "consumed": {
+    "at": "2026-11-15T18:41:28Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "continuation": {
-    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2387",
-    "branch": "cycle-cd3ae73e-2387",
-    "snapshot_sha": "e11333f60c2281aff009d94fa4993f6560d671fe",
     "base_sha": "f86b7a1cb1606f4111548ab6a748ee56e36f4291",
+    "branch": "cycle-cd3ae73e-2387",
+    "cycle": 2387,
     "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2387/audit-fail-reason.json",
-    "cycle": 2387
+    "snapshot_sha": "e11333f60c2281aff009d94fa4993f6560d671fe",
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2387"
   },
   "created_at": "2026-11-12T02:00:00Z",
   "deps": [],

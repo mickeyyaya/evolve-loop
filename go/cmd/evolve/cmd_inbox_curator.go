@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxcurator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 const (
@@ -159,11 +161,69 @@ func (r *curatorRun) curate(changes []inboxcurator.Change, backstop bool) (curat
 	}
 	in := inboxcurator.Inputs{
 		Open: open, Changes: changes, IsProtected: laneForbidden(r.req.root, r.stderr), Backstop: backstop,
-		HasTest:    func(name string) bool { return tests[name] || definedByAChange(changes, name) },
-		PathExists: pathExistsUnder(r.req.root),
-		Thresholds: inboxcurator.Thresholds{Refuse: r.cfg.OverlapRefuse, Warn: r.cfg.OverlapWarn}, MinShare: r.cfg.ConsumeMinShare,
+		RerouteBuildableKinds: r.cfg.RerouteBuildableKinds,
+		HasOpenPR:             openPRMatcher(r.ctx(), r.req.root, r.stderr),
+		HasTest:               func(name string) bool { return tests[name] || definedByAChange(changes, name) },
+		PathExists:            pathExistsUnder(r.req.root),
+		Thresholds:            inboxcurator.Thresholds{Refuse: r.cfg.OverlapRefuse, Warn: r.cfg.OverlapWarn}, MinShare: r.cfg.ConsumeMinShare,
 	}
 	return r.settle(inboxcurator.Curate(in), in.IsProtected), nil
+}
+
+type openPRSummary struct {
+	Number      int    `json:"number"`
+	Title       string `json:"title"`
+	HeadRefName string `json:"headRefName"`
+	Body        string `json:"body"`
+}
+
+func openPRMatcher(ctx context.Context, root string, stderr io.Writer) func(string) bool {
+	return openPRMatcherWith(ctx, sysexec.DefaultRunner, root, stderr)
+}
+
+func openPRMatcherWith(ctx context.Context, run sysexec.RunFunc, root string, stderr io.Writer) func(string) bool {
+	out, err := sysexec.Output(ctx, run, root, "gh", "pr", "list", "--state", "open", "--limit", "1000", "--json", "number,title,headRefName,body")
+	if err != nil {
+		fmt.Fprintf(stderr, "inbox curate: WARN open-pr lookup failed: %v\n", err)
+		return func(string) bool { return false }
+	}
+	var prs []openPRSummary
+	if err := json.Unmarshal([]byte(out), &prs); err != nil {
+		fmt.Fprintf(stderr, "inbox curate: WARN open-pr decode failed: %v\n", err)
+		return func(string) bool { return false }
+	}
+	return func(itemID string) bool {
+		if strings.TrimSpace(itemID) == "" {
+			return false
+		}
+		for _, pr := range prs {
+			if containsExactToken(pr.Title, itemID) || containsExactToken(pr.HeadRefName, itemID) || containsExactToken(pr.Body, itemID) {
+				return true
+			}
+		}
+		return false
+	}
+}
+
+func containsExactToken(text, token string) bool {
+	for start := 0; ; {
+		idx := strings.Index(text[start:], token)
+		if idx < 0 {
+			return false
+		}
+		pos := start + idx
+		end := pos + len(token)
+		beforeOK := pos == 0 || !isIDTokenByte(text[pos-1])
+		afterOK := end == len(text) || !isIDTokenByte(text[end])
+		if beforeOK && afterOK {
+			return true
+		}
+		start = pos + 1
+	}
+}
+
+func isIDTokenByte(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9') || b == '-' || b == '_'
 }
 
 func pathExistsUnder(root string) func(string) bool {

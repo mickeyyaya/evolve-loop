@@ -15,14 +15,16 @@ func init() {
 }
 
 type Inputs struct {
-	Open        []inboxbatch.Item
-	Changes     []Change
-	HasTest     func(string) bool
-	PathExists  func(string) bool
-	IsProtected func(string) bool
-	Thresholds  Thresholds
-	MinShare    float64
-	Backstop    bool
+	Open                  []inboxbatch.Item
+	Changes               []Change
+	HasTest               func(string) bool
+	PathExists            func(string) bool
+	IsProtected           func(string) bool
+	RerouteBuildableKinds []string
+	HasOpenPR             func(string) bool
+	Thresholds            Thresholds
+	MinShare              float64
+	Backstop              bool
 }
 
 func Curate(in Inputs) []Proposal {
@@ -33,7 +35,11 @@ func Curate(in Inputs) []Proposal {
 		routing = routing || TouchesRouting(c.Paths)
 	}
 	if routing {
-		out = append(out, Reroutes(in.Open, in.IsProtected)...)
+		out = append(out, Reroutes(in.Open, RerouteOptions{
+			IsProtected:    in.IsProtected,
+			BuildableKinds: in.RerouteBuildableKinds,
+			HasOpenPR:      in.HasOpenPR,
+		})...)
 	}
 	if in.Backstop {
 		out = append(out, Sweep(in.Open, Tree{HasTest: in.HasTest, PathExists: in.PathExists}, in.MinShare)...)

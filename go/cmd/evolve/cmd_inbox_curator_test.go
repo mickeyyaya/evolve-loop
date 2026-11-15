@@ -336,7 +336,7 @@ func TestCuratorRun_AFailedApplyIsNotApplied(t *testing.T) {
 
 func TestCmd_InboxCurate_TheRootComesFromTheEnvironmentWhenNotNamed(t *testing.T) {
 	root := plainCuratorRoot(t, `{}`)
-	onlyHere := `{"id":"only-here","kind":"feature","route":"console-manual","files":["go/a.go"],"title":"t","acceptance":["a"]}`
+	onlyHere := `{"id":"only-here","kind":"bug","route":"console-manual","files":["go/a.go"],"title":"t","acceptance":["a"]}`
 	if err := os.WriteFile(filepath.Join(root, ".evolve", "inbox", "a-only-here.json"), []byte(onlyHere), 0o644); err != nil {
 		t.Fatal(err)
 	}

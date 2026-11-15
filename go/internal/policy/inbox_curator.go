@@ -19,6 +19,10 @@ var defaultInboxKinds = []string{
 	"refactor", "research", "security", "sweep", "task", "techdebt", "test",
 }
 
+var defaultRerouteBuildableKinds = []string{
+	"bug", "fix", "hardening", "pipeline-repair", "refactor", "security", "techdebt", "test",
+}
+
 type InboxPolicy struct {
 	Curator *InboxCuratorPolicy `json:"curator,omitempty"`
 }
@@ -28,20 +32,22 @@ type InboxTrailerPolicy struct {
 }
 
 type InboxCuratorPolicy struct {
-	Stage           string              `json:"stage,omitempty"`
-	OverlapRefuse   *float64            `json:"overlap_refuse,omitempty"`
-	OverlapWarn     *float64            `json:"overlap_warn,omitempty"`
-	ConsumeMinShare *float64            `json:"consume_min_share,omitempty"`
-	Kinds           []string            `json:"kinds,omitempty"`
-	Trailer         *InboxTrailerPolicy `json:"trailer,omitempty"`
+	Stage                 string              `json:"stage,omitempty"`
+	OverlapRefuse         *float64            `json:"overlap_refuse,omitempty"`
+	OverlapWarn           *float64            `json:"overlap_warn,omitempty"`
+	ConsumeMinShare       *float64            `json:"consume_min_share,omitempty"`
+	Kinds                 []string            `json:"kinds,omitempty"`
+	RerouteBuildableKinds []string            `json:"reroute_buildable_kinds,omitempty"`
+	Trailer               *InboxTrailerPolicy `json:"trailer,omitempty"`
 }
 
 type InboxCuratorConfig struct {
-	Stage           string
-	OverlapRefuse   float64
-	OverlapWarn     float64
-	ConsumeMinShare float64
-	Kinds           []string
+	Stage                 string
+	OverlapRefuse         float64
+	OverlapWarn           float64
+	ConsumeMinShare       float64
+	Kinds                 []string
+	RerouteBuildableKinds []string
 }
 
 func (c InboxCuratorConfig) Enforced() bool { return c.Stage == inboxCuratorEnforce }
@@ -76,14 +82,20 @@ func (b InboxCuratorPolicy) validate() error {
 		return fmt.Errorf("consume_min_share must be in (0, 1], got %v", *b.ConsumeMinShare)
 	case b.Kinds != nil && len(b.Kinds) == 0:
 		return errors.New("kinds is empty; every new item would be refused")
+	case b.RerouteBuildableKinds != nil && len(b.RerouteBuildableKinds) == 0:
+		return errors.New("reroute_buildable_kinds is empty")
 	}
-	return checkDistinctNames("kinds", b.Kinds)
+	if err := checkDistinctNames("kinds", b.Kinds); err != nil {
+		return err
+	}
+	return checkDistinctNames("reroute_buildable_kinds", b.RerouteBuildableKinds)
 }
 
 func (p Policy) InboxCuratorConfig() InboxCuratorConfig {
 	c := InboxCuratorConfig{
 		Stage: inboxCuratorShadow, OverlapRefuse: defaultInboxOverlapRefuse, OverlapWarn: defaultInboxOverlapWarn,
 		ConsumeMinShare: defaultInboxConsumeMinShare, Kinds: slices.Clone(defaultInboxKinds),
+		RerouteBuildableKinds: slices.Clone(defaultRerouteBuildableKinds),
 	}
 	if p.Inbox == nil || p.Inbox.Curator == nil {
 		return c
@@ -94,6 +106,9 @@ func (p Policy) InboxCuratorConfig() InboxCuratorConfig {
 	}
 	if b.Kinds != nil {
 		c.Kinds = slices.Clone(b.Kinds)
+	}
+	if b.RerouteBuildableKinds != nil {
+		c.RerouteBuildableKinds = slices.Clone(b.RerouteBuildableKinds)
 	}
 	c.OverlapRefuse = valueOr(b.OverlapRefuse, c.OverlapRefuse)
 	c.OverlapWarn = valueOr(b.OverlapWarn, min(c.OverlapWarn, c.OverlapRefuse))
