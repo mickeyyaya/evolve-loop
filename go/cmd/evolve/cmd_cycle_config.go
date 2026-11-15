@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/commitgate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
@@ -45,8 +46,11 @@ func productionBuildFloorChecks(ctx context.Context, in core.ReviewInput) []stri
 	out := append(core.ProtectedSurfaceFloorChecks(guards.IsProtectedSurface)(ctx, in), core.DefaultBuildFloorChecks(ctx, in)...)
 	out = append(out, core.ScopeDeltaFloorChecks(guards.IsProtectedSurface)(ctx, in)...)
 	out = append(out, core.GateClassifierFloorChecks(ctx, in)...)
-	return append(out, core.RepoContractFloorChecks(repoContractPack)(ctx, in)...)
+	out = append(out, core.RepoContractFloorChecks(repoContractPack)(ctx, in)...)
+	return append(out, core.LintFloorChecks(lintPackages)(ctx, in)...)
 }
+
+var lintPackages core.LintFn = commitgate.LintPackages
 
 var repoContractPack core.RepoContractPackFn = ship.RunRepoContractPack
 
