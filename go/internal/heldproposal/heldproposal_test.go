@@ -8,20 +8,39 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
 func protectedGuards(path string) bool { return strings.HasPrefix(path, "go/internal/guards/") }
 
-func TestDecide_HoldsAPipelineKindOrAProtectedPathAndNothingElse(t *testing.T) {
+func item(kind, route, injectedBy string) inboxbatch.Item {
+	return inboxbatch.Item{ID: "i-" + kind, Kind: kind, Route: route, InjectedBy: injectedBy}
+}
+
+var fenceFileItem = inboxbatch.Item{ID: "i-fence", Kind: "bug", Route: "lane", Files: []string{"go/internal/guards/a.go"}}
+
+var offFenceFileItem = inboxbatch.Item{ID: "i-off", Kind: "bug", Route: "lane", Files: []string{"go/internal/bridge/x.go"}}
+
+func consoleWhy(it inboxbatch.Item) string {
+	_, why := inboxbatch.ConsoleRouted(it, protectedGuards)
+	return why
+}
+
+func TestDecide_HoldsARoutedItemOrAProtectedPathAndNothingElse(t *testing.T) {
 	cases := []struct {
 		name string
 		in   Inputs
 		want Decision
 	}{
-		{"an ordinary lane change", Inputs{Kinds: []string{"bug"}, Changed: []string{"go/internal/bridge/x.go"}, Protected: protectedGuards}, Decision{}},
-		{"a pipeline-repair item", Inputs{Kinds: []string{" Pipeline-Repair "}, Protected: protectedGuards}, Decision{Hold: true, Reasons: []string{"kind:pipeline-repair"}}},
+		{"an ordinary lane change", Inputs{Items: []inboxbatch.Item{item("bug", "", "")}, Changed: []string{"go/internal/bridge/x.go"}, Protected: protectedGuards}, Decision{}},
+		{"a console-routed pipeline item", Inputs{Items: []inboxbatch.Item{item(" Pipeline-Repair ", "", "")}, Protected: protectedGuards}, Decision{Hold: true, Reasons: []string{"routed:" + consoleWhy(item(" Pipeline-Repair ", "", ""))}}},
+		{"a lane item that declares a fence file", Inputs{Items: []inboxbatch.Item{fenceFileItem}, Protected: protectedGuards}, Decision{Hold: true, Reasons: []string{"routed:" + consoleWhy(fenceFileItem)}}},
+		{"pipeline-repair routed to a lane", Inputs{Items: []inboxbatch.Item{item("pipeline-repair", "lane", "")}, Changed: []string{"go/internal/foo/foo.go"}, Protected: protectedGuards}, Decision{}},
+		{"pipeline-repair routed to a lane on a fence path", Inputs{Items: []inboxbatch.Item{item("pipeline-repair", "lane", "")}, Changed: []string{"go/internal/guards/a.go"}, Protected: protectedGuards}, Decision{Hold: true, Reasons: []string{"protected:go/internal/guards/a.go"}}},
+		{"a lane item that declares an off-fence file", Inputs{Items: []inboxbatch.Item{offFenceFileItem}, Protected: protectedGuards}, Decision{}},
+		{"both causes, sorted", Inputs{Items: []inboxbatch.Item{item("pipeline-integrity", "", "")}, Changed: []string{"go/internal/guards/a.go"}, Protected: protectedGuards}, Decision{Hold: true, Reasons: []string{"protected:go/internal/guards/a.go", "routed:" + consoleWhy(item("pipeline-integrity", "", ""))}}},
 		{"a protected path", Inputs{Changed: []string{"go/internal/guards/role.go", "go/internal/guards/role.go"}, Protected: protectedGuards}, Decision{Hold: true, Reasons: []string{"protected:go/internal/guards/role.go"}}},
-		{"both causes, sorted", Inputs{Kinds: []string{"pipeline-integrity"}, Changed: []string{"go/internal/guards/a.go"}, Protected: protectedGuards}, Decision{Hold: true, Reasons: []string{"kind:pipeline-integrity", "protected:go/internal/guards/a.go"}}},
 		{"no judge holds no path", Inputs{Changed: []string{"go/internal/guards/a.go"}}, Decision{}},
 	}
 	for _, tc := range cases {
@@ -30,6 +49,22 @@ func TestDecide_HoldsAPipelineKindOrAProtectedPathAndNothingElse(t *testing.T) {
 				t.Errorf("Decide = %+v, want %+v", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestSharedRuleHasOnePredicate(t *testing.T) {
+	src, err := os.ReadFile("heldproposal.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(src), `"pipeline-`) {
+		t.Error("heldproposal.go carries its own copy of the pipeline- kind rule")
+	}
+	for _, it := range []inboxbatch.Item{item("pipeline-repair", "", ""), item("pipeline-repair", "lane", ""), item("pipeline-repair", "lane", "agent"), item("ref-state", "", ""), item("bug", "", ""), fenceFileItem, offFenceFileItem} {
+		routed, _ := inboxbatch.ConsoleRouted(it, protectedGuards)
+		if got := Decide(Inputs{Items: []inboxbatch.Item{it}, Protected: protectedGuards}).Hold; got != routed {
+			t.Errorf("item %+v: Decide hold = %v, ConsoleRouted = %v", it, got, routed)
+		}
 	}
 }
 
