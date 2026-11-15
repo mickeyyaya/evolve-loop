@@ -194,14 +194,15 @@ func (a *Adapter) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 		return core.BridgeResponse{}, err
 	}
 	if a.onStopReview != nil {
-		cycle := req.Cycle
-		cb := a.onStopReview
-		onSR := func(phase, action, reason string) { cb(cycle, phase, action, reason) }
 		deps := a.productionEngineDeps(req.Env)
-		deps.OnStopReview = onSR
+		deps.OnStopReview = stopReviewFor(req.Cycle, a.onStopReview)
 		return gobridge.NewEngine(deps).Launch(ctx, inproc)
 	}
 	return a.engineFactory(req.Env).Launch(ctx, inproc)
+}
+
+func stopReviewFor(cycle int, cb func(cycle int, phase, action, reason string)) func(phase, action, reason string) {
+	return func(phase, action, reason string) { cb(cycle, phase, action, reason) }
 }
 
 func (a *Adapter) Probe(ctx context.Context) (core.BridgeProbe, error) {
