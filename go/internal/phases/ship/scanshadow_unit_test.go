@@ -313,7 +313,7 @@ func TestScanShadow_RunRepoContractGateAttachesTheShadowFromPolicy(t *testing.T)
 	t.Parallel()
 	repo := shadowFixture(t)
 	center := signalcenter.New()
-	p := &Phase{repoContractGate: "enforce", signals: center}
+	p := New(Config{RepoContractGate: "enforce", Signals: center})
 	req := core.PhaseRequest{ProjectRoot: repo, Cycle: 41, Workspace: t.TempDir()}
 	if err := p.runRepoContractGate(context.Background(), req, &Options{Class: ClassCycle, ProjectRoot: repo}); err != nil {
 		t.Fatalf("a green tree ships green: %v", err)

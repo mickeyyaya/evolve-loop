@@ -53,7 +53,7 @@ func (s *worktreeShip) land(pending string) error {
 }
 
 func (s *worktreeShip) checkLanding(commit string) error {
-	if err := s.opts.landing().CheckFastForward(s.ctx, s.integration(commit)); err != nil {
+	if err := s.checkFastForward(commit); err != nil {
 		return err
 	}
 	if err := refuseCommittedDocDeletion(s.ctx, s.opts, s.branch, commit); err != nil {
@@ -73,25 +73,50 @@ func (s *worktreeShip) landingCommit(pending string) (string, error) {
 	return strings.TrimSpace(commit), err
 }
 
-func (s *worktreeShip) catchUpMain() {
+func (s *worktreeShip) checkFastForward(commit string) error {
+	return s.opts.landing().CheckFastForward(s.ctx, s.integration(commit))
+}
+
+type catchUpPlan struct {
+	origin      string
+	commits     []string
+	unjournaled string
+}
+
+func (p catchUpPlan) advances() bool {
+	return len(p.commits) > 0 && p.unjournaled == ""
+}
+
+func (s *worktreeShip) planCatchUp() catchUpPlan {
 	origin, err := captureGitOutput(s.ctx, s.opts, "rev-parse", "origin/"+s.branch)
 	if origin = strings.TrimSpace(origin); err != nil || origin == "" {
-		return
+		return catchUpPlan{}
 	}
 	behind, err := captureGitOutput(s.ctx, s.opts, "rev-list", s.branch+".."+origin)
 	commits := strings.Fields(behind)
 	if err != nil || len(commits) == 0 || !isAncestor(s.ctx, s.opts, s.branch, origin) {
-		return
+		return catchUpPlan{}
 	}
+	plan := catchUpPlan{origin: origin, commits: commits}
 	for _, sha := range commits {
 		if !journalHasSHA(s.opts.ProjectRoot, sha) {
-			s.logf("[ship] LANDING: %s is behind origin/%s, but the ship journal does not hold %s, so ship does not fast-forward %s", s.branch, s.branch, sha, s.branch)
-			return
+			plan.unjournaled = sha
+			break
 		}
 	}
-	s.logf("[ship] LANDING: %s is behind origin/%s by %d journaled commit(s); ship fast-forwards %s to %s before its own check", s.branch, s.branch, len(commits), s.branch, origin)
-	s.opts.landing().Integrate(s.ctx, landing.Integration{Branch: s.branch, CycleBranch: "origin/" + s.branch, Commit: origin,
-		Binary: landingBinary, Log: logTo(s.result)})
+	return plan
+}
+
+func (s *worktreeShip) catchUpMain() {
+	plan := s.planCatchUp()
+	switch {
+	case plan.unjournaled != "":
+		s.logf("[ship] LANDING: %s is behind origin/%s, but the ship journal does not hold %s, so ship does not fast-forward %s", s.branch, s.branch, plan.unjournaled, s.branch)
+	case plan.advances():
+		s.logf("[ship] LANDING: %s is behind origin/%s by %d journaled commit(s); ship fast-forwards %s to %s before its own check", s.branch, s.branch, len(plan.commits), s.branch, plan.origin)
+		s.opts.landing().Integrate(s.ctx, landing.Integration{Branch: s.branch, CycleBranch: "origin/" + s.branch, Commit: plan.origin,
+			Binary: landingBinary, Log: logTo(s.result)})
+	}
 }
 
 func (s *worktreeShip) prepareLanding(commit string) (landing.Intent, error) {

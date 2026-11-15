@@ -49,6 +49,15 @@ func headMovedShipError(fx *shippedLane) *ShipError {
 
 func resumeShipAfterHeadMoved(t *testing.T, fx *shippedLane) headMovedOutcome {
 	t.Helper()
+	return resumeShipRaising(t, fx, headMovedShipError(fx), []LedgerEntry{headMovedAuditRow(fx)})
+}
+
+func fleetRebaseShipError(fx *shippedLane, message string) *ShipError {
+	return NewShipError(CodeGitFleetRebaseNeeded, ShipClassTransient, StageAtomicShip, message, "current", fx.newBase)
+}
+
+func resumeShipRaising(t *testing.T, fx *shippedLane, raised *ShipError, rows []LedgerEntry) headMovedOutcome {
+	t.Helper()
 	out := headMovedOutcome{storage: &fakeStorage{
 		state: State{LastCycleNumber: unwindCycle},
 		cycleState: CycleState{
@@ -59,13 +68,13 @@ func resumeShipAfterHeadMoved(t *testing.T, fx *shippedLane) headMovedOutcome {
 			AuditDispatches:                 1,
 		},
 	}}
-	ship := &fakeRunner{name: "ship", failErr: headMovedShipError(fx), failUntil: 1}
+	ship := &fakeRunner{name: "ship", failErr: raised, failUntil: 1}
 	runners := buildRunners(nil)
 	runners[PhaseShip] = orderedRunner{PhaseRunner: ship, name: "ship", order: &out.order}
 	runners[PhaseAudit] = orderedRunner{PhaseRunner: &fakeRunner{name: "audit"}, name: "audit", order: &out.order}
 	center, events := recordingCenter()
 	out.signals = events
-	o := NewOrchestrator(out.storage, &fakeLedger{entries: []LedgerEntry{headMovedAuditRow(fx)}}, runners,
+	o := NewOrchestrator(out.storage, &fakeLedger{entries: rows}, runners,
 		WithWorktreeProvisioner(&fakeWorktree{path: fx.worktree}),
 		WithSignalCenter(center),
 		WithCompositionSnapshot(func(context.Context, string, string) (CompositionAuditSnapshot, error) {
@@ -232,7 +241,7 @@ func TestCarryAuditedChangeOverMovedMain_LeavesOtherCodesAlone(t *testing.T) {
 	t.Parallel()
 
 	cr := &cycleRun{ctx: context.Background()}
-	original := NewShipError(CodeGitFleetRebaseNeeded, ShipClassTransient, StageAtomicShip, "peer moved main")
+	original := NewShipError(CodeGitFFMergeDiverged, ShipClassTransient, StageAtomicShip, "the fast-forward merge diverged")
 
 	if got, declined := cr.carryAuditedChangeOverMovedMain(original); got != original || declined != "" {
 		t.Fatalf("carryAuditedChangeOverMovedMain = (%+v, %q), want the error untouched", got, declined)
@@ -429,5 +438,241 @@ func TestAsFleetRebase_KeepsTheOriginalCodeOfAnErrorWithNoDebug(t *testing.T) {
 
 	if got.Message != "why: moved" || got.Debug[shiperr.OriginalCodeKey] != string(CodeAuditBindingHeadMoved) || original.Debug != nil {
 		t.Fatalf("asFleetRebase = %+v, want the reason prefixed and the original code in a new Debug map", got)
+	}
+}
+
+func TestCarryAuditedChangeOverMovedMain_AFleetRebaseOnAPendingLaneCarriesTheChange(t *testing.T) {
+	t.Parallel()
+
+	fx := pendedAuditedLane(t)
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{entries: []LedgerEntry{headMovedAuditRow(fx)}}, buildRunners(nil))
+	cr := &cycleRun{ctx: context.Background(), o: o, cycle: unwindCycle, cs: fx.cycleState(), req: CycleRequest{ProjectRoot: fx.root}}
+	original := fleetRebaseShipError(fx, "main moved before the repo-contract pack")
+
+	got, declined := cr.carryAuditedChangeOverMovedMain(original)
+
+	if declined != "" || got.Code != CodeGitFleetRebaseNeeded || got.Debug[shiperr.OriginalCodeKey] != string(CodeGitFleetRebaseNeeded) {
+		t.Fatalf("carryAuditedChangeOverMovedMain = (%+v, %q), want a fleet rebase that holds the carried change", got, declined)
+	}
+	if parent, tree := fx.git("rev-parse", "HEAD^"), fx.git("rev-parse", "HEAD^{tree}"); parent != fx.base || tree != fx.auditedTree {
+		t.Fatalf("carrier = parent %s tree %s, want the audited tree %s on %s", parent, tree, fx.auditedTree, fx.base)
+	}
+}
+
+func TestCarryAuditedChangeOverMovedMain_AFleetRebaseOnACommittedLaneLeavesItAlone(t *testing.T) {
+	t.Parallel()
+
+	fx := newCommittedLane(t, "lane.txt", addLaneFile, addPeerFile)
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{entries: []LedgerEntry{headMovedAuditRow(fx)}}, buildRunners(nil))
+	cr := &cycleRun{ctx: context.Background(), o: o, cycle: unwindCycle, cs: fx.cycleState(), req: CycleRequest{ProjectRoot: fx.root}}
+	original := fleetRebaseShipError(fx, "peer moved main at land time")
+
+	got, declined := cr.carryAuditedChangeOverMovedMain(original)
+
+	if got != original || declined != "" {
+		t.Fatalf("carryAuditedChangeOverMovedMain = (%+v, %q), want the error untouched", got, declined)
+	}
+	if head := fx.git("rev-parse", "HEAD"); head != fx.shipCommit {
+		t.Fatalf("HEAD = %s, want the committed lane left on %s", head, fx.shipCommit)
+	}
+}
+
+func TestCarryAuditedChangeOverMovedMain_AFleetRebaseOnACommittedLaneWithAStrayFileLeavesItAlone(t *testing.T) {
+	t.Parallel()
+
+	fx := newCommittedLane(t, "lane.txt", addLaneFile, addPeerFile)
+	if err := os.WriteFile(filepath.Join(fx.worktree, "stray.txt"), []byte("stray\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{entries: []LedgerEntry{headMovedAuditRow(fx)}}, buildRunners(nil))
+	cr := &cycleRun{ctx: context.Background(), o: o, cycle: unwindCycle, cs: fx.cycleState(), req: CycleRequest{ProjectRoot: fx.root}}
+	original := fleetRebaseShipError(fx, "peer moved main at land time")
+
+	got, declined := cr.carryAuditedChangeOverMovedMain(original)
+
+	if got != original || declined != "" {
+		t.Fatalf("carryAuditedChangeOverMovedMain = (%+v, %q), want the error untouched: HEAD is not the cycle base", got, declined)
+	}
+	if head := fx.git("rev-parse", "HEAD"); head != fx.shipCommit {
+		t.Fatalf("HEAD = %s, want the committed lane left on %s", head, fx.shipCommit)
+	}
+}
+
+func TestCarryAuditedChangeOverMovedMain_ADeclinedFleetRebaseOnAPendingLaneNamesAMovedHead(t *testing.T) {
+	t.Parallel()
+
+	fx := pendedAuditedLane(t)
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
+	cr := &cycleRun{ctx: context.Background(), o: o, cycle: unwindCycle, cs: fx.cycleState(), req: CycleRequest{ProjectRoot: fx.root}}
+	original := fleetRebaseShipError(fx, "main moved before the repo-contract pack")
+
+	got, declined := cr.carryAuditedChangeOverMovedMain(original)
+
+	if got.Code != CodeAuditBindingHeadMoved || got.Debug[shiperr.OriginalCodeKey] != string(CodeGitFleetRebaseNeeded) || !strings.HasPrefix(declined, "no auditor row names the audited tree") {
+		t.Fatalf("carryAuditedChangeOverMovedMain = (%+v, %q), want a moved-HEAD error that keeps the fleet-rebase code and the decline reason", got, declined)
+	}
+	if got.Stage != original.Stage || got.Message != original.Message {
+		t.Fatalf("got stage %s message %q, want the stage and message of the raised error", got.Stage, got.Message)
+	}
+}
+
+func TestRunCycleFromPhase_AFleetRebaseOnAPendingLaneCarriesTheChangeInsteadOfEndingAsLanded(t *testing.T) {
+	t.Parallel()
+
+	for name, message := range map[string]string{
+		"early fast-forward check": "main moved after the lane base",
+		"base-red rebase":          "the red scanner pack tests are red on the lane base too and green on main; rebase the lane onto main and verify again",
+		"main-red stop":            "main is red and a stop holds, and the lane is not on the main tip; rebase the lane onto main and verify again",
+	} {
+		t.Run(name, func(t *testing.T) {
+			fx := pendedAuditedLane(t)
+
+			out := resumeShipRaising(t, fx, fleetRebaseShipError(fx, message), []LedgerEntry{headMovedAuditRow(fx)})
+
+			if out.err != nil {
+				t.Fatalf("a pending lane under a moved main must recover, got %v", out.err)
+			}
+			requireOrder(t, out.order, "ship", "ship")
+			if head := fx.git("rev-parse", "HEAD"); head != fx.newBase {
+				t.Fatalf("worktree HEAD = %s, want the audited change rebased onto the new main %s", head, fx.newBase)
+			}
+			paths := recoveryPaths(*out.signals)
+			if len(paths) != 1 || paths[0]["path"] != recoveryPathRebind {
+				t.Fatalf("recovery path signals = %v, want one %s path", paths, recoveryPathRebind)
+			}
+			if _, reason := paths[0]["reason"]; reason {
+				t.Fatalf("recovery path signals = %v, want no reason", paths)
+			}
+		})
+	}
+}
+
+func TestRunCycleFromPhase_ALandTimeFleetRebaseHasNoReasonField(t *testing.T) {
+	t.Parallel()
+
+	fx := newCommittedLane(t, "lane.txt", addLaneFile, addPeerFile)
+
+	out := resumeShipRaising(t, fx, fleetRebaseShipError(fx, "peer moved main at land time"), []LedgerEntry{headMovedAuditRow(fx)})
+
+	paths := recoveryPaths(*out.signals)
+	if len(paths) != 1 {
+		t.Fatalf("recovery path signals = %v, want one", paths)
+	}
+	if _, reason := paths[0]["reason"]; reason {
+		t.Fatalf("recovery path signals = %v, want no reason on a land-time fleet rebase", paths)
+	}
+}
+
+func TestRunCycleFromPhase_ADeclinedCarryOnAPendingFleetRebaseGoesToReaudit(t *testing.T) {
+	t.Parallel()
+
+	fx := pendedAuditedLane(t)
+
+	out := resumeShipRaising(t, fx, fleetRebaseShipError(fx, "main moved after the lane base"), nil)
+
+	if out.err != nil {
+		t.Fatalf("the re-audit route must recover, got %v", out.err)
+	}
+	requireOrder(t, out.order, "ship", "audit", "ship")
+	paths := recoveryPaths(*out.signals)
+	if len(paths) != 1 || paths[0]["path"] != recoveryPathReaudit || paths[0]["code"] != string(CodeAuditBindingHeadMoved) || paths[0]["original_code"] != string(CodeGitFleetRebaseNeeded) || paths[0]["reason"] == "" {
+		t.Fatalf("recovery path signals = %v, want one %s path for %s that names the fleet-rebase origin and why", paths, recoveryPathReaudit, CodeAuditBindingHeadMoved)
+	}
+}
+
+func strayFileLaneWithNoAuditedChange(t *testing.T) (*shippedLane, LedgerEntry) {
+	t.Helper()
+	fx := pendedAuditedLane(t)
+	fx.git("reset", "-q", "--hard")
+	fx.write("stray.txt", "an untracked file the audit never selected\n")
+	row := headMovedAuditRow(fx)
+	row.WorktreeTreeSHA = fx.git("rev-parse", fx.base+"^{tree}")
+	return fx, row
+}
+
+func TestCarryAuditedChangeOverMovedMain_AFleetRebaseOnALaneTheAuditJudgedUnchangedLeavesItAlone(t *testing.T) {
+	t.Parallel()
+
+	fx, row := strayFileLaneWithNoAuditedChange(t)
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{entries: []LedgerEntry{row}}, buildRunners(nil))
+	cr := &cycleRun{ctx: context.Background(), o: o, cycle: unwindCycle, cs: fx.cycleState(), req: CycleRequest{ProjectRoot: fx.root}}
+	original := fleetRebaseShipError(fx, "main moved")
+
+	if got, declined := cr.carryAuditedChangeOverMovedMain(original); got != original || declined != "" {
+		t.Fatalf("carryAuditedChangeOverMovedMain = (%+v, %q), want the error untouched: the audit judged no change", got, declined)
+	}
+}
+
+func TestRunCycleFromPhase_AFleetRebaseOnALaneTheAuditJudgedUnchangedEndsWithoutAReaudit(t *testing.T) {
+	t.Parallel()
+
+	fx, row := strayFileLaneWithNoAuditedChange(t)
+
+	out := resumeShipRaising(t, fx, fleetRebaseShipError(fx, "the red scanner pack tests are red on the lane base too and green on main; rebase the lane onto main and verify again"), []LedgerEntry{row})
+
+	requireOrder(t, out.order, "ship")
+	paths := recoveryPaths(*out.signals)
+	if len(paths) != 1 || paths[0]["path"] != recoveryPathEnd {
+		t.Fatalf("recovery path signals = %v, want one %s path", paths, recoveryPathEnd)
+	}
+	if _, reason := paths[0]["reason"]; reason {
+		t.Fatalf("recovery path signals = %v, want no reason", paths)
+	}
+}
+
+func TestCarryAuditedChangeOverMovedMain_AFleetRebaseOnACleanLaneThatTheAuditSawChangedDeclines(t *testing.T) {
+	t.Parallel()
+
+	fx := pendedAuditedLane(t)
+	fx.git("reset", "-q", "--hard")
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{entries: []LedgerEntry{headMovedAuditRow(fx)}}, buildRunners(nil))
+	cr := &cycleRun{ctx: context.Background(), o: o, cycle: unwindCycle, cs: fx.cycleState(), req: CycleRequest{ProjectRoot: fx.root}}
+	original := fleetRebaseShipError(fx, "main moved")
+
+	got, declined := cr.carryAuditedChangeOverMovedMain(original)
+
+	if got.Code != CodeAuditBindingHeadMoved || !strings.HasPrefix(declined, "the lane diff changed since the audit") {
+		t.Fatalf("carryAuditedChangeOverMovedMain = (%+v, %q), want a moved-HEAD error: the audited change drifted", got, declined)
+	}
+}
+
+func TestPendingAuditedChange_NamesTheAuditedChangeOfAPendingLane(t *testing.T) {
+	t.Parallel()
+
+	fx := pendedAuditedLane(t)
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{entries: []LedgerEntry{headMovedAuditRow(fx)}}, buildRunners(nil))
+
+	change, pending, declined := o.pendingAuditedChange(context.Background(), fx.root, fx.cycleState())
+
+	if !pending || declined != "" || change.Base != fx.base || change.Tree != fx.auditedTree {
+		t.Fatalf("pendingAuditedChange = (%+v, %v, %q), want the audited tree %s on %s", change, pending, declined, fx.auditedTree, fx.base)
+	}
+}
+
+func TestPendingAuditedChange_AMissingOrInPlaceWorktreeIsNotPending(t *testing.T) {
+	t.Parallel()
+
+	fx := pendedAuditedLane(t)
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{entries: []LedgerEntry{headMovedAuditRow(fx)}}, buildRunners(nil))
+	for name, worktree := range map[string]string{"no worktree": "", "the project root": fx.root} {
+		cs := fx.cycleState()
+		cs.ActiveWorktree = worktree
+		if _, pending, _ := o.pendingAuditedChange(context.Background(), fx.root, cs); pending {
+			t.Errorf("%s: pending, want not pending", name)
+		}
+	}
+}
+
+func TestPendingAuditedChange_ALaneWithNoAuditorRowIsPendingOnlyWhenItHoldsFiles(t *testing.T) {
+	t.Parallel()
+
+	fx := pendedAuditedLane(t)
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
+	if _, pending, declined := o.pendingAuditedChange(context.Background(), fx.root, fx.cycleState()); !pending || !strings.HasPrefix(declined, "no auditor row") {
+		t.Fatalf("pendingAuditedChange = (%v, %q), want an unaudited lane with files pending and declined", pending, declined)
+	}
+	fx.git("reset", "-q", "--hard")
+	if _, pending, _ := o.pendingAuditedChange(context.Background(), fx.root, fx.cycleState()); pending {
+		t.Fatal("a clean lane with no auditor row holds nothing to carry")
 	}
 }

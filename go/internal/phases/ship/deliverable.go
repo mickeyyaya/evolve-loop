@@ -50,11 +50,15 @@ func (o *Options) integrationDir() string {
 	return integration.WaveDir(o.ProjectRoot, o.Integration.Wave)
 }
 
+func (o *Options) deliverEnforced() bool {
+	return o.Integration != nil && o.Integration.Stage == policy.FleetIntegrationEnforce
+}
+
 func (s *worktreeShip) deliver(commit, pending string) (bool, error) {
 	if s.opts.Integration == nil {
 		return false, nil
 	}
-	enforce := s.opts.Integration.Stage == policy.FleetIntegrationEnforce
+	enforce := s.opts.deliverEnforced()
 	rec, path, err := s.writeDeliverable(commit)
 	if err != nil {
 		if !enforce {

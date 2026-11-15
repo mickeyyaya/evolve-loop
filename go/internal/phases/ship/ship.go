@@ -5,6 +5,7 @@ package ship
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -27,9 +28,12 @@ type Config struct {
 	PhaseIO          config.Stage
 	ManifestGate     string
 	RepoContractGate string
+	RepoContract     RepoContractFunc
 	Signals          *signalcenter.Center
 	Integration      *Integration
 }
+
+type RepoContractFunc func(ctx context.Context, gate, root, baseRef, workspace string, stderr io.Writer, cleared func([]string)) error
 
 type Phase struct {
 	runner           CmdRunner
@@ -38,6 +42,7 @@ type Phase struct {
 	phaseIO          config.Stage
 	manifestGate     string
 	repoContractGate string
+	repoContract     RepoContractFunc
 	signals          *signalcenter.Center
 	integration      *Integration
 }
@@ -47,7 +52,11 @@ func New(c Config) *Phase {
 	if nowFn == nil {
 		nowFn = time.Now
 	}
-	return &Phase{runner: c.Runner, nowFn: nowFn, sleep: c.Sleep, phaseIO: c.PhaseIO, manifestGate: c.ManifestGate, repoContractGate: c.RepoContractGate, signals: c.Signals, integration: c.Integration}
+	repoContract := c.RepoContract
+	if repoContract == nil {
+		repoContract = runRepoContractGateAt
+	}
+	return &Phase{runner: c.Runner, nowFn: nowFn, sleep: c.Sleep, phaseIO: c.PhaseIO, manifestGate: c.ManifestGate, repoContractGate: c.RepoContractGate, repoContract: repoContract, signals: c.Signals, integration: c.Integration}
 }
 
 func (p *Phase) Name() string { return phaseName }
@@ -123,6 +132,11 @@ func (p *Phase) runNative(ctx context.Context, req core.PhaseRequest, msg string
 	opts := p.shipOptions(req, msg)
 	res, resumed, err := resumeFirst(ctx, &opts)
 	if !resumed && err == nil {
+		if ferr := checkEarlyFastForward(ctx, &opts); ferr != nil {
+			resp, rerr := respond(req, res, ferr)
+			resp.DurationMS = p.nowFn().Sub(start).Milliseconds()
+			return resp, rerr
+		}
 		if gerr := p.runRepoContractGate(ctx, req, &opts); gerr != nil {
 			return core.PhaseResponse{}, gerr
 		}
@@ -144,7 +158,7 @@ func (p *Phase) runRepoContractGate(ctx context.Context, req core.PhaseRequest, 
 		return fmt.Errorf("ship repo-contract gate: %w", err)
 	}
 	ctx = withBaseRed(withScanShadow(ctx, p.scanShadowFor(req)), opts, baseRef)
-	if err := runRepoContractGateAt(ctx, p.repoContractGate, gateRoot, baseRef, req.Workspace, os.Stderr, backstopFlakeSignal(p.signals, req.Cycle)); err != nil {
+	if err := p.repoContract(ctx, p.repoContractGate, gateRoot, baseRef, req.Workspace, os.Stderr, backstopFlakeSignal(p.signals, req.Cycle)); err != nil {
 		return fmt.Errorf("ship repo-contract gate: %w", err)
 	}
 	return nil
