@@ -1,0 +1,226 @@
+{
+  "schema_version": 2,
+  "cycle": 2398,
+  "run_id": "01M7EPR9V353PKJHRWNSJ784FF",
+  "goal": "Wave 173.\n\nWork the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree that it ships;\n- disposition its own defect ledger and the inherited ids;\n- record a terminal outcome on every exit;\n- never change a protected control-plane file with a tool;\n- leave no stale worktree.\n\nRouting:\n- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.\n- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.\n- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.\n\nCraft:\n- New and changed code has no comments. Names, types and tests give the intent.\n- Write each new document and each new log text in ASD-STE100.\n- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.\n- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.\n\nEvidence:\n- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.\n\nThe measure of this wave is the number of shipped cycles. Keep each cycle shipping.\n\nWave 172 facts (run 20261114T064820Z): 4 of 4 cycles shipped.\n- Cycle 2374: final verdict PASS. It shipped.\n- Cycle 2375: final verdict PASS. It shipped.\n- Cycle 2376: final verdict PASS. It shipped.\n- Cycle 2377: final verdict PASS. It shipped.\n- Pull requests merged at this boundary: none.\n\nEarlier waves:\n- Wave 169 (run 20261113T084906Z): 1 of 4 cycles shipped.\n- Wave 170 (run 20261113T094348Z): 1 of 4 cycles shipped.\n- Wave 171 (run 20261113T194212Z): 9 of 16 cycles shipped.",
+  "final_verdict": "PASS",
+  "commit_sha": "4917ade25fd56f743724a1303b2bb1f6f97e45ab",
+  "tree_sha": "52db7db9aace8c7aa30dceb6cf0eecf12010980b",
+  "tasks": [
+    "cmd-evolve-tests-read-module-once"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 118124,
+      "started_at": "2026-11-15T04:17:32Z",
+      "ended_at": "2026-11-15T04:19:31Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 95871,
+        "output": 10649,
+        "cache_read": 548033,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 72434,
+      "started_at": "2026-11-15T04:20:28Z",
+      "ended_at": "2026-11-15T04:21:42Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 79806,
+        "output": 5904,
+        "cache_read": 447891,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 36388,
+      "started_at": "2026-11-15T04:21:42Z",
+      "ended_at": "2026-11-15T04:26:31Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 14,
+        "output": 1695,
+        "cache_read": 477294,
+        "cache_write": 36986
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 920057,
+      "started_at": "2026-11-15T04:26:31Z",
+      "ended_at": "2026-11-15T06:41:46Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 170848,
+        "output": 10621,
+        "cache_read": 1117527,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 303973,
+      "started_at": "2026-11-15T06:42:07Z",
+      "ended_at": "2026-11-15T06:56:23Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 22,
+        "output": 9113,
+        "cache_read": 869724,
+        "cache_write": 59463
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 741592,
+      "started_at": "2026-11-15T06:56:44Z",
+      "ended_at": "2026-11-15T07:20:16Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 71378,
+        "output": 5041,
+        "cache_read": 389199,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 72973,
+      "started_at": "2026-11-15T07:20:37Z",
+      "ended_at": "2026-11-15T07:30:17Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 16,
+        "output": 6001,
+        "cache_read": 571061,
+        "cache_write": 50650
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "FAIL",
+      "duration_ms": 379895,
+      "started_at": "2026-11-15T07:30:38Z",
+      "ended_at": "2026-11-15T07:46:04Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "PASS",
+      "duration_ms": 414725,
+      "started_at": "2026-11-15T07:46:04Z",
+      "ended_at": "2026-11-15T07:53:00Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "explanation_corrections": [
+    "docs/explain/builds/cycle-2398-01m7epr9v353pkjhrwnsj784ff.md:24 claims `collectEnvVarsFromCode` uses `sharedModuleFiles`, but go/cmd/evolve/docs_contract_test.go:113 calls `sourceFilesInDir`. docs/explain/builds/cycle-2398-01m7epr9v353pkjhrwnsj784ff.md:25 claims `scanProductionPackages` uses `sharedModuleFiles`, but go/cmd/evolve/inbox_writers_scan_test.go:48 calls `sourceFilesInDir`. docs/explain/builds/cycle-2398-01m7epr9v353pkjhrwnsj784ff.md:28 omits `sourceFilesInDir` and the per-directory cache `cachedWalkSourceFiles` at go/cmd/evolve/module_scan_loader_test.go:83-118, which is the mechanism that makes those two helpers share the module walk. docs/explain/builds/cycle-2398-01m7epr9v353pkjhrwnsj784ff.md:34 claims the helpers preserve the exact directory exclusions, but go/cmd/evolve/module_scan_loader_test.go:42 adds a `testdata` skip. The other Changed Areas lines match the diff: docs/architecture/packages/cmd-evolve.md:963, go/cmd/evolve/module_scan_loader_test.go:99, go/cmd/evolve/cmd_bridge_engine_roots_test.go:1, go/cmd/evolve/cmd_cycle_config_test.go:1, go/cmd/evolve/cmd_cycle_ledger_roots_test.go:26, go/cmd/evolve/cmd_cycle_observer_signals_test.go:1, go/cmd/evolve/cmd_cycle_signal_center_test.go:1, go/cmd/evolve/cmd_inbox_signals_test.go:1, go/cmd/evolve/cmd_loop_unit13_seam_test.go:1, go/cmd/evolve/cmd_root_guard_test.go:1. The document SHA256 matches the typed handoff."
+  ],
+  "timing": {
+    "total_ms": 3060161,
+    "phase_count": 9,
+    "retried_count": 0,
+    "longest_phase": "build",
+    "longest_ms": 920057,
+    "by_archetype_ms": {
+      "build": 1661649,
+      "control": 794620,
+      "evaluate": 376946,
+      "plan": 226946
+    },
+    "total_tokens": {
+      "input": 417955,
+      "output": 49024,
+      "cache_read": 4420729,
+      "cache_write": 147099
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 242226,
+        "output": 15662,
+        "cache_read": 1506726,
+        "cache_write": 0
+      },
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "evaluate": {
+        "input": 38,
+        "output": 15114,
+        "cache_read": 1440785,
+        "cache_write": 110113
+      },
+      "plan": {
+        "input": 175691,
+        "output": 18248,
+        "cache_read": 1473218,
+        "cache_write": 36986
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.9136221749550084,
+    "hot_phase_count": 7,
+    "hot_phases": [
+      "scout",
+      "triage",
+      "tdd",
+      "build",
+      "audit",
+      "build",
+      "audit"
+    ]
+  },
+  "recalled_lessons": [
+    "cycle-1502-closure-citation-contract-never-reaches-the-auditor-it-grades",
+    "cycle-1492-remedy-on-disk-in-four-places-reaches-no-agent-with-authority-to-apply-it",
+    "cycle-93-build-report-commit-sha-fabrication",
+    "inst-L1549b",
+    "inst-L1544b"
+  ]
+}
