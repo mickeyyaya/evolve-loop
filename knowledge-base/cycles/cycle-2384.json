@@ -1,0 +1,175 @@
+{
+  "schema_version": 2,
+  "cycle": 2384,
+  "run_id": "01M7D6THXY19ZZ3ER3XF2EC9K9",
+  "goal": "Wave 173.\n\nWork the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree that it ships;\n- disposition its own defect ledger and the inherited ids;\n- record a terminal outcome on every exit;\n- never change a protected control-plane file with a tool;\n- leave no stale worktree.\n\nRouting:\n- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.\n- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.\n- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.\n\nCraft:\n- New and changed code has no comments. Names, types and tests give the intent.\n- Write each new document and each new log text in ASD-STE100.\n- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.\n- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.\n\nEvidence:\n- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.\n\nThe measure of this wave is the number of shipped cycles. Keep each cycle shipping.\n\nWave 172 facts (run 20261114T064820Z): 4 of 4 cycles shipped.\n- Cycle 2374: final verdict PASS. It shipped.\n- Cycle 2375: final verdict PASS. It shipped.\n- Cycle 2376: final verdict PASS. It shipped.\n- Cycle 2377: final verdict PASS. It shipped.\n- Pull requests merged at this boundary: none.\n\nEarlier waves:\n- Wave 169 (run 20261113T084906Z): 1 of 4 cycles shipped.\n- Wave 170 (run 20261113T094348Z): 1 of 4 cycles shipped.\n- Wave 171 (run 20261113T194212Z): 9 of 16 cycles shipped.",
+  "final_verdict": "PASS",
+  "commit_sha": "d4af8528106710209f9b2543759b4cec4eda6a16",
+  "tree_sha": "9d9c30dd35352c2732ff5d08be0d82720fdaad30",
+  "tasks": [
+    "ratchet-speed-adjusted-cpu"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 115229,
+      "started_at": "2026-11-14T14:19:50Z",
+      "ended_at": "2026-11-14T14:21:47Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 110677,
+        "output": 10853,
+        "cache_read": 714248,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 48182,
+      "started_at": "2026-11-14T14:22:15Z",
+      "ended_at": "2026-11-14T14:23:07Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 64503,
+        "output": 3324,
+        "cache_read": 169677,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 44945,
+      "started_at": "2026-11-14T14:23:07Z",
+      "ended_at": "2026-11-14T14:30:37Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 12,
+        "output": 2980,
+        "cache_read": 416626,
+        "cache_write": 37815
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 1213409,
+      "started_at": "2026-11-14T14:30:37Z",
+      "ended_at": "2026-11-14T14:53:59Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 188050,
+        "output": 13747,
+        "cache_read": 1094729,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 87818,
+      "started_at": "2026-11-14T14:54:21Z",
+      "ended_at": "2026-11-14T14:58:06Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 18,
+        "output": 7120,
+        "cache_read": 644411,
+        "cache_write": 48942
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "PASS",
+      "duration_ms": 102225,
+      "started_at": "2026-11-14T14:58:32Z",
+      "ended_at": "2026-11-14T15:00:16Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "timing": {
+    "total_ms": 1611808,
+    "phase_count": 6,
+    "retried_count": 0,
+    "longest_phase": "build",
+    "longest_ms": 1213409,
+    "by_archetype_ms": {
+      "build": 1213409,
+      "control": 102225,
+      "evaluate": 87818,
+      "plan": 208356
+    },
+    "total_tokens": {
+      "input": 363260,
+      "output": 38024,
+      "cache_read": 3039691,
+      "cache_write": 86757
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 188050,
+        "output": 13747,
+        "cache_read": 1094729,
+        "cache_write": 0
+      },
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "evaluate": {
+        "input": 18,
+        "output": 7120,
+        "cache_read": 644411,
+        "cache_write": 48942
+      },
+      "plan": {
+        "input": 175192,
+        "output": 17157,
+        "cache_read": 1300551,
+        "cache_write": 37815
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.8932514749698129,
+    "hot_phase_count": 5,
+    "hot_phases": [
+      "scout",
+      "triage",
+      "tdd",
+      "build",
+      "audit"
+    ]
+  },
+  "recalled_lessons": [
+    "cycle-1502-closure-citation-contract-never-reaches-the-auditor-it-grades",
+    "inst-L1544b",
+    "cycle-93-build-report-commit-sha-fabrication",
+    "inst-L1549b",
+    "cycle-81-builder-substituted-ac-taxonomy"
+  ]
+}
