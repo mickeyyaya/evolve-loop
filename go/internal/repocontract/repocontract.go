@@ -170,6 +170,7 @@ var treeReadingSelections = []TestSelection{
 		"TestCarryoverLifecycle_OneConstructionSite",
 		"TestFailureDiagWriter_OneConstructionSite",
 		"TestFailureLearningEngine_OneConstructionSite",
+		"TestNoDecisionLiteralOutsideDecider",
 		"TestPhaseAdvisor_OneConstructionSite",
 		"TestPhaseTimings_SingleWriter",
 	}},
