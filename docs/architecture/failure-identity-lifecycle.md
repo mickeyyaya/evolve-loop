@@ -84,8 +84,12 @@ further tokens now fold:
 
 | Token | Shape | Why |
 |---|---|---|
-| `cycleNumberToken` | `.evolve/runs/cycle-1365/…`, `.evolve/worktrees/cycle-42824668-1440/…`, bare `cycle 1365` | The same abort recorded on two cycles is one defect. The trailing `(?:-\d+)*` is required for the worktree shape, whose name carries both a lane hash and a cycle number. |
+| `cycleNumberToken` | `cycle=N`, `cycleN`, `cycle:N`, `cycle_N`, `cycle-N`, `cycle-<hex>-N`, `cycle-N-<ulid>` | One defect across two cycles or two lane hashes has one identity. The regex accepts an eight-char hex lane hash and a 26-char ULID suffix. |
+| `findingCountToken` | `<n> finding(s)`, `<n> findings`, `<n> finding` | A lint count difference across cycles does not change the defect identity. |
+| `fileCountToken` | `<n> file(s)`, `<n> files`, `<n> file` | A file count difference in lint output does not change the defect identity. |
 | `attemptDenominatorToken` | `(attempt 1/3)`, `retry 3 of 4` | One unwinnable defect retried N times is one defect — exactly the retry storms the breaker exists to halt. |
+
+The count of deterministic check failures (`N deterministic check failure(s)`) stays part of the identity. A floor rejection with three failures and a rejection with two failures stay apart.
 
 **Blast radius is the constraint, not the folding.** If over-normalization
 collapses two different defects, it blinds the breaker far worse than the variance

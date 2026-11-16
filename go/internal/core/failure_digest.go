@@ -151,9 +151,11 @@ var narrativeVerdictToken = regexp.MustCompile(`narrative=(?:PASS|FAIL|WARN|SKIP
 
 var goTestDurationToken = regexp.MustCompile(`\b\d+\.\d+s\b`)
 
-var cycleNumberToken = regexp.MustCompile(`(?i)\bcycle[ =-]\d+(?:-[0-9a-z]{26})?(?:-\d+)*`)
+var cycleNumberToken = regexp.MustCompile(`(?i)\bcycle(?:[ =:_-]?)(?:[0-9a-f]{8}-)?\d+(?:-[0-9a-z]{26})?(?:-\d+)*\b`)
 
 var findingCountToken = regexp.MustCompile(`(?i)\b\d+ findings?(?:\(s\))?`)
+
+var fileCountToken = regexp.MustCompile(`(?i)\b\d+ files?(?:\(s\))?`)
 
 var attemptDenominatorToken = regexp.MustCompile(`(?i)\b(attempt|retry)\s+\d+\s*(?:/|of)\s*\d+`)
 
@@ -170,6 +172,7 @@ func normalizeReasonForFingerprint(reason string) string {
 	reason = narrativeVerdictToken.ReplaceAllString(reason, "narrative=<verdict>")
 	reason = cycleNumberToken.ReplaceAllString(reason, "cycle-N")
 	reason = findingCountToken.ReplaceAllString(reason, "<n> finding(s)")
+	reason = fileCountToken.ReplaceAllString(reason, "<n> file(s)")
 	reason = attemptDenominatorToken.ReplaceAllString(reason, "${1} <n>/<n>")
 	return goTestDurationToken.ReplaceAllString(reason, "<dur>")
 }

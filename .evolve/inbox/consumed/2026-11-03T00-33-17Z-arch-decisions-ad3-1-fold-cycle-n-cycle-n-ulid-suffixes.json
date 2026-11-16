@@ -1,0 +1,53 @@
+{
+  "acceptance": [
+    "Red test first: table test with the four pinned pairs.",
+    "100% statement coverage on each changed function; zero code comments.",
+    "The spec and package note of the changed package state the change in STE."
+  ],
+  "campaign": "architecture-decisions-2026-11",
+  "consumed": {
+    "at": "2026-11-16T05:44:08Z",
+    "cycle": "",
+    "via": "ship"
+  },
+  "continuation": {
+    "base_sha": "109b1b22f1c889be72db4ec0ff88ee21f2e520d6",
+    "branch": "cycle-cd3ae73e-2408",
+    "cycle": 2408,
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2408/audit-fail-reason.json",
+    "snapshot_sha": "97d1b11bcada30637d927c4d3b6e64f5e9751156",
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2408"
+  },
+  "created_at": "2026-11-03T00:33:17Z",
+  "files": [
+    "go/internal/core/failure_digest.go"
+  ],
+  "fix": "Fold `cycle=N`, `cycle-N-\u003culid\u003e` suffixes and finding counts in `normalizeReasonForFingerprint`. Pin 2071/2072 and 2049/2051 as must-merge. Pin 2054/2093 and 2073/2089 as must-not-merge",
+  "id": "arch-decisions-ad3-1-fold-cycle-n-cycle-n-ulid-suffixes",
+  "intake_override": {
+    "console_route": true,
+    "reason": "console: `internal/core` is protected"
+  },
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "released_continuations": [
+    {
+      "base_sha": "109b1b22f1c889be72db4ec0ff88ee21f2e520d6",
+      "branch": "cycle-cd3ae73e-2408",
+      "cycle": 2408,
+      "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2408/audit-fail-reason.json",
+      "reason": "ship-consume-",
+      "released_at": "2026-11-16T05:44:08Z",
+      "snapshot_sha": "97d1b11bcada30637d927c4d3b6e64f5e9751156",
+      "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2408"
+    }
+  ],
+  "route": "lane",
+  "routed_at": "2026-11-13T19:15:34Z",
+  "routed_reason": "operator 2026-11-13: the item touches no protected file and its console route had no reason; a lane can build it",
+  "source": "operator decisions 2026-11-03; plan docs/plans/architecture-decisions-2026-11.md component AD3-1",
+  "summary": "Component AD3-1 of the 2026-11-03 architecture decisions plan. Fold `cycle=N`, `cycle-N-\u003culid\u003e` suffixes and finding counts in `normalizeReasonForFingerprint`. Pin 2071/2072 and 2049/2051 as must-merge. Pin 2054/2093 and 2073/2089 as must-not-merge Stage: none. Size: XS. Route: console: `internal/core` is protected. Plan: docs/plans/architecture-decisions-2026-11.md; research: docs/research/architecture-decisions-2026-11.md.",
+  "title": "AD3-1: Fold cycle=N, cycle-N-\u003culid\u003e suffixes and finding counts in normalizeReasonForFingerprint",
+  "weight": 0.8
+}
