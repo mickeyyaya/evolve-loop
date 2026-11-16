@@ -24,6 +24,10 @@
   "last_failure_reason": "cycle-failure-release",
   "origin": "console",
   "priority_class": "correctness",
+  "route": "console-manual",
+  "routed_at": "2026-11-16T14:54:38Z",
+  "routed_cycle": 2438,
+  "routed_reason": "lane triage (cycle 2438) dropped: protected-surface: go/internal/core/orchestrator.go (full K1b acceptance requires editing protected control-plane surfaces go/internal/core/orchestrator.go, go/internal/core/evaluate_batch.go, go/internal/phases/ship/ship.go, go/internal/phases/ship/held_proposal_gate.go, and go/internal/gateregistry/seed_stages.go to wire production enforce branches and TestEnforceBranchActsAtEnforce)",
   "summary": "K1a (PR #1473) adds the gatecontract Shadow descriptor with nil Decide, Enforce and Score. Spec §4 (D6) needs consumer-side StageActor ports in core and ship and the injection from the cmd/evolve composition root, so dependencies point inward.",
   "title": "Shadow contract K1b: StageActor ports in core and ship, wired by cmd/evolve",
   "weight": 0.85

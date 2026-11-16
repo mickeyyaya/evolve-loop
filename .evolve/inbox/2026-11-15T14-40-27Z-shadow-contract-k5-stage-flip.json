@@ -23,6 +23,10 @@
   "last_failure_reason": "cycle-failure-release",
   "origin": "console",
   "priority_class": "correctness",
+  "route": "console-manual",
+  "routed_at": "2026-11-16T14:37:11Z",
+  "routed_cycle": 2436,
+  "routed_reason": "lane triage (cycle 2436) dropped: out-of-scope: origin=console pipeline-integrity item without route:lane, blocked on unlanded K2/K3/K4 (go/internal/stageevidence/, go/cmd/evolve/cmd_stage.go, go/internal/guards/protected.go) and missing spec docs (docs/architecture/shadow-stage-contract.md, docs/plans/shadow-stage-evidence-2026-11.md, docs/architecture/adr/0167-shadow-stages-prove-themselves-on-chained-evidence.md)",
   "summary": "A stage can be flipped to enforce by a hand edit of policy.json with no verified evidence (#1459 nearly enabled a stage with no enforce path).",
   "title": "evolve stage flip, the loop-start preflight and stage status",
   "weight": 0.85

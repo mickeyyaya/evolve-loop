@@ -23,6 +23,10 @@
   "last_failure_reason": "cycle-failure-release",
   "origin": "console",
   "priority_class": "correctness",
+  "route": "console-manual",
+  "routed_at": "2026-11-16T14:44:52Z",
+  "routed_cycle": 2437,
+  "routed_reason": "lane triage (cycle 2437) dropped: out-of-scope: blocked on unlanded prerequisites shadow-contract-k2-evidence-seal (route: console-manual) and shadow-contract-k1b-stage-actor-ports, missing spec docs (docs/architecture/shadow-stage-contract.md, docs/plans/shadow-stage-evidence-2026-11.md, docs/architecture/adr/0167-shadow-stages-prove-themselves-on-chained-evidence.md) on main cecc133ba, and origin: console without route: lane",
   "summary": "No verb recomputes a shadow stage's readiness from chained evidence today.",
   "title": "evolve stage verify and stage report: a verdict recomputed from the chain",
   "weight": 0.85
