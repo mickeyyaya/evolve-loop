@@ -3,6 +3,11 @@
     "A wiring test proves the loop constructs and runs Oversight, or the docs state that it does not run",
     "A clean landing moves the window in a journey test"
   ],
+  "consumed": {
+    "at": "2026-11-16T06:06:11Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "created_at": "2026-11-05T17:33:04Z",
   "files": [
     "go/internal/orchestrator/oversight.go",
@@ -11,8 +16,8 @@
   "fix": "Design first. Waking it switches on stall, brief and pause actions, so stage them. Correct docs/architecture/wave-orchestrator.md either way.",
   "id": "oversight-has-no-production-constructor",
   "intake_override": {
-    "reason": "found during the merging component work, 2026-11-05",
-    "console_route": true
+    "console_route": true,
+    "reason": "found during the merging component work, 2026-11-05"
   },
   "kind": "bug",
   "origin": "console",

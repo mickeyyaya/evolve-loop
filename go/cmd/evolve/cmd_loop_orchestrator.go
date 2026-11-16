@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/admission"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
+	"github.com/mickeyyaya/evolve-loop/go/internal/events/reader"
+	"github.com/mickeyyaya/evolve-loop/go/internal/events/wake"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
@@ -111,7 +114,73 @@ func (b *loopBatchCoordinator) orchestratedRun(fc policy.FleetConfig, launch fle
 	return func(ctx context.Context, backlog []fleet.Todo, resupply poolSupplyFn) []fleet.Result {
 		pool := b.orchestratorPool(fc, launch, iteration)
 		pool.Resupply = b.orchestratorResupply(resupply, iteration)
+		intake := orchestrator.NewIntake(max(pool.Target, 1))
+		if pool.Admit != nil {
+			pool.Intake = intake
+		}
+		stopOversight := b.startOversight(ctx, fc, pool, intake)
+		defer stopOversight()
 		return pool.Run(ctx, backlog)
+	}
+}
+
+func (b *loopBatchCoordinator) startOversight(ctx context.Context, fc policy.FleetConfig, pool orchestrator.Pool, intake *orchestrator.Intake) func() {
+	src, err := b.openOversightSource()
+	if err != nil {
+		fmt.Fprintf(b.stderr, "[loop] WARN: orchestrator: oversight: %v\n", err)
+		return func() {}
+	}
+	over := &orchestrator.Oversight{
+		Stage:   fc.Orchestrator.Stage,
+		Events:  src,
+		Leases:  pool.Leases,
+		Intake:  intake,
+		Landing: pool.Window,
+		Locate:  pool.Locate,
+		Resize:  b.oversightResize(fc),
+		Publish: b.deps.Signals.Emit,
+	}
+	overCtx, cancel := context.WithCancel(ctx)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		_ = over.Run(overCtx)
+	}()
+	return func() {
+		cancel()
+		wg.Wait()
+	}
+}
+
+func (b *loopBatchCoordinator) openOversightSource() (orchestrator.Source, error) {
+	return b.openOversightSourceWith(func() (reader.Waiter, error) { return wake.New(nil) })
+}
+
+func (b *loopBatchCoordinator) openOversightSourceWith(newWaiter func() (reader.Waiter, error)) (orchestrator.Source, error) {
+	if b.oversightSource != nil {
+		return b.oversightSource()
+	}
+	waiter, err := newWaiter()
+	if err != nil {
+		return nil, err
+	}
+	return orchestrator.Subscribe(b.cfg.EvolveDir, "now", reader.Ports{Waiter: waiter, Now: time.Now})
+}
+
+func (b *loopBatchCoordinator) oversightResize(fc policy.FleetConfig) func() (int, []string) {
+	return func() (int, []string) {
+		var paused []string
+		for _, e := range clihealth.NewStore(b.cfg.ProjectRoot, nil).Active() {
+			if e.BlocksDispatch() {
+				paused = append(paused, e.Family)
+			}
+		}
+		sized := fc.Count
+		if fc.Concurrency > 0 {
+			sized = min(sized, fc.Concurrency)
+		}
+		return max(sized, 1), paused
 	}
 }
 

@@ -428,7 +428,9 @@ The deadline needs a timer, because "nothing happened" is not an event. The loop
 
 The loop observes and acts only on its own lanes. It does not edit a lane's worktree, its verdict or its ship. The integration of §15 owns the landing.
 
-**State: the library is built (O6, 2026-10-18). The loop wiring of the oversight waits for the event producers E10 and E11 of the [event notification plan](../plans/event-notification-protocol-2026-10.md).** `orchestrator.Oversight` ([internal-orchestrator.md](packages/internal-orchestrator.md)) runs `Next` of `internal/events/reader` in a loop. The reader arms the kernel wake, reads to the end of each log, and then waits. The oversight arms no timer. The lease table of §8 keeps the one timer.
+**State: built and wired (O6, 2026-10-18; wired 2026-11-16).** `orchestratedRun` (`go/cmd/evolve/cmd_loop_orchestrator.go`) starts `orchestrator.Oversight` on a child context and stops it when the pool returns. The `Brief` port stays staged until a producer emits `SHIP_INTEGRATION_EJECTED`.
+
+`orchestrator.Oversight` ([internal-orchestrator.md](packages/internal-orchestrator.md)) runs `Next` of `internal/events/reader` in a loop. The reader arms the kernel wake, reads to the end of each log, and then waits. The oversight arms no timer. The lease table of §8 keeps the one timer.
 
 The oversight finds the lane of an event by the cycle number. A lane that no cycle holds yet, and a cycle of another loop, get no action.
 
@@ -463,7 +465,7 @@ The width is a fixed `fleet.count`, and only quota benches change it.
 
 ### Solution
 
-**State: built (O8), 2026-10-18.** `orchestrator.Window` holds the size ([internal-orchestrator.md](packages/internal-orchestrator.md)). At `enforce`, the pool admits a lane only while the lanes in flight number fewer than the size. At `shadow`, the loop builds no window, so nothing publishes. The caller that moves the window is not built (see "What feeds the window").
+**State: built and wired (O8, 2026-10-18; wired 2026-11-16).** `orchestrator.Window` holds the size ([internal-orchestrator.md](packages/internal-orchestrator.md)). At `enforce`, the pool admits a lane only while the lanes in flight number fewer than the size. At `shadow`, the loop builds no window, so nothing publishes. `orchestratedRun` passes the window to `orchestrator.Oversight` as `LandingObserver` (see "What feeds the window").
 
 The window has no effect at width 4. At or below `window.min` (default 4), the window is the sized count of §5. Above that width, the window follows Zuul's rule (P3.10):
 
@@ -485,9 +487,7 @@ The window never stops a lane in flight. A smaller window only delays the next a
 
 **The config.** Both keys must be at least 1. `window.min` must not exceed `window.start`, and `window.start` must not exceed `fleet.count`. A violation refuses the policy, as for the other `fleet.orchestrator` keys. An unset `window.min` follows `window.start` down, so `window.start` of 2 alone is valid.
 
-**What feeds the window.** The window moves only when a caller runs `CleanLanding` or `Conflict`. That caller is the O6 loop, on each `ship.landed` and each landing conflict (§9). O6 is not built. Until it is, the window stays at `window.start`.
-
-**The width before O6.** Until O6 is built, the pool at `enforce` runs `window.start` lanes, whatever `fleet.count` says. To run all `fleet.count` lanes before then, set `window.start` to `fleet.count`.
+**What feeds the window.** The window moves only when a caller runs `CleanLanding` or `Conflict`. `orchestratedRun` passes `pool.Window` to `orchestrator.Oversight` as `LandingObserver`, so each `ship.landed` and each landing conflict moves the window (§9).
 
 **The limit of the window.** The window bounds the conflict rate. It does not lift the serial landing limit of about 6 lanes (§12). One landing takes about 5 minutes, so landings queue at a larger width, whatever the window says. The group commit of ADR-0134 lifts that limit, and this component does not build it. This window also differs from the composition window of the landing queue ([fleet-landing-queue §4](fleet-landing-queue.md#4-the-composition-order)).
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/admission"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
+	"github.com/mickeyyaya/evolve-loop/go/internal/events/reader"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
@@ -254,5 +256,36 @@ func TestOrchestratorPool_BenchedFollowsTheActiveBenchesOfTheProject(t *testing.
 	}
 	if !p.Benched() {
 		t.Error("Benched() = false with an active bench on file")
+	}
+}
+
+func TestOpenOversightSourceWith_ReturnsWaiterError(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	b, _ := iscsCoordinator(root, root, nil)
+	want := errors.New("wake refused")
+	_, got := b.openOversightSourceWith(func() (reader.Waiter, error) { return nil, want })
+	if !errors.Is(got, want) {
+		t.Fatalf("openOversightSourceWith err = %v, want %v", got, want)
+	}
+}
+
+func TestOversightResize_ReturnsSizedWidthAndBlockingPausedFamilies(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	b, _ := iscsCoordinator(root, root, nil)
+	store := clihealth.NewStore(root, nil)
+	if _, err := store.BenchWallUntil("codex", clihealth.Wall{Pattern: clihealth.BootTimeoutPattern, Reset: time.Now().Add(time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.BenchWallUntil("agy", clihealth.Wall{Pattern: "rate_limit", Reset: time.Now().Add(time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	target, paused := b.oversightResize(policy.FleetConfig{Count: 8, Concurrency: 5})()
+	if target != 5 {
+		t.Errorf("target = %d, want 5", target)
+	}
+	if len(paused) != 1 || paused[0] != "agy" {
+		t.Errorf("paused = %v, want [agy]", paused)
 	}
 }
