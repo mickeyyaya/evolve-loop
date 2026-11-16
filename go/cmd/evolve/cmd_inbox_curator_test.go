@@ -433,3 +433,42 @@ func TestCmd_InboxCurate_AnUnreadableTestFileExitsIO(t *testing.T) {
 		t.Errorf("rc = %d stderr = %q, want 2 naming the test index", rc, stderr)
 	}
 }
+
+func (f curatorFixture) fileClaimed(t *testing.T, sha string) string {
+	t.Helper()
+	item := `{"id":"claimed","kind":"feature","priority_class":"stability","weight":0.5,"origin":"console","landed_sha":"` + sha + `",` +
+		`"title":"Claimed as landed","files":["go/claimed.go"],"summary":"s","fix":"f","acceptance":["a"]}`
+	f.repo.Write(".evolve/inbox/2026-10-03T00-00-00Z-claimed.json", item)
+	f.repo.Git("add", ".evolve")
+	f.repo.Git("commit", "-q", "-m", "claimed item")
+	return filepath.Join(f.root, ".evolve", "inbox", "2026-10-03T00-00-00Z-claimed.json")
+}
+
+func TestCurate_AnItemWithACheckedLandedShaGetsADeterministicConsume(t *testing.T) {
+	t.Parallel()
+	f := newCuratorFixture(t, "enforce")
+	f.repo.Write("go/claimed.go", "package claimed\n")
+	f.repo.Git("add", "go")
+	f.repo.Git("commit", "-q", "-m", "deliver claimed")
+	sha := f.repo.Git("rev-parse", "HEAD")
+	path := f.fileClaimed(t, sha)
+
+	rc, stdout, stderr := f.curate(t, "", "--apply")
+
+	if _, err := os.Stat(path); rc != 0 || !os.IsNotExist(err) || !strings.Contains(stdout, "consume claimed (landing, applied)") || !strings.Contains(stdout, sha) {
+		t.Errorf("rc = %d stdout = %q stderr = %q, want the claim consumed with its sha as evidence", rc, stdout, stderr)
+	}
+}
+
+func TestCurate_AClaimThatFailsTheCheckAgainStaysOpen(t *testing.T) {
+	t.Parallel()
+	f := newCuratorFixture(t, "enforce")
+	base := f.repo.Git("rev-parse", "HEAD")
+	path := f.fileClaimed(t, base)
+
+	rc, stdout, stderr := f.curate(t, "", "--apply")
+
+	if _, err := os.Stat(path); rc != 0 || err != nil || strings.Contains(stdout, "consume claimed") {
+		t.Errorf("rc = %d stdout = %q stderr = %q err = %v, want the item open with no consume", rc, stdout, stderr, err)
+	}
+}
