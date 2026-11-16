@@ -26,7 +26,13 @@ import (
 type BuildFloorCheckFn func(ctx context.Context, in ReviewInput) []string
 
 func DefaultBuildFloorChecks(ctx context.Context, in ReviewInput) []string {
-	in = in.withFloorAdded()
+	if out := StaticBuildFloorChecks(ctx, in); len(out) > 0 {
+		return out
+	}
+	return SuiteBuildFloorChecks(ctx, in)
+}
+
+func StaticBuildFloorChecks(ctx context.Context, in ReviewInput) []string {
 	out := RemovalClaimFailures(ctx, in)
 	out = append(out, PlaceholderTokenFailures(ctx, in)...)
 	paths := changedFloorPaths(ctx, in)
@@ -34,8 +40,13 @@ func DefaultBuildFloorChecks(ctx context.Context, in ReviewInput) []string {
 	out = append(out, docsFloorChecks(ctx, in, paths)...)
 	out = append(out, commentFloorFailures(ctx, in)...)
 	out = append(out, sizeFloorFailures(ctx, in)...)
-	out = append(out, coverChangedFailures(ctx, in, paths)...)
-	out = append(out, floorListRegressions(ctx, in)...)
+	return append(out, floorListRegressions(ctx, in)...)
+}
+
+func SuiteBuildFloorChecks(ctx context.Context, in ReviewInput) []string {
+	in = in.withFloorAdded()
+	paths := changedFloorPaths(ctx, in)
+	out := coverChangedFailures(ctx, in, paths)
 	return append(out, changedPackageFloorChecks(ctx, in, paths)...)
 }
 

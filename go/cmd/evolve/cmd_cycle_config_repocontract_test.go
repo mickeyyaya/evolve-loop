@@ -3,13 +3,12 @@ package main
 import (
 	"context"
 	"errors"
-	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship"
 )
 
@@ -22,13 +21,11 @@ func TestRepoContractPackSeam_DefaultsToShipsOwnPack(t *testing.T) {
 }
 
 func TestProductionBuildFloorChecks_CorrectsARedRepoContractPackByTheTestsName(t *testing.T) {
-	wt := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(wt, "go"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(wt, "go", "go.mod"), []byte("module github.com/mickeyyaya/evolve-loop/go\n\ngo 1.23\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	repo := gittest.Fixture(t)
+	repo.Write("go/go.mod", "module github.com/mickeyyaya/evolve-loop/go\n\ngo 1.23\n")
+	repo.Git("add", "-A")
+	repo.Git("commit", "-q", "-m", "base")
+	wt := repo.Dir
 	const red = "github.com/mickeyyaya/evolve-loop/go/internal/rawgitratchet.TestRatchet_NoNewRawGitFixtures"
 	var ranIn []string
 	prev := repoContractPack
@@ -37,7 +34,7 @@ func TestProductionBuildFloorChecks_CorrectsARedRepoContractPackByTheTestsName(t
 		ranIn = append(ranIn, root)
 		return []string{red}, "", errors.New("exit status 1")
 	}
-	got := productionBuildFloorChecks(context.Background(), core.ReviewInput{Phase: string(core.PhaseBuild), Worktree: wt})
+	got := core.BuildHandoffFloor{productionFloorCheck()}.Failures(context.Background(), core.ReviewInput{Phase: string(core.PhaseBuild), Worktree: wt})
 	if len(ranIn) != 1 || ranIn[0] != wt {
 		t.Fatalf("the production floor runs the repo-contract pack once, handed the build worktree; ran in %v", ranIn)
 	}
