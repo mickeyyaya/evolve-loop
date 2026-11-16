@@ -31,9 +31,10 @@ var memberStatuses = []MemberStatus{
 }
 
 type MemberState struct {
-	Status   MemberStatus `json:"status"`
-	Landed   bool         `json:"landed,omitempty"`
-	PatchIDs []string     `json:"patch_ids,omitempty"`
+	Status      MemberStatus `json:"status"`
+	Landed      bool         `json:"landed,omitempty"`
+	PatchIDs    []string     `json:"patch_ids,omitempty"`
+	Redelivered []string     `json:"redelivered,omitempty"`
 }
 
 type IntegrationBatch struct {

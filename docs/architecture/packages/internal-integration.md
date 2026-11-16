@@ -188,3 +188,5 @@ The file is `stopgate.go`. The design is in [gate-contract-g4-base-red-attributi
 - The file is on the protected surface as a gate guarantee.
 - The wiring of the two functions is in `cmd/evolve`. `integrationEnv.train` builds each production train behind the `StopGate` that `integrationEnv.stopGate` makes.
 - Pinned by the `TestStopGate_*` tests, with 100% of the statements of the file.
+- **Redelivery at shadow (EnforceActor card part 0).** `Driver.noteRedelivered` acts on a member that is not pending and is delivered again under new patch ids. At stage `shadow` it stores the new patch ids in `MemberState.Redelivered` and writes no `DriverFailure`. At any other stage, or when the stage cannot be read, it keeps the failure. A delivery with the patch ids of the member is a no-op.
+  - `evolve integration status` prints the member with its redelivered ids, and the `clean` verdict does not count them. Pinned by `TestDriver_AtShadowARedeliveryIsInformationOnTheComposedMember`, `TestDriver_AtEnforceARedeliveryAfterAComposeIsRecordedAsAFailure` and `TestPromotionReachableByGoodBehavior`.
