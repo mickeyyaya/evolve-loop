@@ -44,8 +44,11 @@ func TestComposedBuildHandoffFloor_FollowsTheWorkflowDialAndTheDocumentContract(
 	if !reflect.DeepEqual(code.Names(), []string{productionFloorCheckName}) {
 		t.Fatalf("a code cycle's composed floor = %q", code.Names())
 	}
-	if reflect.ValueOf(code[0].Run).Pointer() != reflect.ValueOf(productionBuildFloorChecks).Pointer() {
-		t.Fatal("the production check is productionBuildFloorChecks itself")
+	if reflect.ValueOf(code[0].Run).Pointer() != reflect.ValueOf(productionStaticFloorChecks).Pointer() {
+		t.Fatal("the production static stage is productionStaticFloorChecks itself")
+	}
+	if reflect.ValueOf(code[0].Tests).Pointer() != reflect.ValueOf(productionSuiteFloorChecks).Pointer() {
+		t.Fatal("the production test stage is productionSuiteFloorChecks itself")
 	}
 	document := config.RoutingConfig{DeliverableKinds: map[string]config.DeliverableKindSpec{config.DeliverableKindDocument: {}}}
 	if got := composedBuildHandoffFloor(enforced, document).Names(); !reflect.DeepEqual(got, []string{productionFloorCheckName, solutionFloorCheckName}) {
