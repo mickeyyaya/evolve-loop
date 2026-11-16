@@ -38,6 +38,7 @@
   - `BaseRed` is a typed notice. The host renders it as a WARN that does not say "skipped", because the gate did run.
   - A lane-only red, a mixed red and an unjudged verdict fail with the cause `retake_red`, as before.
   - When the base run fails, the gate emits `TIER_BASE_RED_UNJUDGED` and blames the lane. The error is in `fields.err`, because `failed` is the one writer of `fields.cause`.
+  - `retake` builds its test flags with `tierArgs` after it takes the lock. So the retake gets the CPU share of that time, not the share of the first try. The log header of the second try shows these flags. Pinned by `TestRetake_RebuildsTheShareAfterTheLock`.
   - `retake` holds the tier lock until it returns. Thus the base run is serialized with the tier runs of the other lanes.
   - The host gives no attribution to a request that has no lane base (`audit.wiredGates`).
   - Limits: the base run starts from `context.Background()`, and the attributor of the host sets its budget. The lock stays held for that time. The ACS durable gate has no attribution.

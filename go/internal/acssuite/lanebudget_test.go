@@ -20,6 +20,7 @@ func TestDefaultGoExec_ALaneSuiteRunsOnTheLaneCPUBudget(t *testing.T) {
 	}
 	t.Setenv("PATH", bin)
 	t.Setenv(ipcenv.FleetWidthKey, "4")
+	t.Setenv(ipcenv.FleetLiveWidthKey, "")
 	procs := strconv.Itoa(lanebudget.Procs(runtime.NumCPU(), 4))
 
 	out, err := defaultGoExec(context.Background(), t.TempDir(), "./acs/cycle1", []string{"PATH=" + bin})
