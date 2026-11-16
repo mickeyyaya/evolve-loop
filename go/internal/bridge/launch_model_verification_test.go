@@ -19,9 +19,9 @@ import (
 )
 
 const (
-	agyFooterClaudeOpus  = "? for shortcuts                                        Claude Opus 5.5 · high"
-	agyFooterGeminiFlash = "? for shortcuts                                        Gemini 3.8 Flash · low"
-	agyFooterNoLabel     = "? for shortcuts"
+	agyFooterClaudeOpus = "? for shortcuts                                        Claude Opus 5.5 · high"
+	agyFooterGeminiFast = "? for shortcuts                                        Gemini 4 Hydrogen · medium"
+	agyFooterNoLabel    = "? for shortcuts"
 )
 
 type modelCheckLaunch struct {
@@ -79,7 +79,7 @@ func agyClaudeLabelWait(t *testing.T) int {
 
 func TestLaunchModelVerification_AgyClaudeBootingGeminiFailsOverWithTheMismatchSignal(t *testing.T) {
 	t.Parallel()
-	frames := append(slices.Repeat([]string{agyFooterGeminiFlash}, agyClaudeLabelWait(t)+2), "cleanup scrollback")
+	frames := append(slices.Repeat([]string{agyFooterGeminiFast}, agyClaudeLabelWait(t)+2), "cleanup scrollback")
 
 	l := launchAgyClaudeOver(t, frames)
 
@@ -96,7 +96,7 @@ func TestLaunchModelVerification_AgyClaudeBootingGeminiFailsOverWithTheMismatchS
 	if len(got) != 1 {
 		t.Fatalf("mismatch signals %d, want 1 (events %+v)", len(got), l.events)
 	}
-	want := map[string]string{"expected": "claude", "observed": "gemini", "label": "Gemini 3.8 Flash · low", "cli": "agy-claude-tmux", "phase": "auditor"}
+	want := map[string]string{"expected": "claude", "observed": "gemini", "label": "Gemini 4 Hydrogen · medium", "cli": "agy-claude-tmux", "phase": "auditor"}
 	for key, value := range want {
 		if got[0].Fields[key] != value {
 			t.Errorf("field %s = %q, want %q (fields %v)", key, got[0].Fields[key], value, got[0].Fields)
@@ -327,7 +327,7 @@ func TestLaunchModelVerification_TheReviewersGeminiPaneIsAMismatch(t *testing.T)
 
 func TestLaunchModelVerification_TheDispatchedFamilyArrivingBeforeTheDeadlineIsVerified(t *testing.T) {
 	t.Parallel()
-	frames := append([]string{agyFooterGeminiFlash, agyFooterGeminiFlash, agyFooterGeminiFlash}, slices.Repeat([]string{agyFooterClaudeOpus}, 60)...)
+	frames := append([]string{agyFooterGeminiFast, agyFooterGeminiFast, agyFooterGeminiFast}, slices.Repeat([]string{agyFooterClaudeOpus}, 60)...)
 
 	l := launchAgyClaudeOver(t, frames)
 
@@ -351,7 +351,7 @@ func TestLaunchModelVerification_AFrameTheResponderActedOnIsNotEvidence(t *testi
 	t.Parallel()
 	wait := agyClaudeLabelWait(t)
 	dialog := "Help us improve: rate the CLI\n" + agyFooterClaudeOpus
-	frames := append(append([]string{agyFooterNoLabel, dialog}, slices.Repeat([]string{agyFooterGeminiFlash}, wait)...), "cleanup scrollback")
+	frames := append(append([]string{agyFooterNoLabel, dialog}, slices.Repeat([]string{agyFooterGeminiFast}, wait)...), "cleanup scrollback")
 
 	l := launchAgyClaudeOver(t, frames)
 
@@ -442,7 +442,7 @@ func TestLaunchModelVerification_AResponderLoopGuardTripDuringTheWaitIsABootFail
 func TestLaunchModelVerification_ANamedSessionOnTheWrongModelIsKilledNotPreserved(t *testing.T) {
 	t.Parallel()
 	cfg := fixtureConfig(t)
-	frames := append(slices.Repeat([]string{agyFooterGeminiFlash}, 4), "cleanup scrollback")
+	frames := append(slices.Repeat([]string{agyFooterGeminiFast}, 4), "cleanup scrollback")
 	tm := &FakeTmuxController{CaptureFrames: frames}
 	lp := tmuxLaunch{name: "agy-claude-tmux", session: "named-wrong-model", named: true, launchCmd: "agy", promptMarker: "? for shortcuts", bootIntervalS: 1}.
 		withModelCheck(launchModelCheck{family: "claude", labelRegex: agyLabelRegex(t), waitS: 2})
@@ -461,7 +461,7 @@ func TestLaunchModelVerification_ABootSmokeVerifiesTheModelToo(t *testing.T) {
 		want   int
 	}{
 		"a Claude boot": {slices.Repeat([]string{agyFooterClaudeOpus}, 4), ExitOK},
-		"a Gemini boot": {append(slices.Repeat([]string{agyFooterGeminiFlash}, agyClaudeLabelWait(t)+2), "cleanup scrollback"), ExitModelMismatch},
+		"a Gemini boot": {append(slices.Repeat([]string{agyFooterGeminiFast}, agyClaudeLabelWait(t)+2), "cleanup scrollback"), ExitModelMismatch},
 	} {
 		t.Run(name, func(t *testing.T) {
 			d, _ := LookupDriver("agy-claude-tmux")
@@ -520,7 +520,7 @@ func footerProbes(t *testing.T) []footerProbe {
 	wait := agyClaudeLabelWait(t)
 	steady := func(frame string) []string { return steadyFrames(wait, frame) }
 	box := inputBox("─")
-	geminiBoxed := "  agy output\n" + box + "\n" + agyFooterGeminiFlash
+	geminiBoxed := "  agy output\n" + box + "\n" + agyFooterGeminiFast
 	claudeBoxed := "  agy output\n" + box + "\n" + agyFooterClaudeOpus
 	claudeAbove := "  Claude Opus 5.5 · high\n"
 	claudeToast := "\n  Claude Opus 5.5 quota reached (resets in 2h)"
@@ -534,8 +534,8 @@ func footerProbes(t *testing.T) []footerProbe {
 		{"P2 a heavy-rule box, Claude above it, an unlabelled footer", steady(claudeAbove + inputBox("━") + "\n" + agyFooterNoLabel), "unreadable"},
 		{"P2b an ASCII-rule box, Claude above it, an unlabelled footer", steady(claudeAbove + inputBox("-") + "\n" + agyFooterNoLabel), "unreadable"},
 		{"P2c a rounded box, Claude above it, an unlabelled footer", steady(claudeAbove + rounded + "\n" + agyFooterNoLabel), "unreadable"},
-		{"P2d a heavy-rule box, Claude above it, a Gemini footer", steady(claudeAbove + inputBox("━") + "\n" + agyFooterGeminiFlash), "gemini"},
-		{"P3 no box, a Claude output line in the tail, a Gemini footer", steady("  The deep seat runs on Claude Opus 5.5 (High)\n  more output\n" + agyFooterGeminiFlash), "gemini"},
+		{"P2d a heavy-rule box, Claude above it, a Gemini footer", steady(claudeAbove + inputBox("━") + "\n" + agyFooterGeminiFast), "gemini"},
+		{"P3 no box, a Claude output line in the tail, a Gemini footer", steady("  The deep seat runs on Claude Opus 5.5 (High)\n  more output\n" + agyFooterGeminiFast), "gemini"},
 		{"P3b no box, a Claude output line in the tail, an unlabelled footer", steady("  The deep seat runs on Claude Opus 5.5 (High)\n  more output\n" + agyFooterNoLabel), "unreadable"},
 		{"P4 a footer split across two lines leaves the prefix line without a label, so it is unreadable and the walk moves on", steady("  agy output\n" + box + "\n? for shortcuts\nClaude Opus 5.5 · high"), "unreadable"},
 		{"P4b a footer split mid-label leaves no whole label on the prefix line, so it is unreadable and the walk moves on", steady("  agy output\n" + box + "\n? for shortcuts      Claude Opus\n  5.5 · high"), "unreadable"},
@@ -549,11 +549,11 @@ func footerProbes(t *testing.T) []footerProbe {
 		{"P9 an ANSI-coloured healthy Claude footer", steady("  agy output\n" + box + "\n\x1b[2m? for shortcuts\x1b[0m      \x1b[36mClaude Opus 5.5\x1b[0m · high"), ""},
 		{"P10 a healthy Claude footer, a Gemini-only toast below it", steady(claudeBoxed + "\n  Gemini 3.8 Flash is ready (press tab)"), ""},
 		{"P11 a GPT-OSS footer", steady("  agy output\n" + box + "\n? for shortcuts      GPT-OSS 120B (Medium)"), "gpt"},
-		{"a toast naming both families above a Gemini footer", steady("  Using Gemini 3.1 Pro (Claude Opus 5.5 unavailable)\n" + agyFooterGeminiFlash), "gemini"},
+		{"a toast naming both families above a Gemini footer", steady("  Using Gemini 3.1 Pro (Claude Opus 5.5 unavailable)\n" + agyFooterGeminiFast), "gemini"},
 		{"a footer naming two families", steady("? for shortcuts      Gemini 3.1 Pro (Claude Opus 5.5 unavailable)"), "ambiguous"},
 		{"Claude above the input box over an unlabelled footer", steady(claudeAbove + box + "\n" + agyFooterNoLabel), "unreadable"},
-		{"a stale Claude footer above the box, a Gemini footer at the bottom", steady(agyFooterClaudeOpus + "\n" + box + "\n" + agyFooterGeminiFlash), "gemini"},
-		{"a stale Gemini footer above the box, a Claude footer at the bottom", steady(agyFooterGeminiFlash + "\n" + box + "\n" + agyFooterClaudeOpus), ""},
+		{"a stale Claude footer above the box, a Gemini footer at the bottom", steady(agyFooterClaudeOpus + "\n" + box + "\n" + agyFooterGeminiFast), "gemini"},
+		{"a stale Gemini footer above the box, a Claude footer at the bottom", steady(agyFooterGeminiFast + "\n" + box + "\n" + agyFooterClaudeOpus), ""},
 		{"a stale Claude footer above the box, an unlabelled footer at the bottom", steady(agyFooterClaudeOpus + "\n" + box + "\n" + agyFooterNoLabel), "unreadable"},
 	}
 }
@@ -581,11 +581,11 @@ func TestLaunchModelVerification_OnlyTheLabelOnTheFooterPrefixLineDecides(t *tes
 func TestLaunchModelVerification_TheMismatchKeepsTheLastLabelledFooter(t *testing.T) {
 	t.Parallel()
 	wait := agyClaudeLabelWait(t)
-	frames := append(append(append([]string{agyFooterNoLabel}, slices.Repeat([]string{agyFooterGeminiFlash}, 3)...), slices.Repeat([]string{agyFooterNoLabel}, wait+2)...), "cleanup scrollback")
+	frames := append(append(append([]string{agyFooterNoLabel}, slices.Repeat([]string{agyFooterGeminiFast}, 3)...), slices.Repeat([]string{agyFooterNoLabel}, wait+2)...), "cleanup scrollback")
 
 	l := launchAgyClaudeOver(t, frames)
 
-	if got := l.mismatches(); len(got) != 1 || got[0].Fields["label"] != "Gemini 3.8 Flash · low" || got[0].Fields["observed"] != "gemini" {
+	if got := l.mismatches(); len(got) != 1 || got[0].Fields["label"] != "Gemini 4 Hydrogen · medium" || got[0].Fields["observed"] != "gemini" {
 		t.Fatalf("mismatches %+v: a footer whose label went blank before the deadline still reports the last label it showed", got)
 	}
 }
@@ -657,7 +657,7 @@ func TestLaunchModelVerification_TheMismatchReportsTheLastFooterRead(t *testing.
 	t.Parallel()
 	wait := agyClaudeLabelWait(t)
 	geminiPro := "? for shortcuts      Gemini 3.1 Pro · high"
-	frames := append(append(append([]string{agyFooterNoLabel}, slices.Repeat([]string{agyFooterGeminiFlash}, 3)...), slices.Repeat([]string{geminiPro}, wait-2)...), "cleanup scrollback")
+	frames := append(append(append([]string{agyFooterNoLabel}, slices.Repeat([]string{agyFooterGeminiFast}, 3)...), slices.Repeat([]string{geminiPro}, wait-2)...), "cleanup scrollback")
 
 	l := launchAgyClaudeOver(t, frames)
 

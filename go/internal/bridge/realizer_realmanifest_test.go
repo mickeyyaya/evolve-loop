@@ -26,7 +26,7 @@ func TestRealizeFor_RealManifests_NoCrossCLILeak(t *testing.T) {
 
 	t.Run("agy-tmux", func(t *testing.T) {
 		r := RealizeFor("agy-tmux", intent)
-		want := []string{"--model", "Gemini 3.8 Flash (High)", "--dangerously-skip-permissions"}
+		want := []string{"--model", "Gemini 4 Hydrogen (High)", "--dangerously-skip-permissions"}
 		if !reflect.DeepEqual(r.LaunchFlags, want) {
 			t.Fatalf("agy-tmux = %v, want %v", r.LaunchFlags, want)
 		}
