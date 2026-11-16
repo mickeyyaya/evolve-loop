@@ -21,10 +21,11 @@ func wantGateSteps() []GateStep {
 		{"make cover-strict", wantJobUbuntu, "line-coverage strict (go/.cover-strict; per-package hard-fail, ADR-0101)", 1200},
 		{"make cover-changed-darwin", wantJobDarwin, "changed functions of the darwin set at 100% (cover-changed; hard-fail)", 200},
 		{"make cover-strict-darwin", wantJobDarwin, "line-coverage strict of the darwin set (go/.cover-strict floors of go/.darwin-set packages; hard-fail)", 1200},
+		{"golangci-lint run", "golangci-lint", "Lint", 200},
 	}
 }
 
-func TestGateSteps_HoldTheFiveGatesWithTheirBounds(t *testing.T) {
+func TestGateSteps_HoldTheSixGatesWithTheirBounds(t *testing.T) {
 	t.Parallel()
 	want := wantGateSteps()
 	if len(GateSteps) != len(want) {
@@ -51,11 +52,19 @@ func goCallerID(t *testing.T) string {
 func TestGateSteps_EachRowNamesARealJobAndStepOfGoYml(t *testing.T) {
 	t.Parallel()
 	caller := goCallerID(t)
-	jobs := readWorkflowContract(t, "go.yml").Jobs
+	displayed := map[string]workflowJobContract{}
+	for _, job := range readWorkflowContract(t, "go.yml").Jobs {
+		displayed[caller+" / "+job.Name] = job
+	}
+	for _, job := range readWorkflowContract(t, RequiredWorkflow).Jobs {
+		if job.Uses == "" {
+			displayed[job.Name] = job
+		}
+	}
 	for _, row := range GateSteps {
 		found := false
-		for _, job := range jobs {
-			if caller+" / "+job.Name != row.Job {
+		for name, job := range displayed {
+			if name != row.Job {
 				continue
 			}
 			for _, step := range job.Steps {
@@ -125,6 +134,22 @@ func TestLookupGateStep_IsExactOnJobAndStep(t *testing.T) {
 	for _, miss := range [][2]string{{"release / " + w.Job[5:], w.Step}, {w.Job, "build"}, {"", ""}} {
 		if got, ok := LookupGateStep(miss[0], miss[1]); ok {
 			t.Errorf("LookupGateStep(%q, %q) = %+v, want a miss", miss[0], miss[1], got)
+		}
+	}
+}
+
+func TestGateStepOfKey_ResolvesAGateOrAJobAndStepName(t *testing.T) {
+	t.Parallel()
+	for _, w := range wantGateSteps() {
+		for _, key := range []string{w.Gate, w.Job + ": " + w.Step} {
+			if got, ok := GateStepOfKey(key); !ok || got != w {
+				t.Errorf("GateStepOfKey(%q) = %+v, %v, want %+v", key, got, ok, w)
+			}
+		}
+	}
+	for _, miss := range []string{"", "Lint", "make nothing", "golangci-lint: Other"} {
+		if got, ok := GateStepOfKey(miss); ok {
+			t.Errorf("GateStepOfKey(%q) = %+v, want a miss", miss, got)
 		}
 	}
 }

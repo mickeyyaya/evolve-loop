@@ -15,14 +15,14 @@ func TestParseGoTest_KeysEachFailByPackageAndMarksAPanicUnnamed(t *testing.T) {
 	}{
 		{"empty output", "", Reds{}},
 		{"a pass", "ok  \t" + pkgA + "\t0.01s\n", Reds{}},
-		{"one test", "--- FAIL: TestX (0.00s)\nFAIL\nFAIL\t" + pkgA + "\t0.01s\n", Reds{Keys: []Key{{pkgA, "TestX"}}}},
-		{"a subtest maps to its top-level test", "    --- FAIL: TestX/sub (0.00s)\n--- FAIL: TestX (0.00s)\nFAIL\t" + pkgA + "\t0.01s\n", Reds{Keys: []Key{{pkgA, "TestX"}}}},
-		{"two packages", "--- FAIL: TestX (0s)\nFAIL\t" + pkgA + "\t0.1s\n--- FAIL: TestY (0s)\nFAIL\t" + pkgB + "\t0.1s\n", Reds{Keys: []Key{{pkgA, "TestX"}, {pkgB, "TestY"}}}},
-		{"the same test name in two packages", "--- FAIL: TestX (0s)\nFAIL\t" + pkgA + "\t0.1s\n--- FAIL: TestX (0s)\nFAIL\t" + pkgB + "\t0.1s\n", Reds{Keys: []Key{{pkgA, "TestX"}, {pkgB, "TestX"}}}},
-		{"a panic is unnamed", "--- FAIL: TestX (0s)\npanic: boom\nFAIL\t" + pkgA + "\t0.1s\n", Reds{Keys: []Key{{pkgA, "TestX"}}, Unnamed: true}},
+		{"one test", "--- FAIL: TestX (0.00s)\nFAIL\nFAIL\t" + pkgA + "\t0.01s\n", Reds{Keys: []Key{{Package: pkgA, Test: "TestX"}}}},
+		{"a subtest maps to its top-level test", "    --- FAIL: TestX/sub (0.00s)\n--- FAIL: TestX (0.00s)\nFAIL\t" + pkgA + "\t0.01s\n", Reds{Keys: []Key{{Package: pkgA, Test: "TestX"}}}},
+		{"two packages", "--- FAIL: TestX (0s)\nFAIL\t" + pkgA + "\t0.1s\n--- FAIL: TestY (0s)\nFAIL\t" + pkgB + "\t0.1s\n", Reds{Keys: []Key{{Package: pkgA, Test: "TestX"}, {Package: pkgB, Test: "TestY"}}}},
+		{"the same test name in two packages", "--- FAIL: TestX (0s)\nFAIL\t" + pkgA + "\t0.1s\n--- FAIL: TestX (0s)\nFAIL\t" + pkgB + "\t0.1s\n", Reds{Keys: []Key{{Package: pkgA, Test: "TestX"}, {Package: pkgB, Test: "TestX"}}}},
+		{"a panic is unnamed", "--- FAIL: TestX (0s)\npanic: boom\nFAIL\t" + pkgA + "\t0.1s\n", Reds{Keys: []Key{{Package: pkgA, Test: "TestX"}}, Unnamed: true}},
 		{"a fail with no named test is unnamed", "FAIL\t" + pkgA + " [build failed]\n", Reds{Unnamed: true}},
 		{"a pending name is unnamed", "--- FAIL: TestX (0s)\n", Reds{Unnamed: true}},
-		{"ok lines and noise are skipped", "ok  \t" + pkgB + "\t0.1s\nexit status 1\n--- FAIL: TestX (0s)\nFAIL\t" + pkgA + "\t0.1s\n", Reds{Keys: []Key{{pkgA, "TestX"}}}},
+		{"ok lines and noise are skipped", "ok  \t" + pkgB + "\t0.1s\nexit status 1\n--- FAIL: TestX (0s)\nFAIL\t" + pkgA + "\t0.1s\n", Reds{Keys: []Key{{Package: pkgA, Test: "TestX"}}}},
 	} {
 		if got := ParseGoTest(tc.out); !reflect.DeepEqual(got, tc.want) {
 			t.Errorf("%s: ParseGoTest = %+v, want %+v", tc.name, got, tc.want)
@@ -33,7 +33,7 @@ func TestParseGoTest_KeysEachFailByPackageAndMarksAPanicUnnamed(t *testing.T) {
 func TestKeysOf_SplitsAPackageAndATopLevelTest(t *testing.T) {
 	t.Parallel()
 	got := KeysOf([]string{"github.com/o/m/go/internal/dup.TestCount", "example.com/m/a.TestY/sub.case"})
-	want := Reds{Keys: []Key{{"github.com/o/m/go/internal/dup", "TestCount"}, {"example.com/m/a", "TestY"}}}
+	want := Reds{Keys: []Key{{Package: "github.com/o/m/go/internal/dup", Test: "TestCount"}, {Package: "example.com/m/a", Test: "TestY"}}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("KeysOf = %+v, want %+v", got, want)
 	}
