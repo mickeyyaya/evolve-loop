@@ -1,6 +1,7 @@
 package orchestrator
 
 import (
+	"sync/atomic"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/admission"
@@ -137,5 +138,30 @@ func TestIdleCauseList_NamesEveryCauseOfTheClosedSet(t *testing.T) {
 	want := "family_held, run_cap, supply_empty, admission_refused, bench or operator_stop"
 	if idleCauseList != want {
 		t.Errorf("idleCauseList = %q, want %q", idleCauseList, want)
+	}
+}
+
+func TestPool_ABrakedPoolPastItsRunCapNamesTheOperatorStop(t *testing.T) {
+	g, events := newGatedLaunch(), &eventLog{}
+	var braked atomic.Bool
+	done := runPool(Pool{Target: 4, MinLanes: 4, MaxLanes: 2, Launch: g.launch, Publish: events.publish, Halted: braked.Load}, todosNamed("a", "b", "c"))
+	startN(t, g, 2)
+
+	braked.Store(true)
+	g.finish("a", 0)
+	g.finish("b", 0)
+	<-done
+
+	got := fieldsOf(events, CodePoolIdle, "cause")
+	if len(got) == 0 {
+		t.Fatalf("%s events = 0, want the idle transitions of a braked run", CodePoolIdle)
+	}
+	for _, c := range got {
+		if c != string(CauseOperatorStop) {
+			t.Errorf("%s cause = %q, want %q: the brake drained a pool that was also at its cap", CodePoolIdle, c, CauseOperatorStop)
+		}
+	}
+	if n := len(events.withCode(CodePoolUnderfilled)); n != 0 {
+		t.Errorf("%s events = %d, want 0: an operator stop is not an underfill", CodePoolUnderfilled, n)
 	}
 }

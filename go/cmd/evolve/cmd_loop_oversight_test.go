@@ -196,3 +196,30 @@ func TestOrchestratedRun_TheOversightHaltReachesThePoolIntakeWhenCellAdmissionLo
 }
 
 func noResupply([]fleet.Todo) ([]fleet.Todo, error) { return nil, nil }
+
+func TestOrchestratedRun_AWaveStopThatMeetsTheRunCapNamesTheOperatorStop(t *testing.T) {
+	t.Parallel()
+	src := newScriptedOversightSource()
+	b, evolveDir, _ := oversightCoordinator(t, src)
+	fc := oversightFleet("enforce")
+	fc.Orchestrator.RunMaxLanes = 1
+	launch := func(_ context.Context, _ fleet.CycleSpec) (int, error) {
+		if err := os.WriteFile(paths.LoopStopPath(evolveDir), nil, 0o644); err != nil {
+			t.Error(err)
+		}
+		return 0, nil
+	}
+	b.orchestratedRun(fc, launch, 2)(context.Background(), []fleet.Todo{{ID: "first"}, {ID: "second"}}, noResupply)
+	idle := supplyEvents(t, b, evolveDir, orchestrator.CodePoolIdle)
+	if len(idle) == 0 {
+		t.Fatalf("%s events = 0, want the idle transition of the drained pool", orchestrator.CodePoolIdle)
+	}
+	for _, e := range idle {
+		if e.Fields["cause"] != string(orchestrator.CauseOperatorStop) {
+			t.Errorf("idle cause = %q, want %q: the wave stop drained a pool that was also at run_max_lanes", e.Fields["cause"], orchestrator.CauseOperatorStop)
+		}
+	}
+	if n := len(supplyEvents(t, b, evolveDir, orchestrator.CodePoolUnderfilled)); n != 0 {
+		t.Errorf("%s events = %d, want 0 after an operator stop", orchestrator.CodePoolUnderfilled, n)
+	}
+}
