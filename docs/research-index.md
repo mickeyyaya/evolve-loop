@@ -771,4 +771,10 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [research/practice-claude-model-release-notes-c433b054-202611.md](research/practice-claude-model-release-notes-c433b054-202611.md) | Note on Claude release notes snapshot `2026-11-13T19:47:32Z` (empty added-line excerpt and November 12 self-hosted Managed Agents) for item `c433b054`, read as untrusted data. `skills/model-notes-claude/COMPACT.md` and all personas stay unchanged. |
 
+## 2026-11-16 — gate, ship and retry waste in the lanes
+
+| Document | What it records |
+|---|---|
+| [research/gate-ship-retry-waste-2026-11.md](research/gate-ship-retry-waste-2026-11.md) | Where lane time went in waves 173-175: gates and ship took 62%, and retry loops took 38% in wave 174. Merge-queue practice, and eight refinements. |
+
 <!-- GENERATED:research-index END -->
