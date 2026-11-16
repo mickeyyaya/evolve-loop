@@ -192,6 +192,7 @@ func (o *Oversight) sealed(e signalcenter.Event) {
 	}
 	h, ok := o.laneOf(e.Cycle)
 	if !ok {
+		o.signalUnlocated(e)
 		return
 	}
 	delete(o.cycles, e.Cycle)
@@ -232,6 +233,12 @@ func (o *Oversight) ejected(e signalcenter.Event) {
 	}})
 }
 
+func (o *Oversight) signalUnlocated(e signalcenter.Event) {
+	o.Publish.emit("Oversight.unlocated", CodeLandingUnlocated, signalcenter.SeverityWarn,
+		"no live lane holds cycle "+strconv.Itoa(e.Cycle)+" for the "+string(e.Kind)+" event",
+		o.stamped(map[string]string{"cycle": strconv.Itoa(e.Cycle), "event": string(e.Kind)}))
+}
+
 func (o *Oversight) sendBrief(lane string, e signalcenter.Event) {
 	err := o.deliverBrief(lane, e.Fields[integration.FieldBriefFile])
 	if err != nil {
@@ -259,6 +266,7 @@ func (o *Oversight) landed(e signalcenter.Event) {
 	delete(o.conflicts, e.Cycle)
 	h, ok := o.laneOf(e.Cycle)
 	if !ok {
+		o.signalUnlocated(e)
 		return
 	}
 	count := "count_clean_landing"

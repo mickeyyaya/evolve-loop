@@ -35,6 +35,7 @@ const (
 	CodeAdmissionOptimistic       signalcenter.Code = "LOOP_ORCH_ADMISSION_OPTIMISTIC"
 	CodeOptimisticAdmissionFailed signalcenter.Code = "LOOP_ORCH_OPTIMISTIC_ADMISSION_FAILED"
 	CodeEjectionBriefFailed       signalcenter.Code = "LOOP_ORCH_EJECTION_BRIEF_FAILED"
+	CodeLandingUnlocated          signalcenter.Code = "LOOP_ORCH_LANDING_UNLOCATED"
 )
 
 const (
@@ -65,6 +66,7 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeAdmissionOptimistic, "at fleet.orchestrator.admission enforce (ADR-0143 W1b) the pool launched a lane that only the optimistic rule admitted: the import-reach rule would have held it behind a lane in flight; held_by is the first such holder when more than one lane in flight reaches the todo; the lane carries that holder in EVOLVE_FLEET_REACH_HOLDER; the count of the wave; INFO; fields.todo, held_by, reason (the package where an edit meets the reach)")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeOptimisticAdmissionFailed, "a lane that only the optimistic rule admitted (ADR-0143 W1b) hit a composed-tree gate failure or a fleet rebase conflict; published once for each lane, at its first such failure, which names the gate; the D3 rate counts a failure only when the admission of the same todo is in the wave, so it stays in [0,1]; WARN; fields.todo, held_by, gate (the failed composed-tree gates, or rebase)")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeEjectionBriefFailed, "the oversight (ADR-0147 I3) could not send the ejection brief to the lane of an ejected deliverable, or no brief port was set, or the brief file could not be read; the cells of the lane stay held and the lane does not learn why its deliverable went back; WARN; fields.lane, cycle, error")
+	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLandingUnlocated, "the oversight received a landing or a seal for a cycle that no live lane holds; it keeps the landing-state cleanup but counts nothing and acts on no lane; WARN; fields.cycle, event")
 }
 
 type Publish func(signalcenter.Event)
