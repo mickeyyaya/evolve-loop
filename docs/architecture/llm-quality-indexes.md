@@ -217,6 +217,8 @@ The Signal Center never moves an index between stages. A listener observes and n
 
 #### 4.6 The sample rule for a stage flip
 
+The stage key of any feature that is not an index also follows [shadow-stage-contract](shadow-stage-contract.md) §6.
+
 - `shadow` to `report`: at least 3 windows of readings with the source present, and each window has at least `n_min` items (given per index).
 - `report` to `gate`: all of the following.
   - The MDE at the current n is smaller than the effect that the gate claims to defend. MDE = (1.96 + 0.84) × sqrt(2 p̄(1 − p̄) / n) for a rate.

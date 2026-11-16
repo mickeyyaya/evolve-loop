@@ -21,7 +21,7 @@ func TestProductionBuildFloorChecks_TheComposedFloorRunsTheGateClassifier(t *tes
 	t.Cleanup(func() { repoContractPack = prev })
 	repoContractPack = func(context.Context, string, string) ([]string, string, error) { return nil, "", nil }
 
-	got := productionBuildFloorChecks(context.Background(), core.ReviewInput{
+	got := core.BuildHandoffFloor{productionFloorCheck()}.Failures(context.Background(), core.ReviewInput{
 		Phase: string(core.PhaseBuild), Cycle: 7, Worktree: wt.Dir, WorktreeBaseSHA: base, ProjectRoot: t.TempDir(),
 	})
 

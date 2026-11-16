@@ -43,7 +43,7 @@ func TestProductionBuildFloorChecks_CorrectsALintFindingByFileAndLine(t *testing
 		return "p/a.go:3:2: Error return value is not checked (errcheck)", nil
 	}
 
-	got := productionBuildFloorChecks(context.Background(), core.ReviewInput{Phase: string(core.PhaseBuild), Worktree: repo.Dir, WorktreeBaseSHA: base})
+	got := core.BuildHandoffFloor{productionFloorCheck()}.Failures(context.Background(), core.ReviewInput{Phase: string(core.PhaseBuild), Worktree: repo.Dir, WorktreeBaseSHA: base})
 
 	if want := filepath.Join(repo.Dir, "go") + " ./p"; len(ran) != 1 || ran[0] != want {
 		t.Fatalf("lint ran %v, want once as %q", ran, want)

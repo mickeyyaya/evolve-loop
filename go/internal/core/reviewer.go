@@ -72,7 +72,7 @@ func (r mandatoryExplanationReviewer) Review(ctx context.Context, in ReviewInput
 		return r.next.Review(ctx, in)
 	}
 	if gaps := r.floor.Failures(ctx, in); len(gaps) > 0 {
-		return floorRejection(append(gaps, floorChecks(r.next).Failures(ctx, in)...), in.Protected)
+		return floorRejection(append(gaps, floorChecks(r.next).StaticFailures(ctx, in)...), in.Protected)
 	}
 	optional := r.next.Review(ctx, in)
 	if !optional.Approve {

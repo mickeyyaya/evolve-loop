@@ -67,6 +67,7 @@ func TestCoverChangedPackages_KeepsOnlyLivePackagesOutsideTestdata(t *testing.T)
 
 func TestCoverTestArgs_AddTheTagsOfTheCoverageRunOnlyWhenGiven(t *testing.T) {
 	t.Setenv(ipcenv.FleetWidthKey, "")
+	t.Setenv(ipcenv.FleetLiveWidthKey, "")
 
 	got := coverTestArgs("/tmp/cover.out", []string{"./p"}, []string{"integration", "acs"})
 

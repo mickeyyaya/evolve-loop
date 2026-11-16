@@ -13,6 +13,9 @@ func TestIpcenv_ConstValues(t *testing.T) {
 	if ipcenv.FleetWidthKey != "EVOLVE_FLEET_WIDTH" {
 		t.Errorf("FleetWidthKey = %q, want %q", ipcenv.FleetWidthKey, "EVOLVE_FLEET_WIDTH")
 	}
+	if ipcenv.FleetLiveWidthKey != "EVOLVE_FLEET_LIVE_WIDTH" {
+		t.Errorf("FleetLiveWidthKey = %q, want %q", ipcenv.FleetLiveWidthKey, "EVOLVE_FLEET_LIVE_WIDTH")
+	}
 	if ipcenv.FleetScopeKey != "EVOLVE_FLEET_SCOPE" {
 		t.Errorf("FleetScopeKey = %q, want %q", ipcenv.FleetScopeKey, "EVOLVE_FLEET_SCOPE")
 	}

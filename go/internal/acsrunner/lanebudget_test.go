@@ -15,6 +15,7 @@ import (
 
 func TestRun_ALaneGoTestCarriesTheLaneCPUBudget(t *testing.T) {
 	t.Setenv(ipcenv.FleetWidthKey, "4")
+	t.Setenv(ipcenv.FleetLiveWidthKey, "")
 	procs := strconv.Itoa(lanebudget.Procs(runtime.NumCPU(), 4))
 	var seen []string
 	withCommander(func(_ context.Context, _ []string, args ...string) (io.ReadCloser, func() error, error) {
@@ -32,6 +33,7 @@ func TestRun_ALaneGoTestCarriesTheLaneCPUBudget(t *testing.T) {
 
 func TestRun_ALaneChildGetsGOMAXPROCSAndNoLaneKey(t *testing.T) {
 	t.Setenv(ipcenv.FleetWidthKey, "4")
+	t.Setenv(ipcenv.FleetLiveWidthKey, "")
 	var env []string
 	withCommander(func(_ context.Context, got []string, _ ...string) (io.ReadCloser, func() error, error) {
 		env = got

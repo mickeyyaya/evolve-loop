@@ -3,6 +3,8 @@ package lanebudget
 import (
 	"context"
 	"io"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 
@@ -15,6 +17,7 @@ func inLane(t *testing.T, cpus int, width string) {
 	hostCPUs = func() int { return cpus }
 	t.Cleanup(func() { hostCPUs = prev })
 	t.Setenv(ipcenv.FleetWidthKey, width)
+	t.Setenv(ipcenv.FleetLiveWidthKey, "")
 }
 
 func TestProcs_DividesTheHostAmongTheLanes(t *testing.T) {
@@ -170,5 +173,112 @@ func TestRunner_BudgetsEachGoTestAndPassesTheRestThrough(t *testing.T) {
 	}
 	if calls[2].env != nil || !slices.Equal(calls[2].args, []string{"test"}) {
 		t.Errorf("git call = %+v, want it unchanged", calls[2])
+	}
+}
+
+func liveFile(t *testing.T, body string) {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), LiveWidthFile)
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(ipcenv.FleetLiveWidthKey, path)
+}
+
+func aliveAs(t *testing.T, alive bool, pid int) {
+	t.Helper()
+	prev := processAlive
+	processAlive = func(p int) bool { return alive && p == pid }
+	t.Cleanup(func() { processAlive = prev })
+}
+
+func TestCurrent_ALoneLaneGetsTheHostCPUs(t *testing.T) {
+	inLane(t, 14, "8")
+	aliveAs(t, true, 4242)
+	liveFile(t, `{"pid":4242,"width":1}`)
+	if got := Current(); got != 14 {
+		t.Errorf("Current() with 1 live lane under a pool limit of 8 = %d, want all 14 CPUs", got)
+	}
+}
+
+func TestCurrent_ReadsTheLiveWidthNotThePoolLimit(t *testing.T) {
+	inLane(t, 14, "8")
+	aliveAs(t, true, 4242)
+	liveFile(t, `{"pid":4242,"width":3}`)
+	if got := Current(); got != 4 {
+		t.Errorf("Current() with 3 live lanes under a pool limit of 8 = %d, want 4", got)
+	}
+}
+
+func TestCurrent_ADeadPoolFileFallsBackToTheSpawnWidth(t *testing.T) {
+	inLane(t, 14, "8")
+	aliveAs(t, false, 4242)
+	liveFile(t, `{"pid":4242,"width":1}`)
+	if got := Current(); got != 1 {
+		t.Errorf("Current() with a dead pool pid = %d, want the spawn width share 1", got)
+	}
+}
+
+func TestCurrent_AnUnusableLiveFileFallsBackToTheSpawnWidth(t *testing.T) {
+	for name, body := range map[string]string{
+		"garbage":    `not json`,
+		"zero width": `{"pid":4242,"width":0}`,
+	} {
+		inLane(t, 14, "8")
+		aliveAs(t, true, 4242)
+		liveFile(t, body)
+		if got := Current(); got != 1 {
+			t.Errorf("%s: Current() = %d, want the spawn width share 1", name, got)
+		}
+	}
+	inLane(t, 14, "8")
+	aliveAs(t, true, 4242)
+	t.Setenv(ipcenv.FleetLiveWidthKey, filepath.Join(t.TempDir(), "absent.json"))
+	if got := Current(); got != 1 {
+		t.Errorf("a missing file: Current() = %d, want 1", got)
+	}
+}
+
+func TestCurrent_ALiveFileWithNoSpawnWidthStaysAConsoleRun(t *testing.T) {
+	inLane(t, 14, "")
+	aliveAs(t, true, 4242)
+	liveFile(t, `{"pid":4242,"width":2}`)
+	if got := Current(); got != 0 {
+		t.Errorf("Current() = %d, want 0: a run with no spawn width stays a console run", got)
+	}
+}
+
+func TestWriteLiveWidth_RoundTripsThroughCurrent(t *testing.T) {
+	inLane(t, 14, "8")
+	aliveAs(t, true, os.Getpid())
+	path := filepath.Join(t.TempDir(), LiveWidthFile)
+	t.Setenv(ipcenv.FleetLiveWidthKey, path)
+	if err := WriteLiveWidth(path, os.Getpid(), 2); err != nil {
+		t.Fatal(err)
+	}
+	if got := Current(); got != 7 {
+		t.Errorf("Current() after WriteLiveWidth(2) = %d, want 7", got)
+	}
+	if err := WriteLiveWidth(path, os.Getpid(), 0); err != nil {
+		t.Fatal(err)
+	}
+	if got := Current(); got != 14 {
+		t.Errorf("a written width of 0 is stored as 1: Current() = %d, want 14", got)
+	}
+}
+
+func TestWriteLiveWidth_AnUnwritablePathIsAnError(t *testing.T) {
+	blocker := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(blocker, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteLiveWidth(filepath.Join(blocker, LiveWidthFile), 1, 1); err == nil {
+		t.Error("WriteLiveWidth below a regular file returned nil")
+	}
+}
+
+func TestProcessAlive_IsTheRunLeaseCheck(t *testing.T) {
+	if !processAlive(os.Getpid()) || processAlive(0) {
+		t.Error("the default liveness check must see this process and reject pid 0")
 	}
 }

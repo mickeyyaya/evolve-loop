@@ -3,11 +3,13 @@ package fleet
 import (
 	"context"
 	"errors"
+	"os"
 	"runtime"
 	"slices"
 	"strconv"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget"
 )
 
 var ErrNeverLaunched = errors.New("fleet: the pool never launched this todo")
@@ -22,6 +24,8 @@ type PoolConfig struct {
 	Halted      func() bool
 	Kick        <-chan struct{}
 	Window      func() int
+
+	LiveWidthFile string
 }
 
 type PoolTransitionKind string
@@ -141,6 +145,7 @@ func (p *pool) settle(idx int) {
 		delete(p.claimed, f)
 	}
 	delete(p.running, idx)
+	p.publishWidth()
 	p.emit(PoolExited, p.backlog[idx].ID)
 	if full, _ := p.fill(PoolBackfilled, false); full {
 		return
@@ -151,6 +156,12 @@ func (p *pool) settle(idx int) {
 	}
 	if full, _ := p.fill(PoolBackfilled, false); !full {
 		p.emit(PoolIdle, "")
+	}
+}
+
+func (p *pool) publishWidth() {
+	if p.cfg.LiveWidthFile != "" {
+		_ = lanebudget.WriteLiveWidth(p.cfg.LiveWidthFile, os.Getpid(), len(p.running))
 	}
 }
 
@@ -255,7 +266,7 @@ func (p *pool) selectDisjoint() int {
 
 func (p *pool) dispatch(idx int, kind PoolTransitionKind) {
 	td := p.backlog[idx]
-	spec := poolSpec(td, p.limit)
+	spec := poolSpec(td, p.limit, p.cfg.LiveWidthFile)
 	if p.cfg.Prepare != nil {
 		prepared, ok := p.cfg.Prepare(td, spec)
 		if !ok {
@@ -268,6 +279,7 @@ func (p *pool) dispatch(idx int, kind PoolTransitionKind) {
 	}
 	p.running[idx] = true
 	p.launches++
+	p.publishWidth()
 	p.emit(kind, td.ID)
 	started := make(chan struct{})
 	go func() {
@@ -287,13 +299,16 @@ func noLaunchResults(n int) []Result {
 	return results
 }
 
-func poolSpec(td Todo, width int) CycleSpec {
+func poolSpec(td Todo, width int, liveWidthFile string) CycleSpec {
 	env := map[string]string{
 		ipcenv.FleetScopeKey: td.ID,
 		ipcenv.FleetKey:      "1",
 	}
 	if width > 0 {
 		env[ipcenv.FleetWidthKey] = strconv.Itoa(width)
+	}
+	if liveWidthFile != "" {
+		env[ipcenv.FleetLiveWidthKey] = liveWidthFile
 	}
 	return CycleSpec{
 		Scope:          []string{td.ID},

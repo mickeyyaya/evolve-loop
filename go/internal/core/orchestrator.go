@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
@@ -176,6 +177,7 @@ type Orchestrator struct {
 
 	directivesProvider func(ctx context.Context, cycle int) directives.Set
 
+	composedBaseRun          baseattr.Runner
 	compositionSnapshot      func(ctx context.Context, worktree, runID string) (CompositionAuditSnapshot, error)
 	compositionGateRunner    func(ctx context.Context, worktree string) map[string]string
 	compositionVerdictWriter func(ledgerPath string, in CompositionVerdictInput) error

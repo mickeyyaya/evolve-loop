@@ -90,6 +90,7 @@ type cycleRun struct {
 	proseReported     map[router.ProseFallback]bool
 
 	preserveWorktree       bool
+	composedPark           *composedPark
 	cycleCompletedNormally bool
 	reachedPhaseEnd        bool
 }

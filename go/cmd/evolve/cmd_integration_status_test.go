@@ -447,3 +447,22 @@ func TestWaveOfPool_IsZeroForAPoolNoWaveHolds(t *testing.T) {
 		t.Fatalf("wave = %d, want 1", got)
 	}
 }
+
+func TestBuildIntegrationStatus_ARedeliveredMemberIsPrintedAsInformationAndStaysClean(t *testing.T) {
+	t.Parallel()
+	ev := cleanEvidence()
+	ev.Record.Members[6] = integration.MemberState{Status: integration.MemberComposed, PatchIDs: []string{"a"}, Redelivered: []string{"b"}}
+	rep := buildIntegrationStatus(5, "shadow", ev)
+	if rep.Verdict != verdictClean {
+		t.Fatalf("verdict = %q (%v), want clean", rep.Verdict, rep.Failed)
+	}
+	if got := rep.Members[0].Redelivered; len(got) != 1 || got[0] != "b" {
+		t.Fatalf("redelivered = %v, want the new patch ids", got)
+	}
+	if line := memberLine(rep.Members[0]); !strings.Contains(line, "redelivered under new patches b") {
+		t.Fatalf("member line = %q, want the redelivered note", line)
+	}
+	if line := memberLine(integrationStatusMember{Cycle: 7, Status: "composed", Landed: true}); line != "  cycle 7: composed, landed" {
+		t.Fatalf("member line = %q", line)
+	}
+}

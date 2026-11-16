@@ -777,6 +777,14 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [research/practice-agy-cli-changelog-command-1-5-9-2026-11.md](research/practice-agy-cli-changelog-command-1-5-9-2026-11.md) | Note on `agy changelog` release `1.5.9` (`run_workflow`, `pluginControls`, Auto mode, `/resume`, `.mp4`, fixes) for item `a5725609`, read as untrusted data. `run_workflow` stays unused. No persona changes. |
 
+## 2026-11-15 — shadow stages prove themselves on chained evidence
+
+| Document | What it records |
+|---|---|
+| [research/shadow-stage-evidence-2026-11.md](research/shadow-stage-evidence-2026-11.md) | Research: seven shadow faults of cycles 2356 to 2390 with evidence. Outside practice on shadow promotion, canary judgment, tamper-evident logs, provenance, test caching and merge queues. |
+| [plans/shadow-stage-evidence-2026-11.md](plans/shadow-stage-evidence-2026-11.md) | Plan: three evidence stores and five scan-skip keys on one score table. It recommends a per-cycle digest in the ledger and one default-deny purity predicate for the scan-skip key. It maps K1 to K5 and F1 to F7 to phases. |
+| [architecture/adr/0167-shadow-stages-prove-themselves-on-chained-evidence.md](architecture/adr/0167-shadow-stages-prove-themselves-on-chained-evidence.md) | ADR-0167, Proposed: five contract rules, the integrity rules, a flip only on a verified verdict, and a protected registry. It extends ADR-0165 and amends ADR-0157 decision 8. |
+
 ## 2026-11-15 — agy changelog command snapshot 2026-11-14T05:48:36Z note
 
 | Document | What it records |
@@ -788,5 +796,11 @@ approaches / decision / results / retro) — lives at
 | Document | What it records |
 |---|---|
 | [research/practice-claude-model-release-notes-c433b054-202611.md](research/practice-claude-model-release-notes-c433b054-202611.md) | Note on Claude release notes snapshot `2026-11-13T19:47:32Z` (empty added-line excerpt and November 12 self-hosted Managed Agents) for item `c433b054`, read as untrusted data. `skills/model-notes-claude/COMPACT.md` and all personas stay unchanged. |
+
+## 2026-11-16 — self-evolving loops: room for the loop to change itself
+
+| Document | What it records |
+|---|---|
+| [research/self-evolving-loop-autonomy-2026-11.md](research/self-evolving-loop-autonomy-2026-11.md) | Why 221 of 268 inbox items are console routes, and what outside systems do about self-improvement and earned autonomy. It gives refinements R1 to R6. |
 
 <!-- GENERATED:research-index END -->

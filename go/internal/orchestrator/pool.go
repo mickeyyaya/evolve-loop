@@ -26,26 +26,27 @@ type Claims interface {
 type Admit func(inFlight, pending []fleet.Todo) int
 
 type Pool struct {
-	Target      int
-	MinLanes    int
-	Concurrency int
-	MaxLanes    int
-	Admit       Admit
-	Freshen     func(fleet.CycleSpec) (fleet.CycleSpec, bool)
-	Launch      fleet.LaunchFn
-	Leases      *Leases
-	Claims      Claims
-	Reap        func(Lane)
-	Locate      func(Lane) (int, bool)
-	Publish     Publish
-	Halted      func() bool
-	Intake      *Intake
-	Stage       string
-	Window      *Window
-	Resupply    func(held []fleet.Todo) []fleet.Todo
-	Holders     *ReachHolders
-	FamilyHolds *FamilyHolds
-	Benched     func() bool
+	Target        int
+	MinLanes      int
+	Concurrency   int
+	MaxLanes      int
+	Admit         Admit
+	Freshen       func(fleet.CycleSpec) (fleet.CycleSpec, bool)
+	Launch        fleet.LaunchFn
+	Leases        *Leases
+	Claims        Claims
+	Reap          func(Lane)
+	Locate        func(Lane) (int, bool)
+	Publish       Publish
+	Halted        func() bool
+	Intake        *Intake
+	Stage         string
+	Window        *Window
+	Resupply      func(held []fleet.Todo) []fleet.Todo
+	Holders       *ReachHolders
+	FamilyHolds   *FamilyHolds
+	Benched       func() bool
+	LiveWidthFile string
 }
 
 var transitionCodes = map[fleet.PoolTransitionKind]signalcenter.Code{
@@ -78,7 +79,7 @@ func (p Pool) Run(ctx context.Context, backlog []fleet.Todo) []fleet.Result {
 	if p.Leases != nil {
 		launch = p.Leases.Watch(p.Launch, p.recover)
 	}
-	cfg := fleet.PoolConfig{Target: p.Target, Concurrency: p.Concurrency, MaxLaunches: p.MaxLanes,
+	cfg := fleet.PoolConfig{Target: p.Target, Concurrency: p.Concurrency, MaxLaunches: p.MaxLanes, LiveWidthFile: p.LiveWidthFile,
 		Halted: func() bool { return in.Stopped() || (p.Halted != nil && p.Halted()) },
 		Next:   next, Kick: in.Wake(), Window: p.admissionWindow(), Resupply: p.Resupply,
 		Prepare: func(td fleet.Todo, spec fleet.CycleSpec) (fleet.CycleSpec, bool) {

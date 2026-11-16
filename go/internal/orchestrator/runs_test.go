@@ -255,6 +255,32 @@ func TestLaneCycle_IsTheNumberOfTheCycleThatHoldsTheTodo(t *testing.T) {
 	}
 }
 
+func TestLaneCycle_FindsADirStampedOneCoarseTickBeforeTheLaneStart(t *testing.T) {
+	runs := t.TempDir()
+	dir := writeCycle(t, runs, 7, []string{"A"})
+	info, err := os.Stat(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lane := Lane{Key: "A", Scope: []string{"A"}, Started: info.ModTime().Add(5 * time.Millisecond)}
+	if got, ok := LaneCycle(runs, lane); !ok || got != 7 {
+		t.Errorf("LaneCycle = %d, %v, want 7, true", got, ok)
+	}
+}
+
+func TestLaneCycle_SkipsADirStampedTwoSecondsBeforeTheLaneStart(t *testing.T) {
+	runs := t.TempDir()
+	dir := writeCycle(t, runs, 7, []string{"A"})
+	info, err := os.Stat(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lane := Lane{Key: "A", Scope: []string{"A"}, Started: info.ModTime().Add(2 * time.Second)}
+	if got, ok := LaneCycle(runs, lane); ok {
+		t.Errorf("LaneCycle = %d, true, want none", got)
+	}
+}
+
 func TestRunsLocator_FindsTheCycleOfALaneOnceAndKeysItByTheLaneStart(t *testing.T) {
 	runs := t.TempDir()
 	locate := RunsLocator(runs)

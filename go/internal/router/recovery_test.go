@@ -39,6 +39,10 @@ func TestRecover_Branches(t *testing.T) {
 
 		{"fleet rebase conflict → debugger", &Blocker{Code: "GIT_FLEET_REBASE_CONFLICT", Class: "integrity", Stage: "ship"}, "debugger", "recover:fleet-rebase-conflict-debugger"},
 
+		{"capacity kill retries ship", &Blocker{Code: "REPO_CONTRACT_CAPACITY", Class: "transient", Stage: "atomic-ship"}, "ship", "recover:capacity-retry-ship"},
+		{"capacity kill keeps its route whatever the class", &Blocker{Code: "REPO_CONTRACT_CAPACITY", Class: "precondition", Stage: "atomic-ship"}, "ship", "recover:capacity-retry-ship"},
+		{"infra kill still re-audits", &Blocker{Code: "REPO_CONTRACT_INFRA", Class: "precondition", Stage: "atomic-ship"}, "audit", "recover:precondition-reaudit"},
+
 		{"transient push rejected", &Blocker{Code: "GIT_PUSH_REJECTED", Class: "transient", Stage: "ship"}, "ship", "recover:transient-retry-ship"},
 		{"transient git io", &Blocker{Code: "GIT_IO", Class: "transient", Stage: "ship"}, "ship", "recover:transient-retry-ship"},
 

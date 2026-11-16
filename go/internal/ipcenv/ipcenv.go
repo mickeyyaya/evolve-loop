@@ -13,6 +13,8 @@ const WorktreeRootKey = "EVOLVE_WORKTREE_ROOT" // SSOT IPC-protocol-allowed
 
 const FleetWidthKey = "EVOLVE_FLEET_WIDTH" // SSOT IPC-protocol-allowed
 
+const FleetLiveWidthKey = "EVOLVE_FLEET_LIVE_WIDTH" // SSOT IPC-protocol-allowed
+
 const FleetReachHolderKey = "EVOLVE_FLEET_REACH_HOLDER" // SSOT IPC-protocol-allowed
 
 const CycleStateFileKey = "EVOLVE_CYCLE_STATE_FILE" // SSOT IPC-protocol-allowed
@@ -26,7 +28,7 @@ const DispatchDepthKey = "EVOLVE_DISPATCH_DEPTH" // SSOT IPC-protocol-allowed
 const PhaseKey = "EVOLVE_PHASE"                  // SSOT IPC-protocol-allowed
 
 func ProtocolKeys() []string {
-	return []string{FleetKey, FleetScopeKey, FleetWidthKey, FleetReachHolderKey, WorktreeRootKey, CycleStateFileKey, TmuxSocketKey, DispatchIDKey, MsgTokenKey, DispatchDepthKey, PhaseKey}
+	return []string{FleetKey, FleetScopeKey, FleetWidthKey, FleetLiveWidthKey, FleetReachHolderKey, WorktreeRootKey, CycleStateFileKey, TmuxSocketKey, DispatchIDKey, MsgTokenKey, DispatchDepthKey, PhaseKey}
 }
 
 func DispatchDepth(getenv func(string) string) int {
