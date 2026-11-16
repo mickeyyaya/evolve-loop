@@ -37,6 +37,8 @@ type integrationStatusMember struct {
 	Cycle  int    `json:"cycle"`
 	Status string `json:"status"`
 	Landed bool   `json:"landed,omitempty"`
+
+	Redelivered []string `json:"redelivered,omitempty"`
 }
 
 type integrationStatusReport struct {
@@ -63,6 +65,14 @@ type integrationStatusWaves struct {
 	ProjectRoot string                    `json:"project_root"`
 	Wave        int                       `json:"wave"`
 	Pools       []integrationStatusReport `json:"pools"`
+}
+
+func memberLine(m integrationStatusMember) string {
+	line := fmt.Sprintf("  cycle %d: %s%s", m.Cycle, m.Status, map[bool]string{true: ", landed", false: ""}[m.Landed])
+	if len(m.Redelivered) > 0 {
+		line += ", redelivered under new patches " + strings.Join(m.Redelivered, ",")
+	}
+	return line
 }
 
 func composes(rec integration.WaveRecord) int {
@@ -146,7 +156,7 @@ func buildIntegrationStatus(pool int, stage string, ev integrationStatusEvidence
 	}
 	for _, c := range slices.Sorted(maps.Keys(rec.Members)) {
 		m := rec.Members[c]
-		rep.Members = append(rep.Members, integrationStatusMember{Cycle: c, Status: string(m.Status), Landed: m.Landed})
+		rep.Members = append(rep.Members, integrationStatusMember{Cycle: c, Status: string(m.Status), Landed: m.Landed, Redelivered: m.Redelivered})
 	}
 	return rep
 }
@@ -348,7 +358,7 @@ func printStatus(rep integrationStatusReport, asJSON bool, stdout, stderr io.Wri
 	fmt.Fprintln(stdout, rep.Enforce)
 	fmt.Fprintf(stdout, "counts: %s\n", countsLine(rep.Counts))
 	for _, m := range rep.Members {
-		fmt.Fprintf(stdout, "  cycle %d: %s%s\n", m.Cycle, m.Status, map[bool]string{true: ", landed", false: ""}[m.Landed])
+		fmt.Fprintln(stdout, memberLine(m))
 	}
 	for _, b := range rep.Batches {
 		fmt.Fprintf(stdout, "  batch %d: %s base %s tip %s members %v\n", b.Index, b.Branch, integration.ShortSHA(b.Base), integration.ShortSHA(b.Tip), b.Members)
