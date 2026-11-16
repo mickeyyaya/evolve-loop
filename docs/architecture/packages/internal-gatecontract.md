@@ -16,3 +16,9 @@
 
 - `TrustClasses` is the one home of the class words. The inventory test of `internal/profiles` reads it.
 - The package is on the protected surface as a gate guarantee.
+
+## Shadow descriptor (K1a)
+
+- `Entry.Shadow` is a pointer to `Shadow`. It holds the policy key, the signal code and the `Decide`, `Enforce` and `Score` function values. It also holds the decision fields, emit sites, `Promotion` numbers, closure and policy subtree. An entry without a shadow contract has `Shadow == nil`.
+- `KindStageFeature` is the fourth kind.
+- `Entry.EffectiveStage` takes a policy lookup. It returns the policy value for an entry that has a policy key, and the seed `Stage` otherwise.

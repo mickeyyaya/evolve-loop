@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"slices"
 	"time"
 
@@ -28,6 +29,7 @@ type RefreshDeps struct {
 	Fallback        map[string]map[string]string
 	EffortListers   map[string]EffortLister
 	AllowedFamilies map[string][]string
+	TierPins        map[string]map[string]string
 	Prior           modelcatalog.Catalog
 	Freshness       map[string]FreshnessPolicy
 	Now             func() time.Time
@@ -60,6 +62,7 @@ func snapshotFor(ctx context.Context, cli string, deps RefreshDeps, log io.Write
 	efforts := discoverEfforts(ctx, cli, deps, log)
 	live, err := liveTiers(ctx, cli, deps)
 	if err == nil {
+		live.tiers = live.withTierPins(cli, deps.TierPins[cli], log)
 		return modelcatalog.CLISnapshot{
 			CLI: cli, Ready: true, TierModels: live.tiers,
 			Available: live.available, Efforts: efforts,
@@ -77,6 +80,25 @@ func snapshotFor(ctx context.Context, cli string, deps RefreshDeps, log io.Write
 		CLI: cli, Ready: true, TierModels: fb, Efforts: efforts,
 		Source: modelcatalog.SourceDetect, FallbackReason: err.Error(),
 	}, true
+}
+
+func (live liveResult) withTierPins(cli string, pins map[string]string, log io.Writer) map[string]string {
+	if len(pins) == 0 {
+		return live.tiers
+	}
+	out := make(map[string]string, len(live.tiers))
+	for tier, model := range live.tiers {
+		out[tier] = model
+	}
+	for _, tier := range slices.Sorted(maps.Keys(pins)) {
+		model := pins[tier]
+		if !slices.Contains(live.available, model) {
+			fmt.Fprintf(log, "[modelquery] WARN %s: tier pin %s=%q is not offered by the CLI; keeping the live pick\n", cli, tier, model)
+			continue
+		}
+		out[tier] = model
+	}
+	return out
 }
 
 type liveResult struct {
@@ -99,14 +121,16 @@ func liveTiers(ctx context.Context, cli string, deps RefreshDeps) (liveResult, e
 			return liveResult{}, fmt.Errorf("no models in allowed families %v", allowed)
 		}
 	}
-	fp := Fingerprint(FingerprintInput{
+	in := FingerprintInput{
 		CLI: cli, Candidates: ids,
 		Policy: deps.Freshness[cli], Tiers: modelcatalog.CanonicalTiers,
-	})
+		Pins: PinList(deps.TierPins[cli]),
+	}
+	fp := Fingerprint(in)
 	if prior, ok := deps.Prior.CLIs[cli]; ok && isReusablePrior(prior, fp) {
 		return liveResult{tiers: prior.TierModels, available: ids, hash: fp}, nil
 	}
-	if tiers, ok := carryAcrossBump(cli, deps.Prior.CLIs[cli], ids, deps.Freshness[cli]); ok {
+	if tiers, ok := carryAcrossBump(deps.Prior.CLIs[cli], ids, in); ok {
 		return liveResult{tiers: tiers, available: ids, hash: fp}, nil
 	}
 	mapped, err := deps.Classifier.Classify(ctx, cli, ids)
@@ -128,14 +152,14 @@ func isSoundPrior(prior modelcatalog.CLIEntry) bool {
 	return prior.Source == modelcatalog.SourceLive && coversCanonicalTiers(prior.TierModels)
 }
 
-func carryAcrossBump(cli string, prior modelcatalog.CLIEntry, ids []string, p FreshnessPolicy) (map[string]string, bool) {
+func carryAcrossBump(prior modelcatalog.CLIEntry, ids []string, in FingerprintInput) (map[string]string, bool) {
 	if !isSoundPrior(prior) || len(prior.Available) == 0 || !sameLineages(prior.Available, ids) {
 		return nil, false
 	}
-	if !priorDerivedFromItsOffering(cli, prior, p) {
+	if !priorDerivedFromItsOffering(prior, in) {
 		return nil, false
 	}
-	tiers := PromoteLatest(prior.TierModels, ids, p)
+	tiers := PromoteLatest(prior.TierModels, ids, in.Policy)
 	for _, model := range tiers {
 		if !slices.Contains(ids, model) {
 			return nil, false
@@ -144,10 +168,9 @@ func carryAcrossBump(cli string, prior modelcatalog.CLIEntry, ids []string, p Fr
 	return tiers, true
 }
 
-func priorDerivedFromItsOffering(cli string, prior modelcatalog.CLIEntry, p FreshnessPolicy) bool {
-	return prior.CandidatesHash != "" && prior.CandidatesHash == Fingerprint(FingerprintInput{
-		CLI: cli, Candidates: prior.Available, Policy: p, Tiers: modelcatalog.CanonicalTiers,
-	})
+func priorDerivedFromItsOffering(prior modelcatalog.CLIEntry, in FingerprintInput) bool {
+	in.Candidates = prior.Available
+	return prior.CandidatesHash != "" && prior.CandidatesHash == Fingerprint(in)
 }
 
 func sameLineages(a, b []string) bool {
