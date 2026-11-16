@@ -81,7 +81,7 @@ func greenMerger(gh *fakePRGitHub, fetch ciwatch.Fetcher, live []runlease.LiveRu
 const mergeSHA = "0123456789abcdef0123456789abcdef01234567"
 
 func openPR(head string) string {
-	return `{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","headRefOid":"` + head + `","baseRefName":"main"}`
+	return `{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","headRefOid":"` + head + `","baseRefName":"main","body":"Closes-Inbox: none"}`
 }
 
 func TestPRMerger_WaitsForGreenThenMergesAtTheVerifiedHead(t *testing.T) {

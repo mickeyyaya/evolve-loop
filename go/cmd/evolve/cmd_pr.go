@@ -165,6 +165,7 @@ type prMerger struct {
 	root         string
 	windowOpen   bool
 	method       string
+	trailerStage string
 	poll, wait   time.Duration
 	updateBranch bool
 	gh           func(ctx context.Context, args ...string) ([]byte, error)
@@ -194,7 +195,8 @@ func newPRMerger(root string, a prMergeArgs, stdout, stderr io.Writer) (prMerger
 		return prMerger{}, err
 	}
 	return prMerger{
-		root: root, windowOpen: gate.open(), method: method, poll: time.Duration(*cw.PollS) * time.Second, wait: a.wait, updateBranch: a.updateBranch,
+		root: root, windowOpen: gate.open(), method: method, trailerStage: pol.InboxTrailerStage(),
+		poll: time.Duration(*cw.PollS) * time.Second, wait: a.wait, updateBranch: a.updateBranch,
 		gh: ghIn(root), fetch: ciwatch.NewGHFetcher(root), liveRuns: func() ([]runlease.LiveRun, error) { return planeLiveRuns(root, time.Now()) },
 		now: time.Now, sleep: time.Sleep, stdout: stdout, stderr: stderr,
 	}, nil
@@ -306,12 +308,19 @@ func (m prMerger) planeIdle() error {
 	return refusef("a loop is running: %s is live", strings.Join(names, ", "))
 }
 
+type prCommit struct {
+	MessageHeadline string `json:"messageHeadline"`
+	MessageBody     string `json:"messageBody"`
+}
+
 type prView struct {
-	State       string `json:"state"`
-	IsDraft     bool   `json:"isDraft"`
-	Mergeable   string `json:"mergeable"`
-	HeadRefOid  string `json:"headRefOid"`
-	BaseRefName string `json:"baseRefName"`
+	State       string     `json:"state"`
+	IsDraft     bool       `json:"isDraft"`
+	Mergeable   string     `json:"mergeable"`
+	HeadRefOid  string     `json:"headRefOid"`
+	BaseRefName string     `json:"baseRefName"`
+	Body        string     `json:"body"`
+	Commits     []prCommit `json:"commits"`
 }
 
 func (p prView) refusal() error {
@@ -343,7 +352,7 @@ func decodeGH(ctx context.Context, gh func(context.Context, ...string) ([]byte, 
 
 func (m prMerger) view(ctx context.Context, n string) (prView, error) {
 	var pr prView
-	if err := m.ghJSON(ctx, &pr, "pr", "view", n, "--json", "number,state,isDraft,mergeable,headRefOid,baseRefName"); err != nil {
+	if err := m.ghJSON(ctx, &pr, "pr", "view", n, "--json", "number,state,isDraft,mergeable,headRefOid,baseRefName,body,commits"); err != nil {
 		return pr, err
 	}
 	return pr, pr.refusal()
@@ -380,12 +389,40 @@ func (m prMerger) admit(ctx context.Context, n string) error {
 	return refusef("%s; #%s waits for a boundary: %s", refusal, n, d.Reason)
 }
 
+func prTrailerText(pr prView) []byte {
+	var b strings.Builder
+	b.WriteString(pr.Body)
+	for _, c := range pr.Commits {
+		b.WriteString("\n\n")
+		b.WriteString(c.MessageHeadline)
+		b.WriteByte('\n')
+		b.WriteString(c.MessageBody)
+	}
+	return []byte(b.String())
+}
+
+func (m prMerger) checkTrailers(n string, pr prView) error {
+	_, _, violations := checkInboxTrailerBytes(m.root, prTrailerText(pr), "PR #"+n)
+	if len(violations) == 0 {
+		return nil
+	}
+	msg := strings.Join(violations, "; ")
+	if m.trailerStage == "enforce" {
+		return refusef("%s", msg)
+	}
+	fmt.Fprintf(m.stderr, "%s#%s shadow: would refuse: %s\n", prMergePrefix, n, msg)
+	return nil
+}
+
 func (m prMerger) mergeOne(ctx context.Context, n string) (string, error) {
 	if err := m.admit(ctx, n); err != nil {
 		return "", err
 	}
 	pr, err := m.view(ctx, n)
 	if err != nil {
+		return "", err
+	}
+	if err := m.checkTrailers(n, pr); err != nil {
 		return "", err
 	}
 	if pr, err = m.upToDate(ctx, n, pr); err != nil {

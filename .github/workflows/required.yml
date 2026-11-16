@@ -184,19 +184,44 @@ jobs:
           base=$(git merge-base "refs/remotes/origin/$BASE_REF" "$HEAD_SHA")
           "$RUNNER_TEMP/evolve" docs ste-lint --strict --changed "$base" --added --project-root "$GITHUB_WORKSPACE"
 
+  trailer-check:
+    name: inbox trailer check
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+      - name: Build evolve
+        working-directory: go
+        run: go build -o "$RUNNER_TEMP/evolve" ./cmd/evolve
+      - name: Check inbox trailers
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          base=$(git merge-base "$BASE_SHA" "$HEAD_SHA")
+          "$RUNNER_TEMP/evolve" inbox trailer-check --range "$base..$HEAD_SHA" --project-root "$GITHUB_WORKSPACE"
+
   required:
     name: CI required
-    needs: [changes, validate, go, golangci-lint, landing, inbox, ste-lint]
+    needs: [changes, validate, go, golangci-lint, landing, inbox, ste-lint, trailer-check]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
       - id: result
         name: Require every selected suite to succeed
         env:
+          EVENT_NAME: ${{ github.event_name }}
           ROUTE_RESULT: ${{ needs.changes.result }}
           DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
           DOCS_REQUIRED: ${{ needs.changes.outputs.docs }}
           STE_LINT_RESULT: ${{ needs.ste-lint.result }}
+          TRAILER_CHECK_RESULT: ${{ needs.trailer-check.result }}
           VALIDATE_RESULT: ${{ needs.validate.result }}
           PLUGIN_RESULT: ${{ needs.validate.outputs.plugin_result }}
           ACS_RESULT: ${{ needs.validate.outputs.acs_result }}
@@ -222,6 +247,10 @@ jobs:
           case "$DOCS_REQUIRED:$STE_LINT_RESULT" in
             true:success|false:skipped) ;;
             *) echo "STE lint did not match the route: $DOCS_REQUIRED:$STE_LINT_RESULT" >&2; exit 1 ;;
+          esac
+          case "$EVENT_NAME:$TRAILER_CHECK_RESULT" in
+            pull_request:success|push:skipped|workflow_dispatch:skipped|schedule:skipped) ;;
+            *) echo "inbox trailer check did not match the event: $EVENT_NAME:$TRAILER_CHECK_RESULT" >&2; exit 1 ;;
           esac
           case "$INBOX_REQUIRED:$INBOX_RESULT" in
             true:success|false:skipped) ;;

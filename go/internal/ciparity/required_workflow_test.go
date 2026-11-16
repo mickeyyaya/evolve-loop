@@ -38,7 +38,7 @@ func TestRequiredWorkflow_AlwaysReportsAndCannotSkipDependencies(t *testing.T) {
 		t.Fatal(err)
 	}
 	slices.Sort(needs)
-	if !slices.Equal(needs, []string{"changes", "go", "golangci-lint", "inbox", "landing", "ste-lint", "validate"}) {
+	if !slices.Equal(needs, []string{"changes", "go", "golangci-lint", "inbox", "landing", "ste-lint", "trailer-check", "validate"}) {
 		t.Fatalf("required result dependencies = %v", needs)
 	}
 	for id, source := range map[string]string{"go": "go.yml", "validate": "ci.yml", "landing": "landing-validation.yml"} {

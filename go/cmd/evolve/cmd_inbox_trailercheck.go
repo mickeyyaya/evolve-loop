@@ -38,15 +38,11 @@ func parseInboxTrailerCheckArgs(args []string, stderr io.Writer) (string, bool, 
 	return strings.TrimSpace(rng), asJSON, true
 }
 
-func checkInboxTrailerRange(root, rng string) ([]string, []string, []string, error) {
-	out, err := sysexec.Command(context.Background(), "git", "-C", root, "log", "--format=%B", rng).CombinedOutput()
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("git log %s: %w (%s)", rng, err, strings.TrimSpace(string(out)))
-	}
-	closes := closesinbox.IDs(out)
-	refs := closesinbox.RefIDs(out)
-	if !closesinbox.Declares(out) {
-		return closes, refs, []string{"no Closes-Inbox or Refs-Inbox trailer in " + rng}, nil
+func checkInboxTrailerBytes(root string, body []byte, label string) ([]string, []string, []string) {
+	closes := closesinbox.IDs(body)
+	refs := closesinbox.RefIDs(body)
+	if !closesinbox.Declares(body) {
+		return closes, refs, []string{"no Closes-Inbox or Refs-Inbox trailer in " + label}
 	}
 	opts := inboxmover.Options{InboxDir: filepath.Join(root, ".evolve", "inbox"), Stderr: io.Discard}
 	var violations []string
@@ -56,6 +52,15 @@ func checkInboxTrailerRange(root, rng string) ([]string, []string, []string, err
 			violations = append(violations, fmt.Sprintf("%s is not an open inbox item (state %s)", id, ds.State))
 		}
 	}
+	return closes, refs, violations
+}
+
+func checkInboxTrailerRange(root, rng string) ([]string, []string, []string, error) {
+	out, err := sysexec.Command(context.Background(), "git", "-C", root, "log", "--format=%B", rng).CombinedOutput()
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("git log %s: %w (%s)", rng, err, strings.TrimSpace(string(out)))
+	}
+	closes, refs, violations := checkInboxTrailerBytes(root, out, rng)
 	return closes, refs, violations, nil
 }
 

@@ -15,11 +15,11 @@ func TestRequiredResult_RejectsMissingOrUnsuccessfulWork(t *testing.T) {
 	t.Parallel()
 	step := workflowStep(t, RequiredWorkflow, "required", "result")
 	bindings := map[string]string{
-		"ROUTE_RESULT": "${{ needs.changes.result }}", "VALIDATE_RESULT": "${{ needs.validate.result }}",
+		"EVENT_NAME": "${{ github.event_name }}", "ROUTE_RESULT": "${{ needs.changes.result }}", "VALIDATE_RESULT": "${{ needs.validate.result }}",
 		"GO_REQUIRED": "${{ needs.changes.outputs.go }}", "GO_RESULT": "${{ needs.go.result }}",
 		"LANDING_REQUIRED": "${{ needs.changes.outputs.landing }}", "LANDING_RESULT": "${{ needs.landing.result }}",
 		"INBOX_REQUIRED": "${{ needs.changes.outputs.inbox }}", "INBOX_RESULT": "${{ needs.inbox.result }}",
-		"LINT_RESULT": "${{ needs.golangci-lint.result }}",
+		"LINT_RESULT": "${{ needs.golangci-lint.result }}", "TRAILER_CHECK_RESULT": "${{ needs.trailer-check.result }}",
 	}
 	for key, want := range bindings {
 		if step.Env[key] != want {
@@ -63,8 +63,13 @@ func TestRequiredResult_RejectsMissingOrUnsuccessfulWork(t *testing.T) {
 		{"lint_unselected_but_failed", map[string]string{"GO_REQUIRED": "false", "GO_RESULT": "skipped", "GO_SUITE_RESULT": "", "LINT_RESULT": "failure"}, false},
 		{"lint_unselected_but_cancelled", map[string]string{"GO_REQUIRED": "false", "GO_RESULT": "skipped", "GO_SUITE_RESULT": "", "LINT_RESULT": "cancelled"}, false},
 		{"route_failed_docs_outputs", map[string]string{"ROUTE_RESULT": "failure", "GO_REQUIRED": "false", "GO_RESULT": "skipped", "GO_SUITE_RESULT": "", "LANDING_REQUIRED": "false", "LANDING_RESULT": "skipped", "LANDING_SUITE_RESULT": ""}, false},
+		{"push_skipped_trailer_check", map[string]string{"EVENT_NAME": "push", "TRAILER_CHECK_RESULT": "skipped"}, true},
+		{"workflow_dispatch_skipped_trailer_check", map[string]string{"EVENT_NAME": "workflow_dispatch", "TRAILER_CHECK_RESULT": "skipped"}, true},
+		{"schedule_skipped_trailer_check", map[string]string{"EVENT_NAME": "schedule", "TRAILER_CHECK_RESULT": "skipped"}, true},
+		{"push_success_trailer_check", map[string]string{"EVENT_NAME": "push", "TRAILER_CHECK_RESULT": "success"}, false},
+		{"unknown_event_trailer_check", map[string]string{"EVENT_NAME": "merge_group", "TRAILER_CHECK_RESULT": "skipped"}, false},
 	}
-	for _, dependency := range []string{"ROUTE_RESULT", "VALIDATE_RESULT", "GO_RESULT", "LANDING_RESULT", "PLUGIN_RESULT", "ACS_RESULT", "GO_SUITE_RESULT", "LANDING_SUITE_RESULT", "STE_LINT_RESULT", "LINT_RESULT", "DOCS_ONLY", "DOCS_REQUIRED"} {
+	for _, dependency := range []string{"ROUTE_RESULT", "VALIDATE_RESULT", "GO_RESULT", "LANDING_RESULT", "PLUGIN_RESULT", "ACS_RESULT", "GO_SUITE_RESULT", "LANDING_SUITE_RESULT", "STE_LINT_RESULT", "TRAILER_CHECK_RESULT", "LINT_RESULT", "DOCS_ONLY", "DOCS_REQUIRED"} {
 		for _, result := range []string{"failure", "cancelled", "skipped", "", "neutral", "pending"} {
 			if dependency == "STE_LINT_RESULT" && result == "skipped" {
 				continue
@@ -91,7 +96,7 @@ func TestRequiredResult_RejectsMissingOrUnsuccessfulWork(t *testing.T) {
 }
 
 func requiredResultEnv(set map[string]string) map[string]string {
-	env := map[string]string{"INBOX_REQUIRED": "false", "INBOX_RESULT": "skipped", "DOCS_ONLY": "false", "DOCS_REQUIRED": "false", "STE_LINT_RESULT": "skipped", "ROUTE_RESULT": "success", "VALIDATE_RESULT": "success", "GO_REQUIRED": "true", "GO_RESULT": "success", "LANDING_REQUIRED": "true", "LANDING_RESULT": "success", "PLUGIN_RESULT": "success", "ACS_RESULT": "success", "GO_SUITE_RESULT": "success", "LANDING_SUITE_RESULT": "success"}
+	env := map[string]string{"EVENT_NAME": "pull_request", "TRAILER_CHECK_RESULT": "success", "INBOX_REQUIRED": "false", "INBOX_RESULT": "skipped", "DOCS_ONLY": "false", "DOCS_REQUIRED": "false", "STE_LINT_RESULT": "skipped", "ROUTE_RESULT": "success", "VALIDATE_RESULT": "success", "GO_REQUIRED": "true", "GO_RESULT": "success", "LANDING_REQUIRED": "true", "LANDING_RESULT": "success", "PLUGIN_RESULT": "success", "ACS_RESULT": "success", "GO_SUITE_RESULT": "success", "LANDING_SUITE_RESULT": "success"}
 	for key, value := range set {
 		env[key] = value
 	}
