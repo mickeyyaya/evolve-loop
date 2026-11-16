@@ -105,7 +105,10 @@ func TestTrainRecordRefusesAnAttestationOfAnotherChange(t *testing.T) {
 	r.f.console(t, 6, "feat: a", map[string]string{"a.md": "a\n"})
 	r.f.g.Git("push", "-q", "origin", "pr-6:refs/pull/6/head")
 	wrong := func(ev Evidence) (AuditBinding, error) {
-		return AttestedBinding(ev, Digest([]byte("elsewhere")), Digest([]byte("raw")))
+		if err := CoversChange(Digest([]byte("elsewhere")), ev.DiffSHA); err != nil {
+			return AuditBinding{}, err
+		}
+		return AttestedBinding(ev, Digest([]byte("raw")))
 	}
 	_, err := r.train.Record(context.Background(), 6, wrong)
 	var refusal *Refusal

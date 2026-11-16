@@ -13,7 +13,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/closesinbox"
 )
 
-const closesInboxKey = "Closes-Inbox: "
+const (
+	closesInboxKey  = "Closes-Inbox: "
+	auditKindKey    = "Evolve-Audit-Kind: "
+	KindCommitChain = "commit-chain"
+)
 
 func FindPRRecord(root string, pr int) (DeliverableRecord, bool) {
 	path := PRRecordPath(WaveDir(root, ConsoleWave), pr)
@@ -28,20 +32,50 @@ func Digest(raw []byte) string {
 
 func digest(parts ...string) string { return Digest([]byte(strings.Join(parts, "\n"))) }
 
+type CommitChange struct {
+	SHA     string
+	BaseSHA string
+	DiffSHA string
+	Paths   []string
+}
+
 type Evidence struct {
 	Base    string
 	Commits []string
+	Changes []CommitChange
 	Paths   []string
 	DiffSHA string
 }
 
+type ChangeCheck func(c CommitChange) (string, error)
+
+func ChainedBinding(ev Evidence, check ChangeCheck) (AuditBinding, error) {
+	if len(ev.Changes) == 0 {
+		return AuditBinding{}, errors.New("integration: a commit chain binds at least one commit change")
+	}
+	records := make([]string, 0, len(ev.Changes))
+	for _, c := range ev.Changes {
+		rec, err := check(c)
+		if err != nil {
+			reason := fmt.Sprintf("commit %s (change %s) has no passing review record: %v. %s", ShortSHA(c.SHA), ShortSHA(c.DiffSHA), err, RestoreStep(ShortSHA(c.BaseSHA), ShortSHA(c.SHA)))
+			return AuditBinding{}, errors.New(reason)
+		}
+		records = append(records, rec)
+	}
+	return AuditBinding{Kind: KindCommitChain, TreeSHA: ev.DiffSHA, ArtifactSHA: digest(records...)}, nil
+}
+
 type Binder func(ev Evidence) (AuditBinding, error)
 
-func AttestedBinding(ev Evidence, tree, artifact string) (AuditBinding, error) {
-	if tree != ev.DiffSHA {
-		return AuditBinding{}, fmt.Errorf("integration: the attestation covers the change %q, not the change %q of this PR", tree, ev.DiffSHA)
+func CoversChange(tree, change string) error {
+	if tree != change {
+		return fmt.Errorf("integration: the attestation covers the change %q, not the change %q of this PR", tree, change)
 	}
-	return AuditBinding{TreeSHA: tree, ArtifactSHA: artifact}, nil
+	return nil
+}
+
+func AttestedBinding(ev Evidence, artifact string) (AuditBinding, error) {
+	return AuditBinding{TreeSHA: ev.DiffSHA, ArtifactSHA: artifact}, nil
 }
 
 func ClassBinding(ev Evidence, class string, covers func(paths []string) bool) (AuditBinding, error) {
@@ -81,6 +115,9 @@ func (c Composer) message(ctx context.Context, rec DeliverableRecord) (string, e
 	lines := []string{"evolve-pr " + strconv.Itoa(rec.PR) + ": integrate", "", sourcePRLine(rec.PR)}
 	for _, id := range ids {
 		lines = append(lines, closesInboxKey+id)
+	}
+	if rec.Audit.Kind != "" {
+		lines = append(lines, auditKindKey+rec.Audit.Kind)
 	}
 	return strings.Join(lines, "\n") + "\n", nil
 }
