@@ -1,6 +1,9 @@
 package inboxcurator
 
 import (
+	"encoding/json"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
@@ -70,5 +73,30 @@ func TestProposalKind_SpellsEachKindAsItsSignalField(t *testing.T) {
 		if got := (Proposal{Kind: kind}).Event("shadow", false).Fields["kind"]; got != want {
 			t.Errorf("kind field = %q, want %q", got, want)
 		}
+	}
+}
+
+func TestCurate_ALandedClaimProposesAConsumeOnlyWhenTheCheckHolds(t *testing.T) {
+	claimed := inboxbatch.Item{ID: "claimed", Path: "c.json", Kind: "bug", Files: []string{"go/a.go"}, ProtectedFiles: []string{"go/p.go"}, LandedSHA: json.RawMessage(`"abc1234"`)}
+	plain := inboxbatch.Item{ID: "plain", Path: "p.json", Kind: "bug", Files: []string{"go/a.go"}}
+	var asked []string
+	check := func(sha string, paths []string) bool {
+		asked = append(asked, sha+" "+strings.Join(paths, ","))
+		return true
+	}
+
+	got := Curate(Inputs{Open: []inboxbatch.Item{claimed, plain}, LandedCheck: check})
+
+	if len(got) != 1 || got[0].Kind != ProposeConsume || got[0].ID != "claimed" || !got[0].Deterministic || got[0].Trigger != TriggerLanding || !slices.Contains(got[0].Evidence, "landed_sha abc1234") {
+		t.Fatalf("proposals = %+v", got)
+	}
+	if !slices.Equal(asked, []string{"abc1234 go/a.go,go/p.go"}) {
+		t.Errorf("the check was asked %v, want the claim once with the declared paths", asked)
+	}
+	if got := Curate(Inputs{Open: []inboxbatch.Item{claimed}, LandedCheck: func(string, []string) bool { return false }}); len(got) != 0 {
+		t.Errorf("a failed check proposed %+v", got)
+	}
+	if got := Curate(Inputs{Open: []inboxbatch.Item{claimed}}); len(got) != 0 {
+		t.Errorf("no wired check proposed %+v", got)
 	}
 }

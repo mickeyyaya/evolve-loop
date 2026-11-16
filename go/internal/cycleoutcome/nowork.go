@@ -10,7 +10,9 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/landedclaim"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -26,6 +28,8 @@ type NoWorkInputs struct {
 	Stderr      io.Writer
 	Ledger      inboxmover.LedgerAppender
 	Signals     *signalcenter.Center
+	LandedCheck landedclaim.Check
+	Protected   func(string) bool
 }
 
 func (in NoWorkInputs) WithLedger(l inboxmover.LedgerAppender) NoWorkInputs {
@@ -52,6 +56,7 @@ func ApplyNoWork(in NoWorkInputs) (NoWorkResult, error) {
 	inboxDir := filepath.Join(in.ProjectRoot, ".evolve", "inbox")
 	var errs []error
 	answers := map[string]string{}
+	claims := landedClaimsOf(in.Workspace)
 	for _, d := range committedset.Dispositions(in.Workspace) {
 		if !containsID(scope, d.ID) {
 			continue
@@ -59,6 +64,12 @@ func ApplyNoWork(in NoWorkInputs) (NoWorkResult, error) {
 		answers[d.ID] = noWorkRouteReason(in.Cycle, d)
 		if present, alreadyRouted := itemRouteState(inboxDir, d.ID, os.ReadFile); !present || alreadyRouted {
 			continue
+		}
+		if stampLanded(in, d.ID, claims[d.ID]) {
+			continue
+		}
+		if err := stampProtectedPath(in, d); err != nil {
+			errs = append(errs, err)
 		}
 		if _, err := inboxmover.RouteConsole(opts, d.ID, answers[d.ID], in.Cycle); err != nil {
 			if !errors.Is(err, inboxmover.ErrNotFound) {
@@ -80,6 +91,42 @@ func ApplyNoWork(in NoWorkInputs) (NoWorkResult, error) {
 		errs = append(errs, err)
 	}
 	return res, errors.Join(errs...)
+}
+
+func landedClaimsOf(workspace string) map[string]string {
+	body, err := os.ReadFile(filepath.Join(workspace, committedset.DecisionFile))
+	if err != nil {
+		return nil
+	}
+	return inboxmover.LandedClaims(body)
+}
+
+func stampLanded(in NoWorkInputs, id, sha string) bool {
+	if in.LandedCheck == nil || sha == "" {
+		return false
+	}
+	loc, err := inboxmover.Locate(filepath.Join(in.ProjectRoot, ".evolve", "inbox"), id)
+	if err != nil {
+		return false
+	}
+	body, _ := os.ReadFile(loc.Path)
+	var item inboxbatch.Item
+	if json.Unmarshal(body, &item) != nil || !in.LandedCheck(sha, item.ClaimPaths()) {
+		return false
+	}
+	stamp, _ := json.Marshal(sha)
+	return inboxmover.UpdateItemJSON(loc.Path, func(m map[string]json.RawMessage) { m[inboxbatch.LandedSHAField] = stamp }) == nil
+}
+
+func stampProtectedPath(in NoWorkInputs, d committedset.Disposition) error {
+	if in.Protected == nil || (d.Bucket != "dropped" && d.Bucket != "escalate_block") {
+		return nil
+	}
+	tag, path := inboxmover.DropReasonToken(d.Reason)
+	if tag != inboxmover.ProtectedSurfaceTag || path == "" || !in.Protected(path) {
+		return nil
+	}
+	return addItemProtectedFiles(in.ProjectRoot, d.ID, []string{path})
 }
 
 func retireUnbackedScope(opts inboxmover.Options, cycle int, scope []string, answers map[string]string) ([]string, error) {
@@ -116,7 +163,7 @@ func itemRouteState(inboxDir, id string, readFile func(string) ([]byte, error)) 
 }
 
 func noWorkRouteReason(cycle int, d committedset.Disposition) string {
-	reason := fmt.Sprintf("lane triage (cycle %d) %s", cycle, d.Bucket)
+	reason := fmt.Sprintf("%s%d) %s", inboxbatch.NoWorkRoutePrefix, cycle, d.Bucket)
 	if d.Reason != "" {
 		reason += ": " + d.Reason
 	}

@@ -1,6 +1,7 @@
 package lifecycle
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -24,6 +25,7 @@ type RouteRequest struct {
 	Reason    string
 	Cycle     int
 	BlockedBy string
+	RoutedBy  string
 }
 
 func (m *Mover) RouteConsole(taskID, reason string, cycle int) (RouteResult, error) {
@@ -46,6 +48,7 @@ func (m *Mover) RouteConsoleRequest(r RouteRequest) (RouteResult, error) {
 		item[inboxbatch.RoutedReasonField] = jsonString(reason)
 		item[inboxbatch.RoutedCycleField] = json.RawMessage(strconv.Itoa(cycle))
 		item[inboxbatch.RoutedAtField] = jsonString(stamp)
+		item[inboxbatch.RoutedByField] = jsonString(cmp.Or(r.RoutedBy, inboxbatch.RoutedByLoop))
 		return addBlocker(item, r.BlockedBy)
 	}); errors.Is(rerr, ErrInvalidItem) {
 		return res, fmt.Errorf("route-console: %s: %w", taskID, rerr)

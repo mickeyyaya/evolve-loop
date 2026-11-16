@@ -134,6 +134,14 @@ Count `PROTECTED_PREDICATE_ROUTE` cycles per wave. If most routes prove to be fa
 - `cmd/evolve`: `TestCloseoutCycleOutcome_AProvenProtectedPredicateRoutesTheItemButStaysAFailure`, which also pins exit code 2.
 - `wave` and `cyclehealth`: the termination reason is shown.
 
+- **A checked landed claim is not a hand-off.** When triage names a commit for an item, `ApplyNoWork` asks the injected `LandedCheck`. The check holds when the commit is on `main` and changes a declared path of the item. `ApplyNoWork` then stamps the sha on the loop-owned field `landed_sha`, in place. It does not route, move or retire the item. The hand-off record does not list it.
+- **A claim that fails the check routes the item.** A failed check, a git error, an unwired check or a missing sha routes the item as before.
+- **The claimed sha has two sources.** The sha comes from `skip_shipped.git_sha`, or from the token after the colon of an `already-shipped:` drop. 
+- **Tests of the landed claim.** Pinned by `TestApplyNoWork_ALandedClaimOnTheItemSurfaceStampsTheShaAndRoutesNothing`, `TestApplyNoWork_ACommitNotOnMainRoutesTheItem`, `TestApplyNoWork_ACommitOffTheItemSurfaceRoutesTheItem`, `TestApplyNoWork_AGitErrorRoutesTheItem`, `TestApplyNoWork_WithNoCheckWiredTheClaimRoutesTheItem`, `TestApplyNoWork_ALandedClaimIsNotAHandoff`, `TestApplyNoWork_AnAlreadyShippedDropNamesItsSha` and `TestApplyNoWork_AnAlreadyShippedDropWithoutAShaRoutesTheItem`.
+- **A protected refusal records its path as a fact.** For a `protected-surface: <path>` answer in `dropped[]` or `escalate_block[]`, `ApplyNoWork` adds the path to `protected_files` through `addItemProtectedFiles`. It does so only when the injected `Protected` predicate confirms the path. It never writes `files`. `inboxbatch.ConsoleRouted` then gives `protected fix surface` for the item. Pinned by `TestApplyNoWork_AProtectedDropStampsTheConfirmedPath`, `TestApplyNoWork_AnEscalatedProtectedCardStampsThePath`, `TestApplyNoWork_APathThePredicateDeniesIsNotStamped` and `TestApplyNoWork_AProtectedStampThatFailsIsReported`.
+- **The no-work route says who made it.** The route carries `routed_by` `loop` and a reason that starts with `inboxbatch.NoWorkRoutePrefix`. Pinned by `TestApplyNoWork_TheNoWorkRouteIsStampedAsTheLoops`.
+- **The production wiring passes both ports.** `cmd/evolve/cmd_cycle.go` builds the inputs through `noWorkInputsFor`. Pinned by `TestNoWorkInputsFor_WiresTheLandedCheckAndTheProtectedPredicate`.
+
 ## Invariants
 
 - **A closeout never invents an id.** It touches only ids of the committed set of the cycle, or of the scope of the lane for no-work.

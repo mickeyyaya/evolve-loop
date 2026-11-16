@@ -72,6 +72,9 @@
   - `AbsorbRootCopies` is the facade of the leaf's `Mover.AbsorbRootCopies`. `sync-main` and the wave sync call it after the merge or the fast-forward.
 - **`RecordRootTaskFailure`** was retired under 06-F2 in cycle 1864 (deleted as a second quarantine writer).
 
+- **A landed item is not on the lane menu.** `PlaceOnLaneMenu` puts an item with `landed_sha` in the waiting list, with the sha as the reason. Pinned by `TestPartitionLaneMenu_AnItemWithALandedShaIsNotOffered`.
+- **The drop vocabulary has one home.** `AlreadyShippedTag` and `ProtectedSurfaceTag` name the tags. `DropReasonToken` splits a reason into its tag and its first word. `LandedClaims` reads the claimed sha of each item from `skip_shipped.git_sha` and from the token after the colon of an `already-shipped:` drop. Pinned by `TestLandedClaims_ReadsTheShipShaAndTheTokenAfterTheColon` and `TestDropReasonToken_SplitsTheTagFromItsFirstWord`.
+
 ## Invariants
 
 - **Every lifecycle move is one `os.Rename` on one filesystem,** so an item is never in two states at once. The leaf pins the movers.
