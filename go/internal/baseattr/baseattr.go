@@ -15,6 +15,21 @@ import (
 type Key struct {
 	Package string `json:"package"`
 	Test    string `json:"test"`
+	Step    string `json:"step,omitempty"`
+}
+
+const stepPrefix = "step:"
+
+func StepKey(name string) Key {
+	return Key{Step: strings.ReplaceAll(name, nameDelim, "+")}
+}
+
+func (k Key) IsStep() bool {
+	return k.Step != ""
+}
+
+func TestKeys(keys []Key) []Key {
+	return slices.DeleteFunc(slices.Clone(keys), Key.IsStep)
 }
 
 type Reds struct {
@@ -90,7 +105,14 @@ func (v Verdict) MainGreen() bool {
 func Names(keys []Key) string {
 	names := make([]string, len(keys))
 	for i, k := range keys {
-		names[i] = k.Package + "." + k.Test
+		names[i] = nameOf(k)
 	}
 	return strings.Join(names, nameDelim)
+}
+
+func nameOf(k Key) string {
+	if k.IsStep() {
+		return stepPrefix + k.Step
+	}
+	return k.Package + "." + k.Test
 }

@@ -16,8 +16,8 @@ import (
 )
 
 var (
-	kA = Key{"example.com/m/p", "TestA"}
-	kB = Key{"example.com/m/p", "TestB"}
+	kA = Key{Package: "example.com/m/p", Test: "TestA"}
+	kB = Key{Package: "example.com/m/p", Test: "TestB"}
 )
 
 type script struct {
@@ -285,7 +285,7 @@ func TestAttribute_RunsOnlyTheRedKeysInADetachedBaseCheckout(t *testing.T) {
 	t.Parallel()
 	r := gittest.Fixture(t)
 	base := commitFiles(t, r, "fx", map[string]string{"go/go.mod": fixtureMod, "go/p/p_test.go": fixtureTest})
-	listing, red := Key{fixturePkg, "TestListsTrackedFiles"}, Key{fixturePkg, "TestRedOnTheBase"}
+	listing, red := Key{Package: fixturePkg, Test: "TestListsTrackedFiles"}, Key{Package: fixturePkg, Test: "TestRedOnTheBase"}
 	real := GoTestRunner(ipcenv.GoTestEnv())
 	var asked [][]Key
 	a := attributorOn(t, r, func(ctx context.Context, dir string, rd Reds) ([]Key, error) {

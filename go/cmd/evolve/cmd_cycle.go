@@ -550,7 +550,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 		core.PhaseBuildPlanner: buildplanner.New(buildplanner.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf}).BaseRunner(),
 		core.PhaseBuild:        swarmrunner.New(build.New(build.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), walked, swarm.ModeWriter, swCfg),
 		core.PhaseAudit:        audit.NewDefaultWithStageCompactSpec(walked, prm, cfg.PhaseIO, cfg.CompactPrompts, documentSpecPtr(cfg), audit.WithContractVerifier(verifierOf), audit.WithHostEffects(hostEffectsOf), audit.WithSignals(func() *signalcenter.Center { return signals })),
-		core.PhaseShip:         ship.New(ship.Config{Runner: sysexec.DefaultRunner, PhaseIO: cfg.PhaseIO, ManifestGate: gatesCfg.ManifestGate, RepoContractGate: gatesCfg.RepoContractGate, Signals: signals, Integration: shipIntegration}),
+		core.PhaseShip:         ship.New(ship.Config{Runner: sysexec.DefaultRunner, PhaseIO: cfg.PhaseIO, ManifestGate: gatesCfg.ManifestGate, RepoContractGate: gatesCfg.RepoContractGate, Signals: signals, Integration: shipIntegration, MainCI: mainCIFetcher(projectRoot), StepRun: ship.GateStepRunner(sysexec.DefaultRunner)}),
 		core.PhaseRetro:        retro.New(retro.Config{Bridge: walked, Prompts: prm, Model: "auto", CompactPrompts: cfg.CompactPrompts, Router: cliRouter, ContractVerifier: verifierOf}),
 		core.PhaseDebugger:     debugger.New(debugger.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, CompactPrompts: cfg.CompactPrompts}),
 	}

@@ -25,6 +25,13 @@ type stopCheck struct {
 
 func checkMainRedStop(ctx context.Context, opts *Options, warn io.Writer) ([]baseattr.Key, error) {
 	stop, holds := selfheal.ReadStop(opts.evolveDir(), warn)
+	if !holds && opts.mainCI == nil {
+		return nil, nil
+	}
+	gates := shipGates(opts, warn)
+	if opts.mainCI != nil {
+		stop, holds = mainCI{opts: opts, warn: warn, attr: attributorOf(opts, gates)}.sync(ctx, stop, holds)
+	}
 	if !holds {
 		return nil, nil
 	}
@@ -32,7 +39,6 @@ func checkMainRedStop(ctx context.Context, opts *Options, warn io.Writer) ([]bas
 	if err != nil {
 		return nil, err
 	}
-	gates := shipGates(opts, warn)
 	bound := selfheal.StopBound{EvolveDir: opts.evolveDir(), Bound: gates.MainRedStopBound, Now: opts.clock(), Emit: opts.Signals.Emit}
 	if err := bound.Check(); err != nil {
 		fmt.Fprintf(warn, "[ship] WARN main-red stop: %v\n", err)
@@ -55,12 +61,30 @@ func (c stopCheck) proof(ctx context.Context, tree, base string) mainstop.Proof 
 	if base == "" || base != c.main {
 		return mainstop.Proof{Base: base}
 	}
-	red, err := c.attr.RunIn(ctx, tree, mainstop.ProofReds(c.stop.Keys))
-	if err != nil {
-		fmt.Fprintf(c.warn, "[ship] WARN main-red stop: the keys of the stop could not be run in the lane (%v), so the lane is not a proven fix\n", err)
-		return mainstop.Proof{Base: base}
+	proof := mainstop.Proof{Base: base}
+	if tests := baseattr.TestKeys(c.stop.Keys); len(tests) > 0 {
+		red, err := c.attr.RunIn(ctx, tree, mainstop.ProofReds(tests))
+		if err != nil {
+			fmt.Fprintf(c.warn, "[ship] WARN main-red stop: the keys of the stop could not be run in the lane (%v), so the lane is not a proven fix\n", err)
+			return proof
+		}
+		proof = c.stop.Proven(base, red)
 	}
-	return c.stop.Proven(base, red)
+	proof.Green = append(proof.Green, c.provenSteps(ctx, tree)...)
+	return proof
+}
+
+func (c stopCheck) provenSteps(ctx context.Context, tree string) []baseattr.Key {
+	steps := c.stop.StepKeys()
+	if len(steps) == 0 || c.opts.stepRun == nil {
+		return nil
+	}
+	red, err := c.opts.stepRun(ctx, tree, steps)
+	if err != nil {
+		fmt.Fprintf(c.warn, "[ship] WARN main-red stop: the steps of the stop could not be run in the lane (%v), so the lane is not a proven fix\n", err)
+		return nil
+	}
+	return mainstop.Without(steps, red)
 }
 
 func (c stopCheck) admit(proof mainstop.Proof) ([]baseattr.Key, error) {
