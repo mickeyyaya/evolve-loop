@@ -33,7 +33,7 @@ func TestBenchOnEscalation_AgyWallScopeFollowsTheDispatchedTier(t *testing.T) {
 	}{
 		{"agy-tmux", "deep", "agy@Gemini 4 Argon"},
 		{"agy-tmux", "top", "agy@Gemini 4 Argon"},
-		{"agy-tmux", "balanced", "agy@Gemini 3.8 Flash"},
+		{"agy-tmux", "balanced", "agy@Gemini 4 Hydrogen"},
 		{"agy-tmux", "", "agy"},
 		{"agy-tmux", "sonnet", "agy"},
 		{"claude-tmux", "deep", "claude"},
