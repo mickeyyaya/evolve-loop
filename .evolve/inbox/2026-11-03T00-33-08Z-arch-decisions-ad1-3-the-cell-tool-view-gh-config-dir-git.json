@@ -6,12 +6,12 @@
   ],
   "campaign": "architecture-decisions-2026-11",
   "continuation": {
-    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2401",
-    "branch": "cycle-cd3ae73e-2401",
-    "snapshot_sha": "9333d6001e4e761ee288ae51bd0c247731c038da",
-    "base_sha": "109b1b22f1c889be72db4ec0ff88ee21f2e520d6",
-    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2401/audit-fail-reason.json",
-    "cycle": 2401
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2429",
+    "branch": "cycle-cd3ae73e-2429",
+    "snapshot_sha": "b853f2a4e8ffa6dee4b94b186775acfc6c484663",
+    "base_sha": "fd03a5b3d9f8606984db139911e9c3539b8d9896",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2429/audit-fail-reason.json",
+    "cycle": 2429
   },
   "created_at": "2026-11-03T00:33:08Z",
   "files": [

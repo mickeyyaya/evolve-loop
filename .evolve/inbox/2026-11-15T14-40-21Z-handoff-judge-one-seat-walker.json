@@ -18,6 +18,10 @@
   "kind": "fix",
   "origin": "console",
   "priority_class": "correctness",
+  "route": "console-manual",
+  "routed_at": "2026-11-16T06:16:26Z",
+  "routed_cycle": 2431,
+  "routed_reason": "lane triage (cycle 2431) escalate_block: protected-surface: .evolve/profiles/handoff-judge.json — control-plane changes go through the console route (operator-gated), not lane top_n",
   "summary": "Branch dev/cl-c1 (handoff-h10-independent-judge, not shipped) was blocked by the architecture review in round 3: the judge walks its own seats (ChainAttempt) beside bridgechain.Walking, so it skips the exit-85 bench and LaunchWithFreshSession; 3 surviving mutants (empty Worktree fallback, multi-line ask text, judge_tier empty).",
   "title": "Handoff judge: one seat walker with an independence filter (redesign after 3 blocked rounds)",
   "weight": 0.7

@@ -10,6 +10,7 @@
     "docs/architecture/adr/0167-shadow-stages-prove-themselves-on-chained-evidence.md"
   ],
   "evidence": "No verb recomputes a shadow stage's readiness from chained evidence today.",
+  "failure_count": 1,
   "files": [
     "go/cmd/evolve/cmd_stage.go",
     "go/internal/stageevidence/score.go"
@@ -17,6 +18,9 @@
   "fix": "Plan §6 K3: stage verify and stage report, the scorer interface, the decision version (digest of the decider closure plus its policy subtree); TestVerdictRecomputesFromFixtureChain, TestVersionDigestStableUnderUnrelatedChange, TestEvidenceOfOtherVersionNotCounted, TestEveryStageHasScorerAndVerdict.",
   "id": "shadow-contract-k3-stage-verify",
   "kind": "feature",
+  "last_failure_class": "unknown",
+  "last_failure_cycle": 2426,
+  "last_failure_reason": "cycle-failure-release",
   "origin": "console",
   "priority_class": "correctness",
   "summary": "No verb recomputes a shadow stage's readiness from chained evidence today.",

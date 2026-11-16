@@ -29,6 +29,10 @@
   "origin": "console",
   "priority_class": "performance",
   "retry_plan": "fresh-deep-plan",
+  "route": "console-manual",
+  "routed_at": "2026-11-16T04:01:51Z",
+  "routed_cycle": 2424,
+  "routed_reason": "lane triage (cycle 2424) dropped: protected-surface: go/acs/cycle1972/predicates_test.go",
   "summary": "2026-11-14 wave 172 supply census: with one in-flight item (paused-plan-starts-a-console-routed-item) holding the cell cmd/evolve, 12 lane-routable items waited (waiting_cell: cells cmd/evolve,family:... held by ...), and the 8-lane fleet ran 4 lanes. cmd/evolve holds every verb, so almost every feature touches it; at the package grain two unrelated verbs (wave status and inbox show) cannot run in parallel. Plan context: docs/architecture/wave-orchestrator.md (cells, admission); the optimistic-admission shadow already measures would-admit pairs (LOOP_ORCH_ADMISSION_SHADOW).",
   "title": "Lane admission treats go/cmd/evolve as one cell, so one item there blocks about 12 others",
   "weight": 0.85

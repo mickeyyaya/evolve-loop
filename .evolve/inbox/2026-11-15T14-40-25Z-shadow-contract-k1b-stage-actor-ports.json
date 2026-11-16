@@ -10,6 +10,7 @@
     "docs/architecture/adr/0167-shadow-stages-prove-themselves-on-chained-evidence.md"
   ],
   "evidence": "K1a (PR #1473) adds the gatecontract Shadow descriptor with nil Decide, Enforce and Score. Spec §4 (D6) needs consumer-side StageActor ports in core and ship and the injection from the cmd/evolve composition root, so dependencies point inward.",
+  "failure_count": 1,
   "files": [
     "go/internal/core/stage_actor.go",
     "go/internal/phases/ship/stage_actor.go",
@@ -18,6 +19,9 @@
   "fix": "Plan §6 K1 (ports part): the ports, the injection, TestEnforceBranchActsAtEnforce through the production entry point with a spy; the parallel_evaluate decider moved to a package a seed can name.",
   "id": "shadow-contract-k1b-stage-actor-ports",
   "kind": "feature",
+  "last_failure_class": "unknown",
+  "last_failure_cycle": 2430,
+  "last_failure_reason": "cycle-failure-release",
   "origin": "console",
   "priority_class": "correctness",
   "summary": "K1a (PR #1473) adds the gatecontract Shadow descriptor with nil Decide, Enforce and Score. Spec §4 (D6) needs consumer-side StageActor ports in core and ship and the injection from the cmd/evolve composition root, so dependencies point inward.",

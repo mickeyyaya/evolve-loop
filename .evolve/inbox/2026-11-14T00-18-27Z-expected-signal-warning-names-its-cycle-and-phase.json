@@ -5,12 +5,12 @@
     "Docs: signal-center-design.md section 8.1 and the signalcenter package note change in STE; 100% coverage on each changed function; zero code comments."
   ],
   "continuation": {
-    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2403",
-    "branch": "cycle-cd3ae73e-2403",
-    "snapshot_sha": "144f125018a616a446e8e1a80e80531780897f10",
-    "base_sha": "109b1b22f1c889be72db4ec0ff88ee21f2e520d6",
-    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2403/audit-fail-reason.json",
-    "cycle": 2403
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2423",
+    "branch": "cycle-cd3ae73e-2423",
+    "snapshot_sha": "4fffe9f9a48c2a5aa928c4d5341c14fc531a3095",
+    "base_sha": "38bc28bc639269d8e738b125443e9ce24a44a869",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2423/audit-fail-reason.json",
+    "cycle": 2423
   },
   "created_at": "2026-11-14T00:18:27Z",
   "files": [

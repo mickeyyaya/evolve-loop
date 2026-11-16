@@ -10,6 +10,7 @@
     "docs/architecture/adr/0167-shadow-stages-prove-themselves-on-chained-evidence.md"
   ],
   "evidence": "A stage can be flipped to enforce by a hand edit of policy.json with no verified evidence (#1459 nearly enabled a stage with no enforce path).",
+  "failure_count": 1,
   "files": [
     "go/cmd/evolve/cmd_stage.go",
     "go/cmd/evolve/cmd_loop_preflight.go"
@@ -17,6 +18,9 @@
   "fix": "Plan §6 K5: the flip verb writes the verified flip record and the policy change together; the loop-start preflight refuses enforce without a flip record; evolve stage status lists every contract row; the policy package imports neither the ledger nor the scorers.",
   "id": "shadow-contract-k5-stage-flip",
   "kind": "feature",
+  "last_failure_class": "unknown",
+  "last_failure_cycle": 2422,
+  "last_failure_reason": "cycle-failure-release",
   "origin": "console",
   "priority_class": "correctness",
   "summary": "A stage can be flipped to enforce by a hand edit of policy.json with no verified evidence (#1459 nearly enabled a stage with no enforce path).",
