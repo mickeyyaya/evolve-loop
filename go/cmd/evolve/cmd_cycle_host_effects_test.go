@@ -10,6 +10,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
@@ -56,7 +57,7 @@ func hostEffectsWorkspace(t *testing.T, withRecord bool) (string, core.ReviewInp
 	}
 	forbidden := func(p string) bool { return p == "go/internal/guards/role.go" }
 	in := core.ReviewInput{Cycle: hostEffectsCycle, Phase: "triage", Workspace: ws, ProjectRoot: root}
-	return root, in, newHostEffects(catalog, nil, nil, forbidden)
+	return root, in, newHostEffects(catalog, ledger.New(filepath.Join(root, ".evolve")), nil, forbidden)
 }
 
 func TestNewHostEffects_AProtectedFilesItemIsRoutedAndAClaimableItemIsClaimed(t *testing.T) {
@@ -71,6 +72,9 @@ func TestNewHostEffects_AProtectedFilesItemIsRoutedAndAClaimableItemIsClaimed(t 
 	}
 	if _, err := os.Stat(filepath.Join(root, ".evolve", "inbox", "processing", "cycle-4", "2026-01-01T00-00-01Z-y.json")); err != nil {
 		t.Fatalf("the claimable item must be claimed into processing/cycle-4: %v", err)
+	}
+	if rows, err := os.ReadFile(filepath.Join(root, ".evolve", "ledger.jsonl")); err != nil || len(rows) == 0 {
+		t.Fatalf("the claim row must land in the root ledger: err=%v bytes=%d", err, len(rows))
 	}
 }
 

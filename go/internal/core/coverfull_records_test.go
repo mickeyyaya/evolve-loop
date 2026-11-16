@@ -127,7 +127,7 @@ func TestRetroStateWriteFailuresAreNonFatal(t *testing.T) {
 	o := NewOrchestrator(st, &fakeLedger{}, nil)
 	cs := &CycleState{WorkspacePath: t.TempDir()}
 	var timings []phaseTimingEntry
-	fl := failureLearningRequest{Cycle: 1, Failed: PhaseBuild, Err: os.ErrInvalid, CycleState: cs, State: &State{}, Result: &CycleResult{}, Timings: &timings}
+	fl := failureLearningRequest{CycleRequest: CycleRequest{ProjectRoot: t.TempDir()}, Cycle: 1, Failed: PhaseBuild, Err: os.ErrInvalid, CycleState: cs, State: &State{}, Result: &CycleResult{}, Timings: &timings}
 	runner := &fakeRunner{name: string(PhaseRetro)}
 	if _, err := o.dispatchRetro(context.Background(), fl, runner, "s", "t"); err != nil {
 		t.Fatalf("dispatchRetro: %v", err)
