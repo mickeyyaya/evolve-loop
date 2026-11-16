@@ -72,9 +72,26 @@ type Options struct {
 	CurrentGoal string
 }
 
+const (
+	planeDirName = ".evolve"
+	inboxDirName = "inbox"
+)
+
+func planeRootOf(inboxDir string) string {
+	inboxDir = filepath.Clean(inboxDir)
+	plane := filepath.Dir(inboxDir)
+	if filepath.Base(inboxDir) != inboxDirName || filepath.Base(plane) != planeDirName {
+		return ""
+	}
+	return filepath.Dir(plane)
+}
+
 func (o *Options) resolveOpts() {
+	if o.ProjectRoot == "" {
+		o.ProjectRoot = planeRootOf(o.InboxDir)
+	}
 	if o.InboxDir == "" {
-		o.InboxDir = filepath.Join(o.ProjectRoot, ".evolve", "inbox")
+		o.InboxDir = filepath.Join(o.ProjectRoot, planeDirName, inboxDirName)
 	}
 	if o.LedgerPath == "" {
 		o.LedgerPath = filepath.Join(o.ProjectRoot, ".evolve", "ledger.jsonl")

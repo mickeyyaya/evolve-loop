@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 )
@@ -26,7 +27,7 @@ func seedHoldInbox(t *testing.T, evolveDir string, ids ...string) {
 
 func claimFor(t *testing.T, evolveDir string, cycle int, ids ...string) {
 	t.Helper()
-	if err := hostInboxClaimer(nil, nil, nil)(filepath.Join(evolveDir, "inbox"), cycle, ids); err != nil {
+	if err := hostInboxClaimer(ledger.New(evolveDir), nil, nil)(filepath.Join(evolveDir, "inbox"), cycle, ids); err != nil {
 		t.Fatal(err)
 	}
 }

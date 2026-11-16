@@ -47,7 +47,7 @@ func (c hostChain) run(t *testing.T) (ws string, res deliverable.Result) {
 		t.Fatal(err)
 	}
 	claim := func(dir string, cycle int, ids []string) error {
-		return inboxmover.ClaimPending(inboxmover.Options{InboxDir: dir, Stderr: io.Discard, IsProtectedPath: c.forbidden}, cycle, ids)
+		return inboxmover.ClaimPending(inboxmover.Options{InboxDir: dir, ProjectRoot: root, Stderr: io.Discard, IsProtectedPath: c.forbidden}, cycle, ids)
 	}
 	in := core.ReviewInput{Cycle: hostChainCycle, Phase: "triage", Workspace: ws, ProjectRoot: root}
 	fx := deliverable.NewHostEffects(cat, claim, c.forbidden)
@@ -113,5 +113,9 @@ func TestHostChain_AnUnroutedPinnedItemTheHostClaimsPassesTheGate(t *testing.T) 
 	}
 	if got, _ := committedset.Committed(ws); len(got) != 1 {
 		t.Fatalf("an unrouted item stays committed: %v", got)
+	}
+	rows, err := os.ReadFile(filepath.Join(ws, "..", "..", "ledger.jsonl"))
+	if err != nil || len(rows) == 0 {
+		t.Fatalf("the claim row must land in the root ledger: err=%v bytes=%d", err, len(rows))
 	}
 }
