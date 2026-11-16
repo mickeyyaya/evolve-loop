@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -130,16 +131,26 @@ func evidenceOf(diff string, commits ...string) Evidence {
 func TestAttestedBindingNeedsTheAttestationOfThisChange(t *testing.T) {
 	t.Parallel()
 	ev := evidenceOf("diff of PR 5", commitSHA40)
-	b, err := AttestedBinding(ev, ev.DiffSHA, Digest([]byte("raw")))
+	b, err := AttestedBinding(ev, Digest([]byte("raw")))
 	if err != nil {
 		t.Fatalf("AttestedBinding: %v", err)
 	}
 	if b.TreeSHA != ev.DiffSHA || b.ArtifactSHA != Digest([]byte("raw")) || b.Class != "" {
 		t.Errorf("binding = %+v", b)
 	}
+}
+
+func TestCoversChangeRefusesAnAttestationOfAnotherChange(t *testing.T) {
+	t.Parallel()
+	ev := evidenceOf("diff of PR 5", commitSHA40)
 	other := evidenceOf("diff of PR 6", commitSHA40)
-	if _, err := AttestedBinding(ev, other.DiffSHA, Digest([]byte("raw"))); err == nil || !strings.Contains(err.Error(), "not the change") {
-		t.Errorf("an attestation of another change bound the PR: %v", err)
+	if err := CoversChange(ev.DiffSHA, ev.DiffSHA); err != nil {
+		t.Errorf("CoversChange of the same change = %v", err)
+	}
+	err := CoversChange(other.DiffSHA, ev.DiffSHA)
+	want := fmt.Sprintf("integration: the attestation covers the change %q, not the change %q of this PR", other.DiffSHA, ev.DiffSHA)
+	if err == nil || err.Error() != want {
+		t.Errorf("CoversChange = %v, want %q", err, want)
 	}
 }
 
