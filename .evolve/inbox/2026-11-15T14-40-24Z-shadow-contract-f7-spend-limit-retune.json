@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "Spec §7 F7: the false-stop share and the window are MaxFalseStopPct and WindowCycles fields of the registry entry; TestSpendLimitWouldStopShippedCycles replays testdata/spend_distribution.json; new limits in policy.json from the printed output; state what the limiter counts.",
+    "The new tests are red without the change"
+  ],
+  "created_at": "2026-11-15T14:40:24Z",
+  "docs": [
+    "docs/architecture/shadow-stage-contract.md",
+    "docs/plans/shadow-stage-evidence-2026-11.md",
+    "docs/architecture/adr/0167-shadow-stages-prove-themselves-on-chained-evidence.md"
+  ],
+  "evidence": "The shadow spend limit made 89 projected stops in waves 145-174 (28 in 165-174), many on cycles that shipped (2357, 2362, 2363, 2368, 2375, 2377, 2386, 2398); max_audit_rounds 2 projects a stop on 40 of 143 shipped cycles in 2200-2390.",
+  "files": [
+    "go/internal/core/spend.go",
+    ".evolve/policy.json",
+    "go/internal/gateregistry/seed_stages.go"
+  ],
+  "fix": "Spec §7 F7: the false-stop share and the window are MaxFalseStopPct and WindowCycles fields of the registry entry; TestSpendLimitWouldStopShippedCycles replays testdata/spend_distribution.json; new limits in policy.json from the printed output; state what the limiter counts.",
+  "id": "shadow-contract-f7-spend-limit-retune",
+  "kind": "fix",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "summary": "The shadow spend limit made 89 projected stops in waves 145-174 (28 in 165-174), many on cycles that shipped (2357, 2362, 2363, 2368, 2375, 2377, 2386, 2398); max_audit_rounds 2 projects a stop on 40 of 143 shipped cycles in 2200-2390.",
+  "title": "Retune the cycle spend limit from the shipped distribution",
+  "weight": 0.85
+}

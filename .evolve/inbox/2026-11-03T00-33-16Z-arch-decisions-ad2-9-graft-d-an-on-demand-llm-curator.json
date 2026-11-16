@@ -16,7 +16,8 @@
   "created_at": "2026-11-03T00:33:16Z",
   "failure_count": 1,
   "files": [
-    "go/cmd/evolve"
+    "go/cmd/evolve",
+    ".evolve/profiles/inbox-auditor.json"
   ],
   "fix": "Graft D: an on-demand LLM curator, `evolve inbox audit`. It writes proposals only. It runs when the count of probe-less old items crosses a policy threshold",
   "id": "arch-decisions-ad2-9-graft-d-an-on-demand-llm-curator",

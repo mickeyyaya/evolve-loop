@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "Plan §6 K1 (ports part): the ports, the injection, TestEnforceBranchActsAtEnforce through the production entry point with a spy; the parallel_evaluate decider moved to a package a seed can name.",
+    "The new tests are red without the change"
+  ],
+  "created_at": "2026-11-15T14:40:25Z",
+  "docs": [
+    "docs/architecture/shadow-stage-contract.md",
+    "docs/plans/shadow-stage-evidence-2026-11.md",
+    "docs/architecture/adr/0167-shadow-stages-prove-themselves-on-chained-evidence.md"
+  ],
+  "evidence": "K1a (PR #1473) adds the gatecontract Shadow descriptor with nil Decide, Enforce and Score. Spec §4 (D6) needs consumer-side StageActor ports in core and ship and the injection from the cmd/evolve composition root, so dependencies point inward.",
+  "files": [
+    "go/internal/core/stage_actor.go",
+    "go/internal/phases/ship/stage_actor.go",
+    "go/cmd/evolve/cmd_cycle.go"
+  ],
+  "fix": "Plan §6 K1 (ports part): the ports, the injection, TestEnforceBranchActsAtEnforce through the production entry point with a spy; the parallel_evaluate decider moved to a package a seed can name.",
+  "id": "shadow-contract-k1b-stage-actor-ports",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "K1a (PR #1473) adds the gatecontract Shadow descriptor with nil Decide, Enforce and Score. Spec §4 (D6) needs consumer-side StageActor ports in core and ship and the injection from the cmd/evolve composition root, so dependencies point inward.",
+  "title": "Shadow contract K1b: StageActor ports in core and ship, wired by cmd/evolve",
+  "weight": 0.85
+}

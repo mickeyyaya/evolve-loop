@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "Red first: the warning for an absent phase end names its cycle, phase, run id and start time in the reason and in fields.",
+    "Event.Cycle is set on the warning.",
+    "Docs: signal-center-design.md section 8.1 and the signalcenter package note change in STE; 100% coverage on each changed function; zero code comments."
+  ],
+  "continuation": {
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2403",
+    "branch": "cycle-cd3ae73e-2403",
+    "snapshot_sha": "144f125018a616a446e8e1a80e80531780897f10",
+    "base_sha": "109b1b22f1c889be72db4ec0ff88ee21f2e520d6",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2403/audit-fail-reason.json",
+    "cycle": 2403
+  },
+  "created_at": "2026-11-14T00:18:27Z",
+  "files": [
+    "go/internal/signalcenter/expected.go"
+  ],
+  "fix": "Put the pair key (cycle and phase), the start signal's timestamp and its run id into the reason and into typed fields of the warning event (cycle, phase, run_id, started_at), and set Event.Cycle so cycle-scoped readers see it. Red test: an absent phase end yields a warning whose reason and fields name cycle 2365 and phase build.",
+  "id": "expected-signal-warning-names-its-cycle-and-phase",
+  "kind": "fix",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "summary": "Wave 171 (2026-11-13 21:48Z, 22:17Z, 23:07Z): the H4 listener (go/internal/signalcenter/expected.go, PR 1437) emitted SIGNAL_EXPECTED_ABSENT three times with the reason 'phase: phase.dispatched was not followed by phase.outcome,phase.aborted within 1h30m0s'. The reason does not name the cycle, the phase or the start time, so the operator cannot act on it. The pair already has a Key function (keyByCyclePhase) that holds this identity. Plan: docs/plans/pipeline-health-indexes-2026-11.md (H4, D3/D4); spec: docs/architecture/signal-center-design.md section 8.1.",
+  "title": "SIGNAL_EXPECTED_ABSENT names the cycle, the phase and the start time of the missing end signal",
+  "weight": 0.75
+}

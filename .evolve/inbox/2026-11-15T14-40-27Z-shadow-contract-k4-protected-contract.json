@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "Plan §6 K4 and K4b: the registry, recorder, baseline and tests are protected surfaces with a shrink-only ratchet; evolve stage migrate writes grandfather flip records and one genesis record once; TestRegistryRatchet, TestViolationBaselineOnlyShrinks, TestHeadPolicyAccepted.",
+    "The new tests are red without the change"
+  ],
+  "created_at": "2026-11-15T14:40:27Z",
+  "docs": [
+    "docs/architecture/shadow-stage-contract.md",
+    "docs/plans/shadow-stage-evidence-2026-11.md",
+    "docs/architecture/adr/0167-shadow-stages-prove-themselves-on-chained-evidence.md"
+  ],
+  "evidence": "The contract can be weakened silently today, and the keys already at enforce have no flip record.",
+  "files": [
+    "go/internal/guards/protected.go",
+    "go/internal/gateregistry/testdata/stage_violations.json",
+    "go/cmd/evolve/cmd_stage.go"
+  ],
+  "fix": "Plan §6 K4 and K4b: the registry, recorder, baseline and tests are protected surfaces with a shrink-only ratchet; evolve stage migrate writes grandfather flip records and one genesis record once; TestRegistryRatchet, TestViolationBaselineOnlyShrinks, TestHeadPolicyAccepted.",
+  "id": "shadow-contract-k4-protected-contract",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "summary": "The contract can be weakened silently today, and the keys already at enforce have no flip record.",
+  "title": "Protect the stage registry, recorder and baseline; migration for keys at enforce",
+  "weight": 0.85
+}

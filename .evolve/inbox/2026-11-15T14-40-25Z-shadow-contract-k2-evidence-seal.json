@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "Plan §6 K2: in-memory decision counter, evidence records, per-cycle digest, the seal as its own unconditional defer on every exit (fresh and resume) writing one stage-evidence-seal ledger entry; the 10-case seal test, edit/delete/reorder verify tests, TestLateDecisionNotCounted.",
+    "The new tests are red without the change"
+  ],
+  "created_at": "2026-11-15T14:40:25Z",
+  "docs": [
+    "docs/architecture/shadow-stage-contract.md",
+    "docs/plans/shadow-stage-evidence-2026-11.md",
+    "docs/architecture/adr/0167-shadow-stages-prove-themselves-on-chained-evidence.md"
+  ],
+  "evidence": "signals.ndjson is a plain append file; shadow evidence there can be edited or lost unseen (operator 2026-11-15: evidence and contract must stay intact and verifiable).",
+  "files": [
+    "go/internal/stageevidence/recorder.go",
+    "go/internal/core/orchestrator.go",
+    "go/internal/core/resume_execution.go"
+  ],
+  "fix": "Plan §6 K2: in-memory decision counter, evidence records, per-cycle digest, the seal as its own unconditional defer on every exit (fresh and resume) writing one stage-evidence-seal ledger entry; the 10-case seal test, edit/delete/reorder verify tests, TestLateDecisionNotCounted.",
+  "id": "shadow-contract-k2-evidence-seal",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "summary": "signals.ndjson is a plain append file; shadow evidence there can be edited or lost unseen (operator 2026-11-15: evidence and contract must stay intact and verifiable).",
+  "title": "Shadow evidence recorder and the stage-evidence-seal ledger entry",
+  "weight": 0.85
+}

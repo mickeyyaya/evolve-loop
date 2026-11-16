@@ -3,6 +3,12 @@
     "A journey test through the production pool plan: a paused scope whose item is console-manual starts no lane, and the warning names both",
     "The test is red without the fix"
   ],
+  "consumed": {
+    "at": "2026-11-16T03:38:29Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "shipped in bb69b6092 (on main); cycle 2409 found it already shipped"
+  },
   "created_at": "2026-11-04T14:34:16Z",
   "files": [
     "go/cmd/evolve/cmd_loop_pool_paused.go"

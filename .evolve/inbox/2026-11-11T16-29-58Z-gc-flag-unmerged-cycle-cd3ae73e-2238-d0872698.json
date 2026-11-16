@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "The next evolve gc run no longer flags cycle-cd3ae73e-2238."
+  ],
+  "created_at": "2026-11-11T16:29:58Z",
+  "failure_count": 1,
+  "fix": "Land the work through evolve ship, or retire the branch or tree on purpose. Then the flag leaves the gc report.",
+  "id": "gc-flag-unmerged-cycle-cd3ae73e-2238-d0872698",
+  "kind": "task",
+  "last_failure_class": "spec",
+  "last_failure_cycle": 2335,
+  "last_failure_reason": "cycle-failure-release",
+  "priority_class": "hygiene",
+  "route": "console-manual",
+  "routed_at": "2026-11-15T02:45:14Z",
+  "routed_cycle": 2397,
+  "routed_reason": "lane triage (cycle 2397) dropped: protected-surface: .git/refs/heads/cycle-cd3ae73e-2238 (console-only branch disposition: land dfedbf993 via evolve ship/continuation adopt or retire branch, then verify via class D evolve gc)",
+  "summary": "evolve gc flagged cycle-cd3ae73e-2238 (unmerged orphan branch (no worktree)) on 2 runs and keeps it: gc never removes a flagged item.",
+  "title": "gc flag flag-unmerged: cycle-cd3ae73e-2238",
+  "weight": 0.3
+}

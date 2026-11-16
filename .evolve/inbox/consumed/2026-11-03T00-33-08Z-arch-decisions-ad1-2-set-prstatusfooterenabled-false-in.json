@@ -5,6 +5,12 @@
     "The spec and package note of the changed package state the change in STE."
   ],
   "campaign": "architecture-decisions-2026-11",
+  "consumed": {
+    "at": "2026-11-16T03:38:29Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "shipped in 5788eee29 (on main); cycle 2413 found it already shipped"
+  },
   "created_at": "2026-11-03T00:33:08Z",
   "files": [
     "go/internal/bridge/manifests/claude-tmux.json"
