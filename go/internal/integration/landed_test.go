@@ -102,11 +102,8 @@ func TestSysGit_ReportsAFailedCommandWithItsStderr(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "rev-parse HEAD") {
 		t.Fatalf("err = %v, want the failed command named", err)
 	}
-	out, err := SysGit()(context.Background(), dir, "", "init", "-q")
-	if err != nil {
-		t.Fatalf("init: %v %q", err, out)
-	}
-	id, err := SysGit()(context.Background(), dir, "diff --git a/f b/f\nnew file mode 100644\n--- /dev/null\n+++ b/f\n@@ -0,0 +1 @@\n+x\n", "patch-id", "--stable")
+	repo := gittest.Fixture(t).Dir
+	id, err := SysGit()(context.Background(), repo, "diff --git a/f b/f\nnew file mode 100644\n--- /dev/null\n+++ b/f\n@@ -0,0 +1 @@\n+x\n", "patch-id", "--stable")
 	if err != nil || strings.TrimSpace(id) == "" {
 		t.Fatalf("stdin reaches git: %q %v", id, err)
 	}
