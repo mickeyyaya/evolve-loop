@@ -31,7 +31,7 @@ func spendRun(t *testing.T, stage config.Stage, current Phase) (*cycleRun, *[]si
 	wf.CycleSpend.Stage = stage
 	center, events := captureSignals()
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil), WithWorkflowConfig(wf), WithSignalCenter(center))
-	cr := &cycleRun{o: o, cycle: 2035, current: current, cs: CycleState{CycleID: 2035, WorkspacePath: ws, AuditDispatches: 4},
+	cr := &cycleRun{o: o, req: CycleRequest{ProjectRoot: t.TempDir()}, cycle: 2035, current: current, cs: CycleState{CycleID: 2035, WorkspacePath: ws, AuditDispatches: 4},
 		phaseTimings: []phaseTimingEntry{{Phase: string(current), Verdict: VerdictPASS}}}
 	return cr, events
 }
