@@ -42,6 +42,7 @@ func budgetPrefix(procs string) string {
 func TestBuildFloorCover_ALaneCoverRunCarriesTheLaneCPUBudget(t *testing.T) {
 	probe, procs := laneWithFakeGo(t)
 	t.Setenv(ipcenv.FleetWidthKey, "4")
+	t.Setenv(ipcenv.FleetLiveWidthKey, "")
 	moduleDir := filepath.Join(t.TempDir(), "go")
 	if err := os.MkdirAll(moduleDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -59,6 +60,7 @@ func TestBuildFloorCover_ALaneCoverRunCarriesTheLaneCPUBudget(t *testing.T) {
 func TestBuildSelfCheck_ALaneUnitRunCarriesTheLaneCPUBudget(t *testing.T) {
 	probe, procs := laneWithFakeGo(t)
 	t.Setenv(ipcenv.FleetWidthKey, "4")
+	t.Setenv(ipcenv.FleetLiveWidthKey, "")
 	moduleDir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(moduleDir, "internal", "x"), 0o755); err != nil {
 		t.Fatal(err)
@@ -80,6 +82,7 @@ func TestBuildSelfCheck_ALaneUnitRunCarriesTheLaneCPUBudget(t *testing.T) {
 func TestListACSPredicates_ALaneListRunCarriesTheLaneCPUBudget(t *testing.T) {
 	probe, procs := laneWithFakeGo(t)
 	t.Setenv(ipcenv.FleetWidthKey, "4")
+	t.Setenv(ipcenv.FleetLiveWidthKey, "")
 	wt := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(wt, "go", "acs", "cycle7"), 0o755); err != nil {
 		t.Fatal(err)

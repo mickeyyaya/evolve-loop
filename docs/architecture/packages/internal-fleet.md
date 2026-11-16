@@ -40,6 +40,9 @@
     - A smaller window stops no lane in flight. It only delays the next admission.
     - A slot that the window holds back is not idle, so `RunPool` emits no `idle` transition for it.
     - The orchestrator gives its adaptive window at `enforce` ([internal-orchestrator.md](internal-orchestrator.md)).
+  - `LiveWidthFile` is the path of the live width file. When it is set, the pool writes its pid and the live lane count (minimum 1) with `lanebudget.WriteLiveWidth`. It does so at each lane start and end. The pool sets `ipcenv.FleetLiveWidthKey` to that path in each lane env. A failed write changes nothing. The lane uses the spawn width.
+  - The loop sets the path to `<evolve dir>/fleet-live-width.json` in `poolRunner`.
+  - Pinned by `TestPool_WritesTheLiveWidthAtLaneStartAndEnd`, `TestPool_ALaneIsToldWhereTheLiveWidthLives`, `TestPool_AFailedLiveWidthWriteDoesNotStopTheLane`, `TestRollingPool_TellsEachLaneWhereTheLiveWidthLives` and `TestDispatchPool_TheProductionRunnerPassesTheLiveWidthFileToEachLane`.
   - The window hook is pinned by `TestRunPool_TheWindowHookBoundsAdmissionAndAShrinkNeverStopsALaneInFlight`, `TestRunPool_AWindowOfZeroOrLessStillAdmitsOneLaneAtATime`, `TestRunPool_AWindowAboveTheTargetNeverRaisesIt` and `TestRunPool_ASlotTheWindowWithholdsIsNotReportedIdleButAnEmptySupplyIs`.
   - Pinned by `TestRunPool_TheNextHookChoosesEachLaunchFromThePendingTodosInOrder`, `TestRunPool_PrepareRewritesTheSpecAndADroppedTodoNeverLaunches`, `TestRunPool_AnExitHookThatRetriesLaunchesTheTodoOnceMore`, `TestRunPool_MaxLaunchesEndsTheRunAtTheLimit` and `TestRunPool_HaltedStopsNewAdmissionsAndTheLaneInFlightFinishes`.
   - Pinned by `TestRunPool_TheNextHookChoosesEachLaunchFromThePendingTodosInOrder`, `TestRunPool_PrepareRewritesTheSpecAndADroppedTodoNeverLaunches`, `TestRunPool_MaxLaunchesEndsTheRunAtTheLimit` and `TestRunPool_HaltedStopsNewAdmissionsAndTheLaneInFlightFinishes`.

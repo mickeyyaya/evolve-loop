@@ -41,3 +41,16 @@ func TestOrchestratorPool_TheDeadlineSealOfAStoppedLaneLandsInItsCycleStream(t *
 		t.Errorf("cycles = %+v, want cycle 1955 ended with the lane deadline termination from the loop's own stream writer", cycles)
 	}
 }
+
+func TestOrchestratorPool_TheProductionPoolPublishesTheLiveWidthUnderThePlane(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	evolveDir := paths.EvolveDirOf(root)
+	b, _ := iscsCoordinator(root, evolveDir, nil)
+
+	p := b.orchestratorPool(policy.FleetConfig{Count: 1, PlanSource: "triage", Orchestrator: enforceOrchestrator}, nil, 1)
+
+	if want := liveWidthFile(evolveDir); p.LiveWidthFile != want {
+		t.Errorf("orchestrator pool LiveWidthFile = %q, want %q so each lane reads the live width", p.LiveWidthFile, want)
+	}
+}
