@@ -2,6 +2,7 @@ package signalcenter
 
 import (
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -330,5 +331,49 @@ func TestExpectedSignal_OnlyTheOrchestratorsDispatchAndClosingOutcomeCount(t *te
 	_ = x.Poll(r.path)
 	if len(*got) != 1 || (*got)[0].Cycle != 5 {
 		t.Errorf("a mid-phase outcome must not close the start and a non-orchestrator dispatch must not open one: %+v", *got)
+	}
+}
+
+func TestExpectedSignal_AbsentWarningNamesCyclePhaseRunIDAndStartTime(t *testing.T) {
+	t.Parallel()
+	r := newStreamRig(t)
+	x, _, got := r.boot(DefaultExpectedPairs())
+	x.deadline = func(string) (time.Duration, bool) { return time.Hour, true }
+	r.out.Emit(phaseEvent(KindPhaseDispatched, 42, "run-42-build", "build", nil))
+	r.clock.advance(2 * time.Hour)
+	_ = x.Poll(r.path)
+	if len(*got) != 1 {
+		t.Fatalf("want 1 warning, got %d", len(*got))
+	}
+	w := (*got)[0]
+	for k, v := range map[string]string{"cycle": "42", "phase": "build", "run_id": "run-42-build", "started": "2026-11-13T10:00:00Z"} {
+		if w.Fields[k] != v {
+			t.Errorf("fields[%q] = %q, want %q", k, w.Fields[k], v)
+		}
+		if !strings.Contains(w.Reason, v) {
+			t.Errorf("reason %q does not contain %q", w.Reason, v)
+		}
+	}
+	if w.Cycle != 42 || w.Phase != "build" || w.RunID != "run-42-build" {
+		t.Errorf("event identity = %d/%q/%q", w.Cycle, w.Phase, w.RunID)
+	}
+}
+
+func TestExpectedSignal_WaveAbsentWarningOmitsCycleAndNamesRunID(t *testing.T) {
+	t.Parallel()
+	r := newStreamRig(t)
+	x, _, got := r.boot(testPairs)
+	r.out.Emit(startEvent(KindWaveStarted, "wave-9"))
+	r.clock.advance(time.Hour)
+	_ = x.Poll(r.path)
+	if len(*got) != 1 {
+		t.Fatalf("want 1 warning, got %d", len(*got))
+	}
+	w := (*got)[0]
+	if w.Fields["run_id"] != "wave-9" || w.RunID != "wave-9" || w.Fields["cycle"] != "" || w.Fields["phase"] != "" {
+		t.Errorf("wave warning = %+v", w)
+	}
+	if !strings.Contains(w.Reason, "wave-9") || strings.Contains(w.Reason, "cycle=") {
+		t.Errorf("wave reason = %q", w.Reason)
 	}
 }

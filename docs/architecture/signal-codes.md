@@ -545,7 +545,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 
 | Code | Meaning |
 |---|---|
-| `SIGNAL_EXPECTED_ABSENT` | a stage emitted its start signal and its end signal did not follow before the deadline from policy; fields.pair names the pair, start_kind and end_kind the two kinds, started the start time, deadline_seconds the limit and key the open start |
+| `SIGNAL_EXPECTED_ABSENT` | a stage emitted its start signal and its end signal did not follow before the deadline from policy; fields.pair names the pair, start_kind and end_kind the two kinds, started the start time, deadline_seconds the limit and key the open start; cycle, phase and run_id name the open start in fields and reason when present |
 
 ### signalcenter
 

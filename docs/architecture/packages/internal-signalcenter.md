@@ -13,6 +13,7 @@ The quality indexes (ADR-0153, proposed) plan to publish through this package as
 - `Center` is the process-scoped fan-out. A nil `*Center` is a Null Object. Every method is safe and does nothing.
 - The sinks are listeners. `NDJSONSink` is the durable record, one file per cycle. `StderrSink` is the one module-tagged line renderer. `ConsoleSink` is the stderr half at WARN and above. The composition roots share that threshold.
 - `Summary` is one listener's per-cycle view. It follows the current cycle by itself.
+- `ExpectedSignals` tracks start/end pairs. Its `SIGNAL_EXPECTED_ABSENT` warning names the open start in reason and fields: cycle, phase, run_id and start time.
 
 ## Invariants
 

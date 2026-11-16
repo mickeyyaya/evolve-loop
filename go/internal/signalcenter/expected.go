@@ -13,7 +13,7 @@ import (
 const CodeExpectedAbsent Code = "SIGNAL_EXPECTED_ABSENT"
 
 func init() {
-	RegisterCode(ModuleSignal, CodeExpectedAbsent, "a stage emitted its start signal and its end signal did not follow before the deadline from policy; fields.pair names the pair, start_kind and end_kind the two kinds, started the start time, deadline_seconds the limit and key the open start")
+	RegisterCode(ModuleSignal, CodeExpectedAbsent, "a stage emitted its start signal and its end signal did not follow before the deadline from policy; fields.pair names the pair, start_kind and end_kind the two kinds, started the start time, deadline_seconds the limit and key the open start; cycle, phase and run_id name the open start in fields and reason when present")
 }
 
 type ExpectedPair struct {
@@ -161,15 +161,36 @@ func (x *ExpectedSignals) expire() []Event {
 }
 
 func absentEvent(key string, o openStart, limit time.Duration) Event {
+	started := o.started.UTC().Format(time.RFC3339Nano)
+	runID := o.event.RunID
+	if runID == "" {
+		runID = o.event.Fields["run_id"]
+	}
+	fields := map[string]string{
+		"pair": o.pair.Name, "start_kind": string(o.pair.Start), "end_kind": o.pair.endNames(),
+		"started": started, "deadline_seconds": strconv.Itoa(int(limit.Seconds())), "key": key,
+	}
+	var parts []string
+	if o.event.Cycle != 0 {
+		c := strconv.Itoa(o.event.Cycle)
+		fields["cycle"] = c
+		parts = append(parts, "cycle="+c)
+	}
+	if o.event.Phase != "" {
+		fields["phase"] = o.event.Phase
+		parts = append(parts, "phase="+o.event.Phase)
+	}
+	if runID != "" {
+		fields["run_id"] = runID
+		parts = append(parts, "run_id="+runID)
+	}
+	parts = append(parts, "started="+started)
 	return Event{
 		Module: ModuleSignal, Origin: "ExpectedSignals.expire", Kind: KindExpectedAbsent,
 		Code: CodeExpectedAbsent, Severity: SeverityWarn,
-		Reason: fmt.Sprintf("%s: %s was not followed by %s within %s", o.pair.Name, o.pair.Start, o.pair.endNames(), limit),
-		Cycle:  o.event.Cycle, RunID: o.event.RunID, Phase: o.event.Phase,
-		Fields: map[string]string{
-			"pair": o.pair.Name, "start_kind": string(o.pair.Start), "end_kind": o.pair.endNames(),
-			"started": o.started.UTC().Format(time.RFC3339Nano), "deadline_seconds": strconv.Itoa(int(limit.Seconds())), "key": key,
-		},
+		Reason: fmt.Sprintf("%s (%s): %s was not followed by %s within %s", o.pair.Name, strings.Join(parts, " "), o.pair.Start, o.pair.endNames(), limit),
+		Cycle:  o.event.Cycle, RunID: runID, Phase: o.event.Phase,
+		Fields: fields,
 	}
 }
 
