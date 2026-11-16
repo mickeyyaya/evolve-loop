@@ -64,6 +64,9 @@ func (o *Orchestrator) recoverShipErrorRoute(ctx context.Context, projectRoot st
 			if o.scopedMergeCarryForward(ctx, cycle, *cs, projectRoot) {
 				return PhaseShip, true
 			}
+			if composedParkOf(ctx).Parked() {
+				return "", false
+			}
 			fmt.Fprintf(o.errOut(), "[orchestrator] cycle %d has no explanation contract, so the identity carry cannot prove the rebased change; auditing it again\n", cycle)
 		case conflict:
 			fmt.Fprintf(o.errOut(), "[orchestrator] cycle %d fleet rebase CONFLICT (overlapping work the partition should have separated) → debugger\n", cycle)
@@ -146,6 +149,9 @@ func (o *Orchestrator) routeRebasedExplanation(ctx context.Context, projectRoot 
 		*cs = rebasedState
 		if o.identityCarryForward(ctx, cycle, rebasedState, base0, projectRoot) {
 			return PhaseShip, true
+		}
+		if composedParkOf(ctx).Parked() {
+			return "", false
 		}
 		fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d rebase is byte-identical on %s: explanation rebound, re-auditing without a Build (ADR-0105)\n", cycle, newBase)
 		return PhaseAudit, true

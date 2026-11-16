@@ -46,7 +46,7 @@ func (o *Orchestrator) identityCarryForward(ctx context.Context, cycle int, cs C
 		return decline("the composed-tree gates did not leave the tree as they found it")
 	}
 	if missing := ciparity.MissingComposedGates(gates); missing != nil {
-		o.declineComposedGates(cycle, cs, "Orchestrator.identityCarryForward", "identity carry", missing, outcomes)
+		o.declineComposedGates(ctx, projectRoot, cycle, cs, "Orchestrator.identityCarryForward", "identity carry", missing, outcomes)
 		return false
 	}
 	patchID, err := identityPatchID(audited)
