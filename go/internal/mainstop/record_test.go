@@ -161,14 +161,14 @@ func TestUpdate_ConcurrentUpdatesLoseNoKey(t *testing.T) {
 func TestRead_MigratesAV1RecordToV2(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	record := `{"schema":"main-red-stop/v1","keys":[{"package":"internal/dup","test":"TestCount"}],"main_sha":"abc"}`
+	record := `{"schema":"` + SchemaV1 + `","keys":[{"package":"internal/dup","test":"TestCount"}],"main_sha":"abc"}`
 	if err := os.WriteFile(Path(dir), []byte(record), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	stop, found, err := Read(dir)
 
-	if err != nil || !found || stop.Schema != Schema || Schema != "main-red-stop/v2" || !slices.Equal(stop.Keys, []baseattr.Key{dupKey}) || stop.MainSHA != "abc" {
+	if err != nil || !found || stop.Schema != Schema || Schema != "main-red-stop/v2" || SchemaV1 != "main-red-stop/v1" || !slices.Equal(stop.Keys, []baseattr.Key{dupKey}) || stop.MainSHA != "abc" {
 		t.Errorf("Read of a v1 record = %+v, %v, %v, want the same keys under schema v2", stop, found, err)
 	}
 }
