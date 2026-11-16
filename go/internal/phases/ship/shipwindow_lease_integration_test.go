@@ -27,7 +27,7 @@ func TestPhase_TheRepoContractPackRunsOutsideTheShipWindow(t *testing.T) {
 	var packRuns []bool
 	prev := repoContractTestFn
 	t.Cleanup(func() { repoContractTestFn = prev })
-	repoContractTestFn = func(ctx context.Context, moduleDir string, out packLog) packOutcome {
+	repoContractTestFn = func(ctx context.Context, moduleDir string, out packLog, _ []string) packOutcome {
 		packRuns = append(packRuns, leaseHeld(repo))
 		return greenPack()
 	}

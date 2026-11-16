@@ -19,7 +19,7 @@ func TestProductionBuildFloorChecks_TheComposedFloorRunsTheGateClassifier(t *tes
 	wt.Write("go/internal/widget/widget_guard_test.go", "package widget\n\nfunc TestWidget_Guard(t *testing.T) {\n\tt.Skip(\"later\")\n}\n")
 	prev := repoContractPack
 	t.Cleanup(func() { repoContractPack = prev })
-	repoContractPack = func(context.Context, string, string) ([]string, string, error) { return nil, "", nil }
+	repoContractPack = func(context.Context, string, string, []string) ([]string, string, error) { return nil, "", nil }
 
 	got := productionBuildFloorChecks(context.Background(), core.ReviewInput{
 		Phase: string(core.PhaseBuild), Cycle: 7, Worktree: wt.Dir, WorktreeBaseSHA: base, ProjectRoot: t.TempDir(),

@@ -243,7 +243,7 @@ func TestReplay_20261109(t *testing.T) {
 }
 
 func redNamedPack(names ...string) core.RepoContractPackFn {
-	return func(context.Context, string, string) ([]string, string, error) {
+	return func(context.Context, string, string, []string) ([]string, string, error) {
 		return names, "--- FAIL: " + redTest + "\n", errors.New("exit status 1")
 	}
 }
