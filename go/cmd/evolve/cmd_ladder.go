@@ -8,18 +8,21 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"text/tabwriter"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/retryladder"
 )
 
 const (
-	ladderUsage        = "Usage: evolve ladder report [--json] [--project-root DIR]"
-	exitLadderInput    = 2
-	exitLadderUsage    = 10
-	ladderClassNone    = "-"
-	ladderTextHeader   = "RUNG\tCLASS\tTRIES\tFIXES\tTOKENS"
-	ladderRowTextShape = "%s\t%s\t%d\t%d\t%d\n"
+	ladderUsage              = "Usage: evolve ladder report [--json] [--project-root DIR]"
+	exitLadderInput          = 2
+	exitLadderUsage          = 10
+	ladderClassNone          = "-"
+	ladderTextHeader         = "RUNG\tCLASS\tTRIES\tFIXES\tTOKENS"
+	ladderRowTextShape       = "%s\t%s\t%d\t%d\t%d\n"
+	ladderDefectTextHeader   = "RUNG\tDEFECT\tFIXES"
+	ladderDefectRowTextShape = "%s\t%s\t%d\n"
 )
 
 type ladderReportJSON struct {
@@ -94,4 +97,45 @@ func writeLadderText(stdout io.Writer, rows []retryladder.ReportRow) {
 		fmt.Fprintf(w, ladderRowTextShape, row.Rung, class, row.Tries, row.Fixes, t.Input+t.Output+t.CacheRead+t.CacheWrite)
 	}
 	_ = w.Flush()
+	defects := collectDefectRows(rows)
+	if len(defects) == 0 {
+		return
+	}
+	fmt.Fprintln(stdout)
+	dw := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(dw, ladderDefectTextHeader)
+	for _, d := range defects {
+		fmt.Fprintf(dw, ladderDefectRowTextShape, d.rung, d.defect, d.fixes)
+	}
+	_ = dw.Flush()
+}
+
+type defectRow struct {
+	rung   retryladder.Rung
+	defect string
+	fixes  int
+}
+
+func collectDefectRows(rows []retryladder.ReportRow) []defectRow {
+	type key struct {
+		rung   retryladder.Rung
+		defect string
+	}
+	counts := map[key]int{}
+	for _, row := range rows {
+		for defect, fixes := range row.Defects {
+			counts[key{rung: row.Rung, defect: defect}] += fixes
+		}
+	}
+	out := make([]defectRow, 0, len(counts))
+	for k, fixes := range counts {
+		out = append(out, defectRow{rung: k.rung, defect: k.defect, fixes: fixes})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].rung != out[j].rung {
+			return out[i].rung < out[j].rung
+		}
+		return out[i].defect < out[j].defect
+	})
+	return out
 }

@@ -210,3 +210,25 @@ func TestLadderReport_LoadRunsFailsLoudlyOnAnUnreadableLedger(t *testing.T) {
 		t.Fatal("a ledger that cannot be read must be an error, not a silent skip")
 	}
 }
+
+func TestLadderReport_BuildReportCountsFixedDefectsPerRung(t *testing.T) {
+	zero := 0
+	one := 1
+	rows := retryladder.BuildReport([][]llmcalls.Record{{
+		{Rung: "R0", ExitCode: &zero, Fingerprint: "lint/ignored"},
+		{Rung: "R1", FailureClass: "lint", ExitCode: &one, Fingerprint: "lint/failed"},
+		{Rung: "R1", FailureClass: "lint", ExitCode: &zero, Fingerprint: "lint/a"},
+		{Rung: "R1", FailureClass: "lint", ExitCode: &zero, Fingerprint: "lint/a"},
+		{Rung: "R1", FailureClass: "lint", ExitCode: &zero, Fingerprint: "lint/b"},
+	}})
+	if len(rows) != 2 {
+		t.Fatalf("len(rows) = %d, want 2: %+v", len(rows), rows)
+	}
+	if rows[0].Defects != nil {
+		t.Fatalf("R0 defects = %+v, want nil", rows[0].Defects)
+	}
+	want := map[string]int{"lint/a": 2, "lint/b": 1}
+	if !reflect.DeepEqual(rows[1].Defects, want) {
+		t.Fatalf("R1 defects = %+v, want %+v", rows[1].Defects, want)
+	}
+}

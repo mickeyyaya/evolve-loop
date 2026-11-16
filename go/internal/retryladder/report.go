@@ -12,11 +12,12 @@ import (
 )
 
 type ReportRow struct {
-	Rung   Rung                  `json:"rung"`
-	Class  string                `json:"class"`
-	Tries  int                   `json:"tries"`
-	Fixes  int                   `json:"fixes"`
-	Tokens cyclestate.TokenUsage `json:"tokens"`
+	Rung    Rung                  `json:"rung"`
+	Class   string                `json:"class"`
+	Tries   int                   `json:"tries"`
+	Fixes   int                   `json:"fixes"`
+	Defects map[string]int        `json:"defects,omitempty"`
+	Tokens  cyclestate.TokenUsage `json:"tokens"`
 }
 
 type reportKey struct {
@@ -40,6 +41,12 @@ func BuildReport(runs [][]llmcalls.Record) []ReportRow {
 			row.Tries++
 			if isFix(rec) {
 				row.Fixes++
+				if rec.Fingerprint != "" {
+					if row.Defects == nil {
+						row.Defects = map[string]int{}
+					}
+					row.Defects[rec.Fingerprint]++
+				}
 			}
 			row.Tokens.Input += rec.Tokens.Input
 			row.Tokens.Output += rec.Tokens.Output

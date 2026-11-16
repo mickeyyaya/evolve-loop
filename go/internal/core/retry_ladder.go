@@ -154,7 +154,11 @@ func (cr *cycleRun) keepLadderRung(phase Phase, req PhaseRequest) PhaseRequest {
 	if !cr.o.workflowConfig.RetryLadder.Enforced() || !retryladder.Climbs(string(phase)) {
 		return req
 	}
-	req.Ladder = &retryladder.Try{Rung: retryladder.Rung(st.Rung), Stage: retryladder.StageEnforce, Tier: st.Tier}
+	var fp string
+	if len(st.Fingerprints) > 0 {
+		fp = st.Fingerprints[len(st.Fingerprints)-1]
+	}
+	req.Ladder = &retryladder.Try{Rung: retryladder.Rung(st.Rung), Fingerprint: fp, Stage: retryladder.StageEnforce, Tier: st.Tier}
 	req.Assignment.Effort = st.Effort
 	return req
 }

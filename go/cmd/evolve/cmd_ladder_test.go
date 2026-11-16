@@ -13,6 +13,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/retryladder"
 )
 
 const ladderCycleOneLedger = `{"phase":"build","rung":"R0","exit_code":1,"tokens":{"input":10,"output":5,"cache_read":0,"cache_write":1}}
@@ -305,5 +307,23 @@ func TestLadderReport_JSONWriteFailureFailsLoudly(t *testing.T) {
 	rc := writeLadderJSON(&failingWriter{}, &stderr, ladderReportJSON{})
 	if rc != 1 || !strings.Contains(stderr.String(), "broken pipe") {
 		t.Fatalf("rc = %d, stderr = %q", rc, stderr.String())
+	}
+}
+
+func TestLadderReport_TextPrintsSortedRungDefectFixes(t *testing.T) {
+	t.Parallel()
+	var stdout bytes.Buffer
+	writeLadderText(&stdout, []retryladder.ReportRow{
+		{Rung: retryladder.R2, Class: "test", Tries: 1, Fixes: 1, Defects: map[string]int{"z-bug": 1}},
+		{Rung: retryladder.R1, Class: "lint", Tries: 3, Fixes: 3, Defects: map[string]int{"b-lint": 1, "a-lint": 2}},
+	})
+	out := stdout.String()
+	for _, want := range []string{"RUNG", "DEFECT", "FIXES", "a-lint", "b-lint", "z-bug"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("stdout %q missing %q", out, want)
+		}
+	}
+	if strings.Index(out, "a-lint") > strings.Index(out, "b-lint") || strings.Index(out, "b-lint") > strings.Index(out, "z-bug") {
+		t.Fatalf("defects not sorted by rung then defect:\n%s", out)
 	}
 }
