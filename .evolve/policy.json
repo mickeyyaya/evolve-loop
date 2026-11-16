@@ -46,9 +46,9 @@
       "claude"
     ],
     "default": [
+      "claude",
       "agy",
-      "agy-claude",
-      "claude"
+      "agy-claude"
     ],
     "agents": {
       "builder": {
@@ -87,9 +87,9 @@
     "tiers": {
       "deep": {
         "clis": [
+          "claude",
           "agy",
-          "agy-claude",
-          "claude"
+          "agy-claude"
         ],
         "share_pct": 50
       },
@@ -185,6 +185,11 @@
     ],
     "preempt_margin": 0.05
   },
+  "isolation": {
+    "i2": {
+      "stage": "enforce"
+    }
+  },
   "parallel_evaluate": {
     "stage": "shadow",
     "concurrency": 3
@@ -194,11 +199,6 @@
   },
   "retrospectives": {
     "stage": "enforce"
-  },
-  "isolation": {
-    "i2": {
-      "stage": "enforce"
-    }
   },
   "retry": {
     "contract_correction_retries": 1
