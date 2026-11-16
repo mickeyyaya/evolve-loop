@@ -13,6 +13,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/auditledger"
+	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -51,6 +52,11 @@ var composedGateTargets = map[string]string{
 	"test":     "test",
 	"acs":      "test-acs-durable",
 	"apicover": "apicover-enforce",
+}
+
+var composedGateFlags = map[string][]string{
+	"test":     {"-race"},
+	"apicover": {"-tags", "integration"},
 }
 
 type composedGateScope struct {
@@ -139,7 +145,9 @@ func (r composedGateRun) gate(ctx context.Context, gate, target, override string
 		return ciparity.GateOutcome{Status: "pass"}
 	}
 	fmt.Fprintf(r.log, "[orchestrator] composed-tree gate %s (make %s) failed in %s: %v; its output tail rides in the %s event\n", gate, target, r.worktree, err, core.CodeComposedGateDeclined)
-	return ciparity.GateOutcome{Status: "fail", Tail: tail.lastLines(20)}
+	reds := baseattr.ParseGoTest(tail.String())
+	reds.Flags = composedGateFlags[gate]
+	return ciparity.GateOutcome{Status: "fail", Tail: tail.lastLines(20), Reds: reds}
 }
 
 type tailWriter struct {
@@ -156,6 +164,8 @@ func (t *tailWriter) Write(p []byte) (int, error) {
 	}
 	return len(p), nil
 }
+
+func (t *tailWriter) String() string { return string(t.buf) }
 
 func (t *tailWriter) lastLines(n int) string {
 	all := strings.Split(strings.TrimRight(string(t.buf), "\n"), "\n")

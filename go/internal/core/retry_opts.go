@@ -69,7 +69,9 @@ func (cr *cycleRun) recoverShipError(next Phase, err error, resp PhaseResponse, 
 	cr.preserveWorktree = true
 	fleetWidth := fleetWidthFromEnv(cr.req.Env)
 	se, declined := cr.carryAuditedChangeOverMovedMain(raised)
-	rec, recovering := cr.o.recoverFromShipError(cr.ctx, cr.req.ProjectRoot, cr.cycle, &cr.cs, se, cr.recoveryDepth, fleetWidth)
+	ctx, park := withComposedPark(cr.ctx)
+	rec, recovering := cr.o.recoverFromShipError(ctx, cr.req.ProjectRoot, cr.cycle, &cr.cs, se, cr.recoveryDepth, fleetWidth)
+	cr.composedPark = park
 	cr.reportRecoveryPath(shipRecovery{raised: raised, routed: se, next: rec, declined: declined})
 	if !recovering {
 		if se != raised {

@@ -37,7 +37,10 @@ func (o *Orchestrator) runGateSet(ctx context.Context, worktree string) (map[str
 	return statuses, *sink
 }
 
-func (o *Orchestrator) declineComposedGates(cycle int, cs CycleState, origin, label string, missing []string, outcomes map[string]ciparity.GateOutcome) {
+func (o *Orchestrator) declineComposedGates(ctx context.Context, projectRoot string, cycle int, cs CycleState, origin, label string, missing []string, outcomes map[string]ciparity.GateOutcome) {
+	if o.parkComposedRed(ctx, projectRoot, cs, missing, outcomes) {
+		return
+	}
 	gates := strings.Join(missing, ",")
 	fields := map[string]string{"gates": gates}
 	for _, gate := range missing {
@@ -70,13 +73,13 @@ func boundedTail(tail string, maxJSONBytes int) string {
 	return marker + string(runes[keep:])
 }
 
-func (o *Orchestrator) runComposedGates(ctx context.Context, cycle int, cs CycleState, worktree, origin, label string) (map[string]string, bool) {
+func (o *Orchestrator) runComposedGates(ctx context.Context, projectRoot string, cycle int, cs CycleState, worktree, origin, label string) (map[string]string, bool) {
 	gateResults, outcomes := o.runGateSet(ctx, worktree)
 	missing := ciparity.MissingComposedGates(gateResults)
 	if missing == nil {
 		return gateResults, true
 	}
-	o.declineComposedGates(cycle, cs, origin, label, missing, outcomes)
+	o.declineComposedGates(ctx, projectRoot, cycle, cs, origin, label, missing, outcomes)
 	return nil, false
 }
 
@@ -179,7 +182,7 @@ func (o *Orchestrator) scopedMergeCarryForward(ctx context.Context, cycle int, c
 		fmt.Fprintf(o.errOut(), "[orchestrator] scoped merge review: resolution patch-id does not match audited change (unverified); falling back to full re-audit\n")
 		return false
 	}
-	gateResults, ok := o.runComposedGates(ctx, cycle, cs, worktree, "Orchestrator.scopedMergeCarryForward", "scoped merge review")
+	gateResults, ok := o.runComposedGates(ctx, projectRoot, cycle, cs, worktree, "Orchestrator.scopedMergeCarryForward", "scoped merge review")
 	if !ok {
 		return false
 	}

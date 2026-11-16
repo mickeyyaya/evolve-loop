@@ -34,3 +34,5 @@
 ## Findings
 
 - A graduation seam must consult `PackageDirHasProductionGoFiles` before it flags a package. Without that check, a package can pass the build seam and fail at audit for the same vacuous reason.
+
+- `GateOutcome.Reds` holds the named failed tests of a red composed gate and the `go test` flags of the gate. The orchestrator runs them on main before it re-audits the lane (`TestComposedGatesTo_ARedGateCarriesItsNamedTestsAndFlags`).
