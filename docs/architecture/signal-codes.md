@@ -218,6 +218,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 
 | Code | Meaning |
 |---|---|
+| `GATE_REPO_CAPACITY_PARKED` | a repo-contract gate hit its deadline twice in a row on the same lane tree, so the orchestrator parked the lane and started no LLM re-audit; fields.code is the ship error code; the lane needs more CPU time or a smaller closure, not a code change |
 | `GATE_REPO_MAIN_RED_PARKED` | ship found the red tests of the lane red on its base and on main, so the orchestrator parked the cycle and did not blame the lane (ADR-0165 G4); the cycle has a main-red checkpoint and a row in main-red-stop.json, and it resumes when main is green; fields.keys (package.Test of each key of the stop), main, fix_item, parked (the parked cycles), checkpoint_error and stop_error (each empty when its write passed; a write that failed makes the signal an incident, because the cycle cannot resume from the park) |
 | `GATE_REPO_MAIN_RED_STOP_ESCALATED` | a stop held longer than gates.main_red_stop_bound_minutes, so the bound check escalated it one time (ADR-0165 G4); main-red-stop.json has escalated_at, and an open main-red incident under .evolve/incidents has the cause and the resume condition, so the healing catalog can propose a revert of the last landing; fields.keys (package.Test of each key of the stop), main, fix_item, parked (the parked cycles), opened_at, bound, incident (the id of the incident record) |
 | `GATE_REPO_MAIN_RED_STOP_OPENED` | a build floor or ship found tests that are red on main, and no stop held, so the stop opened (ADR-0165 G4); main-red-stop.json has the keys and the fix item is in the inbox, where it leads the rank while the stop holds; fields.keys (package.Test of each key that is red on main), main, fix_item, fix_item_error (empty when the item is in the inbox; an item that was not filed makes the signal an incident) |
@@ -526,6 +527,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `SHIP_MANIFEST_GATE` | atomic-ship: a staged path was declared by no build/TDD report (cross-lane leak guard) |
 | `SHIP_MANUAL_DECLINED` | verify-class: the operator declined the manual ship |
 | `SHIP_MANUAL_NOT_TTY` | verify-class: a manual ship needs an interactive confirmation (or the audited --auto-confirm=<reason> parameter) |
+| `SHIP_REPO_CONTRACT_CAPACITY` | atomic-ship: a repo-contract gate hit its deadline on a lane tree that did not change, so the lane lacks CPU time and no LLM can fix it; ship retries the gate once and parks the lane on a second kill (transient) |
 | `SHIP_REPO_CONTRACT_GATE` | atomic-ship: a repo-contract guard suite is RED in the lane worktree; pushing would red main |
 | `SHIP_REPO_CONTRACT_INFRA` | atomic-ship: the repo-contract scanner toolchain died twice without a test-level failure (re-dispatchable) |
 | `SHIP_SCAN_SHADOW_ESCAPE` | the scan shadow found a stored green result for the content key of a package, and that package then failed in the real run; the content key misses an input of the test, and the scan cache cannot be enforced until the miss is closed |

@@ -2,6 +2,7 @@ package ship
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -11,8 +12,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 )
 
+var importerBackstopTimeout = 20 * time.Minute
+
 const (
-	importerBackstopTimeout         = 20 * time.Minute
 	importerBackstopRetryMaxTargets = 25
 	discoveryRetryPause             = time.Second
 )
@@ -61,7 +63,7 @@ func runImporterBackstop(ctx context.Context, out packLog, root, moduleDir, work
 	defer func() {
 		fmt.Fprintf(out, "[ship] repo-contract importer backstop: %d target(s) in %s\n", len(targets), time.Since(start).Round(time.Second))
 	}()
-	return runClassifiedPackRetrying(bctx, out, workspace, "importer backstop", len(targets) <= importerBackstopRetryMaxTargets, func() packOutcome {
+	err := runClassifiedPackRetrying(bctx, out, workspace, "importer backstop", len(targets) <= importerBackstopRetryMaxTargets, func() packOutcome {
 		return runRepoContractPackages(bctx, moduleDir, out, targets)
 	}, &aloneRerun{
 		run: func(failures []packFailure) packOutcome {
@@ -69,6 +71,16 @@ func runImporterBackstop(ctx context.Context, out packLog, root, moduleDir, work
 		},
 		cleared: cleared,
 	})
+	return capacityOnDeadline(ctx, bctx, err, len(targets))
+}
+
+func capacityOnDeadline(parent, bctx context.Context, err error, targets int) error {
+	se, ok := shiperr.AsShipError(err)
+	if !ok || se.Code != shiperr.CodeRepoContractInfra || parent.Err() != nil || !errors.Is(bctx.Err(), context.DeadlineExceeded) {
+		return err
+	}
+	return shiperr.NewShipError(shiperr.CodeRepoContractCapacity, shiperr.ShipClassTransient, shiperr.StageAtomicShip,
+		fmt.Sprintf("repo-contract importer backstop hit its %s deadline on %d target(s) with no test-level failure — CAPACITY fault of the lane, not a contract violation; the tree did not change, so no re-audit can help; ship retries the gate once", importerBackstopTimeout, targets))
 }
 
 func without(xs, drop []string) []string {
