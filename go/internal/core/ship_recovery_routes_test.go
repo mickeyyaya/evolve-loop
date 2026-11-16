@@ -25,6 +25,7 @@ func TestRecover_EveryRecoveryRouteIsALegalEdgeFromShip(t *testing.T) {
 		{Code: "GIT_PUSH_POLICY_REFUSED"},
 		{Code: "EGPS_RED_COUNT"},
 		{Code: string(CodeGitFleetRebaseNeeded)},
+		{Code: "REPO_CONTRACT_CAPACITY", Class: "transient"},
 		{Code: "ANY", Class: "transient"},
 		{Code: "ANY", Class: "unknown"},
 	}
@@ -38,8 +39,8 @@ func TestRecover_EveryRecoveryRouteIsALegalEdgeFromShip(t *testing.T) {
 			t.Errorf("blocker %+v routes to %q (%s), which is not a legal edge from ship", b, cand, dec.Reason)
 		}
 	}
-	if len(reasons) != 9 {
-		t.Fatalf("the blockers reached %d recovery handlers %v, want all 9", len(reasons), reasons)
+	if len(reasons) != 10 {
+		t.Fatalf("the blockers reached %d recovery handlers %v, want all 10", len(reasons), reasons)
 	}
 }
 
