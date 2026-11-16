@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "make test-integration exits non-zero when a test writes a new path under go/ outside the allow list",
+    "make test-integration on a clean tree passes with its own coverage, bin and rusage outputs present",
+    "a regression test plants a leaked .evolve directory and proves the CI target fails",
+    "changed functions at 100% coverage"
+  ],
+  "created_at": "2026-11-16T01:51:21Z",
+  "files": [
+    "go/Makefile",
+    "go/cmd/evolve/cmd_treewalk.go",
+    "go/internal/treewalk/treewalk.go"
+  ],
+  "fix": "Give evolve treewalk check an allow list of the paths the target itself writes (coverage.*, bin/, the TEST_JSON and TESTRUSAGE_OUT files, runner-samples.ndjson), keep that list in one home in go/Makefile, and run snapshot and check around the test runs in test-integration so that CI and the composed gate fail on the same leak.",
+  "id": "ci-test-integration-treewalk-parity",
+  "kind": "pipeline-integrity",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "The cycle composed gate runs make test, which has a treewalk guard. CI runs make test-integration, which has no treewalk guard. Three tests leaked .evolve ledgers under go/ (cmd/evolve, internal/core, internal/phases/triage), CI on main stayed green, and every lane composed gate went red (cycle 2419, wave 174: ORCHESTRATOR_COMPOSED_GATE_DECLINED, 4 LEAK paths).",
+  "title": "CI test-integration runs the treewalk leak guard that make test runs",
+  "weight": 0.8
+}

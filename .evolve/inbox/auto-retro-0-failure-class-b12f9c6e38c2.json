@@ -1,0 +1,14 @@
+{
+  "action": "recurring failure tdd|gate-block|class-b12f9c6e38c2 (2 occurrences)",
+  "evidence_pointer": "advisory raise: queue -\u003e console",
+  "files": null,
+  "id": "failure-class-b12f9c6e38c2",
+  "injected_at": "2026-11-14T05:07:42Z",
+  "injected_by": "retro-preventive-actions-autofiler",
+  "kind": "pipeline-repair",
+  "origin": "retro",
+  "priority": "HIGH",
+  "priority_class": "correctness",
+  "recurrence": 2,
+  "weight": 0.75
+}
