@@ -27,3 +27,13 @@ func TestAPICover_NamesEveryExportedSymbol(t *testing.T) {
 		t.Error("the stage and kind words are not distinct")
 	}
 }
+
+func TestAPICover_NamesTheShadowDescriptor(t *testing.T) {
+	t.Parallel()
+	entry := Entry{Name: "s", Kind: KindStageFeature, Shadow: &Shadow{PolicyKey: "s.stage", Promotion: Promotion{MinDecisions: 1}, EmitSites: []EmitSite{{Path: "p", Func: "f", Ref: "r"}}}}
+	input, decision := StageInput{Root: "r", Cycle: 1}, Decision{Fields: map[string]string{}}
+	record, verdict := EvidenceRecord{Key: "k", Cycle: 1, Seq: 1}, StageVerdict{Ready: true, FalseStops: 1, Escapes: 1, Conflicts: 1}
+	if entry.EffectiveStage(func(string) string { return StageShadow }) != StageShadow || input.Cycle+record.Seq != 2 || decision.Fields == nil || !verdict.Ready {
+		t.Error("the shadow descriptor did not round-trip")
+	}
+}

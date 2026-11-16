@@ -1,0 +1,356 @@
+{
+  "violations": [
+    {
+      "key": "inbox.curator.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "inbox.curator.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "inbox.curator.trailer.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "inbox.curator.trailer.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "gc.remote_sweep.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "gc.remote_sweep.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "pr.merge_window.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "pr.merge_window.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "workflow.findings_repair.code-review.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "workflow.findings_repair.code-review.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "workflow.convergence.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "workflow.convergence.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "workflow.retry_ladder.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "workflow.retry_ladder.audit_fix.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "workflow.retry_ladder.audit_fix.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "workflow.repair.fixability.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "workflow.repair.fixability.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "workflow.cycle_spend.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "workflow.cycle_spend.stage",
+      "rule": "signal-unregistered"
+    },
+    {
+      "key": "workflow.cycle_spend.stage",
+      "rule": "no-would-fields"
+    },
+    {
+      "key": "workflow.cycle_spend.stage",
+      "rule": "no-emit-site"
+    },
+    {
+      "key": "workflow.builder_selfcheck.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "workflow.builder_selfcheck.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "workflow.supersede.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "workflow.supersede.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "swarm.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "swarm.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "failure_disposition.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "failure_disposition.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "merge_gate.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "merge_gate.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "parallel_evaluate.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "parallel_evaluate.stage",
+      "rule": "signal-unregistered"
+    },
+    {
+      "key": "parallel_evaluate.stage",
+      "rule": "no-would-fields"
+    },
+    {
+      "key": "parallel_evaluate.stage",
+      "rule": "no-emit-site"
+    },
+    {
+      "key": "regression_tia.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "regression_tia.stage",
+      "rule": "signal-unregistered"
+    },
+    {
+      "key": "regression_tia.stage",
+      "rule": "no-would-fields"
+    },
+    {
+      "key": "regression_tia.stage",
+      "rule": "no-emit-site"
+    },
+    {
+      "key": "catalog.refresh_stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "catalog.refresh_stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "docs_floor.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "docs_floor.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "docs_floor.ste_stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "docs_floor.ste_stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "comment_floor.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "comment_floor.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "held_proposals.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "cover_changed.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "cover_changed.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "retrospectives.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "retrospectives.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "integrity.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "integrity.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "fleet.budget.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "fleet.budget.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "fleet.orchestrator.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "fleet.orchestrator.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "fleet.integration.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "fleet.integration.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "audit_cascade.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "audit_cascade.stage",
+      "rule": "signal-unregistered"
+    },
+    {
+      "key": "audit_cascade.stage",
+      "rule": "no-would-fields"
+    },
+    {
+      "key": "audit_cascade.stage",
+      "rule": "no-emit-site"
+    },
+    {
+      "key": "isolation.i2.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "isolation.i2.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "isolation.i3.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "isolation.i3.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "isolation.i5.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "isolation.i5.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "isolation.i7.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "isolation.i7.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "isolation.i8.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "isolation.i8.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "isolation.i15.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "isolation.i15.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "isolation.context.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "isolation.context.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "isolation.dispatch_requests.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "isolation.dispatch_requests.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "healing.detector.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "healing.detector.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "healing.orchestrator.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "healing.orchestrator.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "healing.validator.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "healing.validator.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "healing.live_reaction.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "healing.live_reaction.stage",
+      "rule": "no-signal"
+    }
+  ]
+}
