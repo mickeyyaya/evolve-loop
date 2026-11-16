@@ -2,12 +2,17 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
@@ -77,7 +82,51 @@ func TestRollingPool_KeepsTheFixedBacklogAndNeverAsksForResupply(t *testing.T) {
 		t.Fatal("the rolling pool asked for a resupply; it has no launch cap, so its backlog stays fixed")
 		return nil, nil
 	}
-	if res := rollingPool(fc, launch)(context.Background(), []fleet.Todo{{ID: "A"}}, resupply); len(res) != 1 {
+	if res := rollingPool(fc, launch, "")(context.Background(), []fleet.Todo{{ID: "A"}}, resupply); len(res) != 1 {
 		t.Errorf("results = %d, want 1", len(res))
+	}
+}
+
+func TestRollingPool_TellsEachLaneWhereTheLiveWidthLives(t *testing.T) {
+	t.Parallel()
+	fc := policy.FleetConfig{Count: 2, PlanSource: "triage", Scheduling: "pool"}
+	path := filepath.Join(t.TempDir(), lanebudget.LiveWidthFile)
+	var env map[string]string
+	launch := func(_ context.Context, spec fleet.CycleSpec) (int, error) {
+		env = spec.Env
+		return 0, nil
+	}
+	rollingPool(fc, launch, path)(context.Background(), []fleet.Todo{{ID: "A"}}, nil)
+	if env[ipcenv.FleetLiveWidthKey] != path || env[ipcenv.FleetWidthKey] != "2" {
+		t.Errorf("lane env = %v, want %s=%s beside the spawn width", env, ipcenv.FleetLiveWidthKey, path)
+	}
+	var rec struct{ Width int }
+	raw, err := os.ReadFile(path)
+	if err != nil || json.Unmarshal(raw, &rec) != nil || rec.Width != 1 {
+		t.Errorf("live width file = %q, %v, want width 1 after the lane ends", raw, err)
+	}
+}
+
+func TestLiveWidthFile_LivesUnderThePlaneEvolveDirectory(t *testing.T) {
+	t.Parallel()
+	if got, want := liveWidthFile("/plane/.evolve"), filepath.Join("/plane/.evolve", lanebudget.LiveWidthFile); got != want {
+		t.Errorf("liveWidthFile = %q, want %q", got, want)
+	}
+}
+
+func TestDispatchPool_TheProductionRunnerPassesTheLiveWidthFileToEachLane(t *testing.T) {
+	t.Parallel()
+	evolveDir := t.TempDir()
+	b := &loopBatchCoordinator{cfg: loopConfig{EvolveDir: evolveDir}}
+	fc := policy.FleetConfig{Count: 2, PlanSource: "triage", Scheduling: "pool"}
+	var env map[string]string
+	launch := func(_ context.Context, spec fleet.CycleSpec) (int, error) {
+		env = spec.Env
+		return 0, nil
+	}
+	run, mode := b.poolRunner(fc, launch, 1)
+	run(context.Background(), []fleet.Todo{{ID: "A"}}, nil)
+	if want := filepath.Join(evolveDir, lanebudget.LiveWidthFile); mode != "rolling" || env[ipcenv.FleetLiveWidthKey] != want {
+		t.Errorf("mode = %q lane env %s = %q, want rolling and %q", mode, ipcenv.FleetLiveWidthKey, env[ipcenv.FleetLiveWidthKey], want)
 	}
 }

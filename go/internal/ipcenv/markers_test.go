@@ -11,7 +11,7 @@ import (
 var classAMarkers = []string{
 	"EVOLVE_PROJECT_ROOT", "EVOLVE_PLUGIN_ROOT",
 	"EVOLVE_DISPATCH_ID", "EVOLVE_DISPATCH_DEPTH", "EVOLVE_MSG_TOKEN", "EVOLVE_PHASE",
-	"EVOLVE_FLEET", "EVOLVE_FLEET_SCOPE", "EVOLVE_FLEET_WIDTH", "EVOLVE_FLEET_REACH_HOLDER",
+	"EVOLVE_FLEET", "EVOLVE_FLEET_SCOPE", "EVOLVE_FLEET_WIDTH", "EVOLVE_FLEET_LIVE_WIDTH", "EVOLVE_FLEET_REACH_HOLDER",
 	"EVOLVE_WORKTREE_ROOT", "EVOLVE_CYCLE_STATE_FILE", "EVOLVE_TMUX_SOCKET",
 	"EVOLVE_FANOUT_WORKER_TOKEN", "EVOLVE_FANOUT_WORKER_NAME", "EVOLVE_FANOUT_CYCLE", "EVOLVE_FANOUT_WORKSPACE",
 	"EVOLVE_FANOUT_PARENT_AGENT", "EVOLVE_FANOUT_WORKER_ARTIFACT", "EVOLVE_FANOUT_CACHE_PREFIX_FILE",
@@ -38,7 +38,7 @@ func TestCellMarkers_AreTheMarkersThatReachAnLLMCell(t *testing.T) {
 	t.Parallel()
 	want := []string{
 		"EVOLVE_PROJECT_ROOT", ipcenv.WorktreeRootKey, ipcenv.CycleStateFileKey, ipcenv.TmuxSocketKey,
-		ipcenv.FleetKey, ipcenv.FleetScopeKey, ipcenv.FleetWidthKey, ipcenv.FleetReachHolderKey,
+		ipcenv.FleetKey, ipcenv.FleetScopeKey, ipcenv.FleetWidthKey, ipcenv.FleetLiveWidthKey, ipcenv.FleetReachHolderKey,
 		ipcenv.DispatchDepthKey, ipcenv.PhaseKey,
 	}
 	got := ipcenv.CellMarkers()

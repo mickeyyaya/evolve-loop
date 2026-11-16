@@ -36,6 +36,7 @@ func setLaneIPCEnv(t *testing.T) {
 	t.Setenv(ipcenv.FleetKey, "1")
 	t.Setenv(ipcenv.FleetScopeKey, "lane-scope")
 	t.Setenv(ipcenv.FleetWidthKey, "3")
+	t.Setenv(ipcenv.FleetLiveWidthKey, "")
 	t.Setenv(ipcenv.CycleStateFileKey, "/plane/.evolve/runs/cycle-1700/cycle-state.json")
 	t.Setenv(ipcenv.TmuxSocketKey, "/tmp/evolve-lane.sock")
 }

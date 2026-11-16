@@ -4,6 +4,7 @@ package lanebudget
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"os"
 	"runtime"
@@ -11,11 +12,38 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
+const LiveWidthFile = "fleet-live-width.json"
+
 var hostCPUs = runtime.NumCPU
+
+var processAlive = runlease.PIDAlive
+
+type liveWidth struct {
+	PID   int `json:"pid"`
+	Width int `json:"width"`
+}
+
+func WriteLiveWidth(path string, pid, width int) error {
+	return atomicwrite.JSON(path, liveWidth{PID: pid, Width: max(1, width)})
+}
+
+func readLiveWidth() (int, bool) {
+	raw, err := os.ReadFile(os.Getenv(ipcenv.FleetLiveWidthKey))
+	if err != nil {
+		return 0, false
+	}
+	var live liveWidth
+	if json.Unmarshal(raw, &live) != nil || live.Width < 1 || !processAlive(live.PID) {
+		return 0, false
+	}
+	return live.Width, true
+}
 
 func Procs(hostCPUs, width int) int {
 	if width < 1 {
@@ -25,11 +53,14 @@ func Procs(hostCPUs, width int) int {
 }
 
 func Current() int {
-	width, err := strconv.Atoi(strings.TrimSpace(os.Getenv(ipcenv.FleetWidthKey)))
+	spawn, err := strconv.Atoi(strings.TrimSpace(os.Getenv(ipcenv.FleetWidthKey)))
 	if err != nil {
 		return 0
 	}
-	return Procs(hostCPUs(), width)
+	if width, ok := readLiveWidth(); ok {
+		return Procs(hostCPUs(), width)
+	}
+	return Procs(hostCPUs(), spawn)
 }
 
 func Args(args []string) []string {
