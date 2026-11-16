@@ -163,7 +163,9 @@ func readCycle(root string, id int, live cyclestate.CycleState, d *dossier.Dossi
 		c.Shipped = c.Shipped || d.CommitSHA != ""
 		c.StartedAt, c.EndedAt = phaseSpan(c.StartedAt, c.EndedAt, d.Phases)
 	}
-	c.LLMVerdict = readVerdict(ws, c)
+	var verdictFailures []ReadFailure
+	c.LLMVerdict, verdictFailures = readVerdict(ws, c)
+	failures = append(failures, verdictFailures...)
 	return c, warnings, failures
 }
 
@@ -175,12 +177,13 @@ func readTodo(ws string) (string, error) {
 	return scope.TodoIDs[0], nil
 }
 
-func readVerdict(ws string, c Cycle) cyclespend.Verdict {
-	res, err := llmcalls.ReadWorkspace(ws)
-	if err != nil || len(res.Records) == 0 {
-		return cyclespend.Verdict{}
+func readVerdict(ws string, c Cycle) (cyclespend.Verdict, []ReadFailure) {
+	var v cyclespend.Verdict
+	if res, err := llmcalls.ReadWorkspace(ws); err == nil && len(res.Records) > 0 {
+		v = cyclespend.VerdictOf(res.Records, c.failAt, c.Shipped)
 	}
-	return cyclespend.VerdictOf(res.Records, c.failAt, c.Shipped)
+	spans, spanErr := cyclespend.ReadGateSpans(ws)
+	return v.WithHost(spans), appendFailure(nil, filepath.Join(ws, cyclespend.GateSpansFile), spanErr)
 }
 
 func readSpend(ws string) (cyclespend.Spend, []ReadFailure) {

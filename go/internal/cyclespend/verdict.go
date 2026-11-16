@@ -7,10 +7,20 @@ import (
 )
 
 type Verdict struct {
-	LLMMinutesToVerdict float64  `json:"llm_minutes_to_verdict"`
-	FailPointMinutes    *float64 `json:"fail_point_minutes,omitempty"`
-	WasteMinutes        *float64 `json:"waste_minutes,omitempty"`
-	FailFastRatio       *float64 `json:"fail_fast_ratio,omitempty"`
+	LLMMinutesToVerdict  float64  `json:"llm_minutes_to_verdict"`
+	HostMinutesToVerdict float64  `json:"host_minutes_to_verdict,omitempty"`
+	FailPointMinutes     *float64 `json:"fail_point_minutes,omitempty"`
+	WasteMinutes         *float64 `json:"waste_minutes,omitempty"`
+	FailFastRatio        *float64 `json:"fail_fast_ratio,omitempty"`
+}
+
+func (v Verdict) WithHost(spans []GateSpan) Verdict {
+	var host float64
+	for _, s := range spans {
+		host += s.Minutes()
+	}
+	v.HostMinutesToVerdict = host
+	return v
 }
 
 func VerdictOf(calls []llmcalls.Record, failAt time.Time, shipped bool) Verdict {

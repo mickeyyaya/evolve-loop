@@ -77,12 +77,19 @@ func writeWaveCostText(w io.Writer, c wavemeasure.Cost) {
 	case c.Shipped == 0:
 		fmt.Fprintf(w, "cost:    not defined (0 of %d cycle(s) shipped)", c.Started)
 	default:
-		fmt.Fprintf(w, "cost:    %.1f LLM min, %.2f M fresh and %.2f M cache-read tokens per shipped cycle (%d of %d shipped)",
-			*c.LLMMinutesPerShippedCycle, *c.FreshTokensPerShippedCycle/1e6, *c.CacheReadTokensPerShippedCycle/1e6, c.Shipped, c.Started)
+		hostPart := ""
+		if c.HostMinutesPerShippedCycle != nil {
+			hostPart = fmt.Sprintf(", %.1f host min", *c.HostMinutesPerShippedCycle)
+		}
+		fmt.Fprintf(w, "cost:    %.1f LLM min%s, %.2f M fresh and %.2f M cache-read tokens per shipped cycle (%d of %d shipped)",
+			*c.LLMMinutesPerShippedCycle, hostPart, *c.FreshTokensPerShippedCycle/1e6, *c.CacheReadTokensPerShippedCycle/1e6, c.Shipped, c.Started)
 	}
 	fmt.Fprintf(w, " · audit rounds %.2f per cycle · convergence %.2f", *c.AuditRoundsPerCycle, *c.ConvergenceRate)
 	if c.MedianLLMMinutesToVerdict != nil {
 		fmt.Fprintf(w, " · median %.1f LLM min to verdict", *c.MedianLLMMinutesToVerdict)
+	}
+	if c.MedianHostMinutesToVerdict != nil {
+		fmt.Fprintf(w, " · median %.1f host min to verdict", *c.MedianHostMinutesToVerdict)
 	}
 	if c.MedianFailFastRatio != nil {
 		fmt.Fprintf(w, " · median fail-fast %.2f", *c.MedianFailFastRatio)

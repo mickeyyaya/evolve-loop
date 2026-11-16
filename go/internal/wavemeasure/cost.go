@@ -20,6 +20,7 @@ type Cost struct {
 	Started                        int      `json:"started_cycles"`
 	Shipped                        int      `json:"shipped_cycles"`
 	LLMMinutesPerShippedCycle      *float64 `json:"llm_minutes_per_shipped_cycle"`
+	HostMinutesPerShippedCycle     *float64 `json:"host_minutes_per_shipped_cycle"`
 	FreshTokensPerShippedCycle     *float64 `json:"fresh_tokens_per_shipped_cycle"`
 	CacheReadTokensPerShippedCycle *float64 `json:"cache_read_tokens_per_shipped_cycle"`
 	UnmeasuredCalls                int      `json:"unmeasured_calls"`
@@ -31,19 +32,25 @@ type Cost struct {
 	SpendLimitStops                int      `json:"spend_limit_stops"`
 	SpendLimitWouldStops           int      `json:"spend_limit_would_stops"`
 	MedianLLMMinutesToVerdict      *float64 `json:"median_llm_minutes_to_verdict"`
+	MedianHostMinutesToVerdict     *float64 `json:"median_host_minutes_to_verdict"`
 	MedianFailFastRatio            *float64 `json:"median_fail_fast_ratio"`
 }
 
 func computeCost(cycles []CycleSpend) Cost {
 	var t cyclespend.Totals
 	var c Cost
+	var totalHost float64
 	for _, cy := range cycles {
 		t = t.Add(cy.Spend, cy.Shipped)
 		c = c.withHandoff(cy)
+		totalHost += cy.Verdict.HostMinutesToVerdict
 	}
 	c.Started, c.Shipped, c.UnmeasuredCalls = t.Started, t.Shipped, t.Spend.UnmeasuredCalls
 	if per, ok := t.PerShipped(); ok {
 		c.LLMMinutesPerShippedCycle = rounded(per.LLMMinutes, 10)
+		if totalHost > 0 {
+			c.HostMinutesPerShippedCycle = rounded(totalHost/float64(t.Shipped), 10)
+		}
 		c.FreshTokensPerShippedCycle = rounded(per.FreshTokens, 1)
 		c.CacheReadTokensPerShippedCycle = rounded(per.CacheReadTokens, 1)
 	}
@@ -53,21 +60,24 @@ func computeCost(cycles []CycleSpend) Cost {
 	if rate, ok := t.ConvergenceRate(); ok {
 		c.ConvergenceRate = &rate
 	}
-	c.MedianLLMMinutesToVerdict, c.MedianFailFastRatio = verdictMedians(cycles)
+	c.MedianLLMMinutesToVerdict, c.MedianHostMinutesToVerdict, c.MedianFailFastRatio = verdictMedians(cycles)
 	return c
 }
 
-func verdictMedians(cycles []CycleSpend) (*float64, *float64) {
-	var minutes, ratios []float64
+func verdictMedians(cycles []CycleSpend) (*float64, *float64, *float64) {
+	var minutes, hostMinutes, ratios []float64
 	for _, cy := range cycles {
 		if cy.Verdict.LLMMinutesToVerdict > 0 {
 			minutes = append(minutes, cy.Verdict.LLMMinutesToVerdict)
+		}
+		if cy.Verdict.HostMinutesToVerdict > 0 {
+			hostMinutes = append(hostMinutes, cy.Verdict.HostMinutesToVerdict)
 		}
 		if cy.Verdict.FailFastRatio != nil {
 			ratios = append(ratios, *cy.Verdict.FailFastRatio)
 		}
 	}
-	return median(minutes, 10), median(ratios, 100)
+	return median(minutes, 10), median(hostMinutes, 10), median(ratios, 100)
 }
 
 func median(values []float64, scale float64) *float64 {

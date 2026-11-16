@@ -33,6 +33,9 @@
 - **Waste.** The waste is the minutes of the calls that ended after `failAt`. A call with no time never counts as waste.
 - **Fail-fast ratio.** The fail-fast ratio is the fail point divided by the total minutes. It is unset when the total is 0.
 - **Shipped cycle.** A shipped cycle, or a cycle with no blocking signal, has no fail point.
+- **`WithHost` and `GateSpan`.** `WithHost(spans)` adds the length of each `GateSpan` into `HostMinutesToVerdict` and leaves all LLM fields unchanged. An inverted span counts zero minutes.
+- **`Sampler` and `gate-spans.ndjson`.** `Sampler.Measure` records start time, end time and host load for one gate run. `Sampler.Flush` appends buffered spans to `gate-spans.ndjson` in the cycle workspace and skips the write when empty.
+- **`ReadLoadAverage` and `ParseLoadAverage`.** Both functions are the one reader for host load across `cyclespend` and `cmd/evolve`, preferring `/proc/loadavg` and falling back to `sysctl`.
 
 ## Invariants
 

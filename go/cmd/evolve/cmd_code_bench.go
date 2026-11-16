@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -16,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/codeindex/gotypes"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codeindex"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codeindex/codeindextest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclespend"
 )
 
 const (
@@ -99,24 +99,13 @@ func codeBenchProbes() []string {
 }
 
 func hostLoadAverage(ctx context.Context, host codeIndexHost, readFile func(string) ([]byte, error)) float64 {
-	if raw, err := readFile("/proc/loadavg"); err == nil {
-		return parseLoadAverage(string(raw))
-	}
-	var out bytes.Buffer
-	if _, err := host.run(ctx, "sysctl", "", []string{"-n", "vm.loadavg"}, host.env, nil, &out, io.Discard); err != nil {
-		return 0
-	}
-	return parseLoadAverage(out.String())
+	return cyclespend.ReadLoadAverage(readFile, func() (string, error) {
+		var out bytes.Buffer
+		_, err := host.run(ctx, "sysctl", "", []string{"-n", "vm.loadavg"}, host.env, nil, &out, io.Discard)
+		return out.String(), err
+	})
 }
 
 func parseLoadAverage(raw string) float64 {
-	fields := strings.Fields(strings.Trim(strings.TrimSpace(raw), "{}"))
-	if len(fields) == 0 {
-		return 0
-	}
-	load, err := strconv.ParseFloat(fields[0], 64)
-	if err != nil {
-		return 0
-	}
-	return load
+	return cyclespend.ParseLoadAverage(raw)
 }

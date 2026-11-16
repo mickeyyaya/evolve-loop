@@ -252,14 +252,21 @@ func waveCycleText(c wave.Cycle) string {
 
 func waveVerdictText(c wave.Cycle) string {
 	v := c.LLMVerdict
-	switch {
-	case v.LLMMinutesToVerdict <= 0:
+	if v.LLMMinutesToVerdict <= 0 && v.HostMinutesToVerdict <= 0 {
 		return ""
-	case c.Shipped:
-		return fmt.Sprintf(", %.1f LLM min to ship", v.LLMMinutesToVerdict)
 	}
-	text := fmt.Sprintf(", %.1f LLM min to verdict", v.LLMMinutesToVerdict)
-	if v.FailPointMinutes != nil && v.WasteMinutes != nil && v.FailFastRatio != nil {
+	var text string
+	if v.LLMMinutesToVerdict > 0 {
+		if c.Shipped {
+			text = fmt.Sprintf(", %.1f LLM min to ship", v.LLMMinutesToVerdict)
+		} else {
+			text = fmt.Sprintf(", %.1f LLM min to verdict", v.LLMMinutesToVerdict)
+		}
+	}
+	if v.HostMinutesToVerdict > 0 {
+		text += fmt.Sprintf(", %.1f host min", v.HostMinutesToVerdict)
+	}
+	if !c.Shipped && v.FailPointMinutes != nil && v.WasteMinutes != nil && v.FailFastRatio != nil {
 		text += fmt.Sprintf(", fail point %.1f min, waste %.1f min, fail-fast %.2f", *v.FailPointMinutes, *v.WasteMinutes, *v.FailFastRatio)
 	}
 	return text
