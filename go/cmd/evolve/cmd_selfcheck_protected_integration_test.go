@@ -53,7 +53,7 @@ func TestProductionBuildFloorChecks_RefusesAProtectedFileThroughTheRealManifest(
 	prev := repoContractPack
 	t.Cleanup(func() { repoContractPack = prev })
 	repoContractPack = func(context.Context, string, string) ([]string, string, error) { return nil, "", nil }
-	got := productionBuildFloorChecks(context.Background(), core.ReviewInput{
+	got := core.BuildHandoffFloor{productionFloorCheck()}.Failures(context.Background(), core.ReviewInput{
 		Phase: string(core.PhaseBuild), Worktree: wt, WorktreeBaseSHA: base, Workspace: ws,
 	})
 	var protected, placeholder int
