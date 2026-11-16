@@ -37,18 +37,9 @@ func (o *Orchestrator) recoverShipErrorRoute(ctx context.Context, projectRoot st
 	o.backoffOnContention(se.Code, depth, budget)
 	recoverCode, recoverClass := se.Code, se.Class
 	if se.Code == CodeGitFleetRebaseNeeded {
-		predictedConflict := false
-		if cs.ActiveWorktree != "" {
-			switch verdict, perr := ClassifyFleetRebaseCandidate(ctx, cs.ActiveWorktree, "HEAD", "main"); {
-			case perr != nil:
-				fmt.Fprintf(o.errOut(), "[orchestrator] cycle %d fleet-rebase pre-screen error (%v); falling through to rebase\n", cycle, perr)
-			case verdict == FleetRebaseAlreadyLanded:
-				fmt.Fprintf(o.errOut(), "[orchestrator] cycle %d fleet-rebase candidate already landed on main (superseded); short-circuiting with no wasted replay/re-audit (948 duplicate-work fix)\n", cycle)
-				return "", false
-			case verdict == FleetRebaseConflict:
-				predictedConflict = true
-			case verdict == FleetRebaseClean:
-			}
+		predictedConflict, landed := o.prescreenFleetRebase(ctx, cycle, *cs)
+		if landed {
+			return "", false
 		}
 		o.holdShipWindow(ctx, projectRoot, cycle, cs.RunID)
 		unwind := o.unwindUnlessPredictedConflict(ctx, projectRoot, cycle, *cs, predictedConflict)
@@ -66,6 +57,9 @@ func (o *Orchestrator) recoverShipErrorRoute(ctx context.Context, projectRoot st
 			}
 			if o.scopedMergeCarryForward(ctx, cycle, *cs, projectRoot) {
 				return PhaseShip, true
+			}
+			if composedParkOf(ctx).Parked() {
+				return "", false
 			}
 			fmt.Fprintf(o.errOut(), "[orchestrator] cycle %d has no explanation contract, so the identity carry cannot prove the rebased change; auditing it again\n", cycle)
 		case conflict:
@@ -149,6 +143,9 @@ func (o *Orchestrator) routeRebasedExplanation(ctx context.Context, projectRoot 
 		*cs = rebasedState
 		if o.identityCarryForward(ctx, cycle, rebasedState, base0, projectRoot) {
 			return PhaseShip, true
+		}
+		if composedParkOf(ctx).Parked() {
+			return "", false
 		}
 		fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d rebase is byte-identical on %s: explanation rebound, re-auditing without a Build (ADR-0105)\n", cycle, newBase)
 		return PhaseAudit, true
@@ -558,4 +555,20 @@ func worktreeGenerator(worktree string) derived.Generator {
 		}
 		return nil
 	}
+}
+
+func (o *Orchestrator) prescreenFleetRebase(ctx context.Context, cycle int, cs CycleState) (predictedConflict, landed bool) {
+	if cs.ActiveWorktree == "" {
+		return false, false
+	}
+	switch verdict, perr := ClassifyFleetRebaseCandidate(ctx, cs.ActiveWorktree, "HEAD", "main"); {
+	case perr != nil:
+		fmt.Fprintf(o.errOut(), "[orchestrator] cycle %d fleet-rebase pre-screen error (%v); falling through to rebase\n", cycle, perr)
+	case verdict == FleetRebaseAlreadyLanded:
+		fmt.Fprintf(o.errOut(), "[orchestrator] cycle %d fleet-rebase candidate already landed on main (superseded); short-circuiting with no wasted replay/re-audit (948 duplicate-work fix)\n", cycle)
+		return false, true
+	case verdict == FleetRebaseConflict:
+		return true, false
+	}
+	return false, false
 }

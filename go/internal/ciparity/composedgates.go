@@ -1,5 +1,7 @@
 package ciparity
 
+import "github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
+
 var RequiredComposedGates = []string{"compile", "test", "acs", "apicover"}
 
 func MissingComposedGates(results map[string]string) []string {
@@ -15,6 +17,7 @@ func MissingComposedGates(results map[string]string) []string {
 type GateOutcome struct {
 	Status string
 	Tail   string
+	Reds   baseattr.Reds
 }
 
 func GateStatuses(results map[string]GateOutcome) map[string]string {

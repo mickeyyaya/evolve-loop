@@ -57,6 +57,13 @@ func (r *Repo) initWorkTree() {
 	r.quiet()
 }
 
+func At(tb testing.TB, dir string) *Repo {
+	tb.Helper()
+	r := &Repo{Dir: dir, tb: tb}
+	r.initWorkTree()
+	return r
+}
+
 func Bare(tb testing.TB) *Repo {
 	tb.Helper()
 	r := newRepo(tb)
