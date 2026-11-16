@@ -86,16 +86,12 @@ func (h heldCheck) decide() (heldproposal.Decision, error) {
 	if err != nil {
 		return heldproposal.Decision{}, shipErr(core.CodeStateIO, core.ShipClassTransient, core.StageAtomicShip, "ship: read the claimed inbox items for the held-proposal check: "+err.Error())
 	}
-	kinds := make([]string, 0, len(scan.Items))
-	for _, it := range scan.Items {
-		kinds = append(kinds, it.Kind)
-	}
 	out, err := captureGitOutput(h.ctx, h.opts, "diff", "--name-only", "-z", "--no-renames", h.base, h.commit)
 	if err != nil {
 		return heldproposal.Decision{}, err
 	}
 	changed := strings.FieldsFunc(out, func(r rune) bool { return r == 0 })
-	return heldproposal.Decide(heldproposal.Inputs{Kinds: kinds, Changed: changed, Protected: guards.IsProtectedSurface}), nil
+	return heldproposal.Decide(heldproposal.Inputs{Items: scan.Items, Changed: changed, Protected: guards.IsProtectedSurface}), nil
 }
 
 func (h heldCheck) recordShadow(rec heldproposal.Record) error {
