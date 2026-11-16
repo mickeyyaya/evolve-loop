@@ -279,9 +279,15 @@ func (d *Driver) admitMembers(set RecordSet) {
 
 func (d *Driver) noteRedelivered(l ListedRecord) {
 	m, known := d.rec.Members[l.Record.Cycle]
-	if known && l.Pool == d.Pool && m.Status != MemberPending && memberKey(l.Record.Cycle, m.PatchIDs) != MemberKey(l.Record) {
-		d.rec.Failures = appendFailures(d.rec.Failures, DriverFailure{Step: stepRecord, Error: fmt.Sprintf("cycle %d was delivered again under new patches after it was %s", l.Record.Cycle, m.Status), At: d.now()})
+	if !known || l.Pool != d.Pool || m.Status == MemberPending || memberKey(l.Record.Cycle, m.PatchIDs) == MemberKey(l.Record) {
+		return
 	}
+	if stage, err := d.Stage(); err == nil && stage == policy.FleetIntegrationShadow {
+		m.Redelivered = patchIDsOf(l.Record)
+		d.rec.Members[l.Record.Cycle] = m
+		return
+	}
+	d.rec.Failures = appendFailures(d.rec.Failures, DriverFailure{Step: stepRecord, Error: fmt.Sprintf("cycle %d was delivered again under new patches after it was %s", l.Record.Cycle, m.Status), At: d.now()})
 }
 
 func (d *Driver) admits(l ListedRecord) bool {
