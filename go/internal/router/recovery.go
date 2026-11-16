@@ -72,6 +72,15 @@ var recoveryChain = []recoveryHandler{
 		},
 	},
 	{
+		name: "capacity-retry-ship",
+		match: func(b Blocker) (string, bool) {
+			if b.Code == "REPO_CONTRACT_CAPACITY" {
+				return "ship", true
+			}
+			return "", false
+		},
+	},
+	{
 		name: "precondition-reaudit",
 		match: func(b Blocker) (string, bool) {
 			if b.Class == "precondition" ||
