@@ -803,4 +803,10 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [research/self-evolving-loop-autonomy-2026-11.md](research/self-evolving-loop-autonomy-2026-11.md) | Why 221 of 268 inbox items are console routes, and what outside systems do about self-improvement and earned autonomy. It gives refinements R1 to R6. |
 
+## 2026-11-17 — Claude watermark and sampling parameters note
+
+| Document | What it records |
+|---|---|
+| [research/practice-claude-model-release-notes-7ad7926a-202611162241.md](research/practice-claude-model-release-notes-7ad7926a-202611162241.md) | Note on Claude release notes snapshot `2026-11-15T11:10:48Z` (text watermark on four models and non-default sampling parameters) for item `7ad7926a`, read as untrusted data. All personas stay unchanged. The claude model notes gain one bullet. |
+
 <!-- GENERATED:research-index END -->

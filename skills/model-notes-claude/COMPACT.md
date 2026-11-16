@@ -9,3 +9,4 @@ These notes load only into a dispatch whose CLI is `claude`, `claude-tmux` or `c
 - Verify with a command before you claim done, and report only what the command printed.
 - Claude Fable 5.2 and Claude Mythos 5.2 return a 400 error when you edit the system prompt, the tools or an earlier message. This holds when a thinking block follows the edit. Send the history back unchanged.
 - On Claude Fable 5.2 and Claude Mythos 5.2, thinking is always on. An order to answer without thinking does not stop it at medium effort and above. Lower the effort level instead.
+- Do not set a non-default temperature, top_p or top_k on Claude Opus 4.6, Opus 4.5, Sonnet 4.5 or Haiku 4.5. It can remove the text watermark.
