@@ -12,9 +12,10 @@
   "kind": "pipeline-integrity",
   "origin": "console",
   "priority_class": "correctness",
-  "route": "lane",
-  "routed_at": "2026-11-14T07:33:58Z",
-  "routed_reason": "operator 2026-11-14: fill the 8 lanes; plan wave-orchestrator O2a: a pipeline-kind item whose files are not protected is an ordinary code fix",
+  "route": "console-manual",
+  "routed_at": "2026-11-15T14:08:24Z",
+  "routed_cycle": 2409,
+  "routed_reason": "lane triage (cycle 2409) skip_shipped: git_sha bb69b6092",
   "summary": "Cycle 2161 ran on host-sentinel-inside-the-loop, which has route console-manual. waves/supply.json classed the item console_route one second before the launch. productionPoolPlanFn filters triage todos through consoleRoutedResolver, but pausedPlan.order adds each ready paused scope to the head of the plan with no route check.",
   "title": "The pool plan must apply the console route to a paused scope",
   "weight": 0.8
