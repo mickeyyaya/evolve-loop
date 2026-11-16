@@ -30,6 +30,9 @@ func Read(evolveDir string) (Stop, bool, error) {
 	if err := json.Unmarshal(data, &s); err != nil {
 		return Stop{}, false, fmt.Errorf("mainstop: parse %s: %w", Path(evolveDir), err)
 	}
+	if s.Schema == SchemaV1 {
+		s.Schema = Schema
+	}
 	if s.Schema != Schema {
 		return Stop{}, false, fmt.Errorf("mainstop: %s has schema %q, want %q", Path(evolveDir), s.Schema, Schema)
 	}
