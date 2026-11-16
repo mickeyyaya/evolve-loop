@@ -33,7 +33,7 @@ The fence becomes the set of files and symbols that enforce a guarantee. A lane 
 5. A symbol pin under `go/acs/regression/gatepins` keeps the shape of a gate call in a lane-editable file.
 6. A guard test names each protected file and its class. A lost entry fails it.
 7. The gate-shaped tripwire stays. A new gate-shaped file with no entry fails the audit.
-8. A lane can work a protected item or a `pipeline-*` item only as a held proposal.
+8. A lane can work a protected item or a `pipeline-*` item only as a held proposal. Amended by ADR-0167 (F4): a `pipeline-*` item that routing sends to a lane lands as a normal PASS unless it touches a protected path. The hold uses the routing predicate `inboxbatch.ConsoleRouted`.
 9. A held proposal gets an adversarial audit from another family, at the deep tier.
 10. A held ship stops before the landing, in the state `held-for-operator`.
 11. Only `evolve landing approve` writes an approval. It is a class D operator verb.
