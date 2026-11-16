@@ -54,7 +54,7 @@ func Reroutes(open []inboxbatch.Item, opts RerouteOptions) []Proposal {
 }
 
 func canRerouteToLane(it inboxbatch.Item, opts RerouteOptions) bool {
-	if !UnderivedConsoleRoute(it, opts.IsProtected) || recordsAReason(it.RoutedReason) {
+	if !UnderivedConsoleRoute(it, opts.IsProtected) || !loopOwnedRoute(it) {
 		return false
 	}
 	if !slices.Contains(opts.BuildableKinds, strings.ToLower(strings.TrimSpace(it.Kind))) {
@@ -64,6 +64,20 @@ func canRerouteToLane(it inboxbatch.Item, opts RerouteOptions) bool {
 		return false
 	}
 	return opts.HasOpenPR == nil || !opts.HasOpenPR(it.ID)
+}
+
+func loopOwnedRoute(it inboxbatch.Item) bool {
+	switch it.RoutedByText() {
+	case inboxbatch.RoutedByOperator:
+		return false
+	case inboxbatch.RoutedByLoop:
+		return true
+	}
+	var reason string
+	if json.Unmarshal(it.RoutedReason, &reason) == nil && strings.HasPrefix(reason, inboxbatch.NoWorkRoutePrefix) {
+		return true
+	}
+	return !recordsAReason(it.RoutedReason)
 }
 
 func recordsAReason(raw json.RawMessage) bool {

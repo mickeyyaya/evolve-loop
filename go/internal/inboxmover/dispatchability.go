@@ -60,6 +60,9 @@ const (
 )
 
 func PlaceOnLaneMenu(opts Options, it inboxbatch.Item, isProtected func(string) bool) (MenuPlace, string) {
+	if sha := it.LandedSHAText(); sha != "" {
+		return MenuWaiting, "landed on main as " + sha + "; the boundary consumes it"
+	}
 	if routed, reason := inboxbatch.ConsoleRouted(it, isProtected); routed {
 		return MenuConsole, reason
 	}
