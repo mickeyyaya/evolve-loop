@@ -128,7 +128,7 @@ func TestSHA_TableSeam(t *testing.T) {
 func TestRunError_MessagesAndUnwrap(t *testing.T) {
 	t.Parallel()
 
-	fatal := &RunError{ExitCode: 128}
+	fatal := &RunError{ExitCode: 128, Revs: []string{"HEAD"}}
 	if got, want := fatal.Error(), "git diff HEAD exit 128"; got != want {
 		t.Errorf("fatal.Error() = %q, want %q", got, want)
 	}

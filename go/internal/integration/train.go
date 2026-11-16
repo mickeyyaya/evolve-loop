@@ -4,10 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/treestate"
 )
 
 const CauseCI = "ci"
@@ -417,9 +421,43 @@ func (t Train) evidence(ctx context.Context, commits []CommitIdentity) (Evidence
 	}
 	ev := Evidence{Base: first, Paths: paths, DiffSHA: Digest([]byte(diff))}
 	for _, c := range commits {
+		change, err := repo.commitChange(ctx, c)
+		if err != nil {
+			return Evidence{}, err
+		}
 		ev.Commits = append(ev.Commits, c.SHA)
+		ev.Changes = append(ev.Changes, change)
 	}
 	return ev, nil
+}
+
+func (r Repo) commitChange(ctx context.Context, c CommitIdentity) (CommitChange, error) {
+	sum, err := treestate.Between(ctx, r.runner(), r.Dir, nil, c.BaseSHA, c.SHA)
+	if err != nil {
+		return CommitChange{}, fmt.Errorf("integration: read the change of %s..%s: %w", c.BaseSHA, c.SHA, err)
+	}
+	paths, err := r.changedPaths(ctx, c.BaseSHA, c.SHA)
+	if err != nil {
+		return CommitChange{}, err
+	}
+	return CommitChange{SHA: c.SHA, BaseSHA: c.BaseSHA, DiffSHA: sum, Paths: paths}, nil
+}
+
+func (r Repo) runner() sysexec.RunFunc {
+	return func(ctx context.Context, _, dir string, args, _ []string, _ io.Reader, stdout, stderr io.Writer) (int, error) {
+		out, err := r.Git(ctx, dir, "", args...)
+		code := 0
+		var ge *GitError
+		switch {
+		case errors.As(err, &ge) && ge.Err == nil:
+			out, code = ge.Stdout, ge.Code
+			_, _ = io.WriteString(stderr, ge.Stderr)
+		case err != nil:
+			return 0, err
+		}
+		_, _ = io.WriteString(stdout, out)
+		return code, nil
+	}
 }
 
 func (t Train) prCommits(ctx context.Context, pr int) ([]CommitIdentity, error) {
@@ -471,4 +509,8 @@ func mergeReason(sha string, parents []string) string {
 		short[i] = ShortSHA(p)
 	}
 	return "commit " + ShortSHA(sha) + " is a merge of " + strings.Join(short, " and ") + ", and the train composes a linear PR. Next: put the commits on a new branch from origin/main, open a PR, and run record-pr on it."
+}
+
+func RestoreStep(at, source string) string {
+	return fmt.Sprintf("Next: in a worktree at %s, run git restore --source=%s --staged --worktree -- . , run the review seats and evolve commit-gate run, then run record-pr again.", at, source)
 }
