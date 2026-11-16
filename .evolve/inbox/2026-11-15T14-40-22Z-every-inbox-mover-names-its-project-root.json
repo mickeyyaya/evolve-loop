@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "A design that passes architecture review. Five review rounds of two designs (root inference; explicit root + guard) failed on: pre-resolving facades, continuation-registry writers, Roots.ProjectRoot beside Roots.EvolveDir, two Claimer callers, a syntax-only guard, a CI allow list that cannot be pinned. Review texts: scratchpad hi/lat/L-arch*.txt, L2-arch*.txt (2026-11-14).",
+    "The new tests are red without the change"
+  ],
+  "created_at": "2026-11-15T14:40:22Z",
+  "docs": [
+    "docs/architecture/packages/internal-inboxmover.md"
+  ],
+  "evidence": "inboxmover.Options derives its ledger, ActiveCycleFn and the git probes from ProjectRoot; 8 production literals pass only InboxDir (deliverable/effects.go:73, triagecap/lane_menu.go:86, phases/triage/triage.go:189, cmd_inbox.go:132, cmd_loop_goal_ids.go:69, cmd_cycle.go:699,820, cmd_supply_wiring.go:63), so from a non-root working directory the lifecycle row and the landing probe use the wrong root. CI runs make test-integration, which has no treewalk guard, so test leaks went unseen (make test red on main 2026-11-14). The test-only leak fix shipped separately (L-min).",
+  "files": [
+    "go/internal/inboxmover/inboxmover.go"
+  ],
+  "fix": "A design that passes architecture review. Five review rounds of two designs (root inference; explicit root + guard) failed on: pre-resolving facades, continuation-registry writers, Roots.ProjectRoot beside Roots.EvolveDir, two Claimer callers, a syntax-only guard, a CI allow list that cannot be pinned. Review texts: scratchpad hi/lat/L-arch*.txt, L2-arch*.txt (2026-11-14).",
+  "id": "every-inbox-mover-names-its-project-root",
+  "kind": "fix",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "routed_at": "2026-11-15T14:53:43Z",
+  "routed_cycle": 2415,
+  "routed_reason": "lane triage (cycle 2415) dropped: protected-surface: go/internal/inboxmover/inboxmover.go",
+  "summary": "inboxmover.Options derives its ledger, ActiveCycleFn and the git probes from ProjectRoot; 8 production literals pass only InboxDir (deliverable/effects.go:73, triagecap/lane_menu.go:86, phases/triage/triage.go:189, cmd_inbox.go:132, cmd_loop_goal_ids.go:69, cmd_cycle.go:699,820, cmd_supply_wiring.go:63), so from a non-root working directory the lifecycle row and the landing probe use the wrong root. CI runs make test-integration, which has no treewalk guard, so test leaks went unseen (make test red on main 2026-11-14). The test-only leak fix shipped separately (L-min).",
+  "title": "Every inbox mover gets its project root from one source, and CI runs the treewalk leak guard",
+  "weight": 0.75
+}

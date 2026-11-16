@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Red first: a lane diff that adds a package without regenerating go/.darwin-set fails the build floor with a correction that names `evolve ci darwin-set generate`.",
+    "Red first: a lane diff with an errcheck finding fails the floor and names the file and line.",
+    "Docs: the derived and core package notes change in STE; 100% coverage on each changed function; zero code comments."
+  ],
+  "created_at": "2026-11-14T00:28:45Z",
+  "files": [
+    "go/internal/core/build_floor_reviewer.go",
+    "go/internal/derived/derived.go"
+  ],
+  "fix": "At the build floor (so the builder can correct it) run golangci-lint on the changed packages and the check verb of every internal/derived entry whose inputs the diff touches; at ship, refuse a tree whose derived files are stale. One list: the derived registry drives both.",
+  "id": "lane-ship-checks-lint-and-derived-files",
+  "kind": "fix",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "2026-11-14: main went red at ba124fd27 (wave 171). A lane cycle added go/cmd/testlatency with an unchecked f.Close (golangci-lint errcheck) and without regenerating go/.darwin-set; required CI failed on golangci-lint, TestDarwinSetFile_MatchesTheSetDerivedFromTheTree and TestPRRefresh_TheRealGeneratorsOfACloneCommitOnlyTheStaleIndex. The main-red stop then parked every lane until the console fix (PR 1447). The lane floors and the ship gates run neither golangci-lint on the changed packages nor the derived-file checks of internal/derived (flags, signal codes, research index, darwin set). Plan context: docs/architecture/packages/internal-derived.md; docs/architecture/wave-orchestrator.md (main protection).",
+  "title": "A lane cannot ship a golangci-lint finding or a stale derived file",
+  "weight": 0.9
+}

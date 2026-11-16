@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "Red first: a braked pool reports cause operator_stop even when its launch cap is also reached.",
+    "Docs: the orchestrator package note changes in STE; 100% coverage on each changed function; zero code comments."
+  ],
+  "created_at": "2026-11-14T04:51:05Z",
+  "files": [
+    "go/cmd/evolve/cmd_loop_orchestrator.go"
+  ],
+  "fix": "Wire the loop-stop brake (and evolve wave stop) into PoolConfig.Halted so the pool sees the stop; keep the cause order. Red test: a pool past its cap that is then braked reports operator_stop.",
+  "id": "wave-stop-is-classified-as-operator-stop",
+  "kind": "fix",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "summary": "Wave 171, 2026-11-14 04:19Z: after `evolve wave stop` (loop-stop brake), LOOP_ORCH_POOL_IDLE and LOOP_ORCH_POOL_UNDERFILLED carried cause=run_cap. go/internal/orchestrator/idle_cause.go checks t.Stopped before t.Capped, and fleet.pool.stopped() reads PoolConfig.Halted, so the brake path does not reach Halted while the run cap (RunMaxLanes default = orchestratorRunLanesPerSlot x count, policy/fleet_orchestrator.go:83) was already hit. PQ8 then attributes operator-stop drain time to the run cap. Plan: docs/plans/pipeline-health-indexes-2026-11.md (H1, D2).",
+  "title": "A pool that a wave stop drains reports the idle cause operator_stop, not run_cap",
+  "weight": 0.7
+}

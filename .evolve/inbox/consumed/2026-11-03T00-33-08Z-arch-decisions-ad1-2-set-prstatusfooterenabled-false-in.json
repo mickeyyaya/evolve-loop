@@ -5,6 +5,12 @@
     "The spec and package note of the changed package state the change in STE."
   ],
   "campaign": "architecture-decisions-2026-11",
+  "consumed": {
+    "at": "2026-11-16T03:38:29Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "shipped in 5788eee29 (on main); cycle 2413 found it already shipped"
+  },
   "created_at": "2026-11-03T00:33:08Z",
   "files": [
     "go/internal/bridge/manifests/claude-tmux.json"
@@ -18,9 +24,10 @@
   "kind": "feature",
   "origin": "console",
   "priority_class": "security",
-  "route": "lane",
-  "routed_at": "2026-11-13T19:15:33Z",
-  "routed_reason": "operator 2026-11-13: the item touches no protected file and its console route had no reason; a lane can build it",
+  "route": "console-manual",
+  "routed_at": "2026-11-15T14:53:13Z",
+  "routed_cycle": 2413,
+  "routed_reason": "lane triage (cycle 2413) dropped: already-shipped: 5788eee29",
   "source": "operator decisions 2026-11-03; plan docs/plans/architecture-decisions-2026-11.md component AD1-2",
   "summary": "Component AD1-2 of the 2026-11-03 architecture decisions plan. Set `\"prStatusFooterEnabled\":false` in the claude manifest `--settings` data Stage: none. Size: S. Route: console: manifests are protected. Plan: docs/plans/architecture-decisions-2026-11.md; research: docs/research/architecture-decisions-2026-11.md.",
   "title": "AD1-2: Set \"prStatusFooterEnabled\":false in the claude manifest --settings data",

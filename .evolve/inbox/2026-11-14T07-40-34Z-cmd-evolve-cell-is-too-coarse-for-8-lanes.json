@@ -1,0 +1,35 @@
+{
+  "acceptance": [
+    "A design doc compares package, file and verb-family grains on the measured conflict record of waves 170-173.",
+    "Red first: two items that touch different cmd/evolve verb files are admitted together; two that touch the same file are not.",
+    "Docs in STE; 100% coverage on each changed function; zero code comments."
+  ],
+  "continuation": {
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2405",
+    "branch": "cycle-cd3ae73e-2405",
+    "snapshot_sha": "a60582c45c033427e89786a91ec778d9e67e3f75",
+    "base_sha": "109b1b22f1c889be72db4ec0ff88ee21f2e520d6",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2405/audit-fail-reason.json",
+    "cycle": 2405
+  },
+  "created_at": "2026-11-14T07:40:34Z",
+  "failure_count": 1,
+  "files": [
+    "go/internal/orchestrator/admission.go"
+  ],
+  "fix": "Design first: give hub packages (cmd/evolve, internal/core) a finer cell grain (the file set the item declares, or the verb file family), keep the package grain elsewhere, and judge it on the optimistic-admission conflict record (fail rate of admitted pairs) before enforce.",
+  "id": "cmd-evolve-cell-is-too-coarse-for-8-lanes",
+  "kind": "feature",
+  "last_failure_class": "unknown",
+  "last_failure_cycle": 2385,
+  "last_failure_findings": "review gate: phase \"build\" deliverable rejected after 1 correction(s): build handoff floor: 1 deterministic check failure(s) — fix these exactly before handoff:\n  ./acs/cycle2385 (-tags acs): unit tests FAIL\n--- FAIL: TestC2385_010_TheCycle1972CmdEvolvePredicateAdmitsAnotherFileAndHoldsTheSameFile (0.78s)\n--- FAIL: TestC1972_004_TwoCmdEvolveTodosNeverRunAtOnceAndTheHubRuleHolds (0.00s)\nFAIL\tgithub.com/mickeyyaya/evolve-loop/go/acs/cycle1972\t0.074s\nFAIL\tgithub.com/mickeyyaya/evolve-loop/go/acs/cycle2385\t3.586s\n…0.074s\n        FAIL\nFAIL\nFAIL\tgithub.com/mickeyyaya/evolve-loop/go/acs/cycle2385\t3.586s\nFAIL\n",
+  "last_failure_fingerprint": "text:8deab0ef0d2b",
+  "last_failure_reason": "cycle-failure-release",
+  "last_failure_rung": "R3",
+  "origin": "console",
+  "priority_class": "performance",
+  "retry_plan": "fresh-deep-plan",
+  "summary": "2026-11-14 wave 172 supply census: with one in-flight item (paused-plan-starts-a-console-routed-item) holding the cell cmd/evolve, 12 lane-routable items waited (waiting_cell: cells cmd/evolve,family:... held by ...), and the 8-lane fleet ran 4 lanes. cmd/evolve holds every verb, so almost every feature touches it; at the package grain two unrelated verbs (wave status and inbox show) cannot run in parallel. Plan context: docs/architecture/wave-orchestrator.md (cells, admission); the optimistic-admission shadow already measures would-admit pairs (LOOP_ORCH_ADMISSION_SHADOW).",
+  "title": "Lane admission treats go/cmd/evolve as one cell, so one item there blocks about 12 others",
+  "weight": 0.85
+}

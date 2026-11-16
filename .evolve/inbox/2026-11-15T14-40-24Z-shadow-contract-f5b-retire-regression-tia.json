@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "Remove the regression_tia stage key, its shadow code (emitTIADecision and the TIA_SHADOW emitter), its registry entry and baseline row; keep regressiontia.Pure as the one purity predicate (it serves the scan skip, F2). Docs and signal-codes.md updated.",
+    "The new tests are red without the change"
+  ],
+  "created_at": "2026-11-15T14:40:24Z",
+  "docs": [
+    "docs/architecture/shadow-stage-contract.md",
+    "docs/plans/shadow-stage-evidence-2026-11.md",
+    "docs/architecture/adr/0167-shadow-stages-prove-themselves-on-chained-evidence.md"
+  ],
+  "evidence": "F5 (PR #1476) measured 0 of 44 go/acs/regression predicates as pure (each imports pkg/acsassert, which imports os). Operator rule 2026-11-15: split the corpus and retire the stage if fewer than 9 are pure.",
+  "files": [
+    "go/internal/phases/audit/audit.go",
+    "go/internal/policy/policy.go",
+    "go/internal/gateregistry/seed_stages.go"
+  ],
+  "fix": "Remove the regression_tia stage key, its shadow code (emitTIADecision and the TIA_SHADOW emitter), its registry entry and baseline row; keep regressiontia.Pure as the one purity predicate (it serves the scan skip, F2). Docs and signal-codes.md updated.",
+  "id": "shadow-contract-f5b-retire-regression-tia",
+  "kind": "maintenance",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "summary": "F5 (PR #1476) measured 0 of 44 go/acs/regression predicates as pure (each imports pkg/acsassert, which imports os). Operator rule 2026-11-15: split the corpus and retire the stage if fewer than 9 are pure.",
+  "title": "Retire the regression_tia stage: 0 of 44 predicates are pure",
+  "weight": 0.85
+}

@@ -1,0 +1,17 @@
+{
+  "acceptance": [
+    "The next evolve gc run no longer flags cycle-cd3ae73e-2349."
+  ],
+  "created_at": "2026-11-13T19:44:38Z",
+  "fix": "Land the work through evolve ship, or retire the branch or tree on purpose. Then the flag leaves the gc report.",
+  "id": "gc-flag-unmerged-cycle-cd3ae73e-2349-acad88e0",
+  "kind": "task",
+  "priority_class": "hygiene",
+  "route": "console-manual",
+  "routed_at": "2026-11-15T02:40:55Z",
+  "routed_cycle": 2396,
+  "routed_reason": "lane triage (cycle 2396) dropped: out-of-scope: ref-state work on unmerged orphan branch cycle-cd3ae73e-2349 (17405fd03) requires console branch delete or salvage; lane cannot mutate external git refs",
+  "summary": "evolve gc flagged cycle-cd3ae73e-2349 (branch not merged into HEAD) on 2 runs and keeps it: gc never removes a flagged item.",
+  "title": "gc flag flag-unmerged: cycle-cd3ae73e-2349",
+  "weight": 0.3
+}

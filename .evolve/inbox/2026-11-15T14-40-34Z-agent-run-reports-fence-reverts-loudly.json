@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "agent run prints the reverted paths as a WARN line and exits with a distinct non-zero code when a builder seat wrote outside its grant; the console can re-run with a corrected grant; a test pins both.",
+    "The new tests are red without the change"
+  ],
+  "created_at": "2026-11-15T14:40:34Z",
+  "docs": [
+    "docs/architecture/agent-sandbox-contract.md"
+  ],
+  "evidence": "2026-11-15: builder seats wrote files outside their --writable grant in about half the runs (F3, F4, F5, F6, K1); the fence reverted them while the seat reported Verdict PASS, and a later review found the fix missing. The only trace is runtime/.evolve/ephemeral/agent-runs/<run>/fence-reverted.patch.",
+  "files": [
+    "go/internal/agentcmd/run.go",
+    "go/cmd/evolve/cmd_agent.go"
+  ],
+  "fix": "agent run prints the reverted paths as a WARN line and exits with a distinct non-zero code when a builder seat wrote outside its grant; the console can re-run with a corrected grant; a test pins both.",
+  "id": "agent-run-reports-fence-reverts-loudly",
+  "kind": "hardening",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "2026-11-15: builder seats wrote files outside their --writable grant in about half the runs (F3, F4, F5, F6, K1); the fence reverted them while the seat reported Verdict PASS, and a later review found the fix missing. The only trace is runtime/.evolve/ephemeral/agent-runs/<run>/fence-reverted.patch.",
+  "title": "evolve agent run reports fence-reverted files as a hard warning",
+  "weight": 0.6
+}
