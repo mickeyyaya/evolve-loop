@@ -42,12 +42,21 @@ func wireBridgeStages(br bridgeStageSink, cfg config.RoutingConfig) {
 	br.SetFatalPaneStage(cfg.FatalPane.String())
 }
 
-func productionBuildFloorChecks(ctx context.Context, in core.ReviewInput) []string {
-	out := append(core.ProtectedSurfaceFloorChecks(guards.IsProtectedSurface)(ctx, in), core.DefaultBuildFloorChecks(ctx, in)...)
+func productionStaticFloorChecks(ctx context.Context, in core.ReviewInput) []string {
+	out := core.ProtectedSurfaceFloorChecks(guards.IsProtectedSurface)(ctx, in)
+	out = append(out, core.StaticBuildFloorChecks(ctx, in)...)
 	out = append(out, core.ScopeDeltaFloorChecks(guards.IsProtectedSurface)(ctx, in)...)
 	out = append(out, core.GateClassifierFloorChecks(ctx, in)...)
-	out = append(out, core.RepoContractFloorChecks(repoContractPack)(ctx, in)...)
 	return append(out, core.LintFloorChecks(lintPackages)(ctx, in)...)
+}
+
+func productionSuiteFloorChecks(ctx context.Context, in core.ReviewInput) []string {
+	out := core.SuiteBuildFloorChecks(ctx, in)
+	return append(out, core.RepoContractFloorChecks(repoContractPack)(ctx, in)...)
+}
+
+func productionFloorCheck() core.BuildFloorCheck {
+	return core.BuildFloorCheck{Name: productionFloorCheckName, Run: productionStaticFloorChecks, Tests: productionSuiteFloorChecks}
 }
 
 var lintPackages core.LintFn = commitgate.LintPackages
@@ -63,7 +72,7 @@ func composedBuildHandoffFloor(wf policy.WorkflowConfig, cfg config.RoutingConfi
 	if !wf.BuildFloorEnforced {
 		return nil
 	}
-	floor := core.BuildHandoffFloor{{Name: productionFloorCheckName, Run: productionBuildFloorChecks}}
+	floor := core.BuildHandoffFloor{productionFloorCheck()}
 	if spec, ok := cfg.DocumentSpec(); ok {
 		floor = append(floor, core.BuildFloorCheck{Name: solutionFloorCheckName, Run: core.SolutionFloorChecks(spec)})
 	}

@@ -1006,4 +1006,6 @@ var serialTests = map[string]string{
 	"main.TestBootGateHalts_ABenchedSmokeFailureLetsTheReadinessGateRun":                                                   "swaps seams cliUpdateWiringFn and bootPreflightFn",
 	"main.TestUpdateCLIsAtBoundary_AFamilyThatFailsItsSmokeIsBenchedAndTheNextWaveRuns":                                    "swaps seam cliUpdateWiringFn",
 	"main.TestUpdateCLIsAtBoundary_EveryRoutedFamilyFailingItsSmokeHaltsTheNextWave":                                       "swaps seam cliUpdateWiringFn",
+	"main.TestProductionFloor_AStaticRedSkipsTheRepoContractPackAndReportsEveryStaticFailure":                              "swaps seams repoContractPack and lintPackages",
+	"main.TestProductionFloor_AGreenStaticStageRunsTheRepoContractPack":                                                    "swaps seams repoContractPack and lintPackages",
 }
