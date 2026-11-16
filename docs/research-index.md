@@ -771,4 +771,10 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [research/practice-claude-model-release-notes-c433b054-202611.md](research/practice-claude-model-release-notes-c433b054-202611.md) | Note on Claude release notes snapshot `2026-11-13T19:47:32Z` (empty added-line excerpt and November 12 self-hosted Managed Agents) for item `c433b054`, read as untrusted data. `skills/model-notes-claude/COMPACT.md` and all personas stay unchanged. |
 
+## 2026-11-16 — the lane floor runs the tests that read a changed data file
+
+| Document | What it records |
+|---|---|
+| [plans/data-file-test-floor-2026-11.md](plans/data-file-test-floor-2026-11.md) | Why a lane that changes only `.github/workflows/required.yml` skips `go/internal/ciparity`, and the plan for data-file rows in the tree-reading registry of `go/internal/repocontract`. |
+
 <!-- GENERATED:research-index END -->
