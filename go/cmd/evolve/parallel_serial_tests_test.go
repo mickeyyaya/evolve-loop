@@ -940,6 +940,8 @@ var serialTests = map[string]string{
 	"main.TestWireOrchestrator_FailureAdviserWired":                                                                        "calls process-global setter SetModelCatalogDirFn",
 	"main.TestWireOrchestrator_HostEffectsWired":                                                                           "sets env through a helper",
 	"main.TestWireOrchestrator_MemoRunnerRegistered":                                                                       "calls process-global setter SetModelCatalogDirFn",
+	"main.TestWireOrchestrator_ShipMainCIWired":                                                                            "sets env through a helper",
+	"main.TestWireOrchestrator_ShipStepRunWired":                                                                           "sets env through a helper",
 	"main.TestWireOrchestrator_TheCycleRootSendsTheRoutingFallbackToItsSignalCenter":                                       "calls process-global setter SetModelCatalogDirFn",
 	"main.TestWireOrchestrator_APreBuildPhaseAnchoredAfterBuildReachesTheSignalCenter":                                     "calls process-global setter SetModelCatalogDirFn",
 	"main.TestWireOrchestrator_APostBuildPhaseAnchoredAfterBuildRaisesNoRoutingDefect":                                     "calls process-global setter SetModelCatalogDirFn",

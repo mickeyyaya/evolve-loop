@@ -15,7 +15,18 @@ func ParseNames(names string) []Key {
 	if names == "" {
 		return nil
 	}
-	return KeysOf(strings.Split(names, nameDelim)).Keys
+	var keys []Key
+	var tests []string
+	for _, name := range strings.Split(names, nameDelim) {
+		if step, ok := strings.CutPrefix(name, stepPrefix); ok {
+			if step != "" {
+				keys = append(keys, StepKey(step))
+			}
+			continue
+		}
+		tests = append(tests, name)
+	}
+	return append(KeysOf(tests).Keys, keys...)
 }
 
 func (v Verdict) Debug() []string {

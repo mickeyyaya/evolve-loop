@@ -13,7 +13,8 @@
 - `WithParked` keeps one row for each cycle, in cycle order. A second park of a cycle replaces its row.
 - `Admit` gives `AdmitNoStop` when the stop does not hold. It gives `RefuseRebase` when the proof base is not the `main` tip, or when the tip is empty.
 - `Admit` gives `AdmitFix` when the proof has a green stop key and no lane-only red. Each other proof gives `RefuseNotAFix`.
-- `Proven` builds the proof of one run of the stop keys. `Green` holds each key of the stop that the run did not find red.
+- `Proven` builds the proof of one run of the stop keys. `Green` holds each test key of the stop that the run did not find red. A step key is never green through `Proven`, because a run of `go test` proves no step.
+- `StepKeys` gives the step keys of the stop. `ProofReds` leaves out the step keys.
 - `Admission.String` gives the word of each admission: `no-stop`, `fix`, `rebase` and `not-a-fix`. Each signal and each refusal uses these words.
 - `Released` drops the green keys. With no key left, it sets `ReleasedAt` and `ReleasedBy`. It does not change a stop that does not hold.
 - `Resumes` is true when the stop does not hold, or when the given `main` tip is known and is not `MainSHA`. The pool reads it to resume the parked lanes.
@@ -27,8 +28,9 @@
 
 - `Path` is `main-red-stop.json` in the `.evolve` directory.
 - `Read` gives no stop and no error for a missing record. A record that does not parse is an error.
-- `Read` refuses a record whose `schema` is not `Schema`. `Update` sets `Schema` on each stop that it writes.
-- Each key in the record has the fields `package` and `test`.
+- `Schema` is `main-red-stop/v2`. `Read` migrates a record of `SchemaV1` to `Schema` in memory, because a v1 key has no `step` field and stays valid. `Update` writes v2.
+- `Read` refuses a record whose `schema` is neither `Schema` nor `SchemaV1`. `Update` sets `Schema` on each stop that it writes.
+- Each key in the record has the fields `package` and `test`. A step key has the field `step` instead, for a CI step that is not a test.
 - `Update` takes a lock on the file `main-red-stop.json.lock`, reads the record, applies the function and writes the result.
 - The lock is on a second file, because the write replaces the record through a rename.
 - `Update` writes through `atomicwrite`. An error of the function or of the write leaves the record as it was, and `Update` returns the stop on disk.
