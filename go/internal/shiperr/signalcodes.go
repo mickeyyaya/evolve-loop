@@ -45,6 +45,7 @@ var codeDocs = map[ShipErrorCode]string{
 	CodeManifestGate:                "atomic-ship: a staged path was declared by no build/TDD report (cross-lane leak guard)",
 	CodeRepoContractGate:            "atomic-ship: a repo-contract guard suite is RED in the lane worktree; pushing would red main",
 	CodeRepoContractInfra:           "atomic-ship: the repo-contract scanner toolchain died twice without a test-level failure (re-dispatchable)",
+	CodeRepoContractCapacity:        "atomic-ship: a repo-contract gate hit its deadline on a lane tree that did not change, so the lane lacks CPU time and no LLM can fix it; ship retries the gate once and parks the lane on a second kill (transient)",
 	CodeCommittedDocDeleted:         "atomic-ship: the landing deletes a path under docs/ or knowledge-base/ that the target branch holds; a rename into docs/, or within knowledge-base/, ships",
 	CodeForeignPredicatePackage:     "atomic-ship: a cycle landing adds a file under go/acs/cycle<M>/ of a cycle other than the shipping one; archive the superseded package with its explanation record",
 	CodeHeldForOperator:             "atomic-ship: at held_proposals.stage enforce, a lane change that touches the fence or works a pipeline-kind item waits for evolve landing approve of its tree; main did not move (ADR-0157)",
