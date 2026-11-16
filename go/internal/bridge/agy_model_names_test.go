@@ -38,13 +38,13 @@ func TestAgyTierModelsPinnedToVerifiedNames(t *testing.T) {
 		t.Fatalf("LoadManifest(agy-tmux): %v", err)
 	}
 	for tier, want := range map[string]string{
-		"fast":     "Gemini 3.8 Flash (Low)",
-		"balanced": "Gemini 3.8 Flash (High)",
+		"fast":     "Gemini 4 Hydrogen (Medium)",
+		"balanced": "Gemini 4 Hydrogen (High)",
 		"deep":     "Gemini 4 Argon (Medium)",
 		"top":      "Gemini 4 Argon (Medium)",
 	} {
 		if got := m.ModelTierMap[tier]; got != want {
-			t.Errorf("agy tier %q = %q, want %q (each name launched live and shown verbatim in agy's footer: 3.8 Flash on agy 1.2.17, 2026-10-05; 4 Argon Medium and High on agy 1.4.0, 2026-10-16)", tier, got, want)
+			t.Errorf("agy tier %q = %q, want %q (each name launched live and shown verbatim in agy's footer: 4 Hydrogen Medium and High on agy 1.5.9, 2026-11-15, evolve doctor live agy-tmux; 4 Argon Medium for deep and top on agy 1.4.0, 2026-10-16)", tier, got, want)
 		}
 	}
 }

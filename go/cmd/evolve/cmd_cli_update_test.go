@@ -349,7 +349,7 @@ func TestCLIUpdateWiring_TheProbeAndTheSmokeLaunchTheDispatchTierNotTheCLIsOwnDe
 		"smoke": func(s cliupdate.Seams) func(context.Context, string) error { return s.Smoke },
 	}
 	for seam, seamOf := range pick {
-		for family, model := range map[string]string{"agy": "Gemini 3.8 Flash (High)", "claude": "sonnet"} {
+		for family, model := range map[string]string{"agy": "Gemini 4 Hydrogen (High)", "claude": "sonnet"} {
 			t.Run(seam+"/"+family, func(t *testing.T) {
 				t.Parallel()
 				pane := &bridge.FakeTmuxController{CaptureFrames: slices.Repeat([]string{"starting"}, 256)}

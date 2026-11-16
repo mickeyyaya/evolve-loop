@@ -1,5 +1,13 @@
 package policy
 
+import (
+	"fmt"
+	"maps"
+	"slices"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
+)
+
 type ParallelEvaluatePolicy struct {
 	Stage       string `json:"stage,omitempty"`
 	Concurrency int    `json:"concurrency,omitempty"`
@@ -78,6 +86,8 @@ type CatalogPolicy struct {
 
 	AllowedFamilies map[string][]string `json:"allowed_families,omitempty"`
 
+	TierPins map[string]map[string]string `json:"tier_pins,omitempty"`
+
 	RefreshStage string `json:"refresh_stage,omitempty"`
 }
 
@@ -92,6 +102,7 @@ func (p Policy) CatalogConfig() CatalogPolicy {
 		out.AutoRefresh = p.Catalog.AutoRefresh
 	}
 	out.AllowedFamilies = p.Catalog.AllowedFamilies
+	out.TierPins = p.Catalog.TierPins
 	out.RefreshStage = resolveRefreshStage(p.Catalog.RefreshStage, *out.AutoRefresh)
 	return out
 }
@@ -108,4 +119,22 @@ func resolveRefreshStage(raw string, autoRefresh bool) string {
 	default:
 		return "off"
 	}
+}
+
+func (c *CatalogPolicy) validate() error {
+	if c == nil {
+		return nil
+	}
+	for _, cli := range slices.Sorted(maps.Keys(c.TierPins)) {
+		pins := c.TierPins[cli]
+		for _, tier := range slices.Sorted(maps.Keys(pins)) {
+			if !slices.Contains(modelcatalog.CanonicalTiers, tier) {
+				return fmt.Errorf("catalog.tier_pins.%s: %q is not a canonical tier %v", cli, tier, modelcatalog.CanonicalTiers)
+			}
+			if pins[tier] == "" {
+				return fmt.Errorf("catalog.tier_pins.%s.%s: the model is empty", cli, tier)
+			}
+		}
+	}
+	return nil
 }
