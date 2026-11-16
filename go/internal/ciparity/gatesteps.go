@@ -18,11 +18,21 @@ var GateSteps = []GateStep{
 	{"make cover-strict", gateJobUbuntu, "line-coverage strict (go/.cover-strict; per-package hard-fail, ADR-0101)", 1200},
 	{"make cover-changed-darwin", gateJobDarwin, "changed functions of the darwin set at 100% (cover-changed; hard-fail)", 200},
 	{"make cover-strict-darwin", gateJobDarwin, "line-coverage strict of the darwin set (go/.cover-strict floors of go/.darwin-set packages; hard-fail)", 1200},
+	{"golangci-lint run", "golangci-lint", "Lint", 200},
 }
 
 func LookupGateStep(job, step string) (GateStep, bool) {
 	for _, row := range GateSteps {
 		if row.Job == job && row.Step == step {
+			return row, true
+		}
+	}
+	return GateStep{}, false
+}
+
+func GateStepOfKey(key string) (GateStep, bool) {
+	for _, row := range GateSteps {
+		if row.Gate == key || row.Job+": "+row.Step == key {
 			return row, true
 		}
 	}

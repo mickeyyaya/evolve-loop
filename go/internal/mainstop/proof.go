@@ -6,5 +6,5 @@ import (
 )
 
 func ProofReds(keys []baseattr.Key) baseattr.Reds {
-	return baseattr.Reds{Keys: keys, Flags: covchanged.TagFlags(covchanged.DefaultTags)}
+	return baseattr.Reds{Keys: baseattr.TestKeys(keys), Flags: covchanged.TagFlags(covchanged.DefaultTags)}
 }
