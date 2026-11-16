@@ -878,3 +878,4 @@
 ./internal/gateregistry
 ./internal/mainstop
 ./internal/plainfile
+./internal/stagescore

@@ -87,7 +87,9 @@ func scanOnce(t *testing.T, repo string, shadow *scanShadow, center *signalcente
 }
 
 func shadowFor(storeDir string, center *signalcenter.Center) *scanShadow {
-	return newScanShadow(testverdict.NewStore(storeDir, time.Now), sysexec.DefaultRunner, center, shadowCycle, testLimits)
+	s := newScanShadow(testverdict.NewStore(storeDir, time.Now), sysexec.DefaultRunner, center, shadowCycle, testLimits)
+	s.pureFn = alwaysPure
+	return s
 }
 
 func switchOn(t *testing.T, repo string) {
@@ -278,6 +280,7 @@ func TestScanShadow_APanicInBeginDegradesTheScanAndWarns(t *testing.T) {
 		panic("the runner exploded")
 	}
 	s := newScanShadow(testverdict.NewStore(filepath.Join(t.TempDir(), shadowStoreDir), time.Now), panicking, center, shadowCycle, testLimits)
+	s.pureFn = alwaysPure
 	s.begin(context.Background(), t.TempDir())
 	s.observe(packOutcome{pkgs: []pkgResult{green("p/a")}})
 	s.finish()
@@ -301,6 +304,7 @@ func TestScanShadow_RepeatedPanicsWarnOncePerScan(t *testing.T) {
 	t.Parallel()
 	center := signalcenter.New()
 	s := newScanShadow(testverdict.NewStore(filepath.Join(t.TempDir(), shadowStoreDir), panickingClock), healthyTools().run, center, shadowCycle, testLimits)
+	s.pureFn = alwaysPure
 	s.begin(context.Background(), t.TempDir())
 	s.observe(packOutcome{pkgs: []pkgResult{green("p/a"), green("p/b"), green("p/c")}})
 	s.finish()

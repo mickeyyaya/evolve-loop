@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/stagescore"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
@@ -44,8 +45,10 @@ func (s *scanShadow) prune(ctx context.Context, moduleDir string, args []string)
 		s.degrade("go list for the skip: " + err.Error())
 		return run, nil
 	}
+	pkgs := strings.Fields(listed)
+	s.preloadPure(pkgs)
 	var kept, hits, fulls []string
-	for _, pkg := range strings.Fields(listed) {
+	for _, pkg := range pkgs {
 		if full, ok := s.covered(pkgResult{Package: pkg, Passed: true, Flags: flags}); ok {
 			hits, fulls = append(hits, pkg), append(fulls, full)
 			continue
@@ -63,7 +66,7 @@ func (s *scanShadow) prune(ctx context.Context, moduleDir string, args []string)
 }
 
 func (s *scanShadow) covered(r pkgResult) (string, bool) {
-	if !cacheable(r) {
+	if !s.cacheable(r) {
 		return "", false
 	}
 	key, err := s.keyOf(r)
@@ -79,6 +82,9 @@ func (s *scanShadow) commitSkips(hits, fulls []string) {
 	s.packages += len(hits)
 	s.skipped += len(hits)
 	s.hits = append(s.hits, hits...)
+	for range hits {
+		s.records = append(s.records, stagescore.Record{Decision: stagescore.WouldSkip, Outcome: stagescore.Passed})
+	}
 	for _, full := range fulls {
 		s.settled[full] = true
 	}

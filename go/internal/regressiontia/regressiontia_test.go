@@ -1,7 +1,10 @@
 package regressiontia
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -199,4 +202,42 @@ func TestChangedScope_SelectsTestOnlyImporters(t *testing.T) {
 		}
 	}
 	t.Errorf("ChangedScope(./internal/core/...) omits the test-only importer ./internal/routingeval/...; got %d patterns", len(got))
+}
+
+func TestPurePackages_BatchesPurityChecks(t *testing.T) {
+	dir := purityModuleDir(t)
+	got := PurePackages(dir, []string{
+		pureModule + "/internal/leaf",
+		pureModule + "/internal/user",
+		pureModule + "/internal/reados",
+		pureModule + "/internal/ghost",
+	})
+	if !got[pureModule+"/internal/leaf"] || !got[pureModule+"/internal/user"] {
+		t.Fatalf("PurePackages should prove leaf and user pure: %+v", got)
+	}
+	if got[pureModule+"/internal/reados"] || got[pureModule+"/internal/ghost"] {
+		t.Fatalf("PurePackages should deny reados and ghost: %+v", got)
+	}
+	if empty := PurePackages(dir, []string{"errors"}); len(empty) != 0 {
+		t.Fatalf("PurePackages should return empty map for non-module packages: %+v", empty)
+	}
+	g, _, _ := parseDepGraph("malformed_line", nil)
+	if len(g) != 0 {
+		t.Fatalf("parseDepGraph should ignore lines without separator: %+v", g)
+	}
+	if empty := PurePackages("", nil); len(empty) != 0 {
+		t.Fatalf("PurePackages with empty dir/paths should return empty: %+v", empty)
+	}
+	orig := depsRunner
+	t.Cleanup(func() { depsRunner = orig })
+	depsRunner = func(_ context.Context, _, _ string, args, _ []string, _ io.Reader, stdout, _ io.Writer) (int, error) {
+		if len(args) >= 2 && args[1] == "-m" {
+			_, _ = io.WriteString(stdout, pureModule+"\n")
+			return 0, nil
+		}
+		return 1, errors.New("go list failed")
+	}
+	if failed := PurePackages(dir, []string{pureModule + "/internal/leaf"}); len(failed) != 0 {
+		t.Fatalf("PurePackages should fail closed when go list -deps fails: %+v", failed)
+	}
 }

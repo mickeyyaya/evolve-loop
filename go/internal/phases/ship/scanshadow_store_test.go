@@ -25,6 +25,7 @@ func floorTestFn(ctx context.Context, moduleDir string, out packLog) packOutcome
 func floorPack(t *testing.T, repo, store string) (reds []string, err error) {
 	t.Helper()
 	rec := newFloorRecorder(testverdict.NewStore(store, time.Now), sysexec.DefaultRunner, testLimits)
+	rec.pureFn = alwaysPure
 	var notes strings.Builder
 	reds, _, err = runRecordedPack(context.Background(), rec, repo, floorTestFn, &notes)
 	if !strings.Contains(notes.String(), "[build-floor] verdict store:") {
@@ -34,7 +35,9 @@ func floorPack(t *testing.T, repo, store string) (reds []string, err error) {
 }
 
 func shipAt(store string, center *signalcenter.Center, limits policy.ScanCacheConfig) *scanShadow {
-	return newScanShadow(testverdict.NewStore(store, time.Now), sysexec.DefaultRunner, center, shadowCycle, limits)
+	s := newScanShadow(testverdict.NewStore(store, time.Now), sysexec.DefaultRunner, center, shadowCycle, limits)
+	s.pureFn = alwaysPure
+	return s
 }
 
 func storeStats(t *testing.T, store string) testverdict.Stats {
@@ -159,6 +162,7 @@ func (l listingTools) run(ctx context.Context, name, dir string, args, env []str
 func enforcingShadow(t *testing.T, store, root string, tools listingTools) *scanShadow {
 	t.Helper()
 	s := newScanShadow(testverdict.NewStore(store, time.Now), tools.run, signalcenter.New(), shadowCycle, enforceLimits)
+	s.pureFn = alwaysPure
 	s.begin(context.Background(), root)
 	return s
 }
@@ -166,6 +170,7 @@ func enforcingShadow(t *testing.T, store, root string, tools listingTools) *scan
 func seedGreen(t *testing.T, store, root string, tools listingTools, r pkgResult) {
 	t.Helper()
 	rec := newFloorRecorder(testverdict.NewStore(store, time.Now), tools.run, testLimits)
+	rec.pureFn = alwaysPure
 	rec.begin(context.Background(), root)
 	rec.observe(packOutcome{pkgs: []pkgResult{r}})
 	if rec.recorded != 1 {
@@ -250,6 +255,7 @@ func TestScanShadowPrune_APanicKeepsTheRun(t *testing.T) {
 	root := t.TempDir()
 	tools := listingTools{toolRun: healthyTools(), list: "p/a\n"}
 	s := newScanShadow(testverdict.NewStore(filepath.Join(t.TempDir(), shadowStoreDir), panickingClock), tools.run, center, shadowCycle, enforceLimits)
+	s.pureFn = alwaysPure
 	s.begin(context.Background(), root)
 	s.store = nil
 	args := repoContractTestArgs([]string{"./..."}, nil)
@@ -312,6 +318,7 @@ func TestFloorRecorder_AStoreItCannotWriteIsLoud(t *testing.T) {
 	blocked := filepath.Join(t.TempDir(), "blocked")
 	mustWrite(t, blocked, "a file where the store directory should be\n")
 	rec := newFloorRecorder(testverdict.NewStore(blocked, time.Now), healthyTools().run, testLimits)
+	rec.pureFn = alwaysPure
 	var notes strings.Builder
 	_, _, err := runRecordedPack(context.Background(), rec, t.TempDir(), func(context.Context, string, packLog) packOutcome {
 		return packOutcome{pkgs: []pkgResult{green("p/a")}}
@@ -324,6 +331,7 @@ func TestFloorRecorder_AStoreItCannotWriteIsLoud(t *testing.T) {
 func TestFloorRecorder_ADegradedKeyIsNamed(t *testing.T) {
 	t.Parallel()
 	rec := newFloorRecorder(testverdict.NewStore(filepath.Join(t.TempDir(), shadowStoreDir), time.Now), toolRun{goEnv: "not json"}.run, testLimits)
+	rec.pureFn = alwaysPure
 	var notes strings.Builder
 	_, _, _ = runRecordedPack(context.Background(), rec, t.TempDir(), func(context.Context, string, packLog) packOutcome {
 		return packOutcome{pkgs: []pkgResult{green("p/a")}}
@@ -393,6 +401,7 @@ func TestScanShadow_TheFirstStoreErrorKeepsItsCause(t *testing.T) {
 	blocked := filepath.Join(t.TempDir(), "blocked")
 	mustWrite(t, blocked, "a file where the store directory should be\n")
 	rec := newFloorRecorder(testverdict.NewStore(blocked, time.Now), healthyTools().run, testLimits)
+	rec.pureFn = alwaysPure
 	rec.begin(context.Background(), t.TempDir())
 	rec.observe(packOutcome{pkgs: []pkgResult{green("p/a"), green("p/b")}})
 	if rec.storeErrors != 2 || strings.Count(rec.degraded, "store: ") != 1 {

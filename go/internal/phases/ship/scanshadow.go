@@ -11,8 +11,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/overlap"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/regressiontia"
 	"github.com/mickeyyaya/evolve-loop/go/internal/repocontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/stagescore"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/testkey"
 	"github.com/mickeyyaya/evolve-loop/go/internal/testverdict"
@@ -54,8 +56,10 @@ type scanShadow struct {
 
 	settled     map[string]bool
 	hits        []string
+	records     []stagescore.Record
+	pureFn      func(moduleDir string, pkgs []string) map[string]bool
+	pureCache   map[string]bool
 	packages    int
-	escapes     int
 	recorded    int
 	unkeyed     int
 	storeErrors int
@@ -163,6 +167,13 @@ func (s *scanShadow) observe(o packOutcome) {
 	}
 	defer s.guard("observe")
 	s.dropped += o.droppedLines
+	candidates := make([]string, 0, len(o.pkgs))
+	for _, r := range o.pkgs {
+		if len(r.Tags) == 0 && !isHandListed(r.Package) {
+			candidates = append(candidates, r.Package)
+		}
+	}
+	s.preloadPure(candidates)
 	for _, r := range o.pkgs {
 		s.settle(r)
 	}
@@ -171,7 +182,7 @@ func (s *scanShadow) observe(o packOutcome) {
 func (s *scanShadow) settle(r pkgResult) {
 	defer s.guard("settle")
 	s.packages++
-	if !cacheable(r) {
+	if !s.cacheable(r) {
 		s.uncacheable++
 		return
 	}
@@ -192,6 +203,7 @@ func (s *scanShadow) settle(r pkgResult) {
 	switch {
 	case hit && r.Passed:
 		s.hits = append(s.hits, r.Package)
+		s.records = append(s.records, stagescore.Record{Decision: stagescore.WouldSkip, Outcome: stagescore.Passed})
 	case hit:
 		s.escape(r, key, stored.Gate)
 	case r.Passed:
@@ -205,10 +217,54 @@ func (s *scanShadow) recordGreen(r pkgResult, key testkey.Key) {
 	}
 }
 
-func cacheable(r pkgResult) bool {
-	return len(r.Tags) == 0 && !slices.ContainsFunc(repoContractSelections, func(sel repocontract.TestSelection) bool {
-		return strings.HasSuffix(r.Package, strings.TrimPrefix(sel.Package, "."))
+func (s *scanShadow) cacheable(r pkgResult) bool {
+	if len(r.Tags) != 0 || isHandListed(r.Package) {
+		return false
+	}
+	return s.isPure(r.Package)
+}
+
+func isHandListed(pkg string) bool {
+	return slices.ContainsFunc(repoContractSelections, func(sel repocontract.TestSelection) bool {
+		return strings.HasSuffix(pkg, strings.TrimPrefix(sel.Package, "."))
 	})
+}
+
+func (s *scanShadow) isPure(pkg string) bool {
+	if v, ok := s.pureCache[pkg]; ok {
+		return v
+	}
+	s.preloadPure([]string{pkg})
+	return s.pureCache[pkg]
+}
+
+func (s *scanShadow) preloadPure(pkgs []string) {
+	if s.root == "" || len(pkgs) == 0 {
+		return
+	}
+	if s.pureCache == nil {
+		s.pureCache = map[string]bool{}
+	}
+	var missing []string
+	for _, p := range pkgs {
+		if p == "" || isHandListed(p) {
+			continue
+		}
+		if _, ok := s.pureCache[p]; !ok {
+			missing = append(missing, p)
+		}
+	}
+	if len(missing) == 0 {
+		return
+	}
+	fn := s.pureFn
+	if fn == nil {
+		fn = regressiontia.PurePackages
+	}
+	res := fn(repocontract.ModuleDir(s.root), missing)
+	for _, p := range missing {
+		s.pureCache[p] = res[p]
+	}
 }
 
 func (s *scanShadow) keyOf(r pkgResult) (testkey.Key, error) {
@@ -236,7 +292,7 @@ func (s *scanShadow) record(r pkgResult, key testkey.Key) {
 }
 
 func (s *scanShadow) escape(r pkgResult, key testkey.Key, gate string) {
-	s.escapes++
+	s.records = append(s.records, stagescore.Record{Decision: stagescore.WouldSkip, Outcome: stagescore.Red})
 	s.signals.Emit(signalcenter.Event{
 		Cycle: s.cycle, Phase: phaseName,
 		Module: signalcenter.ModuleShip, Origin: "scanShadow.escape", Kind: signalcenter.KindShipWarning,
@@ -257,10 +313,14 @@ func (s *scanShadow) finish() {
 		return
 	}
 	defer s.guard("finish")
+	tally, err := stagescore.Score(s.records)
+	if err != nil {
+		s.degrade("score: " + err.Error())
+	}
 	fields := map[string]string{
 		"packages":      strconv.Itoa(s.packages),
 		"hits":          strconv.Itoa(len(s.hits)),
-		"escapes":       strconv.Itoa(s.escapes),
+		"escapes":       strconv.Itoa(tally.Escapes),
 		"recorded":      strconv.Itoa(s.recorded),
 		"unkeyed":       strconv.Itoa(s.unkeyed),
 		"store_errors":  strconv.Itoa(s.storeErrors),
@@ -277,7 +337,7 @@ func (s *scanShadow) finish() {
 		Cycle: s.cycle, Phase: phaseName,
 		Module: signalcenter.ModuleShip, Origin: "scanShadow.finish", Kind: signalcenter.KindShipWarning,
 		Severity: signalcenter.SeverityInfo,
-		Reason:   fmt.Sprintf("scan shadow: %d package result(s), %d could have been skipped, %d escape(s)", s.packages, len(s.hits), s.escapes),
+		Reason:   fmt.Sprintf("scan shadow: %d package result(s), %d could have been skipped, %d escape(s)", s.packages, len(s.hits), tally.Escapes),
 		Fields:   fields,
 	})
 }

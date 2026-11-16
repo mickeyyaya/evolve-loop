@@ -18,6 +18,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/stagescore"
 	"github.com/mickeyyaya/evolve-loop/go/internal/testkey"
 	"github.com/mickeyyaya/evolve-loop/go/internal/testverdict"
 )
@@ -48,11 +49,20 @@ func (r toolRun) run(_ context.Context, name, _ string, _, _ []string, _ io.Read
 
 func healthyTools() toolRun { return toolRun{goEnv: arm64GoEnv} }
 
+func alwaysPure(_ string, pkgs []string) map[string]bool {
+	out := make(map[string]bool, len(pkgs))
+	for _, p := range pkgs {
+		out[p] = true
+	}
+	return out
+}
+
 func shadowWith(t *testing.T, tools toolRun) (*scanShadow, *signalcenter.Center, string) {
 	t.Helper()
 	center := signalcenter.New()
 	dir := filepath.Join(t.TempDir(), shadowStoreDir)
 	s := newScanShadow(testverdict.NewStore(dir, time.Now), tools.run, center, shadowCycle, testLimits)
+	s.pureFn = alwaysPure
 	s.begin(context.Background(), t.TempDir())
 	return s, center, dir
 }
@@ -106,6 +116,7 @@ func TestScanShadow_AStoreThatCannotWriteIsCountedAndNeverFailsTheScan(t *testin
 	blocked := filepath.Join(t.TempDir(), "blocked")
 	mustWrite(t, blocked, "a file where the store directory should be\n")
 	s := newScanShadow(testverdict.NewStore(blocked, time.Now), healthyTools().run, center, shadowCycle, testLimits)
+	s.pureFn = alwaysPure
 	s.begin(context.Background(), t.TempDir())
 	s.observe(packOutcome{pkgs: []pkgResult{green("p/a")}})
 	s.finish()
@@ -293,6 +304,20 @@ func TestPackOutcomeMerged_KeepsTheResultsOfBothRuns(t *testing.T) {
 	}
 }
 
+func TestScanShadow_CacheablePopulatesCacheOnDirectCallAndFinishDegradesOnBadScore(t *testing.T) {
+	t.Parallel()
+	s, center, _ := shadowWith(t, healthyTools())
+	if !s.cacheable(green("p/direct")) {
+		t.Fatal("cacheable should populate pureCache on direct call")
+	}
+	s.records = append(s.records, stagescore.Record{Decision: "would_unknown"})
+	s.finish()
+	sum := summaryFields(t, center)
+	if !strings.Contains(sum["degraded"], "score:") {
+		t.Fatalf("expected degraded score error, got %v", sum)
+	}
+}
+
 func TestScanShadowFor_FollowsTheDialAndNeedsAProjectRoot(t *testing.T) {
 	t.Parallel()
 	p := &Phase{}
@@ -312,6 +337,9 @@ func TestScanShadowFor_FollowsTheDialAndNeedsAProjectRoot(t *testing.T) {
 func TestScanShadow_RunRepoContractGateAttachesTheShadowFromPolicy(t *testing.T) {
 	t.Parallel()
 	repo := shadowFixture(t)
+	mustWrite(t, filepath.Join(repo, "go", "internal", "user", "user_test.go"), "package user\n\nimport \"testing\"\n\nfunc TestUserContract(t *testing.T) {}\n")
+	runGit(t, repo, "add", "go/internal/user/user_test.go")
+	runGit(t, repo, "commit", "-qm", "pure user test")
 	center := signalcenter.New()
 	p := New(Config{RepoContractGate: "enforce", Signals: center})
 	req := core.PhaseRequest{ProjectRoot: repo, Cycle: 41, Workspace: t.TempDir()}
@@ -418,6 +446,7 @@ func TestScanShadow_ATreeOverTheBudgetDegradesTheScanWithTheReason(t *testing.T)
 	tools := toolRun{files: "big.txt\x00", goEnv: arm64GoEnv}
 	limits := policy.ScanCacheConfig{MaxBytes: 1024, Budget: time.Minute}
 	s := newScanShadow(testverdict.NewStore(filepath.Join(t.TempDir(), shadowStoreDir), time.Now), tools.run, center, shadowCycle, limits)
+	s.pureFn = alwaysPure
 	s.begin(context.Background(), root)
 	s.observe(packOutcome{pkgs: []pkgResult{green("p/a")}})
 	s.finish()

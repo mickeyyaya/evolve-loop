@@ -120,6 +120,84 @@ var escapeHatches = map[string]struct{}{
 	"net/http": {},
 }
 
+func Pure(moduleDir, importPath string) bool {
+	if moduleDir == "" || importPath == "" {
+		return false
+	}
+	return PurePackages(moduleDir, []string{importPath})[importPath]
+}
+
+func PurePackages(moduleDir string, importPaths []string) map[string]bool {
+	out := make(map[string]bool, len(importPaths))
+	if moduleDir == "" || len(importPaths) == 0 {
+		return out
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), depsTimeout)
+	defer cancel()
+
+	modPath, err := sysexec.Output(ctx, depsRunner, moduleDir, "go", "list", "-m")
+	if err != nil || modPath == "" {
+		return out
+	}
+	args := append([]string{"list", "-e", "-test", "-deps", "-f", "{{.ImportPath}}|{{if .Error}}ERR{{else}}{{join .Imports \" \"}}{{end}}"}, importPaths...)
+	raw, err := sysexec.Output(ctx, depsRunner, moduleDir, "go", args...)
+	if err != nil {
+		return out
+	}
+	want := map[string]struct{}{}
+	for _, p := range importPaths {
+		if p != "" && (p == modPath || strings.HasPrefix(p, modPath+"/")) {
+			want[p] = struct{}{}
+		}
+	}
+	if len(want) == 0 {
+		return out
+	}
+	graph, starts, errored := parseDepGraph(raw, want)
+	for pkg := range want {
+		nodes := starts[pkg]
+		if len(nodes) == 0 || errored[pkg] {
+			continue
+		}
+		reach := moduleLocalReach(graph, modPath, nodes)
+		out[pkg] = !reachesAny(reach, errored)
+	}
+	return out
+}
+
+func parseDepGraph(raw string, want map[string]struct{}) (map[string][]string, map[string][]string, map[string]bool) {
+	graph := map[string][]string{}
+	starts := map[string][]string{}
+	errored := map[string]bool{}
+	for _, line := range strings.Split(raw, "\n") {
+		self, rest, ok := strings.Cut(line, "|")
+		if !ok {
+			continue
+		}
+		node := stripVariant(self)
+		owner := testPackageOwner(self)
+		if rest == "ERR" {
+			errored[node] = true
+			errored[owner] = true
+			continue
+		}
+		graph[node] = append(graph[node], stripVariants(strings.Fields(rest))...)
+		if _, ok := want[owner]; ok && !strings.HasSuffix(node, ".test") {
+			starts[owner] = append(starts[owner], node)
+		}
+	}
+	return graph, starts, errored
+}
+
+func reachesAny(reach []string, errored map[string]bool) bool {
+	for _, dep := range reach {
+		if _, hatch := escapeHatches[dep]; hatch || errored[dep] {
+			return true
+		}
+	}
+	return false
+}
+
 func resolveDeps(moduleDir string, patterns []string) map[string][]string {
 	raw, modPath := listCorpusDeps(moduleDir, patterns)
 	if len(raw) == 0 {
