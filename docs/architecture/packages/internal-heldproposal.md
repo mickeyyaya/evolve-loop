@@ -4,11 +4,12 @@
 
 ## Purpose
 
-`internal/heldproposal` holds the rule, the record and the approval of a held proposal. A held proposal is a lane change that needs the operator before it lands. It changes a file on the fence, or it works an inbox item of kind `pipeline-*`. The package decides nothing about the landing itself. The ship check in `phases/ship/held_proposal_gate.go` calls it, and the operator verb `evolve landing` writes the approval.
+`internal/heldproposal` holds the rule, the record and the approval of a held proposal. A held proposal is a lane change that needs the operator before it lands. It changes a file on the fence, or it works an inbox item that routing sends to the console. The package decides nothing about the landing itself. The ship check in `phases/ship/held_proposal_gate.go` calls it, and the operator verb `evolve landing` writes the approval.
 
 ## Design
 
-- **The rule.** `Decide` holds a change when a claimed kind starts with `pipeline-` or a changed path is on the fence. It returns the sorted, unique reasons, for example `kind:pipeline-repair` and `protected:go/internal/guards/role.go`.
+- **The rule.** `Decide` holds a change when `inboxbatch.ConsoleRouted` marks a claimed item as console-owned, or a changed path is on the fence. The routing predicate is the one home of the kind rule, so a `pipeline-*` item with `route: lane` lands as a normal PASS. It returns the sorted, unique reasons, for example `routed:kind:pipeline-repair (...)` and `protected:go/internal/guards/role.go`. `TestSharedRuleHasOnePredicate` pins that the package holds no copy of the `pipeline-` rule.
+- **The hold set.** The hold set is the whole routing predicate, not only `pipeline-*`. It also holds `ref-state` items, `route: console*` items, and items whose declared `files[]` are on the fence. A `routed:mentions protected path` reason is by design. The ship gate judges the item surface with `guards.IsProtectedSurface`, the same judge that it applies to the changed paths.
 - **The record.** `WriteRecord` writes `.evolve/landing/held/cycle-<N>.json`. The status is `would-hold` at `shadow` and `held-for-operator` at `enforce`. The record names the commit, the tree digest, the reasons and the two requirements: the operator approval and the adversarial audit.
 - **The approval.** `WriteApproval` writes `.evolve/landing/approvals/cycle-<N>.json` with the cycle, the tree, the decision and the audit report. `Judge` approves only an `approve` decision of the same tree. Another tree or another decision word is `Pending`.
 - **The terminal status.** The verb sets the record to `approved` or `rejected` (`StatusAfter`), so `evolve wave status` stops the listing and a second decision is refused. The ship accepts an approval only when a record of the same tree is `held-for-operator` or carries the matching terminal status.
