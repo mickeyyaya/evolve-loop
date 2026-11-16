@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "TestComposedGate_ARedThatMainAlsoFailsParksTheLane passes",
+    "TestComposedGate_ARedOnlyTheLaneHasGoesToReaudit passes",
+    "TestComposedGate_ABaseRunErrorKeepsTheRouteOfToday passes"
+  ],
+  "consumed": {
+    "at": "2026-11-16T22:36:49Z",
+    "via": "inbox curate",
+    "cycle": "console",
+    "resolution": "inbox curator: the change touched the fix surface and 3 of 3 named tests exist (commit 3b8f20e0816116e55295c899d3b3f6ccc6414c7f; changed go/internal/core/composition_carryforward.go; tests found: TestComposedGate_ARedThatMainAlsoFailsParksTheLane, TestComposedGate_ARedOnlyTheLaneHasGoesToReaudit, TestComposedGate_ABaseRunErrorKeepsTheRouteOfToday)"
+  },
+  "created_at": "2026-11-16T05:15:01Z",
+  "files": [
+    "go/internal/phases/ship/base_red.go",
+    "go/internal/core/composition_carryforward.go"
+  ],
+  "fix": "Build component S3 of docs/plans/gate-ship-retry-waste-2026-11.md (PR #1497) exactly as decided; red tests first with the names the plan gives; 100% coverage of changed functions.",
+  "id": "gate-ship-s3-composed-base-attribution",
+  "kind": "fix",
+  "origin": "console",
+  "priority_class": "performance",
+  "summary": "All 4 composed-gate declines of wave 174 needed no LLM, but each became a re-audit (4.44 h); composed gates have no base attribution. Plan D3.",
+  "title": "A red composed gate runs its failures on main first",
+  "weight": 0.85
+}

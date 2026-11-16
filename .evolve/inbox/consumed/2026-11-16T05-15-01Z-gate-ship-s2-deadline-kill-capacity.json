@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "TestRecovery_ADeadlineKillOnAnUnchangedTreeRetriesWithoutReaudit passes",
+    "TestRecovery_ASecondKillParksTheLaneWithACapacityCode passes"
+  ],
+  "consumed": {
+    "at": "2026-11-16T22:36:49Z",
+    "via": "inbox curate",
+    "cycle": "console",
+    "resolution": "inbox curator: the change touched the fix surface and 2 of 2 named tests exist (commit 3b8f20e0816116e55295c899d3b3f6ccc6414c7f; changed go/internal/core/ship_recovery.go, go/internal/router/recovery.go; tests found: TestRecovery_ADeadlineKillOnAnUnchangedTreeRetriesWithoutReaudit, TestRecovery_ASecondKillParksTheLaneWithACapacityCode)"
+  },
+  "created_at": "2026-11-16T05:15:01Z",
+  "files": [
+    "go/internal/phases/ship/repocontract.go",
+    "go/internal/core/ship_recovery.go",
+    "go/internal/router/recovery.go"
+  ],
+  "fix": "Build component S2 of docs/plans/gate-ship-retry-waste-2026-11.md (PR #1497) exactly as decided; red tests first with the names the plan gives; 100% coverage of changed functions.",
+  "id": "gate-ship-s2-deadline-kill-capacity",
+  "kind": "fix",
+  "origin": "console",
+  "priority_class": "performance",
+  "summary": "The importer backstop dies at its 20 min cap at 1 CPU and routes to precondition-reaudit on an unchanged tree: ~5.3 h and 2 audited lanes lost in wave 174. Plan D2.",
+  "title": "A gate killed at its deadline retries once and never starts an LLM re-audit",
+  "weight": 0.85
+}
