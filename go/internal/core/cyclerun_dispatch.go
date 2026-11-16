@@ -153,7 +153,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 					resp = cr.recordPhaseSkip(next, err, "post_ship_observer_skip", fmt.Sprintf("phase %s: best-effort observer failed after Ship (%v); skipping", next, err))
 					break
 				}
-				phaseErr := fmt.Errorf("phase %s: %w", next, err)
+				phaseErr := fmt.Errorf("phase %s: %w", next, cr.parkedOr(err))
 				cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempt, phaseErr.Error(), cr.cs.PhaseStartedAt))
 				cr.o.writePhaseFailureDiag(cr.cs.WorkspacePath, string(next), cr.cycle, err, attempt)
 				cr.o.adviseOnUnclassifiedFailure(cr.ctx, cr.cycle, cr.cs.WorkspacePath, cr.req.ProjectRoot, next, err, cr.envSnap)
