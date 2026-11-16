@@ -10,8 +10,9 @@ import (
 )
 
 type BuildFloorCheck struct {
-	Name string
-	Run  BuildFloorCheckFn
+	Name  string
+	Run   BuildFloorCheckFn
+	Tests BuildFloorCheckFn
 }
 
 type BuildHandoffFloor []BuildFloorCheck
@@ -36,6 +37,19 @@ func WholeBuildHandoffFloor(composed BuildHandoffFloor) BuildHandoffFloor {
 }
 
 func (f BuildHandoffFloor) Failures(ctx context.Context, in ReviewInput) []string {
+	if out := f.StaticFailures(ctx, in); len(out) > 0 {
+		return out
+	}
+	var out []string
+	for _, check := range f {
+		if check.Tests != nil {
+			out = append(out, check.Tests(ctx, in)...)
+		}
+	}
+	return out
+}
+
+func (f BuildHandoffFloor) StaticFailures(ctx context.Context, in ReviewInput) []string {
 	var out []string
 	for _, check := range f {
 		out = append(out, check.Run(ctx, in)...)

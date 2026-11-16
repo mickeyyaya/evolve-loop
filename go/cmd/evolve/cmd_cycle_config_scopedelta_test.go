@@ -38,7 +38,7 @@ func TestProductionBuildFloorChecks_ReportsAScopeDeltaThroughTheComposedFloor(t 
 	})
 	var stderr bytes.Buffer
 
-	got := productionBuildFloorChecks(context.Background(), core.ReviewInput{
+	got := core.BuildHandoffFloor{productionFloorCheck()}.Failures(context.Background(), core.ReviewInput{
 		Phase: string(core.PhaseBuild), Cycle: 7, Worktree: wt.Dir, WorktreeBaseSHA: base, ProjectRoot: projectRoot, Signals: center, Stderr: &stderr,
 	})
 

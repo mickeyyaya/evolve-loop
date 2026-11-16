@@ -83,7 +83,8 @@ func TestBuildFloorRoots_ComposeOnlyThroughTheProductionFloor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var refs []string
+	refs := map[string][]string{}
+	symbols := []string{"core.StaticBuildFloorChecks", "core.SuiteBuildFloorChecks", "core.DefaultBuildFloorChecks"}
 	for _, e := range entries {
 		name := e.Name()
 		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
@@ -94,12 +95,19 @@ func TestBuildFloorRoots_ComposeOnlyThroughTheProductionFloor(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, line := range strings.Split(string(src), "\n") {
-			if strings.Contains(line, "core.DefaultBuildFloorChecks") && !strings.HasPrefix(strings.TrimSpace(line), "//") {
-				refs = append(refs, name+": "+strings.TrimSpace(line))
+			for _, sym := range symbols {
+				if strings.Contains(line, sym) && !strings.HasPrefix(strings.TrimSpace(line), "//") {
+					refs[sym] = append(refs[sym], name+": "+strings.TrimSpace(line))
+				}
 			}
 		}
 	}
-	if len(refs) != 1 || !strings.HasPrefix(refs[0], "cmd_cycle_config.go: ") || !strings.Contains(refs[0], "out := append(core.ProtectedSurfaceFloorChecks(guards.IsProtectedSurface)(ctx, in), core.DefaultBuildFloorChecks(ctx, in)...)") {
-		t.Fatalf("core.DefaultBuildFloorChecks must be referenced only by the production composition; got %v", refs)
+	for _, sym := range symbols[:2] {
+		if len(refs[sym]) != 1 || !strings.HasPrefix(refs[sym][0], "cmd_cycle_config.go: ") || !strings.Contains(refs[sym][0], sym+"(ctx, in)") {
+			t.Fatalf("%s must be referenced only by the production composition; got %v", sym, refs[sym])
+		}
+	}
+	if len(refs["core.DefaultBuildFloorChecks"]) != 0 {
+		t.Fatalf("core.DefaultBuildFloorChecks must not be referenced outside tests; got %v", refs["core.DefaultBuildFloorChecks"])
 	}
 }
