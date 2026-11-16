@@ -19,6 +19,7 @@
 
 - Each wire string is exact, because ledger entries and the debugger key off it. Pinned by `TestVocabularyWireStrings`.
 - The codes that a router must tell apart do not collapse into one value. Pinned by `TestCodeRepoContractInfra_Vocab`, `TestCodeRepoContractGate_Vocab`, `TestCodeManifestGate_DistinctFromEntireVocabulary` and `TestManifestGateCode_WireStringAndDistinctness`.
+- `CodeRepoContractCapacity` (`REPO_CONTRACT_CAPACITY`, class transient) is the typed capacity failure of a gate killed at its deadline. It is one home, next to `CodeRepoContractInfra`, and no other code aliases it. Pinned by `TestCodeRepoContractCapacity_Vocab`.
 - A `ShipError` survives wrapping and renders one stable line. Pinned by `TestAsShipError` and `TestNewShipError_Error`.
 - `ErrMainRedParked` is the sentinel of a parked lane. `ShipError.Is` matches it only for the code `MAIN_RED_PARK`, so `errors.Is` finds a park through each wrap. Pinned by `TestShipError_OnlyTheParkCodeIsErrMainRedParked`.
 - An odd debug key is kept with an empty value. Pinned by `TestNewShipError_OddKV`.
