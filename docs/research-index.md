@@ -771,4 +771,10 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [research/practice-claude-model-release-notes-c433b054-202611.md](research/practice-claude-model-release-notes-c433b054-202611.md) | Note on Claude release notes snapshot `2026-11-13T19:47:32Z` (empty added-line excerpt and November 12 self-hosted Managed Agents) for item `c433b054`, read as untrusted data. `skills/model-notes-claude/COMPACT.md` and all personas stay unchanged. |
 
+## 2026-11-16 — self-evolving loops: room for the loop to change itself
+
+| Document | What it records |
+|---|---|
+| [research/self-evolving-loop-autonomy-2026-11.md](research/self-evolving-loop-autonomy-2026-11.md) | Why 221 of 268 inbox items are console routes, and what outside systems do about self-improvement and earned autonomy. It gives refinements R1 to R6. |
+
 <!-- GENERATED:research-index END -->
