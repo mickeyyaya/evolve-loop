@@ -147,12 +147,15 @@ func (b *loopBatchCoordinator) diskSpaceHalt(iteration int) (batchDecision, bool
 	return batchDecision{flow: batchReturn, exitCode: systemFailureHaltExitCode}, true
 }
 
-func (b *loopBatchCoordinator) dispatchPool(iteration int, fleetConfig policy.FleetConfig, launch cycleLaunch) forkOutcome {
-	poolLaunch := launch.LaunchFn()
-	run, mode := rollingPool(fleetConfig, poolLaunch), "rolling"
+func (b *loopBatchCoordinator) poolRunner(fleetConfig policy.FleetConfig, poolLaunch fleet.LaunchFn, iteration int) (poolRunFn, string) {
 	if fleetConfig.Orchestrator.Stage == orchestrator.StageEnforce {
-		run, mode = b.orchestratedRun(fleetConfig, poolLaunch, iteration), "orchestrator"
+		return b.orchestratedRun(fleetConfig, poolLaunch, iteration), "orchestrator"
 	}
+	return rollingPool(fleetConfig, poolLaunch, liveWidthFile(b.cfg.EvolveDir)), "rolling"
+}
+
+func (b *loopBatchCoordinator) dispatchPool(iteration int, fleetConfig policy.FleetConfig, launch cycleLaunch) forkOutcome {
+	run, mode := b.poolRunner(fleetConfig, launch.LaunchFn(), iteration)
 	ran, results, err := planAndRunPool(
 		b.ctx,
 		fleetConfig,

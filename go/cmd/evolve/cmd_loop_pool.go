@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path/filepath"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -32,14 +34,18 @@ func (e *poolPreflightError) Error() string {
 
 func (e *poolPreflightError) Unwrap() error { return e.err }
 
-func rollingPool(fc policy.FleetConfig, launch fleet.LaunchFn) poolRunFn {
+func liveWidthFile(evolveDir string) string {
+	return filepath.Join(evolveDir, lanebudget.LiveWidthFile)
+}
+
+func rollingPool(fc policy.FleetConfig, launch fleet.LaunchFn, widthFile string) poolRunFn {
 	return func(ctx context.Context, backlog []fleet.Todo, _ poolSupplyFn) []fleet.Result {
-		return fleet.RunPool(ctx, fleet.PoolConfig{Target: fc.Count, Concurrency: fc.Concurrency}, backlog, launch, nil)
+		return fleet.RunPool(ctx, fleet.PoolConfig{Target: fc.Count, Concurrency: fc.Concurrency, LiveWidthFile: widthFile}, backlog, launch, nil)
 	}
 }
 
 func dispatchPoolIteration(ctx context.Context, fc policy.FleetConfig, preflight func() error, planFn poolPlanFn, launch fleet.LaunchFn, waveIndex int) (ran bool, results []fleet.Result, err error) {
-	return planAndRunPool(ctx, fc, preflight, func(int) poolPlanFn { return planFn }, rollingPool(fc, launch), waveIndex)
+	return planAndRunPool(ctx, fc, preflight, func(int) poolPlanFn { return planFn }, rollingPool(fc, launch, ""), waveIndex)
 }
 
 func planAndRunPool(ctx context.Context, fc policy.FleetConfig, preflight func() error, plan poolPlanAt, run poolRunFn, waveIndex int) (ran bool, results []fleet.Result, err error) {

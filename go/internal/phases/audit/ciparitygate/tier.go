@@ -29,6 +29,7 @@ func tierArgs(pkgs []string) []string {
 }
 
 type attempt struct {
+	args        []string
 	out, errOut string
 	code        int
 	err         error
@@ -37,7 +38,7 @@ type attempt struct {
 
 func runAttempt(ctx context.Context, run sysexec.RunFunc, dir string, args []string) attempt {
 	out, errOut, code, err := sysexec.Capture(ctx, run, dir, "go", args...)
-	return attempt{out: out, errOut: errOut, code: code, err: err, deadlineHit: errors.Is(ctx.Err(), context.DeadlineExceeded)}
+	return attempt{args: args, out: out, errOut: errOut, code: code, err: err, deadlineHit: errors.Is(ctx.Err(), context.DeadlineExceeded)}
 }
 
 func (g *Gates) IntegrationTier(req Request) ([]string, error) {
@@ -66,7 +67,7 @@ func (g *Gates) IntegrationTier(req Request) ([]string, error) {
 	if first.code == 0 {
 		return nil, nil
 	}
-	return g.retake(req, dir, args, scrubbed, first)
+	return g.retake(req, dir, pkgs, scrubbed, first)
 }
 
 func (g *Gates) tierPackages(ctx context.Context, req Request, dir string, changed []string) ([]string, error) {
@@ -92,12 +93,13 @@ func (g *Gates) tierPackages(ctx context.Context, req Request, dir string, chang
 	return scoped, nil
 }
 
-func (g *Gates) retake(req Request, dir string, args []string, run sysexec.RunFunc, first attempt) ([]string, error) {
-	log := &tierLog{workspace: req.Workspace, args: args}
+func (g *Gates) retake(req Request, dir string, pkgs []string, run sysexec.RunFunc, first attempt) ([]string, error) {
+	log := &tierLog{workspace: req.Workspace, args: first.args}
 	g.logAttempt(req, log, 1, " (lane env, contended)", first)
 	release, lockNote := g.acquireLock(gateTier, req)
+	log.args = tierArgs(pkgs)
 	retakeCtx, retakeCancel := context.WithTimeout(context.Background(), g.timeouts.TierAttempt)
-	second := runAttempt(retakeCtx, run, dir, args)
+	second := runAttempt(retakeCtx, run, dir, log.args)
 	retakeCancel()
 	defer release()
 	if second.err == nil {
