@@ -10,6 +10,7 @@ import (
 
 func TestTaggedTestArgs_RunAnAddedPackageUnderShipsBackstopBudget(t *testing.T) {
 	t.Setenv(ipcenv.FleetWidthKey, "")
+	t.Setenv(ipcenv.FleetLiveWidthKey, "")
 
 	got := taggedTestArgs("./acs/cycle1763", []string{"acs"})
 
@@ -21,6 +22,7 @@ func TestTaggedTestArgs_RunAnAddedPackageUnderShipsBackstopBudget(t *testing.T) 
 
 func TestUnitTestArgs_RunAChangedPackageUnderTheSharedBudget(t *testing.T) {
 	t.Setenv(ipcenv.FleetWidthKey, "")
+	t.Setenv(ipcenv.FleetLiveWidthKey, "")
 
 	got := unitTestArgs("./cmd/evolve")
 
@@ -32,6 +34,7 @@ func TestUnitTestArgs_RunAChangedPackageUnderTheSharedBudget(t *testing.T) {
 
 func TestCoverTestArgs_RunTheCoveragePassUnderTheSharedBudget(t *testing.T) {
 	t.Setenv(ipcenv.FleetWidthKey, "")
+	t.Setenv(ipcenv.FleetLiveWidthKey, "")
 
 	got := coverTestArgs("/tmp/cover.out", []string{"./cmd/evolve", "./internal/core"}, nil)
 

@@ -46,6 +46,7 @@ func goLaneCalls(t *testing.T) (tests, vets []string, testEnv []string) {
 
 func TestRun_ALaneGoTestRunsOnTheLaneCPUBudget(t *testing.T) {
 	t.Setenv(ipcenv.FleetWidthKey, "4")
+	t.Setenv(ipcenv.FleetLiveWidthKey, "")
 	procs := strconv.Itoa(lanebudget.Procs(runtime.NumCPU(), 4))
 
 	tests, vets, env := goLaneCalls(t)
@@ -60,6 +61,7 @@ func TestRun_ALaneGoTestRunsOnTheLaneCPUBudget(t *testing.T) {
 
 func TestRun_AConsoleGoTestKeepsTheGoDefaults(t *testing.T) {
 	t.Setenv(ipcenv.FleetWidthKey, "")
+	t.Setenv(ipcenv.FleetLiveWidthKey, "")
 
 	tests, _, env := goLaneCalls(t)
 

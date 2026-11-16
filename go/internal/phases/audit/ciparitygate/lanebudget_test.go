@@ -63,6 +63,7 @@ func runEachGoTestGate(t *testing.T) []goTestCall {
 
 func TestGoTestGates_ALaneRunsEachGoTestOnTheLaneCPUBudget(t *testing.T) {
 	t.Setenv(ipcenv.FleetWidthKey, strconv.Itoa(runtime.NumCPU()))
+	t.Setenv(ipcenv.FleetLiveWidthKey, "")
 
 	calls := runEachGoTestGate(t)
 
@@ -80,6 +81,7 @@ func TestGoTestGates_ALaneRunsEachGoTestOnTheLaneCPUBudget(t *testing.T) {
 
 func TestGoTestGates_AConsoleRunKeepsTheFixedTierParallelismAndNoGOMAXPROCS(t *testing.T) {
 	t.Setenv(ipcenv.FleetWidthKey, "")
+	t.Setenv(ipcenv.FleetLiveWidthKey, "")
 
 	calls := runEachGoTestGate(t)
 
