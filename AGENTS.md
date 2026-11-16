@@ -44,6 +44,7 @@ This digest has the facts that each agent must have when it starts. The full rul
 - Read a module and list its real exports before you call or import it. Never invent an API.
 - Fix the root cause through a redesign. Never apply a workaround that hides a failure.
 - Never duplicate logic, settings or prose. Keep each in one home, and generate each copy from it.
+- Record each issue, alert or mistake through the issue-record skill, with its logs, results, root cause, fix and regression test.
 
 The full rule set is in [guidance/index.md](guidance/index.md). Run `evolve guidance index --audience <you>` to list the rules of your case.
 <!-- GENERATED:guidance-l0 END -->
