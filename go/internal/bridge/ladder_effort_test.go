@@ -92,7 +92,7 @@ func TestLadderEffort_IntentUsesTheLadderEffortOverTheTierDefault(t *testing.T) 
 	}
 }
 
-func TestLadderEffort_AgyCapsALadderEffortAboveFlashHighAndSaysSo(t *testing.T) {
+func TestLadderEffort_AgyCapsALadderEffortAboveHydrogenHighAndSaysSo(t *testing.T) {
 	t.Parallel()
 	cfg := &Config{CLI: "agy-tmux", Model: "balanced", Realization: RealizeFor("agy-tmux", LaunchIntent{ModelTier: "balanced", Effort: "xhigh", LadderEffort: "xhigh"})}
 	var stderr bytes.Buffer
@@ -102,8 +102,8 @@ func TestLadderEffort_AgyCapsALadderEffortAboveFlashHighAndSaysSo(t *testing.T) 
 	if cfg.Realization.EffortCapped != "xhigh" || cfg.Realization.EffortVariant != "(High)" {
 		t.Fatalf("realization %+v, want xhigh capped to (High)", cfg.Realization)
 	}
-	if !slices.Contains(cfg.Realization.LaunchFlags, "Gemini 3.8 Flash (High)") {
-		t.Fatalf("flags %q, want the Flash High model unchanged", cfg.Realization.LaunchFlags)
+	if !slices.Contains(cfg.Realization.LaunchFlags, "Gemini 4 Hydrogen (High)") {
+		t.Fatalf("flags %q, want the Hydrogen High model unchanged", cfg.Realization.LaunchFlags)
 	}
 	if line := stderr.String(); !strings.Contains(line, "effort=xhigh") || !strings.Contains(line, "(High)") {
 		t.Fatalf("report %q, want the requested xhigh and the granted (High)", line)
@@ -115,7 +115,7 @@ func TestLadderEffort_AgyGrantsALadderEffortTheModelHas(t *testing.T) {
 	for _, effort := range []string{"low", "high"} {
 		r := RealizeFor("agy-tmux", LaunchIntent{ModelTier: "balanced", Effort: effort, LadderEffort: effort})
 		if r.EffortCapped != "" {
-			t.Errorf("ladder effort %s at Flash High was capped: %+v", effort, r)
+			t.Errorf("ladder effort %s at Hydrogen High was capped: %+v", effort, r)
 		}
 	}
 }

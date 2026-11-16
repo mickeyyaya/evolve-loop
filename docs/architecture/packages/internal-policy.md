@@ -68,6 +68,7 @@
   - `parallel_evaluate.concurrency` defaults to 3, the soak sweet spot (about 11% saving, with diminishing returns past it).
   - `classify.hang_classifier` is opt-in, so a misconfigured git log can never mask a real integrity breach as a transport hang.
   - `catalog.allowed_families` filters a CLI's live model ids by family before classification, so agy never receives Claude models.
+  - `catalog.tier_pins` (`cli` to `tier` to `model`) pins a tier of one CLI to an operator-chosen model. `Parse` refuses a tier that is not canonical and a model that is empty. `modelquery` applies a pin only when the CLI offers the model, and writes a `WARN` otherwise.
   - `observation_mask.window_turns` defaults to 10, the optimum reported in arXiv 2508.21433.
   - `fleet.budget.history_window` defaults to 10 cycles: enough for a stable pace median without reaching into stale regimes. `safety_fraction` is validated only by `fleetbudget`, its single owner.
   - `cli_health.proactive_probe` benches capped families before a phase boots them. It complements the reactive bench, which learns of a cap only after a phase has burned a boot.
