@@ -113,6 +113,10 @@
 - **Probes are typed.** `Item.Probes` lists `Probe` values with a `Kind` and an `Arg`. `ProbeKinds()` returns a copy of the three kinds: `test-exists`, `path-exists` and `path-absent`. A probe is a fact that is true when the work of the item is done.
 - **The probe check lives elsewhere.** The package only holds the type. The `inboxcurator` package checks the probes against the tree. Pinned by `TestProbeKinds_ListsTheThreeTypedKinds` and `TestItem_DecodesTypedProbesAsKindAndArgument`.
 
+- **Two loop stamps carry the claim and the origin of a route.** `landed_sha` (`LandedSHAField`) holds the commit that a checked landed claim names. `routed_by` (`RoutedByField`) holds `loop` or `operator` (`RoutedByLoop`, `RoutedByOperator`). Both fields are loop stamps in the field registry. `Item.LandedSHAText` and `Item.RoutedByText` read them. A value that is not text reads as empty.
+- **Two readers serve the stamps.** `Item.ClaimPaths` lists the declared `files` and `protected_files`. `NoWorkRoutePrefix` is the one text that the no-work route writes at the start of `routed_reason` and that the curator reads. 
+- **Tests of the two stamps.** Pinned by `TestRoleOf_EveryItemFieldHasOneOwner`, `TestFieldsOwnedBy_ListsEachOwnersExactKeysSorted`, `TestItem_ClaimPathsAreTheDeclaredAndTheProtectedFiles` and `TestItem_AStampThatIsNotTextReadsAsEmpty`.
+
 ## Findings
 
 - **Hub ceiling** (package creation, 2026-07-16): without it, real-backlog validation fused 55 of 61 items into one cluster through `go/internal/core`. The same validation showed `connects_to`'s transitive closure chaining half the backlog into one cluster, which kept `ConnectsRule` out of the defaults.

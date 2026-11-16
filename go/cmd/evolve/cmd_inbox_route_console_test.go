@@ -148,3 +148,24 @@ func TestCmd_InboxRouteConsole_AnUnreadableInboxIsAFaultNotAnUnknownID(t *testin
 		t.Errorf("rc = %d, want 2: an inbox that cannot be read is a fault, not an id it does not hold\nstderr=%s", rc, stderr.String())
 	}
 }
+
+func TestRouteConsole_StampsTheOriginOfTheCaller(t *testing.T) {
+	d := setupInbox(t, "task-1")
+	t.Setenv("EVOLVE_PROJECT_ROOT", d)
+	var stdout, stderr bytes.Buffer
+
+	if rc := runInbox([]string{"route-console", "task-1", "operator decided", "1757"}, nil, &stdout, &stderr); rc != 0 {
+		t.Fatalf("rc = %d\nstderr=%s", rc, stderr.String())
+	}
+
+	raw, err := os.ReadFile(filepath.Join(d, ".evolve", "inbox", "task-1.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		RoutedBy string `json:"routed_by"`
+	}
+	if err := json.Unmarshal(raw, &got); err != nil || got.RoutedBy != "operator" {
+		t.Errorf("routed_by = %q (err=%v), want operator for the operator CLI", got.RoutedBy, err)
+	}
+}

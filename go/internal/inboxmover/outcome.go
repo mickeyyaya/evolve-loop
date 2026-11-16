@@ -192,7 +192,12 @@ func DeferredIDs(body []byte) []string {
 	return dedupeIDs(out)
 }
 
-var closedDropReasons = []string{"already-shipped", "already-done", "already-landed", "duplicate", "superseded", "obsolete"}
+const (
+	AlreadyShippedTag   = "already-shipped"
+	ProtectedSurfaceTag = "protected-surface"
+)
+
+var closedDropReasons = []string{AlreadyShippedTag, "already-done", "already-landed", "duplicate", "superseded", "obsolete"}
 
 func ClosedDroppedIDs(body []byte) []string {
 	var d committedset.DroppedBucket
@@ -213,10 +218,41 @@ func ClosedDroppedIDs(body []byte) []string {
 }
 
 func dropReasonTag(reason string) string {
+	tag, _ := DropReasonToken(reason)
+	return tag
+}
+
+func DropReasonToken(reason string) (tag, token string) {
+	tag = reason
 	if i := strings.IndexByte(reason, ':'); i >= 0 {
-		reason = reason[:i]
+		tag = reason[:i]
+		if words := strings.Fields(reason[i+1:]); len(words) > 0 {
+			token = words[0]
+		}
 	}
-	return strings.ToLower(strings.TrimSpace(reason))
+	return strings.ToLower(strings.TrimSpace(tag)), token
+}
+
+func LandedClaims(body []byte) map[string]string {
+	var d struct {
+		committedset.DroppedBucket
+		committedset.SkipShippedBucket
+	}
+	if json.Unmarshal(body, &d) != nil {
+		return nil
+	}
+	claims := map[string]string{}
+	for _, e := range d.Dropped {
+		if tag, token := DropReasonToken(e.Reason); tag == AlreadyShippedTag && token != "" {
+			claims[e.ID] = token
+		}
+	}
+	for _, e := range d.SkipShipped {
+		if sha := strings.TrimSpace(e.GitSHA); sha != "" {
+			claims[e.TaskID] = sha
+		}
+	}
+	return claims
 }
 
 func dedupeIDs(ids []string) []string {

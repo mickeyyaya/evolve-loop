@@ -29,9 +29,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/evalgate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/events/rootwire"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/landedclaim"
 	"github.com/mickeyyaya/evolve-loop/go/internal/mintregistry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
@@ -311,16 +313,22 @@ func closeoutCycleOutcome(result core.CycleResult, projectRoot, evolveDir string
 }
 
 func applyCycleNoWorkOutcome(projectRoot string, cycle int, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) error {
-	res, err := cycleoutcome.ApplyNoWork(cycleoutcome.NoWorkInputs{
-		ProjectRoot: projectRoot,
-		Workspace:   cycleWorkspace(projectRoot, cycle),
-		Cycle:       cycle,
-		Stderr:      stderr,
-	}.WithLedger(lifecycle).WithSignals(signals))
+	res, err := cycleoutcome.ApplyNoWork(noWorkInputsFor(projectRoot, cycle, stderr).WithLedger(lifecycle).WithSignals(signals))
 	if len(res.Routed)+len(res.Retired) > 0 {
 		fmt.Fprintf(stderr, "[cycle] planned no-work closeout for cycle %d: routed %v to the console, retired %v (no inbox item)\n", cycle, res.Routed, res.Retired)
 	}
 	return err
+}
+
+func noWorkInputsFor(projectRoot string, cycle int, stderr io.Writer) cycleoutcome.NoWorkInputs {
+	return cycleoutcome.NoWorkInputs{
+		ProjectRoot: projectRoot,
+		Workspace:   cycleWorkspace(projectRoot, cycle),
+		Cycle:       cycle,
+		Stderr:      stderr,
+		LandedCheck: landedclaim.OnMain(gitexec.Default(projectRoot)),
+		Protected:   protectedMembership,
+	}
 }
 
 func applyCycleFailureOutcome(projectRoot, evolveDir string, cycle int, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) error {
