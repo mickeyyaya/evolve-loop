@@ -49,6 +49,7 @@ func composedGateProbeEnv(t *testing.T, width string) string {
 		t.Fatal(err)
 	}
 	t.Setenv("EVOLVE_FLEET_WIDTH", width)
+	t.Setenv("EVOLVE_FLEET_LIVE_WIDTH", "")
 	t.Setenv("GOMAXPROCS", "")
 	composedGatesTo(&bytes.Buffer{})(context.Background(), worktree)
 	raw, err := os.ReadFile(probe)

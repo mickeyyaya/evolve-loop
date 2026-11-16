@@ -30,6 +30,7 @@ func fakeGoOnPath(t *testing.T) string {
 func TestRepoContractPack_ALaneGoTestRunsOnTheLaneCPUBudget(t *testing.T) {
 	probe := fakeGoOnPath(t)
 	t.Setenv(ipcenv.FleetWidthKey, "4")
+	t.Setenv(ipcenv.FleetLiveWidthKey, "")
 	procs := strconv.Itoa(lanebudget.Procs(runtime.NumCPU(), 4))
 	var notes, raw bytes.Buffer
 
@@ -45,6 +46,7 @@ func TestRepoContractPack_ALaneGoTestRunsOnTheLaneCPUBudget(t *testing.T) {
 func TestRepoContractPack_AConsoleGoTestKeepsTheGoDefaults(t *testing.T) {
 	probe := fakeGoOnPath(t)
 	t.Setenv(ipcenv.FleetWidthKey, "")
+	t.Setenv(ipcenv.FleetLiveWidthKey, "")
 	t.Setenv("GOMAXPROCS", "")
 	var notes, raw bytes.Buffer
 

@@ -19,6 +19,9 @@
 - **`GitIdentityConfig(name, email)` gives the text of the cell gitconfig.** It holds only a `[user]` section with the quoted values, and it is empty when both values are empty. It holds no `credential` key.
   - Pinned by `TestCredentialIsolation_IsTheOneSet`, `TestCredentialIsolation_SetsNoCommitIdentityVariable`, `TestGitIdentityConfig_HoldsOnlyTheUserSection` and `TestCredentialSet_EnvIsSortedKeyValuePairs`.
 - **`FleetWidthKey`** (`EVOLVE_FLEET_WIDTH`) advertises the effective lane width of the fleet supervisor to each launched cycle.
+- **`FleetLiveWidthKey`** (`EVOLVE_FLEET_LIVE_WIDTH`) gives each pool lane the absolute path of the live width file.
+  - The pool writes that file at each lane start and each lane end. `lanebudget.Current` reads it.
+  - A lane cell receives the key beside `FleetWidthKey`. Pinned by `TestIpcenv_ConstValues`, `TestMarkers_AreClassAOfTheControlFlagInventory` and `TestCellMarkers_AreTheMarkersThatReachAnLLMCell`.
 - **`FleetReachHolderKey`** (`EVOLVE_FLEET_REACH_HOLDER`) is set for a lane that only the optimistic admission rule admitted (ADR-0143 W1b). It names the lane in flight that the import-reach rule holds it behind. The orchestrator pool sets it, and the lane process reads it to report a composed-gate failure or a rebase conflict.
   - The orchestrator scales the ship-recovery budget of a contention-class error (`shipRecoveryBudget`: the larger of 2 and width plus 1). The width is the number of siblings that race for main.
   - `core.fleetWidthFromEnv` reads it from `CycleRequest.Env`, never from `os.Getenv`. So fleet siblings cannot leak their width into each other.
