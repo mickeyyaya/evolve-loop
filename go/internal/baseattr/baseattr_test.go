@@ -2,6 +2,7 @@ package baseattr
 
 import (
 	"context"
+	"slices"
 	"testing"
 	"time"
 
@@ -10,7 +11,7 @@ import (
 
 func TestReds_AttributableNeedsNamedKeysOnly(t *testing.T) {
 	t.Parallel()
-	k := []Key{{"p", "TestA"}}
+	k := []Key{{Package: "p", Test: "TestA"}}
 	for _, tc := range []struct {
 		name string
 		r    Reds
@@ -28,7 +29,7 @@ func TestReds_AttributableNeedsNamedKeysOnly(t *testing.T) {
 
 func TestVerdict_BlamedAndMainGreen(t *testing.T) {
 	t.Parallel()
-	k := []Key{{"p", "TestA"}}
+	k := []Key{{Package: "p", Test: "TestA"}}
 	for _, tc := range []struct {
 		name         string
 		v            Verdict
@@ -77,5 +78,48 @@ func TestNames_JoinsEachKeyAsPackageDotTest(t *testing.T) {
 	}
 	if got := Names(nil); got != "" {
 		t.Errorf("Names(nil) = %q, want the empty string", got)
+	}
+}
+
+func TestStepKey_NamesAndParsesRoundTrip(t *testing.T) {
+	t.Parallel()
+	step := StepKey("golangci-lint: Lint")
+	test := Key{Package: "p", Test: "TestA"}
+
+	names := Names([]Key{test, step})
+	back := ParseNames(names)
+
+	if !step.IsStep() || test.IsStep() || StepKey("").IsStep() {
+		t.Errorf("IsStep: step=%v test=%v empty=%v, want true, false, false", step.IsStep(), test.IsStep(), StepKey("").IsStep())
+	}
+	if names != "p.TestA, step:golangci-lint: Lint" || len(back) != 2 || back[0] != test || back[1] != step {
+		t.Errorf("names = %q, parsed = %+v, want the step key to survive the round trip", names, back)
+	}
+	if got := ParseNames("step:"); len(got) != 0 {
+		t.Errorf("ParseNames of an empty step = %+v, want no key", got)
+	}
+}
+
+func TestTestKeys_DropsStepKeys(t *testing.T) {
+	t.Parallel()
+	test := Key{Package: "p", Test: "TestA"}
+
+	got := TestKeys([]Key{StepKey("lint"), test})
+
+	if len(got) != 1 || got[0] != test {
+		t.Errorf("TestKeys = %+v, want only %+v", got, test)
+	}
+}
+
+func TestStepKey_ANameWithTheListDelimiterSurvivesTheNamesRoundTrip(t *testing.T) {
+	t.Parallel()
+	keys := []Key{{Package: "p", Test: "TestA"}, StepKey("build, vet"), StepKey("lint")}
+	got := ParseNames(Names(keys))
+	want := []Key{{Package: "p", Test: "TestA"}, StepKey("build+vet"), StepKey("lint")}
+	if !slices.Equal(got, want) {
+		t.Errorf("ParseNames(Names(%v)) = %v, want %v", keys, got, want)
+	}
+	if k := StepKey("a, b, c"); k.Step != "a+b+c" {
+		t.Errorf("StepKey kept the delimiter: %q", k.Step)
 	}
 }

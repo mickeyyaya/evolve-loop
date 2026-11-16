@@ -29,7 +29,7 @@ func fakeGo(calls *[]goCall, out string, code int, err error) sysexec.RunFunc {
 const failOut = "--- FAIL: TestA (0s)\nFAIL\nFAIL\texample.com/m/p\t0.1s\n"
 
 func twoKeys() Reds {
-	return Reds{Keys: []Key{{"example.com/m/p", "TestA"}, {"example.com/m/p", "TestB"}, {"example.com/m/q", "TestC.x"}}, Flags: []string{"-tags", "integration"}}
+	return Reds{Keys: []Key{{Package: "example.com/m/p", Test: "TestA"}, {Package: "example.com/m/p", Test: "TestB"}, {Package: "example.com/m/q", Test: "TestC.x"}}, Flags: []string{"-tags", "integration"}}
 }
 
 func TestGoTestRunner_RunsOnlyTheNamedKeysInTheModule(t *testing.T) {
@@ -40,7 +40,7 @@ func TestGoTestRunner_RunsOnlyTheNamedKeysInTheModule(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []Key{{"example.com/m/p", "TestA"}}; !reflect.DeepEqual(got, want) {
+	if want := []Key{{Package: "example.com/m/p", Test: "TestA"}}; !reflect.DeepEqual(got, want) {
 		t.Errorf("red keys = %v, want %v", got, want)
 	}
 	want := goCall{"go", "/mod", []string{"test", "-count=1", "-tags", "integration", "-run", `^(TestA|TestB|TestC\.x)$`, "example.com/m/p", "example.com/m/q"}, env}
