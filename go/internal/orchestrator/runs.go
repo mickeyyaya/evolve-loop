@@ -100,6 +100,8 @@ func freshest(dir string) time.Time {
 	return at
 }
 
+const fileClockSlack = time.Second
+
 func laneCycleDir(runsDir string, lane Lane) (string, bool) {
 	cycle, ok := LaneCycle(runsDir, lane)
 	return cycleDir(runsDir, cycle), ok
@@ -119,7 +121,7 @@ func laneCycleAbove(runsDir string, lane Lane, floor int) (int, bool) {
 			break
 		}
 		dir := cycleDir(runsDir, c)
-		if info, err := os.Stat(dir); err != nil || info.ModTime().Before(lane.Started) {
+		if info, err := os.Stat(dir); err != nil || info.ModTime().Before(lane.Started.Add(-fileClockSlack)) {
 			continue
 		}
 		if holdsTodo(dir, lane.Scope[0]) {
