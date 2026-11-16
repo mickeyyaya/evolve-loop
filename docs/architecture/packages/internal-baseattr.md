@@ -33,3 +33,8 @@
 - The package imports `gitexec`, `sysexec`, `lanebudget` and the standard library. It imports no pipeline package.
 - The path is on the protected surface as a gate guarantee. A lane cannot edit it.
 - The policy value `gates.base_red_rerun_seconds` sets the time limit of a rerun. The default is 300 seconds.
+
+## Step keys
+
+- `Key` has a `Step` field. A key with a `Step` names a CI step that is not a test, such as `golangci-lint: Lint`. `StepKey` builds it, `IsStep` tests it, and `TestKeys` drops the step keys of a list.
+- `Names` writes a step key as `step:<name>`. `ParseNames` reads that form back, so a step key survives the debug fields of a ship error.

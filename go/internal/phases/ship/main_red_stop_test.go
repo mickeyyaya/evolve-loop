@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ciwatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/covchanged"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxfile"
@@ -759,5 +760,321 @@ func TestShipStop_AnEscalationThatFailsIsAWarningAndTheCheckGoesOn(t *testing.T)
 	wantShipErr(t, c.err, shiperr.CodeMainRedPark, core.ShipClassPrecondition, redPkg+"."+redTest)
 	if l.stop(t).Escalated != nil || len(l.emitted(selfheal.CodeMainRedStopEscalated)) != 0 {
 		t.Error("a failed escalation marked the stop or emitted the signal")
+	}
+}
+
+const lintStep = "golangci-lint: Lint"
+
+var lintKey = baseattr.StepKey(lintStep)
+
+type scriptedCI struct {
+	calls int
+	shas  []string
+	run   ciwatch.RunStatus
+	err   error
+}
+
+func (c *scriptedCI) fetch(_ context.Context, sha string) (ciwatch.RunStatus, error) {
+	c.calls++
+	c.shas = append(c.shas, sha)
+	return c.run, c.err
+}
+
+func redRun(failing ...ciwatch.FailingTest) ciwatch.RunStatus {
+	return ciwatch.RunStatus{Status: ciwatch.StatusCompleted, Conclusion: "failure", FailingTests: failing}
+}
+
+func (l *baseRedLane) ciOptions(ci *scriptedCI) *Options {
+	opts := l.options(nil)
+	opts.mainCI = ci.fetch
+	return opts
+}
+
+func TestShipStop_ARedStepOnMainOpensTheStopAndParksALaneThatDoesNotFixIt(t *testing.T) {
+	t.Parallel()
+	l := newBaseRedLane(t)
+	l.enforceStop(t)
+	ci := &scriptedCI{run: redRun(ciwatch.FailingTest{Step: lintStep, Jobs: []string{"lint"}})}
+
+	checked := stopCheckOf(t, l.ciOptions(ci))
+
+	wantShipErr(t, checked.err, shiperr.CodeMainRedPark, core.ShipClassPrecondition, "step:"+lintStep)
+	stop := l.stop(t)
+	if !stop.Holds() || !slices.Equal(stop.Keys, []baseattr.Key{lintKey}) || stop.MainSHA != l.base || stop.Schema != mainstop.Schema {
+		t.Errorf("stop = %+v, want a v2 stop on the step key at the main tip %s", stop, l.base)
+	}
+	if !slices.Equal(ci.shas, []string{l.base}) {
+		t.Errorf("the CI source was asked for %v, want the main tip %s", ci.shas, l.base)
+	}
+	if got := l.emitted(CodeMainRedCIOpened); len(got) != 1 || got[0].Fields["keys"] != "step:"+lintStep {
+		t.Errorf("opened signals = %+v, want one that names the step", got)
+	}
+	if !l.fixItemPending(t, stop.FixItem) {
+		t.Errorf("the fix item %s is not in the inbox", stop.FixItem)
+	}
+}
+
+func TestShipStop_ALaneThatFixesTheStepIsAdmitted(t *testing.T) {
+	t.Parallel()
+	l := newBaseRedLane(t)
+	l.enforceStop(t)
+	l.holdStop(t, lintKey)
+	var asked []baseattr.Key
+	var dir string
+	opts := l.options(nil)
+	opts.stepRun = func(_ context.Context, tree string, steps []baseattr.Key) ([]baseattr.Key, error) {
+		dir, asked = tree, steps
+		return nil, nil
+	}
+
+	checked := stopCheckOf(t, opts)
+
+	if checked.err != nil || !slices.Equal(checked.green, []baseattr.Key{lintKey}) {
+		t.Fatalf("err = %v, green = %v, want the lane admitted as the fix of the step", checked.err, checked.green)
+	}
+	if !slices.Equal(asked, []baseattr.Key{lintKey}) || dir != l.wt {
+		t.Errorf("the step prover ran %v in %q, want the step in the lane tree %q", asked, dir, l.wt)
+	}
+	res := stopRelease{opts: opts, warn: opts.Stderr}.landedFix(checked.green, RunResult{CommitSHA: "abc1234"}, nil)
+	if stop := l.stop(t); len(res.Logs) != 0 || stop.Holds() {
+		t.Errorf("logs = %v, stop = %+v, want the landed fix to release the step", res.Logs, stop)
+	}
+}
+
+func TestShipStop_AStepThatStaysRedOrCannotRunInTheLaneIsNotAFix(t *testing.T) {
+	t.Parallel()
+	cases := map[string]func(context.Context, string, []baseattr.Key) ([]baseattr.Key, error){
+		"still red": func(_ context.Context, _ string, steps []baseattr.Key) ([]baseattr.Key, error) { return steps, nil },
+		"cannot run": func(context.Context, string, []baseattr.Key) ([]baseattr.Key, error) {
+			return nil, errors.New("no linter")
+		},
+		"no prover set": nil,
+	}
+	for name, prove := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			l := newBaseRedLane(t)
+			l.enforceStop(t)
+			l.holdStop(t, lintKey)
+			opts := l.options(nil)
+			opts.stepRun = prove
+
+			checked := stopCheckOf(t, opts)
+
+			wantShipErr(t, checked.err, shiperr.CodeMainRedPark, core.ShipClassPrecondition, "")
+			if prove != nil && name == "cannot run" && !strings.Contains(checked.log, "no linter") {
+				t.Errorf("log = %q, want the cause of the failed step run", checked.log)
+			}
+		})
+	}
+}
+
+func TestShipStop_AnUnreadableCISourceFailsOpenWithASignal(t *testing.T) {
+	t.Parallel()
+	l := newBaseRedLane(t)
+	l.enforceStop(t)
+	ci := &scriptedCI{err: errors.New("gh is not logged in")}
+
+	checked := stopCheckOf(t, l.ciOptions(ci))
+
+	if checked.err != nil || len(checked.green) != 0 {
+		t.Fatalf("err = %v, green = %v, want the lane free", checked.err, checked.green)
+	}
+	got := l.emitted(CodeMainRedCIUnread)
+	if len(got) != 1 || got[0].Severity != signalcenter.SeverityWarn || !strings.Contains(got[0].Fields["error"], "gh is not logged in") || got[0].Fields["main"] != l.base {
+		t.Errorf("signals = %+v, want one warn signal with the cause", got)
+	}
+	if _, found, _ := mainstop.Read(filepath.Join(l.repo, ".evolve")); found {
+		t.Error("an unreadable source opened a stop")
+	}
+}
+
+func TestShipStop_AMainThatCIDoesNotJudgeRedOpensNoStop(t *testing.T) {
+	t.Parallel()
+	cases := map[string]ciwatch.RunStatus{
+		"green":                  {Status: ciwatch.StatusCompleted, Conclusion: ciwatch.ConclusionSuccess},
+		"in progress":            {Status: "in_progress"},
+		"no names":               redRun(),
+		"an empty failing entry": redRun(ciwatch.FailingTest{}),
+		"in progress with names": {Status: "in_progress", FailingTests: []ciwatch.FailingTest{{Step: lintStep}}},
+	}
+	for name, run := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			l := newBaseRedLane(t)
+			l.enforceStop(t)
+
+			checked := stopCheckOf(t, l.ciOptions(&scriptedCI{run: run}))
+
+			if _, found, _ := mainstop.Read(filepath.Join(l.repo, ".evolve")); checked.err != nil || found {
+				t.Errorf("err = %v, stop found = %v, want the lane free and no stop", checked.err, found)
+			}
+		})
+	}
+}
+
+func TestEmptyCIEntryIsNoKey_OneRuleBothCallersUse(t *testing.T) {
+	t.Parallel()
+	if isKey(baseattr.Key{}) || !isKey(baseattr.Key{Package: "p", Test: "T"}) {
+		t.Error("isKey must refuse only the empty key")
+	}
+	if provable(baseattr.Key{}) {
+		t.Error("provable accepted the empty key")
+	}
+	if got := ciKeys(redRun(ciwatch.FailingTest{}, ciwatch.FailingTest{Package: "p", Test: "T"})); len(got) != 1 {
+		t.Errorf("ciKeys = %v, want the empty entry dropped", got)
+	}
+	l := newBaseRedLane(t)
+	l.enforceStop(t)
+	stopCheckOf(t, l.ciOptions(&scriptedCI{run: redRun(ciwatch.FailingTest{})}))
+	if got := l.emitted(CodeMainRedCIUnprovable); len(got) != 0 {
+		t.Errorf("unprovable signals = %v, want none", got)
+	}
+}
+
+func TestShipStop_TheKeysOfARedRunNameTheTestOrTheStep(t *testing.T) {
+	t.Parallel()
+	l := newBaseRedLane(t)
+	ci := &scriptedCI{run: redRun(
+		ciwatch.FailingTest{Package: redPkg, Test: redTest},
+		ciwatch.FailingTest{Step: lintStep},
+		ciwatch.FailingTest{Step: lintStep},
+	)}
+
+	stopCheckOf(t, l.ciOptions(ci))
+
+	want := []baseattr.Key{redKey, lintKey}
+	if got := l.stop(t).Keys; !slices.Equal(got, want) {
+		t.Errorf("keys = %v, want %v", got, want)
+	}
+}
+
+func TestShipStop_AGreenRequiredRunOfMainReleasesTheStepKeys(t *testing.T) {
+	t.Parallel()
+	l := newBaseRedLane(t)
+	l.enforceStop(t)
+	l.holdStop(t, lintKey, redKey)
+	ci := &scriptedCI{run: ciwatch.RunStatus{Status: ciwatch.StatusCompleted, Conclusion: ciwatch.ConclusionSuccess}}
+	run := &scriptedBase{answers: [][]baseattr.Key{{redKey}}}
+	opts := l.ciOptions(ci)
+	opts.baseRun = run.run
+
+	checked := stopCheckOf(t, opts)
+
+	stop := l.stop(t)
+	if !slices.Equal(stop.Keys, []baseattr.Key{redKey}) || !stop.Holds() {
+		t.Errorf("stop = %+v, want only the step key released", stop)
+	}
+	wantShipErr(t, checked.err, shiperr.CodeMainRedPark, core.ShipClassPrecondition, "")
+}
+
+func TestShipStop_AGreenMainThatClearsEveryKeyReleasesTheStop(t *testing.T) {
+	t.Parallel()
+	l := newBaseRedLane(t)
+	l.enforceStop(t)
+	l.holdStop(t, lintKey)
+	ci := &scriptedCI{run: ciwatch.RunStatus{Status: ciwatch.StatusCompleted, Conclusion: ciwatch.ConclusionSuccess}}
+
+	checked := stopCheckOf(t, l.ciOptions(ci))
+
+	if stop := l.stop(t); checked.err != nil || stop.Holds() || stop.ReleasedBy != "main "+l.base {
+		t.Errorf("err = %v, stop = %+v, want a release by main %s", checked.err, stop, l.base)
+	}
+}
+
+func TestShipStop_AnUnreadableCISourceKeepsAHeldStop(t *testing.T) {
+	t.Parallel()
+	l := newBaseRedLane(t)
+	l.enforceStop(t)
+	l.holdStop(t, lintKey)
+	ci := &scriptedCI{err: errors.New("offline")}
+
+	checked := stopCheckOf(t, l.ciOptions(ci))
+
+	wantShipErr(t, checked.err, shiperr.CodeMainRedPark, core.ShipClassPrecondition, "")
+	if !l.stop(t).Holds() || len(l.emitted(CodeMainRedCIUnread)) != 1 {
+		t.Error("an unreadable source released the stop or gave no signal")
+	}
+}
+
+func TestShipStop_ARedRunKeepsTheStopThatHolds(t *testing.T) {
+	t.Parallel()
+	l := newBaseRedLane(t)
+	l.enforceStop(t)
+	held := l.holdStop(t, lintKey)
+	ci := &scriptedCI{run: redRun(ciwatch.FailingTest{Step: "other step"})}
+
+	checked := stopCheckOf(t, l.ciOptions(ci))
+
+	wantShipErr(t, checked.err, shiperr.CodeMainRedPark, core.ShipClassPrecondition, "step:"+lintStep)
+	if stop := l.stop(t); !slices.Equal(stop.Keys, held.Keys) || len(l.emitted(CodeMainRedCIOpened)) != 0 {
+		t.Errorf("stop = %+v, want the keys of the stop unchanged and no opened signal", stop)
+	}
+}
+
+func TestShipStop_AMainThatCannotBeResolvedSkipsTheCISource(t *testing.T) {
+	t.Parallel()
+	l := newBaseRedLane(t)
+	l.enforceStop(t)
+	runGit(t, l.repo, "branch", "-m", "main", "trunk")
+	ci := &scriptedCI{run: redRun(ciwatch.FailingTest{Step: lintStep})}
+
+	checked := stopCheckOf(t, l.ciOptions(ci))
+
+	if checked.err != nil || ci.calls != 0 || !strings.Contains(checked.log, "the CI source was not read") {
+		t.Errorf("err = %v, CI reads = %d, log = %q, want the lane free, no CI read and a warning", checked.err, ci.calls, checked.log)
+	}
+}
+
+func (l *baseRedLane) lintOptions(code int) *Options {
+	var ran []ranCmd
+	opts := l.ciOptions(&scriptedCI{run: redRun(ciwatch.FailingTest{Step: lintStep})})
+	opts.stepRun = GateStepRunner(scriptedRun(&ran, code, nil))
+	return opts
+}
+
+func TestShipStop_ALaneWhoseTreePassesTheLintCommandIsAdmittedAndOneThatFailsIsParked(t *testing.T) {
+	t.Parallel()
+	l := newBaseRedLane(t)
+	l.enforceStop(t)
+
+	fixed := stopCheckOf(t, l.lintOptions(0))
+	if fixed.err != nil || !slices.Equal(fixed.green, []baseattr.Key{lintKey}) {
+		t.Fatalf("err = %v, green = %v, want the lane admitted as the fix of the lint step", fixed.err, fixed.green)
+	}
+
+	parked := stopCheckOf(t, l.lintOptions(1))
+	wantShipErr(t, parked.err, shiperr.CodeMainRedPark, core.ShipClassPrecondition, "step:"+lintStep)
+}
+
+func TestShipStop_AStepKeyNoRunnerCanProveOpensNoStopAndIsSignalled(t *testing.T) {
+	t.Parallel()
+	l := newBaseRedLane(t)
+	l.enforceStop(t)
+	ci := &scriptedCI{run: redRun(ciwatch.FailingTest{Step: "Unknown step"}, ciwatch.FailingTest{Jobs: []string{"build", "vet"}})}
+
+	checked := stopCheckOf(t, l.ciOptions(ci))
+
+	if _, found, _ := mainstop.Read(filepath.Join(l.repo, ".evolve")); checked.err != nil || found {
+		t.Errorf("err = %v, stop found = %v, want the lane free and no stop", checked.err, found)
+	}
+	got := l.emitted(CodeMainRedCIUnprovable)
+	if len(got) != 1 || got[0].Severity != signalcenter.SeverityWarn || got[0].Fields["keys"] != "step:Unknown step, step:build+vet" || got[0].Fields["main"] != l.base {
+		t.Errorf("signals = %+v, want one warn signal that names the keys", got)
+	}
+}
+
+func TestShipStop_ARunWithProvableAndUnprovableKeysOpensTheStopOnTheProvableOnes(t *testing.T) {
+	t.Parallel()
+	l := newBaseRedLane(t)
+	ci := &scriptedCI{run: redRun(ciwatch.FailingTest{Step: lintStep}, ciwatch.FailingTest{Step: "Unknown step"})}
+
+	stopCheckOf(t, l.ciOptions(ci))
+
+	if got := l.stop(t).Keys; !slices.Equal(got, []baseattr.Key{lintKey}) {
+		t.Errorf("keys = %v, want only the provable step", got)
+	}
+	if got := l.emitted(CodeMainRedCIUnprovable); len(got) != 1 || got[0].Fields["keys"] != "step:Unknown step" {
+		t.Errorf("signals = %+v, want one that names the unprovable key", got)
 	}
 }

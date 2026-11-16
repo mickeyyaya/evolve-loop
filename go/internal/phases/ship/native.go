@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ciwatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
@@ -103,6 +104,10 @@ type Options struct {
 	shipLock func(path string) (release func(), err error)
 
 	baseRun baseattr.Runner
+
+	mainCI ciwatch.Fetcher
+
+	stepRun StepRunner
 
 	Signals *signalcenter.Center
 
