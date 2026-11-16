@@ -142,6 +142,11 @@ func ciClassifyOptions(root string, rerun bool, stderr io.Writer) (ciwatch.Class
 	}, nil
 }
 
+func mainCIFetcher(root string) ciwatch.Fetcher {
+	modulePath, _ := goModulePath(filepath.Join(root, ciModuleDir, "go.mod"))
+	return ciwatch.NewGHClassifySource(root, modulePath).LatestRunOn
+}
+
 func goModulePath(goMod string) (string, error) {
 	f, err := os.Open(goMod)
 	if err != nil {

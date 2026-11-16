@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	Schema        = "main-red-stop/v1"
+	Schema        = "main-red-stop/v2"
+	SchemaV1      = "main-red-stop/v1"
 	fixItemPrefix = "fix-main-red-"
 	fixItemSHALen = 8
 )
@@ -102,7 +103,11 @@ func (a Admission) String() string {
 }
 
 func (s Stop) Proven(base string, red []baseattr.Key) Proof {
-	return Proof{Base: base, Green: Without(s.Keys, red)}
+	return Proof{Base: base, Green: Without(baseattr.TestKeys(s.Keys), red)}
+}
+
+func (s Stop) StepKeys() []baseattr.Key {
+	return slices.DeleteFunc(slices.Clone(s.Keys), func(k baseattr.Key) bool { return !k.IsStep() })
 }
 
 func Without(keys, drop []baseattr.Key) []baseattr.Key {
