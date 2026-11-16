@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
@@ -40,7 +41,7 @@ func runInboxRouteConsole(root string, args []string, stdout, stderr io.Writer) 
 		fmt.Fprintf(stderr, "inbox route-console: %s is held by cycle %d's claim; route it after that lane closes (or after evolve inbox-mover recover-orphans)\n", id, loc.Cycle)
 		return 1
 	}
-	res, err := inboxmover.RouteConsoleRequest(opts, inboxmover.RouteRequest{TaskID: id, Reason: reason, Cycle: cycle, BlockedBy: blocker})
+	res, err := inboxmover.RouteConsoleRequest(opts, inboxmover.RouteRequest{TaskID: id, Reason: reason, Cycle: cycle, BlockedBy: blocker, RoutedBy: inboxbatch.RoutedByOperator})
 	if errors.Is(err, inboxmover.ErrInvalidItem) {
 		fmt.Fprintf(stderr, "inbox route-console: %v\n", err)
 		return 1

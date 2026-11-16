@@ -3,6 +3,7 @@ package inboxcurator
 import (
 	"encoding/json"
 	"slices"
+	"strconv"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
@@ -91,5 +92,53 @@ func TestReroutes_GatesLaneRerouteOnBuildableKindNamedFilesAndNoOpenPR(t *testin
 
 	if len(got) != 1 || got[0].ID != "buildable-bug" || got[0].Target != RouteLaneTarget {
 		t.Fatalf("Reroutes = %+v, want only buildable-bug rerouted to lane", got)
+	}
+}
+
+func routedItem(route, by, reason string) inboxbatch.Item {
+	it := inboxbatch.Item{ID: "x", Kind: "bug", Route: route, Files: []string{"go/pkg/a.go"}}
+	if by != "" {
+		it.RoutedBy = json.RawMessage(strconv.Quote(by))
+	}
+	if reason != "" {
+		it.RoutedReason = json.RawMessage(strconv.Quote(reason))
+	}
+	return it
+}
+
+func rerouteOpts() RerouteOptions {
+	return RerouteOptions{IsProtected: func(string) bool { return false }, BuildableKinds: []string{"bug"}}
+}
+
+func TestReroutes_ALoopRouteWithNoFactGetsALaneProposal(t *testing.T) {
+	open := []inboxbatch.Item{routedItem("console-manual", "loop", "triage refused: free text without the legacy prefix")}
+	got := Reroutes(open, rerouteOpts())
+	if len(got) != 1 || got[0].Target != RouteLaneTarget || got[0].Deterministic {
+		t.Errorf("proposals = %+v, want one judgment proposal to the lane", got)
+	}
+}
+
+func TestReroutes_AnOperatorRouteGetsNoProposal(t *testing.T) {
+	open := []inboxbatch.Item{routedItem("console-manual", "operator", ""), routedItem("console-manual", "operator", "my own words")}
+	if got := Reroutes(open, rerouteOpts()); len(got) != 0 {
+		t.Errorf("proposals = %+v, want none for an operator route", got)
+	}
+}
+
+func TestReroutes_AnOldNoWorkRouteCountsAsLoop(t *testing.T) {
+	open := []inboxbatch.Item{routedItem("console-manual", "", inboxbatch.NoWorkRoutePrefix+"7) escalate_block: x")}
+	if got := Reroutes(open, rerouteOpts()); len(got) != 1 || got[0].Target != RouteLaneTarget {
+		t.Errorf("proposals = %+v, want a lane proposal for the old no-work route", got)
+	}
+}
+
+func TestReroutes_AnOldRouteWithAnotherReasonGetsNoProposal(t *testing.T) {
+	open := []inboxbatch.Item{routedItem("console-manual", "", "operator note: keep")}
+	if got := Reroutes(open, rerouteOpts()); len(got) != 0 {
+		t.Errorf("proposals = %+v, want none: the rule of today refuses a free reason", got)
+	}
+	open = []inboxbatch.Item{routedItem("console-manual", "", "")}
+	if got := Reroutes(open, rerouteOpts()); len(got) != 1 {
+		t.Errorf("proposals = %+v, want one: an old route with no reason keeps the rule of today", got)
 	}
 }
