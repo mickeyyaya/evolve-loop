@@ -1,6 +1,6 @@
 # Plan: concurrent edits — one entry, one file, so that parallel lanes do not meet in the same lines
 
-- **Status:** proposed, 2026-11-17.
+- **Status:** proposed, 2026-11-17. Amended the same day: section 11 changes the components and the order.
 - **Research:** [Concurrent edits: where lane changes collide in the code](../research/concurrent-edit-layout-2026-11.md). **Decision:** no ADR yet. D1 and D2 add a layout rule to the code conventions. No decision here changes admission.
 - **Related:** [the console builds only what a lane cannot build](console-build-or-route-2026-11.md). Its component K5 changes admission so that two items in different files of `cmd/evolve` both admit. This plan does not replace K5. C6 moves code into smaller packages, so each admission cell gets smaller with no admission change. K5 stays in its plan and runs after C6 only when the waiting items stay above the target of §8. The landing side stays as [concurrent cycle landing](concurrent-cycle-landing-2026-10.md) designed it.
 
@@ -16,6 +16,7 @@
 8. [Verification](#8-verification)
 9. [Risks](#9-risks)
 10. [Open questions](#10-open-questions)
+11. [Amendment of 2026-11-17](#11-amendment-of-2026-11-17)
 
 ## 1. Request
 
@@ -147,3 +148,45 @@ What changes our mind: the hot-file measure (D7) shows that most conflicts after
 - **Q1.** Does `git merge-tree --write-tree`, which the train uses, read a merge driver from `.gitattributes`? C2 and C8 depend on the answer. A test answers it before their design.
 - **Q2.** Does C6 split `cmd/evolve` into many verb packages, or into a few groups? The coupling census of the C6 design answers it.
 - **Q3.** Does the protected surface of a gate fragment need one entry for each file, or one entry for the directory? D8 assumes the directory.
+
+## 11. Amendment of 2026-11-17
+
+Before the console started C1, it read the code and the signals again. Three premises of this plan were wrong:
+
+- The signals already name each conflicted file (research F2.9, corrected).
+- Lanes had no code conflict in the 149 runs of cycles 2300 to 2462. The fleet rebase already regenerates the derived outputs (F2.10).
+- All 21 items that wait on a cell wait on the `cmd/evolve` package. A fragment file in that package stays in its cell (F2.11).
+
+So the conflicts that this plan counted cost the console, in PRs that stayed open for days. Rule 6 of operating-policy §2 limits those PRs. The lanes lose time to the coarse cell, not to merges.
+
+The loop also did part of the work before this amendment:
+
+- Cycle 2455 wrote [the admission plan for the coarse cell](admission-cmd-evolve-cell-2026-11.md). Its K1 (file cells for leaf packages) is in the build of cycle 2461. Its K2 is the self-registration of verbs.
+- Cycle 2460 wrote [the split design for `cmd/evolve`](split-cmd-evolve-2026-11.md). It answers Q2: a few groups, with `inbox` first.
+
+Each component now has this state:
+
+| Id | Before | Now | Reason |
+|---|---|---|---|
+| C1 | console | withdrawn: built | F2.9 |
+| C2 | console | narrowed to the train, and deferred | The fleet rebase regenerates already (F2.10). Only console PRs meet a derived conflict in the train. |
+| C3 | lane | kept | It removes the largest central list. A file cell (admission K1) needs it, or the serial map becomes the hot file. |
+| C4 | lane | withdrawn: the same work as item `cmd-evolve-self-registering-verbs` (admission plan K2) | one item for each change |
+| C5 | console | deferred | The gate lists map to no cell (F2.11), and no lane conflicts on them (F2.10). |
+| C6 | lane | first | The design is done. Its six move items are filed. |
+| C7 | lane, with C6 | kept, with each move | the split design D5 |
+| C8 | console | withdrawn | Lanes have no conflicts for a shadow to measure (F2.10). |
+
+Answers to the open questions:
+
+- **Q1.** The train runs `git merge-tree` with `--attr-source` set to the base (`go/internal/integration/compose.go:274`). So the train reads `.gitattributes` from main. C2 can use a merge driver if it starts again.
+- **Q2.** The split design answers it: a few groups, `inbox` first.
+- **Q3.** The manifest has directory entries, for example `/go/internal/phases/ship/landing/` (`go/internal/guards/integrity_surface.go:157`). C5 is deferred, so the question waits.
+
+The new order:
+
+1. The six moves of the split design, one for each boundary, starting with `split-cmd-evolve-inboxcmd`.
+2. Admission K1 (in build), then C3. Then K2, which replaces C4.
+3. The measure of section 8 changes: the target is the count of items that wait on a cell (under 8). The touch counts of the central lists are no longer a target.
+
+The six move items were lost on the first try. The build agent of cycle 2460 wrote them as `inbox-add` requests, and the request channel refuses each kind except `dispatch`. The console filed them from the request files. Item `agent-request-inbox-add-has-no-executor` fixes the channel. The incident record is [the build agent's inbox-add requests were refused](../incidents/2026-11-17-the-build-agents-inbox-add-requests-were-refused.md).

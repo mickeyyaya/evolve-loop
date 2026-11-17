@@ -92,8 +92,18 @@ The serial-test maps of all packages hold 155 touches in 10 files.
 **F2.8** One textual merge was clean but wrong. In #1537, main added reroute fields to `Inputs` and #1487 added a history consume. The merge was clean, but the reroute came before the consume, and the apply step dropped the consume (incident record of 2026-11-17).
 *Implication:* a clean merge is not proof. The gates on the composed tree stay, whatever the layout.
 
-**F2.9** The signals record 61 `GIT_FLEET_REBASE_NEEDED` recoveries in cycles 2300 to 2452 (`.evolve/runs/cycle-2*/signals.ndjson`). They do not record which files conflicted.
-*Implication:* the loop cannot measure its conflict files today. A measure needs the file list in the signal.
+**F2.9** (corrected on 2026-11-17) The signals name each conflicted file. A fleet rebase conflict emits `ORCHESTRATOR_FLEET_REBASE_CONFLICT` with `fields.paths` (`go/internal/core/fleet_rebase_conflict_signal.go`). A train ejection emits `SHIP_INTEGRATION_EJECTED` with `fields.paths` (`go/internal/integration/brief.go:71-77`). The first version of this fact said that the signals had no file list.
+
+The first version was wrong: the census counted the code `GIT_FLEET_REBASE_NEEDED`, which marks a rebase and not a conflict.
+*Implication:* the measure of conflict files exists. Component C1 of the plan is already built.
+
+**F2.10** The count ran on 2026-11-17 over the 149 run directories of cycles 2300 to 2462. They hold 65 signals with the code `GIT_FLEET_REBASE_NEEDED`, 0 `ORCHESTRATOR_FLEET_REBASE_CONFLICT` signals and 3 `SHIP_INTEGRATION_EJECTED` signals. The 3 ejections are on inbox files, not on code.
+
+The fleet rebase already regenerates the outputs of the derived catalog when only they conflict (`derivedConflictIn` in `go/internal/core/ship_recovery.go`). The catalog holds `docs/architecture/signal-codes.md` and `docs/research-index.md` (`go/internal/derived/derived.go`).
+*Implication:* lanes do not lose time to merge conflicts. The 9 conflicts of F2.7 were in console PRs that stayed open for days.
+
+**F2.11** On 2026-11-17, all 21 items that wait on a cell wait on `cmd/evolve`. An admission cell is a package (`footprintOf` in `go/internal/admission/admission.go`). A file that is not Go code and is outside a package, such as `go/.apicover-enforce`, maps to no cell (`packageOf` in `go/internal/admission/modulegraph.go`). 16 of the 21 items name files of `cmd/evolve` that no other waiting item names.
+*Implication:* a new fragment file in `cmd/evolve` stays in the `cmd/evolve` cell, so one entry for each file does not let more lanes run. A package split (C6) or a file cell (the admission plan) does.
 
 ## 3. Current practice
 
@@ -143,4 +153,5 @@ Weak sources: P3.2, P3.3, P3.5 and P3.11 rest on vendor or personal blogs. The 4
 - **R2** A generated aggregate is rewritten by its generator when a merge or a rebase conflicts in it alone. No person or model resolves it. (F2.3, P3.4)
 - **R3** A big package splits into smaller packages along its change coupling, one group at a time, at a boundary, with no lane in it. (F2.4, F2.5, P3.9)
 - **R4** A syntax-aware merge runs in shadow on each fleet rebase and train composition, and its result runs every gate. (F2.7, F2.8, P3.6, P3.8)
-- **R5** The rebase and train signals name each conflicted file, so the loop measures its hot files. (F2.9)
+- **R5** The rebase and train signals name each conflicted file, so the loop measures its hot files. (F2.9: already true.)
+- **R6** To let more lanes run, make the admission cell smaller. A layout change inside one package does not change its cell. (F2.10, F2.11)
