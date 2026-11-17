@@ -1,0 +1,11 @@
+- id: "cycle-2443-recovery-expected-signal-warning-names-its-cycle-and-phase"
+  pattern: "recovery of expected-signal-warning-names-its-cycle-and-phase"
+  description: "The item `expected-signal-warning-names-its-cycle-and-phase` failed in 4 tries with the classes `gate-block`. Cycle 2443 shipped it. Before a new try of a similar item, read the difference above."
+  source: "docs/retrospectives/cycle-2443-recovery-expected-signal-warning-names-its-cycle-and-phase.md"
+  type: "recovery"
+  category: "retrospective"
+  preventiveAction: "Before a new try of a similar item, read the retrospective cycle-2443-recovery-expected-signal-warning-names-its-cycle-and-phase in docs/retrospectives"
+  confidence: 0.8
+  failureContext:
+    failedStep: ""
+    errorCategory: "gate-block"
