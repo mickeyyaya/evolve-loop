@@ -15,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/usageprobe"
 )
 
 type batchFlow uint8
@@ -52,6 +53,10 @@ func (b *loopBatchCoordinator) prepareIteration(iteration int, fleetConfig *poli
 		return b.brakeStop(iteration)
 	}
 	if decision, stop := b.runPreWave(iteration); stop {
+		return decision
+	}
+
+	if decision, stop := b.usageHoldStop(iteration); stop {
 		return decision
 	}
 
@@ -108,6 +113,21 @@ func (b *loopBatchCoordinator) brakeStop(iteration int) batchDecision {
 	b.result.StopReason = loopOperatorBrakeStop
 	emitLoopHalt(b.deps.Signals, 0, "loopBatchCoordinator.brakeStop", CodeLoopHalt, "operator brake engaged", map[string]string{"stop_reason": loopOperatorBrakeStop})
 	return batchDecision{flow: batchStopIterations}
+}
+
+const loopUsageHoldStop = "loop_usage_hold"
+
+func (b *loopBatchCoordinator) usageHoldStop(iteration int) (batchDecision, bool) {
+	pol := policy.LoadOrDefaults(filepath.Join(b.cfg.EvolveDir, "policy.json"), b.stderr)
+	hold := usageprobe.CheckHold(b.cfg.EvolveDir, pol.CLIHealthConfig().UsageHoldPercent, time.Now())
+	if !hold.Held {
+		return batchDecision{}, false
+	}
+	msg := hold.Message(b.cfg.EvolveDir)
+	fmt.Fprintf(b.stderr, "[loop] %s — stopping before cycle %d\n", msg, iteration+1)
+	b.result.StopReason = loopUsageHoldStop
+	emitLoopHalt(b.deps.Signals, 0, "loopBatchCoordinator.usageHoldStop", CodeLoopHalt, msg, map[string]string{"stop_reason": loopUsageHoldStop})
+	return batchDecision{flow: batchStopIterations}, true
 }
 
 func (b *loopBatchCoordinator) resolveWaveBinary(fleetConfig *policy.FleetConfig, waveBinary *string) {

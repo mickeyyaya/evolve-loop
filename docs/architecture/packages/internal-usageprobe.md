@@ -109,3 +109,8 @@ The probe is opt-in (`cli_health.proactive_probe`, compiled default off; this pr
 - **Still open:**
   - codex's `/status` screen has no `windows` block until it is captured live.
   - [Model-level benches](../../plans/model-level-benches-2026-10.md).
+
+## Usage hold
+
+- **`CheckHold` reads the operator limit `cli_health.usage_hold_percent`.** The loop boundary (`cmd/evolve/cmd_loop_window.go`) and `evolve agent run` (`internal/cli/agentcmd/run.go`) both call it, so one reading rule serves both. A limit of 0 or an absent key keeps the brake off.
+- **An unreadable reading holds.** A corrupt `usage-windows.json`, or a probe that recorded an error and no live reading, is never under the limit. The message names the file.

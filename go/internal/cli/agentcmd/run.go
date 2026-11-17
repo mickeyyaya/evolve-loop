@@ -27,10 +27,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/specrunner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/reportdoc"
 	"github.com/mickeyyaya/evolve-loop/go/internal/seatlogin"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/subagent"
+	"github.com/mickeyyaya/evolve-loop/go/internal/usageprobe"
 )
 
 const (
@@ -174,6 +176,9 @@ func (c command) prepare(args []string, stdin io.Reader, stderr io.Writer) (runO
 		r.seatTokenFile = abs
 	}
 	if r.spec, err = admit(o, r.root); err != nil {
+		return o, r, err
+	}
+	if err := usageHoldRefusal(r.root, c.deps.Now()); err != nil {
 		return o, r, err
 	}
 	if r.input, err = composeInput(o.input, o.files, stdin); err != nil {
@@ -455,4 +460,14 @@ func recordViolations(vs []core.ContractViolation) []launchrecord.Violation {
 		out = append(out, launchrecord.Violation{Code: v.Code, Message: v.Message})
 	}
 	return out
+}
+
+func usageHoldRefusal(root string, now time.Time) error {
+	evolveDir := paths.EvolveDirOf(root)
+	pol := policy.LoadOrDefaults(filepath.Join(evolveDir, "policy.json"), io.Discard)
+	hold := usageprobe.CheckHold(evolveDir, pol.CLIHealthConfig().UsageHoldPercent, now)
+	if !hold.Held {
+		return nil
+	}
+	return refusal{exitRefused, hold.Message(evolveDir)}
 }

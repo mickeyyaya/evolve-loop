@@ -199,10 +199,11 @@ func (p Policy) QuotaResetConfig() QuotaResetConfig {
 }
 
 type CLIHealthConfig struct {
-	ProactiveProbe        bool  `json:"proactive_probe,omitempty"`
-	UsageEvidenceTimeoutS int   `json:"usage_evidence_timeout_s,omitempty"`
-	UsageEvidenceTTLS     int   `json:"usage_evidence_ttl_s,omitempty"`
-	Enabled               *bool `json:"enabled,omitempty"`
+	ProactiveProbe        bool    `json:"proactive_probe,omitempty"`
+	UsageEvidenceTimeoutS int     `json:"usage_evidence_timeout_s,omitempty"`
+	UsageEvidenceTTLS     int     `json:"usage_evidence_ttl_s,omitempty"`
+	UsageHoldPercent      float64 `json:"usage_hold_percent,omitempty"`
+	Enabled               *bool   `json:"enabled,omitempty"`
 }
 
 func (c CLIHealthConfig) On() bool { return c.Enabled == nil || *c.Enabled }

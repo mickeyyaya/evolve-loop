@@ -1006,4 +1006,8 @@ var serialTests = map[string]string{
 	"main.TestUpdateCLIsAtBoundary_EveryRoutedFamilyFailingItsSmokeHaltsTheNextWave":                                       "swaps seam cliUpdateWiringFn",
 	"main.TestProductionFloor_AStaticRedSkipsTheRepoContractPackAndReportsEveryStaticFailure":                              "swaps seams repoContractPack and lintPackages",
 	"main.TestProductionFloor_AGreenStaticStageRunsTheRepoContractPack":                                                    "swaps seams repoContractPack and lintPackages",
+	"main.TestUsageBrake_AReadingAtTheLimitStopsTheLoopAtTheNextBoundaryWithNoConsolePresent":                              "swaps seams chainBoundaryAheadFn and chainRunningCommitFn",
+	"main.TestUsageBrake_TheBoundaryProceedsWhenTheReadingIsUnderTheLimitTheBrakeIsOffOrTheWindowReset":                    "swaps seams chainBoundaryAheadFn and chainRunningCommitFn",
+	"main.TestUsageBrake_AnUnreadableReadingIsNotUnderTheLimitAndStopsTheLoopNamingTheFile":                                "swaps seams chainBoundaryAheadFn and chainRunningCommitFn",
+	"main.TestUsageBrake_AnUnreadableReadingDoesNotStopTheLoopWhenTheBrakeIsOff":                                           "swaps seams chainBoundaryAheadFn and chainRunningCommitFn",
 }
