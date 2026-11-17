@@ -95,7 +95,8 @@ func TestIntegrationInboxCloserMovesTheNamedItems(t *testing.T) {
 func TestIntegrationBatchFailsOnAnUnreadableRecordDirectoryLoudly(t *testing.T) {
 	t.Parallel()
 	var out, errb bytes.Buffer
-	env := integrationEnv{Root: t.TempDir(), Wave: "w"}
+	noPRs := func(context.Context, string, ...string) (string, int, error) { return "[]\n", 0, nil }
+	env := integrationEnv{Root: t.TempDir(), Wave: "w", Gh: noPRs}
 	if rc := runIntegrationEnv(env, []string{"batch", "5"}, &out, &errb); rc != exitRefused || !strings.Contains(errb.String(), "PR #5") {
 		t.Errorf("rc=%d err=%q, want a refusal that names PR #5", rc, errb.String())
 	}

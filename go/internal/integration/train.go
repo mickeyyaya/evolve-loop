@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -21,6 +20,8 @@ type PRHost interface {
 	Ready(ctx context.Context) ([]int, error)
 	Comment(ctx context.Context, pr int, body string) error
 	Close(ctx context.Context, pr int, body string) error
+	State(ctx context.Context, pr int) (PRState, error)
+	OpenBatches(ctx context.Context) ([]int, error)
 }
 
 type InboxFunc func(ctx context.Context, ids []string) ([]string, error)
@@ -317,10 +318,7 @@ func (t Train) complete(ctx context.Context, rec DeliverableRecord, act func() e
 	if err := act(); err != nil {
 		return moved, err
 	}
-	if err := os.Remove(PRRecordPath(WaveDir(t.Root, ConsoleWave), rec.PR)); err != nil {
-		return moved, fmt.Errorf("integration: spend the record of PR #%d: %w", rec.PR, err)
-	}
-	return moved, nil
+	return moved, t.spend(rec)
 }
 
 func (t Train) closeInbox(ctx context.Context, rec DeliverableRecord) ([]string, error) {

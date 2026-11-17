@@ -158,7 +158,16 @@ type batchRequest struct {
 func runBatch(t integration.Train, req batchRequest, c cliIO) int {
 	ctx := context.Background()
 	prs := req.prs
-	if len(prs) == 0 {
+	if !req.dry {
+		settled, err := t.Settle(ctx)
+		printSettled(c.stdout, settled)
+		if err != nil {
+			return c.fail(err)
+		}
+		prs = withoutSettled(prs, settled)
+	}
+	named := len(req.prs) > 0
+	if !named {
 		var err error
 		if prs, err = t.ReadyPRs(ctx); err != nil {
 			return c.fail(err)
@@ -177,6 +186,21 @@ func runBatch(t integration.Train, req batchRequest, c cliIO) int {
 	fmt.Fprintf(c.stdout, "landed: %s\n", joinInts(out.Landed))
 	printLanding(c.stdout, out)
 	return c.landExit(out, err)
+}
+
+func withoutSettled(prs []int, settled []integration.Settlement) []int {
+	return slices.DeleteFunc(slices.Clone(prs), func(pr int) bool {
+		return slices.ContainsFunc(settled, func(s integration.Settlement) bool { return s.PR == pr })
+	})
+}
+
+func printSettled(w io.Writer, settled []integration.Settlement) {
+	var inbox []string
+	for _, s := range settled {
+		fmt.Fprintln(w, s.Line())
+		inbox = append(inbox, s.Moved...)
+	}
+	printLanding(w, integration.Outcome{Inbox: inbox})
 }
 
 func (c cliIO) landExit(out integration.Outcome, err error) int {

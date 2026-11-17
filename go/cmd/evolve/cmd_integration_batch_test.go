@@ -68,7 +68,12 @@ func (g *trainGh) run(_ context.Context, _ string, args ...string) (string, int,
 	switch {
 	case strings.HasPrefix(joined, "pr list --head"):
 		return "[]\n", 0, nil
+	case strings.HasPrefix(joined, "pr view"):
+		return `{"state":"OPEN"}` + "\n", 0, nil
 	case strings.HasPrefix(joined, "pr list --state open --base"):
+		if g.ready == "" {
+			return "[]\n", 0, nil
+		}
 		return g.ready, 0, nil
 	case strings.HasPrefix(joined, "pr create"):
 		g.creates++
@@ -266,6 +271,25 @@ func TestIntegrationBatchUsageAndFailures(t *testing.T) {
 	j.gh.ready = "x\n"
 	if rc, _, _ := j.run("batch"); rc != exitIO {
 		t.Errorf("a host failure: rc=%d, want %d", rc, exitIO)
+	}
+}
+
+func TestIntegrationBatchReportsAFailedReadyListAfterASettle(t *testing.T) {
+	t.Parallel()
+	j := newTrainJourney(t)
+	failing := j.env
+	failing.Gh = func(ctx context.Context, dir string, args ...string) (string, int, error) {
+		if strings.Contains(strings.Join(args, " "), "--search") {
+			return "", 1, nil
+		}
+		return j.gh.run(ctx, dir, args...)
+	}
+	var out, errb bytes.Buffer
+	if rc := runIntegrationEnv(failing, []string{"batch"}, &out, &errb); rc != exitIO {
+		t.Errorf("rc=%d err=%q, want %d for a failed ready list", rc, errb.String(), exitIO)
+	}
+	if j.gh.creates != 0 {
+		t.Errorf("a failed ready list must create no batch PR, creates=%d", j.gh.creates)
 	}
 }
 

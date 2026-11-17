@@ -244,3 +244,33 @@ func (h GhHost) Close(ctx context.Context, pr int, body string) error {
 	_, err := h.CI.gh(ctx, "pr", "close", strconv.Itoa(pr), "--comment", body)
 	return err
 }
+
+func (h GhHost) State(ctx context.Context, pr int) (PRState, error) {
+	var view struct {
+		State PRState `json:"state"`
+	}
+	if err := h.CI.decode(ctx, &view, "pr", "view", strconv.Itoa(pr), "--json", "state"); err != nil {
+		return "", err
+	}
+	return view.State, nil
+}
+
+func (h GhHost) OpenBatches(ctx context.Context) ([]int, error) {
+	var open []struct {
+		Number      int    `json:"number"`
+		HeadRefName string `json:"headRefName"`
+	}
+	if err := h.CI.decode(ctx, &open, "pr", "list", "--state", "open", "--base", mainBranch, "--limit", strconv.Itoa(readyLimit), "--json", "number,headRefName"); err != nil {
+		return nil, err
+	}
+	if len(open) >= readyLimit {
+		return nil, fmt.Errorf("integration: gh listed %d open PRs, the most it lists; close the batch PRs that are done", readyLimit)
+	}
+	var prs []int
+	for _, p := range open {
+		if strings.HasPrefix(p.HeadRefName, batchHeadPrefix) {
+			prs = append(prs, p.Number)
+		}
+	}
+	return prs, nil
+}

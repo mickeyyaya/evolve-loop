@@ -21,9 +21,25 @@ type fakeHost struct {
 	closeErr   error
 	comments   map[int][]string
 	closed     map[int]string
+	states     map[int]PRState
+	stateErrs  map[int]error
+	batches    []int
+	batchesErr error
 }
 
 func (h *fakeHost) Ready(context.Context) ([]int, error) { return h.ready, h.readyErr }
+
+func (h *fakeHost) State(_ context.Context, pr int) (PRState, error) {
+	if err := h.stateErrs[pr]; err != nil {
+		return "", err
+	}
+	if state, ok := h.states[pr]; ok {
+		return state, nil
+	}
+	return stateOpen, nil
+}
+
+func (h *fakeHost) OpenBatches(context.Context) ([]int, error) { return h.batches, h.batchesErr }
 
 func (h *fakeHost) Comment(_ context.Context, pr int, body string) error {
 	h.mu.Lock()

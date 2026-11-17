@@ -220,3 +220,7 @@ The files are `consolepr.go`, `train.go` and `deliverable.go`.
 - `bindingErr` accepts the kind only with a tree and no review class. The composed message of the PR adds the trailer `Evolve-Audit-Kind: commit-chain`.
 - This package does not import `commitgate`. The caller gives the `ChangeCheck`.
 - Pinned by `TestEvidence_CarriesTheChangeOfEachCommit`, `TestEvidence_AFailedCommitChangeIsReported`, `TestChainedBinding_BindsEveryCommitRecordInOrder`, `TestChainedBinding_ACommitWithNoRecordIsRefusedByName`, `TestChainedBinding_TheKindNamesTheChain`, `TestChainedBinding_AMalformedKindIsRefused` and `TestRepoRunner_CarriesGitOutputAndExitCode`.
+- **The batch-start settle (cycle 2456).** `Train.Settle` runs at the start of `evolve integration batch`, and a dry run does not run it. A batch can stop after it moved `main`. Then the records of the landed PRs and their batch PRs stay open, because the end-of-run settle did not run.
+  - A record of a PR that the host reports as not open is spent, and one line names the PR. A record of an open PR whose change is on `main` is closed with the landed note and spent, and its inbox items move.
+  - An open batch PR closes only when all of its commits name a `Source-PR`. Each named PR must be closed, on `main` or settled in the same pass. Else the batch PR stays open.
+  - `PRHost.State` and `PRHost.OpenBatches` are the two host reads. `GhHost` uses `gh pr view` and `gh pr list`. A failed read is an error of the settle. The batch stops after it prints the lines of the work done.
