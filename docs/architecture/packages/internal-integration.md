@@ -157,7 +157,7 @@ The package holds the pure parts of the integration of a wave. A fleet lane deli
 
 A lane record has a cycle number and a trailer. A console PR record has the source console-pr, a PR number and no cycle number. DeliverableRecord.Ref gives the number of either kind, and Label gives its name for a message.
 
-The review binding of a console PR covers the change of the PR. Train.Record gives the binder the evidence: the commits, the changed paths and the digest of the diff. AttestedBinding accepts a review record only when its tree equals that digest. ClassBinding accepts a class only when the rule of the class covers the paths.
+The review binding of a console PR covers the change of the PR. Train.Record gives the binder the evidence: the commits, the changed paths and the digest of the diff. CoversChange owns the rule: a review record counts only when its tree equals that digest, and it owns the text of the refusal. Each caller asks CoversChange, and AttestedBinding(ev, artifact) then binds the digest of the change. ClassBinding accepts a class only when the rule of the class covers the paths.
 
 The commit gate writes the review record, and it holds a copy of each launch record that it names. A review record of a docs-only change needs a run of the docs review, and the plain name does not satisfy the check. The class `docs-review` checks only the paths, and it proves no run. The caller owns the record schema and the closed list of classes, because this package cannot import the commit gate. That package imports this one through core.
 
@@ -208,3 +208,15 @@ The file is `stopgate.go`. The design is in [gate-contract-g4-base-red-attributi
   - A non-zero exit is red, and a gofmt listing is red. The first red step ends the pack.
   - A command error is a host failure.
   - The composer gate of the L2 stays a no-op, because `Check` composes in shadow.
+
+## The commit chain of a PR
+
+The files are `consolepr.go`, `train.go` and `deliverable.go`.
+
+- `Evidence.Changes` holds one `CommitChange` for each commit of the PR: `SHA`, `BaseSHA`, `DiffSHA` and `Paths`. `Evidence.Commits` stays the ordered list of SHAs.
+- `DiffSHA` of a commit comes from `treestate.Between` over the parent and the commit. The digest equals the name of the review record that the commit gate wrote for that commit.
+- `ChainedBinding` takes the evidence and a `ChangeCheck`. It checks the commits in order and stops at the first refusal. The refusal names the commit, its digest and the restore command at its parent.
+- The binding has `Kind` `commit-chain`. `TreeSHA` is the digest of the whole change, and `ArtifactSHA` is the digest of the ordered record digests.
+- `bindingErr` accepts the kind only with a tree and no review class. The composed message of the PR adds the trailer `Evolve-Audit-Kind: commit-chain`.
+- This package does not import `commitgate`. The caller gives the `ChangeCheck`.
+- Pinned by `TestEvidence_CarriesTheChangeOfEachCommit`, `TestEvidence_AFailedCommitChangeIsReported`, `TestChainedBinding_BindsEveryCommitRecordInOrder`, `TestChainedBinding_ACommitWithNoRecordIsRefusedByName`, `TestChainedBinding_TheKindNamesTheChain`, `TestChainedBinding_AMalformedKindIsRefused` and `TestRepoRunner_CarriesGitOutputAndExitCode`.
