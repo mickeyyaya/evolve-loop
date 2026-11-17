@@ -785,6 +785,12 @@ approaches / decision / results / retro) — lives at
 | [plans/shadow-stage-evidence-2026-11.md](plans/shadow-stage-evidence-2026-11.md) | Plan: three evidence stores and five scan-skip keys on one score table. It recommends a per-cycle digest in the ledger and one default-deny purity predicate for the scan-skip key. It maps K1 to K5 and F1 to F7 to phases. |
 | [architecture/adr/0167-shadow-stages-prove-themselves-on-chained-evidence.md](architecture/adr/0167-shadow-stages-prove-themselves-on-chained-evidence.md) | ADR-0167, Proposed: five contract rules, the integrity rules, a flip only on a verified verdict, and a protected registry. It extends ADR-0165 and amends ADR-0157 decision 8. |
 
+## 2026-11-15 — pipeline health readings at the start of wave 174
+
+| Document | What it records |
+|---|---|
+| [research/pipeline-health-readings/2026-11-15/readings.md](research/pipeline-health-readings/2026-11-15/readings.md) | PQ, CQ, lane-use and idle-cause readings of waves 172 to 174, the shadow projected stops, and five questions for a later study. The raw JSON of the quality, latency and status verbs is in the same folder. |
+
 ## 2026-11-15 — agy changelog command snapshot 2026-11-14T05:48:36Z note
 
 | Document | What it records |
@@ -797,16 +803,43 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [research/practice-claude-model-release-notes-c433b054-202611.md](research/practice-claude-model-release-notes-c433b054-202611.md) | Note on Claude release notes snapshot `2026-11-13T19:47:32Z` (empty added-line excerpt and November 12 self-hosted Managed Agents) for item `c433b054`, read as untrusted data. `skills/model-notes-claude/COMPACT.md` and all personas stay unchanged. |
 
+## 2026-11-16 — issue records: the entry skill, the analysis skill and the alert link
+
+| Document | What it records |
+|---|---|
+| [research/issue-record-skills-2026-11.md](research/issue-record-skills-2026-11.md) | The local evidence and the outside practice (Agent Skills, postmortem skills, Google SRE, causal analysis) for a record of each issue. |
+| [plans/issue-record-skill-2026-11.md](plans/issue-record-skill-2026-11.md) | The plan for the skills `issue-record` and `issue-analyze`, the L0 rule and the later stub verb that the Signal Center feeds. |
+| [incidents/2026-11-16-tests-leak-evolve-ledgers-under-go.md](incidents/2026-11-16-tests-leak-evolve-ledgers-under-go.md) | The first record of the skill: tests left ledgers under `go/`, and the composed-tree gate of each lane failed. |
+
 ## 2026-11-16 — self-evolving loops: room for the loop to change itself
 
 | Document | What it records |
 |---|---|
 | [research/self-evolving-loop-autonomy-2026-11.md](research/self-evolving-loop-autonomy-2026-11.md) | Why 221 of 268 inbox items are console routes, and what outside systems do about self-improvement and earned autonomy. It gives refinements R1 to R6. |
 
+## 2026-11-16 — pipeline health readings at the end of wave 174
+
+| Document | What it records |
+|---|---|
+| [research/pipeline-health-readings/2026-11-16/readings.md](research/pipeline-health-readings/2026-11-16/readings.md) | The second snapshot of the series: PQ, CQ, lane-use, idle-cause and lane-time readings of the wave 174 boundary. It compares them with the 2026-11-15 snapshot and keeps nine questions. The raw JSON of the quality, latency and status verbs is in the same folder. |
+
+## 2026-11-16 — gate, ship and retry waste in the lanes
+
+| Document | What it records |
+|---|---|
+| [research/gate-ship-retry-waste-2026-11.md](research/gate-ship-retry-waste-2026-11.md) | Where lane time went in waves 173-175: gates and ship took 62%, and retry loops took 38% in wave 174. Merge-queue practice, and eight refinements. |
+
 ## 2026-11-17 — Claude watermark and sampling parameters note
 
 | Document | What it records |
 |---|---|
 | [research/practice-claude-model-release-notes-7ad7926a-202611162241.md](research/practice-claude-model-release-notes-7ad7926a-202611162241.md) | Note on Claude release notes snapshot `2026-11-15T11:10:48Z` (text watermark on four models and non-default sampling parameters) for item `7ad7926a`, read as untrusted data. All personas stay unchanged. The claude model notes gain one bullet. |
+
+## 2026-11-17 — Console work: build only what a lane cannot build
+
+| Document | What it records |
+|---|---|
+| [research/console-build-or-route-2026-11.md](research/console-build-or-route-2026-11.md) | Wave 177 census: 180 of 288 items had a console route with no checked fact, 1 item was admissible, and the lanes ran at 18%. Practice from the Theory of Constraints, Team Topologies, Google SRE, SLSA and agent orchestration. |
+| [plans/console-build-or-route-2026-11.md](plans/console-build-or-route-2026-11.md) | Plan: the console builds an item only for a protected path, a console-only act or an integrity defect of operating-policy §1.1. It starts no feature build while the supply starves or while more than one batch of its PRs is open. |
 
 <!-- GENERATED:research-index END -->

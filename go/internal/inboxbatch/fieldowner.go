@@ -66,6 +66,14 @@ const (
 	PremiseVerifiedSHAField      = "premise_verified_sha"
 	PremiseVerifiedEvidenceField = "premise_verified_evidence"
 	IntakeOverrideField          = "intake_override"
+	LandedSHAField               = "landed_sha"
+	RoutedByField                = "routed_by"
+)
+
+const (
+	RoutedByLoop      = "loop"
+	RoutedByOperator  = "operator"
+	NoWorkRoutePrefix = "lane triage (cycle "
 )
 
 var (
@@ -107,6 +115,8 @@ var fieldRoles = map[string]FieldRole{
 	RetiredReasonField:          loopStamp,
 	RetiredCycleField:           loopStamp,
 	GitSHAField:                 loopStamp,
+	LandedSHAField:              loopStamp,
+	RoutedByField:               loopStamp,
 	ProtectedFilesField:         loopGrowOnly,
 
 	PremiseVerifiedAtField:       operatorStamp,

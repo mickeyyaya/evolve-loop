@@ -169,6 +169,21 @@ undiagnosable. Its blast radius is every later cycle.
 
    *Evidence: green PRs waited 61 PR-hours for a boundary over #979 to #1005 (2026-10-20).
    A code merge in a wave strands the next lane push.*
+6. **The console builds only what a lane cannot build, and stops when the lanes starve.**
+   - The console builds an item only for one of three capabilities:
+     1. the item changes a path that the protected check confirms;
+     2. the item needs an act that only the console does: `gh`, a merge, a boundary or an operator decision;
+     3. the item is a defect of §1.1.
+   - A route reason with no checked fact is not a capability. Route that item to a lane.
+   - When lanes lack a verb, a seam or a cell split, build that enabler. Then route the item to a lane.
+   - Before each new console build, read `evolve wave supply`. With fewer admissible items than the window, start no feature build.
+     Work on the supply instead: routes, splits, enablers, merges and §1.1 defects.
+   - With more open console PRs than one batch (10), start no new build. Review, rebuild and batch the open PRs first.
+   - An unprotected item stays on the console only when it changes the files of an open console PR. Its route reason names that PR.
+   - A build in progress stops at the limits of §1.8 and the convergence policy.
+
+   *Evidence: on 2026-11-17, 180 of 288 items had a console route. For 147 of them, no stored field showed a protected path or a pipeline kind. One item was admissible,
+   and the lanes ran at 18% of the window. 28 console PRs were open. Design: [console-build-or-route-2026-11.md](../plans/console-build-or-route-2026-11.md).*
 
 ## 3. Engineering standards (all work, loop or console)
 

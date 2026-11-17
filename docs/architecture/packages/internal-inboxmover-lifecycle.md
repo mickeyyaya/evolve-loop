@@ -74,6 +74,8 @@
   - A copy with other bytes is parked in `origin-conflicts/cycle-N/` (ledger `park`, a WARN line). The park path has one home, `Mover.parkPath`, and the ledger line one builder, `Mover.parkEntry`. `ReleaseClaimKeeping` with `KeepClaim` uses both. The claim copy is never overwritten, because it can carry a lane's newer stamps.
 - **`moveExclusive` never overwrites.** It makes a hard link and then removes the source. A destination that exists is `ErrExist`, which `ReleaseClaim` reports as `ErrClaimConflict`. If the remove fails, the link is removed again.
 
+- **A console route says who made it.** `RouteConsoleRequest` stamps `routed_by`. The value is `RouteRequest.RoutedBy`, and `loop` when it is empty. `evolve inbox route-console` passes `operator`. Pinned by `TestRouteConsole_StampsTheLoopUnlessTheCallerNamesItself` and, for the CLI, `TestRouteConsole_StampsTheOriginOfTheCaller`.
+
 ## Invariants
 
 - **A processing claim outranks a root copy** in `Locate`, because a lane holding the item wins over a stale root copy of the same id. A missing id, or a missing inbox, is `ErrNotFound`; a read fault on an existing dir is returned as itself. Pinned by `TestLocate_ProcessingOutranksRootAndAbsentIsNotFound`.

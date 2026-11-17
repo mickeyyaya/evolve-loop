@@ -1,8 +1,10 @@
 package inboxmover
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
@@ -73,5 +75,19 @@ func TestPartitionLaneMenu_SplitsReadyConsoleOwnedAndWaiting(t *testing.T) {
 	}
 	if got := idsOf(menu.Waiting); !reflect.DeepEqual(got, []string{"blocked"}) || !reflect.DeepEqual(menu.WaitingReasons, []string{"blocked: deps unmet: needs operator-work"}) {
 		t.Errorf("waiting = %v %v", got, menu.WaitingReasons)
+	}
+}
+
+func TestPartitionLaneMenu_AnItemWithALandedShaIsNotOffered(t *testing.T) {
+	root := t.TempDir()
+	items := []inboxbatch.Item{{ID: "free"}, {ID: "landed", LandedSHA: json.RawMessage(`"abc1234"`)}}
+
+	menu := PartitionLaneMenu(Options{ProjectRoot: root}, items, nil)
+
+	if got := idsOf(menu.Ready); !reflect.DeepEqual(got, []string{"free"}) {
+		t.Errorf("ready = %v, want the item without a landed sha only", got)
+	}
+	if got := idsOf(menu.Waiting); !reflect.DeepEqual(got, []string{"landed"}) || len(menu.WaitingReasons) != 1 || !strings.Contains(menu.WaitingReasons[0], "abc1234") {
+		t.Errorf("waiting = %v %v, want the landed item with its sha as the reason", got, menu.WaitingReasons)
 	}
 }

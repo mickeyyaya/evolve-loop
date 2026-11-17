@@ -74,6 +74,7 @@ func newTrainRig(t *testing.T) *trainRig {
 		Inbox:    inbox,
 		Root:     r.root,
 		Wave:     "t1",
+		MainCI:   &mainCIStub{verdict: Green},
 	}
 	return r
 }

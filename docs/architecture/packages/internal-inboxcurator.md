@@ -78,6 +78,11 @@ The package has four parts:
 | judgment reroute to a lane | 37 console routes that no fact explains and no `routed_reason` records |
 | `merge` | 0: the only pair at or above 0.5 is a declared dependency |
 
+### Landed claims and the route origin (Tier A, 2026-11-16)
+
+- **A checked landed claim gets a deterministic consume.** `CheckedClaims` proposes the consume of each open item that carries `landed_sha`. It first runs the injected `landedclaim.Check` again with the sha and the declared paths. The evidence names the sha. A claim that fails the check gets no proposal, and the item stays open. Pinned by `TestCurate_ALandedClaimProposesAConsumeOnlyWhenTheCheckHolds`, `TestCurate_AnItemWithACheckedLandedShaGetsADeterministicConsume` and `TestCurate_AClaimThatFailsTheCheckAgainStaysOpen`.
+- **The reroute rule reads `routed_by`.** A loop route with no fact gets a lane proposal, and the free text of `routed_reason` does not count. An operator route gets no proposal. A route with no `routed_by` and a reason that starts with `inboxbatch.NoWorkRoutePrefix` counts as a loop route. Any other old route keeps the rule of before: a free reason blocks the proposal. Pinned by `TestReroutes_ALoopRouteWithNoFactGetsALaneProposal`, `TestReroutes_AnOperatorRouteGetsNoProposal`, `TestReroutes_AnOldNoWorkRouteCountsAsLoop` and `TestReroutes_AnOldRouteWithAnotherReasonGetsNoProposal`.
+
 ## Decisions and rejected options
 
 | Choice | Rejected options and why |

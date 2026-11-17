@@ -45,6 +45,31 @@ type Merger struct {
 	Compose func(ctx context.Context, recs []DeliverableRecord) (Composition, error)
 	Heads   func(ctx context.Context, recs []DeliverableRecord) ([]*Ejection, error)
 	Eject   func(ctx context.Context, rec DeliverableRecord, cause error) error
+
+	Progress func(Step)
+}
+
+type StepKind string
+
+const (
+	StepTest    StepKind = "test"
+	StepVerdict StepKind = "verdict"
+	StepRerun   StepKind = "rerun"
+	StepSplit   StepKind = "split"
+	StepLand    StepKind = "land"
+)
+
+type Step struct {
+	Kind    StepKind
+	PRs     []int
+	Batch   int
+	Verdict Verdict
+}
+
+func (m Merger) step(s Step) {
+	if m.Progress != nil {
+		m.Progress(s)
+	}
 }
 
 type Outcome struct {
@@ -79,7 +104,7 @@ func (m Merger) land(ctx context.Context, recs []DeliverableRecord, out *Outcome
 		}
 		recs = comp.Kept
 		b := comp.Batch
-		verdict, pr, err := m.test(ctx, b, out)
+		verdict, pr, err := m.test(ctx, b, refsOf(recs), out)
 		if err != nil {
 			return err
 		}
@@ -101,6 +126,7 @@ func (m Merger) land(ctx context.Context, recs []DeliverableRecord, out *Outcome
 		landed, err := m.fastForward(ctx, b)
 		if landed {
 			out.record(recs, pr)
+			m.step(Step{Kind: StepLand, PRs: refsOf(recs), Batch: pr.Number})
 		}
 		if err != nil || landed {
 			return err
@@ -144,22 +170,32 @@ func (o *Outcome) record(recs []DeliverableRecord, pr PR) {
 	}
 }
 
-func (m Merger) test(ctx context.Context, b Batch, out *Outcome) (Verdict, PR, error) {
+func (m Merger) test(ctx context.Context, b Batch, refs []int, out *Outcome) (Verdict, PR, error) {
 	pr, err := m.CI.Open(ctx, b)
 	if err != nil {
 		return "", PR{}, err
 	}
-	verdict, err := m.CI.Watch(ctx, pr)
+	m.step(Step{Kind: StepTest, PRs: refs, Batch: pr.Number})
+	verdict, err := m.watch(ctx, pr, refs)
 	if err != nil || verdict == Green {
 		return verdict, pr, err
 	}
+	m.step(Step{Kind: StepRerun, PRs: refs, Batch: pr.Number})
 	if err := m.CI.Rerun(ctx, pr); err != nil {
 		return "", pr, err
 	}
-	if verdict, err = m.CI.Watch(ctx, pr); err == nil && verdict == Green {
+	if verdict, err = m.watch(ctx, pr, refs); err == nil && verdict == Green {
 		out.Flaked = true
 	}
 	return verdict, pr, err
+}
+
+func (m Merger) watch(ctx context.Context, pr PR, refs []int) (Verdict, error) {
+	verdict, err := m.CI.Watch(ctx, pr)
+	if err == nil {
+		m.step(Step{Kind: StepVerdict, PRs: refs, Batch: pr.Number, Verdict: verdict})
+	}
+	return verdict, err
 }
 
 func (m Merger) fastForward(ctx context.Context, b Batch) (bool, error) {
@@ -178,6 +214,7 @@ func (m Merger) split(ctx context.Context, recs []DeliverableRecord, out *Outcom
 		out.Ejected = append(out.Ejected, recs[0].Ref())
 		return m.Eject(ctx, recs[0], ErrCIRed)
 	}
+	m.step(Step{Kind: StepSplit, PRs: refsOf(recs)})
 	half := len(recs) / 2
 	if err := m.land(ctx, recs[:half], out); err != nil {
 		return err

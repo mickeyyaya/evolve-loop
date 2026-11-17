@@ -24,9 +24,10 @@ import (
 )
 
 const (
-	integrationBatchUsage  = "usage: evolve integration batch [--dry-run] [--project-root P] [PR...]"
+	integrationBatchUsage  = "usage: evolve integration batch [--dry-run] [--main-red-fix] [--project-root P] [PR...]"
 	integrationRecordUsage = "usage: evolve integration record-pr --pr N (--reviewed | --class NAME)"
 	inboxDir               = ".evolve/inbox/"
+	mainRedFixFlag         = "--main-red-fix"
 )
 
 var reviewClasses = map[string]func(paths []string) bool{
@@ -56,6 +57,7 @@ func (e integrationEnv) train(projectRoot string, warn io.Writer) integration.Tr
 		Inbox:    inboxCloser(e.Root),
 		Root:     e.Root,
 		Wave:     e.Wave,
+		MainCI:   p.CI,
 	}
 }
 
@@ -78,6 +80,10 @@ type cliIO struct {
 
 func (c cliIO) fail(err error) int {
 	fmt.Fprintf(c.stderr, "%s%v\n", integrationPrefix, err)
+	var mainRefusal *integration.MainRefusal
+	if errors.As(err, &mainRefusal) {
+		fmt.Fprintf(c.stderr, "Next: rerun the failed job of main when the red is a flake, or land the fix alone with %s <PR>\n", mainRedFixFlag)
+	}
 	return refusalExit(err)
 }
 
@@ -87,9 +93,9 @@ func usageFail(stderr io.Writer, err error, usage string) int {
 }
 
 func batchVerb(env integrationEnv, args []string, stdout, stderr io.Writer) int {
-	var dry, help bool
+	var dry, help, redFix bool
 	var rootFlag string
-	operands, err := cliFlags{bools: map[string]*bool{"--dry-run": &dry, "--help": &help}, values: map[string]*string{"--project-root": &rootFlag}}.parse(args)
+	operands, err := cliFlags{bools: map[string]*bool{"--dry-run": &dry, "--help": &help, mainRedFixFlag: &redFix}, values: map[string]*string{"--project-root": &rootFlag}}.parse(args)
 	if help && err == nil {
 		fmt.Fprintln(stdout, integrationBatchUsage)
 		return 0
@@ -103,6 +109,9 @@ func batchVerb(env integrationEnv, args []string, stdout, stderr io.Writer) int 
 		}
 		prs = append(prs, n)
 	}
+	if redFix && len(operands) != 1 {
+		err = errors.Join(err, errors.New(mainRedFixFlag+" lands exactly one named PR"))
+	}
 	if err != nil {
 		return usageFail(stderr, err, integrationBatchUsage)
 	}
@@ -110,7 +119,35 @@ func batchVerb(env integrationEnv, args []string, stdout, stderr io.Writer) int 
 	if rc != 0 {
 		return rc
 	}
-	return runBatch(env.train(root, stderr), batchRequest{prs: prs, dry: dry}, cliIO{stdout, stderr})
+	t := env.train(root, stderr)
+	t.MainRedFix, t.Progress = redFix, stepPrinter(stdout)
+	if dry {
+		t.MainCI = integration.PeekCI{CI: env.ports().CI}
+	}
+	return runBatch(t, batchRequest{prs: prs, dry: dry}, cliIO{stdout, stderr})
+}
+
+func stepPrinter(w io.Writer) func(integration.Step) {
+	return func(s integration.Step) {
+		fmt.Fprintln(w, stepLine(s))
+	}
+}
+
+func stepLine(s integration.Step) string {
+	prs := joinInts(s.PRs)
+	switch s.Kind {
+	case integration.StepTest:
+		return fmt.Sprintf("step: test PRs %s in batch PR #%d", prs, s.Batch)
+	case integration.StepVerdict:
+		return fmt.Sprintf("step: batch PR #%d of PRs %s is %s", s.Batch, prs, s.Verdict)
+	case integration.StepRerun:
+		return fmt.Sprintf("step: rerun the failed jobs of batch PR #%d", s.Batch)
+	case integration.StepSplit:
+		return fmt.Sprintf("step: split PRs %s in halves", prs)
+	case integration.StepLand:
+		return fmt.Sprintf("step: landed PRs %s through batch PR #%d", prs, s.Batch)
+	}
+	return fmt.Sprintf("step: %s PRs %s in batch PR #%d", s.Kind, prs, s.Batch)
 }
 
 type batchRequest struct {
@@ -174,18 +211,27 @@ func printLanding(w io.Writer, out integration.Outcome) {
 
 func refusalExit(err error) int {
 	var refusal *integration.Refusal
-	if errors.As(err, &refusal) || errors.Is(err, selfheal.ErrMainRedHold) {
+	var mainRefusal *integration.MainRefusal
+	if errors.As(err, &refusal) || errors.As(err, &mainRefusal) || errors.Is(err, selfheal.ErrMainRedHold) {
 		return exitRefused
 	}
 	return exitIO
 }
 
 func printPlan(w io.Writer, p integration.Plan) {
+	fmt.Fprintf(w, "main: %s CI %s\n", integration.ShortSHA(p.Main.SHA), mainStateText(p.Main.State))
 	fmt.Fprintf(w, "order: %s\n", joinInts(p.Order))
 	for _, e := range p.Ejected {
 		fmt.Fprintf(w, "eject %s %s %s\n", e.Label(), e.Cause, strings.Join(e.Paths, " "))
 	}
 	fmt.Fprintf(w, "batch: %d PRs\n", len(p.Kept))
+}
+
+func mainStateText(state integration.MainCIState) string {
+	if state == integration.MainRedOverridden {
+		return "red, " + mainRedFixFlag
+	}
+	return string(state)
 }
 
 func joinInts(items []int) string {
@@ -229,28 +275,58 @@ func recordPRVerb(env integrationEnv, args []string, stdout, stderr io.Writer) i
 	return recordPR(env.train(env.Root, stderr), recordRequest{pr: n, bind: bind}, c)
 }
 
+type missingRecordError struct{ path string }
+
+func (e *missingRecordError) Error() string { return "no review record at " + e.path }
+
+type reviewedRecord struct{ artifact string }
+
+func reviewedChange(store, digest string, paths []string) (reviewedRecord, error) {
+	label := integration.ShortSHA(digest)
+	path := filepath.Join(store, digest+".json")
+	raw, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return reviewedRecord{}, &missingRecordError{path: path}
+	}
+	if err != nil {
+		return reviewedRecord{}, fmt.Errorf("read the record of change %s at %s: %w", label, path, err)
+	}
+	var rec commitgate.ReviewRecord
+	if err := json.Unmarshal(raw, &rec); err != nil {
+		reason := fmt.Sprintf("the record of change %s at %s does not parse: %v. Next: run the review seats and evolve commit-gate run again, then run record-pr again.", label, path, err)
+		return reviewedRecord{}, errors.New(reason)
+	}
+	if reason := commitgate.CheckReviewedChange(rec, label, paths); reason != "" {
+		return reviewedRecord{}, errors.New(reason)
+	}
+	if err := integration.CoversChange(rec.Attestation.TreeStateSHA, digest); err != nil {
+		return reviewedRecord{}, err
+	}
+	return reviewedRecord{artifact: integration.Digest(raw)}, nil
+}
+
 func reviewedBinder(store string) integration.Binder {
 	return func(ev integration.Evidence) (integration.AuditBinding, error) {
-		label := integration.ShortSHA(ev.DiffSHA)
-		path := filepath.Join(store, ev.DiffSHA+".json")
-		raw, err := os.ReadFile(path)
-		if errors.Is(err, fs.ErrNotExist) {
-			base, head := integration.ShortSHA(ev.Base), integration.ShortSHA(ev.Commits[len(ev.Commits)-1])
-			reason := fmt.Sprintf("no review record for its whole change %s (%s..%s), looked in %s. Next: in a worktree at %s, run git restore --source=%s --staged --worktree -- . , run the review seats and evolve commit-gate run, then run record-pr again.", label, base, head, store, base, head)
-			return integration.AuditBinding{}, errors.New(reason)
+		whole, err := reviewedChange(store, ev.DiffSHA, ev.Paths)
+		var missing *missingRecordError
+		switch {
+		case err == nil:
+			return integration.AttestedBinding(ev, whole.artifact)
+		case !errors.As(err, &missing):
+			return integration.AuditBinding{}, err
+		case len(ev.Changes) > 1:
+			return integration.ChainedBinding(ev, chainCheck(store))
 		}
-		if err != nil {
-			return integration.AuditBinding{}, fmt.Errorf("read the record of change %s at %s: %w", label, path, err)
-		}
-		var rec commitgate.ReviewRecord
-		if err := json.Unmarshal(raw, &rec); err != nil {
-			reason := fmt.Sprintf("the record of change %s at %s does not parse: %v. Next: run the review seats and evolve commit-gate run again, then run record-pr again.", label, path, err)
-			return integration.AuditBinding{}, errors.New(reason)
-		}
-		if reason := commitgate.CheckReviewedChange(rec, label, ev.Paths); reason != "" {
-			return integration.AuditBinding{}, errors.New(reason)
-		}
-		return integration.AttestedBinding(ev, rec.Attestation.TreeStateSHA, integration.Digest(raw))
+		base, head := integration.ShortSHA(ev.Base), integration.ShortSHA(ev.Commits[len(ev.Commits)-1])
+		reason := fmt.Sprintf("no review record for its whole change %s (%s..%s), looked in %s. %s", integration.ShortSHA(ev.DiffSHA), base, head, store, integration.RestoreStep(base, head))
+		return integration.AuditBinding{}, errors.New(reason)
+	}
+}
+
+func chainCheck(store string) integration.ChangeCheck {
+	return func(c integration.CommitChange) (string, error) {
+		rec, err := reviewedChange(store, c.DiffSHA, c.Paths)
+		return rec.artifact, err
 	}
 }
 

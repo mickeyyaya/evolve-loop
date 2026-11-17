@@ -32,6 +32,8 @@ const (
 
 var (
 	ErrRunTimeout = errors.New("integration: CI run timed out")
+	ErrRunPending = errors.New("integration: the CI run is not complete")
+	ErrNoRun      = errors.New("integration: no CI run")
 	prURL         = regexp.MustCompile(`/pull/([0-9]+)\s*$`)
 )
 
@@ -120,7 +122,7 @@ func (c GhCI) runID(ctx context.Context, tip string) (string, error) {
 			return strconv.Itoa(runs[0].DatabaseID), nil
 		}
 		if c.Settle == nil || attempt >= registerTries {
-			return "", fmt.Errorf("integration: no CI run of %s for the tip %s", ciparity.RequiredWorkflow, tip)
+			return "", fmt.Errorf("%w of %s for the tip %s", ErrNoRun, ciparity.RequiredWorkflow, tip)
 		}
 		if err := c.Settle(ctx); err != nil {
 			return "", err
@@ -156,7 +158,10 @@ func (c GhCI) verdict(ctx context.Context, id string) (Verdict, error) {
 			return "", err
 		}
 		if run.Status != "" && run.Status != statusCompleted {
-			if c.Settle == nil || attempt >= watchTries {
+			if c.Settle == nil {
+				return "", fmt.Errorf("integration: run %s is %s: %w", id, run.Status, ErrRunPending)
+			}
+			if attempt >= watchTries {
 				return "", fmt.Errorf("integration: run %s is %s: %w", id, run.Status, ErrRunTimeout)
 			}
 			if err := c.Settle(ctx); err != nil {
@@ -170,8 +175,31 @@ func (c GhCI) verdict(ctx context.Context, id string) (Verdict, error) {
 		case conclusionRed:
 			return Red, nil
 		}
-		return "", fmt.Errorf("integration: run %s ended with the conclusion %q, which is neither green nor red", id, run.Conclusion)
+		return "", &RunConclusionError{Run: id, Conclusion: run.Conclusion}
 	}
+}
+
+type RunConclusionError struct {
+	Run        string
+	Conclusion string
+}
+
+func (e *RunConclusionError) Error() string {
+	return fmt.Sprintf("integration: run %s ended with the conclusion %q, which is neither green nor red", e.Run, e.Conclusion)
+}
+
+type PeekCI struct {
+	CI GhCI
+}
+
+func (p PeekCI) Watch(ctx context.Context, pr PR) (Verdict, error) {
+	c := p.CI
+	c.Settle = nil
+	id, err := c.runID(ctx, pr.Tip)
+	if err != nil {
+		return "", err
+	}
+	return c.verdict(ctx, id)
 }
 
 func (c GhCI) Rerun(ctx context.Context, pr PR) error {

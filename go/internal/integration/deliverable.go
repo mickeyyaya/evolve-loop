@@ -27,6 +27,7 @@ type AuditBinding struct {
 	TreeSHA     string `json:"tree_sha"`
 	ArtifactSHA string `json:"artifact_sha"`
 	Class       string `json:"class,omitempty"`
+	Kind        string `json:"kind,omitempty"`
 }
 
 type DeliverableRecord struct {
@@ -121,6 +122,9 @@ func (r DeliverableRecord) bindingErr() error {
 	}
 	if r.Audit.TreeSHA == "" && r.Audit.Class == "" {
 		return fmt.Errorf("integration: %s has no recorded review binding: name an attestation tree or a review class", r.Label())
+	}
+	if r.Audit.Kind != "" && (r.Audit.Kind != KindCommitChain || r.Audit.Class != "") {
+		return fmt.Errorf("integration: %s has no recorded review binding: the kind %q needs the kind %q with a tree and no review class", r.Label(), r.Audit.Kind, KindCommitChain)
 	}
 	return nil
 }

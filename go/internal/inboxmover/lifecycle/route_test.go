@@ -178,3 +178,27 @@ func TestMover_Release_RoutedPolicyReleasesPlain(t *testing.T) {
 		t.Error("routed cycle parks nothing")
 	}
 }
+
+func TestRouteConsole_StampsTheLoopUnlessTheCallerNamesItself(t *testing.T) {
+	inbox := newInbox(t)
+	path := filepath.Join(inbox, "x.json")
+	m := New(inbox, nil)
+	for name, tc := range map[string]struct {
+		route func() error
+		want  string
+	}{
+		"the plain verb": {func() error { _, err := m.RouteConsole("x", "found", 3); return err }, "loop"},
+		"a named operator": {func() error {
+			_, err := m.RouteConsoleRequest(RouteRequest{TaskID: "x", Reason: "found", Cycle: 3, RoutedBy: "operator"})
+			return err
+		}, "operator"},
+	} {
+		writeItem(t, path, `{"id":"x","routed_by":"stale"}`)
+		if err := tc.route(); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if got := readItem(t, path)["routed_by"]; got != tc.want {
+			t.Errorf("%s: routed_by = %v, want %s", name, got, tc.want)
+		}
+	}
+}

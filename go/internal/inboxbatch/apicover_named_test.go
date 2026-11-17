@@ -88,3 +88,9 @@ func TestItem_HasDeclaredSurfaceAndProtectedBasenames(t *testing.T) {
 		t.Fatalf("ProtectedBasenames = %v, want [disposition_gate.go]", got)
 	}
 }
+
+func TestRouteOwnerValues_AreThePersistedStrings(t *testing.T) {
+	if RoutedByOperator != "operator" || NoWorkRoutePrefix != "lane triage (cycle " {
+		t.Errorf("RoutedByOperator = %q, NoWorkRoutePrefix = %q, want the strings that routed records carry", RoutedByOperator, NoWorkRoutePrefix)
+	}
+}

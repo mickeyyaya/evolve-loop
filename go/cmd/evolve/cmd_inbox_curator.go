@@ -15,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/events/reader"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxcurator"
+	"github.com/mickeyyaya/evolve-loop/go/internal/landedclaim"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
@@ -165,6 +166,7 @@ func (r *curatorRun) curate(changes []inboxcurator.Change, backstop bool) (curat
 		HasOpenPR:             openPRMatcher(r.ctx(), r.req.root, r.stderr),
 		HasTest:               func(name string) bool { return tests[name] || definedByAChange(changes, name) },
 		PathExists:            pathExistsUnder(r.req.root),
+		LandedCheck:           landedclaim.OnMain(r.git),
 		Thresholds:            inboxcurator.Thresholds{Refuse: r.cfg.OverlapRefuse, Warn: r.cfg.OverlapWarn}, MinShare: r.cfg.ConsumeMinShare,
 	}
 	return r.settle(inboxcurator.Curate(in), in.IsProtected), nil

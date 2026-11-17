@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -133,60 +132,6 @@ func TestJourneyRecordPRReviewedRefusesAGateRunThatNamedAPlainReviewer(t *testin
 	rc, out, errb := j.run("record-pr", "--pr", "9", "--reviewed")
 	if want := "prove no review (profiles: code-simplifier)"; rc != exitRefused || out != "" || !strings.Contains(errb, want) {
 		t.Errorf("rc=%d out=%q err=%q, want a refusal that holds %q", rc, out, errb, want)
-	}
-}
-
-var nextRestore = regexp.MustCompile(`in a worktree at (\w+), run (git restore [^,]*? -- \.) ,`)
-
-func TestJourneyRecordPRReviewedNCommitsNeedsOneReviewOfTheWholeChange(t *testing.T) {
-	t.Parallel()
-	j := newTrainJourney(t)
-	j.pr(t, 6, "feat: a", "a.txt", "a\n")
-	j.work.Git("checkout", "-q", "pr-6")
-	j.work.Write("b.txt", "b\n")
-	j.work.Git("add", "b.txt")
-	j.work.Git("rm", "-q", "shared.md")
-	j.work.Git("commit", "-q", "-m", "feat: b")
-	j.work.Git("push", "-q", "origin", "pr-6:refs/pull/6/head")
-	j.work.Git("checkout", "-q", "main")
-	first := strings.TrimSpace(j.work.Git("rev-parse", "pr-6~1"))
-	second := strings.TrimSpace(j.work.Git("rev-parse", "pr-6"))
-	base, head, change, store := j.prFacts(t, "6")
-
-	for i, step := range [][2]string{{base, first}, {first, second}} {
-		wt := j.worktreeAt(t, step[0])
-		j.restore(t, wt, step[1])
-		tokens := []string{j.seat(t, wt, "simp-c"+strconv.Itoa(i), "code-simplifier"), j.seat(t, wt, "rev-c"+strconv.Itoa(i), "code-reviewer")}
-		if rc, logs := j.gate(t, wt, tokens...); rc != 0 {
-			t.Fatalf("gate over commit %d rc=%d\n%s", i, rc, logs)
-		}
-		j.work.Git("worktree", "remove", "--force", wt)
-	}
-
-	want := j.refusal("6", "no review record for its whole change "+change[:7]+" ("+base[:7]+".."+head[:7]+"), looked in "+store+". Next: in a worktree at "+base[:7]+", run git restore --source="+head[:7]+" --staged --worktree -- . , run the review seats and evolve commit-gate run, then run record-pr again.")
-	rc, _, errb := j.run("record-pr", "--pr", "6", "--reviewed")
-	if rc != exitRefused || errb != want {
-		t.Fatalf("rc=%d\n got %q\nwant %q", rc, errb, want)
-	}
-
-	m := nextRestore.FindStringSubmatch(errb)
-	if m == nil {
-		t.Fatalf("no next step in %q", errb)
-	}
-	wt := j.worktreeAt(t, m[1])
-	args := strings.Fields(m[2])
-	cmd := exec.Command(args[0], args[1:]...)
-	cmd.Dir = wt
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("%s: %v\n%s", m[2], err, out)
-	}
-	tokens := []string{j.seat(t, wt, "simp-whole", "code-simplifier"), j.seat(t, wt, "rev-whole", "code-reviewer")}
-	if rc, logs := j.gate(t, wt, tokens...); rc != 0 {
-		t.Fatalf("gate over the whole change rc=%d\n%s", rc, logs)
-	}
-	j.work.Git("worktree", "remove", "--force", wt)
-	if rc, _, errb := j.run("record-pr", "--pr", "6", "--reviewed"); rc != 0 {
-		t.Fatalf("record-pr after the next step rc=%d %s", rc, errb)
 	}
 }
 

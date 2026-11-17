@@ -452,6 +452,36 @@
         "failures": []
       },
       "enforced_by": []
+    },
+    {
+      "id": "issue-gets-a-record",
+      "layer": "L0",
+      "kind": "rule",
+      "summary": "Record each issue, alert or mistake through the issue-record skill, with its logs, results, root cause, fix and regression test.",
+      "bytes": 751,
+      "path": "guidance/rules/issue-gets-a-record.md",
+      "audience": [
+        "all"
+      ],
+      "families": [],
+      "phases": [],
+      "triggers": {
+        "paths": [],
+        "actions": [],
+        "tasks": [],
+        "failures": [
+          "test-failure",
+          "ci-red",
+          "gate-refusal",
+          "warn-signal",
+          "incident-signal",
+          "selfheal-incident",
+          "wrong-claim",
+          "revert",
+          "operator-correction"
+        ]
+      },
+      "enforced_by": []
     }
   ]
 }

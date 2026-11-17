@@ -210,3 +210,18 @@ func TestProtectedMembership_IsTheManifestAndTheCycle1933ReplayUsesIt(t *testing
 		t.Error("the route's file must be proven by guards.IsProtectedSurface")
 	}
 }
+
+func TestNoWorkInputsFor_WiresTheLandedCheckAndTheProtectedPredicate(t *testing.T) {
+	t.Parallel()
+	in := noWorkInputsFor(t.TempDir(), 7, io.Discard)
+
+	if in.LandedCheck == nil {
+		t.Error("the production no-work inputs carry no landed check: a claim would route as before")
+	}
+	if in.Protected == nil || !in.Protected("go/internal/guards/integrity_surface.go") || in.Protected("README.md") {
+		t.Error("the production no-work inputs carry no protected predicate that matches the guard manifest")
+	}
+	if in.Cycle != 7 || in.ProjectRoot == "" || in.Workspace == "" {
+		t.Errorf("inputs = %+v, want the cycle, the root and the workspace", in)
+	}
+}

@@ -8,7 +8,8 @@ Related documents: the train is `go/internal/integration/batchpr.go`, the lane l
 - **Root cause 1:** a flaky test made main red. `laneCycleAbove` compared a cycle directory mtime with the lane start. On Linux the mtime can be some ms before the lane start, so the oversight dropped a landing.
 - **Root cause 2:** the train does not compare a red batch with main. It started on a main whose CI was still running. It split the batch on each red, also on a red that main had too.
 - **Root cause 3:** the train printed nothing for each bisect step. The console watched for a log line that never came.
-- **Fix:** PR #1523 adds a one-second slack to the lane locator. The train fix is inbox item `integration-train-compares-a-red-batch-with-main-before-it-splits`.
+- **Fix:** PR #1523 adds a one-second slack to the lane locator. The train now checks the CI of main before a batch, and it prints each step ([plan §12](../plans/wave-integration-2026-10.md#12-amendment-of-2026-11-17-the-train-checks-main-first-and-prints-each-step), D38 and D39).
+- **Recovery:** after #1523 landed alone, a batch of 10 PRs landed on its first CI run. In all, 12 PRs landed by 22:33.
 - **Lesson:** before a batch, the console must check that the CI of main at the base is complete and green.
 
 ## Terms used throughout
@@ -30,6 +31,10 @@ Related documents: the train is `go/internal/integration/batchpr.go`, the lane l
 | 19:54 | The console finds the stall: the batch log still shows only its header. | batch log |
 | 19:56 | The console stops its batch process and its watcher. It reruns the failed main job. The rerun fails on the same test. | run 43933838938, second run |
 | 20:23 | PR #1523 (the locator fix) ships. Batch 1 starts with #1523 alone. | PR #1523 |
+| 20:58 | Batch 1 is green and lands #1523 (`84395d411`). Main CI on that commit is green at 21:30. | runs 43951805965, 43955293221 |
+| 21:31 | Batch 2 of 12 PRs starts on the green main. Its first run is red on apicover in #1508 and #1512. The console stops the batch before the split and cancels the rerun. | run 43960872653 |
+| 22:02 | Batch 2b starts with the other 10 PRs. It is green on its first run and lands at 22:33 (`7e3b178e6`). | run 43966099022 |
+| 23:02 | Main CI on `7e3b178e6` is green. #1508 and #1512 come back as #1529 and #1530, with the tests that apicover asked for. | run 43971322787 |
 
 ## Root cause
 
@@ -51,25 +56,30 @@ Related documents: the train is `go/internal/integration/batchpr.go`, the lane l
 **F4.1** #1488 also failed b1 and b5 on apicover. #1488 adds the constant `mainstop.SchemaV1`, and no test named it. The constant is not on main.
 *Implication:* the batch had one real failure under the flake. The review of its rebuild (#1524) then found a CRITICAL design defect, so #1524 is held from this boundary.
 
+**F4.2** In batch 2, #1508 and #1512 failed apicover in CI. Each PR added exported names that no test in the same package named. The console had not run `make apicover-check` on the changed packages before `record-pr`.
+*Implication:* a check that CI runs on the whole tree must run before the record. Otherwise a batch run finds the gap, and a full batch waits for it.
+
 ## What changed
 
 | Change | Pull request | Regression test |
 |---|---|---|
 | The lane locator allows one second of file-clock slack | #1523 | `TestLaneCycle_FindsADirStampedOneCoarseTickBeforeTheLaneStart` (red before the fix), `TestLaneCycle_SkipsADirStampedTwoSecondsBeforeTheLaneStart` |
-| The train checks main before it batches and before it splits, and prints each step | inbox item `integration-train-compares-a-red-batch-with-main-before-it-splits` | open |
+| The train checks the CI of main before a batch, and prints each step | plan §12, D38 and D39 | `TestRunBatch_RefusesARedMain` and the `step:` tests of the integration package |
+| The train compares a red batch with the base before it splits | inbox item `integration-train-compares-a-red-batch-with-main-before-it-splits` (plan §12, D40) | open |
 | The oversight emits a signal for a landing it cannot locate | inbox item `oversight-landing-for-an-unlocated-lane-emits-a-signal` | open |
 | The main-red stop opens only on a key that a lane can prove | inbox item `main-red-stop-provable-means-a-lane-can-prove-it` (#1524 held) | open |
 
 ## Limits
 
-- This record was written before the fixes landed. PR #1523, its two `TestLaneCycle_*` tests, PR #1488 and PR #1524 are not on main in this checkout. The three inbox items are in the runtime inbox, not in git.
+- PR #1523 and its two `TestLaneCycle_*` tests are on main. PR #1488 is closed, and its rebuild #1524 is held. The three inbox items are in the runtime inbox, not in git.
 
 - The ratio of flake failures comes from 7 CI runs. It is not a measured rate.
 - This record does not prove that the coarse clock is the only cause of the flake. The red-first test reproduces the mechanism, and the fix removes it.
 
 ## What we learned
 
-- Check that the CI of main at the base is complete and green before a batch.
+- Check that the CI of main at the base is complete and green before a batch. The train now does this check itself (D38).
+- Run apicover on the changed packages before `record-pr`, as CI does.
 - A bisect on a red main tests nothing. The train must compare a red batch with main before it splits.
 - A long verb must print its progress, so that a watcher can wake on a step.
 - Do not compare a file mtime with a process clock without a slack.
