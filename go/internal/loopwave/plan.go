@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
@@ -16,14 +17,16 @@ func (e *Engine) PlanFn(count int) PlanFn { return e.planFn(count, true) }
 
 func (e *Engine) planFn(count int, release bool) PlanFn {
 	return func(ctx context.Context, wave int) ([]byte, []string, error) {
+		var released map[string]bool
 		if release {
-			e.releaseStaleClaims(wave)
+			released = e.releaseStaleClaims(wave)
 		}
 		if lastCycle, err := e.ports.LastCycle(ctx); err == nil && lastCycle > 0 {
 			companion := filepath.Join(e.ports.Workspace(lastCycle), triagecap.TriageDecisionName())
 			if data, rerr := os.ReadFile(companion); rerr == nil {
 				data = e.pruneRouted(e.pruneUndispatchable(e.pruneUnselected(data)))
-				return widenNarrowDecision(data, e.roots.EvolveDir, count, e.backlog), nil, nil
+				data = widenNarrowDecision(data, e.roots.EvolveDir, count, e.backlog)
+				return e.preemptBoundary(data, release, released), nil, nil
 			}
 		}
 		data, err := seedWavePlan(e.roots.EvolveDir, count, e.selector.minLanes(), e.backlog())
@@ -85,16 +88,19 @@ func cards(menus [][]triagecap.FleetCandidate) []map[string]any {
 	return topN
 }
 
-func (e *Engine) releaseStaleClaims(wave int) {
+func (e *Engine) releaseStaleClaims(wave int) map[string]bool {
 	opts := e.lifecycle()
 	opts.CurrentGoal = e.goal
 	released, err := inboxmover.ReleaseStaleClaims(opts, fmt.Sprintf("wave %d plan", wave))
+	ids := make(map[string]bool, len(released))
 	for _, r := range released {
+		ids[r.ID] = true
 		fmt.Fprintf(e.stderr, "[loop] wave plan: released the claim of %q held by cycle-%d (%s): %s\n", r.ID, r.Cycle, r.Outcome, r.Holder.Reason)
 	}
 	if err != nil {
 		fmt.Fprintf(e.stderr, "[loop] WARN: wave plan: a stale claim stays held: %v\n", err)
 	}
+	return ids
 }
 
 func (e *Engine) pruneUndispatchable(data []byte) []byte {
@@ -159,4 +165,28 @@ func marshalOr(data []byte, v any) []byte {
 		return data
 	}
 	return out
+}
+
+func (e *Engine) preemptBoundary(data []byte, record bool, started map[string]bool) []byte {
+	d, ok := parseDecision(data)
+	if !ok || len(d.CommittedFloors) > 0 || len(d.TopN) == 0 {
+		return data
+	}
+	committed := make([]triagecap.FleetCandidate, 0, len(d.TopN))
+	for _, c := range d.TopN {
+		if c.ID != "" {
+			committed = append(committed, triagecap.FleetCandidate{ID: c.ID, Files: c.Files})
+		}
+	}
+	now := time.Now()
+	swapped, p := triagecap.PreemptLowestSlot(e.roots.EvolveDir, committed, started, e.ports.Protected, e.selector.allows, now)
+	if p == nil {
+		return data
+	}
+	if record {
+		if err := triagecap.RecordPreemption(e.roots.EvolveDir, *p, now); err != nil {
+			fmt.Fprintf(e.stderr, "[loop] WARN: wave plan: the preempt line stays unwritten: %v\n", err)
+		}
+	}
+	return remarshalFull(data, cards([][]triagecap.FleetCandidate{swapped}))
 }

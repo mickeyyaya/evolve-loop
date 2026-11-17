@@ -37,6 +37,12 @@
 - **Bench state never breaks a dispatch.** `Store.Active` degrades a missing or corrupt bench file to an empty map, so bench state never breaks a dispatch.
 - **The budget layer.** Only when a `fleet.budget` block exists, `fleetbudget.Plan` sizes the shrunk count against measured quota headroom and pace. Stage `enforce` applies `plan.Lanes` and returns `plan.PaceDelay`. Every other stage, `shadow` included (the default), logs the size it computes and holds the count. The shadow join is logged on both stages and never feeds the plan.
 - **The plan source.** Preferred is the immediately prior cycle's committed `triage-decision.json` (`LastCycle`, then `Workspace`), pruned of undispatchable ids, then of console-routed ids, then widened to fleet width. An absent decision (fresh start, a sealed run dir, a cycle that failed before triage) or a failed last-cycle read falls through to the inbox seed, so a two-wide wave starts on the first cycle. `cardPackages` is always nil: no card-package reader exists, and `top_n[].id` cards flow through the fan-out's own fallback. Only `LastCycle` observes ctx; the decision read is a plain `os.ReadFile` (Q-W10).
+- **The boundary preemption.** After the prune and the widen, `PlanFn` calls `preemptBoundary`.
+  - It asks `triagecap.PreemptLowestSlot` to swap the lowest unstarted slot for a higher-ranked item. The plan then carries the new card.
+  - An item that `releaseStaleClaims` just released keeps its slot (`TestWaveEngine_PassesTheLoopsGoalToTheClaimRelease`).
+  - `PlanFn` writes the ledger line. The preview path (`planFn` with `release` false) plans the same swap and writes no line.
+  - A failed ledger write prints `[loop] WARN: wave plan: the preempt line stays unwritten` and keeps the swap.
+  - A decision with `committed_floors` never changes ([inbox plan P4](../../plans/inbox-prioritization-2026-10.md)).
 - **Stale claims go first.** `PlanFn` calls `inboxmover.ReleaseStaleClaims` before it reads a plan source. It writes one `[loop] wave plan: released the claim of …` line for each release.
   - `WithGoal(hash)` gives the running loop's goal to the judge, so a pause of another goal is released at the first planning after the boundary (`TestPlanFn_TheRunningGoalReleasesAPausedClaimAtTheFirstPlanning`). `cmd/evolve` wires `cfg.GoalHash`.
   - A claim whose holder is `live` or `resume-pending` stays.

@@ -20,6 +20,7 @@ func TestUnobservedLedgerRootsArePinned(t *testing.T) {
 		"cmd/evolve/cmd_ledger.go":          {6, "evolve ledger verify/seal/rebaseline/anchor/deep-verify/evidence restore: operator repair roots outside the orchestrator process"},
 		"internal/cli/agentcmd/run.go":      {1, "evolve agent run appends one cycle-0 agent_run entry from an operator process that has no Signal Center; a failed append is exit 3 with the error on stderr and in the JSON envelope (ADR-0152)"},
 		"internal/cli/guardcmd/guard.go":    {1, "the guard chain reads the ledger (a read-only consumer)"},
+		"internal/triagecap/preempt.go":     {1, "the wave plan appends one preempt line through the chained ledger from the planner, which holds no Signal Center; a failed append is a stderr warning and the swap stays planned"},
 		"internal/inboxmover/inboxmover.go": {1, "the mover's fallback when no Ledger is injected — still reached by the ship phase's post-ship mover and the operator inbox commands until S4b threads the root's"},
 	}
 	callRE := regexp.MustCompile(`\bledger\.New\(`)
