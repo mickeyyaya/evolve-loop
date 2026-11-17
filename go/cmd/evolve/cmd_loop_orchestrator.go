@@ -41,8 +41,7 @@ func laneRunsDir(projectRoot string) string {
 }
 
 func laneLocator(projectRoot string) func(orchestrator.Lane) (int, bool) {
-	runs := laneRunsDir(projectRoot)
-	return func(lane orchestrator.Lane) (int, bool) { return orchestrator.LaneCycle(runs, lane) }
+	return orchestrator.RunsLocator(laneRunsDir(projectRoot))
 }
 
 func (b *loopBatchCoordinator) laneLeases(oc policy.OrchestratorConfig) *orchestrator.Leases {

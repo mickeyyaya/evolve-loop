@@ -136,9 +136,12 @@ func holdsTodo(dir, todo string) bool {
 }
 
 func RunsLocator(runsDir string) func(Lane) (int, bool) {
+	var mu sync.Mutex
 	found := map[string]int{}
 	last := map[string]int{}
 	return func(lane Lane) (int, bool) {
+		mu.Lock()
+		defer mu.Unlock()
 		life := lane.Key + "@" + lane.Started.Format(time.RFC3339Nano)
 		if cycle, ok := found[life]; ok {
 			return cycle, true

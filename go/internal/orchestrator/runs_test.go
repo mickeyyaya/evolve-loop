@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -326,4 +327,28 @@ func TestRunsLocator_ANewLifeNeverTakesTheCycleOfAnEarlierLifeOfTheSameTodo(t *t
 	if got, ok := locate(other); !ok || got != 50 {
 		t.Errorf("locate of another todo = %d, %v, want 50: the floor of A does not apply to B", got, ok)
 	}
+}
+
+func TestRunsLocator_ASealAndTheOversightMayLocateAtOnce(t *testing.T) {
+	runs := t.TempDir()
+	locate := RunsLocator(runs)
+	started := time.Now().Add(-time.Hour)
+	const callers = 8
+	for g := range callers {
+		writeCycle(t, runs, 100+g, []string{"T" + strconv.Itoa(g)})
+	}
+	var wg sync.WaitGroup
+	for g := range callers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			lane := Lane{Key: "T" + strconv.Itoa(g), Scope: []string{"T" + strconv.Itoa(g)}, Started: started}
+			for range 20 {
+				if got, ok := locate(lane); !ok || got != 100+g {
+					t.Errorf("locate of %s = %d, %v, want %d", lane.Key, got, ok, 100+g)
+				}
+			}
+		}()
+	}
+	wg.Wait()
 }
