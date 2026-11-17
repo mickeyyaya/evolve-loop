@@ -18,11 +18,12 @@ import (
 )
 
 const (
-	exitFail     = 1
-	exitRefused  = 3
-	exitDispatch = 21
-	exitUsage    = 10
-	exitInput    = 11
+	exitFail        = 1
+	exitRefused     = 3
+	exitDispatch    = 21
+	exitUsage       = 10
+	exitInput       = 11
+	exitFenceRevert = 12
 )
 
 const usage = `Usage: evolve agent <subcommand>
@@ -41,7 +42,8 @@ const usage = `Usage: evolve agent <subcommand>
       The pipeline restores each other file of the worktree after the run.
       A new file outside every grant is removed, and the run reports an error that names the path and the grant to add.
       A review report that lists a CRITICAL or HIGH finding, or states FAIL, gives the verdict FAIL.
-      Exit 0 PASS/WARN/SKIPPED, 1 FAIL, 3 refused, 21 dispatch error, 10 usage, 11 input.
+      A writer that changed a file outside its grant gets a WARN line on stderr that names each reverted path, and exit 12.
+      Exit 0 PASS/WARN/SKIPPED, 1 FAIL, 3 refused, 21 dispatch error, 10 usage, 11 input, 12 fence revert: the fence reverted a file outside the grant, so run the seat again with the corrected grant.
   evolve agent list [--json] [--project-root P]
       Name each profile that evolve agent run accepts.
   evolve agent capabilities [--json] [--project-root P]

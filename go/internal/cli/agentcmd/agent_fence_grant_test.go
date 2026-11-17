@@ -243,8 +243,8 @@ func TestAgentRun_TheJourneyOfASeatThatCreatesAFileOutsideItsGrantExitsNonZeroAn
 
 	code, env, stderr := runJSON(t, depsWith(fb), builderArgs(root, "--worktree", wt, "--writable", "go/x.go"), "build item X")
 
-	if code != exitFail {
-		t.Errorf("exit %d stderr=%s verdict %q, want %d: a script that gates on the exit code must see the seat fail", code, stderr, env.Verdict, exitFail)
+	if code != exitFenceRevert {
+		t.Errorf("exit %d stderr=%s verdict %q, want %d: a script that gates on the exit code must see the seat fail", code, stderr, env.Verdict, exitFenceRevert)
 	}
 	if rec := readRecord(t, root, env.RunLabel); rec.Verdict == core.VerdictPASS || rec.Verdict != env.Verdict {
 		t.Errorf("launch record verdict %q, envelope verdict %q: the record must carry the same non-PASS verdict", rec.Verdict, env.Verdict)

@@ -545,6 +545,8 @@ func listed(paths []string) []string {
 	return append(slices.Clone(paths[:listMax]), fmt.Sprintf("… +%d more", len(paths)-listMax))
 }
 
+const RestoredMarker = "restored to the dispatched tree"
+
 func (o Outcome) Diagnostics(phase string) []cyclestate.Diagnostic {
 	if o.TakeErr != nil {
 		return []cyclestate.Diagnostic{{Severity: "warning", Message: fmt.Sprintf(
@@ -562,8 +564,8 @@ func (o Outcome) Diagnostics(phase string) []cyclestate.Diagnostic {
 			shown = shown[:listMax]
 		}
 		msg := fmt.Sprintf(
-			"worktree fence: read-only phase %s wrote %d path(s) into its worktree; restored to the dispatched tree: %s%s",
-			phase, len(o.Restored), strings.Join(shown, ", "), more)
+			"worktree fence: read-only phase %s wrote %d path(s) into its worktree; %s: %s%s",
+			phase, len(o.Restored), RestoredMarker, strings.Join(shown, ", "), more)
 		if o.patchPath != "" {
 			msg += fmt.Sprintf(" (reverted patch: %s)", o.patchPath)
 		} else if o.patchErr != nil {

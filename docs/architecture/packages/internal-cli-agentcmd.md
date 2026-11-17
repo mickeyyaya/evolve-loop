@@ -70,3 +70,10 @@
   - The grant is profile data, and the launcher does not derive it. The rule has a glob for the run label, so it is the same for each run. The cycle seats also keep their `Write` grants as data, for example `plan-reviewer.json`.
   - A rename of a report or a move of the run workspace thus changes each profile. The guard test then names each profile that has no grant, so no copy can drift without a failure.
 - `evolve agent list` and `evolve agent run` read one catalog loader, `phasecmd.LoadCatalog`, and one rule: `phasecmd.SpecRunnable`, and a reader or a writer that `worktreeWriter` admits. The list marks a writer with `writes_source`.
+
+## Fence revert (exit 12)
+
+- A writer seat that changes a file outside its grant gets reverted by the worktree fence. `warnFenceRevert` (`verdict.go`) then prints one `WARN` line on stderr. The line holds the fence message that names every reverted path, and the `--writable` next step.
+- `exitCode` returns `exitFenceRevert` (12) for that run. No other outcome uses 12. A dispatch error (21) keeps the priority.
+- `treefence.RestoredMarker` is the one home of the marker text that `agentcmd` matches. A reader seat never gets this exit code.
+- An existing-file revert keeps the envelope verdict PASS. A created-file revert gives FAIL. Both exit 12.

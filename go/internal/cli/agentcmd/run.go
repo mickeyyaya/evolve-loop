@@ -217,7 +217,8 @@ func (c command) run(args []string, stdin io.Reader, stdout, stderr io.Writer) i
 	recordPath, recordErr := writeLaunchRecord(r, out, now)
 	recordErr = errors.Join(appendLedger(r, out, now), recordErr)
 	emit(o, r, out, recordPath, errors.Join(out.runErr, recordErr), stdout)
-	return finish(out.resp, out.runErr, recordErr, stderr)
+	warnFenceRevert(out, stderr)
+	return finish(out, recordErr, stderr)
 }
 
 func keepFailedDeliverable(r standaloneRun, body string, stderr io.Writer) {
@@ -389,7 +390,7 @@ func (out launchOutcome) launchedModel() string {
 func appendLedger(r standaloneRun, out launchOutcome, now time.Time) error {
 	entry := core.LedgerEntry{
 		TS: now.UTC().Format(time.RFC3339), CycleLabel: r.label, Role: r.spec.Name, Kind: ledgerKind,
-		Model: out.launchedModel(), ExitCode: exitCode(out.resp, out.runErr), DurationS: strconv.FormatInt(out.resp.DurationMS/1000, 10),
+		Model: out.launchedModel(), ExitCode: exitCode(out), DurationS: strconv.FormatInt(out.resp.DurationMS/1000, 10),
 		Source: ledgerSrc, RunID: r.label, ArtifactSHA256: out.reportSHA(),
 	}
 	if err := ledger.New(paths.EvolveDirOf(r.root)).Append(context.Background(), entry); err != nil {
@@ -433,25 +434,27 @@ func emit(o runOptions, r standaloneRun, out launchOutcome, recordPath string, f
 	printJSON(stdout, env)
 }
 
-func exitCode(resp core.PhaseResponse, runErr error) int {
+func exitCode(out launchOutcome) int {
 	switch {
-	case runErr != nil:
+	case out.runErr != nil:
 		return exitDispatch
-	case resp.Verdict == core.VerdictFAIL:
+	case out.fenceReverted() != "":
+		return exitFenceRevert
+	case out.resp.Verdict == core.VerdictFAIL:
 		return exitFail
 	}
 	return 0
 }
 
-func finish(resp core.PhaseResponse, runErr, recordErr error, stderr io.Writer) int {
-	if runErr != nil {
-		fmt.Fprintf(stderr, "evolve agent run: %s: %v\n", resp.Phase, runErr)
+func finish(out launchOutcome, recordErr error, stderr io.Writer) int {
+	if out.runErr != nil {
+		fmt.Fprintf(stderr, "evolve agent run: %s: %v\n", out.resp.Phase, out.runErr)
 	}
 	if recordErr != nil {
 		fmt.Fprintf(stderr, "evolve agent run: %v\n", recordErr)
 		return exitDispatch
 	}
-	return exitCode(resp, runErr)
+	return exitCode(out)
 }
 
 func recordViolations(vs []core.ContractViolation) []launchrecord.Violation {

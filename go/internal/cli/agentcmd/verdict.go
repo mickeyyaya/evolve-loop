@@ -3,6 +3,7 @@ package agentcmd
 import (
 	"cmp"
 	"fmt"
+	"io"
 	"slices"
 	"strconv"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/reportdoc"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/treefence"
 )
 
 const CodeVerdictMismatch signalcenter.Code = "REVIEW_AGENT_RUN_VERDICT_MISMATCH"
@@ -118,4 +120,22 @@ func (out launchOutcome) withFenceVerdict() launchOutcome {
 	}
 	out.verdict, out.resp.Verdict = core.VerdictFAIL, core.VerdictFAIL
 	return out
+}
+
+func (out launchOutcome) fenceReverted() string {
+	if !out.writer {
+		return ""
+	}
+	for _, d := range out.resp.Diagnostics {
+		if d.Severity == "warning" && strings.Contains(d.Message, treefence.RestoredMarker) {
+			return d.Message
+		}
+	}
+	return ""
+}
+
+func warnFenceRevert(out launchOutcome, stderr io.Writer) {
+	if msg := out.fenceReverted(); msg != "" {
+		fmt.Fprintf(stderr, "evolve agent run: WARN %s; next step: grant each path with --writable PATH, or grant a directory for new files with --writable-dir DIR, then run the seat again (exit %d)\n", msg, exitFenceRevert)
+	}
 }

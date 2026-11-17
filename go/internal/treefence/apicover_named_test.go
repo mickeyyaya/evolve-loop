@@ -34,6 +34,7 @@ func TestAPICoverNamedExports(t *testing.T) {
 		t.Fatalf("live fence: %v", live.TakeErr())
 	}
 	write(t, dir, "src/mat.go", "mutated\n")
+	var _ string = RestoredMarker
 	var out Outcome = live.End(ctx)
 	diags := out.Diagnostics("audit")
 	if len(out.Restored) != 1 || out.RestoreErr != nil || len(diags) != 1 ||
