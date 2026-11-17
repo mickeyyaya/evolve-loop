@@ -842,4 +842,10 @@ approaches / decision / results / retro) — lives at
 | [research/console-build-or-route-2026-11.md](research/console-build-or-route-2026-11.md) | Wave 177 census: 180 of 288 items had a console route with no checked fact, 1 item was admissible, and the lanes ran at 18%. Practice from the Theory of Constraints, Team Topologies, Google SRE, SLSA and agent orchestration. |
 | [plans/console-build-or-route-2026-11.md](plans/console-build-or-route-2026-11.md) | Plan: the console builds an item only for a protected path, a console-only act or an integrity defect of operating-policy §1.1. It starts no feature build while the supply starves or while more than one batch of its PRs is open. |
 
+## 2026-11-17 — The build floor measures the coverage of a bridge change
+
+| Document | What it records |
+|---|---|
+| [plans/bridge-floor-coverage-2026-11.md](plans/bridge-floor-coverage-2026-11.md) | Plan: the tmux tests of `internal/bridge` carry the build constraint `!notmux`, and only the floor adds the tag `notmux`. The floor then measures the bridge tests that need no tmux. It refuses a partly covered or new function, and names each old function that only the tier covers. Three rounds of architecture review. |
+
 <!-- GENERATED:research-index END -->
