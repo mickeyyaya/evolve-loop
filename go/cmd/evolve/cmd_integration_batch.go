@@ -229,28 +229,58 @@ func recordPRVerb(env integrationEnv, args []string, stdout, stderr io.Writer) i
 	return recordPR(env.train(env.Root, stderr), recordRequest{pr: n, bind: bind}, c)
 }
 
+type missingRecordError struct{ path string }
+
+func (e *missingRecordError) Error() string { return "no review record at " + e.path }
+
+type reviewedRecord struct{ artifact string }
+
+func reviewedChange(store, digest string, paths []string) (reviewedRecord, error) {
+	label := integration.ShortSHA(digest)
+	path := filepath.Join(store, digest+".json")
+	raw, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return reviewedRecord{}, &missingRecordError{path: path}
+	}
+	if err != nil {
+		return reviewedRecord{}, fmt.Errorf("read the record of change %s at %s: %w", label, path, err)
+	}
+	var rec commitgate.ReviewRecord
+	if err := json.Unmarshal(raw, &rec); err != nil {
+		reason := fmt.Sprintf("the record of change %s at %s does not parse: %v. Next: run the review seats and evolve commit-gate run again, then run record-pr again.", label, path, err)
+		return reviewedRecord{}, errors.New(reason)
+	}
+	if reason := commitgate.CheckReviewedChange(rec, label, paths); reason != "" {
+		return reviewedRecord{}, errors.New(reason)
+	}
+	if err := integration.CoversChange(rec.Attestation.TreeStateSHA, digest); err != nil {
+		return reviewedRecord{}, err
+	}
+	return reviewedRecord{artifact: integration.Digest(raw)}, nil
+}
+
 func reviewedBinder(store string) integration.Binder {
 	return func(ev integration.Evidence) (integration.AuditBinding, error) {
-		label := integration.ShortSHA(ev.DiffSHA)
-		path := filepath.Join(store, ev.DiffSHA+".json")
-		raw, err := os.ReadFile(path)
-		if errors.Is(err, fs.ErrNotExist) {
-			base, head := integration.ShortSHA(ev.Base), integration.ShortSHA(ev.Commits[len(ev.Commits)-1])
-			reason := fmt.Sprintf("no review record for its whole change %s (%s..%s), looked in %s. Next: in a worktree at %s, run git restore --source=%s --staged --worktree -- . , run the review seats and evolve commit-gate run, then run record-pr again.", label, base, head, store, base, head)
-			return integration.AuditBinding{}, errors.New(reason)
+		whole, err := reviewedChange(store, ev.DiffSHA, ev.Paths)
+		var missing *missingRecordError
+		switch {
+		case err == nil:
+			return integration.AttestedBinding(ev, whole.artifact)
+		case !errors.As(err, &missing):
+			return integration.AuditBinding{}, err
+		case len(ev.Changes) > 1:
+			return integration.ChainedBinding(ev, chainCheck(store))
 		}
-		if err != nil {
-			return integration.AuditBinding{}, fmt.Errorf("read the record of change %s at %s: %w", label, path, err)
-		}
-		var rec commitgate.ReviewRecord
-		if err := json.Unmarshal(raw, &rec); err != nil {
-			reason := fmt.Sprintf("the record of change %s at %s does not parse: %v. Next: run the review seats and evolve commit-gate run again, then run record-pr again.", label, path, err)
-			return integration.AuditBinding{}, errors.New(reason)
-		}
-		if reason := commitgate.CheckReviewedChange(rec, label, ev.Paths); reason != "" {
-			return integration.AuditBinding{}, errors.New(reason)
-		}
-		return integration.AttestedBinding(ev, rec.Attestation.TreeStateSHA, integration.Digest(raw))
+		base, head := integration.ShortSHA(ev.Base), integration.ShortSHA(ev.Commits[len(ev.Commits)-1])
+		reason := fmt.Sprintf("no review record for its whole change %s (%s..%s), looked in %s. %s", integration.ShortSHA(ev.DiffSHA), base, head, store, integration.RestoreStep(base, head))
+		return integration.AuditBinding{}, errors.New(reason)
+	}
+}
+
+func chainCheck(store string) integration.ChangeCheck {
+	return func(c integration.CommitChange) (string, error) {
+		rec, err := reviewedChange(store, c.DiffSHA, c.Paths)
+		return rec.artifact, err
 	}
 }
 
