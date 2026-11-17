@@ -73,8 +73,37 @@ func TestAgentCapabilities_TheCapsAreTheDispatchRequestLimitsOfThePolicy(t *test
 	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}
-	want := policy.DispatchRequestsPolicy{Stage: policy.DispatchRequestStageShadow, Roles: []string{"premise-challenge"}, PerCycle: 2, MaxDepth: 1}
+	want := policy.DispatchRequestsPolicy{Stage: policy.RequestStageShadow, Roles: []string{"premise-challenge"}, PerCycle: 2, MaxDepth: 1}
 	if d := got.Caps["dispatch"]; !reflect.DeepEqual(d, want) {
 		t.Fatalf("caps.dispatch = %+v, want the validator limits %+v (cli-contract.md §4.2)", d, want)
+	}
+}
+
+func TestAgentCapabilities_EachKindListsItsCapAndRequiredArgs(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	pol := `{"isolation":{"inbox_requests":{"per_cycle":4}}}`
+	if err := os.WriteFile(filepath.Join(root, ".evolve", "policy.json"), []byte(pol), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	if code := New(Deps{})([]string{"capabilities", "--json", "--project-root", root}, nil, &stdout, &stderr); code != 0 {
+		t.Fatalf("exit %d stderr %q", code, stderr.String())
+	}
+	var got struct {
+		Caps map[string]struct {
+			PerCycle     int      `json:"per_cycle"`
+			RequiredArgs []string `json:"required_args"`
+		} `json:"caps"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	d, i := got.Caps["dispatch"], got.Caps["inbox-add"]
+	if d.PerCycle != 3 || !reflect.DeepEqual(d.RequiredArgs, []string{"role"}) || i.PerCycle != 4 || !reflect.DeepEqual(i.RequiredArgs, agentclass.RequiredArgs("inbox-add")) {
+		t.Fatalf("caps = %+v, want the cap and the required args of each kind", got.Caps)
 	}
 }

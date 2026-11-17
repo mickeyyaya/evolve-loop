@@ -66,7 +66,7 @@ func requestCell(t *testing.T) core.RequestCell {
 }
 
 func enforcePolicy() policy.Policy {
-	return policy.Policy{Isolation: &policy.IsolationPolicy{DispatchRequests: &policy.DispatchRequestsPolicy{Stage: policy.DispatchRequestStageEnforce}}}
+	return policy.Policy{Isolation: &policy.IsolationPolicy{DispatchRequests: &policy.DispatchRequestsPolicy{Stage: policy.RequestStageEnforce}}}
 }
 
 func TestAgentRequest_AnApprovedRequestIsRunByThePipeline(t *testing.T) {

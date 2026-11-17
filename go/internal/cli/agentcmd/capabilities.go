@@ -4,9 +4,11 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"maps"
 	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/agentclass"
+	"github.com/mickeyyaya/evolve-loop/go/internal/agentrequest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
@@ -25,7 +27,7 @@ func (c command) capabilities(args []string, stdout, stderr io.Writer) int {
 	}
 	surface := agentclass.Surface(nil, c.deps.VerbSchema)
 	pol := policy.LoadOrDefaults(filepath.Join(paths.EvolveDirOf(projectRoot(*root)), paths.PolicyFile), stderr)
-	surface.Caps[agentclass.KindDispatch] = pol.IsolationDispatchRequests()
+	maps.Copy(surface.Caps, agentrequest.Caps(pol))
 	if *asJSON {
 		printJSON(stdout, surface)
 		return 0
