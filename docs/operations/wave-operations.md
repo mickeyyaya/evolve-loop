@@ -74,15 +74,19 @@ See [checkpoint-resume.md](../architecture/checkpoint-resume.md#resume-every-pau
 
 ### The code index refresh
 
-The code index refresh is part of `sync-main`. It is not a separate step, and the console does not run `git` in `dev/code-index` by hand. After `sync-main` merges `main`, it moves the index worktree (`code_index.index_dir`, `dev/code-index` by default) to `origin/main`, detached. Then it runs the incremental `trail build`. Lanes thus start on a fresh index. The refresh writes only the index worktree ([code-index-cli.md](../architecture/code-index-cli.md) §4).
+The code index refresh is its own step. The console does not run `git` in `dev/code-index` by hand. The order is: `sync-main` merges `main`, then the build step rebuilds the plane binary, then `evolve code refresh` runs. The refresh must come after the rebuild. A merged PR can add a policy key with its reader. The binary from before the merge refuses that key, but the rebuilt binary reads it.
 
-| `sync-main` exit | Cause | Next action |
+Both `wave next` and `boundary run` have a build step. It runs after `sync-main` and `queue-apply`, and before `inbox curate`, `selfheal` and `gc`. Each of those steps and the refresh runs the rebuilt plane binary (`go/bin/evolve`) and keeps its exit code. The binary from before the merge never parses the merged policy. A policy key that no reader of the merged tree knows stops the boundary. The error names the key.
+
+The refresh moves the index worktree (`code_index.index_dir`, `dev/code-index` by default) to `origin/main`, detached. Then it runs the incremental `trail build`. Lanes thus start on a fresh index. The refresh writes only the index worktree ([code-index-cli.md](../architecture/code-index-cli.md) §4).
+
+| `code refresh` exit | Cause | Next action |
 |---|---|---|
-| 0, with `sync-main: moved the code index …` | The index is at `origin/main`. | none |
-| 0, with `sync-main: no code index to refresh: …` | The host has no index worktree. | none. The agents use `grep`. |
+| 0, with `code refresh: … is at origin/main …` | The index is at `origin/main`. | none |
+| 2 | The host has no index worktree. The boundary step treats this exit as success. | none. The agents use `grep`. |
 | 22 | The index worktree has a change that is not `.gitignore` or `.ignore`. Nothing was reset. | Read the named paths. Keep or remove each change by hand, then run `evolve code refresh`. |
 | 23 | `git fetch origin main` failed in the index worktree. | Fix the network or the remote, then run `evolve code refresh`. |
-| 1, after the line `sync-main: reconciled …` | A guard, a policy error, a failed checkout or rebuild, or the deadline of 5 minutes. | Fix the cause in the message, then run `evolve code refresh`. |
+| 1 | A guard, a policy error, a failed checkout or rebuild, or the deadline of 5 minutes. | Fix the cause in the message, then run `evolve code refresh`. |
 
 When the refresh fails, the merge is already done. The step fails, and the brake stays on. After `evolve code refresh` exits 0, run the boundary again without `--merge`.
 

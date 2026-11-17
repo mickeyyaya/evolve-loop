@@ -123,7 +123,7 @@ func waveSteps(a boundaryArgs, root string, drivers []string) []boundaryStep {
 	steps := []boundaryStep{{verb: "checkpoint", args: append([]string{"save", "--all"}, at...)}}
 	steps = append(steps, boundaryHaltSteps(a, root)...)
 	steps = append(steps,
-		boundaryStep{verb: waveBuildVerb, args: at, desc: "make -C " + filepath.Join(root, "go") + " build"},
+		codeRefreshStep(root),
 		boundaryStep{verb: "reset-sha", args: append([]string{"--operator"}, at...)})
 	for _, d := range drivers {
 		steps = append(steps, boundaryStep{verb: "doctor", args: []string{"live", d}})

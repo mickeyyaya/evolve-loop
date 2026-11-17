@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -218,15 +219,13 @@ func clearWaveNotes(store wave.Store, asJSON bool, stdout, stderr io.Writer) int
 func dispatchWaveVerb(run sysexec.RunFunc) boundaryDispatch {
 	handlers := map[string]func([]string, io.Reader, io.Writer, io.Writer) int{
 		"checkpoint": runCheckpoint, "reset-sha": runResetSHA, "doctor": opscmd.RunDoctor,
-		waveBuildVerb: func(args []string, _ io.Reader, stdout, stderr io.Writer) int {
-			return runWaveBuild(run, args, stdout, stderr)
-		},
 	}
+	plane := dispatchPlaneVerbs(run)
 	return func(verb string, args []string, stdout, stderr io.Writer) int {
 		if h, ok := handlers[verb]; ok {
 			return h(args, strings.NewReader(""), stdout, stderr)
 		}
-		return dispatchBoundaryVerb(verb, args, stdout, stderr)
+		return plane(verb, args, stdout, stderr)
 	}
 }
 
@@ -242,6 +241,30 @@ func runWaveBuild(run sysexec.RunFunc, args []string, stdout, stderr io.Writer) 
 		return exitIO
 	}
 	return rc
+}
+
+func runPlaneBinary(run sysexec.RunFunc, verb string, args []string, stdout, stderr io.Writer) int {
+	root := flagValue(args, "--project-root")
+	if root == "" {
+		fmt.Fprintf(stderr, "%s%s needs --project-root\n", wavePrefix, verb)
+		return exitUsage
+	}
+	rc, err := run(context.Background(), filepath.Join(root, "go", "bin", "evolve"), "", append([]string{verb}, args...), nil, nil, stdout, stderr)
+	if err != nil {
+		fmt.Fprintf(stderr, "%s%s: %v\n", wavePrefix, verb, err)
+		return exitIO
+	}
+	if verb == "code" {
+		return tolerateAbsentIndex(rc)
+	}
+	return rc
+}
+
+func flagValue(args []string, name string) string {
+	if i := slices.Index(args, name); i >= 0 && i+1 < len(args) {
+		return args[i+1]
+	}
+	return ""
 }
 
 func gitMainHead(root string) (string, error) {

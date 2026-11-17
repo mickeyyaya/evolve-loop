@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 const (
@@ -58,16 +59,32 @@ func runBoundary(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 }
 
 func dispatchBoundaryVerb(verb string, args []string, stdout, stderr io.Writer) int {
+	return dispatchPlaneVerbs(sysexec.DefaultRunner)(verb, args, stdout, stderr)
+}
+
+var planeBinaryVerbs = []string{"inbox", "selfheal", "gc", "code"}
+
+func dispatchPlaneVerbs(run sysexec.RunFunc) boundaryDispatch {
 	handlers := map[string]func([]string, io.Reader, io.Writer, io.Writer) int{
-		"loop-stop": runLoopStop, "pr": runPR, "sync-main": runSyncMain, "inbox": runInbox, "selfheal": runSelfheal, "quality": runQuality, "gc": runGC, "loop": gatedLoop(defaultDispatchGate),
+		"loop-stop": runLoopStop, "pr": runPR, "sync-main": runSyncMain, "quality": runQuality, "loop": gatedLoop(defaultDispatchGate),
 		boundaryLogVerb: runBoundaryLog, boundaryRatchetVerb: runBoundaryRatchetTighten, queueApplyVerb: runQueueApply,
+		waveBuildVerb: func(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+			return runWaveBuild(run, args, stdout, stderr)
+		},
 	}
-	run, ok := handlers[verb]
-	if !ok {
-		fmt.Fprintf(stderr, "%sno handler for step %q\n", boundaryPrefix, verb)
-		return exitIO
+	for _, verb := range planeBinaryVerbs {
+		handlers[verb] = func(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+			return runPlaneBinary(run, verb, args, stdout, stderr)
+		}
 	}
-	return run(args, strings.NewReader(""), stdout, stderr)
+	return func(verb string, args []string, stdout, stderr io.Writer) int {
+		h, ok := handlers[verb]
+		if !ok {
+			fmt.Fprintf(stderr, "%sno handler for step %q\n", boundaryPrefix, verb)
+			return exitIO
+		}
+		return h(args, strings.NewReader(""), stdout, stderr)
+	}
 }
 
 func gatedLoop(g dispatchGate) func([]string, io.Reader, io.Writer, io.Writer) int {
@@ -181,7 +198,23 @@ func boundaryPRs(merge string) ([]string, error) {
 }
 
 func boundarySteps(a boundaryArgs, root string) []boundaryStep {
-	return append(boundaryHaltSteps(a, root), boundaryLaunchSteps(a, root)...)
+	steps := append(boundaryHaltSteps(a, root), codeRefreshStep(root))
+	return append(steps, boundaryLaunchSteps(a, root)...)
+}
+
+func tolerateAbsentIndex(rc int) int {
+	if rc == codeExitAbsent {
+		return 0
+	}
+	return rc
+}
+
+func waveBuildStep(root string) boundaryStep {
+	return boundaryStep{verb: waveBuildVerb, args: []string{"--project-root", root}, desc: "make -C " + filepath.Join(root, "go") + " build"}
+}
+
+func codeRefreshStep(root string) boundaryStep {
+	return boundaryStep{verb: "code", args: []string{codeRefreshVerbName, "--project-root", root}}
 }
 
 func boundaryHaltSteps(a boundaryArgs, root string) []boundaryStep {
@@ -191,7 +224,8 @@ func boundaryHaltSteps(a boundaryArgs, root string) []boundaryStep {
 		steps = append(steps, boundaryStep{verb: "pr", args: append(append([]string{"merge"}, a.prs...), at...)})
 	}
 	return append(steps, boundaryStep{verb: boundaryRatchetVerb, args: at, desc: boundaryRatchetDesc},
-		boundaryStep{verb: "sync-main", args: at}, boundaryStep{verb: queueApplyVerb, args: at, desc: queueApplyDesc},
+		boundaryStep{verb: "sync-main", args: at},
+		boundaryStep{verb: queueApplyVerb, args: at, desc: queueApplyDesc}, waveBuildStep(root),
 		boundaryStep{verb: "inbox", args: append([]string{"curate", "--apply"}, at...)},
 		boundaryStep{verb: "selfheal", args: append([]string{"incidents"}, at...)},
 		boundaryStep{verb: "selfheal", args: append([]string{"propose"}, at...)},

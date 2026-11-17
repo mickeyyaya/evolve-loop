@@ -21,10 +21,9 @@ import (
 )
 
 var (
-	syncMainFetchSleep    = time.Sleep
-	syncMainGetwd         = os.Getwd
-	syncMainAbsoluteRoot  = paths.AbsoluteRoot
-	syncMainCodeIndexHost = defaultCodeIndexHost
+	syncMainFetchSleep   = time.Sleep
+	syncMainGetwd        = os.Getwd
+	syncMainAbsoluteRoot = paths.AbsoluteRoot
 )
 
 func runSyncMain(args []string, _ io.Reader, stdout, stderr io.Writer) int {
@@ -71,7 +70,7 @@ func runSyncMain(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if code := landing.aroundMerge("origin/"+branch, stamps, merge); code != 0 {
 		return code
 	}
-	if code := finishSyncMain(absRoot, branch, human, stderr); code != 0 || !asJSON {
+	if code := finishSyncMain(branch, human); code != 0 || !asJSON {
 		return code
 	}
 	return printVerbJSON("sync-main", syncMainResult{Root: absRoot, Branch: branch}, stdout, stderr)
@@ -110,12 +109,9 @@ func parseSyncMainArgs(args []string, stderr io.Writer) (string, bool, int) {
 	}), asJSON, 0
 }
 
-func finishSyncMain(root, branch string, stdout, stderr io.Writer) int {
+func finishSyncMain(branch string, stdout io.Writer) int {
 	fmt.Fprintf(stdout, "sync-main: reconciled local %s with origin/%s (merge only; nothing pushed).\n", branch, branch)
-	if branch != codeIndexMainBranch {
-		return 0
-	}
-	return syncMainCodeIndex(root, syncMainCodeIndexHost(), codeIndexRefreshTimeout, stdout, stderr)
+	return 0
 }
 
 func syncMainCodeIndex(root string, host codeIndexHost, timeout time.Duration, stdout, stderr io.Writer) int {

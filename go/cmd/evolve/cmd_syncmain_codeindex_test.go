@@ -52,7 +52,7 @@ func smIndexWorktree(t *testing.T, repo string) string {
 	return index
 }
 
-func TestSyncMain_MovesTheCodeIndexWorktreeToTheNewOriginMain(t *testing.T) {
+func TestCodeRefresh_MovesTheCodeIndexWorktreeToTheNewOriginMain(t *testing.T) {
 	t.Parallel()
 	repo, bare := smInitRepoWithRemote(t)
 	index := smIndexWorktree(t, repo)
@@ -60,7 +60,8 @@ func TestSyncMain_MovesTheCodeIndexWorktreeToTheNewOriginMain(t *testing.T) {
 	smRemoteCommit(t, bare, "remote-change.txt", "from origin\n")
 	var stdout, stderr bytes.Buffer
 
-	rc := runSyncMain([]string{"--project-root", repo}, nil, &stdout, &stderr)
+	smGit(t, repo, "pull", "-q", "--ff-only", "origin", "main")
+	rc := codeRefreshVerb([]string{"--project-root", repo}, &stdout, &stderr, defaultCodeIndexHost(), noEnv, codeIndexRefreshTimeout)
 
 	if rc != 0 || smHead(t, index) != smBareHead(t, bare) || smHead(t, index) == before {
 		t.Fatalf("rc=%d index=%s origin=%s before=%s\nstdout=%s\nstderr=%s", rc, smHead(t, index), smBareHead(t, bare), before, stdout.String(), stderr.String())
@@ -70,7 +71,7 @@ func TestSyncMain_MovesTheCodeIndexWorktreeToTheNewOriginMain(t *testing.T) {
 	}
 }
 
-func TestSyncMain_AForeignEditInTheIndexFailsLoudlyAfterTheMergeAndKeepsTheEdit(t *testing.T) {
+func TestCodeRefresh_AForeignEditInTheIndexFailsLoudlyAndKeepsTheEdit(t *testing.T) {
 	t.Parallel()
 	repo, bare := smInitRepoWithRemote(t)
 	index := smIndexWorktree(t, repo)
@@ -81,7 +82,8 @@ func TestSyncMain_AForeignEditInTheIndexFailsLoudlyAfterTheMergeAndKeepsTheEdit(
 	smRemoteCommit(t, bare, "remote-change.txt", "from origin\n")
 	var stdout, stderr bytes.Buffer
 
-	rc := runSyncMain([]string{"--project-root", repo}, nil, &stdout, &stderr)
+	smGit(t, repo, "pull", "-q", "--ff-only", "origin", "main")
+	rc := codeRefreshVerb([]string{"--project-root", repo}, &stdout, &stderr, defaultCodeIndexHost(), noEnv, codeIndexRefreshTimeout)
 
 	if rc != codeExitIndexDirty || smHead(t, repo) != smBareHead(t, bare) || smHead(t, index) != before {
 		t.Fatalf("rc=%d repo=%s index=%s, want exit 22, the merge done and the index unmoved\nstderr=%s", rc, smHead(t, repo), smHead(t, index), stderr.String())
@@ -91,7 +93,7 @@ func TestSyncMain_AForeignEditInTheIndexFailsLoudlyAfterTheMergeAndKeepsTheEdit(
 	}
 }
 
-func TestSyncMain_OnABranchOtherThanMainLeavesTheIndexAlone(t *testing.T) {
+func TestSyncMain_NeverMovesTheCodeIndex(t *testing.T) {
 	t.Parallel()
 	repo, bare := smInitRepoWithRemote(t)
 	index := smIndexWorktree(t, repo)
