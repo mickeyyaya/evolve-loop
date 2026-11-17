@@ -25,6 +25,8 @@
   - At a wave boundary, `sync-main` runs `evolve code refresh` after merging `main`.
   - For `sync-main`, a change in the index worktree exits 22.
   - For `sync-main`, a fetch failure of `origin main` exits 23. An absent index exits 0.
+  - `sync-main` carries the loop's quarantine move. A tracked inbox item is deleted, and the same id sits untracked under `.evolve/inbox/quarantine/`. If the two copies differ only by the stamps of the loop, `sync-main` commits the move, and then merges `origin main`.
+  - Any other deletion or edit of a tracked inbox item makes `sync-main` refuse with exit 3. Code: `go/internal/inboxstamps/inboxstamps.go`.
 - `evolve practice watch [--dry-run] [--json] [--project-root P]` (2026-10-12) reads the sources that state how each subscribed CLI is best used. It files one inbox item when a source changed. Code: `go/cmd/evolve/cmd_practice.go` over `internal/practicewatch`. Design: [ADR-0133](../architecture/adr/0133-the-loop-watches-cli-practice-and-trims-its-scaffolding.md) and [plan M1](../plans/model-capability-practice-2026-10.md).
   - A source has an id (kebab-case), a family, a kind and a locator. The kinds are `github-file` (a raw file URL) and `github-releases` (an Atom feed or the releases API). The other kinds are `page` (an HTTP page) and `command` (a CLI run through `sysexec`, for example `agy changelog`).
   - The watch removes markup, scripts, styles, dates and blank space from the text. Then it hashes the result. The snapshot is `.evolve/practice/<id>.json`: `hash`, `fetched_at`, `etag` and an `excerpt` of the normalized text (64 KiB at most).
