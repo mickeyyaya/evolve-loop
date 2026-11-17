@@ -842,4 +842,10 @@ approaches / decision / results / retro) — lives at
 | [research/console-build-or-route-2026-11.md](research/console-build-or-route-2026-11.md) | Wave 177 census: 180 of 288 items had a console route with no checked fact, 1 item was admissible, and the lanes ran at 18%. Practice from the Theory of Constraints, Team Topologies, Google SRE, SLSA and agent orchestration. |
 | [plans/console-build-or-route-2026-11.md](plans/console-build-or-route-2026-11.md) | Plan: the console builds an item only for a protected path, a console-only act or an integrity defect of operating-policy §1.1. It starts no feature build while the supply starves or while more than one batch of its PRs is open. |
 
+## 2026-11-17 — The pipeline files the inbox items that phase agents request
+
+| Document | What it records |
+|---|---|
+| [plans/agent-request-inbox-add-2026-11.md](plans/agent-request-inbox-add-2026-11.md) | Plan: the request channel refused 11 `inbox-add` requests, and no item was filed. Four designs scored; a deterministic intake with no LLM judge wins. Decisions D1 to D13 add an executor for each kind and one shared intake. They add a stage for each kind, with `enforce` as the default. Each item that is not filed gets an ERROR signal, and each decision signal gets its reason. |
+
 <!-- GENERATED:research-index END -->
