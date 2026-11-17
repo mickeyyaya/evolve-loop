@@ -74,6 +74,7 @@ type Census struct {
 	Text       func(id string) string
 	InFlight   []admission.Holding
 	Optimistic bool
+	FileCells  []string
 	Window     int
 	Propose    Proposer
 	Path       string
@@ -141,7 +142,7 @@ func (c Census) admit(s *Supply, ranked []inboxrank.Ranked) {
 		}
 		return
 	}
-	admitted, waiting := admission.Admitter{Graph: c.Graph, Text: c.Text, Optimistic: c.Optimistic}.Admit(c.InFlight, todos, len(todos))
+	admitted, waiting := admission.Admitter{Graph: c.Graph, Text: c.Text, Optimistic: c.Optimistic, FileCells: c.FileCells}.Admit(c.InFlight, todos, len(todos))
 	s.Counts[ClassAdmissible] = len(admitted)
 	for _, d := range waiting {
 		s.Counts[ClassWaitingCell]++

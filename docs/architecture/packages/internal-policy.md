@@ -155,3 +155,7 @@
   - Pinned by `routing_defaults_test.go`, which also requires the checked-in `.evolve/policy.json` to strict-decode with the `floors` key and to hold the compiled default (`TestCheckedInPolicy_StrictDecodesWithTheFloorsKey`).
 - **Floor convergence rounds.** `retry.floor_convergence_rounds` (`RetryConfig.FloorConvergenceRounds`) is the number of further build corrections that a converging floor rejection earns. The default is 1 and the maximum is 3. An explicit 0 turns it off. See test-system D4.5.4.
 - **`inbox.curator.trailer.stage`.** `Policy.InboxTrailerStage()` reads `inbox.curator.trailer.stage` and defaults to `shadow`. `InboxCuratorPolicy.validate` refuses any stage other than `shadow` or `enforce`, and `failClosed` sets it to `enforce`. Pinned by `inbox_trailer_test.go`.
+
+## fleet.orchestrator.file_cells (plan K1)
+
+`FleetOrchestratorPolicy.FileCells` lists the leaf packages that admission keys by file (internal-admission.md, "File keys for leaf packages"). `Parse` refuses an empty or blank entry, an entry with a line break and a repeated entry, with an error that names `file_cells`. `OrchestratorConfig` keeps the list as one newline-joined string so that the struct stays comparable; `OrchestratorConfig.FileCells()` splits it. An unset key gives no list.

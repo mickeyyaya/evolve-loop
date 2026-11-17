@@ -3,6 +3,8 @@ package policy
 import (
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 )
 
 type FleetOrchestratorPolicy struct {
@@ -13,6 +15,7 @@ type FleetOrchestratorPolicy struct {
 	DeadlineFloorMinutes int                `json:"deadline_floor_minutes,omitempty"`
 	StallMinutes         int                `json:"stall_minutes,omitempty"`
 	RunMaxLanes          int                `json:"run_max_lanes,omitempty"`
+	FileCells            []string           `json:"file_cells,omitempty"`
 	Window               *FleetWindowPolicy `json:"window,omitempty"`
 }
 
@@ -31,6 +34,16 @@ type OrchestratorConfig struct {
 	RunMaxLanes          int
 	WindowStart          int
 	WindowMin            int
+	fileCells            string
+}
+
+const fileCellsSeparator = "\n"
+
+func (c OrchestratorConfig) FileCells() []string {
+	if c.fileCells == "" {
+		return nil
+	}
+	return strings.Split(c.fileCells, fileCellsSeparator)
 }
 
 const (
@@ -74,7 +87,24 @@ func (o FleetOrchestratorPolicy) validate() error {
 	case o.RunMaxLanes < 0:
 		return errors.New("run_max_lanes must not be negative")
 	}
+	if err := validateFileCells(o.FileCells); err != nil {
+		return err
+	}
 	return o.Window.validate()
+}
+
+func validateFileCells(cells []string) error {
+	for i, cell := range cells {
+		switch {
+		case strings.TrimSpace(cell) == "":
+			return errors.New("file_cells must not hold an empty entry")
+		case strings.Contains(cell, fileCellsSeparator):
+			return fmt.Errorf("file_cells entry %q must not hold a line break", cell)
+		case slices.Contains(cells[:i], cell):
+			return fmt.Errorf("file_cells entry %q is repeated", cell)
+		}
+	}
+	return nil
 }
 
 func orchestratorConfig(o *FleetOrchestratorPolicy, count int) OrchestratorConfig {
@@ -106,6 +136,7 @@ func orchestratorConfig(o *FleetOrchestratorPolicy, count int) OrchestratorConfi
 	if o.RunMaxLanes > 0 {
 		c.RunMaxLanes = o.RunMaxLanes
 	}
+	c.fileCells = strings.Join(o.FileCells, fileCellsSeparator)
 	c.WindowStart, c.WindowMin = o.Window.resolve()
 	return c
 }

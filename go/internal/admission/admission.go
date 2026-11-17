@@ -3,6 +3,7 @@
 package admission
 
 import (
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -50,6 +51,7 @@ type Admitter struct {
 	Graph        Graph
 	Text         func(id string) string
 	Optimistic   bool
+	FileCells    []string
 	OnShadow     func(ShadowAdmission)
 	OnOptimistic func(ShadowAdmission)
 	OnWait       func(Decision)
@@ -57,6 +59,8 @@ type Admitter struct {
 
 type footprint struct {
 	edits  map[string]bool
+	files  map[string]bool
+	filePk map[string]bool
 	reach  map[string]bool
 	hub    bool
 	family string
@@ -155,7 +159,7 @@ func conflict(x, y footprint) bool {
 }
 
 func sharedEdit(x, y footprint) bool {
-	return (x.hub && y.hub) || meets(x.edits, y.edits) || sameFamily(x, y)
+	return (x.hub && y.hub) || meets(x.edits, y.edits) || meets(x.files, y.files) || meets(x.edits, y.filePk) || meets(y.edits, x.filePk) || sameFamily(x, y)
 }
 
 func (a Admitter) heldWithoutFamily(holders []holder, fp footprint) bool {
@@ -183,14 +187,22 @@ func meets(x, y map[string]bool) bool {
 }
 
 func (a Admitter) footprintOf(td fleet.Todo) footprint {
-	pkgs, hub := a.edited(td)
+	whole, fileKeys, hub := a.edited(td)
 	hubs := a.Graph.Hubs()
-	fp := footprint{edits: map[string]bool{}, reach: map[string]bool{}, hub: hub, family: idFamily(td.ID)}
-	for _, p := range pkgs {
+	fp := footprint{edits: map[string]bool{}, files: map[string]bool{}, filePk: map[string]bool{}, reach: map[string]bool{}, hub: hub, family: idFamily(td.ID)}
+	for _, p := range whole {
 		fp.edits[p] = true
 		fp.hub = fp.hub || hubs[p]
 	}
-	for _, p := range a.reachRoots(td, pkgs) {
+	for key, p := range fileKeys {
+		if fp.edits[p] {
+			continue
+		}
+		fp.files[key] = true
+		fp.filePk[p] = true
+		fp.hub = fp.hub || hubs[p]
+	}
+	for _, p := range a.reachRoots(td, whole) {
 		for _, d := range a.Graph.Deps(p) {
 			if !hubs[d] {
 				fp.reach[d] = true
@@ -230,13 +242,34 @@ func (a Admitter) codePackages(td fleet.Todo) map[string]bool {
 	return code
 }
 
-func (a Admitter) edited(td fleet.Todo) (pkgs []string, hub bool) {
+func (a Admitter) edited(td fleet.Todo) (whole []string, fileKeys map[string]string, hub bool) {
 	files := fileList(td)
-	if len(files) > 0 {
-		return a.Graph.Packages(files), slices.ContainsFunc(files, globalZone)
+	if len(files) == 0 {
+		whole = a.Graph.Packages(namedPaths(a.text(td.ID)))
+		return whole, nil, len(whole) == 0
 	}
-	pkgs = a.Graph.Packages(namedPaths(a.text(td.ID)))
-	return pkgs, len(pkgs) == 0
+	fileKeys = map[string]string{}
+	var rest []string
+	for _, f := range files {
+		if pkg, ok := a.fileCell(f); ok {
+			fileKeys[pkg+"/"+path.Base(filepath.ToSlash(f))] = pkg
+			continue
+		}
+		rest = append(rest, f)
+	}
+	return a.Graph.Packages(rest), fileKeys, slices.ContainsFunc(files, globalZone)
+}
+
+func (a Admitter) fileCell(file string) (string, bool) {
+	lg, leafAware := a.Graph.(leafGraph)
+	if !leafAware || len(a.FileCells) == 0 || !strings.HasSuffix(file, ".go") {
+		return "", false
+	}
+	pkgs := a.Graph.Packages([]string{file})
+	if len(pkgs) != 1 || !lg.IsLeaf(pkgs[0]) || !slices.Contains(a.FileCells, strings.TrimPrefix(pkgs[0], ModulePath+"/")) {
+		return "", false
+	}
+	return pkgs[0], true
 }
 
 func fileList(td fleet.Todo) []string {
@@ -282,9 +315,11 @@ func kernelMinted(id string) bool {
 }
 
 func (fp footprint) cells() []string {
-	out := make([]string, 0, len(fp.edits)+2)
-	for p := range fp.edits {
-		out = append(out, strings.TrimPrefix(p, ModulePath+"/"))
+	out := make([]string, 0, len(fp.edits)+len(fp.files)+2)
+	for _, keys := range []map[string]bool{fp.edits, fp.files} {
+		for k := range keys {
+			out = append(out, strings.TrimPrefix(k, ModulePath+"/"))
+		}
 	}
 	if fp.family != "" {
 		out = append(out, fp.family)

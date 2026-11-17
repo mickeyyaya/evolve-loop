@@ -65,6 +65,7 @@ func (w supplyWiring) census() orchestrator.Census {
 		Protected:  protected,
 		Graph:      w.graph,
 		Optimistic: w.fleet.Orchestrator.OptimisticAdmission(),
+		FileCells:  w.fleet.Orchestrator.FileCells(),
 		Text:       engine.InboxText(w.iteration),
 		Window:     window,
 		Propose:    splitProposer(inboxDir, splitForbidden(protected), w.stderr),

@@ -6,13 +6,18 @@
     "docs/architecture/packages/internal-admission.md describes the file keys",
     "with fleet.orchestrator.file_cells empty, admission behaves as before; with cmd/evolve listed, the red test passes"
   ],
+  "consumed": {
+    "at": "2026-11-17T22:27:35Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "continuation": {
-    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2461",
-    "branch": "cycle-cd3ae73e-2461",
-    "snapshot_sha": "f44fe6f7e85b38cd25c68ae44065d4d1eb8e9fac",
     "base_sha": "c73010a5f801e27a855c9e6f21b43e7c9c05e916",
+    "branch": "cycle-cd3ae73e-2461",
+    "cycle": 2461,
     "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2461/audit-fail-reason.json",
-    "cycle": 2461
+    "snapshot_sha": "f44fe6f7e85b38cd25c68ae44065d4d1eb8e9fac",
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2461"
   },
   "created_at": "2026-11-17T10:00:00Z",
   "files": [
@@ -21,11 +26,23 @@
     "go/internal/policy/fleet_orchestrator.go",
     "docs/architecture/packages/internal-admission.md"
   ],
-  "fix": "Build approach A of docs/plans/admission-cmd-evolve-cell-2026-11.md (K1): file sets for leaf packages in the footprint, the shared-edit rule of D3, cells() shows cmd/evolve/<file>. Keep package keys for non-leaf packages. No flag. Add the policy list fleet.orchestrator.file_cells (leaf packages that get file keys; empty = package keys, the default). Do not use fleet.orchestrator.admission for staging: it selects the rule of the whole fleet and file keys apply in both modes.",
+  "fix": "Build approach A of docs/plans/admission-cmd-evolve-cell-2026-11.md (K1): file sets for leaf packages in the footprint, the shared-edit rule of D3, cells() shows cmd/evolve/\u003cfile\u003e. Keep package keys for non-leaf packages. No flag. Add the policy list fleet.orchestrator.file_cells (leaf packages that get file keys; empty = package keys, the default). Do not use fleet.orchestrator.admission for staging: it selects the rule of the whole fleet and file keys apply in both modes.",
   "id": "admission-file-cells-for-leaf-packages",
   "kind": "feature",
   "origin": "console",
   "priority_class": "performance",
+  "released_continuations": [
+    {
+      "base_sha": "c73010a5f801e27a855c9e6f21b43e7c9c05e916",
+      "branch": "cycle-cd3ae73e-2461",
+      "cycle": 2461,
+      "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2461/audit-fail-reason.json",
+      "reason": "ship-consume-",
+      "released_at": "2026-11-17T22:27:35Z",
+      "snapshot_sha": "f44fe6f7e85b38cd25c68ae44065d4d1eb8e9fac",
+      "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2461"
+    }
+  ],
   "summary": "Plan docs/plans/admission-cmd-evolve-cell-2026-11.md K1. Admission holds two lanes that edit two different files of the leaf package cmd/evolve (go/internal/admission/admission.go:153-159).",
   "title": "Admission: file-level edit keys for leaf packages (plan K1 of admission-cmd-evolve-cell)",
   "weight": 0.65
