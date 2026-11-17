@@ -13,15 +13,15 @@
 | ❌ none | No regression test pins this mode. |
 | ⛔ untestable | Depends on external infra/CLI behavior (vendor rate limit, interactive modal) a unit test cannot reproduce; mitigate by design + docs, not a unit test. |
 
-## Summary (recounted 2026-10-17 from the coverage map below)
+## Summary (recounted 2026-11-16 from the coverage map below)
 
 | | Count |
 |---|---|
-| Incidents mapped | 57 |
-| Distinct failure modes (coverage-map rows) | 94 |
-| ✅ covered (a test would fail if the bug returned) | 79 |
+| Incidents mapped | 58 |
+| Distinct failure modes (coverage-map rows) | 96 |
+| ✅ covered (a test fails if the bug comes back) | 80 |
 | 🟡 partial (related test, doesn't pin the exact mode) | 10 |
-| ❌ none (no regression test) | 5 |
+| ❌ none (no regression test) | 6 |
 | ⛔ untestable (external infra / live CLI) | 0 |
 
 These counts are tallies of the coverage map's rows, so they move with it: a new
@@ -33,6 +33,8 @@ summary said 49) and 49 with them. Recounted on 2026-10-07 when the cycle-1825
 carry incident's two rows were added beside cycle 1811's five: 51 incidents, 78 rows; the cycle-1822 explanation-refresh rows make 52 incidents and 80 rows, and the L2 review-rounds incident (a process incident, ❌ until ADR-0126's replay test) makes 53 incidents and 81 rows. The cycle-1828 gate-class incident adds three rows, all covered: 54 incidents, 84 rows and 69 covered. The cycle-1830 incident adds 1 incident and 5 covered rows: 55 incidents, 89 rows and 74 covered. The cycle-1853 secondary-defects record adds 1 incident and 4 covered rows, and the cycle-1637/1691 rebase-chase record adds 1 incident and 1 covered row: 57 incidents, 94 rows and 79 covered. Untestable modes are
 kept in the "Untestable-by-unit" section below rather than as ⛔ map rows.
 
+Recounted on 2026-11-16: the record of the test leak under `go/` adds two rows. One row is covered and one row has no test yet. The map now holds 58 incidents and 96 rows. The `issue-record` skill makes the row a step of each record ([skills/issue-record/SKILL.md](../../skills/issue-record/SKILL.md)).
+
 **Historical baseline.** The 2026-05-29 13-agent parallel sweep counted 14
 incidents and 73 distinct failure modes: 40 covered, 20 partial, 10 with no
 test and 3 untestable, with 30 concrete gap-test proposals. Those numbers
@@ -43,6 +45,8 @@ not the coverage map, which is the hand-maintained per-incident record.
 
 | Incident | Failure mode | Suspect file | Coverage | Pinning test / proposal |
 |---|---|---|---|---|
+| [2026-11-16 tests leak .evolve ledgers under go/](2026-11-16-tests-leak-evolve-ledgers-under-go.md) | `inboxmover` built the ledger path from an empty `ProjectRoot`. A test that named only the inbox wrote `.evolve/ledger.jsonl` in its package directory. The composed-tree `make test` of each lane failed | `inboxmover/inboxmover.go` (`planeRootOf`, `resolveOpts`) | ✅ | `inboxmover/resolve_root_test.go::TestClaimPending_AnInboxOnlyCallerWritesTheClaimRowToThePlaneLedger` + `::TestResolveOpts_AnInboxUnderAPlaneNamesItsProjectRoot` + `::TestResolveOpts_AnInboxOutsideAPlaneKeepsTheGivenRoot` |
+| 2026-11-16 tests leak .evolve ledgers under go/ | CI runs `make test-integration`, which has no treewalk guard, so main stayed green while each lane failed on the leak | `go/Makefile` (`test-integration`) | ❌ | proposal: inbox item `ci-test-integration-treewalk-parity` (a test plants a leaked `.evolve` directory and proves that the CI target fails) |
 | [2026-10-06 — cycle 1811: a lane relocated a sibling's eval](2026-10-06-cycle-1811-cross-lane-eval-relocation.md) | a source writer's leak recovery treated every untracked main-tree path absent from its baseline as its own, so a sibling lane's `.evolve/evals/<slug>.md` (also a sibling's acs package, change record or mint) was moved and staged into the wrong lane | `core/leak_recovery.go` (`recoverBuildLeak`), `core/leak_ownership.go` | ✅ | `core/leak_ownership_recovery_test.go::TestRecoverBeforeReview_SiblingLaneEvalWrittenMidPhaseStaysInTheMainTree` + `::TestRecoverBeforeReview_RegisteredMintStaysInTheMainTree` + `::TestRunCycle_SiblingEvalWrittenDuringTDDIsNeitherChargedNorClaimed`, preservation `::TestRecoverBeforeReview_OwnLaneEvalLeakStillRelocates` + `::TestRecoverBeforeReview_SourceLeakStillRelocatesBesideASibling`, Specification `core/leak_ownership_test.go::TestMainTreeOwnership_ForeignOwnerNamesEveryOwnerKeyedClass` + `::TestMainTreeOwnership_HeldBySiblingNeedsALiveHolder`, guard strictness `core/orchestrator_guard_test.go::TestGuardStillChargesAnEvalNoLiveSiblingHolds` + `core/leak_ownership_recovery_test.go::TestGuardChargesThisLanesOwnEvalWhileItsOwnLeaseIsLive`, the committed-eval route `::TestRecoverBeforeReview_SiblingEditToACommittedEvalIsNotStolen`, the overwrite `::TestRecoverBeforeReview_OwnEvalLeakNeverOverwritesTheWorktreeCopy` |
 | 2026-10-06 — cycle 1811 | the recovery baseline was captured once at cycle start (and once at resume bootstrap), so anything a sibling wrote during the cycle's earlier phases was claimable by every later phase | `core/cyclerun_dispatch.go`, `core/cyclerun_remediate.go`, `core/resume_execution.go` | ✅ | `core/leak_ownership_recovery_test.go::TestRunCycle_PhaseBaselineExcludesASiblingWriteBeforeThePhase` + `::TestRunCycleFromPhase_PhaseBaselineExcludesASiblingWriteBeforeThePhase` + `::TestMaybeRemediate_FixDispatchBaselineExcludesASiblingWriteDuringTheGate` + `::TestDefaultGitDirtyPaths_ReportsAFailedGitStatus` + `::TestRecoverPhaseLeak_SkipsAPhaseWithNoPrePhaseSnapshot`, preservation `::TestRunCycleFromPhase_ALeakDuringTheResumedPhaseIsStillRelocated` |
 | 2026-10-06 — cycle 1811 | a git failure after the phase let a leak through (recovery reported the tree clean after one failed `git status`, the guard only warned when its own read failed), and recovery failed a console-leased path the guard waived | `core/leak_recovery.go` (`readMainTreeStatus`, `withSnapshotRetries`), `core/cyclerun_postreview.go` (`abortUncheckedPhase`), `core/leak_ownership.go` (`leakExemptions`) | ✅ | `core/leak_snapshot_test.go::TestRecoverBeforeReview_APostPhaseGitFailureFailsRecovery` + `::TestRunCycle_APostPhaseGuardReadFailureAbortsThePhase` + `::TestRunCycle_AGuardReCheckFailureAfterTheBinaryDiscardAbortsThePhase` + `::TestSnapshotMainTree_ADotGitRemovedMidCycleDoesNotTurnTheGuardOff` + `::TestRunCycleFromPhase_ADotGitRemovedBetweenResumedPhasesDoesNotTurnTheGuardOff`, `core/leak_ownership_resilience_test.go::TestRecoverBeforeReview_AConsoleLeasedPathIsLeftJustAsTheGuardWaivesIt` + `::TestRecoverBeforeReview_QuarantiningTheSamePathTwiceKeepsBothCopies` |
@@ -216,3 +220,5 @@ nudge-before-kill (cycle-94-98). 30 modes total carry concrete gap proposals.
 ## Contract for new incidents
 
 When an incident ships a fix, add a row here with the pinning test path::name, and flip its coverage to ✅. A fix without a regression row is incomplete (CLAUDE.md Rule 9 — tests verify intent). This index is the single source of truth for "is the pipeline getting more stable over time."
+
+The procedure that writes each record and its row is the [issue-record](../../skills/issue-record/SKILL.md) skill.

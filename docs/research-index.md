@@ -803,6 +803,14 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [research/practice-claude-model-release-notes-c433b054-202611.md](research/practice-claude-model-release-notes-c433b054-202611.md) | Note on Claude release notes snapshot `2026-11-13T19:47:32Z` (empty added-line excerpt and November 12 self-hosted Managed Agents) for item `c433b054`, read as untrusted data. `skills/model-notes-claude/COMPACT.md` and all personas stay unchanged. |
 
+## 2026-11-16 — issue records: the entry skill, the analysis skill and the alert link
+
+| Document | What it records |
+|---|---|
+| [research/issue-record-skills-2026-11.md](research/issue-record-skills-2026-11.md) | The local evidence and the outside practice (Agent Skills, postmortem skills, Google SRE, causal analysis) for a record of each issue. |
+| [plans/issue-record-skill-2026-11.md](plans/issue-record-skill-2026-11.md) | The plan for the skills `issue-record` and `issue-analyze`, the L0 rule and the later stub verb that the Signal Center feeds. |
+| [incidents/2026-11-16-tests-leak-evolve-ledgers-under-go.md](incidents/2026-11-16-tests-leak-evolve-ledgers-under-go.md) | The first record of the skill: tests left ledgers under `go/`, and the composed-tree gate of each lane failed. |
+
 ## 2026-11-16 — self-evolving loops: room for the loop to change itself
 
 | Document | What it records |
