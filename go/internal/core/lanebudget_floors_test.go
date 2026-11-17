@@ -48,7 +48,7 @@ func TestBuildFloorCover_ALaneCoverRunCarriesTheLaneCPUBudget(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	profile, _, status := scopedCoverProfile(context.Background(), ReviewInput{}, moduleDir, []string{"./internal/x"}, []string{"integration"})
+	profile, _, status, _ := scopedCoverProfile(context.Background(), ReviewInput{}, moduleDir, []string{"./internal/x"}, []string{"integration"})
 	t.Cleanup(func() { _ = os.RemoveAll(filepath.Dir(profile)) })
 
 	want := budgetPrefix(procs) + "-count=1 -timeout 20m -tags integration -coverprofile " + profile + " ./internal/x"

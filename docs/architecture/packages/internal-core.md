@@ -1506,6 +1506,24 @@ Rules for these seams:
 
 For the related rule on test isolation, see [driver tests must be environment-hermetic](../../conventions/hermetic-driver-tests.md).
 
+## The cover run of a tiered package
+
+The cover run (`go/internal/core/cover_changed_floor.go`) keeps an env-exclusive package such as `internal/bridge`. The unit lane, the added-tagged lane and the plumbing fallback keep the drop. Their NOTE says that the cover run measures the package. The NOTE of the cover run names the exclusion tag.
+
+- **One tag set for each package.**
+  - `packageCoverTags` is `covchanged.DefaultTags` plus the exclusion tag that `ciparity.EnvExclusiveTagOf` declares for the package.
+  - Between `coversplit.Plan` and the first pass, `tierRuns` moves each tiered package into its own `coversplit.Run` with its tags. Only that call runs under `notmux`.
+  - Every other package keeps `DefaultTags` and its shared tmux server. This includes `cmd/evolve`.
+  - The profiles merge as before, and the retake reuses the runs.
+  - `scopedCoverProfile` is the one entry point. It applies `tierRuns` in every call, and the unit lane has no tiered package, so there it changes nothing. It returns the tag set of the failed run beside the status. The rerun of the red lines and the headline read that set.
+  - The judge step groups the changed packages by their tag set (`coverTagGroups`). It calls `Workspace.Check` once for each group. `coverChangedPackages` and `buildsUnderCoverTags` use the same `packageCoverTags`. The headline of the changed-function check names the union of the groups.
+  - `DefaultTags` does not change. The target `test-notmux` of the Makefile and one step of the ubuntu CI job run the `notmux` build.
+  - A package whose files all carry `notmux` builds no file under its own set, so the cover run does not list it.
+- **A function below 100% is refused** at the stage `enforce`, also in a tiered package. The cause is a hermetic test that is missing, as [hermetic-driver-tests.md](../conventions/hermetic-driver-tests.md) asks.
+- **One exception: not measured at the floor.** A function of a tiered package is not refused when two things hold. It is profiled with no covered statement, and its name is declared in the same file at the floor base. Its earlier coverage came from the tier, so the floor prints a WARN line with the tag and records a residual (`noteNotMeasured`). A function that is new, moved to another file or renamed is refused. The builder adds a hermetic test.
+- **The function with zero statements** in this rule means a function with statements and no covered statement. A function with no statement at all is profiled as full, as before.
+- **Risk.** If the tests without tmux time out under a live wave, the cover run drops the package again. It then lists each changed function as not measured.
+
 ## Base-red attribution in the build floor
 
 The repo-contract, unit-test and cover-changed checks judge a red test against the lane base before they reject the lane.

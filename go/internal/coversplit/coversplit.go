@@ -22,6 +22,7 @@ type Split struct {
 type Run struct {
 	Packages []string
 	CoverPkg string
+	Tags     []string
 }
 
 func Parse(data []byte) ([]Split, error) {
@@ -111,6 +112,13 @@ func (r Run) Args() []string {
 		return r.Packages
 	}
 	return append([]string{"-coverpkg=" + r.CoverPkg}, r.Packages...)
+}
+
+func (r Run) TagsOr(fallback []string) []string {
+	if r.Tags != nil {
+		return r.Tags
+	}
+	return fallback
 }
 
 func Merge(profiles [][]byte) ([]byte, error) {

@@ -25,6 +25,10 @@ The build floor profiles only the changed packages that build a file under `Defa
 - **One home for the tag flags.** `TagFlags` gives the `-tags` flag list of a tag set, and nil for no tag. The build floor and the ship stop check call it.
 - **The key.** `<module dir>.<Name>` or `<module dir>.<Receiver>.<Name>`, the same form as the size ratchet. The receiver forms `*T`, `T[K]` and `T[K, V]` all give `T`.
 
+## Names declared at a base
+
+`DeclaredFuncs(file, data)` gives the names of the functions with a body in one source file, in the form that `Measure` uses (`Type.Method` for a method). The build floor reads the file at its base and uses the names to tell an old function from a new one.
+
 ## Invariants
 
 - **A comment-only change, a block comment and a blank line change no function** (`TestMeasure_CountsOnlyTheFunctionsAChangedCodeLineTouches`).

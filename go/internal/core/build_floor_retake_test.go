@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -145,7 +147,7 @@ func TestScopedCoverProfile_AOneOffRedIsRetakenUnderTheTierLock(t *testing.T) {
 	var stderr strings.Builder
 	in := ReviewInput{ProjectRoot: t.TempDir(), Signals: signals, Stderr: &stderr}
 
-	profile, out, status := scopedCoverProfile(context.Background(), in, flakyModule(t, 1), []string{"./p"}, nil)
+	profile, out, status, _ := scopedCoverProfile(context.Background(), in, flakyModule(t, 1), []string{"./p"}, nil)
 	defer removeProfileDir(profile)
 
 	if status != coverStatusOK {
@@ -162,7 +164,7 @@ func TestScopedCoverProfile_ARedRetakeStaysRed(t *testing.T) {
 	signals := signalcenter.New()
 	in := ReviewInput{ProjectRoot: t.TempDir(), Signals: signals, Stderr: &strings.Builder{}}
 
-	profile, out, status := scopedCoverProfile(context.Background(), in, flakyModule(t, 2), []string{"./p"}, nil)
+	profile, out, status, _ := scopedCoverProfile(context.Background(), in, flakyModule(t, 2), []string{"./p"}, nil)
 	defer removeProfileDir(profile)
 
 	if status != coverStatusTestsFailed || !strings.Contains(out, "--- FAIL: TestFlaky") {
@@ -235,12 +237,14 @@ func removeProfileDir(profile string) {
 
 func TestCoverRetakeResult_APlumbingRetakeKeepsTheFirstRed(t *testing.T) {
 	t.Parallel()
-	if out, status := coverRetakeResult(retakeRedOutput, "merge failed", coverStatusPlumbingError); status != coverStatusTestsFailed || !strings.Contains(out, "--- FAIL: TestFlaky") || !strings.Contains(out, "merge failed") {
-		t.Errorf("(%q, %d), want the first red kept with the plumbing text", out, status)
+	first := coverRed{out: retakeRedOutput, tags: []string{"integration", "notmux"}}
+	if got, status := coverRetakeResult(first, coverRed{out: "merge failed"}, coverStatusPlumbingError); status != coverStatusTestsFailed || !strings.Contains(got.out, "--- FAIL: TestFlaky") || !strings.Contains(got.out, "merge failed") || !slices.Equal(got.tags, first.tags) {
+		t.Errorf("(%+v, %d), want the first red kept with the plumbing text and tags", got, status)
 	}
 	for _, status := range []int{coverStatusOK, coverStatusTestsFailed} {
-		if out, got := coverRetakeResult(retakeRedOutput, "retake", status); got != status || out != "retake" {
-			t.Errorf("status %d: (%q, %d), want the retake verdict", status, out, got)
+		want := coverRed{out: "retake", tags: []string{"integration"}}
+		if got, gotStatus := coverRetakeResult(first, want, status); gotStatus != status || !reflect.DeepEqual(got, want) {
+			t.Errorf("status %d: (%+v, %d), want the retake verdict", status, got, gotStatus)
 		}
 	}
 }
