@@ -19,7 +19,7 @@ func parseWaveNextArgs(args []string) (waveNextArgs, error) {
 	var merge, number string
 	operands, err := cliFlags{
 		bools:  map[string]*bool{"--dry-run": &a.dryRun, "--json": &a.json},
-		values: map[string]*string{"--merge": &merge, "--max-cycles": &a.boundary.maxCycles, "--number": &number, "--project-root": &a.boundary.projectRoot},
+		values: map[string]*string{"--merge": &merge, "--max-cycles": &a.boundary.maxCycles, "--only": &a.boundary.only, "--exclude": &a.boundary.exclude, "--number": &number, "--project-root": &a.boundary.projectRoot},
 		lists:  map[string]*[]string{"--note": &a.notes},
 	}.parse(args)
 	switch {

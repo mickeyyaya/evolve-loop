@@ -59,7 +59,10 @@ func soleOwningLane(owner map[string]int, files []string) (lane int, ok bool) {
 }
 
 func SelectWaveSeedMenus(evolveDir string, committed []FleetCandidate, count, perLane int, isProtected func(string) bool) [][]FleetCandidate {
-	backlog := ReadInboxBacklog(evolveDir, isProtected)
+	return SeedMenusFromBacklog(evolveDir, committed, ReadInboxBacklog(evolveDir, isProtected), count, perLane)
+}
+
+func SeedMenusFromBacklog(evolveDir string, committed, backlog []FleetCandidate, count, perLane int) [][]FleetCandidate {
 	committed = PruneUndispatchable(evolveDir, committed)
 	seed := SelectFleetWidthTopN(backlog, count)
 	if len(committed) > 0 {

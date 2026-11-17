@@ -55,6 +55,8 @@ type loopConfig struct {
 	Detach            bool                     `json:"detach,omitempty"`
 	Relaunch          bool                     `json:"relaunch,omitempty"`
 	LogPath           string                   `json:"log_path,omitempty"`
+	Only              []string                 `json:"only,omitempty"`
+	Exclude           []string                 `json:"exclude,omitempty"`
 	DetachArgv        []string                 `json:"-"`
 	JSON              bool                     `json:"-"`
 	ResumeWaves       int                      `json:"-"`
@@ -92,7 +94,7 @@ func launchParsedLoop(cfg loopConfig, stdin io.Reader, stdout, stderr io.Writer)
 		return runLoopFrontDoor(cfg, stdout, stderr)
 	}
 	cfg.ResumeWaves, cfg.HandedOff = takeReexecHandoff(cfg.EvolveDir, stderr)
-	if rc := refuseInertGoalItems(cfg, stderr); rc != 0 {
+	if rc := refuseUnusableLaunch(cfg, stderr); rc != 0 {
 		return rc
 	}
 	recordLaunchGoal(cfg, stderr)
@@ -109,7 +111,7 @@ func launchParsedLoop(cfg loopConfig, stdin io.Reader, stdout, stderr io.Writer)
 }
 
 func runLoopFrontDoor(cfg loopConfig, stdout, stderr io.Writer) int {
-	if rc := refuseInertGoalItems(cfg, stderr); rc != 0 {
+	if rc := refuseUnusableLaunch(cfg, stderr); rc != 0 {
 		return rc
 	}
 	if cfg.PreflightOnly {

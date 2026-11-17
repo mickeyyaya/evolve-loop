@@ -10,7 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
-	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
 func (e *Engine) Launcher(wave, concurrency int, launch fleet.LaunchFn) Launcher {
@@ -58,7 +57,7 @@ func (e *Engine) probe() fleet.FreshnessProbeFn {
 
 func (e *Engine) refill() fleet.RefillFn {
 	return func(exclude map[string]bool) (fleet.CycleSpec, bool) {
-		for _, c := range triagecap.ReadInboxBacklog(e.roots.EvolveDir, e.ports.Protected) {
+		for _, c := range e.backlog() {
 			if !exclude[c.ID] {
 				return fleet.CycleSpec{Scope: []string{c.ID}, Env: map[string]string{ipcenv.FleetScopeKey: c.ID}}, true
 			}

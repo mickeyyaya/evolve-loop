@@ -1,6 +1,20 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestSelectorFlags_ARelaunchedLaunchIsNotCheckedAgainstItemsItAlreadyShipped":                                "drives runLoop or parseLoopArgs, which read the process arguments and the re-exec handoff",
+	"main.TestSelectorFlags_AnIDInBothListsExits10NamingTheID":                                                        "drives runLoop or parseLoopArgs, which read the process arguments and the re-exec handoff",
+	"main.TestSelectorFlags_AnOnlyIDNoLaneCanTakeExits10AtLaunch":                                                     "drives runLoop or parseLoopArgs, which read the process arguments and the re-exec handoff",
+	"main.TestSelectorFlags_ExcludeNeverAssignsAnExcludedIDToALane":                                                   "drives runLoop or parseLoopArgs, which read the process arguments and the re-exec handoff",
+	"main.TestSelectorFlags_NoInboxFileChanges":                                                                       "drives runLoop or parseLoopArgs, which read the process arguments and the re-exec handoff",
+	"main.TestSelectorFlags_OnlyAndExcludeTogetherNarrowTheListedIDs":                                                 "drives runLoop or parseLoopArgs, which read the process arguments and the re-exec handoff",
+	"main.TestSelectorFlags_OnlyAssignsOnlyTheListedIDs":                                                              "drives runLoop or parseLoopArgs, which read the process arguments and the re-exec handoff",
+	"main.TestSelectorFlags_OnlyIDsTheLanesCanTakeLaunch":                                                             "drives runLoop or parseLoopArgs, which read the process arguments and the re-exec handoff",
+	"main.TestSelectorFlags_TheBoundaryLoopStepCarriesTheSelector":                                                    "drives runLoop or parseLoopArgs, which read the process arguments and the re-exec handoff",
+	"main.TestSelectorFlags_TheChainReExecCarriesTheSelector":                                                         "drives runLoop or parseLoopArgs, which read the process arguments and the re-exec handoff",
+	"main.TestSelectorFlags_TheDetachedChildCarriesTheSelector":                                                       "drives runLoop or parseLoopArgs, which read the process arguments and the re-exec handoff",
+	"main.TestSelectorFlags_TheOnlyCheckRunsAtTheFrontDoor":                                                           "drives runLoop or parseLoopArgs, which read the process arguments and the re-exec handoff",
+	"main.TestSelectorFlags_TheOnlyCheckRunsWhateverTheGoalText":                                                      "drives runLoop or parseLoopArgs, which read the process arguments and the re-exec handoff",
+	"main.TestSelectorFlags_TheWaveNextLoopStepCarriesTheSelector":                                                    "drives runLoop or parseLoopArgs, which read the process arguments and the re-exec handoff",
 	"main.TestPrepareIteration_ABrakeStopRecordsALoopHaltSignalWithTheStopReason":                                     "swaps seams chainBoundaryAheadFn and chainRunningCommitFn",
 	"main.TestLoopHaltKind_IsAProjectStreamKindSoTheLatencyCheckCanReadTheBrakeAndTheStopReason":                      "TDD-owned test that does not call t.Parallel",
 	"main.TestBoundaryMergedPolicy_TheBoundaryRunPlanReadsTheMergedPolicyWithTheBinaryTheBuildLeavesOnDisk":           "TDD-owned test that does not call t.Parallel",

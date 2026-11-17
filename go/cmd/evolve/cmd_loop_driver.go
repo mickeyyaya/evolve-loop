@@ -184,6 +184,7 @@ func (b *loopBatchCoordinator) runFork(iteration int, fleetConfig policy.FleetCo
 		}
 	}
 	if !shouldRunWave(fleetConfig) {
+		warnSelectorIgnored(b.cfg, b.stderr)
 		return forkOutcome{}
 	}
 	waveConfig, pace := budgetAwareWaveConfig(b.ctx, fleetConfig, b.cfg.ProjectRoot, b.cfg.EvolveDir, b.deps.Storage, b.stderr)

@@ -43,6 +43,8 @@ type loopArgFlags struct {
 	detach            bool
 	relaunch          bool
 	logPath           string
+	only              string
+	exclude           string
 }
 
 func registerLoopArgFlags(fs *flag.FlagSet) *loopArgFlags {
@@ -70,6 +72,8 @@ func registerLoopArgFlags(fs *flag.FlagSet) *loopArgFlags {
 	fs.BoolVar(&lf.detach, "detach", false, "launch the loop in a new session with stdout/stderr appended to --log, print its pid and wait (policy boot.detach_wait_s) for its run lease: exit 0 running, 1 exited or unconfirmed")
 	fs.BoolVar(&lf.relaunch, "relaunch", false, "the launch continues an earlier goal: skip the check of the inbox items that the goal names")
 	fs.StringVar(&lf.logPath, "log", "", "with --detach: the file the detached loop's stdout and stderr are appended to (required with --detach)")
+	fs.StringVar(&lf.only, "only", "", "comma-separated inbox ids: the lanes take only these items (an id no lane can take, or one also in --exclude, exits 10; no inbox file changes)")
+	fs.StringVar(&lf.exclude, "exclude", "", "comma-separated inbox ids: the lanes never take these items (no inbox file changes)")
 	fs.BoolVar(&lf.bypassPolicy, "bypass-policy", false, "use --bypass-policy to bypass policy.json pin enforcement for every phase in this batch (operator escape hatch)")
 	fs.BoolVar(&lf.json, "json", false, "with --detach: print the launch as JSON and no text; the foreground loop prints its JSON result anyway")
 	fs.StringVar(&lf.sandboxOff, "sandbox-off", "", sandboxOffUsage)
@@ -312,6 +316,8 @@ func buildLoopConfig(lf *loopArgFlags, goalHash, goalText, strategy string, maxC
 		PreflightOnly:     lf.preflightOnly,
 		Detach:            lf.detach,
 		Relaunch:          lf.relaunch,
+		Only:              splitIDList(lf.only),
+		Exclude:           splitIDList(lf.exclude),
 		PerAgentCLI:       perAgentCLI,
 		PerAgentModel:     perAgentModel,
 		Epoch:             integration.NewEpochHolder(lf.evolveDir),
@@ -385,4 +391,14 @@ func (cfg loopConfig) sandboxMode() string {
 		return config.SandboxModeOff
 	}
 	return ""
+}
+
+func splitIDList(list string) []string {
+	var ids []string
+	for _, id := range strings.Split(list, ",") {
+		if id = strings.TrimSpace(id); id != "" {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 }

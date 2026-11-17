@@ -22,11 +22,11 @@ func (e *Engine) planFn(count int, release bool) PlanFn {
 		if lastCycle, err := e.ports.LastCycle(ctx); err == nil && lastCycle > 0 {
 			companion := filepath.Join(e.ports.Workspace(lastCycle), triagecap.TriageDecisionName())
 			if data, rerr := os.ReadFile(companion); rerr == nil {
-				data = e.pruneRouted(e.pruneUndispatchable(data))
-				return WidenNarrowDecision(data, e.roots.EvolveDir, count, e.ports.Protected), nil, nil
+				data = e.pruneRouted(e.pruneUndispatchable(e.pruneUnselected(data)))
+				return widenNarrowDecision(data, e.roots.EvolveDir, count, e.backlog), nil, nil
 			}
 		}
-		data, err := SeedWavePlanFromInbox(e.roots.EvolveDir, count, e.ports.Protected)
+		data, err := seedWavePlan(e.roots.EvolveDir, count, e.selector.minLanes(), e.backlog())
 		if err != nil {
 			return nil, nil, fmt.Errorf("wave %d: no prior triage decision and %w", wave, err)
 		}
@@ -35,12 +35,16 @@ func (e *Engine) planFn(count int, release bool) PlanFn {
 }
 
 func SeedWavePlanFromInbox(evolveDir string, count int, protected func(string) bool) ([]byte, error) {
+	return seedWavePlan(evolveDir, count, 2, triagecap.ReadInboxBacklog(evolveDir, protected))
+}
+
+func seedWavePlan(evolveDir string, count, minLanes int, backlog []triagecap.FleetCandidate) ([]byte, error) {
 	if count < 2 {
 		count = 2
 	}
-	menus := triagecap.SelectWaveSeedMenus(evolveDir, nil, count, inboxbatch.DefaultMaxItems, protected)
-	if len(menus) < 2 {
-		return nil, fmt.Errorf("inbox seed: %d disjoint lane(s) — need >= 2 file-disjoint inbox todos to fill a wave", len(menus))
+	menus := triagecap.SeedMenusFromBacklog(evolveDir, nil, backlog, count, inboxbatch.DefaultMaxItems)
+	if len(menus) < minLanes {
+		return nil, fmt.Errorf("inbox seed: %d disjoint lane(s) — need >= %d file-disjoint inbox todos to fill a wave", len(menus), minLanes)
 	}
 	return json.Marshal(map[string]any{"top_n": cards(menus)})
 }
@@ -98,6 +102,12 @@ func (e *Engine) pruneUndispatchable(data []byte) []byte {
 	return e.pruneTopN(data, func(id string) (string, bool) {
 		d := inboxmover.ResolveDispatchability(lifecycle, id)
 		return fmt.Sprintf("pruned undispatchable top_n id %q from prior decision (%s)", id, d.Reason), !d.Dispatchable
+	})
+}
+
+func (e *Engine) pruneUnselected(data []byte) []byte {
+	return e.pruneTopN(data, func(id string) (string, bool) {
+		return fmt.Sprintf("pruned top_n id %q from prior decision (outside the launch selector)", id), !e.selector.allows(id)
 	})
 }
 

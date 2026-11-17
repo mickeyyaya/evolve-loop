@@ -238,3 +238,17 @@ func TestSelectWaveSeedMenus_NilCommittedMatchesLegacySelection(t *testing.T) {
 		t.Errorf("legacy baseline drifted: %q", want)
 	}
 }
+
+func TestSeedMenusFromBacklog_SeedsOnlyFromTheGivenBacklog(t *testing.T) {
+	evolveDir := t.TempDir()
+	writeInboxTodo(t, evolveDir, "a1", 0.9, "go/internal/x/a.go")
+	writeInboxTodo(t, evolveDir, "b1", 0.8, "go/internal/y/b.go")
+	writeInboxTodo(t, evolveDir, "c1", 0.7, "go/internal/z/c.go")
+	backlog := ReadInboxBacklog(evolveDir, nil)[1:]
+
+	menus := SeedMenusFromBacklog(evolveDir, nil, backlog, 2, 4)
+
+	if len(menus) != 2 || menuIDs(menus[0]) != "b1" || menuIDs(menus[1]) != "c1" {
+		t.Fatalf("menus = %v, want [b1] [c1] — a1 is not in the given backlog", menus)
+	}
+}

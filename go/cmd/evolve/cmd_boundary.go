@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	boundaryUsage       = "usage: evolve boundary run [--merge n,...] --goal-text-file F [--max-cycles N] [--dry-run] [--json] [--project-root P]"
+	boundaryUsage       = "usage: evolve boundary run [--merge n,...] --goal-text-file F [--max-cycles N] [--only IDS] [--exclude IDS] [--dry-run] [--json] [--project-root P]"
 	boundaryPrefix      = "evolve boundary run: "
 	boundaryGCLeaseWait = "2m"
 	boundaryLoopLog     = "boundary-loop.log"
@@ -49,6 +49,7 @@ type boundaryArgs struct {
 	prs                 []string
 	goalText, maxCycles string
 	projectRoot         string
+	only, exclude       string
 	runID               string
 	dryRun              bool
 	json                bool
@@ -154,6 +155,7 @@ func parseBoundaryArgs(args []string) (boundaryArgs, error) {
 		bools: map[string]*bool{"--dry-run": &a.dryRun, "--json": &a.json},
 		values: map[string]*string{
 			"--merge": &merge, "--goal-text-file": &goalFile, "--max-cycles": &a.maxCycles, "--project-root": &a.projectRoot,
+			"--only": &a.only, "--exclude": &a.exclude,
 		},
 	}.parse(args)
 	switch {
@@ -242,6 +244,12 @@ func boundaryLaunchSteps(a boundaryArgs, root string) []boundaryStep {
 	launch := []string{"--detach", "--relaunch", "--log", boundaryLoopLogPath(root, a.runID), "--goal-text", a.goalText}
 	if a.maxCycles != "" {
 		launch = append(launch, "--max-cycles", a.maxCycles)
+	}
+	if a.only != "" {
+		launch = append(launch, "--only", a.only)
+	}
+	if a.exclude != "" {
+		launch = append(launch, "--exclude", a.exclude)
 	}
 	return []boundaryStep{
 		{verb: "loop-stop", args: append([]string{"--release"}, at...)},

@@ -66,6 +66,7 @@ type Engine struct {
 	signals   func() *signalcenter.Center
 	goal      string
 	admission AdmissionFn
+	selector  Selector
 }
 
 type Option func(*Engine)

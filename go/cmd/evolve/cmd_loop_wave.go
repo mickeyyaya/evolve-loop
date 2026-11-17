@@ -31,7 +31,7 @@ func newWaveEngine(cfg loopConfig, storage core.Storage, warn io.Writer, signals
 		Shrink:    fleet.QuotaAwareCount,
 		Chains:    cliroute.FamilyChains,
 	}
-	return loopwave.New(roots, ports, warn, append([]loopwave.Option{loopwave.WithSignals(signals), loopwave.WithGoal(cfg.GoalHash)}, opts...)...)
+	return loopwave.New(roots, ports, warn, append([]loopwave.Option{loopwave.WithSignals(signals), loopwave.WithGoal(cfg.GoalHash), loopwave.WithSelector(loopwave.Selector{Only: cfg.Only, Exclude: cfg.Exclude})}, opts...)...)
 }
 
 func (b *loopBatchCoordinator) wave() *loopwave.Engine {

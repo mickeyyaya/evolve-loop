@@ -6,6 +6,12 @@ import (
 )
 
 func WidenNarrowDecision(data []byte, evolveDir string, count int, protected func(string) bool) []byte {
+	return widenNarrowDecision(data, evolveDir, count, func() []triagecap.FleetCandidate {
+		return triagecap.ReadInboxBacklog(evolveDir, protected)
+	})
+}
+
+func widenNarrowDecision(data []byte, evolveDir string, count int, backlog func() []triagecap.FleetCandidate) []byte {
 	if count < 2 {
 		return data
 	}
@@ -17,7 +23,7 @@ func WidenNarrowDecision(data []byte, evolveDir string, count int, protected fun
 	if !pruned && len(committed) >= count {
 		return data
 	}
-	topN := widenAndDeepen(evolveDir, committed, count, protected)
+	topN := widenAndDeepen(evolveDir, committed, count, backlog)
 	if !pruned && len(topN) <= len(committed) {
 		return data
 	}
@@ -37,8 +43,8 @@ func pruneCommitted(evolveDir string, d decision) (committed []triagecap.FleetCa
 	return committed, false
 }
 
-func widenAndDeepen(evolveDir string, committed []triagecap.FleetCandidate, count int, protected func(string) bool) []map[string]any {
-	backlog := triagecap.ReadInboxBacklog(evolveDir, protected)
+func widenAndDeepen(evolveDir string, committed []triagecap.FleetCandidate, count int, readBacklog func() []triagecap.FleetCandidate) []map[string]any {
+	backlog := readBacklog()
 	widened := triagecap.WidenTopNToFleetWidth(committed, backlog, count)
 	return cards(triagecap.ExpandWithClusterMates(widened, backlog, inboxbatch.DefaultMaxItems))
 }
