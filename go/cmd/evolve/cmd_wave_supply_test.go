@@ -31,10 +31,10 @@ func TestWaveSupply_PrintsTheClassesTheRefusalsAndWritesNothing(t *testing.T) {
 	out := h.stdout.String()
 	for _, want := range []string{
 		"supply: 2 admissible of 3 item(s), window 1\n",
-		"  admissible         2\n",
-		"  console_route      1\n",
-		"  console_protected  0\n",
-		"refused:\n  console_route  console-x: route:console\n",
+		"  admissible             2\n",
+		"  console_route_no_fact  1\n",
+		"  console_protected      0\n",
+		"refused:\n  console_route_no_fact  console-x: route:console\n",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("stdout lacks %q:\n%s", want, out)
@@ -57,11 +57,11 @@ func TestWaveSupply_JSONIsTheCensusWithAllSixClassesAndTheCauseOfEachRefusal(t *
 	if err := json.Unmarshal(h.stdout.Bytes(), &got); err != nil || rc != 0 {
 		t.Fatalf("rc = %d, decode %v:\n%s", rc, err, h.stdout.String())
 	}
-	want := map[string]int{"admissible": 2, "waiting_cell": 0, "waiting_deps": 0, "console_route": 1, "console_kind": 0, "console_protected": 0}
+	want := map[string]int{"admissible": 2, "waiting_cell": 0, "waiting_deps": 0, "console_route_fact": 0, "console_route_no_fact": 1, "console_kind": 0, "console_protected": 0}
 	if !reflect.DeepEqual(got.Counts, want) || got.Window != 1 || !got.At.Equal(waveTestClock) {
 		t.Errorf("census = counts %v window %d at %v, want %v, window 1 at the clock of the verb", got.Counts, got.Window, got.At, want)
 	}
-	if len(got.Refusals) != 1 || got.Refusals[0].ID != "console-x" || got.Refusals[0].Class != orchestrator.ClassConsoleRoute || got.Refusals[0].Reason != "route:console" {
+	if len(got.Refusals) != 1 || got.Refusals[0].ID != "console-x" || got.Refusals[0].Class != orchestrator.ClassConsoleRouteNoFact || got.Refusals[0].Reason != "route:console" {
 		t.Errorf("refusals = %+v, want the console route item with its cause", got.Refusals)
 	}
 }
@@ -221,7 +221,7 @@ func TestWriteWaveSupplyText_PrintsTheProposalsAndTheWarningsOfTheCensus(t *test
 
 	for _, want := range []string{
 		"supply: 1 admissible of 3 item(s), window 4\n",
-		"  console_protected  2\n",
+		"  console_protected      2\n",
 		"  console_protected  g-prot: protected fix surface: go/internal/guards/g.go\n",
 		"split proposals:\n  h-mixed -> h-mixed-console + h-mixed-lane\n",
 		"warnings:\n  the module graph is not loaded\n",

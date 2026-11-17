@@ -125,7 +125,7 @@ func TestSupply_RecordsTheCauseOfEachRefusal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantCounts := map[string]int{ClassAdmissible: 2, ClassWaitingCell: 1, ClassWaitingDeps: 1, ClassConsoleRoute: 1, ClassConsoleKind: 1, ClassConsoleProtected: 2}
+	wantCounts := map[string]int{ClassAdmissible: 2, ClassWaitingCell: 1, ClassWaitingDeps: 1, ClassConsoleRouteFact: 0, ClassConsoleRouteNoFact: 1, ClassConsoleKind: 1, ClassConsoleProtected: 2}
 	if !reflect.DeepEqual(got.Counts, wantCounts) {
 		t.Errorf("counts = %v, want %v", got.Counts, wantCounts)
 	}
@@ -136,7 +136,7 @@ func TestSupply_RecordsTheCauseOfEachRefusal(t *testing.T) {
 	for id, want := range map[string]struct{ class, reason string }{
 		"b-lane":  {ClassWaitingCell, "held by a-lane"},
 		"d-deps":  {ClassWaitingDeps, "deps unmet: needs a-lane"},
-		"e-route": {ClassConsoleRoute, "route:console-only"},
+		"e-route": {ClassConsoleRouteNoFact, "route:console-only"},
 		"f-kind":  {ClassConsoleKind, "kind:pipeline-repair"},
 		"g-prot":  {ClassConsoleProtected, "protected fix surface: go/internal/guards/g.go"},
 		"h-mixed": {ClassConsoleProtected, "protected fix surface: go/internal/guards/h.go"},
@@ -338,21 +338,30 @@ func TestConsoleClass_FollowsTheReasonsThatTheRoutingAuthorityGives(t *testing.T
 		item inboxbatch.Item
 		want string
 	}{
-		"an explicit route":                      {inboxbatch.Item{Route: "console"}, ClassConsoleRoute},
+		"an explicit route":                      {inboxbatch.Item{Route: "console"}, ClassConsoleRouteNoFact},
+		"a route with a protected file":          {inboxbatch.Item{Route: "console", Files: []string{"go/internal/guards/a.go"}}, ClassConsoleRouteFact},
 		"a pipeline kind":                        {inboxbatch.Item{Kind: "pipeline-repair"}, ClassConsoleKind},
 		"a protected file":                       {inboxbatch.Item{Files: []string{"go/internal/guards/a.go"}}, ClassConsoleProtected},
 		"route lane ignored for an autofile":     {inboxbatch.Item{Route: "lane", Kind: "pipeline-x", InjectedBy: "agent"}, ClassConsoleKind},
 		"route lane cannot relax a protected":    {inboxbatch.Item{Route: "lane", Files: []string{"go/internal/guards/a.go"}}, ClassConsoleProtected},
-		"a route beats a pipeline kind":          {inboxbatch.Item{Route: "console", Kind: "pipeline-x"}, ClassConsoleRoute},
+		"a route beats a pipeline kind":          {inboxbatch.Item{Route: "console", Kind: "pipeline-x"}, ClassConsoleRouteNoFact},
 		"a pipeline kind beats a protected file": {inboxbatch.Item{Kind: "pipeline-x", Files: []string{"go/internal/guards/a.go"}}, ClassConsoleKind},
 	} {
 		routed, reason := inboxbatch.ConsoleRouted(tc.item, guardsProtected)
 		if !routed {
 			t.Fatalf("%s: the routing authority did not route the item to the console", name)
 		}
-		if got := consoleClass(reason); got != tc.want {
+		if got := (Census{Protected: guardsProtected}).consoleClass(tc.item, reason); got != tc.want {
 			t.Errorf("%s: consoleClass(%q) = %s, want %s", name, reason, got, tc.want)
 		}
+	}
+}
+
+func TestConsoleClass_WithoutAProtectedPredicateARouteCountsAsNoFact(t *testing.T) {
+	item := inboxbatch.Item{Route: "console", Files: []string{"go/internal/guards/a.go"}}
+
+	if got := (Census{}).consoleClass(item, "route:console-only"); got != ClassConsoleRouteNoFact {
+		t.Errorf("consoleClass with no protected predicate = %s, want %s", got, ClassConsoleRouteNoFact)
 	}
 }
 
@@ -381,8 +390,8 @@ func TestSupply_TotalIsTheCountOfEveryItemTheCensusSaw(t *testing.T) {
 	}
 }
 
-func TestClasses_ListTheSixClassesOfTheSpecInOrder(t *testing.T) {
-	want := []string{"admissible", "waiting_cell", "waiting_deps", "console_route", "console_kind", "console_protected"}
+func TestClasses_ListTheSevenClassesOfTheSpecInOrder(t *testing.T) {
+	want := []string{"admissible", "waiting_cell", "waiting_deps", "console_route_fact", "console_route_no_fact", "console_kind", "console_protected"}
 	if got := Classes(); !reflect.DeepEqual(got, want) {
 		t.Errorf("Classes = %v, want %v (wave-orchestrator.md §4)", got, want)
 	}

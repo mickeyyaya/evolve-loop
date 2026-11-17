@@ -176,8 +176,8 @@ func TestCompute_CarriesACopyOfTheClassCountsOfTheLastCensusAndOmitsAbsentOnes(t
 	var fields struct {
 		Supply map[string]int `json:"supply"`
 	}
-	if err := json.Unmarshal(raw, &fields); err != nil || len(fields.Supply) != 6 || fields.Supply["console_protected"] != 40 {
-		t.Errorf("JSON = %s, %v, want a supply object with the six class names", raw, err)
+	if err := json.Unmarshal(raw, &fields); err != nil || len(fields.Supply) != 7 || fields.Supply["console_protected"] != 40 {
+		t.Errorf("JSON = %s, %v, want a supply object with the seven class names", raw, err)
 	}
 	empty := wavemeasure.Compute(wavemeasure.Facts{}, at(0))
 	if rawEmpty, _ := json.Marshal(empty); empty.Supply != nil || strings.Contains(string(rawEmpty), "supply") {

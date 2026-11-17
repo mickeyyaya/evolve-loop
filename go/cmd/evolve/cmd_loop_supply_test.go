@@ -109,7 +109,7 @@ func TestDispatchFleetIteration_TakesTheSupplyBeforeThePlan(t *testing.T) {
 			d := b.dispatchFleetIteration(0, fc, "/nonexistent/evolve", &starvation)
 
 			got := supplyEvents(t, b, evolveDir, orchestrator.CodeSupply)
-			if len(got) != 1 || got[0].Fields[orchestrator.ClassAdmissible] != "2" || got[0].Fields[orchestrator.ClassConsoleRoute] != "1" {
+			if len(got) != 1 || got[0].Fields[orchestrator.ClassAdmissible] != "2" || got[0].Fields[orchestrator.ClassConsoleRouteNoFact] != "1" {
 				t.Errorf("supply events = %+v, want one that counts 2 admissible items and 1 console route item", got)
 			}
 			history, err := orchestrator.ReadSupply(probe.recordPath)

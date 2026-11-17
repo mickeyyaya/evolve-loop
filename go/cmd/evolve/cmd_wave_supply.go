@@ -39,7 +39,7 @@ func runWaveSupply(env waveEnv, args []string, stdout, stderr io.Writer) int {
 func writeWaveSupplyText(w io.Writer, s orchestrator.Supply) {
 	fmt.Fprintf(w, "supply: %d admissible of %d item(s), window %d\n", s.Counts[orchestrator.ClassAdmissible], s.Total(), s.Window)
 	for _, class := range orchestrator.Classes() {
-		fmt.Fprintf(w, "  %-18s %d\n", class, s.Counts[class])
+		fmt.Fprintf(w, "  %-22s %d\n", class, s.Counts[class])
 	}
 	if len(s.Refusals) > 0 {
 		fmt.Fprintln(w, "refused:")

@@ -60,7 +60,7 @@ func measureWaveRuns(plane wavePlaneDirs, records []wave.Record, current []wave.
 func writeWaveMeasuresText(w io.Writer, m wavemeasure.Measures) {
 	fmt.Fprintf(w, "measures: width %d/%d · utilization %.2f · conflicts %d/%d", m.WidthRealized, m.WidthSized, m.Utilization, m.Conflicts, m.Landed)
 	if s := m.Supply; s != nil {
-		fmt.Fprintf(w, " · supply %d admissible, %d waiting, %d console", s.Admissible, s.WaitingCell+s.WaitingDeps, s.ConsoleRoute+s.ConsoleKind+s.ConsoleProtected)
+		fmt.Fprintf(w, " · supply %d admissible, %d waiting, %d console", s.Admissible, s.WaitingCell+s.WaitingDeps, s.ConsoleRouteFact+s.ConsoleRouteNoFact+s.ConsoleKind+s.ConsoleProtected)
 	}
 	if m.OptimisticAdmissions > 0 {
 		fmt.Fprintf(w, " · optimistic %d/%d failed (%.2f)", m.OptimisticFailures, m.OptimisticAdmissions, m.OptimisticFailureRate)

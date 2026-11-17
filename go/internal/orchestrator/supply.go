@@ -22,12 +22,13 @@ import (
 )
 
 const (
-	ClassAdmissible       = "admissible"
-	ClassWaitingCell      = "waiting_cell"
-	ClassWaitingDeps      = "waiting_deps"
-	ClassConsoleRoute     = "console_route"
-	ClassConsoleKind      = "console_kind"
-	ClassConsoleProtected = "console_protected"
+	ClassAdmissible         = "admissible"
+	ClassWaitingCell        = "waiting_cell"
+	ClassWaitingDeps        = "waiting_deps"
+	ClassConsoleRouteFact   = "console_route_fact"
+	ClassConsoleRouteNoFact = "console_route_no_fact"
+	ClassConsoleKind        = "console_kind"
+	ClassConsoleProtected   = "console_protected"
 
 	SupplyFile = "supply.json"
 
@@ -39,7 +40,7 @@ const (
 var errCensusClock = errors.New("orchestrator: the census needs a clock")
 
 func Classes() []string {
-	return []string{ClassAdmissible, ClassWaitingCell, ClassWaitingDeps, ClassConsoleRoute, ClassConsoleKind, ClassConsoleProtected}
+	return []string{ClassAdmissible, ClassWaitingCell, ClassWaitingDeps, ClassConsoleRouteFact, ClassConsoleRouteNoFact, ClassConsoleKind, ClassConsoleProtected}
 }
 
 type Refusal struct {
@@ -99,8 +100,8 @@ func (c Census) Count() (Supply, error) {
 	for _, would := range menu.WouldDefer {
 		s.Warnings = append(s.Warnings, "would defer "+would)
 	}
-	protected := s.refuse(menu.Console, menu.ConsoleReasons, consoleClass)
-	s.refuse(menu.Waiting, menu.WaitingReasons, func(string) string { return ClassWaitingDeps })
+	protected := s.refuse(menu.Console, menu.ConsoleReasons, c.consoleClass)
+	s.refuse(menu.Waiting, menu.WaitingReasons, func(inboxbatch.Item, string) string { return ClassWaitingDeps })
 	c.admit(&s, menu.Ranked)
 	if admissible := s.Counts[ClassAdmissible]; c.Propose != nil && admissible < 2*c.Window {
 		s.Proposals = c.Propose(protected, admissible, c.Window)
@@ -148,11 +149,11 @@ func (c Census) admit(s *Supply, ranked []inboxrank.Ranked) {
 	}
 }
 
-func (s *Supply) refuse(items []inboxbatch.Item, reasons []string, classOf func(reason string) string) []inboxbatch.Item {
+func (s *Supply) refuse(items []inboxbatch.Item, reasons []string, classOf func(it inboxbatch.Item, reason string) string) []inboxbatch.Item {
 	var protected []inboxbatch.Item
 	for i, it := range items {
 		reason := strings.TrimPrefix(reasons[i], it.ID+": ")
-		class := classOf(reason)
+		class := classOf(it, reason)
 		s.Counts[class]++
 		s.Refusals = append(s.Refusals, Refusal{ID: it.ID, Class: class, Reason: reason})
 		if class == ClassConsoleProtected {
@@ -174,7 +175,8 @@ func (s Supply) Measure() wavemeasure.Supply {
 	c := s.Counts
 	return wavemeasure.Supply{
 		Admissible: c[ClassAdmissible], WaitingCell: c[ClassWaitingCell], WaitingDeps: c[ClassWaitingDeps],
-		ConsoleRoute: c[ClassConsoleRoute], ConsoleKind: c[ClassConsoleKind], ConsoleProtected: c[ClassConsoleProtected],
+		ConsoleRouteFact: c[ClassConsoleRouteFact], ConsoleRouteNoFact: c[ClassConsoleRouteNoFact],
+		ConsoleKind: c[ClassConsoleKind], ConsoleProtected: c[ClassConsoleProtected],
 	}
 }
 
@@ -205,14 +207,29 @@ func (s Supply) consoleSummary() string {
 	return line
 }
 
-func consoleClass(reason string) string {
+func (c Census) consoleClass(it inboxbatch.Item, reason string) string {
 	switch {
 	case strings.HasPrefix(reason, "route:"):
-		return ClassConsoleRoute
+		if c.touchesProtected(it) {
+			return ClassConsoleRouteFact
+		}
+		return ClassConsoleRouteNoFact
 	case strings.HasPrefix(reason, "kind:"):
 		return ClassConsoleKind
 	}
 	return ClassConsoleProtected
+}
+
+func (c Census) touchesProtected(it inboxbatch.Item) bool {
+	if c.Protected == nil {
+		return false
+	}
+	for _, path := range it.DeclaredPaths() {
+		if c.Protected(path) {
+			return true
+		}
+	}
+	return false
 }
 
 type supplyStore struct {

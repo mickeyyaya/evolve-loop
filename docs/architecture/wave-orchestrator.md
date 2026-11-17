@@ -130,7 +130,8 @@ Before each plan, the census reads the ranked inbox through `inboxrank.Order` an
 | `admissible` | lane-routable, `deps` met, not claimed, and its cells are free | `inboxbatch.PartitionConsole`, §6 |
 | `waiting_cell` | lane-routable, but a lane in flight holds one of its cells | §6 |
 | `waiting_deps` | a `deps` item is open | `inboxrank` |
-| `console_route` | an explicit `route: console*` | `inboxbatch.IsConsoleRoute` |
+| `console_route_fact` | an explicit `route: console*`, and a declared file is protected | `inboxbatch.IsConsoleRoute`, `Census.touchesProtected` |
+| `console_route_no_fact` | an explicit `route: console*`, and no declared file is protected | `inboxbatch.IsConsoleRoute`, `Census.touchesProtected` |
 | `console_kind` | a `pipeline-*` kind | `consoleroute.go:49-56` |
 | `console_protected` | a protected fix surface | `consoleroute.go:58-80` |
 
@@ -170,7 +171,7 @@ The loop and the console use the two calls as follows:
 
 The census builds on the lane menu of `inboxmover.RankLaneMenu`, the same menu as `evolve inbox rank`:
 
-- A console item gets its class from the reason of `inboxbatch.ConsoleRouted`: `route:` is `console_route`, `kind:` is `console_kind`, and every other reason is `console_protected`.
+- A console item gets its class from the reason of `inboxbatch.ConsoleRouted`: `route:` is `console_route_fact` or `console_route_no_fact`, `kind:` is `console_kind`, and every other reason is `console_protected`.
 - A waiting item is `waiting_deps`. This class also holds an item that another lane has claimed. The reason names the dependency or the claim.
 - The ready items go to `admission.Admitter` in rank order, with the lanes in flight as holdings. An item that conflicts with an earlier admitted item is `waiting_cell`, as in §6 step 7.
 - With no module graph, every ready item is `admissible`, and the record holds a warning.

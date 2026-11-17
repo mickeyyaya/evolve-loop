@@ -18,12 +18,13 @@ type Lane struct {
 }
 
 type Supply struct {
-	Admissible       int `json:"admissible"`
-	WaitingCell      int `json:"waiting_cell"`
-	WaitingDeps      int `json:"waiting_deps"`
-	ConsoleRoute     int `json:"console_route"`
-	ConsoleKind      int `json:"console_kind"`
-	ConsoleProtected int `json:"console_protected"`
+	Admissible         int `json:"admissible"`
+	WaitingCell        int `json:"waiting_cell"`
+	WaitingDeps        int `json:"waiting_deps"`
+	ConsoleRouteFact   int `json:"console_route_fact"`
+	ConsoleRouteNoFact int `json:"console_route_no_fact"`
+	ConsoleKind        int `json:"console_kind"`
+	ConsoleProtected   int `json:"console_protected"`
 }
 
 type Facts struct {
