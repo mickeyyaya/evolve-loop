@@ -234,11 +234,33 @@ func contractToolPATH(t *testing.T) string {
 		if err != nil {
 			t.Fatalf("%s is not on PATH: %v", tool, err)
 		}
+		if tool == "go" {
+			contractTelemetryOffGo(t, bin, path)
+			continue
+		}
 		if err := os.Symlink(path, filepath.Join(bin, tool)); err != nil {
 			t.Fatal(err)
 		}
 	}
 	return bin
+}
+
+func contractTelemetryOffGo(t *testing.T, bin, goPath string) {
+	t.Helper()
+	home := t.TempDir()
+	for _, dir := range []string{filepath.Join("Library", "Application Support"), ".config"} {
+		telemetry := filepath.Join(home, dir, "go", "telemetry")
+		if err := os.MkdirAll(telemetry, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(telemetry, "mode"), []byte("off 0\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	shim := "#!/bin/sh\nHOME='" + home + "' XDG_CONFIG_HOME= exec '" + goPath + "' \"$@\"\n"
+	if err := os.WriteFile(filepath.Join(bin, "go"), []byte(shim), 0o755); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func contractArgs(args []string, vars map[string]string) []string {
