@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "TestAdmit_TwoTodosThatEditDifferentFilesOfALeafPackageBothAdmit passes: a leaf-aware graph, todo X lists go/cmd/evolve/a.go, todo Y lists go/cmd/evolve/b.go, both admit",
+    "the guard tests of docs/plans/admission-cmd-evolve-cell-2026-11.md section 5 pass: same file holds the second, a whole-package edit holds a file edit, two files of a non-leaf package hold the second",
+    "TestAdmit_TwoAdmittedTodosNeverConflict stays green and go test -count=1 ./internal/admission/... prints N/N PASS",
+    "docs/architecture/packages/internal-admission.md describes the file keys",
+    "with fleet.orchestrator.file_cells empty, admission behaves as before; with cmd/evolve listed, the red test passes"
+  ],
+  "created_at": "2026-11-17T10:00:00Z",
+  "files": [
+    "go/internal/admission/admission.go",
+    "go/internal/admission/admission_test.go",
+    "go/internal/policy/fleet_orchestrator.go",
+    "docs/architecture/packages/internal-admission.md"
+  ],
+  "fix": "Build approach A of docs/plans/admission-cmd-evolve-cell-2026-11.md (K1): file sets for leaf packages in the footprint, the shared-edit rule of D3, cells() shows cmd/evolve/<file>. Keep package keys for non-leaf packages. No flag. Add the policy list fleet.orchestrator.file_cells (leaf packages that get file keys; empty = package keys, the default). Do not use fleet.orchestrator.admission for staging: it selects the rule of the whole fleet and file keys apply in both modes.",
+  "id": "admission-file-cells-for-leaf-packages",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "performance",
+  "summary": "Plan docs/plans/admission-cmd-evolve-cell-2026-11.md K1. Admission holds two lanes that edit two different files of the leaf package cmd/evolve (go/internal/admission/admission.go:153-159).",
+  "title": "Admission: file-level edit keys for leaf packages (plan K1 of admission-cmd-evolve-cell)",
+  "weight": 0.65
+}

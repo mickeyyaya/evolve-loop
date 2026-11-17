@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "TestHelpOutputIsUnchangedWhenVerbsRegisterThemselves passes: the evolve help output equals the golden output before the change",
+    "a new verb needs no edit to go/cmd/evolve/registry.go",
+    "go test -count=1 from go/ prints N/N PASS"
+  ],
+  "created_at": "2026-11-17T10:00:01Z",
+  "files": [
+    "go/cmd/evolve/registry.go"
+  ],
+  "fix": "Build approach D of docs/plans/admission-cmd-evolve-cell-2026-11.md (K2): each verb file adds its row to commands from its own init function. registry.go keeps the type and an explicit sort. Start only after admission-file-cells-for-leaf-packages shows registry.go as the main holder.",
+  "id": "cmd-evolve-self-registering-verbs",
+  "kind": "refactor",
+  "origin": "console",
+  "priority_class": "performance",
+  "summary": "Plan docs/plans/admission-cmd-evolve-cell-2026-11.md K2. Each new verb edits registry.go (go/cmd/evolve/registry.go:22), so new-verb items still share one file.",
+  "title": "cmd/evolve: verbs register themselves so registry.go stops being a shared edit (plan K2 of admission-cmd-evolve-cell)",
+  "weight": 0.4
+}
