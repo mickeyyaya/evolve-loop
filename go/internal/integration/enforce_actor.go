@@ -7,7 +7,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
+
+const enforceOrigin = "integration.EnforceActor"
 
 type PlaneSync interface {
 	Sync(ctx context.Context) (SyncOutcome, error)
@@ -131,6 +135,11 @@ func (a EnforceActor) ejectMember(ctx context.Context, rec DeliverableRecord, ca
 		}
 		briefPath = path
 	}
+	emitEvent(a.Publish, enforceOrigin, signalcenter.Event{
+		Cycle: rec.Cycle, Kind: signalcenter.KindShipWarning, Code: CodeEjected, Severity: signalcenter.SeverityWarn,
+		Reason: fmt.Sprintf("%s is ejected on a %s", ej.Label(), ej.Cause),
+		Fields: ej.Fields(briefPath),
+	})
 	if a.Requeue != nil {
 		if err := a.Requeue.Requeue(ctx, rec, briefPath); err != nil {
 			res.Failures = append(res.Failures, DriverFailure{Step: "requeue", Error: err.Error(), At: a.now()})
