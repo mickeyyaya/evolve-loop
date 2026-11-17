@@ -190,3 +190,9 @@ The file is `stopgate.go`. The design is in [gate-contract-g4-base-red-attributi
 - Pinned by the `TestStopGate_*` tests, with 100% of the statements of the file.
 - **Redelivery at shadow (EnforceActor card part 0).** `Driver.noteRedelivered` acts on a member that is not pending and is delivered again under new patch ids. At stage `shadow` it stores the new patch ids in `MemberState.Redelivered` and writes no `DriverFailure`. At any other stage, or when the stage cannot be read, it keeps the failure. A delivery with the patch ids of the member is a no-op.
   - `evolve integration status` prints the member with its redelivered ids, and the `clean` verdict does not count them. Pinned by `TestDriver_AtShadowARedeliveryIsInformationOnTheComposedMember`, `TestDriver_AtEnforceARedeliveryAfterAComposeIsRecordedAsAFailure` and `TestPromotionReachableByGoodBehavior`.
+- **The batch test in the train (cycle 2442).** `Train.L2` holds the `BatchTest`. At the enforce stage, `batcher.compose` calls `Check` after the L1 compose and before `CI.Open`. It keeps the landed members, adds the L2 ejections (cause `batch`, briefed through `Host.Comment`) and moves the batch branch to the tested tip. A shadow stage runs no seam.
+- **The host kill (cycle 2442).** A host failure of a package test, a predicate run or a pack step stops `Check` and ejects nobody. `acsrunner.IsHostFailure` finds it, also through a join. A predicate package that does not compile keeps its red and ejects.
+- **The L2 pack (cycle 2442).** `L2Pack` gives six `PackStep` values: repo-contract, cover-changed, cover-strict, build, vet and gofmt. Each step checks out the tip and runs one command in `<checkout>/go`.
+  - A non-zero exit is red, and a gofmt listing is red. The first red step ends the pack.
+  - A command error is a host failure.
+  - The composer gate of the L2 stays a no-op, because `Check` composes in shadow.

@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 const CauseCI = "ci"
@@ -22,6 +24,7 @@ type InboxFunc func(ctx context.Context, ids []string) ([]string, error)
 
 type Train struct {
 	Composer Composer
+	L2       BatchTest
 	CI       CI
 	Main     Main
 	Host     PRHost
@@ -353,7 +356,28 @@ func (b *batcher) compose(ctx context.Context, recs []DeliverableRecord) (Compos
 	}
 	comp, err := b.t.Composer.composeAll(ctx, batch, kept)
 	comp.Ejected = append(moved, comp.Ejected...)
-	return comp, err
+	if err != nil || b.t.L2.Composer.Stage != policy.FleetIntegrationEnforce {
+		return comp, err
+	}
+	return b.t.testBatch(ctx, comp)
+}
+
+func (t Train) testBatch(ctx context.Context, comp Composition) (Composition, error) {
+	res, err := t.L2.Check(ctx, comp.Batch, comp.Kept)
+	if err != nil {
+		return Composition{}, err
+	}
+	comp.Ejected = append(comp.Ejected, res.Ejected...)
+	comp.Kept = withoutEjected(comp.Kept, res.Ejected)
+	if len(comp.Kept) == 0 {
+		t.Composer.Repo.dropBranch(ctx, comp.Batch)
+		return comp, nil
+	}
+	if err := t.Composer.Repo.moveBranch(ctx, comp.Batch, res.Tip); err != nil {
+		return Composition{}, err
+	}
+	comp.Batch.Tip = res.Tip
+	return comp, nil
 }
 
 func withoutEjected(recs []DeliverableRecord, ejected []*Ejection) []DeliverableRecord {

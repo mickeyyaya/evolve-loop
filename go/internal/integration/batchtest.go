@@ -35,6 +35,7 @@ type BatchTest struct {
 	Test       PackageTest
 	Predicates PredicateRun
 	Verdicts   Verdicts
+	Pack       []PackStep
 }
 
 type LayerVerdict struct {
@@ -191,8 +192,26 @@ func (t BatchTest) layer(ctx context.Context, in layerInput) (LayerVerdict, erro
 		}
 		v = v.merge(part)
 	}
+	part, err := t.runPack(ctx, in.tip)
+	if err != nil {
+		return LayerVerdict{}, err
+	}
+	v = v.merge(part)
 	v.Pass = len(v.Red) == 0
 	return v, nil
+}
+
+func (t BatchTest) runPack(ctx context.Context, tip string) (LayerVerdict, error) {
+	for _, step := range t.Pack {
+		out, err := step.Run(ctx, tip, step.Name)
+		if err != nil {
+			return LayerVerdict{}, fmt.Errorf("integration: pack step %s at %s: %w", step.Name, tip, err)
+		}
+		if !out.Green {
+			return LayerVerdict{Red: []string{step.Name}, Output: step.Name + ":\n" + out.Output + "\n"}, nil
+		}
+	}
+	return LayerVerdict{}, nil
 }
 
 func (v LayerVerdict) merge(o LayerVerdict) LayerVerdict {
@@ -248,7 +267,7 @@ func (t BatchTest) runPredicates(ctx context.Context, tip string, cycle int) (La
 func (t BatchTest) predicateRed(ctx context.Context, tip string, cycle int) ([]string, string, error) {
 	v, err := t.Predicates(ctx, tip, cycle)
 	red := redPredicates(v, cycle)
-	if err != nil && (ctx.Err() != nil || len(red) == 0) {
+	if err != nil && (ctx.Err() != nil || len(red) == 0 || acsrunner.IsHostFailure(err)) {
 		return nil, "", err
 	}
 	if err != nil {

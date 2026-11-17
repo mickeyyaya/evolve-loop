@@ -27,3 +27,7 @@
 
 - **2026-10-01**: `evolve acs run` on a package that did not compile wrote `verdict: PASS, ship_eligible: true, total: 0` and exited 0, since the headline was derived from the red and incomplete counts alone and the CLI's exit code only from the red count. A manual ship with that workspace would have consumed inbox items on work that never ran. Found while making `acssuite` write a complete verdict in every mode ([ADR-0114](../adr/0114-the-acs-verdict-is-always-written-and-complete.md)).
 - **2026-10-01, architecture review**: the first fix expressed "no predicates" here as `total > 0` in the headline (FAIL with `red_count` 0, the shape ADR-0114 rejects for the suite), spelled the file name as a literal and had no relative-dir refusal, while `acssuite` had moved to a named red, `VerdictFilename` and the refusal. The two writers now share `NoPredicatesID` and `Path`, first through `acssuite`, then (re-review) through the leaf `internal/acsverdict`, so this package depends on `acsverdict` and `ipcenv` only instead of seventeen internal packages.
+
+## Host failure (cycle 2442)
+
+`HostFailure` and `IsHostFailure` mark a run that the host stopped: a signal kill of `go test`, a cancelled context or a start error. `Run` returns one even when a predicate red was read, because a kill decides nothing about the predicates. A package that does not compile keeps its synthetic red and a plain error. `RunIn` runs `go -C <dir> test` for a checkout.

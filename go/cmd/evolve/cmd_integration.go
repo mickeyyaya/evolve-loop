@@ -30,6 +30,7 @@ type integrationEnv struct {
 	Wave           string
 	Now            time.Time
 
+	Run    integration.Command
 	Settle func(ctx context.Context) error
 	Emit   stopEmit
 	KeyRun stopKeyRun
@@ -71,6 +72,7 @@ func productionIntegrationEnv(root string, now time.Time) integrationEnv {
 		ProjectRootEnv: os.Getenv("EVOLVE_PROJECT_ROOT"),
 		Wave:           "pr" + now.UTC().Format("20060102t150405"),
 		Now:            now,
+		Run:            sysL2Command,
 		Settle:         pauseFor(registrationWait),
 		Emit:           emitIntegrationSignal,
 		KeyRun:         attributedKeyRun(baseattr.GoTestRunner(ipcenv.GoTestEnv())),

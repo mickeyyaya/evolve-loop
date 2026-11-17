@@ -7,9 +7,11 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -173,15 +175,55 @@ func withCommander(c runCommander, fn func()) {
 	fn()
 }
 
+type hostFailure struct{ err error }
+
+func (h *hostFailure) Error() string { return h.err.Error() }
+
+func (h *hostFailure) Unwrap() error { return h.err }
+
+func HostFailure(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &hostFailure{err: err}
+}
+
+func IsHostFailure(err error) bool {
+	var h *hostFailure
+	return errors.As(err, &h)
+}
+
+func killedByHost(ctx context.Context, waitErr error) bool {
+	if waitErr == nil {
+		return false
+	}
+	var exit *exec.ExitError
+	return ctx.Err() != nil || (errors.As(waitErr, &exit) && exit.ExitCode() == -1)
+}
+
 func Run(ctx context.Context, cycle int, pkg string) (Verdict, error) {
-	stdout, wait, err := execCommand(ctx, lanebudget.Env(ipcenv.GoTestEnv()), append([]string{"go"}, lanebudget.Args([]string{"test", "-json", "-count=1", pkg})...)...)
+	return RunIn(ctx, "", cycle, pkg)
+}
+
+func chdirArgs(dir string) []string {
+	if dir == "" {
+		return nil
+	}
+	return []string{"-C", dir}
+}
+
+func RunIn(ctx context.Context, dir string, cycle int, pkg string) (Verdict, error) {
+	stdout, wait, err := execCommand(ctx, lanebudget.Env(ipcenv.GoTestEnv()), append([]string{"go"}, append(chdirArgs(dir), lanebudget.Args([]string{"test", "-json", "-count=1", pkg})...)...)...)
 	if err != nil {
-		return Verdict{}, fmt.Errorf("acsrunner: %w", err)
+		return Verdict{}, HostFailure(fmt.Errorf("acsrunner: %w", err))
 	}
 	v, parseErr := ParseTestJSON(stdout, cycle)
 	waitErr := wait()
 	if parseErr != nil {
 		return v, parseErr
+	}
+	if killedByHost(ctx, waitErr) {
+		return v, HostFailure(fmt.Errorf("acsrunner go test: %w", waitErr))
 	}
 	if waitErr != nil && !v.hasPredicateRed() {
 		return v, fmt.Errorf("acsrunner go test: %w", waitErr)

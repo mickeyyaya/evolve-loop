@@ -49,6 +49,7 @@ func (e integrationEnv) train(projectRoot string, warn io.Writer) integration.Tr
 	gate := e.stopGate(projectRoot, warn)
 	return integration.Train{
 		Composer: integration.Composer{Repo: p.Repo, Stage: policy.FleetIntegrationShadow},
+		L2:       e.batchTest(p.Repo, projectRoot, warn),
 		CI:       gate.CI(p.CI),
 		Main:     gate.Main(p.Main),
 		Host:     integration.GhHost{CI: p.CI},
