@@ -112,6 +112,7 @@ func composedGatesTo(log io.Writer) func(ctx context.Context, worktree string) m
 				results[gate] = run.scoped(ctx, gate, target, scope)
 			}
 		}
+		recordScopedShadow(ctx, log, worktree, results)
 		return results
 	}
 }

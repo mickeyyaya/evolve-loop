@@ -182,7 +182,7 @@ func (o *Orchestrator) scopedMergeCarryForward(ctx context.Context, cycle int, c
 		fmt.Fprintf(o.errOut(), "[orchestrator] scoped merge review: resolution patch-id does not match audited change (unverified); falling back to full re-audit\n")
 		return false
 	}
-	gateResults, ok := o.runComposedGates(ctx, projectRoot, cycle, cs, worktree, "Orchestrator.scopedMergeCarryForward", "scoped merge review")
+	gateResults, ok := o.runComposedGates(WithRecheckSite(ctx, RecheckSite{ProjectRoot: projectRoot, Cycle: cycle, AuditedBase: snap.AuditedBase}), projectRoot, cycle, cs, worktree, "Orchestrator.scopedMergeCarryForward", "scoped merge review")
 	if !ok {
 		return false
 	}

@@ -41,7 +41,7 @@ func (o *Orchestrator) identityCarryForward(ctx context.Context, cycle int, cs C
 	if err != nil || !identical {
 		return decline("the pended change is not byte for byte the audited one (err=%v)", err)
 	}
-	gates, outcomes, ok := o.gatesOnIntactTree(ctx, worktree, tree1)
+	gates, outcomes, ok := o.gatesOnIntactTree(WithRecheckSite(ctx, RecheckSite{ProjectRoot: projectRoot, Cycle: cycle, AuditedBase: base0}), worktree, tree1)
 	if !ok {
 		return decline("the composed-tree gates did not leave the tree as they found it")
 	}

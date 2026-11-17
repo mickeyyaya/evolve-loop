@@ -24,6 +24,8 @@ type carryHarness struct {
 	signals     *signalcenter.Center
 	stderr      io.Writer
 	persist     func(string, CompositionVerdictInput) error
+	site        RecheckSite
+	siteStamped bool
 }
 
 func allComposedGatesPass() map[string]ciparity.GateOutcome {
@@ -56,7 +58,8 @@ func (h *carryHarness) route(t *testing.T, rows ...LedgerEntry) (Phase, bool, Cy
 		WithCompositionSnapshot(func(context.Context, string, string) (CompositionAuditSnapshot, error) {
 			return CompositionAuditSnapshot{LaneAuditRef: "audit-ref"}, nil
 		}),
-		WithCompositionGateRunner(func(_ context.Context, worktree string) map[string]ciparity.GateOutcome {
+		WithCompositionGateRunner(func(ctx context.Context, worktree string) map[string]ciparity.GateOutcome {
+			h.site, h.siteStamped = RecheckSiteFrom(ctx)
 			h.gatesOn = worktree
 			if h.duringGates != nil {
 				h.duringGates()

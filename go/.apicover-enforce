@@ -879,3 +879,4 @@
 ./internal/mainstop
 ./internal/plainfile
 ./internal/stagescore
+./internal/scopedset
