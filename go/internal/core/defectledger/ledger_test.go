@@ -72,7 +72,9 @@ func TestCodes_RegisteredUnderModuleAudit_WithFixedSeverity(t *testing.T) {
 		CodeDispositionsIncomplete, CodeDispositionsUnreadable, CodePromptDegraded}
 	docs := map[signalcenter.Code]string{}
 	for _, cd := range signalcenter.RegisteredCodes()[signalcenter.ModuleAudit] {
-		docs[cd.Code] = cd.Doc
+		if strings.HasPrefix(string(cd.Code), "AUDIT_LEDGER_") {
+			docs[cd.Code] = cd.Doc
+		}
 	}
 	if len(all) != 13 || len(codeSeverity) != 13 {
 		t.Fatalf("thirteen codes, thirteen severity rows: %d %d", len(all), len(codeSeverity))
@@ -93,7 +95,7 @@ func TestCodes_RegisteredUnderModuleAudit_WithFixedSeverity(t *testing.T) {
 		}
 	}
 	if len(docs) != 13 {
-		t.Fatalf("module audit registers exactly the thirteen: %d", len(docs))
+		t.Fatalf("the ledger family of module audit is exactly the thirteen: %d", len(docs))
 	}
 }
 

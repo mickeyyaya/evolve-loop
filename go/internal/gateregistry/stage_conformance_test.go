@@ -26,7 +26,7 @@ const (
 	ruleNoEmitSite    = "no-emit-site"
 	ruleNoWouldFields = "no-would-fields"
 	ruleFieldMissing  = "would-field-missing"
-	baselineCeiling   = 88
+	baselineCeiling   = 85
 	moduleRoot        = "../.."
 )
 
