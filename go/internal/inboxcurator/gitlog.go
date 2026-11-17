@@ -32,6 +32,18 @@ func Landed(ctx context.Context, git gitexec.Git, from, to string) ([]Change, er
 	return readLog(ctx, git, from+".."+to)
 }
 
+func ClosedHistory(ctx context.Context, git gitexec.Git, since time.Time) ([]Change, error) {
+	out, err := git.Output(ctx, "log", "--no-color", "--since="+since.UTC().Format(time.RFC3339), "--grep=Closes-Inbox:", "--format=%H", "HEAD")
+	if err != nil {
+		return nil, fmt.Errorf("inboxcurator: find the commits that close an item: %w", err)
+	}
+	shas := strings.Fields(out)
+	if len(shas) == 0 {
+		return nil, nil
+	}
+	return readChanges(ctx, git, closesLogArgs, append([]string{"--no-walk=unsorted"}, shas...)...)
+}
+
 func Commit(ctx context.Context, git gitexec.Git, sha string) ([]Change, error) {
 	if !revisionRE.MatchString(sha) {
 		return nil, fmt.Errorf("%w: %q", ErrBadRevision, sha)
@@ -50,7 +62,16 @@ func pathLines(block string) []string {
 }
 
 func readLog(ctx context.Context, git gitexec.Git, rev ...string) ([]Change, error) {
-	out, err := git.Output(ctx, append([]string{"-c", "core.quotepath=false", "log", "--no-color", "--first-parent", "-m", "--name-only", logFormat}, rev...)...)
+	return readChanges(ctx, git, fullLogArgs, rev...)
+}
+
+var (
+	fullLogArgs   = []string{"-c", "core.quotepath=false", "log", "--no-color", "--first-parent", "-m", "--name-only", logFormat}
+	closesLogArgs = []string{"log", "--no-color", "--first-parent", logFormat}
+)
+
+func readChanges(ctx context.Context, git gitexec.Git, args []string, rev ...string) ([]Change, error) {
+	out, err := git.Output(ctx, slices.Concat(args, rev)...)
 	if err != nil {
 		return nil, fmt.Errorf("inboxcurator: read the landed commits %s: %w", strings.Join(rev, " "), err)
 	}

@@ -2,14 +2,19 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxcurator"
 )
 
@@ -470,5 +475,53 @@ func TestCurate_AClaimThatFailsTheCheckAgainStaysOpen(t *testing.T) {
 
 	if _, err := os.Stat(path); rc != 0 || err != nil || strings.Contains(stdout, "consume claimed") {
 		t.Errorf("rc = %d stdout = %q stderr = %q err = %v, want the item open with no consume", rc, stdout, stderr, err)
+	}
+}
+
+func (f curatorFixture) closeOnMain(t *testing.T) string {
+	t.Helper()
+	f.repo.Write("docs/note.md", "done\n")
+	f.repo.Git("add", "docs")
+	f.repo.Git("commit", "-q", "-m", "fix: the pool backfills", "-m", "Closes-Inbox: rolling-pool")
+	return f.repo.Git("rev-parse", "HEAD")
+}
+
+func TestCmd_InboxCurate_TheBoundaryConsumesAnItemThatMainClosedBeforeTheCursor(t *testing.T) {
+	t.Parallel()
+	for name, cursor := range map[string]bool{"a cursor past the closing commit": true, "no cursor file": false} {
+		f := newCuratorFixture(t, "enforce")
+		sha := f.closeOnMain(t)
+		if cursor {
+			body := `{"head":"` + sha + `"}`
+			if err := os.WriteFile(filepath.Join(f.root, ".evolve", curatorCursorFile), []byte(body), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		rc, stdout, stderr := f.curate(t, "", "--apply")
+
+		consumed, err := os.ReadFile(filepath.Join(f.root, ".evolve", "inbox", "consumed", "2026-10-01T00-00-00Z-rolling-pool.json"))
+		if rc != 0 || f.pending(t) || err != nil || !strings.Contains(stdout, "consume rolling-pool (history, applied)") || !strings.Contains(string(consumed), "main holds Closes-Inbox for this item ("+sha) {
+			t.Errorf("%s: rc = %d stdout = %q stderr = %q err = %v consumed = %s, want rolling-pool consumed with the sha in the resolution", name, rc, stdout, stderr, err, consumed)
+		}
+	}
+}
+
+func TestCuratorRun_AHistoryFaultWarnsAndYieldsNoHistory(t *testing.T) {
+	t.Parallel()
+	var stderr bytes.Buffer
+	failing := func(context.Context, string, string, []string, []string, io.Reader, io.Writer, io.Writer) (int, error) {
+		return 1, errors.New("git is gone")
+	}
+	run := curatorRun{git: gitexec.Git{Dir: t.TempDir(), Exec: failing}, stderr: &stderr}
+	open := []inboxbatch.Item{{ID: "x", CreatedAt: "2026-10-01T00:00:00Z"}}
+
+	got := run.history(open, true)
+
+	if got != nil || !strings.Contains(stderr.String(), "the history of Closes-Inbox is skipped") {
+		t.Errorf("history = %+v stderr = %q, want none and a WARN", got, stderr.String())
+	}
+	if run.history(open, false) != nil || run.history([]inboxbatch.Item{{ID: "z"}}, true) != nil {
+		t.Error("history without the backstop, or with no filed time, want none")
 	}
 }
