@@ -45,7 +45,7 @@ func swapRepoContractTest(t *testing.T, outcomes ...packOutcome) *[]string {
 	var dirs []string
 	prev := repoContractTestFn
 	t.Cleanup(func() { repoContractTestFn = prev })
-	repoContractTestFn = func(ctx context.Context, moduleDir string, out packLog) packOutcome {
+	repoContractTestFn = func(ctx context.Context, moduleDir string, out packLog, _ []string) packOutcome {
 		o := outcomes[len(outcomes)-1]
 		if len(dirs) < len(outcomes) {
 			o = outcomes[len(dirs)]

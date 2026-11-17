@@ -60,6 +60,12 @@ var serialTests = map[string]string{
 	"ship.TestReplay_20261109":                                                       seamRepoContract,
 	"ship.TestRunRepoContractTestsAlone_EveryPackageGreenIsGreen":                    seamGoTestJSON,
 	"ship.TestRunRepoContractTestsAlone_KeepsTheUnprovenAndTheStillRed":              seamGoTestJSON,
+	"ship.TestRunRepoContractPack_AWorkflowOnlyChangeRunsTheTestsThatReadIt":         seamGoTestJSON,
+	"ship.TestRunRepoContractPack_ADocsOnlyLaneGetsTheSameByNameCallAsAWorkflowLane": seamGoTestJSON,
+	"ship.TestRunRepoContractGate_AWorkflowOnlyChangeRunsTheTestsThatReadIt":         seamGoTestJSON,
+	"ship.TestRunRepoContractPack_AGoOnlyChangeLeavesOutTheDataSet":                  seamGoTestJSON,
+	"ship.TestRunRepoContractGate_AGoOnlyChangeLogsAndRunsTheAlwaysSet":              seamGoTestJSON,
+	"ship.TestRunRepoContractGate_ADiscoveryFailureRefusesBeforeThePackRuns":         seamGoTestJSON,
 }
 
 func TestEveryTopLevelTestIsParallelOrListedSerial(t *testing.T) {

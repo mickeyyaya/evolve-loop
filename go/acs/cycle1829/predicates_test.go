@@ -102,9 +102,9 @@ type packRecord struct {
 
 func buildFloorOver(ctx context.Context, root string) packRecord {
 	var rec packRecord
-	productionPack := func(ctx context.Context, _, root string) ([]string, string, error) {
+	productionPack := func(ctx context.Context, _, root string, changed []string) ([]string, string, error) {
 		rec.ran = true
-		rec.reds, rec.diagnostic, rec.err = ship.RunRepoContractPack(ctx, "", root)
+		rec.reds, rec.diagnostic, rec.err = ship.RunRepoContractPack(ctx, "", root, changed)
 		return rec.reds, rec.diagnostic, rec.err
 	}
 	findings := core.RepoContractFloorChecks(productionPack)(ctx, core.ReviewInput{Worktree: root, ProjectRoot: root})
