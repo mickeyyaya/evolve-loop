@@ -17,6 +17,7 @@ func init() {
 type Inputs struct {
 	Open                  []inboxbatch.Item
 	Changes               []Change
+	History               []Change
 	HasTest               func(string) bool
 	PathExists            func(string) bool
 	IsProtected           func(string) bool
@@ -33,6 +34,9 @@ func Curate(in Inputs) []Proposal {
 	for _, c := range in.Changes {
 		out = append(out, MatchLanding(c, in.Open, in.HasTest, in.MinShare)...)
 		routing = routing || TouchesRouting(c.Paths)
+	}
+	if in.Backstop {
+		out = append(out, ClosedOnMain(in.History, in.Open)...)
 	}
 	if routing {
 		out = append(out, Reroutes(in.Open, RerouteOptions{
