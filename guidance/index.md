@@ -29,3 +29,4 @@ Each row is one active rule of the registry. Open the body of a rule when your t
 | [read-before-call](rules/read-before-call.md) | Read a module and list its real exports before you call or import it. Never invent an API. | all | all | — | — |
 | [root-cause-no-workaround](rules/root-cause-no-workaround.md) | Fix the root cause through a redesign. Never apply a workaround that hides a failure. | all | all | — | — |
 | [one-home-no-duplicates](rules/one-home-no-duplicates.md) | Never duplicate logic, settings or prose. Keep each in one home, and generate each copy from it. | all | all | — | — |
+| [issue-gets-a-record](rules/issue-gets-a-record.md) | Record each issue, alert or mistake through the issue-record skill, with its logs, results, root cause, fix and regression test. | all | all | failures: test-failure, ci-red, gate-refusal, warn-signal, incident-signal, selfheal-incident, wrong-claim, revert, operator-correction | — |
