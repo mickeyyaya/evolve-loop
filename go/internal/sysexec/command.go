@@ -13,5 +13,8 @@ func Command(ctx context.Context, name string, args ...string) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
 	cmd.WaitDelay = WaitDelay
+	if err := refusedInCell(name); err != nil {
+		cmd.Err = err
+	}
 	return cmd
 }

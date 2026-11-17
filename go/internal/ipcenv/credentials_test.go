@@ -25,7 +25,7 @@ func TestCredentialIsolation_IsTheOneSet(t *testing.T) {
 			t.Errorf("Set[%s] = %q, want %q", k, got.Set[k], v)
 		}
 	}
-	if !slices.Equal(got.Unset, []string{"GH_TOKEN", "GITHUB_TOKEN"}) {
+	if !slices.Equal(got.Unset, []string{"GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN"}) {
 		t.Errorf("Unset = %v", got.Unset)
 	}
 }

@@ -38,3 +38,7 @@ func DispatchDepth(getenv func(string) string) int {
 	}
 	return n
 }
+
+func InCell(getenv func(string) string) bool {
+	return getenv(PhaseKey) != "" || DispatchDepth(getenv) > 0
+}

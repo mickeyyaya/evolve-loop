@@ -31,3 +31,24 @@ func TestPhaseMarkers_AreProtocolKeysWithTheirWireNames(t *testing.T) {
 		}
 	}
 }
+
+func TestInCell_IsTrueForThePhaseMarkerOrAPositiveDepth(t *testing.T) {
+	cases := []struct {
+		phase, depth string
+		want         bool
+	}{{"", "", false}, {"build", "", true}, {"", "1", true}, {"", "0", false}, {"", "x", false}}
+	for _, c := range cases {
+		getenv := func(k string) string {
+			switch k {
+			case ipcenv.PhaseKey:
+				return c.phase
+			case ipcenv.DispatchDepthKey:
+				return c.depth
+			}
+			return ""
+		}
+		if got := ipcenv.InCell(getenv); got != c.want {
+			t.Errorf("InCell(phase=%q depth=%q) = %v, want %v", c.phase, c.depth, got, c.want)
+		}
+	}
+}

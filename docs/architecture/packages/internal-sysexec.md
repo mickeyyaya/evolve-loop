@@ -6,13 +6,21 @@
 
 ## Design
 
-- **Leaf package.** It imports nothing from `internal/*`, only the standard library. It can then be imported by production code, by white-box tests and by the `go/test/fixtures` harness without an import cycle. The fixtures import core, so the seam cannot live in core.
+- **Leaf package.** It imports only the standard library and `internal/ipcenv`, which is itself a leaf. It can then be imported by production code, by white-box tests and by the `go/test/fixtures` harness without an import cycle. The fixtures import core, so the seam cannot live in core.
 - **`RunFunc` contract.** Every earlier runner signature reduces to it. It takes a working directory, an environment, piped stdin and streamed stdout and stderr. It gives an exit code and a Go error.
   - A process that runs and exits non-zero returns `(code, nil)`, never an error. Callers branch on the code: `git diff --quiet` with code 1 means "differences" and not "failure". This is load-bearing.
   - The error is non-nil only for unrecoverable failures: binary not found, context cancellation or pipe setup. The exit code is then -1.
   - An empty `dir` inherits the working directory of the caller.
   - A nil `env` inherits `os.Environ()`. A non-nil `env` replaces the process environment, as `os/exec` does.
   - A nil `stdin` means no stdin. A nil `stdout` or `stderr` discards that stream.
+- **No gh in a cell.** `Command` sets `Cmd.Err` to `ErrGhInCell` when the program is `gh` and `ipcenv.InCell` is true.
+  - A cell is the phase marker or a positive dispatch depth.
+  - `Run`, `Output` and `Start` return the error before gh starts. `DefaultRunner` and each caller of it do the same.
+  - The pipeline does GitHub work outside the cell. A cell gets no GitHub token and an empty `GH_CONFIG_DIR`.
+  - `GhCalls` is the table of each production gh call site with its verb and purpose.
+  - The verbs `status`, `release-preflight` and `ci classify` can run in a cell. They report gh as unavailable there.
+  - The guard source uses a raw string for the program name. The scan of the `"gh"` literal then lists only call sites.
+  - `TestC2367_001` keeps the table equal to the code.
 - **`DefaultRunner`.** It wraps `exec.CommandContext` and keeps the contract above.
 - **Helpers.** `Capture` returns stdout and stderr as strings with the exit code and leaves the failure decision to the caller. `Output` returns trimmed stdout and treats any non-zero exit as an error that carries the code and the stderr. Use it for queries where a non-zero exit is a failure (`git rev-parse`, describe, `symbolic-ref`). A caller that must read a specific non-zero code uses `Capture`.
 - **`CombinedOutput`.** It mirrors `exec.Cmd.CombinedOutput`: stdout and stderr interleave into one buffer. Some CLI classifiers frame their reply with header and footer lines on an unspecified stream, so the callers need the merged transcript. An empty stdin is passed as no stdin. A non-zero exit is not folded into the error, because these callers parse the buffer whatever the exit status.

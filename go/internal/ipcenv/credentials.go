@@ -20,7 +20,7 @@ func CredentialIsolation(ghConfigDir, gitConfigGlobal string) CredentialSet {
 			"GIT_SSH_COMMAND":     "ssh -o BatchMode=yes",
 			"GH_CONFIG_DIR":       ghConfigDir,
 		},
-		Unset: []string{"GH_TOKEN", "GITHUB_TOKEN"},
+		Unset: []string{"GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN"},
 	}
 }
 

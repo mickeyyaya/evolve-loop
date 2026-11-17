@@ -37,7 +37,7 @@ func Check(name, reason string, getenv func(string) string) error {
 	if reason == "" {
 		return fmt.Errorf("--%s: %w (pass --%s=<why>)", name, ErrNoReason, name)
 	}
-	if getenv(ipcenv.PhaseKey) != "" || ipcenv.DispatchDepth(getenv) > 0 {
+	if ipcenv.InCell(getenv) {
 		return fmt.Errorf("--%s: %w", name, ErrInCell)
 	}
 	return nil
