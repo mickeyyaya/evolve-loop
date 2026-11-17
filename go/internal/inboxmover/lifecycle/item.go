@@ -262,7 +262,34 @@ func rewriteItemJSON(path string, admit func(body []byte) error, rewrite func(it
 	return commitTmp(tmp, path)
 }
 
+var htmlEscapes = map[string]byte{"u003c": '<', "u003e": '>', "u0026": '&'}
+
+func literalValue(raw json.RawMessage) json.RawMessage {
+	out := make([]byte, 0, len(raw))
+	for i := 0; i < len(raw); i++ {
+		if raw[i] != '\\' || i+1 >= len(raw) {
+			out = append(out, raw[i])
+			continue
+		}
+		if i+6 <= len(raw) {
+			if c, ok := htmlEscapes[strings.ToLower(string(raw[i+1:i+6]))]; ok {
+				out = append(out, c)
+				i += 5
+				continue
+			}
+		}
+		out = append(out, raw[i], raw[i+1])
+		i++
+	}
+	return out
+}
+
 func marshalFiled(item map[string]json.RawMessage) ([]byte, error) {
+	literal := make(map[string]json.RawMessage, len(item))
+	for k, v := range item {
+		literal[k] = literalValue(v)
+	}
+	item = literal
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
