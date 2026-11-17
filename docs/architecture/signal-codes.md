@@ -31,6 +31,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 
 | Code | Meaning |
 |---|---|
+| `AUDIT_CASCADE_SHADOW` | at audit_cascade.stage shadow, the audit records whether enforce would escalate this cycle's audit; fields.would_escalate (true or false) and fields.changed_files (the count of changed files) |
 | `AUDIT_CIPARITY_CHANGESET_UNDERIVABLE` | the cycle's changed-package set was underivable (git failed — e.g. a concurrent-fleet .git/index.lock race) and a whole-repo CI-parity gate (go vet, acs-durable, integration tier) SKIPPED fail-open with a WARN diagnostic; one event per gate, CI backstops the check; fields.gate, root |
 | `AUDIT_CIPARITY_GATE_FAILED` | a CI-parity gate returned offenders — the audit FAILs and the cycle routes to retro; fields.cause ∈ {exit, retake_exec_failed, deadline_with_markers, retake_red, underivable, apicover, ungraduated}, fields.gate, offenders (count), first (the first offender), log (the integration-tier.log when written), exit |
 | `AUDIT_CIPARITY_GATE_STEP_FAILED` | a CI-parity gate's pre-verdict step could not run and the gate failed OPEN (the diagnostic is the WARN the audit renders): fields.step ∈ {exec, tier_attempt, tier_list, bin_dir, cover_run, cover_func, write_func_cover, pkg_dirs, measure}; fields.gate, err, cmd (the exec/list/fork steps) |
@@ -408,6 +409,12 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `OUTCOME_TIMING_SKIPPED` | phase-timing.json was not written because the workspace is empty; the composed timing set is returned to the caller unchanged |
 | `OUTCOME_TIMING_WRITE_FAILED` | phase-timing.json could not be encoded or written (marshal, temp write or rename); the reason names the step and the error; the composed set is still returned |
 
+### parallel.evaluate
+
+| Code | Meaning |
+|---|---|
+| `PARALLEL_EVALUATE_SHADOW` | at parallel_evaluate.stage shadow, the orchestrator computed the evaluate batch that enforce would run in parallel and dispatched it serially; fields.batch lists the phases in batch order |
+
 ### quality
 
 | Code | Meaning |
@@ -561,6 +568,12 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `SIGNALCENTER_UNKNOWN_MODULE` | an event named a module outside the closed set; raw value in fields.raw_module |
 | `SIGNALCENTER_UNKNOWN_SEVERITY` | an event carried a severity outside INFO/WARN/INCIDENT; raw value in fields.raw_severity |
 | `SIGNALCENTER_UNREGISTERED_CODE` | an event carried a code its module never registered; raw value in fields.raw_code |
+
+### tia
+
+| Code | Meaning |
+|---|---|
+| `TIA_SHADOW` | at regression_tia.stage shadow or enforce, the audit records which regression predicates the change would skip; fields.would_skip_count, fields.selected (the count of predicates that run) and fields.write_error when the decision file could not be written (severity WARN then) |
 
 ### tokens
 

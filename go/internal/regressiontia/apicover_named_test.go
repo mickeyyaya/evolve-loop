@@ -52,7 +52,7 @@ func TestResolveDeps_DropsPredicatesThatReachOutsideTheImportGraph(t *testing.T)
 	moduleDir := repoModuleDir(t)
 	const pkg = "./acs/regression/apicover"
 
-	if _, derivable := resolveDeps(moduleDir, []string{pkg})[pkg]; derivable {
+	if _, derivable := skippableDeps(listCorpusDeps(moduleDir, []string{pkg}))[pkg]; derivable {
 		t.Errorf("%s was classified as import-graph derivable, but it reads repo files and spawns `go list` — selection built on that would hide the very class this predicate guards", pkg)
 	}
 }

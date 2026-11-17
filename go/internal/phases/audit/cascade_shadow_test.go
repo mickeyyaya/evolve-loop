@@ -65,7 +65,7 @@ func TestRecordCascadeShadow_AHighRiskDiffWouldEscalateAndATrivialCleanDiffWould
 				gotRoot = root + "@" + base
 				return c.changed, c.known
 			}
-			recordCascadeShadowWith(req, c.verdict, files)
+			recordCascadeShadowWith(req, c.verdict, files, nil)
 			rec, ok := readCascadeRecord(t, req.Workspace)
 			if !ok || rec.Escalate != c.want || rec.Stage != "shadow" || rec.Cycle != 7 || rec.Verdict != c.verdict || rec.ChangedFiles != len(c.changed) {
 				t.Fatalf("record = %+v (written %v), want would_escalate=%v", rec, ok, c.want)
@@ -82,13 +82,13 @@ func TestRecordCascadeShadow_WritesNothingWhenTheCascadeIsOffOrThereIsNoWorkspac
 	called := false
 	files := func(string, string) ([]changedpkgs.ChangedFile, bool) { called = true; return nil, true }
 	off := cascadeRequest(t, "")
-	recordCascadeShadowWith(off, core.VerdictPASS, files)
+	recordCascadeShadowWith(off, core.VerdictPASS, files, nil)
 	if _, ok := readCascadeRecord(t, off.Workspace); ok || called {
 		t.Errorf("an off cascade wrote a record or read the diff (called=%v)", called)
 	}
 	none := cascadeRequest(t, shadowCascade)
 	none.Workspace = ""
-	recordCascadeShadowWith(none, core.VerdictPASS, files)
+	recordCascadeShadowWith(none, core.VerdictPASS, files, nil)
 	if called {
 		t.Error("no workspace must read no diff")
 	}
@@ -98,14 +98,14 @@ func TestRecordCascadeShadow_WritesNothingWhenTheCascadeIsOffOrThereIsNoWorkspac
 		t.Fatal(err)
 	}
 	unwritable.Workspace = filepath.Join(blocker, "ws")
-	diags := recordCascadeShadowWith(unwritable, core.VerdictPASS, func(string, string) ([]changedpkgs.ChangedFile, bool) { return nil, true })
+	diags := recordCascadeShadowWith(unwritable, core.VerdictPASS, func(string, string) ([]changedpkgs.ChangedFile, bool) { return nil, true }, nil)
 	if len(diags) != 1 || diags[0].Severity != "warning" || !strings.Contains(diags[0].Message, "audit cascade shadow: write "+auditcascade.RecordFile) {
 		t.Errorf("an unwritable workspace: diagnostics %+v, want one warning that names the record", diags)
 	}
 	projectOnly := cascadeRequest(t, shadowCascade)
 	projectOnly.Worktree = ""
 	var gotRoot string
-	recordCascadeShadowWith(projectOnly, core.VerdictPASS, func(root, _ string) ([]changedpkgs.ChangedFile, bool) { gotRoot = root; return nil, true })
+	recordCascadeShadowWith(projectOnly, core.VerdictPASS, func(root, _ string) ([]changedpkgs.ChangedFile, bool) { gotRoot = root; return nil, true }, nil)
 	if gotRoot != projectOnly.ProjectRoot {
 		t.Errorf("without a worktree the diff root = %q, want the project root", gotRoot)
 	}

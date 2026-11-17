@@ -35,3 +35,4 @@ The quality indexes (ADR-0153, proposed) plan to publish through this package as
 ## Findings
 
 - Each severity tier has one numeric home, `severityLevels`, with the values held in `infoLevel`, `warnLevel` and `incidentLevel`. A new tier needs a schema change, because the contract has no fourth tier.
+- Three shadow-stage codes joined the registry on 2026-11-15. They are `AUDIT_CASCADE_SHADOW` (module `audit`), `TIA_SHADOW` (module `tia`) and `PARALLEL_EVALUATE_SHADOW` (module `parallel.evaluate`). A code must start with the upper-case name of its module. The two new modules `tia` and `parallel.evaluate` give these codes an owner. The closed module set holds 42 modules.

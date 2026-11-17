@@ -30,6 +30,8 @@ type Decision struct {
 	Selected        []string `json:"selected,omitempty"`
 	WouldSkip       []string `json:"would_skip,omitempty"`
 	WouldSkipCount  int      `json:"would_skip_count"`
+	PureCount       int      `json:"pure_count"`
+	IOCount         int      `json:"io_count"`
 	DurationMS      int64    `json:"duration_ms"`
 }
 
@@ -68,8 +70,11 @@ func Compute(stage, repoRoot, moduleDir string, changed []string) Decision {
 	patterns := corpus(moduleDir)
 	scope := ChangedScope(repoRoot, changed)
 	var deps map[string][]string
+	var pure, io []string
 	if len(scope) > 0 && len(patterns) > 0 {
-		deps = resolveDeps(moduleDir, patterns)
+		reach, modPath := listCorpusDeps(moduleDir, patterns)
+		deps = skippableDeps(reach, modPath)
+		pure, io = Split(patterns, reach)
 	}
 	selected, wouldSkip := Select(patterns, scope, deps)
 	return Decision{
@@ -78,6 +83,8 @@ func Compute(stage, repoRoot, moduleDir string, changed []string) Decision {
 		Selected:        selected,
 		WouldSkip:       wouldSkip,
 		WouldSkipCount:  len(wouldSkip),
+		PureCount:       len(pure),
+		IOCount:         len(io),
 		DurationMS:      time.Since(start).Milliseconds(),
 	}
 }
@@ -198,24 +205,30 @@ func reachesAny(reach []string, errored map[string]bool) bool {
 	return false
 }
 
-func resolveDeps(moduleDir string, patterns []string) map[string][]string {
-	raw, modPath := listCorpusDeps(moduleDir, patterns)
-	if len(raw) == 0 {
-		return nil
-	}
-	out := map[string][]string{}
-	for key, imports := range raw {
-		var pats []string
-		derivable := true
-		for _, dep := range imports {
-			if _, hatch := escapeHatches[dep]; hatch {
-				derivable = false
-				break
-			}
-			pats = append(pats, "./"+strings.TrimPrefix(dep, modPath+"/")+"/...")
-		}
-		if !derivable || len(pats) == 0 {
+func skippable(reach []string) bool {
+	return len(reach) > 0 && !reachesAny(reach, nil)
+}
+
+func Split(patterns []string, reach map[string][]string) (pure, io []string) {
+	for _, p := range patterns {
+		if r, known := reach[p]; known && skippable(r) {
+			pure = append(pure, p)
 			continue
+		}
+		io = append(io, p)
+	}
+	return pure, io
+}
+
+func skippableDeps(reach map[string][]string, modPath string) map[string][]string {
+	out := map[string][]string{}
+	for key, imports := range reach {
+		if !skippable(imports) {
+			continue
+		}
+		pats := make([]string, len(imports))
+		for i, dep := range imports {
+			pats[i] = "./" + strings.TrimPrefix(dep, modPath+"/") + "/..."
 		}
 		sort.Strings(pats)
 		out[key] = pats
