@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "a top-level test with no t.Parallel and no declaration fails the guard, red before the change",
+    "a declared serial test passes the guard",
+    "go/cmd/evolve has no serialTests map after the move"
+  ],
+  "created_at": "2026-11-17T10:50:50Z",
+  "files": [
+    "go/internal/paralleltest/paralleltest.go",
+    "go/cmd/evolve/parallel_serial_tests_test.go"
+  ],
+  "fix": "Give internal/paralleltest a declaration that a test makes in its own file (for example a call with the reason as its first statement). The guard reads it. Move one package at a time, starting with go/cmd/evolve; remove its map in the same change.",
+  "id": "edit-layout-c3-serial-tests-declare-in-place",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "performance",
+  "summary": "Plan docs/plans/concurrent-edit-layout-2026-11.md (PR #1545), D3. go/cmd/evolve/parallel_serial_tests_test.go has 1,014 lines and 91 touches in 30 days; the serial maps of 10 packages take 155 touches (research F2.2).",
+  "title": "Serial tests declare their reason in their own file; the central serial maps go (concurrent-edit C3)",
+  "weight": 0.65
+}

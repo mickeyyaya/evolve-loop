@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "the report text of run agent-docs-review-20261117T104723Z-0962 counts 0 HIGH, red before the change",
+    "a report with an open '[HIGH]' finding under Findings still counts 1 HIGH"
+  ],
+  "created_at": "2026-11-17T10:49:24Z",
+  "files": [
+    "go/internal/reportdoc/severity_counts.go",
+    "go/internal/reportdoc/severity_counts_test.go"
+  ],
+  "fix": "Count only open findings: a finding under a Findings heading, not a line in a section that checks earlier fixes. Or give the review persona one grammar for a fixed finding with no severity tag, and make the counter read that grammar. Add a red test with the report text of this run.",
+  "id": "review-verdict-counts-a-fixed-finding-as-open",
+  "kind": "pipeline-integrity",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "2026-11-17, docs review round 2 of the concurrent-edit plan (run agent-docs-review-20261117T104723Z-0962): the report said 'No HIGH finding' and 'Verdict: PASS', with the line '- HIGH K5 vs C6: fixed.' under 'Round 1 fixes, checked'. reportdoc.CountSeverities (go/internal/reportdoc/severity_counts.go:36) counted that line as one open HIGH, so agentcmd.reportVerdict recorded FAIL (REVIEW_AGENT_RUN_VERDICT_MISMATCH: field PASS, stated PASS, high=1) and commit-gate refused the run. A false verdict is an operating-policy section 1.1 defect.",
+  "title": "A review report that lists a fixed finding as '- HIGH ...: fixed' turns a PASS into a run verdict FAIL",
+  "weight": 0.8
+}

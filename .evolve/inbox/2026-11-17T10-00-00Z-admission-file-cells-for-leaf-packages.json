@@ -6,6 +6,14 @@
     "docs/architecture/packages/internal-admission.md describes the file keys",
     "with fleet.orchestrator.file_cells empty, admission behaves as before; with cmd/evolve listed, the red test passes"
   ],
+  "continuation": {
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2461",
+    "branch": "cycle-cd3ae73e-2461",
+    "snapshot_sha": "f44fe6f7e85b38cd25c68ae44065d4d1eb8e9fac",
+    "base_sha": "c73010a5f801e27a855c9e6f21b43e7c9c05e916",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2461/audit-fail-reason.json",
+    "cycle": 2461
+  },
   "created_at": "2026-11-17T10:00:00Z",
   "files": [
     "go/internal/admission/admission.go",

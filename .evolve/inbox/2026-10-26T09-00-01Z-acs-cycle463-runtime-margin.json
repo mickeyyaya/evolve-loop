@@ -2,14 +2,6 @@
   "acceptance": [
     "go test -tags acs ./acs/cycle463/ finishes under 300 s on the console host"
   ],
-  "continuation": {
-    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2348",
-    "branch": "cycle-cd3ae73e-2348",
-    "snapshot_sha": "170c73b9a7121cc550c48cdfa4939ce4db3e4b28",
-    "base_sha": "59d9e50ba5e7d38bc03b345e8d5c71c499b7f91b",
-    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2348/audit-fail-reason.json",
-    "cycle": 2348
-  },
   "created_at": "2026-10-26T09:00:01Z",
   "deps": [],
   "failure_count": 1,
@@ -26,6 +18,19 @@
   "last_failure_reason": "cycle-failure-release",
   "last_failure_rung": "R2",
   "priority_class": "stability",
+  "released_continuations": [
+    {
+      "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2348",
+      "branch": "cycle-cd3ae73e-2348",
+      "snapshot_sha": "170c73b9a7121cc550c48cdfa4939ce4db3e4b28",
+      "base_sha": "59d9e50ba5e7d38bc03b345e8d5c71c499b7f91b",
+      "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2348/audit-fail-reason.json",
+      "cycle": 2348,
+      "released_at": "2026-11-17T10:13:17Z",
+      "reason": "older than 100 cycles",
+      "released_by": "evolve gc (continuation max age)"
+    }
+  ],
   "retry_plan": "fresh-deep-plan",
   "route": "console-manual",
   "routed_at": "2026-11-13T09:43:38Z",

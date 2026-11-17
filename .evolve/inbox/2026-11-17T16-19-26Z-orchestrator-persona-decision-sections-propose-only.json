@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "A predicate test fails on today's persona text and passes after the rewrite.",
+    "The persona names no script that ships, releases or writes cycle state as an action of the persona."
+  ],
+  "created_at": "2026-11-17T16:19:26Z",
+  "files": [
+    "agents/evolve-orchestrator.md"
+  ],
+  "fix": "Rewrite each decision section of agents/evolve-orchestrator.md as the proposal that the persona makes and the decision that the Go kernel takes. Add a predicate that scans each decision section for an imperative to run a ship, release or state script.",
+  "id": "orchestrator-persona-decision-sections-propose-only",
+  "kind": "fix",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "routed_at": "2026-11-17T18:53:01Z",
+  "routed_by": "loop",
+  "routed_cycle": 2468,
+  "routed_reason": "lane triage (cycle 2468) escalate_block: protected-surface: go/acs/cycle2468/predicates_test.go — control-plane changes go through the console route (operator-gated), not lane top_n",
+  "summary": "Cycle 2200 changed three sentences of the orchestrator persona. On main (2026-11-17) the section 'Verdict Decision Tree (after Audit)' still tells the persona to run ship.sh, release-pipeline.sh and record-failure-to-state.sh on each verdict, although the header says the Go kernel decides. Filed by the console from the lost request of cycle 2200.",
+  "title": "State the decision sections of agents/evolve-orchestrator.md as what the Go kernel decides, and pin them with a predicate",
+  "weight": 0.4
+}

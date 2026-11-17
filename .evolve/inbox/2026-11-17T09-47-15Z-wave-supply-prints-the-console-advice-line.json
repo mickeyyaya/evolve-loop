@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "a supply with 1 admissible item in a window of 8 prints console: feed (red before the change)",
+    "8 admissible items and 11 open console PRs print console: finish",
+    "8 admissible items and 3 open console PRs print console: build"
+  ],
+  "created_at": "2026-11-17T09:47:15Z",
+  "deps": [
+    "wave-supply-splits-console-route-by-checked-fact"
+  ],
+  "files": [
+    "go/cmd/evolve/cmd_wave_supply.go",
+    "go/cmd/evolve/cmd_wave_supply_test.go",
+    "docs/operations/wave-operations.md"
+  ],
+  "fix": "Add one advice line to evolve wave supply: 'console: feed' when admissible < the window, else 'console: finish' when open console PRs > the batch limit, else 'console: build'. Read the window and the batch limit from policy, and the open PR count through the existing PR host port. Print it in text and --json.",
+  "id": "wave-supply-prints-the-console-advice-line",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "performance",
+  "summary": "Plan docs/plans/console-build-or-route-2026-11.md K3 and operating-policy section 2 rule 6. The console starts no feature build while admissible items are fewer than the lane window (D4), and no new build while more than 10 console PRs are open (D6). The console reads these numbers by hand today.",
+  "title": "evolve wave supply prints the console advice: build, feed or finish (plan K3)",
+  "weight": 0.6
+}

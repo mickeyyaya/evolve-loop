@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "TestGcCmdRun in internal/cli/gccmd (fails to compile before the move); only the shim remains in cmd_gc*"
+  ],
+  "created_at": "2026-11-17T12:32:40Z",
+  "deps": [
+    "split-cmd-evolve-landcmd-pr-ci"
+  ],
+  "files": [
+    "go/cmd/evolve/",
+    "go/internal/cli/gccmd/"
+  ],
+  "fix": "Step 3 of docs/plans/split-cmd-evolve-2026-11.md (parent plan concurrent-edit-layout-2026-11, C6/D5). Run at a wave boundary with no open lane in the group's files (evolve wave supply). Red test: TestGcCmdRun in internal/cli/gccmd (fails to compile before the move); only the shim remains in cmd_gc*.go. dependsOn: split-cmd-evolve-landcmd-pr-ci. Note split (C7) follows the same group.",
+  "id": "split-cmd-evolve-gccmd",
+  "kind": "refactor",
+  "origin": "console",
+  "priority_class": "performance",
+  "summary": "Step 3 of docs/plans/split-cmd-evolve-2026-11.md. Filed by the console from the refused request inbox-add-3 of cycle 2460: the request channel runs only dispatch requests, so the pipeline never filed it.",
+  "title": "Move the gc verb group (10 files, 13 outbound symbols, 9 inbound functions) to go/internal/cli/gccmd behind a shim and a Deps value",
+  "weight": 0.6
+}

@@ -5,6 +5,12 @@
     "A paused cycle with a spent budget after the grant still starts a fresh cycle (no loop).",
     "docs/architecture/checkpoint-resume.md, docs/operations/wave-operations.md and the package notes name the verb and the order; 100% coverage on each changed function; zero code comments."
   ],
+  "consumed": {
+    "at": "2026-11-17T18:42:23Z",
+    "via": "inbox curate",
+    "cycle": "console",
+    "resolution": "inbox curator: main holds Closes-Inbox for this item (5b54e5283b5d304e21f8242aac01a7e371d28558) (commit 5b54e5283b5d304e21f8242aac01a7e371d28558)"
+  },
   "created_at": "2026-11-03T12:54:10Z",
   "files": [
     "go/cmd/evolve/cmd_cycle_resume.go",

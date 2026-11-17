@@ -2,14 +2,6 @@
   "acceptance": [
     "Main holds the behaviour that PR #1254 described, proven by a test through the real entry point that is red without the change, or this item is consumed with the evidence that main already holds it"
   ],
-  "continuation": {
-    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2352",
-    "branch": "cycle-cd3ae73e-2352",
-    "snapshot_sha": "823898da54aacd0517c4f2e27d0827385c5d3166",
-    "base_sha": "f869d73e084d4e1f3bcccd23d51fdde772bd0337",
-    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2352/audit-fail-reason.json",
-    "cycle": 2352
-  },
   "created_at": "2026-11-12T02:10:00Z",
   "deps": [],
   "files": [
@@ -23,6 +15,19 @@
   "kind": "fix",
   "origin": "console",
   "priority_class": "correctness",
+  "released_continuations": [
+    {
+      "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2352",
+      "branch": "cycle-cd3ae73e-2352",
+      "snapshot_sha": "823898da54aacd0517c4f2e27d0827385c5d3166",
+      "base_sha": "f869d73e084d4e1f3bcccd23d51fdde772bd0337",
+      "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2352/audit-fail-reason.json",
+      "cycle": 2352,
+      "released_at": "2026-11-17T18:44:28Z",
+      "reason": "older than 100 cycles",
+      "released_by": "evolve gc (continuation max age)"
+    }
+  ],
   "route": "console-manual",
   "routed_at": "2026-11-13T13:37:19Z",
   "routed_cycle": 2352,

@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "TestEarlyFastForward_ALaneNotAuditedOnItsBaseStopsBeforeTheRepoContractGate passes",
+    "TestImporterBackstop_SkipsThePackagesOfTheReceiptTree passes",
+    "TestImporterBackstop_AReceiptOfAnotherTreeSkipsNothing passes"
+  ],
+  "created_at": "2026-11-16T05:15:02Z",
+  "files": [
+    "go/internal/phases/ship/early_fast_forward.go",
+    "go/internal/phases/ship/repocontract_importers.go",
+    "go/internal/phases/ship/ship.go"
+  ],
+  "fix": "Build component S4 of docs/plans/gate-ship-retry-waste-2026-11.md (PR #1497) exactly as decided; red tests first with the names the plan gives; 100% coverage of changed functions.",
+  "id": "gate-ship-s4-binding-first-receipt",
+  "kind": "fix",
+  "origin": "console",
+  "priority_class": "performance",
+  "summary": "The repo-contract gate runs before the binding check and re-tests packages the composed gates passed: 2.88 h in wave 174. Plan D4.",
+  "title": "Ship checks each binding before the repo-contract gate and reuses the composition receipt",
+  "weight": 0.75
+}
