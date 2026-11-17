@@ -2,7 +2,7 @@
 
 - **Status:** proposed, 2026-10-20. The operator decided the questions of §7 on 2026-10-27. Each component of §6 has an inbox item since 2026-10-27.
 - **Research:** [wave-integration-2026-10](../research/wave-integration-2026-10.md). **Decision:** [ADR-0147](../architecture/adr/0147-the-wave-orchestrator-owns-integration-and-decides-when-the-wave-reaches-main.md). **Design:** [wave-orchestrator §15](../architecture/wave-orchestrator.md#15-integration).
-- **Amended:** 2026-11-04, [§10](#10-amendment-of-2026-11-04-console-prs-enter-the-train). 2026-11-05, [§11](#11-amendment-of-2026-11-05-the-lane-side-gets-a-driver-i14).
+- **Amended:** 2026-11-04, [§10](#10-amendment-of-2026-11-04-console-prs-enter-the-train). 2026-11-05, [§11](#11-amendment-of-2026-11-05-the-lane-side-gets-a-driver-i14). 2026-11-17, [§12](#12-amendment-of-2026-11-17-the-train-checks-main-first-and-prints-each-step).
 - **Amends:** [ADR-0139](../architecture/adr/0139-a-wave-orchestrator-supplies-admits-and-backfills-every-lane.md) (the orchestrator now owns landing), [ADR-0128](../architecture/adr/0128-landing-queue-tiered-reverification.md) and [ADR-0134](../architecture/adr/0134-fleet-landings-scale-through-content-keyed-verification-and-group-commit.md) (their composition, proof, tiers and conflict-graph order become parts of the integration engine).
 
 ## Table of contents
@@ -18,6 +18,7 @@
 - [9. Limits](#9-limits)
 - [10. Amendment of 2026-11-04: console PRs enter the train](#10-amendment-of-2026-11-04-console-prs-enter-the-train)
 - [11. Amendment of 2026-11-05: the lane side gets a driver (I14)](#11-amendment-of-2026-11-05-the-lane-side-gets-a-driver-i14)
+- [12. Amendment of 2026-11-17: the train checks main first and prints each step](#12-amendment-of-2026-11-17-the-train-checks-main-first-and-prints-each-step)
 
 ## 1. The problem
 
@@ -310,3 +311,36 @@ I5, I6, I10, I12 and I13 are landed, and this order starts after them. PR (c) is
 - Shadow proves the driver, the record, the order and the conflict count on a held base. It does not prove CI, the merge or the ejection handling.
 - The conflict counts at shadow are an upper bound, because a lane forked later counts as `conflicted_base_ahead`.
 - D3 stays unmeasured at shadow, because `Risk` and `Deps` are not supplied.
+
+## 12. Amendment of 2026-11-17: the train checks main first and prints each step
+
+The incident record [2026-11-17](../incidents/2026-11-17-the-integration-train-bisected-for-three-hours-on-a-red-main.md) gives the evidence. Sections 1 to 11 stay in force, and this section adds to them. The inbox item is `integration-train-compares-a-red-batch-with-main-before-it-splits`.
+
+### The train trusts a main that it did not check
+
+The console started a batch of 13 PRs one minute after the CI of `main` started. That CI run was red from a flaky test. `Merger.land` (`go/internal/integration/batchpr.go:86`) splits a batch on each red after one rerun. Each half failed on the test that `main` had already failed. Six CI runs took 3 h 16 min and landed one PR.
+
+The verb also printed its order and its size, and then nothing until it ended. The console watcher waited for a step line that the verb never printed.
+
+### Candidate designs
+
+| Option | What it does | Cost | Verdict |
+|---|---|---|---|
+| A. Check the CI of main at the start | Before the plan, read the required CI run of the head of `main`. Wait while the run is not complete. Refuse the batch when the run is not green. | One `gh` watch. The verb `evolve integration watch` already reads a run by its commit. | Chosen (D38). |
+| B. Refuse a pending main too | As A, but a running CI also refuses the batch. | The console must run the batch again, and it must poll to know when. | Rejected: it moves the wait to the console, and the console must not poll. |
+| C. Attribute each red batch to main | On a red batch, run the failed tests at the base with `baseattr`. Hold the batch when the base fails the same tests. | One local test run for each red step. It does not catch a red main before the first CI run. | Deferred (D40). It is the next step, and A removes the main cause. |
+| D. A console rule only | The console checks main before it runs the batch. | Nothing in code. | Rejected: the rule existed as practice and failed on 2026-11-16. |
+
+### New decisions
+
+| Id | Decision | Because | Rejected options and why |
+|---|---|---|---|
+| D38 | `Train.Plan` reads the required CI run of the commit that it plans on, the head of `origin/main`. A green run goes on. The real run waits while the run is not complete. The dry run reads the run once and does not wait: it prints `pending` and goes on. A red run, a cancelled run and a missing run are typed results, and each one refuses the batch with exit code 1. A `gh` error stays an error with exit code 2. | A bisect on a red main tests nothing (incident F2.1, F2.2). The check reuses `GhCI.Watch`, which the verb `evolve integration watch` already uses. One read of `main` gives both the check and the base. | B and D above. A refusal for each `Watch` error: a `gh` outage then reads as a red main. |
+| D39 | `Merger.land` emits a typed `Step` event for each CI run, rerun, verdict, split and landing. The batch command formats each event as one line that starts with `step:`. | A long verb must show its progress, so that a watcher can wake on a step (incident F3.1). The domain emits facts, and the command is the one home of the output text. | A text line from `Merger`: the domain then holds presentation text. A log file: a second channel can lose the line. |
+| D40 | Deferred. On a red batch, the train compares the failed tests with the base before it splits. The item `integration-train-compares-a-red-batch-with-main-before-it-splits` stays open for this part. Build D40 when the `step:` lines show a split whose halves both fail on a test that the base also fails. | D38 removes the red main at the start. A flake that fails two runs in a row can still split a batch. | Build it now: it adds a local test run to each red step, and no split of that kind is counted yet. |
+| D41 | On a red main, the operator lands the fix with `--main-red-fix` and exactly one PR. The flag needs one named PR, and the command refuses it in any other case. The main-red stop still judges the fix at the fast-forward, as before. | The stop says: land one batch with each fix and no other change (`go/internal/selfheal/main_red_hold.go:65`). D38 must not block that batch. D41 gives the shape of the batch, and the stop proves its content. | Let a held stop admit any batch: at `shadow` the stop admits all, so a batch of 13 PRs bisects again. Read the stop to pick the fix: the stop names a fix item, not a PR. |
+
+### What this does not prove
+
+- D38 checks main once, at the plan. A push to `main` during the batch is not checked. The wave is braked at a boundary, so only the train moves `main` then. Each landing of the train had a green CI.
+- D38 does not stop a split on a flake that fails twice. D40 is for that case.

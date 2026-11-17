@@ -31,6 +31,10 @@ type Train struct {
 	Inbox    InboxFunc
 	Root     string
 	Wave     string
+
+	MainCI     MainCI
+	MainRedFix bool
+	Progress   func(Step)
 }
 
 type Plan struct {
@@ -38,6 +42,7 @@ type Plan struct {
 	Kept    []DeliverableRecord
 	Landed  []DeliverableRecord
 	Ejected []*Ejection
+	Main    MainState
 }
 
 const (
@@ -76,6 +81,9 @@ func (t Train) Plan(ctx context.Context, prs []int) (Plan, error) {
 	}
 	base, err := t.Main.Head(ctx)
 	if err != nil {
+		return Plan{}, err
+	}
+	if plan.Main, err = t.checkMain(ctx, base); err != nil {
 		return Plan{}, err
 	}
 	plan.Kept, plan.Ejected, err = t.dryCompose(ctx, open, base)
@@ -256,7 +264,7 @@ func (t Train) Land(ctx context.Context, p Plan) (Outcome, error) {
 	}
 	if len(p.Kept) > 0 {
 		b := &batcher{t: t}
-		m := Merger{CI: t.CI, Main: t.Main, Compose: b.compose, Heads: t.movedHeads, Eject: t.eject}
+		m := Merger{CI: t.CI, Main: t.Main, Compose: b.compose, Heads: t.movedHeads, Eject: t.eject, Progress: t.Progress}
 		merged, err := m.Land(ctx, p.Kept)
 		merged.Ejected = append(out.Ejected, merged.Ejected...)
 		out = merged
