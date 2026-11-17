@@ -100,6 +100,7 @@ func (c Channel) read(ctx context.Context, f frame) error {
 			continue
 		}
 		rec, result := c.decide(ctx, f, rf)
+		rec = withSummary(rec)
 		err = writeRecord(f.cell, rec)
 		if err == nil {
 			c.emitDecision(f.cell, rec)

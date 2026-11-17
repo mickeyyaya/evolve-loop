@@ -503,3 +503,30 @@ func TestHandoff_TheRequestsOfAFailedRunAreNotRead(t *testing.T) {
 		t.Fatalf("the requests of a failed run are not read: %v, %d judgements", err, len(failed.judged))
 	}
 }
+
+func TestHandoff_EachDecisionSignalCarriesTheSummaryOfItsRecord(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name    string
+		verdict func(string) string
+		stage   string
+	}{
+		{"refused", func(n string) string { return refuse(n, "the build report already names the suspect file") }, policy.DispatchRequestStageEnforce},
+		{"approved in shadow", approve, policy.DispatchRequestStageShadow},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			h := newHarness(t)
+			h.request("dispatch-1", validRequest)
+			h.verdicts["dispatch-1"] = tc.verdict("dispatch-1")
+			if err := h.channel(tc.stage).Handoff(context.Background(), h.cell); err != nil {
+				t.Fatal(err)
+			}
+			r := h.record("dispatch-1")
+			decision := h.events[len(h.events)-1]
+			if r.Summary == "" || decision.Reason != r.Summary {
+				t.Fatalf("the decision signal carries the summary of the record as its reason, got reason %q and summary %q", decision.Reason, r.Summary)
+			}
+		})
+	}
+}
