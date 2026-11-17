@@ -72,11 +72,15 @@ func recordCount(cell Cell) int {
 	return len(records)
 }
 
-func writeRecord(cell Cell, r Record) error {
+func withSummary(r Record) Record {
 	r.Summary = fmt.Sprintf("%s to %s: %s", r.Request, r.Role, r.Decision)
 	if r.Reason != "" {
 		r.Summary += " (" + r.Reason + ")"
 	}
+	return r
+}
+
+func writeRecord(cell Cell, r Record) error {
 	path := recordPath(cell, r.Request)
 	err := os.MkdirAll(filepath.Dir(path), 0o755)
 	if err == nil {
