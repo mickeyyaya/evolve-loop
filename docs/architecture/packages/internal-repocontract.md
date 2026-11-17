@@ -7,6 +7,7 @@ Ship's repo-contract fixed scanner pack, in one place: which suites it runs and 
 - **`Packages()`** is the pack's suite list and its one home. Ship projects it into `repoContractPackages`, and the red message names each suite from it. The list holds the catalog, profile and phase-coherence scanners, the routing tests, and the packages the detector below finds reading the whole tree that are cheap enough to run at every ship: the raw git fixture ratchet, the function-size ratchet, the `TestMain` exit check (`testmainexit`), the env-agnostic param check (`policy`), the trust-kernel call-site scans (`guards`), the ACS tag guard (`acssuite`), fleet's module-graph partition (`fleet`), the unsatisfiable-predicate lint's live-bytes test and its `go/acs` corpus sweep, which fails only on the two proof kinds (`inverted-idiom`, `go-run-exit-code`) and logs the `absence-message` heuristic, so a heuristic false positive in a lane's new `go/acs/cycle<N>` package never blocks its ship (`evalqualitycheck`, under half a second), the inbox rank's weight-sort guard and its snapshot golden (`inboxrank`, since 2026-10-06, ADR-0121 P2: a lane that sorts inbox items by weight anywhere goes red at its own ship) and this package.
 - **Test-only helpers stay out of production code.** `TestTestOnlyHelpersAreNeverImportedByProductionCode` walks the module's non-test Go files (skipping `testdata`, `vendor` and dot directories) and fails on any import of `internal/fakeclitest` or `internal/tmuxtest`. `fakeclitest`'s `init` runs whatever script sits beside the running binary, and `tmuxtest.Main` starts and kills tmux servers, so either in a production binary would be a trust-boundary hole. It runs at every ship because this package is in the pack. `TestProductionImporters_FlagsOnlyNonTestFiles` pins that a `_test.go` file or a `testdata` fixture importing a helper is not flagged.
 - **`TreeReadingTests()`** is the pack's by-name half: each `TestSelection` is a package pattern and the tests in it that read the whole tree. Ship runs them as one more `go test -run '^(…)$'` over those packages, after the whole packages. One anchored alternation covers every package, so a selected name that also exists in another selected package runs there too; that only adds tests, it never drops one.
+- **`DataFileReads()`** is the registry of tests that read a tracked data file outside their own package directory. A row is `DataFileRead{Path, TestSelection}`. `Path` is one file, a directory prefix that ends in `/`, or `WholeRepository` (`"/"`). **`ByNameTestsFor(changed)`** merges the rows that the change selects with `TreeReadingTests()` per package. **`ByNameTests()`** is the coarse set. The pack runs the merged list as its one by-name call, so a data-only lane runs the tests that read its data file.
 - **`PackRuns(gate, root)`** decides whether the pack runs: only while `gates.repo_contract_gate` is on and `<root>/go/go.mod` declares evolve-loop's own module. **`GateOn`** reads the dial, and **`ModuleDir`** gives the module directory.
 
 ## Why the list is small and fixed
@@ -37,7 +38,42 @@ The detector knows these shapes and no others. A test that finds the tree anothe
 ## What the detector skips
 
 - **`acs/`.** Main's required CI runs only `-tags acs ./acs/regression/...` (`.github/workflows/ci.yml`), and the audit's CI-parity gate replays that suite for every lane (`internal/phases/audit/ciparitygate`), so a lane that breaks a regression predicate is stopped before ship. The per-cycle predicates under `acs/cycleN` (and `acs/redteam`) are `//go:build acs` and never run in required CI, so they cannot turn main red.
-- **Tests that climb past the module root** into the repository's `agents/`, `docs/` or `skills/`. A lane's non-Go edit can break those, but that is a different class: a changed non-Go file mapped to the tests that read it.
+- **Tests that climb past the module root** into the repository's `agents/`, `docs/`, `skills/` or `.github/`. The tree-reading guard skips them. The data-file registry owns them (see below).
+
+## Why a lane that edits a data file runs the tests that read it
+
+Plan: `docs/plans/data-file-test-floor-2026-11.md` (PR 1514), revision 5, layer 1.
+
+A lane that edits `.github/workflows/required.yml` changes no Go file. The unit-test floor selects packages from Go files only, so it ran no `ciparity` test. The pack ran one `ciparity` test by name. The other tests that parse the workflow first ran in CI on main.
+
+`ByNameTestsFor(changed)` selects the by-name tests of one pack run:
+
+- **The always set (D21)** holds the `TreeReadingTests()` rows and the data rows with `Path` equal to `WholeRepository` or under `go/`. It runs on every pack run.
+- **The data set (D20)** holds every other data row. It runs when `changed` holds a path that is not a `.go` file. No path class is left out, and `docs/` is included, because real tests read Markdown under `docs/`.
+- **The coarse set** is the always set plus the data set. `ByNameTests()` returns it. `UnknownChange()` returns a path list that selects it.
+
+The pack takes the changed paths (D23). The floor judge passes `floorPaths`. If the judge cannot read the paths, it passes `UnknownChange()`, so the pack runs the coarse set. Ship reads the changed files one time with `changedFilesTwice`, before the pack, and gives them to the pack and to both backstops. A discovery failure at ship is the `REPO_CONTRACT_INFRA` refusal. Ship has no fallback.
+
+`TestByNameTestsFor_ANonGoPathSelectsTheCoarseSet`, `TestByNameTestsFor_ADocsOnlyChangeSelectsTheCoarseSet` and `TestByNameTestsFor_AGoOnlyChangeSelectsTheAlwaysSet` pin the selector.
+
+### The row checks
+
+No check proves that each reader has a row (D19). A static read detector is open by construction, and three review rounds found new shapes that escaped it. The registry has these checks instead:
+
+- `TestDataFileReads_EveryNamedTestExists` fails when a row names a test function that its package does not declare. `go test -run` of an absent name passes with nothing run.
+- `TestDataFileReads_EveryPathExists` fails when a row `Path` is absent from the tree. `WholeRepository` is exempt.
+- `TestDataFileReads_EveryRowPathMatchesItsKind` fails on a directory `Path` with no `/`, and on a file `Path` that ends in `/`.
+- `TestByNameTests_StaysUnderTheCap` fails when `ByNameTests()` names more than `byNameTestCap` (775) tests. The floor judge fails open on a timeout, so the cap stops silent growth.
+
+Each check has a red case on a fixture: `TestMissingTestProblems_FlagsAnAbsentTestAndAnAbsentPackage`, `TestMissingPathProblems_FlagsAnAbsentPathAndExemptsTheWholeRepository` and `TestRowPathProblem_FlagsAKindMismatchOnAFixture`.
+
+### The limit of layer 1
+
+A new test that reads a data file and has no row is not in the coarse set. A later lane that changes that data file does not run it. The lane that adds the test runs it in its own unit-test floor, because it changes the package. Layer 2 of the plan (a monitor that proposes rows) and the ordinary review answer this limit. Revisit D21 if the always set passes half of `byNameTestCap`.
+
+### The environment-exclusive filter (D9)
+
+The ship consumer, `tierSelections` in `internal/phases/ship/repocontract.go`, keeps only the tree-reading tests of an env-exclusive package. Its tmux boots time out under a live wave. The registry stays a leaf. The floor judge names the pack wall time in its WARN (D12).
 
 ## Why no test may write into the real tree
 
@@ -80,5 +116,5 @@ A test that runs the pack and compares `git status --porcelain --ignored` before
 ## Gate contract
 
 - `Packages()` is the union of the pack patterns that a registry entry covers and the debt set `gateregistry.Unregistered()`. See [internal-gateregistry.md](internal-gateregistry.md) and [gate-contract.md](../gate-contract.md) section 6.5.
-- `TreeReadingTests()` names the two `gateregistry` tests that read the real tree. The pack stays at 15 patterns.
+- `TreeReadingTests()` names the two `gateregistry` tests that read the real tree. The pack stays at 15 patterns. `ByNameTestsFor(changed)` adds the data rows to the same by-name call.
 - `repocontract.go` and `phases/ship/repocontract.go` are on the protected surface. They select the tests that the ship gate runs.

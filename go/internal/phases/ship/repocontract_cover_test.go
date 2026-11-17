@@ -20,7 +20,7 @@ func TestDefaultRepoContractTest_AModuleDirThatIsGoneIsAStartErrorNotARed(t *tes
 	t.Parallel()
 	log, _ := coverPackLog()
 
-	got := defaultRepoContractTest(context.Background(), filepath.Join(t.TempDir(), "gone"), log)
+	got := defaultRepoContractTest(context.Background(), filepath.Join(t.TempDir(), "gone"), log, nil)
 
 	if got.err == nil || strings.Count(got.err.Error(), "go test start: ") != 2 || len(got.failures) != 0 {
 		t.Errorf("outcome = %+v, want two start errors (the pack and the selections) and no named red", got)
@@ -55,9 +55,10 @@ func TestRunAddedTestBackstop_AnUnreadableAddedTestIsAnInfraError(t *testing.T) 
 	t.Cleanup(func() { _ = os.Chmod(added, 0o644) })
 	log, _ := coverPackLog()
 
-	files, untagged, err := runAddedTestBackstop(context.Background(), log, repo, "HEAD", filepath.Join(repo, "go"), t.TempDir())
+	files := []changedpkgs.ChangedFile{{Path: "go/internal/x/x_test.go", Added: true}}
+	untagged, err := runAddedTestBackstop(context.Background(), log, repo, filepath.Join(repo, "go"), t.TempDir(), files)
 
-	if err == nil || !strings.Contains(err.Error(), "could not inspect an added test's build constraints") || files != nil || untagged != nil {
-		t.Errorf("runAddedTestBackstop = %v, %v, %v, want the INFRA inspect error and nothing run", files, untagged, err)
+	if err == nil || !strings.Contains(err.Error(), "could not inspect an added test's build constraints") || untagged != nil {
+		t.Errorf("runAddedTestBackstop = %v, %v, want the INFRA inspect error and nothing run", untagged, err)
 	}
 }

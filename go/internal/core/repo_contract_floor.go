@@ -16,7 +16,7 @@ import (
 
 const repoContractFloorDeadline = 120 * time.Second
 
-type RepoContractPackFn func(ctx context.Context, projectRoot, root string) (reds []string, diagnostic string, err error)
+type RepoContractPackFn func(ctx context.Context, projectRoot, root string, changed []string) (reds []string, diagnostic string, err error)
 
 func RepoContractFloorChecks(run RepoContractPackFn) BuildFloorCheckFn {
 	return FailOpen("repo-contract", RepoContractFloorJudge(run))
@@ -36,19 +36,29 @@ func RepoContractFloorJudge(run RepoContractPackFn) FloorJudge {
 		}
 		runCtx, cancel := context.WithTimeout(ctx, repoContractFloorDeadline)
 		defer cancel()
-		reds, diagnostic, err := run(runCtx, in.ProjectRoot, in.Worktree)
+		started := time.Now()
+		reds, diagnostic, err := run(runCtx, in.ProjectRoot, in.Worktree, changedOrUnknown(ctx, in))
 		if len(reds) == 0 {
-			return nil, unnamedPackExit(err, diagnostic)
+			return nil, unnamedPackExit(err, diagnostic, time.Since(started))
 		}
 		return in.repoContractLines(ctx, reds, diagnostic), nil
 	}
 }
 
-func unnamedPackExit(err error, diagnostic string) error {
+func changedOrUnknown(ctx context.Context, in ReviewInput) []string {
+	paths, err := floorPaths(ctx, in)
+	if err != nil {
+		fmt.Fprintf(in.errOut(), "[build-floor] repo-contract floor: %v; the pack runs the whole by-name set\n", err)
+		return repocontract.UnknownChange()
+	}
+	return paths
+}
+
+func unnamedPackExit(err error, diagnostic string, elapsed time.Duration) error {
 	if err == nil {
 		return nil
 	}
-	return fmt.Errorf("scanner pack exited nonzero naming no test (%v; the floor's deadline is %s); ship's gate runs the pack again before it pushes:\n%s", err, repoContractFloorDeadline, floorFailureDiagnostic(diagnostic))
+	return fmt.Errorf("scanner pack exited nonzero naming no test (%v; the pack ran %s; the floor's deadline is %s); ship's gate runs the pack again before it pushes:\n%s", err, elapsed.Round(time.Millisecond), repoContractFloorDeadline, floorFailureDiagnostic(diagnostic))
 }
 
 func (in ReviewInput) repoContractLines(ctx context.Context, reds []string, diagnostic string) []string {

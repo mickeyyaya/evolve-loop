@@ -30,7 +30,7 @@ func TestProductionBuildFloorChecks_CorrectsARedRepoContractPackByTheTestsName(t
 	var ranIn []string
 	prev := repoContractPack
 	t.Cleanup(func() { repoContractPack = prev })
-	repoContractPack = func(_ context.Context, _, root string) ([]string, string, error) {
+	repoContractPack = func(_ context.Context, _, root string, _ []string) ([]string, string, error) {
 		ranIn = append(ranIn, root)
 		return []string{red}, "", errors.New("exit status 1")
 	}

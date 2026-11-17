@@ -19,6 +19,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/addedtests"
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/repocontract"
@@ -29,7 +30,30 @@ import (
 
 var repoContractPackages = repocontract.Packages()
 
-var repoContractSelections = repocontract.TreeReadingTests()
+var repoContractSelections = repoContractSelectionsFor(repocontract.UnknownChange())
+
+func repoContractSelectionsFor(changed []string) []repocontract.TestSelection {
+	return tierSelections(repocontract.ByNameTestsFor(changed), repocontract.TreeReadingTests())
+}
+
+func tierSelections(all, tree []repocontract.TestSelection) []repocontract.TestSelection {
+	treeTests := map[string][]string{}
+	for _, selection := range tree {
+		treeTests[selection.Package] = append(treeTests[selection.Package], selection.Tests...)
+	}
+	kept := make([]repocontract.TestSelection, 0, len(all))
+	for _, selection := range all {
+		if !ciparity.EnvExclusivePkg(selection.Package) {
+			kept = append(kept, selection)
+			continue
+		}
+		tests := slices.DeleteFunc(slices.Clone(selection.Tests), func(test string) bool { return !slices.Contains(treeTests[selection.Package], test) })
+		if len(tests) > 0 {
+			kept = append(kept, repocontract.TestSelection{Package: selection.Package, Tests: tests})
+		}
+	}
+	return kept
+}
 
 const packWaitDelay = 2 * time.Second
 
@@ -78,9 +102,9 @@ func (o packOutcome) allNamedTests() bool {
 
 var repoContractTestFn = defaultRepoContractTest
 
-func defaultRepoContractTest(ctx context.Context, moduleDir string, out packLog) packOutcome {
+func defaultRepoContractTest(ctx context.Context, moduleDir string, out packLog, changed []string) packOutcome {
 	whole := runRepoContractPackages(ctx, moduleDir, out, repoContractPackages)
-	return whole.merged(runGoTestJSON(ctx, moduleDir, out, repoContractSelectionArgs(repoContractSelections)))
+	return whole.merged(goTestJSONFn(ctx, moduleDir, out, repoContractSelectionArgs(repoContractSelectionsFor(changed))))
 }
 
 func (o packOutcome) merged(next packOutcome) packOutcome {
@@ -105,8 +129,11 @@ func repoContractSelectionArgs(selections []repocontract.TestSelection) []string
 	return append(args, packages...)
 }
 
-func RunRepoContractPack(ctx context.Context, projectRoot, root string) (reds []string, diagnostic string, err error) {
-	return runRecordedPack(ctx, floorRecorderFor(projectRoot), root, repoContractTestFn, os.Stderr)
+func RunRepoContractPack(ctx context.Context, projectRoot, root string, changed []string) (reds []string, diagnostic string, err error) {
+	test := func(ctx context.Context, moduleDir string, out packLog) packOutcome {
+		return repoContractTestFn(ctx, moduleDir, out, changed)
+	}
+	return runRecordedPack(ctx, floorRecorderFor(projectRoot), root, test, os.Stderr)
 }
 
 func runRecordedPack(ctx context.Context, rec *scanShadow, root string, test func(context.Context, string, packLog) packOutcome, notes io.Writer) (reds []string, diagnostic string, err error) {
@@ -160,7 +187,7 @@ func packagesOf(failures []packFailure) []string {
 }
 
 func runRepoContractPackagesWithTags(ctx context.Context, moduleDir string, out packLog, packages, tags []string) packOutcome {
-	return runGoTestJSON(ctx, moduleDir, out, repoContractTestArgs(packages, tags))
+	return goTestJSONFn(ctx, moduleDir, out, repoContractTestArgs(packages, tags))
 }
 
 var goTestJSONFn = runGoTestJSON
@@ -443,18 +470,21 @@ func runRepoContractSteps(ctx context.Context, out packLog, gate, root, baseRef,
 	shadow := scanShadowFrom(ctx)
 	shadow.begin(ctx, root)
 	defer shadow.finish()
-	if err := runFixedPack(ctx, out, gate, root, baseRef, workspace); err != nil {
+	files, err := changedFilesTwice(out, root, baseRef)
+	if err != nil {
 		return err
 	}
-
-	files, untagged, err := runAddedTestBackstop(ctx, out, root, baseRef, moduleDir, workspace)
+	if err := runFixedPack(ctx, out, gate, root, baseRef, workspace, changedPaths(files)); err != nil {
+		return err
+	}
+	untagged, err := runAddedTestBackstop(ctx, out, root, moduleDir, workspace, files)
 	if err != nil {
 		return err
 	}
 	return runImporterBackstop(ctx, out, root, moduleDir, workspace, files, untagged, cleared)
 }
 
-func runFixedPack(ctx context.Context, out packLog, gate, root, baseRef, workspace string) error {
+func runFixedPack(ctx context.Context, out packLog, gate, root, baseRef, workspace string, changed []string) error {
 	runs, note := repocontract.PackRuns(gate, root)
 	moduleDir := repocontract.ModuleDir(root)
 	if !runs {
@@ -467,20 +497,24 @@ func runFixedPack(ctx context.Context, out packLog, gate, root, baseRef, workspa
 	fmt.Fprintf(out, "[ship] repo-contract scanner pack: go test -json -count=1 -timeout %s %s (module %s, changes vs %s)\n",
 		repoContractTestTimeout,
 		strings.Join(repoContractPackages, " "), moduleDir, baseRef)
-	fmt.Fprintf(out, "[ship] repo-contract tree-reading tests by name: go %s\n", strings.Join(repoContractSelectionArgs(repoContractSelections), " "))
+	fmt.Fprintf(out, "[ship] repo-contract tree-reading and data-read tests by name: go %s\n", strings.Join(repoContractSelectionArgs(repoContractSelectionsFor(changed)), " "))
 	return runClassifiedPack(ctx, out, workspace, scannerPackName, func() packOutcome {
-		return repoContractTestFn(ctx, moduleDir, out)
+		return repoContractTestFn(ctx, moduleDir, out, changed)
 	})
 }
 
-func runAddedTestBackstop(ctx context.Context, out packLog, root, baseRef, moduleDir, workspace string) (files []changedpkgs.ChangedFile, untagged []string, err error) {
-	files, err = changedFilesTwice(out, root, baseRef)
-	if err != nil {
-		return nil, nil, err
+func changedPaths(files []changedpkgs.ChangedFile) []string {
+	paths := make([]string, 0, len(files))
+	for _, file := range files {
+		paths = append(paths, file.Path)
 	}
+	return paths
+}
+
+func runAddedTestBackstop(ctx context.Context, out packLog, root, moduleDir, workspace string, files []changedpkgs.ChangedFile) (untagged []string, err error) {
 	groups, excluded, inspectErr := addedtests.Groups(root, files)
 	if inspectErr != nil {
-		return nil, nil, shiperr.NewShipError(shiperr.CodeRepoContractInfra, shiperr.ShipClassPrecondition, shiperr.StageAtomicShip,
+		return nil, shiperr.NewShipError(shiperr.CodeRepoContractInfra, shiperr.ShipClassPrecondition, shiperr.StageAtomicShip,
 			fmt.Sprintf("repo-contract added-test backstop: could not inspect an added test's build constraints (%v) — INFRA fault, not a contract violation; safe to re-dispatch", inspectErr))
 	}
 	for _, path := range excluded {
@@ -495,7 +529,7 @@ func runAddedTestBackstop(ctx context.Context, out packLog, root, baseRef, modul
 		if err := runClassifiedPack(ctx, out, workspace, "added-test backstop", func() packOutcome {
 			return runRepoContractPackagesWithTags(ctx, moduleDir, out, group.Packages, group.Tags)
 		}); err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		if len(group.Tags) == 0 {
 			for _, pkg := range group.Packages {
@@ -503,7 +537,7 @@ func runAddedTestBackstop(ctx context.Context, out packLog, root, baseRef, modul
 			}
 		}
 	}
-	return files, untagged, nil
+	return untagged, nil
 }
 
 func runClassifiedPack(ctx context.Context, out io.Writer, workspace, name string, run func() packOutcome) error {

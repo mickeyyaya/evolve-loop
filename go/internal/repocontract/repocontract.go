@@ -171,6 +171,7 @@ var treeReadingSelections = []TestSelection{
 		"TestFailureDiagWriter_OneConstructionSite",
 		"TestFailureLearningEngine_OneConstructionSite",
 		"TestLoadTddKit_TheRealKitNamesGoModuleDirForAModuleDirCopy",
+		"TestNoDecisionLiteralOutsideDecider",
 		"TestPhaseAdvisor_OneConstructionSite",
 		"TestPhaseTimings_SingleWriter",
 	}},

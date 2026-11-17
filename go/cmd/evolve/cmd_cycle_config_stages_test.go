@@ -22,7 +22,7 @@ func newStagedProductionFixture(t *testing.T) (*gittest.Repo, core.ReviewInput, 
 	packRuns := 0
 	prevPack, prevLint := repoContractPack, lintPackages
 	t.Cleanup(func() { repoContractPack, lintPackages = prevPack, prevLint })
-	repoContractPack = func(context.Context, string, string) ([]string, string, error) {
+	repoContractPack = func(context.Context, string, string, []string) ([]string, string, error) {
 		packRuns++
 		return nil, "", nil
 	}

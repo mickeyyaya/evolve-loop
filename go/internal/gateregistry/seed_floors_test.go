@@ -63,7 +63,7 @@ func packStubs() map[string]string {
 	for _, pattern := range repocontract.Packages() {
 		dirs = append(dirs, strings.TrimSuffix(pattern, "/..."))
 	}
-	for _, selection := range repocontract.TreeReadingTests() {
+	for _, selection := range repocontract.ByNameTests() {
 		dirs = append(dirs, selection.Package)
 	}
 	stubs := map[string]string{}
