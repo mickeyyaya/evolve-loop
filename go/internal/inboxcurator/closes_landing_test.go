@@ -17,7 +17,7 @@ const (
 )
 
 func TestMatchLanding_AClosesInboxTrailerInAMergedBranchIsADeterministicConsume(t *testing.T) {
-	change := Change{Commit: "c1220", Text: "Merge PR #1220 into the boundary batch", Closes: []string{"rolling-pool"}}
+	change := Change{Commit: "c1220", Text: "Merge PR #1220 into the boundary batch", Closes: []string{"rolling-pool"}, When: landedAt}
 	other := item("pool", "other work", []string{"go/x.go"})
 	other.Path = "2026-10-18T00-00-00Z-pool.json"
 
