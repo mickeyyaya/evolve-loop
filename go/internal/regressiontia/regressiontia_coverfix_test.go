@@ -103,3 +103,25 @@ func TestSelect_AnEmptyDependencyPatternOverlapsEveryScope(t *testing.T) {
 		t.Fatalf("selected=%v wouldSkip=%v: a root-wide dependency must stay selected", selected, wouldSkip)
 	}
 }
+
+func TestListCorpusDepsErrors_OmitsErroredPackagesAndTheirImporters(t *testing.T) {
+	withResolveDepsCoverfixListing(t, strings.Join([]string{
+		"example.com/x/internal/ghost|ERR",
+		"example.com/x/acs/regression/a|example.com/x/internal/ghost",
+		"example.com/x/acs/regression/b|ERR",
+		"example.com/x/acs/regression/b_test|example.com/x/internal/leaf",
+		"example.com/x/acs/regression/c|example.com/x/internal/leaf",
+		"example.com/x/internal/leaf|",
+	}, "\n"))
+	patterns := []string{"./acs/regression/a", "./acs/regression/b", "./acs/regression/c"}
+	deps, _ := listCorpusDeps(t.TempDir(), patterns)
+	if _, ok := deps["./acs/regression/a"]; ok {
+		t.Error("a reaches an errored package and must have no dependency entry")
+	}
+	if _, ok := deps["./acs/regression/b"]; ok {
+		t.Error("b has a go list error and must have no dependency entry")
+	}
+	if !reflect.DeepEqual(deps["./acs/regression/c"], []string{"example.com/x/internal/leaf"}) {
+		t.Errorf("c = %v, want its leaf closure", deps["./acs/regression/c"])
+	}
+}

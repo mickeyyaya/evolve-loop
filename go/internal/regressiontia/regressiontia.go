@@ -111,6 +111,8 @@ func corpus(moduleDir string) []string {
 	return out
 }
 
+const depGraphFormat = "{{.ImportPath}}|{{if .Error}}ERR{{else}}{{join .Imports \" \"}}{{end}}"
+
 var escapeHatches = map[string]struct{}{
 	"os":       {},
 	"os/exec":  {},
@@ -139,7 +141,7 @@ func PurePackages(moduleDir string, importPaths []string) map[string]bool {
 	if err != nil || modPath == "" {
 		return out
 	}
-	args := append([]string{"list", "-e", "-test", "-deps", "-f", "{{.ImportPath}}|{{if .Error}}ERR{{else}}{{join .Imports \" \"}}{{end}}"}, importPaths...)
+	args := append([]string{"list", "-e", "-test", "-deps", "-f", depGraphFormat}, importPaths...)
 	raw, err := sysexec.Output(ctx, depsRunner, moduleDir, "go", args...)
 	if err != nil {
 		return out
@@ -191,7 +193,16 @@ func parseDepGraph(raw string, want map[string]struct{}) (map[string][]string, m
 
 func reachesAny(reach []string, errored map[string]bool) bool {
 	for _, dep := range reach {
-		if _, hatch := escapeHatches[dep]; hatch || errored[dep] {
+		if _, hatch := escapeHatches[dep]; hatch {
+			return true
+		}
+	}
+	return reachesErrored(reach, errored)
+}
+
+func reachesErrored(reach []string, errored map[string]bool) bool {
+	for _, dep := range reach {
+		if errored[dep] {
 			return true
 		}
 	}
@@ -238,32 +249,29 @@ func listCorpusDeps(moduleDir string, patterns []string) (map[string][]string, s
 		return nil, ""
 	}
 	out, err := sysexec.Output(ctx, depsRunner, moduleDir, "go", "list", "-e", "-tags", "acs", "-test", "-deps",
-		"-f", "{{.ImportPath}}|{{join .Imports \" \"}}", "./"+filepath.ToSlash(regressionDir)+"/...")
+		"-f", depGraphFormat, "./"+filepath.ToSlash(regressionDir)+"/...")
 	if err != nil {
 		return nil, ""
 	}
 
 	want := map[string]struct{}{}
+	owners := map[string]string{}
 	for _, p := range patterns {
-		want[p] = struct{}{}
+		owner := modPath + "/" + strings.TrimPrefix(p, "./")
+		want[owner] = struct{}{}
+		owners[owner] = p
 	}
-	graph := map[string][]string{}
-	starts := map[string][]string{}
-	for _, line := range strings.Split(out, "\n") {
-		self, rest, ok := strings.Cut(line, "|")
-		if !ok {
+	graph, starts, errored := parseDepGraph(out, want)
+	deps := map[string][]string{}
+	for owner, nodes := range starts {
+		if errored[owner] {
 			continue
 		}
-		node := stripVariant(self)
-		graph[node] = append(graph[node], stripVariants(strings.Fields(rest))...)
-		key := "./" + strings.TrimPrefix(testPackageOwner(self), modPath+"/")
-		if _, ok := want[key]; ok && !strings.HasSuffix(node, ".test") {
-			starts[key] = append(starts[key], node)
+		reach := moduleLocalReach(graph, modPath, nodes)
+		if reachesErrored(reach, errored) {
+			continue
 		}
-	}
-	deps := map[string][]string{}
-	for key, nodes := range starts {
-		deps[key] = moduleLocalReach(graph, modPath, nodes)
+		deps[owners[owner]] = reach
 	}
 	return deps, modPath
 }
