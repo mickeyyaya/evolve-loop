@@ -5,9 +5,14 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/repocontract"
 )
 
 const ratchetRedName = "github.com/mickeyyaya/evolve-loop/go/internal/rawgitratchet.TestRatchet_NoNewRawGitFixtures"
@@ -20,9 +25,11 @@ type fakeRepoContractPack struct {
 	err        error
 	dirs       []string
 	projects   []string
+	changed    [][]string
 }
 
-func (f *fakeRepoContractPack) run(_ context.Context, projectRoot, root string) ([]string, string, error) {
+func (f *fakeRepoContractPack) run(_ context.Context, projectRoot, root string, changed []string) ([]string, string, error) {
+	f.changed = append(f.changed, changed)
 	f.dirs = append(f.dirs, root)
 	f.projects = append(f.projects, projectRoot)
 	return f.reds, f.diagnostic, f.err
@@ -122,7 +129,7 @@ func TestRepoContractFloorChecks_RunsThePackUnderItsOwnDeadline(t *testing.T) {
 
 	var remaining time.Duration
 	var hasDeadline bool
-	run := func(ctx context.Context, _, _ string) ([]string, string, error) {
+	run := func(ctx context.Context, _, _ string, _ []string) ([]string, string, error) {
 		var deadline time.Time
 		deadline, hasDeadline = ctx.Deadline()
 		remaining = time.Until(deadline)
@@ -142,7 +149,7 @@ func TestRepoContractFloorChecks_ADeadlineKillWarnsAndPassesTheHandoff(t *testin
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
-	blocking := func(ctx context.Context, _, _ string) ([]string, string, error) {
+	blocking := func(ctx context.Context, _, _ string, _ []string) ([]string, string, error) {
 		<-ctx.Done()
 		return nil, "partial output before the kill\n", ctx.Err()
 	}
@@ -221,5 +228,96 @@ func TestRepoContractFloor_ARedPackCorrectsTheBuildAndNeverReachesTheAudit(t *te
 	}
 	if build.calls < 2 || !strings.Contains(build.requests[1].CorrectionDirective, "TestRatchet_NoNewRawGitFixtures") {
 		t.Fatalf("the build is re-dispatched with the ratchet's test named; builds=%d", build.calls)
+	}
+}
+
+func TestUnnamedPackExit_NamesThePackWallTimeAndTheFloorDeadline(t *testing.T) {
+	t.Parallel()
+
+	err := unnamedPackExit(errors.New("signal: killed"), "chatter\n", 95400*time.Millisecond)
+	if err == nil {
+		t.Fatal("an exit that names no test is a WARN, never nil")
+	}
+	for _, want := range []string{"signal: killed", "the pack ran 1m35.4s", "the floor's deadline is 2m0s", "chatter"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the WARN names %q; got %q", want, err)
+		}
+	}
+	if got := unnamedPackExit(nil, "", time.Second); got != nil {
+		t.Fatalf("a clean exit has no WARN; got %v", got)
+	}
+}
+
+func TestRepoContractFloorChecks_AnUnnamedExitWarnsWithTheWallTimeOfItsRun(t *testing.T) {
+	t.Parallel()
+
+	unnamed := &fakeRepoContractPack{err: errors.New("signal: killed")}
+	var sink injectedStderr
+	RepoContractFloorChecks(unnamed.run)(context.Background(), ReviewInput{Phase: string(PhaseBuild), Worktree: worktreeWithModule(t), Stderr: &sink})
+	if !strings.Contains(sink.String(), "the pack ran ") {
+		t.Fatalf("the judge measures the pack run and puts it in the WARN; stderr=%q", sink.String())
+	}
+}
+
+func selectionHolds(selections []repocontract.TestSelection, pkg, test string) bool {
+	return slices.ContainsFunc(selections, func(selection repocontract.TestSelection) bool {
+		return selection.Package == pkg && slices.Contains(selection.Tests, test)
+	})
+}
+
+func TestRepoContractFloorJudge_AWorkflowOnlyWorktreeRunsTheTestsThatReadIt(t *testing.T) {
+	t.Parallel()
+
+	repo := gittest.Fixture(t)
+	writeFile(t, filepath.Join(repo.Dir, "go", "go.mod"), "module github.com/mickeyyaya/evolve-loop/go\n\ngo 1.23\n")
+	repo.Git("add", "-A")
+	repo.Git("commit", "-q", "-m", "base")
+	base := repo.Git("rev-parse", "HEAD")
+	writeFile(t, filepath.Join(repo.Dir, ".github", "workflows", "required.yml"), "name: required\n")
+	pack := &fakeRepoContractPack{}
+	in := ReviewInput{Phase: string(PhaseBuild), Worktree: repo.Dir, ProjectRoot: repo.Dir, WorktreeBaseSHA: base}
+	if _, err := RepoContractFloorJudge(pack.run)(context.Background(), in); err != nil {
+		t.Fatal(err)
+	}
+	if len(pack.changed) != 1 || !slices.Equal(pack.changed[0], []string{".github/workflows/required.yml"}) {
+		t.Fatalf("the judge hands the pack the changed paths of the worktree; got %q", pack.changed)
+	}
+	if !selectionHolds(repocontract.ByNameTestsFor(pack.changed[0]), "./internal/ciparity", "TestRequiredWorkflow_AlwaysReportsAndCannotSkipDependencies") {
+		t.Fatal("the selection of a workflow-only change holds the workflow test of ciparity")
+	}
+}
+
+func TestRepoContractFloorJudge_AGoOnlyWorktreeHandsThePackOnlyGoPaths(t *testing.T) {
+	t.Parallel()
+
+	repo := gittest.Fixture(t)
+	writeFile(t, filepath.Join(repo.Dir, "go", "go.mod"), "module github.com/mickeyyaya/evolve-loop/go\n\ngo 1.23\n")
+	repo.Git("add", "-A")
+	repo.Git("commit", "-q", "-m", "base")
+	base := repo.Git("rev-parse", "HEAD")
+	writeFile(t, filepath.Join(repo.Dir, "go", "x.go"), "package x\n")
+	pack := &fakeRepoContractPack{}
+	in := ReviewInput{Phase: string(PhaseBuild), Worktree: repo.Dir, ProjectRoot: repo.Dir, WorktreeBaseSHA: base}
+	if _, err := RepoContractFloorJudge(pack.run)(context.Background(), in); err != nil {
+		t.Fatal(err)
+	}
+	if len(pack.changed) != 1 || !slices.Equal(pack.changed[0], []string{"go/x.go"}) {
+		t.Fatalf("the judge hands the pack the Go path; got %q", pack.changed)
+	}
+}
+
+func TestRepoContractFloorJudge_AnUnreadableChangeRunsTheCoarseSet(t *testing.T) {
+	t.Parallel()
+
+	pack := &fakeRepoContractPack{}
+	in := ReviewInput{Phase: string(PhaseBuild), Worktree: worktreeWithModule(t), ProjectRoot: t.TempDir()}
+	if _, err := RepoContractFloorJudge(pack.run)(context.Background(), in); err != nil {
+		t.Fatal(err)
+	}
+	if len(pack.changed) != 1 {
+		t.Fatalf("an unreadable change still runs the pack once; got %d runs", len(pack.changed))
+	}
+	if !reflect.DeepEqual(repocontract.ByNameTestsFor(pack.changed[0]), repocontract.ByNameTests()) {
+		t.Fatalf("paths %q must select the coarse set of ByNameTests()", pack.changed[0])
 	}
 }
