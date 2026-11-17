@@ -60,10 +60,7 @@ func (cr *cycleRun) askLadder(ask ladderAsk, req PhaseRequest) (PhaseRequest, bo
 	if prior == nil {
 		prior = &LadderState{Rung: string(retryladder.R0)}
 	}
-	base, chain, headroom := ladderRoute(cr.ladderPlan(ask.phase))
-	d := retryladder.Next(retryladder.Input{
-		Rung: retryladder.Rung(prior.Rung), Earlier: prior.Fingerprints, Verdict: verdict, Base: base, Chain: chain, Headroom: headroom,
-	})
+	d := retryladder.Next(cr.ladderInput(ask.phase, prior, verdict))
 	cr.cs.Ladder = nextLadderState(prior, d, verdict)
 	cr.o.emitLadderDecision(cr.cs, ask, prior.Rung, d, verdict)
 	cr.routeToRedesign(ask, prior, d, verdict)
@@ -210,28 +207,44 @@ func (cr *cycleRun) auditLadderAsk(phase Phase) ladderAsk {
 	}
 }
 
-func (cr *cycleRun) nextItemStartRung(ids []string) retryladder.Rung {
-	d := retryladder.Decision{Action: retryladder.ActionStop, Rung: retryladder.R0}
-	if read := cr.o.failureClassFor; read != nil {
-		for _, id := range ids {
-			class := retryladder.Class(read(id))
-			if class == retryladder.Capability {
-				d = retryladder.Decision{Action: retryladder.ActionRaise, Rung: retryladder.R2, Class: class}
-				break
-			}
-			if d.Class == "" {
-				d.Class = class
-			}
-		}
+func (cr *cycleRun) ladderInput(phase Phase, prior *LadderState, verdict retryladder.Verdict) retryladder.Input {
+	base, chain, headroom := ladderRoute(cr.ladderPlan(phase))
+	return retryladder.Input{
+		Rung: retryladder.Rung(prior.Rung), Earlier: prior.Fingerprints, Verdict: verdict, Base: base, Chain: chain, Headroom: headroom,
 	}
-	if cr.cs.Ladder == nil {
-		cr.cs.Ladder = &LadderState{Rung: string(d.Rung)}
-		if d.Rung == retryladder.R2 {
-			cr.cs.Ladder.Tier = retryEscalationTier
-		}
-		cr.o.emitLadderDecision(cr.cs, ladderAsk{phase: PhaseBuild, origin: originNextItem}, string(retryladder.R0), d, retryladder.Verdict{})
+}
+
+func worstScopedClass(read func(string) string, ids []string) retryladder.Class {
+	var worst retryladder.Class
+	if read == nil {
+		return worst
 	}
-	return d.Rung
+	for _, id := range ids {
+		class := retryladder.Class(read(id))
+		if class == retryladder.Capability {
+			return class
+		}
+		worst = cmp.Or(worst, class)
+	}
+	return worst
+}
+
+func (cr *cycleRun) nextItemDecision(class retryladder.Class) (retryladder.Decision, retryladder.Verdict) {
+	verdict := retryladder.VerdictFromClass(class)
+	return retryladder.Next(cr.ladderInput(PhaseBuild, startPrior(), verdict)), verdict
+}
+
+func startPrior() *LadderState {
+	return &LadderState{Rung: string(retryladder.R0)}
+}
+
+func (cr *cycleRun) recordStartRung(d retryladder.Decision, verdict retryladder.Verdict) {
+	if cr.cs.Ladder != nil {
+		return
+	}
+	prior := startPrior()
+	cr.cs.Ladder = nextLadderState(prior, d, verdict)
+	cr.o.emitLadderDecision(cr.cs, ladderAsk{phase: PhaseBuild, origin: originNextItem}, prior.Rung, d, verdict)
 }
 
 func preferDigest(plain string, req PhaseRequest) string {

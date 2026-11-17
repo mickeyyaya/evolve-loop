@@ -7,6 +7,7 @@
 ## Design
 
 - `Classify` reads `Facts` and calls no model. The order is fixed: halt exit, benched quota, infra exit or teardown error, spec, capability, unknown.
+- `VerdictFromClass` makes the verdict of a stored class with no fingerprint. It is the one way for a caller outside the package to make a `Verdict`. `TestNoDecisionLiteralOutsideDecider` scans the module for a `Decision` or `Verdict` literal, `var` or `new` outside this package, also in a slice, map or pointer form. It flags a named result of these types and a field write on such a value.
 - Exit 85 is also `ExitUnknownPrompt`. It is `quota` only with a bench, else `infra`.
 - A floor failure is `spec` when it is protected or outside the lane scope. It is `capability` when it is inside the scope.
 - `Fingerprint` is the sorted set of bracketed violation codes. Without codes it is a hash of the normalized text.

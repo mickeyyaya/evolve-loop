@@ -54,6 +54,10 @@ type Verdict struct {
 	Fingerprint string
 }
 
+func VerdictFromClass(class Class) Verdict {
+	return Verdict{Class: class}
+}
+
 func Classify(f Facts) Verdict {
 	return Verdict{Class: classOf(f), Fingerprint: Fingerprint(f.Reason)}
 }
