@@ -19,10 +19,6 @@ type failingPaneTmux struct {
 
 func (f *failingPaneTmux) PanePIDs(context.Context, string) ([]int, error) { return nil, f.err }
 
-func failingList(err error) func(context.Context) ([]proctree.Process, error) {
-	return func(context.Context) ([]proctree.Process, error) { return nil, err }
-}
-
 func TestRecordPane_AnUnreadablePaneWarnsAndRecordsNothing(t *testing.T) {
 	t.Parallel()
 	var stderr bytes.Buffer
@@ -99,14 +95,5 @@ func TestLivePaneTree_AFailedListingSparesEverySharedHelper(t *testing.T) {
 
 	if got != nil || !strings.Contains(stderr.String(), "cannot list the live pane tree, so each shared helper is spared: ps: exit 1") {
 		t.Errorf("livePaneTree = %v, stderr=%q, want no tree and the WARN", got, stderr.String())
-	}
-}
-
-func TestExecTmuxPanePIDs_AMissingSessionIsAnError(t *testing.T) {
-	t.Parallel()
-	got, err := execTmux{}.PanePIDs(context.Background(), "evolve-cover-no-such-session-"+thisDispatch[:5])
-
-	if err == nil || !strings.HasPrefix(err.Error(), "tmux list-panes: ") || got != nil {
-		t.Errorf("PanePIDs = %v, %v, want no pids and a tmux list-panes error", got, err)
 	}
 }

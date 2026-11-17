@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"github.com/mickeyyaya/evolve-loop/go/internal/covchanged"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -51,7 +52,7 @@ func TestCoverChangedFailures_ExcludesACSTagOnlyPackageFromProfiler(t *testing.T
 	}{
 		"the production package alone is profiled": {
 			[]string{"go/acs/cycle1916/predicates_test.go", "go/p/a.go"},
-			[]profilerCall{{filepath.Join(repo.Dir, "go"), []string{"./p"}, []string{"integration"}}},
+			[]profilerCall{{filepath.Join(repo.Dir, "go"), []string{"./p"}, covchanged.DefaultTags}},
 		},
 		"an acs-only change never runs the profiler": {
 			[]string{"go/acs/cycle1916/predicates_test.go"},
