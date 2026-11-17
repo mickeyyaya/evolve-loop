@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	integrationUsage      = "usage: evolve integration watch --tip SHA\n       evolve integration status [--pool N] [--wave N] [--project-root P] [--json]\n       evolve integration record-pr --pr N (--reviewed | --class NAME)\n       evolve integration batch [--dry-run] [--project-root P] [PR...]\n  watch: exit 0 = CI green, 1 = CI red, 2 = no run to watch or gh failed, 10 = usage\n  status: exit 0 = clean, 1 = not clean, no evidence or an unreadable record; 2 = an absent root, an unreadable wave store, or a wave number that the store does not know; 10 = usage\n  record-pr and batch: exit 0 = done, 1 = refused, a PR was ejected or a main-red stop holds the batch, 2 = git or gh failed or an absent root, 10 = usage"
+	integrationUsage      = "usage: evolve integration watch --tip SHA\n       evolve integration status [--pool N] [--wave N] [--project-root P] [--json]\n       evolve integration record-pr --pr N (--reviewed | --class NAME)\n       evolve integration batch [--dry-run] [--main-red-fix] [--project-root P] [PR...]\n  watch: exit 0 = CI green, 1 = CI red, 2 = no run to watch or gh failed, 10 = usage\n  status: exit 0 = clean, 1 = not clean, no evidence or an unreadable record; 2 = an absent root, an unreadable wave store, or a wave number that the store does not know; 10 = usage\n  record-pr and batch: exit 0 = done, 1 = refused, a PR was ejected, main CI is not green or a main-red stop holds the batch, 2 = git or gh failed or an absent root, 10 = usage"
 	integrationWatchUsage = "usage: evolve integration watch --tip SHA"
 	integrationPrefix     = "evolve integration: "
 )

@@ -173,6 +173,18 @@ Land does these steps, and it never changes a member branch:
 - It closes the inbox items that the landed commits name.
 - It closes each landed PR with a link to the batch, and it spends the record.
 
+### The main check and the steps
+
+The file is `mainci.go`. The design is in [plan §12](../../plans/wave-integration-2026-10.md#12-amendment-of-2026-11-17-the-train-checks-main-first-and-prints-each-step), decisions D38, D39 and D41.
+
+- `Plan` reads the head of `main` once. It gives that commit to `checkMain` and uses it as the base of the scratch compose.
+- `checkMain` asks the `MainCI` port for the verdict of the base. A green verdict gives `MainGreen`, and a pending result gives `MainPending`.
+- A red verdict, `ErrNoRun` and a `RunConclusionError` give a `MainRefusal`, unless `MainRedFix` is set. Any other error stays an error, so a `gh` outage never reads as a red main.
+- `GhCI` gives the typed results at their source: `runID` gives `ErrNoRun`, and `verdict` gives `RunConclusionError`. With no `Settle`, `verdict` gives `ErrRunPending`.
+- `PeekCI` reads a run once with no watch and no wait. The dry run uses it. The real run uses the raw `GhCI`, not the gated port, so a red main never asks the main-red stop.
+- `Merger` emits a typed `Step` for each CI run, verdict, rerun, split and landing through `Progress`. The command formats the `step:` line. A `Merger` with no `Progress` emits nothing.
+- Pinned by `TestTrainPlanChecksTheCIOfTheBaseItPlansOn`, `TestPeekCIReadsTheRunOnceAndNeverWatchesIt`, `TestMergerEmitsEachStepOfARedSplitAndTheLandings` and the `TestRunBatch_*` journeys of `cmd/evolve`.
+
 ## The stop gate of the train
 
 The file is `stopgate.go`. The design is in [gate-contract-g4-base-red-attribution.md](../gate-contract-g4-base-red-attribution.md), section 13.

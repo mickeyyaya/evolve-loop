@@ -26,11 +26,44 @@ type trainGh struct {
 	conclusion  string
 	noRunYet    int
 	conclusions []string
+	main        mainRun
+}
+
+type mainRun struct {
+	tip        string
+	status     string
+	conclusion string
+	listRC     int
+	noRun      bool
+	watched    int
+}
+
+const mainRunID = "7"
+
+func (m *mainRun) reply(args []string) (string, int, bool) {
+	joined := strings.Join(args, " ")
+	switch {
+	case strings.HasPrefix(joined, "run list") && slices.Contains(args, m.tip) && m.listRC != 0:
+		return "", m.listRC, true
+	case strings.HasPrefix(joined, "run list") && slices.Contains(args, m.tip) && m.noRun:
+		return "[]\n", 0, true
+	case strings.HasPrefix(joined, "run list") && slices.Contains(args, m.tip):
+		return `[{"databaseId":` + mainRunID + `}]` + "\n", 0, true
+	case joined == "run watch "+mainRunID+" --exit-status":
+		m.watched++
+		return "", 0, true
+	case strings.HasPrefix(joined, "run view "+mainRunID+" "):
+		return `{"conclusion":"` + m.conclusion + `","status":"` + m.status + `"}` + "\n", 0, true
+	}
+	return "", 0, false
 }
 
 func (g *trainGh) run(_ context.Context, _ string, args ...string) (string, int, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
+	if out, rc, ok := g.main.reply(args); ok {
+		return out, rc, nil
+	}
 	joined := strings.Join(args, " ")
 	switch {
 	case strings.HasPrefix(joined, "pr list --head"):
@@ -91,7 +124,9 @@ func newTrainJourney(t *testing.T) *trainJourney {
 	work.Git("push", "-q", "origin", "main")
 	gh := &trainGh{comments: map[string][]string{}, closed: map[string]string{}, conclusion: "success"}
 	env := integrationEnv{Gh: gh.run, Git: integration.SysGit(), Root: work.Dir, Wave: "j1"}
-	return &trainJourney{work: work, origin: origin, gh: gh, env: env}
+	j := &trainJourney{work: work, origin: origin, gh: gh, env: env}
+	gh.main = mainRun{tip: j.originMain(), status: "completed", conclusion: "success"}
+	return j
 }
 
 func (j *trainJourney) pr(t *testing.T, n int, message, file, body string) {

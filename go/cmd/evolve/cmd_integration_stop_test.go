@@ -348,6 +348,7 @@ func TestStopJourney_TheTrainOfTheCommandPutsTheStopGateOnMainAndOnCI(t *testing
 	s.holdStop()
 	s.red = []baseattr.Key{stopJourneyKey}
 	s.gh.conclusion = "failure"
+	s.gh.main.tip = ""
 	var warn bytes.Buffer
 	train := s.env.train(s.root, &warn)
 	tip := s.originMain()
@@ -502,10 +503,10 @@ func TestEmitIntegrationSignal_EmitsWithDefaultAttachment(t *testing.T) {
 func TestBatchUsage_NamesTheProjectRootFlagAndTheHoldExit(t *testing.T) {
 	t.Parallel()
 	var out, errb bytes.Buffer
-	if rc := runIntegrationEnv(integrationEnv{Root: t.TempDir()}, []string{"batch", "--help"}, &out, &errb); rc != 0 || !strings.Contains(out.String(), "batch [--dry-run] [--project-root P] [PR...]") {
+	if rc := runIntegrationEnv(integrationEnv{Root: t.TempDir()}, []string{"batch", "--help"}, &out, &errb); rc != 0 || !strings.Contains(out.String(), "batch [--dry-run] [--main-red-fix] [--project-root P] [PR...]") {
 		t.Errorf("rc=%d out=%q", rc, out.String())
 	}
-	for _, want := range []string{"evolve integration batch [--dry-run] [--project-root P] [PR...]", "a main-red stop holds the batch", "2 = git or gh failed or an absent root"} {
+	for _, want := range []string{"evolve integration batch [--dry-run] [--main-red-fix] [--project-root P] [PR...]", "a main-red stop holds the batch", "2 = git or gh failed or an absent root"} {
 		if !strings.Contains(integrationUsage, want) {
 			t.Errorf("family usage lacks %q", want)
 		}
