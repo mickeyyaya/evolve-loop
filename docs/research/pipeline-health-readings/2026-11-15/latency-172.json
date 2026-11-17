@@ -1,0 +1,135 @@
+{
+  "wave": 172,
+  "first_cycle": 2374,
+  "last_cycle": 2377,
+  "cycles": 4,
+  "slots": {
+    "window": 25165949937986,
+    "used_slot_hours": 16.351076640833334,
+    "capacity_slot_hours": 55.92433319552445,
+    "avg_live": 2.339028570431576,
+    "utilization": 0.292378571303947
+  },
+  "phases": {
+    "cycles": 4,
+    "lane": 58705637664000,
+    "gap": 591434700000,
+    "gap_share": 0.010074580969293942,
+    "phases": [
+      {
+        "phase": "ship",
+        "spans": 10,
+        "time": 25397713384000,
+        "share": 0.4326281835036538,
+        "model": 0,
+        "host": 25397713384000,
+        "gates": 0,
+        "gate_total": 0,
+        "gate_median": 0
+      },
+      {
+        "phase": "build",
+        "spans": 8,
+        "time": 22051925039000,
+        "share": 0.37563555931737846,
+        "model": 15686131235000,
+        "host": 6365793804000,
+        "gates": 11,
+        "gate_total": 6356092953000,
+        "gate_median": 471227476000
+      },
+      {
+        "phase": "audit",
+        "spans": 12,
+        "time": 8457051094000,
+        "share": 0.14405858501024527,
+        "model": 1506344920000,
+        "host": 6950706174000,
+        "gates": 12,
+        "gate_total": 6934450437000,
+        "gate_median": 638794933000
+      },
+      {
+        "phase": "tdd",
+        "spans": 5,
+        "time": 1682350248000,
+        "share": 0.02865738819887934,
+        "model": 1659079715000,
+        "host": 23270533000,
+        "gates": 8,
+        "gate_total": 21073502000,
+        "gate_median": 1660845000
+      },
+      {
+        "phase": "scout",
+        "spans": 4,
+        "time": 172409297000,
+        "share": 0.002936843953331698,
+        "model": 148198527000,
+        "host": 24210770000,
+        "gates": 4,
+        "gate_total": 22363473000,
+        "gate_median": 5588463000
+      },
+      {
+        "phase": "architecture-design",
+        "spans": 1,
+        "time": 162093627000,
+        "share": 0.0027611253952769944,
+        "model": 160547401000,
+        "host": 1546226000,
+        "gates": 1,
+        "gate_total": 1187036000,
+        "gate_median": 1187036000
+      },
+      {
+        "phase": "triage",
+        "spans": 4,
+        "time": 132111147000,
+        "share": 0.002250399659333134,
+        "model": 115074249000,
+        "host": 17036898000,
+        "gates": 4,
+        "gate_total": 6768662000,
+        "gate_median": 1697350000
+      },
+      {
+        "phase": "test-amplification",
+        "spans": 1,
+        "time": 58549128000,
+        "share": 0.0009973339926073919,
+        "model": 52468884000,
+        "host": 6080244000,
+        "gates": 1,
+        "gate_total": 5538699000,
+        "gate_median": 5538699000
+      }
+    ]
+  },
+  "families": [
+    {
+      "family": "agy",
+      "builds": 20,
+      "passes": 14,
+      "lane": 195350779169000,
+      "per_pass": 13953627083500
+    },
+    {
+      "family": "agy-claude",
+      "builds": 1,
+      "passes": 1,
+      "lane": 5792339268000,
+      "per_pass": 5792339268000
+    },
+    {
+      "family": "claude",
+      "builds": 20,
+      "passes": 14,
+      "lane": 209004269455000,
+      "per_pass": 14928876389642
+    }
+  ],
+  "warnings": [
+    "67 phase outcome(s) had no dispatch signal (older run dirs) and were skipped"
+  ]
+}

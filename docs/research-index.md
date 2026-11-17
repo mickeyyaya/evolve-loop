@@ -785,6 +785,12 @@ approaches / decision / results / retro) — lives at
 | [plans/shadow-stage-evidence-2026-11.md](plans/shadow-stage-evidence-2026-11.md) | Plan: three evidence stores and five scan-skip keys on one score table. It recommends a per-cycle digest in the ledger and one default-deny purity predicate for the scan-skip key. It maps K1 to K5 and F1 to F7 to phases. |
 | [architecture/adr/0167-shadow-stages-prove-themselves-on-chained-evidence.md](architecture/adr/0167-shadow-stages-prove-themselves-on-chained-evidence.md) | ADR-0167, Proposed: five contract rules, the integrity rules, a flip only on a verified verdict, and a protected registry. It extends ADR-0165 and amends ADR-0157 decision 8. |
 
+## 2026-11-15 — pipeline health readings at the start of wave 174
+
+| Document | What it records |
+|---|---|
+| [research/pipeline-health-readings/2026-11-15/readings.md](research/pipeline-health-readings/2026-11-15/readings.md) | PQ, CQ, lane-use and idle-cause readings of waves 172 to 174, the shadow projected stops, and five questions for a later study. The raw JSON of the quality, latency and status verbs is in the same folder. |
+
 ## 2026-11-15 — agy changelog command snapshot 2026-11-14T05:48:36Z note
 
 | Document | What it records |
@@ -802,6 +808,18 @@ approaches / decision / results / retro) — lives at
 | Document | What it records |
 |---|---|
 | [research/self-evolving-loop-autonomy-2026-11.md](research/self-evolving-loop-autonomy-2026-11.md) | Why 221 of 268 inbox items are console routes, and what outside systems do about self-improvement and earned autonomy. It gives refinements R1 to R6. |
+
+## 2026-11-16 — pipeline health readings at the end of wave 174
+
+| Document | What it records |
+|---|---|
+| [research/pipeline-health-readings/2026-11-16/readings.md](research/pipeline-health-readings/2026-11-16/readings.md) | The second snapshot of the series: PQ, CQ, lane-use, idle-cause and lane-time readings of the wave 174 boundary. It compares them with the 2026-11-15 snapshot and keeps nine questions. The raw JSON of the quality, latency and status verbs is in the same folder. |
+
+## 2026-11-16 — gate, ship and retry waste in the lanes
+
+| Document | What it records |
+|---|---|
+| [research/gate-ship-retry-waste-2026-11.md](research/gate-ship-retry-waste-2026-11.md) | Where lane time went in waves 173-175: gates and ship took 62%, and retry loops took 38% in wave 174. Merge-queue practice, and eight refinements. |
 
 ## 2026-11-17 — Claude watermark and sampling parameters note
 
