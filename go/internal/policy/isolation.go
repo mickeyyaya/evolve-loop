@@ -19,10 +19,12 @@ const (
 )
 
 var (
-	requestStages        = []string{RequestStageOff, RequestStageShadow, RequestStageEnforce}
+	requestStages        = []RequestStage{RequestStageOff, RequestStageShadow, RequestStageEnforce}
 	dispatchRequestRoles = []string{"fault-localization", "premise-challenge", "dependency-map"}
 	profileName          = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
 )
+
+type RequestStage string
 
 type IsolationPolicy struct {
 	I2  IsolationInvariantPolicy `json:"i2,omitempty"`
@@ -42,15 +44,15 @@ type IsolationPolicy struct {
 }
 
 type InboxRequestsPolicy struct {
-	Stage    string `json:"stage,omitempty"`
-	PerCycle int    `json:"per_cycle,omitempty"`
+	Stage    RequestStage `json:"stage,omitempty"`
+	PerCycle int          `json:"per_cycle,omitempty"`
 }
 
 type DispatchRequestsPolicy struct {
-	Stage    string   `json:"stage,omitempty"`
-	Roles    []string `json:"roles,omitempty"`
-	PerCycle int      `json:"per_cycle,omitempty"`
-	MaxDepth int      `json:"max_depth,omitempty"`
+	Stage    RequestStage `json:"stage,omitempty"`
+	Roles    []string     `json:"roles,omitempty"`
+	PerCycle int          `json:"per_cycle,omitempty"`
+	MaxDepth int          `json:"max_depth,omitempty"`
 }
 
 type IsolationContextPolicy struct {

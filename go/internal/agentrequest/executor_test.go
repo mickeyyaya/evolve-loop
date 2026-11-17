@@ -22,7 +22,7 @@ func inboxRequest(id string) string {
 		`"why":"The build found a defect outside its scope.","inputs":[],"expected_output":{"artifact":"an inbox item"}}`
 }
 
-func (h *harness) twoKinds(dispatch, inbox string, inboxCap int) Channel {
+func (h *harness) twoKinds(dispatch, inbox policy.RequestStage, inboxCap int) Channel {
 	c := h.channel(dispatch)
 	c.Executors = append(c.Executors, NewInboxAdd(policy.InboxRequestsPolicy{Stage: inbox, PerCycle: inboxCap}))
 	return c

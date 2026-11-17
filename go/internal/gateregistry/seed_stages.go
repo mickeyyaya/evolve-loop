@@ -67,6 +67,7 @@ var stageSeeds = []stageSeed{
 	{key: "isolation.i15.stage"},
 	{key: "isolation.context.stage"},
 	{key: "isolation.dispatch_requests.stage"},
+	{key: "isolation.inbox_requests.stage"},
 	{key: "healing.detector.stage"},
 	{key: "healing.orchestrator.stage"},
 	{key: "healing.validator.stage"},

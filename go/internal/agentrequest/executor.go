@@ -15,7 +15,7 @@ import (
 
 type Executor interface {
 	Kind() string
-	Stage() string
+	Stage() policy.RequestStage
 	admit(f frame, req Request, count int) (string, string)
 	run(ctx context.Context, p Pending, rec Record) (Record, Result)
 }
@@ -33,8 +33,8 @@ type inboxAdd struct {
 
 func NewInboxAdd(pol policy.InboxRequestsPolicy) Executor { return inboxAdd{pol: pol} }
 
-func (inboxAdd) Kind() string    { return agentclass.KindInboxAdd }
-func (e inboxAdd) Stage() string { return e.pol.Stage }
+func (inboxAdd) Kind() string                 { return agentclass.KindInboxAdd }
+func (e inboxAdd) Stage() policy.RequestStage { return e.pol.Stage }
 
 func (e inboxAdd) admit(f frame, req Request, count int) (string, string) {
 	if pre, reason := capCheck(f.cell, count, e.pol.PerCycle); pre != "" {
@@ -74,8 +74,8 @@ func NewDispatch(pol policy.DispatchRequestsPolicy, deps DispatchDeps) Executor 
 	return dispatch{pol: pol, judge: deps.Judge, start: deps.Run, now: deps.Now}
 }
 
-func (dispatch) Kind() string    { return agentclass.KindDispatch }
-func (e dispatch) Stage() string { return e.pol.Stage }
+func (dispatch) Kind() string                 { return agentclass.KindDispatch }
+func (e dispatch) Stage() policy.RequestStage { return e.pol.Stage }
 
 func (e dispatch) admit(f frame, req Request, count int) (string, string) {
 	if !slices.Contains(e.pol.Roles, req.Role()) {
@@ -124,7 +124,7 @@ func (e dispatch) judgeRequest(ctx context.Context, p Pending) (string, string) 
 	if err != nil {
 		return PreJudge, err.Error()
 	}
-	v := selfheal.Validator{Inventory: selfheal.Inventory{Requests: map[string]bool{p.Name: true}}, Stage: e.pol.Stage}
+	v := selfheal.Validator{Inventory: selfheal.Inventory{Requests: map[string]bool{p.Name: true}}, Stage: string(e.pol.Stage)}
 	decision := v.Decide(selfheal.Incident{ID: p.Name, Tier: selfheal.TierItem, Subject: p.Request.Role()}, d.Action, e.now())
 	switch {
 	case decision.Verdict != selfheal.VerdictAccepted:

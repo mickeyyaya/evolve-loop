@@ -75,7 +75,7 @@ func refuse(name, reason string) string {
 		`"action":{"kind":"halt-and-escalate","params":{"reason":"` + reason + `"}},"expected_effect":"no agent runs","confidence":"high"}`
 }
 
-func (h *harness) channel(stage string) Channel {
+func (h *harness) channel(stage policy.RequestStage) Channel {
 	pol := policy.Policy{Isolation: &policy.IsolationPolicy{DispatchRequests: &policy.DispatchRequestsPolicy{Stage: stage, Roles: []string{"fault-localization", "premise-challenge"}, PerCycle: 3, MaxDepth: cmp.Or(h.maxDepth, 1)}}}
 	judge := func(_ context.Context, p Pending) (string, error) {
 		h.judged = append(h.judged, p)
@@ -510,7 +510,7 @@ func TestHandoff_EachDecisionSignalCarriesTheSummaryOfItsRecord(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		verdict func(string) string
-		stage   string
+		stage   policy.RequestStage
 	}{
 		{"refused", func(n string) string { return refuse(n, "the build report already names the suspect file") }, policy.RequestStageEnforce},
 		{"approved in shadow", approve, policy.RequestStageShadow},

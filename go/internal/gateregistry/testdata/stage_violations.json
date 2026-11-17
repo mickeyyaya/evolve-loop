@@ -314,10 +314,10 @@
     },
     {
       "key": "isolation.dispatch_requests.stage",
-      "rule": "string-typed-stage"
+      "rule": "no-signal"
     },
     {
-      "key": "isolation.dispatch_requests.stage",
+      "key": "isolation.inbox_requests.stage",
       "rule": "no-signal"
     },
     {
