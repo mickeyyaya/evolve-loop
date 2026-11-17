@@ -3,9 +3,11 @@ package core
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/retryladder"
 )
 
 func escalationRun(t *testing.T, root, scopeCSV string, reader func(string) int, threshold int) *cycleRun {
@@ -114,5 +116,115 @@ func TestWithFailureCountReader_SetsAndIgnoresNil(t *testing.T) {
 	WithFailureCountReader(nil)(o)
 	if o.failureCountFor == nil {
 		t.Fatal("nil must be ignored, keeping the prior reader")
+	}
+}
+
+func TestComposeBuildTier_TheHigherOfTheLadderTargetAndTheFloor(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct{ name, target, floor, want string }{
+		{"target below the floor", "balanced", "deep", "deep"},
+		{"target above the floor", "top", "deep", "top"},
+		{"floor absent", "balanced", "", "balanced"},
+		{"both absent", "", "", ""},
+	} {
+		if got := composeBuildTier(tc.target, tc.floor); got != tc.want {
+			t.Errorf("%s: composeBuildTier(%q,%q) = %q, want %q", tc.name, tc.target, tc.floor, got, tc.want)
+		}
+	}
+}
+
+func TestWorstScopedClass_CapabilityWinsThenTheFirstClass(t *testing.T) {
+	t.Parallel()
+	read := func(id string) string {
+		return map[string]string{"a": "spec", "b": "capability", "c": "", "d": "unknown"}[id]
+	}
+	if got := worstScopedClass(read, []string{"a", "d"}); got != retryladder.Spec {
+		t.Fatalf("got %q, want the first class spec", got)
+	}
+	if got := worstScopedClass(read, []string{"c", "a", "b"}); got != retryladder.Capability {
+		t.Fatalf("got %q, want capability", got)
+	}
+	if got := worstScopedClass(read, []string{"c", "a"}); got != retryladder.Spec {
+		t.Fatalf("got %q, want spec", got)
+	}
+	if got := worstScopedClass(nil, []string{"a"}); got != "" {
+		t.Fatalf("a nil reader must give no class, got %q", got)
+	}
+}
+
+func TestEscalatedBuildTier_TheLadderTargetFeedsTheDispatchedTierOnlyAtEnforce(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, stage string
+		wantRaised  bool
+	}{
+		{"enforce lets the ladder target raise the tier", policy.RetryLadderEnforce, true},
+		{"shadow records the ladder and never moves the tier", policy.RetryLadderShadow, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			writeCLIProfile(t, root, "builder", "agy-tmux", nil)
+			cr := escalationRun(t, root, "item-a", func(string) int { return 1 }, 2)
+			cr.o.workflowConfig = ladderWorkflow(tc.stage)
+			cr.o.failureClassFor = func(string) string { return string(retryladder.Unknown) }
+			base := cr.ladderPlan(PhaseBuild).Model
+			if base == "" || base == "deep" {
+				t.Fatalf("the routed base tier %q cannot show a ladder-only raise", base)
+			}
+			tier, raised := cr.escalatedBuildTier("")
+			if raised != tc.wantRaised || (raised && tier != base) {
+				t.Fatalf("tier = (%q,%v), want raised=%v at the ladder target %q", tier, raised, tc.wantRaised, base)
+			}
+		})
+	}
+}
+
+func TestEscalatedBuildTier_TheFloorSignalNamesTheFloorOnly(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name      string
+		threshold int
+		wantLine  bool
+	}{
+		{"the floor applies and prints", 1, true},
+		{"a ladder-only raise prints no floor provenance", 2, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			writeCLIProfile(t, root, "builder", "agy-tmux", nil)
+			var out strings.Builder
+			cr := escalationRun(t, root, "item-a", func(string) int { return 1 }, tc.threshold)
+			cr.o.stderr = &out
+			cr.o.workflowConfig = ladderWorkflow(policy.RetryLadderEnforce)
+			cr.o.failureClassFor = func(string) string { return string(retryladder.Unknown) }
+			if _, raised := cr.escalatedBuildTier(""); !raised {
+				t.Fatal("the ladder or the floor must raise")
+			}
+			if got := strings.Contains(out.String(), "deterministic floor"); got != tc.wantLine {
+				t.Fatalf("floor line printed = %v, want %v: %q", got, tc.wantLine, out.String())
+			}
+		})
+	}
+}
+
+func TestNextItemDecision_IsAQueryThatLeavesTheCycleStateAlone(t *testing.T) {
+	t.Parallel()
+	center, events := captureSignals()
+	cr := escalationRun(t, t.TempDir(), "item-a", func(string) int { return 1 }, 1)
+	cr.o.workflowConfig = ladderWorkflow(policy.RetryLadderEnforce)
+	cr.o.signals = center
+	cr.o.failureClassFor = func(string) string { return string(retryladder.Capability) }
+	d, verdict := cr.nextItemDecision(retryladder.Capability)
+	if verdict.Class != retryladder.Capability || d.Action != retryladder.ActionRaise {
+		t.Fatalf("query = %+v %+v", d, verdict)
+	}
+	if cr.cs.Ladder != nil || len(eventsWithCode(*events, CodeLadderDecision)) != 0 {
+		t.Fatalf("the query wrote state or emitted: %+v", cr.cs.Ladder)
+	}
+	cr.recordStartRung(d, verdict)
+	stored := cr.cs.Ladder
+	cr.recordStartRung(d, verdict)
+	if stored == nil || cr.cs.Ladder != stored || len(eventsWithCode(*events, CodeLadderDecision)) != 1 {
+		t.Fatalf("the start rung must be recorded exactly once")
 	}
 }

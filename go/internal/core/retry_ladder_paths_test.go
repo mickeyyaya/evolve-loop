@@ -125,16 +125,15 @@ func TestMaybeRemediate_KeepsTheRungAtEnforceAndClearsItAtShadow(t *testing.T) {
 	}
 }
 
-func TestEscalatedBuildTier_EnforceStartsOnlyACapabilityFailureRaised(t *testing.T) {
+func TestEscalatedBuildTier_TheLadderDecidesTheStartRungAndTheFloorStillRaises(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
-		name, stage, class string
-		wantRaise          bool
+		name, stage, class, wantNext string
 	}{
-		{"shadow keeps the count rule for a spec failure", policy.RetryLadderShadow, "spec", true},
-		{"enforce starts a spec failure at R0", policy.RetryLadderEnforce, "spec", false},
-		{"enforce starts a capability failure raised", policy.RetryLadderEnforce, "capability", true},
-		{"enforce starts an unclassed failure at R0", policy.RetryLadderEnforce, "", false},
+		{"shadow records a spec failure", policy.RetryLadderShadow, "spec", "R0"},
+		{"enforce starts a spec failure at R0", policy.RetryLadderEnforce, "spec", "R0"},
+		{"enforce starts a capability failure raised", policy.RetryLadderEnforce, "capability", "R1"},
+		{"enforce records nothing for an unclassed failure", policy.RetryLadderEnforce, "", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			center, events := captureSignals()
@@ -142,27 +141,58 @@ func TestEscalatedBuildTier_EnforceStartsOnlyACapabilityFailureRaised(t *testing
 			cr.o.workflowConfig = ladderWorkflow(tc.stage)
 			cr.o.signals = center
 			cr.o.failureClassFor = func(string) string { return tc.class }
-			_, raised := cr.escalatedBuildTier("")
-			if raised != tc.wantRaise {
-				t.Fatalf("raised = %v, want %v", raised, tc.wantRaise)
+			if tier, raised := cr.escalatedBuildTier(""); !raised || tier != "deep" {
+				t.Fatalf("the floor must raise at the threshold, got (%q,%v)", tier, raised)
 			}
 			decisions := eventsWithCode(*events, CodeLadderDecision)
-			if len(decisions) != 1 || decisions[0].Fields["origin"] != originNextItem {
-				t.Fatalf("the start rung was not recorded once: %+v", decisions)
+			if tc.wantNext == "" {
+				if len(decisions) != 0 || cr.cs.Ladder != nil {
+					t.Fatalf("no class means nothing to ask: %+v %+v", decisions, cr.cs.Ladder)
+				}
+				return
 			}
-			wantNext := string(retryladder.R0)
-			if tc.class == "capability" {
-				wantNext = string(retryladder.R2)
+			if len(decisions) != 1 || decisions[0].Fields["origin"] != originNextItem || decisions[0].Fields["next"] != tc.wantNext {
+				t.Fatalf("the start rung was not recorded once as %s: %+v", tc.wantNext, decisions)
 			}
-			if decisions[0].Fields["next"] != wantNext {
-				t.Fatalf("start rung = %q, want %q", decisions[0].Fields["next"], wantNext)
-			}
-			if cr.cs.Ladder == nil || cr.cs.Ladder.Rung != wantNext {
+			if cr.cs.Ladder == nil || cr.cs.Ladder.Rung != tc.wantNext {
 				t.Fatalf("the start rung is not the rung of the cycle: %+v", cr.cs.Ladder)
 			}
 			_, _ = cr.escalatedBuildTier("")
 			if n := len(eventsWithCode(*events, CodeLadderDecision)); n != 1 {
 				t.Fatalf("a second build dispatch recorded the start rung again: %d events", n)
+			}
+		})
+	}
+}
+
+func TestEscalatedBuildTier_UnknownClassStartsNotStop(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name      string
+		threshold int
+		wantTier  string
+		wantRaise bool
+	}{
+		{"at the threshold the floor and the ladder both apply", 1, "deep", true},
+		{"below the threshold only the ladder applies", 2, "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			center, events := captureSignals()
+			cr := escalationRun(t, t.TempDir(), "item-a", func(string) int { return 1 }, tc.threshold)
+			cr.o.workflowConfig = ladderWorkflow(policy.RetryLadderEnforce)
+			cr.o.signals = center
+			cr.o.failureClassFor = func(string) string { return string(retryladder.Unknown) }
+			tier, raised := cr.escalatedBuildTier("")
+			if tier != tc.wantTier || raised != tc.wantRaise {
+				t.Fatalf("tier = (%q,%v), want (%q,%v)", tier, raised, tc.wantTier, tc.wantRaise)
+			}
+			decisions := eventsWithCode(*events, CodeLadderDecision)
+			if len(decisions) != 1 {
+				t.Fatalf("want one ladder decision, got %+v", decisions)
+			}
+			f := decisions[0].Fields
+			if f["action"] != string(retryladder.ActionRaise) || f["next"] != string(retryladder.R1) || f["origin"] != originNextItem || f["class"] != string(retryladder.Unknown) {
+				t.Fatalf("an unknown failure at R0 must start raised at R1, got %+v", f)
 			}
 		})
 	}
@@ -186,8 +216,8 @@ func TestApplyDispatchPolicy_TheCountFloorStillRaisesACapabilityBuild(t *testing
 	if req.Assignment.Tier != "deep" {
 		t.Fatalf("a capability failure must start the next build at deep, got %q", req.Assignment.Tier)
 	}
-	if req.Ladder == nil || req.Ladder.Rung != retryladder.R2 || req.Ladder.LadderTier() != "deep" {
-		t.Fatalf("the next-item build does not carry the R2 start rung: %+v", req.Ladder)
+	if req.Ladder == nil || req.Ladder.Rung != retryladder.R1 {
+		t.Fatalf("the next-item build does not carry the R1 start rung of the ladder: %+v", req.Ladder)
 	}
 }
 

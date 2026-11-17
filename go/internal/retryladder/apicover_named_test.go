@@ -138,3 +138,10 @@ func TestFixSpecExportsAreNamed(t *testing.T) {
 		t.Fatalf("headless hunk error = %v", err)
 	}
 }
+
+func TestVerdictFromClassCarriesTheClassAndNoFingerprint(t *testing.T) {
+	v := retryladder.VerdictFromClass(retryladder.Capability)
+	if v.Class != retryladder.Capability || v.Fingerprint != "" {
+		t.Fatalf("VerdictFromClass = %+v", v)
+	}
+}
