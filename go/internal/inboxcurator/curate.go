@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
+	"github.com/mickeyyaya/evolve-loop/go/internal/landedclaim"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -25,11 +26,13 @@ type Inputs struct {
 	Thresholds            Thresholds
 	MinShare              float64
 	Backstop              bool
+	LandedCheck           landedclaim.Check
 }
 
 func Curate(in Inputs) []Proposal {
 	var out []Proposal
 	routing := in.Backstop
+	out = append(out, CheckedClaims(in.Open, in.LandedCheck)...)
 	for _, c := range in.Changes {
 		out = append(out, MatchLanding(c, in.Open, in.HasTest, in.MinShare)...)
 		routing = routing || TouchesRouting(c.Paths)

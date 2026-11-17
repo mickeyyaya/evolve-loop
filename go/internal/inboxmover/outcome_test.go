@@ -89,3 +89,27 @@ func TestClaimLaneScope_ToleratesUnresolvableIDs(t *testing.T) {
 		t.Errorf("item-a.json not claimed into processing/cycle-7/: %v", statErr)
 	}
 }
+
+func TestLandedClaims_ReadsTheShipShaAndTheTokenAfterTheColon(t *testing.T) {
+	body := []byte(`{"skip_shipped":[{"task_id":"a","git_sha":" abc1234 "},{"task_id":"blank","git_sha":""}],
+"dropped":[{"id":"b","reason":"Already-Shipped: def5678 (closed)"},{"id":"c","reason":"already-shipped"},{"id":"d","reason":"stale: 0123456"},{"id":"e","reason":"already-shipped:   "}]}`)
+	got := LandedClaims(body)
+	if len(got) != 2 || got["a"] != "abc1234" || got["b"] != "def5678" {
+		t.Errorf("LandedClaims = %v, want a and b only", got)
+	}
+	if LandedClaims([]byte("not json")) != nil {
+		t.Error("an unreadable body claims nothing")
+	}
+}
+
+func TestDropReasonToken_SplitsTheTagFromItsFirstWord(t *testing.T) {
+	for reason, want := range map[string][2]string{
+		"protected-surface: go/a.go is fenced": {"protected-surface", "go/a.go"},
+		"  Stale ":                             {"stale", ""},
+		"duplicate:":                           {"duplicate", ""},
+	} {
+		if tag, token := DropReasonToken(reason); tag != want[0] || token != want[1] {
+			t.Errorf("DropReasonToken(%q) = %q, %q, want %v", reason, tag, token, want)
+		}
+	}
+}

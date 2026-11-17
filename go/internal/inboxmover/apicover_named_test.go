@@ -144,3 +144,9 @@ func TestFindConsumedRecord_NamedExport(t *testing.T) {
 		t.Errorf("FindConsumedRecord on an empty inbox = %v, want ErrNotFound", err)
 	}
 }
+
+func TestDropReasonTags_AreThePersistedStrings(t *testing.T) {
+	if AlreadyShippedTag != "already-shipped" || ProtectedSurfaceTag != "protected-surface" {
+		t.Errorf("AlreadyShippedTag = %q, ProtectedSurfaceTag = %q, want the strings that inbox records carry", AlreadyShippedTag, ProtectedSurfaceTag)
+	}
+}

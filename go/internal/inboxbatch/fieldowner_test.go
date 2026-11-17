@@ -12,8 +12,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
-var loopStampKeys = []string{"consumed", "continuation", "failure_count", "git_sha", "last_failure_class", "last_failure_cycle", "last_failure_findings", "last_failure_fingerprint", "last_failure_reason", "last_failure_rung", "protected_files", "released_continuations",
-	"retired_cycle", "retired_reason", "retry_plan", "route", "routed_at", "routed_cycle", "routed_reason", "unbacked"}
+var loopStampKeys = []string{"consumed", "continuation", "failure_count", "git_sha", "landed_sha", "last_failure_class", "last_failure_cycle", "last_failure_findings", "last_failure_fingerprint", "last_failure_reason", "last_failure_rung", "protected_files", "released_continuations",
+	"retired_cycle", "retired_reason", "retry_plan", "route", "routed_at", "routed_by", "routed_cycle", "routed_reason", "unbacked"}
 
 var operatorStampKeys = []string{"intake_override", "premise_verified_at", "premise_verified_evidence", "premise_verified_sha"}
 
@@ -24,6 +24,8 @@ func TestRoleOf_EveryItemFieldHasOneOwner(t *testing.T) {
 		"weight":                    {Owner: inboxbatch.CuratorOwned, Shape: inboxbatch.NumberValue},
 		"deps":                      {Owner: inboxbatch.CuratorOwned, Shape: inboxbatch.ListValue},
 		"route":                     {Owner: inboxbatch.LoopStampOwned},
+		inboxbatch.LandedSHAField:   {Owner: inboxbatch.LoopStampOwned},
+		inboxbatch.RoutedByField:    {Owner: inboxbatch.LoopStampOwned},
 		"routed_reason":             {Owner: inboxbatch.LoopStampOwned},
 		"failure_count":             {Owner: inboxbatch.LoopStampOwned, Shape: inboxbatch.CounterValue},
 		"protected_files":           {Owner: inboxbatch.LoopStampOwned, Shape: inboxbatch.GrowOnlyList},

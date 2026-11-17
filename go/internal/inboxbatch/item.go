@@ -34,6 +34,8 @@ type Item struct {
 	Deps              []string                   `json:"deps"`
 	Route             string                     `json:"route"`
 	RoutedReason      json.RawMessage            `json:"routed_reason,omitempty"`
+	RoutedBy          json.RawMessage            `json:"routed_by,omitempty"`
+	LandedSHA         json.RawMessage            `json:"landed_sha,omitempty"`
 	InjectedBy        string                     `json:"injected_by"`
 	Continuation      *continuation.Continuation `json:"continuation,omitempty"`
 	Acceptance        []string                   `json:"acceptance,omitempty"`
@@ -116,6 +118,22 @@ func (it Item) ProtectedBasenames(isProtectedBasename func(string) bool) []strin
 
 func (it Item) DeclaredPaths() []string {
 	return declaredTokens(it.Files)
+}
+
+func (it Item) LandedSHAText() string { return stampText(it.LandedSHA) }
+
+func (it Item) RoutedByText() string { return stampText(it.RoutedBy) }
+
+func stampText(raw json.RawMessage) string {
+	var text string
+	if json.Unmarshal(raw, &text) != nil {
+		return ""
+	}
+	return strings.TrimSpace(text)
+}
+
+func (it Item) ClaimPaths() []string {
+	return declaredTokens(slices.Concat(it.Files, it.ProtectedFiles))
 }
 
 var filedAtLayouts = []string{time.RFC3339, "2006-01-02"}
