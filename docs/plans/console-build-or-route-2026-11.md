@@ -115,7 +115,7 @@ What changes our mind: the lanes fail more than half of the items that this plan
 1. K1 lands with this design set, so the rule applies from the next boundary.
 2. K4 at the next boundary. It uses the census of research F1.3 and the operator's approval. It gives the largest gain at once.
 3. K2 and K3, filed as lane items. K3 needs the split of K2.
-4. K5 after its design review. It changes admission, which every lane uses.
+4. K5 after its design review. It changes admission, which every lane uses. Component C6 of [the concurrent-edit plan](concurrent-edit-layout-2026-11.md) first splits `cmd/evolve` into smaller packages. K5 runs only when the waiting items stay above the target of that plan.
 
 ## 8. Verification
 
