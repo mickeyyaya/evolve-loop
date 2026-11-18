@@ -350,7 +350,7 @@ func TestStopJourney_TheTrainOfTheCommandPutsTheStopGateOnMainAndOnCI(t *testing
 	s.gh.conclusion = "failure"
 	s.gh.main.tip = ""
 	var warn bytes.Buffer
-	train := s.env.train(s.root, &warn)
+	train, _ := s.env.train(s.root, &warn)
 	tip := s.originMain()
 
 	ffErr := train.Main.FastForward(context.Background(), tip)

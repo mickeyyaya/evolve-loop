@@ -79,10 +79,11 @@ func (t Train) Plan(ctx context.Context, prs []int) (Plan, error) {
 	if err := t.verifyHeads(ctx, recs); err != nil {
 		return Plan{}, err
 	}
-	open, err := t.splitLanded(ctx, recs, &plan)
+	open, landed, err := t.splitLanded(ctx, recs, refMain)
 	if err != nil {
 		return Plan{}, err
 	}
+	plan.Landed = landed
 	base, err := t.Main.Head(ctx)
 	if err != nil {
 		return Plan{}, err
@@ -162,22 +163,6 @@ func (t Train) headEjection(ctx context.Context, rec DeliverableRecord, landed b
 	}
 	reason := fmt.Errorf("the head moved from %s to %s while the batch ran; the commits that did not land: %s", last, head, strings.Join(strings.Fields(out), " "))
 	return withErr(ejectionOf(rec, CauseHead), reason), nil
-}
-
-func (t Train) splitLanded(ctx context.Context, recs []DeliverableRecord, plan *Plan) ([]DeliverableRecord, error) {
-	var open []DeliverableRecord
-	for _, rec := range recs {
-		landed, err := t.Composer.Repo.CheckLanded(ctx, rec, refMain)
-		if err != nil {
-			return nil, fmt.Errorf("integration: check whether %s is on main: %w", rec.Label(), err)
-		}
-		if landed {
-			plan.Landed = append(plan.Landed, rec)
-			continue
-		}
-		open = append(open, rec)
-	}
-	return open, nil
 }
 
 func (t Train) records(prs []int) ([]DeliverableRecord, error) {
@@ -268,7 +253,7 @@ func (t Train) Land(ctx context.Context, p Plan) (Outcome, error) {
 	}
 	if len(p.Kept) > 0 {
 		b := &batcher{t: t}
-		m := Merger{CI: t.CI, Main: t.Main, Compose: b.compose, Heads: t.movedHeads, Eject: t.eject, Progress: t.Progress}
+		m := Merger{CI: t.CI, Main: t.Main, Compose: b.compose, Heads: t.movedHeads, Eject: t.eject, Base: t.holdOnBase, Progress: t.Progress}
 		merged, err := m.Land(ctx, p.Kept)
 		merged.Ejected = append(out.Ejected, merged.Ejected...)
 		out = merged
@@ -279,6 +264,14 @@ func (t Train) Land(ctx context.Context, p Plan) (Outcome, error) {
 	return out, errors.Join(append(errs, err)...)
 }
 
+func (t Train) holdOnBase(ctx context.Context, base string) error {
+	state, err := t.checkMain(ctx, base)
+	if err == nil && state.State == MainPending {
+		return &MainRefusal{SHA: base, Reason: string(MainPending)}
+	}
+	return err
+}
+
 func (t Train) settle(ctx context.Context, p Plan, out Outcome) ([]string, error) {
 	var errs []error
 	var inbox []string
@@ -286,13 +279,20 @@ func (t Train) settle(ctx context.Context, p Plan, out Outcome) ([]string, error
 		if via, ok := out.Via[rec.PR]; ok {
 			moved, err := t.finish(ctx, rec, via)
 			inbox, errs = append(inbox, moved...), append(errs, err)
+		} else if slices.Contains(out.OnMain, rec.PR) {
+			moved, err := t.closeLanded(ctx, rec)
+			inbox, errs = append(inbox, moved...), append(errs, err)
 		}
 	}
 	for _, rec := range p.Landed {
-		moved, err := t.complete(ctx, rec, func() error { return t.Host.Close(ctx, rec.PR, alreadyLanded) })
+		moved, err := t.closeLanded(ctx, rec)
 		inbox, errs = append(inbox, moved...), append(errs, err)
 	}
 	return inbox, errors.Join(errs...)
+}
+
+func (t Train) closeLanded(ctx context.Context, rec DeliverableRecord) ([]string, error) {
+	return t.complete(ctx, rec, func() error { return t.Host.Close(ctx, rec.PR, alreadyLanded) })
 }
 
 func (t Train) finish(ctx context.Context, rec DeliverableRecord, via int) ([]string, error) {
@@ -354,10 +354,18 @@ func (b *batcher) compose(ctx context.Context, recs []DeliverableRecord) (Compos
 	if len(kept) == 0 {
 		return Composition{Ejected: moved}, nil
 	}
-	base, err := b.t.Main.Head(ctx)
+	base, err := b.t.fetchedMain(ctx)
 	if err != nil {
 		return Composition{}, err
 	}
+	open, onMain, err := b.t.splitLanded(ctx, kept, base)
+	if err != nil {
+		return Composition{}, err
+	}
+	if len(open) == 0 {
+		return Composition{Ejected: moved, OnMain: onMain}, nil
+	}
+	kept = open
 	b.index++
 	batch, err := b.t.Composer.Repo.StartBatch(ctx, Batch{Wave: b.t.Wave, Index: b.index, Base: base})
 	if err != nil {
@@ -365,10 +373,36 @@ func (b *batcher) compose(ctx context.Context, recs []DeliverableRecord) (Compos
 	}
 	comp, err := b.t.Composer.composeAll(ctx, batch, kept)
 	comp.Ejected = append(moved, comp.Ejected...)
+	comp.OnMain = onMain
 	if err != nil || b.t.L2.Composer.Stage != policy.FleetIntegrationEnforce {
 		return comp, err
 	}
 	return b.t.testBatch(ctx, comp)
+}
+
+func (t Train) fetchedMain(ctx context.Context) (string, error) {
+	git := t.Composer.Repo
+	out, err := git.Git(ctx, git.Dir, "", "rev-parse", "--verify", refMain+"^{commit}")
+	if err != nil {
+		return "", fmt.Errorf("integration: read the base of the batch: %w", err)
+	}
+	return strings.TrimSpace(out), nil
+}
+
+func (t Train) splitLanded(ctx context.Context, recs []DeliverableRecord, ref string) ([]DeliverableRecord, []DeliverableRecord, error) {
+	var open, landedRecs []DeliverableRecord
+	for _, rec := range recs {
+		landed, err := t.Composer.Repo.CheckLanded(ctx, rec, ref)
+		if err != nil {
+			return nil, nil, fmt.Errorf("integration: check whether %s is on main: %w", rec.Label(), err)
+		}
+		if landed {
+			landedRecs = append(landedRecs, rec)
+			continue
+		}
+		open = append(open, rec)
+	}
+	return open, landedRecs, nil
 }
 
 func (t Train) testBatch(ctx context.Context, comp Composition) (Composition, error) {

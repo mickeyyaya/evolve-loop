@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -146,7 +145,7 @@ func TestIntegrationTrainWiresTheBatchTestAtTheStageOfThePolicy(t *testing.T) {
 	if env.Run == nil {
 		t.Fatal("the production env has no command port for the batch test")
 	}
-	l2 := env.train(enforce, io.Discard).L2
+	l2 := trainOf(env, enforce).L2
 	if l2.Composer.Stage != policy.FleetIntegrationEnforce || l2.Composer.Gate == nil || l2.Composer.Repo.Dir != enforce {
 		t.Errorf("L2 composer = %+v, want the enforce stage of the policy on the root with a gate", l2.Composer)
 	}
@@ -161,7 +160,7 @@ func TestIntegrationTrainWiresTheBatchTestAtTheStageOfThePolicy(t *testing.T) {
 		t.Errorf("pack = %v, want %v", names, want)
 	}
 	bare := t.TempDir()
-	if stage := productionIntegrationEnv(bare, now).train(bare, io.Discard).L2.Composer.Stage; stage != policy.FleetIntegrationShadow {
+	if stage := trainOf(productionIntegrationEnv(bare, now), bare).L2.Composer.Stage; stage != policy.FleetIntegrationShadow {
 		t.Errorf("L2 stage without a policy = %q, want %q", stage, policy.FleetIntegrationShadow)
 	}
 }

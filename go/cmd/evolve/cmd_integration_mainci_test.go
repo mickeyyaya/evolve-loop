@@ -164,7 +164,7 @@ func TestRunBatch_ARedMainNeverTouchesTheMainRedStop(t *testing.T) {
 
 func TestStepLine_NamesAnUnknownKindAndNeverCallsItALanding(t *testing.T) {
 	t.Parallel()
-	got := stepLine(integration.Step{Kind: "probe", PRs: []int{4}, Batch: 9})
+	got := stepLine(integration.Step{Kind: "probe", PRs: []int{4}, Batch: 9}, nil)
 	if got != "step: probe PRs 4 in batch PR #9" {
 		t.Errorf("stepLine = %q", got)
 	}

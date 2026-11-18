@@ -49,6 +49,7 @@ type GhCI struct {
 	Repo   Repo
 	Gh     GhFunc
 	Settle func(ctx context.Context) error
+	Runs   *RunLog
 }
 
 func (c GhCI) gh(ctx context.Context, args ...string) (string, error) {
@@ -135,6 +136,7 @@ func (c GhCI) Watch(ctx context.Context, pr PR) (Verdict, error) {
 	if err != nil {
 		return "", err
 	}
+	c.Runs.note(pr.Tip, id)
 	_, code, err := c.Gh(ctx, c.Repo.Dir, "run", "watch", id, "--exit-status")
 	switch {
 	case err != nil:
