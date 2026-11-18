@@ -122,7 +122,10 @@ func newGitEvidenceDetector(cfg *Config, deps Deps) *gitEvidenceDetector {
 		gitCmd: func(ctx context.Context, args ...string) (string, error) {
 			var out strings.Builder
 			full := append([]string{"-C", worktree}, args...)
-			_, err := deps.Runner(ctx, "git", "", full, driverEnv(deps, nil), nil, &out, io.Discard)
+			code, err := deps.Runner(ctx, "git", "", full, driverEnv(deps, nil), nil, &out, io.Discard)
+			if err == nil && code != 0 {
+				err = fmt.Errorf("git %s exited %d", args[0], code)
+			}
 			return strings.TrimSpace(out.String()), err
 		},
 	}
