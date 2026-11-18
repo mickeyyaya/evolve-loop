@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 
@@ -29,11 +30,45 @@ func runWaveSupply(env waveEnv, args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "%s%v\n", wavePrefix, err)
 		return exitIO
 	}
+	advice := orchestrator.ConsoleAdvice(supply.Counts[orchestrator.ClassAdmissible], supply.Window, waveOpenPRs(env, plane.root, stderr))
 	if asJSON {
-		return writeWaveJSON(supply, stdout, stderr)
+		return writeWaveJSON(waveSupplyView{Supply: supply, Advice: advice}, stdout, stderr)
 	}
 	writeWaveSupplyText(stdout, supply)
+	fmt.Fprintln(stdout, advice)
 	return 0
+}
+
+type waveSupplyView struct {
+	orchestrator.Supply
+	Advice string `json:"advice"`
+}
+
+func waveOpenPRs(env waveEnv, root string, stderr io.Writer) int {
+	open, err := env.openPRs(root)
+	if err != nil {
+		fmt.Fprintf(stderr, "%sWARN: the open PRs did not load: %v\n", wavePrefix, err)
+		return 0
+	}
+	return open
+}
+
+func ghOpenPRCount(root string) (int, error) {
+	return countOpenPRs(ghOutput, root)
+}
+
+func countOpenPRs(run func(ctx context.Context, root string, args ...string) (string, error), root string) (int, error) {
+	out, err := run(context.Background(), root, "pr", "list", "--state", "open", "--limit", "200", "--json", "number")
+	if err != nil {
+		return 0, err
+	}
+	var open []struct {
+		Number int `json:"number"`
+	}
+	if err := json.Unmarshal([]byte(out), &open); err != nil {
+		return 0, fmt.Errorf("gh pr list output: %w", err)
+	}
+	return len(open), nil
 }
 
 func writeWaveSupplyText(w io.Writer, s orchestrator.Supply) {

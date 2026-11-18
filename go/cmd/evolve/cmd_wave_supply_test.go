@@ -312,3 +312,56 @@ func TestWaveSupply_ASkippedInboxFileReachesTheOperatorAsAWarning(t *testing.T) 
 		t.Errorf("rc = %d stdout:\n%s", rc, out)
 	}
 }
+
+func TestWaveSupply_PrintsTheAdviceOfTheOpenPRCountAndWarnsWhenGhFails(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct {
+		prs     int
+		prsErr  error
+		want    string
+		warning bool
+	}{
+		"a full batch of PRs finishes":               {prs: 11, want: "console: finish"},
+		"few PRs and a full window build":            {prs: 2, want: "console: build"},
+		"a gh failure is a warning and counts no PR": {prsErr: errors.New("gh is gone"), want: "console: build", warning: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			p := newWavePlane(t)
+			seedSupplyInbox(t, p.evolveDir())
+			h := newWaveHarness()
+			env := h.env(p.root)
+			env.openPRs = func(string) (int, error) { return tc.prs, tc.prsErr }
+			var out, errb bytes.Buffer
+
+			rc := runWaveWith(env, []string{"supply", "--project-root", p.root}, &out, &errb)
+
+			if rc != 0 || !strings.HasSuffix(out.String(), tc.want+"\n") || strings.Contains(errb.String(), "open PRs did not load") != tc.warning {
+				t.Errorf("rc = %d stdout:\n%s\nstderr:\n%s\nwant last line %q, warning %t", rc, out.String(), errb.String(), tc.want, tc.warning)
+			}
+		})
+	}
+}
+
+func TestCountOpenPRs_CountsTheListAndReportsEachFailure(t *testing.T) {
+	t.Parallel()
+	answer := func(out string, err error) func(context.Context, string, ...string) (string, error) {
+		return func(context.Context, string, ...string) (string, error) { return out, err }
+	}
+	if n, err := countOpenPRs(answer(`[{"number":1},{"number":2}]`, nil), "r"); n != 2 || err != nil {
+		t.Errorf("count = %d, %v; want 2", n, err)
+	}
+	if _, err := countOpenPRs(answer("", errors.New("gh is gone")), "r"); err == nil || !strings.Contains(err.Error(), "gh is gone") {
+		t.Errorf("err = %v, want the gh failure", err)
+	}
+	if _, err := countOpenPRs(answer("not json", nil), "r"); err == nil || !strings.Contains(err.Error(), "gh pr list output") {
+		t.Errorf("err = %v, want the decode failure", err)
+	}
+}
+
+func TestGhOpenPRCount_ReachesTheRealGhPort(t *testing.T) {
+	t.Parallel()
+	n, err := ghOpenPRCount(t.TempDir())
+	if err != nil && n != 0 {
+		t.Errorf("count = %d with err %v, want zero on a failure", n, err)
+	}
+}

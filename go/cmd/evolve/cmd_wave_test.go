@@ -173,6 +173,7 @@ func (h *waveHarness) env(root string) waveEnv {
 			h.since = append(h.since, since)
 			return []string{"812"}, h.prsErr
 		},
+		openPRs:   func(string) (int, error) { return 0, nil },
 		loadGraph: h.graph,
 		seatDeps:  h.seatDeps,
 		refreshBinary: func(cfg loopConfig, w io.Writer) bootBinaryRefreshResult {
