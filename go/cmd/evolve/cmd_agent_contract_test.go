@@ -34,7 +34,6 @@ func (b *composingBridge) Probe(context.Context) (core.BridgeProbe, error) {
 }
 
 func TestAgentRunBridge_TheSeatPromptHoldsTheRequiredSectionsOfThePhaseContract(t *testing.T) {
-	t.Parallel()
 	root := diffReviewerProject(t, "code-simplifier")
 	cb := &composingBridge{}
 	run := agentcmd.New(agentcmd.Deps{
@@ -60,7 +59,6 @@ func TestAgentRunBridge_TheSeatPromptHoldsTheRequiredSectionsOfThePhaseContract(
 }
 
 func TestAgentRunBridge_AnUnreadableCatalogStillBuildsABridge(t *testing.T) {
-	t.Parallel()
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".evolve", "phases", "broken"), 0o755); err != nil {
 		t.Fatal(err)

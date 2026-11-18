@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
@@ -380,7 +381,32 @@ func agentRunSignals(projectRoot string, console io.Writer) (*signalcenter.Cente
 	return newRoleSignalCenter(roleAgent, projectRoot, filepath.Join(projectRoot, ".evolve"), console)
 }
 
+func hostPathValue() string {
+	for _, kv := range os.Environ() {
+		if value, ok := strings.CutPrefix(kv, "PATH="); ok {
+			return value
+		}
+	}
+	return ""
+}
+
+func putEvolveBinaryDirOnPath(executable func() (string, error)) {
+	exe, err := executable()
+	if err != nil {
+		return
+	}
+	dir := filepath.Dir(exe)
+	entries := []string{dir}
+	for _, entry := range filepath.SplitList(hostPathValue()) {
+		if entry != "" && entry != dir {
+			entries = append(entries, entry)
+		}
+	}
+	_ = os.Setenv("PATH", strings.Join(entries, string(os.PathListSeparator)))
+}
+
 func agentRunBridge(projectRoot string, signals *signalcenter.Center) core.Bridge {
+	putEvolveBinaryDirOnPath(os.Executable)
 	catalog, err := phasecmd.LoadCatalog(projectRoot)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[agent-run] WARN %v (the seat prompt carries no section contract)\n", err)

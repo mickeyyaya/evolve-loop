@@ -1,6 +1,8 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestAgentRunBridge_AnUnreadableCatalogStillBuildsABridge":                                                   "agentRunBridge puts the evolve binary directory on the process PATH",
+	"main.TestAgentRunBridge_TheSeatPromptHoldsTheRequiredSectionsOfThePhaseContract":                                 "agentRunBridge puts the evolve binary directory on the process PATH",
 	"main.TestSelectorFlags_ARelaunchedLaunchIsNotCheckedAgainstItemsItAlreadyShipped":                                "drives runLoop or parseLoopArgs, which read the process arguments and the re-exec handoff",
 	"main.TestSelectorFlags_AnIDInBothListsExits10NamingTheID":                                                        "drives runLoop or parseLoopArgs, which read the process arguments and the re-exec handoff",
 	"main.TestSelectorFlags_AnOnlyIDNoLaneCanTakeExits10AtLaunch":                                                     "drives runLoop or parseLoopArgs, which read the process arguments and the re-exec handoff",

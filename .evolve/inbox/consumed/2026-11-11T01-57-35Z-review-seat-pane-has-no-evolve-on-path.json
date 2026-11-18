@@ -3,6 +3,11 @@
     "A test of the agent run launch environment finds the evolve binary directory on PATH, and the test is red without the fix",
     "A live evolve agent run code-reviewer seat runs evolve code find and reports its output"
   ],
+  "consumed": {
+    "at": "2026-11-18T09:18:52Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "created_at": "2026-11-11T01:57:35Z",
   "deps": [],
   "files": [
