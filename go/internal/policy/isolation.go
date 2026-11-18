@@ -8,19 +8,23 @@ import (
 )
 
 const (
-	DispatchRequestStageOff     = "off"
-	DispatchRequestStageShadow  = "shadow"
-	DispatchRequestStageEnforce = "enforce"
+	RequestStageOff     = "off"
+	RequestStageShadow  = "shadow"
+	RequestStageEnforce = "enforce"
 
 	dispatchRequestsPerCycle = 3
 	dispatchRequestsMaxDepth = 1
+
+	inboxRequestsPerCycle = 8
 )
 
 var (
-	dispatchRequestStages = []string{DispatchRequestStageOff, DispatchRequestStageShadow, DispatchRequestStageEnforce}
-	dispatchRequestRoles  = []string{"fault-localization", "premise-challenge", "dependency-map"}
-	profileName           = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
+	requestStages        = []RequestStage{RequestStageOff, RequestStageShadow, RequestStageEnforce}
+	dispatchRequestRoles = []string{"fault-localization", "premise-challenge", "dependency-map"}
+	profileName          = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
 )
+
+type RequestStage string
 
 type IsolationPolicy struct {
 	I2  IsolationInvariantPolicy `json:"i2,omitempty"`
@@ -35,13 +39,20 @@ type IsolationPolicy struct {
 	Context *IsolationContextPolicy `json:"context,omitempty"`
 
 	DispatchRequests *DispatchRequestsPolicy `json:"dispatch_requests,omitempty"`
+
+	InboxRequests *InboxRequestsPolicy `json:"inbox_requests,omitempty"`
+}
+
+type InboxRequestsPolicy struct {
+	Stage    RequestStage `json:"stage,omitempty"`
+	PerCycle int          `json:"per_cycle,omitempty"`
 }
 
 type DispatchRequestsPolicy struct {
-	Stage    string   `json:"stage,omitempty"`
-	Roles    []string `json:"roles,omitempty"`
-	PerCycle int      `json:"per_cycle,omitempty"`
-	MaxDepth int      `json:"max_depth,omitempty"`
+	Stage    RequestStage `json:"stage,omitempty"`
+	Roles    []string     `json:"roles,omitempty"`
+	PerCycle int          `json:"per_cycle,omitempty"`
+	MaxDepth int          `json:"max_depth,omitempty"`
 }
 
 type IsolationContextPolicy struct {
@@ -146,7 +157,7 @@ func (p Policy) IsolationDispatchRequests() DispatchRequestsPolicy {
 		out = *p.Isolation.DispatchRequests
 	}
 	if out.Stage == "" {
-		out.Stage = DispatchRequestStageShadow
+		out.Stage = RequestStageShadow
 	}
 	if len(out.Roles) == 0 {
 		out.Roles = dispatchRequestRoles
@@ -165,8 +176,8 @@ func (d *DispatchRequestsPolicy) validate() error {
 	switch {
 	case d == nil:
 		return nil
-	case d.Stage != "" && !slices.Contains(dispatchRequestStages, d.Stage):
-		return fmt.Errorf("stage %q: the stages are %v", d.Stage, dispatchRequestStages)
+	case d.Stage != "" && !slices.Contains(requestStages, d.Stage):
+		return fmt.Errorf("stage %q: the stages are %v", d.Stage, requestStages)
 	case d.PerCycle < 0:
 		return fmt.Errorf("per_cycle %d: a cap cannot be negative", d.PerCycle)
 	case d.MaxDepth < 0:
@@ -176,6 +187,32 @@ func (d *DispatchRequestsPolicy) validate() error {
 		if !profileName.MatchString(role) {
 			return fmt.Errorf("role %q is not a profile name such as fault-localization", role)
 		}
+	}
+	return nil
+}
+
+func (p Policy) IsolationInboxRequests() InboxRequestsPolicy {
+	out := InboxRequestsPolicy{}
+	if p.Isolation != nil && p.Isolation.InboxRequests != nil {
+		out = *p.Isolation.InboxRequests
+	}
+	if out.Stage == "" {
+		out.Stage = RequestStageEnforce
+	}
+	if out.PerCycle == 0 {
+		out.PerCycle = inboxRequestsPerCycle
+	}
+	return out
+}
+
+func (d *InboxRequestsPolicy) validate() error {
+	switch {
+	case d == nil:
+		return nil
+	case d.Stage != "" && !slices.Contains(requestStages, d.Stage):
+		return fmt.Errorf("stage %q: the stages are %v", d.Stage, requestStages)
+	case d.PerCycle < 0:
+		return fmt.Errorf("per_cycle %d: a cap cannot be negative", d.PerCycle)
 	}
 	return nil
 }

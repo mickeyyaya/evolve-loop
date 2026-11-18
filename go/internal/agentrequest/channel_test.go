@@ -75,34 +75,35 @@ func refuse(name, reason string) string {
 		`"action":{"kind":"halt-and-escalate","params":{"reason":"` + reason + `"}},"expected_effect":"no agent runs","confidence":"high"}`
 }
 
-func (h *harness) channel(stage string) Channel {
+func (h *harness) channel(stage policy.RequestStage) Channel {
 	pol := policy.Policy{Isolation: &policy.IsolationPolicy{DispatchRequests: &policy.DispatchRequestsPolicy{Stage: stage, Roles: []string{"fault-localization", "premise-challenge"}, PerCycle: 3, MaxDepth: cmp.Or(h.maxDepth, 1)}}}
+	var judge JudgeFunc = func(_ context.Context, p Pending) (string, error) {
+		h.judged = append(h.judged, p)
+		if h.judgeErr != nil {
+			return "", h.judgeErr
+		}
+		if v, ok := h.verdicts[p.Name]; ok {
+			return v, nil
+		}
+		return approve(p.Name), nil
+	}
+	var dispatch DispatchFunc = func(_ context.Context, p Pending) (Result, error) {
+		h.runs = append(h.runs, p)
+		ws := filepath.Join(h.cell.ProjectRoot, ".evolve", "ephemeral", "agent-runs", "run-"+p.Name)
+		h.write(filepath.Join(ws, "report.md"), "x")
+		if h.runErr != nil {
+			return Result{Workspace: ws}, h.runErr
+		}
+		if body, ok := h.nested[p.Name]; ok {
+			h.write(filepath.Join(ws, "requests", "dispatch-1.json"), body)
+		}
+		return Result{Report: "# Suspects\nparser.go\n", RunLabel: "agent-" + p.Request.Role(), Workspace: ws}, nil
+	}
+	now := func() time.Time { return t0 }
 	return Channel{
-		Policy: pol.IsolationDispatchRequests(),
-		Judge: func(_ context.Context, p Pending) (string, error) {
-			h.judged = append(h.judged, p)
-			if h.judgeErr != nil {
-				return "", h.judgeErr
-			}
-			if v, ok := h.verdicts[p.Name]; ok {
-				return v, nil
-			}
-			return approve(p.Name), nil
-		},
-		Dispatch: func(_ context.Context, p Pending) (Result, error) {
-			h.runs = append(h.runs, p)
-			ws := filepath.Join(h.cell.ProjectRoot, ".evolve", "ephemeral", "agent-runs", "run-"+p.Name)
-			h.write(filepath.Join(ws, "report.md"), "x")
-			if h.runErr != nil {
-				return Result{Workspace: ws}, h.runErr
-			}
-			if body, ok := h.nested[p.Name]; ok {
-				h.write(filepath.Join(ws, "requests", "dispatch-1.json"), body)
-			}
-			return Result{Report: "# Suspects\nparser.go\n", RunLabel: "agent-" + p.Request.Role(), Workspace: ws}, nil
-		},
-		Emit: func(e signalcenter.Event) { h.events = append(h.events, e) },
-		Now:  func() time.Time { return t0 },
+		Executors: []Executor{NewDispatch(pol.IsolationDispatchRequests(), DispatchDeps{Judge: judge, Run: dispatch, Now: now})},
+		Emit:      func(e signalcenter.Event) { h.events = append(h.events, e) },
+		Now:       now,
 	}
 }
 
@@ -134,7 +135,7 @@ func TestDispatchRequest_AValidRequestIsDispatchedByThePipeline(t *testing.T) {
 	h := newHarness(t)
 	h.request("dispatch-1", validRequest)
 
-	if err := h.channel(policy.DispatchRequestStageEnforce).Handoff(context.Background(), h.cell); err != nil {
+	if err := h.channel(policy.RequestStageEnforce).Handoff(context.Background(), h.cell); err != nil {
 		t.Fatal(err)
 	}
 
@@ -167,7 +168,7 @@ func TestHandoff_ADecidedRequestIsNotReadAgain(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 	h.request("dispatch-1", validRequest)
-	c := h.channel(policy.DispatchRequestStageEnforce)
+	c := h.channel(policy.RequestStageEnforce)
 	for range 2 {
 		if err := c.Handoff(context.Background(), h.cell); err != nil {
 			t.Fatal(err)
@@ -184,7 +185,7 @@ func TestHandoff_AnUnreasonableRequestIsRefusedWithARecordedReason(t *testing.T)
 	h.request("dispatch-1", validRequest)
 	h.verdicts["dispatch-1"] = refuse("dispatch-1", "the build report already names the suspect file")
 
-	if err := h.channel(policy.DispatchRequestStageEnforce).Handoff(context.Background(), h.cell); err != nil {
+	if err := h.channel(policy.RequestStageEnforce).Handoff(context.Background(), h.cell); err != nil {
 		t.Fatal(err)
 	}
 
@@ -203,7 +204,7 @@ func TestHandoff_ARequestOfADispatchedAgentIsRefusedPastTheDepthCap(t *testing.T
 	h.request("dispatch-1", validRequest)
 	h.nested["dispatch-1"] = strings.Replace(validRequest, `"inputs":["build-report.md"]`, `"inputs":[]`, 1)
 
-	if err := h.channel(policy.DispatchRequestStageEnforce).Handoff(context.Background(), h.cell); err != nil {
+	if err := h.channel(policy.RequestStageEnforce).Handoff(context.Background(), h.cell); err != nil {
 		t.Fatal(err)
 	}
 
@@ -223,7 +224,7 @@ func TestHandoff_ARequestPastTheCycleCapIsRefused(t *testing.T) {
 		h.request(name, validRequest)
 	}
 
-	if err := h.channel(policy.DispatchRequestStageEnforce).Handoff(context.Background(), h.cell); err != nil {
+	if err := h.channel(policy.RequestStageEnforce).Handoff(context.Background(), h.cell); err != nil {
 		t.Fatal(err)
 	}
 
@@ -248,7 +249,7 @@ func TestHandoff_TheValidatorRefusesBeforeTheOrchestratorJudges(t *testing.T) {
 		{"no expected output", strings.Replace(validRequest, `"the suspect files of the failure"`, `""`, 1), PreSchema},
 		{"a kind with no executor", strings.Replace(validRequest, `"kind":"dispatch"`, `"kind":"inbox-add"`, 1), PreKind},
 		{"a role that the policy does not allow", strings.Replace(validRequest, "fault-localization", "builder", 1), PreRole},
-		{"no role", strings.Replace(validRequest, `{"role":"fault-localization"}`, `{}`, 1), PreRole},
+		{"no role", strings.Replace(validRequest, `{"role":"fault-localization"}`, `{}`, 1), PreArgs},
 		{"an input outside the workspace", strings.Replace(validRequest, `"build-report.md"`, `"../cycle-6/audit-report.md"`, 1), PreInput},
 		{"an input that does not exist", strings.Replace(validRequest, `"build-report.md"`, `"scout-report.md"`, 1), PreInput},
 		{"an input path that is not clean", strings.Replace(validRequest, `"build-report.md"`, `"./build-report.md"`, 1), PreInput},
@@ -260,7 +261,7 @@ func TestHandoff_TheValidatorRefusesBeforeTheOrchestratorJudges(t *testing.T) {
 			h := newHarness(t)
 			h.write(filepath.Join(h.cell.ProjectRoot, ".evolve", "runs", "cycle-6", "audit-report.md"), "# Audit\n")
 			h.request("dispatch-1", c.body)
-			if err := h.channel(policy.DispatchRequestStageEnforce).Handoff(context.Background(), h.cell); err != nil {
+			if err := h.channel(policy.RequestStageEnforce).Handoff(context.Background(), h.cell); err != nil {
 				t.Fatal(err)
 			}
 			r := h.record("dispatch-1")
@@ -292,7 +293,7 @@ func TestHandoff_TheCatalogDisposesOfTheJudgement(t *testing.T) {
 			h := newHarness(t)
 			h.request("dispatch-1", validRequest)
 			h.verdicts["dispatch-1"], h.judgeErr = c.verdict, c.judgeErr
-			if err := h.channel(policy.DispatchRequestStageEnforce).Handoff(context.Background(), h.cell); err != nil {
+			if err := h.channel(policy.RequestStageEnforce).Handoff(context.Background(), h.cell); err != nil {
 				t.Fatal(err)
 			}
 			if r := h.record("dispatch-1"); r.Decision != DecisionRefused || r.Precondition != c.want || !strings.Contains(r.Reason, c.reason) || len(h.runs) != 0 {
@@ -306,10 +307,10 @@ func TestHandoff_ShadowJudgesAndRecordsButDispatchesNothing(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 	h.request("dispatch-1", validRequest)
-	if err := h.channel(policy.DispatchRequestStageShadow).Handoff(context.Background(), h.cell); err != nil {
+	if err := h.channel(policy.RequestStageShadow).Handoff(context.Background(), h.cell); err != nil {
 		t.Fatal(err)
 	}
-	if r := h.record("dispatch-1"); r.Decision != DecisionApproved || r.Stage != policy.DispatchRequestStageShadow || len(h.runs) != 0 || len(h.judged) != 1 {
+	if r := h.record("dispatch-1"); r.Decision != DecisionApproved || r.Stage != policy.RequestStageShadow || len(h.runs) != 0 || len(h.judged) != 1 {
 		t.Fatalf("shadow approves and records, and runs no agent, got %+v runs=%d", r, len(h.runs))
 	}
 }
@@ -319,7 +320,7 @@ func TestHandoff_AFailedDispatchIsRecordedAndSignalled(t *testing.T) {
 	h := newHarness(t)
 	h.request("dispatch-1", validRequest)
 	h.runErr = errors.New("evolve agent run fault-localization: exit 81")
-	if err := h.channel(policy.DispatchRequestStageEnforce).Handoff(context.Background(), h.cell); err != nil {
+	if err := h.channel(policy.RequestStageEnforce).Handoff(context.Background(), h.cell); err != nil {
 		t.Fatal(err)
 	}
 	if r := h.record("dispatch-1"); r.Decision != DecisionFailed || !strings.Contains(r.Reason, "exit 81") {
@@ -338,15 +339,15 @@ func TestHandoff_OffReadsNothingAndAWorkspaceWithNoRequestsIsQuiet(t *testing.T)
 	h := newHarness(t)
 	h.request("dispatch-1", validRequest)
 	h.write(filepath.Join(h.cell.Workspace, "requests", "notes.txt"), "not a request")
-	if err := h.channel(policy.DispatchRequestStageOff).Handoff(context.Background(), h.cell); err != nil || len(h.events) != 0 {
+	if err := h.channel(policy.RequestStageOff).Handoff(context.Background(), h.cell); err != nil || len(h.events) != 0 {
 		t.Fatalf("off reads nothing, got %v %+v", err, h.events)
 	}
 	empty := newHarness(t)
-	if err := empty.channel(policy.DispatchRequestStageEnforce).Handoff(context.Background(), empty.cell); err != nil || len(empty.events) != 0 {
+	if err := empty.channel(policy.RequestStageEnforce).Handoff(context.Background(), empty.cell); err != nil || len(empty.events) != 0 {
 		t.Fatalf("a cell with no requests directory is quiet, got %v %+v", err, empty.events)
 	}
 	h.write(filepath.Join(h.cell.Workspace, "requests", "inbox-add-1.json"), validRequest)
-	if err := h.channel(policy.DispatchRequestStageEnforce).Handoff(context.Background(), h.cell); err != nil {
+	if err := h.channel(policy.RequestStageEnforce).Handoff(context.Background(), h.cell); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(inputindex.RequestsDir(h.cell.ProjectRoot, 7), "notes.json")); !errors.Is(err, os.ErrNotExist) {
@@ -362,7 +363,7 @@ func TestHandoff_AnUnwritableRecordStoreFailsLoudly(t *testing.T) {
 	unreadable := newHarness(t)
 	unreadable.request("dispatch-1", validRequest)
 	unreadable.write(filepath.Join(unreadable.cell.ProjectRoot, ".evolve", "lineage", "requests"), "a file where the store must be")
-	if err := unreadable.channel(policy.DispatchRequestStageEnforce).Handoff(context.Background(), unreadable.cell); err == nil || !strings.Contains(err.Error(), "dispatch-1") {
+	if err := unreadable.channel(policy.RequestStageEnforce).Handoff(context.Background(), unreadable.cell); err == nil || !strings.Contains(err.Error(), "dispatch-1") {
 		t.Fatalf("a store that cannot be read is an error that names the request, got %v", err)
 	}
 	readOnly := newHarness(t)
@@ -372,7 +373,7 @@ func TestHandoff_AnUnwritableRecordStoreFailsLoudly(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
-	err := readOnly.channel(policy.DispatchRequestStageEnforce).Handoff(context.Background(), readOnly.cell)
+	err := readOnly.channel(policy.RequestStageEnforce).Handoff(context.Background(), readOnly.cell)
 	if err == nil || !strings.Contains(err.Error(), "request dispatch-1") || len(readOnly.events) != 1 {
 		t.Fatalf("a record that cannot be written is an error that names the request, and no decision signal claims it, got %v %+v", err, readOnly.events)
 	}
@@ -389,7 +390,7 @@ func TestHandoff_AnInputThatIsNotAPlainFileIsRefusedBeforeTheJudge(t *testing.T)
 		t.Fatal(err)
 	}
 	h.request("dispatch-1", strings.Replace(validRequest, `"build-report.md"`, `"linked.md"`, 1))
-	if err := h.channel(policy.DispatchRequestStageEnforce).Handoff(context.Background(), h.cell); err != nil {
+	if err := h.channel(policy.RequestStageEnforce).Handoff(context.Background(), h.cell); err != nil {
 		t.Fatal(err)
 	}
 	if r := h.record("dispatch-1"); r.Decision != DecisionRefused || r.Precondition != PreInput || !strings.Contains(r.Reason, "not a plain file") || len(h.judged) != 0 {
@@ -414,7 +415,7 @@ func TestHandoff_ACancelledCycleJudgesNothing(t *testing.T) {
 	h.request("dispatch-1", validRequest)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if err := h.channel(policy.DispatchRequestStageEnforce).Handoff(ctx, h.cell); !errors.Is(err, context.Canceled) || len(h.judged) != 0 {
+	if err := h.channel(policy.RequestStageEnforce).Handoff(ctx, h.cell); !errors.Is(err, context.Canceled) || len(h.judged) != 0 {
 		t.Fatalf("a cancelled cycle reads no request, got %v and %d judgements", err, len(h.judged))
 	}
 }
@@ -423,7 +424,7 @@ func TestHandoff_ANewRequestUnderADecidedNameIsRefusedOnce(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 	h.request("dispatch-1", validRequest)
-	c := h.channel(policy.DispatchRequestStageEnforce)
+	c := h.channel(policy.RequestStageEnforce)
 	if err := c.Handoff(context.Background(), h.cell); err != nil {
 		t.Fatal(err)
 	}
@@ -447,7 +448,7 @@ func TestHandoff_ANestedRequestUnderTheDepthCapIsJudgedAndRun(t *testing.T) {
 	h.maxDepth = 2
 	h.request("dispatch-1", validRequest)
 	h.nested["dispatch-1"] = strings.Replace(validRequest, `"inputs":["build-report.md"]`, `"inputs":[]`, 1)
-	if err := h.channel(policy.DispatchRequestStageEnforce).Handoff(context.Background(), h.cell); err != nil {
+	if err := h.channel(policy.RequestStageEnforce).Handoff(context.Background(), h.cell); err != nil {
 		t.Fatal(err)
 	}
 	if r := h.record("dispatch-1.dispatch-1"); r.Decision != DecisionRun || r.Depth != 2 || len(h.runs) != 2 || h.judged[1].Name != "dispatch-1.dispatch-1" {
@@ -459,13 +460,13 @@ func TestHandoff_AnUnreadableRequestStoreOrRecordFailsLoudly(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 	h.write(filepath.Join(h.cell.Workspace, "requests"), "a file where the requests directory must be")
-	if err := h.channel(policy.DispatchRequestStageEnforce).Handoff(context.Background(), h.cell); err == nil || !strings.Contains(err.Error(), "requests of") {
+	if err := h.channel(policy.RequestStageEnforce).Handoff(context.Background(), h.cell); err == nil || !strings.Contains(err.Error(), "requests of") {
 		t.Fatalf("an unreadable requests directory is an error, got %v", err)
 	}
 	corrupt := newHarness(t)
 	corrupt.request("dispatch-1", validRequest)
 	corrupt.write(filepath.Join(inputindex.RequestsDir(corrupt.cell.ProjectRoot, 7), "dispatch-1.json"), "{")
-	if err := corrupt.channel(policy.DispatchRequestStageEnforce).Handoff(context.Background(), corrupt.cell); err == nil || !strings.Contains(err.Error(), "request dispatch-1") || len(corrupt.judged) != 0 {
+	if err := corrupt.channel(policy.RequestStageEnforce).Handoff(context.Background(), corrupt.cell); err == nil || !strings.Contains(err.Error(), "request dispatch-1") || len(corrupt.judged) != 0 {
 		t.Fatalf("a corrupt record is an error and decides nothing, got %v", err)
 	}
 }
@@ -479,7 +480,7 @@ func TestHandoff_ARequestWhoseEvidenceIsNoPlainFileIsRefused(t *testing.T) {
 		t.Fatal(err)
 	}
 	h.request("dispatch-1", strings.Replace(validRequest, `"inputs":["build-report.md"]`, `"inputs":[]`, 1))
-	if err := h.channel(policy.DispatchRequestStageEnforce).Handoff(context.Background(), h.cell); err != nil {
+	if err := h.channel(policy.RequestStageEnforce).Handoff(context.Background(), h.cell); err != nil {
 		t.Fatal(err)
 	}
 	if r := h.record("dispatch-1"); r.Decision != DecisionRefused || r.Precondition != PreEvidence || !strings.Contains(r.Reason, "not a plain file") || len(h.judged) != 0 {
@@ -496,7 +497,7 @@ func TestHandoff_TheRequestsOfAFailedRunAreNotRead(t *testing.T) {
 	failed.runErr = errors.New("evolve agent run fault-localization: exit 81")
 	failed.nested["dispatch-1"] = nested
 	failed.write(filepath.Join(failed.cell.ProjectRoot, ".evolve", "ephemeral", "agent-runs", "run-dispatch-1", "requests", "dispatch-1.json"), nested)
-	if err := failed.channel(policy.DispatchRequestStageEnforce).Handoff(context.Background(), failed.cell); err != nil {
+	if err := failed.channel(policy.RequestStageEnforce).Handoff(context.Background(), failed.cell); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(inputindex.RequestsDir(failed.cell.ProjectRoot, 7), "dispatch-1.dispatch-1.json")); !errors.Is(err, os.ErrNotExist) || len(failed.judged) != 1 {
@@ -509,10 +510,10 @@ func TestHandoff_EachDecisionSignalCarriesTheSummaryOfItsRecord(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		verdict func(string) string
-		stage   string
+		stage   policy.RequestStage
 	}{
-		{"refused", func(n string) string { return refuse(n, "the build report already names the suspect file") }, policy.DispatchRequestStageEnforce},
-		{"approved in shadow", approve, policy.DispatchRequestStageShadow},
+		{"refused", func(n string) string { return refuse(n, "the build report already names the suspect file") }, policy.RequestStageEnforce},
+		{"approved in shadow", approve, policy.RequestStageShadow},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()

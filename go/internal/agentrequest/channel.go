@@ -14,9 +14,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/agentclass"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inputindex"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
-	"github.com/mickeyyaya/evolve-loop/go/internal/selfheal"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -32,6 +30,8 @@ const (
 	PreJudge    = "judge"
 	PreCatalog  = "catalog"
 	PreJudged   = "judged"
+	PreArgs     = "args"
+	PreIntake   = "intake"
 )
 
 type Cell struct {
@@ -50,6 +50,7 @@ type Pending struct {
 	Evidence string
 	EntryIDs []string
 	entries  []inputindex.Entry
+	raw      []byte
 }
 
 type Result struct {
@@ -59,11 +60,9 @@ type Result struct {
 }
 
 type Channel struct {
-	Policy   policy.DispatchRequestsPolicy
-	Judge    func(ctx context.Context, p Pending) (string, error)
-	Dispatch func(ctx context.Context, p Pending) (Result, error)
-	Emit     func(signalcenter.Event)
-	Now      func() time.Time
+	Executors []Executor
+	Emit      func(signalcenter.Event)
+	Now       func() time.Time
 }
 
 type frame struct {
@@ -81,10 +80,33 @@ type requestFile struct {
 }
 
 func (c Channel) Handoff(ctx context.Context, cell Cell) error {
-	if c.Policy.Stage == policy.DispatchRequestStageOff {
+	if !slices.ContainsFunc(c.Executors, func(e Executor) bool { return e.Stage() != policy.RequestStageOff }) {
 		return nil
 	}
 	return c.read(ctx, frame{cell: cell, workspace: cell.Workspace, depth: 1})
+}
+
+func (c Channel) executor(kind string) (Executor, bool) {
+	i := slices.IndexFunc(c.Executors, func(e Executor) bool { return e.Kind() == kind })
+	if i < 0 {
+		return nil, false
+	}
+	return c.Executors[i], true
+}
+
+func (c Channel) kindOff(file string) bool {
+	kind, _, _ := agentclass.RequestFile(file)
+	ex, ok := c.executor(kind)
+	return ok && ex.Stage() == policy.RequestStageOff
+}
+
+func (c Channel) kindStage(file string) string {
+	kind, _, _ := agentclass.RequestFile(file)
+	ex, ok := c.executor(kind)
+	if !ok {
+		return ""
+	}
+	return string(ex.Stage())
 }
 
 func (c Channel) read(ctx context.Context, f frame) error {
@@ -93,6 +115,9 @@ func (c Channel) read(ctx context.Context, f frame) error {
 	for _, file := range files {
 		if err := ctx.Err(); err != nil {
 			return errors.Join(append(errs, err)...)
+		}
+		if c.kindOff(file) {
+			continue
 		}
 		rf, done, err := claim(f, file)
 		if done || err != nil {
@@ -142,13 +167,22 @@ func claim(f frame, file string) (requestFile, bool, error) {
 	if err != nil || !ok || prior.SHA256 == digest(rf.raw) {
 		return rf, ok, err
 	}
-	rf.name, rf.reused = rf.name+"~"+digest(rf.raw)[:12], true
+	rf.name, rf.reused = reusedName(rf.name, rf.raw), true
 	_, ok, err = readRecord(f.cell, rf.name)
 	return rf, ok, err
 }
 
+const reuseSep = "~"
+
+func reusedName(name string, raw []byte) string { return name + reuseSep + digest(raw)[:12] }
+
+func originalName(name string) string {
+	original, _, _ := strings.Cut(name, reuseSep)
+	return original
+}
+
 func (c Channel) decide(ctx context.Context, f frame, rf requestFile) (Record, Result) {
-	rec := Record{Schema: RecordSchema, Request: rf.name, SHA256: digest(rf.raw), Cycle: f.cell.Cycle, Phase: f.cell.Phase, Depth: f.depth, Stage: c.Policy.Stage, At: c.Now().UTC()}
+	rec := Record{Schema: RecordSchema, Request: rf.name, SHA256: digest(rf.raw), Cycle: f.cell.Cycle, Phase: f.cell.Phase, Depth: f.depth, Stage: c.kindStage(rf.file), At: c.Now().UTC()}
 	refused := func(pre, reason string) (Record, Result) {
 		rec.Decision, rec.Precondition, rec.Reason = DecisionRefused, pre, reason
 		return rec, Result{}
@@ -162,43 +196,32 @@ func (c Channel) decide(ctx context.Context, f frame, rf requestFile) (Record, R
 	}
 	rec.Kind, rec.Role = req.Kind, req.Role()
 	c.emitRequest(f.cell, rec, req)
-	entries, pre, reason := c.check(f, rf.file, req)
+	ex, ok := c.executor(req.Kind)
+	if fileKind, _, _ := agentclass.RequestFile(rf.file); !ok || fileKind != req.Kind {
+		return refused(PreKind, c.kindReason(rf.file, req.Kind))
+	}
+	if missing := req.missingArgs(); len(missing) > 0 {
+		return refused(PreArgs, fmt.Sprintf("the %s request lacks the args %v (evolve agent capabilities --json lists the required args)", req.Kind, missing))
+	}
+	if pre, reason := ex.admit(f, req, recordCount(f.cell, ex.Kind())); pre != "" {
+		return refused(pre, reason)
+	}
+	entries, pre, reason := inputEntries(f, req)
 	if pre != "" {
 		return refused(pre, reason)
 	}
-	pending, err := writeEvidence(Pending{Name: rf.name, Cell: f.cell, Depth: f.depth, Request: req, entries: entries}, rf.raw)
-	if err != nil {
-		return refused(PreEvidence, err.Error())
-	}
-	if pre, reason := c.judge(ctx, pending); pre != "" {
-		return refused(pre, reason)
-	}
-	if c.Policy.Stage != policy.DispatchRequestStageEnforce {
-		rec.Decision = DecisionApproved
-		return rec, Result{}
-	}
-	result, err := c.Dispatch(ctx, pending)
-	if err != nil {
-		rec.Decision, rec.Reason = DecisionFailed, err.Error()
-		return rec, result
-	}
-	rec.Decision, rec.RunLabel, rec.Report = DecisionRun, result.RunLabel, result.Report
-	return rec, result
+	return ex.run(ctx, Pending{Name: rf.name, Cell: f.cell, Depth: f.depth, Request: req, entries: entries, raw: rf.raw}, rec)
 }
 
-func (c Channel) check(f frame, file string, req Request) ([]inputindex.Entry, string, string) {
-	if kind, _, _ := agentclass.RequestFile(file); req.Kind != agentclass.KindDispatch || kind != req.Kind {
-		return nil, PreKind, fmt.Sprintf("the pipeline runs only %s requests from %s-<n>.json files; the file %s holds the kind %q", agentclass.KindDispatch, agentclass.KindDispatch, file, req.Kind)
+func (c Channel) kindReason(file, kind string) string {
+	kinds := make([]string, len(c.Executors))
+	for i, e := range c.Executors {
+		kinds[i] = e.Kind()
 	}
-	if !slices.Contains(c.Policy.Roles, req.Role()) {
-		return nil, PreRole, fmt.Sprintf("the role %q is not one of the allowed roles %v (policy isolation.dispatch_requests.roles)", req.Role(), c.Policy.Roles)
-	}
-	if count := recordCount(f.cell); count >= c.Policy.PerCycle {
-		return nil, PreCycleCap, fmt.Sprintf("cycle %d already has %d requests, and the cap is %d", f.cell.Cycle, count, c.Policy.PerCycle)
-	}
-	if f.depth > c.Policy.MaxDepth {
-		return nil, PreDepthCap, fmt.Sprintf("an agent that a request dispatched wrote the request at depth %d, and the cap is %d", f.depth, c.Policy.MaxDepth)
-	}
+	return fmt.Sprintf("the pipeline runs only the kinds %v, each from a <kind>-<n>.json file of its own kind; the file %s holds the kind %q", kinds, file, kind)
+}
+
+func inputEntries(f frame, req Request) ([]inputindex.Entry, string, string) {
 	entries := make([]inputindex.Entry, 0, len(req.Inputs))
 	for _, in := range req.Inputs {
 		e, ok, err := inputEntry(f, in)
@@ -215,24 +238,4 @@ func inputEntry(f frame, in string) (inputindex.Entry, bool, error) {
 		return inputindex.Entry{}, false, nil
 	}
 	return inputindex.FileEntry(f.cell.ProjectRoot, filepath.Join(f.workspace, in), evidenceInput, evidenceInput, "an input that the request names")
-}
-
-func (c Channel) judge(ctx context.Context, p Pending) (string, string) {
-	raw, err := c.Judge(ctx, p)
-	var d phasecontract.Diagnosis
-	if err == nil {
-		d, err = phasecontract.ParseDiagnosis([]byte(raw), p.Name, p.EntryIDs)
-	}
-	if err != nil {
-		return PreJudge, err.Error()
-	}
-	v := selfheal.Validator{Inventory: selfheal.Inventory{Requests: map[string]bool{p.Name: true}}, Stage: c.Policy.Stage}
-	decision := v.Decide(selfheal.Incident{ID: p.Name, Tier: selfheal.TierItem, Subject: p.Request.Role()}, d.Action, c.Now())
-	switch {
-	case decision.Verdict != selfheal.VerdictAccepted:
-		return PreCatalog, decision.Precondition + ": " + decision.Reason
-	case d.Action.Kind != phasecontract.ActionDispatchPhaseAgent:
-		return PreJudged, cmp.Or(d.Action.Params.Reason, d.Hypothesis)
-	}
-	return "", ""
 }

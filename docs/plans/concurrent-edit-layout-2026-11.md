@@ -1,6 +1,6 @@
 # Plan: concurrent edits — one entry, one file, so that parallel lanes do not meet in the same lines
 
-- **Status:** proposed, 2026-11-17. Amended the same day: section 11 changes the components and the order.
+- **Status:** proposed, 2026-11-17. Amended the same day: section 11 changes the components and the order. Amended 2026-11-18: section 12 starts C2 again.
 - **Research:** [Concurrent edits: where lane changes collide in the code](../research/concurrent-edit-layout-2026-11.md). **Decision:** no ADR yet. D1 and D2 add a layout rule to the code conventions. No decision here changes admission.
 - **Related:** [the console builds only what a lane cannot build](console-build-or-route-2026-11.md). Its component K5 changes admission so that two items in different files of `cmd/evolve` both admit. This plan does not replace K5. C6 moves code into smaller packages, so each admission cell gets smaller with no admission change. K5 stays in its plan and runs after C6 only when the waiting items stay above the target of §8. The landing side stays as [concurrent cycle landing](concurrent-cycle-landing-2026-10.md) designed it.
 
@@ -17,6 +17,7 @@
 9. [Risks](#9-risks)
 10. [Open questions](#10-open-questions)
 11. [Amendment of 2026-11-17](#11-amendment-of-2026-11-17)
+12. [Amendment of 2026-11-18: C2 starts again](#12-amendment-of-2026-11-18-c2-starts-again)
 
 ## 1. Request
 
@@ -190,3 +191,100 @@ The new order:
 3. The measure of section 8 changes: the target is the count of items that wait on a cell (under 8). The touch counts of the central lists are no longer a target.
 
 The six move items were lost on the first try. The build agent of cycle 2460 wrote them as `inbox-add` requests, and the request channel refuses each kind except `dispatch`. The console filed them from the request files. Item `agent-request-inbox-add-has-no-executor` fixes the channel. The incident record is [the build agent's inbox-add requests were refused](../incidents/2026-11-17-the-build-agents-inbox-add-requests-were-refused.md).
+
+## 12. Amendment of 2026-11-18: C2 starts again
+
+The operator asked: "Continue mergeing the console code to integration as batch merges and take to main as a whole package". The dry run of that batch ejected two console PRs on `docs/research-index.md`. Batch 178 ejected two others on the same file. The incident record is [the train ejected four console PRs on the research index](../incidents/2026-11-18-the-train-ejected-four-console-prs-on-the-research-index.md).
+
+### 12.1 Facts
+
+**F12.1** Two batches ejected four console PRs on `docs/research-index.md`. Batch 178 ejected #1546 and #1548 at 18:40 UTC on 2026-11-17. The next dry run ejected #1550 and #1552 at 23:43. The second rebuild took 14 minutes, two review seats and two closed PRs (the incident record, timeline).
+*Implication:* section 11 deferred C2 because only console PRs meet this conflict. Console PRs carry the plans, so the conflict comes back at each boundary.
+
+**F12.2** Q1 has a test answer. In a scratch repository with git 2.54, `git merge-tree --write-tree` ran a merge driver that `.gitattributes` named and git config defined. The merged file held the output of the driver. The train passes `--attr-source` as a global git option (`go/internal/integration/compose.go:274`).
+*Implication:* a merge driver is possible in the train. Its command comes from git config, which is not in the repository.
+
+**F12.3** A merge driver gets three versions of one file (`%O`, `%A`, `%B`) and its path. It does not get the other files of the merge ([gitattributes, defining a custom merge driver](https://git-scm.com/docs/gitattributes#_defining_a_custom_merge_driver), [a custom merge driver](https://github.com/Praqma/git-merge-driver)).
+*Implication:* a driver for the research index cannot read the shards. It can only merge the sections of the aggregate, and the generator order (by shard name) is not in the aggregate.
+
+**F12.4** When `git merge-tree --write-tree` finds a conflict, it still writes a tree. The conflicted files in that tree hold conflict markers ([git-merge-tree](https://git-scm.com/docs/git-merge-tree)). The shards are separate files, so they merge with no conflict.
+*Implication:* the conflicted tree holds every source of the aggregate. A generator that runs on that tree gives the exact aggregate.
+
+**F12.5** The fleet rebase already regenerates a derived output when only derived outputs conflict. It uses `derived.IsDerivedConflict` (`go/internal/derived/conflict.go:7`) and `derived.Worktree.Regenerate`, which runs the generator, runs the check and refuses a leftover marker (`go/internal/derived/regen.go:32`).
+The catalog is `derived.Catalog()` (`go/internal/derived/derived.go:40`). The train ejects at `go/internal/integration/compose.go:220`.
+*Implication:* the train can call the same catalog and the same regeneration. It needs no second generator.
+
+**F12.7** `Regenerate` refuses a leftover marker through `git diff --check <Base>` on the outputs (`go/internal/derived/regen.go:43`). `core.DerivedWorktree` sets `Base` to `HEAD` (`go/internal/core/ship_recovery.go:537`). Each generator runs as `go run ./cmd/evolve` in the worktree (`go/internal/core/worktree_evolve.go:19`). One run of `evolve docs index check` this way took 3.3 seconds with a warm build cache, on 2026-11-18.
+*Implication:* the marker guard works only when `HEAD` of the temporary worktree is a tree with no markers. Each generator run compiles the composed tree.
+
+**F12.8** The train has no lock over a whole batch. The epoch lock covers only the increment of the epoch counter (`go/internal/integration/epoch.go:51`).
+*Implication:* the temporary worktree needs a unique directory. Two batches at the same time are out of scope, because the console runs one batch at each boundary.
+
+**F12.6** Current practice for a generated file is to regenerate it, not to merge it by hand. Lockfile guides say to take one side and run the generator ([OpenTofu lock files](https://oneuptime.com/blog/post/2026-03-20-resolve-lock-file-conflicts-opentofu/view), [lockfile conflicts](https://nit-administrative-systems.github.io/AS-CloudDocs/github/appendix-lockfile-resolution)).
+*Implication:* a regeneration step follows practice. A union merge of a generated file does not.
+
+### 12.2 Candidate designs
+
+| Design | What it does |
+|---|---|
+| A. Union attribute | Set `docs/research-index.md merge=union` in `.gitattributes`. |
+| B. Merge driver | Set a driver `evolve docs index merge %O %A %B` in `.gitattributes` and in the git config of the train repository. |
+| C. Regeneration step in the train | When each conflicted path is a derived output, put the conflicted tree in a temporary worktree, run `derived.Worktree.Regenerate`, and take the new tree. |
+| D. One docs PR owns the aggregate | A rule: in each batch, one docs PR carries all shards and the aggregate. This is the manual fix of the incident. |
+
+| Criterion | A | B | C | D |
+|---|---|---|---|---|
+| The output equals the generator output (F12.3, F12.4) | 0: the union keeps the order of the two sides, not the shard order | 1: it merges sections, and the order within a date can be wrong | 2 | 2 |
+| One home of the generator logic (F12.5) | 2 | 0: a second merge logic | 2: the derived catalog | 2 |
+| No setting outside the repository (F12.2) | 2 | 0: git config of the train repository | 2 | 2 |
+| Console time at each boundary (F12.1) | 2 | 2 | 2 | 0: a rebuild and a review for each code PR with a plan |
+| Size of the protected change | 2 | 1 | 1 | 2 |
+| **Total** | 8 | 4 | 9 | 8 |
+
+C ties D on criterion 1. C wins by one point, because D costs console time at each boundary (criterion 4). A and D tie at 8. A fails criterion 1: a wrong order makes `evolve docs index check` red on main, and that check is a hard stop. D is the cost that this amendment removes.
+
+### 12.3 Decisions
+
+| Id | Decision | Because (findings) | Rejected options and why |
+|---|---|---|---|
+| D9 | The train regenerates the derived outputs of a commit when each conflicted path is a derived conflict. Any other conflicted path ejects the PR, as now. | F12.4, F12.5 | A union merge: the order is wrong (F12.3). A merge driver: no shards, and a setting outside the repository (F12.2, F12.3). |
+| D10 | `apply` classifies: it reads the merged blob of each conflicted path from the conflicted tree with `git cat-file`, and calls `derived.IsDerivedConflict`. It calls the port only when each path passes, so a mixed conflict never reaches the port. A read error or a missing blob counts as not derived, for example when one side deletes the file. Then the PR ejects with the cause `conflict`. The port is `Regen(ctx, onto, conflictedTree, paths) (tree, error)` on `integration.Composer`, where `onto` is the running tip that `mergeTree` got. `cmd/evolve` wires it to `derived.Catalog()` and `derived.Worktree`, and a nil port keeps the current ejection. | F12.5 | Import `core` into `integration`: it turns the dependency direction. A copy of the regeneration code: a duplicate. |
+| D11 | The port adds a detached temporary worktree at `onto`, a tree with no markers. It writes the conflicted tree into the index and the work tree only, with `git read-tree -u --reset <conflictedTree>`, with no commit. It gets the generator from `core.DerivedWorktree(dir)`, whose `Base` is `HEAD`. `HEAD` of the worktree is `onto`, so the marker guard compares against a clean tree with no second generator. It runs `Regenerate` for each entry, stages the outputs and runs `git write-tree`. | F12.4, F12.7 | A commit of the conflicted tree as `HEAD`: `git diff --check HEAD` then sees no marker, so the guard does nothing. Render from blobs in memory: the generators read files on disk. |
+| D12 | The port is a value with a field `Dir`. `cmd/evolve` sets it to `.evolve/ephemeral/integration-regen/` under the project root and creates it. Each call makes a unique directory in it with `os.MkdirTemp`. The port removes the worktree with `git worktree remove --force` on each return path, under a new context of 30 seconds that the batch context does not cancel. It runs `git worktree prune` before it adds one. | F12.8 | A fixed directory: two batch attempts meet in it. Removal under the batch context: a timed-out batch leaves a registered worktree. |
+| D13 | A failed regeneration ejects the PR with the cause `conflict`, the paths and the error. A generator that does not build on the composed tree also ejects the PR. The train never lands a tree with a conflict marker. | F12.7 | Land the regenerated tree with no check: a wrong aggregate reaches main. |
+| D14 | The port runs in both stages of the Composer, shadow and enforce, because it is part of the composition, not a gate. The proof of a PR with at least one regenerated commit names the regenerated paths in `Evidence.Derived`, under the rule `derived`. `overlap.Prove` reads no other merge class than `genuine` (`go/internal/overlap/proof.go:22`), so the class stays `clean`. | F12.5 | Regenerate only at enforce: the shadow batch, which lands today, still ejects. |
+
+D9 to D14 replace the C2 row of section 6 and the C2 deferral row of section 11.
+
+Consequences:
+
+- Good: two console PRs that each add a shard land in one batch. The console does not rebuild a PR for a generated file.
+- Good: the train and the fleet rebase use one regeneration path.
+- Bad: each derived conflict costs a temporary worktree and one compile of `cmd/evolve` in it: 3.3 seconds with a warm cache for each generator (F12.7).
+- Bad: a PR that breaks the build of the composed tree ejects, because its generator does not build (D13). The CI of the PR finds that first.
+
+What changes our mind: a generator run in the train that takes more than 2 minutes. Then the regeneration moves after the batch, as one step.
+
+### 12.4 Component C2, as built
+
+| Part | File | Red test first |
+|---|---|---|
+| The conflicted tree comes back with the paths | `go/internal/integration/compose.go` (`mergeTree`, `apply`) | two branches that each add a shard: `apply` gets one tree and no ejection, and the aggregate holds both sections in shard order |
+| The classification in `apply` | `go/internal/integration/compose.go` | a conflict in `docs/research-index.md` and in `a.go` ejects, and the port is not called |
+| A missing blob is not derived | `go/internal/integration/compose.go` | a conflict where one side deletes `docs/research-index.md` ejects with the cause `conflict`, and the port is not called |
+| Both stages regenerate | `go/internal/integration/compose.go` | with a regenerated commit, a shadow Composer and an enforce Composer each compose with no ejection |
+| The port and its nil case | `go/internal/integration/compose.go` (`Composer`) | a nil `Regen` ejects, as now |
+| A later commit regenerates onto the running tip | `go/internal/integration/compose.go` | a console PR with two commits, where the second one conflicts on a derived output, lands with the output of both |
+| A failed regeneration ejects | `go/internal/integration/compose.go` | a port error ejects with the cause `conflict` and names the error |
+| The marker guard works | the port in `go/cmd/evolve/` | a generator stub that leaves a marker makes the port return an error |
+| No worktree is left | the port in `go/cmd/evolve/` | after a failed generator, `git worktree list` has no entry of the port |
+| The proof records the regeneration | `go/internal/integration/compose.go` | a PR with at least one regenerated commit has the regenerated path in `Evidence.Derived` and the rule `derived` in its proof |
+| The wiring | `go/cmd/evolve/cmd_integration_batch.go` | a journey test: `evolve integration batch --dry-run` on a fixture repository composes two shard PRs with no ejection |
+
+The train is protected, so the console builds C2. The red tests above are the gate of each part.
+
+### 12.5 Limits
+
+- C2 does not change the fleet rebase. It already regenerates (F12.5).
+- C2 does not resolve a conflict in a source file, or a conflict where a source file and a derived output both conflict.
+- The test of F12.2 ran on one git version (2.54). C2 does not depend on a merge driver.

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/evidence"
+	"github.com/mickeyyaya/evolve-loop/go/internal/derived"
 	"github.com/mickeyyaya/evolve-loop/go/internal/overlap"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
@@ -44,11 +45,14 @@ type OverlapFacts struct {
 	Catalogs overlap.Catalogs
 }
 
+type RegenFunc func(ctx context.Context, onto, conflictedTree string, paths []string) (string, error)
+
 type Composer struct {
 	Repo    Repo
 	Stage   string
 	Gate    Gate
 	Overlap *OverlapFacts
+	Regen   RegenFunc
 }
 
 type Composed struct {
@@ -211,13 +215,17 @@ func (c Composer) apply(ctx context.Context, b Batch, rec DeliverableRecord) (Co
 		return Composed{}, err
 	}
 	tip := b.Tip
+	var regenerated []string
 	for _, commit := range rec.Commits {
 		tree, conflicted, err := c.Repo.mergeTree(ctx, commit.SHA, tip)
 		if err != nil {
 			return Composed{}, err
 		}
 		if len(conflicted) > 0 {
-			return Composed{}, c.eject(ctx, b, withPaths(ejectionOf(rec, CauseConflict), conflicted))
+			if tree, err = c.regenerate(ctx, tip, tree, conflicted); err != nil {
+				return Composed{}, c.eject(ctx, b, withPaths(ejectionOf(rec, CauseConflict), conflicted, err))
+			}
+			regenerated = append(regenerated, conflicted...)
 		}
 		parent := b.Tip
 		if rec.Console() {
@@ -233,14 +241,35 @@ func (c Composer) apply(ctx context.Context, b Batch, rec DeliverableRecord) (Co
 		return Composed{}, err
 	}
 	b.Tip = tip
-	return Composed{Batch: b, Proof: c.prove(lane, peer)}, nil
+	return Composed{Batch: b, Proof: c.prove(lane, peer, regenerated)}, nil
 }
 
-func (c Composer) prove(lane, peer []string) overlap.Proof {
+func (c Composer) regenerate(ctx context.Context, onto, conflictedTree string, paths []string) (string, error) {
+	if c.Regen == nil || !c.Repo.allDerived(ctx, conflictedTree, paths) {
+		return "", errTextualConflict
+	}
+	tree, err := c.Regen(ctx, onto, conflictedTree, paths)
+	if err != nil {
+		return "", fmt.Errorf("regenerate %v: %w", paths, err)
+	}
+	return tree, nil
+}
+
+func (r Repo) allDerived(ctx context.Context, conflictedTree string, paths []string) bool {
+	for _, p := range paths {
+		blob, err := r.Git(ctx, r.Dir, "", "cat-file", "blob", conflictedTree+":"+p)
+		if err != nil || !derived.IsDerivedConflict(p, []byte(blob)) {
+			return false
+		}
+	}
+	return true
+}
+
+func (c Composer) prove(lane, peer, regenerated []string) overlap.Proof {
 	if c.Overlap == nil || c.Overlap.Catalogs == nil {
 		return overlap.Proof{Tier: overlap.T3, Rules: []overlap.Rule{overlap.RuleUnknown}}
 	}
-	return overlap.Prove(overlap.Input{Lane: lane, Peer: peer, Merge: overlap.MergeClean, Module: c.Overlap.Module, Catalogs: c.Overlap.Catalogs})
+	return overlap.Prove(overlap.Input{Lane: lane, Peer: peer, Merge: overlap.MergeClean, Conflicted: regenerated, Module: c.Overlap.Module, Catalogs: c.Overlap.Catalogs})
 }
 
 func (c Composer) eject(ctx context.Context, b Batch, e *Ejection) error {
@@ -257,8 +286,10 @@ func withErr(e *Ejection, err error) *Ejection {
 	return e
 }
 
-func withPaths(e *Ejection, paths []string) *Ejection {
-	e.Paths, e.Err = paths, errors.New("textual conflict")
+var errTextualConflict = errors.New("textual conflict")
+
+func withPaths(e *Ejection, paths []string, err error) *Ejection {
+	e.Paths, e.Err = paths, err
 	return e
 }
 
@@ -274,7 +305,7 @@ func (r Repo) mergeTree(ctx context.Context, commit, onto string) (string, []str
 	out, err := r.Git(ctx, r.Dir, "", "--attr-source="+onto, "merge-tree", "--write-tree", "--name-only", "-z", "--merge-base="+commit+"^", "--end-of-options", onto, commit)
 	var ge *GitError
 	if errors.As(err, &ge) && ge.Code == 1 && ge.Err == nil {
-		return conflictedPaths(ge.Stdout)
+		return conflictedTree(ge.Stdout)
 	}
 	if err != nil {
 		return "", nil, fmt.Errorf("integration: compose %s onto %s: %w", commit, onto, err)
@@ -282,13 +313,13 @@ func (r Repo) mergeTree(ctx context.Context, commit, onto string) (string, []str
 	return strings.TrimSpace(strings.Split(out, "\x00")[0]), nil, nil
 }
 
-func conflictedPaths(out string) (string, []string, error) {
+func conflictedTree(out string) (string, []string, error) {
 	fields := strings.Split(out, "\x00")
 	end := slices.Index(fields, "")
 	if end < 2 {
 		return "", nil, fmt.Errorf("integration: merge-tree reported a conflict but named no path: %q", out)
 	}
-	return "", fields[1:end], nil
+	return fields[0], fields[1:end], nil
 }
 
 func (r Repo) commitTree(ctx context.Context, tree, parent, msg string) (string, error) {

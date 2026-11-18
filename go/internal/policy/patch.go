@@ -30,6 +30,9 @@ func Parse(raw []byte) (Policy, error) {
 		if err := p.Isolation.DispatchRequests.validate(); err != nil {
 			return Policy{}, fmt.Errorf("isolation.dispatch_requests: %w", err)
 		}
+		if err := p.Isolation.InboxRequests.validate(); err != nil {
+			return Policy{}, fmt.Errorf("isolation.inbox_requests: %w", err)
+		}
 	}
 	if err := p.Catalog.validate(); err != nil {
 		return Policy{}, err

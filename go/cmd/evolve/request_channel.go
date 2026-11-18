@@ -33,22 +33,22 @@ func runAgentSeat(agent agentSeat, args []string, input string, stderr io.Writer
 }
 
 func requestHandoff(pol policy.Policy, agent agentSeat, emit func(signalcenter.Event), stderr io.Writer) core.RequestHandoff {
+	judge := func(_ context.Context, p agentrequest.Pending) (string, error) {
+		run, err := runAgentSeat(agent, []string{orchestratorProfile, "--json", "--project-root", p.Cell.ProjectRoot}, judgeInput(p), stderr)
+		return run.Report, err
+	}
+	dispatch := func(_ context.Context, p agentrequest.Pending) (agentrequest.Result, error) {
+		args := []string{p.Request.Role(), "--json", "--keep", "--project-root", p.Cell.ProjectRoot}
+		for _, in := range p.Inputs {
+			args = append(args, "--file", in)
+		}
+		run, err := runAgentSeat(agent, args, dispatchInput(p), stderr)
+		return agentrequest.Result{Report: run.Report, RunLabel: run.RunLabel, Workspace: run.Workspace}, err
+	}
 	ch := agentrequest.Channel{
-		Policy: pol.IsolationDispatchRequests(),
-		Judge: func(_ context.Context, p agentrequest.Pending) (string, error) {
-			run, err := runAgentSeat(agent, []string{orchestratorProfile, "--json", "--project-root", p.Cell.ProjectRoot}, judgeInput(p), stderr)
-			return run.Report, err
-		},
-		Dispatch: func(_ context.Context, p agentrequest.Pending) (agentrequest.Result, error) {
-			args := []string{p.Request.Role(), "--json", "--keep", "--project-root", p.Cell.ProjectRoot}
-			for _, in := range p.Inputs {
-				args = append(args, "--file", in)
-			}
-			run, err := runAgentSeat(agent, args, dispatchInput(p), stderr)
-			return agentrequest.Result{Report: run.Report, RunLabel: run.RunLabel, Workspace: run.Workspace}, err
-		},
-		Emit: emit,
-		Now:  time.Now,
+		Executors: agentrequest.Executors(pol, agentrequest.DispatchDeps{Judge: judge, Run: dispatch, Now: time.Now}),
+		Emit:      emit,
+		Now:       time.Now,
 	}
 	return func(ctx context.Context, cell core.RequestCell) error {
 		return ch.Handoff(ctx, agentrequest.Cell(cell))

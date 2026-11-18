@@ -130,10 +130,6 @@
     },
     {
       "key": "parallel_evaluate.stage",
-      "rule": "signal-unregistered"
-    },
-    {
-      "key": "parallel_evaluate.stage",
       "rule": "no-would-fields"
     },
     {
@@ -143,10 +139,6 @@
     {
       "key": "regression_tia.stage",
       "rule": "string-typed-stage"
-    },
-    {
-      "key": "regression_tia.stage",
-      "rule": "signal-unregistered"
     },
     {
       "key": "regression_tia.stage",
@@ -246,10 +238,6 @@
     },
     {
       "key": "audit_cascade.stage",
-      "rule": "signal-unregistered"
-    },
-    {
-      "key": "audit_cascade.stage",
       "rule": "no-would-fields"
     },
     {
@@ -314,10 +302,10 @@
     },
     {
       "key": "isolation.dispatch_requests.stage",
-      "rule": "string-typed-stage"
+      "rule": "no-signal"
     },
     {
-      "key": "isolation.dispatch_requests.stage",
+      "key": "isolation.inbox_requests.stage",
       "rule": "no-signal"
     },
     {

@@ -2,10 +2,12 @@ package core
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 func evaluateBatch(plan []string, archetypeOf func(string) string) []string {
@@ -167,6 +169,35 @@ func (cr *cycleRun) evaluateBatchAt(next Phase) []Phase {
 		out[i] = Phase(p)
 	}
 	return out
+}
+
+func (cr *cycleRun) parallelEvaluateBatch(next Phase) []Phase {
+	stage := cr.o.cfg.ParallelEvaluate
+	if stage != config.StageShadow && stage != config.StageEnforce {
+		return nil
+	}
+	batch := cr.evaluateBatchAt(next)
+	if len(batch) < 2 {
+		return nil
+	}
+	if stage == config.StageShadow {
+		cr.emitParallelEvaluateShadow(batch)
+		return nil
+	}
+	return batch
+}
+
+func (cr *cycleRun) emitParallelEvaluateShadow(batch []Phase) {
+	names := make([]string, len(batch))
+	for i, p := range batch {
+		names[i] = string(p)
+	}
+	cr.o.signals.Emit(signalcenter.Event{
+		Cycle: cr.cycle, RunID: cr.cs.RunID, Phase: string(batch[0]), Module: signalcenter.ModuleParallelEval, Origin: "cycleRun.emitParallelEvaluateShadow",
+		Kind: signalcenter.KindPhaseOutcome, Severity: signalcenter.SeverityInfo, Code: signalcenter.CodeParallelEvaluateShadow,
+		Reason: "shadow: enforce would dispatch these evaluate phases as one parallel batch; they run serially",
+		Fields: map[string]string{"batch": strings.Join(names, ",")},
+	})
 }
 
 func (o *Orchestrator) batchArchetype(phase string) string {
