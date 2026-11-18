@@ -41,16 +41,32 @@ func declaresVerdict(spec phasespec.PhaseSpec) bool {
 	})
 }
 
-func statedVerdict(report string) string {
+func statedVerdict(report string) (string, string) {
 	sentinel, _ := phasecontract.ParseVerdictSentinel(report)
-	return cmp.Or(sentinel, reportdoc.Verdict(report))
+	if visible := cmp.Or(sentinel, reportdoc.Verdict(report)); visible != "" {
+		return visible, report
+	}
+	unfenced := withoutFenceMarkers(report)
+	return reportdoc.Verdict(unfenced), unfenced
+}
+
+func withoutFenceMarkers(report string) string {
+	lines := strings.Split(report, "\n")
+	kept := lines[:0]
+	for _, line := range lines {
+		if t := strings.TrimSpace(line); !strings.HasPrefix(t, "```") && !strings.HasPrefix(t, "~~~") {
+			kept = append(kept, line)
+		}
+	}
+	return strings.Join(kept, "\n")
 }
 
 func reportVerdict(spec phasespec.PhaseSpec, field, report string) derivedVerdict {
 	if !declaresVerdict(spec) {
 		return derivedVerdict{verdict: field}
 	}
-	d := derivedVerdict{verdict: field, stated: statedVerdict(report), findings: reportdoc.CountSeverities(report)}
+	stated, counted := statedVerdict(report)
+	d := derivedVerdict{verdict: field, stated: stated, findings: reportdoc.CountSeverities(counted)}
 	if field != core.VerdictPASS && field != core.VerdictWARN {
 		return d
 	}

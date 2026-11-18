@@ -240,16 +240,16 @@ func TestReportVerdict_ANonPassFieldEmitsNoParseDefect(t *testing.T) {
 	}
 }
 
-func TestAgentRun_AFencedVerdictOnlyReportEmitsOneParseDefect(t *testing.T) {
+func TestAgentRun_AVisibleHighWithAFencedPassVerdictStaysFail(t *testing.T) {
 	t.Parallel()
 
-	env, code, center, _ := runWithSignals(t, threatModel+"## Findings\nNone.\n```\n## Verdict\nVerdict: PASS\n```\n")
+	env, code, center, _ := runWithSignals(t, threatModel+"## Findings\n- [HIGH] go/x.go:1 — the error is dropped — wrap it\n## Verdict\n```\nVerdict: PASS\n```\n")
 
 	if env.Verdict != core.VerdictFAIL || code != exitFail {
 		t.Fatalf("verdict %q exit %d, want FAIL and exit 1", env.Verdict, code)
 	}
-	if defects, mismatches := parseDefectSignals(center), mismatchSignals(center); len(defects) != 1 || len(mismatches) != 1 {
-		t.Errorf("mismatch %d defect %d, want 1 and 1", len(mismatches), len(defects))
+	if defects, mismatches := parseDefectSignals(center), mismatchSignals(center); len(defects) != 0 || len(mismatches) != 1 {
+		t.Errorf("mismatch %d defect %d, want 1 and 0", len(mismatches), len(defects))
 	}
 }
 
@@ -283,8 +283,7 @@ func TestReportVerdict_TheParseDefectNeedsNoStatedVerdictAndNoBlockingFinding(t 
 		{"no stated verdict and one HIGH", "## Findings\n- [HIGH] a.go:1 — x\n## Verdict\nsee above\n", false},
 		{"no stated verdict and one CRITICAL", "## Findings\n- [CRITICAL] a.go:1 — x\n## Verdict\nsee above\n", false},
 		{"a stated FAIL and no finding", "## Findings\nNone.\n## Verdict\nVerdict: FAIL\n", false},
-		{"a fenced verdict only", "## Findings\nNone.\n```\n## Verdict\nVerdict: PASS\n```\n", true},
-		{"a fenced HIGH and a fenced PASS", "```\n## Findings\n- [HIGH] a.go:1 — x\n## Verdict\nVerdict: PASS\n```\n", true},
+		{"a fence with no verdict in it", "## Findings\nNone.\n## Verdict\n```\nno verdict here\n```\n", true},
 	}
 	for _, c := range cases {
 		got := reportVerdict(spec, core.VerdictPASS, c.body)
@@ -295,12 +294,69 @@ func TestReportVerdict_TheParseDefectNeedsNoStatedVerdictAndNoBlockingFinding(t 
 	}
 }
 
-func TestReportVerdict_AFencedVerdictStatesNoVerdict(t *testing.T) {
+func TestReportVerdict_AFencedVerdictStatesTheVerdictThatItReads(t *testing.T) {
+	spec := phasespec.PhaseSpec{Name: "go-reviewer", Classify: &phasespec.ClassifyRules{RequireSections: []string{"Findings", "Verdict"}}}
+	cases := []struct {
+		name, body, stated, verdict string
+		mismatch                    bool
+	}{
+		{"a fenced PASS", "## Findings\nNone.\n## Verdict\n```\nVerdict: PASS\n```\n", core.VerdictPASS, core.VerdictPASS, false},
+		{"a fenced WARN", "## Findings\nNone.\n## Verdict\n```\nVerdict: WARN\n```\n", core.VerdictWARN, core.VerdictWARN, false},
+		{"a fenced FAIL", "## Findings\nNone.\n## Verdict\n```\nVerdict: FAIL\n```\n", core.VerdictFAIL, core.VerdictFAIL, true},
+		{"a fenced heading and verdict", "## Findings\nNone.\n```\n## Verdict\nVerdict: PASS\n```\n", core.VerdictPASS, core.VerdictPASS, false},
+	}
+	for _, c := range cases {
+		got := reportVerdict(spec, core.VerdictPASS, c.body)
+
+		if got.stated != c.stated || got.verdict != c.verdict || got.mismatch != c.mismatch || got.parseDefect {
+			t.Errorf("%s: reportVerdict = %+v, want stated %s, verdict %s, mismatch %v and no parse defect", c.name, got, c.stated, c.verdict, c.mismatch)
+		}
+	}
+}
+
+func TestAgentRun_AFullyFencedReportWithABlockingFindingStaysFail(t *testing.T) {
+	cases := []struct{ name, report string }{
+		{"a fenced HIGH and a fenced PASS", threatModel + "```\n## Findings\n- [HIGH] go/x.go:1 — the error is dropped — wrap it\n## Verdict\nVerdict: PASS\n```\n"},
+		{"a fenced CRITICAL and a fenced WARN", threatModel + "```\n## Findings\n- [CRITICAL] go/x.go:1 — the key leaks — redact it\n## Verdict\nVerdict: WARN\n```\n"},
+		{"a tilde fenced HIGH and a tilde fenced PASS", threatModel + "~~~\n## Findings\n- [HIGH] go/x.go:1 — the error is dropped — wrap it\n## Verdict\nVerdict: PASS\n~~~\n"},
+		{"a fenced findings section and a fenced verdict section", threatModel + "```\n## Findings\n- [HIGH] go/x.go:1 — the error is dropped — wrap it\n```\n## Verdict\n```\nVerdict: PASS\n```\n"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			env, code, center, _ := runWithSignals(t, c.report)
+
+			if env.Verdict != core.VerdictFAIL || code != exitFail {
+				t.Fatalf("verdict %q exit %d, want FAIL and exit 1; diagnostics %+v", env.Verdict, code, env.Diagnostics)
+			}
+			if mismatches := mismatchSignals(center); len(mismatches) != 1 {
+				t.Errorf("mismatch signals = %d, want 1", len(mismatches))
+			}
+		})
+	}
+}
+
+func TestReportVerdict_AFencedBlockingFindingBlocksTheVerdictThatTheFenceStates(t *testing.T) {
+	spec := phasespec.PhaseSpec{Name: "go-reviewer", Classify: &phasespec.ClassifyRules{RequireSections: []string{"Findings", "Verdict"}}}
+	cases := []struct{ name, body string }{
+		{"a fenced HIGH and a fenced PASS", "```\n## Findings\n- [HIGH] a.go:1 — x\n## Verdict\nVerdict: PASS\n```\n"},
+		{"a fenced CRITICAL and a fenced PASS", "```\n## Findings\n- [CRITICAL] a.go:1 — x\n## Verdict\nVerdict: PASS\n```\n"},
+		{"a fenced HIGH and a fenced WARN", "```\n## Findings\n- [HIGH] a.go:1 — x\n## Verdict\nVerdict: WARN\n```\n"},
+	}
+	for _, c := range cases {
+		got := reportVerdict(spec, core.VerdictPASS, c.body)
+
+		if got.verdict != core.VerdictFAIL || !got.mismatch || got.findings.Blocking() == 0 {
+			t.Errorf("%s: reportVerdict = %+v, want verdict FAIL, a mismatch and a blocking finding", c.name, got)
+		}
+	}
+}
+
+func TestReportVerdict_AVisibleVerdictKeepsAFencedExampleFindingUncounted(t *testing.T) {
 	spec := phasespec.PhaseSpec{Name: "go-reviewer", Classify: &phasespec.ClassifyRules{RequireSections: []string{"Findings", "Verdict"}}}
 
-	got := reportVerdict(spec, core.VerdictPASS, "## Findings\nNone.\n```\n## Verdict\nVerdict: PASS\n```\n")
+	got := reportVerdict(spec, core.VerdictPASS, "## Findings\nNone. An example line:\n```\n- [HIGH] a.go:1 — x\n```\n## Verdict\nVerdict: PASS\n")
 
-	if got.stated != "" {
-		t.Errorf("stated = %q, want no stated verdict from a fence", got.stated)
+	if got.verdict != core.VerdictPASS || got.mismatch || got.findings.Blocking() != 0 {
+		t.Errorf("reportVerdict = %+v, want PASS, no mismatch and no blocking finding for a fenced example", got)
 	}
 }
