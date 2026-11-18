@@ -168,6 +168,7 @@ func (r *curatorRun) curate(changes []inboxcurator.Change, backstop bool) (curat
 		HasTest:               func(name string) bool { return tests[name] || definedByAChange(changes, name) },
 		PathExists:            pathExistsUnder(r.req.root),
 		LandedCheck:           landedclaim.OnMain(r.git),
+		Stale:                 inboxcurator.Freshness{OnMain: landedclaim.OnMain(r.git), PathExists: pathExistsUnder(r.req.root)}.Stale,
 		Thresholds:            inboxcurator.Thresholds{Refuse: r.cfg.OverlapRefuse, Warn: r.cfg.OverlapWarn}, MinShare: r.cfg.ConsumeMinShare,
 	}
 	return r.settle(inboxcurator.Curate(in), in.IsProtected), nil

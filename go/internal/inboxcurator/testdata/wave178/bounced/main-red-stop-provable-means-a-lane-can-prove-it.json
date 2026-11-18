@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "provable over every GateSteps row agrees with what GateStepRunner can run in a lane, red before the change",
+    "a main red at a coverage gate emits SHIP_MAIN_RED_CI_UNPROVABLE and opens no stop",
+    "GateStepOfKey resolves only the Gate name"
+  ],
+  "created_at": "2026-11-16T20:37:30Z",
+  "files": [
+    "go/internal/ciparity/gatesteps.go",
+    "go/internal/phases/ship/gate_step_runner.go",
+    "go/internal/phases/ship/main_red_ci.go",
+    "docs/architecture/packages/internal-phases-ship.md",
+    "docs/architecture/packages/internal-ciparity.md"
+  ],
+  "fix": "Redesign: give each ciparity.GateStep one home for whether a lane can prove it (for example a LaneProof command, empty for the rows that need the integration profile). provable and GateStepRunner both read it, so a coverage-gate red emits SHIP_MAIN_RED_CI_UNPROVABLE and opens no stop. Fold in the HIGH fix (one key vocabulary: the Gate name). Update the plan and the package notes first, then a red test that runs provable over every GateSteps row.",
+  "id": "main-red-stop-provable-means-a-lane-can-prove-it",
+  "kind": "fix",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "routed_cycle": 2469,
+  "routed_reason": "lane triage (cycle 2469) dropped: stale: gate_step_runner.go and main_red_ci.go absent at HEAD; GateStepOfKey/provable/GateStepRunner not found under go/internal; PR #1524 not merged",
+  "summary": "Architecture review of PR #1524 (the linear rebuild of #1488) found a CRITICAL. provable (go/internal/phases/ship/gate_step_runner.go:37-43) treats a step key as provable when ciparity.GateStepOfKey finds a row, but 5 of the 6 GateSteps rows (make cover-changed, apicover-check, cover-strict and the two darwin rows) read the coverage.txt of make test-integration, which a ship lane never makes. When main goes red at a coverage gate, the stop opens, the fix lane runs the gate, it exits 2, and Admit refuses the fix as not-a-fix: false refusals at shadow, a deadlock until MainRedStopBound at enforce. #1488 was blocked more than 3 times, so it returns to design. The review is saved at docs evidence: scratchpad r1488/critical-review.md; a prescribed HIGH fix (GateStepOfKey matches only the Gate name) is saved as gatekey-high-fix.patch.",
+  "title": "The main-red stop opens on a coverage-gate key that no lane can prove (PR #1524)",
+  "weight": 0.8
+}

@@ -32,11 +32,17 @@ type RerouteOptions struct {
 	IsProtected    func(string) bool
 	BuildableKinds []string
 	HasOpenPR      func(string) bool
+	FixSurface     func(inboxbatch.Item) []string
+	Stale          func(inboxbatch.Item) string
+	Done           func(inboxbatch.Item) bool
 }
 
 func Reroutes(open []inboxbatch.Item, opts RerouteOptions) []Proposal {
 	var out []Proposal
 	for _, it := range open {
+		if opts.Stale != nil && opts.Stale(it) != "" || opts.Done != nil && opts.Done(it) {
+			continue
+		}
 		p := Proposal{Kind: ProposeReroute, ID: it.ID, Path: it.Path, Trigger: TriggerRouting}
 		switch routed, why := inboxbatch.ConsoleRouted(it, opts.IsProtected); {
 		case strings.EqualFold(strings.TrimSpace(it.Route), inboxbatch.RouteLaneValue) && routed:
@@ -60,10 +66,40 @@ func canRerouteToLane(it inboxbatch.Item, opts RerouteOptions) bool {
 	if !slices.Contains(opts.BuildableKinds, strings.ToLower(strings.TrimSpace(it.Kind))) {
 		return false
 	}
-	if len(it.DeclaredPaths()) == 0 {
+	if len(it.DeclaredPaths()) == 0 || reachesProtected(it, opts) {
 		return false
 	}
 	return opts.HasOpenPR == nil || !opts.HasOpenPR(it.ID)
+}
+
+func reachesProtected(it inboxbatch.Item, opts RerouteOptions) bool {
+	if opts.IsProtected == nil {
+		return false
+	}
+	paths := it.MentionedPaths()
+	if opts.FixSurface != nil {
+		paths = append(paths, opts.FixSurface(it)...)
+	}
+	return slices.ContainsFunc(paths, opts.IsProtected)
+}
+
+func StaleClaims(open []inboxbatch.Item, stale func(inboxbatch.Item) string) []Proposal {
+	if stale == nil {
+		return nil
+	}
+	var out []Proposal
+	for _, it := range open {
+		reason := stale(it)
+		if reason == "" {
+			continue
+		}
+		out = append(out, Proposal{
+			Kind: ProposeQuarantine, ID: it.ID, Path: it.Path, Trigger: TriggerRouting,
+			Reason:   "the fix is already on the tree or its premise is absent; the operator judges whether the item still applies",
+			Evidence: []string{reason},
+		})
+	}
+	return out
 }
 
 func loopOwnedRoute(it inboxbatch.Item) bool {

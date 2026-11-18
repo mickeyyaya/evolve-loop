@@ -94,3 +94,14 @@ func TestRouteOwnerValues_AreThePersistedStrings(t *testing.T) {
 		t.Errorf("RoutedByOperator = %q, NoWorkRoutePrefix = %q, want the strings that routed records carry", RoutedByOperator, NoWorkRoutePrefix)
 	}
 }
+
+func TestItem_MentionedPathsDropsTheSentenceFullStopAndTheDeclaredFiles(t *testing.T) {
+	var it Item
+	if err := it.UnmarshalJSON([]byte(`{"id":"m","files":["go/internal/fleet/pool.go"],"summary":"Also edit go/internal/guards/ship.go."}`)); err != nil {
+		t.Fatalf("UnmarshalJSON: %v", err)
+	}
+	got := it.MentionedPaths()
+	if len(got) != 1 || got[0] != "go/internal/guards/ship.go" {
+		t.Fatalf("MentionedPaths = %v, want [go/internal/guards/ship.go]", got)
+	}
+}

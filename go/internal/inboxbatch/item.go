@@ -106,6 +106,8 @@ func (it Item) HasDeclaredSurface() bool {
 	return owned || it.DeclaredSurface()
 }
 
+func (it Item) MentionedPaths() []string { return slices.Clone(it.mentions) }
+
 func (it Item) ProtectedBasenames(isProtectedBasename func(string) bool) []string {
 	var out []string
 	for _, b := range it.basenames {
@@ -234,6 +236,7 @@ func mentionedFiles(doc map[string]any) (paths, basenames []string) {
 		switch x := v.(type) {
 		case string:
 			for _, p := range pathInProseRE.FindAllString(x, -1) {
+				p = strings.TrimRight(p, ".")
 				if len(paths) < maxMentions && !seen[p] && isFileSpelling(p) {
 					seen[p] = true
 					paths = append(paths, p)

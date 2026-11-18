@@ -1,0 +1,28 @@
+{
+  "acceptance": [
+    "Design doc, architecture review, then build: bridgechain takes a candidate filter (Specification) and the judge passes handoff.Independents through it; the routed driver is carried in the seat; the 3 mutant-kill tests; profile cli agrees with cli_routing.agents.handoff-judge; a test that policy.TierNames equals modelcatalog.CanonicalTiers.",
+    "The new tests are red without the change"
+  ],
+  "created_at": "2026-11-15T14:40:21Z",
+  "docs": [
+    "docs/architecture/phase-handoff-contract.md"
+  ],
+  "evidence": "Branch dev/cl-c1 (handoff-h10-independent-judge, not shipped) was blocked by the architecture review in round 3: the judge walks its own seats (ChainAttempt) beside bridgechain.Walking, so it skips the exit-85 bench and LaunchWithFreshSession; 3 surviving mutants (empty Worktree fallback, multi-line ask text, judge_tier empty).",
+  "files": [
+    "go/internal/bridgechain/bridgechain.go",
+    "go/cmd/evolve/handoff_judge.go",
+    "go/internal/core/handoff_judge.go"
+  ],
+  "fix": "Design doc, architecture review, then build: bridgechain takes a candidate filter (Specification) and the judge passes handoff.Independents through it; the routed driver is carried in the seat; the 3 mutant-kill tests; profile cli agrees with cli_routing.agents.handoff-judge; a test that policy.TierNames equals modelcatalog.CanonicalTiers.",
+  "id": "handoff-judge-one-seat-walker",
+  "kind": "fix",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "routed_at": "2026-11-16T06:16:26Z",
+  "routed_cycle": 2431,
+  "routed_reason": "lane triage (cycle 2431) escalate_block: protected-surface: .evolve/profiles/handoff-judge.json — control-plane changes go through the console route (operator-gated), not lane top_n",
+  "summary": "Branch dev/cl-c1 (handoff-h10-independent-judge, not shipped) was blocked by the architecture review in round 3: the judge walks its own seats (ChainAttempt) beside bridgechain.Walking, so it skips the exit-85 bench and LaunchWithFreshSession; 3 surviving mutants (empty Worktree fallback, multi-line ask text, judge_tier empty).",
+  "title": "Handoff judge: one seat walker with an independence filter (redesign after 3 blocked rounds)",
+  "weight": 0.7
+}

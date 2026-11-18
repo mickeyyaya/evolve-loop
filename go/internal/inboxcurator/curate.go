@@ -26,6 +26,8 @@ type Inputs struct {
 	HasOpenPR             func(string) bool
 	Thresholds            Thresholds
 	MinShare              float64
+	FixSurface            func(inboxbatch.Item) []string
+	Stale                 func(inboxbatch.Item) string
 	Backstop              bool
 	LandedCheck           landedclaim.Check
 }
@@ -42,10 +44,14 @@ func Curate(in Inputs) []Proposal {
 		out = append(out, ClosedOnMain(in.History, in.Open)...)
 	}
 	if routing {
+		out = append(out, StaleClaims(in.Open, in.Stale)...)
 		out = append(out, Reroutes(in.Open, RerouteOptions{
 			IsProtected:    in.IsProtected,
 			BuildableKinds: in.RerouteBuildableKinds,
 			HasOpenPR:      in.HasOpenPR,
+			FixSurface:     in.FixSurface,
+			Stale:          in.Stale,
+			Done:           Tree{HasTest: in.HasTest, PathExists: in.PathExists}.ProbesPass,
 		})...)
 	}
 	if in.Backstop {
