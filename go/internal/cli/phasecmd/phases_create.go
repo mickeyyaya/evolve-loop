@@ -52,7 +52,7 @@ func phasesCreate(project string, args []string, stdin io.Reader, stdout, stderr
 		return emitEnvelope(stdout, createEnvelopeOut{OK: false, Phase: spec.Name, Errors: errs, Hint: createHint}, 2)
 	}
 
-	if v := phasespec.ValidateUserSpec(spec); len(v) > 0 {
+	if v := createSpecRefusals(project, spec); len(v) > 0 {
 		return emitEnvelope(stdout, createEnvelopeOut{OK: false, Phase: spec.Name, Errors: v, Hint: createHint}, 2)
 	}
 	warnings := softLintWarnings(spec)

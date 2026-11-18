@@ -178,6 +178,11 @@ func phasesValidate(project, profileDir string, args []string, stdout, stderr io
 	failed := false
 	if len(user) > 0 {
 		failed = reportUserSpecVerdicts(user, stdout)
+		allUser, _, _ := phasespec.DiscoverUserSpecsFromRoots(roots)
+		for _, v := range unproducedTriggerRefusals(project, user, allUser) {
+			failed = true
+			fmt.Fprintf(stdout, "FAIL  %s\n", v)
+		}
 	} else if len(args) == 0 && len(pnames) == 0 {
 		fmt.Fprintln(stdout, "no user phases to validate")
 	}
