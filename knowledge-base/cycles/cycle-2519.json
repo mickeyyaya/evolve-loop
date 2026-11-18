@@ -1,0 +1,226 @@
+{
+  "schema_version": 2,
+  "cycle": 2519,
+  "run_id": "01M7R2C5M1SX7TQJ7B07ME1YC7",
+  "goal": "Wave 180.\n\nWork the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree that it ships;\n- disposition its own defect ledger and the inherited ids;\n- record a terminal outcome on every exit;\n- never change a protected control-plane file with a tool;\n- leave no stale worktree.\n\nRouting:\n- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.\n- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.\n- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.\n\nCraft:\n- New and changed code has no comments. Names, types and tests give the intent.\n- Write each new document and each new log text in ASD-STE100.\n- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.\n- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.\n\nEvidence:\n- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.\n\nThe measure of this wave is the number of shipped cycles. Keep each cycle shipping.\n\nWave 179 facts (run 20261117T184146Z): 11 of 22 cycles shipped.\n- 2 older cycles are not shown.\n- Cycle 2468: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.\n- Cycle 2469: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.\n- Cycle 2470: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.\n- Cycle 2471: final verdict PASS. It shipped.\n- Cycle 2472: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.\n- Cycle 2473: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…d6b823a649f6876d91e6701b0) — re-run Auditor on the new state (carry not re-bound: the carry of cycle-N names main at c33a0ee552aebe2ec3dfe72f4307ae363b00a4ee). Last phase: aborted. It did not ship.\n- Cycle 2474: final verdict PASS. It shipped.\n- Cycle 2475: final verdict PASS. It shipped.\n- Cycle 2476: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.\n- Cycle 2477: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.\n- Cycle 2478: final verdict PASS. It shipped.\n- Cycle 2479: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.\n- Cycle 2480: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.\n- Cycle 2481: final verdict PASS. It shipped.\n- Cycle 2482: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.\n- Cycle 2483: final verdict PASS. It shipped.\n- Cycle 2484: final verdict PASS. It shipped.\n- Cycle 2485: final verdict PASS. It shipped.\n- Cycle 2486: final verdict PASS. It shipped.\n- Cycle 2487: final verdict PASS. It shipped.\n- Pull requests merged at this boundary: none.\n\nEarlier waves:\n- Wave 176 (run 20261116T142321Z): 1 of 6 cycles shipped.\n- Wave 177 (run 20261116T224405Z): 11 of 12 cycles shipped.\n- Wave 178 (run 20261117T101039Z): 10 of 11 cycles shipped.",
+  "final_verdict": "PASS",
+  "commit_sha": "6312414d5bf51eddb647748bd547bcd3c7ce6d6d",
+  "tree_sha": "fa8fd2b4461778960ba2cf72bde5045ddb31b2d5",
+  "tasks": [
+    "wave-supply-prints-the-console-advice-line"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 44821,
+      "started_at": "2026-11-18T19:33:58Z",
+      "ended_at": "2026-11-18T19:34:44Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 16,
+        "output": 2837,
+        "cache_read": 491323,
+        "cache_write": 27716
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 38002,
+      "started_at": "2026-11-18T19:35:16Z",
+      "ended_at": "2026-11-18T19:35:56Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 10,
+        "output": 1477,
+        "cache_read": 358269,
+        "cache_write": 39989
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 139956,
+      "started_at": "2026-11-18T19:35:56Z",
+      "ended_at": "2026-11-18T19:38:18Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 32,
+        "output": 14940,
+        "cache_read": 1553562,
+        "cache_write": 82730
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 1824115,
+      "started_at": "2026-11-18T19:38:18Z",
+      "ended_at": "2026-11-18T20:19:55Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 96,
+        "output": 22491,
+        "cache_read": 5245720,
+        "cache_write": 96685
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 185042,
+      "started_at": "2026-11-18T20:20:17Z",
+      "ended_at": "2026-11-18T20:32:01Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 46,
+        "output": 11895,
+        "cache_read": 1979711,
+        "cache_write": 60712
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 923789,
+      "started_at": "2026-11-18T20:32:21Z",
+      "ended_at": "2026-11-18T20:57:14Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 14,
+        "output": 1973,
+        "cache_read": 503924,
+        "cache_write": 36652
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 135110,
+      "started_at": "2026-11-18T20:57:37Z",
+      "ended_at": "2026-11-18T21:07:47Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 36,
+        "output": 7192,
+        "cache_read": 1432627,
+        "cache_write": 53035
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "FAIL",
+      "duration_ms": 420,
+      "started_at": "2026-11-18T21:08:14Z",
+      "ended_at": "2026-11-18T21:16:09Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "PASS",
+      "duration_ms": 323280,
+      "started_at": "2026-11-18T21:16:10Z",
+      "ended_at": "2026-11-18T21:21:34Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "explanation_corrections": [
+    "docs/explain/builds/cycle-2519-01m7r2c5m1sx7tqj7b07me1yc7.md:18 claims \"unit tests never call `gh`\", but go/cmd/evolve/cmd_wave_supply_test.go:361-367 (`TestGhOpenPRCount_ReachesTheRealGhPort`) runs the real `gh`. The statement holds only for the tests that use the harness environment. The document's other claims are correct: the SHA256 matches the handoff. docs/explain/builds/cycle-2519-01m7r2c5m1sx7tqj7b07me1yc7.md:14 matches go/internal/orchestrator/advice.go:11-19. docs/explain/builds/cycle-2519-01m7r2c5m1sx7tqj7b07me1yc7.md:16 matches go/cmd/evolve/cmd_wave_supply.go:33-73. docs/explain/builds/cycle-2519-01m7r2c5m1sx7tqj7b07me1yc7.md:17 matches go/cmd/evolve/cmd_wave.go:56 and go/cmd/evolve/cmd_wave.go:78. The verification claim at docs/explain/builds/cycle-2519-01m7r2c5m1sx7tqj7b07me1yc7.md:25 (green=268 red=0) is reproduced. Limitations at docs/explain/builds/cycle-2519-01m7r2c5m1sx7tqj7b07me1yc7.md:31 is honest."
+  ],
+  "timing": {
+    "total_ms": 3614535,
+    "phase_count": 9,
+    "retried_count": 0,
+    "longest_phase": "build",
+    "longest_ms": 1824115,
+    "by_archetype_ms": {
+      "build": 2747904,
+      "control": 323700,
+      "evaluate": 320152,
+      "plan": 222779
+    },
+    "total_tokens": {
+      "input": 250,
+      "output": 62805,
+      "cache_read": 11565136,
+      "cache_write": 397519
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 110,
+        "output": 24464,
+        "cache_read": 5749644,
+        "cache_write": 133337
+      },
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "evaluate": {
+        "input": 82,
+        "output": 19087,
+        "cache_read": 3412338,
+        "cache_write": 113747
+      },
+      "plan": {
+        "input": 58,
+        "output": 19254,
+        "cache_read": 2403154,
+        "cache_write": 150435
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.9999783837737884,
+    "hot_phase_count": 7,
+    "hot_phases": [
+      "scout",
+      "triage",
+      "tdd",
+      "build",
+      "audit",
+      "build",
+      "audit"
+    ]
+  },
+  "recalled_lessons": [
+    "cycle-1502-closure-citation-contract-never-reaches-the-auditor-it-grades",
+    "cycle-1492-remedy-on-disk-in-four-places-reaches-no-agent-with-authority-to-apply-it",
+    "cycle-93-build-report-commit-sha-fabrication",
+    "inst-L1544b",
+    "inst-L1549b"
+  ]
+}
