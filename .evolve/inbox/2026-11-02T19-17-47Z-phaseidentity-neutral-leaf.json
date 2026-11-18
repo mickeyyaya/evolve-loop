@@ -15,9 +15,14 @@
   "notes": "",
   "origin": "console",
   "priority_class": "maintainability",
-  "route": "lane",
-  "routed_at": "2026-11-17T17:24:25Z",
-  "routed_reason": "operator 2026-11-18 approved plan K4: the curator found no protected fix surface and no pipeline kind behind the console route; earlier reason: lane triage (cycle 2257) dropped: protected-surface: go/internal/bridge/driver_tmux_prepare.go",
+  "protected_files": [
+    "go/internal/bridge/driver_tmux_prepare.go"
+  ],
+  "route": "console-manual",
+  "routed_at": "2026-11-17T18:59:53Z",
+  "routed_by": "loop",
+  "routed_cycle": 2479,
+  "routed_reason": "lane triage (cycle 2479) escalate_block: protected-surface: go/internal/bridge/driver_tmux_prepare.go — control-plane changes go through the console route (operator-gated), not lane top_n",
   "source": "console, 2026-11-03, plan audit of docs/plans (operator request: no task overlooked); plan docs/plans/opus55-effort-config-2026-10.md",
   "summary": "Listed under 'later' in the plan; no item names it.",
   "title": "Effort config later-1: move WrapPasted to a neutral leaf package and add the headless system note",

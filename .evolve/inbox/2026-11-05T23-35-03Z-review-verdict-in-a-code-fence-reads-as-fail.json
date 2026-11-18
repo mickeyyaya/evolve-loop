@@ -4,15 +4,31 @@
     "A regression test goes through the real agent run entry point, and it is red without the fix.",
     "A report with no verdict at all still fails."
   ],
+  "continuation": {
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2473",
+    "branch": "cycle-cd3ae73e-2473",
+    "snapshot_sha": "1f982d47ee4ca4eec73087ce3bb4baa3c5a41786",
+    "base_sha": "c33a0ee552aebe2ec3dfe72f4307ae363b00a4ee",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2473/audit-fail-reason.json",
+    "cycle": 2473
+  },
   "created_at": "2026-11-05T23:35:03Z",
+  "failure_count": 1,
   "files": [
     "go/internal/cli/agentcmd/verdict.go"
   ],
   "fix": "Read a verdict line inside a code fence as the verdict that it states.",
   "id": "review-verdict-in-a-code-fence-reads-as-fail",
   "kind": "bug",
+  "last_failure_class": "capability",
+  "last_failure_cycle": 2473,
+  "last_failure_findings": "phase ship: ship: native: [AUDIT_BINDING_HEAD_MOVED/precondition @verify-class] git HEAD has moved since audit (audited=6b129b6dcf47551aaa0b840cabaaffae839b37b6 current=3e9dd0f067babf9d6b823a649f6876d91e6701b0) — re-run Auditor on the new state (carry not re-bound: the carry of cycle 2473 names main at c33a0ee552aebe2ec3dfe72f4307ae363b00a4ee)",
+  "last_failure_fingerprint": "text:1bc438bced9b",
+  "last_failure_reason": "cycle-failure-release",
+  "last_failure_rung": "R2",
   "origin": "console",
   "priority_class": "debuggability",
+  "retry_plan": "fresh-deep-plan",
   "route": "lane",
   "routed_at": "2026-11-17T17:24:25Z",
   "routed_reason": "operator 2026-11-18 approved plan K4: the curator found no protected fix surface and no pipeline kind behind the console route; earlier reason: lane triage (cycle 2193) dropped: protected-surface: go/internal/reportdoc/findings.go",

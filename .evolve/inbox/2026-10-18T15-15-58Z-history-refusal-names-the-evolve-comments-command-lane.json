@@ -12,6 +12,9 @@
   "id": "history-refusal-names-the-evolve-comments-command-lane",
   "kind": "bug",
   "priority_class": "hygiene",
+  "protected_files": [
+    "go/internal/commitgate/history_recorded.go"
+  ],
   "released_continuations": [
     {
       "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-1966",
@@ -25,9 +28,11 @@
       "released_by": "evolve gc (continuation max age)"
     }
   ],
-  "route": "lane",
-  "routed_at": "2026-11-17T17:24:24Z",
-  "routed_reason": "operator 2026-11-18 approved plan K4: the curator found no protected fix surface and no pipeline kind behind the console route; earlier reason: lane triage (cycle 1975) dropped: stale: docs already name `evolve comments history` (docs/conventions/code-comments.md:63-66); remaining fix is protected-surface: /go/internal/commitgate/history_recorded.go:9",
+  "route": "console-manual",
+  "routed_at": "2026-11-17T19:03:03Z",
+  "routed_by": "loop",
+  "routed_cycle": 2480,
+  "routed_reason": "lane triage (cycle 2480) dropped: protected-surface: go/internal/commitgate/history_recorded.go",
   "source": "console, 2026-10-05, wave-59 boundary train rebase",
   "split_from": "history-refusal-names-the-evolve-comments-command",
   "summary": "ADR-0115's history refusal tells the author to run `cd go \u0026\u0026 go run ./cmd/commentaudit history ...` (commitgate.recordHistoryCommand, and the docs that point to it). Cycle 1792 (2026-10-05) published the same tool as `evolve comments`, which runs the same commentaudit.Main with the same arguments from anywhere in the repo. Every control should go through the published evolve CLI, so the refusal should name `evolve comments history -base \u003cref\u003e -label \u003cchange\u003e -out docs/history/code-comments`.",

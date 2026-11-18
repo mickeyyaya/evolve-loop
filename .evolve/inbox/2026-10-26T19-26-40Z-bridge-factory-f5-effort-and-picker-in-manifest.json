@@ -20,9 +20,14 @@
   "kind": "refactor",
   "notes": "Plan link: docs/plans/bridge-factory-2026-10.md (component F5, verification G3). Spec link: docs/architecture/agent-bridge-factory.md and ADR-0137. F5 follows the F3 pattern. The plan route is lane, but the item declares a protected path, so it has no route field. Admission decides; the narrowed protected fence lands soon.",
   "priority_class": "hygiene",
-  "route": "lane",
-  "routed_at": "2026-11-17T17:24:24Z",
-  "routed_reason": "operator 2026-11-18 approved plan K4: the curator found no protected fix surface and no pipeline kind behind the console route; earlier reason: lane triage (cycle 2221) escalate_block: protected-surface: go/internal/bridge/manifest.go — control-plane changes go through the console route (operator-gated), not lane top_n",
+  "protected_files": [
+    "go/internal/bridge/manifest.go"
+  ],
+  "route": "console-manual",
+  "routed_at": "2026-11-17T21:45:05Z",
+  "routed_by": "loop",
+  "routed_cycle": 2482,
+  "routed_reason": "lane triage (cycle 2482) dropped: protected-surface: go/internal/bridge/manifest.go",
   "source": "console, 2026-10-27, plan audit: track unfinished components",
   "summary": "Component F5 (decision D3) of the plan docs/plans/bridge-factory-2026-10.md. The spec is docs/architecture/agent-bridge-factory.md and ADR-0137. go/internal/modelquery/picker.go holds a pickerParsers map keyed on a CLI name, and recipe.go reads it. The effort list is not a manifest capture. The CLI-name branches of fact B11 are outside the bridge.",
   "title": "The effort list and the picker parse become manifest data (bridge-factory plan F5)",
