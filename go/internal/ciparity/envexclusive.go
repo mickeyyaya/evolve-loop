@@ -1,9 +1,13 @@
 package ciparity
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 type envExclusiveEntry struct {
 	pkg      string
+	tag      string
 	why      string
 	backstop string
 }
@@ -12,6 +16,7 @@ const EnvExclusiveCIMarker = "runs in CI"
 
 var tierEnvExclusive = []envExclusiveEntry{{
 	pkg:      "internal/bridge",
+	tag:      "notmux",
 	why:      "requireTmux tests boot real tmux sessions; under a live wave those boots time out (13 offenders on cycle-1543, all exit=80; the same tests 7/7 PASS in 17.2s on a quiet host)",
 	backstop: "internal/bridge's requireTmux tier " + EnvExclusiveCIMarker + ": the ubuntu and macOS jobs run it with tmux (main run 39422739711, 2026-10-20: ubuntu 22 and 22, macOS 25 pass, 0 skip); a lane skip leaves CI as its first run",
 }}
@@ -42,4 +47,23 @@ func EnvExclusiveBackstopNote(pkgs []string) string {
 		}
 	}
 	return strings.Join(parts, "; ")
+}
+
+func EnvExclusiveTagOf(p string) (string, bool) {
+	e, ok := envExclusiveEntryFor(p)
+	return e.tag, ok && e.tag != ""
+}
+
+func EnvExclusiveTags() []string {
+	return exclusionTags(tierEnvExclusive)
+}
+
+func exclusionTags(entries []envExclusiveEntry) []string {
+	var tags []string
+	for _, e := range entries {
+		if e.tag != "" && !slices.Contains(tags, e.tag) {
+			tags = append(tags, e.tag)
+		}
+	}
+	return tags
 }

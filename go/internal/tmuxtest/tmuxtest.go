@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -58,34 +57,22 @@ func readServerPID(socket string) (int, error) {
 	return strconv.Atoi(strings.TrimSpace(string(out)))
 }
 
-func Main(m interface{ Run() int }) int {
+type runner interface{ Run() int }
+
+func Main(m runner) int {
 	socket := bridge.DeriveTestSocket(os.Getpid())
+	if err := isolate(socket); err != nil {
+		fmt.Fprintf(os.Stderr, "tmuxtest: %v\n", err)
+		return 1
+	}
+	return serve(m, socket)
+}
+
+func isolate(socket string) error {
 	if err := setenv(bridge.TmuxSocketEnv, socket); err != nil {
-		fmt.Fprintf(os.Stderr, "tmuxtest: select socket %s: %v\n", socket, err)
-		return 1
+		return fmt.Errorf("select socket %s: %w", socket, err)
 	}
-	if err := closeInheritedOnExec(); err != nil {
-		fmt.Fprintf(os.Stderr, "tmuxtest: %v\n", err)
-		return 1
-	}
-	if _, err := exec.LookPath("tmux"); err != nil {
-		return m.Run()
-	}
-	if err := StartServer(socket); err != nil {
-		fmt.Fprintf(os.Stderr, "tmuxtest: %v\n", err)
-		return 1
-	}
-	if err := startOrphanGuard(socket, os.Getpid()); err != nil {
-		fmt.Fprintf(os.Stderr, "tmuxtest: %v\n", err)
-		_ = StopServer(socket)
-		return 1
-	}
-	code := m.Run()
-	if err := stopFamily(socket); err != nil {
-		fmt.Fprintf(os.Stderr, "tmuxtest: %v\n", err)
-		return max(code, 1)
-	}
-	return code
+	return closeInheritedOnExec()
 }
 
 func stopFamily(socket string) error {

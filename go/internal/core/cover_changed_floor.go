@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/covchanged"
@@ -21,7 +22,47 @@ import (
 
 var coverChangedProfiler = scopedCoverProfile
 
-const coverChangedTestsFailedHeadline = "the tests of the changed packages fail under -tags integration, so no changed function is proven"
+func packageCoverTags(pkg string) []string {
+	tags := slices.Clone(covchanged.DefaultTags)
+	if tag, ok := ciparity.EnvExclusiveTagOf(pkg); ok {
+		tags = append(tags, tag)
+	}
+	return tags
+}
+
+type tagGroup struct {
+	tags, pkgs []string
+}
+
+func coverTagGroups(pkgs []string) []tagGroup {
+	var groups []tagGroup
+	for _, pkg := range pkgs {
+		tags := packageCoverTags(pkg)
+		i := slices.IndexFunc(groups, func(g tagGroup) bool { return slices.Equal(g.tags, tags) })
+		if i < 0 {
+			groups = append(groups, tagGroup{tags: tags})
+			i = len(groups) - 1
+		}
+		groups[i].pkgs = append(groups[i].pkgs, pkg)
+	}
+	return groups
+}
+
+func unionTags(groups []tagGroup) []string {
+	var tags []string
+	for _, g := range groups {
+		for _, tag := range g.tags {
+			if !slices.Contains(tags, tag) {
+				tags = append(tags, tag)
+			}
+		}
+	}
+	return tags
+}
+
+func coverChangedTestsFailedHeadline(tags []string) string {
+	return "the tests of the changed packages fail under -tags " + strings.Join(tags, ",") + ", so no changed function is proven"
+}
 
 var coverStrictRunner = changedStrictResults
 
@@ -35,17 +76,18 @@ func coverChangedFailures(ctx context.Context, in ReviewInput, paths []string) [
 	if len(pkgs) == 0 {
 		return nil
 	}
-	profile, out, status := coverChangedProfiler(ctx, in, moduleDir, pkgs, covchanged.DefaultTags)
+	noteCoverEnvExclusive(pkgs, in.errOut())
+	profile, out, status, failedTags := coverChangedProfiler(ctx, in, moduleDir, pkgs, covchanged.DefaultTags)
 	if profile != "" {
 		defer func() { _ = os.RemoveAll(filepath.Dir(profile)) }()
 	}
 	switch status {
 	case coverStatusTestsFailed:
-		lines := in.coverRedLines(ctx, out, covchanged.TagFlags(covchanged.DefaultTags))
-		return coverChangedReport(coverChangedResult(stage, coverChangedTestsFailedHeadline, lines))
+		lines := in.coverRedLines(ctx, out, covchanged.TagFlags(failedTags))
+		return coverChangedReport(coverChangedResult(stage, coverChangedTestsFailedHeadline(failedTags), lines))
 	case coverStatusPlumbingError:
 		fmt.Fprintf(os.Stderr, "[build-floor] WARN cover-changed could not make a coverage profile (%s); `make -C go cover-changed` and CI still judge coverage\n", out)
-		return coverChangedReport(coverChangedResult(stage, coverChangedTestsFailedHeadline, unitRunFailures(ctx, in, moduleDir, pkgs)))
+		return coverChangedReport(coverChangedResult(stage, coverChangedTestsFailedHeadline(covchanged.DefaultTags), unitRunFailures(ctx, in, moduleDir, withoutEnvExclusive(pkgs, in.errOut()))))
 	}
 	failures := coverChangedFunctionFailures(ctx, in, coverMeasure{stage: stage, moduleDir: moduleDir, profile: profile, pkgs: pkgs})
 	floors := baseAndTreeList(ctx, in, moduleDir, ".cover-strict")
@@ -81,14 +123,24 @@ func coverPackageSet(pkgs []string) covchanged.PackageSet {
 func coverChangedFunctionFailures(ctx context.Context, in ReviewInput, m coverMeasure) []string {
 	stage, moduleDir := m.stage, m.moduleDir
 	ws := covchanged.Workspace{ModuleDir: moduleDir, Run: gitRunner}
-	v, err := ws.Check(ctx, covchanged.Options{Base: floorBase(in), Profile: m.profile, Tags: covchanged.DefaultTags, Packages: coverPackageSet(m.pkgs)})
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "[build-floor] WARN cover-changed could not measure the change (%v); `make -C go cover-changed` and CI still judge coverage\n", err)
-		return nil
+	groups := coverTagGroups(m.pkgs)
+	v := covchanged.Verdict{Refused: []covchanged.Func{}}
+	for _, g := range groups {
+		gv, err := ws.Check(ctx, covchanged.Options{Base: floorBase(in), Profile: m.profile, Tags: g.tags, Packages: coverPackageSet(g.pkgs)})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "[build-floor] WARN cover-changed could not measure the change (%v); `make -C go cover-changed` and CI still judge coverage\n", err)
+			return nil
+		}
+		v.Changed += gv.Changed
+		v.Refused = append(v.Refused, gv.Refused...)
 	}
-	headline := fmt.Sprintf("%d of %d changed function(s) are below 100%% statement coverage (go test -tags integration -coverprofile); test each one", len(v.Refused), v.Changed)
-	failures := coverChangedReport(coverChangedResult(stage, headline, v.Problems()))
-	in.residuals.add(coverResiduals(failures, v.Refused, moduleRepoPrefix(in.Worktree, moduleDir))...)
+	prefix := moduleRepoPrefix(in.Worktree, moduleDir)
+	base := baseNames{read: gitBaseReader(ctx, in, prefix), warn: in.errOut()}
+	refused, unmeasured := splitNotMeasured(v.Refused, base.has)
+	headline := fmt.Sprintf("%d of %d changed function(s) are below 100%% statement coverage (go test -tags %s -coverprofile); test each one", len(refused), v.Changed, strings.Join(unionTags(groups), ","))
+	failures := coverChangedReport(coverChangedResult(stage, headline, covchanged.Verdict{Refused: refused}.Problems()))
+	in.residuals.add(coverResiduals(failures, refused, prefix)...)
+	in.noteNotMeasured(unmeasured, prefix)
 	return failures
 }
 
@@ -159,24 +211,27 @@ func coverChangedResult(stage config.Stage, headline string, lines []string) (fa
 
 func coverChangedPackages(moduleDir string, paths []string) []string {
 	var out []string
-	for _, pkg := range floorTestPackages(paths, io.Discard) {
+	scoped, exclusive, _ := ciparity.TierScope(changedGoTestPackages(paths))
+	pkgs := append(scoped, exclusive...)
+	slices.Sort(pkgs)
+	for _, pkg := range pkgs {
 		rel := strings.TrimPrefix(pkg, "./")
 		if slices.Contains(strings.Split(path.Clean(rel), "/"), "testdata") {
 			continue
 		}
-		if buildsUnderCoverTags(filepath.Join(moduleDir, filepath.FromSlash(rel))) {
+		if buildsUnderCoverTags(filepath.Join(moduleDir, filepath.FromSlash(rel)), packageCoverTags(pkg)) {
 			out = append(out, pkg)
 		}
 	}
 	return out
 }
 
-func buildsUnderCoverTags(dir string) bool {
+func buildsUnderCoverTags(dir string, tags []string) bool {
 	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
 		return false
 	}
 	ctxt := build.Default
-	ctxt.BuildTags = covchanged.DefaultTags
+	ctxt.BuildTags = tags
 	_, err := ctxt.ImportDir(dir, 0)
 	var noGo *build.NoGoError
 	return !errors.As(err, &noGo)
