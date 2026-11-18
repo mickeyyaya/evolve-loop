@@ -77,7 +77,7 @@ func refuse(name, reason string) string {
 
 func (h *harness) channel(stage policy.RequestStage) Channel {
 	pol := policy.Policy{Isolation: &policy.IsolationPolicy{DispatchRequests: &policy.DispatchRequestsPolicy{Stage: stage, Roles: []string{"fault-localization", "premise-challenge"}, PerCycle: 3, MaxDepth: cmp.Or(h.maxDepth, 1)}}}
-	judge := func(_ context.Context, p Pending) (string, error) {
+	var judge JudgeFunc = func(_ context.Context, p Pending) (string, error) {
 		h.judged = append(h.judged, p)
 		if h.judgeErr != nil {
 			return "", h.judgeErr
@@ -87,7 +87,7 @@ func (h *harness) channel(stage policy.RequestStage) Channel {
 		}
 		return approve(p.Name), nil
 	}
-	dispatch := func(_ context.Context, p Pending) (Result, error) {
+	var dispatch DispatchFunc = func(_ context.Context, p Pending) (Result, error) {
 		h.runs = append(h.runs, p)
 		ws := filepath.Join(h.cell.ProjectRoot, ".evolve", "ephemeral", "agent-runs", "run-"+p.Name)
 		h.write(filepath.Join(ws, "report.md"), "x")

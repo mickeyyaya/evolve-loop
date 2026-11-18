@@ -253,15 +253,14 @@ func TestParse_RefusesADispatchRequestsBlockThatNoReaderCanApply(t *testing.T) {
 
 func TestIsolationInboxRequests_DefaultsAndOverrides(t *testing.T) {
 	t.Parallel()
-	defaults := policy.Policy{}.IsolationInboxRequests()
-	if defaults.Stage != policy.RequestStageEnforce || defaults.PerCycle != 8 {
-		t.Fatalf("defaults = %+v, want stage enforce, 8 requests for each cycle and weight 0.5", defaults)
+	if got, want := (policy.Policy{}).IsolationInboxRequests(), (policy.InboxRequestsPolicy{Stage: policy.RequestStage("enforce"), PerCycle: 8}); got != want {
+		t.Fatalf("defaults = %+v, want %+v", got, want)
 	}
 	p, err := policy.Parse([]byte(`{"isolation":{"inbox_requests":{"stage":"shadow","per_cycle":2}}}`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := p.IsolationInboxRequests(); got.Stage != policy.RequestStageShadow || got.PerCycle != 2 {
+	if got, want := p.IsolationInboxRequests(), (policy.InboxRequestsPolicy{Stage: policy.RequestStage("shadow"), PerCycle: 2}); got != want {
 		t.Fatalf("overrides = %+v", got)
 	}
 }
